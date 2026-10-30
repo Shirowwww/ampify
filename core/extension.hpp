@@ -1,0 +1,59 @@
+#pragma once
+
+#include <functional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "journal.hpp"
+#include "settings.hpp"
+
+namespace amk {
+
+// What an extension tells the kernel about itself. `start` and `stop` run on the kernel's thread.
+struct ExtensionInfo {
+    std::string id;  // stable and lowercase, used in settings keys: "atmos-leveler"
+    std::string name;  // shown in the settings UI
+    bool enabledByDefault = false;
+    std::function<bool()> start;  // returns false when it cannot start; may throw
+    std::function<void()> stop;
+};
+
+enum class ExtensionState {
+    Off,      // disabled in the settings
+    Running,
+    Failed,   // enabled, but start failed or threw: the other extensions still start
+    Blocked,  // enabled, but the kernel is idle (safe mode or unknown app version)
+};
+
+// Loads, starts and stops extensions. Extensions are enabled one by one in the settings,
+// under the key `extensions.<id>.enabled`.
+class ExtensionHost {
+public:
+    explicit ExtensionHost(Journal& journal);
+
+    // Returns false when the id is empty or already registered.
+    bool Add(ExtensionInfo info);
+
+    // An empty `blockReason` lets the enabled extensions start. Otherwise nothing starts and
+    // every enabled extension is marked Blocked, with the reason written to the journal.
+    void StartAll(const Settings& settings, std::string_view blockReason = {});
+
+    // Stops running extensions in reverse start order. A stop that throws is logged and skipped.
+    void StopAll();
+
+    ExtensionState StateOf(const std::string& id) const;
+
+    static std::string SettingKey(const std::string& id);
+
+private:
+    struct Entry {
+        ExtensionInfo info;
+        ExtensionState state = ExtensionState::Off;
+    };
+
+    Journal& m_journal;
+    std::vector<Entry> m_entries;
+};
+
+}  // namespace amk
