@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Manifeste d'une extension, d'un thème, d'une app ou d'un snippet",
+  "description": "Fichier manifest.json à la racine du dossier de l'élément. Les règles propres à chaque kind (fichier principal requis, nom du dossier, fichiers présents) sont vérifiées par tools/validate.py. Voir docs/extensions/MANIFEST.md.",
+  "type": "object",
+  "required": ["id", "name", "version", "kind", "author", "description", "kitApi"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {"type": "string"},
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,39}$",
+      "description": "Identifiant stable, en minuscules. Doit être le nom du dossier."
+    },
+    "name": {"type": "string", "minLength": 1, "maxLength": 60},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "kind": {"$ref": "#/$defs/kind"},
+    "author": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$",
+      "description": "Identifiant GitHub de l'auteur."
+    },
+    "description": {"type": "string", "minLength": 1, "maxLength": 300},
+    "kitApi": {"$ref": "#/$defs/kitApi"},
+    "homepage": {"$ref": "#/$defs/https"},
+    "license": {"type": "string", "minLength": 1, "maxLength": 64},
+    "main": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.js$",
+      "description": "Script principal, à la racine du dossier. Requis pour une extension et une app."
+    },
+    "colors": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.ini$",
+      "description": "Fichier des schémas de couleurs, pour un thème."
+    },
+    "defaultScheme": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,32}$",
+      "description": "Nom de la section de colors.ini utilisée par défaut."
+    },
+    "resources": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.xaml$",
+      "description": "Dictionnaire de ressources XAML, pour un thème ou un snippet."
+    },
+    "icon": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.svg$",
+      "description": "Icône SVG de la barre latérale, pour une app."
+    },
+    "permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 32,
+      "items": {"$ref": "#/$defs/permission"}
+    },
+    "appVersions": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 16,
+      "description": "Versions d'Apple Music où l'élément est testé. Le noyau applique aussi sa propre liste.",
+      "items": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+){1,3}$"}
+    }
+  },
+  "$defs": {
+    "kind": {"enum": ["extension", "theme", "app", "snippet"]},
+    "kitApi": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "https": {"type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 512},
+    "permission": {
+      "type": "string",
+      "pattern": "^(player\\.read|player\\.control|audio\\.analyze|audio\\.gain|storage|notifications|ui\\.keyboard|ui\\.topbar|ui\\.playbar|ui\\.menu|ui\\.popup|ui\\.page|library\\.read|network:[a-z0-9.-]{1,253})$"
+    }
+  }
+}

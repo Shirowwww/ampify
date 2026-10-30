@@ -18,6 +18,8 @@ On ajoute et on corrige, on ne remplace pas.
 | Mode sans échec : après deux lancements sans réponse, le suivant démarre sans extension | `core/safe_mode.*` | fait, testé |
 | Liste des versions d'Apple Music testées : sur une autre version, le noyau reste inactif | `core/version_gate.*` | fait, testé |
 | Hôte d'extensions : chargement, activation une par une, arrêt, isolement des pannes | `core/extension.*` | fait, testé |
+| API d'extensions, format du manifeste, catalogue, parité avec Spicetify | `docs/extensions/` | écrit, pas encore implémenté |
+| Schémas JSON et validateur (catalogue, manifestes) | `schemas/`, `tools/validate.py` | fait, testé |
 | Mesure de loudness BS.1770 (LUFS) | `extensions/atmos-leveler/loudness_meter.*` | fait, testé |
 | Politique du nivellement Atmos : cible stéréo, mémoire par morceau, plafond de crête | `extensions/atmos-leveler/leveler.*` | fait, testé |
 | Injecteur et lancement du paquet MSIX | à faire | |
@@ -46,6 +48,14 @@ cmake --build build
 ./build/amk_tests
 ```
 
+Validation du catalogue et des manifestes (Python 3, bibliothèque standard) :
+
+```bash
+python3 -m unittest discover -s tools -v
+python3 tools/validate.py catalog catalog/catalog.json
+python3 tools/validate.py manifest examples/hello-extension/manifest.json
+```
+
 Compilation croisée pour Windows x64 :
 
 ```bash
@@ -59,6 +69,11 @@ cmake --build build-win
 ```
 core/                      noyau portable : réglages, journal, mode sans échec, versions, extensions
 extensions/atmos-leveler/  mesure BS.1770 et politique du nivellement Atmos
+docs/extensions/           API d'extensions, format du manifeste, catalogue, parité avec Spicetify
+schemas/                   schémas JSON du manifeste et du catalogue
+catalog/                   catalogue communautaire (vide pour l'instant)
+examples/                  exemple d'extension complet
+tools/                     validateur des manifestes et du catalogue, avec ses tests
 tests/                     tests unitaires sans dépendance (même code pour Linux et Windows)
 cmake/                     fichier de compilation croisée pour Windows
 knowledge/                 relevés sur l'app : architecture, API, pièges observés

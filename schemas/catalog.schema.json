@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Catalogue communautaire des extensions, thèmes, apps et snippets",
+  "description": "Liste publique des éléments installables. Chaque entrée pointe vers une archive dont le SHA-256 est fixé. Voir docs/extensions/CATALOG.md.",
+  "type": "object",
+  "required": ["catalogVersion", "extensions"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {"type": "string"},
+    "catalogVersion": {"type": "integer", "const": 1},
+    "extensions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/entry"}
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["id", "name", "version", "kind", "author", "description", "kitApi", "url", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,39}$",
+          "description": "Identifiant de l'élément. Unique dans le catalogue."
+        },
+        "name": {"type": "string", "minLength": 1, "maxLength": 60},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "kind": {"$ref": "#/$defs/kind"},
+        "author": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$",
+          "description": "Identifiant GitHub de l'auteur."
+        },
+        "description": {"type": "string", "minLength": 1, "maxLength": 300},
+        "kitApi": {"$ref": "#/$defs/kitApi"},
+        "url": {
+          "$ref": "#/$defs/https",
+          "description": "Archive zip contenant le dossier de l'élément, avec son manifest.json."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Empreinte SHA-256 de l'archive, en minuscules. Toute archive qui ne correspond pas est refusée."
+        },
+        "homepage": {"$ref": "#/$defs/https"},
+        "license": {"type": "string", "minLength": 1, "maxLength": 64},
+        "permissions": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 32,
+          "description": "Copie des permissions du manifest, affichée à l'utilisateur avant l'activation.",
+          "items": {"$ref": "#/$defs/permission"}
+        }
+      }
+    },
+    "kind": {"enum": ["extension", "theme", "app", "snippet"]},
+    "kitApi": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "https": {"type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 512},
+    "permission": {
+      "type": "string",
+      "pattern": "^(player\\.read|player\\.control|audio\\.analyze|audio\\.gain|storage|notifications|ui\\.keyboard|ui\\.topbar|ui\\.playbar|ui\\.menu|ui\\.popup|ui\\.page|library\\.read|network:[a-z0-9.-]{1,253})$"
+    }
+  }
+}

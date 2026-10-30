@@ -1,0 +1,305 @@
+# API d'extensions
+
+Ce document décrit ce que peut faire une extension, un thème, une app ou un snippet, et comment le noyau les charge.
+Le format du fichier `manifest.json` est dans [MANIFEST.md](MANIFEST.md). Le catalogue communautaire est dans
+[CATALOG.md](CATALOG.md). Le tableau de comparaison avec Spicetify est dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
+
+Chaque ligne marquée **[ferme]** est tenue pour acquise : elle ne changera pas sans une nouvelle version majeure de
+l'API. Chaque ligne marquée **[provisoire M4]** ou **[provisoire M8]** dépend d'un relevé ou d'un jalon à venir. Elle
+peut changer avant ce jalon, et passera en « ferme » une fois validée sur Apple Music réel.
+
+## 1. Principes
+
+- **Les extensions de la communauté sont du JavaScript, dans un bac à sable.** Elles n'ont ni accès au système de
+  fichiers, ni appel de code natif, ni accès réseau hors des hôtes qu'elles ont déclarés.
+- **Une extension ne touche qu'à ce que l'API expose.** Elle ne peut pas demander un hook sur un composant non listé.
+- **L'API est versionnée** (`kitApi`, voir section 9).
+- **Règles qui ne changent pas**, car elles viennent du `MASTER_PROMPT.md` :
+  - aucun contournement de DRM : pas de hook sur `CoreFP`, `CoreADI64` ni sur le chemin des clés FairPlay ;
+  - le son n'est modifié qu'après décodage ;
+  - le volume du lecteur n'est jamais modifié, car le curseur d'Apple Music se déplacerait ;
+  - aucun enregistrement de la sortie audio sur disque.
+
+## 2. Architecture
+
+```
+AppleMusic.exe ou AMPLibraryAgent.exe
+  └─ noyau (C++, dossier core/) : réglages, journal, mode sans échec, versions, hôte d'extensions
+       ├─ extensions natives intégrées   ex. atmos-leveler, compilé avec le noyau
+       └─ runtime JavaScript [provisoire M7]   une instance par extension, objet global AMK
+            └─ extensions de la communauté : main.js + manifest.json
+```
+
+- **Le runtime JavaScript** est prévu avec QuickJS (licence MIT, compilable en C pour Windows avec MinGW et sous
+  Linux pour les tests). Ce choix reste à confirmer au moment de l'intégration.
+- **Les extensions natives** (DLL chargées à l'exécution) ne sont pas ouvertes à la communauté en v1. Une DLL tourne
+  dans le processus d'Apple Music avec tous les droits : un catalogue public ne peut pas la garantir. Les extensions
+  natives restent intégrées au noyau, comme `atmos-leveler`.
+- **Pourquoi du JavaScript** : c'est le modèle de Spicetify, donc les auteurs connaissent déjà la forme. Un script
+  se modifie sans recompiler. Le bac à sable limite les dégâts d'un script défectueux ou malveillant aux permissions
+  qu'il a demandées. Et le runtime se teste sous Linux.
+- **Un même `main.js` peut tourner dans les deux processus.** `AMK.process` vaut `"ui"` dans `AppleMusic.exe` et
+  `"engine"` dans `AMPLibraryAgent.exe`. Les permissions `audio.*` n'existent que dans le processus moteur. [provisoire M3]
+
+## 3. Cycle de vie
+
+### 3.1 Emplacement
+
+Les éléments installés vivent dans les données de l'utilisateur, jamais dans le paquet MSIX, qui est en lecture seule :
+
+```
+%LOCALAPPDATA%\AppleMusicModKit\
+  extensions\<id>\manifest.json, main.js, ...
+  apps\<id>\...
+  themes\<id>\...
+  snippets\<id>\...
+  storage\<id>.json            données de AMK.storage
+```
+
+Le chemin est fixé ici à titre provisoire. Il sera confirmé en M3.
+
+### 3.2 Étapes
+
+1. **Découverte.** Au démarrage du noyau, chaque sous-dossier est examiné. Un dossier sans `manifest.json` est ignoré.
+2. **Validation.** Le manifeste doit respecter le schéma, `id` doit être le nom du dossier, `kitApi` doit être de
+   la version majeure prise en charge, et les fichiers déclarés doivent exister. En cas d'échec, l'élément reçoit
+   l'état `Failed` et une ligne est écrite dans le journal. Les autres éléments continuent.
+3. **Activation.** Un élément ne démarre que s'il est activé dans les réglages (section 3.3). Un élément de la
+   communauté est désactivé par défaut : le manifeste ne peut pas changer cette valeur.
+4. **Démarrage.** Le noyau évalue `main` (pour une extension ou une app) dans son runtime, puis appelle les
+   fonctions enregistrées. Une exception donne l'état `Failed`, sans arrêter les autres.
+5. **Arrêt.** Les fonctions passées à `AMK.onStop` sont appelées dans l'ordre inverse du démarrage. Un arrêt qui échoue
+   est journalisé et ignoré.
+6. **Rechargement.** Une extension se recharge seule : arrêt puis démarrage. Apple Music ne redémarre pas.
+
+### 3.3 Réglages d'activation
+
+| Élément | Clé dans `settings.txt` | Défaut |
+|---|---|---|
+| Extension | `extensions.<id>.enabled` | `false` pour la communauté |
+| App | `apps.<id>.enabled` | `false` |
+| Snippet | `snippets.<id>.enabled` | `false` |
+| Thème | `theme.id`, `theme.scheme` | aucun thème |
+| Parties d'un thème | `theme.parts.colors`, `theme.parts.resources`, `theme.parts.script` | `true` |
+
+La clé `extensions.<id>.enabled` existe déjà dans `core/extension.hpp`. Les autres suivent la même forme. [provisoire M7]
+
+### 3.4 États
+
+Ce sont les états de `core/extension.hpp` :
+
+- `Off` : désactivé dans les réglages.
+- `Running` : démarré.
+- `Failed` : activé, mais le démarrage a échoué ou a levé une exception.
+- `Blocked` : activé, mais le noyau est inactif, soit en mode sans échec, soit sur une version d'Apple Music inconnue.
+
+### 3.5 Mode sans échec et versions inconnues
+
+- Après deux lancements sans que l'app soit « saine », le lancement suivant ne charge aucun élément : ni extension,
+  ni thème, ni snippet, ni app. C'est le mode sans échec de `core/safe_mode.*`.
+- Sur une version d'Apple Music absente de la liste testée, rien ne démarre. L'app tourne intacte. C'est la règle de
+  `core/version_gate.*`.
+
+## 4. Permissions
+
+Un élément déclare les permissions dont il a besoin dans `manifest.json`. Le catalogue les affiche, et l'utilisateur
+les voit avant d'activer l'élément. Une fonction protégée par une permission non déclarée lève une erreur, sans rien
+faire.
+
+| Permission | Ce qu'elle donne | Statut |
+|---|---|---|
+| (aucune) | `AMK.log`, `AMK.onStop`, `AMK.config`, `AMK.uri`, `AMK.locale` | [ferme] |
+| (aucune) | `AMK.icons` | [provisoire M7] |
+| `storage` | `AMK.storage`, un fichier JSON par élément, dans `storage\<id>.json` | [ferme] |
+| `notifications` | `AMK.notify`, notification Windows | [provisoire M7] |
+| `ui.keyboard` | `AMK.keyboard.bind`, raccourcis globaux ou limités à la fenêtre | [provisoire M7] |
+| `player.read` | `AMK.player.state()` et les événements du lecteur | [provisoire M4] |
+| `player.control` | `AMK.player.play()`, `pause()`, `next()`, `previous()`, `seek()` | [provisoire M4] |
+| `audio.analyze` | `AMK.audio.onSamples`, lecture seule du son décodé, en mémoire | [provisoire M4] |
+| `audio.gain` | `AMK.audio.setGainDb`, gain appliqué aux échantillons, borné par le plafond du noyau | [provisoire M4] |
+| `ui.topbar`, `ui.playbar`, `ui.menu`, `ui.popup` | Ajout d'éléments d'interface à ces emplacements | [provisoire M8] |
+| `ui.page` | Pages d'app et entrées de navigation | [provisoire M8] |
+| `library.read` | `AMK.library`, lecture de la bibliothèque et des playlists | [provisoire M8] |
+| `network:<hôte>` | `AMK.http.get`, uniquement vers l'hôte déclaré | [ferme] pour le mécanisme |
+
+Il n'existe pas de permission pour régler le volume du lecteur, ni pour l'accès au système de fichiers ou au code natif.
+Ils ne seront pas ajoutés.
+
+## 5. Objet global `AMK`
+
+Les exemples sont en JavaScript. Les fonctions asynchrones renvoient des `Promise`.
+
+### 5.1 Base [ferme]
+
+```js
+AMK.version              // "0.1.0" : version du noyau
+AMK.kitApi               // "1.0" : version de l'API visée
+AMK.process              // "ui" ou "engine" [provisoire M3], voir section 2
+AMK.log(message)         // écrit dans le journal, préfixé par l'identifiant de l'élément
+AMK.onStop(fn)           // fn est appelée à l'arrêt de l'élément
+AMK.locale               // langue de l'app, ex. "fr-FR" (lecture seule)
+```
+
+### 5.2 Réglages et stockage [ferme]
+
+```js
+AMK.config.get(clé, défaut)      // lit extensions.<id>.<clé> (ou apps., snippets. selon le type)
+AMK.config.set(clé, valeur)      // écrit la même clé, limitée à l'élément
+AMK.storage.get(clé, défaut)     // valeur JSON, stockée dans storage\<id>.json   [permission storage]
+AMK.storage.set(clé, valeur)
+AMK.storage.remove(clé)
+```
+
+Un élément ne lit ni n'écrit les clés d'un autre élément.
+
+### 5.3 Lecteur [provisoire M4]
+
+```js
+AMK.player.state()
+// -> { playing, positionMs, durationMs, track: { id, title, artist, album, variantId, atmos, lossless } }
+AMK.player.on("trackchange" | "statechange", fn)
+AMK.player.play()
+AMK.player.pause()
+AMK.player.next()
+AMK.player.previous()
+AMK.player.seek(ms)
+AMK.player.queue.add(trackId)       // [provisoire M8]
+AMK.player.queue.remove(trackId)    // [provisoire M8]
+```
+
+Le volume n'est pas exposé. Un élément qui veut « plus fort » règle le gain sur les échantillons (section 5.4).
+
+### 5.4 Son [provisoire M4]
+
+```js
+AMK.audio.onSamples(fn)
+// fn({ samples: Float32Array, channels, sampleRate, frames }), après décodage et avant la sortie.
+// Lecture seule. Les échantillons ne sont pas copiés sur disque.
+
+AMK.audio.setGainDb(db)
+// Gain appliqué aux échantillons du morceau courant, borné par le plafond de la config du noyau.
+// Ne touche jamais au curseur de volume. Modèle : le nivellement Atmos (extensions/atmos-leveler/).
+
+AMK.audio.analyze(...)   // niveaux et spectre, calculés localement sur les échantillons décodés
+```
+
+### 5.5 Interface [provisoire M8]
+
+L'interface n'est pas décrite en XAML, ni en React. Une extension décrit une arborescence de primitives. Le noyau la
+rend en XAML.
+
+Primitives prévues : `stack`, `row`, `text`, `button`, `toggle`, `slider`, `list`, `image`, `icon`.
+
+```js
+AMK.ui.topbar.addButton({ label, icon, onClick })
+AMK.ui.playbar.addButton({ label, icon, onClick })
+AMK.ui.menu.addItem("context" | "app", { label, onClick })
+AMK.ui.popup.open(vue)
+AMK.ui.panel.register(id, vue)
+AMK.ui.title.set(texte)
+AMK.ui.page.register(chemin, vue)     // pour une app
+AMK.ui.navigate(chemin)
+```
+
+Exemple :
+
+```js
+AMK.ui.playbar.addButton({
+  label: "Paroles",
+  icon: AMK.icons.get("lyrics"),
+  onClick: () => AMK.ui.popup.open(vueParoles),
+});
+```
+
+Une extension ne peut pas injecter de XAML brut. C'est la limite la plus importante de l'API : elle évite qu'un élément
+de la communauté touche à des parties de l'interface qu'on n'a pas relevées. Les thèmes sont le seul cas où du XAML
+est livré par un élément (section 6).
+
+### 5.6 Services [provisoire M7 et M8]
+
+```js
+AMK.notify({ title, text })                      // [provisoire M7] permission notifications
+AMK.keyboard.bind("Ctrl+Alt+L", fn)              // [provisoire M7] permission ui.keyboard
+AMK.http.get(url) -> Promise<{ status, text }>   // [ferme] permission network:<hôte>
+AMK.uri.parse(texte) / AMK.uri.build(...)        // [ferme] liens music:// et https://music.apple.com
+AMK.icons.get(nom) -> chaîne SVG                 // [provisoire M7]
+AMK.color.fromArtwork(url) -> Promise<couleur>   // [provisoire M8]
+AMK.library.playlists() / AMK.library.tracks()   // [provisoire M8] permission library.read
+```
+
+`AMK.http.get` ne sert qu'aux services tiers (Last.fm, ListenBrainz, fournisseurs de paroles). Il ne peut pas
+atteindre les API internes d'Apple : le noyau refuse tout hôte qui ne figure pas dans les permissions du manifeste.
+
+## 6. Thèmes, apps et snippets
+
+### 6.1 Thèmes [provisoire M8]
+
+Un thème est un dossier avec `colors.ini`, `resources.xaml`, ou les deux, et éventuellement un `main.js`.
+
+- `colors.ini` a une section par schéma (`[Base]`, `[Dark]`…). Chaque clé est une couleur hexadécimale sans `#`, comme
+  dans Spicetify. Chaque clé remplace une brosse XAML du noyau. La liste des clés est relevée en M8.
+- `resources.xaml` est un dictionnaire de ressources. Il ne peut définir que des clés figurant dans la liste autorisée
+  publiée avec M8. Une clé hors liste fait échouer le thème, avec une ligne dans le journal.
+- `main.js` suit les permissions du manifeste comme une extension.
+
+### 6.2 Apps [provisoire M8]
+
+Une app est une extension qui ajoute une page de navigation (`AMK.ui.page.register`), avec une icône SVG en deux
+états (`icon`, et `active-icon` prévue). Son code ne tourne que lorsque la page est ouverte.
+
+### 6.3 Snippets [provisoire M8]
+
+Un snippet est un fragment de `resources.xaml`, activable seul. Il suit la même liste de clés autorisées que les thèmes.
+
+## 7. Ligne de commande `amk`
+
+Le CLI remplace le CLI de Spicetify. Son écriture (C++ avec le noyau, ou autre) est décidée en M5.
+
+| Commande | Rôle | Équivalent Spicetify | Jalon |
+|---|---|---|---|
+| `amk config [clé] [valeur]` | Lire ou écrire un réglage | `spicetify config` | M5 |
+| `amk extension list` | Lister les extensions, leur état et leurs permissions | `config extensions` | M7 |
+| `amk extension enable <id>` / `disable <id>` | Activer ou désactiver une extension | `config extensions <id>` et `-` | M7 |
+| `amk install <id>` | Installer depuis le catalogue, SHA-256 vérifié | Marketplace | M7 |
+| `amk theme set <id> [--scheme <nom>]` | Choisir un thème et un schéma | `config current_theme` | M8 |
+| `amk watch` | Recharger le thème à chaque sauvegarde | `spicetify watch` | M8 |
+| `amk launch` | Lancer Apple Music avec le noyau | `spicetify auto` | M3 |
+| `amk restore` | Lancer Apple Music sans injection. Rien n'est à restaurer dans le paquet | `spicetify restore` | M6 |
+| `amk path` | Afficher les chemins du kit et d'Apple Music | `spicetify path` | M5 |
+| `amk update` | Mettre à jour le kit depuis une release | `spicetify upgrade` | Après M6 |
+
+## 8. Journal et erreurs
+
+- Chaque ligne du journal indique l'élément, par exemple `Extension hello-extension démarrée`.
+- Une erreur dans `main.js` est journalisée avec son message, sans arrêter les autres éléments.
+- Une fonction appelée sans permission lève une erreur `PermissionDenied`, avec le nom de la permission manquante.
+- Les appels répétés à `AMK.log` ne sont pas limités en v1. Une limite pourra venir plus tard.
+
+## 9. Versions
+
+- `kitApi` est au format `MAJEUR.MINEUR`.
+- Une version majeure change quand une fonction ferme est retirée ou modifiée de façon incompatible.
+- Une version mineure ajoute des fonctions, sans rien casser.
+- Une fonction retirée reste disponible pendant une version mineure, avec un avertissement dans le journal.
+- Un élément déclare la version qu'il vise. Le noyau accepte toute version mineure de la même majeure.
+
+## 10. Points provisoires
+
+Ces points doivent être confirmés avant de passer au statut « ferme » :
+
+- le choix de QuickJS, sa taille et son comportement sous MinGW ;
+- le chemin des données de l'utilisateur (M3) ;
+- la forme des données de `AMK.player` et des événements (M4) ;
+- le format des échantillons transmis à `AMK.audio.onSamples` (M4) ;
+- l'emplacement des éléments d'interface dans l'arbre XAML (M8) ;
+- la liste des clés XAML autorisées pour les thèmes (M8) ;
+- les limites de temps et de mémoire d'un élément (à fixer en M7, sur des mesures).
+
+## 11. Écarté pour la v1
+
+- **DLL natives de la communauté** : elles tourneraient avec les droits du processus d'Apple Music.
+- **XAML brut dans les extensions** : trop large, et il faudrait relever toute l'interface.
+- **React** : il n'existe pas dans WinUI. La description déclarative le remplace.
+- **Appels à l'API interne d'Apple** : hors périmètre, et risqués pour les comptes.
+- **Réglage du volume du lecteur** : il déplacerait le curseur.
+- **Coupure de la télémétrie d'Apple** : décision reportée après M4.

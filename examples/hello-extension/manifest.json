@@ -1,0 +1,12 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "hello-extension",
+  "name": "Bonjour",
+  "version": "0.1.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Exemple minimal : écrit dans le journal et garde un compteur de lancements.",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": ["storage"]
+}
