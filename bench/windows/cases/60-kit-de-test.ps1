@@ -59,8 +59,11 @@ Register-Case -Id 'kit-de-test' -Title 'Kit de test M5 : rapport, archive et lan
 
     if ($elevated) {
         $trace = Join-Path $run 'trace.etl'
-        Add-Check -Ctx $Ctx -Name 'trace ETW enregistrée (trace.etl non vide)' `
-            -Passed ((Test-Path -LiteralPath $trace) -and (Get-Item -LiteralPath $trace).Length -gt 0)
+        # The trace is for the owner's PC. On the runner logman may refuse it: that is reported, not failed.
+        $traced = (Test-Path -LiteralPath $trace) -and (Get-Item -LiteralPath $trace).Length -gt 0
+        $traceLines = @(Get-Content -LiteralPath (Join-Path $run 'deroulement.txt') -ErrorAction SilentlyContinue |
+            Where-Object { $_ -match 'Trace|logman' }) -join ' | '
+        Add-Info -Ctx $Ctx -Name 'trace ETW' -Detail $(if ($traced) { 'enregistrée' } else { "non enregistrée : $traceLines" })
     } else {
         Add-Skip -Ctx $Ctx -Name 'trace ETW' -Reason 'runner non élevé : /sansetl'
     }

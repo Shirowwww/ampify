@@ -63,11 +63,18 @@ class AmkTestCase(unittest.TestCase):
         self.packages = os.path.join(self.tmp, "packages")
         os.makedirs(self.packages)
 
-    def amk(self, *args, input_text="", cwd=None, timeout=60):
+    def amk(self, *args, input_text="", cwd=None, timeout=60, locale=None):
         command = (["wine"] if WINE else []) + [AMK, "--kit-dir", native(self.kit)] + list(args)
+        # The language setting defaults to auto, which follows the locale. The tests read the French texts, so the
+        # locale is pinned to one that gives French, unless a test asks for another one.
+        env = dict(os.environ)
+        if not WINE or locale:
+            for name in ("LC_ALL", "LC_MESSAGES", "LANG"):
+                env.pop(name, None)
+            env["LC_ALL"] = locale or "C.UTF-8"
         return subprocess.run(
             command, input=input_text, capture_output=True, text=True, encoding="utf-8",
-            cwd=cwd or self.tmp, timeout=timeout,
+            cwd=cwd or self.tmp, timeout=timeout, env=env,
         )
 
     def write_element(self, name, kind, version="1.0.0", files=None, permissions=None, folder_name=None):
@@ -176,6 +183,85 @@ class Basics(AmkTestCase):
         self.amk("config", "theme.active", "night")
         listing = self.amk("config").stdout
         self.assertIn("theme.active = night", listing)
+
+
+class Languages(AmkTestCase):
+    def test_help_is_french_by_default_and_english_on_request(self):
+        french = self.amk("help")
+        self.assertEqual(french.returncode, 0)
+        self.assertIn("Usage : amk [options]", french.stdout)
+        self.assertIn("installe depuis le catalogue", french.stdout)
+
+        self.assertEqual(self.amk("config", "language", "en").returncode, 0)
+        english = self.amk("help")
+        self.assertIn("Usage: amk [options]", english.stdout)
+        self.assertIn("install <id> [--yes]         installs from the catalog", english.stdout)
+        self.assertNotIn("installe depuis", english.stdout)
+        unknown = self.amk("nope")
+        self.assertEqual(unknown.returncode, 2)
+        self.assertIn("amk: unknown command: nope", unknown.stderr)
+        self.assertIn("Help: amk help", unknown.stderr)
+        self.assertIn("STATE", self.amk("list").stdout.splitlines()[0])
+
+        self.assertEqual(self.amk("config", "language", "fr").returncode, 0)
+        self.assertIn("commande inconnue : nope", self.amk("nope").stderr)
+
+    @unittest.skipIf(WINE, "Wine takes its locale from its own prefix")
+    def test_auto_follows_the_locale(self):
+        self.assertIn("Usage: amk", self.amk("help", locale="en_US.UTF-8").stdout)
+        self.assertIn("Usage : amk", self.amk("help", locale="fr_FR.UTF-8").stdout)
+        self.assertEqual(self.amk("config", "language", "auto").returncode, 0)
+        self.assertIn("Usage: amk", self.amk("help", locale="de_DE.UTF-8").stdout)
+        # An explicit choice wins over the locale.
+        self.assertEqual(self.amk("config", "language", "fr", locale="en_US.UTF-8").returncode, 0)
+        self.assertIn("Usage : amk", self.amk("help", locale="en_US.UTF-8").stdout)
+
+    def test_language_value_is_checked(self):
+        result = self.amk("config", "language", "de")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("fr, en ou auto", result.stderr)
+
+
+class Services(AmkTestCase):
+    def test_services_are_off_until_turned_on(self):
+        for key in ("discord.enabled", "tray.enabled", "remote.enabled", "midi.enabled"):
+            self.assertNotIn(key, self.settings_text())
+            result = self.amk("config", key, "maybe")
+            self.assertEqual(result.returncode, 1, key)
+
+    def test_turning_the_remote_on_creates_a_token(self):
+        result = self.amk("config", "remote.enabled", "1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Jeton de la télécommande créé", result.stdout)
+        token = self.amk("config", "remote.token").stdout.strip()
+        self.assertRegex(token, r"^[A-Za-z0-9_-]{40}$")
+        # Turning it on again keeps the token.
+        self.amk("config", "remote.enabled", "0")
+        self.amk("config", "remote.enabled", "1")
+        self.assertEqual(self.amk("config", "remote.token").stdout.strip(), token)
+        self.assertEqual(self.amk("config", "remote.token", "court").returncode, 1)
+        self.assertEqual(self.amk("config", "remote.port", "80").returncode, 1)
+        self.assertEqual(self.amk("config", "remote.port", "8974").returncode, 0)
+
+    def test_midi_map_is_checked(self):
+        self.assertEqual(self.amk("config", "midi.map", "note:60=next;cc:7=gain").returncode, 0)
+        result = self.amk("config", "midi.map", "note:60=volume")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("action inconnue", result.stderr)
+
+    def test_examples_of_the_services_run_in_the_engine(self):
+        expected = {
+            "discord-presence": "clientId",
+            "now-playing-file": "fichier de sortie : now-playing.txt",
+            "scrobbler": "Last.fm n'est pas réglé",
+            "listen-stats": "interface",
+        }
+        for name, text in expected.items():
+            folder = os.path.join(ROOT, "examples", name)
+            result = self.amk("test", native(folder))
+            self.assertEqual(result.returncode, 0, name + "\n" + result.stdout + result.stderr)
+            self.assertIn(text, result.stdout, name)
+            self.assertIn("chargé et exécuté sans erreur", result.stdout, name)
 
 
 class Authoring(AmkTestCase):

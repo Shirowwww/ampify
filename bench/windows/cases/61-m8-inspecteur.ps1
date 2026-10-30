@@ -8,7 +8,7 @@ Register-Case -Id 'm8-inspecteur' -Title 'M8 : l''inspecteur écrit l''arbre de 
 
     $launcher = Join-Path $script:BenchKitRoot 'm8\amk_launcher.exe'
     if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Check -Ctx $Ctx -Name 'build M8 présent' -Passed $false -Detail $launcher
+        Add-Skip -Ctx $Ctx -Name 'build M8 présent' -Reason "pas de build M8 dans ce banc (MinGW ne compile pas XAML) : $launcher"
         return
     }
 
@@ -44,6 +44,13 @@ Register-Case -Id 'm8-inspecteur' -Title 'M8 : l''inspecteur écrit l''arbre de 
     if (Test-Path -LiteralPath $dumpPath) {
         $dump = Get-Content -LiteralPath $dumpPath -Raw -Encoding UTF8
         Copy-Item -LiteralPath $dumpPath -Destination $Ctx.Dir -Force
+    }
+    if ($dump) {
+        # The artifact is not reachable from every machine: the first lines of the real tree go to the job log.
+        Write-Host "----- inspector.txt (300 premières lignes)"
+        $dump -split "`r?`n" | Select-Object -First 300 | ForEach-Object { Write-Host "  $_" }
+    } else {
+        Write-JournalTail -FileName 'AppleMusic.log'
     }
     $selectors = ([regex]::Matches($dump, 'sélecteur :')).Count
     Add-Check -Ctx $Ctx -Name 'inspector.txt : des éléments avec leur sélecteur' -Passed ($selectors -gt 0) `

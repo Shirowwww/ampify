@@ -29,6 +29,13 @@ extern const char kUi[];
 extern const char kAudioAnalysis[];
 extern const char kColor[];
 extern const char kReact[];
+extern const char kCrypto[];
+extern const char kI18n[];
+extern const char kDiscord[];
+extern const char kTray[];
+extern const char kMidi[];
+extern const char kRemote[];
+extern const char kFs[];
 }  // namespace prelude
 
 namespace natives {
@@ -50,6 +57,17 @@ void DefineAudioAnalysis(api::NativeScope& scope);
 void StopAudioAnalysis(ScriptExtension& extension);
 void DefineColor(api::NativeScope& scope);
 void DefineReact(api::NativeScope& scope);
+void DefineCrypto(api::NativeScope& scope);
+void DefineI18n(api::NativeScope& scope);
+void DefineDiscord(api::NativeScope& scope);
+void StopDiscord(ScriptExtension& extension);
+void DefineTray(api::NativeScope& scope);
+void StopTray(ScriptExtension& extension);
+void DefineMidi(api::NativeScope& scope);
+void StopMidi(ScriptExtension& extension);
+void DefineRemote(api::NativeScope& scope);
+void StopRemote(ScriptExtension& extension);
+void DefineFs(api::NativeScope& scope);
 }  // namespace natives
 
 namespace prelude { extern const char kLink[]; }
@@ -79,6 +97,13 @@ const ApiModule kModules[] = {
     {"ui", prelude::kUi, natives::DefineUi, nullptr, natives::StopUi},
     {"link", prelude::kLink, natives::DefineLink, natives::StartLink, nullptr},
     {"react", prelude::kReact, natives::DefineReact, nullptr, nullptr},
+    {"crypto", prelude::kCrypto, natives::DefineCrypto, nullptr, nullptr},
+    {"i18n", prelude::kI18n, natives::DefineI18n, nullptr, nullptr},
+    {"discord", prelude::kDiscord, natives::DefineDiscord, nullptr, natives::StopDiscord},
+    {"tray", prelude::kTray, natives::DefineTray, nullptr, natives::StopTray},
+    {"midi", prelude::kMidi, natives::DefineMidi, nullptr, natives::StopMidi},
+    {"remote", prelude::kRemote, natives::DefineRemote, nullptr, natives::StopRemote},
+    {"fs", prelude::kFs, natives::DefineFs, nullptr, nullptr},
 };
 
 }  // namespace

@@ -10,6 +10,12 @@
 
 #include "../core/audio/audio_engine.hpp"
 #include "../core/host.hpp"
+#include "../core/natives/discord.hpp"
+#include "../core/natives/fs.hpp"
+#include "../core/natives/http.hpp"
+#include "../core/natives/midi.hpp"
+#include "../core/natives/remote.hpp"
+#include "../core/natives/tray.hpp"
 #include "../core/journal.hpp"
 #include "../core/manifest.hpp"
 #include "../core/ui_model.hpp"
@@ -73,8 +79,16 @@ private:
 };
 
 // The host of a test run. Settings and storage live in memory. Every other call answers with a fixed value, and each
-// call is counted, so the report says what the element used.
-class TestHost : public Host {
+// call is counted, so the report says what the element used. It offers the optional services too (POST, Discord,
+// icon menu, MIDI, remote control, output files), so that an element using them runs; nothing leaves the process.
+// Those services still answer "off" until their setting is on, as in the kernel, so the report shows that line.
+class TestHost : public Host,
+                 public HttpPostHost,
+                 public DiscordHost,
+                 public TrayHost,
+                 public MidiHost,
+                 public RemoteHost,
+                 public OutputFilesHost {
 public:
     std::string Process() const override { return "ui"; }
     std::string Locale() const override { return "fr-FR"; }
@@ -119,16 +133,52 @@ public:
         Count("réseau : " + url);
         return HttpResponse{200, "{}"};
     }
+    HttpResponse HttpPost(const std::string& url, const std::string&, const HttpHeaders&) override {
+        Count("réseau (envoi) : " + url);
+        return HttpResponse{200, "{}"};
+    }
+    bool SetActivity(const std::string&, const std::string&, const discord::Activity&) override {
+        Count("discord (présence)");
+        return true;
+    }
+    void ClearActivity(const std::string&) override {}
+    bool SetTrayMenu(const std::string&, const std::vector<TrayItem>&) override {
+        Count("icône de notification (menu)");
+        return true;
+    }
+    void RemoveTrayMenu(const std::string&) override {}
+    bool SubscribeMidi(const std::string&) override {
+        Count("midi");
+        return true;
+    }
+    void UnsubscribeMidi(const std::string&) override {}
+    std::vector<std::string> MidiDevices() override { return {}; }
+    bool PublishRemoteState(const std::string&, const std::string&) override {
+        Count("télécommande (état)");
+        return true;
+    }
+    void RemoveRemoteState(const std::string&) override {}
+    bool WriteOutputText(const std::string&, const std::string& name, const std::string&, std::string*) override {
+        Count("fichier de sortie : " + name);  // counted, not written
+        return true;
+    }
+    void* QueryCapability(std::string_view name) override {
+        if (void* found = Offer<HttpPostHost>(name, this)) return found;
+        if (void* found = Offer<DiscordHost>(name, this)) return found;
+        if (void* found = Offer<TrayHost>(name, this)) return found;
+        if (void* found = Offer<MidiHost>(name, this)) return found;
+        if (void* found = Offer<RemoteHost>(name, this)) return found;
+        if (void* found = Offer<OutputFilesHost>(name, this)) return found;
+        if (name == AudioHost::kCapabilityName) return static_cast<AudioHost*>(&m_audio);
+        return Host::QueryCapability(name);
+    }
+
     // Interface calls land in an in-memory model, the same one the kernel keeps. Nothing is drawn.
     UiModel& Ui() override {
         Count("interface");
         return m_ui;
     }
 
-    void* QueryCapability(std::string_view name) override {
-        if (name == AudioHost::kCapabilityName) return static_cast<AudioHost*>(&m_audio);
-        return Host::QueryCapability(name);
-    }
     void PlaySyntheticAudio() { m_audio.PlaySyntheticAudio(); }
 
     const std::map<std::string, int>& Calls() const { return m_calls; }

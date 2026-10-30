@@ -23,12 +23,12 @@ Register-Case -Id 'cli-outils-windows' -Title 'amk trouve tar.exe et curl.exe, e
         $refusedCode = $LASTEXITCODE
         Add-Check -Ctx $Ctx -Name 'catalogue http:// refuse' -Passed ($refusedCode -ne 0) -Detail $refused.Trim()
 
-        # The catalog of the commit under test: main may not have one yet.
-        $ref = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { 'main' }
-        $httpsCatalog = "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/$ref/catalog/catalog.json"
+        # This repository is private, so its raw files need a token. The check is about curl.exe fetching over https:
+        # a public JSON file that is not a catalog must get past the download and fail only as an invalid catalog.
+        $httpsCatalog = 'https://raw.githubusercontent.com/spicetify/marketplace/main/package.json'
         $listed = (& $amk --kit-dir $kit market --catalog $httpsCatalog 2>&1) | Out-String
-        $listedCode = $LASTEXITCODE
-        Add-Check -Ctx $Ctx -Name 'catalogue https:// telecharge avec curl.exe' -Passed ($listedCode -eq 0) -Detail $listed.Trim()
+        $downloaded = -not ($listed -match 'téléchargement impossible|curl: \(')
+        Add-Check -Ctx $Ctx -Name 'https:// telecharge avec curl.exe (fichier public)' -Passed $downloaded -Detail $listed.Trim()
     }
     finally {
         Remove-Item -LiteralPath $kit -Recurse -Force -ErrorAction SilentlyContinue

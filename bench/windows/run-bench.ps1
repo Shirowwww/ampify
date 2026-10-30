@@ -22,6 +22,10 @@ Identifiants des tests à lancer. Vide : tous.
 .PARAMETER SkipInstall
 N'essaie pas d'installer Apple Music.
 
+.PARAMETER CasesDir
+Dossier des tests, relatif à ce script. Par défaut cases (le banc normal). live\cases : le banc connecté
+(.github/workflows/windows-live.yml), qui suppose Apple Music connecté et une sortie audio.
+
 .OUTPUTS
 Code de sortie 1 si un test échoue, 0 sinon. Les tests sautés ne font pas échouer le banc.
 #>
@@ -31,7 +35,8 @@ param(
     [string]$RepoRoot = (Join-Path $PSScriptRoot '..\..'),
     [string]$OutputRoot = (Join-Path $PSScriptRoot '..\..\results'),
     [string[]]$Only = @(),
-    [switch]$SkipInstall
+    [switch]$SkipInstall,
+    [string]$CasesDir = 'cases'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,7 +57,7 @@ if (-not $PSScriptRoot -or -not $env:USERPROFILE) {
 }
 
 . (Join-Path $PSScriptRoot 'lib\harness.ps1')
-Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'cases') -Filter '*.ps1' | Sort-Object Name | ForEach-Object {
+Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot $CasesDir) -Filter '*.ps1' | Sort-Object Name | ForEach-Object {
     . $_.FullName
 }
 
@@ -67,6 +72,8 @@ function Test-Requirement {
     param([string]$Name)
     switch ($Name) {
         'apple-music' { return $script:AppleMusicInstalled }
+        # Set by the live workflow from bench/windows/live/connexion.ps1: Apple Music is signed in to the test account.
+        'apple-account' { return ($script:AppleMusicInstalled -and $env:AMK_SIGNED_IN -eq 'true') }
         default { throw "Prérequis inconnu : $Name" }
     }
 }

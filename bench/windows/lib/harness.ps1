@@ -256,10 +256,47 @@ function Format-CrashEvents {
 }
 
 # Capture de l'écran principal dans le dossier du test. Renvoie le chemin, ou $null si l'écran n'est pas accessible.
+# Win32 calls for the captures: bring Apple Music's window forward and draw it whole, even when another window
+# (the runner's console) sits on top. PrintWindow with PW_RENDERFULLCONTENT (2) also draws WinUI's composition content.
+if (-not ('AmkWindowCapture' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class AmkWindowCapture {
+    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+    [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
+    [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
+}
+'@
+}
+
+# Main window handle of Apple Music, or zero when it has none yet.
+function Get-AppleMusicWindow {
+    $process = Get-Process -Name 'AppleMusic' -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+    if ($process) { return $process.MainWindowHandle }
+    return [IntPtr]::Zero
+}
+
+# Two captures per call: <Name>.png is the screen with Apple Music brought forward and maximized (consoles are
+# minimized first), <Name>-fenetre.png is Apple Music's own window drawn by PrintWindow. Returns the screen capture.
 function Save-Screenshot {
     param($Ctx, [string]$Name)
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+        $window = Get-AppleMusicWindow
+        if ($window -ne [IntPtr]::Zero) {
+            Get-Process -Name 'WindowsTerminal', 'conhost', 'OpenConsole', 'pwsh', 'powershell' -ErrorAction SilentlyContinue |
+                Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
+                ForEach-Object { [AmkWindowCapture]::ShowWindow($_.MainWindowHandle, 6) | Out-Null }  # SW_MINIMIZE
+            [AmkWindowCapture]::ShowWindow($window, 3) | Out-Null  # SW_MAXIMIZE
+            [AmkWindowCapture]::SetForegroundWindow($window) | Out-Null
+            Start-Sleep -Milliseconds 1500  # let the window repaint after maximize
+        }
+
         $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
         $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
         $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
@@ -268,6 +305,24 @@ function Save-Screenshot {
         $bitmap.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
         $graphics.Dispose()
         $bitmap.Dispose()
+
+        if ($window -ne [IntPtr]::Zero) {
+            $rect = New-Object AmkWindowCapture+RECT
+            if ([AmkWindowCapture]::GetWindowRect($window, [ref]$rect)) {
+                $width = [Math]::Max(1, $rect.Right - $rect.Left)
+                $height = [Math]::Max(1, $rect.Bottom - $rect.Top)
+                $own = New-Object System.Drawing.Bitmap $width, $height
+                $ownGraphics = [System.Drawing.Graphics]::FromImage($own)
+                $hdc = $ownGraphics.GetHdc()
+                [AmkWindowCapture]::PrintWindow($window, $hdc, 2) | Out-Null
+                $ownGraphics.ReleaseHdc($hdc)
+                $own.Save((Join-Path $Ctx.Dir "$Name-fenetre.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+                $ownGraphics.Dispose()
+                $own.Dispose()
+            }
+        } else {
+            Write-Host "  capture : aucune fenêtre d'Apple Music, seul l'écran est capturé"
+        }
         return $path
     } catch {
         Write-Host "  capture d'écran impossible : $($_.Exception.Message)"

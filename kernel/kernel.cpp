@@ -107,6 +107,7 @@ DWORD WINAPI KernelMain(LPVOID) {
     static amk::ExtensionLoader loader(host, winHost, journal, kit / "extensions");
     loader.SetAppRoot(kit / "apps");
     loader.SetThemeRoot(kit / "themes");
+    winHost.SetEventSink([](const std::string& entry, const std::string& payload) { loader.DeliverEvent(entry, payload); });
     amk::LoadReport report = loader.Discover();
     journal.Write("Éléments JavaScript retenus : " + std::to_string(report.loaded.size()) + ", rejetés : " +
                   std::to_string(report.rejected.size()));

@@ -139,6 +139,19 @@ Réglages reconnus par `amk config` :
 | `check_kit_update` | `1` ou `0` : `amk` signale une nouvelle version du kit | `0` |
 | `telemetry.block` | `1` ou `0` : bloquer les envois de données d'Apple Music. **Pas encore actif** : la clé est acceptée, le noyau ne la lit pas encore | `0` |
 | `expose_api` | `1` ou `0` : à `0`, aucun élément JavaScript (extension, app, script de thème) ne démarre | `1` |
+| `language` | `fr`, `en` ou `auto` : langue de `amk` et des textes du kit (`AMK.i18n`). `auto` suit la langue du système | `auto` |
+| `discord.enabled` | `1` ou `0` : les éléments qui ont `ipc.discord` peuvent afficher la présence Discord | `0` |
+| `tray.enabled` | `1` ou `0` : icône du kit dans la zone de notification, avec son menu | `0` |
+| `remote.enabled` | `1` ou `0` : télécommande locale sur `127.0.0.1` (jeton obligatoire, créé à la mise à `1`) | `0` |
+| `remote.port` | port de la télécommande, de 1024 à 65535 | `8974` |
+| `remote.token` | jeton de la télécommande, 32 à 128 caractères `A-Z a-z 0-9 - _`. Vide : un nouveau est créé | créé par le kit |
+| `midi.enabled` | `1` ou `0` : lecture d'un contrôleur MIDI | `0` |
+| `midi.device` | numéro de l'appareil MIDI, de 0 à 255 | `0` |
+| `midi.map` | touches reliées aux commandes du kit, ex. `note:60=next;note:62=previous;cc:7=gain` | vide |
+
+Les services (`discord`, `tray`, `remote`, `midi`) sont tous éteints par défaut. Leur fonctionnement est décrit dans
+[API.md](../extensions/API.md), section 5.7. Le noyau les lit au démarrage d'Apple Music : relance l'app après un
+changement.
 
 Ces clés correspondent à celles de Spicetify : `app_path` à `spotify_path`, `prefs_path` à `prefs_path`,
 `app_launch_flags` à `spotify_launch_flags`, `check_kit_update` à `check_spicetify_update`, `telemetry.block` à

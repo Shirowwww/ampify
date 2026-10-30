@@ -17,6 +17,7 @@
 
 #include "../core/audio/audio_engine.hpp"
 #include "../core/gain_board.hpp"
+#include "win_services.hpp"
 
 namespace amk {
 
@@ -84,7 +85,23 @@ std::optional<std::string> ReadWholeFile(const std::filesystem::path& path) {
 }  // namespace
 
 WinHost::WinHost(std::string process, std::filesystem::path kitDirectory, Settings& settings, Journal& journal)
-    : m_process(std::move(process)), m_kit(std::move(kitDirectory)), m_settings(settings), m_journal(journal) {}
+    : m_process(std::move(process)), m_kit(std::move(kitDirectory)), m_settings(settings), m_journal(journal),
+      m_services(std::make_unique<win::Services>(*this, m_process, m_kit, m_journal)) {}
+
+void WinHost::SetEventSink(EventSink sink) { m_services->SetEventSink(std::move(sink)); }
+
+void* WinHost::QueryCapability(std::string_view name) {
+    if (void* found = Offer<HttpPostHost>(name, this)) return found;
+    if (void* found = m_services->Query(name)) return found;
+    // AudioHost in AMPLibraryAgent.exe only, where the audio is rendered: the process's engine, fed by the Atmos
+    // leveler's hooks.
+    if (m_process == "engine" && name == AudioHost::kCapabilityName) {
+        audio::AudioEngine& engine = audio::ProcessAudio();
+        engine.StartDeliveryThread();  // analysis frames go out from their own thread, 20 a second at most
+        return static_cast<AudioHost*>(&engine);
+    }
+    return Host::QueryCapability(name);
+}
 
 std::string WinHost::Process() const { return m_process; }
 
@@ -179,16 +196,8 @@ void WinHost::SetGainDb(const std::string& elementId, double db) {
     m_journal.Write(line.str());
 }
 
-void* WinHost::QueryCapability(std::string_view name) {
-    if (m_process == "engine" && name == AudioHost::kCapabilityName) {
-        audio::AudioEngine& engine = audio::ProcessAudio();
-        engine.StartDeliveryThread();  // analysis frames go out from their own thread, 20 a second at most
-        return static_cast<AudioHost*>(&engine);
-    }
-    return Host::QueryCapability(name);
-}
-
 WinHost::~WinHost() {
+    m_services.reset();
     for (const auto& [id, hotkey] : m_hotkeys) UnregisterHotKey(nullptr, id);
     if (m_notifyWindow) DestroyWindow(static_cast<HWND>(m_notifyWindow));
 }
@@ -199,6 +208,7 @@ void WinHost::Service(const KeyCallback& onKey) {
         auto found = m_hotkeys.find(static_cast<int>(message.wParam));
         if (found != m_hotkeys.end() && onKey) onKey(found->second.elementId, found->second.combo);
     }
+    m_services->Service();
 
     if (m_iconVisible && std::chrono::steady_clock::now() >= m_balloonUntil) {
         NOTIFYICONDATAW icon{};
@@ -266,7 +276,14 @@ void WinHost::UnregisterKeys(const std::string& elementId) {
     }
 }
 
-HttpResponse WinHost::HttpGet(const std::string& url) {
+HttpResponse WinHost::HttpGet(const std::string& url) { return Send(L"GET", url, {}, {}); }
+
+HttpResponse WinHost::HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) {
+    return Send(L"POST", url, body, headers);
+}
+
+HttpResponse WinHost::Send(const wchar_t* verb, const std::string& url, const std::string& body,
+                           const HttpHeaders& headers) {
     std::wstring wide = ToWide(url);
     wchar_t host[256] = {};
     wchar_t path[2048] = {};
@@ -289,11 +306,18 @@ HttpResponse WinHost::HttpGet(const std::string& url) {
     HttpResponse response{0, {}};
     HINTERNET connection = WinHttpConnect(session, std::wstring(parts.lpszHostName, parts.dwHostNameLength).c_str(),
                                           INTERNET_DEFAULT_HTTPS_PORT, 0);
-    HINTERNET request = connection ? WinHttpOpenRequest(connection, L"GET", target.c_str(), nullptr,
+    HINTERNET request = connection ? WinHttpOpenRequest(connection, verb, target.c_str(), nullptr,
                                                         WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
                                                         WINHTTP_FLAG_SECURE)
                                    : nullptr;
-    bool ok = request && WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, nullptr, 0, 0, 0) &&
+    // The names were checked by the http module (content-type, authorization, accept), the values have no line break.
+    std::wstring extra;
+    for (const auto& [name, value] : headers) extra += ToWide(name) + L": " + ToWide(value) + L"\r\n";
+    bool ok = request &&
+              WinHttpSendRequest(request, extra.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : extra.c_str(),
+                                 extra.empty() ? 0 : static_cast<DWORD>(-1L),
+                                 body.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(body.data()),
+                                 static_cast<DWORD>(body.size()), static_cast<DWORD>(body.size()), 0) &&
               WinHttpReceiveResponse(request, nullptr);
 
     if (ok) {

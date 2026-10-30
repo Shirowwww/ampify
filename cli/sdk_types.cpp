@@ -46,7 +46,7 @@ type ExtractedColors = {
   palette: { color: string; population: number }[];
 };
 
-// 5.8 : AMK.React, AMK.ReactDOM, AMK.hooks et AMK.components.
+// 5.9 : AMK.React, AMK.ReactDOM, AMK.hooks et AMK.components.
 type AmkElement = { readonly type: unknown; readonly key: string | null; readonly props: Readonly<Record<string, unknown>> };
 type AmkNode = AmkElement | string | number | boolean | null | undefined | AmkNode[];
 type AmkComponent<P = Record<string, unknown>> = (props: P & { children?: AmkNode }) => AmkNode;
@@ -77,6 +77,13 @@ type DropdownProps = TooltipProps & { label?: string; value?: string; options?: 
 type CardProps = TooltipProps & { title?: string; subtitle?: string; onClick?: (event: ClickEvent) => void };
 type TextProps = TooltipProps & { text?: string; variant?: "title" | "subtitle" | "body" | "caption" };
 type TooltipWrapperProps = { label?: string; content?: string; placement?: "top" | "bottom" | "left" | "right"; delay?: number; showDelay?: number };
+type AudioChunk = { samples: Float32Array; channels: number; sampleRate: number; frames: number };
+type AudioAnalysis = { level: number; spectrum: number[]; tempo: number };
+type DiscordActivity = {
+  clientId: string; details?: string; state?: string; largeImage?: string; largeText?: string;
+  smallImage?: string; smallText?: string; startMs?: number; endMs?: number;
+};
+type MidiEvent = { type: "note" | "noteoff" | "cc"; channel: number; number: number; value: number };
 
 declare const AMK: {
   // 5.1 Base [ferme]
@@ -144,7 +151,32 @@ declare const AMK: {
   // 5.6 Services [provisoire M7 et M8]
   notify(options: { title: string; text: string }): void;
   keyboard: { bind(shortcut: string, fn: () => void): void };
-  http: { get(url: string): Promise<{ status: number; text: string }> };
+  http: {
+    get(url: string): Promise<{ status: number; text: string }>;
+    post(url: string, body?: string | object, options?: { headers?: Record<string, string> }): Promise<{ status: number; text: string }>;
+  };
+  crypto: { md5(text: string): string };
+  i18n: {
+    readonly language: "fr" | "en";
+    define(messages: { fr?: Record<string, string>; en?: Record<string, string> }): void;
+    t(key: string, vars?: Record<string, unknown>): string;
+  };
+
+  // 5.7 Services locaux [provisoire M7] : false quand le réglage du service est à 0
+  discord: {
+    setActivity(activity: DiscordActivity): boolean;
+    clear(): void;
+  };
+  tray: {
+    setMenu(items: Array<{ label: string; onClick: () => void; checked?: boolean; enabled?: boolean } | "-">): boolean;
+    onClick(fn: () => void): boolean;
+  };
+  midi: {
+    on(binding: string, fn: (event: MidiEvent) => void): boolean;
+    devices(): string[];
+  };
+  remote: { setState(state: Record<string, unknown>): boolean };
+  fs: { writeText(name: string, text: string): boolean };
   uri: {
     parse(text: string): unknown;
     build(parts: unknown): string;
@@ -161,12 +193,12 @@ declare const AMK: {
   services: { call(service: string, method: string, args?: unknown): Promise<unknown> };
   lyrics: { current(): Promise<unknown> };
 
-  // 5.7 Lien entre une app et son extension [provisoire M7]
+  // 5.8 Lien entre une app et son extension [provisoire M7]
   link: {
     post(message: unknown): boolean;
     on(fn: (message: any) => void): () => void;
     connected(): boolean;
-  // 5.7 React, composants et ready [provisoire M8]
+  // 5.9 React, composants et ready [provisoire M8]
   readonly ready: Promise<void>;  // AMK.ready.then(fn) : fn tourne quand le noyau a démarré l'élément
   React: AmkHooks & {
     createElement: CreateElement;

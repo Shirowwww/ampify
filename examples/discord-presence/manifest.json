@@ -1,0 +1,13 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "discord-presence",
+  "name": "Présence Discord",
+  "version": "0.1.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Affiche le morceau en cours dans ton statut Discord. Demande discord.enabled et l'identifiant d'une application Discord.",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "processes": ["engine"],
+  "permissions": ["player.read", "ipc.discord"]
+}

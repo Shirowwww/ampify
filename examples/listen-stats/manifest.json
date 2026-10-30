@@ -1,0 +1,13 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "listen-stats",
+  "name": "Statistiques d'écoute",
+  "version": "0.1.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Compte tes écoutes (titres, artistes, temps écouté) sur ton PC et les montre dans un panneau. Aucun son n'est enregistré.",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "processes": ["ui"],
+  "permissions": ["player.read", "storage", "ui.panel"]
+}

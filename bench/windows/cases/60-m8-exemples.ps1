@@ -7,7 +7,7 @@ Register-Case -Id 'm8-exemples' -Title 'M8 : les thèmes d''exemple sont utilisa
 
     $check = Join-Path $script:BenchKitRoot 'm8\amk_theme_check.exe'
     if (-not (Test-Path -LiteralPath $check)) {
-        Add-Check -Ctx $Ctx -Name 'amk_theme_check.exe présent' -Passed $false -Detail $check
+        Add-Skip -Ctx $Ctx -Name 'amk_theme_check.exe présent' -Reason "pas de build M8 dans ce banc (MinGW ne compile pas XAML) : $check"
         return
     }
 

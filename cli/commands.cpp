@@ -12,7 +12,10 @@
 #include <thread>
 
 #include "../core/apple_music.hpp"
+#include "../core/i18n.hpp"
 #include "../core/launch_flags.hpp"
+#include "../core/midi_map.hpp"
+#include "../core/remote_protocol.hpp"
 #include "../core/theme/commands.hpp"
 #include "../core/theme/files.hpp"
 #include "../core/theme/theme.hpp"
@@ -21,6 +24,7 @@
 #include "element.hpp"
 #include "internal.hpp"
 #include "kit.hpp"
+#include "messages.hpp"
 #include "platform.hpp"
 
 #ifndef AMK_VERSION
@@ -104,9 +108,41 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
         if (!SplitLaunchFlags(value, &problem)) return false;
         return true;
     }
+    if (key == i18n::kLanguageSetting) {
+        if (!i18n::IsLanguageSetting(value)) {
+            problem = Tr("language.value");
+            return false;
+        }
+        return true;
+    }
+    if (key == "remote.port" || key == "midi.device") {
+        int low = key == "remote.port" ? 1024 : 0;
+        int high = key == "remote.port" ? 65535 : 255;
+        int number = -1;
+        auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), number);
+        if (error != std::errc() || end != value.data() + value.size() || number < low || number > high) {
+            problem = key + " attend un nombre de " + std::to_string(low) + " à " + std::to_string(high);
+            return false;
+        }
+        return true;
+    }
+    if (key == "remote.token") {
+        if (!value.empty() && !remote::IsValidToken(value)) {
+            problem = "remote.token attend 32 à 128 caractères parmi A-Z a-z 0-9 - _ (vide : un jeton est créé)";
+            return false;
+        }
+        return true;
+    }
+    if (key == "midi.map") {
+        midi::Map map;
+        if (!map.Parse(value, &problem)) return false;
+        return true;
+    }
 
     bool isBooleanKey = key.rfind("theme.parts.", 0) == 0 || key == "theme.inspect" || key == "theme.live_reload" ||
                         key == "check_kit_update" || key == "telemetry.block" || key == "expose_api" ||
+                        key == "discord.enabled" || key == "tray.enabled" || key == "remote.enabled" ||
+                        key == "midi.enabled" ||
                         (key.size() > 8 && key.compare(key.size() - 8, 8, ".enabled") == 0 &&
                          (key.rfind("extensions.", 0) == 0 || key.rfind("apps.", 0) == 0 ||
                           key.rfind("snippets.", 0) == 0));
@@ -124,7 +160,7 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
 // the other kinds wait for amk apply or the next start.
 int AnnounceSwitch(Context& ctx, std::string_view kind, const std::string& id, bool enable) {
     if (kind != "extension" && kind != "app") {
-        ctx.out << "Lance amk apply (ou amk launch) pour l'appliquer.\n";
+        ctx.out << Tr("applyHint") << "\n";
         return 0;
     }
     RequestReload(ctx, {std::string(enable ? "start " : "stop ") + ReloadTarget(kind, id)});
@@ -137,7 +173,7 @@ int ToggleElement(Context& ctx, Settings& settings, std::string_view list, const
     std::string_view kind = KindOfList(list);
     std::string id = value.substr(1);
     bool enable = value[0] == '+';
-    if (!IsValidId(id)) return Failure(ctx, "identifiant invalide : " + id);
+    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     if (enable) {
         bool builtin = kind == "extension" && std::find(std::begin(kBuiltinExtensions), std::end(kBuiltinExtensions),
@@ -152,7 +188,7 @@ int ToggleElement(Context& ctx, Settings& settings, std::string_view list, const
     SetEnabled(settings, kind, id, enable);
     std::string error;
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
-    ctx.out << std::string(list) << " " << value << " : " << (enable ? "activé" : "désactivé") << "\n";
+    ctx.out << std::string(list) << " " << value << " : " << Tr(enable ? "state.on" : "state.off") << "\n";
     return AnnounceSwitch(ctx, kind, id, enable);
 }
 
@@ -169,25 +205,30 @@ int CmdConfigSet(Context& ctx, Settings& settings) {
     std::string problem;
     if (!CheckSetting(key, value, stored, problem)) return Failure(ctx, problem);
     settings.Set(key, stored);
+    // The remote control needs a token: it is created when the remote control is turned on, if none is set yet.
+    bool tokenCreated = false;
+    if (key == "remote.enabled" && stored == "1" && !remote::IsValidToken(settings.GetString("remote.token", ""))) {
+        settings.Set("remote.token", remote::NewToken());
+        tokenCreated = true;
+    }
     std::string error;
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
     ctx.out << key << " = " << stored << "\n";
+    if (tokenCreated) ctx.out << Tr("remote.tokenCreated") << "\n";
     return 0;
 }
 
 // The state shown in `amk list`, in French.
 std::string StateOf(const Settings& settings, const InstalledElement& element) {
     bool enabled = IsEnabled(settings, element.kind, element.id);
-    if (element.kind == "theme") {
-        if (!element.Valid()) return "invalide : " + element.errors.front();
-        return enabled ? "actif" : "inactif";
-    }
-    if (!element.Valid()) return "invalide : " + element.errors.front();
-    return enabled ? "activé" : "désactivé";
+    if (!element.Valid()) return Tr("state.invalid", {{"error", element.errors.front()}});
+    if (element.kind == "theme") return Tr(enabled ? "state.active" : "state.inactive");
+    return Tr(enabled ? "state.on" : "state.off");
 }
 
 void PrintHeader(Context& ctx) {
-    ctx.out << Pad("TYPE", 11) << Pad("IDENTIFIANT", 26) << Pad("VERSION", 11) << "ÉTAT\n";
+    ctx.out << Pad(Tr("list.type"), 11) << Pad(Tr("list.id"), 26) << Pad(Tr("list.version"), 11) << Tr("list.state")
+            << "\n";
 }
 
 int PrintElements(Context& ctx, std::string_view filter) {
@@ -199,8 +240,9 @@ int PrintElements(Context& ctx, std::string_view filter) {
     PrintHeader(ctx);
     for (std::string_view id : kBuiltinExtensions) {
         if (!filter.empty() && filter != "extension") break;
-        ctx.out << Pad("extension", 11) << Pad(id, 26) << Pad("intégré", 11)
-                << (IsEnabled(settings, "extension", id) ? "activé" : "désactivé") << " (dans le noyau)\n";
+        ctx.out << Pad("extension", 11) << Pad(id, 26) << Pad(Tr("list.builtin"), 11)
+                << Tr(IsEnabled(settings, "extension", id) ? "state.on" : "state.off") << " " << Tr("list.inKernel")
+                << "\n";
         any = true;
     }
     for (const InstalledElement& element : ListInstalled(ctx.kit)) {
@@ -210,12 +252,12 @@ int PrintElements(Context& ctx, std::string_view filter) {
                 << "\n";
         any = true;
     }
-    if (!any) ctx.out << "Aucun élément installé. Voir amk market.\n";
+    if (!any) ctx.out << Tr("list.empty") << "\n";
     return 0;
 }
 
 int SetElementState(Context& ctx, std::string_view kind, const std::string& id, bool enable) {
-    if (!IsValidId(id)) return Failure(ctx, "identifiant invalide : " + id);
+    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     Settings settings;
     std::string error;
@@ -232,10 +274,9 @@ int SetElementState(Context& ctx, std::string_view kind, const std::string& id, 
                 if (element.kind == kind && element.id == id) found = &element;
             }
             if (found == nullptr) {
-                return Failure(ctx, "élément introuvable : " + std::string(kind) + " " + id +
-                                        ". Installe-le avec amk install " + id);
+                return Failure(ctx, Tr("element.notFound", {{"kind", kind}, {"id", id}}));
             }
-            if (!found->Valid()) return Failure(ctx, "élément invalide : " + found->errors.front());
+            if (!found->Valid()) return Failure(ctx, Tr("element.invalid", {{"error", found->errors.front()}}));
             for (const std::string& permission : found->manifest->permissions) {
                 permissions += (permissions.empty() ? "" : ", ") + permission;
             }
@@ -245,8 +286,9 @@ int SetElementState(Context& ctx, std::string_view kind, const std::string& id, 
     SetEnabled(settings, kind, id, enable);
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
 
-    ctx.out << std::string(kind) << " " << id << (enable ? " activé" : " désactivé") << "\n";
-    if (enable && !permissions.empty()) ctx.out << "Permissions demandées : " << permissions << "\n";
+    ctx.out << Tr("element.toggled", {{"kind", kind}, {"id", id}, {"state", Tr(enable ? "state.on" : "state.off")}})
+            << "\n";
+    if (enable && !permissions.empty()) ctx.out << Tr("element.permissions", {{"permissions", permissions}}) << "\n";
     return AnnounceSwitch(ctx, kind, id, enable);
 }
 
@@ -399,7 +441,7 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
         } else if (arg == "--version") {
             options.positional.insert(options.positional.begin(), "version");
         } else if (arg.size() > 2 && arg.compare(0, 2, "--") == 0) {
-            error = "option inconnue : " + arg;
+            error = Tr("unknownOption", {{"option", arg}});
             return std::nullopt;
         } else {
             // Element ids start with a letter or a digit, so "-id" from `config extensions -id` is an argument.
@@ -410,12 +452,12 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
 }
 
 int Failure(Context& ctx, const std::string& message) {
-    ctx.err << "amk : " << message << "\n";
+    ctx.err << Tr("prefix") << message << "\n";
     return 1;
 }
 
 int Usage(Context& ctx, const std::string& message) {
-    ctx.err << "amk : " << message << "\nAide : amk help\n";
+    ctx.err << Tr("prefix") << message << "\n" << Tr("helpHint") << "\n";
     return 2;
 }
 
@@ -450,87 +492,12 @@ bool SaveSettings(const Context& ctx, const Settings& settings, std::string& err
 }
 
 int CmdHelp(Context& ctx) {
-    ctx.out << R"(amk : le kit Apple Music, en ligne de commande
-
-Usage : amk [options] <commande> [arguments]
-        amk backup apply launch      plusieurs commandes sans argument à la suite (arrêt au premier échec) :
-                                     backup, apply, launch, auto, restore, devtools, doctor, version
-
-Réglages et état
-  config                       affiche tous les réglages
-  config <clé>                 affiche un réglage
-  config <clé> <valeur>        change un réglage (valeur vérifiée)
-  config extensions +id        active une extension (ou -id pour la désactiver)
-  config --dir                 ouvre le dossier du kit (--dry-run pour seulement l'afficher)
-  path                         affiche les dossiers du kit et d'Apple Music
-  path <nom>                   un seul chemin : kit, settings, extensions, themes, apps, snippets, logs,
-                               backups, app (paquet d'Apple Music), prefs (préférences d'Apple Music)
-  list                         liste les éléments installés et leur état
-
-Éléments
-  extension list|enable|disable <id>   extensions (dont le nivellement Atmos, intégré)
-  snippet  list|enable|disable <id>    snippets (fragments XAML)
-  app      list|enable|disable <id>    apps (pages ajoutées à l'interface)
-  theme    list | set <id> [--scheme <nom>] | clear
-  theme    check <dossier> [--scheme <nom>]   lit un thème comme le noyau et affiche ce qui s'appliquerait
-  theme    watch <dossier> [--scheme <nom>]   relit le thème à chaque sauvegarde (--max-cycles N pour s'arrêter)
-  validate <dossier>           vérifie le manifeste d'un élément (ou un catalogue.json)
-  new <extension|theme|snippet|app> <id>   crée un élément de départ
-
-Marketplace
-  market                       liste le catalogue
-  install <id> [--yes]         installe depuis le catalogue (SHA-256 vérifié)
-  update <id> [--yes]          met à jour un élément installé depuis le catalogue
-  update [--check] [--apply]   met le kit à jour depuis la dernière release GitHub
-  install-kit <version> [--apply]   installe une version précise du kit (même plus ancienne), SHA-256 vérifié
-  versions [list]              versions d'Apple Music acceptées par le noyau, et celle installée
-  versions update              télécharge la liste des versions testées publiée avec le catalogue
-  remove <id>                  retire un élément (une sauvegarde est faite avant)
-
-Application
-  apply                        écrit ce qui se chargera (active.txt) et prévient le noyau
-  launch                       applique puis lance Apple Music avec le noyau (amk_launcher.exe)
-  restore                      lance Apple Music sans noyau, rien n'est modifié dans le paquet
-  restore --backup <nom>       remet les réglages d'une sauvegarde
-  backup                       fait une sauvegarde des réglages et des éléments
-  backup list                  liste les sauvegardes
-  watch [--interval ms]        applique à chaque modification d'un thème ou d'une extension
-
-Création et développement
-  build <dossier> [fichier.zip]        compile un élément : valide, écrit le zip, donne le SHA-256 et l'entrée de catalogue
-  inspect <dossier> | <type> <id>      affiche le manifeste, les fichiers et leurs SHA-256
-  inspect --tree                       affiche le dernier arbre de l'interface écrit par le noyau
-  devtools [on|off]                    demande au noyau d'écrire l'arbre de l'interface (journal\inspector.txt)
-  dev <dossier>                        copie l'élément dans le kit à chaque sauvegarde et le recharge
-  types [fichier]                      écrit amk.d.ts (types pour l'éditeur, amk.d.ts par défaut)
-  test <dossier>                       lance main.js dans le moteur JavaScript, avec un hôte factice
-
-Diagnostic
-  doctor                       état du kit : éléments, réglages, mode sans échec, journal, outils
-  logs [nombre] [--follow]     dernières lignes du journal du noyau et du lanceur
-
-Profils et transferts
-  profile list                 liste les profils de réglages
-  profile save|use|delete <nom>   enregistre, charge (l'état précédent est sauvegardé) ou supprime un profil
-  export <fichier.zip>         exporte réglages et éléments, sans les fichiers de l'app
-  import <fichier.zip>         importe un export après vérification (--dry-run pour voir sans écrire)
-
-Options
-  --kit-dir <dossier>          dossier du kit (par défaut %USERPROFILE%\AppleMusicModKit)
-  --catalog <source>           catalogue : fichier local, file:// ou https://
-  --dry-run                    affiche la commande qui serait lancée, sans la lancer
-  --yes, -y                    répond oui à toutes les questions
-  --max-cycles <n>             arrête watch, dev ou logs --follow après n passages (utile pour les tests)
-  --follow                     logs : continue d'afficher les nouvelles lignes
-  --version, --help
-
-Documentation : docs/cli/COMMANDES.md
-)";
+    ctx.out << Tr("help");
     return 0;
 }
 
 int CmdVersion(Context& ctx) {
-    ctx.out << "amk " << AMK_VERSION << " (API d'extensions 1.0)\n";
+    ctx.out << Tr("version", {{"version", AMK_VERSION}}) << "\n";
     return 0;
 }
 
@@ -599,7 +566,7 @@ int CmdPath(Context& ctx) {
 int CmdConfig(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (ctx.options.dir) return CmdConfigDir(ctx);
-    if (args.size() > 3) return Usage(ctx, "trop d'arguments pour config");
+    if (args.size() > 3) return Usage(ctx, Tr("tooManyArgs", {{"command", "config"}}));
 
     Settings settings;
     std::string error;
@@ -611,7 +578,7 @@ int CmdConfig(Context& ctx) {
     }
     if (args.size() == 2) {
         std::optional<std::string> value = settings.Get(args[1]);
-        if (!value) return Failure(ctx, "clé absente : " + args[1]);
+        if (!value) return Failure(ctx, Tr("missingKey", {{"key", args[1]}}));
         ctx.out << *value << "\n";
         return 0;
     }
@@ -625,14 +592,14 @@ int CmdList(Context& ctx) {
 int CmdKind(Context& ctx, std::string_view kind) {
     const std::vector<std::string>& args = ctx.options.positional;
     std::string_view action = args.size() > 1 ? std::string_view(args[1]) : std::string_view("list");
-    if (args.size() > 3) return Usage(ctx, "trop d'arguments pour " + std::string(kind));
+    if (args.size() > 3) return Usage(ctx, Tr("tooManyArgs", {{"command", kind}}));
 
     if (action == "list") return PrintElements(ctx, kind);
     if (action == "enable" || action == "disable") {
-        if (args.size() < 3) return Usage(ctx, std::string(action) + " attend un identifiant");
+        if (args.size() < 3) return Usage(ctx, Tr("needsId", {{"action", action}}));
         return SetElementState(ctx, kind, args[2], action == "enable");
     }
-    return Usage(ctx, "action inconnue : " + std::string(action));
+    return Usage(ctx, Tr("unknownAction", {{"action", action}}));
 }
 
 int CmdTheme(Context& ctx) {
@@ -767,7 +734,7 @@ int Dispatch(Context& ctx) {
     for (std::string_view kind : kKindCommands) {
         if (command == kind) return CmdKind(ctx, kind);
     }
-    return Usage(ctx, "commande inconnue : " + command);
+    return Usage(ctx, Tr("unknownCommand", {{"command", command}}));
 }
 
 // Verbs that take no argument and can follow one another on a line, as in Spicetify (`spicetify backup apply`):
@@ -794,6 +761,7 @@ bool IsChainLine(const std::vector<std::string>& positional) {
 
 int Execute(const Options& options, std::istream& in, std::ostream& out, std::ostream& err) {
     KitLayout kit(options.kitDir ? PathArgument(*options.kitDir) : platform::DefaultKitDirectory());
+    SetLanguage(LanguageFor(kit.Settings(), platform::UserLocale()));
     std::vector<std::vector<std::string>> commands;
     if (IsChainLine(options.positional)) {
         for (const std::string& verb : options.positional) commands.push_back({verb});
@@ -811,7 +779,7 @@ int Execute(const Options& options, std::istream& in, std::ostream& out, std::os
         code = Dispatch(ctx);
         if (code != 0) {
             if (i + 1 < commands.size()) {
-                err << "amk : « " << commands[i][0] << " » a échoué, les commandes suivantes ne sont pas lancées\n";
+                err << Tr("prefix") << Tr("chainStopped", {{"command", commands[i][0]}}) << "\n";
             }
             break;
         }

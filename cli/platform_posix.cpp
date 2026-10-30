@@ -37,6 +37,15 @@ std::filesystem::path DefaultKitDirectory() {
     return std::filesystem::path(home ? home : ".") / "AppleMusicModKit";
 }
 
+std::string UserLocale() {
+    // The first variable set wins, as for any POSIX program reading its messages language.
+    for (const char* name : {"LC_ALL", "LC_MESSAGES", "LANG"}) {
+        const char* value = std::getenv(name);
+        if (value && *value) return value;
+    }
+    return {};
+}
+
 std::filesystem::path ExecutableDirectory() {
     std::error_code ec;
     std::filesystem::path exe = std::filesystem::read_symlink("/proc/self/exe", ec);

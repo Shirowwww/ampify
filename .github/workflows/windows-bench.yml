@@ -119,11 +119,22 @@ jobs:
     name: Banc Windows, kit compilé avec MSVC
     runs-on: windows-latest
     timeout-minutes: 75
+    # The XAML build comes from xaml-m8. The bench runs even when that job fails, without the M8 cases then.
+    needs: xaml-m8
+    if: always()
     steps:
       - uses: actions/checkout@v4
 
+      - name: Récupérer le build M8 de banc (XAML)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: amk-m8-banc
+          path: dist-msvc/m8
+
       - name: Compiler le kit avec MSVC (diffusion et banc)
         shell: pwsh
+        timeout-minutes: 25  # 8 minutes usually; a stuck build must show where it stopped, not hold the job
         run: |
           $dist = Join-Path $PWD 'dist-msvc'
           $variants = @(
@@ -247,6 +258,32 @@ jobs:
           cmake -S . -B build -A x64 -DAMK_XAML=ON "-DAMK_WINAPPSDK_INCLUDE=$env:WASDK_INCLUDE" 2>&1 |
             Tee-Object -FilePath m8-out/configure.log
           cmake --build build --config Release --parallel 2>&1 | Tee-Object -FilePath m8-out/build.log
+
+      # Same build in bench mode (any Apple Music version), packaged for the MSVC bench, which runs the M8 cases
+      # (example themes, inspector, minuit theme) in the real Apple Music. Never ship it.
+      - name: Compiler et empaqueter le build M8 de banc (AMK_XAML=ON, AMK_BENCH=ON)
+        shell: pwsh
+        working-directory: m8
+        run: |
+          cmake -S . -B build-banc -A x64 -DAMK_XAML=ON -DAMK_BENCH=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DAMK_WINAPPSDK_INCLUDE=$env:WASDK_INCLUDE"
+          if ($LASTEXITCODE -ne 0) { throw 'configuration du build M8 de banc en échec' }
+          cmake --build build-banc --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { throw 'compilation du build M8 de banc en échec' }
+          $pack = Join-Path $PWD 'm8-banc'
+          New-Item -ItemType Directory -Force -Path (Join-Path $pack 'themes') | Out-Null
+          foreach ($exe in 'amk_launcher.exe', 'amk_kernel.dll', 'amk_theme_check.exe') {
+            $found = Get-ChildItem -LiteralPath build-banc -Recurse -Filter $exe | Select-Object -First 1
+            if (-not $found) { throw "$exe absent du build M8 de banc" }
+            Copy-Item -LiteralPath $found.FullName -Destination $pack
+          }
+          Copy-Item -LiteralPath themes/examples -Destination (Join-Path $pack 'themes') -Recurse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amk-m8-banc
+          path: m8/m8-banc
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Lancer amk_tests et amk_ui_thread_test
         if: always()

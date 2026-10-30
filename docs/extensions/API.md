@@ -51,6 +51,7 @@ AppleMusic.exe ou AMPLibraryAgent.exe
 L'objet global est fait de **modules** (`core`, `config`, `storage`, `player`, `audio`, `keyboard`, `notify`, `http`,
 `icons`, `uri`, `color`, `timers`, `console`, `ui`, `link`, et `audioAnalysis` qui complète `audio`). Chaque module vit dans ses propres fichiers, pour que plusieurs personnes
 `icons`, `uri`, `timers`, `console`, `ui`, `react`). Chaque module vit dans ses propres fichiers, pour que plusieurs personnes
+`icons`, `uri`, `timers`, `console`, `ui`, `crypto`, `i18n`, `discord`, `tray`, `midi`, `remote`, `fs`). Chaque module vit dans ses propres fichiers, pour que plusieurs personnes
 puissent en ajouter en même temps sans modifier les mêmes lignes :
 
 | Partie d'un module `foo` | Où |
@@ -169,7 +170,7 @@ faire.
 | Permission | Ce qu'elle donne | Statut |
 |---|---|---|
 | (aucune) | `AMK.log`, `AMK.onStop`, `AMK.config`, `AMK.uri`, `AMK.locale` | [ferme] |
-| (aucune) | `AMK.icons` | [provisoire M7] |
+| (aucune) | `AMK.icons`, `AMK.i18n`, `AMK.crypto`, `AMK.remote` (réglage `remote.enabled`) | [provisoire M7] |
 | `storage` | `AMK.storage`, un fichier JSON par élément, dans `storage\<id>.json` | [ferme] |
 | `notifications` | `AMK.notify`, notification Windows | [provisoire M7] |
 | `ui.keyboard` | `AMK.keyboard.bind`, raccourcis globaux ou limités à la fenêtre | [provisoire M7] |
@@ -184,15 +185,23 @@ faire.
 | `library.read` | `AMK.library`, lecture de la bibliothèque et des playlists | [provisoire M8] |
 | `library.write` | Écriture de playlists et de la file, après la lecture | [provisoire M8] |
 | `services.read` | `AMK.services.call`, appels en lecture à une liste blanche de services de l'app | [provisoire M8] |
-| `ipc.discord` | Tube local vers le client Discord, pour la présence | [provisoire M7] |
-| `midi.input` | Entrées d'un contrôleur MIDI | [provisoire, après M7] |
-| `network:<hôte>` | `AMK.http.get`, uniquement vers l'hôte déclaré | [ferme] pour le mécanisme |
+| `ipc.discord` | `AMK.discord`, tube local vers le client Discord, pour la présence (réglage `discord.enabled`) | [provisoire M7] |
+| `midi.input` | `AMK.midi`, entrées d'un contrôleur MIDI (réglage `midi.enabled`) | [provisoire, après M7] |
+| `ui.tray` | `AMK.tray`, entrées dans le menu de l'icône du kit (réglage `tray.enabled`) | [provisoire M7] |
+| `fs.output` | `AMK.fs.writeText`, un fichier texte dans `output\<id>\` du kit, et nulle part ailleurs | [provisoire M7] |
+| `network:<hôte>` | `AMK.http.get` et `AMK.http.post`, uniquement vers l'hôte déclaré | [ferme] pour le mécanisme |
 
 Chaque chemin de [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md) indique la permission qu'il demande.
 
 Aucune fonction ne modifie le curseur de volume ni `AVCFPlayerSetVolume`. Le gain interne (`audio.gain`) agit sur les
-échantillons seulement. Il n'existe pas de permission pour le système de fichiers ni pour le code natif.
-Ils ne seront pas ajoutés.
+échantillons seulement. Il n'existe pas de permission pour lire le disque, choisir un dossier, ni appeler du code
+natif. Elles ne seront pas ajoutées. `fs.output` est la seule écriture permise : un fichier texte (`.txt`, `.json`,
+`.csv`, `.html`, `.xml`, 256 Ko et 16 fichiers au plus) dans `%USERPROFILE%\AppleMusicModKit\output\<id>\`, pour
+qu'un autre programme le lise (une source texte d'OBS). L'élément ne peut ni relire, ni effacer, ni sortir de ce dossier.
+
+Les services du kit (présence Discord, icône de notification, télécommande locale, MIDI) sont tous **désactivés par
+défaut**. Chacun demande un réglage du kit (`discord.enabled`, `tray.enabled`, `remote.enabled`, `midi.enabled`), que
+seul l'utilisateur change, en plus de la permission de l'élément. Un élément ne peut pas les allumer.
 
 ## 5. Objet global `AMK`
 
@@ -207,6 +216,15 @@ AMK.process              // "ui" ou "engine" [provisoire M3], voir section 2
 AMK.log(message)         // écrit dans le journal, préfixé par l'identifiant de l'élément
 AMK.onStop(fn)           // fn est appelée à l'arrêt de l'élément
 AMK.locale               // langue de l'app, ex. "fr-FR" (lecture seule)
+```
+
+Textes en français et en anglais [provisoire M7], sans permission :
+
+```js
+AMK.i18n.language                    // "fr" ou "en" : langue du kit, réglage language = fr, en ou auto (auto suit Windows)
+AMK.i18n.define({ fr: { salut: "Bonjour {nom}" }, en: { salut: "Hello {nom}" } })
+AMK.i18n.t("salut", { nom: "Léa" })  // texte dans la langue du kit, sinon en français, sinon la clé
+AMK.i18n.t("kit.tray.next")          // textes du kit lui-même, préfixe kit.
 ```
 
 ### 5.2 Réglages et stockage [ferme]
@@ -317,7 +335,7 @@ booléen), jamais des objets ni des listes. Le noyau vérifie l'arbre (`core/ui_
 `onClick` et `onChange` contiennent un numéro de rappel (entier positif), donné par le noyau. Le noyau refuse
 `onClick` hors de `button`, `card`, `image` et `icon`, et `onChange` hors de `toggle`, `slider`, `textfield` et
 `dropdown`. L'hôte signale un clic avec `ScriptExtension::DeliverClick(numéro)` et une nouvelle valeur avec
-`DeliverEvent("change", {"id": numéro, "value": valeur})`. `AMK.React` (section 5.8) remplit ces numéros.
+`DeliverEvent("change", {"id": numéro, "value": valeur})`. `AMK.React` (section 5.9) remplit ces numéros.
 
 ```js
 AMK.ui.topbar.addButton({ label, icon, onClick })
@@ -350,6 +368,8 @@ version suivante pourra accepter du XAML validé contre une liste de types et de
 AMK.notify({ title, text })                      // [provisoire M7] permission notifications
 AMK.keyboard.bind("Ctrl+Alt+L", fn)              // [provisoire M7] permission ui.keyboard
 AMK.http.get(url) -> Promise<{ status, text }>   // [ferme] permission network:<hôte>
+AMK.http.post(url, corps, { headers }) -> Promise<{ status, text }>  // [provisoire M7] mêmes règles que get
+AMK.crypto.md5(texte) -> chaîne hexadécimale     // [provisoire M7] pour les services qui signent ainsi (Last.fm)
 AMK.uri.parse(texte) / AMK.uri.build(...)        // [ferme] liens music:// et https://music.apple.com
 AMK.icons.get(nom) -> chaîne SVG                 // [provisoire M7]
 AMK.color.extract(pixels, largeur, hauteur)      // [provisoire M8] aucune permission
@@ -364,10 +384,61 @@ AMK.lyrics.current() -> Promise<paroles>         // [provisoire M8] permission p
 
 `AMK.http.get` ne sert qu'aux services tiers (Last.fm, ListenBrainz, fournisseurs de paroles). Il ne peut pas
 atteindre les API internes d'Apple : le noyau refuse tout hôte qui ne figure pas dans les permissions du manifeste.
+`AMK.http.post` suit les mêmes règles (https, hôte déclaré). Un corps texte part en formulaire
+(`application/x-www-form-urlencoded`), un objet part en JSON. Seuls les en-têtes `content-type`, `authorization` et
+`accept` sont acceptés, sans retour à la ligne. Corps de 64 Ko au plus.
+
+### 5.7 Services locaux [provisoire M7]
+
+Chaque service est éteint tant que l'utilisateur n'a pas mis son réglage à 1 (`amk config discord.enabled 1`...).
+Éteint, ou absent de l'hôte, un appel renvoie `false` et écrit une ligne au journal, sans lever d'erreur.
+
+```js
+// Présence Discord, permission ipc.discord, réglage discord.enabled
+AMK.discord.setActivity({ clientId, details, state, largeImage, largeText, smallImage, smallText, startMs, endMs })
+AMK.discord.clear()
+
+// Menu de l'icône du kit dans la zone de notification, permission ui.tray, réglage tray.enabled (AppleMusic.exe)
+AMK.tray.setMenu([{ label, onClick, checked, enabled }, "-"])   // "-" : séparateur, 20 entrées au plus
+AMK.tray.onClick(fn)                                            // clic gauche sur l'icône
+
+// Contrôleur MIDI, permission midi.input, réglage midi.enabled (AMPLibraryAgent.exe)
+AMK.midi.on("note:60" | "cc:7" | "ch2:note:36" | "note:*" | "*", fn)   // fn({ type, channel, number, value })
+AMK.midi.devices() -> ["nom", ...]
+
+// Télécommande locale, réglage remote.enabled (AMPLibraryAgent.exe), sans permission
+AMK.remote.setState(objet)          // ajouté à GET /status sous extensions.<id>, 4 Ko au plus
+
+// Fichier de sortie, permission fs.output
+AMK.fs.writeText("now-playing.txt", texte)   // -> output\<id>\now-playing.txt, remplacé d'un coup
+```
+
+`clientId` est l'identifiant d'une application créée sur le portail des développeurs Discord (17 à 20 chiffres).
+Le dernier élément qui appelle `setActivity` l'emporte, et sa présence disparaît quand il s'arrête.
+
+**Télécommande locale.** Serveur HTTP lié à `127.0.0.1` seulement, sur le port `remote.port` (8974 par défaut). Le
+jeton `remote.token` est créé quand on met `remote.enabled` à 1 (`amk config remote.token` l'affiche). Il va dans
+l'en-tête `X-AMK-Token` (ou `Authorization: Bearer`), jamais dans l'adresse. Une requête venue d'une page web (en-tête
+`Origin`, préflight `OPTIONS`) ou avec un autre `Host` que `127.0.0.1` ou `localhost` est refusée.
+
+| Requête | Effet |
+|---|---|
+| `GET /status` | `{ playing, positionMs, durationMs, track, gainDb, extensions }` |
+| `POST /play`, `/pause`, `/next`, `/previous` | commande du lecteur, `409` si l'app ne peut pas maintenant (sous Windows, `play` et `pause` attendent l'état du lecteur, M4) |
+| `POST /volume?db=-6` (ou le corps `{"db": -6}`) | gain interne sur les échantillons, borné par `audio.maxGainDb`. Le curseur de volume ne bouge pas |
+
+```sh
+curl -H "X-AMK-Token: <jeton>" http://127.0.0.1:8974/status
+curl -X POST -H "X-AMK-Token: <jeton>" http://127.0.0.1:8974/next
+```
+
+**MIDI.** `midi.device` choisit l'appareil (0 pour le premier). `midi.map` relie des touches à des commandes du kit,
+sans élément : `note:60=next;note:62=previous;cc:20=play;cc:7=gain` (`gain` : un potentiomètre de -30 à 0 dB). Pas de
+retour lumineux vers le contrôleur.
 `AMK.services.call` ne crée pas de connexion nouvelle : il appelle les services que l'app utilise déjà, et seulement
 ceux de la liste blanche publiée avec le kit.
 
-### 5.7 Lien entre une app et son extension [provisoire M7]
+### 5.8 Lien entre une app et son extension [provisoire M7]
 
 Une app et une extension qui ont le même identifiant sont **liées** (les `subfiles_extension` de Spicetify). Les deux
 tournent dans le même processus, chacune dans son moteur. Elles s'échangent des messages JSON :
@@ -398,7 +469,7 @@ AMK.link.connected()     // true si l'autre élément tourne
   parlent. Un script de thème n'est lié à rien.
 - L'app et l'extension partagent le fichier `storage\<id>.json` (même identifiant). Une seule des deux doit écrire
   son stockage : l'autre passe par `AMK.link`.
-### 5.8 React, composants et `AMK.ready` [provisoire M8]
+### 5.9 React, composants et `AMK.ready` [provisoire M8]
 
 Spicetify donne React aux extensions. Une app native ne peut pas faire tourner le vrai React : le kit fournit un petit
 moteur qui accepte la même écriture, sans JSX, et qui produit l'arbre de primitives de la section 5.5. Il n'a pas de
@@ -501,7 +572,7 @@ Une app est une extension qui ajoute une page de navigation (`AMK.ui.page.regist
 états (`icon`, et `active-icon` prévue). Elle vit dans `apps\<id>` et s'active avec `apps.<id>.enabled`
 (`amk app enable <id>`). Dans cette version, son code tourne dès qu'elle est activée, comme une extension : l'entrée
 de la barre latérale et l'ouverture de la page viennent avec M8. Une app peut avoir une extension du même identifiant,
-qui tourne au démarrage : les deux se parlent par `AMK.link` (section 5.7). Son code peut être réparti en modules
+qui tourne au démarrage : les deux se parlent par `AMK.link` (section 5.8). Son code peut être réparti en modules
 (section 3.6).
 
 ### 6.3 Snippets [provisoire M8]
@@ -597,6 +668,13 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
 | `color.extract` (pixels fournis par le script) | fait | tests C++ |
 | `ui.*`, `React`, `components`, `library`, `player.queue`, `services`, `lyrics`, `color.fromArtwork` | à faire (M8) | |
 | Découverte des dossiers, activation, rechargement (`Restart`), isolement des pannes | fait | tests C++ et Wine |
+| `http.post`, `crypto.md5` | fait. Sous Windows : WinHTTP, mêmes délais et limites que `get` | tests C++ ; échec testé sous Wine, succès à voir sur le PC |
+| `i18n` (`language`, `define`, `t`) et textes du kit en français et en anglais (aide et messages principaux de `amk`) | fait. Réglage `language` : `fr`, `en`, `auto` | tests C++ et `tools/test_cli.py` |
+| `discord.setActivity`, `clear` | fait. Sous Windows : tube `\\.\pipe\discord-ipc-0` à `9`, sur un fil à part, nouvel essai toutes les 15 s | tests C++ ; faux serveur Discord sous Wine ; vrai Discord à voir sur le PC |
+| `tray.setMenu`, `onClick` | fait. Sous Windows : `Shell_NotifyIcon`, fenêtre message sur son propre fil, dans AppleMusic.exe | tests C++ ; Wine refuse l'icône (test sauté) ; à voir sur le PC |
+| `midi.on`, `devices`, et `midi.map` | fait. Sous Windows : `midiInOpen` (winmm), dans AMPLibraryAgent.exe | tests C++ ; liaisons testées sous Wine sans appareil ; vrai contrôleur à voir sur le PC |
+| `remote.setState` et la télécommande locale | fait. Sous Windows : Winsock sur `127.0.0.1` seulement, dans AMPLibraryAgent.exe | tests C++ ; client local et refus des autres adresses sous Wine |
+| `fs.writeText` | fait. `output\<id>\` du kit seulement | tests C++ et Wine |
 | `audio.onSamples`, `audio.analyze` | à faire (M4) | |
 | `React`, `ReactDOM`, `hooks`, `components`, `ready` | fait côté runtime : l'arbre de primitives est produit et vérifié, les clics et changements reviennent par leurs numéros. Le rendu XAML viendra avec M8 | tests C++ (`tests/react_tests.cpp`) ; `amk test examples/react-panel` |
 | `ui.*`, `library`, `player.queue`, `services`, `lyrics`, `color` | à faire (M8) | |

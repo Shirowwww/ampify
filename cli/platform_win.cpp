@@ -101,6 +101,14 @@ std::filesystem::path DefaultKitDirectory() {
     return std::filesystem::path(profile) / L"AppleMusicModKit";
 }
 
+std::string UserLocale() {
+    wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
+    if (GetUserDefaultLocaleName(name, LOCALE_NAME_MAX_LENGTH) == 0) return {};
+    std::string narrow;
+    for (const wchar_t* c = name; *c; ++c) narrow += static_cast<char>(*c);  // locale names are ASCII
+    return narrow;
+}
+
 std::filesystem::path ExecutableDirectory() {
     wchar_t buffer[MAX_PATH * 4];
     DWORD length = GetModuleFileNameW(nullptr, buffer, static_cast<DWORD>(std::size(buffer)));

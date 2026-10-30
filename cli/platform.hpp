@@ -16,6 +16,10 @@ std::vector<std::string> Initialize(int argc, char** argv);
 // %USERPROFILE%\AppleMusicModKit on Windows, $HOME/AppleMusicModKit elsewhere.
 std::filesystem::path DefaultKitDirectory();
 
+// The user's locale, such as "fr-FR" on Windows or "fr_FR.UTF-8" from LC_ALL, LC_MESSAGES or LANG elsewhere.
+// Empty when none is set. The setting `language` = auto follows it (core/i18n.hpp).
+std::string UserLocale();
+
 // The folder that holds amk itself. The launcher and the updater are looked for next to it.
 std::filesystem::path ExecutableDirectory();
 

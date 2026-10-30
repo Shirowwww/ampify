@@ -23,7 +23,9 @@ Register-Case -Id 'cli-build-installe' -Title 'amk build, install, export, impor
         Add-Check -Ctx $Ctx -Name 'amk build ecrit le zip' -Passed ((Test-Path -LiteralPath $zip) -and ($LASTEXITCODE -eq 0)) -Detail $built.Trim()
         if (-not (Test-Path -LiteralPath $zip)) { return }
 
-        $listing = (& tar.exe -tf $zip 2>&1) | Out-String
+        # The tar of Windows, by full path: the job runs under Git Bash, whose GNU tar comes first in PATH.
+        $windowsTar = Join-Path $env:SystemRoot 'System32\tar.exe'
+        $listing = (& $windowsTar -tf $zip 2>&1) | Out-String
         Add-Check -Ctx $Ctx -Name 'tar.exe lit le zip compile' -Passed ($listing -match 'manifest\.json') -Detail $listing.Trim()
 
         # The catalogue entry printed by build, with the address of the local archive.

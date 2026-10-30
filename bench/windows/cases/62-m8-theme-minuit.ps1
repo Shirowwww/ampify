@@ -10,7 +10,7 @@ Register-Case -Id 'm8-theme-minuit' -Title 'M8 : le thème minuit s''applique, p
     $launcher = Join-Path $script:BenchKitRoot 'm8\amk_launcher.exe'
     $example = Join-Path $script:BenchKitRoot 'm8\themes\examples\minuit'
     if (-not (Test-Path -LiteralPath $launcher) -or -not (Test-Path -LiteralPath $example)) {
-        Add-Check -Ctx $Ctx -Name 'build M8 et thème minuit présents' -Passed $false -Detail "$launcher / $example"
+        Add-Skip -Ctx $Ctx -Name 'build M8 et thème minuit présents' -Reason ("pas de build M8 dans ce banc : " + "$launcher / $example")
         return
     }
 
