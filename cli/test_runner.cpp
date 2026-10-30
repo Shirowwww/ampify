@@ -1,9 +1,14 @@
 // `amk test`: runs an element's main.js in the kernel's JavaScript engine, with a host that records what the element
 // asks for. Nothing reaches Apple Music, the network or the disk outside the test: the host answers in memory.
 
+#include <cmath>
+#include <functional>
 #include <map>
+#include <numbers>
 #include <sstream>
+#include <vector>
 
+#include "../core/audio/audio_engine.hpp"
 #include "../core/host.hpp"
 #include "../core/journal.hpp"
 #include "../core/manifest.hpp"
@@ -15,6 +20,57 @@
 namespace amk::cli {
 
 namespace {
+
+// AMK.audio during a test run: the kernel's real analysis and equalizer, fed with a synthetic signal instead of a
+// sound card (see PlaySyntheticAudio). The loudness and the player volume are fixed values.
+class TestAudio : public audio::AudioEngine {
+public:
+    explicit TestAudio(std::function<void(const std::string&)> count) : m_count(std::move(count)) {
+        PublishPlayerVolume(0.5);
+    }
+
+    void SubscribeFrames(const std::string& elementId, FrameSink sink) override {
+        m_count("audio : images d'analyse");
+        AudioEngine::SubscribeFrames(elementId, std::move(sink));
+    }
+    AudioAnalysisResult Analyze(const std::string& elementId) override {
+        m_count("audio : analyse");
+        return AudioEngine::Analyze(elementId);
+    }
+    LoudnessReading Loudness() override {
+        PublishLoudness({-14.0, -14.0});
+        return AudioEngine::Loudness();
+    }
+    std::optional<double> PlayerVolume() override {
+        m_count("audio : volume (lecture)");
+        return AudioEngine::PlayerVolume();
+    }
+    bool SetEqBand(const std::string& elementId, size_t band, double gainDb) override {
+        m_count("audio : égaliseur");
+        return AudioEngine::SetEqBand(elementId, band, gainDb);
+    }
+
+    // 8 s of a 440 Hz tone with a click every 0.5 s (120 BPM), at 48 kHz, then one delivery of the newest frame.
+    void PlaySyntheticAudio() {
+        if (!AnalysisWanted()) return;
+        constexpr double kRate = 48000;
+        constexpr size_t kBlock = 480;
+        std::vector<float> block(2 * kBlock);
+        for (size_t start = 0; start < static_cast<size_t>(8 * kRate); start += kBlock) {
+            for (size_t i = 0; i < kBlock; i++) {
+                size_t n = start + i;
+                double tone = 0.25 * std::sin(2 * std::numbers::pi * 440.0 * static_cast<double>(n) / kRate);
+                double click = (n % 24000) < 240 ? 0.5 : 0.0;
+                block[2 * i] = block[2 * i + 1] = static_cast<float>(tone + click);
+            }
+            FeedAnalysis(block.data(), kBlock, 2, kRate);
+        }
+        DeliverPending();
+    }
+
+private:
+    std::function<void(const std::string&)> m_count;
+};
 
 // The host of a test run. Settings and storage live in memory. Every other call answers with a fixed value, and each
 // call is counted, so the report says what the element used.
@@ -69,6 +125,12 @@ public:
         return m_ui;
     }
 
+    void* QueryCapability(std::string_view name) override {
+        if (name == AudioHost::kCapabilityName) return static_cast<AudioHost*>(&m_audio);
+        return Host::QueryCapability(name);
+    }
+    void PlaySyntheticAudio() { m_audio.PlaySyntheticAudio(); }
+
     const std::map<std::string, int>& Calls() const { return m_calls; }
 
 private:
@@ -78,6 +140,7 @@ private:
     std::map<std::string, std::string> m_storage;
     std::map<std::string, int> m_calls;
     UiModel m_ui;
+    TestAudio m_audio{[this](const std::string& what) { Count(what); }};
 };
 
 }  // namespace
@@ -115,7 +178,10 @@ int CmdTest(Context& ctx) {
     TestHost host;
     ScriptExtension element(*parsed.manifest, folder, host, journal);
     bool started = element.Start();
-    if (started) element.Pump();
+    if (started) {
+        host.PlaySyntheticAudio();  // only when the element asked for analysis frames or the tempo
+        element.Pump();
+    }
     element.Stop();
 
     ctx.out << "amk test : " << manifest.id << " (" << manifest.kind << " " << manifest.version << ")\n";

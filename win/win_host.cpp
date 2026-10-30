@@ -15,6 +15,7 @@
 #include <system_error>
 #include <vector>
 
+#include "../core/audio/audio_engine.hpp"
 #include "../core/gain_board.hpp"
 
 namespace amk {
@@ -176,6 +177,15 @@ void WinHost::SetGainDb(const std::string& elementId, double db) {
     line << std::fixed << std::setprecision(1) << "[" << elementId << "] gain audio : " << db
          << " dB demandé, total " << ElementGains().TotalDb() << " dB";
     m_journal.Write(line.str());
+}
+
+void* WinHost::QueryCapability(std::string_view name) {
+    if (m_process == "engine" && name == AudioHost::kCapabilityName) {
+        audio::AudioEngine& engine = audio::ProcessAudio();
+        engine.StartDeliveryThread();  // analysis frames go out from their own thread, 20 a second at most
+        return static_cast<AudioHost*>(&engine);
+    }
+    return Host::QueryCapability(name);
 }
 
 WinHost::~WinHost() {

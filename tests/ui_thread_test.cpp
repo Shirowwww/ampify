@@ -15,6 +15,8 @@ namespace {
 std::atomic<int> g_ran{0};
 std::atomic<bool> g_onInterfaceThread{false};
 DWORD g_interfaceThread = 0;
+DWORD g_hookedThread = 0;  // the thread AttachUiThread chose: it must be g_interfaceThread
+DWORD g_postError = 0;     // GetLastError after a failed post, 0 when every post worked
 
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     return DefWindowProcW(window, message, wParam, lParam);
@@ -46,11 +48,14 @@ int main() {
             attachedOk = amk::win::AttachUiThread(GetCurrentProcessId(), GetModuleHandleW(nullptr));
             if (!attachedOk) Sleep(100);
         }
+        g_hookedThread = amk::win::UiThreadId();
         for (int i = 0; i < 3; i++) {
-            postedOk = amk::win::PostToUiThread([] {
+            bool posted = amk::win::PostToUiThread([] {
                 g_onInterfaceThread = GetCurrentThreadId() == g_interfaceThread;
                 g_ran++;
-            }) && postedOk;
+            });
+            if (!posted && g_postError == 0) g_postError = GetLastError();
+            postedOk = posted && postedOk;
         }
     });
 
@@ -70,8 +75,10 @@ int main() {
     DestroyWindow(window);
 
     bool passed = attachedOk && postedOk && g_ran == 3 && g_onInterfaceThread;
-    std::printf("attach=%d posted=%d ran=%d on_interface_thread=%d\n", attachedOk ? 1 : 0, postedOk ? 1 : 0,
-                g_ran.load(), g_onInterfaceThread ? 1 : 0);
+    std::printf("attach=%d posted=%d ran=%d on_interface_thread=%d hooked_thread=%lu interface_thread=%lu error=%lu\n",
+                attachedOk ? 1 : 0, postedOk ? 1 : 0, g_ran.load(), g_onInterfaceThread ? 1 : 0,
+                static_cast<unsigned long>(g_hookedThread), static_cast<unsigned long>(g_interfaceThread),
+                static_cast<unsigned long>(g_postError));
     std::printf("%s\n", passed ? "PASS" : "FAIL");
     return passed ? 0 : 1;
 }

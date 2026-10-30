@@ -31,9 +31,11 @@ public:
 
     explicit ObjectPass(double sampleRate);
 
-    // Meters every object, then applies the gain eased towards `targetLinear`. A buffer is read
-    // before it is gained, so the measurement never sees the gain.
-    const PassLevels& Process(std::span<const ObjectBuffer> objects, size_t frames, double targetLinear);
+    // Meters every object, then applies the gain eased towards `targetLinear`, then `stage` when one is given
+    // (the kit's equalizer, keyed by object), then the knee. A buffer is read before it is gained, so the
+    // measurement never sees the gain.
+    const PassLevels& Process(std::span<const ObjectBuffer> objects, size_t frames, double targetLinear,
+                              SampleStage* stage = nullptr);
 
 private:
     double m_sampleRate;

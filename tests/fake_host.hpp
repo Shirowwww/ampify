@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "../core/audio/audio_host.hpp"
 #include "../core/host.hpp"
 
 namespace amk::test {
@@ -76,6 +77,14 @@ struct FakeHost : Host {
     HttpResponse HttpGet(const std::string& url) override {
         requestedUrls.push_back(url);
         return httpResponse;
+    }
+
+    // Optional audio: a test that sets it (usually to an amk::audio::AudioEngine it feeds) offers AudioHost.
+    AudioHost* audio = nullptr;
+
+    void* QueryCapability(std::string_view name) override {
+        if (audio && name == AudioHost::kCapabilityName) return audio;
+        return Host::QueryCapability(name);
     }
 };
 

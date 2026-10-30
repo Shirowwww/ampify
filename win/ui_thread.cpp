@@ -68,7 +68,10 @@ bool AttachUiThread(DWORD processId, HINSTANCE module) {
     EnumWindows(FindMainWindow, reinterpret_cast<LPARAM>(&search));
     if (search.threadId == 0) return false;
 
-    HHOOK hook = SetWindowsHookExW(WH_GETMESSAGE, UiHookProc, module, search.threadId);
+    // The thread is in this process and so is the hook procedure (the kernel DLL, or the test program): Microsoft's
+    // documentation asks for a null module in that case. A module handle is only for hooks into other processes.
+    HINSTANCE hookModule = processId == GetCurrentProcessId() ? nullptr : module;
+    HHOOK hook = SetWindowsHookExW(WH_GETMESSAGE, UiHookProc, hookModule, search.threadId);
     if (!hook) return false;
 
     std::lock_guard<std::mutex> lock(state.mutex);
@@ -99,8 +102,12 @@ bool PostToUiThread(std::function<void()> work) {
     }
 
     // WM_NULL does nothing by itself. Its only use is to make the thread take a message, which runs the hook.
-    PostThreadMessageW(threadId, WM_NULL, 0, 0);
-    return true;
+    return PostThreadMessageW(threadId, WM_NULL, 0, 0) != FALSE;
+}
+
+DWORD UiThreadId() {
+    std::lock_guard<std::mutex> lock(State().mutex);
+    return State().threadId;
 }
 
 bool UiThreadAttached() {

@@ -57,4 +57,22 @@ void ApplyCurve(float* samples, size_t frames, int channels, const std::vector<f
     }
 }
 
+void ApplyCurve(float* samples, size_t frames, int channels, const std::vector<float>& curve, bool unity,
+                SampleStage* stage, const void* key) {
+    const bool staged = stage && stage->Active();
+    if (!staged) {
+        if (!unity) ApplyCurve(samples, frames, channels, curve);
+        return;
+    }
+    const size_t count = frames * static_cast<size_t>(channels);
+    if (!unity) {
+        const size_t width = static_cast<size_t>(channels);
+        for (size_t frame = 0; frame < frames; frame++) {
+            for (size_t channel = 0; channel < width; channel++) samples[frame * width + channel] *= curve[frame];
+        }
+    }
+    stage->Run(key, samples, frames, channels);
+    for (size_t i = 0; i < count; i++) samples[i] = GainRamp::Limit(samples[i]);
+}
+
 }  // namespace atmos

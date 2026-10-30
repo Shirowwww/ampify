@@ -18,6 +18,7 @@
 #include <string>
 #include <thread>
 
+#include "../../core/audio/audio_engine.hpp"
 #include "../../core/journal.hpp"
 #include "../../core/settings.hpp"
 #include "../../extensions/atmos-leveler/atmos_windows.hpp"
@@ -465,6 +466,38 @@ TEST_CASE(Glue_HooksTheMetadataStreamAndGainsItsObjects) {
     CHECK_NEAR(fake.commands.samples[kPassFrames - 1], expected, 1e-3);
 
     std::cout << g_glueText.str();
+}
+
+// AMK.audio on the same hooks: the analysis and the equalizer see the stereo stream that the leveler meters.
+// The tone is played twice, flat then with +6 dB on the 1 kHz band: the analysed 1 kHz band rises by 6 dB.
+TEST_CASE(Glue_AnalysisAndEqualizerSeeTheStereoStream) {
+    CHECK(g_glueStarted);
+    if (!g_glueStarted) return;
+    amk::audio::AudioEngine& engine = amk::audio::ProcessAudio();
+    engine.Analyze("harness");  // starts the analysis
+    CHECK(engine.Eq().IsFlat());
+
+    auto band1k = [&engine]() -> double {
+        amk::AudioAnalysisResult result = engine.Analyze("harness");
+        if (!result.frame || result.frame->bandsDb.size() <= 8) return -200;
+        return result.frame->bandsDb[8];  // the band of 800 Hz to 1.16 kHz
+    };
+
+    bool float32 = false;
+    PlayToneThroughHookedStream(float32);
+    double flat = band1k();
+    CHECK(engine.Loudness().momentary.has_value());  // the live loudness of the stream
+    CHECK_NEAR(engine.PlayerVolume().value_or(0), 0.5, 1e-6);  // read from the volume hook, never written
+
+    CHECK(engine.SetEqBand("harness", 5, 6.0));
+    PlayToneThroughHookedStream(float32);
+    double boosted = band1k();
+    std::cout << "bande 1 kHz : " << flat << " dB à plat, " << boosted << " dB avec +6 dB\n";
+    CHECK(flat > -30);
+    CHECK_NEAR(boosted - flat, 6.0, 0.5);
+
+    engine.Release("harness");  // the equalizer goes back to flat
+    CHECK(engine.Eq().IsFlat());
 
     // The levels file belongs to this run only.
     std::error_code error;

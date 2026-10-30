@@ -55,6 +55,10 @@ public:
 
     UiModel& Ui() override { return m_ui; }
 
+    // AudioHost (core/audio/audio_host.hpp) in AMPLibraryAgent.exe only, where the audio is rendered: the process's
+    // engine, fed by the Atmos leveler's hooks.
+    void* QueryCapability(std::string_view name) override;
+
 private:
     struct Hotkey {
         int id;

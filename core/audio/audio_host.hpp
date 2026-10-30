@@ -1,0 +1,74 @@
+#pragma once
+
+// The host capability behind AMK.audio's analysis, equalizer, loudness and volume (core/natives/audio_analysis.cpp).
+// Read with host.Capability<AudioHost>(): null on a host without audio, such as the interface process, where those
+// functions answer "nothing known" instead of throwing.
+//
+// Rules that every implementation keeps: the samples are only the decoded ones the kit's own hooks already see,
+// they stay in memory, and only small frames of numbers reach the elements. The player volume is read, never set:
+// the equalizer acts on the samples, so Apple Music's slider never moves.
+
+#include <cstddef>
+#include <functional>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "analysis.hpp"
+
+namespace amk {
+
+// Loudness of what plays, in LUFS (ITU-R BS.1770): momentary over 400 ms, short-term over 3 s. Empty when unknown.
+struct LoudnessReading {
+    std::optional<double> momentary;
+    std::optional<double> shortTerm;
+};
+
+struct AudioAnalysisResult {
+    audio::TempoEstimate tempo;
+    LoudnessReading loudness;
+    std::optional<audio::AnalysisFrame> frame;  // the newest analysis frame, if any
+};
+
+struct EqBandState {
+    double frequency = 0;  // Hz
+    double q = 0;
+    std::string kind;  // "peaking", "lowshelf" or "highshelf"
+    double gainDb = 0;
+};
+
+struct AudioHost {
+    static constexpr std::string_view kCapabilityName = "audio";
+
+    using FrameSink = std::function<void(const audio::AnalysisFrame& frame)>;
+
+    virtual ~AudioHost() = default;
+
+    // Analysis frames for one element, about 20 a second at most, from a thread of the host. A second call
+    // replaces the sink. After Release returns, the sink is never called again.
+    virtual void SubscribeFrames(const std::string& elementId, FrameSink sink) = 0;
+
+    // Tempo, loudness and the newest frame. The first call starts the analysis for this element, so the tempo may
+    // be unknown (0) for a few seconds.
+    virtual AudioAnalysisResult Analyze(const std::string& elementId) = 0;
+
+    // Centre frequency of each band of the analysis frames, in Hz.
+    virtual std::vector<double> BandFrequencies() = 0;
+
+    virtual LoudnessReading Loudness() = 0;
+
+    // The volume Apple Music set on its player, 0..1, as its slider shows it. Read only. Empty when not seen yet.
+    virtual std::optional<double> PlayerVolume() = 0;
+
+    // The equalizer: one set of bands for the process, applied to the samples after the kit's gain.
+    virtual std::vector<EqBandState> EqBands() = 0;
+    // False for a band that does not exist. The gain is clamped to +/- 12 dB.
+    virtual bool SetEqBand(const std::string& elementId, size_t band, double gainDb) = 0;
+
+    // The element stops: drops its frames and its use of the analysis, and puts the equalizer back to flat when
+    // this element made the last change to it.
+    virtual void Release(const std::string& elementId) = 0;
+};
+
+}  // namespace amk

@@ -49,7 +49,7 @@ AppleMusic.exe ou AMPLibraryAgent.exe
 ### Organisation du code (pour les contributeurs)
 
 L'objet global est fait de **modules** (`core`, `config`, `storage`, `player`, `audio`, `keyboard`, `notify`, `http`,
-`icons`, `uri`, `timers`, `console`, `ui`, `link`). Chaque module vit dans ses propres fichiers, pour que plusieurs personnes
+`icons`, `uri`, `color`, `timers`, `console`, `ui`, `link`, et `audioAnalysis` qui complète `audio`). Chaque module vit dans ses propres fichiers, pour que plusieurs personnes
 puissent en ajouter en même temps sans modifier les mêmes lignes :
 
 | Partie d'un module `foo` | Où |
@@ -174,8 +174,9 @@ faire.
 | `ui.keyboard` | `AMK.keyboard.bind`, raccourcis globaux ou limités à la fenêtre | [provisoire M7] |
 | `player.read` | `AMK.player.state()` et les événements du lecteur | [provisoire M4] |
 | `player.control` | `AMK.player.play()`, `pause()`, `next()`, `previous()`, `seek()` | [provisoire M4] |
-| `audio.analyze` | `AMK.audio.onSamples`, lecture seule du son décodé, en mémoire | [provisoire M4] |
+| `audio.analyze` | `AMK.audio.onFrame`, `analyze`, `loudness` : spectre, niveaux, tempo et loudness du son décodé, calculés en mémoire | [provisoire M4] |
 | `audio.gain` | `AMK.audio.setGainDb`, gain appliqué aux échantillons, borné par le plafond du noyau | [provisoire M4] |
+| `audio.eq` | `AMK.audio.eq`, égaliseur à 10 bandes appliqué aux échantillons | [provisoire M4] |
 | `ui.topbar`, `ui.playbar`, `ui.menu`, `ui.popup` | Ajout d'éléments d'interface à ces emplacements | [provisoire M8] |
 | `ui.panel`, `ui.window`, `ui.tray` | Panneau latéral, fenêtre secondaire, icône de zone de notification | [provisoire M8] |
 | `ui.page` | Pages d'app et entrées de navigation | [provisoire M8] |
@@ -234,22 +235,52 @@ AMK.player.queue.add(trackId)       // [provisoire M8]
 AMK.player.queue.remove(trackId)    // [provisoire M8]
 ```
 
-Le volume absolu n'est pas exposé en v1. Un élément qui veut changer le son règle un gain interne sur les échantillons
-(section 5.4), jamais le curseur (PARITE, section 8.1).
+Le volume absolu se lit avec `AMK.audio.volume()` (section 5.4), sans jamais l'écrire. Un élément qui veut changer le
+son règle un gain interne sur les échantillons (section 5.4), jamais le curseur (PARITE, section 8.1).
 
 ### 5.4 Son [provisoire M4]
 
 ```js
-AMK.audio.onSamples(fn)
-// fn({ samples: Float32Array, channels, sampleRate, frames }), après décodage et avant la sortie.
-// Lecture seule. Les échantillons ne sont pas copiés sur disque.
-
 AMK.audio.setGainDb(db)
 // Gain appliqué aux échantillons du morceau courant, borné par le plafond de la config du noyau.
 // Ne touche jamais au curseur de volume. Modèle : le nivellement Atmos (extensions/atmos-leveler/).
 
-AMK.audio.analyze(...)   // niveaux et spectre, calculés localement sur les échantillons décodés
+AMK.audio.onFrame(fn)                        // permission audio.analyze. Renvoie false sans son dans ce processus
+// fn({ bands, rms, peak, time }), environ 20 fois par seconde au plus. bands : 16 bandes de 40 Hz à 16 kHz
+// (espacées en log), chacune de 0 (-80 dBFS ou moins) à 1 (0 dBFS). rms et peak : niveau linéaire, 1 = pleine
+// échelle. time : secondes depuis le début de l'analyse. Un script lent reçoit la dernière image, sans file d'attente.
+
+AMK.audio.analyze()                          // permission audio.analyze
+// -> { tempo, confidence, loudness: { momentary, shortTerm }, rms, peak, bands, frequencies }
+// tempo en BPM (null pendant les premières secondes), confidence de 0 à 1, frequencies : centre de chaque bande en Hz.
+
+AMK.audio.loudness()                         // permission audio.analyze
+// -> { momentary, shortTerm } en LUFS (BS.1770 : 400 ms et 3 s), null si rien ne joue. Mesurée avant le gain du
+// noyau et l'égaliseur, comme si le curseur était au maximum.
+
+AMK.audio.volume()                           // permission player.read
+// -> volume du lecteur, de 0 à 1, tel que le curseur l'affiche. Lecture seule. null tant qu'il n'a pas été vu.
+
+AMK.audio.eq.setBand(index, gainDb)          // permission audio.eq. 10 bandes, de 31 Hz à 16 kHz, +/- 12 dB
+AMK.audio.eq.preset(nom)                     // "flat", "rock", "jazz", "bass-booster"... (liste : presets())
+AMK.audio.eq.reset()                         // revient à plat
+AMK.audio.eq.bands()                         // -> [{ frequency, gainDb, q, type }]
+AMK.audio.eq.presets()                       // -> noms des préréglages
 ```
+
+Le son est analysé et égalisé dans `AMPLibraryAgent.exe` (élément avec `"processes": ["engine"]`). Dans l'autre
+processus, ces fonctions ne lèvent pas d'erreur : `onFrame` renvoie `false`, les lectures valent `null` et l'égaliseur
+répond `false`.
+
+- **Où :** sur les échantillons que les hooks du noyau traitent déjà (flux stéréo `IAudioRenderClient` et objets
+  spatiaux Dolby Atmos), jamais sur le tap audio d'Apple, qu'Apple saute pour l'Atmos
+  (`knowledge/atmos-loudness.md`). Ces hooks sont ceux du nivellement Atmos : il doit être activé.
+- **Ordre :** gain du noyau, puis égaliseur, puis genou doux et plafond. Un égaliseur à plat ne touche aucun
+  échantillon (sortie identique bit à bit). Un changement de bande est lissé (12 dB en 0,1 s), sans clic.
+- **Une seule égalisation par processus.** Le dernier élément qui la règle l'emporte, et elle revient à plat quand
+  cet élément s'arrête.
+- **Ce qui ne sort pas :** les échantillons bruts. Le script ne reçoit que de petites images de nombres. Rien n'est
+  écrit sur disque.
 
 ### 5.5 Interface [provisoire M8]
 
@@ -296,11 +327,14 @@ AMK.keyboard.bind("Ctrl+Alt+L", fn)              // [provisoire M7] permission u
 AMK.http.get(url) -> Promise<{ status, text }>   // [ferme] permission network:<hôte>
 AMK.uri.parse(texte) / AMK.uri.build(...)        // [ferme] liens music:// et https://music.apple.com
 AMK.icons.get(nom) -> chaîne SVG                 // [provisoire M7]
+AMK.color.extract(pixels, largeur, hauteur)      // [provisoire M8] aucune permission
+// pixels : RVBA, ligne par ligne (tableau, Uint8Array ou ArrayBuffer). Renvoie les clés de colorExtractor de
+// Spicetify : PROMINENT, VIBRANT, DARK_VIBRANT, LIGHT_VIBRANT, DESATURATED, VIBRANT_NON_ALARMING ("#rrggbb"),
+// et palette : [{ color, population }]. Les images par adresse ne sont pas encore lues.
 AMK.color.fromArtwork(url) -> Promise<couleur>   // [provisoire M8]
 AMK.library.playlists() / AMK.library.tracks()   // [provisoire M8] permission library.read
 AMK.services.call(service, méthode, args)        // [provisoire M8] permission services.read, liste blanche
 AMK.lyrics.current() -> Promise<paroles>         // [provisoire M8] permission player.read
-AMK.audio.analyze() -> { level, spectrum, tempo } // [provisoire M4] permission audio.analyze
 ```
 
 `AMK.http.get` ne sert qu'aux services tiers (Last.fm, ListenBrainz, fournisseurs de paroles). Il ne peut pas
@@ -406,7 +440,7 @@ Ces points doivent être confirmés avant de passer au statut « ferme » :
 - la taille de quickjs-ng et son comportement sous MinGW et MSVC ;
 - le chemin des données de l'utilisateur (M3) ;
 - la forme des données de `AMK.player` et des événements (M4) ;
-- le format des échantillons transmis à `AMK.audio.onSamples` (M4) ;
+- la forme des images de `AMK.audio.onFrame` et le nombre de bandes (M4, à confirmer sur le PC) ;
 - l'emplacement des éléments d'interface dans l'arbre XAML (M8) ;
 - la liste des clés XAML autorisées pour les thèmes (M8) ;
 - les limites de temps et de mémoire d'un élément (à fixer en M7, sur des mesures) ;
@@ -450,8 +484,9 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
 | Permissions : `PermissionDenied` à l'exécution, refus du manifeste à la lecture | fait | tests C++ |
 | Découverte des dossiers (`extensions`, `apps`, scripts de `themes`), activation, isolement des pannes | fait | tests C++ et Wine |
 | Effet immédiat par `reload.txt` : `start`, `stop`, `restart` (manifeste relu), `rescan` | fait côté noyau. Pas encore vu dans Apple Music | tests C++, tests de la CLI |
-| `audio.onSamples`, `audio.analyze` | à faire (M4) | |
-| `ui.*`, `React`, `components`, `library`, `player.queue`, `services`, `lyrics`, `color` | à faire (M8) | |
+| `audio.onFrame`, `analyze`, `loudness`, `volume`, `eq` | fait. Sous Windows : branchés sur les hooks du nivellement Atmos (flux stéréo et objets spatiaux), qui doit être activé | tests C++ (signaux synthétiques) ; égaliseur et analyse vus sur le flux stéréo sous Wine ; écoute à faire sur le PC |
+| `color.extract` (pixels fournis par le script) | fait | tests C++ |
+| `ui.*`, `React`, `components`, `library`, `player.queue`, `services`, `lyrics`, `color.fromArtwork` | à faire (M8) | |
 | Thèmes et snippets | pas chargés par cette version du noyau | |
 
 Limites connues, à corriger avant la version 1 : l'appel réseau est synchrone, donc il bloque le fil qui exécute

@@ -1,4 +1,5 @@
-// Module audio: AMK.audio, the element's gain. Natives: core/natives/audio.cpp.
+// Module audio: AMK.audio, the element's gain. Natives: core/natives/audio.cpp. The analysis, the equalizer, the
+// loudness and the volume are added to the same object by the module audioAnalysis (core/prelude/audio_analysis.cpp).
 
 namespace amk::prelude {
 

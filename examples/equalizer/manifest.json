@@ -1,0 +1,13 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "equalizer",
+  "name": "Égaliseur",
+  "version": "0.1.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Égaliseur à 10 bandes sur le son décodé, avec des préréglages. Marche aussi en Dolby Atmos. Le curseur de volume ne bouge pas.",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": ["audio.eq"],
+  "processes": ["engine"]
+}

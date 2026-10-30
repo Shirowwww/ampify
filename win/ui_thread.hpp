@@ -18,10 +18,14 @@ bool AttachUiThread(DWORD processId, HINSTANCE module);
 // Removes the hook and drops the work that was not run yet.
 void DetachUiThread();
 
-// Queues work for the interface thread and wakes it up. False when not attached. Work that throws is dropped.
+// Queues work for the interface thread and wakes it up. False when not attached or when the wake-up message cannot be
+// posted. Work that throws is dropped.
 bool PostToUiThread(std::function<void()> work);
 
 // True when the hook is installed.
 bool UiThreadAttached();
+
+// The thread the hook is on, 0 when not attached. For diagnostics.
+DWORD UiThreadId();
 
 }  // namespace amk::win

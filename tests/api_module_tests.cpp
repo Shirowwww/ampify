@@ -91,12 +91,15 @@ const Expected kMembers[] = {
     {"storage", "object!{get:f2=get,set:f2=set,remove:f1=remove}"},
     {"player", "object!{state:f0=state,on:f2=on,play:f0=play,pause:f0=pause,next:f0=next,previous:f0=previous,"
                "seek:f1=seek}"},
-    {"audio", "object!{setGainDb:f1=setGainDb}"},
+    {"audio", "object!{setGainDb:f1=setGainDb,onFrame:f1=onFrame,analyze:f0=analyze,loudness:f0=loudness,"
+              "volume:f0=volume,eq:object!{setBand:f2=setBand,preset:f1=preset,reset:f0=reset,bands:f0=bands,"
+              "presets:f0=presets}}"},
     {"keyboard", "object!{bind:f2=bind}"},
     {"notify", "f1="},
     {"http", "object!{get:f1=get}"},
     {"icons", "object!{get:f1=get,names:f0=names}"},
     {"uri", "object!{parse:f1=parse,build:f3=build}"},
+    {"color", "object!{extract:f3=extract}"},
     {"ui", "object!{topbar:object!{addButton:f1=addButton},playbar:object!{addButton:f1=addButton},"
            "menu:object!{addItem:f2=addItem},popup:object!{open:f1=open},panel:object!{register:f2=register},"
            "page:object!{register:f2=register},title:object!{set:f1=set},navigate:f1=navigate}"},

@@ -738,6 +738,20 @@ class Verification(AmkTestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("gain appliqué", result.stdout)
 
+    def test_test_runs_the_equalizer_example(self):
+        folder = os.path.join(ROOT, "examples", "equalizer")
+        result = self.amk("test", native(folder))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("préréglage « flat » appliqué", result.stdout)
+        self.assertIn("1 kHz 0 dB", result.stdout)
+
+    def test_test_feeds_the_visualizer_example_a_synthetic_signal(self):
+        folder = os.path.join(ROOT, "examples", "visualizer-data")
+        result = self.amk("test", native(folder))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("visualiseur à l'écoute", result.stdout)
+        self.assertIn("tempo 120 BPM", result.stdout)  # the test host plays clicks at 120 BPM
+
     def test_test_refuses_a_call_without_its_permission(self):
         folder = self.write_element("demo-denied", "extension", files={"main.js": 'AMK.storage.get("x", 0);\n'})
         result = self.amk("test", native(folder))

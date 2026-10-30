@@ -7,7 +7,8 @@ namespace atmos {
 
 ObjectPass::ObjectPass(double sampleRate) : m_sampleRate(sampleRate), m_ramp(sampleRate) {}
 
-const PassLevels& ObjectPass::Process(std::span<const ObjectBuffer> objects, size_t frames, double targetLinear) {
+const PassLevels& ObjectPass::Process(std::span<const ObjectBuffer> objects, size_t frames, double targetLinear,
+                                      SampleStage* stage) {
     m_levels.framePower.assign(frames, 0.0);
     m_levels.peak = 0;
     const bool unity = m_ramp.Curve(frames, targetLinear, m_curve);
@@ -25,7 +26,7 @@ const PassLevels& ObjectPass::Process(std::span<const ObjectBuffer> objects, siz
             double weighted = weighting.Process(sample);
             m_levels.framePower[frame] += weighted * weighted;
         }
-        if (!unity) ApplyCurve(object.samples, frames, 1, m_curve);
+        ApplyCurve(object.samples, frames, 1, m_curve, unity, stage, object.key);
     }
     return m_levels;
 }

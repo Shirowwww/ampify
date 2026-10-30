@@ -17,8 +17,27 @@ type PlayerState = {
   durationMs: number;
   track: { id: string; title: string; artist: string; album: string; variantId: string; atmos: boolean; lossless: boolean } | null;
 };
-type AudioChunk = { samples: Float32Array; channels: number; sampleRate: number; frames: number };
-type AudioAnalysis = { level: number; spectrum: number[]; tempo: number };
+type AudioFrame = { bands: number[]; rms: number; peak: number; time: number };
+type Loudness = { momentary: number | null; shortTerm: number | null };
+type AudioAnalysis = {
+  tempo: number | null;
+  confidence: number;
+  loudness: Loudness;
+  rms: number | null;
+  peak: number | null;
+  bands: number[];
+  frequencies: number[];
+};
+type EqBand = { frequency: number; gainDb: number; q: number; type: "peaking" | "lowshelf" | "highshelf" };
+type ExtractedColors = {
+  PROMINENT: string;
+  VIBRANT: string;
+  DARK_VIBRANT: string;
+  LIGHT_VIBRANT: string;
+  DESATURATED: string;
+  VIBRANT_NON_ALARMING: string;
+  palette: { color: string; population: number }[];
+};
 
 declare const AMK: {
   // 5.1 Base [ferme]
@@ -57,9 +76,18 @@ declare const AMK: {
 
   // 5.4 Son [provisoire M4]
   audio: {
-    onSamples(fn: (chunk: AudioChunk) => void): void;
-    setGainDb(db: number): void;
+    setGainDb(db: number): number;
+    onFrame(fn: (frame: AudioFrame) => void): boolean;
     analyze(): AudioAnalysis;
+    loudness(): Loudness;
+    volume(): number | null;
+    eq: {
+      setBand(index: number, gainDb: number): boolean;
+      preset(name: string): boolean;
+      reset(): boolean;
+      bands(): EqBand[];
+      presets(): string[];
+    };
   };
 
   // 5.5 Interface [provisoire M8]
@@ -83,7 +111,10 @@ declare const AMK: {
     build(parts: unknown): string;
   };
   icons: { get(name: string): string };
-  color: { fromArtwork(url: string): Promise<string> };
+  color: {
+    extract(pixels: ArrayLike<number> | ArrayBuffer, width: number, height: number): ExtractedColors;
+    fromArtwork(url: string): Promise<string>;
+  };
   library: {
     playlists(): Promise<unknown[]>;
     tracks(): Promise<unknown[]>;

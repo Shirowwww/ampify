@@ -12,7 +12,7 @@ namespace {
 
 // Same list as schemas/manifest.schema.json. Keep the two in step.
 const std::set<std::string_view> kFixedPermissions = {
-    "player.read",   "player.control", "audio.analyze", "audio.gain",    "storage",     "notifications",
+    "player.read",   "player.control", "audio.analyze", "audio.gain",    "audio.eq",    "storage",     "notifications",
     "ipc.discord",   "midi.input",     "library.read",  "library.write", "services.read", "ui.keyboard",
     "ui.topbar",     "ui.playbar",     "ui.menu",       "ui.popup",      "ui.panel",    "ui.page",
     "ui.window",     "ui.tray",

@@ -26,6 +26,8 @@ extern const char kUri[];
 extern const char kTimers[];
 extern const char kConsole[];
 extern const char kUi[];
+extern const char kAudioAnalysis[];
+extern const char kColor[];
 }  // namespace prelude
 
 namespace natives {
@@ -43,6 +45,9 @@ void DefineHttp(api::NativeScope& scope);
 void DefineTimers(api::NativeScope& scope);
 void DefineUi(api::NativeScope& scope);
 void StopUi(ScriptExtension& extension);
+void DefineAudioAnalysis(api::NativeScope& scope);
+void StopAudioAnalysis(ScriptExtension& extension);
+void DefineColor(api::NativeScope& scope);
 }  // namespace natives
 
 namespace prelude { extern const char kLink[]; }
@@ -60,11 +65,13 @@ const ApiModule kModules[] = {
     {"storage", prelude::kStorage, natives::DefineStorage, natives::StartStorage, nullptr},
     {"player", prelude::kPlayer, natives::DefinePlayer, nullptr, nullptr},
     {"audio", prelude::kAudio, natives::DefineAudio, nullptr, natives::StopAudio},
+    {"audioAnalysis", prelude::kAudioAnalysis, natives::DefineAudioAnalysis, nullptr, natives::StopAudioAnalysis},
     {"keyboard", prelude::kKeyboard, natives::DefineKeyboard, nullptr, natives::StopKeyboard},
     {"notify", prelude::kNotify, natives::DefineNotify, nullptr, nullptr},
     {"http", prelude::kHttp, natives::DefineHttp, nullptr, nullptr},
     {"icons", prelude::kIcons, nullptr, nullptr, nullptr},
     {"uri", prelude::kUri, nullptr, nullptr, nullptr},
+    {"color", prelude::kColor, natives::DefineColor, nullptr, nullptr},
     {"timers", prelude::kTimers, natives::DefineTimers, nullptr, nullptr},
     {"console", prelude::kConsole, nullptr, nullptr, nullptr},
     {"ui", prelude::kUi, natives::DefineUi, nullptr, natives::StopUi},

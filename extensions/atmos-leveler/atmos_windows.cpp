@@ -34,11 +34,13 @@
 #include <thread>
 #include <vector>
 
+#include "../../core/audio/audio_engine.hpp"
 #include "../../core/gain_board.hpp"
 #include "../../win/hook.hpp"
 #include "../../win/win_common.hpp"
 #include "format_detection.hpp"
 #include "gain_ramp.hpp"
+#include "kit_audio.hpp"
 #include "level_file.hpp"
 #include "leveler.hpp"
 #include "object_pass.hpp"
@@ -167,6 +169,7 @@ std::atomic<void*> g_meteredRender{nullptr};
 std::atomic<BYTE*> g_meteredBuffer{nullptr};
 std::atomic<UINT32> g_meteredBufferFrames{0};
 std::atomic<int> g_meteredChannels{0};
+std::atomic<int> g_meteredRate{48000};
 GainRamp g_streamRamp(48000);
 std::vector<float> g_streamCurve;  // audio thread only
 
@@ -225,6 +228,10 @@ struct SpatialPass {
     std::vector<ObjectBuffer> objects;
 };
 SpatialPass g_pass;
+
+// AMK.audio (kit_audio.hpp): the equalizer, live loudness and analysis on these same buffers. It only adds steps
+// to the paths below; with a flat equalizer and no element listening, the samples are untouched by it.
+KitAudio g_kitAudio(amk::audio::ProcessAudio());
 
 // Poll thread only: the item being followed, and the gain of its current Atmos track.
 struct Playing {
@@ -538,6 +545,7 @@ void __cdecl SetVolume_Hook(void* player, float volume) {
     g_setVolumeOriginal(player, volume);
 
     g_playerVolume = volume;
+    amk::audio::ProcessAudio().PublishPlayerVolume(volume);  // AMK.audio.volume(): read only, like the slider
     void* old = nullptr;
     {
         std::lock_guard<std::mutex> guard(g_playerLock);
@@ -610,6 +618,7 @@ HRESULT STDMETHODCALLTYPE GetService_Hook(IAudioClient* self, REFIID riid, void*
     }
     g_streamRamp.SetSampleRate(rate);
     g_meteredChannels = it->second.channels;
+    g_meteredRate = rate;
     g_meteredRender.store(*service);
     return hr;
 }
@@ -642,8 +651,14 @@ HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 fr
                 if (lock.owns_lock() && g_leveler) g_leveler->Feed(samples, count, g_playerVolume.load());
             }
 
+            // AMK.audio: the loudness before the gain; the equalizer after the gain and before the knee (inside
+            // ApplyCurve, inactive while flat); the analysis on what leaves for Windows.
+            const int rate = g_meteredRate.load();
+            const float volume = g_playerVolume.load();
+            g_kitAudio.BeforeStream(samples, count, 2, rate, volume);
             bool unity = g_streamRamp.Curve(count, AppliedGain(), g_streamCurve);
-            if (!unity) ApplyCurve(samples, count, 2, g_streamCurve);
+            ApplyCurve(samples, count, 2, g_streamCurve, unity, g_kitAudio.StreamStage(rate), self);
+            g_kitAudio.AfterStream(samples, count, 2, rate, volume);
         }
     }
     return g_releaseBufferOriginal(self, frames, flags);
@@ -687,7 +702,11 @@ void ProcessSpatialPass() {
     std::lock_guard<std::mutex> passGuard(g_passLock);
     if (!g_objectPass || g_pass.frames == 0) return;
 
-    const PassLevels& levels = g_objectPass->Process(g_pass.objects, g_pass.frames, AppliedGain());
+    // AMK.audio: the equalizer runs on each object between the gain and the knee; loudness and analysis after.
+    const int rate = g_spatialRate.load();
+    const PassLevels& levels =
+        g_objectPass->Process(g_pass.objects, g_pass.frames, AppliedGain(), g_kitAudio.ObjectStage(rate));
+    g_kitAudio.AfterObjects(g_pass.objects, g_pass.frames, rate, levels);
 
     // Before the slider volume: measured as they are, nothing to divide out.
     std::unique_lock<std::mutex> lock(g_levelerLock, std::try_to_lock);
