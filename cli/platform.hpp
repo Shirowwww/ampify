@@ -4,6 +4,7 @@
 // which tools unpack a zip. Everything else in the command line is portable.
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,20 @@ bool ListZip(const std::filesystem::path& archive, std::vector<std::string>& ent
 bool ExtractZip(const std::filesystem::path& archive, const std::filesystem::path& destination, std::string& error);
 
 // Downloads an https:// address with curl, which ships with Windows 10 and later. Redirects must stay https.
-bool DownloadHttps(const std::string& url, const std::filesystem::path& destination, std::string& error);
+// `maxSeconds` above 0 gives up after that many seconds (used by the background check for a new kit release).
+bool DownloadHttps(const std::string& url, const std::filesystem::path& destination, std::string& error,
+                   int maxSeconds = 0);
+
+// The folder of the installed Apple Music package (under C:\Program Files\WindowsApps), read-only. Nothing when
+// Apple Music is not installed, and always nothing outside Windows.
+std::optional<std::filesystem::path> AppPackageFolder();
+
+// The preferences file Apple Music writes (a binary plist, see knowledge/apple-music-internals.md):
+// %LOCALAPPDATA%\Packages\<family>\LocalCache\Roaming\Apple Computer\Preferences\AMPLibraryAgent.exe.plist.
+// Nothing outside Windows. The file itself may not exist yet.
+std::optional<std::filesystem::path> AppPreferencesFile();
+
+// The command that opens a folder in the file manager: explorer.exe on Windows, xdg-open elsewhere.
+std::vector<std::string> OpenFolderCommand(const std::filesystem::path& folder);
 
 }  // namespace amk::platform

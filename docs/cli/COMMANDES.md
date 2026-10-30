@@ -39,9 +39,16 @@ Les colonnes « Spicetify » donnent l'équivalent. « Statut » dit ce qui est 
 | `amk config <clé>` | Affiche un réglage | `config <clé>` | Fait |
 | `amk config <clé> <valeur>` | Écrit un réglage, valeur vérifiée | `config <clé> <valeur>` | Fait |
 | `amk config extensions +id` / `-id` | Active ou désactive un élément | `config extensions +id` | Fait (aussi `apps`, `snippets`) |
-| `amk path` | Affiche les dossiers | `path` | Fait |
+| `amk path` | Affiche les dossiers du kit, le dossier d'Apple Music et ses préférences | `path` | Fait |
+| `amk path <nom>` | Un seul chemin, sur une ligne : `kit`, `settings`, `extensions`, `themes`, `apps`, `snippets`, `logs`, `backups`, `app` (paquet d'Apple Music), `prefs` (préférences d'Apple Music) | `path` | Fait. `app` et `prefs` : « introuvable » hors Windows |
+| `amk config --dir` | Ouvre le dossier du kit dans l'Explorateur (`--dry-run` affiche seulement le dossier) | `config-dir` | Fait |
 | `amk backup` / `amk backup list` | Sauvegarde les réglages et les éléments | `backup` | Fait |
+| `amk devtools [on\|off]` | Demande au noyau d'écrire l'arbre de l'interface dans `journal\inspector.txt` (réglage `theme.inspect`) | `enable-devtools` | Fait côté `amk`. Le fichier n'est écrit que par un noyau avec le moteur XAML (M8) |
+| `amk versions [list]` | Versions d'Apple Music acceptées par le noyau, et celle installée | (aucun) | Fait |
+| `amk versions update` | Télécharge la liste des versions testées publiée avec le catalogue et écrit `versions.txt` | (restauration après mise à jour) | Fait |
+| `amk install-kit <version>` | Installe une version précise du kit, même plus ancienne (SHA-256 vérifié) | anciennes versions | Fait |
 | `amk version`, `amk help` | | `--version`, `help` | Fait |
+| `amk backup apply launch` | Plusieurs commandes à la suite, voir « Enchaîner des commandes » | `spicetify backup apply` | Fait |
 
 ### Éléments : extensions, snippets, apps, thèmes
 
@@ -74,7 +81,7 @@ Les colonnes « Spicetify » donnent l'équivalent. « Statut » dit ce qui est 
 
 | Commande prévue | Ce qui la remplace aujourd'hui | Jalon |
 |---|---|---|
-| `amk inspect` avec l'arbre d'interface (`AMK.React`) | Rien | M8 |
+| `amk inspect` avec l'arbre d'interface en direct (`AMK.React`) | `amk devtools`, puis `amk inspect --tree` affiche le dernier arbre écrit par le noyau | M8 |
 
 ## Options
 
@@ -91,6 +98,9 @@ Les colonnes « Spicetify » donnent l'équivalent. « Statut » dit ce qui est 
 | `--scheme <nom>` | Avec `theme set` : schéma de couleurs |
 | `--backup <nom>` | Avec `restore` : sauvegarde à remettre |
 | `--interval <ms>`, `--max-cycles <n>` | Avec `watch` : période de surveillance, et nombre de passages avant l'arrêt |
+| `--tree` | Avec `inspect` : affiche le dernier arbre de l'interface (`journal\inspector.txt`) |
+| `--dir` | Avec `config` : ouvre le dossier du kit |
+| `--` | Tout ce qui suit est un argument, même s'il commence par `--` |
 
 Codes de retour : `0` réussi, `1` échec, `2` mauvais usage. `apply` rend `1` si un élément activé ne peut pas
 se charger. Les messages d'erreur vont sur la sortie d'erreur, précédés de `amk :`.
@@ -107,7 +117,9 @@ se charger. Les messages d'erreur vont sur la sortie d'erreur, précédés de `a
   active.txt                ce qui doit se charger : « extension demo 1.0.0 », « theme night 2.0.0 scheme=Dark »
   reload.txt                compteur écrit à chaque apply, et lignes « restart <id> » écrites par dev (lues par le noyau)
   backups\<aaaammjj-hhmmss>\  copie de settings.txt et des quatre dossiers d'éléments
-  downloads\, updates\, cache\  fichiers temporaires et dernier catalogue lu
+  versions.txt              versions d'Apple Music testées en plus de celles du noyau (écrit par amk versions update)
+  journal\                  journaux du noyau et du lanceur, et inspector.txt (arbre de l'interface, voir devtools)
+  downloads\, updates\, cache\  fichiers temporaires, dernier catalogue lu, et cache\kit-update.txt (check_kit_update)
 ```
 
 Réglages reconnus par `amk config` :
@@ -117,11 +129,76 @@ Réglages reconnus par `amk config` :
 | `extensions.<id>.enabled`, `apps.<id>.enabled`, `snippets.<id>.enabled` | `1` ou `0` | `0` (un élément de la communauté est désactivé) |
 | `theme.active` | identifiant d'un thème, vide pour aucun | vide |
 | `theme.scheme` | nom d'une section de `colors.ini` | défaut du thème |
-| `theme.parts.colors`, `theme.parts.resources`, `theme.parts.script` | `1` ou `0` | `1` |
+| `theme.parts.colors`, `theme.parts.resources`, `theme.parts.assets`, `theme.parts.script` | `1` ou `0` : couleurs, ressources XAML, images, script du thème | `1` |
+| `theme.live_reload` | `1` ou `0` : réapplique le thème quand ses fichiers changent | `1` |
+| `theme.inspect` | `1` ou `0` : le noyau écrit l'arbre de l'interface au prochain passage, puis remet `0` (voir `amk devtools`) | `0` |
 | `catalog.url` | `https://…` ou `file://…` | catalogue du dépôt |
+| `app_path` | chemin complet du dossier d'Apple Music, vide pour le trouver seul | vide (trouvé par Windows) |
+| `prefs_path` | chemin complet du fichier de préférences d'Apple Music, vide pour l'emplacement habituel | vide (`%LOCALAPPDATA%\Packages\AppleInc.AppleMusicWin_nzyj5cx40ttqa\LocalCache\Roaming\Apple Computer\Preferences\AMPLibraryAgent.exe.plist`) |
+| `app_launch_flags` | arguments ajoutés au lancement d'Apple Music, séparés par des espaces (guillemets pour garder un espace) | vide |
+| `check_kit_update` | `1` ou `0` : `amk` signale une nouvelle version du kit | `0` |
+| `telemetry.block` | `1` ou `0` : bloquer les envois de données d'Apple Music. **Pas encore actif** : la clé est acceptée, le noyau ne la lit pas encore | `0` |
+| `expose_api` | `1` ou `0` : à `0`, aucun élément JavaScript (extension, app, script de thème) ne démarre | `1` |
+
+Ces clés correspondent à celles de Spicetify : `app_path` à `spotify_path`, `prefs_path` à `prefs_path`,
+`app_launch_flags` à `spotify_launch_flags`, `check_kit_update` à `check_spicetify_update`, `telemetry.block` à
+`disable_sentry` et `disable_ui_logging`, `expose_api` à `expose_apis`.
+
+`app_launch_flags` est lu par le lanceur, qui passe ces arguments à Apple Music quand il le démarre (Apple Music peut
+les ignorer). `amk launch --dry-run` affiche les arguments qui partiront. Pour une valeur qui commence par `--`,
+tape-la directement : `amk config app_launch_flags --mon-option`, ou entre guillemets s'il y en a plusieurs :
+`amk config app_launch_flags "--a --b"`. Une valeur invalide (guillemet non fermé, caractère de contrôle) est refusée.
 
 Un élément est dans `extensions\<id>` seulement si son nom de dossier est son identifiant. Les dossiers qui
 commencent par un point sont des travaux en cours et sont ignorés.
+
+## Enchaîner des commandes
+
+Comme `spicetify backup apply`, plusieurs commandes sans argument peuvent se suivre sur une ligne :
+
+```
+amk backup apply launch           sauvegarde, applique, puis lance Apple Music
+amk apply devtools launch         idem, et demande l'arbre de l'interface
+```
+
+Les commandes qui s'enchaînent : `backup`, `apply`, `launch` (ou `auto`), `restore`, `devtools`, `doctor`, `version`.
+Elles s'exécutent dans l'ordre. La première qui échoue arrête la ligne : les suivantes ne sont pas lancées, et le code
+de retour est le sien. Les options (`--dry-run`, `--backup <nom>`, `--kit-dir`) valent pour toute la ligne. Dès qu'un
+mot n'est pas une de ces commandes, la ligne est une seule commande : `amk backup list` liste les sauvegardes,
+`amk devtools off` coupe l'inspecteur.
+
+## Versions d'Apple Music et mises à jour cassées
+
+Le noyau ne s'active que sur une version d'Apple Music testée, et seulement si `AVFoundationCF.dll` exporte encore les
+fonctions dont le kit a besoin. Sinon, Apple Music démarre sans mods : rien n'est deviné. Après une mise à jour
+d'Apple Music, le kit reste donc inactif jusqu'à ce que la nouvelle version soit testée.
+
+Les versions testées après la sortie du kit sont publiées dans `catalog/versions.json`, à côté du catalogue. Pour
+chaque version, il liste les exports vérifiés. `catalog.json` fixe l'adresse et le SHA-256 de ce fichier.
+
+- `amk versions` affiche les versions acceptées (celles du noyau et celles de `versions.txt`), les exports exigés, et
+  dit si la version installée est testée.
+- `amk versions update` lit le catalogue (même source que `amk market`), télécharge `versions.json`, vérifie son
+  SHA-256, puis écrit `versions.txt` dans le dossier du kit. Une version dont les exports vérifiés ne couvrent pas
+  ceux dont ce kit a besoin est ignorée.
+- Au lancement suivant, le lanceur et le noyau acceptent ces versions en plus des leurs. La vérification des exports
+  reste faite à chaque lancement. Un `versions.txt` abîmé est ignoré en entier.
+
+## Revenir à une version du kit
+
+`amk install-kit <version>` (par exemple `amk install-kit 0.1.0`) fait comme `amk update`, mais pour la release
+`v<version>` du dépôt, même plus ancienne que celle installée : il télécharge l'archive, vérifie son SHA-256 avec
+`SHA256SUMS.txt`, l'extrait et contrôle son contenu. Sans `--apply`, il s'arrête là et dit quelle commande lancer
+une fois Apple Music fermé : `amk install-kit <version> --apply`. `--check` dit seulement si cette version existe.
+Les réglages et les éléments ne sont pas touchés.
+
+## Nouvelle version du kit
+
+Avec `amk config check_kit_update 1`, les commandes `launch`, `auto`, `apply`, `list`, `doctor` et `market` affichent
+une ligne quand une version plus récente du kit existe. La vérification lit la dernière release GitHub au plus une fois
+par jour (réponse gardée dans `cache\kit-update.txt`), abandonne après 10 secondes, et ne télécharge rien : c'est
+`amk update` qui installe. Les commandes dont un script lit la sortie (`path`, `config`) ne l'affichent jamais.
+Désactivé par défaut.
 
 ## Installer : ce qui est vérifié, dans cet ordre
 
@@ -168,13 +245,15 @@ Les programmes sont lancés sans passer par `cmd.exe`. Une adresse ou un chemin 
 `build <dossier> [fichier.zip]` valide l'élément, écrit un zip, le relit avec le même outil que `install`, puis affiche
 le SHA-256 et l'entrée de catalogue à compléter (l'adresse est une valeur à remplacer). Le zip n'est pas compressé et
 ses dates sont fixes : le même dossier donne toujours le même fichier. Refuse d'écraser un fichier existant. Les
-fichiers et dossiers dont le nom commence par un point ne sont pas inclus. Le zip de `build` n'est pas identique à
-celui de `tools/pack.py` (qui compresse) : les deux sont valides, mais le SHA-256 du catalogue doit venir de l'outil
-que l'auteur a utilisé pour publier.
+fichiers et dossiers dont le nom commence par un point ne sont pas inclus. **`amk build` est l'outil de référence pour
+publier** : un auteur n'a besoin que d'`amk`, sans Python. `tools/pack.py` reste pour la CI du dépôt ; son zip
+(compressé) n'a pas le même SHA-256, donc on publie avec un seul des deux outils.
 
 `inspect <dossier>` ou `inspect <type> <id>` affiche le manifeste, les permissions, l'état d'activation (pour un
-élément installé), et chaque fichier avec sa taille et son SHA-256. Pas encore d'arbre d'interface : il viendra avec le
-moteur XAML (M8).
+élément installé), et chaque fichier avec sa taille et son SHA-256. `inspect --tree` affiche le dernier arbre de
+l'interface écrit par le noyau (`journal\inspector.txt`). Pour en demander un nouveau : `amk devtools`, puis lancer
+Apple Music avec `amk launch`. Le noyau écrit l'arbre au passage suivant et remet `theme.inspect` à `0`. Il faut pour
+cela un noyau avec le moteur de thèmes XAML (M8) ; sans lui, aucun fichier n'est écrit.
 
 `dev <dossier>` valide l'élément, sauvegarde le kit si l'élément y est déjà, l'active, puis le copie dans le kit à
 chaque modification du dossier. Chaque copie écrit `active.txt`, et une ligne `restart <id>` dans `reload.txt`. Le
@@ -217,7 +296,8 @@ rien n'est écrit. Sinon, la commande affiche le contenu et demande confirmation
 alors le kit, remplace les éléments et `settings.txt`, et laisse à `apply` le soin de les charger. `--dry-run` affiche
 le contenu sans rien écrire.
 
-Ce qui manque encore à la parité avec Spicetify : l'arbre d'interface de `inspect` (M8). Le côté noyau du rechargement
+Ce qui manque encore à la parité avec Spicetify : l'arbre d'interface en direct de `inspect` (M8), et la lecture
+de `telemetry.block` par le noyau. Le côté noyau du rechargement
 de `dev` (lecture de `reload.txt`, redémarrage de l'élément) est compilé pour Windows, mais il n'a pas encore tourné dans
 Apple Music : il reste à le voir sur le PC de l'utilisateur. Les tests de la CLI vérifient seulement ce qui est écrit dans
 `reload.txt`.
@@ -226,8 +306,8 @@ Apple Music : il reste à le voir sur le PC de l'utilisateur. Les tests de la CL
 
 ```bash
 cmake -S . -B build && cmake --build build
-./build/amk_tests                                   # 135 tests unitaires : JSON, SHA-256, manifestes, catalogue, archives, zip, sauvegardes, rechargement
-AMK_BIN=$PWD/build/amk python3 -m unittest discover -s tools -v   # validateur, pack.py, 63 tests de bout en bout du binaire (dont amk test)
+./build/amk_tests                                   # tests unitaires : JSON, SHA-256, manifestes, catalogue, archives, zip, sauvegardes, versions, arguments
+AMK_BIN=$PWD/build/amk python3 -m unittest discover -s tools -v   # validateur, pack.py, tests de bout en bout du binaire (dont amk test)
 node --test tools/test_examples.mjs                 # exemples d'extensions, contre un faux AMK
 ```
 

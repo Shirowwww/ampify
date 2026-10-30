@@ -30,7 +30,7 @@ step "linux: build" bash -c "cmake -S . -B '$work/linux' -G Ninja -DCMAKE_BUILD_
 step "linux: amk_tests" "$work/linux/amk_tests"
 step "python: tools" env AMK_BIN="$work/linux/amk" python3 -m unittest discover -s tools
 step "node: examples" node --test tools/test_examples.mjs
-step "catalog: validate" python3 tools/validate.py catalog catalog/catalog.json
+step "catalog: validate" bash -c "python3 tools/validate.py catalog catalog/catalog.json && python3 tools/validate.py versions catalog/versions.json"
 step "examples: manifests" bash -c 'for m in examples/*/manifest.json; do python3 tools/validate.py manifest "$m" || exit 1; done'
 
 if [[ "${1:-}" != "--linux-only" ]]; then

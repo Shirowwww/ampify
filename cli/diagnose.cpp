@@ -7,6 +7,7 @@
 
 #include "../core/safe_mode.hpp"
 #include "../core/version_gate.hpp"
+#include "../core/version_list.hpp"
 #include "element.hpp"
 #include "internal.hpp"
 #include "platform.hpp"
@@ -130,9 +131,12 @@ int CmdDoctor(Context& ctx) {
         }
     }
 
+    std::vector<std::string> extra = LoadVersionList(ctx.kit.Root() / std::string(kVersionListFile));
     std::string versions;
-    for (std::string_view version : kKnownAppVersions) versions += (versions.empty() ? "" : ", ") + std::string(version);
-    ok("versions d'Apple Music testées : " + versions);
+    for (std::string_view version : KnownAppVersionsWith(extra)) {
+        versions += (versions.empty() ? "" : ", ") + std::string(version);
+    }
+    ok("versions d'Apple Music testées : " + versions + (extra.empty() ? "" : " (avec versions.txt)"));
     ok(std::string("Apple Music ") +
        (platform::IsProcessRunning("AppleMusic.exe") ? "est ouvert" : "est fermé") +
        " (vérification du processus)");

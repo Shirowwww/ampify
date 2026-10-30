@@ -5,6 +5,7 @@
 #include <thread>
 
 #include "../core/apple_music.hpp"
+#include "../core/launch_flags.hpp"
 #include "backup.hpp"
 #include "internal.hpp"
 #include "kit.hpp"
@@ -54,8 +55,15 @@ int CmdLaunch(Context& ctx) {
     ApplyNow(ctx);
 
     std::filesystem::path launcher = platform::ExecutableDirectory() / "amk_launcher.exe";
+    // The launcher reads app_launch_flags itself and hands it to Apple Music. Shown here so the user sees what goes.
+    Settings settings;
+    settings.Load(ctx.kit.Settings().string());
+    std::string flagsError;
+    std::string flags = AppLaunchArguments(settings.GetString(std::string(kLaunchFlagsKey), ""), &flagsError);
+    if (!flagsError.empty()) ctx.err << "amk : " << flagsError << " : aucun argument ne sera passé à Apple Music\n";
     if (ctx.options.dryRun) {
         ctx.out << "Commande : " << Utf8(launcher) << "\n";
+        if (!flags.empty()) ctx.out << "Arguments pour Apple Music (app_launch_flags) : " << flags << "\n";
         return 0;
     }
     std::error_code ec;

@@ -5,6 +5,8 @@ list(APPEND AMK_CORE_SOURCES
     core/journal.cpp
     core/safe_mode.cpp
     core/version_gate.cpp
+    core/version_list.cpp
+    core/launch_flags.cpp
     core/extension.cpp
     core/apple_music.cpp
     core/build_signature.cpp

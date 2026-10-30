@@ -122,7 +122,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         if(AMK_WINAPPSDK_INCLUDE)
             target_include_directories(amk_kernel PRIVATE "${AMK_WINAPPSDK_INCLUDE}")
         endif()
-        target_link_libraries(amk_kernel PRIVATE amk_theme)
+        # C++/WinRT calls RoGetActivationFactory and RoOriginateLanguageException, exported by runtimeobject.lib.
+        target_link_libraries(amk_kernel PRIVATE amk_theme runtimeobject)
     endif()
 
     # Starts Apple Music, holds its first process while the kernel loads, then follows the package.
@@ -154,7 +155,7 @@ target_link_libraries(amk PRIVATE amk_cli_portable amk_theme amk_core)
 target_compile_options(amk PRIVATE ${AMK_WARNINGS})
 target_compile_definitions(amk PRIVATE AMK_VERSION="${PROJECT_VERSION}")
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    target_link_libraries(amk PRIVATE shell32)
+    target_link_libraries(amk PRIVATE shell32 amk_win)
 endif()
 
 if(AMK_BUILD_TESTS)

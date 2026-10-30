@@ -62,7 +62,9 @@ TEST_CASE(Loader_RegistersValidElementsAndSkipsTheRest) {
 TEST_CASE(Loader_SkipsElementsDeclaredForTheOtherProcess) {
     fs::path root = Root("processes");
     WriteElement(root, "uionly", Manifest("uionly", "extension", R"(,"processes":["ui"])"), R"(AMK.log("ui");)");
-    WriteElement(root, "anywhere", Manifest("anywhere", "extension"), R"(AMK.log("ok");)");
+    WriteElement(root, "anywhere", Manifest("anywhere", "extension", R"(,"processes":["ui","engine"])"),
+                 R"(AMK.log("ok");)");
+    WriteElement(root, "plain", Manifest("plain", "extension"), R"(AMK.log("ui");)");  // no processes: interface only
 
     amk::test::FakeHost host;
     host.process = "engine";
@@ -73,7 +75,7 @@ TEST_CASE(Loader_SkipsElementsDeclaredForTheOtherProcess) {
 
     amk::LoadReport report = loader.Discover();
     CHECK(report.loaded == std::vector<std::string>{"anywhere"});
-    CHECK(report.skipped == std::vector<std::string>{"uionly"});
+    CHECK((report.skipped == std::vector<std::string>{"plain", "uionly"}));
     CHECK(out.str().find("[uionly] ignoré dans le processus engine") != std::string::npos);
 }
 
@@ -109,6 +111,34 @@ TEST_CASE(Loader_EnabledElementsStartAndOneFailureDoesNotStopTheOthers) {
 
     hosts.StopAll();
     CHECK(hosts.StateOf("solid") == amk::ExtensionState::Off);
+}
+
+TEST_CASE(Loader_ExposeApiOffKeepsEveryScriptOff) {
+    fs::path root = Root("expose-api");
+    WriteElement(root, "ext", Manifest("ext", "extension"), R"(AMK.log("ext");)");
+    WriteElement(root, "page", Manifest("page", "app"), R"(AMK.log("page");)");
+
+    amk::test::FakeHost host;
+    std::ostringstream out;
+    amk::Journal journal(out, [] { return std::string("t"); });
+    amk::ExtensionHost hosts(journal);
+    amk::ExtensionLoader loader(hosts, host, journal, root);
+    CHECK(loader.Discover().loaded.size() == 2);
+
+    amk::Settings settings;
+    settings.SetBool("extensions.ext.enabled", true);
+    settings.SetBool("apps.page.enabled", true);  // the key `amk app enable` writes
+    settings.SetBool("expose_api", false);
+    hosts.StartAll(settings);
+    CHECK(hosts.StateOf("ext") == amk::ExtensionState::Off);
+    CHECK(hosts.StateOf("page") == amk::ExtensionState::Off);
+
+    settings.SetBool("expose_api", true);
+    CHECK(loader.Restart("ext", settings));
+    CHECK(loader.Restart("page", settings));
+    CHECK(hosts.StateOf("ext") == amk::ExtensionState::Running);
+    CHECK(hosts.StateOf("page") == amk::ExtensionState::Running);
+    hosts.StopAll();
 }
 
 TEST_CASE(Loader_RestartReloadsAnElementWithItsNewSettings) {

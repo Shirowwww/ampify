@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <set>
 
+#include "../core/build_signature.hpp"
+#include "../core/version_list.hpp"
 #include "sha256.hpp"
 
 namespace amk {
@@ -40,7 +42,7 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
     }
 
     size_t before = errors.size();
-    CheckAllowedKeys(*document, {"$schema", "catalogVersion", "extensions"}, "", errors);
+    CheckAllowedKeys(*document, {"$schema", "catalogVersion", "extensions", "versions"}, "", errors);
 
     const json::Value* version = document->Find("catalogVersion");
     if (version == nullptr) {
@@ -57,6 +59,26 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
     }
 
     Catalog catalog;
+    if (const json::Value* pin = document->Find("versions")) {
+        if (!pin->IsObject()) {
+            errors.push_back("versions : objet attendu");
+        } else {
+            CheckAllowedKeys(*pin, {"url", "sha256"}, "versions", errors);
+            const json::Value* url = pin->Find("url");
+            const json::Value* sha = pin->Find("sha256");
+            if (url == nullptr || !url->IsString() || !IsAllowedDownloadUrl(url->AsString(), localCatalog)) {
+                errors.push_back("versions.url : adresse https:// attendue");
+            } else {
+                catalog.versionsUrl = url->AsString();
+            }
+            if (sha == nullptr || !sha->IsString() || !IsSha256Hex(sha->AsString())) {
+                errors.push_back("versions.sha256 : 64 caractères hexadécimaux minuscules attendus");
+            } else {
+                catalog.versionsSha256 = sha->AsString();
+            }
+        }
+    }
+
     std::set<std::string> ids;
     if (entries != nullptr && entries->IsArray()) {
         for (size_t index = 0; index < entries->Items().size(); index++) {
@@ -103,6 +125,95 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
 
     if (errors.size() != before) return std::nullopt;
     return catalog;
+}
+
+std::optional<VersionsCatalog> ParseVersionsCatalog(std::string_view text, std::vector<std::string>& errors) {
+    std::string syntaxError;
+    std::optional<json::Value> document = json::Parse(text, syntaxError);
+    if (!document) {
+        errors.push_back("JSON invalide : " + syntaxError);
+        return std::nullopt;
+    }
+    if (!document->IsObject()) {
+        errors.push_back("la liste des versions doit être un objet JSON");
+        return std::nullopt;
+    }
+
+    size_t before = errors.size();
+    CheckAllowedKeys(*document, {"$schema", "versionsFormat", "playerDll", "versions"}, "", errors);
+    const json::Value* format = document->Find("versionsFormat");
+    if (format == nullptr || !format->IsNumber() || format->AsNumber() != 1) {
+        errors.push_back("versionsFormat : seule la version 1 est connue");
+    }
+    const json::Value* dll = document->Find("playerDll");
+    if (dll == nullptr || !dll->IsString() || dll->AsString() != kPlayerDllName) {
+        errors.push_back("playerDll : " + std::string(kPlayerDllName) + " attendu");
+    }
+
+    VersionsCatalog catalog;
+    const json::Value* versions = document->Find("versions");
+    if (versions == nullptr || !versions->IsArray()) {
+        errors.push_back("versions : liste attendue");
+        return std::nullopt;
+    }
+    std::set<std::string> seen;
+    for (size_t index = 0; index < versions->Items().size(); index++) {
+        const json::Value& item = versions->Items()[index];
+        std::string where = "versions[" + std::to_string(index) + "]";
+        if (!item.IsObject()) {
+            errors.push_back(where + " : objet attendu");
+            continue;
+        }
+        CheckAllowedKeys(item, {"version", "tested", "exports", "notes"}, where, errors);
+
+        TestedVersion tested;
+        const json::Value* version = item.Find("version");
+        if (version == nullptr || !version->IsString() || !IsPackageVersionText(version->AsString())) {
+            errors.push_back(where + ".version : version de paquet attendue (quatre nombres, comme 1.1540.23042.0)");
+        } else {
+            tested.version = version->AsString();
+            if (!seen.insert(tested.version).second) errors.push_back(where + ".version : déjà listée");
+        }
+
+        const json::Value* exports = item.Find("exports");
+        if (exports == nullptr || !exports->IsArray() || exports->Items().empty()) {
+            errors.push_back(where + ".exports : liste non vide attendue");
+        } else {
+            for (const json::Value& name : exports->Items()) {
+                if (!name.IsString() || name.AsString().empty() ||
+                    name.AsString().find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_") !=
+                        std::string::npos) {
+                    errors.push_back(where + ".exports : nom d'export invalide");
+                    break;
+                }
+                tested.exports.push_back(name.AsString());
+            }
+        }
+        catalog.versions.push_back(std::move(tested));
+    }
+
+    if (errors.size() != before) return std::nullopt;
+    return catalog;
+}
+
+std::vector<std::string> UsableVersions(const VersionsCatalog& catalog, std::span<const std::string_view> required,
+                                        std::vector<std::string>& rejected) {
+    std::vector<std::string> usable;
+    for (const TestedVersion& tested : catalog.versions) {
+        std::string missing;
+        for (std::string_view name : required) {
+            if (std::find(tested.exports.begin(), tested.exports.end(), name) == tested.exports.end()) {
+                missing = std::string(name);
+                break;
+            }
+        }
+        if (missing.empty()) {
+            usable.push_back(tested.version);
+        } else {
+            rejected.push_back(tested.version + " (export non vérifié : " + missing + ")");
+        }
+    }
+    return usable;
 }
 
 const CatalogEntry* FindCatalogEntry(const Catalog& catalog, std::string_view id) {

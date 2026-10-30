@@ -2,11 +2,12 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "gain-boost",
   "name": "Gain de sortie",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Ajoute un gain fixe au son décodé. Le volume affiché ne change pas, et le plafond du noyau s'applique.",
   "kitApi": "1.0",
   "main": "main.js",
-  "permissions": ["audio.gain"]
+  "permissions": ["audio.gain"],
+  "processes": ["engine"]
 }

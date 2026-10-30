@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "extension.hpp"
@@ -12,6 +13,10 @@
 #include "script_extension.hpp"
 
 namespace amk {
+
+// The `expose_api` setting (Spicetify's `expose_apis`): 0 keeps every JavaScript element (extension, app, theme
+// script) off, whatever its own setting says. Missing means 1.
+inline constexpr std::string_view kExposeApiKey = "expose_api";
 
 struct LoadReport {
     std::vector<std::string> loaded;    // ids registered in the host

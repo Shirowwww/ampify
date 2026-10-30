@@ -82,7 +82,8 @@ bool ExtractZip(const std::filesystem::path& archive, const std::filesystem::pat
     return true;
 }
 
-bool DownloadHttps(const std::string& url, const std::filesystem::path& destination, std::string& error) {
+bool DownloadHttps(const std::string& url, const std::filesystem::path& destination, std::string& error,
+                   int maxSeconds) {
     std::vector<std::string> command = {kCurl,
                                         "--proto",
                                         "=https",
@@ -95,6 +96,7 @@ bool DownloadHttps(const std::string& url, const std::filesystem::path& destinat
                                         "--output",
                                         destination.string(),
                                         url};
+    if (maxSeconds > 0) command.insert(command.end() - 1, {"--max-time", std::to_string(maxSeconds)});
     int code = Run(command);
     if (code != 0) {
         error = "téléchargement impossible (code " + std::to_string(code) + ") : " + url;

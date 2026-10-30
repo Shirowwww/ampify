@@ -1,8 +1,12 @@
 // Windows side of platform.hpp. Programs are started with CreateProcessW, never through cmd.exe, so a path or a
 // URL with quotes or ampersands cannot run anything else.
 
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <windows.h>
 #include <shellapi.h>
 
@@ -13,6 +17,8 @@
 #include <system_error>
 #include <vector>
 
+#include "../core/apple_music.hpp"
+#include "../win/package.hpp"
 #include "platform.hpp"
 
 namespace amk::platform {
@@ -155,6 +161,24 @@ bool StartDetached(const std::vector<std::string>& command) {
     CloseHandle(process.hThread);
     CloseHandle(process.hProcess);
     return true;
+}
+
+std::optional<std::filesystem::path> AppPackageFolder() {
+    std::wstring family = ToWide(std::string(kPackageFamilyName));
+    std::optional<launcher::InstalledPackage> package = launcher::FindInstalledPackage(family.c_str());
+    if (!package) return std::nullopt;
+    return package->directory;
+}
+
+std::optional<std::filesystem::path> AppPreferencesFile() {
+    const wchar_t* local = _wgetenv(L"LOCALAPPDATA");
+    if (local == nullptr || *local == L'\0') return std::nullopt;
+    return std::filesystem::path(local) / L"Packages" / ToWide(std::string(kPackageFamilyName)) / L"LocalCache" /
+           L"Roaming" / L"Apple Computer" / L"Preferences" / L"AMPLibraryAgent.exe.plist";
+}
+
+std::vector<std::string> OpenFolderCommand(const std::filesystem::path& folder) {
+    return {"explorer.exe", ToUtf8(folder.wstring())};
 }
 
 bool IsProcessRunning(const std::string& imageName) {

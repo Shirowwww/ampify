@@ -34,6 +34,8 @@ bool ThemeScriptEnabled(const Settings& settings, const std::string& id) {
     return settings.GetString("theme.active", "") == id && settings.GetBool("theme.parts.script", true);
 }
 
+bool ScriptsAllowed(const Settings& settings) { return settings.GetBool(std::string(kExposeApiKey), true); }
+
 void ExtensionLoader::SetThemeRoot(fs::path root) { m_themeRoot = std::move(root); }
 
 LoadReport ExtensionLoader::Discover() {
@@ -94,13 +96,25 @@ void ExtensionLoader::LoadFolders(const fs::path& root, LoadReport& report, bool
 
         std::string id = manifest.id;
         std::string displayName = manifest.name;
+        bool isApp = manifest.kind == ElementKind::App;
         auto element = std::make_unique<ScriptExtension>(std::move(manifest), folder, m_host, m_journal, m_clock);
         ScriptExtension* raw = element.get();
         ExtensionInfo info;
         info.id = id;
         info.name = displayName;
         info.enabledByDefault = false;  // a community element never starts unless the user enables it
-        if (themes) info.isEnabled = [id](const Settings& settings) { return ThemeScriptEnabled(settings, id); };
+        // expose_api = 0 keeps every JavaScript element off. An app is switched by apps.<id>.enabled, as `amk app
+        // enable` writes it; an extension by extensions.<id>.enabled.
+        if (themes) {
+            info.isEnabled = [id](const Settings& settings) {
+                return ScriptsAllowed(settings) && ThemeScriptEnabled(settings, id);
+            };
+        } else {
+            std::string key = isApp ? "apps." + id + ".enabled" : ExtensionHost::SettingKey(id);
+            info.isEnabled = [key](const Settings& settings) {
+                return ScriptsAllowed(settings) && settings.GetBool(key, false);
+            };
+        }
         info.start = [raw] { return raw->Start(); };
         info.stop = [raw] { raw->Stop(); };
 

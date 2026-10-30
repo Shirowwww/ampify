@@ -23,7 +23,9 @@ Register-Case -Id 'cli-outils-windows' -Title 'amk trouve tar.exe et curl.exe, e
         $refusedCode = $LASTEXITCODE
         Add-Check -Ctx $Ctx -Name 'catalogue http:// refuse' -Passed ($refusedCode -ne 0) -Detail $refused.Trim()
 
-        $httpsCatalog = 'https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/catalog.json'
+        # The catalog of the commit under test: main may not have one yet.
+        $ref = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { 'main' }
+        $httpsCatalog = "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/$ref/catalog/catalog.json"
         $listed = (& $amk --kit-dir $kit market --catalog $httpsCatalog 2>&1) | Out-String
         $listedCode = $LASTEXITCODE
         Add-Check -Ctx $Ctx -Name 'catalogue https:// telecharge avec curl.exe' -Passed ($listedCode -eq 0) -Detail $listed.Trim()

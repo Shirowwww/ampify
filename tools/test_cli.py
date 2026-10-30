@@ -760,5 +760,250 @@ class Transfer(AmkTestCase):
         self.assertIn("n'est pas un export", result.stderr)
 
 
+class Chaining(AmkTestCase):
+    def test_verbs_without_argument_run_in_order(self):
+        result = self.amk("backup", "apply")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Sauvegarde créée", result.stdout)
+        self.assertLess(result.stdout.index("Sauvegarde créée"), result.stdout.index("Apple Music lit ces réglages"))
+        self.assertTrue(os.path.exists(os.path.join(self.kit, "active.txt")))
+
+    def test_chain_stops_at_the_first_failure(self):
+        self.amk("config", "extensions.fantome.enabled", "1")
+        result = self.amk("apply", "backup")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("« apply » a échoué", result.stderr)
+        self.assertNotIn("Sauvegarde créée", result.stdout)
+        self.assertIn("Aucune sauvegarde", self.amk("backup", "list").stdout)
+
+    def test_a_word_that_is_not_a_verb_keeps_one_command(self):
+        result = self.amk("backup", "list")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Aucune sauvegarde", result.stdout)
+        self.assertEqual(self.amk("devtools", "off").returncode, 0)
+
+    def test_version_option_and_launch_chain(self):
+        result = self.amk("--version")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("amk ", result.stdout)
+        result = self.amk("apply", "devtools", "launch", "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Inspecteur activé", result.stdout)
+        self.assertIn("amk_launcher.exe", result.stdout)
+
+
+class Paths(AmkTestCase):
+    def test_one_path_per_name(self):
+        result = self.amk("path", "kit")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), native(self.kit))
+        self.assertTrue(self.amk("path", "settings").stdout.strip().endswith("settings.txt"))
+        for name in ("extensions", "themes", "apps", "snippets"):
+            self.assertTrue(self.amk("path", name).stdout.strip().endswith(name))
+        self.assertTrue(self.amk("path", "logs").stdout.strip().endswith("journal"))
+        result = self.amk("path", "inventé")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("nom inconnu", result.stderr)
+
+    def test_app_and_prefs_follow_their_settings(self):
+        result = self.amk("path", "app")
+        self.assertIn(result.returncode, (0, 1))
+        if not WINE:
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("introuvable", result.stderr)
+        folder = native(os.path.join(self.tmp, "Apple Music"))
+        self.assertEqual(self.amk("config", "app_path", folder).returncode, 0)
+        self.assertEqual(self.amk("path", "app").stdout.strip(), folder)
+        prefs = native(os.path.join(self.tmp, "prefs.plist"))
+        self.assertEqual(self.amk("config", "prefs_path", prefs).returncode, 0)
+        self.assertEqual(self.amk("path", "prefs").stdout.strip(), prefs)
+        self.assertIn(folder, self.amk("path").stdout)
+
+    def test_config_dir_names_the_kit_folder(self):
+        result = self.amk("config", "--dir", "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(native(self.kit), result.stdout)
+        self.assertIn("Commande :", result.stdout)
+        self.assertTrue(os.path.isdir(self.kit))
+
+
+class Devtools(AmkTestCase):
+    def test_devtools_switches_the_inspector(self):
+        result = self.amk("devtools")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("inspector.txt", result.stdout)
+        self.assertIn("theme.inspect = 1", self.settings_text())
+        self.assertEqual(self.amk("devtools", "off").returncode, 0)
+        self.assertIn("theme.inspect = 0", self.settings_text())
+        self.assertEqual(self.amk("devtools", "peut-être").returncode, 2)
+
+    def test_inspect_tree_prints_the_last_dump(self):
+        result = self.amk("inspect", "--tree")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("amk devtools", result.stderr)
+        os.makedirs(os.path.join(self.kit, "journal"))
+        with open(os.path.join(self.kit, "journal", "inspector.txt"), "w", encoding="utf-8") as handle:
+            handle.write("Window\n  Grid#Racine\n")
+        result = self.amk("inspect", "--tree")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Grid#Racine", result.stdout)
+
+
+class NewSettings(AmkTestCase):
+    def test_booleans_are_checked_and_stored_as_1_or_0(self):
+        for key in ("check_kit_update", "telemetry.block", "expose_api", "theme.inspect", "theme.parts.assets"):
+            self.assertEqual(self.amk("config", key, "on").returncode, 0, key)
+            self.assertIn(f"{key} = 1", self.settings_text())
+            self.assertEqual(self.amk("config", key, "peut-être").returncode, 1, key)
+
+    def test_paths_must_be_complete(self):
+        self.assertEqual(self.amk("config", "app_path", "relatif").returncode, 1)
+        self.assertEqual(self.amk("config", "prefs_path", "relatif/x.plist").returncode, 1)
+        self.assertEqual(self.amk("config", "app_path", "").returncode, 0)
+
+    def test_launch_flags_are_split_and_shown_by_launch(self):
+        result = self.amk("config", "app_launch_flags", "--remote-debugging-port=9222")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.amk("config", "app_launch_flags", '--a "deux mots').returncode, 1)
+        self.assertEqual(self.amk("config", "app_launch_flags", '--x=1 "--y=deux mots"').returncode, 0)
+        result = self.amk("launch", "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Arguments pour Apple Music (app_launch_flags) : --x=1 "--y=deux mots"', result.stdout)
+
+
+class TestedVersions(AmkTestCase):
+    REQUIRED = ["AVCFPlayerCopyCurrentItem", "AVCFPlayerItemCopyCurrentStableVariantID", "AVCFPlayerItemCopyTracks",
+                "AVCFPlayerItemTrackCopyAssetTrack", "AVCFPlayerSetVolume"]
+
+    def write_versions(self, versions, sha=None):
+        path = os.path.join(self.tmp, "versions.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"versionsFormat": 1, "playerDll": "AVFoundationCF.dll", "versions": versions}, handle)
+        catalog = os.path.join(self.tmp, "catalog.json")
+        with open(catalog, "w", encoding="utf-8") as handle:
+            json.dump({"catalogVersion": 1, "extensions": [],
+                       "versions": {"url": file_url(path), "sha256": sha or sha256_of(path)}}, handle)
+        return catalog
+
+    def test_update_writes_the_fully_checked_versions(self):
+        catalog = self.write_versions([
+            {"version": "1.1600.1.0", "tested": "2026-10-30", "exports": self.REQUIRED},
+            {"version": "1.1700.2.0", "tested": "2026-10-30", "exports": self.REQUIRED[:2]},
+        ])
+        result = self.amk("versions", "update", *self.catalog_option(catalog))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ignorée    1.1700.2.0", result.stdout)
+        text = self.read("versions.txt")
+        self.assertTrue(text.startswith("amk-versions 1\n"))
+        self.assertIn("1.1600.1.0\n", text)
+        self.assertNotIn("1.1700.2.0", text)
+        listing = self.amk("versions").stdout
+        self.assertIn("1.1540.23042.0", listing)
+        self.assertIn("1.1600.1.0", listing)
+        self.assertIn("versions.txt", listing)
+
+    def test_wrong_checksum_writes_nothing(self):
+        catalog = self.write_versions([{"version": "1.1600.1.0", "tested": "2026-10-30", "exports": self.REQUIRED}],
+                                      sha="0" * 64)
+        result = self.amk("versions", "update", *self.catalog_option(catalog))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("empreinte SHA-256", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.kit, "versions.txt")))
+
+    def test_catalog_without_versions_is_reported(self):
+        catalog = self.write_catalog([])
+        result = self.amk("versions", "update", *self.catalog_option(catalog))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("ne publie pas de liste de versions", result.stderr)
+
+    def test_malformed_list_is_ignored(self):
+        os.makedirs(self.kit)
+        with open(os.path.join(self.kit, "versions.txt"), "w", encoding="utf-8") as handle:
+            handle.write("amk-versions 1\n1.1600.1.0\nn'importe quoi\n")
+        listing = self.amk("versions", "list")
+        self.assertEqual(listing.returncode, 0, listing.stderr)
+        self.assertNotIn("1.1600.1.0", listing.stdout)
+        self.assertIn("ignoré", listing.stdout)
+
+    def test_repository_catalog_with_its_versions_pin_is_valid(self):
+        result = self.amk("validate", native(os.path.join(ROOT, "catalog", "catalog.json")))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
+class KitRelease(AmkTestCase):
+    make_release = KitUpdate.make_release
+
+    @unittest.skipIf(WINE, "install-kit needs tar.exe, which Wine does not ship")
+    def test_install_kit_takes_an_older_version(self):
+        release = self.make_release("0.0.9")
+        install_dir = os.path.join(self.tmp, "install")
+        os.makedirs(install_dir)
+        result = self.amk("install-kit", "0.0.9", "--apply", "--release-url", file_url(release),
+                          "--install-dir", native(install_dir))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("plus ancienne", result.stdout)
+        with open(os.path.join(install_dir, "amk.exe"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "amk.exe 0.0.9")
+
+    def test_install_kit_check_and_wrong_version(self):
+        release = self.make_release("9.9.9")
+        result = self.amk("install-kit", "v9.9.9", "--check", "--release-url", file_url(release))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("amk install-kit 9.9.9", result.stdout)
+        result = self.amk("install-kit", "1.2.3", "--release-url", file_url(release))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("pas la version 1.2.3", result.stderr)
+        self.assertEqual(self.amk("install-kit", "dernière").returncode, 1)
+        self.assertEqual(self.amk("install-kit").returncode, 2)
+
+    @unittest.skipIf(WINE, "install-kit needs tar.exe, which Wine does not ship")
+    def test_install_kit_without_apply_says_how_to_finish(self):
+        release = self.make_release("0.0.8")
+        result = self.amk("install-kit", "0.0.8", "--release-url", file_url(release))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("amk install-kit 0.0.8 --apply", result.stdout)
+
+
+class KitUpdateNotice(AmkTestCase):
+    make_release = KitUpdate.make_release
+
+    def cache_path(self):
+        return os.path.join(self.kit, "cache", "kit-update.txt")
+
+    def test_no_check_unless_enabled(self):
+        release = self.make_release("9.9.9")
+        result = self.amk("list", "--release-url", file_url(release))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("est disponible", result.stderr)
+        self.assertFalse(os.path.exists(self.cache_path()))
+
+    def test_notice_is_printed_once_checked_and_then_cached(self):
+        release = self.make_release("9.9.9")
+        self.assertEqual(self.amk("config", "check_kit_update", "1").returncode, 0)
+        result = self.amk("list", "--release-url", file_url(release))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("la version 9.9.9 du kit est disponible", result.stderr)
+        self.assertTrue(os.path.exists(self.cache_path()))
+
+        os.remove(release)  # a second check would fail: the notice must come from the cache
+        result = self.amk("apply", "--release-url", file_url(release))
+        self.assertIn("9.9.9", result.stderr)
+
+        result = self.amk("path", "kit", "--release-url", file_url(release))
+        self.assertNotIn("disponible", result.stderr)
+        self.assertEqual(result.stdout.strip(), native(self.kit))
+
+    def test_old_cache_is_checked_again(self):
+        release = self.make_release("0.0.1")
+        self.amk("config", "check_kit_update", "1")
+        os.makedirs(os.path.dirname(self.cache_path()), exist_ok=True)
+        with open(self.cache_path(), "w", encoding="utf-8") as handle:
+            handle.write("checked=0\nlatest=9.9.9\n")
+        result = self.amk("doctor", "--release-url", file_url(release))
+        self.assertNotIn("est disponible", result.stderr)
+        with open(self.cache_path(), encoding="utf-8") as handle:
+            self.assertIn("latest=0.0.1", handle.read())
+
+
 if __name__ == "__main__":
     unittest.main()

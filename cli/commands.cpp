@@ -7,10 +7,12 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <span>
 #include <sstream>
 #include <thread>
 
 #include "../core/apple_music.hpp"
+#include "../core/launch_flags.hpp"
 #include "../core/theme/commands.hpp"
 #include "../core/theme/files.hpp"
 #include "../core/theme/theme.hpp"
@@ -84,7 +86,27 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
         return true;
     }
 
-    bool isBooleanKey = key.rfind("theme.parts.", 0) == 0 ||
+    if (key == "app_path" || key == "prefs_path") {
+        if (value.empty()) return true;  // empty: back to the path found on its own
+        for (char c : value) {
+            if (static_cast<unsigned char>(c) < 0x20) {
+                problem = key + " contient un caractère de contrôle";
+                return false;
+            }
+        }
+        if (!PathArgument(value).is_absolute()) {
+            problem = key + " attend un chemin complet, par exemple C:\\dossier\\fichier";
+            return false;
+        }
+        return true;
+    }
+    if (key == kLaunchFlagsKey) {
+        if (!SplitLaunchFlags(value, &problem)) return false;
+        return true;
+    }
+
+    bool isBooleanKey = key.rfind("theme.parts.", 0) == 0 || key == "theme.inspect" || key == "theme.live_reload" ||
+                        key == "check_kit_update" || key == "telemetry.block" || key == "expose_api" ||
                         (key.size() > 8 && key.compare(key.size() - 8, 8, ".enabled") == 0 &&
                          (key.rfind("extensions.", 0) == 0 || key.rfind("apps.", 0) == 0 ||
                           key.rfind("snippets.", 0) == 0));
@@ -318,8 +340,21 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
         return true;
     };
 
+    bool onlyArguments = false;
     for (size_t i = 0; i < arguments.size(); i++) {
         const std::string& arg = arguments[i];
+        // After "--", and for the value of `config app_launch_flags`, a word starting with "--" is an argument:
+        // `amk config app_launch_flags --remote-debugging-port=9222` stores the flag instead of refusing it.
+        bool flagsValue = options.positional.size() == 2 && options.positional[0] == "config" &&
+                          options.positional[1] == kLaunchFlagsKey;
+        if (onlyArguments || flagsValue) {
+            options.positional.push_back(arg);
+            continue;
+        }
+        if (arg == "--") {
+            onlyArguments = true;
+            continue;
+        }
         if (arg == "--kit-dir" || arg == "--catalog" || arg == "--install-dir" || arg == "--release-url" ||
             arg == "--scheme" || arg == "--backup" || arg == "--interval" || arg == "--max-cycles") {
             std::optional<std::string> text = value(i);
@@ -345,6 +380,10 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
             options.apply = true;
         } else if (arg == "--follow") {
             options.follow = true;
+        } else if (arg == "--tree") {
+            options.tree = true;
+        } else if (arg == "--dir") {
+            options.dir = true;
         } else if (arg == "--help" || arg == "-h") {
             options.positional.insert(options.positional.begin(), "help");
         } else if (arg == "--version") {
@@ -404,13 +443,18 @@ int CmdHelp(Context& ctx) {
     ctx.out << R"(amk : le kit Apple Music, en ligne de commande
 
 Usage : amk [options] <commande> [arguments]
+        amk backup apply launch      plusieurs commandes sans argument à la suite (arrêt au premier échec) :
+                                     backup, apply, launch, auto, restore, devtools, doctor, version
 
 Réglages et état
   config                       affiche tous les réglages
   config <clé>                 affiche un réglage
   config <clé> <valeur>        change un réglage (valeur vérifiée)
   config extensions +id        active une extension (ou -id pour la désactiver)
-  path                         affiche les dossiers du kit
+  config --dir                 ouvre le dossier du kit (--dry-run pour seulement l'afficher)
+  path                         affiche les dossiers du kit et d'Apple Music
+  path <nom>                   un seul chemin : kit, settings, extensions, themes, apps, snippets, logs,
+                               backups, app (paquet d'Apple Music), prefs (préférences d'Apple Music)
   list                         liste les éléments installés et leur état
 
 Éléments
@@ -428,6 +472,9 @@ Marketplace
   install <id> [--yes]         installe depuis le catalogue (SHA-256 vérifié)
   update <id> [--yes]          met à jour un élément installé depuis le catalogue
   update [--check] [--apply]   met le kit à jour depuis la dernière release GitHub
+  install-kit <version> [--apply]   installe une version précise du kit (même plus ancienne), SHA-256 vérifié
+  versions [list]              versions d'Apple Music acceptées par le noyau, et celle installée
+  versions update              télécharge la liste des versions testées publiée avec le catalogue
   remove <id>                  retire un élément (une sauvegarde est faite avant)
 
 Application
@@ -442,6 +489,8 @@ Application
 Création et développement
   build <dossier> [fichier.zip]        compile un élément : valide, écrit le zip, donne le SHA-256 et l'entrée de catalogue
   inspect <dossier> | <type> <id>      affiche le manifeste, les fichiers et leurs SHA-256
+  inspect --tree                       affiche le dernier arbre de l'interface écrit par le noyau
+  devtools [on|off]                    demande au noyau d'écrire l'arbre de l'interface (journal\inspector.txt)
   dev <dossier>                        copie l'élément dans le kit à chaque sauvegarde et le recharge
   types [fichier]                      écrit amk.d.ts (types pour l'éditeur, amk.d.ts par défaut)
   test <dossier>                       lance main.js dans le moteur JavaScript, avec un hôte factice
@@ -475,19 +524,71 @@ int CmdVersion(Context& ctx) {
     return 0;
 }
 
+namespace {
+
+// What `amk path <nom>` prints. Nothing when the path cannot be found (Apple Music on another system).
+std::optional<std::filesystem::path> NamedPath(Context& ctx, std::string_view name) {
+    if (name == "kit" || name == "userdata") return ctx.kit.Root();
+    if (name == "settings") return ctx.kit.Settings();
+    if (name == "extensions" || name == "themes" || name == "apps" || name == "snippets") {
+        return ctx.kit.Root() / std::string(name);
+    }
+    if (name == "logs") return ctx.kit.Journal();
+    if (name == "backups") return ctx.kit.Backups();
+    if (name == "app") return PathSetting(ctx, "app_path", platform::AppPackageFolder());
+    if (name == "prefs") return PathSetting(ctx, "prefs_path", platform::AppPreferencesFile());
+    return std::nullopt;
+}
+
+constexpr std::string_view kPathNames[] = {"kit", "settings", "extensions", "themes", "apps", "snippets",
+                                           "logs", "backups", "app", "prefs"};
+
+}  // namespace
+
 int CmdPath(Context& ctx) {
+    const std::vector<std::string>& args = ctx.options.positional;
+    if (args.size() > 2) return Usage(ctx, "path prend au plus un nom");
+    if (args.size() == 2) {
+        const std::string& name = args[1];
+        bool known = name == "userdata" ||
+                     std::find(std::begin(kPathNames), std::end(kPathNames), std::string_view(name)) != std::end(kPathNames);
+        if (!known) {
+            std::string names;
+            for (std::string_view each : kPathNames) names += (names.empty() ? "" : ", ") + std::string(each);
+            return Usage(ctx, "nom inconnu pour path : " + name + " (" + names + ")");
+        }
+        std::optional<std::filesystem::path> path = NamedPath(ctx, name);
+        if (!path) {
+            if (name == "app") {
+                return Failure(ctx, "dossier d'Apple Music introuvable : Apple Music n'est pas installé, ou ce système "
+                                    "n'est pas Windows. Tu peux l'indiquer avec amk config app_path <dossier>.");
+            }
+            return Failure(ctx, "préférences d'Apple Music introuvables sur ce système. Tu peux les indiquer avec "
+                                "amk config prefs_path <fichier>.");
+        }
+        ctx.out << Utf8(*path) << "\n";
+        return 0;
+    }
+
+    std::optional<std::filesystem::path> app = NamedPath(ctx, "app");
+    std::optional<std::filesystem::path> prefs = NamedPath(ctx, "prefs");
     ctx.out << "Dossier du kit   : " << Utf8(ctx.kit.Root()) << "\n"
             << "Réglages         : " << Utf8(ctx.kit.Settings()) << "\n"
             << "Éléments         : " << Utf8(ctx.kit.Root()) << "\\{extensions,themes,apps,snippets}\n"
             << "État du kit      : " << Utf8(ctx.kit.Active()) << ", " << Utf8(ctx.kit.Reload()) << "\n"
+            << "Journal          : " << Utf8(ctx.kit.Journal()) << "\n"
             << "Sauvegardes      : " << Utf8(ctx.kit.Backups()) << "\n"
             << "Dossier de amk   : " << Utf8(platform::ExecutableDirectory()) << "\n"
-            << "Apple Music      : " << kAppUserModelId << "\n";
+            << "Apple Music      : " << kAppUserModelId << "\n"
+            << "Paquet de l'app  : " << (app ? Utf8(*app) : std::string("introuvable sur ce système")) << "\n"
+            << "Préférences      : " << (prefs ? Utf8(*prefs) : std::string("introuvables sur ce système")) << "\n"
+            << "Un seul chemin   : amk path <kit|settings|extensions|themes|apps|snippets|logs|backups|app|prefs>\n";
     return 0;
 }
 
 int CmdConfig(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
+    if (ctx.options.dir) return CmdConfigDir(ctx);
     if (args.size() > 3) return Usage(ctx, "trop d'arguments pour config");
 
     Settings settings;
@@ -617,10 +718,10 @@ int CmdNew(Context& ctx) {
     return 0;
 }
 
-int Execute(const Options& options, std::istream& in, std::ostream& out, std::ostream& err) {
-    KitLayout kit(options.kitDir ? PathArgument(*options.kitDir) : platform::DefaultKitDirectory());
-    Context ctx{options, kit, in, out, err};
+namespace {
 
+int Dispatch(Context& ctx) {
+    const Options& options = ctx.options;
     if (options.positional.empty()) return CmdHelp(ctx);
     const std::string& command = options.positional[0];
 
@@ -642,7 +743,10 @@ int Execute(const Options& options, std::istream& in, std::ostream& out, std::os
     if (command == "backup") return CmdBackup(ctx);
     if (command == "watch") return CmdWatch(ctx);
     if (command == "build") return CmdBuild(ctx);
-    if (command == "inspect") return CmdInspect(ctx);
+    if (command == "inspect") return options.tree ? CmdInspectTree(ctx) : CmdInspect(ctx);
+    if (command == "devtools") return CmdDevtools(ctx);
+    if (command == "versions") return CmdVersions(ctx);
+    if (command == "install-kit") return CmdInstallKit(ctx);
     if (command == "types") return CmdTypes(ctx);
     if (command == "dev") return CmdDev(ctx);
     if (command == "logs") return CmdLogs(ctx);
@@ -655,6 +759,59 @@ int Execute(const Options& options, std::istream& in, std::ostream& out, std::os
         if (command == kind) return CmdKind(ctx, kind);
     }
     return Usage(ctx, "commande inconnue : " + command);
+}
+
+// Verbs that take no argument and can follow one another on a line, as in Spicetify (`spicetify backup apply`):
+// `amk backup apply launch`. A word that is not in this list (an id, `list`, `on`) makes the line one command.
+constexpr std::string_view kChainVerbs[] = {"backup", "apply", "launch", "auto", "restore", "devtools", "doctor", "version"};
+
+// Commands after which the notice about a new kit release may be printed. Never after a command whose output a script
+// reads (path, config), nor after update itself.
+constexpr std::string_view kNoticeCommands[] = {"launch", "auto", "apply", "list", "doctor", "market", "catalog"};
+
+bool Contains(std::span<const std::string_view> list, std::string_view word) {
+    return std::find(list.begin(), list.end(), word) != list.end();
+}
+
+}  // namespace
+
+bool IsChainLine(const std::vector<std::string>& positional) {
+    if (positional.size() < 2) return false;
+    for (const std::string& word : positional) {
+        if (!Contains(kChainVerbs, word)) return false;
+    }
+    return true;
+}
+
+int Execute(const Options& options, std::istream& in, std::ostream& out, std::ostream& err) {
+    KitLayout kit(options.kitDir ? PathArgument(*options.kitDir) : platform::DefaultKitDirectory());
+    std::vector<std::vector<std::string>> commands;
+    if (IsChainLine(options.positional)) {
+        for (const std::string& verb : options.positional) commands.push_back({verb});
+    } else {
+        commands.push_back(options.positional);
+    }
+
+    int code = 0;
+    bool notice = false;
+    for (size_t i = 0; i < commands.size(); i++) {
+        Options one = options;
+        one.positional = commands[i];
+        Context ctx{one, kit, in, out, err};
+        if (!one.positional.empty() && Contains(kNoticeCommands, one.positional[0])) notice = true;
+        code = Dispatch(ctx);
+        if (code != 0) {
+            if (i + 1 < commands.size()) {
+                err << "amk : « " << commands[i][0] << " » a échoué, les commandes suivantes ne sont pas lancées\n";
+            }
+            break;
+        }
+    }
+    if (notice) {
+        Context ctx{options, kit, in, out, err};
+        NotifyKitUpdate(ctx);
+    }
+    return code;
 }
 
 }  // namespace amk::cli

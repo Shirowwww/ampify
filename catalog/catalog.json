@@ -1,16 +1,20 @@
 {
   "catalogVersion": 1,
+  "versions": {
+    "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/versions.json",
+    "sha256": "a97093bcac132c959a19c817f7c6463f6c7e9b41729cfd657b272551c12ce9e7"
+  },
   "extensions": [
     {
       "id": "gain-boost",
       "name": "Gain de sortie",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "kind": "extension",
       "author": "Shirowwww",
       "description": "Ajoute un gain fixe au son décodé. Le volume affiché ne change pas, et le plafond du noyau s'applique.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/thread-k5q5qn/catalog/packages/gain-boost-0.1.0.zip",
-      "sha256": "05b5c7319a2cb1a4e3a802d6ebf8ed59a526aec0372cf8108da5a484d9d89cff",
+      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/packages/gain-boost-0.1.1.zip",
+      "sha256": "0049fc384ff930a69649afbd84a74252425ef28e3072069d37b36524e42fddc3",
       "permissions": [
         "audio.gain"
       ]
@@ -23,7 +27,7 @@
       "author": "Shirowwww",
       "description": "Exemple minimal : écrit dans le journal et garde un compteur de lancements.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/thread-k5q5qn/catalog/packages/hello-extension-0.1.0.zip",
+      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/packages/hello-extension-0.1.0.zip",
       "sha256": "443846e932c8ed0793724e5e3bcbcad4eb8516b6bc2f935f2fa4add3bfa19389",
       "permissions": [
         "storage"
@@ -37,7 +41,7 @@
       "author": "Shirowwww",
       "description": "Noir et blanc, avec des couleurs vives pour les boutons et les sélections.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/thread-k5q5qn/catalog/packages/high-contrast-1.0.0.zip",
+      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/packages/high-contrast-1.0.0.zip",
       "sha256": "8bdfd934eafa9185dae8b7d74cf00ed9613f7622693bd6bcb49c44d1fe96e946",
       "permissions": []
     },
@@ -49,7 +53,7 @@
       "author": "Shirowwww",
       "description": "Raccourcis globaux : Ctrl+Alt+Droite pour le morceau suivant, Ctrl+Alt+Gauche pour le précédent.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/thread-k5q5qn/catalog/packages/keyboard-skip-0.1.0.zip",
+      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/packages/keyboard-skip-0.1.0.zip",
       "sha256": "5f01c9ac4277b4dabc4f2e381851478646f1cffc7c39657c94a15ccb71f403e3",
       "permissions": [
         "player.control",
@@ -64,7 +68,7 @@
       "author": "Shirowwww",
       "description": "Thème bleu nuit, avec un schéma sombre et un schéma clair.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/thread-k5q5qn/catalog/packages/night-blue-1.0.0.zip",
+      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/packages/night-blue-1.0.0.zip",
       "sha256": "c0a86c2f93503d73b9a8e02810dbe48dae08e315590aabb182500980f174269e",
       "permissions": []
     },
@@ -76,7 +80,7 @@
       "author": "Shirowwww",
       "description": "Affiche une notification à chaque nouveau morceau. Ne touche pas au lecteur.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/thread-k5q5qn/catalog/packages/now-playing-notify-0.1.0.zip",
+      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/packages/now-playing-notify-0.1.0.zip",
       "sha256": "77c77c1df4867e6711d414f90b94ac5f63e06b332bb7871333ebdb8e940e0916",
       "permissions": [
         "player.read",
@@ -91,7 +95,7 @@
       "author": "Shirowwww",
       "description": "Thème papier, sobre et clair, avec un schéma sombre en option.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/thread-k5q5qn/catalog/packages/paper-light-1.0.0.zip",
+      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/packages/paper-light-1.0.0.zip",
       "sha256": "8ab9f2c215aa1c2b51f2d647032fc42a64d3556538ddcc92494976ce44e184c6",
       "permissions": []
     },
@@ -103,7 +107,7 @@
       "author": "Shirowwww",
       "description": "Thème or rose, chaud, avec un schéma sombre et un schéma clair.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/thread-k5q5qn/catalog/packages/rose-gold-1.0.0.zip",
+      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/packages/rose-gold-1.0.0.zip",
       "sha256": "66e1339caf24ca948c6a2cc2c53b8c1aa1151e54e19d4aafb611844ea8646242",
       "permissions": []
     },
@@ -115,7 +119,7 @@
       "author": "Shirowwww",
       "description": "Met la lecture en pause après un délai, réglable en minutes, puis prévient.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/thread-k5q5qn/catalog/packages/sleep-timer-0.1.0.zip",
+      "url": "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/packages/sleep-timer-0.1.0.zip",
       "sha256": "2bca48063492006949934db2d30a0b761235b81a2bc2d5aabe42738bf9b7f4b6",
       "permissions": [
         "player.control",

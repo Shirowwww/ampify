@@ -1,0 +1,18 @@
+{
+  "versionsFormat": 1,
+  "playerDll": "AVFoundationCF.dll",
+  "versions": [
+    {
+      "version": "1.1540.23042.0",
+      "tested": "2026-10-30",
+      "exports": [
+        "AVCFPlayerCopyCurrentItem",
+        "AVCFPlayerItemCopyCurrentStableVariantID",
+        "AVCFPlayerItemCopyTracks",
+        "AVCFPlayerItemTrackCopyAssetTrack",
+        "AVCFPlayerSetVolume"
+      ],
+      "notes": "Version relevée dans knowledge/. C'est aussi la version intégrée au noyau."
+    }
+  ]
+}

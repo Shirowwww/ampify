@@ -69,12 +69,6 @@ private:
     amk::Journal m_journal;
 };
 
-std::string HResultText(HRESULT hr) {
-    char buffer[16];
-    std::snprintf(buffer, sizeof(buffer), "0x%08lX", static_cast<unsigned long>(hr));
-    return buffer;
-}
-
 // Creates the start menu shortcut that starts the launcher.
 bool CreateShortcut(const fs::path& shortcut, const fs::path& target, const fs::path& workingDir) {
     IShellLinkW* link = nullptr;
@@ -247,14 +241,6 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
     Log log(keepData ? amk::win::JournalFile("desinstallation.log") : fs::path());
     log.Write("Désinstallation du kit " + std::string(amk::kKitVersion) +
               (keepData ? " (données gardées)" : " (données supprimées)"));
-
-    // Undo the package debugging state the launcher may have set, so the package is back to its own state.
-    std::optional<amk::launcher::InstalledPackage> package =
-        amk::launcher::FindInstalledPackage(amk::win::FromUtf8(amk::kPackageFamilyName).c_str());
-    if (package) {
-        HRESULT hr = amk::launcher::DisablePackageDebugging(package->fullName);
-        log.Write("Débogage du paquet remis à zéro (" + HResultText(hr) + ")");
-    }
 
     // Files first: if one is in use, nothing else is removed yet, so the uninstall can simply be run again.
     for (std::string_view name : amk::InstalledFiles()) {

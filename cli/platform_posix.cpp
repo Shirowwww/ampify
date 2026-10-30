@@ -86,6 +86,18 @@ bool StartDetached(const std::vector<std::string>& command) {
     return true;
 }
 
+std::optional<std::filesystem::path> AppPackageFolder() {
+    return std::nullopt;  // Apple Music for Windows is a Microsoft Store package: there is none here
+}
+
+std::optional<std::filesystem::path> AppPreferencesFile() {
+    return std::nullopt;
+}
+
+std::vector<std::string> OpenFolderCommand(const std::filesystem::path& folder) {
+    return {"xdg-open", folder.string()};
+}
+
 bool IsProcessRunning(const std::string& imageName) {
     return Run({"pgrep", "-x", imageName}) == 0;
 }

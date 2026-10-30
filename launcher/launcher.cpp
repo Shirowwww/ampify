@@ -20,8 +20,12 @@
 #include "../core/build_signature.hpp"
 #include "../core/injection_policy.hpp"
 #include "../core/journal.hpp"
+#include "../core/launch_flags.hpp"
 #include "../core/package_watch.hpp"
 #include "../core/safe_mode.hpp"
+#include "../core/settings.hpp"
+#include "../core/version_gate.hpp"
+#include "../core/version_list.hpp"
 #include "../win/win_common.hpp"
 #include "injection.hpp"
 #include "../win/package.hpp"
@@ -193,12 +197,15 @@ int Run(amk::Journal& journal, const std::filesystem::path& kit) {
     if (!kernelPresent) journal.Write("amk_kernel.dll introuvable à côté du lanceur");
 
     amk::SafeMode safeMode((kit / "state.txt").string());
+    // Builds tested after this kit was compiled, from `amk versions update`. The signature is still checked.
+    std::vector<std::string> extraVersions = amk::LoadVersionList(kit / std::string(amk::kVersionListFile));
+    std::vector<std::string_view> knownVersions = amk::KnownAppVersionsWith(extraVersions);
     std::vector<DWORD> running = amk::launcher::FindPackageProcesses(L"AppleMusic.exe", package->directory);
 
     if (!running.empty()) {
         // Apple Music is already open: nothing is started, so this is not a launch to count.
         DWORD processId = running.front();
-        amk::PolicyVerdict verdict = amk::DecideInjection(version, safeMode.IsActive(), signature);
+        amk::PolicyVerdict verdict = amk::DecideInjection(version, safeMode.IsActive(), signature, knownVersions);
         bool inject = verdict.allowed && kernelPresent;
         journal.Write("Apple Music déjà ouvert (processus " + std::to_string(processId) + ") : " + verdict.reason);
 
@@ -209,13 +216,20 @@ int Run(amk::Journal& journal, const std::filesystem::path& kit) {
     }
 
     bool safe = safeMode.BeginLaunch();
-    amk::PolicyVerdict verdict = amk::DecideInjection(version, safe, signature);
+    amk::PolicyVerdict verdict = amk::DecideInjection(version, safe, signature, knownVersions);
     journal.Write(verdict.reason);
     bool inject = verdict.allowed && kernelPresent;
 
     std::wstring appId = ToWide(amk::kAppUserModelId);
     DWORD processId = 0;
-    HRESULT activationHr = amk::launcher::ActivateApp(appId.c_str(), &processId);
+    // app_launch_flags: extra arguments for Apple Music. An invalid value is written to the journal and not passed.
+    amk::Settings settings;
+    settings.Load((kit / "settings.txt").string());
+    std::string flagsError;
+    std::string flags = amk::AppLaunchArguments(settings.GetString(std::string(amk::kLaunchFlagsKey), ""), &flagsError);
+    if (!flagsError.empty()) journal.Write(flagsError + " : aucun argument passé à Apple Music");
+    if (!flags.empty()) journal.Write("Arguments passés à Apple Music : " + flags);
+    HRESULT activationHr = amk::launcher::ActivateApp(appId.c_str(), &processId, ToWide(flags));
     if (FAILED(activationHr)) {
         journal.Write("Activation refusée (" + HResultText(activationHr) + ")");
         Alert(L"Apple Music n'a pas pu démarrer.");

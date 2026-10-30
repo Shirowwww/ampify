@@ -14,10 +14,14 @@
 #include <string_view>
 #include <vector>
 
+#include <optional>
+
 #include "../core/settings.hpp"
+#include "catalog.hpp"
 #include "commands.hpp"
 #include "element.hpp"
 #include "kit.hpp"
+#include "release.hpp"
 #include "zip_writer.hpp"
 
 namespace amk::cli {
@@ -103,6 +107,24 @@ int CmdMarket(Context& ctx);
 int CmdInstall(Context& ctx);
 int CmdRemove(Context& ctx);
 int CmdUpdate(Context& ctx);
+int CmdInstallKit(Context& ctx);
+
+// Downloads an https address with curl, or copies a file:// address. The caller has checked the address policy.
+bool FetchTo(const std::string& url, const std::filesystem::path& destination, std::string& error, int maxSeconds = 0);
+
+// Reads the catalogue given by --catalog, by catalog.url in the settings, or by default. A remote catalogue that
+// cannot be downloaded falls back to the last copy that worked. Prints the problem and returns false on failure.
+bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local);
+
+// The GitHub address of the latest kit release, or of the release tagged v<version>.
+std::string DefaultReleaseUrl(std::string_view version);
+
+// Reads the release JSON at `source` (https:// or file://) and checks its version.
+std::optional<ReleaseInfo> FetchRelease(Context& ctx, const std::string& source, std::string& error, int maxSeconds = 0);
+
+// Downloads, checks and (with --apply) installs a kit release. `wanted` empty means the latest release, and only a
+// newer one; otherwise the release at `source` must be that version, older or newer (install-kit).
+int InstallKitRelease(Context& ctx, const std::string& source, const std::string& wanted);
 
 // Commands in activation.cpp.
 int CmdApply(Context& ctx);
@@ -129,6 +151,20 @@ int CmdLogs(Context& ctx);
 
 // The *.log files of the journal folder, sorted by name. Empty when the kernel has not run yet (develop.cpp).
 std::vector<std::filesystem::path> JournalFiles(const KitLayout& kit);
+
+// Commands in maintenance.cpp: devtools, versions, and the notice about a new kit release.
+int CmdDevtools(Context& ctx);
+int CmdVersions(Context& ctx);
+int CmdInspectTree(Context& ctx);
+int CmdConfigDir(Context& ctx);
+
+// With check_kit_update = 1: prints one line on the error stream when a newer kit release exists. The answer is
+// kept in cache\kit-update.txt and asked again at most once a day. Never fails the command.
+void NotifyKitUpdate(Context& ctx);
+
+// The value of a path setting (app_path, prefs_path), or `fallback` when it is empty.
+std::optional<std::filesystem::path> PathSetting(const Context& ctx, const std::string& key,
+                                                 std::optional<std::filesystem::path> fallback);
 
 // Commands in diagnose.cpp.
 int CmdDoctor(Context& ctx);

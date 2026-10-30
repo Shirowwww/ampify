@@ -32,6 +32,8 @@ constexpr const char* kDefaultCatalog =
     "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/catalog.json";
 constexpr const char* kDefaultRelease =
     "https://api.github.com/repos/Shirowwww/apple-music-mod-kit/releases/latest";
+// A given release, by its tag: `amk install-kit 0.1.0` reads .../releases/tags/v0.1.0.
+constexpr const char* kReleaseByTag = "https://api.github.com/repos/Shirowwww/apple-music-mod-kit/releases/tags/";
 constexpr const char* kKitArchiveSuffix = "-windows-x64.zip";
 constexpr const char* kChecksums = "SHA256SUMS.txt";
 constexpr const char* kRequiredKitFiles[] = {"amk.exe", "amk_launcher.exe", "amk_kernel.dll"};
@@ -49,8 +51,9 @@ std::string LocalPathOf(std::string_view url) {
     return std::string(rest);
 }
 
-// Downloads an https address with curl, or copies a file:// address. The caller has checked the address policy.
-bool FetchTo(const std::string& url, const std::filesystem::path& destination, std::string& error) {
+}  // namespace
+
+bool FetchTo(const std::string& url, const std::filesystem::path& destination, std::string& error, int maxSeconds) {
     if (StartsWith(url, "file://")) {
         std::error_code ec;
         std::filesystem::copy_file(PathArgument(LocalPathOf(url)), destination,
@@ -61,16 +64,18 @@ bool FetchTo(const std::string& url, const std::filesystem::path& destination, s
         }
         return true;
     }
-    return platform::DownloadHttps(url, destination, error);
+    return platform::DownloadHttps(url, destination, error, maxSeconds);
 }
+
+namespace {
 
 void RemoveQuietly(const std::filesystem::path& path) {
     std::error_code ec;
     std::filesystem::remove_all(path, ec);
 }
 
-// Reads the catalogue given by --catalog, by catalog.url in the settings, or by default. A remote catalogue that
-// cannot be downloaded falls back to the last copy that worked.
+}  // namespace
+
 bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
     Settings settings;
     settings.Load(ctx.kit.Settings().string());
@@ -117,6 +122,8 @@ bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
     catalog = std::move(*parsed);
     return true;
 }
+
+namespace {
 
 // The element that is installed under this identifier, whatever its kind.
 std::vector<InstalledElement> InstalledNamed(const KitLayout& kit, std::string_view id) {
@@ -265,35 +272,71 @@ int UpdateElement(Context& ctx, const std::string& id) {
     return InstallEntry(ctx, *entry, local, true);
 }
 
-int UpdateKit(Context& ctx) {
-    std::string source = ctx.options.releaseUrl ? *ctx.options.releaseUrl : kDefaultRelease;
-    bool releaseLocal = StartsWith(source, "file://");
-    if (!releaseLocal && !StartsWith(source, "https://")) return Failure(ctx, "adresse de release refusée : " + source);
+}  // namespace
 
+std::string DefaultReleaseUrl(std::string_view version) {
+    if (version.empty()) return kDefaultRelease;
+    return std::string(kReleaseByTag) + "v" + std::string(version);
+}
+
+std::optional<ReleaseInfo> FetchRelease(Context& ctx, const std::string& source, std::string& error, int maxSeconds) {
+    if (!StartsWith(source, "file://") && !StartsWith(source, "https://")) {
+        error = "adresse de release refusée : " + source;
+        return std::nullopt;
+    }
     std::error_code ec;
-    std::filesystem::create_directories(ctx.kit.Updates(), ec);
-    std::string error;
-    std::filesystem::path releaseFile = ctx.kit.Downloads() / "release.json";
     std::filesystem::create_directories(ctx.kit.Downloads(), ec);
+    std::filesystem::path releaseFile = platform::TemporaryFile("amk-release");
     std::string text;
-    if (!FetchTo(source, releaseFile, error) || !ReadWholeFile(releaseFile, text)) {
+    if (!FetchTo(source, releaseFile, error, maxSeconds) || !ReadWholeFile(releaseFile, text)) {
         RemoveQuietly(releaseFile);
-        return Failure(ctx, error.empty() ? "release illisible" : error);
+        if (error.empty()) error = "release illisible";
+        return std::nullopt;
     }
     RemoveQuietly(releaseFile);
 
     std::optional<ReleaseInfo> release = ParseRelease(text, error);
-    if (!release) return Failure(ctx, error);
-    if (!IsValidVersion(release->version)) return Failure(ctx, "version de release invalide : " + release->tag);
-
-    if (CompareReleaseVersions(release->version, AMK_VERSION) <= 0) {
-        ctx.out << "amk est à jour (version " << AMK_VERSION << ").\n";
-        return 0;
+    if (!release) return std::nullopt;
+    if (!IsValidVersion(release->version)) {
+        error = "version de release invalide : " + release->tag;
+        return std::nullopt;
     }
-    if (ctx.options.check) {
-        ctx.out << "Version " << release->version << " disponible (installée : " << AMK_VERSION
-                << "). Lance amk update pour la télécharger.\n";
-        return 0;
+    return release;
+}
+
+int InstallKitRelease(Context& ctx, const std::string& source, const std::string& wanted) {
+    std::string error;
+    std::optional<ReleaseInfo> release = FetchRelease(ctx, source, error);
+    if (!release) return Failure(ctx, error);
+    bool releaseLocal = StartsWith(source, "file://");
+    std::error_code ec;
+    std::filesystem::create_directories(ctx.kit.Updates(), ec);
+    // The command to run once Apple Music is closed, to install what this run downloaded.
+    std::string applyCommand = wanted.empty() ? "amk update --apply" : "amk install-kit " + wanted + " --apply";
+
+    if (wanted.empty()) {
+        if (CompareReleaseVersions(release->version, AMK_VERSION) <= 0) {
+            ctx.out << "amk est à jour (version " << AMK_VERSION << ").\n";
+            return 0;
+        }
+        if (ctx.options.check) {
+            ctx.out << "Version " << release->version << " disponible (installée : " << AMK_VERSION
+                    << "). Lance amk update pour la télécharger.\n";
+            return 0;
+        }
+    } else {
+        if (release->version != wanted) {
+            return Failure(ctx, "la release lue est la version " + release->version + ", pas la version " + wanted);
+        }
+        if (ctx.options.check) {
+            ctx.out << "Version " << wanted << " disponible (installée : " << AMK_VERSION
+                    << "). Lance amk install-kit " << wanted << " pour la télécharger.\n";
+            return 0;
+        }
+        if (CompareReleaseVersions(wanted, AMK_VERSION) < 0) {
+            ctx.out << "Attention : la version " << wanted << " est plus ancienne que celle installée (" << AMK_VERSION
+                    << "). Tes réglages et tes éléments restent en place.\n";
+        }
     }
 
     std::string archiveName = "amk-kit-" + release->version + kKitArchiveSuffix;
@@ -354,7 +397,7 @@ int UpdateKit(Context& ctx) {
 
     if (!ctx.options.apply) {
         ctx.out << "Version " << release->version << " téléchargée et vérifiée dans " << Utf8(staged)
-                << ".\nFerme Apple Music, puis lance : amk update --apply\n";
+                << ".\nFerme Apple Music, puis lance : " << applyCommand << "\n";
         return 0;
     }
 
@@ -382,8 +425,6 @@ int UpdateKit(Context& ctx) {
             << ". Relance Apple Music avec amk launch.\n";
     return 0;
 }
-
-}  // namespace
 
 int CmdMarket(Context& ctx) {
     Catalog catalog;
@@ -459,9 +500,20 @@ int CmdRemove(Context& ctx) {
     return 0;
 }
 
+int CmdInstallKit(Context& ctx) {
+    const std::vector<std::string>& args = ctx.options.positional;
+    if (args.size() != 2) return Usage(ctx, "install-kit attend une version du kit, par exemple : amk install-kit 0.1.0");
+    std::string version = args[1];
+    if (!version.empty() && (version.front() == 'v' || version.front() == 'V')) version.erase(0, 1);
+    if (!IsValidVersion(version)) return Failure(ctx, "version invalide : " + args[1] + " (attendu : 0.1.0)");
+    return InstallKitRelease(ctx, ctx.options.releaseUrl ? *ctx.options.releaseUrl : DefaultReleaseUrl(version), version);
+}
+
 int CmdUpdate(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() == 1) return UpdateKit(ctx);
+    if (args.size() == 1) {
+        return InstallKitRelease(ctx, ctx.options.releaseUrl ? *ctx.options.releaseUrl : DefaultReleaseUrl(""), "");
+    }
     if (args.size() == 2) {
         if (!IsValidId(args[1])) return Failure(ctx, "identifiant invalide : " + args[1]);
         return UpdateElement(ctx, args[1]);

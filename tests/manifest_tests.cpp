@@ -51,17 +51,17 @@ TEST_CASE(Manifest_AcceptsEveryPermissionOfTheV2Schema) {
     CHECK(!amk::IsKnownPermission("fs.write"));
 }
 
-TEST_CASE(Manifest_RunsInBothProcessesUnlessDeclared) {
-    amk::ManifestResult both = Check(kHello, "hello-extension");
-    CHECK(both.manifest->RunsIn("ui"));
-    CHECK(both.manifest->RunsIn("engine"));
+TEST_CASE(Manifest_RunsInTheInterfaceUnlessDeclared) {
+    amk::ManifestResult plain = Check(kHello, "hello-extension");
+    CHECK(plain.manifest->RunsIn("ui"));
+    CHECK(!plain.manifest->RunsIn("engine"));
 
-    std::string uiOnly = kHello;
-    uiOnly.insert(uiOnly.find("\"main\""), "\"processes\": [\"ui\"], ");
-    amk::ManifestResult result = Check(uiOnly, "hello-extension");
+    std::string both = kHello;
+    both.insert(both.find("\"main\""), "\"processes\": [\"ui\", \"engine\"], ");
+    amk::ManifestResult result = Check(both, "hello-extension");
     CHECK(result.manifest.has_value());
     CHECK(result.manifest->RunsIn("ui"));
-    CHECK(!result.manifest->RunsIn("engine"));
+    CHECK(result.manifest->RunsIn("engine"));
 }
 
 TEST_CASE(Manifest_RejectsUnknownOrRepeatedProcesses) {

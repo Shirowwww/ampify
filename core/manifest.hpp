@@ -30,7 +30,7 @@ struct Manifest {
     std::vector<std::string> permissions;
     std::vector<std::string> appVersions;
     // Where the element runs: "ui" (AppleMusic.exe), "engine" (AMPLibraryAgent.exe), or both by default.
-    std::vector<std::string> processes = {"ui", "engine"};
+    std::vector<std::string> processes = {"ui"};  // the interface only, unless the manifest asks for the engine too
 
     bool HasPermission(std::string_view permission) const;
     bool RunsIn(std::string_view process) const;

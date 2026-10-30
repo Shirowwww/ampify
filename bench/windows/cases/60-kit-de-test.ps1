@@ -18,11 +18,22 @@ Register-Case -Id 'kit-de-test' -Title 'Kit de test M5 : rapport, archive et lan
     Reset-KitState
     $arguments = @('/auto', '/attente:20')
     if (-not $elevated) { $arguments += '/sansetl' }
-    $code = Invoke-KitProgram -Path $testKit -Arguments $arguments
+    # /attente:20 plus the install, the launch (90 s at most) and the collection: 6 minutes is ample.
+    $code = Invoke-KitProgram -Path $testKit -Arguments $arguments -TimeoutSeconds 360
     Add-Check -Ctx $Ctx -Name 'kit de test : pas d''erreur (code 0, 2 ou 4)' -Passed ($code -in 0, 2, 4) -Detail "code $code"
 
     $pointer = Join-Path $script:KitDir 'rapports\dernier.txt'
     $run = if (Test-Path -LiteralPath $pointer) { (Get-Content -LiteralPath $pointer -Raw -Encoding UTF8).Trim() } else { '' }
+    if ($code -notin 0, 2, 4) {
+        # Show how far the kit got: its own step journal, from the newest report folder.
+        $latest = Get-ChildItem -LiteralPath (Join-Path $script:KitDir 'rapports') -Directory -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($latest) {
+            Write-Host "----- deroulement.txt ($($latest.Name))"
+            Get-Content -LiteralPath (Join-Path $latest.FullName 'deroulement.txt') -ErrorAction SilentlyContinue |
+                ForEach-Object { Write-Host "  $_" }
+        }
+    }
     Add-Check -Ctx $Ctx -Name 'dernier rapport désigné (rapports\dernier.txt)' -Passed ([bool]$run -and (Test-Path -LiteralPath $run))
     if (-not $run) { return }
 

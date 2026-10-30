@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Versions d'Apple Music testées avec le kit",
+  "description": "Publiée avec le catalogue. amk versions update la télécharge (SHA-256 fixé dans catalog.json) et écrit versions.txt dans le dossier du kit. Le noyau accepte ces versions en plus de sa liste intégrée, et vérifie toujours les exports d'AVFoundationCF.dll au lancement.",
+  "type": "object",
+  "required": ["versionsFormat", "playerDll", "versions"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {"type": "string"},
+    "versionsFormat": {"type": "integer", "const": 1},
+    "playerDll": {
+      "type": "string",
+      "const": "AVFoundationCF.dll",
+      "description": "DLL du paquet dont les exports ont été vérifiés."
+    },
+    "versions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/version"}
+    }
+  },
+  "$defs": {
+    "version": {
+      "type": "object",
+      "required": ["version", "tested", "exports"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]{1,9}\\.[0-9]{1,9}\\.[0-9]{1,9}\\.[0-9]{1,9}$",
+          "description": "Version du paquet, comme dans AppleInc.AppleMusicWin_<version>_x64__nzyj5cx40ttqa."
+        },
+        "tested": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Date du test, AAAA-MM-JJ."
+        },
+        "exports": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "maxItems": 64,
+          "description": "Exports d'AVFoundationCF.dll vérifiés présents sur cette version. Ils doivent couvrir ceux dont le kit a besoin (core/build_signature.hpp).",
+          "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "maxLength": 128}
+        },
+        "notes": {"type": "string", "maxLength": 300}
+      }
+    }
+  }
+}

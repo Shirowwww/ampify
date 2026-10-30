@@ -58,6 +58,8 @@ Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'cases') -Filter '*.ps1' | S
 
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 $script:BenchKitRoot = (Resolve-Path -LiteralPath $KitRoot).Path
+# Cases use either name. Both are absolute, so a case may change folders (Push-Location) and still find the kit.
+$script:KitRoot = $script:BenchKitRoot
 $script:BenchOutputRoot = (Resolve-Path -LiteralPath $OutputRoot).Path
 $repo = (Resolve-Path -LiteralPath $RepoRoot).Path
 

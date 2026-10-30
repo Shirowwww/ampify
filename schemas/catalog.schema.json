@@ -8,6 +8,16 @@
   "properties": {
     "$schema": {"type": "string"},
     "catalogVersion": {"type": "integer", "const": 1},
+    "versions": {
+      "type": "object",
+      "required": ["url", "sha256"],
+      "additionalProperties": false,
+      "description": "Où est publiée la liste des versions d'Apple Music testées (catalog/versions.json), et son SHA-256. Lue par amk versions update.",
+      "properties": {
+        "url": {"$ref": "#/$defs/https"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
     "extensions": {
       "type": "array",
       "items": {"$ref": "#/$defs/entry"}

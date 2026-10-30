@@ -3,6 +3,7 @@
 
     python3 tools/validate.py catalog catalog/catalog.json
     python3 tools/validate.py manifest examples/hello-extension/manifest.json
+    python3 tools/validate.py versions catalog/versions.json
 
 Standard library only. The schemas in schemas/ use a small subset of JSON Schema, and this
 script refuses any keyword outside that subset, so a schema is never checked less strictly
@@ -13,6 +14,7 @@ Exit codes: 0 when every file is valid, 1 when a file is invalid, 2 on a usage o
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -22,7 +24,12 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 SCHEMAS = {
     "catalog": os.path.join(ROOT, "schemas", "catalog.schema.json"),
     "manifest": os.path.join(ROOT, "schemas", "manifest.schema.json"),
+    "versions": os.path.join(ROOT, "schemas", "versions.schema.json"),
 }
+
+# The exports the kit needs (core/build_signature.hpp), and every export of the relevant DLL (knowledge/exports).
+BUILD_SIGNATURE = os.path.join(ROOT, "core", "build_signature.hpp")
+KNOWN_EXPORTS = os.path.join(ROOT, "knowledge", "exports", "AVFoundationCF.txt")
 
 # Major version of the kit API this script knows. Entries for another major version are refused.
 KIT_API_MAJOR = 1
@@ -159,9 +166,52 @@ def check_kit_api(kit_api, where):
     return []
 
 
+def required_exports():
+    """Names of kRequiredPlayerExports in core/build_signature.hpp: what a tested version must have been checked for."""
+    with open(BUILD_SIGNATURE, encoding="utf-8") as handle:
+        text = handle.read()
+    block = re.search(r"kRequiredPlayerExports\[\]\s*=\s*\{(.*?)\};", text, re.S)
+    if block is None:
+        raise SchemaError("kRequiredPlayerExports introuvable dans core/build_signature.hpp")
+    return re.findall(r'"([^"]+)"', block.group(1))
+
+
+def check_versions(doc, path):
+    """Rules a schema cannot express for versions.json: unique versions, and exports that cover the kit's needs."""
+    errors = []
+    required = required_exports()
+    known = None
+    if os.path.isfile(KNOWN_EXPORTS):
+        with open(KNOWN_EXPORTS, encoding="utf-8") as handle:
+            known = {line.strip() for line in handle if line.strip()}
+    seen = set()
+    for index, entry in enumerate(doc["versions"]):
+        where = f"versions[{index}]"
+        if entry["version"] in seen:
+            errors.append(f"{where}.version : version déjà listée : {entry['version']}")
+        seen.add(entry["version"])
+        for name in required:
+            if name not in entry["exports"]:
+                errors.append(f"{where}.exports : export requis par le kit absent : {name}")
+        if known is not None:
+            for name in entry["exports"]:
+                if name not in known:
+                    errors.append(f"{where}.exports : {name} n'est pas un export connu de AVFoundationCF.dll")
+    return errors
+
+
 def check_catalog(doc, path):
     """Rules a schema cannot express for the catalogue."""
     errors = []
+    # The pinned versions.json, when it sits next to the catalogue as in the repository, must match its SHA-256.
+    pin = doc.get("versions")
+    if pin and pin["url"].endswith("/versions.json"):
+        local = os.path.join(os.path.dirname(os.path.abspath(path)), "versions.json")
+        if os.path.isfile(local):
+            with open(local, "rb") as handle:
+                digest = hashlib.sha256(handle.read()).hexdigest()
+            if digest != pin["sha256"]:
+                errors.append(f"versions.sha256 : ne correspond pas à versions.json à côté du catalogue ({digest})")
     ids = set()
     for index, entry in enumerate(doc["extensions"]):
         where = f"extensions[{index}]"
@@ -199,11 +249,11 @@ def check_manifest(doc, path):
     return errors
 
 
-SEMANTIC_CHECKS = {"catalog": check_catalog, "manifest": check_manifest}
+SEMANTIC_CHECKS = {"catalog": check_catalog, "manifest": check_manifest, "versions": check_versions}
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Valide le catalogue ou des manifestes du kit.")
+    parser = argparse.ArgumentParser(description="Valide le catalogue, la liste des versions ou des manifestes du kit.")
     parser.add_argument("kind", choices=sorted(SCHEMAS), help="ce que contient le fichier")
     parser.add_argument("files", nargs="+", metavar="file", help="fichiers JSON à valider")
     args = parser.parse_args(argv)

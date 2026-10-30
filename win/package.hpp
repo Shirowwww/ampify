@@ -18,11 +18,9 @@ struct InstalledPackage {
 // The installed package of a family name, or nothing when it is not installed.
 std::optional<InstalledPackage> FindInstalledPackage(const wchar_t* familyName);
 
-// Starts the package's app through the shell's activation manager. `processId` gets the new process.
-HRESULT ActivateApp(const wchar_t* appUserModelId, DWORD* processId);
+// Starts the package's app through the shell's activation manager. `processId` gets the new process. `arguments`,
+// when not empty, is the argument string the app receives (app_launch_flags, built by core/launch_flags.hpp).
+HRESULT ActivateApp(const wchar_t* appUserModelId, DWORD* processId, const std::wstring& arguments = {});
 
-// Clears the package debug setting. The launcher no longer sets it (it suspended nothing), but the first M3 build
-// did, so the uninstaller still clears it to leave the package exactly as Windows had it.
-HRESULT DisablePackageDebugging(const std::wstring& packageFullName);
 
 }  // namespace amk::launcher

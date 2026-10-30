@@ -12,7 +12,7 @@
 namespace amk::test {
 
 struct FakeHost : Host {
-    std::string process = "engine";
+    std::string process = "ui";  // elements run in the interface unless their manifest asks for the engine
     std::string locale = "fr-FR";
     std::map<std::string, std::string> settings;
     std::map<std::string, std::string> storage;  // element id -> JSON object text

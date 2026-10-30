@@ -2,9 +2,16 @@
 # se supprime lui-même : c'est le chemin réel sur Windows, qui ne se teste pas sous Wine.
 
 # Lance un exécutable du kit et renvoie son code de sortie. Aussi utilisé par 60-kit-de-test.ps1.
+# Runs a kit program and returns its exit code. A program still running after the timeout is stopped and the code
+# is -2, so a stuck installer or test kit cannot hold the whole bench until the job's own time limit.
 function Invoke-KitProgram {
-    param([string]$Path, [string[]]$Arguments)
-    $process = Start-Process -FilePath $Path -ArgumentList $Arguments -PassThru -Wait -WindowStyle Hidden
+    param([string]$Path, [string[]]$Arguments, [int]$TimeoutSeconds = 300)
+    $process = Start-Process -FilePath $Path -ArgumentList $Arguments -PassThru -WindowStyle Hidden
+    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        $process | Stop-Process -Force -ErrorAction SilentlyContinue
+        Write-Host "  $(Split-Path -Leaf $Path) arrêté après $TimeoutSeconds s sans réponse"
+        return -2
+    }
     return $process.ExitCode
 }
 
@@ -55,6 +62,7 @@ Register-Case -Id 'installateur' -Title 'Installation, désinstallation gardée 
     # 3. Désinstallation en gardant les données : tout part, sauf le dossier de données.
     $code = Invoke-KitProgram -Path $installedSetup -Arguments @('/uninstall', '/silent', '/keepdata')
     Add-Check -Ctx $Ctx -Name 'désinstallation gardée : code 0' -Passed ($code -eq 0) -Detail "code $code"
+    if ($code -ne 0) { Write-JournalTail -FileName 'desinstallation.log' }
     $gone = Wait-Until -TimeoutSeconds 30 -Condition { -not (Test-Path -LiteralPath $installDir) }
     Add-Check -Ctx $Ctx -Name 'dossier d''installation supprimé, désinstallateur compris' -Passed $gone
     Add-Check -Ctx $Ctx -Name 'raccourci supprimé' -Passed (-not (Test-Path -LiteralPath $shortcut))
@@ -66,6 +74,7 @@ Register-Case -Id 'installateur' -Title 'Installation, désinstallation gardée 
     Invoke-KitProgram -Path $setup -Arguments @('/silent') | Out-Null
     $code = Invoke-KitProgram -Path $installedSetup -Arguments @('/uninstall', '/silent', '/purgedata')
     Add-Check -Ctx $Ctx -Name 'désinstallation purgée : code 0' -Passed ($code -eq 0) -Detail "code $code"
+    if ($code -ne 0) { Write-JournalTail -FileName 'desinstallation.log' }
     $gone = Wait-Until -TimeoutSeconds 30 -Condition { -not (Test-Path -LiteralPath $installDir) }
     Add-Check -Ctx $Ctx -Name 'purge : dossier d''installation supprimé' -Passed $gone
     Add-Check -Ctx $Ctx -Name 'purge : dossier de données supprimé' -Passed (-not (Test-Path -LiteralPath $script:KitDir))

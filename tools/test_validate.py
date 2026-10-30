@@ -4,6 +4,7 @@
 """
 
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -223,6 +224,100 @@ try:
     from jsonschema import Draft202012Validator
 except ImportError:  # optional: the cross-check only runs where jsonschema is installed
     Draft202012Validator = None
+
+
+REQUIRED_EXPORTS = [
+    "AVCFPlayerCopyCurrentItem",
+    "AVCFPlayerItemCopyCurrentStableVariantID",
+    "AVCFPlayerItemCopyTracks",
+    "AVCFPlayerItemTrackCopyAssetTrack",
+    "AVCFPlayerSetVolume",
+]
+
+
+def tested_version(**changes):
+    data = {"version": "1.1600.1.0", "tested": "2026-10-30", "exports": list(REQUIRED_EXPORTS)}
+    return apply_changes(data, changes)
+
+
+class VersionsTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.tmp.name, "versions.json")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, versions, **changes):
+        data = {"versionsFormat": 1, "playerDll": "AVFoundationCF.dll", "versions": versions}
+        write_json(self.path, apply_changes(data, changes))
+        return run("versions", self.path)
+
+    def test_repository_versions_are_valid(self):
+        code, text = run("versions", os.path.join(REPO, "catalog", "versions.json"))
+        self.assertEqual(code, 0, text)
+
+    def test_required_exports_match_the_kernel(self):
+        self.assertEqual(validate.required_exports(), REQUIRED_EXPORTS)
+
+    def test_valid_version_passes(self):
+        code, text = self.write([tested_version()])
+        self.assertEqual(code, 0, text)
+
+    def test_version_needs_four_numbers(self):
+        code, text = self.write([tested_version(version="1.1600.1")])
+        self.assertEqual(code, 1)
+        self.assertIn("versions[0].version", text)
+
+    def test_duplicate_versions_are_refused(self):
+        code, text = self.write([tested_version(), tested_version()])
+        self.assertEqual(code, 1)
+        self.assertIn("déjà listée", text)
+
+    def test_every_required_export_must_be_listed(self):
+        code, text = self.write([tested_version(exports=REQUIRED_EXPORTS[1:])])
+        self.assertEqual(code, 1)
+        self.assertIn("export requis par le kit absent : AVCFPlayerCopyCurrentItem", text)
+
+    def test_unknown_export_is_refused(self):
+        code, text = self.write([tested_version(exports=REQUIRED_EXPORTS + ["AVCFInventé"])])
+        self.assertEqual(code, 1)
+
+        code, text = self.write([tested_version(exports=REQUIRED_EXPORTS + ["AVCFInvented"])])
+        self.assertEqual(code, 1)
+        self.assertIn("pas un export connu", text)
+
+    def test_other_dll_is_refused(self):
+        code, text = self.write([tested_version()], playerDll="Other.dll")
+        self.assertEqual(code, 1)
+        self.assertIn("playerDll", text)
+
+
+class CatalogVersionsPinTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.catalog = os.path.join(self.tmp.name, "catalog.json")
+        self.versions = os.path.join(self.tmp.name, "versions.json")
+        write_json(self.versions, {"versionsFormat": 1, "playerDll": "AVFoundationCF.dll", "versions": []})
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, sha):
+        pin = {"url": "https://example.com/catalog/versions.json", "sha256": sha}
+        write_json(self.catalog, {"catalogVersion": 1, "versions": pin, "extensions": []})
+        return run("catalog", self.catalog)
+
+    def test_pin_matching_the_file_beside_the_catalog_passes(self):
+        with open(self.versions, "rb") as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        code, text = self.write(digest)
+        self.assertEqual(code, 0, text)
+
+    def test_stale_pin_is_refused(self):
+        code, text = self.write("0" * 64)
+        self.assertEqual(code, 1)
+        self.assertIn("versions.sha256", text)
 
 
 @unittest.skipIf(Draft202012Validator is None, "jsonschema n'est pas installé : contrôle croisé ignoré")

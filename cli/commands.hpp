@@ -28,10 +28,16 @@ struct Options {
     bool check = false;                       // --check: `update` only looks
     bool apply = false;                       // --apply: `update` installs the files it downloaded
     bool follow = false;                      // --follow: `logs` keeps printing the lines that are added
+    bool tree = false;                        // --tree: `inspect` prints the last interface tree of the kernel
+    bool dir = false;                         // --dir: `config` opens the kit folder
 };
 
 // Reads the arguments that follow the program name. On a mistake returns nullopt and writes the reason to `error`.
 std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, std::string& error);
+
+// True when every word is a verb without argument that can be chained (`amk backup apply launch`). Execute then runs
+// them in order and stops at the first one that fails.
+bool IsChainLine(const std::vector<std::string>& positional);
 
 // Runs the command. Returns the exit code: 0 for success, 1 for a failure, 2 for a wrong usage.
 int Execute(const Options& options, std::istream& in, std::ostream& out, std::ostream& err);

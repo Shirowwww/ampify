@@ -41,7 +41,8 @@ AppleMusic.exe ou AMPLibraryAgent.exe
   qu'il a demandées. Et le runtime se teste sous Linux.
 - **Un même `main.js` peut tourner dans les deux processus.** `AMK.process` vaut `"ui"` dans `AppleMusic.exe` et
   `"engine"` dans `AMPLibraryAgent.exe`. Les permissions `audio.*` n'existent que dans le processus moteur. [provisoire M3]
-- **Le manifeste choisit les processus** avec `processes` (voir MANIFEST.md). Par défaut, un élément tourne dans les deux.
+- **Le manifeste choisit les processus** avec `processes` (voir MANIFEST.md). Par défaut, un élément tourne seulement dans
+  l'interface (`ui`, AppleMusic.exe). Un élément qui agit sur le son déclare `engine` (AMPLibraryAgent.exe).
   Choix provisoire, décidé avec l'utilisateur : un élément qui écrit son stockage doit déclarer un seul processus, sans quoi
   deux processus écrivent le même fichier. [provisoire M7]
 
@@ -366,7 +367,7 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
 |---|---|---|
 | `version`, `kitApi`, `process`, `locale`, `log`, `onStop` | fait | tests C++ et Wine |
 | `config.get/set` : une clé par élément, jamais `enabled` | fait. `get` rend un booléen, un nombre ou un texte selon la valeur par défaut | tests C++ |
-| `storage.get/set/remove` : fichier JSON par élément, quota de 1 Mo | fait. Écriture par fichier temporaire puis remplacement. Un élément qui écrit doit déclarer un seul processus (`processes`) | tests C++ et Wine |
+| `storage.get/set/remove` : fichier JSON par élément, quota de 1 Mo | fait. Écriture par fichier temporaire puis remplacement. Par défaut, un élément ne tourne que dans l'interface : une seule écriture à la fois | tests C++ et Wine |
 | `processes` : `ui`, `engine`, ou les deux | fait. Un élément d'un autre processus est ignoré, avec une ligne au journal | tests C++ |
 | `player.state`, `on`, `play`, `pause`, `next`, `previous`, `seek` | fait côté runtime. Le noyau Windows ne les branche pas encore : `state` est vide, les commandes répondent « non possible » | hôte factice |
 | `audio.setGainDb` : borné par `audio.maxGainDb` (6 dB par défaut, 12 au plus) et remis à 0 à l'arrêt | fait côté runtime. Le son n'est pas encore branché (M4) | tests C++ |

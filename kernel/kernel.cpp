@@ -21,6 +21,8 @@
 #include "../core/reload.hpp"
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
+#include "../core/version_gate.hpp"
+#include "../core/version_list.hpp"
 #include "../extensions/atmos-leveler/atmos_windows.hpp"
 #include "../win/win_common.hpp"
 #include "../win/win_host.hpp"
@@ -89,7 +91,11 @@ DWORD WINAPI KernelMain(LPVOID) {
     amk::BuildSignature signature = amk::CheckBuildSignature(
         amk::win::ReadFileBytes(amk::win::ExecutablePath().parent_path() / std::string(amk::kPlayerDllName)));
     journal.Write(amk::DescribeSignature(signature));
-    amk::PolicyVerdict verdict = amk::DecideKernel(role, version, signature);
+    // Builds tested after this kit was compiled, from `amk versions update` (<kit>\versions.txt). The signature
+    // check above still applies, and an unknown build still leaves the kernel idle.
+    std::vector<std::string> extraVersions =
+        amk::LoadVersionList(amk::win::KitDirectory() / std::string(amk::kVersionListFile));
+    amk::PolicyVerdict verdict = amk::DecideKernel(role, version, signature, amk::KnownAppVersionsWith(extraVersions));
     journal.Write(verdict.reason);
     if (!verdict.allowed) return 0;
 
