@@ -24,7 +24,7 @@ std::string WithoutDeclaration(const std::string& xaml) {
 
 void AddLayer(const Theme& source, int layer, Theme& composed) {
     for (Assignment assignment : source.assignments) {
-        assignment.layer = layer;
+        assignment.layer += layer;  // keeps the theme's own -1 layer (color.ini translated) below its user.css
         composed.assignments.push_back(std::move(assignment));
     }
 }
@@ -81,6 +81,7 @@ Theme ComposeTheme(const Theme* theme, const std::vector<std::shared_ptr<const T
         composed.name = theme->name;
         composed.scheme = theme->scheme;
         composed.schemes = theme->schemes;
+        composed.dark = theme->dark;
         composed.palette = theme->palette;
         composed.resources = theme->resources;
         composed.variables = theme->variables;

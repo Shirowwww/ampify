@@ -23,6 +23,7 @@ list(APPEND AMK_CLI_SOURCES
     cli/diagnose.cpp
     cli/transfer.cpp
     cli/test_runner.cpp
+    cli/theme_import.cpp
     cli/maintenance.cpp)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND AMK_CLI_SOURCES cli/platform.cpp cli/platform_win.cpp)

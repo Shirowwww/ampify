@@ -60,6 +60,7 @@ Les colonnes « Spicetify » donnent l'équivalent. « Statut » dit ce qui est 
 | `amk app enable <id>` / `disable <id>` | Apps (pages d'interface). Le noyau charge `apps\<id>` et démarre l'app tout de suite, comme une extension | Fait. L'entrée dans la barre latérale vient avec M8 |
 | `amk theme list` | Thèmes installés | Fait |
 | `amk theme set <id> [--scheme <nom>]` | Choisit le thème et son schéma | Fait |
+| `amk theme import <dossier\|zip\|adresse> [id]` | Reprend un thème Spicetify : `color.ini` tel quel, `user.css` de Spotify gardé à part (voir [SPICETIFY.md](../themes/SPICETIFY.md)) | Fait |
 | `amk theme clear` | Aucun thème | Fait |
 | `amk new <type> <id>` | Crée un élément de départ (extension, theme, snippet ou app) dans le dossier courant | Fait |
 | `amk validate <dossier>` | Vérifie le manifeste et les fichiers d'un élément, avec les mêmes règles que `tools/validate.py` | Fait |

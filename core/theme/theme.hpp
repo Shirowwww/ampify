@@ -74,6 +74,9 @@ struct Theme {
     std::string name;
     std::string scheme;               // the scheme in use, empty when colors.ini is missing
     std::vector<std::string> schemes;  // every scheme found in colors.ini, in file order
+    // Dark or light, from the background colour of the scheme (Spicetify's main, or the page brush). Unset when the
+    // scheme gives no background: its name decides then (IsDarkScheme).
+    std::optional<bool> dark;
 
     // False when the folder is not a theme, or when resources.xaml breaks the allowed list. An unusable theme is never applied.
     bool usable = false;

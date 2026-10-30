@@ -1254,10 +1254,16 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
         anyPanel = anyPanel || (mounted.surface.kind == SurfaceKind::Panel && mounted.panelFrame);
     }
     if (context->panelHost) context->panelHost.Visibility(anyPanel ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
-    // Mounting returns early when nothing changed: the overlays follow the window here, on every refresh.
-    if (auto element = content.try_as<xaml::UIElement>(); element && element.XamlRoot()) {
+    // Mounting returns early when nothing changed: the overlays follow the window here, on every refresh. A Popup is
+    // outside the window's tree, so it takes the light or dark mode of the window by hand (a light theme left the
+    // panels dark).
+    if (auto element = content.try_as<xaml::FrameworkElement>(); element && element.XamlRoot()) {
         if (context->panelPopup && context->panelHost) PlacePanelPopup(*context, element.XamlRoot());
         PlacePageHost(*context, element.XamlRoot());
+        xaml::ElementTheme mode = element.ActualTheme();
+        for (xaml::FrameworkElement overlay : {xaml::FrameworkElement(context->panelHost), xaml::FrameworkElement(context->pageHost)}) {
+            if (overlay && overlay.RequestedTheme() != mode) overlay.RequestedTheme(mode);
+        }
     }
 
     try {

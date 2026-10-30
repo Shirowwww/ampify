@@ -521,6 +521,81 @@ TEST_CASE(Theme_RefusesResourcesOutsideTheAllowedList) {
     CHECK(!ProblemContaining(unchecked, "vérification non faite").empty());
 }
 
+// --- Spicetify's color.ini, read as is ------------------------------------------------------------------------
+
+const th::Assignment* AssignmentFor(const th::Theme& theme, std::string_view selector, std::string_view property) {
+    for (const th::Assignment& assignment : theme.assignments) {
+        if (assignment.selector.text == selector && assignment.property == property) return &assignment;
+    }
+    return nullptr;
+}
+
+std::string ResourceValue(const th::Theme& theme, std::string_view key) {
+    for (const th::ResourceOverride& resource : theme.resources) {
+        if (resource.key == key) return resource.value.text;
+    }
+    return "ABSENT";
+}
+
+TEST_CASE(Spicetify_ColorIniPaintsAppleMusicAsIs) {
+    MemoryFiles files;
+    files.files["color.ini"] =
+        "[Nord]\nmain = 2E3440\nsidebar = 3B4252\nplayer = 434C5E\ntext = ECEFF4\nsubtext = D8DEE9\n"
+        "button = 88C0D0\naccent = BF616A\n\n[Snow]\nmain = ECEFF4\ntext = 2E3440\n";
+    files.files["user.css"] = "Grid#Bar { background: var(--spice-accent); color: $button; }\n";
+
+    th::Theme theme = Load(files);
+    CHECK(theme.usable);
+    CHECK(theme.scheme == "Nord");
+    CHECK(theme.problems.empty());
+    CHECK(theme.dark.has_value() && *theme.dark);
+
+    // The app brushes that play the part of each key, and no resource named after a Spicetify key.
+    CHECK(ResourceValue(theme, "TextFillColorPrimaryBrush") == "#FFECEFF4");
+    CHECK(ResourceValue(theme, "TextFillColorSecondaryBrush") == "#FFD8DEE9");
+    CHECK(ResourceValue(theme, "SolidBackgroundFillColorBaseBrush") == "#FF2E3440");
+    CHECK(ResourceValue(theme, "AccentFillColorDefaultBrush") == "#FF88C0D0");
+    CHECK(ResourceValue(theme, "main") == "ABSENT");
+    CHECK(ResourceValue(theme, "accent") == "ABSENT");
+
+    // Apple Music's own elements, on the layer under user.css.
+    const th::Assignment* sidebar = AssignmentFor(theme, "Grid#PaneRoot", "Background");
+    CHECK(sidebar && sidebar->value.text == "#FF3B4252" && sidebar->layer == -1);
+    const th::Assignment* player = AssignmentFor(theme, "BackDrop", "Background");
+    CHECK(player && player->value.text == "#FF434C5E");
+    const th::Assignment* own = AssignmentFor(theme, "Grid#Bar", "Background");
+    CHECK(own && own->value.text == "#FFBF616A" && own->layer == 0);
+
+    th::Theme snow = Load(files, {"Snow", nullptr, {}});
+    CHECK(snow.dark.has_value() && !*snow.dark);
+    CHECK(AssignmentFor(snow, "Grid#PaneRoot", "Background") == nullptr);  // no sidebar key: Apple Music's own
+}
+
+TEST_CASE(Spicetify_ThemeRulesWinOverTheTranslatedOnes) {
+    MemoryFiles files;
+    files.files["color.ini"] = "[Base]\nsidebar = 112233\n";
+    files.files["user.css"] = "Grid { background: #FF445566; }\n";  // less precise than Grid#PaneRoot, but the theme's
+    th::Theme theme = Load(files);
+
+    FakeTree tree;
+    th::NodeId pane = tree.Add(-1, "Grid", "PaneRoot", {{"Background", Brush("#FF000000")}});
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(pane, "Background").text == "#FF445566");
+}
+
+TEST_CASE(Spicetify_ReadsTheKeysOfSpicetifyOne) {
+    MemoryFiles files;
+    files.files["color.ini"] = "[Base]\nmain_fg = FFFFFF\nmain_bg = 000000\nsidebar_and_player_bg = 101010\n";
+    th::Theme theme = Load(files);
+    CHECK(ResourceValue(theme, "TextFillColorPrimaryBrush") == "#FFFFFFFF");
+    CHECK(AssignmentFor(theme, "BackDrop", "Background") != nullptr);  // player falls back to the sidebar colour
+    CHECK(theme.variables.count("spice-text") == 1);
+    CHECK(theme.dark.has_value() && *theme.dark);
+}
+
 TEST_CASE(Theme_NeedsAtLeastOneThemeFile) {
     MemoryFiles files;
     files.files["readme.txt"] = "not a theme";

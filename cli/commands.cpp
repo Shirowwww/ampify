@@ -348,9 +348,32 @@ std::map<std::string, std::string> Template(std::string_view kind, const std::st
         };
     }
     if (kind == "theme") {
+        // A starter that already looks finished: two schemes in Spicetify's names, rounded surfaces, a hover. The
+        // guide (docs/themes/GUIDE.md) walks through these same files.
         return {
-            {"manifest.json", "{\n" + common + ",\n  \"colors\": \"colors.ini\",\n  \"defaultScheme\": \"Dark\"\n}\n"},
-            {"colors.ini", "[Dark]\naccent = FA2D48\n\n[Light]\naccent = FA2D48\n"},
+            {"manifest.json", "{\n" + common + ",\n  \"colors\": \"colors.ini\",\n  \"defaultScheme\": \"Nuit\"\n}\n"},
+            {"colors.ini",
+             "; Les couleurs, un schéma par section. Les noms sont ceux de Spicetify :\n"
+             ";   main     fond des pages          sidebar  barre latérale      player  barre de lecture\n"
+             ";   card     écran du morceau        text     texte               subtext texte secondaire\n"
+             ";   button   accent (boutons, barre de progression)\n"
+             "; Change une valeur et sauvegarde : avec amk theme watch, Apple Music suit tout de suite.\n\n"
+             "[Nuit]\nmain = 16131F\nsidebar = 1D1928\nplayer = 1D1928\ncard = 2A2438\nmain-elevated = 2A2438\n"
+             "text = F3EEFF\nsubtext = B5ABCB\nbutton = FF7A85\nplayback-bar = FF7A85\nhighlight = 2F2840\n\n"
+             "[Jour]\nmain = FBF7F2\nsidebar = F2ECE4\nplayer = F2ECE4\ncard = FFFFFF\nmain-elevated = FFFFFF\n"
+             "text = 1F1A2B\nsubtext = 6A6278\nbutton = E0525F\nplayback-bar = E0525F\nhighlight = EDE5DA\n"},
+            {"user.css",
+             "/* " + id + " : les formes et les effets. Les couleurs viennent de colors.ini ($main, $button...).\n"
+             "   Les noms des éléments (Grid#PaneRoot...) sont dans docs/themes/GUIDE.md ; amk devtools montre l'arbre. */\n\n"
+             ":root {\n    --rayon: 12px;\n}\n\n"
+             "/* Barre latérale : arrondie côté contenu. */\nGrid#PaneRoot {\n"
+             "    corner-radius: 0 var(--rayon) var(--rayon) 0;\n}\n\n"
+             "/* L'écran du morceau en cours, au centre de la barre de lecture. */\n"
+             "NowPlayingControl#LCD > Grid#LCD {\n    corner-radius: var(--rayon);\n}\n\n"
+             "/* Les boutons de lecture, ronds. */\nTransportControl#TransportControl AppBarButton {\n"
+             "    corner-radius: 50;\n}\n\n"
+             "/* La pochette grossit un peu au survol. */\nArtworkImage#ActualArtwork {\n"
+             "    transform-origin: center;\n}\n\nArtworkImage#ActualArtwork:hover {\n    transform: scale(1.08);\n}\n"},
         };
     }
     if (kind == "snippet") {
@@ -608,6 +631,7 @@ int CmdTheme(Context& ctx) {
 
     if (action == "list") return PrintElements(ctx, "theme");
     if (action == "set") return CmdThemeSet(ctx);
+    if (action == "import") return CmdThemeImport(ctx);
     if (action == "clear") {
         Settings settings;
         std::string error;

@@ -99,6 +99,7 @@ int CmdConfig(Context& ctx);
 int CmdList(Context& ctx);
 int CmdKind(Context& ctx, std::string_view kind);
 int CmdTheme(Context& ctx);
+int CmdThemeImport(Context& ctx);  // theme_import.cpp: takes up a Spicetify theme (color.ini as is)
 int CmdValidate(Context& ctx);
 int CmdNew(Context& ctx);
 

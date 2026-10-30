@@ -29,10 +29,16 @@ AppleMusicModKit/
 └── journal/            AppleMusic.log, inspector.txt, inspector.json
 ```
 
+Pour commencer : [GUIDE.md](GUIDE.md) (un thème en 5 minutes). Pour reprendre un thème Spicetify :
+[SPICETIFY.md](SPICETIFY.md).
+
 ## colors.ini
 
-Une section par schéma, par exemple `[Base]` et `[Dark]`. Chaque clé est le nom d'une brosse de l'app. La valeur
-est une couleur hexadécimale, avec ou sans `#` : `FA2D48`, `#FA2D48` ou `#80FA2D48` (alpha en tête).
+Une section par schéma, par exemple `[Base]` et `[Dark]`. Le fichier peut aussi s'appeler `color.ini`, comme chez
+Spicetify. Une clé en minuscules (`main`, `sidebar`, `text`, `button`...) est une couleur de Spicetify : le kit la
+traduit vers les éléments d'Apple Music (tableau dans [SPICETIFY.md](SPICETIFY.md)) et elle s'écrit `$main` ou
+`var(--spice-main)` dans `user.css`. Une clé en PascalCase est le nom d'une brosse de l'app, qu'elle remplace. La
+valeur est une couleur hexadécimale, avec ou sans `#` : `FA2D48`, `#FA2D48` ou `#80FA2D48` (alpha en tête).
 
 ```ini
 [Base]

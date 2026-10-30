@@ -1,14 +1,23 @@
 #include "theme.hpp"
 
 #include <cctype>
+#include <set>
 #include <tuple>
+#include <utility>
 
 #include "fonts.hpp"
 #include "ini.hpp"
+#include "spicetify.hpp"
 
 namespace amk::theme {
 
 namespace {
+
+std::string LowerText(std::string_view text) {
+    std::string result(text);
+    for (char& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return result;
+}
 
 std::string_view Trim(std::string_view text) {
     size_t first = 0;
@@ -30,37 +39,95 @@ const Ini::Section* PickScheme(const Ini& ini, const std::string& wanted, Theme&
     return nullptr;
 }
 
-void LoadColors(FileSource& files, const std::string& wanted, bool applied, Theme& theme) {
-    std::optional<std::string> text = files.Read("colors.ini");
-    if (!text) return;
+// The colours file: colors.ini, or color.ini as Spicetify names it. Empty name when there is none.
+std::pair<std::string, std::optional<std::string>> ReadColorsFile(FileSource& files) {
+    for (const char* name : {"colors.ini", "color.ini"}) {
+        if (std::optional<std::string> text = files.Read(name)) return {name, std::move(text)};
+    }
+    return {};
+}
+
+// A Spicetify colour is written in lowercase (main, main-elevated, main_fg); an app brush in PascalCase.
+bool IsSpicetifyName(std::string_view key) {
+    for (char c : key) {
+        if (std::isupper(static_cast<unsigned char>(c))) return false;
+    }
+    return !key.empty();
+}
+
+// Light or dark, from the background the scheme gives: Spicetify's main, or the app's page background.
+std::optional<bool> DarkFromPalette(const Palette& palette) {
+    for (const char* key : {"main", "SolidBackgroundFillColorBaseBrush", "ApplicationPageBackgroundThemeBrush"}) {
+        if (std::optional<Argb> color = palette.Find(key)) {
+            double luminance = 0.2126 * color->r + 0.7152 * color->g + 0.0722 * color->b;
+            return luminance < 128.0;
+        }
+    }
+    return std::nullopt;
+}
+
+// A Spicetify colour: a $name, a --spice-name variable as in Spicetify, and the app brushes that play its part
+// (SpicetifyResources) unless the scheme names them itself. Returns the Spicetify name.
+std::string DefineSpicetifyColor(const Ini::Entry& entry, Argb color, Theme& theme) {
+    std::string key = SpicetifyKey(entry.key);
+    if (key.empty()) key = LowerText(entry.key);  // a colour of the theme's own, such as accent
+    if (!theme.palette.Define(key, color)) {
+        theme.problems.push_back("colors.ini ligne " + std::to_string(entry.line) + " : « " + entry.key +
+                                 " » défini deux fois, ignoré");
+        return {};
+    }
+    if (LowerText(entry.key) != key) theme.palette.Define(LowerText(entry.key), color);  // main_fg stays usable too
+    theme.variables["spice-" + key] = ToXamlColor(color);
+    return key;
+}
+
+std::set<std::string> LoadColors(FileSource& files, const std::string& wanted, bool applied, Theme& theme) {
+    std::set<std::string> spicetify;
+    auto [file, text] = ReadColorsFile(files);
+    if (!text) return spicetify;
 
     Ini ini;
-    for (const std::string& problem : ini.Parse(*text)) theme.problems.push_back("colors.ini " + problem);
+    for (const std::string& problem : ini.Parse(*text)) theme.problems.push_back(file + " " + problem);
     for (const Ini::Section& section : ini.Sections()) {
         if (!section.name.empty()) theme.schemes.push_back(section.name);
     }
 
     const Ini::Section* scheme = PickScheme(ini, wanted, theme);
     if (!scheme) {
-        theme.problems.push_back("colors.ini : aucun schéma (section [Base] par exemple)");
-        return;
+        theme.problems.push_back(file + " : aucun schéma (section [Base] par exemple)");
+        return spicetify;
     }
     theme.scheme = scheme->name;
 
     for (const Ini::Entry& entry : scheme->entries) {
         std::optional<Argb> color = ParseColor(entry.value);
         if (!color) {
-            theme.problems.push_back("colors.ini ligne " + std::to_string(entry.line) + " : couleur « " + entry.value +
+            theme.problems.push_back(file + " ligne " + std::to_string(entry.line) + " : couleur « " + entry.value +
                                      " » illisible");
             continue;
         }
+        if (IsSpicetifyName(entry.key)) {
+            std::string key = DefineSpicetifyColor(entry, *color, theme);
+            if (!key.empty()) spicetify.insert(key);
+            continue;
+        }
         if (!theme.palette.Define(entry.key, *color)) {
-            theme.problems.push_back("colors.ini ligne " + std::to_string(entry.line) + " : « " + entry.key +
+            theme.problems.push_back(file + " ligne " + std::to_string(entry.line) + " : « " + entry.key +
                                      " » défini deux fois, ignoré");
             continue;
         }
         if (applied) theme.resources.push_back({entry.key, {ValueKind::Color, ToXamlColor(*color)}});
     }
+
+    // The app brushes that play the part of a Spicetify colour, unless the scheme gives them itself.
+    for (const SpicetifyResource& mapping : SpicetifyResources()) {
+        std::optional<Argb> color = spicetify.count(mapping.spicetify) ? theme.palette.Find(mapping.spicetify) : std::nullopt;
+        if (!color || theme.palette.Find(mapping.resource)) continue;
+        theme.palette.Define(mapping.resource, *color);
+        if (applied) theme.resources.push_back({mapping.resource, {ValueKind::Color, ToXamlColor(*color)}});
+    }
+    theme.dark = DarkFromPalette(theme.palette);
+    return spicetify;
 }
 
 // Returns false when the theme must be refused. Refusing is the rule the API sets: a bad key breaks the theme.
@@ -91,12 +158,6 @@ bool LoadDictionary(FileSource& files, const LoadOptions& options, Theme& theme)
     return true;
 }
 
-std::string LowerText(std::string_view text) {
-    std::string result(text);
-    for (char& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return result;
-}
-
 std::string AtLine(const std::string& source, int line) {
     return source + " ligne " + std::to_string(line);
 }
@@ -105,6 +166,7 @@ std::string AtLine(const std::string& source, int line) {
 struct RuleSource {
     std::string file = "user.css";  // for the journal and the problems
     const Theme* base = nullptr;    // the active theme, for a snippet: its font roles fill what the snippet leaves out
+    int layer = 0;                  // -1 for the rules translated from color.ini: the theme's user.css wins over them
 };
 
 // `--font-title`, `--font-title-weight`, `--font-title-size`: checks the value and records the role part.
@@ -171,6 +233,7 @@ void AddAssignment(const Rule& rule, const PropertySpec& spec, const Value& valu
         Assignment assignment{selector, SpecificityOf(selector), std::string(spec.xaml), value, declaration.important,
                               order, declaration.line};
         assignment.source = source.file;
+        assignment.layer = source.layer;
         theme.assignments.push_back(std::move(assignment));
     }
 }
@@ -191,11 +254,9 @@ bool AddFontRole(const Rule& rule, const Declaration& declaration, const std::st
     return true;
 }
 
-void LoadRules(FileSource& files, const ValueContext& context, Theme& theme, bool applied, const RuleSource& source) {
-    std::optional<std::string> css = files.Read("user.css");
-    if (!css) return;
-
-    Stylesheet sheet = ParseStylesheet(*css);
+void LoadRuleText(const std::string& css, const ValueContext& context, Theme& theme, bool applied,
+                  const RuleSource& source) {
+    Stylesheet sheet = ParseStylesheet(css);
     for (const std::string& problem : sheet.problems) theme.problems.push_back(source.file + " " + problem);
 
     // Variables first: as in CSS, a rule may use a variable that a :root block defines further down.
@@ -243,6 +304,10 @@ void LoadRules(FileSource& files, const ValueContext& context, Theme& theme, boo
     }
 }
 
+void LoadRules(FileSource& files, const ValueContext& context, Theme& theme, bool applied, const RuleSource& source) {
+    if (std::optional<std::string> css = files.Read("user.css")) LoadRuleText(*css, context, theme, applied, source);
+}
+
 }  // namespace
 
 Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& files, const LoadOptions& options) {
@@ -250,7 +315,7 @@ Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& fi
     theme.id = id;
     theme.name = id;
 
-    LoadColors(files, options.scheme, options.parts.colors, theme);
+    std::set<std::string> spicetify = LoadColors(files, options.scheme, options.parts.colors, theme);
 
     // A part that is off is still checked, so the problems show up before the part is turned on.
     bool dictionaryOk = LoadDictionary(files, options, theme);
@@ -267,6 +332,13 @@ Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& fi
 
     if (!options.parts.resources) theme.resourceDictionary.clear();
     ValueContext context{theme.palette, files, folder, options.parts.assets};
+    // Spicetify's colours paint Apple Music's own elements first; the theme's user.css comes on top.
+    if (std::string translated = SpicetifyStylesheet(spicetify); !translated.empty()) {
+        RuleSource source;
+        source.file = "color.ini (traduction Spicetify)";
+        source.layer = -1;
+        LoadRuleText(translated, context, theme, options.parts.colors, source);
+    }
     LoadRules(files, context, theme, options.parts.resources, RuleSource{});
     return theme;
 }
@@ -305,7 +377,7 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
 
 std::vector<std::string> ReadSchemes(FileSource& files) {
     std::vector<std::string> schemes;
-    std::optional<std::string> text = files.Read("colors.ini");
+    std::optional<std::string> text = ReadColorsFile(files).second;
     if (!text) return schemes;
 
     Ini ini;

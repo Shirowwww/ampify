@@ -131,8 +131,10 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
 
             std::optional<std::string> dump = ui->session.Tick(ui->backend, request);
             // The app's own light or dark mode follows the scheme, so what the theme does not name matches what it does
-            // (the minuit theme alone left light text on Apple Music's white background).
-            ui->backend.SetAppMode(request.theme ? std::optional<bool>(theme::IsDarkScheme(request.theme->scheme))
+            // (the minuit theme alone left light text on Apple Music's white background). The scheme's background
+            // decides when it gives one (a Spicetify scheme is often named Nord or Mocha), its name otherwise.
+            ui->backend.SetAppMode(request.theme ? std::optional<bool>(request.theme->dark.value_or(
+                                                       theme::IsDarkScheme(request.theme->scheme)))
                                                  : std::nullopt);
             if (dump) {
                 std::ofstream(JournalFile("inspector.txt")) << *dump;

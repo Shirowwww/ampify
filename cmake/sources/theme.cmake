@@ -18,6 +18,7 @@ list(APPEND AMK_THEME_SOURCES
     core/theme/layout.cpp
     core/theme/scheme_choice.cpp
     core/theme/snippets.cpp
+    core/theme/spicetify.cpp
     core/theme/worker.cpp)
 
 list(APPEND AMK_THEME_CHECK_SOURCES tools/theme_check.cpp)

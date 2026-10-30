@@ -31,6 +31,7 @@ Réglages et état
   theme    list | set <id> [--scheme <nom>] | clear
   theme    check <dossier> [--scheme <nom>]   lit un thème comme le noyau et affiche ce qui s'appliquerait
   theme    watch <dossier> [--scheme <nom>]   relit le thème à chaque sauvegarde (--max-cycles N pour s'arrêter)
+  theme    import <dossier|zip|adresse> [id]  reprend un thème Spicetify (son color.ini marche tel quel)
   validate <dossier>           vérifie le manifeste d'un élément (ou un catalogue.json)
   new <extension|theme|snippet|app> <id>   crée un élément de départ
 
@@ -109,6 +110,7 @@ Elements
   theme    list | set <id> [--scheme <name>] | clear
   theme    check <folder> [--scheme <name>]   reads a theme as the kernel does and shows what would apply
   theme    watch <folder> [--scheme <name>]   reads the theme again at each save (--max-cycles N to stop)
+  theme    import <folder|zip|address> [id] takes up a Spicetify theme (its color.ini works as is)
   validate <folder>            checks the manifest of an element (or a catalog.json)
   new <extension|theme|snippet|app> <id>   creates a starter element
 

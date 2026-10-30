@@ -9,7 +9,7 @@ namespace {
 
 bool HasThemeFile(const std::filesystem::path& folder) {
     std::error_code error;
-    for (const char* name : {"colors.ini", "resources.xaml", "user.css"}) {
+    for (const char* name : {"colors.ini", "color.ini", "resources.xaml", "user.css"}) {
         if (std::filesystem::is_regular_file(folder / name, error)) return true;
     }
     return false;

@@ -296,6 +296,55 @@ class Authoring(AmkTestCase):
         self.assertEqual(self.amk("new", "theme", "twice", cwd=self.tmp).returncode, 0)
         self.assertEqual(self.amk("new", "theme", "twice", cwd=self.tmp).returncode, 1)
 
+    def test_new_theme_reads_clean_in_the_engine(self):
+        self.assertEqual(self.amk("new", "theme", "starter", cwd=self.tmp).returncode, 0)
+        check = self.amk("theme", "check", os.path.join(self.tmp, "starter"))
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        self.assertNotIn("Attention", check.stdout)
+
+
+class SpicetifyImport(AmkTestCase):
+    COLOR_INI = "[Nord]\nmain = 2E3440\nsidebar = 3B4252\ntext = ECEFF4\nbutton = 88C0D0\n\n[Snow]\nmain = ECEFF4\n"
+
+    def write_spicetify_theme(self, name: str) -> str:
+        folder = os.path.join(self.tmp, "spicetify", name)
+        os.makedirs(folder)
+        for relative, text in {"color.ini": self.COLOR_INI, "user.css": ".main-view { color: red; }\n",
+                               "LICENSE": "MIT\n"}.items():
+            with open(os.path.join(folder, relative), "w", encoding="utf-8") as handle:
+                handle.write(text)
+        return folder
+
+    def test_import_keeps_color_ini_and_sets_spotify_css_aside(self):
+        folder = self.write_spicetify_theme("Nord Theme")
+        result = self.amk("theme", "import", folder)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Thème nord-theme importé", result.stdout)
+        self.assertIn("amk theme set nord-theme --scheme Nord", result.stdout)
+        self.assertIn("main = 2E3440", self.read("themes", "nord-theme", "color.ini"))
+        self.assertIn(".main-view", self.read("themes", "nord-theme", "spicetify-user.css"))
+        self.assertNotIn(".main-view", self.read("themes", "nord-theme", "user.css"))
+        manifest = json.loads(self.read("themes", "nord-theme", "manifest.json"))
+        self.assertEqual(manifest["colors"], "color.ini")
+        self.assertEqual(manifest["defaultScheme"], "Nord")
+        chosen = self.amk("theme", "set", "nord-theme", "--scheme", "Snow")
+        self.assertEqual(chosen.returncode, 0, chosen.stderr)
+
+    def test_import_refuses_to_replace_without_yes(self):
+        folder = self.write_spicetify_theme("twice")
+        self.assertEqual(self.amk("theme", "import", folder).returncode, 0)
+        self.assertEqual(self.amk("theme", "import", folder).returncode, 1)
+        self.assertEqual(self.amk("theme", "import", folder, "--yes").returncode, 0)
+        self.assertEqual(self.amk("theme", "import", folder, "other").returncode, 0)
+
+    def test_import_asks_which_theme_when_a_folder_holds_several(self):
+        self.write_spicetify_theme("One")
+        self.write_spicetify_theme("Two")
+        result = self.amk("theme", "import", os.path.join(self.tmp, "spicetify"))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("One", result.stderr)
+        self.assertIn("Two", result.stderr)
+
 
 @unittest.skipIf(WINE, "install needs tar.exe and curl.exe, which Wine does not ship")
 class Marketplace(AmkTestCase):
