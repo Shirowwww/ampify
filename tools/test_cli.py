@@ -528,14 +528,13 @@ class KitUpdate(AmkTestCase):
 
 
 def api_members():
-    """Member names of section 5 of API.md (the last segment of each `AMK.a.b` path), checked against amk.d.ts.
-    `React` and `components` are planned for M8 and are not declared yet."""
+    """Member names of section 5 of API.md (the last segment of each `AMK.a.b` path), checked against amk.d.ts."""
     with open(os.path.join(ROOT, "docs", "extensions", "API.md"), encoding="utf-8") as handle:
         text = handle.read()
     section = text[text.index("## 5. Objet global"):text.index("## 6. ")]
     paths = re.findall(r"AMK\.([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)", section)
     names = {path.split(".")[-1] for path in paths}
-    return sorted(names - {"React", "components"})
+    return sorted(names)
 
 
 class Build(AmkTestCase):
@@ -757,6 +756,13 @@ class Verification(AmkTestCase):
         result = self.amk("test", native(folder))
         self.assertEqual(result.returncode, 1)
         self.assertIn("permission manquante : storage", result.stdout)
+
+    def test_test_runs_the_react_panel_example(self):
+        folder = os.path.join(ROOT, "examples", "react-panel")
+        result = self.amk("test", native(folder))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("chargé et exécuté sans erreur", result.stdout)
+        self.assertIn("Panneau React prêt", result.stdout)
 
     def test_test_writes_nothing_to_the_kit(self):
         folder = os.path.join(ROOT, "examples", "sleep-timer")

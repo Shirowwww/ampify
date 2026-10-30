@@ -1,0 +1,642 @@
+// Module react: AMK.React, AMK.ReactDOM, AMK.hooks, AMK.components and AMK.ready. Natives: core/natives/react.cpp.
+//
+// Spicetify hands React to its extensions. A native app cannot run the real React, so this is a small engine that
+// accepts the same way of writing (createElement or h, fragments, keys, function components, the basic hooks,
+// contexts) and renders into the primitive trees of core/ui_model, through AMK.ui. Event props (onClick, onChange)
+// become callback ids that the host reports with ScriptExtension::DeliverClick or DeliverEvent("change", ...). A
+// state change re-renders the whole root once, at the end of the current kernel call (microtask), so several
+// setState calls in one handler give one tree. Effects run after the tree was sent, and their cleanups run on
+// unmount and when the element stops.
+//
+// The text is cut in several literals because MSVC refuses a single string literal over 16 KB.
+
+namespace amk::prelude {
+
+extern const char kReact[];
+const char kReact[] = R"AMKJS(
+  // ---- Elements ---------------------------------------------------------------------------------------------
+
+  const ELEMENT = Symbol("AMK.element");
+  const Fragment = Symbol("AMK.Fragment");
+  const PROVIDER = Symbol("AMK.Provider");
+  const CONSUMER = Symbol("AMK.Consumer");
+
+  const isValidElement = (value) => typeof value === "object" && value !== null && value.$$typeof === ELEMENT;
+
+  const isElementType = (type) =>
+    typeof type === "string" || typeof type === "function" || type === Fragment ||
+    (typeof type === "object" && type !== null && (type.$$typeof === PROVIDER || type.$$typeof === CONSUMER));
+
+  function makeElement(type, key, props, config, children) {
+    if (config !== null && config !== undefined) {
+      for (const name of Object.keys(config)) {
+        if (name === "key") key = config.key === undefined || config.key === null ? null : String(config.key);
+        else props[name] = config[name];
+      }
+    }
+    if (children.length === 1) props.children = children[0];
+    else if (children.length > 1) props.children = children;
+    return Object.freeze({ $$typeof: ELEMENT, type, key, props: Object.freeze(props) });
+  }
+
+  function createElement(type, config, ...children) {
+    if (!isElementType(type)) throw new TypeError("createElement : type d'élément invalide (" + describe(type) + ")");
+    return makeElement(type, null, {}, config, children);
+  }
+
+  function cloneElement(element, config, ...children) {
+    if (!isValidElement(element)) throw new TypeError("cloneElement attend un élément");
+    return makeElement(element.type, element.key, Object.assign({}, element.props), config, children);
+  }
+
+  const childList = (children) => (children === undefined ? [] : Array.isArray(children) ? children : [children]);
+
+  function flatten(children, out) {
+    for (const child of childList(children)) {
+      if (Array.isArray(child)) flatten(child, out);
+      else if (child !== null && child !== undefined && typeof child !== "boolean") out.push(child);
+    }
+    return out;
+  }
+
+  const Children = Object.freeze({
+    toArray: (children) => flatten(children, []),
+    map: (children, fn) => flatten(children, []).map((child, index) => fn(child, index)),
+    forEach(children, fn) {
+      flatten(children, []).forEach((child, index) => fn(child, index));
+    },
+    count: (children) => flatten(children, []).length,
+    only(children) {
+      if (!isValidElement(children)) throw new TypeError("Children.only attend un seul élément");
+      return children;
+    },
+  });
+
+  function createContext(defaultValue) {
+    const context = { defaultValue };
+    context.Provider = Object.freeze({ $$typeof: PROVIDER, context });
+    context.Consumer = Object.freeze({ $$typeof: CONSUMER, context });
+    return Object.freeze(context);
+  }
+
+  // No memoization: a whole root renders again on each change, which stays small (300 primitives at most).
+  const memo = (component) => component;
+
+  // ---- Hooks ------------------------------------------------------------------------------------------------
+
+  let rendering = null;  // the component instance being rendered
+  let hookIndex = 0;
+  const contextValues = new Map();  // context -> stack of the Provider values above the component being rendered
+
+  function hookSlot(name) {
+    if (!rendering) throw new Error(name + " : un hook ne s'appelle que pendant le rendu d'un composant");
+    const hooks = rendering.hooks;
+    if (hookIndex >= hooks.length) hooks.push({});
+    return hooks[hookIndex++];
+  }
+
+  const noDeps = (deps) => deps === undefined || deps === null;
+  const sameDeps = (a, b) =>
+    Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
+
+  function useReducer(reducer, initialArg, init) {
+    const instance = rendering;
+    const hook = hookSlot("useReducer");
+    if (!hook.dispatch) {
+      hook.state = init === undefined ? initialArg : init(initialArg);
+      hook.dispatch = (action) => {
+        if (instance.dead) return;
+        const next = hook.reducer(hook.state, action);
+        if (Object.is(next, hook.state)) return;
+        hook.state = next;
+        schedule(instance.root);
+      };
+    }
+    hook.reducer = reducer;
+    return [hook.state, hook.dispatch];
+  }
+
+  const setStateReducer = (state, action) => (typeof action === "function" ? action(state) : action);
+  const useState = (initial) =>
+    useReducer(setStateReducer, initial, (value) => (typeof value === "function" ? value() : value));
+
+  function useEffect(effect, deps) {
+    if (typeof effect !== "function") throw new TypeError("useEffect attend une fonction");
+    const instance = rendering;
+    const hook = hookSlot("useEffect");
+    if (hook.ran && !noDeps(deps) && sameDeps(hook.deps, deps)) return;
+    hook.effect = effect;
+    hook.nextDeps = deps;
+    instance.effects.push(hook);
+  }
+
+  function useMemo(compute, deps) {
+    const hook = hookSlot("useMemo");
+    if (!hook.computed || noDeps(deps) || !sameDeps(hook.deps, deps)) {
+      hook.value = compute();
+      hook.deps = deps;
+      hook.computed = true;
+    }
+    return hook.value;
+  }
+
+  const useCallback = (fn, deps) => useMemo(() => fn, deps);
+
+  function useRef(initial) {
+    const hook = hookSlot("useRef");
+    if (!hook.ref) hook.ref = Object.seal({ current: initial });
+    return hook.ref;
+  }
+
+  function readContext(context) {
+    const stack = contextValues.get(context);
+    return stack && stack.length ? stack[stack.length - 1] : context.defaultValue;
+  }
+
+  function useContext(context) {
+    if (!rendering) throw new Error("useContext : un hook ne s'appelle que pendant le rendu d'un composant");
+    if (typeof context !== "object" || context === null || !context.Provider) {
+      throw new TypeError("useContext attend un contexte créé par createContext");
+    }
+    return readContext(context);
+  }
+
+  // The player state, kept up to date by its events (permission player.read). One subscription for the element.
+  const playerSetters = new Set();
+  let playerSubscribed = false;
+
+  function usePlayer() {
+    const [state, setState] = useState(() => AMK.player.state());
+    useEffect(() => {
+      if (!playerSubscribed) {
+        playerSubscribed = true;
+        const push = (next) => {
+          for (const set of playerSetters) set(next);
+        };
+        AMK.player.on("trackchange", push);
+        AMK.player.on("statechange", push);
+      }
+      playerSetters.add(setState);
+      return () => playerSetters.delete(setState);
+    }, []);
+    return state;
+  }
+)AMKJS" R"AMKJS(
+  // ---- Rendering ----------------------------------------------------------------------------------------------
+  // An instance is kept per position (or key) of the tree, so hooks keep their state between renders. A root is a
+  // panel, a page or a named popup; it renders again as a whole.
+
+  const roots = new Map();     // "panel:<id>", "page:<path>" or "popup:<name>" -> root
+  const handlers = new Map();  // callback id -> { id, fn }
+  const pending = new Set();   // roots to render again at the end of the current kernel call
+  let flushQueued = false;
+  let busy = false;
+  const kMaxPasses = 50;
+
+  // HTML names that Spicetify code often uses, and what they become.
+  const ALIASES = { div: "stack", section: "stack", span: "text", p: "text", label: "text", h1: "text", h2: "text",
+                    h3: "text", img: "image", select: "dropdown", ul: "list" };
+  const VARIANTS = { h1: "title", h2: "subtitle", h3: "subtitle" };
+  const CONTAINERS = new Set(["stack", "row", "list", "card", "dropdown"]);
+  // Where the text children of a primitive without children go.
+  const TEXT_ATTRIBUTE = { text: "text", button: "label", option: "label", toggle: "label" };
+
+  function kindOf(child) {
+    if (typeof child === "string" || typeof child === "number") return "text";
+    if (Array.isArray(child)) return "array";
+    if (!isValidElement(child)) {
+      throw new TypeError("enfant invalide : " + describe(child) + " (élément, texte, nombre ou liste attendu)");
+    }
+    const type = child.type;
+    if (typeof type === "string") return "host";
+    if (typeof type === "function") return "component";
+    if (type === Fragment) return "fragment";
+    return type.$$typeof === PROVIDER ? "provider" : "consumer";
+  }
+
+  // Renders a list of children against the instances of the previous render, matched by key, or else by position.
+  // Pushes the primitives (objects) and texts (strings) they produce to `out`. Returns the new instances.
+  function reconcile(list, previous, root, out) {
+    const next = new Map();
+    list.forEach((child, index) => {
+      if (child === null || child === undefined || typeof child === "boolean") return;
+      let slot = isValidElement(child) && child.key !== null ? "k" + child.key : "i" + index;
+      while (next.has(slot)) slot += "+";  // a repeated key falls back to its position
+      const kind = kindOf(child);
+      const type = kind === "text" || kind === "array" ? kind : child.type;
+      let old = previous ? previous.get(slot) : undefined;
+      if (old && (old.kind !== kind || old.type !== type)) old = undefined;
+      next.set(slot, renderChild(child, kind, type, old, root, out));
+    });
+    if (previous) {
+      for (const [slot, old] of previous) {
+        if (next.get(slot) !== old) unmount(old);
+      }
+    }
+    return next;
+  }
+
+  function renderChild(child, kind, type, old, root, out) {
+    const instance = old || { kind, type, root, hooks: [], effects: [], children: null, handlers: null, dead: false };
+    switch (kind) {
+      case "text":
+        out.push(String(child));
+        break;
+      case "array":
+        instance.children = reconcile(child, instance.children, root, out);
+        break;
+      case "fragment":
+        instance.children = reconcile(childList(child.props.children), instance.children, root, out);
+        break;
+      case "host": {
+        const inner = [];
+        instance.children = reconcile(childList(child.props.children), instance.children, root, inner);
+        out.push(hostNode(instance, child.props, inner));
+        break;
+      }
+      case "provider": {
+        let stack = contextValues.get(type.context);
+        if (!stack) contextValues.set(type.context, (stack = []));
+        stack.push(child.props.value);
+        try {
+          instance.children = reconcile(childList(child.props.children), instance.children, root, out);
+        } finally {
+          stack.pop();
+        }
+        break;
+      }
+      case "consumer": {
+        const draw = child.props.children;
+        if (typeof draw !== "function") throw new TypeError("Consumer attend une fonction comme enfant");
+        instance.children = reconcile([draw(readContext(type.context))], instance.children, root, out);
+        break;
+      }
+      default:
+        renderComponent(instance, child, root, out);
+    }
+    return instance;
+  }
+
+  function renderComponent(instance, element, root, out) {
+    const savedInstance = rendering;
+    const savedIndex = hookIndex;
+    rendering = instance;
+    hookIndex = 0;
+    instance.effects = [];
+    let result;
+    try {
+      result = element.type(element.props);
+    } finally {
+      rendering = savedInstance;
+      hookIndex = savedIndex;
+    }
+    instance.children = reconcile([result === undefined ? null : result], instance.children, root, out);
+    // After the children: the effects of a child run before those of its parent, as in React.
+    for (const hook of instance.effects) root.effects.push(hook);
+    instance.effects = [];
+  }
+
+  function callbackId(instance, key, fn) {
+    if (!instance.handlers) instance.handlers = {};
+    let entry = instance.handlers[key];
+    if (!entry) {
+      entry = { id: native.reactHandlerId(), fn };
+      instance.handlers[key] = entry;
+      handlers.set(entry.id, entry);
+    }
+    entry.fn = fn;
+    return entry.id;
+  }
+
+  // One primitive of core/ui_model: "type" first, the scalar props, then the children. Functions other than
+  // onClick and onChange, objects (style) and lists are left out: the tree holds scalars only.
+  function hostNode(instance, props, inner) {
+    const name = ALIASES[instance.type] || instance.type;
+    const node = { type: name };
+    if (VARIANTS[instance.type]) node.variant = VARIANTS[instance.type];
+    for (const key of Object.keys(props)) {
+      if (key === "children") continue;
+      const value = props[key];
+      if (key === "onClick" || key === "onChange") {
+        if (typeof value === "function") node[key] = callbackId(instance, key, value);
+        else if (instance.handlers && instance.handlers[key]) instance.handlers[key].fn = null;
+        continue;
+      }
+      const scalar = typeof value === "string" || typeof value === "boolean" ||
+                     (typeof value === "number" && Number.isFinite(value));
+      if (scalar) node[key] = value;
+    }
+    if (CONTAINERS.has(name)) {
+      node.children = inner.map((part) => (typeof part === "string" ? { type: "text", text: part } : part));
+    } else if (inner.length) {
+      const attribute = TEXT_ATTRIBUTE[name];
+      if (!attribute || inner.some((part) => typeof part !== "string")) {
+        throw new TypeError("<" + instance.type + "> " + (attribute ? "n'accepte que du texte comme enfant"
+                                                                   : "n'accepte pas d'enfants"));
+      }
+      if (node[attribute] === undefined) node[attribute] = inner.join("");
+    }
+    return node;
+  }
+
+  function unmount(instance) {
+    if (instance.dead) return;
+    instance.dead = true;
+    for (const hook of instance.hooks) {
+      if (typeof hook.cleanup === "function") {
+        const cleanup = hook.cleanup;
+        hook.cleanup = undefined;
+        runGuarded("nettoyage d'effet", cleanup, []);
+      }
+    }
+    if (instance.handlers) {
+      for (const entry of Object.values(instance.handlers)) handlers.delete(entry.id);
+    }
+    if (instance.children) {
+      for (const child of instance.children.values()) unmount(child);
+    }
+  }
+
+  // Every cleanup first, then every effect, as React does.
+  function runEffects(list) {
+    for (const hook of list) {
+      if (typeof hook.cleanup === "function") {
+        const cleanup = hook.cleanup;
+        hook.cleanup = undefined;
+        runGuarded("nettoyage d'effet", cleanup, []);
+      }
+    }
+    for (const hook of list) {
+      hook.ran = true;
+      hook.deps = hook.nextDeps;
+      const cleanup = runGuarded("effet", hook.effect, []);
+      if (typeof cleanup === "function") hook.cleanup = cleanup;
+    }
+  }
+
+  const TARGETS = ["panel", "page", "popup"];
+
+  function targetOf(target) {
+    let kind;
+    let id;
+    if (target === "popup") {
+      kind = "popup";
+      id = "main";
+    } else if (typeof target === "string" && target.indexOf(":") > 0) {
+      kind = target.slice(0, target.indexOf(":"));
+      id = target.slice(target.indexOf(":") + 1);
+    } else if (typeof target === "object" && target !== null) {
+      kind = TARGETS.find((name) => target[name] !== undefined && target[name] !== null);
+      if (kind) id = target[kind] === true ? "main" : text(target[kind]);
+    }
+    if (!TARGETS.includes(kind) || !id) {
+      throw new TypeError('ReactDOM : cible inconnue (attendu "panel:<nom>", "page:/<chemin>" ou "popup:<nom>")');
+    }
+    return { kind, id, key: kind + ":" + id };
+  }
+
+  function send(target, tree, json) {
+    if (target.kind === "panel") AMK.ui.panel.register(target.id, tree);
+    else if (target.kind === "page") AMK.ui.page.register(target.id, tree);
+    else native.reactPopup(target.id, json);
+  }
+
+  function performRender(root) {
+    if (busy) throw new Error("ReactDOM : un rendu ne peut pas en demander un autre");
+    busy = true;
+    const out = [];
+    root.effects = [];
+    try {
+      root.children = reconcile([root.element], root.children, root, out);
+    } finally {
+      busy = false;
+      contextValues.clear();
+    }
+    const tree = out.length === 1 && typeof out[0] === "object"
+      ? out[0]
+      : { type: "stack", children: out.map((part) => (typeof part === "string" ? { type: "text", text: part } : part)) };
+    const json = JSON.stringify(tree);
+    if (json !== root.sent) {
+      send(root.target, tree, json);
+      root.sent = json;
+    }
+    const effects = root.effects;
+    root.effects = [];
+    runEffects(effects);
+  }
+
+  function schedule(root) {
+    if (root.dead) return;
+    pending.add(root);
+    if (!flushQueued) {
+      flushQueued = true;
+      Promise.resolve().then(flush);
+    }
+  }
+
+  function flush() {
+    flushQueued = false;
+    for (let pass = 0; pending.size > 0; pass++) {
+      if (pass >= kMaxPasses) {
+        native.log("[erreur] React : plus de " + kMaxPasses + " rendus à la suite, un état change à chaque rendu");
+        pending.clear();
+        break;
+      }
+      const batch = [...pending];
+      pending.clear();
+      for (const root of batch) {
+        if (root.dead) continue;
+        try {
+          performRender(root);
+        } catch (error) {
+          native.log("[erreur] rendu React (" + root.target.key + ") : " + describe(error));
+        }
+      }
+    }
+  }
+
+  function destroy(root) {
+    root.dead = true;
+    pending.delete(root);
+    if (root.children) {
+      for (const child of root.children.values()) unmount(child);
+    }
+    root.children = null;
+  }
+
+  function renderInto(element, target) {
+    const where = targetOf(target);
+    let root = roots.get(where.key);
+    if (!root) {
+      root = { target: where, element: null, children: null, effects: [], sent: null, dead: false };
+      roots.set(where.key, root);
+    }
+    root.element = element;
+    pending.delete(root);
+    performRender(root);
+    return null;
+  }
+
+  function unmountAt(target) {
+    const where = targetOf(target);
+    const root = roots.get(where.key);
+    if (!root) return false;
+    destroy(root);
+    roots.delete(where.key);
+    if (where.kind === "popup") native.reactClosePopup(where.id);
+    else send(where, { type: "stack", children: [] }, "");
+    return true;
+  }
+
+  function createRoot(target) {
+    targetOf(target);
+    return Object.freeze({
+      render: (element) => renderInto(element, target),
+      unmount: () => unmountAt(target),
+    });
+  }
+
+  // The element stops: every effect cleanup runs. The interface itself is removed by the module ui.
+  AMK.onStop(() => {
+    for (const root of roots.values()) destroy(root);
+    roots.clear();
+  });
+
+  // Clicks on a tree's callback ids; the other ids are those of the controls of AMK.ui.
+  const controlClick = dispatch.click;
+  dispatch.click = (id) => {
+    const entry = handlers.get(id);
+    if (!entry) {
+      if (controlClick) controlClick(id);
+      return;
+    }
+    if (typeof entry.fn === "function") runGuarded("clic " + id, entry.fn, [{ type: "click", id }]);
+  };
+
+  // A new value from the host, as JSON text: {"id": <callback id>, "value": <boolean, number or text>}.
+  dispatch.change = (payload) => {
+    let data;
+    try {
+      data = JSON.parse(payload);
+    } catch (error) {
+      native.log("[erreur] changement : " + describe(error));
+      return;
+    }
+    const id = Number(data && data.id);
+    const entry = handlers.get(id);
+    if (!entry || typeof entry.fn !== "function") return;
+    const value = data.value;
+    runGuarded("changement " + id, entry.fn, [{ type: "change", id, value, target: { value, checked: value === true } }]);
+  };
+)AMKJS" R"AMKJS(
+  // ---- Components (Spicetify's ReactComponent) ----------------------------------------------------------------
+  // Each one renders primitives. They pass the tooltip props through, so that Tooltip can wrap them.
+
+  const h = createElement;
+  const TIP = ["tooltip", "tooltipPlacement", "tooltipDelay"];
+
+  function pick(props, names) {
+    const out = {};
+    for (const name of names) {
+      if (props[name] !== undefined) out[name] = props[name];
+    }
+    return out;
+  }
+
+  // The handler of a component gets the value itself, then the event.
+  function relay(attributes, fn, convert) {
+    if (typeof fn === "function") attributes.onChange = (event) => fn(convert(event.value), event);
+    return attributes;
+  }
+
+  const asText = (value) => (value === undefined || value === null ? "" : String(value));
+
+  function Button(props) {
+    const attributes = pick(props, ["label", "icon", "disabled", "variant", "onClick", ...TIP]);
+    return h("button", attributes, attributes.label === undefined ? props.children : undefined);
+  }
+  const ButtonPrimary = (props) => h(Button, Object.assign({ variant: "primary" }, props));
+  const ButtonSecondary = (props) => h(Button, Object.assign({ variant: "secondary" }, props));
+  const ButtonTertiary = (props) => h(Button, Object.assign({ variant: "tertiary" }, props));
+
+  function Toggle(props) {
+    const attributes = pick(props, ["label", "disabled", ...TIP]);
+    attributes.checked = Boolean(props.checked !== undefined ? props.checked : props.value);
+    relay(attributes, props.onChange || props.onSelected, (value) => value === true);
+    return h("toggle", attributes, attributes.label === undefined ? props.children : undefined);
+  }
+
+  function Slider(props) {
+    const attributes = pick(props, ["label", "min", "max", "step", "value", "disabled", ...TIP]);
+    return h("slider", relay(attributes, props.onChange, Number));
+  }
+
+  function TextField(props) {
+    const attributes = pick(props, ["label", "value", "placeholder", "disabled", ...TIP]);
+    return h("textfield", relay(attributes, props.onChange, asText));
+  }
+
+  // options: texts, or { value, label } objects. Without options, the children (h("option", ...)) are used.
+  function Dropdown(props) {
+    const attributes = relay(pick(props, ["label", "value", "disabled", ...TIP]), props.onChange, asText);
+    if (attributes.value !== undefined) attributes.value = asText(attributes.value);
+    const options = Array.isArray(props.options)
+      ? props.options.map((option) => {
+          const entry = typeof option === "object" && option !== null ? option : { value: option };
+          const value = asText(entry.value);
+          return h("option", { key: value, value, label: entry.label === undefined ? value : asText(entry.label) });
+        })
+      : props.children;
+    return h("dropdown", attributes, options);
+  }
+
+  const Card = (props) => h("card", pick(props, ["title", "subtitle", "onClick", ...TIP]), props.children);
+  const List = (props) => h("list", pick(props, TIP), props.children);
+
+  function Text(props) {
+    const attributes = pick(props, ["text", "variant", ...TIP]);
+    return h("text", attributes, attributes.text === undefined ? props.children : undefined);
+  }
+
+  // Spicetify's TooltipWrapper (Tippy props): label (or content), placement, delay (or showDelay). It adds the
+  // tooltip attributes to each child, which must be a primitive or a component of AMK.components.
+  function Tooltip(props) {
+    const label = props.label !== undefined ? props.label : props.content;
+    const delay = props.delay !== undefined ? props.delay : props.showDelay;
+    const extra = pick({ tooltip: label === undefined ? undefined : asText(label), tooltipPlacement: props.placement,
+                         tooltipDelay: delay }, TIP);
+    return Children.map(props.children, (child) =>
+      isValidElement(child) ? cloneElement(child, extra) : h("text", Object.assign({ text: asText(child) }, extra)));
+  }
+
+  // ---- The API ----------------------------------------------------------------------------------------------
+
+  const hooks = { useState, useReducer, useEffect, useLayoutEffect: useEffect, useRef, useMemo, useCallback,
+                  useContext };
+
+  AMK.React = Object.assign({ createElement, h: createElement, Fragment, isValidElement, cloneElement, Children,
+                              createContext, memo }, hooks);
+  AMK.ReactDOM = { render: renderInto, unmountComponentAtNode: unmountAt, createRoot };
+  AMK.hooks = Object.assign({ usePlayer }, hooks);
+  AMK.components = { Button, ButtonPrimary, ButtonSecondary, ButtonTertiary, Toggle, Slider, TextField, Dropdown,
+                     Card, List, Text, TextComponent: Text, Tooltip, TooltipWrapper: Tooltip };
+
+  // AMK.ready resolves when the kernel has started the element: on its first Pump, after main.js ran. An app that
+  // defines a global render() function, as a Spicetify custom app does, gets it rendered on its page "/<id>" first.
+  let markReady;
+  AMK.ready = new Promise((resolve) => {
+    markReady = resolve;
+  });
+
+  dispatch.ready = () => {
+    const page = native.reactAppPage;
+    const appRender = globalThis.render;
+    if (page && typeof appRender === "function" && !roots.has("page:" + page)) {
+      const App = () => appRender();
+      runGuarded("render() de l'app", renderInto, [h(App), { page }]);
+    }
+    markReady();
+  };
+)AMKJS";
+
+}  // namespace amk::prelude

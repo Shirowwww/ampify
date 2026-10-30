@@ -81,6 +81,7 @@ bool ScriptExtension::Start() {
     if (!m_runtime->RunJobs(&error)) return fail(error);
 
     m_running = true;
+    DeliverEvent("ready", "");  // AMK.ready resolves on the first Pump (core/prelude/react.cpp)
     return true;
 }
 

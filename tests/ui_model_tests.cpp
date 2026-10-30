@@ -127,3 +127,42 @@ TEST_CASE(UiModel_TheLastNavigationWins) {
     CHECK(route.has_value());
     CHECK(route->second == "/b");
 }
+
+TEST_CASE(UiTree_AcceptsCardsDropdownsAndCallbackIds) {
+    std::string error;
+    CHECK(amk::ValidateTree(Parse(R"({"type":"card","title":"Réglages","onClick":3,"children":[)"
+                                  R"({"type":"textfield","value":"","onChange":4},)"
+                                  R"({"type":"dropdown","value":"a","onChange":5,"children":[{"type":"option","value":"a","label":"A"}]},)"
+                                  R"({"type":"button","label":"OK","tooltip":"Valider","tooltipPlacement":"top","tooltipDelay":0}]})"),
+                            &error));
+    CHECK(error.empty());
+}
+
+TEST_CASE(UiTree_RefusesMisplacedOptionsAndCallbacks) {
+    std::string error;
+    CHECK(!amk::ValidateTree(Parse(R"({"type":"option","value":"a"})"), &error));
+    CHECK(error.find("option") != std::string::npos);
+    CHECK(!amk::ValidateTree(Parse(R"({"type":"dropdown","children":[{"type":"text","text":"a"}]})"), &error));
+    CHECK(!amk::ValidateTree(Parse(R"({"type":"text","text":"a","onClick":1})"), &error));
+    CHECK(error.find("onClick") != std::string::npos);
+    CHECK(!amk::ValidateTree(Parse(R"({"type":"button","onClick":1.5})"), &error));
+    CHECK(!amk::ValidateTree(Parse(R"({"type":"button","onClick":"1"})"), &error));
+    CHECK(!amk::ValidateTree(Parse(R"({"type":"slider","onClick":1})"), &error));
+    CHECK(!amk::ValidateTree(Parse(R"({"type":"button","onChange":1})"), &error));
+    CHECK(!amk::ValidateTree(Parse(R"({"type":"button","tooltipDelay":20000})"), &error));
+    CHECK(!amk::ValidateTree(Parse(R"({"type":"button","tooltip":3})"), &error));
+}
+
+TEST_CASE(UiModel_NamedPopupsAreReplacedAndClosed) {
+    amk::UiModel ui;
+    ui.OpenPopup("a", Parse(R"({"type":"text","text":"une fois"})"));
+    ui.SetPopup("a", "infos", Parse(R"({"type":"text","text":"1"})"));
+    ui.SetPopup("a", "infos", Parse(R"({"type":"text","text":"2"})"));
+    auto popups = ui.Popups();
+    CHECK(popups.size() == 2);
+    CHECK(popups.size() == 2 && popups[1].tree.Dump() == R"({"type":"text","text":"2"})");
+    ui.ClosePopup("a", "infos");
+    CHECK(ui.Popups().size() == 1);
+    int control = ui.AddControl("a", "topbar", "x", "");
+    CHECK(ui.ReserveId() == control + 1);
+}

@@ -26,7 +26,7 @@ struct UiControl {
 
 struct UiSlot {
     std::string elementId;
-    std::string id;  // panel or page path; empty for a popup
+    std::string id;  // panel or page path; for a popup, its name (SetPopup) or empty (OpenPopup)
     Json tree;
 };
 
@@ -44,6 +44,16 @@ public:
 
     // The popups that were opened, in order. The host shows each one once.
     void OpenPopup(const std::string& elementId, Json tree);
+
+    // A popup with a name (AMK.ReactDOM.render): the first call opens it, the next ones replace its tree in place,
+    // so a re-render does not stack popups. ClosePopup removes it.
+    void SetPopup(const std::string& elementId, const std::string& popupId, Json tree);
+    void ClosePopup(const std::string& elementId, const std::string& popupId);
+
+    // A new id for a callback inside a tree (attributes onClick and onChange). It comes from the same counter as the
+    // controls, so it never equals a control id: the host reports a click with ScriptExtension::DeliverClick(id),
+    // and a change with DeliverEvent("change", {"id":id,"value":...}).
+    int ReserveId();
 
     void SetTitle(const std::string& elementId, const std::string& title);
 
@@ -74,6 +84,12 @@ private:
 
 // Checks a tree sent by an element: only the known primitives, with bounded depth, size and text. Attributes are
 // scalars, never objects or lists. On failure `error` gets one French line.
+//
+// Primitives: stack, row, list, card (with children), text, button, toggle, slider, textfield, image, icon,
+// dropdown (whose children are options only) and option (only inside a dropdown). Checked attributes: onClick
+// (button, card, image, icon) and onChange (toggle, slider, textfield, dropdown) hold a callback id, a positive
+// integer; tooltip is a text on any primitive, tooltipPlacement is top, bottom, left or right, and tooltipDelay is
+// a number of milliseconds between 0 and 10000.
 bool ValidateTree(const Json& tree, std::string* error);
 
 // True for the placements listed above.

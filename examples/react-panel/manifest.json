@@ -1,0 +1,12 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "react-panel",
+  "name": "Panneau React",
+  "version": "0.1.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Un panneau écrit comme en React, sans JSX : compteur, minuterie et réglages avec AMK.React et AMK.components.",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": ["ui.panel"]
+}

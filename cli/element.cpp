@@ -39,7 +39,7 @@ constexpr TextRule kResourcesRule{R"re([A-Za-z0-9][A-Za-z0-9._-]{0,63}\.xaml)re"
 constexpr TextRule kIconRule{R"re([A-Za-z0-9][A-Za-z0-9._-]{0,63}\.svg)re", 0, 0,
                              "nom de fichier .svg, à la racine du dossier"};
 constexpr TextRule kPermissionRule{
-    R"re((player\.read|player\.control|audio\.analyze|audio\.gain|audio\.eq|storage|notifications|ui\.keyboard|ui\.topbar|ui\.playbar|ui\.menu|ui\.popup|ui\.page|library\.read|network:[a-z0-9.-]{1,253}))re",
+    R"re((player\.read|player\.control|audio\.analyze|audio\.gain|audio\.eq|storage|notifications|ipc\.discord|midi\.input|library\.read|library\.write|services\.read|ui\.keyboard|ui\.topbar|ui\.playbar|ui\.menu|ui\.popup|ui\.panel|ui\.page|ui\.window|ui\.tray|network:[a-z0-9.-]{1,253}))re",
     0, 0, "une permission de docs/extensions/API.md, section 4"};
 constexpr TextRule kTypeRule{R"re(script|module)re", 0, 0, "script ou module"};
 constexpr TextRule kProcessRule{R"re(ui|engine)re", 0, 0, "ui ou engine"};

@@ -50,6 +50,7 @@ AppleMusic.exe ou AMPLibraryAgent.exe
 
 L'objet global est fait de **modules** (`core`, `config`, `storage`, `player`, `audio`, `keyboard`, `notify`, `http`,
 `icons`, `uri`, `color`, `timers`, `console`, `ui`, `link`, et `audioAnalysis` qui complète `audio`). Chaque module vit dans ses propres fichiers, pour que plusieurs personnes
+`icons`, `uri`, `timers`, `console`, `ui`, `react`). Chaque module vit dans ses propres fichiers, pour que plusieurs personnes
 puissent en ajouter en même temps sans modifier les mêmes lignes :
 
 | Partie d'un module `foo` | Où |
@@ -292,7 +293,31 @@ Une extension décrit son interface de deux façons, qui donnent le même résul
 
 Dans les deux cas, le noyau rend l'arborescence en XAML.
 
-Primitives prévues : `stack`, `row`, `text`, `button`, `toggle`, `slider`, `list`, `image`, `icon`.
+Primitives : `stack`, `row`, `list` et `card` (qui ont des enfants), `text`, `button`, `toggle`, `slider`,
+`textfield`, `image`, `icon`, `dropdown` (ses enfants sont des `option`) et `option` (seulement dans un `dropdown`).
+Chaque nœud est un objet `{ type, ...attributs, children }`. Les attributs sont des valeurs simples (texte, nombre,
+booléen), jamais des objets ni des listes. Le noyau vérifie l'arbre (`core/ui_model.cpp`) : 8 niveaux, 300 nœuds et
+500 caractères par texte au plus.
+
+| Primitive | Attributs lus par le rendu |
+|---|---|
+| `stack`, `row`, `list` | `gap` (nombre), `children` |
+| `card` | `title`, `subtitle`, `onClick`, `children` |
+| `text` | `text`, `variant` (`title`, `subtitle`, `body`, `caption`) |
+| `button` | `label`, `icon` (SVG), `disabled`, `variant` (`primary`, `secondary`, `tertiary`), `onClick` |
+| `toggle` | `label`, `checked`, `disabled`, `onChange` |
+| `slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange` |
+| `textfield` | `label`, `value`, `placeholder`, `disabled`, `onChange` |
+| `dropdown` | `label`, `value`, `disabled`, `onChange`, `children` (des `option`) |
+| `option` | `value`, `label` |
+| `image` | `src`, `label` (texte de remplacement), `onClick` |
+| `icon` | `icon` (SVG, comme `AMK.icons.get`), `label`, `onClick` |
+| toutes | `tooltip` (texte), `tooltipPlacement` (`top`, `bottom`, `left`, `right`), `tooltipDelay` (0 à 10000 ms) |
+
+`onClick` et `onChange` contiennent un numéro de rappel (entier positif), donné par le noyau. Le noyau refuse
+`onClick` hors de `button`, `card`, `image` et `icon`, et `onChange` hors de `toggle`, `slider`, `textfield` et
+`dropdown`. L'hôte signale un clic avec `ScriptExtension::DeliverClick(numéro)` et une nouvelle valeur avec
+`DeliverEvent("change", {"id": numéro, "value": valeur})`. `AMK.React` (section 5.8) remplit ces numéros.
 
 ```js
 AMK.ui.topbar.addButton({ label, icon, onClick })
@@ -373,6 +398,90 @@ AMK.link.connected()     // true si l'autre élément tourne
   parlent. Un script de thème n'est lié à rien.
 - L'app et l'extension partagent le fichier `storage\<id>.json` (même identifiant). Une seule des deux doit écrire
   son stockage : l'autre passe par `AMK.link`.
+### 5.8 React, composants et `AMK.ready` [provisoire M8]
+
+Spicetify donne React aux extensions. Une app native ne peut pas faire tourner le vrai React : le kit fournit un petit
+moteur qui accepte la même écriture, sans JSX, et qui produit l'arbre de primitives de la section 5.5. Il n'a pas de
+permission propre : la cible demande celle de son emplacement (`ui.panel`, `ui.page` ou `ui.popup`).
+
+```js
+const { h, useState } = AMK.React;
+
+function Compteur() {
+  const [n, setN] = useState(0);
+  return h("stack", null,
+    h("text", null, "Clics : " + n),
+    h("button", { label: "Plus un", onClick: () => setN(n + 1) }));
+}
+
+AMK.ReactDOM.render(h(Compteur), "panel:compteur");
+AMK.ready.then(() => AMK.log("prêt"));
+```
+
+```js
+AMK.React.createElement(type, props, ...enfants)   // aussi AMK.React.h
+AMK.React.Fragment
+AMK.React.isValidElement(valeur)
+AMK.React.cloneElement(élément, props, ...enfants)
+AMK.React.Children.toArray(enfants)               // aussi map, forEach, count, only
+AMK.React.createContext(défaut)                    // -> { Provider, Consumer }
+AMK.React.memo(composant)                          // rend le composant tel quel
+AMK.React.useState(initial)                        // aussi useReducer, useEffect, useLayoutEffect,
+AMK.React.useContext(contexte)                     //   useRef, useMemo, useCallback
+AMK.hooks.usePlayer()                              // état du lecteur, suivi par ses événements [permission player.read]
+AMK.ReactDOM.render(élément, cible)
+AMK.ReactDOM.createRoot(cible)                     // -> { render(élément), unmount() }
+AMK.ReactDOM.unmountComponentAtNode(cible)
+AMK.ready                                          // Promise résolue quand le noyau a démarré l'élément
+```
+
+`AMK.hooks` reprend les hooks de `AMK.React`, plus `usePlayer`.
+
+Règles :
+
+- **Types d'éléments** : un nom de primitive (`"stack"`, `"text"`…), une fonction composant, `Fragment`, ou le
+  `Provider` ou le `Consumer` d'un contexte. Quelques noms HTML sont acceptés : `div` et `section` donnent `stack`,
+  `span`, `p` et `label` donnent `text`, `h1` un `text` de variante `title`, `h2` et `h3` la variante `subtitle`,
+  `img` donne `image`, `select` donne `dropdown`, `ul` donne `list`. Pas de classes (`React.Component`). Pas de JSX
+  dans le noyau : un outil peut compiler le JSX vers `AMK.React.createElement`.
+- **Props** : un texte, un nombre ou un booléen devient un attribut. `style`, les objets, les listes et les autres
+  fonctions sont ignorés.
+- **Enfants texte** : dans un conteneur, un texte devient une primitive `text`. Dans `text`, `button`, `toggle` et
+  `option`, les textes sont joints et vont dans l'attribut `text` ou `label`.
+- **Événements** : `onClick` et `onChange` deviennent un numéro de rappel, qui ne change pas d'un rendu à l'autre. Le
+  gestionnaire reçoit `{ type: "click", id }` ou `{ type: "change", id, value, target: { value, checked } }`.
+- **Rendu** : un changement d'état rend toute la cible une seule fois, à la fin de l'appel en cours du noyau (clic,
+  minuterie, événement). Plusieurs `setState` dans un même gestionnaire donnent un seul rendu. L'arbre n'est renvoyé
+  au noyau que s'il a changé. Plus de 50 rendus à la suite sont arrêtés, avec une ligne au journal.
+- **Effets** : ils tournent après l'envoi de l'arbre, ceux des enfants avant ceux des parents. Leur nettoyage tourne
+  avant l'effet suivant, au démontage du composant, et à l'arrêt de l'élément.
+- **Cibles** : `"panel:<nom>"`, `"page:/<chemin>"` (pour une app), `"popup:<nom>"`, ou `"popup"` pour
+  `"popup:main"`. Les objets `{ panel }`, `{ page }` et `{ popup }` marchent aussi. Un popup nommé est mis à jour sur
+  place à chaque rendu, et `unmount` le ferme. Démonter un panneau ou une page y laisse une pile vide.
+- **Erreurs** : une erreur dans `ReactDOM.render` est levée, donc `main.js` échoue avec un message clair. Une erreur
+  dans un rendu suivant est écrite au journal, et l'arbre précédent reste affiché.
+- **Apps** : une app (`kind: app`) qui définit une fonction globale `render()`, comme une app Spicetify, voit ce
+  qu'elle rend affiché sur la page `/<id>` au démarrage, avant que `AMK.ready` soit résolue (permission `ui.page`).
+- **`AMK.ready`** : résolue au premier tour de la boucle du noyau après `main.js`. L'élément est alors démarré, et ses
+  clics et événements arrivent. C'est l'équivalent de l'attente de `Spicetify.Player` ou de `Spicetify.Platform`.
+
+Composants de `AMK.components`, à la place de `Spicetify.ReactComponent` :
+
+| Composant | Props | Primitive |
+|---|---|---|
+| `Button` (et `ButtonPrimary`, `ButtonSecondary`, `ButtonTertiary`) | `label` (ou un texte en enfant), `icon`, `disabled`, `variant`, `onClick` | `button` |
+| `Toggle` | `label`, `value` ou `checked`, `disabled`, `onChange(coché)` | `toggle` |
+| `Slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange(nombre)` | `slider` |
+| `TextField` | `label`, `value`, `placeholder`, `disabled`, `onChange(texte)` | `textfield` |
+| `Dropdown` | `label`, `value`, `options` (textes ou `{ value, label }`), `disabled`, `onChange(valeur)` | `dropdown` et `option` |
+| `Card` | `title`, `subtitle`, `onClick`, enfants | `card` |
+| `List` | enfants | `list` |
+| `Text` (et `TextComponent`) | `text` ou enfants, `variant` | `text` |
+| `Tooltip` (et `TooltipWrapper`) | `label` ou `content`, `placement`, `delay` ou `showDelay`, enfants | ajoute `tooltip`, `tooltipPlacement` et `tooltipDelay` à chaque enfant |
+
+Chaque composant accepte aussi `tooltip`, `tooltipPlacement` et `tooltipDelay`. `Tooltip` entoure une primitive ou un
+composant de `AMK.components`. Un composant écrit par l'extension doit passer ces trois props à sa primitive. Le
+second argument des `onChange` est l'événement complet. Exemple complet : `examples/react-panel/`.
 
 ## 6. Thèmes, apps et snippets
 
@@ -487,6 +596,10 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
 | `audio.onFrame`, `analyze`, `loudness`, `volume`, `eq` | fait. Sous Windows : branchés sur les hooks du nivellement Atmos (flux stéréo et objets spatiaux), qui doit être activé | tests C++ (signaux synthétiques) ; égaliseur et analyse vus sur le flux stéréo sous Wine ; écoute à faire sur le PC |
 | `color.extract` (pixels fournis par le script) | fait | tests C++ |
 | `ui.*`, `React`, `components`, `library`, `player.queue`, `services`, `lyrics`, `color.fromArtwork` | à faire (M8) | |
+| Découverte des dossiers, activation, rechargement (`Restart`), isolement des pannes | fait | tests C++ et Wine |
+| `audio.onSamples`, `audio.analyze` | à faire (M4) | |
+| `React`, `ReactDOM`, `hooks`, `components`, `ready` | fait côté runtime : l'arbre de primitives est produit et vérifié, les clics et changements reviennent par leurs numéros. Le rendu XAML viendra avec M8 | tests C++ (`tests/react_tests.cpp`) ; `amk test examples/react-panel` |
+| `ui.*`, `library`, `player.queue`, `services`, `lyrics`, `color` | à faire (M8) | |
 | Thèmes et snippets | pas chargés par cette version du noyau | |
 
 Limites connues, à corriger avant la version 1 : l'appel réseau est synchrone, donc il bloque le fil qui exécute

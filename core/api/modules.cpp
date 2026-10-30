@@ -28,6 +28,7 @@ extern const char kConsole[];
 extern const char kUi[];
 extern const char kAudioAnalysis[];
 extern const char kColor[];
+extern const char kReact[];
 }  // namespace prelude
 
 namespace natives {
@@ -48,6 +49,7 @@ void StopUi(ScriptExtension& extension);
 void DefineAudioAnalysis(api::NativeScope& scope);
 void StopAudioAnalysis(ScriptExtension& extension);
 void DefineColor(api::NativeScope& scope);
+void DefineReact(api::NativeScope& scope);
 }  // namespace natives
 
 namespace prelude { extern const char kLink[]; }
@@ -76,6 +78,7 @@ const ApiModule kModules[] = {
     {"console", prelude::kConsole, nullptr, nullptr, nullptr},
     {"ui", prelude::kUi, natives::DefineUi, nullptr, natives::StopUi},
     {"link", prelude::kLink, natives::DefineLink, natives::StartLink, nullptr},
+    {"react", prelude::kReact, natives::DefineReact, nullptr, nullptr},
 };
 
 }  // namespace
