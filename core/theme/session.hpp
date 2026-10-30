@@ -33,7 +33,8 @@ public:
     // layout. So switching a snippet off (which the worker turns into a new generation) brings back what was under it.
     // The same generation applies again, which styles the elements that appeared since the last tick and writes
     // nothing else. Empty themeId with no snippet and no layout restores. The problems of each source go to the
-    // journal once per generation, with the name of the source. Returns the inspector dump when the request asks for one.
+    // journal once per generation, with the name of the source. Returns the inspector dump when the request asks for one
+    // and the tree has elements (an empty tree waits for a later tick).
     std::optional<std::string> Tick(TreeBackend& tree, const SessionRequest& request);
 
     bool Active() const { return m_engine.Active(); }

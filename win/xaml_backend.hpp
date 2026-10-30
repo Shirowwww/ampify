@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -44,6 +45,14 @@ public:
     bool EnsureSettingsSection(const std::vector<std::string>& themeNames, const std::string& activeName,
                                std::function<void(const std::string&)> onChoice);
 
+    // The light or dark mode of the app under the theme: RequestedTheme of the main window's content. Dark for a dark
+    // scheme, Light for another scheme, the app's own value back with nullopt (no theme). After a resource change, the
+    // mode goes to the other one and back, which makes the elements already on screen read the new values.
+    void SetAppMode(std::optional<bool> dark);
+
+    // True once the main window has closed: Apple Music is shutting down and its tree must not be touched any more.
+    bool WindowClosed() const { return *m_closed; }
+
 private:
     winrt::Microsoft::UI::Xaml::DependencyObject Resolve(theme::NodeId id) const;
 
@@ -57,6 +66,11 @@ private:
     std::map<std::uint64_t, winrt::Windows::Foundation::IInspectable> m_kept;
     std::uint64_t m_nextToken = 1;
     winrt::Microsoft::UI::Xaml::ResourceDictionary m_merged{nullptr};
+    std::shared_ptr<bool> m_closed = std::make_shared<bool>(false);  // set by Window.Closed, on the interface thread
+    winrt::weak_ref<winrt::Microsoft::UI::Xaml::FrameworkElement> m_modeRoot;  // the element whose mode was changed
+    std::optional<winrt::Microsoft::UI::Xaml::ElementTheme> m_modeOriginal;    // its value before the theme
+    std::map<std::string, theme::Value> m_addedKeys;  // keys added on top of the theme dictionaries, with the value before
+    bool m_resourcesDirty = false;  // a resource changed: {ThemeResource} references must be resolved again
 };
 
 }  // namespace amk::win

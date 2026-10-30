@@ -12,6 +12,7 @@ namespace amk {
 // On any other build the kernel stays idle: the app runs untouched, nothing is guessed by address.
 inline constexpr std::string_view kKnownAppVersions[] = {
     "1.1540.23042.0",
+    "1.1792.39682.0",  // Windows bench, 30/10/2026: injection in both processes, export signature recognized
 };
 
 bool IsKnownAppVersion(std::string_view version,

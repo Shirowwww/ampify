@@ -161,12 +161,15 @@ struct XamlRenderer::Callbacks {
     void Fire(bool click, const std::string& valueJson) const noexcept {
         try {
             std::shared_ptr<int> busy = updating.lock();
-            if (!busy || *busy > 0) return;  // the renderer itself is setting the value, or it is gone
-            if (!click && !echo.empty()) {
-                bool isEcho = valueJson == echo;
+            if (!busy) return;  // the renderer is gone
+            // The renderer's own value, reported now (Toggled, ValueChanged) or late (TextChanged): dropped, and the
+            // echo is spent either way, so a later change by the user to that same value still counts.
+            if (!click && !echo.empty() && valueJson == echo) {
                 echo.clear();
-                if (isEcho) return;
+                return;
             }
+            if (*busy > 0) return;  // the renderer itself is setting values
+            if (!click) echo.clear();
             int id = click ? onClick : onChange;
             if (id <= 0 || !sink) return;
             sink(UiEvent{elementId, id, click, valueJson});
@@ -179,7 +182,10 @@ struct XamlRenderer::Callbacks {
 struct XamlRenderer::Mounted {
     std::string type;
     bool grid = false;  // a row drawn as a Grid of 2 columns
-    winrt::weak_ref<xaml::FrameworkElement> outer;    // what the parent holds
+    // What the parent holds. Strong: a control just built has no other owner until Rewrite puts it in its parent's
+    // panel, and the root has none until the caller puts it in a slot; a weak reference would lose them as soon as
+    // Build returns. The other references stay weak: `outer` keeps them alive.
+    xaml::FrameworkElement outer{nullptr};
     winrt::weak_ref<xaml::FrameworkElement> control;  // what takes the attributes, the name and the tooltip
     winrt::weak_ref<controls::Panel> host;            // where the children go
     winrt::weak_ref<controls::TextBlock> label;       // the label of a toggle, the title of a card
@@ -377,7 +383,7 @@ XamlRenderer::XamlRenderer(std::string elementId, UiEventSink sink)
 XamlRenderer::~XamlRenderer() = default;
 
 xaml::FrameworkElement XamlRenderer::Root() const {
-    return m_root ? m_root->outer.get() : nullptr;
+    return m_root ? m_root->outer : nullptr;
 }
 
 xaml::FrameworkElement XamlRenderer::Render(RenderNode tree, const StyleProbe& probe, uirender::PatchStats& stats,
@@ -386,7 +392,7 @@ xaml::FrameworkElement XamlRenderer::Render(RenderNode tree, const StyleProbe& p
     rootReplaced = false;
     UpdateGuard guard(*m_updating);
 
-    bool rebuild = !m_root || !m_root->outer.get() || (m_tree && NeedsGrid(*next) != m_root->grid && next->type == "row");
+    bool rebuild = !m_root || !m_root->outer || (m_tree && NeedsGrid(*next) != m_root->grid && next->type == "row");
     Patch patch = uirender::Reconcile(rebuild ? nullptr : m_tree.get(), *next);
     stats = uirender::CountPatch(patch);
     if (rebuild || patch.op == PatchOp::Create || patch.op == PatchOp::Replace) {
@@ -736,7 +742,7 @@ void XamlRenderer::Apply(Mounted& mounted, const Patch& patch, const StyleProbe&
             Mounted& old = mounted.children[child.from];
             // A row that changes between 2 children and another count changes its native panel: rebuilt.
             bool layoutChanged = child.node->type == "row" && NeedsGrid(*child.node) != old.grid;
-            if (old.outer.get() && !layoutChanged) {
+            if (old.outer && !layoutChanged) {
                 Apply(old, child, probe);
                 next.push_back(std::move(old));
                 continue;
@@ -756,7 +762,7 @@ void XamlRenderer::Rewrite(Mounted& mounted) {
     children.Clear();
     int column = 0;
     for (const Mounted& child : mounted.children) {
-        xaml::FrameworkElement element = child.outer.get();
+        xaml::FrameworkElement element = child.outer;
         if (!element) continue;
         children.Append(element);
         if (mounted.grid) {

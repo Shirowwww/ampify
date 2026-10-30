@@ -31,6 +31,11 @@ set(AMK_WARNINGS $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
 # The sources are UTF-8 without BOM. MSVC reads them in the system code page unless told otherwise, which turns the
 # French wide-string literals of the XAML interface (L"Réglages") into mojibake. GCC already assumes UTF-8.
 add_compile_options($<$<C_COMPILER_ID:MSVC>:/utf-8> $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+# Visual Studio builds the files of one project one after the other unless told otherwise: /MP compiles them on every
+# core (the five XAML files of the kernel took most of the 14 minutes of the MSVC build in CI).
+if(MSVC AND CMAKE_GENERATOR MATCHES "Visual Studio")
+    add_compile_options(/MP)
+endif()
 
 # Source lists. No source file is named in this file: each package lists its files in cmake/sources/<package>.cmake,
 # and every *.cmake file of that folder is included here, in alphabetical order, before any target is defined.
@@ -140,6 +145,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         target_link_libraries(amk_kernel PRIVATE amk_theme runtimeobject)
         # The WinUI projection gives objects with more sections than the default COFF limit.
         target_compile_options(amk_kernel PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
+        if(MSVC AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+            # The projection headers are parsed once, for the XAML files only; the other kernel files skip the PCH.
+            # Not with a compiler cache (CI: ccache), which cannot cache a file built on a precompiled header.
+            target_precompile_headers(amk_kernel PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/win/xaml_pch.hpp>")
+            set_source_files_properties(${AMK_KERNEL_SOURCES} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+        endif()
     endif()
 
     # Starts Apple Music, holds its first process while the kernel loads, then follows the package.

@@ -106,7 +106,7 @@ winrt::Microsoft::UI::Xaml::FrameworkElement MakeIconElement(const std::string& 
 // A one-pixel line with the theme's divider brush, between the rows of a card.
 winrt::Microsoft::UI::Xaml::FrameworkElement MakeDivider();
 
-// One surface (panel, page or popup) of one element.
+// One surface (panel, page or popup) of one element. It holds its controls: destroy it on the interface thread.
 class XamlRenderer {
 public:
     XamlRenderer(std::string elementId, UiEventSink sink);

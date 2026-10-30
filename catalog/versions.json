@@ -13,6 +13,18 @@
         "AVCFPlayerSetVolume"
       ],
       "notes": "Version relevée dans knowledge/. C'est aussi la version intégrée au noyau."
+    },
+    {
+      "version": "1.1792.39682.0",
+      "tested": "2026-10-30",
+      "exports": [
+        "AVCFPlayerCopyCurrentItem",
+        "AVCFPlayerItemCopyCurrentStableVariantID",
+        "AVCFPlayerItemCopyTracks",
+        "AVCFPlayerItemTrackCopyAssetTrack",
+        "AVCFPlayerSetVolume"
+      ],
+      "notes": "Banc Windows (GitHub Actions, winget) : noyau chargé dans AppleMusic.exe et AMPLibraryAgent.exe, signature reconnue, aucun plantage."
     }
   ]
 }

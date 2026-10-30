@@ -845,6 +845,9 @@ TEST_CASE(Session_ReturnsAnInspectorDumpOnlyWhenAsked) {
     std::optional<std::string> dump = session.Tick(tree, request);
     CHECK(dump.has_value());
     if (dump) CHECK(dump->find("Arbre (5 éléments)") != std::string::npos);
+
+    FakeTree empty;
+    CHECK(!session.Tick(empty, request).has_value());  // no content yet: asked again on the next tick
 }
 
 TEST_CASE(Session_RefusesAThemeThatIsNotUsable) {
@@ -1417,6 +1420,8 @@ TEST_CASE(Scheme_ScheduleParsesAndPicksByTime) {
 
 TEST_CASE(Scheme_SystemModePicksByName) {
     CHECK(th::SystemScheme({"Base", "Dark"}, true) == "Dark");
+    CHECK(th::IsDarkScheme("Dark") && th::IsDarkScheme("Nuit") && th::IsDarkScheme("Minuit sombre"));
+    CHECK(!th::IsDarkScheme("Base") && !th::IsDarkScheme("Light") && !th::IsDarkScheme(""));
     CHECK(th::SystemScheme({"Base", "Dark"}, false) == "Base");
     CHECK(th::SystemScheme({"Sombre", "Clair"}, false) == "Clair");
     CHECK(th::SystemScheme({"Sombre", "Clair"}, true) == "Sombre");

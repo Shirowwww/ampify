@@ -39,6 +39,10 @@ std::string ScheduledScheme(const Schedule& schedule, int minute);
 // mode is asked and no scheme is dark (then the first scheme, the default, stays).
 std::string SystemScheme(const std::vector<std::string>& schemes, bool dark);
 
+// True when the name is a dark scheme by the rule above (Dark, Sombre, Night, Nuit). The app is then switched to its
+// own dark mode under the theme, so the brushes the theme does not name match the ones it does.
+bool IsDarkScheme(const std::string& scheme);
+
 // What the Windows side reports, read on each pass of the worker.
 struct SchemeInputs {
     bool systemDark = false;  // Windows apps in dark mode (AppsUseLightTheme = 0)

@@ -11,6 +11,10 @@
 #include <limits>
 #include <optional>
 #include <string_view>
+#include <utility>
+#include <algorithm>
+#include <functional>
+#include <set>
 
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
@@ -120,13 +124,56 @@ std::optional<std::uint32_t> ItemPosition(const xaml::DependencyObject& object, 
     return *target;
 }
 
+// True when the key is in the dictionary itself, not only in its merged or theme dictionaries (HasKey looks there too).
+bool OwnsKey(const xaml::ResourceDictionary& resources, const IInspectable& name) {
+    for (const auto& pair : resources) {
+        if (pair.Key() == name) return true;
+        auto a = pair.Key().try_as<winrt::Windows::Foundation::IReference<winrt::hstring>>();
+        auto b = name.try_as<winrt::Windows::Foundation::IReference<winrt::hstring>>();
+        if (a && b && a.Value() == b.Value()) return true;
+    }
+    return false;
+}
+
 }  // namespace
 
 bool XamlTreeBackend::Attach() {
+    if (*m_closed) return false;
     xaml::Window window = AppWindow(L"MainWindow");
     if (!window) return false;
     m_window = winrt::make_weak(window);
+    // Walking or writing the tree while Apple Music closes crashed it in Microsoft.UI.Xaml.dll (bench, 30/10).
+    std::shared_ptr<bool> closed = m_closed;
+    window.Closed([closed](IInspectable const&, xaml::WindowEventArgs const&) noexcept { *closed = true; });
     return true;
+}
+
+void XamlTreeBackend::SetAppMode(std::optional<bool> dark) {
+    if (*m_closed) return;
+    bool refresh = std::exchange(m_resourcesDirty, false);
+    xaml::FrameworkElement root = m_modeRoot.get();
+    if (!root) {
+        if (xaml::Window window = m_window.get()) root = window.Content().try_as<xaml::FrameworkElement>();
+        if (!root) return;
+        if (dark) {
+            m_modeRoot = winrt::make_weak(root);
+            m_modeOriginal = root.RequestedTheme();
+        }
+    }
+    xaml::ElementTheme wanted = root.RequestedTheme();
+    if (!dark) {
+        if (m_modeOriginal) wanted = *m_modeOriginal;
+        m_modeRoot = nullptr;
+        m_modeOriginal.reset();
+    } else {
+        wanted = *dark ? xaml::ElementTheme::Dark : xaml::ElementTheme::Light;
+    }
+    if (refresh) {
+        // {ThemeResource} is resolved again on a change of mode only: the other mode for a moment, then the wanted one.
+        bool shownDark = root.ActualTheme() == xaml::ElementTheme::Dark;
+        root.RequestedTheme(shownDark ? xaml::ElementTheme::Light : xaml::ElementTheme::Dark);
+    }
+    if (refresh || root.RequestedTheme() != wanted) root.RequestedTheme(wanted);
 }
 
 xaml::DependencyObject XamlTreeBackend::Resolve(theme::NodeId id) const {
@@ -151,6 +198,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     std::vector<theme::NodeInfo> nodes;
     m_elements.clear();
 
+    if (*m_closed) return nodes;
     xaml::Window window = m_window.get();  // the main window, from AMP.Utils (Attach)
     if (!window) window = AppWindow(L"MainWindow");
     if (!window) return nodes;
@@ -376,12 +424,24 @@ bool XamlTreeBackend::Write(theme::NodeId id, std::string_view property, const t
     return false;
 }
 
+// Every key of the application's resources: the dictionary itself, its merged dictionaries and the theme dictionaries
+// (Default, Light, Dark), where Apple Music and WinUI keep their colours (the dictionary itself is empty in 1.1792).
 std::vector<std::string> XamlTreeBackend::ResourceKeys() {
     std::vector<std::string> keys;
-    xaml::ResourceDictionary resources = xaml::Application::Current().Resources();
-    for (const auto& pair : resources) {
-        keys.push_back(Utf8(winrt::unbox_value_or<winrt::hstring>(pair.Key(), L"")));
-    }
+    std::set<std::string> seen;
+    std::function<void(const xaml::ResourceDictionary&, int)> walk = [&](const xaml::ResourceDictionary& dictionary, int depth) {
+        if (!dictionary || depth > 4) return;
+        for (const auto& pair : dictionary) {
+            std::string key = Utf8(winrt::unbox_value_or<winrt::hstring>(pair.Key(), L""));
+            if (!key.empty() && seen.insert(key).second) keys.push_back(key);
+        }
+        for (const auto& pair : dictionary.ThemeDictionaries()) {
+            walk(pair.Value().try_as<xaml::ResourceDictionary>(), depth + 1);
+        }
+        for (const auto& merged : dictionary.MergedDictionaries()) walk(merged, depth + 1);
+    };
+    walk(xaml::Application::Current().Resources(), 0);
+    std::sort(keys.begin(), keys.end());
     return keys;
 }
 
@@ -392,10 +452,29 @@ std::optional<theme::Value> XamlTreeBackend::ReadResource(std::string_view key) 
 
     IInspectable value = resources.Lookup(winrt::box_value(name));
     if (auto solid = value.try_as<media::SolidColorBrush>()) return theme::Value{theme::ValueKind::Color, ColorText(solid.Color())};
+    // A Color resource reads as a colour too: an opaque handle would differ on every tick and be written again.
+    if (auto color = value.try_as<winrt::Windows::Foundation::IReference<ColorValue>>()) {
+        return theme::Value{theme::ValueKind::Color, ColorText(color.Value())};
+    }
     return Keep(value);
 }
 
 bool XamlTreeBackend::WriteResource(std::string_view key, const theme::Value& value) {
+    std::string keyText(key);
+    xaml::ResourceDictionary resources = xaml::Application::Current().Resources();
+    IInspectable name = winrt::box_value(winrt::to_hstring(keyText));
+    // The value Apple Music had comes back: a key the kit added on top of the theme dictionaries is removed, so the
+    // app's light and dark values work again, instead of the one read under the theme staying for good.
+    if (auto added = m_addedKeys.find(keyText); added != m_addedKeys.end() && added->second == value) {
+        m_addedKeys.erase(added);
+        if (OwnsKey(resources, name)) resources.Remove(name);
+        m_resourcesDirty = true;
+        return true;
+    }
+    if (!OwnsKey(resources, name) && !m_addedKeys.count(keyText)) {
+        if (std::optional<theme::Value> before = ReadResource(key)) m_addedKeys.emplace(keyText, *before);
+    }
+
     std::optional<IInspectable> object;
     if (value.kind == theme::ValueKind::Color) {
         std::optional<ColorValue> color = ColorFromText(value.text);
@@ -406,8 +485,16 @@ bool XamlTreeBackend::WriteResource(std::string_view key, const theme::Value& va
     }
     if (!object) return false;
 
-    xaml::ResourceDictionary resources = xaml::Application::Current().Resources();
-    resources.Insert(winrt::box_value(winrt::to_hstring(std::string(key))), *object);
+    // Fluent names a Color without the Brush suffix (SolidBackgroundFillColorBase) and the brush with it: a brush in
+    // place of a Color breaks every brush built on it, so the value keeps the kind already there.
+    if (value.kind == theme::ValueKind::Color && resources.HasKey(name)) {
+        if (std::optional<ColorValue> color = ColorFromText(value.text);
+            color && resources.Lookup(name).try_as<winrt::Windows::Foundation::IReference<ColorValue>>()) {
+            object = winrt::box_value(*color);
+        }
+    }
+    resources.Insert(name, *object);
+    m_resourcesDirty = true;
     return true;
 }
 
@@ -420,6 +507,7 @@ bool XamlTreeBackend::SetDictionary(std::string_view xaml) {
         if (merged.IndexOf(m_merged, index)) merged.RemoveAt(index);
         m_merged = nullptr;
     }
+    m_resourcesDirty = true;
     if (xaml.empty()) return true;
 
     xaml::ResourceDictionary dictionary = xaml::Markup::XamlReader::Load(winrt::to_hstring(std::string(xaml))).try_as<xaml::ResourceDictionary>();
@@ -467,9 +555,14 @@ bool XamlTreeBackend::EnsureSettingsSection(const std::vector<std::string>& them
         choice.Items().Append(item);
         if (name == activeName) choice.SelectedItem(item);
     }
-    choice.SelectionChanged([onChoice](const IInspectable& sender, const controls::SelectionChangedEventArgs&) {
-        auto selected = sender.as<controls::ComboBox>().SelectedItem().try_as<controls::ComboBoxItem>();
-        if (selected) onChoice(Utf8(winrt::unbox_value_or<winrt::hstring>(selected.Tag(), L"")));
+    // Runs inside Apple Music's XAML: an exception that escaped would come back to XAML as a failure, which raises
+    // Application.UnhandledException and ends the app.
+    choice.SelectionChanged([onChoice](const IInspectable& sender, const controls::SelectionChangedEventArgs&) noexcept {
+        try {
+            auto selected = sender.as<controls::ComboBox>().SelectedItem().try_as<controls::ComboBoxItem>();
+            if (selected) onChoice(Utf8(winrt::unbox_value_or<winrt::hstring>(selected.Tag(), L"")));
+        } catch (...) {
+        }
     });
     section.Children().Append(choice);
 

@@ -167,4 +167,8 @@ SchemeChoice ChooseScheme(const std::string& scheme, const std::string& schedule
     return choice;
 }
 
+bool IsDarkScheme(const std::string& scheme) {
+    return IsDark(scheme);
+}
+
 }  // namespace amk::theme

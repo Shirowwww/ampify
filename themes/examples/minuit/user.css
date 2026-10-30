@@ -1,7 +1,7 @@
-/* Minuit : fond sombre, accent bleu. Les couleurs viennent du schéma Dark de colors.ini. */
+/* Minuit : bleu nuit, accent bleu clair. Les couleurs viennent du schéma Dark de colors.ini. */
 
 Page {
-    background: $SolidBackgroundFillColorBase;
+    background: $SolidBackgroundFillColorBaseBrush;
 }
 
 TextBlock {

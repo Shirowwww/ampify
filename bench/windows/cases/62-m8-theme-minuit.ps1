@@ -41,6 +41,9 @@ Register-Case -Id 'm8-theme-minuit' -Title 'M8 : le thème minuit s''applique, p
         Close-AppleMusic | Out-Null
         return
     }
+    # Runner neuf : la licence MPEG LA s'ouvre avant la fenêtre principale, que le noyau attend.
+    $firstRun = Close-AppleMusicFirstRun
+    Add-Info -Ctx $Ctx -Name 'premier lancement d''Apple Music' -Detail "$firstRun écran(s) fermé(s) (licence, accueil)"
 
     $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text "Thèmes : fil d'interface prêt (DispatcherQueue de la fenêtre principale)" -TimeoutSeconds 90
     Add-Check -Ctx $Ctx -Name 'fil d''interface prêt (DispatcherQueue)' -Passed $hooked

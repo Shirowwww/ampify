@@ -62,7 +62,9 @@ std::optional<std::string> ThemeSession::Tick(TreeBackend& tree, const SessionRe
 
     if (m_composed) m_engine.Apply(*m_composed, tree);
 
-    if (request.inspect) return InspectTree(tree);
+    // An empty tree is the window before its content (first-run licence, start-up): no dump yet, the request stays and
+    // the next tick tries again (bench, 30/10: « Arbre (0 éléments) » written two seconds after start).
+    if (request.inspect && !tree.Snapshot().empty()) return InspectTree(tree);
     return std::nullopt;
 }
 

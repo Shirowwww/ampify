@@ -46,9 +46,10 @@ struct DispatchState {
     std::atomic<std::uint64_t> ran{0};
 };
 
+// Never destroyed: a static destructor would release the DispatcherQueue while Apple Music exits.
 DispatchState& State() {
-    static DispatchState state;
-    return state;
+    static DispatchState* state = new DispatchState;
+    return *state;
 }
 
 void Log(const std::string& line) {

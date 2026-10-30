@@ -172,6 +172,139 @@ function Close-AppleMusic {
     return $gone
 }
 
+# Premier lancement d'Apple Music sur un runner neuf : la licence des codecs (MPEG LA, boutons Agree / Decline /
+# Save As) s'ouvre avant la fenêtre principale, puis, après une connexion, l'écran « Welcome to Apple Music » (Start
+# Listening). Tant qu'ils sont ouverts, le noyau n'a pas de fenêtre XAML, et l'inspecteur comme UI Automation voient
+# la licence au lieu de l'app. Les accepte comme un nouvel utilisateur, par UI Automation seule (mêmes règles que
+# Close-FirstRunDialogs de live\live-common.ps1, qui demande uia.ps1). Rend la main quand l'app montre sa navigation
+# deux fois de suite sans aucun de ces écrans, ou au bout de $TimeoutSeconds. Renvoie le nombre d'écrans fermés,
+# -1 si UI Automation est indisponible.
+function Close-AppleMusicFirstRun {
+    param([int]$TimeoutSeconds = 90)
+    try {
+        Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes -ErrorAction Stop
+    } catch {
+        Write-Host "  premier lancement : UI Automation indisponible ($($_.Exception.Message))"
+        return -1
+    }
+    $AE = [System.Windows.Automation.AutomationElement]
+    $buttonCondition = New-Object System.Windows.Automation.PropertyCondition ($AE::ControlTypeProperty), ([System.Windows.Automation.ControlType]::Button)
+    $agreePattern = '^(Agree|I Agree|Accept|Accepter|J.accepte)$'
+    $declinePattern = '^(Decline|Refuser|Save As|Save As\.\.\.|Enregistrer sous.*)$'
+    $welcomePattern = '^(Start Listening|Commencer l.écoute)$'
+    $laterPattern = '^(Continue|Continuer|Get Started|Commencer|Not Now|Plus tard|Pas maintenant)$'
+    $readyPattern = '^(Search|Rechercher|Home|Accueil|Listen Now|Écouter|Browse|Explorer|Parcourir|Radio|Library|Bibliothèque)$'
+
+    # The visible button of $Buttons whose name matches $Pattern, or $null.
+    $findButton = {
+        param($Buttons, [string]$Pattern)
+        foreach ($button in $Buttons) {
+            try {
+                if (-not $button.Current.IsOffscreen -and ([string]$button.Current.Name -match $Pattern)) { return $button }
+            } catch {
+            }
+        }
+        return $null
+    }
+    $invoke = {
+        param($Element)
+        $pattern = $null
+        try {
+            if ($Element.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+                $pattern.Invoke()
+                return $true
+            }
+        } catch {
+        }
+        return $false
+    }
+
+    $closed = 0
+    $calm = 0
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $ids = @(Get-Process -Name 'AppleMusic' -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
+        $windows = @()
+        if ($ids.Count -gt 0) {
+            try {
+                foreach ($child in $AE::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)) {
+                    try {
+                        if ($ids -contains $child.Current.ProcessId) { $windows += $child }
+                    } catch {
+                    }
+                }
+            } catch {
+            }
+        }
+        $buttons = @()
+        foreach ($window in $windows) {
+            try {
+                $buttons += @($window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $buttonCondition))
+            } catch {
+            }
+        }
+
+        $agree = & $findButton $buttons $agreePattern
+        $decline = & $findButton $buttons $declinePattern
+        $welcome = & $findButton $buttons $welcomePattern
+        $dialog = $null
+        $what = ''
+        if ($agree -and $decline) {
+            $dialog = $agree
+            $what = 'licence MPEG LA acceptée (Agree)'
+        } elseif ($welcome) {
+            $dialog = $welcome
+            $what = "écran d'accueil passé ($([string]$welcome.Current.Name))"
+        }
+
+        $ready = $false
+        if (-not $dialog -and $windows.Count -gt 0) {
+            foreach ($window in $windows) {
+                try {
+                    foreach ($element in $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {
+                        try {
+                            if ([string]$element.Current.Name -match $readyPattern) {
+                                $ready = $true
+                                break
+                            }
+                        } catch {
+                        }
+                    }
+                } catch {
+                }
+                if ($ready) { break }
+            }
+            # A generic « Continue » or « Not Now » only counts on a screen without the app's navigation.
+            if (-not $ready) {
+                $later = & $findButton $buttons $laterPattern
+                if ($later) {
+                    $dialog = $later
+                    $what = "écran d'accueil passé ($([string]$later.Current.Name))"
+                }
+            }
+        }
+
+        if ($dialog) {
+            $calm = 0
+            if (& $invoke $dialog) {
+                Write-Host "  premier lancement : $what"
+                $closed++
+            }
+            Start-Sleep -Seconds 3
+            continue
+        }
+        if ($ready) {
+            $calm++
+            if ($calm -ge 2) { return $closed }
+        } else {
+            $calm = 0
+        }
+        Start-Sleep -Seconds 2
+    }
+    Write-Host "  premier lancement : navigation d'Apple Music non vue après $TimeoutSeconds s ($closed écran(s) fermé(s))"
+    return $closed
+}
+
 # Arrête tout ce que le banc peut laisser ouvert. Appelé avant et après chaque test.
 function Stop-BenchProcesses {
     Get-Process -Name 'amk_launcher', 'AppleMusic', 'AMPLibraryAgent' -ErrorAction SilentlyContinue |

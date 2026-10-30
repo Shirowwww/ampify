@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "kind": "theme",
   "author": "Shirowwww",
-  "description": "Fond sombre et accent bleu, avec le schéma Dark de colors.ini.",
+  "description": "Bleu nuit et accent bleu clair, avec le schéma Dark de colors.ini.",
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Dark"

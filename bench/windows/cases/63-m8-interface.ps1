@@ -185,6 +185,9 @@ Register-Case -Id 'm8-interface' -Title 'M8 : rendu natif d''un panneau React, c
         $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music démarré' -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music démarré par le lanceur' -Passed $launched
         if (-not $launched) { return }
+        # Runner neuf : la licence MPEG LA s'ouvre avant la fenêtre principale, que le noyau attend.
+        $firstRun = Close-AppleMusicFirstRun
+        Add-Info -Ctx $Ctx -Name 'premier lancement d''Apple Music' -Detail "$firstRun écran(s) fermé(s) (licence, accueil)"
 
         # 1. La fenêtre et la DispatcherQueue.
         $window = Wait-Journal -FileName 'AppleMusic.log' -Text 'Interface : fenêtre principale obtenue par AMP.Utils' -TimeoutSeconds 90
@@ -289,6 +292,14 @@ Register-Case -Id 'm8-interface' -Title 'M8 : rendu natif d''un panneau React, c
             $toggle = Find-M8ById -Root $root -Id 'AMK_ModsToggle_react-panel'
             Add-Check -Ctx $Ctx -Name 'UI Automation : bouton « Ouvrir le dossier du kit » et interrupteur react-panel' `
                 -Passed (($null -ne $button) -and ($null -ne $toggle))
+            # The card comes last in the page, below the fold of the runner's screen: brought into view for the capture.
+            if ($button) {
+                try {
+                    $button.GetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView()
+                } catch {
+                }
+                Start-Sleep -Milliseconds 800
+            }
         } else {
             # Opening the settings by automation is a bonus: without it, the card is checked on the PC.
             Add-Info -Ctx $Ctx -Name 'carte Mods' -Detail "non vue (page Lecture repérée : $pageSeen) : à vérifier sur le PC"

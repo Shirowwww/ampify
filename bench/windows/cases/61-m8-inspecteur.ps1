@@ -14,6 +14,7 @@ Register-Case -Id 'm8-inspecteur' -Title 'M8 : l''inspecteur écrit l''arbre de 
 
     # Réglages : on garde les autres clés, on fixe celles du test. Le thème est éteint pour ne rien appliquer.
     Reset-KitState
+    New-Item -ItemType Directory -Force -Path $script:KitDir | Out-Null  # Reset-KitState may leave no folder at all
     $settings = Join-Path $script:KitDir 'settings.txt'
     $lines = @()
     if (Test-Path -LiteralPath $settings) {
@@ -32,6 +33,9 @@ Register-Case -Id 'm8-inspecteur' -Title 'M8 : l''inspecteur écrit l''arbre de 
         Close-AppleMusic | Out-Null
         return
     }
+    # Runner neuf : la licence MPEG LA s'ouvre avant la fenêtre principale, que le noyau attend.
+    $firstRun = Close-AppleMusicFirstRun
+    Add-Info -Ctx $Ctx -Name 'premier lancement d''Apple Music' -Detail "$firstRun écran(s) fermé(s) (licence, accueil)"
 
     $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text "Thèmes : fil d'interface prêt (DispatcherQueue de la fenêtre principale)" -TimeoutSeconds 90
     Add-Check -Ctx $Ctx -Name 'fil d''interface prêt (DispatcherQueue)' -Passed $hooked

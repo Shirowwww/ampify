@@ -16,8 +16,10 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <iterator>
 #include <map>
 #include <mutex>
+#include <new>
 #include <optional>
 #include <set>
 #include <string>
@@ -166,6 +168,9 @@ struct MountedSurface {
     Surface surface;
     std::unique_ptr<XamlRenderer> renderer;
     winrt::weak_ref<xaml::FrameworkElement> frame;  // the panel frame, or the page host's content
+    // Strong for a panel: in the bench the weak frame was gone every 5 s and the panel mounted again, never on screen.
+    // Released on the interface thread with the context (ReleaseXaml, DropContext).
+    xaml::FrameworkElement panelFrame{nullptr};
     winrt::weak_ref<controls::Border> slot;         // holds the renderer's root
     winrt::weak_ref<controls::TextBlock> title;
     winrt::weak_ref<controls::ContentDialog> dialog;
@@ -203,9 +208,14 @@ struct WindowContext {
     std::uint64_t settingsSeenMs = 0;
 
     // Main window only.
-    winrt::weak_ref<controls::Grid> panelHost;
-    winrt::weak_ref<controls::StackPanel> panelStack;
-    winrt::weak_ref<primitives::Popup> panelPopup;
+    // Strong, like the Popup: the panels stay ours even when Apple Music rebuilds the children of its page (in the
+    // bench, a host added to MainPage's Grid went away within seconds and the panel was mounted again and again).
+    controls::Grid panelHost{nullptr};
+    controls::StackPanel panelStack{nullptr};
+    int panelHostsMade = 0;
+    // Strong: nothing else holds a Popup that is outside the tree, and its panels went with it (mounted again on every
+    // refresh, never on screen). Released on the interface thread (ReleaseXaml, DropContext).
+    primitives::Popup panelPopup{nullptr};
     winrt::weak_ref<controls::Grid> pageHost;
     winrt::weak_ref<controls::Border> pageSlot;
     winrt::weak_ref<controls::TextBlock> pageTitle;
@@ -236,6 +246,8 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     std::optional<std::pair<std::string, std::string>> pendingRoute;
 
     // Interface thread only.
+    int detachedReports = 0;  // journal lines about panels taken out of their host, at most 5
+    int goneReports = 0;      // journal lines about surfaces gone from the model, at most 5
     StyleProbe probe;  // copied from the settings page once it was seen; WinUI defaults before
 
     std::mutex onceMutex;
@@ -318,6 +330,47 @@ void ClearWatches(WindowContext& context) {
     }
     context.watches.clear();
     context.watched.clear();
+}
+
+// Drops what the window holds of XAML: the watches, the panel popup, the renderers and their controls, the placed
+// buttons. Interface thread only: XAML objects must not be released from the worker, which drops the contexts of
+// closed or replaced windows (DiscoverWindows).
+void ReleaseXaml(WindowContext& context) noexcept {
+    try {
+        ClearWatches(context);
+        if (context.panelPopup) context.panelPopup.IsOpen(false);
+    } catch (...) {
+    }
+    try {
+        context.panelPopup = nullptr;
+        context.panelHost = nullptr;
+        context.panelStack = nullptr;
+        context.surfaces.clear();
+        context.placed.clear();
+        context.probe.clear();
+        context.probeObjects.clear();
+        context.dialogOpen = false;
+    } catch (...) {
+    }
+}
+
+// A context that leaves the service (window closed or replaced): its last reference goes on the window's interface
+// thread, after ReleaseXaml. When the queue refuses the work (shutting down), the context is kept for good instead:
+// releasing its XAML objects from the worker could crash Apple Music while it closes.
+void DropContext(std::shared_ptr<WindowContext> context) noexcept {
+    auto* holder = new (std::nothrow) std::shared_ptr<WindowContext>(std::move(context));
+    if (!holder) return;
+    try {
+        dispatching::DispatcherQueue dispatcher = (*holder)->dispatcher;
+        if (dispatcher && dispatcher.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [holder]() noexcept {
+                ReleaseXaml(**holder);
+                delete holder;
+            })) {
+            return;
+        }
+    } catch (...) {
+    }
+    // Not queued: `holder` is never freed.
 }
 
 // ---- Discovery ---------------------------------------------------------------------------------------------------
@@ -705,20 +758,63 @@ controls::Border MakeSurfaceFrame(const std::string& frameName, const std::strin
     return frame;
 }
 
-// The overlay of the panels, on the right of the main window's content: a Grid added to the root panel (spanning
-// its rows and columns), or a Popup when the root is not a panel. Provisional placement: margins keep the title bar
-// and the play bar visible, until the real tree is dumped.
+// The panel that holds the main window's content: the content itself, or the first panel inside it when it is a
+// page or another single-child control (Apple Music 1.1792: AMP.UI.Views.MainPage). Null when none is found.
+controls::Panel HostPanelOf(const xaml::DependencyObject& content) {
+    xaml::DependencyObject current = content;
+    for (int depth = 0; current && depth < 4; depth++) {
+        if (auto panel = current.try_as<controls::Panel>()) return panel;
+        if (auto user = current.try_as<controls::UserControl>()) {
+            current = user.Content().try_as<xaml::DependencyObject>();
+        } else if (auto control = current.try_as<controls::ContentControl>()) {
+            current = control.Content().try_as<xaml::DependencyObject>();
+        } else if (auto border = current.try_as<controls::Border>()) {
+            current = border.Child().try_as<xaml::DependencyObject>();
+        } else {
+            return nullptr;
+        }
+    }
+    return nullptr;
+}
+
+// Places the Popup of the panels on the right of the window, below the title bar and above the play bar. Called on
+// every refresh, so the panels follow the size of the window.
+void PlacePanelPopup(const primitives::Popup& popup, const controls::Grid& host, const xaml::XamlRoot& root) {
+    auto size = root.Size();
+    double height = std::max(200.0, static_cast<double>(size.Height) - 160.0);
+    double left = std::max(0.0, static_cast<double>(size.Width) - kPanelWidth - 16.0);
+    if (host.Height() != height) host.Height(height);
+    if (popup.HorizontalOffset() != left) popup.HorizontalOffset(left);
+    if (popup.VerticalOffset() != 56) popup.VerticalOffset(56);
+    if (!popup.IsOpen()) popup.IsOpen(true);
+}
+
+// The overlay of the panels, on the right of the main window: a Popup on the window's XamlRoot, which Apple Music's
+// own pages never touch (AMExclusive inserts into the settings page only). Without a XamlRoot yet, a Grid added to
+// the content's panel, spanning its rows and columns. Margins keep the title bar and the play bar visible.
 controls::StackPanel EnsurePanelHost(UiService::Shared& shared, WindowContext& context, const xaml::DependencyObject& content) {
-    if (auto stack = context.panelStack.get()) {
-        if (auto host = context.panelHost.get()) host.Visibility(xaml::Visibility::Visible);
-        return stack;
+    auto rootElement = content.try_as<xaml::UIElement>();
+    xaml::XamlRoot xamlRoot{nullptr};
+    if (rootElement) xamlRoot = rootElement.XamlRoot();
+    if (context.panelStack && context.panelHost) {
+        if (context.panelPopup) {
+            if (xamlRoot) PlacePanelPopup(context.panelPopup, context.panelHost, xamlRoot);
+            return context.panelStack;
+        }
+        if (context.panelHost.Parent()) return context.panelStack;
+        // Taken out of the page by Apple Music: made again below, in a Popup when possible.
+        shared.journal.Write("Interface : hôte des panneaux retiré de la page par Apple Music, recréé");
+        context.panelHost = nullptr;
+        context.panelStack = nullptr;
+    }
+    if (context.panelHostsMade++ > 0 && context.panelHostsMade <= 4) {
+        shared.journal.Write("Interface : hôte des panneaux recréé (n° " + std::to_string(context.panelHostsMade) + ")");
     }
     controls::Grid host;
     Name(host, "AMK_PanelHost", "Panneaux des extensions");
     host.Width(kPanelWidth);
     host.HorizontalAlignment(xaml::HorizontalAlignment::Right);
     host.VerticalAlignment(xaml::VerticalAlignment::Stretch);
-    host.Margin(xaml::Thickness{0, 56, 16, 104});
     controls::ScrollViewer scroll;
     scroll.VerticalScrollBarVisibility(controls::ScrollBarVisibility::Auto);
     Name(scroll, "AMK_PanelScroll");
@@ -727,33 +823,30 @@ controls::StackPanel EnsurePanelHost(UiService::Shared& shared, WindowContext& c
     scroll.Content(stack);
     host.Children().Append(scroll);
 
-    if (auto panel = content.try_as<controls::Panel>()) {
-        if (auto grid = content.try_as<controls::Grid>()) {
+    if (xamlRoot) {
+        primitives::Popup popup;
+        popup.XamlRoot(xamlRoot);
+        popup.Child(host);
+        context.panelPopup = popup;
+        PlacePanelPopup(popup, host, xamlRoot);
+        shared.Once("panel-host", "Interface : hôte des panneaux ouvert dans un Popup de la fenêtre, à droite (" +
+                                      Utf8(winrt::get_class_name(content)) + ")");
+    } else if (auto panel = HostPanelOf(content)) {
+        host.Margin(xaml::Thickness{0, 56, 16, 104});
+        if (auto grid = panel.try_as<controls::Grid>()) {
             controls::Grid::SetRowSpan(host, std::max<int>(1, static_cast<int>(grid.RowDefinitions().Size())));
             controls::Grid::SetColumnSpan(host, std::max<int>(1, static_cast<int>(grid.ColumnDefinitions().Size())));
         }
         controls::Canvas::SetZIndex(host, 1000);
         panel.Children().Append(host);
         shared.Once("panel-host", "Interface : hôte des panneaux ajouté à droite du contenu de la fenêtre (" +
-                                      Utf8(winrt::get_class_name(content)) + ", placement provisoire)");
+                                      Utf8(winrt::get_class_name(content)) + ", dans " +
+                                      Utf8(winrt::get_class_name(panel)) + ")");
     } else {
-        auto rootElement = content.try_as<xaml::UIElement>();
-        if (!rootElement || !rootElement.XamlRoot()) return nullptr;
-        primitives::Popup popup;
-        popup.XamlRoot(rootElement.XamlRoot());
-        auto size = rootElement.XamlRoot().Size();
-        host.Margin(xaml::Thickness{0, 0, 0, 0});
-        host.Height(std::max(200.0, static_cast<double>(size.Height) - 160.0));
-        popup.HorizontalOffset(std::max(0.0, static_cast<double>(size.Width) - kPanelWidth - 16.0));
-        popup.VerticalOffset(56);
-        popup.Child(host);
-        popup.IsOpen(true);
-        context.panelPopup = winrt::make_weak(popup);
-        shared.Once("panel-host", "Interface : hôte des panneaux ouvert dans un Popup (le contenu de la fenêtre, " +
-                                      Utf8(winrt::get_class_name(content)) + ", n'est pas un panneau ; provisoire)");
+        return nullptr;
     }
-    context.panelHost = winrt::make_weak(host);
-    context.panelStack = winrt::make_weak(stack);
+    context.panelHost = host;
+    context.panelStack = stack;
     return stack;
 }
 
@@ -797,10 +890,18 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
                 const xaml::DependencyObject& content, const Surface& surface) {
     if (context->closedPanels.count(surface.key)) return;
     MountedSurface& mounted = context->surfaces[surface.key];
-    bool alive = mounted.frame.get() != nullptr;
-    if (alive && mounted.surface.revision == surface.revision) return;
+    bool alive = mounted.panelFrame != nullptr;
+    bool detached = alive && !mounted.panelFrame.Parent();
+    if (alive && !detached && mounted.surface.revision == surface.revision) return;
     controls::StackPanel stack = EnsurePanelHost(shared, *context, content);
     if (!stack) return;
+    if (detached) {
+        // Something took the frame out of the host: put back, and said, so the journal shows who does it and when.
+        stack.Children().Append(mounted.panelFrame);
+        if (shared.detachedReports++ < 5) {
+            shared.journal.Write("Interface : panneau « " + SurfaceLabel(surface) + " » sorti de son hôte, remis en place");
+        }
+    }
     bool first = !alive;
     if (first) {
         controls::TextBlock title{nullptr};
@@ -819,7 +920,7 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
                 live->closedPanels.insert(key);
                 auto found = live->surfaces.find(key);
                 if (found != live->surfaces.end()) {
-                    RemoveFromParent(found->second.frame.get());
+                    RemoveFromParent(found->second.panelFrame);
                     live->surfaces.erase(found);
                 }
                 journal->Write("Interface : panneau « " + label + " » fermé (il revient au prochain démarrage de "
@@ -831,6 +932,7 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
         stack.Children().Append(frame);
         mounted.renderer.reset();
         mounted.frame = winrt::make_weak<xaml::FrameworkElement>(frame);
+        mounted.panelFrame = frame;
         mounted.slot = winrt::make_weak(slot);
         mounted.title = winrt::make_weak(title);
     }
@@ -842,10 +944,10 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
 // Provisional, like the panels: Apple Music's own frame is not replaced.
 controls::Border EnsurePageHost(UiService::Shared& shared, WindowContext& context, const xaml::DependencyObject& content) {
     if (auto slot = context.pageSlot.get()) return slot;
-    auto panel = content.try_as<controls::Panel>();
+    controls::Panel panel = HostPanelOf(content);
     if (!panel) {
-        shared.Once("page-host-none", "Interface : pages des apps non affichées : le contenu de la fenêtre n'est pas un "
-                                      "panneau (provisoire)");
+        shared.Once("page-host-none", "Interface : pages des apps non affichées : aucun panneau dans le contenu de la "
+                                      "fenêtre (" + Utf8(winrt::get_class_name(content)) + ")");
         return nullptr;
     }
     controls::Grid host = LoadKitXaml(L"<Grid " + std::wstring(KitXmlns()) +
@@ -881,7 +983,7 @@ controls::Border EnsurePageHost(UiService::Shared& shared, WindowContext& contex
     scroll.Content(slot);
     host.Children().Append(scroll);
 
-    if (auto grid = content.try_as<controls::Grid>()) {
+    if (auto grid = panel.try_as<controls::Grid>()) {
         controls::Grid::SetRowSpan(host, std::max<int>(1, static_cast<int>(grid.RowDefinitions().Size())));
         controls::Grid::SetColumnSpan(host, std::max<int>(1, static_cast<int>(grid.ColumnDefinitions().Size())));
     }
@@ -990,7 +1092,7 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
 void Unmount(WindowContext& context, MountedSurface& mounted) {
     try {
         if (auto dialog = mounted.dialog.get()) dialog.Hide();
-        if (mounted.surface.kind == SurfaceKind::Panel) RemoveFromParent(mounted.frame.get());
+        if (mounted.surface.kind == SurfaceKind::Panel) RemoveFromParent(mounted.panelFrame);
         if (mounted.surface.kind == SurfaceKind::Page) {
             if (auto slot = mounted.slot.get(); slot && mounted.renderer && slot.Child() == mounted.renderer->Root()) {
                 slot.Child(nullptr);
@@ -1104,6 +1206,9 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
             ++it;
             continue;
         }
+        if (shared.goneReports++ < 5) {
+            shared.journal.Write("Interface : « " + it->first + " » n'est plus dans le modèle des extensions, retiré");
+        }
         Unmount(*context, it->second);
         context->closedPanels.erase(it->first);
         it = context->surfaces.erase(it);
@@ -1130,9 +1235,9 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
 
     bool anyPanel = false;
     for (const auto& [key, mounted] : context->surfaces) {
-        anyPanel = anyPanel || (mounted.surface.kind == SurfaceKind::Panel && mounted.frame.get());
+        anyPanel = anyPanel || (mounted.surface.kind == SurfaceKind::Panel && mounted.panelFrame);
     }
-    if (auto host = context->panelHost.get()) host.Visibility(anyPanel ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+    if (context->panelHost) context->panelHost.Visibility(anyPanel ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
 
     try {
         PlaceControls(shared, context, surfaces);
@@ -1148,10 +1253,13 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
     xaml::Window window = context->window.get();
     if (!window) {
         context->ticket.Close();
+        ReleaseXaml(*context);
         return;
     }
     if (AppWindow(context->property) != window) {
-        context->ticket.Close();  // the property now holds another window: this queued work is stale
+        // The property holds another window, or none for a moment (GetAppProperty failed): this work is stale. The
+        // ticket stays open, as in AMExclusive, so a passing failure does not end the window; the context and its XAML
+        // objects go once the window object is gone (DiscoverWindows, DropContext).
         return;
     }
     WeakShared weakShared = shared.weak_from_this();
@@ -1159,7 +1267,13 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
     if (!context->observed) {
         context->observed = true;
         window.Closed([weakContext](IInspectable const&, xaml::WindowEventArgs const&) noexcept {
-            if (auto live = weakContext.lock()) live->ticket.Close();
+            try {
+                if (auto live = weakContext.lock()) {
+                    live->ticket.Close();
+                    ReleaseXaml(*live);
+                }
+            } catch (...) {
+            }
         });
         shared.journal.Write("Interface : fenêtre « " + WindowLabel(*context) +
                              " » liée, premier rafraîchissement exécuté par sa DispatcherQueue (fil " +
@@ -1178,6 +1292,11 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         context->discoverDirty = true;
         context->surfaces.clear();
         context->placed.clear();
+        try {
+            if (context->panelPopup) context->panelPopup.IsOpen(false);  // the panels of the old content
+        } catch (...) {
+        }
+        context->panelPopup = nullptr;
         context->panelHost = nullptr;
         context->panelStack = nullptr;
         context->pageHost = nullptr;
@@ -1211,6 +1330,7 @@ void DiscoverWindows(UiService::Shared& shared) {
         return;
     }
     std::vector<std::shared_ptr<WindowContext>> toRefresh;
+    std::vector<std::shared_ptr<WindowContext>> dropped;
     for (const wchar_t* property : {L"MainWindow", L"MiniPlayerWindow"}) {
         xaml::Window window = AppWindow(property);
         if (!window) continue;
@@ -1224,9 +1344,14 @@ void DiscoverWindows(UiService::Shared& shared) {
         bool created = false;
         {
             std::lock_guard<std::mutex> lock(shared.mutex);
-            std::erase_if(shared.windows, [](const std::shared_ptr<WindowContext>& entry) {
-                return !entry->window.get() || entry->ticket.Closed();
-            });
+            auto stale = std::stable_partition(shared.windows.begin(), shared.windows.end(),
+                                               [](const std::shared_ptr<WindowContext>& entry) {
+                                                   // A closed window stays listed while its object lives (closed
+                                                   // ticket: no more work), so it is not taken up again as new.
+                                                   return static_cast<bool>(entry->window.get());
+                                               });
+            dropped.insert(dropped.end(), std::make_move_iterator(stale), std::make_move_iterator(shared.windows.end()));
+            shared.windows.erase(stale, shared.windows.end());
             for (const auto& entry : shared.windows) {
                 if (entry->window.get() == window) context = entry;
             }
@@ -1246,6 +1371,8 @@ void DiscoverWindows(UiService::Shared& shared) {
         context->discoverDirty = true;
         toRefresh.push_back(context);
     }
+    for (auto& context : dropped) DropContext(std::move(context));
+    dropped.clear();
     if (toRefresh.empty()) shared.Once("no-window", "Interface : AMP.Utils ne donne pas encore de fenêtre « MainWindow »");
     for (const auto& context : toRefresh) QueueRefresh(shared.weak_from_this(), context);
 }

@@ -20,6 +20,7 @@
 #include "../core/theme/inspector.hpp"
 #include "../core/theme/layout.hpp"
 #include "../core/theme/library.hpp"
+#include "../core/theme/scheme_choice.hpp"
 #include "../core/theme/session.hpp"
 #include "../core/theme/theme_settings.hpp"
 #include "../core/theme/worker.hpp"
@@ -126,8 +127,13 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 ui->attached = ui->backend.Attach();
                 if (!ui->attached) return;
             }
+            if (ui->backend.WindowClosed()) return;
 
             std::optional<std::string> dump = ui->session.Tick(ui->backend, request);
+            // The app's own light or dark mode follows the scheme, so what the theme does not name matches what it does
+            // (the minuit theme alone left light text on Apple Music's white background).
+            ui->backend.SetAppMode(request.theme ? std::optional<bool>(theme::IsDarkScheme(request.theme->scheme))
+                                                 : std::nullopt);
             if (dump) {
                 std::ofstream(JournalFile("inspector.txt")) << *dump;
                 std::ofstream(JournalFile("inspector.json")) << theme::InspectTreeJson(ui->backend);
@@ -136,8 +142,12 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 journal.Write("Inspecteur : arbre écrit dans journal\\inspector.txt et inspector.json");
             }
 
-            ui->backend.EnsureSettingsSection(names, activeId, [kit, activeId, &journal](const std::string& choice) {
-                if (choice == activeId) return;  // the combo box reports its first selection too
+            // The section is built once, so the choice is compared with settings.txt as it is now, not with the theme
+            // active when the section was built (going back to that theme would be ignored).
+            ui->backend.EnsureSettingsSection(names, activeId, [kit, &journal](const std::string& choice) {
+                Settings current;
+                current.Load((kit / "settings.txt").string());
+                if (theme::ReadThemeSettings(current).active == choice) return;  // nothing to change
                 UpdateThemeSettings(kit, [&choice](theme::ThemeSettings& value) { value.active = choice; });
                 journal.Write("Thème choisi dans Réglages : « " + (choice.empty() ? std::string("aucun") : choice) + " »");
             });

@@ -71,8 +71,10 @@ void StartInterface(amk::Journal& journal, [[maybe_unused]] const std::filesyste
                     [[maybe_unused]] amk::UiModel& model, [[maybe_unused]] amk::ExtensionLoader& loader) {
 #if defined(AMK_WITH_XAML)
     amk::win::InstallXamlUiThread(journal);
-    static amk::win::ThemeService themes(journal, kit);
-    themes.Start(g_module, GetCurrentProcessId());
+    // Never destroyed, like the interface service below: its theme session holds XAML objects (resource dictionary,
+    // brushes, templates), and a static destructor would release them while Apple Music exits, after XAML is gone.
+    static auto* themes = new amk::win::ThemeService(journal, kit);
+    themes->Start(g_module, GetCurrentProcessId());
 
     // Never destroyed: it holds XAML objects that may only be released on the interface thread.
     static auto* ui = new amk::win::UiService(journal, kit, model, [target = &loader](const amk::win::UiEvent& event) {

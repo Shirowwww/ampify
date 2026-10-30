@@ -3,6 +3,9 @@
 Relevé sur la machine de l'utilisateur, version du paquet `AppleInc.AppleMusicWin_1.1540.23042.0_x64__nzyj5cx40ttqa`
 (Windows 11 26200). Tout ce qui est marqué « vérifié » a été observé ; le reste est déduit.
 
+
+- **PC de l'utilisateur, 30/10/2026 au soir** : Apple Music `1.1792.39682.0` (relevé par l'utilisateur dans Paramètres > Applications), la même version que le banc Windows. Les relevés Atmos de `atmos-loudness.md` ont été faits plus tôt sur `1.1540.23042.0`.
+
 ## Paquet et processus
 
 - Paquet MSIX installé dans `C:\Program Files\WindowsApps\AppleInc.AppleMusicWin_<version>_x64__nzyj5cx40ttqa\`
