@@ -9,7 +9,10 @@
 #include <map>
 #include <sstream>
 
+#include "../core/json.hpp"
 #include "../core/settings.hpp"
+#include "../core/theme/files.hpp"
+#include "../core/theme/theme.hpp"
 #include "archive.hpp"
 #include "backup.hpp"
 #include "catalog.hpp"
@@ -428,7 +431,57 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     return 0;
 }
 
+namespace {
+
+Json TextList(const std::vector<std::string>& items) {
+    Json::Array list;
+    for (const std::string& item : items) list.emplace_back(item);
+    return list;
+}
+
+Json InfoJson(const ElementInfo& info) {
+    return Json::Object{{"id", info.id},           {"name", info.name},
+                        {"kind", info.kind},       {"version", info.version},
+                        {"author", info.author},   {"description", info.description},
+                        {"permissions", TextList(info.permissions)}};
+}
+
+// `amk market --json`: what the Marketplace page shows. The catalogue (empty with catalogOk false when it cannot be
+// read; the reason goes to the error stream), every installed element with its state, and the active theme.
+int PrintMarketJson(Context& ctx) {
+    Catalog catalog;
+    bool local = false;
+    bool catalogOk = LoadCatalog(ctx, catalog, local);
+    Settings settings;
+    std::string error;
+    LoadSettings(ctx, settings, error);
+
+    Json::Array entries;
+    for (const CatalogEntry& entry : catalog.entries) entries.push_back(InfoJson(entry));
+    Json::Array installed;
+    for (const InstalledElement& element : ListInstalled(ctx.kit)) {
+        Json item = element.manifest ? InfoJson(*element.manifest) : Json(Json::Object{{"id", element.id}, {"kind", element.kind}});
+        item.Set("valid", element.Valid());
+        item.Set("enabled", IsEnabled(settings, element.kind, element.id));
+        if (element.kind == "theme") {
+            theme::FolderFiles files(ctx.kit.Root() / "themes" / element.id);
+            item.Set("schemes", TextList(theme::ReadSchemes(files)));
+        }
+        installed.push_back(std::move(item));
+    }
+    Json result = Json::Object{{"catalogOk", catalogOk},
+                               {"catalog", std::move(entries)},
+                               {"installed", std::move(installed)},
+                               {"theme", settings.GetString("theme.active", "")},
+                               {"scheme", settings.GetString("theme.scheme", "")}};
+    ctx.out << result.Dump() << "\n";
+    return 0;
+}
+
+}  // namespace
+
 int CmdMarket(Context& ctx) {
+    if (ctx.options.json) return PrintMarketJson(ctx);
     Catalog catalog;
     bool local = false;
     if (!LoadCatalog(ctx, catalog, local)) return 1;

@@ -97,6 +97,10 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
 
             CatalogEntry entry;
             ReadElementInfo(item, where, entry, errors);
+            // kit.manage runs amk itself: only the Marketplace that ships with the kit has it, never a download.
+            if (std::find(entry.permissions.begin(), entry.permissions.end(), "kit.manage") != entry.permissions.end()) {
+                errors.push_back(where + ".permissions : kit.manage est réservée à la Marketplace du kit");
+            }
 
             const json::Value* url = item.Find("url");
             if (url == nullptr) {

@@ -455,6 +455,8 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
             options.apply = true;
         } else if (arg == "--follow") {
             options.follow = true;
+        } else if (arg == "--json") {
+            options.json = true;
         } else if (arg == "--tree") {
             options.tree = true;
         } else if (arg == "--dir") {

@@ -17,6 +17,7 @@
 
 #include "../core/audio/audio_engine.hpp"
 #include "../core/gain_board.hpp"
+#include "kit_command.hpp"
 #include "player_bridge.hpp"
 #include "win_services.hpp"
 
@@ -88,7 +89,8 @@ std::optional<std::string> ReadWholeFile(const std::filesystem::path& path) {
 WinHost::WinHost(std::string process, std::filesystem::path kitDirectory, Settings& settings, Journal& journal)
     : m_process(std::move(process)), m_kit(std::move(kitDirectory)), m_settings(settings), m_journal(journal),
       m_player(std::make_unique<win::PlayerBridge>(m_process, m_settings, m_journal)),
-      m_services(std::make_unique<win::Services>(*this, m_process, m_kit, m_journal)) {}
+      m_services(std::make_unique<win::Services>(*this, m_process, m_kit, m_journal)),
+      m_kitCommands(std::make_unique<win::KitCommandRunner>(m_journal)) {}
 
 void WinHost::SetEventSink(EventSink sink) { m_services->SetEventSink(std::move(sink)); }
 
@@ -97,6 +99,8 @@ void* WinHost::QueryCapability(std::string_view name) {
     // AMK.player.queue, in both processes: what each one knows of the queue (win/player_bridge.*).
     if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
     if (void* found = m_services->Query(name)) return found;
+    // The Marketplace page runs amk.exe from the interface process, where it is shown.
+    if (m_process == "ui" && name == KitCommandHost::kCapabilityName) return static_cast<KitCommandHost*>(m_kitCommands.get());
     // AudioHost in AMPLibraryAgent.exe only, where the audio is rendered: the process's engine, fed by the Atmos
     // leveler's hooks.
     if (m_process == "engine" && name == AudioHost::kCapabilityName) {

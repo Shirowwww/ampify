@@ -24,6 +24,7 @@ namespace amk {
 namespace win {
 class PlayerBridge;
 class Services;
+class KitCommandRunner;
 }
 
 class WinHost : public Host, public HttpPostHost {
@@ -96,6 +97,7 @@ private:
 
     std::unique_ptr<win::PlayerBridge> m_player;  // AMK.player and the queue capability, see win/player_bridge.*
     std::unique_ptr<win::Services> m_services;
+    std::unique_ptr<win::KitCommandRunner> m_kitCommands;  // AMK.kit.run, in AppleMusic.exe only
 };
 
 }  // namespace amk

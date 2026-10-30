@@ -97,8 +97,10 @@ SurfaceChanges SurfaceTracker::Poll(const UiModel& model) {
     }
 
     std::optional<std::pair<std::string, std::string>> route = model.Route();
-    if (route && route != m_route) changes.route = route;
+    std::uint64_t serial = model.RouteSerial();
+    if (route && (route != m_route || serial != m_routeSerial)) changes.route = route;
     m_route = route;
+    m_routeSerial = serial;
 
     m_current = std::move(now);
     m_signatures = std::move(signatures);

@@ -1,7 +1,8 @@
 # Windows only: the shared helpers (amk_win), the kernel DLL, the Wine harness, the XAML backend, the launcher, the
 # installer and the test kit. The lists are always defined; CMakeLists.txt uses them only when targeting Windows.
 # See the convention at the top of CMakeLists.txt.
-list(APPEND AMK_WIN_SOURCES win/win_common.cpp win/package.cpp win/win_host.cpp win/hook.cpp win/ui_thread.cpp)
+list(APPEND AMK_WIN_SOURCES win/win_common.cpp win/package.cpp win/win_host.cpp win/hook.cpp win/ui_thread.cpp
+    win/kit_command.cpp)
 
 list(APPEND AMK_KERNEL_SOURCES kernel/kernel.cpp extensions/atmos-leveler/atmos_windows.cpp)
 

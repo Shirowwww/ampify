@@ -51,6 +51,7 @@ private:
     std::vector<Surface> m_current;
     std::map<std::string, std::string> m_signatures;  // key -> what the surface showed, as text
     std::optional<std::pair<std::string, std::string>> m_route;
+    std::uint64_t m_routeSerial = 0;
     std::uint64_t m_revision = 0;
 };
 

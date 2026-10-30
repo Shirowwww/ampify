@@ -148,6 +148,16 @@ std::optional<Insertion> ChoosePlaybarInsertion(const std::vector<ProbeNode>& no
 }
 
 std::optional<Insertion> ChooseTopbarInsertion(const std::vector<ProbeNode>& nodes) {
+    // Apple Music 1.1792 has no separate top bar: its play bar is at the top, and the buttons at its right (volume,
+    // AirPlay, lyrics, queue) sit in StackPanel#NowPlayingToggleButtons. A kit button goes after them.
+    if (std::optional<int> toggles = FindByName(nodes, "NowPlayingToggleButtons");
+        toggles && nodes[*toggles].Is(kProbeStackPanel) && !InsideModElement(nodes, *toggles)) {
+        Insertion insertion;
+        insertion.parent = *toggles;
+        insertion.after = -1;
+        insertion.styleFrom = FirstNativeOf(nodes, *toggles, kProbeButtonBase).value_or(-1);
+        return insertion;
+    }
     std::optional<int> search = FirstNativeOf(nodes, -1, kProbeAutoSuggest);
     if (!search) return std::nullopt;
     for (int parent = nodes[*search].parent; parent >= 0; parent = nodes[parent].parent) {

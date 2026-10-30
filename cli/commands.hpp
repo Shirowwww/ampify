@@ -28,6 +28,7 @@ struct Options {
     bool check = false;                       // --check: `update` only looks
     bool apply = false;                       // --apply: `update` installs the files it downloaded
     bool follow = false;                      // --follow: `logs` keeps printing the lines that are added
+    bool json = false;                        // --json: `market` prints JSON, for the Marketplace page
     bool tree = false;                        // --tree: `inspect` prints the last interface tree of the kernel
     bool dir = false;                         // --dir: `config` opens the kit folder
 };

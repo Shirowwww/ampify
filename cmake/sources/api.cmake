@@ -27,4 +27,6 @@ list(APPEND AMK_CORE_SOURCES
     core/natives/notify.cpp
     core/natives/http.cpp
     core/natives/timers.cpp
-    core/natives/ui.cpp)
+    core/natives/ui.cpp
+    core/prelude/kit.cpp
+    core/natives/kit.cpp)

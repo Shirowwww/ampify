@@ -72,6 +72,7 @@ public:
     std::vector<UiSlot> Popups() const;
     std::optional<std::string> Title(const std::string& elementId) const;
     std::optional<std::pair<std::string, std::string>> Route() const;  // element and path
+    std::uint64_t RouteSerial() const;  // one more at each Navigate, so a second visit to the same page shows too
 
 private:
     mutable std::mutex m_mutex;
@@ -82,6 +83,7 @@ private:
     std::vector<UiSlot> m_popups;
     std::map<std::string, std::string> m_titles;
     std::optional<std::pair<std::string, std::string>> m_route;
+    std::uint64_t m_routeSerial = 0;
 };
 
 // Checks a tree sent by an element: only the known primitives, with bounded depth, size and text. Attributes are

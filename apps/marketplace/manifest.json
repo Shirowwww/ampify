@@ -1,0 +1,13 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "marketplace",
+  "name": "Marketplace",
+  "version": "1.0.0",
+  "kind": "app",
+  "author": "Shirowwww",
+  "description": "Installer, retirer et choisir thèmes, schémas, extensions et apps du kit, sans quitter Apple Music.",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "icon": "icon.svg",
+  "permissions": ["kit.manage", "ui.page", "ui.topbar", "ui.window"]
+}

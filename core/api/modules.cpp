@@ -72,6 +72,8 @@ void DefineFs(api::NativeScope& scope);
 
 namespace prelude { extern const char kLink[]; }
 namespace natives { void DefineLink(api::NativeScope& scope); void StartLink(ScriptExtension& extension); }
+namespace prelude { extern const char kKit[]; }
+namespace natives { void DefineKit(api::NativeScope& scope); void StopKit(ScriptExtension& extension); }
 
 namespace api {
 
@@ -104,6 +106,7 @@ const ApiModule kModules[] = {
     {"midi", prelude::kMidi, natives::DefineMidi, nullptr, natives::StopMidi},
     {"remote", prelude::kRemote, natives::DefineRemote, nullptr, natives::StopRemote},
     {"fs", prelude::kFs, natives::DefineFs, nullptr, nullptr},
+    {"kit", prelude::kKit, natives::DefineKit, nullptr, natives::StopKit},
 };
 
 }  // namespace

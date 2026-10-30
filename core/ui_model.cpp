@@ -183,6 +183,7 @@ void UiModel::SetTitle(const std::string& elementId, const std::string& title) {
 void UiModel::Navigate(const std::string& elementId, const std::string& path) {
     std::lock_guard<std::mutex> guard(m_mutex);
     m_route = std::make_pair(elementId, path);
+    m_routeSerial++;
 }
 
 void UiModel::RemoveElement(const std::string& elementId) {
@@ -250,6 +251,11 @@ std::optional<std::string> UiModel::Title(const std::string& elementId) const {
 std::optional<std::pair<std::string, std::string>> UiModel::Route() const {
     std::lock_guard<std::mutex> guard(m_mutex);
     return m_route;
+}
+
+std::uint64_t UiModel::RouteSerial() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return m_routeSerial;
 }
 
 bool ValidateTree(const Json& tree, std::string* error) {

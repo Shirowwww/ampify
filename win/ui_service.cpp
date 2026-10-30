@@ -234,12 +234,13 @@ struct WindowContext {
 using namespace ui_service_detail;
 
 struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
-    Shared(Journal& journal, std::filesystem::path kit, UiEventSink sink)
-        : journal(journal), kit(std::move(kit)), sink(std::move(sink)) {}
+    Shared(Journal& journal, std::filesystem::path kit, UiEventSink sink, UiModel& model)
+        : journal(journal), kit(std::move(kit)), sink(std::move(sink)), model(model) {}
 
     Journal& journal;
     std::filesystem::path kit;
     UiEventSink sink;
+    UiModel& model;  // thread-safe; the Mods card opens the Marketplace page through it
     std::atomic<bool> running{false};
 
     std::mutex mutex;  // guards what follows, up to the interface-thread part
@@ -611,8 +612,28 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
         } catch (...) {
         }
     });
-    controls::Grid::SetColumn(open, 1);
-    header.Children().Append(open);
+    // The Marketplace page (apps/marketplace): thèmes, schémas, extensions, in the app.
+    controls::Button market;
+    if (auto accent = ThemeResource(L"AccentButtonStyle").try_as<xaml::Style>()) market.Style(accent);
+    market.Content(winrt::box_value(L"Ouvrir la Marketplace"));
+    market.VerticalAlignment(xaml::VerticalAlignment::Center);
+    Name(market, "AMK_ModsOpenMarketplace", "Ouvrir la Marketplace");
+    UiModel* model = &shared.model;
+    Journal* journal = &shared.journal;
+    market.Click([model, journal](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            model->Navigate("marketplace", "/marketplace");
+            journal->Write("Réglages : Marketplace ouverte depuis la carte Mods");
+        } catch (...) {
+        }
+    });
+    controls::StackPanel actions;
+    actions.Orientation(controls::Orientation::Horizontal);
+    actions.Spacing(8);
+    actions.Children().Append(market);
+    actions.Children().Append(open);
+    controls::Grid::SetColumn(actions, 1);
+    header.Children().Append(actions);
     body.Children().Append(header);
 
     controls::StackPanel list;
@@ -1152,8 +1173,15 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
 
         controls::Button button;
         if (insertion->styleFrom >= 0) {
-            if (auto native = context->probeObjects[insertion->styleFrom].get().try_as<controls::Button>()) {
-                if (native.Style()) button.Style(native.Style());
+            auto neighbour = context->probeObjects[insertion->styleFrom].get();
+            if (!neighbour.try_as<controls::Button>()) {
+                // A ToggleButton (Apple Music's lyrics or queue button): its style does not fit a Button, so the kit
+                // button stays flat like it, and takes its size below.
+                button.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+                button.BorderThickness(xaml::Thickness{0, 0, 0, 0});
+            }
+            if (auto native = neighbour.try_as<controls::Control>()) {
+                if (auto style = native.Style(); style && neighbour.try_as<controls::Button>()) button.Style(style);
                 button.Width(native.Width());
                 button.Height(native.Height());
                 button.MinWidth(native.MinWidth());
@@ -1416,7 +1444,7 @@ void DiscoverWindows(UiService::Shared& shared) {
 }  // namespace
 
 UiService::UiService(Journal& journal, std::filesystem::path kit, UiModel& model, UiEventSink sink)
-    : m_shared(std::make_shared<Shared>(journal, std::move(kit), std::move(sink))), m_model(model) {}
+    : m_shared(std::make_shared<Shared>(journal, std::move(kit), std::move(sink), model)), m_model(model) {}
 
 UiService::~UiService() {
     Stop();

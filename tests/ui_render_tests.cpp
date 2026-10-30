@@ -371,6 +371,18 @@ TEST_CASE(UiRender_PlaybarButtonGoesAfterTheTransportButtons) {
     CHECK(insertion && insertion->styleFrom == skip);
 }
 
+TEST_CASE(UiRender_TopbarButtonGoesAfterAppleMusicsToggleButtons) {
+    FakeTree tree;
+    int root = tree.Add(-1, "Grid", kProbePanel | kProbeGrid, "TransportBar");
+    tree.Add(root, "AutoSuggestBox", kProbeAutoSuggest);
+    int toggles = tree.Add(root, "StackPanel", kStack | kProbeHorizontal, "NowPlayingToggleButtons");
+    int volume = tree.Add(toggles, "ToggleButton", kProbeButtonBase, "VolumeControl");
+    std::optional<Insertion> insertion = ChooseTopbarInsertion(tree.nodes);
+    CHECK(insertion && insertion->parent == toggles);
+    CHECK(insertion && insertion->after == -1);
+    CHECK(insertion && insertion->styleFrom == volume);
+}
+
 TEST_CASE(UiRender_TopbarButtonGoesBesideTheSearchBox) {
     FakeTree tree;
     int root = tree.Add(-1, "Grid", kProbePanel | kProbeGrid);

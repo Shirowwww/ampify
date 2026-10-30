@@ -595,10 +595,15 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
     } else if (type == "button") {
         auto button = control.as<controls::Button>();
         std::string variant = node.Text("variant", "secondary");
-        xaml::Style style{nullptr};
-        if (variant == "primary") style = StyleResource(L"AccentButtonStyle");
-        else if (probe.button) style = probe.button;
-        if (style && button.Style() != style) button.Style(style);
+        // Apple Music's own button style for every variant: its AccentButtonStyle draws text in a symbol font (the
+        // label came out as icons on 1.1792). A primary button takes the accent colours on top instead.
+        if (probe.button && button.Style() != probe.button) button.Style(probe.button);
+        if (variant == "primary") {
+            if (auto accent = ThemeResource(L"AccentFillColorDefaultBrush").try_as<media::Brush>()) button.Background(accent);
+            if (auto onAccent = ThemeResource(L"TextOnAccentFillColorPrimaryBrush").try_as<media::Brush>()) {
+                button.Foreground(onAccent);
+            }
+        }
         if (variant == "tertiary") {
             button.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
             button.BorderThickness(xaml::Thickness{0, 0, 0, 0});
