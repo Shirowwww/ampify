@@ -1,0 +1,660 @@
+AMP.UI.Controls.AddConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.AskUserDialog
+  methods: .ctor, ShowAsWarning, get_CheckboxText, put_CheckboxText, get_Explanation, put_Explanation, get_IsCheckboxChecked, put_IsCheckboxChecked
+AMP.UI.Controls.AspectRatioGrid
+  methods: .ctor, get_AspectRatio, put_AspectRatio, get_AdditionalSize, put_AdditionalSize, get_IsRound, put_IsRound, get_MeasureAlgorithm, put_MeasureAlgorithm, get_AspectRatioProperty, get_AdditionalSizeProperty, get_IsRoundProperty, get_MeasureAlgorithmProperty
+AMP.UI.Controls.AspectRatioGridMeasureAlgorithm
+  fields: Fit, AdjustHeight, AdjustWidth
+AMP.UI.Controls.AspectRatioPreservationType
+  fields: None, Sizing
+AMP.UI.Controls.AttachableUtilities
+  methods: SetHandlesTappedEvent, GetHandlesTappedEvent, SetImageIconCornerRadius, GetImageIconCornerRadius
+AMP.UI.Controls.BackDrop
+  methods: .ctor, get_BackgroundBrush, put_BackgroundBrush, get_BlurAmount, put_BlurAmount, get_TintOpacity, put_TintOpacity, get_LuminosityOpacity, put_LuminosityOpacity, get_LuminosityColor, put_LuminosityColor, get_TintColor, put_TintColor, get_BackgroundBrushProperty, get_BlurAmountProperty, get_TintOpacityProperty, get_LuminosityOpacityProperty
+AMP.UI.Controls.BindableSwapChainPanel
+  methods: .ctor, Clear, get_SwapChainHandle, put_SwapChainHandle, get_SwapChainHandleChangeResult, put_SwapChainHandleChangeResult, get_WindowInteractionState, put_WindowInteractionState, get_SwapChainHandleChangeResultProperty
+AMP.UI.Controls.BlurControl
+  methods: .ctor, get_ImageLocation, put_ImageLocation, get_IsActive, put_IsActive
+AMP.UI.Controls.BooleanNegationConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.BooleanToInverseVisibilityConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.BooleanToStringConverter
+  methods: .ctor, get_TrueValue, put_TrueValue, get_FalseValue, put_FalseValue, Convert, ConvertBack
+AMP.UI.Controls.BooleanToVisibilityConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.BouncyBarControl
+  methods: .ctor
+AMP.UI.Controls.ChinView
+  methods: .ctor, get_BackgroundImage, put_BackgroundImage, get_FallbackBrush, put_FallbackBrush, get_OverlayBrush, put_OverlayBrush, get_BackgroundImageProperty, get_FallbackBrushProperty, get_OverlayBrushProperty
+AMP.UI.Controls.ClipSequenceControl
+  methods: .ctor, get_ItemsSource, put_ItemsSource, get_ImageTemplate, put_ImageTemplate, get_ShowGradient, put_ShowGradient, get_ShowImage, put_ShowImage, get_MetadataTemplate, put_MetadataTemplate, get_ShowMetadata, put_ShowMetadata, get_ShowLeftChevron, put_ShowLeftChevron, get_ShowRightChevron, put_ShowRightChevron, get_SelectedIndex, put_SelectedIndex, get_NumberOfItems, put_NumberOfItems, get_TopmostContent, put_TopmostContent, get_BackContent, put_BackContent, get_NavigateCommand, put_NavigateCommand, get_AccessibilityTextConverter, put_AccessibilityTextConverter, get_IsAnimationInProgress, put_IsAnimationInProgress, get_CanTransitionToHUD, put_CanTransitionToHUD, get_IsPipModeEnabled, put_IsPipModeEnabled, get_MetadataTimeoutSeconds, put_MetadataTimeoutSeconds, get_WindowSize, put_WindowSize, get_ClipSequenceType, put_ClipSequenceType, get_ExitCutlCommand, put_ExitCutlCommand, get_ShelfScrollAutomationEnabled, put_ShelfScrollAutomationEnabled, SetNextVisualState, GetNextVisualState, SetStoryboardCompleted, GetStoryboardCompleted, SetPersistMetadataOnPointerOver, GetPersistMetadataOnPointerOver, get_ItemsSourceProperty, get_ImageTemplateProperty, get_ShowGradientProperty, get_ShowImageProperty, get_MetadataTemplateProperty, get_ShowMetadataProperty, get_ShowLeftChevronProperty, get_ShowRightChevronProperty, get_SelectedIndexProperty, get_NumberOfItemsProperty, get_TopmostContentProperty, get_BackContentProperty, get_NavigateCommandProperty, get_AccessibilityTextConverterProperty, get_IsAnimationInProgressProperty, get_CanTransitionToHUDProperty, get_IsPipModeEnabledProperty, get_MetadataTimeoutSecondsProperty, get_WindowSizeProperty, get_ClipSequenceTypeProperty, get_ExitCutlCommandProperty, get_ShelfScrollAutomationEnabledProperty
+AMP.UI.Controls.ClipSequenceItem
+  methods: .ctor, get_AccessibilityTextConverter, put_AccessibilityTextConverter, get_Content, put_Content, get_ImageTemplate, put_ImageTemplate, get_ShowImage, put_ShowImage, get_MetadataTemplate, put_MetadataTemplate, get_ShowMetadata, put_ShowMetadata, get_ShowGradient, put_ShowGradient, get_NumberOfItems, put_NumberOfItems, get_SelectedIndex, put_SelectedIndex, get_IsAnimationInProgress, put_IsAnimationInProgress, get_CanTransitionToHUD, put_CanTransitionToHUD, get_WindowSize, put_WindowSize, get_ClipSequenceType, put_ClipSequenceType, get_AccessibilityTextConverterProperty, get_ContentProperty, get_ImageTemplateProperty, get_ShowImageProperty, get_MetadataTemplateProperty, get_ShowMetadataProperty, get_ShowGradientProperty, get_NumberOfItemsProperty, get_SelectedIndexProperty, get_IsAnimationInProgressProperty, get_CanTransitionToHUDProperty, SetHideMetadataCompleted, GetHideMetadataCompleted, get_WindowSizeProperty, get_ClipSequenceTypeProperty
+AMP.UI.Controls.ClosableFlyout
+  methods: .ctor, GetCloseFlyoutCommand, SetCloseFlyoutCommand
+AMP.UI.Controls.ColumnsLayout
+  methods: .ctor
+AMP.UI.Controls.ComboBoxControl
+  methods: .ctor, get_TitleName, put_TitleName, get_Values, put_Values, get_SelectedValue, put_SelectedValue, get_IsEditable, put_IsEditable, get_Orientation, put_Orientation, get_IsReadOnly, put_IsReadOnly, get_IsMixed, put_IsMixed, get_PlaceholderString, put_PlaceholderString, get_TitleNameProperty, get_ValuesProperty, get_SelectedValueProperty, get_IsEditableProperty, get_OrientationProperty, get_IsReadOnlyProperty, get_IsMixedProperty, get_PlaceholderStringProperty
+AMP.UI.Controls.ComboBoxHelper
+  methods: SelectionChangedEmptyIfNone
+AMP.UI.Controls.CommandToVisibilityConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.ContentContainer
+  methods: .ctor
+AMP.UI.Controls.ContentDialog
+  methods: .ctor
+AMP.UI.Controls.CustomCaptionButtons
+  methods: .ctor, ShowButtons, get_FadeCaptionButtons, put_FadeCaptionButtons, get_HostWindow, put_HostWindow, get_MaximizeGlyph, put_MaximizeGlyph, get_MaximizeTooltip, put_MaximizeTooltip, get_NonDraggableElements, put_NonDraggableElements, get_ShowMaximizeButton, put_ShowMaximizeButton, add_MaximizeButtonClick, remove_MaximizeButtonClick, get_MaximizeGlyphProperty, get_MaximizeTooltipProperty, get_ShowMaximizeButtonProperty
+AMP.UI.Controls.DebugConsolePanel
+  methods: .ctor, get_Commands, put_Commands, get_CommandsProperty
+AMP.UI.Controls.DoubleNegationConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.DragRegionChangedEventArgs
+  methods: .ctor, Invoke
+AMP.UI.Controls.EQSlider
+  methods: .ctor
+AMP.UI.Controls.EQSliderAutomationPeer
+  methods: .ctor
+AMP.UI.Controls.EQThumbToolTipValueConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.EmptyPage
+  methods: .ctor
+AMP.UI.Controls.ErrorPanel
+  methods: .ctor, get_RetryCommand, put_RetryCommand, get_Text, put_Text, get_RetryCommandProperty, get_TextProperty
+AMP.UI.Controls.ExtensibleMenuFlyout
+  methods: .ctor, get_CloseFlyout, put_CloseFlyout, SetHideDisabledItems, GetHideDisabledItems, SetItemsSource, GetItemsSource, SetKeyboardAccelerators, GetKeyboardAccelerators, SetItemTemplate, GetItemTemplate, SetItemTemplateSelector, GetItemTemplateSelector, SetSubtitle, GetSubtitle, SetGlyphMargin, GetGlyphMargin, get_CloseFlyoutProperty
+AMP.UI.Controls.FastItemVirtualizer
+  methods: .ctor, SetInstance, GetInstance, SetItemTemplate, GetItemTemplate, SetItemTemplateSelector, GetItemTemplateSelector
+AMP.UI.Controls.FavoriteControl
+  methods: .ctor, get_Hover, put_Hover, get_Favorited, put_Favorited, get_SuggestLess, put_SuggestLess, get_HoverProperty, get_FavoritedProperty, get_SuggestLessProperty
+AMP.UI.Controls.FilterToggleButton
+  methods: .ctor, get_Command, put_Command, get_CommandParameter, put_CommandParameter, get_IsExpanded, put_IsExpanded, get_Text, put_Text, get_CommandProperty, get_CommandParameterProperty, get_IsExpandedProperty, get_TextProperty
+AMP.UI.Controls.FirstColumnAdjustableGrid
+  methods: .ctor
+AMP.UI.Controls.FontType
+  fields: Unset, None, Normal, Light, SemiLight, SemiBold
+AMP.UI.Controls.GlowEffect
+  methods: .ctor, get_CastingElement, put_CastingElement, get_EffectType, put_EffectType, get_CastingElementProperty, get_EffectTypeProperty
+AMP.UI.Controls.GlowEffectType
+  fields: None, Shadow, Radiosity
+AMP.UI.Controls.GreaterThanToVisibilityConverter
+  methods: .ctor, get_Threshold, put_Threshold, Convert, ConvertBack
+AMP.UI.Controls.GridPresentation
+  methods: .ctor, get_ColumnsWhenLarge, put_ColumnsWhenLarge, get_ColumnsWhenMedium, put_ColumnsWhenMedium, get_ColumnsWhenSmall, put_ColumnsWhenSmall, get_Orientation, put_Orientation, GetColumnsForWidth, get_ColumnsWhenLargeProperty, get_ColumnsWhenMediumProperty, get_ColumnsWhenSmallProperty, get_OrientationProperty
+AMP.UI.Controls.GridView
+  methods: .ctor, get_GridPresentation, put_GridPresentation, get_ItemToKeyConverter, put_ItemToKeyConverter, get_ScrollState, put_ScrollState, get_SelectedItemsEx, put_SelectedItemsEx, get_TypeAheadProvider, put_TypeAheadProvider, get_BringSelectedItemIntoViewOffset, put_BringSelectedItemIntoViewOffset, UpdateTypeAhead, add_TypeAheadRequested, remove_TypeAheadRequested, get_GridPresentationProperty, get_ItemToKeyConverterProperty, get_ScrollStateProperty, get_SelectedItemsExProperty
+AMP.UI.Controls.HeaderBar
+  methods: .ctor, get_CanNavigateBack, put_CanNavigateBack, get_HasFilterButton, put_HasFilterButton, get_NavigateBackCommand, put_NavigateBackCommand, get_StickyBackground, put_StickyBackground, get_StickyScrollMode, put_StickyScrollMode, get_Title, put_Title, get_ViewOptionsMenuFlyout, put_ViewOptionsMenuFlyout, get_CanNavigateBackProperty, get_HasFilterButtonProperty, get_NavigateBackCommandProperty, get_StickyBackgroundProperty, get_StickyScrollModeProperty, get_TitleProperty, get_ViewOptionsMenuFlyoutProperty
+AMP.UI.Controls.HidingListBox
+  methods: .ctor
+AMP.UI.Controls.HoverGrid
+  methods: .ctor, UpdateElementState, Reset, SetHoverGridParent, GetHoverGridParent, GetHoverGridParentProperty, SetPointerEnterVisibility, GetPointerEnterVisibility, GetPointerEnterVisibilityProperty, SetPointerExitVisibility, GetPointerExitVisibility, GetPointerExitVisibilityProperty
+AMP.UI.Controls.Hyperlink
+  methods: .ctor, get_ChevronBrush, put_ChevronBrush, get_ChevronFontSize, put_ChevronFontSize, get_Command, put_Command, get_CommandParameter, put_CommandParameter, get_Text, put_Text, get_TextStyle, put_TextStyle, get_MaxLines, put_MaxLines, get_ShowChevron, put_ShowChevron, get_TextTrimming, put_TextTrimming, get_TextWrapping, put_TextWrapping, get_UnderlineStyle, put_UnderlineStyle, get_ChevronBrushProperty, get_ChevronFontSizeProperty, get_CommandProperty, get_CommandParameterProperty, get_TextProperty, get_TextStyleProperty, get_MaxLinesProperty, get_ShowChevronProperty, get_TextTrimmingProperty, get_TextWrappingProperty, get_UnderlineStyleProperty
+AMP.UI.Controls.HyperlinkUnderlineStyle
+  fields: None, Always, Hover
+AMP.UI.Controls.IAskUserDialog
+  methods: ShowAsWarning, get_CheckboxText, put_CheckboxText, get_Explanation, put_Explanation, get_IsCheckboxChecked, put_IsCheckboxChecked
+AMP.UI.Controls.IAspectRatioGrid
+  methods: get_AspectRatio, put_AspectRatio, get_AdditionalSize, put_AdditionalSize, get_IsRound, put_IsRound, get_MeasureAlgorithm, put_MeasureAlgorithm
+AMP.UI.Controls.IAspectRatioGridStatics
+  methods: get_AspectRatioProperty, get_AdditionalSizeProperty, get_IsRoundProperty, get_MeasureAlgorithmProperty
+AMP.UI.Controls.IAttachableUtilities
+AMP.UI.Controls.IAttachableUtilitiesStatics
+  methods: SetHandlesTappedEvent, GetHandlesTappedEvent, SetImageIconCornerRadius, GetImageIconCornerRadius
+AMP.UI.Controls.IBackDrop
+  methods: get_BackgroundBrush, put_BackgroundBrush, get_BlurAmount, put_BlurAmount, get_TintOpacity, put_TintOpacity, get_LuminosityOpacity, put_LuminosityOpacity, get_LuminosityColor, put_LuminosityColor, get_TintColor, put_TintColor
+AMP.UI.Controls.IBackDropStatics
+  methods: get_BackgroundBrushProperty, get_BlurAmountProperty, get_TintOpacityProperty, get_LuminosityOpacityProperty
+AMP.UI.Controls.IBaseView
+  methods: get_TypeAheadProvider, put_TypeAheadProvider, get_BringSelectedItemIntoViewOffset, put_BringSelectedItemIntoViewOffset, UpdateTypeAhead, add_TypeAheadRequested, remove_TypeAheadRequested
+AMP.UI.Controls.IBindableSwapChainPanel
+  methods: Clear, get_SwapChainHandle, put_SwapChainHandle, get_SwapChainHandleChangeResult, put_SwapChainHandleChangeResult, get_WindowInteractionState, put_WindowInteractionState
+AMP.UI.Controls.IBindableSwapChainPanelStatics
+  methods: get_SwapChainHandleChangeResultProperty
+AMP.UI.Controls.IBlurControl
+  methods: get_ImageLocation, put_ImageLocation, get_IsActive, put_IsActive
+AMP.UI.Controls.IBooleanToStringConverter
+  methods: get_TrueValue, put_TrueValue, get_FalseValue, put_FalseValue
+AMP.UI.Controls.IBouncyBarControl
+AMP.UI.Controls.IChinView
+  methods: get_BackgroundImage, put_BackgroundImage, get_FallbackBrush, put_FallbackBrush, get_OverlayBrush, put_OverlayBrush
+AMP.UI.Controls.IChinViewStatics
+  methods: get_BackgroundImageProperty, get_FallbackBrushProperty, get_OverlayBrushProperty
+AMP.UI.Controls.IClipSequenceControl
+  methods: get_ItemsSource, put_ItemsSource, get_ImageTemplate, put_ImageTemplate, get_ShowGradient, put_ShowGradient, get_ShowImage, put_ShowImage, get_MetadataTemplate, put_MetadataTemplate, get_ShowMetadata, put_ShowMetadata, get_ShowLeftChevron, put_ShowLeftChevron, get_ShowRightChevron, put_ShowRightChevron, get_SelectedIndex, put_SelectedIndex, get_NumberOfItems, put_NumberOfItems, get_TopmostContent, put_TopmostContent, get_BackContent, put_BackContent, get_NavigateCommand, put_NavigateCommand, get_AccessibilityTextConverter, put_AccessibilityTextConverter, get_IsAnimationInProgress, put_IsAnimationInProgress, get_CanTransitionToHUD, put_CanTransitionToHUD, get_IsPipModeEnabled, put_IsPipModeEnabled, get_MetadataTimeoutSeconds, put_MetadataTimeoutSeconds, get_WindowSize, put_WindowSize, get_ClipSequenceType, put_ClipSequenceType, get_ExitCutlCommand, put_ExitCutlCommand, get_ShelfScrollAutomationEnabled, put_ShelfScrollAutomationEnabled
+AMP.UI.Controls.IClipSequenceControlStatics
+  methods: SetNextVisualState, GetNextVisualState, SetStoryboardCompleted, GetStoryboardCompleted, SetPersistMetadataOnPointerOver, GetPersistMetadataOnPointerOver, get_ItemsSourceProperty, get_ImageTemplateProperty, get_ShowGradientProperty, get_ShowImageProperty, get_MetadataTemplateProperty, get_ShowMetadataProperty, get_ShowLeftChevronProperty, get_ShowRightChevronProperty, get_SelectedIndexProperty, get_NumberOfItemsProperty, get_TopmostContentProperty, get_BackContentProperty, get_NavigateCommandProperty, get_AccessibilityTextConverterProperty, get_IsAnimationInProgressProperty, get_CanTransitionToHUDProperty, get_IsPipModeEnabledProperty, get_MetadataTimeoutSecondsProperty, get_WindowSizeProperty, get_ClipSequenceTypeProperty, get_ExitCutlCommandProperty, get_ShelfScrollAutomationEnabledProperty
+AMP.UI.Controls.IClipSequenceItem
+  methods: get_AccessibilityTextConverter, put_AccessibilityTextConverter, get_Content, put_Content, get_ImageTemplate, put_ImageTemplate, get_ShowImage, put_ShowImage, get_MetadataTemplate, put_MetadataTemplate, get_ShowMetadata, put_ShowMetadata, get_ShowGradient, put_ShowGradient, get_NumberOfItems, put_NumberOfItems, get_SelectedIndex, put_SelectedIndex, get_IsAnimationInProgress, put_IsAnimationInProgress, get_CanTransitionToHUD, put_CanTransitionToHUD, get_WindowSize, put_WindowSize, get_ClipSequenceType, put_ClipSequenceType
+AMP.UI.Controls.IClipSequenceItemStatics
+  methods: get_AccessibilityTextConverterProperty, get_ContentProperty, get_ImageTemplateProperty, get_ShowImageProperty, get_MetadataTemplateProperty, get_ShowMetadataProperty, get_ShowGradientProperty, get_NumberOfItemsProperty, get_SelectedIndexProperty, get_IsAnimationInProgressProperty, get_CanTransitionToHUDProperty, SetHideMetadataCompleted, GetHideMetadataCompleted, get_WindowSizeProperty, get_ClipSequenceTypeProperty
+AMP.UI.Controls.IClosableFlyout
+AMP.UI.Controls.IClosableFlyoutStatics
+  methods: GetCloseFlyoutCommand, SetCloseFlyoutCommand
+AMP.UI.Controls.IColumnsLayout
+AMP.UI.Controls.IComboBoxControl
+  methods: get_TitleName, put_TitleName, get_Values, put_Values, get_SelectedValue, put_SelectedValue, get_IsEditable, put_IsEditable, get_Orientation, put_Orientation, get_IsReadOnly, put_IsReadOnly, get_IsMixed, put_IsMixed, get_PlaceholderString, put_PlaceholderString
+AMP.UI.Controls.IComboBoxControlStatics
+  methods: get_TitleNameProperty, get_ValuesProperty, get_SelectedValueProperty, get_IsEditableProperty, get_OrientationProperty, get_IsReadOnlyProperty, get_IsMixedProperty, get_PlaceholderStringProperty
+AMP.UI.Controls.IComboBoxHelper
+AMP.UI.Controls.IComboBoxHelperStatics
+  methods: SelectionChangedEmptyIfNone
+AMP.UI.Controls.IContentContainer
+AMP.UI.Controls.IContentDialog
+AMP.UI.Controls.IContentDialogFactory
+  methods: CreateInstance
+AMP.UI.Controls.ICustomCaptionButtons
+  methods: ShowButtons, get_FadeCaptionButtons, put_FadeCaptionButtons, get_HostWindow, put_HostWindow, get_MaximizeGlyph, put_MaximizeGlyph, get_MaximizeTooltip, put_MaximizeTooltip, get_NonDraggableElements, put_NonDraggableElements, get_ShowMaximizeButton, put_ShowMaximizeButton, add_MaximizeButtonClick, remove_MaximizeButtonClick
+AMP.UI.Controls.ICustomCaptionButtonsStatics
+  methods: get_MaximizeGlyphProperty, get_MaximizeTooltipProperty, get_ShowMaximizeButtonProperty
+AMP.UI.Controls.IDebugConsolePanel
+  methods: get_Commands, put_Commands
+AMP.UI.Controls.IDebugConsolePanelStatics
+  methods: get_CommandsProperty
+AMP.UI.Controls.IEQSlider
+AMP.UI.Controls.IEQSliderAutomationPeer
+AMP.UI.Controls.IEQSliderAutomationPeerFactory
+  methods: CreateInstance
+AMP.UI.Controls.IEmptyPage
+AMP.UI.Controls.IErrorPanel
+  methods: get_RetryCommand, put_RetryCommand, get_Text, put_Text
+AMP.UI.Controls.IErrorPanelStatics
+  methods: get_RetryCommandProperty, get_TextProperty
+AMP.UI.Controls.IExtensibleMenuFlyout
+  methods: get_CloseFlyout, put_CloseFlyout
+AMP.UI.Controls.IExtensibleMenuFlyoutStatics
+  methods: SetHideDisabledItems, GetHideDisabledItems, SetItemsSource, GetItemsSource, SetKeyboardAccelerators, GetKeyboardAccelerators, SetItemTemplate, GetItemTemplate, SetItemTemplateSelector, GetItemTemplateSelector, SetSubtitle, GetSubtitle, SetGlyphMargin, GetGlyphMargin, get_CloseFlyoutProperty
+AMP.UI.Controls.IFastItemVirtualizer
+AMP.UI.Controls.IFastItemVirtualizerStatics
+  methods: SetInstance, GetInstance, SetItemTemplate, GetItemTemplate, SetItemTemplateSelector, GetItemTemplateSelector
+AMP.UI.Controls.IFavoriteControl
+  methods: get_Hover, put_Hover, get_Favorited, put_Favorited, get_SuggestLess, put_SuggestLess
+AMP.UI.Controls.IFavoriteControlStatics
+  methods: get_HoverProperty, get_FavoritedProperty, get_SuggestLessProperty
+AMP.UI.Controls.IFilterToggleButton
+  methods: get_Command, put_Command, get_CommandParameter, put_CommandParameter, get_IsExpanded, put_IsExpanded, get_Text, put_Text
+AMP.UI.Controls.IFilterToggleButtonStatics
+  methods: get_CommandProperty, get_CommandParameterProperty, get_IsExpandedProperty, get_TextProperty
+AMP.UI.Controls.IFirstColumnAdjustableGrid
+AMP.UI.Controls.IGlowEffect
+  methods: get_CastingElement, put_CastingElement, get_EffectType, put_EffectType
+AMP.UI.Controls.IGlowEffectStatics
+  methods: get_CastingElementProperty, get_EffectTypeProperty
+AMP.UI.Controls.IGreaterThanToVisibilityConverter
+  methods: get_Threshold, put_Threshold
+AMP.UI.Controls.IGridPresentation
+  methods: get_ColumnsWhenLarge, put_ColumnsWhenLarge, get_ColumnsWhenMedium, put_ColumnsWhenMedium, get_ColumnsWhenSmall, put_ColumnsWhenSmall, get_Orientation, put_Orientation, GetColumnsForWidth
+AMP.UI.Controls.IGridPresentationStatics
+  methods: get_ColumnsWhenLargeProperty, get_ColumnsWhenMediumProperty, get_ColumnsWhenSmallProperty, get_OrientationProperty
+AMP.UI.Controls.IGridView
+  methods: get_GridPresentation, put_GridPresentation, get_ItemToKeyConverter, put_ItemToKeyConverter, get_ScrollState, put_ScrollState, get_SelectedItemsEx, put_SelectedItemsEx
+AMP.UI.Controls.IGridViewStatics
+  methods: get_GridPresentationProperty, get_ItemToKeyConverterProperty, get_ScrollStateProperty, get_SelectedItemsExProperty
+AMP.UI.Controls.IHeaderBar
+  methods: get_CanNavigateBack, put_CanNavigateBack, get_HasFilterButton, put_HasFilterButton, get_NavigateBackCommand, put_NavigateBackCommand, get_StickyBackground, put_StickyBackground, get_StickyScrollMode, put_StickyScrollMode, get_Title, put_Title, get_ViewOptionsMenuFlyout, put_ViewOptionsMenuFlyout
+AMP.UI.Controls.IHeaderBarStatics
+  methods: get_CanNavigateBackProperty, get_HasFilterButtonProperty, get_NavigateBackCommandProperty, get_StickyBackgroundProperty, get_StickyScrollModeProperty, get_TitleProperty, get_ViewOptionsMenuFlyoutProperty
+AMP.UI.Controls.IHidingListBox
+AMP.UI.Controls.IHoverGrid
+  methods: UpdateElementState, Reset
+AMP.UI.Controls.IHoverGridAware
+  methods: get_IsHovering, put_IsHovering
+AMP.UI.Controls.IHoverGridFactory
+  methods: CreateInstance
+AMP.UI.Controls.IHoverGridStatics
+  methods: SetHoverGridParent, GetHoverGridParent, GetHoverGridParentProperty, SetPointerEnterVisibility, GetPointerEnterVisibility, GetPointerEnterVisibilityProperty, SetPointerExitVisibility, GetPointerExitVisibility, GetPointerExitVisibilityProperty
+AMP.UI.Controls.IHyperlink
+  methods: get_ChevronBrush, put_ChevronBrush, get_ChevronFontSize, put_ChevronFontSize, get_Command, put_Command, get_CommandParameter, put_CommandParameter, get_Text, put_Text, get_TextStyle, put_TextStyle, get_MaxLines, put_MaxLines, get_ShowChevron, put_ShowChevron, get_TextTrimming, put_TextTrimming, get_TextWrapping, put_TextWrapping, get_UnderlineStyle, put_UnderlineStyle
+AMP.UI.Controls.IHyperlinkStatics
+  methods: get_ChevronBrushProperty, get_ChevronFontSizeProperty, get_CommandProperty, get_CommandParameterProperty, get_TextProperty, get_TextStyleProperty, get_MaxLinesProperty, get_ShowChevronProperty, get_TextTrimmingProperty, get_TextWrappingProperty, get_UnderlineStyleProperty
+AMP.UI.Controls.IImmersionLockup
+  methods: Connect, Render, get_ImageLocation, put_ImageLocation, get_Animated, put_Animated, add_OnRender, remove_OnRender
+AMP.UI.Controls.IInfoPanelAuxillaryInfoControl
+  methods: get_TextTemplate, put_TextTemplate, get_BadgesTemplate, put_BadgesTemplate
+AMP.UI.Controls.IInfoPanelAuxillaryInfoControlStatics
+  methods: get_TextTemplateProperty, get_BadgesTemplateProperty
+AMP.UI.Controls.IKeyValueConverter
+  methods: get_DefaultValue, put_DefaultValue, get_Pairs
+AMP.UI.Controls.IKeyValuePair
+  methods: get_Key, put_Key, get_Value, put_Value
+AMP.UI.Controls.ILicenseAgreementControl
+  methods: ShowDialogAsync
+AMP.UI.Controls.IListView
+  methods: get_AlternatingRowBackgroundBrush, put_AlternatingRowBackgroundBrush, get_ItemToKeyConverter, put_ItemToKeyConverter, get_KeepSelectionInView, put_KeepSelectionInView, get_ScrollState, put_ScrollState, get_ScrollStateItemKey, put_ScrollStateItemKey, get_ScrollStateItemSize, put_ScrollStateItemSize, get_SelectedItemsEx, put_SelectedItemsEx, add_RowUpdate, remove_RowUpdate
+AMP.UI.Controls.IListViewBaseUtils
+AMP.UI.Controls.IListViewBaseUtilsStatics
+  methods: ScrollIntoViewWithExtent, SelectAndScrollIntoView, SetAlternatingRowBackgroundBrush, GetAlternatingRowBackgroundBrush
+AMP.UI.Controls.IListViewRowUpdateArgs
+  methods: get_Index, put_Index, get_ItemContainer, put_ItemContainer
+AMP.UI.Controls.IListViewStatics
+  methods: get_AlternatingRowBackgroundBrushProperty, get_ItemToKeyConverterProperty, get_KeepSelectionInViewProperty, get_ScrollStateProperty, get_ScrollStateItemKeyProperty, get_ScrollStateItemSizeProperty, get_SelectedItemsExProperty
+AMP.UI.Controls.ILocalizationService
+AMP.UI.Controls.ILocalizationServiceStatics
+  methods: Initialize, get_FlowDirection, ToggleDebugMode, AllowBold, AllowLineHeight, SetFontSize, GetFontSize, FontSizeProperty, SetFontType, GetFontType, FontTypeProperty, SetLineHeight, GetLineHeight, LineHeightProperty, SetOverrideFontFamily, GetOverrideFontFamily, OverrideFontFamilyProperty
+AMP.UI.Controls.IMenuButton
+AMP.UI.Controls.IMoreDialog
+  methods: get_HeaderTitle, put_HeaderTitle, get_HeaderSubtitle, put_HeaderSubtitle, get_ParagraphText, put_ParagraphText, get_IsEditable, put_IsEditable, UnloadObject
+AMP.UI.Controls.IMotionEnabledChangedEventArgs
+  methods: get_MotionEnabled
+AMP.UI.Controls.IMotionEnabledChangedEventArgsFactory
+  methods: CreateInstance
+AMP.UI.Controls.INavView
+AMP.UI.Controls.INavViewStatics
+  methods: GetExpandSubItems, SetExpandSubItems
+AMP.UI.Controls.INavigateBackCommand
+  methods: get_Frame, put_Frame, get_FrameProperty
+AMP.UI.Controls.INavigationInfo
+  methods: get_View, put_View, get_ViewModel, put_ViewModel, get_ViewModelKey, put_ViewModelKey, get_Transition, put_Transition
+AMP.UI.Controls.INavigationViewItemHeader
+  methods: get_Glyph, put_Glyph, add_Click, remove_Click
+AMP.UI.Controls.INavigationViewItemHeaderStatics
+  methods: get_GlyphProperty
+AMP.UI.Controls.INavigator
+  methods: get_ContentFrame, put_ContentFrame, get_CurrentViewModel, put_CurrentViewModel, get_NavigationInfo, put_NavigationInfo
+AMP.UI.Controls.INavigatorStatics
+  methods: get_CurrentViewModelProperty
+AMP.UI.Controls.INonFocusableFlyout
+AMP.UI.Controls.INonVirtualizingStackLayout
+  methods: get_Orientation, put_Orientation, get_Spacing, put_Spacing
+AMP.UI.Controls.INumberRangeControl
+  methods: get_Value1, put_Value1, get_IsValue1Mixed, put_IsValue1Mixed, get_Value2, put_Value2, get_IsValue2Mixed, put_IsValue2Mixed, get_TitleName, put_TitleName, get_MaxDigits, put_MaxDigits, get_NumberWidth, put_NumberWidth, get_UndoEnabled, put_UndoEnabled, get_IsReadOnly, put_IsReadOnly, get_PlaceholderValue1, put_PlaceholderValue1, get_PlaceholderValue2, put_PlaceholderValue2
+AMP.UI.Controls.INumberRangeControlStatics
+  methods: get_Value1Property, get_IsValue1MixedProperty, get_Value2Property, get_IsValue2MixedProperty, get_TitleNameProperty, get_MaxDigitsProperty, get_NumberWidthProperty, get_UndoEnabledProperty, get_IsReadOnlyProperty, get_PlaceholderValue1Property, get_PlaceholderValue2Property
+AMP.UI.Controls.INumberTextBox
+  methods: get_MaxDigits, put_MaxDigits, get_Number, put_Number, get_IsReadOnly, put_IsReadOnly, get_PlaceholderValue, put_PlaceholderValue, add_NumberTextChanged, remove_NumberTextChanged, add_NumberTextKeyUp, remove_NumberTextKeyUp, add_NumberTextLostFocus, remove_NumberTextLostFocus
+AMP.UI.Controls.INumberTextBoxStatics
+  methods: get_MaxDigitsProperty, get_NumberProperty, get_IsReadOnlyProperty, get_PlaceholderValueProperty
+AMP.UI.Controls.INumericToStringConverter
+  methods: get_OnZeroUseBlank, put_OnZeroUseBlank
+AMP.UI.Controls.IOneLineTextEditControl
+  methods: get_Value, put_Value, get_TitleName, put_TitleName, get_UndoEnabled, put_UndoEnabled, get_PlaceholderValue, put_PlaceholderValue, get_IsReadOnly, put_IsReadOnly, get_IsMixed, put_IsMixed, get_ShouldResetValueOnFocusLost, put_ShouldResetValueOnFocusLost
+AMP.UI.Controls.IOneLineTextEditControlStatics
+  methods: get_ValueProperty, get_TitleNameProperty, get_UndoEnabledProperty, get_PlaceholderValueProperty, get_IsReadOnlyProperty, get_IsMixedProperty, get_ShouldResetValueOnFocusLostProperty
+AMP.UI.Controls.IOneNumberEditControl
+  methods: get_Value, put_Value, get_TitleName, put_TitleName, get_MaxDigits, put_MaxDigits, get_NumberWidth, put_NumberWidth, get_IsReadOnly, put_IsReadOnly, get_IsMixed, put_IsMixed, get_PlaceholderValue, put_PlaceholderValue
+AMP.UI.Controls.IOneNumberEditControlStatics
+  methods: get_ValueProperty, get_TitleNameProperty, get_MaxDigitsProperty, get_NumberWidthProperty, get_IsReadOnlyProperty, get_IsMixedProperty, get_PlaceholderValueProperty
+AMP.UI.Controls.IPowerSettingChangedEventArgs
+  methods: get_IsDisplayOn
+AMP.UI.Controls.IPowerSettingChangedEventArgsFactory
+  methods: CreateInstance
+AMP.UI.Controls.IPrimaryPage
+AMP.UI.Controls.IPrimaryPage2
+  methods: get_PageContent, put_PageContent
+AMP.UI.Controls.IProfilePicture
+AMP.UI.Controls.IRatingControl
+  methods: get_TitleName, put_TitleName, get_Rating, put_Rating, get_IsReadOnly, put_IsReadOnly, get_IsRatingMixed, put_IsRatingMixed
+AMP.UI.Controls.IRatingControlStatics
+  methods: get_TitleNameProperty, get_RatingProperty, get_IsReadOnlyProperty, get_IsRatingMixedProperty
+AMP.UI.Controls.IResourceFormatterConverter
+  methods: get_Scope, put_Scope
+AMP.UI.Controls.IRestrictValueToRangeConverter
+  methods: get_LowerBound, put_LowerBound, get_UpperBound, put_UpperBound
+AMP.UI.Controls.IRichEditBox
+AMP.UI.Controls.IRichEditBoxStatics
+  methods: SetRichText, GetRichText
+AMP.UI.Controls.IScrollBar
+AMP.UI.Controls.IScrollBarStatics
+  methods: SetExtent, GetExtent
+AMP.UI.Controls.IScrubberControl
+  methods: get_ThumbVisibility, put_ThumbVisibility, get_TrackHeight, put_TrackHeight, get_TrackRectRadius, put_TrackRectRadius
+AMP.UI.Controls.IScrubberControlStatics
+  methods: get_ThumbVisibilityProperty, get_TrackHeightProperty, get_TrackRectRadiusProperty
+AMP.UI.Controls.ISessionChangedEventArgs
+  methods: get_IsScreenLocked
+AMP.UI.Controls.ISessionChangedEventArgsFactory
+  methods: CreateInstance
+AMP.UI.Controls.ISettingContainerView
+  methods: get_Header, put_Header, get_HelpText, put_HelpText, get_CurrentValue, put_CurrentValue, get_IconGlyph, put_IconGlyph
+AMP.UI.Controls.ISettingContainerViewStatics
+  methods: get_HeaderProperty, get_HelpTextProperty, get_CurrentValueProperty, get_IconGlyphProperty
+AMP.UI.Controls.ISettingsChangedEventArgs
+  methods: get_Placeholder
+AMP.UI.Controls.IShelfView
+  methods: get_CanDragItems, put_CanDragItems, get_ItemsSource, put_ItemsSource, get_ItemTemplate, put_ItemTemplate, get_ItemTemplateSelector, put_ItemTemplateSelector, get_GridPresentation, put_GridPresentation, get_HorizontalOffset, put_HorizontalOffset, get_Rows, put_Rows, get_Header, put_Header, get_LeadingItem, put_LeadingItem, get_LeadingItemTemplate, put_LeadingItemTemplate, get_IsMultipleSelectionMode, put_IsMultipleSelectionMode, get_ShowSmallChevron, put_ShowSmallChevron, get_SelectedItemsSource, put_SelectedItemsSource, add_DragItemsStarting, remove_DragItemsStarting, add_DragItemsCompleted, remove_DragItemsCompleted, add_ItemClick, remove_ItemClick
+AMP.UI.Controls.IShelfViewStatics
+  methods: SetIsItemMainContent, GetIsItemMainContent, get_CanDragItemsProperty, get_ItemsSourceProperty, get_ItemTemplateProperty, get_ItemTemplateSelectorProperty, get_GridPresentationProperty, get_HorizontalOffsetProperty, get_RowsProperty, get_HeaderProperty, get_LeadingItemProperty, get_LeadingItemTemplateProperty, get_IsMultipleSelectionModeProperty, get_ShowSmallChevronProperty, get_SelectedItemsSourceProperty
+AMP.UI.Controls.ISliderAutomationPeerFactory
+AMP.UI.Controls.ISliderAutomationPeerFactoryFactory
+  methods: CreateInstance
+AMP.UI.Controls.ISliderAutomationPeerFactoryStatics
+  methods: Create
+AMP.UI.Controls.ISliderWithDragState
+  methods: get_Limit, put_Limit, get_LimitLabelText, put_LimitLabelText, get_ShowLimitLabelText, put_ShowLimitLabelText, get_GridContainer, put_GridContainer, get_StackPanelContainer, put_StackPanelContainer, get_IsThumbDragging, put_IsThumbDragging, get_CustomAutomationPeerClassName, put_CustomAutomationPeerClassName, get_CustomAutomationPeer, put_CustomAutomationPeer, get_HorizontalThumbAutomationId, put_HorizontalThumbAutomationId, get_VerticalThumbAutomationId, put_VerticalThumbAutomationId, Detach, add_SliderDragStateChanged, remove_SliderDragStateChanged
+AMP.UI.Controls.ISliderWithDragStateStatics
+  methods: get_LimitProperty, get_LimitLabelTextProperty, get_ShowLimitLabelTextProperty, get_GridContainerProperty, get_StackPanelContainerProperty, get_IsThumbDraggingProperty, get_CustomAutomationPeerClassNameProperty, get_CustomAutomationPeerProperty, get_HorizontalThumbAutomationIdProperty, get_VerticalThumbAutomationIdProperty
+AMP.UI.Controls.ISpinner
+  methods: get_IsActive, get_ShowAfter, put_ShowAfter, get_Text, put_Text
+AMP.UI.Controls.ISpinnerStatics
+  methods: get_IsActiveProperty, get_ShowAfterProperty, get_TextProperty
+AMP.UI.Controls.ISplitDigitControl
+  methods: get_Code, add_CodeChanged, remove_CodeChanged, Reset
+AMP.UI.Controls.IStickyHeader
+  methods: get_AssociatedScrollViewer, put_AssociatedScrollViewer, get_IsInsideItemsControl, put_IsInsideItemsControl, get_IsInsideAssociatedScrollViewer, put_IsInsideAssociatedScrollViewer, get_OffBranchParent, put_OffBranchParent, get_OffsetY, put_OffsetY, get_StickyBackground, put_StickyBackground
+AMP.UI.Controls.IStickyHeaderStatics
+  methods: get_AssociatedScrollViewerProperty, get_IsInsideItemsControlProperty, get_IsInsideAssociatedScrollViewerProperty, get_OffBranchParentProperty, get_OffsetYProperty, get_StickyBackgroundProperty
+AMP.UI.Controls.IStyleSelector
+  methods: get_Styles, put_Styles
+AMP.UI.Controls.IStyleSelectorItem
+  methods: get_Type, put_Type, get_Style, put_Style, IsEqual
+AMP.UI.Controls.IStyleSelectorItemFactory
+  methods: CreateInstance
+AMP.UI.Controls.ITaskbarButtonMessageEventArgs
+  methods: get_Message, get_Type
+AMP.UI.Controls.ITaskbarButtonMessageEventArgsFactory
+  methods: CreateInstance
+AMP.UI.Controls.ITemplateSelector
+  methods: get_Templates, put_Templates
+AMP.UI.Controls.ITemplateSelectorItem
+  methods: get_Type, put_Type, get_Template, put_Template
+AMP.UI.Controls.ITemplateSelectorItemFactory
+  methods: CreateInstance
+AMP.UI.Controls.ITemplateSelectorItemOverrides
+  methods: IsEqual
+AMP.UI.Controls.ITextBlock
+AMP.UI.Controls.ITextBlockStatics
+  methods: SetTaggedText, GetTaggedText, SetAutoTextToolTip, GetAutoTextToolTip, ParseTaggedText
+AMP.UI.Controls.ITextBoxLoc
+AMP.UI.Controls.IThemeResources
+AMP.UI.Controls.ITickerTapeControl
+  methods: StartAnimation, StopAnimation, get_Text, put_Text
+AMP.UI.Controls.ITileControl
+  methods: get_Header, put_Header, get_HoverContent, put_HoverContent, get_RootHoverGrid, put_RootHoverGrid, get_Footer, put_Footer, get_Right, put_Right
+AMP.UI.Controls.ITileControlStatics
+  methods: get_HeaderProperty, get_HoverContentProperty, get_RootHoverGridProperty, get_FooterProperty, get_RightProperty
+AMP.UI.Controls.ITimeEditControl
+  methods: get_TitleName, put_TitleName, get_TimeValue, put_TimeValue, get_TimeWidth, put_TimeWidth, get_DefaultValue, put_DefaultValue, get_MaxTimeValue, put_MaxTimeValue, get_IsReadOnly, put_IsReadOnly
+AMP.UI.Controls.ITimeEditControlStatics
+  methods: get_TitleNameProperty, get_TimeValueProperty, get_TimeWidthProperty, get_DefaultValueProperty, get_MaxTimeValueProperty, get_IsReadOnlyProperty
+AMP.UI.Controls.ITitlebar
+  methods: GetTitlebarButtonColors, GetTitleBarElement, GetNonDraggableRects, SetWindowState, add_DragRegionChanged, remove_DragRegionChanged
+AMP.UI.Controls.ITwoLinesDateControl
+  methods: get_Value, put_Value, get_TitleName, put_TitleName, get_UndoEnabled, put_UndoEnabled, get_IsMixed, put_IsMixed, get_IsReadOnly, put_IsReadOnly
+AMP.UI.Controls.ITwoLinesDateControlStatics
+  methods: get_ValueProperty, get_TitleNameProperty, get_UndoEnabledProperty, get_IsMixedProperty, get_IsReadOnlyProperty
+AMP.UI.Controls.ITwoLinesTextEditControl
+  methods: get_Value, put_Value, get_TitleName, put_TitleName, get_UndoEnabled, put_UndoEnabled, get_PlaceholderValue, put_PlaceholderValue, get_IsReadOnly, put_IsReadOnly, get_IsMixed, put_IsMixed, get_ShouldResetValueOnFocusLost, put_ShouldResetValueOnFocusLost, get_Completions, put_Completions, get_FilteredItems, put_FilteredItems
+AMP.UI.Controls.ITwoLinesTextEditControlStatics
+  methods: get_ValueProperty, get_TitleNameProperty, get_UndoEnabledProperty, get_PlaceholderValueProperty, get_IsReadOnlyProperty, get_IsMixedProperty, get_ShouldResetValueOnFocusLostProperty, get_CompletionsProperty, get_FilteredItemsProperty
+AMP.UI.Controls.IUndoButton
+  methods: add_Click, remove_Click
+AMP.UI.Controls.IUniformGrid
+AMP.UI.Controls.IUtilities
+AMP.UI.Controls.IUtilitiesStatics
+  methods: LocalizedAppName, Add, Both, GreaterThan, None, Not, Or, Empty, True, False, NotEmpty, NotNull, Null, NullAndFalse, NullAndNotNull, NotNullAndEmpty, NotNullAndNotEmpty, NotNullOrNotEmpty, NotNullOrNotNull, NullAndNull, BothNotNull, TrueAndNull, TrueAndNotNull, FalseAndNotNull, TrueAndFalse, FalseIfEqualString, TrueIfEqualString, IfEmptyStringValue1ElseValue2, BoldIfEitherTrue, BoldFontTypeIfEitherTrue, SolidColorBrush, SubtitleBrush, ColorWithAlpha, Milliseconds, Seconds, SecondsToTimeSpan, VisibleIfEmpty, VisibleIfNotEmpty, VisibleIfNull, VisibleIfNotNull, VisibleIfEitherNotNull, VisibleIfBothTrue, VisibleIfBothFalse, VisibleIfTrue, VisibleIfTrueAndFalse, VisibleIfFalse, VisibleIfEitherTrue, VisibleIfFalseAndTrue, VisibleIfGreaterThan, VisibleIfEqual, VisibleIfEqualString, VisibleIfNotEqual, VisibleIfNotEqualString, VisibleIfNotEmptyOrNotNull, VisibleIfInternalBuild, VisibleIfDebugBuild, HasMultipleItems, HasSingleItem, HasNoItems, HasStringItems, SvgImageSource, BitmapImageSource, BitmapImageSourceFromString, CreateRenderTargetBitmap, SvgImageSourceFromEncodedData, BoxString, UnboxString, SFSymbolToUnicode, FavoriteStateToUnicode, ExplicitSymbolIf, ConvertDigitsToMonospaced, GetAspectRatio, ConditionalSelectDouble, ConditionalSelectSize, DimmedOpacityIfTrue, ExtendedSelectionModeIfAllowed, MapOrientationToIntHV, IsOrientationVertical, IsOrientationHorizontal, FavoriteStateButtonStyle, FavoriteStateButtonTooltip, ElevateIfFalse, ThicknessIfTrue, CornerRadiusIfTrueOrElse, FullOpacityIfTrueOrElseValue, NoOpacityIfTrue
+AMP.UI.Controls.IVideoAdvisoryControl
+  methods: get_HasFinishedAnimation, put_HasFinishedAnimation, get_BadgeSize, put_BadgeSize, get_DividerSize, put_DividerSize, get_DividerMargin, put_DividerMargin, get_DividerBrush, put_DividerBrush, get_LegendBlockSize, put_LegendBlockSize, get_LegendBlockPadding, put_LegendBlockPadding, get_LegendBlockBrush, put_LegendBlockBrush, get_LegendBlockCornerRadius, put_LegendBlockCornerRadius, get_LegendBlockFontFamily, put_LegendBlockFontFamily, get_LegendBlockFontSize, put_LegendBlockFontSize, get_LegendBlockFontWeight, put_LegendBlockFontWeight, get_LegendBlockTextBrush, put_LegendBlockTextBrush, get_DescriptionFontFamily, put_DescriptionFontFamily, get_DescriptionFontSize, put_DescriptionFontSize, get_DescriptionFontWeight, put_DescriptionFontWeight, get_DescriptionBrush, put_DescriptionBrush, get_DescriptionHorizontalSpacing, put_DescriptionHorizontalSpacing, get_DescriptionVerticalSpacing, put_DescriptionVerticalSpacing, get_PhotosensitiveDescriptionWidth, put_PhotosensitiveDescriptionWidth, get_PhotosensitiveDescriptionMaxLines, put_PhotosensitiveDescriptionMaxLines, get_PhotosensitiveDescriptionFontFamily, put_PhotosensitiveDescriptionFontFamily, get_PhotosensitiveDescriptionFontSize, put_PhotosensitiveDescriptionFontSize, get_PhotosensitiveDescriptionFontWeight, put_PhotosensitiveDescriptionFontWeight, get_PhotosensitiveDescriptionBrush, put_PhotosensitiveDescriptionBrush, get_VideoAdvisoryData, put_VideoAdvisoryData, get_DescriptionContent1, get_DescriptionContent2, get_DescriptionContent3, get_DescriptionContent4, get_DescriptionContent5, get_DescriptionContent6, get_DescriptionContent7, get_DescriptionContent8, get_DescriptionContent9, StartAnimation, get_DescriptionSecondGroupVerticalScrollOffset, get_DescriptionThirdGroupVerticalScrollOffset, get_PhotosensitiveVerticalScrollOffset, SetRenderScale
+AMP.UI.Controls.IVideoAdvisoryControlStatics
+  methods: get_HasFinishedAnimationProperty
+AMP.UI.Controls.IVideoAdvisoryData
+  methods: get_RatingBadgeSource, put_RatingBadgeSource, get_AdvisoryDescriptions, put_AdvisoryDescriptions, get_PhotosensitiveBadgeSource, put_PhotosensitiveBadgeSource, get_PhotosensitiveDescriptionString, put_PhotosensitiveDescriptionString
+AMP.UI.Controls.IVideoAdvisoryDescription
+  methods: get_Legend, put_Legend, get_LegendBlockSize, put_LegendBlockSize, get_LegendBlockMargin, put_LegendBlockMargin, get_LegendBlockBrush, put_LegendBlockBrush, get_LegendBlockCornerRadius, put_LegendBlockCornerRadius, get_LegendBlockTextPadding, put_LegendBlockTextPadding, get_LegendBlockFontFamily, put_LegendBlockFontFamily, get_LegendBlockFontSize, put_LegendBlockFontSize, get_LegendBlockFontWeight, put_LegendBlockFontWeight, get_LegendBlockTextBrush, put_LegendBlockTextBrush, get_Description, put_Description, get_DescriptionFontFamily, put_DescriptionFontFamily, get_DescriptionFontSize, put_DescriptionFontSize, get_DescriptionFontWeight, put_DescriptionFontWeight, get_DescriptionBrush, put_DescriptionBrush, get_DescriptionMargin, put_DescriptionMargin
+AMP.UI.Controls.IVideoAdvisoryDescriptionText
+  methods: get_Legend, put_Legend, get_Description, put_Description
+AMP.UI.Controls.IVideoAdvisoryDescriptionTextFactory
+  methods: CreateInstance
+AMP.UI.Controls.IVideoPositionSliderAutomationPeer
+  methods: add_ScreenReaderNarrationStateChanged, remove_ScreenReaderNarrationStateChanged
+AMP.UI.Controls.IVideoPositionSliderAutomationPeerFactory
+  methods: CreateInstance
+AMP.UI.Controls.IVideoVolumeSliderAutomationPeer
+AMP.UI.Controls.IVideoVolumeSliderAutomationPeerFactory
+  methods: CreateInstance
+AMP.UI.Controls.IViewTypeAheadArgs
+  methods: get_TypeAheadProvider, put_TypeAheadProvider, get_SearchString, put_SearchString
+AMP.UI.Controls.IVolumeControl
+  methods: get_CurrentVolumeGlyph, put_CurrentVolumeGlyph, get_Level, put_Level, get_Muted, put_Muted, get_IsOpen, put_IsOpen, add_FlyoutClosing, remove_FlyoutClosing, add_FlyoutOpening, remove_FlyoutOpening
+AMP.UI.Controls.IVolumeControlStatics
+  methods: get_CurrentVolumeGlyphProperty, get_LevelProperty, get_MutedProperty, get_IsOpenProperty
+AMP.UI.Controls.IWebView2
+AMP.UI.Controls.IWebView2Statics
+  methods: SetHasKeyboardHook, GetHasKeyboardHook, SetText, GetText
+AMP.UI.Controls.IWindow
+  methods: SetBounds, SetIcon, get_MinPhysicalSize, put_MinPhysicalSize, get_MaxPhysicalSize, put_MaxPhysicalSize, SetPreferredMinSize, SetPreferredMaxSize, SetWindowAspectRatio, GetState, SetState, SetBackgroundBrushWithStockObject, ClearBackgroundBrush, CurrentDPI, get_BorderInfo, RefreshBorderInfo, ClearTaskbarButtonMessageIds, RegisterTaskbarButtonMessageId, GetTitleBar, ExtendContentIntoTitleBar, CollapseTitleBarButtons, SetTitlebarInterface, SetIsTitleBarDraggable, get_MotionEnabled, add_MotionEnabledChanged, remove_MotionEnabledChanged, add_PowerSettingChanged, remove_PowerSettingChanged, add_SessionChanged, remove_SessionChanged, add_SettingsChanged, remove_SettingsChanged, add_TaskbarButtonMessage, remove_TaskbarButtonMessage, add_Closing, remove_Closing, add_Destroying, remove_Destroying, add_DPIChanged, remove_DPIChanged, add_MaximizeRequested, remove_MaximizeRequested, add_PointerMovedInNonClient, remove_PointerMovedInNonClient, add_PositionChanged, remove_PositionChanged, add_PresenterChanged, remove_PresenterChanged, add_SizeMoveModeChanged, remove_SizeMoveModeChanged, add_StateChanged, remove_StateChanged
+AMP.UI.Controls.IWindowBorderInfo
+  methods: get_HasValue, put_HasValue, get_LeftBorderThickness, get_TopBorderThickness, get_RightBorderThickness, get_BottomBorderThickness, get_TitleBarHeight
+AMP.UI.Controls.IWindowBorderInfoFactory
+  methods: CreateInstance
+AMP.UI.Controls.IWindowClosingEventArgs
+  methods: get_Cancel, put_Cancel
+AMP.UI.Controls.IWindowDPIChangedEventArgs
+  methods: get_Handled, put_Handled, get_DPI
+AMP.UI.Controls.IWindowDPIChangedEventArgsFactory
+  methods: CreateInstance
+AMP.UI.Controls.IWindowDestroyingEventArgs
+  methods: get_Handled, put_Handled
+AMP.UI.Controls.IWindowFactory
+  methods: CreateInstance
+AMP.UI.Controls.IWindowMaximizeRequestedEventArgs
+  methods: get_Handled, put_Handled
+AMP.UI.Controls.IWindowPointerMovedInNonClientEventArgs
+  methods: get_Handled, put_Handled, get_IsLeaving
+AMP.UI.Controls.IWindowPointerMovedInNonClientEventArgsFactory
+  methods: CreateInstance
+AMP.UI.Controls.IWindowPositionChangedEventArgs
+  methods: get_Handled, put_Handled, get_Position
+AMP.UI.Controls.IWindowPositionChangedEventArgsFactory
+  methods: CreateInstance
+AMP.UI.Controls.IWindowPresenterChangedEventArgs
+  methods: get_Handled, put_Handled, get_Presenter
+AMP.UI.Controls.IWindowPresenterChangedEventArgsFactory
+  methods: CreateInstance
+AMP.UI.Controls.IWindowSizeContentControl
+  methods: get_WindowSize, put_WindowSize, get_ContentIndex, put_ContentIndex, get_ContentSetSize, put_ContentSetSize
+AMP.UI.Controls.IWindowSizeContentControlStatics
+  methods: get_WindowSizeProperty, get_ContentIndexProperty, get_ContentSetSizeProperty
+AMP.UI.Controls.IWindowSizeMoveModeChangedEventArgs
+  methods: get_Handled, put_Handled, get_IsActive
+AMP.UI.Controls.IWindowSizeMoveModeChangedEventArgsFactory
+  methods: CreateInstance
+AMP.UI.Controls.IWindowStateChangedEventArgs
+  methods: get_Handled, put_Handled, get_State
+AMP.UI.Controls.IWindowStateChangedEventArgsFactory
+  methods: CreateInstance
+AMP.UI.Controls.IWindowStatics
+  methods: GetDefaultTitlebarButtonColors, ShowModalWindowAsync
+AMP.UI.Controls.IXMDPAttachableUI
+  methods: get_TypeName, put_TypeName
+AMP.UI.Controls.ImmersionLockup
+  methods: .ctor, Connect, Render, get_ImageLocation, put_ImageLocation, get_Animated, put_Animated, add_OnRender, remove_OnRender
+AMP.UI.Controls.InfoPanelAuxillaryInfoControl
+  methods: .ctor, get_TextTemplate, put_TextTemplate, get_BadgesTemplate, put_BadgesTemplate, get_TextTemplateProperty, get_BadgesTemplateProperty
+AMP.UI.Controls.KeyValueConverter
+  methods: .ctor, get_DefaultValue, put_DefaultValue, get_Pairs, Convert, ConvertBack
+AMP.UI.Controls.KeyValuePair
+  methods: .ctor, get_Key, put_Key, get_Value, put_Value
+AMP.UI.Controls.LicenseAgreementControl
+  methods: .ctor, ShowDialogAsync
+AMP.UI.Controls.ListView
+  methods: .ctor, get_AlternatingRowBackgroundBrush, put_AlternatingRowBackgroundBrush, get_ItemToKeyConverter, put_ItemToKeyConverter, get_KeepSelectionInView, put_KeepSelectionInView, get_ScrollState, put_ScrollState, get_ScrollStateItemKey, put_ScrollStateItemKey, get_ScrollStateItemSize, put_ScrollStateItemSize, get_SelectedItemsEx, put_SelectedItemsEx, add_RowUpdate, remove_RowUpdate, get_TypeAheadProvider, put_TypeAheadProvider, get_BringSelectedItemIntoViewOffset, put_BringSelectedItemIntoViewOffset, UpdateTypeAhead, add_TypeAheadRequested, remove_TypeAheadRequested, get_AlternatingRowBackgroundBrushProperty, get_ItemToKeyConverterProperty, get_KeepSelectionInViewProperty, get_ScrollStateProperty, get_ScrollStateItemKeyProperty, get_ScrollStateItemSizeProperty, get_SelectedItemsExProperty
+AMP.UI.Controls.ListViewBaseUtils
+  methods: ScrollIntoViewWithExtent, SelectAndScrollIntoView, SetAlternatingRowBackgroundBrush, GetAlternatingRowBackgroundBrush
+AMP.UI.Controls.ListViewRowUpdateArgs
+  methods: .ctor, get_Index, put_Index, get_ItemContainer, put_ItemContainer
+AMP.UI.Controls.LoadingToBrushConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.LocalizationService
+  methods: Initialize, get_FlowDirection, ToggleDebugMode, AllowBold, AllowLineHeight, SetFontSize, GetFontSize, FontSizeProperty, SetFontType, GetFontType, FontTypeProperty, SetLineHeight, GetLineHeight, LineHeightProperty, SetOverrideFontFamily, GetOverrideFontFamily, OverrideFontFamilyProperty
+AMP.UI.Controls.MenuButton
+  methods: .ctor
+AMP.UI.Controls.MoreDialog
+  methods: .ctor, get_HeaderTitle, put_HeaderTitle, get_HeaderSubtitle, put_HeaderSubtitle, get_ParagraphText, put_ParagraphText, get_IsEditable, put_IsEditable, UnloadObject
+AMP.UI.Controls.MotionEnabledChangedEventArgs
+  methods: .ctor, get_MotionEnabled
+AMP.UI.Controls.NavView
+  methods: GetExpandSubItems, SetExpandSubItems
+AMP.UI.Controls.NavigateBackCommand
+  methods: .ctor, get_Frame, put_Frame, get_FrameProperty
+AMP.UI.Controls.NavigationInfo
+  methods: .ctor, get_View, put_View, get_ViewModel, put_ViewModel, get_ViewModelKey, put_ViewModelKey, get_Transition, put_Transition
+AMP.UI.Controls.NavigationViewItemHeader
+  methods: .ctor, get_Glyph, put_Glyph, add_Click, remove_Click, get_GlyphProperty
+AMP.UI.Controls.Navigator
+  methods: .ctor, get_ContentFrame, put_ContentFrame, get_CurrentViewModel, put_CurrentViewModel, get_NavigationInfo, put_NavigationInfo, get_CurrentViewModelProperty
+AMP.UI.Controls.NonFocusableFlyout
+  methods: .ctor
+AMP.UI.Controls.NonVirtualizingStackLayout
+  methods: .ctor, get_Orientation, put_Orientation, get_Spacing, put_Spacing
+AMP.UI.Controls.NotNullToVisibilityConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.NullToGridLengthConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.NumberRangeControl
+  methods: .ctor, get_Value1, put_Value1, get_IsValue1Mixed, put_IsValue1Mixed, get_Value2, put_Value2, get_IsValue2Mixed, put_IsValue2Mixed, get_TitleName, put_TitleName, get_MaxDigits, put_MaxDigits, get_NumberWidth, put_NumberWidth, get_UndoEnabled, put_UndoEnabled, get_IsReadOnly, put_IsReadOnly, get_PlaceholderValue1, put_PlaceholderValue1, get_PlaceholderValue2, put_PlaceholderValue2, get_Value1Property, get_IsValue1MixedProperty, get_Value2Property, get_IsValue2MixedProperty, get_TitleNameProperty, get_MaxDigitsProperty, get_NumberWidthProperty, get_UndoEnabledProperty, get_IsReadOnlyProperty, get_PlaceholderValue1Property, get_PlaceholderValue2Property
+AMP.UI.Controls.NumberTextBox
+  methods: .ctor, get_MaxDigits, put_MaxDigits, get_Number, put_Number, get_IsReadOnly, put_IsReadOnly, get_PlaceholderValue, put_PlaceholderValue, add_NumberTextChanged, remove_NumberTextChanged, add_NumberTextKeyUp, remove_NumberTextKeyUp, add_NumberTextLostFocus, remove_NumberTextLostFocus, get_MaxDigitsProperty, get_NumberProperty, get_IsReadOnlyProperty, get_PlaceholderValueProperty
+AMP.UI.Controls.NumericToStringConverter
+  methods: .ctor, get_OnZeroUseBlank, put_OnZeroUseBlank, Convert, ConvertBack
+AMP.UI.Controls.OneLineTextEditControl
+  methods: .ctor, get_Value, put_Value, get_TitleName, put_TitleName, get_UndoEnabled, put_UndoEnabled, get_PlaceholderValue, put_PlaceholderValue, get_IsReadOnly, put_IsReadOnly, get_IsMixed, put_IsMixed, get_ShouldResetValueOnFocusLost, put_ShouldResetValueOnFocusLost, get_ValueProperty, get_TitleNameProperty, get_UndoEnabledProperty, get_PlaceholderValueProperty, get_IsReadOnlyProperty, get_IsMixedProperty, get_ShouldResetValueOnFocusLostProperty
+AMP.UI.Controls.OneNumberEditControl
+  methods: .ctor, get_Value, put_Value, get_TitleName, put_TitleName, get_MaxDigits, put_MaxDigits, get_NumberWidth, put_NumberWidth, get_IsReadOnly, put_IsReadOnly, get_IsMixed, put_IsMixed, get_PlaceholderValue, put_PlaceholderValue, get_ValueProperty, get_TitleNameProperty, get_MaxDigitsProperty, get_NumberWidthProperty, get_IsReadOnlyProperty, get_IsMixedProperty, get_PlaceholderValueProperty
+AMP.UI.Controls.PowerSettingChangedEventArgs
+  methods: .ctor, get_IsDisplayOn
+AMP.UI.Controls.PrimaryPage
+  methods: .ctor, get_PageContent, put_PageContent, GetTitlebarButtonColors, GetTitleBarElement, GetNonDraggableRects, SetWindowState, add_DragRegionChanged, remove_DragRegionChanged
+AMP.UI.Controls.ProfilePicture
+  methods: .ctor
+AMP.UI.Controls.RatingControl
+  methods: .ctor, get_TitleName, put_TitleName, get_Rating, put_Rating, get_IsReadOnly, put_IsReadOnly, get_IsRatingMixed, put_IsRatingMixed, get_TitleNameProperty, get_RatingProperty, get_IsReadOnlyProperty, get_IsRatingMixedProperty
+AMP.UI.Controls.RatioToPercentageConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.ResourceFormatterConverter
+  methods: .ctor, get_Scope, put_Scope, Convert, ConvertBack
+AMP.UI.Controls.RestrictValueToRangeConverter
+  methods: .ctor, get_LowerBound, put_LowerBound, get_UpperBound, put_UpperBound, Convert, ConvertBack
+AMP.UI.Controls.RichEditBox
+  methods: SetRichText, GetRichText
+AMP.UI.Controls.SFSymbolToUnicodeConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.ScrollBar
+  methods: SetExtent, GetExtent
+AMP.UI.Controls.ScrubberControl
+  methods: .ctor, get_ThumbVisibility, put_ThumbVisibility, get_TrackHeight, put_TrackHeight, get_TrackRectRadius, put_TrackRectRadius, get_ThumbVisibilityProperty, get_TrackHeightProperty, get_TrackRectRadiusProperty
+AMP.UI.Controls.SecondsToKeyTimeConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.SecondsToTimeStringConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.SessionChangedEventArgs
+  methods: .ctor, get_IsScreenLocked
+AMP.UI.Controls.SettingContainerView
+  methods: .ctor, get_Header, put_Header, get_HelpText, put_HelpText, get_CurrentValue, put_CurrentValue, get_IconGlyph, put_IconGlyph, get_HeaderProperty, get_HelpTextProperty, get_CurrentValueProperty, get_IconGlyphProperty
+AMP.UI.Controls.SettingsChangedEventArgs
+  methods: .ctor, get_Placeholder
+AMP.UI.Controls.ShelfView
+  methods: .ctor, get_CanDragItems, put_CanDragItems, get_ItemsSource, put_ItemsSource, get_ItemTemplate, put_ItemTemplate, get_ItemTemplateSelector, put_ItemTemplateSelector, get_GridPresentation, put_GridPresentation, get_HorizontalOffset, put_HorizontalOffset, get_Rows, put_Rows, get_Header, put_Header, get_LeadingItem, put_LeadingItem, get_LeadingItemTemplate, put_LeadingItemTemplate, get_IsMultipleSelectionMode, put_IsMultipleSelectionMode, get_ShowSmallChevron, put_ShowSmallChevron, get_SelectedItemsSource, put_SelectedItemsSource, add_DragItemsStarting, remove_DragItemsStarting, add_DragItemsCompleted, remove_DragItemsCompleted, add_ItemClick, remove_ItemClick, SetIsItemMainContent, GetIsItemMainContent, get_CanDragItemsProperty, get_ItemsSourceProperty, get_ItemTemplateProperty, get_ItemTemplateSelectorProperty, get_GridPresentationProperty, get_HorizontalOffsetProperty, get_RowsProperty, get_HeaderProperty, get_LeadingItemProperty, get_LeadingItemTemplateProperty, get_IsMultipleSelectionModeProperty, get_ShowSmallChevronProperty, get_SelectedItemsSourceProperty
+AMP.UI.Controls.SliderAutomationPeerFactory
+  methods: .ctor, Create
+AMP.UI.Controls.SliderWithDragState
+  methods: .ctor, get_Limit, put_Limit, get_LimitLabelText, put_LimitLabelText, get_ShowLimitLabelText, put_ShowLimitLabelText, get_GridContainer, put_GridContainer, get_StackPanelContainer, put_StackPanelContainer, get_IsThumbDragging, put_IsThumbDragging, get_CustomAutomationPeerClassName, put_CustomAutomationPeerClassName, get_CustomAutomationPeer, put_CustomAutomationPeer, get_HorizontalThumbAutomationId, put_HorizontalThumbAutomationId, get_VerticalThumbAutomationId, put_VerticalThumbAutomationId, Detach, add_SliderDragStateChanged, remove_SliderDragStateChanged, get_LimitProperty, get_LimitLabelTextProperty, get_ShowLimitLabelTextProperty, get_GridContainerProperty, get_StackPanelContainerProperty, get_IsThumbDraggingProperty, get_CustomAutomationPeerClassNameProperty, get_CustomAutomationPeerProperty, get_HorizontalThumbAutomationIdProperty, get_VerticalThumbAutomationIdProperty
+AMP.UI.Controls.Spinner
+  methods: .ctor, get_IsActive, get_ShowAfter, put_ShowAfter, get_Text, put_Text, get_IsActiveProperty, get_ShowAfterProperty, get_TextProperty
+AMP.UI.Controls.SplitDigitControl
+  methods: .ctor, get_Code, add_CodeChanged, remove_CodeChanged, Reset
+AMP.UI.Controls.StickyHeader
+  methods: .ctor, get_AssociatedScrollViewer, put_AssociatedScrollViewer, get_IsInsideItemsControl, put_IsInsideItemsControl, get_IsInsideAssociatedScrollViewer, put_IsInsideAssociatedScrollViewer, get_OffBranchParent, put_OffBranchParent, get_OffsetY, put_OffsetY, get_StickyBackground, put_StickyBackground, get_AssociatedScrollViewerProperty, get_IsInsideItemsControlProperty, get_IsInsideAssociatedScrollViewerProperty, get_OffBranchParentProperty, get_OffsetYProperty, get_StickyBackgroundProperty
+AMP.UI.Controls.StickyHeaderAssociatedScrollViewer
+  fields: Grandparent, OffBranch, Parent
+AMP.UI.Controls.StringToBooleanConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.StringToInverseVisConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.StringToVisConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.StyleSelector
+  methods: .ctor, get_Styles, put_Styles
+AMP.UI.Controls.StyleSelectorItem
+  methods: .ctor, get_Type, put_Type, get_Style, put_Style, IsEqual
+AMP.UI.Controls.TaskbarButtonMessageEventArgs
+  methods: .ctor, get_Message, get_Type
+AMP.UI.Controls.TaskbarButtonMessageType
+  fields: TaskbarButtonCreated, UserMessage
+AMP.UI.Controls.TemplateSelector
+  methods: .ctor, get_Templates, put_Templates
+AMP.UI.Controls.TemplateSelectorItem
+  methods: .ctor, get_Type, put_Type, get_Template, put_Template, IsEqual, ToString
+AMP.UI.Controls.TextBlock
+  methods: SetTaggedText, GetTaggedText, SetAutoTextToolTip, GetAutoTextToolTip, ParseTaggedText
+AMP.UI.Controls.TextBoxLoc
+  methods: .ctor
+AMP.UI.Controls.TextTrimmingToBooleanConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.ThemeResources
+  methods: .ctor
+AMP.UI.Controls.TickerTapeControl
+  methods: .ctor, StartAnimation, StopAnimation, get_Text, put_Text
+AMP.UI.Controls.TileControl
+  methods: .ctor, get_Header, put_Header, get_HoverContent, put_HoverContent, get_RootHoverGrid, put_RootHoverGrid, get_Footer, put_Footer, get_Right, put_Right, get_HeaderProperty, get_HoverContentProperty, get_RootHoverGridProperty, get_FooterProperty, get_RightProperty
+AMP.UI.Controls.TimeEditControl
+  methods: .ctor, get_TitleName, put_TitleName, get_TimeValue, put_TimeValue, get_TimeWidth, put_TimeWidth, get_DefaultValue, put_DefaultValue, get_MaxTimeValue, put_MaxTimeValue, get_IsReadOnly, put_IsReadOnly, get_TitleNameProperty, get_TimeValueProperty, get_TimeWidthProperty, get_DefaultValueProperty, get_MaxTimeValueProperty, get_IsReadOnlyProperty
+AMP.UI.Controls.TimeSpanToStringConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.TitlebarButtonColors
+  fields: ButtonBackgroundColor, ButtonForegroundColor, ButtonInactiveBackgroundColor, ButtonInactiveForegroundColor, ButtonHoverBackgroundColor, ButtonHoverForegroundColor, ButtonPressedBackgroundColor, ButtonPressedForegroundColor
+AMP.UI.Controls.TwoLinesDateControl
+  methods: .ctor, get_Value, put_Value, get_TitleName, put_TitleName, get_UndoEnabled, put_UndoEnabled, get_IsMixed, put_IsMixed, get_IsReadOnly, put_IsReadOnly, get_ValueProperty, get_TitleNameProperty, get_UndoEnabledProperty, get_IsMixedProperty, get_IsReadOnlyProperty
+AMP.UI.Controls.TwoLinesTextEditControl
+  methods: .ctor, get_Value, put_Value, get_TitleName, put_TitleName, get_UndoEnabled, put_UndoEnabled, get_PlaceholderValue, put_PlaceholderValue, get_IsReadOnly, put_IsReadOnly, get_IsMixed, put_IsMixed, get_ShouldResetValueOnFocusLost, put_ShouldResetValueOnFocusLost, get_Completions, put_Completions, get_FilteredItems, put_FilteredItems, get_ValueProperty, get_TitleNameProperty, get_UndoEnabledProperty, get_PlaceholderValueProperty, get_IsReadOnlyProperty, get_IsMixedProperty, get_ShouldResetValueOnFocusLostProperty, get_CompletionsProperty, get_FilteredItemsProperty
+AMP.UI.Controls.UndoButton
+  methods: .ctor, add_Click, remove_Click
+AMP.UI.Controls.UniformGrid
+  methods: .ctor
+AMP.UI.Controls.Utilities
+  methods: LocalizedAppName, Add, Both, GreaterThan, None, Not, Or, Empty, True, False, NotEmpty, NotNull, Null, NullAndFalse, NullAndNotNull, NotNullAndEmpty, NotNullAndNotEmpty, NotNullOrNotEmpty, NotNullOrNotNull, NullAndNull, BothNotNull, TrueAndNull, TrueAndNotNull, FalseAndNotNull, TrueAndFalse, FalseIfEqualString, TrueIfEqualString, IfEmptyStringValue1ElseValue2, BoldIfEitherTrue, BoldFontTypeIfEitherTrue, SolidColorBrush, SubtitleBrush, ColorWithAlpha, Milliseconds, Seconds, SecondsToTimeSpan, VisibleIfEmpty, VisibleIfNotEmpty, VisibleIfNull, VisibleIfNotNull, VisibleIfEitherNotNull, VisibleIfBothTrue, VisibleIfBothFalse, VisibleIfTrue, VisibleIfTrueAndFalse, VisibleIfFalse, VisibleIfEitherTrue, VisibleIfFalseAndTrue, VisibleIfGreaterThan, VisibleIfEqual, VisibleIfEqualString, VisibleIfNotEqual, VisibleIfNotEqualString, VisibleIfNotEmptyOrNotNull, VisibleIfInternalBuild, VisibleIfDebugBuild, HasMultipleItems, HasSingleItem, HasNoItems, HasStringItems, SvgImageSource, BitmapImageSource, BitmapImageSourceFromString, CreateRenderTargetBitmap, SvgImageSourceFromEncodedData, BoxString, UnboxString, SFSymbolToUnicode, FavoriteStateToUnicode, ExplicitSymbolIf, ConvertDigitsToMonospaced, GetAspectRatio, ConditionalSelectDouble, ConditionalSelectSize, DimmedOpacityIfTrue, ExtendedSelectionModeIfAllowed, MapOrientationToIntHV, IsOrientationVertical, IsOrientationHorizontal, FavoriteStateButtonStyle, FavoriteStateButtonTooltip, ElevateIfFalse, ThicknessIfTrue, CornerRadiusIfTrueOrElse, FullOpacityIfTrueOrElseValue, NoOpacityIfTrue
+AMP.UI.Controls.VersionStringConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.VideoAdvisoryControl
+  methods: .ctor, get_HasFinishedAnimation, put_HasFinishedAnimation, get_BadgeSize, put_BadgeSize, get_DividerSize, put_DividerSize, get_DividerMargin, put_DividerMargin, get_DividerBrush, put_DividerBrush, get_LegendBlockSize, put_LegendBlockSize, get_LegendBlockPadding, put_LegendBlockPadding, get_LegendBlockBrush, put_LegendBlockBrush, get_LegendBlockCornerRadius, put_LegendBlockCornerRadius, get_LegendBlockFontFamily, put_LegendBlockFontFamily, get_LegendBlockFontSize, put_LegendBlockFontSize, get_LegendBlockFontWeight, put_LegendBlockFontWeight, get_LegendBlockTextBrush, put_LegendBlockTextBrush, get_DescriptionFontFamily, put_DescriptionFontFamily, get_DescriptionFontSize, put_DescriptionFontSize, get_DescriptionFontWeight, put_DescriptionFontWeight, get_DescriptionBrush, put_DescriptionBrush, get_DescriptionHorizontalSpacing, put_DescriptionHorizontalSpacing, get_DescriptionVerticalSpacing, put_DescriptionVerticalSpacing, get_PhotosensitiveDescriptionWidth, put_PhotosensitiveDescriptionWidth, get_PhotosensitiveDescriptionMaxLines, put_PhotosensitiveDescriptionMaxLines, get_PhotosensitiveDescriptionFontFamily, put_PhotosensitiveDescriptionFontFamily, get_PhotosensitiveDescriptionFontSize, put_PhotosensitiveDescriptionFontSize, get_PhotosensitiveDescriptionFontWeight, put_PhotosensitiveDescriptionFontWeight, get_PhotosensitiveDescriptionBrush, put_PhotosensitiveDescriptionBrush, get_VideoAdvisoryData, put_VideoAdvisoryData, get_DescriptionContent1, get_DescriptionContent2, get_DescriptionContent3, get_DescriptionContent4, get_DescriptionContent5, get_DescriptionContent6, get_DescriptionContent7, get_DescriptionContent8, get_DescriptionContent9, StartAnimation, get_DescriptionSecondGroupVerticalScrollOffset, get_DescriptionThirdGroupVerticalScrollOffset, get_PhotosensitiveVerticalScrollOffset, SetRenderScale, add_PropertyChanged, remove_PropertyChanged, get_HasFinishedAnimationProperty
+AMP.UI.Controls.VideoAdvisoryData
+  methods: .ctor, get_RatingBadgeSource, put_RatingBadgeSource, get_AdvisoryDescriptions, put_AdvisoryDescriptions, get_PhotosensitiveBadgeSource, put_PhotosensitiveBadgeSource, get_PhotosensitiveDescriptionString, put_PhotosensitiveDescriptionString
+AMP.UI.Controls.VideoAdvisoryDescription
+  methods: .ctor, get_Legend, put_Legend, get_LegendBlockSize, put_LegendBlockSize, get_LegendBlockMargin, put_LegendBlockMargin, get_LegendBlockBrush, put_LegendBlockBrush, get_LegendBlockCornerRadius, put_LegendBlockCornerRadius, get_LegendBlockTextPadding, put_LegendBlockTextPadding, get_LegendBlockFontFamily, put_LegendBlockFontFamily, get_LegendBlockFontSize, put_LegendBlockFontSize, get_LegendBlockFontWeight, put_LegendBlockFontWeight, get_LegendBlockTextBrush, put_LegendBlockTextBrush, get_Description, put_Description, get_DescriptionFontFamily, put_DescriptionFontFamily, get_DescriptionFontSize, put_DescriptionFontSize, get_DescriptionFontWeight, put_DescriptionFontWeight, get_DescriptionBrush, put_DescriptionBrush, get_DescriptionMargin, put_DescriptionMargin
+AMP.UI.Controls.VideoAdvisoryDescriptionText
+  methods: .ctor, get_Legend, put_Legend, get_Description, put_Description
+AMP.UI.Controls.VideoPositionSliderAutomationPeer
+  methods: .ctor, add_ScreenReaderNarrationStateChanged, remove_ScreenReaderNarrationStateChanged
+AMP.UI.Controls.VideoVolumeSliderAutomationPeer
+  methods: .ctor
+AMP.UI.Controls.ViewTypeAheadArgs
+  methods: get_TypeAheadProvider, put_TypeAheadProvider, get_SearchString, put_SearchString
+AMP.UI.Controls.VolumeAdjustmentToPercentageConverter
+  methods: .ctor, Convert, ConvertBack
+AMP.UI.Controls.VolumeControl
+  methods: .ctor, get_CurrentVolumeGlyph, put_CurrentVolumeGlyph, get_Level, put_Level, get_Muted, put_Muted, get_IsOpen, put_IsOpen, add_FlyoutClosing, remove_FlyoutClosing, add_FlyoutOpening, remove_FlyoutOpening, get_CurrentVolumeGlyphProperty, get_LevelProperty, get_MutedProperty, get_IsOpenProperty
+AMP.UI.Controls.WebView2
+  methods: SetHasKeyboardHook, GetHasKeyboardHook, SetText, GetText
+AMP.UI.Controls.Window
+  methods: .ctor, SetBounds, SetIcon, get_MinPhysicalSize, put_MinPhysicalSize, get_MaxPhysicalSize, put_MaxPhysicalSize, SetPreferredMinSize, SetPreferredMaxSize, SetWindowAspectRatio, GetState, SetState, SetBackgroundBrushWithStockObject, ClearBackgroundBrush, CurrentDPI, get_BorderInfo, RefreshBorderInfo, ClearTaskbarButtonMessageIds, RegisterTaskbarButtonMessageId, GetTitleBar, ExtendContentIntoTitleBar, CollapseTitleBarButtons, SetTitlebarInterface, SetIsTitleBarDraggable, get_MotionEnabled, add_MotionEnabledChanged, remove_MotionEnabledChanged, add_PowerSettingChanged, remove_PowerSettingChanged, add_SessionChanged, remove_SessionChanged, add_SettingsChanged, remove_SettingsChanged, add_TaskbarButtonMessage, remove_TaskbarButtonMessage, add_Closing, remove_Closing, add_Destroying, remove_Destroying, add_DPIChanged, remove_DPIChanged, add_MaximizeRequested, remove_MaximizeRequested, add_PointerMovedInNonClient, remove_PointerMovedInNonClient, add_PositionChanged, remove_PositionChanged, add_PresenterChanged, remove_PresenterChanged, add_SizeMoveModeChanged, remove_SizeMoveModeChanged, add_StateChanged, remove_StateChanged, GetDefaultTitlebarButtonColors, ShowModalWindowAsync
+AMP.UI.Controls.WindowBorderInfo
+  methods: .ctor, get_HasValue, put_HasValue, get_LeftBorderThickness, get_TopBorderThickness, get_RightBorderThickness, get_BottomBorderThickness, get_TitleBarHeight
+AMP.UI.Controls.WindowClosingEventArgs
+  methods: .ctor, get_Cancel, put_Cancel
+AMP.UI.Controls.WindowDPIChangedEventArgs
+  methods: .ctor, get_Handled, put_Handled, get_DPI
+AMP.UI.Controls.WindowDestroyingEventArgs
+  methods: .ctor, get_Handled, put_Handled
+AMP.UI.Controls.WindowMaximizeRequestedEventArgs
+  methods: .ctor, get_Handled, put_Handled
+AMP.UI.Controls.WindowPointerMovedInNonClientEventArgs
+  methods: .ctor, get_Handled, put_Handled, get_IsLeaving
+AMP.UI.Controls.WindowPositionChangedEventArgs
+  methods: .ctor, get_Handled, put_Handled, get_Position
+AMP.UI.Controls.WindowPresenterChangedEventArgs
+  methods: .ctor, get_Handled, put_Handled, get_Presenter
+AMP.UI.Controls.WindowSizeContentControl
+  methods: .ctor, get_WindowSize, put_WindowSize, get_ContentIndex, put_ContentIndex, get_ContentSetSize, put_ContentSetSize, get_WindowSizeProperty, get_ContentIndexProperty, get_ContentSetSizeProperty
+AMP.UI.Controls.WindowSizeMoveModeChangedEventArgs
+  methods: .ctor, get_Handled, put_Handled, get_IsActive
+AMP.UI.Controls.WindowState
+  fields: WindowStateNormal, WindowStateMaximized, WindowStateMinimized, WindowStateDisabled
+AMP.UI.Controls.WindowStateChangedEventArgs
+  methods: .ctor, get_Handled, put_Handled, get_State
+AMP.UI.Controls.XMDPAttachableUI
+  methods: .ctor, get_TypeName, put_TypeName
+AMP.UI.Controls.XamlMetaDataProvider
+  methods: .ctor, GetXamlType, GetXmlnsDefinitions

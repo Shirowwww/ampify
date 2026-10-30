@@ -1,0 +1,36 @@
+AMP.Core.AMPLibraryAppKinds
+  fields: AMPLibraryAppKind_Music, AMPLibraryAppKind_TV
+AMP.Core.AMPLibraryMediaDomains
+  fields: AMPLibraryMediaDomainsNone, AMPLibraryMediaDomainsMusic, AMPLibraryMediaDomainsTVAndMovies, AMPLibraryMediaDomainsPodcasts, AMPLibraryMediaDomainsBooks, AMPLibraryMediaDomainsAll, AMPLibraryMediaDomainsWinAll
+AMP.Core.AMPLibraryState
+  fields: eUnknown, eSetup, eStarting, eStarted, eStopping, eStopped, eShutdown
+AMP.Core.AMPMusicLibrary
+  methods: .ctor, get_Version, get_ServerInfo, get_State, Setup, Cleanup, MediaAppStarting, MediaAppQuitting, MediaAppGetLibraryInfoAsync, MediaAppOpenLibraryAsync, MediaAppSetLibraryLocationAsync, MediaAppExecFetchRequestAsync, MediaAppReleaseFetchRequestWriteStream, MediaAppCloseFetchRequest, MediaAppExecAgentCommandAsync, get_ClientID, get_MediaDomainsOpened, get_ServerProtocolVersion, RegisterLibraryClient, GetDomainInfoAsync, OpenDomainsAsync, CloseDomainsForClientID, SendDBChangesToLibraryAsync, FetchLibraryFromRevsionAsync, SaveAgentLogToFileAsync, add_PlaybackEventHandler, remove_PlaybackEventHandler, add_PlaybackEventWithCallbackHandler, remove_PlaybackEventWithCallbackHandler, PlaybackEventResponse, add_FetchInvalidationHandler, remove_FetchInvalidationHandler, add_ActivityStateHandler, remove_ActivityStateHandler, add_CloudLibraryEventHandler, remove_CloudLibraryEventHandler, add_LibraryEventHandler, remove_LibraryEventHandler, add_StoreServicesUIEventHandler, remove_StoreServicesUIEventHandler, StoreServicesUIEventResponse, add_BusyChangedHandler, remove_BusyChangedHandler, add_LibraryRevisionChangedHandler, remove_LibraryRevisionChangedHandler, add_DeviceEventHandler, remove_DeviceEventHandler, Kill
+AMP.Core.AMPTVLibrary
+  methods: .ctor, get_Version, get_ServerInfo, get_State, Setup, Cleanup, MediaAppStarting, MediaAppQuitting, MediaAppGetLibraryInfoAsync, MediaAppOpenLibraryAsync, MediaAppSetLibraryLocationAsync, MediaAppExecFetchRequestAsync, MediaAppReleaseFetchRequestWriteStream, MediaAppCloseFetchRequest, MediaAppExecAgentCommandAsync, get_ClientID, get_MediaDomainsOpened, get_ServerProtocolVersion, RegisterLibraryClient, GetDomainInfoAsync, OpenDomainsAsync, CloseDomainsForClientID, SendDBChangesToLibraryAsync, FetchLibraryFromRevsionAsync, SaveAgentLogToFileAsync, add_PlaybackEventHandler, remove_PlaybackEventHandler, add_PlaybackEventWithCallbackHandler, remove_PlaybackEventWithCallbackHandler, PlaybackEventResponse, add_FetchInvalidationHandler, remove_FetchInvalidationHandler, add_ActivityStateHandler, remove_ActivityStateHandler, add_CloudLibraryEventHandler, remove_CloudLibraryEventHandler, add_LibraryEventHandler, remove_LibraryEventHandler, add_StoreServicesUIEventHandler, remove_StoreServicesUIEventHandler, StoreServicesUIEventResponse, add_BusyChangedHandler, remove_BusyChangedHandler, add_LibraryRevisionChangedHandler, remove_LibraryRevisionChangedHandler, add_DeviceEventHandler, remove_DeviceEventHandler, Kill
+AMP.Core.ActvityStateEventDelegate
+  methods: .ctor, Invoke
+AMP.Core.BusyChangedEventDelegate
+  methods: .ctor, Invoke
+AMP.Core.CloudLibraryEventDelegate
+  methods: .ctor, Invoke
+AMP.Core.DeviceEventDelegate
+  methods: .ctor, Invoke
+AMP.Core.FetchInvalidationEventDelegate
+  methods: .ctor, Invoke
+AMP.Core.IAMPLibrary
+  methods: get_Version, get_ServerInfo, get_State, Setup, Cleanup, MediaAppStarting, MediaAppQuitting, MediaAppGetLibraryInfoAsync, MediaAppOpenLibraryAsync, MediaAppSetLibraryLocationAsync, MediaAppExecFetchRequestAsync, MediaAppReleaseFetchRequestWriteStream, MediaAppCloseFetchRequest, MediaAppExecAgentCommandAsync, get_ClientID, get_MediaDomainsOpened, get_ServerProtocolVersion, RegisterLibraryClient, GetDomainInfoAsync, OpenDomainsAsync, CloseDomainsForClientID, SendDBChangesToLibraryAsync, FetchLibraryFromRevsionAsync, SaveAgentLogToFileAsync, add_PlaybackEventHandler, remove_PlaybackEventHandler, add_PlaybackEventWithCallbackHandler, remove_PlaybackEventWithCallbackHandler, PlaybackEventResponse, add_FetchInvalidationHandler, remove_FetchInvalidationHandler, add_ActivityStateHandler, remove_ActivityStateHandler, add_CloudLibraryEventHandler, remove_CloudLibraryEventHandler, add_LibraryEventHandler, remove_LibraryEventHandler, add_StoreServicesUIEventHandler, remove_StoreServicesUIEventHandler, StoreServicesUIEventResponse, add_BusyChangedHandler, remove_BusyChangedHandler, add_LibraryRevisionChangedHandler, remove_LibraryRevisionChangedHandler, add_DeviceEventHandler, remove_DeviceEventHandler, Kill
+AMP.Core.IAMPMusicLibrary
+AMP.Core.IAMPTVLibrary
+AMP.Core.LibraryEventDelegate
+  methods: .ctor, Invoke
+AMP.Core.LibraryRevisionChangedEventDelegate
+  methods: .ctor, Invoke
+AMP.Core.PlaybackEventDelegate
+  methods: .ctor, Invoke
+AMP.Core.PlaybackEventWithCallbackDelegate
+  methods: .ctor, Invoke
+AMP.Core.RegisterClientResult
+  fields: clientID, persistentMachineID, status
+AMP.Core.StoreServicesUIEventDelegate
+  methods: .ctor, Invoke

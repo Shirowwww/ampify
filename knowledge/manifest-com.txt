@@ -1,0 +1,11 @@
+            <com:ExeServer Executable="AMPLibraryAgent.exe" DisplayName="AMPLibraryAgent">
+              <com:Class Id="68E7097C-F969-4006-AAC3-95115F0ED1C4" DisplayName="AMP.Core.IAMPMusicLibrary" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+      </Extensions>
+--
+      <ProxyStub ClassId="F707A913-E0CE-4FD4-BCE3-425DD153285B">
+        <Path>AMPLibraryAgent.Proxies.dll</Path>
+        <Interface Name="IAMPLibrary" InterfaceId="F707A913-E0CE-4FD4-BCE3-425DD153285B" />
+        <Interface Name="IAMPMusicLibrary" InterfaceId="68E7097C-F969-4006-AAC3-95115F0ED1C4" />
