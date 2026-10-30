@@ -10,9 +10,9 @@ namespace {
 const char* const kLauncherLog =
     "[13:36:35.001] Paquet trouvé : AppleInc.AppleMusicWin_1.1540.23042.0_x64__nzyj5cx40ttqa (dossier C:\\Program Files\\WindowsApps\\AppleInc.AppleMusicWin_1.1540.23042.0_x64__nzyj5cx40ttqa)\n"
     "[13:36:35.002] version 1.1540.23042.0 testée : noyau injecté\n"
-    "[13:36:35.010] Lancement suspendu demandé à Windows\n"
     "[13:36:36.400] Apple Music démarré (processus 4120)\n"
-    "[13:36:36.900] AppleMusic.exe : noyau chargé\n"
+    "[13:36:36.410] 2 thread(s) mis en pause\n"
+    "[13:36:36.900] AppleMusic.exe (4120) : noyau chargé pendant la pause\n"
     "[13:36:36.950] 2 thread(s) repris après l'injection\n"
     "[13:37:10.200] AMPLibraryAgent.exe (5012) : noyau chargé\n"
     "[13:40:00.000] Apple Music fermé : le lanceur s'arrête\n";
@@ -121,7 +121,7 @@ TEST_CASE(RunReport_ZeroResumedThreadsNeedsReview) {
 TEST_CASE(RunReport_NotSuspendedIsAllowedButReported) {
     // Windows may refuse the suspended start. The kit still injects after the start, so this is a note, not a failure.
     std::string launcher = kLauncherLog;
-    launcher = WithoutLine(launcher, "Lancement suspendu demandé à Windows");
+    launcher = WithoutLine(launcher, "2 thread(s) mis en pause");
     launcher = WithoutLine(launcher, "2 thread(s) repris après l'injection");
 
     amk::RunFacts facts = amk::ReadRunFacts(launcher, kAppleMusicLog, kLibraryAgentLog);

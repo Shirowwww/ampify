@@ -34,6 +34,8 @@ Relevé sur la machine de l'utilisateur, version du paquet `AppleInc.AppleMusicW
   Apple Music crée un nouveau lecteur à chaque contexte de lecture.
 - Volume de l'app : `AVCFPlayerSetVolume(player, float)` (linéaire 0..1, curseur à 18 % ≈ 0,178). L'app relit
   le volume par `AVCFPlayerGetVolume`.
+- Volume de l'Atmos (Sound Check, mode loudness de CoreMedia, mesures, ce qui marche) : voir
+  [atmos-loudness.md](atmos-loudness.md).
 - Sound Check : l'app appelle `AVCFPlayerItemSetLoudnessInfo` (« adjust to album loudness ») à la création
   des items. **Aucun niveau n'est appliqué aux items Atmos** : mesuré 5 dB plus bas que la même chanson en
   stéréo (Damso, 0-90 s : stéréo -31,6 LUFS, Atmos -36,6 LUFS en sortie).

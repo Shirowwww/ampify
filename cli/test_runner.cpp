@@ -7,6 +7,7 @@
 #include "../core/host.hpp"
 #include "../core/journal.hpp"
 #include "../core/manifest.hpp"
+#include "../core/ui_model.hpp"
 #include "../core/script_extension.hpp"
 #include "archive.hpp"
 #include "internal.hpp"
@@ -62,6 +63,11 @@ public:
         Count("réseau : " + url);
         return HttpResponse{200, "{}"};
     }
+    // Interface calls land in an in-memory model, the same one the kernel keeps. Nothing is drawn.
+    UiModel& Ui() override {
+        Count("interface");
+        return m_ui;
+    }
 
     const std::map<std::string, int>& Calls() const { return m_calls; }
 
@@ -71,6 +77,7 @@ private:
     std::map<std::string, std::string> m_settings;
     std::map<std::string, std::string> m_storage;
     std::map<std::string, int> m_calls;
+    UiModel m_ui;
 };
 
 }  // namespace

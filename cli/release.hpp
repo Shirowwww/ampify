@@ -21,6 +21,6 @@ std::optional<ReleaseInfo> ParseRelease(std::string_view text, std::string& erro
 std::map<std::string, std::string> ParseChecksums(std::string_view text);
 
 // -1, 0 or 1. Compares numeric components, so 0.10.0 is newer than 0.9.0. A leading "v" is ignored.
-int CompareVersions(std::string_view left, std::string_view right);
+int CompareReleaseVersions(std::string_view left, std::string_view right);
 
 }  // namespace amk

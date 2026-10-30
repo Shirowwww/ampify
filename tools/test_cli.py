@@ -168,14 +168,14 @@ class Basics(AmkTestCase):
         self.assertIn("theme.parts.colors = 1", self.settings_text())
 
         self.assertEqual(self.amk("config", "theme.parts.colors", "peut-être").returncode, 1)
-        self.assertEqual(self.amk("config", "theme.id", "Pas Bon").returncode, 1)
+        self.assertEqual(self.amk("config", "theme.active", "Pas Bon").returncode, 1)
         self.assertEqual(self.amk("config", "catalog.url", "http://example.com/c.json").returncode, 1)
         self.assertEqual(self.amk("config", "clé.inconnue").returncode, 1)
 
     def test_config_lists_every_key(self):
-        self.amk("config", "theme.id", "night")
+        self.amk("config", "theme.active", "night")
         listing = self.amk("config").stdout
-        self.assertIn("theme.id = night", listing)
+        self.assertIn("theme.active = night", listing)
 
 
 class Authoring(AmkTestCase):
@@ -288,7 +288,7 @@ class Marketplace(AmkTestCase):
         self.assertEqual(self.install("night").returncode, 0)
         choose = self.amk("theme", "set", "night", "--scheme", "Dark")
         self.assertEqual(choose.returncode, 0, choose.stderr)
-        self.assertIn("theme.id = night", self.settings_text())
+        self.assertIn("theme.active = night", self.settings_text())
         self.amk("apply")
         self.assertIn("theme night 1.0.0 scheme=Dark", self.read("active.txt"))
 
@@ -371,7 +371,7 @@ class Activation(AmkTestCase):
         self.assertIn(APP_ID, result.stdout)
 
     def test_backup_create_and_list(self):
-        self.amk("config", "theme.id", "night")
+        self.amk("config", "theme.active", "night")
         created = self.amk("backup")
         self.assertEqual(created.returncode, 0, created.stderr)
         name = re.search(r"Sauvegarde créée : (\S+)", created.stdout).group(1)
@@ -379,7 +379,7 @@ class Activation(AmkTestCase):
         self.assertEqual(self.amk("restore", "--backup", "absent-19700101-000000").returncode, 1)
 
     def test_watch_reacts_to_an_edit(self):
-        self.amk("config", "theme.id", "")
+        self.amk("config", "theme.active", "")
         process = subprocess.Popen(
             ([AMK] if not WINE else ["wine", AMK]) + ["--kit-dir", native(self.kit), "watch",
                                                       "--interval", "100", "--max-cycles", "60"],

@@ -390,10 +390,10 @@ TEST_CASE(Archive_DetectsLinksInExtractedTree) {
 // ---- Versions and release metadata ----------------------------------------------------------------
 
 TEST_CASE(Version_ComparesNumerically) {
-    CHECK(amk::CompareVersions("0.10.0", "0.9.0") == 1);
-    CHECK(amk::CompareVersions("v1.2.3", "1.2.3") == 0);
-    CHECK(amk::CompareVersions("1.2", "1.2.0") == 0);
-    CHECK(amk::CompareVersions("0.1.0", "0.2.0") == -1);
+    CHECK(amk::CompareReleaseVersions("0.10.0", "0.9.0") == 1);
+    CHECK(amk::CompareReleaseVersions("v1.2.3", "1.2.3") == 0);
+    CHECK(amk::CompareReleaseVersions("1.2", "1.2.0") == 0);
+    CHECK(amk::CompareReleaseVersions("0.1.0", "0.2.0") == -1);
 }
 
 TEST_CASE(Release_ParsesGitHubJson) {
@@ -455,11 +455,11 @@ TEST_CASE(Kit_EnableAndDisableWriteTheRightKeys) {
     CHECK(settings.GetBool("apps.lyrics.enabled", false));
 
     amk::SetEnabled(settings, "theme", "night", true);
-    CHECK(settings.GetString("theme.id", "") == "night");
+    CHECK(settings.GetString("theme.active", "") == "night");
     amk::SetEnabled(settings, "theme", "day", false);  // another theme: the active one stays
-    CHECK(settings.GetString("theme.id", "") == "night");
+    CHECK(settings.GetString("theme.active", "") == "night");
     amk::SetEnabled(settings, "theme", "night", false);
-    CHECK(settings.GetString("theme.id", "x") == "");
+    CHECK(settings.GetString("theme.active", "x") == "");
 
     CHECK(amk::EnabledKey("extension", "atmos-leveler") == "extensions.atmos-leveler.enabled");
 }
@@ -478,7 +478,7 @@ TEST_CASE(Activation_ReportsWhatLoadsAndWhatCannot) {
     settings.SetBool("extensions.demo.enabled", true);
     settings.SetBool("extensions.atmos-leveler.enabled", true);
     settings.SetBool("extensions.gone.enabled", true);
-    settings.Set("theme.id", "night");
+    settings.Set("theme.active", "night");
 
     amk::ActiveReport report = amk::ComputeActive(kit, settings);
     CHECK(report.items.size() == 3);
@@ -527,7 +527,7 @@ TEST_CASE(WriteTextFile_CreatesFoldersAndReplacesAtomically) {
 TEST_CASE(Backup_CreateListAndRestore) {
     std::filesystem::path root = ScratchDir("backup-cycle");
     amk::KitLayout kit(root);
-    WriteFile(kit.Settings(), "theme.id = night\n");
+    WriteFile(kit.Settings(), "theme.active = night\n");
     WriteFile(kit.Element("theme", "night") / "manifest.json", "{}");
 
     std::string error;
@@ -540,12 +540,12 @@ TEST_CASE(Backup_CreateListAndRestore) {
     CHECK(amk::ListBackups(kit).size() == 1);
 
     // Change the configuration: a new theme, the old one removed, settings edited.
-    WriteFile(kit.Settings(), "theme.id = day\n");
+    WriteFile(kit.Settings(), "theme.active = day\n");
     std::filesystem::remove_all(kit.Element("theme", "night"));
     WriteFile(kit.Element("theme", "day") / "manifest.json", "{}");
 
     CHECK(amk::RestoreBackup(kit, *first, error));
-    CHECK(ReadFile(kit.Settings()) == "theme.id = night\n");
+    CHECK(ReadFile(kit.Settings()) == "theme.active = night\n");
     CHECK(std::filesystem::exists(kit.Element("theme", "night") / "manifest.json"));
     CHECK(!std::filesystem::exists(kit.Element("theme", "day")));
 

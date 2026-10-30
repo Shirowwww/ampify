@@ -113,7 +113,7 @@ testkit/                   kit de test M5 (AMK-Test.exe, Windows) et trace ETW
 bench/windows/             banc de test Windows (PowerShell) : installe Apple Music, lance, vérifie les journaux
 docs/tests/                procédures de test sur le PC, une par jalon, et le banc Windows
 cmake/                     fichier de compilation croisée pour Windows
-vendor/quickjs/             moteur JavaScript QuickJS 2021-03-27, non modifié (MIT)
+vendor/quickjs/             moteur JavaScript quickjs-ng 0.17.0, non modifié (MIT)
 knowledge/                 relevés sur l'app : architecture, API, pièges observés
 reference/                 mod Windhawk de référence et outil de mesure LUFS
 ```

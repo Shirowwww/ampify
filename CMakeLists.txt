@@ -18,27 +18,30 @@ endif()
 
 set(AMK_WARNINGS $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
 
-# QuickJS 2021-03-27, vendored unchanged (MIT, see vendor/quickjs/LICENSE). Compiled as C with its own
-# warnings silenced: those files are upstream code, and we only change them by replacing the release.
+# quickjs-ng 0.17.0, vendored unchanged (MIT, see vendor/quickjs/LICENSE and vendor/quickjs/VERSION). Compiled as
+# C11 with its own warnings silenced: those files are upstream code, and we only change them by replacing the release.
+# The sources, defines and MSVC flags mirror the qjs library target of upstream's CMakeLists.txt.
 add_library(amk_quickjs STATIC
     vendor/quickjs/quickjs.c
-    vendor/quickjs/cutils.c
+    vendor/quickjs/dtoa.c
     vendor/quickjs/libregexp.c
     vendor/quickjs/libunicode.c)
-target_compile_options(amk_quickjs PRIVATE $<$<NOT:$<C_COMPILER_ID:MSVC>>:-w>)
-target_compile_definitions(amk_quickjs PRIVATE "CONFIG_VERSION=\"2021-03-27\"")
+set_target_properties(amk_quickjs PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS ON)
 target_include_directories(amk_quickjs SYSTEM PUBLIC vendor/quickjs)
-# QuickJS uses pthreads for Atomics. With MinGW, winpthreads provides them, linked statically.
-if(MINGW)
-    target_link_libraries(amk_quickjs PUBLIC pthread)
+if(WIN32)
+    # Upstream's Windows defines. quickjs-ng uses Win32 threads, critical sections and condition variables there,
+    # so MinGW no longer needs winpthreads.
+    target_compile_definitions(amk_quickjs PRIVATE WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0601)
+else()
+    target_compile_definitions(amk_quickjs PRIVATE _GNU_SOURCE)
+    find_package(Threads REQUIRED)
+    target_link_libraries(amk_quickjs PUBLIC Threads::Threads m ${CMAKE_DL_LIBS})
 endif()
-# MSVC has neither the GCC extensions nor the POSIX headers that QuickJS includes. cmake/msvc maps them: a header
-# that is force-included in every QuickJS file, and small pthread.h, sys/time.h and stdatomic.h over SRWLOCK,
-# CONDITION_VARIABLE, GetSystemTimeAsFileTime and the Interlocked intrinsics. The vendored files are not changed.
 if(MSVC)
-    target_compile_options(amk_quickjs PRIVATE /w "/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/msvc/quickjs_msvc.h")
-    target_compile_definitions(amk_quickjs PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
-    target_include_directories(amk_quickjs SYSTEM PRIVATE cmake/msvc/include)
+    # MSVC accepts <stdatomic.h>, which quickjs.c uses for Atomics, only in C11 mode with this flag.
+    target_compile_options(amk_quickjs PRIVATE /W0 /experimental:c11atomics)
+else()
+    target_compile_options(amk_quickjs PRIVATE -w -funsigned-char)
 endif()
 
 # Portable kernel: settings, journal, safe mode, version gate, extension host,
@@ -93,11 +96,6 @@ target_compile_options(amk_theme PRIVATE ${AMK_WARNINGS})
 add_executable(amk_theme_check tools/theme_check.cpp)
 target_link_libraries(amk_theme_check PRIVATE amk_theme)
 target_compile_options(amk_theme_check PRIVATE ${AMK_WARNINGS})
-
-# The amk command: theme list, theme set (--scheme), watch. Edits settings.txt; the kernel applies the change.
-add_executable(amk tools/amk.cpp)
-target_link_libraries(amk PRIVATE amk_theme)
-target_compile_options(amk PRIVATE ${AMK_WARNINGS})
 
 # Atmos leveler: BS.1770 loudness meter, gain ramp, spatial object pass and gain policy. Pure C++, no Windows API.
 add_library(atmos_leveler STATIC
@@ -208,7 +206,7 @@ else()
     list(APPEND AMK_CLI_SOURCES cli/platform.cpp cli/platform_posix.cpp)
 endif()
 add_executable(amk ${AMK_CLI_SOURCES})
-target_link_libraries(amk PRIVATE amk_cli_portable amk_core)
+target_link_libraries(amk PRIVATE amk_cli_portable amk_theme amk_core)
 target_compile_options(amk PRIVATE ${AMK_WARNINGS})
 target_compile_definitions(amk PRIVATE AMK_VERSION="${PROJECT_VERSION}")
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")

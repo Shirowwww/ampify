@@ -134,6 +134,21 @@ function Start-Launcher {
 }
 
 # Lance Apple Music comme le ferait l'utilisateur depuis le menu Démarrer : sans le lanceur, donc sans noyau.
+# Démarre AMPLibraryAgent.exe en activant la classe COM que le paquet d'Apple Music déclare (serveur hors processus
+# AMP.Core.IAMPMusicLibrary). L'activation se fait dans un pwsh séparé, arrêté au bout de 20 s s'il reste bloqué :
+# seul le démarrage du processus compte, l'objet obtenu n'est pas utilisé. Renvoie une ligne pour le rapport.
+function Start-AgentByCom {
+    $clsid = '68E7097C-F969-4006-AAC3-95115F0ED1C4'
+    $script = "try { `$t = [Type]::GetTypeFromCLSID('$clsid'); `$o = [Activator]::CreateInstance(`$t); 'activée' } catch { 'erreur : ' + `$_.Exception.Message }"
+    $out = Join-Path ([IO.Path]::GetTempPath()) 'amk-agent-com.txt'
+    Remove-Item -LiteralPath $out -ErrorAction SilentlyContinue
+    $process = Start-Process -FilePath 'pwsh' -ArgumentList @('-NoProfile', '-Command', $script) -RedirectStandardOutput $out -PassThru -WindowStyle Hidden
+    if (-not $process.WaitForExit(20000)) { $process | Stop-Process -Force -ErrorAction SilentlyContinue }
+    $result = if (Test-Path -LiteralPath $out) { (Get-Content -LiteralPath $out -Raw).Trim() } else { '' }
+    $started = Wait-Until -TimeoutSeconds 15 -Condition { @(Get-Process -Name 'AMPLibraryAgent' -ErrorAction SilentlyContinue).Count -gt 0 }
+    return "classe $clsid : $(if ($result) { $result } else { 'pas de réponse' }) ; AMPLibraryAgent.exe $(if ($started) { 'démarré' } else { 'toujours absent' })"
+}
+
 function Start-AppNormally {
     Start-Process -FilePath 'explorer.exe' -ArgumentList "shell:AppsFolder\$($script:AppUserModelId)"
 }

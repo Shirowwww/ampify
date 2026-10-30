@@ -88,7 +88,7 @@ std::map<std::string, std::string> ParseChecksums(std::string_view text) {
     return sums;
 }
 
-int CompareVersions(std::string_view left, std::string_view right) {
+int CompareReleaseVersions(std::string_view left, std::string_view right) {
     std::vector<std::uint64_t> a = NumericParts(left);
     std::vector<std::uint64_t> b = NumericParts(right);
     size_t count = a.size() > b.size() ? a.size() : b.size();

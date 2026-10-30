@@ -44,7 +44,8 @@ HANDLE OpenProcessForInjection(DWORD processId) {
     return OpenProcess(kInjectionRights, FALSE, processId);
 }
 
-bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::string& failure, DWORD timeoutMs) {
+bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::string& failure, DWORD timeoutMs,
+                  HANDLE* pending) {
     // kernel32 sits at the same address in every process, so the address found here is valid there too.
     FARPROC loadLibraryProc = GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "LoadLibraryW");
     if (!loadLibraryProc) {
@@ -85,8 +86,27 @@ bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::s
         // The remote thread may still be reading the path, so its memory is left in place.
         failure = "LoadLibraryW n'a pas répondu dans les " + std::to_string(timeoutMs / 1000) +
                   " s (le chargement peut finir plus tard, voir le journal du noyau)";
+        if (pending) {
+            *pending = thread;
+            return false;
+        }
     }
 
+    CloseHandle(thread);
+    return loaded;
+}
+
+bool FinishRemoteLoad(HANDLE thread, DWORD timeoutMs, std::string& failure) {
+    bool loaded = false;
+    if (WaitForSingleObject(thread, timeoutMs) == WAIT_OBJECT_0) {
+        DWORD exitCode = 0;
+        GetExitCodeThread(thread, &exitCode);
+        loaded = exitCode != 0;
+        if (!loaded) failure = "LoadLibraryW a échoué dans le processus";
+    } else {
+        failure = "LoadLibraryW n'a toujours pas répondu " + std::to_string(timeoutMs / 1000) +
+                  " s après la reprise (voir le journal du noyau)";
+    }
     CloseHandle(thread);
     return loaded;
 }

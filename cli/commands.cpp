@@ -8,8 +8,12 @@
 #include <iterator>
 #include <map>
 #include <sstream>
+#include <thread>
 
 #include "../core/apple_music.hpp"
+#include "../core/theme/commands.hpp"
+#include "../core/theme/files.hpp"
+#include "../core/theme/theme.hpp"
 #include "archive.hpp"
 #include "catalog.hpp"
 #include "element.hpp"
@@ -58,7 +62,7 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
     stored = value;
     bool boolean = false;
 
-    if (key == "theme.id") {
+    if (key == "theme.active") {
         if (!value.empty() && !IsValidId(value)) {
             problem = "identifiant de thème invalide : " + value;
             return false;
@@ -228,10 +232,22 @@ int CmdThemeSet(Context& ctx) {
     if (found == nullptr) return Failure(ctx, "thème introuvable : " + id + ". Installe-le avec amk install " + id);
     if (!found->Valid()) return Failure(ctx, "thème invalide : " + found->errors.front());
 
+    // The manifest is valid; now the theme engine reads the theme as the kernel will, and refuses what it would refuse.
+    std::filesystem::path folder = ctx.kit.Root() / "themes" / id;
+    theme::FolderFiles files(folder);
+    theme::LoadOptions load;
+    if (ctx.options.scheme) load.scheme = *ctx.options.scheme;
+    theme::Theme loaded = theme::LoadTheme(id, folder.generic_string(), files, load);
+    if (!loaded.usable) {
+        return Failure(ctx, "thème refusé par le moteur : " +
+                                (loaded.problems.empty() ? std::string("raison inconnue") : loaded.problems.front()));
+    }
+    for (const std::string& problem : loaded.problems) ctx.out << "Attention : " << problem << "\n";
+
     Settings settings;
     std::string error;
     if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
-    settings.Set("theme.id", id);
+    settings.Set("theme.active", id);
     if (ctx.options.scheme) {
         if (!IsValidScheme(*ctx.options.scheme)) return Failure(ctx, "nom de schéma invalide : " + *ctx.options.scheme);
         settings.Set("theme.scheme", *ctx.options.scheme);
@@ -402,6 +418,8 @@ Réglages et état
   snippet  list|enable|disable <id>    snippets (fragments XAML)
   app      list|enable|disable <id>    apps (pages ajoutées à l'interface)
   theme    list | set <id> [--scheme <nom>] | clear
+  theme    check <dossier> [--scheme <nom>]   lit un thème comme le noyau et affiche ce qui s'appliquerait
+  theme    watch <dossier> [--scheme <nom>]   relit le thème à chaque sauvegarde (--max-cycles N pour s'arrêter)
   validate <dossier>           vérifie le manifeste d'un élément (ou un catalogue.json)
   new <extension|theme|snippet|app> <id>   crée un élément de départ
 
@@ -516,10 +534,30 @@ int CmdTheme(Context& ctx) {
         Settings settings;
         std::string error;
         if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
-        settings.Set("theme.id", "");
+        settings.Set("theme.active", "");
         if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
         ctx.out << "Aucun thème actif. Lance amk apply pour l'appliquer.\n";
         return 0;
+    }
+    // check and watch read a theme folder anywhere on disk, the way the kernel reads it, and print what would apply.
+    if (action == "check" || action == "watch") {
+        if (args.size() != 3) return Usage(ctx, "theme " + std::string(action) + " attend un dossier de thème");
+        std::vector<std::string> watchArgs{"watch", args[2]};
+        if (ctx.options.scheme) watchArgs.insert(watchArgs.end(), {"--scheme", *ctx.options.scheme});
+        int polls = action == "check" ? -1 : ctx.options.maxCycles;
+        if (polls >= 0) watchArgs.insert(watchArgs.end(), {"--polls", std::to_string(polls)});
+        if (action == "check") {
+            std::filesystem::path folder = std::filesystem::absolute(PathArgument(args[2]));
+            std::error_code error;
+            if (!std::filesystem::is_directory(folder, error)) return Failure(ctx, "dossier introuvable : " + args[2]);
+            theme::FolderFiles files(folder);
+            theme::LoadOptions load;
+            if (ctx.options.scheme) load.scheme = *ctx.options.scheme;
+            return theme::PrintThemeReport(theme::LoadTheme(Utf8(folder.filename()), folder.generic_string(), files, load),
+                                           ctx.out);
+        }
+        std::chrono::milliseconds interval(std::max(ctx.options.intervalMs, 200));
+        return theme::RunWatch(watchArgs, ctx.out, ctx.err, [interval] { std::this_thread::sleep_for(interval); });
     }
     return Usage(ctx, "action inconnue pour theme : " + std::string(action));
 }

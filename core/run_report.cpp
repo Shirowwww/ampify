@@ -67,9 +67,13 @@ RunFacts ReadRunFacts(std::string_view launcherLog, std::string_view appleMusicL
         }
         if (Contains(line, "Apple Music démarré")) facts.launched = true;
         if (Contains(line, "testée : noyau injecté")) facts.versionTested = true;
-        if (Contains(line, "Lancement suspendu demandé")) facts.suspendedLaunch = true;
+        // The M3 launcher holds the first process ("N thread(s) mis en pause"); older builds asked Windows instead.
+        if (Contains(line, "thread(s) mis en pause") || Contains(line, "Lancement suspendu demandé")) {
+            facts.suspendedLaunch = true;
+        }
         if (std::optional<int> resumed = ResumedCount(line)) facts.resumedThreads = resumed;
-        if (Contains(line, "AppleMusic.exe : noyau chargé")) facts.kernelInAppleMusic = true;
+        // "AppleMusic.exe (4120) : noyau chargé pendant la pause", "... après la reprise", or the older form without the id.
+        if (Contains(line, "AppleMusic.exe") && Contains(line, ": noyau chargé")) facts.kernelInAppleMusic = true;
         if (Contains(line, "AMPLibraryAgent.exe (") && Contains(line, ": noyau chargé")) {
             facts.kernelInLibraryAgent = true;
         }

@@ -17,15 +17,16 @@ on:
       - 'testkit/**'
       - 'extensions/**'
       - 'tests/**'
+      - 'cli/**'
+      - 'vendor/**'
+      - 'examples/**'
+      - 'themes/**'
+      - 'catalog/**'
+      - 'tools/**'
       - 'cmake/**'
       - 'CMakeLists.txt'
       - '.github/workflows/windows-bench.yml'
   workflow_dispatch:
-    inputs:
-      m8_ref:
-        description: 'Branche M8 compilée par le job xaml-m8'
-        required: false
-        default: 'thread-052bjz'
 
 permissions:
   contents: read
@@ -138,6 +139,11 @@ jobs:
             $target = Join-Path $dist $variant.Name
             New-Item -ItemType Directory -Force -Path $target | Out-Null
             Copy-Item -LiteralPath (Join-Path $build 'Release\amk_launcher.exe'), (Join-Path $build 'Release\amk_kernel.dll') -Destination $target
+            if ($variant.Name -eq 'diffusion') {
+              Copy-Item -LiteralPath (Join-Path $build 'Release\amk_setup.exe'), (Join-Path $build 'Release\AMK-Test.exe') -Destination $target
+              New-Item -ItemType Directory -Force -Path (Join-Path $dist 'cli') | Out-Null
+              Copy-Item -LiteralPath (Join-Path $build 'Release\amk.exe') -Destination (Join-Path $dist 'cli')
+            }
           }
           "Commit : $env:GITHUB_SHA`ndiffusion : AMK_BENCH=OFF (MSVC)`nbanc : AMK_BENCH=ON (MSVC). Ne jamais diffuser." |
             Set-Content -LiteralPath (Join-Path $dist 'BUILD_INFO.txt')
@@ -269,7 +275,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # Compile le kit avec MSVC, sans Windows App SDK : prouve que QuickJS (cmake/msvc) et le noyau se construisent
+  # Compile le kit avec MSVC, sans Windows App SDK : prouve que quickjs-ng et le noyau se construisent
   # avec le compilateur de l'utilisateur, et lance les tests unitaires sous Windows. Indépendant du job M8 ci-dessus.
   msvc-kit:
     name: Compiler le kit (MSVC) et lancer amk_tests

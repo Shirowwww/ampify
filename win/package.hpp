@@ -21,4 +21,8 @@ std::optional<InstalledPackage> FindInstalledPackage(const wchar_t* familyName);
 // Starts the package's app through the shell's activation manager. `processId` gets the new process.
 HRESULT ActivateApp(const wchar_t* appUserModelId, DWORD* processId);
 
+// Clears the package debug setting. The launcher no longer sets it (it suspended nothing), but the first M3 build
+// did, so the uninstaller still clears it to leave the package exactly as Windows had it.
+HRESULT DisablePackageDebugging(const std::wstring& packageFullName);
+
 }  // namespace amk::launcher

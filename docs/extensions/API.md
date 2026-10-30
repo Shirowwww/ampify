@@ -30,8 +30,9 @@ AppleMusic.exe ou AMPLibraryAgent.exe
             └─ extensions de la communauté : main.js + manifest.json
 ```
 
-- **Le runtime JavaScript** est prévu avec QuickJS (licence MIT, compilable en C pour Windows avec MinGW et sous
-  Linux pour les tests). Ce choix reste à confirmer au moment de l'intégration.
+- **Le runtime JavaScript** est [quickjs-ng](https://github.com/quickjs-ng/quickjs), la branche maintenue de QuickJS
+  (licence MIT, compilée en C avec MSVC et MinGW pour Windows, et sous Linux pour les tests). La version vendue et
+  son empreinte sont dans `vendor/quickjs/VERSION`. QuickJS 2021-03-27 ne se compilait pas avec MSVC.
 - **Les extensions natives** (DLL chargées à l'exécution) ne sont pas ouvertes à la communauté en v1. Une DLL tourne
   dans le processus d'Apple Music avec tous les droits : un catalogue public ne peut pas la garantir. Les extensions
   natives restent intégrées au noyau, comme `atmos-leveler`.
@@ -85,7 +86,7 @@ processus chargent les éléments JavaScript, et `AMK.process` permet à un él�
 | Extension | `extensions.<id>.enabled` | `false` pour la communauté |
 | App | `apps.<id>.enabled` | `false` |
 | Snippet | `snippets.<id>.enabled` | `false` |
-| Thème | `theme.id`, `theme.scheme` | aucun thème |
+| Thème | `theme.active`, `theme.scheme` | aucun thème |
 | Parties d'un thème | `theme.parts.colors`, `theme.parts.resources`, `theme.parts.script` | `true` |
 
 La clé `extensions.<id>.enabled` existe déjà dans `core/extension.hpp`. Les autres suivent la même forme. [provisoire M7]
@@ -312,7 +313,7 @@ Le CLI remplace le CLI de Spicetify. Son écriture (C++ avec le noyau, ou autre)
 
 Ces points doivent être confirmés avant de passer au statut « ferme » :
 
-- le choix de QuickJS, sa taille et son comportement sous MinGW ;
+- la taille de quickjs-ng et son comportement sous MinGW et MSVC ;
 - le chemin des données de l'utilisateur (M3) ;
 - la forme des données de `AMK.player` et des événements (M4) ;
 - le format des échantillons transmis à `AMK.audio.onSamples` (M4) ;

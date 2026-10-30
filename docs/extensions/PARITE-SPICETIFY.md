@@ -75,7 +75,7 @@ Pour la lecture et les commandes, on utilise aussi l'API publique SMTC de Window
 | `disable_sentry`, `disable_ui_logging` | `telemetry.block`, désactivé par défaut. Voir 8.5. | Limité | Noyau, M5 |
 | `remove_rtl_rule` | Sans objet en CSS, il n'y en a pas. Pour une langue de droite à gauche, un thème règle `FlowDirection` élément par élément. | Clair | XAML, si besoin |
 | `expose_apis` | `expose_api` : active l'objet `AMK` pour les éléments. Désactivé, aucun élément JavaScript ne démarre. | Clair | JS, M7 |
-| `current_theme` | `theme.id` : thème actif. | Clair | XAML, M8 |
+| `current_theme` | `theme.active` : thème actif (`none` ou vide pour aucun). | Clair | XAML, M8 |
 | `color_scheme` | `theme.scheme` : schéma de couleurs du thème actif. | Clair | XAML, M8 |
 | `extensions` (liste) | Une clé par élément, `extensions.<id>.enabled`, au lieu d'une liste. | Clair | JS, M7 |
 | `custom_apps` (liste) | `apps.<id>.enabled`, même principe. | Clair | JS, M7 |

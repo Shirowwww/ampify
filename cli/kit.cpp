@@ -76,16 +76,16 @@ std::vector<InstalledElement> ListInstalled(const KitLayout& kit) {
 }
 
 bool IsEnabled(const Settings& settings, std::string_view kind, std::string_view id) {
-    if (kind == "theme") return settings.GetString("theme.id", "") == id;
+    if (kind == "theme") return settings.GetString("theme.active", "") == id;
     return settings.GetBool(EnabledKey(kind, id), false);
 }
 
 void SetEnabled(Settings& settings, std::string_view kind, std::string_view id, bool enabled) {
     if (kind == "theme") {
         if (enabled) {
-            settings.Set("theme.id", std::string(id));
-        } else if (settings.GetString("theme.id", "") == id) {
-            settings.Set("theme.id", "");
+            settings.Set("theme.active", std::string(id));
+        } else if (settings.GetString("theme.active", "") == id) {
+            settings.Set("theme.active", "");
         }
         return;
     }
@@ -99,7 +99,8 @@ ActiveReport ComputeActive(const KitLayout& kit, const Settings& settings) {
         if (IsEnabled(settings, "extension", id)) report.items.push_back({"extension", std::string(id), "builtin", ""});
     }
 
-    std::string themeId = settings.GetString("theme.id", "");
+    std::string themeId = settings.GetString("theme.active", "");
+    if (themeId == "none") themeId.clear();  // what the theme engine writes for "no theme"
     bool themeFound = false;
     for (const InstalledElement& element : ListInstalled(kit)) {
         if (element.kind == "theme" && element.id == themeId) themeFound = true;

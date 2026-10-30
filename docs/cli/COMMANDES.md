@@ -115,7 +115,7 @@ Réglages reconnus par `amk config` :
 | Clé | Valeur | Défaut |
 |---|---|---|
 | `extensions.<id>.enabled`, `apps.<id>.enabled`, `snippets.<id>.enabled` | `1` ou `0` | `0` (un élément de la communauté est désactivé) |
-| `theme.id` | identifiant d'un thème, vide pour aucun | vide |
+| `theme.active` | identifiant d'un thème, vide pour aucun | vide |
 | `theme.scheme` | nom d'une section de `colors.ini` | défaut du thème |
 | `theme.parts.colors`, `theme.parts.resources`, `theme.parts.script` | `1` ou `0` | `1` |
 | `catalog.url` | `https://…` ou `file://…` | catalogue du dépôt |

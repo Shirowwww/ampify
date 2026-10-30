@@ -58,10 +58,18 @@ Register-Case -Id 'injection-banc' -Title 'Build de banc : noyau dans AppleMusic
     Add-Check -Ctx $Ctx -Name 'AppleMusic.log : hôte d''extensions prêt' -Passed $hostReady
 
     $agentPattern = 'AMPLibraryAgent\.exe \(\d+\) : noyau chargé'
-    $agentInjected = Wait-Until -TimeoutSeconds 90 -Condition { $null -ne (Find-JournalMatch -FileName 'launcher.log' -Pattern $agentPattern) }
+    $agentInjected = Wait-Until -TimeoutSeconds 30 -Condition { $null -ne (Find-JournalMatch -FileName 'launcher.log' -Pattern $agentPattern) }
+    if (-not $agentInjected -and @(Get-Process -Name 'AMPLibraryAgent' -ErrorAction SilentlyContinue).Count -eq 0) {
+        # Sans compte Apple, Apple Music ne démarre pas son moteur sur le runner. Le banc le démarre comme l'app le
+        # ferait : en activant la classe COM que le paquet déclare (AMP.Core.IAMPMusicLibrary, knowledge/manifest-com.txt).
+        # Le lanceur suit le paquet et doit l'injecter comme d'habitude. Rien n'est appelé dans le moteur.
+        $activation = Start-AgentByCom
+        Add-Info -Ctx $Ctx -Name 'AMPLibraryAgent.exe démarré par le banc (COM)' -Detail $activation
+        $agentInjected = Wait-Until -TimeoutSeconds 60 -Condition { $null -ne (Find-JournalMatch -FileName 'launcher.log' -Pattern $agentPattern) }
+    }
     Add-Check -Ctx $Ctx -Name 'lanceur : noyau chargé dans AMPLibraryAgent.exe' -Passed $agentInjected `
         -Detail $(if ($agentInjected) { 'agent vu et injecté' } else { 'AMPLibraryAgent.exe non vu dans les 90 s' })
-    $agentLogged = Test-JournalContains -FileName 'AMPLibraryAgent.log' -Text 'Noyau chargé dans AMPLibraryAgent.exe'
+    $agentLogged = Wait-Journal -FileName 'AMPLibraryAgent.log' -Text 'Noyau chargé dans AMPLibraryAgent.exe' -TimeoutSeconds 15
     Add-Check -Ctx $Ctx -Name 'AMPLibraryAgent.log : noyau chargé' -Passed $agentLogged
     $agentRunning = @(Get-Process -Name 'AMPLibraryAgent' -ErrorAction SilentlyContinue).Count
     Add-Info -Ctx $Ctx -Name 'AMPLibraryAgent.exe ouvert au moment du contrôle' -Detail "$agentRunning processus"

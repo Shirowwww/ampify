@@ -87,12 +87,26 @@ bool InjectWhileHeld(amk::Journal& journal, DWORD processId, const std::filesyst
     journal.Write(std::to_string(held) + " thread(s) mis en pause");
 
     std::string failure;
-    bool loaded = amk::launcher::InjectKernel(process, kernelDll, failure, kHeldLoadTimeoutMs);
-    journal.Write(loaded ? label + " : noyau chargé pendant la pause" : label + " : échec, " + failure);
+    HANDLE pending = nullptr;
+    bool loaded = amk::launcher::InjectKernel(process, kernelDll, failure, kHeldLoadTimeoutMs, &pending);
+    if (loaded) {
+        journal.Write(label + " : noyau chargé pendant la pause");
+    } else if (pending) {
+        // LoadLibraryW waits for the loader lock, which a held thread may own while the app is still starting.
+        journal.Write(label + " : chargement en attente pendant la pause, reprise des threads");
+    } else {
+        journal.Write(label + " : échec, " + failure);
+    }
 
     // Resumed on every path, so the app is never left frozen, even when the load failed.
     int resumed = amk::launcher::ResumeProcessThreads(processId);
     journal.Write(std::to_string(resumed) + " thread(s) repris après l'injection");
+
+    if (pending) {
+        failure.clear();
+        loaded = amk::launcher::FinishRemoteLoad(pending, amk::launcher::kDefaultRemoteLoadTimeoutMs, failure);
+        journal.Write(loaded ? label + " : noyau chargé après la reprise" : label + " : échec, " + failure);
+    }
 
     CloseHandle(process);
     return loaded;

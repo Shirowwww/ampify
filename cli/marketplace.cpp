@@ -258,7 +258,7 @@ int UpdateElement(Context& ctx, const std::string& id) {
     }
 
     std::string installedVersion = installed.front().manifest ? installed.front().manifest->version : "0.0.0";
-    if (CompareVersions(entry->version, installedVersion) <= 0) {
+    if (CompareReleaseVersions(entry->version, installedVersion) <= 0) {
         ctx.out << id << " est déjà à jour (version " << installedVersion << ").\n";
         return 0;
     }
@@ -286,7 +286,7 @@ int UpdateKit(Context& ctx) {
     if (!release) return Failure(ctx, error);
     if (!IsValidVersion(release->version)) return Failure(ctx, "version de release invalide : " + release->tag);
 
-    if (CompareVersions(release->version, AMK_VERSION) <= 0) {
+    if (CompareReleaseVersions(release->version, AMK_VERSION) <= 0) {
         ctx.out << "amk est à jour (version " << AMK_VERSION << ").\n";
         return 0;
     }
@@ -448,7 +448,7 @@ int CmdRemove(Context& ctx) {
     Settings settings;
     if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
     if (kind == "theme") {
-        if (settings.GetString("theme.id", "") == id) settings.Set("theme.id", "");
+        if (settings.GetString("theme.active", "") == id) settings.Set("theme.active", "");
     } else {
         settings.Remove(EnabledKey(kind, id));
     }

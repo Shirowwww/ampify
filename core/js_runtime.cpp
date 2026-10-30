@@ -88,7 +88,7 @@ std::string TakeException(JSContext* ctx) {
     JSValue exception = JS_GetException(ctx);
     std::string line;
 
-    if (JS_IsError(ctx, exception)) {
+    if (JS_IsError(exception)) {
         JSValue nameValue = JS_GetPropertyStr(ctx, exception, "name");
         JSValue messageValue = JS_GetPropertyStr(ctx, exception, "message");
         std::string name = ToUtf8(ctx, nameValue, "Error");
