@@ -16,11 +16,13 @@
 #include "win_common.hpp"
 #include "xaml_backend.hpp"
 #include "../core/settings.hpp"
-#include "../core/theme/files.hpp"
+#include "../core/theme/css.hpp"
+#include "../core/theme/inspector.hpp"
+#include "../core/theme/layout.hpp"
 #include "../core/theme/library.hpp"
 #include "../core/theme/session.hpp"
-#include "../core/theme/theme.hpp"
 #include "../core/theme/theme_settings.hpp"
+#include "../core/theme/worker.hpp"
 
 namespace amk::win {
 
@@ -29,24 +31,33 @@ namespace {
 constexpr auto kTick = std::chrono::seconds(3);
 constexpr auto kAttachRetry = std::chrono::seconds(1);
 
-// The folder of one theme is `themes\<name>` under the kit. The file of allowed resource keys is written by the
-// inspector on the PC. Without it, resources.xaml is loaded without the key check, and the journal says so.
-std::optional<std::set<std::string>> AllowedKeys(const std::filesystem::path& kit) {
-    std::ifstream in(kit / "resource-keys.txt");
-    if (!in) return std::nullopt;
-
-    std::set<std::string> keys;
-    std::string line;
-    while (std::getline(in, line)) {
-        while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
-        if (!line.empty() && line[0] != '#') keys.insert(line);
-    }
-    return keys;
+// Windows apps in dark mode, for theme.scheme = auto. Light when the value cannot be read (older Windows).
+bool SystemUsesDarkMode() {
+    DWORD light = 1;
+    DWORD size = sizeof(light);
+    LONG status = RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                               L"AppsUseLightTheme", RRF_RT_REG_DWORD, nullptr, &light, &size);
+    return status == ERROR_SUCCESS && light == 0;
 }
 
-// A change of part is a change of theme: the parts are part of the key that triggers a reload.
-std::string PartsKey(const theme::ThemeParts& parts) {
-    return std::string("|") + (parts.colors ? "c" : "-") + (parts.resources ? "r" : "-") + (parts.assets ? "a" : "-");
+// Local time in minutes from midnight, for theme.schedule.
+int LocalMinute() {
+    SYSTEMTIME now{};
+    GetLocalTime(&now);
+    return now.wHour * 60 + now.wMinute;
+}
+
+// After an inspection, writes sidebar.json when it does not exist yet: every NavigationViewItem of the tree, in the
+// current order, none hidden. The user then edits it (docs/themes/FORMAT.md, « Barre latérale et accueil »).
+void WriteSidebarIfMissing(const std::filesystem::path& kit, theme::TreeBackend& tree) {
+    std::filesystem::path file = kit / std::string(theme::LayoutFileName(theme::LayoutKind::Sidebar));
+    std::error_code error;
+    if (std::filesystem::exists(file, error)) return;
+    std::optional<theme::Selector> items = theme::ParseSelector("NavigationViewItem");
+    if (!items) return;
+    std::vector<std::string> names = theme::NamesMatching(tree.Snapshot(), *items);
+    if (names.empty()) return;
+    std::ofstream(file, std::ios::binary) << theme::WriteLayout(theme::GenerateLayout(std::nullopt, names));
 }
 
 // Changes only the theme keys of settings.txt, and keeps the rest of the file as it is.
@@ -93,42 +104,16 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
     if (!m_running) return;
     m_journal.Write("Thèmes : crochet installé sur le thread d'interface");
 
-    std::string lastKey;
-    std::uint64_t generation = 0;
-    std::shared_ptr<const theme::Theme> loaded;
-    std::string activeId;
+    // Reads the settings, the theme, the snippets, sidebar.json and home.json, and reloads only what changed. The
+    // Windows mode and the local time choose the scheme for theme.scheme = auto and theme.schedule.
+    theme::ThemeWorker worker(m_kit);
 
     while (m_running) {
         Settings settings;
         settings.Load((m_kit / "settings.txt").string());
-        theme::ThemeSettings wanted = theme::ReadThemeSettings(settings);
-
-        // A new key means a new generation: the interface restores the old theme and applies the new one.
-        std::string key = wanted.active.empty() ? "none" : wanted.active + "|" + wanted.scheme + PartsKey(wanted.parts);
-        if (!wanted.active.empty() && wanted.liveReload) key += "|" + theme::FolderSignature(m_kit / "themes" / wanted.active);
-        if (key != lastKey) {
-            lastKey = key;
-            generation++;
-            loaded.reset();
-            activeId = wanted.active;
-            if (!wanted.active.empty()) {
-                std::filesystem::path folder = m_kit / "themes" / wanted.active;
-                theme::FolderFiles files(folder);
-                theme::LoadOptions options;
-                options.scheme = wanted.scheme;
-                options.parts = wanted.parts;
-                std::optional<std::set<std::string>> allowed = AllowedKeys(m_kit);
-                options.allowedKeys = allowed ? &*allowed : nullptr;
-                loaded = std::make_shared<const theme::Theme>(
-                    theme::LoadTheme(wanted.active, folder.generic_string(), files, options));
-            }
-        }
-
-        theme::SessionRequest request;
-        request.themeId = activeId;
-        request.theme = loaded;
-        request.generation = generation;
-        request.inspect = wanted.inspect;
+        worker.SetSystemDark(SystemUsesDarkMode());
+        theme::SessionRequest request = worker.Tick(settings, LocalMinute());
+        std::string activeId = request.themeId;
 
         std::vector<std::string> names{""};  // "" is the choice "Aucun"
         for (const std::string& folder : theme::ListThemeFolders(m_kit / "themes")) names.push_back(folder);
@@ -145,8 +130,10 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             std::optional<std::string> dump = ui->session.Tick(ui->backend, request);
             if (dump) {
                 std::ofstream(JournalFile("inspector.txt")) << *dump;
+                std::ofstream(JournalFile("inspector.json")) << theme::InspectTreeJson(ui->backend);
+                WriteSidebarIfMissing(kit, ui->backend);
                 UpdateThemeSettings(kit, [](theme::ThemeSettings& value) { value.inspect = false; });
-                journal.Write("Inspecteur : arbre écrit dans journal\\inspector.txt");
+                journal.Write("Inspecteur : arbre écrit dans journal\\inspector.txt et inspector.json");
             }
 
             ui->backend.EnsureSettingsSection(names, activeId, [kit, activeId, &journal](const std::string& choice) {

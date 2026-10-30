@@ -32,7 +32,7 @@ std::wstring ToWide(const std::string& text) {
     return out;
 }
 
-// Returns the virtual key of a key name written by the kit's normalizer (see core/amk_prelude.cpp), or 0.
+// Returns the virtual key of a key name written by the kit's normalizer (see core/prelude/keyboard.cpp), or 0.
 UINT VirtualKeyOf(const std::string& name) {
     static const std::map<std::string, UINT> named = {
         {"Left", VK_LEFT}, {"Right", VK_RIGHT}, {"Up", VK_UP}, {"Down", VK_DOWN}, {"Space", VK_SPACE},

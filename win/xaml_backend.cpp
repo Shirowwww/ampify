@@ -82,6 +82,43 @@ std::string ShortName(const std::string& fullType) {
     return dot == std::string::npos ? fullType : fullType.substr(dot + 1);
 }
 
+// The position of `object` in the list that holds it and can reorder it (theme::kOrderProperty). A NavigationViewItem
+// lives in the MenuItems of the nearest NavigationView; another element in the Children of its direct parent Panel
+// (not an ItemsRepeater, whose children it manages itself). With `target`, the element moves there first. Nothing when
+// no such list holds it, for example items generated from MenuItemsSource or footer items. To check on the PC: moving
+// the selected entry may change the selection.
+std::optional<std::uint32_t> ItemPosition(const xaml::DependencyObject& object, std::optional<std::uint32_t> target) {
+    if (object.try_as<controls::NavigationViewItemBase>()) {
+        for (xaml::DependencyObject parent = media::VisualTreeHelper::GetParent(object); parent;
+             parent = media::VisualTreeHelper::GetParent(parent)) {
+            auto navigation = parent.try_as<controls::NavigationView>();
+            if (!navigation) continue;
+            auto items = navigation.MenuItems();
+            std::uint32_t index = 0;
+            if (!items.IndexOf(object, index)) return std::nullopt;
+            if (!target) return index;
+            if (*target >= items.Size()) return std::nullopt;
+            items.RemoveAt(index);
+            items.InsertAt(*target, object);
+            return *target;
+        }
+        return std::nullopt;
+    }
+
+    xaml::DependencyObject parent = media::VisualTreeHelper::GetParent(object);
+    if (!parent) return std::nullopt;
+    auto panel = parent.try_as<controls::Panel>();
+    auto element = object.try_as<xaml::UIElement>();
+    if (!panel || !element || parent.try_as<controls::ItemsRepeater>()) return std::nullopt;
+    auto children = panel.Children();
+    std::uint32_t index = 0;
+    if (!children.IndexOf(element, index)) return std::nullopt;
+    if (!target) return index;
+    if (*target >= children.Size()) return std::nullopt;
+    children.Move(index, *target);
+    return *target;
+}
+
 }  // namespace
 
 bool XamlTreeBackend::Attach() {
@@ -181,6 +218,15 @@ std::optional<theme::Value> XamlTreeBackend::Read(theme::NodeId id, std::string_
         if (auto element = object.try_as<xaml::FrameworkElement>()) {
             double value = property == "Width" ? element.Width() : element.Height();
             return theme::Value{theme::ValueKind::Length, th::FormatNumber(value)};
+        }
+    } else if (property == "FlowDirection") {
+        if (auto element = object.try_as<xaml::FrameworkElement>()) {
+            bool rtl = element.FlowDirection() == xaml::FlowDirection::RightToLeft;
+            return theme::Value{theme::ValueKind::Keyword, rtl ? "RightToLeft" : "LeftToRight"};
+        }
+    } else if (property == th::kOrderProperty) {
+        if (std::optional<std::uint32_t> position = ItemPosition(object, std::nullopt)) {
+            return theme::Value{theme::ValueKind::Number, std::to_string(*position)};
         }
     } else if (property == "Template") {
         if (auto control = object.try_as<controls::Control>()) {
@@ -290,6 +336,19 @@ bool XamlTreeBackend::Write(theme::NodeId id, std::string_view property, const t
             return true;
         }
         return false;
+    }
+
+    if (property == "FlowDirection" && value.kind == theme::ValueKind::Keyword) {
+        if (auto element = object.try_as<xaml::FrameworkElement>()) {
+            element.FlowDirection(value.text == "RightToLeft" ? xaml::FlowDirection::RightToLeft
+                                                               : xaml::FlowDirection::LeftToRight);
+            return true;
+        }
+        return false;
+    }
+
+    if (property == th::kOrderProperty && value.kind == theme::ValueKind::Number) {
+        return ItemPosition(object, static_cast<std::uint32_t>(std::stoul(value.text))).has_value();
     }
 
     if (property == "Template") {

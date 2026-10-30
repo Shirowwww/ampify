@@ -1,0 +1,101 @@
+// The list of the modules that make the AMK object, and the assembly of the prelude from their fragments.
+//
+// To add a module `foo`: write core/prelude/foo.cpp (kFoo, the JavaScript) and, when it needs the kernel,
+// core/natives/foo.cpp (DefineFoo, plus StartFoo or StopFoo when needed); declare them below; add one line to
+// kModules. Both files go in cmake/sources/<package>.cmake. Guide: docs/extensions/API.md, "Organisation du code".
+
+#include "module.hpp"
+
+#include "../script_extension.hpp"
+
+namespace amk {
+
+namespace prelude {
+extern const char kFrameHead[];
+extern const char kFrameTail[];
+extern const char kCore[];
+extern const char kConfig[];
+extern const char kStorage[];
+extern const char kPlayer[];
+extern const char kAudio[];
+extern const char kKeyboard[];
+extern const char kNotify[];
+extern const char kHttp[];
+extern const char kIcons[];
+extern const char kUri[];
+extern const char kTimers[];
+extern const char kConsole[];
+extern const char kUi[];
+}  // namespace prelude
+
+namespace natives {
+void DefineCore(api::NativeScope& scope);
+void DefineConfig(api::NativeScope& scope);
+void DefineStorage(api::NativeScope& scope);
+void StartStorage(ScriptExtension& extension);
+void DefinePlayer(api::NativeScope& scope);
+void DefineAudio(api::NativeScope& scope);
+void StopAudio(ScriptExtension& extension);
+void DefineKeyboard(api::NativeScope& scope);
+void StopKeyboard(ScriptExtension& extension);
+void DefineNotify(api::NativeScope& scope);
+void DefineHttp(api::NativeScope& scope);
+void DefineTimers(api::NativeScope& scope);
+void DefineUi(api::NativeScope& scope);
+void StopUi(ScriptExtension& extension);
+}  // namespace natives
+
+namespace api {
+
+namespace {
+
+// Prelude order: a module sees what the modules above it added, and AMK lists its members in this order.
+// Columns: name, prelude fragment, natives, start hook, stop hook.
+const ApiModule kModules[] = {
+    {"core", prelude::kCore, natives::DefineCore, nullptr, nullptr},
+    {"config", prelude::kConfig, natives::DefineConfig, nullptr, nullptr},
+    {"storage", prelude::kStorage, natives::DefineStorage, natives::StartStorage, nullptr},
+    {"player", prelude::kPlayer, natives::DefinePlayer, nullptr, nullptr},
+    {"audio", prelude::kAudio, natives::DefineAudio, nullptr, natives::StopAudio},
+    {"keyboard", prelude::kKeyboard, natives::DefineKeyboard, nullptr, natives::StopKeyboard},
+    {"notify", prelude::kNotify, natives::DefineNotify, nullptr, nullptr},
+    {"http", prelude::kHttp, natives::DefineHttp, nullptr, nullptr},
+    {"icons", prelude::kIcons, nullptr, nullptr, nullptr},
+    {"uri", prelude::kUri, nullptr, nullptr, nullptr},
+    {"timers", prelude::kTimers, natives::DefineTimers, nullptr, nullptr},
+    {"console", prelude::kConsole, nullptr, nullptr, nullptr},
+    {"ui", prelude::kUi, natives::DefineUi, nullptr, natives::StopUi},
+};
+
+}  // namespace
+
+std::span<const ApiModule> Modules() { return kModules; }
+
+const std::string& Prelude() {
+    static const std::string text = [] {
+        std::string out = prelude::kFrameHead;
+        for (const ApiModule& module : kModules) {
+            if (!module.prelude) continue;
+            out += "\n  // ---- Module ";
+            out += module.name;
+            out += "\n  {";
+            out += module.prelude;
+            out += "  }\n";
+        }
+        out += prelude::kFrameTail;
+        return out;
+    }();
+    return text;
+}
+
+JSValue MakeNatives(JSContext* ctx, ScriptExtension& extension) {
+    JSValue natives = JS_NewObject(ctx);
+    NativeScope scope(ctx, natives, extension);
+    for (const ApiModule& module : kModules) {
+        if (module.defineNatives) module.defineNatives(scope);
+    }
+    return natives;
+}
+
+}  // namespace api
+}  // namespace amk

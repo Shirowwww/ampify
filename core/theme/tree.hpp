@@ -24,6 +24,7 @@ enum class ValueKind {
     Number,      // a plain number, such as "0.5" or "700" for a font weight
     Text,        // a font family such as "Segoe UI Variable"
     Template,    // the XAML text of a ControlTemplate
+    Keyword,     // the name of an enumeration member as XAML spells it, such as "RightToLeft" for FlowDirection
     Opaque,      // a token that Read gave back for an object the engine cannot express as text; Write restores it
 };
 
@@ -45,6 +46,8 @@ struct NodeInfo {
     int depth = 0;
 };
 
+inline constexpr std::string_view kOrderProperty = "Order";
+
 class TreeBackend {
 public:
     virtual ~TreeBackend() = default;
@@ -53,6 +56,9 @@ public:
     virtual std::vector<NodeInfo> Snapshot() = 0;
 
     // The current value of a XAML property, in the form Write accepts. Nothing when the element has no such property.
+    // Besides the XAML properties, the engine uses one property of its own, kOrderProperty ("Order"): the position of
+    // the element among the items of its parent (a Number, 0 first). Writing it moves the element to that position,
+    // as NavigationView.MenuItems.Move or Panel.Children.Move would. Read gives nothing when the parent cannot reorder.
     virtual std::optional<Value> Read(NodeId id, std::string_view property) = 0;
 
     // False when the element is gone or does not support the property or the value.

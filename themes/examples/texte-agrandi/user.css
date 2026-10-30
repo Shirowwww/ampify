@@ -1,7 +1,12 @@
 /* Texte agrandi et marges plus larges. Les éléments qui n'ont pas la propriété sont refusés, sans gravité. */
 
+/* Rôles de police : la taille du texte courant est donnée une fois, ici. Les extensions la lisent avec AMK.fonts. */
+:root {
+    --font-body-size: 18px;
+}
+
 TextBlock {
-    font-size: 18px;
+    font-size: var(--font-body-size);
 }
 
 Button {

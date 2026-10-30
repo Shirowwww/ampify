@@ -45,6 +45,9 @@ public:
     // Any thread: queues a click on a control of the interface, for the element that added it.
     void DeliverClick(int controlId);
 
+    // Any thread: queues dispatch.<entry>(payload) for every running element (ScriptExtension::DeliverEvent).
+    void DeliverEvent(const std::string& entry, const std::string& payload);
+
     // The folder of the themes. A theme with a main.js is an element too: it runs in AppleMusic.exe while it is the
     // active theme, and only when theme.parts.script is on. Call it before Discover.
     void SetThemeRoot(std::filesystem::path root);

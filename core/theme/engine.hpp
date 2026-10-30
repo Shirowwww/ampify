@@ -19,6 +19,10 @@ namespace amk::theme {
 // Applying is idempotent: a value that is already in place is not written again, so the engine can run on a timer
 // to style elements that appear later (a page opened for the first time).
 //
+// The position of an element among its siblings (kOrderProperty) is not a value like the others: moving one element
+// shifts the others. Moves are made in the order of their target position, which places every element in one pass,
+// and Restore undoes them in the reverse order.
+//
 // Must run on the interface thread, like the backend it drives.
 class ThemeEngine {
 public:
@@ -36,7 +40,7 @@ public:
     void Restore(TreeBackend& tree);
 
     bool Active() const { return m_active; }
-    size_t OriginalCount() const { return m_originals.size() + m_resourceOriginals.size(); }
+    size_t OriginalCount() const { return m_originals.size() + m_resourceOriginals.size() + m_moves.size(); }
 
 private:
     void ApplyAssignments(const Theme& theme, TreeBackend& tree, const std::vector<NodeInfo>& nodes, Report& report);
@@ -44,9 +48,21 @@ private:
     void ApplyDictionary(const Theme& theme, TreeBackend& tree, Report& report);
     void Refuse(const std::string& key, const std::string& message, Report& report);
 
+    struct Move {
+        NodeId id = 0;
+        Value before;  // the position before this move
+    };
+    struct PendingMove {
+        const NodeInfo* node = nullptr;
+        const Assignment* assignment = nullptr;
+    };
+    void ApplyMoves(std::vector<PendingMove>& pending, TreeBackend& tree, Report& report);
+    bool WriteValue(const NodeInfo& node, const Assignment& assignment, TreeBackend& tree, Report& report, bool keep);
+
     Journal& m_journal;
     std::map<std::pair<NodeId, std::string>, Value> m_originals;  // element and XAML property, first value seen
     std::map<std::string, Value> m_resourceOriginals;             // resource key, first value seen
+    std::vector<Move> m_moves;  // every change of position, in the order made
     std::string m_dictionary;  // the resource dictionary currently merged, empty when none
     std::set<std::string> m_reported;  // refusals already written to the journal, so a timer does not repeat them
     bool m_active = false;

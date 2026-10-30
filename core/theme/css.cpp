@@ -235,6 +235,12 @@ Stylesheet ParseStylesheet(std::string_view css) {
 
         Rule rule;
         rule.line = line;
+        if (LowerCopy(head) == ":root") {
+            rule.root = true;
+            rule.declarations = ParseDeclarations(body, open + 1, clean, sheet.problems);
+            sheet.rules.push_back(std::move(rule));
+            continue;
+        }
         bool selectorsOk = true;
         for (const Piece& piece : SplitTopLevel(head, ',')) {
             std::string problem;

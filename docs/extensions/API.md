@@ -32,7 +32,7 @@ AppleMusic.exe ou AMPLibraryAgent.exe
 
 - **Le runtime JavaScript** est [quickjs-ng](https://github.com/quickjs-ng/quickjs), la branche maintenue de QuickJS
   (licence MIT, compilée en C avec MSVC et MinGW pour Windows, et sous Linux pour les tests). La version vendue et
-  son empreinte sont dans `vendor/quickjs/VERSION`. QuickJS 2021-03-27 ne se compilait pas avec MSVC.
+  son empreinte sont dans `vendor/quickjs/UPSTREAM.txt`. QuickJS 2021-03-27 ne se compilait pas avec MSVC.
 - **Les extensions natives** (DLL chargées à l'exécution) ne sont pas ouvertes à la communauté en v1. Une DLL tourne
   dans le processus d'Apple Music avec tous les droits : un catalogue public ne peut pas la garantir. Les extensions
   natives restent intégrées au noyau, comme `atmos-leveler`.
@@ -44,6 +44,23 @@ AppleMusic.exe ou AMPLibraryAgent.exe
 - **Le manifeste choisit les processus** avec `processes` (voir MANIFEST.md). Par défaut, un élément tourne dans les deux.
   Choix provisoire, décidé avec l'utilisateur : un élément qui écrit son stockage doit déclarer un seul processus, sans quoi
   deux processus écrivent le même fichier. [provisoire M7]
+
+### Organisation du code (pour les contributeurs)
+
+L'objet global est fait de **modules** (`core`, `config`, `storage`, `player`, `audio`, `keyboard`, `notify`, `http`,
+`icons`, `uri`, `timers`, `console`, `ui`). Chaque module vit dans ses propres fichiers, pour que plusieurs personnes
+puissent en ajouter en même temps sans modifier les mêmes lignes :
+
+| Partie d'un module `foo` | Où |
+|---|---|
+| JavaScript (le morceau du prélude qui remplit l'objet et, s'il reçoit des événements, `dispatch.foo`) | `core/prelude/foo.cpp`, constante `kFoo`. Il tourne dans son propre bloc : ses constantes lui restent privées. Il voit `native`, l'objet global en construction, `dispatch` et les aides de `core/prelude/frame.cpp` (`text`, `describe`, `runGuarded`). Le gel final est fait par le cadre, pas par le module |
+| Fonctions natives (le C++ appelé par `native.xxx`) | `core/natives/foo.cpp`, fonction `DefineFoo`, plus `StartFoo` ou `StopFoo` si le module doit charger ou rendre quelque chose. Les aides communes et la vérification de permission sont dans `core/api/bridge.hpp` (`Require`, `HostOf`, `State<T>` pour un état par élément) |
+| Inscription | une ligne dans la table `kModules` de `core/api/modules.cpp` (et la déclaration de `kFoo` et `DefineFoo` juste au-dessus). L'ordre de la table est l'ordre du prélude |
+| Événements venus du noyau | `ExtensionLoader::DeliverEvent("foo", charge)` appelle `dispatch.foo(charge)` dans chaque élément actif, sans nouvelle méthode dans les fichiers partagés |
+| Service de l'hôte | une capacité optionnelle, déclarée dans l'en-tête du module (`struct FooHost { static constexpr std::string_view kCapabilityName = "foo"; ... }`), lue avec `host.Capability<FooHost>()`, nulle sur les hôtes qui ne l'offrent pas. Seuls les hôtes qui la prennent en charge l'implémentent (voir `core/host.hpp`). Les méthodes virtuelles pures existantes de `Host` ne bougent pas |
+| Construction | un nouveau fichier `cmake/sources/<paquet>.cmake` avec `list(APPEND AMK_CORE_SOURCES ...)` et, pour les tests, `list(APPEND AMK_TESTS_SOURCES ...)` (convention en tête de `CMakeLists.txt`) |
+| Tests | `tests/foo_tests.cpp`, listé dans le fichier `.cmake` du paquet. `tests/api_module_tests.cpp` fige les membres existants de l'objet global, un par un : un nouveau membre n'y touche pas, une modification d'un membre existant le fait échouer |
+| Types et documentation | la section 5 de ce document, `cli/sdk_types.cpp` (`amk types`, vérifié par `tools/test_cli.py`) et, si les exemples s'en servent, l'objet factice de `tools/test_examples.mjs` |
 
 ## 3. Cycle de vie
 
@@ -276,6 +293,8 @@ Une app est une extension qui ajoute une page de navigation (`AMK.ui.page.regist
 ### 6.3 Snippets [provisoire M8]
 
 Un snippet est un fragment de `resources.xaml`, activable seul. Il suit la même liste de clés autorisées que les thèmes.
+Il peut aussi avoir un `user.css`, appliqué après le thème actif. Détails : [`docs/themes/FORMAT.md`](../themes/FORMAT.md),
+section « Snippets ».
 
 ## 7. Ligne de commande `amk`
 

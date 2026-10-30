@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "ui_model.hpp"
 
@@ -72,6 +73,40 @@ public:
 
     // The interface that the elements add to. Thread-safe: the host renders it, and the tests read it.
     virtual UiModel& Ui() = 0;
+
+    // ---- Optional capabilities --------------------------------------------------------------------------------
+    // The pure virtuals above are what every host has. A new service is a capability instead, so that adding one
+    // does not touch every host. A module declares it in its own header:
+    //
+    //     struct AudioAnalysisHost {
+    //         static constexpr std::string_view kCapabilityName = "audio.analysis";
+    //         virtual ~AudioAnalysisHost() = default;
+    //         virtual bool Subscribe(const std::string& elementId) = 0;
+    //     };
+    //
+    // A host that supports it derives from that struct and answers QueryCapability for its name (see Offer). The
+    // module's natives call host.Capability<AudioAnalysisHost>(), which is null on the hosts that do not have it.
+
+    // The capability T of this host, or nullptr when it does not offer it.
+    template <class T>
+    T* Capability() {
+        return static_cast<T*>(QueryCapability(T::kCapabilityName));
+    }
+
+    // The capability named `name`, as a T* converted to void*, or nullptr. An override ends with
+    // `return Base::QueryCapability(name);`, so that the classes it derives from can still offer theirs.
+    virtual void* QueryCapability(std::string_view name) {
+        (void)name;
+        return nullptr;
+    }
+
+protected:
+    // For QueryCapability overrides: `if (void* found = Offer<AudioAnalysisHost>(name, this)) return found;`.
+    // The cast goes through T*, so that Capability<T> gets the right address under multiple inheritance.
+    template <class T, class Self>
+    static void* Offer(std::string_view name, Self* self) {
+        return name == T::kCapabilityName ? static_cast<void*>(static_cast<T*>(self)) : nullptr;
+    }
 };
 
 }  // namespace amk

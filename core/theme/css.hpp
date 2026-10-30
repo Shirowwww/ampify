@@ -14,6 +14,9 @@ namespace amk::theme {
 //   A B             a B somewhere inside an A
 //   A > B           a B whose direct parent is an A
 // Parts can be combined: `Grid#Bar > TextBlock`. Attributes and pseudo-classes are not supported yet.
+//
+// One more block is read: `:root { --name: value; }` defines variables, which values use as `var(--name)` or
+// `var(--name, fallback)`. The variables named --font-<role> describe the font roles (see fonts.hpp).
 
 enum class Combinator {
     Descendant,  // whitespace
@@ -39,6 +42,7 @@ struct Declaration {
 };
 
 struct Rule {
+    bool root = false;  // a `:root` block: no selectors, its declarations are variables
     std::vector<Selector> selectors;
     std::vector<Declaration> declarations;
     int line = 0;

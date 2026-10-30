@@ -142,4 +142,10 @@ void ExtensionLoader::DeliverClick(int controlId) {
     }
 }
 
+void ExtensionLoader::DeliverEvent(const std::string& entry, const std::string& payload) {
+    for (auto& element : m_elements) {
+        if (element->running()) element->DeliverEvent(entry, payload);
+    }
+}
+
 }  // namespace amk

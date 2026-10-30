@@ -136,6 +136,7 @@ int SetTheme(const std::vector<std::string>& args, const KitLayout& kit, std::os
     value.liveReload = current.liveReload;
     value.inspect = current.inspect;
     value.parts = current.parts;
+    value.schedule = current.schedule;
     WriteThemeSettings(settings, value);
     if (!settings.Save(kit.Settings().string())) {
         err << "impossible d'écrire " << kit.Settings().string() << '\n';

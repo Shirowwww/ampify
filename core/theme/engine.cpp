@@ -1,5 +1,7 @@
 #include "engine.hpp"
 
+#include <algorithm>
+#include <cstdlib>
 #include <iterator>
 #include <optional>
 #include <vector>
@@ -8,9 +10,11 @@ namespace amk::theme {
 
 namespace {
 
-// True when `candidate` should replace `current` for the same element and property.
+// True when `candidate` should replace `current` for the same element and property. !important first, then the layer
+// (a snippet beats the theme, sidebar.json beats both), then specificity, then the place in the file.
 bool Beats(const Assignment& candidate, const Assignment& current) {
     if (candidate.important != current.important) return candidate.important;
+    if (candidate.layer != current.layer) return candidate.layer > current.layer;
     if (candidate.specificity != current.specificity) return current.specificity < candidate.specificity;
     return candidate.order > current.order;
 }
@@ -35,6 +39,7 @@ ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
     for (auto it = m_originals.begin(); it != m_originals.end();) {
         it = live.count(it->first.first) ? std::next(it) : m_originals.erase(it);
     }
+    std::erase_if(m_moves, [&](const Move& move) { return !live.count(move.id); });
 
     ApplyDictionary(theme, tree, report);
     ApplyResources(theme, tree, report);
@@ -51,6 +56,7 @@ ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
 
 void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const std::vector<NodeInfo>& nodes,
                                    Report& report) {
+    std::vector<PendingMove> pending;
     for (int index = 0; index < static_cast<int>(nodes.size()); index++) {
         const NodeInfo& node = nodes[index];
 
@@ -64,30 +70,51 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
         }
 
         for (const auto& [property, assignment] : winners) {
-            std::optional<Value> current = tree.Read(node.id, property);
-            if (!current) {
-                Refuse(Describe(node) + " " + property,
-                       "« " + Describe(node) + " » n'a pas de propriété " + property, report);
+            if (property == kOrderProperty) {
+                pending.push_back({&node, assignment});
                 continue;
             }
-            if (*current == assignment->value) {
-                report.unchanged++;
-                continue;
-            }
-
-            auto key = std::make_pair(node.id, property);
-            if (!m_originals.count(key)) m_originals.emplace(key, *current);
-
-            if (!tree.Write(node.id, property, assignment->value)) {
-                Refuse(Describe(node) + " " + property, "valeur refusée pour « " + Describe(node) + " " + property + " »",
-                       report);
-                continue;
-            }
-            report.applied++;
-            m_journal.Write("Appliqué : " + Describe(node) + " " + property + " = " + assignment->value.text +
-                            " (user.css ligne " + std::to_string(assignment->line) + ")");
+            WriteValue(node, *assignment, tree, report, true);
         }
     }
+    ApplyMoves(pending, tree, report);
+}
+
+// Writes one value when it differs from the current one. `keep` stores the first value seen, for Restore.
+bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment, TreeBackend& tree, Report& report,
+                             bool keep) {
+    const std::string& property = assignment.property;
+    std::optional<Value> current = tree.Read(node.id, property);
+    if (!current) {
+        Refuse(Describe(node) + " " + property, "« " + Describe(node) + " » n'a pas de propriété " + property, report);
+        return false;
+    }
+    if (*current == assignment.value) {
+        report.unchanged++;
+        return false;
+    }
+
+    auto key = std::make_pair(node.id, property);
+    if (keep && !m_originals.count(key)) m_originals.emplace(key, *current);
+
+    if (!tree.Write(node.id, property, assignment.value)) {
+        Refuse(Describe(node) + " " + property, "valeur refusée pour « " + Describe(node) + " " + property + " »", report);
+        return false;
+    }
+    if (!keep) m_moves.push_back({node.id, *current});
+    report.applied++;
+    m_journal.Write("Appliqué : " + Describe(node) + " " + property + " = " + assignment.value.text + " (" +
+                    assignment.source + " ligne " + std::to_string(assignment.line) + ")");
+    return true;
+}
+
+// Moves the elements in the order of their target position: placing position 0 first, then 1, and so on, never
+// disturbs an element already placed, so one pass is enough. Each move is recorded, Restore undoes them backwards.
+void ThemeEngine::ApplyMoves(std::vector<PendingMove>& pending, TreeBackend& tree, Report& report) {
+    auto position = [](const PendingMove& move) { return std::atoi(move.assignment->value.text.c_str()); };
+    std::stable_sort(pending.begin(), pending.end(),
+                     [&](const PendingMove& a, const PendingMove& b) { return position(a) < position(b); });
+    for (const PendingMove& move : pending) WriteValue(*move.node, *move.assignment, tree, report, false);
 }
 
 void ThemeEngine::ApplyResources(const Theme& theme, TreeBackend& tree, Report& report) {
@@ -134,6 +161,13 @@ void ThemeEngine::Restore(TreeBackend& tree) {
     int restored = 0;
     int gone = 0;
 
+    for (auto it = m_moves.rbegin(); it != m_moves.rend(); ++it) {
+        if (tree.Write(it->id, kOrderProperty, it->before)) {
+            restored++;
+        } else {
+            gone++;
+        }
+    }
     for (const auto& [key, original] : m_originals) {
         if (tree.Write(key.first, key.second, original)) {
             restored++;
@@ -160,6 +194,7 @@ void ThemeEngine::Restore(TreeBackend& tree) {
 
     m_originals.clear();
     m_resourceOriginals.clear();
+    m_moves.clear();
     m_reported.clear();
     m_active = false;
     m_journal.Write("Thème retiré : " + std::to_string(restored) + " valeur(s) restaurée(s), " + std::to_string(gone) +

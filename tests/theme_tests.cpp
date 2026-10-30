@@ -9,20 +9,27 @@
 #include <vector>
 
 #include "../core/journal.hpp"
+#include "../core/json.hpp"
+#include "../core/manifest.hpp"
 #include "../core/settings.hpp"
 #include "../core/theme/color.hpp"
 #include "../core/theme/css.hpp"
 #include "../core/theme/commands.hpp"
 #include "../core/theme/engine.hpp"
 #include "../core/theme/files.hpp"
+#include "../core/theme/fonts.hpp"
 #include "../core/theme/ini.hpp"
 #include "../core/theme/inspector.hpp"
+#include "../core/theme/layout.hpp"
 #include "../core/theme/library.hpp"
 #include "../core/theme/properties.hpp"
+#include "../core/theme/scheme_choice.hpp"
 #include "../core/theme/selector.hpp"
 #include "../core/theme/session.hpp"
+#include "../core/theme/snippets.hpp"
 #include "../core/theme/theme.hpp"
 #include "../core/theme/theme_settings.hpp"
+#include "../core/theme/worker.hpp"
 #include "test.hpp"
 
 namespace th = amk::theme;
@@ -1029,4 +1036,642 @@ TEST_CASE(Commands_WatchRejectsBadUse) {
     CHECK(th::RunWatch(Args({"watch"}), out, err, nothing) == 2);
     CHECK(th::RunWatch(Args({"watch", "/no/such/folder/for/amk"}), out, err, nothing) == 2);
     CHECK(th::RunWatch(Args({"watch", "x", "--polls", "many"}), out, err, nothing) == 2);
+}
+
+// --- Spicetify parity: flow-direction, order, variables, font roles, snippets, schemes, layout, inspector JSON ----
+
+namespace {
+
+// A NavigationView with items that can be reordered, as the real sidebar can (NavigationView.MenuItems.Move).
+// Snapshot lists the items in their current order; Order reads and moves the position of an item.
+class ListTree final : public th::TreeBackend {
+public:
+    struct Item {
+        th::NodeId id = 0;
+        std::string name;
+        th::Value visibility{th::ValueKind::Visibility, "Visible"};
+    };
+    std::vector<Item> items;  // current order
+
+    explicit ListTree(std::vector<std::string> names) {
+        for (const std::string& name : names) items.push_back({items.size() + 2, name, {}});
+        for (Item& item : items) item.visibility = {th::ValueKind::Visibility, "Visible"};
+    }
+
+    std::vector<std::string> Names() const {
+        std::vector<std::string> names;
+        for (const Item& item : items) names.push_back(item.name);
+        return names;
+    }
+
+    std::vector<th::NodeInfo> Snapshot() override {
+        std::vector<th::NodeInfo> nodes;
+        nodes.push_back({1, "NavigationView", "", "Sidebar", -1, 0});
+        for (const Item& item : items) nodes.push_back({item.id, "NavigationViewItem", "", item.name, 0, 1});
+        return nodes;
+    }
+
+    std::optional<th::Value> Read(th::NodeId id, std::string_view property) override {
+        int index = IndexOf(id);
+        if (index < 0) return std::nullopt;
+        if (property == th::kOrderProperty) return th::Value{th::ValueKind::Number, std::to_string(index)};
+        if (property == "Visibility") return items[index].visibility;
+        return std::nullopt;
+    }
+
+    bool Write(th::NodeId id, std::string_view property, const th::Value& value) override {
+        int index = IndexOf(id);
+        if (index < 0) return false;
+        if (property == "Visibility") {
+            items[index].visibility = value;
+            return true;
+        }
+        if (property != th::kOrderProperty) return false;
+        int target = std::stoi(value.text);
+        if (target < 0 || target >= static_cast<int>(items.size())) return false;
+        Item moved = items[index];
+        items.erase(items.begin() + index);
+        items.insert(items.begin() + target, moved);
+        return true;
+    }
+
+    std::vector<std::string> ResourceKeys() override { return {}; }
+    std::optional<th::Value> ReadResource(std::string_view) override { return std::nullopt; }
+    bool WriteResource(std::string_view, const th::Value&) override { return false; }
+    bool SetDictionary(std::string_view) override { return true; }
+
+private:
+    int IndexOf(th::NodeId id) const {
+        for (size_t i = 0; i < items.size(); i++) {
+            if (items[i].id == id) return static_cast<int>(i);
+        }
+        return -1;
+    }
+};
+
+std::shared_ptr<const th::Theme> Shared(th::Theme theme) {
+    return std::make_shared<const th::Theme>(std::move(theme));
+}
+
+th::Theme LoadSnippetFrom(MemoryFiles& files, const char* id, const th::Theme* base, th::LoadOptions options = {}) {
+    return th::LoadSnippet(id, std::string("C:/snippets/") + id, files, base, options);
+}
+
+void WriteFile(const std::filesystem::path& file, const std::string& text) {
+    std::filesystem::create_directories(file.parent_path());
+    std::ofstream(file, std::ios::binary) << text;
+}
+
+}  // namespace
+
+TEST_CASE(Properties_FlowDirectionAndOrder) {
+    th::Palette palette;
+    MemoryFiles files;
+    CHECK(Converted("flow-direction", "rtl", palette, files) == "RightToLeft");
+    CHECK(Converted("flow-direction", "Right-To-Left", palette, files) == "RightToLeft");
+    CHECK(Converted("direction", "ltr", palette, files) == "LeftToRight");
+    CHECK(Converted("flow-direction", "up", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(th::FindProperty("flow-direction")->xaml == "FlowDirection");
+
+    CHECK(Converted("order", "2", palette, files) == "2");
+    CHECK(Converted("order", "007", palette, files) == "7");
+    CHECK(Converted("order", "-1", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(Converted("order", "1.5", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(th::FindProperty("order")->xaml == th::kOrderProperty);
+}
+
+TEST_CASE(Engine_AppliesFlowDirectionAndRestoresIt) {
+    MemoryFiles files;
+    files.files["user.css"] = "Page { flow-direction: rtl; }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+
+    FakeTree tree;
+    tree.Add(-1, "Page", "", {{"FlowDirection", {th::ValueKind::Keyword, "LeftToRight"}}});
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    engine.Apply(theme, tree);
+    CHECK(tree.elements[0].properties["FlowDirection"].text == "RightToLeft");
+    engine.Restore(tree);
+    CHECK(tree.elements[0].properties["FlowDirection"].text == "LeftToRight");
+}
+
+TEST_CASE(Engine_MovesItemsInOrderAndUndoesTheMoves) {
+    ListTree tree({"A", "B", "C", "D"});
+    MemoryFiles files;
+    // D first, then B: listed items come first in the listed order, the others keep theirs after them.
+    files.files["user.css"] = "#D { order: 0; }\n#B { order: 1; }\n";
+    th::Theme theme = Load(files);
+
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    th::ThemeEngine::Report first = engine.Apply(theme, tree);
+    CHECK((tree.Names() == std::vector<std::string>{"D", "B", "A", "C"}));
+    CHECK(first.applied == 2);
+
+    th::ThemeEngine::Report second = engine.Apply(theme, tree);  // the next tick writes nothing
+    CHECK(second.applied == 0);
+    CHECK((tree.Names() == std::vector<std::string>{"D", "B", "A", "C"}));
+
+    engine.Restore(tree);
+    CHECK((tree.Names() == std::vector<std::string>{"A", "B", "C", "D"}));
+}
+
+TEST_CASE(Variables_RootBlockAndVar) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        ":root {\n"
+        "    --accent: #FF112233;\n"
+        "    --pad: 4px;\n"
+        "    --both: var(--pad) 8px;\n"
+        "    color: red;\n"
+        "}\n"
+        "Page { background: var(--accent); padding: var(--both); }\n"
+        "Grid { background: var(--absent, #FF445566); }\n"
+        "TextBlock { color: var(--absent); --local: 1; }\n"
+        "Border { margin: VAR(--later); }\n"
+        ":root { --later: 2; }\n";
+    th::Theme theme = Load(files);
+
+    std::map<std::string, std::string> values;
+    for (const th::Assignment& assignment : theme.assignments) values[assignment.selector.text + " " + assignment.property] = assignment.value.text;
+    CHECK(values["Page Background"] == "#FF112233");
+    CHECK(values["Page Padding"] == "8,4,8,4");
+    CHECK(values["Grid Background"] == "#FF445566");
+    CHECK(values["Border Margin"] == "2,2,2,2");  // a :root further down still counts, as in CSS
+    CHECK(!values.count("TextBlock Foreground"));
+    CHECK(theme.variables["pad"] == "4px");
+
+    CHECK(!ProblemContaining(theme, "user.css ligne 5 : « color » dans :root").empty());
+    CHECK(!ProblemContaining(theme, "variable « --absent » non définie").empty());
+    CHECK(!ProblemContaining(theme, "variable « --local » hors de :root").empty());
+
+    std::string problem;
+    CHECK(!th::SubstituteVariables("var(--x", {}, &problem).has_value());
+    CHECK(problem.find("parenthèse") != std::string::npos);
+    CHECK(!th::SubstituteVariables("var(x)", {}, &problem).has_value());
+    CHECK(th::SubstituteVariables("var(--a, var(--b, 3))", {}).value_or("") == "3");
+}
+
+TEST_CASE(Fonts_RolesFromRootBlockAndDefaults) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        ":root {\n"
+        "    --font-title: \"Segoe UI Variable Display\";\n"
+        "    --font-title-weight: bold;\n"
+        "    --font-titre-size: 30px;\n"
+        "    --font-texte: Inter;\n"
+        "    --font-body-weight: heavy;\n"
+        "}\n"
+        "TextBlock#Title { font-role: title; }\n"
+        "TextBlock { font-family: var(--font-texte); }\n"
+        "Grid { font-role: nothing; }\n";
+    th::Theme theme = Load(files);
+
+    std::optional<th::FontStyle> title = th::ResolveFontRole(&theme, "titre");
+    CHECK(title.has_value());
+    if (title) {
+        CHECK(title->role == "title");
+        CHECK(title->family == "Segoe UI Variable Display");
+        CHECK(title->weight == "700");
+        CHECK(title->size == "30");
+        CHECK(title->fromTheme);
+    }
+    std::optional<th::FontStyle> body = th::ResolveFontRole(&theme, "body");
+    CHECK(body && body->family == "Inter" && body->weight == "400" && body->size == "14");
+    std::optional<th::FontStyle> caption = th::ResolveFontRole(nullptr, "caption");
+    CHECK(caption && !caption->fromTheme && caption->size == "12");
+    CHECK(!th::ResolveFontRole(&theme, "unknown").has_value());
+
+    int titleParts = 0;
+    for (const th::Assignment& assignment : theme.assignments) {
+        if (assignment.selector.text == "TextBlock#Title") titleParts++;
+        if (assignment.selector.text == "TextBlock") CHECK(assignment.value.text == "Inter");
+    }
+    CHECK(titleParts == 3);
+    CHECK(!ProblemContaining(theme, "--font-body-weight").empty());
+    CHECK(!ProblemContaining(theme, "rôle de police « nothing » inconnu").empty());
+
+    std::optional<amk::Json> json = amk::Json::Parse(th::FontRolesJson(&theme));
+    CHECK(json.has_value());
+    if (json) {
+        const amk::Json* role = json->Find("title");
+        CHECK(role && role->Find("family") && *role->Find("family")->AsString() == "Segoe UI Variable Display");
+        CHECK(role && role->Find("weight") && *role->Find("weight")->AsNumber() == 700);
+        CHECK(role && role->Find("fromTheme") && *role->Find("fromTheme")->AsBool());
+        CHECK(json->Find("display") != nullptr);  // a default role is listed too
+    }
+}
+
+TEST_CASE(Snippets_LoadWithTheColoursOfTheTheme) {
+    MemoryFiles themeFiles;
+    themeFiles.files["colors.ini"] = "[Base]\nAccent = FF0000\n";
+    themeFiles.files["user.css"] = ":root { --font-title: Bahnschrift; }\n";
+    th::Theme theme = Load(themeFiles);
+
+    MemoryFiles files;
+    files.files["colors.ini"] = "[Base]\nAccent = 00FF00\n";
+    files.files["resources.xaml"] = "<ResourceDictionary xmlns=\"x\">\n  <!-- rien -->\n</ResourceDictionary>";
+    files.files["user.css"] = "Page { background: $Accent; }\nTextBlock { font-role: title; }\n";
+    th::Theme snippet = LoadSnippetFrom(files, "s1", &theme);
+    CHECK(snippet.usable);
+    CHECK(snippet.resourceDictionary.empty());  // an empty dictionary is not merged
+    CHECK(!ProblemContaining(snippet, "colors.ini ignoré").empty());
+    CHECK(!snippet.assignments.empty());
+    if (!snippet.assignments.empty()) {
+        CHECK(snippet.assignments[0].value.text == "#FFFF0000");  // the theme's colour
+        CHECK(snippet.assignments[0].source == "snippets/s1/user.css");
+        CHECK(snippet.assignments[1].value.text == "Bahnschrift");  // the theme's font role
+    }
+
+    // Without a theme, $names have nothing to read.
+    th::Theme alone = LoadSnippetFrom(files, "s1", nullptr);
+    CHECK(!ProblemContaining(alone, "absente de [colors]").empty());
+
+    MemoryFiles refused;
+    refused.files["resources.xaml"] = "<ResourceDictionary><X x:Key=\"Secret\"/></ResourceDictionary>";
+    std::set<std::string> allowed{"Accent"};
+    th::LoadOptions options;
+    options.allowedKeys = &allowed;
+    CHECK(!LoadSnippetFrom(refused, "s2", &theme, options).usable);
+
+    MemoryFiles empty;
+    empty.files["manifest.json"] = "{}";
+    CHECK(!LoadSnippetFrom(empty, "s3", &theme).usable);
+}
+
+TEST_CASE(Snippets_EnabledInIdOrderAndDictionariesCombined) {
+    amk::Settings settings;
+    settings.Set("snippets.zeta.enabled", "1");
+    settings.Set("snippets.alpha.enabled", "true");
+    settings.Set("snippets.beta.enabled", "0");
+    settings.Set("snippets.ghost.enabled", "1");  // not installed
+    CHECK((th::EnabledSnippets(settings, {"zeta", "beta", "alpha"}) == std::vector<std::string>{"alpha", "zeta"}));
+
+    std::string theme = "<?xml version=\"1.0\"?><ResourceDictionary><A x:Key=\"K\"/></ResourceDictionary>";
+    std::string snippet = "<ResourceDictionary><B x:Key=\"K\"/></ResourceDictionary>";
+    CHECK(th::CombineDictionaries({theme}) == theme);
+    CHECK(th::CombineDictionaries({"", "<ResourceDictionary/>"}).empty());
+    std::string combined = th::CombineDictionaries({theme, "<ResourceDictionary/>", snippet});
+    CHECK(combined.find("<ResourceDictionary.MergedDictionaries>") != std::string::npos);
+    CHECK(combined.find("<?xml") == std::string::npos);
+    CHECK(combined.find("<A x:Key") < combined.find("<B x:Key"));  // the snippet comes last, so it wins
+
+    std::string folder = TempFolder("snippet-list");
+    WriteFile(std::filesystem::path(folder) / "b" / "user.css", "Page { opacity: 1; }");
+    WriteFile(std::filesystem::path(folder) / "a" / "resources.xaml", "<ResourceDictionary/>");
+    WriteFile(std::filesystem::path(folder) / "c" / "notes.txt", "pas un snippet");
+    CHECK((th::ListSnippetFolders(folder) == std::vector<std::string>{"a", "b"}));
+}
+
+TEST_CASE(Snippets_BeatTheThemeInIdOrder) {
+    MemoryFiles themeFiles;
+    themeFiles.files["user.css"] = "Grid#Bar { background: #FF111111; }\nPage { background: #FF101010; }\n";
+    th::Theme theme = Load(themeFiles);
+
+    MemoryFiles first;
+    first.files["user.css"] = "Grid { background: #FF222222; }\nPage { background: #FF202020; }\n";
+    MemoryFiles second;
+    second.files["user.css"] = "Page { background: #FF303030; }\n";
+    std::vector<std::shared_ptr<const th::Theme>> snippets{Shared(LoadSnippetFrom(first, "a", &theme)),
+                                                           Shared(LoadSnippetFrom(second, "b", &theme))};
+
+    th::Theme composed = th::ComposeTheme(&theme, snippets, nullptr);
+    CHECK(composed.name == "test + a, b");
+
+    FakeTree tree = MakePage();
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    engine.Apply(composed, tree);
+    CHECK(tree.elements[1].properties["Background"].text == "#FF222222");  // a snippet type beats a theme #name
+    CHECK(tree.elements[0].properties["Background"].text == "#FF303030");  // b comes after a
+    CHECK(log.str().find("(snippets/b/user.css ligne 1)") != std::string::npos);
+}
+
+TEST_CASE(Session_SnippetsComeAndGoWithoutTouchingTheTheme) {
+    MemoryFiles themeFiles;
+    themeFiles.files["user.css"] = "Page { background: #FF101010; }\n";
+    auto theme = Shared(Load(themeFiles));
+
+    MemoryFiles snippetFiles;
+    snippetFiles.files["user.css"] = "Page { background: #FF999999; }\n#Hide { visibility: collapsed; }\nGrid { bad: 1; }\n";
+    auto snippet = Shared(LoadSnippetFrom(snippetFiles, "calme", theme.get()));
+
+    FakeTree tree = MakePage();
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeSession session(journal);
+
+    th::SessionRequest request;
+    request.themeId = "test";
+    request.theme = theme;
+    request.snippets = {snippet};
+    request.generation = 1;
+    session.Tick(tree, request);
+    CHECK(tree.elements[0].properties["Background"].text == "#FF999999");
+    CHECK(tree.elements[4].properties["Visibility"].text == "Collapsed");
+    CHECK(log.str().find("Snippet « calme » chargé") != std::string::npos);
+    CHECK(log.str().find("Snippet « calme » : snippets/calme/user.css ligne 3 : propriété « bad » inconnue") !=
+          std::string::npos);
+    CHECK(session.Applied() && session.Applied()->name == "test + calme");
+
+    // The snippet is switched off: the worker sends a new generation without it.
+    request.snippets.clear();
+    request.generation = 2;
+    session.Tick(tree, request);
+    CHECK(tree.elements[0].properties["Background"].text == "#FF101010");  // the theme again
+    CHECK(tree.elements[4].properties["Visibility"].text == "Visible");     // the original again
+
+    // A snippet without a theme still applies.
+    th::SessionRequest alone;
+    alone.snippets = {snippet};
+    alone.generation = 3;
+    session.Tick(tree, alone);
+    CHECK(session.Active());
+    CHECK(tree.elements[0].properties["Background"].text == "#FF999999");
+
+    th::SessionRequest none;
+    none.generation = 4;
+    session.Tick(tree, none);
+    CHECK(!session.Active());
+    CHECK(tree.elements[0].properties["Background"].text == "#FF000000");
+}
+
+TEST_CASE(Scheme_ScheduleParsesAndPicksByTime) {
+    th::Schedule schedule = th::ParseSchedule("19:00=Dark, 7:00=Light; bad, 25:00=X, 12:30=, 07:00=Clair");
+    CHECK(schedule.entries.size() == 2);
+    CHECK(schedule.problems.size() == 4);  // bad, 25:00, 12:30= and 07:00 given twice
+    if (schedule.entries.size() == 2) {
+        CHECK(schedule.entries[0].minute == 7 * 60);
+        CHECK(schedule.entries[0].scheme == "Clair");  // the last 07:00 counts
+    }
+    CHECK(th::ScheduledScheme(schedule, 6 * 60 + 59) == "Dark");  // the evening entry still holds before 07:00
+    CHECK(th::ScheduledScheme(schedule, 7 * 60) == "Clair");
+    CHECK(th::ScheduledScheme(schedule, 18 * 60 + 59) == "Clair");
+    CHECK(th::ScheduledScheme(schedule, 23 * 60 + 59) == "Dark");
+    CHECK(th::ScheduledScheme(th::ParseSchedule(""), 600).empty());
+}
+
+TEST_CASE(Scheme_SystemModePicksByName) {
+    CHECK(th::SystemScheme({"Base", "Dark"}, true) == "Dark");
+    CHECK(th::SystemScheme({"Base", "Dark"}, false) == "Base");
+    CHECK(th::SystemScheme({"Sombre", "Clair"}, false) == "Clair");
+    CHECK(th::SystemScheme({"Sombre", "Clair"}, true) == "Sombre");
+    CHECK(th::SystemScheme({"MidnightDark", "DayLight"}, false) == "DayLight");
+    CHECK(th::SystemScheme({"Nuit", "Jour"}, false) == "Jour");
+    CHECK(th::SystemScheme({"Only"}, true).empty());
+    CHECK(th::SystemScheme({}, false).empty());
+}
+
+TEST_CASE(Scheme_ChoosePrefersTheScheduleThenAutoThenTheName) {
+    std::vector<std::string> schemes{"Light", "Dark"};
+    th::SchemeChoice choice = th::ChooseScheme("auto", "", schemes, {true, 600});
+    CHECK(choice.scheme == "Dark");
+    CHECK(choice.reason == "mode sombre de Windows");
+
+    choice = th::ChooseScheme("Dark", "07:00=Light,19:00=Dark", schemes, {true, 12 * 60});
+    CHECK(choice.scheme == "Light");
+    CHECK(choice.reason == "horaire 07:00");
+
+    choice = th::ChooseScheme("", "07:00=auto,22:00=Dark", schemes, {false, 9 * 60});
+    CHECK(choice.scheme == "Light");
+    CHECK(choice.reason == "horaire 07:00, mode clair de Windows");
+
+    choice = th::ChooseScheme("dark", "", schemes, {false, 0});
+    CHECK(choice.scheme == "Dark");  // the name as colors.ini writes it
+
+    choice = th::ChooseScheme("auto", "", {"Only"}, {true, 0});
+    CHECK(choice.scheme.empty());
+    CHECK(!choice.problems.empty());
+
+    choice = th::ChooseScheme("", "08:00=Sepia", schemes, {false, 9 * 60});
+    CHECK(choice.scheme == "Sepia");
+    CHECK(!choice.problems.empty());
+}
+
+TEST_CASE(Settings_ScheduleIsKeptAndOnlyWrittenWhenSet) {
+    amk::Settings settings;
+    th::ThemeSettings value;
+    value.schedule = "07:00=Light,19:00=Dark";
+    th::WriteThemeSettings(settings, value);
+    CHECK(th::ReadThemeSettings(settings).schedule == "07:00=Light,19:00=Dark");
+    th::WriteThemeSettings(settings, th::ThemeSettings{});
+    CHECK(!settings.Get("theme.schedule").has_value());
+
+    std::string root = TempFolder("schedule-kept");
+    std::filesystem::path kit(root);
+    WriteFile(kit / "themes" / "minuit" / "colors.ini", "[Light]\nA = FFFFFF\n[Dark]\nA = 000000\n");
+    WriteFile(kit / "settings.txt", "theme.schedule = 07:00=Light,19:00=Dark\n");
+    std::ostringstream out, err;
+    CHECK(th::RunThemeCommand({"theme", "set", "minuit"}, th::KitLayout{kit}, out, err) == 0);
+    amk::Settings after;
+    after.Load((kit / "settings.txt").string());
+    CHECK(after.GetString("theme.schedule", "") == "07:00=Light,19:00=Dark");
+}
+
+TEST_CASE(Worker_ReloadsOnlyWhenSomethingChanges) {
+    std::filesystem::path kit(TempFolder("worker"));
+    WriteFile(kit / "themes" / "minuit" / "colors.ini", "[Light]\nA = FFFFFF\n\n[Dark]\nA = 000000\n");
+    WriteFile(kit / "themes" / "minuit" / "user.css", "Page { background: $A; }\n");
+    WriteFile(kit / "snippets" / "calme" / "user.css", "Page { opacity: 0.5; }\n");
+
+    amk::Settings settings;
+    settings.Set("theme.active", "minuit");
+    settings.Set("theme.scheme", "auto");
+
+    th::ThemeWorker worker(kit);
+    worker.SetSystemDark(true);
+    th::SessionRequest first = worker.Tick(settings, 600);
+    CHECK(first.theme && first.theme->scheme == "Dark");
+    CHECK(first.schemeReason == "mode sombre de Windows");
+    CHECK(first.snippets.empty());
+    CHECK(!first.layout);
+
+    th::SessionRequest same = worker.Tick(settings, 601);
+    CHECK(same.generation == first.generation);
+
+    worker.SetSystemDark(false);
+    th::SessionRequest light = worker.Tick(settings, 602);
+    CHECK(light.generation == first.generation + 1);
+    CHECK(light.theme && light.theme->scheme == "Light");
+
+    settings.Set("theme.schedule", "07:00=Light,19:00=Dark");
+    CHECK(worker.Tick(settings, 600).generation == light.generation);  // still Light: no reload
+    th::SessionRequest evening = worker.Tick(settings, 20 * 60);
+    CHECK(evening.generation == light.generation + 1);
+    CHECK(evening.theme && evening.theme->scheme == "Dark");
+    CHECK(evening.schemeReason == "horaire 19:00");
+
+    settings.Set("snippets.calme.enabled", "1");
+    th::SessionRequest withSnippet = worker.Tick(settings, 20 * 60);
+    CHECK(withSnippet.generation == evening.generation + 1);
+    CHECK(withSnippet.snippets.size() == 1);
+    if (withSnippet.snippets.size() == 1) CHECK(withSnippet.snippets[0]->usable);
+
+    WriteFile(kit / "sidebar.json", "{\"items\":[{\"name\":\"Radio\",\"hidden\":true}]}");
+    th::SessionRequest withLayout = worker.Tick(settings, 20 * 60);
+    CHECK(withLayout.generation == withSnippet.generation + 1);
+    CHECK(withLayout.layout && withLayout.layout->assignments.size() == 1);
+
+    settings.Set("theme.inspect", "1");
+    th::SessionRequest inspect = worker.Tick(settings, 20 * 60);
+    CHECK(inspect.inspect);
+    CHECK(inspect.generation == withLayout.generation);  // asking for a dump reloads nothing
+}
+
+TEST_CASE(Layout_ParsesWritesAndGenerates) {
+    std::vector<std::string> problems;
+    std::optional<th::LayoutConfig> config = th::ParseLayout(
+        "{\"version\":1,\"reorder\":true,\"items\":[{\"name\":\"Home\"},{\"name\":\"Radio\",\"hidden\":true},"
+        "{\"name\":\"bad name\"},{\"name\":\"Home\"},{\"name\":\"Store\",\"hidden\":\"yes\"}]}",
+        problems);
+    CHECK(config.has_value());
+    if (config) {
+        CHECK(config->reorder);
+        CHECK(config->items.size() == 3);
+        CHECK(config->items[1].hidden);
+        std::vector<std::string> again;
+        std::optional<th::LayoutConfig> back = th::ParseLayout(th::WriteLayout(*config), again);
+        CHECK(back && back->items.size() == 3 && back->items[1].name == "Radio" && back->items[1].hidden && again.empty());
+    }
+    CHECK(problems.size() == 3);
+    CHECK(!th::ParseLayout("[1]", problems).has_value());
+    CHECK(!th::ParseLayout("{\"version\":1}", problems).has_value());
+
+    ListTree tree({"Home", "Browse", "Radio"});
+    std::vector<std::string> names = th::NamesMatching(tree.Snapshot(), Sel("NavigationViewItem"));
+    CHECK((names == std::vector<std::string>{"Home", "Browse", "Radio"}));
+
+    th::LayoutConfig fresh = th::GenerateLayout(std::nullopt, names);
+    CHECK(fresh.reorder && fresh.items.size() == 3 && !fresh.items[0].hidden);
+
+    th::LayoutConfig existing;
+    existing.items = {{"Radio", true}, {"Closed", false}};
+    th::LayoutConfig merged = th::GenerateLayout(existing, names);
+    CHECK(!merged.reorder);  // an existing file keeps its choice
+    CHECK(merged.items.size() == 4);
+    if (merged.items.size() == 4) {
+        CHECK(merged.items[0].name == "Radio" && merged.items[0].hidden);
+        CHECK(merged.items[1].name == "Closed");  // kept: its page may simply be closed
+        CHECK(merged.items[2].name == "Home");
+    }
+}
+
+TEST_CASE(Session_SidebarJsonHidesAndReordersThenRestores) {
+    std::vector<std::string> problems;
+    std::optional<th::LayoutConfig> config = th::ParseLayout(
+        "{\"reorder\":true,\"items\":[{\"name\":\"Radio\"},{\"name\":\"Home\"},{\"name\":\"Browse\",\"hidden\":true}]}",
+        problems);
+    CHECK(config.has_value());
+    auto layout = std::make_shared<th::Theme>();
+    layout->usable = true;
+    if (config) th::AddLayoutRules(*config, th::LayoutKind::Sidebar, *layout);
+    CHECK(layout->assignments.size() == 4);
+    if (!layout->assignments.empty()) {
+        CHECK(layout->assignments[0].selector.text == "NavigationViewItem#Radio");
+        CHECK(layout->assignments[0].source == "sidebar.json");
+    }
+
+    ListTree tree({"Home", "Browse", "Radio"});
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeSession session(journal);
+    th::SessionRequest request;
+    request.layout = layout;
+    request.generation = 1;
+    session.Tick(tree, request);
+    CHECK((tree.Names() == std::vector<std::string>{"Radio", "Home", "Browse"}));
+    CHECK(tree.items[2].visibility.text == "Collapsed");
+    CHECK(log.str().find("(sidebar.json ligne 3)") != std::string::npos);
+
+    th::SessionRequest none;
+    none.generation = 2;
+    session.Tick(tree, none);
+    CHECK((tree.Names() == std::vector<std::string>{"Home", "Browse", "Radio"}));
+    CHECK(tree.items[1].visibility.text == "Visible");
+
+    th::Theme home;
+    th::LayoutConfig sections;
+    sections.items = {{"NewReleases", true}};
+    th::AddLayoutRules(sections, th::LayoutKind::Home, home);
+    CHECK(home.assignments.size() == 1);  // no reorder: only the hiding
+    if (!home.assignments.empty()) CHECK(home.assignments[0].selector.text == "#NewReleases");
+}
+
+TEST_CASE(Inspector_ExportsTheTreeAsJson) {
+    FakeTree tree = MakePage();
+    tree.resources["AccentFillColorDefaultBrush"] = Brush("#FF0A84FF");
+    tree.elements[0].properties["FlowDirection"] = {th::ValueKind::Keyword, "LeftToRight"};
+
+    std::string text = th::InspectTreeJson(tree);
+    std::string error;
+    std::optional<amk::Json> json = amk::Json::Parse(text, &error);
+    CHECK(json.has_value());
+    if (!json) {
+        amk::test::ReportFailure(__FILE__, __LINE__, "inspector.json : " + error);
+        return;
+    }
+    CHECK(!*json->Find("truncated")->AsBool());
+    const amk::Json::Array& resources = *json->Find("resources")->AsArray();
+    CHECK(resources.size() == 1 && *resources[0].Find("key")->AsString() == "AccentFillColorDefaultBrush");
+    const amk::Json::Array& nodes = *json->Find("nodes")->AsArray();
+    CHECK(nodes.size() == 5);
+    if (nodes.size() == 5) {
+        CHECK(*nodes[0].Find("parent")->AsNumber() == -1);
+        CHECK(*nodes[0].Find("properties")->Find("FlowDirection")->AsString() == "LeftToRight");
+        CHECK(*nodes[2].Find("selector")->AsString() == "Grid#Bar > TextBlock");
+        CHECK(*nodes[2].Find("parent")->AsNumber() == 1);
+        CHECK(*nodes[1].Find("name")->AsString() == "Bar");
+        CHECK(*nodes[1].Find("properties")->Find("Background")->AsString() == "#FF0000FF");
+    }
+
+    th::InspectOptions small;
+    small.maxLines = 2;
+    std::optional<amk::Json> cut = amk::Json::Parse(th::InspectTreeJson(tree, small));
+    CHECK(cut && *cut->Find("truncated")->AsBool() && cut->Find("nodes")->AsArray()->size() == 2);
+}
+
+TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
+    const std::filesystem::path source(AMK_SOURCE_DIR);
+    std::vector<std::string> themes = th::ListThemeFolders(source / "themes" / "examples");
+    CHECK(themes.size() >= 4);
+    std::shared_ptr<const th::Theme> base;
+    for (const std::string& name : themes) {
+        std::filesystem::path folder = source / "themes" / "examples" / name;
+        th::FolderFiles files(folder);
+        th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
+        CHECK(theme.usable);
+        for (const std::string& problem : theme.problems) {
+            amk::test::ReportFailure(__FILE__, __LINE__, name + " : " + problem);
+        }
+        if (name == "minuit") base = Shared(std::move(theme));
+    }
+
+    std::vector<std::string> snippets = th::ListSnippetFolders(source / "themes" / "snippets");
+    CHECK(!snippets.empty());
+    for (const std::string& name : snippets) {
+        std::filesystem::path folder = source / "themes" / "snippets" / name;
+        th::FolderFiles files(folder);
+        // A snippet must work over a theme and without one.
+        for (const th::Theme* over : {base.get(), static_cast<const th::Theme*>(nullptr)}) {
+            th::Theme snippet = th::LoadSnippet(name, folder.generic_string(), files, over);
+            CHECK(snippet.usable);
+            CHECK(!snippet.assignments.empty() || !snippet.resourceDictionary.empty());
+            for (const std::string& problem : snippet.problems) {
+                amk::test::ReportFailure(__FILE__, __LINE__, "snippet " + name + " : " + problem);
+            }
+        }
+
+        std::optional<std::string> manifest = files.Read("manifest.json");
+        CHECK(manifest.has_value());
+        amk::ManifestResult result =
+            amk::ParseManifest(manifest.value_or(""), name, 1, [&](const std::string& file) { return files.Exists(file); });
+        CHECK(result.manifest.has_value() && result.manifest->kind == amk::ElementKind::Snippet);
+        for (const std::string& error : result.errors) {
+            amk::test::ReportFailure(__FILE__, __LINE__, "snippet " + name + " manifest : " + error);
+        }
+    }
 }

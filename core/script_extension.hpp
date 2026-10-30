@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <typeindex>
 #include <vector>
 
 #include "host.hpp"
@@ -58,11 +59,16 @@ public:
     // Queues a click on a control of the interface that this element added.
     void DeliverClick(int controlId);
 
+    // Queues a call to the prelude's dispatch.<entry>(payload), for a module that sends its own events (the
+    // fragment adds that entry point; the payload is usually JSON text). Nothing happens if no module defined it,
+    // except a line in the journal.
+    void DeliverEvent(const std::string& entry, const std::string& payload);
+
     // Settings prefix of the element: "extensions." or "apps.".
     std::string ConfigPrefix() const;
 
 private:
-    friend struct ScriptBridge;
+    friend struct ScriptBridge;  // the natives of the API modules (core/api/bridge.hpp)
 
     void Post(std::function<void()> task);
     void Teardown();
@@ -70,8 +76,8 @@ private:
     void DispatchPlayer(const std::string& event, const std::string& stateJson);
     void DispatchKey(const std::string& combo);
     void DispatchClick(int controlId);
+    void DispatchEvent(const std::string& entry, const std::string& payload);
     void DispatchTimer(uint32_t id);
-    void PersistStorage();
 
     Manifest m_manifest;
     std::filesystem::path m_folder;
@@ -86,6 +92,7 @@ private:
     std::map<std::string, std::string> m_storage;  // key -> JSON text of the value
     std::multimap<std::chrono::steady_clock::time_point, uint32_t> m_timers;
     double m_gainDb = 0;
+    std::map<std::type_index, std::shared_ptr<void>> m_moduleState;  // see ScriptBridge::State
 
     std::mutex m_queueMutex;
     std::vector<std::function<void()>> m_queue;

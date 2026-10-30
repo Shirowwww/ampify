@@ -8,7 +8,7 @@ namespace amk::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 16> kProperties{{
+constexpr std::array<PropertySpec, 19> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"color", "Foreground", PropertyKind::Brush},
     {"foreground", "Foreground", PropertyKind::Brush},
@@ -25,6 +25,9 @@ constexpr std::array<PropertySpec, 16> kProperties{{
     {"opacity", "Opacity", PropertyKind::Number},
     {"visibility", "Visibility", PropertyKind::Visibility},
     {"template", "Template", PropertyKind::Template},
+    {"flow-direction", "FlowDirection", PropertyKind::FlowDirection},
+    {"direction", "FlowDirection", PropertyKind::FlowDirection},
+    {"order", kOrderProperty, PropertyKind::Order},
 }};
 
 std::string_view Trimmed(std::string_view text) {
@@ -168,6 +171,22 @@ Conversion ConvertText(std::string_view raw) {
     return Ok(ValueKind::Text, std::string(text));
 }
 
+// The direction in which text and children are laid out. A right-to-left language turns the whole page around.
+Conversion ConvertFlowDirection(std::string_view raw) {
+    std::string value = Lowered(Trimmed(raw));
+    if (value == "ltr" || value == "left-to-right" || value == "lefttoright") return Ok(ValueKind::Keyword, "LeftToRight");
+    if (value == "rtl" || value == "right-to-left" || value == "righttoleft") return Ok(ValueKind::Keyword, "RightToLeft");
+    return Fail("sens inconnu : « " + std::string(Trimmed(raw)) + " » (ltr ou rtl)");
+}
+
+Conversion ConvertOrder(std::string_view raw) {
+    std::string_view text = Trimmed(raw);
+    if (text.empty() || text.size() > 4 || text.find_first_not_of("0123456789") != std::string_view::npos) {
+        return Fail("position illisible : « " + std::string(text) + " » (un nombre entier à partir de 0)");
+    }
+    return Ok(ValueKind::Number, std::to_string(std::stoi(std::string(text))));
+}
+
 Conversion ConvertTemplate(std::string_view raw, const ValueContext& context) {
     std::optional<std::string> path = UrlArgument(raw);
     if (!path) return Fail("un modèle s'écrit url(fichier.xaml)");
@@ -209,6 +228,10 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
             return ConvertText(raw);
         case PropertyKind::Template:
             return ConvertTemplate(raw, context);
+        case PropertyKind::FlowDirection:
+            return ConvertFlowDirection(raw);
+        case PropertyKind::Order:
+            return ConvertOrder(raw);
     }
     return Fail("type de propriété inconnu");
 }

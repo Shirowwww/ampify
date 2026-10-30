@@ -16,6 +16,16 @@ struct InspectOptions {
 // indented by depth, with the selector that finds it and the values of the common properties.
 std::string InspectTree(TreeBackend& tree, const InspectOptions& options = {});
 
+// The same tree as JSON, written next to inspector.txt as journal\inspector.json, for tools such as `amk inspect --tree`:
+//   {"version":1,"truncated":false,
+//    "resources":[{"key":"…","value":"…"}],
+//    "nodes":[{"index":0,"id":"…","type":"Grid","fullType":"…","name":"Bar","parent":-1,"depth":0,
+//              "selector":"Grid#Bar","properties":{"Background":"#FF0000FF"}}]}
+// `nodes` lists the parents before their children; `parent` is the index of the parent in `nodes`, -1 for a root.
+// `id` is a text, because the backend's numbers do not all fit a JSON number. Templates and opaque values read
+// « présent », as in inspector.txt. The same element limit applies; `truncated` says when it was reached.
+std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options = {});
+
 // A selector for the element at `index`: `Type#name` when it has a name, otherwise the chain of types from the
 // nearest named ancestor (or the root) down to the element, joined with `>`.
 std::string SuggestSelector(const std::vector<NodeInfo>& nodes, int index);

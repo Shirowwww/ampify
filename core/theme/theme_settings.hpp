@@ -9,7 +9,8 @@ namespace amk::theme {
 
 // The theme keys of settings.txt. The values are read and written as they are kept on disk.
 //   theme.active       folder name of the theme in use; empty or `none` for no theme
-//   theme.scheme       colour scheme inside colors.ini; empty takes the first one
+//   theme.scheme       colour scheme inside colors.ini; empty takes the first one; `auto` follows the Windows mode
+//   theme.schedule     schemes by local time, such as `07:00=Light,19:00=Dark`; wins over theme.scheme (scheme_choice.hpp)
 //   theme.live_reload  1 to apply a theme again when its files change (default 1)
 //   theme.inspect      1 to write an inspector dump on the next pass; the kernel clears it afterwards
 //   theme.parts.colors     1 to apply the colours of colors.ini (default 1)
@@ -19,6 +20,7 @@ namespace amk::theme {
 struct ThemeSettings {
     std::string active;
     std::string scheme;
+    std::string schedule;
     bool liveReload = true;
     bool inspect = false;
     ThemeParts parts;

@@ -179,5 +179,10 @@ Ce qui est fait, avec les décisions de cette étude :
 - Réglage intégré : une section « Thème » en tête de la page Général, écrite en code (pas en XAML). Non compilée.
 - Thèmes d'exemple : `themes/examples/`.
 
+Ajouts pour la parité Spicetify (même format, voir [`docs/themes/FORMAT.md`](themes/FORMAT.md)) : `flow-direction` et
+`order` dans `user.css`, variables `:root` et rôles de police (`--font-title`, `font-role`), snippets appliqués après
+le thème, schéma `auto` (mode de Windows) et `theme.schedule` (heure), `sidebar.json` et `home.json`, et l'export
+`inspector.json`. Le travail côté fil de travail est dans `core/theme/worker.*`, portable et testé.
+
 Ce qui reste ouvert : la liaison XAML n'est pas compilée (voir `win/xaml_backend.cpp`), aucun nom d'élément réel
 n'est relevé. Les réglages `theme.parts.colors`, `.resources` et `.assets` sont faits ; `theme.parts.script` reste pour M7.

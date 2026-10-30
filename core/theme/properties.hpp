@@ -22,6 +22,8 @@ enum class PropertyKind {
     Number,      // a plain number, or a font weight keyword: normal, bold
     Text,        // a font family: a name, optionally in quotes
     Template,    // url(file) of a XAML ControlTemplate
+    FlowDirection,  // ltr / left-to-right, or rtl / right-to-left (XAML LeftToRight, RightToLeft)
+    Order,       // a whole number from 0: the position of the element among the items of its parent (kOrderProperty)
 };
 
 struct PropertySpec {
