@@ -7,6 +7,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(AMK_BUILD_TESTS "Build the portable unit tests" ON)
 
+# Bench build, used only by the Windows test bench in CI (.github/workflows/windows-bench.yml). It accepts any
+# installed Apple Music build, so the bench can check the injection on the version the runner has. Never ship it.
+option(AMK_BENCH "Bench build: accepts any Apple Music build. Never distribute." OFF)
+if(AMK_BENCH)
+    message(WARNING "AMK_BENCH=ON : build de banc, toute version d'Apple Music est acceptée. Ne pas diffuser.")
+    add_compile_definitions(AMK_BENCH_ANY_VERSION)
+    set(AMK_BUILD_TESTS OFF)  # the unit tests check the shipping version policy, which the bench build relaxes
+endif()
+
 set(AMK_WARNINGS $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
 
 # QuickJS 2021-03-27, vendored unchanged (MIT, see vendor/quickjs/LICENSE). Compiled as C with its own
@@ -45,24 +54,41 @@ add_library(amk_core STATIC
 target_compile_options(amk_core PRIVATE ${AMK_WARNINGS})
 target_link_libraries(amk_core PUBLIC amk_quickjs)
 
-# Atmos leveler: BS.1770 loudness meter and gain policy. Pure C++, no Windows API.
+# Atmos leveler: BS.1770 loudness meter, gain ramp, spatial object pass and gain policy. Pure C++, no Windows API.
 add_library(atmos_leveler STATIC
     extensions/atmos-leveler/loudness_meter.cpp
+    extensions/atmos-leveler/gain_ramp.cpp
+    extensions/atmos-leveler/object_pass.cpp
+    extensions/atmos-leveler/format_detection.cpp
     extensions/atmos-leveler/leveler.cpp)
 target_compile_options(atmos_leveler PRIVATE ${AMK_WARNINGS})
 
 # Windows only: the kernel DLL, the launcher, and the helpers they share. Built when targeting Windows.
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    add_library(amk_win STATIC win/win_common.cpp win/win_host.cpp)
+    add_library(amk_win STATIC win/win_common.cpp win/win_host.cpp win/hook.cpp)
     target_compile_options(amk_win PRIVATE ${AMK_WARNINGS})
     target_compile_definitions(amk_win PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
-    target_link_libraries(amk_win PUBLIC ole32 shell32 user32 winhttp)
+    target_link_libraries(amk_win PUBLIC ole32 shell32 user32 psapi winhttp amk_core)
 
     # Loaded into AppleMusic.exe and AMPLibraryAgent.exe by the launcher.
-    add_library(amk_kernel MODULE kernel/kernel.cpp)
+    add_library(amk_kernel MODULE kernel/kernel.cpp extensions/atmos-leveler/atmos_windows.cpp)
     set_target_properties(amk_kernel PROPERTIES PREFIX "" OUTPUT_NAME amk_kernel)
-    target_link_libraries(amk_kernel PRIVATE amk_core amk_win)
+    target_link_libraries(amk_kernel PRIVATE amk_core amk_win atmos_leveler)
     target_compile_options(amk_kernel PRIVATE ${AMK_WARNINGS})
+
+    # Wine harness (opt-in): hooks on fake COM objects and a fake AVFoundationCF.dll, run under Wine.
+    option(AMK_BUILD_HARNESS "Build the Wine hook harness" OFF)
+    if(AMK_BUILD_HARNESS)
+        # Named like Apple's DLL, so the import table says "AVFoundationCF.dll" as Apple Music's would.
+        add_library(amk_fake_av SHARED tests/win/fake_avfoundation.cpp)
+        set_target_properties(amk_fake_av PROPERTIES PREFIX "" OUTPUT_NAME AVFoundationCF)
+        target_compile_options(amk_fake_av PRIVATE ${AMK_WARNINGS})
+
+        add_executable(amk_hook_harness tests/win/hook_harness.cpp
+            extensions/atmos-leveler/atmos_windows.cpp)
+        target_link_libraries(amk_hook_harness PRIVATE amk_core amk_win atmos_leveler amk_fake_av)
+        target_compile_options(amk_hook_harness PRIVATE ${AMK_WARNINGS})
+    endif()
 
     # Starts Apple Music suspended, injects the kernel, resumes it, then watches for AMPLibraryAgent.exe.
     add_executable(amk_launcher WIN32
@@ -85,7 +111,8 @@ if(AMK_BUILD_TESTS)
         tests/manifest_tests.cpp
         tests/js_runtime_tests.cpp
         tests/script_extension_tests.cpp
-        tests/loader_tests.cpp)
+        tests/loader_tests.cpp
+        tests/pipeline_tests.cpp)
     target_link_libraries(amk_tests PRIVATE amk_core atmos_leveler)
     target_compile_options(amk_tests PRIVATE ${AMK_WARNINGS})
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")

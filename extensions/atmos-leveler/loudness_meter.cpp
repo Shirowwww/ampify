@@ -19,73 +19,80 @@ double PowerToLufs(double meanSquare) {
 
 }  // namespace
 
-double LoudnessMeter::Biquad::Process(double x) {
+double KWeighting::Biquad::Process(double x) {
     double y = b0 * x + z1;
     z1 = b1 * x - a1 * y + z2;
     z2 = b2 * x - a2 * y;
     return y;
 }
 
-LoudnessMeter::LoudnessMeter(double sampleRate, int channels)
-    : m_sampleRate(sampleRate),
-      m_chunkFrames(std::max<size_t>(1, static_cast<size_t>(std::lround(sampleRate / 10.0)))),
-      m_filters(static_cast<size_t>(channels)),
-      m_chunkSquares(static_cast<size_t>(channels), 0.0) {
-    // BS.1770 stage 1: high shelf modelling the head. Stage 2: RLB high-pass.
+KWeighting::KWeighting(double sampleRate) {
     // Constants from ITU-R BS.1770-4, bilinear transform as in libebur128.
     const double k1 = std::tan(std::numbers::pi * 1681.974450955533 / sampleRate);
     const double q1 = 0.7071752369554196;
     const double vh = std::pow(10.0, 3.999843853973347 / 20.0);
     const double vb = std::pow(vh, 0.4996667741545416);
     double a0 = 1.0 + k1 / q1 + k1 * k1;
-    Biquad shelf;
-    shelf.b0 = (vh + vb * k1 / q1 + k1 * k1) / a0;
-    shelf.b1 = 2.0 * (k1 * k1 - vh) / a0;
-    shelf.b2 = (vh - vb * k1 / q1 + k1 * k1) / a0;
-    shelf.a1 = 2.0 * (k1 * k1 - 1.0) / a0;
-    shelf.a2 = (1.0 - k1 / q1 + k1 * k1) / a0;
+    m_shelf.b0 = (vh + vb * k1 / q1 + k1 * k1) / a0;
+    m_shelf.b1 = 2.0 * (k1 * k1 - vh) / a0;
+    m_shelf.b2 = (vh - vb * k1 / q1 + k1 * k1) / a0;
+    m_shelf.a1 = 2.0 * (k1 * k1 - 1.0) / a0;
+    m_shelf.a2 = (1.0 - k1 / q1 + k1 * k1) / a0;
 
     const double k2 = std::tan(std::numbers::pi * 38.13547087602444 / sampleRate);
     const double q2 = 0.5003270373238773;
     a0 = 1.0 + k2 / q2 + k2 * k2;
-    Biquad highPass;
-    highPass.b0 = 1.0;
-    highPass.b1 = -2.0;
-    highPass.b2 = 1.0;
-    highPass.a1 = 2.0 * (k2 * k2 - 1.0) / a0;
-    highPass.a2 = (1.0 - k2 / q2 + k2 * k2) / a0;
-
-    for (ChannelFilter& filter : m_filters) {
-        filter.shelf = shelf;
-        filter.highPass = highPass;
-    }
+    m_highPass.b0 = 1.0;
+    m_highPass.b1 = -2.0;
+    m_highPass.b2 = 1.0;
+    m_highPass.a1 = 2.0 * (k2 * k2 - 1.0) / a0;
+    m_highPass.a2 = (1.0 - k2 / q2 + k2 * k2) / a0;
 }
+
+double KWeighting::Process(double x) {
+    return m_highPass.Process(m_shelf.Process(x));
+}
+
+void KWeighting::Reset() {
+    m_shelf.z1 = m_shelf.z2 = 0;
+    m_highPass.z1 = m_highPass.z2 = 0;
+}
+
+LoudnessMeter::LoudnessMeter(double sampleRate, int channels)
+    : m_sampleRate(sampleRate),
+      m_chunkFrames(std::max<size_t>(1, static_cast<size_t>(std::lround(sampleRate / 10.0)))),
+      m_filters(static_cast<size_t>(channels), KWeighting(sampleRate)) {}
 
 void LoudnessMeter::Process(const float* interleaved, size_t frames, float gain) {
     const size_t channels = m_filters.size();
     for (size_t frame = 0; frame < frames; frame++) {
         const float* sample = interleaved + frame * channels;
+        double power = 0;
         for (size_t channel = 0; channel < channels; channel++) {
             double x = static_cast<double>(sample[channel]) * gain;
             m_peak = std::max(m_peak, static_cast<float>(std::fabs(x)));
 
-            ChannelFilter& filter = m_filters[channel];
-            double y = filter.highPass.Process(filter.shelf.Process(x));
-            m_chunkSquares[channel] += y * y;
+            double y = m_filters[channel].Process(x);
+            power += y * y;
         }
-
-        if (++m_framesInChunk == m_chunkFrames) {
-            // BS.1770 channel weights are 1.0 for every channel of a stereo or Atmos render.
-            double power = 0;
-            for (double& square : m_chunkSquares) {
-                power += square / static_cast<double>(m_chunkFrames);
-                square = 0;
-            }
-            m_chunkPowers.push_back(power);
-            m_framesInChunk = 0;
-        }
+        AddFramePower(power);
     }
     m_frames += frames;
+}
+
+void LoudnessMeter::ProcessPower(const double* framePower, size_t frames, double scale, float peak) {
+    for (size_t frame = 0; frame < frames; frame++) AddFramePower(framePower[frame] * scale);
+    m_frames += frames;
+    m_peak = std::max(m_peak, peak);
+}
+
+void LoudnessMeter::AddFramePower(double power) {
+    m_chunkPower += power;
+    if (++m_framesInChunk == m_chunkFrames) {
+        m_chunkPowers.push_back(m_chunkPower / static_cast<double>(m_chunkFrames));
+        m_chunkPower = 0;
+        m_framesInChunk = 0;
+    }
 }
 
 std::optional<double> LoudnessMeter::IntegratedLufs() const {
@@ -132,11 +139,8 @@ float LoudnessMeter::Peak() const {
 }
 
 void LoudnessMeter::Reset() {
-    for (ChannelFilter& filter : m_filters) {
-        filter.shelf.z1 = filter.shelf.z2 = 0;
-        filter.highPass.z1 = filter.highPass.z2 = 0;
-    }
-    std::fill(m_chunkSquares.begin(), m_chunkSquares.end(), 0.0);
+    for (KWeighting& filter : m_filters) filter.Reset();
+    m_chunkPower = 0;
     m_framesInChunk = 0;
     m_chunkPowers.clear();
     m_frames = 0;

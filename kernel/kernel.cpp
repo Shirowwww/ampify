@@ -15,6 +15,7 @@
 #include "../core/journal.hpp"
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
+#include "../extensions/atmos-leveler/atmos_windows.hpp"
 #include "../win/win_common.hpp"
 #include "../win/win_host.hpp"
 
@@ -49,11 +50,17 @@ DWORD WINAPI KernelMain(LPVOID) {
     // JavaScript elements (extensions and apps) live in %USERPROFILE%\AppleMusicModKit\extensions\<id>.
     // Both processes load them: an element tells them apart with AMK.process.
     static amk::WinHost winHost(role == amk::ProcessRole::AppleMusic ? "ui" : "engine", kit, settings, journal);
-    static amk::ExtensionHost host(journal);  // the native extensions are registered here: M4 adds the Atmos leveler
+    static amk::ExtensionHost host(journal);
     static amk::ExtensionLoader loader(host, winHost, journal, kit / "extensions");
     amk::LoadReport report = loader.Discover();
     journal.Write("Éléments JavaScript retenus : " + std::to_string(report.loaded.size()) + ", rejetés : " +
                   std::to_string(report.rejected.size()));
+
+    // The Atmos leveler lives where the audio is rendered: AMPLibraryAgent.exe only.
+    if (role == amk::ProcessRole::LibraryAgent) {
+        host.Add(atmos::hooks::MakeAtmosLevelerExtension(journal, settings));
+    }
+
     // JavaScript runs on this one thread only: QuickJS is not thread-safe, and the shortcuts are delivered to the
     // thread that registered them. Starting the elements here keeps that true.
     std::thread([] {

@@ -106,6 +106,40 @@ void AtmosLeveler::Feed(const float* interleaved, size_t frames, float volume) {
     m_meter.Process(interleaved, frames, 1.0f / volume);
 }
 
+void AtmosLeveler::FeedPower(const std::vector<double>& framePower, float peak, float volume) {
+    if (!m_active || volume <= 0.0f) return;
+
+    m_volume = volume;
+
+    size_t settle = std::min(framePower.size(), m_settleFramesLeft);
+    m_settleFramesLeft -= settle;
+    size_t frames = framePower.size() - settle;
+    if (frames == 0) return;
+
+    // Power scales with the square of the gain, the peak with the gain itself.
+    m_audible = true;
+    double scale = 1.0 / (static_cast<double>(volume) * volume);
+    m_meter.ProcessPower(framePower.data() + settle, frames, scale, peak / volume);
+}
+
+void AtmosLeveler::SetSampleRate(double sampleRate) {
+    if (sampleRate == m_sampleRate) return;
+
+    FinishTrack();
+    m_sampleRate = sampleRate;
+    m_meter = LoudnessMeter(sampleRate, m_channels);
+}
+
+std::optional<double> AtmosLeveler::MeasuredLufs() const {
+    return m_meter.IntegratedLufs();
+}
+
+std::optional<FinishedTrack> AtmosLeveler::TakeFinished() {
+    std::optional<FinishedTrack> finished = m_finished;
+    m_finished.reset();
+    return finished;
+}
+
 double AtmosLeveler::Poll(double currentDb) {
     if (!m_active || !m_atmos) return currentDb;
 
@@ -136,6 +170,7 @@ void AtmosLeveler::FinishTrack() {
 
     double seconds = m_meter.Seconds();
     std::optional<double> lufs = m_meter.IntegratedLufs();
+    if (lufs) m_finished = FinishedTrack{m_atmos, *lufs, seconds};
     if (lufs && seconds >= m_config.minSecondsToStore) {
         if (m_atmos) {
             m_store.Put(m_variantId, StoredLevel{*lufs, seconds});

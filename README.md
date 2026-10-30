@@ -33,6 +33,7 @@ On ajoute et on corrige, on ne remplace pas.
 | Noyau chargé dans les deux processus (DLL) | `kernel/` | écrit, compilé, à tester sur Windows |
 | Hooks sur `AppleMusic.exe` et `AMPLibraryAgent.exe` | à faire (M4) | |
 | Kit de test en un double-clic | à faire (M5) | |
+| Banc de test Windows automatique : Apple Music installé, lancement, injection, mode sans échec | `bench/windows/`, `.github/workflows/windows-bench.yml` | écrit, lancé en CI, voir [docs/tests/banc-windows.md](docs/tests/banc-windows.md) |
 
 Le nivellement Atmos est la première extension. Il mesure le son décodé et règle le gain sur les
 échantillons, jamais sur le curseur de volume : le curseur d'Apple Music ne bouge pas.
@@ -87,7 +88,8 @@ catalog/                   catalogue communautaire (vide pour l'instant)
 examples/                  exemple d'extension complet
 tools/                     validateur des manifestes et du catalogue, avec ses tests
 tests/                     tests unitaires sans dépendance (même code pour Linux et Windows)
-docs/tests/                procédures de test sur le PC, une par jalon
+bench/windows/             banc de test Windows (PowerShell) : installe Apple Music, lance, vérifie les journaux
+docs/tests/                procédures de test sur le PC, une par jalon, et le banc Windows
 cmake/                     fichier de compilation croisée pour Windows
 vendor/quickjs/             moteur JavaScript QuickJS 2021-03-27, non modifié (MIT)
 knowledge/                 relevés sur l'app : architecture, API, pièges observés

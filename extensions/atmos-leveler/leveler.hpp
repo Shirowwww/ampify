@@ -62,6 +62,13 @@ private:
     std::map<std::string, StoredLevel> m_levels;
 };
 
+// A track whose loudness the leveler has measured, for the journal.
+struct FinishedTrack {
+    bool atmos = false;
+    double lufs = 0;
+    double seconds = 0;
+};
+
 // What the gain policy knows about the track that is playing.
 struct TrackLevel {
     std::optional<double> storedLufs;    // known before the track is heard, from the VariantStore
@@ -88,11 +95,25 @@ public:
     // Decoded samples, with the player volume applied, as Apple Music hands them to the audio device.
     void Feed(const float* interleaved, size_t frames, float volume);
 
+    // Spatial audio objects, from ObjectPass: per-frame power of all objects and their peak, both
+    // before the gain. Same settle period and volume handling as Feed.
+    void FeedPower(const std::vector<double>& framePower, float peak, float volume);
+
+    // Rebuilds the meter when the stream runs at another sample rate. A track being measured ends first.
+    void SetSampleRate(double sampleRate);
+
     // The Atmos gain (dB) for the current track. For a stereo track the value passed in comes back
     // unchanged: check IsAtmos() and apply 0 dB to stereo tracks.
     double Poll(double currentDb);
 
     bool IsAtmos() const;
+
+    // Loudness of the current track so far. Empty until enough audio has been measured.
+    std::optional<double> MeasuredLufs() const;
+
+    // The last track that ended with a measured loudness. Returned once, then forgotten.
+    std::optional<FinishedTrack> TakeFinished();
+
     const TargetHistory& StereoHistory() const;
     const VariantStore& Store() const;
 
@@ -113,6 +134,7 @@ private:
     size_t m_settleFramesLeft = 0;
     bool m_audible = false;
     float m_volume = 1.0f;
+    std::optional<FinishedTrack> m_finished;
 };
 
 }  // namespace atmos

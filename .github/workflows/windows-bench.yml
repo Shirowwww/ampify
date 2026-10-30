@@ -1,0 +1,171 @@
+name: Banc de test Windows
+
+# Compile le kit (diffusion et banc) sous Linux, puis lance les tests sur un vrai Windows avec Apple Music installé.
+# Le détail des tests et la façon d'en ajouter : docs/tests/banc-windows.md.
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'bench/windows/**'
+      - 'core/**'
+      - 'kernel/**'
+      - 'launcher/**'
+      - 'win/**'
+      - 'extensions/**'
+      - 'tests/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/windows-bench.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compiler les deux builds
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer le compilateur croisé pour Windows
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-x86-64 cmake
+
+      - name: Tests unitaires (Linux)
+        run: |
+          cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-linux --parallel
+          ./build-linux/amk_tests
+
+      - name: Build de diffusion (Windows x64, versions testées seulement)
+        run: |
+          cmake -S . -B build-diffusion \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake \
+            -DCMAKE_BUILD_TYPE=Release -DAMK_BUILD_TESTS=OFF -DAMK_BENCH=OFF
+          cmake --build build-diffusion --parallel
+
+      - name: Build de banc (Windows x64, accepte toute version, ne jamais diffuser)
+        run: |
+          cmake -S . -B build-banc \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake \
+            -DCMAKE_BUILD_TYPE=Release -DAMK_BUILD_TESTS=OFF -DAMK_BENCH=ON
+          cmake --build build-banc --parallel
+
+      - name: Préparer le paquet pour le banc
+        run: |
+          mkdir -p dist/diffusion dist/banc
+          cp build-diffusion/amk_launcher.exe build-diffusion/amk_kernel.dll dist/diffusion/
+          cp build-banc/amk_launcher.exe build-banc/amk_kernel.dll dist/banc/
+          {
+            echo "Commit : $GITHUB_SHA"
+            echo "diffusion : AMK_BENCH=OFF, n'injecte que sur les versions de core/version_gate.hpp"
+            echo "banc : AMK_BENCH=ON, accepte toute version d'Apple Music. Ne jamais diffuser."
+          } > dist/BUILD_INFO.txt
+          find dist -type f -exec ls -l {} +
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amk-builds
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+
+  bench:
+    name: Banc Windows (Apple Music installé par winget)
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: amk-builds
+          path: dist
+
+      - name: Lancer le banc
+        shell: bash
+        run: pwsh -NoProfile -File ./bench/windows/run-bench.ps1 -KitRoot dist -RepoRoot . -OutputRoot results
+
+      - name: Publier les résultats (journaux, captures, rapport)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: banc-windows-resultats
+          path: results
+          if-no-files-found: warn
+          retention-days: 14
+
+  # M8 : compile la branche des thèmes XAML avec MSVC et le paquet Windows App SDK. Indépendant du banc M3.
+  xaml-m8:
+    name: Compiler M8 XAML (MSVC + Windows App SDK)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: thread-052bjz
+          path: m8
+
+      - name: Télécharger les en-têtes Windows App SDK (NuGet)
+        shell: pwsh
+        run: |
+          $version = '1.6.240923002'
+          $out = Join-Path $PWD 'm8\m8-out'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $package = Join-Path $env:RUNNER_TEMP 'wasdk.zip'
+          Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.WindowsAppSDK/$version" -OutFile $package
+          $folder = Join-Path $env:RUNNER_TEMP 'wasdk'
+          Expand-Archive -LiteralPath $package -DestinationPath $folder -Force
+          Get-ChildItem -LiteralPath $folder -Recurse -Filter '*.h' |
+            ForEach-Object { $_.FullName.Substring($folder.Length) } |
+            Set-Content -LiteralPath (Join-Path $out 'wasdk-headers.txt')
+          $header = Get-ChildItem -LiteralPath $folder -Recurse -Filter 'Microsoft.UI.Xaml.h' |
+            Where-Object { $_.Directory.Name -eq 'winrt' } | Select-Object -First 1
+          if (-not $header) { throw 'winrt/Microsoft.UI.Xaml.h introuvable : voir m8/m8-out/wasdk-headers.txt' }
+          $include = $header.Directory.Parent.FullName
+          Write-Host "Dossier d'en-têtes : $include"
+          "WASDK_INCLUDE=$include" | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Configurer et compiler (MSVC, AMK_XAML=ON)
+        shell: pwsh
+        working-directory: m8
+        run: |
+          New-Item -ItemType Directory -Force -Path m8-out | Out-Null
+          cmake -S . -B build -A x64 -DAMK_XAML=ON "-DAMK_WINAPPSDK_INCLUDE=$env:WASDK_INCLUDE" 2>&1 |
+            Tee-Object -FilePath m8-out/configure.log
+          cmake --build build --config Release --parallel 2>&1 | Tee-Object -FilePath m8-out/build.log
+
+      - name: Lancer amk_tests et amk_ui_thread_test
+        if: always()
+        shell: pwsh
+        working-directory: m8
+        run: |
+          New-Item -ItemType Directory -Force -Path m8-out | Out-Null
+          foreach ($exe in 'amk_tests.exe', 'amk_ui_thread_test.exe') {
+            $found = Get-ChildItem -LiteralPath build -Recurse -Filter $exe -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $found) {
+              "$exe : introuvable (compilation en échec ?)" | Add-Content -LiteralPath m8-out/tests.log
+              continue
+            }
+            Copy-Item -LiteralPath $found.FullName -Destination m8-out
+            & $found.FullName 2>&1 | Tee-Object -FilePath (Join-Path m8-out "$exe.log")
+            "$exe : code de sortie $LASTEXITCODE" | Add-Content -LiteralPath m8-out/tests.log
+          }
+          Get-ChildItem -LiteralPath build -Recurse -Filter 'amk_kernel.dll' -ErrorAction SilentlyContinue |
+            Select-Object -First 1 | Copy-Item -Destination m8-out
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: amk-m8-xaml
+          path: m8/m8-out
+          if-no-files-found: warn
+          retention-days: 14
