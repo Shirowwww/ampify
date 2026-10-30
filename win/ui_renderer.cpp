@@ -182,14 +182,14 @@ struct XamlRenderer::Callbacks {
 struct XamlRenderer::Mounted {
     std::string type;
     bool grid = false;  // a row drawn as a Grid of 2 columns
-    // What the parent holds. Strong: a control just built has no other owner until Rewrite puts it in its parent's
-    // panel, and the root has none until the caller puts it in a slot; a weak reference would lose them as soon as
-    // Build returns. The other references stay weak: `outer` keeps them alive.
-    xaml::FrameworkElement outer{nullptr};
-    winrt::weak_ref<xaml::FrameworkElement> control;  // what takes the attributes, the name and the tooltip
-    winrt::weak_ref<controls::Panel> host;            // where the children go
-    winrt::weak_ref<controls::TextBlock> label;       // the label of a toggle, the title of a card
-    winrt::weak_ref<controls::TextBlock> subtitle;    // the subtitle of a card
+    // All strong: in Apple Music a weak reference to a XAML object the kit made never resolves, even while the object
+    // is on screen (seen on 1.1792: the slot of a panel was lost right after it was made). The renderer is released
+    // on the interface thread with its surface, and no handler holds these objects, so there is no cycle.
+    xaml::FrameworkElement outer{nullptr};    // what the parent holds
+    xaml::FrameworkElement control{nullptr};  // what takes the attributes, the name and the tooltip
+    controls::Panel host{nullptr};            // where the children go
+    controls::TextBlock label{nullptr};       // the label of a toggle, the title of a card
+    controls::TextBlock subtitle{nullptr};    // the subtitle of a card
     std::shared_ptr<Callbacks> callbacks;
     std::vector<Mounted> children;
 };
@@ -556,7 +556,7 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
     SetAttributes(mounted, node, probe);
     if (node.type == "dropdown") {
         FillOptions(mounted, node);
-    } else if (mounted.host.get()) {
+    } else if (mounted.host) {
         for (const RenderNode& child : node.children) mounted.children.push_back(Build(child, probe));
         Rewrite(mounted);
     }
@@ -564,7 +564,7 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
 }
 
 void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const StyleProbe& probe) {
-    xaml::FrameworkElement control = mounted.control.get();
+    xaml::FrameworkElement control = mounted.control;
     if (!control) return;
     mounted.callbacks->onClick = static_cast<int>(node.Number("onClick", 0));
     mounted.callbacks->onChange = static_cast<int>(node.Number("onChange", 0));
@@ -579,11 +579,11 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
         if (auto panel = control.try_as<controls::StackPanel>()) panel.Spacing(gap);
         if (auto grid = control.try_as<controls::Grid>()) grid.ColumnSpacing(gap);
     } else if (type == "card") {
-        if (auto title = mounted.label.get()) {
+        if (auto title = mounted.label) {
             SetText(title, Wide(node.Text("title")));
             SetVisible(title, node.Has("title"));
         }
-        if (auto subtitle = mounted.subtitle.get()) {
+        if (auto subtitle = mounted.subtitle) {
             SetText(subtitle, Wide(node.Text("subtitle")));
             SetVisible(subtitle, node.Has("subtitle"));
         }
@@ -629,7 +629,7 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
             mounted.callbacks->echo = checked ? "true" : "false";
             toggle.IsOn(checked);
         }
-        if (auto label = mounted.label.get()) {
+        if (auto label = mounted.label) {
             SetText(label, Wide(node.Text("label")));
             SetVisible(label, !node.Text("label").empty());
         }
@@ -694,7 +694,7 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
 }
 
 void XamlRenderer::FillOptions(Mounted& mounted, const RenderNode& node) {
-    auto combo = mounted.control.get().try_as<controls::ComboBox>();
+    auto combo = mounted.control ? mounted.control.try_as<controls::ComboBox>() : nullptr;
     if (!combo) return;
     UpdateGuard guard(*m_updating);
     std::string selected = node.Text("value");
@@ -730,7 +730,7 @@ void XamlRenderer::Apply(Mounted& mounted, const Patch& patch, const StyleProbe&
         if (optionsChanged || patch.op == PatchOp::Update) FillOptions(mounted, node);
         return;
     }
-    if (!mounted.host.get()) return;
+    if (!mounted.host) return;
 
     bool rewrite = patch.reordered;
     std::vector<Mounted> next;
@@ -756,7 +756,7 @@ void XamlRenderer::Apply(Mounted& mounted, const Patch& patch, const StyleProbe&
 }
 
 void XamlRenderer::Rewrite(Mounted& mounted) {
-    controls::Panel host = mounted.host.get();
+    controls::Panel host = mounted.host;
     if (!host) return;
     auto children = host.Children();
     children.Clear();

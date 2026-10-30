@@ -14,6 +14,7 @@ list(APPEND AMK_THEME_SOURCES
     core/theme/theme_settings.cpp
     core/theme/commands.cpp
     core/theme/fonts.cpp
+    core/theme/hover.cpp
     core/theme/layout.cpp
     core/theme/scheme_choice.cpp
     core/theme/snippets.cpp

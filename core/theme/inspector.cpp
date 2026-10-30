@@ -11,7 +11,8 @@ namespace {
 // The properties worth seeing when choosing a rule. Each one is read with Read(), so an element that lacks it is skipped.
 constexpr const char* kInspectedProperties[] = {
     "Background", "Foreground", "BorderBrush", "CornerRadius", "FontFamily", "FontSize", "FontWeight",
-    "Margin", "Padding", "Width", "Height", "Opacity", "Visibility", "FlowDirection",
+    "Margin", "Padding", "Width", "Height", "Opacity", "Visibility", "FlowDirection", "HorizontalAlignment",
+    "VerticalAlignment", "Grid.Row", "Grid.Column", "Canvas.ZIndex",
 };
 
 // Items of a JSON list, one per line, for a file a person may open.
@@ -27,7 +28,12 @@ std::string Label(const NodeInfo& node) {
 }
 
 std::string ValueText(const Value& value) {
-    if (value.kind == ValueKind::Template || value.kind == ValueKind::Opaque) return "présent";
+    if (value.kind == ValueKind::Opaque) {
+        // "handle:N;#AARRGGBB": an app brush kept as an object, with its colour (opacity included) when it is plain.
+        size_t colour = value.text.find(';');
+        return colour == std::string::npos ? "présent" : value.text.substr(colour + 1);
+    }
+    if (value.kind == ValueKind::Template) return "présent";
     return value.text;
 }
 

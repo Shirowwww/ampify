@@ -40,6 +40,7 @@ ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
         it = live.count(it->first.first) ? std::next(it) : m_originals.erase(it);
     }
     std::erase_if(m_moves, [&](const Move& move) { return !live.count(move.id); });
+    std::erase_if(m_hovers, [&](const auto& entry) { return !live.count(entry.first); });
 
     ApplyDictionary(theme, tree, report);
     ApplyResources(theme, tree, report);
@@ -60,12 +61,14 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
     for (int index = 0; index < static_cast<int>(nodes.size()); index++) {
         const NodeInfo& node = nodes[index];
 
-        // The winning declaration for each property of this element.
+        // The winning declaration for each property of this element, and apart from them the :hover ones.
         std::map<std::string, const Assignment*> winners;
+        std::map<std::string, const Assignment*> hoverWinners;
         for (const Assignment& assignment : theme.assignments) {
             if (!Matches(assignment.selector, nodes, index)) continue;
 
-            auto [it, inserted] = winners.try_emplace(assignment.property, &assignment);
+            auto& target = assignment.selector.hover ? hoverWinners : winners;
+            auto [it, inserted] = target.try_emplace(assignment.property, &assignment);
             if (!inserted && Beats(assignment, *it->second)) it->second = &assignment;
         }
 
@@ -76,14 +79,56 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
             }
             WriteValue(node, *assignment, tree, report, true);
         }
+        // An element that lost its :hover rules (a theme edited live) is visited too, to take its hover off.
+        if (!hoverWinners.empty() || m_hovers.count(node.id)) ApplyHover(node, hoverWinners, tree, report);
     }
     ApplyMoves(pending, tree, report);
+}
+
+// Gives the backend the :hover values of one element when they differ from the ones it holds. A property the element
+// does not have is refused here, as a plain value would be. No value left takes the hover off.
+void ThemeEngine::ApplyHover(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners,
+                             TreeBackend& tree, Report& report) {
+    std::vector<HoverValue> values;
+    for (const auto& [property, assignment] : winners) {
+        if (!tree.Read(node.id, property)) {
+            Refuse(Describe(node) + " " + property, "« " + Describe(node) + " » n'a pas de propriété " + property, report);
+            continue;
+        }
+        values.push_back({property, assignment->value});
+    }
+
+    auto known = m_hovers.find(node.id);
+    if (known != m_hovers.end() && known->second == values) {
+        report.unchanged += static_cast<int>(values.size());
+        return;
+    }
+    if (known == m_hovers.end() && values.empty()) return;
+
+    if (!tree.SetHover(node.id, values)) {
+        Refuse(Describe(node) + " :hover", "« " + Describe(node) + " » ne suit pas le pointeur (:hover)", report);
+        return;
+    }
+    if (values.empty()) {
+        m_hovers.erase(node.id);
+        m_journal.Write("Survol retiré : " + Describe(node));
+        return;
+    }
+    report.applied += static_cast<int>(values.size());
+    std::string list;
+    for (const HoverValue& value : values) list += (list.empty() ? "" : ", ") + value.property + " = " + value.value.text;
+    m_journal.Write("Survol : " + Describe(node) + " " + list);
+    m_hovers[node.id] = std::move(values);
 }
 
 // Writes one value when it differs from the current one. `keep` stores the first value seen, for Restore.
 bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment, TreeBackend& tree, Report& report,
                              bool keep) {
     const std::string& property = assignment.property;
+    if (node.icon && property == "FontFamily") {
+        report.unchanged++;  // left in its icon font on purpose
+        return false;
+    }
     std::optional<Value> current = tree.Read(node.id, property);
     if (!current) {
         Refuse(Describe(node) + " " + property, "« " + Describe(node) + " » n'a pas de propriété " + property, report);
@@ -161,6 +206,14 @@ void ThemeEngine::Restore(TreeBackend& tree) {
     int restored = 0;
     int gone = 0;
 
+    // The hovers first: an element under the pointer gets back the values underneath before those are restored too.
+    for (const auto& [id, values] : m_hovers) {
+        if (tree.SetHover(id, {})) {
+            restored++;
+        } else {
+            gone++;
+        }
+    }
     for (auto it = m_moves.rbegin(); it != m_moves.rend(); ++it) {
         if (tree.Write(it->id, kOrderProperty, it->before)) {
             restored++;
@@ -192,6 +245,7 @@ void ThemeEngine::Restore(TreeBackend& tree) {
         m_dictionary.clear();
     }
 
+    m_hovers.clear();
     m_originals.clear();
     m_resourceOriginals.clear();
     m_moves.clear();

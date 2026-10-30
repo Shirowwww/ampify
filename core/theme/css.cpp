@@ -174,6 +174,21 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
             if (compound.name.empty()) return fail("nom après « # » manquant dans « " + selector.text + " »");
         }
 
+        // A pseudo-class. Only :hover, and only on the last part: the engine follows the pointer of the element it styles.
+        if (i < s.size() && s[i] == ':') {
+            size_t start = ++i;
+            while (i < s.size() && IsNameChar(s[i])) i++;
+            std::string pseudo = LowerCopy(s.substr(start, i - start));
+            if (pseudo != "hover") {
+                return fail("pseudo-classe « :" + std::string(s.substr(start, i - start)) + " » non prise en charge dans « " +
+                            selector.text + " » (seule :hover l'est)");
+            }
+            if (s.substr(i).find_first_not_of(" \t\r\n") != std::string_view::npos) {
+                return fail("« :hover » seulement sur le dernier élément de « " + selector.text + " »");
+            }
+            selector.hover = true;
+        }
+
         // Nothing was read (for example a stray `@`): the check below reports it, so the loop always advances.
         if (i < s.size() && !IsSpace(s[i]) && s[i] != '>') {
             return fail("caractère « " + std::string(1, s[i]) + " » non pris en charge dans « " + selector.text + " »");

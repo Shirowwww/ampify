@@ -31,7 +31,8 @@ MainPage (AMP.UI.Views.MainPage)                      contenu de la fenêtre « 
    │        │  │                                       ToggleButton#LyricsToggleButton, ToggleButton#PlayQueueToggleButton
    │        │  └─ Border#CaptionButtonsOcclusionBorder
    │        ├─ SplitView#ContentSplitView              zone des pages (le volet sert à la file d'attente et aux paroles)
-   │        │  └─ Grid#ContentRoot > Frame#ContentFrame > ContentPage (AMP.UI.Views.ContentPage)
+   │        │  └─ Grid > Grid#ContentRoot > Border > Grid > Frame#ContentFrame > ContentPage (AMP.UI.Views.ContentPage)
+   │        │     (sélecteur sûr : SplitView#ContentSplitView > Grid > Grid#ContentRoot ; voir plus bas)
    │        │     ├─ Grid#ContentPageShadowGrid
    │        │     └─ Spinner#Spinner
    │        └─ InfoBar#topInfoBar, InfoBar#bottomInfoBar
@@ -51,6 +52,17 @@ MainPage (AMP.UI.Views.MainPage)                      contenu de la fenêtre « 
   n'était pas encore chargé au moment du relevé.
 - **Noms en double** : `Grid#RootGrid`, `Grid#LayoutRoot`, `Border#Root`, `ContentPresenter#ContentPresenter` viennent des
   gabarits WinUI et existent des dizaines de fois. Viser plutôt le parent nommé (`Grid#TransportBar Button`).
+- **`Grid#ContentRoot` existe au moins trois fois** (relevé du 30/10 sur le PC, compte connecté) : celui du gabarit du
+  `NavigationView` (`SplitView#RootSplitView > Grid > Grid#ContentRoot`, qui contient la barre de lecture et toutes
+  les pages), un dans chaque `AppBarButton` de lecture (précédent, lecture, suivant), et celui de la zone des pages
+  (`SplitView#ContentSplitView > Grid > Grid#ContentRoot`). Une marge posée sur `Grid#ContentRoot` seul faisait
+  descendre la barre de lecture et disparaître ses trois boutons.
+- **La zone des pages passe sous la barre de lecture** : `Grid#TransportBar` est en haut de la même grille, avec
+  `BackDrop` (hauteur 64) comme fond givré. Une page défile donc sous la barre. Ordre d'affichage d'origine :
+  `Grid#TransportBar` `Canvas.ZIndex` 10, `BackDrop` 9, `SplitView#ContentSplitView` 0. Un `z-index` plus petit que 10
+  sur la barre la fait passer sous les pages (elle disparaît).
+- **Icônes** : les badges (explicite, étoiles) sont des `TextBlock` en caractères à usage privé. Le kit ne change
+  jamais leur police (sinon un carré vide s'affiche), même si une règle `TextBlock { font-family: … }` les vise.
 - **MainPage n'est pas un panneau** : son contenu est `Grid#PageRoot`. Apple Music y retire les enfants qu'il ne
   connaît pas (un hôte ajouté par le kit y disparaissait en quelques secondes) : les panneaux du kit passent par un
   Popup de la fenêtre.

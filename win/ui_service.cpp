@@ -167,19 +167,19 @@ struct HostWatch {
 struct MountedSurface {
     Surface surface;
     std::unique_ptr<XamlRenderer> renderer;
-    winrt::weak_ref<xaml::FrameworkElement> frame;  // the panel frame, or the page host's content
-    // Strong for a panel: in the bench the weak frame was gone every 5 s and the panel mounted again, never on screen.
+    // Everything the kit makes is held strongly: in Apple Music a weak reference to a XAML object the kit made never
+    // resolves (the weak frame was gone every 5 s, then the weak slot right after it was made: an empty panel).
     // Released on the interface thread with the context (ReleaseXaml, DropContext).
     xaml::FrameworkElement panelFrame{nullptr};
-    winrt::weak_ref<controls::Border> slot;         // holds the renderer's root
-    winrt::weak_ref<controls::TextBlock> title;
-    winrt::weak_ref<controls::ContentDialog> dialog;
+    controls::Border slot{nullptr};  // holds the renderer's root
+    controls::TextBlock title{nullptr};
+    controls::ContentDialog dialog{nullptr};
     bool mounted = false;
     bool dismissed = false;  // a popup the user closed
 };
 
 struct PlacedControl {
-    winrt::weak_ref<controls::Button> button;
+    controls::Button button{nullptr};  // strong, like the panels: see MountedSurface
     bool reported = false;
 };
 
@@ -196,7 +196,8 @@ struct WindowContext {
     bool observed = false;
     winrt::weak_ref<xaml::DependencyObject> root;
     winrt::event_token rootLayout{};
-    bool rootLayoutActive = false;
+    winrt::event_token rootSize{};
+    bool rootLayoutActive = false;  // both handlers above are registered
     std::vector<HostWatch> watches;
     std::unordered_set<std::uintptr_t> watched;
     std::vector<ProbeNode> probe;
@@ -216,9 +217,10 @@ struct WindowContext {
     // Strong: nothing else holds a Popup that is outside the tree, and its panels went with it (mounted again on every
     // refresh, never on screen). Released on the interface thread (ReleaseXaml, DropContext).
     primitives::Popup panelPopup{nullptr};
-    winrt::weak_ref<controls::Grid> pageHost;
-    winrt::weak_ref<controls::Border> pageSlot;
-    winrt::weak_ref<controls::TextBlock> pageTitle;
+    primitives::Popup pagePopup{nullptr};  // app pages, over the content area
+    controls::Grid pageHost{nullptr};      // strong, like the panels: see MountedSurface
+    controls::Border pageSlot{nullptr};
+    controls::TextBlock pageTitle{nullptr};
     std::map<std::string, MountedSurface> surfaces;
     std::map<std::string, PlacedControl> placed;
     std::set<std::string> closedPanels;
@@ -339,12 +341,17 @@ void ReleaseXaml(WindowContext& context) noexcept {
     try {
         ClearWatches(context);
         if (context.panelPopup) context.panelPopup.IsOpen(false);
+        if (context.pagePopup) context.pagePopup.IsOpen(false);
     } catch (...) {
     }
     try {
         context.panelPopup = nullptr;
+        context.pagePopup = nullptr;
         context.panelHost = nullptr;
         context.panelStack = nullptr;
+        context.pageHost = nullptr;
+        context.pageSlot = nullptr;
+        context.pageTitle = nullptr;
         context.surfaces.clear();
         context.placed.clear();
         context.probe.clear();
@@ -758,54 +765,56 @@ controls::Border MakeSurfaceFrame(const std::string& frameName, const std::strin
     return frame;
 }
 
-// The panel that holds the main window's content: the content itself, or the first panel inside it when it is a
-// page or another single-child control (Apple Music 1.1792: AMP.UI.Views.MainPage). Null when none is found.
-controls::Panel HostPanelOf(const xaml::DependencyObject& content) {
-    xaml::DependencyObject current = content;
-    for (int depth = 0; current && depth < 4; depth++) {
-        if (auto panel = current.try_as<controls::Panel>()) return panel;
-        if (auto user = current.try_as<controls::UserControl>()) {
-            current = user.Content().try_as<xaml::DependencyObject>();
-        } else if (auto control = current.try_as<controls::ContentControl>()) {
-            current = control.Content().try_as<xaml::DependencyObject>();
-        } else if (auto border = current.try_as<controls::Border>()) {
-            current = border.Child().try_as<xaml::DependencyObject>();
-        } else {
-            return nullptr;
-        }
+// The part of the window under the play bar and right of the sidebar, in the window's coordinates, from the names the
+// discovery found (Apple Music 1.1792: Grid#TransportBar at the top, Grid#PaneRoot on the left).
+struct ContentArea {
+    double left = 0;
+    double top = 56;
+};
+
+ContentArea FindContentArea(const WindowContext& context) {
+    ContentArea area;
+    auto edge = [&context](std::string_view name, bool right) -> std::optional<double> {
+        std::optional<int> index = uirender::FindByName(context.probe, name);
+        if (!index || *index >= static_cast<int>(context.probeObjects.size())) return std::nullopt;
+        auto element = context.probeObjects[*index].get().try_as<xaml::FrameworkElement>();
+        if (!element || element.ActualWidth() <= 0 || element.ActualHeight() <= 0) return std::nullopt;
+        auto origin = element.TransformToVisual(nullptr).TransformPoint({0, 0});
+        return right ? origin.X + element.ActualWidth() : origin.Y + element.ActualHeight();
+    };
+    try {
+        if (auto bottom = edge("TransportBar", false)) area.top = std::max(0.0, *bottom);
+        if (auto right = edge("PaneRoot", true)) area.left = std::max(0.0, *right);
+    } catch (...) {
+        // An element leaving the tree while it is measured: the defaults hold until the next refresh.
     }
-    return nullptr;
+    return area;
 }
 
-// Places the Popup of the panels on the right of the window, below the title bar and above the play bar. Called on
-// every refresh, so the panels follow the size of the window.
-void PlacePanelPopup(const primitives::Popup& popup, const controls::Grid& host, const xaml::XamlRoot& root) {
+// Places the Popup of the panels on the right of the window, under the play bar. Called on every refresh and when
+// the window changes size, so the panels follow it.
+void PlacePanelPopup(const WindowContext& context, const xaml::XamlRoot& root) {
     auto size = root.Size();
-    double height = std::max(200.0, static_cast<double>(size.Height) - 160.0);
-    double left = std::max(0.0, static_cast<double>(size.Width) - kPanelWidth - 16.0);
-    if (host.Height() != height) host.Height(height);
-    if (popup.HorizontalOffset() != left) popup.HorizontalOffset(left);
-    if (popup.VerticalOffset() != 56) popup.VerticalOffset(56);
-    if (!popup.IsOpen()) popup.IsOpen(true);
+    ContentArea area = FindContentArea(context);
+    double top = area.top + 8;
+    double height = std::max(200.0, static_cast<double>(size.Height) - top - 16.0);
+    double left = std::max(area.left, static_cast<double>(size.Width) - kPanelWidth - 16.0);
+    if (context.panelHost.Height() != height) context.panelHost.Height(height);
+    if (context.panelPopup.HorizontalOffset() != left) context.panelPopup.HorizontalOffset(left);
+    if (context.panelPopup.VerticalOffset() != top) context.panelPopup.VerticalOffset(top);
+    if (!context.panelPopup.IsOpen()) context.panelPopup.IsOpen(true);
 }
 
 // The overlay of the panels, on the right of the main window: a Popup on the window's XamlRoot, which Apple Music's
-// own pages never touch (AMExclusive inserts into the settings page only). Without a XamlRoot yet, a Grid added to
-// the content's panel, spanning its rows and columns. Margins keep the title bar and the play bar visible.
+// own pages never touch (AMExclusive inserts into the settings page only). Apple Music takes out the children it does
+// not know from its own panels (Grid#PageRoot), so there is no fallback there: without a XamlRoot yet, nothing.
 controls::StackPanel EnsurePanelHost(UiService::Shared& shared, WindowContext& context, const xaml::DependencyObject& content) {
     auto rootElement = content.try_as<xaml::UIElement>();
-    xaml::XamlRoot xamlRoot{nullptr};
-    if (rootElement) xamlRoot = rootElement.XamlRoot();
-    if (context.panelStack && context.panelHost) {
-        if (context.panelPopup) {
-            if (xamlRoot) PlacePanelPopup(context.panelPopup, context.panelHost, xamlRoot);
-            return context.panelStack;
-        }
-        if (context.panelHost.Parent()) return context.panelStack;
-        // Taken out of the page by Apple Music: made again below, in a Popup when possible.
-        shared.journal.Write("Interface : hôte des panneaux retiré de la page par Apple Music, recréé");
-        context.panelHost = nullptr;
-        context.panelStack = nullptr;
+    xaml::XamlRoot xamlRoot = rootElement ? rootElement.XamlRoot() : nullptr;
+    if (!xamlRoot) return nullptr;
+    if (context.panelStack && context.panelHost && context.panelPopup) {
+        PlacePanelPopup(context, xamlRoot);
+        return context.panelStack;
     }
     if (context.panelHostsMade++ > 0 && context.panelHostsMade <= 4) {
         shared.journal.Write("Interface : hôte des panneaux recréé (n° " + std::to_string(context.panelHostsMade) + ")");
@@ -823,30 +832,15 @@ controls::StackPanel EnsurePanelHost(UiService::Shared& shared, WindowContext& c
     scroll.Content(stack);
     host.Children().Append(scroll);
 
-    if (xamlRoot) {
-        primitives::Popup popup;
-        popup.XamlRoot(xamlRoot);
-        popup.Child(host);
-        context.panelPopup = popup;
-        PlacePanelPopup(popup, host, xamlRoot);
-        shared.Once("panel-host", "Interface : hôte des panneaux ouvert dans un Popup de la fenêtre, à droite (" +
-                                      Utf8(winrt::get_class_name(content)) + ")");
-    } else if (auto panel = HostPanelOf(content)) {
-        host.Margin(xaml::Thickness{0, 56, 16, 104});
-        if (auto grid = panel.try_as<controls::Grid>()) {
-            controls::Grid::SetRowSpan(host, std::max<int>(1, static_cast<int>(grid.RowDefinitions().Size())));
-            controls::Grid::SetColumnSpan(host, std::max<int>(1, static_cast<int>(grid.ColumnDefinitions().Size())));
-        }
-        controls::Canvas::SetZIndex(host, 1000);
-        panel.Children().Append(host);
-        shared.Once("panel-host", "Interface : hôte des panneaux ajouté à droite du contenu de la fenêtre (" +
-                                      Utf8(winrt::get_class_name(content)) + ", dans " +
-                                      Utf8(winrt::get_class_name(panel)) + ")");
-    } else {
-        return nullptr;
-    }
+    primitives::Popup popup;
+    popup.XamlRoot(xamlRoot);
+    popup.Child(host);
+    context.panelPopup = popup;
     context.panelHost = host;
     context.panelStack = stack;
+    PlacePanelPopup(context, xamlRoot);
+    shared.Once("panel-host", "Interface : hôte des panneaux ouvert dans un Popup de la fenêtre, à droite (" +
+                                  Utf8(winrt::get_class_name(content)) + ")");
     return stack;
 }
 
@@ -861,10 +855,10 @@ uirender::PatchStats RenderInto(UiService::Shared& shared, MountedSurface& mount
     bool replaced = false;
     xaml::FrameworkElement root =
         mounted.renderer->Render(uirender::BuildRenderTree(surface.tree, surface.nodeId), shared.probe, stats, replaced);
-    if (auto slot = mounted.slot.get()) {
+    if (auto slot = mounted.slot) {
         if (replaced || slot.Child() != root) slot.Child(root);
     }
-    if (auto title = mounted.title.get()) {
+    if (auto title = mounted.title) {
         std::string text = surface.title.empty() ? surface.id : surface.title;
         if (Utf8(title.Text()) != text) title.Text(Wide(text));
     }
@@ -931,31 +925,50 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
         });
         stack.Children().Append(frame);
         mounted.renderer.reset();
-        mounted.frame = winrt::make_weak<xaml::FrameworkElement>(frame);
         mounted.panelFrame = frame;
-        mounted.slot = winrt::make_weak(slot);
-        mounted.title = winrt::make_weak(title);
+        mounted.slot = slot;
+        mounted.title = title;
     }
     uirender::PatchStats stats = RenderInto(shared, mounted, surface);
     JournalRender(shared, "panneau", surface, stats, first);
 }
 
-// The host of an app page: covers the content area of the main window while the route points to the page.
-// Provisional, like the panels: Apple Music's own frame is not replaced.
-controls::Border EnsurePageHost(UiService::Shared& shared, WindowContext& context, const xaml::DependencyObject& content) {
-    if (auto slot = context.pageSlot.get()) return slot;
-    controls::Panel panel = HostPanelOf(content);
-    if (!panel) {
-        shared.Once("page-host-none", "Interface : pages des apps non affichées : aucun panneau dans le contenu de la "
-                                      "fenêtre (" + Utf8(winrt::get_class_name(content)) + ")");
-        return nullptr;
+// Covers the content area (under the play bar, right of the sidebar) with the page host, or hides it.
+void PlacePageHost(WindowContext& context, const xaml::XamlRoot& root) {
+    if (!context.pagePopup || !context.pageHost) return;
+    auto size = root.Size();
+    ContentArea area = FindContentArea(context);
+    double width = std::max(200.0, static_cast<double>(size.Width) - area.left);
+    double height = std::max(200.0, static_cast<double>(size.Height) - area.top);
+    if (context.pageHost.Width() != width) context.pageHost.Width(width);
+    if (context.pageHost.Height() != height) context.pageHost.Height(height);
+    if (context.pagePopup.HorizontalOffset() != area.left) context.pagePopup.HorizontalOffset(area.left);
+    if (context.pagePopup.VerticalOffset() != area.top) context.pagePopup.VerticalOffset(area.top);
+}
+
+void ShowPageHost(WindowContext& context, bool visible) {
+    if (!context.pagePopup || !context.pageHost) return;
+    context.pageHost.Visibility(visible ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+    if (context.pagePopup.IsOpen() != visible) context.pagePopup.IsOpen(visible);
+}
+
+// The host of an app page: a Popup of the window over the content area while the route points to the page (Apple
+// Music takes out what the kit adds to its own panels). Apple Music's own frame is not replaced.
+controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr<WindowContext>& owner,
+                                const xaml::DependencyObject& content) {
+    WindowContext& context = *owner;
+    auto rootElement = content.try_as<xaml::UIElement>();
+    xaml::XamlRoot xamlRoot = rootElement ? rootElement.XamlRoot() : nullptr;
+    if (!xamlRoot) return nullptr;
+    if (context.pageSlot) {
+        PlacePageHost(context, xamlRoot);
+        return context.pageSlot;
     }
     controls::Grid host = LoadKitXaml(L"<Grid " + std::wstring(KitXmlns()) +
                                       L" Background='{ThemeResource SolidBackgroundFillColorBaseBrush}'/>")
                               .try_as<controls::Grid>();
     if (!host) host = controls::Grid();
     Name(host, "AMK_PageHost", "Page d'une app du kit");
-    host.Margin(xaml::Thickness{0, 48, 0, 96});
     host.Padding(xaml::Thickness{32, 16, 32, 16});
     controls::RowDefinition headerRow;
     headerRow.Height(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
@@ -983,25 +996,28 @@ controls::Border EnsurePageHost(UiService::Shared& shared, WindowContext& contex
     scroll.Content(slot);
     host.Children().Append(scroll);
 
-    if (auto grid = panel.try_as<controls::Grid>()) {
-        controls::Grid::SetRowSpan(host, std::max<int>(1, static_cast<int>(grid.RowDefinitions().Size())));
-        controls::Grid::SetColumnSpan(host, std::max<int>(1, static_cast<int>(grid.ColumnDefinitions().Size())));
-    }
-    controls::Canvas::SetZIndex(host, 900);
     host.Visibility(xaml::Visibility::Collapsed);
-    panel.Children().Append(host);
+    primitives::Popup popup;
+    popup.XamlRoot(xamlRoot);
+    popup.Child(host);
 
-    winrt::weak_ref<controls::Grid> weakHost = winrt::make_weak(host);
-    back.Click([weakHost](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+    // The handler holds the window context weakly, not the host: the host holds the button that holds the handler.
+    WeakContext weakContext = owner;
+    back.Click([weakContext](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
-            if (auto live = weakHost.get()) live.Visibility(xaml::Visibility::Collapsed);
+            if (auto live = weakContext.lock()) {
+                live->pageClosed = true;
+                ShowPageHost(*live, false);
+            }
         } catch (...) {
         }
     });
-    context.pageHost = weakHost;
-    context.pageSlot = winrt::make_weak(slot);
-    context.pageTitle = winrt::make_weak(title);
-    shared.Once("page-host", "Interface : hôte des pages des apps ajouté au contenu de la fenêtre (provisoire)");
+    context.pagePopup = popup;
+    context.pageHost = host;
+    context.pageSlot = slot;
+    context.pageTitle = title;
+    PlacePageHost(context, xamlRoot);
+    shared.Once("page-host", "Interface : hôte des pages des apps ouvert dans un Popup de la fenêtre");
     return slot;
 }
 
@@ -1013,16 +1029,16 @@ void MountPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& 
         mounted.surface = surface;
         return;  // rendered when the extension navigates to it
     }
-    controls::Border slot = EnsurePageHost(shared, *context, content);
+    controls::Border slot = EnsurePageHost(shared, context, content);
     if (!slot) return;
-    bool first = !mounted.mounted || !mounted.slot.get();
+    bool first = !mounted.mounted || mounted.slot != slot;
     if (!first && mounted.surface.revision == surface.revision) return;
     if (first) mounted.renderer.reset();
-    mounted.slot = winrt::make_weak(slot);
+    mounted.slot = slot;
     mounted.title = context->pageTitle;
     uirender::PatchStats stats = RenderInto(shared, mounted, surface);
     mounted.mounted = true;
-    if (auto host = context->pageHost.get(); host && !context->pageClosed) host.Visibility(xaml::Visibility::Visible);
+    if (!context->pageClosed) ShowPageHost(*context, true);
     JournalRender(shared, "page", surface, stats, first);
 }
 
@@ -1030,7 +1046,7 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
                 const xaml::DependencyObject& content, const Surface& surface) {
     MountedSurface& mounted = context->surfaces[surface.key];
     if (mounted.dismissed) return;
-    if (auto dialog = mounted.dialog.get()) {
+    if (auto dialog = mounted.dialog) {
         if (mounted.surface.revision == surface.revision) return;
         uirender::PatchStats stats;
         bool replaced = false;
@@ -1084,19 +1100,19 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
         return;  // another ContentDialog of Apple Music is open: tried again on the next refresh
     }
     context->dialogOpen = true;
-    mounted.dialog = winrt::make_weak(dialog);
+    mounted.dialog = dialog;
     mounted.surface = surface;
     JournalRender(shared, "popup", surface, stats, true);
 }
 
 void Unmount(WindowContext& context, MountedSurface& mounted) {
     try {
-        if (auto dialog = mounted.dialog.get()) dialog.Hide();
+        if (auto dialog = mounted.dialog) dialog.Hide();
         if (mounted.surface.kind == SurfaceKind::Panel) RemoveFromParent(mounted.panelFrame);
         if (mounted.surface.kind == SurfaceKind::Page) {
-            if (auto slot = mounted.slot.get(); slot && mounted.renderer && slot.Child() == mounted.renderer->Root()) {
+            if (auto slot = mounted.slot; slot && mounted.renderer && slot.Child() == mounted.renderer->Root()) {
                 slot.Child(nullptr);
-                if (auto host = context.pageHost.get()) host.Visibility(xaml::Visibility::Collapsed);
+                ShowPageHost(context, false);
             }
         }
     } catch (...) {
@@ -1118,7 +1134,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
             continue;
         }
         PlacedControl& placed = context->placed[surface.key];
-        if (placed.button.get()) continue;
+        if (placed.button && placed.button.Parent()) continue;  // taken out by Apple Music: placed again
 
         std::optional<uirender::Insertion> insertion = control.placement == "playbar"
                                                            ? uirender::ChoosePlaybarInsertion(context->probe)
@@ -1167,7 +1183,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         auto after = insertion->after >= 0 ? context->probeObjects[insertion->after].get().try_as<xaml::UIElement>() : nullptr;
         if (after && children.IndexOf(after, index)) children.InsertAt(index + 1, button);
         else children.Append(button);
-        placed.button = winrt::make_weak(button);
+        placed.button = button;
         shared.journal.Write("Interface : bouton « " + control.label + " » de " + control.elementId + " placé dans « " +
                              control.placement + " » (repères provisoires)");
     }
@@ -1176,7 +1192,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
             ++it;
             continue;
         }
-        RemoveFromParent(it->second.button.get());
+        RemoveFromParent(it->second.button);
         it = context->placed.erase(it);
     }
 }
@@ -1193,7 +1209,7 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
     if (route) {
         context->route = route;
         context->pageClosed = false;
-        if (auto host = context->pageHost.get()) host.Visibility(xaml::Visibility::Collapsed);
+        ShowPageHost(*context, false);
         for (auto& [key, mounted] : context->surfaces) {
             if (mounted.surface.kind == SurfaceKind::Page) mounted.surface.revision = 0;  // render again for the new route
         }
@@ -1238,6 +1254,11 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
         anyPanel = anyPanel || (mounted.surface.kind == SurfaceKind::Panel && mounted.panelFrame);
     }
     if (context->panelHost) context->panelHost.Visibility(anyPanel ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+    // Mounting returns early when nothing changed: the overlays follow the window here, on every refresh.
+    if (auto element = content.try_as<xaml::UIElement>(); element && element.XamlRoot()) {
+        if (context->panelPopup && context->panelHost) PlacePanelPopup(*context, element.XamlRoot());
+        PlacePageHost(*context, element.XamlRoot());
+    }
 
     try {
         PlaceControls(shared, context, surfaces);
@@ -1286,6 +1307,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         ClearWatches(*context);
         if (auto old = context->root.get().try_as<xaml::FrameworkElement>(); old && context->rootLayoutActive) {
             old.LayoutUpdated(context->rootLayout);
+            old.SizeChanged(context->rootSize);
         }
         context->root = winrt::make_weak(content);
         std::uint64_t revision = ++context->rootRevision;
@@ -1293,14 +1315,17 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         context->surfaces.clear();
         context->placed.clear();
         try {
-            if (context->panelPopup) context->panelPopup.IsOpen(false);  // the panels of the old content
+            if (context->panelPopup) context->panelPopup.IsOpen(false);  // the overlays of the old content
+            if (context->pagePopup) context->pagePopup.IsOpen(false);
         } catch (...) {
         }
         context->panelPopup = nullptr;
         context->panelHost = nullptr;
         context->panelStack = nullptr;
+        context->pagePopup = nullptr;
         context->pageHost = nullptr;
         context->pageSlot = nullptr;
+        context->pageTitle = nullptr;
         context->rootLayoutActive = false;
         // LayoutUpdated until the content is mounted: the first pages appear a few layout passes later.
         if (auto element = content.try_as<xaml::FrameworkElement>()) {
@@ -1311,6 +1336,11 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
                     if (live && live->ticket.OnLayout(NowMs())) Wake(weakShared, weakContext, revision, true);
                 } catch (...) {
                 }
+            });
+            // The overlays (panels, app pages) follow the window's size.
+            context->rootSize = element.SizeChanged([weakShared, weakContext, revision](IInspectable const&,
+                                                                                       xaml::SizeChangedEventArgs const&) noexcept {
+                Wake(weakShared, weakContext, revision, false);
             });
             context->rootLayoutActive = true;
             context->ticket.ArmLayout(NowMs());

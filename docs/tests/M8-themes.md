@@ -68,6 +68,16 @@ Ouvre `%USERPROFILE%\AppleMusicModKit\journal\AppleMusic.log`. Cherche ces ligne
 - `Refusé : …` et `Ressource absente…` : les noms qui ne correspondent pas à l'app. Envoie-moi toutes ces lignes.
 - `Thème retiré : …` : la restauration.
 
+## Étape 7 : la refonte « Verre »
+
+1. Copie aussi le dossier `verre` dans `themes`, puis choisis « verre » dans la page Général.
+2. Note ce qui change : fond en dégradé, barre latérale et barre de lecture floutées (acrylique), contenu dans une
+   carte arrondie avec une ombre, texte plus grand.
+3. Passe le pointeur sur les boutons de lecture et sur la pochette : ils doivent grossir, puis revenir quand le
+   pointeur s'en va.
+4. Choisis « Aucun » avec le pointeur sur un bouton : tout doit revenir, et le bouton ne doit plus grossir ensuite.
+5. Dans le journal : `Survol : …` (une ligne par élément suivi), `Survol retiré : …`, et les `Refusé : …` à m'envoyer.
+
 ## Ce que tu me renvoies
 
 - `inspector.txt` (étape 3), après relecture.

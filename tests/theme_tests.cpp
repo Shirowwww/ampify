@@ -18,6 +18,7 @@
 #include "../core/theme/engine.hpp"
 #include "../core/theme/files.hpp"
 #include "../core/theme/fonts.hpp"
+#include "../core/theme/hover.hpp"
 #include "../core/theme/ini.hpp"
 #include "../core/theme/inspector.hpp"
 #include "../core/theme/layout.hpp"
@@ -54,8 +55,9 @@ public:
 };
 
 // An interface made of plain data. An element has only the properties it was created with, as a real element has
-// only its own. Removing an element makes every later call on it fail, as a closed page does.
-class FakeTree final : public th::TreeBackend {
+// only its own. Removing an element makes every later call on it fail, as a closed page does. :hover goes through the
+// same HoverTracker as the Windows backend; PointerEnter and PointerExit stand for the pointer events.
+class FakeTree final : public th::TreeBackend, private th::HoverTracker::Access {
 public:
     struct Element {
         th::NodeInfo info;  // `parent` holds the index of the parent element until Snapshot translates it
@@ -68,6 +70,9 @@ public:
     std::string dictionary;
     std::set<std::string> refusedProperties;
     int writes = 0;
+    std::set<th::NodeId> followed;  // elements with pointer handlers attached
+    int handlersAttached = 0;
+    int handlersRemoved = 0;
 
     // Returns the element id, which is its index plus one. `parent` is an element index, or -1 for a root.
     th::NodeId Add(int parent, std::string type, std::string name, std::map<std::string, th::Value> properties = {}) {
@@ -102,21 +107,38 @@ public:
     }
 
     std::optional<th::Value> Read(th::NodeId id, std::string_view property) override {
-        Element* element = Find(id);
-        if (!element) return std::nullopt;
-        auto it = element->properties.find(std::string(property));
-        if (it == element->properties.end()) return std::nullopt;
-        return it->second;
+        return hover.Read(id, property, *this);
     }
 
     bool Write(th::NodeId id, std::string_view property, const th::Value& value) override {
-        Element* element = Find(id);
-        if (!element || refusedProperties.count(std::string(property))) return false;
-        auto it = element->properties.find(std::string(property));
-        if (it == element->properties.end()) return false;
-        it->second = value;
-        writes++;
+        return hover.Write(id, property, value, *this);
+    }
+
+    bool SetHover(th::NodeId id, const std::vector<th::HoverValue>& values) override {
+        bool alive = Find(id) != nullptr;
+        if (values.empty()) {
+            hover.Set(id, values, *this);
+            if (followed.erase(id)) handlersRemoved++;
+            return alive;
+        }
+        if (!alive) return false;
+        if (hover.Set(id, values, *this) == th::HoverTracker::Change::Added && followed.insert(id).second) {
+            handlersAttached++;
+        }
         return true;
+    }
+
+    void PointerEnter(th::NodeId id) {
+        if (followed.count(id)) hover.Enter(id, *this);
+    }
+
+    void PointerExit(th::NodeId id) {
+        if (followed.count(id)) hover.Exit(id, *this);
+    }
+
+    // The value the element shows, whatever the hover.
+    th::Value Shown(th::NodeId id, const std::string& property) {
+        return ReadRaw(id, property).value_or(th::Value{th::ValueKind::Text, "ABSENT"});
     }
 
     std::vector<std::string> ResourceKeys() override {
@@ -146,10 +168,30 @@ public:
     }
 
 private:
+    std::optional<th::Value> ReadRaw(th::NodeId id, std::string_view property) override {
+        Element* element = Find(id);
+        if (!element) return std::nullopt;
+        auto it = element->properties.find(std::string(property));
+        if (it == element->properties.end()) return std::nullopt;
+        return it->second;
+    }
+
+    bool WriteRaw(th::NodeId id, std::string_view property, const th::Value& value) override {
+        Element* element = Find(id);
+        if (!element || refusedProperties.count(std::string(property))) return false;
+        auto it = element->properties.find(std::string(property));
+        if (it == element->properties.end()) return false;
+        it->second = value;
+        writes++;
+        return true;
+    }
+
     Element* Find(th::NodeId id) {
         if (id == 0 || id > elements.size() || !elements[id - 1].alive) return nullptr;
         return &elements[id - 1];
     }
+
+    th::HoverTracker hover;
 };
 
 th::Value Brush(std::string text) {
@@ -331,7 +373,10 @@ TEST_CASE(Selector_RejectsWhatItDoesNotKnow) {
     std::string problem;
     CHECK(!th::ParseSelector("Grid[Name=x]", &problem));
     CHECK(problem.find("non pris en charge") != std::string::npos);
-    CHECK(!th::ParseSelector("Grid:hover", &problem));
+    CHECK(!th::ParseSelector("Grid:focus", &problem));
+    CHECK(problem.find(":focus") != std::string::npos);
+    CHECK(!th::ParseSelector("Grid:hover > TextBlock", &problem));
+    CHECK(problem.find("dernier") != std::string::npos);
     CHECK(!th::ParseSelector("TextBlock >", &problem));
     CHECK(!th::ParseSelector("# ", &problem));
 }
@@ -599,6 +644,29 @@ TEST_CASE(Engine_RefusesWhatAnElementCannotTake) {
     CHECK(log.str().find("Refusé") == log.str().rfind("Refusé"));
 }
 
+TEST_CASE(Engine_LeavesTheFontOfAnIconAlone) {
+    MemoryFiles files;
+    files.files["user.css"] = "TextBlock { font-family: Arial; font-size: 20px; }\n";
+    th::Theme theme = Load(files);
+
+    FakeTree tree;
+    std::map<std::string, th::Value> font = {{"FontFamily", {th::ValueKind::Text, "Segoe UI"}},
+                                             {"FontSize", {th::ValueKind::Length, "12"}}};
+    tree.Add(-1, "Grid", "Bar");
+    th::NodeId text = tree.Add(0, "TextBlock", "", font);
+    th::NodeId icon = tree.Add(0, "TextBlock", "Star", font);
+    tree.elements[2].info.icon = true;  // TextBlock#Star draws an icon glyph
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(text, "FontFamily").text == "Arial");
+    CHECK(tree.Shown(icon, "FontFamily").text == "Segoe UI");
+    CHECK(tree.Shown(icon, "FontSize").text == "20");  // the rest of the rule still applies to it
+    CHECK(log.str().find("Refusé") == std::string::npos);
+}
+
 TEST_CASE(Engine_ReappliesAThemeLikeLiveReloadDoes) {
     MemoryFiles files;
     files.files["user.css"] = kPageRules;
@@ -773,10 +841,20 @@ TEST_CASE(Inspector_DumpsResourcesAndElements) {
     CHECK(th::InspectTree(tree, small).find("arrêté après 2 lignes") != std::string::npos);
 }
 
+TEST_CASE(Inspector_ShowsTheColourOfAnAppBrushKeptAsAnObject) {
+    FakeTree tree;
+    tree.Add(-1, "Grid", "LCD", {{"Background", {th::ValueKind::Opaque, "handle:3;#14FFFFFF"}},
+                                 {"BorderBrush", {th::ValueKind::Opaque, "handle:4"}}});
+
+    std::string dump = th::InspectTree(tree);
+    CHECK(dump.find("Background=#14FFFFFF") != std::string::npos);
+    CHECK(dump.find("BorderBrush=présent") != std::string::npos);
+}
+
 // --- Example themes shipped in the repository ------------------------------------------------------------
 
 TEST_CASE(Examples_LoadWithoutProblems) {
-    for (const char* name : {"minuit", "texte-agrandi", "bouton-arrondi", "masquer-chrome"}) {
+    for (const char* name : {"minuit", "texte-agrandi", "bouton-arrondi", "masquer-chrome", "verre"}) {
         std::filesystem::path folder = std::filesystem::path(AMK_SOURCE_DIR) / "themes" / "examples" / name;
         th::FolderFiles files(folder);
         th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
@@ -1679,4 +1757,309 @@ TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
             amk::test::ReportFailure(__FILE__, __LINE__, "snippet " + name + " manifest : " + error);
         }
     }
+}
+
+// --- Full redesign: gradients, acrylic, layout, transforms, shadows, fonts, :hover ------------------------
+
+TEST_CASE(Properties_GradientsImagesAndAcrylic) {
+    th::Palette palette;
+    palette.Define("Accent", th::Argb{0xFF, 0xFA, 0x2D, 0x48});
+    MemoryFiles files;
+    files.files["images/bg.png"] = "PNG";
+
+    // The points are relative to the element; the line reaches the corners, as CSS draws it.
+    CHECK(Converted("background", "linear-gradient(90deg, #000000, #FFFFFF)", palette, files) ==
+          "0,0.5,1,0.5;#FF000000@0;#FFFFFFFF@1");
+    CHECK(Converted("background", "linear-gradient(to bottom, #000 0%, $accent 50%, #FFF)", palette, files) ==
+          "0.5,0,0.5,1;#FF000000@0;#FFFA2D48@0.5;#FFFFFFFF@1");
+    CHECK(Converted("background", "linear-gradient(135deg, #000, #111, #222, #333)", palette, files) ==
+          "0,0,1,1;#FF000000@0;#FF111111@0.3333;#FF222222@0.6667;#FF333333@1");
+    CHECK(Converted("background", "linear-gradient(#000, transparent)", palette, files) ==
+          "0.5,0,0.5,1;#FF000000@0;#00FFFFFF@1");
+    CHECK(Converted("color", "linear-gradient(to top right, #000, #FFF)", palette, files) ==
+          "0,1,1,0;#FF000000@0;#FFFFFFFF@1");
+    CHECK(Converted("background", "linear-gradient(45deg, #000 60%, #FFF 20%)", palette, files).ends_with("@0.6;#FFFFFFFF@0.6"));
+    CHECK(Converted("background", "linear-gradient(90deg, #000)", palette, files).find("deux couleurs") != std::string::npos);
+    CHECK(Converted("background", "linear-gradient(1turn, #000, #FFF)", palette, files).find("angle") != std::string::npos);
+    CHECK(Converted("background", "linear-gradient(#000 150%, #FFF)", palette, files).find("position") != std::string::npos);
+    CHECK(Converted("background", "linear-gradient(#000, $Missing)", palette, files).find("absente") != std::string::npos);
+    CHECK(Converted("background", "linear-gradient(to middle, #000, #FFF)", palette, files).rfind("PROBLEM", 0) == 0);
+
+    CHECK(Converted("background", "url(images/bg.png) cover", palette, files) == "C:/themes/test/images/bg.png|UniformToFill");
+    CHECK(Converted("background", "url(images/bg.png) contain", palette, files) == "C:/themes/test/images/bg.png|Uniform");
+    CHECK(Converted("background", "url('images/bg.png') FILL", palette, files) == "C:/themes/test/images/bg.png|Fill");
+    CHECK(Converted("background", "url(images/bg.png) tile", palette, files).find("ajustement") != std::string::npos);
+    CHECK(Converted("background", "url(../bg.png) cover", palette, files).find("non autorisé") != std::string::npos);
+
+    CHECK(th::FindProperty("backdrop")->xaml == "Background");
+    CHECK(Converted("backdrop", "acrylic(#1C1C1E, 0.6)", palette, files) == "#FF1C1C1E;0.6");
+    CHECK(Converted("backdrop", "acrylic($accent, 1)", palette, files) == "#FFFA2D48;1");
+    CHECK(Converted("backdrop", "acrylic(#1C1C1E, 1.5)", palette, files).find("hors de 0 à 1") != std::string::npos);
+    CHECK(Converted("backdrop", "acrylic(#1C1C1E)", palette, files).find("deux valeurs") != std::string::npos);
+    CHECK(Converted("backdrop", "#1C1C1E", palette, files).find("acrylic(") != std::string::npos);
+}
+
+TEST_CASE(Properties_LayoutTransformsShadowsAndFonts) {
+    th::Palette palette;
+    MemoryFiles files;
+    files.files["fonts/Inter.ttf"] = "TTF";
+    files.files["fonts/Inter.woff"] = "WOFF";
+
+    CHECK(Converted("horizontal-alignment", "center", palette, files) == "Center");
+    CHECK(Converted("horizontal-alignment", "Right", palette, files) == "Right");
+    CHECK(Converted("vertical-alignment", "bottom", palette, files) == "Bottom");
+    CHECK(Converted("vertical-alignment", "stretch", palette, files) == "Stretch");
+    CHECK(Converted("vertical-alignment", "left", palette, files).find("top, center, bottom") != std::string::npos);
+
+    CHECK(th::FindProperty("grid-row")->xaml == "Grid.Row");
+    CHECK(th::FindProperty("z-index")->xaml == "Canvas.ZIndex");
+    CHECK(Converted("grid-row", "2", palette, files) == "2");
+    CHECK(Converted("grid-column", "0", palette, files) == "0");
+    CHECK(Converted("grid-row", "-1", palette, files).find("commence à 0") != std::string::npos);
+    CHECK(Converted("grid-column-span", "0", palette, files).find("commence à 1") != std::string::npos);
+    CHECK(Converted("grid-row-span", "3", palette, files) == "3");
+    CHECK(Converted("z-index", "-5", palette, files) == "-5");
+    CHECK(Converted("z-index", "1.5", palette, files).find("entier") != std::string::npos);
+
+    // CompositeTransform: scaleX, scaleY, rotation, translateX, translateY.
+    CHECK(Converted("transform", "scale(1.05)", palette, files) == "1.05,1.05,0,0,0");
+    CHECK(Converted("transform", "scale(2, 3) rotate(-5deg) translate(10px, 4)", palette, files) == "2,3,-5,10,4");
+    CHECK(Converted("transform", "translateY(8px) scaleX(2)", palette, files) == "2,1,0,0,8");
+    CHECK(Converted("transform", "rotate(10deg) rotate(5deg)", palette, files) == "1,1,15,0,0");
+    CHECK(Converted("transform", "none", palette, files) == "1,1,0,0,0");
+    CHECK(Converted("transform", "skew(4deg)", palette, files).find("inconnue") != std::string::npos);
+    CHECK(Converted("transform", "rotate(5)", palette, files).find("degrés") != std::string::npos);
+    CHECK(Converted("transform", "scale(1.05", palette, files).rfind("PROBLEM", 0) == 0);
+
+    CHECK(Converted("transform-origin", "50% 50%", palette, files) == "0.5,0.5");
+    CHECK(Converted("transform-origin", "center", palette, files) == "0.5,0.5");
+    CHECK(Converted("transform-origin", "top left", palette, files) == "0,0");
+    CHECK(Converted("transform-origin", "right", palette, files) == "1,0.5");
+    CHECK(Converted("transform-origin", "bottom", palette, files) == "0.5,1");
+    CHECK(Converted("transform-origin", "25% 100%", palette, files) == "0.25,1");
+    CHECK(Converted("transform-origin", "10px 5px", palette, files).find("origine") != std::string::npos);
+    CHECK(Converted("transform-origin", "left right", palette, files).rfind("PROBLEM", 0) == 0);
+
+    CHECK(Converted("box-shadow", "16px", palette, files) == "16");
+    CHECK(Converted("box-shadow", "none", palette, files) == "0");
+    CHECK(Converted("box-shadow", "200", palette, files).find("0 à 100") != std::string::npos);
+    CHECK(Converted("box-shadow", "0 4px 8px #000", palette, files).find("profondeur") != std::string::npos);
+
+    // Four corners, in CSS order (top-left, top-right, bottom-right, bottom-left), kept as bottom-left first.
+    CHECK(Converted("corner-radius", "8 8 0 0", palette, files) == "0,8,8,0");
+
+    CHECK(Converted("font-family", "url(fonts/Inter.ttf#Inter Display)", palette, files) ==
+          "file:///C:/themes/test/fonts/Inter.ttf#Inter Display");
+    CHECK(Converted("font-family", "url(\"fonts/Inter.ttf#Inter\")", palette, files) ==
+          "file:///C:/themes/test/fonts/Inter.ttf#Inter");
+    CHECK(Converted("font-family", "url(fonts/Inter.ttf)", palette, files).find("nom de famille") != std::string::npos);
+    CHECK(Converted("font-family", "url(fonts/Inter.woff#Inter)", palette, files).find("ttf, otf ou ttc") != std::string::npos);
+    CHECK(Converted("font-family", "url(../Inter.ttf#Inter)", palette, files).find("non autorisé") != std::string::npos);
+    CHECK(Converted("font-family", "url(fonts/Absent.otf#Absent)", palette, files).find("introuvable") != std::string::npos);
+
+    th::ValueContext noAssets{palette, files, "C:/themes/test", false};
+    th::Conversion refused = th::ConvertValue(*th::FindProperty("font-family"), "url(fonts/Inter.ttf#Inter)", noAssets);
+    CHECK(!refused.value && refused.problem.find("polices désactivées") != std::string::npos);
+
+    // A font role can point at a font of the theme too.
+    files.files["user.css"] = ":root { --font-title: url(fonts/Inter.ttf#Inter); }\nTextBlock { font-role: title; }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+    CHECK(theme.fonts["title"].family == "file:///C:/themes/test/fonts/Inter.ttf#Inter");
+}
+
+TEST_CASE(Css_HoverOnTheLastPartOnly) {
+    std::string problem;
+    std::optional<th::Selector> hover = th::ParseSelector("Grid#TransportBar Button:hover", &problem);
+    CHECK(hover.has_value());
+    if (!hover) return;
+    CHECK(hover->hover);
+    CHECK(hover->parts.size() == 2);
+    CHECK(hover->parts[1].type == "Button");
+    CHECK(hover->text == "Grid#TransportBar Button:hover");
+    std::optional<th::Selector> named = th::ParseSelector("#Play:HOVER", &problem);
+    CHECK(named.has_value() && named->hover && named->parts[0].name == "Play");
+    CHECK(!th::ParseSelector("Button", &problem)->hover);
+    // Matching is structural: the state is the backend's business.
+    CHECK(th::SpecificityOf(*hover) == th::SpecificityOf(Sel("Grid#TransportBar Button")));
+
+    MemoryFiles files;
+    files.files["user.css"] = "Button, Button:hover { order: 1; opacity: 0.5; }\n";
+    th::Theme theme = Load(files);
+    CHECK(!ProblemContaining(theme, "impossible sous :hover").empty());
+    CHECK(theme.assignments.size() == 3);  // order and opacity for Button, opacity only for Button:hover
+}
+
+namespace {
+
+// Page > Button, with what a real button would have.
+FakeTree MakeButtonPage() {
+    FakeTree tree;
+    tree.Add(-1, "Page", "", {{"Background", Brush("#FF000000")}});
+    tree.Add(0, "Button", "Play",
+             {{"Background", Brush("#FF000000")},
+              {"Opacity", {th::ValueKind::Number, "1"}},
+              {"RenderTransform", {th::ValueKind::Opaque, "handle:1"}},
+              {"Shadow", {th::ValueKind::Opaque, "handle:2"}}});
+    return tree;
+}
+
+}  // namespace
+
+TEST_CASE(Engine_HoverShowsUnderThePointerAndRestores) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "Button { background: #FF111111; }\n"
+        "Button:hover { background: #FF222222; transform: scale(1.05); box-shadow: 16px; }\n"
+        "#Play:hover { opacity: 0.5; }\n"
+        "Button:hover { font-size: 20; }\n";  // a Button of this tree has no FontSize: refused
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+
+    FakeTree tree = MakeButtonPage();
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    th::ThemeEngine::Report first = engine.Apply(theme, tree);
+    CHECK(first.applied == 1 + 4);  // the background, then the four hover values
+    CHECK(first.refused == 1);
+    CHECK(engine.OriginalCount() == 2);  // the background, and one hover to take off
+    CHECK(tree.handlersAttached == 1);
+    CHECK(tree.Shown(2, "Background").text == "#FF111111");
+    CHECK(tree.Shown(2, "RenderTransform").text == "handle:1");
+    CHECK(log.str().find("Survol : Button#Play") != std::string::npos);
+
+    tree.PointerEnter(2);
+    CHECK(tree.Shown(2, "Background").text == "#FF222222");
+    CHECK(tree.Shown(2, "RenderTransform").text == "1.05,1.05,0,0,0");
+    CHECK(tree.Shown(2, "Shadow").text == "16");
+    CHECK(tree.Shown(2, "Opacity").text == "0.5");
+
+    // The next tick, under the pointer: the engine sees its own values and leaves the hover alone.
+    th::ThemeEngine::Report second = engine.Apply(theme, tree);
+    CHECK(second.applied == 0);
+    CHECK(tree.handlersAttached == 1);
+    CHECK(tree.Shown(2, "Background").text == "#FF222222");
+
+    tree.PointerExit(2);
+    CHECK(tree.Shown(2, "Background").text == "#FF111111");
+    CHECK(tree.Shown(2, "RenderTransform").text == "handle:1");
+    CHECK(tree.Shown(2, "Shadow").text == "handle:2");
+    CHECK(tree.Shown(2, "Opacity").text == "1");
+
+    // Taking the theme off under the pointer brings back the originals and removes the handlers.
+    tree.PointerEnter(2);
+    engine.Restore(tree);
+    CHECK(engine.OriginalCount() == 0);
+    CHECK(tree.handlersRemoved == 1);
+    CHECK(tree.followed.empty());
+    CHECK(tree.Shown(2, "Background").text == "#FF000000");
+    CHECK(tree.Shown(2, "RenderTransform").text == "handle:1");
+    CHECK(tree.Shown(2, "Opacity").text == "1");
+    tree.PointerEnter(2);  // nothing follows the pointer any more
+    CHECK(tree.Shown(2, "Opacity").text == "1");
+}
+
+TEST_CASE(Engine_HoverFollowsThemeChangesWithoutLeaking) {
+    MemoryFiles withHover;
+    withHover.files["user.css"] = "Button { background: #FF111111; }\nButton:hover { opacity: 0.5; }\n";
+    MemoryFiles otherHover;
+    otherHover.files["user.css"] = "Button { background: #FF333333; }\nButton:hover { opacity: 0.8; background: #FF444444; }\n";
+    MemoryFiles noHover;
+    noHover.files["user.css"] = "Button { background: #FF111111; }\n";
+
+    FakeTree tree = MakeButtonPage();
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    engine.Apply(Load(withHover), tree);
+    tree.PointerEnter(2);
+    CHECK(tree.Shown(2, "Opacity").text == "0.5");
+
+    // Edited live under the pointer: the new hover values show at once, the new base waits underneath.
+    engine.Apply(Load(otherHover), tree);
+    CHECK(tree.Shown(2, "Opacity").text == "0.8");
+    CHECK(tree.Shown(2, "Background").text == "#FF444444");
+    CHECK(tree.handlersAttached == 1);
+    tree.PointerExit(2);
+    CHECK(tree.Shown(2, "Background").text == "#FF333333");
+    CHECK(tree.Shown(2, "Opacity").text == "1");
+
+    // The :hover rule is gone: the hover comes off and the handlers with it.
+    engine.Apply(Load(noHover), tree);
+    CHECK(tree.handlersRemoved == 1);
+    CHECK(tree.followed.empty());
+    CHECK(engine.OriginalCount() == 1);
+
+    // An element that goes away takes its hover with it.
+    engine.Apply(Load(withHover), tree);
+    CHECK(tree.handlersAttached == 2);
+    CHECK(engine.OriginalCount() == 2);
+    tree.Remove(2);
+    engine.Apply(Load(withHover), tree);
+    CHECK(engine.OriginalCount() == 0);
+    engine.Restore(tree);
+}
+
+TEST_CASE(Engine_NewPropertiesRestoreExactly) {
+    MemoryFiles files;
+    files.files["images/glass.png"] = "PNG";
+    files.files["user.css"] =
+        "Grid#Card {\n"
+        "    background: linear-gradient(135deg, #1C1C1E, #2C2C2E);\n"
+        "    border-color: url(images/glass.png) cover;\n"
+        "    corner-radius: 16 16 4 4;\n"
+        "    horizontal-alignment: center;\n"
+        "    vertical-alignment: top;\n"
+        "    grid-row: 1;\n"
+        "    grid-column-span: 2;\n"
+        "    z-index: 3;\n"
+        "    transform: rotate(2deg);\n"
+        "    transform-origin: center;\n"
+        "    box-shadow: 24px;\n"
+        "}\n"
+        "Border { backdrop: acrylic(#202020, 0.7); }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+
+    FakeTree tree;
+    tree.Add(-1, "Grid", "Card",
+             {{"Background", {th::ValueKind::Opaque, "handle:7"}},
+              {"BorderBrush", Brush("#FF000000")},
+              {"CornerRadius", {th::ValueKind::Thickness, "0,0,0,0"}},
+              {"HorizontalAlignment", {th::ValueKind::Keyword, "Stretch"}},
+              {"VerticalAlignment", {th::ValueKind::Keyword, "Stretch"}},
+              {"Grid.Row", {th::ValueKind::Number, "0"}},
+              {"Grid.ColumnSpan", {th::ValueKind::Number, "1"}},
+              {"Canvas.ZIndex", {th::ValueKind::Number, "0"}},
+              {"RenderTransform", {th::ValueKind::Opaque, "handle:8"}},
+              {"RenderTransformOrigin", {th::ValueKind::Point, "0,0"}},
+              {"Shadow", {th::ValueKind::Opaque, "handle:9"}}});
+    tree.Add(0, "Border", "", {{"Background", Brush("#FFFFFFFF")}});
+    std::map<std::string, th::Value> before = tree.elements[0].properties;
+
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    th::ThemeEngine::Report first = engine.Apply(theme, tree);
+    CHECK(first.applied == 12);
+    CHECK(first.refused == 0);
+    std::map<std::string, th::Value>& card = tree.elements[0].properties;
+    CHECK(card["Background"] == (th::Value{th::ValueKind::Gradient, "0,0,1,1;#FF1C1C1E@0;#FF2C2C2E@1"}));
+    CHECK(card["BorderBrush"].text == "C:/themes/test/images/glass.png|UniformToFill");
+    CHECK(card["CornerRadius"].text == "4,16,16,4");
+    CHECK(card["HorizontalAlignment"].text == "Center");
+    CHECK(card["Grid.ColumnSpan"].text == "2");
+    CHECK(card["RenderTransform"] == (th::Value{th::ValueKind::Transform, "1,1,2,0,0"}));
+    CHECK(card["RenderTransformOrigin"].text == "0.5,0.5");
+    CHECK(card["Shadow"] == (th::Value{th::ValueKind::Shadow, "24"}));
+    CHECK(tree.elements[1].properties["Background"] == (th::Value{th::ValueKind::Acrylic, "#FF202020;0.7"}));
+
+    CHECK(engine.Apply(theme, tree).applied == 0);
+
+    engine.Restore(tree);
+    CHECK(tree.elements[0].properties == before);
+    CHECK(tree.elements[1].properties["Background"].text == "#FFFFFFFF");
 }

@@ -9,6 +9,7 @@ mon-theme/
 ├── resources.xaml    dictionnaire de ressources XAML (optionnel)
 ├── user.css          règles pour des éléments précis (optionnel)
 ├── images/           images référencées par url(...)
+├── fonts/            polices référencées par url(...) dans font-family
 └── templates/        modèles de contrôle référencés par url(...)
 ```
 
@@ -85,9 +86,11 @@ Grid#Bar > TextBlock {
 | `*` | tous les éléments |
 | `A B` | un `B` situé quelque part dans un `A` |
 | `A > B` | un `B` dont le parent direct est un `A` |
+| `A:hover` | un `A`, tant que le pointeur est dessus (voir « Survol ») |
 
-On peut combiner : `Grid#Bar > TextBlock`. Les attributs (`[x=y]`) et les pseudo-classes (`:hover`) ne sont pas pris
-en charge. Une règle qui en contient est ignorée, avec une ligne dans le journal.
+On peut combiner : `Grid#Bar > TextBlock`, `Grid#TransportBar Button:hover`. `:hover` se place seulement sur le
+dernier élément du sélecteur. Les attributs (`[x=y]`) et les autres pseudo-classes (`:focus`…) ne sont pas pris en
+charge. Une règle qui en contient est ignorée, avec une ligne dans le journal.
 
 ### Priorité
 
@@ -129,12 +132,13 @@ Page {
 
 | CSS | XAML | Valeurs acceptées |
 |---|---|---|
-| `background` | `Background` | couleur, `$nom`, `transparent`, `url(images/fichier.png)` |
-| `color` ou `foreground` | `Foreground` | couleur, `$nom` |
-| `border-color` | `BorderBrush` | couleur, `$nom` |
+| `background` | `Background` | couleur, `$nom`, `transparent`, `url(images/fichier.png) [cover\|contain\|fill]`, `linear-gradient(...)` (voir « Dégradés et images ») |
+| `backdrop` | `Background` | `acrylic(teinte, opacité)` : un fond acrylique (voir « Acrylique ») |
+| `color` ou `foreground` | `Foreground` | comme `background` |
+| `border-color` | `BorderBrush` | comme `background` |
 | `border-width` | `BorderThickness` | 1 à 4 longueurs, ordre CSS : haut droite bas gauche |
-| `corner-radius` | `CornerRadius` | une seule longueur, appliquée aux quatre coins |
-| `font-family` | `FontFamily` | nom de police, entre guillemets ou non |
+| `corner-radius` | `CornerRadius` | 1 à 4 longueurs, ordre CSS : haut-gauche, haut-droite, bas-droite, bas-gauche |
+| `font-family` | `FontFamily` | nom de police, entre guillemets ou non, ou `url(fonts/fichier.ttf#Nom)` (voir « Polices du thème ») |
 | `font-size` | `FontSize` | nombre, `px` facultatif |
 | `font-weight` | `FontWeight` | `normal`, `bold` ou un nombre de 1 à 1000 |
 | `margin` | `Margin` | 1 à 4 longueurs |
@@ -145,9 +149,170 @@ Page {
 | `template` | `Template` | `url(templates/fichier.xaml)`, un `ControlTemplate` complet |
 | `flow-direction` ou `direction` | `FlowDirection` | `ltr` (gauche à droite) ou `rtl` (droite à gauche) ; `left-to-right` et `right-to-left` aussi |
 | `order` | position (propre au kit) | nombre entier à partir de 0 : place de l'élément parmi ceux de son parent |
+| `horizontal-alignment` | `HorizontalAlignment` | `left`, `center`, `right` ou `stretch` |
+| `vertical-alignment` | `VerticalAlignment` | `top`, `center`, `bottom` ou `stretch` |
+| `grid-row`, `grid-column` | `Grid.Row`, `Grid.Column` | nombre entier à partir de 0 |
+| `grid-row-span`, `grid-column-span` | `Grid.RowSpan`, `Grid.ColumnSpan` | nombre entier à partir de 1 |
+| `z-index` | `Canvas.ZIndex` | nombre entier, négatif possible : l'élément le plus haut passe devant ses voisins |
+| `transform` | `RenderTransform` | `scale(x[, y])`, `rotate(Ndeg)`, `translate(x[, y])`, `none` (voir « Transformations ») |
+| `transform-origin` | `RenderTransformOrigin` | une ou deux valeurs : pourcentages, ou `left`, `center`, `right`, `top`, `bottom` |
+| `box-shadow` | `Shadow` et `Translation` | une profondeur de 0 à 100 pixels, ou `none` (voir « Ombres ») |
 | `font-role` | `FontFamily`, `FontWeight`, `FontSize` | un rôle de police, par exemple `title` (voir « Rôles de police ») |
 
 Une propriété qui n'existe pas sur un élément est refusée sans gravité. Le journal la signale une seule fois.
+Comme toutes les autres, les propriétés ci-dessous reprennent leur valeur d'origine quand le thème est retiré.
+
+### Dégradés et images
+
+`linear-gradient` suit l'écriture CSS : une direction facultative, puis au moins deux couleurs, chacune avec une
+position facultative.
+
+```css
+ContentPage {
+    background: linear-gradient(135deg, #0E1424 0%, $AccentFillColorDefaultBrush 60%, #2A1F45);
+}
+
+Grid#Bar {
+    background: linear-gradient(to right, #CC182238, transparent);
+}
+```
+
+- La direction est un angle en degrés (`0deg` vers le haut, `90deg` vers la droite, dans le sens des aiguilles d'une
+  montre) ou `to top`, `to right`, `to bottom right`… Sans direction, le dégradé va vers le bas.
+- Une couleur s'écrit comme ailleurs : `#hex`, `$nom` ou `transparent`. Une position est un pourcentage de 0 à 100.
+  Une position absente se place comme en CSS : la première à 0 %, la dernière à 100 %, les autres à égale distance.
+- Le dégradé devient un `LinearGradientBrush` dont les points sont relatifs à l'élément. Sa ligne passe par les coins
+  d'un carré : sur un élément très allongé, un angle en biais ne tombe pas exactement sur les coins.
+- `color` et `border-color` acceptent aussi un dégradé.
+
+Une image se donne avec `url(...)`, suivie d'un ajustement facultatif :
+
+| Ajustement | Effet | XAML |
+|---|---|---|
+| `cover` | remplit l'élément en gardant les proportions, quitte à couper l'image | `Stretch=UniformToFill` |
+| `contain` | l'image entière, en gardant les proportions | `Stretch=Uniform` |
+| `fill` (ou rien) | étire l'image aux dimensions de l'élément | `Stretch=Fill` |
+
+Le chemin part du dossier du thème. Un chemin qui en sort (`..`, chemin absolu, lettre de lecteur) est refusé.
+
+### Acrylique
+
+`backdrop: acrylic(teinte, opacité)` pose un fond acrylique (`AcrylicBrush` de WinUI 3) : un flou de ce qui est
+derrière l'élément, teinté. L'opacité de la teinte va de 0 à 1.
+
+```css
+Grid#PaneRoot {
+    backdrop: acrylic($LayerFillColorDefaultBrush, 0.55);
+}
+```
+
+- `backdrop` et `background` écrivent la même propriété : la règle qui gagne (voir « Priorité ») donne le fond.
+- C'est l'acrylique dans l'app : il floute les éléments de la fenêtre, pas le bureau.
+- Quand Windows coupe les effets (transparence désactivée, économiseur de batterie), la teinte seule s'affiche.
+
+### Disposition
+
+`horizontal-alignment` et `vertical-alignment` placent un élément dans la place que lui donne son parent. `grid-row`,
+`grid-column` et leurs `-span` déplacent un enfant d'une `Grid` dans une autre case : ils ne sont lus que sur un
+élément dont le parent direct est une `Grid`, et refusés ailleurs. `z-index` fait passer un élément devant ou
+derrière ses voisins.
+
+```css
+Grid#TransportBar > StackPanel#NowPlayingToggleButtons {
+    grid-column: 0;
+    horizontal-alignment: left;
+}
+```
+
+Les cases et le nombre de lignes et de colonnes viennent de l'app : l'inspecteur montre `Grid.Row` et
+`Grid.Column` de chaque élément. Un numéro de case qui n'existe pas met l'élément dans la dernière.
+
+### Transformations
+
+`transform` tourne, agrandit ou décale un élément sans changer la place qu'il occupe : ses voisins ne bougent pas.
+
+```css
+TransportControl#TransportControl AppBarButton {
+    transform-origin: center;
+}
+
+TransportControl#TransportControl AppBarButton:hover {
+    transform: scale(1.15) rotate(-3deg);
+}
+```
+
+- Fonctions : `scale(x)` ou `scale(x, y)`, `scaleX`, `scaleY`, `rotate(Ndeg)`, `translate(x, y)` (pixels),
+  `translateX`, `translateY`. `none` remet l'élément tel quel.
+- Elles deviennent un seul `CompositeTransform`, qui applique toujours l'échelle, puis la rotation, puis le
+  décalage, quel que soit l'ordre écrit. Deux `scale` se multiplient, deux `rotate` ou deux `translate`
+  s'additionnent.
+- `transform-origin` donne le point fixe, relatif à l'élément : `center` (ou `50% 50%`), `left top`, `right`… Sans
+  lui, XAML part du coin haut gauche. Les pixels ne sont pas acceptés.
+
+### Ombres
+
+`box-shadow` prend une seule valeur : la profondeur, en pixels. Le kit pose une `ThemeShadow` sur l'élément et
+l'avance de cette profondeur (`Translation`, axe Z) : plus l'élément est haut, plus l'ombre est grande et floue.
+
+```css
+SplitView#ContentSplitView > Grid > Grid#ContentRoot {
+    box-shadow: 24px;
+}
+```
+
+`Grid#ContentRoot` seul viserait aussi le `ContentRoot` interne du `NavigationView` (qui contient la barre de lecture)
+et celui des boutons de lecture : un nom tiré des modèles de WinUI se vise toujours sous un parent nommé.
+
+- `none` ou `0` retire l'ombre. La forme CSS complète (`0 4px 8px #000`) n'est pas acceptée : la couleur, le
+  décalage et le flou viennent de Windows.
+- Une `ThemeShadow` ne se dessine que sur ce qui est derrière l'élément dans la fenêtre. Selon la version de WinUI,
+  elle peut ne pas se voir hors d'une fenêtre surgissante. À vérifier sur l'app réelle.
+- L'ancienne valeur Z de l'élément revient avec son ombre d'origine quand le thème est retiré.
+
+### Survol
+
+Une règle dont le sélecteur finit par `:hover` s'applique tant que le pointeur est sur l'élément :
+
+```css
+Frame#ContentFrame Button {
+    transform-origin: center;
+}
+
+Frame#ContentFrame Button:hover {
+    transform: scale(1.05);
+    box-shadow: 16px;
+}
+```
+
+- Les règles `:hover` forment une cascade à part, avec les mêmes règles de priorité entre elles. Sous le pointeur,
+  leurs valeurs passent devant celles des règles normales, quelle que soit la précision.
+- Quand le pointeur s'en va, l'élément reprend exactement ce qu'il avait : la valeur du thème, ou celle d'origine.
+- Le kit suit le pointeur (`PointerEntered` et `PointerExited`) une seule fois par élément. Retirer le thème, ou une
+  règle `:hover` qui disparaît, enlève ce suivi et remet les valeurs, même si le pointeur est encore dessus.
+- `order` n'est pas possible sous `:hover` : la déclaration est ignorée et signalée.
+- Le changement est immédiat, sans animation.
+- Un contrôle qui garde pour lui l'événement du pointeur ne réagit pas. À vérifier sur l'app réelle.
+
+### Polices du thème
+
+`font-family: url(fonts/fichier.ttf#Nom de la famille)` utilise une police livrée dans le dossier du thème. Le nom
+après `#` est celui de la famille dans le fichier (visible dans l'aperçu des polices de Windows).
+
+```css
+:root {
+    --font-title: url(fonts/Inter-Bold.ttf#Inter);
+}
+
+TextBlock {
+    font-family: url("fonts/Inter-Regular.ttf#Inter");
+}
+```
+
+- Fichiers acceptés : `.ttf`, `.otf` et `.ttc`. Le chemin part du dossier du thème, comme pour les images.
+- Le kit donne à XAML l'adresse du fichier (`file:///C:/…/fonts/fichier.ttf#Nom`), comme pour les images. Une adresse
+  `ms-appx:///` désignerait le paquet d'Apple Music, pas le thème.
+- Avec `theme.parts.assets = false`, les polices du dossier sont refusées comme les images.
+- Les rôles de police (`--font-<rôle>`) acceptent aussi cette écriture.
 
 ### Langues de droite à gauche
 
@@ -300,6 +465,13 @@ crée `sidebar.json` s'il n'existe pas encore : la liste complète, rien de masq
 `win/theme_service.cpp`, pas encore compilé). Il suffit ensuite de passer des entrées à `"hidden": true` ou de les
 déplacer dans la liste.
 
+## Exemple de refonte : « Verre »
+
+[`themes/examples/verre/`](../../themes/examples/verre/) change presque toute l'interface : fond en dégradé, barre
+latérale et barre de lecture en acrylique, contenu dans une grande carte arrondie avec une ombre, texte plus grand,
+boutons qui grossissent au survol. Ses sélecteurs utilisent les noms relevés sur Apple Music 1.1792 ; ceux qui ne
+visent qu'un type générique sont marqués provisoires en tête de son `user.css`.
+
 ## Vérifier un thème
 
 Sur n'importe quel PC, sans Apple Music :
@@ -397,6 +569,12 @@ Le moteur XAML (`win/xaml_backend.cpp`) doit savoir lire et écrire `FlowDirecti
 `RightToLeft`) et la position `Order` (déplacer l'élément dans `MenuItems` ou `Children` de son parent). Ce câblage
 n'est pas encore compilé : voir [`docs/tests/M8-themes.md`](../tests/M8-themes.md).
 
+Pour les dégradés, l'acrylique, les transformations et les ombres, le moteur XAML crée un objet (pinceau,
+transformation, ombre) et retient la valeur qui l'a produit : tant que l'élément garde cet objet, il se relit comme
+cette valeur, et le passage suivant n'écrit rien. Le survol passe par `HoverTracker` (`core/theme/hover.hpp`), le
+même code que celui des tests : sous le pointeur, le moteur lit et écrit la valeur « en dessous », sans défaire le
+survol.
+
 ## Limites connues
 
 - Les noms d'éléments viennent de l'app. Ils peuvent changer à chaque mise à jour d'Apple Music. Relevez-les avec
@@ -405,6 +583,8 @@ n'est pas encore compilé : voir [`docs/tests/M8-themes.md`](../tests/M8-themes.
 - Une ressource lue en `StaticResource` garde sa valeur d'origine jusqu'à la recréation de l'élément. Le
   comportement reste à mesurer sur l'app réelle (procédure dans [`docs/tests/M8-themes.md`](../tests/M8-themes.md)).
 - Les images et les polices doivent être dans le dossier du thème.
+- `:hover` change les valeurs d'un coup, sans transition. `box-shadow` ne règle que la profondeur, et la `ThemeShadow`
+  peut rester invisible sur certains éléments. Le dégradé en biais est exact sur un élément carré.
 - Les noms de `sidebar.json` et `home.json` ne sont pas encore relevés sur l'app réelle, et la sidebar d'Apple Music
   n'est peut-être pas un `NavigationView`. Si ce n'est pas le cas, `sidebar.json` ne trouvera rien, sans autre effet.
 - `auto` et `theme.schedule` sont relus toutes les 3 secondes : le changement de schéma n'est pas instantané.

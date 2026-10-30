@@ -15,15 +15,22 @@ namespace amk::theme {
 
 // The CSS properties a theme may set, and the XAML property each one maps to.
 enum class PropertyKind {
-    Brush,       // a colour, `#hex`, `$palette` name, `transparent`, or `url(image)`
+    Brush,       // a colour, `#hex`, `$palette` name, `transparent`, `url(image) [cover|contain|fill]`, or
+                 // `linear-gradient(<angle>deg | to <side>, <colour> [<p>%], <colour> [<p>%], ...)`
+    Backdrop,    // `acrylic(<colour>, <opacity>)`: an AcrylicBrush, written to Background like a brush
     Length,      // a number of pixels (`px` optional), or `auto`
-    Thickness,   // one to four lengths, in CSS order: top right bottom left
+    Thickness,   // one to four lengths, in CSS order: top right bottom left (corners for corner-radius)
     Visibility,  // visible, or collapsed / hidden / none
     Number,      // a plain number, or a font weight keyword: normal, bold
-    Text,        // a font family: a name, optionally in quotes
+    Text,        // a font family: a name, optionally in quotes, or `url(fonts/file.ttf#Family Name)`
     Template,    // url(file) of a XAML ControlTemplate
     FlowDirection,  // ltr / left-to-right, or rtl / right-to-left (XAML LeftToRight, RightToLeft)
     Order,       // a whole number from 0: the position of the element among the items of its parent (kOrderProperty)
+    Alignment,   // left / center / right / stretch, or top / center / bottom / stretch for vertical-alignment
+    Integer,     // a whole number: a Grid row or column (from 0), a span (from 1), a z-index (may be negative)
+    Transform,   // scale(x[, y]) rotate(<deg>) translate(x[, y]) and their X / Y forms, or none
+    TransformOrigin,  // one or two percentages or keywords (left, center, right, top, bottom)
+    Shadow,      // a depth in pixels from 0 to 100 (ThemeShadow and Translation Z), or none
 };
 
 struct PropertySpec {

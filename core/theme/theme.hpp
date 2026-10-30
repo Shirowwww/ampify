@@ -18,7 +18,7 @@ namespace amk::theme {
 
 // One declaration for one selector, with its value already converted. The engine applies these.
 struct Assignment {
-    Selector selector;
+    Selector selector;     // selector.hover: a :hover rule, applied while the pointer is over the element
     Specificity specificity;
     std::string property;  // XAML name, such as "Background"
     Value value;
@@ -67,7 +67,7 @@ struct LoadOptions {
 //                   replaces the brush `Key` of the app. The same names can be used as $Key in user.css.
 //   resources.xaml  a resource dictionary; it may only define keys from the allowed list, or the whole theme is refused
 //   user.css        rules for elements, see css.hpp (extra layer, optional)
-//   images/, templates/   files that the rules refer to with url(...)
+//   images/, templates/, fonts/   files that the rules refer to with url(...)
 // A folder needs at least one of the three files to be a theme.
 struct Theme {
     std::string id;  // the folder name, which is what settings store

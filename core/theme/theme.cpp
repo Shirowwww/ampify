@@ -162,6 +162,12 @@ void LoadVariables(const Stylesheet& sheet, const ValueContext& context, const R
 void AddAssignment(const Rule& rule, const PropertySpec& spec, const Value& value, const Declaration& declaration,
                    int order, const RuleSource& source, Theme& theme) {
     for (const Selector& selector : rule.selectors) {
+        // A move is not a value that can come and go with the pointer: the other items would shift each time.
+        if (selector.hover && spec.kind == PropertyKind::Order) {
+            theme.problems.push_back(AtLine(source.file, declaration.line) + " : « " + declaration.property +
+                                     " » impossible sous :hover (" + selector.text + "), ignorée");
+            continue;
+        }
         Assignment assignment{selector, SpecificityOf(selector), std::string(spec.xaml), value, declaration.important,
                               order, declaration.line};
         assignment.source = source.file;

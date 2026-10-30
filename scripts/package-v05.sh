@@ -101,9 +101,9 @@ for file in "${binaries[@]/#/$bin_dir/}" "$cli_dir/amk.exe"; do
     [[ "$(head -c 2 "$file")" == "MZ" ]] || die "$(basename "$file") n'est pas un exécutable Windows"
 done
 
-# The examples the guide uses: extensions with something to see or hear, and the four example themes.
+# The examples the guide uses: extensions with something to see or hear, and the example themes.
 extensions=(react-panel now-playing-notify hello-extension keyboard-skip sleep-timer)
-themes=(minuit texte-agrandi bouton-arrondi masquer-chrome)
+themes=(minuit texte-agrandi bouton-arrondi masquer-chrome verre)
 
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT

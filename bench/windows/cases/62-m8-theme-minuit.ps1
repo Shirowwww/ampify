@@ -20,6 +20,12 @@ Register-Case -Id 'm8-theme-minuit' -Title 'M8 : le thème minuit s''applique, p
     $target = Join-Path $themes 'minuit'
     Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
     Copy-Item -LiteralPath $example -Destination $target -Recurse -Force
+    # Verre, la refonte complète, est essayé dans le même lancement, après minuit.
+    $verreExample = Join-Path $script:BenchKitRoot 'm8\themes\examples\verre'
+    if (Test-Path -LiteralPath $verreExample) {
+        Remove-Item -LiteralPath (Join-Path $themes 'verre') -Recurse -Force -ErrorAction SilentlyContinue
+        Copy-Item -LiteralPath $verreExample -Destination (Join-Path $themes 'verre') -Recurse -Force
+    }
 
     Reset-KitState
     $settings = Join-Path $script:KitDir 'settings.txt'
@@ -63,7 +69,23 @@ Register-Case -Id 'm8-theme-minuit' -Title 'M8 : le thème minuit s''applique, p
     $refusals = @(([string]$log) -split "`r?`n" | Where-Object { $_.StartsWith('Refusé : ') })
     Add-Info -Ctx $Ctx -Name 'lignes « Refusé » du journal' -Detail "$($refusals.Count) : $(($refusals | Select-Object -First 3) -join ' | ')"
 
+    Start-Sleep -Seconds 4  # one more tick: the colours reach what is already on screen
     Save-Screenshot -Ctx $Ctx -Name 'minuit-applique' | Out-Null
+
+    if (Test-Path -LiteralPath (Join-Path $themes 'verre')) {
+        $switch = @(Get-Content -LiteralPath $settings -Encoding UTF8 | Where-Object { $_ -notmatch '^\s*theme\.(active|scheme)\s*=' })
+        $switch += 'theme.active = verre'
+        $switch += 'theme.scheme = Dark'
+        Set-Content -LiteralPath $settings -Value $switch -Encoding UTF8
+        $verrePattern = 'Thème « verre » : (\d+) valeur\(s\) appliquée\(s\)'
+        $verreApplied = Wait-Until -TimeoutSeconds 60 -Condition { $null -ne (Find-JournalMatch -FileName 'AppleMusic.log' -Pattern $verrePattern) }
+        $verreCount = 0
+        if ($verreApplied) { $verreCount = [int](Find-JournalMatch -FileName 'AppleMusic.log' -Pattern $verrePattern).Groups[1].Value }
+        Add-Check -Ctx $Ctx -Name 'thème verre (refonte) : des valeurs appliquées' -Passed ($verreApplied -and $verreCount -gt 0) `
+            -Detail "$verreCount valeur(s)"
+        Start-Sleep -Seconds 4
+        Save-Screenshot -Ctx $Ctx -Name 'verre-applique' | Out-Null
+    }
 
     # Retrait : on repasse à none dans settings.txt, sans redémarrer Apple Music.
     $kept = @(Get-Content -LiteralPath $settings -Encoding UTF8 | Where-Object { $_ -notmatch '^\s*theme\.active\s*=' })

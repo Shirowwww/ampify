@@ -17,7 +17,11 @@ using NodeId = std::uint64_t;
 
 enum class ValueKind {
     Color,       // "#AARRGGBB", upper case
-    Image,       // absolute path of an image file, with '/' separators
+    Image,       // absolute path of an image file, with '/' separators, then "|Fill", "|Uniform" or "|UniformToFill"
+                 // when the theme chose how the image fills the element
+    Gradient,    // a linear gradient: "x1,y1,x2,y2;#AARRGGBB@offset;...", points relative to the element (0 to 1),
+                 // at least two stops, offsets from 0 to 1 in order
+    Acrylic,     // an acrylic brush: "#AARRGGBB;opacity", the tint and its opacity (0 to 1)
     Length,      // device-independent pixels, "18", or "NaN" for auto
     Thickness,   // "left,top,right,bottom", such as "8,4,8,4"
     Visibility,  // "Visible" or "Collapsed"
@@ -25,6 +29,9 @@ enum class ValueKind {
     Text,        // a font family such as "Segoe UI Variable"
     Template,    // the XAML text of a ControlTemplate
     Keyword,     // the name of an enumeration member as XAML spells it, such as "RightToLeft" for FlowDirection
+    Transform,   // a CompositeTransform: "scaleX,scaleY,rotation,translateX,translateY", rotation in degrees
+    Point,       // a point relative to the element, "x,y" from 0 to 1, such as "0.5,0.5" for RenderTransformOrigin
+    Shadow,      // a ThemeShadow raised by this depth in pixels (the Z of UIElement.Translation), such as "16"
     Opaque,      // a token that Read gave back for an object the engine cannot express as text; Write restores it
 };
 
@@ -44,9 +51,20 @@ struct NodeInfo {
     std::string name;      // x:Name, may be empty
     int parent = -1;
     int depth = 0;
+    // Text made only of icon glyphs (private-use characters, as in Apple Music's badges and stars): its font is never
+    // changed, or the icon would show as an empty box in the theme's font.
+    bool icon = false;
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";
+
+// One value of a :hover rule: shown while the pointer is over the element.
+struct HoverValue {
+    std::string property;  // XAML name, as for Read and Write
+    Value value;
+
+    bool operator==(const HoverValue&) const = default;
+};
 
 class TreeBackend {
 public:
@@ -72,6 +90,17 @@ public:
     // Merges a resource dictionary (the XAML of a theme's resources.xaml) into the application. Empty text removes
     // the dictionary merged last. False when the XAML is refused.
     virtual bool SetDictionary(std::string_view xaml) = 0;
+
+    // The values to show while the pointer is over the element (:hover rules), in place of the ones given before. The
+    // backend follows the pointer itself (once per element) and puts back what was there when the pointer leaves; while
+    // the pointer is over the element, Read and Write of a hovered property see and change the value underneath, so the
+    // engine never notices. An empty list takes the hover off: the values underneath come back and the backend stops
+    // following the pointer. False when the element is gone or cannot follow the pointer. HoverTracker (hover.hpp)
+    // holds the logic a backend needs.
+    virtual bool SetHover(NodeId id, const std::vector<HoverValue>& values) {
+        (void)id;
+        return values.empty();
+    }
 };
 
 }  // namespace amk::theme

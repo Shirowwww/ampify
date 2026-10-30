@@ -13,7 +13,9 @@ namespace amk::theme {
 //   *               any element
 //   A B             a B somewhere inside an A
 //   A > B           a B whose direct parent is an A
-// Parts can be combined: `Grid#Bar > TextBlock`. Attributes and pseudo-classes are not supported yet.
+// Parts can be combined: `Grid#Bar > TextBlock`. One pseudo-class is read, on the last part only:
+//   Button:hover    a Button, while the pointer is over it (the values come back when it leaves)
+// Attributes and the other pseudo-classes are not supported.
 //
 // One more block is read: `:root { --name: value; }` defines variables, which values use as `var(--name)` or
 // `var(--name, fallback)`. The variables named --font-<role> describe the font roles (see fonts.hpp).
@@ -32,6 +34,7 @@ struct Compound {
 struct Selector {
     std::vector<Compound> parts;  // left to right; the last part is the element that receives the declarations
     std::string text;             // as written, for the journal
+    bool hover = false;           // `:hover` on the last part: the declarations apply while the pointer is over it
 };
 
 struct Declaration {
