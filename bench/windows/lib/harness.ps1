@@ -106,6 +106,18 @@ function Wait-Journal {
     return Wait-Until -TimeoutSeconds $TimeoutSeconds -Condition { Test-JournalContains -FileName $FileName -Text $Text }
 }
 
+# Fin d'un journal du kit dans le journal du job : pour lire pourquoi un test échoue sans ouvrir l'artefact.
+function Write-JournalTail {
+    param([string]$FileName, [int]$Lines = 40)
+    Write-Host "----- $FileName (fin du journal)"
+    $content = Read-Journal $FileName
+    if (-not $content) {
+        Write-Host '  (absent ou vide)'
+        return
+    }
+    $content -split "`r?`n" | Select-Object -Last $Lines | ForEach-Object { Write-Host "  $_" }
+}
+
 # Lignes du journal qui correspondent à une expression régulière, pour relire un chiffre (par exemple les threads).
 function Find-JournalMatch {
     param([string]$FileName, [string]$Pattern)

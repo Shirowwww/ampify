@@ -34,7 +34,6 @@ Pour la lecture et les commandes, on utilise aussi l'API publique SMTC de Window
 - **Clair** : le mécanisme est connu. Il reste à coder et à tester, sans rien découvrir.
 - **Limité** : le mécanisme marche, avec une limite écrite dans la ligne.
 - **À prouver** : le mécanisme est plausible. Un relevé ou un test sur le PC doit le confirmer.
-- **Décision** : le chemin existe, mais il touche à une règle du projet. Voir la section 8.
 
 ## Fils de travail
 
@@ -96,7 +95,7 @@ Pour la lecture et les commandes, on utilise aussi l'API publique SMTC de Window
 | Attendre que les API existent (boucle `setTimeout`) | `AMK.ready`, une Promise résolue quand le lecteur et l'interface sont prêts. | Clair | JS, M7 |
 | `Player` : état, morceau, événements | Lecture par SMTC (titre, artiste, album, état, position) et par COM (`PlaybackEventDelegate`). Identifiant de variante par `AVCFPlayerItemCopyCurrentStableVariantID` (relevé). Le lien avec l'identifiant de morceau Apple reste à établir. | Limité | Noyau, M4 et M5 |
 | `Player` : lecture, pause, suivant, précédent, seek | SMTC : `TryPlayAsync`, `TryPauseAsync`, `TrySkipNextAsync`, `TrySkipPreviousAsync`. Ou `MediaAppExecAgentCommandAsync` (relevé). Le seek est à prouver. | Limité | JS, M4 |
-| `Player` : volume | Décision, voir 8.1. | Décision | Audio, M4 |
+| `Player` : volume | `AMK.audio.setGainDb` : gain interne relatif, appliqué sur les échantillons. Un volume absolu suit le curseur : le noyau lit sa position et ajuste le gain interne, sans jamais l'écrire. Voir 8.1. | Limité | Audio, M4 |
 | `Platform.History` (navigation) | `AMK.ui.navigate(route)`. Le kit tient une table de routes : chaque route renvoie à une page de l'app (types de `AMP.UI.Views`) ou à une page du kit. Le paramètre attendu par chaque page reste à relever. | Limité | XAML, M8 |
 | `Platform.Library`, `Platform.Playlists` | Projection winmd de `AMP.Services` : lecture de la bibliothèque et des playlists par les services de l'app. Lecture d'abord, écriture ensuite, sous une permission `library.write` à créer. | Limité | Noyau et JS, M8 |
 | `CosmosAsync` | Voir 8.2. | Limité | Noyau, M8 |
@@ -173,19 +172,22 @@ Pour la lecture et les commandes, on utilise aussi l'API publique SMTC de Window
 
 ## 8. Les fonctions qui n'étaient pas directes
 
-Quatre lignes n'avaient pas d'équivalent direct. Elles ont maintenant un chemin, avec sa limite.
+Cinq points n'avaient pas d'équivalent direct. Ils ont maintenant un chemin, avec sa limite.
 
-### 8.1 Volume du lecteur (`Player.setVolume`) : décision
+### 8.1 Volume du lecteur (`Player.setVolume`)
 
-Le volume du lecteur est lié au curseur d'Apple Music. Le régler déplacerait le curseur, ce qui va contre une règle
-du projet (voir `PROGRESS.md`). Deux chemins existent :
+Règle de l'utilisateur (2026-10-30) : tout changement de gain est interne. Il ne doit jamais se voir sur la barre de volume
+d'Apple Music. Concrètement :
 
-- **A. Gain sur les échantillons seulement** (chemin actuel) : `AMK.audio.setGainDb` agit sur le son décodé. Le
-  curseur ne bouge pas, et le volume reste celui de l'utilisateur.
-- **B. Shim de lecture** : le noyau répond au curseur une autre valeur que le volume réel, pour afficher le volume
-  réglé. L'interface afficherait alors un chiffre faux. Je le déconseille.
+- le gain passe par `AMK.audio.setGainDb`, appliqué sur les échantillons décodés. C'est un gain relatif, qui s'ajoute au
+  volume choisi par l'utilisateur ;
+- un volume absolu (`setVolume`) se fait en lisant la position du curseur, puis en ajustant le gain interne pour que le
+  son corresponde à la valeur demandée. Le curseur n'est jamais écrit, et `AVCFPlayerSetVolume` n'est jamais appelé ;
+- le noyau ne répond jamais au curseur une autre valeur que celle de l'utilisateur. Un « faux volume » se verrait sur la
+  barre, donc il est exclu.
 
-Voir la section 11.
+*Statut : Limité.* Le gain relatif est clair. Le suivi du curseur demande de vérifier, sur le PC, que la lecture de
+la position est fiable et que le gain suit sans à-coup (M4).
 
 ### 8.2 `CosmosAsync` (API interne de Spotify)
 
@@ -260,7 +262,7 @@ Idées ajoutées pour aller plus loin. Chacune a un chemin, et son statut suit l
   Apple Music demande Windows, un compte du Microsoft Store et un abonnement. Le compte reste sur le PC de l'utilisateur, comme
   le prévoit `MASTER_PROMPT.md`.
 
-## 11. Décision en attente
+## 11. Décisions
 
-Une seule décision touche une règle du projet : le volume du lecteur (8.1). Le chemin par défaut est A : le gain agit
-sur les échantillons, et le curseur d'Apple ne bouge pas. Il n'est pas remis en cause sans un choix explicite.
+Aucune décision n'est ouverte dans ce document. Le volume a été tranché par l'utilisateur le 2026-10-30 : le gain est interne,
+et il ne doit jamais se voir sur la barre de volume (8.1).

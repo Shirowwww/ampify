@@ -21,6 +21,8 @@ Register-Case -Id 'injection-banc' -Title 'Build de banc : noyau dans AppleMusic
     $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music démarré' -TimeoutSeconds 120
     Add-Check -Ctx $Ctx -Name 'Apple Music démarré par le lanceur' -Passed $launched
     if (-not $launched) {
+        Write-JournalTail -FileName 'launcher.log'
+        Write-JournalTail -FileName 'AppleMusic.log'
         Close-AppleMusic | Out-Null
         return
     }
@@ -31,23 +33,26 @@ Register-Case -Id 'injection-banc' -Title 'Build de banc : noyau dans AppleMusic
         -Passed ($null -ne $signature -and $signature.Value -like 'signature reconnue*') `
         -Detail $(if ($signature) { $signature.Value } else { 'ligne absente du journal' })
 
-    # Lancement suspendu : Windows garde l'app en pause pendant l'injection. Zéro thread repris veut dire que rien n'a été suspendu.
-    $suspendRequested = Test-JournalContains -FileName 'launcher.log' -Text 'Lancement suspendu demandé à Windows'
-    $suspendUnavailable = Test-JournalContains -FileName 'launcher.log' -Text 'Lancement suspendu indisponible'
+    # Lancement suspendu : le lanceur met les threads d'Apple Music en pause pendant l'injection, puis les reprend.
+    # Zéro thread mis en pause veut dire que rien n'a été suspendu.
+    $paused = Find-JournalMatch -FileName 'launcher.log' -Pattern '(\d+) thread\(s\) mis en pause'
+    $unavailable = Test-JournalContains -FileName 'launcher.log' -Text 'pas de pause'
     $resumed = Wait-Journal -FileName 'launcher.log' -Text "thread(s) repris après l'injection" -TimeoutSeconds 30
     $threads = Find-JournalMatch -FileName 'launcher.log' -Pattern '(\d+) thread\(s\) repris'
-    if ($suspendRequested -and $resumed -and $threads) {
-        $count = [int]$threads.Groups[1].Value
-        Add-Check -Ctx $Ctx -Name 'lancement suspendu : des threads ont été suspendus puis repris' `
-            -Passed ($count -gt 0) -Detail "$count thread(s) repris"
-    } elseif ($suspendUnavailable) {
+    if ($paused -and $resumed -and $threads) {
+        $count = [int]$paused.Groups[1].Value
+        Add-Check -Ctx $Ctx -Name 'lancement suspendu : des threads ont été mis en pause puis repris' `
+            -Passed ($count -gt 0) -Detail "$count mis en pause, $($threads.Groups[1].Value) repris"
+    } elseif ($unavailable) {
         Add-Info -Ctx $Ctx -Name 'lancement suspendu' -Detail 'indisponible sur ce Windows : injection après le démarrage (moins sûr)'
     } else {
         Add-Check -Ctx $Ctx -Name 'lancement suspendu : ligne du journal présente' -Passed $false `
-            -Detail "ni 'demandé à Windows' ni 'indisponible', ou pas de ligne de reprise"
+            -Detail "ni 'mis en pause' ni 'pas de pause', ou pas de ligne de reprise"
     }
 
-    $kernelInApp = Wait-Journal -FileName 'launcher.log' -Text 'AppleMusic.exe : noyau chargé' -TimeoutSeconds 60
+    # Le nom du processus porte son identifiant : « AppleMusic.exe (1234) : noyau chargé ».
+    $appPattern = 'AppleMusic\.exe \(\d+\) : noyau chargé'
+    $kernelInApp = Wait-Until -TimeoutSeconds 60 -Condition { $null -ne (Find-JournalMatch -FileName 'launcher.log' -Pattern $appPattern) }
     Add-Check -Ctx $Ctx -Name 'lanceur : noyau chargé dans AppleMusic.exe' -Passed $kernelInApp
     $hostReady = Wait-Journal -FileName 'AppleMusic.log' -Text "Hôte d'extensions prêt" -TimeoutSeconds 60
     Add-Check -Ctx $Ctx -Name 'AppleMusic.log : hôte d''extensions prêt' -Passed $hostReady
@@ -58,6 +63,8 @@ Register-Case -Id 'injection-banc' -Title 'Build de banc : noyau dans AppleMusic
         -Detail $(if ($agentInjected) { 'agent vu et injecté' } else { 'AMPLibraryAgent.exe non vu dans les 90 s' })
     $agentLogged = Test-JournalContains -FileName 'AMPLibraryAgent.log' -Text 'Noyau chargé dans AMPLibraryAgent.exe'
     Add-Check -Ctx $Ctx -Name 'AMPLibraryAgent.log : noyau chargé' -Passed $agentLogged
+    $agentRunning = @(Get-Process -Name 'AMPLibraryAgent' -ErrorAction SilentlyContinue).Count
+    Add-Info -Ctx $Ctx -Name 'AMPLibraryAgent.exe ouvert au moment du contrôle' -Detail "$agentRunning processus"
 
     $healthy = Wait-Journal -FileName 'AppleMusic.log' -Text 'Application saine après 20 s' -TimeoutSeconds 60
     Add-Check -Ctx $Ctx -Name 'AppleMusic.log : application saine après 20 s' -Passed $healthy
@@ -94,4 +101,8 @@ Register-Case -Id 'injection-banc' -Title 'Build de banc : noyau dans AppleMusic
     $crashes = @(Get-AppCrashEvents -Since $since)
     Add-Check -Ctx $Ctx -Name 'aucun plantage d''Apple Music' -Passed ($crashes.Count -eq 0) `
         -Detail "$($crashes.Count) événement(s) : $(Format-CrashEvents -Events $crashes)"
+
+    Write-JournalTail -FileName 'launcher.log'
+    Write-JournalTail -FileName 'AppleMusic.log'
+    Write-JournalTail -FileName 'AMPLibraryAgent.log'
 }

@@ -1,12 +1,14 @@
 #pragma once
 
-// Windows helpers shared by the kernel and the launcher. Not compiled on Linux.
+// Windows helpers shared by the kernel, the launcher, the installer and the test kit. Not compiled on Linux.
 
 #include <windows.h>
+#include <shlobj.h>
 
 #include <cstddef>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace amk::win {
@@ -30,5 +32,34 @@ bool WindowsResponsive(DWORD processId);
 
 // The bytes of a file, read whole. Empty when it cannot be read, which the signature check reports as unreadable.
 std::vector<std::byte> ReadFileBytes(const std::filesystem::path& file);
+
+// A Windows known folder, such as FOLDERID_LocalAppData. Empty when Windows does not give one.
+std::filesystem::path KnownFolder(const KNOWNFOLDERID& folder);
+
+// %LOCALAPPDATA%\Programs\AppleMusicModKit, where the installer puts the kit.
+std::filesystem::path InstallDirectory();
+
+// Conversions between UTF-8 (what the journals and the report use) and UTF-16 (what Windows uses).
+std::string ToUtf8(std::wstring_view text);
+std::wstring FromUtf8(std::string_view text);
+
+// True when this process runs with administrator rights.
+bool IsElevated();
+
+// Ids of the running processes whose image file name is `imageName`, whatever folder they run from.
+std::vector<DWORD> ProcessIdsNamed(const wchar_t* imageName);
+
+// Runs a program and waits for it. Its output goes to `outputFile` when one is given. Returns the exit code,
+// or -1 when the program did not start.
+int RunAndWait(const std::wstring& commandLine, const std::filesystem::path& outputFile = {});
+
+// Runs a program with the administrator prompt. Returns the exit code, or -1 when the user refused or it did not start.
+int RunElevatedAndWait(const std::filesystem::path& program, const std::wstring& parameters);
+
+// Yes / No question in a dialog. Returns true for Yes.
+bool AskYesNo(const std::wstring& text, const std::wstring& title);
+
+// Dialog with one OK button. `error` picks the error icon.
+void ShowMessage(const std::wstring& text, bool error = false);
 
 }  // namespace amk::win

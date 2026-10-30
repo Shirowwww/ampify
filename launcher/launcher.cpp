@@ -24,7 +24,7 @@
 #include "../core/safe_mode.hpp"
 #include "../win/win_common.hpp"
 #include "injection.hpp"
-#include "package.hpp"
+#include "../win/package.hpp"
 
 namespace {
 

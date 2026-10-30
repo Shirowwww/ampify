@@ -13,6 +13,8 @@ on:
       - 'kernel/**'
       - 'launcher/**'
       - 'win/**'
+      - 'setup/**'
+      - 'testkit/**'
       - 'extensions/**'
       - 'tests/**'
       - 'cmake/**'
@@ -67,7 +69,7 @@ jobs:
       - name: Préparer le paquet pour le banc
         run: |
           mkdir -p dist/diffusion dist/banc dist/cli
-          cp build-diffusion/amk_launcher.exe build-diffusion/amk_kernel.dll dist/diffusion/
+          cp build-diffusion/amk_launcher.exe build-diffusion/amk_kernel.dll build-diffusion/amk_setup.exe build-diffusion/AMK-Test.exe dist/diffusion/
           cp build-banc/amk_launcher.exe build-banc/amk_kernel.dll dist/banc/
           cp build-diffusion/amk.exe dist/cli/
           {

@@ -6,10 +6,11 @@ des extensions, des thèmes et des modes qu'on active ou désactive à volonté,
 On garde toutes les fonctions d'Apple Music (lossless, Dolby Atmos, paroles, bibliothèque, synchronisation).
 On ajoute et on corrige, on ne remplace pas.
 
-> **État : injecteur écrit, à tester sur Windows.** Le noyau, le runtime JavaScript des extensions (M7), le
-> nivellement Atmos et la CLI `amk` sont testés hors de Windows, et sous Wine pour la partie Windows.
-> Le lanceur et la DLL du noyau compilent pour Windows, mais n'ont pas encore été lancés avec Apple Music.
-> La procédure de test est dans [docs/tests/M3-injecteur.md](docs/tests/M3-injecteur.md). Voir [PROGRESS.md](PROGRESS.md).
+> **État : intégration en cours.** Toutes les branches de travail sont réunies. Le lanceur et le noyau sont validés
+> sur le PC de l'utilisateur (lancement, injection, mode sans échec). Le nivellement Atmos, le runtime JavaScript, les thèmes,
+> la CLI `amk`, l'installateur et le kit de test sont testés sous Linux et sous Wine, et attendent leur passage sur
+> Windows. Procédures : [M3](docs/tests/M3-injecteur.md), [M4](docs/tests/M4-atmos.md),
+> [M5 + M6](docs/tests/M5-M6-kit-de-test.md). Voir [PROGRESS.md](PROGRESS.md).
 
 ## Ce qui est en place
 
@@ -32,11 +33,12 @@ On ajoute et on corrige, on ne remplace pas.
 | Lanceur : lancement d'Apple Music, pause du premier processus pendant l'injection, suivi du paquet | `launcher/`, `core/package_watch.*` | écrit, compilé, à tester sur Windows |
 | Noyau chargé dans les deux processus (DLL) | `kernel/` | écrit, compilé, à tester sur Windows |
 | Hooks sur `AppleMusic.exe` et `AMPLibraryAgent.exe` | à faire (M4) | |
-| Kit de test en un double-clic | à faire (M5) | |
 | CLI `amk` : réglages, extensions, thèmes, snippets, `apply`, `launch`, `restore`, `watch`, sauvegardes, `build`, `inspect`, `dev`, `test`, `types`, `doctor`, `logs`, `profile`, `export`, `import` | `cli/`, `docs/cli/COMMANDES.md` | fait, testé (135 tests unitaires, 63 tests de bout en bout) |
 | Installation et mise à jour depuis le catalogue, SHA-256 vérifié, archives contrôlées | `cli/marketplace.cpp` | fait, testé sous Linux (`unzip`). Sous Windows : `tar.exe` et `curl.exe` |
 | Catalogue, schémas, validateur, empaquetage | `catalog/`, `schemas/`, `tools/` | fait, testé |
 | Spécification de la page Marketplace dans l'app | `docs/marketplace/PAGE.md` | écrite, la page reste à faire (M8) |
+| Installateur et désinstallation propre : copie trois fichiers, raccourci du menu Démarrer, entrée dans Paramètres > Applications. Ne touche jamais au paquet d'Apple Music | `setup/`, `win/` | écrit, testé sous Wine, à tester sur Windows |
+| Kit de test en un double-clic (`AMK-Test.exe`) : installe, lance Apple Music, enregistre une trace ETW, collecte les journaux, écrit un rapport anonyme | `testkit/`, `core/run_report.*` | écrit, testé sous Wine, à tester sur Windows |
 | Banc de test Windows automatique : Apple Music installé, lancement, injection, mode sans échec | `bench/windows/`, `.github/workflows/windows-bench.yml` | écrit, lancé en CI, voir [docs/tests/banc-windows.md](docs/tests/banc-windows.md) |
 
 Le nivellement Atmos est la première extension. Un élément de la communauté s'installe avec `amk install <id>` depuis
@@ -72,12 +74,18 @@ python3 tools/validate.py manifest examples/hello-extension/manifest.json
 node --test tools/test_examples.mjs
 ```
 
-Compilation croisée pour Windows x64 (produit `amk_tests.exe`, `amk_kernel.dll` et `amk_launcher.exe`) :
+Compilation croisée pour Windows x64 (produit `amk_tests.exe`, `amk_kernel.dll`, `amk_launcher.exe`, `amk_setup.exe`, `AMK-Test.exe` et `amk.exe`) :
 
 ```bash
 sudo apt install g++-mingw-w64-x86-64
 cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake
 cmake --build build-win
+```
+
+Essais de l'installateur et du kit de test sous Wine (depuis le dossier `build-win`) :
+
+```bash
+scripts/wine-e2e.sh build-win <dossier de préfixe Wine>
 ```
 
 ## Organisation
@@ -100,6 +108,8 @@ catalog/                   catalogue communautaire (vide pour l'instant)
 examples/                  exemple d'extension complet
 tools/                     validateur des manifestes et du catalogue, avec ses tests
 tests/                     tests unitaires sans dépendance (même code pour Linux et Windows)
+setup/                     installateur et désinstallateur (amk_setup.exe, Windows)
+testkit/                   kit de test M5 (AMK-Test.exe, Windows) et trace ETW
 bench/windows/             banc de test Windows (PowerShell) : installe Apple Music, lance, vérifie les journaux
 docs/tests/                procédures de test sur le PC, une par jalon, et le banc Windows
 cmake/                     fichier de compilation croisée pour Windows

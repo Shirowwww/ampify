@@ -135,7 +135,8 @@ faire.
 
 Chaque chemin de [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md) indique la permission qu'il demande.
 
-Il n'existe pas de permission pour régler le volume du lecteur, ni pour l'accès au système de fichiers ou au code natif.
+Aucune fonction ne modifie le curseur de volume ni `AVCFPlayerSetVolume`. Le gain interne (`audio.gain`) agit sur les
+échantillons seulement. Il n'existe pas de permission pour le système de fichiers ni pour le code natif.
 Ils ne seront pas ajoutés.
 
 ## 5. Objet global `AMK`
@@ -180,7 +181,8 @@ AMK.player.queue.add(trackId)       // [provisoire M8]
 AMK.player.queue.remove(trackId)    // [provisoire M8]
 ```
 
-Le volume n'est pas exposé. Un élément qui veut « plus fort » règle le gain sur les échantillons (section 5.4).
+Le volume absolu n'est pas exposé en v1. Un élément qui veut changer le son règle un gain interne sur les échantillons
+(section 5.4), jamais le curseur (PARITE, section 8.1).
 
 ### 5.4 Son [provisoire M4]
 
@@ -330,7 +332,8 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
   leur mode de confiance propre.
 - **XAML brut dans les extensions** : chemin : du XAML validé par le noyau contre une liste publiée de types et de
   propriétés, avant rendu.
-- **Volume du lecteur** : décision en attente (PARITE, section 8.1). Par défaut, le curseur ne bouge pas.
+- **Volume absolu** : il suit le curseur sans jamais l'écrire. Le gain interne reste le seul moyen de changer le son
+  (PARITE, section 8.1).
 - **Services internes d'Apple** : liste blanche d'appels en lecture (PARITE, section 8.2). L'API publique MusicKit
   demande un compte Apple Developer : option à ouvrir plus tard.
 - **Télémétrie** : option `telemetry.block`, désactivée par défaut, qui ne touche jamais aux hôtes de licence ou de DRM

@@ -42,8 +42,8 @@ if(MSVC)
 endif()
 
 # Portable kernel: settings, journal, safe mode, version gate, extension host,
-# Apple Music identity, injection policy, DRM guard, package watch, JSON, manifests, the JavaScript runtime
-# and the extension loader.
+# Apple Music identity, injection policy, DRM guard, package watch, kit file layout, test report, JSON, manifests,
+# the JavaScript runtime and the extension loader.
 add_library(amk_core STATIC
     core/settings.cpp
     core/journal.cpp
@@ -64,7 +64,9 @@ add_library(amk_core STATIC
     core/player_watch.cpp
     core/ui_model.cpp
     core/reload.cpp
-    core/package_watch.cpp)
+    core/package_watch.cpp
+    core/kit_layout.cpp
+    core/run_report.cpp)
 target_compile_options(amk_core PRIVATE ${AMK_WARNINGS})
 target_link_libraries(amk_core PUBLIC amk_quickjs)
 
@@ -111,12 +113,13 @@ target_compile_options(atmos_leveler PRIVATE ${AMK_WARNINGS})
 option(AMK_XAML "Build the XAML theme backend in the kernel (needs the Windows App SDK C++/WinRT headers)" OFF)
 set(AMK_WINAPPSDK_INCLUDE "" CACHE PATH "Folder that holds winrt/Microsoft.UI.Xaml.h, from the Windows App SDK NuGet package")
 
-# Windows only: the kernel DLL, the launcher, and the helpers they share. Built when targeting Windows.
+# Windows only: the kernel DLL, the launcher, the installer, the test kit, and the helpers they share.
+# Built when targeting Windows. Every executable is static, so it runs without any DLL beside it.
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    add_library(amk_win STATIC win/win_common.cpp win/win_host.cpp win/hook.cpp win/ui_thread.cpp)
+    add_library(amk_win STATIC win/win_common.cpp win/package.cpp win/win_host.cpp win/hook.cpp win/ui_thread.cpp)
     target_compile_options(amk_win PRIVATE ${AMK_WARNINGS})
     target_compile_definitions(amk_win PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
-    target_link_libraries(amk_win PUBLIC ole32 shell32 user32 psapi winhttp amk_core)
+    target_link_libraries(amk_win PUBLIC ole32 shell32 user32 advapi32 psapi winhttp amk_core)
 
     # Loaded into AppleMusic.exe and AMPLibraryAgent.exe by the launcher.
     add_library(amk_kernel MODULE kernel/kernel.cpp extensions/atmos-leveler/atmos_windows.cpp)
@@ -155,10 +158,21 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     # Starts Apple Music, holds its first process while the kernel loads, then follows the package.
     add_executable(amk_launcher WIN32
         launcher/launcher.cpp
-        launcher/package.cpp
         launcher/injection.cpp)
     target_link_libraries(amk_launcher PRIVATE amk_core amk_win)
     target_compile_options(amk_launcher PRIVATE ${AMK_WARNINGS})
+
+    # Installs the kit and uninstalls it. The same file is copied into the install folder as the uninstaller.
+    add_executable(amk_setup WIN32 setup/setup.cpp)
+    set_target_properties(amk_setup PROPERTIES OUTPUT_NAME amk_setup)
+    target_link_libraries(amk_setup PRIVATE amk_core amk_win)
+    target_compile_options(amk_setup PRIVATE ${AMK_WARNINGS})
+
+    # The M5 test kit, started by a double-click: installs, launches Apple Music, traces, writes the report.
+    add_executable(amk_testkit WIN32 testkit/testkit.cpp testkit/etl.cpp)
+    set_target_properties(amk_testkit PROPERTIES OUTPUT_NAME AMK-Test)
+    target_link_libraries(amk_testkit PRIVATE amk_core amk_win)
+    target_compile_options(amk_testkit PRIVATE ${AMK_WARNINGS})
 endif()
 
 # Portable part of the command line `amk`: JSON, SHA-256, manifests, catalog, kit layout, backups.
@@ -224,7 +238,8 @@ if(AMK_BUILD_TESTS)
         tests/theme_script_tests.cpp
         tests/reload_tests.cpp
         tests/signature_tests.cpp
-        tests/watch_tests.cpp)
+        tests/watch_tests.cpp
+        tests/kit_tests.cpp)
     target_link_libraries(amk_tests PRIVATE amk_core atmos_leveler amk_theme amk_cli_portable)
     target_compile_options(amk_tests PRIVATE ${AMK_WARNINGS})
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")

@@ -31,7 +31,8 @@ Register-Case -Id 'mode-sans-echec' -Title 'Mode sans échec : après deux éche
     Add-Check -Ctx $Ctx -Name 'amk_kernel.dll absent d''AppleMusic.exe' -Passed ($kernel.Loaded -eq 0) `
         -Detail "processus : $($kernel.Processes), avec le noyau : $($kernel.Loaded)"
 
-    $healthy = Wait-Journal -FileName 'launcher.log' -Text 'Application saine sans noyau après 20 s' -TimeoutSeconds 60
+    # Sans noyau, c'est le lanceur qui constate l'app saine et remet le compteur à zéro (launcher.log).
+    $healthy = Wait-Journal -FileName 'launcher.log' -Text 'compteur du mode sans échec remis à zéro' -TimeoutSeconds 60
     Add-Check -Ctx $Ctx -Name 'application saine : compteur remis à zéro' -Passed ($healthy -and ((Get-SafeModeCount) -eq 0)) `
         -Detail "compteur : $(Get-SafeModeCount)"
     Save-Screenshot -Ctx $Ctx -Name 'apple-music-mode-sans-echec' | Out-Null
