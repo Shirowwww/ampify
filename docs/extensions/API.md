@@ -210,7 +210,7 @@ Les exemples sont en JavaScript. Les fonctions asynchrones renvoient des `Promis
 ### 5.1 Base [ferme]
 
 ```js
-AMK.version              // "0.1.0" : version du noyau
+AMK.version              // "0.5.0" : version du noyau (celle du kit)
 AMK.kitApi               // "1.0" : version de l'API visée
 AMK.process              // "ui" ou "engine" [provisoire M3], voir section 2
 AMK.log(message)         // écrit dans le journal, préfixé par l'identifiant de l'élément
@@ -332,7 +332,11 @@ Une extension décrit son interface de deux façons, qui donnent le même résul
 - avec `AMK.React`, un petit moteur qui accepte l'écriture React (hooks de base, fragments, props) et produit la même
   arborescence. Les composants internes de Spotify ne se reprennent pas : on utilise `AMK.components` à la place.
 
-Dans les deux cas, le noyau rend l'arborescence en XAML.
+Dans les deux cas, le noyau rend l'arborescence en XAML, avec de vrais contrôles WinUI (`win/ui_renderer.cpp`) : chaque
+nœud porte le nom et l'AutomationId `AMK_<élément>_<nœud>`, un nouveau rendu ne modifie que les nœuds changés (par
+position, ou par l'attribut `key`), et le style est copié des contrôles natifs de la page Lecture des Réglages. Les
+emplacements (panneau à droite, popups en boîte de dialogue, boutons de barre) sont provisoires : voir
+`docs/tests/M8-interface.md`. [provisoire M8]
 
 Primitives : `stack`, `row`, `list` et `card` (qui ont des enfants), `text`, `button`, `toggle`, `slider`,
 `textfield`, `image`, `icon`, `dropdown` (ses enfants sont des `option`) et `option` (seulement dans un `dropdown`).
@@ -690,7 +694,8 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
 | Effet immédiat par `reload.txt` : `start`, `stop`, `restart` (manifeste relu), `rescan` | fait côté noyau. Pas encore vu dans Apple Music | tests C++, tests de la CLI |
 | `audio.onFrame`, `analyze`, `loudness`, `volume`, `eq` | fait. Sous Windows : branchés sur les hooks du nivellement Atmos (flux stéréo et objets spatiaux), qui doit être activé | tests C++ (signaux synthétiques) ; égaliseur et analyse vus sur le flux stéréo sous Wine ; écoute à faire sur le PC |
 | `color.extract` (pixels fournis par le script) | fait | tests C++ |
-| `ui.*`, `React`, `components`, `library`, `services`, `lyrics`, `color.fromArtwork` | à faire (M8) | |
+| `ui.*`, `React`, `components` : rendu natif (panneaux, popups, pages, boutons de barre) et carte « Mods » dans Réglages > Lecture | fait côté noyau (liaison XAML, build MSVC). Emplacements provisoires, pas encore vu dans Apple Music | tests C++ (arbre, comparaison, repères sur un faux arbre) ; banc MSVC `63-m8-interface` |
+| `library`, `services`, `lyrics`, `color.fromArtwork` | à faire (M8) | |
 | Découverte des dossiers, activation, rechargement (`Restart`), isolement des pannes | fait | tests C++ et Wine |
 | `http.post`, `crypto.md5` | fait. Sous Windows : WinHTTP, mêmes délais et limites que `get` | tests C++ ; échec testé sous Wine, succès à voir sur le PC |
 | `i18n` (`language`, `define`, `t`) et textes du kit en français et en anglais (aide et messages principaux de `amk`) | fait. Réglage `language` : `fr`, `en`, `auto` | tests C++ et `tools/test_cli.py` |

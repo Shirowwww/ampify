@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.20)
-project(AppleMusicModKit VERSION 0.1.0 LANGUAGES C CXX)
+project(AppleMusicModKit VERSION 0.5.0 LANGUAGES C CXX)
+
+# The kit version is written in three places: here (amk --version), core/kit_layout.hpp (installer, test report) and
+# core/script_extension.hpp (AMK.version). A release with two different numbers would confuse `amk update`, so the
+# configure step refuses to go on when they disagree.
+foreach(amk_version_file core/kit_layout.hpp core/script_extension.hpp)
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/${amk_version_file}" amk_version_text)
+    if(NOT amk_version_text MATCHES "(kKitVersion|kKernelVersion) = \"${PROJECT_VERSION}\"")
+        message(FATAL_ERROR "${amk_version_file} ne porte pas la version ${PROJECT_VERSION} du projet : mettez-les d'accord.")
+    endif()
+endforeach()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,6 +27,10 @@ if(AMK_BENCH)
 endif()
 
 set(AMK_WARNINGS $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
+
+# The sources are UTF-8 without BOM. MSVC reads them in the system code page unless told otherwise, which turns the
+# French wide-string literals of the XAML interface (L"Réglages") into mojibake. GCC already assumes UTF-8.
+add_compile_options($<$<C_COMPILER_ID:MSVC>:/utf-8> $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 # Source lists. No source file is named in this file: each package lists its files in cmake/sources/<package>.cmake,
 # and every *.cmake file of that folder is included here, in alphabetical order, before any target is defined.
@@ -81,7 +95,7 @@ target_compile_options(atmos_leveler PRIVATE ${AMK_WARNINGS})
 
 # XAML theme backend (win/xaml_backend.cpp, win/theme_service.cpp). Off by default: it needs the Windows App SDK C++/WinRT
 # headers, which MinGW does not ship, and it has not been compiled or run yet. See docs/tests/M8-themes.md.
-option(AMK_XAML "Build the XAML theme backend in the kernel (needs the Windows App SDK C++/WinRT headers)" OFF)
+option(AMK_XAML "Build the XAML theme backend and native interface in the kernel (needs the Windows App SDK C++/WinRT headers)" OFF)
 set(AMK_WINAPPSDK_INCLUDE "" CACHE PATH "Folder that holds winrt/Microsoft.UI.Xaml.h, from the Windows App SDK NuGet package")
 
 # Windows only: the kernel DLL, the launcher, the installer, the test kit, and the helpers they share.
@@ -124,6 +138,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         endif()
         # C++/WinRT calls RoGetActivationFactory and RoOriginateLanguageException, exported by runtimeobject.lib.
         target_link_libraries(amk_kernel PRIVATE amk_theme runtimeobject)
+        # The WinUI projection gives objects with more sections than the default COFF limit.
+        target_compile_options(amk_kernel PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
     endif()
 
     # Starts Apple Music, holds its first process while the kernel loads, then follows the package.

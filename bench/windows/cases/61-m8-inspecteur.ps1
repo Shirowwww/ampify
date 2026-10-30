@@ -33,8 +33,8 @@ Register-Case -Id 'm8-inspecteur' -Title 'M8 : l''inspecteur écrit l''arbre de 
         return
     }
 
-    $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text "Thèmes : crochet installé sur le thread d'interface" -TimeoutSeconds 90
-    Add-Check -Ctx $Ctx -Name 'crochet installé sur le thread d''interface' -Passed $hooked
+    $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text "Thèmes : fil d'interface prêt (DispatcherQueue de la fenêtre principale)" -TimeoutSeconds 90
+    Add-Check -Ctx $Ctx -Name 'fil d''interface prêt (DispatcherQueue)' -Passed $hooked
 
     $dumped = Wait-Journal -FileName 'AppleMusic.log' -Text 'Inspecteur : arbre écrit' -TimeoutSeconds 90
     Add-Check -Ctx $Ctx -Name 'journal : arbre écrit par l''inspecteur' -Passed $dumped

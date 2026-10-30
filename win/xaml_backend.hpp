@@ -4,7 +4,7 @@
 //
 // NOT COMPILED IN THE CURRENT BUILD. It needs the Windows App SDK C++/WinRT headers, so it is built only when
 // AMK_WITH_XAML is defined (see CMakeLists.txt). Every member must be called on the interface thread, through
-// PostToUiThread (ui_thread.hpp). Nothing here has run against Apple Music yet: see docs/tests/M8-themes.md.
+// PostToUiThread (ui_thread.hpp, DispatcherQueue of the main window). Nothing here has run against Apple Music yet: see docs/tests/M8-themes.md.
 
 #if defined(AMK_WITH_XAML)
 
@@ -28,7 +28,8 @@ namespace amk::win {
 
 class XamlTreeBackend final : public theme::TreeBackend {
 public:
-    // False when the window is not up yet. The caller retries on the next tick.
+    // Takes Apple Music's main window from AMP.Utils.dll (xaml_host.hpp: Window::Current() is null in a WinUI 3
+    // desktop app). False when the window is not up yet. The caller retries on the next tick.
     bool Attach();
 
     std::vector<theme::NodeInfo> Snapshot() override;
@@ -50,6 +51,7 @@ private:
     theme::Value Keep(winrt::Windows::Foundation::IInspectable object);
     winrt::Windows::Foundation::IInspectable Restore(const theme::Value& token) const;
 
+    winrt::weak_ref<winrt::Microsoft::UI::Xaml::Window> m_window;
     std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_elements;
     std::map<theme::NodeId, std::string> m_templates;  // the XAML text of the template last written to each element
     std::map<std::uint64_t, winrt::Windows::Foundation::IInspectable> m_kept;

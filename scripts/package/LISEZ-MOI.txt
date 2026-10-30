@@ -1,0 +1,35 @@
+Apple Music Mod Kit @VERSION@ (version de test)
+=============================================
+
+Ce dossier contient le kit qui ajoute des mods à Apple Music pour Windows.
+Il ne modifie jamais Apple Music lui-même. Le désinstaller remet tout comme avant.
+
+Avant tout, dézippe le dossier entier (clic droit sur le zip, « Extraire tout »).
+Les fichiers ne marchent pas s'ils sont lancés depuis l'intérieur du zip.
+
+Dans l'ordre :
+
+1. amk_setup.exe          installe le kit. Il ajoute « Apple Music avec mods » au menu Démarrer.
+2. preparer-le-test.cmd   copie les extensions et les thèmes d'exemple, et active ceux du test.
+3. Menu Démarrer > « Apple Music avec mods » : Apple Music s'ouvre avec les mods.
+4. AMK-Test.exe           fait le test complet et écrit un rapport à me renvoyer.
+
+Le guide pas à pas, avec ce qu'il faut regarder et renvoyer, est dans GUIDE-DU-TEST.txt.
+
+Les autres fichiers :
+
+  amk_launcher.exe, amk_kernel.dll   le lanceur et le noyau, copiés par l'installateur
+  amk.exe                            l'outil en ligne de commande (amk help)
+  exemples\                          extensions et thèmes d'exemple
+  SHA256SUMS.txt                     empreintes des fichiers, pour vérifier qu'ils sont intacts
+  BUILD_INFO.txt                     d'où vient cette version
+  GUIDE-DU-TEST.txt                  le guide du test, pas à pas
+
+Si quelque chose ne va pas :
+
+- L'icône habituelle d'Apple Music lance toujours Apple Music sans mods.
+- Si Apple Music plante ou se fige deux fois de suite au démarrage avec les mods, le kit se coupe tout seul au
+  lancement suivant (mode sans échec). Apple Music s'ouvre alors normalement.
+- Pour tout enlever : Paramètres Windows > Applications > Applications installées > « Apple Music avec Mod Kit »
+  > Désinstaller.
+- Les journaux sont dans %USERPROFILE%\AppleMusicModKit\journal\.

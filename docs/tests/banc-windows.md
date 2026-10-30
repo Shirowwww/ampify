@@ -53,6 +53,7 @@ résumé et `winget.log`. Les tests qui n'ont pas besoin d'Apple Music tournent 
 | `version-diffusion` | Build de diffusion : injection si la version installée est dans la liste testée, refus sinon. L'app démarre dans les deux cas. | 1 et 2 |
 | `injection-banc` | Build de banc : signature de `AVFoundationCF.dll` reconnue, noyau chargé dans `AppleMusic.exe` et `AMPLibraryAgent.exe`, lancement suspendu (nombre de threads repris), application saine après 20 s, fermeture propre du lanceur. | 1, 2 et 3 |
 | `mode-sans-echec` | Compteur à 2 : le lanceur démarre sans noyau, puis remet le compteur à zéro après 20 s. | 4 |
+| `m8-interface` (banc MSVC, build M8) | Fenêtre obtenue par AMP.Utils, travail exécuté par la DispatcherQueue, panneau de `react-panel` monté après un démarrage à chaud (`reload.txt`), éléments `AMK_…` trouvés par UI Automation, clic « Plus un » mis à jour sur place, thème minuit, carte Mods de Réglages > Lecture si la navigation automatique y arrive. Une capture PNG par étape (`m8-avant-montage`, `m8-panneau-monte`, `m8-panneau-clic`, `m8-theme-applique`, `m8-reglages-mods`). Voir `docs/tests/M8-interface.md`. | M8 |
 
 Les tests `lancement-normal`, `version-diffusion` et `injection-banc` vérifient aussi qu'Apple Music n'a pas planté
 (événements « Application Error » de Windows).

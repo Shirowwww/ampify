@@ -225,6 +225,16 @@ std::optional<UiSlot> UiModel::Page(const std::string& elementId, const std::str
     return std::nullopt;
 }
 
+std::vector<UiSlot> UiModel::Panels() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return m_panels;
+}
+
+std::vector<UiSlot> UiModel::Pages() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return m_pages;
+}
+
 std::vector<UiSlot> UiModel::Popups() const {
     std::lock_guard<std::mutex> guard(m_mutex);
     return m_popups;

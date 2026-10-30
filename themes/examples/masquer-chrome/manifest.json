@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "masquer-chrome",
+  "name": "Masquer le chrome",
+  "version": "0.1.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Masque des éléments de l'interface par leur nom, relevé avec l'inspecteur.",
+  "kitApi": "1.0",
+  "colors": "colors.ini"
+}

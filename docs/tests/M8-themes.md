@@ -63,7 +63,7 @@ la DLL avec la liaison XAML. Les étapes 1 et 2 ne dépendent pas de cette DLL e
 
 Ouvre `%USERPROFILE%\AppleMusicModKit\journal\AppleMusic.log`. Cherche ces lignes :
 
-- `Thèmes : crochet installé sur le thread d'interface` : la liaison fonctionne (la première étape du test).
+- `Thèmes : fil d'interface prêt (DispatcherQueue de la fenêtre principale)` : la liaison fonctionne (la première étape du test).
 - `Thème « minuit » : N valeur(s) appliquée(s)` : N donne le nombre de valeurs écrites.
 - `Refusé : …` et `Ressource absente…` : les noms qui ne correspondent pas à l'app. Envoie-moi toutes ces lignes.
 - `Thème retiré : …` : la restauration.

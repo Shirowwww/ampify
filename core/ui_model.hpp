@@ -67,6 +67,8 @@ public:
     std::vector<UiControl> Controls() const;
     std::optional<UiSlot> Panel(const std::string& elementId, const std::string& panelId) const;
     std::optional<UiSlot> Page(const std::string& elementId, const std::string& path) const;
+    std::vector<UiSlot> Panels() const;  // every registered panel, in registration order (the native renderer)
+    std::vector<UiSlot> Pages() const;   // every registered page, in registration order
     std::vector<UiSlot> Popups() const;
     std::optional<std::string> Title(const std::string& elementId) const;
     std::optional<std::pair<std::string, std::string>> Route() const;  // element and path

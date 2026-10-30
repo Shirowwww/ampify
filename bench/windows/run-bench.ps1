@@ -61,6 +61,9 @@ Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot $CasesDir) -Filter '*.ps1' |
     . $_.FullName
 }
 
+# -Only may arrive as one comma-separated string from the workflow (pwsh -File passes it as is).
+$Only = @($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 $script:BenchKitRoot = (Resolve-Path -LiteralPath $KitRoot).Path
 # Cases use either name. Both are absolute, so a case may change folders (Push-Location) and still find the kit.

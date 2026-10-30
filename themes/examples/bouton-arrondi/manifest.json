@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "bouton-arrondi",
+  "name": "Bouton arrondi",
+  "version": "0.1.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Remplace le modèle des boutons par un bouton aux coins arrondis.",
+  "kitApi": "1.0",
+  "colors": "colors.ini"
+}

@@ -113,6 +113,59 @@ TEST_CASE(Loader_EnabledElementsStartAndOneFailureDoesNotStopTheOthers) {
     CHECK(hosts.StateOf("solid") == amk::ExtensionState::Off);
 }
 
+TEST_CASE(Loader_TargetedClicksAndEventsReachOnlyTheirElement) {
+    fs::path root = Root("targeted");
+    WriteElement(root, "one", Manifest("one", "extension", R"(,"permissions":["ui.panel"])"),
+                 R"(const { h, useState } = AMK.React;
+function P() {
+  const [n, setN] = useState(0);
+  return h("stack", null, h("text", null, "n=" + n),
+    h("button", { label: "plus", onClick: () => { setN(n + 1); AMK.log("un clic"); } }),
+    h("toggle", { label: "t", onChange: (e) => AMK.log("bascule " + e.value) }));
+}
+AMK.ReactDOM.render(h(P), "panel:p");)");
+    WriteElement(root, "two", Manifest("two", "extension"), R"(AMK.log("deux");)");
+
+    amk::test::FakeHost host;
+    std::ostringstream out;
+    amk::Journal journal(out, [] { return std::string("t"); });
+    amk::ExtensionHost hosts(journal);
+    amk::ExtensionLoader loader(hosts, host, journal, root);
+    CHECK(loader.Discover().loaded.size() == 2);
+    amk::Settings settings;
+    settings.SetBool("extensions.one.enabled", true);
+    settings.SetBool("extensions.two.enabled", true);
+    hosts.StartAll(settings);
+    loader.Pump();
+
+    std::optional<amk::UiSlot> panel = host.Ui().Panel("one", "p");
+    CHECK(panel.has_value());
+    if (!panel) return;
+    const amk::Json* children = panel->tree.Find("children");
+    const amk::Json::Array* items = children ? children->AsArray() : nullptr;
+    CHECK(items && items->size() == 3);
+    if (!items || items->size() != 3) return;
+    const amk::Json* onClick = (*items)[1].Find("onClick");
+    const amk::Json* onChange = (*items)[2].Find("onChange");
+    CHECK(onClick && onChange);
+    if (!onClick || !onChange) return;
+    int click = static_cast<int>(*onClick->AsNumber());
+    int change = static_cast<int>(*onChange->AsNumber());
+
+    loader.DeliverClickTo("two", click);  // another element: nothing happens
+    loader.Pump();
+    CHECK(out.str().find("un clic") == std::string::npos);
+
+    loader.DeliverClickTo("one", click);
+    loader.DeliverEventTo("one", "change", R"({"id":)" + std::to_string(change) + R"(,"value":true})");
+    loader.Pump();
+    CHECK(out.str().find("[one] un clic") != std::string::npos);
+    CHECK(out.str().find("[one] bascule true") != std::string::npos);
+    std::optional<amk::UiSlot> after = host.Ui().Panel("one", "p");
+    CHECK(after && after->tree.Dump().find("n=1") != std::string::npos);
+    hosts.StopAll();
+}
+
 TEST_CASE(Loader_ExposeApiOffKeepsEveryScriptOff) {
     fs::path root = Root("expose-api");
     WriteElement(root / "extensions", "ext", Manifest("ext", "extension"), R"(AMK.log("ext");)");

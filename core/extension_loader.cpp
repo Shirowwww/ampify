@@ -295,4 +295,18 @@ void ExtensionLoader::DeliverEvent(const std::string& entry, const std::string& 
     }
 }
 
+void ExtensionLoader::DeliverClickTo(const std::string& elementId, int callbackId) {
+    std::lock_guard<std::mutex> lock(m_elementsMutex);
+    for (auto& element : m_elements) {
+        if (element->id() == elementId && element->running()) element->DeliverClick(callbackId);
+    }
+}
+
+void ExtensionLoader::DeliverEventTo(const std::string& elementId, const std::string& entry, const std::string& payload) {
+    std::lock_guard<std::mutex> lock(m_elementsMutex);
+    for (auto& element : m_elements) {
+        if (element->id() == elementId && element->running()) element->DeliverEvent(entry, payload);
+    }
+}
+
 }  // namespace amk

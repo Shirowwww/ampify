@@ -2,3 +2,6 @@ build/
 build-*/
 *.tmp
 __pycache__/
+# Test packages made by scripts/package-v05.sh: handed over by hand, never committed.
+dist/amk-kit-*-windows-x64.zip
+dist/SHA256SUMS.txt

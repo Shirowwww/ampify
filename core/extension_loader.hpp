@@ -78,6 +78,12 @@ public:
     // Any thread: queues dispatch.<entry>(payload) for every running element (ScriptExtension::DeliverEvent).
     void DeliverEvent(const std::string& entry, const std::string& payload);
 
+    // Any thread: the native renderer (win/ui_renderer.cpp) reports a click or a new value on a callback id of an
+    // interface tree, for the element that drew it only (its id as UiModel records it). The JavaScript runs later,
+    // on the owner thread, through the element's queue, as for DeliverClick and DeliverEvent.
+    void DeliverClickTo(const std::string& elementId, int callbackId);
+    void DeliverEventTo(const std::string& elementId, const std::string& entry, const std::string& payload);
+
     // Owner thread only: a rescan or a restart changes the list.
     const std::vector<std::unique_ptr<ScriptExtension>>& elements() const { return m_elements; }
 

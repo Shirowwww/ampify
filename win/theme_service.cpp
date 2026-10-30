@@ -102,7 +102,7 @@ void ThemeService::Stop() {
 void ThemeService::Run(HINSTANCE module, DWORD processId) {
     while (m_running && !AttachUiThread(processId, module)) std::this_thread::sleep_for(kAttachRetry);
     if (!m_running) return;
-    m_journal.Write("Thèmes : crochet installé sur le thread d'interface");
+    m_journal.Write("Thèmes : fil d'interface prêt (DispatcherQueue de la fenêtre principale)");
 
     // Reads the settings, the theme, the snippets, sidebar.json and home.json, and reloads only what changed. The
     // Windows mode and the local time choose the scheme for theme.scheme = auto and theme.schedule.

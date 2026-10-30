@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "texte-agrandi",
+  "name": "Texte agrandi",
+  "version": "0.1.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Texte plus grand et marges plus larges.",
+  "kitApi": "1.0",
+  "colors": "colors.ini"
+}

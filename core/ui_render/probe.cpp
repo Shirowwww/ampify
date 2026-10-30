@@ -1,0 +1,216 @@
+#include "probe.hpp"
+
+#include "render_tree.hpp"
+
+namespace amk::uirender {
+
+namespace {
+
+bool IsModName(const std::string& name) {
+    return IsOwnName(name) || IsForeignModName(name);
+}
+
+bool NamedLike(const ProbeNode& node, std::string_view name) {
+    return node.name == name || node.automationId == name;
+}
+
+// The number of ToggleSwitch under each node, outside the mod elements. Parents come before their children, so one
+// pass from the end adds each node's count to its parent.
+std::vector<unsigned> ToggleCounts(const std::vector<ProbeNode>& nodes) {
+    std::vector<unsigned> counts(nodes.size(), 0);
+    std::vector<bool> excluded(nodes.size(), false);
+    for (std::size_t index = 0; index < nodes.size(); index++) {
+        int parent = nodes[index].parent;
+        excluded[index] = IsModName(nodes[index].name) || (parent >= 0 && excluded[parent]);
+    }
+    for (std::size_t index = nodes.size(); index-- > 0;) {
+        if (excluded[index]) continue;
+        if (nodes[index].Is(kProbeToggleSwitch)) counts[index]++;
+        int parent = nodes[index].parent;
+        if (parent >= 0) counts[parent] += counts[index];
+    }
+    return counts;
+}
+
+bool InsideItems(const std::vector<ProbeNode>& nodes, int node) {
+    for (int current = nodes[node].parent; current >= 0; current = nodes[current].parent) {
+        if (nodes[current].Is(kProbeItemsControl) || nodes[current].Is(kProbeItemsRepeater)) return true;
+    }
+    return false;
+}
+
+}  // namespace
+
+bool ShouldDescend(const ProbeNode& node) {
+    if (node.Is(kProbeItemsControl) || node.Is(kProbeItemsRepeater) || node.Is(kProbeButtonBase)) return false;
+    return !IsOwnName(node.name);
+}
+
+std::optional<int> FindByClass(const std::vector<ProbeNode>& nodes, std::string_view fragment) {
+    if (fragment.empty()) return std::nullopt;
+    for (std::size_t index = 0; index < nodes.size(); index++) {
+        if (nodes[index].className.find(fragment) != std::string::npos) return static_cast<int>(index);
+    }
+    return std::nullopt;
+}
+
+std::optional<int> FindByName(const std::vector<ProbeNode>& nodes, std::string_view name) {
+    if (name.empty()) return std::nullopt;
+    for (std::size_t index = 0; index < nodes.size(); index++) {
+        if (NamedLike(nodes[index], name)) return static_cast<int>(index);
+    }
+    return std::nullopt;
+}
+
+bool IsUnder(const std::vector<ProbeNode>& nodes, int node, int ancestor) {
+    for (int current = node; current >= 0; current = nodes[current].parent) {
+        if (current == ancestor) return true;
+    }
+    return false;
+}
+
+bool InsideModElement(const std::vector<ProbeNode>& nodes, int node) {
+    for (int current = node; current >= 0; current = nodes[current].parent) {
+        if (IsModName(nodes[current].name)) return true;
+    }
+    return false;
+}
+
+std::optional<int> ChooseSettingsAnchor(const std::vector<ProbeNode>& nodes, int page) {
+    if (page < 0 || page >= static_cast<int>(nodes.size())) return std::nullopt;
+    std::vector<unsigned> counts = ToggleCounts(nodes);
+    std::optional<int> best;
+    unsigned bestCount = 0;
+    for (std::size_t index = page; index < nodes.size(); index++) {
+        int node = static_cast<int>(index);
+        if (!nodes[index].Is(kProbeStackPanel) || !IsUnder(nodes, node, page) || InsideModElement(nodes, node)) continue;
+        if (counts[index] > bestCount) {  // strictly more: on a tie the first one met, the outermost, stays
+            best = node;
+            bestCount = counts[index];
+        }
+    }
+    return best;
+}
+
+std::vector<int> ChildrenOf(const std::vector<ProbeNode>& nodes, int parent) {
+    std::vector<int> children;
+    for (std::size_t index = 0; index < nodes.size(); index++) {
+        if (nodes[index].parent == parent) children.push_back(static_cast<int>(index));
+    }
+    return children;
+}
+
+std::optional<int> ChooseTemplateRow(const std::vector<ProbeNode>& nodes, int anchor) {
+    std::optional<int> row;
+    for (int child : ChildrenOf(nodes, anchor)) {
+        if (!IsModName(nodes[child].name)) row = child;
+    }
+    return row;
+}
+
+std::optional<int> LastNativeOf(const std::vector<ProbeNode>& nodes, int root, unsigned flag) {
+    std::optional<int> last;
+    for (std::size_t index = 0; index < nodes.size(); index++) {
+        int node = static_cast<int>(index);
+        if (!nodes[index].Is(flag) || (root >= 0 && !IsUnder(nodes, node, root)) || InsideModElement(nodes, node)) continue;
+        last = node;
+    }
+    return last;
+}
+
+std::optional<int> FirstNativeOf(const std::vector<ProbeNode>& nodes, int root, unsigned flag) {
+    for (std::size_t index = 0; index < nodes.size(); index++) {
+        int node = static_cast<int>(index);
+        if (!nodes[index].Is(flag) || (root >= 0 && !IsUnder(nodes, node, root))) continue;
+        if (InsideModElement(nodes, node) || InsideItems(nodes, node)) continue;
+        return node;
+    }
+    return std::nullopt;
+}
+
+std::optional<Insertion> ChoosePlaybarInsertion(const std::vector<ProbeNode>& nodes) {
+    std::optional<int> anchor = FindByName(nodes, "TransportControl_SkipForward");
+    if (!anchor) anchor = FindByName(nodes, "TransportControl_PlayPauseStop");
+    if (!anchor) return std::nullopt;
+    // The transport button may sit in a wrapper (a Grid around the button): climb to the first Panel.
+    int child = *anchor;
+    int parent = nodes[child].parent;
+    while (parent >= 0 && !nodes[parent].Is(kProbePanel)) {
+        child = parent;
+        parent = nodes[parent].parent;
+    }
+    if (parent < 0 || InsideModElement(nodes, parent)) return std::nullopt;
+    Insertion insertion;
+    insertion.parent = parent;
+    insertion.after = child;
+    insertion.styleFrom = *anchor;
+    return insertion;
+}
+
+std::optional<Insertion> ChooseTopbarInsertion(const std::vector<ProbeNode>& nodes) {
+    std::optional<int> search = FirstNativeOf(nodes, -1, kProbeAutoSuggest);
+    if (!search) return std::nullopt;
+    for (int parent = nodes[*search].parent; parent >= 0; parent = nodes[parent].parent) {
+        const ProbeNode& node = nodes[parent];
+        if (InsideModElement(nodes, parent)) return std::nullopt;
+        if ((node.Is(kProbeStackPanel) && node.Is(kProbeHorizontal)) || node.Is(kProbeGrid)) {
+            Insertion insertion;
+            insertion.parent = parent;
+            insertion.after = -1;
+            insertion.styleFrom = FirstNativeOf(nodes, parent, kProbeButtonBase).value_or(-1);
+            return insertion;
+        }
+    }
+    return std::nullopt;
+}
+
+std::uint64_t RefreshTicket::Request() {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_closed || m_pending) return 0;
+    m_pending = ++m_serial;
+    return m_pending;
+}
+
+bool RefreshTicket::Take(std::uint64_t ticket) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_closed || !ticket || m_pending != ticket) return false;
+    m_pending = 0;
+    return true;
+}
+
+void RefreshTicket::Close() {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_closed = true;
+    m_pending = 0;
+    m_layoutBudget = 0;
+}
+
+bool RefreshTicket::Closed() const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_closed;
+}
+
+void RefreshTicket::ArmLayout(std::uint64_t nowMs) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_closed) return;
+    m_layoutDeadline = nowMs + 750;
+    m_layoutBudget = 4;
+}
+
+bool RefreshTicket::OnLayout(std::uint64_t nowMs) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_closed || !m_layoutBudget) return false;
+    if (nowMs >= m_layoutDeadline) {
+        m_layoutBudget = 0;
+        return false;
+    }
+    --m_layoutBudget;
+    return true;
+}
+
+void RefreshTicket::StopLayout() {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_layoutBudget = 0;
+}
+
+}  // namespace amk::uirender

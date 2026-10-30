@@ -50,7 +50,9 @@ function Write-FolderSizes {
         $path = Join-Path $package $folder
         if (-not (Test-Path -LiteralPath $path)) { Write-Host "    $folder : absent"; continue }
         $items = @(Get-ChildItem -LiteralPath $path -Recurse -File -Force -ErrorAction SilentlyContinue)
-        $bytes = ($items | Measure-Object -Property Length -Sum).Sum
+        # Summed by hand: Measure-Object returns no Sum for an empty folder, which strict mode rejects.
+        [long]$bytes = 0
+        foreach ($item in $items) { $bytes += $item.Length }
         Write-Host ("    {0} : {1} fichier(s), {2:N1} Mo" -f $folder, $items.Count, ($bytes / 1MB))
     }
 }

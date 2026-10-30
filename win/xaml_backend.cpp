@@ -19,6 +19,7 @@
 #include <winrt/Windows.UI.Text.h>
 
 #include "../core/theme/properties.hpp"
+#include "xaml_host.hpp"
 
 namespace amk::win {
 
@@ -122,7 +123,10 @@ std::optional<std::uint32_t> ItemPosition(const xaml::DependencyObject& object, 
 }  // namespace
 
 bool XamlTreeBackend::Attach() {
-    return xaml::Window::Current() != nullptr;
+    xaml::Window window = AppWindow(L"MainWindow");
+    if (!window) return false;
+    m_window = winrt::make_weak(window);
+    return true;
 }
 
 xaml::DependencyObject XamlTreeBackend::Resolve(theme::NodeId id) const {
@@ -147,7 +151,8 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     std::vector<theme::NodeInfo> nodes;
     m_elements.clear();
 
-    xaml::Window window = xaml::Window::Current();  // the main window of the process
+    xaml::Window window = m_window.get();  // the main window, from AMP.Utils (Attach)
+    if (!window) window = AppWindow(L"MainWindow");
     if (!window) return nodes;
     xaml::UIElement content = window.Content();
     if (!content) return nodes;

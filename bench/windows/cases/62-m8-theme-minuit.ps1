@@ -42,8 +42,8 @@ Register-Case -Id 'm8-theme-minuit' -Title 'M8 : le thème minuit s''applique, p
         return
     }
 
-    $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text "Thèmes : crochet installé sur le thread d'interface" -TimeoutSeconds 90
-    Add-Check -Ctx $Ctx -Name 'crochet installé sur le thread d''interface' -Passed $hooked
+    $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text "Thèmes : fil d'interface prêt (DispatcherQueue de la fenêtre principale)" -TimeoutSeconds 90
+    Add-Check -Ctx $Ctx -Name 'fil d''interface prêt (DispatcherQueue)' -Passed $hooked
 
     # « Thème « minuit » : N valeur(s) appliquée(s), … » : N est le nombre de valeurs écrites.
     $applyPattern = 'Thème « minuit » : (\d+) valeur\(s\) appliquée\(s\)'

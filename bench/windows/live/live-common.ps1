@@ -23,9 +23,32 @@ $script:Patterns = @{
 }
 
 # Waits for Apple Music's main window to show its navigation. Returns the main window element or $null.
+# Apple Music's first launch shows dialogs before the main window: the codec licence (MPEG LA, buttons Agree /
+# Decline / Save As), then possibly a welcome screen. They are accepted like a new user would. Returns $true when a
+# dialog was handled, so callers may wait a moment for the next one.
+function Close-FirstRunDialogs {
+    $licence = Find-Element -NamePattern 'MPEGLA|MPEG LA|mpegla' -VisibleOnly
+    $agree = Find-Element -ControlType 'Button' -NamePattern '^(Agree|Accepter|J''accepte|I Agree|Accept)$' -VisibleOnly
+    if ($agree -and ($licence -or (Find-Element -ControlType 'Button' -NamePattern '^(Decline|Refuser)$' -VisibleOnly))) {
+        Write-Host '  premier lancement : licence acceptée (Agree)'
+        Invoke-Click -Element $agree | Out-Null
+        Start-Sleep -Seconds 3
+        return $true
+    }
+    $welcome = Find-Element -ControlType 'Button' -NamePattern '^(Start Listening|Commencer l.écoute|Continue|Continuer|Get Started|Commencer|Not Now|Plus tard|Pas maintenant)$' -VisibleOnly
+    if ($welcome -and -not (Find-Element -NamePattern $script:Patterns.Ready)) {
+        Write-Host "  premier lancement : écran d'accueil passé ($(Format-Element $welcome))"
+        Invoke-Click -Element $welcome | Out-Null
+        Start-Sleep -Seconds 3
+        return $true
+    }
+    return $false
+}
+
 function Wait-AppleMusicReady {
     param([int]$TimeoutSeconds = 90)
     $ready = Wait-Until -TimeoutSeconds $TimeoutSeconds -PollSeconds 3 -Condition {
+        Close-FirstRunDialogs | Out-Null  # its $true/$false must not join the condition's output
         $null -ne (Find-Element -NamePattern $script:Patterns.Ready)
     }
     if (-not $ready) { return $null }

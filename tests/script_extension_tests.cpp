@@ -124,7 +124,7 @@ TEST_CASE(Element_CannotReplaceTheFrozenApi) {
     Fixture f;
     auto element = f.Make("frozen", "", R"(AMK.version = "9.9"; AMK.log(AMK.version);)");
     CHECK(element->Start());
-    CHECK(f.Logged("[frozen] 0.1.0"));
+    CHECK(f.Logged(std::string("[frozen] ") + amk::kKernelVersion));
 }
 
 TEST_CASE(Element_TimersFireWhenDueAndCanBeCleared) {

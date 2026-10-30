@@ -119,6 +119,35 @@ $typed = Set-Text -Element $password -Text $env:AMK_APPLE_PASSWORD -Secret
 Write-Host "  mot de passe saisi ($typed)"
 Send-Key Enter
 
+# Waits for the verification code in the repository: .live/code-2fa-<run id>.txt on the branch of this run, committed
+# by the coordinator once the owner reads the SMS. The run id in the name means an old code is never reused. The code
+# is masked as soon as it is read. Returns the digits, or an empty string after the timeout.
+function Wait-CodeFromRepository([int]$TimeoutMinutes) {
+    if (-not $env:GITHUB_TOKEN -or -not $env:GITHUB_REPOSITORY -or -not $env:GITHUB_RUN_ID) { return '' }
+    $ref = if ($env:AMK_CODE_REF) { $env:AMK_CODE_REF } else { $env:GITHUB_REF_NAME }
+    $url = "https://api.github.com/repos/$($env:GITHUB_REPOSITORY)/contents/.live/code-2fa-$($env:GITHUB_RUN_ID).txt?ref=$ref"
+    $headers = @{ Authorization = "Bearer $($env:GITHUB_TOKEN)"; Accept = 'application/vnd.github.raw'; 'X-GitHub-Api-Version' = '2022-11-28' }
+    Write-Host "  Apple demande un code : en attente de .live/code-2fa-$($env:GITHUB_RUN_ID).txt sur $ref ($TimeoutMinutes min au plus)"
+    $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $text = Invoke-RestMethod -Uri $url -Headers $headers -ErrorAction Stop
+            $digits = ([string]$text -replace '\D', '')
+            if ($digits.Length -eq 6) {
+                Write-Host "::add-mask::$digits"
+                Register-UiaSecret $digits
+                Write-Host '  code reçu par le dépôt'
+                return $digits
+            }
+        } catch {
+            # 404 until the file is committed: keep waiting.
+        }
+        Start-Sleep -Seconds 10
+    }
+    Write-Host '  aucun code reçu à temps'
+    return ''
+}
+
 # Outcome: signed in, a verification code asked, or an error shown.
 $codePattern = 'verification code|Verification Code|code de vérification|Two-Factor|two-factor|double authentification|Enter the code|Saisissez le code|six-digit|6-digit|6 chiffres'
 $errorPattern = 'incorrect|not valid|invalid|locked|verrouill|disabled|désactivé|try again later|réessayer plus tard|could not|impossible'
@@ -132,7 +161,13 @@ while (-not $outcome -and (Get-Date) -lt $deadline) {
         param($e) -not $e.Current.IsPassword -and $e.Current.Name -notmatch '^(Search|Rechercher)'
     })
     if (-not $codeTyped -and ($codePrompt -or $boxes.Count -ge 6)) {
-        if (-not $env:AMK_CODE_2FA) { $outcome = 'code-requis'; break }
+        if (-not $env:AMK_CODE_2FA) {
+            # No code given at launch (SMS accounts cannot make one beforehand): wait for the coordinator to commit it.
+            Save-Screenshot -Ctx $ctx -Name '01b-code-demande' | Out-Null
+            $env:AMK_CODE_2FA = Wait-CodeFromRepository -TimeoutMinutes 15
+            if (-not $env:AMK_CODE_2FA) { $outcome = 'code-requis'; break }
+            $deadline = (Get-Date).AddSeconds(120)  # the wait used up the first window: give the code its own
+        }
         $digits = ($env:AMK_CODE_2FA -replace '\D', '')
         $target = $boxes | Where-Object { $_.Current.Name -match 'code|Code|digit|chiffre' } | Select-Object -First 1
         if (-not $target -and $boxes.Count -ge 1) { $target = $boxes[0] }
@@ -169,8 +204,11 @@ if ($outcome -ne 'connecte') {
 }
 
 Start-Sleep -Seconds 8
+# The welcome screen ("Welcome to Apple Music", Start Listening) comes right after sign-in: close it first, so that
+# the subscription check below looks at the app and not at that screen.
+for ($i = 0; $i -lt 3 -and (Close-FirstRunDialogs); $i++) { Start-Sleep -Seconds 2 }
 $subscription = Find-Element -NamePattern $script:Patterns.Subscribe -VisibleOnly
-Write-Host "  abonnement Apple Music : $(if ($subscription) { 'proposé (le compte n''a peut-être pas d''abonnement : la lecture complète échouera)' } else { 'aucune offre affichée' })"
+Write-Host "  abonnement Apple Music : $(if ($subscription) { "offre affichée ($(Format-Element $subscription)) : le compte n'a peut-être pas d'abonnement, la lecture complète échouera" } else { 'aucune offre affichée' })"
 Save-Screenshot -Ctx $ctx -Name '02-connecte' | Out-Null
 Set-StepOutput 'fresh' 'true'
 

@@ -6,6 +6,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -21,6 +22,7 @@
 #include "../core/reload.hpp"
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
+#include "../core/ui_model.hpp"
 #include "../core/version_gate.hpp"
 #include "../core/version_list.hpp"
 #include "../extensions/atmos-leveler/atmos_windows.hpp"
@@ -28,7 +30,10 @@
 #include "../win/win_host.hpp"
 
 #if defined(AMK_WITH_XAML)
+#include "../core/json.hpp"
 #include "../win/theme_service.hpp"
+#include "../win/ui_service.hpp"
+#include "../win/xaml_host.hpp"
 #endif
 
 namespace {
@@ -57,15 +62,33 @@ void ServiceReloadRequests(const std::filesystem::path& kit, amk::ReloadWatcher&
     loader.Apply(requests, settings);
 }
 
-HINSTANCE g_module = nullptr;  // the kernel DLL itself, needed to install the interface hook
+HINSTANCE g_module = nullptr;  // the kernel DLL itself, passed to the interface-thread facade
 
-// Themes only touch the interface, so only AppleMusic.exe starts the service.
-void StartThemes(amk::Journal& journal, [[maybe_unused]] const std::filesystem::path& kit) {
+// Themes and the native interface only touch the interface, so only AppleMusic.exe starts them. Both reach the
+// interface thread through the DispatcherQueue of Apple Music's main window (win/xaml_host.hpp). The clicks and
+// changes of the rendered trees go back to the JavaScript thread through the elements' queues.
+void StartInterface(amk::Journal& journal, [[maybe_unused]] const std::filesystem::path& kit,
+                    [[maybe_unused]] amk::UiModel& model, [[maybe_unused]] amk::ExtensionLoader& loader) {
 #if defined(AMK_WITH_XAML)
+    amk::win::InstallXamlUiThread(journal);
     static amk::win::ThemeService themes(journal, kit);
     themes.Start(g_module, GetCurrentProcessId());
+
+    // Never destroyed: it holds XAML objects that may only be released on the interface thread.
+    static auto* ui = new amk::win::UiService(journal, kit, model, [target = &loader](const amk::win::UiEvent& event) {
+        if (event.click) {
+            target->DeliverClickTo(event.elementId, event.callbackId);
+            return;
+        }
+        amk::Json payload(amk::Json::Object{});
+        payload.Set("id", amk::Json(static_cast<double>(event.callbackId)));
+        std::optional<amk::Json> value = amk::Json::Parse(event.valueJson);
+        payload.Set("value", value ? *value : amk::Json());
+        target->DeliverEventTo(event.elementId, "change", payload.Dump());
+    });
+    ui->Start();
 #else
-    journal.Write("Thèmes : ce build n'a pas la liaison XAML (AMK_XAML), aucun thème n'est appliqué");
+    journal.Write("Thèmes et interface native : ce build n'a pas la liaison XAML (AMK_XAML), rien n'est affiché");
 #endif
 }
 
@@ -144,7 +167,7 @@ DWORD WINAPI KernelMain(LPVOID) {
         }
     }).detach();
 
-    if (role == amk::ProcessRole::AppleMusic) StartThemes(journal, kit);
+    if (role == amk::ProcessRole::AppleMusic) StartInterface(journal, kit, winHost.Ui(), loader);
 
     if (role == amk::ProcessRole::AppleMusic) {
         // The interface process is the one that proves the app is healthy. Its window must not be hung.
