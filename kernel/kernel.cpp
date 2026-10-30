@@ -37,11 +37,11 @@ constexpr auto kHealthyAfter = std::chrono::seconds(20);
 constexpr auto kHealthyRetry = std::chrono::seconds(5);
 constexpr auto kReloadEvery = std::chrono::milliseconds(500);
 
-// Reads reload.txt and restarts the elements that its new requests name. The settings are read again first, so an
-// element that `amk dev` has just enabled starts with the value on disk. A missing file counts as empty: the first
-// text is only the baseline, so a file that is created later is not missed.
+// Reads reload.txt and runs its new requests: start, stop, restart, rescan (core/reload.hpp). The settings are read
+// again first, so an element that `amk` has just enabled starts with the value on disk. A missing file counts as
+// empty: the first text is only the baseline, so a file that is created later is not missed.
 void ServiceReloadRequests(const std::filesystem::path& kit, amk::ReloadWatcher& watcher, amk::ExtensionLoader& loader,
-                           amk::Settings& settings, amk::Journal& journal) {
+                           amk::Settings& settings) {
     std::string text;
     std::ifstream in(kit / "reload.txt", std::ios::binary);
     if (in) {
@@ -50,14 +50,11 @@ void ServiceReloadRequests(const std::filesystem::path& kit, amk::ReloadWatcher&
         text = buffer.str();
     }
 
-    std::vector<std::string> ids = watcher.Changed(text);
-    if (ids.empty()) return;
+    std::vector<amk::ReloadRequest> requests = watcher.Requests(text);
+    if (requests.empty()) return;
 
     settings.Load((kit / "settings.txt").string());
-    for (const std::string& id : ids) {
-        journal.Write("Rechargement demandé : " + id);
-        loader.Restart(id, settings);
-    }
+    loader.Apply(requests, settings);
 }
 
 HINSTANCE g_module = nullptr;  // the kernel DLL itself, needed to install the interface hook
@@ -103,11 +100,12 @@ DWORD WINAPI KernelMain(LPVOID) {
     static amk::Settings settings;
     settings.Load((kit / "settings.txt").string());
 
-    // JavaScript elements (extensions and apps) live in %USERPROFILE%\AppleMusicModKit\extensions\<id>.
-    // Both processes load them: an element tells them apart with AMK.process.
+    // JavaScript elements live in %USERPROFILE%\AppleMusicModKit\extensions\<id> and apps\<id>. Both processes
+    // load them: an element tells them apart with AMK.process.
     static amk::WinHost winHost(role == amk::ProcessRole::AppleMusic ? "ui" : "engine", kit, settings, journal);
     static amk::ExtensionHost host(journal);
     static amk::ExtensionLoader loader(host, winHost, journal, kit / "extensions");
+    loader.SetAppRoot(kit / "apps");
     loader.SetThemeRoot(kit / "themes");
     amk::LoadReport report = loader.Discover();
     journal.Write("Éléments JavaScript retenus : " + std::to_string(report.loaded.size()) + ", rejetés : " +
@@ -138,7 +136,7 @@ DWORD WINAPI KernelMain(LPVOID) {
                 for (const std::string& event : playerWatcher.Poll(snapshot)) loader.DeliverPlayer(event, snapshot);
             }
             if (std::chrono::steady_clock::now() >= nextReload) {
-                ServiceReloadRequests(kit, reload, loader, settings, journal);
+                ServiceReloadRequests(kit, reload, loader, settings);
                 nextReload = std::chrono::steady_clock::now() + kReloadEvery;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(50));

@@ -21,6 +21,12 @@ std::string_view FolderOfKind(std::string_view kind);
 // A theme has no such key: `theme.id` names the one active theme.
 std::string EnabledKey(std::string_view kind, std::string_view id);
 
+// How reload.txt names an element in its requests (core/reload.hpp): `app:<id>` for an app, `<id>` otherwise.
+std::string ReloadTarget(std::string_view kind, std::string_view id);
+
+// Above this size, AppendReloadRequests starts reload.txt again with only the new lines.
+inline constexpr size_t kReloadFileLimit = 64 * 1024;
+
 // The folders of the kit, under %USERPROFILE%\AppleMusicModKit (docs/cli/COMMANDES.md, "Fichiers du kit").
 class KitLayout {
 public:
@@ -83,5 +89,9 @@ std::string FormatActive(const ActiveReport& report);
 
 // Writes through a temporary file, so a crash mid-write never leaves a half-written file. Creates the folder.
 bool WriteTextFile(const std::filesystem::path& file, const std::string& text, std::string& error);
+
+// Adds lines to reload.txt, such as "start demo" or "rescan". The kernel reads only the lines added since its last
+// pass, so a request is never lost by a later write, unless the file was over kReloadFileLimit and starts again.
+bool AppendReloadRequests(const KitLayout& kit, const std::vector<std::string>& lines, std::string& error);
 
 }  // namespace amk

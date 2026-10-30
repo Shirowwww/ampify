@@ -90,6 +90,13 @@ declare const AMK: {
   };
   services: { call(service: string, method: string, args?: unknown): Promise<unknown> };
   lyrics: { current(): Promise<unknown> };
+
+  // 5.7 Lien entre une app et son extension [provisoire M7]
+  link: {
+    post(message: unknown): boolean;
+    on(fn: (message: any) => void): () => void;
+    connected(): boolean;
+  };
 };
 )ts";
 }

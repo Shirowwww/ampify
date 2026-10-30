@@ -92,6 +92,29 @@ void SetEnabled(Settings& settings, std::string_view kind, std::string_view id, 
     settings.SetBool(EnabledKey(kind, id), enabled);
 }
 
+std::string ReloadTarget(std::string_view kind, std::string_view id) {
+    return (kind == "app" ? "app:" : "") + std::string(id);
+}
+
+bool AppendReloadRequests(const KitLayout& kit, const std::vector<std::string>& lines, std::string& error) {
+    std::string text;
+    for (const std::string& line : lines) text += line + "\n";
+
+    std::error_code ec;
+    uintmax_t size = std::filesystem::file_size(kit.Reload(), ec);
+    if (ec || size > kReloadFileLimit) return WriteTextFile(kit.Reload(), text, error);
+
+    // One write per call, so the kernel sees whole lines; a line it reads half-written waits for its newline.
+    std::ofstream out(kit.Reload(), std::ios::binary | std::ios::app);
+    out << text;
+    out.flush();
+    if (!out) {
+        error = "écriture impossible : " + kit.Reload().string();
+        return false;
+    }
+    return true;
+}
+
 ActiveReport ComputeActive(const KitLayout& kit, const Settings& settings) {
     ActiveReport report;
 

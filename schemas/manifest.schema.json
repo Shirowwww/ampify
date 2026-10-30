@@ -29,6 +29,10 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.js$",
       "description": "Script principal, à la racine du dossier. Requis pour une extension et une app."
     },
+    "type": {
+      "enum": ["script", "module"],
+      "description": "Comment main est exécuté : script classique (par défaut) ou module ES, qui peut importer les fichiers .js et .mjs de son dossier avec un chemin relatif."
+    },
     "colors": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.ini$",

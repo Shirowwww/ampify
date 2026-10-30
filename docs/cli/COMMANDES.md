@@ -55,9 +55,9 @@ Les colonnes « Spicetify » donnent l'équivalent. « Statut » dit ce qui est 
 | Commande | Rôle | Statut |
 |---|---|---|
 | `amk list` | Tous les éléments installés, leur type, leur version et leur état | Fait |
-| `amk extension list` / `enable <id>` / `disable <id>` | Extensions. Le nivellement Atmos (`atmos-leveler`) est intégré et s'active de la même façon | Fait |
+| `amk extension list` / `enable <id>` / `disable <id>` | Extensions. Le nivellement Atmos (`atmos-leveler`) est intégré et s'active de la même façon. Si Apple Music tourne avec le noyau, l'extension démarre ou s'arrête tout de suite (voir « Effet immédiat ») | Fait |
 | `amk snippet enable <id>` / `disable <id>` | Snippets (fragments XAML) | Fait |
-| `amk app enable <id>` / `disable <id>` | Apps (pages d'interface) | Fait. Le chargement de la page vient avec M8 |
+| `amk app enable <id>` / `disable <id>` | Apps (pages d'interface). Le noyau charge `apps\<id>` et démarre l'app tout de suite, comme une extension | Fait. L'entrée dans la barre latérale vient avec M8 |
 | `amk theme list` | Thèmes installés | Fait |
 | `amk theme set <id> [--scheme <nom>]` | Choisit le thème et son schéma | Fait |
 | `amk theme clear` | Aucun thème | Fait |
@@ -70,9 +70,9 @@ Les colonnes « Spicetify » donnent l'équivalent. « Statut » dit ce qui est 
 | Commande | Rôle | Statut |
 |---|---|---|
 | `amk market` (ou `catalog`) | Liste le catalogue et ce qui est déjà installé | Fait |
-| `amk install <id> [--yes]` | Télécharge, vérifie le SHA-256, valide, installe. Désactivé par défaut | Fait |
-| `amk update <id> [--yes]` | Met à jour un élément depuis le catalogue, si la version est plus récente | Fait |
-| `amk remove <id>` | Retire un élément. Une sauvegarde est faite avant | Fait |
+| `amk install <id> [--yes]` | Télécharge, vérifie le SHA-256, valide, installe. Désactivé par défaut. Un noyau en marche voit le nouveau dossier tout de suite | Fait |
+| `amk update <id> [--yes]` | Met à jour un élément depuis le catalogue, si la version est plus récente. Un noyau en marche le redémarre avec la nouvelle version | Fait |
+| `amk remove <id>` | Retire un élément. Une sauvegarde est faite avant. Un noyau en marche l'arrête | Fait |
 | `amk update` | Vérifie la dernière release du kit, télécharge, contrôle le SHA-256 | Fait |
 | `amk update --check` | Dit seulement si une version plus récente existe | Fait |
 | `amk update --apply` | Installe la version téléchargée. Apple Music doit être fermé | Fait |
@@ -115,7 +115,7 @@ se charger. Les messages d'erreur vont sur la sortie d'erreur, précédés de `a
   apps\<id>\                manifest.json, main.js, icon.svg
   snippets\<id>\            manifest.json, resources.xaml
   active.txt                ce qui doit se charger : « extension demo 1.0.0 », « theme night 2.0.0 scheme=Dark »
-  reload.txt                compteur écrit à chaque apply, et lignes « restart <id> » écrites par dev (lues par le noyau)
+  reload.txt                demandes au noyau en marche : « start <id> », « stop <id> », « restart <id> », « rescan » (voir « Effet immédiat »)
   backups\<aaaammjj-hhmmss>\  copie de settings.txt et des quatre dossiers d'éléments
   versions.txt              versions d'Apple Music testées en plus de celles du noyau (écrit par amk versions update)
   journal\                  journaux du noyau et du lanceur, et inspector.txt (arbre de l'interface, voir devtools)
@@ -151,6 +151,28 @@ tape-la directement : `amk config app_launch_flags --mon-option`, ou entre guill
 
 Un élément est dans `extensions\<id>` seulement si son nom de dossier est son identifiant. Les dossiers qui
 commencent par un point sont des travaux en cours et sont ignorés.
+
+## Effet immédiat (`reload.txt`)
+
+Quand Apple Music tourne déjà avec le noyau, il n'a pas besoin d'être relancé pour une extension ou une app. `amk`
+ajoute une ligne à `reload.txt`, et le noyau lit les nouvelles lignes toutes les 500 ms, relit `settings.txt`, puis
+fait la demande dans son moteur JavaScript :
+
+| Ligne | Écrite par | Ce que fait le noyau |
+|---|---|---|
+| `start <id>` | `extension enable`, `app enable`, `config extensions +id` | Charge l'élément s'il ne le connaît pas encore (nouveau dossier), puis le démarre s'il est activé |
+| `stop <id>` | `extension disable`, `app disable`, `config extensions -id`, `remove` | Arrête l'élément |
+| `restart <id>` | `dev` (à chaque copie), `update` | Arrête l'élément, relit son dossier (manifeste et code), puis le redémarre s'il est activé |
+| `rescan` | `install`, `remove` | Cherche les nouveaux dossiers (il démarre ceux qui sont activés) et oublie ceux qui ont disparu |
+
+Une app s'écrit `app:<id>` (par exemple `start app:paroles`), parce qu'une app et une extension peuvent avoir le même
+identifiant (elles sont alors liées, voir `AMK.link` dans `docs/extensions/API.md`). Les lignes s'ajoutent à la fin du
+fichier : une demande n'est jamais effacée par la suivante. Au-delà de 64 Ko, le fichier repart de zéro. Le noyau ne
+relit pas les lignes déjà présentes au démarrage d'Apple Music : à ce moment-là, il charge tout depuis les dossiers.
+
+Les thèmes et les snippets ne passent pas par ces lignes : le moteur de thèmes suit ses propres fichiers.
+
+Si Apple Music ne tourne pas, ces lignes ne servent à rien et ne gênent pas : le prochain `amk launch` charge tout.
 
 ## Enchaîner des commandes
 
@@ -256,12 +278,13 @@ Apple Music avec `amk launch`. Le noyau écrit l'arbre au passage suivant et rem
 cela un noyau avec le moteur de thèmes XAML (M8) ; sans lui, aucun fichier n'est écrit.
 
 `dev <dossier>` valide l'élément, sauvegarde le kit si l'élément y est déjà, l'active, puis le copie dans le kit à
-chaque modification du dossier. Chaque copie écrit `active.txt`, et une ligne `restart <id>` dans `reload.txt`. Le
-noyau relit ce fichier toutes les 500 ms, relit `settings.txt`, et redémarre l'élément dans son moteur JavaScript : le
-code `main.js` est relu depuis le kit, et l'élément repart avec son stockage. Une modification invalide est signalée,
+chaque modification du dossier. Chaque copie écrit `active.txt`, et une ligne `restart <id>` dans `reload.txt` (`restart app:<id>` pour une
+app). Le noyau relit ce fichier toutes les 500 ms, relit `settings.txt`, et redémarre l'élément dans son moteur
+JavaScript : le dossier est relu depuis le kit (manifeste, `main.js` et les modules qu'il importe), et l'élément repart
+avec son stockage. Une modification invalide est signalée,
 et la dernière version qui marchait reste dans le kit. Le dossier de l'auteur reste la source : `install`, `update` ou
-`remove` remplacent la copie du kit. Un changement de `manifest.json` (permissions, processus) n'est pris en compte
-qu'au prochain démarrage d'Apple Music : le noyau garde le manifeste lu au démarrage.
+`remove` remplacent la copie du kit. Un changement de `manifest.json` (permissions, processus, `type`) compte dès le
+redémarrage de l'élément : le noyau relit le manifeste à chaque `restart`.
 
 `test <dossier>` charge `main.js` dans le même moteur JavaScript (QuickJS) que le noyau, avec un hôte factice : les
 réglages et le stockage restent en mémoire, et le lecteur et le réseau répondent une valeur fixe. Il affiche le
@@ -297,10 +320,10 @@ alors le kit, remplace les éléments et `settings.txt`, et laisse à `apply` le
 le contenu sans rien écrire.
 
 Ce qui manque encore à la parité avec Spicetify : l'arbre d'interface en direct de `inspect` (M8), et la lecture
-de `telemetry.block` par le noyau. Le côté noyau du rechargement
-de `dev` (lecture de `reload.txt`, redémarrage de l'élément) est compilé pour Windows, mais il n'a pas encore tourné dans
-Apple Music : il reste à le voir sur le PC de l'utilisateur. Les tests de la CLI vérifient seulement ce qui est écrit dans
-`reload.txt`.
+de `telemetry.block` par le noyau. Le côté noyau de l'effet immédiat
+(lecture de `reload.txt`, démarrage, arrêt, rechargement, nouvelle lecture des dossiers) est testé sous Linux avec un
+hôte factice et compilé pour Windows, mais il n'a pas encore tourné dans Apple Music : il reste à le voir sur le PC de
+l'utilisateur. Les tests de la CLI vérifient ce qui est écrit dans `reload.txt`.
 
 ## Tests
 

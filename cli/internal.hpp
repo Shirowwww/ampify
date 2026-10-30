@@ -137,6 +137,10 @@ int CmdWatch(Context& ctx);
 // Returns 0, or 1 when an enabled element cannot load. Used by apply, launch, watch and dev.
 int ApplyNow(Context& ctx, const std::vector<std::string>& restarts = {});
 
+// Asks a running kernel to apply a change at once, through reload.txt: "start <cible>", "stop <cible>", "rescan".
+// A failure is only printed: the change still applies at the next start of Apple Music.
+void RequestReload(Context& ctx, const std::vector<std::string>& lines);
+
 // Commands in author.cpp: build, inspect, types.
 int CmdBuild(Context& ctx);
 int CmdInspect(Context& ctx);

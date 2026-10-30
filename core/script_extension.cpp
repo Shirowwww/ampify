@@ -50,7 +50,8 @@ bool ScriptExtension::Start() {
         return false;
     };
 
-    std::optional<std::string> source = ReadFile(m_folder / m_manifest.main.value_or("main.js"));
+    std::string mainName = m_manifest.main.value_or("main.js");
+    std::optional<std::string> source = ReadFile(m_folder / mainName);
     if (!source) return fail("main.js illisible");
 
     for (const api::ApiModule& module : api::Modules()) {
@@ -58,6 +59,7 @@ bool ScriptExtension::Start() {
     }
     m_runtime = std::make_unique<js::Runtime>(m_limits);
     m_runtime->SetUserData(this);
+    m_runtime->SetModuleRoot(m_folder);  // import reads the element's own folder, and nothing else
 
     std::string error;
     JSContext* ctx = m_runtime->context();
@@ -72,7 +74,10 @@ bool ScriptExtension::Start() {
     if (!built) return fail("API AMK : " + error);
     m_dispatch = dispatch;
 
-    if (!m_runtime->Eval(*source, id() + "/main.js", &error)) return fail(error);
+    // "type": "module" makes main.js an ES module, with static imports. A classic script may still use import().
+    bool evaluated = m_manifest.module ? m_runtime->EvalModule(*source, mainName, &error)
+                                       : m_runtime->Eval(*source, mainName, &error);
+    if (!evaluated) return fail(error);
     if (!m_runtime->RunJobs(&error)) return fail(error);
 
     m_running = true;

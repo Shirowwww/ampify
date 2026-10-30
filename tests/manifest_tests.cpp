@@ -147,3 +147,22 @@ TEST_CASE(Manifest_SurvivesMutatedInput) {
         CHECK(result.manifest.has_value() == result.errors.empty());
     }
 }
+
+TEST_CASE(Manifest_TypeIsScriptOrModule) {
+    amk::ManifestResult plain = Check(kHello, "hello-extension");
+    CHECK(plain.manifest && !plain.manifest->module);
+
+    std::string module = kHello;
+    module.insert(module.find("\"main\""), "\"type\": \"module\", ");
+    amk::ManifestResult parsed = Check(module, "hello-extension");
+    CHECK(parsed.warnings.empty());
+    CHECK(parsed.manifest && parsed.manifest->module);
+
+    std::string script = kHello;
+    script.insert(script.find("\"main\""), "\"type\": \"script\", ");
+    CHECK(Check(script, "hello-extension").manifest);
+
+    std::string other = kHello;
+    other.insert(other.find("\"main\""), "\"type\": \"commonjs\", ");
+    CHECK(!Check(other, "hello-extension").manifest);
+}

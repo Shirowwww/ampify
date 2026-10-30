@@ -246,6 +246,12 @@ def check_manifest(doc, path):
     for key in ("main", "colors", "resources", "icon"):
         if key in doc and not os.path.isfile(os.path.join(folder, doc[key])):
             errors.append(f"{key} : fichier absent du dossier : {doc[key]}")
+    # The kernel refuses to import through a link, and amk refuses to install one: a link could point anywhere.
+    for current, folders, files in os.walk(folder):
+        for name in sorted(folders + files):
+            if os.path.islink(os.path.join(current, name)):
+                relative = os.path.relpath(os.path.join(current, name), folder).replace(os.sep, "/")
+                errors.append(f"lien symbolique interdit dans l'élément : {relative}")
     return errors
 
 

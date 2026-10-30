@@ -88,7 +88,6 @@ int CmdTest(Context& ctx) {
 
     std::filesystem::path folder = PathArgument(args[1]);
     FolderValidation validation = ValidateElementFolder(folder);
-    if (ContainsLink(folder)) validation.errors.push_back("lien symbolique interdit dans l'élément");
     if (!validation.ok() || !validation.errors.empty() || !validation.manifest) {
         ctx.err << Utf8(folder) << " : invalide\n";
         for (const std::string& problem : validation.errors) ctx.err << "  - " << problem << "\n";

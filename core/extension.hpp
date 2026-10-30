@@ -48,6 +48,17 @@ public:
     // Reloads one extension: stop, then start again if it is still enabled. Returns false for an unknown id.
     bool Restart(const std::string& id, const Settings& settings);
 
+    // Starts one extension if the settings enable it and it is not running yet. Returns false for an unknown id.
+    bool Start(const std::string& id, const Settings& settings);
+
+    // Stops one extension. Returns false for an unknown id.
+    bool Stop(const std::string& id);
+
+    // Stops one extension and forgets it, so that its id can be added again. Returns false for an unknown id.
+    bool Remove(const std::string& id);
+
+    bool Has(const std::string& id) const;
+
     ExtensionState StateOf(const std::string& id) const;
 
     static std::string SettingKey(const std::string& id);

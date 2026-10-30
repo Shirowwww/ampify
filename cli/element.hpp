@@ -38,6 +38,8 @@ struct ElementManifest : ElementInfo {
     std::vector<std::string> appVersions;
     // Processes where the element runs: "ui" (AppleMusic.exe), "engine" (AMPLibraryAgent.exe). Empty means both.
     std::vector<std::string> processes;
+    // How main runs: "script" (the default) or "module" (ES module, with relative imports inside the folder).
+    std::optional<std::string> type;
 };
 
 // The checks below mirror schemas/*.schema.json. They never touch the disk.
@@ -59,7 +61,8 @@ bool ReadElementInfo(const json::Value& object, const std::string& where, Elemen
 void CheckAllowedKeys(const json::Value& object, std::initializer_list<std::string_view> allowed,
                       const std::string& where, std::vector<std::string>& errors);
 
-// Rules a schema cannot express: the id is the folder name, the files that the kind needs exist.
+// Rules a schema cannot express: the id is the folder name, the files that the kind needs exist, and no symbolic
+// link is in the folder (the kernel would refuse to import through it).
 std::vector<std::string> CheckElementFolder(const ElementManifest& manifest, const std::filesystem::path& folder);
 
 struct FolderValidation {

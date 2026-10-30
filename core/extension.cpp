@@ -78,6 +78,39 @@ bool ExtensionHost::Restart(const std::string& id, const Settings& settings) {
     return false;
 }
 
+bool ExtensionHost::Start(const std::string& id, const Settings& settings) {
+    for (Entry& entry : m_entries) {
+        if (entry.info.id != id) continue;
+        if (entry.state != ExtensionState::Running) StartEntry(entry, settings, {});
+        return true;
+    }
+    return false;
+}
+
+bool ExtensionHost::Stop(const std::string& id) {
+    for (Entry& entry : m_entries) {
+        if (entry.info.id != id) continue;
+        StopEntry(entry);
+        entry.state = ExtensionState::Off;  // a failed or blocked one is off too once asked to stop
+        return true;
+    }
+    return false;
+}
+
+bool ExtensionHost::Remove(const std::string& id) {
+    for (auto it = m_entries.begin(); it != m_entries.end(); ++it) {
+        if (it->info.id != id) continue;
+        StopEntry(*it);
+        m_entries.erase(it);
+        return true;
+    }
+    return false;
+}
+
+bool ExtensionHost::Has(const std::string& id) const {
+    return std::any_of(m_entries.begin(), m_entries.end(), [&](const Entry& entry) { return entry.info.id == id; });
+}
+
 ExtensionState ExtensionHost::StateOf(const std::string& id) const {
     for (const Entry& entry : m_entries) {
         if (entry.info.id == id) return entry.state;

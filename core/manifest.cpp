@@ -20,7 +20,7 @@ const std::set<std::string_view> kFixedPermissions = {
 
 const std::set<std::string_view> kKnownFields = {
     "$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage", "license",
-    "main", "colors", "defaultScheme", "resources", "icon", "permissions", "appVersions", "processes",
+    "main", "colors", "defaultScheme", "resources", "icon", "permissions", "appVersions", "processes", "type",
 };
 
 // Length in Unicode code points, so that "é" counts as one character.
@@ -179,6 +179,10 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
 
     m.main = text_of("main", false);
     check("main", m.main, kJsFilePattern, "un fichier .js à la racine");
+    if (std::optional<std::string> type = text_of("type", false)) {
+        if (*type == "module") m.module = true;
+        else if (*type != "script") result.errors.push_back("type doit valoir script ou module");
+    }
     m.colors = text_of("colors", false);
     check("colors", m.colors, kIniFilePattern, "un fichier .ini à la racine");
     m.defaultScheme = text_of("defaultScheme", false);

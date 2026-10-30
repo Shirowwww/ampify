@@ -28,11 +28,12 @@ int ApplyNow(Context& ctx, const std::vector<std::string>& restarts) {
     ActiveReport report = ComputeActive(ctx.kit, settings);
     if (!WriteTextFile(ctx.kit.Active(), FormatActive(report), error)) return Failure(ctx, error);
 
-    // The kernel and the interface watch this file to know that something changed. Its content is only a counter.
+    // The kernel and the interface watch this file to know that something changed: a counter line, then the restart
+    // requests of amk dev. Lines are added, so a request that the kernel has not read yet stays in the file.
     auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-    std::string requests = std::to_string(stamp.count()) + "\n";
-    for (const std::string& id : restarts) requests += "restart " + id + "\n";
-    if (!WriteTextFile(ctx.kit.Reload(), requests, error)) return Failure(ctx, error);
+    std::vector<std::string> requests = {std::to_string(stamp.count())};
+    for (const std::string& target : restarts) requests.push_back("restart " + target);
+    if (!AppendReloadRequests(ctx.kit, requests, error)) return Failure(ctx, error);
 
     for (const ActiveItem& item : report.items) {
         ctx.out << "  charge    " << item.kind << " " << item.id << " " << item.version;
@@ -42,6 +43,11 @@ int ApplyNow(Context& ctx, const std::vector<std::string>& restarts) {
     for (const std::string& problem : report.problems) ctx.err << "  ignoré    " << problem << "\n";
     if (report.items.empty() && report.problems.empty()) ctx.out << "  rien d'activé\n";
     return report.problems.empty() ? 0 : 1;
+}
+
+void RequestReload(Context& ctx, const std::vector<std::string>& lines) {
+    std::string error;
+    if (!AppendReloadRequests(ctx.kit, lines, error)) ctx.err << "amk : " << error << "\n";
 }
 
 int CmdApply(Context& ctx) {

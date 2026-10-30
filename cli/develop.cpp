@@ -54,7 +54,6 @@ bool SyncElement(const KitLayout& kit, const std::filesystem::path& source, cons
 void ReloadOnce(Context& ctx, const std::filesystem::path& source, const std::string& kind, const std::string& id) {
     std::string stamp = "[" + ClockText() + "] ";
     FolderValidation check = ValidateElementFolder(source);
-    if (ContainsLink(source)) check.errors.push_back("lien symbolique interdit dans l'élément");
     if (!check.ok() || !check.errors.empty() || !check.manifest) {
         ctx.err << stamp << "invalide, le kit garde la version précédente :\n";
         for (const std::string& problem : check.errors) ctx.err << "  - " << problem << "\n";
@@ -72,7 +71,7 @@ void ReloadOnce(Context& ctx, const std::filesystem::path& source, const std::st
     }
     ctx.out << stamp << id << " rechargé\n";
     // The kernel restarts the element on its JavaScript thread, from this request in reload.txt.
-    ApplyNow(ctx, {id});
+    ApplyNow(ctx, {ReloadTarget(kind, id)});
 }
 
 bool ParseCount(std::string_view text, int& value) {
@@ -124,7 +123,6 @@ int CmdDev(Context& ctx) {
 
     std::filesystem::path source = PathArgument(args[1]);
     FolderValidation first = ValidateElementFolder(source);
-    if (ContainsLink(source)) first.errors.push_back("lien symbolique interdit dans l'élément");
     if (!first.ok() || !first.errors.empty() || !first.manifest) {
         ctx.err << Utf8(source) << " : invalide, rien n'a été copié\n";
         for (const std::string& problem : first.errors) ctx.err << "  - " << problem << "\n";

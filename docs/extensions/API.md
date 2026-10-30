@@ -49,7 +49,7 @@ AppleMusic.exe ou AMPLibraryAgent.exe
 ### Organisation du code (pour les contributeurs)
 
 L'objet global est fait de **modules** (`core`, `config`, `storage`, `player`, `audio`, `keyboard`, `notify`, `http`,
-`icons`, `uri`, `timers`, `console`, `ui`). Chaque module vit dans ses propres fichiers, pour que plusieurs personnes
+`icons`, `uri`, `timers`, `console`, `ui`, `link`). Chaque module vit dans ses propres fichiers, pour que plusieurs personnes
 puissent en ajouter en même temps sans modifier les mêmes lignes :
 
 | Partie d'un module `foo` | Où |
@@ -85,7 +85,10 @@ processus chargent les éléments JavaScript, et `AMK.process` permet à un él�
 
 ### 3.2 Étapes
 
-1. **Découverte.** Au démarrage du noyau, chaque sous-dossier est examiné. Un dossier sans `manifest.json` est ignoré.
+1. **Découverte.** Au démarrage du noyau, chaque sous-dossier de `extensions`, `apps` et `themes` est examiné. Un
+   dossier sans `manifest.json` est ignoré, comme un dossier dont le nom commence par un point (travail en cours
+   d'`amk`). Chaque type a son dossier : une app placée dans `extensions` (ou l'inverse) est refusée. Un snippet n'a
+   pas de script : le noyau ne le charge pas.
 2. **Validation.** Le manifeste doit respecter le schéma, `id` doit être le nom du dossier, `kitApi` doit être de
    la version majeure prise en charge, et les fichiers déclarés doivent exister. En cas d'échec, l'élément reçoit
    l'état `Failed` et une ligne est écrite dans le journal. Les autres éléments continuent.
@@ -95,7 +98,12 @@ processus chargent les éléments JavaScript, et `AMK.process` permet à un él�
    fonctions enregistrées. Une exception donne l'état `Failed`, sans arrêter les autres.
 5. **Arrêt.** Les fonctions passées à `AMK.onStop` sont appelées dans l'ordre inverse du démarrage. Un arrêt qui échoue
    est journalisé et ignoré.
-6. **Rechargement.** Une extension se recharge seule : arrêt puis démarrage. Apple Music ne redémarre pas.
+6. **Rechargement.** Une extension ou une app se recharge seule : arrêt, nouvelle lecture du dossier (manifeste et
+   code), puis démarrage. Apple Music ne redémarre pas. `amk` le demande par `reload.txt` : `start`, `stop`, `restart`
+   et `rescan` (nouveaux dossiers et dossiers retirés). Détails : `docs/cli/COMMANDES.md`, « Effet immédiat ».
+
+Dans le noyau, une app porte l'identifiant `app:<id>` (journal, `reload.txt`), parce qu'une app et une extension
+peuvent avoir le même identifiant : elles sont alors liées (section 6.2).
 
 ### 3.3 Réglages d'activation
 
@@ -124,6 +132,32 @@ Ce sont les états de `core/extension.hpp` :
   ni thème, ni snippet, ni app. C'est le mode sans échec de `core/safe_mode.*`.
 - Sur une version d'Apple Music absente de la liste testée, rien ne démarre. L'app tourne intacte. C'est la règle de
   `core/version_gate.*`.
+
+### 3.6 Plusieurs fichiers : modules ES [provisoire M7]
+
+Un élément peut répartir son code en plusieurs fichiers, comme les `subfiles` de Spicetify. Avec `"type": "module"`
+dans le manifeste, `main.js` est un module ES :
+
+```js
+// main.js
+import { formater } from "./lib/texte.js";
+import reglages from "./reglages.mjs";
+AMK.log(formater(reglages.titre));
+```
+
+Règles du chargeur de modules (`core/js_runtime.cpp`, `ResolveModuleName` et `ReadModuleFile`) :
+
+- seul un chemin relatif au fichier qui importe est accepté : `./x.js`, `./lib/x.js`, `../x.js` ;
+- le chemin ne sort jamais du dossier de l'élément : `../` au-dessus du dossier est refusé ;
+- pas de nom nu (`import "lodash"`), pas de chemin absolu (`/x.js`, `C:/x.js`), pas de `\`, pas de `:` ;
+- les noms de fichiers et de dossiers sont faits de lettres, chiffres, `.`, `_` et `-`, sans point au début ;
+- seuls les fichiers `.js` et `.mjs` s'importent, 1 Mo au plus chacun ;
+- un lien symbolique (ou une jonction Windows) sur le chemin est refusé.
+
+Un import refusé lève une `ReferenceError` qui commence par « import refusé ». L'élément passe alors à l'état `Failed`,
+avec la raison dans le journal. Sans `"type": "module"`, `main.js` reste un script classique : il peut quand même
+charger un module avec `import("./x.js")`, qui renvoie une `Promise`, selon les mêmes règles. Un module partage l'objet
+`AMK` et les permissions de l'élément : importer un fichier ne donne aucun droit de plus.
 
 ## 4. Permissions
 
@@ -274,6 +308,38 @@ atteindre les API internes d'Apple : le noyau refuse tout hôte qui ne figure pa
 `AMK.services.call` ne crée pas de connexion nouvelle : il appelle les services que l'app utilise déjà, et seulement
 ceux de la liste blanche publiée avec le kit.
 
+### 5.7 Lien entre une app et son extension [provisoire M7]
+
+Une app et une extension qui ont le même identifiant sont **liées** (les `subfiles_extension` de Spicetify). Les deux
+tournent dans le même processus, chacune dans son moteur. Elles s'échangent des messages JSON :
+
+```js
+// extensions/paroles/main.js : tourne au démarrage
+AMK.link.on((message) => {
+  if (message.type === "demande") AMK.link.post({ type: "paroles", texte: "..." });
+});
+
+// apps/paroles/main.js : la page
+AMK.link.on((message) => AMK.log("reçu : " + message.texte));
+AMK.link.post({ type: "demande" });
+```
+
+```js
+AMK.link.post(message)   // envoie une valeur JSON (64 Ko au plus) ; true si l'autre élément tourne
+AMK.link.on(fn)          // fn(message) reçoit chaque message de l'autre ; renvoie une fonction qui retire fn
+AMK.link.connected()     // true si l'autre élément tourne
+```
+
+- Un message est copié en JSON : une fonction ou `undefined` lève une `TypeError`, un message de plus de 64 Ko une
+  `RangeError`.
+- Il arrive au tour suivant du fil JavaScript, jamais pendant l'appel à `post`. L'ordre des messages est gardé.
+- Si l'autre élément est arrêté ou en train de démarrer, `post` renvoie `false` et le message est perdu. Le plus simple :
+  celui qui démarre en second envoie un premier message, et l'autre lui répond.
+- Aucune permission n'est demandée : rien ne sort du processus, et seuls les deux éléments du même identifiant se
+  parlent. Un script de thème n'est lié à rien.
+- L'app et l'extension partagent le fichier `storage\<id>.json` (même identifiant). Une seule des deux doit écrire
+  son stockage : l'autre passe par `AMK.link`.
+
 ## 6. Thèmes, apps et snippets
 
 ### 6.1 Thèmes [provisoire M8]
@@ -289,7 +355,11 @@ Un thème est un dossier avec `colors.ini`, `resources.xaml`, ou les deux, et é
 ### 6.2 Apps [provisoire M8]
 
 Une app est une extension qui ajoute une page de navigation (`AMK.ui.page.register`), avec une icône SVG en deux
-états (`icon`, et `active-icon` prévue). Son code ne tourne que lorsque la page est ouverte.
+états (`icon`, et `active-icon` prévue). Elle vit dans `apps\<id>` et s'active avec `apps.<id>.enabled`
+(`amk app enable <id>`). Dans cette version, son code tourne dès qu'elle est activée, comme une extension : l'entrée
+de la barre latérale et l'ouverture de la page viennent avec M8. Une app peut avoir une extension du même identifiant,
+qui tourne au démarrage : les deux se parlent par `AMK.link` (section 5.7). Son code peut être réparti en modules
+(section 3.6).
 
 ### 6.3 Snippets [provisoire M8]
 
@@ -375,8 +445,11 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
 | `keyboard.bind` (forme normalisée, touche F, média ou modificateur obligatoire) | fait. Sous Windows : `RegisterHotKey`, remis sur le fil JavaScript | tests C++ ; press simulée sous Wine |
 | `http.get` (https, hôte déclaré, 1 Mo au plus) | fait. Sous Windows : WinHTTP, délai de 5 à 10 s, une erreur renvoie statut 0 au lieu de lever une exception | tests C++ ; échec testé sous Wine, succès à voir sur le PC |
 | `uri.parse`, `uri.build`, `icons.get`, `setTimeout`, `setInterval`, `queueMicrotask`, `console` | fait | tests C++ |
+| Modules ES (`"type": "module"`, `import` relatif limité au dossier de l'élément, `import()`) | fait | tests C++, `tools/test_validate.py` |
+| `link.post`, `link.on`, `link.connected` : app et extension du même identifiant | fait | tests C++ |
 | Permissions : `PermissionDenied` à l'exécution, refus du manifeste à la lecture | fait | tests C++ |
-| Découverte des dossiers, activation, rechargement (`Restart`), isolement des pannes | fait | tests C++ et Wine |
+| Découverte des dossiers (`extensions`, `apps`, scripts de `themes`), activation, isolement des pannes | fait | tests C++ et Wine |
+| Effet immédiat par `reload.txt` : `start`, `stop`, `restart` (manifeste relu), `rescan` | fait côté noyau. Pas encore vu dans Apple Music | tests C++, tests de la CLI |
 | `audio.onSamples`, `audio.analyze` | à faire (M4) | |
 | `ui.*`, `React`, `components`, `library`, `player.queue`, `services`, `lyrics`, `color` | à faire (M8) | |
 | Thèmes et snippets | pas chargés par cette version du noyau | |

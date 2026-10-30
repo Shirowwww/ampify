@@ -240,6 +240,8 @@ int InstallEntry(Context& ctx, const CatalogEntry& entry, bool localCatalog, boo
     }
     RemoveQuietly(staging);
     RemoveQuietly(previous);
+    // A running kernel loads the new folder at once (installed disabled), or restarts the updated element.
+    RequestReload(ctx, {isUpdate ? "restart " + ReloadTarget(entry.kind, entry.id) : std::string("rescan")});
 
     ctx.out << entry.id << " " << entry.version << (isUpdate ? " mis à jour" : " installé") << ". ";
     if (entry.kind == "theme") {
@@ -494,6 +496,7 @@ int CmdRemove(Context& ctx) {
         settings.Remove(EnabledKey(kind, id));
     }
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
+    RequestReload(ctx, {"stop " + ReloadTarget(kind, id), "rescan"});
 
     ctx.out << id << " retiré. Sauvegarde faite avant : " << *snapshot << " (amk restore --backup " << *snapshot
             << " pour revenir en arrière).\n";

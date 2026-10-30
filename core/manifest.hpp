@@ -29,8 +29,10 @@ struct Manifest {
     std::optional<std::string> icon;
     std::vector<std::string> permissions;
     std::vector<std::string> appVersions;
-    // Where the element runs: "ui" (AppleMusic.exe), "engine" (AMPLibraryAgent.exe), or both by default.
+    // Where the element runs: "ui" (AppleMusic.exe), "engine" (AMPLibraryAgent.exe), or both.
     std::vector<std::string> processes = {"ui"};  // the interface only, unless the manifest asks for the engine too
+    // "type": "module" runs main as an ES module (static import). "script", the default, runs it as a classic script.
+    bool module = false;
 
     bool HasPermission(std::string_view permission) const;
     bool RunsIn(std::string_view process) const;

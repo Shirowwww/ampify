@@ -120,6 +120,18 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
     return true;
 }
 
+// After an element is switched: an extension or an app starts or stops at once in a running kernel (reload.txt);
+// the other kinds wait for amk apply or the next start.
+int AnnounceSwitch(Context& ctx, std::string_view kind, const std::string& id, bool enable) {
+    if (kind != "extension" && kind != "app") {
+        ctx.out << "Lance amk apply (ou amk launch) pour l'appliquer.\n";
+        return 0;
+    }
+    RequestReload(ctx, {std::string(enable ? "start " : "stop ") + ReloadTarget(kind, id)});
+    ctx.out << "Si Apple Music tourne avec le noyau, le changement s'applique tout de suite. Sinon, lance amk launch.\n";
+    return 0;
+}
+
 // `amk config extensions +id` and `-id`. Enabling needs an element that is installed and valid, or built-in.
 int ToggleElement(Context& ctx, Settings& settings, std::string_view list, const std::string& value) {
     std::string_view kind = KindOfList(list);
@@ -141,8 +153,7 @@ int ToggleElement(Context& ctx, Settings& settings, std::string_view list, const
     std::string error;
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
     ctx.out << std::string(list) << " " << value << " : " << (enable ? "activé" : "désactivé") << "\n";
-    ctx.out << "Lance amk apply (ou amk launch) pour l'appliquer.\n";
-    return 0;
+    return AnnounceSwitch(ctx, kind, id, enable);
 }
 
 int CmdConfigSet(Context& ctx, Settings& settings) {
@@ -236,8 +247,7 @@ int SetElementState(Context& ctx, std::string_view kind, const std::string& id, 
 
     ctx.out << std::string(kind) << " " << id << (enable ? " activé" : " désactivé") << "\n";
     if (enable && !permissions.empty()) ctx.out << "Permissions demandées : " << permissions << "\n";
-    ctx.out << "Lance amk apply (ou amk launch) pour l'appliquer.\n";
-    return 0;
+    return AnnounceSwitch(ctx, kind, id, enable);
 }
 
 int CmdThemeSet(Context& ctx) {
@@ -671,7 +681,6 @@ int CmdValidate(Context& ctx) {
     std::error_code ec;
     if (std::filesystem::is_directory(target, ec)) {
         FolderValidation validation = ValidateElementFolder(target);
-        if (ContainsLink(target)) validation.errors.push_back("lien symbolique interdit dans l'élément");
         if (validation.ok() && validation.errors.empty()) {
             ctx.out << Utf8(target) << " : valide (" << validation.manifest->kind << " " << validation.manifest->id
                     << " " << validation.manifest->version << ")\n";

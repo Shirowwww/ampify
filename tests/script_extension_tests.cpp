@@ -321,3 +321,30 @@ TEST_CASE(Element_ExamplesStartWithTheirOwnPermissions) {
         CHECK(!element.running());
     }
 }
+
+TEST_CASE(Element_MainMayBeAModuleThatImportsItsOwnFiles) {
+    fs::path dir = ScratchDir("module-main");
+    std::string manifest = R"({"id":"module-main","name":"Module","version":"1.0.0","kind":"extension",)"
+                           R"("author":"Shirowwww","description":"Test.","kitApi":"1.0","main":"main.js",)"
+                           R"("type":"module"})";
+    std::ofstream(dir / "manifest.json") << manifest;
+    std::ofstream(dir / "main.js") << "import { greet } from './lib/greet.js';\nAMK.log(greet('module'));\n";
+    fs::create_directories(dir / "lib");
+    std::ofstream(dir / "lib" / "greet.js") << "export const greet = (who) => 'bonjour ' + who;\n";
+    amk::ManifestResult result = amk::ParseManifest(manifest, "module-main", 1, [](const std::string&) { return true; });
+    CHECK(result.manifest && result.manifest->module);
+
+    Fixture f;
+    f.host.process = "ui";
+    amk::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock());
+    CHECK(element.Start());
+    CHECK(f.Logged("[module-main] bonjour module"));
+    element.Stop();
+
+    // Without "type": "module", a static import is a syntax error: the element fails, the reason is logged.
+    amk::ManifestResult classic = amk::ParseManifest(Manifest("module-main", ""), "module-main", 1,
+                                                     [](const std::string&) { return true; });
+    amk::ScriptExtension script(*classic.manifest, dir, f.host, f.journal, f.clock());
+    CHECK(!script.Start());
+    CHECK(script.lastError().find("SyntaxError") != std::string::npos);
+}

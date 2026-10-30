@@ -41,6 +41,7 @@ constexpr TextRule kIconRule{R"re([A-Za-z0-9][A-Za-z0-9._-]{0,63}\.svg)re", 0, 0
 constexpr TextRule kPermissionRule{
     R"re((player\.read|player\.control|audio\.analyze|audio\.gain|storage|notifications|ui\.keyboard|ui\.topbar|ui\.playbar|ui\.menu|ui\.popup|ui\.page|library\.read|network:[a-z0-9.-]{1,253}))re",
     0, 0, "une permission de docs/extensions/API.md, section 4"};
+constexpr TextRule kTypeRule{R"re(script|module)re", 0, 0, "script ou module"};
 constexpr TextRule kProcessRule{R"re(ui|engine)re", 0, 0, "ui ou engine"};
 constexpr TextRule kAppVersionRule{R"re([0-9]+(\.[0-9]+){1,3})re", 0, 0, "version d'Apple Music, par exemple 1.1540.23042.0"};
 
@@ -215,7 +216,7 @@ std::optional<ElementManifest> ParseManifest(std::string_view text, std::vector<
     CheckAllowedKeys(*document,
                      {"$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage",
                       "license", "main", "colors", "defaultScheme", "resources", "icon", "permissions",
-                      "appVersions", "processes"},
+                      "appVersions", "processes", "type"},
                      "", errors);
 
     ElementManifest manifest;
@@ -225,6 +226,7 @@ std::optional<ElementManifest> ParseManifest(std::string_view text, std::vector<
     manifest.defaultScheme = ReadOptionalText(*document, "defaultScheme", "", kSchemeRule, errors);
     manifest.resources = ReadOptionalText(*document, "resources", "", kResourcesRule, errors);
     manifest.icon = ReadOptionalText(*document, "icon", "", kIconRule, errors);
+    manifest.type = ReadOptionalText(*document, "type", "", kTypeRule, errors);
     manifest.appVersions = ReadList(*document, "appVersions", "", kAppVersionRule, kMaxAppVersions, errors);
     manifest.processes = ReadList(*document, "processes", "", kProcessRule, kMaxProcesses, errors);
     if (document->Find("processes") != nullptr && manifest.processes.empty()) {
@@ -271,6 +273,14 @@ std::vector<std::string> CheckElementFolder(const ElementManifest& manifest, con
         if (!std::filesystem::is_regular_file(folder / **file)) {
             errors.push_back(std::string(key) + " : fichier absent du dossier : " + **file);
         }
+    }
+
+    std::error_code ec;
+    for (auto it = std::filesystem::recursive_directory_iterator(folder, ec);
+         !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+        if (!it->is_symlink(ec)) continue;
+        std::string relative = it->path().lexically_relative(folder).generic_string();
+        errors.push_back("lien symbolique interdit dans l'élément : " + relative);
     }
     return errors;
 }

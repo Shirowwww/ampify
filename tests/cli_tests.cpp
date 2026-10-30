@@ -644,3 +644,32 @@ TEST_CASE(Manifest_ProcessesAreOneOrTwoDistinctNames) {
     CHECK(!errors.empty());
 }
 
+
+TEST_CASE(Manifest_TypeIsScriptOrModuleForTheCli) {
+    const std::string base =
+        R"({"id": "demo", "name": "Démo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"
+        R"("description": "Test.", "kitApi": "1.0", "main": "main.js", )";
+    std::vector<std::string> errors;
+    std::optional<amk::ElementManifest> module = amk::ParseManifest(base + R"("type": "module"})", errors);
+    CHECK(module && module->type == std::optional<std::string>("module"));
+    CHECK(amk::ParseManifest(base + R"("type": "script"})", errors).has_value());
+    CHECK(errors.empty());
+    CHECK(!amk::ParseManifest(base + R"("type": "commonjs"})", errors).has_value());
+    CHECK(MentionsField(errors, "type : valeur invalide"));
+}
+
+TEST_CASE(Folder_RefusesASymbolicLink) {
+    std::filesystem::path root = ScratchDir("folder-link");
+    std::filesystem::path good = root / "demo";
+    WriteFile(good / "manifest.json", kValidExtension);
+    WriteFile(good / "main.js", "AMK.log('ok');");
+    WriteFile(good / "lib" / "util.js", "export const x = 1;");
+    CHECK(amk::ValidateElementFolder(good).ok());  // sub-folders are allowed: main.js may import from them
+
+    std::error_code ec;
+    std::filesystem::create_symlink(root / "elsewhere.js", good / "lib" / "link.js", ec);
+    if (ec) return;  // no symbolic links on this system
+    amk::FolderValidation linked = amk::ValidateElementFolder(good);
+    CHECK(!linked.ok());
+    CHECK(MentionsField(linked.errors, "lien symbolique interdit dans l'élément : lib/link.js"));
+}

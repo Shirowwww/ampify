@@ -45,6 +45,7 @@ Le dossier [examples/hello-extension](../../examples/hello-extension/) est un ex
 | Champ | Extension | App | Thème | Snippet | Règle |
 |---|---|---|---|---|---|
 | `main` | requis | requis | facultatif | interdit | Script `.js` à la racine du dossier |
+| `type` | facultatif | facultatif | facultatif | — | `script` (par défaut) ou `module` : `main` est alors un module ES, qui peut importer d'autres fichiers du dossier (API.md, section 3.6) |
 | `icon` | — | facultatif | — | — | Icône `.svg` de la barre latérale |
 | `colors` | — | — | requis, ou `resources` | — | Fichier `.ini` des schémas de couleurs |
 | `defaultScheme` | — | — | facultatif | — | Section de `colors.ini` utilisée par défaut |
@@ -53,8 +54,10 @@ Le dossier [examples/hello-extension](../../examples/hello-extension/) est un ex
 Les champs qui ne concernent pas le `kind` sont ignorés par le noyau. Le validateur ne vérifie que les champs requis
 pour chaque `kind`.
 
-Les noms de fichiers sont à la racine du dossier. Un sous-dossier, un chemin relatif comme `../x.js`, ou un nom qui
-commence par un point, est refusé.
+Les fichiers déclarés dans le manifeste sont à la racine du dossier. Un sous-dossier, un chemin relatif comme
+`../x.js`, ou un nom qui commence par un point, est refusé dans ces champs. Le dossier peut contenir des sous-dossiers
+pour les fichiers que `main` importe (`import x from "./lib/x.js"`). Un lien symbolique, où qu'il soit dans le dossier,
+est refusé.
 
 ## Ce que vérifie le validateur
 
@@ -65,7 +68,11 @@ commence par un point, est refusé.
 3. `id`, égal au nom du dossier ;
 4. la version majeure de `kitApi` ;
 5. les champs requis par `kind` (tableau ci-dessus) ;
-6. la présence, dans le dossier, de chaque fichier déclaré.
+6. la présence, dans le dossier, de chaque fichier déclaré ;
+7. l'absence de lien symbolique dans le dossier (le noyau refuse d'importer à travers un lien).
+
+`amk validate` applique les mêmes règles (`cli/element.cpp`), et le noyau les refait au chargement
+(`core/manifest.cpp`).
 
 Le noyau devra refaire ces contrôles au démarrage (jalon M7), sans s'appuyer sur le validateur. Les permissions inconnues
 seront refusées par le schéma comme par le noyau.

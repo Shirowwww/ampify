@@ -83,7 +83,7 @@ class AmkTestCase(unittest.TestCase):
             "description": f"Élément de test {name}.",
             "kitApi": "1.0",
         }
-        if kind == "extension":
+        if kind in ("extension", "app"):
             manifest["main"] = "main.js"
             files = {"main.js": 'AMK.log("ok");\n', **(files or {})}
         if kind == "theme":
@@ -259,6 +259,67 @@ class Marketplace(AmkTestCase):
         self.assertEqual(self.amk("extension", "disable", "demo").returncode, 0)
         self.amk("apply")
         self.assertNotIn("extension demo", self.read("active.txt"))
+
+    def reload_lines(self):
+        path = os.path.join(self.kit, "reload.txt")
+        if not os.path.exists(path):
+            return []
+        return self.read("reload.txt").splitlines()
+
+    def test_enable_and_disable_ask_a_running_kernel_to_start_and_stop(self):
+        self.assertEqual(self.install("demo").returncode, 0)
+        self.assertEqual(self.reload_lines()[-1], "rescan")  # the kernel loads the new folder, still disabled
+
+        enable = self.amk("extension", "enable", "demo")
+        self.assertEqual(enable.returncode, 0, enable.stderr)
+        self.assertIn("tout de suite", enable.stdout)
+        self.assertEqual(self.reload_lines()[-1], "start demo")
+
+        self.assertEqual(self.amk("extension", "disable", "demo").returncode, 0)
+        self.assertEqual(self.reload_lines()[-1], "stop demo")
+
+        self.assertEqual(self.amk("config", "extensions", "+demo").returncode, 0)
+        self.assertEqual(self.reload_lines()[-1], "start demo")
+        self.assertEqual(self.amk("config", "extensions", "-demo").returncode, 0)
+        self.assertEqual(self.reload_lines()[-1], "stop demo")
+
+        # Requests are added, never replaced, so the kernel cannot miss one between two passes.
+        lines = self.reload_lines()
+        self.assertEqual(lines[-5:], ["rescan", "start demo", "stop demo", "start demo", "stop demo"])
+
+        # amk apply adds its counter after them.
+        self.amk("apply")
+        self.assertEqual(self.reload_lines()[:5], lines[:5])
+        self.assertRegex(self.reload_lines()[-1], r"^[0-9]+$")
+
+    def test_app_requests_name_the_app(self):
+        page = self.write_element("demo", "app")
+        entry, _ = self.entry_for(page)
+        catalog = self.write_catalog([entry])
+        self.assertEqual(self.install("demo", catalog).returncode, 0)
+        enable = self.amk("app", "enable", "demo")
+        self.assertEqual(enable.returncode, 0, enable.stderr)
+        self.assertIn("apps.demo.enabled = 1", self.settings_text())
+        self.assertEqual(self.reload_lines()[-1], "start app:demo")
+        self.assertEqual(self.amk("app", "disable", "demo").returncode, 0)
+        self.assertEqual(self.reload_lines()[-1], "stop app:demo")
+
+    def test_snippet_enable_writes_no_request(self):
+        self.assertEqual(self.install("calm").returncode, 0)
+        before = self.reload_lines()
+        self.assertEqual(self.amk("snippet", "enable", "calm").returncode, 0)
+        self.assertEqual(self.reload_lines(), before)
+
+    def test_remove_and_update_ask_the_kernel_to_follow(self):
+        self.assertEqual(self.install("demo").returncode, 0)
+        newer_folder = self.write_element("demo", "extension", version="1.1.0", permissions=["storage"])
+        newer_entry, _ = self.entry_for(newer_folder)
+        catalog = self.write_catalog([newer_entry])
+        self.assertEqual(self.amk("update", "demo", "--yes", *self.catalog_option(catalog)).returncode, 0)
+        self.assertEqual(self.reload_lines()[-1], "restart demo")
+
+        self.assertEqual(self.amk("remove", "demo").returncode, 0)
+        self.assertEqual(self.reload_lines()[-2:], ["stop demo", "rescan"])
 
     def test_checksum_mismatch_is_refused(self):
         wrong = dict(self.demo_entry, id="broken", sha256="0" * 64)

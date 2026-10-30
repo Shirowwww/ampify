@@ -214,6 +214,30 @@ class ManifestTests(unittest.TestCase):
         code, text = run("manifest", self.install(data, files=("colors.ini",)))
         self.assertEqual(code, 0, text)
 
+    def test_type_is_script_or_module(self):
+        for value in ("script", "module"):
+            code, text = run("manifest", self.install(manifest(type=value)))
+            self.assertEqual(code, 0, text)
+        code, text = run("manifest", self.install(manifest(type="commonjs")))
+        self.assertEqual(code, 1)
+        self.assertIn("type", text)
+
+    def test_subfolders_are_allowed_and_links_are_refused(self):
+        path = self.install(manifest(), files=("main.js",))
+        folder = os.path.dirname(path)
+        os.makedirs(os.path.join(folder, "lib"))
+        with open(os.path.join(folder, "lib", "util.js"), "w", encoding="utf-8") as handle:
+            handle.write("export const x = 1;\n")
+        code, text = run("manifest", path)
+        self.assertEqual(code, 0, text)
+        try:
+            os.symlink(os.path.join(self.tmp.name, "elsewhere.js"), os.path.join(folder, "lib", "link.js"))
+        except (OSError, NotImplementedError):
+            self.skipTest("pas de lien symbolique sur ce système")
+        code, text = run("manifest", path)
+        self.assertEqual(code, 1)
+        self.assertIn("lien symbolique interdit dans l'élément : lib/link.js", text)
+
     def test_snippet_needs_resources_and_forbids_main(self):
         code, text = run("manifest", self.install(manifest(kind="snippet", resources="snippet.xaml"), files=("snippet.xaml", "main.js")))
         self.assertEqual(code, 1)
@@ -327,7 +351,7 @@ class ReferenceAgreementTests(unittest.TestCase):
     POOL = [
         "", "a", "demo-ext", "Demo", "1.0.0", "1.0", "1", "2.0", "https://a.b/c.zip", "http://a.b",
         "a\nb", "x" * 61, "../x.js", "main.js", "colors.ini", "network:api.example.com", "fs.write",
-        "storage", "Shirowwww", "-bad", "é", "0" * 64, "a" * 64, "extension", "theme", "plugin",
+        "storage", "Shirowwww", "-bad", "é", "0" * 64, "a" * 64, "extension", "theme", "plugin", "module", "script",
         0, 1, 1.0, 1.5, -1, True, False, None, [], ["storage"], ["storage", "storage"], {}, {"a": 1},
     ]
 
@@ -341,7 +365,7 @@ class ReferenceAgreementTests(unittest.TestCase):
             elif keys and roll < 0.7:
                 doc[rng.choice(keys)] = rng.choice(self.POOL)
             else:
-                doc[rng.choice(["extra", "permissions", "appVersions", "license", "resources"])] = rng.choice(self.POOL)
+                doc[rng.choice(["extra", "permissions", "appVersions", "license", "resources", "type"])] = rng.choice(self.POOL)
         return doc
 
     def check(self, schema, base, mutator, count=1500):

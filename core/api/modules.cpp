@@ -45,6 +45,9 @@ void DefineUi(api::NativeScope& scope);
 void StopUi(ScriptExtension& extension);
 }  // namespace natives
 
+namespace prelude { extern const char kLink[]; }
+namespace natives { void DefineLink(api::NativeScope& scope); void StartLink(ScriptExtension& extension); }
+
 namespace api {
 
 namespace {
@@ -65,6 +68,7 @@ const ApiModule kModules[] = {
     {"timers", prelude::kTimers, natives::DefineTimers, nullptr, nullptr},
     {"console", prelude::kConsole, nullptr, nullptr, nullptr},
     {"ui", prelude::kUi, natives::DefineUi, nullptr, natives::StopUi},
+    {"link", prelude::kLink, natives::DefineLink, natives::StartLink, nullptr},
 };
 
 }  // namespace
