@@ -24,6 +24,13 @@ struct LevelerConfig {
     size_t minStereoTracks = 2;       // stereo tracks needed before the target is trusted
 };
 
+// Highest gain the settings may ask for, in dB. The leveler never boosts more than this.
+constexpr double kGainLimitDb = 15.0;
+
+// The config with fallbackGainDb and maxGainDb brought into 0..kGainLimitDb. A value that is not a number
+// takes its default back.
+LevelerConfig ClampGains(LevelerConfig config);
+
 double DbToLinear(double db);
 double LinearToDb(double linear);
 
@@ -39,6 +46,10 @@ public:
     std::optional<double> Target(size_t minTracks) const;
 
     size_t Size() const;
+    size_t Capacity() const;
+
+    // Oldest first, as they were remembered.
+    const std::vector<double>& Values() const;
 
 private:
     size_t m_capacity;
@@ -58,8 +69,17 @@ public:
     // Returns false when an existing measurement is at least as long, so nothing changed.
     bool Put(const std::string& variantId, StoredLevel level);
 
+    const std::map<std::string, StoredLevel>& Levels() const;
+
 private:
     std::map<std::string, StoredLevel> m_levels;
+};
+
+// Where the decoded audio reaches the leveler. Each path has its own meter at its own sample rate, so a
+// stereo stream at 96 kHz and Atmos objects at 48 kHz are both measured.
+enum class AudioPath {
+    Stream,   // IAudioRenderClient: interleaved stereo, after the player volume. Measures stereo tracks.
+    Objects,  // spatial audio objects: mono buffers, before the slider volume. Measures Atmos tracks.
 };
 
 // A track whose loudness the leveler has measured, for the journal.
@@ -67,6 +87,8 @@ struct FinishedTrack {
     bool atmos = false;
     double lufs = 0;
     double seconds = 0;
+    AudioPath path = AudioPath::Stream;  // the meter the loudness comes from
+    bool stored = false;                 // it changed the VariantStore or the TargetHistory: worth saving
 };
 
 // What the gain policy knows about the track that is playing.
@@ -74,8 +96,9 @@ struct TrackLevel {
     std::optional<double> storedLufs;    // known before the track is heard, from the VariantStore
     std::optional<double> measuredLufs;  // from the meter, once minSecondsToLevel has been measured
     bool audible = false;                // audio has passed the settle period
-    double peak = 0;                     // linear peak, relative to the player volume
-    double userVolume = 1;               // linear player volume (the slider)
+    double peak = 0;                     // linear peak, without the player volume
+    double userVolume = 1;               // player volume already in the buffers the gain goes into: the
+                                         // slider for the stereo stream, 1 for spatial objects (before it)
 };
 
 // The Atmos gain (dB) the track should have now. Pure: the caller keeps `currentDb` and calls
@@ -85,22 +108,35 @@ double NextGainDb(const LevelerConfig& config, std::optional<double> target, con
 
 // Follows one playing item at a time: meters the decoded samples and remembers the level of
 // each track it heard for long enough. Not thread-safe: the caller serializes calls.
+//
+// A track is measured on the meter of its kind: the stream for stereo, the objects for Atmos. When that
+// meter has nothing and the other one has, the other one is used (an Atmos track a device without spatial
+// audio gets as a stereo stream, say).
 class AtmosLeveler {
 public:
-    AtmosLeveler(const LevelerConfig& config, double sampleRate, int channels);
+    explicit AtmosLeveler(const LevelerConfig& config, double streamRate = 48000, double objectRate = 48000);
 
     // Ends the previous track, storing it if it was measured long enough, then starts this one.
+    // An Atmos track with an empty variant id is measured but never stored.
     void StartTrack(const std::string& variantId, bool atmos);
 
-    // Decoded samples, with the player volume applied, as Apple Music hands them to the audio device.
+    // Ends the current track, as StartTrack does, without starting another: what plays next is not known yet.
+    void EndTrack();
+
+    // Decoded stereo samples from the render stream, with the player volume applied, as Apple Music hands
+    // them to the audio device. Measured as if the slider were at full.
     void Feed(const float* interleaved, size_t frames, float volume);
 
-    // Spatial audio objects, from ObjectPass: per-frame power of all objects and their peak, both
-    // before the gain. Same settle period and volume handling as Feed.
-    void FeedPower(const std::vector<double>& framePower, float peak, float volume);
+    // Spatial audio objects, from ObjectPass: per-frame power of all objects and their peak, both before
+    // the gain. The objects are taken before the slider volume, so nothing is divided out.
+    void FeedPower(const std::vector<double>& framePower, float peak);
 
-    // Rebuilds the meter when the stream runs at another sample rate. A track being measured ends first.
-    void SetSampleRate(double sampleRate);
+    // Rate of each path. A change rebuilds that meter's filters only: the track goes on, and what was
+    // measured is kept.
+    void SetStreamRate(double sampleRate);
+    void SetObjectRate(double sampleRate);
+    double StreamRate() const;
+    double ObjectRate() const;
 
     // The Atmos gain (dB) for the current track. For a stereo track the value passed in comes back
     // unchanged: check IsAtmos() and apply 0 dB to stereo tracks.
@@ -114,26 +150,40 @@ public:
     // The last track that ended with a measured loudness. Returned once, then forgotten.
     std::optional<FinishedTrack> TakeFinished();
 
+    // Puts back what an earlier run saved. The history keeps its capacity: only the newest values stay.
+    void Restore(const VariantStore& store, const std::vector<double>& stereo);
+
     const TargetHistory& StereoHistory() const;
     const VariantStore& Store() const;
 
 private:
+    struct Path {
+        LoudnessMeter meter;
+        double settleLeft = 0;  // seconds still to skip at the start of the track
+        bool audible = false;   // audio has passed the settle period
+
+        Path(double sampleRate, int channels) : meter(sampleRate, channels) {}
+        void Start(double settleSeconds);
+        // How many of `frames` frames fall in the settle period. Counts them as skipped.
+        size_t Settle(size_t frames);
+    };
+
     void FinishTrack();
+    // The path the current track is measured on.
+    const Path& Measuring() const;
+    AudioPath MeasuringPath() const;
 
     LevelerConfig m_config;
-    double m_sampleRate;
-    int m_channels;
     TargetHistory m_stereo;
     VariantStore m_store;
 
-    LoudnessMeter m_meter;
+    Path m_stream;
+    Path m_objects;
     std::string m_variantId;
     bool m_active = false;
     bool m_atmos = false;
     std::optional<StoredLevel> m_stored;
-    size_t m_settleFramesLeft = 0;
-    bool m_audible = false;
-    float m_volume = 1.0f;
+    float m_volume = 1.0f;  // last player volume seen with the stream
     std::optional<FinishedTrack> m_finished;
 };
 

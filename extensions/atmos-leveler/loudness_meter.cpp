@@ -58,9 +58,17 @@ void KWeighting::Reset() {
     m_highPass.z1 = m_highPass.z2 = 0;
 }
 
+namespace {
+
+size_t ChunkFrames(double sampleRate) {
+    return std::max<size_t>(1, static_cast<size_t>(std::lround(sampleRate / 10.0)));
+}
+
+}  // namespace
+
 LoudnessMeter::LoudnessMeter(double sampleRate, int channels)
     : m_sampleRate(sampleRate),
-      m_chunkFrames(std::max<size_t>(1, static_cast<size_t>(std::lround(sampleRate / 10.0)))),
+      m_chunkFrames(ChunkFrames(sampleRate)),
       m_filters(static_cast<size_t>(channels), KWeighting(sampleRate)) {}
 
 void LoudnessMeter::Process(const float* interleaved, size_t frames, float gain) {
@@ -77,12 +85,12 @@ void LoudnessMeter::Process(const float* interleaved, size_t frames, float gain)
         }
         AddFramePower(power);
     }
-    m_frames += frames;
+    m_seconds += static_cast<double>(frames) / m_sampleRate;
 }
 
 void LoudnessMeter::ProcessPower(const double* framePower, size_t frames, double scale, float peak) {
     for (size_t frame = 0; frame < frames; frame++) AddFramePower(framePower[frame] * scale);
-    m_frames += frames;
+    m_seconds += static_cast<double>(frames) / m_sampleRate;
     m_peak = std::max(m_peak, peak);
 }
 
@@ -131,11 +139,25 @@ std::optional<double> LoudnessMeter::IntegratedLufs() const {
 }
 
 double LoudnessMeter::Seconds() const {
-    return static_cast<double>(m_frames) / m_sampleRate;
+    return m_seconds;
 }
 
 float LoudnessMeter::Peak() const {
     return m_peak;
+}
+
+void LoudnessMeter::SetSampleRate(double sampleRate) {
+    if (sampleRate == m_sampleRate) return;
+
+    m_sampleRate = sampleRate;
+    m_chunkFrames = ChunkFrames(sampleRate);
+    for (KWeighting& filter : m_filters) filter = KWeighting(sampleRate);
+    m_chunkPower = 0;
+    m_framesInChunk = 0;
+}
+
+double LoudnessMeter::SampleRate() const {
+    return m_sampleRate;
 }
 
 void LoudnessMeter::Reset() {
@@ -143,7 +165,7 @@ void LoudnessMeter::Reset() {
     m_chunkPower = 0;
     m_framesInChunk = 0;
     m_chunkPowers.clear();
-    m_frames = 0;
+    m_seconds = 0;
     m_peak = 0;
 }
 

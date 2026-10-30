@@ -2,7 +2,7 @@
 // file under other names (CoreFoundation.dll, CoreFP.dll) to test the module guard.
 //
 // It describes one item: a player whose current item has one track, a Dolby Atmos format and a stable variant
-// id "abc123". Objects are tokens that describe themselves (a magic value and a kind), so any copy of this
+// id "abc123". The harness can withhold the variant, as Apple Music does while an item loads. Objects are tokens that describe themselves (a magic value and a kind), so any copy of this
 // file, loaded under any name, recognises the tokens another copy handed out, as real CoreFoundation does.
 
 #include <windows.h>
@@ -33,6 +33,8 @@ Token g_format{kMagic, kFormat, kFormatText};
 Token g_variant{kMagic, kVariant, kVariantText};
 
 int g_volumeCalls = 0;
+int g_trackReads = 0;
+bool g_variantKnown = true;
 
 bool IsKind(const void* object, int kind) {
     const Token* token = static_cast<const Token*>(object);
@@ -58,11 +60,22 @@ __declspec(dllexport) int __cdecl amk_fake_protected_method(void* self, int valu
     return value + 1;
 }
 
+// While `known` is 0, the item has no stable variant yet.
+__declspec(dllexport) void __cdecl amk_fake_set_variant_known(int known) {
+    g_variantKnown = known != 0;
+}
+
+// How many times the tracks of the item were asked for.
+__declspec(dllexport) int __cdecl amk_fake_track_reads() {
+    return g_trackReads;
+}
+
 __declspec(dllexport) void* __cdecl AVCFPlayerCopyCurrentItem(void* player) {
     return player ? &g_item : nullptr;
 }
 
 __declspec(dllexport) void* __cdecl AVCFPlayerItemCopyTracks(const void* item) {
+    g_trackReads++;
     return IsKind(item, kItem) ? &g_tracks : nullptr;
 }
 
@@ -75,7 +88,7 @@ __declspec(dllexport) void* __cdecl AVCFAssetTrackCopyFormatDescriptions(const v
 }
 
 __declspec(dllexport) void* __cdecl AVCFPlayerItemCopyCurrentStableVariantID(const void* item) {
-    return IsKind(item, kItem) ? &g_variant : nullptr;
+    return IsKind(item, kItem) && g_variantKnown ? &g_variant : nullptr;
 }
 
 __declspec(dllexport) void* __cdecl CFRetain(const void* object) {

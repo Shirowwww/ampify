@@ -182,26 +182,27 @@ TEST_CASE(Format_ReadsTheVariantIdBetweenTheQuotes) {
 }
 
 TEST_CASE(Leveler_PowerPathMeasuresLikeTheInterleavedPath) {
-    // Apple Music hands over samples already scaled by the slider (0.5 here). Both paths must
-    // measure them as if the slider were at full.
+    // The stereo stream comes after the slider (0.5 here), the objects before it. Both paths must measure
+    // the track as if the slider were at full.
     atmos::LevelerConfig config;
     config.settleSeconds = 0;
     const float volume = 0.5f;
 
-    std::vector<float> mono = Sine(48000, 12.0, 0.1 * volume);
-    std::vector<float> stereo = Stereo(mono);
+    std::vector<float> mono = Sine(48000, 12.0, 0.1);
+    std::vector<float> afterSlider = Sine(48000, 12.0, 0.1 * volume);
+    std::vector<float> stereo = Stereo(afterSlider);
 
-    atmos::AtmosLeveler interleaved(config, 48000, 2);
-    interleaved.StartTrack("variant", true);
-    interleaved.Feed(stereo.data(), mono.size(), volume);
+    atmos::AtmosLeveler interleaved(config);
+    interleaved.StartTrack("variant", false);
+    interleaved.Feed(stereo.data(), afterSlider.size(), volume);
 
     TwoObjects objects{mono, mono};
     atmos::ObjectPass pass(48000);
     const atmos::PassLevels& levels = pass.Process(objects.Buffers(), mono.size(), 1.0);
 
-    atmos::AtmosLeveler fromObjects(config, 48000, 2);
+    atmos::AtmosLeveler fromObjects(config);
     fromObjects.StartTrack("variant", true);
-    fromObjects.FeedPower(levels.framePower, levels.peak, volume);
+    fromObjects.FeedPower(levels.framePower, levels.peak);
 
     CHECK(interleaved.MeasuredLufs().has_value());
     CHECK_NEAR(fromObjects.MeasuredLufs().value_or(-200.0), interleaved.MeasuredLufs().value_or(-200.0), 0.01);
@@ -212,7 +213,7 @@ TEST_CASE(Leveler_ReportsTheFinishedTrackOnce) {
     config.settleSeconds = 0;
     std::vector<float> stereo = Stereo(Sine(48000, 12.0, 0.1));
 
-    atmos::AtmosLeveler leveler(config, 48000, 2);
+    atmos::AtmosLeveler leveler(config);
     CHECK(!leveler.TakeFinished().has_value());
     leveler.StartTrack("first", true);
     leveler.Feed(stereo.data(), stereo.size() / 2, 1.0f);
@@ -225,16 +226,32 @@ TEST_CASE(Leveler_ReportsTheFinishedTrackOnce) {
     CHECK(!leveler.TakeFinished().has_value());
 }
 
-TEST_CASE(Leveler_SampleRateChangeKeepsTheStoredLevels) {
+TEST_CASE(Leveler_SampleRateChangeKeepsTheMeasurement) {
+    // A stream reopened at another rate goes on measuring the same track: 6 s at 48 kHz, then 6 s at
+    // 96 kHz, measure like 12 s of one stream.
     atmos::LevelerConfig config;
     config.settleSeconds = 0;
     config.minSecondsToStore = 10.0;
-    std::vector<float> stereo = Stereo(Sine(48000, 12.0, 0.1));
+    std::vector<float> at48 = Stereo(Sine(48000, 6.0, 0.1));
+    std::vector<float> at96 = Stereo(Sine(96000, 6.0, 0.1));
 
-    atmos::AtmosLeveler leveler(config, 48000, 2);
-    leveler.StartTrack("kept", true);
-    leveler.Feed(stereo.data(), stereo.size() / 2, 1.0f);
-    leveler.SetSampleRate(96000);  // ends the track being measured, so it is stored
-    CHECK(leveler.Store().Find("kept").has_value());
-    CHECK(!leveler.MeasuredLufs().has_value());
+    atmos::AtmosLeveler leveler(config, 48000, 48000);
+    leveler.StartTrack("stereo", false);
+    leveler.Feed(at48.data(), at48.size() / 2, 1.0f);
+    leveler.SetStreamRate(96000);
+    leveler.Feed(at96.data(), at96.size() / 2, 1.0f);
+    CHECK(leveler.StreamRate() == 96000);
+
+    std::optional<double> measured = leveler.MeasuredLufs();
+    atmos::LoudnessMeter reference(48000, 2);
+    std::vector<float> whole = Stereo(Sine(48000, 12.0, 0.1));
+    reference.Process(whole.data(), whole.size() / 2);
+    CHECK(measured.has_value());
+    CHECK_NEAR(measured.value_or(-200.0), reference.IntegratedLufs().value_or(0.0), 0.05);
+
+    leveler.EndTrack();
+    std::optional<atmos::FinishedTrack> finished = leveler.TakeFinished();
+    CHECK(finished && finished->stored);
+    CHECK(finished && std::abs(finished->seconds - 12.0) < 0.01);
+    CHECK(leveler.StereoHistory().Size() == 1);
 }

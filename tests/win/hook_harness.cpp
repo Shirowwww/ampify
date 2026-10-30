@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <initializer_list>
 #include <iostream>
 #include <sstream>
@@ -20,11 +21,14 @@
 #include "../../core/journal.hpp"
 #include "../../core/settings.hpp"
 #include "../../extensions/atmos-leveler/atmos_windows.hpp"
+#include "../../extensions/atmos-leveler/spatial_metadata.hpp"
 #include "../../win/hook.hpp"
 #include "../test.hpp"
 
 extern "C" __declspec(dllimport) void __cdecl AVCFPlayerSetVolume(void* player, float volume);
 extern "C" __declspec(dllimport) int __cdecl amk_fake_volume_calls();
+extern "C" __declspec(dllimport) void __cdecl amk_fake_set_variant_known(int known);
+extern "C" __declspec(dllimport) int __cdecl amk_fake_track_reads();
 
 namespace {
 
@@ -237,37 +241,234 @@ void PlayToneThroughHookedStream(bool& float32) {
     if (SUCCEEDED(com)) CoUninitialize();
 }
 
-TEST_CASE(Glue_StartsOnWineAndMetersTheStereoStream) {
-    static std::ostringstream text;
-    static amk::Journal journal(text, [] { return std::string("00:00:00.000"); });
+// The journal of the glue, shared by the Glue tests: they run in this order, in one process, and the leveler
+// starts once.
+std::ostringstream g_glueText;
+amk::Journal g_glueJournal(g_glueText, [] { return std::string("00:00:00.000"); });
+bool g_glueStarted = false;
 
+bool Journaled(const std::string& line) {
+    return g_glueText.str().find(line) != std::string::npos;
+}
+
+TEST_CASE(Glue_StartsOnWineAndMetersTheStereoStream) {
     LoadCopy(L"CoreFoundation.dll");
+
+    // An earlier run measured two stereo tracks at -16 LUFS and the fake's Atmos variant at -20 LUFS.
+    std::filesystem::path levels = atmos::hooks::testing::LevelsFile();
+    std::error_code error;
+    std::filesystem::create_directories(levels.parent_path(), error);
+    std::ofstream(levels, std::ios::binary | std::ios::trunc) << "stereo -16.0\nstereo -16.0\natmos abc123 -20.0 300.0\n";
+
+    // The item is still loading: no stable variant yet.
+    amk_fake_set_variant_known(0);
+
     amk::Settings settings;
-    amk::ExtensionInfo info = atmos::hooks::MakeAtmosLevelerExtension(journal, settings);
+    amk::ExtensionInfo info = atmos::hooks::MakeAtmosLevelerExtension(g_glueJournal, settings);
     CHECK(info.id == "atmos-leveler");
     CHECK(!info.enabledByDefault);
 
-    bool started = info.start();
-    CHECK(started);
-    CHECK(text.str().find("hook AVCFPlayerSetVolume posé") != std::string::npos);
+    g_glueStarted = info.start();
+    CHECK(g_glueStarted);
+    CHECK(Journaled("hook AVCFPlayerSetVolume posé"));
+    CHECK(Journaled("niveaux relus : 1 variante(s) Atmos, 2 morceau(x) stéréo"));
 
     // Apple Music sets the player's volume: the hook sees the player, and the poll thread finds its item.
     static char player;
+    int volumeCalls = amk_fake_volume_calls();
     AVCFPlayerSetVolume(&player, 0.5f);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
+    // Without a variant the item is left alone: its tracks are not even read.
+    CHECK(amk_fake_track_reads() == 0);
+    CHECK(!Journaled("piste Dolby Atmos"));
+
+    amk_fake_set_variant_known(1);
     bool float32 = false;
     PlayToneThroughHookedStream(float32);
     CHECK(float32);
     std::this_thread::sleep_for(std::chrono::seconds(1));  // a few poll cycles after the item is known
 
-    std::cout << text.str();
-    std::cout << "start() returned " << (started ? "true" : "false") << '\n';
+    // The stereo render client was identified, and the stereo meter took its rate.
+    CHECK(Journaled("mesure stéréo à "));
+    // The fake item is Dolby Atmos: it starts at the fallback gain, then jumps to its saved level, 4 dB under
+    // the saved stereo target.
+    CHECK(Journaled("piste Dolby Atmos, variante abc123, gain de départ 5.0 dB"));
+    CHECK(Journaled("gain 5.0 -> 4.0 dB"));
+    // The slider was never moved: the only call to AVCFPlayerSetVolume is the one above.
+    CHECK(amk_fake_volume_calls() == volumeCalls + 1);
+    CHECK(!Journaled("CoreFP"));
+}
 
-    // The first stream sets the meter's rate: the stereo render client was identified and metered.
-    CHECK(text.str().find("débit du premier flux (flux stéréo)") != std::string::npos);
-    // The fake item is Dolby Atmos: the leveler starts it at the fallback gain, before any target is known.
-    CHECK(text.str().find("piste Dolby Atmos, variante abc123, gain de départ 5.0 dB") != std::string::npos);
-    CHECK(text.str().find("CoreFP") == std::string::npos);
+// --- Fake Atmos stream: ISpatialAudioObjectRenderStreamForMetadata ----------------------------------
+
+constexpr UINT32 kPassFrames = 480;  // 10 ms at 48 kHz
+
+// One metadata object: hands out its buffer from GetBuffer (slot 3). `Kind` gives each object type its own
+// vtable, as the commands and items objects have.
+template <int Kind>
+class FakeMetadataObject : public ISpatialAudioObjectBase {
+public:
+    float samples[kPassFrames] = {};
+    int getBufferCalls = 0;
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, void** object) override {
+        *object = nullptr;
+        return E_NOINTERFACE;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return 1; }
+    ULONG STDMETHODCALLTYPE Release() override { return 1; }
+    HRESULT STDMETHODCALLTYPE GetBuffer(BYTE** buffer, UINT32* bytes) override {
+        getBufferCalls++;
+        *buffer = reinterpret_cast<BYTE*>(samples);
+        *bytes = sizeof(samples);
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE SetEndOfStream(UINT32) override { return S_OK; }
+    HRESULT STDMETHODCALLTYPE IsActive(WINBOOL* active) override {
+        *active = TRUE;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetAudioObjectType(AudioObjectType* type) override {
+        *type = AudioObjectType_Dynamic;
+        return S_OK;
+    }
+};
+
+using FakeCommandsObject = FakeMetadataObject<1>;
+using FakeItemsObject = FakeMetadataObject<2>;
+using MetadataStream = atmos::hooks::ISpatialAudioObjectRenderStreamForMetadataLite;
+
+// The stream, declared through the interface of spatial_metadata.hpp: the compiler lays out its vtable, so the
+// hooks on slots 8, 9, 10 and 11 land on these methods only if the leveler's slot numbers match the declaration.
+class FakeMetadataStream : public MetadataStream {
+public:
+    FakeCommandsObject commands;
+    FakeItemsObject items;
+    int beginCalls = 0;
+    int endCalls = 0;
+    int activations = 0;
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, void** object) override {
+        *object = nullptr;
+        return E_NOINTERFACE;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return 1; }
+    ULONG STDMETHODCALLTYPE Release() override { return 1; }
+    HRESULT STDMETHODCALLTYPE GetAvailableDynamicObjectCount(UINT32* count) override {
+        *count = 16;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE GetService(REFIID, void**) override { return E_NOINTERFACE; }
+    HRESULT STDMETHODCALLTYPE Start() override { return S_OK; }
+    HRESULT STDMETHODCALLTYPE Stop() override { return S_OK; }
+    HRESULT STDMETHODCALLTYPE Reset() override { return S_OK; }
+    HRESULT STDMETHODCALLTYPE BeginUpdatingAudioObjects(UINT32* count, UINT32* frames) override {
+        beginCalls++;
+        *count = 16;
+        *frames = kPassFrames;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE EndUpdatingAudioObjects() override {
+        endCalls++;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE ActivateSpatialAudioObjectForMetadataCommands(AudioObjectType,
+                                                                            ISpatialAudioObjectBase** object) override {
+        activations++;
+        *object = &commands;
+        return S_OK;
+    }
+    HRESULT STDMETHODCALLTYPE ActivateSpatialAudioObjectForMetadataItems(AudioObjectType,
+                                                                         ISpatialAudioObjectBase** object) override {
+        activations++;
+        *object = &items;
+        return S_OK;
+    }
+};
+
+// The pointer as the compiler cannot see through it, so every call goes through the vtable, as Apple Music's do.
+template <typename T>
+__attribute__((noinline)) T* Opaque(T* pointer) {
+    asm volatile("" : "+r"(pointer));
+    return pointer;
+}
+
+TEST_CASE(Glue_HooksTheMetadataStreamAndGainsItsObjects) {
+    CHECK(g_glueStarted);
+    if (!g_glueStarted) return;
+
+    // Apple Music activates its Atmos stream: float32 mono objects at 48 kHz.
+    static FakeMetadataStream fake;
+    WAVEFORMATEX format{};
+    format.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+    format.nChannels = 1;
+    format.nSamplesPerSec = 48000;
+    format.wBitsPerSample = 32;
+    format.nBlockAlign = 4;
+    format.nAvgBytesPerSec = 48000 * 4;
+
+    atmos::hooks::SpatialAudioObjectRenderStreamForMetadataActivationParamsLite activation{};
+    activation.ObjectFormat = &format;
+    activation.MaxDynamicObjectCount = 16;
+    activation.Category = AudioCategory_Media;
+    PROPVARIANT params{};
+    params.vt = VT_BLOB;
+    params.blob.cbSize = sizeof(activation);
+    params.blob.pBlobData = reinterpret_cast<BYTE*>(&activation);
+    atmos::hooks::testing::SpatialStreamActivated(&params, atmos::hooks::kIidRenderStreamForMetadata, &fake);
+
+    CHECK(Journaled("flux spatial activé : ISpatialAudioObjectRenderStreamForMetadata "
+                    "(IID BBC9C907-48D5-4A2E-A0C7-F7F0D67C1FB1)"));
+    CHECK(Journaled("mesure Atmos à 48000 Hz"));
+    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::BeginUpdatingAudioObjects posé"));
+    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::EndUpdatingAudioObjects posé"));
+    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::ActivateSpatialAudioObjectForMetadataCommands posé"));
+    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::ActivateSpatialAudioObjectForMetadataItems posé"));
+
+    MetadataStream* stream = Opaque<MetadataStream>(&fake);
+    ISpatialAudioObjectBase* commands = nullptr;
+    ISpatialAudioObjectBase* items = nullptr;
+    CHECK(SUCCEEDED(stream->ActivateSpatialAudioObjectForMetadataCommands(AudioObjectType_Dynamic, &commands)));
+    CHECK(SUCCEEDED(stream->ActivateSpatialAudioObjectForMetadataItems(AudioObjectType_Dynamic, &items)));
+    CHECK(fake.activations == 2);  // the hooks passed the calls on
+    CHECK(Journaled("hook ISpatialAudioObjectForMetadataCommands::GetBuffer posé"));
+    CHECK(Journaled("hook ISpatialAudioObjectForMetadataItems::GetBuffer posé"));
+    if (!commands || !items) return;
+    commands = Opaque(commands);
+    items = Opaque(items);
+
+    // Two seconds of passes, as Apple Music renders them: open the pass, fill each object's buffer, close it.
+    constexpr int kPasses = 200;
+    constexpr float kSample = 0.1f;
+    for (int pass = 0; pass < kPasses; pass++) {
+        UINT32 count = 0;
+        UINT32 frames = 0;
+        stream->BeginUpdatingAudioObjects(&count, &frames);
+        for (ISpatialAudioObjectBase* object : {commands, items}) {
+            BYTE* buffer = nullptr;
+            UINT32 bytes = 0;
+            object->GetBuffer(&buffer, &bytes);
+            float* samples = reinterpret_cast<float*>(buffer);
+            for (UINT32 frame = 0; frame < frames; frame++) samples[frame] = kSample;
+        }
+        stream->EndUpdatingAudioObjects();
+    }
+    CHECK(fake.beginCalls == kPasses);
+    CHECK(fake.endCalls == kPasses);
+    CHECK(fake.commands.getBufferCalls == kPasses);
+    CHECK(fake.items.getBufferCalls == kPasses);
+
+    // The saved level asks for 4 dB: the ramp has converged, and the objects carry it.
+    double expected = kSample * std::pow(10.0, 4.0 / 20.0);
+    CHECK_NEAR(fake.items.samples[kPassFrames - 1], expected, 1e-3);
+    CHECK_NEAR(fake.commands.samples[kPassFrames - 1], expected, 1e-3);
+
+    std::cout << g_glueText.str();
+
+    // The levels file belongs to this run only.
+    std::error_code error;
+    std::filesystem::remove(atmos::hooks::testing::LevelsFile(), error);
 }
 
 }  // namespace

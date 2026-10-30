@@ -54,6 +54,13 @@ public:
     // Largest absolute sample seen since the last Reset, after `gain`.
     float Peak() const;
 
+    // Re-derives the weighting and the chunk length for a stream at another rate. What was measured is kept:
+    // a chunk is 100 ms whatever the rate, so the blocks before and after the change gate together. Only the
+    // chunk being filled is dropped.
+    void SetSampleRate(double sampleRate);
+
+    double SampleRate() const;
+
     void Reset();
 
 private:
@@ -67,7 +74,7 @@ private:
     size_t m_framesInChunk = 0;
     std::vector<double> m_chunkPowers;  // mean power per 100 ms chunk
 
-    size_t m_frames = 0;
+    double m_seconds = 0;  // frames / rate, summed: stays right across a rate change
     float m_peak = 0;
 };
 

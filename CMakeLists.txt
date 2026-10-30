@@ -97,13 +97,15 @@ add_executable(amk_theme_check tools/theme_check.cpp)
 target_link_libraries(amk_theme_check PRIVATE amk_theme)
 target_compile_options(amk_theme_check PRIVATE ${AMK_WARNINGS})
 
-# Atmos leveler: BS.1770 loudness meter, gain ramp, spatial object pass and gain policy. Pure C++, no Windows API.
+# Atmos leveler: BS.1770 loudness meter, gain ramp, spatial object pass, gain policy and saved levels. Pure C++, no
+# Windows API.
 add_library(atmos_leveler STATIC
     extensions/atmos-leveler/loudness_meter.cpp
     extensions/atmos-leveler/gain_ramp.cpp
     extensions/atmos-leveler/object_pass.cpp
     extensions/atmos-leveler/format_detection.cpp
-    extensions/atmos-leveler/leveler.cpp)
+    extensions/atmos-leveler/leveler.cpp
+    extensions/atmos-leveler/level_file.cpp)
 target_compile_options(atmos_leveler PRIVATE ${AMK_WARNINGS})
 
 # XAML theme backend (win/xaml_backend.cpp, win/theme_service.cpp). Off by default: it needs the Windows App SDK C++/WinRT
