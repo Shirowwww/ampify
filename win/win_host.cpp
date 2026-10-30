@@ -17,6 +17,7 @@
 
 #include "../core/audio/audio_engine.hpp"
 #include "../core/gain_board.hpp"
+#include "player_bridge.hpp"
 #include "win_services.hpp"
 
 namespace amk {
@@ -86,12 +87,15 @@ std::optional<std::string> ReadWholeFile(const std::filesystem::path& path) {
 
 WinHost::WinHost(std::string process, std::filesystem::path kitDirectory, Settings& settings, Journal& journal)
     : m_process(std::move(process)), m_kit(std::move(kitDirectory)), m_settings(settings), m_journal(journal),
+      m_player(std::make_unique<win::PlayerBridge>(m_process, m_settings, m_journal)),
       m_services(std::make_unique<win::Services>(*this, m_process, m_kit, m_journal)) {}
 
 void WinHost::SetEventSink(EventSink sink) { m_services->SetEventSink(std::move(sink)); }
 
 void* WinHost::QueryCapability(std::string_view name) {
     if (void* found = Offer<HttpPostHost>(name, this)) return found;
+    // AMK.player.queue, in both processes: what each one knows of the queue (win/player_bridge.*).
+    if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
     if (void* found = m_services->Query(name)) return found;
     // AudioHost in AMPLibraryAgent.exe only, where the audio is rendered: the process's engine, fed by the Atmos
     // leveler's hooks.
@@ -142,39 +146,11 @@ bool WinHost::WriteStorage(const std::string& elementId, const std::string& json
     return !error;
 }
 
-PlayerSnapshot WinHost::Player() {
-    // The player state is measured in AMPLibraryAgent.exe. It is not shared with the interface process yet.
-    return {};
-}
+// AMK.player: Apple's player in AppleMusic.exe, the Windows media controls (SMTC), then the media keys. See
+// win/player_bridge.*. Never the volume.
+PlayerSnapshot WinHost::Player() { return m_player->Snapshot(); }
 
-namespace {
-
-// A media key is handled by the system and by Apple Music, as on a keyboard. It never changes the volume.
-bool SendMediaKey(WORD key) {
-    INPUT inputs[2] = {};
-    inputs[0].type = INPUT_KEYBOARD;
-    inputs[0].ki.wVk = key;
-    inputs[0].ki.dwFlags = KEYEVENTF_EXTENDEDKEY;
-    inputs[1] = inputs[0];
-    inputs[1].ki.dwFlags = KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP;
-    return SendInput(2, inputs, sizeof(INPUT)) == 2;
-}
-
-}  // namespace
-
-bool WinHost::Control(PlayerCommand command, int64_t seekMs) {
-    (void)seekMs;  // no media key seeks: the command is refused
-    switch (command) {
-        case PlayerCommand::Next: return SendMediaKey(VK_MEDIA_NEXT_TRACK);
-        case PlayerCommand::Previous: return SendMediaKey(VK_MEDIA_PREV_TRACK);
-        // Play and pause are one toggle key: sending it blindly could start a stopped track or stop a playing one.
-        // They wait for the player state, which the host does not have yet.
-        case PlayerCommand::Play:
-        case PlayerCommand::Pause:
-        case PlayerCommand::Seek: return false;
-    }
-    return false;
-}
+bool WinHost::Control(PlayerCommand command, int64_t seekMs) { return m_player->Control(command, seekMs); }
 
 void WinHost::SetGainDb(const std::string& elementId, double db) {
     // Only AMPLibraryAgent.exe renders the audio, so only there does the gain reach the samples.
@@ -198,6 +174,9 @@ void WinHost::SetGainDb(const std::string& elementId, double db) {
 
 WinHost::~WinHost() {
     m_services.reset();
+    // The kernel's host is a static, destroyed while the process exits, when AMP.Services.dll may already be unloaded:
+    // releasing Apple's objects then would call into freed code. The player's few references are left to the system.
+    (void)m_player.release();
     for (const auto& [id, hotkey] : m_hotkeys) UnregisterHotKey(nullptr, id);
     if (m_notifyWindow) DestroyWindow(static_cast<HWND>(m_notifyWindow));
 }

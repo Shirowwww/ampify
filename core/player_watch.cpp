@@ -4,7 +4,8 @@ namespace amk {
 
 std::vector<std::string> PlayerWatcher::Poll(const PlayerSnapshot& snapshot) {
     std::optional<std::string> track;
-    if (snapshot.track) track = snapshot.track->id + "|" + snapshot.track->variantId;
+    // The queue entry counts too: the same song played again from the queue is a new track for the elements.
+    if (snapshot.track) track = snapshot.track->id + "|" + snapshot.track->variantId + "|" + snapshot.track->queueItemId;
 
     std::vector<std::string> events;
     if (m_known) {

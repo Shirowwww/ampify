@@ -174,8 +174,8 @@ faire.
 | `storage` | `AMK.storage`, un fichier JSON par élément, dans `storage\<id>.json` | [ferme] |
 | `notifications` | `AMK.notify`, notification Windows | [provisoire M7] |
 | `ui.keyboard` | `AMK.keyboard.bind`, raccourcis globaux ou limités à la fenêtre | [provisoire M7] |
-| `player.read` | `AMK.player.state()` et les événements du lecteur | [provisoire M4] |
-| `player.control` | `AMK.player.play()`, `pause()`, `next()`, `previous()`, `seek()` | [provisoire M4] |
+| `player.read` | `AMK.player.state()`, les événements du lecteur et `AMK.player.queue.list()` | [provisoire M4] |
+| `player.control` | `AMK.player.play()`, `pause()`, `toggle()`, `next()`, `previous()`, `seek()`, `queue.add()`, `queue.remove()` | [provisoire M4] |
 | `audio.analyze` | `AMK.audio.onFrame`, `analyze`, `loudness` : spectre, niveaux, tempo et loudness du son décodé, calculés en mémoire | [provisoire M4] |
 | `audio.gain` | `AMK.audio.setGainDb`, gain appliqué aux échantillons, borné par le plafond du noyau | [provisoire M4] |
 | `audio.eq` | `AMK.audio.eq`, égaliseur à 10 bandes appliqué aux échantillons | [provisoire M4] |
@@ -183,7 +183,7 @@ faire.
 | `ui.panel`, `ui.window`, `ui.tray` | Panneau latéral, fenêtre secondaire, icône de zone de notification | [provisoire M8] |
 | `ui.page` | Pages d'app et entrées de navigation | [provisoire M8] |
 | `library.read` | `AMK.library`, lecture de la bibliothèque et des playlists | [provisoire M8] |
-| `library.write` | Écriture de playlists et de la file, après la lecture | [provisoire M8] |
+| `library.write` | Écriture de playlists, après la lecture (la file d'attente passe par `player.control`) | [provisoire M8] |
 | `services.read` | `AMK.services.call`, appels en lecture à une liste blanche de services de l'app | [provisoire M8] |
 | `ipc.discord` | `AMK.discord`, tube local vers le client Discord, pour la présence (réglage `discord.enabled`) | [provisoire M7] |
 | `midi.input` | `AMK.midi`, entrées d'un contrôleur MIDI (réglage `midi.enabled`) | [provisoire, après M7] |
@@ -243,16 +243,39 @@ Un élément ne lit ni n'écrit les clés d'un autre élément.
 
 ```js
 AMK.player.state()
-// -> { playing, positionMs, durationMs, track: { id, title, artist, album, variantId, atmos, lossless } }
+// -> { playing, positionMs, durationMs,
+//      track: { id, title, artist, album, variantId, atmos, lossless, queueItemId } | null,
+//      source: "apple" | "smtc" | "" }
 AMK.player.on("trackchange" | "statechange", fn)
-AMK.player.play()
+AMK.player.play()        // true quand l'app a accepté la commande
 AMK.player.pause()
+AMK.player.toggle()      // lecture si en pause, pause si en lecture (player.control suffit)
 AMK.player.next()
 AMK.player.previous()
 AMK.player.seek(ms)
-AMK.player.queue.add(trackId)       // [provisoire M8]
-AMK.player.queue.remove(trackId)    // [provisoire M8]
+AMK.player.queue.list()  // -> { available, complete, source, reason, items: [{ id, title, artist, durationMs, section }] }
+AMK.player.queue.add(trackId, { position: "next" | "last" })   // [provisoire M8]
+AMK.player.queue.remove(itemId)                                // [provisoire M8]
 ```
+
+- **`track.id`** est le même quelle que soit la source : il est calculé à partir du titre, de l'artiste et de l'album
+  (`t-` suivi de 16 caractères). Un élément peut s'en servir pour garder des données par morceau.
+- **`track.queueItemId`** est l'entrée de la file chez Apple : le même morceau joué deux fois a deux entrées.
+  `trackchange` arrive quand le morceau, sa variante ou son entrée change. Vide quand la source ne le donne pas.
+- **`track.variantId`** est le format audio donné par Apple : `"lossless"`, `"hi-res-lossless"`, `"dolby-atmos"`,
+  `"spatial"`, `"surround"` ou `"other"`. Vide avec SMTC. `atmos` et `lossless` en découlent.
+- **`source`** dit qui a répondu. Sous Windows, dans `AppleMusic.exe`, le noyau lit le lecteur d'Apple
+  (`AMP.Services.Player`) ; sinon (dans `AMPLibraryAgent.exe`, ou si une nouvelle version d'Apple Music change
+  l'interface), il lit les contrôles multimédias de Windows (SMTC). `""` veut dire « état inconnu », pas « arrêté ».
+- **Les commandes** passent par SMTC, puis par une touche multimédia. `play` et `pause` ne passent par la touche
+  lecture/pause que si l'état est connu, pour ne jamais faire l'inverse. `seek` passe seulement par SMTC. Le réglage
+  `player.appleCommands = true` fait passer `play`, `pause`, `next` et `previous` par le lecteur d'Apple d'abord.
+  Une commande déjà faite (`play` pendant la lecture) répond `true` sans rien envoyer.
+- **La file** : `list()` dit ce que le noyau sait. `complete` vaut `false` quand il ne connaît qu'une partie de la
+  file (sous Windows, pour l'instant, la piste en cours seulement), et `reason` dit pourquoi. `available` vaut
+  `false` dans un hôte sans file. `add()` et `remove()` renvoient `false` quand l'hôte ne peut pas changer la file ;
+  la raison est écrite dans le journal. Sous Windows, elles répondent `false` tant que les paramètres des méthodes
+  d'Apple ne sont pas relevés sur le PC.
 
 Le volume absolu se lit avec `AMK.audio.volume()` (section 5.4), sans jamais l'écrire. Un élément qui veut changer le
 son règle un gain interne sur les échantillons (section 5.4), jamais le curseur (PARITE, section 8.1).
@@ -653,7 +676,8 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
 | `config.get/set` : une clé par élément, jamais `enabled` | fait. `get` rend un booléen, un nombre ou un texte selon la valeur par défaut | tests C++ |
 | `storage.get/set/remove` : fichier JSON par élément, quota de 1 Mo | fait. Écriture par fichier temporaire puis remplacement. Par défaut, un élément ne tourne que dans l'interface : une seule écriture à la fois | tests C++ et Wine |
 | `processes` : `ui`, `engine`, ou les deux | fait. Un élément d'un autre processus est ignoré, avec une ligne au journal | tests C++ |
-| `player.state`, `on`, `play`, `pause`, `next`, `previous`, `seek` | fait côté runtime. Le noyau Windows ne les branche pas encore : `state` est vide, les commandes répondent « non possible » | hôte factice |
+| `player.state`, `on`, `play`, `pause`, `toggle`, `next`, `previous`, `seek` | fait. Sous Windows : lecteur d'Apple (`AMP.Services.Player`, dans AppleMusic.exe), sinon SMTC, sinon touches multimédias (`win/player_bridge.*`). Commandes par SMTC, puis touche ; par le lecteur d'Apple avec `player.appleCommands` | tests C++ (slots vérifiés contre `knowledge/winmd`) ; faux objets WinRT sous Wine ; lecture réelle à voir sur le PC |
+| `player.queue.list`, `add`, `remove` | fait côté runtime (capacité `QueueHost`, `core/player_queue.hpp`). Sous Windows : `list` donne la piste en cours (`complete: false`) ; `add` et `remove` répondent `false` avec la raison au journal. Une sonde en lecture seule décrit `AMP.Services.PlayQueue` dans le journal | tests C++ ; sonde sous Wine avec de faux objets ; vraie file à relever sur le PC |
 | `audio.setGainDb` : borné par `audio.maxGainDb` (6 dB par défaut, 12 au plus) et remis à 0 à l'arrêt | fait côté runtime. Le son n'est pas encore branché (M4) | tests C++ |
 | `notify` (titre 120 caractères, texte 500) | fait. Sous Windows : bulle de notification (icône temporaire, 8 s), et une ligne au journal | tests C++ ; bulle à voir sur le PC |
 | `keyboard.bind` (forme normalisée, touche F, média ou modificateur obligatoire) | fait. Sous Windows : `RegisterHotKey`, remis sur le fil JavaScript | tests C++ ; press simulée sous Wine |
@@ -666,7 +690,7 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
 | Effet immédiat par `reload.txt` : `start`, `stop`, `restart` (manifeste relu), `rescan` | fait côté noyau. Pas encore vu dans Apple Music | tests C++, tests de la CLI |
 | `audio.onFrame`, `analyze`, `loudness`, `volume`, `eq` | fait. Sous Windows : branchés sur les hooks du nivellement Atmos (flux stéréo et objets spatiaux), qui doit être activé | tests C++ (signaux synthétiques) ; égaliseur et analyse vus sur le flux stéréo sous Wine ; écoute à faire sur le PC |
 | `color.extract` (pixels fournis par le script) | fait | tests C++ |
-| `ui.*`, `React`, `components`, `library`, `player.queue`, `services`, `lyrics`, `color.fromArtwork` | à faire (M8) | |
+| `ui.*`, `React`, `components`, `library`, `services`, `lyrics`, `color.fromArtwork` | à faire (M8) | |
 | Découverte des dossiers, activation, rechargement (`Restart`), isolement des pannes | fait | tests C++ et Wine |
 | `http.post`, `crypto.md5` | fait. Sous Windows : WinHTTP, mêmes délais et limites que `get` | tests C++ ; échec testé sous Wine, succès à voir sur le PC |
 | `i18n` (`language`, `define`, `t`) et textes du kit en français et en anglais (aide et messages principaux de `amk`) | fait. Réglage `language` : `fr`, `en`, `auto` | tests C++ et `tools/test_cli.py` |
@@ -677,7 +701,7 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
 | `fs.writeText` | fait. `output\<id>\` du kit seulement | tests C++ et Wine |
 | `audio.onSamples`, `audio.analyze` | à faire (M4) | |
 | `React`, `ReactDOM`, `hooks`, `components`, `ready` | fait côté runtime : l'arbre de primitives est produit et vérifié, les clics et changements reviennent par leurs numéros. Le rendu XAML viendra avec M8 | tests C++ (`tests/react_tests.cpp`) ; `amk test examples/react-panel` |
-| `ui.*`, `library`, `player.queue`, `services`, `lyrics`, `color` | à faire (M8) | |
+| `ui.*`, `library`, `services`, `lyrics`, `color` | à faire (M8) | |
 | Thèmes et snippets | pas chargés par cette version du noyau | |
 
 Limites connues, à corriger avant la version 1 : l'appel réseau est synchrone, donc il bloque le fil qui exécute

@@ -22,6 +22,7 @@ namespace amk {
 // cannot cross the C frames of QuickJS. The kit services (Discord, icon, remote control, MIDI, output files) are
 // capabilities kept in win/win_services.*.
 namespace win {
+class PlayerBridge;
 class Services;
 }
 
@@ -68,7 +69,7 @@ public:
     UiModel& Ui() override { return m_ui; }
 
     // AudioHost (core/audio/audio_host.hpp) in AMPLibraryAgent.exe only, where the audio is rendered: the process's
-    // engine, fed by the Atmos leveler's hooks.
+    // engine, fed by the Atmos leveler's hooks. QueueHost (core/player_queue.hpp) in both processes.
     void* QueryCapability(std::string_view name) override;
 
 private:
@@ -93,6 +94,7 @@ private:
     bool m_iconVisible = false;
     std::chrono::steady_clock::time_point m_balloonUntil;
 
+    std::unique_ptr<win::PlayerBridge> m_player;  // AMK.player and the queue capability, see win/player_bridge.*
     std::unique_ptr<win::Services> m_services;
 };
 

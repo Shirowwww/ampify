@@ -22,8 +22,26 @@ type PlayerState = {
   playing: boolean;
   positionMs: number;
   durationMs: number;
-  track: { id: string; title: string; artist: string; album: string; variantId: string; atmos: boolean; lossless: boolean } | null;
+  track: {
+    id: string;
+    title: string;
+    artist: string;
+    album: string;
+    variantId: string;
+    atmos: boolean;
+    lossless: boolean;
+    queueItemId: string;  // entrée de la file chez Apple, "" quand la source ne la donne pas
+  } | null;
+  source: "apple" | "smtc" | "";  // "" : état inconnu (aucune source n'a répondu)
 };
+type QueueItem = {
+  id: string;
+  title: string;
+  artist: string;
+  durationMs: number;
+  section: "history" | "current" | "next-added" | "next" | "autoplay" | "unknown";
+};
+type QueueState = { available: boolean; complete: boolean; source: string; reason: string; items: QueueItem[] };
 type AudioFrame = { bands: number[]; rms: number; peak: number; time: number };
 type Loudness = { momentary: number | null; shortTerm: number | null };
 type AudioAnalysis = {
@@ -109,14 +127,16 @@ declare const AMK: {
   player: {
     state(): PlayerState;
     on(event: "trackchange" | "statechange", fn: (state: PlayerState) => void): void;
-    play(): void;
-    pause(): void;
-    next(): void;
-    previous(): void;
-    seek(ms: number): void;
+    play(): boolean;
+    pause(): boolean;
+    next(): boolean;
+    previous(): boolean;
+    seek(ms: number): boolean;
+    toggle(): boolean;
     queue: {
-      add(trackId: string): void;
-      remove(trackId: string): void;
+      list(): QueueState;
+      add(trackId: string | number, options?: { position?: "next" | "last" }): boolean;
+      remove(itemId: string | number): boolean;
     };
   };
 

@@ -17,6 +17,9 @@ struct TrackInfo {
     std::string variantId;
     bool atmos = false;
     bool lossless = false;
+    // The entry of the play queue that holds this track, as Apple numbers it. The same song played twice has two
+    // entries. Empty when the source does not tell it (SMTC).
+    std::string queueItemId;
 };
 
 struct PlayerSnapshot {
@@ -24,6 +27,9 @@ struct PlayerSnapshot {
     int64_t positionMs = 0;
     int64_t durationMs = 0;
     std::optional<TrackInfo> track;  // empty when nothing is loaded
+    // Where the state was read: "apple" (AMP.Services.Player, inside Apple Music), "smtc" (the Windows media
+    // controls), or empty when no source answered. An empty source means "unknown", not "stopped".
+    std::string source;
 };
 
 enum class PlayerCommand { Play, Pause, Next, Previous, Seek };
