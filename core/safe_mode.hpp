@@ -21,6 +21,9 @@ public:
 
     int UnhealthyLaunches() const;
 
+    // Read-only version of BeginLaunch's answer: true while safe mode is on. Does not count a launch.
+    bool IsActive() const;
+
 private:
     std::string m_statePath;
     int m_maxUnhealthyLaunches;

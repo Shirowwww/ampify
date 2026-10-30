@@ -7,6 +7,7 @@ import contextlib
 import io
 import json
 import os
+import random
 import tempfile
 import unittest
 
@@ -192,6 +193,11 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("permissions[0]", text)
 
+    def test_permissions_used_by_the_parity_paths_are_accepted(self):
+        granted = ["ipc.discord", "services.read", "library.write", "ui.window", "ui.tray", "midi.input"]
+        code, text = run("manifest", self.install(manifest(permissions=granted)))
+        self.assertEqual(code, 0, text)
+
     def test_kit_api_must_match_major_version(self):
         code, text = run("manifest", self.install(manifest(kitApi="2.0")))
         self.assertEqual(code, 1)
@@ -211,6 +217,68 @@ class ManifestTests(unittest.TestCase):
         code, text = run("manifest", self.install(manifest(kind="snippet", resources="snippet.xaml"), files=("snippet.xaml", "main.js")))
         self.assertEqual(code, 1)
         self.assertIn("main : interdit pour un snippet", text)
+
+
+try:
+    from jsonschema import Draft202012Validator
+except ImportError:  # optional: the cross-check only runs where jsonschema is installed
+    Draft202012Validator = None
+
+
+@unittest.skipIf(Draft202012Validator is None, "jsonschema n'est pas installé : contrôle croisé ignoré")
+class ReferenceAgreementTests(unittest.TestCase):
+    """Random documents must get the same verdict from this validator and from jsonschema."""
+
+    POOL = [
+        "", "a", "demo-ext", "Demo", "1.0.0", "1.0", "1", "2.0", "https://a.b/c.zip", "http://a.b",
+        "a\nb", "x" * 61, "../x.js", "main.js", "colors.ini", "network:api.example.com", "fs.write",
+        "storage", "Shirowwww", "-bad", "é", "0" * 64, "a" * 64, "extension", "theme", "plugin",
+        0, 1, 1.0, 1.5, -1, True, False, None, [], ["storage"], ["storage", "storage"], {}, {"a": 1},
+    ]
+
+    def mutate(self, rng, doc):
+        doc = json.loads(json.dumps(doc))
+        for _ in range(rng.randint(1, 3)):
+            keys = list(doc)
+            roll = rng.random()
+            if keys and roll < 0.3:
+                del doc[rng.choice(keys)]
+            elif keys and roll < 0.7:
+                doc[rng.choice(keys)] = rng.choice(self.POOL)
+            else:
+                doc[rng.choice(["extra", "permissions", "appVersions", "license", "resources"])] = rng.choice(self.POOL)
+        return doc
+
+    def check(self, schema, base, mutator, count=1500):
+        rng = random.Random(42)
+        reference = Draft202012Validator(schema)
+        for _ in range(count):
+            doc = mutator(rng, base)
+            errors = []
+            validate.validate(doc, schema, schema, "", errors)
+            self.assertEqual(not errors, reference.is_valid(doc), json.dumps(doc, sort_keys=True)[:200])
+
+    def test_manifest_schema_agrees_with_jsonschema(self):
+        base = {"id": "demo-ext", "name": "Démo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww",
+                "description": "x", "kitApi": "1.0", "main": "main.js"}
+        self.check(load_schema("manifest"), base, self.mutate)
+
+    def test_catalog_schema_agrees_with_jsonschema(self):
+        entry = {"id": "demo-ext", "name": "Démo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww",
+                 "description": "x", "kitApi": "1.0", "url": "https://a.b/c.zip", "sha256": "a" * 64}
+        base = {"catalogVersion": 1, "extensions": [entry]}
+        self.check(load_schema("catalog"), base, self.mutate_catalog)
+
+    def mutate_catalog(self, rng, doc):
+        if rng.random() < 0.5:
+            return self.mutate(rng, doc)
+        entries = [self.mutate(rng, doc["extensions"][0]) for _ in range(rng.randint(0, 3))]
+        return {"catalogVersion": rng.choice([1, 1.0, 2, "1"]), "extensions": entries}
+
+
+def load_schema(kind):
+    with open(validate.SCHEMAS[kind], encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 class SchemaSubsetTests(unittest.TestCase):

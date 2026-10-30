@@ -40,4 +40,8 @@ int SafeMode::UnhealthyLaunches() const {
     return state.GetInt(kUnhealthyKey, 0);
 }
 
+bool SafeMode::IsActive() const {
+    return UnhealthyLaunches() >= m_maxUnhealthyLaunches;
+}
+
 }  // namespace amk

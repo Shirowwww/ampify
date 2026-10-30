@@ -1,166 +1,266 @@
-# Parité avec Spicetify
+# Parité avec Spicetify, et au-delà
 
-Ce tableau compare, fonction par fonction, Spicetify (Spotify) et le kit (Apple Music pour Windows).
-Référence Spicetify : [docs CLI](https://spicetify.app/docs/cli/commands), [configuration](https://spicetify.app/docs/customization/config-file),
-[thèmes](https://spicetify.app/docs/advanced-usage/themes), [extensions](https://spicetify.app/docs/development/extensions),
+L'objectif est de reproduire toutes les fonctions de Spicetify, puis d'aller plus loin. Pour chaque fonction, ce
+document donne un chemin d'implémentation concret : le mécanisme, le travail à faire, la façon de le prouver, et le
+fil de travail qui le construit. Aucune ligne n'est écartée sans chemin de remplacement.
+
+Sources Spicetify : [commandes](https://spicetify.app/docs/cli/commands),
+[configuration](https://spicetify.app/docs/customization/config-file),
+[thèmes](https://spicetify.app/docs/advanced-usage/themes),
+[extensions](https://spicetify.app/docs/development/extensions),
 [apps personnalisées](https://spicetify.app/docs/development/custom-apps) et le [dépôt](https://github.com/spicetify/cli).
 
-## Pourquoi l'écart existe
+## Pourquoi tout passe par Windows
 
-Spicetify réécrit les fichiers de Spotify. L'interface de Spotify est une application web (CEF, React) : du CSS,
-du JavaScript et des composants React suffisent pour la modifier.
+Spicetify écrit dans les fichiers de Spotify. Le kit n'écrit rien dans le paquet : il injecte son noyau au lancement,
+puis agit dans le processus. Cinq mécanismes servent à presque tout le reste :
 
-Apple Music pour Windows est une interface WinUI 3, en XAML. Il n'y a pas de bundle web à réécrire. Le kit ne
-modifie donc aucun fichier du paquet, qui est en lecture seule. Il injecte son noyau au lancement (M3). L'apparence
-passe par les ressources XAML (M8). Le comportement passe par des hooks dont les noms restent à confirmer (M4 et M8).
+1. **Injection et noyau** (M3) : lancement du paquet suspendu, puis chargement du noyau dans `AppleMusic.exe` et
+   `AMPLibraryAgent.exe`. Windhawk injecte déjà une DLL dans ces deux processus.
+2. **Moteur JavaScript dans le noyau** : QuickJS, une instance par élément, objet global `AMK`.
+3. **Arbre XAML dans le processus** : le noyau partage le processus de l'interface. Il lit les ressources de l'app,
+   parcourt l'arbre visuel depuis la fenêtre, ajoute des éléments et écoute des événements (ouverture d'un menu,
+   changement de page). Toute modification passe par le fil de l'interface.
+4. **Projections C++/WinRT des winmd** : les winmd d'Apple Music sont dans le paquet (`knowledge/winmd/`). `cppwinrt`
+   génère des projections typées. Le kit appelle alors les services internes (`AMP.Services`) par leur nom, comme
+   l'app elle-même.
+5. **Son après décodage** : l'égaliseur intégré passe par un « tap » (`AVCFAudioMixInputParametersSetAudioTapProcessor`,
+   relevé dans `knowledge/exports/AVFoundationCF.txt`). Le noyau peut s'y brancher pour lire et modifier les échantillons.
 
-Le relevé de `knowledge/apple-music-internals.md` montre que `AppleMusic.exe` embarque WebView2, un moteur
-JavaScript (V8 ou JavaScriptCoreV8) et le moteur Jet pour les pages du store. Ce sont des pistes pour des pages web
-ou du JavaScript dans l'app. Aucune n'est vérifiée.
+Pour la lecture et les commandes, on utilise aussi l'API publique SMTC de Windows, et les appels COM relevés.
 
-## Légende
+## Statuts
 
-- **Oui** : faisable avec l'architecture prévue, sans inconnue majeure.
-- **Partiel** : faisable pour une partie seulement. La limite est écrite dans la ligne.
-- **À étudier** : dépend d'un relevé pas encore fait (winmd, arbre XAML, comportement réel de l'app).
-- **Non** : hors de portée, ou écarté pour une raison écrite dans la ligne.
+- **Clair** : le mécanisme est connu. Il reste à coder et à tester, sans rien découvrir.
+- **Limité** : le mécanisme marche, avec une limite écrite dans la ligne.
+- **À prouver** : le mécanisme est plausible. Un relevé ou un test sur le PC doit le confirmer.
+- **Décision** : le chemin existe, mais il touche à une règle du projet. Voir la section 8.
+
+## Fils de travail
+
+- **JS** : « Construire le moteur d'extensions JavaScript ».
+- **XAML** : « Construire le moteur de thèmes XAML ».
+- **CLI** : « Créer la CLI et la marketplace ».
+- **Noyau** : injection, lancement, mode sans échec (M3).
+- **Audio** : tap audio et hooks Atmos (M4).
+- **Test** : kit de test sur le PC (M5). Installateur (M6).
 
 ## 1. Installation et ligne de commande
 
-| Spicetify | Équivalent dans le kit | Faisable | Jalon |
+| Spicetify | Chemin d'implémentation | Statut | Fil, jalon |
 |---|---|---|---|
-| Installateur, détection du chemin de Spotify | Installateur et désinstallation propre | Oui | M6 |
-| `spicetify backup` et `apply` : patcher les fichiers de l'app | Injection au lancement. Aucun fichier du paquet n'est écrit | Oui | M3 |
-| `spicetify restore` : revenir à l'original | `amk restore` : lancer sans injecter. Rien à restaurer dans le paquet | Oui | M6 |
-| `spicetify auto` : sauvegarder, appliquer, lancer | `amk launch` | Oui | M3 |
-| `spicetify config` : lire et écrire les réglages | `amk config`, sur le `settings.txt` déjà en place | Oui | M5 |
-| `config <liste> <élément>` et `<élément>-` : ajouter ou retirer une extension | `amk extension enable <id>` et `amk extension disable <id>` | Oui | M7 |
-| `apply --extension <fichier>` : appliquer une seule extension | `amk extension enable <id>` avec rechargement de cette seule extension | Oui | M7 |
-| `watch` : appliquer à chaque modification des fichiers du thème | `amk watch` : rechargement du thème à la sauvegarde | Partiel : couleurs et ressources XAML, pas le code natif | M8 |
-| `update` : rechargement à chaud sans relancer Spotify | Rechargement d'un thème ou d'une extension sans relancer Apple Music | Partiel : les extensions se rechargent, les ressources XAML seulement si elles le permettent | M7, M8 |
-| `enable-devtools` : outils de développement Chromium | Outils WebView2 pour les parties web, et arbre visuel XAML pour le reste | Partiel : les pages web et l'arbre XAML, pas l'interface entière | Plus tard |
-| `upgrade` et `check_spicetify_upgrade` : mise à jour du CLI | `amk update` : nouvelle version depuis une release GitHub, SHA-256 vérifié | Oui | Après M6 |
-| `path`, `config-dir` | `amk path` | Oui | M5 |
-| Restauration après une mise à jour cassée | Version gate : sur une version inconnue, le noyau reste inactif. Mode sans échec | Oui | Fait (M1) |
-| `preprocesses` : couper Sentry, la télémétrie d'interface, les règles RTL | Non retenu en v1 : le kit ne coupe pas la télémétrie d'Apple | Non | À décider après M4 |
-| `spotify_launch_flags` : port de débogage distant | Arguments de lancement d'Apple Music | À étudier | M3 |
-| Section `[Patch]` : patchs du bundle JavaScript | Sans objet : pas de bundle à patcher. Les fonctions sont résolues par nom (exports, winmd), jamais par adresse | Non | — |
+| Installateur, détection de Spotify | Installateur qui trouve le paquet Apple Music (`Get-AppxPackage`, puis le registre) et crée les dossiers de données. Il ne copie pas l'app. | Clair | Test, M6 |
+| `backup` et `apply` (patch des fichiers) | `amk apply` lance l'app avec le noyau injecté : processus suspendu puis injection, ou `IPackageDebugSettings`. Aucun fichier du paquet n'est écrit. | Clair | Noyau, M3 |
+| `restore` | `amk restore` lance l'app sans noyau. Il n'y a rien à remettre en place. Pour désinstaller : supprimer le dossier de données et la clé de démarrage. | Clair | Test, M6 |
+| `auto` | `amk launch` : vérifie l'installation, applique la configuration, lance l'app. | Clair | Noyau, M3 |
+| `config` (lire, écrire) | `amk config [clé] [valeur]`, sur le `settings.txt` existant (`core/settings.*`). | Clair | CLI, M5 |
+| `config <liste> <élément>` et `<élément>-` | `amk extension enable <id>` et `amk extension disable <id>`. La syntaxe `amk config extensions +id` et `-id` est aussi acceptée. | Clair | CLI, M7 |
+| `apply --extension <fichier>` | `amk extension enable <id>` ne charge que cet élément, sans relancer l'app. | Clair | JS, M7 |
+| `watch` | `amk watch` surveille le dossier du thème (`ReadDirectoryChangesW`) et recharge le dictionnaire de ressources à chaque sauvegarde. | Clair | XAML, M8 |
+| `update` (rechargement à chaud) | Les extensions se rechargent seules : arrêt puis démarrage. Les thèmes changent de dictionnaire actif. Les éléments XAML déjà affichés gardent l'ancien style jusqu'à leur recréation : `amk watch` recrée la page visible. | Limité | XAML, M8 |
+| `enable-devtools` | Trois outils : un port de débogage WebView2 pour les pages web (si l'app en a, à vérifier), un export JSON de l'arbre XAML (voir 7.2), et un panneau d'inspection du kit. | Limité | XAML, M8 |
+| `upgrade` | `amk update` lit la dernière release GitHub du kit, vérifie le SHA-256 publié et demande confirmation. | Clair | CLI, après M6 |
+| `path`, `config-dir` | `amk path userdata`, `amk path app` et `amk path prefs` affichent les chemins. `amk config --dir` ouvre le dossier. | Clair | CLI, M5 |
+| Restauration après une mise à jour cassée | Le noyau se désactive seul sur une version inconnue (`core/version_gate.*`). `amk versions update` récupère la liste des versions testées, publiée dans le catalogue. | Clair | Noyau (fait pour la partie noyau), CLI |
+| `--help`, `--version`, enchaînement (`backup apply enable-devtools`) | `amk` accepte plusieurs verbes sur une ligne, par exemple `amk apply devtools`. | Clair | CLI, M5 |
+| Anciennes versions (Legacy) | `amk install-kit <version>` installe une release passée, avec son SHA-256. | Clair | CLI, après M6 |
 
 ## 2. Configuration
 
-| Spicetify | Équivalent dans le kit | Faisable | Jalon |
+| Clé Spicetify | Chemin d'implémentation | Statut | Fil, jalon |
 |---|---|---|---|
-| `current_theme`, `color_scheme` | `theme.id`, `theme.scheme` dans `settings.txt` | Oui | M8 |
-| `extensions`, `custom_apps` (listes) | Une clé par élément : `extensions.<id>.enabled`, `apps.<id>.enabled`, `snippets.<id>.enabled` | Oui | M7 |
-| `inject_css`, `inject_theme_js`, `replace_colors` (activer chaque partie) | `theme.parts.colors`, `theme.parts.resources`, `theme.parts.script` | Oui | M8 |
-| `overwrite_assets` : remplacer images et polices du thème | Remplacement des ressources graphiques à l'exécution | À étudier : le paquet est en lecture seule, les polices et images passent peut-être par les ressources | M8 |
-| `sidebar_config`, `home_config` (générés) | Configuration de la barre latérale, générée par l'app `page` | À étudier : dépend de l'entrée de navigation | M8 |
+| `spotify_path` | `app_path` : chemin du paquet, détecté par l'installateur, modifiable par `amk config app_path`. | Clair | Noyau, M3 |
+| `prefs_path` | `prefs_path` : plist de préférences de l'app (relevé). Lecture seule pour le kit, sauf réglage explicite. | Clair | Test, M5 |
+| `spotify_launch_flags` | `app_launch_flags` : arguments ajoutés au lancement, par exemple le port de débogage de la ligne 1.10. | Clair | Noyau, M3 |
+| `check_spicetify_upgrade` | `check_kit_update` : vérification au démarrage de `amk`, sans téléchargement automatique. | Clair | CLI, M6 |
+| `disable_sentry`, `disable_ui_logging` | `telemetry.block`, désactivé par défaut. Voir 8.5. | Limité | Noyau, M5 |
+| `remove_rtl_rule` | Sans objet en CSS, il n'y en a pas. Pour une langue de droite à gauche, un thème règle `FlowDirection` élément par élément. | Clair | XAML, si besoin |
+| `expose_apis` | `expose_api` : active l'objet `AMK` pour les éléments. Désactivé, aucun élément JavaScript ne démarre. | Clair | JS, M7 |
+| `current_theme` | `theme.id` : thème actif. | Clair | XAML, M8 |
+| `color_scheme` | `theme.scheme` : schéma de couleurs du thème actif. | Clair | XAML, M8 |
+| `extensions` (liste) | Une clé par élément, `extensions.<id>.enabled`, au lieu d'une liste. | Clair | JS, M7 |
+| `custom_apps` (liste) | `apps.<id>.enabled`, même principe. | Clair | JS, M7 |
+| `inject_css` | `theme.parts.resources` : les règles deviennent des surcharges de ressources XAML (voir 4.2). | Limité | XAML, M8 |
+| `inject_theme_js` | `theme.parts.script` : le `main.js` du thème tourne ou non. | Clair | JS, M7 |
+| `replace_colors` | `theme.parts.colors` : les couleurs de `colors.ini` sont appliquées ou non. | Clair | XAML, M8 |
+| `overwrite_assets` | `theme.parts.assets` : images par remplacement de la source d'une ressource (`ms-appdata:///`), polices par `FontFamily`. | Limité | XAML, M8 |
+| `sidebar_config`, `home_config` (générés) | `sidebar.json` et `home.json`, générés par le kit à partir des apps enregistrées (ordre, masquage). Le plan réel de la barre latérale reste à relever. | À prouver | XAML, M8 |
+| `xpui.js_find_8008`, `xpui.js_repl_8008` (patchs) | Table de patchs par version testée, repérés par motif d'octets, jamais par adresse fixe. Voir 8.4. | Limité | Noyau, par version |
 
-## 3. Extensions : API JavaScript
+## 3. Extensions (API JavaScript)
 
-| Spicetify | Équivalent dans le kit | Faisable | Jalon |
+| Spicetify | Chemin d'implémentation | Statut | Fil, jalon |
 |---|---|---|---|
-| Fichier JavaScript unique, chargé au démarrage | `main.js` dans un dossier avec `manifest.json` | Oui | M7 |
-| Creator : TypeScript, JSX, compilation | TypeScript avec fichiers de types `.d.ts`. Pas de JSX en v1 | Partiel | Après M7 |
-| Attendre que les `Spicetify.*` existent (boucle `setTimeout`) | Le noyau appelle `main.js` une fois l'API prête. Plus besoin de boucle | Oui | M7 |
-| `Player` : état, morceau, événements | `AMK.player.state()` et `AMK.player.on(...)`, à partir de COM (`PlaybackEventDelegate`) | Partiel : à valider sur l'app réelle | M4, M5 |
-| `Player` : lecture, pause, suivant, précédent, seek | `AMK.player.play()`, `pause()`, `next()`, `previous()`, `seek()` | Partiel : passe par `MediaAppExecAgentCommandAsync` ou SMTC, à valider | M4 |
-| `Player` : volume (`setVolume`) | Non : le curseur d'Apple Music se déplacerait. Le gain se règle sur les échantillons (`AMK.audio.setGainDb`) | Non | — |
-| `Platform.History` : navigation entre les pages | `AMK.ui.navigate(chemin)` | À étudier : besoin de la navigation de l'app | M8 |
-| `Platform.Library`, `Platform.Playlists` : bibliothèque et playlists | `AMK.library` en lecture, via les services winmd (`AMP.Services`). L'écriture viendra plus tard | Partiel : lecture seulement pour l'instant | M8 |
-| `CosmosAsync` : appels à l'API interne de Spotify | Non pour l'API interne d'Apple. Pour les services tiers (Last.fm, ListenBrainz, paroles) : `AMK.http.get` limité aux hôtes déclarés | Partiel | M7 |
-| `GraphQL` : API GraphQL de Spotify | Non : API propre à Spotify | Non | — |
-| `URI` : lire et construire des liens | `AMK.uri` : liens `music://`, `https://music.apple.com` | Oui | M7 |
-| `React`, `ReactDOM`, `ReactComponent`, `ReactHook` | Non : pas de React dans WinUI. Remplacé par `AMK.ui`, une description déclarative rendue en XAML | Partiel | M8 |
-| `Topbar` : boutons dans la barre du haut | `AMK.ui.topbar.addButton(...)` | À étudier : emplacement nommé dans l'arbre XAML | M8 |
-| `Playbar` : boutons dans la barre de lecture | `AMK.ui.playbar.addButton(...)` | À étudier : même question | M8 |
-| `ContextMenu` : entrées du clic droit | `AMK.ui.menu.addItem('context', ...)` | À étudier : le menu contextuel doit être repéré dans l'arbre XAML | M8 |
-| `Menu` : entrées du menu de l'app | `AMK.ui.menu.addItem('app', ...)` | À étudier | M8 |
-| `PopupModal` : fenêtres modales | `AMK.ui.popup.open(vue)`, avec un `ContentDialog` WinUI | Partiel | M8 |
-| `Panel`, `AppTitle` : panneau latéral et titre de fenêtre | `AMK.ui.panel.register(...)` et `AMK.ui.title.set(...)` | À étudier | M8 |
-| `showNotification` : message à l'écran | `AMK.notify({title, text})`, par notification Windows | Oui | M7 |
-| `Keyboard` : raccourcis clavier | `AMK.keyboard.bind('Ctrl+Alt+L', fn)`. Raccourcis globaux (RegisterHotKey) ou limités à la fenêtre | Oui | M7 |
-| `LocalStorage` : stockage par extension | `AMK.storage`, un fichier JSON par extension | Oui | M7 |
-| `Config` : lire la configuration | `AMK.config.get(clé)`, limité aux clés de l'extension | Oui | M7 |
-| `addToQueue`, `removeFromQueue` : file d'attente | `AMK.player.queue.add(...)` et `remove(...)` | À étudier : file d'attente dans `AMP.Services` | M8 |
-| `colorExtractor` : couleur dominante de la pochette | `AMK.color.fromArtwork(url)` | Partiel : il faut trouver où l'app décode la pochette | M8 |
-| `getAudioData` : données d'analyse audio | `AMK.audio.onSamples` : analyse locale (niveaux, spectre) sur le son décodé. Pas de données serveur | Partiel : après M4 | M4 |
-| `SVGIcons`, `getFontStyle` : icônes et polices | `AMK.icons.get(nom)` : jeu d'icônes fourni par le kit | Oui | M7 |
-| `Locale` : textes traduits | `AMK.locale` : langue de l'app | Oui | M7 |
-| *(sans équivalent Spicetify)* Hooks audio après décodage : nivellement Atmos, gain, égaliseur | `AMK.audio.onSamples` et `AMK.audio.setGainDb`, sur le modèle du nivellement Atmos | Partiel : à valider sur de vrais morceaux Atmos | M4 |
+| Fichier JavaScript unique | `main.js` dans un dossier avec `manifest.json`, chargé par le noyau. | Clair | JS, M7 |
+| Creator (TypeScript, JSX, compilation) | `amk-creator` : types `amk.d.ts` générés depuis la spec, JSX compilé vers `AMK.React`, un seul fichier en sortie. Le compilateur reste à choisir sous licence permissive. | Clair | CLI, après le moteur JS |
+| Attendre que les API existent (boucle `setTimeout`) | `AMK.ready`, une Promise résolue quand le lecteur et l'interface sont prêts. | Clair | JS, M7 |
+| `Player` : état, morceau, événements | Lecture par SMTC (titre, artiste, album, état, position) et par COM (`PlaybackEventDelegate`). Identifiant de variante par `AVCFPlayerItemCopyCurrentStableVariantID` (relevé). Le lien avec l'identifiant de morceau Apple reste à établir. | Limité | Noyau, M4 et M5 |
+| `Player` : lecture, pause, suivant, précédent, seek | SMTC : `TryPlayAsync`, `TryPauseAsync`, `TrySkipNextAsync`, `TrySkipPreviousAsync`. Ou `MediaAppExecAgentCommandAsync` (relevé). Le seek est à prouver. | Limité | JS, M4 |
+| `Player` : volume | Décision, voir 8.1. | Décision | Audio, M4 |
+| `Platform.History` (navigation) | `AMK.ui.navigate(route)`. Le kit tient une table de routes : chaque route renvoie à une page de l'app (types de `AMP.UI.Views`) ou à une page du kit. Le paramètre attendu par chaque page reste à relever. | Limité | XAML, M8 |
+| `Platform.Library`, `Platform.Playlists` | Projection winmd de `AMP.Services` : lecture de la bibliothèque et des playlists par les services de l'app. Lecture d'abord, écriture ensuite, sous une permission `library.write` à créer. | Limité | Noyau et JS, M8 |
+| `CosmosAsync` | Voir 8.2. | Limité | Noyau, M8 |
+| `GraphQL` | Voir 8.3. | Limité | Noyau, M8 |
+| `URI` | `AMK.uri` en JavaScript : analyse et construction des liens `music:`, `musics:`, `itms:` et `https://music.apple.com`. Testé sous Node. | Clair | JS, M7 |
+| `React` | `AMK.React` : petit moteur compatible avec l'écriture React (hooks de base, fragments, props), qui rend l'arbre de primitives du kit. | Clair | JS, M7 |
+| `ReactDOM` | `AMK.ReactDOM.render(vue, cible)` : la cible est un conteneur du kit (page, popup, panneau). | Clair | JS, M7 |
+| `ReactComponent` (Button, Toggle, etc.) | `AMK.components` : Button, Toggle, Slider, Card, List, Dropdown, Tooltip, aux couleurs du thème. Les composants internes de Spotify ne se reprennent pas tels quels. | Clair | JS et XAML, M8 |
+| `ReactHook` | `AMK.hooks` : `useState`, `useEffect`, `useMemo`, `useRef`, `useContext`, plus `usePlayer()` et `useTheme()` qui s'abonnent aux événements. | Clair | JS, M7 |
+| `TippyProps` | `AMK.ui.tooltip` : `ToolTipService.ToolTip`, avec délai et position. | Clair | XAML, M8 |
+| `Topbar` (boutons de la barre du haut) | Repérer le panneau de la barre du haut par parcours de l'arbre (identifiant d'automatisation, sinon type), puis y insérer un `Button`. Le nom du panneau reste à relever. | À prouver | XAML, M8 |
+| `Playbar` (boutons de la barre de lecture) | Même principe, sur le panneau qui contient les commandes de lecture. | À prouver | XAML, M8 |
+| `ContextMenu` | Écouter `FlyoutBase.Opening` sur les menus de l'app, lire le `DataContext` (le morceau visé), ajouter des `MenuFlyoutItem`. | Limité | XAML, M8 |
+| `Menu` (menu de l'app) | Ajouter une entrée à la barre de menus si elle existe, sinon à un menu du kit dans la barre du haut. | À prouver | XAML, M8 |
+| `PopupModal` | `ContentDialog` avec le `XamlRoot` de la fenêtre active. | Clair | XAML, M8 |
+| `Panel` | Un `Grid` ajouté à droite de la fenêtre, ouvert et fermé par un bouton, largeur mémorisée. La place est partagée avec la mise en page de l'app. | Limité | XAML, M8 |
+| `AppTitle` | `AppWindow.Title`, remis à la valeur d'origine à la fermeture. | Clair | XAML, M8 |
+| `Keyboard` | `AMK.keyboard.bind("Ctrl+Alt+L", fn)` : `RegisterHotKey` pour les raccourcis globaux, et `KeyDown` sur la fenêtre pour ceux qui ne valent que dans l'app. | Clair | JS, M7 |
+| `LocalStorage` | `AMK.storage` : un fichier JSON par élément. | Clair | JS, M7 |
+| `Config` | `AMK.config.get` et `AMK.config.set`, limités aux clés de l'élément. | Clair | JS, M7 |
+| `Queue` (propriété) | `AMK.player.queue.list()`, lu depuis le service de file d'attente d'`AMP.Services`. Lecture seule d'abord. | Limité | Noyau et JS, M8 |
+| `addToQueue`, `removeFromQueue` | `AMK.player.queue.add(id)` et `remove(id)`, par le service de file. Il faut prouver que l'appel passe par le service, et non par l'interface. | À prouver | Noyau, M8 |
+| `colorExtractor` | Lire les pixels de la pochette affichée (`RenderTargetBitmap`), puis extraire les couleurs dominantes par quantification. L'algorithme se teste hors de l'app. | Limité | JS et noyau, M8 |
+| `getAudioData` | `AMK.audio.analyze()` : niveau, spectre (FFT) et tempo, calculés sur le tap audio, en mémoire. | Limité | Audio, M4 |
+| `showNotification` | `AMK.notify({ title, text })` : notification Windows par `AppNotificationManager`. | Clair | JS, M7 |
+| `getFontStyle` | `AMK.fonts.style(nom)` : famille et graisse utilisées par le thème pour un rôle (titre, texte). | Clair | XAML, M8 |
+| `SVGIcons` | `AMK.icons` : jeu d'icônes livré avec le kit, plus Segoe Fluent Icons (police de Windows 11). La licence du jeu reste à vérifier. | Clair | JS, M7 |
+| `Locale` | `AMK.locale` : langue de Windows et langue de l'app. | Clair | JS, M7 |
 
 ## 4. Thèmes
 
-| Spicetify | Équivalent dans le kit | Faisable | Jalon |
+| Spicetify | Chemin d'implémentation | Statut | Fil, jalon |
 |---|---|---|---|
-| `color.ini` : couleurs nommées, sections de schémas (`[Base]`, `[Dark]`) | `colors.ini`, même forme. Chaque couleur remplace une brosse XAML | Partiel : la liste des brosses à remplacer reste à relever | M8 |
-| `user.css` : règles CSS libres | Non en CSS, il n'y a pas de DOM. `resources.xaml` : dictionnaire de ressources, limité à une liste de clés autorisées | Partiel | M8 |
-| `theme.js` : JavaScript livré avec le thème | `main` dans le manifeste d'un thème, exécuté comme une extension | Oui | M7 |
-| Choix du schéma de couleurs | `defaultScheme` et choix dans les Réglages | Oui | M8 |
-| Thème dans le dépôt officiel `spicetify-themes` | Dépôt de thèmes du kit, même principe | Oui | Après M8 |
-| Recharger un thème modifié | `amk watch` (voir section 1) | Partiel | M8 |
+| `color.ini` (sections, couleurs nommées) | `colors.ini` : chaque clé remplace une couleur ou une brosse du dictionnaire de l'app, pour les thèmes clair et sombre. La liste des clés se relève sur le dictionnaire réel. | Limité | XAML, M8 |
+| `user.css` (règles libres) | `resources.xaml` : des styles et des modèles de contrôle surchargent les types standard (`Button`, `TextBlock`…) et les éléments nommés. Pas de sélecteur CSS complet, mais des cibles par type et par nom. | Limité | XAML, M8 |
+| `theme.js` | `main.js` du thème, exécuté comme une extension. | Clair | JS, M7 |
+| Schémas de couleurs (`[Base]`, `[Dark]`) | Sections de `colors.ini`, et `theme.scheme` pour le choix. | Clair | XAML, M8 |
+| Parties d'un thème | `theme.parts.*`, voir 2 (`inject_css`, `inject_theme_js`, `replace_colors`). | Clair | XAML, M8 |
+| Images et polices | Voir 2 (`overwrite_assets`). | Limité | XAML, M8 |
+| Dépôt officiel de thèmes | Dépôt `amk-themes`, même format, validé en CI par `tools/validate.py`. | Clair | CLI, après M8 |
+| Recharger un thème modifié | Voir 1 (`watch`). | Clair | XAML, M8 |
 
 ## 5. Apps personnalisées
 
-| Spicetify | Équivalent dans le kit | Faisable | Jalon |
+| Spicetify | Chemin d'implémentation | Statut | Fil, jalon |
 |---|---|---|---|
-| Dossier `CustomApps/<nom>/` avec `index.js`, `manifest.json`, `style.css` | Dossier `apps/<id>/` avec `manifest.json` (`kind: app`), `main.js` et `icon` SVG | Oui pour le format | M7 |
-| `render()` en React, sans JSX | `AMK.ui.page.register(chemin, vue)` avec une vue déclarative | Partiel | M8 |
-| Entrée dans la barre latérale, icône normale et active | Entrée de navigation, icône SVG en deux états | À étudier | M8 |
-| Routage et sous-pages (`Platform.History.push`) | `AMK.ui.navigate` et chemins déclarés par la page | À étudier | M8 |
-| Page en HTML, dans WebView2 | Option : une app peut être une page web. WebView2 est déjà dans `AppleMusic.exe` | À étudier : aucun emplacement de page identifié | M8 |
-| `subfiles_extension` : scripts lancés au démarrage | Une app peut déclarer des extensions (`permissions` et `main` du manifeste) | Oui | M7 |
+| Dossier `CustomApps/<nom>/` (`index.js`, `manifest.json`, `style.css`) | `apps/<id>/` : `manifest.json` (`kind: app`), `main.js`, icône `.svg`. Le style passe par les ressources (4.2). | Clair | JS, M7 |
+| `render()` en React, sans JSX | `AMK.React` et les composants de 3 (`React`, `ReactComponent`). | Clair | JS, M7 et M8 |
+| Entrée de barre latérale, icône normale et active | Ajouter un `NavigationViewItem` à la barre latérale, si elle est un `NavigationView` (à vérifier). L'icône : le `d` du SVG devient la géométrie d'un `PathIcon`, pour les icônes d'un seul tracé. L'état actif suit la sélection. | À prouver | XAML, M8 |
+| Routage et sous-pages (`Platform.History.push`) | `AMK.ui.navigate(route)` et les routes déclarées par l'app (voir 3). | Limité | XAML, M8 |
+| Page en HTML | Option : une page WebView2 créée en code, qui parle au noyau par `AMK.bridge.postMessage`. WebView2 est présent dans le paquet (relevé) ; reste à confirmer qu'il est utilisable comme runtime. | Limité | XAML, M8 |
+| `subfiles_extension` (scripts au démarrage) | Une app peut être liée à une extension de même identifiant : l'extension tourne au démarrage, l'app à l'ouverture de sa page. | Clair | JS, M7 |
+| `subfiles` (plusieurs fichiers, sous-dossiers) | Modules ES : `import` relatif, limité au dossier de l'élément. | Clair | JS, M7 |
 
 ## 6. Snippets et marketplace
 
-| Spicetify | Équivalent dans le kit | Faisable | Jalon |
+| Spicetify | Chemin d'implémentation | Statut | Fil, jalon |
 |---|---|---|---|
-| Snippets : petits fragments CSS que l'on active | `kind: snippet` : fragment `resources.xaml` activable | Partiel | M8 |
-| Marketplace : onglet dans l'app pour parcourir et installer | Catalogue JSON sur GitHub, avec `amk install <id>` d'abord, puis un onglet dans l'app | Partiel : l'onglet dépend de `ui.page` | M7 (catalogue), M8 (onglet) |
-| Installation depuis le marketplace avec mise à jour | `amk install` et `amk update` : vérification du SHA-256 à chaque fois | Oui | M7 |
+| Snippets (petits CSS activables) | `kind: snippet` : fragment `resources.xaml` activable par `amk snippet enable <id>`. | Limité | XAML, M8 |
+| Marketplace : onglet dans l'app | Phase 1 : `amk market` lit `catalog/catalog.json` et installe. Phase 2 : un onglet, qui est une page d'app (5), lit le même catalogue. | Limité | CLI puis XAML, après M8 |
+| Installer et mettre à jour depuis la marketplace | `amk install <id>` et `amk update <id>` : SHA-256 vérifié, permissions affichées avant l'activation. | Clair | CLI, M7 |
+| Catalogue public | `catalog/catalog.json`, schéma, validateur et relecture humaine, voir `CATALOG.md`. | Clair | Fait, M7 |
 
 ## 7. Outils de développement
 
-| Spicetify | Équivalent dans le kit | Faisable | Jalon |
+| Spicetify | Chemin d'implémentation | Statut | Fil, jalon |
 |---|---|---|---|
-| Console du développeur (journaux des extensions) | Journal du noyau et `AMK.log`, lisibles dans `%LOCALAPPDATA%` | Oui | Fait en partie (M1) |
-| React DevTools : inspecter l'arbre de composants | Arbre visuel XAML (Live Visual Tree) et outils WebView2 | À étudier | Plus tard |
-| Creator : modèle de projet, tests, compilation | `amk new <type>` et les fichiers de types. Pas prévu avant M8 | Partiel | Après M8 |
-| Rechargement à chaud d'une extension en développement | Arrêt puis démarrage de la seule extension, sans relancer l'app | Oui | M7 |
+| Console du développeur | `amk logs --follow` (journal du noyau et `AMK.log`), plus un volet de journal dans le panneau d'inspection. | Clair | CLI, M5 |
+| React DevTools | `amk inspect` : arbre de `AMK.React` (inspectable par construction) et export JSON de l'arbre XAML, affiché dans le navigateur. Pour l'interface native, il n'existe pas d'outil officiel équivalent. | Limité | CLI et XAML, M8 |
+| Creator (projet, tests, compilation) | `amk new <type>`, `amk build` (compilation, validation du manifeste, zip, SHA-256) et `amk test` (voir 7.5). | Clair | CLI, après le moteur JS |
+| Rechargement à chaud pendant le développement | `amk dev <dossier>` : surveille le dossier et recharge l'élément à chaque sauvegarde. | Clair | CLI, après M7 |
+| Tests d'éléments | `amk test` exécute le `main.js` dans Node, avec un faux `AMK` qui suit le contrat de l'API. Pas besoin de l'app. Un prototype existe dans `tools/`. | Clair | CLI, après M7 |
+| Types pour l'éditeur | `amk.d.ts` généré depuis la même source que `docs/extensions/API.md`. | Clair | JS |
 
-## Résumé
+## 8. Les fonctions qui n'étaient pas directes
 
-Sur les 68 fonctions comparées (sections 1 à 7) :
+Quatre lignes n'avaient pas d'équivalent direct. Elles ont maintenant un chemin, avec sa limite.
 
-- **30 Oui** : faisables avec l'architecture prévue.
-- **20 Partiel** : faisables en partie, avec la limite écrite dans la ligne.
-- **14 À étudier** : à décider après un relevé sur l'app réelle.
-- **4 Non** : hors de portée ou écartées.
+### 8.1 Volume du lecteur (`Player.setVolume`) : décision
 
-Les lignes « À étudier » et « Partiel » qui touchent à l'interface se décident surtout après le relevé de l'arbre XAML,
-en M8. Les lignes « Partiel » sur le lecteur et le son se décident après M4.
+Le volume du lecteur est lié au curseur d'Apple Music. Le régler déplacerait le curseur, ce qui va contre une règle
+du projet (voir `PROGRESS.md`). Deux chemins existent :
 
-## Ce que le kit fera mieux
+- **A. Gain sur les échantillons seulement** (chemin actuel) : `AMK.audio.setGainDb` agit sur le son décodé. Le
+  curseur ne bouge pas, et le volume reste celui de l'utilisateur.
+- **B. Shim de lecture** : le noyau répond au curseur une autre valeur que le volume réel, pour afficher le volume
+  réglé. L'interface afficherait alors un chiffre faux. Je le déconseille.
 
-- **Le son.** Spicetify ne touche pas à l'audio. Le kit peut agir sur le son décodé (Atmos, gain, égaliseur), sans
-  toucher au volume affiché.
-- **Pas de patch de fichiers.** Rien n'est écrit dans le paquet MSIX. Une mise à jour d'Apple Music ne laisse pas de
-  fichiers modifiés à réparer, et la désinstallation consiste à lancer sans injecter.
-- **Les versions connues.** Sur une version non testée, le noyau reste inactif plutôt que de deviner.
+Voir la section 11.
 
-## Ce qui ne sera pas copié
+### 8.2 `CosmosAsync` (API interne de Spotify)
 
-- L'API interne de Spotify (`CosmosAsync`, `GraphQL`) : ce n'est pas l'API d'Apple et elle n'est pas publique.
-- React dans les extensions : la description déclarative tient le même rôle sans React.
-- Le CSS libre : il n'y a pas de DOM. Les thèmes passent par les ressources XAML.
-- La télémétrie : décision reportée après M4.
+Chemin : `AMK.services.call(...)` appelle les services que l'app utilise déjà, par leurs projections de `AMP.Services`.
+Les appels sont en lecture seule, sur une liste blanche de méthodes publiée avec le kit. Pas de nouvelle connexion vers
+Apple : on réutilise ce que l'app fait déjà. Pour le catalogue public, l'API MusicKit exige un jeton développeur (compte
+Apple Developer). Option à ouvrir plus tard, hors v1. *Statut : Limité.*
 
-## Ordre de travail
+### 8.3 `GraphQL`
 
-1. **M7 (maintenant)** : format du manifeste, schéma du catalogue, validateur, API et tableau de parité. Ce qui est
-   écrit ici ne touche pas à l'app.
-2. **M3 et M4** : confirmer le lancement, le moteur d'injection et les hooks audio. Les lignes « Partiel » et
-   « À étudier » qui dépendent de l'app réelle se décident là.
-3. **M7 (suite)** : runtime JavaScript dans le noyau, chargement des extensions depuis un dossier, `amk extension`,
-   `amk install`.
-4. **M8** : thèmes XAML, `amk watch`, puis apps, snippets et l'onglet du marketplace, selon les relevés d'arbre XAML.
+Spotify a une API GraphQL. Apple n'en expose pas d'équivalent connu. Les données passent par les services de 8.2, et
+il n'y a pas de traduction GraphQL. *Statut : Limité.*
+
+### 8.4 Section `[Patch]` (patchs du bundle JavaScript)
+
+Chemin en trois étages :
+
+1. **Ressources XAML** du paquet, surchargées à l'exécution (voir 4.2). C'est le cas le plus courant.
+2. **Scripts éventuels de l'app** : le paquet contient V8, JavaScriptCoreV8 et le moteur Jet, pour les pages du store.
+   Il faut relever s'il existe du JavaScript modifiable à l'exécution.
+3. **En dernier recours**, une table de motifs d'octets par version testée. Jamais une adresse fixe, pour respecter la
+   règle « résoudre par nom ». Une version absente de la table ne reçoit aucun patch (version gate).
+
+*Statut : Limité.* Chaque mise à jour d'Apple Music demande une vérification.
+
+### 8.5 Préprocessus de télémétrie (`disable_sentry`, `disable_ui_logging`)
+
+Chemin : `telemetry.block`, désactivé par défaut. Le noyau répond localement aux requêtes envoyées aux hôtes de
+télémétrie relevés, en accrochant les appels réseau de `AppleMusic.exe` (WinHTTP ou WinINet, selon ce que l'app
+utilise). Les hôtes de licence et de DRM ne figurent jamais sur cette liste, et le code ne les touche pas.
+*Statut : Limité.* La liste d'hôtes vient d'une capture du trafic, faite sur le PC par le kit de test (M5).
+
+## 9. Au-delà de Spicetify
+
+Idées ajoutées pour aller plus loin. Chacune a un chemin, et son statut suit la même légende.
+
+| Idée | Chemin d'implémentation | Statut | Fil, jalon |
+|---|---|---|---|
+| Nivellement Atmos | Déjà écrit : extension intégrée au noyau, gain sur les échantillons, cible stéréo. | Limité | Audio, M4 (validé hors app seulement) |
+| Égaliseur et effets audio | DSP natif (C++) branché sur le tap, réglé par `AMK.audio.setBand(...)`. Pas de DSP en JavaScript, trop lent. | À prouver | Audio, M4 |
+| Mesure LUFS affichée | Résultat du meter BS.1770 (`extensions/atmos-leveler/`) dans le panneau d'inspection. | Clair | Audio et test, M5 |
+| Paroles (fenêtre ou surimpression) | `AMK.lyrics.current()` par les services de paroles de l'app (`AMP.Services`), ou un fournisseur ouvert (LRCLIB) via `network:`. | Limité | JS, M8 |
+| Discord Rich Presence | Élément qui parle au client Discord par son tube local (`\\.\pipe\discord-ipc-0`), avec une permission `ipc.discord`. | Clair | JS, M7 |
+| Scrobbling Last.fm et ListenBrainz | `AMK.http` vers les hôtes déclarés, clés saisies par l'utilisateur et gardées dans `storage`. | Clair | JS, M7 |
+| Touches média et raccourcis globaux | SMTC et `RegisterHotKey`. La touche lecture/pause du clavier agit sur l'app. | Clair | Noyau, M3 |
+| Mini-lecteur toujours au-dessus | Fenêtre WinUI secondaire (`AppWindow`, `OverlappedPresenter.IsAlwaysOnTop`) avec les commandes SMTC. | Clair | XAML, M8 |
+| Icône dans la zone de notification | `Shell_NotifyIconW` depuis le noyau, avec un menu. | Clair | Noyau, M3 |
+| Télécommande locale | Serveur HTTP ou WebSocket lié à `127.0.0.1` seulement, jeton créé à l'installation. Sert aux téléphones et aux Stream Deck. | Clair | Noyau, après M7 |
+| Contrôleur MIDI | `midiInOpen` (Win32) : notes et contrôleurs reliés à des commandes du kit. Pas de retour lumineux. | Limité | JS et noyau, après M7 |
+| « En cours » pour OBS ou un stream | Fichier texte mis à jour, ou source de la télécommande locale. | Clair | JS, M7 |
+| Minuteur de sommeil | `AMK.player.pause()` à l'heure choisie, avec la permission `player.control`. | Clair | JS, M7 |
+| Statistiques d'écoute | Journal JSON local : titre, artiste, durée écoutée. Métadonnées seulement, jamais de fichier audio ni de flux. | Clair | JS, M7 |
+| Playlists M3U8 (import et export) | Services de bibliothèque (voir 3), fichiers locaux. | Limité | JS et noyau, M8 |
+| Profils de réglages | `amk profile use <nom>` : un dossier de réglages par profil (travail, soirée, test). | Clair | CLI, M5 |
+| Thème qui suit le système ou l'heure | `UISettings.ColorValuesChanged` pour clair et sombre, et horaires dans le thème. | Clair | XAML, M8 |
+| Accessibilité | Thème à contraste élevé et réglage de la taille du texte, par les ressources. | Clair | XAML, M8 |
+| Diagnostic (`amk doctor`) | Version d'Apple Music, mode sans échec, état de chaque élément, dernières lignes du journal, dans un seul rapport. Sert aux tests. | Clair | CLI, M5 |
+| Export et import des réglages | `amk export <fichier.zip>` et `amk import`, sans les fichiers de l'app. | Clair | CLI, M6 |
+| Interface du kit en français et en anglais | `AMK.locale` et des fichiers de textes FR et EN. | Clair | JS, M7 |
+| Visualiseur dans la barre de lecture | Spectre (voir 3, `getAudioData`) dessiné dans un `Path` ou un canevas. Le coût CPU reste à mesurer. | Limité | XAML, M8 |
+
+## 10. Comment chaque chemin sera prouvé
+
+- **Logique pure** (JavaScript, validateur, mesure, réglages) : tests sous Node et sous Linux, sans l'app.
+- **Mécanismes Windows** (injection, arbre XAML, SMTC, notifications) : sondes exécutées sur le PC par le kit de test
+  (M5). Le résultat est écrit dans le rapport.
+- **Services internes** (projections winmd) : une sonde appelle chaque méthode retenue en lecture seule, et journalise
+  le résultat (M3 et M8).
+- **Son** (tap, hooks, Atmos) : mesures sur des morceaux réels, sur le PC, avec un enregistrement en mémoire seulement
+  (M4).
+- **Ce qui ne se teste pas ici** : tout ce qui touche à l'app réelle. Il n'y a ni KVM ni QEMU dans ce conteneur, et
+  Apple Music demande Windows, un compte du Microsoft Store et un abonnement. Le compte reste sur le PC de l'utilisateur, comme
+  le prévoit `MASTER_PROMPT.md`.
+
+## 11. Décision en attente
+
+Une seule décision touche une règle du projet : le volume du lecteur (8.1). Le chemin par défaut est A : le gain agit
+sur les échantillons, et le curseur d'Apple ne bouge pas. Il n'est pas remis en cause sans un choix explicite.

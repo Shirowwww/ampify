@@ -118,9 +118,16 @@ faire.
 | `audio.analyze` | `AMK.audio.onSamples`, lecture seule du son décodé, en mémoire | [provisoire M4] |
 | `audio.gain` | `AMK.audio.setGainDb`, gain appliqué aux échantillons, borné par le plafond du noyau | [provisoire M4] |
 | `ui.topbar`, `ui.playbar`, `ui.menu`, `ui.popup` | Ajout d'éléments d'interface à ces emplacements | [provisoire M8] |
+| `ui.panel`, `ui.window`, `ui.tray` | Panneau latéral, fenêtre secondaire, icône de zone de notification | [provisoire M8] |
 | `ui.page` | Pages d'app et entrées de navigation | [provisoire M8] |
 | `library.read` | `AMK.library`, lecture de la bibliothèque et des playlists | [provisoire M8] |
+| `library.write` | Écriture de playlists et de la file, après la lecture | [provisoire M8] |
+| `services.read` | `AMK.services.call`, appels en lecture à une liste blanche de services de l'app | [provisoire M8] |
+| `ipc.discord` | Tube local vers le client Discord, pour la présence | [provisoire M7] |
+| `midi.input` | Entrées d'un contrôleur MIDI | [provisoire, après M7] |
 | `network:<hôte>` | `AMK.http.get`, uniquement vers l'hôte déclaré | [ferme] pour le mécanisme |
+
+Chaque chemin de [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md) indique la permission qu'il demande.
 
 Il n'existe pas de permission pour régler le volume du lecteur, ni pour l'accès au système de fichiers ou au code natif.
 Ils ne seront pas ajoutés.
@@ -185,8 +192,13 @@ AMK.audio.analyze(...)   // niveaux et spectre, calculés localement sur les éc
 
 ### 5.5 Interface [provisoire M8]
 
-L'interface n'est pas décrite en XAML, ni en React. Une extension décrit une arborescence de primitives. Le noyau la
-rend en XAML.
+Une extension décrit son interface de deux façons, qui donnent le même résultat :
+
+- directement, par une arborescence de primitives ;
+- avec `AMK.React`, un petit moteur qui accepte l'écriture React (hooks de base, fragments, props) et produit la même
+  arborescence. Les composants internes de Spotify ne se reprennent pas : on utilise `AMK.components` à la place.
+
+Dans les deux cas, le noyau rend l'arborescence en XAML.
 
 Primitives prévues : `stack`, `row`, `text`, `button`, `toggle`, `slider`, `list`, `image`, `icon`.
 
@@ -211,9 +223,9 @@ AMK.ui.playbar.addButton({
 });
 ```
 
-Une extension ne peut pas injecter de XAML brut. C'est la limite la plus importante de l'API : elle évite qu'un élément
-de la communauté touche à des parties de l'interface qu'on n'a pas relevées. Les thèmes sont le seul cas où du XAML
-est livré par un élément (section 6).
+Une extension ne peut pas injecter de XAML brut en v1. Elle évite qu'un élément de la communauté touche à des parties de
+l'interface qu'on n'a pas relevées. Les thèmes sont le seul cas où du XAML est livré par un élément (section 6). Une
+version suivante pourra accepter du XAML validé contre une liste de types et de propriétés autorisés (voir section 11).
 
 ### 5.6 Services [provisoire M7 et M8]
 
@@ -225,10 +237,15 @@ AMK.uri.parse(texte) / AMK.uri.build(...)        // [ferme] liens music:// et ht
 AMK.icons.get(nom) -> chaîne SVG                 // [provisoire M7]
 AMK.color.fromArtwork(url) -> Promise<couleur>   // [provisoire M8]
 AMK.library.playlists() / AMK.library.tracks()   // [provisoire M8] permission library.read
+AMK.services.call(service, méthode, args)        // [provisoire M8] permission services.read, liste blanche
+AMK.lyrics.current() -> Promise<paroles>         // [provisoire M8] permission player.read
+AMK.audio.analyze() -> { level, spectrum, tempo } // [provisoire M4] permission audio.analyze
 ```
 
 `AMK.http.get` ne sert qu'aux services tiers (Last.fm, ListenBrainz, fournisseurs de paroles). Il ne peut pas
 atteindre les API internes d'Apple : le noyau refuse tout hôte qui ne figure pas dans les permissions du manifeste.
+`AMK.services.call` ne crée pas de connexion nouvelle : il appelle les services que l'app utilise déjà, et seulement
+ceux de la liste blanche publiée avec le kit.
 
 ## 6. Thèmes, apps et snippets
 
@@ -293,13 +310,23 @@ Ces points doivent être confirmés avant de passer au statut « ferme » :
 - le format des échantillons transmis à `AMK.audio.onSamples` (M4) ;
 - l'emplacement des éléments d'interface dans l'arbre XAML (M8) ;
 - la liste des clés XAML autorisées pour les thèmes (M8) ;
-- les limites de temps et de mémoire d'un élément (à fixer en M7, sur des mesures).
+- les limites de temps et de mémoire d'un élément (à fixer en M7, sur des mesures) ;
+- les chemins de la section 8 de PARITE-SPICETIFY.md, qui dépendent de l'app réelle : la navigation, la barre
+  latérale, les emplacements de la barre du haut et de la barre de lecture, la file d'attente, les hôtes de télémétrie.
 
-## 11. Écarté pour la v1
+## 11. Hors v1, avec leur chemin
 
-- **DLL natives de la communauté** : elles tourneraient avec les droits du processus d'Apple Music.
-- **XAML brut dans les extensions** : trop large, et il faudrait relever toute l'interface.
-- **React** : il n'existe pas dans WinUI. La description déclarative le remplace.
-- **Appels à l'API interne d'Apple** : hors périmètre, et risqués pour les comptes.
-- **Réglage du volume du lecteur** : il déplacerait le curseur.
-- **Coupure de la télémétrie d'Apple** : décision reportée après M4.
+Rien n'est écarté définitivement. Chaque point reste hors de la v1 pour une raison précise, et le chemin suivant est
+décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
+
+- **DLL natives de la communauté** : elles tourneraient avec tous les droits dans le processus d'Apple Music. Chemin :
+  une phase suivante, avec une signature de l'éditeur et une relecture du code. Le catalogue les listerait à part, avec
+  leur mode de confiance propre.
+- **XAML brut dans les extensions** : chemin : du XAML validé par le noyau contre une liste publiée de types et de
+  propriétés, avant rendu.
+- **Volume du lecteur** : décision en attente (PARITE, section 8.1). Par défaut, le curseur ne bouge pas.
+- **Services internes d'Apple** : liste blanche d'appels en lecture (PARITE, section 8.2). L'API publique MusicKit
+  demande un compte Apple Developer : option à ouvrir plus tard.
+- **Télémétrie** : option `telemetry.block`, désactivée par défaut, qui ne touche jamais aux hôtes de licence ou de DRM
+  (PARITE, section 8.5).
+- **Patchs par version** : table de motifs d'octets, sans adresse fixe, pour chaque version testée (PARITE, section 8.4).

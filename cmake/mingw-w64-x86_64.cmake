@@ -13,5 +13,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
 # The kernel must not depend on MinGW runtime DLLs next to Apple Music.
+# MODULE libraries (amk_kernel.dll) have their own linker flags, so all three are set.
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-static")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "-static")
+set(CMAKE_MODULE_LINKER_FLAGS_INIT "-static")

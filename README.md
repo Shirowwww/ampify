@@ -6,8 +6,9 @@ des extensions, des thèmes et des modes qu'on active ou désactive à volonté,
 On garde toutes les fonctions d'Apple Music (lossless, Dolby Atmos, paroles, bibliothèque, synchronisation).
 On ajoute et on corrige, on ne remplace pas.
 
-> **État : premiers jalons.** Le noyau et le nivellement Atmos sont écrits et testés hors de Windows.
-> Il n'y a encore aucun injecteur : rien ne touche Apple Music pour l'instant. Voir [PROGRESS.md](PROGRESS.md).
+> **État : injecteur écrit, à tester sur Windows.** Le noyau et le nivellement Atmos sont testés hors de Windows.
+> Le lanceur et la DLL du noyau compilent pour Windows, mais n'ont pas encore été lancés avec Apple Music.
+> La procédure de test est dans [docs/tests/M3-injecteur.md](docs/tests/M3-injecteur.md). Voir [PROGRESS.md](PROGRESS.md).
 
 ## Ce qui est en place
 
@@ -22,9 +23,11 @@ On ajoute et on corrige, on ne remplace pas.
 | Schémas JSON et validateur (catalogue, manifestes) | `schemas/`, `tools/validate.py` | fait, testé |
 | Mesure de loudness BS.1770 (LUFS) | `extensions/atmos-leveler/loudness_meter.*` | fait, testé |
 | Politique du nivellement Atmos : cible stéréo, mémoire par morceau, plafond de crête | `extensions/atmos-leveler/leveler.*` | fait, testé |
-| Injecteur et lancement du paquet MSIX | à faire | |
-| Hooks sur `AppleMusic.exe` et `AMPLibraryAgent.exe` | à faire | |
-| Kit de test en un double-clic | à faire | |
+| Identité du paquet, décision d'injection, garde DRM | `core/apple_music.*`, `core/injection_policy.*`, `core/drm_guard.*` | fait, testé |
+| Lanceur : lancement suspendu, injection, surveillance d'`AMPLibraryAgent.exe` | `launcher/` | écrit, compilé, à tester sur Windows |
+| Noyau chargé dans les deux processus (DLL) | `kernel/` | écrit, compilé, à tester sur Windows |
+| Hooks sur `AppleMusic.exe` et `AMPLibraryAgent.exe` | à faire (M4) | |
+| Kit de test en un double-clic | à faire (M5) | |
 
 Le nivellement Atmos est la première extension. Il mesure le son décodé et règle le gain sur les
 échantillons, jamais sur le curseur de volume : le curseur d'Apple Music ne bouge pas.
@@ -54,9 +57,10 @@ Validation du catalogue et des manifestes (Python 3, bibliothèque standard) :
 python3 -m unittest discover -s tools -v
 python3 tools/validate.py catalog catalog/catalog.json
 python3 tools/validate.py manifest examples/hello-extension/manifest.json
+node --test tools/test_examples.mjs
 ```
 
-Compilation croisée pour Windows x64 :
+Compilation croisée pour Windows x64 (produit `amk_tests.exe`, `amk_kernel.dll` et `amk_launcher.exe`) :
 
 ```bash
 sudo apt install g++-mingw-w64-x86-64
@@ -67,7 +71,10 @@ cmake --build build-win
 ## Organisation
 
 ```
-core/                      noyau portable : réglages, journal, mode sans échec, versions, extensions
+core/                      noyau portable : réglages, journal, mode sans échec, versions, extensions, injection
+kernel/                    DLL chargée dans AppleMusic.exe et AMPLibraryAgent.exe (Windows)
+launcher/                  lanceur : paquet MSIX, lancement suspendu, injection (Windows)
+win/                       aides Windows partagées par le lanceur et le noyau
 extensions/atmos-leveler/  mesure BS.1770 et politique du nivellement Atmos
 docs/extensions/           API d'extensions, format du manifeste, catalogue, parité avec Spicetify
 schemas/                   schémas JSON du manifeste et du catalogue
@@ -75,6 +82,7 @@ catalog/                   catalogue communautaire (vide pour l'instant)
 examples/                  exemple d'extension complet
 tools/                     validateur des manifestes et du catalogue, avec ses tests
 tests/                     tests unitaires sans dépendance (même code pour Linux et Windows)
+docs/tests/                procédures de test sur le PC, une par jalon
 cmake/                     fichier de compilation croisée pour Windows
 knowledge/                 relevés sur l'app : architecture, API, pièges observés
 reference/                 mod Windhawk de référence et outil de mesure LUFS
