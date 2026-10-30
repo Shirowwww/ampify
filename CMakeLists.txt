@@ -58,7 +58,10 @@ add_library(amk_core STATIC
     core/js_runtime.cpp
     core/amk_prelude.cpp
     core/script_extension.cpp
-    core/extension_loader.cpp)
+    core/extension_loader.cpp
+    core/gain_board.cpp
+    core/player_watch.cpp
+    core/ui_model.cpp)
 target_compile_options(amk_core PRIVATE ${AMK_WARNINGS})
 target_link_libraries(amk_core PUBLIC amk_quickjs)
 
@@ -169,7 +172,11 @@ if(AMK_BUILD_TESTS)
         tests/script_extension_tests.cpp
         tests/loader_tests.cpp
         tests/pipeline_tests.cpp
-        tests/theme_tests.cpp)
+        tests/theme_tests.cpp
+        tests/gain_board_tests.cpp
+        tests/player_watch_tests.cpp
+        tests/ui_model_tests.cpp
+        tests/ui_element_tests.cpp)
     target_link_libraries(amk_tests PRIVATE amk_core atmos_leveler amk_theme)
     target_compile_options(amk_tests PRIVATE ${AMK_WARNINGS})
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")

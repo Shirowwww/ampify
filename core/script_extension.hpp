@@ -55,6 +55,9 @@ public:
     // Queues a shortcut press, in the normalized form given to Host::RegisterKey.
     void DeliverKey(const std::string& combo);
 
+    // Queues a click on a control of the interface that this element added.
+    void DeliverClick(int controlId);
+
     // Settings prefix of the element: "extensions." or "apps.".
     std::string ConfigPrefix() const;
 
@@ -66,6 +69,7 @@ private:
     bool CallDispatch(const char* entry, int argc, JSValueConst* argv);
     void DispatchPlayer(const std::string& event, const std::string& stateJson);
     void DispatchKey(const std::string& combo);
+    void DispatchClick(int controlId);
     void DispatchTimer(uint32_t id);
     void PersistStorage();
 

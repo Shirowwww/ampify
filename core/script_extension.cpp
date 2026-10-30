@@ -92,6 +92,20 @@ std::string HttpsHost(const std::string& url) {
 
 }  // namespace
 
+// Sizes of the interface, in characters, and the names that panels, pages and routes may use.
+constexpr size_t kMaxUiLabel = 60;
+constexpr size_t kMaxUiIcon = 8000;
+constexpr size_t kMaxUiTitle = 120;
+constexpr size_t kMaxUiName = 64;
+
+// Lowercase letters, digits, dashes and slashes, so that a name is never a path trick.
+bool ValidUiName(const std::string& name) {
+    if (name.empty() || name.size() > kMaxUiName) return false;
+    return std::all_of(name.begin(), name.end(), [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '/';
+    });
+}
+
 // The natives that the prelude calls. Each one checks the permission it needs, then acts through the host.
 // A failed check throws an Error named PermissionDenied, which says which permission is missing.
 struct ScriptBridge {
@@ -288,6 +302,89 @@ struct ScriptBridge {
         return JS_UNDEFINED;
     }
 
+    // ---- Interface. The kit keeps what an element asks for, and the host draws it (M8). Each call needs the
+    // permission of its part of the interface.
+
+    // Parses the tree that the element built with JSON.stringify, and checks its shape. On failure, `failure`
+    // holds the exception to return.
+    static std::optional<Json> TreeOf(JSContext* ctx, const std::string& text, JSValue* failure) {
+        std::string error;
+        std::optional<Json> tree = Json::Parse(text, &error);
+        if (tree && ValidateTree(*tree, &error)) return tree;
+        *failure = Throw(ctx, "TypeError", "interface refusée : " + error);
+        return std::nullopt;
+    }
+
+    AMK_NATIVE(UiControl) {
+        ScriptExtension* ext = Owner(ctx);
+        std::string placement = String(ctx, argc, argv, 0).value_or("");
+        if (!IsPlacement(placement)) return Throw(ctx, "TypeError", "emplacement inconnu : " + placement);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, std::string(PlacementPermission(placement)), &failure)) return failure;
+        std::string label = String(ctx, argc, argv, 1).value_or("").substr(0, kMaxUiLabel);
+        std::string icon = String(ctx, argc, argv, 2).value_or("").substr(0, kMaxUiIcon);
+        return JS_NewInt32(ctx, ext->m_host.Ui().AddControl(ext->id(), placement, label, icon));
+    }
+
+    AMK_NATIVE(UiPanel) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.panel", &failure)) return failure;
+        std::string panelId = String(ctx, argc, argv, 0).value_or("");
+        if (!ValidUiName(panelId)) return Throw(ctx, "TypeError", "nom de panneau invalide : " + panelId);
+        std::optional<Json> tree = TreeOf(ctx, String(ctx, argc, argv, 1).value_or(""), &failure);
+        if (!tree) return failure;
+        ext->m_host.Ui().SetPanel(ext->id(), panelId, std::move(*tree));
+        return JS_UNDEFINED;
+    }
+
+    AMK_NATIVE(UiPopup) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.popup", &failure)) return failure;
+        std::optional<Json> tree = TreeOf(ctx, String(ctx, argc, argv, 0).value_or(""), &failure);
+        if (!tree) return failure;
+        ext->m_host.Ui().OpenPopup(ext->id(), std::move(*tree));
+        return JS_UNDEFINED;
+    }
+
+    AMK_NATIVE(UiPage) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.page", &failure)) return failure;
+        if (ext->manifest().kind != ElementKind::App) {
+            return Throw(ctx, "PermissionDenied", "les pages sont réservées aux apps (kind app dans manifest.json)");
+        }
+        std::string path = String(ctx, argc, argv, 0).value_or("");
+        if (path.empty() || path[0] != '/' || !ValidUiName(path)) {
+            return Throw(ctx, "TypeError", "chemin de page invalide : " + path);
+        }
+        std::optional<Json> tree = TreeOf(ctx, String(ctx, argc, argv, 1).value_or(""), &failure);
+        if (!tree) return failure;
+        ext->m_host.Ui().SetPage(ext->id(), path, std::move(*tree));
+        return JS_UNDEFINED;
+    }
+
+    AMK_NATIVE(UiNavigate) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.page", &failure)) return failure;
+        std::string path = String(ctx, argc, argv, 0).value_or("");
+        if (path.empty() || path[0] != '/' || !ValidUiName(path)) {
+            return Throw(ctx, "TypeError", "chemin de page invalide : " + path);
+        }
+        ext->m_host.Ui().Navigate(ext->id(), path);
+        return JS_UNDEFINED;
+    }
+
+    AMK_NATIVE(UiTitle) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.window", &failure)) return failure;
+        ext->m_host.Ui().SetTitle(ext->id(), String(ctx, argc, argv, 0).value_or("").substr(0, kMaxUiTitle));
+        return JS_UNDEFINED;
+    }
+
 #undef AMK_NATIVE
 
     // The object passed to the prelude. Its fields are the only way down to the kernel.
@@ -311,6 +408,12 @@ struct ScriptBridge {
         define("httpGet", HttpGet, 1);
         define("schedule", Schedule, 2);
         define("cancel", Cancel, 1);
+        define("uiControl", UiControl, 3);
+        define("uiPanel", UiPanel, 2);
+        define("uiPopup", UiPopup, 1);
+        define("uiPage", UiPage, 2);
+        define("uiNavigate", UiNavigate, 1);
+        define("uiTitle", UiTitle, 1);
         JS_SetPropertyStr(ctx, natives, "version", JS_NewString(ctx, kKernelVersion));
         JS_SetPropertyStr(ctx, natives, "kitApi", JS_NewString(ctx, kKitApi));
         JS_SetPropertyStr(ctx, natives, "process", JS_NewString(ctx, ext->m_host.Process().c_str()));
@@ -384,6 +487,7 @@ void ScriptExtension::Stop() {
     if (m_runtime) CallDispatch("stop", 0, nullptr);
     if (m_gainDb != 0) m_host.SetGainDb(id(), 0);
     m_host.UnregisterKeys(id());
+    m_host.Ui().RemoveElement(id());
     Teardown();
 }
 
@@ -460,6 +564,16 @@ void ScriptExtension::DispatchKey(const std::string& combo) {
     JSContext* ctx = m_runtime->context();
     JSValue arg = JS_NewString(ctx, combo.c_str());
     CallDispatch("key", 1, &arg);
+    m_runtime->Free(arg);
+}
+
+void ScriptExtension::DeliverClick(int controlId) {
+    Post([this, controlId] { DispatchClick(controlId); });
+}
+
+void ScriptExtension::DispatchClick(int controlId) {
+    JSValue arg = JS_NewInt32(m_runtime->context(), controlId);
+    CallDispatch("click", 1, &arg);
     m_runtime->Free(arg);
 }
 

@@ -111,4 +111,12 @@ void ExtensionLoader::DeliverKey(const std::string& elementId, const std::string
     }
 }
 
+void ExtensionLoader::DeliverClick(int controlId) {
+    std::optional<UiControl> control = m_host.Ui().Find(controlId);
+    if (!control) return;
+    for (auto& element : m_elements) {
+        if (element->id() == control->elementId && element->running()) element->DeliverClick(controlId);
+    }
+}
+
 }  // namespace amk

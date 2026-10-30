@@ -4,14 +4,18 @@
 #include <shellapi.h>
 #include <winhttp.h>
 
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <iomanip>
 #include <fstream>
 #include <map>
 #include <sstream>
 #include <string_view>
 #include <system_error>
 #include <vector>
+
+#include "../core/gain_board.hpp"
 
 namespace amk {
 
@@ -120,17 +124,58 @@ bool WinHost::WriteStorage(const std::string& elementId, const std::string& json
     return !error;
 }
 
-PlayerSnapshot WinHost::Player() { return {}; }
+PlayerSnapshot WinHost::Player() {
+    // The player state is measured in AMPLibraryAgent.exe. It is not shared with the interface process yet.
+    return {};
+}
+
+namespace {
+
+// A media key is handled by the system and by Apple Music, as on a keyboard. It never changes the volume.
+bool SendMediaKey(WORD key) {
+    INPUT inputs[2] = {};
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki.wVk = key;
+    inputs[0].ki.dwFlags = KEYEVENTF_EXTENDEDKEY;
+    inputs[1] = inputs[0];
+    inputs[1].ki.dwFlags = KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP;
+    return SendInput(2, inputs, sizeof(INPUT)) == 2;
+}
+
+}  // namespace
 
 bool WinHost::Control(PlayerCommand command, int64_t seekMs) {
-    (void)command;
-    (void)seekMs;
+    (void)seekMs;  // no media key seeks: the command is refused
+    switch (command) {
+        case PlayerCommand::Next: return SendMediaKey(VK_MEDIA_NEXT_TRACK);
+        case PlayerCommand::Previous: return SendMediaKey(VK_MEDIA_PREV_TRACK);
+        // Play and pause are one toggle key: sending it blindly could start a stopped track or stop a playing one.
+        // They wait for the player state, which the host does not have yet.
+        case PlayerCommand::Play:
+        case PlayerCommand::Pause:
+        case PlayerCommand::Seek: return false;
+    }
     return false;
 }
 
 void WinHost::SetGainDb(const std::string& elementId, double db) {
-    (void)elementId;
-    (void)db;  // not connected yet (M4): the gain stays at 0 dB
+    // Only AMPLibraryAgent.exe renders the audio, so only there does the gain reach the samples.
+    if (m_process != "engine") {
+        static bool noticed = false;
+        if (!noticed) m_journal.Write("gain audio : appliqué seulement dans AMPLibraryAgent.exe, ignoré ici");
+        noticed = true;
+        return;
+    }
+    // The same ceiling as the script side: audio.maxGainDb, from 0 to 12 dB, 6 by default.
+    double ceiling = 6.0;
+    if (std::optional<std::string> raw = ReadSetting("audio.maxGainDb")) {
+        ceiling = std::clamp(std::strtod(raw->c_str(), nullptr), 0.0, 12.0);
+    }
+    ElementGains().Set(elementId, db, ceiling);
+    std::ostringstream line;
+    line << std::fixed << std::setprecision(1) << "[" << elementId << "] gain audio : " << db
+         << " dB demandé, total " << ElementGains().TotalDb() << " dB";
+    m_journal.Write(line.str());
 }
 
 WinHost::~WinHost() {

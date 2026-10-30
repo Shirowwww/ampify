@@ -28,6 +28,7 @@
 #include <thread>
 #include <vector>
 
+#include "../../core/gain_board.hpp"
 #include "../../win/hook.hpp"
 #include "format_detection.hpp"
 #include "gain_ramp.hpp"
@@ -476,6 +477,10 @@ HRESULT STDMETHODCALLTYPE GetBuffer_Hook(IAudioRenderClient* self, UINT32 frames
     return hr;
 }
 
+// The gain the audio threads apply now: the leveler's target, times what the elements asked for with
+// AMK.audio.setGainDb. Both are applied to the samples after they are measured, never to the volume.
+float AppliedGain() { return g_targetLinear.load() * amk::ElementGains().Linear(); }
+
 // Measures the decoded samples, then applies the gain, before Windows gets them.
 HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 frames, DWORD flags) {
     if (frames && self == g_meteredRender.load(std::memory_order_relaxed)) {
@@ -493,7 +498,7 @@ HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 fr
                 }
             }
 
-            bool unity = g_streamRamp.Curve(count, g_targetLinear.load(), g_streamCurve);
+            bool unity = g_streamRamp.Curve(count, AppliedGain(), g_streamCurve);
             if (!unity) ApplyCurve(samples, count, 2, g_streamCurve);
         }
     }
@@ -564,7 +569,7 @@ void ProcessSpatialPass() {
     std::lock_guard<std::mutex> passGuard(g_passLock);
     if (!g_objectPass || g_pass.frames == 0) return;
 
-    const PassLevels& levels = g_objectPass->Process(g_pass.objects, g_pass.frames, g_targetLinear.load());
+    const PassLevels& levels = g_objectPass->Process(g_pass.objects, g_pass.frames, AppliedGain());
 
     float volume = g_objectVolumeUsed ? 1.0f : g_playerVolume.load();
     std::unique_lock<std::mutex> lock(g_levelerLock, std::try_to_lock);

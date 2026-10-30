@@ -12,6 +12,7 @@
 #include "../core/extension.hpp"
 #include "../core/extension_loader.hpp"
 #include "../core/injection_policy.hpp"
+#include "../core/player_watch.hpp"
 #include "../core/journal.hpp"
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
@@ -82,11 +83,18 @@ DWORD WINAPI KernelMain(LPVOID) {
     std::thread([] {
         host.StartAll(settings);
         journal.Write("Hôte d'extensions prêt");
+        amk::PlayerWatcher playerWatcher;
+        int ticks = 0;
         while (true) {
             winHost.Service([](const std::string& elementId, const std::string& combo) {
                 loader.DeliverKey(elementId, combo);
             });
             loader.Pump();
+            // The player is looked at every 250 ms, and its changes go to the elements that subscribed to them.
+            if (++ticks % 5 == 0) {
+                amk::PlayerSnapshot snapshot = winHost.Player();
+                for (const std::string& event : playerWatcher.Poll(snapshot)) loader.DeliverPlayer(event, snapshot);
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     }).detach();

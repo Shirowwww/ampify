@@ -53,6 +53,8 @@ public:
 
     HttpResponse HttpGet(const std::string& url) override;
 
+    UiModel& Ui() override { return m_ui; }
+
 private:
     struct Hotkey {
         int id;
@@ -60,6 +62,7 @@ private:
         std::string combo;
     };
 
+    UiModel m_ui;
     std::string m_process;
     std::filesystem::path m_kit;
     Settings& m_settings;

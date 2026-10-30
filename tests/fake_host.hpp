@@ -24,6 +24,7 @@ struct FakeHost : Host {
     std::vector<std::string> unregistered;              // element ids
     std::vector<std::string> requestedUrls;
     HttpResponse httpResponse{200, "ok"};
+    UiModel ui;
 
     std::string Process() const override { return process; }
     std::string Locale() const override { return locale; }
@@ -53,6 +54,7 @@ struct FakeHost : Host {
     }
 
     void SetGainDb(const std::string& elementId, double db) override { gains.emplace_back(elementId, db); }
+    UiModel& Ui() override { return ui; }
 
     void Notify(const std::string& elementId, const std::string& title, const std::string& text) override {
         (void)elementId;

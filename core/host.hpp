@@ -4,6 +4,8 @@
 #include <optional>
 #include <string>
 
+#include "ui_model.hpp"
+
 namespace amk {
 
 struct TrackInfo {
@@ -67,6 +69,9 @@ public:
 
     // Only https hosts that the manifest declares reach this call. The kernel does not follow other hosts.
     virtual HttpResponse HttpGet(const std::string& url) = 0;
+
+    // The interface that the elements add to. Thread-safe: the host renders it, and the tests read it.
+    virtual UiModel& Ui() = 0;
 };
 
 }  // namespace amk

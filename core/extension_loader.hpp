@@ -42,6 +42,9 @@ public:
     // Any thread: queues a shortcut press for the element that registered it.
     void DeliverKey(const std::string& elementId, const std::string& combo);
 
+    // Any thread: queues a click on a control of the interface, for the element that added it.
+    void DeliverClick(int controlId);
+
     const std::vector<std::unique_ptr<ScriptExtension>>& elements() const { return m_elements; }
 
 private:
