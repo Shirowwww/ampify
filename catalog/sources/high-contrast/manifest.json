@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "high-contrast",
+  "name": "Contraste élevé",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Noir et blanc, avec des couleurs vives pour les boutons et les sélections.",
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Dark"
+}

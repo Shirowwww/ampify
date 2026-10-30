@@ -4,6 +4,8 @@
 #include <shlobj.h>
 #include <appmodel.h>
 
+#include <cstddef>
+#include <fstream>
 #include <system_error>
 #include <vector>
 
@@ -71,6 +73,18 @@ bool WindowsResponsive(DWORD processId) {
     HungWindowSearch search{processId, false};
     EnumWindows(FindHungWindow, reinterpret_cast<LPARAM>(&search));
     return !search.hung;
+}
+
+std::vector<std::byte> ReadFileBytes(const std::filesystem::path& file) {
+    std::ifstream stream(file, std::ios::binary | std::ios::ate);
+    if (!stream) return {};
+    std::streamsize size = stream.tellg();
+    if (size <= 0) return {};
+
+    std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+    stream.seekg(0);
+    if (!stream.read(reinterpret_cast<char*>(bytes.data()), size)) return {};
+    return bytes;
 }
 
 }  // namespace amk::win

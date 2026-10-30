@@ -2,6 +2,7 @@ name: Banc de test Windows
 
 # Compile le kit (diffusion et banc) sous Linux, puis lance les tests sur un vrai Windows avec Apple Music installé.
 # Le détail des tests et la façon d'en ajouter : docs/tests/banc-windows.md.
+# Branche-agnostique : tourne sur chaque branche ** qui touche au code, et à la main (workflow_dispatch).
 
 on:
   push:
@@ -18,6 +19,11 @@ on:
       - 'CMakeLists.txt'
       - '.github/workflows/windows-bench.yml'
   workflow_dispatch:
+    inputs:
+      m8_ref:
+        description: 'Branche M8 compilée par le job xaml-m8'
+        required: false
+        default: 'thread-052bjz'
 
 permissions:
   contents: read
@@ -60,9 +66,10 @@ jobs:
 
       - name: Préparer le paquet pour le banc
         run: |
-          mkdir -p dist/diffusion dist/banc
+          mkdir -p dist/diffusion dist/banc dist/cli
           cp build-diffusion/amk_launcher.exe build-diffusion/amk_kernel.dll dist/diffusion/
           cp build-banc/amk_launcher.exe build-banc/amk_kernel.dll dist/banc/
+          cp build-diffusion/amk.exe dist/cli/
           {
             echo "Commit : $GITHUB_SHA"
             echo "diffusion : AMK_BENCH=OFF, n'injecte que sur les versions de core/version_gate.hpp"
@@ -103,9 +110,53 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # M8 : compile la branche des thèmes XAML avec MSVC et le paquet Windows App SDK. Indépendant du banc M3.
+  # Même banc, kit compilé avec MSVC au lieu de MinGW (la projection C++/WinRT ne se génère pas avec MinGW).
+  # Le kit MSVC est lié à la CRT statique, pour ne rien demander au processus d'Apple Music.
+  bench-msvc:
+    name: Banc Windows, kit compilé avec MSVC
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compiler le kit avec MSVC (diffusion et banc)
+        shell: pwsh
+        run: |
+          $dist = Join-Path $PWD 'dist-msvc'
+          $variants = @(
+            @{ Name = 'diffusion'; Bench = 'OFF' },
+            @{ Name = 'banc'; Bench = 'ON' }
+          )
+          foreach ($variant in $variants) {
+            $build = "build-msvc-$($variant.Name)"
+            cmake -S . -B $build -A x64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DAMK_BUILD_TESTS=OFF "-DAMK_BENCH=$($variant.Bench)"
+            if ($LASTEXITCODE -ne 0) { throw "configuration MSVC $($variant.Name) en échec" }
+            cmake --build $build --config Release --parallel
+            if ($LASTEXITCODE -ne 0) { throw "compilation MSVC $($variant.Name) en échec" }
+            $target = Join-Path $dist $variant.Name
+            New-Item -ItemType Directory -Force -Path $target | Out-Null
+            Copy-Item -LiteralPath (Join-Path $build 'Release\amk_launcher.exe'), (Join-Path $build 'Release\amk_kernel.dll') -Destination $target
+          }
+          "Commit : $env:GITHUB_SHA`ndiffusion : AMK_BENCH=OFF (MSVC)`nbanc : AMK_BENCH=ON (MSVC). Ne jamais diffuser." |
+            Set-Content -LiteralPath (Join-Path $dist 'BUILD_INFO.txt')
+
+      - name: Lancer le banc sur le kit MSVC
+        shell: bash
+        run: pwsh -NoProfile -File ./bench/windows/run-bench.ps1 -KitRoot dist-msvc -RepoRoot . -OutputRoot results-msvc
+
+      - name: Publier les résultats MSVC
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: banc-windows-msvc-resultats
+          path: results-msvc
+          if-no-files-found: warn
+          retention-days: 14
+
+  # M8 : compile la branche des thèmes XAML avec MSVC. Les en-têtes C++/WinRT sont générés par cppwinrt.exe
+  # à partir des .winmd du paquet Windows App SDK. Indépendant du banc M3.
   xaml-m8:
-    name: Compiler M8 XAML (MSVC + Windows App SDK)
+    name: Compiler M8 XAML (MSVC + C++/WinRT généré)
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -113,7 +164,7 @@ jobs:
         with:
           path: m8
 
-      - name: Télécharger les en-têtes Windows App SDK (NuGet)
+      - name: Télécharger le paquet Windows App SDK (NuGet) et lister ses .winmd
         shell: pwsh
         run: |
           $version = '1.6.240923002'
@@ -123,15 +174,62 @@ jobs:
           Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.WindowsAppSDK/$version" -OutFile $package
           $folder = Join-Path $env:RUNNER_TEMP 'wasdk'
           Expand-Archive -LiteralPath $package -DestinationPath $folder -Force
-          Get-ChildItem -LiteralPath $folder -Recurse -Filter '*.h' |
+          Get-ChildItem -LiteralPath $folder -Recurse -File |
             ForEach-Object { $_.FullName.Substring($folder.Length) } |
-            Set-Content -LiteralPath (Join-Path $out 'wasdk-headers.txt')
-          $header = Get-ChildItem -LiteralPath $folder -Recurse -Filter 'Microsoft.UI.Xaml.h' |
-            Where-Object { $_.Directory.Name -eq 'winrt' } | Select-Object -First 1
-          if (-not $header) { throw 'winrt/Microsoft.UI.Xaml.h introuvable : voir m8/m8-out/wasdk-headers.txt' }
-          $include = $header.Directory.Parent.FullName
-          Write-Host "Dossier d'en-têtes : $include"
-          "WASDK_INCLUDE=$include" | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8
+            Set-Content -LiteralPath (Join-Path $out 'wasdk-paquet.txt')
+          $winmds = @(Get-ChildItem -LiteralPath $folder -Recurse -Filter '*.winmd' | Where-Object { $_.FullName -match 'uap10\.0' })
+          if ($winmds.Count -eq 0) {
+            $winmds = @(Get-ChildItem -LiteralPath $folder -Recurse -Filter '*.winmd')
+          }
+          if ($winmds.Count -eq 0) { throw 'aucun .winmd dans le paquet : voir m8/m8-out/wasdk-paquet.txt' }
+          $winmds | ForEach-Object { $_.FullName } | Set-Content -LiteralPath (Join-Path $out 'wasdk-winmd.txt')
+          Write-Host "$($winmds.Count) fichier(s) .winmd du Windows App SDK"
+
+          # Microsoft.UI.Xaml.winmd référence les types WebView2 : cppwinrt doit aussi voir leurs .winmd.
+          $webview = Join-Path $env:RUNNER_TEMP 'webview2.zip'
+          Invoke-WebRequest -Uri 'https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2' -OutFile $webview
+          $webFolder = Join-Path $env:RUNNER_TEMP 'webview2'
+          Expand-Archive -LiteralPath $webview -DestinationPath $webFolder -Force
+          Get-ChildItem -LiteralPath $webFolder -Recurse -File |
+            ForEach-Object { $_.FullName.Substring($webFolder.Length) } |
+            Set-Content -LiteralPath (Join-Path $out 'webview2-paquet.txt')
+          $webWinmds = @(Get-ChildItem -LiteralPath $webFolder -Recurse -Filter '*WebView2*.winmd' |
+            Group-Object Name | ForEach-Object { $_.Group[0] })
+          if ($webWinmds.Count -eq 0) { throw 'aucun .winmd WebView2 dans le paquet : voir m8/m8-out/webview2-paquet.txt' }
+          $webWinmds | ForEach-Object { $_.FullName } | Add-Content -LiteralPath (Join-Path $out 'wasdk-winmd.txt')
+          Write-Host "$($webWinmds.Count) fichier(s) .winmd WebView2"
+
+      - name: Générer la projection C++/WinRT (cppwinrt.exe du SDK Windows)
+        shell: pwsh
+        run: |
+          $out = Join-Path $PWD 'm8\m8-out'
+          $kit = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10'
+          $cppwinrt = Get-ChildItem -LiteralPath (Join-Path $kit 'bin') -Recurse -Filter 'cppwinrt.exe' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $cppwinrt) { throw 'cppwinrt.exe introuvable dans le SDK Windows' }
+          $sdkWinrt = Get-ChildItem -LiteralPath (Join-Path $kit 'Include') -Recurse -Directory -Filter 'winrt' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Parent.Name -eq 'cppwinrt' } | Select-Object -First 1
+          if (-not $sdkWinrt) { throw 'dossier cppwinrt\winrt introuvable dans le SDK Windows' }
+
+          $gen = Join-Path $out 'winrt-gen'
+          New-Item -ItemType Directory -Force -Path $gen | Out-Null
+          $arguments = @()
+          foreach ($winmd in Get-Content -LiteralPath (Join-Path $out 'wasdk-winmd.txt')) {
+            $arguments += @('-in', $winmd)
+          }
+          $arguments += @('-ref', 'sdk', '-out', $gen)
+          & $cppwinrt.FullName @arguments 2>&1 | Tee-Object -FilePath (Join-Path $out 'cppwinrt.log')
+          if ($LASTEXITCODE -ne 0) { throw "cppwinrt.exe a échoué (code $LASTEXITCODE) : voir m8/m8-out/cppwinrt.log" }
+
+          # Les en-têtes de base (winrt/base.h, winrt/Windows.*.h) viennent du SDK : on les met à côté de la projection.
+          $target = Join-Path $gen 'winrt'
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          Copy-Item -Path (Join-Path $sdkWinrt.FullName '*') -Destination $target -Recurse -Force
+          if (-not (Test-Path -LiteralPath (Join-Path $target 'Microsoft.UI.Xaml.h'))) {
+            throw 'winrt\Microsoft.UI.Xaml.h absent après génération : voir m8/m8-out/cppwinrt.log'
+          }
+          Write-Host "Projection : $gen (cppwinrt : $($cppwinrt.FullName))"
+          "WASDK_INCLUDE=$gen" | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Configurer et compiler (MSVC, AMK_XAML=ON)
         shell: pwsh

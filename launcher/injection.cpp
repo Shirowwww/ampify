@@ -7,10 +7,35 @@ namespace amk::launcher {
 
 namespace {
 
-constexpr DWORD kRemoteLoadTimeoutMs = 10000;
-
 std::string ErrorText(DWORD code) {
     return "erreur Windows " + std::to_string(code);
+}
+
+// Suspends or resumes each thread of the process. Returns how many actually changed state.
+int ChangeThreadSuspension(DWORD processId, bool suspend) {
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return 0;
+
+    int changed = 0;
+    THREADENTRY32 entry{};
+    entry.dwSize = sizeof(entry);
+    if (Thread32First(snapshot, &entry)) {
+        do {
+            if (entry.th32OwnerProcessID != processId) continue;
+
+            HANDLE thread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, entry.th32ThreadID);
+            if (!thread) continue;
+
+            // Both calls return the suspend count the thread had before. Resuming counts only a thread that was
+            // suspended, which means a previous count above zero.
+            DWORD previous = suspend ? SuspendThread(thread) : ResumeThread(thread);
+            if (previous != static_cast<DWORD>(-1) && (suspend || previous > 0)) changed++;
+            CloseHandle(thread);
+        } while (Thread32Next(snapshot, &entry));
+    }
+
+    CloseHandle(snapshot);
+    return changed;
 }
 
 }  // namespace
@@ -19,7 +44,7 @@ HANDLE OpenProcessForInjection(DWORD processId) {
     return OpenProcess(kInjectionRights, FALSE, processId);
 }
 
-bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::string& failure) {
+bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::string& failure, DWORD timeoutMs) {
     // kernel32 sits at the same address in every process, so the address found here is valid there too.
     FARPROC loadLibraryProc = GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "LoadLibraryW");
     if (!loadLibraryProc) {
@@ -50,7 +75,7 @@ bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::s
     }
 
     bool loaded = false;
-    if (WaitForSingleObject(thread, kRemoteLoadTimeoutMs) == WAIT_OBJECT_0) {
+    if (WaitForSingleObject(thread, timeoutMs) == WAIT_OBJECT_0) {
         DWORD exitCode = 0;  // LoadLibraryW's result: the module handle, zero on failure
         GetExitCodeThread(thread, &exitCode);
         loaded = exitCode != 0;
@@ -58,36 +83,20 @@ bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::s
         VirtualFreeEx(process, remotePath, 0, MEM_RELEASE);
     } else {
         // The remote thread may still be reading the path, so its memory is left in place.
-        failure = "LoadLibraryW n'a pas répondu dans les 10 s";
+        failure = "LoadLibraryW n'a pas répondu dans les " + std::to_string(timeoutMs / 1000) +
+                  " s (le chargement peut finir plus tard, voir le journal du noyau)";
     }
 
     CloseHandle(thread);
     return loaded;
 }
 
+int SuspendProcessThreads(DWORD processId) {
+    return ChangeThreadSuspension(processId, true);
+}
+
 int ResumeProcessThreads(DWORD processId) {
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-    if (snapshot == INVALID_HANDLE_VALUE) return 0;
-
-    int resumed = 0;
-    THREADENTRY32 entry{};
-    entry.dwSize = sizeof(entry);
-    if (Thread32First(snapshot, &entry)) {
-        do {
-            if (entry.th32OwnerProcessID != processId) continue;
-
-            HANDLE thread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, entry.th32ThreadID);
-            if (!thread) continue;
-
-            // ResumeThread returns the suspend count it had before: above zero means it was suspended.
-            DWORD previous = ResumeThread(thread);
-            if (previous != static_cast<DWORD>(-1) && previous > 0) resumed++;
-            CloseHandle(thread);
-        } while (Thread32Next(snapshot, &entry));
-    }
-
-    CloseHandle(snapshot);
-    return resumed;
+    return ChangeThreadSuspension(processId, false);
 }
 
 std::vector<DWORD> FindPackageProcesses(const wchar_t* imageName, const std::filesystem::path& directory) {

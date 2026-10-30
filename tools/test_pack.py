@@ -1,0 +1,107 @@
+"""Tests of tools/pack.py: deterministic archives, pinned checksums, catalogue updates.
+
+    python3 -m unittest discover -s tools -v
+"""
+
+import hashlib
+import json
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+import zipfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pack  # noqa: E402
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EXAMPLE = os.path.join(ROOT, "examples", "hello-extension")
+
+
+class PackTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="amk-pack-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def make_element(self, name="demo", kind="extension", version="1.0.0", extra=None):
+        folder = os.path.join(self.tmp, name)
+        os.makedirs(folder)
+        manifest = {
+            "id": name,
+            "name": name.title(),
+            "version": version,
+            "kind": kind,
+            "author": "Shirowwww",
+            "description": "Élément de test.",
+            "kitApi": "1.0",
+        }
+        if kind == "extension":
+            manifest["main"] = "main.js"
+            with open(os.path.join(folder, "main.js"), "w", encoding="utf-8") as handle:
+                handle.write('AMK.log("ok");\n')
+        with open(os.path.join(folder, "manifest.json"), "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+        for relative, text in (extra or {}).items():
+            with open(os.path.join(folder, relative), "w", encoding="utf-8") as handle:
+                handle.write(text)
+        return folder
+
+    def test_example_packs_with_root_entries_and_pinned_sha(self):
+        archive = os.path.join(self.tmp, "hello.zip")
+        result = pack.pack(EXAMPLE, archive)
+        with zipfile.ZipFile(archive) as bundle:
+            self.assertEqual(sorted(bundle.namelist()), ["main.js", "manifest.json"])
+        with open(archive, "rb") as handle:
+            self.assertEqual(result["sha256"], hashlib.sha256(handle.read()).hexdigest())
+        self.assertEqual(result["id"], "hello-extension")
+
+    def test_same_folder_gives_the_same_bytes(self):
+        folder = self.make_element()
+        first = pack.pack(folder, os.path.join(self.tmp, "a.zip"))["sha256"]
+        second = pack.pack(folder, os.path.join(self.tmp, "b.zip"))["sha256"]
+        self.assertEqual(first, second)
+
+    def test_invalid_manifest_is_refused(self):
+        folder = self.make_element()
+        os.remove(os.path.join(folder, "main.js"))
+        with self.assertRaises(pack.PackError) as caught:
+            pack.pack(folder, os.path.join(self.tmp, "x.zip"))
+        self.assertIn("main", str(caught.exception))
+
+    def test_links_are_refused(self):
+        folder = self.make_element()
+        target = os.path.join(folder, "main.js")
+        try:
+            os.symlink(target, os.path.join(folder, "alias.js"))
+        except OSError:
+            self.skipTest("symbolic links are not available here")
+        with self.assertRaises(pack.PackError):
+            pack.pack(folder, os.path.join(self.tmp, "x.zip"))
+
+    def test_catalog_entry_is_added_then_replaced(self):
+        folder = self.make_element()
+        catalog = os.path.join(self.tmp, "catalog.json")
+        with open(catalog, "w", encoding="utf-8") as handle:
+            json.dump({"catalogVersion": 1, "extensions": []}, handle)
+
+        pack.pack(folder, os.path.join(self.tmp, "1.zip"), catalog, "https://example.com/demo-1.zip")
+        pack.pack(folder, os.path.join(self.tmp, "2.zip"), catalog, "https://example.com/demo-2.zip")
+
+        with open(catalog, encoding="utf-8") as handle:
+            entries = json.load(handle)["extensions"]
+        self.assertEqual([entry["id"] for entry in entries], ["demo"])
+        self.assertEqual(entries[0]["url"], "https://example.com/demo-2.zip")
+        self.assertRegex(entries[0]["sha256"], r"^[0-9a-f]{64}$")
+
+    def test_catalog_needs_an_https_address(self):
+        folder = self.make_element()
+        catalog = os.path.join(self.tmp, "catalog.json")
+        with open(catalog, "w", encoding="utf-8") as handle:
+            json.dump({"catalogVersion": 1, "extensions": []}, handle)
+        with self.assertRaises(pack.PackError):
+            pack.pack(folder, os.path.join(self.tmp, "x.zip"), catalog, "http://example.com/x.zip")
+
+
+if __name__ == "__main__":
+    unittest.main()

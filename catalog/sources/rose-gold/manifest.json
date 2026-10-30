@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "rose-gold",
+  "name": "Or rose",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Thème or rose, chaud, avec un schéma sombre et un schéma clair.",
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Dark"
+}

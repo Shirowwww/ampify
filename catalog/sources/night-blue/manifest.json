@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "night-blue",
+  "name": "Bleu nuit",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Thème bleu nuit, avec un schéma sombre et un schéma clair.",
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Dark"
+}

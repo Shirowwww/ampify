@@ -1,6 +1,6 @@
 #pragma once
 
-// Process calls for the launcher: load the kernel DLL into a process, resume a suspended process,
+// Process calls for the launcher: load the kernel DLL into a process, hold and resume its threads,
 // find the processes of the package. Windows only.
 
 #include <windows.h>
@@ -16,11 +16,19 @@ inline constexpr DWORD kInjectionRights = PROCESS_CREATE_THREAD | PROCESS_QUERY_
                                           PROCESS_VM_WRITE | PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION |
                                           SYNCHRONIZE;
 
+inline constexpr DWORD kDefaultRemoteLoadTimeoutMs = 10000;
+
 // Opens a process with kInjectionRights. Null on failure: GetLastError says why.
 HANDLE OpenProcessForInjection(DWORD processId);
 
-// Loads `kernelDll` into `process` by running LoadLibraryW there. On failure, `failure` says why, in French.
-bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::string& failure);
+// Loads `kernelDll` into `process` by running LoadLibraryW there, and waits at most `timeoutMs`.
+// On failure, `failure` says why, in French. A load that is still pending at the timeout may finish
+// later: the thread is not killed, and the caller should check the kernel's own journal.
+bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::string& failure,
+                  DWORD timeoutMs = kDefaultRemoteLoadTimeoutMs);
+
+// Suspends every thread of `processId`. Returns how many were suspended.
+int SuspendProcessThreads(DWORD processId);
 
 // Resumes every thread of `processId` that was suspended. Returns how many were resumed.
 int ResumeProcessThreads(DWORD processId);

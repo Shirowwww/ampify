@@ -51,7 +51,7 @@ résumé et `winget.log`. Les tests qui n'ont pas besoin d'Apple Music tournent 
 |---|---|---|
 | `lancement-normal` | Apple Music lancé comme d'habitude, sans le lanceur : pas de journal du noyau, pas de module `amk_kernel.dll`, fenêtre qui répond. | 3 |
 | `version-diffusion` | Build de diffusion : injection si la version installée est dans la liste testée, refus sinon. L'app démarre dans les deux cas. | 1 et 2 |
-| `injection-banc` | Build de banc : noyau chargé dans `AppleMusic.exe` et `AMPLibraryAgent.exe`, lancement suspendu (nombre de threads repris), application saine après 20 s, fermeture propre du lanceur. | 1, 2 et 3 |
+| `injection-banc` | Build de banc : signature de `AVFoundationCF.dll` reconnue, noyau chargé dans `AppleMusic.exe` et `AMPLibraryAgent.exe`, lancement suspendu (nombre de threads repris), application saine après 20 s, fermeture propre du lanceur. | 1, 2 et 3 |
 | `mode-sans-echec` | Compteur à 2 : le lanceur démarre sans noyau, puis remet le compteur à zéro après 20 s. | 4 |
 
 Les tests `lancement-normal`, `version-diffusion` et `injection-banc` vérifient aussi qu'Apple Music n'a pas planté
@@ -68,6 +68,17 @@ l'artefact le dit aussi.
 
 Le test `version-diffusion` garde la politique de diffusion : sur une version inconnue, il vérifie que le build de
 diffusion refuse l'injection.
+
+## Signature du build (`AVFoundationCF.dll`)
+
+Le lanceur et le noyau lisent la table d'exports de `AVFoundationCF.dll`, dans le dossier du paquet, à chaque
+lancement. Les noms requis sont dans `core/build_signature.hpp`. Le noyau ne stocke aucune adresse : il ne résout
+que par nom. Une version testée dont la DLL n'exporte pas ces noms est refusée. Le journal du lanceur écrit une ligne
+`signature reconnue : 5 exports trouvés dans AVFoundationCF.dll`, ou `signature non reconnue : exports absents ...`.
+Le test `injection-banc` vérifie cette ligne sur la version installée sur le runner.
+
+Pour marquer une nouvelle version comme testée, il faut les deux : le banc injecte proprement sur elle, et sa signature
+est reconnue. Ensuite on l'ajoute à `kKnownAppVersions`.
 
 ## Ajouter un test
 

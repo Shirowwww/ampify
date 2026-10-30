@@ -24,4 +24,8 @@ ProcessRole RoleOfImageName(std::string_view imagePath);
 // Empty when the package is not Apple Music's or the name is malformed.
 std::string AppleMusicVersion(std::string_view packageFullName);
 
+// Compares two dotted versions part by part as numbers: "1.1792.0.0" is newer than "1.1540.23042.0".
+// Returns below 0, 0 or above 0, like strcmp.
+int CompareVersions(std::string_view left, std::string_view right);
+
 }  // namespace amk

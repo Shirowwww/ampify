@@ -1,5 +1,6 @@
 #include "apple_music.hpp"
 
+#include <cstdint>
 #include <vector>
 
 #include "text_util.hpp"
@@ -41,6 +42,32 @@ std::string AppleMusicVersion(std::string_view packageFullName) {
     if (parts.size() != 5) return {};
     if (parts[0] != kPackageName || parts[4] != kPublisherId) return {};
     return std::string(parts[1]);
+}
+
+namespace {
+
+// Reads the number at the start of `text` and moves past the next dot. A missing number counts as 0.
+std::uint64_t TakeNumber(std::string_view& text) {
+    std::uint64_t value = 0;
+    size_t digits = 0;
+    while (digits < text.size() && text[digits] >= '0' && text[digits] <= '9') {
+        value = value * 10 + static_cast<std::uint64_t>(text[digits] - '0');
+        ++digits;
+    }
+    size_t dot = text.find('.', digits);
+    text = dot == std::string_view::npos ? std::string_view{} : text.substr(dot + 1);
+    return value;
+}
+
+}  // namespace
+
+int CompareVersions(std::string_view left, std::string_view right) {
+    while (!left.empty() || !right.empty()) {
+        std::uint64_t a = TakeNumber(left);
+        std::uint64_t b = TakeNumber(right);
+        if (a != b) return a < b ? -1 : 1;
+    }
+    return 0;
 }
 
 }  // namespace amk

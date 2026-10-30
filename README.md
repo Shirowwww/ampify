@@ -6,8 +6,8 @@ des extensions, des thèmes et des modes qu'on active ou désactive à volonté,
 On garde toutes les fonctions d'Apple Music (lossless, Dolby Atmos, paroles, bibliothèque, synchronisation).
 On ajoute et on corrige, on ne remplace pas.
 
-> **État : injecteur écrit, à tester sur Windows.** Le noyau, le runtime JavaScript des extensions (M7) et le
-> nivellement Atmos sont testés hors de Windows, et sous Wine pour la partie Windows.
+> **État : injecteur écrit, à tester sur Windows.** Le noyau, le runtime JavaScript des extensions (M7), le
+> nivellement Atmos et la CLI `amk` sont testés hors de Windows, et sous Wine pour la partie Windows.
 > Le lanceur et la DLL du noyau compilent pour Windows, mais n'ont pas encore été lancés avec Apple Music.
 > La procédure de test est dans [docs/tests/M3-injecteur.md](docs/tests/M3-injecteur.md). Voir [PROGRESS.md](PROGRESS.md).
 
@@ -29,13 +29,18 @@ On ajoute et on corrige, on ne remplace pas.
 | Mesure de loudness BS.1770 (LUFS) | `extensions/atmos-leveler/loudness_meter.*` | fait, testé |
 | Politique du nivellement Atmos : cible stéréo, mémoire par morceau, plafond de crête | `extensions/atmos-leveler/leveler.*` | fait, testé |
 | Identité du paquet, décision d'injection, garde DRM | `core/apple_music.*`, `core/injection_policy.*`, `core/drm_guard.*` | fait, testé |
-| Lanceur : lancement suspendu, injection, surveillance d'`AMPLibraryAgent.exe` | `launcher/` | écrit, compilé, à tester sur Windows |
+| Lanceur : lancement d'Apple Music, pause du premier processus pendant l'injection, suivi du paquet | `launcher/`, `core/package_watch.*` | écrit, compilé, à tester sur Windows |
 | Noyau chargé dans les deux processus (DLL) | `kernel/` | écrit, compilé, à tester sur Windows |
 | Hooks sur `AppleMusic.exe` et `AMPLibraryAgent.exe` | à faire (M4) | |
 | Kit de test en un double-clic | à faire (M5) | |
+| CLI `amk` : réglages, extensions, thèmes, snippets, `apply`, `launch`, `restore`, `watch`, sauvegardes, `build`, `inspect`, `dev`, `test`, `types`, `doctor`, `logs`, `profile`, `export`, `import` | `cli/`, `docs/cli/COMMANDES.md` | fait, testé (135 tests unitaires, 63 tests de bout en bout) |
+| Installation et mise à jour depuis le catalogue, SHA-256 vérifié, archives contrôlées | `cli/marketplace.cpp` | fait, testé sous Linux (`unzip`). Sous Windows : `tar.exe` et `curl.exe` |
+| Catalogue, schémas, validateur, empaquetage | `catalog/`, `schemas/`, `tools/` | fait, testé |
+| Spécification de la page Marketplace dans l'app | `docs/marketplace/PAGE.md` | écrite, la page reste à faire (M8) |
 | Banc de test Windows automatique : Apple Music installé, lancement, injection, mode sans échec | `bench/windows/`, `.github/workflows/windows-bench.yml` | écrit, lancé en CI, voir [docs/tests/banc-windows.md](docs/tests/banc-windows.md) |
 
-Le nivellement Atmos est la première extension. Il mesure le son décodé et règle le gain sur les
+Le nivellement Atmos est la première extension. Un élément de la communauté s'installe avec `amk install <id>` depuis
+le catalogue, et reste désactivé tant que l'utilisateur ne l'a pas activé (voir [docs/cli/COMMANDES.md](docs/cli/COMMANDES.md)). Il mesure le son décodé et règle le gain sur les
 échantillons, jamais sur le curseur de volume : le curseur d'Apple Music ne bouge pas.
 
 ## Règles qui ne changent pas
@@ -57,10 +62,11 @@ cmake --build build
 ./build/amk_tests
 ```
 
-Validation du catalogue et des manifestes (Python 3, bibliothèque standard) :
+Tests de la CLI, de la marketplace et de la validation du catalogue et des manifestes (Python 3, et le binaire `amk`
+compilé, chemin absolu) :
 
 ```bash
-python3 -m unittest discover -s tools -v
+AMK_BIN=$PWD/build/amk python3 -m unittest discover -s tools -v
 python3 tools/validate.py catalog catalog/catalog.json
 python3 tools/validate.py manifest examples/hello-extension/manifest.json
 node --test tools/test_examples.mjs
@@ -77,6 +83,12 @@ cmake --build build-win
 ## Organisation
 
 ```
+cli/                       commande `amk` : JSON, SHA-256, manifestes, catalogue, kit, sauvegardes, commandes, plateforme
+catalog/                   catalogue public des éléments (JSON, vide pour l'instant)
+schemas/                   schémas JSON du manifeste et du catalogue
+tools/                     validateur, empaquetage (pack.py), tests Python et Node des outils et de la CLI
+docs/cli/                  référence des commandes de `amk`
+docs/marketplace/          spécification de la page Marketplace dans l'app
 core/                      noyau portable : réglages, journal, mode sans échec, versions, extensions, injection
 kernel/                    DLL chargée dans AppleMusic.exe et AMPLibraryAgent.exe (Windows)
 launcher/                  lanceur : paquet MSIX, lancement suspendu, injection (Windows)

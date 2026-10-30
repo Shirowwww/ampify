@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "apple_music.hpp"
+#include "build_signature.hpp"
 #include "version_gate.hpp"
 
 namespace amk {
@@ -15,13 +16,14 @@ struct PolicyVerdict {
     std::string reason;
 };
 
-// Launcher side, once per launch: inject the kernel into Apple Music? Safe mode and unknown builds say no,
-// and Apple Music then starts untouched.
-PolicyVerdict DecideInjection(std::string_view appVersion, bool safeMode,
+// Launcher side, once per launch: inject the kernel into Apple Music? Safe mode, an unknown build, and a build
+// whose player DLL does not export what the kit needs all say no, and Apple Music then starts untouched.
+PolicyVerdict DecideInjection(std::string_view appVersion, bool safeMode, const BuildSignature& signature,
                               std::span<const std::string_view> known = kKnownAppVersions);
 
-// Kernel side, inside each process: run only in a process of the package and on a build that was tested.
-PolicyVerdict DecideKernel(ProcessRole role, std::string_view appVersion,
+// Kernel side, inside each process: run only in a process of the package, on a build that was tested, whose
+// player DLL matches the signature.
+PolicyVerdict DecideKernel(ProcessRole role, std::string_view appVersion, const BuildSignature& signature,
                            std::span<const std::string_view> known = kKnownAppVersions);
 
 }  // namespace amk

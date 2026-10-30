@@ -29,6 +29,12 @@ public:
     void SetBool(const std::string& key, bool value);
     void SetInt(const std::string& key, int value);
 
+    // Forgets the key. A missing key is not an error.
+    void Remove(const std::string& key);
+
+    // Every key, sorted by name, as read from the file and set since.
+    const std::map<std::string, std::string>& Values() const { return m_values; }
+
 private:
     std::map<std::string, std::string> m_values;
 };

@@ -120,4 +120,8 @@ void Settings::SetInt(const std::string& key, int value) {
     Set(key, std::to_string(value));
 }
 
+void Settings::Remove(const std::string& key) {
+    m_values.erase(key);
+}
+
 }  // namespace amk

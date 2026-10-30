@@ -79,4 +79,4 @@ ce qui s'est passé.
 - Le son était-il propre ? Oui ou non, et si non, à quel moment.
 - Le journal contient-il une ligne `posé dans` avec CoreFP, CoreADI64 ou FairPlay ? Oui ou non.
 
-Ces tests suffisent pour valider M4, avec M3 dans le même passage.
+Ce passage valide M4. Il confirme aussi la lecture audio de M3, qui reste à confirmer.

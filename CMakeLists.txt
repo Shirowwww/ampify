@@ -42,7 +42,7 @@ if(MSVC)
 endif()
 
 # Portable kernel: settings, journal, safe mode, version gate, extension host,
-# Apple Music identity, injection policy, DRM guard, JSON, manifests, the JavaScript runtime
+# Apple Music identity, injection policy, DRM guard, package watch, JSON, manifests, the JavaScript runtime
 # and the extension loader.
 add_library(amk_core STATIC
     core/settings.cpp
@@ -51,6 +51,7 @@ add_library(amk_core STATIC
     core/version_gate.cpp
     core/extension.cpp
     core/apple_music.cpp
+    core/build_signature.cpp
     core/injection_policy.cpp
     core/drm_guard.cpp
     core/json.cpp
@@ -61,7 +62,9 @@ add_library(amk_core STATIC
     core/extension_loader.cpp
     core/gain_board.cpp
     core/player_watch.cpp
-    core/ui_model.cpp)
+    core/ui_model.cpp
+    core/reload.cpp
+    core/package_watch.cpp)
 target_compile_options(amk_core PRIVATE ${AMK_WARNINGS})
 target_link_libraries(amk_core PUBLIC amk_quickjs)
 
@@ -149,13 +152,53 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         target_link_libraries(amk_kernel PRIVATE amk_theme)
     endif()
 
-    # Starts Apple Music suspended, injects the kernel, resumes it, then watches for AMPLibraryAgent.exe.
+    # Starts Apple Music, holds its first process while the kernel loads, then follows the package.
     add_executable(amk_launcher WIN32
         launcher/launcher.cpp
         launcher/package.cpp
         launcher/injection.cpp)
     target_link_libraries(amk_launcher PRIVATE amk_core amk_win)
     target_compile_options(amk_launcher PRIVATE ${AMK_WARNINGS})
+endif()
+
+# Portable part of the command line `amk`: JSON, SHA-256, manifests, catalog, kit layout, backups.
+add_library(amk_cli_portable STATIC
+    cli/json.cpp
+    cli/sha256.cpp
+    cli/element.cpp
+    cli/catalog.cpp
+    cli/kit.cpp
+    cli/backup.cpp
+    cli/archive.cpp
+    cli/watch.cpp
+    cli/release.cpp
+    cli/zip_writer.cpp)
+target_link_libraries(amk_cli_portable PUBLIC amk_core)
+target_compile_options(amk_cli_portable PRIVATE ${AMK_WARNINGS})
+
+# The command line `amk`: commands, platform glue, and the marketplace.
+set(AMK_CLI_SOURCES
+    cli/amk.cpp
+    cli/commands.cpp
+    cli/marketplace.cpp
+    cli/activation.cpp
+    cli/author.cpp
+    cli/sdk_types.cpp
+    cli/develop.cpp
+    cli/diagnose.cpp
+    cli/transfer.cpp
+    cli/test_runner.cpp)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    list(APPEND AMK_CLI_SOURCES cli/platform.cpp cli/platform_win.cpp)
+else()
+    list(APPEND AMK_CLI_SOURCES cli/platform.cpp cli/platform_posix.cpp)
+endif()
+add_executable(amk ${AMK_CLI_SOURCES})
+target_link_libraries(amk PRIVATE amk_cli_portable amk_core)
+target_compile_options(amk PRIVATE ${AMK_WARNINGS})
+target_compile_definitions(amk PRIVATE AMK_VERSION="${PROJECT_VERSION}")
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    target_link_libraries(amk PRIVATE shell32)
 endif()
 
 if(AMK_BUILD_TESTS)
@@ -166,6 +209,7 @@ if(AMK_BUILD_TESTS)
         tests/atmos_tests.cpp
         tests/apple_music_tests.cpp
         tests/policy_tests.cpp
+        tests/cli_tests.cpp
         tests/json_tests.cpp
         tests/manifest_tests.cpp
         tests/js_runtime_tests.cpp
@@ -177,8 +221,11 @@ if(AMK_BUILD_TESTS)
         tests/player_watch_tests.cpp
         tests/ui_model_tests.cpp
         tests/ui_element_tests.cpp
-        tests/theme_script_tests.cpp)
-    target_link_libraries(amk_tests PRIVATE amk_core atmos_leveler amk_theme)
+        tests/theme_script_tests.cpp
+        tests/reload_tests.cpp
+        tests/signature_tests.cpp
+        tests/watch_tests.cpp)
+    target_link_libraries(amk_tests PRIVATE amk_core atmos_leveler amk_theme amk_cli_portable)
     target_compile_options(amk_tests PRIVATE ${AMK_WARNINGS})
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         target_sources(amk_tests PRIVATE tests/win_host_tests.cpp)
@@ -186,4 +233,11 @@ if(AMK_BUILD_TESTS)
     endif()
     target_compile_definitions(amk_tests PRIVATE AMK_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     add_test(NAME amk_tests COMMAND amk_tests)
+
+    # Python tests of the validator, the packer and the command line (tools/test_cli.py runs the amk binary).
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME amk_tools COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tools -v)
+        set_tests_properties(amk_tools PROPERTIES ENVIRONMENT "AMK_BIN=$<TARGET_FILE:amk>")
+    endif()
 endif()

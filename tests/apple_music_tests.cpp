@@ -26,6 +26,15 @@ TEST_CASE(AppleMusic_RecognisesItsTwoProcesses) {
     CHECK(amk::RoleOfImageName("C:\\Tools\\AppleMusic.exe.bak") == amk::ProcessRole::Unknown);
 }
 
+// Self-updates change the package version: the launcher must see the newer one, numerically, not as text.
+TEST_CASE(AppleMusic_VersionsCompareAsNumbers) {
+    CHECK(amk::CompareVersions("1.1792.39682.0", "1.1540.23042.0") > 0);
+    CHECK(amk::CompareVersions("1.1540.23042.0", "1.1792.39682.0") < 0);
+    CHECK(amk::CompareVersions("1.9.0.0", "1.10.0.0") < 0);  // not "1.9" > "1.10" as text
+    CHECK(amk::CompareVersions("1.1540.23042.0", "1.1540.23042.0") == 0);
+    CHECK(amk::CompareVersions("1.2", "1.2.0.0") == 0);      // a missing part counts as 0
+}
+
 TEST_CASE(DrmGuard_RefusesFairPlayModules) {
     CHECK(amk::IsProtectedModule("CoreFP.dll"));
     CHECK(amk::IsProtectedModule("corefp"));

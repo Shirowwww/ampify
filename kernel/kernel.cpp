@@ -4,16 +4,21 @@
 #include <windows.h>
 
 #include <chrono>
+#include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "../core/apple_music.hpp"
+#include "../core/build_signature.hpp"
 #include "../core/extension.hpp"
 #include "../core/extension_loader.hpp"
 #include "../core/injection_policy.hpp"
 #include "../core/player_watch.hpp"
 #include "../core/journal.hpp"
+#include "../core/reload.hpp"
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
 #include "../extensions/atmos-leveler/atmos_windows.hpp"
@@ -28,6 +33,30 @@ namespace {
 
 constexpr auto kHealthyAfter = std::chrono::seconds(20);
 constexpr auto kHealthyRetry = std::chrono::seconds(5);
+constexpr auto kReloadEvery = std::chrono::milliseconds(500);
+
+// Reads reload.txt and restarts the elements that its new requests name. The settings are read again first, so an
+// element that `amk dev` has just enabled starts with the value on disk. A missing file counts as empty: the first
+// text is only the baseline, so a file that is created later is not missed.
+void ServiceReloadRequests(const std::filesystem::path& kit, amk::ReloadWatcher& watcher, amk::ExtensionLoader& loader,
+                           amk::Settings& settings, amk::Journal& journal) {
+    std::string text;
+    std::ifstream in(kit / "reload.txt", std::ios::binary);
+    if (in) {
+        std::ostringstream buffer;
+        buffer << in.rdbuf();
+        text = buffer.str();
+    }
+
+    std::vector<std::string> ids = watcher.Changed(text);
+    if (ids.empty()) return;
+
+    settings.Load((kit / "settings.txt").string());
+    for (const std::string& id : ids) {
+        journal.Write("Rechargement demandé : " + id);
+        loader.Restart(id, settings);
+    }
+}
 
 HINSTANCE g_module = nullptr;  // the kernel DLL itself, needed to install the interface hook
 
@@ -55,8 +84,12 @@ DWORD WINAPI KernelMain(LPVOID) {
     journal.Write("Noyau chargé dans " + amk::win::ExecutablePath().filename().string() + " (processus " +
                   std::to_string(GetCurrentProcessId()) + ")");
 
+    // Read on every start: the package may have been updated since the launcher last looked.
     std::string version = amk::AppleMusicVersion(amk::win::PackageFullName());
-    amk::PolicyVerdict verdict = amk::DecideKernel(role, version);
+    amk::BuildSignature signature = amk::CheckBuildSignature(
+        amk::win::ReadFileBytes(amk::win::ExecutablePath().parent_path() / std::string(amk::kPlayerDllName)));
+    journal.Write(amk::DescribeSignature(signature));
+    amk::PolicyVerdict verdict = amk::DecideKernel(role, version, signature);
     journal.Write(verdict.reason);
     if (!verdict.allowed) return 0;
 
@@ -81,11 +114,13 @@ DWORD WINAPI KernelMain(LPVOID) {
 
     // JavaScript runs on this one thread only: QuickJS is not thread-safe, and the shortcuts are delivered to the
     // thread that registered them. Starting the elements here keeps that true.
-    std::thread([] {
+    std::thread([kit] {
         host.StartAll(settings);
         journal.Write("Hôte d'extensions prêt");
         amk::PlayerWatcher playerWatcher;
         int ticks = 0;
+        amk::ReloadWatcher reload;
+        auto nextReload = std::chrono::steady_clock::now();
         while (true) {
             winHost.Service([](const std::string& elementId, const std::string& combo) {
                 loader.DeliverKey(elementId, combo);
@@ -95,6 +130,10 @@ DWORD WINAPI KernelMain(LPVOID) {
             if (++ticks % 5 == 0) {
                 amk::PlayerSnapshot snapshot = winHost.Player();
                 for (const std::string& event : playerWatcher.Poll(snapshot)) loader.DeliverPlayer(event, snapshot);
+            }
+            if (std::chrono::steady_clock::now() >= nextReload) {
+                ServiceReloadRequests(kit, reload, loader, settings, journal);
+                nextReload = std::chrono::steady_clock::now() + kReloadEvery;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }

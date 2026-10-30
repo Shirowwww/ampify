@@ -21,9 +21,4 @@ std::optional<InstalledPackage> FindInstalledPackage(const wchar_t* familyName);
 // Starts the package's app through the shell's activation manager. `processId` gets the new process.
 HRESULT ActivateApp(const wchar_t* appUserModelId, DWORD* processId);
 
-// Asks Windows to start the package's processes suspended, until DisablePackageDebugging is called.
-// Fails on Windows builds that do not offer it; the launcher then starts the app normally.
-HRESULT EnablePackageDebugging(const std::wstring& packageFullName);
-HRESULT DisablePackageDebugging(const std::wstring& packageFullName);
-
 }  // namespace amk::launcher

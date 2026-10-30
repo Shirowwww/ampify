@@ -126,9 +126,9 @@ function Start-AppNormally {
     Start-Process -FilePath 'explorer.exe' -ArgumentList "shell:AppsFolder\$($script:AppUserModelId)"
 }
 
-# La virgule garde le tableau vide tel quel : sans elle, PowerShell renvoie $null et .Count échoue.
+# Les processus sortent un par un : les appelants les comptent avec @(...), qui donne un tableau même vide ou à un élément.
 function Get-AppProcesses {
-    return ,@(Get-Process -Name 'AppleMusic' -ErrorAction SilentlyContinue)
+    Get-Process -Name 'AppleMusic' -ErrorAction SilentlyContinue
 }
 
 # Ferme Apple Music comme un utilisateur (fenêtre fermée), puis de force si elle ne part pas.
@@ -137,10 +137,10 @@ function Close-AppleMusic {
     foreach ($process in Get-AppProcesses) {
         $process.CloseMainWindow() | Out-Null
     }
-    $gone = Wait-Until -TimeoutSeconds 20 -Condition { (Get-AppProcesses).Count -eq 0 }
+    $gone = Wait-Until -TimeoutSeconds 20 -Condition { @(Get-AppProcesses).Count -eq 0 }
     if (-not $gone) {
         Get-AppProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
-        Wait-Until -TimeoutSeconds 10 -Condition { (Get-AppProcesses).Count -eq 0 } | Out-Null
+        Wait-Until -TimeoutSeconds 10 -Condition { @(Get-AppProcesses).Count -eq 0 } | Out-Null
     }
     return $gone
 }
@@ -201,20 +201,30 @@ function Get-KernelState {
     }
 }
 
-# Plantages d'Apple Music enregistrés par Windows depuis $Since.
+# Plantages d'Apple Music enregistrés par Windows depuis $Since, en objets simples (Id, Heure, Message).
+# Les appelants l'enveloppent dans @(...) : une virgule ici rangerait le tableau dans un second tableau, et le compte serait faux.
 function Get-AppCrashEvents {
     param([datetime]$Since)
-    $events = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $Since } -ErrorAction SilentlyContinue
-    return ,@($events | Where-Object { ($_.Id -in 1000, 1001, 1002) -and ($_.Message -match 'AppleMusic\.exe|AMPLibraryAgent\.exe') })
+    $records = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $Since } -ErrorAction SilentlyContinue)
+    $crashes = @()
+    foreach ($record in $records) {
+        if ($record.Id -notin 1000, 1001, 1002) { continue }
+        $message = [string]$record.Message
+        if ($message -notmatch 'AppleMusic\.exe|AMPLibraryAgent\.exe') { continue }
+        $crashes += [pscustomobject]@{ Id = $record.Id; Time = $record.TimeCreated; Message = $message }
+    }
+    return $crashes
 }
 
 # Résumé lisible des plantages : identifiant de l'événement et début du message, pour savoir ce qui a planté.
 function Format-CrashEvents {
     param([object[]]$Events)
-    $lines = @($Events | Select-Object -First 2 | ForEach-Object {
-        $text = ([string]$_.Message) -replace '\s+', ' '
-        "id $($_.Id) : " + $text.Substring(0, [Math]::Min(240, $text.Length))
-    })
+    $lines = @()
+    foreach ($crash in $Events) {
+        if ($lines.Count -ge 2) { break }
+        $text = [string]$crash.Message -replace '\s+', ' '
+        $lines += "id $($crash.Id) : " + $text.Substring(0, [Math]::Min(240, $text.Length))
+    }
     return ($lines -join ' | ')
 }
 

@@ -25,6 +25,12 @@ Register-Case -Id 'injection-banc' -Title 'Build de banc : noyau dans AppleMusic
         return
     }
 
+    # Signature : la DLL du lecteur du paquet doit exporter les noms dont le noyau dépend. Sinon le lanceur refuse, même en mode banc.
+    $signature = Find-JournalMatch -FileName 'launcher.log' -Pattern 'signature (?:non )?reconnue[^\r\n]*'
+    Add-Check -Ctx $Ctx -Name 'signature : exports de AVFoundationCF.dll reconnus' `
+        -Passed ($null -ne $signature -and $signature.Value -like 'signature reconnue*') `
+        -Detail $(if ($signature) { $signature.Value } else { 'ligne absente du journal' })
+
     # Lancement suspendu : Windows garde l'app en pause pendant l'injection. Zéro thread repris veut dire que rien n'a été suspendu.
     $suspendRequested = Test-JournalContains -FileName 'launcher.log' -Text 'Lancement suspendu demandé à Windows'
     $suspendUnavailable = Test-JournalContains -FileName 'launcher.log' -Text 'Lancement suspendu indisponible'

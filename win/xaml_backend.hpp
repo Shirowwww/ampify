@@ -17,6 +17,9 @@
 
 #include <winrt/Microsoft.UI.Xaml.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
+// ComboBox inherits SelectedItem and SelectionChanged from Selector, declared in Primitives. Without this include,
+// MSVC reported C3779 on both members (run 41071266204).
+#include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 
 #include "../core/theme/tree.hpp"

@@ -4,8 +4,10 @@
 
 #include <windows.h>
 
+#include <cstddef>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace amk::win {
 
@@ -25,5 +27,8 @@ std::string PackageFullName();
 
 // False while a visible top-level window of `processId` is hung. True otherwise, including when it has no window.
 bool WindowsResponsive(DWORD processId);
+
+// The bytes of a file, read whole. Empty when it cannot be read, which the signature check reports as unreadable.
+std::vector<std::byte> ReadFileBytes(const std::filesystem::path& file);
 
 }  // namespace amk::win

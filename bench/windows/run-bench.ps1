@@ -38,8 +38,9 @@ $ErrorActionPreference = 'Stop'
 
 # Une erreur non prévue arrête le banc, avec la ligne fautive dans le journal du job.
 trap {
-    Write-Host "::error::banc interrompu : $($_.Exception.Message)"
+    Write-Host "::error::banc interrompu : $($_.Exception.GetType().FullName) : $($_.Exception.Message)"
     Write-Host $_.InvocationInfo.PositionMessage
+    Write-Host $_.Exception.ToString()
     Write-Host $_.ScriptStackTrace
     exit 1
 }
@@ -96,7 +97,7 @@ if (Test-Path -LiteralPath $buildInfo) {
     Get-Content -LiteralPath $buildInfo | ForEach-Object { $preparation.Add($_) }
 }
 
-$script:KnownVersions = Get-KnownAppVersions -RepoRoot $repo
+$script:KnownVersions = @(Get-KnownAppVersions -RepoRoot $repo)
 $preparation.Add("Versions testées (core/version_gate.hpp) : $($script:KnownVersions -join ', ')")
 
 $installState = 'installation sautée (-SkipInstall)'
@@ -141,7 +142,7 @@ foreach ($case in $script:Cases) {
         Id = $case.Id
         Title = $case.Title
         Status = $caseStatus
-        Checks = @($ctx.Checks)
+        Checks = $ctx.Checks.ToArray()
     }
     $report += $entry
     Write-Host '::endgroup::'
