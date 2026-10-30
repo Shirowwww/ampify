@@ -1,0 +1,9 @@
+/* Minuit : fond sombre, accent bleu. Les couleurs viennent du schéma Dark de colors.ini. */
+
+Page {
+    background: $SolidBackgroundFillColorBase;
+}
+
+TextBlock {
+    color: $TextFillColorPrimaryBrush;
+}

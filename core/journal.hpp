@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <mutex>
 #include <ostream>
 #include <string>
 #include <string_view>
@@ -8,6 +9,7 @@
 namespace amk {
 
 // Journal lines look like `[13:09:27.041] message`. The clock is injectable so tests stay deterministic.
+// Write is safe to call from several threads: the kernel's worker and the interface thread both log.
 class Journal {
 public:
     using Stamp = std::function<std::string()>;
@@ -23,6 +25,7 @@ public:
 private:
     std::ostream& m_out;
     Stamp m_stamp;
+    std::mutex m_mutex;
 };
 
 }  // namespace amk

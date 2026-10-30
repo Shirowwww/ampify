@@ -10,6 +10,7 @@ namespace amk {
 Journal::Journal(std::ostream& out, Stamp stamp) : m_out(out), m_stamp(std::move(stamp)) {}
 
 void Journal::Write(std::string_view message) {
+    std::lock_guard<std::mutex> lock(m_mutex);
     m_out << '[' << m_stamp() << "] " << message << '\n';
     m_out.flush();
 }

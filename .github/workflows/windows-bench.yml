@@ -111,7 +111,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: thread-052bjz
           path: m8
 
       - name: Télécharger les en-têtes Windows App SDK (NuGet)

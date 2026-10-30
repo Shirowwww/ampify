@@ -28,9 +28,17 @@ add_library(amk_quickjs STATIC
 target_compile_options(amk_quickjs PRIVATE $<$<NOT:$<C_COMPILER_ID:MSVC>>:-w>)
 target_compile_definitions(amk_quickjs PRIVATE "CONFIG_VERSION=\"2021-03-27\"")
 target_include_directories(amk_quickjs SYSTEM PUBLIC vendor/quickjs)
-# QuickJS uses pthreads for Atomics. On Windows, MinGW provides them through winpthreads, linked statically.
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+# QuickJS uses pthreads for Atomics. With MinGW, winpthreads provides them, linked statically.
+if(MINGW)
     target_link_libraries(amk_quickjs PUBLIC pthread)
+endif()
+# MSVC has neither the GCC extensions nor pthreads that QuickJS uses. cmake/msvc maps them: a header that is
+# force-included in every QuickJS file, and a small pthread.h over SRWLOCK and CONDITION_VARIABLE. The vendored
+# files are not changed.
+if(MSVC)
+    target_compile_options(amk_quickjs PRIVATE /w "/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/msvc/quickjs_msvc.h")
+    target_compile_definitions(amk_quickjs PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_include_directories(amk_quickjs SYSTEM PRIVATE cmake/msvc/include)
 endif()
 
 # Portable kernel: settings, journal, safe mode, version gate, extension host,
@@ -54,6 +62,35 @@ add_library(amk_core STATIC
 target_compile_options(amk_core PRIVATE ${AMK_WARNINGS})
 target_link_libraries(amk_core PUBLIC amk_quickjs)
 
+# Theme engine: colour schemes, resources, CSS-like rules, cascade, apply and restore, live reload, inspector.
+# Pure C++ over the TreeBackend interface, so it builds and tests on any host. The Windows backend implements that interface.
+add_library(amk_theme STATIC
+    core/theme/color.cpp
+    core/theme/css.cpp
+    core/theme/engine.cpp
+    core/theme/files.cpp
+    core/theme/ini.cpp
+    core/theme/inspector.cpp
+    core/theme/library.cpp
+    core/theme/properties.cpp
+    core/theme/selector.cpp
+    core/theme/session.cpp
+    core/theme/theme.cpp
+    core/theme/theme_settings.cpp
+    core/theme/commands.cpp)
+target_link_libraries(amk_theme PUBLIC amk_core)
+target_compile_options(amk_theme PRIVATE ${AMK_WARNINGS})
+
+# Command-line checker for a theme folder: prints the problems and the rules that would apply. Runs on any host.
+add_executable(amk_theme_check tools/theme_check.cpp)
+target_link_libraries(amk_theme_check PRIVATE amk_theme)
+target_compile_options(amk_theme_check PRIVATE ${AMK_WARNINGS})
+
+# The amk command: theme list, theme set (--scheme), watch. Edits settings.txt; the kernel applies the change.
+add_executable(amk tools/amk.cpp)
+target_link_libraries(amk PRIVATE amk_theme)
+target_compile_options(amk PRIVATE ${AMK_WARNINGS})
+
 # Atmos leveler: BS.1770 loudness meter, gain ramp, spatial object pass and gain policy. Pure C++, no Windows API.
 add_library(atmos_leveler STATIC
     extensions/atmos-leveler/loudness_meter.cpp
@@ -63,9 +100,14 @@ add_library(atmos_leveler STATIC
     extensions/atmos-leveler/leveler.cpp)
 target_compile_options(atmos_leveler PRIVATE ${AMK_WARNINGS})
 
+# XAML theme backend (win/xaml_backend.cpp, win/theme_service.cpp). Off by default: it needs the Windows App SDK C++/WinRT
+# headers, which MinGW does not ship, and it has not been compiled or run yet. See docs/tests/M8-themes.md.
+option(AMK_XAML "Build the XAML theme backend in the kernel (needs the Windows App SDK C++/WinRT headers)" OFF)
+set(AMK_WINAPPSDK_INCLUDE "" CACHE PATH "Folder that holds winrt/Microsoft.UI.Xaml.h, from the Windows App SDK NuGet package")
+
 # Windows only: the kernel DLL, the launcher, and the helpers they share. Built when targeting Windows.
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    add_library(amk_win STATIC win/win_common.cpp win/win_host.cpp win/hook.cpp)
+    add_library(amk_win STATIC win/win_common.cpp win/win_host.cpp win/hook.cpp win/ui_thread.cpp)
     target_compile_options(amk_win PRIVATE ${AMK_WARNINGS})
     target_compile_definitions(amk_win PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
     target_link_libraries(amk_win PUBLIC ole32 shell32 user32 psapi winhttp amk_core)
@@ -90,6 +132,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         target_compile_options(amk_hook_harness PRIVATE ${AMK_WARNINGS})
     endif()
 
+    # Checks the interface-thread hook with a real window. Run it under Wine with a display, or on the Windows bench.
+    add_executable(amk_ui_thread_test tests/ui_thread_test.cpp)
+    target_link_libraries(amk_ui_thread_test PRIVATE amk_win)
+    target_compile_options(amk_ui_thread_test PRIVATE ${AMK_WARNINGS})
+
+    if(AMK_XAML)
+        target_sources(amk_kernel PRIVATE win/xaml_backend.cpp win/theme_service.cpp)
+        target_compile_definitions(amk_kernel PRIVATE AMK_WITH_XAML=1)
+        if(AMK_WINAPPSDK_INCLUDE)
+            target_include_directories(amk_kernel PRIVATE "${AMK_WINAPPSDK_INCLUDE}")
+        endif()
+        target_link_libraries(amk_kernel PRIVATE amk_theme)
+    endif()
+
     # Starts Apple Music suspended, injects the kernel, resumes it, then watches for AMPLibraryAgent.exe.
     add_executable(amk_launcher WIN32
         launcher/launcher.cpp
@@ -112,8 +168,9 @@ if(AMK_BUILD_TESTS)
         tests/js_runtime_tests.cpp
         tests/script_extension_tests.cpp
         tests/loader_tests.cpp
-        tests/pipeline_tests.cpp)
-    target_link_libraries(amk_tests PRIVATE amk_core atmos_leveler)
+        tests/pipeline_tests.cpp
+        tests/theme_tests.cpp)
+    target_link_libraries(amk_tests PRIVATE amk_core atmos_leveler amk_theme)
     target_compile_options(amk_tests PRIVATE ${AMK_WARNINGS})
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         target_sources(amk_tests PRIVATE tests/win_host_tests.cpp)

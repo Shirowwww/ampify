@@ -19,10 +19,26 @@
 #include "../win/win_common.hpp"
 #include "../win/win_host.hpp"
 
+#if defined(AMK_WITH_XAML)
+#include "../win/theme_service.hpp"
+#endif
+
 namespace {
 
 constexpr auto kHealthyAfter = std::chrono::seconds(20);
 constexpr auto kHealthyRetry = std::chrono::seconds(5);
+
+HINSTANCE g_module = nullptr;  // the kernel DLL itself, needed to install the interface hook
+
+// Themes only touch the interface, so only AppleMusic.exe starts the service.
+void StartThemes(amk::Journal& journal, [[maybe_unused]] const std::filesystem::path& kit) {
+#if defined(AMK_WITH_XAML)
+    static amk::win::ThemeService themes(journal, kit);
+    themes.Start(g_module, GetCurrentProcessId());
+#else
+    journal.Write("Thèmes : ce build n'a pas la liaison XAML (AMK_XAML), aucun thème n'est appliqué");
+#endif
+}
 
 // Runs once per process. Journal, extension host and safe mode state stay alive until the process exits,
 // so nothing is torn down while the app still runs.
@@ -75,6 +91,8 @@ DWORD WINAPI KernelMain(LPVOID) {
         }
     }).detach();
 
+    if (role == amk::ProcessRole::AppleMusic) StartThemes(journal, kit);
+
     if (role == amk::ProcessRole::AppleMusic) {
         // The interface process is the one that proves the app is healthy. Its window must not be hung.
         std::this_thread::sleep_for(kHealthyAfter);
@@ -96,6 +114,7 @@ DWORD WINAPI KernelMain(LPVOID) {
 
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
+        g_module = instance;
         DisableThreadLibraryCalls(instance);
         HANDLE thread = CreateThread(nullptr, 0, KernelMain, nullptr, 0, nullptr);
         if (thread) CloseHandle(thread);

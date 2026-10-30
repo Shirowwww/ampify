@@ -1,0 +1,5 @@
+/* Boutons arrondis : remplace le modèle de contrôle par templates/button.xaml. */
+
+Button {
+    template: url(templates/button.xaml);
+}

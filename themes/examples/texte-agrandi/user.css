@@ -1,0 +1,13 @@
+/* Texte agrandi et marges plus larges. Les éléments qui n'ont pas la propriété sont refusés, sans gravité. */
+
+TextBlock {
+    font-size: 18px;
+}
+
+Button {
+    padding: 8 16;
+}
+
+Page {
+    padding: 12px;
+}
