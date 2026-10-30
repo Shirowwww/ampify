@@ -17,6 +17,9 @@ struct ExtensionInfo {
     bool enabledByDefault = false;
     std::function<bool()> start;  // returns false when it cannot start; may throw
     std::function<void()> stop;
+    // When set, it decides whether the element starts, in place of the extensions.<id>.enabled setting.
+    // Last on purpose: the aggregate initializers above stay valid.
+    std::function<bool(const Settings&)> isEnabled;
 };
 
 enum class ExtensionState {

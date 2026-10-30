@@ -28,13 +28,27 @@ std::optional<std::string> ReadText(const fs::path& path) {
 ExtensionLoader::ExtensionLoader(ExtensionHost& hosts, Host& host, Journal& journal, fs::path root, Clock clock)
     : m_hosts(hosts), m_host(host), m_journal(journal), m_root(std::move(root)), m_clock(std::move(clock)) {}
 
+// A theme script runs while its theme is the active one, and while theme.parts.script is on. The keys are those of
+// core/theme/theme_settings.cpp; the theme library is not part of the kernel's core, so they are read here.
+bool ThemeScriptEnabled(const Settings& settings, const std::string& id) {
+    return settings.GetString("theme.active", "") == id && settings.GetBool("theme.parts.script", true);
+}
+
+void ExtensionLoader::SetThemeRoot(fs::path root) { m_themeRoot = std::move(root); }
+
 LoadReport ExtensionLoader::Discover() {
     LoadReport report;
+    LoadFolders(m_root, report, false);
+    if (!m_themeRoot.empty()) LoadFolders(m_themeRoot, report, true);
+    return report;
+}
+
+void ExtensionLoader::LoadFolders(const fs::path& root, LoadReport& report, bool themes) {
     std::error_code ec;
-    if (!fs::is_directory(m_root, ec)) return report;
+    if (!fs::is_directory(root, ec)) return;
 
     std::vector<fs::path> folders;
-    for (const fs::directory_entry& entry : fs::directory_iterator(m_root, ec)) {
+    for (const fs::directory_entry& entry : fs::directory_iterator(root, ec)) {
         if (entry.is_directory(ec)) folders.push_back(entry.path());
     }
     std::sort(folders.begin(), folders.end());
@@ -56,7 +70,16 @@ LoadReport ExtensionLoader::Discover() {
         }
 
         Manifest manifest = std::move(*result.manifest);
-        if (manifest.kind != ElementKind::Extension && manifest.kind != ElementKind::App) {
+        if (themes) {
+            // A theme without a main.js has no script: its folder belongs to the theme engine. Its script runs in
+            // AppleMusic.exe only, because the interface is the only thing a theme changes.
+            if (manifest.kind != ElementKind::Theme) {
+                m_journal.Write("[" + name + "] rejeté : le dossier des thèmes attend un thème");
+                report.rejected.push_back(name);
+                continue;
+            }
+            if (!manifest.main || m_host.Process() != "ui") continue;
+        } else if (manifest.kind != ElementKind::Extension && manifest.kind != ElementKind::App) {
             m_journal.Write("[" + name + "] type " + std::string(ToString(manifest.kind)) +
                             " non chargé par cette version du noyau");
             report.rejected.push_back(name);
@@ -77,6 +100,7 @@ LoadReport ExtensionLoader::Discover() {
         info.id = id;
         info.name = displayName;
         info.enabledByDefault = false;  // a community element never starts unless the user enables it
+        if (themes) info.isEnabled = [id](const Settings& settings) { return ThemeScriptEnabled(settings, id); };
         info.start = [raw] { return raw->Start(); };
         info.stop = [raw] { raw->Stop(); };
 
@@ -88,7 +112,6 @@ LoadReport ExtensionLoader::Discover() {
         m_elements.push_back(std::move(element));
         report.loaded.push_back(id);
     }
-    return report;
 }
 
 bool ExtensionLoader::Restart(const std::string& id, const Settings& settings) {

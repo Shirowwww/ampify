@@ -24,7 +24,8 @@ void ExtensionHost::StartAll(const Settings& settings, std::string_view blockRea
 }
 
 void ExtensionHost::StartEntry(Entry& entry, const Settings& settings, std::string_view blockReason) {
-    bool enabled = settings.GetBool(SettingKey(entry.info.id), entry.info.enabledByDefault);
+    bool enabled = entry.info.isEnabled ? entry.info.isEnabled(settings)
+                                        : settings.GetBool(SettingKey(entry.info.id), entry.info.enabledByDefault);
     if (!enabled) {
         entry.state = ExtensionState::Off;
         return;

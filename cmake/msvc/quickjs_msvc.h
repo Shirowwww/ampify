@@ -1,10 +1,14 @@
-/* Force-included in the QuickJS sources when they are built with MSVC (see CMakeLists.txt). QuickJS uses GCC
-   extensions that MSVC does not have: attributes, __builtin_expect, and the bit scans behind clz and ctz. They are
-   mapped here, so the vendored files in vendor/quickjs stay unchanged. The bit scans need an x64 target. */
+/* Force-included in the QuickJS sources when they are built with MSVC (see CMakeLists.txt). QuickJS uses GCC and C99
+   extensions that MSVC does not have: attributes, __builtin_expect, the bit scans behind clz and ctz, restrict,
+   alloca and ssize_t. They are mapped here, so the vendored files in vendor/quickjs stay unchanged. The bit scans need
+   an x64 target. The headers that QuickJS includes for POSIX (sys/time.h, pthread.h, stdatomic.h) are in
+   cmake/msvc/include. */
 #ifndef AMK_QUICKJS_MSVC_H
 #define AMK_QUICKJS_MSVC_H
 
 #include <intrin.h>
+#include <malloc.h>
+#include <stddef.h>
 
 #define __attribute__(attributes)
 #define __builtin_expect(value, expected) (value)
@@ -13,6 +17,10 @@
 #define __builtin_clzll(value) amk_msvc_clz64(value)
 #define __builtin_ctz(value) amk_msvc_ctz32(value)
 #define __builtin_ctzll(value) amk_msvc_ctz64(value)
+#define alloca _alloca
+#define restrict __restrict
+
+typedef __int64 ssize_t;
 
 static inline int amk_msvc_clz32(unsigned int a) {
     unsigned long index;

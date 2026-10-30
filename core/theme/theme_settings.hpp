@@ -15,6 +15,7 @@ namespace amk::theme {
 //   theme.parts.colors     1 to apply the colours of colors.ini (default 1)
 //   theme.parts.resources  1 to apply resources.xaml and user.css (default 1)
 //   theme.parts.assets     1 to load the images of the theme (default 1)
+//   theme.parts.script     1 to run main.js of the active theme in AppleMusic.exe (default 1)
 struct ThemeSettings {
     std::string active;
     std::string scheme;

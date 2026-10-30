@@ -69,6 +69,7 @@ DWORD WINAPI KernelMain(LPVOID) {
     static amk::WinHost winHost(role == amk::ProcessRole::AppleMusic ? "ui" : "engine", kit, settings, journal);
     static amk::ExtensionHost host(journal);
     static amk::ExtensionLoader loader(host, winHost, journal, kit / "extensions");
+    loader.SetThemeRoot(kit / "themes");
     amk::LoadReport report = loader.Discover();
     journal.Write("Éléments JavaScript retenus : " + std::to_string(report.loaded.size()) + ", rejetés : " +
                   std::to_string(report.rejected.size()));

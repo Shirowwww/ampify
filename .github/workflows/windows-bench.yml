@@ -168,3 +168,39 @@ jobs:
           path: m8/m8-out
           if-no-files-found: warn
           retention-days: 14
+
+  # Compile le kit avec MSVC, sans Windows App SDK : prouve que QuickJS (cmake/msvc) et le noyau se construisent
+  # avec le compilateur de l'utilisateur, et lance les tests unitaires sous Windows. Indépendant du job M8 ci-dessus.
+  msvc-kit:
+    name: Compiler le kit (MSVC) et lancer amk_tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurer et compiler (MSVC, x64)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path msvc-out | Out-Null
+          cmake -S . -B build -A x64 > msvc-out/configure.log 2>&1
+          if ($LASTEXITCODE -ne 0) { Get-Content msvc-out/configure.log -Tail 120; exit 1 }
+          cmake --build build --config Release --parallel > msvc-out/build.log 2>&1
+          if ($LASTEXITCODE -ne 0) { Get-Content msvc-out/build.log -Tail 200; exit 1 }
+
+      - name: Lancer amk_tests
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -LiteralPath build -Recurse -Filter 'amk_tests.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'amk_tests.exe introuvable après la compilation' }
+          & $exe.FullName > msvc-out/amk_tests.log 2>&1
+          $code = $LASTEXITCODE
+          Get-Content msvc-out/amk_tests.log -Tail 40
+          if ($code -ne 0) { exit $code }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: amk-msvc-kit
+          path: msvc-out
+          if-no-files-found: warn
+          retention-days: 14

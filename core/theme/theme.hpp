@@ -34,11 +34,12 @@ struct ResourceOverride {
 //   colors     the colours of colors.ini replace the app's brushes
 //   resources  resources.xaml and the rules of user.css (Spicetify's inject_css)
 //   assets     images in url(...) (Spicetify's overwrite_assets)
-// theme.parts.script (main.js) belongs to M7 and is not read here.
+//   script     main.js runs in AppleMusic.exe while the theme is the active one (the loader starts it)
 struct ThemeParts {
     bool colors = true;
     bool resources = true;
     bool assets = true;
+    bool script = true;
 };
 
 // What the loader needs beyond the files themselves.

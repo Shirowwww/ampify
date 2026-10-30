@@ -16,6 +16,7 @@ ThemeSettings ReadThemeSettings(const Settings& settings) {
     value.parts.colors = settings.GetBool("theme.parts.colors", true);
     value.parts.resources = settings.GetBool("theme.parts.resources", true);
     value.parts.assets = settings.GetBool("theme.parts.assets", true);
+    value.parts.script = settings.GetBool("theme.parts.script", true);
     return value;
 }
 
@@ -27,6 +28,7 @@ void WriteThemeSettings(Settings& settings, const ThemeSettings& value) {
     settings.SetBool("theme.parts.colors", value.parts.colors);
     settings.SetBool("theme.parts.resources", value.parts.resources);
     settings.SetBool("theme.parts.assets", value.parts.assets);
+    settings.SetBool("theme.parts.script", value.parts.script);
 }
 
 }  // namespace amk::theme

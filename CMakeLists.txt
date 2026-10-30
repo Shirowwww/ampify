@@ -32,9 +32,9 @@ target_include_directories(amk_quickjs SYSTEM PUBLIC vendor/quickjs)
 if(MINGW)
     target_link_libraries(amk_quickjs PUBLIC pthread)
 endif()
-# MSVC has neither the GCC extensions nor pthreads that QuickJS uses. cmake/msvc maps them: a header that is
-# force-included in every QuickJS file, and a small pthread.h over SRWLOCK and CONDITION_VARIABLE. The vendored
-# files are not changed.
+# MSVC has neither the GCC extensions nor the POSIX headers that QuickJS includes. cmake/msvc maps them: a header
+# that is force-included in every QuickJS file, and small pthread.h, sys/time.h and stdatomic.h over SRWLOCK,
+# CONDITION_VARIABLE, GetSystemTimeAsFileTime and the Interlocked intrinsics. The vendored files are not changed.
 if(MSVC)
     target_compile_options(amk_quickjs PRIVATE /w "/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/msvc/quickjs_msvc.h")
     target_compile_definitions(amk_quickjs PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
@@ -176,7 +176,8 @@ if(AMK_BUILD_TESTS)
         tests/gain_board_tests.cpp
         tests/player_watch_tests.cpp
         tests/ui_model_tests.cpp
-        tests/ui_element_tests.cpp)
+        tests/ui_element_tests.cpp
+        tests/theme_script_tests.cpp)
     target_link_libraries(amk_tests PRIVATE amk_core atmos_leveler amk_theme)
     target_compile_options(amk_tests PRIVATE ${AMK_WARNINGS})
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")

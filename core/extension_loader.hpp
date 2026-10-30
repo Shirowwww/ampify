@@ -45,13 +45,20 @@ public:
     // Any thread: queues a click on a control of the interface, for the element that added it.
     void DeliverClick(int controlId);
 
+    // The folder of the themes. A theme with a main.js is an element too: it runs in AppleMusic.exe while it is the
+    // active theme, and only when theme.parts.script is on. Call it before Discover.
+    void SetThemeRoot(std::filesystem::path root);
+
     const std::vector<std::unique_ptr<ScriptExtension>>& elements() const { return m_elements; }
 
 private:
+    void LoadFolders(const std::filesystem::path& root, LoadReport& report, bool themes);
+
     ExtensionHost& m_hosts;
     Host& m_host;
     Journal& m_journal;
     std::filesystem::path m_root;
+    std::filesystem::path m_themeRoot;
     Clock m_clock;
     std::vector<std::unique_ptr<ScriptExtension>> m_elements;
 };
