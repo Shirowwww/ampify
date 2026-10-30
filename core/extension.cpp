@@ -20,47 +20,61 @@ bool ExtensionHost::Add(ExtensionInfo info) {
 }
 
 void ExtensionHost::StartAll(const Settings& settings, std::string_view blockReason) {
-    for (Entry& entry : m_entries) {
-        bool enabled = settings.GetBool(SettingKey(entry.info.id), entry.info.enabledByDefault);
-        if (!enabled) {
-            entry.state = ExtensionState::Off;
-            continue;
-        }
+    for (Entry& entry : m_entries) StartEntry(entry, settings, blockReason);
+}
 
-        if (!blockReason.empty()) {
-            entry.state = ExtensionState::Blocked;
-            m_journal.Write("Extension " + entry.info.id + " non démarrée : " + std::string(blockReason));
-            continue;
-        }
-
-        bool started = false;
-        try {
-            started = entry.info.start && entry.info.start();
-        } catch (const std::exception& error) {
-            m_journal.Write("Extension " + entry.info.id + " a levé une erreur : " + error.what());
-        } catch (...) {
-            m_journal.Write("Extension " + entry.info.id + " a levé une erreur inconnue");
-        }
-
-        entry.state = started ? ExtensionState::Running : ExtensionState::Failed;
-        m_journal.Write("Extension " + entry.info.id + (started ? " démarrée" : " en échec"));
+void ExtensionHost::StartEntry(Entry& entry, const Settings& settings, std::string_view blockReason) {
+    bool enabled = settings.GetBool(SettingKey(entry.info.id), entry.info.enabledByDefault);
+    if (!enabled) {
+        entry.state = ExtensionState::Off;
+        return;
     }
+
+    if (!blockReason.empty()) {
+        entry.state = ExtensionState::Blocked;
+        m_journal.Write("Extension " + entry.info.id + " non démarrée : " + std::string(blockReason));
+        return;
+    }
+
+    bool started = false;
+    try {
+        started = entry.info.start && entry.info.start();
+    } catch (const std::exception& error) {
+        m_journal.Write("Extension " + entry.info.id + " a levé une erreur : " + error.what());
+    } catch (...) {
+        m_journal.Write("Extension " + entry.info.id + " a levé une erreur inconnue");
+    }
+
+    entry.state = started ? ExtensionState::Running : ExtensionState::Failed;
+    m_journal.Write("Extension " + entry.info.id + (started ? " démarrée" : " en échec"));
 }
 
 void ExtensionHost::StopAll() {
-    for (auto it = m_entries.rbegin(); it != m_entries.rend(); ++it) {
-        if (it->state != ExtensionState::Running) continue;
+    for (auto it = m_entries.rbegin(); it != m_entries.rend(); ++it) StopEntry(*it);
+}
 
-        try {
-            if (it->info.stop) it->info.stop();
-            m_journal.Write("Extension " + it->info.id + " arrêtée");
-        } catch (const std::exception& error) {
-            m_journal.Write("Extension " + it->info.id + " n'a pas pu s'arrêter proprement : " + error.what());
-        } catch (...) {
-            m_journal.Write("Extension " + it->info.id + " n'a pas pu s'arrêter proprement");
-        }
-        it->state = ExtensionState::Off;
+void ExtensionHost::StopEntry(Entry& entry) {
+    if (entry.state != ExtensionState::Running) return;
+
+    try {
+        if (entry.info.stop) entry.info.stop();
+        m_journal.Write("Extension " + entry.info.id + " arrêtée");
+    } catch (const std::exception& error) {
+        m_journal.Write("Extension " + entry.info.id + " n'a pas pu s'arrêter proprement : " + error.what());
+    } catch (...) {
+        m_journal.Write("Extension " + entry.info.id + " n'a pas pu s'arrêter proprement");
     }
+    entry.state = ExtensionState::Off;
+}
+
+bool ExtensionHost::Restart(const std::string& id, const Settings& settings) {
+    for (Entry& entry : m_entries) {
+        if (entry.info.id != id) continue;
+        StopEntry(entry);
+        StartEntry(entry, settings, {});
+        return true;
+    }
+    return false;
 }
 
 ExtensionState ExtensionHost::StateOf(const std::string& id) const {

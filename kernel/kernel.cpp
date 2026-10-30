@@ -10,11 +10,13 @@
 
 #include "../core/apple_music.hpp"
 #include "../core/extension.hpp"
+#include "../core/extension_loader.hpp"
 #include "../core/injection_policy.hpp"
 #include "../core/journal.hpp"
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
 #include "../win/win_common.hpp"
+#include "../win/win_host.hpp"
 
 namespace {
 
@@ -41,12 +43,27 @@ DWORD WINAPI KernelMain(LPVOID) {
     if (!verdict.allowed) return 0;
 
     std::filesystem::path kit = amk::win::KitDirectory();
-    amk::Settings settings;
+    static amk::Settings settings;
     settings.Load((kit / "settings.txt").string());
 
-    static amk::ExtensionHost host(journal);  // no extension is registered yet: M4 adds the Atmos leveler
+    // JavaScript elements (extensions and apps) live in %USERPROFILE%\AppleMusicModKit\extensions\<id>.
+    // Both processes load them: an element tells them apart with AMK.process.
+    static amk::WinHost winHost(role == amk::ProcessRole::AppleMusic ? "ui" : "engine", kit, settings, journal);
+    static amk::ExtensionHost host(journal);  // the native extensions are registered here: M4 adds the Atmos leveler
+    static amk::ExtensionLoader loader(host, winHost, journal, kit / "extensions");
+    amk::LoadReport report = loader.Discover();
+    journal.Write("Éléments JavaScript retenus : " + std::to_string(report.loaded.size()) + ", rejetés : " +
+                  std::to_string(report.rejected.size()));
     host.StartAll(settings);
     journal.Write("Hôte d'extensions prêt");
+
+    // QuickJS is not thread-safe: this thread is the only one that runs JavaScript after this point.
+    std::thread([] {
+        while (true) {
+            loader.Pump();
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    }).detach();
 
     if (role == amk::ProcessRole::AppleMusic) {
         // The interface process is the one that proves the app is healthy. Its window must not be hung.

@@ -1,0 +1,12 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "now-playing-notify",
+  "name": "Notification de piste",
+  "version": "0.1.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Affiche une notification à chaque nouveau morceau. Ne touche pas au lecteur.",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": ["player.read", "notifications"]
+}

@@ -42,6 +42,9 @@ public:
     // Stops running extensions in reverse start order. A stop that throws is logged and skipped.
     void StopAll();
 
+    // Reloads one extension: stop, then start again if it is still enabled. Returns false for an unknown id.
+    bool Restart(const std::string& id, const Settings& settings);
+
     ExtensionState StateOf(const std::string& id) const;
 
     static std::string SettingKey(const std::string& id);
@@ -51,6 +54,9 @@ private:
         ExtensionInfo info;
         ExtensionState state = ExtensionState::Off;
     };
+
+    void StartEntry(Entry& entry, const Settings& settings, std::string_view blockReason);
+    void StopEntry(Entry& entry);
 
     Journal& m_journal;
     std::vector<Entry> m_entries;
