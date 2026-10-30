@@ -8,5 +8,6 @@
   "description": "Exemple minimal : écrit dans le journal et garde un compteur de lancements.",
   "kitApi": "1.0",
   "main": "main.js",
+  "processes": ["ui"],
   "permissions": ["storage"]
 }

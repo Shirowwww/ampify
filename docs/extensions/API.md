@@ -40,6 +40,9 @@ AppleMusic.exe ou AMPLibraryAgent.exe
   qu'il a demandées. Et le runtime se teste sous Linux.
 - **Un même `main.js` peut tourner dans les deux processus.** `AMK.process` vaut `"ui"` dans `AppleMusic.exe` et
   `"engine"` dans `AMPLibraryAgent.exe`. Les permissions `audio.*` n'existent que dans le processus moteur. [provisoire M3]
+- **Le manifeste choisit les processus** avec `processes` (voir MANIFEST.md). Par défaut, un élément tourne dans les deux.
+  Choix provisoire, décidé avec l'utilisateur : un élément qui écrit son stockage doit déclarer un seul processus, sans quoi
+  deux processus écrivent le même fichier. [provisoire M7]
 
 ## 3. Cycle de vie
 
@@ -48,7 +51,8 @@ AppleMusic.exe ou AMPLibraryAgent.exe
 Les éléments installés vivent dans les données de l'utilisateur, jamais dans le paquet MSIX, qui est en lecture seule :
 
 ```
-%LOCALAPPDATA%\AppleMusicModKit\
+%USERPROFILE%\AppleMusicModKit\
+  settings.txt
   extensions\<id>\manifest.json, main.js, ...
   apps\<id>\...
   themes\<id>\...
@@ -56,7 +60,9 @@ Les éléments installés vivent dans les données de l'utilisateur, jamais dans
   storage\<id>.json            données de AMK.storage
 ```
 
-Le chemin est fixé ici à titre provisoire. Il sera confirmé en M3.
+Chemin retenu en M3 : `%USERPROFILE%\AppleMusicModKit`, et non `%LOCALAPPDATA%`. MSIX redirige les écritures
+d'Apple Music faites sous AppData, donc le lanceur et le noyau ne verraient pas les mêmes fichiers. Les deux
+processus chargent les éléments JavaScript, et `AMK.process` permet à un élément de les distinguer.
 
 ### 3.2 Étapes
 
@@ -330,3 +336,28 @@ décrit dans [PARITE-SPICETIFY.md](PARITE-SPICETIFY.md).
 - **Télémétrie** : option `telemetry.block`, désactivée par défaut, qui ne touche jamais aux hôtes de licence ou de DRM
   (PARITE, section 8.5).
 - **Patchs par version** : table de motifs d'octets, sans adresse fixe, pour chaque version testée (PARITE, section 8.4).
+
+## 12. État de la mise en œuvre (M7)
+
+| Partie | État | Vérification |
+|---|---|---|
+| `version`, `kitApi`, `process`, `locale`, `log`, `onStop` | fait | tests C++ et Wine |
+| `config.get/set` : une clé par élément, jamais `enabled` | fait. `get` rend un booléen, un nombre ou un texte selon la valeur par défaut | tests C++ |
+| `storage.get/set/remove` : fichier JSON par élément, quota de 1 Mo | fait. Écriture par fichier temporaire puis remplacement. Un élément qui écrit doit déclarer un seul processus (`processes`) | tests C++ et Wine |
+| `processes` : `ui`, `engine`, ou les deux | fait. Un élément d'un autre processus est ignoré, avec une ligne au journal | tests C++ |
+| `player.state`, `on`, `play`, `pause`, `next`, `previous`, `seek` | fait côté runtime. Le noyau Windows ne les branche pas encore : `state` est vide, les commandes répondent « non possible » | hôte factice |
+| `audio.setGainDb` : borné par `audio.maxGainDb` (6 dB par défaut, 12 au plus) et remis à 0 à l'arrêt | fait côté runtime. Le son n'est pas encore branché (M4) | tests C++ |
+| `notify` (titre 120 caractères, texte 500) | fait. Sous Windows : bulle de notification (icône temporaire, 8 s), et une ligne au journal | tests C++ ; bulle à voir sur le PC |
+| `keyboard.bind` (forme normalisée, touche F, média ou modificateur obligatoire) | fait. Sous Windows : `RegisterHotKey`, remis sur le fil JavaScript | tests C++ ; press simulée sous Wine |
+| `http.get` (https, hôte déclaré, 1 Mo au plus) | fait. Sous Windows : WinHTTP, délai de 5 à 10 s, une erreur renvoie statut 0 au lieu de lever une exception | tests C++ ; échec testé sous Wine, succès à voir sur le PC |
+| `uri.parse`, `uri.build`, `icons.get`, `setTimeout`, `setInterval`, `queueMicrotask`, `console` | fait | tests C++ |
+| Permissions : `PermissionDenied` à l'exécution, refus du manifeste à la lecture | fait | tests C++ |
+| Découverte des dossiers, activation, rechargement (`Restart`), isolement des pannes | fait | tests C++ et Wine |
+| `audio.onSamples`, `audio.analyze` | à faire (M4) | |
+| `ui.*`, `React`, `components`, `library`, `player.queue`, `services`, `lyrics`, `color` | à faire (M8) | |
+| Thèmes et snippets | pas chargés par cette version du noyau | |
+
+Limites connues, à corriger avant la version 1 : l'appel réseau est synchrone, donc il bloque le fil qui exécute
+le JavaScript le temps de la réponse (jusqu'à 10 s). Un élément qui tourne dans les deux processus et écrit son stockage peut perdre
+une mise à jour : c'est pourquoi `processes` existe (voir `QUESTIONS.md`).
+

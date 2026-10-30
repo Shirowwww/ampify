@@ -51,3 +51,49 @@ TEST_CASE(WinHost_SettingsArePersistedToSettingsTxt) {
     CHECK(host.Process() == "ui");
     CHECK(!host.Locale().empty());
 }
+
+TEST_CASE(WinHost_ShortcutPressIsDeliveredToTheRegisteringThread) {
+    fs::path kit = KitForTest("hotkeys");
+    amk::Settings settings;
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("t"); });
+    amk::WinHost host("ui", kit, settings, journal);
+
+    CHECK(host.RegisterKey("hk", "Ctrl+Alt+F12"));
+    CHECK(!host.RegisterKey("hk", "Ctrl+Alt+Nope"));  // unknown key name
+
+    // The system posts WM_HOTKEY with the registration id (the first one, in a fresh host) to the thread.
+    PostThreadMessageW(GetCurrentThreadId(), WM_HOTKEY, 1, 0);
+    std::string delivered;
+    host.Service([&](const std::string& elementId, const std::string& combo) { delivered = elementId + " " + combo; });
+    CHECK(delivered == "hk Ctrl+Alt+F12");
+
+    host.UnregisterKeys("hk");
+    delivered.clear();
+    PostThreadMessageW(GetCurrentThreadId(), WM_HOTKEY, 1, 0);
+    host.Service([&](const std::string& elementId, const std::string& combo) { delivered = elementId + " " + combo; });
+    CHECK(delivered.empty());  // the registration is gone, so the id is ignored
+}
+
+TEST_CASE(WinHost_HttpFailureComesBackAsAnErrorValue) {
+    fs::path kit = KitForTest("http");
+    amk::Settings settings;
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("t"); });
+    amk::WinHost host("engine", kit, settings, journal);
+
+    amk::HttpResponse response = host.HttpGet("https://nonexistent.invalid/x");
+    CHECK(response.status == 0);
+    CHECK(!response.text.empty());
+}
+
+TEST_CASE(WinHost_NotifyWritesTheJournalLine) {
+    fs::path kit = KitForTest("notify");
+    amk::Settings settings;
+    std::ostringstream log;
+    amk::Journal journal(log, [] { return std::string("t"); });
+    amk::WinHost host("ui", kit, settings, journal);
+
+    host.Notify("hk", "Titre", "Texte");
+    CHECK(log.str().find("[hk] notification : Titre - Texte") != std::string::npos);
+}

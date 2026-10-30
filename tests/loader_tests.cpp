@@ -59,6 +59,24 @@ TEST_CASE(Loader_RegistersValidElementsAndSkipsTheRest) {
     CHECK(hosts.StateOf("good") == amk::ExtensionState::Off);  // disabled until the user enables it
 }
 
+TEST_CASE(Loader_SkipsElementsDeclaredForTheOtherProcess) {
+    fs::path root = Root("processes");
+    WriteElement(root, "uionly", Manifest("uionly", "extension", R"(,"processes":["ui"])"), R"(AMK.log("ui");)");
+    WriteElement(root, "anywhere", Manifest("anywhere", "extension"), R"(AMK.log("ok");)");
+
+    amk::test::FakeHost host;
+    host.process = "engine";
+    std::ostringstream out;
+    amk::Journal journal(out, [] { return std::string("t"); });
+    amk::ExtensionHost hosts(journal);
+    amk::ExtensionLoader loader(hosts, host, journal, root);
+
+    amk::LoadReport report = loader.Discover();
+    CHECK(report.loaded == std::vector<std::string>{"anywhere"});
+    CHECK(report.skipped == std::vector<std::string>{"uionly"});
+    CHECK(out.str().find("[uionly] ignoré dans le processus engine") != std::string::npos);
+}
+
 TEST_CASE(Loader_MissingRootIsNotAnError) {
     amk::test::FakeHost host;
     std::ostringstream out;

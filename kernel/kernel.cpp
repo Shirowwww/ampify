@@ -54,12 +54,15 @@ DWORD WINAPI KernelMain(LPVOID) {
     amk::LoadReport report = loader.Discover();
     journal.Write("Éléments JavaScript retenus : " + std::to_string(report.loaded.size()) + ", rejetés : " +
                   std::to_string(report.rejected.size()));
-    host.StartAll(settings);
-    journal.Write("Hôte d'extensions prêt");
-
-    // QuickJS is not thread-safe: this thread is the only one that runs JavaScript after this point.
+    // JavaScript runs on this one thread only: QuickJS is not thread-safe, and the shortcuts are delivered to the
+    // thread that registered them. Starting the elements here keeps that true.
     std::thread([] {
+        host.StartAll(settings);
+        journal.Write("Hôte d'extensions prêt");
         while (true) {
+            winHost.Service([](const std::string& elementId, const std::string& combo) {
+                loader.DeliverKey(elementId, combo);
+            });
             loader.Pump();
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }

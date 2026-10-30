@@ -56,7 +56,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_library(amk_win STATIC win/win_common.cpp win/win_host.cpp)
     target_compile_options(amk_win PRIVATE ${AMK_WARNINGS})
     target_compile_definitions(amk_win PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
-    target_link_libraries(amk_win PUBLIC ole32 shell32 user32)
+    target_link_libraries(amk_win PUBLIC ole32 shell32 user32 winhttp)
 
     # Loaded into AppleMusic.exe and AMPLibraryAgent.exe by the launcher.
     add_library(amk_kernel MODULE kernel/kernel.cpp)

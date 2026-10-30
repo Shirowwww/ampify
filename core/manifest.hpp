@@ -29,8 +29,11 @@ struct Manifest {
     std::optional<std::string> icon;
     std::vector<std::string> permissions;
     std::vector<std::string> appVersions;
+    // Where the element runs: "ui" (AppleMusic.exe), "engine" (AMPLibraryAgent.exe), or both by default.
+    std::vector<std::string> processes = {"ui", "engine"};
 
     bool HasPermission(std::string_view permission) const;
+    bool RunsIn(std::string_view process) const;
 
     // The hosts named by `network:<host>` permissions, in manifest order.
     std::vector<std::string> NetworkHosts() const;

@@ -38,6 +38,7 @@ Le dossier [examples/hello-extension](../../examples/hello-extension/) est un ex
 | `license` | non | 1 à 64 caractères | Licence de l'auteur |
 | `appVersions` | non | Liste de versions d'Apple Music, 16 au plus | Versions où l'élément a été testé. Le noyau applique aussi sa propre liste. |
 | `permissions` | non | Liste de 32 au plus, valeurs de la section 4 de [API.md](API.md) | Ce dont l'élément a besoin. Affiché avant l'activation. |
+| `processes` | non | Une ou deux valeurs : `ui` (AppleMusic.exe), `engine` (AMPLibraryAgent.exe), sans doublon | Où l'élément tourne. Par défaut, les deux. Un élément qui stocke des données doit le déclarer, pour éviter deux écritures concurrentes. |
 
 ## Champs par `kind`
 

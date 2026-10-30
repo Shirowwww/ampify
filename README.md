@@ -6,7 +6,8 @@ des extensions, des thèmes et des modes qu'on active ou désactive à volonté,
 On garde toutes les fonctions d'Apple Music (lossless, Dolby Atmos, paroles, bibliothèque, synchronisation).
 On ajoute et on corrige, on ne remplace pas.
 
-> **État : injecteur écrit, à tester sur Windows.** Le noyau et le nivellement Atmos sont testés hors de Windows.
+> **État : injecteur écrit, à tester sur Windows.** Le noyau, le runtime JavaScript des extensions (M7) et le
+> nivellement Atmos sont testés hors de Windows, et sous Wine pour la partie Windows.
 > Le lanceur et la DLL du noyau compilent pour Windows, mais n'ont pas encore été lancés avec Apple Music.
 > La procédure de test est dans [docs/tests/M3-injecteur.md](docs/tests/M3-injecteur.md). Voir [PROGRESS.md](PROGRESS.md).
 
@@ -19,7 +20,11 @@ On ajoute et on corrige, on ne remplace pas.
 | Mode sans échec : après deux lancements sans réponse, le suivant démarre sans extension | `core/safe_mode.*` | fait, testé |
 | Liste des versions d'Apple Music testées : sur une autre version, le noyau reste inactif | `core/version_gate.*` | fait, testé |
 | Hôte d'extensions : chargement, activation une par une, arrêt, isolement des pannes | `core/extension.*` | fait, testé |
-| API d'extensions, format du manifeste, catalogue, parité avec Spicetify | `docs/extensions/` | écrit, pas encore implémenté |
+| API d'extensions, format du manifeste, catalogue, parité avec Spicetify | `docs/extensions/` | écrit ; implémenté en partie (voir `docs/extensions/API.md`, section 12) |
+| Runtime JavaScript : moteur QuickJS vendu, objet `AMK`, minuteries, permissions à l'exécution | `core/js_runtime.*`, `core/amk_prelude.*`, `core/script_extension.*`, `vendor/quickjs/` | fait, testé (Linux, Wine) |
+| Lecture du JSON et validation des manifestes côté noyau | `core/json.*`, `core/manifest.*` | fait, testé |
+| Chargeur d'éléments : dossiers, activation, rechargement, isolement des pannes | `core/extension_loader.*`, `win/win_host.*`, `kernel/` | fait, testé ; branché au noyau, à tester sur le PC |
+| Exemples d'extensions (5) | `examples/` | fait, validés et exécutés par les tests |
 | Schémas JSON et validateur (catalogue, manifestes) | `schemas/`, `tools/validate.py` | fait, testé |
 | Mesure de loudness BS.1770 (LUFS) | `extensions/atmos-leveler/loudness_meter.*` | fait, testé |
 | Politique du nivellement Atmos : cible stéréo, mémoire par morceau, plafond de crête | `extensions/atmos-leveler/leveler.*` | fait, testé |
@@ -84,6 +89,7 @@ tools/                     validateur des manifestes et du catalogue, avec ses t
 tests/                     tests unitaires sans dépendance (même code pour Linux et Windows)
 docs/tests/                procédures de test sur le PC, une par jalon
 cmake/                     fichier de compilation croisée pour Windows
+vendor/quickjs/             moteur JavaScript QuickJS 2021-03-27, non modifié (MIT)
 knowledge/                 relevés sur l'app : architecture, API, pièges observés
 reference/                 mod Windhawk de référence et outil de mesure LUFS
 ```

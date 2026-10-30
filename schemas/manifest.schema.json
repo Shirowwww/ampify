@@ -55,6 +55,14 @@
       "maxItems": 32,
       "items": {"$ref": "#/$defs/permission"}
     },
+    "processes": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "maxItems": 2,
+      "description": "Processus où l'élément tourne : ui (AppleMusic.exe), engine (AMPLibraryAgent.exe). Par défaut, les deux.",
+      "items": {"enum": ["ui", "engine"]}
+    },
     "appVersions": {
       "type": "array",
       "uniqueItems": true,

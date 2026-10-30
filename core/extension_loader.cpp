@@ -63,6 +63,12 @@ LoadReport ExtensionLoader::Discover() {
             continue;
         }
 
+        if (!manifest.RunsIn(m_host.Process())) {
+            m_journal.Write("[" + name + "] ignoré dans le processus " + m_host.Process());
+            report.skipped.push_back(name);
+            continue;
+        }
+
         std::string id = manifest.id;
         std::string displayName = manifest.name;
         auto element = std::make_unique<ScriptExtension>(std::move(manifest), folder, m_host, m_journal, m_clock);

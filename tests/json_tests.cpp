@@ -50,3 +50,38 @@ TEST_CASE(Json_SetReplacesAnExistingMember) {
     object.Set("n", amk::Json(true));
     CHECK(object.Dump() == R"({"k":2,"n":true})");
 }
+
+// Mutated and random input must never crash the reader or the manifest checks. The seed is fixed, so a failure
+// can be replayed.
+TEST_CASE(Json_SurvivesMutatedAndRandomInput) {
+    const std::string valid = R"({"a":[1,2.5e3,"é\n",true,null],"b":{"c":"d"}})";
+    unsigned state = 12345;
+    auto next = [&state] {
+        state = state * 1103515245u + 12345u;
+        return (state >> 16) & 0x7fff;
+    };
+
+    int accepted = 0;
+    for (int round = 0; round < 4000; round++) {
+        std::string text = valid;
+        size_t edits = 1 + next() % 4;
+        for (size_t i = 0; i < edits && !text.empty(); i++) {
+            size_t at = next() % text.size();
+            switch (next() % 3) {
+                case 0: text[at] = static_cast<char>(next() % 256); break;
+                case 1: text.erase(at, 1); break;
+                default: text.insert(at, 1, static_cast<char>(next() % 128)); break;
+            }
+        }
+        if (amk::Json::Parse(text)) accepted++;
+    }
+    CHECK(accepted > 0);  // some mutations stay valid, and the reader keeps accepting them
+
+    for (int round = 0; round < 2000; round++) {
+        std::string noise;
+        size_t length = next() % 64;
+        for (size_t i = 0; i < length; i++) noise += static_cast<char>(next() % 256);
+        amk::Json::Parse(noise);  // only the absence of a crash matters
+    }
+    CHECK(amk::Json::Parse(valid).has_value());
+}

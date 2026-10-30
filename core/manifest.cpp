@@ -20,7 +20,7 @@ const std::set<std::string_view> kFixedPermissions = {
 
 const std::set<std::string_view> kKnownFields = {
     "$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage", "license",
-    "main", "colors", "defaultScheme", "resources", "icon", "permissions", "appVersions",
+    "main", "colors", "defaultScheme", "resources", "icon", "permissions", "appVersions", "processes",
 };
 
 // Length in Unicode code points, so that "é" counts as one character.
@@ -66,6 +66,10 @@ std::string_view ToString(ElementKind kind) {
 
 bool Manifest::HasPermission(std::string_view permission) const {
     return std::find(permissions.begin(), permissions.end(), permission) != permissions.end();
+}
+
+bool Manifest::RunsIn(std::string_view process) const {
+    return std::find(processes.begin(), processes.end(), process) != processes.end();
 }
 
 std::vector<std::string> Manifest::NetworkHosts() const {
@@ -215,6 +219,24 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
                     result.errors.push_back("appVersions : version invalide");
                 } else {
                     m.appVersions.push_back(*v);
+                }
+            }
+        }
+    }
+
+    if (const Json* list = root->Find("processes")) {
+        m.processes.clear();
+        if (!list->AsArray() || list->AsArray()->empty() || list->AsArray()->size() > 2) {
+            result.errors.push_back("processes doit être une liste d'une ou deux valeurs : ui, engine");
+        } else {
+            for (const Json& item : *list->AsArray()) {
+                const std::string* process = item.AsString();
+                if (!process || (*process != "ui" && *process != "engine")) {
+                    result.errors.push_back("processes : valeur inconnue (ui ou engine)");
+                } else if (std::find(m.processes.begin(), m.processes.end(), *process) != m.processes.end()) {
+                    result.errors.push_back("processes : valeur en double : " + *process);
+                } else {
+                    m.processes.push_back(*process);
                 }
             }
         }

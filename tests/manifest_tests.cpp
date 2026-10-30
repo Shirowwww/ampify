@@ -51,6 +51,33 @@ TEST_CASE(Manifest_AcceptsEveryPermissionOfTheV2Schema) {
     CHECK(!amk::IsKnownPermission("fs.write"));
 }
 
+TEST_CASE(Manifest_RunsInBothProcessesUnlessDeclared) {
+    amk::ManifestResult both = Check(kHello, "hello-extension");
+    CHECK(both.manifest->RunsIn("ui"));
+    CHECK(both.manifest->RunsIn("engine"));
+
+    std::string uiOnly = kHello;
+    uiOnly.insert(uiOnly.find("\"main\""), "\"processes\": [\"ui\"], ");
+    amk::ManifestResult result = Check(uiOnly, "hello-extension");
+    CHECK(result.manifest.has_value());
+    CHECK(result.manifest->RunsIn("ui"));
+    CHECK(!result.manifest->RunsIn("engine"));
+}
+
+TEST_CASE(Manifest_RejectsUnknownOrRepeatedProcesses) {
+    std::string unknown = kHello;
+    unknown.insert(unknown.find("\"main\""), "\"processes\": [\"tray\"], ");
+    CHECK(!Check(unknown, "hello-extension").manifest);
+
+    std::string repeated = kHello;
+    repeated.insert(repeated.find("\"main\""), "\"processes\": [\"ui\", \"ui\"], ");
+    CHECK(!Check(repeated, "hello-extension").manifest);
+
+    std::string empty = kHello;
+    empty.insert(empty.find("\"main\""), "\"processes\": [], ");
+    CHECK(!Check(empty, "hello-extension").manifest);
+}
+
 TEST_CASE(Manifest_RejectsAnUnsupportedKitApiMajor) {
     std::string v2 = kHello;
     v2.replace(v2.find("\"1.0\""), 5, "\"2.0\"");
@@ -99,4 +126,24 @@ TEST_CASE(Manifest_ChecksFormatsAndLengths) {
     CHECK(!Check(httpsOnly, "hello-extension").manifest);
 
     CHECK(!Check("not json", "hello-extension").manifest);
+}
+
+TEST_CASE(Manifest_SurvivesMutatedInput) {
+    unsigned state = 777;
+    auto next = [&state] {
+        state = state * 1103515245u + 12345u;
+        return (state >> 16) & 0x7fff;
+    };
+    for (int round = 0; round < 1500; round++) {
+        std::string text = kHello;
+        size_t edits = 1 + next() % 5;
+        for (size_t i = 0; i < edits && !text.empty(); i++) {
+            size_t at = next() % text.size();
+            if (next() % 2) text.erase(at, 1);
+            else text[at] = static_cast<char>(32 + next() % 95);
+        }
+        amk::ManifestResult result = Check(text, "hello-extension");
+        // A manifest is either accepted with no error, or rejected with at least one message.
+        CHECK(result.manifest.has_value() == result.errors.empty());
+    }
 }

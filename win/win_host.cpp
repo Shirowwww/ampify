@@ -1,14 +1,71 @@
 #include "win_host.hpp"
 
 #include <windows.h>
+#include <shellapi.h>
+#include <winhttp.h>
 
+#include <cctype>
+#include <cstdlib>
 #include <fstream>
+#include <map>
 #include <sstream>
+#include <string_view>
 #include <system_error>
+#include <vector>
 
 namespace amk {
 
 namespace {
+
+constexpr size_t kMaxResponseBytes = size_t{1} << 20;  // a Last.fm or ListenBrainz answer is far smaller
+constexpr auto kBalloonDuration = std::chrono::seconds(8);
+
+std::wstring ToWide(const std::string& text) {
+    if (text.empty()) return {};
+    int size = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+    std::wstring out(static_cast<size_t>(size), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), size);
+    return out;
+}
+
+// Returns the virtual key of a key name written by the kit's normalizer (see core/amk_prelude.cpp), or 0.
+UINT VirtualKeyOf(const std::string& name) {
+    static const std::map<std::string, UINT> named = {
+        {"Left", VK_LEFT}, {"Right", VK_RIGHT}, {"Up", VK_UP}, {"Down", VK_DOWN}, {"Space", VK_SPACE},
+        {"Enter", VK_RETURN}, {"Escape", VK_ESCAPE}, {"Tab", VK_TAB}, {"Backspace", VK_BACK},
+        {"Delete", VK_DELETE}, {"Home", VK_HOME}, {"End", VK_END}, {"PageUp", VK_PRIOR}, {"PageDown", VK_NEXT},
+        {"MediaPlayPause", VK_MEDIA_PLAY_PAUSE}, {"MediaNextTrack", VK_MEDIA_NEXT_TRACK},
+        {"MediaPreviousTrack", VK_MEDIA_PREV_TRACK}, {"MediaStop", VK_MEDIA_STOP},
+    };
+    if (name.size() == 1 && std::isalnum(static_cast<unsigned char>(name[0]))) {
+        return static_cast<UINT>(std::toupper(static_cast<unsigned char>(name[0])));  // A-Z and 0-9 match their ASCII
+    }
+    if (name.size() >= 2 && name[0] == 'F') {
+        int number = std::atoi(name.c_str() + 1);
+        if (number >= 1 && number <= 24) return VK_F1 + static_cast<UINT>(number - 1);
+    }
+    auto found = named.find(name);
+    return found == named.end() ? 0 : found->second;
+}
+
+// "Ctrl+Alt+Right" becomes the modifiers and the virtual key for RegisterHotKey. False when unknown.
+bool ParseCombo(const std::string& combo, UINT& modifiers, UINT& key) {
+    modifiers = MOD_NOREPEAT;
+    std::string_view rest = combo;
+    while (true) {
+        size_t plus = rest.find('+');
+        if (plus == std::string_view::npos) break;
+        std::string part(rest.substr(0, plus));
+        if (part == "Ctrl") modifiers |= MOD_CONTROL;
+        else if (part == "Alt") modifiers |= MOD_ALT;
+        else if (part == "Shift") modifiers |= MOD_SHIFT;
+        else if (part == "Win") modifiers |= MOD_WIN;
+        else return false;
+        rest.remove_prefix(plus + 1);
+    }
+    key = VirtualKeyOf(std::string(rest));
+    return key != 0;
+}
 
 // The file holds a plain text key, so it is read and written as bytes.
 std::optional<std::string> ReadWholeFile(const std::filesystem::path& path) {
@@ -76,22 +133,135 @@ void WinHost::SetGainDb(const std::string& elementId, double db) {
     (void)db;  // not connected yet (M4): the gain stays at 0 dB
 }
 
+WinHost::~WinHost() {
+    for (const auto& [id, hotkey] : m_hotkeys) UnregisterHotKey(nullptr, id);
+    if (m_notifyWindow) DestroyWindow(static_cast<HWND>(m_notifyWindow));
+}
+
+void WinHost::Service(const KeyCallback& onKey) {
+    MSG message;
+    while (PeekMessageW(&message, nullptr, WM_HOTKEY, WM_HOTKEY, PM_REMOVE)) {
+        auto found = m_hotkeys.find(static_cast<int>(message.wParam));
+        if (found != m_hotkeys.end() && onKey) onKey(found->second.elementId, found->second.combo);
+    }
+
+    if (m_iconVisible && std::chrono::steady_clock::now() >= m_balloonUntil) {
+        NOTIFYICONDATAW icon{};
+        icon.cbSize = sizeof icon;
+        icon.hWnd = static_cast<HWND>(m_notifyWindow);
+        icon.uID = 1;
+        Shell_NotifyIconW(NIM_DELETE, &icon);
+        m_iconVisible = false;
+    }
+}
+
 void WinHost::Notify(const std::string& elementId, const std::string& title, const std::string& text) {
-    // Windows notifications are not connected yet: the message goes to the journal for now.
     m_journal.Write("[" + elementId + "] notification : " + title + (text.empty() ? "" : " - " + text));
+
+    // A balloon needs a notification icon. A message-only window owns it, and the icon is removed after the balloon.
+    if (!m_notifyWindow) {
+        m_notifyWindow = CreateWindowExW(0, L"STATIC", L"AMKNotify", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
+                                         GetModuleHandleW(nullptr), nullptr);
+        if (!m_notifyWindow) {
+            m_journal.Write("[" + elementId + "] notification non affichée : fenêtre impossible à créer");
+            return;
+        }
+    }
+
+    NOTIFYICONDATAW icon{};
+    icon.cbSize = sizeof icon;
+    icon.hWnd = static_cast<HWND>(m_notifyWindow);
+    icon.uID = 1;
+    icon.uFlags = NIF_ICON | NIF_TIP | NIF_INFO;
+    icon.hIcon = LoadIconW(nullptr, reinterpret_cast<LPCWSTR>(IDI_INFORMATION));  // a resource id, not a string
+    wcsncpy_s(icon.szTip, L"Apple Music Mod Kit", _TRUNCATE);
+    wcsncpy_s(icon.szInfoTitle, ToWide(title).c_str(), _TRUNCATE);
+    wcsncpy_s(icon.szInfo, ToWide(text).c_str(), _TRUNCATE);
+    icon.dwInfoFlags = NIIF_INFO;
+
+    DWORD action = m_iconVisible ? NIM_MODIFY : NIM_ADD;
+    if (!Shell_NotifyIconW(action, &icon)) {
+        m_journal.Write("[" + elementId + "] notification non affichée : l'icône de notification a été refusée");
+        return;
+    }
+    m_iconVisible = true;
+    m_balloonUntil = std::chrono::steady_clock::now() + kBalloonDuration;
 }
 
 bool WinHost::RegisterKey(const std::string& elementId, const std::string& combo) {
-    (void)elementId;
-    (void)combo;
-    return false;  // global shortcuts are not connected yet
+    UINT modifiers = 0;
+    UINT key = 0;
+    if (!ParseCombo(combo, modifiers, key)) return false;
+
+    int id = m_nextHotkeyId++;
+    // Registered without a window, so WM_HOTKEY goes to the calling thread: the JavaScript thread.
+    if (!RegisterHotKey(nullptr, id, modifiers, key)) return false;
+    m_hotkeys[id] = Hotkey{id, elementId, combo};
+    return true;
 }
 
-void WinHost::UnregisterKeys(const std::string& elementId) { (void)elementId; }
+void WinHost::UnregisterKeys(const std::string& elementId) {
+    for (auto it = m_hotkeys.begin(); it != m_hotkeys.end();) {
+        if (it->second.elementId == elementId) {
+            UnregisterHotKey(nullptr, it->first);
+            it = m_hotkeys.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
 
 HttpResponse WinHost::HttpGet(const std::string& url) {
-    (void)url;
-    return {0, "réseau non branché dans cette version du noyau"};
+    std::wstring wide = ToWide(url);
+    wchar_t host[256] = {};
+    wchar_t path[2048] = {};
+    URL_COMPONENTSW parts{};
+    parts.dwStructSize = sizeof parts;
+    parts.lpszHostName = host;
+    parts.dwHostNameLength = 256;
+    parts.lpszUrlPath = path;
+    parts.dwUrlPathLength = 2048;
+    parts.dwExtraInfoLength = 1;  // ask for the query string too
+    if (!WinHttpCrackUrl(wide.c_str(), 0, 0, &parts)) return {0, "adresse invalide"};
+    std::wstring target(parts.lpszUrlPath, parts.dwUrlPathLength);
+    target += std::wstring(parts.lpszExtraInfo, parts.dwExtraInfoLength);
+
+    HINTERNET session = WinHttpOpen(L"AppleMusicModKit/0.1", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!session) return {0, "réseau indisponible"};
+    WinHttpSetTimeouts(session, 5000, 5000, 5000, 10000);
+
+    HttpResponse response{0, {}};
+    HINTERNET connection = WinHttpConnect(session, std::wstring(parts.lpszHostName, parts.dwHostNameLength).c_str(),
+                                          INTERNET_DEFAULT_HTTPS_PORT, 0);
+    HINTERNET request = connection ? WinHttpOpenRequest(connection, L"GET", target.c_str(), nullptr,
+                                                        WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                                        WINHTTP_FLAG_SECURE)
+                                   : nullptr;
+    bool ok = request && WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, nullptr, 0, 0, 0) &&
+              WinHttpReceiveResponse(request, nullptr);
+
+    if (ok) {
+        DWORD status = 0;
+        DWORD size = sizeof status;
+        WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,
+                            &status, &size, WINHTTP_NO_HEADER_INDEX);
+        response.status = static_cast<int>(status);
+
+        std::vector<char> chunk(16 * 1024);
+        DWORD read = 0;
+        while (response.text.size() < kMaxResponseBytes &&
+               WinHttpReadData(request, chunk.data(), static_cast<DWORD>(chunk.size()), &read) && read > 0) {
+            response.text.append(chunk.data(), read);
+        }
+    } else {
+        response.text = "réseau : la requête a échoué (code " + std::to_string(GetLastError()) + ")";
+    }
+
+    if (request) WinHttpCloseHandle(request);
+    if (connection) WinHttpCloseHandle(connection);
+    WinHttpCloseHandle(session);
+    return response;
 }
 
 }  // namespace amk

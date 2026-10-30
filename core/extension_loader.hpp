@@ -16,6 +16,7 @@ namespace amk {
 struct LoadReport {
     std::vector<std::string> loaded;    // ids registered in the host
     std::vector<std::string> rejected;  // folder names that were skipped, with the reason in the journal
+    std::vector<std::string> skipped;   // valid, but declared for the other process
 };
 
 // Finds the JavaScript elements (kind extension and app) in a folder with one sub-folder per element, and
