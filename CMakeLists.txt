@@ -31,6 +31,12 @@ set(AMPIFY_WARNINGS $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
 # The sources are UTF-8 without BOM. MSVC reads them in the system code page unless told otherwise, which turns the
 # non-ASCII wide-string literals of the XAML interface (L"…") into mojibake. GCC already assumes UTF-8.
 add_compile_options($<$<C_COMPILER_ID:MSVC>:/utf-8> $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+# A .pdb beside each binary, so the offset of a crash in the Windows event log leads to a function. The package takes
+# the binaries by name and never ships it; only its file name is written into the binary. /Z7 keeps ccache working.
+if(MSVC)
+    add_compile_options(/Z7)
+    add_link_options(/DEBUG /OPT:REF /OPT:ICF /PDBALTPATH:%_PDB%)
+endif()
 # Visual Studio builds the files of one project one after the other unless told otherwise: /MP compiles them on every
 # core (the five XAML files of the kernel took most of the 14 minutes of the MSVC build in CI).
 if(MSVC AND CMAKE_GENERATOR MATCHES "Visual Studio")

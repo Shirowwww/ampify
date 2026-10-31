@@ -337,13 +337,13 @@ bool XamlTreeBackend::Attach() {
     return true;
 }
 
-void XamlTreeBackend::SetAppMode(std::optional<bool> dark) {
-    if (*m_closed) return;
+bool XamlTreeBackend::SetAppMode(std::optional<bool> dark) {
+    if (*m_closed) return false;
     bool refresh = std::exchange(m_resourcesDirty, false);
     xaml::FrameworkElement root = m_modeRoot.get();
     if (!root) {
         if (xaml::Window window = m_window.get()) root = window.Content().try_as<xaml::FrameworkElement>();
-        if (!root) return;
+        if (!root) return false;
         if (dark) {
             m_modeRoot = winrt::make_weak(root);
             m_modeOriginal = root.RequestedTheme();
@@ -358,11 +358,13 @@ void XamlTreeBackend::SetAppMode(std::optional<bool> dark) {
         wanted = *dark ? xaml::ElementTheme::Dark : xaml::ElementTheme::Light;
     }
     if (refresh) {
+        m_refreshReason = m_dirtyReason + (m_dirtyCount > 1 ? " and " + std::to_string(m_dirtyCount - 1) + " more" : "");
         // {ThemeResource} is resolved again on a change of mode only: the other mode for a moment, then the wanted one.
         bool shownDark = root.ActualTheme() == xaml::ElementTheme::Dark;
         root.RequestedTheme(shownDark ? xaml::ElementTheme::Light : xaml::ElementTheme::Dark);
     }
     if (refresh || root.RequestedTheme() != wanted) root.RequestedTheme(wanted);
+    return refresh;
 }
 
 xaml::DependencyObject XamlTreeBackend::Resolve(theme::NodeId id) const {
@@ -1221,6 +1223,14 @@ std::vector<std::wstring> PointerStateKeys(const controls::Control& control, std
     return keys;
 }
 
+// The engine builds a new brush at each write: two solid brushes of the same colour and opacity count as the same.
+bool SameBrush(const IInspectable& a, const IInspectable& b) {
+    if (a == b) return true;
+    auto first = a.try_as<media::SolidColorBrush>();
+    auto second = b.try_as<media::SolidColorBrush>();
+    return first && second && first.Color() == second.Color() && first.Opacity() == second.Opacity();
+}
+
 }  // namespace
 
 void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::DependencyObject& object, std::string_view property,
@@ -1241,14 +1251,22 @@ void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::Dependency
         held.element = winrt::make_weak(object);
         held.control = winrt::make_weak(control);
         xaml::ResourceDictionary resources = control.Resources();
+        bool changed = false;
         for (const std::wstring& key : PointerStateKeys(control, property)) {
             IInspectable name = winrt::box_value(winrt::hstring(key));
+            IInspectable before = resources.HasKey(name) ? resources.Lookup(name) : nullptr;
             bool fresh = std::none_of(held.keys.begin(), held.keys.end(), [&](const auto& kept) { return kept.first == key; });
-            if (fresh) held.keys.emplace_back(key, resources.HasKey(name) ? resources.Lookup(name) : nullptr);
+            if (fresh) held.keys.emplace_back(key, before);
+            if (SameBrush(before, value)) continue;
             resources.Insert(name, value);
+            changed = true;
         }
-        // States already shown once resolved their {ThemeResource} then: the next mode refresh reads the new keys.
-        m_resourcesDirty = true;
+        // States already shown once resolved their {ThemeResource} then: the next mode refresh reads the new keys. Only
+        // on a real change: the refresh stops the window for about half a second, and it made Apple Music reset the
+        // play button's background, which was then written again, every 3 s.
+        if (changed) {
+            MarkResourcesDirty("states of " + ShortName(Utf8(winrt::get_class_name(control))) + " " + std::string(property));
+        }
     } catch (...) {
         m_refusedStates++;  // costs the states their theme value, never the value itself
     }
@@ -1266,7 +1284,7 @@ void XamlTreeBackend::ReleaseStates(theme::NodeId id, std::string_view property)
             } catch (...) {
             }
         }
-        m_resourcesDirty = true;
+        MarkResourcesDirty("states released, " + std::string(property));
     }
     m_heldStates.erase(it);
 }
@@ -1319,7 +1337,7 @@ bool XamlTreeBackend::WriteResource(std::string_view key, const theme::Value& va
     if (auto added = m_addedKeys.find(keyText); added != m_addedKeys.end() && added->second == value) {
         m_addedKeys.erase(added);
         if (OwnsKey(resources, name)) resources.Remove(name);
-        m_resourcesDirty = true;
+        MarkResourcesDirty("resource " + keyText + " removed");
         return true;
     }
     if (!OwnsKey(resources, name) && !m_addedKeys.count(keyText)) {
@@ -1345,8 +1363,17 @@ bool XamlTreeBackend::WriteResource(std::string_view key, const theme::Value& va
         }
     }
     resources.Insert(name, *object);
-    m_resourcesDirty = true;
+    MarkResourcesDirty("resource " + keyText);
     return true;
+}
+
+void XamlTreeBackend::MarkResourcesDirty(std::string why) {
+    if (!m_resourcesDirty) {
+        m_dirtyReason = std::move(why);
+        m_dirtyCount = 0;
+    }
+    m_resourcesDirty = true;
+    m_dirtyCount++;
 }
 
 bool XamlTreeBackend::SetDictionary(std::string_view xaml) {
@@ -1358,7 +1385,7 @@ bool XamlTreeBackend::SetDictionary(std::string_view xaml) {
         if (merged.IndexOf(m_merged, index)) merged.RemoveAt(index);
         m_merged = nullptr;
     }
-    m_resourcesDirty = true;
+    MarkResourcesDirty("dictionary");
     if (xaml.empty()) return true;
 
     xaml::ResourceDictionary dictionary = xaml::Markup::XamlReader::Load(winrt::to_hstring(std::string(xaml))).try_as<xaml::ResourceDictionary>();

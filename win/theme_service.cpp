@@ -85,6 +85,7 @@ struct UiSide {
     theme::ThemeSession session;
     bool attached = false;
     int timedPasses = 0;  // passes after a change whose duration went to the log
+    int timedRefreshes = 0;  // the same for the window's resource refreshes
     std::size_t heldStates = 0;  // the counts last written to the log
     std::size_t refusedStates = 0;
 };
@@ -163,9 +164,19 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             // The app's own light or dark mode follows the scheme, so what the theme does not name matches what it does
             // (the midnight theme alone left light text on Apple Music's white background). The scheme's background
             // decides when it gives one (a Spicetify scheme is often named Nord or Mocha), its name otherwise.
-            ui->backend.SetAppMode(request.theme ? std::optional<bool>(request.theme->dark.value_or(
-                                                       theme::IsDarkScheme(request.theme->scheme)))
-                                                 : std::nullopt);
+            auto modeStart = std::chrono::steady_clock::now();
+            bool refreshed = ui->backend.SetAppMode(request.theme ? std::optional<bool>(request.theme->dark.value_or(
+                                                                        theme::IsDarkScheme(request.theme->scheme)))
+                                                                  : std::nullopt);
+            if (refreshed) {
+                auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - modeStart);
+                bool worthLogging = ui->timedRefreshes < kTimedPasses || ms.count() > kSlowPassMs;
+                if (worthLogging && ui->timedRefreshes < kMaxTimedPasses) {
+                    ui->timedRefreshes++;
+                    journal.Write("Themes: the window read its theme resources again, " + std::to_string(ms.count()) +
+                                  " ms (" + ui->backend.RefreshReason() + ")");
+                }
+            }
             if (dump) {
                 std::ofstream(JournalFile("inspector.txt")) << *dump;
                 std::ofstream(JournalFile("inspector.json")) << theme::InspectTreeJson(ui->backend);

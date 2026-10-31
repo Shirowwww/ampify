@@ -88,6 +88,19 @@ pwsh -File bench\windows\run-bench.ps1 -KitRoot build-msvc\kit -Only <case> -Ski
 
 Start by hand: `build-msvc\bench\ampify_launcher.exe`. Logs are in `%USERPROFILE%\Ampify\logs\`.
 
+### Reading a crash
+
+Each MSVC binary gets its `.pdb` beside it (never packaged). When Windows logs a crash of Apple Music in Ampify's
+kernel (Event Viewer, Windows Logs > Application, source "Application Error"), note the fault offset and give it to the
+debugger of the Windows SDK, with the same build still in place:
+
+```powershell
+& "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe" -z build-msvc\bench\ampify_kernel.dll `
+    -y build-msvc\bench -c "ln ampify_kernel+0x13a1d; q"
+```
+
+The answer is the function that held the instruction. A later build moves the code, so keep the build that crashed.
+
 ## Adding a source file or a module
 
 Each package lists its files in `cmake/sources/<package>.cmake`, always with `list(APPEND ...)`, never `set()`. See

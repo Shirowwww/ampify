@@ -57,14 +57,17 @@ public:
 
     // The light or dark mode of the app under the theme: RequestedTheme of the main window's content. Dark for a dark
     // scheme, Light for another scheme, the app's own value back with nullopt (no theme). After a resource change, the
-    // mode goes to the other one and back, which makes the elements already on screen read the new values.
-    void SetAppMode(std::optional<bool> dark);
+    // mode goes to the other one and back, which makes the elements already on screen read the new values. True when
+    // it did that switch.
+    bool SetAppMode(std::optional<bool> dark);
 
     // True once the main window has closed: Apple Music is shutting down and its tree must not be touched any more.
     bool WindowClosed() const { return *m_closed; }
     // How many state values hold a theme's value now (HoldThroughStates), and how many refused it, for the log.
     std::size_t HeldStateCount() const;
     std::size_t RefusedStateCount() const { return m_refusedStates; }
+    // What made the last SetAppMode read the resources again, for the log.
+    const std::string& RefreshReason() const { return m_refreshReason; }
 
     // Runs `pass` on the interface thread soon after the interface may hold new elements: a page navigated
     // (Frame.Navigated, then twice more while the page fills in), rows or cards realised while scrolling
@@ -110,6 +113,7 @@ private:
     void HoldThroughStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
                            std::string_view property, const winrt::Windows::Foundation::IInspectable& value) noexcept;
     void ReleaseStates(theme::NodeId id, std::string_view property) noexcept;
+    void MarkResourcesDirty(std::string why);
 
     winrt::weak_ref<winrt::Microsoft::UI::Xaml::Window> m_window;
     std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_elements;
@@ -146,6 +150,9 @@ private:
     std::optional<winrt::Microsoft::UI::Xaml::ElementTheme> m_modeOriginal;    // its value before the theme
     std::map<std::string, theme::Value> m_addedKeys;  // keys added on top of the theme dictionaries, with the value before
     bool m_resourcesDirty = false;  // a resource changed: {ThemeResource} references must be resolved again
+    std::string m_dirtyReason;      // the first change since the last refresh, and how many followed it
+    int m_dirtyCount = 0;
+    std::string m_refreshReason;
     // `background: artwork`: the image Apple Music shows for the song playing (Image#StaticArtwork in its play bar),
     // found again on each snapshot, and the brushes Ampify made from it, which follow it when the song changes.
     winrt::Microsoft::UI::Xaml::Media::ImageSource m_artwork{nullptr};

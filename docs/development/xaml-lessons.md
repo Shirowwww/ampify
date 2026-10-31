@@ -38,6 +38,7 @@ General rules learned:
 | Inspector: empty tree | The snapshot was taken before the window had content | No snapshot on an empty tree, try again at the next tick |
 | Apple Music crashed (0xc000027b) at the theme change after an inspector pass | Enumerating the application's dictionaries realizes deferred resources, and the next refresh fails on them | No enumeration: the inspector asks `HasKey` for a fixed list of Fluent colour keys (`core/theme/colour_keys.cpp`) |
 | A button lost the theme's colours under the pointer and while pressed (Greenroom's play button turned black) | The button's visual states set Fluent resources, which win over local values | The colours are also written into the control's own resources under `{Type}{Property}PointerOver` and `Pressed` keys |
+| The window froze for about half a second every 3 seconds with Greenroom | Each write of the play button's background put new state keys, which asked for a refresh of the whole window's resources (400 to 800 ms on the interface thread); the refresh reset that background, which the next pass wrote again | State keys are written only when their colour changes. The log gives the duration and the cause of every refresh |
 
 The application dictionary has only one key of its own (`ContentPageShadow`). Colors are in merged and theme dictionaries.
 Walking some of them fails with E_FAIL, so each part is read inside a try/catch. Do not walk them at all while
