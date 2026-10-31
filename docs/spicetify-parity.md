@@ -103,7 +103,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | `TippyProps` | `tooltip`, `tooltipPlacement` and `tooltipDelay` on every primitive and component | Done |
 | `Topbar` | `Ampify.ui.topbar.addButton`. The button goes in the playback bar's toggle button row, since Apple Music has no separate top bar | Done |
 | `Playbar` | `Ampify.ui.playbar.addButton` | Done |
-| `ContextMenu`, `Menu` | `Ampify.ui.menu.addItem` is in the API, but menus are not displayed yet | Planned |
+| `ContextMenu`, `Menu` | `Ampify.ui.menu.addItem`: entries in Apple Music's main menu (`"app"`) and in the menu of a song, an album or a playlist (`"context"`), whose `onClick` receives the item's name. Spicetify gives the items' URIs, a `shouldAdd` filter and submenus; Apple Music's menus give no identifier for their item | Partial |
 | `PopupModal` | `Ampify.ui.popup.open`, a native dialog | Done |
 | `Panel` (documented by Spicetify, absent from its code) | `Ampify.ui.panel.register`, a 380 px column on the right | Done |
 | `AppTitle` | `Ampify.ui.title.set`, not yet checked in Apple Music | Partial |

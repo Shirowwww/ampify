@@ -85,6 +85,19 @@ const char kUi[] = R"AMPIFYJS(
     const fn = uiCallbacks.get(id);
     if (fn) runGuarded("button " + id, fn, []);
   };
+
+  // An entry of Apple Music's menus: a context entry receives the name of the item its menu is about.
+  dispatch.menuClick = (payload) => {
+    let event;
+    try {
+      event = JSON.parse(payload);
+    } catch (error) {
+      native.log("[error] menuClick: " + describe(error));
+      return;
+    }
+    const fn = uiCallbacks.get(Number(event && event.id));
+    if (fn) runGuarded("menu " + event.id, fn, [event.title ? { title: String(event.title) } : {}]);
+  };
 )AMPIFYJS";
 
 }  // namespace ampify::prelude

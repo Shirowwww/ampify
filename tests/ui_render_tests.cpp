@@ -341,6 +341,22 @@ TEST_CASE(UiRender_SettingsAnchorIsTheStackWithTheMostToggles) {
     CHECK(!InsideModElement(tree.nodes, inner));
 }
 
+TEST_CASE(UiRender_AMenuIsAboutTheItemItsPlayEntryQuotes) {
+    // Apple Music's French menus put a narrow no-break space inside the guillemets.
+    CHECK(QuotedMenuName({"Ajouter \xC3\xA0 la playlist", "Lire \xC2\xAB\xE2\x80\xAFMerci\xE2\x80\xAF\xC2\xBB"}) == "Merci");
+    CHECK(QuotedMenuName({"Lire \xC2\xAB\xC2\xA0Merci\xC2\xA0\xC2\xBB"}) == "Merci");
+    CHECK(QuotedMenuName({"Play \xE2\x80\x9CMerci\xE2\x80\x9D"}) == "Merci");
+    CHECK(QuotedMenuName({"\xE2\x80\x9EMerci\xE2\x80\x9C wiedergeben"}) == "Merci");
+    CHECK(QuotedMenuName({"Play \"Merci\""}) == "Merci");
+    // A name that holds quotes itself keeps them: from the first opening quote to the last closing one.
+    CHECK(QuotedMenuName({"Lire \xC2\xAB Le \xC2\xAB grand \xC2\xBB soir \xC2\xBB"}) == "Le \xC2\xAB grand \xC2\xBB soir");
+    // A menu of options quotes nothing; empty quotes do not name an item.
+    CHECK(QuotedMenuName({"Trier par titre", "Trier par artiste"}).empty());
+    CHECK(QuotedMenuName({"Lire \xC2\xAB  \xC2\xBB", "Partager \xE2\x80\x9CSurvival\xE2\x80\x9D"}) == "Survival");
+    CHECK(QuotedMenuName({"Say \""}).empty());
+    CHECK(QuotedMenuName({}).empty());
+}
+
 TEST_CASE(UiRender_PageWithoutTogglesHasNoAnchor) {
     FakeTree tree;
     int page = tree.Add(-1, "AppleMusicWin.Views.PlaybackSettingsPage", kProbePage);

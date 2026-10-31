@@ -1,5 +1,7 @@
 #include "probe.hpp"
 
+#include <utility>
+
 #include "render_tree.hpp"
 
 namespace ampify::uirender {
@@ -12,6 +14,26 @@ bool IsModName(const std::string& name) {
 
 bool NamedLike(const ProbeNode& node, std::string_view name) {
     return node.name == name || node.automationId == name;
+}
+
+// Without the spaces around it: spaces, no-break spaces, narrow no-break spaces and thin spaces.
+std::string_view TrimSpaces(std::string_view text) {
+    static constexpr std::string_view kSpaces[] = {" ", "\xC2\xA0", "\xE2\x80\xAF", "\xE2\x80\x89"};
+    bool trimmed = true;
+    while (trimmed) {
+        trimmed = false;
+        for (std::string_view space : kSpaces) {
+            if (text.starts_with(space)) {
+                text.remove_prefix(space.size());
+                trimmed = true;
+            }
+            if (text.ends_with(space)) {
+                text.remove_suffix(space.size());
+                trimmed = true;
+            }
+        }
+    }
+    return text;
 }
 
 // The number of ToggleSwitch under each node, outside the mod elements. Parents come before their children, so one
@@ -74,6 +96,27 @@ bool InsideModElement(const std::vector<ProbeNode>& nodes, int node) {
         if (IsModName(nodes[current].name)) return true;
     }
     return false;
+}
+
+std::string QuotedMenuName(const std::vector<std::string>& texts) {
+    // Opening and closing quotes in UTF-8: « », “ ”, „ “, 「 」 and straight ones.
+    static constexpr std::pair<std::string_view, std::string_view> kQuotes[] = {
+        {"\xC2\xAB", "\xC2\xBB"},
+        {"\xE2\x80\x9C", "\xE2\x80\x9D"},
+        {"\xE2\x80\x9E", "\xE2\x80\x9C"},
+        {"\xE3\x80\x8C", "\xE3\x80\x8D"},
+        {"\"", "\""},
+    };
+    for (const std::string& text : texts) {
+        for (const auto& [open, close] : kQuotes) {
+            std::size_t start = text.find(open);
+            std::size_t end = text.rfind(close);
+            if (start == std::string::npos || end == std::string::npos || end < start + open.size()) continue;
+            std::string_view name = TrimSpaces(std::string_view(text).substr(start + open.size(), end - start - open.size()));
+            if (!name.empty()) return std::string(name);
+        }
+    }
+    return {};
 }
 
 std::optional<int> ChooseSettingsAnchor(const std::vector<ProbeNode>& nodes, int page) {

@@ -73,6 +73,9 @@ Atmos leveler.
 - The "Open the Marketplace" button of the Ampify card in Settings is readable again: Apple Music's accent style drew
   its text in a symbol font. A theme no longer reports values refused on elements that are gone or never realized,
   and Greenroom loads with none refused.
+- Menu entries: `Ampify.ui.menu.addItem("app", ...)` adds an entry to Apple Music's main menu, and `"context"` one to
+  the menu of a song, an album or a playlist (right click, the "..." of a row), whose `onClick` receives the item's
+  name. They take the look of Apple Music's entries and leave the menu once it closes.
 
 ### Preview
 

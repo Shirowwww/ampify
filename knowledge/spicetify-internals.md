@@ -144,7 +144,7 @@ message but `apply` still reports success.
 | `ReactQuery`, `ReactFlipToolkit`, `ReactJSX`, `ReactDOMServer`, `Tippy`, `classnames`, `Mousetrap` | found by heuristics | not offered |
 | `Snackbar`, `showNotification` | Spotify's snackbar | `Ampify.notify` |
 | `Topbar.Button`, `Playbar.Button`, `Playbar.Widget` | Spicetify DOM code | done (`Widget` missing) |
-| `ContextMenu`, `ContextMenuV2`, `Menu` | patch plus registry rendered as Spotify menu items | planned |
+| `ContextMenu`, `ContextMenuV2`, `Menu` | patch plus registry rendered as Spotify menu items | partial (`Ampify.ui.menu.addItem`) |
 | `PopupModal` | Spicetify's own element | done |
 | `AppTitle` | product-state override | partial |
 | `colorExtractor`, `extractColorPreset`, `Color` | Spotify backends and GraphQL | partial (`Ampify.color.extract`) |

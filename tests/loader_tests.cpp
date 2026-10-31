@@ -166,6 +166,37 @@ Ampify.ReactDOM.render(h(P), "panel:p");)");
     hosts.StopAll();
 }
 
+TEST_CASE(Loader_AMenuEntryReceivesTheNameOfItsItem) {
+    fs::path root = Root("menu-entries");
+    WriteElement(root, "menus", Manifest("menus", "extension", R"(,"permissions":["ui.menu"])"),
+                 R"(Ampify.ui.menu.addItem("context", { label: "Find lyrics", onClick: (item) => Ampify.log("lyrics of " + item.title) });
+Ampify.ui.menu.addItem("app", { label: "About", onClick: (item) => Ampify.log("about " + JSON.stringify(item)) });)");
+
+    ampify::test::FakeHost host;
+    std::ostringstream out;
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::ExtensionHost hosts(journal);
+    ampify::ExtensionLoader loader(hosts, host, journal, root);
+    CHECK(loader.Discover().loaded.size() == 1);
+    ampify::Settings settings;
+    settings.SetBool("extensions.menus.enabled", true);
+    hosts.StartAll(settings);
+    loader.Pump();
+
+    std::vector<ampify::UiControl> controls = host.Ui().Controls();
+    CHECK(controls.size() == 2);
+    if (controls.size() != 2) return;
+    CHECK(controls[0].placement == "menu-context" && controls[1].placement == "menu-app");
+    loader.DeliverEventTo("menus", "menuClick", R"({"id":)" + std::to_string(controls[0].id) + R"(,"title":"Merci"})");
+    loader.DeliverEventTo("menus", "menuClick", R"({"id":)" + std::to_string(controls[1].id) + R"(,"title":""})");
+    loader.DeliverEventTo("menus", "menuClick", "not json");
+    loader.Pump();
+    CHECK(out.str().find("[menus] lyrics of Merci") != std::string::npos);
+    CHECK(out.str().find("[menus] about {}") != std::string::npos);
+    CHECK(out.str().find("menuClick") != std::string::npos);  // the bad payload is reported, nothing runs
+    hosts.StopAll();
+}
+
 TEST_CASE(Loader_ExposeApiOffKeepsEveryScriptOff) {
     fs::path root = Root("expose-api");
     WriteElement(root / "extensions", "ext", Manifest("ext", "extension"), R"(Ampify.log("ext");)");

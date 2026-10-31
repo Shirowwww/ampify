@@ -68,6 +68,11 @@ bool IsUnder(const std::vector<ProbeNode>& nodes, int node, int ancestor);
 // True when `node` or one of its ancestors carries an Ampify or AMExclusive name.
 bool InsideModElement(const std::vector<ProbeNode>& nodes, int node);
 
+// The name of the item a menu is about (a song, an album, a playlist), from the texts of its entries: Apple Music's
+// "Play «Name»" entry quotes it. The text between the first opening quote and the last closing one of the first entry
+// that has both, without the spaces around it. Empty for a menu of options, which quotes nothing.
+std::string QuotedMenuName(const std::vector<std::string>& texts);
+
 // The settings anchor of a page: the StackPanel under `page` that holds the most ToggleSwitch (outside Ampify's and
 // AMExclusive's elements). On a tie the outermost wins, as in AMExclusive. Nothing when the page has no toggle.
 std::optional<int> ChooseSettingsAnchor(const std::vector<ProbeNode>& nodes, int page);

@@ -407,7 +407,7 @@ host reports a click with `ScriptExtension::DeliverClick(number)` and a new valu
 Ampify.ui.topbar.addButton({ label, icon, onClick })
 Ampify.ui.playbar.addButton({ label, icon, onClick })
 Ampify.ui.sidebar.addItem({ label, icon, onClick })   // icon: a Segoe Fluent Icons glyph, such as ""
-Ampify.ui.menu.addItem("context" | "app", { label, onClick })
+Ampify.ui.menu.addItem("context" | "app", { label, icon, onClick })   // onClick receives { title } for "context"
 Ampify.ui.popup.open(view)
 Ampify.ui.fullscreen.open(view)        // permission ui.fullscreen; called again, it updates the view in place
 Ampify.ui.fullscreen.close()
@@ -426,6 +426,22 @@ Ampify.ui.playbar.addButton({
   label: "Lyrics",
   icon: Ampify.icons.get("lyrics"),
   onClick: () => Ampify.ui.popup.open(lyricsView),
+});
+```
+
+**Menu entries.** `Ampify.ui.menu.addItem` (permission `ui.menu`) puts an entry at the end of Apple Music's own menus,
+below a separator, with the look of Apple Music's entries and an optional Segoe Fluent Icons glyph:
+
+- `"app"`: the main menu, opened from the "..." next to "Apple Music" at the top of the sidebar. `onClick` receives `{}`.
+- `"context"`: the menu of an item (a song, an album, a playlist), opened with a right click or the "..." of a row.
+  These are the menus that offer to play the item ("Play «Name»"); a menu of options gets no entry.
+  `onClick` receives `{ title }`, the item's name as that menu shows it.
+
+```js
+Ampify.ui.menu.addItem("context", {
+  label: "Search the lyrics",
+  icon: "",
+  onClick: ({ title }) => Ampify.log("lyrics of " + title),
 });
 ```
 

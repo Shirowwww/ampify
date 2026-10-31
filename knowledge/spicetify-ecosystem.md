@@ -161,7 +161,7 @@ lines (cat-jam) to 30,000 (Spicy Lyrics).
 | `showNotification`, `PopupModal` | 10 | done |
 | `Locale`, `React`, `ReactDOM`, `Config` | 8 to 9 | done |
 | `GraphQL` | 7 | no equivalent |
-| `Menu`, `ContextMenu` | 7 and 4 | planned, not displayed |
+| `Menu`, `ContextMenu` | 7 and 4 | partial: entries shown, with the item's name only |
 | `URI`, `SVGIcons`, `LocalStorage` | 6 | done |
 | `Topbar`, `Queue`, `Keyboard` | 4 to 5 | done or partial |
 
@@ -212,7 +212,7 @@ with line numbers), `types`, `doctor`, permissions with consent, `appVersions`, 
 | 8 | Notifications | 10 of 20 | done |
 | 9 | Persistent settings | 177 files | done |
 | 10 | Ready-made settings UI | every big theme builds one | missing |
-| 11 | Context-menu entries | 7 projects | planned |
+| 11 | Context-menu entries | 7 projects | partial (the item's name, no URI) |
 | 12 | Buttons in the play bar or top bar | 5 projects | done |
 | 13 | Library and playlist data | 3 to 5 projects | planned |
 | 14 | Data beyond the playing song | 12 projects | planned |
