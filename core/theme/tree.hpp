@@ -57,6 +57,10 @@ struct NodeInfo {
     // Text made only of icon glyphs (private-use characters, as in Apple Music's badges and stars): its font is never
     // changed, or the icon would show as an empty box in the theme's font.
     bool icon = false;
+    // The place of the element among its parent's children (from 0) and how many children the parent has, for
+    // :nth-child, :first-child and :last-child. -1 and 0 when unknown: those selectors then match nothing.
+    int position = -1;
+    int siblings = 0;
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";

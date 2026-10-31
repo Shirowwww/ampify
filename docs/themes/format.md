@@ -93,10 +93,14 @@ Grid#Bar > TextBlock {
 | `A B` | A `B` anywhere inside an `A` |
 | `A > B` | A `B` whose direct parent is an `A` |
 | `A:hover` | An `A`, while the pointer is over it (see "Hover") |
+| `A:nth-child(2)` | An `A` that is the second child of its parent (counting from 1) |
+| `A:first-child`, `A:last-child` | An `A` that is the first, or the last, child of its parent |
 
-You can combine them: `Grid#Bar > TextBlock`, `Grid#TransportBar Button:hover`. `:hover` goes only on the last element
-of the selector. Attributes (`[x=y]`) and other pseudo-classes (`:focus`...) are not supported. A rule that contains
-one is ignored, with a line in the log.
+You can combine them: `Grid#Bar > TextBlock`, `Grid#TransportBar Button:hover`,
+`Grid#TransportBar > Grid:nth-child(2)`. The structural pseudo-classes reach the many elements Apple Music leaves
+unnamed; they count every child of the parent, whatever its type. `:hover` goes only on the last element of the
+selector. Attributes (`[x=y]`) and other pseudo-classes (`:focus`...) are not supported. A rule that contains one is
+ignored, with a line in the log.
 
 ### Priority
 

@@ -28,6 +28,8 @@ enum class Combinator {
 struct Compound {
     std::string type;  // empty means any element
     std::string name;  // without the '#', empty when absent
+    int nth = 0;        // :nth-child(n), from 1 (:first-child is 1); 0 when absent
+    bool last = false;  // :last-child
     Combinator combinator = Combinator::Descendant;  // relation to the compound before it; unused for the first
 };
 

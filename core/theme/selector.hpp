@@ -8,9 +8,11 @@
 
 namespace ampify::theme {
 
-// CSS specificity: a selector with more #names beats one with more types, which beats one with fewer of either.
+// CSS specificity: a selector with more #names beats one with more pseudo-classes (:nth-child...), which beats one
+// with more types.
 struct Specificity {
     int names = 0;
+    int classes = 0;
     int types = 0;
 
     auto operator<=>(const Specificity&) const = default;

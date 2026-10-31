@@ -386,8 +386,10 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         xaml::DependencyObject object;
         int parent;
         int depth;
+        int position;
+        int siblings;
     };
-    std::vector<Pending> stack{{content, -1, 0}};
+    std::vector<Pending> stack{{content, -1, 0, 0, 1}};
     int lcdDepth = -1;
     media::ImageSource artwork{nullptr};
     while (!stack.empty()) {
@@ -402,6 +404,8 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         if (auto text = item.object.try_as<controls::TextBlock>()) node.icon = IsIconText(text.Text());
         node.parent = item.parent;
         node.depth = item.depth;
+        node.position = item.position;
+        node.siblings = item.siblings;
         // The play bar's artwork: the first Image#StaticArtwork under NowPlayingControl#LCD.
         if (lcdDepth >= 0 && item.depth <= lcdDepth) lcdDepth = -1;
         if (node.name == "LCD" && node.type == "NowPlayingControl") lcdDepth = item.depth;
@@ -416,7 +420,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
 
         int count = media::VisualTreeHelper::GetChildrenCount(item.object);
         for (int i = count - 1; i >= 0; i--) {
-            stack.push_back({media::VisualTreeHelper::GetChild(item.object, i), index, item.depth + 1});
+            stack.push_back({media::VisualTreeHelper::GetChild(item.object, i), index, item.depth + 1, i, count});
         }
     }
 
@@ -512,12 +516,22 @@ void XamlTreeBackend::RunPass() noexcept {
     }
 }
 
+// A property Apple Music's element refuses (E_ACCESSDENIED, a sealed object, a value out of range) throws: it only
+// costs that value, reported by the engine as refused, never the rest of the pass.
 std::optional<theme::Value> XamlTreeBackend::Read(theme::NodeId id, std::string_view property) {
-    return m_hover.Read(id, property, *this);
+    try {
+        return m_hover.Read(id, property, *this);
+    } catch (...) {
+        return std::nullopt;
+    }
 }
 
 bool XamlTreeBackend::Write(theme::NodeId id, std::string_view property, const theme::Value& value) {
-    return m_hover.Write(id, property, value, *this);
+    try {
+        return m_hover.Write(id, property, value, *this);
+    } catch (...) {
+        return false;
+    }
 }
 
 std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::string_view property) {

@@ -94,15 +94,20 @@ public:
     std::vector<th::NodeInfo> Snapshot() override {
         std::vector<int> position(elements.size(), -1);
         std::vector<th::NodeInfo> nodes;
+        std::map<int, int> children;  // live children, by parent element index
+        std::vector<int> parentOf;    // the parent element index of each node
         for (size_t i = 0; i < elements.size(); i++) {
             if (!elements[i].alive) continue;
 
             th::NodeInfo info = elements[i].info;
             int parent = elements[i].info.parent;
             info.parent = parent >= 0 ? position[parent] : -1;
+            info.position = children[parent]++;
             position[i] = static_cast<int>(nodes.size());
             nodes.push_back(info);
+            parentOf.push_back(parent);
         }
+        for (size_t k = 0; k < nodes.size(); k++) nodes[k].siblings = children[parentOf[k]];
         return nodes;
     }
 
@@ -361,6 +366,38 @@ TEST_CASE(Selector_MatchesTypesNamesAndCombinators) {
     CHECK(th::Matches(Sel("Page > Grid > Border > TextBlock"), nodes, 5));
     CHECK(th::Matches(Sel("* > Border"), nodes, 4));
     CHECK(th::Matches(Sel("Grid Border > TextBlock"), nodes, 5));  // the descendant search must try every ancestor
+}
+
+TEST_CASE(Selector_StructuralPseudoClassesCountFromOne) {
+    // Grid#Bar with three Grid children, the second holding a TextBlock.
+    std::vector<th::NodeInfo> nodes(5);
+    nodes[0] = {1, "Grid", "", "Bar", -1, 0};
+    nodes[1] = {2, "Grid", "", "", 0, 1};
+    nodes[2] = {3, "Grid", "", "", 0, 1};
+    nodes[3] = {4, "TextBlock", "", "", 2, 2};
+    nodes[4] = {5, "Grid", "", "", 0, 1};
+    for (int i : {1, 2, 4}) nodes[i].siblings = 3;
+    nodes[1].position = 0;
+    nodes[2].position = 1;
+    nodes[4].position = 2;
+    nodes[3].position = 0;
+    nodes[3].siblings = 1;
+
+    CHECK(th::Matches(Sel("Grid#Bar > Grid:nth-child(2)"), nodes, 2));
+    CHECK(!th::Matches(Sel("Grid#Bar > Grid:nth-child(2)"), nodes, 1));
+    CHECK(th::Matches(Sel("Grid#Bar > Grid:first-child"), nodes, 1));
+    CHECK(th::Matches(Sel("Grid#Bar > Grid:last-child"), nodes, 4));
+    CHECK(!th::Matches(Sel("Grid#Bar > Grid:last-child"), nodes, 2));
+    CHECK(th::Matches(Sel("Grid:nth-child(2) TextBlock:first-child:last-child"), nodes, 3));
+    CHECK(th::SpecificityOf(Sel("Grid:nth-child(2)")) > th::SpecificityOf(Sel("Grid Grid")));
+    CHECK(th::SpecificityOf(Sel("#Bar")) > th::SpecificityOf(Sel("Grid:nth-child(2)")));
+
+    std::string problem;
+    CHECK(!th::ParseSelector("Grid:nth-child(0)", &problem));
+    CHECK(problem.find("counts from 1") != std::string::npos);
+    CHECK(!th::ParseSelector("Grid:nth-child(odd)", &problem));
+    CHECK(!th::ParseSelector("Grid:nth-child", &problem));
+    CHECK(th::ParseSelector("Grid:nth-child(3):hover", &problem));
 }
 
 TEST_CASE(Selector_SpecificityOrdersNamesBeforeTypes) {

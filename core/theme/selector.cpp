@@ -7,6 +7,8 @@ namespace {
 bool CompoundMatches(const Compound& compound, const NodeInfo& node) {
     if (!compound.type.empty() && compound.type != node.type && compound.type != node.fullType) return false;
     if (!compound.name.empty() && compound.name != node.name) return false;
+    if (compound.nth > 0 && node.position + 1 != compound.nth) return false;
+    if (compound.last && (node.position < 0 || node.position != node.siblings - 1)) return false;
     return true;
 }
 
@@ -33,6 +35,8 @@ Specificity SpecificityOf(const Selector& selector) {
     Specificity specificity;
     for (const Compound& compound : selector.parts) {
         if (!compound.name.empty()) specificity.names++;
+        if (compound.nth > 0) specificity.classes++;
+        if (compound.last) specificity.classes++;
         if (!compound.type.empty()) specificity.types++;
     }
     return specificity;

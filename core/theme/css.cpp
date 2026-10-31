@@ -174,19 +174,38 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
             if (compound.name.empty()) return fail("name missing after \"#\" in \"" + selector.text + "\"");
         }
 
-        // A pseudo-class. Only :hover, and only on the last part: the engine follows the pointer of the element it styles.
-        if (i < s.size() && s[i] == ':') {
+        // Pseudo-classes: the structural ones on any part, :hover only on the last part (the engine follows the pointer
+        // of the element it styles).
+        while (i < s.size() && s[i] == ':') {
             size_t start = ++i;
             while (i < s.size() && IsNameChar(s[i])) i++;
             std::string pseudo = LowerCopy(s.substr(start, i - start));
-            if (pseudo != "hover") {
+            if (pseudo == "first-child") {
+                compound.nth = 1;
+            } else if (pseudo == "last-child") {
+                compound.last = true;
+            } else if (pseudo == "nth-child") {
+                size_t close = s.find(')', i);
+                if (i >= s.size() || s[i] != '(' || close == std::string_view::npos) {
+                    return fail(":nth-child needs a number in brackets, like :nth-child(2), in \"" + selector.text + "\"");
+                }
+                std::string_view digits = s.substr(i + 1, close - i - 1);
+                int n = 0;
+                for (char c : digits) n = (c >= '0' && c <= '9' && n < 10000) ? n * 10 + (c - '0') : -1;
+                if (digits.empty() || n < 1) {
+                    return fail(":nth-child counts from 1, like :nth-child(2), in \"" + selector.text + "\"");
+                }
+                compound.nth = n;
+                i = close + 1;
+            } else if (pseudo == "hover") {
+                if (s.substr(i).find_first_not_of(" \t\r\n") != std::string_view::npos) {
+                    return fail("\":hover\" is only allowed on the last element of \"" + selector.text + "\"");
+                }
+                selector.hover = true;
+            } else {
                 return fail("pseudo-class \":" + std::string(s.substr(start, i - start)) + "\" is not supported in \"" +
-                            selector.text + "\" (only :hover is)");
+                            selector.text + "\" (:hover, :nth-child(n), :first-child and :last-child are)");
             }
-            if (s.substr(i).find_first_not_of(" \t\r\n") != std::string_view::npos) {
-                return fail("\":hover\" is only allowed on the last element of \"" + selector.text + "\"");
-            }
-            selector.hover = true;
         }
 
         // Nothing was read (for example a stray `@`): the check below reports it, so the loop always advances.
