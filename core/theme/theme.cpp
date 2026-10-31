@@ -265,9 +265,11 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
     int order = 0;
     for (const Rule& rule : sheet.rules) {
         if (rule.root) continue;
+        RuleSource from = source;
+        if (!rule.origin.empty()) from.file = rule.origin;
         for (const Declaration& declaration : rule.declarations) {
             if (declaration.property.starts_with("--")) {
-                theme.problems.push_back(AtLine(source.file, declaration.line) + ": variable \"" +
+                theme.problems.push_back(AtLine(from.file, declaration.line) + ": variable \"" +
                                          declaration.property + "\" outside :root, ignored");
                 continue;
             }
@@ -275,30 +277,30 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
             std::string problem;
             std::optional<std::string> raw = SubstituteVariables(declaration.value, theme.variables, &problem);
             if (!raw) {
-                theme.problems.push_back(AtLine(source.file, declaration.line) + ": " + problem + ", ignored");
+                theme.problems.push_back(AtLine(from.file, declaration.line) + ": " + problem + ", ignored");
                 continue;
             }
 
             if (LowerText(declaration.property) == "font-role") {
-                if (AddFontRole(rule, declaration, *raw, order, source, applied, theme)) order++;
+                if (AddFontRole(rule, declaration, *raw, order, from, applied, theme)) order++;
                 continue;
             }
 
             const PropertySpec* spec = FindProperty(declaration.property);
             if (!spec) {
-                theme.problems.push_back(AtLine(source.file, declaration.line) + ": property \"" +
+                theme.problems.push_back(AtLine(from.file, declaration.line) + ": property \"" +
                                          declaration.property + "\" is unknown, ignored");
                 continue;
             }
 
             Conversion conversion = ConvertValue(*spec, *raw, context);
             if (!conversion.value) {
-                theme.problems.push_back(AtLine(source.file, declaration.line) + ": " + conversion.problem +
+                theme.problems.push_back(AtLine(from.file, declaration.line) + ": " + conversion.problem +
                                          ", ignored");
                 continue;
             }
 
-            if (applied) AddAssignment(rule, *spec, *conversion.value, declaration, order, source, theme);
+            if (applied) AddAssignment(rule, *spec, *conversion.value, declaration, order, from, theme);
             order++;
         }
     }

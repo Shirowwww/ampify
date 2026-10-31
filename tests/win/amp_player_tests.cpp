@@ -190,6 +190,10 @@ HRESULT STDMETHODCALLTYPE IsPlaying(Facet*, unsigned char* out) {  // IPlayerSta
     *out = g.playing;
     return S_OK;
 }
+HRESULT STDMETHODCALLTYPE Subtitle(Facet*, HSTRING* out) {  // INowPlayingItem.get_Subtitle, slot 6
+    *out = MakeString(L"Artiste — Album");
+    return S_OK;
+}
 HRESULT STDMETHODCALLTYPE Artist(Facet*, HSTRING* out) {  // INowPlayingItem.get_Artist, slot 7
     *out = MakeString(L"Artiste");
     return S_OK;
@@ -334,6 +338,7 @@ void Build() {
     stateNotifyVt.slots[7] = Fn(&RemoveHandler);
 
     itemObj.facets = {{rt::GuidOf(ampify::amp::kIidsNowPlayingItem[0]), &itemF}};
+    itemVt.slots[6] = Fn(&Subtitle);
     itemVt.slots[7] = Fn(&Artist);
     itemVt.slots[8] = Fn(&Album);
     itemVt.slots[11] = Fn(&ItemArtwork);
@@ -434,6 +439,7 @@ TEST_CASE(AmpPlayer_ReadsTheStateThroughTheWinmdSlots) {
     CHECK(reading->title == "Title \xC3\xA9");
     CHECK(reading->artist == "Artiste");
     CHECK(reading->album == "Album");
+    CHECK(reading->subtitle == "Artiste — Album");
     CHECK(reading->positionRaw == 600'000'000 && reading->durationRaw == 1'800'000'000);
     CHECK(reading->audioFormat == 1);
     CHECK(reading->queueItemId == 42);

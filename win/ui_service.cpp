@@ -1170,7 +1170,7 @@ controls::StackPanel EnsureSidebarHost(WindowContext& context, const controls::N
     if (context.sidebarHost && footer == context.sidebarHost) return context.sidebarHost;
     controls::StackPanel host;
     Name(host, "AMPIFY_SidebarHost");
-    navigation.PaneFooter(nullptr);  // frees Apple Music's footer, which becomes the last child of the panel
+    navigation.PaneFooter(nullptr);  // frees Apple Music's footer, a separator, which becomes the first child of the panel
     if (footer) host.Children().Append(footer);
     navigation.PaneFooter(host);
     context.sidebarHost = host;
@@ -1252,9 +1252,8 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
         } catch (...) {
         }
     });
-    // Before Apple Music's footer, which stays last.
-    std::uint32_t before = host.Children().Size() - (context->sidebarOriginal ? 1u : 0u);
-    host.Children().InsertAt(before, button);
+    // After Apple Music's separator, so the entries sit with the account, below the line that ends the list.
+    host.Children().Append(button);
     placed.button = button;
     shared.journal.Write("Interface: sidebar entry \"" + control.label + "\" of " + control.elementId + " placed");
 }

@@ -158,6 +158,24 @@ PlayerSnapshot PlayerBridge::Snapshot() {
             m_unit = unit;
         }
         snapshot = SnapshotFromAmp(*apple, m_unit);
+        // Apple's item sometimes leaves the artist and album empty: the media session of the same track has them.
+        if (snapshot.track && smtc && smtc->title == apple->title && snapshot.track->artist.empty()) {
+            auto [artist, album] = SplitArtistAlbum(smtc->artist);
+            snapshot.track->artist = artist;
+            if (snapshot.track->album.empty()) snapshot.track->album = album.empty() ? smtc->album : album;
+        }
+        // The raw cover of the first tracks, since its address format may change with Apple Music.
+        if (apple->hasItem && apple->queueItemId != m_coverLoggedItem && m_coverLogs < 3) {
+            m_coverLoggedItem = apple->queueItemId;
+            m_coverLogs++;
+            const ArtworkReading& cover = apple->artwork;
+            m_journal.Write("Player: cover of \"" + apple->title + "\": address \"" + cover.uri + "\", format \"" +
+                            cover.format + "\", crop \"" + cover.cropCode + "\", " +
+                            std::to_string(static_cast<int>(cover.width)) + "x" +
+                            std::to_string(static_cast<int>(cover.height)) + ", colour " +
+                            (cover.hasColor ? ArtworkColorHex(cover) : std::string("none")) + ", lyrics " +
+                            (apple->lyricsAvailable ? "yes" : "not yet"));
+        }
         if (snapshot.track && !snapshot.track->artwork.empty()) {
             SayOnce("apple-artwork", "Player: cover read from Apple's player (" + snapshot.track->artwork + ")");
         }

@@ -1,0 +1,77 @@
+/* Greenroom: Apple Music laid out like the most common music player layout. The playback bar runs along the bottom of
+   the window, with the song on the left and the controls in the middle; the sidebar and the pages are rounded dark
+   panels on a black window; cards light up under the pointer.
+
+   The two layouts place the zones with aligned edges (docs/themes/format.md, "Ready-made layouts"); the classes are
+   Ampify's stable names for Apple Music's zones (docs/themes/names.md). */
+
+:root {
+    --window-background: #000000;
+    --panel-background: #121212;
+    --panel-radius: 8px;
+    --raised: #1F1F1F;
+    --hover: #2A2A2A;
+}
+
+@import "ampify:floating-panels";
+@import "ampify:bottom-bar";
+
+/* ---- Playback bar ------------------------------------------------------------------------------------------------- */
+
+/* The now-playing display loses its box: artwork, title and artist sit on the bar. */
+.lcd {
+    background: transparent;
+    border-width: 0;
+}
+
+.lcd-artwork-image {
+    corner-radius: 4px;
+}
+
+/* Play: a white disc with a dark icon, slightly larger on hover. */
+.play-button > Grid#Root {
+    background: #FFFFFF;
+    corner-radius: 20px;
+}
+
+.play-button FontIcon {
+    foreground: #000000;
+}
+
+.play-button {
+    transition: transform 120ms;
+}
+
+.play-button:hover {
+    transform: scale(1.06);
+}
+
+/* ---- Pages -------------------------------------------------------------------------------------------------------- */
+
+.page-title {
+    font-weight: 800;
+}
+
+/* Cards: a raised tile behind the artwork and its titles under the pointer. */
+.card {
+    corner-radius: 6px;
+    transition: background 180ms;
+}
+
+.card:hover {
+    background: var(--hover);
+}
+
+.artwork {
+    corner-radius: 6px;
+}
+
+/* Track lists: rows light up like the cards. */
+.track-row {
+    corner-radius: 4px;
+    transition: background 120ms;
+}
+
+.track-row:hover {
+    background: var(--raised);
+}

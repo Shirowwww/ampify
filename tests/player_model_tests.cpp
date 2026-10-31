@@ -146,6 +146,22 @@ TEST_CASE(AmpAbi_EverySlotMatchesTheMethodOrderOfTheWinmd) {
     }
 }
 
+TEST_CASE(PlayerModel_SplitsArtistAndAlbumOnTheEmDash) {
+    auto [artist, album] = ampify::SplitArtistAlbum("Billie Eilish \xE2\x80\x94 WHEN WE ALL FALL ASLEEP");
+    CHECK(artist == "Billie Eilish");
+    CHECK(album == "WHEN WE ALL FALL ASLEEP");
+    auto [alone, none] = ampify::SplitArtistAlbum("Daft Punk");
+    CHECK(alone == "Daft Punk" && none.empty());
+
+    ampify::AmpReading reading;
+    reading.hasItem = true;
+    reading.title = "bad guy";
+    reading.subtitle = "Billie Eilish \xE2\x80\x94 WHEN WE ALL FALL ASLEEP";
+    ampify::PlayerSnapshot snapshot = ampify::SnapshotFromAmp(reading, ampify::AmpTimeUnit::Unknown);
+    CHECK(snapshot.track && snapshot.track->artist == "Billie Eilish");
+    CHECK(snapshot.track && snapshot.track->album == "WHEN WE ALL FALL ASLEEP");
+}
+
 TEST_CASE(AmpAbi_TheVolumeMuteAndEqMethodsAreNeverInTheTable) {
     auto types = WinmdMethods();
     const auto& player = types["AMP.Services.IPlayer"];

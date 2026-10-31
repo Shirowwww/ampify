@@ -39,6 +39,7 @@ struct AmpReading {
     std::string title;  // INowPlayingItem.Name
     std::string artist;
     std::string album;
+    std::string subtitle;  // INowPlayingItem.Subtitle, "Artist \u2014 Album"
     int64_t positionRaw = 0;  // INowPlayingItem.CurrentPosition, in the unit given by AmpTimeUnit
     int64_t durationRaw = 0;
     int32_t audioFormat = 0;  // amp::AudioFormat
@@ -81,6 +82,10 @@ std::string TrackIdOf(const std::string& title, const std::string& artist, const
 std::string VariantOfAudioFormat(int32_t format);
 bool IsAtmosFormat(int32_t format);
 bool IsLosslessFormat(int32_t format);
+
+// Apple Music writes "Artist \u2014 Album" where one line holds both (its subtitle, and its media session's artist):
+// the two parts, or the text and an empty album when there is no separator.
+std::pair<std::string, std::string> SplitArtistAlbum(const std::string& text);
 
 PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit);
 // The position moves on between two SMTC updates while playing: it is extrapolated to `now`, and kept within the

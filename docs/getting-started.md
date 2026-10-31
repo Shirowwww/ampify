@@ -50,12 +50,13 @@ The example themes that ship with Ampify:
 
 | Theme | What it does |
 |---|---|
+| `greenroom` | The playback bar along the bottom, the song on the left, rounded dark panels, a green accent |
 | `midnight` | Night-blue colors |
 | `glass` | Gradient background, frosted sidebar and playback bar, rounded content card, buttons that grow on hover |
-| `artwork` | The artwork of the playing song, blurred behind the whole window |
+| `artwork` | The artwork of the playing song, blurred behind floating glass panels |
 | `large-text` | Larger text |
 | `rounded-buttons` | Rounded buttons |
-| `hide-chrome` | Hides some interface parts |
+| `hide-chrome` | Hides the buttons and banners most people never use |
 
 `square-corners` is a snippet: a small style that you switch on or off on its own, on top of any theme.
 

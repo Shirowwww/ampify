@@ -1,5 +1,6 @@
 # Theme engine: target ampify_theme, and the checker ampify_theme_check. See the convention at the top of CMakeLists.txt.
 list(APPEND AMPIFY_THEME_SOURCES
+    core/theme/builtins.cpp
     core/theme/color.cpp
     core/theme/css.cpp
     core/theme/engine.cpp

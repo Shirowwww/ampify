@@ -1,68 +1,76 @@
 /* Artwork: the artwork of the current track fills the whole window, blurred behind dark glass panels that float,
    like Spicetify's Hazy or Comfy themes. The background changes with each track.
 
-   How it works: `background: artwork` puts the artwork on the background grid (Grid#PageRoot); the Apple Music
-   layers above it become transparent; each panel takes an acrylic, which blurs what is behind it. Names taken from
-   Apple Music 1.1792 (knowledge/apple-music-xaml-tree.md). */
+   How it works: `background: artwork` puts the artwork on the window; the floating-panels layout makes the layers
+   above it transparent and lines up the panels; each panel then takes an acrylic, which blurs what is behind it. The
+   playback bar floats too, as a third panel above the pages. */
 
 :root {
+    --window-background: artwork cover;
     --glass: acrylic(#0B0B10, 0.62);
     --glass-light: acrylic(#0B0B10, 0.45);
-    --radius: 18px;
+    --panel-radius: 18px;
+    --gap: 10;
+    --gap-half: 5;
+    /* The bar: 64 high, 10 from the top, then a gap of 10 before the pages. */
+    --content-top: 84;
 }
 
-/* The background: the artwork, covering the window. */
-Grid#PageRoot {
-    background: artwork cover;
-}
+@import "ampify:floating-panels";
 
-/* The Apple Music layers between the background and the panels. */
-NavigationView#NavView,
-ContentPage,
-Border#Titlebar,
-SplitView#ContentSplitView > Grid > Grid#ContentRoot > Border > Grid {
-    background: transparent;
-}
-
-/* The sidebar: a glass panel detached from the edges. */
-Grid#PaneRoot {
+.sidebar {
     backdrop: var(--glass);
-    corner-radius: var(--radius);
-    margin: 10 6 10 10;
 }
 
-/* The pages area: one large glass panel, lighter, so the artwork shows through. */
-SplitView#ContentSplitView > Grid > Grid#ContentRoot {
+/* The pages: lighter glass, so the artwork shows through. */
+.content {
     backdrop: var(--glass-light);
-    corner-radius: var(--radius);
-    margin: 4 10 10 4;
 }
 
-/* The playback bar, at the top: glass too. Apple Music's frosting (BackDrop) is hidden, it did not let the artwork
-   through. */
-BackDrop {
+/* The bar stops before the window's buttons, so it needs no strip to keep them readable. */
+.playbar {
+    backdrop: var(--glass);
+    corner-radius: var(--panel-radius);
+    margin: 10 148 0 5;
+}
+
+.caption-buttons-cover {
     visibility: collapsed;
 }
 
-Grid#TransportBar {
-    backdrop: acrylic(#0B0B10, 0.55);
+.playbar-toggles {
+    horizontal-alignment: right;
+    margin: 0 12 0 0;
 }
 
-NowPlayingControl#LCD > Grid#LCD {
+.lcd {
     background: #33FFFFFF;
     corner-radius: 12px;
 }
 
 /* The artwork in the bar grows on hover. */
-ArtworkImage#ActualArtwork {
+.lcd-artwork-image {
     transform-origin: center;
     corner-radius: 6px;
 }
 
-ArtworkImage#ActualArtwork:hover {
+.lcd-artwork-image:hover {
     transform: scale(1.1);
 }
 
-TextBlock#AppName {
+.app-name {
     font-weight: 700;
+}
+
+.card {
+    corner-radius: 12px;
+    transition: background 180ms;
+}
+
+.card:hover {
+    background: #1FFFFFFF;
+}
+
+.artwork {
+    corner-radius: 10px;
 }

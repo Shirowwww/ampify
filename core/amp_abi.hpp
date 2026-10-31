@@ -78,6 +78,7 @@ inline constexpr int kStateIsPaused = 24;
 inline constexpr int kStateIsPlaying = 25;
 
 // AMP.Services.CommonModels.INowPlayingItem: get_Subtitle, get_Artist, get_Album, ... get_Name (13th), ...
+inline constexpr int kItemSubtitle = 6;
 inline constexpr int kItemArtist = 7;
 inline constexpr int kItemAlbum = 8;
 inline constexpr int kItemArtwork = 11;
@@ -132,6 +133,7 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.IPlayer", "SkipNextAsync", slot::kPlayerSkipNextAsync},
     {"AMP.Services.CommonModels.IPlayerState", "get_IsPaused", slot::kStateIsPaused},
     {"AMP.Services.CommonModels.IPlayerState", "get_IsPlaying", slot::kStateIsPlaying},
+    {"AMP.Services.CommonModels.INowPlayingItem", "get_Subtitle", slot::kItemSubtitle},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_Artist", slot::kItemArtist},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_Album", slot::kItemAlbum},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_Name", slot::kItemName},

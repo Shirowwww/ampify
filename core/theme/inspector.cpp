@@ -131,4 +131,46 @@ std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options) {
            ",\n  \"resources\": " + JsonLines(resources) + ",\n  \"nodes\": " + JsonLines(list) + "\n}\n";
 }
 
+std::optional<std::vector<NodeInfo>> ReadInspectorTree(std::string_view text, std::string* problem) {
+    auto fail = [&](std::string reason) -> std::optional<std::vector<NodeInfo>> {
+        if (problem) *problem = std::move(reason);
+        return std::nullopt;
+    };
+    std::string error;
+    std::optional<Json> json = Json::Parse(text, &error);
+    if (!json) return fail("not JSON: " + error);
+    const Json* list = json->Find("nodes");
+    if (!list || !list->AsArray()) return fail("no \"nodes\" list: not an inspector.json");
+
+    auto textOf = [](const Json& item, std::string_view key) {
+        const Json* member = item.Find(key);
+        const std::string* value = member ? member->AsString() : nullptr;
+        return value ? *value : std::string();
+    };
+    std::vector<NodeInfo> nodes;
+    std::vector<int> children;  // per node, its children so far
+    for (const Json& item : *list->AsArray()) {
+        const Json* parent = item.Find("parent");
+        const Json* depth = item.Find("depth");
+        if (!parent || !parent->AsNumber() || !depth || !depth->AsNumber()) {
+            return fail("node " + std::to_string(nodes.size()) + " has no parent or depth");
+        }
+        NodeInfo node;
+        node.id = nodes.size() + 1;
+        node.type = textOf(item, "type");
+        node.fullType = textOf(item, "fullType");
+        node.name = textOf(item, "name");
+        node.parent = static_cast<int>(*parent->AsNumber());
+        node.depth = static_cast<int>(*depth->AsNumber());
+        if (node.parent < -1 || node.parent >= static_cast<int>(nodes.size())) {
+            return fail("node " + std::to_string(nodes.size()) + " comes before its parent");
+        }
+        node.position = node.parent < 0 ? 0 : children[node.parent]++;
+        nodes.push_back(std::move(node));
+        children.push_back(0);
+    }
+    for (NodeInfo& node : nodes) node.siblings = node.parent < 0 ? 1 : children[node.parent];
+    return nodes;
+}
+
 }  // namespace ampify::theme

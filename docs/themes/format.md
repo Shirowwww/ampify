@@ -95,6 +95,7 @@ Grid#Bar > TextBlock {
 | `A:hover` | An `A`, while the pointer is over it (see "Hover") |
 | `A:nth-child(2)` | An `A` that is the second child of its parent (counting from 1) |
 | `A:first-child`, `A:last-child` | An `A` that is the first, or the last, child of its parent |
+| `.sidebar`, `.card`... | A stable name for a zone of Apple Music (see [names.md](names.md)) |
 
 You can combine them: `Grid#Bar > TextBlock`, `Grid#TransportBar Button:hover`,
 `Grid#TransportBar > Grid:nth-child(2)`. The structural pseudo-classes reach the many elements Apple Music leaves
@@ -227,6 +228,8 @@ The placement properties (`vertical-alignment`, `horizontal-alignment`, `grid-ro
 Grid#TransportBar, BackDrop { vertical-alignment: bottom; }
 ```
 
+For a whole layout with aligned edges, start from a ready-made one (see "Ready-made layouts" below).
+
 `horizontal-alignment` and `vertical-alignment` place an element in the space its parent gives it. `grid-row`,
 `grid-column` and their `-span` variants move a child of a `Grid` to another cell. They are read only on an element whose
 direct parent is a `Grid`, and refused elsewhere. `z-index` puts an element in front of or behind its neighbors.
@@ -240,6 +243,53 @@ Grid#TransportBar > StackPanel#NowPlayingToggleButtons {
 
 The cells and the number of rows and columns come from the app. The inspector shows `Grid.Row` and `Grid.Column` of
 each element. A cell number that does not exist puts the element in the last cell.
+
+### Ready-made layouts
+
+Moving Apple Music's zones by hand takes many rules that must agree with each other, or the edges stop lining up: a
+sidebar a few pixels shorter than the pages next to it, a bar that overlaps a panel. Ampify ships layouts tuned once,
+which a theme brings in with `@import`:
+
+```css
+:root {
+    --gap: 10;
+    --panel-background: #121212;
+}
+
+@import "ampify:floating-panels";
+@import "ampify:bottom-bar";
+
+/* The theme's own rules come after, so they win over the layouts. */
+.play-button { background: #1ED760; }
+```
+
+`@import url(ampify:bottom-bar);` works too. The rules of a layout take the place of the `@import` in the file, so a
+rule written after it overrides it at equal specificity. The log names them after their layout
+(`ampify:bottom-bar line 12`). Other `@import` statements (a file, a URL) are not supported and are ignored.
+
+| Layout | What it does |
+|---|---|
+| `ampify:floating-panels` | The sidebar and the pages become two rounded panels on the window's background, with even gaps and aligned bottom edges. The frosted layer goes, and the page tops shrink to the gap. |
+| `ampify:bottom-bar` | The playback bar moves to the bottom, across the whole window: the song on the left, its title next to its artwork, the buttons in the middle, volume and toggles at the right end. Both panels stop above it. Import it after `floating-panels`. |
+
+Each layout reads variables that the theme may set in its `:root`, with these defaults:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `--window-background` | `#0B0B0D` | The window, around the panels |
+| `--panel-background` | `#17171A` | Both panels |
+| `--panel-radius` | `10px` | Their corners |
+| `--gap` | `8` | The space around the panels |
+| `--gap-half` | `4` | Half of it, between the two panels, so the gap between them equals the others |
+| `--content-top` | `64` | `floating-panels`: where the pages start, below the playback bar at the top |
+| `--page-top` | `8`, or `40` with `bottom-bar` | The space above the first line of a page. With the bar at the bottom, it leaves room for the window's buttons. |
+| `--bar-height` | `72` | `bottom-bar`: the height of the bar |
+| `--bar-room` | `80` | `bottom-bar`: the space the panels leave at the bottom, the bar and a gap |
+| `--bar-reach` | `-298` | `bottom-bar`: how far left the bar reaches past the page column, the sidebar's width and a gap |
+
+Known limit: `--bar-reach` assumes the sidebar is open at its usual width (290 pixels). When Apple Music folds the
+sidebar in a narrow window, the bar reaches past the left edge of the window. There is no `@media` query yet to change
+the value with the width of the window.
 
 ### Acrylic
 
@@ -532,6 +582,9 @@ ampify_theme_check.exe C:\path\to\my-theme [Dark]
 
 The tool prints the schemes, each rule kept with its line, then the problems. It exits with code 0 only if the theme is
 usable and has no problem.
+
+`ampify_theme_check.exe --names <inspector.json>...` checks the stable names against trees saved by the inspector
+(see [names.md](names.md)).
 
 ## Theme parts
 

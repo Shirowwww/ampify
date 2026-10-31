@@ -145,6 +145,13 @@ bool IsLosslessFormat(int32_t format) {
            format == static_cast<int32_t>(amp::AudioFormat::HiResLossless);
 }
 
+std::pair<std::string, std::string> SplitArtistAlbum(const std::string& text) {
+    static const std::string kSeparator = " \xE2\x80\x94 ";  // " \u2014 ", an em dash between spaces
+    size_t at = text.find(kSeparator);
+    if (at == std::string::npos) return {text, ""};
+    return {text.substr(0, at), text.substr(at + kSeparator.size())};
+}
+
 PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit) {
     PlayerSnapshot snapshot;
     snapshot.source = "apple";
@@ -159,7 +166,13 @@ PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit) {
     track.title = reading.title;
     track.artist = reading.artist;
     track.album = reading.album;
-    track.id = TrackIdOf(reading.title, reading.artist, reading.album);
+    // Some items leave the artist empty and only fill the subtitle, "Artist \u2014 Album".
+    if (track.artist.empty() && !reading.subtitle.empty()) {
+        auto [artist, album] = SplitArtistAlbum(reading.subtitle);
+        track.artist = artist;
+        if (track.album.empty()) track.album = album;
+    }
+    track.id = TrackIdOf(track.title, track.artist, track.album);
     track.variantId = VariantOfAudioFormat(reading.audioFormat);
     track.atmos = IsAtmosFormat(reading.audioFormat);
     track.lossless = IsLosslessFormat(reading.audioFormat);

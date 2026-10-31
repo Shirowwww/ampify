@@ -17,6 +17,10 @@ namespace ampify::theme {
 //   Button:hover    a Button, while the pointer is over it (the values come back when it leaves)
 // Attributes and the other pseudo-classes are not supported.
 //
+// A part may also be a stable name, written as a class (`.sidebar`, `.card:hover`, `.playbar Button`): it stands for
+// the path to that zone of Apple Music (builtins.hpp). `@import "ampify:<layout>";` brings in a ready-made layout at
+// that place of the stylesheet, so the rules after it override it.
+//
 // One more block is read: `:root { --name: value; }` defines variables, which values use as `var(--name)` or
 // `var(--name, fallback)`. The variables named --font-<role> describe the font roles (see fonts.hpp).
 
@@ -51,11 +55,12 @@ struct Rule {
     std::vector<Selector> selectors;
     std::vector<Declaration> declarations;
     int line = 0;
+    std::string origin;  // "ampify:<layout>" for a rule brought by @import, empty for the stylesheet's own
 };
 
 struct Stylesheet {
     std::vector<Rule> rules;
-    std::vector<std::string> problems;  // French, with the line number. A bad rule is skipped, the others still load.
+    std::vector<std::string> problems;  // with the line number. A bad rule is skipped, the others still load.
 };
 
 Stylesheet ParseStylesheet(std::string_view css);

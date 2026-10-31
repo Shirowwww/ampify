@@ -37,7 +37,8 @@ constexpr DWORD kCommandTimeoutMs = 3000;
 constexpr unsigned long long kStringsEveryMs = 5000;
 // Apple may fetch the lyrics some seconds after a track starts: asked again every 3 s for about a minute.
 constexpr unsigned long long kLyricsRetryMs = 3000;
-constexpr int kLyricsMaxTries = 20;
+// Apple Music may fetch the lyrics late (when its lyrics panel opens, for example): look for them for 10 minutes.
+constexpr int kLyricsMaxTries = 200;
 
 // Windows.UI.Color, which IArtwork.get_BGColor writes through its out pointer (four bytes, by value).
 struct WinRtColor {
@@ -244,6 +245,7 @@ std::optional<AmpReading> AmpPlayer::Read() {
             m_title = rt::ReadString(item, slot::kItemName);
             m_artist = rt::ReadString(item, slot::kItemArtist);
             m_album = rt::ReadString(item, slot::kItemAlbum);
+            m_subtitle = rt::ReadString(item, slot::kItemSubtitle);
             m_artwork = newest ? ReadArtwork(newest) : ArtworkReading{};
             m_item = itemObject;
             m_itemQueueId = reading.queueItemId;
@@ -258,6 +260,7 @@ std::optional<AmpReading> AmpPlayer::Read() {
         reading.title = m_title;
         reading.artist = m_artist;
         reading.album = m_album;
+        reading.subtitle = m_subtitle;
         reading.artwork = m_artwork;
         reading.lyricsAvailable = m_lyrics.has_value();
     } else {

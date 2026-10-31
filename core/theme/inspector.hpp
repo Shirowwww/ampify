@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "tree.hpp"
@@ -25,6 +27,11 @@ std::string InspectTree(TreeBackend& tree, const InspectOptions& options = {});
 // `id` is a text, because the backend's numbers do not all fit a JSON number. Templates and opaque values read
 // "present", as in inspector.txt. The same element limit applies; `truncated` says when it was reached.
 std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options = {});
+
+// Reads back the `nodes` of inspector.json, for tools that check selectors against a saved tree
+// (`ampify_theme_check --names`). Each node gets its place among its parent's children from the order of the list.
+// Nothing, with `problem` set, for a file that is not such a tree.
+std::optional<std::vector<NodeInfo>> ReadInspectorTree(std::string_view json, std::string* problem = nullptr);
 
 // A selector for the element at `index`: `Type#name` when it has a name, otherwise the chain of types from the
 // nearest named ancestor (or the root) down to the element, joined with `>`.

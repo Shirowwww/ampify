@@ -1,9 +1,11 @@
-/* Hides elements by name. The names come from the inspector: a name that is not there does nothing. */
+/* Hides the buttons and banners most people never use, by their stable names (docs/themes/names.md). Remove a line to
+   bring that element back. */
 
-#AdvertisingBanner {
+.info-bar,
+.reactions-button,
+.share-button,
+.add-description-button,
+.airplay-button,
+.apple-logo {
     visibility: collapsed;
-}
-
-Border#UpsellBanner {
-    visibility: hidden;
 }

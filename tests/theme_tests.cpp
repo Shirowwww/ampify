@@ -12,6 +12,7 @@
 #include "../core/json.hpp"
 #include "../core/manifest.hpp"
 #include "../core/settings.hpp"
+#include "../core/theme/builtins.hpp"
 #include "../core/theme/color.hpp"
 #include "../core/theme/css.hpp"
 #include "../core/theme/commands.hpp"
@@ -333,6 +334,144 @@ TEST_CASE(Css_SkipsBadRulesAndKeepsTheOthers) {
         CHECK(sheet.rules[0].selectors[0].parts[0].name == "A");
         CHECK(sheet.rules[1].declarations.empty());
     }
+}
+
+TEST_CASE(Css_ClassesStandForThePathsToApplesZones) {
+    th::Stylesheet sheet = th::ParseStylesheet(".sidebar { margin: 8 }\n.card:hover, .playbar Button { opacity: 0.5 }\n");
+
+    CHECK(sheet.problems.empty());
+    CHECK(sheet.rules.size() == 2);
+    if (sheet.rules.size() != 2) return;
+
+    const th::Selector& sidebar = sheet.rules[0].selectors.at(0);
+    CHECK(sidebar.text == ".sidebar");
+    CHECK(sidebar.parts.size() == 3);
+    CHECK(sidebar.parts.front().name == "RootSplitView");
+    CHECK(sidebar.parts.back().name == "PaneRoot");
+
+    CHECK(sheet.rules[1].selectors.size() == 2);
+    const th::Selector& card = sheet.rules[1].selectors.at(0);
+    CHECK(card.hover);
+    CHECK(card.parts.back().name == "SquareLockupContent");
+    const th::Selector& button = sheet.rules[1].selectors.at(1);
+    CHECK(button.parts.front().name == "TransportBar");
+    CHECK(button.parts.back().type == "Button");
+    CHECK(button.parts.back().combinator == th::Combinator::Descendant);
+}
+
+TEST_CASE(Css_AClassWithSeveralFormsGivesOneSelectorEach) {
+    th::Stylesheet sheet = th::ParseStylesheet(".page-top-spacer { height: 8 }\n");
+    CHECK(sheet.problems.empty());
+    CHECK(sheet.rules.size() == 1 && sheet.rules[0].selectors.size() == 5);
+}
+
+TEST_CASE(Css_RefusesUnknownAndGluedClassesButKeepsFullTypeNames) {
+    std::string problem;
+    CHECK(!th::ExpandClasses(".nope", &problem));
+    CHECK(problem.find(".nope") != std::string::npos);
+    CHECK(!th::ExpandClasses("Grid.card", &problem));
+    CHECK(problem.find("glued") != std::string::npos);
+    CHECK(!th::ExpandClasses(".Sidebar", &problem));
+
+    std::optional<std::vector<std::string>> full = th::ExpandClasses("Microsoft.UI.Xaml.Controls.Grid > .lcd");
+    CHECK(full && full->size() == 1 && full->at(0).starts_with("Microsoft.UI.Xaml.Controls.Grid > NowPlayingControl"));
+
+    th::Stylesheet sheet = th::ParseStylesheet(".nope, Grid { margin: 1 }\nGrid#A { margin: 2 }\n");
+    CHECK(sheet.problems.size() == 1);
+    CHECK(sheet.rules.size() == 1);
+}
+
+TEST_CASE(Css_ImportBringsAReadyMadeLayoutAtItsPlace) {
+    th::Stylesheet sheet = th::ParseStylesheet(
+        "@import \"ampify:floating-panels\";\n@import url(ampify:bottom-bar);\n.sidebar { margin: 1 }\n");
+
+    CHECK(sheet.problems.empty());
+    CHECK(sheet.rules.size() > 3);
+    if (sheet.rules.size() < 3) return;
+    CHECK(sheet.rules.front().origin == "ampify:floating-panels");
+    CHECK(sheet.rules[sheet.rules.size() - 2].origin == "ampify:bottom-bar");
+    CHECK(sheet.rules.back().origin.empty());  // the stylesheet's own rule comes last, so it wins at equal weight
+
+    th::Stylesheet unknown = th::ParseStylesheet("@import \"ampify:nope\";\n@import url(x.css);\nGrid { margin: 1 }\n");
+    CHECK(unknown.problems.size() == 2);
+    CHECK(!unknown.problems.empty() && unknown.problems[0].find("bottom-bar") != std::string::npos);
+    CHECK(unknown.rules.size() == 1);
+}
+
+TEST_CASE(Builtins_EveryClassAndLayoutIsValid) {
+    for (const std::string& name : th::ClassNames()) {
+        std::optional<std::vector<std::string>> selectors = th::ClassSelectors(name);
+        CHECK(selectors && !selectors->empty());
+        if (!selectors) continue;
+        for (const std::string& selector : *selectors) {
+            std::string problem;
+            CHECK(th::ParseSelector(selector, &problem));
+            CHECK(problem.empty());
+        }
+    }
+    for (const std::string& name : th::BuiltinStylesheetNames()) {
+        th::Stylesheet sheet = th::ParseStylesheet(*th::BuiltinStylesheet(name));
+        CHECK(sheet.problems.empty());
+        for (const th::Rule& rule : sheet.rules) {
+            for (const th::Declaration& declaration : rule.declarations) CHECK(th::FindProperty(declaration.property));
+        }
+    }
+}
+
+TEST_CASE(Builtins_EveryClassAndLayoutIsDocumented) {
+    auto read = [](const char* relative) {
+        std::ifstream in(std::filesystem::path(AMPIFY_SOURCE_DIR) / relative, std::ios::binary);
+        std::stringstream text;
+        text << in.rdbuf();
+        return text.str();
+    };
+    std::string names = read("docs/themes/names.md");
+    std::string format = read("docs/themes/format.md");
+    CHECK(!names.empty() && !format.empty());
+    std::string undocumented;  // the classes missing from names.md, kept to read in a debugger
+    for (const std::string& name : th::ClassNames()) {
+        if (names.find("`." + name + "`") == std::string::npos) undocumented += " ." + name;
+    }
+    CHECK(undocumented.empty());
+    for (const std::string& name : th::BuiltinStylesheetNames()) CHECK(format.find("`ampify:" + name + "`") != std::string::npos);
+}
+
+TEST_CASE(Theme_ALayoutTakesTheThemesVariablesAndReportsUnderItsName) {
+    MemoryFiles files;
+    files.files["user.css"] = ":root { --gap: 12; --panel-background: #FF112233; }\n@import \"ampify:floating-panels\";\n";
+
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+    bool sawSidebar = false;
+    for (const th::Assignment& assignment : theme.assignments) {
+        if (assignment.selector.text != ".sidebar") continue;
+        CHECK(assignment.source == "ampify:floating-panels");
+        if (assignment.property == "Margin") {
+            sawSidebar = true;
+            CHECK(assignment.value.text == "12,12,4,12");  // XAML order: left, top, right, bottom
+        }
+    }
+    CHECK(sawSidebar);
+}
+
+TEST_CASE(Inspector_ReadsASavedTreeWithEachPlace) {
+    std::optional<std::vector<th::NodeInfo>> nodes = th::ReadInspectorTree(R"({"version":1,"nodes":[
+        {"index":0,"type":"Grid","fullType":"","name":"TransportBar","parent":-1,"depth":0},
+        {"index":1,"type":"Grid","name":"","parent":0,"depth":1},
+        {"index":2,"type":"Grid","name":"","parent":0,"depth":1},
+        {"index":3,"type":"TextBlock","name":"Title","parent":2,"depth":2}]})");
+
+    CHECK(nodes && nodes->size() == 4);
+    if (!nodes || nodes->size() != 4) return;
+    CHECK((*nodes)[2].position == 1 && (*nodes)[2].siblings == 2);
+    CHECK((*nodes)[3].position == 0 && (*nodes)[3].siblings == 1);
+    std::optional<th::Selector> second = th::ParseSelector("Grid#TransportBar > Grid:nth-child(2)");
+    CHECK(second && th::Matches(*second, *nodes, 2) && !th::Matches(*second, *nodes, 1));
+
+    std::string problem;
+    CHECK(!th::ReadInspectorTree("{\"nodes\":[{\"type\":\"Grid\",\"parent\":3,\"depth\":0}]}", &problem));
+    CHECK(problem.find("before its parent") != std::string::npos);
+    CHECK(!th::ReadInspectorTree("[]", &problem));
 }
 
 // --- Selectors and specificity ---------------------------------------------------------------------------

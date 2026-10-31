@@ -1,17 +1,8 @@
-/* Glass: a complete redesign of the interface. Gradient and acrylic backgrounds, large rounded cards, larger and
+/* Glass: a complete redesign of the interface. A night gradient behind frosted panels, large rounded cards, larger and
    airier text, buttons that grow on hover, shadows under the cards.
 
-   Selectors. The names come from the inspector on Apple Music 1.1792: MainSidebar, NavView, PaneRoot,
-   PaneHeaderGrid, AppName, MenuItemsHost, TransportBar, TransportControl, LCD, ActualArtwork, NowPlayingToggleButtons,
-   ContentSplitView, ContentRoot, ContentFrame, Titlebar, and the types Sidebar, BackDrop, NowPlayingControl,
-   TickerTapeControl, ArtworkImage, ContentPage, NavigationViewItem. They may change with each update of the app.
-
-   PROVISIONAL: the rules that only target a generic type (Button, ToggleButton, AppBarButton, ListViewItem,
-   GridViewItem, TextBlock) under a named parent. The page cards (albums, playlists) have not been recorded yet:
-   their names will be added from the inspector (theme.inspect = 1, logs\inspector.txt).
-
-   Names like Grid#RootGrid, Border#Root or ContentPresenter#ContentPresenter come from control templates and
-   repeat dozens of times: they are never targeted alone, always under a named parent. */
+   The floating-panels layout lines the panels up (docs/themes/format.md, "Ready-made layouts"); the classes are
+   Ampify's stable names for Apple Music's zones (docs/themes/names.md). */
 
 :root {
     --font-title: "Segoe UI Variable Display";
@@ -19,73 +10,64 @@
     --font-title-size: 30px;
     --font-body: "Segoe UI Variable Text";
     --font-body-size: 15px;
-    --radius-card: 18px;
+    --window-background: linear-gradient(135deg, #0E1424 0%, #1A2240 55%, #2A1F45 100%);
+    --panel-radius: 18px;
+    --gap: 12;
+    --gap-half: 6;
     --radius-button: 12px;
     --glass: acrylic($LayerFillColorDefaultBrush, 0.55);
 }
 
-/* The window background: a night blue gradient, diagonal. */
-ContentPage {
-    background: linear-gradient(135deg, #0E1424 0%, #1A2240 55%, #2A1F45 100%);
-}
+@import "ampify:floating-panels";
 
-Border#Titlebar {
-    background: transparent;
-}
+/* ---- Sidebar: frosted glass ---------------------------------------------------------------------------------------- */
 
-/* Sidebar: frosted glass, corners rounded on the content side. */
-Grid#PaneRoot {
+.sidebar {
     backdrop: var(--glass);
-    corner-radius: 0 var(--radius-card) var(--radius-card) 0;
 }
 
-Grid#PaneHeaderGrid {
+.sidebar-header {
     padding: 12 16 8 16;
 }
 
-TextBlock#AppName {
+.app-name {
     font-role: title;
     font-size: 22px;
 }
 
-ItemsRepeater#MenuItemsHost NavigationViewItem {
+.sidebar-items NavigationViewItem {
     corner-radius: var(--radius-button);
     margin: 3 10;
     font-size: 15px;
     transform-origin: left center;
 }
 
-ItemsRepeater#MenuItemsHost NavigationViewItem:hover {
+.sidebar-items NavigationViewItem:hover {
     transform: translateX(4px) scale(1.02);
 }
 
-/* Playback bar (at the top in Apple Music): a strip of glass, set above the content. */
-BackDrop {
-    background: linear-gradient(to right, #CC182238, #CC22304F);
-}
+/* ---- Playback bar, at the top, above the pages ------------------------------------------------------------------- */
 
-Grid#TransportBar {
+.playbar {
     backdrop: var(--glass);
     padding: 6 12;
-    box-shadow: 16px;
-    /* No z-index: Apple Music sets it to 10 (BackDrop to 9) so it stays above the pages. */
 }
 
-TransportControl#TransportControl AppBarButton,
-TransportControl#TransportControl ToggleButton,
-TransportControl#TransportControl Button {
+.transport AppBarButton,
+.transport ToggleButton,
+.transport Button {
     corner-radius: 50;
     transform-origin: center;
 }
 
-TransportControl#TransportControl AppBarButton:hover,
-TransportControl#TransportControl ToggleButton:hover,
-TransportControl#TransportControl Button:hover {
+.transport AppBarButton:hover,
+.transport ToggleButton:hover,
+.transport Button:hover {
     transform: scale(1.15);
 }
 
-/* The LCD at the center of the bar: a light, rounded card with a shadow. */
-NowPlayingControl#LCD > Grid#LCD {
+/* The display of the song: a light, rounded card with a shadow. */
+.lcd {
     corner-radius: 14px;
     background: linear-gradient(180deg, #33FFFFFF, #14FFFFFF);
     border-color: #40FFFFFF;
@@ -93,67 +75,74 @@ NowPlayingControl#LCD > Grid#LCD {
     box-shadow: 12px;
 }
 
-ArtworkImage#ActualArtwork {
+.lcd-artwork-image {
     box-shadow: 8px;
     transform-origin: center;
 }
 
-ArtworkImage#ActualArtwork:hover {
+.lcd-artwork-image:hover {
     transform: scale(1.08);
 }
 
-TickerTapeControl#TrackTitleTickerTape {
+.track-title {
     font-size: 15px;
     font-weight: 600;
 }
 
-StackPanel#NowPlayingToggleButtons ToggleButton {
+.playbar-toggles ToggleButton {
     corner-radius: var(--radius-button);
     transform-origin: center;
 }
 
-StackPanel#NowPlayingToggleButtons ToggleButton:hover {
+.playbar-toggles ToggleButton:hover {
     transform: scale(1.12);
 }
 
-/* The content: a large glass card, detached from the edges, with a deep shadow. Grid#ContentRoot alone would also
-   target the NavigationView (which carries the playback bar) and the playback buttons: always under the SplitView. */
-SplitView#ContentSplitView > Grid > Grid#ContentRoot {
-    margin: 10 12 12 6;
-    corner-radius: var(--radius-card);
+/* ---- Pages: a large glass card ------------------------------------------------------------------------------------- */
+
+.content {
     backdrop: acrylic($CardBackgroundFillColorDefaultBrush, 0.4);
     box-shadow: 24px;
 }
 
 /* The font only: a common size would overwrite the page titles. */
-Frame#ContentFrame TextBlock {
+.content-frame TextBlock {
     font-family: var(--font-body);
 }
 
-/* Provisional: the cells of the page's lists and grids, until their real names are known. */
-Frame#ContentFrame ListViewItem,
-Frame#ContentFrame GridViewItem {
+.card {
     corner-radius: 14px;
-    margin: 4;
     transform-origin: center;
+    transition: transform 160ms;
 }
 
-Frame#ContentFrame GridViewItem:hover {
+.card:hover {
     transform: scale(1.04);
     box-shadow: 20px;
 }
 
-Frame#ContentFrame ListViewItem:hover {
+.artwork {
+    corner-radius: 12px;
+}
+
+.track-row {
+    corner-radius: 10px;
+    transition: background 120ms;
+}
+
+.track-row:hover {
     background: #1AFFFFFF;
 }
 
-/* Provisional: the page buttons (Play, Shuffle…). */
-Frame#ContentFrame Button {
+.album-play-button,
+.album-shuffle-button {
     corner-radius: var(--radius-button);
     padding: 10 20;
     transform-origin: center;
+    transition: transform 120ms;
 }
 
-Frame#ContentFrame Button:hover {
+.album-play-button:hover,
+.album-shuffle-button:hover {
     transform: scale(1.05);
 }

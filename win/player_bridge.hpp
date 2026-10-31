@@ -83,6 +83,8 @@ private:
     bool m_probed = false;
     std::string m_lastSource = "?";
     AmpTimeUnit m_unit = AmpTimeUnit::Unknown;
+    uint64_t m_coverLoggedItem = 0;  // the queue item whose raw cover went to the log
+    int m_coverLogs = 0;
     PlayerSnapshot m_last;
 };
 

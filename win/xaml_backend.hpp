@@ -151,6 +151,9 @@ private:
     std::map<theme::NodeId, std::string> m_transitions;
     std::map<theme::NodeId, TransitionOriginals> m_transitionOriginals;
     std::map<theme::NodeId, std::string> m_facadeTransforms;
+    // The origins an element refused because its transform goes through Scale and Translation: the facade turns
+    // around them instead (WriteAnimatedTransform).
+    std::map<theme::NodeId, winrt::Windows::Foundation::Point> m_facadeOrigins;
 };
 
 }  // namespace ampify::win

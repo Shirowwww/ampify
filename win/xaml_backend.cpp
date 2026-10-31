@@ -565,6 +565,8 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
     } else if (property == "Foreground") {
         if (auto control = object.try_as<controls::Control>()) return brush(control.Foreground());
         if (auto text = object.try_as<controls::TextBlock>()) return brush(text.Foreground());
+        if (auto icon = object.try_as<controls::IconElement>()) return brush(icon.Foreground());
+        if (auto presenter = object.try_as<controls::ContentPresenter>()) return brush(presenter.Foreground());
     } else if (property == "BorderBrush") {
         if (auto control = object.try_as<controls::Control>()) return brush(control.BorderBrush());
         if (auto border = object.try_as<controls::Border>()) return brush(border.BorderBrush());
@@ -642,7 +644,9 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         }
     } else if (property == "RenderTransformOrigin") {
         if (auto element = object.try_as<xaml::UIElement>()) {
-            winrt::Windows::Foundation::Point origin = element.RenderTransformOrigin();
+            auto kept = m_facadeOrigins.find(id);
+            winrt::Windows::Foundation::Point origin = kept != m_facadeOrigins.end() ? kept->second
+                                                                                      : element.RenderTransformOrigin();
             return theme::Value{theme::ValueKind::Point, FractionText(origin.X) + "," + FractionText(origin.Y)};
         }
     } else if (property == "Shadow") {
@@ -745,7 +749,11 @@ bool XamlTreeBackend::WriteAnimatedTransform(theme::NodeId id, const xaml::UIEle
         return false;
     }
     try {
-        auto origin = element.RenderTransformOrigin();
+        // CSS scales around the centre by default, XAML around the top left corner: an origin left at 0,0 means the
+        // theme did not choose one.
+        auto kept = m_facadeOrigins.find(id);
+        auto origin = kept != m_facadeOrigins.end() ? kept->second : element.RenderTransformOrigin();
+        if (origin.X == 0 && origin.Y == 0) origin = {0.5f, 0.5f};
         auto size = element.ActualSize();
         element.CenterPoint({size.x * origin.X, size.y * origin.Y, 0});
         element.Scale({static_cast<float>(parts[0]), static_cast<float>(parts[1]), 1});
@@ -801,6 +809,11 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         } else if (property == "Foreground") {
             if (auto control = object.try_as<controls::Control>()) { control.Foreground(*target); written = true; }
             else if (auto text = object.try_as<controls::TextBlock>()) { text.Foreground(*target); written = true; }
+            else if (auto icon = object.try_as<controls::IconElement>()) { icon.Foreground(*target); written = true; }
+            else if (auto presenter = object.try_as<controls::ContentPresenter>()) {
+                presenter.Foreground(*target);
+                written = true;
+            }
         } else {
             if (auto control = object.try_as<controls::Control>()) { control.BorderBrush(*target); written = true; }
             else if (auto border = object.try_as<controls::Border>()) { border.BorderBrush(*target); written = true; }
@@ -978,7 +991,14 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         std::vector<double> point = Numbers(value.text, ',');
         auto element = object.try_as<xaml::UIElement>();
         if (!element || point.size() != 2) return false;
-        element.RenderTransformOrigin(winrt::Windows::Foundation::Point{static_cast<float>(point[0]), static_cast<float>(point[1])});
+        winrt::Windows::Foundation::Point origin{static_cast<float>(point[0]), static_cast<float>(point[1])};
+        try {
+            element.RenderTransformOrigin(origin);
+            m_facadeOrigins.erase(id);
+        } catch (...) {
+            // Apple Music animates some elements through Scale and Translation, and WinUI then refuses this property.
+            m_facadeOrigins[id] = origin;
+        }
         return true;
     }
 

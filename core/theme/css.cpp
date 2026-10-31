@@ -2,6 +2,8 @@
 
 #include <cctype>
 
+#include "builtins.hpp"
+
 namespace ampify::theme {
 
 namespace {
@@ -126,6 +128,48 @@ std::vector<Declaration> ParseDeclarations(std::string_view body, size_t bodyOff
     return declarations;
 }
 
+constexpr std::string_view kBuiltinPrefix = "ampify:";
+
+// The layout named by `@import "ampify:<name>"` or `@import url(ampify:<name>)`, or nothing for another statement.
+std::optional<std::string> BuiltinImport(std::string_view statement) {
+    const std::string_view keyword = "@import";
+    if (LowerCopy(statement.substr(0, keyword.size())) != keyword) return std::nullopt;
+
+    std::string_view target = Trimmed(statement.substr(keyword.size()));
+    if (LowerCopy(target.substr(0, 4)) == "url(" && target.ends_with(')')) {
+        target = Trimmed(target.substr(4, target.size() - 5));
+    }
+    if (target.size() >= 2 && (target.front() == '"' || target.front() == '\'') && target.back() == target.front()) {
+        target = target.substr(1, target.size() - 2);
+    }
+    if (LowerCopy(target.substr(0, kBuiltinPrefix.size())) != kBuiltinPrefix) return std::nullopt;
+    return LowerCopy(target.substr(kBuiltinPrefix.size()));
+}
+
+std::string LayoutList() {
+    std::string list;
+    for (const std::string& name : BuiltinStylesheetNames()) list += (list.empty() ? "" : ", ") + name;
+    return list;
+}
+
+// The selectors of a rule head, each class replaced by the path it stands for. Nothing, with `problem` set, when one
+// of them is wrong: the whole rule is then skipped, as in CSS.
+std::optional<std::vector<Selector>> ParseSelectorList(std::string_view head, std::string& problem) {
+    std::vector<Selector> selectors;
+    for (const Piece& piece : SplitTopLevel(head, ',')) {
+        std::string_view written = Trimmed(piece.text);
+        std::optional<std::vector<std::string>> expanded = ExpandClasses(written, &problem);
+        if (!expanded) return std::nullopt;
+        for (const std::string& text : *expanded) {
+            std::optional<Selector> selector = ParseSelector(text, &problem);
+            if (!selector) return std::nullopt;
+            selector->text = std::string(written);  // the log shows the class, not the long path
+            selectors.push_back(std::move(*selector));
+        }
+    }
+    return selectors;
+}
+
 }  // namespace
 
 std::optional<Selector> ParseSelector(std::string_view text, std::string* problem) {
@@ -241,9 +285,26 @@ Stylesheet ParseStylesheet(std::string_view css) {
         size_t semicolon = clean.find(';', pos);
         if (semicolon != std::string::npos && (open == std::string::npos || semicolon < open)) {
             std::string_view statement = Trimmed(std::string_view(clean).substr(pos, semicolon - pos));
-            sheet.problems.push_back("line " + std::to_string(line) + ": rule \"" + std::string(statement) +
-                                     "\" is not supported, ignored");
             pos = semicolon + 1;
+            std::optional<std::string> layout = BuiltinImport(statement);
+            if (!layout) {
+                sheet.problems.push_back("line " + std::to_string(line) + ": rule \"" + std::string(statement) +
+                                         "\" is not supported, ignored");
+                continue;
+            }
+            std::optional<std::string_view> builtin = BuiltinStylesheet(*layout);
+            if (!builtin) {
+                sheet.problems.push_back("line " + std::to_string(line) + ": layout \"ampify:" + *layout +
+                                         "\" is unknown (" + LayoutList() + "), ignored");
+                continue;
+            }
+            // Layouts hold no @import, so this goes one level deep.
+            Stylesheet imported = ParseStylesheet(*builtin);
+            for (Rule& rule : imported.rules) {
+                rule.origin = "ampify:" + *layout;
+                sheet.rules.push_back(std::move(rule));
+            }
+            for (const std::string& problem : imported.problems) sheet.problems.push_back("ampify:" + *layout + " " + problem);
             continue;
         }
 
@@ -275,18 +336,14 @@ Stylesheet ParseStylesheet(std::string_view css) {
             sheet.rules.push_back(std::move(rule));
             continue;
         }
-        bool selectorsOk = true;
-        for (const Piece& piece : SplitTopLevel(head, ',')) {
-            std::string problem;
-            std::optional<Selector> selector = ParseSelector(piece.text, &problem);
-            if (!selector) {
-                sheet.problems.push_back("line " + std::to_string(line) + ": " + problem + ", rule ignored");
-                selectorsOk = false;
-                break;
-            }
-            rule.selectors.push_back(std::move(*selector));
+        std::string problem;
+        std::optional<std::vector<Selector>> selectors = ParseSelectorList(head, problem);
+        if (!selectors) {
+            sheet.problems.push_back("line " + std::to_string(line) + ": " + problem + ", rule ignored");
+            continue;
         }
-        if (!selectorsOk || rule.selectors.empty()) continue;
+        if (selectors->empty()) continue;
+        rule.selectors = std::move(*selectors);
 
         rule.declarations = ParseDeclarations(body, open + 1, clean, sheet.problems);
         sheet.rules.push_back(std::move(rule));
