@@ -51,6 +51,9 @@ struct ScriptBridge {
     // Kernel services.
     static Host& HostOf(ScriptExtension* ext) { return ext->m_host; }
     static Journal& JournalOf(ScriptExtension* ext) { return ext->m_journal; }
+    static uint32_t SubmitHttp(ScriptExtension* ext, std::function<HttpResponse()> request) {
+        return ext->SubmitHttp(std::move(request));
+    }
     static std::chrono::steady_clock::time_point Now(ScriptExtension* ext) { return ext->m_clock(); }
 
     // State of the built-in modules, kept by ScriptExtension.

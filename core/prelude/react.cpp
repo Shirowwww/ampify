@@ -508,6 +508,16 @@ const char kReact[] = R"AMPIFYJS(
     });
   }
 
+  // The element opens one of its pages: the page mounts anew, as a Spicetify custom app does when the user comes back
+  // to it, so its state starts over and its effects run again (a page that reads data on mount shows fresh data).
+  dispatch.pageShow = (path) => {
+    const root = roots.get("page:" + path);
+    if (!root || root.dead || !root.children) return;
+    for (const child of root.children.values()) unmount(child);
+    root.children = null;
+    schedule(root);
+  };
+
   // The element stops: every effect cleanup runs. The interface itself is removed by the module ui.
   Ampify.onStop(() => {
     for (const root of roots.values()) destroy(root);

@@ -82,6 +82,7 @@ public:
     virtual void UnregisterKeys(const std::string& elementId) = 0;
 
     // Only https hosts that the manifest declares reach this call. The kernel does not follow other hosts.
+    // Called from a worker thread of the element, possibly several at once: it must be safe to call concurrently.
     virtual HttpResponse HttpGet(const std::string& url) = 0;
 
     // The interface that the elements add to. Thread-safe: the host renders it, and the tests read it.

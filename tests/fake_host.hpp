@@ -2,7 +2,10 @@
 
 // A Host for the tests: everything in memory, and every call is recorded so that a test can check it.
 
+#include <chrono>
+#include <condition_variable>
 #include <map>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -74,10 +77,41 @@ struct FakeHost : Host {
         }
     }
 
+    // Requests come from a worker thread. A test that holds the gate shut makes them wait, as a slow network would
+    // (at most kHttpHoldLimit, so a test that forgets to release does not hang).
+    static constexpr std::chrono::seconds kHttpHoldLimit{5};
+    void HoldHttp() {
+        std::lock_guard<std::mutex> lock(httpMutex);
+        httpHeld = true;
+    }
+    void ReleaseHttp() {
+        {
+            std::lock_guard<std::mutex> lock(httpMutex);
+            httpHeld = false;
+        }
+        httpChanged.notify_all();
+    }
+    // True once `count` requests have reached the host, or false after the hold limit.
+    bool WaitForRequests(size_t count) {
+        std::unique_lock<std::mutex> lock(httpMutex);
+        return httpChanged.wait_for(lock, kHttpHoldLimit, [&] { return requestedUrls.size() >= count; });
+    }
+    size_t RequestCount() {
+        std::lock_guard<std::mutex> lock(httpMutex);
+        return requestedUrls.size();
+    }
+
     HttpResponse HttpGet(const std::string& url) override {
+        std::unique_lock<std::mutex> lock(httpMutex);
         requestedUrls.push_back(url);
+        httpChanged.notify_all();
+        httpChanged.wait_for(lock, kHttpHoldLimit, [this] { return !httpHeld; });
         return httpResponse;
     }
+
+    std::mutex httpMutex;  // guards requestedUrls and httpHeld (and the posts of ServiceHost)
+    std::condition_variable httpChanged;
+    bool httpHeld = false;
 
     // Optional audio: a test that sets it (usually to an ampify::audio::AudioEngine it feeds) offers AudioHost.
     AudioHost* audio = nullptr;

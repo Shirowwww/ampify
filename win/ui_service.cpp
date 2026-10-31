@@ -39,6 +39,7 @@
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Windows.System.h>
 
 #include "../core/ui_render/mods.hpp"
@@ -226,6 +227,14 @@ struct WindowContext {
     controls::Grid pageHost{nullptr};      // strong, like the panels: see MountedSurface
     controls::Border pageSlot{nullptr};
     controls::TextBlock pageTitle{nullptr};
+    // While an app page shows, Apple Music's page under it is hidden, so the theme's panel shows through the host, and
+    // Apple Music's navigation closes the app page. Strong until the app page closes (UncoverApplePage).
+    controls::Frame coveredFrame{nullptr};
+    double coveredOpacity = 1.0;
+    winrt::event_token coveredNavigated{};
+    controls::NavigationView coveredSidebar{nullptr};  // its item already selected does not navigate: watched too
+    winrt::event_token coveredInvoked{};
+    media::Brush pageBackground{nullptr};  // the host's own, when Apple Music's page cannot be hidden
     // The fullscreen view: a Popup of the window over all of its content, strong like the other hosts.
     primitives::Popup fullscreenPopup{nullptr};
     controls::Grid fullscreenHost{nullptr};
@@ -365,12 +374,15 @@ void ClearWatches(WindowContext& context) {
     context.watched.clear();
 }
 
+void UncoverApplePage(WindowContext& context) noexcept;
+
 // Drops what the window holds of XAML: the watches, the panel popup, the renderers and their controls, the placed
 // buttons. Interface thread only: XAML objects must not be released from the worker, which drops the contexts of
 // closed or replaced windows (DiscoverWindows).
 void ReleaseXaml(WindowContext& context) noexcept {
     try {
         ClearWatches(context);
+        UncoverApplePage(context);
         if (context.panelPopup) context.panelPopup.IsOpen(false);
         if (context.pagePopup) context.pagePopup.IsOpen(false);
         if (context.fullscreenPopup) context.fullscreenPopup.IsOpen(false);
@@ -385,6 +397,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
         context.pageHost = nullptr;
         context.pageSlot = nullptr;
         context.pageTitle = nullptr;
+        context.pageBackground = nullptr;
         context.sidebarHost = nullptr;
         context.sidebarOriginal = nullptr;
         context.surfaces.clear();
@@ -1033,11 +1046,72 @@ void PlacePageHost(WindowContext& context, const xaml::XamlRoot& root) {
     if (context.pagePopup.VerticalOffset() != area.top) context.pagePopup.VerticalOffset(area.top);
 }
 
+// Shows Apple Music's page again, and gives the host its own background back. Safe to call when nothing is covered.
+void UncoverApplePage(WindowContext& context) noexcept {
+    try {
+        if (auto frame = std::exchange(context.coveredFrame, nullptr)) {
+            frame.Navigated(context.coveredNavigated);
+            frame.Opacity(context.coveredOpacity);
+        }
+        if (auto sidebar = std::exchange(context.coveredSidebar, nullptr)) sidebar.ItemInvoked(context.coveredInvoked);
+        if (context.pageHost && context.pageBackground) context.pageHost.Background(context.pageBackground);
+    } catch (...) {
+    }
+}
+
 void ShowPageHost(WindowContext& context, bool visible) {
     if (!context.pagePopup || !context.pageHost) return;
     context.pageHost.Visibility(visible ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
-    if (visible) OpenOverlay(context, context.pagePopup);
-    else if (context.pagePopup.IsOpen()) context.pagePopup.IsOpen(false);
+    if (visible) {
+        OpenOverlay(context, context.pagePopup);
+        return;
+    }
+    UncoverApplePage(context);
+    if (context.pagePopup.IsOpen()) context.pagePopup.IsOpen(false);
+}
+
+// Hides Apple Music's page under the shown app page: the host turns see-through, so the app page sits on the theme's
+// panel (its colour, acrylic, corners) as Apple Music's pages do. A navigation of Apple Music (sidebar, back arrow,
+// search) closes the app page, as leaving a Spicetify app does.
+void CoverApplePage(const std::shared_ptr<WindowContext>& owner) {
+    WindowContext& context = *owner;
+    std::optional<int> index = uirender::FindByName(context.probe, "ContentFrame");
+    if (!index || *index >= static_cast<int>(context.probeObjects.size()) || !context.pageHost) return;
+    auto frame = context.probeObjects[*index].get().try_as<controls::Frame>();
+    if (!frame || frame == context.coveredFrame) return;
+    UncoverApplePage(context);
+    WeakContext weakContext = owner;
+    auto leave = [weakContext]() noexcept {
+        try {
+            if (auto live = weakContext.lock()) {
+                live->pageClosed = true;
+                ShowPageHost(*live, false);
+            }
+        } catch (...) {
+        }
+    };
+    context.coveredNavigated = frame.Navigated(
+        [leave](IInspectable const&, xaml::Navigation::NavigationEventArgs const&) noexcept { leave(); });
+    if (std::optional<int> nav = uirender::FindByName(context.probe, "NavView");
+        nav && *nav < static_cast<int>(context.probeObjects.size())) {
+        if (auto sidebar = context.probeObjects[*nav].get().try_as<controls::NavigationView>()) {
+            // A folder of the sidebar that only opens or closes leaves the page where it is.
+            using InvokedArgs = controls::NavigationViewItemInvokedEventArgs;
+            context.coveredInvoked = sidebar.ItemInvoked([leave](IInspectable const&, InvokedArgs const& args) noexcept {
+                try {
+                    auto item = args.InvokedItemContainer().try_as<controls::NavigationViewItem>();
+                    if (args.IsSettingsInvoked() || !item || item.SelectsOnInvoked()) leave();
+                } catch (...) {
+                }
+            });
+            context.coveredSidebar = sidebar;
+        }
+    }
+    context.coveredFrame = frame;
+    context.coveredOpacity = frame.Opacity();
+    frame.Opacity(0);
+    if (!context.pageBackground) context.pageBackground = context.pageHost.Background();
+    context.pageHost.Background(media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));  // still takes clicks
 }
 
 // The host of an app page: a Popup of the window over the content area while the route points to the page (Apple
@@ -1126,7 +1200,10 @@ void MountPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& 
     mounted.title = context->pageTitle;
     uirender::PatchStats stats = RenderInto(shared, mounted, surface);
     mounted.mounted = true;
-    if (!context->pageClosed) ShowPageHost(*context, true);
+    if (!context->pageClosed) {
+        ShowPageHost(*context, true);
+        CoverApplePage(context);
+    }
     JournalRender(shared, "page", surface, stats, first);
 }
 
@@ -1713,6 +1790,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         context->discoverDirty = true;
         context->surfaces.clear();
         context->placed.clear();
+        UncoverApplePage(*context);
         try {
             if (context->panelPopup) context->panelPopup.IsOpen(false);  // the overlays of the old content
             if (context->pagePopup) context->pagePopup.IsOpen(false);
@@ -1727,6 +1805,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         context->pageHost = nullptr;
         context->pageSlot = nullptr;
         context->pageTitle = nullptr;
+        context->pageBackground = nullptr;
         context->rootLayoutActive = false;
         // LayoutUpdated until the content is mounted: the first pages appear a few layout passes later.
         if (auto element = content.try_as<xaml::FrameworkElement>()) {

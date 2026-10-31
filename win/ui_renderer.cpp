@@ -446,6 +446,39 @@ controls::Border MakeCardBorder(const StyleProbe& probe) {
     return card;
 }
 
+// A primary button: the accent brushes in every visual state. Under Apple Music's button style the pointer brought back
+// the plain button's brushes, and a brush set directly stayed the one read when the button was drawn (a dark accent in
+// a light window after a theme change). {ThemeResource} follows the light and dark modes and the theme's colours.
+controls::ControlTemplate PrimaryButtonTemplate() {
+    return LoadXaml<controls::ControlTemplate>(
+        L"<ControlTemplate " + std::wstring(kXmlns) +
+        L" xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'>"
+        L"<Grid x:Name='Root' Background='{ThemeResource AccentFillColorDefaultBrush}'"
+        L" BorderBrush='{ThemeResource AccentControlElevationBorderBrush}' BorderThickness='{TemplateBinding BorderThickness}'"
+        L" CornerRadius='{TemplateBinding CornerRadius}' Padding='{TemplateBinding Padding}'>"
+        L"<VisualStateManager.VisualStateGroups><VisualStateGroup x:Name='CommonStates'>"
+        L"<VisualState x:Name='Normal'/>"
+        L"<VisualState x:Name='PointerOver'><VisualState.Setters>"
+        L"<Setter Target='Root.Background' Value='{ThemeResource AccentFillColorSecondaryBrush}'/>"
+        L"</VisualState.Setters></VisualState>"
+        L"<VisualState x:Name='Pressed'><VisualState.Setters>"
+        L"<Setter Target='Root.Background' Value='{ThemeResource AccentFillColorTertiaryBrush}'/>"
+        L"<Setter Target='Label.Foreground' Value='{ThemeResource TextOnAccentFillColorSecondaryBrush}'/>"
+        L"</VisualState.Setters></VisualState>"
+        L"<VisualState x:Name='Disabled'><VisualState.Setters>"
+        L"<Setter Target='Root.Background' Value='{ThemeResource AccentFillColorDisabledBrush}'/>"
+        L"<Setter Target='Root.BorderBrush' Value='{ThemeResource ControlFillColorTransparentBrush}'/>"
+        L"<Setter Target='Label.Foreground' Value='{ThemeResource TextOnAccentFillColorDisabledBrush}'/>"
+        L"</VisualState.Setters></VisualState>"
+        L"</VisualStateGroup></VisualStateManager.VisualStateGroups>"
+        L"<ContentPresenter x:Name='Label' Content='{TemplateBinding Content}'"
+        L" Foreground='{ThemeResource TextOnAccentFillColorPrimaryBrush}' FontFamily='{TemplateBinding FontFamily}'"
+        L" FontSize='{TemplateBinding FontSize}' FontWeight='{TemplateBinding FontWeight}'"
+        L" HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}'"
+        L" VerticalAlignment='{TemplateBinding VerticalContentAlignment}'/>"
+        L"</Grid></ControlTemplate>");
+}
+
 controls::TextBlock MakeText(const std::wstring& text, const std::string& variant, bool secondary, const StyleProbe* probe) {
     controls::TextBlock block{nullptr};
     if (secondary) {
@@ -904,15 +937,18 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
         // Apple Music's own button style for every variant: its AccentButtonStyle draws text in a symbol font (the
         // label came out as icons on 1.1792). A primary button takes the accent colours on top instead.
         if (probe.button && button.Style() != probe.button) button.Style(probe.button);
-        if (variant == "primary") {
-            if (auto accent = ThemeResource(L"AccentFillColorDefaultBrush").try_as<media::Brush>()) button.Background(accent);
-            if (auto onAccent = ThemeResource(L"TextOnAccentFillColorPrimaryBrush").try_as<media::Brush>()) {
-                button.Foreground(onAccent);
-            }
+        if (variant == "primary" && !m_primaryTemplate) m_primaryTemplate = PrimaryButtonTemplate();
+        if (variant == "primary" && m_primaryTemplate) {
+            if (button.Template() != m_primaryTemplate) button.Template(m_primaryTemplate);
+        } else {
+            button.ClearValue(controls::Control::TemplateProperty());  // a button that was primary before
         }
         if (variant == "tertiary") {
             button.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
             button.BorderThickness(xaml::Thickness{0, 0, 0, 0});
+        } else {
+            button.ClearValue(controls::Control::BackgroundProperty());  // a button that was tertiary before
+            button.ClearValue(controls::Control::BorderThicknessProperty());
         }
         std::string icon = node.Text("icon");
         winrt::hstring label = Wide(node.Text("label"));

@@ -115,16 +115,20 @@ function CatalogCard({ entry, installed, busy, run }) {
         }));
 }
 
+// The page mounts anew each time it opens: it shows the last state read at once, while ampify reads it again.
+let lastState = null;
+
 function Marketplace() {
-  const [state, setState] = useState(null);
-  const [message, setMessage] = useState("Reading the catalog…");
+  const [state, setState] = useState(lastState);
+  const [message, setMessage] = useState(lastState ? "" : "Reading the catalog…");
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
 
   const refresh = () =>
     Ampify.kit.run(["market", "--json"]).then((result) => {
       try {
-        setState(JSON.parse(result.out));
+        lastState = JSON.parse(result.out);
+        setState(lastState);
         setMessage(result.err ? lastLine(result.err) : "");
       } catch (error) {
         setMessage("Cannot read the state of Ampify: " + (lastLine(result.err) || "unreadable reply"));

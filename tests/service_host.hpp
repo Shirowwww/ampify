@@ -51,6 +51,7 @@ struct ServiceHost : FakeHost, HttpPostHost, DiscordHost, TrayHost, MidiHost, Re
     std::filesystem::path outputRoot;
 
     HttpResponse HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) override {
+        std::lock_guard<std::mutex> lock(httpMutex);  // called from a worker thread
         posts.push_back({url, body, headers});
         return postResponse;
     }

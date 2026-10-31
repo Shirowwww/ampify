@@ -32,12 +32,18 @@ Atmos leveler.
   main one, without a title bar (`Ampify.ui.applePlayer.open()`). The view Ampify drew before, the cover on a blurred
   background with the lyrics in time (Apple Music's own, or LRCLIB's), is now the `lyrics-view` example.
 - The Marketplace page, opened from the Ampify entry at the bottom of the sidebar. It reads the public catalog,
-  Shirowwww/ampify-catalog.
+  Shirowwww/ampify-catalog. An app's page mounts anew each time it opens, as a Spicetify app does: the Marketplace
+  showed the theme of its first opening after a change made elsewhere. The page sits on the theme's panel in place of
+  Apple Music's page, and Apple Music's own navigation (sidebar, back arrow, search) leaves it: it used to stay over
+  the page the user had just chosen. Its main buttons keep the accent colour under the pointer and after a theme
+  change: they turned plain, or kept the previous theme's colour.
 - The "Ampify" card in Settings > Playback: one switch per extension, with an immediate effect.
 - The Atmos leveler: Dolby Atmos songs are brought to the level of stereo songs, without ever moving the volume slider.
 - The `ampify` command line and the catalog (`ampify market`, `ampify install`, `ampify update`).
 - The player: current song, play and pause, next song.
 - The installer puts `ampify.exe` next to the kernel, because the Marketplace page runs it.
+- `Ampify.http.get` and `post` no longer block the thread that runs JavaScript: a slow request does not freeze timers or
+  events, and an element may have 4 requests in flight.
 
 ### Preview
 

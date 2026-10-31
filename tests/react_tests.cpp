@@ -488,6 +488,45 @@ TEST_CASE(React_AnAppRenderFunctionGoesToItsPage) {
     element->Stop();
 }
 
+// Opened again, a page mounts anew, as a Spicetify custom app does: its state starts over and its effects run again.
+TEST_CASE(React_APageMountsAgainWhenTheElementOpensIt) {
+    Fixture f;
+    auto element = f.Make("reopen", R"(
+        const { h, useState, useEffect } = Ampify.React;
+        function Home() {
+          const [n, setN] = useState(0);
+          useEffect(() => {
+            Ampify.log("opened");
+            return () => Ampify.log("left");
+          }, []);
+          return h("stack", null,
+            h("button", { label: "Page " + n, onClick: () => setN(n + 1) }),
+            h("button", { label: "again", onClick: () => Ampify.ui.navigate("/reopen") }));
+        }
+        function render() { return h(Home); }
+    )", R"("ui.page")", "app");
+    auto click = [&](const std::string& label) {
+        auto page = f.host.ui.Page("reopen", "/reopen");
+        const ampify::Json* node = page ? FindNode(page->tree, "label", label) : nullptr;
+        const ampify::Json* callback = node ? node->Find("onClick") : nullptr;
+        const double* number = callback ? callback->AsNumber() : nullptr;
+        CHECK(number != nullptr);
+        if (number) element->DeliverClick(static_cast<int>(*number));
+        element->Pump();
+    };
+    CHECK(element->Start());
+    element->Pump();
+    CHECK(f.Count("opened") == 1);
+    click("Page 0");
+    click("again");
+    CHECK(f.Logged("left"));
+    CHECK(f.Count("opened") == 2);
+    CHECK(f.Position("left") < f.out.str().rfind("opened"));
+    auto page = f.host.ui.Page("reopen", "/reopen");
+    CHECK(page && FindNode(page->tree, "label", "Page 0") != nullptr);
+    element->Stop();
+}
+
 TEST_CASE(React_MistakesAreReportedInEnglish) {
     Fixture f;
     auto text = f.Make("badchild", R"(

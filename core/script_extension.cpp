@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "api/module.hpp"
+#include "json.hpp"
 #include "natives/player.hpp"
 
 // The API itself is made of modules: core/api/modules.cpp lists them, core/prelude holds their JavaScript and
@@ -34,7 +35,10 @@ ScriptExtension::ScriptExtension(Manifest manifest, std::filesystem::path folder
       m_clock(clock ? std::move(clock) : [] { return std::chrono::steady_clock::now(); }),
       m_limits(limits) {}
 
-ScriptExtension::~ScriptExtension() { Teardown(); }
+ScriptExtension::~ScriptExtension() {
+    Teardown();
+    m_http.Join();  // bounded by the host's request timeout
+}
 
 std::string ScriptExtension::ConfigPrefix() const {
     return m_manifest.kind == ElementKind::App ? "apps." : "extensions.";
@@ -110,6 +114,7 @@ void ScriptExtension::Teardown() {
     }
     m_runtime.reset();
     m_running = false;
+    m_http.Cancel();
     m_gainDb = 0;
     m_timers.clear();
     m_moduleState.clear();
@@ -154,6 +159,30 @@ void ScriptExtension::Pump() {
 void ScriptExtension::Post(std::function<void()> task) {
     std::lock_guard<std::mutex> lock(m_queueMutex);
     if (m_running) m_queue.push_back(std::move(task));
+}
+
+uint32_t ScriptExtension::SubmitHttp(std::function<HttpResponse()> request) {
+    uint32_t id = m_lastHttpId + 1;
+    uint64_t generation = m_http.Generation();
+    bool started = m_http.Submit([this, id, generation, request = std::move(request)] {
+        HttpResponse response;
+        try {
+            response = request();
+        } catch (const std::exception& error) {
+            response = HttpResponse{0, std::string("network: ") + error.what()};
+        }
+        std::string payload = Json(Json::Object{{"id", static_cast<double>(id)},
+                                                {"status", static_cast<double>(response.status)},
+                                                {"text", response.text}})
+                                  .Dump();
+        // The generation changes at Stop, so an answer of an earlier run never reaches a restarted element.
+        Post([this, generation, payload = std::move(payload)] {
+            if (generation == m_http.Generation()) DispatchEvent("http", payload);
+        });
+    });
+    if (!started) return 0;
+    m_lastHttpId = id;
+    return id;
 }
 
 void ScriptExtension::DeliverPlayer(const std::string& event, const PlayerSnapshot& snapshot) {

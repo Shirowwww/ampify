@@ -4,6 +4,7 @@
 #include <string>
 
 #include "../core/md5.hpp"
+#include "pump.hpp"
 #include "service_host.hpp"
 #include "test.hpp"
 
@@ -47,19 +48,20 @@ TEST_CASE(HttpPost_FollowsTheRulesOfGet) {
           .catch((e) => Ampify.log("line " + e.name));
     )", R"("network:api.example.org")");
     CHECK(element->Start());
-    CHECK(f.Logged("form 201 sent"));
-    CHECK(f.Logged("json 201"));
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("form 201 sent") && f.Logged("json 201"); }));
     CHECK(f.Logged("host PermissionDenied"));
     CHECK(f.Logged("plain TypeError"));
     CHECK(f.Logged("cookie TypeError"));
     CHECK(f.Logged("line TypeError"));
 
+    // The two requests run on their own threads: they reach the host in either order.
     CHECK(f.host.posts.size() == 2);
     if (f.host.posts.size() == 2) {
-        const auto& form = f.host.posts[0];
+        bool formFirst = f.host.posts[0].url == "https://api.example.org/form";
+        const auto& form = f.host.posts[formFirst ? 0 : 1];
         CHECK(form.url == "https://api.example.org/form" && form.body == "a=1&b=2");
         CHECK((form.headers == ampify::HttpHeaders{{"content-type", "application/x-www-form-urlencoded"}}));
-        const auto& json = f.host.posts[1];
+        const auto& json = f.host.posts[formFirst ? 1 : 0];
         CHECK(json.body == R"({"titre":"x"})");
         CHECK((json.headers == ampify::HttpHeaders{{"authorization", "Token k"}, {"content-type", "application/json"}}));
     }
@@ -71,5 +73,5 @@ TEST_CASE(HttpPost_HostWithoutTheServiceAnswersStatusZero) {
         Ampify.http.post("https://api.example.org/", "x").then((r) => Ampify.log("code " + r.status + " " + r.text));
     )", R"("network:api.example.org")");
     CHECK(element->Start());
-    CHECK(f.Logged("code 0 sending is not supported by this host"));
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("code 0 sending is not supported by this host"); }));
 }

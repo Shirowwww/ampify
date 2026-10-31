@@ -477,7 +477,8 @@ Ampify.lyrics.current() -> Promise<lyrics>          // [planned] permission play
 internal APIs: the kernel refuses any host that is not in the permissions of the manifest. `Ampify.http.post` follows the
 same rules (https, declared host). A text body is sent as a form (`application/x-www-form-urlencoded`), and an object is
 sent as JSON. Only the headers `content-type`, `authorization` and `accept` are accepted, with no line break. The body is
-64 KB at most.
+64 KB at most. Both calls return at once: the request runs off the JavaScript thread, so a slow server does not freeze
+the element's timers or events. An element may have 4 requests in flight; the next call rejects with a `RangeError`.
 
 `Ampify.services.call` will not create a new connection: it will call the services the app already uses, and only those
 on the allow-list published with Ampify.
@@ -622,7 +623,10 @@ Rules:
   `"fullscreen:"` (or `"fullscreen"`) for the fullscreen view. The objects `{ panel }`, `{ page }`, `{ popup }` and
   `{ fullscreen: true }` work too. A named popup and the fullscreen view are updated in place at each render, and
   `unmount` closes them. When the user closes the fullscreen view, its root unmounts by itself (effect cleanups run).
-  Unmounting a panel or a page leaves an empty stack there.
+  Unmounting a panel or a page leaves an empty stack there. Each `Ampify.ui.navigate` to a page mounts it anew, as
+  Spotify does with a Spicetify app the user comes back to: its state starts over and its effects run again, so an
+  effect with `[]` that reads data shows fresh data at each visit. A value to keep between visits goes in a variable
+  outside the component.
 - **Errors:** an error in `ReactDOM.render` is thrown, so `main.js` fails with a clear message. An error in a later
   render goes to the log, and the previous tree stays displayed.
 - **Apps:** an app (`kind: app`) that defines a global function `render()`, like a Spicetify app, has what it returns
@@ -668,9 +672,12 @@ A theme is a folder with `colors.ini`, `resources.xaml`, or both, and optionally
 
 An app is an extension that adds a navigation page (`Ampify.ui.page.register`), with an SVG icon in two states (`icon`,
 and `active-icon` planned). It lives in `apps\<id>` and is switched on with `apps.<id>.enabled`
-(`ampify app enable <id>`). In this version its code runs as soon as it is switched on, like an extension. The sidebar
-entry and the opening of the page are not wired yet. An app can have an extension with the same id, which runs at start:
-the two talk through `Ampify.link` (section 5.8). Its code can be split into modules (section 3.6).
+(`ampify app enable <id>`). In this version its code runs as soon as it is switched on, like an extension. The icon does
+not make a sidebar entry yet: the app adds one (`Ampify.ui.sidebar.addItem`) that opens its page with
+`Ampify.ui.navigate("/<path>")`. The page then takes the place of Apple Music's page, on the theme's page panel, with a
+Back button; Apple Music's own navigation (sidebar, back arrow, search) closes it. An app can have an extension with
+the same id, which runs at start: the two talk through `Ampify.link` (section 5.8). Its code can be split into modules
+(section 3.6).
 
 ### 6.3 Snippets [preview]
 
@@ -754,7 +761,7 @@ Nothing is ruled out for good. Each point stays outside API 1.0 for a specific r
 | `audio.setGainDb`: capped by `audio.maxGainDb` (6 dB by default, 12 at most), back to 0 at stop | Done | C++ tests |
 | `notify` (title 120 characters, text 500) | Done. On Windows: a balloon notification (temporary icon, 8 s) and a log line | C++ tests; balloon to check on a PC |
 | `keyboard.bind` (normalized form, an F key, a media key or a modifier is required) | Done. On Windows: `RegisterHotKey`, handed back to the JavaScript thread | C++ tests; simulated press under Wine |
-| `http.get`, `http.post` (https, declared host, 1 MB at most for the reply; 64 KB for a body) | Done. On Windows: WinHTTP, timeout of 5 to 10 s, an error returns status 0 instead of throwing | C++ tests; failure tested under Wine, success to check on a PC |
+| `http.get`, `http.post` (https, declared host, 1 MB at most for the reply; 64 KB for a body) | Done. On Windows: WinHTTP, timeout of 5 to 10 s, an error returns status 0 instead of throwing. The request runs on a worker thread of the element and the promise resolves on a later pump; 4 requests in flight at most per element, answers that come after a stop are dropped | C++ tests; failure tested under Wine, success to check on a PC |
 | `crypto.md5`, `uri.parse`, `uri.build`, `icons.get`, `setTimeout`, `setInterval`, `queueMicrotask`, `console` | Done | C++ tests |
 | ES modules (`"type": "module"`, relative `import` limited to the element's folder, `import()`) | Done | C++ tests, `tools/test_validate.py` |
 | `link.post`, `link.on`, `link.connected`: app and extension with the same id | Done | C++ tests |
@@ -773,6 +780,5 @@ Nothing is ruled out for good. Each point stays outside API 1.0 for a specific r
 | `kit.run` | Done, Marketplace only | C++ tests |
 | `library`, `services`, `lyrics`, `color.fromArtwork` | Planned. Typed in `ampify.d.ts`, not implemented | |
 
-Known limits to fix before 1.0: the network call is synchronous, so it blocks the thread that runs JavaScript while it
-waits for the reply (up to 10 s). An element that runs in both processes and writes its storage can lose an update,
-which is why `processes` exists.
+Known limit: an element that runs in both processes and writes its storage can lose an update, which is why
+`processes` exists.

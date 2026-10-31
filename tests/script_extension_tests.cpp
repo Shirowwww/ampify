@@ -7,6 +7,7 @@
 #include "../core/manifest.hpp"
 #include "../core/script_extension.hpp"
 #include "fake_host.hpp"
+#include "pump.hpp"
 #include "test.hpp"
 
 #ifndef AMPIFY_SOURCE_DIR
@@ -255,10 +256,10 @@ TEST_CASE(Element_HttpReachesOnlyDeclaredHttpsHosts) {
         Ampify.http.get("http://api.example.org/").catch((e) => Ampify.log("plain " + e.name));
     )");
     CHECK(element->Start());
-    CHECK(f.Logged("code 200 ok"));
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("code 200 ok"); }));
     CHECK(f.Logged("refused PermissionDenied"));
     CHECK(f.Logged("plain TypeError"));
-    CHECK(f.host.requestedUrls.size() == 1);
+    CHECK(f.host.RequestCount() == 1);
 }
 
 TEST_CASE(Element_UriParsesAndBuildsLinks) {

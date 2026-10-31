@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "host.hpp"
+#include "http_worker.hpp"
 #include "journal.hpp"
 #include "js_runtime.hpp"
 #include "manifest.hpp"
@@ -39,6 +40,8 @@ public:
     const Manifest& manifest() const { return m_manifest; }
     const std::string& id() const { return m_manifest.id; }
     bool running() const { return m_running; }
+    // Network requests that have not come back yet, including those of a run that was stopped.
+    size_t httpInFlight() const { return m_http.InFlight(); }
     const std::string& lastError() const { return m_lastError; }
 
     // Reads main.js, runs the API and the script. False on any error, which is logged and kept in lastError.
@@ -71,6 +74,9 @@ private:
     friend struct ScriptBridge;  // the natives of the API modules (core/api/bridge.hpp)
 
     void Post(std::function<void()> task);
+    // Runs `request` on a worker thread and delivers its answer to dispatch.http on a later Pump, unless the element
+    // stopped meanwhile. Returns the id of the request, 0 at the cap (kMaxHttpInFlight). `request` runs off-thread.
+    uint32_t SubmitHttp(std::function<HttpResponse()> request);
     void Teardown();
     bool CallDispatch(const char* entry, int argc, JSValueConst* argv);
     void DispatchPlayer(const std::string& event, const std::string& stateJson);
@@ -98,6 +104,8 @@ private:
     std::vector<std::function<void()>> m_queue;
     std::atomic<bool> m_running{false};
     std::string m_lastError;
+    uint32_t m_lastHttpId = 0;
+    HttpWorker m_http;  // its threads call Post, so ~ScriptExtension joins them first
 };
 
 // Bytes of storage one element may keep. Above it, storage.set throws a QuotaExceeded error.

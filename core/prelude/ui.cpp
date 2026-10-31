@@ -75,7 +75,10 @@ const char kUi[] = R"AMPIFYJS(
     panel: Object.freeze({ register: (id, vue) => native.uiPanel(text(id), treeText(vue)) }),
     page: Object.freeze({ register: (path, vue) => native.uiPage(text(path), treeText(vue)) }),
     title: Object.freeze({ set: (title) => native.uiTitle(text(title)) }),
-    navigate: (path) => native.uiNavigate(text(path)),
+    navigate(path) {
+      native.uiNavigate(text(path));
+      if (dispatch.pageShow) dispatch.pageShow(text(path));  // module react
+    },
   });
 
   dispatch.click = (id) => {

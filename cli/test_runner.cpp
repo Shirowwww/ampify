@@ -1,11 +1,14 @@
 // `ampify test`: runs an element's main.js in the kernel's JavaScript engine, with a host that records what the element
 // asks for. Nothing reaches Apple Music, the network or the disk outside the test: the host answers in memory.
 
+#include <chrono>
 #include <cmath>
 #include <functional>
 #include <map>
+#include <mutex>
 #include <numbers>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 #include "../core/audio/audio_engine.hpp"
@@ -26,6 +29,8 @@
 namespace ampify::cli {
 
 namespace {
+
+constexpr std::chrono::seconds kRequestWait{3};  // how long a test run waits for the fake network calls to answer
 
 // Ampify.audio during a test run: the kernel's real analysis and equalizer, fed with a synthetic signal instead of a
 // sound card (see PlaySyntheticAudio). The loudness and the player volume are fixed values.
@@ -181,11 +186,19 @@ public:
 
     void PlaySyntheticAudio() { m_audio.PlaySyntheticAudio(); }
 
-    const std::map<std::string, int>& Calls() const { return m_calls; }
+    std::map<std::string, int> Calls() {
+        std::lock_guard<std::mutex> lock(m_callsMutex);
+        return m_calls;
+    }
 
 private:
-    void Count(const std::string& what) { m_calls[what]++; }
+    // Network calls arrive from the element's worker thread.
+    void Count(const std::string& what) {
+        std::lock_guard<std::mutex> lock(m_callsMutex);
+        m_calls[what]++;
+    }
 
+    std::mutex m_callsMutex;
     std::map<std::string, std::string> m_settings;
     std::map<std::string, std::string> m_storage;
     std::map<std::string, int> m_calls;
@@ -230,6 +243,12 @@ int CmdTest(Context& ctx) {
     bool started = element.Start();
     if (started) {
         host.PlaySyntheticAudio();  // only when the element asked for analysis frames or the tempo
+        element.Pump();
+        // Requests answer from a worker thread: wait for them, so the report shows the calls and what they did.
+        auto deadline = std::chrono::steady_clock::now() + kRequestWait;
+        while (element.httpInFlight() > 0 && std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
         element.Pump();
     }
     element.Stop();

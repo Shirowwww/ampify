@@ -1,13 +1,16 @@
 // Module http: Ampify.http, GET and POST requests to the https hosts that the manifest declares.
-// Natives: core/natives/http.cpp.
+// Natives: core/natives/http.cpp. The request runs off the JavaScript thread: the native returns an id, and the
+// promise resolves when dispatch.http gets the answer, on a later pump.
 
 namespace ampify::prelude {
 
 extern const char kHttp[];
 const char kHttp[] = R"AMPIFYJS(
+  const httpRequests = new Map();
+
   Ampify.http = {
     get(url) {
-      return new Promise((resolve) => resolve(native.httpGet(text(url))));
+      return new Promise((resolve) => httpRequests.set(native.httpGet(text(url)), resolve));
     },
     // body: a string (sent as a form, application/x-www-form-urlencoded, unless headers say otherwise) or an
     // object (sent as JSON). options.headers: content-type, authorization, accept.
@@ -24,9 +27,17 @@ const char kHttp[] = R"AMPIFYJS(
           if (!headers["content-type"]) headers["content-type"] = "application/json";
         }
         if (!headers["content-type"]) headers["content-type"] = "application/x-www-form-urlencoded";
-        resolve(native.httpPost(text(url), payload, JSON.stringify(headers)));
+        httpRequests.set(native.httpPost(text(url), payload, JSON.stringify(headers)), resolve);
       });
     },
+  };
+
+  dispatch.http = (payload) => {
+    const answer = JSON.parse(payload);
+    const resolve = httpRequests.get(answer.id);
+    if (!resolve) return;
+    httpRequests.delete(answer.id);
+    resolve({ status: answer.status, text: answer.text });
   };
 )AMPIFYJS";
 

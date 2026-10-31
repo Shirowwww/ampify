@@ -152,6 +152,7 @@ private:
     std::shared_ptr<int> m_updating;  // > 0 while the renderer sets values itself: the change events are ignored
     std::unique_ptr<uirender::RenderNode> m_tree;
     std::unique_ptr<Mounted> m_root;
+    winrt::Microsoft::UI::Xaml::Controls::ControlTemplate m_primaryTemplate{nullptr};  // shared by the primary buttons
 };
 
 }  // namespace ampify::win

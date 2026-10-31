@@ -1,8 +1,11 @@
 // Natives of the module http (core/prelude/http.cpp). Permission: network:<host>, for each https host. get goes
 // through Host::HttpGet; post through the optional HttpPostHost (core/natives/http.hpp), with the same URL rules.
+// The checks run here, on the JavaScript thread; the request runs on the element's HttpWorker and the answer comes
+// back as dispatch.http (ScriptExtension::SubmitHttp).
 
 #include <algorithm>
 #include <cctype>
+#include <functional>
 #include <string_view>
 #include <vector>
 
@@ -53,11 +56,15 @@ struct HttpNatives : ScriptBridge {
         return url;
     }
 
-    static JSValue ResponseObject(JSContext* ctx, const HttpResponse& response) {
-        JSValue object = JS_NewObject(ctx);
-        JS_SetPropertyStr(ctx, object, "status", JS_NewInt32(ctx, response.status));
-        JS_SetPropertyStr(ctx, object, "text", JS_NewStringLen(ctx, response.text.data(), response.text.size()));
-        return object;
+    // Starts the request off the JavaScript thread and returns its id; the prelude resolves the promise when
+    // dispatch.http gets the answer. Over the cap, throws instead of queuing.
+    static JSValue Start(JSContext* ctx, ScriptExtension* ext, std::function<HttpResponse()> request) {
+        uint32_t id = SubmitHttp(ext, std::move(request));
+        if (id == 0) {
+            return Throw(ctx, "RangeError",
+                         "too many requests in flight (" + std::to_string(kMaxHttpInFlight) + " at most)");
+        }
+        return JS_NewUint32(ctx, id);
     }
 
     AMPIFY_NATIVE(HttpGet) {
@@ -65,7 +72,8 @@ struct HttpNatives : ScriptBridge {
         JSValue failure = JS_UNDEFINED;
         std::optional<std::string> url = CheckedUrl(ctx, ext, argc, argv, &failure);
         if (!url) return failure;
-        return ResponseObject(ctx, HostOf(ext).HttpGet(*url));
+        Host* host = &HostOf(ext);
+        return Start(ctx, ext, [host, target = *url] { return host->HttpGet(target); });
     }
 
     // native.httpPost(url, body, headersJson): headersJson is an object of lowercase names, built by the prelude.
@@ -93,8 +101,12 @@ struct HttpNatives : ScriptBridge {
         }
 
         HttpPostHost* poster = HostOf(ext).Capability<HttpPostHost>();
-        if (!poster) return ResponseObject(ctx, HttpResponse{0, "sending is not supported by this host"});
-        return ResponseObject(ctx, poster->HttpPost(*url, body, headers));
+        if (!poster) {
+            return Start(ctx, ext, [] { return HttpResponse{0, "sending is not supported by this host"}; });
+        }
+        return Start(ctx, ext, [poster, target = *url, body = std::move(body), headers = std::move(headers)] {
+            return poster->HttpPost(target, body, headers);
+        });
     }
 };
 
