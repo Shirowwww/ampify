@@ -6,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include "css.hpp"
+
 namespace ampify::theme {
 
 // Everything the engine knows about the live interface goes through TreeBackend. The Windows backend
@@ -71,6 +73,12 @@ inline constexpr std::string_view kArtworkImage = "artwork:";
 // The original of a property the element had no value of its own for (TreeBackend::ReadOriginal).
 inline const Value kNoOwnValue{ValueKind::Opaque, "no-own-value"};
 
+// The size of the window's content, in device-independent pixels.
+struct ViewSize {
+    double width = 0;
+    double height = 0;
+};
+
 // One value of a :hover rule: shown while the pointer is over the element.
 struct HoverValue {
     std::string property;  // XAML name, as for Read and Write
@@ -119,6 +127,13 @@ public:
         (void)id;
         return values.empty();
     }
+
+    // The window's size, for @media rules. Nothing when unknown: those rules then apply nowhere.
+    virtual std::optional<ViewSize> WindowSize() { return std::nullopt; }
+
+    // The @media conditions of the theme, given on each pass: when the window's size makes one of them start or stop
+    // matching, the backend asks for a pass, as it does for a new page.
+    virtual void WatchSize(const std::vector<MediaQuery>& queries) { (void)queries; }
 };
 
 }  // namespace ampify::theme

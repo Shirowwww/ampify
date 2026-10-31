@@ -20,8 +20,10 @@ Atmos leveler.
 - Themes apply before a new page is drawn, with animated transitions, `:nth-child`, and four example themes: Greenroom
   (play bar at the bottom), Artwork, Glass and Midnight. A button keeps the theme's colours under the pointer and while
   pressed (Greenroom's white play button used to turn black when clicked). Rules accept `border-radius` as well as
-  `corner-radius`, and `min-width`, `max-width`, `min-height`, `max-height`, `compact-pane-length`. In a narrow
-  window, `floating-panels` widens the folded sidebar so its gaps no longer cut its icons. The window's own buttons
+  `corner-radius`, and `min-width`, `max-width`, `min-height`, `max-height`, `compact-pane-length`, and values can
+  use `calc()`. `@media` rules follow the window's size. In a narrow window, `floating-panels` keeps the folded
+  sidebar at Apple Music's 48 pixels, whole, with the same gap to the pages as when it is open, and `bottom-bar` keeps
+  the song in view. The window's own buttons
   (minimize, maximize, close) follow the theme's light or dark mode: they were black on dark themes on a PC in light
   mode.
 - The inspector shows what each element's visual states change. It no longer walks Apple Music's resource dictionaries,

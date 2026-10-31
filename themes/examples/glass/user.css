@@ -13,7 +13,6 @@
     --window-background: linear-gradient(135deg, #0E1424 0%, #1A2240 55%, #2A1F45 100%);
     --panel-radius: 18px;
     --gap: 12;
-    --gap-half: 6;
     --radius-button: 12px;
     --glass: acrylic($LayerFillColorDefaultBrush, 0.55);
 }
@@ -26,8 +25,9 @@
     backdrop: var(--glass);
 }
 
+/* The logo stays where Apple Music puts it: over the icons of the folded sidebar, clear of the menu button. */
 .sidebar-header {
-    padding: 12 8 8 8;
+    padding: 4 8 8 0;
 }
 
 .app-name {
@@ -105,6 +105,11 @@
     box-shadow: 24px;
 }
 
+/* The search header, the same glass over the results that scroll under it. */
+.search-header {
+    backdrop: acrylic($CardBackgroundFillColorDefaultBrush, 0.4);
+}
+
 /* The font only: a common size would overwrite the page titles. */
 .content-frame TextBlock {
     font-family: var(--font-body);
@@ -137,9 +142,13 @@
 .album-play-button,
 .album-shuffle-button {
     corner-radius: var(--radius-button);
-    padding: 10 20;
     transform-origin: center;
     transition: transform 120ms;
+}
+
+/* Wider padding for the labelled button only: the shuffle button is an icon alone, and would push it out. */
+.album-play-button {
+    padding: 10 20;
 }
 
 .album-play-button:hover,

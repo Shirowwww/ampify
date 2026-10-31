@@ -1,6 +1,7 @@
 #include "css.hpp"
 
 #include <cctype>
+#include <charconv>
 
 #include "builtins.hpp"
 
@@ -126,6 +127,102 @@ std::vector<Declaration> ParseDeclarations(std::string_view body, size_t bodyOff
         declarations.push_back(std::move(declaration));
     }
     return declarations;
+}
+
+// The brace that closes the block opened at `open`, braces inside it included, or npos.
+size_t MatchingBrace(std::string_view text, size_t open) {
+    int depth = 0;
+    for (size_t i = open; i < text.size(); i++) {
+        if (text[i] == '{') depth++;
+        if (text[i] == '}' && --depth == 0) return i;
+    }
+    return std::string_view::npos;
+}
+
+// Reads one `(min-width: 600px)` of an @media query into `query`.
+bool ReadMediaFeature(std::string_view feature, MediaQuery& query, std::string& problem) {
+    size_t colon = feature.find(':');
+    std::string name = LowerCopy(Trimmed(feature.substr(0, colon)));
+    std::string_view value = colon == std::string_view::npos ? std::string_view() : Trimmed(feature.substr(colon + 1));
+    if (value.size() > 2 && LowerCopy(value.substr(value.size() - 2)) == "px") value = Trimmed(value.substr(0, value.size() - 2));
+    double number = 0;
+    auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), number);
+    double* bound = name == "min-width" ? &query.minWidth : name == "max-width" ? &query.maxWidth
+                  : name == "min-height" ? &query.minHeight : name == "max-height" ? &query.maxHeight : nullptr;
+    if (!bound) {
+        problem = "@media (" + std::string(Trimmed(feature)) + ") is not supported: min-width, max-width, min-height "
+                  "and max-height are";
+        return false;
+    }
+    if (value.empty() || error != std::errc() || end != value.data() + value.size()) {
+        problem = "@media (" + std::string(Trimmed(feature)) + ") needs a size in pixels";
+        return false;
+    }
+    *bound = number;
+    return true;
+}
+
+// The condition of `@media <text>`: an optional `screen` or `all`, then features joined by `and`.
+std::optional<MediaQuery> ParseMediaQuery(std::string_view text, std::string& problem) {
+    MediaQuery query;
+    query.text = std::string(Trimmed(text));
+    std::string lowered = LowerCopy(text);
+    size_t pos = 0;
+    while (pos < lowered.size()) {
+        if (IsSpace(lowered[pos])) {
+            pos++;
+            continue;
+        }
+        if (lowered[pos] == '(') {
+            size_t close = lowered.find(')', pos);
+            if (close == std::string::npos) {
+                problem = "@media " + query.text + " is missing a \")\"";
+                return std::nullopt;
+            }
+            if (!ReadMediaFeature(std::string_view(text).substr(pos + 1, close - pos - 1), query, problem)) return std::nullopt;
+            pos = close + 1;
+            continue;
+        }
+        size_t end = pos;
+        while (end < lowered.size() && !IsSpace(lowered[end]) && lowered[end] != '(') end++;
+        std::string word = lowered.substr(pos, end - pos);
+        if (word != "and" && word != "screen" && word != "all" && word != "only") {
+            problem = "@media " + query.text + " is not supported: only sizes are read, such as (max-width: 1200px)";
+            return std::nullopt;
+        }
+        pos = end;
+    }
+    return query;
+}
+
+// An at-rule with a block, its head read up to `open`: @media opens a block of rules with a condition, any other is
+// skipped whole. Returns where reading goes on.
+size_t ReadAtRule(std::string_view head, size_t open, int line, std::string_view clean, std::optional<MediaQuery>& media,
+                  std::vector<std::string>& problems) {
+    const std::string where = "line " + std::to_string(line) + ": ";
+    size_t close = MatchingBrace(clean, open);
+    if (close == std::string_view::npos) {
+        problems.push_back(where + "closing brace missing");
+        return clean.size();
+    }
+    std::string lowered = LowerCopy(head);
+    bool isMedia = lowered.starts_with("@media") && (lowered.size() == 6 || IsSpace(lowered[6]) || lowered[6] == '(');
+    if (!isMedia) {
+        problems.push_back(where + "rule \"" + std::string(head) + "\" is not supported, ignored");
+        return close + 1;
+    }
+    if (media) {
+        problems.push_back(where + "@media inside @media is not supported, ignored");
+        return close + 1;
+    }
+    std::string problem;
+    std::optional<MediaQuery> query = ParseMediaQuery(head.substr(6), problem);
+    if (!query) {
+        problems.push_back(where + problem + ", ignored");
+        return close + 1;
+    }
+    media = std::move(query);
+    return open + 1;
 }
 
 constexpr std::string_view kBuiltinPrefix = "ampify:";
@@ -271,9 +368,15 @@ Stylesheet ParseStylesheet(std::string_view css) {
     Stylesheet sheet;
     std::string clean = WithoutComments(css);
     size_t pos = 0;
+    std::optional<MediaQuery> media;  // set inside an @media block
 
     while (pos < clean.size()) {
         if (IsSpace(clean[pos])) {
+            pos++;
+            continue;
+        }
+        if (media && clean[pos] == '}') {  // the end of the @media block
+            media.reset();
             pos++;
             continue;
         }
@@ -302,6 +405,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
             Stylesheet imported = ParseStylesheet(*builtin);
             for (Rule& rule : imported.rules) {
                 rule.origin = "ampify:" + *layout;
+                if (media && !rule.media) rule.media = media;
                 sheet.rules.push_back(std::move(rule));
             }
             for (const std::string& problem : imported.problems) sheet.problems.push_back("ampify:" + *layout + " " + problem);
@@ -312,25 +416,29 @@ Stylesheet ParseStylesheet(std::string_view css) {
             sheet.problems.push_back("line " + std::to_string(line) + ": opening brace missing");
             break;
         }
+        std::string_view head = Trimmed(std::string_view(clean).substr(pos, open - pos));
+        if (!head.empty() && head.front() == '@') {
+            pos = ReadAtRule(head, open, line, clean, media, sheet.problems);
+            continue;
+        }
+
         size_t close = clean.find('}', open);
         if (close == std::string::npos) {
             sheet.problems.push_back("line " + std::to_string(line) + ": closing brace missing");
             break;
         }
-
-        std::string_view head = Trimmed(std::string_view(clean).substr(pos, open - pos));
         std::string_view body = std::string_view(clean).substr(open + 1, close - open - 1);
         pos = close + 1;
 
-        if (!head.empty() && head.front() == '@') {
-            sheet.problems.push_back("line " + std::to_string(line) + ": rule \"" + std::string(head) +
-                                     "\" is not supported, ignored");
-            continue;
-        }
-
         Rule rule;
         rule.line = line;
+        rule.media = media;
         if (LowerCopy(head) == ":root") {
+            if (media) {
+                sheet.problems.push_back("line " + std::to_string(line) + ": variables inside @media are not supported, "
+                                         "ignored");
+                continue;
+            }
             rule.root = true;
             rule.declarations = ParseDeclarations(body, open + 1, clean, sheet.problems);
             sheet.rules.push_back(std::move(rule));

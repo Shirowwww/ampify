@@ -402,7 +402,47 @@ bool XamlTreeBackend::Attach() {
     // Walking or writing the tree while Apple Music closes crashed it in Microsoft.UI.Xaml.dll (bench, 30/10).
     std::shared_ptr<bool> closed = m_closed;
     window.Closed([closed](IInspectable const&, xaml::WindowEventArgs const&) noexcept { *closed = true; });
+    std::weak_ptr<bool> alive = m_alive;
+    window.SizeChanged([this, alive](IInspectable const&, xaml::WindowSizeChangedEventArgs const&) noexcept {
+        if (!alive.expired()) OnSizeChanged();
+    });
     return true;
+}
+
+std::optional<theme::ViewSize> XamlTreeBackend::WindowSize() {
+    try {
+        xaml::Window window = m_window.get();
+        if (!window) return std::nullopt;
+        winrt::Windows::Foundation::Rect bounds = window.Bounds();
+        return theme::ViewSize{bounds.Width, bounds.Height};
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+std::vector<bool> XamlTreeBackend::MediaAnswers() {
+    std::vector<bool> answers;
+    std::optional<theme::ViewSize> size = WindowSize();
+    for (const theme::MediaQuery& query : m_mediaQueries) answers.push_back(size && query.Matches(size->width, size->height));
+    return answers;
+}
+
+void XamlTreeBackend::WatchSize(const std::vector<theme::MediaQuery>& queries) {
+    if (queries == m_mediaQueries) return;
+    m_mediaQueries = queries;
+    m_mediaAnswers = MediaAnswers();
+}
+
+// Resizing fires many times a second: only a change of answer costs a pass.
+void XamlTreeBackend::OnSizeChanged() noexcept {
+    try {
+        if (m_mediaQueries.empty()) return;
+        std::vector<bool> answers = MediaAnswers();
+        if (answers == m_mediaAnswers) return;
+        m_mediaAnswers = std::move(answers);
+        SchedulePass(0);
+    } catch (...) {
+    }
 }
 
 bool XamlTreeBackend::SetAppMode(std::optional<bool> dark) {

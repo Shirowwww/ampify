@@ -53,6 +53,9 @@ public:
     // empty list removes both handlers. The handlers hold a weak pointer to m_alive: once the backend is destroyed
     // (maybe off the interface thread, so they are not removed then) they do nothing.
     bool SetHover(theme::NodeId id, const std::vector<theme::HoverValue>& values) override;
+    // The main window's bounds. Window.SizeChanged asks for a pass when one of the watched queries changes its answer.
+    std::optional<theme::ViewSize> WindowSize() override;
+    void WatchSize(const std::vector<theme::MediaQuery>& queries) override;
 
     // Adds the theme section to the first GeneralSettingsPage that has none. Returns true when it was added.
     bool EnsureSettingsSection(const std::vector<std::string>& themeNames, const std::string& activeName,
@@ -110,6 +113,8 @@ private:
                                 const theme::Value& value);
     void SchedulePass(int followUps) noexcept;
     void RunPass() noexcept;
+    std::vector<bool> MediaAnswers();
+    void OnSizeChanged() noexcept;
     void RemoveHoverHandlers(theme::NodeId id);
     // The PointerOver and Pressed states of a control template write some properties of its parts above any local
     // value: a theme's background on a button's Root vanished under the pointer and while pressed (greenroom's white
@@ -153,6 +158,8 @@ private:
     };
     std::map<std::pair<theme::NodeId, std::string>, HeldStates> m_heldStates;
     std::size_t m_refusedStates = 0;
+    std::vector<theme::MediaQuery> m_mediaQueries;  // the theme's @media conditions (WatchSize)
+    std::vector<bool> m_mediaAnswers;               // whether each matched at the last pass
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);  // the pointer handlers hold a weak pointer to it
     winrt::Microsoft::UI::Xaml::ResourceDictionary m_merged{nullptr};
     std::shared_ptr<bool> m_closed = std::make_shared<bool>(false);  // set by Window.Closed, on the interface thread

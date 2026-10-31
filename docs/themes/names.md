@@ -133,6 +133,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 
 | Class | Zone |
 |---|---|
+| `.search-top-spacer` | The empty space above the search page's header, 64 pixels high, that keeps it below the playback bar |
 | `.search-header` | The top of the search page |
 | `.search-scopes` | The buttons that choose where to search |
 | `.search-scope` | One of them: Apple Music, Library, Store |

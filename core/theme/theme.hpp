@@ -27,6 +27,7 @@ struct Assignment {
     int line = 0;
     int layer = 0;         // 0 for the theme, then one per snippet in id order, then sidebar.json and home.json
     std::string source = "user.css";  // the file, for the log: user.css, snippets/<id>/user.css, sidebar.json
+    std::optional<MediaQuery> media;  // applies only while the window matches it (@media)
 };
 
 // One font role (title, body...), as user.css sets it with --font-<role>, --font-<role>-weight, --font-<role>-size.
@@ -112,6 +113,10 @@ std::vector<std::string> ReadSchemes(FileSource& files);
 // Nothing when a variable is missing and has no fallback; `problem` then says which one.
 std::optional<std::string> SubstituteVariables(std::string_view value, const std::map<std::string, std::string>& variables,
                                                std::string* problem = nullptr);
+
+// Replaces each `calc(...)` of `value` with its result: numbers with an optional unit (`px`, `ms`...), + - * / and
+// brackets, after the variables are in. Nothing when an expression cannot be computed; `problem` then says why.
+std::optional<std::string> EvaluateCalc(std::string_view value, std::string* problem = nullptr);
 
 // True for a dictionary with no entry at all, such as `<ResourceDictionary/>`: merging it would change nothing.
 bool IsEmptyDictionary(std::string_view xaml);

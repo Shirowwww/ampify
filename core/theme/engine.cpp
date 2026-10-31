@@ -62,6 +62,17 @@ struct RuleIndex {
     }
 };
 
+// Each @media condition of the theme once, for TreeBackend::WatchSize.
+std::vector<MediaQuery> MediaQueries(const Theme& theme) {
+    std::vector<MediaQuery> queries;
+    for (const Assignment& assignment : theme.assignments) {
+        if (assignment.media && std::find(queries.begin(), queries.end(), *assignment.media) == queries.end()) {
+            queries.push_back(*assignment.media);
+        }
+    }
+    return queries;
+}
+
 }  // namespace
 
 ThemeEngine::ThemeEngine(Journal& journal) : m_journal(journal) {}
@@ -98,6 +109,8 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
                                    Report& report) {
     std::vector<PendingMove> pending;
     const RuleIndex index(theme.assignments);
+    const std::optional<ViewSize> size = tree.WindowSize();
+    tree.WatchSize(MediaQueries(theme));
     for (int position = 0; position < static_cast<int>(nodes.size()); position++) {
         const NodeInfo& node = nodes[position];
 
@@ -105,6 +118,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
         std::map<std::string, const Assignment*> winners;
         std::map<std::string, const Assignment*> hoverWinners;
         index.ForCandidates(node, [&](const Assignment& assignment) {
+            if (assignment.media && !(size && assignment.media->Matches(size->width, size->height))) return;
             if (!Matches(assignment.selector, nodes, position)) return;
 
             auto& target = assignment.selector.hover ? hoverWinners : winners;
@@ -124,10 +138,26 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
             }
             WriteValue(node, *assignment, tree, report, true);
         }
+        GiveBack(node, winners, tree, report);
         // An element that lost its :hover rules (a theme edited live) is visited too, to take its hover off.
         if (!hoverWinners.empty() || m_hovers.count(node.id)) ApplyHover(node, hoverWinners, tree, report);
     }
     ApplyMoves(pending, tree, report);
+}
+
+// Puts back the original of each property the theme no longer gives this element: an @media rule that stopped
+// matching, a rule edited out of a theme, an element that moved out of a selector.
+void ThemeEngine::GiveBack(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners,
+                           TreeBackend& tree, Report& report) {
+    for (auto it = m_originals.lower_bound({node.id, std::string()});
+         it != m_originals.end() && it->first.first == node.id;) {
+        if (winners.count(it->first.second)) {
+            ++it;
+            continue;
+        }
+        if (tree.Write(node.id, it->first.second, it->second)) report.applied++;
+        it = m_originals.erase(it);
+    }
 }
 
 // Gives the backend the :hover values of one element when they differ from the ones it holds. A property the element

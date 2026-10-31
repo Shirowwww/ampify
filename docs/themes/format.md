@@ -137,6 +137,20 @@ Page {
 - In `:root`, only variables are read. A variable written outside `:root` is ignored.
 - A snippet sees the variables of the active theme.
 
+`calc()` computes a number from others, once the variables are in: `+`, `-`, `*`, `/` and brackets, on numbers with
+or without a unit (`px`, `ms`...). Two lengths can be added or subtracted, not multiplied, and a length cannot be
+divided by another.
+
+```css
+:root {
+    --gap: 12;
+}
+
+.content {
+    margin: var(--gap) var(--gap) var(--gap) calc(var(--gap) * 2);
+}
+```
+
 ### Properties
 
 | CSS | XAML | Accepted values |
@@ -282,18 +296,32 @@ Each layout reads variables that the theme may set in its `:root`, with these de
 | `--window-background` | `#0B0B0D` | The window, around the panels |
 | `--panel-background` | `#17171A` | Both panels |
 | `--panel-radius` | `10px` | Their corners |
-| `--gap` | `8` | The space around the panels |
-| `--gap-half` | `4` | Half of it, between the two panels, so the gap between them equals the others |
+| `--gap` | `8` | The space around the panels and between them |
 | `--content-top` | `64` | `floating-panels`: where the pages start, below the playback bar at the top |
-| `--compact-pane` | `56` | `floating-panels`: the width of the sidebar folded into icons, its left gap included (48 + 8). Wider shows the start of the texts Apple Music hides there |
+| `--compact-pane` | `48` | `floating-panels`: the width of the sidebar folded into icons, as in Apple Music. Wider shows the start of the texts Apple Music hides there |
 | `--page-top` | `8`, or `40` with `bottom-bar` | The space above the first line of a page. With the bar at the bottom, it leaves room for the window's buttons. |
 | `--bar-height` | `72` | `bottom-bar`: the height of the bar |
 | `--bar-room` | `80` | `bottom-bar`: the space the panels leave at the bottom, the bar and a gap |
-| `--bar-reach` | `-298` | `bottom-bar`: how far left the bar reaches past the page column, the sidebar's width and a gap |
+| `--bar-reach` | `calc(var(--gap) - 290)` | `bottom-bar`: how far left the bar reaches past the page column: the open sidebar's 290 pixels less a gap, so the song's artwork lines up with the sidebar |
+| `--bar-reach-folded` | `calc(var(--gap) - var(--compact-pane))` | `bottom-bar`: the same when Apple Music folds the sidebar, at 1324 pixels wide and less |
 
-Known limit: `--bar-reach` assumes the sidebar is open at its usual width (290 pixels). When Apple Music folds the
-sidebar in a narrow window, the bar reaches past the left edge of the window. There is no `@media` query yet to change
-the value with the width of the window.
+### Window size (`@media`)
+
+Rules inside `@media` apply only while the window has that size, in the pixels Windows counts for the app (the
+inspector writes the current size on its first line). `min-width`, `max-width`, `min-height` and `max-height` are read,
+joined by `and`; bounds are included. When the window crosses a bound, the theme follows at once, and a value that no
+rule gives any more goes back to Apple Music's.
+
+```css
+@media (max-width: 1324px) {
+    .lcd {
+        visibility: collapsed;
+    }
+}
+```
+
+Apple Music folds its sidebar at 1324 pixels wide and less. Variables cannot be set inside `@media`, and an `@media`
+cannot hold another.
 
 ### Acrylic
 

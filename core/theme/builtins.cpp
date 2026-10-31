@@ -116,6 +116,7 @@ const std::vector<ClassEntry> kClasses{
     {"song-row", {"StackPanel#DataGridRowStack"}},
 
     // Search
+    {"search-top-spacer", {"SearchPage > Grid > Grid:first-child"}},
     {"search-header", {"Grid#SearchPageHeader"}},
     {"search-scopes", {"Grid#SearchPageSelector"}},
     {"search-scope", {"ToggleButton#SearchAppleMusic", "ToggleButton#SearchLibrary", "ToggleButton#SearchStore"}},
@@ -197,18 +198,20 @@ constexpr std::string_view kFloatingPanels = R"css(
 .sidebar {
     background: var(--panel-background, #17171A);
     corner-radius: var(--panel-radius, 10px);
-    margin: var(--gap, 8) var(--gap-half, 4) var(--gap, 8) var(--gap, 8);
+    margin: var(--gap, 8) calc(var(--gap, 8) * -1) var(--gap, 8) var(--gap, 8);
 }
 
-/* Folded in a narrow window, the sidebar keeps Apple Music's 48 pixels for its icons inside the gaps. */
+/* Folded, the sidebar shows the first 48 pixels from its own edge, so it ends a gap into the page column: the pages
+   start two gaps into it, and the open sidebar reaches one gap into it. The space between the panels is one gap either
+   way. Wider than 48 shows the start of the texts Apple Music hides there. */
 .navigation {
-    compact-pane-length: var(--compact-pane, 56);
+    compact-pane-length: var(--compact-pane, 48);
 }
 
 .content {
     background: var(--panel-background, #17171A);
     corner-radius: var(--panel-radius, 10px);
-    margin: var(--content-top, 64) var(--gap, 8) var(--gap, 8) var(--gap-half, 4);
+    margin: var(--content-top, 64) var(--gap, 8) var(--gap, 8) calc(var(--gap, 8) * 2);
 }
 
 .page-top-spacer {
@@ -218,6 +221,20 @@ constexpr std::string_view kFloatingPanels = R"css(
 .stacked-list {
     padding: var(--page-top, 8) 0 0 0;
 }
+
+/* The search page's header is the top of the panel, and the results scroll in from under it (48 high). */
+.search-top-spacer {
+    height: 0;
+}
+
+.search-header {
+    background: var(--panel-background, #17171A);
+    corner-radius: var(--panel-radius, 10px) var(--panel-radius, 10px) 0 0;
+}
+
+Frame#SearchContentFrame .stacked-list {
+    padding: calc(48 + var(--gap, 8)) 0 0 0;
+}
 )css";
 
 // The playback bar along the bottom of the window, under both panels: the song on the left, the controls in the
@@ -226,7 +243,14 @@ constexpr std::string_view kBottomBar = R"css(
 .playbar {
     vertical-alignment: bottom;
     height: var(--bar-height, 72);
-    margin: 0 0 0 var(--bar-reach, -298);
+    margin: 0 0 0 var(--bar-reach, calc(var(--gap, 8) - 290));
+}
+
+/* At 1324 pixels and less Apple Music folds the sidebar to its icons: the page column starts there instead. */
+@media (max-width: 1324px) {
+    .playbar {
+        margin: 0 0 0 var(--bar-reach-folded, calc(var(--gap, 8) - var(--compact-pane, 48)));
+    }
 }
 
 .playbar-controls {
@@ -249,10 +273,13 @@ constexpr std::string_view kBottomBar = R"css(
     horizontal-alignment: left;
 }
 
+/* Apple Music centres each line between a spacer and the More button; at the left, the title would sit apart from the
+   artist. */
 .track-title,
 .track-artist {
     grid-column: 0;
     grid-column-span: 2;
+    horizontal-alignment: left;
 }
 
 /* Volume, lyrics and queue at the right end of the bar. */
@@ -266,11 +293,11 @@ constexpr std::string_view kBottomBar = R"css(
 }
 
 .sidebar {
-    margin: var(--gap, 8) var(--gap-half, 4) var(--bar-room, 80) var(--gap, 8);
+    margin: var(--gap, 8) calc(var(--gap, 8) * -1) var(--bar-room, 80) var(--gap, 8);
 }
 
 .content {
-    margin: var(--gap, 8) var(--gap, 8) var(--bar-room, 80) var(--gap-half, 4);
+    margin: var(--gap, 8) var(--gap, 8) var(--bar-room, 80) calc(var(--gap, 8) * 2);
 }
 
 .page-top-spacer {
@@ -279,6 +306,11 @@ constexpr std::string_view kBottomBar = R"css(
 
 .stacked-list {
     padding: var(--page-top, 40) 0 0 0;
+}
+
+/* The window's buttons sit over the right end of the search header: its scope buttons stop before them. */
+.search-header {
+    padding: 0 150 0 40;
 }
 )css";
 

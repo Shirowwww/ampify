@@ -56,6 +56,7 @@ keys into the control's resources works before and after the groups exist.
 | A margin on `Grid#ContentRoot` alone pushed the playback bar down and hid its three buttons | Same duplicate name | Same fix |
 | Top bar button not found | Apple Music has no separate top bar | Ampify's buttons go in `StackPanel#NowPlayingToggleButtons` |
 | A text size on every `TextBlock` overwrote page titles | Too broad a selector | Target under a named parent |
+| Folded sidebar with floating panels: the start of the account name showed, and the panel covered the page's edge | The folded `SplitView` clips `Grid#PaneRoot` to `CompactPaneLength` counted from the pane's own edge, so its left margin pushes the visible part into the page column instead of shrinking it | `compact-pane-length: 48`, and the space between the panels taken by the page's left margin (two gaps) with a negative right margin on the sidebar (one gap) |
 
 Names from WinUI templates (`Grid#RootGrid`, `Grid#LayoutRoot`, `Border#Root`, `ContentPresenter#ContentPresenter`) appear
 dozens of times. Always target them under a named parent.

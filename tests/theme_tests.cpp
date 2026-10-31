@@ -130,6 +130,12 @@ public:
         return Read(id, property);
     }
 
+    std::optional<th::ViewSize> size;  // the window, for @media; unknown by default
+    std::vector<th::MediaQuery> watched;
+
+    std::optional<th::ViewSize> WindowSize() override { return size; }
+    void WatchSize(const std::vector<th::MediaQuery>& queries) override { watched = queries; }
+
     bool SetHover(th::NodeId id, const std::vector<th::HoverValue>& values) override {
         bool alive = Find(id) != nullptr;
         if (values.empty()) {
@@ -330,6 +336,33 @@ TEST_CASE(Css_ParsesSelectorsDeclarationsAndLines) {
     CHECK(rule.declarations[1].important);
 }
 
+TEST_CASE(Css_MediaBlocksGiveTheirRulesACondition) {
+    th::Stylesheet sheet = th::ParseStylesheet(
+        "@media (max-width: 1000px) {\n"
+        "    .sidebar { margin: 1 }\n"
+        "    Border { width: 2 }\n"
+        "}\n"
+        "Grid { margin: 2 }\n"
+        "@media screen and (min-width: 600) and (max-height: 900px) { A { width: 1 } }\n"
+        "@media (orientation: portrait) { B { width: 1 } }\n"
+        "@supports (display: grid) { C { width: 1 } }\n"
+        "@media (max-width: 500) { :root { --x: 1; } }\n"
+        "D { width: 3 }\n");
+
+    CHECK(sheet.rules.size() == 5);
+    if (sheet.rules.size() != 5) return;
+    CHECK(sheet.rules[0].media && sheet.rules[0].media->maxWidth == 1000);
+    CHECK(sheet.rules[0].line == 2);
+    CHECK(sheet.rules[1].media && sheet.rules[1].selectors[0].parts[0].type == "Border");
+    CHECK(!sheet.rules[2].media);
+    CHECK(sheet.rules[2].line == 5);
+    const std::optional<th::MediaQuery>& both = sheet.rules[3].media;
+    CHECK(both && both->minWidth == 600 && both->maxHeight == 900);
+    CHECK(both && both->Matches(800, 700) && !both->Matches(500, 700) && !both->Matches(800, 1000));
+    CHECK(sheet.rules[4].selectors[0].parts[0].type == "D");
+    CHECK(sheet.problems.size() == 3);  // orientation, @supports, a :root inside @media
+}
+
 TEST_CASE(Css_SkipsBadRulesAndKeepsTheOthers) {
     th::Stylesheet sheet = th::ParseStylesheet(
         "Grid > { color: red; }\n"
@@ -452,16 +485,16 @@ TEST_CASE(Theme_ALayoutTakesTheThemesVariablesAndReportsUnderItsName) {
 
     th::Theme theme = Load(files);
     CHECK(theme.problems.empty());
-    bool sawSidebar = false;
+    std::map<std::string, std::string> margins;
     for (const th::Assignment& assignment : theme.assignments) {
-        if (assignment.selector.text != ".sidebar") continue;
+        if (assignment.selector.text != ".sidebar" && assignment.selector.text != ".content") continue;
         CHECK(assignment.source == "ampify:floating-panels");
-        if (assignment.property == "Margin") {
-            sawSidebar = true;
-            CHECK(assignment.value.text == "12,12,4,12");  // XAML order: left, top, right, bottom
-        }
+        if (assignment.property == "Margin") margins[assignment.selector.text] = assignment.value.text;
     }
-    CHECK(sawSidebar);
+    // XAML order: left, top, right, bottom. The sidebar reaches a gap into the page column, the pages start two gaps
+    // into it: one gap between the panels, open or folded.
+    CHECK(margins[".sidebar"] == "12,12,-12,12");
+    CHECK(margins[".content"] == "24,64,12,12");
 }
 
 TEST_CASE(Inspector_ReadsASavedTreeWithEachPlace) {
@@ -1617,6 +1650,73 @@ TEST_CASE(Variables_RootBlockAndVar) {
     CHECK(problem.find("parenthesis") != std::string::npos);
     CHECK(!th::SubstituteVariables("var(x)", {}, &problem).has_value());
     CHECK(th::SubstituteVariables("var(--a, var(--b, 3))", {}).value_or("") == "3");
+}
+
+TEST_CASE(Engine_MediaRulesFollowTheWindowSize) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "Grid { width: 10 }\n"
+        "@media (max-width: 800px) { Grid { width: 20 } TextBlock { color: #FF00FF00 } }\n";
+    th::Theme theme = Load(files);
+
+    FakeTree tree;
+    th::NodeId grid = tree.Add(-1, "Grid", "", {{"Width", {th::ValueKind::Length, "5"}}});
+    th::NodeId text = tree.Add(0, "TextBlock", "", {{"Foreground", Brush("#FF111111")}});
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    tree.size = th::ViewSize{1000, 700};
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(grid, "Width").text == "10");
+    CHECK(tree.Shown(text, "Foreground").text == "#FF111111");
+    CHECK(tree.watched.size() == 1 && tree.watched[0].maxWidth == 800);
+
+    tree.size = th::ViewSize{700, 700};
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(grid, "Width").text == "20");
+    CHECK(tree.Shown(text, "Foreground").text == "#FF00FF00");
+
+    // Wider again: the rule outside @media wins back, and the colour no rule gives any more goes back.
+    tree.size = th::ViewSize{1000, 700};
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(grid, "Width").text == "10");
+    CHECK(tree.Shown(text, "Foreground").text == "#FF111111");
+
+    engine.Restore(tree);
+    CHECK(tree.Shown(grid, "Width").text == "5");
+}
+
+TEST_CASE(Calc_ComputesLengthsFromVariables) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        ":root { --gap: 12; --double: calc(var(--gap) * 2); }\n"
+        "Grid { margin: var(--gap) calc(var(--gap) * -1) var(--gap) var(--double); }\n"
+        "Border { padding: calc(1px * 2px); }\n";
+    th::Theme theme = Load(files);
+
+    std::map<std::string, std::string> values;
+    for (const th::Assignment& assignment : theme.assignments) values[assignment.selector.text + " " + assignment.property] = assignment.value.text;
+    CHECK(values["Grid Margin"] == "24,12,-12,12");
+    CHECK(!values.count("Border Padding"));
+    CHECK(!ProblemContaining(theme, "user.css line 3: calc() multiplies two lengths").empty());
+
+    CHECK(th::EvaluateCalc("4 calc(10 - 2 * 3) calc((1 + 2) * 3px)").value_or("") == "4 4 9px");
+    CHECK(th::EvaluateCalc("CALC(7 / 2)").value_or("") == "3.5");
+    CHECK(th::EvaluateCalc("calc(calc(0.1 + 0.2) * 10ms)").value_or("") == "3ms");
+    CHECK(th::EvaluateCalc("#FF112233").value_or("") == "#FF112233");
+    CHECK(th::EvaluateCalc("calc(-(1 + 2) * 2px) calc(+4)").value_or("") == "-6px 4");
+    CHECK(!th::EvaluateCalc("calc(inf * 2)").has_value());
+
+    std::string problem;
+    CHECK(!th::EvaluateCalc("calc(1 / 0)", &problem).has_value());
+    CHECK(problem == "calc() divides by zero");
+    CHECK(!th::EvaluateCalc("calc(4px / 2px)", &problem).has_value());
+    CHECK(!th::EvaluateCalc("calc(1px + 2ms)", &problem).has_value());
+    CHECK(problem == "calc() adds ms to px");
+    CHECK(!th::EvaluateCalc("calc(1 +)", &problem).has_value());
+    CHECK(!th::EvaluateCalc("calc(2", &problem).has_value());
+    CHECK(problem.find("parenthesis") != std::string::npos);
 }
 
 TEST_CASE(Fonts_RolesFromRootBlockAndDefaults) {

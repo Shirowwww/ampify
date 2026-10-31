@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "../json.hpp"
+#include "properties.hpp"
 
 namespace ampify::theme {
 
@@ -57,6 +58,10 @@ std::string SuggestSelector(const std::vector<NodeInfo>& nodes, int index) {
 
 std::string InspectTree(TreeBackend& tree, const InspectOptions& options) {
     std::string dump;
+    // The size @media rules compare with.
+    if (std::optional<ViewSize> size = tree.WindowSize()) {
+        dump += "Window: " + FormatNumber(size->width) + " x " + FormatNumber(size->height) + "\n\n";
+    }
 
     std::vector<std::string> keys = tree.ResourceKeys();
     dump += "Application resources (" + std::to_string(keys.size()) + "):\n";

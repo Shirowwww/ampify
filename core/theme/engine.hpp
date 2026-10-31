@@ -66,6 +66,8 @@ private:
     bool WriteValue(const NodeInfo& node, const Assignment& assignment, TreeBackend& tree, Report& report, bool keep);
     void ApplyHover(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners, TreeBackend& tree,
                     Report& report);
+    void GiveBack(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners, TreeBackend& tree,
+                  Report& report);
 
     Journal& m_journal;
     std::map<std::pair<NodeId, std::string>, Value> m_originals;  // element and XAML property, first value seen

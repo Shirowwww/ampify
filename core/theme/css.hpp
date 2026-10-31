@@ -23,6 +23,23 @@ namespace ampify::theme {
 //
 // One more block is read: `:root { --name: value; }` defines variables, which values use as `var(--name)` or
 // `var(--name, fallback)`. The variables named --font-<role> describe the font roles (see fonts.hpp).
+//
+// `@media (max-width: 1200px) { ... }` holds rules that apply only while the window has that size: min-width,
+// max-width, min-height and max-height, joined by `and`. Other at-rules are skipped whole.
+
+// The condition of an @media block, on the window's size in device-independent pixels, bounds included.
+struct MediaQuery {
+    double minWidth = 0;
+    double maxWidth = 1e9;
+    double minHeight = 0;
+    double maxHeight = 1e9;
+    std::string text;  // as written, for the log
+
+    bool Matches(double width, double height) const {
+        return width >= minWidth && width <= maxWidth && height >= minHeight && height <= maxHeight;
+    }
+    bool operator==(const MediaQuery&) const = default;
+};
 
 enum class Combinator {
     Descendant,  // whitespace
@@ -56,6 +73,7 @@ struct Rule {
     std::vector<Declaration> declarations;
     int line = 0;
     std::string origin;  // "ampify:<layout>" for a rule brought by @import, empty for the stylesheet's own
+    std::optional<MediaQuery> media;  // the condition of the @media block around the rule
 };
 
 struct Stylesheet {
