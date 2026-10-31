@@ -46,11 +46,6 @@ void HoverTracker::Exit(NodeId id, Access& access) {
     element.hovered = false;
 }
 
-bool HoverTracker::Hovered(NodeId id) const {
-    auto it = m_elements.find(id);
-    return it != m_elements.end() && it->second.hovered;
-}
-
 std::optional<Value> HoverTracker::Read(NodeId id, std::string_view property, Access& access) {
     auto it = m_elements.find(id);
     if (it != m_elements.end() && it->second.hovered) {

@@ -1,4 +1,4 @@
-// NOT COMPILED IN THE CURRENT BUILD: see xaml_backend.cpp. Only the file reads and the posts are plain Win32 and C++.
+// Built with AMPIFY_WITH_XAML, like xaml_backend.cpp. Only the file reads and the posts are plain Win32 and C++.
 
 #if defined(AMPIFY_WITH_XAML)
 

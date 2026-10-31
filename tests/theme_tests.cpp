@@ -595,6 +595,22 @@ TEST_CASE(Properties_ConvertLengthsAndThickness) {
     CHECK(Converted("margin", "1 2 3 4 5", palette, files).rfind("PROBLEM", 0) == 0);
 }
 
+TEST_CASE(Properties_AcceptTheCssNamesThemesUseMost) {
+    th::Palette palette;
+    MemoryFiles files;
+
+    // border-radius is what every Spicetify theme writes; it is corner-radius under another name.
+    CHECK(th::FindProperty("border-radius") && th::FindProperty("border-radius")->xaml == "CornerRadius");
+    CHECK(Converted("border-radius", "8px", palette, files) == Converted("corner-radius", "8px", palette, files));
+    CHECK(Converted("min-width", "120px", palette, files) == "120");
+    CHECK(Converted("max-height", "64", palette, files) == "64");
+    CHECK(Converted("max-width", "none", palette, files) == "inf");
+    CHECK(Converted("min-height", "none", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(Converted("min-width", "auto", palette, files) == "0");
+    CHECK(th::FindProperty("min-height")->xaml == "MinHeight");
+    CHECK(th::FindProperty("max-width")->xaml == "MaxWidth");
+}
+
 TEST_CASE(Properties_ConvertVisibilityNumbersAndText) {
     th::Palette palette;
     MemoryFiles files;

@@ -1,4 +1,4 @@
-// NOT RUN YET IN APPLE MUSIC: see xaml_host.hpp. Written against the C++/WinRT projection of Windows App SDK 1.8.
+// Written against the C++/WinRT projection of Windows App SDK 1.8.
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -43,7 +43,6 @@ struct DispatchState {
     std::atomic<DWORD> threadId{0};
     std::atomic<bool> firstRun{false};
     std::atomic<bool> unavailableLogged{false};
-    std::atomic<std::uint64_t> ran{0};
 };
 
 // Never destroyed: a static destructor would release the DispatcherQueue while Apple Music exits.
@@ -122,7 +121,6 @@ bool XamlPost(std::function<void()> work) {
                     Log("Interface: first work run by the main window's DispatcherQueue (thread " +
                         std::to_string(GetCurrentThreadId()) + ")");
                 }
-                current.ran++;
                 work();
             } catch (const winrt::hresult_error& error) {
                 Log("Interface: a task on the interface thread failed (" + HresultText(error.code().value) + ")");
@@ -182,10 +180,6 @@ void EnsureMta() noexcept {
 void InstallXamlUiThread(Journal& journal) {
     State().journal = &journal;
     SetUiThreadBackend(&kXamlBackend);
-}
-
-std::uint64_t XamlUiTasksRun() noexcept {
-    return State().ran.load();
 }
 
 std::uint64_t NowMs() noexcept {

@@ -45,7 +45,6 @@ struct ElementManifest : ElementInfo {
 // The checks below mirror schemas/*.schema.json. They never touch the disk.
 bool IsValidId(std::string_view text);
 bool IsValidVersion(std::string_view text);
-bool IsValidKind(std::string_view text);
 bool IsValidPermission(std::string_view text);
 bool IsValidScheme(std::string_view text);
 bool IsHttpsUrl(std::string_view text);

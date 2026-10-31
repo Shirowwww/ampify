@@ -52,7 +52,8 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | `config <list> <item>` and `<item>-` | `ampify extension enable <id>` and `disable <id>`. `ampify config extensions +id` and `-id` also work | Done |
 | `apply --extension <file>` | `ampify extension enable <id>` loads just that element, with no restart of the app | Done |
 | `watch` | `ampify watch` and `ampify dev <folder>` reload an element or a theme at each save | Done |
-| `update` (hot reload) | Extensions reload by themselves (stop, then start). Themes remove and apply again. No Apple Music restart | Done |
+| `refresh`, `watch` (reload what changed) | Extensions reload by themselves (stop, then start). Themes remove and apply again. No Apple Music restart | Done |
+| `update` (Spicetify updates itself, then applies again) | `ampify update` | Done |
 | `enable-devtools` | `ampify devtools` writes the XAML tree to `logs\inspector.txt` and `inspector.json`. There is no WebView2 debug port | Partial |
 | `upgrade` | `ampify update` reads the latest GitHub release, checks the published SHA-256 and asks for confirmation | Done |
 | `path`, `config-dir` | `ampify path [name]` and `ampify config --dir` | Done |
@@ -67,7 +68,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | `spotify_path` | `app_path` | Done |
 | `prefs_path` | `prefs_path`, read-only for Ampify unless set explicitly | Done |
 | `spotify_launch_flags` | `app_launch_flags`, arguments added when Apple Music starts (Apple Music may ignore them) | Done |
-| `check_spicetify_upgrade` | `check_kit_update`, a check at `ampify` start, never an automatic download | Done |
+| `check_spicetify_update` | `check_kit_update`, a check at `ampify` start, never an automatic download | Done |
 | `disable_sentry`, `disable_ui_logging` | `telemetry.block`. The key is accepted but the kernel does not read it yet | Planned |
 | `remove_rtl_rule` | Not needed: there are no right-to-left CSS rules to remove. A theme can set `flow-direction` | Different |
 | `expose_apis` | `expose_api`. At `0`, no JavaScript element starts | Done |
@@ -104,7 +105,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | `Playbar` | `Ampify.ui.playbar.addButton` | Done |
 | `ContextMenu`, `Menu` | `Ampify.ui.menu.addItem` is in the API, but menus are not displayed yet | Planned |
 | `PopupModal` | `Ampify.ui.popup.open`, a native dialog | Done |
-| `Panel` | `Ampify.ui.panel.register`, a 380 px column on the right | Done |
+| `Panel` (documented by Spicetify, absent from its code) | `Ampify.ui.panel.register`, a 380 px column on the right | Done |
 | `AppTitle` | `Ampify.ui.title.set`, not yet checked in Apple Music | Partial |
 | `Keyboard` | `Ampify.keyboard.bind` (global shortcuts through `RegisterHotKey`) | Done |
 | `LocalStorage` | `Ampify.storage`, one JSON file per element | Done |
@@ -114,7 +115,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | `colorExtractor` | `Ampify.color.extract(pixels, width, height)` works on pixels the script supplies. `color.fromArtwork` is planned | Partial |
 | `getAudioData` | `Ampify.audio.analyze()`, `onFrame` and `loudness()`: level, spectrum, tempo, LUFS, computed in memory | Done |
 | `showNotification` | `Ampify.notify({ title, text })`, a Windows notification | Done |
-| `getFontStyle` | The theme engine has font roles. `Ampify.fonts.style(name)` to read them from an extension is not available yet | Planned |
+| `getFontStyle` (documented by Spicetify, absent from its code) | The theme engine has font roles. `Ampify.fonts.style(name)` to read them from an extension is not available yet | Planned |
 | `SVGIcons` | `Ampify.icons.get(name)` | Done |
 | `Locale` | `Ampify.locale` and `Ampify.i18n` | Done |
 
@@ -212,7 +213,7 @@ hosts found by traffic capture. License and DRM hosts would never be on that lis
 | Discord Rich Presence | `Ampify.discord`, through the local pipe, permission `ipc.discord` | Done |
 | Last.fm and ListenBrainz scrobbling | `Ampify.http` to the declared hosts. Example: `examples/scrobbler` | Done |
 | Media keys and global shortcuts | SMTC and `RegisterHotKey` | Done |
-| Always-on-top mini player | A secondary WinUI window | Planned |
+| Always-on-top mini player | Apple Music has its own, with a full-screen player and karaoke lyrics ([knowledge/apple-music-native-views.md](../knowledge/apple-music-native-views.md)). Themes do not reach its window yet | Different |
 | Notification-area icon | `Ampify.tray`, permission `ui.tray`, setting `tray.enabled` | Done |
 | Local remote | HTTP on `127.0.0.1` with a token, for phones and Stream Deck | Done |
 | MIDI controller | `Ampify.midi` and `midi.map`, no light feedback | Done |

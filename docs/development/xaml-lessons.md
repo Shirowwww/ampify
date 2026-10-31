@@ -36,9 +36,16 @@ General rules learned:
 | Apple Music's backgrounds ignore Fluent brushes (`SolidBackgroundFillColorBaseBrush`...) | They use their own brushes | Target the elements by name in `user.css` |
 | The resource inspector failed in a loop (0x80004005) | Walking the resource dictionaries | try/catch per dictionary and per key |
 | Inspector: empty tree | The snapshot was taken before the window had content | No snapshot on an empty tree, try again at the next tick |
+| Apple Music crashed (0xc000027b) at the theme change after an inspector pass | Enumerating the application's dictionaries realizes deferred resources, and the next refresh fails on them | No enumeration: the inspector asks `HasKey` for a fixed list of Fluent colour keys (`core/theme/colour_keys.cpp`) |
+| A button lost the theme's colours under the pointer and while pressed (Greenroom's play button turned black) | The button's visual states set Fluent resources, which win over local values | The colours are also written into the control's own resources under `{Type}{Property}PointerOver` and `Pressed` keys |
 
 The application dictionary has only one key of its own (`ContentPageShadow`). Colors are in merged and theme dictionaries.
-Walking some of them fails with E_FAIL, so each part is read inside a try/catch.
+Walking some of them fails with E_FAIL, so each part is read inside a try/catch. Do not walk them at all while
+Apple Music runs: see the crash above.
+
+Visual states are not there to read before a control is first hovered: WinUI builds the state groups of an
+`AppBarButton` lazily, so a search for the setters of `PointerOver` finds nothing on a fresh button. Writing the state
+keys into the control's resources works before and after the groups exist.
 
 ## Selectors and layout
 

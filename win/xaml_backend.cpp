@@ -1,5 +1,5 @@
-// NOT COMPILED IN THE CURRENT BUILD: see xaml_backend.hpp. Written against the C++/WinRT projection of the Windows App SDK.
-// The API names below are the ones documented for WinUI 3; each one is listed in docs/development/testing-on-a-pc.md to check on the PC.
+// Written against the C++/WinRT projection of the Windows App SDK. What WinUI 3 did differently from its documentation
+// is in docs/development/xaml-lessons.md.
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -677,9 +677,15 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         }
     } else if (property == "Opacity") {
         if (auto element = object.try_as<xaml::UIElement>()) return number(element.Opacity());
-    } else if (property == "Width" || property == "Height") {
+    } else if (property == "Width" || property == "Height" || property == "MinWidth" || property == "MaxWidth" ||
+               property == "MinHeight" || property == "MaxHeight") {
         if (auto element = object.try_as<xaml::FrameworkElement>()) {
-            double value = property == "Width" ? element.Width() : element.Height();
+            double value = property == "Width"       ? element.Width()
+                           : property == "Height"    ? element.Height()
+                           : property == "MinWidth"  ? element.MinWidth()
+                           : property == "MaxWidth"  ? element.MaxWidth()
+                           : property == "MinHeight" ? element.MinHeight()
+                                                     : element.MaxHeight();
             return theme::Value{theme::ValueKind::Length, th::FormatNumber(value)};
         }
     } else if (property == "FlowDirection") {
@@ -961,13 +967,19 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         return false;
     }
 
-    if ((property == "Width" || property == "Height") && value.kind == theme::ValueKind::Length) {
+    if ((property == "Width" || property == "Height" || property == "MinWidth" || property == "MaxWidth" ||
+         property == "MinHeight" || property == "MaxHeight") &&
+        value.kind == theme::ValueKind::Length) {
         double length = ParseLength(value.text);
-        if (auto element = object.try_as<xaml::FrameworkElement>()) {
-            if (property == "Width") element.Width(length); else element.Height(length);
-            return true;
-        }
-        return false;
+        auto element = object.try_as<xaml::FrameworkElement>();
+        if (!element) return false;
+        if (property == "Width") element.Width(length);
+        else if (property == "Height") element.Height(length);
+        else if (property == "MinWidth") element.MinWidth(length);
+        else if (property == "MaxWidth") element.MaxWidth(length);
+        else if (property == "MinHeight") element.MinHeight(length);
+        else element.MaxHeight(length);
+        return true;
     }
 
     if (property == "Opacity" && value.kind == theme::ValueKind::Number) {

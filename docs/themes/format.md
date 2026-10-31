@@ -146,13 +146,15 @@ Page {
 | `color` or `foreground` | `Foreground` | Same as `background` |
 | `border-color` | `BorderBrush` | Same as `background` |
 | `border-width` | `BorderThickness` | 1 to 4 lengths, CSS order: top right bottom left |
-| `corner-radius` | `CornerRadius` | 1 to 4 lengths, CSS order: top-left, top-right, bottom-right, bottom-left |
+| `corner-radius` or `border-radius` | `CornerRadius` | 1 to 4 lengths, CSS order: top-left, top-right, bottom-right, bottom-left |
 | `font-family` | `FontFamily` | A font name, quoted or not, or `url(fonts/file.ttf#Name)` (see "Theme fonts") |
 | `font-size` | `FontSize` | Number, `px` optional |
 | `font-weight` | `FontWeight` | `normal`, `bold`, or a number from 1 to 1000 |
 | `margin` | `Margin` | 1 to 4 lengths |
 | `padding` | `Padding` | 1 to 4 lengths |
 | `width`, `height` | `Width`, `Height` | A length or `auto` |
+| `min-width`, `min-height` | `MinWidth`, `MinHeight` | A length, or `auto` for no minimum |
+| `max-width`, `max-height` | `MaxWidth`, `MaxHeight` | A length, or `none` for no maximum |
 | `opacity` | `Opacity` | A number from 0 to 1 |
 | `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`) |
 | `template` | `Template` | `url(templates/file.xaml)`, a full `ControlTemplate` |

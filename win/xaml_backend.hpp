@@ -2,9 +2,9 @@
 
 // The Windows backend of the theme engine: reads and writes the live XAML tree of Apple Music.
 //
-// NOT COMPILED IN THE CURRENT BUILD. It needs the Windows App SDK C++/WinRT headers, so it is built only when
-// AMPIFY_WITH_XAML is defined (see CMakeLists.txt). Every member must be called on the interface thread, through
-// PostToUiThread (ui_thread.hpp, DispatcherQueue of the main window). Nothing here has run against Apple Music yet: see docs/development/testing-on-a-pc.md.
+// It needs the Windows App SDK C++/WinRT headers, so it is built only when AMPIFY_WITH_XAML is defined (see
+// CMakeLists.txt). Every member must be called on the interface thread, through PostToUiThread (ui_thread.hpp,
+// DispatcherQueue of the main window).
 
 #if defined(AMPIFY_WITH_XAML)
 

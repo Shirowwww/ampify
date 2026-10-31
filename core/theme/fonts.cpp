@@ -37,10 +37,6 @@ double NumberOr(const std::string& text, double fallback) {
 
 }  // namespace
 
-const std::vector<FontStyle>& DefaultFontRoles() {
-    return kDefaults;
-}
-
 std::string CanonicalFontRole(std::string_view role) {
     std::string lowered(role);
     for (char& c : lowered) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));

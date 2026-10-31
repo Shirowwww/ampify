@@ -53,19 +53,21 @@ effect has to be taught to the engine once.
 
 ## What is still missing, by impact
 
-1. **A full-screen view of the song** (Beautiful Lyrics, Liquid Lyrics): large artwork, animated background, synchronized
-   lyrics. It needs a full-screen app page and access to Apple Music's lyrics (its pane `LyricsToggleButton` exists: to
-   read with the inspector).
-2. **Transitions:** a `transition: transform 200ms` so hovers animate instead of jumping. Feasible with Composition's
-   implicit animations.
-3. **Targeting the page cards** (albums, playlists) by their real names, for Comfy-style banners and grids: read the tree of
-   an album page and a playlist with the inspector.
-4. **The player on the kernel side:** `AMP.Services.Player` changed its interface in 1.1792 ("IPlayer absent" in the log):
-   `Ampify.player` does not see the current song through Apple's player, which blocks statistics and lyrics.
-5. **An animated background** (a warped artwork that moves, Kawarp): needs a Composition effect; after the full-screen view.
-6. **Spotify's CSS does not translate:** it targets HTML classes that do not exist in Apple Music. A Spicetify theme keeps
+Updated on 2026-10-31 (see [spicetify-ecosystem.md](spicetify-ecosystem.md) for the counts behind this order).
+
+1. **Feedback states beyond hover**: `:active` and `:focus` (13 of 18 themes), `@keyframes` (11).
+2. **Names for states and sub-parts**: selected and playing rows, the parts of the progress bar, the action bar and the
+   header background of album pages, lyrics lines, scrollbars, context menus.
+3. **Apple's own player views**: the mini player and the full-screen player, with karaoke lyrics, live in a second window
+   that themes do not reach ([apple-music-native-views.md](apple-music-native-views.md)). Ampify's Now Playing exists but
+   is simpler.
+4. **An animated background** (a warped artwork that moves, Kawarp): needs a Composition effect.
+5. **Spotify's CSS does not translate:** it targets HTML classes that do not exist in Apple Music. A Spicetify theme keeps
    its colors, not its layout.
-7. A transparent top of the window for the artwork theme, which leaves the playback bar area dark today.
+
+Done since the first survey: transitions (`transition`, see [docs/themes/format.md](../docs/themes/format.md)), names for
+cards, shelves and album headers ([docs/themes/names.md](../docs/themes/names.md)), the player on the kernel side, and a
+full-window Now Playing view.
 
 Images looked at (addresses on the date of the survey): Hazy `github.com/Astromations/Hazy/raw/main/hazy_home.png`, Comfy
 `github.com/Comfy-Themes/Spicetify/raw/main/images/preview.png`, Lucid

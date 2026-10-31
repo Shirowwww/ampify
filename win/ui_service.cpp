@@ -1,4 +1,4 @@
-// NOT RUN YET IN APPLE MUSIC: see ui_service.hpp. Written against the C++/WinRT projection of Windows App SDK 1.8.
+// Written against the C++/WinRT projection of Windows App SDK 1.8.
 // Window discovery, page watching and the refresh tickets are adapted from AMExclusive (MIT,
 // https://github.com/AntiOblivionis/AMExclusive, mod/src/UiAdapter.cpp: ScheduleUiDiscovery, QueueUiRefresh,
 // ObserveUiHosts, RefreshUiWindow, AttachOrRefreshToggle, at 91f589d).

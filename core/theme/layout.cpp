@@ -28,7 +28,7 @@ std::optional<LayoutConfig> ParseLayout(std::string_view json, std::vector<std::
     std::string error;
     std::optional<Json> document = Json::Parse(json, &error);
     if (!document || !document->IsObject()) {
-        problems.push_back("JSON illisible" + (error.empty() ? std::string() : " : " + error));
+        problems.push_back("invalid JSON" + (error.empty() ? std::string() : ": " + error));
         return std::nullopt;
     }
     const Json* items = document->Find("items");

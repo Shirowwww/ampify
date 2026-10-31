@@ -10,7 +10,7 @@ namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 31> kProperties{{
+constexpr std::array<PropertySpec, 36> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
@@ -18,6 +18,7 @@ constexpr std::array<PropertySpec, 31> kProperties{{
     {"border-color", "BorderBrush", PropertyKind::Brush},
     {"border-width", "BorderThickness", PropertyKind::Thickness},
     {"corner-radius", "CornerRadius", PropertyKind::Thickness},
+    {"border-radius", "CornerRadius", PropertyKind::Thickness},  // the name CSS and Spicetify themes use
     {"font-family", "FontFamily", PropertyKind::Text},
     {"font-size", "FontSize", PropertyKind::Length},
     {"font-weight", "FontWeight", PropertyKind::Number},
@@ -25,6 +26,10 @@ constexpr std::array<PropertySpec, 31> kProperties{{
     {"padding", "Padding", PropertyKind::Thickness},
     {"width", "Width", PropertyKind::Length},
     {"height", "Height", PropertyKind::Length},
+    {"min-width", "MinWidth", PropertyKind::Length},
+    {"max-width", "MaxWidth", PropertyKind::Length},
+    {"min-height", "MinHeight", PropertyKind::Length},
+    {"max-height", "MaxHeight", PropertyKind::Length},
     {"opacity", "Opacity", PropertyKind::Number},
     {"visibility", "Visibility", PropertyKind::Visibility},
     {"template", "Template", PropertyKind::Template},
@@ -656,6 +661,9 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
         case PropertyKind::Backdrop:
             return ConvertBackdrop(raw, context);
         case PropertyKind::Length:
+            // No limit: XAML's MaxWidth and MaxHeight default to infinity, MinWidth and MinHeight to 0 (NaN throws).
+            if (spec.css.starts_with("max-") && Lowered(Trimmed(raw)) == "none") return Ok(ValueKind::Length, "inf");
+            if (spec.css.starts_with("min-") && Lowered(Trimmed(raw)) == "auto") return Ok(ValueKind::Length, "0");
             return ConvertLength(raw);
         case PropertyKind::Thickness:
             return ConvertThickness(raw);

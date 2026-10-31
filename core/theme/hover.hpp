@@ -45,7 +45,6 @@ public:
     void Forget(NodeId id) { m_elements.erase(id); }
 
     bool Has(NodeId id) const { return m_elements.count(id) > 0; }
-    bool Hovered(NodeId id) const;
     size_t Count() const { return m_elements.size(); }
 
 private:

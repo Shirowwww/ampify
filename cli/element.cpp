@@ -135,10 +135,6 @@ bool IsValidVersion(std::string_view text) {
     return Matches(text, kVersionRule);
 }
 
-bool IsValidKind(std::string_view text) {
-    return Matches(text, kKindRule);
-}
-
 bool IsValidPermission(std::string_view text) {
     return Matches(text, kPermissionRule);
 }

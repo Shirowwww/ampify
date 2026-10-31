@@ -17,9 +17,10 @@ Atmos leveler.
 - Stable names for about 120 zones of Apple Music (`.sidebar`, `.playbar`, `.card`...) and ready-made layouts
   (`@import "ampify:floating-panels"`, `"ampify:bottom-bar"`) with aligned edges. `ampify_theme_check --names` checks the
   names against inspector trees after an Apple Music update.
-- Themes apply before a new page is drawn, with animated transitions, `:nth-child`, and four showcase themes: Greenroom
+- Themes apply before a new page is drawn, with animated transitions, `:nth-child`, and four example themes: Greenroom
   (play bar at the bottom), Artwork, Glass and Midnight. A button keeps the theme's colours under the pointer and while
-  pressed (Greenroom's white play button used to turn black when clicked).
+  pressed (Greenroom's white play button used to turn black when clicked). Rules accept `border-radius` as well as
+  `corner-radius`, and `min-width`, `max-width`, `min-height`, `max-height`.
 - The inspector shows what each element's visual states change. It no longer walks Apple Music's resource dictionaries,
   which made the app crash at the next theme change.
 - Now Playing: the song over the whole window, its cover on a blurred background and its lyrics in time with the song

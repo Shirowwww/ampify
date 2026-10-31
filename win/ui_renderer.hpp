@@ -2,7 +2,7 @@
 
 // The native renderer: turns the interface trees of core/ui_model (Ampify.ui, Ampify.React) into WinUI controls, and
 // updates them in place when the extension registers its tree again. Compiled only with AMPIFY_WITH_XAML. Every call
-// happens on the interface thread. Not run yet in Apple Music: see docs/development/testing-on-a-pc.md.
+// happens on the interface thread.
 //
 // | primitive | control                                                                       |
 // |-----------|-------------------------------------------------------------------------------|

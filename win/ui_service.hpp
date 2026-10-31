@@ -2,8 +2,8 @@
 
 // The kernel's interface service in AppleMusic.exe: finds Apple Music's XAML windows, follows their pages, shows the
 // extensions' panels, popups, app pages, fullscreen view and buttons with the native renderer (ui_renderer.hpp), and adds the
-// "Ampify" card to the Playback page of the settings. Compiled only with AMPIFY_WITH_XAML. Not run
-// yet in Apple Music: the bench case 63-ui-surfaces checks its log lines (docs/development/testing-on-a-pc.md).
+// "Ampify" card to the Playback page of the settings. Compiled only with AMPIFY_WITH_XAML. The bench case
+// 63-ui-surfaces checks its log lines (docs/development/testing-on-a-pc.md).
 //
 // Threads: a worker thread (MTA) watches the windows (SetWinEventHook on the process + a poll every 5 s) and the
 // interface model (UiModel, every 250 ms); everything that touches XAML runs on the window's interface thread through

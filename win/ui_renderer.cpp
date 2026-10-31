@@ -1,4 +1,4 @@
-// NOT RUN YET IN APPLE MUSIC: see ui_renderer.hpp. Written against the C++/WinRT projection of Windows App SDK 1.8.
+// Written against the C++/WinRT projection of Windows App SDK 1.8.
 // The style copying follows AMExclusive (MIT, https://github.com/AntiOblivionis/AMExclusive, mod/src/UiAdapter.cpp,
 // AttachOrRefreshToggle, at 91f589d): native Style, margins and padding first, WinUI card resources otherwise.
 

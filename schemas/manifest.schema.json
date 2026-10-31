@@ -18,7 +18,7 @@
     "author": {
       "type": "string",
       "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$",
-      "description": "Identifiant GitHub de l'auteur."
+      "description": "GitHub login of the author."
     },
     "description": {"type": "string", "minLength": 1, "maxLength": 300},
     "kitApi": {"$ref": "#/$defs/kitApi"},

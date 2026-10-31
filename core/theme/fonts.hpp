@@ -29,10 +29,6 @@ struct FontStyle {
     bool fromTheme = false;
 };
 
-// The roles of the Windows 11 type ramp, in this order: caption, body, body-strong, subtitle, title, title-large,
-// display. They are the defaults when a theme says nothing.
-const std::vector<FontStyle>& DefaultFontRoles();
-
 // Lower case, and the French names map to the English ones: titre -> title, texte -> body, sous-titre -> subtitle,
 // legende or legende with an accent -> caption.
 std::string CanonicalFontRole(std::string_view role);

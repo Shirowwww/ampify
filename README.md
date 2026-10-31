@@ -4,23 +4,24 @@ Themes, extensions and apps for Apple Music on Windows. Ampify does for the offi
 Spicetify does for Spotify: you change how it looks and add features, and Apple Music keeps everything it already
 does (lossless, Dolby Atmos, lyrics, your library, sync).
 
-> **Status: early.** Ampify runs on a test PC with Apple Music 1.1792.39682.0 (from the Microsoft Store) and on the
+> Early days: Ampify runs on a test PC with Apple Music 1.1792.39682.0 (from the Microsoft Store) and on the
 > Windows CI bench. It is not released yet.
 
 ## What you get
 
-- **Themes** that restyle the whole window: colors, fonts, corner radius, glass and acrylic panels, the artwork of
+- Themes that restyle the whole window: colors, fonts, corner radius, glass and acrylic panels, the artwork of
   the song playing behind the interface, a playback bar moved to the bottom. Spicetify `color.ini` palettes work as
   they are (`ampify theme import <github address>`).
-- **Now Playing**: the song playing over the whole window, its cover on a blurred background and its lyrics in time
-  with the song (Apple Music's own, or LRCLIB's).
-- **A Marketplace page inside Apple Music**: browse, install, update and switch themes and extensions in two clicks.
-- **Extensions in JavaScript** with an API close to Spicetify's (`Ampify.Player`, `Ampify.React`,
-  `Ampify.components`, `Ampify.Platform`...): panels, pages, notifications, Discord presence, Last.fm scrobbling,
-  keyboard shortcuts, a sleep timer.
-- **An Atmos leveler**: Dolby Atmos tracks play about 4 dB quieter than stereo ones in Apple Music. The leveler
+- Now Playing, which puts the current song over the whole window: its cover on a blurred background and its lyrics
+  in time with the music (Apple Music's own, or LRCLIB's).
+- A Marketplace page inside Apple Music, where you browse, install, update and switch themes and extensions in two
+  clicks.
+- JavaScript extensions, with an API close to Spicetify's (`Ampify.Player`, `Ampify.React`, `Ampify.components`,
+  `Ampify.Platform`...): panels, pages, notifications, Discord presence, Last.fm scrobbling, keyboard shortcuts, a
+  sleep timer.
+- An Atmos leveler. Dolby Atmos tracks play about 4 dB quieter than stereo ones in Apple Music; the leveler
   measures each track and corrects the gain on the decoded samples. The volume bar never moves.
-- **A command line** (`ampify.exe`) for everything: settings, themes, extensions, backups, author tools.
+- A command line, `ampify.exe`, for settings, themes, extensions, backups and author tools.
 
 ## Install
 
