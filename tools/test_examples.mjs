@@ -440,9 +440,29 @@ test("fullscreen-demo opens a layered view from the top bar, steps its lines and
   assert.equal(world.intervals.size, 0);
 });
 
-// Now Playing ships with Ampify, in extensions/ rather than examples/.
-function fakeNowPlaying({ apple = null, lrclib = [], busyFirst = false } = {}) {
-  const dir = join(examples, "..", "extensions", "now-playing");
+test("now-playing opens Apple's full-screen player from the playback bar", () => {
+  const dir = join(examples, "..", "extensions", "now-playing");  // ships with Ampify, in extensions/
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+  const granted = new Set(manifest.permissions ?? []);
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+  };
+  const buttons = [];
+  let opened = 0;
+  const ui = {
+    playbar: { addButton: (button) => (need("ui.playbar"), buttons.push(button)) },
+    applePlayer: { open: () => (need("ui.fullscreen"), opened++) },
+  };
+  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify: { ui } });
+  assert.equal(buttons.length, 1);
+  assert.equal(buttons[0].icon, "");
+  assert.equal(opened, 0, "nothing opens before the button is clicked");
+  buttons[0].onClick();
+  assert.equal(opened, 1);
+});
+
+function fakeLyricsView({ apple = null, lrclib = [], busyFirst = false } = {}) {
+  const dir = join(examples, "lyrics-view");
   const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
   const source = readFileSync(join(dir, "main.js"), "utf-8");
   const granted = new Set(manifest.permissions ?? []);
@@ -498,17 +518,17 @@ function fakeNowPlaying({ apple = null, lrclib = [], busyFirst = false } = {}) {
   return world;
 }
 
-const settleNowPlaying = () => new Promise((resolve) => setTimeout(resolve, 20));
+const settleLyricsView = () => new Promise((resolve) => setTimeout(resolve, 20));
 const lyricLines = (view) => view.children[2].children[1].children.filter((node) => node.key && node.key.startsWith("line-"));
 
-test("now-playing shows the cover and LRCLIB's synced lyrics, retrying when the service is busy", async () => {
+test("lyrics-view shows the cover and LRCLIB's synced lyrics, retrying when the service is busy", async () => {
   const lrc = "[00:05.00]first line\n[00:10.00]second line\n[00:15.00]third line";
-  const world = fakeNowPlaying({ lrclib: [{ syncedLyrics: lrc }], busyFirst: true });
+  const world = fakeLyricsView({ lrclib: [{ syncedLyrics: lrc }], busyFirst: true });
   assert.equal(world.buttons.length, 1);
   assert.equal(world.views.length, 0, "nothing opens before the button is clicked");
 
   world.buttons[0].onClick();
-  await settleNowPlaying();
+  await settleLyricsView();
   const view = world.views.at(-1);
   assert.equal(view.children[0].src, "https://is1.example/a/1200x1200bb.jpg");
   const lines = lyricLines(view);
@@ -517,11 +537,11 @@ test("now-playing shows the cover and LRCLIB's synced lyrics, retrying when the 
   assert.ok(world.asked.some((url) => url.includes("track_name=Song&")), "the title is searched without its featuring");
 });
 
-test("now-playing prefers Apple's lyrics, and stops its timer when closed", async () => {
+test("lyrics-view prefers Apple's lyrics, and stops its timer when closed", async () => {
   const apple = { synced: true, lines: [{ start: 0, end: 20000, text: "apple line" }] };
-  const world = fakeNowPlaying({ apple });
+  const world = fakeLyricsView({ apple });
   world.buttons[0].onClick();
-  await settleNowPlaying();
+  await settleLyricsView();
   assert.deepEqual(lyricLines(world.views.at(-1)).map((line) => line.text), ["apple line"]);
   assert.ok(!world.asked.some((url) => url.includes("lrclib")), "no LRCLIB request when Apple has the lyrics");
 

@@ -168,6 +168,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             bool refreshed = ui->backend.SetAppMode(request.theme ? std::optional<bool>(request.theme->dark.value_or(
                                                                         theme::IsDarkScheme(request.theme->scheme)))
                                                                   : std::nullopt);
+            if (std::string note = ui->backend.TakeCaptionNote(); !note.empty()) journal.Write(note);
             if (refreshed) {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - modeStart);
                 bool worthLogging = ui->timedRefreshes < kTimedPasses || ms.count() > kSlowPassMs;

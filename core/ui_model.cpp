@@ -401,6 +401,16 @@ std::uint64_t UiModel::RouteSerial() const {
     return m_routeSerial;
 }
 
+void UiModel::RequestApplePlayer() {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    m_applePlayerRequests++;
+}
+
+std::uint64_t UiModel::ApplePlayerRequests() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return m_applePlayerRequests;
+}
+
 bool ValidateTree(const Json& tree, std::string* error) {
     int nodes = 0;
     return CheckNode(tree, "", 1, nodes, error);

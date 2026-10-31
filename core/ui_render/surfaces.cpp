@@ -106,6 +106,9 @@ SurfaceChanges SurfaceTracker::Poll(const UiModel& model) {
     if (route && (route != m_route || serial != m_routeSerial)) changes.route = route;
     m_route = route;
     m_routeSerial = serial;
+    std::uint64_t requests = model.ApplePlayerRequests();
+    changes.applePlayer = requests != m_applePlayerRequests;
+    m_applePlayerRequests = requests;
 
     m_current = std::move(now);
     m_signatures = std::move(signatures);

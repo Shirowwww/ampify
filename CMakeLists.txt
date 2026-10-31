@@ -148,7 +148,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
             target_include_directories(ampify_kernel PRIVATE "${AMPIFY_WINAPPSDK_INCLUDE}")
         endif()
         # C++/WinRT calls RoGetActivationFactory and RoOriginateLanguageException, exported by runtimeobject.lib.
-        target_link_libraries(ampify_kernel PRIVATE ampify_theme runtimeobject)
+        # dwmapi: the visible frame of a window, to lay Apple's player over the main window (win/apple_player.cpp).
+        target_link_libraries(ampify_kernel PRIVATE ampify_theme runtimeobject dwmapi)
         # The WinUI projection gives objects with more sections than the default COFF limit.
         target_compile_options(ampify_kernel PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
         if(MSVC AND NOT CMAKE_CXX_COMPILER_LAUNCHER)

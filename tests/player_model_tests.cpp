@@ -22,10 +22,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
-// "AMP.Services.IPlayer" -> its methods, in order, from knowledge/winmd/AMP.Services.txt.
-std::map<std::string, std::vector<std::string>> WinmdMethods() {
-    std::map<std::string, std::vector<std::string>> types;
-    std::ifstream file(fs::path(AMPIFY_SOURCE_DIR) / "knowledge" / "winmd" / "AMP.Services.txt");
+void ReadWinmdList(std::istream& file, std::map<std::string, std::vector<std::string>>& types) {
     std::string line, current;
     while (std::getline(file, line)) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
@@ -38,6 +35,15 @@ std::map<std::string, std::vector<std::string>> WinmdMethods() {
         } else if (!line.empty() && line[0] != ' ') {
             current = line;
         }
+    }
+}
+
+// "AMP.Services.IPlayer" -> its methods, in order, from knowledge/winmd/AMP.Services.txt and AMP.UI.Views.txt.
+std::map<std::string, std::vector<std::string>> WinmdMethods() {
+    std::map<std::string, std::vector<std::string>> types;
+    for (const char* name : {"AMP.Services.txt", "AMP.UI.Views.txt"}) {
+        std::ifstream file(fs::path(AMPIFY_SOURCE_DIR) / "knowledge" / "winmd" / name);
+        ReadWinmdList(file, types);
     }
     return types;
 }

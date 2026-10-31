@@ -67,12 +67,20 @@ dozens of times. Always target them under a named parent.
 | Icons as empty squares | A `TextBlock { font-family }` rule changed the font of glyphs (private-use characters) | The engine never changes the font of a text made of icons |
 | "Primary" buttons as symbols | Apple Music's `AccentButtonStyle` draws the text in a symbol font | Use Apple Music's button style and set accent colors on top |
 
+## Windows
+
+| Problem | Cause | Fix |
+|---|---|---|
+| Apple's full-screen player lost its resize border a moment after Ampify set `WS_THICKFRAME` | The FullScreen presenter of its AppWindow puts its own Win32 style back after any change | Give the window an `OverlappedPresenter` with `SetBorderAndTitleBar(true, false)`, on the window's interface thread |
+| Which new window is Apple's player? | Enumerating the process's windows also finds dialogs and Ampify's own windows | Ask Apple Music by name: `GetAppProperty("FullScreenPlayerWindow")`, like `MainWindow` |
+
 ## Build and capture
 
 | Problem | Cause | Fix |
 |---|---|---|
 | MSVC build failed on a PC | `build-msvc.ps1` took the first `cppwinrt.exe` (SDK 17763, C++/WinRT 1.0) | The newest SDK that has an x64 `cppwinrt.exe` |
 | XAML link error | `RoGetActivationFactory` missing | Link `runtimeobject` |
+| CI build: `'GetClassNameA': is not a member of ... IAutomationPeer` | `windows.h` came between two WinRT headers: its `GetClassName` macro renamed the method in one and not the other (the CI builds without `UNICODE`) | Include every WinRT header of the file before `windows.h` |
 | Screenshot cut off on the right | PowerShell not DPI aware, screen at 125% | `SetProcessDpiAwarenessContext(-4)` before capturing |
 | Catppuccin Latte looked the same as Apple Music's light mode | Colors close to Apple Music's own show no difference | Compare side by side, and change shapes too |
 

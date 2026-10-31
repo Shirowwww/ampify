@@ -298,6 +298,18 @@ TEST_CASE(UiRender_SurfacesCoverPopupsPagesControlsAndRoute) {
     CHECK(tracker.Poll(model).removed.size() == 1);
 }
 
+TEST_CASE(UiRender_AnApplePlayerRequestIsReportedOnce) {
+    ampify::UiModel model;
+    SurfaceTracker tracker;
+    CHECK(!tracker.Poll(model).applePlayer);
+
+    model.RequestApplePlayer();
+    SurfaceChanges changes = tracker.Poll(model);
+    CHECK(changes.applePlayer);
+    CHECK(!changes.Empty());
+    CHECK(!tracker.Poll(model).applePlayer);
+}
+
 TEST_CASE(UiRender_SettingsAnchorIsTheStackWithTheMostToggles) {
     FakeTree tree;
     int root = tree.Add(-1, "Microsoft.UI.Xaml.Controls.Grid", kProbePanel | kProbeGrid);

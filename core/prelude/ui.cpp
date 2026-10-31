@@ -71,6 +71,7 @@ const char kUi[] = R"AMPIFYJS(
     }),
     popup: Object.freeze({ open: (vue) => native.uiPopup(treeText(vue)) }),
     fullscreen,
+    applePlayer: Object.freeze({ open: () => native.uiApplePlayer() }),
     panel: Object.freeze({ register: (id, vue) => native.uiPanel(text(id), treeText(vue)) }),
     page: Object.freeze({ register: (path, vue) => native.uiPage(text(path), treeText(vue)) }),
     title: Object.freeze({ set: (title) => native.uiTitle(text(title)) }),

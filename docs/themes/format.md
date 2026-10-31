@@ -155,6 +155,7 @@ Page {
 | `width`, `height` | `Width`, `Height` | A length or `auto` |
 | `min-width`, `min-height` | `MinWidth`, `MinHeight` | A length, or `auto` for no minimum |
 | `max-width`, `max-height` | `MaxWidth`, `MaxHeight` | A length, or `none` for no maximum |
+| `compact-pane-length` | `CompactPaneLength` | On `.navigation`: the width of the sidebar folded into icons (48 in Apple Music) |
 | `opacity` | `Opacity` | A number from 0 to 1 |
 | `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`) |
 | `template` | `Template` | `url(templates/file.xaml)`, a full `ControlTemplate` |
@@ -284,6 +285,7 @@ Each layout reads variables that the theme may set in its `:root`, with these de
 | `--gap` | `8` | The space around the panels |
 | `--gap-half` | `4` | Half of it, between the two panels, so the gap between them equals the others |
 | `--content-top` | `64` | `floating-panels`: where the pages start, below the playback bar at the top |
+| `--compact-pane` | `56` | `floating-panels`: the width of the sidebar folded into icons, its left gap included (48 + 8). Wider shows the start of the texts Apple Music hides there |
 | `--page-top` | `8`, or `40` with `bottom-bar` | The space above the first line of a page. With the bar at the bottom, it leaves room for the window's buttons. |
 | `--bar-height` | `72` | `bottom-bar`: the height of the bar |
 | `--bar-room` | `80` | `bottom-bar`: the space the panels leave at the bottom, the bar and a gap |

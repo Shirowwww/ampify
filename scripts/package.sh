@@ -103,7 +103,7 @@ for file in "${binaries[@]/#/$bin_dir/}" "$cli_dir/ampify.exe"; do
 done
 
 # The examples the guide uses: extensions with something to see or hear, and the example themes.
-extensions=(react-panel now-playing-notify hello-extension keyboard-skip sleep-timer)
+extensions=(react-panel now-playing-notify hello-extension keyboard-skip sleep-timer lyrics-view)
 themes=(greenroom midnight large-text rounded-buttons hide-chrome glass artwork)
 
 stage="$(mktemp -d)"
@@ -119,7 +119,7 @@ for id in "${extensions[@]}"; do
 done
 # The Marketplace page ships with Ampify (it holds kit.manage, which the catalog refuses).
 cp -R "$root/apps/marketplace" "$pkg/examples/apps/"
-# Now Playing too: the full window view with lyrics is part of Ampify.
+# Now Playing too: its button opens Apple Music's full-screen player.
 cp -R "$root/extensions/now-playing" "$pkg/examples/extensions/"
 for id in "${themes[@]}"; do
     [[ -d "$root/themes/examples/$id" ]] || die "example theme not found: themes/examples/$id"

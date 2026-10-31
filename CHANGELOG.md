@@ -20,11 +20,15 @@ Atmos leveler.
 - Themes apply before a new page is drawn, with animated transitions, `:nth-child`, and four example themes: Greenroom
   (play bar at the bottom), Artwork, Glass and Midnight. A button keeps the theme's colours under the pointer and while
   pressed (Greenroom's white play button used to turn black when clicked). Rules accept `border-radius` as well as
-  `corner-radius`, and `min-width`, `max-width`, `min-height`, `max-height`.
+  `corner-radius`, and `min-width`, `max-width`, `min-height`, `max-height`, `compact-pane-length`. In a narrow
+  window, `floating-panels` widens the folded sidebar so its gaps no longer cut its icons. The window's own buttons
+  (minimize, maximize, close) follow the theme's light or dark mode: they were black on dark themes on a PC in light
+  mode.
 - The inspector shows what each element's visual states change. It no longer walks Apple Music's resource dictionaries,
   which made the app crash at the next theme change.
-- Now Playing: the song over the whole window, its cover on a blurred background and its lyrics in time with the song
-  (Apple Music's own, or LRCLIB's).
+- Now Playing: a button of the playback bar that opens Apple Music's own full-screen player as a window laid over the
+  main one, without a title bar (`Ampify.ui.applePlayer.open()`). The view Ampify drew before, the cover on a blurred
+  background with the lyrics in time (Apple Music's own, or LRCLIB's), is now the `lyrics-view` example.
 - The Marketplace page, opened from the Ampify entry at the bottom of the sidebar. It reads the public catalog,
   Shirowwww/ampify-catalog.
 - The "Ampify" card in Settings > Playback: one switch per extension, with an immediate effect.

@@ -104,7 +104,8 @@ const Expected kMembers[] = {
     {"ui", "object!{topbar:object!{addButton:f1=addButton},playbar:object!{addButton:f1=addButton},"
            "sidebar:object!{addItem:f1=addItem},"
            "menu:object!{addItem:f2=addItem},popup:object!{open:f1=open},"
-           "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},panel:object!{register:f2=register},"
+           "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},"
+           "panel:object!{register:f2=register},"
            "page:object!{register:f2=register},title:object!{set:f1=set},navigate:f1=navigate}"},
 };
 

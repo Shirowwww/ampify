@@ -126,6 +126,18 @@ TEST_CASE(Interface_NavigateAsksForAPage) {
     CHECK(route->second == "/library");
 }
 
+TEST_CASE(Interface_ApplePlayerNeedsTheFullscreenPermission) {
+    Fixture f;
+    auto denied = f.Make("apple-no", "extension", "", R"(Ampify.ui.applePlayer.open();)");
+    CHECK(!denied->Start());
+    CHECK(f.host.ui.ApplePlayerRequests() == 0);
+
+    auto allowed = f.Make("apple-yes", "extension", R"("ui.fullscreen")",
+                          R"(Ampify.ui.applePlayer.open(); Ampify.ui.applePlayer.open();)");
+    CHECK(allowed->Start());
+    CHECK(f.host.ui.ApplePlayerRequests() == 2);
+}
+
 TEST_CASE(Interface_TitleNeedsTheWindowPermission) {
     Fixture f;
     auto denied = f.Make("title-no", "extension", "", R"(Ampify.ui.title.set("Demo");)");

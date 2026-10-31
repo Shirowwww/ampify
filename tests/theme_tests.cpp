@@ -122,6 +122,14 @@ public:
         return hover.Write(id, property, value, *this);
     }
 
+    // Properties an element shows without holding a value of its own (inherited, from its template).
+    std::set<std::pair<th::NodeId, std::string>> notOwn;
+
+    std::optional<th::Value> ReadOriginal(th::NodeId id, std::string_view property) override {
+        if (notOwn.count({id, std::string(property)})) return th::kNoOwnValue;
+        return Read(id, property);
+    }
+
     bool SetHover(th::NodeId id, const std::vector<th::HoverValue>& values) override {
         bool alive = Find(id) != nullptr;
         if (values.empty()) {
@@ -609,6 +617,9 @@ TEST_CASE(Properties_AcceptTheCssNamesThemesUseMost) {
     CHECK(Converted("min-width", "auto", palette, files) == "0");
     CHECK(th::FindProperty("min-height")->xaml == "MinHeight");
     CHECK(th::FindProperty("max-width")->xaml == "MaxWidth");
+    // The width of the folded sidebar, for layouts that put margins around it.
+    CHECK(th::FindProperty("compact-pane-length") && th::FindProperty("compact-pane-length")->xaml == "CompactPaneLength");
+    CHECK(Converted("compact-pane-length", "60px", palette, files) == "60");
 }
 
 TEST_CASE(Properties_ConvertVisibilityNumbersAndText) {
@@ -858,6 +869,28 @@ constexpr const char* kPageRules =
     "#Hide { visibility: collapsed; }\n";
 
 }  // namespace
+
+TEST_CASE(Engine_RestoreClearsWhatTheElementOnlyInherited) {
+    MemoryFiles files;
+    files.files["user.css"] = "FontIcon { color: #FF000000; }\nTextBlock { color: #FF00FF00; }\n";
+    th::Theme theme = Load(files);
+
+    FakeTree tree;
+    th::NodeId icon = tree.Add(-1, "FontIcon", "", {{"Foreground", Brush("#FFE4E4E4")}});
+    th::NodeId text = tree.Add(-1, "TextBlock", "", {{"Foreground", Brush("#FF111111")}});
+    tree.notOwn.insert({icon, "Foreground"});  // the icon shows its button's colour
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(icon, "Foreground").text == "#FF000000");
+    engine.Restore(tree);
+
+    // The icon gets no fixed colour back, so it follows its button again; the text had its own and gets it back.
+    CHECK(tree.Shown(icon, "Foreground") == th::kNoOwnValue);
+    CHECK(tree.Shown(text, "Foreground").text == "#FF111111");
+}
 
 TEST_CASE(Engine_AppliesTheCascadeAndRestoresTheOriginals) {
     MemoryFiles files;

@@ -59,7 +59,20 @@ inline constexpr char kIidUriRuntimeClass[] = "9E365E57-48B2-4160-956F-C7385120B
 inline constexpr char kIidNotifyPropertyChanged[] = "90B17601-B065-586E-83D9-9ADC3A695284";
 inline constexpr char kIidPropertyChangedHandler[] = "E3DE52F6-1E32-5DA6-BB2D-B5B6096C962D";
 
+// Apple's own full-screen player, in AMP.UI.Views.winmd 1.1792 (GuidAttribute values of IFullScreenPlayerStatics and
+// IFullScreenPlayer). The full-screen button of Apple's mini player shows the same object. Opened by
+// Ampify.ui.applePlayer (win/apple_player.cpp).
+inline constexpr char kFullScreenPlayerClass[] = "AMP.UI.Views.FullScreenPlayer";
+inline constexpr char kIidFullScreenPlayerStatics[] = "4D31E252-6ACE-5007-9125-9AD55E79E5E6";
+inline constexpr char kIidFullScreenPlayer[] = "98034843-19EB-5B19-8A3F-A1AEDEDD9727";
+
 namespace slot {
+// AMP.UI.Views.IFullScreenPlayerStatics: Instance, Shutdown. AMP.UI.Views.IFullScreenPlayer: get_ViewModel,
+// put_ViewModel, Show (no argument).
+inline constexpr int kFullScreenPlayerStaticsInstance = 6;
+inline constexpr int kFullScreenPlayerViewModel = 6;
+inline constexpr int kFullScreenPlayerShow = 8;
+
 // AMP.Services.IPlayerStatics: get_Current.
 inline constexpr int kPlayerStaticsCurrent = 6;
 
@@ -116,7 +129,7 @@ inline constexpr int kPlayQueueStaticsCurrent = 6;
 inline constexpr int kPlayQueueSections = 9;
 }  // namespace slot
 
-// Every slot above with its interface and method, for the test against AMP.Services.txt.
+// Every slot above with its interface and method, for the test against AMP.Services.txt and AMP.UI.Views.txt.
 struct SlotEvidence {
     const char* interfaceName;
     const char* method;
@@ -156,6 +169,9 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.CommonModels.ILyricsInfo", "GetLanguage", slot::kLyricsLanguage},
     {"AMP.Services.IPlayQueueStatics", "get_Current", slot::kPlayQueueStaticsCurrent},
     {"AMP.Services.IPlayQueue", "get_Sections", slot::kPlayQueueSections},
+    {"AMP.UI.Views.IFullScreenPlayerStatics", "Instance", slot::kFullScreenPlayerStaticsInstance},
+    {"AMP.UI.Views.IFullScreenPlayer", "get_ViewModel", slot::kFullScreenPlayerViewModel},
+    {"AMP.UI.Views.IFullScreenPlayer", "Show", slot::kFullScreenPlayerShow},
 };
 
 // AMP.Services.CommonModels.AudioFormat, in the order of its fields in AMP.Services.txt: Other, Lossless,

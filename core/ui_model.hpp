@@ -74,6 +74,10 @@ public:
     // The page that the last navigate call asked for.
     void Navigate(const std::string& elementId, const std::string& path);
 
+    // Ampify.ui.applePlayer.open: one more each time an element asks for Apple's own full-screen player.
+    void RequestApplePlayer();
+    std::uint64_t ApplePlayerRequests() const;
+
     // Removes everything that the element added, when it stops.
     void RemoveElement(const std::string& elementId);
 
@@ -102,6 +106,7 @@ private:
     std::map<std::string, std::string> m_titles;
     std::optional<std::pair<std::string, std::string>> m_route;
     std::uint64_t m_routeSerial = 0;
+    std::uint64_t m_applePlayerRequests = 0;
 };
 
 // Checks a tree sent by an element: only the known primitives, with bounded depth, size and text. Attributes are

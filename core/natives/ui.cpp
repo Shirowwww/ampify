@@ -85,6 +85,15 @@ struct UiNatives : ScriptBridge {
         return JS_NewFloat64(ctx, static_cast<double>(HostOf(ext).Ui().SetFullscreen(ext->id(), std::move(*tree), session)));
     }
 
+    // native.uiApplePlayer(): opens Apple Music's own full-screen player, as a window over the main one.
+    AMPIFY_NATIVE(UiApplePlayer) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.fullscreen", &failure)) return failure;
+        HostOf(ext).Ui().RequestApplePlayer();
+        return JS_UNDEFINED;
+    }
+
     // native.uiFullscreenClose(session): closes the element's own fullscreen surface, so it needs no permission.
     AMPIFY_NATIVE(UiFullscreenClose) {
         ScriptExtension* ext = Owner(ctx);
@@ -144,6 +153,7 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiPopup", UiNatives::UiPopup, 1);
     scope.Function("uiFullscreen", UiNatives::UiFullscreen, 2);
     scope.Function("uiFullscreenClose", UiNatives::UiFullscreenClose, 1);
+    scope.Function("uiApplePlayer", UiNatives::UiApplePlayer, 0);
     scope.Function("uiPage", UiNatives::UiPage, 2);
     scope.Function("uiNavigate", UiNatives::UiNavigate, 1);
     scope.Function("uiTitle", UiNatives::UiTitle, 1);

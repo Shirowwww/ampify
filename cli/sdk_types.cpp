@@ -205,6 +205,8 @@ declare const Ampify: {
     popup: { open(view: UiNode): void };
     // permission ui.fullscreen; onClose runs when the user closes it or another element takes the screen
     fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void };
+    // permission ui.fullscreen; Apple Music's own full-screen player, laid over the window
+    applePlayer: { open(): void };
     panel: { register(id: string, view: UiNode): void };
     title: { set(text: string): void };
     page: { register(path: string, view: UiNode): void };

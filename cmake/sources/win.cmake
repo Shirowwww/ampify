@@ -13,7 +13,8 @@ list(APPEND AMPIFY_HOOK_HARNESS_SOURCES tests/win/hook_harness.cpp
 
 list(APPEND AMPIFY_UI_THREAD_TEST_SOURCES tests/ui_thread_test.cpp)
 
-list(APPEND AMPIFY_XAML_SOURCES win/xaml_backend.cpp win/theme_service.cpp win/xaml_host.cpp win/ui_renderer.cpp win/ui_service.cpp)
+list(APPEND AMPIFY_XAML_SOURCES win/xaml_backend.cpp win/theme_service.cpp win/xaml_host.cpp win/ui_renderer.cpp win/ui_service.cpp
+    win/apple_player.cpp)
 
 list(APPEND AMPIFY_LAUNCHER_SOURCES
     launcher/launcher.cpp

@@ -68,6 +68,9 @@ inline constexpr std::string_view kOrderProperty = "Order";
 // The path of an Image value that stands for the artwork of the song playing (`background: artwork` in user.css).
 inline constexpr std::string_view kArtworkImage = "artwork:";
 
+// The original of a property the element had no value of its own for (TreeBackend::ReadOriginal).
+inline const Value kNoOwnValue{ValueKind::Opaque, "no-own-value"};
+
 // One value of a :hover rule: shown while the pointer is over the element.
 struct HoverValue {
     std::string property;  // XAML name, as for Read and Write
@@ -91,6 +94,11 @@ public:
 
     // False when the element is gone or does not support the property or the value.
     virtual bool Write(NodeId id, std::string_view property, const Value& value) = 0;
+
+    // The value to put back when the theme comes off, read before the first write. kNoOwnValue when the element had
+    // no value of its own (it showed its template's, its style's or its parent's): writing kNoOwnValue then clears the
+    // property, and the element follows them again. Writing back the value it showed would freeze it there.
+    virtual std::optional<Value> ReadOriginal(NodeId id, std::string_view property) { return Read(id, property); }
 
     // Application-level resources, such as brushes in the app dictionaries. Keys are the resource names.
     virtual std::vector<std::string> ResourceKeys() = 0;

@@ -19,7 +19,9 @@
 #include <vector>
 
 #include <winrt/Microsoft.UI.Dispatching.h>
+#include <winrt/Microsoft.UI.Windowing.h>
 #include <winrt/Microsoft.UI.Xaml.h>
+#include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 // ComboBox inherits SelectedItem and SelectionChanged from Selector, declared in Primitives. Without this include,
 // MSVC reported C3779 on both members (run 41071266204).
@@ -42,6 +44,7 @@ public:
     std::vector<theme::NodeInfo> Snapshot() override;
     std::optional<theme::Value> Read(theme::NodeId id, std::string_view property) override;
     bool Write(theme::NodeId id, std::string_view property, const theme::Value& value) override;
+    std::optional<theme::Value> ReadOriginal(theme::NodeId id, std::string_view property) override;
     std::vector<std::string> ResourceKeys() override;
     std::optional<theme::Value> ReadResource(std::string_view key) override;
     bool WriteResource(std::string_view key, const theme::Value& value) override;
@@ -68,6 +71,8 @@ public:
     std::size_t RefusedStateCount() const { return m_refusedStates; }
     // What made the last SetAppMode read the resources again, for the log.
     const std::string& RefreshReason() const { return m_refreshReason; }
+    // What the caption buttons were set to before the first theme, once, for the log; empty after.
+    std::string TakeCaptionNote() { return std::exchange(m_captionNote, std::string()); }
 
     // Runs `pass` on the interface thread soon after the interface may hold new elements: a page navigated
     // (Frame.Navigated, then twice more while the page fills in), rows or cards realised while scrolling
@@ -114,6 +119,11 @@ private:
                            std::string_view property, const winrt::Windows::Foundation::IInspectable& value) noexcept;
     void ReleaseStates(theme::NodeId id, std::string_view property) noexcept;
     void MarkResourcesDirty(std::string why);
+    // The window's caption buttons in the mode of the theme; nullopt gives them back the app's own colours.
+    void SetCaptionMode(std::optional<bool> dark);
+    struct CaptionColours;
+    static void WriteCaption(const winrt::Microsoft::UI::Windowing::AppWindowTitleBar& bar, const CaptionColours& wanted);
+    CaptionColours Restored(const winrt::Microsoft::UI::Windowing::AppWindowTitleBar& bar) const;
 
     winrt::weak_ref<winrt::Microsoft::UI::Xaml::Window> m_window;
     std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_elements;
@@ -148,6 +158,13 @@ private:
     std::shared_ptr<bool> m_closed = std::make_shared<bool>(false);  // set by Window.Closed, on the interface thread
     winrt::weak_ref<winrt::Microsoft::UI::Xaml::FrameworkElement> m_modeRoot;  // the element whose mode was changed
     std::optional<winrt::Microsoft::UI::Xaml::ElementTheme> m_modeOriginal;    // its value before the theme
+    struct CaptionColours {
+        winrt::Windows::Foundation::IReference<winrt::Windows::UI::Color> foreground, hoverForeground, hoverBackground,
+            pressedForeground, pressedBackground;
+    };
+    std::optional<CaptionColours> m_captionOriginal;  // the app's caption button colours, while a theme sets them
+    std::optional<CaptionColours> m_captionWritten;   // what Ampify wrote last
+    std::string m_captionNote;
     std::map<std::string, theme::Value> m_addedKeys;  // keys added on top of the theme dictionaries, with the value before
     bool m_resourcesDirty = false;  // a resource changed: {ThemeResource} references must be resolved again
     std::string m_dirtyReason;      // the first change since the last refresh, and how many followed it

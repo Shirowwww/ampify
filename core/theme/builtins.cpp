@@ -200,6 +200,11 @@ constexpr std::string_view kFloatingPanels = R"css(
     margin: var(--gap, 8) var(--gap-half, 4) var(--gap, 8) var(--gap, 8);
 }
 
+/* Folded in a narrow window, the sidebar keeps Apple Music's 48 pixels for its icons inside the gaps. */
+.navigation {
+    compact-pane-length: var(--compact-pane, 56);
+}
+
 .content {
     background: var(--panel-background, #17171A);
     corner-radius: var(--panel-radius, 10px);

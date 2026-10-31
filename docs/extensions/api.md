@@ -179,7 +179,7 @@ switching the element on. A function protected by an undeclared permission throw
 | `audio.eq` | `Ampify.audio.eq`, a 10-band equalizer applied to the samples | [preview] |
 | `ui.topbar`, `ui.playbar`, `ui.sidebar`, `ui.menu`, `ui.popup` | Adding interface elements at those places (`ui.sidebar`: an entry at the bottom of Apple Music's sidebar) | [preview] |
 | `ui.panel`, `ui.window` | Side panel, secondary window | [preview] |
-| `ui.fullscreen` | `Ampify.ui.fullscreen`, a view over the whole window (a "now playing" screen with lyrics) | [preview] |
+| `ui.fullscreen` | `Ampify.ui.fullscreen`, a view over the whole window (a "now playing" screen with lyrics), and `Ampify.ui.applePlayer`, Apple Music's own full-screen player | [preview] |
 | `ui.page` | App pages and navigation entries | [preview] |
 | `library.read` | `Ampify.library`, reading the library and playlists | [planned] |
 | `library.write` | Writing playlists, after reading (the queue goes through `player.control`) | [planned] |
@@ -407,6 +407,7 @@ Ampify.ui.popup.open(view)
 Ampify.ui.fullscreen.open(view)        // permission ui.fullscreen; called again, it updates the view in place
 Ampify.ui.fullscreen.close()
 Ampify.ui.fullscreen.onClose(fn)       // returns a function that removes fn
+Ampify.ui.applePlayer.open()           // permission ui.fullscreen; Apple Music's own full-screen player
 Ampify.ui.panel.register(id, view)
 Ampify.ui.title.set(text)
 Ampify.ui.page.register(path, view)     // for an app
@@ -439,6 +440,12 @@ Ampify.ui.fullscreen.open({ type: "layer", children: [
   ] },
 ] });
 ```
+
+**Apple's player.** `Ampify.ui.applePlayer.open()` opens the full-screen player of Apple Music, the one its mini player
+opens, and lays its window over the main window: same place and size, no title bar, edges that resize, and a
+background that moves the window when dragged. Apple draws everything in it (cover, lyrics, controls). When Apple Music
+refuses (its player has no view model yet, or another version of Apple Music changed its interfaces), nothing opens and
+the log says why. Now Playing (`extensions/now-playing`) is a button of the playback bar that calls it.
 
 Menus are not displayed yet.
 

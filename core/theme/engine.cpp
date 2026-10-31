@@ -185,7 +185,7 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
     }
 
     auto key = std::make_pair(node.id, property);
-    if (keep && !m_originals.count(key)) m_originals.emplace(key, *current);
+    if (keep && !m_originals.count(key)) m_originals.emplace(key, tree.ReadOriginal(node.id, property).value_or(*current));
 
     if (!tree.Write(node.id, property, assignment.value)) {
         Refuse(Describe(node) + " " + property, "value refused for \"" + Describe(node) + " " + property + "\"", report);

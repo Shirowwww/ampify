@@ -179,7 +179,7 @@ jobs:
           - shard: tools
             cases: cli-windows-tools,extension-hello,installer,cli-build-installed,test-kit,amp-player
           - shard: ui
-            cases: ui-examples,ui-inspector,ui-theme-midnight,ui-surfaces
+            cases: ui-examples,ui-inspector,ui-theme-midnight,ui-surfaces,ui-apple-player
     steps:
       - uses: actions/checkout@v4
 

@@ -10,7 +10,7 @@ namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 36> kProperties{{
+constexpr std::array<PropertySpec, 37> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
@@ -30,6 +30,7 @@ constexpr std::array<PropertySpec, 36> kProperties{{
     {"max-width", "MaxWidth", PropertyKind::Length},
     {"min-height", "MinHeight", PropertyKind::Length},
     {"max-height", "MaxHeight", PropertyKind::Length},
+    {"compact-pane-length", "CompactPaneLength", PropertyKind::Length},  // NavigationView, the folded sidebar
     {"opacity", "Opacity", PropertyKind::Number},
     {"visibility", "Visibility", PropertyKind::Visibility},
     {"template", "Template", PropertyKind::Template},

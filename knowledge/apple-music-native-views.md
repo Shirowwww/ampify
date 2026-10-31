@@ -13,7 +13,11 @@ copied here.
    that window into the **full-screen player** (`WindowPresenterFullScreen`).
 3. `ExitFullScreenButton` goes back to the mini player, `CloseFullScreenButton` closes it.
 
-Both views live in `MiniPlayerWindow`, not in the main window.
+Neither view lives in the main window. `AMP.UI.Views.FullScreenPlayer.Instance().Show()` (what Ampify's
+`Ampify.ui.applePlayer` calls) brings up a window of its own, which Apple names `FullScreenPlayerWindow` among its app
+properties (`GetAppProperty`, like `MainWindow` and `MiniPlayerWindow`). Measured on 1.1792: it is created within
+200 ms of `Show`, on the main window's interface thread, with the FullScreen presenter. That presenter puts its own
+Win32 style back after any change; swapping it for an overlapped presenter (border, no title bar) holds.
 
 ## Mini player (`MiniPlayerPage`, `MiniPlayerView`)
 
@@ -52,11 +56,14 @@ Apple's lyrics are richer than they look in the side panel:
 `SungColor`, `UnsungColor`, `LyricsOpacity_*`, `LineFontSize` and `ArtworkMaxSize` are not in the application's resources:
 each view defines them for itself. A theme cannot reach them with `colors.ini` today.
 
-## Against Ampify's Now Playing
+## Against Ampify's lyrics view
 
-| | Apple's full-screen player | Ampify's Now Playing (`extensions/now-playing`) |
+Now Playing (`extensions/now-playing`) opens Apple's player since 0.5.0. The view Ampify drew before is the
+`lyrics-view` example.
+
+| | Apple's full-screen player | Ampify's lyrics view (`examples/lyrics-view`) |
 |---|---|---|
-| Getting there | two clicks: artwork, then full screen, in a second window | one button in the playback bar, over the main window |
+| Getting there | two clicks in Apple Music (artwork, then full screen); one with Now Playing | one button in the playback bar, over the main window |
 | Background | animated artwork (`ImmersionLockup`) | the cover, blurred, still |
 | Lyrics | line states, word by word, background vocals, translation, pronunciation, instrumental dots | the current line highlighted, two lines before and four after |
 | Lyrics source | Apple's, always | Apple's once its lyrics panel has been open for the song, otherwise LRCLIB |
@@ -75,5 +82,5 @@ lyrics from LRCLIB when Apple has none.
 2. **Element-scoped resources.** Writing `SungColor`, `UnsungColor`, `LyricsOpacity_Current` or `LineFontSize` into a
    view's own resources would let a theme recolour and resize Apple's karaoke lyrics, the same way Ampify already keeps
    a button's colours under the pointer (it writes `{Control}{Property}PointerOver` keys into that button's resources).
-3. **One click to Apple's full screen.** A playback-bar button that opens Apple's full-screen player directly, instead
-   of an Ampify view, if Apple's commands for the mini player and the full-screen switch can be invoked.
+3. **One click to Apple's full screen.** Done: `Ampify.ui.applePlayer.open()` (`win/apple_player.cpp`), used by Now
+   Playing, opens it as a window over the main one.

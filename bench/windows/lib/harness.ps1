@@ -416,12 +416,19 @@ function Get-AppleMusicWindow {
 
 # Two captures per call: <Name>.png is the screen with Apple Music brought forward and maximized (consoles are
 # minimized first), <Name>-window.png is Apple Music's own window drawn by PrintWindow. Returns the screen capture.
+# -AsIs leaves Apple Music's windows where they are: a window laid over the main one stays in front.
 function Save-Screenshot {
-    param($Ctx, [string]$Name)
+    param($Ctx, [string]$Name, [switch]$AsIs)
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing
         $window = Get-AppleMusicWindow
-        if ($window -ne [IntPtr]::Zero) {
+        if ($AsIs) {
+            Get-Process -Name 'WindowsTerminal', 'conhost', 'OpenConsole', 'pwsh', 'powershell' -ErrorAction SilentlyContinue |
+                Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
+                ForEach-Object { [AmpifyWindowCapture]::ShowWindow($_.MainWindowHandle, 6) | Out-Null }  # SW_MINIMIZE
+            Start-Sleep -Milliseconds 500
+            $window = [IntPtr]::Zero  # no PrintWindow of the main window: it is behind
+        } elseif ($window -ne [IntPtr]::Zero) {
             Get-Process -Name 'WindowsTerminal', 'conhost', 'OpenConsole', 'pwsh', 'powershell' -ErrorAction SilentlyContinue |
                 Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
                 ForEach-Object { [AmpifyWindowCapture]::ShowWindow($_.MainWindowHandle, 6) | Out-Null }  # SW_MINIMIZE

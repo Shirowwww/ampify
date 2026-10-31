@@ -37,8 +37,9 @@ struct SurfaceChanges {
     std::vector<Surface> changed;  // surfaces whose tree, title or control changed
     std::vector<Surface> removed;  // surfaces that are gone (only kind, element, id and key are meaningful)
     std::optional<std::pair<std::string, std::string>> route;  // a new Ampify.ui.navigate (element, path), once
+    bool applePlayer = false;  // Ampify.ui.applePlayer.open was called since the last poll
 
-    bool Empty() const { return added.empty() && changed.empty() && removed.empty() && !route; }
+    bool Empty() const { return added.empty() && changed.empty() && removed.empty() && !route && !applePlayer; }
 };
 
 class SurfaceTracker {
@@ -54,6 +55,7 @@ private:
     std::map<std::string, std::string> m_signatures;  // key -> what the surface showed, as text
     std::optional<std::pair<std::string, std::string>> m_route;
     std::uint64_t m_routeSerial = 0;
+    std::uint64_t m_applePlayerRequests = 0;
     std::uint64_t m_revision = 0;
 };
 

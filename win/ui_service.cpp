@@ -46,6 +46,7 @@
 #include "../core/ui_render/render_tree.hpp"
 #include "../core/ui_render/surfaces.hpp"
 #include "../core/ui_render/svg_icon.hpp"
+#include "apple_player.hpp"
 #include "xaml_host.hpp"
 
 namespace ampify::win {
@@ -266,6 +267,7 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     std::vector<std::shared_ptr<WindowContext>> windows;
     std::vector<Surface> surfaces;
     std::optional<std::pair<std::string, std::string>> pendingRoute;
+    bool applePlayerPending = false;  // Ampify.ui.applePlayer.open, run by the next refresh of the main window
 
     // Interface thread only.
     int detachedReports = 0;  // log lines about panels taken out of their host, at most 5
@@ -1578,11 +1580,14 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
                    const xaml::DependencyObject& content) {
     std::vector<Surface> surfaces;
     std::optional<std::pair<std::string, std::string>> route;
+    bool applePlayer = false;
     {
         std::lock_guard<std::mutex> lock(shared.mutex);
         surfaces = shared.surfaces;
         route = std::exchange(shared.pendingRoute, std::nullopt);
+        applePlayer = std::exchange(shared.applePlayerPending, false);
     }
+    if (applePlayer) OpenApplePlayer(context->window.get(), shared.journal);
     if (route) {
         context->route = route;
         context->pageClosed = false;
@@ -1855,6 +1860,7 @@ void UiService::Run() {
                     std::lock_guard<std::mutex> lock(m_shared->mutex);
                     m_shared->surfaces = tracker.Current();
                     if (changes.route) m_shared->pendingRoute = changes.route;
+                    if (changes.applePlayer) m_shared->applePlayerPending = true;
                     windows = m_shared->windows;
                 }
                 for (const auto& context : windows) {

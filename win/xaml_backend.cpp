@@ -117,6 +117,74 @@ std::string ThicknessText(const xaml::Thickness& value) {
            th::FormatNumber(value.Bottom);
 }
 
+// BorderBrush, Padding, BorderThickness and CornerRadius, on the four kinds of element that carry them.
+xaml::DependencyProperty OwnBoxProperty(const xaml::DependencyObject& object, std::string_view property) {
+    const bool control = static_cast<bool>(object.try_as<controls::Control>());
+    const bool border = static_cast<bool>(object.try_as<controls::Border>());
+    const bool grid = static_cast<bool>(object.try_as<controls::Grid>());
+    const bool stack = static_cast<bool>(object.try_as<controls::StackPanel>());
+    bool brush = property == "BorderBrush", padding = property == "Padding", thickness = property == "BorderThickness";
+    if (control) {
+        return brush ? controls::Control::BorderBrushProperty() : padding ? controls::Control::PaddingProperty()
+               : thickness ? controls::Control::BorderThicknessProperty() : controls::Control::CornerRadiusProperty();
+    }
+    if (border) {
+        return brush ? controls::Border::BorderBrushProperty() : padding ? controls::Border::PaddingProperty()
+               : thickness ? controls::Border::BorderThicknessProperty() : controls::Border::CornerRadiusProperty();
+    }
+    if (grid) {
+        return brush ? controls::Grid::BorderBrushProperty() : padding ? controls::Grid::PaddingProperty()
+               : thickness ? controls::Grid::BorderThicknessProperty() : controls::Grid::CornerRadiusProperty();
+    }
+    if (stack) {
+        return brush ? controls::StackPanel::BorderBrushProperty() : padding ? controls::StackPanel::PaddingProperty()
+               : thickness ? controls::StackPanel::BorderThicknessProperty()
+                           : controls::StackPanel::CornerRadiusProperty();
+    }
+    return nullptr;
+}
+
+// The dependency property behind a theme property on this element, checked in the same order as ReadRaw and WriteRaw.
+// Null for a property that is not one value on the element (a transform, the order, an attached Grid value).
+xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::string_view property) {
+    const bool control = static_cast<bool>(object.try_as<controls::Control>());
+    const bool text = static_cast<bool>(object.try_as<controls::TextBlock>());
+    if (property == "Background") {
+        if (control) return controls::Control::BackgroundProperty();
+        if (object.try_as<controls::Panel>()) return controls::Panel::BackgroundProperty();
+        if (object.try_as<controls::Border>()) return controls::Border::BackgroundProperty();
+    } else if (property == "Foreground") {
+        if (control) return controls::Control::ForegroundProperty();
+        if (text) return controls::TextBlock::ForegroundProperty();
+        if (object.try_as<controls::IconElement>()) return controls::IconElement::ForegroundProperty();
+        if (object.try_as<controls::ContentPresenter>()) return controls::ContentPresenter::ForegroundProperty();
+    } else if (property == "BorderBrush" || property == "Padding" || property == "BorderThickness" ||
+               property == "CornerRadius") {
+        return OwnBoxProperty(object, property);
+    } else if (property == "FontSize" || property == "FontFamily" || property == "FontWeight") {
+        bool size = property == "FontSize", family = property == "FontFamily";
+        if (control) {
+            return size ? controls::Control::FontSizeProperty() : family ? controls::Control::FontFamilyProperty()
+                                                                         : controls::Control::FontWeightProperty();
+        }
+        if (text) {
+            return size ? controls::TextBlock::FontSizeProperty() : family ? controls::TextBlock::FontFamilyProperty()
+                                                                           : controls::TextBlock::FontWeightProperty();
+        }
+    } else if (object.try_as<xaml::FrameworkElement>()) {
+        if (property == "Margin") return xaml::FrameworkElement::MarginProperty();
+        if (property == "Width") return xaml::FrameworkElement::WidthProperty();
+        if (property == "Height") return xaml::FrameworkElement::HeightProperty();
+        if (property == "MinWidth") return xaml::FrameworkElement::MinWidthProperty();
+        if (property == "MaxWidth") return xaml::FrameworkElement::MaxWidthProperty();
+        if (property == "MinHeight") return xaml::FrameworkElement::MinHeightProperty();
+        if (property == "MaxHeight") return xaml::FrameworkElement::MaxHeightProperty();
+        if (property == "Opacity") return xaml::UIElement::OpacityProperty();
+        if (property == "Visibility") return xaml::UIElement::VisibilityProperty();
+    }
+    return nullptr;
+}
+
 // The order of a corner-radius value (properties.cpp): bottom-left, top-left, top-right, bottom-right.
 std::string CornerText(const xaml::CornerRadius& value) {
     return th::FormatNumber(value.BottomLeft) + "," + th::FormatNumber(value.TopLeft) + "," +
@@ -364,7 +432,93 @@ bool XamlTreeBackend::SetAppMode(std::optional<bool> dark) {
         root.RequestedTheme(shownDark ? xaml::ElementTheme::Light : xaml::ElementTheme::Dark);
     }
     if (refresh || root.RequestedTheme() != wanted) root.RequestedTheme(wanted);
+    SetCaptionMode(dark);
     return refresh;
+}
+
+namespace {
+
+using ColourRef = winrt::Windows::Foundation::IReference<winrt::Windows::UI::Color>;
+
+bool SameColour(const ColourRef& a, const ColourRef& b) {
+    if (!a || !b) return !a && !b;
+    winrt::Windows::UI::Color x = a.Value(), y = b.Value();
+    return x.A == y.A && x.R == y.R && x.G == y.G && x.B == y.B;
+}
+
+std::string ColourText(const ColourRef& colour) {
+    if (!colour) return "unset";
+    winrt::Windows::UI::Color c = colour.Value();
+    char hex[10];
+    std::snprintf(hex, sizeof(hex), "#%02X%02X%02X%02X", c.A, c.R, c.G, c.B);
+    return hex;
+}
+
+ColourRef Grey(std::uint8_t alpha, std::uint8_t value) {
+    return ColourRef(winrt::Windows::UI::Color{alpha, value, value, value});
+}
+
+}  // namespace
+
+// The system draws the caption buttons from the title bar's colours, not from the XAML tree, and Apple Music sets them
+// for the system's mode: black on the dark themes of a PC in light mode. They follow the theme's mode, with the
+// alphas Apple uses (0x33 under the pointer, 0x66 pressed), and get the app's own back when the theme goes.
+void XamlTreeBackend::SetCaptionMode(std::optional<bool> dark) {
+    try {
+        xaml::Window window = m_window.get();
+        if (!window || (!dark && !m_captionOriginal)) return;
+        auto bar = window.AppWindow().TitleBar();
+        if (dark && !m_captionOriginal) {
+            m_captionOriginal = CaptionColours{bar.ButtonForegroundColor(), bar.ButtonHoverForegroundColor(),
+                                               bar.ButtonHoverBackgroundColor(), bar.ButtonPressedForegroundColor(),
+                                               bar.ButtonPressedBackgroundColor()};
+            m_captionNote = "Themes: caption buttons follow the theme's mode (the app's foreground was " +
+                            ColourText(m_captionOriginal->foreground) + ")";
+        }
+        if (!dark) {
+            WriteCaption(bar, Restored(bar));
+            m_captionOriginal.reset();
+            m_captionWritten.reset();
+            return;
+        }
+        std::uint8_t ink = *dark ? 0xFF : 0x00;
+        m_captionWritten = CaptionColours{Grey(0xFF, ink), Grey(0xFF, ink), Grey(0x33, ink), Grey(0xFF, ink), Grey(0x66, ink)};
+        WriteCaption(bar, *m_captionWritten);
+    } catch (...) {
+    }
+}
+
+// The app's colours back, except where the app wrote its own since (a change of the system's mode): those stay.
+XamlTreeBackend::CaptionColours XamlTreeBackend::Restored(const winrt::Microsoft::UI::Windowing::AppWindowTitleBar& bar) const {
+    CaptionColours restore = *m_captionOriginal;
+    CaptionColours written = m_captionWritten.value_or(restore);
+    auto keepApps = [](ColourRef& target, const ColourRef& now, const ColourRef& ours) {
+        if (!SameColour(now, ours)) target = now;
+    };
+    keepApps(restore.foreground, bar.ButtonForegroundColor(), written.foreground);
+    keepApps(restore.hoverForeground, bar.ButtonHoverForegroundColor(), written.hoverForeground);
+    keepApps(restore.hoverBackground, bar.ButtonHoverBackgroundColor(), written.hoverBackground);
+    keepApps(restore.pressedForeground, bar.ButtonPressedForegroundColor(), written.pressedForeground);
+    keepApps(restore.pressedBackground, bar.ButtonPressedBackgroundColor(), written.pressedBackground);
+    return restore;
+}
+
+// Writes only the colours that differ: each write makes the system draw the caption buttons again.
+void XamlTreeBackend::WriteCaption(const winrt::Microsoft::UI::Windowing::AppWindowTitleBar& bar,
+                                   const CaptionColours& wanted) {
+    if (!SameColour(bar.ButtonForegroundColor(), wanted.foreground)) bar.ButtonForegroundColor(wanted.foreground);
+    if (!SameColour(bar.ButtonHoverForegroundColor(), wanted.hoverForeground)) {
+        bar.ButtonHoverForegroundColor(wanted.hoverForeground);
+    }
+    if (!SameColour(bar.ButtonHoverBackgroundColor(), wanted.hoverBackground)) {
+        bar.ButtonHoverBackgroundColor(wanted.hoverBackground);
+    }
+    if (!SameColour(bar.ButtonPressedForegroundColor(), wanted.pressedForeground)) {
+        bar.ButtonPressedForegroundColor(wanted.pressedForeground);
+    }
+    if (!SameColour(bar.ButtonPressedBackgroundColor(), wanted.pressedBackground)) {
+        bar.ButtonPressedBackgroundColor(wanted.pressedBackground);
+    }
 }
 
 xaml::DependencyObject XamlTreeBackend::Resolve(theme::NodeId id) const {
@@ -607,6 +761,22 @@ bool XamlTreeBackend::Write(theme::NodeId id, std::string_view property, const t
     }
 }
 
+// An icon or a text usually shows its button's colour and font, a template part its control's values: none of them
+// its own. Those read as kNoOwnValue, so that removing the theme clears them instead of freezing what they showed.
+std::optional<theme::Value> XamlTreeBackend::ReadOriginal(theme::NodeId id, std::string_view property) {
+    try {
+        xaml::DependencyObject object = Resolve(id);
+        if (!object) return std::nullopt;
+        if (!m_hover.Has(id)) {
+            xaml::DependencyProperty own = OwnProperty(object, property);
+            if (own && object.ReadLocalValue(own) == xaml::DependencyProperty::UnsetValue()) return theme::kNoOwnValue;
+        }
+        return Read(id, property);
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
 std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::string_view property) {
     xaml::DependencyObject object = Resolve(id);
     if (!object) return std::nullopt;
@@ -689,6 +859,10 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
                            : property == "MinHeight" ? element.MinHeight()
                                                      : element.MaxHeight();
             return theme::Value{theme::ValueKind::Length, th::FormatNumber(value)};
+        }
+    } else if (property == "CompactPaneLength") {
+        if (auto nav = object.try_as<controls::NavigationView>()) {
+            return theme::Value{theme::ValueKind::Length, th::FormatNumber(nav.CompactPaneLength())};
         }
     } else if (property == "FlowDirection") {
         if (auto element = object.try_as<xaml::FrameworkElement>()) {
@@ -859,6 +1033,14 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
     xaml::DependencyObject object = Resolve(id);
     if (!object) return false;
 
+    if (value == theme::kNoOwnValue) {
+        xaml::DependencyProperty own = OwnProperty(object, property);
+        if (!own) return false;
+        object.ClearValue(own);
+        Forget(id, property);
+        return true;
+    }
+
     if (property == "Background" || property == "Foreground" || property == "BorderBrush") {
         std::optional<media::Brush> target;
         bool made = false;  // an object made from the value, remembered so that it reads back as the value
@@ -981,6 +1163,13 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         else if (property == "MaxWidth") element.MaxWidth(length);
         else if (property == "MinHeight") element.MinHeight(length);
         else element.MaxHeight(length);
+        return true;
+    }
+
+    if (property == "CompactPaneLength" && value.kind == theme::ValueKind::Length) {
+        auto nav = object.try_as<controls::NavigationView>();
+        if (!nav) return false;
+        nav.CompactPaneLength(ParseLength(value.text));
         return true;
     }
 

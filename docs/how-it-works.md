@@ -225,13 +225,26 @@ place of the sidebar's footer and keeps Apple Music's own separator in it.
 ## Now Playing
 
 Now Playing (`extensions/now-playing`) is an extension that ships with Ampify. Its button joins the lyrics and queue
-buttons of the playback bar, and it opens a view over the whole window (`Ampify.ui.fullscreen`): a popup of the main
-window, above Apple Music's pages and panels, which navigation leaves in place.
+buttons of the playback bar and opens Apple Music's own full-screen player (`Ampify.ui.applePlayer`,
+`win/apple_player.cpp`):
+
+- The kernel calls `AMP.UI.Views.FullScreenPlayer.Instance().Show()`, which the full-screen button of Apple's mini
+  player calls, by vtable slot (`core/amp_abi.hpp`). It refuses when the player has no view model yet.
+- Apple then creates the player's window, which it names `FullScreenPlayerWindow` among its app properties
+  (`GetAppProperty`, like `MainWindow`). A timer of the interface thread waits for it and for its FullScreen presenter,
+  then gives it an overlapped presenter with a border and no title bar, and places it so that its visible rectangle is
+  the main window's. Changing the Win32 style is not enough: the FullScreen presenter puts its own style back.
+- A press that no control of the player takes (its background, the artwork, the titles), then a move of a few pixels,
+  moves the window with the pointer, as a title bar would. A plain click still reaches Apple's handlers.
+
+The lyrics view Ampify drew before is the `lyrics-view` example (`examples/lyrics-view`). It opens a view over the whole
+window (`Ampify.ui.fullscreen`): a popup of the main window, above Apple Music's pages and panels, which navigation
+leaves in place.
 
 - The song comes from Apple's player (`AMP.Services`), read through the slots of its WinRT interfaces. The artist and
   album come from the item's subtitle when Apple leaves them empty.
 - The lyrics are Apple Music's own (`ILyricsInfo.GetTTML`, parsed in `core/lyrics.cpp`) when Apple has fetched them. It
-  does so once its lyrics panel has been open for the song, so Now Playing falls back on LRCLIB, a free public library
+  does so once its lyrics panel has been open for the song, so the view falls back on LRCLIB, a free public library
   of synced lyrics, and switches to Apple's when they arrive.
 - Apple's cover address is internal (`amp-artwork-id://`), so the cover comes from the iTunes Search API.
 - The view is redrawn four times a second while open; the kernel only changes the lines whose state changed, and their

@@ -154,8 +154,9 @@ xaml::Window AppWindow(std::wstring_view property) noexcept {
         IInspectable value = function(winrt::hstring(property));
         return value ? value.try_as<xaml::Window>() : nullptr;
     } catch (const winrt::hresult_error& error) {
-        // MiniPlayerWindow is absent while the mini player is closed: E_BOUNDS, not a problem.
-        if (!(property == L"MiniPlayerWindow" && error.code() == E_BOUNDS)) {
+        // The mini player's and the full-screen player's windows are absent while closed: E_BOUNDS, not a problem.
+        bool playerWindow = property == L"MiniPlayerWindow" || property == L"FullScreenPlayerWindow";
+        if (!(playerWindow && error.code() == E_BOUNDS)) {
             static std::atomic<int> logged{0};
             if (logged++ < 3) {
                 Log("Interface: GetAppProperty failed (" + HresultText(error.code().value) + ")");

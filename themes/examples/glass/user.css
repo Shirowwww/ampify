@@ -27,7 +27,7 @@
 }
 
 .sidebar-header {
-    padding: 12 16 8 16;
+    padding: 12 8 8 8;
 }
 
 .app-name {
@@ -37,7 +37,7 @@
 
 .sidebar-items NavigationViewItem {
     corner-radius: var(--radius-button);
-    margin: 3 10;
+    margin: 3 4;
     font-size: 15px;
     transform-origin: left center;
 }
