@@ -36,6 +36,8 @@ The folder [examples/hello-extension](../../examples/hello-extension/) is a comp
 | `kitApi` | yes | `MAJOR.MINOR`, for example `1.0` | Version of the targeted API. The major version must be supported. |
 | `homepage` | no | `https://` URL | Project page |
 | `license` | no | 1 to 64 characters | The author's license |
+| `tags` | no | List of 5 at most, unique, each `[a-z0-9][a-z0-9-]{0,19}` | Short lowercase words (`dark`, `layout`, `glass`, `lyrics`) shown on the Marketplace card |
+| `preview` | no | A `.png`, `.jpg` or `.jpeg` file name at the root of the folder, 2 MB at most | Picture shown on the Marketplace card. The file must exist. |
 | `appVersions` | no | List of Apple Music versions, 16 at most | Versions where the element was tested. The kernel also applies its own list. |
 | `permissions` | no | List of 32 at most, values from section 4 of [api.md](api.md) | What the element needs. Shown before activation. |
 | `processes` | no | One or two values: `ui` (AppleMusic.exe), `engine` (AMPLibraryAgent.exe), no duplicate | Where the element runs. Default `["ui"]`: the interface only, once per launch. An element that acts on sound declares `engine`. With both, it runs twice and must avoid writing the same storage. |

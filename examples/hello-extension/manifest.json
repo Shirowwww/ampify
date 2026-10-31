@@ -2,12 +2,20 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "hello-extension",
   "name": "Hello",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Minimal example: writes to the log and keeps a launch counter.",
   "kitApi": "1.0",
   "main": "main.js",
-  "processes": ["ui"],
-  "permissions": ["storage"]
+  "processes": [
+    "ui"
+  ],
+  "permissions": [
+    "storage"
+  ],
+  "tags": [
+    "example",
+    "developer"
+  ]
 }

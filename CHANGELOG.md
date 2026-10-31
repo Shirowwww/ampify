@@ -56,6 +56,23 @@ Atmos leveler.
 - A theme starts on the `defaultScheme` of its manifest (Midnight opened in its light scheme). A font size can be
   relative to each element, `120%` or `1.2em`: Large text now enlarges every text and keeps titles above body text.
   Sizes are no longer written again every 3 seconds when WinUI reads them back rounded.
+- A manifest can name a `preview` picture and up to five `tags`, which the catalog carries to the Marketplace;
+  `tools/pack.py` publishes the picture next to the archive. Every theme of the public catalog has its preview, and
+  the catalog now offers all seven example themes.
+- The Marketplace is a grid of cards with their preview, in tabs (Themes, Extensions, Apps, Snippets, Installed), with
+  search, tags, a clear state on each card ("In use · update to 1.1.0"), the scheme menu, and a detail view. An element
+  that asks for permissions installs off and opens its detail view, where it is turned on under the list of what it
+  may do; the permissions an update adds are marked there before it runs. A card never grants a permission itself. A
+  failed uninstall stays on the detail view with ampify's error, and "Refresh" no longer clears the catalog's warning.
+- Kit pages: `title` and `subtitle` texts follow Apple Music's sizes, buttons and menus keep their width on the left
+  instead of stretching after a render, and the keys of `Ampify.React` reach the native controls, so a line that
+  appears above a list no longer rebuilds the whole list. An open page takes the new theme's accent at once.
+- A theme that gives only its accent also gets its hover and pressed accents (Glass and Midnight showed Apple Music's
+  red under the pointer), and text on a light accent turns black so it stays readable. `ampify theme set` keeps the
+  scheme when the same theme is set again, and keeps `auto` for every theme; another theme starts on its own default.
+- The "Open the Marketplace" button of the Ampify card in Settings is readable again: Apple Music's accent style drew
+  its text in a symbol font. A theme no longer reports values refused on elements that are gone or never realized,
+  and Greenroom loads with none refused.
 
 ### Preview
 

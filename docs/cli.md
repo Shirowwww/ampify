@@ -57,10 +57,10 @@ The "Spicetify" column gives the equivalent.
 | `ampify snippet enable <id>` / `disable <id>` | Snippets (small style fragments) |
 | `ampify app enable <id>` / `disable <id>` | Apps (interface pages). The kernel loads `apps\<id>` and starts the app at once, like an extension |
 | `ampify theme list` | Installed themes |
-| `ampify theme set <id> [--scheme <name>]` | Picks the theme and its scheme |
+| `ampify theme set <id> [--scheme <name>]` | Picks the theme and its scheme. Without `--scheme`, another theme starts on its own default scheme; the same theme set again keeps its scheme, and `auto` stays for every theme |
 | `ampify theme import <folder\|zip\|address> [id]` | Reuses a Spicetify theme: `color.ini` as it is, Spotify's `user.css` kept aside (see [themes/spicetify.md](themes/spicetify.md)) |
 | `ampify theme check <folder>` | Reads a theme like the kernel does and reports each refused rule with its line |
-| `ampify theme clear` | No theme |
+| `ampify theme clear` | No theme, and no scheme left for the next one |
 | `ampify new <kind> <id>` | Creates a starter element (extension, theme, snippet or app) in the current folder |
 | `ampify validate <folder>` | Checks the manifest and files of an element, with the same rules as `tools/validate.py` |
 | `ampify validate <catalog.json>` | Checks a catalog |

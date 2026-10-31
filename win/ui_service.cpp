@@ -664,7 +664,8 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     });
     // The Marketplace page (apps/marketplace): themes, schemes, extensions, in the app.
     controls::Button market;
-    if (auto accent = ThemeResource(L"AccentButtonStyle").try_as<xaml::Style>()) market.Style(accent);
+    if (shared.probe.button) market.Style(shared.probe.button);
+    if (controls::ControlTemplate accent = PrimaryButtonTemplate()) market.Template(accent);
     market.Content(winrt::box_value(L"Open the Marketplace"));
     market.VerticalAlignment(xaml::VerticalAlignment::Center);
     Name(market, "AMPIFY_ModsOpenMarketplace", "Open the Marketplace");

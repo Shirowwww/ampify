@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <initializer_list>
 #include <optional>
@@ -14,6 +15,9 @@ namespace ampify {
 // Major version of the extension API this kit implements (docs/extensions/api.md, section 9).
 inline constexpr int kKitApiMajor = 1;
 
+// Largest preview image the Marketplace page is asked to load.
+inline constexpr std::uintmax_t kMaxPreviewBytes = 2 * 1024 * 1024;
+
 // Fields that a manifest.json and an entry of catalog.json share.
 struct ElementInfo {
     std::string id;
@@ -26,6 +30,7 @@ struct ElementInfo {
     std::optional<std::string> homepage;
     std::optional<std::string> license;
     std::vector<std::string> permissions;
+    std::vector<std::string> tags;  // Marketplace labels, at most 5
 };
 
 // What a manifest.json declares, as docs/extensions/manifest.md describes it.
@@ -35,6 +40,7 @@ struct ElementManifest : ElementInfo {
     std::optional<std::string> defaultScheme;
     std::optional<std::string> resources;
     std::optional<std::string> icon;
+    std::optional<std::string> preview;  // Marketplace image (png or jpg) at the root of the folder
     std::vector<std::string> appVersions;
     // Processes where the element runs: "ui" (AppleMusic.exe), "engine" (AMPLibraryAgent.exe). Empty means both.
     std::vector<std::string> processes;
@@ -48,6 +54,7 @@ bool IsValidVersion(std::string_view text);
 bool IsValidPermission(std::string_view text);
 bool IsValidScheme(std::string_view text);
 bool IsHttpsUrl(std::string_view text);
+bool IsPreviewUrl(std::string_view text);  // https address of a .png, .jpg or .jpeg image
 
 // Parses manifest text. On failure returns nullopt and appends one French message per problem to `errors`.
 std::optional<ElementManifest> ParseManifest(std::string_view text, std::vector<std::string>& errors);
@@ -61,7 +68,7 @@ void CheckAllowedKeys(const json::Value& object, std::initializer_list<std::stri
                       const std::string& where, std::vector<std::string>& errors);
 
 // Rules a schema cannot express: the id is the folder name, the files that the kind needs exist, and no symbolic
-// link is in the folder (the kernel would refuse to import through it).
+// link is in the folder (the kernel would refuse to import through it). A preview image is at most kMaxPreviewBytes.
 std::vector<std::string> CheckElementFolder(const ElementManifest& manifest, const std::filesystem::path& folder);
 
 struct FolderValidation {

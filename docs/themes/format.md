@@ -8,6 +8,7 @@ my-theme/
 ├── manifest.json     id, name, version, default scheme
 ├── colors.ini        colors per scheme (optional)
 ├── resources.xaml    XAML resource dictionary (optional)
+├── preview.png       picture for the Marketplace card, named by "preview" in the manifest (optional, 2 MB at most)
 ├── user.css          rules for specific elements (optional)
 ├── images/           images referenced by url(...)
 ├── fonts/            fonts referenced by url(...) in font-family
@@ -54,6 +55,13 @@ SolidBackgroundFillColorBase = 1C1C1E
   "Automatic scheme".
 - The same names work as named colors in `user.css`: `background: $SolidBackgroundFillColorBase;`.
 - A name that does not exist in the app is reported in the log ("missing resource") and does nothing else.
+- A scheme that gives the accent (`AccentFillColorDefaultBrush`, or Spicetify's `button`) also gives its hover and
+  pressed colors, as Fluent does: `AccentFillColorSecondaryBrush` is the accent at 90%, `AccentFillColorTertiaryBrush`
+  at 80%. Without them, a button under the pointer showed Apple Music's own accent.
+- On an accent where white text reads under 3:1 (a light cyan, Spotify's green, a yellow), the text on it
+  (`TextOnAccentFillColorPrimaryBrush` and `...SecondaryBrush`) turns black, as in Fluent's dark mode.
+- A key the scheme names itself is never replaced, and neither is one that `resources.xaml` defines (nor what would be
+  worked out from an accent it defines).
 
 ## resources.xaml
 
@@ -753,6 +761,8 @@ pointer, the engine reads and writes the "underneath" value without undoing the 
   `theme.inspect`) before writing rules.
 - A resource read as `StaticResource` keeps its original value until the element is recreated.
 - Images and fonts must be in the theme folder.
+- Apple Music animates a few elements itself (the play button of the playback bar): a `transition` on them is refused
+  with a line in the log, and their `transform` or colour changes apply at once.
 - `box-shadow` only sets the depth, and the `ThemeShadow` can stay invisible on some elements. A slanted gradient is exact on a square element.
 - The names in `sidebar.json` and `home.json` have not all been read from the real app, and Apple Music's sidebar may
   not be a `NavigationView`. If it is not, `sidebar.json` finds nothing and has no other effect.

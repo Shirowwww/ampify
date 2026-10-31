@@ -31,6 +31,9 @@ SCHEMAS = {
 BUILD_SIGNATURE = os.path.join(ROOT, "core", "build_signature.hpp")
 KNOWN_EXPORTS = os.path.join(ROOT, "knowledge", "exports", "AVFoundationCF.txt")
 
+# Largest preview image a manifest may ship (cli/element.hpp, kMaxPreviewBytes).
+MAX_PREVIEW_BYTES = 2 * 1024 * 1024
+
 # Major version of the kit API this script knows. Entries for another major version are refused.
 KIT_API_MAJOR = 1
 
@@ -243,9 +246,12 @@ def check_manifest(doc, path):
         if "main" in doc:
             errors.append("main: not allowed for a snippet")
 
-    for key in ("main", "colors", "resources", "icon"):
+    for key in ("main", "colors", "resources", "icon", "preview"):
         if key in doc and not os.path.isfile(os.path.join(folder, doc[key])):
             errors.append(f"{key}: file missing from the folder: {doc[key]}")
+    if "preview" in doc and os.path.isfile(os.path.join(folder, doc["preview"])):
+        if os.path.getsize(os.path.join(folder, doc["preview"])) > MAX_PREVIEW_BYTES:
+            errors.append(f"preview: file larger than 2 MB: {doc['preview']}")
     # The kernel refuses to import through a link, and ampify refuses to install one: a link could point anywhere.
     for current, folders, files in os.walk(folder):
         for name in sorted(folders + files):

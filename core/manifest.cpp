@@ -21,6 +21,7 @@ const std::set<std::string_view> kFixedPermissions = {
 const std::set<std::string_view> kKnownFields = {
     "$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage", "license",
     "main", "colors", "defaultScheme", "resources", "icon", "permissions", "appVersions", "processes", "type",
+    "preview", "tags",
 };
 
 // Length in Unicode code points, so that "é" counts as one character.

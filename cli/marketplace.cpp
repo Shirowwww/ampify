@@ -124,6 +124,7 @@ bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
         return false;
     }
     catalog = std::move(*parsed);
+    if (!local) catalog.sourceUrl = source;
     return true;
 }
 
@@ -444,7 +445,8 @@ Json InfoJson(const ElementInfo& info) {
     return Json::Object{{"id", info.id},           {"name", info.name},
                         {"kind", info.kind},       {"version", info.version},
                         {"author", info.author},   {"description", info.description},
-                        {"permissions", TextList(info.permissions)}};
+                        {"permissions", TextList(info.permissions)},
+                        {"tags", TextList(info.tags)}};
 }
 
 // `ampify market --json`: what the Marketplace page shows. The catalogue (empty with catalogOk false when it cannot be
@@ -458,15 +460,32 @@ int PrintMarketJson(Context& ctx) {
     LoadSettings(ctx, settings, error);
 
     Json::Array entries;
-    for (const CatalogEntry& entry : catalog.entries) entries.push_back(InfoJson(entry));
+    // The page loads nothing from another address: a preview is passed on only from the catalog's host or the archive's.
+    std::string catalogHost = UrlHost(catalog.sourceUrl);
+    for (const CatalogEntry& entry : catalog.entries) {
+        Json item = InfoJson(entry);
+        if (entry.preview) {
+            std::string host = UrlHost(*entry.preview);
+            if (!host.empty() && (host == catalogHost || host == UrlHost(entry.url))) item.Set("preview", *entry.preview);
+        }
+        entries.push_back(std::move(item));
+    }
     Json::Array installed;
     for (const InstalledElement& element : ListInstalled(ctx.kit)) {
         Json item = element.manifest ? InfoJson(*element.manifest) : Json(Json::Object{{"id", element.id}, {"kind", element.kind}});
         item.Set("valid", element.Valid());
         item.Set("enabled", IsEnabled(settings, element.kind, element.id));
+        if (element.manifest && element.manifest->preview) {
+            std::filesystem::path image =
+                std::filesystem::absolute(ctx.kit.Element(element.kind, element.id) / *element.manifest->preview);
+            std::error_code ec;
+            if (std::filesystem::is_regular_file(image, ec)) item.Set("preview", Utf8(image));
+        }
         if (element.kind == "theme") {
             theme::FolderFiles files(ctx.kit.Root() / "themes" / element.id);
             item.Set("schemes", TextList(theme::ReadSchemes(files)));
+            // The scheme the theme starts on while theme.scheme is empty, for the page's scheme menu.
+            item.Set("defaultScheme", theme::ReadDefaultScheme(files));
         }
         installed.push_back(std::move(item));
     }

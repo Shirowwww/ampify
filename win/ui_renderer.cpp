@@ -198,20 +198,32 @@ struct Placement {
     xaml::VerticalAlignment vertical = xaml::VerticalAlignment::Stretch;
 };
 
-// Where a node sits in its parent when it says nothing: images and icons on the left, rows centred vertically.
+// Where a node sits in its parent when it says nothing: images, icons, buttons and dropdowns on the left (the last two
+// as their WinUI styles have it), rows centred vertically.
 Placement TypePlacement(const RenderNode& node) {
     Placement placement;
-    if (node.type == "image" || node.type == "icon") placement.horizontal = xaml::HorizontalAlignment::Left;
+    if (node.type == "image" || node.type == "icon" || node.type == "button" || node.type == "dropdown") {
+        placement.horizontal = xaml::HorizontalAlignment::Left;
+    }
     if (node.type == "row") placement.vertical = xaml::VerticalAlignment::Center;
     return placement;
 }
 
-// The node's own align and valign over the parent's defaults. On a text, align is the text alignment instead.
+// The node's own align and valign over the parent's defaults. On a text, align is the text alignment instead. The
+// values are always set locally: a control outside the tree has no style yet, so comparing with what it reads would
+// skip the write, and its style would decide until the next update wrote the value (buttons stretched after a click).
 void Place(const xaml::FrameworkElement& element, const RenderNode& node, Placement placement) {
     if (node.type != "text") placement.horizontal = HorizontalOf(node.Text("align"), placement.horizontal);
     placement.vertical = VerticalOf(node.Text("valign"), placement.vertical);
-    if (element.HorizontalAlignment() != placement.horizontal) element.HorizontalAlignment(placement.horizontal);
-    if (element.VerticalAlignment() != placement.vertical) element.VerticalAlignment(placement.vertical);
+    auto unset = xaml::DependencyProperty::UnsetValue();
+    if (element.ReadLocalValue(xaml::FrameworkElement::HorizontalAlignmentProperty()) == unset ||
+        element.HorizontalAlignment() != placement.horizontal) {
+        element.HorizontalAlignment(placement.horizontal);
+    }
+    if (element.ReadLocalValue(xaml::FrameworkElement::VerticalAlignmentProperty()) == unset ||
+        element.VerticalAlignment() != placement.vertical) {
+        element.VerticalAlignment(placement.vertical);
+    }
 }
 
 void SetPanelBackground(const xaml::FrameworkElement& element, const media::Brush& brush) {
@@ -764,6 +776,8 @@ void XamlRenderer::PlaceChildren(Mounted& mounted, const RenderNode& node) {
             if (controls::Grid::GetColumn(element) != cell) controls::Grid::SetColumn(element, cell);
             placement.vertical = xaml::VerticalAlignment::Center;
             if (mounted.layout == Layout::Pair && index == 1) placement.horizontal = xaml::HorizontalAlignment::Right;
+            // A growing child takes the space left, a button included.
+            if (child.Bool("grow", false)) placement.horizontal = xaml::HorizontalAlignment::Stretch;
         } else if (mounted.layout == Layout::Grid) {
             if (controls::Grid::GetRow(element) != cell) controls::Grid::SetRow(element, cell);
         } else if (mounted.layout == Layout::Layer) {
@@ -806,12 +820,29 @@ void XamlRenderer::SetBox(Mounted& mounted, const RenderNode& node) {
     if (element.MaxWidth() != maxWidth) element.MaxWidth(maxWidth);
 }
 
+// The Fluent type ramp's size and weight for a title and a subtitle. Apple Music's resources leave these two styles
+// at body size, so a title came out as plain text: the values go on the text itself.
+struct RampStep {
+    double size;
+    std::uint16_t weight;
+};
+
+static std::optional<RampStep> RampOf(const std::string& variant) {
+    if (variant == "title") return RampStep{28, 600};
+    if (variant == "subtitle") return RampStep{20, 600};
+    return std::nullopt;
+}
+
 // size, weight, color, align, wrap and maxLines of a text. A removed attribute gives the text style's value back.
 static void SetTextStyle(const controls::TextBlock& block, const RenderNode& node, bool& colored) {
+    std::optional<RampStep> ramp = RampOf(node.Text("variant"));
     if (node.Has("size")) block.FontSize(node.Number("size", 14));
+    else if (ramp) block.FontSize(ramp->size);
     else ClearLocal(block, controls::TextBlock::FontSizeProperty());
     if (node.Has("weight")) {
         block.FontWeight(winrt::Windows::UI::Text::FontWeight{static_cast<std::uint16_t>(node.Number("weight", 400))});
+    } else if (ramp) {
+        block.FontWeight(winrt::Windows::UI::Text::FontWeight{ramp->weight});
     } else {
         ClearLocal(block, controls::TextBlock::FontWeightProperty());
     }

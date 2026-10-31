@@ -69,6 +69,64 @@ std::optional<bool> DarkFromPalette(const Palette& palette) {
     return std::nullopt;
 }
 
+// WCAG relative luminance, 0 (black) to 1 (white).
+double RelativeLuminance(Argb color) {
+    auto linear = [](std::uint8_t channel) {
+        double value = channel / 255.0;
+        return value <= 0.04045 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
+}
+
+constexpr const char* kAccent = "AccentFillColorDefaultBrush";
+
+// A brush the theme does not name, worked out from one it does. The theme's resources.xaml has the last word: a key
+// it defines, or the one the colour comes from, is left to it.
+void DefineDerived(Theme& theme, const std::set<std::string>& owned, const char* from, const char* key, Argb color,
+                   bool applied) {
+    if (owned.count(from) || owned.count(key) || !theme.palette.Define(key, color)) return;
+    if (applied) theme.resources.push_back({key, {ValueKind::Color, ToXamlColor(color)}});
+}
+
+// Fluent's accent under the pointer and while pressed is the accent at 90% and 80%. A theme that names only the
+// accent would otherwise show Apple Music's own colour on hover.
+void DefineAccentStates(Theme& theme, const std::set<std::string>& owned, bool applied) {
+    constexpr std::pair<const char*, double> kStates[] = {{"AccentFillColorSecondaryBrush", 0.9},
+                                                          {"AccentFillColorTertiaryBrush", 0.8}};
+    std::optional<Argb> accent = theme.palette.Find(kAccent);
+    if (!accent) return;
+    for (const auto& [key, opacity] : kStates) {
+        Argb color = *accent;
+        color.a = static_cast<std::uint8_t>(std::lround(accent->a * opacity));
+        DefineDerived(theme, owned, kAccent, key, color, applied);
+    }
+}
+
+// Apple Music lays white text on the accent whatever its colour. On an accent where white reads under 3:1 (a light
+// cyan, Spotify's green, a yellow) and that names no colour for its text, the text goes black, as in Fluent's dark
+// mode. Any other accent keeps Apple Music's white.
+void DefineTextOnAccent(Theme& theme, const std::set<std::string>& owned, bool applied) {
+    constexpr const char* kPrimary = "TextOnAccentFillColorPrimaryBrush";
+    constexpr const char* kSecondary = "TextOnAccentFillColorSecondaryBrush";
+    constexpr double kMinimumWhiteContrast = 3.0;
+    constexpr Argb kBlack{0xFF, 0, 0, 0};
+    constexpr Argb kBlackSecondary{0xB3, 0, 0, 0};  // 70%, as Fluent's secondary text on the accent
+    std::optional<Argb> accent = theme.palette.Find(kAccent);
+    if (!accent || theme.palette.Find(kPrimary) || owned.count(kPrimary)) return;
+    if (1.05 / (RelativeLuminance(*accent) + 0.05) >= kMinimumWhiteContrast) return;
+    for (const auto& [key, color] : {std::pair{kPrimary, kBlack}, std::pair{kSecondary, kBlackSecondary}}) {
+        DefineDerived(theme, owned, kAccent, key, color, applied);
+    }
+}
+
+// The colours a theme leaves to Ampify, once its own resources.xaml is known.
+void DefineDerivedColors(Theme& theme, bool applied) {
+    std::vector<std::string> keys = XamlKeys(theme.resourceDictionary);
+    std::set<std::string> owned(keys.begin(), keys.end());
+    DefineAccentStates(theme, owned, applied);
+    DefineTextOnAccent(theme, owned, applied);
+}
+
 // A Spicetify colour: a $name, a --spice-name variable as in Spicetify, and the app brushes that play its part
 // (SpicetifyResources) unless the scheme names them itself. Returns the Spicetify name.
 std::string DefineSpicetifyColor(const Ini::Entry& entry, Argb color, Theme& theme) {
@@ -340,6 +398,7 @@ Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& fi
     if (!dictionaryOk) return theme;
 
     if (!options.parts.resources) theme.resourceDictionary.clear();
+    DefineDerivedColors(theme, options.parts.colors);
     ValueContext context{theme.palette, files, folder, options.parts.assets};
     // Spicetify's colours paint Apple Music's own elements first; the theme's user.css comes on top.
     if (std::string translated = SpicetifyStylesheet(spicetify); !translated.empty()) {

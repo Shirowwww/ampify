@@ -549,3 +549,207 @@ test("lyrics-view prefers Apple's lyrics, and stops its timer when closed", asyn
   world.closers.forEach((fn) => fn());
   assert.equal(world.intervals.size, 0);
 });
+
+// ---- The Marketplace page ----------------------------------------------------------------------------------------
+
+// A small stand-in for Ampify.React: function components render depth-first with their hooks kept by their place in
+// the tree, a state change renders the whole page again, and host elements come out as plain nodes.
+function fakeReact() {
+  const slots = new Map();
+  const mounted = new Set();
+  const page = { tree: null, render: null };
+  let current = null;
+  const flat = (children) => children.flat(Infinity).filter((child) => child !== null && child !== undefined && child !== false);
+  const h = (type, props, ...children) => ({ type, props: props || {}, children: flat(children) });
+  const slot = () => {
+    const name = current.place + "#" + current.index++;
+    current.seen.add(name);
+    return name;
+  };
+  const draw = () => {
+    const effects = [];
+    const seen = new Set();
+    const expand = (node, place) => {
+      if (node === null || node === undefined || node === false) return [];
+      if (typeof node !== "object") return [String(node)];
+      if (Array.isArray(node)) return node.flatMap((child, index) => expand(child, place + "." + index));
+      const here = place + "/" + (node.props.key ?? (typeof node.type === "function" ? node.type.name : node.type));
+      if (typeof node.type === "function") {
+        current = { place: here, index: 0, effects, seen };
+        return expand(node.type({ ...node.props, children: node.children }), here);
+      }
+      const children = node.children.flatMap((child, index) => expand(child, here + "." + index));
+      return [{ type: node.type, ...node.props, children }];
+    };
+    page.tree = expand(page.render(), "")[0];
+    // What did not render this time is unmounted: its state starts afresh next time.
+    for (const name of [...slots.keys()]) if (!seen.has(name)) slots.delete(name);
+    for (const name of [...mounted]) if (!seen.has(name)) mounted.delete(name);
+    effects.forEach((effect) => effect());
+  };
+  const useState = (initial) => {
+    const name = slot();
+    if (!slots.has(name)) slots.set(name, typeof initial === "function" ? initial() : initial);
+    return [slots.get(name), (value) => {
+      slots.set(name, value);
+      draw();
+    }];
+  };
+  const useEffect = (effect) => {
+    const name = slot();
+    if (mounted.has(name)) return;
+    mounted.add(name);
+    current.effects.push(effect);
+  };
+  const mount = (render) => {
+    page.render = render;
+    draw();
+  };
+  return { React: { h, useState, useEffect }, mount, page };
+}
+
+const marketEntry = (id, kind, permissions = [], version = "1.0.0") => ({
+  id, kind, version, permissions, name: id[0].toUpperCase() + id.slice(1), author: "Shirowwww",
+  description: `Test ${id}.`, tags: [],
+});
+const marketCopy = (id, kind, permissions = [], extra = {}) =>
+  ({ ...marketEntry(id, kind, permissions), valid: true, enabled: false, ...extra });
+
+// The Marketplace against a fake ampify: each command changes the state `market --json` gives back, as the real one.
+function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = {} } = {}) {
+  const react = fakeReact();
+  const world = { state: { catalogOk: true, catalog, installed, theme, scheme: "" }, commands: [], marketError: "" };
+  const copyOf = (id) => world.state.installed.find((item) => item.id === id);
+  const apply = {
+    install: ([id]) => world.state.installed.push(marketCopy(id, "", [], catalog.find((entry) => entry.id === id))),
+    update: ([id]) => Object.assign(copyOf(id), catalog.find((entry) => entry.id === id)),
+    remove: ([id]) => { world.state.installed = world.state.installed.filter((item) => item.id !== id); },
+    extension: ([action, id]) => { copyOf(id).enabled = action === "enable"; },
+    theme: ([action, id, , scheme]) => Object.assign(world.state, { theme: action === "set" ? id : "", scheme: scheme || "" }),
+  };
+  const h = react.React.h;
+  const ampify = {
+    React: react.React,
+    components: {
+      Card: (props) => h("card", props, props.children),
+      Button: (props) => h("button", props),
+      ButtonPrimary: (props) => h("button", { ...props, variant: "accent" }),
+      ButtonTertiary: (props) => h("button", { ...props, variant: "tertiary" }),
+      Dropdown: (props) => h("dropdown", props),
+      Text: (props) => h("text", { ...props, text: props.children.join("") }),
+    },
+    kit: {
+      run: (args) => {
+        const command = args.join(" ");
+        if (args[0] === "market") return Promise.resolve({ code: 0, out: JSON.stringify(world.state), err: world.marketError });
+        world.commands.push(command);
+        if (failures[command]) return Promise.resolve({ code: 1, out: "", err: `ampify: ${failures[command]}\n` });
+        apply[args[0]](args.slice(1));
+        return Promise.resolve({ code: 0, out: "", err: "" });
+      },
+    },
+    ui: { title: { set: () => {} }, sidebar: { addItem: () => {} }, navigate: () => {} },
+  };
+  const context = { Ampify: ampify };
+  runIn(readFileSync(join(examples, "..", "apps", "marketplace", "main.js"), "utf-8"), context);
+  react.mount(context.render);
+  return { world, page: react.page };
+}
+
+const allNodes = (node) => (typeof node === "object" ? [node, ...node.children.flatMap(allNodes)] : []);
+const textsOf = (node) => allNodes(node).filter((child) => child.type === "text").map((child) => child.text);
+const cardOf = (page, name) =>
+  allNodes(page.tree).find((node) => node.type === "card" && textsOf(node).includes(name));
+function buttonIn(node, label) {
+  const found = allNodes(node).find((child) => child.type === "button" && child.label === label);
+  assert.ok(found, `a button "${label}" is shown`);
+  return found;
+}
+
+test("the Marketplace installs an element with permissions off, then turns it on from its detail view", async () => {
+  const { world, page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension", ["storage"])] });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Install").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["install demo --yes"], "installed, not turned on");
+  assert.ok(textsOf(page.tree).includes("It can:\n• keep its settings"), "the detail view lists the permissions");
+  assert.ok(textsOf(page.tree).includes("Demo installed. Read what it can do, then turn it on."));
+
+  buttonIn(page.tree, "Turn on").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["install demo --yes", "extension enable demo"]);
+  assert.equal(world.state.installed[0].enabled, true);
+});
+
+test("the Marketplace installs and uses a theme without permissions in one click", async () => {
+  const { world, page } = fakeMarketplace({ catalog: [marketEntry("night", "theme")] });
+  await settle();
+  buttonIn(cardOf(page, "Night"), "Install").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["install night --yes", "theme set night"]);
+  assert.ok(textsOf(page.tree).includes("Night installed and in use"));
+  buttonIn(cardOf(page, "Night"), "Turn off");
+});
+
+test("on a card, an action that grants permissions opens the detail view instead of acting", async () => {
+  const { world, page } = fakeMarketplace({
+    catalog: [marketEntry("demo", "extension", ["storage"]), marketEntry("glow", "theme", ["player.read"])],
+    installed: [marketCopy("demo", "extension", ["storage"]), marketCopy("glow", "theme", ["player.read"])],
+  });
+  await settle();
+  buttonIn(cardOf(page, "Glow"), "Use…").onClick();
+  assert.ok(textsOf(page.tree).includes("It can:\n• see the track that is playing"));
+  buttonIn(page.tree, "‹ Themes").onClick();
+
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Turn on…").onClick();
+  assert.deepEqual(world.commands, [], "nothing runs before the detail view");
+  buttonIn(page.tree, "Turn on").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["extension enable demo"]);
+});
+
+test("an update that adds a permission to an element that is on is confirmed on the detail view", async () => {
+  const { world, page } = fakeMarketplace({
+    catalog: [marketEntry("demo", "extension", ["storage", "network:api.example.com"], "1.1.0")],
+    installed: [marketCopy("demo", "extension", ["storage"], { enabled: true })],
+  });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Update…").onClick();
+  assert.deepEqual(world.commands, []);
+  assert.ok(textsOf(page.tree).includes(
+    "It can:\n• keep its settings\n• send requests to api.example.com (new in version 1.1.0)"));
+  buttonIn(page.tree, "Update").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["update demo --yes"]);
+  assert.equal(world.state.installed[0].version, "1.1.0");
+});
+
+test("a failed uninstall keeps the detail view open with ampify's error", async () => {
+  const { world, page } = fakeMarketplace({
+    catalog: [marketEntry("demo", "extension")],
+    installed: [marketCopy("demo", "extension")],
+    failures: { "remove demo --yes": "cannot remove: a file is in use" },
+  });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  buttonIn(page.tree, "Uninstall").onClick();
+  buttonIn(page.tree, "Confirm uninstall").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["remove demo --yes"]);
+  assert.ok(textsOf(page.tree).includes("ampify: cannot remove: a file is in use"));
+  buttonIn(page.tree, "‹ Extensions");
+});
+
+test("Refresh shows the catalog's warning instead of clearing it", async () => {
+  const { world, page } = fakeMarketplace({ catalog: [marketEntry("night", "theme")] });
+  await settle();
+  assert.ok(!textsOf(page.tree).includes("Reading the catalog…"), "the first reading leaves no status line behind");
+  world.marketError = "ampify: catalog unreachable, cached copy used\n";
+  buttonIn(page.tree, "Refresh").onClick();
+  await settle();
+  assert.ok(textsOf(page.tree).includes("ampify: catalog unreachable, cached copy used"));
+});

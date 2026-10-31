@@ -345,8 +345,11 @@ An extension describes its interface in two ways that give the same result:
 
 In both cases the kernel renders the tree as XAML with real WinUI controls (`win/ui_renderer.cpp`). Each node carries the
 name and the AutomationId `AMPIFY_<element>_<node>`. A new render only changes the nodes that changed (by position, or by
-the `key` attribute). The style is copied from the native controls of the Settings > Playback page. The places (side
-panel, dialog popups, bar buttons) are described in [../how-it-works.md](../how-it-works.md).
+the `key` attribute). With `Ampify.React`, the key of an element reaches the nodes it draws: `key` for one node,
+`key.<their own key or position>` for the nodes of a fragment or of a component that draws several. A status line put
+above keyed sections then leaves them in place instead of rebuilding them. The style is copied from the native controls
+of the Settings > Playback page. The places (side panel, dialog popups, bar buttons) are described in
+[../how-it-works.md](../how-it-works.md).
 
 Primitives: `stack`, `row`, `list`, `layer` and `card` (which have children), `text`, `button`, `toggle`, `slider`,
 `textfield`, `image`, `icon`, `dropdown` (its children are `option`) and `option` (only inside a `dropdown`). Each node is
@@ -358,7 +361,7 @@ lists. The kernel checks the tree (`core/ui_model.cpp`): 8 levels, 300 nodes and
 | `stack`, `row`, `list` | `gap` (number), `children` |
 | `layer` | `children`, drawn on top of each other (the first one at the back) and stretched over the layer |
 | `card` | `title`, `subtitle`, `onClick`, `children` |
-| `text` | `text`, `variant` (`title`, `subtitle`, `body`, `caption`), and the text style below |
+| `text` | `text`, `variant` (`title` 28 px and `subtitle` 20 px, both semibold as in Apple Music's own pages, `body`, `caption`), and the text style below |
 | `button` | `label`, `icon` (SVG), `disabled`, `variant` (`primary`, `secondary`, `tertiary`), `onClick` |
 | `toggle` | `label`, `checked`, `disabled`, `onChange` |
 | `slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange` |
@@ -391,7 +394,9 @@ renderer reads them; elsewhere they are ignored, as before.
 
 The children of a `layer` fill it unless their `align` or `valign` says otherwise. An `image` without `fit` and `height`
 stays at most 240 pixels high, as before. In a `row` of two children, the second goes to the right, as before; a child
-with `grow` changes that row into columns that fit their content, the growing ones sharing what is left.
+with `grow` changes that row into columns that fit their content, the growing ones sharing what is left, stretched
+across their column. A `button`, `dropdown`, `image` or `icon` keeps the width of its content at the start of a
+`stack` unless its `align` says otherwise, as in Apple Music's own pages.
 
 `onClick` and `onChange` hold a callback number (a positive integer) given by the kernel. The kernel refuses `onClick`
 outside `button`, `card`, `image` and `icon`, and `onChange` outside `toggle`, `slider`, `textfield` and `dropdown`. The

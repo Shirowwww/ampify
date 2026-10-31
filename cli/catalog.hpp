@@ -14,6 +14,7 @@ namespace ampify {
 struct CatalogEntry : ElementInfo {
     std::string url;
     std::string sha256;
+    std::optional<std::string> preview;  // https address of the card image
 };
 
 struct Catalog {
@@ -21,6 +22,8 @@ struct Catalog {
     // Optional `versions` object: where catalog/versions.json is published, and the SHA-256 that pins it.
     std::string versionsUrl;
     std::string versionsSha256;
+    // Address the catalog was read from. Empty for a local file. Set by LoadCatalog, not by ParseCatalog.
+    std::string sourceUrl;
 };
 
 // One Apple Music build listed in catalog/versions.json (schemas/versions.schema.json): its package version, and
@@ -36,6 +39,9 @@ struct VersionsCatalog {
 
 // A download address the kit accepts: https, or a file:// path when the catalog itself is local (development only).
 bool IsAllowedDownloadUrl(std::string_view url, bool localCatalog);
+
+// Host (and port) of an https address, in lowercase. Empty for anything else, or when the address has a user part.
+std::string UrlHost(std::string_view url);
 
 // Parses catalog.json (schemas/catalog.schema.json). `localCatalog` is true when the file was read from disk.
 // On failure returns nullopt and appends one French message per problem to `errors`.

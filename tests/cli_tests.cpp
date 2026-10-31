@@ -348,6 +348,40 @@ TEST_CASE(Catalog_RejectsBadChecksumDuplicatesAndUnknownKeys) {
     CHECK(MentionsField(errors, "extensions[0].stars: unknown field"));
 }
 
+TEST_CASE(Catalog_TagsAndPreviewAreChecked) {
+    auto with = [](const std::string& fields) {
+        std::string entry = kCatalogEntry;
+        entry.insert(entry.size() - 1, ", " + fields);
+        return CatalogWith(entry);
+    };
+    std::vector<std::string> errors;
+    std::optional<ampify::Catalog> catalog = ampify::ParseCatalog(
+        with(R"("tags": ["dark", "glass"], "preview": "https://example.com/demo.png")"), false, errors);
+    CHECK(errors.empty());
+    CHECK(catalog && catalog->entries[0].tags.size() == 2);
+    CHECK(catalog && catalog->entries[0].preview == std::optional<std::string>("https://example.com/demo.png"));
+
+    CHECK(!ampify::ParseCatalog(with(R"("tags": ["Dark"])"), false, errors).has_value());
+    CHECK(MentionsField(errors, "extensions[0].tags[0]"));
+    errors.clear();
+    CHECK(!ampify::ParseCatalog(with(R"("preview": "http://example.com/demo.png")"), false, errors).has_value());
+    CHECK(MentionsField(errors, "extensions[0].preview"));
+    errors.clear();
+    CHECK(!ampify::ParseCatalog(with(R"("preview": "https://example.com/demo.gif")"), false, errors).has_value());
+    CHECK(!ampify::ParseCatalog(with(R"("preview": 3)"), false, errors).has_value());
+    std::string longUrl = "https://example.com/" + std::string(500, 'a') + ".png";
+    CHECK(!ampify::ParseCatalog(with("\"preview\": \"" + longUrl + "\""), false, errors).has_value());
+}
+
+TEST_CASE(Catalog_UrlHostIsTheLowercaseAuthorityOfAnHttpsAddress) {
+    CHECK(ampify::UrlHost("https://Example.com/a/b.png") == "example.com");
+    CHECK(ampify::UrlHost("https://example.com:8443/x?y#z") == "example.com:8443");
+    CHECK(ampify::UrlHost("https://example.com") == "example.com");
+    CHECK(ampify::UrlHost("http://example.com/a.png").empty());
+    CHECK(ampify::UrlHost("file:///C:/a.png").empty());
+    CHECK(ampify::UrlHost("https://good.com@evil.com/a.png").empty());
+}
+
 TEST_CASE(Catalog_RejectsUnknownCatalogVersion) {
     std::vector<std::string> errors;
     CHECK(!ampify::ParseCatalog(R"({"catalogVersion": 2, "extensions": []})", false, errors).has_value());
@@ -656,6 +690,66 @@ TEST_CASE(Manifest_TypeIsScriptOrModuleForTheCli) {
     CHECK(errors.empty());
     CHECK(!ampify::ParseManifest(base + R"("type": "commonjs"})", errors).has_value());
     CHECK(MentionsField(errors, "type: invalid value"));
+}
+
+TEST_CASE(Manifest_TagsAreFiveShortUniqueWords) {
+    const std::string base =
+        R"({"id": "demo", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"
+        R"("description": "Test.", "kitApi": "1.0", "main": "main.js", )";
+    std::vector<std::string> errors;
+    std::optional<ampify::ElementManifest> tagged =
+        ampify::ParseManifest(base + R"("tags": ["dark", "glass-2", "a"]})", errors);
+    CHECK(errors.empty());
+    CHECK(tagged && tagged->tags.size() == 3 && tagged->tags[1] == "glass-2");
+    CHECK(ampify::ParseManifest(base + R"("tags": ["a", "b", "c", "d", "e"]})", errors).has_value());
+
+    CHECK(!ampify::ParseManifest(base + R"("tags": ["Dark"]})", errors).has_value());
+    CHECK(!ampify::ParseManifest(base + R"("tags": ["two words"]})", errors).has_value());
+    CHECK(!ampify::ParseManifest(base + R"("tags": ["-dark"]})", errors).has_value());
+    CHECK(!ampify::ParseManifest(base + R"("tags": ["abcdefghijklmnopqrstu"]})", errors).has_value());
+    CHECK(!ampify::ParseManifest(base + R"("tags": ["a", "b", "c", "d", "e", "f"]})", errors).has_value());
+    CHECK(MentionsField(errors, "tags: at most 5 items"));
+    errors.clear();
+    CHECK(!ampify::ParseManifest(base + R"("tags": ["dark", "dark"]})", errors).has_value());
+    CHECK(MentionsField(errors, "tags[1]: duplicate value"));
+}
+
+TEST_CASE(Manifest_PreviewIsAnImageNameAtTheRoot) {
+    const std::string base =
+        R"({"id": "demo", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"
+        R"("description": "Test.", "kitApi": "1.0", "main": "main.js", )";
+    std::vector<std::string> errors;
+    for (const char* name : {"preview.png", "shot.jpg", "Shot-2.jpeg"}) {
+        std::optional<ampify::ElementManifest> manifest =
+            ampify::ParseManifest(base + R"("preview": ")" + name + R"("})", errors);
+        CHECK(manifest && manifest->preview == std::optional<std::string>(name));
+    }
+    CHECK(errors.empty());
+    CHECK(!ampify::ParseManifest(base + R"("preview": "anim.gif"})", errors).has_value());
+    CHECK(MentionsField(errors, "preview: invalid value"));
+    CHECK(!ampify::ParseManifest(base + R"("preview": "img/shot.png"})", errors).has_value());
+    CHECK(!ampify::ParseManifest(base + R"("preview": "../shot.png"})", errors).has_value());
+}
+
+TEST_CASE(Folder_PreviewMustExistAndStayUnderTwoMegabytes) {
+    std::filesystem::path root = ScratchDir("folder-preview");
+    std::filesystem::path folder = root / "demo";
+    std::string manifest = kValidExtension;
+    manifest.replace(manifest.find("\"main\": \"main.js\","), 18, "\"main\": \"main.js\", \"preview\": \"shot.png\",");
+    WriteFile(folder / "manifest.json", manifest);
+    WriteFile(folder / "main.js", "Ampify.log('ok');");
+
+    ampify::FolderValidation missing = ampify::ValidateElementFolder(folder);
+    CHECK(!missing.ok());
+    CHECK(MentionsField(missing.errors, "preview: file missing from the folder"));
+
+    WriteFile(folder / "shot.png", std::string(ampify::kMaxPreviewBytes, 'x'));
+    CHECK(ampify::ValidateElementFolder(folder).ok());
+
+    WriteFile(folder / "shot.png", std::string(ampify::kMaxPreviewBytes + 1, 'x'));
+    ampify::FolderValidation large = ampify::ValidateElementFolder(folder);
+    CHECK(!large.ok());
+    CHECK(MentionsField(large.errors, "preview: file larger than 2 MB"));
 }
 
 TEST_CASE(Folder_RefusesASymbolicLink) {

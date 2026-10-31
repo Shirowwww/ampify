@@ -6,7 +6,9 @@
 
 The archive holds the files of the folder at its root, with manifest.json among them, as docs/extensions/catalog.md
 requires. The zip is deterministic: entries are sorted and carry a fixed timestamp, so the same folder always gives
-the same SHA-256. With --catalog, the entry for the element is added or replaced, and the catalog is validated.
+the same SHA-256. With --catalog, the entry for the element is added or replaced, and the catalog is validated. The
+manifest's preview picture is copied next to the archive under the archive's name (demo-1.0.0.jpg), and the entry
+points to it next to the archive's address: publish both.
 """
 
 import argparse
@@ -15,6 +17,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import sys
 import zipfile
 
@@ -74,14 +77,26 @@ def build_archive(folder, archive):
     return digest.hexdigest()
 
 
-def catalog_entry(manifest, url, sha256):
+def publish_preview(folder, manifest, archive, url):
+    """Copies the manifest's preview next to the archive, under the archive's name, and returns its address next to
+    the archive's: the Marketplace shows a catalog preview only from the catalog's host or the archive's."""
+    if "preview" not in manifest:
+        return None
+    target = os.path.splitext(archive)[0] + os.path.splitext(manifest["preview"])[1]
+    shutil.copyfile(os.path.join(folder, manifest["preview"]), target)
+    return url.rsplit("/", 1)[0] + "/" + os.path.basename(target)
+
+
+def catalog_entry(manifest, url, sha256, preview=None):
     entry = {
         key: manifest[key]
         for key in ("id", "name", "version", "kind", "author", "description", "kitApi")
     }
-    for key in ("homepage", "license"):
+    for key in ("homepage", "license", "tags"):
         if key in manifest:
             entry[key] = manifest[key]
+    if preview:
+        entry["preview"] = preview
     entry["url"] = url
     entry["sha256"] = sha256
     entry["permissions"] = list(manifest.get("permissions", []))
@@ -110,7 +125,8 @@ def pack(folder, archive, catalog=None, url=None):
         raise PackError("--catalog also needs --url, the https address where the archive will be published")
     sha256 = build_archive(folder, archive)
     if catalog:
-        update_catalog(catalog, catalog_entry(manifest, url, sha256))
+        preview = publish_preview(folder, manifest, archive, url)
+        update_catalog(catalog, catalog_entry(manifest, url, sha256, preview))
     return {"id": manifest["id"], "version": manifest["version"], "archive": archive, "sha256": sha256}
 
 

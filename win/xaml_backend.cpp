@@ -400,6 +400,32 @@ std::string DescribeStates(const xaml::FrameworkElement& element) {
     return text;
 }
 
+// An element's {ThemeResource} brushes are resolved when it is first shown, and again on a change of mode: the other
+// mode for a moment, then the one it had, makes this element alone read them again. Nothing is drawn in between.
+// Doing it for the whole window stopped Apple Music for half a second.
+void ReadThemeAgain(const xaml::FrameworkElement& element) {
+    xaml::ElementTheme requested = element.RequestedTheme();
+    bool dark = element.ActualTheme() == xaml::ElementTheme::Dark;
+    element.RequestedTheme(dark ? xaml::ElementTheme::Light : xaml::ElementTheme::Dark);
+    element.RequestedTheme(requested);
+}
+
+// The open popups (Ampify's pages and panels, Apple Music's menus) are not under the window's content, so a change of
+// mode there does not reach them: without this, a page kept the accent of the theme before.
+// A popup that closes meanwhile is skipped: the change of mode and the caption still go through.
+void ReadPopupsAgain(const xaml::XamlRoot& root) noexcept {
+    try {
+        if (!root) return;
+        for (const primitives::Popup& popup : media::VisualTreeHelper::GetOpenPopupsForXamlRoot(root)) {
+            try {
+                if (auto child = popup.Child().try_as<xaml::FrameworkElement>()) ReadThemeAgain(child);
+            } catch (...) {
+            }
+        }
+    } catch (...) {
+    }
+}
+
 }  // namespace
 
 bool XamlTreeBackend::Attach() {
@@ -480,6 +506,7 @@ bool XamlTreeBackend::SetAppMode(std::optional<bool> dark) {
         root.RequestedTheme(shownDark ? xaml::ElementTheme::Light : xaml::ElementTheme::Dark);
     }
     if (refresh || root.RequestedTheme() != wanted) root.RequestedTheme(wanted);
+    if (refresh) ReadPopupsAgain(root.XamlRoot());
     SetCaptionMode(dark);
     return refresh;
 }
@@ -1608,16 +1635,6 @@ StateKeys PointerStateKeys(const controls::Control& control, std::string_view pr
         }
     }
     return result;
-}
-
-// A control's states resolve their {ThemeResource} brushes when they are first shown, and again on a change of mode:
-// the other mode for a moment, then the one it had, makes this control alone read them again. Nothing is drawn in
-// between. Doing it for the whole window stopped Apple Music for half a second.
-void ReadThemeAgain(const controls::Control& control) {
-    xaml::ElementTheme requested = control.RequestedTheme();
-    bool dark = control.ActualTheme() == xaml::ElementTheme::Dark;
-    control.RequestedTheme(dark ? xaml::ElementTheme::Light : xaml::ElementTheme::Dark);
-    control.RequestedTheme(requested);
 }
 
 // The engine builds a new brush at each write: two brushes that draw the same count as the same. Comparing gradients

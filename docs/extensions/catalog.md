@@ -37,6 +37,8 @@ The example above is not in the catalog: its SHA-256 is a placeholder.
 | `url` | yes | A `.zip` archive on `https://`. Its content is the element's folder, with `manifest.json` at the root. |
 | `sha256` | yes | SHA-256 of the archive, lowercase, 64 characters. |
 | `homepage`, `license` | no | Same rules as in the manifest. |
+| `tags` | no | A copy of the manifest tags: 5 at most, unique, each `[a-z0-9][a-z0-9-]{0,19}`. Shown on the card. |
+| `preview` | no | An `https://` URL ending in `.png`, `.jpg` or `.jpeg`, 512 characters at most. The page shows it only when its host is the catalog's own host or the host of the archive `url`; any other address is left out. A catalog read from a local file only has the archive `url` host. |
 | `permissions` | no | A copy of the manifest permissions. It lets the consent be shown before the download. |
 
 The permission `kit.manage` is refused in the catalog: only the Marketplace that ships with Ampify holds it.
@@ -50,7 +52,9 @@ exports of each. `catalog.json` pins its address and SHA-256. `ampify versions u
    `python3 tools/validate.py manifest <folder>/manifest.json` (or `ampify validate <folder>`).
 2. Create the `.zip` archive of the folder, without the parent folder, and publish it on `https://` (for example in a
    GitHub release). `ampify build <folder>` does this and prints the catalog entry. Publish with one tool only:
-   `tools/pack.py` writes a compressed zip with a different SHA-256.
+   `tools/pack.py` writes a compressed zip with a different SHA-256. With `--catalog`, `tools/pack.py` also copies the
+   manifest's `preview` picture next to the archive, under the archive's name, and points the entry to it: publish the
+   picture with the archive.
 3. Compute its hash: `sha256sum <archive>.zip` (or `certutil -hashfile <archive>.zip SHA256` on Windows).
 4. Add the entry to the catalog in a pull request.
 5. Validate the catalog: `python3 tools/validate.py catalog catalog/catalog.json`.
@@ -102,30 +106,41 @@ command line, and bypasses no check.
 - Invalid catalog: the page refuses to display it and shows the reasons, like `ampify validate`. It does not keep a partial
   list.
 - The catalog is read once per page opening. A "Refresh" button reads it again.
+- The page reads everything from `ampify market --json`: `catalogOk`, the `catalog` entries, the `installed` elements
+  (with `valid`, `enabled`, a local `preview`, and for a theme its `schemes` and `defaultScheme`), the active `theme`
+  and its `scheme`.
 
 **Screen**
 
-1. **List.** One row per element: name, author, kind (extension, theme, app, snippet), version, a one-line description,
-   and a state: not installed, installed, update available, enabled, invalid. Search by text, filter by kind.
+1. **Tabs and cards.** Tabs Themes, Extensions, Apps, Snippets and Installed, a search field (names, authors,
+   descriptions, tags) and "Refresh". The cards stand three to a row, twelve to a page: the preview picture (or a band
+   with the icon of the kind), name, author and version, two lines of description, the state and tags, the permissions
+   in one line, the main action and "Details". On the Themes and Installed tabs, a bar names the theme in use, with its
+   scheme menu and "Use Apple Music's look".
 2. **Detail.** Name, id, author (link to the GitHub profile), version, license, project page (`homepage`), full
    description. The **permissions** are listed with a plain sentence for each (for example `network:api.example.com`:
-   "sends requests to api.example.com").
-3. **Actions** by state: "Install"; "Update" (shows the new permissions before confirming); "Enable" or "Disable" and
-   "Remove"; for a theme, "Use this theme" and the choice of scheme, plus "Restore Apple Music's look". Destructive
-   actions ("Remove") ask for confirmation. A backup is made first, as on the command line.
+   "sends requests to api.example.com"); the ones an update adds are marked "new in version ...".
+3. **Actions** by state: "Install"; "Update"; "Turn on" or "Turn off" and "Uninstall"; for a theme, "Use" and the
+   choice of scheme, plus "Use Apple Music's look". Destructive actions ("Uninstall") ask for confirmation. A backup is
+   made first, as on the command line. The status line under the tabs says what the last action did, or ampify's error
+   as it is.
 
 **Rules**
 
 - **Nothing installs without a click in the page**, and the permissions are shown before that click.
 - **The same engine as `ampify install`.** HTTPS download, SHA-256 checked before any extraction, file list check,
   symbolic links refused, manifest compared with the catalog. The page reimplements nothing. It calls `ampify.exe`.
-- **An installed element is off.** Switching it on is a second click, on the detail view, which shows its permissions
-  again.
+- **An element that asks for permissions is installed off.** The page then opens its detail view, where switching it
+  on is a second click under the list of its permissions. An element that asks for none is installed and put on (a
+  theme put in use) in one click.
+- **A card never grants a permission.** An action that would ("Turn on", "Use", or an "Update" that adds permissions
+  to an element that is on) ends with an ellipsis on the card and opens the detail view instead.
 - **Nothing is run during the install.** The code only runs after activation, and only with the permissions the user saw.
 - **An update keeps the settings.** An element that was on stays on, unless its new version asks for a new permission
   that the user refuses.
 - **No network beyond the catalog and the releases.** The page loads no image or script from another address. An icon
-  comes from the archive.
+  comes from the archive. A preview of an installed element is its own file; a preview in the catalog is used only when
+  it is on the host of the catalog or of the archive.
 
 **States and messages**
 

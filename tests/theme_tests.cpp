@@ -223,9 +223,14 @@ private:
     }
 
     Element* Find(th::NodeId id) {
-        if (id == 0 || id > elements.size() || !elements[id - 1].alive) return nullptr;
+        if (id == 0 || id > elements.size() || !elements[id - 1].alive || unreachable.count(id)) return nullptr;
         return &elements[id - 1];
     }
+
+public:
+    std::set<th::NodeId> unreachable;  // listed by the snapshot, gone when reached (a template part never realized)
+
+private:
 
     th::HoverTracker hover;
 };
@@ -844,6 +849,63 @@ TEST_CASE(Spicetify_ColorIniPaintsAppleMusicAsIs) {
     CHECK(AssignmentFor(snow, "Grid#PaneRoot", "Background") == nullptr);  // no sidebar key: Apple Music's own
 }
 
+TEST_CASE(Theme_TextOnALightAccentTurnsDark) {
+    MemoryFiles files;
+    files.files["colors.ini"] =
+        "[Cyan]\nAccentFillColorDefaultBrush = 4FD1FF\n\n"
+        "[Blue]\nAccentFillColorDefaultBrush = 2F6FEB\n\n"
+        "[Own]\nAccentFillColorDefaultBrush = 4FD1FF\nTextOnAccentFillColorPrimaryBrush = 112233\n";
+
+    // White on a light cyan reads at 1.8:1: the text on the accent goes dark, as in Fluent's dark mode.
+    th::Theme cyan = Load(files, {"Cyan", nullptr, {}});
+    CHECK(ResourceValue(cyan, "TextOnAccentFillColorPrimaryBrush") == "#FF000000");
+    CHECK(ResourceValue(cyan, "TextOnAccentFillColorSecondaryBrush") == "#B3000000");
+
+    // On a blue white reads on, Apple Music's own white stays.
+    th::Theme blue = Load(files, {"Blue", nullptr, {}});
+    CHECK(ResourceValue(blue, "TextOnAccentFillColorPrimaryBrush") == "ABSENT");
+
+    // A theme that names the colour keeps it.
+    th::Theme own = Load(files, {"Own", nullptr, {}});
+    CHECK(ResourceValue(own, "TextOnAccentFillColorPrimaryBrush") == "#FF112233");
+
+    // A Spicetify button colour counts as the accent.
+    files.files["colors.ini"] = "[Green]\nbutton = 1ED760\n";
+    th::Theme green = Load(files);
+    CHECK(ResourceValue(green, "TextOnAccentFillColorPrimaryBrush") == "#FF000000");
+
+    // A colour the theme's resources.xaml gives stays its own.
+    files.files["resources.xaml"] =
+        "<ResourceDictionary><SolidColorBrush x:Key=\"TextOnAccentFillColorPrimaryBrush\"/></ResourceDictionary>";
+    th::Theme dictionary = Load(files);
+    CHECK(ResourceValue(dictionary, "TextOnAccentFillColorPrimaryBrush") == "ABSENT");
+}
+
+TEST_CASE(Theme_HoverAndPressedAccentsFollowTheAccent) {
+    MemoryFiles files;
+    files.files["colors.ini"] =
+        "[Only]\nAccentFillColorDefaultBrush = 0A84FF\n\n"
+        "[Hover]\nAccentFillColorDefaultBrush = 0A84FF\nAccentFillColorSecondaryBrush = 112233\n";
+
+    // Fluent's accent under the pointer and while pressed: the accent at 90% and 80%.
+    th::Theme only = Load(files, {"Only", nullptr, {}});
+    CHECK(ResourceValue(only, "AccentFillColorSecondaryBrush") == "#E60A84FF");
+    CHECK(ResourceValue(only, "AccentFillColorTertiaryBrush") == "#CC0A84FF");
+
+    // A state the theme names stays its own; the other one still follows the accent.
+    th::Theme hover = Load(files, {"Hover", nullptr, {}});
+    CHECK(ResourceValue(hover, "AccentFillColorSecondaryBrush") == "#FF112233");
+    CHECK(ResourceValue(hover, "AccentFillColorTertiaryBrush") == "#CC0A84FF");
+
+    // A key the theme's resources.xaml defines is left to it.
+    files.files["resources.xaml"] =
+        "<ResourceDictionary><SolidColorBrush x:Key=\"AccentFillColorTertiaryBrush\"/></ResourceDictionary>";
+    std::set<std::string> allowed{"AccentFillColorTertiaryBrush"};
+    th::Theme dictionary = Load(files, {"Only", &allowed, {}});
+    CHECK(ResourceValue(dictionary, "AccentFillColorSecondaryBrush") == "#E60A84FF");
+    CHECK(ResourceValue(dictionary, "AccentFillColorTertiaryBrush") == "ABSENT");
+}
+
 TEST_CASE(Spicetify_ThemeRulesWinOverTheTranslatedOnes) {
     MemoryFiles files;
     files.files["color.ini"] = "[Base]\nsidebar = 112233\n";
@@ -1158,6 +1220,27 @@ TEST_CASE(Engine_AppliesColoursResourcesAndDictionaries) {
     engine.Restore(tree);
     CHECK(tree.resources["AccentFillColorDefaultBrush"].text == "#FF000000");
     CHECK(tree.dictionary.empty());
+}
+
+TEST_CASE(Engine_DoesNotRefuseAValueForAnElementGoneSinceTheSnapshot) {
+    // The hidden chevron of an AppBarButton is listed, then cannot be reached: nothing to write, and no fault of the
+    // theme either.
+    MemoryFiles files;
+    files.files["user.css"] = "Button FontIcon { foreground: #FF000000; }\n";
+    th::Theme theme = Load(files);
+    FakeTree tree;
+    tree.Add(-1, "Button", "Play");
+    th::NodeId icon = tree.Add(0, "FontIcon", "", {{"Foreground", Brush("#FFFFFFFF")}});
+    th::NodeId chevron = tree.Add(0, "FontIcon", "SubItemChevron");
+    tree.unreachable.insert(chevron);
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    th::ThemeEngine::Report report = engine.Apply(theme, tree);
+    CHECK(report.refused == 0);
+    CHECK(report.applied == 1);
+    CHECK(tree.elements[icon - 1].properties["Foreground"].text == "#FF000000");
 }
 
 TEST_CASE(Engine_ReportsADictionaryTheInterfaceRefuses) {

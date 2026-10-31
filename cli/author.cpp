@@ -50,8 +50,13 @@ std::string CatalogEntryText(const ElementManifest& manifest, const std::string&
         << "  \"kind\": " << json::Quote(manifest.kind) << ",\n"
         << "  \"author\": " << json::Quote(manifest.author) << ",\n"
         << "  \"description\": " << json::Quote(manifest.description) << ",\n"
-        << "  \"kitApi\": " << json::Quote(manifest.kitApi) << ",\n"
-        << "  \"permissions\": [";
+        << "  \"kitApi\": " << json::Quote(manifest.kitApi) << ",\n";
+    if (!manifest.tags.empty()) {
+        out << "  \"tags\": [";
+        for (size_t i = 0; i < manifest.tags.size(); i++) out << (i ? ", " : "") << json::Quote(manifest.tags[i]);
+        out << "],\n";
+    }
+    out << "  \"permissions\": [";
     for (size_t i = 0; i < manifest.permissions.size(); i++) {
         out << (i ? ", " : "") << json::Quote(manifest.permissions[i]);
     }

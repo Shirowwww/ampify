@@ -13,7 +13,7 @@
 // | layer     | Grid of one cell: the children on top of each other, stretched by default     |
 // | card      | Border (card brushes of the theme or of a native card) + title, subtitle      |
 // | text      | TextBlock, style Title/Subtitle/Body/Caption TextBlockStyle                    |
-// | button    | Button (AccentButtonStyle for primary, transparent for tertiary), icon + label|
+// | button    | Button (accent template for primary, transparent for tertiary), icon + label  |
 // | toggle    | ToggleSwitch on the right of its label (Grid of 2 columns)                    |
 // | slider    | Slider with Header                                                            |
 // | textfield | TextBox with Header and PlaceholderText                                       |
@@ -67,8 +67,8 @@ using UiEventSink = std::function<void(const UiEvent&)>;
 
 // The look of the page, copied from native controls (the style probe): each new control takes the Style of a native
 // control of the same kind, and a card takes the brushes, corner and padding of a native card. Everything left null
-// falls back to the theme resources of WinUI (CardBackgroundFillColorDefaultBrush, CardStrokeColorDefaultBrush,
-// AccentButtonStyle, the TextBlock styles), which follow the light and dark modes.
+// falls back to the theme resources of WinUI (CardBackgroundFillColorDefaultBrush, CardStrokeColorDefaultBrush, the
+// TextBlock styles), which follow the light and dark modes.
 struct StyleProbe {
     winrt::Microsoft::UI::Xaml::Style button{nullptr};
     winrt::Microsoft::UI::Xaml::Style toggle{nullptr};
@@ -115,6 +115,10 @@ winrt::Microsoft::UI::Xaml::FrameworkElement MakeIconElement(const std::string& 
 
 // A one-pixel line with the theme's divider brush, between the rows of a card.
 winrt::Microsoft::UI::Xaml::FrameworkElement MakeDivider();
+
+// The template of a primary button: the accent brushes in every visual state. Apple Music's AccentButtonStyle draws
+// its text in a symbol font (WebDings), so a primary button takes the plain button style with this template.
+winrt::Microsoft::UI::Xaml::Controls::ControlTemplate PrimaryButtonTemplate();
 
 // One surface (panel, page or popup) of one element. It holds its controls: destroy it on the interface thread.
 class XamlRenderer {

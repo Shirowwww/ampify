@@ -94,6 +94,29 @@ class PackTests(unittest.TestCase):
         self.assertEqual(entries[0]["url"], "https://example.com/demo-2.zip")
         self.assertRegex(entries[0]["sha256"], r"^[0-9a-f]{64}$")
 
+    def test_preview_is_published_next_to_the_archive(self):
+        folder = self.make_element()
+        with open(os.path.join(folder, "preview.jpg"), "wb") as handle:
+            handle.write(b"\xff\xd8\xff\xe0 not a real picture")
+        with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as handle:
+            manifest = json.load(handle)
+        manifest.update(preview="preview.jpg", tags=["dark", "minimal"])
+        with open(os.path.join(folder, "manifest.json"), "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+        catalog = os.path.join(self.tmp, "catalog.json")
+        with open(catalog, "w", encoding="utf-8") as handle:
+            json.dump({"catalogVersion": 1, "extensions": []}, handle)
+
+        archive = os.path.join(self.tmp, "packages", "demo-1.0.0.zip")
+        os.makedirs(os.path.dirname(archive))
+        pack.pack(folder, archive, catalog, "https://example.com/packages/demo-1.0.0.zip")
+
+        with open(catalog, encoding="utf-8") as handle:
+            entry = json.load(handle)["extensions"][0]
+        self.assertEqual(entry["preview"], "https://example.com/packages/demo-1.0.0.jpg")
+        self.assertEqual(entry["tags"], ["dark", "minimal"])
+        self.assertTrue(os.path.isfile(os.path.join(self.tmp, "packages", "demo-1.0.0.jpg")))
+
     def test_catalog_needs_an_https_address(self):
         folder = self.make_element()
         catalog = os.path.join(self.tmp, "catalog.json")

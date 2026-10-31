@@ -2,10 +2,15 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "hide-chrome",
   "name": "Hide chrome",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Hides the buttons and banners most people never use: reactions, share, AirPlay, info banners.",
   "kitApi": "1.0",
-  "colors": "colors.ini"
+  "colors": "colors.ini",
+  "tags": [
+    "minimal",
+    "declutter"
+  ],
+  "preview": "preview.jpg"
 }

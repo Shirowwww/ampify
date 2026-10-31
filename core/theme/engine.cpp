@@ -180,7 +180,9 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const std::map<std::string, c
     for (const auto& [property, assignment] : winners) {
         std::optional<Value> current = tree.Read(node.id, property);
         if (!current) {
-            Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report);
+            if (tree.Alive(node.id)) {
+                Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report);
+            }
             continue;
         }
         // A relative size under the pointer scales the size underneath, the theme's own when it has one.
@@ -227,7 +229,10 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
     }
     std::optional<Value> current = tree.Read(node.id, property);
     if (!current) {
-        Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report);
+        // Gone since the snapshot, or a template part WinUI never realized: nothing the theme did wrong.
+        if (tree.Alive(node.id)) {
+            Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report);
+        }
         return false;
     }
     std::optional<Value> value = Resolve(node.id, property, assignment.value, *current);
@@ -244,7 +249,11 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
     if (keep && !m_originals.count(key)) m_originals.emplace(key, tree.ReadOriginal(node.id, property).value_or(*current));
 
     if (!tree.Write(node.id, property, *value)) {
-        Refuse(Describe(node) + " " + property, "value refused for \"" + Describe(node) + " " + property + "\"", report);
+        std::string reason = property == "Transition"
+                                 ? "\"" + Describe(node) + "\" is animated by Apple Music: transition refused, its "
+                                   "changes apply at once"
+                                 : "value refused for \"" + Describe(node) + " " + property + "\"";
+        Refuse(Describe(node) + " " + property, reason, report);
         return false;
     }
     if (!keep) m_moves.push_back({node.id, *current});

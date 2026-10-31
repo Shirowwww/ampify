@@ -236,8 +236,22 @@ const char kReact[] = R"AMPIFYJS(
     return next;
   }
 
+  // The key of an element goes on the nodes it draws: the kernel then matches the native controls by key too, and a
+  // child put before them does not rebuild them. The nodes of a fragment, or of a component that draws several, keep
+  // apart by their own key, else by their position.
+  function keyNodes(out, start, key, fragment) {
+    if (key === null) return;
+    const many = fragment || out.length - start > 1;
+    for (let index = start; index < out.length; index++) {
+      const node = out[index];
+      if (typeof node === "string") continue;
+      node.key = many ? key + "." + (node.key !== undefined ? node.key : index - start) : key;
+    }
+  }
+
   function renderChild(child, kind, type, old, root, out) {
     const instance = old || { kind, type, root, hooks: [], effects: [], children: null, handlers: null, dead: false };
+    const start = out.length;
     switch (kind) {
       case "text":
         out.push(String(child));
@@ -274,6 +288,7 @@ const char kReact[] = R"AMPIFYJS(
       default:
         renderComponent(instance, child, root, out);
     }
+    if (kind !== "text" && kind !== "array") keyNodes(out, start, child.key, kind === "fragment");
     return instance;
   }
 

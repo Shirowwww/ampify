@@ -38,10 +38,7 @@
     foreground: #000000;
 }
 
-.play-button {
-    transition: transform 120ms;
-}
-
+/* Apple Music animates this button itself, so the growth is immediate: a transition here would be refused. */
 .play-button:hover {
     transform: scale(1.06);
 }

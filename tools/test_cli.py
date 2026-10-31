@@ -337,6 +337,62 @@ class Marketplace(AmpifyTestCase):
         self.assertIn("demo", result.stdout)
         self.assertIn("not installed", result.stdout)
 
+    def market_json(self, catalog):
+        result = self.ampify("market", "--json", *self.catalog_option(catalog))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_market_json_gives_tags_and_the_absolute_preview_of_an_installed_theme(self):
+        folder = self.write_element("glow", "theme", files={"preview.png": "png"})
+        manifest_path = os.path.join(folder, "manifest.json")
+        manifest = read_json(manifest_path)
+        manifest.update(tags=["dark", "glass"], preview="preview.png")
+        with open(manifest_path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+        entry, _ = self.entry_for(folder)
+        self.assertEqual(entry["tags"], ["dark", "glass"])
+        catalog = self.write_catalog([entry, self.night_entry])
+        self.assertEqual(self.install("glow", catalog).returncode, 0)
+        self.assertEqual(self.install("night", catalog).returncode, 0)
+
+        installed = {item["id"]: item for item in self.market_json(catalog)["installed"]}
+        self.assertEqual(installed["glow"]["tags"], ["dark", "glass"])
+        expected = os.path.join(self.kit, "themes", "glow", "preview.png")
+        self.assertEqual(os.path.normcase(os.path.normpath(installed["glow"]["preview"])),
+                         os.path.normcase(os.path.normpath(expected)))
+        self.assertTrue(os.path.isabs(installed["glow"]["preview"]))
+        self.assertEqual(installed["glow"]["schemes"], ["Dark"])
+        self.assertEqual(installed["glow"]["defaultScheme"], "Dark")
+        self.assertEqual(installed["night"]["tags"], [])
+        self.assertNotIn("preview", installed["night"])
+
+    def test_market_json_keeps_a_catalog_preview_only_from_a_known_host(self):
+        def listed(name, **changes):
+            return {**self.night_entry, "id": name, "url": "https://cdn.example.com/" + name + ".zip", **changes}
+
+        catalog = self.write_catalog([
+            listed("same-host", preview="https://CDN.example.com/same.png", tags=["dark"]),
+            listed("other-host", preview="https://images.example.net/other.png"),
+            listed("no-preview"),
+        ])
+        items = {item["id"]: item for item in self.market_json(catalog)["catalog"]}
+        self.assertEqual(items["same-host"]["preview"], "https://CDN.example.com/same.png")
+        self.assertEqual(items["same-host"]["tags"], ["dark"])
+        self.assertNotIn("preview", items["other-host"])
+        self.assertEqual(items["other-host"]["tags"], [])
+        self.assertNotIn("preview", items["no-preview"])
+
+    def test_build_prints_the_tags_in_the_catalog_entry(self):
+        folder = self.write_element("tagged", "theme")
+        manifest_path = os.path.join(folder, "manifest.json")
+        manifest = read_json(manifest_path)
+        manifest["tags"] = ["dark", "layout"]
+        with open(manifest_path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+        result = self.ampify("build", folder, os.path.join(self.tmp, "tagged.zip"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('"tags": ["dark", "layout"],', result.stdout)
+
     def test_install_asks_before_writing_without_yes(self):
         result = self.ampify("install", "demo", *self.catalog_option(self.catalog), input_text="no\n")
         self.assertEqual(result.returncode, 1)
@@ -458,7 +514,23 @@ class Marketplace(AmpifyTestCase):
         self.ampify("apply")
         self.assertIn("theme night 1.0.0 scheme=Dark", self.read("active.txt"))
 
+        # A scheme belongs to the theme it was chosen for: setting the same theme again keeps it, another theme starts
+        # on its own default, and "auto" follows Windows whatever the theme.
+        again = self.ampify("theme", "set", "night")
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertIn("theme.scheme = Dark", self.settings_text())
+        dusk_entry, _ = self.entry_for(self.write_element("dusk", "theme"))
+        self.assertEqual(self.install("dusk", self.write_catalog([self.night_entry, dusk_entry])).returncode, 0)
+        other = self.ampify("theme", "set", "dusk")
+        self.assertEqual(other.returncode, 0, other.stderr)
+        self.assertNotIn("theme.scheme", self.settings_text())
+        self.assertEqual(self.ampify("config", "theme.scheme", "auto").returncode, 0)
+        self.assertEqual(self.ampify("theme", "set", "night").returncode, 0)
+        self.assertIn("theme.scheme = auto", self.settings_text())
+
+        self.ampify("theme", "set", "night", "--scheme", "Dark")
         self.assertEqual(self.ampify("theme", "clear").returncode, 0)
+        self.assertNotIn("theme.scheme", self.settings_text())
         self.ampify("apply")
         self.assertNotIn("theme night", self.read("active.txt"))
 

@@ -299,11 +299,22 @@ int CmdThemeSet(Context& ctx) {
     if (found == nullptr) return Failure(ctx, "theme not found: " + id + ". Install it with ampify install " + id);
     if (!found->Valid()) return Failure(ctx, "invalid theme: " + found->errors.front());
 
+    Settings settings;
+    std::string error;
+    if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
+    // A scheme belongs to the theme it was chosen for: kept, the Dark of one theme opened the next one on its Dark.
+    // Setting the same theme again keeps it, and so does "auto", which follows Windows whatever the theme.
+    std::string stored = settings.GetString("theme.scheme", "");
+    bool keep = !ctx.options.scheme && !stored.empty() &&
+                (stored == "auto" || settings.GetString("theme.active", "") == id);
+
     // The manifest is valid; now the theme engine reads the theme as the kernel will, and refuses what it would refuse.
     std::filesystem::path folder = ctx.kit.Root() / "themes" / id;
     theme::FolderFiles files(folder);
     theme::LoadOptions load;
-    if (ctx.options.scheme) load.scheme = *ctx.options.scheme;
+    load.scheme = ctx.options.scheme ? *ctx.options.scheme
+                  : keep && stored != "auto" ? stored
+                                             : theme::ReadDefaultScheme(files);
     theme::Theme loaded = theme::LoadTheme(id, folder.generic_string(), files, load);
     if (!loaded.usable) {
         return Failure(ctx, "theme refused by the theme engine: " +
@@ -311,13 +322,12 @@ int CmdThemeSet(Context& ctx) {
     }
     for (const std::string& problem : loaded.problems) ctx.out << "Warning: " << problem << "\n";
 
-    Settings settings;
-    std::string error;
-    if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
     settings.Set("theme.active", id);
     if (ctx.options.scheme) {
         if (!IsValidScheme(*ctx.options.scheme)) return Failure(ctx, "invalid scheme name: " + *ctx.options.scheme);
         settings.Set("theme.scheme", *ctx.options.scheme);
+    } else if (!keep) {
+        settings.Remove("theme.scheme");
     }
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
 
@@ -632,6 +642,7 @@ int CmdTheme(Context& ctx) {
         std::string error;
         if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
         settings.Set("theme.active", "");
+        settings.Remove("theme.scheme");
         if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
         ctx.out << "No active theme. Run ampify apply to apply it.\n";
         return 0;

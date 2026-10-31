@@ -55,6 +55,19 @@
         },
         "homepage": {"$ref": "#/$defs/https"},
         "license": {"type": "string", "minLength": 1, "maxLength": 64},
+        "tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 5,
+          "description": "Copy of the manifest's tags, shown on the Marketplace card.",
+          "items": {"$ref": "#/$defs/tag"}
+        },
+        "preview": {
+          "type": "string",
+          "pattern": "^https://[^\\s]+\\.(png|jpg|jpeg)$",
+          "maxLength": 512,
+          "description": "Preview image shown on the Marketplace card. The page loads it only from the host of the catalog or of the archive url."
+        },
         "permissions": {
           "type": "array",
           "uniqueItems": true,
@@ -66,6 +79,7 @@
     },
     "kind": {"enum": ["extension", "theme", "app", "snippet"]},
     "kitApi": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "tag": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,19}$"},
     "https": {"type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 512},
     "permission": {
       "type": "string",

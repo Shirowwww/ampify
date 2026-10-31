@@ -2,11 +2,18 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "sleep-timer",
   "name": "Sleep timer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Pauses playback after a delay, set in minutes, then lets you know.",
   "kitApi": "1.0",
   "main": "main.js",
-  "permissions": ["player.control", "notifications"]
+  "permissions": [
+    "player.control",
+    "notifications"
+  ],
+  "tags": [
+    "timer",
+    "sleep"
+  ]
 }

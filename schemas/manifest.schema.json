@@ -53,6 +53,18 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.svg$",
       "description": "SVG icon for the sidebar, for an app."
     },
+    "tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 5,
+      "description": "Short lowercase words (dark, layout, glass, lyrics...) that the Marketplace shows on the card.",
+      "items": {"$ref": "#/$defs/tag"}
+    },
+    "preview": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.(png|jpg|jpeg)$",
+      "description": "Preview image for the Marketplace, at the root of the folder. 2 MB at most."
+    },
     "permissions": {
       "type": "array",
       "uniqueItems": true,
@@ -78,6 +90,7 @@
   "$defs": {
     "kind": {"enum": ["extension", "theme", "app", "snippet"]},
     "kitApi": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "tag": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,19}$"},
     "https": {"type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 512},
     "permission": {
       "type": "string",

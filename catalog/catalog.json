@@ -8,25 +8,36 @@
     {
       "id": "artwork",
       "name": "Artwork",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "kind": "theme",
       "author": "Shirowwww",
       "description": "The artwork of the current track fills the window, under dark glass panels that float.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/artwork-0.1.0.zip",
-      "sha256": "adc81b3bcc9d3ab28fc6e8bd717a25f59e7f5558ba02d6e12a1d57c5f6bd7a83",
+      "tags": [
+        "artwork",
+        "dark",
+        "glass",
+        "immersive"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/artwork-0.2.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/artwork-0.2.0.zip",
+      "sha256": "a54b9b1fb5dfee59fcd85f09107ed27b3cb69ce2d38ac6f50bb1ea6ff10e3f71",
       "permissions": []
     },
     {
       "id": "gain-boost",
       "name": "Output gain",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "kind": "extension",
       "author": "Shirowwww",
       "description": "Adds a fixed gain to the decoded sound. The displayed volume does not change, and the kernel's ceiling applies.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/gain-boost-0.1.1.zip",
-      "sha256": "fde15e16b9c2ea84ca41b056ebccf35443b0f314235009e3b8388149df54f936",
+      "tags": [
+        "audio",
+        "volume"
+      ],
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/gain-boost-0.1.2.zip",
+      "sha256": "343e2326443112f5aa923fa97997d3fcc78ef8d97e8d2a9839d8859c692efbb4",
       "permissions": [
         "audio.gain"
       ]
@@ -34,90 +45,182 @@
     {
       "id": "glass",
       "name": "Glass",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "kind": "theme",
       "author": "Shirowwww",
       "description": "A complete redesign: gradient and acrylic backgrounds, large rounded cards, larger text, buttons that grow on hover, shadows.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/glass-0.1.0.zip",
-      "sha256": "9071e85a8a6958053ca79907e1eb33518ffcf6112ea6c76de88c2b86ccb56ac3",
+      "tags": [
+        "glass",
+        "redesign",
+        "rounded",
+        "dark",
+        "light"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/glass-0.2.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/glass-0.2.0.zip",
+      "sha256": "513a742b0f4abf4e08e997bf1d66b20742eaa2b2c04f837c178c7f11ba5ed3c2",
       "permissions": []
     },
     {
       "id": "greenroom",
       "name": "Greenroom",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "kind": "theme",
       "author": "Shirowwww",
       "description": "A familiar layout from another music app: the playback bar at the bottom across the window, the track on the left, rounded dark panels and a green accent.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/greenroom-0.1.0.zip",
-      "sha256": "1cc259cfc5b73a7fee9336bdf922ef6203373bee5c352ffadb6afef32c813fd9",
+      "tags": [
+        "layout",
+        "dark",
+        "green",
+        "redesign"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/greenroom-0.2.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/greenroom-0.2.0.zip",
+      "sha256": "508d8d3865bfbb99e272644a6c3f2c97adafb540112f6ee4a72092b3e8c53b50",
       "permissions": []
     },
     {
       "id": "hello-extension",
       "name": "Hello",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "kind": "extension",
       "author": "Shirowwww",
       "description": "Minimal example: writes to the log and keeps a launch counter.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/hello-extension-0.1.0.zip",
-      "sha256": "4683499651ae92a0be38c468b3e81ab6567afb8b26bb5c617317abaa15d2d1e7",
+      "tags": [
+        "example",
+        "developer"
+      ],
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/hello-extension-0.1.1.zip",
+      "sha256": "82d583ab220fb921efc28ff798169ba599ac88e98184ad28625aa20673a3b14e",
       "permissions": [
         "storage"
       ]
     },
     {
+      "id": "hide-chrome",
+      "name": "Hide chrome",
+      "version": "0.2.0",
+      "kind": "theme",
+      "author": "Shirowwww",
+      "description": "Hides the buttons and banners most people never use: reactions, share, AirPlay, info banners.",
+      "kitApi": "1.0",
+      "tags": [
+        "minimal",
+        "declutter"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/hide-chrome-0.2.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/hide-chrome-0.2.0.zip",
+      "sha256": "b2d91d56c14a3758c93690376e532897dc1be7a540ba6cfd4bd9b35e325de49d",
+      "permissions": []
+    },
+    {
       "id": "high-contrast",
       "name": "High contrast",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "theme",
       "author": "Shirowwww",
       "description": "Black and white, with bright colors for buttons and selections.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/high-contrast-1.0.0.zip",
-      "sha256": "94c817d4531ffe10b832c2b80b214735a2b1cf9cce22905f68ae8b567c3dff41",
+      "tags": [
+        "accessibility",
+        "contrast",
+        "dark"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/high-contrast-1.1.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/high-contrast-1.1.0.zip",
+      "sha256": "c5c151cbc30939726083dadd2ab55054876920f8817c85a929a6881650c2b7cc",
       "permissions": []
     },
     {
       "id": "keyboard-skip",
       "name": "Skip tracks from the keyboard",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "kind": "extension",
       "author": "Shirowwww",
       "description": "Global shortcuts: Ctrl+Alt+Right for the next track, Ctrl+Alt+Left for the previous one.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/keyboard-skip-0.1.0.zip",
-      "sha256": "03fade0c269babbaba5ee18cb7f86da4ec7ba55ae28440975518954b9d253ce5",
+      "tags": [
+        "keyboard",
+        "shortcuts"
+      ],
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/keyboard-skip-0.1.1.zip",
+      "sha256": "691e99aafda67a9dd3ad515d73eab4f0aeb4f651d4f63b99613c7be92680496f",
       "permissions": [
         "player.control",
         "ui.keyboard"
       ]
     },
     {
+      "id": "large-text",
+      "name": "Large text",
+      "version": "0.2.0",
+      "kind": "theme",
+      "author": "Shirowwww",
+      "description": "Every text 20% larger, titles included, and wider page margins.",
+      "kitApi": "1.0",
+      "tags": [
+        "accessibility",
+        "large-text",
+        "readable"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/large-text-0.2.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/large-text-0.2.0.zip",
+      "sha256": "6d4fd2054789b404e4a87607aaef4b1fe51e64005685ad8ef5178253f81b1ff0",
+      "permissions": []
+    },
+    {
+      "id": "midnight",
+      "name": "Midnight",
+      "version": "0.2.0",
+      "kind": "theme",
+      "author": "Shirowwww",
+      "description": "Night blue with a light blue accent, using the Dark scheme of colors.ini.",
+      "kitApi": "1.0",
+      "tags": [
+        "dark",
+        "blue",
+        "colors"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/midnight-0.2.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/midnight-0.2.0.zip",
+      "sha256": "d2f37f51f74e6675d32f1b7b3d971f99829a6d784aff9d854bb93b14e6b7bc74",
+      "permissions": []
+    },
+    {
       "id": "night-blue",
       "name": "Night blue",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "theme",
       "author": "Shirowwww",
       "description": "Night blue theme, with a dark scheme and a light scheme.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/night-blue-1.0.0.zip",
-      "sha256": "f9612f5de3bc7d9ce5afb29dc3d61da0136a389a29cd8394f48a67b0e3900585",
+      "tags": [
+        "dark",
+        "blue",
+        "colors"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/night-blue-1.1.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/night-blue-1.1.0.zip",
+      "sha256": "ca68da27a3838f4ef71574b4eace4a128345acde46078d0ecc6d7f1634718a5f",
       "permissions": []
     },
     {
       "id": "now-playing-notify",
       "name": "Track notification",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "kind": "extension",
       "author": "Shirowwww",
       "description": "Shows a notification for each new track. Does not touch the player.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/now-playing-notify-0.1.0.zip",
-      "sha256": "2b9beb758369270f9ae78b971b1426b0c31fbc3859bc35133e3d2ef977e0328c",
+      "tags": [
+        "notifications",
+        "now-playing"
+      ],
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/now-playing-notify-0.1.1.zip",
+      "sha256": "acbd9f1dcf59247d53c95ffa39fa758857b9684ba9a9e65aa47590d8f2af4d60",
       "permissions": [
         "player.read",
         "notifications"
@@ -126,37 +229,71 @@
     {
       "id": "paper-light",
       "name": "Light paper",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "theme",
       "author": "Shirowwww",
       "description": "Plain, light paper theme, with an optional dark scheme.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/paper-light-1.0.0.zip",
-      "sha256": "8a25b40aa233c23dac590b66cb13bedffcf59006b572f357acec8a27314027b0",
+      "tags": [
+        "light",
+        "minimal",
+        "colors"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/paper-light-1.1.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/paper-light-1.1.0.zip",
+      "sha256": "c79047313ec32beecdd72214252d024f5ccb80cd02eebf170fcfb4237313a175",
       "permissions": []
     },
     {
       "id": "rose-gold",
       "name": "Rose gold",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "kind": "theme",
       "author": "Shirowwww",
       "description": "Warm rose gold theme, with a dark scheme and a light scheme.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/rose-gold-1.0.0.zip",
-      "sha256": "6eb5eb9b04013e62622b0a59e2f80fe120e7d73cff53af8e0c92e4a53e8b04e7",
+      "tags": [
+        "dark",
+        "warm",
+        "colors"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/rose-gold-1.1.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/rose-gold-1.1.0.zip",
+      "sha256": "84cce1b78aed775d8470b8a90472c917172ef011f5144db9c54f35d0492b14f6",
+      "permissions": []
+    },
+    {
+      "id": "rounded-buttons",
+      "name": "Rounded buttons",
+      "version": "0.2.0",
+      "kind": "theme",
+      "author": "Shirowwww",
+      "description": "Replaces the button template with one that has rounded corners.",
+      "kitApi": "1.0",
+      "tags": [
+        "template",
+        "rounded",
+        "buttons"
+      ],
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/rounded-buttons-0.2.0.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/rounded-buttons-0.2.0.zip",
+      "sha256": "ea782ee19e451d55019c1701af397520c79a8561017b8579370307db94be97a3",
       "permissions": []
     },
     {
       "id": "sleep-timer",
       "name": "Sleep timer",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "kind": "extension",
       "author": "Shirowwww",
       "description": "Pauses playback after a delay, set in minutes, then lets you know.",
       "kitApi": "1.0",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/sleep-timer-0.1.0.zip",
-      "sha256": "bdf7dec444c9e507aa0b0218897b282e727415730542791dd5c8987fea2c36ab",
+      "tags": [
+        "timer",
+        "sleep"
+      ],
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/sleep-timer-0.1.1.zip",
+      "sha256": "36903de41a8f09fa21fb0d617f874b53d63e1410b1ca0f2d195c0a833057f086",
       "permissions": [
         "player.control",
         "notifications"

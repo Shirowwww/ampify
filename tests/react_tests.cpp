@@ -112,7 +112,7 @@ TEST_CASE(React_RendersTheExpectedPrimitiveTree) {
     CHECK(f.Panel("tree", "demo") ==
           R"({"type":"stack","gap":8,"className":"x","children":[{"type":"text","variant":"title","text":"Hello Alex"},)"
           R"({"type":"text","text":"Un"},{"type":"text","text":"2"},{"type":"button","label":"OK","onClick":1},)"
-          R"({"type":"row","children":[{"type":"text","text":"A"},{"type":"text","text":"B"}]}]})");
+          R"({"type":"row","children":[{"type":"text","text":"A","key":"a"},{"type":"text","text":"B","key":"b"}]}]})");
     element->Stop();
 }
 
@@ -166,8 +166,8 @@ TEST_CASE(React_ChangeEventsReachTheComponents) {
     CHECK(f.Panel("settings", "reglages") ==
           R"({"type":"stack","children":[{"type":"toggle","label":"Actif","checked":false,"onChange":1},)"
           R"({"type":"slider","label":"Niveau","min":0,"max":100,"value":10,"onChange":2},)"
-          R"({"type":"dropdown","label":"Mode","value":"a","onChange":3,"children":[{"type":"option","value":"a","label":"a"},)"
-          R"({"type":"option","value":"b","label":"Bee"}]},)"
+          R"({"type":"dropdown","label":"Mode","value":"a","onChange":3,"children":[{"type":"option","value":"a","label":"a","key":"a"},)"
+          R"({"type":"option","value":"b","label":"Bee","key":"b"}]},)"
           R"({"type":"textfield","label":"Name","value":"","placeholder":"Your name","onChange":4}]})");
 
     element->DeliverEvent("change", R"({"id":1,"value":true})");
@@ -178,8 +178,8 @@ TEST_CASE(React_ChangeEventsReachTheComponents) {
     CHECK(f.Panel("settings", "reglages") ==
           R"({"type":"stack","children":[{"type":"toggle","label":"Actif","checked":true,"onChange":1},)"
           R"({"type":"slider","label":"Niveau","min":0,"max":100,"value":42,"onChange":2},)"
-          R"({"type":"dropdown","label":"Mode","value":"b","onChange":3,"children":[{"type":"option","value":"a","label":"a"},)"
-          R"({"type":"option","value":"b","label":"Bee"}]},)"
+          R"({"type":"dropdown","label":"Mode","value":"b","onChange":3,"children":[{"type":"option","value":"a","label":"a","key":"a"},)"
+          R"({"type":"option","value":"b","label":"Bee","key":"b"}]},)"
           R"({"type":"textfield","label":"Name","value":"Alex","placeholder":"Your name","onChange":4}]})");
 
     // An unknown id or a broken payload changes nothing and does not stop the element.
@@ -332,9 +332,31 @@ TEST_CASE(React_KeysKeepTheStateOfReorderedChildren) {
     element->DeliverClick(1);
     element->Pump();
     CHECK(f.Panel("keys", "cles") ==
-          R"({"type":"stack","children":[{"type":"text","text":"b=b"},{"type":"text","text":"a=a"},)"
+          R"({"type":"stack","children":[{"type":"text","text":"b=b","key":"b"},{"type":"text","text":"a=a","key":"a"},)"
           R"({"type":"button","label":"inverser","onClick":1}]})");
     CHECK(f.Count("init ") == 2);
+    element->Stop();
+}
+
+TEST_CASE(React_KeysReachTheNodesTheKernelMatches) {
+    Fixture f;
+    auto element = f.Make("keyed", R"(
+        const { h, Fragment } = Ampify.React;
+        function Card(props) { return h("text", { key: "inner" }, props.name); }
+        function App() {
+          return h("stack", null,
+            h(Card, { key: "first", name: "A" }),
+            h("button", { key: "go", label: "Go" }),
+            h(Fragment, { key: "pair" }, h("text", null, "B"), h("text", null, "C")),
+            h(Fragment, { key: "one" }, h("text", { key: "d" }, "D")));
+        }
+        Ampify.ReactDOM.render(h(App), "panel:keyed");
+    )");
+    CHECK(element->Start());
+    CHECK(f.Panel("keyed", "keyed") ==
+          R"({"type":"stack","children":[{"type":"text","text":"A","key":"first"},{"type":"button","label":"Go","key":"go"},)"
+          R"({"type":"text","text":"B","key":"pair.0"},{"type":"text","text":"C","key":"pair.1"},)"
+          R"({"type":"text","text":"D","key":"one.d"}]})");
     element->Stop();
 }
 

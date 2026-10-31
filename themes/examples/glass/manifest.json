@@ -2,11 +2,19 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "glass",
   "name": "Glass",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "A complete redesign: gradient and acrylic backgrounds, large rounded cards, larger text, buttons that grow on hover, shadows.",
   "kitApi": "1.0",
   "colors": "colors.ini",
-  "defaultScheme": "Dark"
+  "defaultScheme": "Dark",
+  "tags": [
+    "glass",
+    "redesign",
+    "rounded",
+    "dark",
+    "light"
+  ],
+  "preview": "preview.jpg"
 }

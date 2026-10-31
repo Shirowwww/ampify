@@ -38,6 +38,12 @@ constexpr TextRule kResourcesRule{R"re([A-Za-z0-9][A-Za-z0-9._-]{0,63}\.xaml)re"
                                   "a .xaml file name, at the root of the folder"};
 constexpr TextRule kIconRule{R"re([A-Za-z0-9][A-Za-z0-9._-]{0,63}\.svg)re", 0, 0,
                              "a .svg file name, at the root of the folder"};
+constexpr TextRule kPreviewRule{R"re([A-Za-z0-9][A-Za-z0-9._-]{0,63}\.(png|jpg|jpeg))re", 0, 0,
+                                "a .png, .jpg or .jpeg file name, at the root of the folder"};
+constexpr TextRule kPreviewUrlRule{R"re(https://\S+\.(png|jpg|jpeg))re", 0, 512,
+                                   "https:// address of a .png, .jpg or .jpeg image"};
+constexpr TextRule kTagRule{R"re([a-z0-9][a-z0-9-]{0,19})re", 0, 0,
+                            "lowercase letters, digits and hyphens, 1 to 20 characters"};
 constexpr TextRule kPermissionRule{
     R"re((player\.read|player\.control|audio\.analyze|audio\.gain|audio\.eq|storage|notifications|ipc\.discord|midi\.input|library\.read|library\.write|services\.read|ui\.keyboard|ui\.topbar|ui\.playbar|ui\.sidebar|ui\.menu|ui\.popup|ui\.fullscreen|ui\.panel|ui\.page|ui\.window|ui\.tray|fs\.output|kit\.manage|network:[a-z0-9.-]{1,253}))re",
     0, 0, "a permission from docs/extensions/api.md, section 4"};
@@ -46,6 +52,7 @@ constexpr TextRule kProcessRule{R"re(ui|engine)re", 0, 0, "ui or engine"};
 constexpr TextRule kAppVersionRule{R"re([0-9]+(\.[0-9]+){1,3})re", 0, 0, "Apple Music version, for example 1.1540.23042.0"};
 
 constexpr size_t kMaxPermissions = 32;
+constexpr size_t kMaxTags = 5;
 constexpr size_t kMaxAppVersions = 16;
 constexpr size_t kMaxProcesses = 2;
 
@@ -147,6 +154,10 @@ bool IsHttpsUrl(std::string_view text) {
     return Matches(text, kHttpsRule);
 }
 
+bool IsPreviewUrl(std::string_view text) {
+    return Matches(text, kPreviewUrlRule);
+}
+
 size_t CharacterCount(std::string_view text) {
     size_t count = 0;
     for (unsigned char byte : text) {
@@ -184,6 +195,7 @@ bool ReadElementInfo(const json::Value& object, const std::string& where, Elemen
     info.homepage = ReadOptionalText(object, "homepage", where, kHttpsRule, errors);
     info.license = ReadOptionalText(object, "license", where, kLicenseRule, errors);
     info.permissions = ReadList(object, "permissions", where, kPermissionRule, kMaxPermissions, errors);
+    info.tags = ReadList(object, "tags", where, kTagRule, kMaxTags, errors);
 
     if (!info.kitApi.empty()) {
         // The pattern already guarantees digits before the dot. A huge major is simply not supported.
@@ -212,7 +224,7 @@ std::optional<ElementManifest> ParseManifest(std::string_view text, std::vector<
     CheckAllowedKeys(*document,
                      {"$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage",
                       "license", "main", "colors", "defaultScheme", "resources", "icon", "permissions",
-                      "appVersions", "processes", "type"},
+                      "appVersions", "processes", "type", "tags", "preview"},
                      "", errors);
 
     ElementManifest manifest;
@@ -222,6 +234,7 @@ std::optional<ElementManifest> ParseManifest(std::string_view text, std::vector<
     manifest.defaultScheme = ReadOptionalText(*document, "defaultScheme", "", kSchemeRule, errors);
     manifest.resources = ReadOptionalText(*document, "resources", "", kResourcesRule, errors);
     manifest.icon = ReadOptionalText(*document, "icon", "", kIconRule, errors);
+    manifest.preview = ReadOptionalText(*document, "preview", "", kPreviewRule, errors);
     manifest.type = ReadOptionalText(*document, "type", "", kTypeRule, errors);
     manifest.appVersions = ReadList(*document, "appVersions", "", kAppVersionRule, kMaxAppVersions, errors);
     manifest.processes = ReadList(*document, "processes", "", kProcessRule, kMaxProcesses, errors);
@@ -263,6 +276,7 @@ std::vector<std::string> CheckElementFolder(const ElementManifest& manifest, con
         {"colors", &manifest.colors},
         {"resources", &manifest.resources},
         {"icon", &manifest.icon},
+        {"preview", &manifest.preview},
     };
     for (const auto& [key, file] : files) {
         if (!file->has_value()) continue;
@@ -272,6 +286,14 @@ std::vector<std::string> CheckElementFolder(const ElementManifest& manifest, con
     }
 
     std::error_code ec;
+    if (manifest.preview) {
+        // A missing file was reported above: file_size then fails and nothing more is said.
+        std::uintmax_t size = std::filesystem::file_size(folder / *manifest.preview, ec);
+        if (!ec && size > kMaxPreviewBytes) {
+            errors.push_back("preview: file larger than 2 MB: " + *manifest.preview);
+        }
+        ec.clear();
+    }
     for (auto it = std::filesystem::recursive_directory_iterator(folder, ec);
          !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
         if (!it->is_symlink(ec)) continue;

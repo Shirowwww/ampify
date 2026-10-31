@@ -131,6 +131,36 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("permissions[0]", text)
 
+    def test_tags_and_preview_pass(self):
+        code, text = self.write([entry(tags=["dark", "glass-2"], preview="https://example.com/demo.png")])
+        self.assertEqual(code, 0, text)
+        for ending in ("jpg", "jpeg"):
+            code, text = self.write([entry(preview=f"https://example.com/demo.{ending}")])
+            self.assertEqual(code, 0, text)
+
+    def test_bad_tags_are_refused(self):
+        cases = {
+            "capital": ["Dark"],
+            "space": ["two words"],
+            "leading hyphen": ["-dark"],
+            "too long": ["a" * 21],
+            "six tags": ["a", "b", "c", "d", "e", "f"],
+            "duplicate": ["dark", "dark"],
+        }
+        for label, tags in cases.items():
+            with self.subTest(label):
+                code, text = self.write([entry(tags=tags)])
+                self.assertEqual(code, 1)
+                self.assertIn("extensions[0].tags", text)
+
+    def test_preview_must_be_an_https_image(self):
+        for value in ("http://example.com/demo.png", "https://example.com/demo.gif", "https://example.com/demo",
+                      "demo.png", "https://example.com/a b.png", "https://example.com/" + "a" * 500 + ".png"):
+            with self.subTest(value[:40]):
+                code, text = self.write([entry(preview=value)])
+                self.assertEqual(code, 1)
+                self.assertIn("extensions[0].preview", text)
+
     def test_missing_file_is_a_usage_error(self):
         code, _ = run("catalog", os.path.join(self.tmp.name, "absent.json"))
         self.assertEqual(code, 2)
@@ -221,6 +251,49 @@ class ManifestTests(unittest.TestCase):
         code, text = run("manifest", self.install(manifest(type="commonjs")))
         self.assertEqual(code, 1)
         self.assertIn("type", text)
+
+    def test_tags_and_preview_pass(self):
+        data = manifest(tags=["dark", "layout"], preview="preview.png")
+        code, text = run("manifest", self.install(data, files=("main.js", "preview.png")))
+        self.assertEqual(code, 0, text)
+
+    def test_bad_tags_are_refused(self):
+        cases = {
+            "capital": ["Dark"],
+            "space": ["two words"],
+            "six tags": ["a", "b", "c", "d", "e", "f"],
+            "duplicate": ["dark", "dark"],
+        }
+        for label, tags in cases.items():
+            with self.subTest(label):
+                code, text = run("manifest", self.install(manifest(tags=tags)))
+                self.assertEqual(code, 1)
+                self.assertIn("tags", text)
+
+    def test_preview_must_be_a_png_or_jpeg_name_at_the_root(self):
+        for value in ("preview.gif", "img/preview.png", "../preview.png", "preview"):
+            with self.subTest(value):
+                code, text = run("manifest", self.install(manifest(preview=value)))
+                self.assertEqual(code, 1)
+                self.assertIn("preview", text)
+
+    def test_preview_file_must_exist(self):
+        code, text = run("manifest", self.install(manifest(preview="preview.png")))
+        self.assertEqual(code, 1)
+        self.assertIn("preview: file missing from the folder: preview.png", text)
+
+    def test_preview_file_is_at_most_two_megabytes(self):
+        path = self.install(manifest(preview="preview.png"), files=("main.js", "preview.png"))
+        image = os.path.join(os.path.dirname(path), "preview.png")
+        with open(image, "wb") as handle:
+            handle.write(b"x" * (2 * 1024 * 1024))
+        code, text = run("manifest", path)
+        self.assertEqual(code, 0, text)
+        with open(image, "ab") as handle:
+            handle.write(b"x")
+        code, text = run("manifest", path)
+        self.assertEqual(code, 1)
+        self.assertIn("preview: file larger than 2 MB", text)
 
     def test_subfolders_are_allowed_and_links_are_refused(self):
         path = self.install(manifest(), files=("main.js",))

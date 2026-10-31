@@ -1,6 +1,7 @@
 #include "catalog.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <set>
 
 #include "../core/build_signature.hpp"
@@ -23,6 +24,17 @@ std::string EntryLabel(size_t index) {
 }
 
 }  // namespace
+
+std::string UrlHost(std::string_view url) {
+    constexpr std::string_view kScheme = "https://";
+    if (url.substr(0, kScheme.size()) != kScheme) return {};
+    std::string_view rest = url.substr(kScheme.size());
+    std::string host(rest.substr(0, rest.find_first_of("/?#\\")));
+    if (host.find('@') != std::string::npos) return {};
+    std::transform(host.begin(), host.end(), host.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return host;
+}
 
 bool IsAllowedDownloadUrl(std::string_view url, bool localCatalog) {
     if (IsHttpsUrl(url)) return true;
@@ -92,7 +104,7 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
             size_t entryBefore = errors.size();
             CheckAllowedKeys(item,
                              {"id", "name", "version", "kind", "author", "description", "kitApi", "url", "sha256",
-                              "homepage", "license", "permissions"},
+                              "homepage", "license", "permissions", "tags", "preview"},
                              where, errors);
 
             CatalogEntry entry;
@@ -109,6 +121,14 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
                 errors.push_back(where + ".url: https:// address expected");
             } else {
                 entry.url = url->AsString();
+            }
+
+            if (const json::Value* preview = item.Find("preview")) {
+                if (!preview->IsString() || !IsPreviewUrl(preview->AsString())) {
+                    errors.push_back(where + ".preview: https:// address of a .png, .jpg or .jpeg image expected");
+                } else {
+                    entry.preview = preview->AsString();
+                }
             }
 
             const json::Value* sha = item.Find("sha256");
