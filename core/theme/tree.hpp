@@ -25,7 +25,8 @@ enum class ValueKind {
     Gradient,    // a linear gradient: "x1,y1,x2,y2;#AARRGGBB@offset;...", points relative to the element (0 to 1),
                  // at least two stops, offsets from 0 to 1 in order
     Acrylic,     // an acrylic brush: "#AARRGGBB;opacity", the tint and its opacity (0 to 1)
-    Length,      // device-independent pixels, "18", or "NaN" for auto
+    Length,      // device-independent pixels, "18", or "NaN" for auto ("120%" in a theme's font size, which the engine
+                 // turns into pixels before Write)
     Thickness,   // "left,top,right,bottom", such as "8,4,8,4"
     Visibility,  // "Visible" or "Collapsed"
     Number,      // a plain number, such as "0.5" or "700" for a font weight
@@ -66,6 +67,8 @@ struct NodeInfo {
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";
+// A control's template, given back before the control's other values (ThemeEngine::Restore).
+inline constexpr std::string_view kTemplateProperty = "Template";
 
 // The path of an Image value that stands for the artwork of the song playing (`background: artwork` in user.css).
 inline constexpr std::string_view kArtworkImage = "artwork:";
@@ -93,6 +96,14 @@ public:
 
     // Every element currently in the interface, parents before children.
     virtual std::vector<NodeInfo> Snapshot() = 0;
+
+    // True for an element out of the interface that still exists: WinUI takes the entries of a menu out of its tree
+    // when the menu closes, and puts the same ones back at the next opening. The engine keeps what it must give back
+    // to such an element, and Restore writes to it. An element missing from Snapshot is gone otherwise.
+    virtual bool Alive(NodeId id) {
+        (void)id;
+        return false;
+    }
 
     // The current value of a XAML property, in the form Write accepts. Nothing when the element has no such property.
     // Besides the XAML properties, the engine uses one property of its own, kOrderProperty ("Order"): the position of

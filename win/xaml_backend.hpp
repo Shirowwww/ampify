@@ -42,6 +42,7 @@ public:
     bool Attach();
 
     std::vector<theme::NodeInfo> Snapshot() override;
+    bool Alive(theme::NodeId id) override;
     std::optional<theme::Value> Read(theme::NodeId id, std::string_view property) override;
     bool Write(theme::NodeId id, std::string_view property, const theme::Value& value) override;
     std::optional<theme::Value> ReadOriginal(theme::NodeId id, std::string_view property) override;
@@ -79,8 +80,9 @@ public:
 
     // Runs `pass` on the interface thread soon after the interface may hold new elements: a page navigated
     // (Frame.Navigated, then twice more while the page fills in), rows or cards realised while scrolling
-    // (ListViewBase.ContainerContentChanging, ItemsRepeater.ElementPrepared). A burst of events makes one pass. Snapshot
-    // follows each such element once, so a theme reaches new content without waiting for the next tick.
+    // (ListViewBase.ContainerContentChanging, ItemsRepeater.ElementPrepared), a flyout, menu or tooltip that opens. A
+    // burst of events makes one pass. Snapshot follows each such element once, so a theme reaches new content without
+    // waiting for the next tick.
     void WatchChanges(std::function<void()> pass);
 
 private:
@@ -113,6 +115,9 @@ private:
                                 const theme::Value& value);
     void SchedulePass(int followUps) noexcept;
     void RunPass() noexcept;
+    bool LearnPopups(const winrt::Microsoft::UI::Xaml::XamlRoot& root);
+    void WatchPopups(const winrt::Microsoft::UI::Xaml::UIElement& content);
+    void CheckPopups() noexcept;
     std::vector<bool> MediaAnswers();
     void OnSizeChanged() noexcept;
     void RemoveHoverHandlers(theme::NodeId id);
@@ -123,6 +128,10 @@ private:
     void HoldThroughStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
                            std::string_view property, const winrt::Windows::Foundation::IInspectable& value) noexcept;
     void ReleaseStates(theme::NodeId id, std::string_view property) noexcept;
+    void UpdateStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                      std::string_view property, winrt::Windows::Foundation::IInspectable shown) noexcept;
+    std::optional<winrt::Windows::Foundation::IInspectable> KeyOriginal(
+        void* holder, const std::wstring& key, const std::pair<theme::NodeId, std::string>& except) const;
     void MarkResourcesDirty(std::string why);
     // The window's caption buttons in the mode of the theme; nullopt gives them back the app's own colours.
     void SetCaptionMode(std::optional<bool> dark);
@@ -153,6 +162,7 @@ private:
     struct HeldStates {
         winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject> element;  // to forget the entry once it is gone
         winrt::weak_ref<winrt::Microsoft::UI::Xaml::Controls::Control> control;  // whose Resources hold the keys
+        void* holder = nullptr;  // that control's identity, compared without resolving the weak reference
         // Each key written to the control's own resources, with the value it had there (null when it had none).
         std::vector<std::pair<std::wstring, winrt::Windows::Foundation::IInspectable>> keys;
     };
@@ -187,6 +197,17 @@ private:
     std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_watched;
     winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_passTimer{nullptr};
     int m_followUps = 0;
+    // Flyouts, menus and tooltips open in popups outside the window's tree. Each popup seen open is walked from then on,
+    // open or closed: a flyout keeps its content and the theme between two openings. A click or a key in the window
+    // (m_inputRoot) looks for a popup that opened at once, a timer every quarter of a second (m_openPopups: the open
+    // ones at the last look).
+    std::vector<winrt::weak_ref<winrt::Microsoft::UI::Xaml::Controls::Primitives::Popup>> m_popups;
+    std::vector<void*> m_openPopups;
+    winrt::weak_ref<winrt::Microsoft::UI::Xaml::UIElement> m_inputRoot;
+    winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_popupTimer{nullptr};
+    // Every element written to, found again out of the snapshot (Alive): a menu's entries leave its tree when it
+    // closes, and get their originals back when the theme comes off then.
+    std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_touched;
     // `transition`: the text written to each element, the transitions it had before (put back when the text goes
     // empty), and, for an element whose transform animates, the transform shown through UIElement.Scale, Rotation and
     // Translation (which XAML animates by itself) instead of RenderTransform.

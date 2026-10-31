@@ -11,7 +11,8 @@
 namespace ampify::theme {
 
 struct InspectOptions {
-    size_t maxLines = 5000;  // a page can hold thousands of elements; the dump stops here and says so
+    // Apple Music's window holds 5000 to 7000 elements, the popups last: the dump stops here and says so.
+    size_t maxLines = 20000;
 };
 
 // The dump written to the logs folder: the resource keys first, then the element tree, one element per line,

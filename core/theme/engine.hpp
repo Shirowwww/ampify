@@ -64,6 +64,7 @@ private:
     };
     void ApplyMoves(std::vector<PendingMove>& pending, TreeBackend& tree, Report& report);
     bool WriteValue(const NodeInfo& node, const Assignment& assignment, TreeBackend& tree, Report& report, bool keep);
+    std::optional<Value> Resolve(NodeId id, const std::string& property, const Value& value, const Value& current);
     void ApplyHover(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners, TreeBackend& tree,
                     Report& report);
     void GiveBack(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners, TreeBackend& tree,
@@ -71,6 +72,8 @@ private:
 
     Journal& m_journal;
     std::map<std::pair<NodeId, std::string>, Value> m_originals;  // element and XAML property, first value seen
+    std::map<std::pair<NodeId, std::string>, Value> m_baseSizes;  // the same, for a relative font size: the size seen
+                                                                   // before the theme, which the next passes no longer read
     std::map<std::string, Value> m_resourceOriginals;             // resource key, first value seen
     std::vector<Move> m_moves;  // every change of position, in the order made
     std::map<NodeId, std::vector<HoverValue>> m_hovers;  // the :hover values the backend holds for each element

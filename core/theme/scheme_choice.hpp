@@ -12,7 +12,7 @@ namespace ampify::theme {
 //   theme.schedule = 07:00=Light,19:00=Dark   the scheme follows the local time (it wins over theme.scheme)
 //   theme.scheme   = auto                     the scheme follows the Windows mode
 //   theme.scheme   = Dark                     this scheme
-//   theme.scheme   =                          the first scheme of colors.ini
+//   theme.scheme   =                          the theme's defaultScheme (manifest.json), or the first scheme
 //
 // For `auto`, a dark scheme is a name such as Dark, Sombre, Night or Nuit (or one that contains dark, sombre, night or
 // nuit), a light scheme a name such as Light, Clair, Day or Jour (or one that contains light or clair). In light mode,
@@ -55,8 +55,9 @@ struct SchemeChoice {
     std::vector<std::string> problems;  // a bad schedule entry, a scheme that colors.ini does not have
 };
 
-// `scheme` and `schedule` are the values of theme.scheme and theme.schedule. `schemes` are the sections of colors.ini.
+// `scheme` and `schedule` are the values of theme.scheme and theme.schedule. `schemes` are the sections of colors.ini,
+// `defaultScheme` the one the theme's manifest names, used when neither setting picks a scheme.
 SchemeChoice ChooseScheme(const std::string& scheme, const std::string& schedule, const std::vector<std::string>& schemes,
-                          const SchemeInputs& inputs);
+                          const SchemeInputs& inputs, const std::string& defaultScheme = {});
 
 }  // namespace ampify::theme

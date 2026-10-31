@@ -158,6 +158,15 @@ const std::vector<ClassEntry> kClasses{
     {"airplay-button", {"Button#AirPlayButton"}},
     {"volume", {"VolumeControl#VolumeControl"}},
     {"volume-button", {"Button#VolumeButton"}},
+    {"volume-slider", {"Slider#VolumeSlider"}},
+    {"volume-mute-button", {"Button#MuteButton"}},
+
+    // Popups: flyouts, menus and tooltips, each a root of its own outside the window's tree
+    {"flyout", {"Popup > FlyoutPresenter"}},
+    {"menu", {"Popup > MenuFlyoutPresenter"}},
+    {"menu-item", {"MenuFlyoutItem", "ToggleMenuFlyoutItem", "MenuFlyoutSubItem"}},
+    {"menu-separator", {"MenuFlyoutSeparator"}},
+    {"tooltip", {"Popup > ToolTip"}},
 
     // Lyrics and queue panels
     {"lyrics-panel", {"SplitView#ContentSplitView > Grid > Grid#PaneRoot"}},

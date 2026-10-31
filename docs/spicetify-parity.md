@@ -133,6 +133,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | Official theme repository | The catalog in this repository | Partial |
 | Reload a changed theme | `ampify dev`, `ampify watch`, `theme.live_reload` | Done |
 | Blurred artwork background | `background: artwork` under acrylic panels (the `artwork` theme) | Done |
+| Context menus, tooltips, the volume bar (`.main-contextMenu-menu`, `.main-popupMenu-*`, `.volume-bar`) | `.menu`, `.menu-item`, `.tooltip`, `.flyout`, `.volume-slider`: the popups take the theme the first time they open, and the controls keep its colours under the pointer and while pressed ([themes/names.md](themes/names.md)) | Done |
 
 ## 5. Custom apps
 

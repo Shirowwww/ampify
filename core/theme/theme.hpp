@@ -109,6 +109,9 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
 // The section names of colors.ini, in file order, without loading the theme. Empty when the file is missing.
 std::vector<std::string> ReadSchemes(FileSource& files);
 
+// The scheme manifest.json names as the theme's default (`defaultScheme`). Empty when the manifest has none.
+std::string ReadDefaultScheme(FileSource& files);
+
 // Replaces each `var(--name)` or `var(--name, fallback)` of `value` with the variable (names are case-insensitive).
 // Nothing when a variable is missing and has no fallback; `problem` then says which one.
 std::optional<std::string> SubstituteVariables(std::string_view value, const std::map<std::string, std::string>& variables,

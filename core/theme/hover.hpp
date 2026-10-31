@@ -41,6 +41,9 @@ public:
     std::optional<Value> Read(NodeId id, std::string_view property, Access& access);
     bool Write(NodeId id, std::string_view property, const Value& value, Access& access);
 
+    // The :hover value of one property of the element, whether the pointer is over it or not.
+    std::optional<Value> ValueOf(NodeId id, std::string_view property) const;
+
     // The element is gone: forget it without writing anything.
     void Forget(NodeId id) { m_elements.erase(id); }
 

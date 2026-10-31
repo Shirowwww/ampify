@@ -7,6 +7,7 @@
 #include <tuple>
 #include <utility>
 
+#include "../json.hpp"
 #include "fonts.hpp"
 #include "ini.hpp"
 #include "spicetify.hpp"
@@ -193,6 +194,7 @@ void DefineFontPart(const std::string& name, const std::string& value, int line,
     }
 
     Conversion conversion = ConvertValue(*FindProperty(css), value, context);
+    if (conversion.value && IsRelativeSize(*conversion.value)) conversion = {std::nullopt, "a font role takes pixels"};
     if (!conversion.value) {
         theme.problems.push_back(AtLine(source.file, line) + ": --" + name + ": " + conversion.problem + ", ignored");
         return;
@@ -393,6 +395,14 @@ std::vector<std::string> ReadSchemes(FileSource& files) {
         if (!section.name.empty()) schemes.push_back(section.name);
     }
     return schemes;
+}
+
+std::string ReadDefaultScheme(FileSource& files) {
+    std::optional<std::string> text = files.Read("manifest.json");
+    std::optional<Json> manifest = text ? Json::Parse(*text) : std::nullopt;
+    const Json* scheme = manifest ? manifest->Find("defaultScheme") : nullptr;
+    const std::string* name = scheme ? scheme->AsString() : nullptr;
+    return name ? *name : std::string();
 }
 
 namespace {

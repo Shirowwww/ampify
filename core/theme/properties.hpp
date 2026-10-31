@@ -64,4 +64,16 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
 // Shortest text that reads back to the same number, without trailing zeros: 18, 0.5, -4.
 std::string FormatNumber(double number);
 
+// A font size relative to the element's own: "120%" or "1.2em" in user.css, kept as "120%" in the Length value. The
+// engine scales each element's size with it, and the backend only ever sees pixels.
+bool IsRelativeSize(const Value& value);
+
+// `relative` applied to `size`, a Length in pixels: "16.8" for "120%" of "14". Nothing when `size` is not a positive
+// number or `relative` is not a relative size.
+std::optional<Value> ScaleFontSize(const Value& relative, const Value& size);
+
+// True for the same value, numbers compared as WinUI keeps them: in single precision, so a size written as 16.8 reads
+// back as 16.799999237060547, and must not count as a new value on every pass.
+bool SameValue(const Value& a, const Value& b);
+
 }  // namespace ampify::theme

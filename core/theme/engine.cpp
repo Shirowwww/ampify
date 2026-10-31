@@ -83,14 +83,23 @@ ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
     m_passes++;
     std::vector<NodeInfo> nodes = tree.Snapshot();
 
-    // The originals of elements that have disappeared cannot be restored any more. Forget them, so a long session stays small.
+    // What the engine must give back to an element stays while the element exists, in the interface or out of it (the
+    // entries of a closed menu). The elements that are gone are forgotten, so a long session stays small.
     std::set<NodeId> live;
     for (const NodeInfo& node : nodes) live.insert(node.id);
+    std::map<NodeId, bool> absent;  // the elements missing from this snapshot, and whether they still exist
+    auto kept = [&](NodeId id) {
+        if (live.count(id)) return true;
+        auto [it, fresh] = absent.try_emplace(id, false);
+        if (fresh) it->second = tree.Alive(id);
+        return it->second;
+    };
     for (auto it = m_originals.begin(); it != m_originals.end();) {
-        it = live.count(it->first.first) ? std::next(it) : m_originals.erase(it);
+        it = kept(it->first.first) ? std::next(it) : m_originals.erase(it);
     }
-    std::erase_if(m_moves, [&](const Move& move) { return !live.count(move.id); });
-    std::erase_if(m_hovers, [&](const auto& entry) { return !live.count(entry.first); });
+    std::erase_if(m_baseSizes, [&](const auto& entry) { return !kept(entry.first.first); });
+    std::erase_if(m_moves, [&](const Move& move) { return !kept(move.id); });
+    std::erase_if(m_hovers, [&](const auto& entry) { return !kept(entry.first); });
 
     ApplyDictionary(theme, tree, report);
     ApplyResources(theme, tree, report);
@@ -149,14 +158,17 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
 // matching, a rule edited out of a theme, an element that moved out of a selector.
 void ThemeEngine::GiveBack(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners,
                            TreeBackend& tree, Report& report) {
-    for (auto it = m_originals.lower_bound({node.id, std::string()});
-         it != m_originals.end() && it->first.first == node.id;) {
-        if (winners.count(it->first.second)) {
-            ++it;
-            continue;
+    for (bool templates : {true, false}) {  // the template first, as in Restore
+        for (auto it = m_originals.lower_bound({node.id, std::string()});
+             it != m_originals.end() && it->first.first == node.id;) {
+            if ((it->first.second == kTemplateProperty) != templates || winners.count(it->first.second)) {
+                ++it;
+                continue;
+            }
+            if (tree.Write(node.id, it->first.second, it->second)) report.applied++;
+            m_baseSizes.erase(it->first);
+            it = m_originals.erase(it);
         }
-        if (tree.Write(node.id, it->first.second, it->second)) report.applied++;
-        it = m_originals.erase(it);
     }
 }
 
@@ -166,11 +178,20 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const std::map<std::string, c
                              TreeBackend& tree, Report& report) {
     std::vector<HoverValue> values;
     for (const auto& [property, assignment] : winners) {
-        if (!tree.Read(node.id, property)) {
+        std::optional<Value> current = tree.Read(node.id, property);
+        if (!current) {
             Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report);
             continue;
         }
-        values.push_back({property, assignment->value});
+        // A relative size under the pointer scales the size underneath, the theme's own when it has one.
+        std::optional<Value> value = IsRelativeSize(assignment->value) ? ScaleFontSize(assignment->value, *current)
+                                                                       : assignment->value;
+        if (!value) {
+            Refuse(Describe(node) + " " + property, "\"" + Describe(node) + " " + property + "\" has no size to scale",
+                   report);
+            continue;
+        }
+        values.push_back({property, *value});
     }
 
     auto known = m_hovers.find(node.id);
@@ -209,7 +230,12 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
         Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report);
         return false;
     }
-    if (*current == assignment.value) {
+    std::optional<Value> value = Resolve(node.id, property, assignment.value, *current);
+    if (!value) {
+        Refuse(Describe(node) + " " + property, "\"" + Describe(node) + " " + property + "\" has no size to scale", report);
+        return false;
+    }
+    if (SameValue(*current, *value)) {
         report.unchanged++;
         return false;
     }
@@ -217,15 +243,24 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
     auto key = std::make_pair(node.id, property);
     if (keep && !m_originals.count(key)) m_originals.emplace(key, tree.ReadOriginal(node.id, property).value_or(*current));
 
-    if (!tree.Write(node.id, property, assignment.value)) {
+    if (!tree.Write(node.id, property, *value)) {
         Refuse(Describe(node) + " " + property, "value refused for \"" + Describe(node) + " " + property + "\"", report);
         return false;
     }
     if (!keep) m_moves.push_back({node.id, *current});
     report.applied++;
-    if (m_detailed) m_journal.Write("Applied: " + Describe(node) + " " + property + " = " + assignment.value.text + " (" +
+    if (m_detailed) m_journal.Write("Applied: " + Describe(node) + " " + property + " = " + value->text + " (" +
                     assignment.source + " line " + std::to_string(assignment.line) + ")");
     return true;
+}
+
+// A relative font size becomes pixels: the factor times the size the element had before the theme, kept from the
+// first pass since the next ones read back the theme's own. Other values pass as they are.
+std::optional<Value> ThemeEngine::Resolve(NodeId id, const std::string& property, const Value& value,
+                                          const Value& current) {
+    if (!IsRelativeSize(value)) return value;
+    const Value& before = m_baseSizes.try_emplace({id, property}, current).first->second;
+    return ScaleFontSize(value, before);
 }
 
 // Moves the elements in the order of their target position: placing position 0 first, then 1, and so on, never
@@ -296,11 +331,16 @@ void ThemeEngine::Restore(TreeBackend& tree) {
             gone++;
         }
     }
-    for (const auto& [key, original] : m_originals) {
-        if (tree.Write(key.first, key.second, original)) {
-            restored++;
-        } else {
-            gone++;
+    // A control's own template before its other values: a theme template's Border refuses some of Apple Music's own
+    // values (the search box's buttons have a negative padding), and WinUI then stops the app.
+    for (bool templates : {true, false}) {
+        for (const auto& [key, original] : m_originals) {
+            if ((key.second == kTemplateProperty) != templates) continue;
+            if (tree.Write(key.first, key.second, original)) {
+                restored++;
+            } else {
+                gone++;
+            }
         }
     }
     for (const auto& [key, original] : m_resourceOriginals) {
@@ -322,6 +362,7 @@ void ThemeEngine::Restore(TreeBackend& tree) {
 
     m_hovers.clear();
     m_originals.clear();
+    m_baseSizes.clear();
     m_resourceOriginals.clear();
     m_moves.clear();
     m_reported.clear();

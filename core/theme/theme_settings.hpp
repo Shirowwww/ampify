@@ -9,7 +9,7 @@ namespace ampify::theme {
 
 // The theme keys of settings.txt. The values are read and written as they are kept on disk.
 //   theme.active       folder name of the theme in use; empty or `none` for no theme
-//   theme.scheme       colour scheme inside colors.ini; empty takes the first one; `auto` follows the Windows mode
+//   theme.scheme       colour scheme inside colors.ini; empty takes the theme's default; `auto` follows the Windows mode
 //   theme.schedule     schemes by local time, such as `07:00=Light,19:00=Dark`; wins over theme.scheme (scheme_choice.hpp)
 //   theme.live_reload  1 to apply a theme again when its files change (default 1)
 //   theme.inspect      1 to write an inspector dump on the next pass; the kernel clears it afterwards

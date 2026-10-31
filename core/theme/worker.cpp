@@ -66,11 +66,13 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
     const std::filesystem::path themeFolder = m_kit / "themes" / wanted.active;
 
     std::vector<std::string> schemes;
+    std::string defaultScheme;
     if (!wanted.active.empty()) {
         FolderFiles files(themeFolder);
         schemes = ReadSchemes(files);
+        defaultScheme = ReadDefaultScheme(files);
     }
-    m_scheme = ChooseScheme(wanted.scheme, wanted.schedule, schemes, {m_systemDark, minute});
+    m_scheme = ChooseScheme(wanted.scheme, wanted.schedule, schemes, {m_systemDark, minute}, defaultScheme);
 
     const std::filesystem::path snippetRoot = m_kit / "snippets";
     std::vector<std::string> snippets = EnabledSnippets(settings, ListSnippetFolders(snippetRoot));

@@ -46,6 +46,27 @@
     transform: scale(1.06);
 }
 
+/* Volume: a white bar on a grey track. */
+.volume-slider {
+    color: #FFFFFF;
+    background: #4D4D4D;
+}
+
+.volume-slider Thumb {
+    background: #FFFFFF;
+}
+
+/* Menus, flyouts and tooltips: solid raised panels, each entry lit under the pointer. */
+.menu,
+.flyout,
+.tooltip {
+    background: #282828;
+}
+
+.menu-item:hover {
+    background: #3E3E3E;
+}
+
 /* ---- Pages -------------------------------------------------------------------------------------------------------- */
 
 .page-title {

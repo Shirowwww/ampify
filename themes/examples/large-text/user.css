@@ -1,16 +1,12 @@
 /* Large text and wider margins. Elements that do not have the property are refused, harmlessly. */
 
-/* Font roles: the size of body text is given once, here. Extensions read it with Ampify.fonts. */
+/* Each text grows from its own size, so titles stay above the body text. */
 :root {
-    --font-body-size: 18px;
+    --text-scale: 120%;
 }
 
 TextBlock {
-    font-size: var(--font-body-size);
-}
-
-Button {
-    padding: 8 16;
+    font-size: var(--text-scale);
 }
 
 Page {

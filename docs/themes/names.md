@@ -166,8 +166,38 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.playbar-toggles` | The buttons of the third column |
 | `.lyrics-button`, `.queue-button`, `.airplay-button` | Lyrics, Up Next, AirPlay |
 | `.volume`, `.volume-button` | The volume control, and its speaker button |
+| `.volume-slider` | The slider in the volume flyout: `color` fills the part left of the thumb, `background` the rest of the track |
+| `.volume-mute-button` | The mute button on its left |
 
-Ampify never moves the volume. A theme can change how the volume control looks, and nothing else about it.
+Ampify never moves the volume. A theme can change how the volume control looks, and nothing else about it. The
+flyout that holds the slider is a `.flyout` (see "Flyouts, menus and tooltips"). The slider's thumb is
+`.volume-slider Thumb`, and its track is `.volume-slider Rectangle#HorizontalTrackRect` (its `height` gives the track's
+thickness). The track, the fill and the thumb keep the theme's colours under the pointer and while dragged.
+
+```css
+.volume-slider {
+    color: #FFFFFF;
+    background: #4D4D4D;
+}
+
+.volume-slider Thumb {
+    background: #FFFFFF;
+}
+```
+
+## Flyouts, menus and tooltips
+
+Apple Music opens them in popups, outside the window's tree: each popup is a root of its own in the inspector,
+`Popup`, and a selector reaches what is inside it (`.flyout Slider`), never what opened it (`.playbar .flyout`
+matches nothing). A popup takes the theme the first time it opens, and keeps it.
+
+| Class | Zone |
+|---|---|
+| `.flyout` | A flyout, such as the volume's: its `background`, `corner-radius` and `border-color` |
+| `.menu` | A menu, such as the "..." menu of a song, and each of its submenus |
+| `.menu-item` | An entry of a menu, including those that open a submenu or show a check mark |
+| `.menu-separator` | The line between two groups of entries |
+| `.tooltip` | The tip that shows under a button after a moment |
 
 ## Lyrics and queue
 

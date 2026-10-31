@@ -128,7 +128,7 @@ std::string SystemScheme(const std::vector<std::string>& schemes, bool dark) {
 }
 
 SchemeChoice ChooseScheme(const std::string& scheme, const std::string& schedule, const std::vector<std::string>& schemes,
-                          const SchemeInputs& inputs) {
+                          const SchemeInputs& inputs, const std::string& defaultScheme) {
     SchemeChoice choice;
     std::string wanted = std::string(Trim(scheme));
 
@@ -141,6 +141,10 @@ SchemeChoice ChooseScheme(const std::string& scheme, const std::string& schedule
             if (candidate.minute <= inputs.minute) entry = &candidate;
         }
         choice.reason = "schedule " + TimeText(entry->minute);
+    }
+    if (wanted.empty() && !Trim(defaultScheme).empty()) {
+        wanted = std::string(Trim(defaultScheme));
+        choice.reason = "the theme's default";
     }
 
     if (Lowered(wanted) == "auto") {

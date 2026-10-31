@@ -105,6 +105,7 @@ int SetTheme(const std::vector<std::string>& args, const KitLayout& kit, std::os
 
     const std::string id = parsed.positional[0];
     const bool none = id == "none";
+    std::string scheme = parsed.scheme;  // the one the theme gets: --scheme, else its default
     ThemeSettings value;
     if (!none) {
         std::vector<std::string> folders = ListThemeFolders(kit.Themes());
@@ -116,8 +117,9 @@ int SetTheme(const std::vector<std::string>& args, const KitLayout& kit, std::os
         }
 
         FolderFiles files(kit.Themes() / id);
+        if (scheme.empty()) scheme = ReadDefaultScheme(files);
         LoadOptions options;
-        options.scheme = parsed.scheme;
+        options.scheme = scheme;
         Theme theme = LoadTheme(id, (kit.Themes() / id).generic_string(), files, options);
         if (!theme.usable) {
             PrintThemeReport(theme, err);
@@ -146,7 +148,7 @@ int SetTheme(const std::vector<std::string>& args, const KitLayout& kit, std::os
     if (none) {
         out << "No theme: the original colors are back.\n";
     } else {
-        out << "Theme \"" << id << "\" chosen, scheme " << SchemeName(parsed.scheme) << ".\n";
+        out << "Theme \"" << id << "\" chosen, scheme " << SchemeName(scheme) << ".\n";
     }
     out << "If Apple Music is open, the change applies within 3 seconds, without a restart.\n";
     return kOk;
@@ -216,7 +218,7 @@ int RunWatch(const std::vector<std::string>& args, std::ostream& out, std::ostre
     auto check = [&]() {
         FolderFiles files(folder);
         LoadOptions options;
-        options.scheme = parsed.scheme;
+        options.scheme = parsed.scheme.empty() ? ReadDefaultScheme(files) : parsed.scheme;
         Theme theme = LoadTheme(folder.filename().string(), folder.generic_string(), files, options);
         out << "--- " << (theme.usable ? "checked" : "refused") << ": " << theme.problems.size() << " problem(s)\n";
         return PrintThemeReport(theme, out);

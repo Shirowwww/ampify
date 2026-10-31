@@ -348,7 +348,25 @@ Conversion ConvertLength(std::string_view raw) {
     return Ok(ValueKind::Length, FormatNumber(*pixels));
 }
 
-Conversion ConvertThickness(std::string_view raw) {
+// Pixels, or a size relative to the one the element had before the theme (IsRelativeSize): a theme that enlarges
+// every text keeps the titles above the body text.
+Conversion ConvertFontSize(std::string_view raw) {
+    std::string_view text = Trimmed(raw);
+    std::string lowered = Lowered(text);
+    std::optional<double> factor = ParsePercent(text);
+    if (!factor && lowered.ends_with("em") && !lowered.ends_with("rem")) {
+        factor = ParseNumber(Trimmed(text.substr(0, text.size() - 2)));
+    }
+    if (!factor) return ConvertLength(raw);
+    if (!(*factor > 0 && *factor <= 10)) {
+        return Fail("font size out of range: \"" + std::string(text) + "\" (above 0%, up to 1000%)");
+    }
+    return Ok(ValueKind::Length, FormatNumber(std::round(*factor * 10000) / 100) + "%");
+}
+
+// As in CSS, only a margin goes below zero. A negative padding, border or corner reaches a template's Border, which
+// refuses it at the next layout: WinUI then stops Apple Music.
+Conversion ConvertThickness(std::string_view raw, bool allowNegative) {
     std::string_view text = Trimmed(raw);
     std::array<std::string, 4> parts;  // CSS order: top, right, bottom, left
     size_t count = 0;
@@ -362,6 +380,7 @@ Conversion ConvertThickness(std::string_view raw) {
 
         std::optional<double> pixels = ParsePixels(piece);
         if (!pixels) return Fail("unreadable thickness: \"" + std::string(piece) + "\"");
+        if (*pixels < 0 && !allowNegative) return Fail("negative value: \"" + std::string(piece) + "\" (only a margin can be)");
         if (count == parts.size()) return Fail("more than four values: \"" + std::string(text) + "\"");
         parts[count++] = FormatNumber(*pixels);
     }
@@ -665,9 +684,10 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
             // No limit: XAML's MaxWidth and MaxHeight default to infinity, MinWidth and MinHeight to 0 (NaN throws).
             if (spec.css.starts_with("max-") && Lowered(Trimmed(raw)) == "none") return Ok(ValueKind::Length, "inf");
             if (spec.css.starts_with("min-") && Lowered(Trimmed(raw)) == "auto") return Ok(ValueKind::Length, "0");
+            if (spec.xaml == "FontSize") return ConvertFontSize(raw);
             return ConvertLength(raw);
         case PropertyKind::Thickness:
-            return ConvertThickness(raw);
+            return ConvertThickness(raw, spec.xaml == "Margin");
         case PropertyKind::Visibility:
             return ConvertVisibility(raw);
         case PropertyKind::Number:
@@ -701,6 +721,35 @@ std::string FormatNumber(double number) {
     auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), number);
     if (error != std::errc()) return "0";
     return std::string(buffer.data(), end);
+}
+
+bool IsRelativeSize(const Value& value) {
+    return value.kind == ValueKind::Length && value.text.ends_with('%');
+}
+
+std::optional<Value> ScaleFontSize(const Value& relative, const Value& size) {
+    std::optional<double> factor = ParsePercent(relative.text);
+    std::optional<double> pixels = ParseNumber(size.text);
+    if (!IsRelativeSize(relative) || !factor || !pixels || !(*pixels > 0)) return std::nullopt;
+    return Value{ValueKind::Length, FormatNumber(std::round(*pixels * *factor * 100) / 100)};
+}
+
+bool SameValue(const Value& a, const Value& b) {
+    if (a == b) return true;
+    const bool numeric = a.kind == ValueKind::Length || a.kind == ValueKind::Number || a.kind == ValueKind::Thickness ||
+                         a.kind == ValueKind::Point || a.kind == ValueKind::Transform || a.kind == ValueKind::Shadow;
+    if (a.kind != b.kind || !numeric) return false;
+
+    std::string_view left = a.text, right = b.text;
+    while (true) {
+        size_t endLeft = std::min(left.find(','), left.size()), endRight = std::min(right.find(','), right.size());
+        std::optional<double> x = ParseNumber(left.substr(0, endLeft));
+        std::optional<double> y = ParseNumber(right.substr(0, endRight));
+        if (!x || !y || std::abs(*x - *y) > 1e-5 * std::max({1.0, std::abs(*x), std::abs(*y)})) return false;
+        if (endLeft == left.size() || endRight == right.size()) return endLeft == left.size() && endRight == right.size();
+        left.remove_prefix(endLeft + 1);
+        right.remove_prefix(endRight + 1);
+    }
 }
 
 }  // namespace ampify::theme

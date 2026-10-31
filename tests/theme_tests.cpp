@@ -58,13 +58,15 @@ public:
 };
 
 // An interface made of plain data. An element has only the properties it was created with, as a real element has
-// only its own. Removing an element makes every later call on it fail, as a closed page does. :hover goes through the
-// same HoverTracker as the Windows backend; PointerEnter and PointerExit stand for the pointer events.
+// only its own. Removing an element makes every later call on it fail, as a closed page does; detaching it only takes
+// it out of the snapshot, as a closing menu does with its entries. :hover goes through the same HoverTracker as the
+// Windows backend; PointerEnter and PointerExit stand for the pointer events.
 class FakeTree final : public th::TreeBackend, private th::HoverTracker::Access {
 public:
     struct Element {
         th::NodeInfo info;  // `parent` holds the index of the parent element until Snapshot translates it
         bool alive = true;
+        bool detached = false;
         std::map<std::string, th::Value> properties;
     };
 
@@ -73,6 +75,8 @@ public:
     std::string dictionary;
     std::set<std::string> refusedProperties;
     int writes = 0;
+    std::vector<std::string> written;  // the properties written, in order
+    bool singlePrecision = false;      // keeps lengths as WinUI does: 16.8 reads back as 16.799999237060547
     std::set<th::NodeId> followed;  // elements with pointer handlers attached
     int handlersAttached = 0;
     int handlersRemoved = 0;
@@ -94,13 +98,19 @@ public:
         if (Element* element = Find(id)) element->alive = false;
     }
 
+    void Detach(th::NodeId id, bool detached = true) {
+        if (Element* element = Find(id)) element->detached = detached;
+    }
+
+    bool Alive(th::NodeId id) override { return Find(id) != nullptr; }
+
     std::vector<th::NodeInfo> Snapshot() override {
         std::vector<int> position(elements.size(), -1);
         std::vector<th::NodeInfo> nodes;
         std::map<int, int> children;  // live children, by parent element index
         std::vector<int> parentOf;    // the parent element index of each node
         for (size_t i = 0; i < elements.size(); i++) {
-            if (!elements[i].alive) continue;
+            if (!elements[i].alive || elements[i].detached) continue;
 
             th::NodeInfo info = elements[i].info;
             int parent = elements[i].info.parent;
@@ -204,7 +214,11 @@ private:
         auto it = element->properties.find(std::string(property));
         if (it == element->properties.end()) return false;
         it->second = value;
+        if (singlePrecision && value.kind == th::ValueKind::Length) {
+            it->second.text = th::FormatNumber(static_cast<float>(std::stod(value.text)));
+        }
         writes++;
+        written.emplace_back(property);
         return true;
     }
 
@@ -625,6 +639,21 @@ TEST_CASE(Properties_ConvertLengthsAndThickness) {
 
     CHECK(Converted("font-size", "18px", palette, files) == "18");
     CHECK(Converted("font-size", "1.5", palette, files) == "1.5");
+    // Relative to the element's own size; the engine works out the pixels.
+    CHECK(Converted("font-size", "120%", palette, files) == "120%");
+    CHECK(Converted("font-size", "1.25em", palette, files) == "125%");
+    CHECK(Converted("font-size", "0%", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(Converted("font-size", "1.2rem", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(Converted("width", "50%", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(th::ScaleFontSize({th::ValueKind::Length, "120%"}, {th::ValueKind::Length, "14"})->text == "16.8");
+    CHECK(!th::ScaleFontSize({th::ValueKind::Length, "120%"}, {th::ValueKind::Length, "NaN"}));
+
+    // WinUI keeps numbers in single precision: what it reads back is still the value written.
+    CHECK(th::SameValue({th::ValueKind::Length, "16.8"}, {th::ValueKind::Length, "16.799999237060547"}));
+    CHECK(th::SameValue({th::ValueKind::Thickness, "8,4.1,8,4"}, {th::ValueKind::Thickness, "8,4.099999904632568,8,4"}));
+    CHECK(!th::SameValue({th::ValueKind::Length, "16.8"}, {th::ValueKind::Length, "16.9"}));
+    CHECK(!th::SameValue({th::ValueKind::Thickness, "8,4,8,4"}, {th::ValueKind::Thickness, "8,4,8"}));
+    CHECK(!th::SameValue({th::ValueKind::Color, "#FF000000"}, {th::ValueKind::Color, "#FF000001"}));
     CHECK(Converted("width", "auto", palette, files) == "NaN");
     CHECK(Converted("width", "wide", palette, files).rfind("PROBLEM", 0) == 0);
 
@@ -634,6 +663,12 @@ TEST_CASE(Properties_ConvertLengthsAndThickness) {
     CHECK(Converted("margin", "1 2 3", palette, files) == "2,1,2,3");
     CHECK(Converted("margin", "1 2 3 4", palette, files) == "4,1,2,3");
     CHECK(Converted("margin", "1 2 3 4 5", palette, files).rfind("PROBLEM", 0) == 0);
+
+    // As in CSS, only a margin goes below zero: a template's Border refuses the rest, and WinUI then stops the app.
+    CHECK(Converted("margin", "0 -12", palette, files) == "-12,0,-12,0");
+    CHECK(Converted("padding", "0 0 0 -2", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(Converted("border-width", "-1", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(Converted("corner-radius", "8 -4", palette, files).rfind("PROBLEM", 0) == 0);
 }
 
 TEST_CASE(Properties_AcceptTheCssNamesThemesUseMost) {
@@ -1013,6 +1048,48 @@ TEST_CASE(Engine_LeavesTheFontOfAnIconAlone) {
     CHECK(tree.Shown(icon, "FontFamily").text == "Segoe UI");
     CHECK(tree.Shown(icon, "FontSize").text == "20");  // the rest of the rule still applies to it
     CHECK(log.str().find("Refused") == std::string::npos);
+}
+
+TEST_CASE(Engine_ScalesEachTextFromItsOwnSize) {
+    MemoryFiles files;
+    files.files["user.css"] = "TextBlock { font-size: 120%; }\nTextBlock:hover { font-size: 1.5em; }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+
+    FakeTree tree;
+    tree.singlePrecision = true;
+    th::NodeId body = tree.Add(-1, "TextBlock", "Body", {{"FontSize", {th::ValueKind::Length, "14"}}});
+    th::NodeId title = tree.Add(-1, "TextBlock", "Title", {{"FontSize", {th::ValueKind::Length, "28"}}});
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    auto size = [&](th::NodeId id, const char* pixels) {
+        return th::SameValue(tree.Shown(id, "FontSize"), {th::ValueKind::Length, pixels});
+    };
+
+    engine.Apply(theme, tree);
+    CHECK(size(body, "16.8"));
+    CHECK(size(title, "33.6"));  // still twice the body text
+
+    // The next pass reads back 16.799999237060547, the same size, and still starts from the size before the theme.
+    CHECK(engine.Apply(theme, tree).applied == 0);
+    CHECK(size(body, "16.8"));
+
+    tree.PointerEnter(title);
+    CHECK(size(title, "50.4"));  // 150% of the theme's size underneath
+    tree.PointerExit(title);
+
+    engine.Restore(tree);
+    CHECK(tree.Shown(body, "FontSize").text == "14");
+    CHECK(tree.Shown(title, "FontSize").text == "28");
+}
+
+TEST_CASE(Theme_AFontRoleTakesPixels) {
+    MemoryFiles files;
+    files.files["user.css"] = ":root { --font-body-size: 120%; }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.size() == 1);
+    if (!theme.problems.empty()) CHECK(theme.problems[0].find("a font role takes pixels") != std::string::npos);
 }
 
 TEST_CASE(Engine_ReappliesAThemeLikeLiveReloadDoes) {
@@ -1401,6 +1478,7 @@ TEST_CASE(Commands_SetKeepsTheOtherSettings) {
     before.SetBool("theme.live_reload", false);
     before.SetBool("theme.parts.assets", false);
     before.Save(kit.Settings().string());
+    { std::ofstream(kit.Themes() / "midnight" / "manifest.json") << R"({"defaultScheme": "Dark"})"; }
 
     std::ostringstream out;
     std::ostringstream err;
@@ -1411,7 +1489,8 @@ TEST_CASE(Commands_SetKeepsTheOtherSettings) {
     CHECK(after.GetString("extensions.atmos-leveler.enabled", "") == "1");
     CHECK(!after.GetBool("theme.live_reload", true));
     CHECK(!after.GetBool("theme.parts.assets", true));
-    CHECK(after.GetString("theme.scheme", "x").empty());  // no --scheme: the first scheme is used
+    CHECK(after.GetString("theme.scheme", "x").empty());  // no --scheme: the theme's default, read on each pass
+    CHECK(out.str().find("chosen, scheme Dark") != std::string::npos);
     std::filesystem::remove_all(kit.root);
 }
 
@@ -1958,6 +2037,34 @@ TEST_CASE(Scheme_ChoosePrefersTheScheduleThenAutoThenTheName) {
     CHECK(!choice.problems.empty());
 }
 
+TEST_CASE(Scheme_TheThemesDefaultComesAfterTheSettings) {
+    std::vector<std::string> schemes{"Base", "Dark"};
+    th::SchemeChoice choice = th::ChooseScheme("", "", schemes, {false, 600}, "Dark");
+    CHECK(choice.scheme == "Dark");
+    CHECK(choice.reason == "the theme's default");
+
+    CHECK(th::ChooseScheme("Base", "", schemes, {false, 600}, "Dark").scheme == "Base");
+    CHECK(th::ChooseScheme("", "07:00=Base", schemes, {false, 600}, "Dark").scheme == "Base");
+
+    choice = th::ChooseScheme("", "", schemes, {false, 600});
+    CHECK(choice.scheme.empty());
+    CHECK(choice.reason == "first scheme");
+}
+
+TEST_CASE(Worker_StartsOnTheSchemeTheManifestNames) {
+    std::filesystem::path kit(TempFolder("worker-default"));
+    WriteFile(kit / "themes" / "midnight" / "colors.ini", "[Base]\nA = FFFFFF\n\n[Dark]\nA = 000000\n");
+    WriteFile(kit / "themes" / "midnight" / "manifest.json", R"({"id": "midnight", "defaultScheme": "Dark"})");
+
+    ampify::Settings settings;
+    settings.Set("theme.active", "midnight");
+    th::ThemeWorker worker(kit);
+    th::SessionRequest request = worker.Tick(settings, 600);
+    CHECK(request.theme && request.theme->scheme == "Dark");
+    CHECK(request.schemeReason == "the theme's default");
+    std::filesystem::remove_all(kit);
+}
+
 TEST_CASE(Settings_ScheduleIsKeptAndOnlyWrittenWhenSet) {
     ampify::Settings settings;
     th::ThemeSettings value;
@@ -2437,6 +2544,96 @@ TEST_CASE(Engine_HoverFollowsThemeChangesWithoutLeaking) {
     engine.Apply(Load(withHover), tree);
     CHECK(engine.OriginalCount() == 0);
     engine.Restore(tree);
+}
+
+TEST_CASE(Engine_GivesBackToAnElementTakenOutOfTheInterface) {
+    MemoryFiles files;
+    files.files["user.css"] = "Button { background: #FF111111; }\nButton:hover { opacity: 0.5; }\n";
+    th::Theme theme = Load(files);
+    FakeTree tree = MakeButtonPage();
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    engine.Apply(theme, tree);
+    CHECK(engine.OriginalCount() == 2);  // the background, and the hover to take off
+
+    // A menu closes: WinUI takes its entries out of the tree and keeps them for the next opening.
+    tree.Detach(2);
+    engine.Apply(theme, tree);
+    CHECK(engine.OriginalCount() == 2);
+
+    // Back in the tree, the theme's values are still in place.
+    tree.Detach(2, false);
+    th::ThemeEngine::Report again = engine.Apply(theme, tree);
+    CHECK(again.applied == 0);
+
+    // The theme comes off while the menu is closed: the entry gets its own values back all the same.
+    tree.Detach(2);
+    engine.Restore(tree);
+    CHECK(tree.Shown(2, "Background").text == "#FF000000");
+    CHECK(tree.handlersRemoved == 1);
+    CHECK(engine.OriginalCount() == 0);
+}
+
+// The search box's buttons have a padding of 0,0,-2,0, which a theme template's Border refuses (WinUI then stops Apple
+// Music): their own template comes back before that padding, when the theme comes off or stops giving them anything.
+TEST_CASE(Engine_GivesATemplateBackBeforeTheOtherValues) {
+    MemoryFiles files;
+    files.files["templates/button.xaml"] = "<ControlTemplate />";
+    files.files["user.css"] = "Button { padding: 8; template: url(templates/button.xaml); }\n";
+    th::Theme theme = Load(files);
+    MemoryFiles plainFiles;
+    plainFiles.files["user.css"] = "Grid { opacity: 0.5; }\n";
+    th::Theme plain = Load(plainFiles);
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+
+    for (bool restore : {true, false}) {
+        FakeTree tree;
+        tree.Add(-1, "Button", "QueryButton",
+                 {{"Padding", {th::ValueKind::Thickness, "0,0,-2,0"}}, {"Template", {th::ValueKind::Opaque, "handle:1"}}});
+        th::ThemeEngine engine(journal);
+        engine.Apply(theme, tree);
+        CHECK(tree.Shown(1, "Template").kind == th::ValueKind::Template);
+
+        tree.written.clear();
+        if (restore) {
+            engine.Restore(tree);
+        } else {
+            engine.Apply(plain, tree);
+        }
+        CHECK(tree.written == std::vector<std::string>({"Template", "Padding"}));
+        CHECK(tree.Shown(1, "Padding").text == "0,0,-2,0");
+    }
+}
+
+TEST_CASE(Hover_ValueOfGivesTheHoverValueWithOrWithoutThePointer) {
+    struct Element final : th::HoverTracker::Access {
+        std::map<std::string, th::Value, std::less<>> values{{"Background", Brush("#FF111111")}};
+        std::optional<th::Value> ReadRaw(th::NodeId, std::string_view property) override {
+            auto it = values.find(property);
+            if (it == values.end()) return std::nullopt;
+            return it->second;
+        }
+        bool WriteRaw(th::NodeId, std::string_view property, const th::Value& value) override {
+            values[std::string(property)] = value;
+            return true;
+        }
+    } element;
+    th::HoverTracker hover;
+
+    hover.Set(7, {{"Background", Brush("#FF222222")}}, element);
+    CHECK(hover.ValueOf(7, "Background") == Brush("#FF222222"));  // before the pointer comes
+    hover.Enter(7, element);
+    CHECK(hover.ValueOf(7, "Background") == Brush("#FF222222"));
+    CHECK(element.values["Background"] == Brush("#FF222222"));
+    CHECK(!hover.ValueOf(7, "Foreground"));
+    CHECK(!hover.ValueOf(8, "Background"));
+
+    hover.Set(7, {}, element);
+    CHECK(!hover.ValueOf(7, "Background"));
+    CHECK(element.values["Background"] == Brush("#FF111111"));
 }
 
 TEST_CASE(Engine_NewPropertiesRestoreExactly) {

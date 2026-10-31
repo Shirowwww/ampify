@@ -68,4 +68,13 @@ bool HoverTracker::Write(NodeId id, std::string_view property, const Value& valu
     return access.WriteRaw(id, property, value);
 }
 
+std::optional<Value> HoverTracker::ValueOf(NodeId id, std::string_view property) const {
+    auto it = m_elements.find(id);
+    if (it == m_elements.end()) return std::nullopt;
+    for (const HoverValue& hover : it->second.values) {
+        if (hover.property == property) return hover.value;
+    }
+    return std::nullopt;
+}
+
 }  // namespace ampify::theme

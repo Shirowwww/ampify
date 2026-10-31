@@ -49,8 +49,9 @@ AccentFillColorDefaultBrush = 0A84FF
 SolidBackgroundFillColorBase = 1C1C1E
 ```
 
-- The first scheme is the default. The setting `theme.scheme` picks another. It can also follow the Windows mode or the
-  time of day: see "Automatic scheme".
+- The scheme named by `defaultScheme` in `manifest.json` is the default, or the first scheme when the manifest names
+  none. The setting `theme.scheme` picks another. It can also follow the Windows mode or the time of day: see
+  "Automatic scheme".
 - The same names work as named colors in `user.css`: `background: $SolidBackgroundFillColorBase;`.
 - A name that does not exist in the app is reported in the log ("missing resource") and does nothing else.
 
@@ -159,20 +160,20 @@ divided by another.
 | `backdrop` | `Background` | `acrylic(tint, opacity)`: an acrylic background (see "Acrylic") |
 | `color` or `foreground` | `Foreground` | Same as `background` |
 | `border-color` | `BorderBrush` | Same as `background` |
-| `border-width` | `BorderThickness` | 1 to 4 lengths, CSS order: top right bottom left |
-| `corner-radius` or `border-radius` | `CornerRadius` | 1 to 4 lengths, CSS order: top-left, top-right, bottom-right, bottom-left |
+| `border-width` | `BorderThickness` | 1 to 4 lengths, none negative, CSS order: top right bottom left |
+| `corner-radius` or `border-radius` | `CornerRadius` | 1 to 4 lengths, none negative, CSS order: top-left, top-right, bottom-right, bottom-left |
 | `font-family` | `FontFamily` | A font name, quoted or not, or `url(fonts/file.ttf#Name)` (see "Theme fonts") |
-| `font-size` | `FontSize` | Number, `px` optional |
+| `font-size` | `FontSize` | Number, `px` optional; or relative to the element's own size, `120%` or `1.2em`, so titles stay above body text |
 | `font-weight` | `FontWeight` | `normal`, `bold`, or a number from 1 to 1000 |
-| `margin` | `Margin` | 1 to 4 lengths |
-| `padding` | `Padding` | 1 to 4 lengths |
+| `margin` | `Margin` | 1 to 4 lengths, negative ones allowed |
+| `padding` | `Padding` | 1 to 4 lengths, none negative |
 | `width`, `height` | `Width`, `Height` | A length or `auto` |
 | `min-width`, `min-height` | `MinWidth`, `MinHeight` | A length, or `auto` for no minimum |
 | `max-width`, `max-height` | `MaxWidth`, `MaxHeight` | A length, or `none` for no maximum |
 | `compact-pane-length` | `CompactPaneLength` | On `.navigation`: the width of the sidebar folded into icons (48 in Apple Music) |
 | `opacity` | `Opacity` | A number from 0 to 1 |
 | `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`) |
-| `template` | `Template` | `url(templates/file.xaml)`, a full `ControlTemplate` |
+| `template` | `Template` | `url(templates/file.xaml)`, a full `ControlTemplate`. Not applied to a control whose padding or border is negative (Apple Music's search box buttons): WinUI would stop the app |
 | `flow-direction` or `direction` | `FlowDirection` | `ltr` (left to right) or `rtl` (right to left); `left-to-right` and `right-to-left` also work |
 | `order` | Position (Ampify only) | An integer from 0: the place of the element among its parent's children |
 | `horizontal-alignment` | `HorizontalAlignment` | `left`, `center`, `right` or `stretch` |
@@ -410,6 +411,32 @@ stays in those two states: Ampify writes the same brush to the keys the button's
 button's own resources only. Checked, selected or "repeat on" states keep Apple Music's colours, since they say
 something. The inspector shows what each element's states change (`States=` below).
 
+The same goes for the entries of a menu, which also stay lit while their submenu is open, and for a slider: `color`
+fills the part left of the thumb, `background` the rest of the track, and its `Thumb` keeps its `background` while
+dragged. A `:hover` colour on such a control is what its states show under the pointer: `.menu-item:hover
+{ background: #3E3E3E; }` lights each entry of a menu.
+
+### Flyouts, menus and tooltips
+
+Apple Music opens its flyouts (the volume's), its menus and its tooltips in popups, outside the window's tree. Each
+popup is a root of its own, `Popup`: a selector reaches what is inside it, and never what opened it.
+
+```css
+.menu,
+.flyout,
+.tooltip {
+    background: #282828;
+}
+
+.menu-item:hover {
+    background: #3E3E3E;
+}
+```
+
+A popup takes the theme the first time it opens, within a quarter of a second (at once when a click or a key opened
+it), then keeps it while it is closed. It follows the light or dark mode of the element that opened it. See
+[names.md](names.md) for `.flyout`, `.menu`, `.menu-item`, `.menu-separator`, `.tooltip` and the volume slider.
+
 ### Transitions
 
 `transition` animates the changes of an element instead of jumping to the new value: a `:hover`, a theme being applied,
@@ -501,7 +528,7 @@ TextBlock {
 
 - `--font-<role>`: the family, like `font-family`.
 - `--font-<role>-weight`: the weight, like `font-weight` (`normal`, `bold` or a number).
-- `--font-<role>-size`: the size, like `font-size`.
+- `--font-<role>-size`: the size in pixels, like `font-size` (a role refuses a relative size such as `120%`).
 
 What the theme does not set keeps the Windows 11 value:
 
@@ -555,7 +582,7 @@ The scheme of `colors.ini` can follow the Windows mode (light or dark), or the t
 | Setting | Effect |
 |---|---|
 | `theme.scheme = Dark` | That scheme |
-| `theme.scheme =` (empty) | The first scheme of `colors.ini` |
+| `theme.scheme =` (empty) | The theme's `defaultScheme`, or the first scheme of `colors.ini` |
 | `theme.scheme = auto` | Follows the Windows mode |
 | `theme.schedule = 07:00=Light,19:00=Dark` | Follows the local time; takes priority over `theme.scheme` |
 
@@ -697,8 +724,9 @@ With `theme.inspect = 1`, the kernel writes the interface tree on its next pass,
 }
 ```
 
-`nodes` lists parents before their children. `parent` is the index of the parent in `nodes` (-1 for a root). `id` is a
-string. Templates and objects have the value "present". After 5000 elements the list stops and `truncated` is `true`.
+`nodes` lists parents before their children. `parent` is the index of the parent in `nodes` (-1 for a root: the
+window's content, then each popup seen open). `id` is a string. Templates and objects have the value "present". After
+20000 elements the list stops and `truncated` is `true`.
 
 ## Windows side
 
@@ -729,5 +757,5 @@ pointer, the engine reads and writes the "underneath" value without undoing the 
 - The names in `sidebar.json` and `home.json` have not all been read from the real app, and Apple Music's sidebar may
   not be a `NavigationView`. If it is not, `sidebar.json` finds nothing and has no other effect.
 - `auto` and `theme.schedule` are re-read every 3 seconds, so the scheme change is not instant. New pages and rows that
-  appear while scrolling get the theme within a fraction of a second: Ampify follows page navigation and the lists of
-  the page.
+  appear while scrolling get the theme within a fraction of a second: Ampify follows page navigation, the lists of the
+  page and the popups that open.

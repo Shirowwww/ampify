@@ -44,6 +44,18 @@ Atmos leveler.
 - The installer puts `ampify.exe` next to the kernel, because the Marketplace page runs it.
 - `Ampify.http.get` and `post` no longer block the thread that runs JavaScript: a slow request does not freeze timers or
   events, and an element may have 4 requests in flight.
+- Themes reach the flyouts, menus and tooltips, which Apple Music opens outside its window: the volume flyout, the "..."
+  menus and their submenus, the tips under the buttons (`.flyout`, `.menu`, `.menu-item`, `.menu-separator`,
+  `.tooltip`). The volume slider has its names (`.volume-slider`, `.volume-mute-button`): its track, its fill and its
+  thumb keep the theme's colours under the pointer and while dragged, and Greenroom draws it white on grey. A `:hover`
+  colour on a menu entry or a button is what it shows under the pointer, and an entry stays lit while its submenu is
+  open. Keeping those colours no longer stops the window (the first opening of the volume flyout froze it for 0.7 s),
+  and removing a theme gives back Apple Music's colours under the pointer (a slider stayed white on a white flyout).
+- A theme with a button template no longer stops Apple Music: the search box's buttons have a negative padding, which
+  a template's border refuses. A negative padding, border or corner in `user.css` is refused with a line in the log.
+- A theme starts on the `defaultScheme` of its manifest (Midnight opened in its light scheme). A font size can be
+  relative to each element, `120%` or `1.2em`: Large text now enlarges every text and keeps titles above body text.
+  Sizes are no longer written again every 3 seconds when WinUI reads them back rounded.
 
 ### Preview
 
