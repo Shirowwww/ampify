@@ -1,7 +1,9 @@
 #include "player_model.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdio>
 
 #include "amp_abi.hpp"
 #include "md5.hpp"
@@ -16,7 +18,64 @@ constexpr int64_t kTicksPerMs = 10'000;
 constexpr int64_t kSecondsBelow = 20'000;
 constexpr int64_t kTicksFrom = 36'000'000;
 
+constexpr int kArtworkSize = 1000;
+constexpr size_t kMaxArtworkCodeLength = 8;
+constexpr char kDefaultCropCode[] = "bb";
+constexpr char kDefaultArtworkFormat[] = "jpg";
+
+bool HasPrefixNoCase(const std::string& text, const char* prefix) {
+    for (size_t i = 0; prefix[i]; ++i) {
+        if (i >= text.size() || std::tolower(static_cast<unsigned char>(text[i])) != prefix[i]) return false;
+    }
+    return true;
+}
+
+// A crop code or a format goes into the address: letters and digits only, else the default.
+std::string Token(const std::string& value, const char* fallback) {
+    bool ok = !value.empty() && value.size() <= kMaxArtworkCodeLength;
+    for (char c : value) ok = ok && std::isalnum(static_cast<unsigned char>(c));
+    return ok ? value : fallback;
+}
+
+// The template may reach us with its braces escaped, as Windows.Foundation.Uri writes them.
+void FillPlaceholder(std::string& text, const std::string& name, const std::string& value) {
+    for (const std::string& token : {"{" + name + "}", "%7B" + name + "%7D", "%7b" + name + "%7d"}) {
+        for (size_t at = text.find(token); at != std::string::npos; at = text.find(token, at + value.size())) {
+            text.replace(at, token.size(), value);
+        }
+    }
+}
+
 }  // namespace
+
+std::string ArtworkAddress(const ArtworkReading& artwork) {
+    const std::string& uri = artwork.uri;
+    if (!HasPrefixNoCase(uri, "https://")) return "";
+    for (char c : uri) {
+        // The address is handed to scripts and to image loaders: no white space, control or quote characters.
+        if (static_cast<unsigned char>(c) <= 0x20 || c == 0x7F || c == '"' || c == '<' || c == '>' || c == '\\') return "";
+    }
+    int width = kArtworkSize, height = kArtworkSize;
+    if (artwork.width > 0 && artwork.height > 0) {
+        double ratio = artwork.width / artwork.height;
+        if (ratio >= 1) height = std::max(1, static_cast<int>(std::lround(kArtworkSize / ratio)));
+        else width = std::max(1, static_cast<int>(std::lround(kArtworkSize * ratio)));
+    }
+    std::string address = uri;
+    FillPlaceholder(address, "w", std::to_string(width));
+    FillPlaceholder(address, "h", std::to_string(height));
+    FillPlaceholder(address, "c", Token(artwork.cropCode, kDefaultCropCode));
+    FillPlaceholder(address, "f", Token(artwork.format, kDefaultArtworkFormat));
+    return address;
+}
+
+std::string ArtworkColorHex(const ArtworkReading& artwork) {
+    if (!artwork.hasColor) return "";
+    if (artwork.alpha == 0 && artwork.red == 0 && artwork.green == 0 && artwork.blue == 0) return "";
+    char text[8];
+    std::snprintf(text, sizeof text, "#%02X%02X%02X", artwork.red, artwork.green, artwork.blue);
+    return text;
+}
 
 AmpTimeUnit DetectAmpTimeUnit(int64_t durationRaw, std::optional<int64_t> smtcDurationMs) {
     if (durationRaw <= 0) return AmpTimeUnit::Unknown;
@@ -105,7 +164,10 @@ PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit) {
     track.atmos = IsAtmosFormat(reading.audioFormat);
     track.lossless = IsLosslessFormat(reading.audioFormat);
     if (reading.queueItemId != 0) track.queueItemId = std::to_string(reading.queueItemId);
+    track.artwork = ArtworkAddress(reading.artwork);
+    track.artworkColor = ArtworkColorHex(reading.artwork);
     snapshot.track = std::move(track);
+    snapshot.lyricsAvailable = reading.lyricsAvailable;
     return snapshot;
 }
 

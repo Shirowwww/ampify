@@ -2,7 +2,7 @@
 
 // Apple's own player object, AMP.Services.Player, reached from inside AppleMusic.exe through its private WinRT
 // interfaces (slots and identifiers in core/amp_abi.hpp, with their evidence). Read: playing or paused, position,
-// duration, title, artist, album, audio format, queue entry. Commands: PlayAsync, PauseAsync, SkipNextAsync,
+// duration, title, artist, album, audio format, queue entry, cover and its colour, lyrics. Commands: PlayAsync, PauseAsync, SkipNextAsync,
 // SkipPreviousAsync, only when the setting player.appleCommands allows them (see win/player_bridge.cpp). Never the
 // volume, never the DRM.
 //
@@ -21,6 +21,7 @@
 #include <string>
 
 #include "../core/host.hpp"
+#include "../core/lyrics.hpp"
 #include "../core/player_model.hpp"
 #include "winrt_abi.hpp"
 
@@ -44,6 +45,10 @@ public:
 
     // The current state. nullopt when the player stopped answering: the object is dropped, and Active() is false.
     std::optional<AmpReading> Read();
+
+    // The lyrics of the current track as Apple holds them, read when the track changes and again every few seconds
+    // while absent (a bounded number of times). nullopt when there are none (yet).
+    const std::optional<RawLyrics>& Lyrics() const { return m_lyrics; }
 
     // Play, Pause, Next, Previous through IPlayer. False for Seek, or when the call fails or does not complete
     // within 3 s.
@@ -73,6 +78,11 @@ private:
     uint64_t m_itemQueueId = 0;
     unsigned long long m_stringsAt = 0;
     std::string m_title, m_artist, m_album;
+    ArtworkReading m_artwork;
+
+    std::optional<RawLyrics> m_lyrics;  // of the item in m_item
+    int m_lyricsTries = 0;
+    unsigned long long m_lyricsNextTry = 0;
 };
 
 }  // namespace ampify::win

@@ -172,7 +172,7 @@ switching the element on. A function protected by an undeclared permission throw
 | `storage` | `Ampify.storage`, one JSON file per element, in `storage\<id>.json` | [stable] |
 | `notifications` | `Ampify.notify`, a Windows notification | [preview] |
 | `ui.keyboard` | `Ampify.keyboard.bind`, global or window-only shortcuts | [preview] |
-| `player.read` | `Ampify.player.state()`, player events and `Ampify.player.queue.list()` | [preview] |
+| `player.read` | `Ampify.player.state()`, `Ampify.player.lyrics()`, player events and `Ampify.player.queue.list()` | [preview] |
 | `player.control` | `Ampify.player.play()`, `pause()`, `toggle()`, `next()`, `previous()`, `seek()`, `queue.add()`, `queue.remove()` | [preview] |
 | `audio.analyze` | `Ampify.audio.onFrame`, `analyze`, `loudness`: spectrum, levels, tempo and loudness of the decoded sound, computed in memory | [preview] |
 | `audio.gain` | `Ampify.audio.setGainDb`, a gain applied to the samples, capped by the kernel ceiling | [preview] |
@@ -246,9 +246,11 @@ An element neither reads nor writes the keys of another element.
 ```js
 Ampify.player.state()
 // -> { playing, positionMs, durationMs,
-//      track: { id, title, artist, album, variantId, atmos, lossless, queueItemId } | null,
+//      track: { id, title, artist, album, variantId, atmos, lossless, queueItemId, artwork, artworkColor } | null,
 //      source: "apple" | "smtc" | "" }
-Ampify.player.on("trackchange" | "statechange", fn)
+Ampify.player.on("trackchange" | "statechange" | "lyricschange", fn)
+Ampify.player.lyrics()      // -> null | { source: "apple", synced, language,
+//                                         lines: [{ start, end, text, words: [{ start, end, text }] }], text }
 Ampify.player.play()        // true when the app accepted the command
 Ampify.player.pause()
 Ampify.player.toggle()      // play if paused, pause if playing (player.control is enough)
@@ -266,6 +268,16 @@ Ampify.player.queue.remove(itemId)                                // [preview]
   the song, its variant or its entry changes. Empty when the source does not give it.
 - **`track.variantId`** is the audio format given by Apple: `"lossless"`, `"hi-res-lossless"`, `"dolby-atmos"`,
   `"spatial"`, `"surround"` or `"other"`. Empty with SMTC. `atmos` and `lossless` follow from it.
+- **`track.artwork`** is the https address of the cover at about 1000 px, or `""` (SMTC, or Apple gave none). Only
+  `https://` addresses are passed on. **`track.artworkColor`** is the dominant colour of the cover, `"#RRGGBB"`, or `""`.
+  Both come from Apple's player only.
+- **`lyrics()`** gives Apple Music's own lyrics of the song playing (permission `player.read`), or `null` when Apple Music
+  has none for it, when it has not fetched them yet, or when the source is not Apple's player. Times are in
+  milliseconds from the start of the song. With `synced: true`, each line has `start` and `end`, and `words` holds the
+  timed words when Apple times them (otherwise `words` is empty). With `synced: false` the lines are plain text, without
+  `start` and `end`. `text` is the whole text, one line per row. Apple may only have the lyrics a few seconds after the
+  song starts: `lyricschange` fires when the lyrics of the current track become available (after `trackchange` if both
+  happen together). An element can also just call `lyrics()` again after `trackchange`.
 - **`source`** says who answered. On Windows, in `AppleMusic.exe`, the kernel reads Apple's player
   (`AMP.Services.Player`). Otherwise (in `AMPLibraryAgent.exe`, or if a new Apple Music version changes the interface) it
   reads the Windows media controls (SMTC). `""` means "state unknown", not "stopped".

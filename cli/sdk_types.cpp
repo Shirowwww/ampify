@@ -31,8 +31,19 @@ type PlayerState = {
     atmos: boolean;
     lossless: boolean;
     queueItemId: string;  // Apple's queue entry, "" when the source does not give it
+    artwork: string;       // https address of the cover (about 1000 px), "" when unknown
+    artworkColor: string;  // dominant colour of the cover, "#RRGGBB", "" when unknown
   } | null;
   source: "apple" | "smtc" | "";  // "": unknown state (no source answered)
+};
+type LyricWord = { start: number; end: number; text: string };
+type LyricLine = { start?: number; end?: number; text: string; words: LyricWord[] };  // no start/end unless synced
+type Lyrics = {
+  source: "apple";
+  synced: boolean;  // false: plain text lines, without times
+  language: string;
+  lines: LyricLine[];
+  text: string;
 };
 type QueueItem = {
   id: string;
@@ -126,7 +137,8 @@ declare const Ampify: {
   // 5.3 Player [preview]
   player: {
     state(): PlayerState;
-    on(event: "trackchange" | "statechange", fn: (state: PlayerState) => void): void;
+    on(event: "trackchange" | "statechange" | "lyricschange", fn: (state: PlayerState) => void): void;
+    lyrics(): Lyrics | null;  // Apple Music's own lyrics of the song playing, null when it has none (yet)
     play(): boolean;
     pause(): boolean;
     next(): boolean;

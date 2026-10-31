@@ -13,11 +13,13 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 
 #include "../core/host.hpp"
 #include "../core/journal.hpp"
+#include "../core/lyrics_host.hpp"
 #include "../core/player_model.hpp"
 #include "../core/player_queue.hpp"
 #include "../core/settings.hpp"
@@ -38,7 +40,7 @@ struct PlayerBridgeOptions {
     int maxAttempts = 24;     // 2 minutes, then SMTC for good (until the player answers again)
 };
 
-class PlayerBridge : public QueueHost {
+class PlayerBridge : public QueueHost, public LyricsHost {
 public:
     using Options = PlayerBridgeOptions;
 
@@ -53,6 +55,9 @@ public:
     QueueSnapshot Queue() override;
     QueueResult AddToQueue(const std::string& trackId, QueuePosition position) override;
     QueueResult RemoveFromQueue(const std::string& itemId) override;
+
+    // Apple's lyrics of the current track, from Apple's player only (SMTC has none).
+    std::optional<RawLyrics> Lyrics() override;
 
     // For the tests: how many activation attempts of Apple's player were made.
     int AppleAttempts() const { return m_appleAttempts; }

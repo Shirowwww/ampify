@@ -89,9 +89,9 @@ const Expected kMembers[] = {
     {"onStop", "f1=onStop"},
     {"config", "object!{get:f2=get,set:f2=set}"},
     {"storage", "object!{get:f2=get,set:f2=set,remove:f1=remove}"},
-    // toggle and queue added in kitApi 1.x, compatible additions
+    // toggle, queue and lyrics added in kitApi 1.x, compatible additions
     {"player", "object!{state:f0=state,on:f2=on,play:f0=play,pause:f0=pause,next:f0=next,previous:f0=previous,"
-               "seek:f1=seek,toggle:f0=toggle,queue:object!{list:f0=list,add:f2=add,remove:f1=remove}}"},
+               "seek:f1=seek,toggle:f0=toggle,lyrics:f0=lyrics,queue:object!{list:f0=list,add:f2=add,remove:f1=remove}}"},
     {"audio", "object!{setGainDb:f1=setGainDb,onFrame:f1=onFrame,analyze:f0=analyze,loudness:f0=loudness,"
               "volume:f0=volume,eq:object!{setBand:f2=setBand,preset:f1=preset,reset:f0=reset,bands:f0=bands,"
               "presets:f0=presets}}"},

@@ -20,6 +20,10 @@ struct TrackInfo {
     // The entry of the play queue that holds this track, as Apple numbers it. The same song played twice has two
     // entries. Empty when the source does not tell it (SMTC).
     std::string queueItemId;
+    // The cover as an https address of a 1000 px image, and its dominant colour as "#RRGGBB". Empty when the source
+    // does not give them (SMTC) or Apple has none.
+    std::string artwork;
+    std::string artworkColor;
 };
 
 struct PlayerSnapshot {
@@ -30,6 +34,9 @@ struct PlayerSnapshot {
     // Where the state was read: "apple" (AMP.Services.Player, inside Apple Music), "smtc" (the Windows media
     // controls), or empty when no source answered. An empty source means "unknown", not "stopped".
     std::string source;
+    // Apple has lyrics for the current track and the kernel holds them. Not shown to elements: it drives the
+    // "lyricschange" event (core/player_watch.*), and Ampify.player.lyrics() gives the lyrics themselves.
+    bool lyricsAvailable = false;
 };
 
 enum class PlayerCommand { Play, Pause, Next, Previous, Seek };

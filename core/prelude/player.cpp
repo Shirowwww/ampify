@@ -5,7 +5,7 @@ namespace ampify::prelude {
 
 extern const char kPlayer[];
 const char kPlayer[] = R"AMPIFYJS(
-  const trackListeners = { trackchange: [], statechange: [] };
+  const trackListeners = { trackchange: [], statechange: [], lyricschange: [] };
   const queueId = (value, what) => {
     if (typeof value !== "string" && typeof value !== "number") throw new TypeError(what);
     return String(value);
@@ -17,7 +17,7 @@ const char kPlayer[] = R"AMPIFYJS(
     },
     on(event, fn) {
       const listeners = trackListeners[event];
-      if (!listeners) throw new RangeError("unknown event: " + event + " (trackchange or statechange)");
+      if (!listeners) throw new RangeError("unknown event: " + event + " (trackchange, statechange or lyricschange)");
       if (typeof fn !== "function") throw new TypeError("player.on expects a function");
       native.require("player.read");
       listeners.push(fn);
@@ -32,6 +32,9 @@ const char kPlayer[] = R"AMPIFYJS(
       return native.playerCommand("seek", Math.floor(position));
     },
     toggle: () => native.playerCommand("toggle", 0),
+    lyrics() {
+      return JSON.parse(native.playerLyrics());
+    },
     queue: Object.freeze({
       list() {
         return JSON.parse(native.queueList());

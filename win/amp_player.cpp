@@ -35,6 +35,61 @@ bool QueryAny(const rt::Ref& object, const char* const (&iids)[N], rt::Ref& out)
 
 constexpr DWORD kCommandTimeoutMs = 3000;
 constexpr unsigned long long kStringsEveryMs = 5000;
+// Apple may fetch the lyrics some seconds after a track starts: asked again every 3 s for about a minute.
+constexpr unsigned long long kLyricsRetryMs = 3000;
+constexpr int kLyricsMaxTries = 20;
+
+// Windows.UI.Color, which IArtwork.get_BGColor writes through its out pointer (four bytes, by value).
+struct WinRtColor {
+    uint8_t a = 0, r = 0, g = 0, b = 0;
+};
+
+// The cover of an INowPlayingItem (1.1792). Every call survives a null object, a refused QueryInterface or a failed
+// getter: the field stays empty. Getters only, never a put_*.
+ArtworkReading ReadArtwork(const rt::Ref& item) {
+    ArtworkReading out;
+    rt::Ref object, artwork;
+    // INowPlayingItem.get_Artwork (slot 11), then IArtwork.
+    if (FAILED(rt::CallSlot(item, slot::kItemArtwork, object.Put())) || !object) return out;
+    if (!rt::Query(object, rt::GuidOf(amp::kIidArtwork), artwork)) return out;
+
+    WinRtColor color;
+    out.hasColor = SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkBgColor, &color));  // slot 6
+    out.alpha = color.a;
+    out.red = color.r;
+    out.green = color.g;
+    out.blue = color.b;
+    out.format = rt::ReadString(artwork, slot::kArtworkFormat);      // slot 10
+    out.cropCode = rt::ReadString(artwork, slot::kArtworkCropCode);  // slot 17
+    double height = 0, width = 0;
+    if (SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkHeight, &height))) out.height = height;  // slot 12
+    if (SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkWidth, &width))) out.width = width;      // slot 14
+
+    // get_Uri (slot 16) gives a Windows.Foundation.Uri; IUriRuntimeClass.get_AbsoluteUri is its slot 6.
+    rt::Ref uriObject, uri;
+    if (SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkUri, uriObject.Put())) && uriObject &&
+        rt::Query(uriObject, rt::GuidOf(amp::kIidUriRuntimeClass), uri)) {
+        out.uri = rt::ReadString(uri, slot::kUriAbsoluteUri);
+    }
+    return out;
+}
+
+// The lyrics of an INowPlayingItem (1.1792), or nullopt while there are none.
+std::optional<RawLyrics> ReadLyrics(const rt::Ref& item) {
+    rt::Ref object, info;
+    // INowPlayingItem.get_LyricsInfo (slot 46), then ILyricsInfo.
+    if (FAILED(rt::CallSlot(item, slot::kItemLyricsInfo, object.Put())) || !object) return std::nullopt;
+    if (!rt::Query(object, rt::GuidOf(amp::kIidLyricsInfo), info)) return std::nullopt;
+    unsigned char have = 0;  // HaveLyrics (slot 12): a WinRT Boolean, one byte
+    if (FAILED(rt::CallSlot(info, slot::kLyricsHaveLyrics, &have)) || have == 0) return std::nullopt;
+
+    RawLyrics raw;
+    raw.ttml = rt::ReadString(info, slot::kLyricsTtml);          // GetTTML, slot 14
+    raw.staticText = rt::ReadString(info, slot::kLyricsStatic);  // GetStaticLyrics, slot 13
+    raw.language = rt::ReadString(info, slot::kLyricsLanguage);  // GetLanguage, slot 15
+    if (raw.ttml.empty() && raw.staticText.empty()) return std::nullopt;
+    return raw;
+}
 
 // Interfaces any WinRT object may list in GetIids without telling anything about Apple's types. The queue probe
 // ignores them; what is left must be exactly the one interface it looks for.
@@ -174,19 +229,41 @@ std::optional<AmpReading> AmpPlayer::Read() {
         // only when the item changes, and every 5 s for late metadata.
         unsigned long long now = GetTickCount64();
         bool changed = !itemObject.SameObject(m_item) || reading.queueItemId != m_itemQueueId;
-        if (changed || now - m_stringsAt >= kStringsEveryMs) {
+        bool stringsDue = changed || now - m_stringsAt >= kStringsEveryMs;
+        if (changed) {
+            m_lyrics.reset();
+            m_lyricsTries = 0;
+            m_lyricsNextTry = 0;
+        }
+        bool lyricsDue = !m_lyrics && m_lyricsTries < kLyricsMaxTries && now >= m_lyricsNextTry;
+
+        // The cover and the lyrics only exist on the 1.1792 interface: the older identifier is not asked for them.
+        rt::Ref newest;
+        if (stringsDue || lyricsDue) rt::Query(itemObject, rt::GuidOf(amp::kIidsNowPlayingItem[0]), newest);
+        if (stringsDue) {
             m_title = rt::ReadString(item, slot::kItemName);
             m_artist = rt::ReadString(item, slot::kItemArtist);
             m_album = rt::ReadString(item, slot::kItemAlbum);
+            m_artwork = newest ? ReadArtwork(newest) : ArtworkReading{};
             m_item = itemObject;
             m_itemQueueId = reading.queueItemId;
             m_stringsAt = now;
         }
+        if (lyricsDue) {
+            ++m_lyricsTries;
+            m_lyricsNextTry = now + kLyricsRetryMs;
+            if (newest) m_lyrics = ReadLyrics(newest);
+            else m_lyricsTries = kLyricsMaxTries;
+        }
         reading.title = m_title;
         reading.artist = m_artist;
         reading.album = m_album;
+        reading.artwork = m_artwork;
+        reading.lyricsAvailable = m_lyrics.has_value();
     } else {
         m_item.Reset();
+        m_artwork = ArtworkReading{};
+        m_lyrics.reset();
     }
     return reading;
 }

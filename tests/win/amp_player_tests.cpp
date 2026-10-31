@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "../../core/amp_abi.hpp"
+#include "../../core/lyrics_host.hpp"
 #include "../../core/player_queue.hpp"
 #include "../../core/settings.hpp"
 #include "../../win/amp_player.hpp"
@@ -48,6 +49,11 @@ struct World {
     int64_t position = 600'000'000, duration = 1'800'000'000;  // 100 ns, as Apple's TimeSpan-like Int64 may be
     int32_t format = 1;                                          // Lossless
     uint64_t queueId = 42;
+    bool noArtwork = false;      // get_Artwork answers S_OK with a null object
+    bool lyricsInfoNull = false;  // get_LyricsInfo answers S_OK with a null object
+    unsigned char haveLyrics = 1;
+    int lyricsAsked = 0;          // HaveLyrics calls
+    int ttmlRead = 0;             // GetTTML calls
 } g;
 
 const GUID kUnknown = rt::GuidOf("00000000-0000-0000-C000-000000000046");
@@ -221,6 +227,70 @@ HRESULT STDMETHODCALLTYPE AsyncCompleted(Facet*, int32_t* status) {  // IAsyncIn
     return S_OK;
 }
 
+// ---- The cover and the lyrics (1.1792) ----------------------------------------------------------------------------
+
+Vtable artworkVt, uriVt, lyricsVt;
+Fake artworkObj, uriObj, lyricsObj;
+Facet artworkF{artworkVt.slots, &artworkObj}, uriF{uriVt.slots, &uriObj}, lyricsF{lyricsVt.slots, &lyricsObj};
+
+HRESULT STDMETHODCALLTYPE ItemArtwork(Facet*, void** out) {  // INowPlayingItem.get_Artwork, slot 11
+    *out = g.noArtwork ? nullptr : &artworkF;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE ItemLyricsInfo(Facet*, void** out) {  // get_LyricsInfo, slot 46
+    *out = g.lyricsInfoNull ? nullptr : &lyricsF;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE ArtworkColor(Facet*, uint8_t* out) {  // IArtwork.get_BGColor, slot 6: A, R, G, B
+    out[0] = 255;
+    out[1] = 0x33;
+    out[2] = 0x66;
+    out[3] = 0x99;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE ArtworkFormat(Facet*, HSTRING* out) {  // get_Format, slot 10
+    *out = MakeString(L"jpg");
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE ArtworkHeight(Facet*, double* out) {  // get_Height, slot 12
+    *out = 600;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE ArtworkWidth(Facet*, double* out) {  // get_Width, slot 14
+    *out = 600;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE ArtworkUri(Facet*, void** out) {  // get_Uri, slot 16
+    *out = &uriF;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE ArtworkCrop(Facet*, HSTRING* out) {  // GetCropCode, slot 17
+    *out = MakeString(L"bb");
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE UriAbsolute(Facet*, HSTRING* out) {  // IUriRuntimeClass.get_AbsoluteUri, slot 6
+    *out = MakeString(L"https://is1-ssl.mzstatic.com/image/thumb/Music/a.jpg/{w}x{h}{c}.{f}");
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE HaveLyrics(Facet*, unsigned char* out) {  // ILyricsInfo.HaveLyrics, slot 12
+    ++g.lyricsAsked;
+    *out = g.haveLyrics;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE StaticLyrics(Facet*, HSTRING* out) {  // GetStaticLyrics, slot 13
+    *out = MakeString(L"First line\nSecond line");
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE Ttml(Facet*, HSTRING* out) {  // GetTTML, slot 14
+    ++g.ttmlRead;
+    *out = MakeString(L"<tt xml:lang=\"en\"><body><div><p begin=\"1.0\" end=\"2.5\">Hello</p></div></body></tt>");
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE LyricsLanguage(Facet*, HSTRING* out) {  // GetLanguage, slot 15
+    *out = MakeString(L"en");
+    return S_OK;
+}
+
 // ---- The queue probe ----------------------------------------------------------------------------------------------
 
 Vtable queueFactoryVt, queueStaticsVt, queueVt, queueIfaceVt, sectionsVt;
@@ -266,12 +336,29 @@ void Build() {
     itemObj.facets = {{rt::GuidOf(ampify::amp::kIidsNowPlayingItem[0]), &itemF}};
     itemVt.slots[7] = Fn(&Artist);
     itemVt.slots[8] = Fn(&Album);
+    itemVt.slots[11] = Fn(&ItemArtwork);
     itemVt.slots[19] = Fn(&Name);
     itemVt.slots[24] = Fn(&IsPlaceholder);
     itemVt.slots[30] = Fn(&CurrentPosition);
     itemVt.slots[31] = Fn(&Duration);
     itemVt.slots[38] = Fn(&AudioFormat);
     itemVt.slots[45] = Fn(&QueueItemId);
+    itemVt.slots[46] = Fn(&ItemLyricsInfo);
+
+    artworkObj.facets = {{rt::GuidOf(ampify::amp::kIidArtwork), &artworkF}};
+    artworkVt.slots[6] = Fn(&ArtworkColor);
+    artworkVt.slots[10] = Fn(&ArtworkFormat);
+    artworkVt.slots[12] = Fn(&ArtworkHeight);
+    artworkVt.slots[14] = Fn(&ArtworkWidth);
+    artworkVt.slots[16] = Fn(&ArtworkUri);
+    artworkVt.slots[17] = Fn(&ArtworkCrop);
+    uriObj.facets = {{rt::GuidOf(ampify::amp::kIidUriRuntimeClass), &uriF}};
+    uriVt.slots[6] = Fn(&UriAbsolute);
+    lyricsObj.facets = {{rt::GuidOf(ampify::amp::kIidLyricsInfo), &lyricsF}};
+    lyricsVt.slots[12] = Fn(&HaveLyrics);
+    lyricsVt.slots[13] = Fn(&StaticLyrics);
+    lyricsVt.slots[14] = Fn(&Ttml);
+    lyricsVt.slots[15] = Fn(&LyricsLanguage);
 
     asyncObj.facets = {{kUnknown, &asyncF}, {kAsyncInfo, &asyncInfoF}};
     asyncInfoVt.slots[7] = Fn(&AsyncCompleted);
@@ -360,6 +447,75 @@ TEST_CASE(AmpPlayer_ReadsTheStateThroughTheWinmdSlots) {
     CHECK(g.unexpected == 0);
 }
 
+TEST_CASE(AmpPlayer_ReadsTheCoverAndTheLyricsOfTheItem) {
+    Reset();
+    Hook hook(FakeActivation);
+    ampify::win::AmpPlayer player;
+    std::string failure;
+    CHECK(player.Activate(failure));
+    std::optional<ampify::AmpReading> reading = player.Read();
+    CHECK(reading.has_value());
+    CHECK(reading->artwork.uri == "https://is1-ssl.mzstatic.com/image/thumb/Music/a.jpg/{w}x{h}{c}.{f}");
+    CHECK(reading->artwork.format == "jpg" && reading->artwork.cropCode == "bb");
+    CHECK(reading->artwork.width == 600 && reading->artwork.height == 600);
+    CHECK(reading->artwork.hasColor && reading->artwork.alpha == 255 && reading->artwork.red == 0x33 &&
+          reading->artwork.green == 0x66 && reading->artwork.blue == 0x99);
+    CHECK(reading->lyricsAvailable);
+    CHECK(player.Lyrics().has_value() && player.Lyrics()->language == "en");
+    CHECK(player.Lyrics()->ttml.find("Hello") != std::string::npos);
+    CHECK(player.Lyrics()->staticText == "First line\nSecond line");
+
+    // Cached for the track: reading again does not ask Apple again.
+    int asked = g.lyricsAsked;
+    CHECK(player.Read().has_value());
+    CHECK(g.lyricsAsked == asked);
+    CHECK(g.unexpected == 0);
+}
+
+TEST_CASE(AmpPlayer_ASecondTrackIsReadAgainAndLyricsLateAreRetried) {
+    Reset();
+    Hook hook(FakeActivation);
+    ampify::win::AmpPlayer player;
+    std::string failure;
+    CHECK(player.Activate(failure));
+    g.haveLyrics = 0;
+    std::optional<ampify::AmpReading> reading = player.Read();
+    CHECK(reading.has_value() && !reading->lyricsAvailable && !player.Lyrics().has_value());
+    CHECK(g.lyricsAsked == 1);
+    CHECK(player.Read().has_value() && g.lyricsAsked == 1);  // not before the retry delay
+
+    // A new queue entry resets the cache and asks at once.
+    g.haveLyrics = 1;
+    g.queueId = 43;
+    reading = player.Read();
+    CHECK(reading.has_value() && reading->lyricsAvailable && g.lyricsAsked == 2);
+
+    // Lyrics that show up some seconds later are found by the retry.
+    g.queueId = 44;
+    g.haveLyrics = 0;
+    CHECK(!player.Read()->lyricsAvailable);
+    g.haveLyrics = 1;
+    Sleep(3200);
+    CHECK(player.Read()->lyricsAvailable);
+    CHECK(g.unexpected == 0);
+}
+
+TEST_CASE(AmpPlayer_ASkippedCoverOrLyricsInfoLeavesTheOtherFieldsAlone) {
+    Reset();
+    Hook hook(FakeActivation);
+    ampify::win::AmpPlayer player;
+    std::string failure;
+    CHECK(player.Activate(failure));
+    g.noArtwork = true;
+    g.lyricsInfoNull = true;
+    std::optional<ampify::AmpReading> reading = player.Read();
+    CHECK(reading.has_value() && reading->hasItem);
+    CHECK(reading->artwork.uri.empty() && !reading->artwork.hasColor);
+    CHECK(!reading->lyricsAvailable);
+    CHECK(reading->title == "Title \xC3\xA9");
+    CHECK(g.unexpected == 0);
+}
+
 TEST_CASE(AmpPlayer_CommandsCallTheirOwnSlotsAndNothingElse) {
     Reset();
     Hook hook(FakeActivation);
@@ -440,6 +596,10 @@ TEST_CASE(PlayerBridge_ReadsApplesPlayerAndUsesItsCommandsOnlyWhenAllowed) {
     CHECK(s.track.has_value() && s.track->title == "Title \xC3\xA9" && s.track->lossless && !s.track->atmos);
     CHECK(s.positionMs == 60'000 && s.durationMs == 180'000);
     CHECK(s.track->queueItemId == "42");
+    CHECK(s.track->artwork == "https://is1-ssl.mzstatic.com/image/thumb/Music/a.jpg/1000x1000bb.jpg");
+    CHECK(s.track->artworkColor == "#336699");
+    CHECK(s.lyricsAvailable);
+    CHECK(bridge.Lyrics().has_value() && bridge.Lyrics()->language == "en");
     CHECK(log.str().find("AMP.Services.Player activated (test") != std::string::npos);
     CHECK(log.str().find("first state read by AMP.Services.Player: playing=yes") != std::string::npos);
     CHECK(log.str().find("IPlayQueue = 66666666-7777-8888-9999-AAAAAAAAAAAA") != std::string::npos);
@@ -511,4 +671,5 @@ TEST_CASE(WinHost_OffersTheQueueCapability) {
     ampify::Journal journal(log, [] { return std::string("t"); });
     ampify::WinHost host("engine", kit, settings, journal);
     CHECK(host.Capability<ampify::QueueHost>() != nullptr);
+    CHECK(host.Capability<ampify::LyricsHost>() != nullptr);
 }

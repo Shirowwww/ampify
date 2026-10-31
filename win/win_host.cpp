@@ -98,6 +98,8 @@ void* WinHost::QueryCapability(std::string_view name) {
     if (void* found = Offer<HttpPostHost>(name, this)) return found;
     // Ampify.player.queue, in both processes: what each one knows of the queue (win/player_bridge.*).
     if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
+    // Ampify.player.lyrics: Apple's lyrics, read in the process that has Apple's player.
+    if (name == LyricsHost::kCapabilityName) return static_cast<LyricsHost*>(m_player.get());
     if (void* found = m_services->Query(name)) return found;
     // The Marketplace page runs ampify.exe from the interface process, where it is shown.
     if (m_process == "ui" && name == KitCommandHost::kCapabilityName) return static_cast<KitCommandHost*>(m_kitCommands.get());

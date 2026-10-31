@@ -5,6 +5,7 @@
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
+#include "../lyrics_host.hpp"
 #include "../player_queue.hpp"
 
 namespace ampify::natives {
@@ -27,6 +28,8 @@ Json PlayerJson(const PlayerSnapshot& snapshot) {
         track.emplace_back("atmos", Json(t.atmos));
         track.emplace_back("lossless", Json(t.lossless));
         track.emplace_back("queueItemId", Json(t.queueItemId));
+        track.emplace_back("artwork", Json(t.artwork));
+        track.emplace_back("artworkColor", Json(t.artworkColor));
         members.emplace_back("track", Json(std::move(track)));
     }
     members.emplace_back("source", Json(snapshot.source));
@@ -60,6 +63,17 @@ struct PlayerNatives : ScriptBridge {
         else if (name == "toggle") command = HostOf(ext).Player().playing ? PlayerCommand::Pause : PlayerCommand::Play;
         else return Throw(ctx, "TypeError", "unknown player command: " + name);
         return JS_NewBool(ctx, HostOf(ext).Control(command, seek));
+    }
+
+    // native.playerLyrics(): the LyricsJson of core/lyrics.hpp, as text ("null" without lyrics or without the service).
+    AMPIFY_NATIVE(PlayerLyrics) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "player.read", &failure)) return failure;
+        LyricsHost* source = HostOf(ext).Capability<LyricsHost>();
+        std::optional<RawLyrics> raw = source ? source->Lyrics() : std::nullopt;
+        std::string json = LyricsJson(raw ? LyricsFromRaw(*raw) : std::nullopt).Dump();
+        return JS_NewStringLen(ctx, json.data(), json.size());
     }
 
     // native.queueList(): the QueueJson of core/player_queue.hpp, as text.
@@ -112,6 +126,7 @@ struct PlayerNatives : ScriptBridge {
 void DefinePlayer(api::NativeScope& scope) {
     scope.Function("playerState", PlayerNatives::PlayerState, 0);
     scope.Function("playerCommand", PlayerNatives::PlayerControl, 2);
+    scope.Function("playerLyrics", PlayerNatives::PlayerLyrics, 0);
     scope.Function("queueList", PlayerNatives::QueueList, 0);
     scope.Function("queueAdd", PlayerNatives::QueueAdd, 2);
     scope.Function("queueRemove", PlayerNatives::QueueRemove, 1);

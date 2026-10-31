@@ -44,6 +44,15 @@ inline constexpr const char* kIidsNowPlayingItem[] = {
     "E376ACB7-0569-56C5-8443-A288ACD362EA",  // 1.1540
 };
 
+// The cover and the lyrics of the item, in AMP.Services.winmd 1.1792 (the ids are the GuidAttribute values of
+// IArtwork and ILyricsInfo). Nothing in the repository lists these two interfaces for 1.1540, so they are only read
+// from an item that answers to the 1.1792 INowPlayingItem; a changed interface changes its identifier, and
+// QueryInterface fails, so the field is skipped.
+inline constexpr char kIidArtwork[] = "6F00C1EF-8302-5354-BD7E-8D1A943B4F0D";      // AMP.Services.CommonModels.IArtwork
+inline constexpr char kIidLyricsInfo[] = "8DC3CA60-B650-5649-B901-D152B6C110F4";    // ...CommonModels.ILyricsInfo
+// Windows.Foundation.IUriRuntimeClass, from the Windows SDK (windows.foundation.h).
+inline constexpr char kIidUriRuntimeClass[] = "9E365E57-48B2-4160-956F-C7385120BBFC";
+
 // Microsoft.UI.Xaml.Data (WinUI 3), which Apple Music's view models implement: INotifyPropertyChanged and its
 // delegate. Source: CsWinRT, src/WinRT.Runtime/Interop/IID.g.cs (IID_MUX_INotifyPropertyChanged and
 // IID_MUX_PropertyChangedEventHandler).
@@ -71,12 +80,33 @@ inline constexpr int kStateIsPlaying = 25;
 // AMP.Services.CommonModels.INowPlayingItem: get_Subtitle, get_Artist, get_Album, ... get_Name (13th), ...
 inline constexpr int kItemArtist = 7;
 inline constexpr int kItemAlbum = 8;
+inline constexpr int kItemArtwork = 11;
 inline constexpr int kItemName = 19;
 inline constexpr int kItemIsPlaceholder = 24;
 inline constexpr int kItemCurrentPosition = 30;
 inline constexpr int kItemDuration = 31;
 inline constexpr int kItemAudioFormat = 38;
 inline constexpr int kItemPlayQueueItemId = 45;
+inline constexpr int kItemLyricsInfo = 46;
+
+// AMP.Services.CommonModels.IArtwork: get_BGColor (Windows.UI.Color: four bytes A, R, G, B, written through the out
+// pointer), put_BGColor, get_CropStyle, put_CropStyle, get_Format, put_Format, get_Height (double), put_Height,
+// get_Width (double), put_Width, get_Uri (Windows.Foundation.Uri), GetCropCode. Only the getters are called.
+inline constexpr int kArtworkBgColor = 6;
+inline constexpr int kArtworkFormat = 10;
+inline constexpr int kArtworkHeight = 12;
+inline constexpr int kArtworkWidth = 14;
+inline constexpr int kArtworkUri = 16;
+inline constexpr int kArtworkCropCode = 17;
+// Windows.Foundation.IUriRuntimeClass: get_AbsoluteUri is its first method.
+inline constexpr int kUriAbsoluteUri = 6;
+
+// AMP.Services.CommonModels.ILyricsInfo: get_LyricsState, get_LyricsSource, get_ContentDescriptor, get_IsEditable,
+// get_RequiresReporting, get_MetricsJSON, HaveLyrics, GetStaticLyrics, GetTTML, GetLanguage.
+inline constexpr int kLyricsHaveLyrics = 12;
+inline constexpr int kLyricsStatic = 13;
+inline constexpr int kLyricsTtml = 14;
+inline constexpr int kLyricsLanguage = 15;
 
 // AMP.Services.IPlayQueueStatics: get_Current. AMP.Services.IPlayQueue: get_AutoPlaySupported, get_AutoPlayEnabled,
 // get_AutoPlayActive, get_Sections, ... Their identifiers are not known: the queue probe finds them at run time
@@ -110,6 +140,18 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.CommonModels.INowPlayingItem", "get_Duration", slot::kItemDuration},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_AudioFormat", slot::kItemAudioFormat},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_PlayQueueItemID", slot::kItemPlayQueueItemId},
+    {"AMP.Services.CommonModels.INowPlayingItem", "get_Artwork", slot::kItemArtwork},
+    {"AMP.Services.CommonModels.INowPlayingItem", "get_LyricsInfo", slot::kItemLyricsInfo},
+    {"AMP.Services.CommonModels.IArtwork", "get_BGColor", slot::kArtworkBgColor},
+    {"AMP.Services.CommonModels.IArtwork", "get_Format", slot::kArtworkFormat},
+    {"AMP.Services.CommonModels.IArtwork", "get_Height", slot::kArtworkHeight},
+    {"AMP.Services.CommonModels.IArtwork", "get_Width", slot::kArtworkWidth},
+    {"AMP.Services.CommonModels.IArtwork", "get_Uri", slot::kArtworkUri},
+    {"AMP.Services.CommonModels.IArtwork", "GetCropCode", slot::kArtworkCropCode},
+    {"AMP.Services.CommonModels.ILyricsInfo", "HaveLyrics", slot::kLyricsHaveLyrics},
+    {"AMP.Services.CommonModels.ILyricsInfo", "GetStaticLyrics", slot::kLyricsStatic},
+    {"AMP.Services.CommonModels.ILyricsInfo", "GetTTML", slot::kLyricsTtml},
+    {"AMP.Services.CommonModels.ILyricsInfo", "GetLanguage", slot::kLyricsLanguage},
     {"AMP.Services.IPlayQueueStatics", "get_Current", slot::kPlayQueueStaticsCurrent},
     {"AMP.Services.IPlayQueue", "get_Sections", slot::kPlayQueueSections},
 };

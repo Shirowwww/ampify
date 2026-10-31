@@ -158,6 +158,10 @@ PlayerSnapshot PlayerBridge::Snapshot() {
             m_unit = unit;
         }
         snapshot = SnapshotFromAmp(*apple, m_unit);
+        if (snapshot.track && !snapshot.track->artwork.empty()) {
+            SayOnce("apple-artwork", "Player: cover read from Apple's player (" + snapshot.track->artwork + ")");
+        }
+        if (snapshot.lyricsAvailable) SayOnce("apple-lyrics", "Player: lyrics read from Apple's player");
         if (m_apple->Notifications() > 0) {
             SayOnce("apple-notified", "Player: Apple sends its PropertyChanged notifications (PlayerState, Player)");
         }
@@ -208,6 +212,11 @@ bool PlayerBridge::Control(PlayerCommand command, int64_t seekMs) {
             std::string("Player: command ") + CommandName(command) +
                 " not possible now (no route accepted it)");
     return false;
+}
+
+std::optional<RawLyrics> PlayerBridge::Lyrics() {
+    if (!m_apple->Active()) return std::nullopt;
+    return m_apple->Lyrics();
 }
 
 QueueSnapshot PlayerBridge::Queue() {

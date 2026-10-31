@@ -13,6 +13,23 @@
 
 namespace ampify {
 
+// The cover of the item, as IArtwork gives it. Every field may be missing.
+struct ArtworkReading {
+    std::string uri;       // IArtwork.get_Uri, often a template with {w}, {h}, {c} and {f}
+    std::string format;    // "jpg", "png"...
+    std::string cropCode;  // IArtwork.GetCropCode, "bb", "cc"...
+    double width = 0;
+    double height = 0;
+    bool hasColor = false;  // get_BGColor answered
+    uint8_t alpha = 0, red = 0, green = 0, blue = 0;
+};
+
+// The https address of the cover at about 1000 px: the template filled in, or the address as it is when it has no
+// placeholder. Empty for anything that is not an https address.
+std::string ArtworkAddress(const ArtworkReading& artwork);
+// "#RRGGBB" from the colour, or empty when Apple gave none (a fully transparent black counts as none).
+std::string ArtworkColorHex(const ArtworkReading& artwork);
+
 // What win/amp_player.cpp reads from AMP.Services.Player, as raw values.
 struct AmpReading {
     bool playing = false;
@@ -26,6 +43,8 @@ struct AmpReading {
     int64_t durationRaw = 0;
     int32_t audioFormat = 0;  // amp::AudioFormat
     uint64_t queueItemId = 0;
+    ArtworkReading artwork;
+    bool lyricsAvailable = false;  // ILyricsInfo.HaveLyrics said yes and the text was read
 };
 
 // What win/smtc_session.cpp reads from the Apple Music session of the Windows media controls.
