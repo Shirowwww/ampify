@@ -85,6 +85,8 @@ struct UiSide {
     theme::ThemeSession session;
     bool attached = false;
     int timedPasses = 0;  // passes after a change whose duration went to the log
+    std::size_t heldStates = 0;  // the counts last written to the log
+    std::size_t refusedStates = 0;
 };
 
 ThemeService::ThemeService(Journal& journal, std::filesystem::path kit)
@@ -150,6 +152,14 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             if (ui->backend.WindowClosed()) return;
 
             std::optional<std::string> dump = ui->session.Tick(ui->backend, request);
+            std::size_t held = ui->backend.HeldStateCount();
+            std::size_t refused = ui->backend.RefusedStateCount();
+            if (held != ui->heldStates || refused != ui->refusedStates) {
+                ui->heldStates = held;
+                ui->refusedStates = refused;
+                journal.Write("Themes: " + std::to_string(held) + " value(s) kept under the pointer and while pressed, " +
+                              std::to_string(ui->backend.RefusedStateCount()) + " refused");
+            }
             // The app's own light or dark mode follows the scheme, so what the theme does not name matches what it does
             // (the midnight theme alone left light text on Apple Music's white background). The scheme's background
             // decides when it gives one (a Spicetify scheme is often named Nord or Mocha), its name otherwise.

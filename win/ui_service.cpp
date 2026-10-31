@@ -821,26 +821,46 @@ controls::Border MakeSurfaceFrame(const std::string& frameName, const std::strin
     return frame;
 }
 
-// The part of the window under the play bar and right of the sidebar, in the window's coordinates, from the names the
-// discovery found (Apple Music 1.1792: Grid#TransportBar at the top, Grid#PaneRoot on the left).
+// The part of the window where Apple Music shows its pages, in the window's coordinates. A theme may move the play bar
+// and the panels (to the bottom, as floating panels), so the frame of the pages comes first; the names the discovery
+// found are the fallback (Apple Music 1.1792: Grid#TransportBar at the top, Grid#PaneRoot on the left).
 struct ContentArea {
     double left = 0;
     double top = 56;
+    double width = 0;   // 0: up to the right edge of the window
+    double height = 0;  // 0: down to the bottom edge of the window
 };
 
-ContentArea FindContentArea(const WindowContext& context) {
+ContentArea FindContentArea(const WindowContext& context, double windowHeight) {
     ContentArea area;
-    auto edge = [&context](std::string_view name, bool right) -> std::optional<double> {
+    auto bounds = [&context](std::string_view name) -> std::optional<winrt::Windows::Foundation::Rect> {
         std::optional<int> index = uirender::FindByName(context.probe, name);
         if (!index || *index >= static_cast<int>(context.probeObjects.size())) return std::nullopt;
         auto element = context.probeObjects[*index].get().try_as<xaml::FrameworkElement>();
         if (!element || element.ActualWidth() <= 0 || element.ActualHeight() <= 0) return std::nullopt;
         auto origin = element.TransformToVisual(nullptr).TransformPoint({0, 0});
-        return right ? origin.X + element.ActualWidth() : origin.Y + element.ActualHeight();
+        return winrt::Windows::Foundation::Rect{origin.X, origin.Y, static_cast<float>(element.ActualWidth()),
+                                                static_cast<float>(element.ActualHeight())};
     };
     try {
-        if (auto bottom = edge("TransportBar", false)) area.top = std::max(0.0, *bottom);
-        if (auto right = edge("PaneRoot", true)) area.left = std::max(0.0, *right);
+        std::optional<winrt::Windows::Foundation::Rect> bar = bounds("TransportBar");
+        if (auto frame = bounds("ContentFrame")) {
+            area = {frame->X, frame->Y, frame->Width, frame->Height};
+        } else {
+            area.top = 0;
+            if (auto pane = bounds("PaneRoot")) area.left = std::max(0.0f, pane->X + pane->Width);
+        }
+        // Apple Music's pages run under its play bar, which is see-through: the host stops at the bar, above or below.
+        if (bar && bar->Y < windowHeight / 2) {
+            double barBottom = bar->Y + bar->Height;
+            if (area.top < barBottom) {
+                if (area.height > 0) area.height = std::max(0.0, area.height - (barBottom - area.top));
+                area.top = barBottom;
+            }
+        } else if (bar) {
+            double pagesBottom = area.height > 0 ? area.top + area.height : windowHeight;
+            if (pagesBottom > bar->Y) area.height = std::max(0.0, static_cast<double>(bar->Y) - area.top);
+        }
     } catch (...) {
         // An element leaving the tree while it is measured: the defaults hold until the next refresh.
     }
@@ -858,10 +878,12 @@ void OpenOverlay(WindowContext& context, const primitives::Popup& popup) {
 
 void PlacePanelPopup(WindowContext& context, const xaml::XamlRoot& root) {
     auto size = root.Size();
-    ContentArea area = FindContentArea(context);
+    ContentArea area = FindContentArea(context, size.Height);
+    double bottom = area.height > 0 ? area.top + area.height : static_cast<double>(size.Height);
+    double right = area.width > 0 ? area.left + area.width : static_cast<double>(size.Width);
     double top = area.top + 8;
-    double height = std::max(200.0, static_cast<double>(size.Height) - top - 16.0);
-    double left = std::max(area.left, static_cast<double>(size.Width) - kPanelWidth - 16.0);
+    double height = std::max(200.0, bottom - top - 16.0);
+    double left = std::max(area.left, right - kPanelWidth - 16.0);
     if (context.panelHost.Height() != height) context.panelHost.Height(height);
     if (context.panelPopup.HorizontalOffset() != left) context.panelPopup.HorizontalOffset(left);
     if (context.panelPopup.VerticalOffset() != top) context.panelPopup.VerticalOffset(top);
@@ -996,13 +1018,13 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
     JournalRender(shared, "panel", surface, stats, first);
 }
 
-// Covers the content area (under the play bar, right of the sidebar) with the page host, or hides it.
+// Covers the area of Apple Music's pages with the page host, wherever the theme put it.
 void PlacePageHost(WindowContext& context, const xaml::XamlRoot& root) {
     if (!context.pagePopup || !context.pageHost) return;
     auto size = root.Size();
-    ContentArea area = FindContentArea(context);
-    double width = std::max(200.0, static_cast<double>(size.Width) - area.left);
-    double height = std::max(200.0, static_cast<double>(size.Height) - area.top);
+    ContentArea area = FindContentArea(context, size.Height);
+    double width = std::max(200.0, area.width > 0 ? area.width : static_cast<double>(size.Width) - area.left);
+    double height = std::max(200.0, area.height > 0 ? area.height : static_cast<double>(size.Height) - area.top);
     if (context.pageHost.Width() != width) context.pageHost.Width(width);
     if (context.pageHost.Height() != height) context.pageHost.Height(height);
     if (context.pagePopup.HorizontalOffset() != area.left) context.pagePopup.HorizontalOffset(area.left);

@@ -2,6 +2,7 @@
 list(APPEND AMPIFY_THEME_SOURCES
     core/theme/builtins.cpp
     core/theme/color.cpp
+    core/theme/colour_keys.cpp
     core/theme/css.cpp
     core/theme/engine.cpp
     core/theme/files.cpp

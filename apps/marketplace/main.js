@@ -39,6 +39,9 @@ const permissionText = (list) =>
 
 const KINDS = { theme: "Theme", extension: "Extension", app: "App", snippet: "Snippet" };
 
+// Takes the free width of a row, so the last action of every card sits at its right edge.
+const SPACER = h("stack", { grow: true });
+
 const matches = (item, search) =>
   !search || [item.name, item.id, item.description, item.author].some((field) =>
     String(field || "").toLowerCase().includes(search.toLowerCase()));
@@ -69,6 +72,7 @@ function ThemeCard({ theme, active, activeScheme, busy, run }) {
       active
         ? h(Text, { variant: "caption" }, "In use")
         : h(ButtonPrimary, { label: "Use this theme", disabled: busy || !theme.valid, onClick: () => choose(scheme) }),
+      SPACER,
       // Turning a theme off and deleting it are two different actions: only an unused theme can be uninstalled.
       active
         ? h(Button, { label: "Turn off", disabled: busy, onClick: () => run(["theme", "clear"], "Theme turned off") })
@@ -89,6 +93,7 @@ function ElementCard({ element, busy, run }) {
         disabled: busy || !element.valid || element.id === "marketplace",
         onChange: (on) => run([kind, on ? "enable" : "disable", element.id], (on ? "Turned on: " : "Turned off: ") + element.id),
       }),
+      SPACER,
       element.id === "marketplace"
         ? null
         : confirm

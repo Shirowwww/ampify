@@ -20,6 +20,7 @@
 
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
+#include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -27,6 +28,7 @@
 #include <winrt/Windows.UI.Text.h>
 #include <winrt/Windows.Foundation.Numerics.h>
 
+#include "../core/theme/colour_keys.hpp"
 #include "../core/theme/properties.hpp"
 #include "xaml_host.hpp"
 
@@ -38,6 +40,7 @@ namespace th = ampify::theme;
 namespace xaml = winrt::Microsoft::UI::Xaml;
 namespace controls = xaml::Controls;
 namespace media = xaml::Media;
+namespace animation = xaml::Media::Animation;
 using winrt::Windows::Foundation::IInspectable;
 using ColorValue = winrt::Windows::UI::Color;
 
@@ -254,6 +257,73 @@ bool OwnsKey(const xaml::ResourceDictionary& resources, const IInspectable& name
     return false;
 }
 
+// What a state writes, as the element's property and, for a colour animation, the brush's own property:
+// "(Border.Background).(SolidColorBrush.Color)" is {"Background", "Color"}; "Background" and "(Grid.Background)" are
+// {"Background", ""}.
+struct StatePath {
+    std::string property;
+    std::string sub;
+};
+
+StatePath SplitStatePath(const winrt::hstring& path) {
+    std::vector<std::string> segments{""};
+    int depth = 0;
+    for (char c : Utf8(path)) {
+        if (c == '(') depth++;
+        else if (c == ')') depth--;
+        else if (c == '.' && depth == 0) segments.emplace_back();
+        else segments.back() += c;
+    }
+    for (std::string& segment : segments) {
+        size_t dot = segment.rfind('.');  // "Border.Background" inside parentheses: the owner type, then the property
+        if (dot != std::string::npos) segment = segment.substr(dot + 1);
+    }
+    return {segments[0], segments.size() > 1 ? segments[1] : std::string()};
+}
+
+std::string StatePathText(const StatePath& path) {
+    return path.sub.empty() ? path.property : path.property + "." + path.sub;
+}
+
+// For the inspector: the states an element's visual state groups hold and what each one writes, such as
+// "CommonStates: PointerOver (Root.Background), Pressed (Root.Background, Content.Foreground)". A theme author sees
+// which properties Apple Music changes under the pointer, while pressed, checked or selected.
+std::string DescribeStates(const xaml::FrameworkElement& element) {
+    std::string text;
+    for (const xaml::VisualStateGroup& group : xaml::VisualStateManager::GetVisualStateGroups(element)) {
+        std::string states;
+        for (const xaml::VisualState& state : group.States()) {
+            std::string writes;
+            auto add = [&](const std::string& target, const StatePath& path) {
+                writes += (writes.empty() ? "" : ", ") + target + "." + StatePathText(path);
+            };
+            for (const xaml::SetterBase& base : state.Setters()) {
+                auto setter = base.try_as<xaml::Setter>();
+                if (!setter || !setter.Target() || !setter.Target().Path()) continue;
+                IInspectable aim = setter.Target().Target();
+                std::string target;
+                if (auto object = aim.try_as<xaml::FrameworkElement>()) {
+                    target = object.Name().empty() ? ShortName(Utf8(winrt::get_class_name(object))) : Utf8(object.Name());
+                } else {
+                    target = Utf8(winrt::unbox_value_or<winrt::hstring>(aim, L"?"));
+                }
+                add(target, SplitStatePath(setter.Target().Path().Path()));
+            }
+            if (animation::Storyboard board = state.Storyboard()) {
+                for (const animation::Timeline& child : board.Children()) {
+                    add(Utf8(animation::Storyboard::GetTargetName(child)),
+                        SplitStatePath(animation::Storyboard::GetTargetProperty(child)));
+                }
+            }
+            if (writes.empty()) continue;
+            states += (states.empty() ? "" : ", ") + Utf8(state.Name()) + " (" + writes + ")";
+        }
+        if (states.empty()) continue;
+        text += (text.empty() ? "" : "; ") + Utf8(group.Name()) + ": " + states;
+    }
+    return text;
+}
+
 }  // namespace
 
 bool XamlTreeBackend::Attach() {
@@ -433,6 +503,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         m_translations.erase(it->first.first);
         it = m_written.erase(it);
     }
+    std::erase_if(m_heldStates, [](const auto& entry) { return !entry.second.element.get(); });
     FollowArtwork(artwork);
     std::erase_if(m_watched, [](const auto& entry) { return !entry.second.get(); });
     for (auto it = m_hoverHandlers.begin(); it != m_hoverHandlers.end();) {
@@ -661,6 +732,11 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
             if (known != m_templates.end()) return theme::Value{theme::ValueKind::Template, known->second};
             return Keep(control.Template());
         }
+    } else if (property == "States") {
+        if (auto element = object.try_as<xaml::FrameworkElement>()) {
+            std::string states = DescribeStates(element);
+            if (!states.empty()) return theme::Value{theme::ValueKind::Text, states};
+        }
     }
     return std::nullopt;
 }
@@ -823,8 +899,10 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         if (!written) return false;
         if (made) {
             Remember(id, property, value, *target);
+            HoldThroughStates(id, object, property, *target);
         } else {
             Forget(id, property);
+            ReleaseStates(id, property);
         }
         return true;
     }
@@ -1112,35 +1190,93 @@ void XamlTreeBackend::RemoveHoverHandlers(theme::NodeId id) {
     m_hoverHandlers.erase(it);
 }
 
-// Every key of the application's resources: the dictionary itself, its merged dictionaries and the theme dictionaries
-// (Default, Light, Dark), where Apple Music and WinUI keep their colours (the dictionary itself is empty in 1.1792).
+namespace {
+
+// The keys a control template reads for its pointer states, by WinUI's naming: {Control}{Property}{State}, for the
+// control's own type and the WinUI button it derives from (Apple's transport buttons are AppBarButtons whose template
+// reads both AppBarButton... and Button... keys).
+std::vector<std::wstring> PointerStateKeys(const controls::Control& control, std::string_view property) {
+    std::vector<std::string> types{ShortName(Utf8(winrt::get_class_name(control)))};
+    if (control.try_as<controls::Primitives::ToggleButton>()) types.emplace_back("ToggleButton");
+    else if (control.try_as<controls::Primitives::ButtonBase>()) types.emplace_back("Button");
+    std::vector<std::wstring> keys;
+    for (const std::string& type : types) {
+        for (const char* state : {"PointerOver", "Pressed"}) {
+            std::wstring key = winrt::to_hstring(type + std::string(property) + state).c_str();
+            if (std::find(keys.begin(), keys.end(), key) == keys.end()) keys.push_back(key);
+        }
+    }
+    return keys;
+}
+
+}  // namespace
+
+void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::DependencyObject& object, std::string_view property,
+                                        const IInspectable& value) noexcept {
+    // The control itself or its template's root, which the states write to (Root.Background). A deeper part keeps the
+    // control's own feedback: a list row's background must not become the highlight of the row under the pointer.
+    constexpr int kTemplateDepth = 2;
+    try {
+        controls::Control control{nullptr};
+        xaml::DependencyObject current = object;
+        for (int depth = 0; current && !control && depth < kTemplateDepth; depth++) {
+            control = current.try_as<controls::Control>();
+            current = media::VisualTreeHelper::GetParent(current);
+        }
+        if (!control) return;
+        auto entry = std::make_pair(id, std::string(property));
+        HeldStates& held = m_heldStates[entry];
+        held.element = winrt::make_weak(object);
+        held.control = winrt::make_weak(control);
+        xaml::ResourceDictionary resources = control.Resources();
+        for (const std::wstring& key : PointerStateKeys(control, property)) {
+            IInspectable name = winrt::box_value(winrt::hstring(key));
+            bool fresh = std::none_of(held.keys.begin(), held.keys.end(), [&](const auto& kept) { return kept.first == key; });
+            if (fresh) held.keys.emplace_back(key, resources.HasKey(name) ? resources.Lookup(name) : nullptr);
+            resources.Insert(name, value);
+        }
+        // States already shown once resolved their {ThemeResource} then: the next mode refresh reads the new keys.
+        m_resourcesDirty = true;
+    } catch (...) {
+        m_refusedStates++;  // costs the states their theme value, never the value itself
+    }
+}
+
+void XamlTreeBackend::ReleaseStates(theme::NodeId id, std::string_view property) noexcept {
+    auto it = m_heldStates.find(std::make_pair(id, std::string(property)));
+    if (it == m_heldStates.end()) return;
+    if (auto control = it->second.control.get()) {
+        for (const auto& [key, original] : it->second.keys) {
+            try {
+                IInspectable name = winrt::box_value(winrt::hstring(key));
+                if (original) control.Resources().Insert(name, original);
+                else if (control.Resources().HasKey(name)) control.Resources().Remove(name);
+            } catch (...) {
+            }
+        }
+        m_resourcesDirty = true;
+    }
+    m_heldStates.erase(it);
+}
+
+std::size_t XamlTreeBackend::HeldStateCount() const {
+    std::size_t count = 0;
+    for (const auto& entry : m_heldStates) count += entry.second.keys.size();
+    return count;
+}
+
+// The known colour keys the application holds. Its dictionaries are not enumerated: that realised every deferred
+// resource out of its context, and Apple Music crashed at the next theme change (0xc000027b, ERROR_NOT_FOUND stowed in
+// Microsoft.UI.Xaml.dll; 4 launches out of 4 with the inspector on, 31/10). Looking up a known key is safe.
 std::vector<std::string> XamlTreeBackend::ResourceKeys() {
     std::vector<std::string> keys;
-    std::set<std::string> seen;
-    std::function<void(const xaml::ResourceDictionary&, int)> walk = [&](const xaml::ResourceDictionary& dictionary, int depth) {
-        if (!dictionary || depth > 4) return;
-        // Walking some of Apple Music's dictionaries fails with E_FAIL (bench, 30/10: the whole inspector task was
-        // lost every tick). Each part is tried on its own; what fails is skipped.
+    xaml::ResourceDictionary resources = xaml::Application::Current().Resources();
+    for (std::string_view key : theme::ColourResourceKeys()) {
         try {
-            for (const auto& pair : dictionary) {
-                std::string key = Utf8(winrt::unbox_value_or<winrt::hstring>(pair.Key(), L""));
-                if (!key.empty() && seen.insert(key).second) keys.push_back(key);
-            }
+            if (resources.HasKey(winrt::box_value(winrt::to_hstring(std::string(key))))) keys.emplace_back(key);
         } catch (...) {
         }
-        try {
-            for (const auto& pair : dictionary.ThemeDictionaries()) {
-                walk(pair.Value().try_as<xaml::ResourceDictionary>(), depth + 1);
-            }
-        } catch (...) {
-        }
-        try {
-            for (const auto& merged : dictionary.MergedDictionaries()) walk(merged, depth + 1);
-        } catch (...) {
-        }
-    };
-    walk(xaml::Application::Current().Resources(), 0);
-    std::sort(keys.begin(), keys.end());
+    }
     return keys;
 }
 

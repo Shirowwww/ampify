@@ -62,6 +62,9 @@ public:
 
     // True once the main window has closed: Apple Music is shutting down and its tree must not be touched any more.
     bool WindowClosed() const { return *m_closed; }
+    // How many state values hold a theme's value now (HoldThroughStates), and how many refused it, for the log.
+    std::size_t HeldStateCount() const;
+    std::size_t RefusedStateCount() const { return m_refusedStates; }
 
     // Runs `pass` on the interface thread soon after the interface may hold new elements: a page navigated
     // (Frame.Navigated, then twice more while the page fills in), rows or cards realised while scrolling
@@ -100,6 +103,13 @@ private:
     void SchedulePass(int followUps) noexcept;
     void RunPass() noexcept;
     void RemoveHoverHandlers(theme::NodeId id);
+    // The PointerOver and Pressed states of a control template write some properties of its parts above any local
+    // value: a theme's background on a button's Root vanished under the pointer and while pressed (greenroom's white
+    // play button showed its black icon on black). The brushes those states read ({Control}{Property}PointerOver and
+    // Pressed) get the theme's value in that control's own resources; ReleaseStates gives Apple Music's back.
+    void HoldThroughStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                           std::string_view property, const winrt::Windows::Foundation::IInspectable& value) noexcept;
+    void ReleaseStates(theme::NodeId id, std::string_view property) noexcept;
 
     winrt::weak_ref<winrt::Microsoft::UI::Xaml::Window> m_window;
     std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_elements;
@@ -121,6 +131,14 @@ private:
         winrt::event_token exited;
     };
     std::map<theme::NodeId, HoverHandlers> m_hoverHandlers;
+    struct HeldStates {
+        winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject> element;  // to forget the entry once it is gone
+        winrt::weak_ref<winrt::Microsoft::UI::Xaml::Controls::Control> control;  // whose Resources hold the keys
+        // Each key written to the control's own resources, with the value it had there (null when it had none).
+        std::vector<std::pair<std::wstring, winrt::Windows::Foundation::IInspectable>> keys;
+    };
+    std::map<std::pair<theme::NodeId, std::string>, HeldStates> m_heldStates;
+    std::size_t m_refusedStates = 0;
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);  // the pointer handlers hold a weak pointer to it
     winrt::Microsoft::UI::Xaml::ResourceDictionary m_merged{nullptr};
     std::shared_ptr<bool> m_closed = std::make_shared<bool>(false);  // set by Window.Closed, on the interface thread

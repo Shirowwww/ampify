@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -14,6 +15,7 @@
 #include "../core/settings.hpp"
 #include "../core/theme/builtins.hpp"
 #include "../core/theme/color.hpp"
+#include "../core/theme/colour_keys.hpp"
 #include "../core/theme/css.hpp"
 #include "../core/theme/commands.hpp"
 #include "../core/theme/engine.hpp"
@@ -1089,12 +1091,20 @@ TEST_CASE(Inspector_SuggestsASelectorThatMatchesItsElement) {
     }
 }
 
+TEST_CASE(ColourKeys_AreSortedUniqueAndNameTheFluentBrushes) {
+    std::span<const std::string_view> keys = th::ColourResourceKeys();
+    CHECK(keys.size() > 500);
+    CHECK(std::adjacent_find(keys.begin(), keys.end(), [](auto a, auto b) { return a >= b; }) == keys.end());
+    CHECK(std::binary_search(keys.begin(), keys.end(), std::string_view("TextFillColorPrimaryBrush")));
+    CHECK(std::binary_search(keys.begin(), keys.end(), std::string_view("PaneBackgroundBrush")));
+}
+
 TEST_CASE(Inspector_DumpsResourcesAndElements) {
     FakeTree tree = MakePage();
     tree.resources["AccentFillColorDefaultBrush"] = Brush("#FF0A84FF");
 
     std::string dump = th::InspectTree(tree);
-    CHECK(dump.find("Ressources de l'application (1) :") != std::string::npos);
+    CHECK(dump.find("Application resources (1):") != std::string::npos);
     CHECK(dump.find("AccentFillColorDefaultBrush = #FF0A84FF") != std::string::npos);
     CHECK(dump.find("(5 elements)") != std::string::npos);
     CHECK(dump.find("  Grid#Bar  selector: Grid#Bar  Background=#FF0000FF") != std::string::npos);

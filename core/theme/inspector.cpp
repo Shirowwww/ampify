@@ -12,7 +12,7 @@ namespace {
 constexpr const char* kInspectedProperties[] = {
     "Background", "Foreground", "BorderBrush", "CornerRadius", "FontFamily", "FontSize", "FontWeight",
     "Margin", "Padding", "Width", "Height", "Opacity", "Visibility", "FlowDirection", "HorizontalAlignment",
-    "VerticalAlignment", "Grid.Row", "Grid.Column", "Canvas.ZIndex",
+    "VerticalAlignment", "Grid.Row", "Grid.Column", "Canvas.ZIndex", "States",
 };
 
 // Items of a JSON list, one per line, for a file a person may open.
@@ -59,10 +59,10 @@ std::string InspectTree(TreeBackend& tree, const InspectOptions& options) {
     std::string dump;
 
     std::vector<std::string> keys = tree.ResourceKeys();
-    dump += "Ressources de l'application (" + std::to_string(keys.size()) + ") :\n";
+    dump += "Application resources (" + std::to_string(keys.size()) + "):\n";
     for (const std::string& key : keys) {
         std::optional<Value> value = tree.ReadResource(key);
-        dump += "  " + key + " = " + (value ? ValueText(*value) : std::string("(illisible)")) + "\n";
+        dump += "  " + key + " = " + (value ? ValueText(*value) : std::string("(unreadable)")) + "\n";
     }
 
     std::vector<NodeInfo> nodes = tree.Snapshot();

@@ -14,7 +14,18 @@ Atmos leveler.
 - JavaScript extensions, with the whole API (`Ampify.*`) and the React-style layer (`Ampify.React`, `Ampify.components`).
 - Themes (colors and `user.css` rules), chosen in the Marketplace page. Spicetify `color.ini` files work as they are, and
   `ampify theme import` brings in a whole Spicetify theme.
-- The Marketplace page, opened with a button next to the lyrics and queue buttons.
+- Stable names for about 120 zones of Apple Music (`.sidebar`, `.playbar`, `.card`...) and ready-made layouts
+  (`@import "ampify:floating-panels"`, `"ampify:bottom-bar"`) with aligned edges. `ampify_theme_check --names` checks the
+  names against inspector trees after an Apple Music update.
+- Themes apply before a new page is drawn, with animated transitions, `:nth-child`, and four showcase themes: Greenroom
+  (play bar at the bottom), Artwork, Glass and Midnight. A button keeps the theme's colours under the pointer and while
+  pressed (Greenroom's white play button used to turn black when clicked).
+- The inspector shows what each element's visual states change. It no longer walks Apple Music's resource dictionaries,
+  which made the app crash at the next theme change.
+- Now Playing: the song over the whole window, its cover on a blurred background and its lyrics in time with the song
+  (Apple Music's own, or LRCLIB's).
+- The Marketplace page, opened from the Ampify entry at the bottom of the sidebar. It reads the public catalog,
+  Shirowwww/ampify-catalog.
 - The "Ampify" card in Settings > Playback: one switch per extension, with an immediate effect.
 - The Atmos leveler: Dolby Atmos songs are brought to the level of stereo songs, without ever moving the volume slider.
 - The `ampify` command line and the catalog (`ampify market`, `ampify install`, `ampify update`).
@@ -35,6 +46,6 @@ primitives (`layer`, backgrounds and acrylic, text size and color, opacity, scal
   opens normally with no mods.
 - The places of panels, of the Ampify card and of the theme choice may still move.
 - The Atmos leveler passed the automated tests, and still needs a listening check on a real PC.
-- On Apple Music 1.1792, the player interfaces changed, so the current song is read through the Windows media controls
-  (SMTC) and some fields are empty.
+- On Apple Music 1.1792, Apple keeps the cover's address internal, so `track.artwork` is empty (Now Playing takes the
+  cover from the iTunes Search API), and Apple's lyrics only come once its lyrics panel has been open for the song.
 - The binaries are not code-signed: Windows SmartScreen can ask for a confirmation.

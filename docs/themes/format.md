@@ -371,6 +371,13 @@ Frame#ContentFrame Button:hover {
 - The change is immediate, unless the element has a `transition` (next section).
 - A control that keeps the pointer event for itself does not react.
 
+Apple Music's buttons change their own background, text colour and border under the pointer and while pressed. A
+`background`, `color` or `border-color` given to a button, or to the root of its template (`.play-button > Grid#Root`),
+stays in those two states: Ampify writes the same brush to the keys the button's states read
+(`AppBarButtonBackgroundPointerOver`, `AppBarButtonBackgroundPressed`, `ButtonBackgroundPointerOver`...), in that
+button's own resources only. Checked, selected or "repeat on" states keep Apple Music's colours, since they say
+something. The inspector shows what each element's states change (`States=` below).
+
 ### Transitions
 
 `transition` animates the changes of an element instead of jumping to the new value: a `:hover`, a theme being applied,
@@ -634,7 +641,13 @@ change between versions):
 
 With `theme.inspect = 1`, the kernel writes the interface tree on its next pass, then sets the setting back to 0:
 
-- `logs\inspector.txt`: for reading. The resources, then one element per line, with a selector and its values.
+- `logs\inspector.txt`: for reading. The colour resources, then one element per line, with a selector and its values.
+  `States=` lists what an element's visual states change, for example
+  `CommonStates: PointerOver (ContentPresenter.Background, ContentPresenter.Foreground), Pressed (...)`. WinUI creates
+  the states of a control the first time they are used, so a button never hovered may show none.
+- The resources listed are the colours and brushes Apple Music and WinUI name (about 870 in Apple Music 1.1792), each
+  looked up by its key. The application's dictionaries are not walked: walking them made Apple Music crash at the next
+  theme change.
 - `logs\inspector.json`: the same tree for tools (function `InspectTreeJson` in `core/theme/inspector.hpp`). The command
   `ampify inspect --tree` prints the text version.
 
