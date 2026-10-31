@@ -1,11 +1,10 @@
 # Community catalog and Marketplace
 
-The catalog is the public list of installable extensions, themes, apps and snippets. Today it is in
-[catalog/catalog.json](../../catalog/catalog.json). The schema is in
-[schemas/catalog.schema.json](../../schemas/catalog.schema.json). The format of the elements is in
-[manifest.md](manifest.md).
-
-It can move to a separate repository one day. The format will stay the same.
+The catalog is the public list of installable extensions, themes, apps and snippets. It lives in its own public
+repository, [Shirowwww/ampify-catalog](https://github.com/Shirowwww/ampify-catalog), with the archives and the readable
+sources of every element. [catalog/](../../catalog) in this repository holds the same files, which the tests read; the
+two stay identical. The schema is in [schemas/catalog.schema.json](../../schemas/catalog.schema.json). The format of the
+elements is in [manifest.md](manifest.md).
 
 ## Format
 
@@ -97,8 +96,8 @@ command line, and bypasses no check.
 
 **Data**
 
-- Source: the same catalog as the command line (`catalog.url` in the settings, by default `catalog/catalog.json` of the
-  repository). The last catalog read is kept in `cache\catalog.json`.
+- Source: the same catalog as the command line (`catalog.url` in the settings, by default the `catalog.json` of
+  Shirowwww/ampify-catalog). The last catalog read is kept in `cache\catalog.json`.
 - Offline or remote catalog unavailable: the page shows the cached copy and says so at the top.
 - Invalid catalog: the page refuses to display it and shows the reasons, like `ampify validate`. It does not keep a partial
   list.
@@ -156,9 +155,6 @@ command line, and bypasses no check.
 
 **Open questions**
 
-- Whether the catalog stays in this repository (a raw GitHub address) or moves to a dedicated one. Until a public
-  catalog exists, the default address returns an error and the page works only with a local catalog
-  (`ampify config catalog.url file:///...`).
 - An icon per element: SVG only, or PNG too (heavier, more cases to check).
 
 ## Tests

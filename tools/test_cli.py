@@ -994,7 +994,8 @@ class Paths(AmpifyTestCase):
     def test_app_and_prefs_follow_their_settings(self):
         result = self.ampify("path", "app")
         self.assertIn(result.returncode, (0, 1))
-        if not WINE:
+        # A Windows PC may really have Apple Music installed; elsewhere it is never found.
+        if not WINE and os.name != "nt":
             self.assertEqual(result.returncode, 1)
             self.assertIn("not found", result.stderr)
         folder = native(os.path.join(self.tmp, "Apple Music"))

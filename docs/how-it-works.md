@@ -145,10 +145,16 @@ Pipeline:
 
 1. **Sources.** The active theme, then each enabled snippet in alphabetical order, then `sidebar.json` and `home.json`.
    Each source brings `colors.ini` (named colors), `resources.xaml` (resource overrides) and `user.css` (rules).
-2. **Rules.** A selector is a XAML type and an `x:Name` (`Grid#TransportBar`), with descendant and child combinators and
-   `:hover`. A declaration maps to a XAML property (`background` to `Background`, `corner-radius` to `CornerRadius`, ...).
+2. **Rules.** A selector is a XAML type and an `x:Name` (`Grid#TransportBar`), with descendant and child combinators,
+   `:nth-child` and `:hover`. A stable name written as a class (`.playbar`, `.card`) is replaced by the path it stands
+   for before the selector is read, and `@import "ampify:<layout>"` brings in a ready-made layout at its place
+   (`core/theme/builtins.cpp`). A declaration maps to a XAML property (`background` to `Background`, `corner-radius` to
+   `CornerRadius`, ...).
 3. **Cascade.** `!important`, then source order, then specificity, then place in the file.
 4. **Apply.** On the UI thread, the engine finds elements that match, reads the original value, and writes the new one.
+   A pass runs when Apple Music shows something new (a page navigation, list items appearing) and every 3 seconds, so a
+   new page is themed before it is drawn. Rules are indexed by the name and type of their last part, so a pass over a
+   few thousand elements takes milliseconds.
 5. **Layers.** The Spicetify color translation forms a low layer. A rule in the theme's `user.css` always beats it.
 6. **Restore.** Every written value keeps its original. Removing the theme restores all values in reverse order, with no
    restart. A hover rule restores the previous value when the pointer leaves.
@@ -165,7 +171,11 @@ Other points:
   3 seconds.
 - A changed theme folder (a signature of the folder is compared) is reloaded: remove, then apply again.
 - The inspector (`theme.inspect = 1`, or `ampify devtools`) writes `logs\inspector.txt` and `inspector.json`: the
-  resources and the element tree with a selector for each element. It is the source of real names.
+  resources and the element tree with a selector for each element. It is the source of real names, and of the table of
+  stable names: `ampify_theme_check --names` checks that table against saved trees after an Apple Music update.
+- A `transition` is handed to XAML's own implicit transitions, so the compositor animates the change. A transform
+  that animates goes through `UIElement.Scale`, `Rotation` and `Translation`, around the centre unless the theme
+  chooses another origin.
 
 The engine is portable C++ in `core/theme/` and is tested on Linux. `win/theme_service.cpp` and `win/xaml_backend.cpp`
 connect it to WinUI. Formats: [themes/format.md](themes/format.md).
@@ -205,8 +215,27 @@ element. The commands it may run are limited to `market`, `install`, `remove`, `
 Because it calls the same command line, the page applies the same checks as `ampify install` (see
 [extensions/catalog.md](extensions/catalog.md)). Themes are chosen in two clicks.
 
-The catalog lives in this repository. `ampify` uses `tar.exe` and `curl.exe`, which ship with Windows 10 (1803) and 11,
-so nothing is installed for the user.
+The catalog lives in its own public repository, Shirowwww/ampify-catalog, where every archive is pinned by SHA-256.
+`ampify` uses `tar.exe` and `curl.exe`, which ship with Windows 10 (1803) and 11, so nothing is installed for the user.
+
+The Marketplace opens from the Ampify entry at the bottom of Apple Music's sidebar. Apple Music fills that part of its
+sidebar from a list it owns, and adding to the list crashed it: Ampify puts its entries in a small panel that takes the
+place of the sidebar's footer and keeps Apple Music's own separator in it.
+
+## Now Playing
+
+Now Playing (`extensions/now-playing`) is an extension that ships with Ampify. Its button joins the lyrics and queue
+buttons of the playback bar, and it opens a view over the whole window (`Ampify.ui.fullscreen`): a popup of the main
+window, above Apple Music's pages and panels, which navigation leaves in place.
+
+- The song comes from Apple's player (`AMP.Services`), read through the slots of its WinRT interfaces. The artist and
+  album come from the item's subtitle when Apple leaves them empty.
+- The lyrics are Apple Music's own (`ILyricsInfo.GetTTML`, parsed in `core/lyrics.cpp`) when Apple has fetched them. It
+  does so once its lyrics panel has been open for the song, so Now Playing falls back on LRCLIB, a free public library
+  of synced lyrics, and switches to Apple's when they arrive.
+- Apple's cover address is internal (`amp-artwork-id://`), so the cover comes from the iTunes Search API.
+- The view is redrawn four times a second while open; the kernel only changes the lines whose state changed, and their
+  opacity animates on the compositor.
 
 ## Atmos leveler
 

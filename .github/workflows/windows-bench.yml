@@ -2,12 +2,13 @@ name: Windows bench
 
 # Builds Ampify (release and bench) on Linux, then runs the cases on a real Windows with Apple Music installed.
 # The cases and how to add one: docs/development/bench-and-ci.md.
-# Runs on every branch that touches the code, and by hand (workflow_dispatch). Pushes that only touch docs or
-# other files outside the list below start nothing.
+# Runs on pushes to main and dev that touch the code, and by hand (workflow_dispatch) on any branch. Pushes that only
+# touch docs or other files outside the list below start nothing. Work reaches main through dev, so a pull request
+# needs no run of its own.
 
 on:
   push:
-    branches: ['**']
+    branches: [main, dev]
     paths:
       - 'bench/windows/**'
       # The signed-in bench is run by hand on a signed-in PC (it needs an Apple account): its files must not
@@ -66,6 +67,13 @@ jobs:
           cmake --build build-linux
           ./build-linux/ampify_tests
           ccache --show-stats || true
+      # The command line, the catalog tools and the JavaScript elements, against the binary just built.
+      - name: Tool and element tests
+        env:
+          AMPIFY_BIN: ${{ github.workspace }}/build-linux/ampify
+        run: |
+          python3 -m unittest discover -s tools -p 'test_*.py'
+          node --test tools/test_examples.mjs
 
   build:
     name: Build the two Windows builds (MinGW)
