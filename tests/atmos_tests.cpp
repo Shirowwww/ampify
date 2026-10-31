@@ -290,7 +290,7 @@ TEST_CASE(Leveler_AtmosPeakCeilingUsesTheRawObjectPeak) {
 }
 
 TEST_CASE(Leveler_StereoAt96kAndAtmosAt48kAreBothMeasured) {
-    // l'utilisateur's output: the stereo stream at 96 kHz, the Atmos objects at 48 kHz. Each path keeps its own rate.
+    // A typical output: the stereo stream at 96 kHz, the Atmos objects at 48 kHz. Each path keeps its own rate.
     atmos::LevelerConfig config;
     atmos::AtmosLeveler leveler(config, 96000, 48000);
     CHECK(leveler.StreamRate() == 96000);

@@ -4,7 +4,7 @@
 
 #include "text_util.hpp"
 
-namespace amk {
+namespace ampify {
 
 bool IsProtectedModule(std::string_view modulePath) {
     std::string name = ToLowerAscii(FileName(modulePath));
@@ -15,4 +15,4 @@ bool IsProtectedModule(std::string_view modulePath) {
     return name.find("fairplay") != std::string::npos;
 }
 
-}  // namespace amk
+}  // namespace ampify

@@ -7,22 +7,22 @@
 #include "../json.hpp"
 #include "service_gate.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
 struct DiscordNatives : ScriptBridge {
     // native.discordSet(activityJson): true when the host took the activity.
-    AMK_NATIVE(Set) {
+    AMPIFY_NATIVE(Set) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ipc.discord", &failure)) return failure;
         std::optional<Json> value = Json::Parse(String(ctx, argc, argv, 0).value_or(""));
-        if (!value || !value->AsObject()) return Throw(ctx, "TypeError", "discord.setActivity attend un objet");
+        if (!value || !value->AsObject()) return Throw(ctx, "TypeError", "discord.setActivity expects an object");
         const Json* clientId = value->Find("clientId");
         if (!clientId || !clientId->AsString() || !discord::IsValidClientId(*clientId->AsString())) {
             return Throw(ctx, "TypeError",
-                         "discord.setActivity attend clientId, l'identifiant de l'application Discord (17 à 20 chiffres)");
+                         "discord.setActivity expects clientId, the Discord application id (17 to 20 digits)");
         }
         std::string error;
         std::optional<discord::Activity> activity = discord::ActivityFromJson(*value, &error);
@@ -34,7 +34,7 @@ struct DiscordNatives : ScriptBridge {
         return JS_NewBool(ctx, discordHost->SetActivity(ext->id(), *clientId->AsString(), *activity));
     }
 
-    AMK_NATIVE(Clear) {
+    AMPIFY_NATIVE(Clear) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ipc.discord", &failure)) return failure;
@@ -56,4 +56,4 @@ void StopDiscord(ScriptExtension& extension) {
     if (DiscordHost* host = ScriptBridge::HostOf(&extension).Capability<DiscordHost>()) host->ClearActivity(extension.id());
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

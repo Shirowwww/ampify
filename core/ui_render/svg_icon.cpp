@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <sstream>
 
-namespace amk::uirender {
+namespace ampify::uirender {
 
 namespace {
 
@@ -85,4 +85,4 @@ bool IsGlyphIcon(std::string_view icon) {
     return icon.size() <= 8;
 }
 
-}  // namespace amk::uirender
+}  // namespace ampify::uirender

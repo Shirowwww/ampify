@@ -7,7 +7,7 @@
 
 #include "theme.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // Font roles: a name for the font of a kind of text (title, body...), as Spicetify's getFontStyle gives it.
 //
@@ -18,7 +18,7 @@ namespace amk::theme {
 //       --font-title-size: 30px;
 //   }
 // Its rules use it with `font-family: var(--font-title)`, or all three parts at once with `font-role: title`.
-// A role the theme does not set keeps the Windows 11 type ramp below. AMK.fonts.style(name) will read FontRolesJson.
+// A role the theme does not set keeps the Windows 11 type ramp below. Ampify.fonts.style(name) will read FontRolesJson.
 
 // What a role resolves to. `fromTheme` is true when at least one part comes from the theme (or a snippet).
 struct FontStyle {
@@ -34,7 +34,7 @@ struct FontStyle {
 const std::vector<FontStyle>& DefaultFontRoles();
 
 // Lower case, and the French names map to the English ones: titre -> title, texte -> body, sous-titre -> subtitle,
-// legende or légende -> caption.
+// legende or legende with an accent -> caption.
 std::string CanonicalFontRole(std::string_view role);
 
 // The role as the layers set it: for each part, the first layer that sets it wins, then the default. `layers` go from
@@ -47,7 +47,7 @@ std::optional<FontStyle> ResolveFontRole(const Theme* theme, std::string_view ro
 // The default roles, then the roles only the theme sets, by name.
 std::vector<std::string> FontRoleNames(const Theme* theme);
 
-// Every role as JSON, for AMK.fonts: {"body":{"family":"…","weight":400,"size":14,"fromTheme":false},…}.
+// Every role as JSON, for Ampify.fonts: {"body":{"family":"…","weight":400,"size":14,"fromTheme":false},…}.
 std::string FontRolesJson(const Theme* theme);
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

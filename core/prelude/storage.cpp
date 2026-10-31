@@ -1,23 +1,23 @@
-// Module storage: AMK.storage, JSON values kept per element. Natives: core/natives/storage.cpp.
+// Module storage: Ampify.storage, JSON values kept per element. Natives: core/natives/storage.cpp.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kStorage[];
-const char kStorage[] = R"AMKJS(
-  AMK.storage = {
+const char kStorage[] = R"AMPIFYJS(
+  Ampify.storage = {
     get(key, fallback) {
       const raw = native.storageGet(text(key));
       return raw === undefined ? fallback : JSON.parse(raw);
     },
     set(key, value) {
       const raw = JSON.stringify(value);
-      if (raw === undefined) throw new TypeError("storage.set : la valeur n'est pas du JSON");
+      if (raw === undefined) throw new TypeError("storage.set: the value is not JSON");
       native.storageSet(text(key), raw);
     },
     remove(key) {
       native.storageRemove(text(key));
     },
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

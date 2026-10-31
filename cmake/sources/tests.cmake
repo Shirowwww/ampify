@@ -1,7 +1,7 @@
-# Unit tests: target amk_tests (when AMK_BUILD_TESTS is on). AMK_TESTS_WIN_SOURCES is added when targeting
-# Windows. A package may list its own tests in its own file with list(APPEND AMK_TESTS_SOURCES ...). See the
+# Unit tests: target ampify_tests (when AMPIFY_BUILD_TESTS is on). AMPIFY_TESTS_WIN_SOURCES is added when targeting
+# Windows. A package may list its own tests in its own file with list(APPEND AMPIFY_TESTS_SOURCES ...). See the
 # convention at the top of CMakeLists.txt.
-list(APPEND AMK_TESTS_SOURCES
+list(APPEND AMPIFY_TESTS_SOURCES
     tests/main.cpp
     tests/core_tests.cpp
     tests/atmos_tests.cpp
@@ -27,4 +27,4 @@ list(APPEND AMK_TESTS_SOURCES
     tests/api_module_tests.cpp
     tests/parity_tests.cpp)
 
-list(APPEND AMK_TESTS_WIN_SOURCES tests/win_host_tests.cpp)
+list(APPEND AMPIFY_TESTS_WIN_SOURCES tests/win_host_tests.cpp)

@@ -1,9 +1,9 @@
-// Module icons: AMK.icons, the kit's SVG icons. JavaScript only, no natives.
+// Module icons: Ampify.icons, the kit's SVG icons. JavaScript only, no natives.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kIcons[];
-const char kIcons[] = R"AMKJS(
+const char kIcons[] = R"AMPIFYJS(
   const ICONS = {
     play: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
     pause: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
@@ -15,15 +15,15 @@ const char kIcons[] = R"AMKJS(
     timer: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 2h6v2H9zm3 6a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm1 8h-2V8h2z"/></svg>',
   };
 
-  AMK.icons = {
+  Ampify.icons = {
     get(name) {
       if (!Object.prototype.hasOwnProperty.call(ICONS, name)) {
-        throw new RangeError("icône inconnue : " + name + " (" + Object.keys(ICONS).join(", ") + ")");
+        throw new RangeError("unknown icon: " + name + " (" + Object.keys(ICONS).join(", ") + ")");
       }
       return ICONS[name];
     },
     names: () => Object.keys(ICONS),
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

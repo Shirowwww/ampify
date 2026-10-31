@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "artwork",
+  "name": "Artwork",
+  "version": "0.1.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "The artwork of the current track fills the window, under dark glass panels that float.",
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Night"
+}

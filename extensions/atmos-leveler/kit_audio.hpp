@@ -1,10 +1,10 @@
 #pragma once
 
-// The kit's own processing on the leveler's sample path, for AMK.audio: the equalizer (after the leveler's gain,
+// Ampify's own processing on the leveler's sample path, for Ampify.audio: the equalizer (after the leveler's gain,
 // before the soft knee), the live loudness and the analysis frames. The Windows hooks (atmos_windows.cpp) call it;
 // it has no Windows code, so the tests drive it with synthetic buffers.
 //
-// It works on the kit's own hooks, the stereo IAudioRenderClient stream and the Dolby Atmos spatial objects, and
+// It works on Ampify's own hooks, the stereo IAudioRenderClient stream and the Dolby Atmos spatial objects, and
 // never on Apple's audio tap, which Apple skips for Atmos (knowledge/atmos-loudness.md). The samples stay in the
 // buffers Apple Music already hands to Windows: nothing is copied out but small frames of numbers.
 //
@@ -29,7 +29,7 @@ namespace atmos {
 // Inactive (the samples untouched) while the settings are flat and every processor has rung out.
 class EqStage : public SampleStage {
 public:
-    explicit EqStage(const amk::audio::EqSettings& settings, size_t maxProcessors = ObjectPass::kMaxObjects);
+    explicit EqStage(const ampify::audio::EqSettings& settings, size_t maxProcessors = ObjectPass::kMaxObjects);
 
     void SetSampleRate(double sampleRate) { m_rate = sampleRate; }
 
@@ -39,16 +39,16 @@ public:
     size_t Processors() const { return m_processors.size(); }
 
 private:
-    const amk::audio::EqSettings& m_settings;
+    const ampify::audio::EqSettings& m_settings;
     size_t m_max;
     double m_rate = 48000;
     bool m_running = false;
-    std::unordered_map<const void*, std::unique_ptr<amk::audio::EqProcessor>> m_processors;
+    std::unordered_map<const void*, std::unique_ptr<ampify::audio::EqProcessor>> m_processors;
 };
 
 class KitAudio {
 public:
-    explicit KitAudio(amk::audio::AudioEngine& engine);
+    explicit KitAudio(ampify::audio::AudioEngine& engine);
 
     // ---- Stereo stream (IAudioRenderClient, after the player volume) ----
 
@@ -68,7 +68,7 @@ public:
     void AfterObjects(std::span<const ObjectBuffer> objects, size_t frames, int sampleRate, const PassLevels& levels);
 
 private:
-    amk::audio::AudioEngine& m_engine;
+    ampify::audio::AudioEngine& m_engine;
     EqStage m_streamEq;
     EqStage m_objectEq;
     LiveLoudness m_streamLoudness;

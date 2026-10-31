@@ -8,26 +8,22 @@
 #include <string>
 #include <vector>
 
-namespace amk::platform {
+namespace ampify::platform {
 
 // Called once at startup. Returns the arguments as UTF-8. On Windows it also switches the console to UTF-8.
 std::vector<std::string> Initialize(int argc, char** argv);
 
-// %USERPROFILE%\AppleMusicModKit on Windows, $HOME/AppleMusicModKit elsewhere.
+// %USERPROFILE%\Ampify on Windows, $HOME/Ampify elsewhere.
 std::filesystem::path DefaultKitDirectory();
 
-// The user's locale, such as "fr-FR" on Windows or "fr_FR.UTF-8" from LC_ALL, LC_MESSAGES or LANG elsewhere.
-// Empty when none is set. The setting `language` = auto follows it (core/i18n.hpp).
-std::string UserLocale();
-
-// The folder that holds amk itself. The launcher and the updater are looked for next to it.
+// The folder that holds ampify itself. The launcher and the updater are looked for next to it.
 std::filesystem::path ExecutableDirectory();
 
 // Runs a program with these arguments, without a shell, and waits for it. Returns its exit code, or -1 when
 // it cannot start. When `stdoutFile` is not empty, standard output goes there.
 int Run(const std::vector<std::string>& command, const std::filesystem::path& stdoutFile = {});
 
-// True when the command runs and exits with 0. Its output is discarded. Used by `amk doctor` on tar, unzip and curl.
+// True when the command runs and exits with 0. Its output is discarded. Used by `ampify doctor` on tar, unzip and curl.
 bool ToolWorks(const std::vector<std::string>& command);
 
 // Starts a program and does not wait for it. Returns false when it cannot start.
@@ -62,4 +58,4 @@ std::optional<std::filesystem::path> AppPreferencesFile();
 // The command that opens a folder in the file manager: explorer.exe on Windows, xdg-open elsewhere.
 std::vector<std::string> OpenFolderCommand(const std::filesystem::path& folder);
 
-}  // namespace amk::platform
+}  // namespace ampify::platform

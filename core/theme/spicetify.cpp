@@ -4,7 +4,7 @@
 #include <cctype>
 #include <utility>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -103,4 +103,4 @@ std::string SpicetifyStylesheet(const std::set<std::string>& defined) {
     return css;
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

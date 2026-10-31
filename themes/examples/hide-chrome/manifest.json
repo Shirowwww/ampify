@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "hide-chrome",
+  "name": "Hide chrome",
+  "version": "0.1.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Hides interface elements by name, taken from the inspector.",
+  "kitApi": "1.0",
+  "colors": "colors.ini"
+}

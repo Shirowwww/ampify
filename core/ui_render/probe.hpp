@@ -1,13 +1,13 @@
 #pragma once
 
-// How the kit finds its way in Apple Music's live XAML tree, without Windows: the Windows side (win/ui_service.cpp)
+// How Ampify finds its way in Apple Music's live XAML tree, without Windows: the Windows side (win/ui_service.cpp)
 // copies a bounded part of the tree into a flat list of ProbeNode, and the functions below choose the page, the
 // anchors and the template rows. Tested under Linux with fake trees (tests/ui_render_tests.cpp).
 //
 // The rules for the settings page, the bounded walk and the refresh ticket come from AMExclusive (MIT,
 // https://github.com/AntiOblivionis/AMExclusive, mod/src/UiAdapter.cpp and mod/src/UiRefreshState.h at 91f589d),
-// adapted to the kit. The placement of the top bar and play bar buttons is provisional until the real tree of
-// Apple Music is dumped (docs/tests/M8-interface.md).
+// adapted to Ampify. The placement of the top bar and play bar buttons is provisional until the real tree of
+// Apple Music is dumped (docs/development/testing-on-a-pc.md).
 
 #include <cstdint>
 #include <deque>
@@ -18,7 +18,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace amk::uirender {
+namespace ampify::uirender {
 
 // What the Windows side knows of a node's type, as flags: try_as on the projected types.
 enum ProbeFlag : unsigned {
@@ -53,7 +53,7 @@ struct ProbeNode {
 };
 
 // The discovery walks only these nodes' children: never into item lists (the library can hold thousands of rows),
-// buttons, or the kit's own elements.
+// buttons, or Ampify's own elements.
 bool ShouldDescend(const ProbeNode& node);
 
 // The first node whose runtime class name contains `fragment`, such as "PlaybackSettingsPage".
@@ -65,17 +65,17 @@ std::optional<int> FindByName(const std::vector<ProbeNode>& nodes, std::string_v
 // True when `node` is `ancestor` or below it.
 bool IsUnder(const std::vector<ProbeNode>& nodes, int node, int ancestor);
 
-// True when `node` or one of its ancestors carries a kit or AMExclusive name.
+// True when `node` or one of its ancestors carries an Ampify or AMExclusive name.
 bool InsideModElement(const std::vector<ProbeNode>& nodes, int node);
 
-// The settings anchor of a page: the StackPanel under `page` that holds the most ToggleSwitch (outside the kit's and
+// The settings anchor of a page: the StackPanel under `page` that holds the most ToggleSwitch (outside Ampify's and
 // AMExclusive's elements). On a tie the outermost wins, as in AMExclusive. Nothing when the page has no toggle.
 std::optional<int> ChooseSettingsAnchor(const std::vector<ProbeNode>& nodes, int page);
 
 // The direct children of `parent`, in order.
 std::vector<int> ChildrenOf(const std::vector<ProbeNode>& nodes, int parent);
 
-// The row that serves as model for a new card: the last direct child of `anchor` that is not a kit or AMExclusive
+// The row that serves as model for a new card: the last direct child of `anchor` that is not an Ampify or AMExclusive
 // element. Nothing when the anchor has no such child.
 std::optional<int> ChooseTemplateRow(const std::vector<ProbeNode>& nodes, int anchor);
 
@@ -143,4 +143,4 @@ private:
     bool m_closed = false;
 };
 
-}  // namespace amk::uirender
+}  // namespace ampify::uirender

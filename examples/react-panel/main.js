@@ -1,18 +1,18 @@
-// Un panneau écrit comme une extension Spicetify en React, sans JSX : AMK.React remplace React, AMK.components
-// remplace Spicetify.ReactComponent, et AMK.ReactDOM.render envoie l'arbre dans un panneau du kit.
-// Voir docs/extensions/API.md, section 5.7.
-const { h, useState, useEffect, createContext, useContext } = AMK.React;
-const { Card, Button, Toggle, Slider, Dropdown, Tooltip, Text } = AMK.components;
+// A panel written like a Spicetify extension in React, without JSX: Ampify.React replaces React, Ampify.components
+// replaces Spicetify.ReactComponent, and Ampify.ReactDOM.render sends the tree to an Ampify panel.
+// See docs/extensions/api.md, section 5.7.
+const { h, useState, useEffect, createContext, useContext } = Ampify.React;
+const { Card, Button, Toggle, Slider, Dropdown, Tooltip, Text } = Ampify.components;
 
-// Un réglage partagé par tous les composants du panneau.
+// A setting shared by all the components of the panel.
 const Unit = createContext("min");
 
 function Counter() {
   const [count, setCount] = useState(0);
-  return h(Card, { title: "Compteur" },
-    h(Text, null, "Clics : " + count),
-    h(Tooltip, { label: "Ajoute un au compteur", placement: "top" },
-      h(Button, { label: "Plus un", onClick: () => setCount((n) => n + 1) })));
+  return h(Card, { title: "Counter" },
+    h(Text, null, "Clicks: " + count),
+    h(Tooltip, { label: "Adds one to the counter", placement: "top" },
+      h(Button, { label: "Add one", onClick: () => setCount((n) => n + 1) })));
 }
 
 function SleepTimer() {
@@ -20,36 +20,36 @@ function SleepTimer() {
   const [enabled, setEnabled] = useState(false);
   const [minutes, setMinutes] = useState(30);
 
-  // L'effet arme la minuterie, et son nettoyage l'annule : quand on la coupe, change la durée ou ferme la carte.
+  // The effect arms the timer, and its cleanup cancels it: when it is turned off, the length changes or the card closes.
   useEffect(() => {
     if (!enabled) return undefined;
-    AMK.log("Minuterie armée : " + minutes + " " + unit);
-    const timer = setTimeout(() => AMK.log("Minuterie terminée"), minutes * 60000);
+    Ampify.log("Timer armed: " + minutes + " " + unit);
+    const timer = setTimeout(() => Ampify.log("Timer finished"), minutes * 60000);
     return () => {
       clearTimeout(timer);
-      AMK.log("Minuterie annulée");
+      Ampify.log("Timer cancelled");
     };
   }, [enabled, minutes]);
 
-  return h(Card, { title: "Minuterie" },
-    h(Toggle, { label: "Activer", value: enabled, onChange: setEnabled }),
-    h(Slider, { label: "Durée (" + unit + ")", min: 5, max: 120, step: 5, value: minutes, onChange: setMinutes }));
+  return h(Card, { title: "Timer" },
+    h(Toggle, { label: "Turn on", value: enabled, onChange: setEnabled }),
+    h(Slider, { label: "Length (" + unit + ")", min: 5, max: 120, step: 5, value: minutes, onChange: setMinutes }));
 }
 
 function Panel() {
   const [view, setView] = useState("simple");
   return h(Unit.Provider, { value: "min" },
     h("stack", null,
-      h(Text, { variant: "title" }, "Panneau React"),
+      h(Text, { variant: "title" }, "React panel"),
       h(Dropdown, {
-        label: "Affichage",
+        label: "View",
         value: view,
-        options: [{ value: "simple", label: "Simple" }, { value: "complet", label: "Complet" }],
+        options: [{ value: "simple", label: "Simple" }, { value: "full", label: "Full" }],
         onChange: setView,
       }),
       h(Counter),
-      view === "complet" ? h(SleepTimer) : null));
+      view === "full" ? h(SleepTimer) : null));
 }
 
-AMK.ReactDOM.render(h(Panel), "panel:react-panel");
-AMK.ready.then(() => AMK.log("Panneau React prêt"));
+Ampify.ReactDOM.render(h(Panel), "panel:react-panel");
+Ampify.ready.then(() => Ampify.log("React panel ready"));

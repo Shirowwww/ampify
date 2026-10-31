@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <system_error>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -44,7 +44,7 @@ bool CopyTree(const std::filesystem::path& from, const std::filesystem::path& to
     if (std::filesystem::is_directory(status)) {
         std::filesystem::create_directories(to, ec);
         if (ec) {
-            error = "dossier impossible à créer : " + to.string();
+            error = "cannot create folder: " + to.string();
             return false;
         }
         for (const auto& entry : std::filesystem::directory_iterator(from, ec)) {
@@ -56,7 +56,7 @@ bool CopyTree(const std::filesystem::path& from, const std::filesystem::path& to
     std::filesystem::create_directories(to.parent_path(), ec);
     std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing, ec);
     if (ec) {
-        error = "copie impossible : " + from.string() + " (" + ec.message() + ")";
+        error = "cannot copy: " + from.string() + " (" + ec.message() + ")";
         return false;
     }
     return true;
@@ -69,7 +69,7 @@ bool ClearConfiguration(const KitLayout& kit, std::string& error) {
     for (std::string_view folder : kKindFolders) {
         std::filesystem::remove_all(kit.Root() / folder, ec);
         if (ec) {
-            error = "suppression impossible : " + (kit.Root() / folder).string();
+            error = "cannot delete: " + (kit.Root() / folder).string();
             return false;
         }
     }
@@ -97,7 +97,7 @@ std::optional<std::string> CreateBackup(const KitLayout& kit, std::string& error
         std::error_code ec;
         std::filesystem::create_directories(target / folder, ec);
         if (ec) {
-            error = "dossier impossible à créer : " + (target / folder).string();
+            error = "cannot create folder: " + (target / folder).string();
             return std::nullopt;
         }
         if (!CopyTree(kit.Root() / folder, target / folder, error)) return std::nullopt;
@@ -118,13 +118,13 @@ std::vector<std::string> ListBackups(const KitLayout& kit) {
 
 bool RestoreBackup(const KitLayout& kit, std::string_view name, std::string& error) {
     if (!IsSafeBackupName(name)) {
-        error = "nom de sauvegarde invalide : " + std::string(name);
+        error = "invalid backup name: " + std::string(name);
         return false;
     }
     std::filesystem::path source = kit.Backups() / std::string(name);
     std::error_code ec;
     if (!std::filesystem::is_directory(source, ec)) {
-        error = "sauvegarde introuvable : " + std::string(name);
+        error = "backup not found: " + std::string(name);
         return false;
     }
 
@@ -142,4 +142,4 @@ bool RestoreBackup(const KitLayout& kit, std::string_view name, std::string& err
     return true;
 }
 
-}  // namespace amk
+}  // namespace ampify

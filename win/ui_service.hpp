@@ -2,17 +2,17 @@
 
 // The kernel's interface service in AppleMusic.exe: finds Apple Music's XAML windows, follows their pages, shows the
 // extensions' panels, popups, app pages and buttons with the native renderer (ui_renderer.hpp), and adds the
-// « Mods (Apple Music Mod Kit) » card to the Playback page of the settings. Compiled only with AMK_WITH_XAML. Not run
-// yet in Apple Music: the bench case 63-m8-interface checks its journal lines (docs/tests/M8-interface.md).
+// "Ampify" card to the Playback page of the settings. Compiled only with AMPIFY_WITH_XAML. Not run
+// yet in Apple Music: the bench case 63-ui-surfaces checks its log lines (docs/development/testing-on-a-pc.md).
 //
 // Threads: a worker thread (MTA) watches the windows (SetWinEventHook on the process + a poll every 5 s) and the
 // interface model (UiModel, every 250 ms); everything that touches XAML runs on the window's interface thread through
 // window.DispatcherQueue().TryEnqueue(Low), one queued refresh per window at a time (uirender::RefreshTicket).
 //
 // Discovery, page watching and the settings card follow AMExclusive (MIT, https://github.com/AntiOblivionis/AMExclusive,
-// mod/src/UiAdapter.cpp at 91f589d), adapted to the kit.
+// mod/src/UiAdapter.cpp at 91f589d), adapted to Ampify.
 
-#if defined(AMK_WITH_XAML)
+#if defined(AMPIFY_WITH_XAML)
 
 #include <filesystem>
 #include <memory>
@@ -22,7 +22,7 @@
 #include "../core/ui_model.hpp"
 #include "ui_renderer.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 class UiService {
 public:
@@ -47,6 +47,6 @@ private:
     std::thread m_worker;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win
 
-#endif  // AMK_WITH_XAML
+#endif  // AMPIFY_WITH_XAML

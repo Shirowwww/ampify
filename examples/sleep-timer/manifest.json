@@ -1,11 +1,11 @@
 {
   "$schema": "../../schemas/manifest.schema.json",
   "id": "sleep-timer",
-  "name": "Minuterie de sommeil",
+  "name": "Sleep timer",
   "version": "0.1.0",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Met la lecture en pause après un délai, réglable en minutes, puis prévient.",
+  "description": "Pauses playback after a delay, set in minutes, then lets you know.",
   "kitApi": "1.0",
   "main": "main.js",
   "permissions": ["player.control", "notifications"]

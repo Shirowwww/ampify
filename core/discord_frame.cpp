@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-namespace amk::discord {
+namespace ampify::discord {
 
 namespace {
 
@@ -101,7 +101,7 @@ std::string SetActivityJson(uint32_t pid, const std::optional<Activity>& activit
 std::optional<Activity> ActivityFromJson(const Json& value, std::string* error) {
     const Json::Object* fields = value.AsObject();
     if (!fields) {
-        Fail(error, "setActivity attend un objet");
+        Fail(error, "setActivity expects an object");
         return std::nullopt;
     }
     Activity activity;
@@ -119,7 +119,7 @@ std::optional<Activity> ActivityFromJson(const Json& value, std::string* error) 
             if (field.IsNull()) continue;
             const std::string* s = field.AsString();
             if (!s) {
-                Fail(error, key + " doit être un texte");
+                Fail(error, key + " must be a string");
                 return std::nullopt;
             }
             // Discord counts bytes. A longer text is cut on a character boundary rather than refused.
@@ -136,14 +136,14 @@ std::optional<Activity> ActivityFromJson(const Json& value, std::string* error) 
             if (field.IsNull()) continue;
             const double* n = field.AsNumber();
             if (!n || !std::isfinite(*n) || *n < 0 || *n > 9.0e15) {
-                Fail(error, key + " doit être un nombre de millisecondes positif");
+                Fail(error, key + " must be a positive number of milliseconds");
                 return std::nullopt;
             }
             (key == "startMs" ? activity.startMs : activity.endMs) = static_cast<int64_t>(*n);
             continue;
         }
         if (key == "clientId") continue;  // read by the caller
-        Fail(error, "champ inconnu dans setActivity : " + key);
+        Fail(error, "unknown field in setActivity: " + key);
         return std::nullopt;
     }
     // Discord ignores a details or state of a single byte: pad it so that the line still shows.
@@ -151,7 +151,7 @@ std::optional<Activity> ActivityFromJson(const Json& value, std::string* error) 
         if (line->size() == 1) line->push_back(' ');
     }
     if (activity.details.empty() && activity.state.empty()) {
-        Fail(error, "setActivity attend au moins details ou state");
+        Fail(error, "setActivity expects at least details or state");
         return std::nullopt;
     }
     return activity;
@@ -170,15 +170,15 @@ bool IsReady(const Frame& frame) {
 std::optional<std::string> ErrorOf(const Frame& frame) {
     std::optional<Json> root = Json::Parse(frame.json);
     auto messageOf = [](const Json* holder) -> std::string {
-        if (!holder) return "erreur sans message";
+        if (!holder) return "error without a message";
         const Json* message = holder->Find("message");
-        return message && message->AsString() ? *message->AsString() : "erreur sans message";
+        return message && message->AsString() ? *message->AsString() : "error without a message";
     };
-    if (frame.opcode == Opcode::Close) return root ? messageOf(&*root) : std::string("connexion fermée par Discord");
+    if (frame.opcode == Opcode::Close) return root ? messageOf(&*root) : std::string("connection closed by Discord");
     if (!root) return std::nullopt;
     const Json* evt = root->Find("evt");
     if (evt && evt->AsString() && *evt->AsString() == "ERROR") return messageOf(root->Find("data"));
     return std::nullopt;
 }
 
-}  // namespace amk::discord
+}  // namespace ampify::discord

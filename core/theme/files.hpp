@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // True for a path that stays inside the theme folder: relative, no drive letter, no "..", no backslash tricks.
 bool IsSafeRelativePath(std::string_view path);
@@ -34,4 +34,4 @@ private:
     std::filesystem::path m_folder;
 };
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

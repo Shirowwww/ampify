@@ -1,5 +1,5 @@
-# Theme engine: target amk_theme, and the checker amk_theme_check. See the convention at the top of CMakeLists.txt.
-list(APPEND AMK_THEME_SOURCES
+# Theme engine: target ampify_theme, and the checker ampify_theme_check. See the convention at the top of CMakeLists.txt.
+list(APPEND AMPIFY_THEME_SOURCES
     core/theme/color.cpp
     core/theme/css.cpp
     core/theme/engine.cpp
@@ -21,4 +21,4 @@ list(APPEND AMK_THEME_SOURCES
     core/theme/spicetify.cpp
     core/theme/worker.cpp)
 
-list(APPEND AMK_THEME_CHECK_SOURCES tools/theme_check.cpp)
+list(APPEND AMPIFY_THEME_CHECK_SOURCES tools/theme_check.cpp)

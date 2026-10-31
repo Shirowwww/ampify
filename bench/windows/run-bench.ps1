@@ -1,33 +1,33 @@
 <#
 .SYNOPSIS
-Banc de test Windows : installe Apple Music si besoin, lance les tests de bench/windows/cases et écrit le rapport.
+Windows test bench: installs Apple Music if needed, runs the cases of bench/windows/cases and writes the report.
 
 .DESCRIPTION
-Chaque fichier de cases/ enregistre un ou plusieurs tests (Register-Case). Un test dont le prérequis manque est sauté,
-avec la raison dans le rapport. Le banc ferme Apple Music de force et remet à zéro les journaux du kit : ne pas le
-lancer sur un PC où l'on utilise Apple Music. Pour ajouter un test, voir docs/tests/banc-windows.md.
+Each file of cases/ registers one or more cases (Register-Case). A case whose requirement is missing is skipped,
+with the reason in the report. The bench closes Apple Music by force and empties the Ampify logs: do not run it
+on a PC where Apple Music is in use. To add a case, see docs/development/bench-and-ci.md.
 
 .PARAMETER KitRoot
-Dossier qui contient diffusion\ (build de diffusion) et banc\ (build de banc), avec amk_launcher.exe et amk_kernel.dll.
+Folder that holds release\ (release build) and bench\ (bench build), with ampify_launcher.exe and ampify_kernel.dll.
 
 .PARAMETER RepoRoot
-Racine du dépôt : la liste des versions testées est lue dans core\version_gate.hpp.
+Root of the repository: the list of tested versions is read from core\version_gate.hpp.
 
 .PARAMETER OutputRoot
-Dossier des résultats : results.json, rapport.md, winget.log, et un dossier par test (journaux, captures).
+Results folder: results.json, report.md, winget.log, and one folder per case (logs, screenshots).
 
 .PARAMETER Only
-Identifiants des tests à lancer. Vide : tous.
+Ids of the cases to run. Empty: all of them.
 
 .PARAMETER SkipInstall
-N'essaie pas d'installer Apple Music.
+Does not try to install Apple Music.
 
 .PARAMETER CasesDir
-Dossier des tests, relatif à ce script. Par défaut cases (le banc normal). live\cases : le banc connecté
-(.github/workflows/windows-live.yml), qui suppose Apple Music connecté et une sortie audio.
+Folder of the cases, relative to this script. Default: cases (the normal bench). live\cases: the signed-in bench
+(run locally), which needs a signed-in Apple Music and an audio output.
 
 .OUTPUTS
-Code de sortie 1 si un test échoue, 0 sinon. Les tests sautés ne font pas échouer le banc.
+Exit code 1 when a case fails, 0 otherwise. Skipped cases do not fail the bench.
 #>
 [CmdletBinding()]
 param(
@@ -41,19 +41,19 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Une erreur non prévue arrête le banc, avec la ligne fautive dans le journal du job.
+# An unexpected error stops the bench, with the faulty line in the job log.
 trap {
-    Write-Host "::error::banc interrompu : $($_.Exception.GetType().FullName) : $($_.Exception.Message)"
+    Write-Host "::error::bench interrupted: $($_.Exception.GetType().FullName): $($_.Exception.Message)"
     Write-Host $_.InvocationInfo.PositionMessage
     Write-Host $_.Exception.ToString()
     Write-Host $_.ScriptStackTrace
     exit 1
 }
 
-# Diagnostic de démarrage : si un chemin de base est vide, la suite échoue plus bas sans dire pourquoi.
-Write-Host "Démarrage : PSScriptRoot=[$PSScriptRoot] PSCommandPath=[$PSCommandPath] USERPROFILE=[$env:USERPROFILE]"
+# Startup diagnostic: if a base path is empty, the rest fails further down without saying why.
+Write-Host "Startup: PSScriptRoot=[$PSScriptRoot] PSCommandPath=[$PSCommandPath] USERPROFILE=[$env:USERPROFILE]"
 if (-not $PSScriptRoot -or -not $env:USERPROFILE) {
-    throw 'Chemins de base vides : lancer le banc avec pwsh -File bench/windows/run-bench.ps1'
+    throw 'Base paths are empty: start the bench with pwsh -File bench/windows/run-bench.ps1'
 }
 
 . (Join-Path $PSScriptRoot 'lib\harness.ps1')
@@ -75,13 +75,13 @@ function Test-Requirement {
     param([string]$Name)
     switch ($Name) {
         'apple-music' { return $script:AppleMusicInstalled }
-        # Set by the live workflow from bench/windows/live/connexion.ps1: Apple Music is signed in to the test account.
-        'apple-account' { return ($script:AppleMusicInstalled -and $env:AMK_SIGNED_IN -eq 'true') }
-        default { throw "Prérequis inconnu : $Name" }
+        # Set by the signed-in bench after bench/windows/live/sign-in.ps1: Apple Music is signed in to the test account.
+        'apple-account' { return ($script:AppleMusicInstalled -and $env:AMPIFY_SIGNED_IN -eq 'true') }
+        default { throw "Unknown requirement: $Name" }
     }
 }
 
-# FAIL si une vérification échoue ; SKIP si rien n'a pu être vérifié ; PASS sinon (INFO ne compte pas).
+# FAIL when a check fails; SKIP when nothing could be checked; PASS otherwise (INFO does not count).
 function Get-CaseStatus {
     param($Ctx)
     $status = 'SKIP'
@@ -97,53 +97,53 @@ function Format-Cell {
     return ($Text -replace '\|', '\|' -replace "[\r\n]+", ' ')
 }
 
-# Préparation : environnement, build, versions, installation d'Apple Music.
-Write-Step 'Préparation'
+# Preparation: environment, build, versions, Apple Music install.
+Write-Step 'Preparation'
 $os = Get-CimInstance -ClassName Win32_OperatingSystem
 $preparation = New-Object System.Collections.Generic.List[string]
-$preparation.Add("Système : $($os.Caption) $($os.Version)")
-$preparation.Add("PowerShell : $($PSVersionTable.PSVersion)")
-$preparation.Add("Date : $((Get-Date).ToString('s'))")
+$preparation.Add("System: $($os.Caption) $($os.Version)")
+$preparation.Add("PowerShell: $($PSVersionTable.PSVersion)")
+$preparation.Add("Date: $((Get-Date).ToString('s'))")
 $buildInfo = Join-Path $script:BenchKitRoot 'BUILD_INFO.txt'
 if (Test-Path -LiteralPath $buildInfo) {
     Get-Content -LiteralPath $buildInfo | ForEach-Object { $preparation.Add($_) }
 }
 
 $script:KnownVersions = @(Get-KnownAppVersions -RepoRoot $repo)
-$preparation.Add("Versions testées (core/version_gate.hpp) : $($script:KnownVersions -join ', ')")
+$preparation.Add("Tested versions (core/version_gate.hpp): $($script:KnownVersions -join ', ')")
 
-$installState = 'installation sautée (-SkipInstall)'
+$installState = 'install skipped (-SkipInstall)'
 if (-not $SkipInstall) {
     $installState = Install-AppleMusic -LogFile (Join-Path $script:BenchOutputRoot 'winget.log')
 }
 $fullName = Get-AppleMusicFullName
 $script:AppleMusicInstalled = [bool]$fullName
 if ($fullName) { $script:AppleMusicVersion = Get-VersionFromFullName -FullName $fullName }
-$preparation.Add("Apple Music : $installState")
-$preparation.Add("Version installée : $(if ($script:AppleMusicVersion) { $script:AppleMusicVersion } else { 'aucune' })")
+$preparation.Add("Apple Music: $installState")
+$preparation.Add("Installed version: $(if ($script:AppleMusicVersion) { $script:AppleMusicVersion } else { 'none' })")
 if (-not $script:AppleMusicInstalled) {
-    Write-Host "::warning::Apple Music n'est pas installé sur ce runner : les tests d'application sont sautés ($installState)"
+    Write-Host "::warning::Apple Music is not installed on this runner: the app cases are skipped ($installState)"
 }
 
 $preparation | ForEach-Object { Write-Host $_ }
 $preparation | Set-Content -LiteralPath (Join-Path $script:BenchOutputRoot 'preparation.txt') -Encoding UTF8
 
-# Les tests.
+# The cases.
 $report = @()
 foreach ($case in $script:Cases) {
     if ($Only.Count -gt 0 -and $Only -notcontains $case.Id) { continue }
 
-    Write-Host "::group::$($case.Id) : $($case.Title)"
+    Write-Host "::group::$($case.Id): $($case.Title)"
     $ctx = New-CaseContext -Case $case
     Stop-BenchProcesses
     $missing = @($case.Requires | Where-Object { -not (Test-Requirement -Name $_) })
     if ($missing.Count -gt 0) {
-        Add-Skip -Ctx $ctx -Name 'prérequis' -Reason ("manque : " + ($missing -join ', ') + " (préparation : $installState)")
+        Add-Skip -Ctx $ctx -Name 'requirements' -Reason ("missing: " + ($missing -join ', ') + " (preparation: $installState)")
     } else {
         try {
             & $case.Action $ctx
         } catch {
-            Add-Check -Ctx $ctx -Name 'le test s''est déroulé sans erreur' -Passed $false -Detail $_.Exception.Message
+            Add-Check -Ctx $ctx -Name 'the case ran without error' -Passed $false -Detail $_.Exception.Message
             Write-Host $_.ScriptStackTrace
         }
     }
@@ -160,32 +160,32 @@ foreach ($case in $script:Cases) {
     Write-Host '::endgroup::'
 }
 
-# Résultats : JSON pour les machines, rapport Markdown pour les humains.
+# Results: JSON for machines, Markdown report for people.
 $report | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:BenchOutputRoot 'results.json') -Encoding UTF8
 
 $lines = New-Object System.Collections.Generic.List[string]
-$lines.Add('# Banc de test Windows')
+$lines.Add('# Windows test bench')
 $lines.Add('')
-$lines.Add('## Préparation')
+$lines.Add('## Preparation')
 $lines.Add('')
 foreach ($line in $preparation) { $lines.Add("- $(Format-Cell $line)") }
 $lines.Add('')
-$lines.Add('## Tests')
+$lines.Add('## Cases')
 $lines.Add('')
-$lines.Add('| Test | Résultat |')
+$lines.Add('| Case | Result |')
 $lines.Add('|---|---|')
-foreach ($case in $report) { $lines.Add("| $($case.Id) : $(Format-Cell $case.Title) | **$($case.Status)** |") }
+foreach ($case in $report) { $lines.Add("| $($case.Id): $(Format-Cell $case.Title) | **$($case.Status)** |") }
 foreach ($case in $report) {
     $lines.Add('')
-    $lines.Add("### $($case.Id) : $(Format-Cell $case.Title) ($($case.Status))")
+    $lines.Add("### $($case.Id): $(Format-Cell $case.Title) ($($case.Status))")
     $lines.Add('')
-    $lines.Add('| Vérification | Résultat | Détail |')
+    $lines.Add('| Check | Result | Detail |')
     $lines.Add('|---|---|---|')
     foreach ($check in $case.Checks) {
         $lines.Add("| $(Format-Cell $check.Name) | $($check.Status) | $(Format-Cell $check.Detail) |")
     }
 }
-$lines | Set-Content -LiteralPath (Join-Path $script:BenchOutputRoot 'rapport.md') -Encoding UTF8
+$lines | Set-Content -LiteralPath (Join-Path $script:BenchOutputRoot 'report.md') -Encoding UTF8
 
 if ($env:GITHUB_STEP_SUMMARY) {
     $lines | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
@@ -193,9 +193,9 @@ if ($env:GITHUB_STEP_SUMMARY) {
 
 $failed = @($report | Where-Object { $_.Status -eq 'FAIL' })
 $skipped = @($report | Where-Object { $_.Status -eq 'SKIP' })
-Write-Step "Bilan : $($report.Count) test(s), $($failed.Count) en échec, $($skipped.Count) sauté(s)"
+Write-Step "Summary: $($report.Count) case(s), $($failed.Count) failed, $($skipped.Count) skipped"
 if ($failed.Count -gt 0) {
-    $failed | ForEach-Object { Write-Host "::error::banc : $($_.Id) en échec" }
+    $failed | ForEach-Object { Write-Host "::error::bench: $($_.Id) failed" }
     exit 1
 }
 exit 0

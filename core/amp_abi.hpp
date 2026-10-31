@@ -20,7 +20,7 @@
 //
 // Never called, by rule: SetVolumeAsync, SetMuteAsync and the EQ methods of IPlayer, and every FairPlay/DRM type.
 
-namespace amk::amp {
+namespace ampify::amp {
 
 inline constexpr int kInspectableSlots = 6;
 
@@ -109,4 +109,4 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
 // explicit values; the PC confirms it on a lossless and an Atmos track.
 enum class AudioFormat { Other = 0, Lossless = 1, HiResLossless = 2, DolbyAtmos = 3, Spatial = 4, Surround = 5 };
 
-}  // namespace amk::amp
+}  // namespace ampify::amp

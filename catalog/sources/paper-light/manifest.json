@@ -1,11 +1,11 @@
 {
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "paper-light",
-  "name": "Papier clair",
+  "name": "Light paper",
   "version": "1.0.0",
   "kind": "theme",
   "author": "Shirowwww",
-  "description": "Thème papier, sobre et clair, avec un schéma sombre en option.",
+  "description": "Plain, light paper theme, with an optional dark scheme.",
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Light"

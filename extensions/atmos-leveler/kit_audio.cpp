@@ -11,7 +11,7 @@ float Unscale(float volume) { return volume > 0.001f ? 1.0f / volume : 0.0f; }
 
 }  // namespace
 
-EqStage::EqStage(const amk::audio::EqSettings& settings, size_t maxProcessors)
+EqStage::EqStage(const ampify::audio::EqSettings& settings, size_t maxProcessors)
     : m_settings(settings), m_max(std::max<size_t>(1, maxProcessors)) {}
 
 bool EqStage::Active() {
@@ -34,12 +34,12 @@ void EqStage::Run(const void* key, float* interleaved, size_t frames, int channe
     if (found == m_processors.end()) {
         // Objects come and go. Past the limit the states are dropped rather than the table grown without end.
         if (m_processors.size() >= m_max) m_processors.clear();
-        found = m_processors.emplace(key, std::make_unique<amk::audio::EqProcessor>(m_settings)).first;
+        found = m_processors.emplace(key, std::make_unique<ampify::audio::EqProcessor>(m_settings)).first;
     }
     found->second->Process(interleaved, frames, channels, m_rate);
 }
 
-KitAudio::KitAudio(amk::audio::AudioEngine& engine)
+KitAudio::KitAudio(ampify::audio::AudioEngine& engine)
     : m_engine(engine),
       m_streamEq(engine.Eq(), 8),
       m_objectEq(engine.Eq()),

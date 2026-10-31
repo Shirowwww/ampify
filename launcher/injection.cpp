@@ -3,12 +3,12 @@
 #include <tlhelp32.h>
 #include <wchar.h>
 
-namespace amk::launcher {
+namespace ampify::launcher {
 
 namespace {
 
 std::string ErrorText(DWORD code) {
-    return "erreur Windows " + std::to_string(code);
+    return "Windows error " + std::to_string(code);
 }
 
 // Suspends or resumes each thread of the process. Returns how many actually changed state.
@@ -49,7 +49,7 @@ bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::s
     // kernel32 sits at the same address in every process, so the address found here is valid there too.
     FARPROC loadLibraryProc = GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "LoadLibraryW");
     if (!loadLibraryProc) {
-        failure = "LoadLibraryW introuvable";
+        failure = "LoadLibraryW not found";
         return false;
     }
 
@@ -57,12 +57,12 @@ bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::s
     SIZE_T bytes = (path.size() + 1) * sizeof(wchar_t);
     void* remotePath = VirtualAllocEx(process, nullptr, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     if (!remotePath) {
-        failure = "mémoire distante refusée (" + ErrorText(GetLastError()) + ")";
+        failure = "remote memory refused (" + ErrorText(GetLastError()) + ")";
         return false;
     }
 
     if (!WriteProcessMemory(process, remotePath, path.c_str(), bytes, nullptr)) {
-        failure = "écriture distante refusée (" + ErrorText(GetLastError()) + ")";
+        failure = "remote write refused (" + ErrorText(GetLastError()) + ")";
         VirtualFreeEx(process, remotePath, 0, MEM_RELEASE);
         return false;
     }
@@ -70,7 +70,7 @@ bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::s
     auto loadLibrary = reinterpret_cast<LPTHREAD_START_ROUTINE>(reinterpret_cast<void*>(loadLibraryProc));
     HANDLE thread = CreateRemoteThread(process, nullptr, 0, loadLibrary, remotePath, 0, nullptr);
     if (!thread) {
-        failure = "thread distant refusé (" + ErrorText(GetLastError()) + ")";
+        failure = "remote thread refused (" + ErrorText(GetLastError()) + ")";
         VirtualFreeEx(process, remotePath, 0, MEM_RELEASE);
         return false;
     }
@@ -80,12 +80,12 @@ bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::s
         DWORD exitCode = 0;  // LoadLibraryW's result: the module handle, zero on failure
         GetExitCodeThread(thread, &exitCode);
         loaded = exitCode != 0;
-        if (!loaded) failure = "LoadLibraryW a échoué dans le processus";
+        if (!loaded) failure = "LoadLibraryW failed in the process";
         VirtualFreeEx(process, remotePath, 0, MEM_RELEASE);
     } else {
         // The remote thread may still be reading the path, so its memory is left in place.
-        failure = "LoadLibraryW n'a pas répondu dans les " + std::to_string(timeoutMs / 1000) +
-                  " s (le chargement peut finir plus tard, voir le journal du noyau)";
+        failure = "LoadLibraryW did not answer within " + std::to_string(timeoutMs / 1000) +
+                  " s (the load may finish later, see the kernel log)";
         if (pending) {
             *pending = thread;
             return false;
@@ -102,10 +102,10 @@ bool FinishRemoteLoad(HANDLE thread, DWORD timeoutMs, std::string& failure) {
         DWORD exitCode = 0;
         GetExitCodeThread(thread, &exitCode);
         loaded = exitCode != 0;
-        if (!loaded) failure = "LoadLibraryW a échoué dans le processus";
+        if (!loaded) failure = "LoadLibraryW failed in the process";
     } else {
-        failure = "LoadLibraryW n'a toujours pas répondu " + std::to_string(timeoutMs / 1000) +
-                  " s après la reprise (voir le journal du noyau)";
+        failure = "LoadLibraryW had still not answered " + std::to_string(timeoutMs / 1000) +
+                  " s after the resume (see the kernel log)";
     }
     CloseHandle(thread);
     return loaded;
@@ -150,4 +150,4 @@ std::vector<DWORD> FindPackageProcesses(const wchar_t* imageName, const std::fil
     return found;
 }
 
-}  // namespace amk::launcher
+}  // namespace ampify::launcher

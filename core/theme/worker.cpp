@@ -11,7 +11,7 @@
 #include "snippets.hpp"
 #include "theme_settings.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -125,4 +125,4 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
     return m_request;
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

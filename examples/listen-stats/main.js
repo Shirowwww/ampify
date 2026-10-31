@@ -1,16 +1,8 @@
-// Compte les écoutes sur ce PC : nombre de lectures et temps écouté, par titre et par artiste, puis les montre dans
-// un panneau. Seuls le titre, l'artiste et des durées sont gardés, dans le stockage de l'élément : jamais de son.
-// Une lecture compte à partir de 30 secondes écoutées.
+// Counts plays on this PC: number of plays and time listened, per track and per artist, then shows them in
+// a panel. Only the title, the artist and durations are kept, in the item's storage: never any sound.
+// A play counts from 30 seconds listened.
 
-AMK.i18n.define({
-  fr: {
-    title: "Statistiques d'écoute",
-    total: "{plays} lectures, {minutes} min écoutées",
-    artists: "Artistes les plus écoutés",
-    tracks: "Titres les plus écoutés",
-    row: "{rank}. {name} — {plays} lecture(s)",
-    empty: "Rien d'écouté pour l'instant",
-  },
+Ampify.i18n.define({
   en: {
     title: "Listening stats",
     total: "{plays} plays, {minutes} min listened",
@@ -22,16 +14,16 @@ AMK.i18n.define({
 });
 
 const MIN_PLAY_MS = 30000;
-const MAX_TRACKS = 500;  // au-delà, les titres les moins écoutés sont oubliés (le stockage est limité à 1 Mo)
+const MAX_TRACKS = 500;  // beyond this, the least played tracks are forgotten (storage is limited to 1 MB)
 
-const stats = AMK.storage.get("stats", { plays: 0, listenedMs: 0, tracks: {}, artists: {} });
+const stats = Ampify.storage.get("stats", { plays: 0, listenedMs: 0, tracks: {}, artists: {} });
 let current = null;  // { id, title, artist, playedMs, since }
 
 function elapsed(now) {
   return current.playedMs + (current.since === null ? 0 : now - current.since);
 }
 
-// Ajoute le temps écouté du morceau en cours aux compteurs, puis repart de zéro pour ce morceau.
+// Adds the time listened to the current track to the counters, then restarts from zero for this track.
 function commit(now, finished) {
   if (!current) return;
   const ms = elapsed(now);
@@ -51,7 +43,7 @@ function commit(now, finished) {
     current.counted = true;
   }
   prune();
-  AMK.storage.set("stats", stats);
+  Ampify.storage.set("stats", stats);
 }
 
 function prune() {
@@ -71,24 +63,24 @@ function render() {
   const lines = (table, names, label) =>
     names.map((key, index) => ({
       type: "text",
-      text: AMK.i18n.t("row", { rank: index + 1, name: label(key), plays: table[key].plays }),
+      text: Ampify.i18n.t("row", { rank: index + 1, name: label(key), plays: table[key].plays }),
     }));
   const children = [
-    { type: "text", text: AMK.i18n.t("title"), style: "title" },
-    { type: "text", text: AMK.i18n.t("total", { plays: stats.plays, minutes: Math.round(stats.listenedMs / 60000) }) },
+    { type: "text", text: Ampify.i18n.t("title"), style: "title" },
+    { type: "text", text: Ampify.i18n.t("total", { plays: stats.plays, minutes: Math.round(stats.listenedMs / 60000) }) },
   ];
   if (stats.plays === 0 && Object.keys(stats.tracks).length === 0) {
-    children.push({ type: "text", text: AMK.i18n.t("empty") });
+    children.push({ type: "text", text: Ampify.i18n.t("empty") });
   } else {
-    children.push({ type: "text", text: AMK.i18n.t("artists"), style: "subtitle" });
+    children.push({ type: "text", text: Ampify.i18n.t("artists"), style: "subtitle" });
     children.push({ type: "list", children: lines(stats.artists, top(stats.artists, 5), (name) => name) });
-    children.push({ type: "text", text: AMK.i18n.t("tracks"), style: "subtitle" });
+    children.push({ type: "text", text: Ampify.i18n.t("tracks"), style: "subtitle" });
     children.push({
       type: "list",
       children: lines(stats.tracks, top(stats.tracks, 5), (id) => stats.tracks[id].title + " (" + stats.tracks[id].artist + ")"),
     });
   }
-  AMK.ui.panel.register("stats", { type: "stack", children });
+  Ampify.ui.panel.register("stats", { type: "stack", children });
 }
 
 function onTrack(state) {
@@ -117,12 +109,12 @@ function onState(state) {
   }
 }
 
-AMK.player.on("trackchange", onTrack);
-AMK.player.on("statechange", onState);
-onTrack(AMK.player.state());
-// Le temps écouté est enregistré chaque minute, pour ne pas le perdre si l'app se ferme.
+Ampify.player.on("trackchange", onTrack);
+Ampify.player.on("statechange", onState);
+onTrack(Ampify.player.state());
+// Time listened is saved every minute, so it is not lost if the app closes.
 setInterval(() => {
   commit(Date.now(), false);
   render();
 }, 60000);
-AMK.onStop(() => commit(Date.now(), true));
+Ampify.onStop(() => commit(Date.now(), true));

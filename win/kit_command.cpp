@@ -7,7 +7,7 @@
 
 #include "win_common.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -19,7 +19,7 @@ struct RunResult {
     std::string err;
 };
 
-// The folder of this DLL (amk_kernel.dll), where the kit puts amk.exe.
+// The folder of this DLL (ampify_kernel.dll), where Ampify puts ampify.exe.
 std::filesystem::path KernelFolder() {
     HMODULE module = nullptr;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -57,11 +57,11 @@ std::string ReadAll(HANDLE pipe) {
     return text;
 }
 
-RunResult RunAmk(const std::vector<std::string>& arguments) {
+RunResult RunAmpify(const std::vector<std::string>& arguments) {
     RunResult result;
-    std::filesystem::path program = KernelFolder() / "amk.exe";
+    std::filesystem::path program = KernelFolder() / "ampify.exe";
     if (!std::filesystem::exists(program)) {
-        result.err = "amk.exe introuvable à côté du noyau : " + ToUtf8(program.wstring());
+        result.err = "ampify.exe not found next to the kernel: " + ToUtf8(program.wstring());
         return result;
     }
     std::wstring commandLine = Quote(program.wstring());
@@ -70,7 +70,7 @@ RunResult RunAmk(const std::vector<std::string>& arguments) {
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
     HANDLE outRead = nullptr, outWrite = nullptr, errRead = nullptr, errWrite = nullptr;
     if (!CreatePipe(&outRead, &outWrite, &inherit, 0) || !CreatePipe(&errRead, &errWrite, &inherit, 0)) {
-        result.err = "tube impossible à créer";
+        result.err = "could not create the pipe";
         return result;
     }
     SetHandleInformation(outRead, HANDLE_FLAG_INHERIT, 0);
@@ -93,7 +93,7 @@ RunResult RunAmk(const std::vector<std::string>& arguments) {
     if (!started) {
         CloseHandle(outRead);
         CloseHandle(errRead);
-        result.err = "amk.exe n'a pas démarré (erreur " + std::to_string(GetLastError()) + ")";
+        result.err = "ampify.exe did not start (error " + std::to_string(GetLastError()) + ")";
         return result;
     }
 
@@ -133,11 +133,11 @@ void KitCommandRunner::RunKitCommand(const std::string& owner, const std::vector
     std::thread([owners, owner, generation, arguments, done = std::move(done), journal] {
         RunResult result;
         try {
-            result = RunAmk(arguments);
+            result = RunAmpify(arguments);
         } catch (...) {
-            result.err = "exception pendant amk";
+            result.err = "exception while running ampify";
         }
-        journal->Write("Kit : amk " + arguments.front() + " terminé (code " + std::to_string(result.code) + ")");
+        journal->Write("Ampify: ampify " + arguments.front() + " finished (code " + std::to_string(result.code) + ")");
         std::lock_guard<std::mutex> guard(owners->lock);
         if (owners->generation[owner] != generation) return;
         try {
@@ -152,4 +152,4 @@ void KitCommandRunner::Forget(const std::string& owner) {
     m_owners->generation[owner]++;
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

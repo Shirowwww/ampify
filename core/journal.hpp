@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-namespace amk {
+namespace ampify {
 
 // Journal lines look like `[13:09:27.041] message`. The clock is injectable so tests stay deterministic.
 // Write is safe to call from several threads: the kernel's worker and the interface thread both log.
@@ -28,4 +28,4 @@ private:
     std::mutex m_mutex;
 };
 
-}  // namespace amk
+}  // namespace ampify

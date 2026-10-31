@@ -3,67 +3,40 @@
 #include <algorithm>
 #include <cctype>
 
-namespace amk::i18n {
+namespace ampify::i18n {
 
 namespace {
 
 // Texts of the kernel and of the services. Simple words: the person reading may not be technical.
 constexpr Message kKit[] = {
-    {"tray.tooltip", "Apple Music Mod Kit", "Apple Music Mod Kit"},
-    {"tray.previous", "Morceau précédent", "Previous track"},
-    {"tray.next", "Morceau suivant", "Next track"},
-    {"tray.openKit", "Ouvrir le dossier du kit", "Open the kit folder"},
-    {"tray.started", "Icône de la zone de notification affichée", "Notification area icon shown"},
-    {"tray.failed", "Icône de la zone de notification refusée par Windows ({error})",
-     "Windows refused the notification area icon ({error})"},
-    {"remote.started", "Télécommande locale prête sur http://127.0.0.1:{port} (jeton demandé)",
-     "Local remote control ready on http://127.0.0.1:{port} (token required)"},
-    {"remote.failed", "Télécommande locale non démarrée : {error}", "Local remote control not started: {error}"},
-    {"remote.tokenCreated", "Télécommande locale : jeton créé dans remote.token (amk config remote.token)",
-     "Local remote control: token created in remote.token (amk config remote.token)"},
-    {"discord.connected", "Discord : connecté, la présence s'affiche", "Discord: connected, the presence is shown"},
-    {"discord.unavailable", "Discord : client introuvable ou fermé, nouvel essai dans 15 s",
-     "Discord: client not found or closed, trying again in 15 s"},
-    {"discord.error", "Discord a refusé la présence : {error}", "Discord refused the presence: {error}"},
-    {"midi.opened", "MIDI : entrée « {name} » ouverte", "MIDI: input \"{name}\" opened"},
-    {"midi.none", "MIDI : aucun appareil d'entrée trouvé", "MIDI: no input device found"},
-    {"midi.failed", "MIDI : ouverture de l'entrée impossible ({error})", "MIDI: the input cannot be opened ({error})"},
-    {"midi.mapRefused", "MIDI : midi.map refusé : {error}", "MIDI: midi.map refused: {error}"},
-    {"service.off", "{service} : désactivé (réglage {setting} à 0)", "{service}: off (setting {setting} is 0)"},
-    {"common.yes", "oui", "yes"},
-    {"common.no", "non", "no"},
+    {"tray.tooltip", "Ampify"},
+    {"tray.previous", "Previous track"},
+    {"tray.next", "Next track"},
+    {"tray.openKit", "Open the Ampify folder"},
+    {"tray.started", "Notification area icon shown"},
+    {"tray.failed", "Windows refused the notification area icon ({error})"},
+    {"remote.started", "Local remote control ready on http://127.0.0.1:{port} (token required)"},
+    {"remote.failed", "Local remote control not started: {error}"},
+    {"remote.tokenCreated", "Local remote control: token created in remote.token (ampify config remote.token)"},
+    {"discord.connected", "Discord: connected, the presence is shown"},
+    {"discord.unavailable", "Discord: client not found or closed, trying again in 15 s"},
+    {"discord.error", "Discord refused the presence: {error}"},
+    {"midi.opened", "MIDI: input \"{name}\" opened"},
+    {"midi.none", "MIDI: no input device found"},
+    {"midi.failed", "MIDI: the input cannot be opened ({error})"},
+    {"midi.mapRefused", "MIDI: midi.map refused: {error}"},
+    {"service.off", "{service}: off (setting {setting} is 0)"},
+    {"common.yes", "yes"},
+    {"common.no", "no"},
 };
 
-std::string Lower(std::string_view text) {
-    std::string out(text);
-    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return std::tolower(c); });
-    return out;
-}
+bool IsLetter(char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0; }
 
 }  // namespace
 
-bool IsLanguageSetting(std::string_view value) {
-    return value.empty() || value == "fr" || value == "en" || value == "auto";
-}
-
-Language ResolveLanguage(std::string_view setting, std::string_view locale) {
-    if (setting == "fr") return Language::Fr;
-    if (setting == "en") return Language::En;
-    std::string lowered = Lower(locale);
-    std::string_view name = lowered;
-    if (name.empty() || name == "c" || name == "posix" || name.substr(0, 2) == "c." || name.substr(0, 2) == "fr") {
-        return Language::Fr;
-    }
-    return Language::En;
-}
-
-std::string_view Code(Language language) { return language == Language::En ? "en" : "fr"; }
-
-std::string_view Lookup(std::span<const Message> table, Language language, std::string_view key) {
+std::string_view Lookup(std::span<const Message> table, std::string_view key) {
     for (const Message& message : table) {
-        if (message.key != key) continue;
-        if (language == Language::En && !message.en.empty()) return message.en;
-        return message.fr;
+        if (message.key == key) return message.text;
     }
     return key;
 }
@@ -115,8 +88,15 @@ std::string Placeholders(std::string_view pattern) {
 
 std::span<const Message> KitMessages() { return kKit; }
 
-std::string Text(Language language, std::string_view key, Args args) {
-    return Format(Lookup(KitMessages(), language, key), args);
+std::string Text(std::string_view key, Args args) { return Format(Lookup(KitMessages(), key), args); }
+
+std::string LanguageCode(std::string_view locale) {
+    bool twoLetters = locale.size() >= 2 && IsLetter(locale[0]) && IsLetter(locale[1]) &&
+                      (locale.size() == 2 || !IsLetter(locale[2]));
+    if (!twoLetters) return "en";
+    std::string code(locale.substr(0, 2));
+    std::transform(code.begin(), code.end(), code.begin(), [](unsigned char c) { return std::tolower(c); });
+    return code;
 }
 
-}  // namespace amk::i18n
+}  // namespace ampify::i18n

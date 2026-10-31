@@ -1,11 +1,11 @@
 {
   "$schema": "../../schemas/manifest.schema.json",
   "id": "scrobbler",
-  "name": "Scrobbler Last.fm",
+  "name": "Last.fm scrobbler",
   "version": "0.1.0",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Envoie à Last.fm les morceaux écoutés (scrobbling). Les écoutes non envoyées attendent dans le stockage.",
+  "description": "Sends the tracks you listen to to Last.fm (scrobbling). Plays that could not be sent wait in storage.",
   "kitApi": "1.0",
   "main": "main.js",
   "processes": ["engine"],

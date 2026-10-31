@@ -19,7 +19,7 @@
 #include <utility>
 #include <vector>
 
-namespace amk::win::rt {
+namespace ampify::win::rt {
 
 // The combase.dll functions the player needs. Null when combase.dll or one of them is missing.
 struct Combase {
@@ -32,7 +32,7 @@ struct Combase {
 const Combase* Api();
 
 // Joins the multithreaded apartment on this thread, once. False when the thread already lives in a single-threaded
-// apartment (the calls still work, the journal says it).
+// apartment (the calls still work, the log says it).
 bool EnsureMultithreaded();
 
 // An owned reference to a COM object, released at the end of its life.
@@ -122,7 +122,7 @@ void SetActivationHookForTests(ActivationHook hook);
 
 struct Activation {
     HRESULT result = E_FAIL;
-    std::string how;  // "RoGetActivationFactory", "DllGetActivationFactory de AMP.Services.dll", "test"
+    std::string how;  // "RoGetActivationFactory", "DllGetActivationFactory from AMP.Services.dll", "test"
 };
 
 // The activation factory of `className`, as the interface `iid`. First RoGetActivationFactory; then, as C++/WinRT
@@ -162,4 +162,4 @@ private:
     std::shared_ptr<std::atomic<unsigned>> m_count;
 };
 
-}  // namespace amk::win::rt
+}  // namespace ampify::win::rt

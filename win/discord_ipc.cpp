@@ -4,7 +4,7 @@
 #include <chrono>
 #include <vector>
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -13,8 +13,8 @@ constexpr DWORD kAnswerTimeoutMs = 3000;
 
 }  // namespace
 
-DiscordIpc::DiscordIpc(Journal& journal, i18n::Language language, std::wstring pipeBase)
-    : m_journal(journal), m_language(language), m_pipeBase(std::move(pipeBase)) {
+DiscordIpc::DiscordIpc(Journal& journal, std::wstring pipeBase)
+    : m_journal(journal), m_pipeBase(std::move(pipeBase)) {
     m_thread = std::thread([this] { Run(); });
 }
 
@@ -67,13 +67,13 @@ void DiscordIpc::Run() {
         if (m_pipe == INVALID_HANDLE_VALUE) {
             if (!activity) continue;  // nothing shown, nothing to clear
             if (!Connect(clientId)) {
-                if (!m_warnedUnavailable) m_journal.Write(i18n::Text(m_language, "discord.unavailable"));
+                if (!m_warnedUnavailable) m_journal.Write(i18n::Text("discord.unavailable"));
                 m_warnedUnavailable = true;
                 retry = true;
                 continue;
             }
             m_warnedUnavailable = false;
-            m_journal.Write(i18n::Text(m_language, "discord.connected"));
+            m_journal.Write(i18n::Text("discord.connected"));
         }
 
         std::string nonce = std::to_string(++m_nonce);
@@ -88,7 +88,7 @@ void DiscordIpc::Run() {
             std::optional<discord::Frame> frame = Read(kAnswerTimeoutMs);
             if (!frame) break;
             if (std::optional<std::string> error = discord::ErrorOf(*frame)) {
-                m_journal.Write(i18n::Text(m_language, "discord.error", {{"error", *error}}));
+                m_journal.Write(i18n::Text("discord.error", {{"error", *error}}));
                 if (frame->opcode == discord::Opcode::Close) Disconnect();
                 break;
             }
@@ -119,7 +119,7 @@ bool DiscordIpc::Connect(const std::string& clientId) {
             }
             if (frame) {
                 if (std::optional<std::string> error = discord::ErrorOf(*frame)) {
-                    m_journal.Write(i18n::Text(m_language, "discord.error", {{"error", *error}}));
+                    m_journal.Write(i18n::Text("discord.error", {{"error", *error}}));
                 }
             }
         }
@@ -174,4 +174,4 @@ std::optional<discord::Frame> DiscordIpc::Read(DWORD timeoutMs) {
     }
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

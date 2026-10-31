@@ -1,57 +1,59 @@
-# Volume de l'Atmos : ce qu'Apple fait, ce qui marche (relevé du 2026-10-30)
+# Atmos volume: what Apple does and what works
 
-Relevé fait par l'utilisateur sur son PC, Apple Music pour Windows `1.1540.23042.0`. Complète la section « Lecture » de
-[apple-music-internals.md](apple-music-internals.md). Les adresses (RVA) ne servent qu'à comprendre : le kit ne
-résout jamais une fonction par adresse.
+Measured on Apple Music for Windows `1.1540.23042.0`. It completes the "Playback" section of
+[apple-music-internals.md](apple-music-internals.md). Addresses (RVA) are only here for understanding: Ampify never
+resolves a function by address.
 
-## Le système d'Apple ne règle pas le volume de l'Atmos
+## Apple's system does not set the Atmos volume
 
-**Sound Check ne touche jamais l'Atmos.**
+**Sound Check never touches Atmos.**
 
-- `AVCFPlayerItemSetLoudnessInfo` ne reçoit que `{"adjust to album loudness": true}`.
-- Les items Atmos n'ont aucune information de loudness.
-- Le tap audio (égaliseur, Sound Check) est sauté exprès pour l'Atmos : préférence
-  `skip-audio-tap-for-atmos-passthrough`. Un élément qui passerait par le tap ne verrait donc pas l'Atmos.
+- `AVCFPlayerItemSetLoudnessInfo` only receives `{"adjust to album loudness": true}`.
+- Atmos items carry no loudness information.
+- The audio tap (equalizer, Sound Check) is skipped on purpose for Atmos: preference
+  `skip-audio-tap-for-atmos-passthrough`. An element that went through the tap would not see Atmos.
 
-**CoreMedia a son propre nivellement Atmos, et il ne suffit pas.**
+**CoreMedia has its own Atmos leveling, and it is not enough.**
 
-- `media::MediaEngineWrapper::EnableLoudnessModeForDolbyAtmosMusic` (RVA `0x2067b0`) pose un drapeau (`+0x365`)
-  avant la création du moteur.
-- La création du moteur (`0x207130`) appelle ensuite `ApplyLoudnessModeForDolbyAtmosMusic` (`0x206cf0`). Celle-ci
-  insère l'effet audio Dolby avec `CODECAPI_AVDecDDOperationalMode` = préférence `atmos-loudness-mode`
-  (domaine `com.apple.coremedia`, lue une seule fois par processus, défaut `8` = PORTABLE16).
-- RVA valables pour `CoreMedia.dll` dont l'horodatage PE est `0x69b9c1b1`.
+- `media::MediaEngineWrapper::EnableLoudnessModeForDolbyAtmosMusic` (RVA `0x2067b0`) sets a flag (`+0x365`) before the
+  engine is created.
+- Creating the engine (`0x207130`) then calls `ApplyLoudnessModeForDolbyAtmosMusic` (`0x206cf0`). That inserts the Dolby
+  audio effect with `CODECAPI_AVDecDDOperationalMode` = preference `atmos-loudness-mode` (domain `com.apple.coremedia`,
+  read once per process, default `8` = PORTABLE16).
+- The RVAs are valid for a `CoreMedia.dll` whose PE timestamp is `0x69b9c1b1`.
 
-**Mesures BS.1770 sur le même morceau :**
+**BS.1770 measurements on the same song:**
 
-| Réglage | Loudness |
+| Setting | Loudness |
 |---|---|
-| Atmos, mode 8 (celui d'Apple, toujours appliqué et réussi) | -19,9 LUFS |
-| Atmos, modes 7 et 6 (le décodeur retombe sans dialnorm) | -31,15 LUFS |
-| Stéréo avec Sound Check | -15,9 à -16,1 LUFS |
+| Atmos, mode 8 (Apple's, always applied and successful) | -19.9 LUFS |
+| Atmos, modes 7 and 6 (the decoder falls back with no dialnorm) | -31.15 LUFS |
+| Stereo with Sound Check | -15.9 to -16.1 LUFS |
 
-**Ne pas retenter ce réglage.** Seul le mode 8 fonctionne, et il laisse l'Atmos environ 4 dB sous la stéréo.
-Le kit ne lit ni n'écrit `atmos-loudness-mode`.
+**Do not try this setting again.** Only mode 8 works, and it leaves Atmos about 4 dB below stereo. Ampify neither reads nor
+writes `atmos-loudness-mode`.
 
-## La seule correction qui marche : un gain sur les échantillons décodés, mesuré par morceau
+## The only fix that works: a gain on the decoded samples, measured per song
 
-| Chemin | Interface | Format | Position par rapport au curseur |
+| Path | Interface | Format | Position relative to the slider |
 |---|---|---|---|
-| Stéréo | `IAudioRenderClient` | float32, 2 canaux, 96 kHz (sortie de l'utilisateur) | après : le volume du lecteur est déjà appliqué |
-| Atmos | `ISpatialAudioObjectRenderStreamForMetadata` (IID `Data1` = `0xBBC9C907`) | objets mono float32, 48 kHz, 16 dynamiques | avant : le volume du curseur n'est pas encore appliqué |
+| Stereo | `IAudioRenderClient` | float32, 2 channels, 96 kHz (the test output) | after: the player volume is already applied |
+| Atmos | `ISpatialAudioObjectRenderStreamForMetadata` (IID `Data1` = `0xBBC9C907`) | mono float32 objects, 48 kHz, 16 dynamic | before: the slider volume is not applied yet |
 
-Méthodes accrochées à la volée sur le flux Atmos (numéros de vtable) : `GetBuffer` en 3 (sur l'objet audio),
-`BeginUpdatingAudioObjects` en 8, `EndUpdatingAudioObjects` en 9, activation d'objets en 10 et 11.
+Methods hooked on the fly on the Atmos stream (vtable numbers): `GetBuffer` at 3 (on the audio object),
+`BeginUpdatingAudioObjects` at 8, `EndUpdatingAudioObjects` at 9, object activation at 10 and 11.
 
-Conséquence : pour comparer l'Atmos à la stéréo, la mesure doit ramener les deux chemins à la même échelle
-(la stéréo divisée par le volume du lecteur, ou l'Atmos multiplié par ce volume).
+Consequence: to compare Atmos with stereo, the measurement must bring both paths to the same scale (stereo divided by the
+player volume, or Atmos multiplied by it).
 
-**Ne jamais passer par `AVCFPlayerSetVolume`** : le curseur d'Apple Music affiche le volume du lecteur, il bougerait.
-Le noyau lit ce volume, il ne l'écrit jamais.
+**Never go through `AVCFPlayerSetVolume`:** Apple Music's slider shows the player volume and would move. The kernel reads
+this volume and never writes it.
 
-## Réglages du nivellement
+## Leveling settings
 
-- Cible : médiane des 30 derniers morceaux stéréo mesurés.
-- Gain entre 0 et 15 dB.
-- Plafond de crête 0,95, genou doux à partir de 0,94.
-- Une valeur gardée par variante stable du morceau (`AVCFPlayerItemCopyCurrentStableVariantID`).
+- Target: the median of the last 30 stereo songs measured.
+- Gain between 0 and 15 dB.
+- Peak ceiling 0.95, soft knee from 0.94.
+- One value kept per stable variant of the song (`AVCFPlayerItemCopyCurrentStableVariantID`).
+- Starting gain for a new Atmos song: 5.0 dB, then it converges as the measurement builds.
+- With AMExclusive active (exclusive output), leveling pauses ([amexclusive-notes.md](amexclusive-notes.md)).

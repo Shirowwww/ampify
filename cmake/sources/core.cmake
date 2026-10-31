@@ -1,6 +1,6 @@
-# Portable kernel: target amk_core. The modules of the AMK object are in api.cmake. See the convention at the top
+# Portable kernel: target ampify_core. The modules of the Ampify object are in api.cmake. See the convention at the top
 # of CMakeLists.txt.
-list(APPEND AMK_CORE_SOURCES
+list(APPEND AMPIFY_CORE_SOURCES
     core/settings.cpp
     core/journal.cpp
     core/safe_mode.cpp

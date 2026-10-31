@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
 // True when an archive entry stays inside the folder it is extracted to: relative, no "..", no drive letter,
 // no backslash, no control character. `reason` says what is wrong when this returns false.
@@ -18,4 +18,4 @@ std::string CheckArchiveListing(const std::vector<std::string>& entries);
 // files outside the folder, so an extracted tree with one is refused.
 bool ContainsLink(const std::filesystem::path& folder);
 
-}  // namespace amk
+}  // namespace ampify

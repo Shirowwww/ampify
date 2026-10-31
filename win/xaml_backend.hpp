@@ -3,10 +3,10 @@
 // The Windows backend of the theme engine: reads and writes the live XAML tree of Apple Music.
 //
 // NOT COMPILED IN THE CURRENT BUILD. It needs the Windows App SDK C++/WinRT headers, so it is built only when
-// AMK_WITH_XAML is defined (see CMakeLists.txt). Every member must be called on the interface thread, through
+// AMPIFY_WITH_XAML is defined (see CMakeLists.txt). Every member must be called on the interface thread, through
 // PostToUiThread (ui_thread.hpp, DispatcherQueue of the main window). Nothing here has run against Apple Music yet: see docs/tests/M8-themes.md.
 
-#if defined(AMK_WITH_XAML)
+#if defined(AMPIFY_WITH_XAML)
 
 #include <cstdint>
 #include <functional>
@@ -28,7 +28,7 @@
 #include "../core/theme/hover.hpp"
 #include "../core/theme/tree.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 // The hover logic (theme::HoverTracker) reads and writes the element through ReadRaw and WriteRaw, the XAML access
 // without the hover; Read and Write go through the tracker.
@@ -81,6 +81,9 @@ private:
                                           const winrt::Windows::Foundation::IInspectable& object) const;
     void Forget(theme::NodeId id, std::string_view property);
 
+    winrt::Microsoft::UI::Xaml::Media::Brush ArtworkBrush(const std::string& text);
+    void FollowArtwork(const winrt::Microsoft::UI::Xaml::Media::ImageSource& artwork);
+
     void OnPointer(theme::NodeId id, bool entered) noexcept;
     void RemoveHoverHandlers(theme::NodeId id);
 
@@ -111,8 +114,12 @@ private:
     std::optional<winrt::Microsoft::UI::Xaml::ElementTheme> m_modeOriginal;    // its value before the theme
     std::map<std::string, theme::Value> m_addedKeys;  // keys added on top of the theme dictionaries, with the value before
     bool m_resourcesDirty = false;  // a resource changed: {ThemeResource} references must be resolved again
+    // `background: artwork`: the image Apple Music shows for the song playing (Image#StaticArtwork in its play bar),
+    // found again on each snapshot, and the brushes the kit made from it, which follow it when the song changes.
+    winrt::Microsoft::UI::Xaml::Media::ImageSource m_artwork{nullptr};
+    std::vector<winrt::Microsoft::UI::Xaml::Media::ImageBrush> m_artworkBrushes;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win
 
-#endif  // AMK_WITH_XAML
+#endif  // AMPIFY_WITH_XAML

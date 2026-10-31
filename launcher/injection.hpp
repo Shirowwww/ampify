@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace amk::launcher {
+namespace ampify::launcher {
 
 // Rights the launcher asks for when it opens an Apple Music process to load the kernel into it.
 inline constexpr DWORD kInjectionRights = PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION |
@@ -23,7 +23,7 @@ HANDLE OpenProcessForInjection(DWORD processId);
 
 // Loads `kernelDll` into `process` by running LoadLibraryW there, and waits at most `timeoutMs`.
 // On failure, `failure` says why, in French. A load that is still pending at the timeout may finish
-// later: the thread is not killed, and the caller should check the kernel's own journal.
+// later: the thread is not killed, and the caller should check the kernel's own log.
 //
 // When `pending` is given and the load is still running at the timeout, the remote thread's handle is stored there
 // instead of being closed, so the caller can wait again with FinishRemoteLoad (for example after resuming the
@@ -44,4 +44,4 @@ int ResumeProcessThreads(DWORD processId);
 // Ids of the running processes that have this image name and run from under `directory`.
 std::vector<DWORD> FindPackageProcesses(const wchar_t* imageName, const std::filesystem::path& directory);
 
-}  // namespace amk::launcher
+}  // namespace ampify::launcher

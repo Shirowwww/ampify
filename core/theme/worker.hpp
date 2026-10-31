@@ -11,9 +11,9 @@
 #include "scheme_choice.hpp"
 #include "session.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
-// The worker side of the themes: on each pass it reads settings.txt and the kit folder, decides what the interface
+// The worker side of the themes: on each pass it reads settings.txt and the Ampify folder, decides what the interface
 // should show, and loads it again only when something changed. Portable: the Windows service (win/theme_service.cpp)
 // calls it from its worker thread and posts the request to the interface thread, where ThemeSession applies it.
 //
@@ -24,7 +24,7 @@ namespace amk::theme {
 //   Tick(settings, minute)    the settings just read, and the local time in minutes from midnight (GetLocalTime),
 //                             for theme.schedule
 //
-// Kit folder layout read here: themes\<id>\, snippets\<id>\, resource-keys.txt, sidebar.json, home.json.
+// Ampify folder layout read here: themes\<id>\, snippets\<id>\, resource-keys.txt, sidebar.json, home.json.
 class ThemeWorker {
 public:
     explicit ThemeWorker(std::filesystem::path kit);
@@ -52,4 +52,4 @@ private:
 // comments). Nothing when the file is missing: the check is then skipped and the problems say so.
 std::optional<std::set<std::string>> ReadAllowedKeys(const std::filesystem::path& file);
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

@@ -18,7 +18,7 @@
 #include "../core/player_model.hpp"
 #include "winrt_abi.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 class SmtcSession {
 public:
@@ -52,4 +52,4 @@ private:
     std::string m_title, m_artist, m_album;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win

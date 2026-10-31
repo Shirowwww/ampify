@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <iterator>
 
-namespace amk {
+namespace ampify {
 namespace {
 
 constexpr std::size_t kLfanewOffset = 0x3C;     // DOS header: offset of the PE header
@@ -146,17 +146,17 @@ BuildSignature CheckBuildSignature(std::span<const std::byte> image, std::span<c
 
 std::string DescribeSignature(const BuildSignature& signature) {
     std::string dll(kPlayerDllName);
-    if (!signature.readable) return "signature non reconnue : " + dll + " illisible";
+    if (!signature.readable) return "signature not recognised: " + dll + " is unreadable";
     if (!signature.missing.empty()) {
         std::string list;
         for (const std::string& name : signature.missing) {
             if (!list.empty()) list += ", ";
             list += name;
         }
-        return "signature non reconnue : exports absents de " + dll + " (" + list + ")";
+        return "signature not recognised: exports missing from " + dll + " (" + list + ")";
     }
-    return "signature reconnue : " + std::to_string(std::size(kRequiredPlayerExports)) + " exports trouvés dans " +
+    return "signature recognised: " + std::to_string(std::size(kRequiredPlayerExports)) + " exports found in " +
            dll;
 }
 
-}  // namespace amk
+}  // namespace ampify

@@ -7,12 +7,12 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
 struct TimerNatives : ScriptBridge {
-    AMK_NATIVE(Schedule) {
+    AMPIFY_NATIVE(Schedule) {
         ScriptExtension* ext = Owner(ctx);
         uint32_t id = static_cast<uint32_t>(Number(ctx, argc, argv, 0));
         auto delay = std::chrono::milliseconds(std::max<int64_t>(1, static_cast<int64_t>(Number(ctx, argc, argv, 1))));
@@ -25,7 +25,7 @@ struct TimerNatives : ScriptBridge {
         return JS_UNDEFINED;
     }
 
-    AMK_NATIVE(Cancel) {
+    AMPIFY_NATIVE(Cancel) {
         ScriptExtension* ext = Owner(ctx);
         uint32_t id = static_cast<uint32_t>(Number(ctx, argc, argv, 0));
         auto& timers = TimersOf(ext);
@@ -43,4 +43,4 @@ void DefineTimers(api::NativeScope& scope) {
     scope.Function("cancel", TimerNatives::Cancel, 1);
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

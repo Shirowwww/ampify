@@ -1,12 +1,12 @@
-// Module config: AMK.config, the element's settings. Natives: core/natives/config.cpp.
+// Module config: Ampify.config, the element's settings. Natives: core/natives/config.cpp.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kConfig[];
-const char kConfig[] = R"AMKJS(
+const char kConfig[] = R"AMPIFYJS(
   const TRUE_WORDS = ["true", "on", "yes", "1"];
 
-  AMK.config = {
+  Ampify.config = {
     get(key, fallback) {
       const raw = native.configGet(text(key));
       if (raw === undefined) return fallback;
@@ -22,10 +22,10 @@ const char kConfig[] = R"AMKJS(
       if (typeof value === "boolean") raw = value ? "true" : "false";
       else if (typeof value === "number" && Number.isFinite(value)) raw = String(value);
       else if (typeof value === "string") raw = value;
-      else throw new TypeError("config.set : valeur booléenne, numérique ou texte seulement");
+      else throw new TypeError("config.set: boolean, number or text values only");
       native.configSet(text(key), raw);
     },
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

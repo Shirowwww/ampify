@@ -6,14 +6,14 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
 constexpr double kDefaultGainCeilingDb = 6.0;
 
 struct AudioNatives : ScriptBridge {
-    AMK_NATIVE(SetGain) {
+    AMPIFY_NATIVE(SetGain) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.gain", &failure)) return failure;
@@ -40,4 +40,4 @@ void StopAudio(ScriptExtension& extension) {
     if (ScriptBridge::GainDbOf(&extension) != 0) ScriptBridge::HostOf(&extension).SetGainDb(extension.id(), 0);
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

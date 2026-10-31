@@ -10,7 +10,7 @@
 #include "theme.hpp"
 #include "tree.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // Applies a theme to the live tree and takes it back off.
 //
@@ -77,4 +77,4 @@ private:
     bool m_active = false;
 };
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

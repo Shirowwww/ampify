@@ -7,7 +7,7 @@
 #include "../json.hpp"
 #include "selector.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -33,7 +33,7 @@ std::optional<LayoutConfig> ParseLayout(std::string_view json, std::vector<std::
     }
     const Json* items = document->Find("items");
     if (!items || !items->IsArray()) {
-        problems.push_back("liste « items » absente");
+        problems.push_back("list \"items\" missing");
         return std::nullopt;
     }
 
@@ -42,7 +42,7 @@ std::optional<LayoutConfig> ParseLayout(std::string_view json, std::vector<std::
         if (reorder->AsBool()) {
             config.reorder = *reorder->AsBool();
         } else {
-            problems.push_back("« reorder » doit valoir true ou false, false est utilisé");
+            problems.push_back("\"reorder\" must be true or false, false is used");
         }
     }
 
@@ -52,11 +52,11 @@ std::optional<LayoutConfig> ParseLayout(std::string_view json, std::vector<std::
         index++;
         const Json* name = item.Find("name");
         if (!item.IsObject() || !name || !name->AsString() || !IsElementName(*name->AsString())) {
-            problems.push_back("élément " + std::to_string(index) + " : « name » doit être un x:Name (lettres, chiffres, _ et -), ignoré");
+            problems.push_back("element " + std::to_string(index) + ": \"name\" must be an x:Name (letters, digits, _ and -), ignored");
             continue;
         }
         if (!seen.insert(*name->AsString()).second) {
-            problems.push_back("élément " + std::to_string(index) + " : « " + *name->AsString() + " » en double, ignoré");
+            problems.push_back("element " + std::to_string(index) + ": \"" + *name->AsString() + "\" is a duplicate, ignored");
             continue;
         }
         LayoutItem entry;
@@ -65,7 +65,7 @@ std::optional<LayoutConfig> ParseLayout(std::string_view json, std::vector<std::
             if (hidden->AsBool()) {
                 entry.hidden = *hidden->AsBool();
             } else {
-                problems.push_back("élément " + std::to_string(index) + " : « hidden » doit valoir true ou false");
+                problems.push_back("element " + std::to_string(index) + ": \"hidden\" must be true or false");
             }
         }
         config.items.push_back(std::move(entry));
@@ -133,4 +133,4 @@ void AddLayoutRules(const LayoutConfig& config, LayoutKind kind, Theme& out) {
     }
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

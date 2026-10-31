@@ -5,7 +5,7 @@
 #include "../settings.hpp"
 #include "theme.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // The theme keys of settings.txt. The values are read and written as they are kept on disk.
 //   theme.active       folder name of the theme in use; empty or `none` for no theme
@@ -29,4 +29,4 @@ struct ThemeSettings {
 ThemeSettings ReadThemeSettings(const Settings& settings);
 void WriteThemeSettings(Settings& settings, const ThemeSettings& value);
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

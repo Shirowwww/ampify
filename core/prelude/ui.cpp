@@ -1,10 +1,10 @@
-// Module ui: AMK.ui. The kit keeps what the element asks for, and the Windows host draws it (M8).
+// Module ui: Ampify.ui. The kit keeps what the element asks for, and the Windows host draws it (M8).
 // Natives: core/natives/ui.cpp.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kUi[];
-const char kUi[] = R"AMKJS(
+const char kUi[] = R"AMPIFYJS(
   const uiCallbacks = new Map();
 
   const treeText = (vue) => {
@@ -23,7 +23,7 @@ const char kUi[] = R"AMKJS(
     return id;
   };
 
-  AMK.ui = Object.freeze({
+  Ampify.ui = Object.freeze({
     topbar: Object.freeze({ addButton: (options) => addControl("topbar", options) }),
     playbar: Object.freeze({ addButton: (options) => addControl("playbar", options) }),
     menu: Object.freeze({
@@ -43,6 +43,6 @@ const char kUi[] = R"AMKJS(
     const fn = uiCallbacks.get(id);
     if (fn) runGuarded("bouton " + id, fn, []);
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

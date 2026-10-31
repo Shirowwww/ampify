@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <utility>
 
-namespace amk::json {
+namespace ampify::json {
 
 namespace {
 
@@ -46,7 +46,7 @@ public:
     Value ParseDocument() {
         Value value = ParseValue(0);
         SkipSpace();
-        if (m_pos != m_text.size()) Fail("texte après la fin du document");
+        if (m_pos != m_text.size()) Fail("text after the end of the document");
         return value;
     }
 
@@ -66,14 +66,14 @@ private:
     }
 
     void ExpectLiteral(std::string_view literal) {
-        if (m_text.substr(m_pos, literal.size()) != literal) Fail("valeur invalide");
+        if (m_text.substr(m_pos, literal.size()) != literal) Fail("invalid value");
         m_pos += literal.size();
     }
 
     Value ParseValue(int depth) {
-        if (depth > kMaxDepth) Fail("imbrication trop profonde");
+        if (depth > kMaxDepth) Fail("nesting too deep");
         SkipSpace();
-        if (m_pos >= m_text.size()) Fail("fin de texte inattendue");
+        if (m_pos >= m_text.size()) Fail("unexpected end of text");
 
         char c = m_text[m_pos];
         switch (c) {
@@ -94,7 +94,7 @@ private:
                 return Value();
             default:
                 if (c == '-' || IsDigit(c)) return ParseNumber();
-                Fail("caractère inattendu");
+                Fail("unexpected character");
         }
     }
 
@@ -111,12 +111,12 @@ private:
 
         while (true) {
             SkipSpace();
-            if (Peek() != '"') Fail("nom de membre attendu");
+            if (Peek() != '"') Fail("member name expected");
             std::string key = ParseString();
-            if (std::find(keys.begin(), keys.end(), key) != keys.end()) Fail("membre en double : " + key);
+            if (std::find(keys.begin(), keys.end(), key) != keys.end()) Fail("duplicate member: " + key);
 
             SkipSpace();
-            if (Peek() != ':') Fail("':' attendu");
+            if (Peek() != ':') Fail("':' expected");
             m_pos++;
 
             values.push_back(ParseValue(depth + 1));
@@ -129,7 +129,7 @@ private:
                 m_pos++;
                 return Value::MakeObject(std::move(keys), std::move(values));
             } else {
-                Fail("',' ou '}' attendu");
+                Fail("',' or '}' expected");
             }
         }
     }
@@ -154,13 +154,13 @@ private:
                 m_pos++;
                 return Value::MakeArray(std::move(items));
             } else {
-                Fail("',' ou ']' attendu");
+                Fail("',' or ']' expected");
             }
         }
     }
 
     std::uint32_t ParseHex4() {
-        if (m_pos + 4 > m_text.size()) Fail("\\u incomplet");
+        if (m_pos + 4 > m_text.size()) Fail("\\u incomplete");
         std::uint32_t value = 0;
         for (int i = 0; i < 4; i++) {
             char c = m_text[m_pos++];
@@ -172,7 +172,7 @@ private:
             } else if (c >= 'A' && c <= 'F') {
                 value |= static_cast<std::uint32_t>(c - 'A' + 10);
             } else {
-                Fail("chiffre hexadécimal attendu");
+                Fail("hexadecimal digit expected");
             }
         }
         return value;
@@ -182,16 +182,16 @@ private:
         m_pos++;  // opening quote
         std::string out;
         while (true) {
-            if (m_pos >= m_text.size()) Fail("chaîne non fermée");
+            if (m_pos >= m_text.size()) Fail("unclosed string");
             unsigned char c = static_cast<unsigned char>(m_text[m_pos++]);
             if (c == '"') return out;
-            if (c < 0x20) Fail("caractère de contrôle dans une chaîne");
+            if (c < 0x20) Fail("control character in a string");
             if (c != '\\') {
                 out += static_cast<char>(c);
                 continue;
             }
 
-            if (m_pos >= m_text.size()) Fail("échappement incomplet");
+            if (m_pos >= m_text.size()) Fail("incomplete escape");
             char escape = m_text[m_pos++];
             switch (escape) {
                 case '"': out += '"'; break;
@@ -204,19 +204,19 @@ private:
                 case 't': out += '\t'; break;
                 case 'u': {
                     std::uint32_t code = ParseHex4();
-                    if (code >= 0xDC00 && code <= 0xDFFF) Fail("substitut isolé");
+                    if (code >= 0xDC00 && code <= 0xDFFF) Fail("lone surrogate");
                     if (code >= 0xD800 && code <= 0xDBFF) {
-                        if (m_text.substr(m_pos, 2) != "\\u") Fail("paire de substitution incomplète");
+                        if (m_text.substr(m_pos, 2) != "\\u") Fail("incomplete surrogate pair");
                         m_pos += 2;
                         std::uint32_t low = ParseHex4();
-                        if (low < 0xDC00 || low > 0xDFFF) Fail("paire de substitution invalide");
+                        if (low < 0xDC00 || low > 0xDFFF) Fail("invalid surrogate pair");
                         code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
                     }
                     AppendUtf8(out, code);
                     break;
                 }
                 default:
-                    Fail("échappement inconnu");
+                    Fail("unknown escape");
             }
         }
     }
@@ -224,7 +224,7 @@ private:
     Value ParseNumber() {
         size_t start = m_pos;
         if (Peek() == '-') m_pos++;
-        if (!IsDigit(Peek())) Fail("nombre invalide");
+        if (!IsDigit(Peek())) Fail("invalid number");
         if (Peek() == '0') {
             m_pos++;
         } else {
@@ -232,20 +232,20 @@ private:
         }
         if (Peek() == '.') {
             m_pos++;
-            if (!IsDigit(Peek())) Fail("nombre invalide");
+            if (!IsDigit(Peek())) Fail("invalid number");
             while (IsDigit(Peek())) m_pos++;
         }
         if (Peek() == 'e' || Peek() == 'E') {
             m_pos++;
             if (Peek() == '+' || Peek() == '-') m_pos++;
-            if (!IsDigit(Peek())) Fail("nombre invalide");
+            if (!IsDigit(Peek())) Fail("invalid number");
             while (IsDigit(Peek())) m_pos++;
         }
 
         std::string_view token = m_text.substr(start, m_pos - start);
         double number = 0;
         auto [end, error] = std::from_chars(token.data(), token.data() + token.size(), number);
-        if (error != std::errc() || end != token.data() + token.size()) Fail("nombre hors limites");
+        if (error != std::errc() || end != token.data() + token.size()) Fail("number out of range");
         return Value::MakeNumber(number);
     }
 
@@ -332,4 +332,4 @@ std::string Quote(std::string_view text) {
     return out;
 }
 
-}  // namespace amk::json
+}  // namespace ampify::json

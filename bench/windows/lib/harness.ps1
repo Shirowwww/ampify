@@ -1,18 +1,18 @@
-# Fonctions communes du banc de test Windows. Chargé par run-bench.ps1 : ne se lance pas seul.
-# Pour ajouter un test, voir docs/tests/banc-windows.md.
+# Shared functions of the Windows test bench. Loaded by run-bench.ps1: not run on its own.
+# To add a case, see docs/development/bench-and-ci.md.
 
 Set-StrictMode -Version Latest
 
-# Identité de l'app et chemins du kit sur ce PC (mêmes valeurs que core/apple_music.hpp et win/win_common.cpp).
+# App identity and Ampify paths on this PC (same values as core/apple_music.hpp and win/win_common.cpp).
 $script:PackageFamily = 'AppleInc.AppleMusicWin_nzyj5cx40ttqa'
 $script:AppUserModelId = "$($script:PackageFamily)!App"
 $script:StoreProductId = '9PFHDD62MXS1'
-$script:KitDir = Join-Path $env:USERPROFILE 'AppleMusicModKit'
-$script:JournalDir = Join-Path $script:KitDir 'journal'
+$script:KitDir = Join-Path $env:USERPROFILE 'Ampify'
+$script:JournalDir = Join-Path $script:KitDir 'logs'
 $script:StateFile = Join-Path $script:KitDir 'state.txt'
 
-# Rempli par run-bench.ps1 avant les tests.
-# Noms distincts des paramètres de run-bench.ps1 : le harnais est chargé dans la même portée que le script.
+# Filled in by run-bench.ps1 before the cases.
+# Names distinct from the run-bench.ps1 parameters: the harness is loaded in the same scope as the script.
 $script:BenchKitRoot = $null
 $script:BenchOutputRoot = $null
 $script:AppleMusicInstalled = $false
@@ -25,7 +25,7 @@ function Write-Step {
     Write-Host "==> $Text"
 }
 
-# Enregistre un test. Action reçoit le contexte du test ($Ctx) et doit appeler Add-Check.
+# Registers a case. Action receives the case context ($Ctx) and must call Add-Check.
 function Register-Case {
     param(
         [string]$Id,
@@ -48,7 +48,7 @@ function New-CaseContext {
     }
 }
 
-# PASS, FAIL, INFO (constat sans verdict) ou SKIP (test impossible sur ce runner, avec la raison).
+# PASS, FAIL, INFO (a finding without a verdict) or SKIP (case impossible on this runner, with the reason).
 function Add-Check {
     param($Ctx, [string]$Name, [bool]$Passed, [string]$Detail = '')
     $status = if ($Passed) { 'PASS' } else { 'FAIL' }
@@ -72,7 +72,7 @@ function Add-Result {
     Write-Host "  [$Status] $Name$suffix"
 }
 
-# Attend qu'une condition soit vraie. Renvoie $false si le délai passe.
+# Waits for a condition to become true. Returns $false when the time runs out.
 function Wait-Until {
     param([scriptblock]$Condition, [int]$TimeoutSeconds, [int]$PollSeconds = 2)
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -83,7 +83,7 @@ function Wait-Until {
     return $false
 }
 
-# Contenu d'un journal du kit (launcher.log, AppleMusic.log, AMPLibraryAgent.log). $null s'il n'existe pas.
+# Content of an Ampify log (launcher.log, AppleMusic.log, AMPLibraryAgent.log). $null when it does not exist.
 function Read-Journal {
     param([string]$FileName)
     $path = Join-Path $script:JournalDir $FileName
@@ -106,19 +106,19 @@ function Wait-Journal {
     return Wait-Until -TimeoutSeconds $TimeoutSeconds -Condition { Test-JournalContains -FileName $FileName -Text $Text }
 }
 
-# Fin d'un journal du kit dans le journal du job : pour lire pourquoi un test échoue sans ouvrir l'artefact.
+# End of an Ampify log, printed in the job log: to read why a case fails without opening the artifact.
 function Write-JournalTail {
     param([string]$FileName, [int]$Lines = 40)
-    Write-Host "----- $FileName (fin du journal)"
+    Write-Host "----- $FileName (end of the log)"
     $content = Read-Journal $FileName
     if (-not $content) {
-        Write-Host '  (absent ou vide)'
+        Write-Host '  (missing or empty)'
         return
     }
     $content -split "`r?`n" | Select-Object -Last $Lines | ForEach-Object { Write-Host "  $_" }
 }
 
-# Lignes du journal qui correspondent à une expression régulière, pour relire un chiffre (par exemple les threads).
+# First match of a regular expression in a log, to read a number (for example the threads).
 function Find-JournalMatch {
     param([string]$FileName, [string]$Pattern)
     $content = Read-Journal $FileName
@@ -133,33 +133,33 @@ function Start-Launcher {
     return Start-Process -FilePath $LauncherPath -WorkingDirectory (Split-Path -Parent $LauncherPath) -PassThru
 }
 
-# Lance Apple Music comme le ferait l'utilisateur depuis le menu Démarrer : sans le lanceur, donc sans noyau.
-# Démarre AMPLibraryAgent.exe en activant la classe COM que le paquet d'Apple Music déclare (serveur hors processus
-# AMP.Core.IAMPMusicLibrary). L'activation se fait dans un pwsh séparé, arrêté au bout de 20 s s'il reste bloqué :
-# seul le démarrage du processus compte, l'objet obtenu n'est pas utilisé. Renvoie une ligne pour le rapport.
+# Starts Apple Music the way a user would from the Start menu: without the launcher, so without the kernel.
+# Starts AMPLibraryAgent.exe by activating the COM class that Apple Music's package declares (out-of-process server
+# AMP.Core.IAMPMusicLibrary). The activation runs in a separate pwsh, stopped after 20 s if it hangs: only the
+# process start matters, the object obtained is not used. Returns a line for the report.
 function Start-AgentByCom {
     $clsid = '68E7097C-F969-4006-AAC3-95115F0ED1C4'
-    $script = "try { `$t = [Type]::GetTypeFromCLSID('$clsid'); `$o = [Activator]::CreateInstance(`$t); 'activée' } catch { 'erreur : ' + `$_.Exception.Message }"
-    $out = Join-Path ([IO.Path]::GetTempPath()) 'amk-agent-com.txt'
+    $script = "try { `$t = [Type]::GetTypeFromCLSID('$clsid'); `$o = [Activator]::CreateInstance(`$t); 'activated' } catch { 'error: ' + `$_.Exception.Message }"
+    $out = Join-Path ([IO.Path]::GetTempPath()) 'ampify-agent-com.txt'
     Remove-Item -LiteralPath $out -ErrorAction SilentlyContinue
     $process = Start-Process -FilePath 'pwsh' -ArgumentList @('-NoProfile', '-Command', $script) -RedirectStandardOutput $out -PassThru -WindowStyle Hidden
     if (-not $process.WaitForExit(20000)) { $process | Stop-Process -Force -ErrorAction SilentlyContinue }
     $result = if (Test-Path -LiteralPath $out) { (Get-Content -LiteralPath $out -Raw).Trim() } else { '' }
     $started = Wait-Until -TimeoutSeconds 15 -Condition { @(Get-Process -Name 'AMPLibraryAgent' -ErrorAction SilentlyContinue).Count -gt 0 }
-    return "classe $clsid : $(if ($result) { $result } else { 'pas de réponse' }) ; AMPLibraryAgent.exe $(if ($started) { 'démarré' } else { 'toujours absent' })"
+    return "class ${clsid}: $(if ($result) { $result } else { 'no answer' }); AMPLibraryAgent.exe $(if ($started) { 'started' } else { 'still missing' })"
 }
 
 function Start-AppNormally {
     Start-Process -FilePath 'explorer.exe' -ArgumentList "shell:AppsFolder\$($script:AppUserModelId)"
 }
 
-# Les processus sortent un par un : les appelants les comptent avec @(...), qui donne un tableau même vide ou à un élément.
+# The processes come out one by one: callers count them with @(...), which gives an array even when empty or with one item.
 function Get-AppProcesses {
     Get-Process -Name 'AppleMusic' -ErrorAction SilentlyContinue
 }
 
-# Ferme Apple Music comme un utilisateur (fenêtre fermée), puis de force si elle ne part pas.
-# Renvoie $true si elle est partie toute seule.
+# Closes Apple Music like a user (window closed), then by force if it does not leave.
+# Returns $true when it left on its own.
 function Close-AppleMusic {
     foreach ($process in Get-AppProcesses) {
         $process.CloseMainWindow() | Out-Null
@@ -172,23 +172,23 @@ function Close-AppleMusic {
     return $gone
 }
 
-# Premier lancement d'Apple Music sur un runner neuf : la licence des codecs (MPEG LA, boutons Agree / Decline /
-# Save As) s'ouvre avant la fenêtre principale, puis, après une connexion, l'écran « Welcome to Apple Music » (Start
-# Listening). Tant qu'ils sont ouverts, le noyau n'a pas de fenêtre XAML, et l'inspecteur comme UI Automation voient
-# la licence au lieu de l'app. Les accepte comme un nouvel utilisateur, par UI Automation seule (mêmes règles que
-# Close-FirstRunDialogs de live\live-common.ps1, qui demande uia.ps1). Rend la main quand l'app montre sa navigation
-# deux fois de suite sans aucun de ces écrans, ou au bout de $TimeoutSeconds. Renvoie le nombre d'écrans fermés,
-# -1 si UI Automation est indisponible.
+# First launch of Apple Music on a new runner: the codec licence (MPEG LA, buttons Agree / Decline / Save As) opens
+# before the main window, then, after a sign-in, the "Welcome to Apple Music" screen (Start Listening). While they
+# are open, the kernel has no XAML window, and the inspector and UI Automation see the licence instead of the app.
+# Accepts them like a new user would, through UI Automation only (same rules as Close-FirstRunDialogs in
+# live\live-common.ps1, which needs uia.ps1). Returns when the app shows its navigation twice in a row with none of
+# these screens, or after $TimeoutSeconds. Returns the number of screens closed, -1 when UI Automation is not available.
 function Close-AppleMusicFirstRun {
     param([int]$TimeoutSeconds = 90)
     try {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes -ErrorAction Stop
     } catch {
-        Write-Host "  premier lancement : UI Automation indisponible ($($_.Exception.Message))"
+        Write-Host "  first launch: UI Automation not available ($($_.Exception.Message))"
         return -1
     }
     $AE = [System.Windows.Automation.AutomationElement]
     $buttonCondition = New-Object System.Windows.Automation.PropertyCondition ($AE::ControlTypeProperty), ([System.Windows.Automation.ControlType]::Button)
+    # Apple Music's own button names, in English and in French (a French Windows shows the French ones).
     $agreePattern = '^(Agree|I Agree|Accept|Accepter|J.accepte)$'
     $declinePattern = '^(Decline|Refuser|Save As|Save As\.\.\.|Enregistrer sous.*)$'
     $welcomePattern = '^(Start Listening|Commencer l.écoute)$'
@@ -251,10 +251,10 @@ function Close-AppleMusicFirstRun {
         $what = ''
         if ($agree -and $decline) {
             $dialog = $agree
-            $what = 'licence MPEG LA acceptée (Agree)'
+            $what = 'MPEG LA licence accepted (Agree)'
         } elseif ($welcome) {
             $dialog = $welcome
-            $what = "écran d'accueil passé ($([string]$welcome.Current.Name))"
+            $what = "welcome screen passed ($([string]$welcome.Current.Name))"
         }
 
         $ready = $false
@@ -274,12 +274,12 @@ function Close-AppleMusicFirstRun {
                 }
                 if ($ready) { break }
             }
-            # A generic « Continue » or « Not Now » only counts on a screen without the app's navigation.
+            # A generic "Continue" or "Not Now" only counts on a screen without the app's navigation.
             if (-not $ready) {
                 $later = & $findButton $buttons $laterPattern
                 if ($later) {
                     $dialog = $later
-                    $what = "écran d'accueil passé ($([string]$later.Current.Name))"
+                    $what = "welcome screen passed ($([string]$later.Current.Name))"
                 }
             }
         }
@@ -287,7 +287,7 @@ function Close-AppleMusicFirstRun {
         if ($dialog) {
             $calm = 0
             if (& $invoke $dialog) {
-                Write-Host "  premier lancement : $what"
+                Write-Host "  first launch: $what"
                 $closed++
             }
             Start-Sleep -Seconds 3
@@ -301,29 +301,29 @@ function Close-AppleMusicFirstRun {
         }
         Start-Sleep -Seconds 2
     }
-    Write-Host "  premier lancement : navigation d'Apple Music non vue après $TimeoutSeconds s ($closed écran(s) fermé(s))"
+    Write-Host "  first launch: Apple Music navigation not seen after $TimeoutSeconds s ($closed screen(s) closed)"
     return $closed
 }
 
-# Arrête tout ce que le banc peut laisser ouvert. Appelé avant et après chaque test.
+# Stops everything the bench may leave open. Called before and after each case.
 function Stop-BenchProcesses {
-    Get-Process -Name 'amk_launcher', 'AppleMusic', 'AMPLibraryAgent' -ErrorAction SilentlyContinue |
+    Get-Process -Name 'ampify_launcher', 'AppleMusic', 'AMPLibraryAgent' -ErrorAction SilentlyContinue |
         Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
 }
 
-# Remet le kit à zéro pour un test : journaux et compteur du mode sans échec. Ne touche pas aux réglages.
+# Resets Ampify for a case: logs and the safe mode counter. Does not touch the settings.
 function Reset-KitState {
     Stop-BenchProcesses
     Remove-Item -LiteralPath $script:JournalDir -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $script:StateFile -Force -ErrorAction SilentlyContinue
 }
 
-# Copie les journaux du kit dans le dossier du test, pour les garder dans les résultats.
+# Copies the Ampify logs into the case folder, to keep them in the results.
 function Copy-JournalToResults {
     param($Ctx)
     if (-not (Test-Path -LiteralPath $script:JournalDir)) { return }
-    $target = Join-Path $Ctx.Dir 'journal'
+    $target = Join-Path $Ctx.Dir 'logs'
     New-Item -ItemType Directory -Force -Path $target | Out-Null
     Copy-Item -Path (Join-Path $script:JournalDir '*') -Destination $target -Force -ErrorAction SilentlyContinue
 }
@@ -341,7 +341,7 @@ function Get-SafeModeCount {
     return $null
 }
 
-# Où en est le noyau dans les processus d'Apple Music : combien en ont le module amk_kernel.dll.
+# Where the kernel stands in Apple Music's processes: how many have the ampify_kernel.dll module.
 function Get-KernelState {
     param([string]$ProcessName = 'AppleMusic')
     $processes = @(Get-Process -Name $ProcessName -ErrorAction SilentlyContinue)
@@ -349,7 +349,7 @@ function Get-KernelState {
     $unreadable = 0
     foreach ($process in $processes) {
         try {
-            if ($process.Modules | Where-Object { $_.ModuleName -ieq 'amk_kernel.dll' }) { $loaded++ }
+            if ($process.Modules | Where-Object { $_.ModuleName -ieq 'ampify_kernel.dll' }) { $loaded++ }
         } catch {
             $unreadable++
         }
@@ -361,8 +361,8 @@ function Get-KernelState {
     }
 }
 
-# Plantages d'Apple Music enregistrés par Windows depuis $Since, en objets simples (Id, Heure, Message).
-# Les appelants l'enveloppent dans @(...) : une virgule ici rangerait le tableau dans un second tableau, et le compte serait faux.
+# Apple Music crashes recorded by Windows since $Since, as simple objects (Id, Time, Message).
+# Callers wrap it in @(...): a comma here would put the array inside a second array, and the count would be wrong.
 function Get-AppCrashEvents {
     param([datetime]$Since)
     $records = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $Since } -ErrorAction SilentlyContinue)
@@ -376,26 +376,26 @@ function Get-AppCrashEvents {
     return $crashes
 }
 
-# Résumé lisible des plantages : identifiant de l'événement et début du message, pour savoir ce qui a planté.
+# Readable summary of the crashes: event id and start of the message, to know what crashed.
 function Format-CrashEvents {
     param([object[]]$Events)
     $lines = @()
     foreach ($crash in $Events) {
         if ($lines.Count -ge 2) { break }
         $text = [string]$crash.Message -replace '\s+', ' '
-        $lines += "id $($crash.Id) : " + $text.Substring(0, [Math]::Min(240, $text.Length))
+        $lines += "id $($crash.Id): " + $text.Substring(0, [Math]::Min(240, $text.Length))
     }
     return ($lines -join ' | ')
 }
 
-# Capture de l'écran principal dans le dossier du test. Renvoie le chemin, ou $null si l'écran n'est pas accessible.
+# Screenshot of the main screen in the case folder. Returns the path, or $null when the screen is not reachable.
 # Win32 calls for the captures: bring Apple Music's window forward and draw it whole, even when another window
 # (the runner's console) sits on top. PrintWindow with PW_RENDERFULLCONTENT (2) also draws WinUI's composition content.
-if (-not ('AmkWindowCapture' -as [type])) {
+if (-not ('AmpifyWindowCapture' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-public static class AmkWindowCapture {
+public static class AmpifyWindowCapture {
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -415,7 +415,7 @@ function Get-AppleMusicWindow {
 }
 
 # Two captures per call: <Name>.png is the screen with Apple Music brought forward and maximized (consoles are
-# minimized first), <Name>-fenetre.png is Apple Music's own window drawn by PrintWindow. Returns the screen capture.
+# minimized first), <Name>-window.png is Apple Music's own window drawn by PrintWindow. Returns the screen capture.
 function Save-Screenshot {
     param($Ctx, [string]$Name)
     try {
@@ -424,9 +424,9 @@ function Save-Screenshot {
         if ($window -ne [IntPtr]::Zero) {
             Get-Process -Name 'WindowsTerminal', 'conhost', 'OpenConsole', 'pwsh', 'powershell' -ErrorAction SilentlyContinue |
                 Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
-                ForEach-Object { [AmkWindowCapture]::ShowWindow($_.MainWindowHandle, 6) | Out-Null }  # SW_MINIMIZE
-            [AmkWindowCapture]::ShowWindow($window, 3) | Out-Null  # SW_MAXIMIZE
-            [AmkWindowCapture]::SetForegroundWindow($window) | Out-Null
+                ForEach-Object { [AmpifyWindowCapture]::ShowWindow($_.MainWindowHandle, 6) | Out-Null }  # SW_MINIMIZE
+            [AmpifyWindowCapture]::ShowWindow($window, 3) | Out-Null  # SW_MAXIMIZE
+            [AmpifyWindowCapture]::SetForegroundWindow($window) | Out-Null
             Start-Sleep -Milliseconds 1500  # let the window repaint after maximize
         }
 
@@ -440,47 +440,47 @@ function Save-Screenshot {
         $bitmap.Dispose()
 
         if ($window -ne [IntPtr]::Zero) {
-            $rect = New-Object AmkWindowCapture+RECT
-            if ([AmkWindowCapture]::GetWindowRect($window, [ref]$rect)) {
+            $rect = New-Object AmpifyWindowCapture+RECT
+            if ([AmpifyWindowCapture]::GetWindowRect($window, [ref]$rect)) {
                 $width = [Math]::Max(1, $rect.Right - $rect.Left)
                 $height = [Math]::Max(1, $rect.Bottom - $rect.Top)
                 $own = New-Object System.Drawing.Bitmap $width, $height
                 $ownGraphics = [System.Drawing.Graphics]::FromImage($own)
                 $hdc = $ownGraphics.GetHdc()
-                [AmkWindowCapture]::PrintWindow($window, $hdc, 2) | Out-Null
+                [AmpifyWindowCapture]::PrintWindow($window, $hdc, 2) | Out-Null
                 $ownGraphics.ReleaseHdc($hdc)
-                $own.Save((Join-Path $Ctx.Dir "$Name-fenetre.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+                $own.Save((Join-Path $Ctx.Dir "$Name-window.png"), [System.Drawing.Imaging.ImageFormat]::Png)
                 $ownGraphics.Dispose()
                 $own.Dispose()
             }
         } else {
-            Write-Host "  capture : aucune fenêtre d'Apple Music, seul l'écran est capturé"
+            Write-Host "  screenshot: no Apple Music window, only the screen is captured"
         }
         return $path
     } catch {
-        Write-Host "  capture d'écran impossible : $($_.Exception.Message)"
+        Write-Host "  screenshot impossible: $($_.Exception.Message)"
         return $null
     }
 }
 
-# Versions d'Apple Music de la liste de diffusion, lues dans core/version_gate.hpp pour rester alignées sur le code.
+# Apple Music versions of the release list, read from core/version_gate.hpp to stay in line with the code.
 function Get-KnownAppVersions {
     param([string]$RepoRoot)
     $header = Get-Content -LiteralPath (Join-Path $RepoRoot 'core\version_gate.hpp') -Raw
     $block = [regex]::Match($header, 'kKnownAppVersions\[\]\s*=\s*\{(?<body>.*?)\};', 'Singleline')
-    if (-not $block.Success) { throw 'kKnownAppVersions introuvable dans core/version_gate.hpp' }
+    if (-not $block.Success) { throw 'kKnownAppVersions not found in core/version_gate.hpp' }
     return @([regex]::Matches($block.Groups['body'].Value, '"([0-9.]+)"') | ForEach-Object { $_.Groups[1].Value })
 }
 
-# Nom complet du paquet d'Apple Music installé pour l'utilisateur courant, ou '' s'il n'est pas installé.
-# Interrogé dans Windows PowerShell 5.1 : Get-AppxPackage passe par un module de compatibilité sous PowerShell 7.
+# Full name of the Apple Music package installed for the current user, or '' when it is not installed.
+# Queried in Windows PowerShell 5.1: Get-AppxPackage goes through a compatibility module under PowerShell 7.
 function Get-AppleMusicFullName {
     $query = "(Get-AppxPackage -Name 'AppleInc.AppleMusicWin' | Select-Object -First 1).PackageFullName"
     $name = & powershell.exe -NoProfile -NonInteractive -Command $query 2>$null
     return [string]($name | Select-Object -First 1)
 }
 
-# Version dans un nom complet de paquet : AppleInc.AppleMusicWin_1.1540.23042.0_x64__nzyj5cx40ttqa.
+# Version in a full package name: AppleInc.AppleMusicWin_1.1540.23042.0_x64__nzyj5cx40ttqa.
 function Get-VersionFromFullName {
     param([string]$FullName)
     $parts = $FullName -split '_'
@@ -488,15 +488,15 @@ function Get-VersionFromFullName {
     return $parts[1]
 }
 
-# Installe Apple Music avec winget (client officiel de Microsoft, source Microsoft Store).
-# Renvoie une phrase qui dit ce qui s'est passé. Le journal complet de winget va dans $LogFile.
+# Installs Apple Music with winget (Microsoft's official client, Microsoft Store source).
+# Returns a sentence that says what happened. The full winget output goes to $LogFile.
 function Install-AppleMusic {
     param([string]$LogFile)
     # winget writes progress to stderr: that must not stop the script.
     $ErrorActionPreference = 'Continue'
-    if (Get-AppleMusicFullName) { return 'déjà installé sur ce runner' }
+    if (Get-AppleMusicFullName) { return 'already installed on this runner' }
 
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return 'winget absent de ce runner' }
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return 'winget missing from this runner' }
 
     $wingetArgs = @(
         'install', '--id', $script:StoreProductId, '--source', 'msstore', '--exact', '--silent',
@@ -506,6 +506,6 @@ function Install-AppleMusic {
     $exitCode = $LASTEXITCODE
     Set-Content -LiteralPath $LogFile -Value $output -Encoding UTF8
 
-    if (Get-AppleMusicFullName) { return 'installé par winget' }
-    return "winget n'a pas installé Apple Music (code de sortie $exitCode, voir winget.log)"
+    if (Get-AppleMusicFullName) { return 'installed by winget' }
+    return "winget did not install Apple Music (exit code $exitCode, see winget.log)"
 }

@@ -14,7 +14,7 @@
 #include "../json.hpp"
 #include "../ui_model.hpp"
 
-namespace amk::uirender {
+namespace ampify::uirender {
 
 enum class SurfaceKind { Panel, Page, Popup, Control };
 
@@ -26,7 +26,7 @@ struct Surface {
     std::string nodeId;      // id of the root render node (SurfaceNodeId), "" for a control
     Json tree;               // the interface tree (not for a control)
     UiControl control;       // for a control only
-    std::string title;       // AMK.ui.title of the element, may be empty
+    std::string title;       // Ampify.ui.title of the element, may be empty
     std::uint64_t revision = 0;  // changes each time the surface changes
 };
 
@@ -34,7 +34,7 @@ struct SurfaceChanges {
     std::vector<Surface> added;    // new surfaces, in model order
     std::vector<Surface> changed;  // surfaces whose tree, title or control changed
     std::vector<Surface> removed;  // surfaces that are gone (only kind, element, id and key are meaningful)
-    std::optional<std::pair<std::string, std::string>> route;  // a new AMK.ui.navigate (element, path), once
+    std::optional<std::pair<std::string, std::string>> route;  // a new Ampify.ui.navigate (element, path), once
 
     bool Empty() const { return added.empty() && changed.empty() && removed.empty() && !route; }
 };
@@ -57,4 +57,4 @@ private:
 
 const char* SurfaceKindName(SurfaceKind kind);
 
-}  // namespace amk::uirender
+}  // namespace ampify::uirender

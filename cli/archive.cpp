@@ -2,24 +2,24 @@
 
 #include <system_error>
 
-namespace amk {
+namespace ampify {
 
 bool IsSafeArchiveEntry(std::string_view entry, std::string& reason) {
     if (entry.empty()) {
-        reason = "entrée vide";
+        reason = "empty entry";
         return false;
     }
     if (entry.front() == '/') {
-        reason = "chemin absolu : " + std::string(entry);
+        reason = "absolute path: " + std::string(entry);
         return false;
     }
     for (char c : entry) {
         if (c == '\\' || c == ':') {
-            reason = "caractère interdit dans le chemin : " + std::string(entry);
+            reason = "forbidden character in the path: " + std::string(entry);
             return false;
         }
         if (static_cast<unsigned char>(c) < 0x20) {
-            reason = "caractère de contrôle dans le chemin";
+            reason = "control character in the path";
             return false;
         }
     }
@@ -31,11 +31,11 @@ bool IsSafeArchiveEntry(std::string_view entry, std::string& reason) {
         size_t end = slash == std::string_view::npos ? entry.size() : slash;
         std::string_view part = entry.substr(start, end - start);
         if (part == "..") {
-            reason = "remontée hors du dossier : " + std::string(entry);
+            reason = "path climbs out of the folder: " + std::string(entry);
             return false;
         }
         if (part == "." || (part.empty() && end != entry.size())) {
-            reason = "composant de chemin invalide : " + std::string(entry);
+            reason = "invalid path component: " + std::string(entry);
             return false;
         }
         if (slash == std::string_view::npos) break;
@@ -47,7 +47,7 @@ bool IsSafeArchiveEntry(std::string_view entry, std::string& reason) {
 std::string CheckArchiveListing(const std::vector<std::string>& entries) {
     for (const std::string& entry : entries) {
         std::string reason;
-        if (!IsSafeArchiveEntry(entry, reason)) return "archive refusée : " + reason;
+        if (!IsSafeArchiveEntry(entry, reason)) return "archive refused: " + reason;
     }
     return {};
 }
@@ -61,4 +61,4 @@ bool ContainsLink(const std::filesystem::path& folder) {
     return false;
 }
 
-}  // namespace amk
+}  // namespace ampify

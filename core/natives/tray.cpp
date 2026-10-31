@@ -7,7 +7,7 @@
 #include "../json.hpp"
 #include "service_gate.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
@@ -27,14 +27,14 @@ std::string CleanLabel(const std::string& label) {
 
 struct TrayNatives : ScriptBridge {
     // native.traySetMenu(itemsJson): [{id, label, separator, checked, enabled}], built by the prelude.
-    AMK_NATIVE(SetMenu) {
+    AMPIFY_NATIVE(SetMenu) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ui.tray", &failure)) return failure;
         std::optional<Json> value = Json::Parse(String(ctx, argc, argv, 0).value_or(""));
         const Json::Array* list = value ? value->AsArray() : nullptr;
-        if (!list) return Throw(ctx, "TypeError", "tray.setMenu attend une liste");
-        if (list->size() > kMaxTrayItems) return Throw(ctx, "RangeError", "tray.setMenu : 20 entrées au plus");
+        if (!list) return Throw(ctx, "TypeError", "tray.setMenu expects a list");
+        if (list->size() > kMaxTrayItems) return Throw(ctx, "RangeError", "tray.setMenu: 20 entries at most");
 
         std::vector<TrayItem> items;
         for (const Json& entry : *list) {
@@ -46,7 +46,7 @@ struct TrayNatives : ScriptBridge {
             if (!item.separator) {
                 const Json* label = entry.Find("label");
                 item.label = CleanLabel(label && label->AsString() ? *label->AsString() : "");
-                if (item.label.empty()) return Throw(ctx, "TypeError", "tray.setMenu : chaque entrée attend un label");
+                if (item.label.empty()) return Throw(ctx, "TypeError", "tray.setMenu: each entry expects a label");
                 const Json* checked = entry.Find("checked");
                 item.checked = checked && checked->AsBool() && *checked->AsBool();
                 const Json* enabled = entry.Find("enabled");
@@ -55,18 +55,18 @@ struct TrayNatives : ScriptBridge {
             items.push_back(std::move(item));
         }
 
-        if (!ServiceGate::Open(ext, "tray.enabled", "Icône de notification")) return JS_FALSE;
+        if (!ServiceGate::Open(ext, "tray.enabled", "Notification area icon")) return JS_FALSE;
         TrayHost* tray = HostOf(ext).Capability<TrayHost>();
         if (!tray) return JS_FALSE;
         return JS_NewBool(ctx, tray->SetTrayMenu(ext->id(), items));
     }
 
-    // native.trayListen(): checks the permission before AMK.tray.onClick keeps its function.
-    AMK_NATIVE(Listen) {
+    // native.trayListen(): checks the permission before Ampify.tray.onClick keeps its function.
+    AMPIFY_NATIVE(Listen) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ui.tray", &failure)) return failure;
-        return JS_NewBool(ctx, ServiceGate::Open(ext, "tray.enabled", "Icône de notification") &&
+        return JS_NewBool(ctx, ServiceGate::Open(ext, "tray.enabled", "Notification area icon") &&
                                    HostOf(ext).Capability<TrayHost>() != nullptr);
     }
 };
@@ -84,4 +84,4 @@ void StopTray(ScriptExtension& extension) {
     if (TrayHost* tray = ScriptBridge::HostOf(&extension).Capability<TrayHost>()) tray->RemoveTrayMenu(extension.id());
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

@@ -11,13 +11,13 @@
 #include <string_view>
 #include <vector>
 
-namespace amk::win {
+namespace ampify::win {
 
-// %USERPROFILE%\AppleMusicModKit. Deliberately outside AppData: MSIX redirects the writes that Apple Music
+// %USERPROFILE%\Ampify. Deliberately outside AppData: MSIX redirects the writes that Apple Music
 // makes under AppData, so the launcher and the kernel would not see the same files.
 std::filesystem::path KitDirectory();
 
-// Journal file for one process, such as journal\launcher.log. Creates the folder. The file is replaced at
+// Log file for one process, such as logs\launcher.log. Creates the folder. The file is replaced at
 // every start, so it only ever holds the current run.
 std::filesystem::path JournalFile(const std::string& name);
 
@@ -36,10 +36,10 @@ std::vector<std::byte> ReadFileBytes(const std::filesystem::path& file);
 // A Windows known folder, such as FOLDERID_LocalAppData. Empty when Windows does not give one.
 std::filesystem::path KnownFolder(const KNOWNFOLDERID& folder);
 
-// %LOCALAPPDATA%\Programs\AppleMusicModKit, where the installer puts the kit.
+// %LOCALAPPDATA%\Programs\Ampify, where the installer puts Ampify.
 std::filesystem::path InstallDirectory();
 
-// Conversions between UTF-8 (what the journals and the report use) and UTF-16 (what Windows uses).
+// Conversions between UTF-8 (what the logs and the report use) and UTF-16 (what Windows uses).
 std::string ToUtf8(std::wstring_view text);
 std::wstring FromUtf8(std::string_view text);
 
@@ -62,4 +62,4 @@ bool AskYesNo(const std::wstring& text, const std::wstring& title);
 // Dialog with one OK button. `error` picks the error icon.
 void ShowMessage(const std::wstring& text, bool error = false);
 
-}  // namespace amk::win
+}  // namespace ampify::win

@@ -9,9 +9,9 @@
 
 #include "json.hpp"
 
-namespace amk {
+namespace ampify {
 
-// Major version of the extension API this kit implements (docs/extensions/API.md, section 9).
+// Major version of the extension API this kit implements (docs/extensions/api.md, section 9).
 inline constexpr int kKitApiMajor = 1;
 
 // Fields that a manifest.json and an entry of catalog.json share.
@@ -28,7 +28,7 @@ struct ElementInfo {
     std::vector<std::string> permissions;
 };
 
-// What a manifest.json declares, as docs/extensions/MANIFEST.md describes it.
+// What a manifest.json declares, as docs/extensions/manifest.md describes it.
 struct ElementManifest : ElementInfo {
     std::optional<std::string> main;
     std::optional<std::string> colors;
@@ -75,10 +75,10 @@ struct FolderValidation {
 // Reads <folder>/manifest.json, then runs the schema and folder checks.
 FolderValidation ValidateElementFolder(const std::filesystem::path& folder);
 
-// The last name of a folder path, so "dossier/" and "dossier" both give "dossier".
+// The last name of a folder path, so "folder/" and "folder" both give "folder".
 std::string FolderName(const std::filesystem::path& folder);
 
 // Number of characters in UTF-8 text, the unit the schema uses for minLength and maxLength.
 size_t CharacterCount(std::string_view text);
 
-}  // namespace amk
+}  // namespace ampify

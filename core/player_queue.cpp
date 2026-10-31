@@ -1,6 +1,6 @@
 #include "player_queue.hpp"
 
-namespace amk {
+namespace ampify {
 
 const char* QueueSectionName(QueueSection section) {
     switch (section) {
@@ -61,9 +61,9 @@ Json QueueJson(const QueueSnapshot& snapshot, bool available) {
     members.emplace_back("complete", Json(available && snapshot.complete));
     members.emplace_back("source", Json(snapshot.source));
     members.emplace_back("reason", Json(available ? snapshot.reason
-                                                  : std::string("pas de file d'attente dans ce processus")));
+                                                  : std::string("no queue in this process")));
     members.emplace_back("items", Json(std::move(items)));
     return Json(std::move(members));
 }
 
-}  // namespace amk
+}  // namespace ampify

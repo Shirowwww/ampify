@@ -16,7 +16,7 @@
 #include "../audio/audio_host.hpp"
 #include "../audio/equalizer.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
@@ -71,13 +71,13 @@ struct AudioAnalysisNatives : ScriptBridge {
         FrameMailbox& box = State<FrameMailbox>(ext);
         if (box.unavailableNoted) return;
         box.unavailableNoted = true;
-        JournalOf(ext).Write("[" + ext->id() + "] analyse audio indisponible dans ce processus (" +
-                             HostOf(ext).Process() + ") : le son n'est traité que dans AMPLibraryAgent.exe");
+        JournalOf(ext).Write("[" + ext->id() + "] audio analysis is not available in this process (" +
+                             HostOf(ext).Process() + "): sound is only processed in AMPLibraryAgent.exe");
     }
 
     static JSValue Text(JSContext* ctx, const std::string& text) { return JS_NewStringLen(ctx, text.data(), text.size()); }
 
-    AMK_NATIVE(Subscribe) {
+    AMPIFY_NATIVE(Subscribe) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.analyze", &failure)) return failure;
@@ -99,7 +99,7 @@ struct AudioAnalysisNatives : ScriptBridge {
         return JS_TRUE;
     }
 
-    AMK_NATIVE(TakeFrame) {
+    AMPIFY_NATIVE(TakeFrame) {
         ScriptExtension* ext = Owner(ctx);
         FrameMailbox& box = State<FrameMailbox>(ext);
         std::string json;
@@ -112,7 +112,7 @@ struct AudioAnalysisNatives : ScriptBridge {
         return Text(ctx, json);
     }
 
-    AMK_NATIVE(Analyze) {
+    AMPIFY_NATIVE(Analyze) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.analyze", &failure)) return failure;
@@ -140,7 +140,7 @@ struct AudioAnalysisNatives : ScriptBridge {
         return Text(ctx, json);
     }
 
-    AMK_NATIVE(Loudness) {
+    AMPIFY_NATIVE(Loudness) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.analyze", &failure)) return failure;
@@ -148,7 +148,7 @@ struct AudioAnalysisNatives : ScriptBridge {
         return Text(ctx, LoudnessJson(audio ? audio->Loudness() : LoudnessReading{}));
     }
 
-    AMK_NATIVE(Volume) {
+    AMPIFY_NATIVE(Volume) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "player.read", &failure)) return failure;
@@ -163,12 +163,12 @@ struct AudioAnalysisNatives : ScriptBridge {
         if (count == 0) return JS_FALSE;
         if (!(index >= 0) || index >= static_cast<double>(count) || index != std::floor(index)) {
             return Throw(ctx, "RangeError",
-                         "bande d'égaliseur inconnue : " + Num(index) + " (0 à " + std::to_string(count - 1) + ")");
+                         "unknown equalizer band: " + Num(index) + " (0 to " + std::to_string(count - 1) + ")");
         }
         return JS_NewBool(ctx, audio->SetEqBand(ext->id(), static_cast<size_t>(index), gainDb));
     }
 
-    AMK_NATIVE(EqSetBand) {
+    AMPIFY_NATIVE(EqSetBand) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.eq", &failure)) return failure;
@@ -180,7 +180,7 @@ struct AudioAnalysisNatives : ScriptBridge {
         return SetBand(ctx, ext, audio, Number(ctx, argc, argv, 0), Number(ctx, argc, argv, 1));
     }
 
-    AMK_NATIVE(EqPreset) {
+    AMPIFY_NATIVE(EqPreset) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.eq", &failure)) return failure;
@@ -189,7 +189,7 @@ struct AudioAnalysisNatives : ScriptBridge {
         if (!gains) {
             std::string names;
             for (const std::string& known : audio::PresetNames()) names += (names.empty() ? "" : ", ") + known;
-            return Throw(ctx, "RangeError", "préréglage inconnu : " + name + " (" + names + ")");
+            return Throw(ctx, "RangeError", "unknown preset: " + name + " (" + names + ")");
         }
         AudioHost* audio = Audio(ext);
         if (!audio) {
@@ -201,7 +201,7 @@ struct AudioAnalysisNatives : ScriptBridge {
         return JS_TRUE;
     }
 
-    AMK_NATIVE(EqBands) {
+    AMPIFY_NATIVE(EqBands) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.eq", &failure)) return failure;
@@ -244,4 +244,4 @@ void StopAudioAnalysis(ScriptExtension& extension) {
     if (AudioHost* audio = ScriptBridge::HostOf(&extension).Capability<AudioHost>()) audio->Release(extension.id());
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

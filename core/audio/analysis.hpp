@@ -1,6 +1,6 @@
 #pragma once
 
-// Analysis of the decoded audio for AMK.audio: levels, a spectrum in log-spaced bands, and a tempo estimate.
+// Analysis of the decoded audio for Ampify.audio: levels, a spectrum in log-spaced bands, and a tempo estimate.
 // Pure C++, no Windows API: the kernel feeds it the samples its own hooks already see (never Apple's audio tap,
 // which Apple skips for Dolby Atmos). Everything stays in memory: only small frames of numbers leave this file.
 
@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace amk::audio {
+namespace ampify::audio {
 
 // RMS and peak (linear, 1 = full scale) of `count` samples.
 struct Levels {
@@ -152,4 +152,4 @@ private:
     uint64_t m_frameCount = 0;
 };
 
-}  // namespace amk::audio
+}  // namespace ampify::audio

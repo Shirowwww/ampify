@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the kit's JSON files: the community catalog and extension manifests.
+"""Check Ampify's JSON files: the community catalog and element manifests.
 
     python3 tools/validate.py catalog catalog/catalog.json
     python3 tools/validate.py manifest examples/hello-extension/manifest.json
@@ -67,7 +67,7 @@ class SchemaError(Exception):
 def check_supported(schema, where):
     """Refuse any keyword this validator does not enforce."""
     if not isinstance(schema, dict):
-        raise SchemaError(f"{where} : un sous-schéma doit être un objet")
+        raise SchemaError(f"{where}: a sub-schema must be an object")
     for key, value in schema.items():
         if key in SUBSCHEMA_MAPS:
             for name, sub in value.items():
@@ -77,18 +77,18 @@ def check_supported(schema, where):
         elif key == "additionalProperties" and isinstance(value, dict):
             check_supported(value, f"{where}/additionalProperties")
         elif key not in ANNOTATIONS and key not in RULES:
-            raise SchemaError(f"{where} : mot-clé non pris en charge : {key}")
+            raise SchemaError(f"{where}: unsupported keyword: {key}")
 
 
 def resolve(root, ref):
     """Follow a local reference such as '#/$defs/kind'."""
     if not ref.startswith("#/"):
-        raise SchemaError(f"référence non locale : {ref}")
+        raise SchemaError(f"non-local reference: {ref}")
     node = root
     for part in ref[2:].split("/"):
         part = part.replace("~1", "/").replace("~0", "~")
         if not isinstance(node, dict) or part not in node:
-            raise SchemaError(f"référence introuvable : {ref}")
+            raise SchemaError(f"reference not found: {ref}")
         node = node[part]
     return node
 
@@ -102,38 +102,38 @@ def join(path, name):
 
 
 def validate(value, schema, root, path, errors):
-    """Append a French message to `errors` for each rule that `value` breaks."""
+    """Append a message to `errors` for each rule that `value` breaks."""
     if "$ref" in schema:
         validate(value, resolve(root, schema["$ref"]), root, path, errors)
 
     if "type" in schema and not TYPE_CHECKS[schema["type"]](value):
-        errors.append(f"{at(path)} : type attendu {schema['type']}")
+        errors.append(f"{at(path)}: expected type {schema['type']}")
         return
     if "const" in schema and value != schema["const"]:
-        errors.append(f"{at(path)} : valeur attendue {schema['const']!r}")
+        errors.append(f"{at(path)}: expected value {schema['const']!r}")
     if "enum" in schema and value not in schema["enum"]:
         allowed = ", ".join(str(item) for item in schema["enum"])
-        errors.append(f"{at(path)} : valeur non autorisée (attendu : {allowed})")
+        errors.append(f"{at(path)}: value not allowed (expected: {allowed})")
 
     if isinstance(value, str):
         if "minLength" in schema and len(value) < schema["minLength"]:
-            errors.append(f"{at(path)} : moins de {schema['minLength']} caractère(s)")
+            errors.append(f"{at(path)}: fewer than {schema['minLength']} character(s)")
         if "maxLength" in schema and len(value) > schema["maxLength"]:
-            errors.append(f"{at(path)} : plus de {schema['maxLength']} caractères")
+            errors.append(f"{at(path)}: more than {schema['maxLength']} characters")
         if "pattern" in schema and re.search(schema["pattern"], value) is None:
-            errors.append(f"{at(path)} : ne correspond pas au motif {schema['pattern']}")
+            errors.append(f"{at(path)}: does not match the pattern {schema['pattern']}")
 
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         if "minimum" in schema and value < schema["minimum"]:
-            errors.append(f"{at(path)} : inférieur à {schema['minimum']}")
+            errors.append(f"{at(path)}: below {schema['minimum']}")
         if "maximum" in schema and value > schema["maximum"]:
-            errors.append(f"{at(path)} : supérieur à {schema['maximum']}")
+            errors.append(f"{at(path)}: above {schema['maximum']}")
 
     if isinstance(value, dict):
         properties = schema.get("properties", {})
         for name in schema.get("required", []):
             if name not in value:
-                errors.append(f"{at(path)} : champ requis absent : {name}")
+                errors.append(f"{at(path)}: required field missing: {name}")
         for name, sub in properties.items():
             if name in value:
                 validate(value[name], sub, root, join(path, name), errors)
@@ -141,20 +141,20 @@ def validate(value, schema, root, path, errors):
         additional = schema.get("additionalProperties", True)
         if additional is False:
             for name in extra:
-                errors.append(f"{at(join(path, name))} : propriété non autorisée")
+                errors.append(f"{at(join(path, name))}: property not allowed")
         elif isinstance(additional, dict):
             for name in extra:
                 validate(value[name], additional, root, join(path, name), errors)
 
     if isinstance(value, list):
         if "minItems" in schema and len(value) < schema["minItems"]:
-            errors.append(f"{at(path)} : moins de {schema['minItems']} élément(s)")
+            errors.append(f"{at(path)}: fewer than {schema['minItems']} item(s)")
         if "maxItems" in schema and len(value) > schema["maxItems"]:
-            errors.append(f"{at(path)} : plus de {schema['maxItems']} élément(s)")
+            errors.append(f"{at(path)}: more than {schema['maxItems']} item(s)")
         if schema.get("uniqueItems"):
             seen = [json.dumps(item, sort_keys=True) for item in value]
             if len(set(seen)) != len(seen):
-                errors.append(f"{at(path)} : éléments en double")
+                errors.append(f"{at(path)}: duplicate items")
         if "items" in schema:
             for index, item in enumerate(value):
                 validate(item, schema["items"], root, f"{path}[{index}]", errors)
@@ -162,7 +162,7 @@ def validate(value, schema, root, path, errors):
 
 def check_kit_api(kit_api, where):
     if int(kit_api.split(".")[0]) != KIT_API_MAJOR:
-        return [f"{where} : version d'API non prise en charge (attendu {KIT_API_MAJOR}.x)"]
+        return [f"{where}: unsupported API version (expected {KIT_API_MAJOR}.x)"]
     return []
 
 
@@ -172,12 +172,12 @@ def required_exports():
         text = handle.read()
     block = re.search(r"kRequiredPlayerExports\[\]\s*=\s*\{(.*?)\};", text, re.S)
     if block is None:
-        raise SchemaError("kRequiredPlayerExports introuvable dans core/build_signature.hpp")
+        raise SchemaError("kRequiredPlayerExports not found in core/build_signature.hpp")
     return re.findall(r'"([^"]+)"', block.group(1))
 
 
 def check_versions(doc, path):
-    """Rules a schema cannot express for versions.json: unique versions, and exports that cover the kit's needs."""
+    """Rules a schema cannot express for versions.json: unique versions, and exports that cover what Ampify needs."""
     errors = []
     required = required_exports()
     known = None
@@ -188,22 +188,22 @@ def check_versions(doc, path):
     for index, entry in enumerate(doc["versions"]):
         where = f"versions[{index}]"
         if entry["version"] in seen:
-            errors.append(f"{where}.version : version déjà listée : {entry['version']}")
+            errors.append(f"{where}.version: version already listed: {entry['version']}")
         seen.add(entry["version"])
         for name in required:
             if name not in entry["exports"]:
-                errors.append(f"{where}.exports : export requis par le kit absent : {name}")
+                errors.append(f"{where}.exports: export required by Ampify is missing: {name}")
         if known is not None:
             for name in entry["exports"]:
                 if name not in known:
-                    errors.append(f"{where}.exports : {name} n'est pas un export connu de AVFoundationCF.dll")
+                    errors.append(f"{where}.exports: {name} is not a known export of AVFoundationCF.dll")
     return errors
 
 
 def check_catalog(doc, path):
-    """Rules a schema cannot express for the catalogue."""
+    """Rules a schema cannot express for the catalog."""
     errors = []
-    # The pinned versions.json, when it sits next to the catalogue as in the repository, must match its SHA-256.
+    # The pinned versions.json, when it sits next to the catalog as in the repository, must match its SHA-256.
     pin = doc.get("versions")
     if pin and pin["url"].endswith("/versions.json"):
         local = os.path.join(os.path.dirname(os.path.abspath(path)), "versions.json")
@@ -211,12 +211,12 @@ def check_catalog(doc, path):
             with open(local, "rb") as handle:
                 digest = hashlib.sha256(handle.read()).hexdigest()
             if digest != pin["sha256"]:
-                errors.append(f"versions.sha256 : ne correspond pas à versions.json à côté du catalogue ({digest})")
+                errors.append(f"versions.sha256: does not match the versions.json next to the catalog ({digest})")
     ids = set()
     for index, entry in enumerate(doc["extensions"]):
         where = f"extensions[{index}]"
         if entry["id"] in ids:
-            errors.append(f"{where}.id : identifiant déjà présent dans le catalogue : {entry['id']}")
+            errors.append(f"{where}.id: id already in the catalog: {entry['id']}")
         ids.add(entry["id"])
         errors += check_kit_api(entry["kitApi"], f"{where}.kitApi")
     return errors
@@ -227,31 +227,31 @@ def check_manifest(doc, path):
     errors = []
     folder = os.path.dirname(os.path.abspath(path))
     if os.path.basename(path) != "manifest.json":
-        errors.append("le fichier doit s'appeler manifest.json")
+        errors.append("the file must be named manifest.json")
     if doc["id"] != os.path.basename(folder):
-        errors.append(f"id : doit être le nom du dossier ({os.path.basename(folder)})")
+        errors.append(f"id: must be the folder name ({os.path.basename(folder)})")
     errors += check_kit_api(doc["kitApi"], "kitApi")
 
     kind = doc["kind"]
     if kind in ("extension", "app") and "main" not in doc:
-        errors.append(f"main : requis pour une {kind}")
+        errors.append(f"main: required for an {kind}")
     if kind == "theme" and not ({"colors", "resources"} & doc.keys()):
-        errors.append("colors ou resources : au moins un des deux est requis pour un thème")
+        errors.append("colors or resources: at least one of the two is required for a theme")
     if kind == "snippet":
         if "resources" not in doc:
-            errors.append("resources : requis pour un snippet")
+            errors.append("resources: required for a snippet")
         if "main" in doc:
-            errors.append("main : interdit pour un snippet")
+            errors.append("main: not allowed for a snippet")
 
     for key in ("main", "colors", "resources", "icon"):
         if key in doc and not os.path.isfile(os.path.join(folder, doc[key])):
-            errors.append(f"{key} : fichier absent du dossier : {doc[key]}")
-    # The kernel refuses to import through a link, and amk refuses to install one: a link could point anywhere.
+            errors.append(f"{key}: file missing from the folder: {doc[key]}")
+    # The kernel refuses to import through a link, and ampify refuses to install one: a link could point anywhere.
     for current, folders, files in os.walk(folder):
         for name in sorted(folders + files):
             if os.path.islink(os.path.join(current, name)):
                 relative = os.path.relpath(os.path.join(current, name), folder).replace(os.sep, "/")
-                errors.append(f"lien symbolique interdit dans l'élément : {relative}")
+                errors.append(f"symbolic link not allowed in the element: {relative}")
     return errors
 
 
@@ -259,17 +259,17 @@ SEMANTIC_CHECKS = {"catalog": check_catalog, "manifest": check_manifest, "versio
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Valide le catalogue, la liste des versions ou des manifestes du kit.")
-    parser.add_argument("kind", choices=sorted(SCHEMAS), help="ce que contient le fichier")
-    parser.add_argument("files", nargs="+", metavar="file", help="fichiers JSON à valider")
+    parser = argparse.ArgumentParser(description="Check the catalog, the list of versions or element manifests.")
+    parser.add_argument("kind", choices=sorted(SCHEMAS), help="what the file contains")
+    parser.add_argument("files", nargs="+", metavar="file", help="JSON files to check")
     args = parser.parse_args(argv)
 
     try:
         with open(SCHEMAS[args.kind], encoding="utf-8") as handle:
             schema = json.load(handle)
-        check_supported(schema, "schéma")
+        check_supported(schema, "schema")
     except (OSError, ValueError, SchemaError) as error:
-        print(f"schéma {args.kind} inutilisable : {error}", file=sys.stderr)
+        print(f"unusable {args.kind} schema: {error}", file=sys.stderr)
         return 2
 
     status = 0
@@ -282,15 +282,15 @@ def main(argv=None):
             if not errors:
                 errors = SEMANTIC_CHECKS[args.kind](document, path)
         except (OSError, ValueError, SchemaError, re.error) as error:
-            print(f"{path} : contrôle impossible : {error}", file=sys.stderr)
+            print(f"{path}: cannot check: {error}", file=sys.stderr)
             return 2
 
         if errors:
             status = 1
             for message in errors:
-                print(f"{path} : {message}")
+                print(f"{path}: {message}")
         else:
-            print(f"{path} : valide")
+            print(f"{path}: valid")
     return status
 
 

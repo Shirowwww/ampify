@@ -2,7 +2,7 @@
 
 #include "render_tree.hpp"
 
-namespace amk::uirender {
+namespace ampify::uirender {
 
 namespace {
 
@@ -149,7 +149,7 @@ std::optional<Insertion> ChoosePlaybarInsertion(const std::vector<ProbeNode>& no
 
 std::optional<Insertion> ChooseTopbarInsertion(const std::vector<ProbeNode>& nodes) {
     // Apple Music 1.1792 has no separate top bar: its play bar is at the top, and the buttons at its right (volume,
-    // AirPlay, lyrics, queue) sit in StackPanel#NowPlayingToggleButtons. A kit button goes after them.
+    // AirPlay, lyrics, queue) sit in StackPanel#NowPlayingToggleButtons. An Ampify button goes after them.
     if (std::optional<int> toggles = FindByName(nodes, "NowPlayingToggleButtons");
         toggles && nodes[*toggles].Is(kProbeStackPanel) && !InsideModElement(nodes, *toggles)) {
         Insertion insertion;
@@ -223,4 +223,4 @@ void RefreshTicket::StopLayout() {
     m_layoutBudget = 0;
 }
 
-}  // namespace amk::uirender
+}  // namespace ampify::uirender

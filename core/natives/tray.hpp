@@ -1,6 +1,6 @@
 #pragma once
 
-// The optional host service behind AMK.tray (permission ui.tray, setting tray.enabled). The Windows host keeps one
+// The optional host service behind Ampify.tray (permission ui.tray, setting tray.enabled). The Windows host keeps one
 // notification area icon with a menu, on its own thread (win/tray.*). A click on an element's item comes back as
 // dispatch.tray({"to": <id>, "item": <n>}), a left click on the icon as dispatch.tray({"click": true}).
 
@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
 struct TrayItem {
     int id = 0;  // chosen by the element's prelude, from 1
@@ -30,4 +30,4 @@ struct TrayHost {
     virtual void RemoveTrayMenu(const std::string& elementId) = 0;
 };
 
-}  // namespace amk
+}  // namespace ampify

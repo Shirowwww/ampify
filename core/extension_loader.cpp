@@ -8,7 +8,7 @@
 
 #include "manifest.hpp"
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -61,7 +61,7 @@ void ExtensionLoader::LoadFolders(const fs::path& root, Origin origin, LoadRepor
     std::vector<fs::path> folders;
     for (const fs::directory_entry& entry : fs::directory_iterator(root, ec)) {
         std::string name = entry.path().filename().string();
-        if (name.empty() || name[0] == '.') continue;  // work in progress of amk (install, replacement)
+        if (name.empty() || name[0] == '.') continue;  // work in progress of ampify (install, replacement)
         if (entry.is_directory(ec)) folders.push_back(entry.path());
     }
     std::sort(folders.begin(), folders.end());
@@ -84,9 +84,9 @@ void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadRepo
         std::error_code fileError;
         return fs::is_regular_file(folder / file, fileError);
     });
-    for (const std::string& warning : result.warnings) m_journal.Write("[" + name + "] avertissement : " + warning);
+    for (const std::string& warning : result.warnings) m_journal.Write("[" + name + "] warning: " + warning);
     if (!result.manifest) {
-        for (const std::string& error : result.errors) m_journal.Write("[" + name + "] rejeté : " + error);
+        for (const std::string& error : result.errors) m_journal.Write("[" + name + "] rejected: " + error);
         report.rejected.push_back(name);
         return;
     }
@@ -96,24 +96,24 @@ void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadRepo
         // A theme without a main.js has no script: its folder belongs to the theme engine. Its script runs in
         // AppleMusic.exe only, because the interface is the only thing a theme changes.
         if (manifest.kind != ElementKind::Theme) {
-            m_journal.Write("[" + name + "] rejeté : le dossier des thèmes attend un thème");
+            m_journal.Write("[" + name + "] rejected: the themes folder expects a theme");
             report.rejected.push_back(name);
             return;
         }
         if (!manifest.main || m_host.Process() != "ui") return;
     } else {
-        // Each kind has its own folder, where amk installs it: extensions/<id> for an extension, apps/<id> for an app.
+        // Each kind has its own folder, where ampify installs it: extensions/<id> for an extension, apps/<id> for an app.
         ElementKind expected = origin == Origin::Apps ? ElementKind::App : ElementKind::Extension;
         if (manifest.kind != expected) {
             m_journal.Write("[" + name + "] type " + std::string(ToString(manifest.kind)) +
-                            " non chargé depuis le dossier " + (origin == Origin::Apps ? "apps" : "extensions"));
+                            " not loaded from the folder " + (origin == Origin::Apps ? "apps" : "extensions"));
             report.rejected.push_back(name);
             return;
         }
     }
 
     if (!manifest.RunsIn(m_host.Process())) {
-        m_journal.Write("[" + name + "] ignoré dans le processus " + m_host.Process());
+        m_journal.Write("[" + name + "] skipped in the process " + m_host.Process());
         report.skipped.push_back(name);
         return;
     }
@@ -128,7 +128,7 @@ void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadRepo
     info.id = hostId;
     info.name = displayName;
     info.enabledByDefault = false;  // a community element never starts unless the user enables it
-    // expose_api = 0 keeps every JavaScript element off. An app is switched by apps.<id>.enabled, as `amk app
+    // expose_api = 0 keeps every JavaScript element off. An app is switched by apps.<id>.enabled, as `ampify app
     // enable` writes it; an extension by extensions.<id>.enabled.
     if (origin == Origin::Themes) {
         info.isEnabled = [id](const Settings& settings) {
@@ -144,7 +144,7 @@ void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadRepo
     info.stop = [raw] { raw->Stop(); };
 
     if (!m_hosts.Add(std::move(info))) {
-        m_journal.Write("[" + name + "] rejeté : identifiant déjà utilisé");
+        m_journal.Write("[" + name + "] rejected: id already in use");
         report.rejected.push_back(name);
         return;
     }
@@ -197,7 +197,7 @@ bool ExtensionLoader::Stop(const std::string& target) { return m_hosts.Stop(targ
 bool ExtensionLoader::Restart(const std::string& target, const Settings& settings) {
     ScriptExtension* element = Find(target);
     if (!element) {
-        // A native extension restarts in place. An element the kernel has not seen yet (copied by amk dev, installed
+        // A native extension restarts in place. An element the kernel has not seen yet (copied by ampify dev, installed
         // since the start) is found by a rescan, which starts it when the settings enable it.
         if (m_hosts.Has(target)) return m_hosts.Restart(target, settings);
         Rescan(settings);
@@ -211,7 +211,7 @@ bool ExtensionLoader::Restart(const std::string& target, const Settings& setting
     LoadReport report;
     LoadFolder(folder, origin, report);
     if (!Find(target)) {
-        m_journal.Write("[" + target + "] rechargement impossible : l'élément n'est plus valide, il reste arrêté");
+        m_journal.Write("[" + target + "] cannot reload: the element is no longer valid, it stays stopped");
         return true;
     }
     m_hosts.Start(target, settings);
@@ -225,7 +225,7 @@ LoadReport ExtensionLoader::Rescan(const Settings& settings) {
         if (!fs::is_regular_file(FolderOf(*element) / "manifest.json", ec)) gone.push_back(HostId(element->manifest()));
     }
     for (const std::string& hostId : gone) {
-        m_journal.Write("[" + hostId + "] retiré : son dossier n'existe plus");
+        m_journal.Write("[" + hostId + "] removed: its folder no longer exists");
         Forget(hostId);
     }
 
@@ -238,23 +238,23 @@ void ExtensionLoader::Apply(const std::vector<ReloadRequest>& requests, const Se
     for (const ReloadRequest& request : requests) {
         switch (request.action) {
             case ReloadRequest::Action::Start:
-                m_journal.Write("Démarrage demandé : " + request.target);
-                if (!Start(request.target, settings)) m_journal.Write("[" + request.target + "] introuvable dans le kit");
+                m_journal.Write("Start requested: " + request.target);
+                if (!Start(request.target, settings)) m_journal.Write("[" + request.target + "] not found in Ampify");
                 break;
             case ReloadRequest::Action::Stop:
-                m_journal.Write("Arrêt demandé : " + request.target);
+                m_journal.Write("Stop requested: " + request.target);
                 Stop(request.target);
                 break;
             case ReloadRequest::Action::Restart:
-                m_journal.Write("Rechargement demandé : " + request.target);
+                m_journal.Write("Reload requested: " + request.target);
                 if (!Restart(request.target, settings)) {
-                    m_journal.Write("[" + request.target + "] introuvable dans le kit");
+                    m_journal.Write("[" + request.target + "] not found in Ampify");
                 }
                 break;
             case ReloadRequest::Action::Rescan: {
-                m_journal.Write("Nouvelle lecture des dossiers du kit demandée");
+                m_journal.Write("Rescan of the Ampify folders requested");
                 LoadReport report = Rescan(settings);
-                m_journal.Write("Nouveaux éléments : " + std::to_string(report.loaded.size()));
+                m_journal.Write("New elements: " + std::to_string(report.loaded.size()));
                 break;
             }
         }
@@ -309,4 +309,4 @@ void ExtensionLoader::DeliverEventTo(const std::string& elementId, const std::st
     }
 }
 
-}  // namespace amk
+}  // namespace ampify

@@ -34,11 +34,11 @@ def write_json(path, data):
 def entry(**changes):
     data = {
         "id": "demo-ext",
-        "name": "Démo",
+        "name": "Demo",
         "version": "1.0.0",
         "kind": "extension",
         "author": "Shirowwww",
-        "description": "Entrée de test.",
+        "description": "A test entry.",
         "kitApi": "1.0",
         "url": "https://example.com/demo-ext.zip",
         "sha256": "a" * 64,
@@ -49,7 +49,7 @@ def entry(**changes):
 def manifest(**changes):
     data = {
         "id": "demo-ext",
-        "name": "Démo",
+        "name": "Demo",
         "version": "1.0.0",
         "kind": "extension",
         "author": "Shirowwww",
@@ -102,19 +102,19 @@ class CatalogTests(unittest.TestCase):
         self.assertIn("extensions[0].url", text)
 
     def test_duplicate_ids_are_refused(self):
-        code, text = self.write([entry(), entry(name="Autre")])
+        code, text = self.write([entry(), entry(name="Other")])
         self.assertEqual(code, 1)
-        self.assertIn("déjà présent", text)
+        self.assertIn("already in the catalog", text)
 
     def test_unknown_field_is_refused(self):
         code, text = self.write([entry(download_count=3)])
         self.assertEqual(code, 1)
-        self.assertIn("propriété non autorisée", text)
+        self.assertIn("property not allowed", text)
 
     def test_missing_required_field_is_refused(self):
         code, text = self.write([entry(sha256=None)])
         self.assertEqual(code, 1)
-        self.assertIn("champ requis absent : sha256", text)
+        self.assertIn("required field missing: sha256", text)
 
     def test_catalog_version_must_be_one(self):
         code, text = self.write([], catalogVersion=2)
@@ -124,7 +124,7 @@ class CatalogTests(unittest.TestCase):
     def test_other_kit_api_major_is_refused(self):
         code, text = self.write([entry(kitApi="2.0")])
         self.assertEqual(code, 1)
-        self.assertIn("version d'API non prise en charge", text)
+        self.assertIn("unsupported API version", text)
 
     def test_unknown_permission_is_refused(self):
         code, text = self.write([entry(permissions=["fs.write"])])
@@ -164,7 +164,7 @@ class ManifestTests(unittest.TestCase):
     def test_folder_must_match_id(self):
         code, text = run("manifest", self.install(manifest(), folder="autre"))
         self.assertEqual(code, 1)
-        self.assertIn("doit être le nom du dossier", text)
+        self.assertIn("must be the folder name", text)
 
     def test_file_must_be_named_manifest(self):
         path = self.install(manifest())
@@ -177,12 +177,12 @@ class ManifestTests(unittest.TestCase):
     def test_extension_needs_main(self):
         code, text = run("manifest", self.install(manifest(main=None)))
         self.assertEqual(code, 1)
-        self.assertIn("main : requis", text)
+        self.assertIn("main: required", text)
 
     def test_main_must_exist_beside_manifest(self):
         code, text = run("manifest", self.install(manifest(), files=()))
         self.assertEqual(code, 1)
-        self.assertIn("fichier absent du dossier", text)
+        self.assertIn("file missing from the folder", text)
 
     def test_path_traversal_is_refused(self):
         code, text = run("manifest", self.install(manifest(main="../evil.js")))
@@ -207,7 +207,7 @@ class ManifestTests(unittest.TestCase):
     def test_theme_needs_colors_or_resources(self):
         code, text = run("manifest", self.install(manifest(kind="theme", main=None), files=()))
         self.assertEqual(code, 1)
-        self.assertIn("au moins un des deux", text)
+        self.assertIn("at least one of the two", text)
 
     def test_theme_with_colors_passes(self):
         data = manifest(kind="theme", main=None, colors="colors.ini", defaultScheme="Base")
@@ -233,15 +233,15 @@ class ManifestTests(unittest.TestCase):
         try:
             os.symlink(os.path.join(self.tmp.name, "elsewhere.js"), os.path.join(folder, "lib", "link.js"))
         except (OSError, NotImplementedError):
-            self.skipTest("pas de lien symbolique sur ce système")
+            self.skipTest("no symbolic links on this system")
         code, text = run("manifest", path)
         self.assertEqual(code, 1)
-        self.assertIn("lien symbolique interdit dans l'élément : lib/link.js", text)
+        self.assertIn("symbolic link not allowed in the element: lib/link.js", text)
 
     def test_snippet_needs_resources_and_forbids_main(self):
         code, text = run("manifest", self.install(manifest(kind="snippet", resources="snippet.xaml"), files=("snippet.xaml", "main.js")))
         self.assertEqual(code, 1)
-        self.assertIn("main : interdit pour un snippet", text)
+        self.assertIn("main: not allowed for a snippet", text)
 
 
 try:
@@ -296,12 +296,12 @@ class VersionsTests(unittest.TestCase):
     def test_duplicate_versions_are_refused(self):
         code, text = self.write([tested_version(), tested_version()])
         self.assertEqual(code, 1)
-        self.assertIn("déjà listée", text)
+        self.assertIn("already listed", text)
 
     def test_every_required_export_must_be_listed(self):
         code, text = self.write([tested_version(exports=REQUIRED_EXPORTS[1:])])
         self.assertEqual(code, 1)
-        self.assertIn("export requis par le kit absent : AVCFPlayerCopyCurrentItem", text)
+        self.assertIn("export required by Ampify is missing: AVCFPlayerCopyCurrentItem", text)
 
     def test_unknown_export_is_refused(self):
         code, text = self.write([tested_version(exports=REQUIRED_EXPORTS + ["AVCFInventé"])])
@@ -309,7 +309,7 @@ class VersionsTests(unittest.TestCase):
 
         code, text = self.write([tested_version(exports=REQUIRED_EXPORTS + ["AVCFInvented"])])
         self.assertEqual(code, 1)
-        self.assertIn("pas un export connu", text)
+        self.assertIn("not a known export", text)
 
     def test_other_dll_is_refused(self):
         code, text = self.write([tested_version()], playerDll="Other.dll")
@@ -344,7 +344,7 @@ class CatalogVersionsPinTests(unittest.TestCase):
         self.assertIn("versions.sha256", text)
 
 
-@unittest.skipIf(Draft202012Validator is None, "jsonschema n'est pas installé : contrôle croisé ignoré")
+@unittest.skipIf(Draft202012Validator is None, "jsonschema is not installed: cross-check skipped")
 class ReferenceAgreementTests(unittest.TestCase):
     """Random documents must get the same verdict from this validator and from jsonschema."""
 
@@ -378,12 +378,12 @@ class ReferenceAgreementTests(unittest.TestCase):
             self.assertEqual(not errors, reference.is_valid(doc), json.dumps(doc, sort_keys=True)[:200])
 
     def test_manifest_schema_agrees_with_jsonschema(self):
-        base = {"id": "demo-ext", "name": "Démo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww",
+        base = {"id": "demo-ext", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww",
                 "description": "x", "kitApi": "1.0", "main": "main.js"}
         self.check(load_schema("manifest"), base, self.mutate)
 
     def test_catalog_schema_agrees_with_jsonschema(self):
-        entry = {"id": "demo-ext", "name": "Démo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww",
+        entry = {"id": "demo-ext", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww",
                  "description": "x", "kitApi": "1.0", "url": "https://a.b/c.zip", "sha256": "a" * 64}
         base = {"catalogVersion": 1, "extensions": [entry]}
         self.check(load_schema("catalog"), base, self.mutate_catalog)

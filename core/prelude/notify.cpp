@@ -1,13 +1,13 @@
-// Module notify: AMK.notify, a notification from the element. Natives: core/natives/notify.cpp.
+// Module notify: Ampify.notify, a notification from the element. Natives: core/natives/notify.cpp.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kNotify[];
-const char kNotify[] = R"AMKJS(
-  AMK.notify = (options) => {
+const char kNotify[] = R"AMPIFYJS(
+  Ampify.notify = (options) => {
     const note = options || {};
     native.notify(note.title === undefined ? "" : text(note.title), note.text === undefined ? "" : text(note.text));
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

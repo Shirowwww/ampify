@@ -1,6 +1,6 @@
 // NOT RUN YET IN APPLE MUSIC: see xaml_host.hpp. Written against the C++/WinRT projection of Windows App SDK 1.8.
 
-#if defined(AMK_WITH_XAML)
+#if defined(AMPIFY_WITH_XAML)
 
 #include "xaml_host.hpp"
 
@@ -14,7 +14,7 @@
 
 #include "ui_thread.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -66,8 +66,8 @@ bool XamlAttach(DWORD, HINSTANCE) {
     xaml::Window window = AppWindow(L"MainWindow");
     if (!window) {
         if (!AppPropertyAvailable() && !state.unavailableLogged.exchange(true)) {
-            Log("Interface : AMP.Utils.dll ou son export GetAppProperty est indisponible pour l'instant : la fenêtre "
-                "XAML n'est pas accessible (nouvel essai toutes les secondes)");
+            Log("Interface: AMP.Utils.dll or its GetAppProperty export is not available yet: the XAML window "
+                "cannot be reached (retrying every second)");
         }
         return false;
     }
@@ -83,8 +83,8 @@ bool XamlAttach(DWORD, HINSTANCE) {
         state.window = winrt::make_weak(window);
         state.queue = queue;
     }
-    Log("Interface : fenêtre principale obtenue par AMP.Utils (GetAppProperty « MainWindow »), le travail passe "
-        "par sa DispatcherQueue");
+    Log("Interface: main window obtained through AMP.Utils (GetAppProperty \"MainWindow\"), work goes "
+        "through its DispatcherQueue");
     return true;
 }
 
@@ -119,15 +119,15 @@ bool XamlPost(std::function<void()> work) {
             try {
                 current.threadId = GetCurrentThreadId();
                 if (!current.firstRun.exchange(true)) {
-                    Log("Interface : premier travail exécuté par la DispatcherQueue de la fenêtre principale (fil " +
+                    Log("Interface: first work run by the main window's DispatcherQueue (thread " +
                         std::to_string(GetCurrentThreadId()) + ")");
                 }
                 current.ran++;
                 work();
             } catch (const winrt::hresult_error& error) {
-                Log("Interface : une tâche du fil d'interface a échoué (" + HresultText(error.code().value) + ")");
+                Log("Interface: a task on the interface thread failed (" + HresultText(error.code().value) + ")");
             } catch (...) {
-                Log("Interface : une tâche du fil d'interface a échoué (exception inconnue)");
+                Log("Interface: a task on the interface thread failed (unknown exception)");
             }
         });
     } catch (...) {
@@ -160,7 +160,7 @@ xaml::Window AppWindow(std::wstring_view property) noexcept {
         if (!(property == L"MiniPlayerWindow" && error.code() == E_BOUNDS)) {
             static std::atomic<int> logged{0};
             if (logged++ < 3) {
-                Log("Interface : GetAppProperty a échoué (" + HresultText(error.code().value) + ")");
+                Log("Interface: GetAppProperty failed (" + HresultText(error.code().value) + ")");
             }
         }
         return nullptr;
@@ -198,6 +198,6 @@ std::string HresultText(std::int32_t code) {
     return buffer;
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win
 
-#endif  // AMK_WITH_XAML
+#endif  // AMPIFY_WITH_XAML

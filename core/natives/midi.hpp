@@ -1,6 +1,6 @@
 #pragma once
 
-// The optional host service behind AMK.midi (permission midi.input, setting midi.enabled). The Windows host reads
+// The optional host service behind Ampify.midi (permission midi.input, setting midi.enabled). The Windows host reads
 // the device chosen by midi.device with winmm (win/midi.*). Each note or controller message comes back to the
 // elements as dispatch.midi(<midi::EventJson>).
 
@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
 struct MidiHost {
     static constexpr std::string_view kCapabilityName = "midi";
@@ -22,4 +22,4 @@ struct MidiHost {
     virtual std::vector<std::string> MidiDevices() = 0;
 };
 
-}  // namespace amk
+}  // namespace ampify

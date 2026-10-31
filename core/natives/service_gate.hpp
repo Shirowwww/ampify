@@ -1,16 +1,16 @@
 #pragma once
 
-// For the natives of the kit services (discord, tray, midi, remote): the setting check, with one journal line per
+// For the natives of the Ampify services (discord, tray, midi, remote): the setting check, with one log line per
 // element and service when the service is off, so that an author sees why nothing happens.
 
 #include <set>
 #include <string>
 
 #include "../api/bridge.hpp"
-#include "kit_language.hpp"
+#include "../i18n.hpp"
 #include "service_flags.hpp"
 
-namespace amk {
+namespace ampify {
 
 struct ServiceGate : ScriptBridge {
     struct Warned {
@@ -22,11 +22,10 @@ struct ServiceGate : ScriptBridge {
         if (ServiceEnabled(HostOf(ext), key)) return true;
         if (State<Warned>(ext).keys.insert(key).second) {
             JournalOf(ext).Write("[" + ext->id() + "] " +
-                                 i18n::Text(KitLanguage(HostOf(ext)), "service.off",
-                                            {{"service", service}, {"setting", key}}));
+                                 i18n::Text("service.off", {{"service", service}, {"setting", key}}));
         }
         return false;
     }
 };
 
-}  // namespace amk
+}  // namespace ampify

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace amk::midi {
+namespace ampify::midi {
 
 namespace {
 
@@ -69,7 +69,7 @@ std::optional<Binding> ParseBinding(std::string_view input, std::string* error) 
         size_t colon = rest.find(':');
         int channel = colon == std::string_view::npos ? -1 : Number(rest.substr(2, colon - 2), 1, 16);
         if (channel < 0) {
-            Fail(error, "canal MIDI invalide dans « " + std::string(input) + " » (ch1 à ch16)");
+            Fail(error, "invalid MIDI channel in '" + std::string(input) + "' (ch1 to ch16)");
             return std::nullopt;
         }
         binding.channel = channel;
@@ -81,13 +81,13 @@ std::optional<Binding> ParseBinding(std::string_view input, std::string* error) 
     if (type == "note") binding.type = Binding::Type::Note;
     else if (type == "cc") binding.type = Binding::Type::Control;
     else {
-        Fail(error, "liaison MIDI inconnue : « " + std::string(input) + " » (ex. note:60, cc:7, ch2:note:36, *)");
+        Fail(error, "unknown MIDI binding: '" + std::string(input) + "' (e.g. note:60, cc:7, ch2:note:36, *)");
         return std::nullopt;
     }
     if (number == "*") return binding;
     binding.number = Number(number, 0, 127);
     if (binding.number < 0) {
-        Fail(error, "numéro MIDI invalide dans « " + std::string(input) + " » (0 à 127)");
+        Fail(error, "invalid MIDI number in '" + std::string(input) + "' (0 to 127)");
         return std::nullopt;
     }
     return binding;
@@ -119,10 +119,10 @@ bool Map::Parse(std::string_view text, std::string* error) {
         std::string trimmed = Lower(item);
         if (trimmed.empty()) continue;
         size_t eq = trimmed.find('=');
-        if (eq == std::string::npos) return Fail(error, "midi.map : « " + trimmed + " » attend liaison=action");
+        if (eq == std::string::npos) return Fail(error, "midi.map: '" + trimmed + "' expects binding=action");
         std::optional<Binding> binding = ParseBinding(trimmed.substr(0, eq), error);
         if (!binding) return false;
-        if (binding->type == Binding::Type::Any) return Fail(error, "midi.map : « * » ne peut pas recevoir d'action");
+        if (binding->type == Binding::Type::Any) return Fail(error, "midi.map: '*' cannot take an action");
         std::string action = trimmed.substr(eq + 1);
         Rule rule{*binding, Action::Next};
         if (action == "play") rule.action = Action::Play;
@@ -130,9 +130,9 @@ bool Map::Parse(std::string_view text, std::string* error) {
         else if (action == "next") rule.action = Action::Next;
         else if (action == "previous") rule.action = Action::Previous;
         else if (action == "gain") rule.action = Action::Gain;
-        else return Fail(error, "midi.map : action inconnue « " + action + " » (play, pause, next, previous, gain)");
+        else return Fail(error, "midi.map: unknown action '" + action + "' (play, pause, next, previous, gain)");
         if (rule.action == Action::Gain && binding->type != Binding::Type::Control) {
-            return Fail(error, "midi.map : gain demande un contrôleur (cc:<n>)");
+            return Fail(error, "midi.map: gain needs a controller (cc:<n>)");
         }
         rules.push_back(rule);
     }
@@ -158,4 +158,4 @@ std::optional<Decision> Map::Handle(const Event& event) {
     return std::nullopt;
 }
 
-}  // namespace amk::midi
+}  // namespace ampify::midi

@@ -16,7 +16,7 @@ namespace atmos::hooks {
 
 // Reads extensions.atmos-leveler.auto_level, fallback_db and max_db, with the reference mod's defaults. The two
 // gains are brought into 0..15 dB.
-amk::ExtensionInfo MakeAtmosLevelerExtension(amk::Journal& journal, const amk::Settings& settings);
+ampify::ExtensionInfo MakeAtmosLevelerExtension(ampify::Journal& journal, const ampify::Settings& settings);
 
 // For the Wine harness only, which has no spatial audio engine to activate Apple Music's stream with.
 namespace testing {
@@ -25,7 +25,7 @@ namespace testing {
 // these arguments: a metadata stream gets its hooks. The leveler must have started.
 void SpatialStreamActivated(const PROPVARIANT* params, REFIID riid, void* stream);
 
-// %USERPROFILE%\AppleMusicModKit\atmos-levels.txt: the levels kept across runs.
+// %USERPROFILE%\Ampify\atmos-levels.txt: the levels kept across runs.
 std::filesystem::path LevelsFile();
 
 }  // namespace testing

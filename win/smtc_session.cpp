@@ -5,7 +5,7 @@
 
 #include "win_common.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -79,7 +79,7 @@ bool SmtcSession::Start(std::string& failure) {
         L"Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager", kIidManagerStatics, statics);
     if (FAILED(activation.result) || FAILED(rt::CallSlot(statics, kStaticsRequestAsync, m_request.Put())) ||
         !m_request) {
-        failure = "API SMTC indisponible sur ce Windows";
+        failure = "SMTC API not available on this Windows";
         return false;
     }
     m_started = true;
@@ -190,4 +190,4 @@ bool SmtcSession::Command(PlayerCommand command, int64_t seekMs) {
     return SUCCEEDED(rt::CallSlot(operation, rt::kAsyncGetResultsSlot, &accepted)) && accepted != 0;
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

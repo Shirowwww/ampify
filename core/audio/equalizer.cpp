@@ -6,7 +6,7 @@
 #include <numbers>
 #include <utility>
 
-namespace amk::audio {
+namespace ampify::audio {
 
 namespace {
 
@@ -270,4 +270,4 @@ bool EqProcessor::Process(float* samples, size_t frames, int channels, double sa
     return true;
 }
 
-}  // namespace amk::audio
+}  // namespace ampify::audio

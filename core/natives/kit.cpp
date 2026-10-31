@@ -9,7 +9,7 @@
 #include "../api/module.hpp"
 #include "../json.hpp"
 
-namespace amk {
+namespace ampify {
 
 bool IsKitCommandAllowed(const std::vector<std::string>& arguments) {
     static constexpr std::array<std::string_view, 9> kCommands = {
@@ -42,15 +42,15 @@ struct KitNatives : ScriptBridge {
                                          .Dump());
     }
 
-    AMK_NATIVE(Run) {
+    AMPIFY_NATIVE(Run) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "kit.manage", &failure)) return failure;
         if (ext->id() != kMarketplaceId) {
-            return Throw(ctx, "PermissionDenied", "kit.manage est réservée à la Marketplace du kit");
+            return Throw(ctx, "PermissionDenied", "kit.manage is reserved for the Marketplace that ships with Ampify");
         }
         double id = 0;
-        if (argc < 2 || JS_ToFloat64(ctx, &id, argv[0]) != 0) return Throw(ctx, "TypeError", "kit.run : appel invalide");
+        if (argc < 2 || JS_ToFloat64(ctx, &id, argv[0]) != 0) return Throw(ctx, "TypeError", "kit.run: invalid call");
         std::optional<Json> parsed = Json::Parse(String(ctx, argc, argv, 1).value_or(""));
         std::vector<std::string> arguments;
         if (parsed && parsed->IsArray()) {
@@ -59,14 +59,14 @@ struct KitNatives : ScriptBridge {
             }
         }
         if (!IsKitCommandAllowed(arguments)) {
-            return Throw(ctx, "PermissionDenied", "kit.run : commande refusée pour une page");
+            return Throw(ctx, "PermissionDenied", "kit.run: command refused for a page");
         }
         KitCommandHost* host = HostOf(ext).Capability<KitCommandHost>();
         if (!host) {
-            Report(ext, id, -1, "", "commandes du kit indisponibles dans ce processus");
+            Report(ext, id, -1, "", "Ampify commands are not available in this process");
             return JS_UNDEFINED;
         }
-        JournalOf(ext).Write("[" + ext->id() + "] amk " + arguments.front() + (arguments.size() > 1 ? " " + arguments[1] : ""));
+        JournalOf(ext).Write("[" + ext->id() + "] ampify " + arguments.front() + (arguments.size() > 1 ? " " + arguments[1] : ""));
         host->RunKitCommand(ext->id(), arguments, [ext, id](int code, const std::string& out, const std::string& err) {
             Report(ext, id, code, out, err);
         });
@@ -90,4 +90,4 @@ void StopKit(ScriptExtension& extension) {
 
 }  // namespace natives
 
-}  // namespace amk
+}  // namespace ampify

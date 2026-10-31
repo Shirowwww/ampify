@@ -8,7 +8,7 @@
 #include "../core/settings.hpp"
 #include "element.hpp"
 
-namespace amk {
+namespace ampify {
 
 // Extensions built into the kernel. They have no folder, only a settings key.
 inline constexpr std::string_view kBuiltinExtensions[] = {"atmos-leveler"};
@@ -27,7 +27,7 @@ std::string ReloadTarget(std::string_view kind, std::string_view id);
 // Above this size, AppendReloadRequests starts reload.txt again with only the new lines.
 inline constexpr size_t kReloadFileLimit = 64 * 1024;
 
-// The folders of the kit, under %USERPROFILE%\AppleMusicModKit (docs/cli/COMMANDES.md, "Fichiers du kit").
+// The folders of the kit, under %USERPROFILE%\Ampify (docs/cli.md, "Ampify files").
 class KitLayout {
 public:
     explicit KitLayout(std::filesystem::path root) : m_root(std::move(root)) {}
@@ -44,7 +44,7 @@ public:
     std::filesystem::path Downloads() const { return m_root / "downloads"; }
     std::filesystem::path Cache() const { return m_root / "cache"; }
     std::filesystem::path Updates() const { return m_root / "updates"; }
-    std::filesystem::path Journal() const { return m_root / "journal"; }
+    std::filesystem::path Journal() const { return m_root / "logs"; }
     std::filesystem::path Profiles() const { return m_root / "profiles"; }
     std::filesystem::path SafeModeState() const { return m_root / "state.txt"; }
 
@@ -94,4 +94,4 @@ bool WriteTextFile(const std::filesystem::path& file, const std::string& text, s
 // pass, so a request is never lost by a later write, unless the file was over kReloadFileLimit and starts again.
 bool AppendReloadRequests(const KitLayout& kit, const std::vector<std::string>& lines, std::string& error);
 
-}  // namespace amk
+}  // namespace ampify

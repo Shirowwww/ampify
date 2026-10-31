@@ -6,7 +6,7 @@
 
 #include <chrono>
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -27,25 +27,25 @@ bool RemoteServer::Start(const Config& config, remote::Backend& backend, std::st
     if (running()) return true;
     // The address is checked before any socket exists: this server never listens beyond the PC.
     if (!remote::IsLoopbackText(config.address)) {
-        return Fail(error, "adresse refusée : " + config.address + " (la télécommande n'écoute que 127.0.0.1)");
+        return Fail(error, "address refused: " + config.address + " (the remote only listens on 127.0.0.1)");
     }
-    if (!remote::IsValidToken(config.token)) return Fail(error, "jeton absent ou trop court (remote.token)");
+    if (!remote::IsValidToken(config.token)) return Fail(error, "token missing or too short (remote.token)");
 
     in_addr address{};
     if (inet_pton(AF_INET, config.address.c_str(), &address) != 1) {
-        return Fail(error, "adresse refusée : " + config.address + " (IPv4 attendue, ex. 127.0.0.1)");
+        return Fail(error, "address refused: " + config.address + " (IPv4 expected, e.g. 127.0.0.1)");
     }
 
     WSADATA data;
-    if (WSAStartup(MAKEWORD(2, 2), &data) != 0) return Fail(error, "Winsock indisponible");
+    if (WSAStartup(MAKEWORD(2, 2), &data) != 0) return Fail(error, "Winsock not available");
     m_winsock = true;
 
     SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listener == INVALID_SOCKET) {
         Stop();
-        return Fail(error, "socket impossible à créer");
+        return Fail(error, "could not create the socket");
     }
-    // No other program may bind the same port while the kit holds it.
+    // No other program may bind the same port while Ampify holds it.
     BOOL exclusive = TRUE;
     setsockopt(listener, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&exclusive), sizeof exclusive);
 
@@ -57,7 +57,7 @@ bool RemoteServer::Start(const Config& config, remote::Backend& backend, std::st
         int code = WSAGetLastError();
         closesocket(listener);
         Stop();
-        return Fail(error, "port " + std::to_string(config.port) + " indisponible (code " + std::to_string(code) + ")");
+        return Fail(error, "port " + std::to_string(config.port) + " not available (code " + std::to_string(code) + ")");
     }
     // Checked again on the socket itself, in case the address text and the bound address ever disagree.
     sockaddr_in actual{};
@@ -66,12 +66,12 @@ bool RemoteServer::Start(const Config& config, remote::Backend& backend, std::st
         !remote::IsLoopbackIpv4(ntohl(actual.sin_addr.s_addr))) {
         closesocket(listener);
         Stop();
-        return Fail(error, "le socket n'est pas lié à 127.0.0.1 : arrêt");
+        return Fail(error, "the socket is not bound to 127.0.0.1: stopping");
     }
     if (listen(listener, 8) != 0) {
         closesocket(listener);
         Stop();
-        return Fail(error, "écoute impossible");
+        return Fail(error, "could not listen");
     }
 
     m_socket = static_cast<uintptr_t>(listener);
@@ -130,9 +130,9 @@ void RemoteServer::Run() {
         } else if (status == remote::ParseStatus::Complete) {
             response = router.Handle(request, true, *m_backend);
         } else if (status == remote::ParseStatus::TooLarge) {
-            response = remote::Response{413, R"({"ok":false,"error":"requête trop grande"})"};
+            response = remote::Response{413, R"({"ok":false,"error":"request too large"})"};
         } else {
-            response = remote::Response{400, R"({"ok":false,"error":"requête HTTP illisible"})"};
+            response = remote::Response{400, R"({"ok":false,"error":"unreadable HTTP request"})"};
         }
         std::string bytes = remote::Serialize(response);
         size_t sent = 0;
@@ -146,4 +146,4 @@ void RemoteServer::Run() {
     }
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

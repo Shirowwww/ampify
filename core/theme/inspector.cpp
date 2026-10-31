@@ -4,7 +4,7 @@
 
 #include "../json.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -31,9 +31,9 @@ std::string ValueText(const Value& value) {
     if (value.kind == ValueKind::Opaque) {
         // "handle:N;#AARRGGBB": an app brush kept as an object, with its colour (opacity included) when it is plain.
         size_t colour = value.text.find(';');
-        return colour == std::string::npos ? "présent" : value.text.substr(colour + 1);
+        return colour == std::string::npos ? "present" : value.text.substr(colour + 1);
     }
-    if (value.kind == ValueKind::Template) return "présent";
+    if (value.kind == ValueKind::Template) return "present";
     return value.text;
 }
 
@@ -66,19 +66,19 @@ std::string InspectTree(TreeBackend& tree, const InspectOptions& options) {
     }
 
     std::vector<NodeInfo> nodes = tree.Snapshot();
-    dump += "\nArbre (" + std::to_string(nodes.size()) + " éléments) :\n";
+    dump += "\nTree (" + std::to_string(nodes.size()) + " elements):\n";
 
     size_t lines = 0;
     for (int index = 0; index < static_cast<int>(nodes.size()); index++) {
         if (lines++ >= options.maxLines) {
-            dump += "... arrêté après " + std::to_string(options.maxLines) + " lignes\n";
+            dump += "... stopped after " + std::to_string(options.maxLines) + " lines\n";
             break;
         }
 
         const NodeInfo& node = nodes[index];
         dump += std::string(static_cast<size_t>(node.depth) * 2, ' ') + Label(node);
         if (!node.fullType.empty()) dump += "  (" + node.fullType + ")";
-        dump += "  sélecteur : " + SuggestSelector(nodes, index);
+        dump += "  selector: " + SuggestSelector(nodes, index);
 
         for (const char* property : kInspectedProperties) {
             std::optional<Value> value = tree.Read(node.id, property);
@@ -131,4 +131,4 @@ std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options) {
            ",\n  \"resources\": " + JsonLines(resources) + ",\n  \"nodes\": " + JsonLines(list) + "\n}\n";
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

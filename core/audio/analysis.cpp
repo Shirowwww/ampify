@@ -4,7 +4,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace amk::audio {
+namespace ampify::audio {
 
 namespace {
 
@@ -324,4 +324,4 @@ void AudioAnalyzer::Frame() {
     m_frameCount++;
 }
 
-}  // namespace amk::audio
+}  // namespace ampify::audio

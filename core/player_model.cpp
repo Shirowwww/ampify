@@ -6,7 +6,7 @@
 #include "amp_abi.hpp"
 #include "md5.hpp"
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -58,9 +58,9 @@ const char* AmpTimeUnitName(AmpTimeUnit unit) {
         case AmpTimeUnit::Seconds: return "s";
         case AmpTimeUnit::Milliseconds: return "ms";
         case AmpTimeUnit::Ticks100ns: return "100 ns";
-        case AmpTimeUnit::Unknown: return "inconnue";
+        case AmpTimeUnit::Unknown: return "unknown";
     }
-    return "inconnue";
+    return "unknown";
 }
 
 std::string TrackIdOf(const std::string& title, const std::string& artist, const std::string& album) {
@@ -188,9 +188,9 @@ const char* RouteName(CommandRoute route) {
     switch (route) {
         case CommandRoute::Apple: return "Apple";
         case CommandRoute::Smtc: return "SMTC";
-        case CommandRoute::MediaKey: return "touche multimédia";
+        case CommandRoute::MediaKey: return "media key";
     }
     return "?";
 }
 
-}  // namespace amk
+}  // namespace ampify

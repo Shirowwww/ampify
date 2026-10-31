@@ -10,7 +10,7 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
@@ -57,11 +57,11 @@ struct LinkNatives : ScriptBridge {
         return nullptr;
     }
 
-    AMK_NATIVE(LinkPost) {
+    AMPIFY_NATIVE(LinkPost) {
         ScriptExtension* ext = Owner(ctx);
         std::string json = String(ctx, argc, argv, 0).value_or("null");
         if (json.size() > kMaxLinkMessageBytes) {
-            return Throw(ctx, "RangeError", "message trop long pour AMK.link : 64 Ko au plus");
+            return Throw(ctx, "RangeError", "message too long for Ampify.link: 64 KB at most");
         }
         std::lock_guard<std::mutex> lock(Registry().mutex);
         ScriptExtension* peer = PeerOf(ext);
@@ -70,7 +70,7 @@ struct LinkNatives : ScriptBridge {
         return JS_TRUE;
     }
 
-    AMK_NATIVE(LinkConnected) {
+    AMPIFY_NATIVE(LinkConnected) {
         std::lock_guard<std::mutex> lock(Registry().mutex);
         ScriptExtension* peer = PeerOf(Owner(ctx));
         return JS_NewBool(ctx, peer && peer->running());
@@ -94,4 +94,4 @@ void StartLink(ScriptExtension& extension) {
     registry.members.push_back(&extension);
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

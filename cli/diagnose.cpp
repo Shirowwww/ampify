@@ -1,4 +1,4 @@
-// `amk doctor`: one report on the state of the kit, for a person who reports a problem and for the tests.
+// `ampify doctor`: one report on the state of the kit, for a person who reports a problem and for the tests.
 
 #include <algorithm>
 #include <fstream>
@@ -12,13 +12,13 @@
 #include "internal.hpp"
 #include "platform.hpp"
 
-namespace amk::cli {
+namespace ampify::cli {
 
 namespace {
 
 constexpr size_t kJournalTail = 3;
 
-// The archive and download tools that `amk install` and `amk update` need.
+// The archive and download tools that `ampify install` and `ampify update` need.
 #ifdef _WIN32
 const std::vector<std::string> kArchiveTool = {"tar.exe", "--version"};
 const std::vector<std::string> kDownloadTool = {"curl.exe", "--version"};
@@ -56,33 +56,33 @@ std::vector<std::filesystem::path> Leftovers(const KitLayout& kit) {
 }  // namespace
 
 int CmdDoctor(Context& ctx) {
-    if (ctx.options.positional.size() != 1) return Usage(ctx, "doctor ne prend pas d'argument");
+    if (ctx.options.positional.size() != 1) return Usage(ctx, "doctor takes no argument");
 
     int errors = 0;
     int warnings = 0;
     auto ok = [&](const std::string& text) { ctx.out << "[OK]        " << text << "\n"; };
     auto warn = [&](const std::string& text) {
-        ctx.out << "[ATTENTION] " << text << "\n";
+        ctx.out << "[WARNING]   " << text << "\n";
         warnings++;
     };
     auto fail = [&](const std::string& text) {
-        ctx.out << "[ERREUR]    " << text << "\n";
+        ctx.out << "[ERROR]     " << text << "\n";
         errors++;
     };
 
     std::error_code ec;
     if (!std::filesystem::is_directory(ctx.kit.Root(), ec)) {
-        warn("dossier du kit absent : " + Utf8(ctx.kit.Root()) + " (amk new, amk install ou amk config le créeront)");
+        warn("Ampify folder missing: " + Utf8(ctx.kit.Root()) + " (ampify new, ampify install or ampify config will create it)");
     } else {
-        ok("dossier du kit : " + Utf8(ctx.kit.Root()));
+        ok("Ampify folder: " + Utf8(ctx.kit.Root()));
     }
 
     Settings settings;
     std::string error;
     if (!LoadSettings(ctx, settings, error)) {
-        fail("réglages illisibles : " + error);
+        fail("unreadable settings: " + error);
     } else {
-        ok("réglages lus (" + std::to_string(settings.Values().size()) + " clé(s))");
+        ok("settings read (" + std::to_string(settings.Values().size()) + " key(s))");
     }
 
     std::vector<InstalledElement> installed = ListInstalled(ctx.kit);
@@ -92,39 +92,39 @@ int CmdDoctor(Context& ctx) {
             valid++;
             continue;
         }
-        std::string reason = element.errors.empty() ? "manifeste illisible" : element.errors.front();
-        warn("élément invalide " + element.kind + " " + element.id + " : " + reason);
+        std::string reason = element.errors.empty() ? "unreadable manifest" : element.errors.front();
+        warn("invalid element " + element.kind + " " + element.id + ": " + reason);
     }
-    ok(std::to_string(valid) + " élément(s) installé(s) et valide(s) sur " + std::to_string(installed.size()));
+    ok(std::to_string(valid) + " valid element(s) out of " + std::to_string(installed.size()));
 
     for (const std::filesystem::path& leftover : Leftovers(ctx.kit)) {
-        warn("reste d'une installation ou d'un développement interrompu : " + Utf8(leftover) + " (peut être supprimé)");
+        warn("leftover of an interrupted install or development: " + Utf8(leftover) + " (can be deleted)");
     }
 
     // active.txt must describe the current settings, or the kernel loads what was there before the last change.
     ActiveReport report = ComputeActive(ctx.kit, settings);
-    for (const std::string& problem : report.problems) warn("activé mais non chargé : " + problem);
+    for (const std::string& problem : report.problems) warn("enabled but not loaded: " + problem);
     std::string written;
     if (!ReadWholeFile(ctx.kit.Active(), written)) {
-        warn("active.txt absent : lance amk apply");
+        warn("active.txt missing: run ampify apply");
     } else if (written != FormatActive(report)) {
-        warn("active.txt ne correspond plus aux réglages : lance amk apply");
+        warn("active.txt no longer matches the settings: run ampify apply");
     } else {
-        ok("active.txt à jour");
+        ok("active.txt up to date");
     }
 
-    amk::SafeMode safeMode(ctx.kit.SafeModeState().string());
+    ampify::SafeMode safeMode(ctx.kit.SafeModeState().string());
     if (safeMode.IsActive()) {
-        warn("mode sans échec actif : le noyau est désactivé après deux lancements sans réponse");
+        warn("safe mode on: the kernel is turned off after two starts without an answer");
     } else {
-        ok("mode sans échec : inactif");
+        ok("safe mode: off");
     }
 
     std::vector<std::filesystem::path> journals = JournalFiles(ctx.kit);
     if (journals.empty()) {
-        ok("journal : aucun fichier, le noyau n'a pas encore tourné");
+        ok("logs: no file, the kernel has not run yet");
     } else {
-        ok("journal : " + std::to_string(journals.size()) + " fichier(s)");
+        ok("logs: " + std::to_string(journals.size()) + " file(s)");
         for (const std::filesystem::path& journal : journals) {
             ctx.out << "            " << Utf8(journal.filename()) << "\n";
             for (const std::string& line : LastLines(journal, kJournalTail)) ctx.out << "              " << line << "\n";
@@ -136,32 +136,32 @@ int CmdDoctor(Context& ctx) {
     for (std::string_view version : KnownAppVersionsWith(extra)) {
         versions += (versions.empty() ? "" : ", ") + std::string(version);
     }
-    ok("versions d'Apple Music testées : " + versions + (extra.empty() ? "" : " (avec versions.txt)"));
+    ok("tested Apple Music versions: " + versions + (extra.empty() ? "" : " (with versions.txt)"));
     ok(std::string("Apple Music ") +
-       (platform::IsProcessRunning("AppleMusic.exe") ? "est ouvert" : "est fermé") +
-       " (vérification du processus)");
+       (platform::IsProcessRunning("AppleMusic.exe") ? "is open" : "is closed") +
+       " (process check)");
 
     if (platform::ToolWorks(kArchiveTool)) {
-        ok("outil d'archives disponible : " + kArchiveTool.front());
+        ok("archive tool available: " + kArchiveTool.front());
     } else {
-        fail("outil d'archives introuvable : " + kArchiveTool.front() + " (installer et mettre à jour ne marchent pas)");
+        fail("archive tool not found: " + kArchiveTool.front() + " (install and update will not work)");
     }
     if (platform::ToolWorks(kDownloadTool)) {
-        ok("outil de téléchargement disponible : " + kDownloadTool.front());
+        ok("download tool available: " + kDownloadTool.front());
     } else {
-        fail("outil de téléchargement introuvable : " + kDownloadTool.front() + " (le catalogue distant ne marche pas)");
+        fail("download tool not found: " + kDownloadTool.front() + " (the remote catalog will not work)");
     }
 
 #ifdef _WIN32
-    if (!std::filesystem::is_regular_file(platform::ExecutableDirectory() / "amk_launcher.exe", ec)) {
-        warn("amk_launcher.exe absent à côté d'amk : amk launch ne pourra pas démarrer Apple Music avec le noyau");
+    if (!std::filesystem::is_regular_file(platform::ExecutableDirectory() / "ampify_launcher.exe", ec)) {
+        warn("ampify_launcher.exe missing next to ampify: ampify launch cannot start Apple Music with the kernel");
     } else {
-        ok("amk_launcher.exe présent");
+        ok("ampify_launcher.exe present");
     }
 #endif
 
-    ctx.out << "\nRésumé : " << errors << " erreur(s), " << warnings << " attention(s).\n";
+    ctx.out << "\nSummary: " << errors << " error(s), " << warnings << " warning(s).\n";
     return errors > 0 ? 1 : 0;
 }
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

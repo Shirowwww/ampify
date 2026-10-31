@@ -1,6 +1,6 @@
 #pragma once
 
-// The optional host service behind AMK.http.post. AMK.http.get uses Host::HttpGet, which every host has.
+// The optional host service behind Ampify.http.post. Ampify.http.get uses Host::HttpGet, which every host has.
 
 #include <string>
 #include <string_view>
@@ -9,7 +9,7 @@
 
 #include "../host.hpp"
 
-namespace amk {
+namespace ampify {
 
 using HttpHeaders = std::vector<std::pair<std::string, std::string>>;
 
@@ -23,4 +23,4 @@ struct HttpPostHost {
     virtual HttpResponse HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) = 0;
 };
 
-}  // namespace amk
+}  // namespace ampify

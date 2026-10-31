@@ -24,7 +24,7 @@
 #include "../core/script_extension.hpp"
 #include "fake_host.hpp"
 
-namespace amk::test {
+namespace ampify::test {
 
 struct ServiceHost : FakeHost, HttpPostHost, DiscordHost, TrayHost, MidiHost, RemoteHost, OutputFilesHost {
     struct Post {
@@ -39,7 +39,7 @@ struct ServiceHost : FakeHost, HttpPostHost, DiscordHost, TrayHost, MidiHost, Re
     };
 
     std::vector<Post> posts;
-    HttpResponse postResponse{201, "envoyé"};
+    HttpResponse postResponse{201, "sent"};
     std::vector<ShownActivity> activities;
     std::vector<std::string> clearedActivities;
     std::map<std::string, std::vector<TrayItem>> trayMenus;
@@ -73,7 +73,7 @@ struct ServiceHost : FakeHost, HttpPostHost, DiscordHost, TrayHost, MidiHost, Re
         return true;
     }
     void UnsubscribeMidi(const std::string& elementId) override { midiUnsubscribed.push_back(elementId); }
-    std::vector<std::string> MidiDevices() override { return {"Clavier de test"}; }
+    std::vector<std::string> MidiDevices() override { return {"Test keyboard"}; }
     bool PublishRemoteState(const std::string& elementId, const std::string& json) override {
         remoteStates[elementId] = json;
         return true;
@@ -108,11 +108,11 @@ struct ServiceFixture {
     std::unique_ptr<ScriptExtension> Make(const std::string& id, const std::string& main,
                                           const std::string& permissions = "") {
         namespace fs = std::filesystem;
-        fs::path dir = fs::temp_directory_path() / "amk-tests" / ("service-" + id);
+        fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("service-" + id);
         fs::remove_all(dir);
         fs::create_directories(dir);
         const std::string manifest =
-            R"({"id":")" + id + R"(","name":"Démo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
+            R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
             R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
         std::ofstream(dir / "manifest.json") << manifest;
         std::ofstream(dir / "main.js") << main;
@@ -120,7 +120,7 @@ struct ServiceFixture {
         if (!result.manifest) {
             std::string reasons;
             for (const std::string& error : result.errors) reasons += error + "; ";
-            throw std::runtime_error("manifeste de test refusé : " + reasons);
+            throw std::runtime_error("test manifest refused: " + reasons);
         }
         return std::make_unique<ScriptExtension>(*result.manifest, dir, host, journal);
     }
@@ -128,4 +128,4 @@ struct ServiceFixture {
     bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
 };
 
-}  // namespace amk::test
+}  // namespace ampify::test

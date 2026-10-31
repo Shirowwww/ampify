@@ -1,13 +1,13 @@
 #pragma once
 
-// The optional host service behind AMK.remote. The Windows host runs the local remote control (setting
+// The optional host service behind Ampify.remote. The Windows host runs the local remote control (setting
 // remote.enabled, 127.0.0.1 only, token required, win/remote_server.*). An element may add its own state to the
 // answer of GET /status, under "extensions": {"<id>": ...}. It cannot receive requests.
 
 #include <string>
 #include <string_view>
 
-namespace amk {
+namespace ampify {
 
 inline constexpr size_t kMaxRemoteStateBytes = 4096;
 
@@ -20,4 +20,4 @@ struct RemoteHost {
     virtual void RemoveRemoteState(const std::string& elementId) = 0;
 };
 
-}  // namespace amk
+}  // namespace ampify

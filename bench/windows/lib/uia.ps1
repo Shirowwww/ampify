@@ -1,6 +1,6 @@
 # UI Automation helpers for the live bench (bench/windows/live): find Apple Music's elements, click them, type into
 # them like a user, and dump the tree into the job log. Loaded after harness.ps1 (it reuses Get-AppleMusicWindow and
-# the AmkWindowCapture type). Works in Windows PowerShell 5.1 and PowerShell 7.
+# the AmpifyWindowCapture type). Works in Windows PowerShell 5.1 and PowerShell 7.
 # Secrets: every text that reaches the log goes through Protect-UiaText, which hides the registered values.
 
 Set-StrictMode -Version Latest
@@ -9,13 +9,13 @@ Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, WindowsBase, Syste
 
 # Keyboard and mouse input through SendInput. Text goes as Unicode key events, so any character of a password is
 # typed as is, without SendKeys escaping.
-if (-not ('AmkInput' -as [type])) {
+if (-not ('AmpifyInput' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-public static class AmkInput {
+public static class AmpifyInput {
     [StructLayout(LayoutKind.Sequential)]
     struct MOUSEINPUT { public int dx; public int dy; public uint mouseData; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
     [StructLayout(LayoutKind.Sequential)]
@@ -116,11 +116,11 @@ function Protect-UiaText {
 }
 
 # The account and the code come from the workflow's environment: they are registered as soon as this file loads.
-foreach ($uiaSecretName in 'AMK_APPLE_ID', 'AMK_APPLE_PASSWORD', 'AMK_CODE_2FA') {
+foreach ($uiaSecretName in 'AMPIFY_APPLE_ID', 'AMPIFY_APPLE_PASSWORD', 'AMPIFY_CODE_2FA') {
     $uiaSecretValue = [Environment]::GetEnvironmentVariable($uiaSecretName)
     if (-not $uiaSecretValue) { continue }
     Register-UiaSecret $uiaSecretValue
-    if ($uiaSecretName -eq 'AMK_APPLE_ID' -and $uiaSecretValue.Contains('@')) {
+    if ($uiaSecretName -eq 'AMPIFY_APPLE_ID' -and $uiaSecretValue.Contains('@')) {
         $uiaSecretLocal = $uiaSecretValue.Substring(0, $uiaSecretValue.IndexOf('@'))
         if ($uiaSecretLocal.Length -ge 4) { Register-UiaSecret $uiaSecretLocal }
     }
@@ -137,10 +137,10 @@ $script:UiaVirtualKeys = @{
 function Send-Key {
     param([Parameter(Mandatory)][string[]]$Keys)
     $codes = [uint16[]]@($Keys | ForEach-Object {
-        if (-not $script:UiaVirtualKeys.ContainsKey($_)) { throw "touche inconnue : $_" }
+        if (-not $script:UiaVirtualKeys.ContainsKey($_)) { throw "unknown key: $_" }
         [uint16]$script:UiaVirtualKeys[$_]
     })
-    [AmkInput]::SendChord($codes)
+    [AmpifyInput]::SendChord($codes)
     Start-Sleep -Milliseconds 150
 }
 
@@ -193,15 +193,15 @@ function Show-AppleMusicWindow {
     if ($window -eq [IntPtr]::Zero) { return $false }
     Get-Process -Name 'WindowsTerminal', 'conhost', 'OpenConsole', 'pwsh', 'powershell' -ErrorAction SilentlyContinue |
         Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.MainWindowHandle -ne $window } |
-        ForEach-Object { [AmkWindowCapture]::ShowWindow($_.MainWindowHandle, 6) | Out-Null }  # SW_MINIMIZE
-    [AmkWindowCapture]::ShowWindow($window, 3) | Out-Null  # SW_MAXIMIZE
-    return [AmkInput]::Foreground($window)
+        ForEach-Object { [AmpifyWindowCapture]::ShowWindow($_.MainWindowHandle, 6) | Out-Null }  # SW_MINIMIZE
+    [AmpifyWindowCapture]::ShowWindow($window, 3) | Out-Null  # SW_MAXIMIZE
+    return [AmpifyInput]::Foreground($window)
 }
 
 function Get-UiaControlType {
     param([string]$Name)
     $field = [System.Windows.Automation.ControlType].GetField($Name)
-    if (-not $field) { throw "type de contrôle inconnu : $Name" }
+    if (-not $field) { throw "unknown control type: $Name" }
     return $field.GetValue($null)
 }
 
@@ -268,7 +268,7 @@ function Find-Element {
     return $null
 }
 
-# Same search, with a timeout that defaults to 30 s. -Required throws a French message when nothing appears.
+# Same search, with a timeout that defaults to 30 s. -Required throws when nothing appears.
 function Wait-ForElement {
     param(
         $Root = $null,
@@ -290,7 +290,7 @@ function Wait-ForElement {
     $element = Find-Element @search -TimeoutSeconds $TimeoutSeconds -VisibleOnly:$VisibleOnly
     if (-not $element -and $Required) {
         $what = if ($Description) { $Description } else { ($search.Keys | Where-Object { $_ -ne 'Root' } | ForEach-Object { "$_=$($search[$_])" }) -join ', ' }
-        throw "élément introuvable après $TimeoutSeconds s : $what"
+        throw "element not found after $TimeoutSeconds s: $what"
     }
     return $element
 }
@@ -304,16 +304,16 @@ function Format-Element {
         $name = [string]$c.Name
         if ($name.Length -gt 120) { $name = $name.Substring(0, 117) + '...' }
         $flags = @()
-        if ($c.IsOffscreen) { $flags += 'hors écran' }
-        if (-not $c.IsEnabled) { $flags += 'désactivé' }
-        if ($c.IsPassword) { $flags += 'mot de passe' }
-        $text = "[$type] « $name »"
+        if ($c.IsOffscreen) { $flags += 'offscreen' }
+        if (-not $c.IsEnabled) { $flags += 'disabled' }
+        if ($c.IsPassword) { $flags += 'password' }
+        $text = "[$type] `"$name`""
         if ($c.AutomationId) { $text += " id=$($c.AutomationId)" }
-        if ($c.ClassName) { $text += " classe=$($c.ClassName)" }
+        if ($c.ClassName) { $text += " class=$($c.ClassName)" }
         if ($flags.Count) { $text += " (" + ($flags -join ', ') + ")" }
         return (Protect-UiaText $text)
     } catch {
-        return '[élément disparu]'
+        return '[element gone]'
     }
 }
 
@@ -341,13 +341,13 @@ function Invoke-Click {
     $point = New-Object System.Windows.Point(0, 0)
     if (-not $Element.TryGetClickablePoint([ref]$point)) {
         $rect = $Element.Current.BoundingRectangle
-        if ($rect.IsEmpty -or $rect.Width -le 0) { throw "élément sans position à l'écran : $(Format-Element $Element)" }
+        if ($rect.IsEmpty -or $rect.Width -le 0) { throw "element without a position on screen: $(Format-Element $Element)" }
         $point = New-Object System.Windows.Point(($rect.X + $rect.Width / 2), ($rect.Y + $rect.Height / 2))
     }
-    [AmkInput]::Click([int]$point.X, [int]$point.Y, [bool]$Double)
+    [AmpifyInput]::Click([int]$point.X, [int]$point.Y, [bool]$Double)
     Start-Sleep -Milliseconds 400
-    if ($Double) { return 'double clic' }
-    return 'clic souris'
+    if ($Double) { return 'double click' }
+    return 'mouse click'
 }
 
 # Types text into an element like a user: focus, Ctrl+A and Delete to clear it, then Unicode key events. -Secret
@@ -369,9 +369,9 @@ function Set-Text {
         Send-Key Control, A
         Send-Key Delete
     }
-    $sent = [AmkInput]::SendText($Text, 25)
-    if ($sent -ne $Text.Length) { throw "saisie incomplète : $sent caractère(s) sur $($Text.Length)" }
-    return 'clavier'
+    $sent = [AmpifyInput]::SendText($Text, 25)
+    if ($sent -ne $Text.Length) { throw "incomplete typing: $sent character(s) out of $($Text.Length)" }
+    return 'keyboard'
 }
 
 # The tree under an element, one line per element, indented by depth (Control view by default, -Raw for every
@@ -401,7 +401,7 @@ function Get-TreeDump {
         }
         for ($i = $children.Count - 1; $i -ge 0; $i--) { $stack.Push(@($children[$i], ($depth + 1))) }
     }
-    if ($stack.Count -gt 0) { $lines.Add("... (coupé à $MaxLines lignes)") }
+    if ($stack.Count -gt 0) { $lines.Add("... (cut at $MaxLines lines)") }
     return $lines.ToArray()
 }
 
@@ -409,9 +409,9 @@ function Get-TreeDump {
 function Write-TreeDump {
     param([Parameter(Mandatory)]$Root, [Parameter(Mandatory)][string]$Title, [int]$MaxLines = 400, [string]$Path = '', [switch]$Raw)
     $lines = @(Get-TreeDump -Root $Root -MaxLines $MaxLines -Raw:$Raw)
-    Write-Host "----- arbre UIA : $Title ($($lines.Count) lignes)"
+    Write-Host "----- UIA tree: $Title ($($lines.Count) lines)"
     foreach ($line in $lines) { Write-Host "  $line" }
-    Write-Host "----- fin de l'arbre : $Title"
+    Write-Host "----- end of the tree: $Title"
     if ($Path) { $lines | Set-Content -LiteralPath $Path -Encoding UTF8 }
 }
 
@@ -431,7 +431,7 @@ function Write-VisibleSummary {
     $types = 'Button', 'Hyperlink', 'Edit', 'Text', 'ListItem', 'TabItem', 'ComboBox', 'CheckBox'
     $lines = @()
     foreach ($window in @(Get-UiaAppWindows)) {
-        $lines += "fenêtre : $(Format-Element $window)"
+        $lines += "window: $(Format-Element $window)"
         foreach ($type in $types) {
             foreach ($element in @(Find-Element -Root $window -ControlType $type -All -VisibleOnly)) {
                 if ($lines.Count -ge $Max) { break }
@@ -439,6 +439,6 @@ function Write-VisibleSummary {
             }
         }
     }
-    Write-Host "----- à l'écran : $Title"
+    Write-Host "----- on screen: $Title"
     $lines | Select-Object -First $Max | ForEach-Object { Write-Host "  $_" }
 }

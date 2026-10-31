@@ -7,13 +7,13 @@
 #include "../api/module.hpp"
 #include "../color_extract.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
 struct ColorNatives : ScriptBridge {
     // native.colorExtract(bytes: Uint8Array, width, height): JSON text with Spicetify's keys, or null.
-    AMK_NATIVE(Extract) {
+    AMPIFY_NATIVE(Extract) {
         if (argc < 3) return JS_NULL;
         size_t size = 0;
         uint8_t* bytes = JS_GetUint8Array(ctx, &size, argv[0]);
@@ -48,4 +48,4 @@ void DefineColor(api::NativeScope& scope) {
     scope.Function("colorExtract", ColorNatives::Extract, 3);
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

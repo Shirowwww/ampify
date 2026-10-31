@@ -27,17 +27,17 @@
 #include "messages.hpp"
 #include "platform.hpp"
 
-#ifndef AMK_VERSION
-#define AMK_VERSION "0.0.0-dev"
+#ifndef AMPIFY_VERSION
+#define AMPIFY_VERSION "0.0.0-dev"
 #endif
 
-namespace amk::cli {
+namespace ampify::cli {
 
 namespace {
 
 constexpr std::string_view kKindCommands[] = {"extension", "snippet", "app"};
 
-// Element lists of the settings that accept `amk config <liste> +id` and `-id`.
+// Element lists of the settings that accept `ampify config <list> +id` and `-id`.
 std::string_view KindOfList(std::string_view list) {
     if (list == "extensions") return "extension";
     if (list == "apps") return "app";
@@ -70,21 +70,21 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
 
     if (key == "theme.active") {
         if (!value.empty() && !IsValidId(value)) {
-            problem = "identifiant de thème invalide : " + value;
+            problem = "invalid theme id: " + value;
             return false;
         }
         return true;
     }
     if (key == "theme.scheme") {
         if (!value.empty() && !IsValidScheme(value)) {
-            problem = "nom de schéma invalide : " + value;
+            problem = "invalid scheme name: " + value;
             return false;
         }
         return true;
     }
     if (key == "catalog.url") {
         if (!IsHttpsUrl(value) && value.rfind("file://", 0) != 0) {
-            problem = "catalog.url doit commencer par https:// (ou file:// pour un catalogue local)";
+            problem = "catalog.url must start with https:// (or file:// for a local catalog)";
             return false;
         }
         return true;
@@ -94,12 +94,12 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
         if (value.empty()) return true;  // empty: back to the path found on its own
         for (char c : value) {
             if (static_cast<unsigned char>(c) < 0x20) {
-                problem = key + " contient un caractère de contrôle";
+                problem = key + " contains a control character";
                 return false;
             }
         }
         if (!PathArgument(value).is_absolute()) {
-            problem = key + " attend un chemin complet, par exemple C:\\dossier\\fichier";
+            problem = key + " expects a full path, for example C:\\folder\\file";
             return false;
         }
         return true;
@@ -108,27 +108,20 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
         if (!SplitLaunchFlags(value, &problem)) return false;
         return true;
     }
-    if (key == i18n::kLanguageSetting) {
-        if (!i18n::IsLanguageSetting(value)) {
-            problem = Tr("language.value");
-            return false;
-        }
-        return true;
-    }
     if (key == "remote.port" || key == "midi.device") {
         int low = key == "remote.port" ? 1024 : 0;
         int high = key == "remote.port" ? 65535 : 255;
         int number = -1;
         auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), number);
         if (error != std::errc() || end != value.data() + value.size() || number < low || number > high) {
-            problem = key + " attend un nombre de " + std::to_string(low) + " à " + std::to_string(high);
+            problem = key + " expects a number from " + std::to_string(low) + " to " + std::to_string(high);
             return false;
         }
         return true;
     }
     if (key == "remote.token") {
         if (!value.empty() && !remote::IsValidToken(value)) {
-            problem = "remote.token attend 32 à 128 caractères parmi A-Z a-z 0-9 - _ (vide : un jeton est créé)";
+            problem = "remote.token expects 32 to 128 characters among A-Z a-z 0-9 - _ (empty: a token is created)";
             return false;
         }
         return true;
@@ -148,7 +141,7 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
                           key.rfind("snippets.", 0) == 0));
     if (isBooleanKey) {
         if (!ParseBoolText(value, boolean)) {
-            problem = key + " attend 1 ou 0 (true, false, on, off, yes, no)";
+            problem = key + " expects 1 or 0 (true, false, on, off, yes, no)";
             return false;
         }
         stored = boolean ? "1" : "0";
@@ -157,18 +150,18 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
 }
 
 // After an element is switched: an extension or an app starts or stops at once in a running kernel (reload.txt);
-// the other kinds wait for amk apply or the next start.
+// the other kinds wait for ampify apply or the next start.
 int AnnounceSwitch(Context& ctx, std::string_view kind, const std::string& id, bool enable) {
     if (kind != "extension" && kind != "app") {
         ctx.out << Tr("applyHint") << "\n";
         return 0;
     }
     RequestReload(ctx, {std::string(enable ? "start " : "stop ") + ReloadTarget(kind, id)});
-    ctx.out << "Si Apple Music tourne avec le noyau, le changement s'applique tout de suite. Sinon, lance amk launch.\n";
+    ctx.out << "If Apple Music is running with the kernel, the change applies right away. Otherwise, run ampify launch.\n";
     return 0;
 }
 
-// `amk config extensions +id` and `-id`. Enabling needs an element that is installed and valid, or built-in.
+// `ampify config extensions +id` and `-id`. Enabling needs an element that is installed and valid, or built-in.
 int ToggleElement(Context& ctx, Settings& settings, std::string_view list, const std::string& value) {
     std::string_view kind = KindOfList(list);
     std::string id = value.substr(1);
@@ -182,13 +175,13 @@ int ToggleElement(Context& ctx, Settings& settings, std::string_view list, const
         for (const InstalledElement& element : ListInstalled(ctx.kit)) {
             if (element.kind == kind && element.id == id) installed = element.Valid();
         }
-        if (!builtin && !installed) return Failure(ctx, "élément absent ou invalide : " + std::string(kind) + " " + id);
+        if (!builtin && !installed) return Failure(ctx, "element missing or invalid: " + std::string(kind) + " " + id);
     }
 
     SetEnabled(settings, kind, id, enable);
     std::string error;
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
-    ctx.out << std::string(list) << " " << value << " : " << Tr(enable ? "state.on" : "state.off") << "\n";
+    ctx.out << std::string(list) << " " << value << ": " << Tr(enable ? "state.on" : "state.off") << "\n";
     return AnnounceSwitch(ctx, kind, id, enable);
 }
 
@@ -218,7 +211,7 @@ int CmdConfigSet(Context& ctx, Settings& settings) {
     return 0;
 }
 
-// The state shown in `amk list`, in French.
+// The state shown in `ampify list`.
 std::string StateOf(const Settings& settings, const InstalledElement& element) {
     bool enabled = IsEnabled(settings, element.kind, element.id);
     if (!element.Valid()) return Tr("state.invalid", {{"error", element.errors.front()}});
@@ -294,17 +287,17 @@ int SetElementState(Context& ctx, std::string_view kind, const std::string& id, 
 
 int CmdThemeSet(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() < 3) return Usage(ctx, "theme set attend un identifiant de thème");
+    if (args.size() < 3) return Usage(ctx, "theme set needs a theme id");
     const std::string& id = args[2];
-    if (!IsValidId(id)) return Failure(ctx, "identifiant invalide : " + id);
+    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     const InstalledElement* found = nullptr;
     std::vector<InstalledElement> elements = ListInstalled(ctx.kit);
     for (const InstalledElement& element : elements) {
         if (element.kind == "theme" && element.id == id) found = &element;
     }
-    if (found == nullptr) return Failure(ctx, "thème introuvable : " + id + ". Installe-le avec amk install " + id);
-    if (!found->Valid()) return Failure(ctx, "thème invalide : " + found->errors.front());
+    if (found == nullptr) return Failure(ctx, "theme not found: " + id + ". Install it with ampify install " + id);
+    if (!found->Valid()) return Failure(ctx, "invalid theme: " + found->errors.front());
 
     // The manifest is valid; now the theme engine reads the theme as the kernel will, and refuses what it would refuse.
     std::filesystem::path folder = ctx.kit.Root() / "themes" / id;
@@ -313,66 +306,66 @@ int CmdThemeSet(Context& ctx) {
     if (ctx.options.scheme) load.scheme = *ctx.options.scheme;
     theme::Theme loaded = theme::LoadTheme(id, folder.generic_string(), files, load);
     if (!loaded.usable) {
-        return Failure(ctx, "thème refusé par le moteur : " +
-                                (loaded.problems.empty() ? std::string("raison inconnue") : loaded.problems.front()));
+        return Failure(ctx, "theme refused by the theme engine: " +
+                                (loaded.problems.empty() ? std::string("unknown reason") : loaded.problems.front()));
     }
-    for (const std::string& problem : loaded.problems) ctx.out << "Attention : " << problem << "\n";
+    for (const std::string& problem : loaded.problems) ctx.out << "Warning: " << problem << "\n";
 
     Settings settings;
     std::string error;
     if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
     settings.Set("theme.active", id);
     if (ctx.options.scheme) {
-        if (!IsValidScheme(*ctx.options.scheme)) return Failure(ctx, "nom de schéma invalide : " + *ctx.options.scheme);
+        if (!IsValidScheme(*ctx.options.scheme)) return Failure(ctx, "invalid scheme name: " + *ctx.options.scheme);
         settings.Set("theme.scheme", *ctx.options.scheme);
     }
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
 
-    ctx.out << "Thème " << id << " choisi";
-    if (ctx.options.scheme) ctx.out << " (schéma " << *ctx.options.scheme << ")";
-    ctx.out << ". Lance amk apply (ou amk launch) pour l'appliquer.\n";
+    ctx.out << "Theme " << id << " selected";
+    if (ctx.options.scheme) ctx.out << " (scheme " << *ctx.options.scheme << ")";
+    ctx.out << ". " << Tr("applyHint") << "\n";
     return 0;
 }
 
-// The files that `amk new` writes for each kind. Placeholders: the id and the author.
+// The files that `ampify new` writes for each kind. Placeholders: the id and the author.
 std::map<std::string, std::string> Template(std::string_view kind, const std::string& id) {
-    const std::string author = "votre-identifiant-github";
+    const std::string author = "your-github-username";
     std::string common = "  \"id\": \"" + id + "\",\n  \"name\": \"" + id + "\",\n  \"version\": \"0.1.0\",\n  \"kind\": \"" +
-                         std::string(kind) + "\",\n  \"author\": \"" + author + "\",\n  \"description\": \"À décrire.\",\n" +
+                         std::string(kind) + "\",\n  \"author\": \"" + author + "\",\n  \"description\": \"Describe it here.\",\n" +
                          "  \"kitApi\": \"1.0\"";
     if (kind == "extension") {
         return {
             {"manifest.json", "{\n" + common + ",\n  \"main\": \"main.js\",\n  \"permissions\": []\n}\n"},
-            {"main.js", "// Extension \"" + id + "\". Démarrée une fois le noyau prêt.\nAMK.log(\"" + id + " démarrée\");\n"
-                        "AMK.onStop(() => AMK.log(\"" + id + " arrêtée\"));\n"},
+            {"main.js", "// Extension \"" + id + "\". Started once the kernel is ready.\nAmpify.log(\"" + id + " started\");\n"
+                        "Ampify.onStop(() => Ampify.log(\"" + id + " stopped\"));\n"},
         };
     }
     if (kind == "theme") {
         // A starter that already looks finished: two schemes in Spicetify's names, rounded surfaces, a hover. The
-        // guide (docs/themes/GUIDE.md) walks through these same files.
+        // guide (docs/themes/guide.md) walks through these same files.
         return {
-            {"manifest.json", "{\n" + common + ",\n  \"colors\": \"colors.ini\",\n  \"defaultScheme\": \"Nuit\"\n}\n"},
+            {"manifest.json", "{\n" + common + ",\n  \"colors\": \"colors.ini\",\n  \"defaultScheme\": \"Night\"\n}\n"},
             {"colors.ini",
-             "; Les couleurs, un schéma par section. Les noms sont ceux de Spicetify :\n"
-             ";   main     fond des pages          sidebar  barre latérale      player  barre de lecture\n"
-             ";   card     écran du morceau        text     texte               subtext texte secondaire\n"
-             ";   button   accent (boutons, barre de progression)\n"
-             "; Change une valeur et sauvegarde : avec amk theme watch, Apple Music suit tout de suite.\n\n"
-             "[Nuit]\nmain = 16131F\nsidebar = 1D1928\nplayer = 1D1928\ncard = 2A2438\nmain-elevated = 2A2438\n"
+             "; The colors, one scheme per section. The names are Spicetify's:\n"
+             ";   main     page background        sidebar  sidebar             player  playback bar\n"
+             ";   card     now playing display    text     text                subtext secondary text\n"
+             ";   button   accent (buttons, progress bar)\n"
+             "; Change a value and save: with ampify theme watch, Apple Music follows right away.\n\n"
+             "[Night]\nmain = 16131F\nsidebar = 1D1928\nplayer = 1D1928\ncard = 2A2438\nmain-elevated = 2A2438\n"
              "text = F3EEFF\nsubtext = B5ABCB\nbutton = FF7A85\nplayback-bar = FF7A85\nhighlight = 2F2840\n\n"
-             "[Jour]\nmain = FBF7F2\nsidebar = F2ECE4\nplayer = F2ECE4\ncard = FFFFFF\nmain-elevated = FFFFFF\n"
+             "[Day]\nmain = FBF7F2\nsidebar = F2ECE4\nplayer = F2ECE4\ncard = FFFFFF\nmain-elevated = FFFFFF\n"
              "text = 1F1A2B\nsubtext = 6A6278\nbutton = E0525F\nplayback-bar = E0525F\nhighlight = EDE5DA\n"},
             {"user.css",
-             "/* " + id + " : les formes et les effets. Les couleurs viennent de colors.ini ($main, $button...).\n"
-             "   Les noms des éléments (Grid#PaneRoot...) sont dans docs/themes/GUIDE.md ; amk devtools montre l'arbre. */\n\n"
-             ":root {\n    --rayon: 12px;\n}\n\n"
-             "/* Barre latérale : arrondie côté contenu. */\nGrid#PaneRoot {\n"
-             "    corner-radius: 0 var(--rayon) var(--rayon) 0;\n}\n\n"
-             "/* L'écran du morceau en cours, au centre de la barre de lecture. */\n"
-             "NowPlayingControl#LCD > Grid#LCD {\n    corner-radius: var(--rayon);\n}\n\n"
-             "/* Les boutons de lecture, ronds. */\nTransportControl#TransportControl AppBarButton {\n"
+             "/* " + id + ": shapes and effects. The colors come from colors.ini ($main, $button...).\n"
+             "   The element names (Grid#PaneRoot...) are in docs/themes/guide.md; ampify devtools shows the tree. */\n\n"
+             ":root {\n    --radius: 12px;\n}\n\n"
+             "/* Sidebar: rounded on the content side. */\nGrid#PaneRoot {\n"
+             "    corner-radius: 0 var(--radius) var(--radius) 0;\n}\n\n"
+             "/* The now playing display, in the middle of the playback bar. */\n"
+             "NowPlayingControl#LCD > Grid#LCD {\n    corner-radius: var(--radius);\n}\n\n"
+             "/* The playback buttons, round. */\nTransportControl#TransportControl AppBarButton {\n"
              "    corner-radius: 50;\n}\n\n"
-             "/* La pochette grossit un peu au survol. */\nArtworkImage#ActualArtwork {\n"
+             "/* The artwork grows a little on hover. */\nArtworkImage#ActualArtwork {\n"
              "    transform-origin: center;\n}\n\nArtworkImage#ActualArtwork:hover {\n    transform: scale(1.08);\n}\n"},
         };
     }
@@ -386,7 +379,7 @@ std::map<std::string, std::string> Template(std::string_view kind, const std::st
     }
     return {
         {"manifest.json", "{\n" + common + ",\n  \"main\": \"main.js\",\n  \"icon\": \"icon.svg\"\n}\n"},
-        {"main.js", "// App \"" + id + "\". Son code tourne quand sa page est ouverte.\n"},
+        {"main.js", "// App \"" + id + "\". Its code runs when its page is open.\n"},
         {"icon.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path d=\"M12 2l10 20H2z\"/></svg>\n"},
     };
 }
@@ -397,7 +390,7 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
     Options options;
     auto value = [&](size_t& index) -> std::optional<std::string> {
         if (index + 1 >= arguments.size()) {
-            error = arguments[index] + " attend une valeur";
+            error = arguments[index] + " expects a value";
             return std::nullopt;
         }
         return arguments[++index];
@@ -408,7 +401,7 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
         const char* last = first + text.size();
         auto [end, status] = std::from_chars(first, last, parsed);
         if (status != std::errc() || end != last || parsed < 0) {
-            error = "nombre attendu : " + text;
+            error = "number expected: " + text;
             return false;
         }
         target = parsed;
@@ -419,7 +412,7 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
     for (size_t i = 0; i < arguments.size(); i++) {
         const std::string& arg = arguments[i];
         // After "--", and for the value of `config app_launch_flags`, a word starting with "--" is an argument:
-        // `amk config app_launch_flags --remote-debugging-port=9222` stores the flag instead of refusing it.
+        // `ampify config app_launch_flags --remote-debugging-port=9222` stores the flag instead of refusing it.
         bool flagsValue = options.positional.size() == 2 && options.positional[0] == "config" &&
                           options.positional[1] == kLaunchFlagsKey;
         if (onlyArguments || flagsValue) {
@@ -500,7 +493,7 @@ std::string Utf8(const std::filesystem::path& path) {
 
 bool LoadSettings(const Context& ctx, Settings& settings, std::string& error) {
     if (!settings.Load(ctx.kit.Settings().string())) {
-        error = "lecture impossible : " + Utf8(ctx.kit.Settings());
+        error = "cannot read: " + Utf8(ctx.kit.Settings());
         return false;
     }
     return true;
@@ -510,7 +503,7 @@ bool SaveSettings(const Context& ctx, const Settings& settings, std::string& err
     std::error_code ec;
     std::filesystem::create_directories(ctx.kit.Root(), ec);
     if (!settings.Save(ctx.kit.Settings().string())) {
-        error = "écriture impossible : " + Utf8(ctx.kit.Settings());
+        error = "cannot write: " + Utf8(ctx.kit.Settings());
         return false;
     }
     return true;
@@ -522,13 +515,13 @@ int CmdHelp(Context& ctx) {
 }
 
 int CmdVersion(Context& ctx) {
-    ctx.out << Tr("version", {{"version", AMK_VERSION}}) << "\n";
+    ctx.out << Tr("version", {{"version", AMPIFY_VERSION}}) << "\n";
     return 0;
 }
 
 namespace {
 
-// What `amk path <nom>` prints. Nothing when the path cannot be found (Apple Music on another system).
+// What `ampify path <name>` prints. Nothing when the path cannot be found (Apple Music on another system).
 std::optional<std::filesystem::path> NamedPath(Context& ctx, std::string_view name) {
     if (name == "kit" || name == "userdata") return ctx.kit.Root();
     if (name == "settings") return ctx.kit.Settings();
@@ -549,7 +542,7 @@ constexpr std::string_view kPathNames[] = {"kit", "settings", "extensions", "the
 
 int CmdPath(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() > 2) return Usage(ctx, "path prend au plus un nom");
+    if (args.size() > 2) return Usage(ctx, "path takes at most one name");
     if (args.size() == 2) {
         const std::string& name = args[1];
         bool known = name == "userdata" ||
@@ -557,16 +550,16 @@ int CmdPath(Context& ctx) {
         if (!known) {
             std::string names;
             for (std::string_view each : kPathNames) names += (names.empty() ? "" : ", ") + std::string(each);
-            return Usage(ctx, "nom inconnu pour path : " + name + " (" + names + ")");
+            return Usage(ctx, "unknown name for path: " + name + " (" + names + ")");
         }
         std::optional<std::filesystem::path> path = NamedPath(ctx, name);
         if (!path) {
             if (name == "app") {
-                return Failure(ctx, "dossier d'Apple Music introuvable : Apple Music n'est pas installé, ou ce système "
-                                    "n'est pas Windows. Tu peux l'indiquer avec amk config app_path <dossier>.");
+                return Failure(ctx, "Apple Music folder not found: Apple Music is not installed, or this system "
+                                    "is not Windows. You can set it with ampify config app_path <folder>.");
             }
-            return Failure(ctx, "préférences d'Apple Music introuvables sur ce système. Tu peux les indiquer avec "
-                                "amk config prefs_path <fichier>.");
+            return Failure(ctx, "Apple Music preferences not found on this system. You can set them with "
+                                "ampify config prefs_path <file>.");
         }
         ctx.out << Utf8(*path) << "\n";
         return 0;
@@ -574,17 +567,17 @@ int CmdPath(Context& ctx) {
 
     std::optional<std::filesystem::path> app = NamedPath(ctx, "app");
     std::optional<std::filesystem::path> prefs = NamedPath(ctx, "prefs");
-    ctx.out << "Dossier du kit   : " << Utf8(ctx.kit.Root()) << "\n"
-            << "Réglages         : " << Utf8(ctx.kit.Settings()) << "\n"
-            << "Éléments         : " << Utf8(ctx.kit.Root()) << "\\{extensions,themes,apps,snippets}\n"
-            << "État du kit      : " << Utf8(ctx.kit.Active()) << ", " << Utf8(ctx.kit.Reload()) << "\n"
-            << "Journal          : " << Utf8(ctx.kit.Journal()) << "\n"
-            << "Sauvegardes      : " << Utf8(ctx.kit.Backups()) << "\n"
-            << "Dossier de amk   : " << Utf8(platform::ExecutableDirectory()) << "\n"
+    ctx.out << "Ampify folder    : " << Utf8(ctx.kit.Root()) << "\n"
+            << "Settings         : " << Utf8(ctx.kit.Settings()) << "\n"
+            << "Elements         : " << Utf8(ctx.kit.Root()) << "\\{extensions,themes,apps,snippets}\n"
+            << "Ampify state     : " << Utf8(ctx.kit.Active()) << ", " << Utf8(ctx.kit.Reload()) << "\n"
+            << "Logs             : " << Utf8(ctx.kit.Journal()) << "\n"
+            << "Backups          : " << Utf8(ctx.kit.Backups()) << "\n"
+            << "ampify folder    : " << Utf8(platform::ExecutableDirectory()) << "\n"
             << "Apple Music      : " << kAppUserModelId << "\n"
-            << "Paquet de l'app  : " << (app ? Utf8(*app) : std::string("introuvable sur ce système")) << "\n"
-            << "Préférences      : " << (prefs ? Utf8(*prefs) : std::string("introuvables sur ce système")) << "\n"
-            << "Un seul chemin   : amk path <kit|settings|extensions|themes|apps|snippets|logs|backups|app|prefs>\n";
+            << "App package      : " << (app ? Utf8(*app) : std::string("not found on this system")) << "\n"
+            << "Preferences      : " << (prefs ? Utf8(*prefs) : std::string("not found on this system")) << "\n"
+            << "One path only    : ampify path <kit|settings|extensions|themes|apps|snippets|logs|backups|app|prefs>\n";
     return 0;
 }
 
@@ -640,12 +633,12 @@ int CmdTheme(Context& ctx) {
         if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
         settings.Set("theme.active", "");
         if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
-        ctx.out << "Aucun thème actif. Lance amk apply pour l'appliquer.\n";
+        ctx.out << "No active theme. Run ampify apply to apply it.\n";
         return 0;
     }
     // check and watch read a theme folder anywhere on disk, the way the kernel reads it, and print what would apply.
     if (action == "check" || action == "watch") {
-        if (args.size() != 3) return Usage(ctx, "theme " + std::string(action) + " attend un dossier de thème");
+        if (args.size() != 3) return Usage(ctx, "theme " + std::string(action) + " needs a theme folder");
         std::vector<std::string> watchArgs{"watch", args[2]};
         if (ctx.options.scheme) watchArgs.insert(watchArgs.end(), {"--scheme", *ctx.options.scheme});
         int polls = action == "check" ? -1 : ctx.options.maxCycles;
@@ -653,7 +646,7 @@ int CmdTheme(Context& ctx) {
         if (action == "check") {
             std::filesystem::path folder = std::filesystem::absolute(PathArgument(args[2]));
             std::error_code error;
-            if (!std::filesystem::is_directory(folder, error)) return Failure(ctx, "dossier introuvable : " + args[2]);
+            if (!std::filesystem::is_directory(folder, error)) return Failure(ctx, "folder not found: " + args[2]);
             theme::FolderFiles files(folder);
             theme::LoadOptions load;
             if (ctx.options.scheme) load.scheme = *ctx.options.scheme;
@@ -663,60 +656,60 @@ int CmdTheme(Context& ctx) {
         std::chrono::milliseconds interval(std::max(ctx.options.intervalMs, 200));
         return theme::RunWatch(watchArgs, ctx.out, ctx.err, [interval] { std::this_thread::sleep_for(interval); });
     }
-    return Usage(ctx, "action inconnue pour theme : " + std::string(action));
+    return Usage(ctx, Tr("unknownAction", {{"action", std::string("theme ") + std::string(action)}}));
 }
 
 int CmdValidate(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() != 2) return Usage(ctx, "validate attend un dossier ou un catalogue.json");
+    if (args.size() != 2) return Usage(ctx, "validate needs a folder or a catalog.json");
 
     std::filesystem::path target = PathArgument(args[1]);
     std::error_code ec;
     if (std::filesystem::is_directory(target, ec)) {
         FolderValidation validation = ValidateElementFolder(target);
         if (validation.ok() && validation.errors.empty()) {
-            ctx.out << Utf8(target) << " : valide (" << validation.manifest->kind << " " << validation.manifest->id
+            ctx.out << Utf8(target) << ": valid (" << validation.manifest->kind << " " << validation.manifest->id
                     << " " << validation.manifest->version << ")\n";
             return 0;
         }
-        ctx.err << Utf8(target) << " : invalide\n";
+        ctx.err << Utf8(target) << ": invalid\n";
         for (const std::string& problem : validation.errors) ctx.err << "  - " << problem << "\n";
         return 1;
     }
 
     std::ifstream in(target, std::ios::binary);
-    if (!in) return Failure(ctx, "fichier introuvable : " + args[1]);
+    if (!in) return Failure(ctx, "file not found: " + args[1]);
     std::stringstream buffer;
     buffer << in.rdbuf();
     std::vector<std::string> errors;
     std::optional<Catalog> catalog = ParseCatalog(buffer.str(), false, errors);
     if (!catalog) {
-        ctx.err << args[1] << " : invalide\n";
+        ctx.err << args[1] << ": invalid\n";
         for (const std::string& problem : errors) ctx.err << "  - " << problem << "\n";
         return 1;
     }
-    ctx.out << args[1] << " : valide (" << catalog->entries.size() << " élément(s))\n";
+    ctx.out << args[1] << ": valid (" << catalog->entries.size() << " element(s))\n";
     return 0;
 }
 
 int CmdNew(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() != 3) return Usage(ctx, "new attend un type et un identifiant");
+    if (args.size() != 3) return Usage(ctx, "new needs a type and an id");
     const std::string& kind = args[1];
     const std::string& id = args[2];
-    if (!IsKindFolderText(kind)) return Failure(ctx, "type inconnu : " + kind + " (extension, theme, snippet ou app)");
-    if (!IsValidId(id)) return Failure(ctx, "identifiant invalide : " + id);
+    if (!IsKindFolderText(kind)) return Failure(ctx, "unknown type: " + kind + " (extension, theme, snippet or app)");
+    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     std::filesystem::path folder = std::filesystem::current_path() / PathArgument(id);
     std::error_code ec;
-    if (std::filesystem::exists(folder, ec)) return Failure(ctx, "le dossier existe déjà : " + Utf8(folder));
+    if (std::filesystem::exists(folder, ec)) return Failure(ctx, "the folder already exists: " + Utf8(folder));
 
     for (const auto& [name, text] : Template(kind, id)) {
         std::string error;
         if (!WriteTextFile(folder / name, text, error)) return Failure(ctx, error);
     }
-    ctx.out << "Élément créé dans " << Utf8(folder) << ". Remplace votre-identifiant-github par le tien,\n"
-            << "puis vérifie-le avec : amk validate " << id << "\n";
+    ctx.out << "Element created in " << Utf8(folder) << ". Replace your-github-username with yours,\n"
+            << "then check it with: ampify validate " << id << "\n";
     return 0;
 }
 
@@ -764,7 +757,7 @@ int Dispatch(Context& ctx) {
 }
 
 // Verbs that take no argument and can follow one another on a line, as in Spicetify (`spicetify backup apply`):
-// `amk backup apply launch`. A word that is not in this list (an id, `list`, `on`) makes the line one command.
+// `ampify backup apply launch`. A word that is not in this list (an id, `list`, `on`) makes the line one command.
 constexpr std::string_view kChainVerbs[] = {"backup", "apply", "launch", "auto", "restore", "devtools", "doctor", "version"};
 
 // Commands after which the notice about a new kit release may be printed. Never after a command whose output a script
@@ -787,7 +780,6 @@ bool IsChainLine(const std::vector<std::string>& positional) {
 
 int Execute(const Options& options, std::istream& in, std::ostream& out, std::ostream& err) {
     KitLayout kit(options.kitDir ? PathArgument(*options.kitDir) : platform::DefaultKitDirectory());
-    SetLanguage(LanguageFor(kit.Settings(), platform::UserLocale()));
     std::vector<std::vector<std::string>> commands;
     if (IsChainLine(options.positional)) {
         for (const std::string& verb : options.positional) commands.push_back({verb});
@@ -817,4 +809,4 @@ int Execute(const Options& options, std::istream& in, std::ostream& out, std::os
     return code;
 }
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

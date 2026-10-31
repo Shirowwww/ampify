@@ -10,14 +10,14 @@
 #include "../reload.hpp"
 #include "../settings.hpp"
 
-namespace amk::uirender {
+namespace ampify::uirender {
 
 namespace fs = std::filesystem;
 
 namespace {
 
 constexpr int kKitApiMajor = 1;                     // the same as ExtensionLoader
-constexpr std::uintmax_t kReloadLimit = 64 * 1024;  // rewritten past this size, as amk does
+constexpr std::uintmax_t kReloadLimit = 64 * 1024;  // rewritten past this size, as ampify does
 
 bool ReadText(const fs::path& file, std::string& text) {
     std::ifstream in(file, std::ios::binary);
@@ -62,7 +62,7 @@ std::vector<ModEntry> ListMods(const fs::path& kit) {
 
 bool SwitchMod(const fs::path& kit, const std::string& id, bool enabled, std::string& error) {
     if (!IsReloadTarget(id) || id.rfind("app:", 0) == 0) {
-        error = "identifiant d'extension invalide : " + id;
+        error = "invalid extension id: " + id;
         return false;
     }
     Settings settings;
@@ -70,7 +70,7 @@ bool SwitchMod(const fs::path& kit, const std::string& id, bool enabled, std::st
     settings.Load(settingsPath);
     settings.SetBool(ExtensionHost::SettingKey(id), enabled);
     if (!settings.Save(settingsPath)) {
-        error = "écriture impossible : " + settingsPath;
+        error = "cannot write: " + settingsPath;
         return false;
     }
 
@@ -83,10 +83,10 @@ bool SwitchMod(const fs::path& kit, const std::string& id, bool enabled, std::st
     out << (enabled ? "start " : "stop ") << id << "\n";
     out.flush();
     if (!out) {
-        error = "écriture impossible : " + reload.string();
+        error = "cannot write: " + reload.string();
         return false;
     }
     return true;
 }
 
-}  // namespace amk::uirender
+}  // namespace ampify::uirender

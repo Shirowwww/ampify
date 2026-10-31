@@ -11,7 +11,7 @@ namespace atmos {
 
 // Momentary (400 ms) and short-term (3 s) loudness of a live stream, in LUFS (ITU-R BS.1770, EBU R128 windows).
 // Same K-weighting and 100 ms chunks as LoudnessMeter, but over sliding windows, without gating, and with a fixed
-// amount of memory, so it can run for hours. Feeds AMK.audio.loudness(). Not thread-safe.
+// amount of memory, so it can run for hours. Feeds Ampify.audio.loudness(). Not thread-safe.
 class LiveLoudness {
 public:
     LiveLoudness(double sampleRate, int channels);

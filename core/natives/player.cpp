@@ -1,5 +1,5 @@
 // Natives of the module player (core/prelude/player.cpp). Permissions: player.read and player.control. The queue
-// (AMK.player.queue) is the optional QueueHost capability of core/player_queue.hpp.
+// (Ampify.player.queue) is the optional QueueHost capability of core/player_queue.hpp.
 
 #include "player.hpp"
 
@@ -7,7 +7,7 @@
 #include "../api/module.hpp"
 #include "../player_queue.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 Json PlayerJson(const PlayerSnapshot& snapshot) {
     Json::Object members;
@@ -36,7 +36,7 @@ Json PlayerJson(const PlayerSnapshot& snapshot) {
 namespace {
 
 struct PlayerNatives : ScriptBridge {
-    AMK_NATIVE(PlayerState) {
+    AMPIFY_NATIVE(PlayerState) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "player.read", &failure)) return failure;
@@ -44,7 +44,7 @@ struct PlayerNatives : ScriptBridge {
         return JS_NewStringLen(ctx, json.data(), json.size());
     }
 
-    AMK_NATIVE(PlayerControl) {
+    AMPIFY_NATIVE(PlayerControl) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "player.control", &failure)) return failure;
@@ -58,12 +58,12 @@ struct PlayerNatives : ScriptBridge {
         else if (name == "seek") command = PlayerCommand::Seek;
         // Toggle needs the state, but only player.control: the element does not read it.
         else if (name == "toggle") command = HostOf(ext).Player().playing ? PlayerCommand::Pause : PlayerCommand::Play;
-        else return Throw(ctx, "TypeError", "commande de lecteur inconnue : " + name);
+        else return Throw(ctx, "TypeError", "unknown player command: " + name);
         return JS_NewBool(ctx, HostOf(ext).Control(command, seek));
     }
 
     // native.queueList(): the QueueJson of core/player_queue.hpp, as text.
-    AMK_NATIVE(QueueList) {
+    AMPIFY_NATIVE(QueueList) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "player.read", &failure)) return failure;
@@ -74,26 +74,26 @@ struct PlayerNatives : ScriptBridge {
 
     // native.queueAdd(trackId, position) and native.queueRemove(itemId): true when the host changed the queue. A
     // refusal goes to the journal with its reason, so that the author sees why.
-    AMK_NATIVE(QueueAdd) {
+    AMPIFY_NATIVE(QueueAdd) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "player.control", &failure)) return failure;
         std::string id = String(ctx, argc, argv, 0).value_or("");
-        if (!IsValidQueueId(id)) return Throw(ctx, "TypeError", "queue.add attend un identifiant de morceau");
+        if (!IsValidQueueId(id)) return Throw(ctx, "TypeError", "queue.add expects a track id");
         QueuePosition position;
         if (!ParseQueuePosition(String(ctx, argc, argv, 1).value_or(""), position)) {
-            return Throw(ctx, "RangeError", "queue.add : position \"next\" ou \"last\"");
+            return Throw(ctx, "RangeError", "queue.add: position \"next\" or \"last\"");
         }
         return Answer(ctx, ext, "queue.add", [&](QueueHost& queue) { return queue.AddToQueue(id, position); });
     }
 
-    AMK_NATIVE(QueueRemove) {
+    AMPIFY_NATIVE(QueueRemove) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "player.control", &failure)) return failure;
         std::string id = String(ctx, argc, argv, 0).value_or("");
         if (!IsValidQueueId(id)) {
-            return Throw(ctx, "TypeError", "queue.remove attend l'identifiant d'une entrée de la file");
+            return Throw(ctx, "TypeError", "queue.remove expects the id of a queue entry");
         }
         return Answer(ctx, ext, "queue.remove", [&](QueueHost& queue) { return queue.RemoveFromQueue(id); });
     }
@@ -101,8 +101,8 @@ struct PlayerNatives : ScriptBridge {
     template <class Call>
     static JSValue Answer(JSContext* ctx, ScriptExtension* ext, const char* what, Call call) {
         QueueHost* queue = HostOf(ext).Capability<QueueHost>();
-        QueueResult result = queue ? call(*queue) : QueueResult{false, "pas de file d'attente dans ce processus"};
-        if (!result.ok) JournalOf(ext).Write("[" + ext->id() + "] " + what + " refusé : " + result.reason);
+        QueueResult result = queue ? call(*queue) : QueueResult{false, "no queue in this process"};
+        if (!result.ok) JournalOf(ext).Write("[" + ext->id() + "] " + what + " refused: " + result.reason);
         return JS_NewBool(ctx, result.ok);
     }
 };
@@ -117,4 +117,4 @@ void DefinePlayer(api::NativeScope& scope) {
     scope.Function("queueRemove", PlayerNatives::QueueRemove, 1);
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

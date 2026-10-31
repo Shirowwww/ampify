@@ -81,19 +81,19 @@ bool FakePost(std::function<void()> work) {
 bool FakeAttached() { return FakeBackend::attachedNow; }
 DWORD FakeThreadId() { return 4242; }
 
-const amk::win::UiThreadBackend kFakeBackend{FakeAttach, FakeDetach, FakePost, FakeAttached, FakeThreadId};
+const ampify::win::UiThreadBackend kFakeBackend{FakeAttach, FakeDetach, FakePost, FakeAttached, FakeThreadId};
 
 // Part 2: with a backend installed, every call goes to it.
 bool CheckBackend() {
-    amk::win::SetUiThreadBackend(&kFakeBackend);
+    ampify::win::SetUiThreadBackend(&kFakeBackend);
     int ran = 0;
-    bool attached = amk::win::AttachUiThread(GetCurrentProcessId(), GetModuleHandleW(nullptr));
-    bool posted = amk::win::PostToUiThread([&ran] { ran++; });
-    bool reported = amk::win::UiThreadAttached() && amk::win::UiThreadId() == 4242;
-    amk::win::DetachUiThread();
-    bool detached = !amk::win::UiThreadAttached();
-    amk::win::SetUiThreadBackend(nullptr);
-    bool fallbackBack = !amk::win::UiThreadAttached() && amk::win::UiThreadId() == 0;
+    bool attached = ampify::win::AttachUiThread(GetCurrentProcessId(), GetModuleHandleW(nullptr));
+    bool posted = ampify::win::PostToUiThread([&ran] { ran++; });
+    bool reported = ampify::win::UiThreadAttached() && ampify::win::UiThreadId() == 4242;
+    ampify::win::DetachUiThread();
+    bool detached = !ampify::win::UiThreadAttached();
+    ampify::win::SetUiThreadBackend(nullptr);
+    bool fallbackBack = !ampify::win::UiThreadAttached() && ampify::win::UiThreadId() == 0;
     bool passed = attached && posted && ran == 1 && reported && detached && fallbackBack && FakeBackend::attaches == 1 &&
                   FakeBackend::posts == 1 && FakeBackend::detaches == 1;
     std::printf("backend: attach=%d post=%d ran=%d reported=%d detached=%d fallback_back=%d\n", attached ? 1 : 0,
@@ -127,15 +127,15 @@ Outcome CheckQueue(bool wine) {
         if (controller) controller->Release();
         return wine ? Outcome::Skip : Outcome::Fail;
     }
-    bool adopted = amk::win::AdoptCurrentThreadQueue(queue);
+    bool adopted = ampify::win::AdoptCurrentThreadQueue(queue);
     queue->Release();
 
     WNDCLASSW windowClass{};
     windowClass.lpfnWndProc = WindowProc;
     windowClass.hInstance = GetModuleHandleW(nullptr);
-    windowClass.lpszClassName = L"AmkUiThreadTest";
+    windowClass.lpszClassName = L"AmpifyUiThreadTest";
     RegisterClassW(&windowClass);
-    HWND window = CreateWindowExW(0, windowClass.lpszClassName, L"amk", WS_OVERLAPPEDWINDOW, 0, 0, 200, 100, nullptr,
+    HWND window = CreateWindowExW(0, windowClass.lpszClassName, L"ampify", WS_OVERLAPPEDWINDOW, 0, 0, 200, 100, nullptr,
                                   nullptr, windowClass.hInstance, nullptr);
     if (!window) {
         std::printf("queue: FAIL window\n");
@@ -151,12 +151,12 @@ Outcome CheckQueue(bool wine) {
     std::thread worker([&] {
         // The window may take a moment to be visible: retry for a few seconds, as the kernel does.
         for (int attempt = 0; attempt < 50 && !attachedOk; attempt++) {
-            attachedOk = amk::win::AttachUiThread(GetCurrentProcessId(), GetModuleHandleW(nullptr));
+            attachedOk = ampify::win::AttachUiThread(GetCurrentProcessId(), GetModuleHandleW(nullptr));
             if (!attachedOk) Sleep(100);
         }
-        attachedThread = amk::win::UiThreadId();
+        attachedThread = ampify::win::UiThreadId();
         for (int i = 0; i < 3; i++) {
-            bool posted = amk::win::PostToUiThread([] {
+            bool posted = ampify::win::PostToUiThread([] {
                 if (GetCurrentThreadId() != g_interfaceThread) g_onInterfaceThread = false;
                 g_ran++;
             });
@@ -176,7 +176,7 @@ Outcome CheckQueue(bool wine) {
         }
     }
     worker.join();
-    amk::win::DetachUiThread();
+    ampify::win::DetachUiThread();
     DestroyWindow(window);
     controller->Release();
 

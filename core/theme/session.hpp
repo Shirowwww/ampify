@@ -11,7 +11,7 @@
 #include "theme.hpp"
 #include "tree.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // What the interface thread should have on screen, as the worker thread decides it (see worker.hpp).
 struct SessionRequest {
@@ -39,7 +39,7 @@ public:
 
     bool Active() const { return m_engine.Active(); }
 
-    // What the session applies, theme and snippets together; null when nothing is applied. For AMK.fonts and the like.
+    // What the session applies, theme and snippets together; null when nothing is applied. For Ampify.fonts and the like.
     std::shared_ptr<const Theme> Applied() const { return m_composed; }
 
 private:
@@ -53,4 +53,4 @@ private:
     std::shared_ptr<const Theme> m_composed;
 };
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

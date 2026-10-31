@@ -1,9 +1,9 @@
 #pragma once
 
 // The kernel's theme service: a worker thread reads the settings and the theme folder, and posts each tick to the
-// interface thread, where the theme session applies it. Compiled only with AMK_WITH_XAML, like xaml_backend.hpp.
+// interface thread, where the theme session applies it. Compiled only with AMPIFY_WITH_XAML, like xaml_backend.hpp.
 
-#if defined(AMK_WITH_XAML)
+#if defined(AMPIFY_WITH_XAML)
 
 #include <windows.h>
 
@@ -14,7 +14,7 @@
 
 #include "../core/journal.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 struct UiSide;  // the state that only the interface thread touches; defined in theme_service.cpp
 
@@ -37,6 +37,6 @@ private:
     std::shared_ptr<UiSide> m_ui;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win
 
-#endif  // AMK_WITH_XAML
+#endif  // AMPIFY_WITH_XAML

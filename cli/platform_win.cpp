@@ -21,7 +21,7 @@
 #include "../win/package.hpp"
 #include "platform.hpp"
 
-namespace amk::platform {
+namespace ampify::platform {
 
 namespace {
 
@@ -97,16 +97,8 @@ std::vector<std::string> Initialize(int, char**) {
 
 std::filesystem::path DefaultKitDirectory() {
     const wchar_t* profile = _wgetenv(L"USERPROFILE");
-    if (profile == nullptr || *profile == L'\0') return std::filesystem::current_path() / "AppleMusicModKit";
-    return std::filesystem::path(profile) / L"AppleMusicModKit";
-}
-
-std::string UserLocale() {
-    wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
-    if (GetUserDefaultLocaleName(name, LOCALE_NAME_MAX_LENGTH) == 0) return {};
-    std::string narrow;
-    for (const wchar_t* c = name; *c; ++c) narrow += static_cast<char>(*c);  // locale names are ASCII
-    return narrow;
+    if (profile == nullptr || *profile == L'\0') return std::filesystem::current_path() / "Ampify";
+    return std::filesystem::path(profile) / L"Ampify";
 }
 
 std::filesystem::path ExecutableDirectory() {
@@ -190,7 +182,7 @@ std::vector<std::string> OpenFolderCommand(const std::filesystem::path& folder) 
 }
 
 bool IsProcessRunning(const std::string& imageName) {
-    std::filesystem::path listing = TemporaryFile("amk-tasklist");
+    std::filesystem::path listing = TemporaryFile("ampify-tasklist");
     int code = Run({"tasklist.exe", "/FI", "IMAGENAME eq " + imageName, "/NH"}, listing);
     bool running = false;
     if (code == 0) {
@@ -203,4 +195,4 @@ bool IsProcessRunning(const std::string& imageName) {
     return running;
 }
 
-}  // namespace amk::platform
+}  // namespace ampify::platform

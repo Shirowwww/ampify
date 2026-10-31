@@ -4,7 +4,7 @@
 
 #include "settings.hpp"
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -44,4 +44,4 @@ bool SafeMode::IsActive() const {
     return UnhealthyLaunches() >= m_maxUnhealthyLaunches;
 }
 
-}  // namespace amk
+}  // namespace ampify

@@ -1,6 +1,6 @@
 #include "hover.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 HoverTracker::Change HoverTracker::Set(NodeId id, const std::vector<HoverValue>& values, Access& access) {
     auto it = m_elements.find(id);
@@ -73,4 +73,4 @@ bool HoverTracker::Write(NodeId id, std::string_view property, const Value& valu
     return access.WriteRaw(id, property, value);
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

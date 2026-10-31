@@ -6,7 +6,7 @@
 
 #include "host.hpp"
 
-namespace amk {
+namespace ampify {
 
 // Turns successive player snapshots into the events that elements subscribe to: "trackchange" when the track or
 // its variant or its queue entry changes, "statechange" when playback starts or stops. The first snapshot only
@@ -22,4 +22,4 @@ private:
     bool m_known = false;
 };
 
-}  // namespace amk
+}  // namespace ampify

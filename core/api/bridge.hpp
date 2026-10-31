@@ -2,7 +2,7 @@
 
 // What the natives of every module share: the extension that owns the runtime, argument conversion, errors, the
 // permission check, and access to the kernel services. A natives file derives a struct from ScriptBridge and writes
-// its natives as AMK_NATIVE static members, so these helpers read unqualified. Natives run on the JavaScript thread.
+// its natives as AMPIFY_NATIVE static members, so these helpers read unqualified. Natives run on the JavaScript thread.
 
 #include <map>
 #include <memory>
@@ -13,7 +13,7 @@
 
 #include "../script_extension.hpp"
 
-namespace amk {
+namespace ampify {
 
 struct ScriptBridge {
     static ScriptExtension* Owner(JSContext* ctx) {
@@ -44,7 +44,7 @@ struct ScriptBridge {
     static bool Require(JSContext* ctx, ScriptExtension* ext, const std::string& permission, JSValue* failure) {
         if (ext->manifest().HasPermission(permission)) return true;
         *failure = Throw(ctx, "PermissionDenied",
-                         "permission manquante : " + permission + " (à déclarer dans manifest.json)");
+                         "missing permission: " + permission + " (declare it in manifest.json)");
         return false;
     }
 
@@ -71,9 +71,9 @@ struct ScriptBridge {
     }
 };
 
-}  // namespace amk
+}  // namespace ampify
 
 // A native: called from the prelude as native.<name>(...), on the JavaScript thread.
-#define AMK_NATIVE(name)                                                                       \
+#define AMPIFY_NATIVE(name)                                                                       \
     static JSValue name([[maybe_unused]] JSContext* ctx, [[maybe_unused]] JSValueConst self, \
                         [[maybe_unused]] int argc, [[maybe_unused]] JSValueConst* argv)

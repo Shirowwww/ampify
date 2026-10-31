@@ -8,7 +8,7 @@
 
 #include "element.hpp"
 
-namespace amk {
+namespace ampify {
 
 // One installable element. `url` is a zip archive whose root is the element folder; `sha256` pins its content.
 struct CatalogEntry : ElementInfo {
@@ -51,4 +51,4 @@ std::optional<VersionsCatalog> ParseVersionsCatalog(std::string_view text, std::
 std::vector<std::string> UsableVersions(const VersionsCatalog& catalog, std::span<const std::string_view> required,
                                         std::vector<std::string>& rejected);
 
-}  // namespace amk
+}  // namespace ampify

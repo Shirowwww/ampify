@@ -3,7 +3,7 @@
 // MIDI input, without any device: reading the short messages that winmm hands over (midiInOpen packs the status
 // byte and two data bytes in one DWORD), and matching them against bindings such as "note:60" or "ch2:cc:7".
 // The Windows side (win/midi.*) only reads the device. Bindings come from two places: the setting midi.map, read by
-// the kit (note:60=next;note:62=previous;cc:7=gain), and AMK.midi.on(binding, fn) in an element.
+// the kit (note:60=next;note:62=previous;cc:7=gain), and Ampify.midi.on(binding, fn) in an element.
 
 #include <cstdint>
 #include <optional>
@@ -11,7 +11,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk::midi {
+namespace ampify::midi {
 
 enum class Kind { NoteOn, NoteOff, ControlChange };
 
@@ -40,7 +40,7 @@ struct Binding {
     int number = -1;
 };
 
-// Reads a binding. On error returns nullopt and fills `error` in French.
+// Reads a binding. On error returns nullopt and fills `error` in English.
 std::optional<Binding> ParseBinding(std::string_view text, std::string* error = nullptr);
 
 // The canonical text of a binding ("ch2:note:60", "cc:*", "*").
@@ -67,7 +67,7 @@ struct Decision {
 class Map {
 public:
     // Reads "note:60=next;note:62=previous;cc:7=gain" (separators ';' or ','). Actions: play, pause, next,
-    // previous, gain (gain needs a cc binding). On error, keeps nothing and fills `error` in French.
+    // previous, gain (gain needs a cc binding). On error, keeps nothing and fills `error` in English.
     bool Parse(std::string_view text, std::string* error = nullptr);
 
     // The first rule that matches. A note rule fires on note on. A cc rule with a command fires when the value goes
@@ -81,4 +81,4 @@ private:
     int m_lastValue[16][128] = {};
 };
 
-}  // namespace amk::midi
+}  // namespace ampify::midi

@@ -1,7 +1,7 @@
 // NOT COMPILED IN THE CURRENT BUILD: see xaml_backend.hpp. Written against the C++/WinRT projection of the Windows App SDK.
 // The API names below are the ones documented for WinUI 3; each one is listed in docs/tests/M8-themes.md to check on the PC.
 
-#if defined(AMK_WITH_XAML)
+#if defined(AMPIFY_WITH_XAML)
 
 #include "xaml_backend.hpp"
 
@@ -28,11 +28,11 @@
 #include "../core/theme/properties.hpp"
 #include "xaml_host.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
-namespace th = amk::theme;
+namespace th = ampify::theme;
 namespace xaml = winrt::Microsoft::UI::Xaml;
 namespace controls = xaml::Controls;
 namespace media = xaml::Media;
@@ -332,6 +332,36 @@ void XamlTreeBackend::Forget(theme::NodeId id, std::string_view property) {
     m_written.erase(std::make_pair(id, std::string(property)));
 }
 
+media::Brush XamlTreeBackend::ArtworkBrush(const std::string& text) {
+    media::ImageBrush brush;
+    std::string stretch = text.substr(text.find('|') == std::string::npos ? text.size() : text.find('|') + 1);
+    brush.Stretch(stretch == "Uniform" ? media::Stretch::Uniform
+                  : stretch == "Fill"  ? media::Stretch::Fill
+                                       : media::Stretch::UniformToFill);
+    if (m_artwork) brush.ImageSource(m_artwork);
+    m_artworkBrushes.push_back(brush);
+    return brush;
+}
+
+// Gives the brushes of `background: artwork` the image of the song playing, and lets go of those no element holds
+// any more (the theme was removed). Strong references: weak ones to what the kit made never resolve in Apple Music.
+void XamlTreeBackend::FollowArtwork(const media::ImageSource& artwork) {
+    if (artwork) m_artwork = artwork;  // between two songs the image may be missing for a moment: keep the last one
+    // COM identity: the brush is stored as a Brush, an interface pointer other than the ImageBrush one.
+    auto identity = [](const winrt::Windows::Foundation::IUnknown& object) {
+        return object ? winrt::get_abi(object.as<winrt::Windows::Foundation::IUnknown>()) : nullptr;
+    };
+    std::erase_if(m_artworkBrushes, [&](const media::ImageBrush& brush) {
+        for (const auto& [key, written] : m_written) {
+            if (identity(written.object) == identity(brush)) return false;
+        }
+        return true;
+    });
+    for (media::ImageBrush& brush : m_artworkBrushes) {
+        if (m_artwork && brush.ImageSource() != m_artwork) brush.ImageSource(m_artwork);
+    }
+}
+
 IInspectable XamlTreeBackend::Restore(const theme::Value& token) const {
     std::uint64_t number = std::stoull(token.text.substr(std::string("handle:").size()));
     auto it = m_kept.find(number);
@@ -356,6 +386,8 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         int depth;
     };
     std::vector<Pending> stack{{content, -1, 0}};
+    int lcdDepth = -1;
+    media::ImageSource artwork{nullptr};
     while (!stack.empty()) {
         Pending item = stack.back();
         stack.pop_back();
@@ -368,6 +400,12 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         if (auto text = item.object.try_as<controls::TextBlock>()) node.icon = IsIconText(text.Text());
         node.parent = item.parent;
         node.depth = item.depth;
+        // The play bar's artwork: the first Image#StaticArtwork under NowPlayingControl#LCD.
+        if (lcdDepth >= 0 && item.depth <= lcdDepth) lcdDepth = -1;
+        if (node.name == "LCD" && node.type == "NowPlayingControl") lcdDepth = item.depth;
+        if (lcdDepth >= 0 && !artwork && node.name == "StaticArtwork") {
+            if (auto image = item.object.try_as<controls::Image>()) artwork = image.Source();
+        }
 
         int index = static_cast<int>(nodes.size());
         nodes.push_back(node);
@@ -388,6 +426,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         m_translations.erase(it->first.first);
         it = m_written.erase(it);
     }
+    FollowArtwork(artwork);
     for (auto it = m_hoverHandlers.begin(); it != m_hoverHandlers.end();) {
         if (it->second.element.get()) {
             ++it;
@@ -539,7 +578,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
             target = media::SolidColorBrush(*color);
             made = true;
         } else if (value.kind == theme::ValueKind::Image) {
-            target = ImageFrom(value.text);
+            target = value.text.starts_with(theme::kArtworkImage) ? ArtworkBrush(value.text) : ImageFrom(value.text);
             made = true;
         } else if (value.kind == theme::ValueKind::Gradient) {
             media::Brush gradient = GradientFrom(value.text);
@@ -965,7 +1004,7 @@ bool XamlTreeBackend::EnsureSettingsSection(const std::vector<std::string>& them
     if (page < 0) return false;
 
     for (const theme::NodeInfo& node : nodes) {
-        if (node.name == "AmkThemeSection") return false;  // already there
+        if (node.name == "AmpifyThemeSection") return false;  // already there
     }
 
     controls::Panel panel{nullptr};
@@ -977,10 +1016,10 @@ bool XamlTreeBackend::EnsureSettingsSection(const std::vector<std::string>& them
     if (!panel) return false;
 
     controls::StackPanel section;
-    section.Name(L"AmkThemeSection");
+    section.Name(L"AmpifyThemeSection");
 
     controls::TextBlock title;
-    title.Text(L"Thème (Apple Music Mod Kit)");
+    title.Text(L"Thème (Ampify)");
     section.Children().Append(title);
 
     controls::ComboBox choice;
@@ -1007,6 +1046,6 @@ bool XamlTreeBackend::EnsureSettingsSection(const std::vector<std::string>& them
     return true;
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win
 
-#endif  // AMK_WITH_XAML
+#endif  // AMPIFY_WITH_XAML

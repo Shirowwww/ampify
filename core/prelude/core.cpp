@@ -1,26 +1,26 @@
-// Module core: AMK.version, kitApi, process, locale, log and onStop. Natives: core/natives/core.cpp.
+// Module core: Ampify.version, kitApi, process, locale, log and onStop. Natives: core/natives/core.cpp.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kCore[];
-const char kCore[] = R"AMKJS(
+const char kCore[] = R"AMPIFYJS(
   const stopHandlers = [];
 
-  Object.assign(AMK, {
+  Object.assign(Ampify, {
     version: native.version,
     kitApi: native.kitApi,
     process: native.process,
     locale: native.locale,
     log: (message) => native.log(text(message)),
     onStop(fn) {
-      if (typeof fn !== "function") throw new TypeError("onStop attend une fonction");
+      if (typeof fn !== "function") throw new TypeError("onStop expects a function");
       stopHandlers.push(fn);
     },
   });
 
   dispatch.stop = () => {
-    for (let i = stopHandlers.length - 1; i >= 0; i--) runGuarded("arrêt", stopHandlers[i], []);
+    for (let i = stopHandlers.length - 1; i >= 0; i--) runGuarded("stop", stopHandlers[i], []);
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

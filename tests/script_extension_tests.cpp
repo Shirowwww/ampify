@@ -9,8 +9,8 @@
 #include "fake_host.hpp"
 #include "test.hpp"
 
-#ifndef AMK_SOURCE_DIR
-#define AMK_SOURCE_DIR "."
+#ifndef AMPIFY_SOURCE_DIR
+#define AMPIFY_SOURCE_DIR "."
 #endif
 
 namespace {
@@ -18,38 +18,38 @@ namespace {
 namespace fs = std::filesystem;
 
 fs::path ScratchDir(const std::string& name) {
-    fs::path dir = fs::temp_directory_path() / "amk-tests" / ("element-" + name);
+    fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("element-" + name);
     fs::remove_all(dir);
     fs::create_directories(dir);
     return dir;
 }
 
 std::string Manifest(const std::string& id, const std::string& permissions) {
-    return R"({"id":")" + id + R"(","name":"Démo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
+    return R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
            R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
 }
 
 // Everything an element needs in one place: a fake host, a journal in a string, and a clock the test moves.
 struct Fixture {
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal{out, [] { return std::string("t"); }};
+    ampify::Journal journal{out, [] { return std::string("t"); }};
     std::chrono::steady_clock::time_point now{std::chrono::seconds(1000)};
 
-    amk::Clock clock() {
+    ampify::Clock clock() {
         return [this] { return now; };
     }
 
     // Writes the element's folder and returns the element. Each test uses its own id, so folders never clash.
-    std::unique_ptr<amk::ScriptExtension> Make(const std::string& id, const std::string& permissions,
-                                               const std::string& main, amk::js::Limits limits = {}) {
+    std::unique_ptr<ampify::ScriptExtension> Make(const std::string& id, const std::string& permissions,
+                                               const std::string& main, ampify::js::Limits limits = {}) {
         fs::path dir = ScratchDir(id);
         std::ofstream(dir / "manifest.json") << Manifest(id, permissions);
         std::ofstream(dir / "main.js") << main;
-        amk::ManifestResult result = amk::ParseManifest(Manifest(id, permissions), id, 1, [](const std::string&) {
+        ampify::ManifestResult result = ampify::ParseManifest(Manifest(id, permissions), id, 1, [](const std::string&) {
             return true;
         });
-        return std::make_unique<amk::ScriptExtension>(*result.manifest, dir, host, journal, clock(), limits);
+        return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, host, journal, clock(), limits);
     }
 
     bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
@@ -59,11 +59,11 @@ struct Fixture {
 
 TEST_CASE(Element_RunsMainAndLogsWithItsId) {
     Fixture f;
-    auto element = f.Make("demo", "", R"(AMK.log("bonjour"); AMK.log(AMK.process + " " + AMK.locale);)");
+    auto element = f.Make("demo", "", R"(Ampify.log("hello"); Ampify.log(Ampify.process + " " + Ampify.locale);)");
     f.host.process = "ui";
     CHECK(element->Start());
     CHECK(element->running());
-    CHECK(f.Logged("[demo] bonjour"));
+    CHECK(f.Logged("[demo] hello"));
     CHECK(f.Logged("[demo] ui fr-FR"));
     element->Stop();
     CHECK(!element->running());
@@ -71,7 +71,7 @@ TEST_CASE(Element_RunsMainAndLogsWithItsId) {
 
 TEST_CASE(Element_RejectsStorageWithoutThePermission) {
     Fixture f;
-    auto element = f.Make("nostore", "", R"(AMK.storage.set("a", 1);)");
+    auto element = f.Make("nostore", "", R"(Ampify.storage.set("a", 1);)");
     CHECK(!element->Start());
     CHECK(element->lastError().find("PermissionDenied") != std::string::npos);
     CHECK(element->lastError().find("storage") != std::string::npos);
@@ -81,7 +81,7 @@ TEST_CASE(Element_RejectsStorageWithoutThePermission) {
 TEST_CASE(Element_StorageSurvivesARestart) {
     Fixture f;
     const std::string main =
-        R"(const n = AMK.storage.get("launches", 0) + 1; AMK.storage.set("launches", n); AMK.log("lancement " + n);)";
+        R"(const n = Ampify.storage.get("launches", 0) + 1; Ampify.storage.set("launches", n); Ampify.log("launch " + n);)";
     auto first = f.Make("counter", R"("storage")", main);
     CHECK(first->Start());
     first->Stop();
@@ -90,49 +90,49 @@ TEST_CASE(Element_StorageSurvivesARestart) {
 
     auto second = f.Make("counter", R"("storage")", main);
     CHECK(second->Start());
-    CHECK(f.Logged("lancement 2"));
+    CHECK(f.Logged("launch 2"));
 }
 
 TEST_CASE(Element_ConfigReadsTypedValuesAndWritesOnlyItsOwnKeys) {
     Fixture f;
     f.host.settings["extensions.cfg.volume"] = "7";
     auto element = f.Make("cfg", "", R"(
-        AMK.log("v=" + (AMK.config.get("volume", 5) + 1));
-        AMK.log("d=" + AMK.config.get("absent", 2.5));
-        AMK.config.set("on", true);
-        try { AMK.config.set("enabled", true); } catch (e) { AMK.log("refus " + e.name); }
+        Ampify.log("v=" + (Ampify.config.get("volume", 5) + 1));
+        Ampify.log("d=" + Ampify.config.get("absent", 2.5));
+        Ampify.config.set("on", true);
+        try { Ampify.config.set("enabled", true); } catch (e) { Ampify.log("refused " + e.name); }
     )");
     CHECK(element->Start());
     CHECK(f.Logged("v=8"));
     CHECK(f.Logged("d=2.5"));
-    CHECK(f.Logged("refus TypeError"));
+    CHECK(f.Logged("refused TypeError"));
     CHECK(f.host.settings["extensions.cfg.on"] == "true");
     CHECK(f.host.settings.count("extensions.cfg.enabled") == 0);
 }
 
 TEST_CASE(Element_RunsOnStopHandlersInReverseOrder) {
     Fixture f;
-    auto element = f.Make("order", "", R"(AMK.onStop(() => AMK.log("un")); AMK.onStop(() => AMK.log("deux"));)");
+    auto element = f.Make("order", "", R"(Ampify.onStop(() => Ampify.log("one")); Ampify.onStop(() => Ampify.log("two"));)");
     CHECK(element->Start());
     element->Stop();
     std::string log = f.out.str();
-    CHECK(log.find("deux") != std::string::npos);
-    CHECK(log.find("deux") < log.find("un", log.find("deux")));
+    CHECK(log.find("two") != std::string::npos);
+    CHECK(log.find("two") < log.find("one", log.find("two")));
 }
 
 TEST_CASE(Element_CannotReplaceTheFrozenApi) {
     Fixture f;
-    auto element = f.Make("frozen", "", R"(AMK.version = "9.9"; AMK.log(AMK.version);)");
+    auto element = f.Make("frozen", "", R"(Ampify.version = "9.9"; Ampify.log(Ampify.version);)");
     CHECK(element->Start());
-    CHECK(f.Logged(std::string("[frozen] ") + amk::kKernelVersion));
+    CHECK(f.Logged(std::string("[frozen] ") + ampify::kKernelVersion));
 }
 
 TEST_CASE(Element_TimersFireWhenDueAndCanBeCleared) {
     Fixture f;
     auto element = f.Make("timers", "", R"(
-        setTimeout(() => AMK.log("tic"), 100);
+        setTimeout(() => Ampify.log("tic"), 100);
         let n = 0;
-        const id = setInterval(() => { n++; AMK.log("t" + n); if (n === 2) clearInterval(id); }, 10);
+        const id = setInterval(() => { n++; Ampify.log("t" + n); if (n === 2) clearInterval(id); }, 10);
     )");
     CHECK(element->Start());
     f.now += std::chrono::milliseconds(50);
@@ -151,64 +151,64 @@ TEST_CASE(Element_TimersFireWhenDueAndCanBeCleared) {
 TEST_CASE(Element_ThrowingTimerDoesNotStopTheOthers) {
     Fixture f;
     auto element = f.Make("boom", "", R"(
-        setTimeout(() => { throw new Error("boum"); }, 10);
-        setTimeout(() => AMK.log("autre"), 10);
+        setTimeout(() => { throw new Error("boom"); }, 10);
+        setTimeout(() => Ampify.log("other"), 10);
     )");
     CHECK(element->Start());
     f.now += std::chrono::milliseconds(20);
     element->Pump();
-    CHECK(f.Logged("boum"));
-    CHECK(f.Logged("autre"));
+    CHECK(f.Logged("boom"));
+    CHECK(f.Logged("other"));
     CHECK(element->running());
 }
 
 TEST_CASE(Element_PlayerStateNeedsPlayerRead) {
     Fixture f;
     f.host.player.playing = true;
-    amk::TrackInfo track;
-    track.title = "Titre";
+    ampify::TrackInfo track;
+    track.title = "Title";
     f.host.player.track = track;
-    auto denied = f.Make("noread", "", R"(try { AMK.player.state(); } catch (e) { AMK.log(e.name); })");
+    auto denied = f.Make("noread", "", R"(try { Ampify.player.state(); } catch (e) { Ampify.log(e.name); })");
     CHECK(denied->Start());
     CHECK(f.Logged("PermissionDenied"));
 
-    auto element = f.Make("read", R"("player.read")", R"(AMK.log(AMK.player.state().track.title);)");
+    auto element = f.Make("read", R"("player.read")", R"(Ampify.log(Ampify.player.state().track.title);)");
     CHECK(element->Start());
-    CHECK(f.Logged("[read] Titre"));
+    CHECK(f.Logged("[read] Title"));
 }
 
 TEST_CASE(Element_PlayerEventsArriveOnThePumpNotOnTheCallingThread) {
     Fixture f;
-    auto element = f.Make("events", R"("player.read")", R"(AMK.player.on("trackchange", (s) => AMK.log("piste " + s.track.title));)");
+    auto element = f.Make("events", R"("player.read")", R"(Ampify.player.on("trackchange", (s) => Ampify.log("track " + s.track.title));)");
     CHECK(element->Start());
 
-    amk::PlayerSnapshot snapshot;
-    amk::TrackInfo track;
-    track.title = "Nouveau";
+    ampify::PlayerSnapshot snapshot;
+    ampify::TrackInfo track;
+    track.title = "New";
     snapshot.track = track;
     element->DeliverPlayer("trackchange", snapshot);
-    CHECK(!f.Logged("piste Nouveau"));
+    CHECK(!f.Logged("track New"));
     element->Pump();
-    CHECK(f.Logged("piste Nouveau"));
+    CHECK(f.Logged("track New"));
 }
 
 TEST_CASE(Element_PlayerCommandsNeedPlayerControl) {
     Fixture f;
-    auto denied = f.Make("nocontrol", "", R"(try { AMK.player.next(); } catch (e) { AMK.log(e.name); })");
+    auto denied = f.Make("nocontrol", "", R"(try { Ampify.player.next(); } catch (e) { Ampify.log(e.name); })");
     CHECK(denied->Start());
     CHECK(f.host.commands.empty());
 
-    auto element = f.Make("control", R"("player.control")", R"(AMK.player.next(); AMK.player.seek(1500);)");
+    auto element = f.Make("control", R"("player.control")", R"(Ampify.player.next(); Ampify.player.seek(1500);)");
     CHECK(element->Start());
     CHECK(f.host.commands.size() == 2);
-    CHECK(f.host.commands[0] == amk::PlayerCommand::Next);
-    CHECK(f.host.commands[1] == amk::PlayerCommand::Seek);
+    CHECK(f.host.commands[0] == ampify::PlayerCommand::Next);
+    CHECK(f.host.commands[1] == ampify::PlayerCommand::Seek);
 }
 
 TEST_CASE(Element_GainIsClampedToTheKernelCeilingAndResetOnStop) {
     Fixture f;
     f.host.settings["audio.maxGainDb"] = "3";
-    auto element = f.Make("gain", R"("audio.gain")", R"(AMK.log("gain=" + AMK.audio.setGainDb(20));)");
+    auto element = f.Make("gain", R"("audio.gain")", R"(Ampify.log("gain=" + Ampify.audio.setGainDb(20));)");
     CHECK(element->Start());
     CHECK(f.Logged("gain=3"));
     CHECK(f.host.gains.back().first == "gain");
@@ -220,29 +220,29 @@ TEST_CASE(Element_GainIsClampedToTheKernelCeilingAndResetOnStop) {
 TEST_CASE(Element_NotifyNeedsPermissionAndTruncates) {
     Fixture f;
     std::string text(600, 'x');
-    std::string main = std::string(R"(AMK.notify({ title: "Salut", text: ")") + text + R"(" });)";
+    std::string main = std::string(R"(Ampify.notify({ title: "Salut", text: ")") + text + R"(" });)";
     auto element = f.Make("note", R"("notifications")", main);
     CHECK(element->Start());
     CHECK(f.host.notifications.size() == 1);
     CHECK(f.host.notifications[0].size() == std::string("Salut|").size() + 500);
     CHECK(f.host.notifications[0] == "Salut|" + std::string(500, 'x'));
 
-    auto denied = f.Make("nonote", "", R"(AMK.notify({ title: "x" });)");
+    auto denied = f.Make("nonote", "", R"(Ampify.notify({ title: "x" });)");
     CHECK(!denied->Start());
 }
 
 TEST_CASE(Element_KeyboardBindingIsNormalizedAndDelivered) {
     Fixture f;
     auto element = f.Make("keys", R"("ui.keyboard")", R"(
-        AMK.keyboard.bind("ctrl+alt+right", () => AMK.log("suivant"));
-        try { AMK.keyboard.bind("a", () => {}); } catch (e) { AMK.log("refus " + e.name); }
+        Ampify.keyboard.bind("ctrl+alt+right", () => Ampify.log("next"));
+        try { Ampify.keyboard.bind("a", () => {}); } catch (e) { Ampify.log("refused " + e.name); }
     )");
     CHECK(element->Start());
     CHECK(f.host.keys.count("Ctrl+Alt+Right") == 1);
-    CHECK(f.Logged("refus RangeError"));
+    CHECK(f.Logged("refused RangeError"));
     element->DeliverKey("Ctrl+Alt+Right");
     element->Pump();
-    CHECK(f.Logged("suivant"));
+    CHECK(f.Logged("next"));
     element->Stop();
     CHECK(f.host.keys.empty());
 }
@@ -250,23 +250,23 @@ TEST_CASE(Element_KeyboardBindingIsNormalizedAndDelivered) {
 TEST_CASE(Element_HttpReachesOnlyDeclaredHttpsHosts) {
     Fixture f;
     auto element = f.Make("net", R"("network:api.example.org")", R"(
-        AMK.http.get("https://api.example.org/x").then((r) => AMK.log("code " + r.status + " " + r.text));
-        AMK.http.get("https://evil.example/").catch((e) => AMK.log("refus " + e.name));
-        AMK.http.get("http://api.example.org/").catch((e) => AMK.log("clair " + e.name));
+        Ampify.http.get("https://api.example.org/x").then((r) => Ampify.log("code " + r.status + " " + r.text));
+        Ampify.http.get("https://evil.example/").catch((e) => Ampify.log("refused " + e.name));
+        Ampify.http.get("http://api.example.org/").catch((e) => Ampify.log("plain " + e.name));
     )");
     CHECK(element->Start());
     CHECK(f.Logged("code 200 ok"));
-    CHECK(f.Logged("refus PermissionDenied"));
-    CHECK(f.Logged("clair TypeError"));
+    CHECK(f.Logged("refused PermissionDenied"));
+    CHECK(f.Logged("plain TypeError"));
     CHECK(f.host.requestedUrls.size() == 1);
 }
 
 TEST_CASE(Element_UriParsesAndBuildsLinks) {
     Fixture f;
     auto element = f.Make("uri", "", R"(
-        AMK.log(JSON.stringify(AMK.uri.parse("https://music.apple.com/fr/album/nom/123?i=456")));
-        AMK.log(AMK.uri.build("album", "123", { storefront: "fr" }));
-        AMK.log(String(AMK.uri.parse("https://example.org/x")));
+        Ampify.log(JSON.stringify(Ampify.uri.parse("https://music.apple.com/fr/album/name/123?i=456")));
+        Ampify.log(Ampify.uri.build("album", "123", { storefront: "fr" }));
+        Ampify.log(String(Ampify.uri.parse("https://example.org/x")));
     )");
     CHECK(element->Start());
     CHECK(f.Logged(R"({"kind":"album","storefront":"fr","id":"123","trackId":"456"})"));
@@ -277,8 +277,8 @@ TEST_CASE(Element_UriParsesAndBuildsLinks) {
 TEST_CASE(Element_IconsReturnSvgAndRejectUnknownNames) {
     Fixture f;
     auto element = f.Make("icons", "", R"(
-        AMK.log(AMK.icons.get("play").slice(0, 4));
-        try { AMK.icons.get("inconnue"); } catch (e) { AMK.log(e.name); }
+        Ampify.log(Ampify.icons.get("play").slice(0, 4));
+        try { Ampify.icons.get("unknown"); } catch (e) { Ampify.log(e.name); }
     )");
     CHECK(element->Start());
     CHECK(f.Logged("[icons] <svg"));
@@ -287,15 +287,15 @@ TEST_CASE(Element_IconsReturnSvgAndRejectUnknownNames) {
 
 TEST_CASE(Element_FailsCleanlyWhenMainThrows) {
     Fixture f;
-    auto element = f.Make("throws", "", R"(throw new Error("boum au démarrage");)");
+    auto element = f.Make("throws", "", R"(throw new Error("boom at start");)");
     CHECK(!element->Start());
-    CHECK(element->lastError().find("boum au démarrage") != std::string::npos);
+    CHECK(element->lastError().find("boom at start") != std::string::npos);
     CHECK(!element->running());
 }
 
 TEST_CASE(Element_IsCutWhenItLoopsForever) {
     Fixture f;
-    amk::js::Limits limits;
+    ampify::js::Limits limits;
     limits.budget = std::chrono::milliseconds(50);
     auto element = f.Make("spin", "", "while (true) {}", limits);
     CHECK(!element->Start());
@@ -305,17 +305,17 @@ TEST_CASE(Element_IsCutWhenItLoopsForever) {
 TEST_CASE(Element_ExamplesStartWithTheirOwnPermissions) {
     for (const char* name : {"hello-extension", "now-playing-notify", "keyboard-skip", "sleep-timer", "gain-boost"}) {
         Fixture f;
-        fs::path dir = fs::path(AMK_SOURCE_DIR) / "examples" / name;
+        fs::path dir = fs::path(AMPIFY_SOURCE_DIR) / "examples" / name;
         std::ifstream manifestFile(dir / "manifest.json");
         std::stringstream manifestText;
         manifestText << manifestFile.rdbuf();
-        amk::ManifestResult result = amk::ParseManifest(manifestText.str(), name, 1, [&](const std::string& file) {
+        ampify::ManifestResult result = ampify::ParseManifest(manifestText.str(), name, 1, [&](const std::string& file) {
             return fs::exists(dir / file);
         });
         CHECK(result.manifest.has_value());
         if (!result.manifest) continue;
 
-        amk::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock());
+        ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock());
         CHECK(element.Start());
         element.Stop();
         CHECK(!element.running());
@@ -328,23 +328,23 @@ TEST_CASE(Element_MainMayBeAModuleThatImportsItsOwnFiles) {
                            R"("author":"Shirowwww","description":"Test.","kitApi":"1.0","main":"main.js",)"
                            R"("type":"module"})";
     std::ofstream(dir / "manifest.json") << manifest;
-    std::ofstream(dir / "main.js") << "import { greet } from './lib/greet.js';\nAMK.log(greet('module'));\n";
+    std::ofstream(dir / "main.js") << "import { greet } from './lib/greet.js';\nAmpify.log(greet('module'));\n";
     fs::create_directories(dir / "lib");
-    std::ofstream(dir / "lib" / "greet.js") << "export const greet = (who) => 'bonjour ' + who;\n";
-    amk::ManifestResult result = amk::ParseManifest(manifest, "module-main", 1, [](const std::string&) { return true; });
+    std::ofstream(dir / "lib" / "greet.js") << "export const greet = (who) => 'hello ' + who;\n";
+    ampify::ManifestResult result = ampify::ParseManifest(manifest, "module-main", 1, [](const std::string&) { return true; });
     CHECK(result.manifest && result.manifest->module);
 
     Fixture f;
     f.host.process = "ui";
-    amk::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock());
+    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock());
     CHECK(element.Start());
-    CHECK(f.Logged("[module-main] bonjour module"));
+    CHECK(f.Logged("[module-main] hello module"));
     element.Stop();
 
     // Without "type": "module", a static import is a syntax error: the element fails, the reason is logged.
-    amk::ManifestResult classic = amk::ParseManifest(Manifest("module-main", ""), "module-main", 1,
+    ampify::ManifestResult classic = ampify::ParseManifest(Manifest("module-main", ""), "module-main", 1,
                                                      [](const std::string&) { return true; });
-    amk::ScriptExtension script(*classic.manifest, dir, f.host, f.journal, f.clock());
+    ampify::ScriptExtension script(*classic.manifest, dir, f.host, f.journal, f.clock());
     CHECK(!script.Start());
     CHECK(script.lastError().find("SyntaxError") != std::string::npos);
 }

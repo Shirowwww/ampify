@@ -1,6 +1,6 @@
 #include "player_watch.hpp"
 
-namespace amk {
+namespace ampify {
 
 std::vector<std::string> PlayerWatcher::Poll(const PlayerSnapshot& snapshot) {
     std::optional<std::string> track;
@@ -18,4 +18,4 @@ std::vector<std::string> PlayerWatcher::Poll(const PlayerSnapshot& snapshot) {
     return events;
 }
 
-}  // namespace amk
+}  // namespace ampify

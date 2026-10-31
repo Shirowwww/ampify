@@ -4,23 +4,23 @@
 
 int main() {
     int passed = 0;
-    for (const amk::test::Case& test : amk::test::Cases()) {
-        int failuresBefore = amk::test::Failures();
+    for (const ampify::test::Case& test : ampify::test::Cases()) {
+        int failuresBefore = ampify::test::Failures();
         try {
             test.run();
         } catch (const std::exception& error) {
-            amk::test::ReportFailure(test.name.c_str(), 0, std::string("exception: ") + error.what());
+            ampify::test::ReportFailure(test.name.c_str(), 0, std::string("exception: ") + error.what());
         } catch (...) {
-            amk::test::ReportFailure(test.name.c_str(), 0, "unknown exception");
+            ampify::test::ReportFailure(test.name.c_str(), 0, "unknown exception");
         }
 
-        if (amk::test::Failures() == failuresBefore) {
+        if (ampify::test::Failures() == failuresBefore) {
             passed++;
         } else {
             std::cerr << "FAILED: " << test.name << '\n';
         }
     }
 
-    std::cout << passed << " / " << amk::test::Cases().size() << " tests passed\n";
-    return amk::test::Failures() == 0 ? 0 : 1;
+    std::cout << passed << " / " << ampify::test::Cases().size() << " tests passed\n";
+    return ampify::test::Failures() == 0 ? 0 : 1;
 }

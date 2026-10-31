@@ -8,7 +8,6 @@
 #include <cstdlib>
 
 #include "../core/json.hpp"
-#include "../core/natives/kit_language.hpp"
 #include "../core/natives/player.hpp"
 #include "../core/natives/service_flags.hpp"
 #include "../core/output_files.hpp"
@@ -18,7 +17,7 @@
 #include "tray.hpp"
 #include "win_common.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -65,7 +64,6 @@ void* Services::Query(std::string_view name) {
 void Services::EnsureStarted() {
     if (m_started) return;
     m_started = true;
-    m_language = KitLanguage(m_host);
     if (m_process == "ui" && ServiceEnabled(m_host, "tray.enabled")) StartTray();
     if (m_process == "engine" && ServiceEnabled(m_host, "remote.enabled")) StartRemote();
     if (m_process == "engine" && ServiceEnabled(m_host, "midi.enabled")) StartMidi();
@@ -80,26 +78,26 @@ void Services::Emit(const std::string& entry, const std::string& payload) {
 void Services::StartTray() {
     auto tray = std::make_unique<TrayIcon>();
     std::string error;
-    bool started = tray->Start(FromUtf8(i18n::Text(m_language, "tray.tooltip")),
+    bool started = tray->Start(FromUtf8(i18n::Text("tray.tooltip")),
                                [this](UINT command) {
                                    std::lock_guard<std::mutex> guard(m_queueMutex);
                                    m_trayQueue.push_back(command);
                                },
                                &error);
     if (!started) {
-        m_journal.Write(i18n::Text(m_language, "tray.failed", {{"error", error}}));
+        m_journal.Write(i18n::Text("tray.failed", {{"error", error}}));
         return;
     }
     m_tray = std::move(tray);
     RebuildTrayMenu();
-    m_journal.Write(i18n::Text(m_language, "tray.started"));
+    m_journal.Write(i18n::Text("tray.started"));
 }
 
 void Services::RebuildTrayMenu() {
     if (!m_tray) return;
     std::vector<TrayEntry> entries;
-    entries.push_back({kTrayPrevious, FromUtf8(i18n::Text(m_language, "tray.previous"))});
-    entries.push_back({kTrayNext, FromUtf8(i18n::Text(m_language, "tray.next"))});
+    entries.push_back({kTrayPrevious, FromUtf8(i18n::Text("tray.previous"))});
+    entries.push_back({kTrayNext, FromUtf8(i18n::Text("tray.next"))});
     m_trayTargets.clear();
     unsigned next = kTrayFirstElementItem;
     for (const auto& [elementId, items] : m_trayItems) {
@@ -123,7 +121,7 @@ void Services::RebuildTrayMenu() {
     TrayEntry separator;
     separator.separator = true;
     entries.push_back(separator);
-    entries.push_back({kTrayOpenKit, FromUtf8(i18n::Text(m_language, "tray.openKit"))});
+    entries.push_back({kTrayOpenKit, FromUtf8(i18n::Text("tray.openKit"))});
     m_tray->SetMenu(std::move(entries));
 }
 
@@ -155,7 +153,7 @@ bool Services::trayRunning() const { return m_tray && m_tray->running(); }
 bool Services::SetActivity(const std::string& elementId, const std::string& clientId,
                            const discord::Activity& activity) {
     EnsureStarted();
-    if (!m_discord) m_discord = std::make_unique<DiscordIpc>(m_journal, m_language);
+    if (!m_discord) m_discord = std::make_unique<DiscordIpc>(m_journal);
     m_discordOwner = elementId;
     m_discord->Set(clientId, activity);
     return true;
@@ -172,11 +170,11 @@ void Services::ClearActivity(const std::string& elementId) {
 void Services::StartMidi() {
     std::string error;
     if (std::optional<std::string> map = m_host.ReadSetting("midi.map"); map && !map->empty()) {
-        if (!m_midiMap.Parse(*map, &error)) m_journal.Write(i18n::Text(m_language, "midi.mapRefused", {{"error", error}}));
+        if (!m_midiMap.Parse(*map, &error)) m_journal.Write(i18n::Text("midi.mapRefused", {{"error", error}}));
     }
     std::vector<std::string> devices = MidiInput::Devices();
     if (devices.empty()) {
-        m_journal.Write(i18n::Text(m_language, "midi.none"));
+        m_journal.Write(i18n::Text("midi.none"));
         return;
     }
     auto input = std::make_unique<MidiInput>();
@@ -188,10 +186,10 @@ void Services::StartMidi() {
                               },
                               &error);
     if (!opened) {
-        m_journal.Write(i18n::Text(m_language, "midi.failed", {{"error", error}}));
+        m_journal.Write(i18n::Text("midi.failed", {{"error", error}}));
         return;
     }
-    m_journal.Write(i18n::Text(m_language, "midi.opened", {{"name", input->name()}}));
+    m_journal.Write(i18n::Text("midi.opened", {{"name", input->name()}}));
     m_midi = std::move(input);
 }
 
@@ -224,19 +222,19 @@ void Services::StartRemote() {
     config.port = static_cast<uint16_t>(IntSetting(m_host, "remote.port", remote::kDefaultPort, 0, 65535));
     config.token = m_host.ReadSetting("remote.token").value_or("");
     if (!remote::IsValidToken(config.token)) {
-        // Created once, on the first start, and kept in settings.txt: amk config remote.token shows it.
+        // Created once, on the first start, and kept in settings.txt: ampify config remote.token shows it.
         config.token = remote::NewToken();
         m_host.WriteSetting("remote.token", config.token);
-        m_journal.Write(i18n::Text(m_language, "remote.tokenCreated"));
+        m_journal.Write(i18n::Text("remote.tokenCreated"));
     }
     RefreshStatus();
     auto server = std::make_unique<RemoteServer>();
     std::string error;
     if (!server->Start(config, *this, &error)) {
-        m_journal.Write(i18n::Text(m_language, "remote.failed", {{"error", error}}));
+        m_journal.Write(i18n::Text("remote.failed", {{"error", error}}));
         return;
     }
-    m_journal.Write(i18n::Text(m_language, "remote.started", {{"port", std::to_string(server->port())}}));
+    m_journal.Write(i18n::Text("remote.started", {{"port", std::to_string(server->port())}}));
     m_remote = std::move(server);
 }
 
@@ -316,7 +314,7 @@ void Services::Service() {
     for (const std::shared_ptr<RemoteTask>& task : remoteTasks) {
         std::optional<double> result;
         if (task->action == "gain") {
-            // The internal gain on the samples, under the kit's ceiling. The volume slider never moves.
+            // The internal gain on the samples, under Ampify's ceiling. The volume slider never moves.
             m_host.SetGainDb("remote", task->db);
             m_remoteGainDb = task->db;
             result = task->db;
@@ -366,4 +364,4 @@ void Services::Service() {
     if (m_remote && ++m_ticks % 5 == 0) RefreshStatus();
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

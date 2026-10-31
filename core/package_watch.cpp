@@ -2,7 +2,7 @@
 
 #include <initializer_list>
 
-namespace amk {
+namespace ampify {
 
 PackageWatch::PackageWatch(WatchConfig config) : m_config(config) {}
 
@@ -39,13 +39,13 @@ WatchActions PackageWatch::Step(const WatchSnapshot& snapshot) {
     if (!m_appSeen) {
         if (snapshot.seconds >= m_config.firstSeenWithin) {
             actions.stop = true;
-            actions.stopReason = "Apple Music n'est pas apparu";
+            actions.stopReason = "Apple Music did not appear";
         }
     } else if (snapshot.appProcesses.empty() && snapshot.seconds - m_lastSeen >= m_config.goneAfter) {
         actions.stop = true;
-        actions.stopReason = "Apple Music fermé";
+        actions.stopReason = "Apple Music closed";
     }
     return actions;
 }
 
-}  // namespace amk
+}  // namespace ampify

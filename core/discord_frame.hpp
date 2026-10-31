@@ -12,7 +12,7 @@
 
 #include "json.hpp"
 
-namespace amk::discord {
+namespace ampify::discord {
 
 enum class Opcode : uint32_t { Handshake = 0, Frame = 1, Close = 2, Ping = 3, Pong = 4 };
 
@@ -44,7 +44,7 @@ private:
 };
 
 // What an element shows in Discord. Empty strings are left out of the payload. Times are Unix milliseconds,
-// 0 for none: with startMs Discord counts up ("02:13 écoulées"), with endMs it counts down.
+// 0 for none: with startMs Discord counts up ("02:13 elapsed"), with endMs it counts down.
 struct Activity {
     std::string details;     // first line, such as the title
     std::string state;       // second line, such as the artist
@@ -70,9 +70,9 @@ std::string HandshakeJson(std::string_view clientId);
 // is cleared ("activity": null).
 std::string SetActivityJson(uint32_t pid, const std::optional<Activity>& activity, std::string_view nonce);
 
-// Reads the object an element passed to AMK.discord.setActivity, with the field names of the API
+// Reads the object an element passed to Ampify.discord.setActivity, with the field names of the API
 // (details, state, largeImage, largeText, smallImage, smallText, startMs, endMs). Unknown fields are refused, so a
-// typo does not go unnoticed. On error returns nullopt and fills `error` in French.
+// typo does not go unnoticed. On error returns nullopt and fills `error` in English.
 std::optional<Activity> ActivityFromJson(const Json& value, std::string* error);
 
 // True when a frame read from Discord is the READY event that follows a successful handshake.
@@ -81,4 +81,4 @@ bool IsReady(const Frame& frame);
 // The message of an ERROR event, or of a Close frame, or nullopt when the frame is not an error.
 std::optional<std::string> ErrorOf(const Frame& frame);
 
-}  // namespace amk::discord
+}  // namespace ampify::discord

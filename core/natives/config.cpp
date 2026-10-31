@@ -7,7 +7,7 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
@@ -22,19 +22,19 @@ bool ValidConfigKey(const std::string& key) {
 }
 
 struct ConfigNatives : ScriptBridge {
-    AMK_NATIVE(ConfigGet) {
+    AMPIFY_NATIVE(ConfigGet) {
         ScriptExtension* ext = Owner(ctx);
         std::string key = String(ctx, argc, argv, 0).value_or("");
-        if (!ValidConfigKey(key)) return Throw(ctx, "TypeError", "clé de réglage invalide : " + key);
+        if (!ValidConfigKey(key)) return Throw(ctx, "TypeError", "invalid setting key: " + key);
         std::optional<std::string> value = HostOf(ext).ReadSetting(ext->ConfigPrefix() + ext->id() + "." + key);
         return value ? JS_NewStringLen(ctx, value->data(), value->size()) : JS_UNDEFINED;
     }
 
-    AMK_NATIVE(ConfigSet) {
+    AMPIFY_NATIVE(ConfigSet) {
         ScriptExtension* ext = Owner(ctx);
         std::string key = String(ctx, argc, argv, 0).value_or("");
         std::string value = String(ctx, argc, argv, 1).value_or("");
-        if (!ValidConfigKey(key)) return Throw(ctx, "TypeError", "clé de réglage invalide : " + key);
+        if (!ValidConfigKey(key)) return Throw(ctx, "TypeError", "invalid setting key: " + key);
         HostOf(ext).WriteSetting(ext->ConfigPrefix() + ext->id() + "." + key, value);
         return JS_UNDEFINED;
     }
@@ -47,4 +47,4 @@ void DefineConfig(api::NativeScope& scope) {
     scope.Function("configSet", ConfigNatives::ConfigSet, 2);
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

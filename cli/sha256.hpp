@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-namespace amk {
+namespace ampify {
 
 // SHA-256 of the bytes, as 64 lowercase hexadecimal characters.
 std::string Sha256Hex(std::string_view data);
@@ -16,4 +16,4 @@ std::optional<std::string> Sha256File(const std::filesystem::path& file);
 // True for exactly 64 lowercase hexadecimal characters, the only form a catalog accepts.
 bool IsSha256Hex(std::string_view text);
 
-}  // namespace amk
+}  // namespace ampify

@@ -1,4 +1,4 @@
-// Tests of AMK.audio's analysis, equalizer, loudness and volume, and of AMK.color, as an extension sees them: a
+// Tests of Ampify.audio's analysis, equalizer, loudness and volume, and of Ampify.color, as an extension sees them: a
 // script runs in the kernel's engine against the fake host, whose AudioHost is a real AudioEngine fed with
 // synthetic signals.
 
@@ -24,28 +24,28 @@ namespace {
 namespace fs = std::filesystem;
 
 struct Fixture {
-    amk::test::FakeHost host;
-    amk::audio::AudioEngine engine;
+    ampify::test::FakeHost host;
+    ampify::audio::AudioEngine engine;
     std::ostringstream out;
-    amk::Journal journal{out, [] { return std::string("t"); }};
+    ampify::Journal journal{out, [] { return std::string("t"); }};
 
     explicit Fixture(bool withAudio = true) {
         host.process = "engine";  // the audio is rendered in AMPLibraryAgent.exe
         if (withAudio) host.audio = &engine;
     }
 
-    std::unique_ptr<amk::ScriptExtension> Make(const std::string& id, const std::string& main,
+    std::unique_ptr<ampify::ScriptExtension> Make(const std::string& id, const std::string& main,
                                                const std::string& permissions) {
-        fs::path dir = fs::temp_directory_path() / "amk-tests" / ("audio-" + id);
+        fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("audio-" + id);
         fs::remove_all(dir);
         fs::create_directories(dir);
         const std::string manifest =
-            R"({"id":")" + id + R"(","name":"Démo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
+            R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
             R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
         std::ofstream(dir / "manifest.json") << manifest;
         std::ofstream(dir / "main.js") << main;
-        amk::ManifestResult result = amk::ParseManifest(manifest, id, 1, [](const std::string&) { return true; });
-        return std::make_unique<amk::ScriptExtension>(*result.manifest, dir, host, journal);
+        ampify::ManifestResult result = ampify::ParseManifest(manifest, id, 1, [](const std::string&) { return true; });
+        return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, host, journal);
     }
 
     bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
@@ -76,24 +76,24 @@ struct Fixture {
 TEST_CASE(AudioModule_OnFrameGetsBandsRmsAndPeak) {
     Fixture f;
     auto element = f.Make("frames", R"(
-        AMK.log("abonné " + AMK.audio.onFrame((frame) => {
+        Ampify.log("subscribed " + Ampify.audio.onFrame((frame) => {
             const loudest = frame.bands.indexOf(Math.max(...frame.bands));
-            AMK.log("image " + frame.bands.length + " bandes, max " + loudest + ", crête " + frame.peak.toFixed(2) +
-                    ", rms>0 " + (frame.rms > 0) + ", entre 0 et 1 " + frame.bands.every((b) => b >= 0 && b <= 1));
+            Ampify.log("frame " + frame.bands.length + " bands, max " + loudest + ", peak " + frame.peak.toFixed(2) +
+                    ", rms>0 " + (frame.rms > 0) + ", between 0 and 1 " + frame.bands.every((b) => b >= 0 && b <= 1));
         }));
     )", R"("audio.analyze")");
     CHECK(element->Start());
-    CHECK(f.Logged("[frames] abonné true"));
+    CHECK(f.Logged("[frames] subscribed true"));
     f.Play(0.5);
     f.engine.DeliverPending();
     element->Pump();
-    CHECK(f.Logged("[frames] image 16 bandes, max 8, crête 0.25, rms>0 true, entre 0 et 1 true"));
+    CHECK(f.Logged("[frames] frame 16 bands, max 8, peak 0.25, rms>0 true, between 0 and 1 true"));
     element->Stop();
 }
 
 TEST_CASE(AudioModule_SlowScriptGetsTheLatestFrameOnly) {
     Fixture f;
-    auto element = f.Make("latest", R"(AMK.audio.onFrame((frame) => AMK.log("t=" + frame.time.toFixed(2)));)",
+    auto element = f.Make("latest", R"(Ampify.audio.onFrame((frame) => Ampify.log("t=" + frame.time.toFixed(2)));)",
                           R"("audio.analyze")");
     CHECK(element->Start());
     f.Play(0.5);
@@ -109,22 +109,22 @@ TEST_CASE(AudioModule_SlowScriptGetsTheLatestFrameOnly) {
 TEST_CASE(AudioModule_AnalyzeGivesTempoLoudnessAndBands) {
     Fixture f;
     auto element = f.Make("analyze", R"(
-        const first = AMK.audio.analyze();
-        AMK.log("avant " + first.tempo + " " + first.bands.length + " " + first.frequencies.length);
+        const first = Ampify.audio.analyze();
+        Ampify.log("before " + first.tempo + " " + first.bands.length + " " + first.frequencies.length);
         setTimeout(() => {
-            const result = AMK.audio.analyze();
-            AMK.log("tempo " + Math.round(result.tempo) + " confiance " + (result.confidence > 0.3) +
+            const result = Ampify.audio.analyze();
+            Ampify.log("tempo " + Math.round(result.tempo) + " confidence " + (result.confidence > 0.3) +
                     " loudness " + result.loudness.momentary + "/" + result.loudness.shortTerm +
-                    " bandes " + result.bands.length);
+                    " bands " + result.bands.length);
         }, 10);
     )", R"("audio.analyze")");
     CHECK(element->Start());
-    CHECK(f.Logged("[analyze] avant null 0 16"));
+    CHECK(f.Logged("[analyze] before null 0 16"));
     f.Play(10);
     f.engine.PublishLoudness({-15.5, -16.25});
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     element->Pump();
-    CHECK(f.Logged("[analyze] tempo 120 confiance true loudness -15.5/-16.25 bandes 16"));
+    CHECK(f.Logged("[analyze] tempo 120 confidence true loudness -15.5/-16.25 bands 16"));
     element->Stop();
     CHECK(!f.engine.AnalysisWanted());  // the element stopped: nobody needs the analysis now
 }
@@ -134,8 +134,8 @@ TEST_CASE(AudioModule_LoudnessAndVolumeAreRead) {
     f.engine.PublishPlayerVolume(0.42);
     f.engine.PublishLoudness({-9.0, std::nullopt});
     auto element = f.Make("readings", R"(
-        const l = AMK.audio.loudness();
-        AMK.log("loudness " + l.momentary + " " + l.shortTerm + " volume " + AMK.audio.volume());
+        const l = Ampify.audio.loudness();
+        Ampify.log("loudness " + l.momentary + " " + l.shortTerm + " volume " + Ampify.audio.volume());
     )", R"("audio.analyze", "player.read")");
     CHECK(element->Start());
     CHECK(f.Logged("[readings] loudness -9 null volume 0.42"));
@@ -145,28 +145,28 @@ TEST_CASE(AudioModule_LoudnessAndVolumeAreRead) {
 TEST_CASE(AudioModule_EqualizerBandsAndPresets) {
     Fixture f;
     auto element = f.Make("eq", R"(
-        AMK.log("bandes " + AMK.audio.eq.bands().map((b) => b.frequency + ":" + b.type).join(","));
-        AMK.log("réglée " + AMK.audio.eq.setBand(5, 6));
-        AMK.log("1 kHz " + AMK.audio.eq.bands()[5].gainDb);
-        AMK.log("borne " + AMK.audio.eq.setBand(0, 40) + " " + AMK.audio.eq.bands()[0].gainDb);
-        try { AMK.audio.eq.setBand(10, 1); } catch (e) { AMK.log("hors liste " + e.name); }
-        try { AMK.audio.eq.setBand(1.5, 1); } catch (e) { AMK.log("pas entier " + e.name); }
-        try { AMK.audio.eq.preset("inconnu"); } catch (e) { AMK.log("préréglage " + e.name); }
-        AMK.log("préréglages " + AMK.audio.eq.presets().includes("rock"));
-        AMK.log("rock " + AMK.audio.eq.preset("rock"));
+        Ampify.log("bands " + Ampify.audio.eq.bands().map((b) => b.frequency + ":" + b.type).join(","));
+        Ampify.log("set " + Ampify.audio.eq.setBand(5, 6));
+        Ampify.log("1 kHz " + Ampify.audio.eq.bands()[5].gainDb);
+        Ampify.log("limit " + Ampify.audio.eq.setBand(0, 40) + " " + Ampify.audio.eq.bands()[0].gainDb);
+        try { Ampify.audio.eq.setBand(10, 1); } catch (e) { Ampify.log("out of list " + e.name); }
+        try { Ampify.audio.eq.setBand(1.5, 1); } catch (e) { Ampify.log("not whole " + e.name); }
+        try { Ampify.audio.eq.preset("unknown"); } catch (e) { Ampify.log("preset " + e.name); }
+        Ampify.log("presets " + Ampify.audio.eq.presets().includes("rock"));
+        Ampify.log("rock " + Ampify.audio.eq.preset("rock"));
     )", R"("audio.eq")");
     CHECK(element->Start());
-    CHECK(f.Logged("[eq] bandes 31.25:peaking,62.5:peaking,125:peaking,250:peaking,500:peaking,1000:peaking,"
+    CHECK(f.Logged("[eq] bands 31.25:peaking,62.5:peaking,125:peaking,250:peaking,500:peaking,1000:peaking,"
                    "2000:peaking,4000:peaking,8000:peaking,16000:peaking"));
-    CHECK(f.Logged("[eq] réglée true"));
+    CHECK(f.Logged("[eq] set true"));
     CHECK(f.Logged("[eq] 1 kHz 6"));
-    CHECK(f.Logged("[eq] borne true 12"));
-    CHECK(f.Logged("[eq] hors liste RangeError"));
-    CHECK(f.Logged("[eq] pas entier RangeError"));
-    CHECK(f.Logged("[eq] préréglage RangeError"));
-    CHECK(f.Logged("[eq] préréglages true"));
+    CHECK(f.Logged("[eq] limit true 12"));
+    CHECK(f.Logged("[eq] out of list RangeError"));
+    CHECK(f.Logged("[eq] not whole RangeError"));
+    CHECK(f.Logged("[eq] preset RangeError"));
+    CHECK(f.Logged("[eq] presets true"));
     CHECK(f.Logged("[eq] rock true"));
-    CHECK_NEAR(f.engine.Eq().GainDb(0), amk::audio::PresetGains("rock")->at(0), 1e-6);
+    CHECK_NEAR(f.engine.Eq().GainDb(0), ampify::audio::PresetGains("rock")->at(0), 1e-6);
     CHECK(!f.engine.Eq().IsFlat());
     element->Stop();
     CHECK(f.engine.Eq().IsFlat());  // the element that set it stopped: back to a bit-exact passthrough
@@ -175,19 +175,19 @@ TEST_CASE(AudioModule_EqualizerBandsAndPresets) {
 TEST_CASE(AudioModule_PermissionsAreChecked) {
     Fixture f;
     auto element = f.Make("denied", R"(
-        for (const [name, call] of [["frames", () => AMK.audio.onFrame(() => {})], ["analyze", () => AMK.audio.analyze()],
-                                    ["loudness", () => AMK.audio.loudness()], ["volume", () => AMK.audio.volume()],
-                                    ["eq", () => AMK.audio.eq.setBand(0, 1)], ["bands", () => AMK.audio.eq.bands()]]) {
-            try { call(); AMK.log(name + " permis"); } catch (e) { AMK.log(name + " " + e.name + " " + e.message); }
+        for (const [name, call] of [["frames", () => Ampify.audio.onFrame(() => {})], ["analyze", () => Ampify.audio.analyze()],
+                                    ["loudness", () => Ampify.audio.loudness()], ["volume", () => Ampify.audio.volume()],
+                                    ["eq", () => Ampify.audio.eq.setBand(0, 1)], ["bands", () => Ampify.audio.eq.bands()]]) {
+            try { call(); Ampify.log(name + " permis"); } catch (e) { Ampify.log(name + " " + e.name + " " + e.message); }
         }
     )", "");
     CHECK(element->Start());
-    CHECK(f.Logged("[denied] frames PermissionDenied permission manquante : audio.analyze"));
-    CHECK(f.Logged("[denied] analyze PermissionDenied permission manquante : audio.analyze"));
-    CHECK(f.Logged("[denied] loudness PermissionDenied permission manquante : audio.analyze"));
-    CHECK(f.Logged("[denied] volume PermissionDenied permission manquante : player.read"));
-    CHECK(f.Logged("[denied] eq PermissionDenied permission manquante : audio.eq"));
-    CHECK(f.Logged("[denied] bands PermissionDenied permission manquante : audio.eq"));
+    CHECK(f.Logged("[denied] frames PermissionDenied missing permission: audio.analyze"));
+    CHECK(f.Logged("[denied] analyze PermissionDenied missing permission: audio.analyze"));
+    CHECK(f.Logged("[denied] loudness PermissionDenied missing permission: audio.analyze"));
+    CHECK(f.Logged("[denied] volume PermissionDenied missing permission: player.read"));
+    CHECK(f.Logged("[denied] eq PermissionDenied missing permission: audio.eq"));
+    CHECK(f.Logged("[denied] bands PermissionDenied missing permission: audio.eq"));
     CHECK(f.engine.Eq().IsFlat());
     element->Stop();
 }
@@ -195,31 +195,31 @@ TEST_CASE(AudioModule_PermissionsAreChecked) {
 TEST_CASE(AudioModule_WithoutAudioNothingThrows) {
     Fixture f(false);  // the interface process: no AudioHost
     auto element = f.Make("noaudio", R"(
-        AMK.log("abonné " + AMK.audio.onFrame(() => {}));
-        const result = AMK.audio.analyze();
-        AMK.log("tempo " + result.tempo + " loudness " + AMK.audio.loudness().momentary + " volume " + AMK.audio.volume());
-        AMK.log("eq " + AMK.audio.eq.setBand(0, 3) + " " + AMK.audio.eq.bands().length + " " + AMK.audio.eq.preset("pop"));
+        Ampify.log("subscribed " + Ampify.audio.onFrame(() => {}));
+        const result = Ampify.audio.analyze();
+        Ampify.log("tempo " + result.tempo + " loudness " + Ampify.audio.loudness().momentary + " volume " + Ampify.audio.volume());
+        Ampify.log("eq " + Ampify.audio.eq.setBand(0, 3) + " " + Ampify.audio.eq.bands().length + " " + Ampify.audio.eq.preset("pop"));
     )", R"("audio.analyze", "audio.eq", "player.read")");
     CHECK(element->Start());
-    CHECK(f.Logged("[noaudio] abonné false"));
+    CHECK(f.Logged("[noaudio] subscribed false"));
     CHECK(f.Logged("[noaudio] tempo null loudness null volume null"));
     CHECK(f.Logged("[noaudio] eq false 0 false"));
-    CHECK(f.Count("analyse audio indisponible") == 1);
+    CHECK(f.Count("audio analysis is not available") == 1);
     element->Stop();
 }
 
 TEST_CASE(AudioModule_ListenerErrorsAreLoggedAndOthersStillRun) {
     Fixture f;
     auto element = f.Make("guarded", R"(
-        AMK.audio.onFrame(() => { throw new Error("raté"); });
-        AMK.audio.onFrame(() => AMK.log("second appelé"));
+        Ampify.audio.onFrame(() => { throw new Error("failed"); });
+        Ampify.audio.onFrame(() => Ampify.log("second called"));
     )", R"("audio.analyze")");
     CHECK(element->Start());
     f.Play(0.1);
     f.engine.DeliverPending();
     element->Pump();
-    CHECK(f.Logged("raté"));
-    CHECK(f.Logged("[guarded] second appelé"));
+    CHECK(f.Logged("failed"));
+    CHECK(f.Logged("[guarded] second called"));
     CHECK(element->running());
     element->Stop();
 }
@@ -232,19 +232,19 @@ TEST_CASE(ColorModule_ExtractsTwoColours) {
             const red = (i % w) < 7;
             pixels.set(red ? [200, 40, 40, 255] : [40, 70, 200, 255], i * 4);
         }
-        const c = AMK.color.extract(pixels, w, h);
-        AMK.log("couleurs " + c.PROMINENT + " " + c.palette.map((s) => s.color).join(",") + " " +
+        const c = Ampify.color.extract(pixels, w, h);
+        Ampify.log("colors " + c.PROMINENT + " " + c.palette.map((s) => s.color).join(",") + " " +
                 ["VIBRANT", "DARK_VIBRANT", "LIGHT_VIBRANT", "DESATURATED", "VIBRANT_NON_ALARMING"].every((k) => /^#[0-9a-f]{6}$/.test(c[k])));
-        AMK.log("tableau " + AMK.color.extract(Array.from(pixels), w, h).PROMINENT);
-        AMK.log("buffer " + AMK.color.extract(pixels.buffer, w, h).PROMINENT);
-        try { AMK.color.extract("https://exemple.fr/pochette.jpg"); } catch (e) { AMK.log("adresse " + e.name); }
-        try { AMK.color.extract(pixels, 3, 3); } catch (e) { AMK.log("taille " + e.name); }
+        Ampify.log("array " + Ampify.color.extract(Array.from(pixels), w, h).PROMINENT);
+        Ampify.log("buffer " + Ampify.color.extract(pixels.buffer, w, h).PROMINENT);
+        try { Ampify.color.extract("https://exemple.fr/artwork.jpg"); } catch (e) { Ampify.log("address " + e.name); }
+        try { Ampify.color.extract(pixels, 3, 3); } catch (e) { Ampify.log("size " + e.name); }
     )", "");
     CHECK(element->Start());
-    CHECK(f.Logged("[colors] couleurs #c82828 #c82828,#2846c8 true"));
-    CHECK(f.Logged("[colors] tableau #c82828"));
+    CHECK(f.Logged("[colors] colors #c82828 #c82828,#2846c8 true"));
+    CHECK(f.Logged("[colors] array #c82828"));
     CHECK(f.Logged("[colors] buffer #c82828"));
-    CHECK(f.Logged("[colors] adresse TypeError"));
-    CHECK(f.Logged("[colors] taille RangeError"));
+    CHECK(f.Logged("[colors] address TypeError"));
+    CHECK(f.Logged("[colors] size RangeError"));
     element->Stop();
 }

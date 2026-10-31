@@ -1,24 +1,24 @@
-// Envoie à Last.fm les morceaux écoutés (« scrobbling »), avec les règles de Last.fm : un morceau de plus de
-// 30 secondes compte quand il a été écouté pendant la moitié de sa durée, ou pendant 4 minutes.
+// Sends the tracks you listen to to Last.fm ("scrobbling"), with Last.fm's rules: a track longer than
+// 30 seconds counts once it has been played for half its length, or for 4 minutes.
 //
-// À régler une fois (clé API sur https://www.last.fm/api/account/create, puis une clé de session) :
-//   amk config extensions.scrobbler.apiKey <clé API>
-//   amk config extensions.scrobbler.apiSecret <secret partagé>
-//   amk config extensions.scrobbler.sessionKey <clé de session>
-// Une écoute qui n'a pas pu partir (réseau coupé) attend dans le stockage et repart plus tard.
+// Set up once (API key at https://www.last.fm/api/account/create, then a session key):
+//   ampify config extensions.scrobbler.apiKey <API key>
+//   ampify config extensions.scrobbler.apiSecret <shared secret>
+//   ampify config extensions.scrobbler.sessionKey <session key>
+// A play that could not be sent (network down) waits in storage and is sent later.
 
 const API = "https://ws.audioscrobbler.com/2.0/";
 const MAX_PENDING = 200;
-const apiKey = String(AMK.config.get("apiKey", "")).trim();
-const apiSecret = String(AMK.config.get("apiSecret", "")).trim();
-const sessionKey = String(AMK.config.get("sessionKey", "")).trim();
+const apiKey = String(Ampify.config.get("apiKey", "")).trim();
+const apiSecret = String(Ampify.config.get("apiSecret", "")).trim();
+const sessionKey = String(Ampify.config.get("sessionKey", "")).trim();
 const ready = apiKey !== "" && apiSecret !== "" && sessionKey !== "";
 
-// api_sig de Last.fm : les paramètres triés par nom, collés en « nomvaleur », suivis du secret, puis en MD5.
-// « format » n'en fait pas partie.
+// Last.fm's api_sig: the parameters sorted by name, joined as "namevalue", followed by the secret, then MD5.
+// "format" is not part of it.
 function signature(params) {
   const names = Object.keys(params).filter((name) => name !== "format").sort();
-  return AMK.crypto.md5(names.map((name) => name + params[name]).join("") + apiSecret);
+  return Ampify.crypto.md5(names.map((name) => name + params[name]).join("") + apiSecret);
 }
 
 function call(method, values) {
@@ -31,10 +31,10 @@ function call(method, values) {
   const body = Object.keys(params)
     .map((name) => encodeURIComponent(name) + "=" + encodeURIComponent(params[name]))
     .join("&");
-  return AMK.http.post(API, body);
+  return Ampify.http.post(API, body);
 }
 
-let current = null;  // le morceau en cours : titre, durée, temps écouté
+let current = null;  // the current track: title, length, time played
 let sending = false;
 
 function listenedMs(now) {
@@ -45,7 +45,7 @@ function check(now) {
   if (!current || current.done || current.durationMs <= 30000) return;
   if (listenedMs(now) < Math.min(current.durationMs / 2, 240000)) return;
   current.done = true;
-  const pending = AMK.storage.get("pending", []);
+  const pending = Ampify.storage.get("pending", []);
   pending.push({
     artist: current.artist,
     track: current.title,
@@ -54,26 +54,26 @@ function check(now) {
     duration: Math.round(current.durationMs / 1000),
   });
   while (pending.length > MAX_PENDING) pending.shift();
-  AMK.storage.set("pending", pending);
-  AMK.storage.set("total", AMK.storage.get("total", 0) + 1);
+  Ampify.storage.set("pending", pending);
+  Ampify.storage.set("total", Ampify.storage.get("total", 0) + 1);
   flush();
 }
 
-// Envoie les écoutes en attente, une à une, dans l'ordre.
+// Sends the waiting plays one by one, in order.
 function flush() {
   if (!ready || sending) return;
-  const pending = AMK.storage.get("pending", []);
+  const pending = Ampify.storage.get("pending", []);
   if (pending.length === 0) return;
   sending = true;
   call("track.scrobble", pending[0]).then((answer) => {
     sending = false;
     if (answer.status !== 200) {
-      AMK.log("Last.fm n'a pas pris l'écoute (code " + answer.status + "), nouvel essai dans 5 minutes");
+      Ampify.log("Last.fm did not accept the play (code " + answer.status + "), trying again in 5 minutes");
       return;
     }
-    const rest = AMK.storage.get("pending", []);
+    const rest = Ampify.storage.get("pending", []);
     rest.shift();
-    AMK.storage.set("pending", rest);
+    Ampify.storage.set("pending", rest);
     flush();
   });
 }
@@ -115,10 +115,10 @@ function onState(state) {
   check(now);
 }
 
-if (!ready) AMK.log("Last.fm n'est pas réglé : indique apiKey, apiSecret et sessionKey (voir main.js)");
-AMK.player.on("trackchange", onTrack);
-AMK.player.on("statechange", onState);
-onTrack(AMK.player.state());
+if (!ready) Ampify.log("Last.fm is not set up: set apiKey, apiSecret and sessionKey (see main.js)");
+Ampify.player.on("trackchange", onTrack);
+Ampify.player.on("statechange", onState);
+onTrack(Ampify.player.state());
 setInterval(() => check(Date.now()), 15000);
 setInterval(flush, 5 * 60 * 1000);
 flush();

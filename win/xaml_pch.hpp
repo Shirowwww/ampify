@@ -1,6 +1,6 @@
 #pragma once
 
-// Precompiled header of the XAML sources (AMK_XAML_SOURCES, MSVC only). The C++/WinRT projection of WinUI is most of
+// Precompiled header of the XAML sources (AMPIFY_XAML_SOURCES, MSVC only). The C++/WinRT projection of WinUI is most of
 // their build time: parsed once here instead of once per file. Same include order as the sources themselves.
 
 #include <windows.h>

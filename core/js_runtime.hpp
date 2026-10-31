@@ -9,7 +9,7 @@
 
 #include <quickjs.h>
 
-namespace amk::js {
+namespace ampify::js {
 
 struct Limits {
     size_t memoryBytes = size_t{32} << 20;  // heap of one extension
@@ -95,4 +95,4 @@ std::string ToUtf8(JSContext* ctx, JSValueConst value, const std::string& fallba
 // Creates an Error object with a custom `name`, so that the script can tell PermissionDenied from other failures.
 JSValue NewNamedError(JSContext* ctx, const char* name, const std::string& message);
 
-}  // namespace amk::js
+}  // namespace ampify::js

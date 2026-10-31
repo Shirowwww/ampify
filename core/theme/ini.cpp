@@ -2,7 +2,7 @@
 
 #include <cctype>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -46,7 +46,7 @@ std::vector<std::string> Ini::Parse(std::string_view text) {
 
         if (line.front() == '[') {
             if (line.back() != ']' || line.size() < 3) {
-                problems.push_back("ligne " + std::to_string(lineNumber) + " : en-tête de section mal fermé");
+                problems.push_back("line " + std::to_string(lineNumber) + ": section header not closed");
                 current = nullptr;
                 continue;
             }
@@ -57,14 +57,14 @@ std::vector<std::string> Ini::Parse(std::string_view text) {
 
         size_t equals = line.find('=');
         if (equals == std::string::npos) {
-            problems.push_back("ligne " + std::to_string(lineNumber) + " : ligne sans « = » ignorée");
+            problems.push_back("line " + std::to_string(lineNumber) + ": line without \"=\" ignored");
             continue;
         }
 
         std::string key = Trimmed(std::string_view(line).substr(0, equals));
         std::string value = Trimmed(std::string_view(line).substr(equals + 1));
         if (key.empty()) {
-            problems.push_back("ligne " + std::to_string(lineNumber) + " : clé vide ignorée");
+            problems.push_back("line " + std::to_string(lineNumber) + ": empty key ignored");
             continue;
         }
 
@@ -95,4 +95,4 @@ std::optional<std::string> Ini::Get(std::string_view section, std::string_view k
     return value;
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

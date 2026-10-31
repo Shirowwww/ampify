@@ -5,7 +5,7 @@
 #include <limits>
 #include <utility>
 
-namespace amk::audio {
+namespace ampify::audio {
 
 namespace {
 
@@ -162,4 +162,4 @@ AudioEngine& ProcessAudio() {
     return *engine;
 }
 
-}  // namespace amk::audio
+}  // namespace ampify::audio

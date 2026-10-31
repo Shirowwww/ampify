@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <cstring>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -91,4 +91,4 @@ std::string Md5Hex(std::string_view data) {
     return out;
 }
 
-}  // namespace amk
+}  // namespace ampify

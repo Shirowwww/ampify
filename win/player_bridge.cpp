@@ -6,7 +6,7 @@
 #include "smtc_session.hpp"
 #include "winrt_abi.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -39,13 +39,13 @@ bool ProcessShowsAWindow() {
     return found;
 }
 
-std::string YesNo(bool value) { return value ? "oui" : "non"; }
+std::string YesNo(bool value) { return value ? "yes" : "no"; }
 
 std::string Describe(const PlayerSnapshot& snapshot) {
-    std::string track = "aucun";
-    if (snapshot.track) track = "« " + snapshot.track->title + " » (" + snapshot.track->variantId + ")";
-    return "en lecture=" + YesNo(snapshot.playing) + ", position=" + std::to_string(snapshot.positionMs) +
-           " ms, durée=" + std::to_string(snapshot.durationMs) + " ms, morceau=" + track;
+    std::string track = "none";
+    if (snapshot.track) track = "\"" + snapshot.track->title + "\" (" + snapshot.track->variantId + ")";
+    return "playing=" + YesNo(snapshot.playing) + ", position=" + std::to_string(snapshot.positionMs) +
+           " ms, duration=" + std::to_string(snapshot.durationMs) + " ms, track=" + track;
 }
 
 }  // namespace
@@ -64,12 +64,12 @@ void PlayerBridge::SayOnce(const std::string& key, const std::string& line) {
 
 void PlayerBridge::TryApple() {
     if (m_process != "ui") {
-        SayOnce("apple-engine", "Lecteur : AMP.Services.Player vit dans AppleMusic.exe, il n'est pas utilisé ici ; "
-                                "état et commandes par SMTC, puis par les touches multimédias");
+        SayOnce("apple-engine", "Player: AMP.Services.Player lives in AppleMusic.exe, it is not used here; "
+                                "state and commands go through SMTC, then the media keys");
         return;
     }
     if (!m_settings.GetBool("player.apple", true)) {
-        SayOnce("apple-off", "Lecteur : AMP.Services.Player désactivé par le réglage player.apple ; SMTC à la place");
+        SayOnce("apple-off", "Player: AMP.Services.Player turned off by the player.apple setting; SMTC instead");
         return;
     }
     if (m_apple->Active() || m_appleGivenUp) return;
@@ -78,31 +78,31 @@ void PlayerBridge::TryApple() {
     if (m_options.waitForWindow && !ProcessShowsAWindow()) return;
 
     if (!rt::EnsureMultithreaded()) {
-        SayOnce("apple-sta", "Lecteur : le fil JavaScript est déjà dans un appartement STA ; appels faits depuis "
-                             "ce fil");
+        SayOnce("apple-sta", "Player: the JavaScript thread is already in an STA apartment; calls are made from "
+                             "this thread");
     }
     ++m_appleAttempts;
     std::string failure;
     if (!m_apple->Activate(failure)) {
         m_appleNextTry = now + m_options.retryMs;
         if (m_appleAttempts == 1) {
-            m_journal.Write("Lecteur : AMP.Services.Player pas encore joignable (" + failure +
-                            "), nouvel essai toutes les " + std::to_string(m_options.retryMs / 1000) + " s");
+            m_journal.Write("Player: AMP.Services.Player not reachable yet (" + failure +
+                            "), trying again every " + std::to_string(m_options.retryMs / 1000) + " s");
         }
         if (m_appleAttempts >= m_options.maxAttempts) {
             m_appleGivenUp = true;
-            m_journal.Write("Lecteur : AMP.Services.Player non activé (" + failure +
-                            ") ; repli sur les contrôles multimédias de Windows (SMTC), puis sur les touches "
-                            "multimédias");
+            m_journal.Write("Player: AMP.Services.Player not activated (" + failure +
+                            "); falling back to Windows media controls (SMTC), then to the media "
+                            "keys");
         }
         return;
     }
 
-    m_journal.Write("Lecteur : AMP.Services.Player activé (" + m_apple->ActivationPath() + ", fil " +
-                    (rt::EnsureMultithreaded() ? "MTA" : "STA") + ", notifications PropertyChanged : " +
+    m_journal.Write("Player: AMP.Services.Player activated (" + m_apple->ActivationPath() + ", thread " +
+                    (rt::EnsureMultithreaded() ? "MTA" : "STA") + ", PropertyChanged notifications: " +
                     YesNo(m_apple->Subscribed()) + ")");
     if (std::optional<AmpReading> first = m_apple->Read()) {
-        m_journal.Write("Lecteur : premier état lu par AMP.Services.Player : " +
+        m_journal.Write("Player: first state read by AMP.Services.Player: " +
                         Describe(SnapshotFromAmp(*first, DetectAmpTimeUnit(first->durationRaw, std::nullopt))));
     }
     if (!m_probed && m_settings.GetBool("player.queueProbe", true)) {
@@ -118,7 +118,7 @@ void PlayerBridge::TrySmtc() {
     std::string failure;
     if (!m_smtc->Start(failure)) {
         m_smtcNextTry = now + kSmtcRetryMs;
-        SayOnce("smtc-missing", "Lecteur : " + failure + " ; les touches multimédias restent possibles");
+        SayOnce("smtc-missing", "Player: " + failure + "; the media keys still work");
     }
 }
 
@@ -129,7 +129,7 @@ PlayerSnapshot PlayerBridge::Snapshot() {
 
     std::optional<SmtcReading> smtc = m_smtc->Read();
     if (m_smtc->Found()) {
-        SayOnce("smtc-found", "Lecteur : session SMTC d'Apple Music trouvée (" + m_smtc->AppId() + ")");
+        SayOnce("smtc-found", "Player: Apple Music SMTC session found (" + m_smtc->AppId() + ")");
     }
 
     PlayerSnapshot snapshot;
@@ -137,7 +137,7 @@ PlayerSnapshot PlayerBridge::Snapshot() {
     std::optional<AmpReading> apple = appleWasActive ? m_apple->Read() : std::nullopt;
     if (appleWasActive && !apple) {
         // The object stopped answering (Apple Music rebuilt its player): SMTC meanwhile, and a new activation later.
-        m_journal.Write("Lecteur : AMP.Services.Player ne répond plus ; repli sur SMTC, nouvel essai dans " +
+        m_journal.Write("Player: AMP.Services.Player no longer answers; falling back to SMTC, trying again in " +
                         std::to_string(m_options.retryMs / 1000) + " s");
         m_appleAttempts = 0;
         m_appleNextTry = GetTickCount64() + m_options.retryMs;
@@ -151,23 +151,23 @@ PlayerSnapshot PlayerBridge::Snapshot() {
         AmpTimeUnit unit = DetectAmpTimeUnit(apple->durationRaw, smtcMs);
         if (unit != AmpTimeUnit::Unknown && (m_unit == AmpTimeUnit::Unknown || smtcMs)) {
             if (unit != m_unit) {
-                m_journal.Write(std::string("Lecteur : unité de temps d'AMP.Services.Player : ") +
+                m_journal.Write(std::string("Player: time unit of AMP.Services.Player: ") +
                                 AmpTimeUnitName(unit) +
-                                (smtcMs ? " (d'après la durée SMTC)" : " (d'après la durée seule)"));
+                                (smtcMs ? " (from the SMTC duration)" : " (from the duration alone)"));
             }
             m_unit = unit;
         }
         snapshot = SnapshotFromAmp(*apple, m_unit);
         if (m_apple->Notifications() > 0) {
-            SayOnce("apple-notified", "Lecteur : Apple envoie ses notifications PropertyChanged (PlayerState, Player)");
+            SayOnce("apple-notified", "Player: Apple sends its PropertyChanged notifications (PlayerState, Player)");
         }
     } else if (smtc) {
         snapshot = SnapshotFromSmtc(*smtc);
     }
 
     if (snapshot.source != m_lastSource) {
-        m_journal.Write("Lecteur : état lu par " +
-                        (snapshot.source.empty() ? std::string("aucune source") : snapshot.source));
+        m_journal.Write("Player: state read from " +
+                        (snapshot.source.empty() ? std::string("no source") : snapshot.source));
         m_lastSource = snapshot.source;
     }
     m_last = snapshot;
@@ -197,16 +197,16 @@ bool PlayerBridge::Control(PlayerCommand command, int64_t seekMs) {
                 }
                 break;
         }
-        std::string what = std::string(CommandName(command)) + " par " + RouteName(step.route);
+        std::string what = std::string(CommandName(command)) + " via " + RouteName(step.route);
         if (done) {
-            SayOnce("ok " + what, "Lecteur : commande " + what + " acceptée");
+            SayOnce("ok " + what, "Player: command " + what + " accepted");
             return true;
         }
-        SayOnce("ko " + what, "Lecteur : commande " + what + " refusée, voie suivante");
+        SayOnce("ko " + what, "Player: command " + what + " refused, next route");
     }
     SayOnce(std::string("none ") + CommandName(command),
-            std::string("Lecteur : commande ") + CommandName(command) +
-                " impossible maintenant (aucune voie ne l'a acceptée)");
+            std::string("Player: command ") + CommandName(command) +
+                " not possible now (no route accepted it)");
     return false;
 }
 
@@ -215,8 +215,8 @@ QueueSnapshot PlayerBridge::Queue() {
     PlayerSnapshot snapshot = Snapshot();
     queue.source = snapshot.source;
     queue.complete = false;
-    queue.reason = "seule la piste en cours est connue : les interfaces de la file d'Apple (AMP.Services.PlayQueue) "
-                   "ne sont pas encore relevées";
+    queue.reason = "only the current track is known: the interfaces of Apple's queue (AMP.Services.PlayQueue) "
+                   "are not mapped yet";
     if (snapshot.track) {
         QueueItem item;
         item.id = snapshot.track->queueItemId.empty() ? snapshot.track->id : snapshot.track->queueItemId;
@@ -230,13 +230,13 @@ QueueSnapshot PlayerBridge::Queue() {
 }
 
 QueueResult PlayerBridge::AddToQueue(const std::string&, QueuePosition) {
-    return {false, "ajouter à la file n'est pas encore possible : les paramètres de "
-                   "IPlayer.StartOrQueueLibraryPlaybackAsync ne sont pas relevés"};
+    return {false, "adding to the queue is not possible yet: the parameters of "
+                   "IPlayer.StartOrQueueLibraryPlaybackAsync are not mapped"};
 }
 
 QueueResult PlayerBridge::RemoveFromQueue(const std::string&) {
-    return {false, "retirer de la file n'est pas encore possible : les paramètres de "
-                   "IPlayQueue.DeletePlayQueueItemsAsync ne sont pas relevés"};
+    return {false, "removing from the queue is not possible yet: the parameters of "
+                   "IPlayQueue.DeletePlayQueueItemsAsync are not mapped"};
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

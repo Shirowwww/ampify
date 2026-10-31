@@ -10,7 +10,7 @@
 
 #include "../core/drm_guard.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -103,18 +103,18 @@ void** VtableEntry(void* object, size_t slot) {
 
 bool HookVtableEntry(void** entry, void* replacement, void** original, std::string& why) {
     if (!entry || !replacement || !original) {
-        why = "argument nul";
+        why = "null argument";
         return false;
     }
 
     std::lock_guard<std::mutex> guard(g_lock);
     std::string module = ModuleOf(*entry);
     if (IsProtectedModule(module)) {
-        why = "refusé : " + module + " est un module protégé";
+        why = "refused: " + module + " is a protected module";
         return false;
     }
     if (!Replace(entry, replacement, original)) {
-        why = "emplacement de vtable non modifiable";
+        why = "vtable slot cannot be modified";
         return false;
     }
     return true;
@@ -151,4 +151,4 @@ void RestoreHooks() {
     g_replaced.clear();
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

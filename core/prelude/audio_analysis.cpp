@@ -1,11 +1,11 @@
-// Module audioAnalysis: adds to AMK.audio (made by the module audio) the analysis frames, the tempo, the loudness,
+// Module audioAnalysis: adds to Ampify.audio (made by the module audio) the analysis frames, the tempo, the loudness,
 // the player volume (read only) and the equalizer. Natives: core/natives/audio_analysis.cpp. The kernel computes
 // everything in C++ on the decoded samples; the script only gets small frames of numbers.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kAudioAnalysis[];
-const char kAudioAnalysis[] = R"AMKJS(
+const char kAudioAnalysis[] = R"AMPIFYJS(
   const frameListeners = [];
   const presetNames = Object.freeze(JSON.parse(native.eqPresetNames));
 
@@ -13,8 +13,8 @@ const char kAudioAnalysis[] = R"AMKJS(
     setBand(index, gainDb) {
       const band = Number(index);
       const gain = Number(gainDb);
-      if (!Number.isInteger(band)) throw new RangeError("eq.setBand attend un numéro de bande entier");
-      if (!Number.isFinite(gain)) throw new RangeError("eq.setBand attend un gain en décibels");
+      if (!Number.isInteger(band)) throw new RangeError("eq.setBand expects a whole band number");
+      if (!Number.isFinite(gain)) throw new RangeError("eq.setBand expects a gain in decibels");
       return native.eqSetBand(band, gain);
     },
     preset(name) {
@@ -32,9 +32,9 @@ const char kAudioAnalysis[] = R"AMKJS(
   };
   Object.freeze(eq);
 
-  Object.assign(AMK.audio, {
+  Object.assign(Ampify.audio, {
     onFrame(fn) {
-      if (typeof fn !== "function") throw new TypeError("audio.onFrame attend une fonction");
+      if (typeof fn !== "function") throw new TypeError("audio.onFrame expects a function");
       const available = native.audioSubscribe();
       frameListeners.push(fn);
       return available;
@@ -57,6 +57,6 @@ const char kAudioAnalysis[] = R"AMKJS(
     const frame = JSON.parse(json);
     for (const fn of frameListeners.slice()) runGuarded("audio.onFrame", fn, [frame]);
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

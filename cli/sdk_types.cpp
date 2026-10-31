@@ -1,12 +1,12 @@
-// The declarations that `amk types` writes. They follow section 5 of docs/extensions/API.md. tools/test_cli.py checks
+// The declarations that `ampify types` writes. They follow section 5 of docs/extensions/API.md. tools/test_cli.py checks
 // that every member named there appears here, so the two files cannot drift apart without a failing test.
 
 #include "internal.hpp"
 
-namespace amk::cli {
+namespace ampify::cli {
 
-std::string_view AmkDeclarations() {
-    return R"ts(// amk.d.ts : types de l'objet global AMK (API d'extensions, kitApi 1.x).
+std::string_view AmpifyDeclarations() {
+    return R"ts(// ampify.d.ts : types de l'objet global Ampify (API d'extensions, kitApi 1.x).
 // Suit la section 5 de docs/extensions/API.md. Les membres marqués provisoires peuvent encore changer.
 
 type TooltipProps = { tooltip?: string; tooltipPlacement?: "top" | "bottom" | "left" | "right"; tooltipDelay?: number };
@@ -64,18 +64,18 @@ type ExtractedColors = {
   palette: { color: string; population: number }[];
 };
 
-// 5.9 : AMK.React, AMK.ReactDOM, AMK.hooks et AMK.components.
-type AmkElement = { readonly type: unknown; readonly key: string | null; readonly props: Readonly<Record<string, unknown>> };
-type AmkNode = AmkElement | string | number | boolean | null | undefined | AmkNode[];
-type AmkComponent<P = Record<string, unknown>> = (props: P & { children?: AmkNode }) => AmkNode;
-type AmkContext<T> = { readonly defaultValue: T; readonly Provider: object; readonly Consumer: object };
-type AmkTarget = string | { panel: string } | { page: string } | { popup: string | true };
-type AmkRoot = { render(element: AmkNode): null; unmount(): boolean };
+// 5.9 : Ampify.React, Ampify.ReactDOM, Ampify.hooks et Ampify.components.
+type AmpifyElement = { readonly type: unknown; readonly key: string | null; readonly props: Readonly<Record<string, unknown>> };
+type AmpifyNode = AmpifyElement | string | number | boolean | null | undefined | AmpifyNode[];
+type AmpifyComponent<P = Record<string, unknown>> = (props: P & { children?: AmpifyNode }) => AmpifyNode;
+type AmpifyContext<T> = { readonly defaultValue: T; readonly Provider: object; readonly Consumer: object };
+type AmpifyTarget = string | { panel: string } | { page: string } | { popup: string | true };
+type AmpifyRoot = { render(element: AmpifyNode): null; unmount(): boolean };
 type ClickEvent = { type: "click"; id: number };
 type ChangeEvent = { type: "change"; id: number; value: unknown; target: { value: unknown; checked: boolean } };
 type SetState<T> = (value: T | ((previous: T) => T)) => void;
 type Deps = readonly unknown[];
-type AmkHooks = {
+type AmpifyHooks = {
   useState<T>(initial: T | (() => T)): [T, SetState<T>];
   useReducer<S, A>(reducer: (state: S, action: A) => S, initial: S, init?: (arg: S) => S): [S, (action: A) => void];
   useEffect(effect: () => void | (() => void), deps?: Deps): void;
@@ -83,10 +83,10 @@ type AmkHooks = {
   useRef<T>(initial: T): { current: T };
   useMemo<T>(compute: () => T, deps?: Deps): T;
   useCallback<F extends (...args: never[]) => unknown>(fn: F, deps?: Deps): F;
-  useContext<T>(context: AmkContext<T>): T;
+  useContext<T>(context: AmpifyContext<T>): T;
 };
-type CreateElement = (type: string | symbol | object | AmkComponent<never>, props?: Record<string, unknown> | null,
-                      ...children: AmkNode[]) => AmkElement;
+type CreateElement = (type: string | symbol | object | AmpifyComponent<never>, props?: Record<string, unknown> | null,
+                      ...children: AmpifyNode[]) => AmpifyElement;
 type ButtonProps = TooltipProps & { label?: string; icon?: string; disabled?: boolean; variant?: "primary" | "secondary" | "tertiary"; onClick?: (event: ClickEvent) => void };
 type ToggleProps = TooltipProps & { label?: string; value?: boolean; checked?: boolean; disabled?: boolean; onChange?: (checked: boolean, event: ChangeEvent) => void };
 type SliderProps = TooltipProps & { label?: string; min?: number; max?: number; step?: number; value?: number; disabled?: boolean; onChange?: (value: number, event: ChangeEvent) => void };
@@ -103,7 +103,7 @@ type DiscordActivity = {
 };
 type MidiEvent = { type: "note" | "noteoff" | "cc"; channel: number; number: number; value: number };
 
-declare const AMK: {
+declare const Ampify: {
   // 5.1 Base [ferme]
   readonly version: string;
   readonly kitApi: string;
@@ -219,47 +219,47 @@ declare const AMK: {
     on(fn: (message: any) => void): () => void;
     connected(): boolean;
   // 5.9 React, composants et ready [provisoire M8]
-  readonly ready: Promise<void>;  // AMK.ready.then(fn) : fn tourne quand le noyau a démarré l'élément
-  React: AmkHooks & {
+  readonly ready: Promise<void>;  // Ampify.ready.then(fn) : fn tourne quand le noyau a démarré l'élément
+  React: AmpifyHooks & {
     createElement: CreateElement;
     h: CreateElement;
     readonly Fragment: symbol;
-    isValidElement(value: unknown): value is AmkElement;
-    cloneElement(element: AmkElement, props?: Record<string, unknown> | null, ...children: AmkNode[]): AmkElement;
+    isValidElement(value: unknown): value is AmpifyElement;
+    cloneElement(element: AmpifyElement, props?: Record<string, unknown> | null, ...children: AmpifyNode[]): AmpifyElement;
     Children: {
-      toArray(children: AmkNode): AmkNode[];
-      map<T>(children: AmkNode, fn: (child: AmkNode, index: number) => T): T[];
-      forEach(children: AmkNode, fn: (child: AmkNode, index: number) => void): void;
-      count(children: AmkNode): number;
-      only(children: AmkNode): AmkElement;
+      toArray(children: AmpifyNode): AmpifyNode[];
+      map<T>(children: AmpifyNode, fn: (child: AmpifyNode, index: number) => T): T[];
+      forEach(children: AmpifyNode, fn: (child: AmpifyNode, index: number) => void): void;
+      count(children: AmpifyNode): number;
+      only(children: AmpifyNode): AmpifyElement;
     };
-    createContext<T>(defaultValue: T): AmkContext<T>;
+    createContext<T>(defaultValue: T): AmpifyContext<T>;
     memo<C>(component: C): C;
   };
   ReactDOM: {
-    render(element: AmkNode, target: AmkTarget): null;
-    createRoot(target: AmkTarget): AmkRoot;
-    unmountComponentAtNode(target: AmkTarget): boolean;
+    render(element: AmpifyNode, target: AmpifyTarget): null;
+    createRoot(target: AmpifyTarget): AmpifyRoot;
+    unmountComponentAtNode(target: AmpifyTarget): boolean;
   };
-  hooks: AmkHooks & { usePlayer(): PlayerState };
+  hooks: AmpifyHooks & { usePlayer(): PlayerState };
   components: {
-    Button: AmkComponent<ButtonProps>;
-    ButtonPrimary: AmkComponent<ButtonProps>;
-    ButtonSecondary: AmkComponent<ButtonProps>;
-    ButtonTertiary: AmkComponent<ButtonProps>;
-    Toggle: AmkComponent<ToggleProps>;
-    Slider: AmkComponent<SliderProps>;
-    TextField: AmkComponent<TextFieldProps>;
-    Dropdown: AmkComponent<DropdownProps>;
-    Card: AmkComponent<CardProps>;
-    List: AmkComponent<TooltipProps>;
-    Text: AmkComponent<TextProps>;
-    TextComponent: AmkComponent<TextProps>;
-    Tooltip: AmkComponent<TooltipWrapperProps>;
-    TooltipWrapper: AmkComponent<TooltipWrapperProps>;
+    Button: AmpifyComponent<ButtonProps>;
+    ButtonPrimary: AmpifyComponent<ButtonProps>;
+    ButtonSecondary: AmpifyComponent<ButtonProps>;
+    ButtonTertiary: AmpifyComponent<ButtonProps>;
+    Toggle: AmpifyComponent<ToggleProps>;
+    Slider: AmpifyComponent<SliderProps>;
+    TextField: AmpifyComponent<TextFieldProps>;
+    Dropdown: AmpifyComponent<DropdownProps>;
+    Card: AmpifyComponent<CardProps>;
+    List: AmpifyComponent<TooltipProps>;
+    Text: AmpifyComponent<TextProps>;
+    TextComponent: AmpifyComponent<TextProps>;
+    Tooltip: AmpifyComponent<TooltipWrapperProps>;
+    TooltipWrapper: AmpifyComponent<TooltipWrapperProps>;
   };
 };
 )ts";
 }
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

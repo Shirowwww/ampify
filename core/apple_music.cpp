@@ -5,7 +5,7 @@
 
 #include "text_util.hpp"
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -70,4 +70,4 @@ int CompareVersions(std::string_view left, std::string_view right) {
     return 0;
 }
 
-}  // namespace amk
+}  // namespace ampify

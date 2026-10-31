@@ -7,7 +7,7 @@
 #include "../core/version_list.hpp"
 #include "sha256.hpp"
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -33,11 +33,11 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
     std::string syntaxError;
     std::optional<json::Value> document = json::Parse(text, syntaxError);
     if (!document) {
-        errors.push_back("JSON invalide : " + syntaxError);
+        errors.push_back("invalid JSON: " + syntaxError);
         return std::nullopt;
     }
     if (!document->IsObject()) {
-        errors.push_back("le catalogue doit être un objet JSON");
+        errors.push_back("the catalog must be a JSON object");
         return std::nullopt;
     }
 
@@ -46,33 +46,33 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
 
     const json::Value* version = document->Find("catalogVersion");
     if (version == nullptr) {
-        errors.push_back("catalogVersion : champ obligatoire absent");
+        errors.push_back("catalogVersion: required field missing");
     } else if (!version->IsNumber() || version->AsNumber() != 1) {
-        errors.push_back("catalogVersion : seule la version 1 est connue");
+        errors.push_back("catalogVersion: only version 1 is known");
     }
 
     const json::Value* entries = document->Find("extensions");
     if (entries == nullptr) {
-        errors.push_back("extensions : champ obligatoire absent");
+        errors.push_back("extensions: required field missing");
     } else if (!entries->IsArray()) {
-        errors.push_back("extensions : liste attendue");
+        errors.push_back("extensions: list expected");
     }
 
     Catalog catalog;
     if (const json::Value* pin = document->Find("versions")) {
         if (!pin->IsObject()) {
-            errors.push_back("versions : objet attendu");
+            errors.push_back("versions: object expected");
         } else {
             CheckAllowedKeys(*pin, {"url", "sha256"}, "versions", errors);
             const json::Value* url = pin->Find("url");
             const json::Value* sha = pin->Find("sha256");
             if (url == nullptr || !url->IsString() || !IsAllowedDownloadUrl(url->AsString(), localCatalog)) {
-                errors.push_back("versions.url : adresse https:// attendue");
+                errors.push_back("versions.url: https:// address expected");
             } else {
                 catalog.versionsUrl = url->AsString();
             }
             if (sha == nullptr || !sha->IsString() || !IsSha256Hex(sha->AsString())) {
-                errors.push_back("versions.sha256 : 64 caractères hexadécimaux minuscules attendus");
+                errors.push_back("versions.sha256: 64 lowercase hexadecimal characters expected");
             } else {
                 catalog.versionsSha256 = sha->AsString();
             }
@@ -85,7 +85,7 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
             const json::Value& item = entries->Items()[index];
             std::string where = EntryLabel(index);
             if (!item.IsObject()) {
-                errors.push_back(where + " : objet attendu");
+                errors.push_back(where + ": object expected");
                 continue;
             }
 
@@ -97,31 +97,31 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
 
             CatalogEntry entry;
             ReadElementInfo(item, where, entry, errors);
-            // kit.manage runs amk itself: only the Marketplace that ships with the kit has it, never a download.
+            // kit.manage runs ampify itself: only the Marketplace that ships with the kit has it, never a download.
             if (std::find(entry.permissions.begin(), entry.permissions.end(), "kit.manage") != entry.permissions.end()) {
-                errors.push_back(where + ".permissions : kit.manage est réservée à la Marketplace du kit");
+                errors.push_back(where + ".permissions: kit.manage is reserved for Ampify's Marketplace");
             }
 
             const json::Value* url = item.Find("url");
             if (url == nullptr) {
-                errors.push_back(where + ".url : champ obligatoire absent");
+                errors.push_back(where + ".url: required field missing");
             } else if (!url->IsString() || !IsAllowedDownloadUrl(url->AsString(), localCatalog)) {
-                errors.push_back(where + ".url : adresse https:// attendue");
+                errors.push_back(where + ".url: https:// address expected");
             } else {
                 entry.url = url->AsString();
             }
 
             const json::Value* sha = item.Find("sha256");
             if (sha == nullptr) {
-                errors.push_back(where + ".sha256 : champ obligatoire absent");
+                errors.push_back(where + ".sha256: required field missing");
             } else if (!sha->IsString() || !IsSha256Hex(sha->AsString())) {
-                errors.push_back(where + ".sha256 : 64 caractères hexadécimaux minuscules attendus");
+                errors.push_back(where + ".sha256: 64 lowercase hexadecimal characters expected");
             } else {
                 entry.sha256 = sha->AsString();
             }
 
             if (!entry.id.empty() && !ids.insert(entry.id).second) {
-                errors.push_back(where + ".id : identifiant déjà présent dans le catalogue : " + entry.id);
+                errors.push_back(where + ".id: id already in the catalog: " + entry.id);
             }
             if (errors.size() == entryBefore) catalog.entries.push_back(std::move(entry));
         }
@@ -135,11 +135,11 @@ std::optional<VersionsCatalog> ParseVersionsCatalog(std::string_view text, std::
     std::string syntaxError;
     std::optional<json::Value> document = json::Parse(text, syntaxError);
     if (!document) {
-        errors.push_back("JSON invalide : " + syntaxError);
+        errors.push_back("invalid JSON: " + syntaxError);
         return std::nullopt;
     }
     if (!document->IsObject()) {
-        errors.push_back("la liste des versions doit être un objet JSON");
+        errors.push_back("the list of versions must be a JSON object");
         return std::nullopt;
     }
 
@@ -147,17 +147,17 @@ std::optional<VersionsCatalog> ParseVersionsCatalog(std::string_view text, std::
     CheckAllowedKeys(*document, {"$schema", "versionsFormat", "playerDll", "versions"}, "", errors);
     const json::Value* format = document->Find("versionsFormat");
     if (format == nullptr || !format->IsNumber() || format->AsNumber() != 1) {
-        errors.push_back("versionsFormat : seule la version 1 est connue");
+        errors.push_back("versionsFormat: only version 1 is known");
     }
     const json::Value* dll = document->Find("playerDll");
     if (dll == nullptr || !dll->IsString() || dll->AsString() != kPlayerDllName) {
-        errors.push_back("playerDll : " + std::string(kPlayerDllName) + " attendu");
+        errors.push_back("playerDll: " + std::string(kPlayerDllName) + " expected");
     }
 
     VersionsCatalog catalog;
     const json::Value* versions = document->Find("versions");
     if (versions == nullptr || !versions->IsArray()) {
-        errors.push_back("versions : liste attendue");
+        errors.push_back("versions: list expected");
         return std::nullopt;
     }
     std::set<std::string> seen;
@@ -165,7 +165,7 @@ std::optional<VersionsCatalog> ParseVersionsCatalog(std::string_view text, std::
         const json::Value& item = versions->Items()[index];
         std::string where = "versions[" + std::to_string(index) + "]";
         if (!item.IsObject()) {
-            errors.push_back(where + " : objet attendu");
+            errors.push_back(where + ": object expected");
             continue;
         }
         CheckAllowedKeys(item, {"version", "tested", "exports", "notes"}, where, errors);
@@ -173,21 +173,21 @@ std::optional<VersionsCatalog> ParseVersionsCatalog(std::string_view text, std::
         TestedVersion tested;
         const json::Value* version = item.Find("version");
         if (version == nullptr || !version->IsString() || !IsPackageVersionText(version->AsString())) {
-            errors.push_back(where + ".version : version de paquet attendue (quatre nombres, comme 1.1540.23042.0)");
+            errors.push_back(where + ".version: package version expected (four numbers, like 1.1540.23042.0)");
         } else {
             tested.version = version->AsString();
-            if (!seen.insert(tested.version).second) errors.push_back(where + ".version : déjà listée");
+            if (!seen.insert(tested.version).second) errors.push_back(where + ".version: already listed");
         }
 
         const json::Value* exports = item.Find("exports");
         if (exports == nullptr || !exports->IsArray() || exports->Items().empty()) {
-            errors.push_back(where + ".exports : liste non vide attendue");
+            errors.push_back(where + ".exports: non-empty list expected");
         } else {
             for (const json::Value& name : exports->Items()) {
                 if (!name.IsString() || name.AsString().empty() ||
                     name.AsString().find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_") !=
                         std::string::npos) {
-                    errors.push_back(where + ".exports : nom d'export invalide");
+                    errors.push_back(where + ".exports: invalid export name");
                     break;
                 }
                 tested.exports.push_back(name.AsString());
@@ -214,7 +214,7 @@ std::vector<std::string> UsableVersions(const VersionsCatalog& catalog, std::spa
         if (missing.empty()) {
             usable.push_back(tested.version);
         } else {
-            rejected.push_back(tested.version + " (export non vérifié : " + missing + ")");
+            rejected.push_back(tested.version + " (export not verified: " + missing + ")");
         }
     }
     return usable;
@@ -226,4 +226,4 @@ const CatalogEntry* FindCatalogEntry(const Catalog& catalog, std::string_view id
     return found == catalog.entries.end() ? nullptr : &*found;
 }
 
-}  // namespace amk
+}  // namespace ampify

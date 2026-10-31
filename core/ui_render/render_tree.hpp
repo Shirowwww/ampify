@@ -1,7 +1,7 @@
 #pragma once
 
 // The portable half of the native renderer (win/ui_renderer.*): it turns an interface tree of core/ui_model (the JSON
-// that AMK.ui and AMK.React produce) into a tree of render nodes with stable ids, and compares two of them to say,
+// that Ampify.ui and Ampify.React produce) into a tree of render nodes with stable ids, and compares two of them to say,
 // node by node, what the Windows side must keep, update in place, create or rebuild. No Windows API here, so the
 // rules are tested under Linux with a fake widget tree (tests/ui_render_tests.cpp).
 
@@ -13,7 +13,7 @@
 
 #include "../json.hpp"
 
-namespace amk::uirender {
+namespace ampify::uirender {
 
 // One primitive of the tree. `id` is unique among the nodes of one surface: the surface id for the root, then the
 // path of child positions ("panel-x.0.2"). A child that has a scalar attribute `key` (or `id`) uses it instead of its
@@ -38,15 +38,15 @@ std::string SurfaceNodeId(std::string_view kind, std::string_view id);
 // Builds the render tree of `tree` (already checked by ValidateTree). `rootId` is the id of the root node.
 RenderNode BuildRenderTree(const Json& tree, const std::string& rootId);
 
-// The x:Name and AutomationId of the native element: "AMK_<elementId>_<nodeId>". Characters that XAML refuses in a
+// The x:Name and AutomationId of the native element: "AMPIFY_<elementId>_<nodeId>". Characters that XAML refuses in a
 // name are replaced by '_'. The bench and UI Automation find the elements by this name.
 std::string ElementName(std::string_view elementId, std::string_view nodeId);
 
-// True for a name that the kit gave (prefix "AMK_", or "Amk" for the older theme section): the discovery never
+// True for a name that Ampify gave (prefix "AMPIFY_", or "Ampify" for the older theme section): the discovery never
 // walks into those, and the anchors never choose them.
 bool IsOwnName(std::string_view name);
 
-// True for a name given by AMExclusive ("AMExclusive" prefix): the kit never touches those elements.
+// True for a name given by AMExclusive ("AMExclusive" prefix): Ampify never touches those elements.
 bool IsForeignModName(std::string_view name);
 
 // What the Windows side does with one node.
@@ -80,10 +80,10 @@ struct PatchStats {
     bool Unchanged() const { return created == 0 && updated == 0 && replaced == 0 && removed == 0; }
 };
 
-// Counts the nodes of a patch, for the journal line of each render.
+// Counts the nodes of a patch, for the log line of each render.
 PatchStats CountPatch(const Patch& patch);
 
 // Number of nodes in a render tree.
 std::size_t CountNodes(const RenderNode& node);
 
-}  // namespace amk::uirender
+}  // namespace ampify::uirender

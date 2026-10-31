@@ -21,11 +21,11 @@
 namespace {
 
 namespace fs = std::filesystem;
-using namespace amk::uirender;
+using namespace ampify::uirender;
 
-amk::Json Parse(const std::string& text) {
-    std::optional<amk::Json> value = amk::Json::Parse(text);
-    return value ? *value : amk::Json();
+ampify::Json Parse(const std::string& text) {
+    std::optional<ampify::Json> value = ampify::Json::Parse(text);
+    return value ? *value : ampify::Json();
 }
 
 RenderNode Tree(const std::string& text) {
@@ -85,7 +85,7 @@ struct FakeTree {
 const unsigned kStack = kProbePanel | kProbeStackPanel;
 
 fs::path FreshKit(const std::string& name) {
-    fs::path dir = fs::temp_directory_path() / "amk-tests" / ("ui-render-" + name);
+    fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("ui-render-" + name);
     fs::remove_all(dir);
     fs::create_directories(dir);
     return dir;
@@ -106,8 +106,8 @@ std::string ReadFile(const fs::path& file) {
 void AddExtension(const fs::path& kit, const std::string& id, const std::string& name) {
     WriteFile(kit / "extensions" / id / "manifest.json",
               R"({"id":")" + id + R"(","name":")" + name + R"(","version":"1.0.0","kind":"extension","author":"x",)"
-              R"("description":"Fait )" + name + R"(","kitApi":"1.0","main":"main.js","permissions":[]})");
-    WriteFile(kit / "extensions" / id / "main.js", "AMK.log('ok');");
+              R"("description":"Makes )" + name + R"(","kitApi":"1.0","main":"main.js","permissions":[]})");
+    WriteFile(kit / "extensions" / id / "main.js", "Ampify.log('ok');");
 }
 
 }  // namespace
@@ -131,24 +131,24 @@ TEST_CASE(UiRender_RepeatedKeysFallBackToThePosition) {
 }
 
 TEST_CASE(UiRender_ElementNamesAreSafeForXaml) {
-    CHECK(ElementName("react-panel", "panel-react-panel.0.1") == "AMK_react-panel_panel-react-panel.0.1");
-    CHECK(ElementName("a b", "x/y") == "AMK_a_b_x_y");
+    CHECK(ElementName("react-panel", "panel-react-panel.0.1") == "AMPIFY_react-panel_panel-react-panel.0.1");
+    CHECK(ElementName("a b", "x/y") == "AMPIFY_a_b_x_y");
     CHECK(SurfaceNodeId("page", "/stats/top") == "page-stats-top");
     CHECK(SurfaceNodeId("popup", "") == "popup-main");
-    CHECK(IsOwnName("AMK_ModsCard"));
-    CHECK(IsOwnName("AmkThemeSection"));
+    CHECK(IsOwnName("AMPIFY_ModsCard"));
+    CHECK(IsOwnName("AmpifyThemeSection"));
     CHECK(!IsOwnName("AMExclusiveModeCard"));
     CHECK(IsForeignModName("AMExclusiveModeCard"));
 }
 
 TEST_CASE(UiRender_AttributesReadAsTextNumberAndBoolean) {
-    RenderNode node = Tree(R"({"type":"slider","min":5,"max":"120","value":30.5,"disabled":true,"label":"Durée"})");
+    RenderNode node = Tree(R"({"type":"slider","min":5,"max":"120","value":30.5,"disabled":true,"label":"Length"})");
     CHECK(node.Number("min", 0) == 5);
     CHECK(node.Number("max", 0) == 120);
     CHECK(node.Text("min") == "5");
     CHECK(node.Bool("disabled", false));
     CHECK(!node.Bool("checked", false));
-    CHECK(node.Text("label") == "Durée");
+    CHECK(node.Text("label") == "Length");
     CHECK(node.Text("absent", "x") == "x");
 }
 
@@ -174,12 +174,12 @@ TEST_CASE(UiRender_SameTreeKeepsEveryControl) {
 
 TEST_CASE(UiRender_ChangedLabelIsUpdatedInPlace) {
     FakeRenderer renderer;
-    RenderNode first = Tree(R"({"type":"stack","children":[{"type":"text","text":"Clics : 0"},{"type":"button","label":"Plus un"}]})");
+    RenderNode first = Tree(R"({"type":"stack","children":[{"type":"text","text":"Clicks: 0"},{"type":"button","label":"Add one"}]})");
     std::shared_ptr<Widget> mounted = renderer.Build(first);
     int textSerial = mounted->children[0]->serial;
     int buttonSerial = mounted->children[1]->serial;
 
-    RenderNode second = Tree(R"({"type":"stack","children":[{"type":"text","text":"Clics : 1"},{"type":"button","label":"Plus un"}]})");
+    RenderNode second = Tree(R"({"type":"stack","children":[{"type":"text","text":"Clicks: 1"},{"type":"button","label":"Add one"}]})");
     Patch patch = Reconcile(&first, second);
     CHECK(patch.children[0].op == PatchOp::Update);
     CHECK(patch.children[0].changed == std::vector<std::string>{"text"});
@@ -187,7 +187,7 @@ TEST_CASE(UiRender_ChangedLabelIsUpdatedInPlace) {
     CHECK(!patch.reordered);
     mounted = renderer.Apply(patch, mounted);
     CHECK(mounted->children[0]->serial == textSerial);
-    CHECK(mounted->children[0]->label == "Clics : 1");
+    CHECK(mounted->children[0]->label == "Clicks: 1");
     CHECK(mounted->children[1]->serial == buttonSerial);
     CHECK(CountPatch(patch).updated == 1);
 }
@@ -245,7 +245,7 @@ TEST_CASE(UiRender_RemovedChildIsReported) {
 }
 
 TEST_CASE(UiRender_SurfacesReportAddedChangedAndRemoved) {
-    amk::UiModel model;
+    ampify::UiModel model;
     model.SetPanel("react-panel", "react-panel", Parse(R"({"type":"text","text":"a"})"));
     SurfaceTracker tracker;
     SurfaceChanges first = tracker.Poll(model);
@@ -261,7 +261,7 @@ TEST_CASE(UiRender_SurfacesReportAddedChangedAndRemoved) {
     CHECK(second.changed.size() == 1);
     CHECK(second.changed[0].revision > first.added[0].revision);
 
-    model.SetTitle("react-panel", "Mon panneau");
+    model.SetTitle("react-panel", "My panel");
     CHECK(tracker.Poll(model).changed.size() == 1);
 
     model.RemoveElement("react-panel");
@@ -271,7 +271,7 @@ TEST_CASE(UiRender_SurfacesReportAddedChangedAndRemoved) {
 }
 
 TEST_CASE(UiRender_SurfacesCoverPopupsPagesControlsAndRoute) {
-    amk::UiModel model;
+    ampify::UiModel model;
     model.OpenPopup("x", Parse(R"({"type":"text","text":"1"})"));
     model.OpenPopup("x", Parse(R"({"type":"text","text":"2"})"));
     model.SetPopup("x", "main", Parse(R"({"type":"text","text":"3"})"));
@@ -312,7 +312,7 @@ TEST_CASE(UiRender_SettingsAnchorIsTheStackWithTheMostToggles) {
     tree.Add(inner, "Microsoft.UI.Xaml.Controls.ToggleSwitch", kProbeToggleSwitch);
     int foreign = tree.Add(outer, "Microsoft.UI.Xaml.Controls.Border", kProbeBorder, "AMExclusiveModeCard");
     tree.Add(foreign, "Microsoft.UI.Xaml.Controls.ToggleSwitch", kProbeToggleSwitch, "AMExclusiveModeToggle");
-    int ours = tree.Add(outer, "Microsoft.UI.Xaml.Controls.Border", kProbeBorder, "AMK_ModsCard");
+    int ours = tree.Add(outer, "Microsoft.UI.Xaml.Controls.Border", kProbeBorder, "AMPIFY_ModsCard");
     int ourStack = tree.Add(ours, "Microsoft.UI.Xaml.Controls.StackPanel", kStack);
     for (int i = 0; i < 5; i++) tree.Add(ourStack, "Microsoft.UI.Xaml.Controls.ToggleSwitch", kProbeToggleSwitch);
 
@@ -344,7 +344,7 @@ TEST_CASE(UiRender_DiscoveryDoesNotWalkIntoListsButtonsOrKitElements) {
     ProbeNode repeater;
     repeater.flags = kProbeItemsRepeater;
     ProbeNode ours;
-    ours.name = "AMK_PanelHost";
+    ours.name = "AMPIFY_PanelHost";
     ProbeNode grid;
     grid.flags = kProbePanel;
     ProbeNode foreign;
@@ -455,8 +455,8 @@ TEST_CASE(UiRender_RefreshTicketQueuesOnceAndCloses) {
 
 TEST_CASE(UiRender_ModsListsValidExtensionsWithTheirState) {
     fs::path kit = FreshKit("mods-list");
-    AddExtension(kit, "react-panel", "Panneau React");
-    AddExtension(kit, "hello-extension", "Bonjour");
+    AddExtension(kit, "react-panel", "React panel");
+    AddExtension(kit, "hello-extension", "Hello");
     WriteFile(kit / "extensions" / "broken" / "manifest.json", "{");
     WriteFile(kit / "extensions" / ".tmp-install" / "manifest.json", "{}");
     WriteFile(kit / "settings.txt", "extensions.react-panel.enabled = true\n");
@@ -464,18 +464,18 @@ TEST_CASE(UiRender_ModsListsValidExtensionsWithTheirState) {
     std::vector<ModEntry> mods = ListMods(kit);
     CHECK(mods.size() == 2);
     if (mods.size() == 2) {
-        CHECK(mods[0].id == "hello-extension");  // sorted by name: Bonjour, Panneau React
+        CHECK(mods[0].id == "hello-extension");  // sorted by name: Hello, React panel
         CHECK(!mods[0].enabled);
         CHECK(mods[1].id == "react-panel");
         CHECK(mods[1].enabled);
-        CHECK(mods[1].description == "Fait Panneau React");
+        CHECK(mods[1].description == "Makes React panel");
     }
     CHECK(ListMods(FreshKit("mods-empty")).empty());
 }
 
 TEST_CASE(UiRender_ModsSwitchWritesTheSettingAndAReloadRequest) {
     fs::path kit = FreshKit("mods-switch");
-    WriteFile(kit / "settings.txt", "theme.active = minuit\n");
+    WriteFile(kit / "settings.txt", "theme.active = midnight\n");
     WriteFile(kit / "reload.txt", "1700000000\n");
     std::string error;
     CHECK(SwitchMod(kit, "react-panel", true, error));
@@ -483,7 +483,7 @@ TEST_CASE(UiRender_ModsSwitchWritesTheSettingAndAReloadRequest) {
     CHECK(error.empty());
     std::string settings = ReadFile(kit / "settings.txt");
     CHECK(settings.find("extensions.react-panel.enabled") != std::string::npos);
-    CHECK(settings.find("theme.active = minuit") != std::string::npos);
+    CHECK(settings.find("theme.active = midnight") != std::string::npos);
     CHECK(ReadFile(kit / "reload.txt") == "1700000000\nstart react-panel\nstop react-panel\n");
 
     CHECK(!SwitchMod(kit, "app:stats", true, error));
@@ -505,7 +505,7 @@ TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {
     SvgIcon hostile = ParseSvgIcon(R"(<svg><path d="M0 0' Fill='Red"/><path d="M0 0&lt;"/></svg>)");
     CHECK(!hostile.Usable());
     CHECK(hostile.width == 24);
-    CHECK(!ParseSvgIcon("pas une icône").Usable());
+    CHECK(!ParseSvgIcon("not an icon").Usable());
 
     CHECK(IsGlyphIcon("\xEE\x9D\xA8"));  // U+E768, Play in Segoe Fluent Icons
     CHECK(!IsGlyphIcon("<svg/>"));

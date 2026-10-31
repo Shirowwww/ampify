@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Catalogue communautaire des extensions, thèmes, apps et snippets",
-  "description": "Liste publique des éléments installables. Chaque entrée pointe vers une archive dont le SHA-256 est fixé. Voir docs/extensions/CATALOG.md.",
+  "title": "Community catalog of extensions, themes, apps and snippets",
+  "description": "Public list of installable items. Each entry points to an archive with a pinned SHA-256. See docs/extensions/catalog.md.",
   "type": "object",
   "required": ["catalogVersion", "extensions"],
   "additionalProperties": false,
@@ -12,7 +12,7 @@
       "type": "object",
       "required": ["url", "sha256"],
       "additionalProperties": false,
-      "description": "Où est publiée la liste des versions d'Apple Music testées (catalog/versions.json), et son SHA-256. Lue par amk versions update.",
+      "description": "Where the list of tested Apple Music versions is published (catalog/versions.json), and its SHA-256. Read by ampify versions update.",
       "properties": {
         "url": {"$ref": "#/$defs/https"},
         "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
@@ -32,7 +32,7 @@
         "id": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9-]{1,39}$",
-          "description": "Identifiant de l'élément. Unique dans le catalogue."
+          "description": "Id of the item. Unique in the catalog."
         },
         "name": {"type": "string", "minLength": 1, "maxLength": 60},
         "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
@@ -46,12 +46,12 @@
         "kitApi": {"$ref": "#/$defs/kitApi"},
         "url": {
           "$ref": "#/$defs/https",
-          "description": "Archive zip contenant le dossier de l'élément, avec son manifest.json."
+          "description": "Zip archive containing the item's folder, with its manifest.json."
         },
         "sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$",
-          "description": "Empreinte SHA-256 de l'archive, en minuscules. Toute archive qui ne correspond pas est refusée."
+          "description": "SHA-256 hash of the archive, in lowercase. Any archive that does not match is refused."
         },
         "homepage": {"$ref": "#/$defs/https"},
         "license": {"type": "string", "minLength": 1, "maxLength": 64},
@@ -59,7 +59,7 @@
           "type": "array",
           "uniqueItems": true,
           "maxItems": 32,
-          "description": "Copie des permissions du manifest, affichée à l'utilisateur avant l'activation.",
+          "description": "Copy of the manifest's permissions, shown to the user before the item is turned on.",
           "items": {"$ref": "#/$defs/permission"}
         }
       }

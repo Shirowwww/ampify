@@ -8,7 +8,7 @@
 #include <system_error>
 #include <vector>
 
-namespace amk::platform {
+namespace ampify::platform {
 
 namespace {
 
@@ -46,11 +46,11 @@ std::filesystem::path TemporaryFile(const std::string& stem) {
 }
 
 bool ListZip(const std::filesystem::path& archive, std::vector<std::string>& entries, std::string& error) {
-    std::filesystem::path listing = TemporaryFile("amk-list");
+    std::filesystem::path listing = TemporaryFile("ampify-list");
     std::vector<std::string> command = {kZipLister[0], kZipLister[1], archive.string()};
     int code = Run(command, listing);
     if (code != 0) {
-        error = "lecture de l'archive impossible (outil " + std::string(kZipLister[0]) +
+        error = "cannot read the archive (tool " + std::string(kZipLister[0]) +
                 ", code " + std::to_string(code) + ")";
         std::error_code ec;
         std::filesystem::remove(listing, ec);
@@ -76,7 +76,7 @@ bool ExtractZip(const std::filesystem::path& archive, const std::filesystem::pat
 #endif
     int code = Run(command);
     if (code != 0) {
-        error = "extraction impossible (code " + std::to_string(code) + ")";
+        error = "extraction failed (code " + std::to_string(code) + ")";
         return false;
     }
     return true;
@@ -99,7 +99,7 @@ bool DownloadHttps(const std::string& url, const std::filesystem::path& destinat
     if (maxSeconds > 0) command.insert(command.end() - 1, {"--max-time", std::to_string(maxSeconds)});
     int code = Run(command);
     if (code != 0) {
-        error = "téléchargement impossible (code " + std::to_string(code) + ") : " + url;
+        error = "download failed (code " + std::to_string(code) + "): " + url;
         return false;
     }
     return true;
@@ -113,4 +113,4 @@ bool ToolWorks(const std::vector<std::string>& command) {
     return code == 0;
 }
 
-}  // namespace amk::platform
+}  // namespace ampify::platform

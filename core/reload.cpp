@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -98,4 +98,4 @@ std::vector<std::string> ReloadWatcher::Changed(const std::string& text) {
     return ids;
 }
 
-}  // namespace amk
+}  // namespace ampify

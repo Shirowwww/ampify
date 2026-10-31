@@ -1,6 +1,6 @@
 #pragma once
 
-// The kit's notification area icon, with its menu. It lives on its own thread, with a message-only window that
+// Ampify's notification area icon, with its menu. It lives on its own thread, with a message-only window that
 // receives the icon's messages, so the menu stays responsive whatever the JavaScript thread does. A choice in the
 // menu, or a left click on the icon (command 0), is handed to the callback on that thread: the callback only queues.
 //
@@ -15,7 +15,7 @@
 #include <thread>
 #include <vector>
 
-namespace amk::win {
+namespace ampify::win {
 
 struct TrayEntry {
     UINT command = 0;  // from 1; 0 is the left click on the icon
@@ -63,4 +63,4 @@ private:
     std::thread m_thread;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win

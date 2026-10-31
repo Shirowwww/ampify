@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-namespace amk {
+namespace ampify {
 
 // ASCII lowercase copy. Enough for file names and package names, which are ASCII.
 inline std::string ToLowerAscii(std::string_view text) {
@@ -21,4 +21,4 @@ inline std::string_view FileName(std::string_view path) {
     return cut == std::string_view::npos ? path : path.substr(cut + 1);
 }
 
-}  // namespace amk
+}  // namespace ampify

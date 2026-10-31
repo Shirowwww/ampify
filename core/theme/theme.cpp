@@ -9,7 +9,7 @@
 #include "ini.hpp"
 #include "spicetify.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -31,7 +31,7 @@ std::string_view Trim(std::string_view text) {
 const Ini::Section* PickScheme(const Ini& ini, const std::string& wanted, Theme& theme) {
     if (!wanted.empty()) {
         if (const Ini::Section* section = ini.FindSection(wanted)) return section;
-        theme.problems.push_back("colors.ini : schéma « " + wanted + " » absent, le premier est utilisé");
+        theme.problems.push_back("colors.ini: scheme \"" + wanted + "\" not found, the first one is used");
     }
     for (const Ini::Section& section : ini.Sections()) {
         if (!section.name.empty()) return &section;
@@ -72,8 +72,8 @@ std::string DefineSpicetifyColor(const Ini::Entry& entry, Argb color, Theme& the
     std::string key = SpicetifyKey(entry.key);
     if (key.empty()) key = LowerText(entry.key);  // a colour of the theme's own, such as accent
     if (!theme.palette.Define(key, color)) {
-        theme.problems.push_back("colors.ini ligne " + std::to_string(entry.line) + " : « " + entry.key +
-                                 " » défini deux fois, ignoré");
+        theme.problems.push_back("colors.ini line " + std::to_string(entry.line) + ": \"" + entry.key +
+                                 "\" defined twice, ignored");
         return {};
     }
     if (LowerText(entry.key) != key) theme.palette.Define(LowerText(entry.key), color);  // main_fg stays usable too
@@ -94,7 +94,7 @@ std::set<std::string> LoadColors(FileSource& files, const std::string& wanted, b
 
     const Ini::Section* scheme = PickScheme(ini, wanted, theme);
     if (!scheme) {
-        theme.problems.push_back(file + " : aucun schéma (section [Base] par exemple)");
+        theme.problems.push_back(file + ": no scheme (a [Base] section, for example)");
         return spicetify;
     }
     theme.scheme = scheme->name;
@@ -102,8 +102,8 @@ std::set<std::string> LoadColors(FileSource& files, const std::string& wanted, b
     for (const Ini::Entry& entry : scheme->entries) {
         std::optional<Argb> color = ParseColor(entry.value);
         if (!color) {
-            theme.problems.push_back(file + " ligne " + std::to_string(entry.line) + " : couleur « " + entry.value +
-                                     " » illisible");
+            theme.problems.push_back(file + " line " + std::to_string(entry.line) + ": color \"" + entry.value +
+                                     "\" is unreadable");
             continue;
         }
         if (IsSpicetifyName(entry.key)) {
@@ -112,8 +112,8 @@ std::set<std::string> LoadColors(FileSource& files, const std::string& wanted, b
             continue;
         }
         if (!theme.palette.Define(entry.key, *color)) {
-            theme.problems.push_back(file + " ligne " + std::to_string(entry.line) + " : « " + entry.key +
-                                     " » défini deux fois, ignoré");
+            theme.problems.push_back(file + " line " + std::to_string(entry.line) + ": \"" + entry.key +
+                                     "\" defined twice, ignored");
             continue;
         }
         if (applied) theme.resources.push_back({entry.key, {ValueKind::Color, ToXamlColor(*color)}});
@@ -136,19 +136,19 @@ bool LoadDictionary(FileSource& files, const LoadOptions& options, Theme& theme)
     if (!xaml) return true;
 
     if (xaml->find("<ResourceDictionary") == std::string::npos) {
-        theme.problems.push_back("resources.xaml : pas de <ResourceDictionary>, thème refusé");
+        theme.problems.push_back("resources.xaml: no <ResourceDictionary>, theme refused");
         return false;
     }
 
     if (XamlKeys(*xaml).empty()) {
-        // No key to check: implicit styles only, or an empty dictionary such as the one `amk new snippet` writes.
+        // No key to check: implicit styles only, or an empty dictionary such as the one `ampify new snippet` writes.
     } else if (!options.allowedKeys) {
-        theme.problems.push_back("resources.xaml : liste des clés autorisées absente, vérification non faite");
+        theme.problems.push_back("resources.xaml: list of allowed keys missing, check not done");
     } else {
         bool allAllowed = true;
         for (const std::string& key : XamlKeys(*xaml)) {
             if (options.allowedKeys->count(key)) continue;
-            theme.problems.push_back("resources.xaml : clé « " + key + " » hors de la liste autorisée, thème refusé");
+            theme.problems.push_back("resources.xaml: key \"" + key + "\" is not in the allowed list, theme refused");
             allAllowed = false;
         }
         if (!allAllowed) return false;
@@ -159,12 +159,12 @@ bool LoadDictionary(FileSource& files, const LoadOptions& options, Theme& theme)
 }
 
 std::string AtLine(const std::string& source, int line) {
-    return source + " ligne " + std::to_string(line);
+    return source + " line " + std::to_string(line);
 }
 
 // What the rules of one file need besides the theme they fill.
 struct RuleSource {
-    std::string file = "user.css";  // for the journal and the problems
+    std::string file = "user.css";  // for the log and the problems
     const Theme* base = nullptr;    // the active theme, for a snippet: its font roles fill what the snippet leaves out
     int layer = 0;                  // -1 for the rules translated from color.ini: the theme's user.css wins over them
 };
@@ -186,13 +186,13 @@ void DefineFontPart(const std::string& name, const std::string& value, int line,
         }
     }
     if (role.empty()) {
-        theme.problems.push_back(AtLine(source.file, line) + " : rôle de police sans nom (--font-<rôle>)");
+        theme.problems.push_back(AtLine(source.file, line) + ": font role without a name (--font-<role>)");
         return;
     }
 
     Conversion conversion = ConvertValue(*FindProperty(css), value, context);
     if (!conversion.value) {
-        theme.problems.push_back(AtLine(source.file, line) + " : --" + name + " : " + conversion.problem + ", ignorée");
+        theme.problems.push_back(AtLine(source.file, line) + ": --" + name + ": " + conversion.problem + ", ignored");
         return;
     }
     theme.fonts[CanonicalFontRole(role)].*part = conversion.value->text;
@@ -204,14 +204,14 @@ void LoadVariables(const Stylesheet& sheet, const ValueContext& context, const R
         if (!rule.root) continue;
         for (const Declaration& declaration : rule.declarations) {
             if (!declaration.property.starts_with("--") || declaration.property.size() == 2) {
-                theme.problems.push_back(AtLine(source.file, declaration.line) + " : « " + declaration.property +
-                                         " » dans :root, seules les variables --nom sont lues");
+                theme.problems.push_back(AtLine(source.file, declaration.line) + ": \"" + declaration.property +
+                                         "\" inside :root, only --name variables are read");
                 continue;
             }
             std::string problem;
             std::optional<std::string> value = SubstituteVariables(declaration.value, theme.variables, &problem);
             if (!value) {
-                theme.problems.push_back(AtLine(source.file, declaration.line) + " : " + problem + ", ignorée");
+                theme.problems.push_back(AtLine(source.file, declaration.line) + ": " + problem + ", ignored");
                 continue;
             }
             std::string name = LowerText(std::string_view(declaration.property).substr(2));
@@ -226,8 +226,8 @@ void AddAssignment(const Rule& rule, const PropertySpec& spec, const Value& valu
     for (const Selector& selector : rule.selectors) {
         // A move is not a value that can come and go with the pointer: the other items would shift each time.
         if (selector.hover && spec.kind == PropertyKind::Order) {
-            theme.problems.push_back(AtLine(source.file, declaration.line) + " : « " + declaration.property +
-                                     " » impossible sous :hover (" + selector.text + "), ignorée");
+            theme.problems.push_back(AtLine(source.file, declaration.line) + ": \"" + declaration.property +
+                                     "\" is not possible under :hover (" + selector.text + "), ignored");
             continue;
         }
         Assignment assignment{selector, SpecificityOf(selector), std::string(spec.xaml), value, declaration.important,
@@ -243,8 +243,8 @@ bool AddFontRole(const Rule& rule, const Declaration& declaration, const std::st
                  const RuleSource& source, bool applied, Theme& theme) {
     std::optional<FontStyle> style = ResolveFontRole(std::vector<const Theme*>{&theme, source.base}, value);
     if (!style) {
-        theme.problems.push_back(AtLine(source.file, declaration.line) + " : rôle de police « " + value +
-                                 " » inconnu, ignorée");
+        theme.problems.push_back(AtLine(source.file, declaration.line) + ": font role \"" + value +
+                                 "\" is unknown, ignored");
         return false;
     }
     if (!applied) return true;
@@ -267,15 +267,15 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
         if (rule.root) continue;
         for (const Declaration& declaration : rule.declarations) {
             if (declaration.property.starts_with("--")) {
-                theme.problems.push_back(AtLine(source.file, declaration.line) + " : variable « " +
-                                         declaration.property + " » hors de :root, ignorée");
+                theme.problems.push_back(AtLine(source.file, declaration.line) + ": variable \"" +
+                                         declaration.property + "\" outside :root, ignored");
                 continue;
             }
 
             std::string problem;
             std::optional<std::string> raw = SubstituteVariables(declaration.value, theme.variables, &problem);
             if (!raw) {
-                theme.problems.push_back(AtLine(source.file, declaration.line) + " : " + problem + ", ignorée");
+                theme.problems.push_back(AtLine(source.file, declaration.line) + ": " + problem + ", ignored");
                 continue;
             }
 
@@ -286,15 +286,15 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
 
             const PropertySpec* spec = FindProperty(declaration.property);
             if (!spec) {
-                theme.problems.push_back(AtLine(source.file, declaration.line) + " : propriété « " +
-                                         declaration.property + " » inconnue, ignorée");
+                theme.problems.push_back(AtLine(source.file, declaration.line) + ": property \"" +
+                                         declaration.property + "\" is unknown, ignored");
                 continue;
             }
 
             Conversion conversion = ConvertValue(*spec, *raw, context);
             if (!conversion.value) {
-                theme.problems.push_back(AtLine(source.file, declaration.line) + " : " + conversion.problem +
-                                         ", ignorée");
+                theme.problems.push_back(AtLine(source.file, declaration.line) + ": " + conversion.problem +
+                                         ", ignored");
                 continue;
             }
 
@@ -323,7 +323,7 @@ Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& fi
 
     bool isTheme = !theme.schemes.empty() || files.Exists("resources.xaml") || hasRules;
     if (!isTheme) {
-        theme.problems.push_back("aucun fichier de thème (colors.ini, resources.xaml ou user.css) : pas un thème");
+        theme.problems.push_back("no theme file (colors.ini, resources.xaml or user.css): not a theme");
         return theme;
     }
 
@@ -354,13 +354,13 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
     }
 
     if (files.Exists("colors.ini")) {
-        snippet.problems.push_back("colors.ini ignoré : un snippet utilise les couleurs du thème actif ($nom)");
+        snippet.problems.push_back("colors.ini ignored: a snippet uses the colors of the active theme ($name)");
     }
 
     bool dictionaryOk = LoadDictionary(files, options, snippet);
     bool isSnippet = files.Exists("resources.xaml") || files.Exists("user.css");
     if (!isSnippet) {
-        snippet.problems.push_back("aucun fichier de snippet (resources.xaml ou user.css) : pas un snippet");
+        snippet.problems.push_back("no snippet file (resources.xaml or user.css): not a snippet");
         return snippet;
     }
     snippet.usable = dictionaryOk;
@@ -408,7 +408,7 @@ std::optional<std::string> SubstituteVariables(std::string_view value, const std
             }
         }
         if (close == std::string::npos) {
-            if (problem) *problem = "var( sans parenthèse fermante";
+            if (problem) *problem = "var( without a closing parenthesis";
             return std::nullopt;
         }
 
@@ -416,7 +416,7 @@ std::optional<std::string> SubstituteVariables(std::string_view value, const std
         size_t comma = inside.find(',');
         std::string name = LowerText(Trim(inside.substr(0, comma)));
         if (!name.starts_with("--") || name.size() == 2) {
-            if (problem) *problem = "var() attend un nom --variable";
+            if (problem) *problem = "var() needs a --variable name";
             return std::nullopt;
         }
 
@@ -427,12 +427,12 @@ std::optional<std::string> SubstituteVariables(std::string_view value, const std
         } else if (comma != std::string_view::npos) {
             replacement = std::string(Trim(inside.substr(comma + 1)));
         } else {
-            if (problem) *problem = "variable « " + name + " » non définie";
+            if (problem) *problem = "variable \"" + name + "\" is not defined";
             return std::nullopt;
         }
         text = text.substr(0, start) + replacement + text.substr(close + 1);
     }
-    if (problem) *problem = "trop de var() imbriqués";
+    if (problem) *problem = "too many nested var()";
     return std::nullopt;
 }
 
@@ -473,4 +473,4 @@ std::vector<std::string> XamlKeys(std::string_view xaml) {
     return keys;
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

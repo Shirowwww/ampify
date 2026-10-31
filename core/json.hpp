@@ -7,7 +7,7 @@
 #include <variant>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
 // A small JSON value: enough for manifests and storage files. Objects keep their member order, so
 // Dump() is deterministic. Parsing is strict RFC 8259 with a nesting limit, so a hostile file cannot
@@ -52,4 +52,4 @@ private:
     std::variant<std::nullptr_t, bool, double, std::string, Array, Object> m_value{nullptr};
 };
 
-}  // namespace amk
+}  // namespace ampify

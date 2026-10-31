@@ -11,7 +11,7 @@
 #include "files.hpp"
 #include "tree.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // The CSS properties a theme may set, and the XAML property each one maps to.
 enum class PropertyKind {
@@ -63,4 +63,4 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
 // Shortest text that reads back to the same number, without trailing zeros: 18, 0.5, -4.
 std::string FormatNumber(double number);
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

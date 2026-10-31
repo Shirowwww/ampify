@@ -1,6 +1,6 @@
-// Wine harness for the Windows hook layer and the Atmos glue. Built only with -DAMK_BUILD_HARNESS=ON.
-// Run it from the build folder:  amk_hook_harness.exe            (hook tests)
-//                                amk_hook_harness.exe Glue       (leveler start, its own process)
+// Wine harness for the Windows hook layer and the Atmos glue. Built only with -DAMPIFY_BUILD_HARNESS=ON.
+// Run it from the build folder:  ampify_hook_harness.exe            (hook tests)
+//                                ampify_hook_harness.exe Glue       (leveler start, its own process)
 // The glue hooks the same import the import test uses, so the two never share a process.
 
 #include <windows.h>
@@ -27,9 +27,9 @@
 #include "../test.hpp"
 
 extern "C" __declspec(dllimport) void __cdecl AVCFPlayerSetVolume(void* player, float volume);
-extern "C" __declspec(dllimport) int __cdecl amk_fake_volume_calls();
-extern "C" __declspec(dllimport) void __cdecl amk_fake_set_variant_known(int known);
-extern "C" __declspec(dllimport) int __cdecl amk_fake_track_reads();
+extern "C" __declspec(dllimport) int __cdecl ampify_fake_volume_calls();
+extern "C" __declspec(dllimport) void __cdecl ampify_fake_set_variant_known(int known);
+extern "C" __declspec(dllimport) int __cdecl ampify_fake_track_reads();
 
 namespace {
 
@@ -93,11 +93,11 @@ struct FakeObject {
 TEST_CASE(Vtable_ReplacementRunsAndCanCallTheOriginal) {
     void* table[2] = {AddressOf(Original), AddressOf(Original)};
     FakeObject object{table};
-    void** entry = amk::win::VtableEntry(&object, 1);
+    void** entry = ampify::win::VtableEntry(&object, 1);
 
     std::string why;
     void* original = nullptr;
-    CHECK(amk::win::HookVtableEntry(entry, AddressOf(Replacement), &original, why));
+    CHECK(ampify::win::HookVtableEntry(entry, AddressOf(Replacement), &original, why));
     CHECK(original == AddressOf(Original));
     g_original = original;
 
@@ -109,11 +109,11 @@ TEST_CASE(Vtable_ReplacementRunsAndCanCallTheOriginal) {
 
     // A second hook on the same entry hands back the first original and keeps the replacement.
     void* again = nullptr;
-    CHECK(amk::win::HookVtableEntry(entry, AddressOf(Replacement), &again, why));
+    CHECK(ampify::win::HookVtableEntry(entry, AddressOf(Replacement), &again, why));
     CHECK(again == AddressOf(Original));
 
     // The table is local to this test: put the entry back before it goes, or a later restore writes into this stack.
-    amk::win::RestoreHooks();
+    ampify::win::RestoreHooks();
     CHECK(*entry == AddressOf(Original));
 }
 
@@ -124,14 +124,14 @@ TEST_CASE(Vtable_RefusesMethodsOfProtectedModules) {
         CHECK(module != nullptr);
         if (!module) continue;
 
-        void* method = AddressOf(GetProcAddress(module, "amk_fake_protected_method"));
+        void* method = AddressOf(GetProcAddress(module, "ampify_fake_protected_method"));
         void* table[1] = {method};
         FakeObject object{table};
 
         std::string why;
         void* original = nullptr;
-        CHECK(!amk::win::HookVtableEntry(amk::win::VtableEntry(&object, 0), AddressOf(Replacement), &original, why));
-        CHECK(why.find("protégé") != std::string::npos);
+        CHECK(!ampify::win::HookVtableEntry(ampify::win::VtableEntry(&object, 0), AddressOf(Replacement), &original, why));
+        CHECK(why.find("protected") != std::string::npos);
         CHECK(table[0] == method);
     }
 }
@@ -153,12 +153,12 @@ __attribute__((noinline)) void CallImportedVolume(float volume) {
 }
 
 TEST_CASE(Import_ReplacesCallsMadeThroughTheImportTable) {
-    int before = amk_fake_volume_calls();
+    int before = ampify_fake_volume_calls();
     CallImportedVolume(0.5f);
-    CHECK(amk_fake_volume_calls() == before + 1);
+    CHECK(ampify_fake_volume_calls() == before + 1);
 
     void* original = nullptr;
-    size_t replaced = amk::win::HookImportEverywhere("AVFoundationCF.dll", "AVCFPlayerSetVolume",
+    size_t replaced = ampify::win::HookImportEverywhere("AVFoundationCF.dll", "AVCFPlayerSetVolume",
                                                      AddressOf(ImportReplacement), &original);
     CHECK(replaced >= 1);
 
@@ -168,9 +168,9 @@ TEST_CASE(Import_ReplacesCallsMadeThroughTheImportTable) {
 
     CallImportedVolume(0.25f);
     CHECK(g_importReplacementCalls == 1);
-    CHECK(amk_fake_volume_calls() == before + 2);  // the replacement passed the call on
+    CHECK(ampify_fake_volume_calls() == before + 2);  // the replacement passed the call on
 
-    amk::win::RestoreHooks();
+    ampify::win::RestoreHooks();
     CallImportedVolume(0.1f);
     CHECK(g_importReplacementCalls == 1);  // back to the import: the replacement is not called again
 }
@@ -242,10 +242,10 @@ void PlayToneThroughHookedStream(bool& float32) {
     if (SUCCEEDED(com)) CoUninitialize();
 }
 
-// The journal of the glue, shared by the Glue tests: they run in this order, in one process, and the leveler
+// The log of the glue, shared by the Glue tests: they run in this order, in one process, and the leveler
 // starts once.
 std::ostringstream g_glueText;
-amk::Journal g_glueJournal(g_glueText, [] { return std::string("00:00:00.000"); });
+ampify::Journal g_glueJournal(g_glueText, [] { return std::string("00:00:00.000"); });
 bool g_glueStarted = false;
 
 bool Journaled(const std::string& line) {
@@ -262,42 +262,42 @@ TEST_CASE(Glue_StartsOnWineAndMetersTheStereoStream) {
     std::ofstream(levels, std::ios::binary | std::ios::trunc) << "stereo -16.0\nstereo -16.0\natmos abc123 -20.0 300.0\n";
 
     // The item is still loading: no stable variant yet.
-    amk_fake_set_variant_known(0);
+    ampify_fake_set_variant_known(0);
 
-    amk::Settings settings;
-    amk::ExtensionInfo info = atmos::hooks::MakeAtmosLevelerExtension(g_glueJournal, settings);
+    ampify::Settings settings;
+    ampify::ExtensionInfo info = atmos::hooks::MakeAtmosLevelerExtension(g_glueJournal, settings);
     CHECK(info.id == "atmos-leveler");
     CHECK(!info.enabledByDefault);
 
     g_glueStarted = info.start();
     CHECK(g_glueStarted);
-    CHECK(Journaled("hook AVCFPlayerSetVolume posé"));
-    CHECK(Journaled("niveaux relus : 1 variante(s) Atmos, 2 morceau(x) stéréo"));
+    CHECK(Journaled("hook AVCFPlayerSetVolume placed"));
+    CHECK(Journaled("levels read back: 1 Atmos variant(s), 2 stereo track(s)"));
 
     // Apple Music sets the player's volume: the hook sees the player, and the poll thread finds its item.
     static char player;
-    int volumeCalls = amk_fake_volume_calls();
+    int volumeCalls = ampify_fake_volume_calls();
     AVCFPlayerSetVolume(&player, 0.5f);
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // Without a variant the item is left alone: its tracks are not even read.
-    CHECK(amk_fake_track_reads() == 0);
-    CHECK(!Journaled("piste Dolby Atmos"));
+    CHECK(ampify_fake_track_reads() == 0);
+    CHECK(!Journaled("Dolby Atmos track"));
 
-    amk_fake_set_variant_known(1);
+    ampify_fake_set_variant_known(1);
     bool float32 = false;
     PlayToneThroughHookedStream(float32);
     CHECK(float32);
     std::this_thread::sleep_for(std::chrono::seconds(1));  // a few poll cycles after the item is known
 
     // The stereo render client was identified, and the stereo meter took its rate.
-    CHECK(Journaled("mesure stéréo à "));
+    CHECK(Journaled("stereo measurement at "));
     // The fake item is Dolby Atmos: it starts at the fallback gain, then jumps to its saved level, 4 dB under
     // the saved stereo target.
-    CHECK(Journaled("piste Dolby Atmos, variante abc123, gain de départ 5.0 dB"));
+    CHECK(Journaled("Dolby Atmos track, variant abc123, starting gain 5.0 dB"));
     CHECK(Journaled("gain 5.0 -> 4.0 dB"));
     // The slider was never moved: the only call to AVCFPlayerSetVolume is the one above.
-    CHECK(amk_fake_volume_calls() == volumeCalls + 1);
+    CHECK(ampify_fake_volume_calls() == volumeCalls + 1);
     CHECK(!Journaled("CoreFP"));
 }
 
@@ -419,13 +419,13 @@ TEST_CASE(Glue_HooksTheMetadataStreamAndGainsItsObjects) {
     params.blob.pBlobData = reinterpret_cast<BYTE*>(&activation);
     atmos::hooks::testing::SpatialStreamActivated(&params, atmos::hooks::kIidRenderStreamForMetadata, &fake);
 
-    CHECK(Journaled("flux spatial activé : ISpatialAudioObjectRenderStreamForMetadata "
+    CHECK(Journaled("spatial stream activated: ISpatialAudioObjectRenderStreamForMetadata "
                     "(IID BBC9C907-48D5-4A2E-A0C7-F7F0D67C1FB1)"));
-    CHECK(Journaled("mesure Atmos à 48000 Hz"));
-    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::BeginUpdatingAudioObjects posé"));
-    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::EndUpdatingAudioObjects posé"));
-    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::ActivateSpatialAudioObjectForMetadataCommands posé"));
-    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::ActivateSpatialAudioObjectForMetadataItems posé"));
+    CHECK(Journaled("Atmos measurement at 48000 Hz"));
+    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::BeginUpdatingAudioObjects placed"));
+    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::EndUpdatingAudioObjects placed"));
+    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::ActivateSpatialAudioObjectForMetadataCommands placed"));
+    CHECK(Journaled("hook ISpatialAudioObjectRenderStreamForMetadata::ActivateSpatialAudioObjectForMetadataItems placed"));
 
     MetadataStream* stream = Opaque<MetadataStream>(&fake);
     ISpatialAudioObjectBase* commands = nullptr;
@@ -433,8 +433,8 @@ TEST_CASE(Glue_HooksTheMetadataStreamAndGainsItsObjects) {
     CHECK(SUCCEEDED(stream->ActivateSpatialAudioObjectForMetadataCommands(AudioObjectType_Dynamic, &commands)));
     CHECK(SUCCEEDED(stream->ActivateSpatialAudioObjectForMetadataItems(AudioObjectType_Dynamic, &items)));
     CHECK(fake.activations == 2);  // the hooks passed the calls on
-    CHECK(Journaled("hook ISpatialAudioObjectForMetadataCommands::GetBuffer posé"));
-    CHECK(Journaled("hook ISpatialAudioObjectForMetadataItems::GetBuffer posé"));
+    CHECK(Journaled("hook ISpatialAudioObjectForMetadataCommands::GetBuffer placed"));
+    CHECK(Journaled("hook ISpatialAudioObjectForMetadataItems::GetBuffer placed"));
     if (!commands || !items) return;
     commands = Opaque(commands);
     items = Opaque(items);
@@ -468,17 +468,17 @@ TEST_CASE(Glue_HooksTheMetadataStreamAndGainsItsObjects) {
     std::cout << g_glueText.str();
 }
 
-// AMK.audio on the same hooks: the analysis and the equalizer see the stereo stream that the leveler meters.
+// Ampify.audio on the same hooks: the analysis and the equalizer see the stereo stream that the leveler meters.
 // The tone is played twice, flat then with +6 dB on the 1 kHz band: the analysed 1 kHz band rises by 6 dB.
 TEST_CASE(Glue_AnalysisAndEqualizerSeeTheStereoStream) {
     CHECK(g_glueStarted);
     if (!g_glueStarted) return;
-    amk::audio::AudioEngine& engine = amk::audio::ProcessAudio();
+    ampify::audio::AudioEngine& engine = ampify::audio::ProcessAudio();
     engine.Analyze("harness");  // starts the analysis
     CHECK(engine.Eq().IsFlat());
 
     auto band1k = [&engine]() -> double {
-        amk::AudioAnalysisResult result = engine.Analyze("harness");
+        ampify::AudioAnalysisResult result = engine.Analyze("harness");
         if (!result.frame || result.frame->bandsDb.size() <= 8) return -200;
         return result.frame->bandsDb[8];  // the band of 800 Hz to 1.16 kHz
     };
@@ -492,7 +492,7 @@ TEST_CASE(Glue_AnalysisAndEqualizerSeeTheStereoStream) {
     CHECK(engine.SetEqBand("harness", 5, 6.0));
     PlayToneThroughHookedStream(float32);
     double boosted = band1k();
-    std::cout << "bande 1 kHz : " << flat << " dB à plat, " << boosted << " dB avec +6 dB\n";
+    std::cout << "1 kHz band: " << flat << " dB flat, " << boosted << " dB with +6 dB\n";
     CHECK(flat > -30);
     CHECK_NEAR(boosted - flat, 6.0, 0.5);
 
@@ -510,21 +510,21 @@ int main(int argc, char** argv) {
     std::string prefix = argc > 1 ? argv[1] : "";
     int ran = 0;
     int passed = 0;
-    for (const amk::test::Case& test : amk::test::Cases()) {
+    for (const ampify::test::Case& test : ampify::test::Cases()) {
         bool glue = test.name.rfind("Glue", 0) == 0;
         bool selected = prefix.empty() ? !glue : test.name.rfind(prefix, 0) == 0;
         if (!selected) continue;
 
-        int before = amk::test::Failures();
+        int before = ampify::test::Failures();
         try {
             test.run();
         } catch (const std::exception& error) {
-            amk::test::ReportFailure(test.name.c_str(), 0, std::string("exception: ") + error.what());
+            ampify::test::ReportFailure(test.name.c_str(), 0, std::string("exception: ") + error.what());
         } catch (...) {
-            amk::test::ReportFailure(test.name.c_str(), 0, "exception");
+            ampify::test::ReportFailure(test.name.c_str(), 0, "exception");
         }
         ran++;
-        if (amk::test::Failures() == before) {
+        if (ampify::test::Failures() == before) {
             passed++;
         } else {
             std::cerr << "FAILED: " << test.name << '\n';
@@ -532,5 +532,5 @@ int main(int argc, char** argv) {
     }
 
     std::cout << passed << " / " << ran << " harness tests passed\n";
-    return amk::test::Failures() == 0 ? 0 : 1;
+    return ampify::test::Failures() == 0 ? 0 : 1;
 }

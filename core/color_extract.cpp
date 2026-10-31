@@ -5,7 +5,7 @@
 #include <cmath>
 #include <cstdio>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -250,4 +250,4 @@ std::optional<ExtractedColors> ExtractColors(const uint8_t* rgba, size_t size, s
     return out;
 }
 
-}  // namespace amk
+}  // namespace ampify

@@ -9,7 +9,7 @@
 #include "../core/amp_abi.hpp"
 #include "win_common.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -239,4 +239,4 @@ std::string AmpPlayer::ProbeQueue() {
     return found + " ; Sections = " + rt::ClassName(sections) + " (interfaces : " + ListIids(rt::Iids(sections)) + ")";
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

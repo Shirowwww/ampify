@@ -7,10 +7,10 @@
 
 #include <filesystem>
 
-namespace amk::testkit {
+namespace ampify::testkit {
 
 // The trace session that the test kit creates and stops. The session lives only until it is stopped or Windows restarts.
-inline constexpr const wchar_t* kTraceSession = L"AMK_M5";
+inline constexpr const wchar_t* kTraceSession = L"AMPIFY_M5";
 
 // Starts the trace into `etlFile`. With `firstProviderOnly`, only the first provider is recorded: used when the
 // full list is refused by this Windows build. Returns logman's exit code, or -1 when it did not run or was refused.
@@ -20,4 +20,4 @@ int StartTrace(const std::filesystem::path& etlFile, bool firstProviderOnly);
 // Stops the trace session. Returns logman's exit code, or -1 when it did not run or was refused.
 int StopTrace();
 
-}  // namespace amk::testkit
+}  // namespace ampify::testkit

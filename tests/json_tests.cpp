@@ -5,7 +5,7 @@
 
 TEST_CASE(Json_ParsesNestedValuesAndDumpsThemBack) {
     std::string error;
-    auto value = amk::Json::Parse(R"({"b":[1,2.5,true,null],"a":{"s":"x"}})", &error);
+    auto value = ampify::Json::Parse(R"({"b":[1,2.5,true,null],"a":{"s":"x"}})", &error);
     CHECK(value.has_value());
     CHECK(error.empty());
     CHECK(value->Dump() == R"({"b":[1,2.5,true,null],"a":{"s":"x"}})");
@@ -14,40 +14,40 @@ TEST_CASE(Json_ParsesNestedValuesAndDumpsThemBack) {
 }
 
 TEST_CASE(Json_DecodesEscapesAndSurrogatePairs) {
-    auto value = amk::Json::Parse(R"("\u00e9\n\ud83c\udfb5")");
+    auto value = ampify::Json::Parse(R"("\u00e9\n\ud83c\udfb5")");
     CHECK(value.has_value());
     CHECK(*value->AsString() == "\xC3\xA9\n\xF0\x9F\x8E\xB5");  // é, newline, U+1F3B5
 }
 
 TEST_CASE(Json_RejectsMalformedInput) {
-    CHECK(!amk::Json::Parse("{\"a\":1,}"));          // trailing comma
-    CHECK(!amk::Json::Parse("\"unterminated"));
-    CHECK(!amk::Json::Parse("[1 2]"));
-    CHECK(!amk::Json::Parse("01"));                 // leading zero
-    CHECK(!amk::Json::Parse("\"\x01\""));            // raw control character
-    CHECK(!amk::Json::Parse("\"\\ud800\""));         // lone surrogate
-    CHECK(!amk::Json::Parse("{} {}"));               // trailing text
+    CHECK(!ampify::Json::Parse("{\"a\":1,}"));          // trailing comma
+    CHECK(!ampify::Json::Parse("\"unterminated"));
+    CHECK(!ampify::Json::Parse("[1 2]"));
+    CHECK(!ampify::Json::Parse("01"));                 // leading zero
+    CHECK(!ampify::Json::Parse("\"\x01\""));            // raw control character
+    CHECK(!ampify::Json::Parse("\"\\ud800\""));         // lone surrogate
+    CHECK(!ampify::Json::Parse("{} {}"));               // trailing text
 }
 
 TEST_CASE(Json_LimitsNestingDepth) {
     std::string deep(100, '[');
     deep += std::string(100, ']');
     std::string error;
-    CHECK(!amk::Json::Parse(deep, &error));
+    CHECK(!ampify::Json::Parse(deep, &error));
     CHECK(!error.empty());
 }
 
 TEST_CASE(Json_DumpEscapesStringsAndWritesIntegersWithoutDecimals) {
-    amk::Json value(std::string("a\"b\\c\n\x01"));
+    ampify::Json value(std::string("a\"b\\c\n\x01"));
     CHECK(value.Dump() == "\"a\\\"b\\\\c\\n\\u0001\"");
-    CHECK(amk::Json(3.0).Dump() == "3");
-    CHECK(amk::Json(0.5).Dump() == "0.5");
+    CHECK(ampify::Json(3.0).Dump() == "3");
+    CHECK(ampify::Json(0.5).Dump() == "0.5");
 }
 
 TEST_CASE(Json_SetReplacesAnExistingMember) {
-    amk::Json object(amk::Json::Object{{"k", amk::Json(1.0)}});
-    object.Set("k", amk::Json(2.0));
-    object.Set("n", amk::Json(true));
+    ampify::Json object(ampify::Json::Object{{"k", ampify::Json(1.0)}});
+    object.Set("k", ampify::Json(2.0));
+    object.Set("n", ampify::Json(true));
     CHECK(object.Dump() == R"({"k":2,"n":true})");
 }
 
@@ -73,7 +73,7 @@ TEST_CASE(Json_SurvivesMutatedAndRandomInput) {
                 default: text.insert(at, 1, static_cast<char>(next() % 128)); break;
             }
         }
-        if (amk::Json::Parse(text)) accepted++;
+        if (ampify::Json::Parse(text)) accepted++;
     }
     CHECK(accepted > 0);  // some mutations stay valid, and the reader keeps accepting them
 
@@ -81,7 +81,7 @@ TEST_CASE(Json_SurvivesMutatedAndRandomInput) {
         std::string noise;
         size_t length = next() % 64;
         for (size_t i = 0; i < length; i++) noise += static_cast<char>(next() % 256);
-        amk::Json::Parse(noise);  // only the absence of a crash matters
+        ampify::Json::Parse(noise);  // only the absence of a crash matters
     }
-    CHECK(amk::Json::Parse(valid).has_value());
+    CHECK(ampify::Json::Parse(valid).has_value());
 }

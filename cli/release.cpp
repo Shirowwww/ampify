@@ -6,7 +6,7 @@
 #include "json.hpp"
 #include "sha256.hpp"
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -35,13 +35,13 @@ std::optional<ReleaseInfo> ParseRelease(std::string_view text, std::string& erro
     std::string syntaxError;
     std::optional<json::Value> document = json::Parse(text, syntaxError);
     if (!document || !document->IsObject()) {
-        error = "réponse de la release illisible" + (syntaxError.empty() ? std::string() : " : " + syntaxError);
+        error = "unreadable release answer" + (syntaxError.empty() ? std::string() : ": " + syntaxError);
         return std::nullopt;
     }
 
     const json::Value* tag = document->Find("tag_name");
     if (tag == nullptr || !tag->IsString() || tag->AsString().empty()) {
-        error = "release sans tag_name";
+        error = "release without tag_name";
         return std::nullopt;
     }
 
@@ -100,4 +100,4 @@ int CompareReleaseVersions(std::string_view left, std::string_view right) {
     return 0;
 }
 
-}  // namespace amk
+}  // namespace ampify

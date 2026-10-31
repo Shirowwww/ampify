@@ -1,9 +1,9 @@
 // Module console: the global console, written to the journal through native.log. JavaScript only, no natives.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kConsole[];
-const char kConsole[] = R"AMKJS(
+const char kConsole[] = R"AMPIFYJS(
   function logLine(prefix, args) {
     native.log(prefix + args.map(describe).join(" "));
   }
@@ -11,11 +11,11 @@ const char kConsole[] = R"AMKJS(
   const console = {
     log: (...args) => logLine("", args),
     info: (...args) => logLine("", args),
-    warn: (...args) => logLine("[avertissement] ", args),
-    error: (...args) => logLine("[erreur] ", args),
+    warn: (...args) => logLine("[warning] ", args),
+    error: (...args) => logLine("[error] ", args),
   };
 
   globalThis.console = console;
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

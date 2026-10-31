@@ -1,17 +1,17 @@
 // Natives of the module core (core/prelude/core.cpp): the journal, the shared permission check, and the constants
-// behind AMK.version, kitApi, process and locale.
+// behind Ampify.version, kitApi, process and locale.
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
 struct CoreNatives : ScriptBridge {
     using ScriptBridge::Require;
 
-    AMK_NATIVE(Log) {
+    AMPIFY_NATIVE(Log) {
         ScriptExtension* ext = Owner(ctx);
         std::string message = String(ctx, argc, argv, 0).value_or("");
         JournalOf(ext).Write("[" + ext->id() + "] " + message);
@@ -19,7 +19,7 @@ struct CoreNatives : ScriptBridge {
     }
 
     // native.require(permission): throws PermissionDenied when the manifest does not declare it.
-    AMK_NATIVE(Require) {
+    AMPIFY_NATIVE(Require) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, String(ctx, argc, argv, 0).value_or(""), &failure)) return failure;
@@ -38,4 +38,4 @@ void DefineCore(api::NativeScope& scope) {
     scope.String("locale", ScriptBridge::HostOf(&scope.extension()).Locale());
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

@@ -1,11 +1,11 @@
 {
   "$schema": "../../schemas/manifest.schema.json",
   "id": "visualizer-data",
-  "name": "Données du visualiseur",
+  "name": "Visualizer data",
   "version": "0.1.0",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Écrit dans le journal le spectre, le niveau, le tempo et la loudness de ce qui joue. Base pour un visualiseur.",
+  "description": "Writes the spectrum, level, tempo and loudness of what is playing to the log. A starting point for a visualizer.",
   "kitApi": "1.0",
   "main": "main.js",
   "permissions": ["audio.analyze", "player.read"],

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Packs an element folder into the zip that the catalogue points to, and pins its SHA-256.
+"""Packs an element folder into the zip that the catalog points to, and pins its SHA-256.
 
-    python3 tools/pack.py <dossier> --out <archive.zip>
-    python3 tools/pack.py <dossier> --out <archive.zip> --catalog catalog/catalog.json --url https://...
+    python3 tools/pack.py <folder> --out <archive.zip>
+    python3 tools/pack.py <folder> --out <archive.zip> --catalog catalog/catalog.json --url https://...
 
-The archive holds the files of the folder at its root, with manifest.json among them, as docs/extensions/CATALOG.md
+The archive holds the files of the folder at its root, with manifest.json among them, as docs/extensions/catalog.md
 requires. The zip is deterministic: entries are sorted and carry a fixed timestamp, so the same folder always gives
-the same SHA-256. With --catalog, the entry for the element is added or replaced, and the catalogue is validated.
+the same SHA-256. With --catalog, the entry for the element is added or replaced, and the catalog is validated.
 """
 
 import argparse
@@ -19,7 +19,7 @@ import sys
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import validate  # noqa: E402  (same folder: the schemas and rules of the kit)
+import validate  # noqa: E402  (same folder: the schemas and rules of Ampify)
 
 FIXED_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 
@@ -32,12 +32,12 @@ def check_folder(folder):
     """Runs the manifest checks of validate.py. Raises PackError with the reasons."""
     manifest = os.path.join(folder, "manifest.json")
     if not os.path.isfile(manifest):
-        raise PackError(f"{folder} : manifest.json absent")
+        raise PackError(f"{folder}: manifest.json missing")
     report = io.StringIO()
     with contextlib.redirect_stdout(report):
         status = validate.main(["manifest", manifest])
     if status != 0:
-        raise PackError(report.getvalue().strip() or f"{manifest} : invalide")
+        raise PackError(report.getvalue().strip() or f"{manifest}: invalid")
     with open(manifest, encoding="utf-8") as handle:
         return json.load(handle)
 
@@ -50,11 +50,11 @@ def files_of(folder):
         for name in sorted(files):
             full = os.path.join(root, name)
             if os.path.islink(full):
-                raise PackError(f"lien symbolique interdit : {full}")
+                raise PackError(f"symbolic link not allowed: {full}")
             found.append(os.path.relpath(full, folder).replace(os.sep, "/"))
         for name in dirs:
             if os.path.islink(os.path.join(root, name)):
-                raise PackError(f"lien symbolique interdit : {os.path.join(root, name)}")
+                raise PackError(f"symbolic link not allowed: {os.path.join(root, name)}")
     return sorted(found)
 
 
@@ -101,13 +101,13 @@ def update_catalog(catalog_path, entry):
     with contextlib.redirect_stdout(report):
         status = validate.main(["catalog", catalog_path])
     if status != 0:
-        raise PackError(f"catalogue invalide après l'ajout de {entry['id']} : {report.getvalue().strip()}")
+        raise PackError(f"invalid catalog after adding {entry['id']}: {report.getvalue().strip()}")
 
 
 def pack(folder, archive, catalog=None, url=None):
     manifest = check_folder(folder)
     if catalog and not url:
-        raise PackError("--catalog demande aussi --url, l'adresse https où l'archive sera publiée")
+        raise PackError("--catalog also needs --url, the https address where the archive will be published")
     sha256 = build_archive(folder, archive)
     if catalog:
         update_catalog(catalog, catalog_entry(manifest, url, sha256))
@@ -115,17 +115,17 @@ def pack(folder, archive, catalog=None, url=None):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Empaquette un élément du kit et fixe son SHA-256.")
-    parser.add_argument("folder", help="dossier de l'élément, avec son manifest.json")
-    parser.add_argument("--out", required=True, help="archive .zip à créer")
-    parser.add_argument("--catalog", help="catalogue à mettre à jour (catalog/catalog.json)")
-    parser.add_argument("--url", help="adresse https:// où l'archive sera publiée")
+    parser = argparse.ArgumentParser(description="Packs an Ampify element and pins its SHA-256.")
+    parser.add_argument("folder", help="element folder, with its manifest.json")
+    parser.add_argument("--out", required=True, help="the .zip archive to create")
+    parser.add_argument("--catalog", help="catalog to update (catalog/catalog.json)")
+    parser.add_argument("--url", help="https:// address where the archive will be published")
     args = parser.parse_args(argv)
 
     try:
         result = pack(args.folder, args.out, args.catalog, args.url)
     except (PackError, OSError, KeyError, ValueError) as error:
-        print(f"pack : {error}", file=sys.stderr)
+        print(f"pack: {error}", file=sys.stderr)
         return 1
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0

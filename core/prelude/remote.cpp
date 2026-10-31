@@ -1,20 +1,20 @@
-// Module remote: AMK.remote, the element's part of the local remote control's GET /status. Natives:
+// Module remote: Ampify.remote, the element's part of the local remote control's GET /status. Natives:
 // core/natives/remote.cpp.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kRemote[];
-const char kRemote[] = R"AMKJS(
-  AMK.remote = {
+const char kRemote[] = R"AMPIFYJS(
+  Ampify.remote = {
     // state: a plain object, 4 KB at most once in JSON. Shown under extensions.<id> in GET /status.
     // Returns false when the remote control is off (setting remote.enabled) or not offered by this host.
     setState(state) {
       if (typeof state !== "object" || state === null || Array.isArray(state)) {
-        throw new TypeError("remote.setState attend un objet");
+        throw new TypeError("remote.setState expects an object");
       }
       return native.remoteState(JSON.stringify(state));
     },
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

@@ -8,7 +8,7 @@
 #include <optional>
 #include <string>
 
-namespace amk::launcher {
+namespace ampify::launcher {
 
 struct InstalledPackage {
     std::wstring fullName;            // e.g. AppleInc.AppleMusicWin_1.1540.23042.0_x64__nzyj5cx40ttqa
@@ -23,4 +23,4 @@ std::optional<InstalledPackage> FindInstalledPackage(const wchar_t* familyName);
 HRESULT ActivateApp(const wchar_t* appUserModelId, DWORD* processId, const std::wstring& arguments = {});
 
 
-}  // namespace amk::launcher
+}  // namespace ampify::launcher

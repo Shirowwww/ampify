@@ -1,6 +1,6 @@
 #pragma once
 
-// The optional host service behind AMK.discord (permission ipc.discord, setting discord.enabled). The Windows host
+// The optional host service behind Ampify.discord (permission ipc.discord, setting discord.enabled). The Windows host
 // talks to the Discord client through \\.\pipe\discord-ipc-<n> (win/discord_ipc.*).
 
 #include <string>
@@ -8,7 +8,7 @@
 
 #include "../discord_frame.hpp"
 
-namespace amk {
+namespace ampify {
 
 struct DiscordHost {
     static constexpr std::string_view kCapabilityName = "discord";
@@ -20,8 +20,8 @@ struct DiscordHost {
     virtual bool SetActivity(const std::string& elementId, const std::string& clientId,
                              const discord::Activity& activity) = 0;
 
-    // Clears the presence if this element set it. Called by AMK.discord.clear and when the element stops.
+    // Clears the presence if this element set it. Called by Ampify.discord.clear and when the element stops.
     virtual void ClearActivity(const std::string& elementId) = 0;
 };
 
-}  // namespace amk
+}  // namespace ampify

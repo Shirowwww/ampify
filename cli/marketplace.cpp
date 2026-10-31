@@ -19,27 +19,28 @@
 #include "element.hpp"
 #include "internal.hpp"
 #include "kit.hpp"
+#include "messages.hpp"
 #include "platform.hpp"
 #include "release.hpp"
 #include "sha256.hpp"
 
-#ifndef AMK_VERSION
-#define AMK_VERSION "0.0.0-dev"
+#ifndef AMPIFY_VERSION
+#define AMPIFY_VERSION "0.0.0-dev"
 #endif
 
-namespace amk::cli {
+namespace ampify::cli {
 
 namespace {
 
 constexpr const char* kDefaultCatalog =
-    "https://raw.githubusercontent.com/Shirowwww/apple-music-mod-kit/main/catalog/catalog.json";
+    "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog.json";
 constexpr const char* kDefaultRelease =
-    "https://api.github.com/repos/Shirowwww/apple-music-mod-kit/releases/latest";
-// A given release, by its tag: `amk install-kit 0.1.0` reads .../releases/tags/v0.1.0.
-constexpr const char* kReleaseByTag = "https://api.github.com/repos/Shirowwww/apple-music-mod-kit/releases/tags/";
+    "https://api.github.com/repos/Shirowwww/ampify/releases/latest";
+// A given release, by its tag: `ampify install-kit 0.1.0` reads .../releases/tags/v0.1.0.
+constexpr const char* kReleaseByTag = "https://api.github.com/repos/Shirowwww/ampify/releases/tags/";
 constexpr const char* kKitArchiveSuffix = "-windows-x64.zip";
 constexpr const char* kChecksums = "SHA256SUMS.txt";
-constexpr const char* kRequiredKitFiles[] = {"amk.exe", "amk_launcher.exe", "amk_kernel.dll"};
+constexpr const char* kRequiredKitFiles[] = {"ampify.exe", "ampify_launcher.exe", "ampify_kernel.dll"};
 
 bool StartsWith(std::string_view text, std::string_view prefix) {
     return text.size() >= prefix.size() && text.substr(0, prefix.size()) == prefix;
@@ -62,7 +63,7 @@ bool FetchTo(const std::string& url, const std::filesystem::path& destination, s
         std::filesystem::copy_file(PathArgument(LocalPathOf(url)), destination,
                                    std::filesystem::copy_options::overwrite_existing, ec);
         if (ec) {
-            error = "copie impossible : " + LocalPathOf(url);
+            error = "cannot copy: " + LocalPathOf(url);
             return false;
         }
         return true;
@@ -97,10 +98,10 @@ bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
         if (!platform::DownloadHttps(source, part, error) || !ReadWholeFile(part, text)) {
             RemoveQuietly(part);
             if (!ReadWholeFile(cached, text)) {
-                ctx.err << "amk : catalogue inaccessible : " << error << "\n";
+                ctx.err << "ampify: catalog unreachable: " << error << "\n";
                 return false;
             }
-            ctx.err << "amk : catalogue distant inaccessible, copie locale utilisée\n";
+            ctx.err << "ampify: remote catalog unreachable, using the local copy\n";
         } else {
             RemoveQuietly(part);
             std::filesystem::create_directories(ctx.kit.Cache(), ec);
@@ -111,14 +112,14 @@ bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
         local = true;
         std::string path = StartsWith(source, "file://") ? LocalPathOf(source) : source;
         if (!ReadWholeFile(PathArgument(path), text)) {
-            ctx.err << "amk : catalogue introuvable : " << path << "\n";
+            ctx.err << "ampify: catalog not found: " << path << "\n";
             return false;
         }
     }
 
     std::optional<Catalog> parsed = ParseCatalog(text, local, errors);
     if (!parsed) {
-        ctx.err << "amk : catalogue invalide\n";
+        ctx.err << "ampify: invalid catalog\n";
         for (const std::string& problem : errors) ctx.err << "  - " << problem << "\n";
         return false;
     }
@@ -145,21 +146,21 @@ std::string JoinPermissions(const std::vector<std::string>& permissions) {
 
 // Downloads, checks and puts one catalogue entry in place. Used by install and by update.
 int InstallEntry(Context& ctx, const CatalogEntry& entry, bool localCatalog, bool isUpdate) {
-    if (!IsAllowedDownloadUrl(entry.url, localCatalog)) return Failure(ctx, "adresse refusée : " + entry.url);
+    if (!IsAllowedDownloadUrl(entry.url, localCatalog)) return Failure(ctx, "address refused: " + entry.url);
 
-    ctx.out << entry.name << " (" << entry.id << ") " << entry.version << ", par " << entry.author << "\n"
+    ctx.out << entry.name << " (" << entry.id << ") " << entry.version << ", by " << entry.author << "\n"
             << entry.description << "\n";
     std::string permissions = JoinPermissions(entry.permissions);
-    ctx.out << (permissions.empty() ? std::string("Aucune permission demandée.")
-                                    : "Permissions demandées : " + permissions)
+    ctx.out << (permissions.empty() ? std::string("No permission requested.")
+                                    : "Requested permissions: " + permissions)
             << "\n";
 
     if (!ctx.options.yes) {
-        ctx.out << (isUpdate ? "Mettre à jour " : "Installer ") << entry.id << " ? [o/N] " << std::flush;
+        ctx.out << (isUpdate ? "Update " : "Install ") << entry.id << "? [y/N] " << std::flush;
         std::string answer;
         std::getline(ctx.in, answer);
         if (!IsYes(answer)) {
-            ctx.out << "Annulé.\n";
+            ctx.out << "Cancelled.\n";
             return 1;
         }
     }
@@ -173,7 +174,7 @@ int InstallEntry(Context& ctx, const CatalogEntry& entry, bool localCatalog, boo
     RemoveQuietly(archive);
 
     std::string error;
-    ctx.out << "Téléchargement...\n" << std::flush;
+    ctx.out << "Downloading...\n" << std::flush;
     if (!FetchTo(entry.url, archive, error)) {
         RemoveQuietly(archive);
         return Failure(ctx, error);
@@ -182,7 +183,7 @@ int InstallEntry(Context& ctx, const CatalogEntry& entry, bool localCatalog, boo
     std::optional<std::string> digest = Sha256File(archive);
     if (!digest || *digest != entry.sha256) {
         RemoveQuietly(archive);
-        return Failure(ctx, "empreinte SHA-256 différente de celle du catalogue : archive refusée");
+        return Failure(ctx, "SHA-256 differs from the catalog's: archive refused");
     }
 
     std::vector<std::string> entries;
@@ -208,19 +209,19 @@ int InstallEntry(Context& ctx, const CatalogEntry& entry, bool localCatalog, boo
 
     if (ContainsLink(extracted)) {
         RemoveQuietly(staging);
-        return Failure(ctx, "lien symbolique interdit dans l'archive");
+        return Failure(ctx, "symbolic link not allowed in the archive");
     }
     FolderValidation validation = ValidateElementFolder(extracted);
     if (!validation.ok()) {
         RemoveQuietly(staging);
-        ctx.err << "amk : l'archive ne contient pas un élément valide :\n";
+        ctx.err << "ampify: the archive does not contain a valid element:\n";
         for (const std::string& message : validation.errors) ctx.err << "  - " << message << "\n";
         return 1;
     }
     const ElementManifest& manifest = *validation.manifest;
     if (manifest.id != entry.id || manifest.version != entry.version || manifest.kind != entry.kind) {
         RemoveQuietly(staging);
-        return Failure(ctx, "le manifeste de l'archive ne correspond pas au catalogue");
+        return Failure(ctx, "the manifest in the archive does not match the catalog");
     }
 
     // Swap the folders: the previous version is kept until the new one is in place.
@@ -232,46 +233,46 @@ int InstallEntry(Context& ctx, const CatalogEntry& entry, bool localCatalog, boo
         std::filesystem::rename(destination, previous, ec);
         if (ec) {
             RemoveQuietly(staging);
-            return Failure(ctx, "remplacement impossible : " + Utf8(destination));
+            return Failure(ctx, "cannot replace: " + Utf8(destination));
         }
     }
     std::filesystem::rename(extracted, destination, ec);
     if (ec) {
         if (std::filesystem::exists(previous, ec)) std::filesystem::rename(previous, destination, ec);
         RemoveQuietly(staging);
-        return Failure(ctx, "installation impossible : " + Utf8(destination));
+        return Failure(ctx, "cannot install: " + Utf8(destination));
     }
     RemoveQuietly(staging);
     RemoveQuietly(previous);
     // A running kernel loads the new folder at once (installed disabled), or restarts the updated element.
     RequestReload(ctx, {isUpdate ? "restart " + ReloadTarget(entry.kind, entry.id) : std::string("rescan")});
 
-    ctx.out << entry.id << " " << entry.version << (isUpdate ? " mis à jour" : " installé") << ". ";
+    ctx.out << entry.id << " " << entry.version << (isUpdate ? " updated" : " installed") << ". ";
     if (entry.kind == "theme") {
-        ctx.out << "Choisis-le avec amk theme set " << entry.id << ".\n";
+        ctx.out << "Use it with ampify theme set " << entry.id << ".\n";
     } else {
-        ctx.out << "Il est désactivé : amk " << entry.kind << " enable " << entry.id << " pour l'activer.\n";
+        ctx.out << "It is off: run ampify " << entry.kind << " enable " << entry.id << " to turn it on.\n";
     }
     return 0;
 }
 
 int UpdateElement(Context& ctx, const std::string& id) {
     std::vector<InstalledElement> installed = InstalledNamed(ctx.kit, id);
-    if (installed.empty()) return Failure(ctx, "élément non installé : " + id + ". Utilise amk install " + id);
-    if (installed.size() > 1) return Failure(ctx, "plusieurs éléments portent l'identifiant " + id);
+    if (installed.empty()) return Failure(ctx, "element not installed: " + id + ". Use ampify install " + id);
+    if (installed.size() > 1) return Failure(ctx, "several elements have the id " + id);
 
     Catalog catalog;
     bool local = false;
     if (!LoadCatalog(ctx, catalog, local)) return 1;
     const CatalogEntry* entry = FindCatalogEntry(catalog, id);
-    if (entry == nullptr) return Failure(ctx, "élément absent du catalogue : " + id);
+    if (entry == nullptr) return Failure(ctx, "element not in the catalog: " + id);
     if (entry->kind != installed.front().kind) {
-        return Failure(ctx, "le catalogue range " + id + " comme " + entry->kind + ", pas comme " + installed.front().kind);
+        return Failure(ctx, "the catalog lists " + id + " as " + entry->kind + ", not as " + installed.front().kind);
     }
 
     std::string installedVersion = installed.front().manifest ? installed.front().manifest->version : "0.0.0";
     if (CompareReleaseVersions(entry->version, installedVersion) <= 0) {
-        ctx.out << id << " est déjà à jour (version " << installedVersion << ").\n";
+        ctx.out << id << " is already up to date (version " << installedVersion << ").\n";
         return 0;
     }
     return InstallEntry(ctx, *entry, local, true);
@@ -286,16 +287,16 @@ std::string DefaultReleaseUrl(std::string_view version) {
 
 std::optional<ReleaseInfo> FetchRelease(Context& ctx, const std::string& source, std::string& error, int maxSeconds) {
     if (!StartsWith(source, "file://") && !StartsWith(source, "https://")) {
-        error = "adresse de release refusée : " + source;
+        error = "release address refused: " + source;
         return std::nullopt;
     }
     std::error_code ec;
     std::filesystem::create_directories(ctx.kit.Downloads(), ec);
-    std::filesystem::path releaseFile = platform::TemporaryFile("amk-release");
+    std::filesystem::path releaseFile = platform::TemporaryFile("ampify-release");
     std::string text;
     if (!FetchTo(source, releaseFile, error, maxSeconds) || !ReadWholeFile(releaseFile, text)) {
         RemoveQuietly(releaseFile);
-        if (error.empty()) error = "release illisible";
+        if (error.empty()) error = "unreadable release";
         return std::nullopt;
     }
     RemoveQuietly(releaseFile);
@@ -303,7 +304,7 @@ std::optional<ReleaseInfo> FetchRelease(Context& ctx, const std::string& source,
     std::optional<ReleaseInfo> release = ParseRelease(text, error);
     if (!release) return std::nullopt;
     if (!IsValidVersion(release->version)) {
-        error = "version de release invalide : " + release->tag;
+        error = "invalid release version: " + release->tag;
         return std::nullopt;
     }
     return release;
@@ -317,47 +318,47 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     std::error_code ec;
     std::filesystem::create_directories(ctx.kit.Updates(), ec);
     // The command to run once Apple Music is closed, to install what this run downloaded.
-    std::string applyCommand = wanted.empty() ? "amk update --apply" : "amk install-kit " + wanted + " --apply";
+    std::string applyCommand = wanted.empty() ? "ampify update --apply" : "ampify install-kit " + wanted + " --apply";
 
     if (wanted.empty()) {
-        if (CompareReleaseVersions(release->version, AMK_VERSION) <= 0) {
-            ctx.out << "amk est à jour (version " << AMK_VERSION << ").\n";
+        if (CompareReleaseVersions(release->version, AMPIFY_VERSION) <= 0) {
+            ctx.out << "ampify is up to date (version " << AMPIFY_VERSION << ").\n";
             return 0;
         }
         if (ctx.options.check) {
-            ctx.out << "Version " << release->version << " disponible (installée : " << AMK_VERSION
-                    << "). Lance amk update pour la télécharger.\n";
+            ctx.out << "Version " << release->version << " is available (installed: " << AMPIFY_VERSION
+                    << "). Run ampify update to download it.\n";
             return 0;
         }
     } else {
         if (release->version != wanted) {
-            return Failure(ctx, "la release lue est la version " + release->version + ", pas la version " + wanted);
+            return Failure(ctx, "the release read is version " + release->version + ", not version " + wanted);
         }
         if (ctx.options.check) {
-            ctx.out << "Version " << wanted << " disponible (installée : " << AMK_VERSION
-                    << "). Lance amk install-kit " << wanted << " pour la télécharger.\n";
+            ctx.out << "Version " << wanted << " is available (installed: " << AMPIFY_VERSION
+                    << "). Run ampify install-kit " << wanted << " to download it.\n";
             return 0;
         }
-        if (CompareReleaseVersions(wanted, AMK_VERSION) < 0) {
-            ctx.out << "Attention : la version " << wanted << " est plus ancienne que celle installée (" << AMK_VERSION
-                    << "). Tes réglages et tes éléments restent en place.\n";
+        if (CompareReleaseVersions(wanted, AMPIFY_VERSION) < 0) {
+            ctx.out << "Warning: version " << wanted << " is older than the installed one (" << AMPIFY_VERSION
+                    << "). Your settings and elements stay in place.\n";
         }
     }
 
-    std::string archiveName = "amk-kit-" + release->version + kKitArchiveSuffix;
+    std::string archiveName = "ampify-" + release->version + kKitArchiveSuffix;
     auto archiveAddress = release->assets.find(archiveName);
     auto sumsAddress = release->assets.find(kChecksums);
     if (archiveAddress == release->assets.end() || sumsAddress == release->assets.end()) {
-        return Failure(ctx, "la release " + release->tag + " ne contient pas " + archiveName + " et " + kChecksums);
+        return Failure(ctx, "release " + release->tag + " does not contain " + archiveName + " and " + kChecksums);
     }
     if (!IsAllowedDownloadUrl(archiveAddress->second, releaseLocal) ||
         !IsAllowedDownloadUrl(sumsAddress->second, releaseLocal)) {
-        return Failure(ctx, "adresse refusée dans la release");
+        return Failure(ctx, "address refused in the release");
     }
 
     std::filesystem::path archive = ctx.kit.Updates() / archiveName;
     std::filesystem::path sumsFile = ctx.kit.Updates() / kChecksums;
-    ctx.out << "Téléchargement de la version " << release->version << "...\n" << std::flush;
+    ctx.out << "Downloading version " << release->version << "...\n" << std::flush;
     if (!FetchTo(archiveAddress->second, archive, error) || !FetchTo(sumsAddress->second, sumsFile, error)) {
         RemoveQuietly(archive);
         return Failure(ctx, error);
@@ -371,7 +372,7 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     std::optional<std::string> digest = Sha256File(archive);
     if (expected == sums.end() || !digest || *digest != expected->second) {
         RemoveQuietly(archive);
-        return Failure(ctx, "empreinte SHA-256 de l'archive de mise à jour incorrecte : archive refusée");
+        return Failure(ctx, "wrong SHA-256 for the update archive: archive refused");
     }
 
     std::vector<std::string> entries;
@@ -391,23 +392,23 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     RemoveQuietly(archive);
     if (ContainsLink(staged)) {
         RemoveQuietly(staged);
-        return Failure(ctx, "lien symbolique interdit dans l'archive de mise à jour");
+        return Failure(ctx, "symbolic link not allowed in the update archive");
     }
     for (const char* required : kRequiredKitFiles) {
         if (!std::filesystem::is_regular_file(staged / required, ec)) {
             RemoveQuietly(staged);
-            return Failure(ctx, std::string("archive incomplète, fichier manquant : ") + required);
+            return Failure(ctx, std::string("incomplete archive, missing file: ") + required);
         }
     }
 
     if (!ctx.options.apply) {
-        ctx.out << "Version " << release->version << " téléchargée et vérifiée dans " << Utf8(staged)
-                << ".\nFerme Apple Music, puis lance : " << applyCommand << "\n";
+        ctx.out << "Version " << release->version << " downloaded and checked in " << Utf8(staged)
+                << ".\nClose Apple Music, then run: " << applyCommand << "\n";
         return 0;
     }
 
     if (platform::IsProcessRunning("AppleMusic.exe") || platform::IsProcessRunning("AMPLibraryAgent.exe")) {
-        return Failure(ctx, "ferme Apple Music avant d'installer la mise à jour");
+        return Failure(ctx, "close Apple Music before installing the update");
     }
     std::filesystem::path installDir = ctx.options.installDir ? PathArgument(*ctx.options.installDir)
                                                               : platform::ExecutableDirectory();
@@ -420,14 +421,14 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
             old += ".old";
             RemoveQuietly(old);
             std::filesystem::rename(destination, old, ec);
-            if (ec) return Failure(ctx, "impossible de remplacer " + Utf8(destination));
+            if (ec) return Failure(ctx, "cannot replace " + Utf8(destination));
         }
         std::filesystem::copy_file(file.path(), destination, std::filesystem::copy_options::overwrite_existing, ec);
-        if (ec) return Failure(ctx, "copie impossible vers " + Utf8(destination));
+        if (ec) return Failure(ctx, "cannot copy to " + Utf8(destination));
     }
     RemoveQuietly(staged);
-    ctx.out << "amk " << release->version << " installé dans " << Utf8(installDir)
-            << ". Relance Apple Music avec amk launch.\n";
+    ctx.out << "ampify " << release->version << " installed in " << Utf8(installDir)
+            << ". Start Apple Music again with ampify launch.\n";
     return 0;
 }
 
@@ -446,7 +447,7 @@ Json InfoJson(const ElementInfo& info) {
                         {"permissions", TextList(info.permissions)}};
 }
 
-// `amk market --json`: what the Marketplace page shows. The catalogue (empty with catalogOk false when it cannot be
+// `ampify market --json`: what the Marketplace page shows. The catalogue (empty with catalogOk false when it cannot be
 // read; the reason goes to the error stream), every installed element with its state, and the active theme.
 int PrintMarketJson(Context& ctx) {
     Catalog catalog;
@@ -486,52 +487,52 @@ int CmdMarket(Context& ctx) {
     bool local = false;
     if (!LoadCatalog(ctx, catalog, local)) return 1;
     if (catalog.entries.empty()) {
-        ctx.out << "Le catalogue est vide pour l'instant.\n";
+        ctx.out << "The catalog is empty for now.\n";
         return 0;
     }
 
     std::vector<InstalledElement> installed = ListInstalled(ctx.kit);
-    ctx.out << Pad("IDENTIFIANT", 24) << Pad("VERSION", 10) << Pad("TYPE", 10) << Pad("AUTEUR", 18) << "ÉTAT\n";
+    ctx.out << Pad("ID", 24) << Pad("VERSION", 10) << Pad("TYPE", 10) << Pad("AUTHOR", 18) << "STATE\n";
     for (const CatalogEntry& entry : catalog.entries) {
-        std::string state = "non installé";
+        std::string state = "not installed";
         for (const InstalledElement& element : installed) {
             if (element.kind == entry.kind && element.id == entry.id) {
-                state = "installé " + (element.manifest ? element.manifest->version : std::string("?"));
+                state = "installed " + (element.manifest ? element.manifest->version : std::string("?"));
             }
         }
         ctx.out << Pad(entry.id, 24) << Pad(entry.version, 10) << Pad(entry.kind, 10) << Pad(entry.author, 18)
-                << state << " : " << entry.description << "\n";
+                << state << ": " << entry.description << "\n";
     }
     return 0;
 }
 
 int CmdInstall(Context& ctx) {
-    if (ctx.options.positional.size() != 2) return Usage(ctx, "install attend un identifiant d'élément");
+    if (ctx.options.positional.size() != 2) return Usage(ctx, "install needs an element id");
     const std::string& id = ctx.options.positional[1];
-    if (!IsValidId(id)) return Failure(ctx, "identifiant invalide : " + id);
+    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     Catalog catalog;
     bool local = false;
     if (!LoadCatalog(ctx, catalog, local)) return 1;
     const CatalogEntry* entry = FindCatalogEntry(catalog, id);
-    if (entry == nullptr) return Failure(ctx, "élément absent du catalogue : " + id);
+    if (entry == nullptr) return Failure(ctx, "element not in the catalog: " + id);
     return InstallEntry(ctx, *entry, local, false);
 }
 
 int CmdRemove(Context& ctx) {
-    if (ctx.options.positional.size() != 2) return Usage(ctx, "remove attend un identifiant d'élément");
+    if (ctx.options.positional.size() != 2) return Usage(ctx, "remove needs an element id");
     const std::string& id = ctx.options.positional[1];
-    if (!IsValidId(id)) return Failure(ctx, "identifiant invalide : " + id);
+    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     std::vector<InstalledElement> matches = InstalledNamed(ctx.kit, id);
     if (matches.empty()) {
         if (std::find(std::begin(kBuiltinExtensions), std::end(kBuiltinExtensions), std::string_view(id)) !=
             std::end(kBuiltinExtensions)) {
-            return Failure(ctx, id + " est intégré au noyau et ne se retire pas, il se désactive");
+            return Failure(ctx, id + " is built into the kernel and cannot be removed, only turned off");
         }
-        return Failure(ctx, "élément introuvable : " + id);
+        return Failure(ctx, "element not found: " + id);
     }
-    if (matches.size() > 1) return Failure(ctx, "plusieurs éléments portent l'identifiant " + id);
+    if (matches.size() > 1) return Failure(ctx, "several elements have the id " + id);
     const std::string kind = matches.front().kind;
 
     std::string error;
@@ -539,7 +540,7 @@ int CmdRemove(Context& ctx) {
     if (!snapshot) return Failure(ctx, error);
 
     RemoveQuietly(ctx.kit.Element(kind, id));
-    if (std::filesystem::exists(ctx.kit.Element(kind, id))) return Failure(ctx, "suppression impossible : " + id);
+    if (std::filesystem::exists(ctx.kit.Element(kind, id))) return Failure(ctx, "cannot delete: " + id);
 
     Settings settings;
     if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
@@ -551,17 +552,17 @@ int CmdRemove(Context& ctx) {
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
     RequestReload(ctx, {"stop " + ReloadTarget(kind, id), "rescan"});
 
-    ctx.out << id << " retiré. Sauvegarde faite avant : " << *snapshot << " (amk restore --backup " << *snapshot
-            << " pour revenir en arrière).\n";
+    ctx.out << id << " removed. Backup made first: " << *snapshot << " (ampify restore --backup " << *snapshot
+            << " to go back).\n";
     return 0;
 }
 
 int CmdInstallKit(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() != 2) return Usage(ctx, "install-kit attend une version du kit, par exemple : amk install-kit 0.1.0");
+    if (args.size() != 2) return Usage(ctx, "install-kit needs a version of Ampify, for example: ampify install-kit 0.1.0");
     std::string version = args[1];
     if (!version.empty() && (version.front() == 'v' || version.front() == 'V')) version.erase(0, 1);
-    if (!IsValidVersion(version)) return Failure(ctx, "version invalide : " + args[1] + " (attendu : 0.1.0)");
+    if (!IsValidVersion(version)) return Failure(ctx, "invalid version: " + args[1] + " (expected: 0.1.0)");
     return InstallKitRelease(ctx, ctx.options.releaseUrl ? *ctx.options.releaseUrl : DefaultReleaseUrl(version), version);
 }
 
@@ -571,10 +572,10 @@ int CmdUpdate(Context& ctx) {
         return InstallKitRelease(ctx, ctx.options.releaseUrl ? *ctx.options.releaseUrl : DefaultReleaseUrl(""), "");
     }
     if (args.size() == 2) {
-        if (!IsValidId(args[1])) return Failure(ctx, "identifiant invalide : " + args[1]);
+        if (!IsValidId(args[1])) return Failure(ctx, Tr("invalidId", {{"id", args[1]}}));
         return UpdateElement(ctx, args[1]);
     }
-    return Usage(ctx, "update attend un identifiant d'élément, ou rien pour mettre le kit à jour");
+    return Usage(ctx, "update needs an element id, or nothing to update Ampify");
 }
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

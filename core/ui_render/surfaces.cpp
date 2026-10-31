@@ -4,7 +4,7 @@
 
 #include "render_tree.hpp"
 
-namespace amk::uirender {
+namespace ampify::uirender {
 
 namespace {
 
@@ -107,4 +107,4 @@ SurfaceChanges SurfaceTracker::Poll(const UiModel& model) {
     return changes;
 }
 
-}  // namespace amk::uirender
+}  // namespace ampify::uirender

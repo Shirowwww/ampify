@@ -10,9 +10,9 @@
 #include "../core/journal.hpp"
 #include "../core/natives/kit.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
-// AMK.kit.run on Windows: runs amk.exe, which sits beside amk_kernel.dll, with no window and no input (a question
+// Ampify.kit.run on Windows: runs ampify.exe, which sits beside ampify_kernel.dll, with no window and no input (a question
 // gets end of file, so only --yes acts), and reports its exit code and output.
 class KitCommandRunner final : public KitCommandHost {
 public:
@@ -32,4 +32,4 @@ private:
     Journal& m_journal;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win

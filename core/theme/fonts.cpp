@@ -5,11 +5,11 @@
 
 #include "../json.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
-// The WinUI 3 type ramp of Windows 11 (Microsoft's « Typography in Windows » guidance).
+// The WinUI 3 type ramp of Windows 11 (Microsoft's "Typography in Windows" guidance).
 const std::vector<FontStyle> kDefaults = {
     {"caption", "Segoe UI Variable Small", "400", "12", false},
     {"body", "Segoe UI Variable Text", "400", "14", false},
@@ -44,10 +44,7 @@ const std::vector<FontStyle>& DefaultFontRoles() {
 std::string CanonicalFontRole(std::string_view role) {
     std::string lowered(role);
     for (char& c : lowered) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    if (lowered == "titre") return "title";
-    if (lowered == "texte") return "body";
-    if (lowered == "sous-titre") return "subtitle";
-    if (lowered == "legende" || lowered == "l\xc3\xa9gende") return "caption";
+    if (lowered == "text") return "body";
     return lowered;
 }
 
@@ -110,4 +107,4 @@ std::string FontRolesJson(const Theme* theme) {
     return Json(std::move(roles)).Dump();
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

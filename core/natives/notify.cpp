@@ -3,7 +3,7 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
@@ -11,7 +11,7 @@ constexpr size_t kMaxNotifyTitle = 120;
 constexpr size_t kMaxNotifyText = 500;
 
 struct NotifyNatives : ScriptBridge {
-    AMK_NATIVE(Notify) {
+    AMPIFY_NATIVE(Notify) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "notifications", &failure)) return failure;
@@ -28,4 +28,4 @@ void DefineNotify(api::NativeScope& scope) {
     scope.Function("notify", NotifyNatives::Notify, 2);
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

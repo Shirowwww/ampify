@@ -1,4 +1,4 @@
-"""Tests of tools/pack.py: deterministic archives, pinned checksums, catalogue updates.
+"""Tests of tools/pack.py: deterministic archives, pinned checksums, catalog updates.
 
     python3 -m unittest discover -s tools -v
 """
@@ -21,7 +21,7 @@ EXAMPLE = os.path.join(ROOT, "examples", "hello-extension")
 
 class PackTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.mkdtemp(prefix="amk-pack-")
+        self.tmp = tempfile.mkdtemp(prefix="ampify-pack-")
         self.addCleanup(shutil.rmtree, self.tmp, True)
 
     def make_element(self, name="demo", kind="extension", version="1.0.0", extra=None):
@@ -33,13 +33,13 @@ class PackTests(unittest.TestCase):
             "version": version,
             "kind": kind,
             "author": "Shirowwww",
-            "description": "Élément de test.",
+            "description": "A test element.",
             "kitApi": "1.0",
         }
         if kind == "extension":
             manifest["main"] = "main.js"
             with open(os.path.join(folder, "main.js"), "w", encoding="utf-8") as handle:
-                handle.write('AMK.log("ok");\n')
+                handle.write('Ampify.log("ok");\n')
         with open(os.path.join(folder, "manifest.json"), "w", encoding="utf-8") as handle:
             json.dump(manifest, handle)
         for relative, text in (extra or {}).items():

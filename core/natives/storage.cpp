@@ -7,7 +7,7 @@
 #include "../api/module.hpp"
 #include "../json.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
@@ -34,7 +34,7 @@ std::string DumpStorage(const std::map<std::string, std::string>& values) {
 struct StorageNatives : ScriptBridge {
     static void Persist(ScriptExtension* ext) { HostOf(ext).WriteStorage(ext->id(), DumpStorage(StorageOf(ext))); }
 
-    AMK_NATIVE(StorageGet) {
+    AMPIFY_NATIVE(StorageGet) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "storage", &failure)) return failure;
@@ -44,26 +44,26 @@ struct StorageNatives : ScriptBridge {
         return JS_NewStringLen(ctx, found->second.data(), found->second.size());
     }
 
-    AMK_NATIVE(StorageSet) {
+    AMPIFY_NATIVE(StorageSet) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "storage", &failure)) return failure;
         std::string key = String(ctx, argc, argv, 0).value_or("");
         std::string raw = String(ctx, argc, argv, 1).value_or("");
-        if (key.empty() || key.size() > 128) return Throw(ctx, "TypeError", "clé de stockage invalide");
-        if (!Json::Parse(raw)) return Throw(ctx, "TypeError", "valeur de stockage non JSON");
+        if (key.empty() || key.size() > 128) return Throw(ctx, "TypeError", "invalid storage key");
+        if (!Json::Parse(raw)) return Throw(ctx, "TypeError", "storage value is not JSON");
 
         std::map<std::string, std::string> next = StorageOf(ext);
         next[key] = raw;
         if (DumpStorage(next).size() > kStorageQuotaBytes) {
-            return Throw(ctx, "QuotaExceeded", "stockage plein : " + std::to_string(kStorageQuotaBytes) + " octets au plus");
+            return Throw(ctx, "QuotaExceeded", "storage full: " + std::to_string(kStorageQuotaBytes) + " bytes at most");
         }
         StorageOf(ext) = std::move(next);
         Persist(ext);
         return JS_UNDEFINED;
     }
 
-    AMK_NATIVE(StorageRemove) {
+    AMPIFY_NATIVE(StorageRemove) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "storage", &failure)) return failure;
@@ -85,4 +85,4 @@ void StartStorage(ScriptExtension& extension) {
     ScriptBridge::StorageOf(&extension) = ParseStorage(ScriptBridge::HostOf(&extension).ReadStorage(extension.id()));
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

@@ -1,7 +1,7 @@
 #pragma once
 
 // The kit's equalizer: biquad filters from the RBJ Audio EQ Cookbook, a fixed set of bands whose gains the
-// elements set (AMK.audio.eq), applied to the decoded samples the kit's hooks already process. Pure C++.
+// elements set (Ampify.audio.eq), applied to the decoded samples the kit's hooks already process. Pure C++.
 //
 // Two halves, for two threads: EqSettings holds the target gains (written by the JavaScript thread, read by the
 // audio threads without a lock), and each audio stream has its own EqProcessor, which keeps the filter state and
@@ -16,7 +16,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk::audio {
+namespace ampify::audio {
 
 enum class FilterKind { Peaking, LowShelf, HighShelf };
 
@@ -111,4 +111,4 @@ private:
     double m_rate = 0;
 };
 
-}  // namespace amk::audio
+}  // namespace ampify::audio

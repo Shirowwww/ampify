@@ -4,12 +4,12 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
 struct KeyboardNatives : ScriptBridge {
-    AMK_NATIVE(BindKey) {
+    AMPIFY_NATIVE(BindKey) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ui.keyboard", &failure)) return failure;
@@ -26,4 +26,4 @@ void DefineKeyboard(api::NativeScope& scope) {
 // Releases the element's shortcuts when it stops.
 void StopKeyboard(ScriptExtension& extension) { ScriptBridge::HostOf(&extension).UnregisterKeys(extension.id()); }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

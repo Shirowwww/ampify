@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk::json {
+namespace ampify::json {
 
 // A parsed JSON value. Object members keep their file order, and a duplicate key is a parse error:
 // a manifest must not mean one thing to one reader and another to the next.
@@ -54,4 +54,4 @@ std::optional<Value> Parse(std::string_view text, std::string& error);
 // A JSON string literal, quotes included.
 std::string Quote(std::string_view text);
 
-}  // namespace amk::json
+}  // namespace ampify::json

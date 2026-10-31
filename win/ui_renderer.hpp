@@ -1,8 +1,8 @@
 #pragma once
 
-// The native renderer: turns the interface trees of core/ui_model (AMK.ui, AMK.React) into WinUI controls, and
-// updates them in place when the extension registers its tree again. Compiled only with AMK_WITH_XAML. Every call
-// happens on the interface thread. Not run yet in Apple Music: see docs/tests/M8-interface.md.
+// The native renderer: turns the interface trees of core/ui_model (Ampify.ui, Ampify.React) into WinUI controls, and
+// updates them in place when the extension registers its tree again. Compiled only with AMPIFY_WITH_XAML. Every call
+// happens on the interface thread. Not run yet in Apple Music: see docs/development/testing-on-a-pc.md.
 //
 // | primitive | control                                                                       |
 // |-----------|-------------------------------------------------------------------------------|
@@ -19,11 +19,11 @@
 // | image     | Image (BitmapImage from an https or file address)                             |
 // | icon      | Path shapes from the SVG (theme text brush), FontIcon for a glyph             |
 //
-// Every node gets x:Name and AutomationId "AMK_<elementId>_<nodeId>" (uirender::ElementName), an AutomationProperties
+// Every node gets x:Name and AutomationId "AMPIFY_<elementId>_<nodeId>" (uirender::ElementName), an AutomationProperties
 // name, and its tooltip through ToolTipService. Clicks and changes go to the sink, which hands them to the
 // JavaScript thread (ExtensionLoader::DeliverClickTo / DeliverEventTo).
 
-#if defined(AMK_WITH_XAML)
+#if defined(AMPIFY_WITH_XAML)
 
 #include <windows.h>
 #ifdef GetCurrentTime
@@ -44,7 +44,7 @@
 
 #include "../core/ui_render/render_tree.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 // A click (onClick) or a new value (onChange) on a node, for the element that drew it.
 struct UiEvent {
@@ -72,13 +72,13 @@ struct StyleProbe {
     std::optional<winrt::Microsoft::UI::Xaml::Thickness> cardPadding;
     std::optional<winrt::Microsoft::UI::Xaml::CornerRadius> cardCorner;
     std::optional<winrt::Microsoft::UI::Xaml::Thickness> cardMargin;
-    std::string origin;  // where the styles come from, for the journal ("" when nothing was found)
+    std::string origin;  // where the styles come from, for the log ("" when nothing was found)
 
     int Found() const;  // number of styles and card values found
 };
 
 // Fills `probe` from the native controls under `root` (bounded walk, 4000 nodes, outside item lists and outside the
-// kit's and AMExclusive's elements). Keeps what `probe` already has when nothing better is found.
+// Ampify's and AMExclusive's elements). Keeps what `probe` already has when nothing better is found.
 void CaptureStyleProbe(const winrt::Microsoft::UI::Xaml::DependencyObject& root, StyleProbe& probe,
                        const std::string& origin);
 
@@ -97,7 +97,7 @@ winrt::Microsoft::UI::Xaml::Controls::TextBlock MakeText(const std::wstring& tex
 // The XAML presentation namespace attribute, for LoadKitXaml texts.
 const wchar_t* KitXmlns() noexcept;
 
-// Loads XAML written by the kit (never text of an extension), or null when the reader refuses it.
+// Loads XAML written by Ampify (never text of an extension), or null when the reader refuses it.
 winrt::Windows::Foundation::IInspectable LoadKitXaml(const std::wstring& text) noexcept;
 
 // An icon from SVG text (Path shapes filled with the theme brush `brushKey`) or a glyph (FontIcon), or null.
@@ -140,6 +140,6 @@ private:
     std::unique_ptr<Mounted> m_root;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win
 
-#endif  // AMK_WITH_XAML
+#endif  // AMPIFY_WITH_XAML

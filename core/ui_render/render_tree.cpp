@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace amk::uirender {
+namespace ampify::uirender {
 
 namespace {
 
@@ -52,7 +52,7 @@ void Build(const Json& tree, const std::string& id, RenderNode& out) {
     std::vector<std::string> used;
     for (std::size_t index = 0; index < items->size(); index++) {
         std::string segment = KeyOf((*items)[index]);
-        // A repeated key falls back to the position, as AMK.React does.
+        // A repeated key falls back to the position, as Ampify.React does.
         if (segment.empty() || std::find(used.begin(), used.end(), segment) != used.end()) segment = std::to_string(index);
         used.push_back(segment);
         RenderNode child;
@@ -139,11 +139,11 @@ RenderNode BuildRenderTree(const Json& tree, const std::string& rootId) {
 }
 
 std::string ElementName(std::string_view elementId, std::string_view nodeId) {
-    return "AMK_" + Sanitized(elementId, '_', true, false) + "_" + Sanitized(nodeId, '_', true, true);
+    return "AMPIFY_" + Sanitized(elementId, '_', true, false) + "_" + Sanitized(nodeId, '_', true, true);
 }
 
 bool IsOwnName(std::string_view name) {
-    return name.substr(0, 4) == "AMK_" || name.substr(0, 3) == "Amk";
+    return name.starts_with("AMPIFY_") || name.starts_with("Ampify");
 }
 
 bool IsForeignModName(std::string_view name) {
@@ -201,4 +201,4 @@ std::size_t CountNodes(const RenderNode& node) {
     return count;
 }
 
-}  // namespace amk::uirender
+}  // namespace ampify::uirender

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -54,11 +54,11 @@ bool IsNamed(const std::string& scheme, std::initializer_list<const char*> exact
 }
 
 bool IsDark(const std::string& scheme) {
-    return IsNamed(scheme, {"dark", "sombre", "night", "nuit"}, {"dark", "sombre", "night", "nuit"});
+    return IsNamed(scheme, {"dark", "night"}, {"dark", "night"});
 }
 
 bool IsLight(const std::string& scheme) {
-    return IsNamed(scheme, {"light", "clair", "day", "jour"}, {"light", "clair"});
+    return IsNamed(scheme, {"light", "day"}, {"light"});
 }
 
 // The name as colors.ini writes it, or empty when the theme has no such scheme (names are case-insensitive).
@@ -85,13 +85,13 @@ Schedule ParseSchedule(std::string_view text) {
         int minute = equals == std::string_view::npos ? -1 : ParseTime(Trim(piece.substr(0, equals)));
         std::string scheme = equals == std::string_view::npos ? std::string() : std::string(Trim(piece.substr(equals + 1)));
         if (minute < 0 || scheme.empty()) {
-            schedule.problems.push_back("theme.schedule : « " + std::string(piece) + " » ignoré (écrire HH:MM=Schéma)");
+            schedule.problems.push_back("theme.schedule: \"" + std::string(piece) + "\" ignored (write HH:MM=Scheme)");
             continue;
         }
         bool replaced = false;
         for (ScheduleEntry& entry : schedule.entries) {
             if (entry.minute != minute) continue;
-            schedule.problems.push_back("theme.schedule : " + TimeText(minute) + " donné deux fois, le dernier compte");
+            schedule.problems.push_back("theme.schedule: " + TimeText(minute) + " given twice, the last one counts");
             entry.scheme = scheme;
             replaced = true;
         }
@@ -140,28 +140,28 @@ SchemeChoice ChooseScheme(const std::string& scheme, const std::string& schedule
         for (const ScheduleEntry& candidate : parsed.entries) {
             if (candidate.minute <= inputs.minute) entry = &candidate;
         }
-        choice.reason = "horaire " + TimeText(entry->minute);
+        choice.reason = "schedule " + TimeText(entry->minute);
     }
 
     if (Lowered(wanted) == "auto") {
         choice.scheme = SystemScheme(schemes, inputs.systemDark);
-        std::string mode = inputs.systemDark ? "sombre" : "clair";
-        choice.reason += (choice.reason.empty() ? "" : ", ") + std::string("mode ") + mode + " de Windows";
+        std::string mode = inputs.systemDark ? "dark" : "light";
+        choice.reason += (choice.reason.empty() ? "" : ", ") + std::string("Windows ") + mode + " mode";
         if (choice.scheme.empty() && !schemes.empty()) {
-            choice.problems.push_back("aucun schéma " + mode + " dans colors.ini (Dark, Sombre, Light, Clair...), le premier est utilisé");
+            choice.problems.push_back("no " + mode + " scheme in colors.ini (Dark, Night, Light, Day...), the first one is used");
         }
         return choice;
     }
 
     if (wanted.empty()) {
-        if (choice.reason.empty()) choice.reason = "premier schéma";
+        if (choice.reason.empty()) choice.reason = "first scheme";
         return choice;
     }
     choice.scheme = FindScheme(schemes, wanted);
     if (choice.reason.empty()) choice.reason = "theme.scheme";
     if (choice.scheme.empty()) {
         // LoadTheme says it too, but only the schedule knows where the name came from.
-        if (!parsed.entries.empty()) choice.problems.push_back("theme.schedule : schéma « " + wanted + " » absent de colors.ini");
+        if (!parsed.entries.empty()) choice.problems.push_back("theme.schedule: scheme \"" + wanted + "\" not found in colors.ini");
         choice.scheme = wanted;  // LoadTheme reports it and falls back to the first scheme
     }
     return choice;
@@ -171,4 +171,4 @@ bool IsDarkScheme(const std::string& scheme) {
     return IsDark(scheme);
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

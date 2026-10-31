@@ -1,11 +1,11 @@
-// Module http: AMK.http, GET and POST requests to the https hosts that the manifest declares.
+// Module http: Ampify.http, GET and POST requests to the https hosts that the manifest declares.
 // Natives: core/natives/http.cpp.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kHttp[];
-const char kHttp[] = R"AMKJS(
-  AMK.http = {
+const char kHttp[] = R"AMPIFYJS(
+  Ampify.http = {
     get(url) {
       return new Promise((resolve) => resolve(native.httpGet(text(url))));
     },
@@ -28,6 +28,6 @@ const char kHttp[] = R"AMKJS(
       });
     },
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

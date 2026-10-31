@@ -1,9 +1,9 @@
-// Affiche une notification quand un nouveau morceau commence. Le même morceau n'est annoncé qu'une fois.
+// Shows a notification when a new track starts. The same track is announced only once.
 let lastTrackId = null;
 
-AMK.player.on("trackchange", (state) => {
+Ampify.player.on("trackchange", (state) => {
   const track = state.track;
   if (!track || track.id === lastTrackId) return;
   lastTrackId = track.id;
-  AMK.notify({ title: track.title, text: track.artist });
+  Ampify.notify({ title: track.title, text: track.artist });
 });

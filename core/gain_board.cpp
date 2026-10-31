@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace amk {
+namespace ampify {
 
 void GainBoard::Set(const std::string& elementId, double db, double ceilingDb) {
     if (db == 0) {
@@ -22,4 +22,4 @@ GainBoard& ElementGains() {
     return board;
 }
 
-}  // namespace amk
+}  // namespace ampify

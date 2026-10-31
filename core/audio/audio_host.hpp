@@ -1,6 +1,6 @@
 #pragma once
 
-// The host capability behind AMK.audio's analysis, equalizer, loudness and volume (core/natives/audio_analysis.cpp).
+// The host capability behind Ampify.audio's analysis, equalizer, loudness and volume (core/natives/audio_analysis.cpp).
 // Read with host.Capability<AudioHost>(): null on a host without audio, such as the interface process, where those
 // functions answer "nothing known" instead of throwing.
 //
@@ -17,7 +17,7 @@
 
 #include "analysis.hpp"
 
-namespace amk {
+namespace ampify {
 
 // Loudness of what plays, in LUFS (ITU-R BS.1770): momentary over 400 ms, short-term over 3 s. Empty when unknown.
 struct LoudnessReading {
@@ -71,4 +71,4 @@ struct AudioHost {
     virtual void Release(const std::string& elementId) = 0;
 };
 
-}  // namespace amk
+}  // namespace ampify

@@ -1,12 +1,12 @@
 #pragma once
 
-// The list of extra tested Apple Music builds that `amk versions update` writes to <kit>\versions.txt. It comes from
+// The list of extra tested Apple Music builds that `ampify versions update` writes to <kit>\versions.txt. It comes from
 // catalog/versions.json, published with the catalogue, so a build tested after this kit was compiled can be allowed
 // without a new kit release. It only adds names to the version gate: the export signature of AVFoundationCF.dll is
 // still checked on every launch (core/build_signature.hpp), and an unknown build still leaves the kernel idle.
 //
 // File format, plain text:
-//   amk-versions 1             first line, required
+//   ampify-versions 1             first line, required
 //   # comment                  ignored, as are blank lines
 //   1.1600.12345.0             one package version per line: four numbers separated by dots
 //
@@ -18,9 +18,9 @@
 #include <string_view>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
-inline constexpr std::string_view kVersionListHeader = "amk-versions 1";
+inline constexpr std::string_view kVersionListHeader = "ampify-versions 1";
 inline constexpr std::string_view kVersionListFile = "versions.txt";
 
 // True for a package version such as "1.1540.23042.0": four groups of 1 to 9 digits.
@@ -35,4 +35,4 @@ std::string FormatVersionList(const std::vector<std::string>& versions, std::str
 // Reads <file>. A missing, unreadable or malformed file gives an empty list.
 std::vector<std::string> LoadVersionList(const std::filesystem::path& file);
 
-}  // namespace amk
+}  // namespace ampify

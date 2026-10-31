@@ -1,0 +1,5 @@
+/* Rounded buttons: replaces the control template with templates/button.xaml. */
+
+Button {
+    template: url(templates/button.xaml);
+}

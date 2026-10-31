@@ -5,7 +5,7 @@
 #include <set>
 #include <sstream>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -306,4 +306,4 @@ FolderValidation ValidateElementFolder(const std::filesystem::path& folder) {
     return result;
 }
 
-}  // namespace amk
+}  // namespace ampify

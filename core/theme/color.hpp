@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // A colour as XAML stores it: alpha, red, green, blue, one byte each.
 struct Argb {
@@ -36,4 +36,4 @@ private:
     std::map<std::string, Argb> m_colors;  // keys are lowercase
 };
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

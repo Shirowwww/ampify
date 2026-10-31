@@ -5,7 +5,7 @@
 #include <ctime>
 #include <utility>
 
-namespace amk {
+namespace ampify {
 
 Journal::Journal(std::ostream& out, Stamp stamp) : m_out(out), m_stamp(std::move(stamp)) {}
 
@@ -33,4 +33,4 @@ std::string Journal::LocalTimeStamp() {
     return buffer;
 }
 
-}  // namespace amk
+}  // namespace ampify

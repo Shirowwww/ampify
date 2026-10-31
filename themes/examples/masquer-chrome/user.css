@@ -1,9 +1,0 @@
-/* Masque des éléments par leur nom. Les noms viennent de l'inspecteur : un nom absent ne fait rien. */
-
-#AdvertisingBanner {
-    visibility: collapsed;
-}
-
-Border#UpsellBanner {
-    visibility: hidden;
-}

@@ -13,13 +13,13 @@
 #include "../core/natives/http.hpp"
 #include "../core/settings.hpp"
 
-namespace amk {
+namespace ampify {
 
 // The kernel's Host on Windows. Settings live in settings.txt and each element's storage in
-// storage\<id>.json, both under the kit folder. Shortcuts are registered on the thread that runs the
+// storage\<id>.json, both under the data folder. Shortcuts are registered on the thread that runs the
 // JavaScript, and Service() on that same thread receives their presses. HTTPS goes through WinHTTP.
 // The audio gain (M4) is not connected yet: it does nothing. Nothing here throws, because an exception
-// cannot cross the C frames of QuickJS. The kit services (Discord, icon, remote control, MIDI, output files) are
+// cannot cross the C frames of QuickJS. The Ampify services (Discord, icon, remote control, MIDI, output files) are
 // capabilities kept in win/win_services.*.
 namespace win {
 class PlayerBridge;
@@ -95,9 +95,9 @@ private:
     bool m_iconVisible = false;
     std::chrono::steady_clock::time_point m_balloonUntil;
 
-    std::unique_ptr<win::PlayerBridge> m_player;  // AMK.player and the queue capability, see win/player_bridge.*
+    std::unique_ptr<win::PlayerBridge> m_player;  // Ampify.player and the queue capability, see win/player_bridge.*
     std::unique_ptr<win::Services> m_services;
-    std::unique_ptr<win::KitCommandRunner> m_kitCommands;  // AMK.kit.run, in AppleMusic.exe only
+    std::unique_ptr<win::KitCommandRunner> m_kitCommands;  // Ampify.kit.run, in AppleMusic.exe only
 };
 
-}  // namespace amk
+}  // namespace ampify

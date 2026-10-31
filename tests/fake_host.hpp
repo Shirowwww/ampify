@@ -10,7 +10,7 @@
 #include "../core/audio/audio_host.hpp"
 #include "../core/host.hpp"
 
-namespace amk::test {
+namespace ampify::test {
 
 struct FakeHost : Host {
     std::string process = "ui";  // elements run in the interface unless their manifest asks for the engine
@@ -79,7 +79,7 @@ struct FakeHost : Host {
         return httpResponse;
     }
 
-    // Optional audio: a test that sets it (usually to an amk::audio::AudioEngine it feeds) offers AudioHost.
+    // Optional audio: a test that sets it (usually to an ampify::audio::AudioEngine it feeds) offers AudioHost.
     AudioHost* audio = nullptr;
 
     void* QueryCapability(std::string_view name) override {
@@ -88,4 +88,4 @@ struct FakeHost : Host {
     }
 };
 
-}  // namespace amk::test
+}  // namespace ampify::test

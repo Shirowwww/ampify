@@ -2,7 +2,7 @@
 
 // Runs work on the interface thread of this process, through a DispatcherQueue. A thin facade with two backends:
 //
-// - The XAML build (AMK_WITH_XAML) installs its backend at start (win/xaml_host.cpp): the work goes to
+// - The XAML build (AMPIFY_WITH_XAML) installs its backend at start (win/xaml_host.cpp): the work goes to
 //   window.DispatcherQueue().TryEnqueue (Microsoft.UI.Dispatching) of Apple Music's main window, obtained from
 //   AMP.Utils.dll. That is the path used in Apple Music.
 // - Without a backend, a Windows.System.DispatcherQueue that the interface thread adopted (AdoptCurrentThreadQueue),
@@ -18,7 +18,7 @@
 
 #include <functional>
 
-namespace amk::win {
+namespace ampify::win {
 
 // Interface thread only: adopts the Windows.System.DispatcherQueue of the calling thread for the fallback backend.
 // `dispatcherQueue` is an ABI::Windows::System::IDispatcherQueue* (for example from CreateDispatcherQueueController);
@@ -56,4 +56,4 @@ struct UiThreadBackend {
 // while another thread uses the facade. The backend must outlive its use (a static object).
 void SetUiThreadBackend(const UiThreadBackend* backend);
 
-}  // namespace amk::win
+}  // namespace ampify::win

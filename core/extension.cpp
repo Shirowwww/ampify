@@ -4,7 +4,7 @@
 #include <exception>
 #include <utility>
 
-namespace amk {
+namespace ampify {
 
 ExtensionHost::ExtensionHost(Journal& journal) : m_journal(journal) {}
 
@@ -33,7 +33,7 @@ void ExtensionHost::StartEntry(Entry& entry, const Settings& settings, std::stri
 
     if (!blockReason.empty()) {
         entry.state = ExtensionState::Blocked;
-        m_journal.Write("Extension " + entry.info.id + " non démarrée : " + std::string(blockReason));
+        m_journal.Write("Extension " + entry.info.id + " not started: " + std::string(blockReason));
         return;
     }
 
@@ -41,13 +41,13 @@ void ExtensionHost::StartEntry(Entry& entry, const Settings& settings, std::stri
     try {
         started = entry.info.start && entry.info.start();
     } catch (const std::exception& error) {
-        m_journal.Write("Extension " + entry.info.id + " a levé une erreur : " + error.what());
+        m_journal.Write("Extension " + entry.info.id + " threw an error: " + error.what());
     } catch (...) {
-        m_journal.Write("Extension " + entry.info.id + " a levé une erreur inconnue");
+        m_journal.Write("Extension " + entry.info.id + " threw an unknown error");
     }
 
     entry.state = started ? ExtensionState::Running : ExtensionState::Failed;
-    m_journal.Write("Extension " + entry.info.id + (started ? " démarrée" : " en échec"));
+    m_journal.Write("Extension " + entry.info.id + (started ? " started" : " failed"));
 }
 
 void ExtensionHost::StopAll() {
@@ -59,11 +59,11 @@ void ExtensionHost::StopEntry(Entry& entry) {
 
     try {
         if (entry.info.stop) entry.info.stop();
-        m_journal.Write("Extension " + entry.info.id + " arrêtée");
+        m_journal.Write("Extension " + entry.info.id + " stopped");
     } catch (const std::exception& error) {
-        m_journal.Write("Extension " + entry.info.id + " n'a pas pu s'arrêter proprement : " + error.what());
+        m_journal.Write("Extension " + entry.info.id + " could not stop cleanly: " + error.what());
     } catch (...) {
-        m_journal.Write("Extension " + entry.info.id + " n'a pas pu s'arrêter proprement");
+        m_journal.Write("Extension " + entry.info.id + " could not stop cleanly");
     }
     entry.state = ExtensionState::Off;
 }
@@ -122,4 +122,4 @@ std::string ExtensionHost::SettingKey(const std::string& id) {
     return "extensions." + id + ".enabled";
 }
 
-}  // namespace amk
+}  // namespace ampify

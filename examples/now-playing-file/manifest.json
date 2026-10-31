@@ -1,11 +1,11 @@
 {
   "$schema": "../../schemas/manifest.schema.json",
   "id": "now-playing-file",
-  "name": "Fichier « En cours » pour OBS",
+  "name": "Now playing file for OBS",
   "version": "0.1.0",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Écrit le morceau en cours dans un fichier texte, à lire comme source texte dans OBS ou un autre logiciel de stream.",
+  "description": "Writes the current track to a text file, to read as a text source in OBS or other streaming software.",
   "kitApi": "1.0",
   "main": "main.js",
   "processes": ["engine"],

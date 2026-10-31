@@ -31,7 +31,7 @@ private:
 // Multiplies each frame of interleaved samples by its gain from `curve`, then applies the knee.
 void ApplyCurve(float* samples, size_t frames, int channels, const std::vector<float>& curve);
 
-// A step on the samples after the gain and before the knee: the kit's equalizer (kit_audio.hpp). `key` names the
+// A step on the samples after the gain and before the knee: Ampify's equalizer (kit_audio.hpp). `key` names the
 // stream or the spatial object the samples belong to, so the stage keeps one filter state for each.
 class SampleStage {
 public:

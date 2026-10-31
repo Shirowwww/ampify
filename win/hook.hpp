@@ -9,7 +9,7 @@
 #include <cstddef>
 #include <string>
 
-namespace amk::win {
+namespace ampify::win {
 
 // The vtable entry of method `slot` for `object`'s class. Every object of that class shares the entry.
 // Interface pointers of the same object can have their own vtable: take the entry from the pointer you hold.
@@ -31,4 +31,4 @@ std::string ModuleOf(const void* address);
 // Puts back every slot and import entry replaced so far, and forgets them.
 void RestoreHooks();
 
-}  // namespace amk::win
+}  // namespace ampify::win

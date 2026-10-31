@@ -17,9 +17,9 @@
 #include "js_runtime.hpp"
 #include "manifest.hpp"
 
-namespace amk {
+namespace ampify {
 
-// Version of the kernel, as AMK.version. Same number as the kit (kKitVersion), checked by CMakeLists.txt. The API version is AMK.kitApi.
+// Version of the kernel, as Ampify.version. Same number as the kit (kKitVersion), checked by CMakeLists.txt. The API version is Ampify.kitApi.
 inline constexpr const char* kKernelVersion = "0.5.0";
 inline constexpr const char* kKitApi = "1.0";
 
@@ -103,4 +103,4 @@ private:
 // Bytes of storage one element may keep. Above it, storage.set throws a QuotaExceeded error.
 inline constexpr size_t kStorageQuotaBytes = size_t{1} << 20;
 
-}  // namespace amk
+}  // namespace ampify

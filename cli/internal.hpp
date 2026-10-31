@@ -1,6 +1,6 @@
 #pragma once
 
-// Shared by the command files of `amk`. Not part of the portable API.
+// Shared by the command files of `ampify`. Not part of the portable API.
 
 #include <cctype>
 #include <chrono>
@@ -24,7 +24,7 @@
 #include "release.hpp"
 #include "zip_writer.hpp"
 
-namespace amk::cli {
+namespace ampify::cli {
 
 // Everything a command needs: the options, the kit, and the three streams.
 struct Context {
@@ -47,7 +47,7 @@ inline std::string Pad(std::string_view text, size_t width) {
 std::filesystem::path PathArgument(std::string_view text);
 std::string Utf8(const std::filesystem::path& path);
 
-// Prints "amk : <message>" on the error stream. Failure returns 1 and Usage returns 2.
+// Prints "ampify: <message>" on the error stream. Failure returns 1 and Usage returns 2.
 int Failure(Context& ctx, const std::string& message);
 int Usage(Context& ctx, const std::string& message);
 
@@ -68,13 +68,13 @@ inline std::string ClockText() {
     return buffer;
 }
 
-// True for the answers that mean yes: o, oui, y, yes (spaces and case are ignored).
+// True for the answers that mean yes: y, yes (spaces and case are ignored).
 inline bool IsYes(std::string answer) {
     std::string lowered;
     for (char c : answer) {
         if (!std::isspace(static_cast<unsigned char>(c))) lowered += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
-    return lowered == "o" || lowered == "oui" || lowered == "y" || lowered == "yes";
+    return lowered == "y" || lowered == "yes";
 }
 
 // Whole content of a file. False when it cannot be read.
@@ -138,7 +138,7 @@ int CmdWatch(Context& ctx);
 // Returns 0, or 1 when an enabled element cannot load. Used by apply, launch, watch and dev.
 int ApplyNow(Context& ctx, const std::vector<std::string>& restarts = {});
 
-// Asks a running kernel to apply a change at once, through reload.txt: "start <cible>", "stop <cible>", "rescan".
+// Asks a running kernel to apply a change at once, through reload.txt: "start <target>", "stop <target>", "rescan".
 // A failure is only printed: the change still applies at the next start of Apple Music.
 void RequestReload(Context& ctx, const std::vector<std::string>& lines);
 
@@ -147,8 +147,8 @@ int CmdBuild(Context& ctx);
 int CmdInspect(Context& ctx);
 int CmdTypes(Context& ctx);
 
-// The TypeScript declarations that `amk types` writes (sdk_types.cpp).
-std::string_view AmkDeclarations();
+// The TypeScript declarations that `ampify types` writes (sdk_types.cpp).
+std::string_view AmpifyDeclarations();
 
 // Commands in develop.cpp: dev and logs.
 int CmdDev(Context& ctx);
@@ -182,4 +182,4 @@ int CmdProfile(Context& ctx);
 int CmdExport(Context& ctx);
 int CmdImport(Context& ctx);
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

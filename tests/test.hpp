@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace amk::test {
+namespace ampify::test {
 
 struct Case {
     std::string name;
@@ -35,16 +35,16 @@ inline void ReportFailure(const char* file, int line, const std::string& message
     Failures()++;
 }
 
-}  // namespace amk::test
+}  // namespace ampify::test
 
 #define TEST_CASE(name)                                                    \
     static void name();                                                    \
-    static const amk::test::Registration name##_registration(#name, name); \
+    static const ampify::test::Registration name##_registration(#name, name); \
     static void name()
 
 #define CHECK(condition)                                                                    \
     do {                                                                                    \
-        if (!(condition)) amk::test::ReportFailure(__FILE__, __LINE__, "CHECK(" #condition ")"); \
+        if (!(condition)) ampify::test::ReportFailure(__FILE__, __LINE__, "CHECK(" #condition ")"); \
     } while (0)
 
 #define CHECK_NEAR(actual, expected, tolerance)                                                    \
@@ -55,6 +55,6 @@ inline void ReportFailure(const char* file, int line, const std::string& message
             std::ostringstream message;                                                            \
             message << "CHECK_NEAR(" #actual ", " #expected ") got " << actualValue                \
                     << ", expected " << expectedValue << " +/- " << (tolerance);                   \
-            amk::test::ReportFailure(__FILE__, __LINE__, message.str());                           \
+            ampify::test::ReportFailure(__FILE__, __LINE__, message.str());                           \
         }                                                                                          \
     } while (0)

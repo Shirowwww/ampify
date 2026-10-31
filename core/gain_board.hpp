@@ -4,7 +4,7 @@
 #include <map>
 #include <string>
 
-namespace amk {
+namespace ampify {
 
 // The gain that each element asks for, in dB, added together. The total is clamped to the ceiling, so several
 // elements cannot push past it. Written on the owner thread of the elements; the audio threads read the linear
@@ -32,4 +32,4 @@ private:
 // The gain board of this process. Elements reach it through the Windows host; the Atmos hooks apply it.
 GainBoard& ElementGains();
 
-}  // namespace amk
+}  // namespace ampify

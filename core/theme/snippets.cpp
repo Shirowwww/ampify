@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <system_error>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -115,4 +115,4 @@ Theme ComposeTheme(const Theme* theme, const std::vector<std::shared_ptr<const T
     return composed;
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

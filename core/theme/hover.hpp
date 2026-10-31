@@ -8,7 +8,7 @@
 
 #include "tree.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // The :hover values of the elements, for a backend (TreeBackend::SetHover). Portable, so the tests drive the same
 // logic as the Windows backend: the backend only follows the pointer and calls Enter and Exit.
@@ -58,4 +58,4 @@ private:
     std::map<NodeId, Element> m_elements;
 };
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

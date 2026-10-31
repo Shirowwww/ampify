@@ -1,7 +1,7 @@
 #pragma once
 
 // A MIDI input device through winmm (midiInOpen). Each short message is handed to the callback on winmm's own
-// thread, packed as in core/midi_map.hpp; the callback must only queue. No output: the kit sends no light back.
+// thread, packed as in core/midi_map.hpp; the callback must only queue. No output: Ampify sends no light back.
 
 #include <windows.h>
 #include <mmsystem.h>
@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace amk::win {
+namespace ampify::win {
 
 class MidiInput {
 public:
@@ -41,4 +41,4 @@ private:
     std::string m_name;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win

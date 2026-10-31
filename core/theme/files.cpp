@@ -4,7 +4,7 @@
 #include <sstream>
 #include <system_error>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 bool IsSafeRelativePath(std::string_view path) {
     if (path.empty() || path.front() == '/' || path.front() == '\\') return false;
@@ -45,4 +45,4 @@ std::filesystem::path FolderFiles::Resolve(std::string_view path) const {
     return m_folder / std::filesystem::path(std::string(path));
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

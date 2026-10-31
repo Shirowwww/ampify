@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // The theme folders under `root`, one sub-folder per theme, sorted by name. A folder with none of the theme
 // files (colors.ini, resources.xaml, user.css) is left out.
@@ -27,4 +27,4 @@ private:
     std::optional<std::string> m_last;
 };
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

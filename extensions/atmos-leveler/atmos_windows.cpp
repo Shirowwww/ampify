@@ -121,7 +121,7 @@ Fn FromAddress(void* address) {
 }
 
 // Everything the hooks read is set before they are installed, and the hooks live until the process exits.
-amk::Journal* g_journal = nullptr;
+ampify::Journal* g_journal = nullptr;
 std::mutex g_journalLock;
 Api g_api;
 LevelerConfig g_config;
@@ -131,7 +131,7 @@ SetVolume_t g_setVolumeOriginal = nullptr;
 // Leveler and the gain it decides. The audio threads only try to lock: a block they miss is not measured.
 std::mutex g_levelerLock;
 std::unique_ptr<AtmosLeveler> g_leveler;
-int g_journaledStreamRate = 0;  // rates last written to the journal, under g_levelerLock
+int g_journaledStreamRate = 0;  // rates last written to the log, under g_levelerLock
 int g_journaledObjectRate = 0;
 std::atomic<float> g_targetLinear{1.0f};  // gain the audio threads apply now: the Atmos gain, or 1 for stereo
 std::atomic<float> g_playerVolume{1.0f};  // last volume Apple Music set on the player
@@ -229,9 +229,9 @@ struct SpatialPass {
 };
 SpatialPass g_pass;
 
-// AMK.audio (kit_audio.hpp): the equalizer, live loudness and analysis on these same buffers. It only adds steps
+// Ampify.audio (kit_audio.hpp): the equalizer, live loudness and analysis on these same buffers. It only adds steps
 // to the paths below; with a flat equalizer and no element listening, the samples are untouched by it.
-KitAudio g_kitAudio(amk::audio::ProcessAudio());
+KitAudio g_kitAudio(ampify::audio::ProcessAudio());
 
 // Poll thread only: the item being followed, and the gain of its current Atmos track.
 struct Playing {
@@ -246,14 +246,14 @@ Playing g_playing;
 
 void Note(const std::string& message) {
     std::lock_guard<std::mutex> guard(g_journalLock);
-    if (g_journal) g_journal->Write("Atmos : " + message);
+    if (g_journal) g_journal->Write("Atmos: " + message);
 }
 
 std::string FileNameOf(const std::string& path) {
     return std::filesystem::path(path).filename().string();
 }
 
-// A number for the journal, with a fixed number of decimals.
+// A number for the log, with a fixed number of decimals.
 std::string Fixed(double value, int decimals) {
     char text[32];
     std::snprintf(text, sizeof(text), "%.*f", decimals, value);
@@ -268,14 +268,14 @@ std::string GuidText(const GUID& guid) {
     return text;
 }
 
-// Hooks one vtable entry and journals the module it lands in. Returns false when it is refused.
+// Hooks one vtable entry and logs the module it lands in. Returns false when it is refused.
 bool HookEntry(void** entry, void* replacement, void** original, const char* name) {
     std::string why;
-    if (!amk::win::HookVtableEntry(entry, replacement, original, why)) {
-        Note(std::string("hook ") + name + " refusé : " + why);
+    if (!ampify::win::HookVtableEntry(entry, replacement, original, why)) {
+        Note(std::string("hook ") + name + " refused: " + why);
         return false;
     }
-    Note("hook " + std::string(name) + " posé dans " + FileNameOf(amk::win::ModuleOf(*original)));
+    Note("hook " + std::string(name) + " placed in " + FileNameOf(ampify::win::ModuleOf(*original)));
     return true;
 }
 
@@ -286,7 +286,7 @@ bool OriginalTable::Hook(void** entry, void* replacement, const char* name) {
         if (m_slots[i].entry.load(std::memory_order_relaxed) == entry) return true;  // hooked already
     }
     if (count == m_slots.size()) {
-        Note(std::string("hook ") + name + " refusé : trop de vtables spatiales");
+        Note(std::string("hook ") + name + " refused: too many spatial vtables");
         return false;
     }
 
@@ -318,7 +318,7 @@ bool Resolve(const wchar_t* module, const char* name, T& out) {
     HMODULE handle = GetModuleHandleW(module);
     FARPROC address = handle ? GetProcAddress(handle, name) : nullptr;
     if (!address) {
-        Note(std::string(name) + " introuvable : nivellement inactif");
+        Note(std::string(name) + " not found: leveler inactive");
         return false;
     }
     std::memcpy(&out, &address, sizeof(out));  // a function address of another type: copied, not cast
@@ -343,14 +343,14 @@ bool ResolveApi() {
 // --- Levels kept across runs ---------------------------------------------------------------------
 
 std::filesystem::path LevelsFile() {
-    return amk::win::KitDirectory() / kLevelsFileName;
+    return ampify::win::KitDirectory() / kLevelsFileName;
 }
 
 // Reads what earlier runs measured. Called once, before the hooks are installed.
 void LoadLevels() {
     std::ifstream file(LevelsFile(), std::ios::binary);
     if (!file) {
-        Note("aucun niveau enregistré : la cible stéréo se construit au fil des morceaux");
+        Note("no saved level: the stereo target builds up as tracks play");
         return;
     }
     std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -358,8 +358,8 @@ void LoadLevels() {
 
     std::lock_guard<std::mutex> guard(g_levelerLock);
     g_leveler->Restore(saved.atmos, saved.stereo);
-    Note("niveaux relus : " + std::to_string(g_leveler->Store().Levels().size()) + " variante(s) Atmos, " +
-         std::to_string(g_leveler->StereoHistory().Size()) + " morceau(x) stéréo");
+    Note("levels read back: " + std::to_string(g_leveler->Store().Levels().size()) + " Atmos variant(s), " +
+         std::to_string(g_leveler->StereoHistory().Size()) + " stereo track(s)");
 }
 
 // Writes the levels after a track changed them. A temporary file replaces the old one, so a crash mid-write
@@ -375,12 +375,12 @@ void SaveLevels(const std::string& text) {
         std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
         out << text;
         if (!out.flush()) {
-            Note("niveaux non enregistrés : " + amk::win::ToUtf8(temporary.wstring()) + " illisible en écriture");
+            Note("levels not saved: " + ampify::win::ToUtf8(temporary.wstring()) + " cannot be written");
             return;
         }
     }
     if (!MoveFileExW(temporary.c_str(), file.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-        Note("niveaux non enregistrés : remplacement de " + amk::win::ToUtf8(file.wstring()) + " refusé (" +
+        Note("levels not saved: replacing " + ampify::win::ToUtf8(file.wstring()) + " was refused (" +
              std::to_string(GetLastError()) + ")");
     }
 }
@@ -445,9 +445,9 @@ void StartIfKnown() {
     g_playing.currentDb = g_config.fallbackGainDb;  // a new track starts at the fallback gain, as the reference does
     g_playing.reportedDb = g_playing.currentDb;
     g_playing.polls = 0;
-    Note(std::string(kind == TrackKind::Atmos ? "piste Dolby Atmos" : "piste stéréo") + ", variante " +
+    Note(std::string(kind == TrackKind::Atmos ? "Dolby Atmos track" : "stereo track") + ", variant " +
          g_playing.variant +
-         (kind == TrackKind::Atmos ? ", gain de départ " + Fixed(g_playing.currentDb, 1) + " dB" : std::string()));
+         (kind == TrackKind::Atmos ? ", starting gain " + Fixed(g_playing.currentDb, 1) + " dB" : std::string()));
 }
 
 // Follows the player's current item and its stable variant. Poll thread only.
@@ -488,10 +488,10 @@ void FollowTrack() {
 }
 
 const char* PathName(AudioPath path) {
-    return path == AudioPath::Objects ? "objets spatiaux" : "flux stéréo";
+    return path == AudioPath::Objects ? "spatial objects" : "stereo stream";
 }
 
-// Decides the gain for the audio threads, journals what changed and saves what a finished track taught.
+// Decides the gain for the audio threads, logs what changed and saves what a finished track taught.
 // Poll thread only.
 void UpdateGain() {
     std::string levels;  // the file's new text, written once the lock is released
@@ -506,10 +506,10 @@ void UpdateGain() {
             g_playing.reportedDb = g_playing.currentDb;
         }
         if (auto finished = g_leveler->TakeFinished()) {
-            Note(std::string(finished->atmos ? "morceau Atmos" : "morceau stéréo") + " mesuré (" +
-                 PathName(finished->path) + ") : " + Fixed(finished->lufs, 2) + " LUFS sur " +
+            Note(std::string(finished->atmos ? "Atmos track" : "stereo track") + " measured (" +
+                 PathName(finished->path) + "): " + Fixed(finished->lufs, 2) + " LUFS over " +
                  std::to_string(static_cast<int>(finished->seconds)) + " s" +
-                 (finished->stored ? std::string(", enregistré") : std::string()));
+                 (finished->stored ? std::string(", saved") : std::string()));
             if (finished->stored) levels = FormatLevels(g_leveler->Store(), g_leveler->StereoHistory());
         }
         if (atmos && ++g_playing.polls >= kPollsPerReport) {
@@ -517,8 +517,8 @@ void UpdateGain() {
             std::optional<double> measured = g_leveler->MeasuredLufs();
             std::optional<double> target = g_leveler->StereoHistory().Target(g_config.minStereoTracks);
             if (measured) {
-                Note("mesure en cours : " + Fixed(*measured, 2) + " LUFS, cible stéréo " +
-                     (target ? Fixed(*target, 2) + " LUFS" : std::string("pas encore connue")));
+                Note("measuring: " + Fixed(*measured, 2) + " LUFS, stereo target " +
+                     (target ? Fixed(*target, 2) + " LUFS" : std::string("not known yet")));
             }
         }
     }
@@ -532,7 +532,7 @@ void PollLoop() {
             FollowTrack();
             UpdateGain();
         } catch (...) {
-            Note("erreur dans la boucle de suivi : le nivellement continue sans ce passage");
+            Note("error in the follow loop: the leveler carries on without this pass");
         }
     }
 }
@@ -545,7 +545,7 @@ void __cdecl SetVolume_Hook(void* player, float volume) {
     g_setVolumeOriginal(player, volume);
 
     g_playerVolume = volume;
-    amk::audio::ProcessAudio().PublishPlayerVolume(volume);  // AMK.audio.volume(): read only, like the slider
+    ampify::audio::ProcessAudio().PublishPlayerVolume(volume);  // Ampify.audio.volume(): read only, like the slider
     void* old = nullptr;
     {
         std::lock_guard<std::mutex> guard(g_playerLock);
@@ -613,7 +613,7 @@ HRESULT STDMETHODCALLTYPE GetService_Hook(IAudioClient* self, REFIID riid, void*
         g_leveler->SetStreamRate(rate);
         if (rate != g_journaledStreamRate) {
             g_journaledStreamRate = rate;
-            Note("mesure stéréo à " + std::to_string(rate) + " Hz (IAudioRenderClient, après le volume du lecteur)");
+            Note("stereo measurement at " + std::to_string(rate) + " Hz (IAudioRenderClient, after the player volume)");
         }
     }
     g_streamRamp.SetSampleRate(rate);
@@ -633,8 +633,8 @@ HRESULT STDMETHODCALLTYPE GetBuffer_Hook(IAudioRenderClient* self, UINT32 frames
 }
 
 // The gain the audio threads apply now: the leveler's target, times what the elements asked for with
-// AMK.audio.setGainDb. Both are applied to the samples after they are measured, never to the volume.
-float AppliedGain() { return g_targetLinear.load() * amk::ElementGains().Linear(); }
+// Ampify.audio.setGainDb. Both are applied to the samples after they are measured, never to the volume.
+float AppliedGain() { return g_targetLinear.load() * ampify::ElementGains().Linear(); }
 
 // Measures the decoded samples, then applies the gain, before Windows gets them.
 HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 frames, DWORD flags) {
@@ -651,7 +651,7 @@ HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 fr
                 if (lock.owns_lock() && g_leveler) g_leveler->Feed(samples, count, g_playerVolume.load());
             }
 
-            // AMK.audio: the loudness before the gain; the equalizer after the gain and before the knee (inside
+            // Ampify.audio: the loudness before the gain; the equalizer after the gain and before the knee (inside
             // ApplyCurve, inactive while flat); the analysis on what leaves for Windows.
             const int rate = g_meteredRate.load();
             const float volume = g_playerVolume.load();
@@ -670,7 +670,7 @@ HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 fr
 // through g_spatialOriginals, so it is always there.
 template <typename Fn>
 Fn SpatialOriginal(void* self, size_t slot) {
-    return FromAddress<Fn>(g_spatialOriginals.Find(amk::win::VtableEntry(self, slot)));
+    return FromAddress<Fn>(g_spatialOriginals.Find(ampify::win::VtableEntry(self, slot)));
 }
 
 HRESULT STDMETHODCALLTYPE BeginUpdating_Hook(void* self, UINT32* available, UINT32* frames) {
@@ -702,7 +702,7 @@ void ProcessSpatialPass() {
     std::lock_guard<std::mutex> passGuard(g_passLock);
     if (!g_objectPass || g_pass.frames == 0) return;
 
-    // AMK.audio: the equalizer runs on each object between the gain and the knee; loudness and analysis after.
+    // Ampify.audio: the equalizer runs on each object between the gain and the knee; loudness and analysis after.
     const int rate = g_spatialRate.load();
     const PassLevels& levels =
         g_objectPass->Process(g_pass.objects, g_pass.frames, AppliedGain(), g_kitAudio.ObjectStage(rate));
@@ -729,7 +729,7 @@ HRESULT ActivateObject(void* self, size_t slot, AudioObjectType type, void** obj
 
     HRESULT hr = original(self, type, object);
     if (SUCCEEDED(hr) && object && *object) {
-        g_spatialOriginals.Hook(amk::win::VtableEntry(*object, kObjectGetBuffer), AddressOf(ObjectGetBuffer_Hook),
+        g_spatialOriginals.Hook(ampify::win::VtableEntry(*object, kObjectGetBuffer), AddressOf(ObjectGetBuffer_Hook),
                                 name);
     }
     return hr;
@@ -745,13 +745,13 @@ HRESULT STDMETHODCALLTYPE ActivateForItems_Hook(void* self, AudioObjectType type
 
 // Apple Music's Atmos stream: hooks its update pass and its object activations, once per vtable.
 void HookMetadataStream(void* stream) {
-    g_spatialOriginals.Hook(amk::win::VtableEntry(stream, kBeginUpdating), AddressOf(BeginUpdating_Hook),
+    g_spatialOriginals.Hook(ampify::win::VtableEntry(stream, kBeginUpdating), AddressOf(BeginUpdating_Hook),
                             "ISpatialAudioObjectRenderStreamForMetadata::BeginUpdatingAudioObjects");
-    g_spatialOriginals.Hook(amk::win::VtableEntry(stream, kEndUpdating), AddressOf(EndUpdating_Hook),
+    g_spatialOriginals.Hook(ampify::win::VtableEntry(stream, kEndUpdating), AddressOf(EndUpdating_Hook),
                             "ISpatialAudioObjectRenderStreamForMetadata::EndUpdatingAudioObjects");
-    g_spatialOriginals.Hook(amk::win::VtableEntry(stream, kActivateForCommands), AddressOf(ActivateForCommands_Hook),
+    g_spatialOriginals.Hook(ampify::win::VtableEntry(stream, kActivateForCommands), AddressOf(ActivateForCommands_Hook),
                             "ISpatialAudioObjectRenderStreamForMetadata::ActivateSpatialAudioObjectForMetadataCommands");
-    g_spatialOriginals.Hook(amk::win::VtableEntry(stream, kActivateForItems), AddressOf(ActivateForItems_Hook),
+    g_spatialOriginals.Hook(ampify::win::VtableEntry(stream, kActivateForItems), AddressOf(ActivateForItems_Hook),
                             "ISpatialAudioObjectRenderStreamForMetadata::ActivateSpatialAudioObjectForMetadataItems");
 }
 
@@ -768,11 +768,11 @@ void OnSpatialStreamActivated(const PROPVARIANT* params, REFIID riid, void* stre
         reinterpret_cast<const SpatialAudioObjectRenderStreamActivationParams*>(params->blob.pBlobData);
     const WAVEFORMATEX* format = activation->ObjectFormat;
     bool metadata = riid.Data1 == kIidRenderStreamForMetadata.Data1;
-    Note(std::string("flux spatial activé : ") +
+    Note(std::string("spatial stream activated: ") +
          (metadata ? "ISpatialAudioObjectRenderStreamForMetadata" : "ISpatialAudioObjectRenderStream") + " (IID " +
-         GuidText(riid) + (metadata && riid != kIidRenderStreamForMetadata ? ", autre que celui du SDK" : "") + ")");
+         GuidText(riid) + (metadata && riid != kIidRenderStreamForMetadata ? ", different from the SDK one" : "") + ")");
     if (!IsFloat32(format) || format->nChannels != 1) {
-        Note("flux spatial en un format non pris en charge : pas de nivellement sur ce flux");
+        Note("spatial stream in an unsupported format: no leveling on this stream");
         return;
     }
 
@@ -787,7 +787,7 @@ void OnSpatialStreamActivated(const PROPVARIANT* params, REFIID riid, void* stre
         g_leveler->SetObjectRate(rate);
         if (rate != g_journaledObjectRate) {
             g_journaledObjectRate = rate;
-            Note("mesure Atmos à " + std::to_string(rate) + " Hz (objets spatiaux, avant le volume du curseur)");
+            Note("Atmos measurement at " + std::to_string(rate) + " Hz (spatial objects, before the slider volume)");
         }
     }
     g_spatialRate = rate;
@@ -801,11 +801,11 @@ HRESULT STDMETHODCALLTYPE ActivateSpatial_Hook(ISpatialAudioClient* self, const 
     return hr;
 }
 
-// Journals once whether Apple Music sets a volume per object. The objects are measured before any volume
+// Logs once whether Apple Music sets a volume per object. The objects are measured before any volume
 // either way, so it changes nothing to the measurement.
 HRESULT STDMETHODCALLTYPE ObjectSetVolume_Hook(ISpatialAudioObject* self, float volume) {
     if (volume < 0.999f && !g_objectVolumeSeen.exchange(true)) {
-        Note("volume par objet observé (" + Fixed(volume, 3) + ") : la mesure lit les tampons avant ce volume");
+        Note("per-object volume seen (" + Fixed(volume, 3) + "): the measurement reads the buffers before this volume");
     }
     return g_objectSetVolumeOriginal(self, volume);
 }
@@ -839,7 +839,7 @@ void ReadSpatialEntries(IMMDevice* device, AudioEntries& out) {
                                                 reinterpret_cast<void**>(&client)));
     // The activation is hooked whenever there is a client: Apple Music's metadata stream is found through it,
     // even where the throwaway plain stream below cannot be made.
-    if (activated) out.activateSpatial = amk::win::VtableEntry(client, kActivateSpatial);
+    if (activated) out.activateSpatial = ampify::win::VtableEntry(client, kActivateSpatial);
     if (activated && SUCCEEDED(client->GetSupportedAudioObjectFormatEnumerator(&formats)) &&
         SUCCEEDED(formats->GetFormat(0, &format))) {
         SpatialAudioObjectRenderStreamActivationParams activation{};
@@ -855,10 +855,10 @@ void ReadSpatialEntries(IMMDevice* device, AudioEntries& out) {
         if (SUCCEEDED(client->ActivateSpatialAudioStream(&variant, __uuidof(ISpatialAudioObjectRenderStream),
                                                          reinterpret_cast<void**>(&stream))) &&
             SUCCEEDED(stream->ActivateSpatialAudioObject(AudioObjectType_FrontLeft, &object))) {
-            out.beginUpdating = amk::win::VtableEntry(stream, kBeginUpdating);
-            out.endUpdating = amk::win::VtableEntry(stream, kEndUpdating);
-            out.objectGetBuffer = amk::win::VtableEntry(object, kObjectGetBuffer);
-            out.objectSetVolume = amk::win::VtableEntry(object, kObjectSetVolume);
+            out.beginUpdating = ampify::win::VtableEntry(stream, kBeginUpdating);
+            out.endUpdating = ampify::win::VtableEntry(stream, kEndUpdating);
+            out.objectGetBuffer = ampify::win::VtableEntry(object, kObjectGetBuffer);
+            out.objectSetVolume = ampify::win::VtableEntry(object, kObjectSetVolume);
         }
     }
 
@@ -891,16 +891,16 @@ bool ReadAudioEntries(AudioEntries& out) {
               SUCCEEDED(client->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, 1000000, 0, format, nullptr)) &&
               SUCCEEDED(client->GetService(kIidAudioRenderClient, reinterpret_cast<void**>(&render)));
     if (ok) {
-        out.initialize.push_back(amk::win::VtableEntry(client, kInitialize));
-        out.getService.push_back(amk::win::VtableEntry(client, kGetService));
-        out.getBuffer = amk::win::VtableEntry(render, kGetBuffer);
-        out.releaseBuffer = amk::win::VtableEntry(render, kReleaseBuffer);
+        out.initialize.push_back(ampify::win::VtableEntry(client, kInitialize));
+        out.getService.push_back(ampify::win::VtableEntry(client, kGetService));
+        out.getBuffer = ampify::win::VtableEntry(render, kGetBuffer);
+        out.releaseBuffer = ampify::win::VtableEntry(render, kReleaseBuffer);
 
         IAudioClient3* client3 = nullptr;
         if (SUCCEEDED(client->QueryInterface(iidClient3, reinterpret_cast<void**>(&client3)))) {
-            out.initialize.push_back(amk::win::VtableEntry(client3, kInitialize));
-            out.getService.push_back(amk::win::VtableEntry(client3, kGetService));
-            out.initializeShared = amk::win::VtableEntry(client3, kInitializeSharedStream);
+            out.initialize.push_back(ampify::win::VtableEntry(client3, kInitialize));
+            out.getService.push_back(ampify::win::VtableEntry(client3, kGetService));
+            out.initializeShared = ampify::win::VtableEntry(client3, kInitializeSharedStream);
             client3->Release();
         }
         ReadSpatialEntries(device, out);
@@ -917,7 +917,7 @@ bool ReadAudioEntries(AudioEntries& out) {
 // Installs every hook whose entry could be read. Returns how many were installed.
 int InstallAudioHooks(AudioEntries& entries) {
     int installed = 0;
-    // Each entry lands in its own vtable, so each one is hooked and journaled on its own.
+    // Each entry lands in its own vtable, so each one is hooked and logged on its own.
     for (void** entry : entries.initialize) {
         installed += HookEntry(entry, AddressOf(Initialize_Hook), reinterpret_cast<void**>(&g_initializeOriginal),
                                "IAudioClient::Initialize");
@@ -937,7 +937,7 @@ int InstallAudioHooks(AudioEntries& entries) {
                            reinterpret_cast<void**>(&g_releaseBufferOriginal), "IAudioRenderClient::ReleaseBuffer");
 
     if (!entries.activateSpatial) {
-        Note("objets spatiaux indisponibles sur le périphérique par défaut : Dolby Atmos non nivelé");
+        Note("spatial objects not available on the default device: Dolby Atmos not leveled");
         return installed;
     }
     // The activation hook is what finds Apple Music's metadata stream; the plain stream's classes come
@@ -960,7 +960,7 @@ int InstallAudioHooks(AudioEntries& entries) {
 
 // Starts the leveler: waits for the Apple Music modules, hooks the player volume and the audio, then
 // runs the poll thread. Called once, from the kernel's thread for this process.
-bool StartLeveler(amk::Journal& journal, const LevelerConfig& config) {
+bool StartLeveler(ampify::Journal& journal, const LevelerConfig& config) {
     {
         std::lock_guard<std::mutex> guard(g_journalLock);
         g_journal = &journal;
@@ -968,13 +968,13 @@ bool StartLeveler(amk::Journal& journal, const LevelerConfig& config) {
     g_config = config;
 
     if (!WaitForModules({L"AVFoundationCF.dll", L"CoreFoundation.dll"})) {
-        Note("AVFoundationCF.dll ou CoreFoundation.dll absent après 60 s : nivellement inactif");
+        Note("AVFoundationCF.dll or CoreFoundation.dll missing after 60 s: leveler inactive");
         return false;
     }
     if (!ResolveApi()) return false;
 
     {
-        // One meter per path: the stereo stream (96 kHz on l'utilisateur's output) and the Atmos objects (48 kHz).
+        // One meter per path: the stereo stream (for example 96 kHz) and the Atmos objects (48 kHz).
         // Each takes its stream's rate once the stream is seen.
         std::lock_guard<std::mutex> guard(g_levelerLock);
         g_leveler = std::make_unique<AtmosLeveler>(config, 48000, 48000);
@@ -982,14 +982,14 @@ bool StartLeveler(amk::Journal& journal, const LevelerConfig& config) {
     LoadLevels();
 
     // The player's volume is only read: the hook passes it on unchanged, so the slider does not move.
-    size_t volumeImports = amk::win::HookImportEverywhere(
+    size_t volumeImports = ampify::win::HookImportEverywhere(
         "AVFoundationCF.dll", "AVCFPlayerSetVolume", AddressOf(SetVolume_Hook),
         reinterpret_cast<void**>(&g_setVolumeOriginal));
     if (volumeImports == 0) {
-        Note("AVCFPlayerSetVolume n'est importée par aucun module : volume non suivi, nivellement inactif");
+        Note("AVCFPlayerSetVolume is imported by no module: volume not followed, leveler inactive");
         return false;
     }
-    Note("hook AVCFPlayerSetVolume posé dans " + std::to_string(volumeImports) + " import(s)");
+    Note("hook AVCFPlayerSetVolume placed in " + std::to_string(volumeImports) + " import(s)");
 
     // The kernel's thread may not be in a COM apartment yet. The throwaway objects need one.
     HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -997,20 +997,20 @@ bool StartLeveler(amk::Journal& journal, const LevelerConfig& config) {
     bool readable = (SUCCEEDED(com) || com == RPC_E_CHANGED_MODE) && ReadAudioEntries(entries);
     if (SUCCEEDED(com)) CoUninitialize();
     if (!readable) {
-        Note("vtables audio illisibles sur le périphérique par défaut : aucun gain posé");
+        Note("audio vtables unreadable on the default device: no gain applied");
         return false;
     }
     int installed = InstallAudioHooks(entries);
     if (installed == 0) return false;
 
     std::thread(PollLoop).detach();
-    Note("nivellement démarré : " + std::to_string(installed) + " hook(s) audio");
+    Note("leveler started: " + std::to_string(installed) + " audio hook(s)");
     return true;
 }
 
 // Reads the settings the leveler takes. Missing keys keep the reference mod's defaults; the gains are brought
 // into 0..15 dB.
-LevelerConfig ConfigFrom(const amk::Settings& settings) {
+LevelerConfig ConfigFrom(const ampify::Settings& settings) {
     LevelerConfig config;
     config.autoLevel = settings.GetBool("extensions.atmos-leveler.auto_level", config.autoLevel);
     config.fallbackGainDb = settings.GetDouble("extensions.atmos-leveler.fallback_db", config.fallbackGainDb);
@@ -1020,12 +1020,12 @@ LevelerConfig ConfigFrom(const amk::Settings& settings) {
 
 }  // namespace
 
-amk::ExtensionInfo MakeAtmosLevelerExtension(amk::Journal& journal, const amk::Settings& settings) {
+ampify::ExtensionInfo MakeAtmosLevelerExtension(ampify::Journal& journal, const ampify::Settings& settings) {
     LevelerConfig config = ConfigFrom(settings);
 
-    amk::ExtensionInfo info;
+    ampify::ExtensionInfo info;
     info.id = "atmos-leveler";
-    info.name = "Nivellement Atmos";
+    info.name = "Atmos leveler";
     info.enabledByDefault = false;  // opt-in until it is tested on a real Dolby Atmos track
     info.start = [&journal, config] { return StartLeveler(journal, config); };
     // No stop: the hooks stay in place until the process exits, so nothing is left half-patched.

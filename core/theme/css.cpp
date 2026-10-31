@@ -2,7 +2,7 @@
 
 #include <cctype>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -101,7 +101,7 @@ std::vector<Declaration> ParseDeclarations(std::string_view body, size_t bodyOff
         int line = LineOf(clean, offset);
         size_t colon = text.find(':');
         if (colon == std::string_view::npos) {
-            problems.push_back("ligne " + std::to_string(line) + " : déclaration sans « : » ignorée");
+            problems.push_back("line " + std::to_string(line) + ": declaration without \":\" ignored");
             continue;
         }
 
@@ -118,7 +118,7 @@ std::vector<Declaration> ParseDeclarations(std::string_view body, size_t bodyOff
         declaration.value = std::string(value);
 
         if (declaration.property.empty() || declaration.value.empty()) {
-            problems.push_back("ligne " + std::to_string(line) + " : déclaration incomplète ignorée");
+            problems.push_back("line " + std::to_string(line) + ": incomplete declaration ignored");
             continue;
         }
         declarations.push_back(std::move(declaration));
@@ -138,7 +138,7 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
         return std::nullopt;
     };
 
-    if (s.empty()) return fail("sélecteur vide");
+    if (s.empty()) return fail("empty selector");
 
     Combinator pending = Combinator::Descendant;
     bool sawChild = false;
@@ -150,7 +150,7 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
         }
 
         if (s[i] == '>') {
-            if (selector.parts.empty() || sawChild) return fail("« > » mal placé dans « " + selector.text + " »");
+            if (selector.parts.empty() || sawChild) return fail("misplaced \">\" in \"" + selector.text + "\"");
             pending = Combinator::Child;
             sawChild = true;
             i++;
@@ -171,7 +171,7 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
             size_t start = i;
             while (i < s.size() && IsNameChar(s[i])) i++;
             compound.name = std::string(s.substr(start, i - start));
-            if (compound.name.empty()) return fail("nom après « # » manquant dans « " + selector.text + " »");
+            if (compound.name.empty()) return fail("name missing after \"#\" in \"" + selector.text + "\"");
         }
 
         // A pseudo-class. Only :hover, and only on the last part: the engine follows the pointer of the element it styles.
@@ -180,18 +180,18 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
             while (i < s.size() && IsNameChar(s[i])) i++;
             std::string pseudo = LowerCopy(s.substr(start, i - start));
             if (pseudo != "hover") {
-                return fail("pseudo-classe « :" + std::string(s.substr(start, i - start)) + " » non prise en charge dans « " +
-                            selector.text + " » (seule :hover l'est)");
+                return fail("pseudo-class \":" + std::string(s.substr(start, i - start)) + "\" is not supported in \"" +
+                            selector.text + "\" (only :hover is)");
             }
             if (s.substr(i).find_first_not_of(" \t\r\n") != std::string_view::npos) {
-                return fail("« :hover » seulement sur le dernier élément de « " + selector.text + " »");
+                return fail("\":hover\" is only allowed on the last element of \"" + selector.text + "\"");
             }
             selector.hover = true;
         }
 
         // Nothing was read (for example a stray `@`): the check below reports it, so the loop always advances.
         if (i < s.size() && !IsSpace(s[i]) && s[i] != '>') {
-            return fail("caractère « " + std::string(1, s[i]) + " » non pris en charge dans « " + selector.text + " »");
+            return fail("character \"" + std::string(1, s[i]) + "\" is not supported in \"" + selector.text + "\"");
         }
 
         compound.combinator = selector.parts.empty() ? Combinator::Descendant : pending;
@@ -200,7 +200,7 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
         sawChild = false;
     }
 
-    if (sawChild) return fail("« > » sans élément après dans « " + selector.text + " »");
+    if (sawChild) return fail("\">\" has no element after it in \"" + selector.text + "\"");
     return selector;
 }
 
@@ -222,19 +222,19 @@ Stylesheet ParseStylesheet(std::string_view css) {
         size_t semicolon = clean.find(';', pos);
         if (semicolon != std::string::npos && (open == std::string::npos || semicolon < open)) {
             std::string_view statement = Trimmed(std::string_view(clean).substr(pos, semicolon - pos));
-            sheet.problems.push_back("ligne " + std::to_string(line) + " : règle « " + std::string(statement) +
-                                     " » non prise en charge, ignorée");
+            sheet.problems.push_back("line " + std::to_string(line) + ": rule \"" + std::string(statement) +
+                                     "\" is not supported, ignored");
             pos = semicolon + 1;
             continue;
         }
 
         if (open == std::string::npos) {
-            sheet.problems.push_back("ligne " + std::to_string(line) + " : accolade ouvrante manquante");
+            sheet.problems.push_back("line " + std::to_string(line) + ": opening brace missing");
             break;
         }
         size_t close = clean.find('}', open);
         if (close == std::string::npos) {
-            sheet.problems.push_back("ligne " + std::to_string(line) + " : accolade fermante manquante");
+            sheet.problems.push_back("line " + std::to_string(line) + ": closing brace missing");
             break;
         }
 
@@ -243,8 +243,8 @@ Stylesheet ParseStylesheet(std::string_view css) {
         pos = close + 1;
 
         if (!head.empty() && head.front() == '@') {
-            sheet.problems.push_back("ligne " + std::to_string(line) + " : règle « " + std::string(head) +
-                                     " » non prise en charge, ignorée");
+            sheet.problems.push_back("line " + std::to_string(line) + ": rule \"" + std::string(head) +
+                                     "\" is not supported, ignored");
             continue;
         }
 
@@ -261,7 +261,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
             std::string problem;
             std::optional<Selector> selector = ParseSelector(piece.text, &problem);
             if (!selector) {
-                sheet.problems.push_back("ligne " + std::to_string(line) + " : " + problem + ", règle ignorée");
+                sheet.problems.push_back("line " + std::to_string(line) + ": " + problem + ", rule ignored");
                 selectorsOk = false;
                 break;
             }
@@ -275,4 +275,4 @@ Stylesheet ParseStylesheet(std::string_view css) {
     return sheet;
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

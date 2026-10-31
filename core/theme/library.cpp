@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <system_error>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -55,4 +55,4 @@ bool ChangeWatcher::Poll() {
     return changed;
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

@@ -2,7 +2,7 @@
 
 #include "win_common.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 MidiInput::~MidiInput() { Close(); }
 
@@ -25,9 +25,9 @@ bool MidiInput::Open(unsigned index, OnMessage onMessage, std::string* error) {
     std::vector<std::string> devices = Devices();
     if (index >= devices.size()) {
         if (error) {
-            *error = devices.empty() ? "aucun appareil MIDI branché"
-                                     : "appareil MIDI " + std::to_string(index) + " absent (" +
-                                           std::to_string(devices.size()) + " trouvé(s))";
+            *error = devices.empty() ? "no MIDI device plugged in"
+                                     : "MIDI device " + std::to_string(index) + " missing (" +
+                                           std::to_string(devices.size()) + " found)";
         }
         return false;
     }
@@ -37,14 +37,14 @@ bool MidiInput::Open(unsigned index, OnMessage onMessage, std::string* error) {
                                  reinterpret_cast<DWORD_PTR>(this), CALLBACK_FUNCTION);
     if (result != MMSYSERR_NOERROR) {
         if (error) {
-            *error = result == MMSYSERR_ALLOCATED ? "appareil déjà utilisé par un autre programme"
-                                                  : "midiInOpen a échoué (code " + std::to_string(result) + ")";
+            *error = result == MMSYSERR_ALLOCATED ? "device already in use by another program"
+                                                  : "midiInOpen failed (code " + std::to_string(result) + ")";
         }
         return false;
     }
     if (midiInStart(handle) != MMSYSERR_NOERROR) {
         midiInClose(handle);
-        if (error) *error = "midiInStart a échoué";
+        if (error) *error = "midiInStart failed";
         return false;
     }
     m_handle = handle;
@@ -66,4 +66,4 @@ void CALLBACK MidiInput::Callback(HMIDIIN, UINT message, DWORD_PTR instance, DWO
     if (self && self->m_onMessage) self->m_onMessage(static_cast<uint32_t>(param1));
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

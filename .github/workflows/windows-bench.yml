@@ -1,15 +1,17 @@
-name: Banc de test Windows
+name: Windows bench
 
-# Compile le kit (diffusion et banc) sous Linux, puis lance les tests sur un vrai Windows avec Apple Music installé.
-# Le détail des tests et la façon d'en ajouter : docs/tests/banc-windows.md.
-# Branche-agnostique : tourne sur chaque branche ** qui touche au code, et à la main (workflow_dispatch).
+# Builds Ampify (release and bench) on Linux, then runs the cases on a real Windows with Apple Music installed.
+# The cases and how to add one: docs/development/bench-and-ci.md.
+# Runs on every branch that touches the code, and by hand (workflow_dispatch). Pushes that only touch docs or
+# other files outside the list below start nothing.
 
 on:
   push:
     branches: ['**']
     paths:
       - 'bench/windows/**'
-      # The signed-in bench has its own workflow (windows-live.yml): its files must not restart this one.
+      # The signed-in bench is run by hand on a signed-in PC (it needs an Apple account): its files must not
+      # restart this workflow.
       - '!bench/windows/live/**'
       - '!bench/windows/lib/uia.ps1'
       - '!bench/windows/lib/audio.ps1'
@@ -35,18 +37,21 @@ on:
 permissions:
   contents: read
 
+# A new push cancels the run in progress on the same branch. The main branch is never cancelled: each of its
+# runs finishes, so a result exists for every commit that landed there.
 concurrency:
   group: windows-bench-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # Unit tests on Linux, in parallel with the Windows builds: the benches do not wait for them.
   linux-tests:
-    name: Tests unitaires (Linux)
+    name: Unit tests (Linux)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Outils et cache de compilation
+      - name: Tools and build cache
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build ccache
@@ -55,20 +60,21 @@ jobs:
           path: ~/.cache/ccache
           key: ccache-linux-${{ github.sha }}
           restore-keys: ccache-linux-
-      - name: Compiler et lancer amk_tests
+      - name: Build and run ampify_tests
         run: |
           cmake -S . -B build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build-linux
-          ./build-linux/amk_tests
+          ./build-linux/ampify_tests
           ccache --show-stats || true
 
   build:
-    name: Compiler les deux builds Windows (MinGW)
+    name: Build the two Windows builds (MinGW)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - name: Installer le compilateur croisé pour Windows et le cache de compilation
+      - name: Install the Windows cross compiler and the build cache
         run: |
           sudo apt-get update
           sudo apt-get install -y g++-mingw-w64-x86-64 cmake ninja-build ccache
@@ -80,42 +86,42 @@ jobs:
           key: ccache-mingw-${{ github.sha }}
           restore-keys: ccache-mingw-
 
-      - name: Build de diffusion (Windows x64, versions testées seulement)
+      - name: Release build (Windows x64, tested versions only)
         run: |
-          cmake -S . -B build-diffusion -G Ninja -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          cmake -S . -B build-release -G Ninja -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake \
-            -DCMAKE_BUILD_TYPE=Release -DAMK_BUILD_TESTS=OFF -DAMK_BENCH=OFF
-          cmake --build build-diffusion --parallel
+            -DCMAKE_BUILD_TYPE=Release -DAMPIFY_BUILD_TESTS=OFF -DAMPIFY_BENCH=OFF
+          cmake --build build-release --parallel
 
-      - name: Build de banc (Windows x64, accepte toute version, ne jamais diffuser)
+      - name: Bench build (Windows x64, accepts any version, never ship)
         run: |
-          cmake -S . -B build-banc -G Ninja -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          cmake -S . -B build-bench -G Ninja -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake \
-            -DCMAKE_BUILD_TYPE=Release -DAMK_BUILD_TESTS=OFF -DAMK_BENCH=ON
-          cmake --build build-banc --parallel
+            -DCMAKE_BUILD_TYPE=Release -DAMPIFY_BUILD_TESTS=OFF -DAMPIFY_BENCH=ON
+          cmake --build build-bench --parallel
 
-      - name: Préparer le paquet pour le banc
+      - name: Lay out the package for the bench
         run: |
-          mkdir -p dist/diffusion dist/banc dist/cli
-          cp build-diffusion/amk_launcher.exe build-diffusion/amk_kernel.dll build-diffusion/amk_setup.exe build-diffusion/AMK-Test.exe dist/diffusion/
-          cp build-banc/amk_launcher.exe build-banc/amk_kernel.dll dist/banc/
-          cp build-diffusion/amk.exe dist/cli/
+          mkdir -p dist/release dist/bench dist/cli
+          cp build-release/ampify_launcher.exe build-release/ampify_kernel.dll build-release/ampify_setup.exe build-release/Ampify-Test.exe build-release/ampify.exe dist/release/
+          cp build-bench/ampify_launcher.exe build-bench/ampify_kernel.dll dist/bench/
+          cp build-release/ampify.exe dist/cli/
           {
-            echo "Commit : $GITHUB_SHA"
-            echo "diffusion : AMK_BENCH=OFF, n'injecte que sur les versions de core/version_gate.hpp"
-            echo "banc : AMK_BENCH=ON, accepte toute version d'Apple Music. Ne jamais diffuser."
+            echo "Commit: $GITHUB_SHA"
+            echo "release: AMPIFY_BENCH=OFF, injects only on the versions of core/version_gate.hpp"
+            echo "bench: AMPIFY_BENCH=ON, accepts any Apple Music version. Never ship."
           } > dist/BUILD_INFO.txt
           find dist -type f -exec ls -l {} +
 
       - uses: actions/upload-artifact@v4
         with:
-          name: amk-builds
+          name: ampify-builds
           path: dist
           if-no-files-found: error
           retention-days: 14
 
   bench:
-    name: Banc Windows MinGW (${{ matrix.shard }})
+    name: Windows bench MinGW (${{ matrix.shard }})
     needs: build
     runs-on: windows-latest
     timeout-minutes: 45
@@ -124,96 +130,96 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - shard: lancement
-            cases: lancement-normal,version-diffusion,injection-banc,mode-sans-echec,nivellement-atmos
-          - shard: outils
-            cases: cli-outils-windows,extension-hello,installateur,cli-build-installe,kit-de-test,lecteur-amp
+          - shard: launch
+            cases: normal-launch,release-version,bench-injection,safe-mode,atmos-leveler
+          - shard: tools
+            cases: cli-windows-tools,extension-hello,installer,cli-build-installed,test-kit,amp-player
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
         with:
-          name: amk-builds
+          name: ampify-builds
           path: dist
 
-      - name: Lancer le banc
+      - name: Run the bench
         shell: bash
         run: pwsh -NoProfile -File ./bench/windows/run-bench.ps1 -KitRoot dist -RepoRoot . -OutputRoot results -Only "${{ matrix.cases }}"
 
-      - name: Publier les résultats (journaux, captures, rapport)
-        if: always()
+      - name: Publish the results (logs, screenshots, report)
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: banc-windows-resultats-${{ matrix.shard }}
+          name: windows-bench-results-${{ matrix.shard }}
           path: results
           if-no-files-found: warn
           retention-days: 14
 
-  # Même banc, kit compilé avec MSVC (le compilateur de l'utilisateur), liaison XAML comprise. Le kit vient du job xaml-m8,
-  # qui le compile une seule fois (CRT statique, pour ne rien demander au processus d'Apple Music).
+  # Same bench, on the kit built with MSVC (the compiler of the shipped build), XAML binding included. The kit comes
+  # from the msvc-build job, which builds it once (static CRT, so nothing is asked of Apple Music's process).
   bench-msvc:
-    name: Banc Windows MSVC (${{ matrix.shard }})
+    name: Windows bench MSVC (${{ matrix.shard }})
     runs-on: windows-latest
     timeout-minutes: 45
-    needs: xaml-m8
+    needs: msvc-build
     strategy:
       fail-fast: false
       matrix:
         include:
-          - shard: lancement
-            cases: lancement-normal,version-diffusion,injection-banc,mode-sans-echec,nivellement-atmos
-          - shard: outils
-            cases: cli-outils-windows,extension-hello,installateur,cli-build-installe,kit-de-test,lecteur-amp
-          - shard: interface
-            cases: m8-exemples,m8-inspecteur,m8-theme-minuit,m8-interface
+          - shard: launch
+            cases: normal-launch,release-version,bench-injection,safe-mode,atmos-leveler
+          - shard: tools
+            cases: cli-windows-tools,extension-hello,installer,cli-build-installed,test-kit,amp-player
+          - shard: ui
+            cases: ui-examples,ui-inspector,ui-theme-midnight,ui-surfaces
     steps:
       - uses: actions/checkout@v4
 
-      # The two halves of the MSVC kit (diffusion + cli, banc + m8), built side by side by xaml-m8.
+      # The two halves of the MSVC kit (release + cli, bench + ui), built side by side by msvc-build.
       - uses: actions/download-artifact@v4
         with:
-          pattern: amk-msvc-kit-*
+          pattern: ampify-msvc-kit-*
           path: dist-msvc
           merge-multiple: true
 
-      - name: Lancer le banc sur le kit MSVC
+      - name: Run the bench on the MSVC kit
         shell: bash
         run: pwsh -NoProfile -File ./bench/windows/run-bench.ps1 -KitRoot dist-msvc -RepoRoot . -OutputRoot results-msvc -Only "${{ matrix.cases }}"
 
-      - name: Publier les résultats MSVC
-        if: always()
+      - name: Publish the MSVC results
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: banc-windows-msvc-resultats-${{ matrix.shard }}
+          name: windows-bench-msvc-results-${{ matrix.shard }}
           path: results-msvc
           if-no-files-found: warn
           retention-days: 14
 
-  # M8 : compile la liaison XAML (thèmes, rendu natif des interfaces, carte Mods) avec MSVC. Les en-têtes C++/WinRT
-  # sont générés par cppwinrt.exe à partir des métadonnées WinUI 1.8 (celles d'Apple Music 1.1540+). Indépendant du
-  # banc M3.
+  # Builds the XAML binding (themes, native rendering of the interfaces, Ampify card) with MSVC. The C++/WinRT headers
+  # are generated by cppwinrt.exe from the WinUI 1.8 metadata (the one of Apple Music 1.1540+). Independent of the
+  # MinGW bench.
   # Two runners side by side: the shipping build (with the MSVC unit tests) and the bench build, which only differs
-  # by AMK_BENCH and would otherwise wait for the first one.
-  xaml-m8:
-    name: Compiler M8 XAML (MSVC, ${{ matrix.variant }})
+  # by AMPIFY_BENCH and would otherwise wait for the first one.
+  msvc-build:
+    name: Build with MSVC and XAML (${{ matrix.variant }})
     runs-on: windows-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        variant: [diffusion, banc]
+        variant: [release, bench]
     steps:
       - uses: actions/checkout@v4
         with:
-          path: m8
+          path: src
 
-      # Apple Music 1.1540+ est aligné sur Windows App SDK 1.8 : la projection vient des métadonnées WinUI 1.8, comme
-      # chez AMExclusive (MIT, mod/scripts/Get-WinUIMetadata.ps1). Seuls les .winmd sont extraits, aucune DLL n'est
-      # livrée. L'empreinte SHA-256 de chaque paquet est relevée, celle de Microsoft.UI.Xaml.winmd est épinglée.
-      - name: Télécharger les métadonnées WinUI 1.8 (NuGet) et vérifier leurs empreintes
+      # Apple Music 1.1540+ is aligned on Windows App SDK 1.8: the projection comes from the WinUI 1.8 metadata, as in
+      # AMExclusive (MIT, mod/scripts/Get-WinUIMetadata.ps1). Only the .winmd files are extracted, no DLL is
+      # shipped. The SHA-256 of each package is recorded, the one of Microsoft.UI.Xaml.winmd is pinned.
+      - name: Download the WinUI 1.8 metadata (NuGet) and check their hashes
         shell: pwsh
         run: |
-          $out = Join-Path $PWD 'm8\m8-out'
+          $out = Join-Path $PWD 'src\build-out'
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           $metadata = Join-Path $env:RUNNER_TEMP 'winui-metadata'
           New-Item -ItemType Directory -Force -Path $metadata | Out-Null
@@ -241,7 +247,7 @@ jobs:
             try {
               foreach ($entryPath in $package.Entries) {
                 $entry = $zip.GetEntry($entryPath)
-                if (-not $entry) { throw "métadonnée absente de $($package.Id) $($package.Version) : $entryPath" }
+                if (-not $entry) { throw "metadata missing from $($package.Id) $($package.Version): $entryPath" }
                 $destination = Join-Path $metadata ([IO.Path]::GetFileName($entryPath))
                 [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destination, $true)
                 $hashes += "  $entryPath $((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash)"
@@ -250,28 +256,28 @@ jobs:
               $zip.Dispose()
             }
           }
-          $hashes | Set-Content -LiteralPath (Join-Path $out 'winui-empreintes.txt')
+          $hashes | Set-Content -LiteralPath (Join-Path $out 'winui-hashes.txt')
           $hashes | ForEach-Object { Write-Host $_ }
           $xaml = Join-Path $metadata 'Microsoft.UI.Xaml.winmd'
           $actual = (Get-FileHash -LiteralPath $xaml -Algorithm SHA256).Hash
           if ($actual -ne $expectedXaml) {
-            throw "Microsoft.UI.Xaml.winmd : empreinte inattendue $actual (attendue $expectedXaml)"
+            throw "Microsoft.UI.Xaml.winmd: unexpected hash $actual (expected $expectedXaml)"
           }
-          Write-Host "Microsoft.UI.Xaml.winmd vérifié : $actual"
+          Write-Host "Microsoft.UI.Xaml.winmd checked: $actual"
           Get-ChildItem -LiteralPath $metadata -Filter '*.winmd' | ForEach-Object { $_.FullName } |
             Set-Content -LiteralPath (Join-Path $out 'wasdk-winmd.txt')
 
-      - name: Générer la projection C++/WinRT (cppwinrt.exe du SDK Windows)
+      - name: Generate the C++/WinRT projection (cppwinrt.exe from the Windows SDK)
         shell: pwsh
         run: |
-          $out = Join-Path $PWD 'm8\m8-out'
+          $out = Join-Path $PWD 'src\build-out'
           $kit = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10'
           $cppwinrt = Get-ChildItem -LiteralPath (Join-Path $kit 'bin') -Recurse -Filter 'cppwinrt.exe' -ErrorAction SilentlyContinue |
             Select-Object -First 1
-          if (-not $cppwinrt) { throw 'cppwinrt.exe introuvable dans le SDK Windows' }
+          if (-not $cppwinrt) { throw 'cppwinrt.exe not found in the Windows SDK' }
           $sdkWinrt = Get-ChildItem -LiteralPath (Join-Path $kit 'Include') -Recurse -Directory -Filter 'winrt' -ErrorAction SilentlyContinue |
             Where-Object { $_.Parent.Name -eq 'cppwinrt' } | Select-Object -First 1
-          if (-not $sdkWinrt) { throw 'dossier cppwinrt\winrt introuvable dans le SDK Windows' }
+          if (-not $sdkWinrt) { throw 'cppwinrt\winrt folder not found in the Windows SDK' }
 
           $gen = Join-Path $out 'winrt-gen'
           New-Item -ItemType Directory -Force -Path $gen | Out-Null
@@ -281,16 +287,16 @@ jobs:
           }
           $arguments += @('-ref', 'sdk', '-out', $gen)
           & $cppwinrt.FullName @arguments 2>&1 | Tee-Object -FilePath (Join-Path $out 'cppwinrt.log')
-          if ($LASTEXITCODE -ne 0) { throw "cppwinrt.exe a échoué (code $LASTEXITCODE) : voir m8/m8-out/cppwinrt.log" }
+          if ($LASTEXITCODE -ne 0) { throw "cppwinrt.exe failed (code $LASTEXITCODE): see src/build-out/cppwinrt.log" }
 
-          # Les en-têtes de base (winrt/base.h, winrt/Windows.*.h) viennent du SDK : on les met à côté de la projection.
+          # The base headers (winrt/base.h, winrt/Windows.*.h) come from the SDK: put them next to the projection.
           $target = Join-Path $gen 'winrt'
           New-Item -ItemType Directory -Force -Path $target | Out-Null
           Copy-Item -Path (Join-Path $sdkWinrt.FullName '*') -Destination $target -Recurse -Force
           if (-not (Test-Path -LiteralPath (Join-Path $target 'Microsoft.UI.Xaml.h'))) {
-            throw 'winrt\Microsoft.UI.Xaml.h absent après génération : voir m8/m8-out/cppwinrt.log'
+            throw 'winrt\Microsoft.UI.Xaml.h missing after the generation: see src/build-out/cppwinrt.log'
           }
-          Write-Host "Projection : $gen (cppwinrt : $($cppwinrt.FullName))"
+          Write-Host "Projection: $gen (cppwinrt: $($cppwinrt.FullName))"
           "WASDK_INCLUDE=$gen" | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8
 
       # ccache keeps the compiled files from one run to the next: only the files a commit touches are compiled again.
@@ -301,7 +307,7 @@ jobs:
           key: ccache-msvc-${{ matrix.variant }}-${{ github.sha }}
           restore-keys: ccache-msvc-${{ matrix.variant }}-
 
-      - name: Installer ccache et ouvrir l'environnement MSVC (Ninja)
+      - name: Install ccache and open the MSVC environment (Ninja)
         shell: pwsh
         run: |
           $version = '4.10.2'
@@ -318,97 +324,97 @@ jobs:
             if ($line -match '^([^=]+)=(.*)$') { "$($Matches[1])=$($Matches[2])" | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8 }
           }
 
-      - name: Configurer et compiler (MSVC, AMK_XAML=ON)
-        if: matrix.variant == 'diffusion'
+      - name: Configure and build (MSVC, AMPIFY_XAML=ON)
+        if: matrix.variant == 'release'
         shell: pwsh
-        working-directory: m8
+        working-directory: src
         run: |
-          New-Item -ItemType Directory -Force -Path m8-out | Out-Null
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DAMK_XAML=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DAMK_WINAPPSDK_INCLUDE=$env:WASDK_INCLUDE" 2>&1 |
-            Tee-Object -FilePath m8-out/configure.log
-          if ($LASTEXITCODE -ne 0) { throw 'configuration MSVC en échec : voir m8-out/configure.log' }
-          cmake --build build --config Release --parallel 2>&1 | Tee-Object -FilePath m8-out/build.log
-          if ($LASTEXITCODE -ne 0) { throw 'compilation MSVC en échec : voir m8-out/build.log' }
+          New-Item -ItemType Directory -Force -Path build-out | Out-Null
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DAMPIFY_XAML=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DAMPIFY_WINAPPSDK_INCLUDE=$env:WASDK_INCLUDE" 2>&1 |
+            Tee-Object -FilePath build-out/configure.log
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC configuration failed: see build-out/configure.log' }
+          cmake --build build --config Release --parallel 2>&1 | Tee-Object -FilePath build-out/build.log
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC build failed: see build-out/build.log' }
           ccache --show-stats
-          # The shipping half of the MSVC kit, in the layout of the MinGW one: diffusion (tested versions only), cli.
+          # The shipping half of the MSVC kit, in the layout of the MinGW one: release (tested versions only), cli.
           $kit = Join-Path $PWD 'msvc-kit'
-          foreach ($pair in @(@('diffusion', @('amk_launcher.exe', 'amk_kernel.dll', 'amk_setup.exe', 'AMK-Test.exe')), @('cli', @('amk.exe')))) {
+          foreach ($pair in @(@('release', @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify_setup.exe', 'Ampify-Test.exe', 'ampify.exe')), @('cli', @('ampify.exe')))) {
             $to = Join-Path $kit $pair[0]
             New-Item -ItemType Directory -Force -Path $to | Out-Null
             foreach ($name in $pair[1]) {
               $found = Get-ChildItem -LiteralPath build -Recurse -Filter $name | Select-Object -First 1
-              if (-not $found) { throw "$name absent de build" }
+              if (-not $found) { throw "$name missing from build" }
               Copy-Item -LiteralPath $found.FullName -Destination $to
             }
           }
-          "Commit : $env:GITHUB_SHA`ndiffusion : AMK_BENCH=OFF (MSVC, XAML)`nbanc et m8 : AMK_BENCH=ON (MSVC, XAML). Ne jamais diffuser." |
+          "Commit: $env:GITHUB_SHA`nrelease: AMPIFY_BENCH=OFF (MSVC, XAML)`nbench and ui: AMPIFY_BENCH=ON (MSVC, XAML). Never ship." |
             Set-Content -LiteralPath (Join-Path $kit 'BUILD_INFO.txt')
 
-      # Same build in bench mode (any Apple Music version), for the MSVC bench, which runs the M8 cases (example
-      # themes, inspector, minuit theme, native interface) in the real Apple Music. Never ship it.
-      - name: Compiler le build de banc (AMK_XAML=ON, AMK_BENCH=ON)
-        if: matrix.variant == 'banc'
+      # Same build in bench mode (any Apple Music version), for the MSVC bench, which runs the UI cases (example
+      # themes, inspector, midnight theme, native interface) in the real Apple Music. Never ship it.
+      - name: Build the bench build (AMPIFY_XAML=ON, AMPIFY_BENCH=ON)
+        if: matrix.variant == 'bench'
         shell: pwsh
-        working-directory: m8
+        working-directory: src
         run: |
-          cmake -S . -B build-banc -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DAMK_XAML=ON -DAMK_BENCH=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DAMK_WINAPPSDK_INCLUDE=$env:WASDK_INCLUDE"
-          if ($LASTEXITCODE -ne 0) { throw 'configuration du build M8 de banc en échec' }
+          cmake -S . -B build-bench -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DAMPIFY_XAML=ON -DAMPIFY_BENCH=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DAMPIFY_WINAPPSDK_INCLUDE=$env:WASDK_INCLUDE"
+          if ($LASTEXITCODE -ne 0) { throw 'UI bench build configuration failed' }
           # Only what the bench kit takes from this build.
-          cmake --build build-banc --config Release --parallel --target amk_launcher amk_kernel amk_theme_check
-          if ($LASTEXITCODE -ne 0) { throw 'compilation du build M8 de banc en échec' }
+          cmake --build build-bench --config Release --parallel --target ampify_launcher ampify_kernel ampify_theme_check
+          if ($LASTEXITCODE -ne 0) { throw 'UI bench build failed' }
           ccache --show-stats
-          # The bench half of the MSVC kit: banc (any version, never shipped), m8 (same build, for the interface cases).
+          # The bench half of the MSVC kit: bench (any version, never shipped), ui (same build, for the interface cases).
           $kit = Join-Path $PWD 'msvc-kit'
-          foreach ($pair in @(@('banc', @('amk_launcher.exe', 'amk_kernel.dll')), @('m8', @('amk_launcher.exe', 'amk_kernel.dll', 'amk_theme_check.exe')))) {
+          foreach ($pair in @(@('bench', @('ampify_launcher.exe', 'ampify_kernel.dll')), @('ui', @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify_theme_check.exe')))) {
             $to = Join-Path $kit $pair[0]
             New-Item -ItemType Directory -Force -Path $to | Out-Null
             foreach ($name in $pair[1]) {
-              $found = Get-ChildItem -LiteralPath build-banc -Recurse -Filter $name | Select-Object -First 1
-              if (-not $found) { throw "$name absent de build-banc" }
+              $found = Get-ChildItem -LiteralPath build-bench -Recurse -Filter $name | Select-Object -First 1
+              if (-not $found) { throw "$name missing from build-bench" }
               Copy-Item -LiteralPath $found.FullName -Destination $to
             }
           }
-          New-Item -ItemType Directory -Force -Path (Join-Path $kit 'm8\themes'), (Join-Path $kit 'm8\examples') | Out-Null
-          Copy-Item -LiteralPath themes/examples -Destination (Join-Path $kit 'm8\themes') -Recurse
-          # The example extension of the interface case (63-m8-interface): a React panel.
-          Copy-Item -LiteralPath examples/react-panel -Destination (Join-Path $kit 'm8\examples') -Recurse
+          New-Item -ItemType Directory -Force -Path (Join-Path $kit 'ui\themes'), (Join-Path $kit 'ui\examples') | Out-Null
+          Copy-Item -LiteralPath themes/examples -Destination (Join-Path $kit 'ui\themes') -Recurse
+          # The example extension of the interface case (63-ui-surfaces): a React panel.
+          Copy-Item -LiteralPath examples/react-panel -Destination (Join-Path $kit 'ui\examples') -Recurse
 
       - uses: actions/upload-artifact@v4
         with:
-          name: amk-msvc-kit-${{ matrix.variant }}
-          path: m8/msvc-kit
+          name: ampify-msvc-kit-${{ matrix.variant }}
+          path: src/msvc-kit
           if-no-files-found: error
           retention-days: 14
 
-      - name: Lancer amk_tests et amk_ui_thread_test
-        if: always() && matrix.variant == 'diffusion'
+      - name: Run ampify_tests and ampify_ui_thread_test
+        if: ${{ !cancelled() && matrix.variant == 'release' }}
         shell: pwsh
-        working-directory: m8
+        working-directory: src
         run: |
-          New-Item -ItemType Directory -Force -Path m8-out | Out-Null
+          New-Item -ItemType Directory -Force -Path build-out | Out-Null
           $failed = @()
-          foreach ($exe in 'amk_tests.exe', 'amk_ui_thread_test.exe') {
+          foreach ($exe in 'ampify_tests.exe', 'ampify_ui_thread_test.exe') {
             $found = Get-ChildItem -LiteralPath build -Recurse -Filter $exe -ErrorAction SilentlyContinue | Select-Object -First 1
             if (-not $found) {
-              "$exe : introuvable (compilation en échec ?)" | Add-Content -LiteralPath m8-out/tests.log
+              "${exe}: not found (build failed?)" | Add-Content -LiteralPath build-out/tests.log
               $failed += $exe
               continue
             }
-            Copy-Item -LiteralPath $found.FullName -Destination m8-out
-            & $found.FullName 2>&1 | Tee-Object -FilePath (Join-Path m8-out "$exe.log")
+            Copy-Item -LiteralPath $found.FullName -Destination build-out
+            & $found.FullName 2>&1 | Tee-Object -FilePath (Join-Path build-out "$exe.log")
             $code = $LASTEXITCODE
-            "$exe : code de sortie $code" | Add-Content -LiteralPath m8-out/tests.log
+            "${exe}: exit code $code" | Add-Content -LiteralPath build-out/tests.log
             if ($code -ne 0) { $failed += $exe }
           }
-          Get-ChildItem -LiteralPath build -Recurse -Filter 'amk_kernel.dll' -ErrorAction SilentlyContinue |
-            Select-Object -First 1 | Copy-Item -Destination m8-out
-          # This job is also the MSVC unit test job now: a failing test fails it.
-          if ($failed.Count -gt 0) { throw "tests en échec sous Windows : $($failed -join ', ')" }
+          Get-ChildItem -LiteralPath build -Recurse -Filter 'ampify_kernel.dll' -ErrorAction SilentlyContinue |
+            Select-Object -First 1 | Copy-Item -Destination build-out
+          # This job is also the MSVC unit test job: a failing test fails it.
+          if ($failed.Count -gt 0) { throw "tests failed on Windows: $($failed -join ', ')" }
 
       - uses: actions/upload-artifact@v4
-        if: always() && matrix.variant == 'diffusion'
+        if: ${{ !cancelled() && matrix.variant == 'release' }}
         with:
-          name: amk-m8-xaml
-          path: m8/m8-out
+          name: ampify-msvc-logs
+          path: src/build-out
           if-no-files-found: warn
           retention-days: 14

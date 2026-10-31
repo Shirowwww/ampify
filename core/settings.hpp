@@ -4,7 +4,7 @@
 #include <optional>
 #include <string>
 
-namespace amk {
+namespace ampify {
 
 // Persistent settings: a plain text file with one `key = value` per line,
 // readable and editable by hand. Blank lines and lines starting with '#' are ignored.
@@ -39,4 +39,4 @@ private:
     std::map<std::string, std::string> m_values;
 };
 
-}  // namespace amk
+}  // namespace ampify

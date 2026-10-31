@@ -6,7 +6,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // Everything the engine knows about the live interface goes through TreeBackend. The Windows backend
 // implements it with XAML; the tests implement it with a fake tree. Nothing here is Windows-specific.
@@ -18,7 +18,8 @@ using NodeId = std::uint64_t;
 enum class ValueKind {
     Color,       // "#AARRGGBB", upper case
     Image,       // absolute path of an image file, with '/' separators, then "|Fill", "|Uniform" or "|UniformToFill"
-                 // when the theme chose how the image fills the element
+                 // when the theme chose how the image fills the element; kArtworkImage instead of a path for the
+                 // artwork of the song playing
     Gradient,    // a linear gradient: "x1,y1,x2,y2;#AARRGGBB@offset;...", points relative to the element (0 to 1),
                  // at least two stops, offsets from 0 to 1 in order
     Acrylic,     // an acrylic brush: "#AARRGGBB;opacity", the tint and its opacity (0 to 1)
@@ -57,6 +58,9 @@ struct NodeInfo {
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";
+
+// The path of an Image value that stands for the artwork of the song playing (`background: artwork` in user.css).
+inline constexpr std::string_view kArtworkImage = "artwork:";
 
 // One value of a :hover rule: shown while the pointer is over the element.
 struct HoverValue {
@@ -103,4 +107,4 @@ public:
     }
 };
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

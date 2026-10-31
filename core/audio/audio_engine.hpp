@@ -2,7 +2,7 @@
 
 // The process's AudioHost: the analysis, the equalizer settings, the loudness and the player volume that the
 // sample path publishes, and the delivery of analysis frames to the elements. Portable: the Windows kernel feeds it
-// from the Atmos leveler's hooks (extensions/atmos-leveler/kit_audio.*), the tests and `amk test` feed it
+// from the Atmos leveler's hooks (extensions/atmos-leveler/kit_audio.*), the tests and `ampify test` feed it
 // synthetic signals.
 //
 // Threads: the audio threads call FeedAnalysis and the Publish* methods, and read Eq(); they never block (the
@@ -20,7 +20,7 @@
 #include "audio_host.hpp"
 #include "equalizer.hpp"
 
-namespace amk::audio {
+namespace ampify::audio {
 
 class AudioEngine : public AudioHost {
 public:
@@ -96,4 +96,4 @@ private:
 // The engine of this process. Never destroyed: the audio hooks may still run while the process exits.
 AudioEngine& ProcessAudio();
 
-}  // namespace amk::audio
+}  // namespace ampify::audio

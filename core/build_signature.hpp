@@ -11,7 +11,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
 // The player DLL that holds the playback calls the kit needs. M3 checks them; M4 hooks them.
 inline constexpr std::string_view kPlayerDllName = "AVFoundationCF.dll";
@@ -42,7 +42,7 @@ inline bool SignatureMatches(const BuildSignature& signature) {
     return signature.readable && signature.missing.empty();
 }
 
-// One line for the journal, in French: what was found in the build on disk, or why it is not recognised.
+// One line for the log, in English: what was found in the build on disk, or why it is not recognised.
 std::string DescribeSignature(const BuildSignature& signature);
 
-}  // namespace amk
+}  // namespace ampify

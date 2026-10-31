@@ -6,7 +6,7 @@
 #include <system_error>
 #include <vector>
 
-namespace amk::js {
+namespace ampify::js {
 
 // ---- ES modules -----------------------------------------------------------------------------------------------------
 
@@ -45,7 +45,7 @@ std::optional<std::string> ResolveModuleName(std::string_view base, std::string_
         return std::nullopt;
     };
     if (specifier.substr(0, 2) != "./" && specifier.substr(0, 3) != "../") {
-        return refuse("seul un chemin relatif au fichier (./ ou ../) est accepté : " + std::string(specifier));
+        return refuse("only a path relative to the file (./ or ../) is accepted: " + std::string(specifier));
     }
 
     // The folder of the importing module, as segments. Its own name is dropped.
@@ -58,18 +58,18 @@ std::optional<std::string> ResolveModuleName(std::string_view base, std::string_
     for (std::string_view segment : Split(specifier)) {
         if (segment == ".") continue;
         if (segment == "..") {
-            if (path.empty()) return refuse("le chemin sort du dossier de l'élément : " + std::string(specifier));
+            if (path.empty()) return refuse("the path leaves the element folder: " + std::string(specifier));
             path.pop_back();
             continue;
         }
         if (!IsModuleSegment(segment)) {
-            return refuse("nom de fichier refusé (lettres, chiffres, . _ - seulement) : " + std::string(specifier));
+            return refuse("file name refused (letters, digits, . _ - only): " + std::string(specifier));
         }
         path.emplace_back(segment);
     }
-    if (path.empty() || path.size() > kMaxModuleDepth) return refuse("chemin refusé : " + std::string(specifier));
+    if (path.empty() || path.size() > kMaxModuleDepth) return refuse("path refused: " + std::string(specifier));
     if (!EndsWith(path.back(), ".js") && !EndsWith(path.back(), ".mjs")) {
-        return refuse("seuls les fichiers .js et .mjs s'importent : " + std::string(specifier));
+        return refuse("only .js and .mjs files can be imported: " + std::string(specifier));
     }
 
     std::string name;
@@ -141,7 +141,7 @@ char* Runtime::NormalizeModule(JSContext* ctx, const char* base, const char* nam
     std::string reason;
     std::optional<std::string> resolved = ResolveModuleName(base ? base : "", name ? name : "", &reason);
     if (!resolved) {
-        JS_ThrowReferenceError(ctx, "import refusé : %s", reason.c_str());
+        JS_ThrowReferenceError(ctx, "import refused: %s", reason.c_str());
         return nullptr;
     }
     return js_strdup(ctx, resolved->c_str());
@@ -150,13 +150,13 @@ char* Runtime::NormalizeModule(JSContext* ctx, const char* base, const char* nam
 JSModuleDef* Runtime::LoadModule(JSContext* ctx, const char* name, void* opaque) {
     auto* self = static_cast<Runtime*>(opaque);
     if (self->m_moduleRoot.empty()) {
-        JS_ThrowReferenceError(ctx, "import refusé : pas de dossier d'élément ici");
+        JS_ThrowReferenceError(ctx, "import refused: no element folder here");
         return nullptr;
     }
     std::string reason;
     std::optional<std::string> source = ReadModuleFile(self->m_moduleRoot, name, &reason);
     if (!source) {
-        JS_ThrowReferenceError(ctx, "import refusé : %s", reason.c_str());
+        JS_ThrowReferenceError(ctx, "import refused: %s", reason.c_str());
         return nullptr;
     }
     JSValue compiled =
@@ -215,10 +215,10 @@ std::optional<std::string> ReadModuleFile(const std::filesystem::path& root, con
     std::error_code ec;
     for (std::string_view segment : Split(name)) {
         path /= std::string(segment);
-        if (fs::is_symlink(fs::symlink_status(path, ec))) return refuse("lien symbolique refusé : " + name);
+        if (fs::is_symlink(fs::symlink_status(path, ec))) return refuse("symbolic link refused: " + name);
     }
     if (!fs::is_regular_file(fs::status(path, ec)) || ec) {
-        return refuse("fichier introuvable dans le dossier de l'élément : " + name);
+        return refuse("file not found in the element folder: " + name);
     }
 
     // A link that the check above cannot see (a junction on Windows) still resolves out of the folder.
@@ -228,13 +228,13 @@ std::optional<std::string> ReadModuleFile(const std::filesystem::path& root, con
     fs::path realPath = fs::weakly_canonical(path, pathError);
     if (!rootError && !pathError) {
         fs::path relative = realPath.lexically_relative(realRoot);
-        if (relative.empty() || *relative.begin() == "..") return refuse("le fichier sort du dossier de l'élément : " + name);
+        if (relative.empty() || *relative.begin() == "..") return refuse("the file leaves the element folder: " + name);
     }
 
     uintmax_t size = fs::file_size(path, ec);
-    if (ec || size > kMaxModuleBytes) return refuse("fichier trop gros pour un module (1 Mo au plus) : " + name);
+    if (ec || size > kMaxModuleBytes) return refuse("file too big for a module (1 MB at most): " + name);
     std::ifstream file(path, std::ios::binary);
-    if (!file) return refuse("fichier illisible : " + name);
+    if (!file) return refuse("file unreadable: " + name);
     std::ostringstream buffer;
     buffer << file.rdbuf();
     return buffer.str();
@@ -264,11 +264,11 @@ std::string TakeException(JSContext* ctx) {
     } else {
         // A thrown string or number, or an uncatchable error that the budget handler raised.
         const char* text = JS_ToCString(ctx, exception);
-        line = text ? text : "exception inconnue";
+        line = text ? text : "unknown exception";
         if (text) JS_FreeCString(ctx, text);
     }
 
-    if (line.find("interrupted") != std::string::npos) line = "budget de temps dépassé, appel interrompu";
+    if (line.find("interrupted") != std::string::npos) line = "time budget exceeded, call interrupted";
     JS_FreeValue(ctx, exception);
     return line;
 }
@@ -281,4 +281,4 @@ JSValue NewNamedError(JSContext* ctx, const char* name, const std::string& messa
     return error;
 }
 
-}  // namespace amk::js
+}  // namespace ampify::js

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Versions d'Apple Music testées avec le kit",
-  "description": "Publiée avec le catalogue. amk versions update la télécharge (SHA-256 fixé dans catalog.json) et écrit versions.txt dans le dossier du kit. Le noyau accepte ces versions en plus de sa liste intégrée, et vérifie toujours les exports d'AVFoundationCF.dll au lancement.",
+  "title": "Apple Music versions tested with Ampify",
+  "description": "Published with the catalog. ampify versions update downloads it (SHA-256 pinned in catalog.json) and writes versions.txt in the Ampify folder. The kernel accepts these versions on top of its built-in list, and always checks the exports of AVFoundationCF.dll at launch.",
   "type": "object",
   "required": ["versionsFormat", "playerDll", "versions"],
   "additionalProperties": false,
@@ -11,7 +11,7 @@
     "playerDll": {
       "type": "string",
       "const": "AVFoundationCF.dll",
-      "description": "DLL du paquet dont les exports ont été vérifiés."
+      "description": "DLL of the package whose exports were checked."
     },
     "versions": {
       "type": "array",
@@ -27,19 +27,19 @@
         "version": {
           "type": "string",
           "pattern": "^[0-9]{1,9}\\.[0-9]{1,9}\\.[0-9]{1,9}\\.[0-9]{1,9}$",
-          "description": "Version du paquet, comme dans AppleInc.AppleMusicWin_<version>_x64__nzyj5cx40ttqa."
+          "description": "Package version, as in AppleInc.AppleMusicWin_<version>_x64__nzyj5cx40ttqa."
         },
         "tested": {
           "type": "string",
           "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-          "description": "Date du test, AAAA-MM-JJ."
+          "description": "Test date, YYYY-MM-DD."
         },
         "exports": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "maxItems": 64,
-          "description": "Exports d'AVFoundationCF.dll vérifiés présents sur cette version. Ils doivent couvrir ceux dont le kit a besoin (core/build_signature.hpp).",
+          "description": "Exports of AVFoundationCF.dll checked as present in this version. They must cover the ones Ampify needs (core/build_signature.hpp).",
           "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "maxLength": 128}
         },
         "notes": {"type": "string", "maxLength": 300}

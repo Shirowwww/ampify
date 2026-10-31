@@ -6,7 +6,7 @@
 #include <cmath>
 #include <vector>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -293,10 +293,22 @@ Conversion ConvertImage(std::string_view text, const ValueContext& context) {
     return Ok(ValueKind::Image, context.folder + "/" + *path + stretch);
 }
 
+// artwork [cover|contain|fill]: the artwork of the song playing, as Apple Music shows it in its play bar. The backend
+// follows it: the image changes with the song.
+Conversion ConvertArtwork(std::string_view text, const ValueContext& context) {
+    if (!context.allowImages) return Fail("images désactivées (partie assets du thème)");
+    std::string fit = Lowered(Trimmed(text.substr(std::string_view("artwork").size())));
+    if (fit.empty() || fit == "cover") return Ok(ValueKind::Image, std::string(kArtworkImage) + "|UniformToFill");
+    if (fit == "contain") return Ok(ValueKind::Image, std::string(kArtworkImage) + "|Uniform");
+    if (fit == "fill") return Ok(ValueKind::Image, std::string(kArtworkImage) + "|Fill");
+    return Fail("ajustement d'image inconnu : « " + fit + " » (cover, contain ou fill)");
+}
+
 Conversion ConvertBrush(std::string_view raw, const ValueContext& context) {
     std::string_view text = Trimmed(raw);
     if (text.empty()) return Fail("couleur vide");
 
+    if (Lowered(text.substr(0, 7)) == "artwork" && (text.size() == 7 || text[7] == ' ')) return ConvertArtwork(text, context);
     if (Lowered(text.substr(0, 4)) == "url(") return ConvertImage(text, context);
     if (std::optional<std::string_view> inside = FunctionArguments(text, "linear-gradient")) {
         return ConvertGradient(*inside, context);
@@ -634,4 +646,4 @@ std::string FormatNumber(double number) {
     return std::string(buffer.data(), end);
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

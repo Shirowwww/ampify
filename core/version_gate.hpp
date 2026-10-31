@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
 // Builds of Apple Music the kernel has been tested on, as shown by the package version
 // (`AppleInc.AppleMusicWin_<version>_x64__...`). Hooks are only installed on these builds.
@@ -23,4 +23,4 @@ bool IsKnownAppVersion(std::string_view version,
 // as `known` to IsKnownAppVersion, DecideInjection or DecideKernel: the build signature is still checked there.
 std::vector<std::string_view> KnownAppVersionsWith(const std::vector<std::string>& extra);
 
-}  // namespace amk
+}  // namespace ampify

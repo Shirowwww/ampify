@@ -11,7 +11,7 @@
 
 #include "host.hpp"
 
-namespace amk {
+namespace ampify {
 
 // What win/amp_player.cpp reads from AMP.Services.Player, as raw values.
 struct AmpReading {
@@ -51,7 +51,7 @@ enum class AmpTimeUnit { Unknown, Seconds, Milliseconds, Ticks100ns };
 // it, a song is assumed to last between 20 s and 10 h. Unknown when the duration is 0.
 AmpTimeUnit DetectAmpTimeUnit(int64_t durationRaw, std::optional<int64_t> smtcDurationMs);
 int64_t AmpTimeToMs(int64_t raw, AmpTimeUnit unit);
-const char* AmpTimeUnitName(AmpTimeUnit unit);  // "s", "ms", "100 ns", "inconnue"
+const char* AmpTimeUnitName(AmpTimeUnit unit);  // "s", "ms", "100 ns", "unknown"
 
 // A stable id for a track from its title, artist and album: "t-" and 16 hexadecimal characters. The same song gives
 // the same id whatever the source (Apple's player or SMTC), so an element can keep per-track data.
@@ -99,6 +99,6 @@ CommandPlan PlanCommand(PlayerCommand command, int64_t seekMs, const PlayerSnaps
                         const RouteAvailability& available);
 
 const char* CommandName(PlayerCommand command);  // "play", "pause", "next", "previous", "seek"
-const char* RouteName(CommandRoute route);       // "Apple", "SMTC", "touche multimédia"
+const char* RouteName(CommandRoute route);       // "Apple", "SMTC", "media key"
 
-}  // namespace amk
+}  // namespace ampify

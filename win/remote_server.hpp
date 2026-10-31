@@ -12,7 +12,7 @@
 
 #include "../core/remote_protocol.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 class RemoteServer {
 public:
@@ -48,4 +48,4 @@ private:
     std::thread m_thread;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win

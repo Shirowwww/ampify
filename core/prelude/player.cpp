@@ -1,24 +1,24 @@
-// Module player: AMK.player, the state of the player, its events, its commands and its queue. Natives:
+// Module player: Ampify.player, the state of the player, its events, its commands and its queue. Natives:
 // core/natives/player.cpp.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kPlayer[];
-const char kPlayer[] = R"AMKJS(
+const char kPlayer[] = R"AMPIFYJS(
   const trackListeners = { trackchange: [], statechange: [] };
   const queueId = (value, what) => {
     if (typeof value !== "string" && typeof value !== "number") throw new TypeError(what);
     return String(value);
   };
 
-  AMK.player = {
+  Ampify.player = {
     state() {
       return JSON.parse(native.playerState());
     },
     on(event, fn) {
       const listeners = trackListeners[event];
-      if (!listeners) throw new RangeError("événement inconnu : " + event + " (trackchange ou statechange)");
-      if (typeof fn !== "function") throw new TypeError("player.on attend une fonction");
+      if (!listeners) throw new RangeError("unknown event: " + event + " (trackchange or statechange)");
+      if (typeof fn !== "function") throw new TypeError("player.on expects a function");
       native.require("player.read");
       listeners.push(fn);
     },
@@ -28,7 +28,7 @@ const char kPlayer[] = R"AMKJS(
     previous: () => native.playerCommand("previous", 0),
     seek(ms) {
       const position = Number(ms);
-      if (!Number.isFinite(position) || position < 0) throw new RangeError("seek attend un nombre de millisecondes positif");
+      if (!Number.isFinite(position) || position < 0) throw new RangeError("seek expects a positive number of milliseconds");
       return native.playerCommand("seek", Math.floor(position));
     },
     toggle: () => native.playerCommand("toggle", 0),
@@ -38,10 +38,10 @@ const char kPlayer[] = R"AMKJS(
       },
       add(trackId, options) {
         const position = options && options.position !== undefined ? String(options.position) : "";
-        return native.queueAdd(queueId(trackId, "queue.add attend un identifiant de morceau"), position);
+        return native.queueAdd(queueId(trackId, "queue.add expects a track id"), position);
       },
       remove(itemId) {
-        return native.queueRemove(queueId(itemId, "queue.remove attend l'identifiant d'une entrée de la file"));
+        return native.queueRemove(queueId(itemId, "queue.remove expects the id of a queue entry"));
       },
     }),
   };
@@ -49,6 +49,6 @@ const char kPlayer[] = R"AMKJS(
   dispatch.player = (event, stateJson) => {
     for (const fn of trackListeners[event]) runGuarded(event, fn, [JSON.parse(stateJson)]);
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

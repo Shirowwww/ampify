@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-namespace amk {
+namespace ampify {
 
 // The Microsoft Store package that holds Apple Music for Windows, and the id that starts its app.
 inline constexpr std::string_view kPackageFamilyName = "AppleInc.AppleMusicWin_nzyj5cx40ttqa";
@@ -28,4 +28,4 @@ std::string AppleMusicVersion(std::string_view packageFullName);
 // Returns below 0, 0 or above 0, like strcmp.
 int CompareVersions(std::string_view left, std::string_view right);
 
-}  // namespace amk
+}  // namespace ampify

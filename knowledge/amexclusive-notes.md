@@ -1,57 +1,54 @@
-# Ce qu'AMExclusive nous apprend (relevé du 2026-10-30)
+# What AMExclusive teaches us
 
-[AMExclusive](https://github.com/AntiOblivionis/AMExclusive) (MIT) ajoute la sortie WASAPI exclusive à Apple Music
-pour Windows. Il est testé sur la même version que le PC de l'utilisateur (`1.1540.23042.0`), et il ajoute des réglages
-dans la page Lecture des Réglages d'Apple Music. Relu en lecture seule au commit `91f589d` ; les références sont des
-chemins de son dossier `mod/`.
+[AMExclusive](https://github.com/AntiOblivionis/AMExclusive) (MIT) adds exclusive WASAPI output to Apple Music for
+Windows. It is tested on `1.1540.23042.0`, and it adds settings to the Playback page of Apple Music's Settings. Read in
+read-only mode at commit `91f589d`. The references are paths in its `mod/` folder.
 
-## Ce qui marche chez lui et que nous reprenons
+## What works for it and what Ampify takes
 
-- **La fenêtre XAML** : `Window::Current()` renvoie null en WinUI 3 desktop. AMExclusive appelle l'export de
-  `AMP.Utils.dll` `?GetAppProperty@SharedUtils@@YA?AUIInspectable@Foundation@Windows@winrt@@AEBUhstring@5@@Z`
-  (`IInspectable(hstring const&)`) avec `"MainWindow"` ou `"MiniPlayerWindow"`, puis `try_as<Window>()`
-  (`src/UiAdapter.cpp:315-364`). `MiniPlayerWindow` absente renvoie `E_BOUNDS`.
-- **Le fil d'interface** : `window.DispatcherQueue().TryEnqueue(Low, ...)` depuis un fil MTA, avec un ticket par
-  fenêtre contre les doublons, `HasThreadAccess()` à l'entrée (`UiAdapter.cpp:836-856`, `:1259-1293`). Pas de hook
-  `WH_GETMESSAGE` (le nôtre ne s'exécutait pas sur Windows Server 2025).
-- **La découverte** : `SetWinEventHook(EVENT_OBJECT_CREATE..SHOW, WINEVENT_OUTOFCONTEXT)` sur le processus, sondage
-  toutes les 5 s, puis `Loaded`/`Unloaded`/`Content` sur Frame, Page et UserControl, `Tapped`/`KeyDown` avec
-  `handledEventsToo`, `LayoutUpdated` jusqu'au montage, et un numéro de révision qui invalide les rappels périmés.
-  Parcours en largeur limité à 512 nœuds, sans entrer dans ItemsControl, ItemsRepeater ni ButtonBase.
-- **Les pages se reconnaissent par leur classe** : `get_class_name` contient `PlaybackSettingsPage`. Dans la page,
-  le `StackPanel` qui contient le plus de `ToggleSwitch` sert d'ancre ; son dernier enfant sert de modèle de ligne.
-- **L'aspect natif** : copie du `Style`, des marges et du padding des contrôles voisins ; à défaut, les ressources
-  `CardBackgroundFillColorDefaultBrush` et `CardStrokeColorDefaultBrush`. `AutomationProperties` toujours renseignés.
-- **L'idempotence** : chaque élément ajouté porte un nom préfixé ; s'il existe déjà, on le rafraîchit au lieu de le
-  recréer. Tout est construit avant d'être inséré, avec retour arrière si un ajout échoue.
-- **Les noms réels d'Apple Music** : `TransportControl_PlayPauseStop`, `TransportControl_SkipBack`,
-  `TransportControl_SkipForward`, `LCDScrubber` (`x:Name` ou AutomationId), `Scrubber` (AutomationId), lignes de
-  piste en `ListViewItem`.
-- **Le lecteur, en lecture** : interfaces WinRT privées d'`AMP.Services.Player` déclarées à la main
-  (`src/ApplePlayback.h:16-152`) : `IPlayerStatics` {34D100F9-0F0A-5980-8F04-7AF57FDB29B0} `get_Current`,
-  `IPlayer`, `IPlayerState`, `INowPlayingItem` (dont `PlayQueueItemID` et le format audio), avec
-  `INotifyPropertyChanged` sur `PlayerState`, `NowPlayingItem` et `PlayQueueItemID`.
-- **L'injection** : même méthode que la nôtre (`CreateRemoteThread` + `LoadLibraryW`), après vérification de
-  l'identité du paquet (`GetPackagesByPackageFamily`, x64, famille `AppleInc.AppleMusicWin_nzyj5cx40ttqa`). Le
-  dossier des DLL reçoit l'ACL `S-1-15-2-1` (ALL APPLICATION PACKAGES) en lecture et exécution. Un compagnon démarre
-  par une tâche planifiée sur l'événement `Microsoft-Windows-AppModel-Runtime/Admin` 201 (lancement d'Apple Music),
-  ce qui marche aussi quand l'utilisateur ouvre Apple Music sans notre raccourci.
-- **Les métadonnées WinUI** : Apple Music 1.1540 est aligné sur Windows App SDK 1.8. AMExclusive projette depuis
-  `microsoft.windowsappsdk.winui` 1.8.251222000, avec le SHA-256 de `Microsoft.UI.Xaml.winmd` épinglé
+- **The XAML window.** `Window::Current()` returns null in desktop WinUI 3. AMExclusive calls the export of `AMP.Utils.dll`
+  `?GetAppProperty@SharedUtils@@YA?AUIInspectable@Foundation@Windows@winrt@@AEBUhstring@5@@Z`
+  (`IInspectable(hstring const&)`) with `"MainWindow"` or `"MiniPlayerWindow"`, then `try_as<Window>()`
+  (`src/UiAdapter.cpp:315-364`). An absent `MiniPlayerWindow` returns `E_BOUNDS`.
+- **The UI thread.** `window.DispatcherQueue().TryEnqueue(Low, ...)` from an MTA thread, with one ticket per window against
+  duplicates, and `HasThreadAccess()` on entry (`UiAdapter.cpp:836-856`, `:1259-1293`). No `WH_GETMESSAGE` hook (Ampify's
+  own never ran on Windows Server 2025).
+- **Discovery.** `SetWinEventHook(EVENT_OBJECT_CREATE..SHOW, WINEVENT_OUTOFCONTEXT)` on the process, a poll every 5 s, then
+  `Loaded`/`Unloaded`/`Content` on Frame, Page and UserControl, `Tapped`/`KeyDown` with `handledEventsToo`, `LayoutUpdated`
+  until mount, and a revision number that invalidates stale callbacks. Breadth-first walk limited to 512 nodes, without
+  entering ItemsControl, ItemsRepeater or ButtonBase.
+- **Pages are recognized by class:** `get_class_name` contains `PlaybackSettingsPage`. In the page, the `StackPanel` that
+  holds the most `ToggleSwitch` elements serves as the anchor, and its last child serves as the row model.
+- **Native look.** Copy the `Style`, margins and padding of neighboring controls; failing that, the resources
+  `CardBackgroundFillColorDefaultBrush` and `CardStrokeColorDefaultBrush`. `AutomationProperties` are always set.
+- **Idempotence.** Each added element carries a prefixed name. If it exists, it is refreshed instead of recreated.
+  Everything is built before being inserted, with a rollback if an addition fails.
+- **Real Apple Music names:** `TransportControl_PlayPauseStop`, `TransportControl_SkipBack`, `TransportControl_SkipForward`,
+  `LCDScrubber` (`x:Name` or AutomationId), `Scrubber` (AutomationId), track rows as `ListViewItem`.
+- **The player, read-only.** Private WinRT interfaces of `AMP.Services.Player`, declared by hand
+  (`src/ApplePlayback.h:16-152`): `IPlayerStatics` {34D100F9-0F0A-5980-8F04-7AF57FDB29B0} `get_Current`, `IPlayer`,
+  `IPlayerState`, `INowPlayingItem` (including `PlayQueueItemID` and the audio format), with `INotifyPropertyChanged` on
+  `PlayerState`, `NowPlayingItem` and `PlayQueueItemID`.
+- **Injection.** The same method as Ampify (`CreateRemoteThread` + `LoadLibraryW`), after checking the package identity
+  (`GetPackagesByPackageFamily`, x64, family `AppleInc.AppleMusicWin_nzyj5cx40ttqa`). The DLL folder gets the ACL
+  `S-1-15-2-1` (ALL APPLICATION PACKAGES) for read and execute. A companion starts through a scheduled task on the event
+  `Microsoft-Windows-AppModel-Runtime/Admin` 201 (Apple Music launch), which also works when the user opens Apple Music
+  without the shortcut.
+- **WinUI metadata.** Apple Music 1.1540 is aligned with Windows App SDK 1.8. AMExclusive projects from
+  `microsoft.windowsappsdk.winui` 1.8.251222000, with the SHA-256 of `Microsoft.UI.Xaml.winmd` pinned
   (`A824AB1E380E384C382CEC14AC5DAD9D4C1B91F519D512082F0E7E5D6AC109DE`, `scripts/Get-WinUIMetadata.ps1`).
 
-## Ce que nous ne reprenons pas
+## What Ampify does not take
 
-- **Le verrou de qualité** : il modifie la sélection des variantes HLS, y compris le sous-type protégé `qlac`, dans
-  CoreMedia, par une adresse brute. Ce n'est pas un contournement de DRM, mais c'est collé au chemin des flux
-  protégés : hors de nos règles.
-- Les hooks CoreAudioToolbox, le remplacement de l'`IAudioClient` d'Apple, le faux `IAudioStreamVolume`, le hook
-  global de `CoCreateInstance`.
+- **The quality lock.** It changes the selection of HLS variants, including the protected `qlac` subtype, in CoreMedia,
+  through a raw address. It sits next to the protected stream path, which is outside Ampify's rules, whatever its intent.
+- The CoreAudioToolbox hooks, the replacement of Apple's `IAudioClient`, the fake `IAudioStreamVolume`, and the global
+  `CoCreateInstance` hook.
 
-## Cohabitation avec le kit
+## Living with Ampify
 
-Avec AMExclusive actif, Apple écrit dans un render client logiciel, et le vrai rendu part d'un client WASAPI
-exclusif en PCM entier. Notre nivellement ne verrait plus le bon flux et casserait le bit-perfect. Règle : si
-`am-exclusive-hook.dll` est chargé dans `AMPLibraryAgent.exe`, ou si un `IAudioClient::Initialize` arrive en mode
-exclusif, le nivellement se met en pause et le dit. AMExclusive ne gère pas l'Atmos : pas de conflit sur les flux
-spatiaux.
+With AMExclusive active, Apple writes to a software render client, and the real rendering goes out through an exclusive
+WASAPI client in integer PCM. Ampify's Atmos leveler would no longer see the right stream and would break bit-perfect
+output. Rule: if `am-exclusive-hook.dll` is loaded in `AMPLibraryAgent.exe`, or if an `IAudioClient::Initialize` arrives in
+exclusive mode, the leveler pauses and says so. AMExclusive does not handle Atmos, so there is no conflict on spatial
+streams.

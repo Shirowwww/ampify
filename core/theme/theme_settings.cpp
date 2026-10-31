@@ -2,7 +2,7 @@
 
 #include <cctype>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 ThemeSettings ReadThemeSettings(const Settings& settings) {
     ThemeSettings value;
@@ -38,4 +38,4 @@ void WriteThemeSettings(Settings& settings, const ThemeSettings& value) {
     settings.SetBool("theme.parts.script", value.parts.script);
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk::cli {
+namespace ampify::cli {
 
 // CRC-32 (IEEE 802.3), the checksum that zip keeps for each file.
 std::uint32_t Crc32(std::string_view bytes);
@@ -21,8 +21,8 @@ struct ZipSource {
 };
 
 // Writes `archive` from `files`, in name order, with timestamps fixed to 1980. The archive is first written beside
-// its target and renamed at the end, so a failure leaves no half-written file. Refuses names that `amk install`
+// its target and renamed at the end, so a failure leaves no half-written file. Refuses names that `ampify install`
 // would refuse, and archives over 4 GiB or 65535 entries (zip64 is not implemented).
 bool WriteZip(const std::filesystem::path& archive, std::vector<ZipSource> files, std::string& error);
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

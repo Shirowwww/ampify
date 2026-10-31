@@ -22,7 +22,7 @@
 
 namespace {
 
-namespace rt = amk::win::rt;
+namespace rt = ampify::win::rt;
 
 // ---- A tiny fake WinRT object model -------------------------------------------------------------------------------
 
@@ -242,8 +242,8 @@ void Build() {
     static bool built = false;
     if (built) return;
     built = true;
-    const GUID player = rt::GuidOf(amk::amp::kIidPlayer);
-    staticsObj.facets = {{rt::GuidOf(amk::amp::kIidPlayerStatics), &staticsF}};
+    const GUID player = rt::GuidOf(ampify::amp::kIidPlayer);
+    staticsObj.facets = {{rt::GuidOf(ampify::amp::kIidPlayerStatics), &staticsF}};
     staticsVt.slots[6] = Fn(&CurrentPlayer);
 
     playerObj.facets = {{player, &playerF}, {kNotify, &notifyF}};
@@ -257,13 +257,13 @@ void Build() {
     notifyVt.slots[6] = Fn(&AddHandler);
     notifyVt.slots[7] = Fn(&RemoveHandler);
 
-    stateObj.facets = {{rt::GuidOf(amk::amp::kIidPlayerState), &stateF}, {kNotify, &stateNotifyF}};
+    stateObj.facets = {{rt::GuidOf(ampify::amp::kIidPlayerState), &stateF}, {kNotify, &stateNotifyF}};
     stateVt.slots[24] = Fn(&IsPaused);
     stateVt.slots[25] = Fn(&IsPlaying);
     stateNotifyVt.slots[6] = Fn(&AddHandler);
     stateNotifyVt.slots[7] = Fn(&RemoveHandler);
 
-    itemObj.facets = {{rt::GuidOf(amk::amp::kIidNowPlayingItem), &itemF}};
+    itemObj.facets = {{rt::GuidOf(ampify::amp::kIidNowPlayingItem), &itemF}};
     itemVt.slots[7] = Fn(&Artist);
     itemVt.slots[8] = Fn(&Album);
     itemVt.slots[19] = Fn(&Name);
@@ -291,7 +291,7 @@ void Build() {
 HRESULT FakeActivation(std::wstring_view name, const GUID& iid, void** out) {
     Build();
     *out = nullptr;
-    if (name == L"AMP.Services.Player" && IsEqualGUID(iid, rt::GuidOf(amk::amp::kIidPlayerStatics))) {
+    if (name == L"AMP.Services.Player" && IsEqualGUID(iid, rt::GuidOf(ampify::amp::kIidPlayerStatics))) {
         *out = &staticsF;
         return S_OK;
     }
@@ -319,8 +319,8 @@ struct Hook {
     ~Hook() { rt::SetActivationHookForTests(nullptr); }
 };
 
-amk::win::PlayerBridgeOptions TestOptions(std::vector<unsigned short>* keys) {
-    amk::win::PlayerBridgeOptions options;
+ampify::win::PlayerBridgeOptions TestOptions(std::vector<unsigned short>* keys) {
+    ampify::win::PlayerBridgeOptions options;
     options.keys = [keys](unsigned short key) {
         keys->push_back(key);
         return true;
@@ -337,11 +337,11 @@ TEST_CASE(AmpPlayer_ReadsTheStateThroughTheWinmdSlots) {
     Reset();
     Hook hook(FakeActivation);
     rt::EnsureMultithreaded();
-    amk::win::AmpPlayer player;
+    ampify::win::AmpPlayer player;
     std::string failure;
     CHECK(player.Activate(failure));
     CHECK(player.ActivationPath() == "test");
-    std::optional<amk::AmpReading> reading = player.Read();
+    std::optional<ampify::AmpReading> reading = player.Read();
     CHECK(reading.has_value());
     CHECK(reading->playing && !reading->paused && reading->hasItem && !reading->placeholder);
     CHECK(reading->title == "Titre \xC3\xA9");
@@ -363,14 +363,14 @@ TEST_CASE(AmpPlayer_ReadsTheStateThroughTheWinmdSlots) {
 TEST_CASE(AmpPlayer_CommandsCallTheirOwnSlotsAndNothingElse) {
     Reset();
     Hook hook(FakeActivation);
-    amk::win::AmpPlayer player;
+    ampify::win::AmpPlayer player;
     std::string failure;
     CHECK(player.Activate(failure));
-    CHECK(player.Command(amk::PlayerCommand::Play));
-    CHECK(player.Command(amk::PlayerCommand::Pause));
-    CHECK(player.Command(amk::PlayerCommand::Next));
-    CHECK(player.Command(amk::PlayerCommand::Previous));
-    CHECK(!player.Command(amk::PlayerCommand::Seek));  // SetPositionAsync is never called
+    CHECK(player.Command(ampify::PlayerCommand::Play));
+    CHECK(player.Command(ampify::PlayerCommand::Pause));
+    CHECK(player.Command(ampify::PlayerCommand::Next));
+    CHECK(player.Command(ampify::PlayerCommand::Previous));
+    CHECK(!player.Command(ampify::PlayerCommand::Seek));  // SetPositionAsync is never called
     CHECK(g.play == 1 && g.pause == 1 && g.next == 1 && g.previous == 1);
     CHECK(g.unexpected == 0);
 }
@@ -378,7 +378,7 @@ TEST_CASE(AmpPlayer_CommandsCallTheirOwnSlotsAndNothingElse) {
 TEST_CASE(AmpPlayer_CountsApplesPropertyChangedNotifications) {
     Reset();
     Hook hook(FakeActivation);
-    amk::win::AmpPlayer player;
+    ampify::win::AmpPlayer player;
     std::string failure;
     CHECK(player.Activate(failure));
     CHECK(g.playerHandler != nullptr);
@@ -392,7 +392,7 @@ TEST_CASE(AmpPlayer_CountsApplesPropertyChangedNotifications) {
 TEST_CASE(AmpPlayer_TheQueueProbeFindsTheInterfacesByElimination) {
     Reset();
     Hook hook(FakeActivation);
-    amk::win::AmpPlayer player;
+    ampify::win::AmpPlayer player;
     std::string line = player.ProbeQueue();
     CHECK(line.find("IPlayQueueStatics = 11111111-2222-3333-4444-555555555555") != std::string::npos);
     CHECK(line.find("IPlayQueue = 66666666-7777-8888-9999-AAAAAAAAAAAA") != std::string::npos);
@@ -404,11 +404,11 @@ TEST_CASE(AmpPlayer_TheQueueProbeFindsTheInterfacesByElimination) {
 TEST_CASE(PlayerBridge_FallsBackToSmtcThenTheMediaKeysWhenApplesPlayerIsMissing) {
     Reset();
     Hook hook(NoActivation);
-    amk::Settings settings;
+    ampify::Settings settings;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
+    ampify::Journal journal(log, [] { return std::string("t"); });
     std::vector<unsigned short> keys;
-    amk::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
+    ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
 
     CHECK(bridge.Snapshot().source.empty());
     CHECK(bridge.Snapshot().source.empty());
@@ -417,24 +417,24 @@ TEST_CASE(PlayerBridge_FallsBackToSmtcThenTheMediaKeysWhenApplesPlayerIsMissing)
     CHECK(log.str().find("repli sur les contrôles multimédias de Windows (SMTC)") != std::string::npos);
     CHECK(log.str().find("API SMTC indisponible") != std::string::npos);
 
-    CHECK(bridge.Control(amk::PlayerCommand::Next, 0));
+    CHECK(bridge.Control(ampify::PlayerCommand::Next, 0));
     CHECK(keys.size() == 1 && keys[0] == VK_MEDIA_NEXT_TRACK);
     // The state is unknown: the play/pause key could do the opposite, so play is refused.
-    CHECK(!bridge.Control(amk::PlayerCommand::Play, 0));
-    CHECK(!bridge.Control(amk::PlayerCommand::Seek, 1000));
+    CHECK(!bridge.Control(ampify::PlayerCommand::Play, 0));
+    CHECK(!bridge.Control(ampify::PlayerCommand::Seek, 1000));
     CHECK(keys.size() == 1);
 }
 
 TEST_CASE(PlayerBridge_ReadsApplesPlayerAndUsesItsCommandsOnlyWhenAllowed) {
     Reset();
     Hook hook(FakeActivation);
-    amk::Settings settings;
+    ampify::Settings settings;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
+    ampify::Journal journal(log, [] { return std::string("t"); });
     std::vector<unsigned short> keys;
-    amk::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
+    ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
 
-    amk::PlayerSnapshot s = bridge.Snapshot();
+    ampify::PlayerSnapshot s = bridge.Snapshot();
     CHECK(s.source == "apple");
     CHECK(s.playing);
     CHECK(s.track.has_value() && s.track->title == "Titre \xC3\xA9" && s.track->lossless && !s.track->atmos);
@@ -445,14 +445,14 @@ TEST_CASE(PlayerBridge_ReadsApplesPlayerAndUsesItsCommandsOnlyWhenAllowed) {
     CHECK(log.str().find("IPlayQueue = 66666666-7777-8888-9999-AAAAAAAAAAAA") != std::string::npos);
 
     // player.appleCommands is off: pause goes to the media key, the state being known (playing).
-    CHECK(bridge.Control(amk::PlayerCommand::Pause, 0));
+    CHECK(bridge.Control(ampify::PlayerCommand::Pause, 0));
     CHECK(g.pause == 0);
     CHECK(keys.size() == 1 && keys[0] == VK_MEDIA_PLAY_PAUSE);
-    CHECK(bridge.Control(amk::PlayerCommand::Play, 0));  // already playing: nothing sent
+    CHECK(bridge.Control(ampify::PlayerCommand::Play, 0));  // already playing: nothing sent
     CHECK(keys.size() == 1 && g.play == 0);
 
     settings.Set("player.appleCommands", "true");
-    CHECK(bridge.Control(amk::PlayerCommand::Next, 0));
+    CHECK(bridge.Control(ampify::PlayerCommand::Next, 0));
     CHECK(g.next == 1 && keys.size() == 1);
     CHECK(g.unexpected == 0);
 }
@@ -460,11 +460,11 @@ TEST_CASE(PlayerBridge_ReadsApplesPlayerAndUsesItsCommandsOnlyWhenAllowed) {
 TEST_CASE(PlayerBridge_TheEngineNeverAsksForApplesPlayer) {
     Reset();
     Hook hook(FakeActivation);
-    amk::Settings settings;
+    ampify::Settings settings;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
+    ampify::Journal journal(log, [] { return std::string("t"); });
     std::vector<unsigned short> keys;
-    amk::win::PlayerBridge bridge("engine", settings, journal, TestOptions(&keys));
+    ampify::win::PlayerBridge bridge("engine", settings, journal, TestOptions(&keys));
     CHECK(bridge.Snapshot().source.empty());
     CHECK(bridge.AppleAttempts() == 0);
     CHECK(log.str().find("vit dans AppleMusic.exe, il n'est pas utilisé ici") != std::string::npos);
@@ -473,12 +473,12 @@ TEST_CASE(PlayerBridge_TheEngineNeverAsksForApplesPlayer) {
 TEST_CASE(PlayerBridge_TheKillSwitchKeepsApplesPlayerOff) {
     Reset();
     Hook hook(FakeActivation);
-    amk::Settings settings;
+    ampify::Settings settings;
     settings.Set("player.apple", "false");
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
+    ampify::Journal journal(log, [] { return std::string("t"); });
     std::vector<unsigned short> keys;
-    amk::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
+    ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
     CHECK(bridge.Snapshot().source.empty());
     CHECK(bridge.AppleAttempts() == 0);
     CHECK(log.str().find("désactivé par le réglage player.apple") != std::string::npos);
@@ -487,28 +487,28 @@ TEST_CASE(PlayerBridge_TheKillSwitchKeepsApplesPlayerOff) {
 TEST_CASE(PlayerBridge_TheQueueHasTheCurrentTrackAndRefusesChangesWithAReason) {
     Reset();
     Hook hook(FakeActivation);
-    amk::Settings settings;
+    ampify::Settings settings;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
+    ampify::Journal journal(log, [] { return std::string("t"); });
     std::vector<unsigned short> keys;
-    amk::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
-    amk::QueueSnapshot queue = bridge.Queue();
+    ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
+    ampify::QueueSnapshot queue = bridge.Queue();
     CHECK(!queue.complete);
     CHECK(queue.source == "apple");
     CHECK(queue.items.size() == 1);
-    CHECK(queue.items[0].id == "42" && queue.items[0].section == amk::QueueSection::Current);
-    amk::QueueResult added = bridge.AddToQueue("1", amk::QueuePosition::Next);
+    CHECK(queue.items[0].id == "42" && queue.items[0].section == ampify::QueueSection::Current);
+    ampify::QueueResult added = bridge.AddToQueue("1", ampify::QueuePosition::Next);
     CHECK(!added.ok && !added.reason.empty());
     CHECK(!bridge.RemoveFromQueue("42").ok);
 }
 
 TEST_CASE(WinHost_OffersTheQueueCapability) {
     namespace fs = std::filesystem;
-    fs::path kit = fs::temp_directory_path() / "amk-tests" / "win-host-queue";
+    fs::path kit = fs::temp_directory_path() / "ampify-tests" / "win-host-queue";
     fs::create_directories(kit);
-    amk::Settings settings;
+    ampify::Settings settings;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
-    amk::WinHost host("engine", kit, settings, journal);
-    CHECK(host.Capability<amk::QueueHost>() != nullptr);
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    ampify::WinHost host("engine", kit, settings, journal);
+    CHECK(host.Capability<ampify::QueueHost>() != nullptr);
 }

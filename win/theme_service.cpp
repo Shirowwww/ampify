@@ -1,6 +1,6 @@
 // NOT COMPILED IN THE CURRENT BUILD: see xaml_backend.cpp. Only the file reads and the posts are plain Win32 and C++.
 
-#if defined(AMK_WITH_XAML)
+#if defined(AMPIFY_WITH_XAML)
 
 #include "theme_service.hpp"
 
@@ -25,7 +25,7 @@
 #include "../core/theme/theme_settings.hpp"
 #include "../core/theme/worker.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -131,7 +131,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
 
             std::optional<std::string> dump = ui->session.Tick(ui->backend, request);
             // The app's own light or dark mode follows the scheme, so what the theme does not name matches what it does
-            // (the minuit theme alone left light text on Apple Music's white background). The scheme's background
+            // (the midnight theme alone left light text on Apple Music's white background). The scheme's background
             // decides when it gives one (a Spicetify scheme is often named Nord or Mocha), its name otherwise.
             ui->backend.SetAppMode(request.theme ? std::optional<bool>(request.theme->dark.value_or(
                                                        theme::IsDarkScheme(request.theme->scheme)))
@@ -159,6 +159,6 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
     }
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win
 
-#endif  // AMK_WITH_XAML
+#endif  // AMPIFY_WITH_XAML

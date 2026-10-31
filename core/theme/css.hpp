@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // The CSS subset that themes use (user.css). Selectors name XAML elements:
 //   Grid            every Grid (short type name, or the full name)
@@ -33,7 +33,7 @@ struct Compound {
 
 struct Selector {
     std::vector<Compound> parts;  // left to right; the last part is the element that receives the declarations
-    std::string text;             // as written, for the journal
+    std::string text;             // as written, for the log
     bool hover = false;           // `:hover` on the last part: the declarations apply while the pointer is over it
 };
 
@@ -61,4 +61,4 @@ Stylesheet ParseStylesheet(std::string_view css);
 // Parses one selector. On failure returns nothing and, when `problem` is given, writes the reason.
 std::optional<Selector> ParseSelector(std::string_view text, std::string* problem = nullptr);
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

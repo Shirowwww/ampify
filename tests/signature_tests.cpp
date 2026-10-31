@@ -67,14 +67,14 @@ Bytes MakeDll(const std::vector<std::string>& names, bool withExports = true) {
 
 std::vector<std::string> RequiredNames() {
     std::vector<std::string> names;
-    for (std::string_view name : amk::kRequiredPlayerExports) names.emplace_back(name);
+    for (std::string_view name : ampify::kRequiredPlayerExports) names.emplace_back(name);
     return names;
 }
 
 }  // namespace
 
 TEST_CASE(PeExports_ReadsTheNamesOfAnImage) {
-    std::optional<std::vector<std::string>> names = amk::PeExportNames(MakeDll({"AVCFPlayerSetVolume", "Other"}));
+    std::optional<std::vector<std::string>> names = ampify::PeExportNames(MakeDll({"AVCFPlayerSetVolume", "Other"}));
     CHECK(names.has_value());
     CHECK(names && *names == std::vector<std::string>({"AVCFPlayerSetVolume", "Other"}));
 }
@@ -83,18 +83,18 @@ TEST_CASE(PeExports_RefusesBytesThatAreNotAPeImage) {
     std::string text = "this is not a DLL";
     Bytes bytes;
     for (char c : text) bytes.push_back(static_cast<std::byte>(c));
-    CHECK(!amk::PeExportNames(bytes).has_value());
-    CHECK(!amk::PeExportNames({}).has_value());
+    CHECK(!ampify::PeExportNames(bytes).has_value());
+    CHECK(!ampify::PeExportNames({}).has_value());
 }
 
 TEST_CASE(PeExports_RefusesATruncatedImage) {
     Bytes bytes = MakeDll(RequiredNames());
     bytes.resize(0x180);  // the headers survive, the export directory at 0x200 is cut off
-    CHECK(!amk::PeExportNames(bytes).has_value());
+    CHECK(!ampify::PeExportNames(bytes).has_value());
 }
 
 TEST_CASE(PeExports_ImageWithoutExportsIsReadableAndEmpty) {
-    std::optional<std::vector<std::string>> names = amk::PeExportNames(MakeDll({}, false));
+    std::optional<std::vector<std::string>> names = ampify::PeExportNames(MakeDll({}, false));
     CHECK(names.has_value());
     CHECK(names && names->empty());
 }
@@ -103,10 +103,10 @@ TEST_CASE(Signature_MatchesWhenEveryRequiredExportIsThere) {
     std::vector<std::string> names = RequiredNames();
     names.push_back("SomethingElse");  // extra exports do no harm
 
-    amk::BuildSignature signature = amk::CheckBuildSignature(MakeDll(names));
+    ampify::BuildSignature signature = ampify::CheckBuildSignature(MakeDll(names));
     CHECK(signature.readable);
     CHECK(signature.missing.empty());
-    CHECK(amk::SignatureMatches(signature));
+    CHECK(ampify::SignatureMatches(signature));
 }
 
 TEST_CASE(Signature_ReportsEachMissingExport) {
@@ -114,34 +114,34 @@ TEST_CASE(Signature_ReportsEachMissingExport) {
     names.erase(names.begin() + 4);  // AVCFPlayerSetVolume is gone
     names[0] = "avcfplayercopycurrentitem";  // names are case-sensitive
 
-    amk::BuildSignature signature = amk::CheckBuildSignature(MakeDll(names));
+    ampify::BuildSignature signature = ampify::CheckBuildSignature(MakeDll(names));
     CHECK(signature.readable);
-    CHECK(!amk::SignatureMatches(signature));
+    CHECK(!ampify::SignatureMatches(signature));
     CHECK(signature.missing.size() == 2);
     CHECK(signature.missing.size() == 2 && signature.missing[0] == "AVCFPlayerCopyCurrentItem");
     CHECK(signature.missing.size() == 2 && signature.missing[1] == "AVCFPlayerSetVolume");
 }
 
 TEST_CASE(Signature_AnUnreadableFileIsNeverAMatch) {
-    amk::BuildSignature signature = amk::CheckBuildSignature({});
+    ampify::BuildSignature signature = ampify::CheckBuildSignature({});
     CHECK(!signature.readable);
-    CHECK(!amk::SignatureMatches(signature));
+    CHECK(!ampify::SignatureMatches(signature));
 }
 
 TEST_CASE(Signature_AnImageWithoutExportsMissesEverything) {
-    amk::BuildSignature signature = amk::CheckBuildSignature(MakeDll({}, false));
+    ampify::BuildSignature signature = ampify::CheckBuildSignature(MakeDll({}, false));
     CHECK(signature.readable);
-    CHECK(signature.missing.size() == std::size(amk::kRequiredPlayerExports));
-    CHECK(!amk::SignatureMatches(signature));
+    CHECK(signature.missing.size() == std::size(ampify::kRequiredPlayerExports));
+    CHECK(!ampify::SignatureMatches(signature));
 }
 
 TEST_CASE(Signature_DescribesWhatWasFound) {
-    CHECK(amk::DescribeSignature(amk::CheckBuildSignature(MakeDll(RequiredNames()))).find("signature reconnue") !=
+    CHECK(ampify::DescribeSignature(ampify::CheckBuildSignature(MakeDll(RequiredNames()))).find("signature recognised") !=
           std::string::npos);
 
-    std::string missing = amk::DescribeSignature(amk::CheckBuildSignature(MakeDll({"Other"})));
-    CHECK(missing.find("exports absents") != std::string::npos);
+    std::string missing = ampify::DescribeSignature(ampify::CheckBuildSignature(MakeDll({"Other"})));
+    CHECK(missing.find("exports missing") != std::string::npos);
     CHECK(missing.find("AVCFPlayerSetVolume") != std::string::npos);
 
-    CHECK(amk::DescribeSignature({}).find("illisible") != std::string::npos);
+    CHECK(ampify::DescribeSignature({}).find("unreadable") != std::string::npos);
 }

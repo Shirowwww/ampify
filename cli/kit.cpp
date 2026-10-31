@@ -6,7 +6,7 @@
 #include <map>
 #include <system_error>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -109,7 +109,7 @@ bool AppendReloadRequests(const KitLayout& kit, const std::vector<std::string>& 
     out << text;
     out.flush();
     if (!out) {
-        error = "écriture impossible : " + kit.Reload().string();
+        error = "cannot write: " + kit.Reload().string();
         return false;
     }
     return true;
@@ -130,7 +130,7 @@ ActiveReport ComputeActive(const KitLayout& kit, const Settings& settings) {
         if (!IsEnabled(settings, element.kind, element.id)) continue;
 
         if (!element.Valid()) {
-            report.problems.push_back(element.kind + " " + element.id + " : " + element.errors.front());
+            report.problems.push_back(element.kind + " " + element.id + ": " + element.errors.front());
             continue;
         }
         ActiveItem item{element.kind, element.id, element.manifest->version, ""};
@@ -141,7 +141,7 @@ ActiveReport ComputeActive(const KitLayout& kit, const Settings& settings) {
     }
 
     if (!themeId.empty() && !themeFound) {
-        report.problems.push_back("theme " + themeId + " : dossier introuvable dans le kit");
+        report.problems.push_back("theme " + themeId + ": folder not found in Ampify");
     }
 
     // A key that says "on" for something the kit does not have is reported, not silently ignored.
@@ -152,14 +152,14 @@ ActiveReport ComputeActive(const KitLayout& kit, const Settings& settings) {
         bool installed = std::any_of(report.items.begin(), report.items.end(),
                                      [&](const ActiveItem& item) { return item.kind == kind && item.id == id; });
         if (!installed && !std::filesystem::exists(kit.Element(kind, id))) {
-            report.problems.push_back(kind + " " + id + " : activé, mais absent du kit");
+            report.problems.push_back(kind + " " + id + ": enabled, but missing from Ampify");
         }
     }
     return report;
 }
 
 std::string FormatActive(const ActiveReport& report) {
-    std::string text = "# Généré par amk apply. Le noyau relit ce fichier au démarrage d'Apple Music.\n";
+    std::string text = "# Written by ampify apply. The kernel reads this file again when Apple Music starts.\n";
     for (const ActiveItem& item : report.items) {
         text += item.kind + " " + item.id + " " + item.version;
         if (!item.scheme.empty()) text += " scheme=" + item.scheme;
@@ -172,7 +172,7 @@ bool WriteTextFile(const std::filesystem::path& file, const std::string& text, s
     std::error_code ec;
     std::filesystem::create_directories(file.parent_path(), ec);
     if (ec) {
-        error = "dossier impossible à créer : " + file.parent_path().string();
+        error = "cannot create folder: " + file.parent_path().string();
         return false;
     }
 
@@ -182,17 +182,17 @@ bool WriteTextFile(const std::filesystem::path& file, const std::string& text, s
         std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
         out << text;
         if (!out) {
-            error = "écriture impossible : " + file.string();
+            error = "cannot write: " + file.string();
             return false;
         }
     }
     std::filesystem::rename(temporary, file, ec);
     if (ec) {
         std::filesystem::remove(temporary, ec);
-        error = "remplacement impossible : " + file.string();
+        error = "cannot replace: " + file.string();
         return false;
     }
     return true;
 }
 
-}  // namespace amk
+}  // namespace ampify

@@ -8,7 +8,7 @@
 #include "kit_layout.hpp"
 #include "text_util.hpp"
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -30,9 +30,9 @@ void ForEachLine(std::string_view text, Visit visit) {
     }
 }
 
-// The number written just before " thread(s) repris" on a line, or nothing.
+// The number written just before " thread(s) resumed" on a line, or nothing.
 std::optional<int> ResumedCount(std::string_view line) {
-    size_t cut = line.find(" thread(s) repris");
+    size_t cut = line.find(" thread(s) resumed");
     if (cut == std::string_view::npos) return std::nullopt;
 
     size_t first = cut;
@@ -41,7 +41,7 @@ std::optional<int> ResumedCount(std::string_view line) {
     return std::stoi(std::string(line.substr(first, cut - first)));
 }
 
-// One line of the checklist. `status` is "OK", "NON" (failed), "?" (to look at) or "info" (for information only).
+// One line of the checklist. `status` is "OK", "FAIL" (failed), "?" (to look at) or "info" (for information only).
 struct Row {
     std::string status;
     std::string label;
@@ -51,7 +51,7 @@ struct Row {
 std::string FormatRow(const Row& row) {
     std::string marker = "[" + row.status + "]";
     marker.resize(std::max<size_t>(marker.size(), 7), ' ');
-    return marker + row.label + " : " + row.detail + "\n";
+    return marker + row.label + ": " + row.detail + "\n";
 }
 
 }  // namespace
@@ -60,36 +60,36 @@ RunFacts ReadRunFacts(std::string_view launcherLog, std::string_view appleMusicL
     RunFacts facts;
 
     ForEachLine(launcherLog, [&](std::string_view line) {
-        constexpr std::string_view kPackagePrefix = "Paquet trouvé : ";
+        constexpr std::string_view kPackagePrefix = "Package found: ";
         if (line.find(kPackagePrefix) != std::string_view::npos) {
             std::string_view rest = line.substr(line.find(kPackagePrefix) + kPackagePrefix.size());
             facts.packageName = std::string(rest.substr(0, rest.find(' ')));
         }
-        if (Contains(line, "Apple Music démarré")) facts.launched = true;
-        if (Contains(line, "testée : noyau injecté")) facts.versionTested = true;
-        // The M3 launcher holds the first process ("N thread(s) mis en pause"); older builds asked Windows instead.
-        if (Contains(line, "thread(s) mis en pause") || Contains(line, "Lancement suspendu demandé")) {
+        if (Contains(line, "Apple Music started")) facts.launched = true;
+        if (Contains(line, "tested: kernel injected")) facts.versionTested = true;
+        // The M3 launcher holds the first process ("N thread(s) paused"); older builds asked Windows instead.
+        if (Contains(line, "thread(s) paused") || Contains(line, "Suspended launch requested")) {
             facts.suspendedLaunch = true;
         }
         if (std::optional<int> resumed = ResumedCount(line)) facts.resumedThreads = resumed;
-        // "AppleMusic.exe (4120) : noyau chargé pendant la pause", "... après la reprise", or the older form without the id.
-        if (Contains(line, "AppleMusic.exe") && Contains(line, ": noyau chargé")) facts.kernelInAppleMusic = true;
-        if (Contains(line, "AMPLibraryAgent.exe (") && Contains(line, ": noyau chargé")) {
+        // "AppleMusic.exe (4120): kernel loaded during the pause", "... after the resume", or the older form without the id.
+        if (Contains(line, "AppleMusic.exe") && Contains(line, ": kernel loaded")) facts.kernelInAppleMusic = true;
+        if (Contains(line, "AMPLibraryAgent.exe (") && Contains(line, ": kernel loaded")) {
             facts.kernelInLibraryAgent = true;
         }
-        if (Contains(line, "mode sans échec actif")) facts.safeModeActive = true;
-        if (Contains(line, "Apple Music fermé")) facts.closed = true;
+        if (Contains(line, "safe mode active")) facts.safeModeActive = true;
+        if (Contains(line, "Apple Music closed")) facts.closed = true;
     });
 
     ForEachLine(appleMusicLog, [&](std::string_view line) {
-        if (Contains(line, "Noyau chargé dans AppleMusic.exe")) facts.kernelInAppleMusic = true;
-        if (Contains(line, "testée") && !Contains(line, "non testée")) facts.versionTested = true;
-        if (Contains(line, "Application saine après 20 s")) facts.healthy = true;
-        if (Contains(line, "Fenêtre bloquée")) facts.hungWindowWarnings++;
+        if (Contains(line, "Kernel loaded in AppleMusic.exe")) facts.kernelInAppleMusic = true;
+        if (Contains(line, "tested") && !Contains(line, "not tested")) facts.versionTested = true;
+        if (Contains(line, "Healthy after 20 s")) facts.healthy = true;
+        if (Contains(line, "Window not responding")) facts.hungWindowWarnings++;
     });
 
     ForEachLine(libraryAgentLog, [&](std::string_view line) {
-        if (Contains(line, "Noyau chargé dans AMPLibraryAgent.exe")) facts.kernelInLibraryAgent = true;
+        if (Contains(line, "Kernel loaded in AMPLibraryAgent.exe")) facts.kernelInLibraryAgent = true;
     });
 
     // A package name that is not Apple Music's is not a run of Apple Music.
@@ -113,59 +113,59 @@ std::string BuildReport(const RunFacts& facts, const RunEnvironment& env) {
     RunVerdict verdict = JudgeRun(facts, env);
 
     std::string text;
-    text += "Rapport du test Apple Music Mod Kit (M5)\n";
-    text += "Date : " + env.date + "\n";
-    text += "Windows : " + env.windows + "\n";
-    text += "Apple Music : " + (version.empty() ? std::string("non trouvé") : version) + "\n";
-    text += "Kit : " + std::string(kKitVersion) + "\n\n";
+    text += "Ampify test report (M5)\n";
+    text += "Date: " + env.date + "\n";
+    text += "Windows: " + env.windows + "\n";
+    text += "Apple Music: " + (version.empty() ? std::string("not found") : version) + "\n";
+    text += "Ampify: " + std::string(kKitVersion) + "\n\n";
 
     switch (verdict) {
         case RunVerdict::Passed:
-            text += "RÉSULTAT : RÉUSSI\n";
+            text += "RESULT: PASSED\n";
             break;
         case RunVerdict::NeedsReview:
-            text += "RÉSULTAT : À REVOIR (voir les lignes [NON] et [?])\n";
+            text += "RESULT: NEEDS REVIEW (see the [FAIL] and [?] lines)\n";
             break;
         case RunVerdict::NotRun:
-            text += "RÉSULTAT : NON EXÉCUTÉ (Apple Music n'a pas été lancé par le kit)\n";
+            text += "RESULT: NOT RUN (Apple Music was not started by Ampify)\n";
             break;
     }
-    text += "\nVérifications\n";
+    text += "\nChecks\n";
 
     std::vector<Row> rows;
-    rows.push_back({env.installOk ? "OK" : "NON", "Kit installé", env.installDetail});
-    rows.push_back({version.empty() ? "NON" : "OK", "Apple Music trouvé",
-                    version.empty() ? std::string("introuvable") : "version " + version});
-    rows.push_back({facts.launched ? "OK" : "NON", "Apple Music lancé par le kit", facts.launched ? "oui" : "non"});
-    rows.push_back({facts.versionTested ? "OK" : "NON", "Version testée, noyau autorisé",
-                    facts.versionTested ? "oui" : "non, le noyau reste inactif"});
+    rows.push_back({env.installOk ? "OK" : "FAIL", "Ampify installed", env.installDetail});
+    rows.push_back({version.empty() ? "FAIL" : "OK", "Apple Music found",
+                    version.empty() ? std::string("not found") : "version " + version});
+    rows.push_back({facts.launched ? "OK" : "FAIL", "Apple Music started by Ampify", facts.launched ? "yes" : "no"});
+    rows.push_back({facts.versionTested ? "OK" : "FAIL", "Tested version, kernel allowed",
+                    facts.versionTested ? "yes" : "no, the kernel stays inactive"});
 
     if (!facts.launched) {
-        rows.push_back({"info", "Lancement suspendu", "sans objet, Apple Music n'a pas été lancé"});
+        rows.push_back({"info", "Suspended launch", "not applicable, Apple Music was not started"});
     } else if (!facts.suspendedLaunch) {
-        rows.push_back({"?", "Lancement suspendu", "non, le noyau est injecté après le démarrage"});
+        rows.push_back({"?", "Suspended launch", "no, the kernel is injected after the start"});
     } else if (facts.resumedThreads.value_or(0) > 0) {
-        rows.push_back({"OK", "Lancement suspendu", std::to_string(*facts.resumedThreads) + " thread(s) repris"});
+        rows.push_back({"OK", "Suspended launch", std::to_string(*facts.resumedThreads) + " thread(s) resumed"});
     } else {
-        rows.push_back({"?", "Lancement suspendu", "0 thread repris : rien n'était suspendu"});
+        rows.push_back({"?", "Suspended launch", "0 threads resumed: nothing was suspended"});
     }
 
-    rows.push_back({facts.kernelInAppleMusic ? "OK" : "NON", "Noyau dans AppleMusic.exe",
-                    facts.kernelInAppleMusic ? "chargé" : "non vu"});
-    rows.push_back({facts.kernelInLibraryAgent ? "OK" : "NON", "Noyau dans AMPLibraryAgent.exe",
-                    facts.kernelInLibraryAgent ? "chargé" : "non vu (lancez un titre pour le faire démarrer)"});
-    rows.push_back({facts.healthy ? "OK" : "NON", "Application saine après 20 s", facts.healthy ? "oui" : "non"});
-    rows.push_back({facts.hungWindowWarnings == 0 ? "OK" : "?", "Fenêtre bloquée",
-                    facts.hungWindowWarnings == 0 ? "non" : std::to_string(facts.hungWindowWarnings) + " fois"});
-    rows.push_back({facts.safeModeActive ? "?" : "OK", "Mode sans échec",
-                    facts.safeModeActive ? "actif : le noyau a été désactivé" : "inactif"});
-    rows.push_back({"info", "Trace ETW", env.traceStatus});
-    rows.push_back({"info", "Événements Windows", env.eventsStatus});
+    rows.push_back({facts.kernelInAppleMusic ? "OK" : "FAIL", "Kernel in AppleMusic.exe",
+                    facts.kernelInAppleMusic ? "loaded" : "not seen"});
+    rows.push_back({facts.kernelInLibraryAgent ? "OK" : "FAIL", "Kernel in AMPLibraryAgent.exe",
+                    facts.kernelInLibraryAgent ? "loaded" : "not seen (play a track to start it)"});
+    rows.push_back({facts.healthy ? "OK" : "FAIL", "Healthy after 20 s", facts.healthy ? "yes" : "no"});
+    rows.push_back({facts.hungWindowWarnings == 0 ? "OK" : "?", "Window not responding",
+                    facts.hungWindowWarnings == 0 ? "no" : std::to_string(facts.hungWindowWarnings) + " times"});
+    rows.push_back({facts.safeModeActive ? "?" : "OK", "Safe mode",
+                    facts.safeModeActive ? "on: the kernel was turned off" : "off"});
+    rows.push_back({"info", "ETW trace", env.traceStatus});
+    rows.push_back({"info", "Windows events", env.eventsStatus});
 
     for (const Row& row : rows) text += FormatRow(row);
 
-    text += "\nLes chemins de votre PC sont anonymes : votre nom d'utilisateur est remplacé par « utilisateur ».\n";
-    text += "Le fichier trace.etl, s'il existe, n'est pas anonymisé.\n";
+    text += "\nPaths on your PC are anonymous: your user name is replaced by \"user\".\n";
+    text += "The trace.etl file, if there is one, is not anonymous.\n";
     return text;
 }
 
@@ -189,7 +189,7 @@ std::string HideUserName(std::string_view text, std::string_view userName) {
                     lowered[end] == '\n' || lowered[end] == '"' || lowered[end] == ' ';
         if (!ends) continue;
 
-        result += std::string(text.substr(copied, start - copied)) + "utilisateur";
+        result += std::string(text.substr(copied, start - copied)) + "user";
         copied = end;
         i = end - 1;
     }
@@ -197,4 +197,4 @@ std::string HideUserName(std::string_view text, std::string_view userName) {
     return result;
 }
 
-}  // namespace amk
+}  // namespace ampify

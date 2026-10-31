@@ -1,6 +1,6 @@
 #pragma once
 
-// Colours of an image, for AMK.color.extract (the counterpart of Spicetify's colorExtractor). Median cut over the
+// Colours of an image, for Ampify.color.extract (the counterpart of Spicetify's colorExtractor). Median cut over the
 // pixels, then a choice of swatches by lightness and saturation, as Android's Palette and node-vibrant do.
 // Pure C++: the caller hands an RGBA buffer, already in memory.
 
@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
 struct Rgb {
     uint8_t r = 0, g = 0, b = 0;
@@ -41,4 +41,4 @@ struct ExtractedColors {
 std::optional<ExtractedColors> ExtractColors(const uint8_t* rgba, size_t size, size_t width, size_t height,
                                              size_t maxColors = 16);
 
-}  // namespace amk
+}  // namespace ampify

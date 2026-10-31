@@ -1,13 +1,13 @@
-// Module crypto: AMK.crypto.md5, for the services that sign their calls with it (Last.fm). Natives:
+// Module crypto: Ampify.crypto.md5, for the services that sign their calls with it (Last.fm). Natives:
 // core/natives/crypto.cpp.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kCrypto[];
-const char kCrypto[] = R"AMKJS(
-  AMK.crypto = {
+const char kCrypto[] = R"AMPIFYJS(
+  Ampify.crypto = {
     md5: (value) => native.md5(text(value)),
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

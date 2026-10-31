@@ -6,7 +6,7 @@
 
 #include "json.hpp"
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -272,4 +272,4 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
     return result;
 }
 
-}  // namespace amk
+}  // namespace ampify

@@ -21,7 +21,7 @@
 #include "player_bridge.hpp"
 #include "win_services.hpp"
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -36,7 +36,7 @@ std::wstring ToWide(const std::string& text) {
     return out;
 }
 
-// Returns the virtual key of a key name written by the kit's normalizer (see core/prelude/keyboard.cpp), or 0.
+// Returns the virtual key of a key name written by Ampify's normalizer (see core/prelude/keyboard.cpp), or 0.
 UINT VirtualKeyOf(const std::string& name) {
     static const std::map<std::string, UINT> named = {
         {"Left", VK_LEFT}, {"Right", VK_RIGHT}, {"Up", VK_UP}, {"Down", VK_DOWN}, {"Space", VK_SPACE},
@@ -96,10 +96,10 @@ void WinHost::SetEventSink(EventSink sink) { m_services->SetEventSink(std::move(
 
 void* WinHost::QueryCapability(std::string_view name) {
     if (void* found = Offer<HttpPostHost>(name, this)) return found;
-    // AMK.player.queue, in both processes: what each one knows of the queue (win/player_bridge.*).
+    // Ampify.player.queue, in both processes: what each one knows of the queue (win/player_bridge.*).
     if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
     if (void* found = m_services->Query(name)) return found;
-    // The Marketplace page runs amk.exe from the interface process, where it is shown.
+    // The Marketplace page runs ampify.exe from the interface process, where it is shown.
     if (m_process == "ui" && name == KitCommandHost::kCapabilityName) return static_cast<KitCommandHost*>(m_kitCommands.get());
     // AudioHost in AMPLibraryAgent.exe only, where the audio is rendered: the process's engine, fed by the Atmos
     // leveler's hooks.
@@ -150,7 +150,7 @@ bool WinHost::WriteStorage(const std::string& elementId, const std::string& json
     return !error;
 }
 
-// AMK.player: Apple's player in AppleMusic.exe, the Windows media controls (SMTC), then the media keys. See
+// Ampify.player: Apple's player in AppleMusic.exe, the Windows media controls (SMTC), then the media keys. See
 // win/player_bridge.*. Never the volume.
 PlayerSnapshot WinHost::Player() { return m_player->Snapshot(); }
 
@@ -160,7 +160,7 @@ void WinHost::SetGainDb(const std::string& elementId, double db) {
     // Only AMPLibraryAgent.exe renders the audio, so only there does the gain reach the samples.
     if (m_process != "engine") {
         static bool noticed = false;
-        if (!noticed) m_journal.Write("gain audio : appliqué seulement dans AMPLibraryAgent.exe, ignoré ici");
+        if (!noticed) m_journal.Write("audio gain: applied only in AMPLibraryAgent.exe, ignored here");
         noticed = true;
         return;
     }
@@ -171,8 +171,8 @@ void WinHost::SetGainDb(const std::string& elementId, double db) {
     }
     ElementGains().Set(elementId, db, ceiling);
     std::ostringstream line;
-    line << std::fixed << std::setprecision(1) << "[" << elementId << "] gain audio : " << db
-         << " dB demandé, total " << ElementGains().TotalDb() << " dB";
+    line << std::fixed << std::setprecision(1) << "[" << elementId << "] audio gain: " << db
+         << " dB requested, total " << ElementGains().TotalDb() << " dB";
     m_journal.Write(line.str());
 }
 
@@ -204,14 +204,14 @@ void WinHost::Service(const KeyCallback& onKey) {
 }
 
 void WinHost::Notify(const std::string& elementId, const std::string& title, const std::string& text) {
-    m_journal.Write("[" + elementId + "] notification : " + title + (text.empty() ? "" : " - " + text));
+    m_journal.Write("[" + elementId + "] notification: " + title + (text.empty() ? "" : " - " + text));
 
     // A balloon needs a notification icon. A message-only window owns it, and the icon is removed after the balloon.
     if (!m_notifyWindow) {
-        m_notifyWindow = CreateWindowExW(0, L"STATIC", L"AMKNotify", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
+        m_notifyWindow = CreateWindowExW(0, L"STATIC", L"AmpifyNotify", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
                                          GetModuleHandleW(nullptr), nullptr);
         if (!m_notifyWindow) {
-            m_journal.Write("[" + elementId + "] notification non affichée : fenêtre impossible à créer");
+            m_journal.Write("[" + elementId + "] notification not shown: could not create the window");
             return;
         }
     }
@@ -222,14 +222,14 @@ void WinHost::Notify(const std::string& elementId, const std::string& title, con
     icon.uID = 1;
     icon.uFlags = NIF_ICON | NIF_TIP | NIF_INFO;
     icon.hIcon = LoadIconW(nullptr, reinterpret_cast<LPCWSTR>(IDI_INFORMATION));  // a resource id, not a string
-    wcsncpy_s(icon.szTip, L"Apple Music Mod Kit", _TRUNCATE);
+    wcsncpy_s(icon.szTip, L"Ampify", _TRUNCATE);
     wcsncpy_s(icon.szInfoTitle, ToWide(title).c_str(), _TRUNCATE);
     wcsncpy_s(icon.szInfo, ToWide(text).c_str(), _TRUNCATE);
     icon.dwInfoFlags = NIIF_INFO;
 
     DWORD action = m_iconVisible ? NIM_MODIFY : NIM_ADD;
     if (!Shell_NotifyIconW(action, &icon)) {
-        m_journal.Write("[" + elementId + "] notification non affichée : l'icône de notification a été refusée");
+        m_journal.Write("[" + elementId + "] notification not shown: the notification icon was refused");
         return;
     }
     m_iconVisible = true;
@@ -277,13 +277,13 @@ HttpResponse WinHost::Send(const wchar_t* verb, const std::string& url, const st
     parts.lpszUrlPath = path;
     parts.dwUrlPathLength = 2048;
     parts.dwExtraInfoLength = 1;  // ask for the query string too
-    if (!WinHttpCrackUrl(wide.c_str(), 0, 0, &parts)) return {0, "adresse invalide"};
+    if (!WinHttpCrackUrl(wide.c_str(), 0, 0, &parts)) return {0, "invalid address"};
     std::wstring target(parts.lpszUrlPath, parts.dwUrlPathLength);
     target += std::wstring(parts.lpszExtraInfo, parts.dwExtraInfoLength);
 
-    HINTERNET session = WinHttpOpen(L"AppleMusicModKit/0.1", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+    HINTERNET session = WinHttpOpen(L"Ampify/0.1", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                     WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-    if (!session) return {0, "réseau indisponible"};
+    if (!session) return {0, "network not available"};
     WinHttpSetTimeouts(session, 5000, 5000, 5000, 10000);
 
     HttpResponse response{0, {}};
@@ -317,7 +317,7 @@ HttpResponse WinHost::Send(const wchar_t* verb, const std::string& url, const st
             response.text.append(chunk.data(), read);
         }
     } else {
-        response.text = "réseau : la requête a échoué (code " + std::to_string(GetLastError()) + ")";
+        response.text = "network: the request failed (code " + std::to_string(GetLastError()) + ")";
     }
 
     if (request) WinHttpCloseHandle(request);
@@ -326,4 +326,4 @@ HttpResponse WinHost::Send(const wchar_t* verb, const std::string& url, const st
     return response;
 }
 
-}  // namespace amk
+}  // namespace ampify

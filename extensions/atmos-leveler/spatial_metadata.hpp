@@ -11,7 +11,7 @@
 
 namespace atmos::hooks {
 
-// {BBC9C907-48D5-4A2E-A0C7-F7F0D67C1FB1}, as declared in spatialaudiometadata.h. l'utilisateur's field notes give the Data1
+// {BBC9C907-48D5-4A2E-A0C7-F7F0D67C1FB1}, as declared in spatialaudiometadata.h. Field notes give the Data1
 // part (0xBBC9C907) on the stream Apple Music activates.
 constexpr GUID kIidRenderStreamForMetadata = {0xBBC9C907, 0x48D5, 0x4A2E, {0xA0, 0xC7, 0xF7, 0xF0, 0xD6, 0x7C, 0x1F, 0xB1}};
 

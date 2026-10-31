@@ -2,7 +2,7 @@
 
 #include <cctype>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -81,4 +81,4 @@ std::optional<Argb> Palette::Find(std::string_view name) const {
     return it->second;
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

@@ -8,7 +8,7 @@ namespace atmos {
 
 namespace {
 
-constexpr std::string_view kHeader = "# Apple Music Mod Kit, atmos-leveler\n";
+constexpr std::string_view kHeader = "# Ampify, atmos-leveler\n";
 
 void AppendNumber(std::string& out, double value, int decimals) {
     char buffer[64];

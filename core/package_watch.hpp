@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
 // What the launcher sees at one poll of the package.
 struct WatchSnapshot {
@@ -54,4 +54,4 @@ private:
     bool m_healthReported = false;
 };
 
-}  // namespace amk
+}  // namespace ampify

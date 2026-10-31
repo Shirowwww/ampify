@@ -9,10 +9,10 @@
 
 #include "json.hpp"
 
-namespace amk {
+namespace ampify {
 
 // What the elements add to the interface. It records and checks, and touches no window: the Windows host renders
-// it (XAML, M8) and the tests read it. Every method takes the lock, because the renderer and the owner thread of the
+// it (XAML) and the tests read it. Every method takes the lock, because the renderer and the owner thread of the
 // elements both use it.
 //
 // Placements: "topbar" and "playbar" (buttons), "menu-context" and "menu-app" (menu items).
@@ -21,7 +21,7 @@ struct UiControl {
     std::string elementId;
     std::string placement;
     std::string label;
-    std::string icon;  // SVG text, as AMK.icons gives it
+    std::string icon;  // SVG text, as Ampify.icons gives it
 };
 
 struct UiSlot {
@@ -45,7 +45,7 @@ public:
     // The popups that were opened, in order. The host shows each one once.
     void OpenPopup(const std::string& elementId, Json tree);
 
-    // A popup with a name (AMK.ReactDOM.render): the first call opens it, the next ones replace its tree in place,
+    // A popup with a name (Ampify.ReactDOM.render): the first call opens it, the next ones replace its tree in place,
     // so a re-render does not stack popups. ClosePopup removes it.
     void SetPopup(const std::string& elementId, const std::string& popupId, Json tree);
     void ClosePopup(const std::string& elementId, const std::string& popupId);
@@ -102,4 +102,4 @@ bool IsPlacement(std::string_view placement);
 // The permission that adds to a placement: ui.topbar, ui.playbar or ui.menu.
 std::string_view PlacementPermission(std::string_view placement);
 
-}  // namespace amk
+}  // namespace ampify

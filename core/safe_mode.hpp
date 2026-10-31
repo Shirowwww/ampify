@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace amk {
+namespace ampify {
 
 // Safe mode: if Apple Music keeps dying or hanging right after the kernel loads, the next
 // launches start without any extension, so the user gets the untouched app back.
@@ -29,4 +29,4 @@ private:
     int m_maxUnhealthyLaunches;
 };
 
-}  // namespace amk
+}  // namespace ampify

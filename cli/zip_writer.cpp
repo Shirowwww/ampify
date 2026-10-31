@@ -8,7 +8,7 @@
 
 #include "archive.hpp"
 
-namespace amk::cli {
+namespace ampify::cli {
 
 namespace {
 
@@ -60,7 +60,7 @@ std::uint32_t Crc32(std::string_view bytes) {
 
 bool WriteZip(const std::filesystem::path& archive, std::vector<ZipSource> files, std::string& error) {
     if (files.size() > kMaxEntries) {
-        error = "trop de fichiers pour un zip : " + std::to_string(files.size());
+        error = "too many files for a zip: " + std::to_string(files.size());
         return false;
     }
     std::sort(files.begin(), files.end(), [](const ZipSource& a, const ZipSource& b) { return a.name < b.name; });
@@ -70,7 +70,7 @@ bool WriteZip(const std::filesystem::path& archive, std::vector<ZipSource> files
     for (const ZipSource& source : files) {
         std::string reason;
         if (!IsSafeArchiveEntry(source.name, reason)) {
-            error = "nom refusé dans l'archive (" + reason + ") : " + source.name;
+            error = "name refused in the archive (" + reason + "): " + source.name;
             return false;
         }
 
@@ -78,13 +78,13 @@ bool WriteZip(const std::filesystem::path& archive, std::vector<ZipSource> files
         if (!source.file.empty()) {
             std::ifstream in(source.file, std::ios::binary);
             if (!in) {
-                error = "lecture impossible : " + source.name;
+                error = "cannot read: " + source.name;
                 return false;
             }
             data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
         }
         if (data.size() > kMaxBytes || body.size() + data.size() > kMaxBytes) {
-            error = "archive trop grande pour un zip sans zip64 (4 Gio)";
+            error = "archive too large for a zip without zip64 (4 GiB)";
             return false;
         }
 
@@ -107,7 +107,7 @@ bool WriteZip(const std::filesystem::path& archive, std::vector<ZipSource> files
     }
 
     if (body.size() > kMaxBytes) {
-        error = "archive trop grande pour un zip sans zip64 (4 Gio)";
+        error = "archive too large for a zip without zip64 (4 GiB)";
         return false;
     }
     const auto directoryStart = static_cast<std::uint32_t>(body.size());
@@ -150,16 +150,16 @@ bool WriteZip(const std::filesystem::path& archive, std::vector<ZipSource> files
     std::error_code ec;
     if (!out) {
         std::filesystem::remove(partial, ec);
-        error = "écriture impossible du zip";
+        error = "cannot write the zip";
         return false;
     }
     std::filesystem::rename(partial, archive, ec);
     if (ec) {
         std::filesystem::remove(partial, ec);
-        error = "impossible de créer le zip à l'emplacement demandé";
+        error = "cannot create the zip at the requested place";
         return false;
     }
     return true;
 }
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

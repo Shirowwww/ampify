@@ -9,7 +9,7 @@
 
 #include "kit.hpp"
 
-namespace amk {
+namespace ampify {
 
 // A snapshot of what the user configured: settings.txt and the four element folders, copied into
 // backups\<yyyymmdd-hhmmss>\. Binaries are never part of it, and the Apple Music package is never read.
@@ -25,4 +25,4 @@ bool CopyElementFolder(const std::filesystem::path& from, const std::filesystem:
 // Puts a snapshot back in place. Takes a snapshot of the current state first, so the restore can be undone.
 bool RestoreBackup(const KitLayout& kit, std::string_view name, std::string& error);
 
-}  // namespace amk
+}  // namespace ampify

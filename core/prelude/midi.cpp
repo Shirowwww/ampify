@@ -1,10 +1,10 @@
-// Module midi: AMK.midi, notes and controllers of a MIDI device. Natives: core/natives/midi.cpp. The matching below
+// Module midi: Ampify.midi, notes and controllers of a MIDI device. Natives: core/natives/midi.cpp. The matching below
 // follows midi::Matches (core/midi_map.cpp); tests/services_tests.cpp checks both against the same events.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kMidi[];
-const char kMidi[] = R"AMKJS(
+const char kMidi[] = R"AMPIFYJS(
   const midiHandlers = [];
 
   const midiMatches = (binding, event) => {
@@ -14,11 +14,11 @@ const char kMidi[] = R"AMKJS(
     return binding.type === "note" ? event.type === "note" : event.type === "cc";
   };
 
-  AMK.midi = {
+  Ampify.midi = {
     // binding: "note:60", "cc:7", "ch2:note:36", "note:*", "*". fn({ type, channel, number, value }).
     // Returns false when MIDI is off (setting midi.enabled) or no device could be opened.
     on(binding, fn) {
-      if (typeof fn !== "function") throw new TypeError("midi.on attend une fonction");
+      if (typeof fn !== "function") throw new TypeError("midi.on expects a function");
       const parsed = JSON.parse(native.midiBinding(text(binding)));
       midiHandlers.push({ binding: parsed, fn });
       return native.midiSubscribe();
@@ -33,6 +33,6 @@ const char kMidi[] = R"AMKJS(
       if (midiMatches(handler.binding, event)) runGuarded("midi " + event.type + ":" + event.number, handler.fn, [event]);
     }
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

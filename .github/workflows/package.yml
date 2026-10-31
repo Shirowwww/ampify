@@ -1,0 +1,86 @@
+name: Test package
+
+# Builds the test package (ampify-<version>-windows-x64.zip and SHA256SUMS.txt) from the MSVC kit of a Windows bench
+# run that is already green (windows-bench.yml, artifacts ampify-msvc-kit-*). Started by hand only: the package is
+# published as an artifact of the run, never as a release. A release needs the owner's approval.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Id of the windows-bench.yml run whose ampify-msvc-kit artifacts are taken"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    name: Build the package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Read the commit of the run
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          case "$RUN_ID" in (''|*[!0-9]*) echo "run_id must be a number: $RUN_ID" >&2; exit 1 ;; esac
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '"sha=\(.head_sha)\nworkflow=\(.path)\nconclusion=\(.conclusion)"' >> "$GITHUB_OUTPUT"
+
+      - name: Check that the run comes from the Windows bench
+        env:
+          RUN_ID: ${{ inputs.run_id }}
+          RUN_SHA: ${{ steps.run.outputs.sha }}
+          WORKFLOW: ${{ steps.run.outputs.workflow }}
+          CONCLUSION: ${{ steps.run.outputs.conclusion }}
+        run: |
+          echo "Run $RUN_ID: $WORKFLOW, conclusion $CONCLUSION, commit $RUN_SHA"
+          case "$WORKFLOW" in
+            .github/workflows/windows-bench.yml|.github/workflows/windows-bench.yml@*) ;;
+            *) echo "this run does not come from windows-bench.yml" >&2; exit 1 ;;
+          esac
+          [ "$CONCLUSION" = "success" ] || echo "::warning::run $RUN_ID is not fully green ($CONCLUSION): check the benches before handing the package over"
+
+      # The script, the guide and the examples come from the branch chosen at launch (it must contain
+      # scripts/package.sh). The script refuses binaries of another version of Ampify.
+      - uses: actions/checkout@v4
+
+      - name: Compare the commits
+        env:
+          RUN_SHA: ${{ steps.run.outputs.sha }}
+        run: |
+          if [ "$RUN_SHA" != "$GITHUB_SHA" ]; then
+            echo "::warning::kit built at commit $RUN_SHA, script and examples taken at commit $GITHUB_SHA"
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          # The two halves of the kit (ampify-msvc-kit-release, ampify-msvc-kit-bench), merged into one folder.
+          pattern: ampify-msvc-kit-*
+          merge-multiple: true
+          path: ampify-msvc-kit
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Build the zip
+        env:
+          RUN_SHA: ${{ steps.run.outputs.sha }}
+        run: bash scripts/package.sh --msvc ampify-msvc-kit --out dist --commit "$RUN_SHA"
+
+      - name: Package contents
+        run: |
+          unzip -l dist/ampify-*-windows-x64.zip
+          cat dist/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ampify-package
+          path: |
+            dist/ampify-*-windows-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30

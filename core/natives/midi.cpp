@@ -8,13 +8,13 @@
 #include "../midi_map.hpp"
 #include "service_gate.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
 struct MidiNatives : ScriptBridge {
     // native.midiBinding(text): {"type":"any"|"note"|"cc","channel":n,"number":n}, or a RangeError.
-    AMK_NATIVE(Binding) {
+    AMPIFY_NATIVE(Binding) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "midi.input", &failure)) return failure;
@@ -32,7 +32,7 @@ struct MidiNatives : ScriptBridge {
         return JS_NewStringLen(ctx, text.data(), text.size());
     }
 
-    AMK_NATIVE(Subscribe) {
+    AMPIFY_NATIVE(Subscribe) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "midi.input", &failure)) return failure;
@@ -42,7 +42,7 @@ struct MidiNatives : ScriptBridge {
     }
 
     // native.midiDevices(): JSON array of the input device names.
-    AMK_NATIVE(Devices) {
+    AMPIFY_NATIVE(Devices) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "midi.input", &failure)) return failure;
@@ -68,4 +68,4 @@ void StopMidi(ScriptExtension& extension) {
     if (MidiHost* host = ScriptBridge::HostOf(&extension).Capability<MidiHost>()) host->UnsubscribeMidi(extension.id());
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

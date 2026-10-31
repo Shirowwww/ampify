@@ -7,7 +7,7 @@
 //   - a peer that is not a loopback address gets 403, whatever it asks;
 //   - the Host header must name 127.0.0.1, localhost or [::1] (a web page cannot reach the server through a
 //     DNS name that points to 127.0.0.1);
-//   - every request needs the token, in "X-AMK-Token: <jeton>" or "Authorization: Bearer <jeton>". A token in the
+//   - every request needs the token, in "X-Ampify-Token: <jeton>" or "Authorization: Bearer <jeton>". A token in the
 //     address is refused, because addresses end up in histories and logs;
 //   - no CORS: a browser page cannot add the token header without a preflight, and the preflight is refused.
 //
@@ -22,7 +22,7 @@
 #include <string>
 #include <string_view>
 
-namespace amk::remote {
+namespace ampify::remote {
 
 inline constexpr size_t kMaxHeaderBytes = 8 * 1024;
 inline constexpr size_t kMaxBodyBytes = 4 * 1024;
@@ -88,4 +88,4 @@ private:
     std::string m_token;
 };
 
-}  // namespace amk::remote
+}  // namespace ampify::remote

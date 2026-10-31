@@ -9,10 +9,10 @@
 #include "theme.hpp"
 #include "tree.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // sidebar.json and home.json, Spicetify's sidebar_config and home_config: which entries of the sidebar (or sections of
-// the home page) are hidden, and in which order they come. The files sit in the kit folder, next to settings.txt:
+// the home page) are hidden, and in which order they come. The files sit in the Ampify folder, next to settings.txt:
 //
 //   {
 //     "version": 1,
@@ -39,7 +39,7 @@ struct LayoutConfig {
     std::vector<LayoutItem> items;
 };
 
-// The file name in the kit folder: sidebar.json or home.json.
+// The file name in the Ampify folder: sidebar.json or home.json.
 std::string_view LayoutFileName(LayoutKind kind);
 
 // Reads a layout file. Bad items are skipped and reported (French, one message each). Nothing when the text is not a
@@ -61,4 +61,4 @@ std::vector<std::string> NamesMatching(const std::vector<NodeInfo>& nodes, const
 // The rules of one file, added to `out` (whose id and name stay as they are). Their source is the file name.
 void AddLayoutRules(const LayoutConfig& config, LayoutKind kind, Theme& out);
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

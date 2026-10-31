@@ -11,7 +11,7 @@
 #include "../json.hpp"
 #include "http.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
@@ -41,13 +41,13 @@ struct HttpNatives : ScriptBridge {
         std::string url = String(ctx, argc, argv, 0).value_or("");
         std::string host = HttpsHost(url);
         if (host.empty()) {
-            *failure = Throw(ctx, "TypeError", "seules les URL https:// sont autorisées");
+            *failure = Throw(ctx, "TypeError", "only https:// URLs are allowed");
             return std::nullopt;
         }
         std::vector<std::string> allowed = ext->manifest().NetworkHosts();
         if (std::find(allowed.begin(), allowed.end(), host) == allowed.end()) {
             *failure = Throw(ctx, "PermissionDenied",
-                             "permission manquante : network:" + host + " (à déclarer dans manifest.json)");
+                             "missing permission: network:" + host + " (declare it in manifest.json)");
             return std::nullopt;
         }
         return url;
@@ -60,7 +60,7 @@ struct HttpNatives : ScriptBridge {
         return object;
     }
 
-    AMK_NATIVE(HttpGet) {
+    AMPIFY_NATIVE(HttpGet) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         std::optional<std::string> url = CheckedUrl(ctx, ext, argc, argv, &failure);
@@ -69,31 +69,31 @@ struct HttpNatives : ScriptBridge {
     }
 
     // native.httpPost(url, body, headersJson): headersJson is an object of lowercase names, built by the prelude.
-    AMK_NATIVE(HttpPost) {
+    AMPIFY_NATIVE(HttpPost) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         std::optional<std::string> url = CheckedUrl(ctx, ext, argc, argv, &failure);
         if (!url) return failure;
         std::string body = String(ctx, argc, argv, 1).value_or("");
-        if (body.size() > kMaxPostBody) return Throw(ctx, "RangeError", "corps de requête trop long (64 Ko au plus)");
+        if (body.size() > kMaxPostBody) return Throw(ctx, "RangeError", "request body too long (64 KB at most)");
 
         HttpHeaders headers;
         std::optional<Json> given = Json::Parse(String(ctx, argc, argv, 2).value_or("{}"));
-        if (!given || !given->AsObject()) return Throw(ctx, "TypeError", "headers doit être un objet");
+        if (!given || !given->AsObject()) return Throw(ctx, "TypeError", "headers must be an object");
         for (const auto& [name, value] : *given->AsObject()) {
             if (!IsAllowedHeader(name)) {
-                return Throw(ctx, "TypeError", "en-tête non autorisé : " + name + " (content-type, authorization, accept)");
+                return Throw(ctx, "TypeError", "header not allowed: " + name + " (content-type, authorization, accept)");
             }
             const std::string* text = value.AsString();
             if (!text || text->size() > kMaxHeaderValue ||
                 text->find_first_of(std::string("\r\n\0", 3)) != std::string::npos) {
-                return Throw(ctx, "TypeError", "valeur d'en-tête refusée : " + name);
+                return Throw(ctx, "TypeError", "header value refused: " + name);
             }
             headers.emplace_back(name, *text);
         }
 
         HttpPostHost* poster = HostOf(ext).Capability<HttpPostHost>();
-        if (!poster) return ResponseObject(ctx, HttpResponse{0, "envoi non pris en charge par cet hôte"});
+        if (!poster) return ResponseObject(ctx, HttpResponse{0, "sending is not supported by this host"});
         return ResponseObject(ctx, poster->HttpPost(*url, body, headers));
     }
 };
@@ -105,4 +105,4 @@ void DefineHttp(api::NativeScope& scope) {
     scope.Function("httpPost", HttpNatives::HttpPost, 3);
 }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

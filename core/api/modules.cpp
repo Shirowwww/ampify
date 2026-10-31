@@ -1,14 +1,14 @@
-// The list of the modules that make the AMK object, and the assembly of the prelude from their fragments.
+// The list of the modules that make the Ampify object, and the assembly of the prelude from their fragments.
 //
 // To add a module `foo`: write core/prelude/foo.cpp (kFoo, the JavaScript) and, when it needs the kernel,
 // core/natives/foo.cpp (DefineFoo, plus StartFoo or StopFoo when needed); declare them below; add one line to
-// kModules. Both files go in cmake/sources/<package>.cmake. Guide: docs/extensions/API.md, "Organisation du code".
+// kModules. Both files go in cmake/sources/<package>.cmake. Guide: CONTRIBUTING.md, "Add an API module".
 
 #include "module.hpp"
 
 #include "../script_extension.hpp"
 
-namespace amk {
+namespace ampify {
 
 namespace prelude {
 extern const char kFrameHead[];
@@ -79,7 +79,7 @@ namespace api {
 
 namespace {
 
-// Prelude order: a module sees what the modules above it added, and AMK lists its members in this order.
+// Prelude order: a module sees what the modules above it added, and Ampify lists its members in this order.
 // Columns: name, prelude fragment, natives, start hook, stop hook.
 const ApiModule kModules[] = {
     {"core", prelude::kCore, natives::DefineCore, nullptr, nullptr},
@@ -140,4 +140,4 @@ JSValue MakeNatives(JSContext* ctx, ScriptExtension& extension) {
 }
 
 }  // namespace api
-}  // namespace amk
+}  // namespace ampify

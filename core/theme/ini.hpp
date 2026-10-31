@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // A small INI reader for theme.ini: `[section]` headers, `key = value` lines, and `;` or `#` comments.
 // Section and key names are matched case-insensitively. A key that appears twice keeps its last value.
@@ -35,4 +35,4 @@ private:
     std::vector<Section> m_sections;
 };
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

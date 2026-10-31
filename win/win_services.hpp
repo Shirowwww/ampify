@@ -34,7 +34,7 @@
 #include "../core/natives/tray.hpp"
 #include "../core/remote_protocol.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 class DiscordIpc;
 class TrayIcon;
@@ -124,7 +124,6 @@ private:
     std::string m_process;
     std::filesystem::path m_kit;
     Journal& m_journal;
-    i18n::Language m_language = i18n::Language::Fr;
     bool m_started = false;
     EventSink m_sink;
 
@@ -152,4 +151,4 @@ private:
     std::string m_status = "{}";
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win

@@ -1,4 +1,4 @@
-// AMK.link: the message channel between an app and the extension that has the same id.
+// Ampify.link: the message channel between an app and the extension that has the same id.
 
 #include <filesystem>
 #include <fstream>
@@ -24,12 +24,12 @@ std::string Manifest(const std::string& id, const std::string& kind) {
 // A kit with an extensions and an apps folder, read by one loader in the interface process.
 struct LinkKit {
     fs::path root;
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal{out, [] { return std::string("t"); }};
-    amk::ExtensionHost hosts{journal};
-    amk::ExtensionLoader loader;
-    amk::Settings settings;
+    ampify::Journal journal{out, [] { return std::string("t"); }};
+    ampify::ExtensionHost hosts{journal};
+    ampify::ExtensionLoader loader;
+    ampify::Settings settings;
 
     explicit LinkKit(const std::string& name)
         : root(Clean(name)), loader(hosts, host, journal, root / "extensions") {
@@ -38,7 +38,7 @@ struct LinkKit {
     }
 
     static fs::path Clean(const std::string& name) {
-        fs::path folder = fs::temp_directory_path() / "amk-tests" / ("link-" + name);
+        fs::path folder = fs::temp_directory_path() / "ampify-tests" / ("link-" + name);
         fs::remove_all(folder);
         return folder;
     }
@@ -67,75 +67,75 @@ struct LinkKit {
 
 TEST_CASE(Link_AppAndExtensionExchangeJsonMessages) {
     LinkKit kit("exchange");
-    kit.Add("extensions", "paroles", R"(
-        AMK.link.on((message) => {
-          AMK.log("l'extension reçoit " + message.text + " " + message.n);
-          AMK.link.post({ text: "merci", list: [1, 2] });
+    kit.Add("extensions", "lyrics", R"(
+        Ampify.link.on((message) => {
+          Ampify.log("the extension gets " + message.text + " " + message.n);
+          Ampify.link.post({ text: "thanks", list: [1, 2] });
         });)");
-    kit.Add("apps", "paroles", R"(
-        AMK.link.on((message) => AMK.log("l'app reçoit " + message.text + " " + message.list.length));
-        AMK.log("connectée " + AMK.link.connected());
-        AMK.log("envoyé " + AMK.link.post({ text: "bonjour", n: 3 }));)");
+    kit.Add("apps", "lyrics", R"(
+        Ampify.link.on((message) => Ampify.log("the app gets " + message.text + " " + message.list.length));
+        Ampify.log("connected " + Ampify.link.connected());
+        Ampify.log("sent " + Ampify.link.post({ text: "hello", n: 3 }));)");
     kit.Start();
-    CHECK(kit.hosts.StateOf("paroles") == amk::ExtensionState::Running);
-    CHECK(kit.hosts.StateOf("app:paroles") == amk::ExtensionState::Running);
-    CHECK(kit.Logged("[paroles] connectée true"));
-    CHECK(kit.Logged("[paroles] envoyé true"));
+    CHECK(kit.hosts.StateOf("lyrics") == ampify::ExtensionState::Running);
+    CHECK(kit.hosts.StateOf("app:lyrics") == ampify::ExtensionState::Running);
+    CHECK(kit.Logged("[lyrics] connected true"));
+    CHECK(kit.Logged("[lyrics] sent true"));
 
     // Delivered on the next turns of the JavaScript thread, never inside post itself.
-    CHECK(!kit.Logged("l'extension reçoit"));
+    CHECK(!kit.Logged("the extension gets"));
     kit.Pump();
-    CHECK(kit.Logged("[paroles] l'extension reçoit bonjour 3"));
-    CHECK(kit.Logged("[paroles] l'app reçoit merci 2"));
+    CHECK(kit.Logged("[lyrics] the extension gets hello 3"));
+    CHECK(kit.Logged("[lyrics] the app gets thanks 2"));
     kit.hosts.StopAll();
 }
 
 TEST_CASE(Link_NoPeerMeansPostReturnsFalse) {
     LinkKit kit("alone");
-    kit.Add("extensions", "seule", R"(AMK.log("seule " + AMK.link.post({}) + " " + AMK.link.connected());)");
-    kit.Add("apps", "autre", R"(AMK.log("autre " + AMK.link.post({}));)");  // another id: not linked
+    kit.Add("extensions", "alone", R"(Ampify.log("alone " + Ampify.link.post({}) + " " + Ampify.link.connected());)");
+    kit.Add("apps", "other", R"(Ampify.log("other " + Ampify.link.post({}));)");  // another id: not linked
     kit.Start();
-    CHECK(kit.Logged("[seule] seule false false"));
-    CHECK(kit.Logged("[autre] autre false"));
+    CHECK(kit.Logged("[alone] alone false false"));
+    CHECK(kit.Logged("[other] other false"));
     kit.hosts.StopAll();
 }
 
 TEST_CASE(Link_AStoppedPeerIsNotReachable) {
     LinkKit kit("stopped");
-    kit.Add("extensions", "duo", R"(AMK.link.on((m) => AMK.log("reçu " + m));)");
-    kit.Add("apps", "duo", R"(AMK.log("envoi " + AMK.link.post("x"));)");  // posts each time it starts
+    kit.Add("extensions", "duo", R"(Ampify.link.on((m) => Ampify.log("received " + m));)");
+    kit.Add("apps", "duo", R"(Ampify.log("sending " + Ampify.link.post("x"));)");  // posts each time it starts
     kit.Start();
     kit.Pump();
-    CHECK(kit.Logged("[duo] envoi true"));
-    CHECK(kit.Logged("[duo] reçu x"));
+    CHECK(kit.Logged("[duo] sending true"));
+    CHECK(kit.Logged("[duo] received x"));
 
     // The extension stops: the app, started again, finds nobody.
-    kit.loader.Apply(amk::ParseReloadRequests("stop duo\nrestart app:duo\n"), kit.settings);
-    CHECK(kit.Logged("[duo] envoi false"));
-    CHECK(kit.hosts.StateOf("app:duo") == amk::ExtensionState::Running);
+    kit.loader.Apply(ampify::ParseReloadRequests("stop duo\nrestart app:duo\n"), kit.settings);
+    CHECK(kit.Logged("[duo] sending false"));
+    CHECK(kit.hosts.StateOf("app:duo") == ampify::ExtensionState::Running);
 
     // Back on: reachable again.
-    kit.loader.Apply(amk::ParseReloadRequests("start duo\nrestart app:duo\n"), kit.settings);
+    kit.loader.Apply(ampify::ParseReloadRequests("start duo\nrestart app:duo\n"), kit.settings);
     kit.Pump();
-    CHECK(kit.out.str().rfind("envoi true") > kit.out.str().find("envoi false"));
+    CHECK(kit.out.str().rfind("sending true") > kit.out.str().find("sending false"));
     kit.hosts.StopAll();
 }
 
 TEST_CASE(Link_RefusesWhatIsNotJsonAndLongMessages) {
     LinkKit kit("refuse");
     kit.Add("extensions", "strict", R"(
-        try { AMK.link.post(undefined); } catch (e) { AMK.log("vide " + e.name); }
-        try { AMK.link.post(() => 1); } catch (e) { AMK.log("fonction " + e.name); }
-        try { AMK.link.post("x".repeat(70000)); } catch (e) { AMK.log("long " + e.name); }
-        try { AMK.link.on(42); } catch (e) { AMK.log("écoute " + e.name); }
-        const off = AMK.link.on(() => {});
+        try { Ampify.link.post(undefined); } catch (e) { Ampify.log("empty " + e.name); }
+        try { Ampify.link.post(() => 1); } catch (e) { Ampify.log("function " + e.name); }
+        try { Ampify.link.post("x".repeat(70000)); } catch (e) { Ampify.log("long " + e.name); }
+        try { Ampify.link.on(42); } catch (e) { Ampify.log("listen " + e.name); }
+        const off = Ampify.link.on(() => {});
         off(); off();
-        AMK.log("membres " + Object.isFrozen(AMK.link));)");
+        Ampify.log("members " + Object.isFrozen(Ampify.link));)");
     kit.Start();
-    CHECK(kit.Logged("[strict] vide TypeError"));
-    CHECK(kit.Logged("[strict] fonction TypeError"));
+    CHECK(kit.Logged("[strict] empty TypeError"));
+    CHECK(kit.Logged("[strict] function TypeError"));
     CHECK(kit.Logged("[strict] long RangeError"));
-    CHECK(kit.Logged("[strict] écoute TypeError"));
-    CHECK(kit.Logged("[strict] membres true"));
+    CHECK(kit.Logged("[strict] listen TypeError"));
+    CHECK(kit.Logged("[strict] members true"));
     kit.hosts.StopAll();
 }

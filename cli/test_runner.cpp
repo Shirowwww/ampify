@@ -1,4 +1,4 @@
-// `amk test`: runs an element's main.js in the kernel's JavaScript engine, with a host that records what the element
+// `ampify test`: runs an element's main.js in the kernel's JavaScript engine, with a host that records what the element
 // asks for. Nothing reaches Apple Music, the network or the disk outside the test: the host answers in memory.
 
 #include <cmath>
@@ -23,11 +23,11 @@
 #include "archive.hpp"
 #include "internal.hpp"
 
-namespace amk::cli {
+namespace ampify::cli {
 
 namespace {
 
-// AMK.audio during a test run: the kernel's real analysis and equalizer, fed with a synthetic signal instead of a
+// Ampify.audio during a test run: the kernel's real analysis and equalizer, fed with a synthetic signal instead of a
 // sound card (see PlaySyntheticAudio). The loudness and the player volume are fixed values.
 class TestAudio : public audio::AudioEngine {
 public:
@@ -36,11 +36,11 @@ public:
     }
 
     void SubscribeFrames(const std::string& elementId, FrameSink sink) override {
-        m_count("audio : images d'analyse");
+        m_count("audio: analysis frames");
         AudioEngine::SubscribeFrames(elementId, std::move(sink));
     }
     AudioAnalysisResult Analyze(const std::string& elementId) override {
-        m_count("audio : analyse");
+        m_count("audio: analysis");
         return AudioEngine::Analyze(elementId);
     }
     LoudnessReading Loudness() override {
@@ -48,11 +48,11 @@ public:
         return AudioEngine::Loudness();
     }
     std::optional<double> PlayerVolume() override {
-        m_count("audio : volume (lecture)");
+        m_count("audio: volume (read)");
         return AudioEngine::PlayerVolume();
     }
     bool SetEqBand(const std::string& elementId, size_t band, double gainDb) override {
-        m_count("audio : égaliseur");
+        m_count("audio: equalizer");
         return AudioEngine::SetEqBand(elementId, band, gainDb);
     }
 
@@ -94,56 +94,56 @@ public:
     std::string Locale() const override { return "fr-FR"; }
 
     std::optional<std::string> ReadSetting(const std::string& key) override {
-        Count("réglages (lecture)");
+        Count("settings (read)");
         auto found = m_settings.find(key);
         if (found == m_settings.end()) return std::nullopt;
         return found->second;
     }
     void WriteSetting(const std::string& key, const std::string& value) override {
-        Count("réglages (écriture)");
+        Count("settings (write)");
         m_settings[key] = value;
     }
     std::optional<std::string> ReadStorage(const std::string& elementId) override {
-        Count("stockage (lecture)");
+        Count("storage (read)");
         auto found = m_storage.find(elementId);
         if (found == m_storage.end()) return std::nullopt;
         return found->second;
     }
     bool WriteStorage(const std::string& elementId, const std::string& json) override {
-        Count("stockage (écriture)");
+        Count("storage (write)");
         m_storage[elementId] = json;
         return true;
     }
     PlayerSnapshot Player() override {
-        Count("lecteur (lecture)");
+        Count("player (read)");
         return {};
     }
     bool Control(PlayerCommand, int64_t) override {
-        Count("lecteur (commande)");
+        Count("player (command)");
         return true;
     }
-    void SetGainDb(const std::string&, double) override { Count("gain audio"); }
+    void SetGainDb(const std::string&, double) override { Count("audio gain"); }
     void Notify(const std::string&, const std::string&, const std::string&) override { Count("notification"); }
     bool RegisterKey(const std::string&, const std::string&) override {
-        Count("raccourci");
+        Count("shortcut");
         return true;
     }
     void UnregisterKeys(const std::string&) override {}
     HttpResponse HttpGet(const std::string& url) override {
-        Count("réseau : " + url);
+        Count("network: " + url);
         return HttpResponse{200, "{}"};
     }
     HttpResponse HttpPost(const std::string& url, const std::string&, const HttpHeaders&) override {
-        Count("réseau (envoi) : " + url);
+        Count("network (send): " + url);
         return HttpResponse{200, "{}"};
     }
     bool SetActivity(const std::string&, const std::string&, const discord::Activity&) override {
-        Count("discord (présence)");
+        Count("discord (presence)");
         return true;
     }
     void ClearActivity(const std::string&) override {}
     bool SetTrayMenu(const std::string&, const std::vector<TrayItem>&) override {
-        Count("icône de notification (menu)");
+        Count("notification icon (menu)");
         return true;
     }
     void RemoveTrayMenu(const std::string&) override {}
@@ -154,12 +154,12 @@ public:
     void UnsubscribeMidi(const std::string&) override {}
     std::vector<std::string> MidiDevices() override { return {}; }
     bool PublishRemoteState(const std::string&, const std::string&) override {
-        Count("télécommande (état)");
+        Count("remote control (state)");
         return true;
     }
     void RemoveRemoteState(const std::string&) override {}
     bool WriteOutputText(const std::string&, const std::string& name, const std::string&, std::string*) override {
-        Count("fichier de sortie : " + name);  // counted, not written
+        Count("output file: " + name);  // counted, not written
         return true;
     }
     void* QueryCapability(std::string_view name) override {
@@ -197,7 +197,7 @@ private:
 
 int CmdTest(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() != 2) return Usage(ctx, "test attend le dossier de l'élément");
+    if (args.size() != 2) return Usage(ctx, "test needs the element folder");
 
     std::filesystem::path folder = PathArgument(args[1]);
     FolderValidation validation = ValidateElementFolder(folder);
@@ -210,18 +210,18 @@ int CmdTest(Context& ctx) {
 
     // The engine checks the manifest again with its own rules, as it does at load time.
     std::string text;
-    if (!ReadWholeFile(folder / "manifest.json", text)) return Failure(ctx, "manifest.json illisible");
+    if (!ReadWholeFile(folder / "manifest.json", text)) return Failure(ctx, "unreadable manifest.json");
     std::error_code ec;
-    ManifestResult parsed = amk::ParseManifest(text, FolderName(folder), kKitApiMajor,
+    ManifestResult parsed = ampify::ParseManifest(text, FolderName(folder), kKitApiMajor,
                                                [&](const std::string& file) {
                                                    return std::filesystem::is_regular_file(folder / file, ec);
                                                });
     if (!parsed.manifest) {
-        ctx.err << "le moteur refuse le manifeste :\n";
+        ctx.err << "the engine refuses the manifest:\n";
         for (const std::string& problem : parsed.errors) ctx.err << "  - " << problem << "\n";
         return 1;
     }
-    for (const std::string& warning : parsed.warnings) ctx.out << "  attention  " << warning << "\n";
+    for (const std::string& warning : parsed.warnings) ctx.out << "  warning    " << warning << "\n";
 
     std::ostringstream journalText;
     Journal journal(journalText, Journal::LocalTimeStamp);
@@ -234,20 +234,20 @@ int CmdTest(Context& ctx) {
     }
     element.Stop();
 
-    ctx.out << "amk test : " << manifest.id << " (" << manifest.kind << " " << manifest.version << ")\n";
+    ctx.out << "ampify test: " << manifest.id << " (" << manifest.kind << " " << manifest.version << ")\n";
     ctx.out << "  permissions  ";
-    if (manifest.permissions.empty()) ctx.out << "aucune";
+    if (manifest.permissions.empty()) ctx.out << "none";
     for (size_t i = 0; i < manifest.permissions.size(); i++) ctx.out << (i ? ", " : "") << manifest.permissions[i];
-    ctx.out << "\n  main.js      " << (started ? "chargé et exécuté sans erreur" : "échec : " + element.lastError())
+    ctx.out << "\n  main.js      " << (started ? "loaded and run without error" : "failed: " + element.lastError())
             << "\n";
 
     std::istringstream lines(journalText.str());
-    for (std::string line; std::getline(lines, line);) ctx.out << "  journal      " << line << "\n";
-    for (const auto& [what, count] : host.Calls()) ctx.out << "  appel        " << what << " x" << count << "\n";
+    for (std::string line; std::getline(lines, line);) ctx.out << "  log          " << line << "\n";
+    for (const auto& [what, count] : host.Calls()) ctx.out << "  call         " << what << " x" << count << "\n";
 
     if (!started) return 1;
-    ctx.out << "Aucune erreur. Les appels ci-dessus sont ceux que le moteur a faits pour l'élément, avec un hôte factice.\n";
+    ctx.out << "No error. The calls above are the ones the engine made for the element, with a fake host.\n";
     return 0;
 }
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

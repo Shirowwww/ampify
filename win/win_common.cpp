@@ -11,7 +11,7 @@
 #include <system_error>
 #include <vector>
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -71,12 +71,12 @@ int StartAndWait(std::wstring commandLine, const std::filesystem::path& outputFi
 
 std::filesystem::path KitDirectory() {
     std::filesystem::path profilePath = KnownFolder(FOLDERID_Profile);
-    if (profilePath.empty()) return std::filesystem::temp_directory_path() / L"AppleMusicModKit";
-    return profilePath / L"AppleMusicModKit";
+    if (profilePath.empty()) return std::filesystem::temp_directory_path() / L"Ampify";
+    return profilePath / L"Ampify";
 }
 
 std::filesystem::path JournalFile(const std::string& name) {
-    std::filesystem::path directory = KitDirectory() / L"journal";
+    std::filesystem::path directory = KitDirectory() / L"logs";
     std::error_code error;
     std::filesystem::create_directories(directory, error);
     return directory / name;
@@ -127,7 +127,7 @@ std::filesystem::path KnownFolder(const KNOWNFOLDERID& folder) {
 }
 
 std::filesystem::path InstallDirectory() {
-    return KnownFolder(FOLDERID_LocalAppData) / L"Programs" / L"AppleMusicModKit";
+    return KnownFolder(FOLDERID_LocalAppData) / L"Programs" / L"Ampify";
 }
 
 std::string ToUtf8(std::wstring_view text) {
@@ -204,7 +204,7 @@ bool AskYesNo(const std::wstring& text, const std::wstring& title) {
 }
 
 void ShowMessage(const std::wstring& text, bool error) {
-    MessageBoxW(nullptr, text.c_str(), L"Apple Music Mod Kit", (error ? MB_ICONERROR : MB_ICONINFORMATION) | MB_OK);
+    MessageBoxW(nullptr, text.c_str(), L"Ampify", (error ? MB_ICONERROR : MB_ICONINFORMATION) | MB_OK);
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

@@ -27,7 +27,7 @@ std::string Manifest(const std::string& id, const std::string& kind, const std::
 }
 
 fs::path Root(const std::string& name) {
-    fs::path root = fs::temp_directory_path() / "amk-tests" / ("loader-" + name);
+    fs::path root = fs::temp_directory_path() / "ampify-tests" / ("loader-" + name);
     fs::remove_all(root);
     fs::create_directories(root);
     return root;
@@ -37,116 +37,116 @@ fs::path Root(const std::string& name) {
 
 TEST_CASE(Loader_RegistersValidElementsAndSkipsTheRest) {
     fs::path root = Root("discover");
-    WriteElement(root, "good", Manifest("good", "extension"), R"(AMK.log("bonjour");)");
-    WriteElement(root, "app-ok", Manifest("app-ok", "app"), R"(AMK.log("app");)");
-    WriteElement(root, "bad-id", Manifest("other", "extension"), R"(AMK.log("x");)");  // id differs from folder
-    WriteElement(root, "theme", Manifest("theme", "theme", R"(,"colors":"c.ini")"), "AMK.log('x');");
+    WriteElement(root, "good", Manifest("good", "extension"), R"(Ampify.log("hello");)");
+    WriteElement(root, "app-ok", Manifest("app-ok", "app"), R"(Ampify.log("app");)");
+    WriteElement(root, "bad-id", Manifest("other", "extension"), R"(Ampify.log("x");)");  // id differs from folder
+    WriteElement(root, "theme", Manifest("theme", "theme", R"(,"colors":"c.ini")"), "Ampify.log('x');");
     std::ofstream(root / "theme" / "c.ini") << "[Base]\n";
     fs::create_directories(root / "no-manifest");
 
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal(out, [] { return std::string("t"); });
-    amk::ExtensionHost hosts(journal);
-    amk::ExtensionLoader loader(hosts, host, journal, root);
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::ExtensionHost hosts(journal);
+    ampify::ExtensionLoader loader(hosts, host, journal, root);
 
-    amk::LoadReport report = loader.Discover();
+    ampify::LoadReport report = loader.Discover();
     CHECK(report.loaded == std::vector<std::string>{"good"});
     CHECK(report.rejected.size() == 3);
-    CHECK(out.str().find("[bad-id] rejeté") != std::string::npos);
-    CHECK(out.str().find("type theme non chargé") != std::string::npos);
-    CHECK(out.str().find("[app-ok] type app non chargé depuis le dossier extensions") != std::string::npos);
-    CHECK(hosts.StateOf("good") == amk::ExtensionState::Off);  // disabled until the user enables it
+    CHECK(out.str().find("[bad-id] rejected") != std::string::npos);
+    CHECK(out.str().find("type theme not loaded") != std::string::npos);
+    CHECK(out.str().find("[app-ok] type app not loaded from the folder extensions") != std::string::npos);
+    CHECK(hosts.StateOf("good") == ampify::ExtensionState::Off);  // disabled until the user enables it
 }
 
 TEST_CASE(Loader_SkipsElementsDeclaredForTheOtherProcess) {
     fs::path root = Root("processes");
-    WriteElement(root, "uionly", Manifest("uionly", "extension", R"(,"processes":["ui"])"), R"(AMK.log("ui");)");
+    WriteElement(root, "uionly", Manifest("uionly", "extension", R"(,"processes":["ui"])"), R"(Ampify.log("ui");)");
     WriteElement(root, "anywhere", Manifest("anywhere", "extension", R"(,"processes":["ui","engine"])"),
-                 R"(AMK.log("ok");)");
-    WriteElement(root, "plain", Manifest("plain", "extension"), R"(AMK.log("ui");)");  // no processes: interface only
+                 R"(Ampify.log("ok");)");
+    WriteElement(root, "plain", Manifest("plain", "extension"), R"(Ampify.log("ui");)");  // no processes: interface only
 
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     host.process = "engine";
     std::ostringstream out;
-    amk::Journal journal(out, [] { return std::string("t"); });
-    amk::ExtensionHost hosts(journal);
-    amk::ExtensionLoader loader(hosts, host, journal, root);
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::ExtensionHost hosts(journal);
+    ampify::ExtensionLoader loader(hosts, host, journal, root);
 
-    amk::LoadReport report = loader.Discover();
+    ampify::LoadReport report = loader.Discover();
     CHECK(report.loaded == std::vector<std::string>{"anywhere"});
     CHECK((report.skipped == std::vector<std::string>{"plain", "uionly"}));
-    CHECK(out.str().find("[uionly] ignoré dans le processus engine") != std::string::npos);
+    CHECK(out.str().find("[uionly] skipped in the process engine") != std::string::npos);
 }
 
 TEST_CASE(Loader_MissingRootIsNotAnError) {
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal(out, [] { return std::string("t"); });
-    amk::ExtensionHost hosts(journal);
-    amk::ExtensionLoader loader(hosts, host, journal, Root("absent") / "nothing-here");
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::ExtensionHost hosts(journal);
+    ampify::ExtensionLoader loader(hosts, host, journal, Root("absent") / "nothing-here");
     CHECK(loader.Discover().loaded.empty());
 }
 
 TEST_CASE(Loader_EnabledElementsStartAndOneFailureDoesNotStopTheOthers) {
     fs::path root = Root("isolation");
-    WriteElement(root, "solid", Manifest("solid", "extension"), R"(AMK.log("solide");)");
+    WriteElement(root, "solid", Manifest("solid", "extension"), R"(Ampify.log("solid");)");
     WriteElement(root, "broken", Manifest("broken", "extension"), R"(throw new Error("panne");)");
 
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal(out, [] { return std::string("t"); });
-    amk::ExtensionHost hosts(journal);
-    amk::ExtensionLoader loader(hosts, host, journal, root);
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::ExtensionHost hosts(journal);
+    ampify::ExtensionLoader loader(hosts, host, journal, root);
     CHECK(loader.Discover().loaded.size() == 2);
 
-    amk::Settings settings;
+    ampify::Settings settings;
     settings.SetBool("extensions.solid.enabled", true);
     settings.SetBool("extensions.broken.enabled", true);
     hosts.StartAll(settings);
 
-    CHECK(hosts.StateOf("solid") == amk::ExtensionState::Running);
-    CHECK(hosts.StateOf("broken") == amk::ExtensionState::Failed);
-    CHECK(out.str().find("[solid] solide") != std::string::npos);
+    CHECK(hosts.StateOf("solid") == ampify::ExtensionState::Running);
+    CHECK(hosts.StateOf("broken") == ampify::ExtensionState::Failed);
+    CHECK(out.str().find("[solid] solid") != std::string::npos);
 
     hosts.StopAll();
-    CHECK(hosts.StateOf("solid") == amk::ExtensionState::Off);
+    CHECK(hosts.StateOf("solid") == ampify::ExtensionState::Off);
 }
 
 TEST_CASE(Loader_TargetedClicksAndEventsReachOnlyTheirElement) {
     fs::path root = Root("targeted");
     WriteElement(root, "one", Manifest("one", "extension", R"(,"permissions":["ui.panel"])"),
-                 R"(const { h, useState } = AMK.React;
+                 R"(const { h, useState } = Ampify.React;
 function P() {
   const [n, setN] = useState(0);
   return h("stack", null, h("text", null, "n=" + n),
-    h("button", { label: "plus", onClick: () => { setN(n + 1); AMK.log("un clic"); } }),
-    h("toggle", { label: "t", onChange: (e) => AMK.log("bascule " + e.value) }));
+    h("button", { label: "more", onClick: () => { setN(n + 1); Ampify.log("a click"); } }),
+    h("toggle", { label: "t", onChange: (e) => Ampify.log("toggle " + e.value) }));
 }
-AMK.ReactDOM.render(h(P), "panel:p");)");
-    WriteElement(root, "two", Manifest("two", "extension"), R"(AMK.log("deux");)");
+Ampify.ReactDOM.render(h(P), "panel:p");)");
+    WriteElement(root, "two", Manifest("two", "extension"), R"(Ampify.log("two");)");
 
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal(out, [] { return std::string("t"); });
-    amk::ExtensionHost hosts(journal);
-    amk::ExtensionLoader loader(hosts, host, journal, root);
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::ExtensionHost hosts(journal);
+    ampify::ExtensionLoader loader(hosts, host, journal, root);
     CHECK(loader.Discover().loaded.size() == 2);
-    amk::Settings settings;
+    ampify::Settings settings;
     settings.SetBool("extensions.one.enabled", true);
     settings.SetBool("extensions.two.enabled", true);
     hosts.StartAll(settings);
     loader.Pump();
 
-    std::optional<amk::UiSlot> panel = host.Ui().Panel("one", "p");
+    std::optional<ampify::UiSlot> panel = host.Ui().Panel("one", "p");
     CHECK(panel.has_value());
     if (!panel) return;
-    const amk::Json* children = panel->tree.Find("children");
-    const amk::Json::Array* items = children ? children->AsArray() : nullptr;
+    const ampify::Json* children = panel->tree.Find("children");
+    const ampify::Json::Array* items = children ? children->AsArray() : nullptr;
     CHECK(items && items->size() == 3);
     if (!items || items->size() != 3) return;
-    const amk::Json* onClick = (*items)[1].Find("onClick");
-    const amk::Json* onChange = (*items)[2].Find("onChange");
+    const ampify::Json* onClick = (*items)[1].Find("onClick");
+    const ampify::Json* onChange = (*items)[2].Find("onChange");
     CHECK(onClick && onChange);
     if (!onClick || !onChange) return;
     int click = static_cast<int>(*onClick->AsNumber());
@@ -154,97 +154,97 @@ AMK.ReactDOM.render(h(P), "panel:p");)");
 
     loader.DeliverClickTo("two", click);  // another element: nothing happens
     loader.Pump();
-    CHECK(out.str().find("un clic") == std::string::npos);
+    CHECK(out.str().find("a click") == std::string::npos);
 
     loader.DeliverClickTo("one", click);
     loader.DeliverEventTo("one", "change", R"({"id":)" + std::to_string(change) + R"(,"value":true})");
     loader.Pump();
-    CHECK(out.str().find("[one] un clic") != std::string::npos);
-    CHECK(out.str().find("[one] bascule true") != std::string::npos);
-    std::optional<amk::UiSlot> after = host.Ui().Panel("one", "p");
+    CHECK(out.str().find("[one] a click") != std::string::npos);
+    CHECK(out.str().find("[one] toggle true") != std::string::npos);
+    std::optional<ampify::UiSlot> after = host.Ui().Panel("one", "p");
     CHECK(after && after->tree.Dump().find("n=1") != std::string::npos);
     hosts.StopAll();
 }
 
 TEST_CASE(Loader_ExposeApiOffKeepsEveryScriptOff) {
     fs::path root = Root("expose-api");
-    WriteElement(root / "extensions", "ext", Manifest("ext", "extension"), R"(AMK.log("ext");)");
-    WriteElement(root / "apps", "page", Manifest("page", "app"), R"(AMK.log("page");)");
+    WriteElement(root / "extensions", "ext", Manifest("ext", "extension"), R"(Ampify.log("ext");)");
+    WriteElement(root / "apps", "page", Manifest("page", "app"), R"(Ampify.log("page");)");
 
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal(out, [] { return std::string("t"); });
-    amk::ExtensionHost hosts(journal);
-    amk::ExtensionLoader loader(hosts, host, journal, root / "extensions");
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::ExtensionHost hosts(journal);
+    ampify::ExtensionLoader loader(hosts, host, journal, root / "extensions");
     loader.SetAppRoot(root / "apps");
     CHECK(loader.Discover().loaded.size() == 2);
 
-    amk::Settings settings;
+    ampify::Settings settings;
     settings.SetBool("extensions.ext.enabled", true);
-    settings.SetBool("apps.page.enabled", true);  // the key `amk app enable` writes
+    settings.SetBool("apps.page.enabled", true);  // the key `ampify app enable` writes
     settings.SetBool("expose_api", false);
     hosts.StartAll(settings);
-    CHECK(hosts.StateOf("ext") == amk::ExtensionState::Off);
-    CHECK(hosts.StateOf("app:page") == amk::ExtensionState::Off);
+    CHECK(hosts.StateOf("ext") == ampify::ExtensionState::Off);
+    CHECK(hosts.StateOf("app:page") == ampify::ExtensionState::Off);
 
     settings.SetBool("expose_api", true);
     CHECK(loader.Restart("ext", settings));
     CHECK(loader.Restart("app:page", settings));
-    CHECK(hosts.StateOf("ext") == amk::ExtensionState::Running);
-    CHECK(hosts.StateOf("app:page") == amk::ExtensionState::Running);
+    CHECK(hosts.StateOf("ext") == ampify::ExtensionState::Running);
+    CHECK(hosts.StateOf("app:page") == ampify::ExtensionState::Running);
     hosts.StopAll();
 }
 
 TEST_CASE(Loader_RestartReloadsAnElementWithItsNewSettings) {
     fs::path root = Root("restart");
-    WriteElement(root, "reload", Manifest("reload", "extension"), R"(AMK.log("chargé");)");
+    WriteElement(root, "reload", Manifest("reload", "extension"), R"(Ampify.log("loaded");)");
 
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal(out, [] { return std::string("t"); });
-    amk::ExtensionHost hosts(journal);
-    amk::ExtensionLoader loader(hosts, host, journal, root);
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::ExtensionHost hosts(journal);
+    ampify::ExtensionLoader loader(hosts, host, journal, root);
     loader.Discover();
 
-    amk::Settings settings;
+    ampify::Settings settings;
     settings.SetBool("extensions.reload.enabled", true);
     hosts.StartAll(settings);
-    CHECK(hosts.StateOf("reload") == amk::ExtensionState::Running);
+    CHECK(hosts.StateOf("reload") == ampify::ExtensionState::Running);
 
     settings.SetBool("extensions.reload.enabled", false);
     CHECK(loader.Restart("reload", settings));
-    CHECK(hosts.StateOf("reload") == amk::ExtensionState::Off);
+    CHECK(hosts.StateOf("reload") == ampify::ExtensionState::Off);
     CHECK(!loader.Restart("unknown", settings));
 }
 
 TEST_CASE(Loader_PlayerEventsAndKeysReachOnlyTheRightRunningElements) {
     fs::path root = Root("events");
     WriteElement(root, "listener", Manifest("listener", "extension", R"(,"permissions":["player.read","ui.keyboard"])"),
-                 R"(AMK.player.on("statechange", (s) => AMK.log("état " + s.playing));
-                    AMK.keyboard.bind("F5", () => AMK.log("touche"));)");
-    WriteElement(root, "idle", Manifest("idle", "extension"), R"(AMK.log("rien");)");
+                 R"(Ampify.player.on("statechange", (s) => Ampify.log("state " + s.playing));
+                    Ampify.keyboard.bind("F5", () => Ampify.log("key"));)");
+    WriteElement(root, "idle", Manifest("idle", "extension"), R"(Ampify.log("nothing");)");
 
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal(out, [] { return std::string("t"); });
-    amk::ExtensionHost hosts(journal);
-    amk::ExtensionLoader loader(hosts, host, journal, root);
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::ExtensionHost hosts(journal);
+    ampify::ExtensionLoader loader(hosts, host, journal, root);
     loader.Discover();
 
-    amk::Settings settings;
+    ampify::Settings settings;
     settings.SetBool("extensions.listener.enabled", true);
     hosts.StartAll(settings);  // "idle" stays off
 
-    amk::PlayerSnapshot snapshot;
+    ampify::PlayerSnapshot snapshot;
     snapshot.playing = true;
     loader.DeliverPlayer("statechange", snapshot);
     loader.DeliverKey("listener", "F5");
     loader.DeliverKey("idle", "F5");  // not its key, and it is off
     loader.Pump();
 
-    CHECK(out.str().find("[listener] état true") != std::string::npos);
-    CHECK(out.str().find("[listener] touche") != std::string::npos);
-    CHECK(out.str().find("[idle] rien") == std::string::npos);
+    CHECK(out.str().find("[listener] state true") != std::string::npos);
+    CHECK(out.str().find("[listener] key") != std::string::npos);
+    CHECK(out.str().find("[idle] nothing") == std::string::npos);
     hosts.StopAll();
     CHECK(host.keys.empty());
 }
@@ -254,12 +254,12 @@ namespace {
 // A kit with its folders, a loader that knows them, and settings to switch the elements.
 struct KitSetup {
     fs::path root;
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal{out, [] { return std::string("t"); }};
-    amk::ExtensionHost hosts{journal};
-    amk::ExtensionLoader loader;
-    amk::Settings settings;
+    ampify::Journal journal{out, [] { return std::string("t"); }};
+    ampify::ExtensionHost hosts{journal};
+    ampify::ExtensionLoader loader;
+    ampify::Settings settings;
 
     explicit KitSetup(const std::string& name) : root(Root(name)), loader(hosts, host, journal, root / "extensions") {
         host.process = "ui";
@@ -269,49 +269,49 @@ struct KitSetup {
     }
 
     bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
-    void Request(const std::string& text) { loader.Apply(amk::ParseReloadRequests(text), settings); }
+    void Request(const std::string& text) { loader.Apply(ampify::ParseReloadRequests(text), settings); }
 };
 
 }  // namespace
 
 TEST_CASE(Loader_DiscoversAppsInTheirOwnFolder) {
     KitSetup s("apps-folder");
-    WriteElement(s.root / "apps", "page", Manifest("page", "app"), R"(AMK.log("page ouverte");)");
-    WriteElement(s.root / "apps", "wrong", Manifest("wrong", "extension"), R"(AMK.log("x");)");
-    WriteElement(s.root / "apps", ".page.previous", Manifest("page", "app"), R"(AMK.log("x");)");  // work in progress
+    WriteElement(s.root / "apps", "page", Manifest("page", "app"), R"(Ampify.log("page opened");)");
+    WriteElement(s.root / "apps", "wrong", Manifest("wrong", "extension"), R"(Ampify.log("x");)");
+    WriteElement(s.root / "apps", ".page.previous", Manifest("page", "app"), R"(Ampify.log("x");)");  // work in progress
 
-    amk::LoadReport report = s.loader.Discover();
+    ampify::LoadReport report = s.loader.Discover();
     CHECK(report.loaded == std::vector<std::string>{"app:page"});
     CHECK(report.rejected == std::vector<std::string>{"wrong"});
-    CHECK(s.Logged("[wrong] type extension non chargé depuis le dossier apps"));
+    CHECK(s.Logged("[wrong] type extension not loaded from the folder apps"));
 
     // apps.<id>.enabled switches an app, not extensions.<id>.enabled.
     s.settings.SetBool("extensions.page.enabled", true);
     s.hosts.StartAll(s.settings);
-    CHECK(s.hosts.StateOf("app:page") == amk::ExtensionState::Off);
+    CHECK(s.hosts.StateOf("app:page") == ampify::ExtensionState::Off);
     s.settings.SetBool("apps.page.enabled", true);
     s.hosts.StartAll(s.settings);
-    CHECK(s.hosts.StateOf("app:page") == amk::ExtensionState::Running);
-    CHECK(s.Logged("[page] page ouverte"));
+    CHECK(s.hosts.StateOf("app:page") == ampify::ExtensionState::Running);
+    CHECK(s.Logged("[page] page opened"));
     s.hosts.StopAll();
 }
 
 TEST_CASE(Loader_AnAppAndAnExtensionMayShareAnId) {
     KitSetup s("shared-id");
-    WriteElement(s.root / "extensions", "duo", Manifest("duo", "extension"), R"(AMK.log("extension");)");
-    WriteElement(s.root / "apps", "duo", Manifest("duo", "app"), R"(AMK.log("app");)");
+    WriteElement(s.root / "extensions", "duo", Manifest("duo", "extension"), R"(Ampify.log("extension");)");
+    WriteElement(s.root / "apps", "duo", Manifest("duo", "app"), R"(Ampify.log("app");)");
     CHECK(s.loader.Discover().loaded == (std::vector<std::string>{"duo", "app:duo"}));
 
     s.settings.SetBool("extensions.duo.enabled", true);
     s.settings.SetBool("apps.duo.enabled", true);
     s.hosts.StartAll(s.settings);
-    CHECK(s.hosts.StateOf("duo") == amk::ExtensionState::Running);
-    CHECK(s.hosts.StateOf("app:duo") == amk::ExtensionState::Running);
+    CHECK(s.hosts.StateOf("duo") == ampify::ExtensionState::Running);
+    CHECK(s.hosts.StateOf("app:duo") == ampify::ExtensionState::Running);
 
     // Stopping the extension leaves the app running.
     s.Request("stop duo\n");
-    CHECK(s.hosts.StateOf("duo") == amk::ExtensionState::Off);
-    CHECK(s.hosts.StateOf("app:duo") == amk::ExtensionState::Running);
+    CHECK(s.hosts.StateOf("duo") == ampify::ExtensionState::Off);
+    CHECK(s.hosts.StateOf("app:duo") == ampify::ExtensionState::Running);
     s.hosts.StopAll();
 }
 
@@ -320,56 +320,56 @@ TEST_CASE(Loader_StartRequestLoadsAnElementInstalledAfterTheStart) {
     CHECK(s.loader.Discover().loaded.empty());
     s.hosts.StartAll(s.settings);
 
-    // amk install, then amk extension enable: the folder and the setting appear while Apple Music runs.
-    WriteElement(s.root / "extensions", "fresh", Manifest("fresh", "extension"), R"(AMK.log("nouvelle");)");
+    // ampify install, then ampify extension enable: the folder and the setting appear while Apple Music runs.
+    WriteElement(s.root / "extensions", "fresh", Manifest("fresh", "extension"), R"(Ampify.log("new");)");
     s.settings.SetBool("extensions.fresh.enabled", true);
     s.Request("start fresh\n");
-    CHECK(s.hosts.StateOf("fresh") == amk::ExtensionState::Running);
-    CHECK(s.Logged("[fresh] nouvelle"));
-    CHECK(s.Logged("Démarrage demandé : fresh"));
+    CHECK(s.hosts.StateOf("fresh") == ampify::ExtensionState::Running);
+    CHECK(s.Logged("[fresh] new"));
+    CHECK(s.Logged("Start requested: fresh"));
 
     // The same for an app, with its own target.
-    WriteElement(s.root / "apps", "fresh", Manifest("fresh", "app"), R"(AMK.log("page");)");
+    WriteElement(s.root / "apps", "fresh", Manifest("fresh", "app"), R"(Ampify.log("page");)");
     s.settings.SetBool("apps.fresh.enabled", true);
     s.Request("start app:fresh\n");
-    CHECK(s.hosts.StateOf("app:fresh") == amk::ExtensionState::Running);
+    CHECK(s.hosts.StateOf("app:fresh") == ampify::ExtensionState::Running);
 
     s.Request("stop fresh\nstop app:fresh\n");
-    CHECK(s.hosts.StateOf("fresh") == amk::ExtensionState::Off);
-    CHECK(s.hosts.StateOf("app:fresh") == amk::ExtensionState::Off);
+    CHECK(s.hosts.StateOf("fresh") == ampify::ExtensionState::Off);
+    CHECK(s.hosts.StateOf("app:fresh") == ampify::ExtensionState::Off);
 
     s.Request("start missing\n");
-    CHECK(s.Logged("[missing] introuvable dans le kit"));
+    CHECK(s.Logged("[missing] not found in Ampify"));
 }
 
 TEST_CASE(Loader_StartRequestKeepsADisabledElementOff) {
     KitSetup s("start-disabled");
-    WriteElement(s.root / "extensions", "quiet", Manifest("quiet", "extension"), R"(AMK.log("x");)");
+    WriteElement(s.root / "extensions", "quiet", Manifest("quiet", "extension"), R"(Ampify.log("x");)");
     s.loader.Discover();
     s.Request("start quiet\n");
-    CHECK(s.hosts.StateOf("quiet") == amk::ExtensionState::Off);
+    CHECK(s.hosts.StateOf("quiet") == ampify::ExtensionState::Off);
 }
 
 TEST_CASE(Loader_RescanAddsNewFoldersAndDropsRemovedOnes) {
     KitSetup s("rescan");
-    WriteElement(s.root / "extensions", "old", Manifest("old", "extension"), R"(AMK.log("ancienne");)");
+    WriteElement(s.root / "extensions", "old", Manifest("old", "extension"), R"(Ampify.log("old");)");
     s.loader.Discover();
     s.settings.SetBool("extensions.old.enabled", true);
     s.settings.SetBool("apps.later.enabled", true);
     s.hosts.StartAll(s.settings);
-    CHECK(s.hosts.StateOf("old") == amk::ExtensionState::Running);
+    CHECK(s.hosts.StateOf("old") == ampify::ExtensionState::Running);
 
     fs::remove_all(s.root / "extensions" / "old");
-    WriteElement(s.root / "apps", "later", Manifest("later", "app"), R"(AMK.log("arrivée");)");
+    WriteElement(s.root / "apps", "later", Manifest("later", "app"), R"(Ampify.log("arrived");)");
     s.Request("rescan\n");
     CHECK(!s.hosts.Has("old"));
-    CHECK(s.Logged("Extension old arrêtée"));
-    CHECK(s.Logged("[old] retiré : son dossier n'existe plus"));
-    CHECK(s.hosts.StateOf("app:later") == amk::ExtensionState::Running);  // enabled, so started at once
+    CHECK(s.Logged("Extension old stopped"));
+    CHECK(s.Logged("[old] removed: its folder no longer exists"));
+    CHECK(s.hosts.StateOf("app:later") == ampify::ExtensionState::Running);  // enabled, so started at once
     CHECK(s.loader.elements().size() == 1);
 
     // A second rescan changes nothing.
-    amk::LoadReport again = s.loader.Rescan(s.settings);
+    ampify::LoadReport again = s.loader.Rescan(s.settings);
     CHECK(again.loaded.empty());
     CHECK(s.loader.elements().size() == 1);
     s.hosts.StopAll();
@@ -378,33 +378,33 @@ TEST_CASE(Loader_RescanAddsNewFoldersAndDropsRemovedOnes) {
 TEST_CASE(Loader_RestartReadsTheManifestAgain) {
     KitSetup s("restart-manifest");
     WriteElement(s.root / "extensions", "grow", Manifest("grow", "extension"),
-                 R"(try { AMK.storage.set("k", 1); AMK.log("stockage permis"); } catch (e) { AMK.log(e.name); })");
+                 R"(try { Ampify.storage.set("k", 1); Ampify.log("storage allowed"); } catch (e) { Ampify.log(e.name); })");
     s.loader.Discover();
     s.settings.SetBool("extensions.grow.enabled", true);
     s.hosts.StartAll(s.settings);
     CHECK(s.Logged("[grow] PermissionDenied"));
 
-    // amk dev or amk update rewrote the folder with a new permission.
+    // ampify dev or ampify update rewrote the folder with a new permission.
     std::ofstream(s.root / "extensions" / "grow" / "manifest.json")
         << Manifest("grow", "extension", R"(,"permissions":["storage"],"processes":["ui"])");
     s.Request("restart grow\n");
-    CHECK(s.hosts.StateOf("grow") == amk::ExtensionState::Running);
-    CHECK(s.Logged("[grow] stockage permis"));
+    CHECK(s.hosts.StateOf("grow") == ampify::ExtensionState::Running);
+    CHECK(s.Logged("[grow] storage allowed"));
 
     // A manifest broken by hand leaves the element stopped, with the reason in the journal.
     std::ofstream(s.root / "extensions" / "grow" / "manifest.json") << "{ casse";
     s.Request("restart grow\n");
     CHECK(!s.hosts.Has("grow"));
-    CHECK(s.Logged("[grow] rechargement impossible"));
+    CHECK(s.Logged("[grow] cannot reload"));
 }
 
 TEST_CASE(Loader_RestartOfANewFolderLoadsIt) {
     KitSetup s("restart-new");
     s.loader.Discover();
-    WriteElement(s.root / "extensions", "dev", Manifest("dev", "extension"), R"(AMK.log("copié par dev");)");
+    WriteElement(s.root / "extensions", "dev", Manifest("dev", "extension"), R"(Ampify.log("copied by dev");)");
     s.settings.SetBool("extensions.dev.enabled", true);
     CHECK(s.loader.Restart("dev", s.settings));
-    CHECK(s.hosts.StateOf("dev") == amk::ExtensionState::Running);
+    CHECK(s.hosts.StateOf("dev") == ampify::ExtensionState::Running);
     s.hosts.StopAll();
 }
 
@@ -415,8 +415,8 @@ TEST_CASE(Loader_RequestsReachANativeExtensionToo) {
     s.hosts.Add({"atmos-leveler", "Atmos", false, [&] { return ++starts > 0; }, [] {}});
     s.settings.SetBool("extensions.atmos-leveler.enabled", true);
     s.Request("start atmos-leveler\n");
-    CHECK(s.hosts.StateOf("atmos-leveler") == amk::ExtensionState::Running);
+    CHECK(s.hosts.StateOf("atmos-leveler") == ampify::ExtensionState::Running);
     s.Request("stop atmos-leveler\n");
-    CHECK(s.hosts.StateOf("atmos-leveler") == amk::ExtensionState::Off);
+    CHECK(s.hosts.StateOf("atmos-leveler") == ampify::ExtensionState::Off);
     CHECK(starts == 1);
 }

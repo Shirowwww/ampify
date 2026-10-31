@@ -6,7 +6,7 @@
 #include <fstream>
 #include <system_error>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -49,7 +49,7 @@ bool Settings::Save(const std::string& path) const {
     {
         std::ofstream out(temporary, std::ios::trunc);
         if (!out) return false;
-        out << "# Apple Music Mod Kit settings. Edit by hand if you like.\n";
+        out << "# Ampify settings. Edit by hand if you like.\n";
         for (const auto& [key, value] : m_values) out << key << " = " << value << "\n";
         if (!out) return false;
     }
@@ -124,4 +124,4 @@ void Settings::Remove(const std::string& key) {
     m_values.erase(key);
 }
 
-}  // namespace amk
+}  // namespace ampify

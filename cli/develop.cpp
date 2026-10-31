@@ -1,4 +1,4 @@
-// `amk dev` copies an element that is being written into the kit at every save. `amk logs` prints the journal.
+// `ampify dev` copies an element that is being written into the kit at every save. `ampify logs` prints the log.
 
 #include <algorithm>
 #include <charconv>
@@ -15,7 +15,7 @@
 #include "internal.hpp"
 #include "watch.hpp"
 
-namespace amk::cli {
+namespace ampify::cli {
 
 namespace {
 
@@ -23,7 +23,7 @@ constexpr auto kMinimumInterval = std::chrono::milliseconds(100);
 constexpr int kDefaultLines = 50;
 
 // Copies the author's folder into the kit. The copy is made beside the old one and then swapped in, so the kernel
-// never sees an element that is half copied. The dot prefix keeps the staging folder out of `amk list`.
+// never sees an element that is half copied. The dot prefix keeps the staging folder out of `ampify list`.
 bool SyncElement(const KitLayout& kit, const std::filesystem::path& source, const std::string& kind,
                  const std::string& id, std::string& error) {
     std::error_code ec;
@@ -38,12 +38,12 @@ bool SyncElement(const KitLayout& kit, const std::filesystem::path& source, cons
     }
     std::filesystem::remove_all(target, ec);
     if (ec) {
-        error = "remplacement impossible dans le kit : " + id;
+        error = "cannot replace in Ampify: " + id;
         return false;
     }
     std::filesystem::rename(staging, target, ec);
     if (ec) {
-        error = "mise en place impossible dans le kit : " + id;
+        error = "cannot put in place in Ampify: " + id;
         return false;
     }
     return true;
@@ -55,12 +55,12 @@ void ReloadOnce(Context& ctx, const std::filesystem::path& source, const std::st
     std::string stamp = "[" + ClockText() + "] ";
     FolderValidation check = ValidateElementFolder(source);
     if (!check.ok() || !check.errors.empty() || !check.manifest) {
-        ctx.err << stamp << "invalide, le kit garde la version précédente :\n";
+        ctx.err << stamp << "invalid, Ampify keeps the previous version:\n";
         for (const std::string& problem : check.errors) ctx.err << "  - " << problem << "\n";
         return;
     }
     if (check.manifest->id != id || check.manifest->kind != kind) {
-        ctx.err << stamp << "l'identifiant ou le type a changé : relance amk dev\n";
+        ctx.err << stamp << "the id or the type changed: run ampify dev again\n";
         return;
     }
 
@@ -69,7 +69,7 @@ void ReloadOnce(Context& ctx, const std::filesystem::path& source, const std::st
         ctx.err << stamp << error << "\n";
         return;
     }
-    ctx.out << stamp << id << " rechargé\n";
+    ctx.out << stamp << id << " reloaded\n";
     // The kernel restarts the element on its JavaScript thread, from this request in reload.txt.
     ApplyNow(ctx, {ReloadTarget(kind, id)});
 }
@@ -119,12 +119,12 @@ std::uintmax_t PrintFrom(Context& ctx, const std::filesystem::path& file, std::u
 
 int CmdDev(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() != 2) return Usage(ctx, "dev attend le dossier de l'élément à développer");
+    if (args.size() != 2) return Usage(ctx, "dev needs the folder of the element to develop");
 
     std::filesystem::path source = PathArgument(args[1]);
     FolderValidation first = ValidateElementFolder(source);
     if (!first.ok() || !first.errors.empty() || !first.manifest) {
-        ctx.err << Utf8(source) << " : invalide, rien n'a été copié\n";
+        ctx.err << Utf8(source) << ": invalid, nothing was copied\n";
         for (const std::string& problem : first.errors) ctx.err << "  - " << problem << "\n";
         return 1;
     }
@@ -137,7 +137,7 @@ int CmdDev(Context& ctx) {
         std::string error;
         std::optional<std::string> snapshot = CreateBackup(ctx.kit, error);
         if (!snapshot) return Failure(ctx, error);
-        ctx.out << "Version du kit sauvegardée avant développement : " << *snapshot << "\n";
+        ctx.out << "Ampify version backed up before development: " << *snapshot << "\n";
     }
 
     Settings settings;
@@ -148,7 +148,7 @@ int CmdDev(Context& ctx) {
 
     std::chrono::milliseconds interval(ctx.options.intervalMs);
     if (interval < kMinimumInterval) interval = kMinimumInterval;
-    ctx.out << "amk dev : " << id << " (" << kind << ") surveillé dans " << Utf8(source) << ". Ctrl+C pour arrêter.\n"
+    ctx.out << "ampify dev: " << id << " (" << kind << ") watched in " << Utf8(source) << ". Press Ctrl+C to stop.\n"
             << std::flush;
 
     std::string last;
@@ -169,9 +169,9 @@ int CmdDev(Context& ctx) {
 
 int CmdLogs(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() > 2) return Usage(ctx, "logs attend un nombre de lignes, et --follow pour suivre");
+    if (args.size() > 2) return Usage(ctx, "logs takes a number of lines, and --follow to keep following");
     int lines = kDefaultLines;
-    if (args.size() == 2 && !ParseCount(args[1], lines)) return Usage(ctx, "nombre de lignes invalide : " + args[1]);
+    if (args.size() == 2 && !ParseCount(args[1], lines)) return Usage(ctx, "invalid number of lines: " + args[1]);
 
     std::chrono::milliseconds interval(ctx.options.intervalMs);
     if (interval < kMinimumInterval) interval = kMinimumInterval;
@@ -181,7 +181,7 @@ int CmdLogs(Context& ctx) {
     int passes = 0;
     while (true) {
         std::vector<std::filesystem::path> files = JournalFiles(ctx.kit);
-        if (files.empty() && passes == 0) ctx.out << "Aucun journal pour l'instant : le noyau n'a pas encore été lancé.\n";
+        if (files.empty() && passes == 0) ctx.out << "No log yet: the kernel has not been started.\n";
 
         for (const std::filesystem::path& file : files) {
             std::error_code ec;
@@ -207,4 +207,4 @@ int CmdLogs(Context& ctx) {
     }
 }
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

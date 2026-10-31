@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <fstream>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -80,4 +80,4 @@ std::vector<std::string> LoadVersionList(const std::filesystem::path& file) {
     return versions ? *versions : std::vector<std::string>{};
 }
 
-}  // namespace amk
+}  // namespace ampify

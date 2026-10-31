@@ -3,7 +3,7 @@
 #include "inspector.hpp"
 #include "snippets.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 ThemeSession::ThemeSession(Journal& journal) : m_journal(journal), m_engine(journal) {}
 
@@ -68,4 +68,4 @@ std::optional<std::string> ThemeSession::Tick(TreeBackend& tree, const SessionRe
     return std::nullopt;
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

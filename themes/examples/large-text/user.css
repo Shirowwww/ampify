@@ -1,0 +1,18 @@
+/* Large text and wider margins. Elements that do not have the property are refused, harmlessly. */
+
+/* Font roles: the size of body text is given once, here. Extensions read it with Ampify.fonts. */
+:root {
+    --font-body-size: 18px;
+}
+
+TextBlock {
+    font-size: var(--font-body-size);
+}
+
+Button {
+    padding: 8 16;
+}
+
+Page {
+    padding: 12px;
+}

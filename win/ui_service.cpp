@@ -3,7 +3,7 @@
 // https://github.com/AntiOblivionis/AMExclusive, mod/src/UiAdapter.cpp: ScheduleUiDiscovery, QueueUiRefresh,
 // ObserveUiHosts, RefreshUiWindow, AttachOrRefreshToggle, at 91f589d).
 
-#if defined(AMK_WITH_XAML)
+#if defined(AMPIFY_WITH_XAML)
 
 #include "ui_service.hpp"
 
@@ -44,7 +44,7 @@
 #include "../core/ui_render/surfaces.hpp"
 #include "xaml_host.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -534,7 +534,7 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
     toggle.MinWidth(0);
     toggle.VerticalAlignment(xaml::VerticalAlignment::Center);
     toggle.HorizontalAlignment(xaml::HorizontalAlignment::Right);
-    Name(toggle, "AMK_ModsToggle_" + mod.id, mod.name);
+    Name(toggle, "AMPIFY_ModsToggle_" + mod.id, mod.name);
     automation::AutomationProperties::SetHelpText(toggle, L"Active ou coupe cette extension tout de suite");
     g_modsUpdating++;
     toggle.IsOn(mod.enabled);
@@ -570,7 +570,7 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
 controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uirender::ModEntry>& mods,
                                const xaml::FrameworkElement& templateRow) {
     controls::Border card = MakeCardBorder(shared.probe);
-    Name(card, "AMK_ModsCard", "Mods (Apple Music Mod Kit)");
+    Name(card, "AMPIFY_ModsCard", "Mods (Ampify)");
     if (templateRow) {
         card.Margin(templateRow.Margin());
         card.HorizontalAlignment(templateRow.HorizontalAlignment());
@@ -594,8 +594,8 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     header.ColumnDefinitions().Append(button);
     controls::StackPanel titles;
     titles.VerticalAlignment(xaml::VerticalAlignment::Center);
-    controls::TextBlock title = MakeText(L"Mods (Apple Music Mod Kit)", "bodyStrong", false, &shared.probe);
-    Name(title, "AMK_ModsTitle");
+    controls::TextBlock title = MakeText(L"Mods (Ampify)", "bodyStrong", false, &shared.probe);
+    Name(title, "AMPIFY_ModsTitle");
     titles.Children().Append(title);
     titles.Children().Append(MakeText(L"Les extensions installées dans le kit. Un changement s'applique tout de suite.",
                                       "caption", true, &shared.probe));
@@ -604,7 +604,7 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     if (shared.probe.button) open.Style(shared.probe.button);
     open.Content(winrt::box_value(L"Ouvrir le dossier du kit"));
     open.VerticalAlignment(xaml::VerticalAlignment::Center);
-    Name(open, "AMK_ModsOpenFolder", "Ouvrir le dossier du kit");
+    Name(open, "AMPIFY_ModsOpenFolder", "Ouvrir le dossier du kit");
     std::filesystem::path kit = shared.kit;
     open.Click([kit](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
@@ -617,7 +617,7 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     if (auto accent = ThemeResource(L"AccentButtonStyle").try_as<xaml::Style>()) market.Style(accent);
     market.Content(winrt::box_value(L"Ouvrir la Marketplace"));
     market.VerticalAlignment(xaml::VerticalAlignment::Center);
-    Name(market, "AMK_ModsOpenMarketplace", "Ouvrir la Marketplace");
+    Name(market, "AMPIFY_ModsOpenMarketplace", "Ouvrir la Marketplace");
     UiModel* model = &shared.model;
     Journal* journal = &shared.journal;
     market.Click([model, journal](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
@@ -638,9 +638,9 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
 
     controls::StackPanel list;
     list.Spacing(10);
-    Name(list, "AMK_ModsList");
+    Name(list, "AMPIFY_ModsList");
     if (mods.empty()) {
-        list.Children().Append(MakeText(L"Aucune extension installée pour l'instant. Ajoute-en avec « amk install », puis "
+        list.Children().Append(MakeText(L"Aucune extension installée pour l'instant. Ajoute-en avec « ampify install », puis "
                                         L"rouvre cette page.",
                                         "caption", true, &shared.probe));
     }
@@ -681,15 +681,15 @@ bool MountModsCard(UiService::Shared& shared, const xaml::FrameworkElement& page
     auto children = stack.Children();
     for (std::uint32_t index = 0; index < children.Size(); index++) {
         auto existing = children.GetAt(index).try_as<xaml::FrameworkElement>();
-        if (existing && existing.Name() == L"AMK_ModsCard") {
+        if (existing && existing.Name() == L"AMPIFY_ModsCard") {
             children.SetAt(index, card);
-            shared.journal.Write("Réglages : carte « Mods (Apple Music Mod Kit) » rafraîchie (" +
+            shared.journal.Write("Réglages : carte « Mods (Ampify) » rafraîchie (" +
                                  std::to_string(mods.size()) + " extension(s))");
             return true;
         }
     }
     children.Append(card);
-    shared.journal.Write("Réglages : carte « Mods (Apple Music Mod Kit) » ajoutée à la page Lecture (" +
+    shared.journal.Write("Réglages : carte « Mods (Ampify) » ajoutée à la page Lecture (" +
                          std::to_string(mods.size()) + " extension(s), " + std::to_string(probe.Found()) +
                          " valeur(s) de style natif copiée(s))");
     return true;
@@ -841,13 +841,13 @@ controls::StackPanel EnsurePanelHost(UiService::Shared& shared, WindowContext& c
         shared.journal.Write("Interface : hôte des panneaux recréé (n° " + std::to_string(context.panelHostsMade) + ")");
     }
     controls::Grid host;
-    Name(host, "AMK_PanelHost", "Panneaux des extensions");
+    Name(host, "AMPIFY_PanelHost", "Panneaux des extensions");
     host.Width(kPanelWidth);
     host.HorizontalAlignment(xaml::HorizontalAlignment::Right);
     host.VerticalAlignment(xaml::VerticalAlignment::Stretch);
     controls::ScrollViewer scroll;
     scroll.VerticalScrollBarVisibility(controls::ScrollBarVisibility::Auto);
-    Name(scroll, "AMK_PanelScroll");
+    Name(scroll, "AMPIFY_PanelScroll");
     controls::StackPanel stack;
     stack.Spacing(12);
     scroll.Content(stack);
@@ -989,7 +989,7 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
                                       L" Background='{ThemeResource SolidBackgroundFillColorBaseBrush}'/>")
                               .try_as<controls::Grid>();
     if (!host) host = controls::Grid();
-    Name(host, "AMK_PageHost", "Page d'une app du kit");
+    Name(host, "AMPIFY_PageHost", "Page d'une app du kit");
     host.Padding(xaml::Thickness{32, 16, 32, 16});
     controls::RowDefinition headerRow;
     headerRow.Height(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
@@ -1004,7 +1004,7 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
     header.Margin(xaml::Thickness{0, 0, 0, 16});
     controls::Button back;
     back.Content(winrt::box_value(L"Retour"));
-    Name(back, "AMK_PageHost_retour", "Retour");
+    Name(back, "AMPIFY_PageHost_retour", "Retour");
     controls::TextBlock title = MakeText(L"", "title", false);
     title.VerticalAlignment(xaml::VerticalAlignment::Center);
     header.Children().Append(back);
@@ -1507,6 +1507,6 @@ void UiService::Run() {
     for (const auto& context : m_shared->windows) context->ticket.Close();
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win
 
-#endif  // AMK_WITH_XAML
+#endif  // AMPIFY_WITH_XAML

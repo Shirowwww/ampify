@@ -3,9 +3,9 @@
 #include "../host.hpp"
 #include "../json.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
-// The player state as AMK.player.state() returns it and as the player events carry it.
+// The player state as Ampify.player.state() returns it and as the player events carry it.
 Json PlayerJson(const PlayerSnapshot& snapshot);
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

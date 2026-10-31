@@ -33,7 +33,7 @@
 #include "../core/theme/worker.hpp"
 #include "test.hpp"
 
-namespace th = amk::theme;
+namespace th = ampify::theme;
 
 namespace {
 
@@ -203,7 +203,7 @@ th::Selector Sel(const char* text) {
     std::optional<th::Selector> selector = th::ParseSelector(text, &problem);
     CHECK(selector.has_value());
     if (!selector) {
-        amk::test::ReportFailure(__FILE__, __LINE__, "selector « " + std::string(text) + " » : " + problem);
+        ampify::test::ReportFailure(__FILE__, __LINE__, "selector « " + std::string(text) + " » : " + problem);
         return {};
     }
     return *selector;
@@ -231,7 +231,7 @@ std::string ProblemContaining(const th::Theme& theme, std::string_view fragment)
 }
 
 std::string TempFolder(const char* name) {
-    std::filesystem::path folder = std::filesystem::temp_directory_path() / ("amk-theme-test-" + std::string(name));
+    std::filesystem::path folder = std::filesystem::temp_directory_path() / ("ampify-theme-test-" + std::string(name));
     std::filesystem::remove_all(folder);
     std::filesystem::create_directories(folder);
     return folder.string();
@@ -580,10 +580,23 @@ TEST_CASE(Spicetify_ThemeRulesWinOverTheTranslatedOnes) {
     FakeTree tree;
     th::NodeId pane = tree.Add(-1, "Grid", "PaneRoot", {{"Background", Brush("#FF000000")}});
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
     engine.Apply(theme, tree);
     CHECK(tree.Shown(pane, "Background").text == "#FF445566");
+}
+
+TEST_CASE(Theme_ArtworkIsTheSongPlayingAsABackground) {
+    MemoryFiles files;
+    files.files["user.css"] = "Grid#PageRoot { background: artwork; }\nGrid#A { background: artwork contain; }\n"
+                              "Grid#B { background: artwork sideways; }\n";
+    th::Theme theme = Load(files);
+    const th::Assignment* cover = AssignmentFor(theme, "Grid#PageRoot", "Background");
+    CHECK(cover && cover->value.kind == th::ValueKind::Image && cover->value.text == "artwork:|UniformToFill");
+    const th::Assignment* contain = AssignmentFor(theme, "Grid#A", "Background");
+    CHECK(contain && contain->value.text == "artwork:|Uniform");
+    CHECK(AssignmentFor(theme, "Grid#B", "Background") == nullptr);
+    CHECK(!ProblemContaining(theme, "ajustement d'image inconnu").empty());
 }
 
 TEST_CASE(Spicetify_ReadsTheKeysOfSpicetifyOne) {
@@ -659,7 +672,7 @@ TEST_CASE(Engine_AppliesTheCascadeAndRestoresTheOriginals) {
 
     FakeTree tree = MakePage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
 
     th::ThemeEngine::Report first = engine.Apply(theme, tree);
@@ -707,7 +720,7 @@ TEST_CASE(Engine_RefusesWhatAnElementCannotTake) {
 
     FakeTree tree = MakePage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
 
     th::ThemeEngine::Report report = engine.Apply(theme, tree);
@@ -732,7 +745,7 @@ TEST_CASE(Engine_LeavesTheFontOfAnIconAlone) {
     th::NodeId icon = tree.Add(0, "TextBlock", "Star", font);
     tree.elements[2].info.icon = true;  // TextBlock#Star draws an icon glyph
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
 
     engine.Apply(theme, tree);
@@ -753,7 +766,7 @@ TEST_CASE(Engine_ReappliesAThemeLikeLiveReloadDoes) {
 
     FakeTree tree = MakePage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
 
     engine.Apply(first, tree);
@@ -773,7 +786,7 @@ TEST_CASE(Engine_ForgetsOriginalsOfElementsThatWentAway) {
 
     FakeTree tree = MakePage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
 
     engine.Apply(theme, tree);
@@ -796,7 +809,7 @@ TEST_CASE(Engine_AppliesColoursResourcesAndDictionaries) {
     FakeTree tree;
     tree.resources["AccentFillColorDefaultBrush"] = Brush("#FF000000");
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
 
     th::ThemeEngine::Report report = engine.Apply(theme, tree);
@@ -818,7 +831,7 @@ TEST_CASE(Engine_ReportsADictionaryTheInterfaceRefuses) {
 
     FakeTree tree;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
 
     th::ThemeEngine::Report report = engine.Apply(theme, tree);
@@ -831,17 +844,17 @@ TEST_CASE(Engine_ReportsADictionaryTheInterfaceRefuses) {
 TEST_CASE(Library_ListsOnlyFoldersWithThemeFiles) {
     std::string root = TempFolder("library");
     std::filesystem::path base(root);
-    std::filesystem::create_directories(base / "minuit");
+    std::filesystem::create_directories(base / "midnight");
     std::filesystem::create_directories(base / "vide");
     std::filesystem::create_directories(base / "css");
-    { std::ofstream(base / "minuit" / "colors.ini") << "[Base]\n"; }
+    { std::ofstream(base / "midnight" / "colors.ini") << "[Base]\n"; }
     { std::ofstream(base / "css" / "user.css") << "Page {}\n"; }
 
     std::vector<std::string> folders = th::ListThemeFolders(base);
     CHECK(folders.size() == 2);
     if (folders.size() == 2) {
         CHECK(folders[0] == "css");
-        CHECK(folders[1] == "minuit");
+        CHECK(folders[1] == "midnight");
     }
     std::filesystem::remove_all(base);
 }
@@ -867,16 +880,16 @@ TEST_CASE(Library_SignatureChangesWhenAFileChanges) {
 }
 
 TEST_CASE(Settings_ThemeKeysRoundTrip) {
-    amk::Settings settings;
+    ampify::Settings settings;
     th::ThemeSettings value;
-    value.active = "minuit";
+    value.active = "midnight";
     value.scheme = "Dark";
     value.liveReload = false;
     value.inspect = true;
     th::WriteThemeSettings(settings, value);
 
     th::ThemeSettings back = th::ReadThemeSettings(settings);
-    CHECK(back.active == "minuit");
+    CHECK(back.active == "midnight");
     CHECK(back.scheme == "Dark");
     CHECK(!back.liveReload);
     CHECK(back.inspect);
@@ -929,14 +942,14 @@ TEST_CASE(Inspector_ShowsTheColourOfAnAppBrushKeptAsAnObject) {
 // --- Example themes shipped in the repository ------------------------------------------------------------
 
 TEST_CASE(Examples_LoadWithoutProblems) {
-    for (const char* name : {"minuit", "texte-agrandi", "bouton-arrondi", "masquer-chrome", "verre"}) {
-        std::filesystem::path folder = std::filesystem::path(AMK_SOURCE_DIR) / "themes" / "examples" / name;
+    for (const char* name : {"midnight", "large-text", "rounded-buttons", "hide-chrome", "glass"}) {
+        std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "examples" / name;
         th::FolderFiles files(folder);
         th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
 
         CHECK(theme.usable);
         for (const std::string& problem : theme.problems) {
-            amk::test::ReportFailure(__FILE__, __LINE__, std::string(name) + " : " + problem);
+            ampify::test::ReportFailure(__FILE__, __LINE__, std::string(name) + " : " + problem);
         }
         CHECK(!theme.assignments.empty() || !theme.resources.empty());
     }
@@ -955,7 +968,7 @@ TEST_CASE(Session_RestoresOnANewGenerationAndStylesNewElements) {
 
     FakeTree tree = MakePage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeSession session(journal);
 
     th::SessionRequest request;
@@ -988,7 +1001,7 @@ TEST_CASE(Session_RestoresOnANewGenerationAndStylesNewElements) {
 TEST_CASE(Session_ReturnsAnInspectorDumpOnlyWhenAsked) {
     FakeTree tree = MakePage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeSession session(journal);
 
     th::SessionRequest request;
@@ -1012,7 +1025,7 @@ TEST_CASE(Session_RefusesAThemeThatIsNotUsable) {
 
     FakeTree tree = MakePage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeSession session(journal);
 
     th::SessionRequest request;
@@ -1056,7 +1069,7 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
 }
 
 TEST_CASE(Parts_ReadBackFromSettings) {
-    amk::Settings settings;
+    ampify::Settings settings;
     th::ThemeSettings value;
     value.parts = {false, true, false};
     th::WriteThemeSettings(settings, value);
@@ -1064,20 +1077,20 @@ TEST_CASE(Parts_ReadBackFromSettings) {
     CHECK(!back.parts.colors);
     CHECK(back.parts.resources);
     CHECK(!back.parts.assets);
-    CHECK(th::ReadThemeSettings(amk::Settings{}).parts.colors);  // defaults are on
+    CHECK(th::ReadThemeSettings(ampify::Settings{}).parts.colors);  // defaults are on
 }
 
-// --- Commands: amk theme list, amk theme set, amk watch --------------------------------------------------
+// --- Commands: ampify theme list, ampify theme set, ampify watch --------------------------------------------------
 
 namespace {
 
-// A kit in a temporary folder, with a usable theme `minuit` (two schemes) and a refused theme `casse`.
+// A kit in a temporary folder, with a usable theme `midnight` (two schemes) and a refused theme `casse`.
 th::KitLayout MakeKit(const char* name) {
     th::KitLayout kit{std::filesystem::path(TempFolder(name))};
-    std::filesystem::create_directories(kit.Themes() / "minuit");
+    std::filesystem::create_directories(kit.Themes() / "midnight");
     std::filesystem::create_directories(kit.Themes() / "casse");
-    { std::ofstream(kit.Themes() / "minuit" / "colors.ini") << "[Base]\nAccent = 0A84FF\n[Dark]\nAccent = 1C1C1E\n"; }
-    { std::ofstream(kit.Themes() / "minuit" / "user.css") << "Page { background: $accent; }\n"; }
+    { std::ofstream(kit.Themes() / "midnight" / "colors.ini") << "[Base]\nAccent = 0A84FF\n[Dark]\nAccent = 1C1C1E\n"; }
+    { std::ofstream(kit.Themes() / "midnight" / "user.css") << "Page { background: $accent; }\n"; }
     { std::ofstream(kit.Themes() / "casse" / "resources.xaml") << "<Oops />\n"; }
     return kit;
 }
@@ -1093,8 +1106,8 @@ TEST_CASE(Commands_ListShowsUsableAndRefusedThemes) {
     std::ostringstream out;
     std::ostringstream err;
     CHECK(th::RunThemeCommand(Args({"theme", "list"}), kit, out, err) == 0);
-    CHECK(out.str().find("minuit") != std::string::npos);
-    CHECK(out.str().find("minuit : utilisable, schémas : Base Dark") != std::string::npos);
+    CHECK(out.str().find("midnight") != std::string::npos);
+    CHECK(out.str().find("midnight : utilisable, schémas : Base Dark") != std::string::npos);
     CHECK(out.str().find("casse : refusé") != std::string::npos);
     std::filesystem::remove_all(kit.root);
 }
@@ -1103,19 +1116,19 @@ TEST_CASE(Commands_SetWritesTheThemeAndTheScheme) {
     th::KitLayout kit = MakeKit("set");
     std::ostringstream out;
     std::ostringstream err;
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "minuit", "--scheme", "Dark"}), kit, out, err) == 0);
+    CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight", "--scheme", "Dark"}), kit, out, err) == 0);
 
-    amk::Settings settings;
+    ampify::Settings settings;
     settings.Load(kit.Settings().string());
-    CHECK(settings.GetString("theme.active", "") == "minuit");
+    CHECK(settings.GetString("theme.active", "") == "midnight");
     CHECK(settings.GetString("theme.scheme", "") == "Dark");
-    CHECK(out.str().find("Thème « minuit » choisi, schéma Dark") != std::string::npos);
+    CHECK(out.str().find("Thème « midnight » choisi, schéma Dark") != std::string::npos);
     std::filesystem::remove_all(kit.root);
 }
 
 TEST_CASE(Commands_SetKeepsTheOtherSettings) {
     th::KitLayout kit = MakeKit("keep");
-    amk::Settings before;
+    ampify::Settings before;
     before.Set("extensions.atmos-leveler.enabled", "1");
     before.SetBool("theme.live_reload", false);
     before.SetBool("theme.parts.assets", false);
@@ -1123,9 +1136,9 @@ TEST_CASE(Commands_SetKeepsTheOtherSettings) {
 
     std::ostringstream out;
     std::ostringstream err;
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "minuit"}), kit, out, err) == 0);
+    CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight"}), kit, out, err) == 0);
 
-    amk::Settings after;
+    ampify::Settings after;
     after.Load(kit.Settings().string());
     CHECK(after.GetString("extensions.atmos-leveler.enabled", "") == "1");
     CHECK(!after.GetBool("theme.live_reload", true));
@@ -1139,9 +1152,9 @@ TEST_CASE(Commands_SetNoneAndTheErrors) {
     std::ostringstream out;
     std::ostringstream err;
 
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "minuit"}), kit, out, err) == 0);
+    CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight"}), kit, out, err) == 0);
     CHECK(th::RunThemeCommand(Args({"theme", "set", "none"}), kit, out, err) == 0);
-    amk::Settings settings;
+    ampify::Settings settings;
     settings.Load(kit.Settings().string());
     CHECK(th::ReadThemeSettings(settings).active.empty());
 
@@ -1150,8 +1163,8 @@ TEST_CASE(Commands_SetNoneAndTheErrors) {
     CHECK(th::RunThemeCommand(Args({"theme", "set", "casse"}), kit, out, err) == 1);
     CHECK(err.str().find("refusé : réglages inchangés") != std::string::npos);
     CHECK(th::RunThemeCommand(Args({"theme", "frobnicate"}), kit, out, err) == 2);
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "minuit", "--bogus"}), kit, out, err) == 2);
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "minuit", "--scheme"}), kit, out, err) == 2);
+    CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight", "--bogus"}), kit, out, err) == 2);
+    CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight", "--scheme"}), kit, out, err) == 2);
 
     settings.Load(kit.Settings().string());
     CHECK(th::ReadThemeSettings(settings).active.empty());  // still none
@@ -1190,7 +1203,7 @@ TEST_CASE(Commands_WatchRejectsBadUse) {
     std::ostringstream err;
     auto nothing = [] {};
     CHECK(th::RunWatch(Args({"watch"}), out, err, nothing) == 2);
-    CHECK(th::RunWatch(Args({"watch", "/no/such/folder/for/amk"}), out, err, nothing) == 2);
+    CHECK(th::RunWatch(Args({"watch", "/no/such/folder/for/ampify"}), out, err, nothing) == 2);
     CHECK(th::RunWatch(Args({"watch", "x", "--polls", "many"}), out, err, nothing) == 2);
 }
 
@@ -1305,7 +1318,7 @@ TEST_CASE(Engine_AppliesFlowDirectionAndRestoresIt) {
     FakeTree tree;
     tree.Add(-1, "Page", "", {{"FlowDirection", {th::ValueKind::Keyword, "LeftToRight"}}});
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
     engine.Apply(theme, tree);
     CHECK(tree.elements[0].properties["FlowDirection"].text == "RightToLeft");
@@ -1321,7 +1334,7 @@ TEST_CASE(Engine_MovesItemsInOrderAndUndoesTheMoves) {
     th::Theme theme = Load(files);
 
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
     th::ThemeEngine::Report first = engine.Apply(theme, tree);
     CHECK((tree.Names() == std::vector<std::string>{"D", "B", "A", "C"}));
@@ -1410,10 +1423,10 @@ TEST_CASE(Fonts_RolesFromRootBlockAndDefaults) {
     CHECK(!ProblemContaining(theme, "--font-body-weight").empty());
     CHECK(!ProblemContaining(theme, "rôle de police « nothing » inconnu").empty());
 
-    std::optional<amk::Json> json = amk::Json::Parse(th::FontRolesJson(&theme));
+    std::optional<ampify::Json> json = ampify::Json::Parse(th::FontRolesJson(&theme));
     CHECK(json.has_value());
     if (json) {
-        const amk::Json* role = json->Find("title");
+        const ampify::Json* role = json->Find("title");
         CHECK(role && role->Find("family") && *role->Find("family")->AsString() == "Segoe UI Variable Display");
         CHECK(role && role->Find("weight") && *role->Find("weight")->AsNumber() == 700);
         CHECK(role && role->Find("fromTheme") && *role->Find("fromTheme")->AsBool());
@@ -1459,7 +1472,7 @@ TEST_CASE(Snippets_LoadWithTheColoursOfTheTheme) {
 }
 
 TEST_CASE(Snippets_EnabledInIdOrderAndDictionariesCombined) {
-    amk::Settings settings;
+    ampify::Settings settings;
     settings.Set("snippets.zeta.enabled", "1");
     settings.Set("snippets.alpha.enabled", "true");
     settings.Set("snippets.beta.enabled", "0");
@@ -1499,7 +1512,7 @@ TEST_CASE(Snippets_BeatTheThemeInIdOrder) {
 
     FakeTree tree = MakePage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
     engine.Apply(composed, tree);
     CHECK(tree.elements[1].properties["Background"].text == "#FF222222");  // a snippet type beats a theme #name
@@ -1518,7 +1531,7 @@ TEST_CASE(Session_SnippetsComeAndGoWithoutTouchingTheTheme) {
 
     FakeTree tree = MakePage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeSession session(journal);
 
     th::SessionRequest request;
@@ -1573,7 +1586,7 @@ TEST_CASE(Scheme_ScheduleParsesAndPicksByTime) {
 
 TEST_CASE(Scheme_SystemModePicksByName) {
     CHECK(th::SystemScheme({"Base", "Dark"}, true) == "Dark");
-    CHECK(th::IsDarkScheme("Dark") && th::IsDarkScheme("Nuit") && th::IsDarkScheme("Minuit sombre"));
+    CHECK(th::IsDarkScheme("Dark") && th::IsDarkScheme("Nuit") && th::IsDarkScheme("Midnight sombre"));
     CHECK(!th::IsDarkScheme("Base") && !th::IsDarkScheme("Light") && !th::IsDarkScheme(""));
     CHECK(th::SystemScheme({"Base", "Dark"}, false) == "Base");
     CHECK(th::SystemScheme({"Sombre", "Clair"}, false) == "Clair");
@@ -1611,7 +1624,7 @@ TEST_CASE(Scheme_ChoosePrefersTheScheduleThenAutoThenTheName) {
 }
 
 TEST_CASE(Settings_ScheduleIsKeptAndOnlyWrittenWhenSet) {
-    amk::Settings settings;
+    ampify::Settings settings;
     th::ThemeSettings value;
     value.schedule = "07:00=Light,19:00=Dark";
     th::WriteThemeSettings(settings, value);
@@ -1621,23 +1634,23 @@ TEST_CASE(Settings_ScheduleIsKeptAndOnlyWrittenWhenSet) {
 
     std::string root = TempFolder("schedule-kept");
     std::filesystem::path kit(root);
-    WriteFile(kit / "themes" / "minuit" / "colors.ini", "[Light]\nA = FFFFFF\n[Dark]\nA = 000000\n");
+    WriteFile(kit / "themes" / "midnight" / "colors.ini", "[Light]\nA = FFFFFF\n[Dark]\nA = 000000\n");
     WriteFile(kit / "settings.txt", "theme.schedule = 07:00=Light,19:00=Dark\n");
     std::ostringstream out, err;
-    CHECK(th::RunThemeCommand({"theme", "set", "minuit"}, th::KitLayout{kit}, out, err) == 0);
-    amk::Settings after;
+    CHECK(th::RunThemeCommand({"theme", "set", "midnight"}, th::KitLayout{kit}, out, err) == 0);
+    ampify::Settings after;
     after.Load((kit / "settings.txt").string());
     CHECK(after.GetString("theme.schedule", "") == "07:00=Light,19:00=Dark");
 }
 
 TEST_CASE(Worker_ReloadsOnlyWhenSomethingChanges) {
     std::filesystem::path kit(TempFolder("worker"));
-    WriteFile(kit / "themes" / "minuit" / "colors.ini", "[Light]\nA = FFFFFF\n\n[Dark]\nA = 000000\n");
-    WriteFile(kit / "themes" / "minuit" / "user.css", "Page { background: $A; }\n");
+    WriteFile(kit / "themes" / "midnight" / "colors.ini", "[Light]\nA = FFFFFF\n\n[Dark]\nA = 000000\n");
+    WriteFile(kit / "themes" / "midnight" / "user.css", "Page { background: $A; }\n");
     WriteFile(kit / "snippets" / "calme" / "user.css", "Page { opacity: 0.5; }\n");
 
-    amk::Settings settings;
-    settings.Set("theme.active", "minuit");
+    ampify::Settings settings;
+    settings.Set("theme.active", "midnight");
     settings.Set("theme.scheme", "auto");
 
     th::ThemeWorker worker(kit);
@@ -1735,7 +1748,7 @@ TEST_CASE(Session_SidebarJsonHidesAndReordersThenRestores) {
 
     ListTree tree({"Home", "Browse", "Radio"});
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeSession session(journal);
     th::SessionRequest request;
     request.layout = layout;
@@ -1766,16 +1779,16 @@ TEST_CASE(Inspector_ExportsTheTreeAsJson) {
 
     std::string text = th::InspectTreeJson(tree);
     std::string error;
-    std::optional<amk::Json> json = amk::Json::Parse(text, &error);
+    std::optional<ampify::Json> json = ampify::Json::Parse(text, &error);
     CHECK(json.has_value());
     if (!json) {
-        amk::test::ReportFailure(__FILE__, __LINE__, "inspector.json : " + error);
+        ampify::test::ReportFailure(__FILE__, __LINE__, "inspector.json : " + error);
         return;
     }
     CHECK(!*json->Find("truncated")->AsBool());
-    const amk::Json::Array& resources = *json->Find("resources")->AsArray();
+    const ampify::Json::Array& resources = *json->Find("resources")->AsArray();
     CHECK(resources.size() == 1 && *resources[0].Find("key")->AsString() == "AccentFillColorDefaultBrush");
-    const amk::Json::Array& nodes = *json->Find("nodes")->AsArray();
+    const ampify::Json::Array& nodes = *json->Find("nodes")->AsArray();
     CHECK(nodes.size() == 5);
     if (nodes.size() == 5) {
         CHECK(*nodes[0].Find("parent")->AsNumber() == -1);
@@ -1788,12 +1801,12 @@ TEST_CASE(Inspector_ExportsTheTreeAsJson) {
 
     th::InspectOptions small;
     small.maxLines = 2;
-    std::optional<amk::Json> cut = amk::Json::Parse(th::InspectTreeJson(tree, small));
+    std::optional<ampify::Json> cut = ampify::Json::Parse(th::InspectTreeJson(tree, small));
     CHECK(cut && *cut->Find("truncated")->AsBool() && cut->Find("nodes")->AsArray()->size() == 2);
 }
 
 TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
-    const std::filesystem::path source(AMK_SOURCE_DIR);
+    const std::filesystem::path source(AMPIFY_SOURCE_DIR);
     std::vector<std::string> themes = th::ListThemeFolders(source / "themes" / "examples");
     CHECK(themes.size() >= 4);
     std::shared_ptr<const th::Theme> base;
@@ -1803,9 +1816,9 @@ TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
         th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
         CHECK(theme.usable);
         for (const std::string& problem : theme.problems) {
-            amk::test::ReportFailure(__FILE__, __LINE__, name + " : " + problem);
+            ampify::test::ReportFailure(__FILE__, __LINE__, name + " : " + problem);
         }
-        if (name == "minuit") base = Shared(std::move(theme));
+        if (name == "midnight") base = Shared(std::move(theme));
     }
 
     std::vector<std::string> snippets = th::ListSnippetFolders(source / "themes" / "snippets");
@@ -1819,17 +1832,17 @@ TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
             CHECK(snippet.usable);
             CHECK(!snippet.assignments.empty() || !snippet.resourceDictionary.empty());
             for (const std::string& problem : snippet.problems) {
-                amk::test::ReportFailure(__FILE__, __LINE__, "snippet " + name + " : " + problem);
+                ampify::test::ReportFailure(__FILE__, __LINE__, "snippet " + name + " : " + problem);
             }
         }
 
         std::optional<std::string> manifest = files.Read("manifest.json");
         CHECK(manifest.has_value());
-        amk::ManifestResult result =
-            amk::ParseManifest(manifest.value_or(""), name, 1, [&](const std::string& file) { return files.Exists(file); });
-        CHECK(result.manifest.has_value() && result.manifest->kind == amk::ElementKind::Snippet);
+        ampify::ManifestResult result =
+            ampify::ParseManifest(manifest.value_or(""), name, 1, [&](const std::string& file) { return files.Exists(file); });
+        CHECK(result.manifest.has_value() && result.manifest->kind == ampify::ElementKind::Snippet);
         for (const std::string& error : result.errors) {
-            amk::test::ReportFailure(__FILE__, __LINE__, "snippet " + name + " manifest : " + error);
+            ampify::test::ReportFailure(__FILE__, __LINE__, "snippet " + name + " manifest : " + error);
         }
     }
 }
@@ -1993,7 +2006,7 @@ TEST_CASE(Engine_HoverShowsUnderThePointerAndRestores) {
 
     FakeTree tree = MakeButtonPage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
 
     th::ThemeEngine::Report first = engine.Apply(theme, tree);
@@ -2046,7 +2059,7 @@ TEST_CASE(Engine_HoverFollowsThemeChangesWithoutLeaking) {
 
     FakeTree tree = MakeButtonPage();
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
 
     engine.Apply(Load(withHover), tree);
@@ -2116,7 +2129,7 @@ TEST_CASE(Engine_NewPropertiesRestoreExactly) {
     std::map<std::string, th::Value> before = tree.elements[0].properties;
 
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
     th::ThemeEngine engine(journal);
     th::ThemeEngine::Report first = engine.Apply(theme, tree);
     CHECK(first.applied == 12);

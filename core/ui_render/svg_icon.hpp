@@ -1,6 +1,6 @@
 #pragma once
 
-// The icons of the kit (AMK.icons) are small SVG texts with one or more <path d="...">. The native renderer draws
+// The icons of Ampify (Ampify.icons) are small SVG texts with one or more <path d="...">. The native renderer draws
 // them as XAML Path shapes filled with the theme's text brush, so they follow the light and dark modes; an
 // SvgImageSource would draw them black. This parser keeps only what is safe to put in a XAML attribute.
 
@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk::uirender {
+namespace ampify::uirender {
 
 struct SvgIcon {
     double width = 24;   // from viewBox, 24 x 24 when it is missing
@@ -25,4 +25,4 @@ SvgIcon ParseSvgIcon(std::string_view svg);
 // True for a Segoe Fluent Icons glyph given as text (one or two UTF-16 code units, not an SVG): drawn with FontIcon.
 bool IsGlyphIcon(std::string_view icon);
 
-}  // namespace amk::uirender
+}  // namespace ampify::uirender

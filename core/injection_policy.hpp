@@ -8,9 +8,9 @@
 #include "build_signature.hpp"
 #include "version_gate.hpp"
 
-namespace amk {
+namespace ampify {
 
-// A yes or no, with the reason in French for the journal.
+// A yes or no, with the reason in English for the log.
 struct PolicyVerdict {
     bool allowed = false;
     std::string reason;
@@ -26,4 +26,4 @@ PolicyVerdict DecideInjection(std::string_view appVersion, bool safeMode, const 
 PolicyVerdict DecideKernel(ProcessRole role, std::string_view appVersion, const BuildSignature& signature,
                            std::span<const std::string_view> known = kKnownAppVersions);
 
-}  // namespace amk
+}  // namespace ampify

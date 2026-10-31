@@ -1,8 +1,8 @@
-// Module react: AMK.React, AMK.ReactDOM, AMK.hooks, AMK.components and AMK.ready. Natives: core/natives/react.cpp.
+// Module react: Ampify.React, Ampify.ReactDOM, Ampify.hooks, Ampify.components and Ampify.ready. Natives: core/natives/react.cpp.
 //
 // Spicetify hands React to its extensions. A native app cannot run the real React, so this is a small engine that
 // accepts the same way of writing (createElement or h, fragments, keys, function components, the basic hooks,
-// contexts) and renders into the primitive trees of core/ui_model, through AMK.ui. Event props (onClick, onChange)
+// contexts) and renders into the primitive trees of core/ui_model, through Ampify.ui. Event props (onClick, onChange)
 // become callback ids that the host reports with ScriptExtension::DeliverClick or DeliverEvent("change", ...). A
 // state change re-renders the whole root once, at the end of the current kernel call (microtask), so several
 // setState calls in one handler give one tree. Effects run after the tree was sent, and their cleanups run on
@@ -10,16 +10,16 @@
 //
 // The text is cut in several literals because MSVC refuses a single string literal over 16 KB.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kReact[];
-const char kReact[] = R"AMKJS(
+const char kReact[] = R"AMPIFYJS(
   // ---- Elements ---------------------------------------------------------------------------------------------
 
-  const ELEMENT = Symbol("AMK.element");
-  const Fragment = Symbol("AMK.Fragment");
-  const PROVIDER = Symbol("AMK.Provider");
-  const CONSUMER = Symbol("AMK.Consumer");
+  const ELEMENT = Symbol("Ampify.element");
+  const Fragment = Symbol("Ampify.Fragment");
+  const PROVIDER = Symbol("Ampify.Provider");
+  const CONSUMER = Symbol("Ampify.Consumer");
 
   const isValidElement = (value) => typeof value === "object" && value !== null && value.$$typeof === ELEMENT;
 
@@ -40,12 +40,12 @@ const char kReact[] = R"AMKJS(
   }
 
   function createElement(type, config, ...children) {
-    if (!isElementType(type)) throw new TypeError("createElement : type d'élément invalide (" + describe(type) + ")");
+    if (!isElementType(type)) throw new TypeError("createElement: invalid element type (" + describe(type) + ")");
     return makeElement(type, null, {}, config, children);
   }
 
   function cloneElement(element, config, ...children) {
-    if (!isValidElement(element)) throw new TypeError("cloneElement attend un élément");
+    if (!isValidElement(element)) throw new TypeError("cloneElement expects an element");
     return makeElement(element.type, element.key, Object.assign({}, element.props), config, children);
   }
 
@@ -67,7 +67,7 @@ const char kReact[] = R"AMKJS(
     },
     count: (children) => flatten(children, []).length,
     only(children) {
-      if (!isValidElement(children)) throw new TypeError("Children.only attend un seul élément");
+      if (!isValidElement(children)) throw new TypeError("Children.only expects a single element");
       return children;
     },
   });
@@ -89,7 +89,7 @@ const char kReact[] = R"AMKJS(
   const contextValues = new Map();  // context -> stack of the Provider values above the component being rendered
 
   function hookSlot(name) {
-    if (!rendering) throw new Error(name + " : un hook ne s'appelle que pendant le rendu d'un composant");
+    if (!rendering) throw new Error(name + ": a hook can only be called while a component renders");
     const hooks = rendering.hooks;
     if (hookIndex >= hooks.length) hooks.push({});
     return hooks[hookIndex++];
@@ -121,7 +121,7 @@ const char kReact[] = R"AMKJS(
     useReducer(setStateReducer, initial, (value) => (typeof value === "function" ? value() : value));
 
   function useEffect(effect, deps) {
-    if (typeof effect !== "function") throw new TypeError("useEffect attend une fonction");
+    if (typeof effect !== "function") throw new TypeError("useEffect expects a function");
     const instance = rendering;
     const hook = hookSlot("useEffect");
     if (hook.ran && !noDeps(deps) && sameDeps(hook.deps, deps)) return;
@@ -154,9 +154,9 @@ const char kReact[] = R"AMKJS(
   }
 
   function useContext(context) {
-    if (!rendering) throw new Error("useContext : un hook ne s'appelle que pendant le rendu d'un composant");
+    if (!rendering) throw new Error("useContext: a hook can only be called while a component renders");
     if (typeof context !== "object" || context === null || !context.Provider) {
-      throw new TypeError("useContext attend un contexte créé par createContext");
+      throw new TypeError("useContext expects a context made by createContext");
     }
     return readContext(context);
   }
@@ -166,22 +166,22 @@ const char kReact[] = R"AMKJS(
   let playerSubscribed = false;
 
   function usePlayer() {
-    const [state, setState] = useState(() => AMK.player.state());
+    const [state, setState] = useState(() => Ampify.player.state());
     useEffect(() => {
       if (!playerSubscribed) {
         playerSubscribed = true;
         const push = (next) => {
           for (const set of playerSetters) set(next);
         };
-        AMK.player.on("trackchange", push);
-        AMK.player.on("statechange", push);
+        Ampify.player.on("trackchange", push);
+        Ampify.player.on("statechange", push);
       }
       playerSetters.add(setState);
       return () => playerSetters.delete(setState);
     }, []);
     return state;
   }
-)AMKJS" R"AMKJS(
+)AMPIFYJS" R"AMPIFYJS(
   // ---- Rendering ----------------------------------------------------------------------------------------------
   // An instance is kept per position (or key) of the tree, so hooks keep their state between renders. A root is a
   // panel, a page or a named popup; it renders again as a whole.
@@ -205,7 +205,7 @@ const char kReact[] = R"AMKJS(
     if (typeof child === "string" || typeof child === "number") return "text";
     if (Array.isArray(child)) return "array";
     if (!isValidElement(child)) {
-      throw new TypeError("enfant invalide : " + describe(child) + " (élément, texte, nombre ou liste attendu)");
+      throw new TypeError("invalid child: " + describe(child) + " (element, text, number or list expected)");
     }
     const type = child.type;
     if (typeof type === "string") return "host";
@@ -267,7 +267,7 @@ const char kReact[] = R"AMKJS(
       }
       case "consumer": {
         const draw = child.props.children;
-        if (typeof draw !== "function") throw new TypeError("Consumer attend une fonction comme enfant");
+        if (typeof draw !== "function") throw new TypeError("Consumer expects a function as its child");
         instance.children = reconcile([draw(readContext(type.context))], instance.children, root, out);
         break;
       }
@@ -331,8 +331,8 @@ const char kReact[] = R"AMKJS(
     } else if (inner.length) {
       const attribute = TEXT_ATTRIBUTE[name];
       if (!attribute || inner.some((part) => typeof part !== "string")) {
-        throw new TypeError("<" + instance.type + "> " + (attribute ? "n'accepte que du texte comme enfant"
-                                                                   : "n'accepte pas d'enfants"));
+        throw new TypeError("<" + instance.type + "> " + (attribute ? "only accepts text as its child"
+                                                                   : "does not accept children"));
       }
       if (node[attribute] === undefined) node[attribute] = inner.join("");
     }
@@ -346,7 +346,7 @@ const char kReact[] = R"AMKJS(
       if (typeof hook.cleanup === "function") {
         const cleanup = hook.cleanup;
         hook.cleanup = undefined;
-        runGuarded("nettoyage d'effet", cleanup, []);
+        runGuarded("effect cleanup", cleanup, []);
       }
     }
     if (instance.handlers) {
@@ -363,13 +363,13 @@ const char kReact[] = R"AMKJS(
       if (typeof hook.cleanup === "function") {
         const cleanup = hook.cleanup;
         hook.cleanup = undefined;
-        runGuarded("nettoyage d'effet", cleanup, []);
+        runGuarded("effect cleanup", cleanup, []);
       }
     }
     for (const hook of list) {
       hook.ran = true;
       hook.deps = hook.nextDeps;
-      const cleanup = runGuarded("effet", hook.effect, []);
+      const cleanup = runGuarded("effect", hook.effect, []);
       if (typeof cleanup === "function") hook.cleanup = cleanup;
     }
   }
@@ -390,19 +390,19 @@ const char kReact[] = R"AMKJS(
       if (kind) id = target[kind] === true ? "main" : text(target[kind]);
     }
     if (!TARGETS.includes(kind) || !id) {
-      throw new TypeError('ReactDOM : cible inconnue (attendu "panel:<nom>", "page:/<chemin>" ou "popup:<nom>")');
+      throw new TypeError('ReactDOM: unknown target (expected "panel:<name>", "page:/<path>" or "popup:<name>")');
     }
     return { kind, id, key: kind + ":" + id };
   }
 
   function send(target, tree, json) {
-    if (target.kind === "panel") AMK.ui.panel.register(target.id, tree);
-    else if (target.kind === "page") AMK.ui.page.register(target.id, tree);
+    if (target.kind === "panel") Ampify.ui.panel.register(target.id, tree);
+    else if (target.kind === "page") Ampify.ui.page.register(target.id, tree);
     else native.reactPopup(target.id, json);
   }
 
   function performRender(root) {
-    if (busy) throw new Error("ReactDOM : un rendu ne peut pas en demander un autre");
+    if (busy) throw new Error("ReactDOM: a render cannot start another one");
     busy = true;
     const out = [];
     root.effects = [];
@@ -438,7 +438,7 @@ const char kReact[] = R"AMKJS(
     flushQueued = false;
     for (let pass = 0; pending.size > 0; pass++) {
       if (pass >= kMaxPasses) {
-        native.log("[erreur] React : plus de " + kMaxPasses + " rendus à la suite, un état change à chaque rendu");
+        native.log("[error] React: more than " + kMaxPasses + " renders in a row, a state changes on every render");
         pending.clear();
         break;
       }
@@ -449,7 +449,7 @@ const char kReact[] = R"AMKJS(
         try {
           performRender(root);
         } catch (error) {
-          native.log("[erreur] rendu React (" + root.target.key + ") : " + describe(error));
+          native.log("[error] React render (" + root.target.key + "): " + describe(error));
         }
       }
     }
@@ -497,12 +497,12 @@ const char kReact[] = R"AMKJS(
   }
 
   // The element stops: every effect cleanup runs. The interface itself is removed by the module ui.
-  AMK.onStop(() => {
+  Ampify.onStop(() => {
     for (const root of roots.values()) destroy(root);
     roots.clear();
   });
 
-  // Clicks on a tree's callback ids; the other ids are those of the controls of AMK.ui.
+  // Clicks on a tree's callback ids; the other ids are those of the controls of Ampify.ui.
   const controlClick = dispatch.click;
   dispatch.click = (id) => {
     const entry = handlers.get(id);
@@ -510,7 +510,7 @@ const char kReact[] = R"AMKJS(
       if (controlClick) controlClick(id);
       return;
     }
-    if (typeof entry.fn === "function") runGuarded("clic " + id, entry.fn, [{ type: "click", id }]);
+    if (typeof entry.fn === "function") runGuarded("click " + id, entry.fn, [{ type: "click", id }]);
   };
 
   // A new value from the host, as JSON text: {"id": <callback id>, "value": <boolean, number or text>}.
@@ -519,16 +519,16 @@ const char kReact[] = R"AMKJS(
     try {
       data = JSON.parse(payload);
     } catch (error) {
-      native.log("[erreur] changement : " + describe(error));
+      native.log("[error] change: " + describe(error));
       return;
     }
     const id = Number(data && data.id);
     const entry = handlers.get(id);
     if (!entry || typeof entry.fn !== "function") return;
     const value = data.value;
-    runGuarded("changement " + id, entry.fn, [{ type: "change", id, value, target: { value, checked: value === true } }]);
+    runGuarded("change " + id, entry.fn, [{ type: "change", id, value, target: { value, checked: value === true } }]);
   };
-)AMKJS" R"AMKJS(
+)AMPIFYJS" R"AMPIFYJS(
   // ---- Components (Spicetify's ReactComponent) ----------------------------------------------------------------
   // Each one renders primitives. They pass the tooltip props through, so that Tooltip can wrap them.
 
@@ -599,7 +599,7 @@ const char kReact[] = R"AMKJS(
   }
 
   // Spicetify's TooltipWrapper (Tippy props): label (or content), placement, delay (or showDelay). It adds the
-  // tooltip attributes to each child, which must be a primitive or a component of AMK.components.
+  // tooltip attributes to each child, which must be a primitive or a component of Ampify.components.
   function Tooltip(props) {
     const label = props.label !== undefined ? props.label : props.content;
     const delay = props.delay !== undefined ? props.delay : props.showDelay;
@@ -614,17 +614,17 @@ const char kReact[] = R"AMKJS(
   const hooks = { useState, useReducer, useEffect, useLayoutEffect: useEffect, useRef, useMemo, useCallback,
                   useContext };
 
-  AMK.React = Object.assign({ createElement, h: createElement, Fragment, isValidElement, cloneElement, Children,
+  Ampify.React = Object.assign({ createElement, h: createElement, Fragment, isValidElement, cloneElement, Children,
                               createContext, memo }, hooks);
-  AMK.ReactDOM = { render: renderInto, unmountComponentAtNode: unmountAt, createRoot };
-  AMK.hooks = Object.assign({ usePlayer }, hooks);
-  AMK.components = { Button, ButtonPrimary, ButtonSecondary, ButtonTertiary, Toggle, Slider, TextField, Dropdown,
+  Ampify.ReactDOM = { render: renderInto, unmountComponentAtNode: unmountAt, createRoot };
+  Ampify.hooks = Object.assign({ usePlayer }, hooks);
+  Ampify.components = { Button, ButtonPrimary, ButtonSecondary, ButtonTertiary, Toggle, Slider, TextField, Dropdown,
                      Card, List, Text, TextComponent: Text, Tooltip, TooltipWrapper: Tooltip };
 
-  // AMK.ready resolves when the kernel has started the element: on its first Pump, after main.js ran. An app that
+  // Ampify.ready resolves when the kernel has started the element: on its first Pump, after main.js ran. An app that
   // defines a global render() function, as a Spicetify custom app does, gets it rendered on its page "/<id>" first.
   let markReady;
-  AMK.ready = new Promise((resolve) => {
+  Ampify.ready = new Promise((resolve) => {
     markReady = resolve;
   });
 
@@ -633,10 +633,10 @@ const char kReact[] = R"AMKJS(
     const appRender = globalThis.render;
     if (page && typeof appRender === "function" && !roots.has("page:" + page)) {
       const App = () => appRender();
-      runGuarded("render() de l'app", renderInto, [h(App), { page }]);
+      runGuarded("render() of the app", renderInto, [h(App), { page }]);
     }
     markReady();
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

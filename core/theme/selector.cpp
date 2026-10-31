@@ -1,6 +1,6 @@
 #include "selector.hpp"
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -43,4 +43,4 @@ bool Matches(const Selector& selector, const std::vector<NodeInfo>& nodes, int i
     return MatchFrom(selector.parts, selector.parts.size() - 1, nodes, index);
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

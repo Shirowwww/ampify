@@ -1,11 +1,11 @@
 # Shared helpers of the live bench (signed-in Apple Music, real playback, UI). Loaded after harness.ps1 and uia.ps1.
-# Element names are matched in English and French: the runner's Windows is in English, l'utilisateur's PC in French.
+# Element names are matched in English and French: the runner's Windows is in English, a local PC may be in French.
 
 Set-StrictMode -Version Latest
 
 # Catalog items for the playback test, checked on music.apple.com (fr and us storefronts) on 2026-10-30:
-# - stereo: Dave Brubeck, « Take Five » (Dave Brubeck's Greatest Hits), album badges dolbyAtmos=false.
-# - Dolby Atmos: Billie Eilish, « bad guy » (WHEN WE ALL FALL ASLEEP, WHERE DO WE GO?), album badges dolbyAtmos=true.
+# - stereo: Dave Brubeck, "Take Five" (Dave Brubeck's Greatest Hits), album badges dolbyAtmos=false.
+# - Dolby Atmos: Billie Eilish, "bad guy" (WHEN WE ALL FALL ASLEEP, WHERE DO WE GO?), album badges dolbyAtmos=true.
 $script:LiveTracks = @(
     [pscustomobject]@{ Kind = 'stereo'; Title = 'Take Five'; Artist = 'Dave Brubeck'; Album = '157427923'; Track = '157427932'; Slug = 'take-five' },
     [pscustomobject]@{ Kind = 'atmos'; Title = 'bad guy'; Artist = 'Billie Eilish'; Album = '1450695723'; Track = '1450695739'; Slug = 'bad-guy' }
@@ -30,14 +30,14 @@ function Close-FirstRunDialogs {
     $licence = Find-Element -NamePattern 'MPEGLA|MPEG LA|mpegla' -VisibleOnly
     $agree = Find-Element -ControlType 'Button' -NamePattern '^(Agree|Accepter|J''accepte|I Agree|Accept)$' -VisibleOnly
     if ($agree -and ($licence -or (Find-Element -ControlType 'Button' -NamePattern '^(Decline|Refuser)$' -VisibleOnly))) {
-        Write-Host '  premier lancement : licence acceptée (Agree)'
+        Write-Host '  first launch: licence accepted (Agree)'
         Invoke-Click -Element $agree | Out-Null
         Start-Sleep -Seconds 3
         return $true
     }
     $welcome = Find-Element -ControlType 'Button' -NamePattern '^(Start Listening|Commencer l.écoute|Continue|Continuer|Get Started|Commencer|Not Now|Plus tard|Pas maintenant)$' -VisibleOnly
     if ($welcome -and -not (Find-Element -NamePattern $script:Patterns.Ready)) {
-        Write-Host "  premier lancement : écran d'accueil passé ($(Format-Element $welcome))"
+        Write-Host "  first launch: welcome screen passed ($(Format-Element $welcome))"
         Invoke-Click -Element $welcome | Out-Null
         Start-Sleep -Seconds 3
         return $true
@@ -55,18 +55,18 @@ function Wait-AppleMusicReady {
     return Get-UiaMainWindow
 }
 
-# 'oui' (no sign-in button and the app is ready), 'non' (a sign-in button is shown) or 'inconnu'.
+# 'yes' (no sign-in button and the app is ready), 'no' (a sign-in button is shown) or 'unknown'.
 function Test-AppleMusicSignedIn {
     $signIn = Find-Element -NamePattern $script:Patterns.SignIn -Where {
         param($e) $e.Current.ControlType -in @([System.Windows.Automation.ControlType]::Button, [System.Windows.Automation.ControlType]::Hyperlink,
             [System.Windows.Automation.ControlType]::ListItem, [System.Windows.Automation.ControlType]::MenuItem)
     }
-    if ($signIn) { return 'non' }
-    if (Find-Element -NamePattern $script:Patterns.Ready) { return 'oui' }
-    return 'inconnu'
+    if ($signIn) { return 'no' }
+    if (Find-Element -NamePattern $script:Patterns.Ready) { return 'yes' }
+    return 'unknown'
 }
 
-# Apple Music's own volume slider, or $null. The kit never moves it; the test only reads it.
+# Apple Music's own volume slider, or $null. Ampify never moves it; the case only reads it.
 function Get-VolumeSlider {
     return Find-Element -ControlType 'Slider' -NamePattern 'Volume'
 }
@@ -93,7 +93,7 @@ function Start-TrackPlayback {
     }
     if ($row) {
         Invoke-Click -Element $row -Double | Out-Null
-        if (Wait-Until -TimeoutSeconds 20 -Condition $Started) { return "double clic sur « $($Track.Title) »" }
+        if (Wait-Until -TimeoutSeconds 20 -Condition $Started) { return "double click on `"$($Track.Title)`"" }
     }
 
     # The page's own Play button is the one highest on screen (the player bar sits at the bottom).
@@ -101,7 +101,7 @@ function Start-TrackPlayback {
     $top = $plays | Sort-Object { $_.Current.BoundingRectangle.Y } | Select-Object -First 1
     if ($top) {
         Invoke-Click -Element $top | Out-Null
-        if (Wait-Until -TimeoutSeconds 20 -Condition $Started) { return 'bouton Lecture de la page' }
+        if (Wait-Until -TimeoutSeconds 20 -Condition $Started) { return 'the page''s Play button' }
     }
 
     $search = Find-Element -ControlType 'Edit' -NamePattern '^(Search|Rechercher)'
@@ -114,7 +114,7 @@ function Start-TrackPlayback {
         }
         if ($hit) {
             Invoke-Click -Element $hit -Double | Out-Null
-            if (Wait-Until -TimeoutSeconds 20 -Condition $Started) { return 'recherche puis double clic' }
+            if (Wait-Until -TimeoutSeconds 20 -Condition $Started) { return 'search, then double click' }
         }
     }
     return $null
@@ -136,7 +136,7 @@ function Open-AppleMusicSettings {
     if ($entry) {
         Invoke-Click -Element $entry | Out-Null
     } else {
-        [AmkInput]::SendChord([uint16[]]@(0x11, 0xBC))  # Ctrl + ,
+        [AmpifyInput]::SendChord([uint16[]]@(0x11, 0xBC))  # Ctrl + ,
     }
     Start-Sleep -Seconds 3
     if (Find-Element -NamePattern $script:Patterns.Playback -TimeoutSeconds 10) { return Get-UiaMainWindow }
@@ -148,13 +148,13 @@ function Open-AppleMusicSettings {
 # sentence for the report.
 function Set-AppleMusicAtmosAlwaysOn {
     $settings = Open-AppleMusicSettings
-    if (-not $settings) { return 'Réglages introuvables' }
+    if (-not $settings) { return 'Settings not found' }
     $playback = Find-Element -NamePattern $script:Patterns.Playback -VisibleOnly
     if ($playback) { Invoke-Click -Element $playback | Out-Null; Start-Sleep -Seconds 2 }
     $combo = Find-Element -ControlType 'ComboBox' -VisibleOnly -Where { param($e) $e.Current.Name -match 'Atmos' -or $e.Current.AutomationId -match 'Atmos' }
     if (-not $combo) {
         Send-Key Escape
-        return 'liste « Dolby Atmos » introuvable sur la page Lecture'
+        return '"Dolby Atmos" list not found on the Playback page'
     }
     $expand = $null
     if ($combo.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$expand)) {
@@ -164,13 +164,13 @@ function Set-AppleMusicAtmosAlwaysOn {
     }
     Start-Sleep -Seconds 1
     $choice = Find-Element -ControlType 'ListItem' -NamePattern '^(Always On|Always on|Toujours activé|Toujours activée|Toujours)$' -TimeoutSeconds 5
-    $result = if ($choice) { "« $($choice.Current.Name) » choisi ($(Invoke-Click -Element $choice))" } else { 'choix « Always On » introuvable' }
+    $result = if ($choice) { "`"$($choice.Current.Name)`" chosen ($(Invoke-Click -Element $choice))" } else { '"Always On" choice not found' }
     Start-Sleep -Seconds 1
     if ($expand) { try { $expand.Collapse() } catch { } }
     $selection = $null
     if ($combo.TryGetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern, [ref]$selection)) {
         $current = @($selection.Current.GetSelection() | ForEach-Object { $_.Current.Name }) -join ', '
-        $result += " ; valeur affichée : $current"
+        $result += "; value shown: $current"
     }
     Send-Key Escape
     Start-Sleep -Seconds 1

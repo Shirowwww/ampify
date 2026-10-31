@@ -1,18 +1,18 @@
-// Module tray: AMK.tray, items in the menu of the kit's notification area icon. Natives: core/natives/tray.cpp.
+// Module tray: Ampify.tray, items in the menu of the kit's notification area icon. Natives: core/natives/tray.cpp.
 // The host sends the clicks to every element (ExtensionLoader::DeliverEvent), so an item click names its element.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kTray[];
-const char kTray[] = R"AMKJS(
+const char kTray[] = R"AMPIFYJS(
   const trayItems = new Map();
   let trayClick = null;
 
-  AMK.tray = {
+  Ampify.tray = {
     // items: [{ label, onClick, checked, enabled }, "-" for a separator]. Replaces the element's previous items.
     // Returns false when the icon is off (setting tray.enabled) or not offered by this host.
     setMenu(items) {
-      if (!Array.isArray(items)) throw new TypeError("tray.setMenu attend une liste");
+      if (!Array.isArray(items)) throw new TypeError("tray.setMenu expects a list");
       const entries = [];
       const handlers = new Map();
       items.forEach((item, index) => {
@@ -22,7 +22,7 @@ const char kTray[] = R"AMKJS(
           return;
         }
         if (!item || typeof item.onClick !== "function") {
-          throw new TypeError("tray.setMenu : chaque entrée attend label et onClick");
+          throw new TypeError("tray.setMenu: each entry expects label and onClick");
         }
         entries.push({
           id,
@@ -39,7 +39,7 @@ const char kTray[] = R"AMKJS(
     },
     // fn() runs on a left click on the icon.
     onClick(fn) {
-      if (typeof fn !== "function") throw new TypeError("tray.onClick attend une fonction");
+      if (typeof fn !== "function") throw new TypeError("tray.onClick expects a function");
       const shown = native.trayListen();
       trayClick = fn;
       return shown;
@@ -49,13 +49,13 @@ const char kTray[] = R"AMKJS(
   dispatch.tray = (payload) => {
     const event = JSON.parse(payload);
     if (event.click === true) {
-      if (trayClick) runGuarded("icône de notification", trayClick, []);
+      if (trayClick) runGuarded("notification area icon", trayClick, []);
       return;
     }
     if (event.to !== native.trayOwner) return;
     const fn = trayItems.get(event.item);
-    if (fn) runGuarded("menu de l'icône " + event.item, fn, []);
+    if (fn) runGuarded("icon menu " + event.item, fn, []);
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

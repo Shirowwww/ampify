@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <system_error>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -65,4 +65,4 @@ std::string FolderFingerprint(const std::filesystem::path& folder) {
     return Hex(hash);
 }
 
-}  // namespace amk
+}  // namespace ampify

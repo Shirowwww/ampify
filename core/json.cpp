@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -20,7 +20,7 @@ public:
         if (value) {
             SkipSpace();
             if (m_pos != m_text.size()) {
-                Fail("texte après la valeur");
+                Fail("text after the value");
                 value.reset();
             }
         }
@@ -34,7 +34,7 @@ private:
     std::string m_error;
 
     std::optional<Json> Fail(const std::string& message) {
-        if (m_error.empty()) m_error = message + " à l'octet " + std::to_string(m_pos);
+        if (m_error.empty()) m_error = message + " at byte " + std::to_string(m_pos);
         return std::nullopt;
     }
 
@@ -52,9 +52,9 @@ private:
     }
 
     std::optional<Json> ParseValue(int depth) {
-        if (depth > kMaxDepth) return Fail("imbrication trop profonde");
+        if (depth > kMaxDepth) return Fail("nesting too deep");
         SkipSpace();
-        if (m_pos >= m_text.size()) return Fail("fin de texte inattendue");
+        if (m_pos >= m_text.size()) return Fail("unexpected end of text");
 
         char c = m_text[m_pos];
         if (c == '{') return ParseObject(depth);
@@ -68,7 +68,7 @@ private:
         if (Consume("false")) return Json(false);
         if (Consume("null")) return Json();
         if (c == '-' || (c >= '0' && c <= '9')) return ParseNumber();
-        return Fail("caractère inattendu");
+        return Fail("unexpected character");
     }
 
     std::optional<Json> ParseObject(int depth) {
@@ -81,11 +81,11 @@ private:
         }
         while (true) {
             SkipSpace();
-            if (m_pos >= m_text.size() || m_text[m_pos] != '"') return Fail("clé attendue");
+            if (m_pos >= m_text.size() || m_text[m_pos] != '"') return Fail("key expected");
             std::optional<std::string> key = ParseString();
             if (!key) return std::nullopt;
             SkipSpace();
-            if (m_pos >= m_text.size() || m_text[m_pos] != ':') return Fail("':' attendu");
+            if (m_pos >= m_text.size() || m_text[m_pos] != ':') return Fail("':' expected");
             m_pos++;
             std::optional<Json> value = ParseValue(depth + 1);
             if (!value) return std::nullopt;
@@ -100,7 +100,7 @@ private:
                 m_pos++;
                 return Json(std::move(members));
             }
-            return Fail("',' ou '}' attendu");
+            return Fail("',' or '}' expected");
         }
     }
 
@@ -126,25 +126,25 @@ private:
                 m_pos++;
                 return Json(std::move(items));
             }
-            return Fail("',' ou ']' attendu");
+            return Fail("',' or ']' expected");
         }
     }
 
     std::optional<Json> ParseNumber() {
         size_t start = m_pos;
         if (m_text[m_pos] == '-') m_pos++;
-        if (m_pos >= m_text.size()) return Fail("nombre incomplet");
+        if (m_pos >= m_text.size()) return Fail("incomplete number");
         if (m_text[m_pos] == '0') {
             m_pos++;
         } else if (m_text[m_pos] >= '1' && m_text[m_pos] <= '9') {
             while (m_pos < m_text.size() && std::isdigit(static_cast<unsigned char>(m_text[m_pos]))) m_pos++;
         } else {
-            return Fail("chiffre attendu");
+            return Fail("digit expected");
         }
         if (m_pos < m_text.size() && m_text[m_pos] == '.') {
             m_pos++;
             if (m_pos >= m_text.size() || !std::isdigit(static_cast<unsigned char>(m_text[m_pos]))) {
-                return Fail("chiffre attendu après le point");
+                return Fail("digit expected after the point");
             }
             while (m_pos < m_text.size() && std::isdigit(static_cast<unsigned char>(m_text[m_pos]))) m_pos++;
         }
@@ -152,13 +152,13 @@ private:
             m_pos++;
             if (m_pos < m_text.size() && (m_text[m_pos] == '+' || m_text[m_pos] == '-')) m_pos++;
             if (m_pos >= m_text.size() || !std::isdigit(static_cast<unsigned char>(m_text[m_pos]))) {
-                return Fail("chiffre attendu dans l'exposant");
+                return Fail("digit expected in the exponent");
             }
             while (m_pos < m_text.size() && std::isdigit(static_cast<unsigned char>(m_text[m_pos]))) m_pos++;
         }
         std::string token(m_text.substr(start, m_pos - start));
         double value = std::strtod(token.c_str(), nullptr);
-        if (!std::isfinite(value)) return Fail("nombre hors limites");
+        if (!std::isfinite(value)) return Fail("number out of range");
         return Json(value);
     }
 
@@ -206,7 +206,7 @@ private:
             unsigned char c = static_cast<unsigned char>(m_text[m_pos++]);
             if (c == '"') return out;
             if (c < 0x20) {
-                Fail("caractère de contrôle dans une chaîne");
+                Fail("control character in a string");
                 return std::nullopt;
             }
             if (c != '\\') {
@@ -227,35 +227,35 @@ private:
                 case 'u': {
                     std::optional<unsigned> code = ParseHex4();
                     if (!code) {
-                        Fail("échappement \\u invalide");
+                        Fail("invalid \\u escape");
                         return std::nullopt;
                     }
                     unsigned point = *code;
                     if (point >= 0xD800 && point <= 0xDBFF) {
                         // A high surrogate must be followed by a low one.
                         if (!Consume("\\u")) {
-                            Fail("paire de substitution incomplète");
+                            Fail("incomplete surrogate pair");
                             return std::nullopt;
                         }
                         std::optional<unsigned> low = ParseHex4();
                         if (!low || *low < 0xDC00 || *low > 0xDFFF) {
-                            Fail("paire de substitution invalide");
+                            Fail("invalid surrogate pair");
                             return std::nullopt;
                         }
                         point = 0x10000 + ((point - 0xD800) << 10) + (*low - 0xDC00);
                     } else if (point >= 0xDC00 && point <= 0xDFFF) {
-                        Fail("substitution isolée");
+                        Fail("lone surrogate");
                         return std::nullopt;
                     }
                     AppendUtf8(out, point);
                     break;
                 }
                 default:
-                    Fail("échappement inconnu");
+                    Fail("unknown escape");
                     return std::nullopt;
             }
         }
-        Fail("chaîne non terminée");
+        Fail("unterminated string");
         return std::nullopt;
     }
 };
@@ -347,4 +347,4 @@ void Json::Set(std::string key, Json value) {
     members->emplace_back(std::move(key), std::move(value));
 }
 
-}  // namespace amk
+}  // namespace ampify

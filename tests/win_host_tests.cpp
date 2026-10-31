@@ -13,7 +13,7 @@ namespace {
 namespace fs = std::filesystem;
 
 fs::path KitForTest(const std::string& name) {
-    fs::path kit = fs::temp_directory_path() / "amk-tests" / ("win-host-" + name);
+    fs::path kit = fs::temp_directory_path() / "ampify-tests" / ("win-host-" + name);
     fs::remove_all(kit);
     fs::create_directories(kit);
     return kit;
@@ -23,10 +23,10 @@ fs::path KitForTest(const std::string& name) {
 
 TEST_CASE(WinHost_StorageRoundTripsThroughTheKitFolder) {
     fs::path kit = KitForTest("storage");
-    amk::Settings settings;
+    ampify::Settings settings;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
-    amk::WinHost host("engine", kit, settings, journal);
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    ampify::WinHost host("engine", kit, settings, journal);
 
     CHECK(!host.ReadStorage("demo").has_value());
     CHECK(host.WriteStorage("demo", R"({"launches":2})"));
@@ -37,15 +37,15 @@ TEST_CASE(WinHost_StorageRoundTripsThroughTheKitFolder) {
 
 TEST_CASE(WinHost_SettingsArePersistedToSettingsTxt) {
     fs::path kit = KitForTest("settings");
-    amk::Settings settings;
+    ampify::Settings settings;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
-    amk::WinHost host("ui", kit, settings, journal);
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    ampify::WinHost host("ui", kit, settings, journal);
 
     host.WriteSetting("extensions.demo.volume", "7");
     CHECK(host.ReadSetting("extensions.demo.volume").value_or("") == "7");
 
-    amk::Settings reloaded;
+    ampify::Settings reloaded;
     CHECK(reloaded.Load((kit / "settings.txt").string()));
     CHECK(reloaded.GetInt("extensions.demo.volume", 0) == 7);
     CHECK(host.Process() == "ui");
@@ -54,10 +54,10 @@ TEST_CASE(WinHost_SettingsArePersistedToSettingsTxt) {
 
 TEST_CASE(WinHost_ShortcutPressIsDeliveredToTheRegisteringThread) {
     fs::path kit = KitForTest("hotkeys");
-    amk::Settings settings;
+    ampify::Settings settings;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
-    amk::WinHost host("ui", kit, settings, journal);
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    ampify::WinHost host("ui", kit, settings, journal);
 
     CHECK(host.RegisterKey("hk", "Ctrl+Alt+F12"));
     CHECK(!host.RegisterKey("hk", "Ctrl+Alt+Nope"));  // unknown key name
@@ -77,23 +77,23 @@ TEST_CASE(WinHost_ShortcutPressIsDeliveredToTheRegisteringThread) {
 
 TEST_CASE(WinHost_HttpFailureComesBackAsAnErrorValue) {
     fs::path kit = KitForTest("http");
-    amk::Settings settings;
+    ampify::Settings settings;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
-    amk::WinHost host("engine", kit, settings, journal);
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    ampify::WinHost host("engine", kit, settings, journal);
 
-    amk::HttpResponse response = host.HttpGet("https://nonexistent.invalid/x");
+    ampify::HttpResponse response = host.HttpGet("https://nonexistent.invalid/x");
     CHECK(response.status == 0);
     CHECK(!response.text.empty());
 }
 
 TEST_CASE(WinHost_NotifyWritesTheJournalLine) {
     fs::path kit = KitForTest("notify");
-    amk::Settings settings;
+    ampify::Settings settings;
     std::ostringstream log;
-    amk::Journal journal(log, [] { return std::string("t"); });
-    amk::WinHost host("ui", kit, settings, journal);
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    ampify::WinHost host("ui", kit, settings, journal);
 
-    host.Notify("hk", "Titre", "Texte");
-    CHECK(log.str().find("[hk] notification : Titre - Texte") != std::string::npos);
+    host.Notify("hk", "Title", "Text");
+    CHECK(log.str().find("[hk] notification: Title - Text") != std::string::npos);
 }

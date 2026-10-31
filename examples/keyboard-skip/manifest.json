@@ -1,11 +1,11 @@
 {
   "$schema": "../../schemas/manifest.schema.json",
   "id": "keyboard-skip",
-  "name": "Passer de piste au clavier",
+  "name": "Skip tracks from the keyboard",
   "version": "0.1.0",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Raccourcis globaux : Ctrl+Alt+Droite pour le morceau suivant, Ctrl+Alt+Gauche pour le précédent.",
+  "description": "Global shortcuts: Ctrl+Alt+Right for the next track, Ctrl+Alt+Left for the previous one.",
   "kitApi": "1.0",
   "main": "main.js",
   "permissions": ["player.control", "ui.keyboard"]

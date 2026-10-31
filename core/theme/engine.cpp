@@ -6,7 +6,7 @@
 #include <optional>
 #include <vector>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 namespace {
 
@@ -255,4 +255,4 @@ void ThemeEngine::Restore(TreeBackend& tree) {
                     " élément(s) disparu(s)");
 }
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

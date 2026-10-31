@@ -1,4 +1,4 @@
-// The AMK object is assembled from one prelude fragment and one natives file per module (core/api/modules.cpp).
+// The Ampify object is assembled from one prelude fragment and one natives file per module (core/api/modules.cpp).
 // These tests pin what an extension sees, so that moving code between modules cannot change the API.
 
 #include <filesystem>
@@ -21,13 +21,13 @@ namespace {
 namespace fs = std::filesystem;
 
 struct Fixture {
-    amk::test::FakeHost host;
+    ampify::test::FakeHost host;
     std::ostringstream out;
-    amk::Journal journal{out, [] { return std::string("t"); }};
+    ampify::Journal journal{out, [] { return std::string("t"); }};
 
-    std::unique_ptr<amk::ScriptExtension> Make(const std::string& id, const std::string& main,
+    std::unique_ptr<ampify::ScriptExtension> Make(const std::string& id, const std::string& main,
                                                const std::string& permissions = "") {
-        fs::path dir = fs::temp_directory_path() / "amk-tests" / ("module-" + id);
+        fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("module-" + id);
         fs::remove_all(dir);
         fs::create_directories(dir);
         const std::string manifest =
@@ -35,8 +35,8 @@ struct Fixture {
             R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
         std::ofstream(dir / "manifest.json") << manifest;
         std::ofstream(dir / "main.js") << main;
-        amk::ManifestResult result = amk::ParseManifest(manifest, id, 1, [](const std::string&) { return true; });
-        return std::make_unique<amk::ScriptExtension>(*result.manifest, dir, host, journal);
+        ampify::ManifestResult result = ampify::ParseManifest(manifest, id, 1, [](const std::string&) { return true; });
+        return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, host, journal);
     }
 
     bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
@@ -53,7 +53,7 @@ struct Fixture {
     }
 };
 
-// Describes each member of AMK, two levels further down: type (functions with their arity, "p" when they can be
+// Describes each member of Ampify, two levels further down: type (functions with their arity, "p" when they can be
 // constructed, and their name), and "!" when frozen. One journal line per member and per global, plus the member
 // order, so that a new module adds members without touching the expectations below. Those were taken from the
 // single-file prelude, before it was split into modules.
@@ -67,11 +67,11 @@ const char* const kDescribeSurface = R"(
         }
         return s;
     };
-    AMK.log("frozen " + Object.isFrozen(AMK));
-    AMK.log("order " + Object.keys(AMK).join(","));
-    for (const key of Object.keys(AMK)) AMK.log("member " + key + " = " + show(AMK[key], 2));
+    Ampify.log("frozen " + Object.isFrozen(Ampify));
+    Ampify.log("order " + Object.keys(Ampify).join(","));
+    for (const key of Object.keys(Ampify)) Ampify.log("member " + key + " = " + show(Ampify[key], 2));
     for (const name of ["setTimeout", "setInterval", "clearTimeout", "clearInterval", "queueMicrotask", "console"]) {
-        AMK.log("global " + name + " = " + show(globalThis[name], 1));
+        Ampify.log("global " + name + " = " + show(globalThis[name], 1));
     }
 )";
 
@@ -117,7 +117,7 @@ const Expected kGlobals[] = {
 
 }  // namespace
 
-TEST_CASE(Prelude_AmkSurfaceIsUnchanged) {
+TEST_CASE(Prelude_AmpifySurfaceIsUnchanged) {
     Fixture f;
     auto element = f.Make("surface", kDescribeSurface);
     CHECK(element->Start());
@@ -125,13 +125,13 @@ TEST_CASE(Prelude_AmkSurfaceIsUnchanged) {
     for (const Expected& member : kMembers) {
         const std::string actual = f.Line("surface", std::string("member ") + member.name + " = ");
         if (actual != member.description) {
-            amk::test::ReportFailure(__FILE__, __LINE__, std::string("AMK.") + member.name + " : " + actual);
+            ampify::test::ReportFailure(__FILE__, __LINE__, std::string("Ampify.") + member.name + " : " + actual);
         }
     }
     for (const Expected& global : kGlobals) {
         const std::string actual = f.Line("surface", std::string("global ") + global.name + " = ");
         if (actual != global.description) {
-            amk::test::ReportFailure(__FILE__, __LINE__, std::string(global.name) + " : " + actual);
+            ampify::test::ReportFailure(__FILE__, __LINE__, std::string(global.name) + " : " + actual);
         }
     }
 
@@ -148,16 +148,16 @@ TEST_CASE(Prelude_AmkSurfaceIsUnchanged) {
 TEST_CASE(ApiModules_HaveUniqueNamesAndNatives) {
     Fixture f;
     auto element = f.Make("natives", "");
-    amk::js::Runtime runtime;
+    ampify::js::Runtime runtime;
     JSContext* ctx = runtime.context();
     std::set<std::string> modules;
     std::set<std::string> natives;
-    for (const amk::api::ApiModule& module : amk::api::Modules()) {
+    for (const ampify::api::ApiModule& module : ampify::api::Modules()) {
         CHECK(modules.insert(module.name).second);
         CHECK(module.prelude != nullptr || module.defineNatives != nullptr);
         if (!module.defineNatives) continue;
         JSValue object = JS_NewObject(ctx);
-        amk::api::NativeScope scope(ctx, object, *element);
+        ampify::api::NativeScope scope(ctx, object, *element);
         module.defineNatives(scope);
         JSPropertyEnum* names = nullptr;
         uint32_t count = 0;
@@ -176,7 +176,7 @@ TEST_CASE(ApiModules_HaveUniqueNamesAndNatives) {
 
 TEST_CASE(Element_DeliverEventCallsTheNamedDispatchEntry) {
     Fixture f;
-    auto element = f.Make("events", R"(AMK.keyboard.bind("ctrl+alt+right", () => AMK.log("suivant"));)",
+    auto element = f.Make("events", R"(Ampify.keyboard.bind("ctrl+alt+right", () => Ampify.log("suivant"));)",
                           R"("ui.keyboard")");
     CHECK(element->Start());
     element->DeliverEvent("key", "Ctrl+Alt+Right");
@@ -202,13 +202,13 @@ struct OtherState {
 TEST_CASE(Element_ModuleStateIsPerTypeAndDroppedWithTheRuntime) {
     Fixture f;
     auto element = f.Make("state", "");
-    amk::ScriptBridge::State<CounterState>(element.get()).value = 3;
-    CHECK(amk::ScriptBridge::State<CounterState>(element.get()).value == 3);
-    CHECK(amk::ScriptBridge::State<OtherState>(element.get()).value == 0);
+    ampify::ScriptBridge::State<CounterState>(element.get()).value = 3;
+    CHECK(ampify::ScriptBridge::State<CounterState>(element.get()).value == 3);
+    CHECK(ampify::ScriptBridge::State<OtherState>(element.get()).value == 0);
     CHECK(element->Start());
-    CHECK(amk::ScriptBridge::State<CounterState>(element.get()).value == 3);
+    CHECK(ampify::ScriptBridge::State<CounterState>(element.get()).value == 3);
     element->Stop();
-    CHECK(amk::ScriptBridge::State<CounterState>(element.get()).value == 0);
+    CHECK(ampify::ScriptBridge::State<CounterState>(element.get()).value == 0);
 }
 
 namespace {
@@ -227,7 +227,7 @@ struct ChimeHost {
 };
 
 // A host that offers EchoHost only. FakeHost comes first, so EchoHost sits at another address in the object.
-struct EchoingHost : amk::test::FakeHost, EchoHost {
+struct EchoingHost : ampify::test::FakeHost, EchoHost {
     std::string Echo(const std::string& text) override { return "écho " + text; }
     void* QueryCapability(std::string_view name) override {
         if (void* found = Offer<EchoHost>(name, this)) return found;
@@ -238,12 +238,12 @@ struct EchoingHost : amk::test::FakeHost, EchoHost {
 }  // namespace
 
 TEST_CASE(Host_CapabilityIsNullUnlessTheHostOffersIt) {
-    amk::test::FakeHost plain;
-    amk::Host& plainHost = plain;
+    ampify::test::FakeHost plain;
+    ampify::Host& plainHost = plain;
     CHECK(plainHost.Capability<EchoHost>() == nullptr);
 
     EchoingHost echoing;
-    amk::Host& host = echoing;
+    ampify::Host& host = echoing;
     EchoHost* echo = host.Capability<EchoHost>();
     CHECK(echo != nullptr);
     CHECK(echo == static_cast<EchoHost*>(&echoing));

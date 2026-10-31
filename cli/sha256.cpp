@@ -7,7 +7,7 @@
 #include <fstream>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -148,4 +148,4 @@ bool IsSha256Hex(std::string_view text) {
     return true;
 }
 
-}  // namespace amk
+}  // namespace ampify

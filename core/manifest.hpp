@@ -6,11 +6,11 @@
 #include <string_view>
 #include <vector>
 
-namespace amk {
+namespace ampify {
 
 enum class ElementKind { Extension, Theme, App, Snippet };
 
-// The fields of a manifest.json that the kernel uses. The rules are those of docs/extensions/MANIFEST.md, which
+// The fields of a manifest.json that the kernel uses. The rules are those of docs/extensions/manifest.md, which
 // tools/validate.py also enforces. The kernel checks them again, because a folder can be edited by hand.
 struct Manifest {
     std::string id;
@@ -43,7 +43,7 @@ struct Manifest {
 
 struct ManifestResult {
     std::optional<Manifest> manifest;  // set only when there are no errors
-    std::vector<std::string> errors;   // French messages, one per problem
+    std::vector<std::string> errors;   // English messages, one per problem
     std::vector<std::string> warnings; // unknown fields are ignored, with a warning
 };
 
@@ -57,4 +57,4 @@ bool IsKnownPermission(std::string_view permission);
 
 std::string_view ToString(ElementKind kind);
 
-}  // namespace amk
+}  // namespace ampify

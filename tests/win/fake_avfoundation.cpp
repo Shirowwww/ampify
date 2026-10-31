@@ -11,7 +11,7 @@
 
 namespace {
 
-constexpr unsigned kMagic = 0x414d4b54;  // "AMKT"
+constexpr unsigned kMagic = 0x414d4b54;  // "AmpifyT"
 
 enum Kind : int { kItem = 1, kTracks, kTrack, kAsset, kFormats, kFormat, kVariant };
 
@@ -51,22 +51,22 @@ __declspec(dllexport) void __cdecl AVCFPlayerSetVolume(void* player, float volum
     g_volumeCalls++;
 }
 
-__declspec(dllexport) int __cdecl amk_fake_volume_calls() {
+__declspec(dllexport) int __cdecl ampify_fake_volume_calls() {
     return g_volumeCalls;
 }
 
-__declspec(dllexport) int __cdecl amk_fake_protected_method(void* self, int value) {
+__declspec(dllexport) int __cdecl ampify_fake_protected_method(void* self, int value) {
     (void)self;
     return value + 1;
 }
 
 // While `known` is 0, the item has no stable variant yet.
-__declspec(dllexport) void __cdecl amk_fake_set_variant_known(int known) {
+__declspec(dllexport) void __cdecl ampify_fake_set_variant_known(int known) {
     g_variantKnown = known != 0;
 }
 
 // How many times the tracks of the item were asked for.
-__declspec(dllexport) int __cdecl amk_fake_track_reads() {
+__declspec(dllexport) int __cdecl ampify_fake_track_reads() {
     return g_trackReads;
 }
 

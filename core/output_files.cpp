@@ -5,7 +5,7 @@
 #include <fstream>
 #include <system_error>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -55,15 +55,15 @@ std::filesystem::path OutputFolder(const std::filesystem::path& outputRoot, std:
 bool WriteOutputFile(const std::filesystem::path& outputRoot, std::string_view elementId, std::string_view name,
                      std::string_view text, std::string* error) {
     if (!IsValidOutputName(name)) {
-        return Fail(error, "nom de fichier refusé : « " + std::string(name) +
-                               " » (lettres, chiffres, . _ -, et .txt, .json, .csv, .html ou .xml)");
+        return Fail(error, "file name refused: '" + std::string(name) +
+                               "' (letters, digits, . _ -, and .txt, .json, .csv, .html or .xml)");
     }
-    if (text.size() > kMaxOutputFileBytes) return Fail(error, "texte trop long (256 Ko au plus)");
+    if (text.size() > kMaxOutputFileBytes) return Fail(error, "text too long (256 KB at most)");
 
     std::error_code ec;
     std::filesystem::path folder = OutputFolder(outputRoot, elementId);
     std::filesystem::create_directories(folder, ec);
-    if (ec) return Fail(error, "dossier de sortie impossible à créer");
+    if (ec) return Fail(error, "cannot create the output folder");
     std::filesystem::path target = folder / Utf8Path(name);
 
     if (!std::filesystem::exists(target, ec)) {
@@ -71,16 +71,16 @@ bool WriteOutputFile(const std::filesystem::path& outputRoot, std::string_view e
         for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
             if (entry.is_regular_file(ec) && entry.path().extension() != ".tmp") count++;
         }
-        if (count >= kMaxOutputFilesPerElement) return Fail(error, "trop de fichiers de sortie (16 au plus)");
+        if (count >= kMaxOutputFilesPerElement) return Fail(error, "too many output files (16 at most)");
     }
 
     std::filesystem::path temporary = target;
     temporary += ".tmp";
     {
         std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
-        if (!file) return Fail(error, "écriture impossible dans le dossier de sortie");
+        if (!file) return Fail(error, "cannot write in the output folder");
         file.write(text.data(), static_cast<std::streamsize>(text.size()));
-        if (!file) return Fail(error, "écriture impossible dans le dossier de sortie");
+        if (!file) return Fail(error, "cannot write in the output folder");
     }
     std::filesystem::rename(temporary, target, ec);
     if (ec) {
@@ -89,10 +89,10 @@ bool WriteOutputFile(const std::filesystem::path& outputRoot, std::string_view e
         std::filesystem::rename(temporary, target, ec);
         if (ec) {
             std::filesystem::remove(temporary, ec);
-            return Fail(error, "fichier de sortie occupé par un autre programme");
+            return Fail(error, "output file in use by another program");
         }
     }
     return true;
 }
 
-}  // namespace amk
+}  // namespace ampify

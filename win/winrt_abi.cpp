@@ -6,7 +6,7 @@
 
 #include "win_common.hpp"
 
-namespace amk::win::rt {
+namespace ampify::win::rt {
 
 namespace {
 
@@ -168,7 +168,7 @@ Activation GetActivationFactory(std::wstring_view className, const GUID& iid, Re
         return {SUCCEEDED(hr) && factory ? S_OK : (FAILED(hr) ? hr : E_POINTER), "test"};
     }
     const Combase* api = Api();
-    if (!api) return {E_NOTIMPL, "combase.dll indisponible"};
+    if (!api) return {E_NOTIMPL, "combase.dll not available"};
     HString name(className);
 
     HRESULT registered = REGDB_E_CLASSNOTREG;
@@ -192,8 +192,8 @@ Activation GetActivationFactory(std::wstring_view className, const GUID& iid, Re
         Ref activation;
         HRESULT hr = get(name.Get(), activation.Put());
         if (FAILED(hr) || !activation) continue;
-        if (Query(activation, iid, factory)) return {S_OK, "DllGetActivationFactory de " + ToUtf8(module) + ".dll"};
-        return {E_NOINTERFACE, "DllGetActivationFactory de " + ToUtf8(module) + ".dll, interface absente"};
+        if (Query(activation, iid, factory)) return {S_OK, "DllGetActivationFactory from " + ToUtf8(module) + ".dll"};
+        return {E_NOINTERFACE, "DllGetActivationFactory from " + ToUtf8(module) + ".dll, interface missing"};
     }
     return {registered, "RoGetActivationFactory"};
 }
@@ -248,4 +248,4 @@ HRESULT STDMETHODCALLTYPE ChangeCounter::Invoke(void*, void*) {
     return S_OK;
 }
 
-}  // namespace amk::win::rt
+}  // namespace ampify::win::rt

@@ -7,7 +7,7 @@
 
 #include "ui_model.hpp"
 
-namespace amk {
+namespace ampify {
 
 struct TrackInfo {
     std::string id;
@@ -115,4 +115,4 @@ protected:
     }
 };
 
-}  // namespace amk
+}  // namespace ampify

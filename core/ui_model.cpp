@@ -4,7 +4,7 @@
 #include <array>
 #include <cmath>
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -273,4 +273,4 @@ std::string_view PlacementPermission(std::string_view placement) {
     return "ui.menu";
 }
 
-}  // namespace amk
+}  // namespace ampify

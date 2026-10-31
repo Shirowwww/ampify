@@ -1,11 +1,11 @@
 {
   "$schema": "../../schemas/manifest.schema.json",
   "id": "listen-stats",
-  "name": "Statistiques d'écoute",
+  "name": "Listening stats",
   "version": "0.1.0",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Compte tes écoutes (titres, artistes, temps écouté) sur ton PC et les montre dans un panneau. Aucun son n'est enregistré.",
+  "description": "Counts your plays (tracks, artists, time listened) on your PC and shows them in a panel. No sound is recorded.",
   "kitApi": "1.0",
   "main": "main.js",
   "processes": ["ui"],

@@ -1,3 +1,3 @@
-// Deux raccourcis globaux pour changer de morceau sans quitter ce que l'on fait.
-AMK.keyboard.bind("Ctrl+Alt+Right", () => AMK.player.next());
-AMK.keyboard.bind("Ctrl+Alt+Left", () => AMK.player.previous());
+// Two global shortcuts to change track without leaving what you are doing.
+Ampify.keyboard.bind("Ctrl+Alt+Right", () => Ampify.player.next());
+Ampify.keyboard.bind("Ctrl+Alt+Left", () => Ampify.player.previous());

@@ -1,11 +1,11 @@
 {
   "$schema": "../../schemas/manifest.schema.json",
   "id": "discord-presence",
-  "name": "Présence Discord",
+  "name": "Discord presence",
   "version": "0.1.0",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Affiche le morceau en cours dans ton statut Discord. Demande discord.enabled et l'identifiant d'une application Discord.",
+  "description": "Shows the current track in your Discord status. Needs discord.enabled and the id of a Discord application.",
   "kitApi": "1.0",
   "main": "main.js",
   "processes": ["engine"],

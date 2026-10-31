@@ -8,7 +8,7 @@
 #include "journal.hpp"
 #include "settings.hpp"
 
-namespace amk {
+namespace ampify {
 
 // What an extension tells the kernel about itself. `start` and `stop` run on the kernel's thread.
 struct ExtensionInfo {
@@ -76,4 +76,4 @@ private:
     std::vector<Entry> m_entries;
 };
 
-}  // namespace amk
+}  // namespace ampify

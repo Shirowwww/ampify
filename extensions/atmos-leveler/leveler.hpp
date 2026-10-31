@@ -82,7 +82,7 @@ enum class AudioPath {
     Objects,  // spatial audio objects: mono buffers, before the slider volume. Measures Atmos tracks.
 };
 
-// A track whose loudness the leveler has measured, for the journal.
+// A track whose loudness the leveler has measured, for the log.
 struct FinishedTrack {
     bool atmos = false;
     double lufs = 0;

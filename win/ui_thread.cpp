@@ -7,7 +7,7 @@
 #include <new>
 #include <utility>
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -232,4 +232,4 @@ bool UiThreadAttached() {
     return State().attached;
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

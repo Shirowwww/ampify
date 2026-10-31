@@ -1,8 +1,8 @@
 // La Marketplace du kit : une page d'Apple Music pour installer, retirer et choisir thèmes, schémas, extensions et
-// apps. Elle ne fait rien elle-même : chaque action passe par amk (AMK.kit.run), avec les mêmes contrôles qu'en
+// apps. Elle ne fait rien elle-même : chaque action passe par ampify (Ampify.kit.run), avec les mêmes contrôles qu'en
 // console (SHA-256, archive vérifiée, sauvegarde avant un retrait). Spécification : docs/marketplace/PAGE.md.
-const { h, useState, useEffect } = AMK.React;
-const { Card, Button, ButtonPrimary, ButtonTertiary, Toggle, Dropdown, TextField, Text } = AMK.components;
+const { h, useState, useEffect } = Ampify.React;
+const { Card, Button, ButtonPrimary, ButtonTertiary, Toggle, Dropdown, TextField, Text } = Ampify.components;
 
 // Une phrase par permission, montrée avant l'installation et avant l'activation.
 const PERMISSIONS = {
@@ -42,7 +42,7 @@ const matches = (item, search) =>
   !search || [item.name, item.id, item.description, item.author].some((field) =>
     String(field || "").toLowerCase().includes(search.toLowerCase()));
 
-// La dernière ligne utile de la sortie d'amk, pour le bandeau.
+// La dernière ligne utile de la sortie d'ampify, pour le bandeau.
 const lastLine = (text) => String(text || "").trim().split(/\r?\n/).filter(Boolean).pop() || "";
 
 function ThemeCard({ theme, active, activeScheme, busy, run }) {
@@ -113,7 +113,7 @@ function Marketplace() {
   const [search, setSearch] = useState("");
 
   const refresh = () =>
-    AMK.kit.run(["market", "--json"]).then((result) => {
+    Ampify.kit.run(["market", "--json"]).then((result) => {
       try {
         setState(JSON.parse(result.out));
         setMessage(result.err ? lastLine(result.err) : "");
@@ -122,11 +122,11 @@ function Marketplace() {
       }
     });
 
-  // Une action : amk, puis l'état relu. Le bandeau dit ce qui s'est passé, ou l'erreur d'amk telle quelle.
+  // Une action : ampify, puis l'état relu. Le bandeau dit ce qui s'est passé, ou l'erreur d'ampify telle quelle.
   const run = (args, success) => {
     setBusy(true);
     setMessage("En cours…");
-    return AMK.kit.run(args).then((result) => {
+    return Ampify.kit.run(args).then((result) => {
       setMessage(result.code === 0 ? success : lastLine(result.err) || lastLine(result.out) || "Échec (code " + result.code + ")");
       return refresh();
     }).then(() => setBusy(false), () => setBusy(false));
@@ -158,7 +158,7 @@ function Marketplace() {
     themes.length
       ? h("list", { gap: 12 }, themes.map((theme) =>
           h(ThemeCard, { key: theme.id, theme, active: theme.id === activeTheme, activeScheme: state.scheme, busy, run })))
-      : h(Text, { variant: "caption" }, "Aucun thème installé. amk theme import en reprend un de Spicetify."),
+      : h(Text, { variant: "caption" }, "Aucun thème installé. ampify theme import en reprend un de Spicetify."),
     h(Text, { variant: "subtitle" }, "Extensions et apps"),
     others.length
       ? h("list", { gap: 12 }, others.map((element) => h(ElementCard, { key: element.kind + element.id, element, busy, run })))
@@ -171,12 +171,12 @@ function Marketplace() {
         : h(Text, { variant: "caption" }, "Le catalogue est vide pour l'instant."));
 }
 
-// La page « /marketplace » de l'app (AMK.ready la rend), et un bouton en haut d'Apple Music pour l'ouvrir.
+// La page « /marketplace » de l'app (Ampify.ready la rend), et un bouton en haut d'Apple Music pour l'ouvrir.
 function render() {
   return h(Marketplace);
 }
 globalThis.render = render;
 
 const BAG = '<svg viewBox="0 0 24 24"><path d="M4 7h16l-1.2 12.2a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8L4 7zm4 0V6a4 4 0 0 1 8 0v1h-2V6a2 2 0 0 0-4 0v1H8z"/></svg>';
-AMK.ui.title.set("Marketplace");
-AMK.ui.topbar.addButton({ label: "Marketplace", icon: BAG, onClick: () => AMK.ui.navigate("/marketplace") });
+Ampify.ui.title.set("Marketplace");
+Ampify.ui.topbar.addButton({ label: "Marketplace", icon: BAG, onClick: () => Ampify.ui.navigate("/marketplace") });

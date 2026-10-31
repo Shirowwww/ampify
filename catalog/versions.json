@@ -12,7 +12,7 @@
         "AVCFPlayerItemTrackCopyAssetTrack",
         "AVCFPlayerSetVolume"
       ],
-      "notes": "Version relevée dans knowledge/. C'est aussi la version intégrée au noyau."
+      "notes": "Version found in knowledge/. It is also the version built into the kernel."
     },
     {
       "version": "1.1792.39682.0",
@@ -24,7 +24,7 @@
         "AVCFPlayerItemTrackCopyAssetTrack",
         "AVCFPlayerSetVolume"
       ],
-      "notes": "Banc Windows (GitHub Actions, winget) : noyau chargé dans AppleMusic.exe et AMPLibraryAgent.exe, signature reconnue, aucun plantage."
+      "notes": "Windows bench (GitHub Actions, winget): kernel loaded in AppleMusic.exe and AMPLibraryAgent.exe, signature recognized, no crash."
     }
   ]
 }

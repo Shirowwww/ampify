@@ -8,7 +8,7 @@
 #include "../json.hpp"
 #include "../ui_model.hpp"
 
-namespace amk::natives {
+namespace ampify::natives {
 
 namespace {
 
@@ -33,14 +33,14 @@ struct UiNatives : ScriptBridge {
         std::string error;
         std::optional<Json> tree = Json::Parse(text, &error);
         if (tree && ValidateTree(*tree, &error)) return tree;
-        *failure = Throw(ctx, "TypeError", "interface refusée : " + error);
+        *failure = Throw(ctx, "TypeError", "interface refused: " + error);
         return std::nullopt;
     }
 
-    AMK_NATIVE(UiControl) {
+    AMPIFY_NATIVE(UiControl) {
         ScriptExtension* ext = Owner(ctx);
         std::string placement = String(ctx, argc, argv, 0).value_or("");
-        if (!IsPlacement(placement)) return Throw(ctx, "TypeError", "emplacement inconnu : " + placement);
+        if (!IsPlacement(placement)) return Throw(ctx, "TypeError", "unknown placement: " + placement);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, std::string(PlacementPermission(placement)), &failure)) return failure;
         std::string label = String(ctx, argc, argv, 1).value_or("").substr(0, kMaxUiLabel);
@@ -48,19 +48,19 @@ struct UiNatives : ScriptBridge {
         return JS_NewInt32(ctx, HostOf(ext).Ui().AddControl(ext->id(), placement, label, icon));
     }
 
-    AMK_NATIVE(UiPanel) {
+    AMPIFY_NATIVE(UiPanel) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ui.panel", &failure)) return failure;
         std::string panelId = String(ctx, argc, argv, 0).value_or("");
-        if (!ValidUiName(panelId)) return Throw(ctx, "TypeError", "nom de panneau invalide : " + panelId);
+        if (!ValidUiName(panelId)) return Throw(ctx, "TypeError", "invalid panel name: " + panelId);
         std::optional<Json> tree = TreeOf(ctx, String(ctx, argc, argv, 1).value_or(""), &failure);
         if (!tree) return failure;
         HostOf(ext).Ui().SetPanel(ext->id(), panelId, std::move(*tree));
         return JS_UNDEFINED;
     }
 
-    AMK_NATIVE(UiPopup) {
+    AMPIFY_NATIVE(UiPopup) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ui.popup", &failure)) return failure;
@@ -70,16 +70,16 @@ struct UiNatives : ScriptBridge {
         return JS_UNDEFINED;
     }
 
-    AMK_NATIVE(UiPage) {
+    AMPIFY_NATIVE(UiPage) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ui.page", &failure)) return failure;
         if (ext->manifest().kind != ElementKind::App) {
-            return Throw(ctx, "PermissionDenied", "les pages sont réservées aux apps (kind app dans manifest.json)");
+            return Throw(ctx, "PermissionDenied", "pages are reserved for apps (kind app in manifest.json)");
         }
         std::string path = String(ctx, argc, argv, 0).value_or("");
         if (path.empty() || path[0] != '/' || !ValidUiName(path)) {
-            return Throw(ctx, "TypeError", "chemin de page invalide : " + path);
+            return Throw(ctx, "TypeError", "invalid page path: " + path);
         }
         std::optional<Json> tree = TreeOf(ctx, String(ctx, argc, argv, 1).value_or(""), &failure);
         if (!tree) return failure;
@@ -87,19 +87,19 @@ struct UiNatives : ScriptBridge {
         return JS_UNDEFINED;
     }
 
-    AMK_NATIVE(UiNavigate) {
+    AMPIFY_NATIVE(UiNavigate) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ui.page", &failure)) return failure;
         std::string path = String(ctx, argc, argv, 0).value_or("");
         if (path.empty() || path[0] != '/' || !ValidUiName(path)) {
-            return Throw(ctx, "TypeError", "chemin de page invalide : " + path);
+            return Throw(ctx, "TypeError", "invalid page path: " + path);
         }
         HostOf(ext).Ui().Navigate(ext->id(), path);
         return JS_UNDEFINED;
     }
 
-    AMK_NATIVE(UiTitle) {
+    AMPIFY_NATIVE(UiTitle) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ui.window", &failure)) return failure;
@@ -122,4 +122,4 @@ void DefineUi(api::NativeScope& scope) {
 // Removes what the element added to the interface when it stops.
 void StopUi(ScriptExtension& extension) { ScriptBridge::HostOf(&extension).Ui().RemoveElement(extension.id()); }
 
-}  // namespace amk::natives
+}  // namespace ampify::natives

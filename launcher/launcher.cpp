@@ -1,4 +1,4 @@
-// amk_launcher.exe: starts Apple Music with the kernel loaded into its processes. The launcher stays open while
+// ampify_launcher.exe: starts Apple Music with the kernel loaded into its processes. The launcher stays open while
 // Apple Music runs, so it can load the kernel into every process of the package, including ones that appear
 // later (a hand-over to a new process, or AMPLibraryAgent.exe). The package folder is never written to.
 
@@ -54,70 +54,70 @@ std::string HResultText(HRESULT hr) {
 }
 
 void Alert(const wchar_t* text) {
-    MessageBoxW(nullptr, text, L"Apple Music Mod Kit", MB_ICONERROR | MB_OK);
+    MessageBoxW(nullptr, text, L"Ampify", MB_ICONERROR | MB_OK);
 }
 
-// Loads the kernel into one process and writes the outcome to the journal. Returns true on success.
-bool InjectInto(amk::Journal& journal, DWORD processId, const std::filesystem::path& kernelDll,
+// Loads the kernel into one process and writes the outcome to the log. Returns true on success.
+bool InjectInto(ampify::Journal& journal, DWORD processId, const std::filesystem::path& kernelDll,
                 const std::string& label) {
-    HANDLE process = amk::launcher::OpenProcessForInjection(processId);
+    HANDLE process = ampify::launcher::OpenProcessForInjection(processId);
     if (!process) {
-        journal.Write(label + " : ouverture impossible (erreur Windows " + std::to_string(GetLastError()) + ")");
+        journal.Write(label + ": could not open (Windows error " + std::to_string(GetLastError()) + ")");
         return false;
     }
 
     std::string failure;
-    bool loaded = amk::launcher::InjectKernel(process, kernelDll, failure);
+    bool loaded = ampify::launcher::InjectKernel(process, kernelDll, failure);
     CloseHandle(process);
 
-    journal.Write(loaded ? label + " : noyau chargé" : label + " : échec, " + failure);
+    journal.Write(loaded ? label + ": kernel loaded" : label + ": failed, " + failure);
     return loaded;
 }
 
 // Holds the first Apple Music process still while the kernel loads, then resumes it, whatever the outcome.
 // Windows offers no way to start the app suspended from here (a package debug setting alone does not suspend
 // it), so the hold begins when ActivateApp returns. The app may already have run for a moment by then: the
-// journal says how many threads were held and whether the kernel loaded during the hold.
-bool InjectWhileHeld(amk::Journal& journal, DWORD processId, const std::filesystem::path& kernelDll) {
+// log says how many threads were held and whether the kernel loaded during the hold.
+bool InjectWhileHeld(ampify::Journal& journal, DWORD processId, const std::filesystem::path& kernelDll) {
     std::string label = "AppleMusic.exe (" + std::to_string(processId) + ")";
-    HANDLE process = amk::launcher::OpenProcessForInjection(processId);
+    HANDLE process = ampify::launcher::OpenProcessForInjection(processId);
     if (!process) {
-        journal.Write(label + " : ouverture impossible, pas de pause (erreur Windows " +
+        journal.Write(label + ": could not open, no pause (Windows error " +
                       std::to_string(GetLastError()) + ")");
         return false;
     }
 
-    int held = amk::launcher::SuspendProcessThreads(processId);
-    journal.Write(std::to_string(held) + " thread(s) mis en pause");
+    int held = ampify::launcher::SuspendProcessThreads(processId);
+    journal.Write(std::to_string(held) + " thread(s) paused");
 
     std::string failure;
     HANDLE pending = nullptr;
-    bool loaded = amk::launcher::InjectKernel(process, kernelDll, failure, kHeldLoadTimeoutMs, &pending);
+    bool loaded = ampify::launcher::InjectKernel(process, kernelDll, failure, kHeldLoadTimeoutMs, &pending);
     if (loaded) {
-        journal.Write(label + " : noyau chargé pendant la pause");
+        journal.Write(label + ": kernel loaded during the pause");
     } else if (pending) {
         // LoadLibraryW waits for the loader lock, which a held thread may own while the app is still starting.
-        journal.Write(label + " : chargement en attente pendant la pause, reprise des threads");
+        journal.Write(label + ": load pending during the pause, resuming threads");
     } else {
-        journal.Write(label + " : échec, " + failure);
+        journal.Write(label + ": failed, " + failure);
     }
 
     // Resumed on every path, so the app is never left frozen, even when the load failed.
-    int resumed = amk::launcher::ResumeProcessThreads(processId);
-    journal.Write(std::to_string(resumed) + " thread(s) repris après l'injection");
+    int resumed = ampify::launcher::ResumeProcessThreads(processId);
+    journal.Write(std::to_string(resumed) + " thread(s) resumed after injection");
 
     if (pending) {
         failure.clear();
-        loaded = amk::launcher::FinishRemoteLoad(pending, amk::launcher::kDefaultRemoteLoadTimeoutMs, failure);
-        journal.Write(loaded ? label + " : noyau chargé après la reprise" : label + " : échec, " + failure);
+        loaded = ampify::launcher::FinishRemoteLoad(pending, ampify::launcher::kDefaultRemoteLoadTimeoutMs, failure);
+        journal.Write(loaded ? label + ": kernel loaded after the resume" : label + ": failed, " + failure);
     }
 
     CloseHandle(process);
     return loaded;
 }
 
-amk::WatchConfig MakeWatchConfig(bool inject, bool reportHealth) {
-    amk::WatchConfig config;
+ampify::WatchConfig MakeWatchConfig(bool inject, bool reportHealth) {
+    ampify::WatchConfig config;
     config.inject = inject;
     config.reportHealth = reportHealth;
     return config;
@@ -126,33 +126,33 @@ amk::WatchConfig MakeWatchConfig(bool inject, bool reportHealth) {
 // Ids of the running processes with this image name in the package, as the watch counts them.
 std::vector<uint32_t> PackageIds(const wchar_t* imageName, const std::filesystem::path& directory) {
     std::vector<uint32_t> ids;
-    for (DWORD processId : amk::launcher::FindPackageProcesses(imageName, directory)) ids.push_back(processId);
+    for (DWORD processId : ampify::launcher::FindPackageProcesses(imageName, directory)) ids.push_back(processId);
     return ids;
 }
 
 // Follows the package until Apple Music has been gone for a while. Each process it sees gets the kernel once.
 // When `config.reportHealth` is set, the safe-mode count is cleared once the app has been responsive for 20 s.
-// The rules live in amk::PackageWatch; this function only reads the system and carries out the actions.
-void Supervise(amk::Journal& journal, const std::filesystem::path& packageDirectory,
-               const std::filesystem::path& kernelDll, amk::WatchConfig config, std::optional<DWORD> handledProcess,
-               amk::SafeMode* healthCheck) {
-    amk::PackageWatch watch(config);
+// The rules live in ampify::PackageWatch; this function only reads the system and carries out the actions.
+void Supervise(ampify::Journal& journal, const std::filesystem::path& packageDirectory,
+               const std::filesystem::path& kernelDll, ampify::WatchConfig config, std::optional<DWORD> handledProcess,
+               ampify::SafeMode* healthCheck) {
+    ampify::PackageWatch watch(config);
     if (handledProcess) watch.MarkHandled(*handledProcess);
 
     Clock::time_point started = Clock::now();
     while (true) {
-        amk::WatchSnapshot snapshot;
+        ampify::WatchSnapshot snapshot;
         snapshot.seconds = std::chrono::duration<double>(Clock::now() - started).count();
         snapshot.appProcesses = PackageIds(L"AppleMusic.exe", packageDirectory);
         snapshot.agentProcesses = PackageIds(L"AMPLibraryAgent.exe", packageDirectory);
         for (uint32_t processId : snapshot.appProcesses) {
-            if (amk::win::WindowsResponsive(processId)) {
+            if (ampify::win::WindowsResponsive(processId)) {
                 snapshot.appResponsive = true;
                 break;
             }
         }
 
-        amk::WatchActions actions = watch.Step(snapshot);
+        ampify::WatchActions actions = watch.Step(snapshot);
         for (uint32_t processId : actions.inject) {
             bool isApp = std::find(snapshot.appProcesses.begin(), snapshot.appProcesses.end(), processId) !=
                          snapshot.appProcesses.end();
@@ -162,52 +162,52 @@ void Supervise(amk::Journal& journal, const std::filesystem::path& packageDirect
 
         if (actions.markHealthy) {
             healthCheck->MarkHealthy();
-            journal.Write("Application saine après 20 s, rapportée par le lanceur : "
-                          "compteur du mode sans échec remis à zéro");
+            journal.Write("Healthy after 20 s, reported by the launcher: "
+                          "safe mode count reset");
         }
 
         if (actions.stop) {
-            journal.Write(actions.stopReason + " : le lanceur s'arrête");
+            journal.Write(actions.stopReason + ": the launcher stops");
             return;
         }
         Sleep(kPollIntervalMs);
     }
 }
 
-int Run(amk::Journal& journal, const std::filesystem::path& kit) {
-    std::wstring family = ToWide(amk::kPackageFamilyName);
-    std::optional<amk::launcher::InstalledPackage> package = amk::launcher::FindInstalledPackage(family.c_str());
+int Run(ampify::Journal& journal, const std::filesystem::path& kit) {
+    std::wstring family = ToWide(ampify::kPackageFamilyName);
+    std::optional<ampify::launcher::InstalledPackage> package = ampify::launcher::FindInstalledPackage(family.c_str());
     if (!package) {
-        journal.Write("Apple Music pour Windows introuvable");
-        Alert(L"Apple Music pour Windows n'est pas installé sur ce PC.");
+        journal.Write("Apple Music for Windows not found");
+        Alert(L"Apple Music for Windows is not installed on this PC.");
         return 1;
     }
 
     std::string fullName = ToNarrow(package->fullName);
-    std::string version = amk::AppleMusicVersion(fullName);
-    journal.Write("Paquet trouvé : " + fullName + " (dossier " + package->directory.string() + ")");
+    std::string version = ampify::AppleMusicVersion(fullName);
+    journal.Write("Package found: " + fullName + " (folder " + package->directory.string() + ")");
 
     // Read on every launch, never kept from an earlier one: an update can change the player DLL under the same name.
-    amk::BuildSignature signature = amk::CheckBuildSignature(
-        amk::win::ReadFileBytes(package->directory / std::string(amk::kPlayerDllName)));
-    journal.Write(amk::DescribeSignature(signature));
+    ampify::BuildSignature signature = ampify::CheckBuildSignature(
+        ampify::win::ReadFileBytes(package->directory / std::string(ampify::kPlayerDllName)));
+    journal.Write(ampify::DescribeSignature(signature));
 
-    std::filesystem::path kernelDll = amk::win::ExecutablePath().parent_path() / L"amk_kernel.dll";
+    std::filesystem::path kernelDll = ampify::win::ExecutablePath().parent_path() / L"ampify_kernel.dll";
     bool kernelPresent = std::filesystem::exists(kernelDll);
-    if (!kernelPresent) journal.Write("amk_kernel.dll introuvable à côté du lanceur");
+    if (!kernelPresent) journal.Write("ampify_kernel.dll not found next to the launcher");
 
-    amk::SafeMode safeMode((kit / "state.txt").string());
-    // Builds tested after this kit was compiled, from `amk versions update`. The signature is still checked.
-    std::vector<std::string> extraVersions = amk::LoadVersionList(kit / std::string(amk::kVersionListFile));
-    std::vector<std::string_view> knownVersions = amk::KnownAppVersionsWith(extraVersions);
-    std::vector<DWORD> running = amk::launcher::FindPackageProcesses(L"AppleMusic.exe", package->directory);
+    ampify::SafeMode safeMode((kit / "state.txt").string());
+    // Builds tested after this build of Ampify was compiled, from `ampify versions update`. The signature is still checked.
+    std::vector<std::string> extraVersions = ampify::LoadVersionList(kit / std::string(ampify::kVersionListFile));
+    std::vector<std::string_view> knownVersions = ampify::KnownAppVersionsWith(extraVersions);
+    std::vector<DWORD> running = ampify::launcher::FindPackageProcesses(L"AppleMusic.exe", package->directory);
 
     if (!running.empty()) {
         // Apple Music is already open: nothing is started, so this is not a launch to count.
         DWORD processId = running.front();
-        amk::PolicyVerdict verdict = amk::DecideInjection(version, safeMode.IsActive(), signature, knownVersions);
+        ampify::PolicyVerdict verdict = ampify::DecideInjection(version, safeMode.IsActive(), signature, knownVersions);
         bool inject = verdict.allowed && kernelPresent;
-        journal.Write("Apple Music déjà ouvert (processus " + std::to_string(processId) + ") : " + verdict.reason);
+        journal.Write("Apple Music already open (process " + std::to_string(processId) + "): " + verdict.reason);
 
         bool injected = inject && InjectInto(journal, processId, kernelDll,
                                              "AppleMusic.exe (" + std::to_string(processId) + ")");
@@ -216,26 +216,26 @@ int Run(amk::Journal& journal, const std::filesystem::path& kit) {
     }
 
     bool safe = safeMode.BeginLaunch();
-    amk::PolicyVerdict verdict = amk::DecideInjection(version, safe, signature, knownVersions);
+    ampify::PolicyVerdict verdict = ampify::DecideInjection(version, safe, signature, knownVersions);
     journal.Write(verdict.reason);
     bool inject = verdict.allowed && kernelPresent;
 
-    std::wstring appId = ToWide(amk::kAppUserModelId);
+    std::wstring appId = ToWide(ampify::kAppUserModelId);
     DWORD processId = 0;
-    // app_launch_flags: extra arguments for Apple Music. An invalid value is written to the journal and not passed.
-    amk::Settings settings;
+    // app_launch_flags: extra arguments for Apple Music. An invalid value is written to the log and not passed.
+    ampify::Settings settings;
     settings.Load((kit / "settings.txt").string());
     std::string flagsError;
-    std::string flags = amk::AppLaunchArguments(settings.GetString(std::string(amk::kLaunchFlagsKey), ""), &flagsError);
-    if (!flagsError.empty()) journal.Write(flagsError + " : aucun argument passé à Apple Music");
-    if (!flags.empty()) journal.Write("Arguments passés à Apple Music : " + flags);
-    HRESULT activationHr = amk::launcher::ActivateApp(appId.c_str(), &processId, ToWide(flags));
+    std::string flags = ampify::AppLaunchArguments(settings.GetString(std::string(ampify::kLaunchFlagsKey), ""), &flagsError);
+    if (!flagsError.empty()) journal.Write(flagsError + ": no argument passed to Apple Music");
+    if (!flags.empty()) journal.Write("Arguments passed to Apple Music: " + flags);
+    HRESULT activationHr = ampify::launcher::ActivateApp(appId.c_str(), &processId, ToWide(flags));
     if (FAILED(activationHr)) {
-        journal.Write("Activation refusée (" + HResultText(activationHr) + ")");
-        Alert(L"Apple Music n'a pas pu démarrer.");
+        journal.Write("Activation refused (" + HResultText(activationHr) + ")");
+        Alert(L"Apple Music could not start.");
         return 1;
     }
-    journal.Write("Apple Music démarré (processus " + std::to_string(processId) + ")");
+    journal.Write("Apple Music started (process " + std::to_string(processId) + ")");
 
     // Without a kernel in the app, nothing reports health. The launcher then does it, so a launch that does not
     // inject (safe mode, unknown build, failed load) still clears the count and cannot lock the mods out for good.
@@ -249,15 +249,15 @@ int Run(amk::Journal& journal, const std::filesystem::path& kit) {
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
-    std::ofstream file(amk::win::JournalFile("launcher.log"), std::ios::trunc);
-    amk::Journal journal(file, amk::Journal::LocalTimeStamp);
+    std::ofstream file(ampify::win::JournalFile("launcher.log"), std::ios::trunc);
+    ampify::Journal journal(file, ampify::Journal::LocalTimeStamp);
 
     int code = 1;
     try {
-        code = Run(journal, amk::win::KitDirectory());
+        code = Run(journal, ampify::win::KitDirectory());
     } catch (const std::exception& error) {
-        journal.Write(std::string("Erreur inattendue : ") + error.what());
-        Alert(L"Le lanceur a rencontré une erreur. Voir le journal dans AppleMusicModKit\\journal.");
+        journal.Write(std::string("Unexpected error: ") + error.what());
+        Alert(L"The launcher hit an error. See the log in Ampify\\logs.");
     }
 
     CoUninitialize();

@@ -11,7 +11,7 @@
 
 #include "platform.hpp"
 
-namespace amk::platform {
+namespace ampify::platform {
 
 namespace {
 
@@ -34,16 +34,7 @@ std::vector<std::string> Initialize(int argc, char** argv) {
 
 std::filesystem::path DefaultKitDirectory() {
     const char* home = std::getenv("HOME");
-    return std::filesystem::path(home ? home : ".") / "AppleMusicModKit";
-}
-
-std::string UserLocale() {
-    // The first variable set wins, as for any POSIX program reading its messages language.
-    for (const char* name : {"LC_ALL", "LC_MESSAGES", "LANG"}) {
-        const char* value = std::getenv(name);
-        if (value && *value) return value;
-    }
-    return {};
+    return std::filesystem::path(home ? home : ".") / "Ampify";
 }
 
 std::filesystem::path ExecutableDirectory() {
@@ -111,4 +102,4 @@ bool IsProcessRunning(const std::string& imageName) {
     return Run({"pgrep", "-x", imageName}) == 0;
 }
 
-}  // namespace amk::platform
+}  // namespace ampify::platform

@@ -1,10 +1,10 @@
-// Module keyboard: AMK.keyboard, global shortcuts. Natives: core/natives/keyboard.cpp. The Windows host reads the
+// Module keyboard: Ampify.keyboard, global shortcuts. Natives: core/natives/keyboard.cpp. The Windows host reads the
 // key names that normalizeCombo writes (win/win_host.cpp).
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kKeyboard[];
-const char kKeyboard[] = R"AMKJS(
+const char kKeyboard[] = R"AMPIFYJS(
   // Key names are written in any case ("right", "Right"): they are matched in lowercase, then written as here.
   const KEY_NAMES = [
     "Left", "Right", "Up", "Down", "Space", "Enter", "Escape", "Tab", "Backspace", "Delete", "Home", "End",
@@ -18,11 +18,11 @@ const char kKeyboard[] = R"AMKJS(
   function normalizeCombo(input) {
     const parts = text(input).split("+").map((part) => part.trim()).filter((part) => part.length > 0);
     const key = parts.pop();
-    if (key === undefined) throw new RangeError("raccourci vide");
+    if (key === undefined) throw new RangeError("empty shortcut");
     const mods = new Set();
     for (const part of parts) {
       const mod = MODIFIERS[part.toLowerCase()];
-      if (!mod) throw new RangeError("modificateur inconnu : " + part);
+      if (!mod) throw new RangeError("unknown modifier: " + part);
       mods.add(mod);
     }
     const lower = key.toLowerCase();
@@ -30,19 +30,19 @@ const char kKeyboard[] = R"AMKJS(
     if (key.length === 1 && /[A-Za-z0-9]/.test(key)) name = key.toUpperCase();
     else if (/^f([1-9]|1[0-9]|2[0-4])$/.test(lower)) name = key.toUpperCase();
     else if (KEY_CANONICAL.has(lower)) name = KEY_CANONICAL.get(lower);
-    else throw new RangeError("touche inconnue : " + key);
+    else throw new RangeError("unknown key: " + key);
     // Function keys and media keys may stand alone; every other key needs a modifier.
-    if (mods.size === 0 && !/^F[0-9]|^Media/.test(name)) throw new RangeError("raccourci sans modificateur : " + input);
+    if (mods.size === 0 && !/^F[0-9]|^Media/.test(name)) throw new RangeError("shortcut without a modifier: " + input);
     return ["Ctrl", "Alt", "Shift", "Win"].filter((mod) => mods.has(mod)).concat([name]).join("+");
   }
 
   const keyHandlers = new Map();
 
-  AMK.keyboard = {
+  Ampify.keyboard = {
     bind(combo, fn) {
-      if (typeof fn !== "function") throw new TypeError("keyboard.bind attend une fonction");
+      if (typeof fn !== "function") throw new TypeError("keyboard.bind expects a function");
       const normalized = normalizeCombo(combo);
-      if (!native.bindKey(normalized)) throw new Error("raccourci indisponible : " + normalized);
+      if (!native.bindKey(normalized)) throw new Error("shortcut not available: " + normalized);
       keyHandlers.set(normalized, fn);
       return normalized;
     },
@@ -50,8 +50,8 @@ const char kKeyboard[] = R"AMKJS(
 
   dispatch.key = (combo) => {
     const fn = keyHandlers.get(combo);
-    if (fn) runGuarded("raccourci " + combo, fn, []);
+    if (fn) runGuarded("shortcut " + combo, fn, []);
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

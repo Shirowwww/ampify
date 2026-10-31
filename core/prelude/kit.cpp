@@ -1,17 +1,17 @@
-// Module kit: AMK.kit, the kit's own command line for the Marketplace page. Permission kit.manage, reserved to the
+// Module kit: Ampify.kit, the kit's own command line for the Marketplace page. Permission kit.manage, reserved to the
 // Marketplace that ships with the kit. Natives: core/natives/kit.cpp.
 
-namespace amk::prelude {
+namespace ampify::prelude {
 
 extern const char kKit[];
-const char kKit[] = R"AMKJS(
+const char kKit[] = R"AMPIFYJS(
   const kitRuns = new Map();
   let kitNextRun = 1;
 
-  AMK.kit = Object.freeze({
-    // Runs amk with these arguments ("install", "demo", "--yes") and resolves with { code, out, err }.
+  Ampify.kit = Object.freeze({
+    // Runs ampify with these arguments ("install", "demo", "--yes") and resolves with { code, out, err }.
     run(args) {
-      if (!Array.isArray(args) || args.length === 0) throw new TypeError("kit.run attend une liste d'arguments");
+      if (!Array.isArray(args) || args.length === 0) throw new TypeError("kit.run expects a list of arguments");
       const id = kitNextRun++;
       return new Promise((resolve) => {
         kitRuns.set(id, resolve);
@@ -32,6 +32,6 @@ const char kKit[] = R"AMKJS(
     kitRuns.delete(result.id);
     resolve({ code: result.code, out: result.out, err: result.err });
   };
-)AMKJS";
+)AMPIFYJS";
 
-}  // namespace amk::prelude
+}  // namespace ampify::prelude

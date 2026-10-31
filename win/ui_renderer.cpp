@@ -2,7 +2,7 @@
 // The style copying follows AMExclusive (MIT, https://github.com/AntiOblivionis/AMExclusive, mod/src/UiAdapter.cpp,
 // AttachOrRefreshToggle, at 91f589d): native Style, margins and padding first, WinUI card resources otherwise.
 
-#if defined(AMK_WITH_XAML)
+#if defined(AMPIFY_WITH_XAML)
 
 #include "ui_renderer.hpp"
 
@@ -21,7 +21,7 @@
 #include "../core/ui_render/probe.hpp"
 #include "../core/ui_render/svg_icon.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
@@ -779,6 +779,6 @@ void XamlRenderer::Rewrite(Mounted& mounted) {
     }
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win
 
-#endif  // AMK_WITH_XAML
+#endif  // AMPIFY_WITH_XAML

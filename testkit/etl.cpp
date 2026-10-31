@@ -7,7 +7,7 @@
 
 #include "../win/win_common.hpp"
 
-namespace amk::testkit {
+namespace ampify::testkit {
 
 namespace {
 
@@ -27,7 +27,7 @@ constexpr Provider kProviders[] = {
 };
 
 std::filesystem::path LogmanPath() {
-    return amk::win::KnownFolder(FOLDERID_System) / L"logman.exe";
+    return ampify::win::KnownFolder(FOLDERID_System) / L"logman.exe";
 }
 
 }  // namespace
@@ -40,11 +40,11 @@ int StartTrace(const std::filesystem::path& etlFile, bool firstProviderOnly) {
         parameters += std::wstring(L" -p \"") + kProviders[i].name + L"\" " + kProviders[i].keywords + L" " +
                       kProviders[i].level;
     }
-    return amk::win::RunElevatedAndWait(LogmanPath(), parameters);
+    return ampify::win::RunElevatedAndWait(LogmanPath(), parameters);
 }
 
 int StopTrace() {
-    return amk::win::RunElevatedAndWait(LogmanPath(), std::wstring(L"stop ") + kTraceSession + L" -ets");
+    return ampify::win::RunElevatedAndWait(LogmanPath(), std::wstring(L"stop ") + kTraceSession + L" -ets");
 }
 
-}  // namespace amk::testkit
+}  // namespace ampify::testkit

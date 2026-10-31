@@ -13,11 +13,11 @@
 #include "platform.hpp"
 #include "sha256.hpp"
 
-#ifndef AMK_VERSION
-#define AMK_VERSION "0.0.0-dev"
+#ifndef AMPIFY_VERSION
+#define AMPIFY_VERSION "0.0.0-dev"
 #endif
 
-namespace amk::cli {
+namespace ampify::cli {
 
 namespace {
 
@@ -71,9 +71,9 @@ std::optional<std::filesystem::path> PathSetting(const Context& ctx, const std::
 
 int CmdDevtools(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() > 2) return Usage(ctx, "devtools prend on, off, ou rien (pour on)");
+    if (args.size() > 2) return Usage(ctx, "devtools takes on, off, or nothing (for on)");
     std::string action = args.size() == 2 ? args[1] : "on";
-    if (action != "on" && action != "off") return Usage(ctx, "devtools prend on ou off, pas " + action);
+    if (action != "on" && action != "off") return Usage(ctx, "devtools takes on or off, not " + action);
 
     Settings settings;
     std::string error;
@@ -82,129 +82,129 @@ int CmdDevtools(Context& ctx) {
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
 
     if (action == "off") {
-        ctx.out << "Inspecteur désactivé (theme.inspect = 0).\n";
+        ctx.out << "Inspector turned off (theme.inspect = 0).\n";
         return 0;
     }
-    ctx.out << "Inspecteur activé (theme.inspect = 1).\n"
-            << "Au prochain passage du noyau dans Apple Music (lancé avec amk launch), l'arbre de l'interface sera écrit\n"
-            << "dans " << Utf8(InspectorFile(ctx.kit)) << ", puis le noyau remettra theme.inspect à 0.\n"
-            << "Affiche-le avec : amk inspect --tree\n"
-            << "Il faut un noyau avec le moteur de thèmes XAML (M8). Sans lui, aucun fichier n'est écrit.\n";
+    ctx.out << "Inspector turned on (theme.inspect = 1).\n"
+            << "The next time the kernel runs in Apple Music (started with ampify launch), the interface tree is written\n"
+            << "to " << Utf8(InspectorFile(ctx.kit)) << ", then the kernel sets theme.inspect back to 0.\n"
+            << "Show it with: ampify inspect --tree\n"
+            << "This needs a kernel with the XAML theme engine. Without it, no file is written.\n";
     return 0;
 }
 
 int CmdInspectTree(Context& ctx) {
-    if (ctx.options.positional.size() != 1) return Usage(ctx, "inspect --tree ne prend pas d'argument");
+    if (ctx.options.positional.size() != 1) return Usage(ctx, "inspect --tree takes no argument");
     std::filesystem::path file = InspectorFile(ctx.kit);
     std::string text;
     if (!ReadWholeFile(file, text)) {
-        return Failure(ctx, "aucun arbre d'interface pour l'instant (" + Utf8(file) +
-                                " absent). Lance amk devtools, puis Apple Music avec amk launch.");
+        return Failure(ctx, "no interface tree yet (" + Utf8(file) +
+                                " is missing). Run ampify devtools, then Apple Music with ampify launch.");
     }
-    ctx.out << "Arbre de l'interface écrit par le noyau (" << Utf8(file) << ") :\n" << text;
+    ctx.out << "Interface tree written by the kernel (" << Utf8(file) << "):\n" << text;
     if (!text.empty() && text.back() != '\n') ctx.out << "\n";
     return 0;
 }
 
 int CmdConfigDir(Context& ctx) {
-    if (ctx.options.positional.size() != 1) return Usage(ctx, "config --dir ne prend pas d'argument");
+    if (ctx.options.positional.size() != 1) return Usage(ctx, "config --dir takes no argument");
     std::error_code ec;
     std::filesystem::create_directories(ctx.kit.Root(), ec);
     ctx.out << Utf8(ctx.kit.Root()) << "\n";
     std::vector<std::string> command = platform::OpenFolderCommand(ctx.kit.Root());
     if (ctx.options.dryRun) {
-        ctx.out << "Commande :";
+        ctx.out << "Command:";
         for (const std::string& part : command) ctx.out << " " << part;
         ctx.out << "\n";
         return 0;
     }
-    if (!platform::StartDetached(command)) return Failure(ctx, "ouverture du dossier impossible");
+    if (!platform::StartDetached(command)) return Failure(ctx, "cannot open the folder");
     return 0;
 }
 
 int CmdVersions(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     std::string action = args.size() > 1 ? args[1] : "list";
-    if (args.size() > 2) return Usage(ctx, "versions prend list ou update");
+    if (args.size() > 2) return Usage(ctx, "versions takes list or update");
     std::filesystem::path listFile = ctx.kit.Root() / std::string(kVersionListFile);
 
     if (action == "list") {
         std::vector<std::string> extra = LoadVersionList(listFile);
-        ctx.out << "Versions d'Apple Music acceptées par le noyau :\n";
+        ctx.out << "Apple Music versions accepted by the kernel:\n";
         for (std::string_view version : kKnownAppVersions) {
-            ctx.out << "  " << Pad(version, 20) << "intégrée au noyau\n";
+            ctx.out << "  " << Pad(version, 20) << "built into the kernel\n";
         }
         for (const std::string& version : extra) {
             if (IsKnownAppVersion(version)) continue;
-            ctx.out << "  " << Pad(version, 20) << "versions.txt (amk versions update)\n";
+            ctx.out << "  " << Pad(version, 20) << "versions.txt (ampify versions update)\n";
         }
         std::error_code ec;
         if (std::filesystem::exists(listFile, ec) && extra.empty()) {
-            ctx.out << "Attention : " << Utf8(listFile) << " est illisible ou vide, il est ignoré.\n";
+            ctx.out << "Warning: " << Utf8(listFile) << " is unreadable or empty, it is ignored.\n";
         }
 
-        ctx.out << "À chaque lancement, " << kPlayerDllName << " doit aussi exporter :";
+        ctx.out << "At each start, " << kPlayerDllName << " must also export:";
         for (std::string_view name : kRequiredPlayerExports) ctx.out << " " << name;
         ctx.out << "\n";
 
         std::optional<std::filesystem::path> folder = platform::AppPackageFolder();
         if (!folder) {
-            ctx.out << "Apple Music installé : introuvable sur ce système.\n";
+            ctx.out << "Installed Apple Music: not found on this system.\n";
             return 0;
         }
         std::string installed = AppleMusicVersion(Utf8(folder->filename()));
         if (installed.empty()) {
-            ctx.out << "Apple Music installé : version illisible (" << Utf8(*folder) << ").\n";
+            ctx.out << "Installed Apple Music: unreadable version (" << Utf8(*folder) << ").\n";
             return 0;
         }
         bool known = IsKnownAppVersion(installed, KnownAppVersionsWith(extra));
-        ctx.out << "Apple Music installé : " << installed
-                << (known ? " (testée)\n" : " (non testée : le noyau reste inactif. Essaie amk versions update)\n");
+        ctx.out << "Installed Apple Music: " << installed
+                << (known ? " (tested)\n" : " (not tested: the kernel stays off. Try ampify versions update)\n");
         return 0;
     }
 
-    if (action != "update") return Usage(ctx, "action inconnue pour versions : " + action);
+    if (action != "update") return Usage(ctx, "unknown action for versions: " + action);
 
     Catalog catalog;
     bool local = false;
     if (!LoadCatalog(ctx, catalog, local)) return 1;
-    if (catalog.versionsUrl.empty()) return Failure(ctx, "le catalogue ne publie pas de liste de versions");
-    if (!IsAllowedDownloadUrl(catalog.versionsUrl, local)) return Failure(ctx, "adresse refusée : " + catalog.versionsUrl);
+    if (catalog.versionsUrl.empty()) return Failure(ctx, "the catalog does not publish a list of versions");
+    if (!IsAllowedDownloadUrl(catalog.versionsUrl, local)) return Failure(ctx, "address refused: " + catalog.versionsUrl);
 
     std::error_code ec;
     std::filesystem::create_directories(ctx.kit.Downloads(), ec);
     std::filesystem::path part = ctx.kit.Downloads() / "versions.json.part";
     std::string error;
-    ctx.out << "Téléchargement de la liste des versions testées...\n" << std::flush;
+    ctx.out << "Downloading the list of tested versions...\n" << std::flush;
     std::string text;
     bool fetched = FetchTo(catalog.versionsUrl, part, error) && ReadWholeFile(part, text);
     std::optional<std::string> digest = fetched ? Sha256File(part) : std::nullopt;
     std::filesystem::remove(part, ec);
-    if (!fetched) return Failure(ctx, error.empty() ? "liste des versions illisible" : error);
+    if (!fetched) return Failure(ctx, error.empty() ? "unreadable list of versions" : error);
     if (!digest || *digest != catalog.versionsSha256) {
-        return Failure(ctx, "empreinte SHA-256 différente de celle du catalogue : liste refusée");
+        return Failure(ctx, "SHA-256 differs from the catalog's: list refused");
     }
 
     std::vector<std::string> problems;
     std::optional<VersionsCatalog> versions = ParseVersionsCatalog(text, problems);
     if (!versions) {
-        ctx.err << "amk : liste des versions invalide\n";
+        ctx.err << "ampify: invalid list of versions\n";
         for (const std::string& problem : problems) ctx.err << "  - " << problem << "\n";
         return 1;
     }
     std::vector<std::string> rejected;
     std::vector<std::string> usable = UsableVersions(*versions, kRequiredPlayerExports, rejected);
-    for (const std::string& version : rejected) ctx.out << "  ignorée    " << version << "\n";
+    for (const std::string& version : rejected) ctx.out << "  ignored    " << version << "\n";
 
     if (!WriteTextFile(listFile,
-                       FormatVersionList(usable, "Écrit par amk versions update. Relance cette commande pour le mettre à jour."),
+                       FormatVersionList(usable, "Written by ampify versions update. Run that command again to update it."),
                        error)) {
         return Failure(ctx, error);
     }
-    for (const std::string& version : usable) ctx.out << "  testée     " << version << "\n";
-    ctx.out << usable.size() << " version(s) écrite(s) dans " << Utf8(listFile)
-            << ". Le noyau les accepte au prochain lancement d'Apple Music (amk launch), si "
-            << kPlayerDllName << " a toujours les exports attendus.\n";
+    for (const std::string& version : usable) ctx.out << "  tested     " << version << "\n";
+    ctx.out << usable.size() << " version(s) written to " << Utf8(listFile)
+            << ". The kernel accepts them the next time Apple Music starts (ampify launch), if "
+            << kPlayerDllName << " still has the expected exports.\n";
     return 0;
 }
 
@@ -227,9 +227,9 @@ void NotifyKitUpdate(Context& ctx) {
         std::string writeError;
         WriteTextFile(file, "checked=" + std::to_string(now) + "\nlatest=" + cache.latest + "\n", writeError);
     }
-    if (!IsValidVersion(cache.latest) || CompareReleaseVersions(cache.latest, AMK_VERSION) <= 0) return;
-    ctx.err << "amk : la version " << cache.latest << " du kit est disponible (installée : " << AMK_VERSION
-            << "). Lance amk update pour la télécharger.\n";
+    if (!IsValidVersion(cache.latest) || CompareReleaseVersions(cache.latest, AMPIFY_VERSION) <= 0) return;
+    ctx.err << "ampify: version " << cache.latest << " of Ampify is available (installed: " << AMPIFY_VERSION
+            << "). Run ampify update to download it.\n";
 }
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

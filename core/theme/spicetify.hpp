@@ -6,8 +6,8 @@
 #include <vector>
 
 // Spicetify's color.ini, read as is: its keys (main, sidebar, player, text...) are translated to Apple Music's own
-// elements and to the Fluent brushes that play the same part. See docs/themes/SPICETIFY.md.
-namespace amk::theme {
+// elements and to the Fluent brushes that play the same part. See docs/themes/spicetify.md.
+namespace ampify::theme {
 
 // The Spicetify name of `key`, lowercase: a current key (main, main-elevated, text...) or the current name of a
 // Spicetify 1 key (main_fg is text). Empty when `key` is not a Spicetify colour.
@@ -24,4 +24,4 @@ const std::vector<SpicetifyResource>& SpicetifyResources();
 // user.css text. A theme's own user.css goes after it and wins. Empty when no key has a rule.
 std::string SpicetifyStylesheet(const std::set<std::string>& defined);
 
-}  // namespace amk::theme
+}  // namespace ampify::theme

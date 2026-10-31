@@ -8,7 +8,7 @@
 
 #include "../core/apple_music.hpp"
 
-namespace amk::launcher {
+namespace ampify::launcher {
 
 
 std::optional<InstalledPackage> FindInstalledPackage(const wchar_t* familyName) {
@@ -31,8 +31,8 @@ std::optional<InstalledPackage> FindInstalledPackage(const wchar_t* familyName) 
     std::string newestVersion;
     for (UINT32 i = 0; i < count; ++i) {
         std::wstring candidate = names[i];
-        std::string version = amk::AppleMusicVersion(std::string(candidate.begin(), candidate.end()));
-        if (fullName.empty() || amk::CompareVersions(version, newestVersion) > 0) {
+        std::string version = ampify::AppleMusicVersion(std::string(candidate.begin(), candidate.end()));
+        if (fullName.empty() || ampify::CompareVersions(version, newestVersion) > 0) {
             fullName = candidate;
             newestVersion = version;
         }
@@ -64,4 +64,4 @@ HRESULT ActivateApp(const wchar_t* appUserModelId, DWORD* processId, const std::
     return hr;
 }
 
-}  // namespace amk::launcher
+}  // namespace ampify::launcher

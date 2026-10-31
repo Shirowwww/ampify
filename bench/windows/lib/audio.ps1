@@ -5,12 +5,12 @@
 
 Set-StrictMode -Version Latest
 
-if (-not ('AmkAudio.Endpoints' -as [type])) {
+if (-not ('AmpifyAudio.Endpoints' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 
-namespace AmkAudio {
+namespace AmpifyAudio {
     [StructLayout(LayoutKind.Sequential)]
     public struct PropertyKey { public Guid fmtid; public int pid; }
 
@@ -156,14 +156,14 @@ namespace AmkAudio {
             SpatialState state = new SpatialState();
             IMMDevice device;
             if (Enumerator().GetDefaultAudioEndpoint(eRender, eConsole, out device) != 0 || device == null) {
-                state.Error = "aucun périphérique de sortie par défaut";
+                state.Error = "no default output device";
                 return state;
             }
             Guid iid = new Guid("BBF8E066-AAAA-49BE-9A4D-FD2A858EA27F");
             object raw;
             int hr = device.Activate(ref iid, CLSCTX_ALL, IntPtr.Zero, out raw);
             if (hr != 0 || raw == null) {
-                state.Error = string.Format("ISpatialAudioClient indisponible (0x{0:X8})", hr);
+                state.Error = string.Format("ISpatialAudioClient not available (0x{0:X8})", hr);
                 return state;
             }
             ISpatialAudioClient client = (ISpatialAudioClient)raw;
@@ -182,35 +182,35 @@ namespace AmkAudio {
 
 # Active render endpoints (name and id).
 function Get-RenderEndpoints {
-    return @([AmkAudio.Endpoints]::ActiveRender())
+    return @([AmpifyAudio.Endpoints]::ActiveRender())
 }
 
 # Default render endpoint, or $null.
 function Get-DefaultRenderEndpoint {
-    return [AmkAudio.Endpoints]::DefaultRender()
+    return [AmpifyAudio.Endpoints]::DefaultRender()
 }
 
 function Set-DefaultRenderEndpoint {
     param([Parameter(Mandatory)][string]$Id)
-    return [AmkAudio.Endpoints]::SetDefault($Id)
+    return [AmpifyAudio.Endpoints]::SetDefault($Id)
 }
 
 function Format-HResult {
     param([int]$Value)
-    if ($Value -eq 0) { return 'oui' }
-    return ('non (0x{0:X8})' -f $Value)
+    if ($Value -eq 0) { return 'yes' }
+    return ('no (0x{0:X8})' -f $Value)
 }
 
 # One line on ISpatialAudioClient for the log.
 function Get-SpatialAudioSummary {
-    $state = [AmkAudio.Endpoints]::Spatial()
+    $state = [AmpifyAudio.Endpoints]::Spatial()
     if ($state.Error) { return $state.Error }
-    return "objets dynamiques max : $($state.MaxDynamicObjects) ; flux d'objets : $(Format-HResult $state.ObjectStreamHr) ; " +
-        "flux à métadonnées (Atmos) : $(Format-HResult $state.MetadataStreamHr)"
+    return "max dynamic objects: $($state.MaxDynamicObjects); object stream: $(Format-HResult $state.ObjectStreamHr); " +
+        "metadata stream (Atmos): $(Format-HResult $state.MetadataStreamHr)"
 }
 
 function Get-SpatialAudioState {
-    return [AmkAudio.Endpoints]::Spatial()
+    return [AmpifyAudio.Endpoints]::Spatial()
 }
 
 # Spatial sound format of the default render device, read (and set with -Enable) through the WinRT class
@@ -228,17 +228,17 @@ try {
     $null = [Windows.Media.Audio.SpatialAudioFormatSubtype,Windows.Media.Audio,ContentType=WindowsRuntime]
     $null = [Windows.Media.Audio.SetDefaultSpatialAudioFormatResult,Windows.Media.Audio,ContentType=WindowsRuntime]
     $id = [Windows.Media.Devices.MediaDevice]::GetDefaultAudioRenderId([Windows.Media.Devices.AudioDeviceRole]::Default)
-    if (-not $id) { 'aucun périphérique de sortie par défaut (WinRT)'; exit 0 }
+    if (-not $id) { 'no default output device (WinRT)'; exit 0 }
     $config = [Windows.Media.Audio.SpatialAudioDeviceConfiguration]::GetForDeviceId($id)
     $sonic = [Windows.Media.Audio.SpatialAudioFormatSubtype]::WindowsSonic
     $atmos = [Windows.Media.Audio.SpatialAudioFormatSubtype]::DolbyAtmosForHeadphones
     function Show-State {
-        "son spatial pris en charge : $($config.IsSpatialAudioSupported)"
-        "Windows Sonic pris en charge : $($config.IsSpatialAudioFormatSupported($sonic))"
-        "Dolby Atmos for Headphones pris en charge : $($config.IsSpatialAudioFormatSupported($atmos))"
-        $active = if ($config.ActiveSpatialAudioFormat -eq $sonic) { 'Windows Sonic' } elseif ($config.ActiveSpatialAudioFormat) { $config.ActiveSpatialAudioFormat } else { 'aucun' }
-        $default = if ($config.DefaultSpatialAudioFormat -eq $sonic) { 'Windows Sonic' } elseif ($config.DefaultSpatialAudioFormat) { $config.DefaultSpatialAudioFormat } else { 'aucun' }
-        "format spatial actif : $active ; par défaut : $default"
+        "spatial sound supported: $($config.IsSpatialAudioSupported)"
+        "Windows Sonic supported: $($config.IsSpatialAudioFormatSupported($sonic))"
+        "Dolby Atmos for Headphones supported: $($config.IsSpatialAudioFormatSupported($atmos))"
+        $active = if ($config.ActiveSpatialAudioFormat -eq $sonic) { 'Windows Sonic' } elseif ($config.ActiveSpatialAudioFormat) { $config.ActiveSpatialAudioFormat } else { 'none' }
+        $default = if ($config.DefaultSpatialAudioFormat -eq $sonic) { 'Windows Sonic' } elseif ($config.DefaultSpatialAudioFormat) { $config.DefaultSpatialAudioFormat } else { 'none' }
+        "active spatial format: $active; default: $default"
     }
     Show-State
     if (__ENABLE__ -and $config.ActiveSpatialAudioFormat -ne $sonic) {
@@ -249,12 +249,12 @@ try {
         $operation = $config.SetDefaultSpatialAudioFormatAsync($sonic)
         $task = $asTask.MakeGenericMethod([Windows.Media.Audio.SetDefaultSpatialAudioFormatResult]).Invoke($null, @($operation))
         $null = $task.Wait(30000)
-        "activation de Windows Sonic : $($task.Result.Status)"
+        "Windows Sonic activation: $($task.Result.Status)"
         Start-Sleep -Seconds 2
         Show-State
     }
 } catch {
-    "son spatial (WinRT) : erreur : $($_.Exception.Message)"
+    "spatial sound (WinRT): error: $($_.Exception.Message)"
 }
 '@
     $script = $script.Replace('__ENABLE__', $(if ($Enable) { '$true' } else { '$false' }))

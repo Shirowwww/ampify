@@ -4,11 +4,11 @@
 
 #include <future>
 
-namespace amk::win {
+namespace ampify::win {
 
 namespace {
 
-constexpr wchar_t kWindowClass[] = L"AMKTrayIcon";
+constexpr wchar_t kWindowClass[] = L"AmpifyTrayIcon";
 constexpr UINT kIconId = 1;
 
 void FillIcon(NOTIFYICONDATAW& icon, HWND window) {
@@ -38,10 +38,10 @@ bool TrayIcon::Start(const std::wstring& tooltip, OnCommand onCommand, std::stri
         windowClass.lpszClassName = kWindowClass;
         RegisterClassExW(&windowClass);  // fails harmlessly when already registered by an earlier icon
 
-        HWND window = CreateWindowExW(0, kWindowClass, L"AMKTray", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance,
+        HWND window = CreateWindowExW(0, kWindowClass, L"AmpifyTray", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance,
                                       nullptr);
         if (!window) {
-            started.set_value("fenêtre impossible à créer (code " + std::to_string(GetLastError()) + ")");
+            started.set_value("could not create the window (code " + std::to_string(GetLastError()) + ")");
             return;
         }
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
@@ -54,7 +54,7 @@ bool TrayIcon::Start(const std::wstring& tooltip, OnCommand onCommand, std::stri
         wcsncpy_s(icon.szTip, m_tooltip.c_str(), _TRUNCATE);
         if (!Shell_NotifyIconW(NIM_ADD, &icon)) {
             DestroyWindow(window);
-            started.set_value("Shell_NotifyIcon a refusé l'icône");
+            started.set_value("Shell_NotifyIcon refused the icon");
             return;
         }
         m_window = window;
@@ -138,4 +138,4 @@ LRESULT CALLBACK TrayIcon::WindowProc(HWND window, UINT message, WPARAM wParam, 
     }
 }
 
-}  // namespace amk::win
+}  // namespace ampify::win

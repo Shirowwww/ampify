@@ -7,20 +7,20 @@
 namespace {
 
 // Pretends that every file of `files` exists in the element's folder.
-amk::ManifestResult Check(const std::string& json, const std::string& folder, std::set<std::string> files = {"main.js"}) {
-    return amk::ParseManifest(json, folder, 1, [&](const std::string& file) { return files.count(file) > 0; });
+ampify::ManifestResult Check(const std::string& json, const std::string& folder, std::set<std::string> files = {"main.js"}) {
+    return ampify::ParseManifest(json, folder, 1, [&](const std::string& file) { return files.count(file) > 0; });
 }
 
 const std::string kHello = R"({
-  "id": "hello-extension", "name": "Bonjour", "version": "0.1.0", "kind": "extension",
-  "author": "Shirowwww", "description": "Exemple.", "kitApi": "1.0", "main": "main.js",
+  "id": "hello-extension", "name": "Hello", "version": "0.1.0", "kind": "extension",
+  "author": "Shirowwww", "description": "Example.", "kitApi": "1.0", "main": "main.js",
   "permissions": ["storage", "network:api.listenbrainz.org"]
 })";
 
 }  // namespace
 
 TEST_CASE(Manifest_AcceptsAValidExtension) {
-    amk::ManifestResult result = Check(kHello, "hello-extension");
+    ampify::ManifestResult result = Check(kHello, "hello-extension");
     CHECK(result.errors.empty());
     CHECK(result.manifest.has_value());
     CHECK(result.manifest->HasPermission("storage"));
@@ -45,20 +45,20 @@ TEST_CASE(Manifest_RejectsUnknownAndDuplicatePermissions) {
 TEST_CASE(Manifest_AcceptsEveryPermissionOfTheV2Schema) {
     for (const char* permission : {"ipc.discord", "midi.input", "library.write", "services.read", "ui.panel",
                                    "ui.window", "ui.tray", "audio.gain", "player.control"}) {
-        CHECK(amk::IsKnownPermission(permission));
+        CHECK(ampify::IsKnownPermission(permission));
     }
-    CHECK(!amk::IsKnownPermission("network:Api.Example.com"));  // hosts are lowercase
-    CHECK(!amk::IsKnownPermission("fs.write"));
+    CHECK(!ampify::IsKnownPermission("network:Api.Example.com"));  // hosts are lowercase
+    CHECK(!ampify::IsKnownPermission("fs.write"));
 }
 
 TEST_CASE(Manifest_RunsInTheInterfaceUnlessDeclared) {
-    amk::ManifestResult plain = Check(kHello, "hello-extension");
+    ampify::ManifestResult plain = Check(kHello, "hello-extension");
     CHECK(plain.manifest->RunsIn("ui"));
     CHECK(!plain.manifest->RunsIn("engine"));
 
     std::string both = kHello;
     both.insert(both.find("\"main\""), "\"processes\": [\"ui\", \"engine\"], ");
-    amk::ManifestResult result = Check(both, "hello-extension");
+    ampify::ManifestResult result = Check(both, "hello-extension");
     CHECK(result.manifest.has_value());
     CHECK(result.manifest->RunsIn("ui"));
     CHECK(result.manifest->RunsIn("engine"));
@@ -95,7 +95,7 @@ TEST_CASE(Manifest_RequiresMainForExtensionsAndForbidsItForSnippets) {
 }
 
 TEST_CASE(Manifest_RequiresColorsOrResourcesForThemes) {
-    std::string theme = R"({"id":"night","name":"Nuit","version":"1.0.0","kind":"theme","author":"a",
+    std::string theme = R"({"id":"night","name":"Night","version":"1.0.0","kind":"theme","author":"a",
         "description":"d","kitApi":"1.0"})";
     CHECK(!Check(theme, "night").manifest);
     std::string withColors = theme.substr(0, theme.size() - 1) + R"(,"colors":"colors.ini"})";
@@ -103,7 +103,7 @@ TEST_CASE(Manifest_RequiresColorsOrResourcesForThemes) {
 }
 
 TEST_CASE(Manifest_ReportsMissingFiles) {
-    amk::ManifestResult result = Check(kHello, "hello-extension", {});
+    ampify::ManifestResult result = Check(kHello, "hello-extension", {});
     CHECK(!result.manifest);
     CHECK(!result.errors.empty());
 }
@@ -111,7 +111,7 @@ TEST_CASE(Manifest_ReportsMissingFiles) {
 TEST_CASE(Manifest_IgnoresUnknownFieldsWithAWarning) {
     std::string extra = kHello;
     extra.insert(extra.find("\"main\""), "\"futureField\": 1, ");
-    amk::ManifestResult result = Check(extra, "hello-extension");
+    ampify::ManifestResult result = Check(extra, "hello-extension");
     CHECK(result.manifest.has_value());
     CHECK(result.warnings.size() == 1);
 }
@@ -142,19 +142,19 @@ TEST_CASE(Manifest_SurvivesMutatedInput) {
             if (next() % 2) text.erase(at, 1);
             else text[at] = static_cast<char>(32 + next() % 95);
         }
-        amk::ManifestResult result = Check(text, "hello-extension");
+        ampify::ManifestResult result = Check(text, "hello-extension");
         // A manifest is either accepted with no error, or rejected with at least one message.
         CHECK(result.manifest.has_value() == result.errors.empty());
     }
 }
 
 TEST_CASE(Manifest_TypeIsScriptOrModule) {
-    amk::ManifestResult plain = Check(kHello, "hello-extension");
+    ampify::ManifestResult plain = Check(kHello, "hello-extension");
     CHECK(plain.manifest && !plain.manifest->module);
 
     std::string module = kHello;
     module.insert(module.find("\"main\""), "\"type\": \"module\", ");
-    amk::ManifestResult parsed = Check(module, "hello-extension");
+    ampify::ManifestResult parsed = Check(module, "hello-extension");
     CHECK(parsed.warnings.empty());
     CHECK(parsed.manifest && parsed.manifest->module);
 

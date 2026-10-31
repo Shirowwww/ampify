@@ -8,7 +8,7 @@
 
 #include "json.hpp"
 
-namespace amk::remote {
+namespace ampify::remote {
 
 namespace {
 
@@ -84,7 +84,7 @@ Response Error(int status, const std::string& message) {
 Response Ok(bool done) {
     Json body(Json::Object{});
     body.Set("ok", Json(done));
-    if (!done) body.Set("error", Json("Apple Music ne peut pas faire cette action maintenant"));
+    if (!done) body.Set("error", Json("Apple Music cannot do this right now"));
     return Response{done ? 200 : 409, body.Dump()};
 }
 
@@ -267,7 +267,7 @@ std::string NewToken() {
 }
 
 Response Router::Handle(const Request& request, bool peerLoopback, Backend& backend) const {
-    if (!peerLoopback) return Error(403, "seules les connexions locales (127.0.0.1) sont acceptées");
+    if (!peerLoopback) return Error(403, "only local connections (127.0.0.1) are accepted");
 
     auto header = [&](const char* name) -> const std::string* {
         auto found = request.headers.find(name);
@@ -277,34 +277,34 @@ Response Router::Handle(const Request& request, bool peerLoopback, Backend& back
     const std::string* host = header("host");
     std::string hostName = host ? HostWithoutPort(*host) : std::string();
     if (hostName != "127.0.0.1" && hostName != "localhost" && hostName != "[::1]") {
-        return Error(403, "en-tête Host refusé : utilise http://127.0.0.1:<port>");
+        return Error(403, "Host header refused: use http://127.0.0.1:<port>");
     }
     // A browser adds Origin to cross-site requests. The remote control is for local tools, not for web pages.
-    if (header("origin")) return Error(403, "requête venue d'une page web refusée");
-    if (request.method == "OPTIONS") return Error(403, "requête venue d'une page web refusée");
+    if (header("origin")) return Error(403, "request from a web page refused");
+    if (request.method == "OPTIONS") return Error(403, "request from a web page refused");
 
-    if (request.query.count("token")) return Error(400, "le jeton va dans l'en-tête X-AMK-Token, pas dans l'adresse");
-    if (!IsValidToken(m_token)) return Error(503, "aucun jeton n'est configuré (réglage remote.token)");
+    if (request.query.count("token")) return Error(400, "the token goes in the X-Ampify-Token header, not in the address");
+    if (!IsValidToken(m_token)) return Error(503, "no token is set (setting remote.token)");
     std::string provided;
-    if (const std::string* value = header("x-amk-token")) {
+    if (const std::string* value = header("x-ampify-token")) {
         provided = *value;
     } else if (const std::string* auth = header("authorization")) {
         constexpr std::string_view kBearer = "bearer ";
         if (Lower(std::string_view(*auth).substr(0, kBearer.size())) == kBearer) provided = auth->substr(kBearer.size());
     }
-    if (!TokenMatches(m_token, provided)) return Error(401, "jeton absent ou faux");
+    if (!TokenMatches(m_token, provided)) return Error(401, "token missing or wrong");
 
     const std::string& path = request.path;
     if (path == "/status") {
-        if (request.method != "GET") return Error(405, "GET attendu pour /status");
+        if (request.method != "GET") return Error(405, "GET expected for /status");
         return Response{200, backend.StatusJson()};
     }
     if (path == "/play" || path == "/pause" || path == "/next" || path == "/previous") {
-        if (request.method != "POST") return Error(405, "POST attendu pour " + path);
+        if (request.method != "POST") return Error(405, "POST expected for " + path);
         return Ok(backend.Command(std::string_view(path).substr(1)));
     }
     if (path == "/volume") {
-        if (request.method != "POST") return Error(405, "POST attendu pour /volume");
+        if (request.method != "POST") return Error(405, "POST expected for /volume");
         std::optional<double> db;
         auto found = request.query.find("db");
         if (found != request.query.end()) {
@@ -316,7 +316,7 @@ Response Router::Handle(const Request& request, bool peerLoopback, Backend& back
             const Json* field = body ? body->Find("db") : nullptr;
             if (field && field->AsNumber()) db = *field->AsNumber();
         }
-        if (!db || !std::isfinite(*db)) return Error(400, "volume attend db, un nombre (ex. /volume?db=-6)");
+        if (!db || !std::isfinite(*db)) return Error(400, "volume expects db, a number (e.g. /volume?db=-6)");
         std::optional<double> applied = backend.SetGainDb(std::clamp(*db, -60.0, 12.0));
         if (!applied) return Ok(false);
         Json body(Json::Object{});
@@ -324,7 +324,7 @@ Response Router::Handle(const Request& request, bool peerLoopback, Backend& back
         body.Set("gainDb", Json(*applied));
         return Response{200, body.Dump()};
     }
-    return Error(404, "chemin inconnu : " + path);
+    return Error(404, "unknown path: " + path);
 }
 
-}  // namespace amk::remote
+}  // namespace ampify::remote

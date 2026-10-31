@@ -14,7 +14,7 @@
 #include "reload.hpp"
 #include "script_extension.hpp"
 
-namespace amk {
+namespace ampify {
 
 // The `expose_api` setting (Spicetify's `expose_apis`): 0 keeps every JavaScript element (extension, app, theme
 // script) off, whatever its own setting says. Missing means 1.
@@ -110,4 +110,4 @@ private:
     std::vector<std::unique_ptr<ScriptExtension>> m_elements;
 };
 
-}  // namespace amk
+}  // namespace ampify

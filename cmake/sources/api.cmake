@@ -1,8 +1,8 @@
-# The modules of the AMK object, built into amk_core: the registry (core/api), the JavaScript of each module
+# The modules of the Ampify object, built into ampify_core: the registry (core/api), the JavaScript of each module
 # (core/prelude) and its natives (core/natives). A new module lists its files in its own package file, such as
-# cmake/sources/<package>.cmake, with list(APPEND AMK_CORE_SOURCES ...). See docs/extensions/API.md,
+# cmake/sources/<package>.cmake, with list(APPEND AMPIFY_CORE_SOURCES ...). See docs/extensions/api.md,
 # "Organisation du code", and the convention at the top of CMakeLists.txt.
-list(APPEND AMK_CORE_SOURCES
+list(APPEND AMPIFY_CORE_SOURCES
     core/api/modules.cpp
     core/prelude/frame.cpp
     core/prelude/core.cpp

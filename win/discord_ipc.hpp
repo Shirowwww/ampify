@@ -18,12 +18,12 @@
 #include "../core/i18n.hpp"
 #include "../core/journal.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 class DiscordIpc {
 public:
     // `pipeBase` is followed by 0 to 9. The tests keep the default name, under Wine where no Discord runs.
-    DiscordIpc(Journal& journal, i18n::Language language, std::wstring pipeBase = L"\\\\.\\pipe\\discord-ipc-");
+    DiscordIpc(Journal& journal, std::wstring pipeBase = L"\\\\.\\pipe\\discord-ipc-");
     ~DiscordIpc();
 
     DiscordIpc(const DiscordIpc&) = delete;
@@ -44,7 +44,6 @@ private:
     std::optional<discord::Frame> Read(DWORD timeoutMs);
 
     Journal& m_journal;
-    i18n::Language m_language;
     std::wstring m_pipeBase;
 
     mutable std::mutex m_mutex;
@@ -65,4 +64,4 @@ private:
     std::thread m_thread;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win

@@ -1,6 +1,6 @@
 #pragma once
 
-// The command line of `amk`: parsing of the options, and the commands that a user runs.
+// The command line of `ampify`: parsing of the options, and the commands that a user runs.
 // The portable logic lives in the other headers of this folder. This part is the glue with the
 // platform (platform.hpp) and the console.
 
@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace amk::cli {
+namespace ampify::cli {
 
 struct Options {
     std::vector<std::string> positional;  // the command, then its arguments
@@ -36,11 +36,11 @@ struct Options {
 // Reads the arguments that follow the program name. On a mistake returns nullopt and writes the reason to `error`.
 std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, std::string& error);
 
-// True when every word is a verb without argument that can be chained (`amk backup apply launch`). Execute then runs
+// True when every word is a verb without argument that can be chained (`ampify backup apply launch`). Execute then runs
 // them in order and stops at the first one that fails.
 bool IsChainLine(const std::vector<std::string>& positional);
 
 // Runs the command. Returns the exit code: 0 for success, 1 for a failure, 2 for a wrong usage.
 int Execute(const Options& options, std::istream& in, std::ostream& out, std::ostream& err);
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

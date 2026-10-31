@@ -1,15 +1,15 @@
 #pragma once
 
-// The AMK object is made of modules. A module is a fragment of the prelude (core/prelude/<module>.cpp), the
+// The Ampify object is made of modules. A module is a fragment of the prelude (core/prelude/<module>.cpp), the
 // natives that fragment calls (core/natives/<module>.cpp) and, when it needs them, start and stop hooks. The list,
-// in prelude order, is in core/api/modules.cpp. Contributor guide: docs/extensions/API.md, "Organisation du code".
+// in prelude order, is in core/api/modules.cpp. Contributor guide: CONTRIBUTING.md, "Add an API module".
 
 #include <span>
 #include <string>
 
 #include "../js_runtime.hpp"
 
-namespace amk {
+namespace ampify {
 
 class ScriptExtension;
 
@@ -44,7 +44,7 @@ struct ApiModule {
     const char* name;
 
     // JavaScript run inside the prelude, in its own block, after the modules listed before it. It sees `native`,
-    // `AMK`, `dispatch` and the shared helpers of core/prelude/frame.cpp. Null when the module has none.
+    // `Ampify`, `dispatch` and the shared helpers of core/prelude/frame.cpp. Null when the module has none.
     const char* prelude;
 
     // Adds the natives that the fragment calls. Null when the module has none.
@@ -68,4 +68,4 @@ const std::string& Prelude();
 JSValue MakeNatives(JSContext* ctx, ScriptExtension& extension);
 
 }  // namespace api
-}  // namespace amk
+}  // namespace ampify

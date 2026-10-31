@@ -9,10 +9,11 @@
 #include "element.hpp"
 #include "internal.hpp"
 #include "json.hpp"
+#include "messages.hpp"
 #include "platform.hpp"
 #include "sha256.hpp"
 
-namespace amk::cli {
+namespace ampify::cli {
 
 std::vector<ZipSource> FilesUnder(const std::filesystem::path& folder, const std::string& prefix) {
     std::vector<ZipSource> files;
@@ -62,7 +63,7 @@ std::string CatalogEntryText(const ElementManifest& manifest, const std::string&
 }
 
 void PrintProblems(Context& ctx, const std::filesystem::path& folder, const FolderValidation& validation) {
-    ctx.err << Utf8(folder) << " : invalide, rien n'a été écrit\n";
+    ctx.err << Utf8(folder) << ": invalid, nothing was written\n";
     for (const std::string& problem : validation.errors) ctx.err << "  - " << problem << "\n";
 }
 
@@ -71,7 +72,7 @@ void PrintProblems(Context& ctx, const std::filesystem::path& folder, const Fold
 int CmdBuild(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() < 2 || args.size() > 3) {
-        return Usage(ctx, "build attend un dossier, et en option le fichier .zip à écrire");
+        return Usage(ctx, "build needs a folder, and optionally the .zip file to write");
     }
 
     std::filesystem::path folder = PathArgument(args[1]);
@@ -85,30 +86,30 @@ int CmdBuild(Context& ctx) {
     std::filesystem::path archive = args.size() == 3 ? PathArgument(args[2])
                                                      : PathArgument(manifest.id + "-" + manifest.version + ".zip");
     std::error_code ec;
-    if (std::filesystem::exists(archive, ec)) return Failure(ctx, "le fichier existe déjà : " + Utf8(archive));
+    if (std::filesystem::exists(archive, ec)) return Failure(ctx, "the file already exists: " + Utf8(archive));
 
     std::vector<ZipSource> files = FilesUnder(folder, "");
     std::string error;
     if (!WriteZip(archive, files, error)) return Failure(ctx, error);
 
-    // Read the archive back with the tool that `amk install` uses, so a broken archive is caught here.
+    // Read the archive back with the tool that `ampify install` uses, so a broken archive is caught here.
     std::vector<std::string> entries;
-    if (!platform::ListZip(archive, entries, error)) return Failure(ctx, "relecture du zip impossible : " + error);
+    if (!platform::ListZip(archive, entries, error)) return Failure(ctx, "cannot read the zip back: " + error);
     std::string refusal = CheckArchiveListing(entries);
     if (!refusal.empty()) return Failure(ctx, refusal);
     if (entries.size() != files.size()) {
-        return Failure(ctx, "le zip relu ne contient pas les " + std::to_string(files.size()) + " fichiers attendus");
+        return Failure(ctx, "the zip read back does not contain the " + std::to_string(files.size()) + " expected files");
     }
 
     std::optional<std::string> digest = Sha256File(archive);
-    if (!digest) return Failure(ctx, "SHA-256 impossible à calculer pour " + Utf8(archive));
+    if (!digest) return Failure(ctx, "cannot compute the SHA-256 of " + Utf8(archive));
     std::uintmax_t size = std::filesystem::file_size(archive, ec);
 
-    ctx.out << "Élément compilé : " << Utf8(archive) << "\n"
-            << "  fichiers  " << files.size() << "\n"
-            << "  taille    " << size << " octets\n"
+    ctx.out << "Element built: " << Utf8(archive) << "\n"
+            << "  files     " << files.size() << "\n"
+            << "  size      " << size << " bytes\n"
             << "  SHA-256   " << *digest << "\n\n"
-            << "Entrée de catalogue. Remplace l'adresse par celle de la release, puis ajoute l'entrée à catalog/catalog.json :\n"
+            << "Catalog entry. Replace the address with the one of the release, then add the entry to catalog/catalog.json:\n"
             << CatalogEntryText(manifest, *digest);
     return 0;
 }
@@ -122,13 +123,13 @@ int CmdInspect(Context& ctx) {
         folder = PathArgument(args[1]);
     } else if (args.size() == 3) {
         if (FolderOfKind(args[1]).empty()) {
-            return Failure(ctx, "type inconnu : " + args[1] + " (extension, theme, snippet ou app)");
+            return Failure(ctx, "unknown type: " + args[1] + " (extension, theme, snippet or app)");
         }
-        if (!IsValidId(args[2])) return Failure(ctx, "identifiant invalide : " + args[2]);
+        if (!IsValidId(args[2])) return Failure(ctx, Tr("invalidId", {{"id", args[2]}}));
         folder = ctx.kit.Element(args[1], args[2]);
         installed = true;
     } else {
-        return Usage(ctx, "inspect attend un dossier, ou un type et un identifiant installé");
+        return Usage(ctx, "inspect needs a folder, or a type and an installed id");
     }
 
     FolderValidation validation = ValidateElementFolder(folder);
@@ -140,29 +141,29 @@ int CmdInspect(Context& ctx) {
 
     ctx.out << manifest.name << " (" << manifest.id << " " << manifest.version << ")\n"
             << "  type         " << manifest.kind << "\n"
-            << "  auteur       " << manifest.author << "\n"
-            << "  API du kit   " << manifest.kitApi << "\n"
+            << "  author       " << manifest.author << "\n"
+            << "  Ampify API   " << manifest.kitApi << "\n"
             << "  description  " << manifest.description << "\n"
-            << "  dossier      " << Utf8(folder) << "\n"
+            << "  folder       " << Utf8(folder) << "\n"
             << "  permissions  ";
-    if (manifest.permissions.empty()) ctx.out << "aucune";
+    if (manifest.permissions.empty()) ctx.out << "none";
     for (size_t i = 0; i < manifest.permissions.size(); i++) {
         ctx.out << (i ? ", " : "") << manifest.permissions[i];
     }
-    ctx.out << "\n  processus    ";
-    if (manifest.processes.empty()) ctx.out << "ui, engine (par défaut)";
+    ctx.out << "\n  processes    ";
+    if (manifest.processes.empty()) ctx.out << "ui, engine (default)";
     for (size_t i = 0; i < manifest.processes.size(); i++) ctx.out << (i ? ", " : "") << manifest.processes[i];
     ctx.out << "\n";
     if (installed) {
         Settings settings;
         std::string error;
         if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
-        ctx.out << "  activé       " << (IsEnabled(settings, manifest.kind, manifest.id) ? "oui" : "non") << "\n";
+        ctx.out << "  enabled      " << (IsEnabled(settings, manifest.kind, manifest.id) ? "yes" : "no") << "\n";
     }
 
     std::vector<ZipSource> files = FilesUnder(folder, "");
     std::sort(files.begin(), files.end(), [](const ZipSource& a, const ZipSource& b) { return a.name < b.name; });
-    ctx.out << "\nFichiers :\n";
+    ctx.out << "\nFiles:\n";
     std::uintmax_t total = 0;
     std::error_code ec;
     for (const ZipSource& file : files) {
@@ -172,25 +173,25 @@ int CmdInspect(Context& ctx) {
         ctx.out << "  " << Pad(std::to_string(size), 10) << (digest ? *digest : std::string(64, '?')) << "  " << file.name
                 << "\n";
     }
-    ctx.out << "  " << files.size() << " fichier(s), " << total << " octets au total\n";
+    ctx.out << "  " << files.size() << " file(s), " << total << " bytes in total\n";
     return 0;
 }
 
 int CmdTypes(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() > 2) return Usage(ctx, "types attend un fichier, ou rien pour amk.d.ts dans le dossier courant");
+    if (args.size() > 2) return Usage(ctx, "types takes a file, or nothing for ampify.d.ts in the current folder");
 
-    std::filesystem::path target = args.size() == 2 ? PathArgument(args[1]) : std::filesystem::current_path() / "amk.d.ts";
+    std::filesystem::path target = args.size() == 2 ? PathArgument(args[1]) : std::filesystem::current_path() / "ampify.d.ts";
     std::error_code ec;
-    if (std::filesystem::is_directory(target, ec)) target /= "amk.d.ts";
+    if (std::filesystem::is_directory(target, ec)) target /= "ampify.d.ts";
     if (std::filesystem::exists(target, ec) && !ctx.options.yes) {
-        return Failure(ctx, "le fichier existe déjà : " + Utf8(target) + " (ajoute --yes pour le remplacer)");
+        return Failure(ctx, "the file already exists: " + Utf8(target) + " (add --yes to replace it)");
     }
 
     std::string error;
-    if (!WriteTextFile(target, std::string(AmkDeclarations()), error)) return Failure(ctx, error);
-    ctx.out << "Types écrits : " << Utf8(target) << "\n";
+    if (!WriteTextFile(target, std::string(AmpifyDeclarations()), error)) return Failure(ctx, error);
+    ctx.out << "Types written: " << Utf8(target) << "\n";
     return 0;
 }
 
-}  // namespace amk::cli
+}  // namespace ampify::cli

@@ -9,7 +9,7 @@
 // The API itself is made of modules: core/api/modules.cpp lists them, core/prelude holds their JavaScript and
 // core/natives the C++ functions that JavaScript calls. This file runs an element: its runtime, queue and timers.
 
-namespace amk {
+namespace ampify {
 
 namespace {
 
@@ -52,7 +52,7 @@ bool ScriptExtension::Start() {
 
     std::string mainName = m_manifest.main.value_or("main.js");
     std::optional<std::string> source = ReadFile(m_folder / mainName);
-    if (!source) return fail("main.js illisible");
+    if (!source) return fail("main.js unreadable");
 
     for (const api::ApiModule& module : api::Modules()) {
         if (module.start) module.start(*this);
@@ -64,14 +64,14 @@ bool ScriptExtension::Start() {
     std::string error;
     JSContext* ctx = m_runtime->context();
     JSValue prelude = JS_UNDEFINED;
-    if (!m_runtime->Eval(api::Prelude(), "amk-prelude.js", &error, &prelude)) return fail("API AMK : " + error);
+    if (!m_runtime->Eval(api::Prelude(), "ampify-prelude.js", &error, &prelude)) return fail("Ampify API: " + error);
 
     JSValue natives = api::MakeNatives(ctx, *this);
     JSValue dispatch = JS_UNDEFINED;
     bool built = m_runtime->Call(prelude, 1, &natives, &dispatch, &error);
     m_runtime->Free(natives);
     m_runtime->Free(prelude);
-    if (!built) return fail("API AMK : " + error);
+    if (!built) return fail("Ampify API: " + error);
     m_dispatch = dispatch;
 
     // "type": "module" makes main.js an ES module, with static imports. A classic script may still use import().
@@ -81,7 +81,7 @@ bool ScriptExtension::Start() {
     if (!m_runtime->RunJobs(&error)) return fail(error);
 
     m_running = true;
-    DeliverEvent("ready", "");  // AMK.ready resolves on the first Pump (core/prelude/react.cpp)
+    DeliverEvent("ready", "");  // Ampify.ready resolves on the first Pump (core/prelude/react.cpp)
     return true;
 }
 
@@ -207,4 +207,4 @@ void ScriptExtension::DispatchTimer(uint32_t id) {
     m_runtime->Free(arg);
 }
 
-}  // namespace amk
+}  // namespace ampify

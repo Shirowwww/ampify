@@ -7,9 +7,9 @@
 // volume, never the DRM.
 //
 // Threads: every method runs on the JavaScript thread, in the multithreaded apartment. AMExclusive reads the same
-// objects on the interface thread; the kit reads them from its own thread first, as the plan of record asks, and
+// objects on the interface thread; Ampify reads them from its own thread first, as the plan of record asks, and
 // keeps the reads short: scalars on every poll, strings only when the track changes or every 5 s. If the objects
-// refuse a thread other than the interface's, activation fails with a clear journal line and SMTC takes over.
+// refuse a thread other than the interface's, activation fails with a clear log line and SMTC takes over.
 //
 // Not used in AMPLibraryAgent.exe: the player object lives in the interface process, and activating it elsewhere
 // could build a second player.
@@ -24,7 +24,7 @@
 #include "../core/player_model.hpp"
 #include "winrt_abi.hpp"
 
-namespace amk::win {
+namespace ampify::win {
 
 class AmpPlayer {
 public:
@@ -49,7 +49,7 @@ public:
     // within 3 s.
     bool Command(PlayerCommand command);
 
-    // Looks for AMP.Services.PlayQueue and its sections, read only, and describes what it found for the journal:
+    // Looks for AMP.Services.PlayQueue and its sections, read only, and describes what it found for the log:
     // the identifiers of the queue's interfaces are not in the winmd list, so this probe finds them at run time
     // (GetIids), and stops at the first doubt.
     std::string ProbeQueue();
@@ -75,4 +75,4 @@ private:
     std::string m_title, m_artist, m_album;
 };
 
-}  // namespace amk::win
+}  // namespace ampify::win

@@ -11,7 +11,7 @@ namespace atmos {
 // What the leveler remembers from one run to the next: the level of each Atmos variant it measured, and the
 // recent stereo tracks the target is the median of. Kept as plain text, one value per line:
 //
-//   # Apple Music Mod Kit, atmos-leveler
+//   # Ampify, atmos-leveler
 //   atmos <stable variant id> <lufs> <seconds>
 //   stereo <lufs>
 //

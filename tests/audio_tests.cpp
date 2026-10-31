@@ -1,4 +1,4 @@
-// Tests of the audio pieces behind AMK.audio and AMK.color, on synthetic signals: the spectrum, the tempo, the
+// Tests of the audio pieces behind Ampify.audio and Ampify.color, on synthetic signals: the spectrum, the tempo, the
 // equalizer, the live loudness, the kit's steps on the leveler's sample path, the engine, and colour extraction.
 
 #include <algorithm>
@@ -24,9 +24,9 @@
 
 namespace {
 
-using amk::audio::AudioAnalyzer;
-using amk::audio::EqProcessor;
-using amk::audio::EqSettings;
+using ampify::audio::AudioAnalyzer;
+using ampify::audio::EqProcessor;
+using ampify::audio::EqSettings;
 
 constexpr double kPi = std::numbers::pi;
 
@@ -64,7 +64,7 @@ void FeedInBlocks(AudioAnalyzer& analyzer, const std::vector<float>& samples, in
 }
 
 size_t BandOf(double frequency) {
-    std::vector<double> edges = amk::audio::LogBandEdges(AudioAnalyzer::kBands, 40.0, 16000.0);
+    std::vector<double> edges = ampify::audio::LogBandEdges(AudioAnalyzer::kBands, 40.0, 16000.0);
     for (size_t i = 0; i + 1 < edges.size(); i++) {
         if (frequency >= edges[i] && frequency < edges[i + 1]) return i;
     }
@@ -101,13 +101,13 @@ double MeasuredGainDb(EqSettings& settings, double frequency, double rate, int c
 
 TEST_CASE(Analysis_LevelsOfASine) {
     std::vector<float> sine = Sine(1000, 1.0, 48000, 48000, 1);
-    amk::audio::Levels levels = amk::audio::MeasureLevels(sine.data(), sine.size());
+    ampify::audio::Levels levels = ampify::audio::MeasureLevels(sine.data(), sine.size());
     CHECK_NEAR(levels.rms, std::sqrt(0.5), 0.001);
     CHECK_NEAR(levels.peak, 1.0, 0.001);
 }
 
 TEST_CASE(Analysis_FftPutsASineInItsBin) {
-    amk::audio::Fft fft(1024);
+    ampify::audio::Fft fft(1024);
     std::vector<std::complex<float>> data(1024);
     for (size_t i = 0; i < 1024; i++) data[i] = {static_cast<float>(std::cos(2 * kPi * 37 * static_cast<double>(i) / 1024)), 0};
     fft.Forward(data);
@@ -142,7 +142,7 @@ TEST_CASE(Analysis_ClickTrainAt120BpmGives120) {
     for (double rate : {44100.0, 48000.0, 96000.0}) {
         AudioAnalyzer analyzer;
         FeedInBlocks(analyzer, Clicks(120, rate, 10), 2, rate);
-        amk::audio::TempoEstimate tempo = analyzer.Tempo();
+        ampify::audio::TempoEstimate tempo = analyzer.Tempo();
         CHECK_NEAR(tempo.bpm, 120.0, 1.5);
         CHECK(tempo.confidence > 0.3);
     }
@@ -170,8 +170,8 @@ TEST_CASE(Analysis_TempoUnknownOnSilenceAndShortInput) {
 // ---- Equalizer ------------------------------------------------------------------------------------------------------
 
 TEST_CASE(Equalizer_DesignsHitTheirGain) {
-    using amk::audio::BiquadCoefficients;
-    using amk::audio::FilterKind;
+    using ampify::audio::BiquadCoefficients;
+    using ampify::audio::FilterKind;
     for (double rate : {44100.0, 48000.0, 96000.0}) {
         auto peak = BiquadCoefficients::Design(FilterKind::Peaking, 1000, 1.41, 6, rate);
         CHECK_NEAR(peak.MagnitudeDb(1000, rate), 6.0, 0.01);
@@ -258,15 +258,15 @@ TEST_CASE(Equalizer_SettingsClampAndPresets) {
     EqSettings settings;
     CHECK(settings.Bands().size() == 10);
     CHECK(settings.SetGainDb(0, 40));
-    CHECK_NEAR(settings.GainDb(0), amk::audio::kEqMaxGainDb, 1e-9);
+    CHECK_NEAR(settings.GainDb(0), ampify::audio::kEqMaxGainDb, 1e-9);
     CHECK(!settings.SetGainDb(10, 1));
     CHECK(!settings.SetGainDb(1, std::nan("")));
     settings.Flatten();
     CHECK(settings.IsFlat());
-    CHECK(amk::audio::PresetGains("rock").has_value());
-    CHECK(amk::audio::PresetGains("rock")->size() == 10);
-    CHECK(!amk::audio::PresetGains("inconnu").has_value());
-    for (const std::string& name : amk::audio::PresetNames()) CHECK(amk::audio::PresetGains(name).has_value());
+    CHECK(ampify::audio::PresetGains("rock").has_value());
+    CHECK(ampify::audio::PresetGains("rock")->size() == 10);
+    CHECK(!ampify::audio::PresetGains("unknown").has_value());
+    for (const std::string& name : ampify::audio::PresetNames()) CHECK(ampify::audio::PresetGains(name).has_value());
 }
 
 // ---- Loudness -------------------------------------------------------------------------------------------------------
@@ -299,7 +299,7 @@ TEST_CASE(LiveLoudness_MomentaryFollowsAChange) {
 // ---- The kit's steps on the sample path -----------------------------------------------------------------------------
 
 TEST_CASE(KitAudio_UnityGainAndFlatEqLeaveTheStreamUntouched) {
-    amk::audio::AudioEngine engine;
+    ampify::audio::AudioEngine engine;
     atmos::KitAudio kit(engine);
     std::vector<float> input = Sine(440, 0.99, 48000, 4800);  // above the knee: the knee must not run either
     std::vector<float> samples = input;
@@ -309,7 +309,7 @@ TEST_CASE(KitAudio_UnityGainAndFlatEqLeaveTheStreamUntouched) {
 }
 
 TEST_CASE(KitAudio_EqualizerRunsAfterTheGainAndBeforeTheKnee) {
-    amk::audio::AudioEngine engine;
+    ampify::audio::AudioEngine engine;
     atmos::KitAudio kit(engine);
     engine.Eq().SetGainDb(5, 6.0206);  // x2 at 1 kHz
     const double rate = 48000;
@@ -332,7 +332,7 @@ TEST_CASE(KitAudio_EqualizerRunsAfterTheGainAndBeforeTheKnee) {
 }
 
 TEST_CASE(KitAudio_EqualizerOnSpatialObjects) {
-    amk::audio::AudioEngine engine;
+    ampify::audio::AudioEngine engine;
     atmos::KitAudio kit(engine);
     engine.Eq().SetGainDb(5, 6.0);
     atmos::ObjectPass pass(48000);
@@ -350,9 +350,9 @@ TEST_CASE(KitAudio_EqualizerOnSpatialObjects) {
 }
 
 TEST_CASE(KitAudio_LoudnessAndAnalysisIgnoreTheSlider) {
-    amk::audio::AudioEngine engine;
+    ampify::audio::AudioEngine engine;
     atmos::KitAudio kit(engine);
-    engine.SubscribeFrames("demo", [](const amk::audio::AnalysisFrame&) {});
+    engine.SubscribeFrames("demo", [](const ampify::audio::AnalysisFrame&) {});
     const float volume = 0.5f;
     std::vector<float> curve;
     for (size_t start = 0; start < 48000 * 4; start += 480) {
@@ -365,7 +365,7 @@ TEST_CASE(KitAudio_LoudnessAndAnalysisIgnoreTheSlider) {
     }
     CHECK_NEAR(engine.Loudness().momentary.value_or(0), -20.0, 0.2);
     CHECK_NEAR(engine.Loudness().shortTerm.value_or(0), -20.0, 0.2);
-    amk::AudioAnalysisResult result = engine.Analyze("demo");
+    ampify::AudioAnalysisResult result = engine.Analyze("demo");
     CHECK(result.frame.has_value());
     if (result.frame) CHECK_NEAR(result.frame->peak, 0.1, 0.005);
 }
@@ -373,13 +373,13 @@ TEST_CASE(KitAudio_LoudnessAndAnalysisIgnoreTheSlider) {
 // ---- Engine ---------------------------------------------------------------------------------------------------------
 
 TEST_CASE(AudioEngine_DeliversEachFrameOnceAndStopsOnRelease) {
-    amk::audio::AudioEngine engine;
+    ampify::audio::AudioEngine engine;
     std::vector<float> sine = Sine(1000, 0.5, 48000, 4800);
     engine.FeedAnalysis(sine.data(), 4800, 2, 48000);
     CHECK(!engine.AnalysisWanted());  // nobody listens: nothing analysed
 
     int calls = 0;
-    engine.SubscribeFrames("a", [&](const amk::audio::AnalysisFrame& frame) {
+    engine.SubscribeFrames("a", [&](const ampify::audio::AnalysisFrame& frame) {
         calls++;
         CHECK(frame.bandsDb.size() == AudioAnalyzer::kBands);
     });
@@ -399,7 +399,7 @@ TEST_CASE(AudioEngine_DeliversEachFrameOnceAndStopsOnRelease) {
 }
 
 TEST_CASE(AudioEngine_ReleaseFlattensOnlyTheLastEqualizerOwner) {
-    amk::audio::AudioEngine engine;
+    ampify::audio::AudioEngine engine;
     CHECK(engine.SetEqBand("a", 2, 4));
     CHECK(!engine.SetEqBand("a", 99, 4));
     engine.Release("b");
@@ -409,7 +409,7 @@ TEST_CASE(AudioEngine_ReleaseFlattensOnlyTheLastEqualizerOwner) {
 }
 
 TEST_CASE(AudioEngine_VolumeAndLoudnessAreReadOnlyReadings) {
-    amk::audio::AudioEngine engine;
+    ampify::audio::AudioEngine engine;
     CHECK(!engine.PlayerVolume().has_value());
     CHECK(!engine.Loudness().momentary.has_value());
     engine.PublishPlayerVolume(0.42);
@@ -421,9 +421,9 @@ TEST_CASE(AudioEngine_VolumeAndLoudnessAreReadOnlyReadings) {
 }
 
 TEST_CASE(AudioEngine_DeliveryThreadSendsFrames) {
-    amk::audio::AudioEngine engine;
+    ampify::audio::AudioEngine engine;
     std::atomic<int> calls{0};
-    engine.SubscribeFrames("a", [&](const amk::audio::AnalysisFrame&) { calls++; });
+    engine.SubscribeFrames("a", [&](const ampify::audio::AnalysisFrame&) { calls++; });
     engine.StartDeliveryThread(std::chrono::milliseconds(5));
     std::vector<float> sine = Sine(1000, 0.5, 48000, 4800);
     for (int attempt = 0; attempt < 200 && calls.load() == 0; attempt++) {
@@ -438,11 +438,11 @@ TEST_CASE(AudioEngine_DeliveryThreadSendsFrames) {
 
 namespace {
 
-std::vector<uint8_t> TwoColours(size_t width, size_t height, amk::Rgb first, amk::Rgb second, size_t firstColumns) {
+std::vector<uint8_t> TwoColours(size_t width, size_t height, ampify::Rgb first, ampify::Rgb second, size_t firstColumns) {
     std::vector<uint8_t> rgba(width * height * 4);
     for (size_t y = 0; y < height; y++) {
         for (size_t x = 0; x < width; x++) {
-            const amk::Rgb& c = x < firstColumns ? first : second;
+            const ampify::Rgb& c = x < firstColumns ? first : second;
             uint8_t* p = &rgba[(y * width + x) * 4];
             p[0] = c.r, p[1] = c.g, p[2] = c.b, p[3] = 255;
         }
@@ -453,10 +453,10 @@ std::vector<uint8_t> TwoColours(size_t width, size_t height, amk::Rgb first, amk
 }  // namespace
 
 TEST_CASE(ColorExtract_TwoColourImageGivesBothColours) {
-    const amk::Rgb red{200, 40, 40};
-    const amk::Rgb blue{40, 70, 200};
+    const ampify::Rgb red{200, 40, 40};
+    const ampify::Rgb blue{40, 70, 200};
     std::vector<uint8_t> image = TwoColours(64, 32, red, blue, 45);  // 70 % red
-    auto colors = amk::ExtractColors(image.data(), image.size(), 64, 32);
+    auto colors = ampify::ExtractColors(image.data(), image.size(), 64, 32);
     CHECK(colors.has_value());
     if (!colors) return;
     CHECK(colors->palette.size() == 2);
@@ -474,20 +474,20 @@ TEST_CASE(ColorExtract_EveryKeyIsFilledAndTransparencyIgnored) {
         image[i * 4 + 0] = image[i * 4 + 1] = image[i * 4 + 2] = 128;
         image[i * 4 + 3] = i < 128 ? 255 : 0;  // half transparent: ignored
     }
-    auto colors = amk::ExtractColors(image.data(), image.size(), 16, 16);
+    auto colors = ampify::ExtractColors(image.data(), image.size(), 16, 16);
     CHECK(colors.has_value());
     if (!colors) return;
     CHECK(colors->palette.size() == 1);
-    CHECK(colors->prominent == (amk::Rgb{128, 128, 128}));
+    CHECK(colors->prominent == (ampify::Rgb{128, 128, 128}));
     CHECK(!(colors->darkVibrant == colors->lightVibrant));  // made from the grey, at their own lightness
 
     std::vector<uint8_t> clear(4 * 4 * 4, 0);
-    CHECK(!amk::ExtractColors(clear.data(), clear.size(), 4, 4).has_value());
-    CHECK(!amk::ExtractColors(image.data(), image.size() - 1, 16, 16).has_value());
+    CHECK(!ampify::ExtractColors(clear.data(), clear.size(), 4, 4).has_value());
+    CHECK(!ampify::ExtractColors(image.data(), image.size() - 1, 16, 16).has_value());
 }
 
 TEST_CASE(ColorExtract_LargeImageIsSampled) {
     std::vector<uint8_t> image = TwoColours(1000, 1000, {10, 200, 30}, {250, 250, 250}, 500);
-    auto colors = amk::ExtractColors(image.data(), image.size(), 1000, 1000);
+    auto colors = ampify::ExtractColors(image.data(), image.size(), 1000, 1000);
     CHECK(colors.has_value() && colors->palette.size() == 2);
 }

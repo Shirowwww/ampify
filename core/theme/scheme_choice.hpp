@@ -4,7 +4,7 @@
 #include <string_view>
 #include <vector>
 
-namespace amk::theme {
+namespace ampify::theme {
 
 // Which colour scheme of colors.ini to use, from the settings, the Windows mode (light or dark) and the time of day.
 // Pure functions: the Windows side gives the mode and the local time, the tests give any.
@@ -51,7 +51,7 @@ struct SchemeInputs {
 
 struct SchemeChoice {
     std::string scheme;                 // the name to pass to LoadTheme; empty takes the first scheme
-    std::string reason;                 // French, for the journal: « horaire 19:00 », « mode sombre de Windows »...
+    std::string reason;                 // English, for the log: "schedule 19:00", "Windows dark mode"...
     std::vector<std::string> problems;  // a bad schedule entry, a scheme that colors.ini does not have
 };
 
@@ -59,4 +59,4 @@ struct SchemeChoice {
 SchemeChoice ChooseScheme(const std::string& scheme, const std::string& schedule, const std::vector<std::string>& schemes,
                           const SchemeInputs& inputs);
 
-}  // namespace amk::theme
+}  // namespace ampify::theme
