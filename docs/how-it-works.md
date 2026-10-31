@@ -129,6 +129,7 @@ from the native controls of the Settings > Playback page once it has been opened
 |---|---|
 | Panels (`Ampify.ui.panel`) | A 380 px column on the right, in a popup of the window, with a Close button |
 | Popups | A native dialog, one at a time |
+| Fullscreen view (`Ampify.ui.fullscreen`) | A popup of the window that covers all of it, above the other overlays, with a Close button and Escape |
 | App pages | Cover the content when the app calls `Ampify.ui.navigate`, with a Back button |
 | Playback bar buttons | In `StackPanel#NowPlayingToggleButtons`, next to the lyrics and queue buttons |
 | "Ampify" card | Added to the end of Settings > Playback, re-inserted each time the page loads |

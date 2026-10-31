@@ -29,6 +29,8 @@ if errorlevel 1 goto :failed
 if errorlevel 1 goto :failed
 "%HERE%ampify.exe" extension enable hello-extension
 if errorlevel 1 goto :failed
+"%HERE%ampify.exe" extension enable now-playing
+if errorlevel 1 goto :failed
 "%HERE%ampify.exe" app enable marketplace
 if errorlevel 1 goto :failed
 rem The theme stays off: the guide has it chosen in Settings > General. Its dark scheme is the one to see.

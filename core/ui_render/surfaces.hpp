@@ -16,14 +16,16 @@
 
 namespace ampify::uirender {
 
-enum class SurfaceKind { Panel, Page, Popup, Control };
+enum class SurfaceKind { Panel, Page, Popup, Control, Fullscreen };
 
 struct Surface {
     SurfaceKind kind = SurfaceKind::Panel;
     std::string elementId;
-    std::string id;          // panel id, page path, popup key ("#<n>" for an unnamed popup), or control id as text
+    // panel id, page path, popup key ("#<n>" for an unnamed popup), control id as text, or the fullscreen session as
+    // text (each session is a new surface, so a surface the user closed stays closed for the rest of its session)
+    std::string id;
     std::string key;         // unique among the surfaces: "<kind>|<element>|<id>"
-    std::string nodeId;      // id of the root render node (SurfaceNodeId), "" for a control
+    std::string nodeId;      // id of the root render node (SurfaceNodeId; "fullscreen-main"), "" for a control
     Json tree;               // the interface tree (not for a control)
     UiControl control;       // for a control only
     std::string title;       // Ampify.ui.title of the element, may be empty

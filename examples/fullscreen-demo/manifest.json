@@ -1,0 +1,12 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "fullscreen-demo",
+  "name": "Fullscreen demo",
+  "version": "0.1.0",
+  "kind": "app",
+  "author": "Shirowwww",
+  "description": "A now playing screen over the whole window: blurred artwork, a big title and lines that fade in turn.",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": ["ui.fullscreen", "ui.topbar"]
+}

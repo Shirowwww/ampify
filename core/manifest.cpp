@@ -15,7 +15,7 @@ const std::set<std::string_view> kFixedPermissions = {
     "player.read",   "player.control", "audio.analyze", "audio.gain",    "audio.eq",    "storage",     "notifications",
     "ipc.discord",   "midi.input",     "library.read",  "library.write", "services.read", "ui.keyboard",
     "ui.topbar",     "ui.playbar",     "ui.menu",       "ui.popup",      "ui.panel",    "ui.page",
-    "ui.window",     "ui.sidebar",    "ui.tray",       "fs.output",   "kit.manage",
+    "ui.window",     "ui.sidebar",    "ui.tray",       "fs.output",   "kit.manage",  "ui.fullscreen",
 };
 
 const std::set<std::string_view> kKnownFields = {

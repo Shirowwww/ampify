@@ -179,6 +179,7 @@ switching the element on. A function protected by an undeclared permission throw
 | `audio.eq` | `Ampify.audio.eq`, a 10-band equalizer applied to the samples | [preview] |
 | `ui.topbar`, `ui.playbar`, `ui.sidebar`, `ui.menu`, `ui.popup` | Adding interface elements at those places (`ui.sidebar`: an entry at the bottom of Apple Music's sidebar) | [preview] |
 | `ui.panel`, `ui.window` | Side panel, secondary window | [preview] |
+| `ui.fullscreen` | `Ampify.ui.fullscreen`, a view over the whole window (a "now playing" screen with lyrics) | [preview] |
 | `ui.page` | App pages and navigation entries | [preview] |
 | `library.read` | `Ampify.library`, reading the library and playlists | [planned] |
 | `library.write` | Writing playlists, after reading (the queue goes through `player.control`) | [planned] |
@@ -347,25 +348,50 @@ name and the AutomationId `AMPIFY_<element>_<node>`. A new render only changes t
 the `key` attribute). The style is copied from the native controls of the Settings > Playback page. The places (side
 panel, dialog popups, bar buttons) are described in [../how-it-works.md](../how-it-works.md).
 
-Primitives: `stack`, `row`, `list` and `card` (which have children), `text`, `button`, `toggle`, `slider`, `textfield`,
-`image`, `icon`, `dropdown` (its children are `option`) and `option` (only inside a `dropdown`). Each node is an object
-`{ type, ...attributes, children }`. Attributes are simple values (text, number, boolean), never objects or lists. The
-kernel checks the tree (`core/ui_model.cpp`): 8 levels, 300 nodes and 500 characters per text at most.
+Primitives: `stack`, `row`, `list`, `layer` and `card` (which have children), `text`, `button`, `toggle`, `slider`,
+`textfield`, `image`, `icon`, `dropdown` (its children are `option`) and `option` (only inside a `dropdown`). Each node is
+an object `{ type, ...attributes, children }`. Attributes are simple values (text, number, boolean), never objects or
+lists. The kernel checks the tree (`core/ui_model.cpp`): 8 levels, 300 nodes and 500 characters per text at most.
 
 | Primitive | Attributes read by the renderer |
 |---|---|
 | `stack`, `row`, `list` | `gap` (number), `children` |
+| `layer` | `children`, drawn on top of each other (the first one at the back) and stretched over the layer |
 | `card` | `title`, `subtitle`, `onClick`, `children` |
-| `text` | `text`, `variant` (`title`, `subtitle`, `body`, `caption`) |
+| `text` | `text`, `variant` (`title`, `subtitle`, `body`, `caption`), and the text style below |
 | `button` | `label`, `icon` (SVG), `disabled`, `variant` (`primary`, `secondary`, `tertiary`), `onClick` |
 | `toggle` | `label`, `checked`, `disabled`, `onChange` |
 | `slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange` |
 | `textfield` | `label`, `value`, `placeholder`, `disabled`, `onChange` |
 | `dropdown` | `label`, `value`, `disabled`, `onChange`, `children` (some `option`) |
 | `option` | `value`, `label` |
-| `image` | `src`, `label` (alternative text), `onClick` |
+| `image` | `src` (an `https://` address or a file path), `label` (alternative text), `onClick`, `fit` (`cover`, `contain`, `fill`), `cornerRadius`, `width`, `height` |
 | `icon` | `icon` (SVG, as `Ampify.icons.get`), `label`, `onClick` |
 | all | `tooltip` (text), `tooltipPlacement` (`top`, `bottom`, `left`, `right`), `tooltipDelay` (0 to 10000 ms) |
+
+Style attributes. The kernel refuses a bad value with a message that names the attribute. They are checked where the
+renderer reads them; elsewhere they are ignored, as before.
+
+| Where | Attribute | Values |
+|---|---|---|
+| any node | `opacity` | 0 to 1 |
+| any node | `scale` | 0 to 10, around the centre of the node (a current lyrics line that grows) |
+| any node | `transition` | `"opacity 400ms"`, `"scale 0.3s"`, `"translation 200ms"`, `"all 300ms"`, several separated by commas, or `"none"`; 10 s at most. A change of these properties is then animated by the compositor |
+| any node | `align`, `valign` | `start`, `center`, `end`, `stretch`: the place of the node in its parent, across and along. On a `text`, `align` is the text alignment instead: `left`, `center`, `right` |
+| any node | `grow` | `true`: the node takes the space left in its `row` (width) or `stack` (height) |
+| `stack`, `row`, `layer`, `card` | `background` | `#RRGGBB`, `#AARRGGBB`, `acrylic` (the theme's), or `acrylic(#AARRGGBB, 0.6)`: an acrylic that blurs what is under it in the window, with its tint and tint opacity |
+| `stack`, `row`, `layer`, `card` | `padding` | a number, or `"top,right,bottom,left"` (0 to 1000 each) |
+| `stack`, `row`, `layer`, `card`, `image` | `cornerRadius` | 0 to 1000 |
+| `stack`, `row`, `layer`, `card` (`width` and `height` on `image` too) | `width`, `height`, `minWidth`, `maxWidth` | pixels, 0 to 10000 |
+| `text` | `size` | 8 to 120 pixels |
+| `text` | `weight` | 100 to 900 (400 regular, 700 bold) |
+| `text` | `color` | `#RRGGBB` or `#AARRGGBB` |
+| `text` | `wrap` | `false` keeps the text on one line, cut with an ellipsis (`true` by default) |
+| `text` | `maxLines` | 0 (no limit) to 100, the rest cut with an ellipsis |
+
+The children of a `layer` fill it unless their `align` or `valign` says otherwise. An `image` without `fit` and `height`
+stays at most 240 pixels high, as before. In a `row` of two children, the second goes to the right, as before; a child
+with `grow` changes that row into columns that fit their content, the growing ones sharing what is left.
 
 `onClick` and `onChange` hold a callback number (a positive integer) given by the kernel. The kernel refuses `onClick`
 outside `button`, `card`, `image` and `icon`, and `onChange` outside `toggle`, `slider`, `textfield` and `dropdown`. The
@@ -378,6 +404,9 @@ Ampify.ui.playbar.addButton({ label, icon, onClick })
 Ampify.ui.sidebar.addItem({ label, icon, onClick })   // icon: a Segoe Fluent Icons glyph, such as ""
 Ampify.ui.menu.addItem("context" | "app", { label, onClick })
 Ampify.ui.popup.open(view)
+Ampify.ui.fullscreen.open(view)        // permission ui.fullscreen; called again, it updates the view in place
+Ampify.ui.fullscreen.close()
+Ampify.ui.fullscreen.onClose(fn)       // returns a function that removes fn
 Ampify.ui.panel.register(id, view)
 Ampify.ui.title.set(text)
 Ampify.ui.page.register(path, view)     // for an app
@@ -392,6 +421,23 @@ Ampify.ui.playbar.addButton({
   icon: Ampify.icons.get("lyrics"),
   onClick: () => Ampify.ui.popup.open(lyricsView),
 });
+```
+
+**Fullscreen view.** `Ampify.ui.fullscreen.open(view)` covers the whole Apple Music window, above everything it draws,
+in its light or dark mode. Apple Music's navigation and the window's size changes leave it in place. A Close button (top
+left, clear of the window's own buttons) and the Escape key close it; the focus then goes back to where it was. There is one fullscreen view at a time:
+the last element that opens it wins. `onClose` functions run when the user closes it or when another element takes the
+screen, not after `close()`. After that, calling `open` opens it again, so a view refreshed by a timer should stop it in
+`onClose`. A "now playing" screen usually puts a `layer` at the root:
+
+```js
+Ampify.ui.fullscreen.open({ type: "layer", children: [
+  { type: "image", src: artworkUrl, fit: "cover" },
+  { type: "stack", background: "acrylic(#99000000, 0.6)", padding: 64, children: [
+    { type: "text", text: title, size: 48, weight: 700, align: "center" },
+    { type: "text", text: line, size: 32, opacity: 0.5, transition: "opacity 400ms, scale 300ms" },
+  ] },
+] });
 ```
 
 Menus are not displayed yet.
@@ -513,7 +559,7 @@ Ampify.link.connected()     // true if the other element is running
 
 Spicetify gives React to extensions. A native app cannot run real React, so Ampify provides a small engine that accepts
 the same style, without JSX, and produces the primitive tree of section 5.5. It has no permission of its own: the target
-asks for the permission of its place (`ui.panel`, `ui.page` or `ui.popup`).
+asks for the permission of its place (`ui.panel`, `ui.page`, `ui.popup` or `ui.fullscreen`).
 
 ```js
 const { h, useState } = Ampify.React;
@@ -565,9 +611,11 @@ Rules:
   More than 50 renders in a row are stopped, with a line in the log.
 - **Effects:** they run after the tree is sent, those of children before those of parents. Their cleanup runs before the
   next effect, when the component unmounts, and when the element stops.
-- **Targets:** `"panel:<name>"`, `"page:/<path>"` (for an app), `"popup:<name>"`, or `"popup"` for `"popup:main"`. The
-  objects `{ panel }`, `{ page }` and `{ popup }` work too. A named popup is updated in place at each render, and
-  `unmount` closes it. Unmounting a panel or a page leaves an empty stack there.
+- **Targets:** `"panel:<name>"`, `"page:/<path>"` (for an app), `"popup:<name>"`, or `"popup"` for `"popup:main"`, and
+  `"fullscreen:"` (or `"fullscreen"`) for the fullscreen view. The objects `{ panel }`, `{ page }`, `{ popup }` and
+  `{ fullscreen: true }` work too. A named popup and the fullscreen view are updated in place at each render, and
+  `unmount` closes them. When the user closes the fullscreen view, its root unmounts by itself (effect cleanups run).
+  Unmounting a panel or a page leaves an empty stack there.
 - **Errors:** an error in `ReactDOM.render` is thrown, so `main.js` fails with a clear message. An error in a later
   render goes to the log, and the previous tree stays displayed.
 - **Apps:** an app (`kind: app`) that defines a global function `render()`, like a Spicetify app, has what it returns
@@ -584,12 +632,14 @@ Components of `Ampify.components`, in place of `Spicetify.ReactComponent`:
 | `Slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange(number)` | `slider` |
 | `TextField` | `label`, `value`, `placeholder`, `disabled`, `onChange(text)` | `textfield` |
 | `Dropdown` | `label`, `value`, `options` (texts or `{ value, label }`), `disabled`, `onChange(value)` | `dropdown` and `option` |
-| `Card` | `title`, `subtitle`, `onClick`, children | `card` |
+| `Card` | `title`, `subtitle`, `onClick`, children, the box style (`background`, `padding`, `cornerRadius`, sizes) | `card` |
 | `List` | children | `list` |
-| `Text` (and `TextComponent`) | `text` or children, `variant` | `text` |
+| `Text` (and `TextComponent`) | `text` or children, `variant`, `size`, `weight`, `color`, `align`, `wrap`, `maxLines` | `text` |
 | `Tooltip` (and `TooltipWrapper`) | `label` or `content`, `placement`, `delay` or `showDelay`, children | adds `tooltip`, `tooltipPlacement` and `tooltipDelay` to each child |
 
-Each component also accepts `tooltip`, `tooltipPlacement` and `tooltipDelay`. `Tooltip` wraps a primitive or a component
+Each component also accepts `tooltip`, `tooltipPlacement` and `tooltipDelay`. `Button`, `Card` and `Text` also pass
+`opacity`, `scale`, `transition`, `align`, `valign` and `grow` through. Other primitives (`layer`, `image`, `stack`) take
+their style attributes directly: `h("layer", null, ...)`. `Tooltip` wraps a primitive or a component
 of `Ampify.components`. A component written by the extension must pass these three props to its primitive. The second
 argument of `onChange` is the full event. Full example: `examples/react-panel/`.
 

@@ -36,8 +36,10 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
+#include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Windows.System.h>
 
 #include "../core/ui_render/mods.hpp"
 #include "../core/ui_render/probe.hpp"
@@ -223,6 +225,17 @@ struct WindowContext {
     controls::Grid pageHost{nullptr};      // strong, like the panels: see MountedSurface
     controls::Border pageSlot{nullptr};
     controls::TextBlock pageTitle{nullptr};
+    // The fullscreen view: a Popup of the window over all of its content, strong like the other hosts.
+    primitives::Popup fullscreenPopup{nullptr};
+    controls::Grid fullscreenHost{nullptr};
+    controls::Border fullscreenSlot{nullptr};
+    controls::Button fullscreenClose{nullptr};
+    std::string fullscreenKey;                // the surface it shows, "" when none
+    xaml::UIElement focusBefore{nullptr};     // what had the focus when it opened, focused again when it closes
+    // Popups open in the order they were opened: when the panel or page popup opens after the fullscreen view, the
+    // view is opened again so it stays on top.
+    std::uint64_t overlayOpens = 0;
+    std::uint64_t fullscreenRaisedAt = 0;
     std::map<std::string, MountedSurface> surfaces;
     std::map<std::string, PlacedControl> placed;
     // The panel Ampify puts in the sidebar's PaneFooter for the sidebar entries, and the footer Apple Music had there
@@ -326,6 +339,15 @@ void Wake(const WeakShared& weakShared, const WeakContext& weakContext, std::uin
     }
 }
 
+void ForgetFullscreenHost(WindowContext& context) {
+    context.fullscreenPopup = nullptr;
+    context.fullscreenHost = nullptr;
+    context.fullscreenSlot = nullptr;
+    context.fullscreenClose = nullptr;
+    context.fullscreenKey.clear();
+    context.focusBefore = nullptr;
+}
+
 void ClearWatches(WindowContext& context) {
     for (HostWatch& watch : context.watches) {
         try {
@@ -349,9 +371,11 @@ void ReleaseXaml(WindowContext& context) noexcept {
         ClearWatches(context);
         if (context.panelPopup) context.panelPopup.IsOpen(false);
         if (context.pagePopup) context.pagePopup.IsOpen(false);
+        if (context.fullscreenPopup) context.fullscreenPopup.IsOpen(false);
     } catch (...) {
     }
     try {
+        ForgetFullscreenHost(context);
         context.panelPopup = nullptr;
         context.pagePopup = nullptr;
         context.panelHost = nullptr;
@@ -825,7 +849,14 @@ ContentArea FindContentArea(const WindowContext& context) {
 
 // Places the Popup of the panels on the right of the window, under the play bar. Called on every refresh and when
 // the window changes size, so the panels follow it.
-void PlacePanelPopup(const WindowContext& context, const xaml::XamlRoot& root) {
+// Opens one of the overlays under the fullscreen view, and counts it so the view goes back on top (ApplySurfaces).
+void OpenOverlay(WindowContext& context, const primitives::Popup& popup) {
+    if (popup.IsOpen()) return;
+    popup.IsOpen(true);
+    context.overlayOpens++;
+}
+
+void PlacePanelPopup(WindowContext& context, const xaml::XamlRoot& root) {
     auto size = root.Size();
     ContentArea area = FindContentArea(context);
     double top = area.top + 8;
@@ -834,7 +865,7 @@ void PlacePanelPopup(const WindowContext& context, const xaml::XamlRoot& root) {
     if (context.panelHost.Height() != height) context.panelHost.Height(height);
     if (context.panelPopup.HorizontalOffset() != left) context.panelPopup.HorizontalOffset(left);
     if (context.panelPopup.VerticalOffset() != top) context.panelPopup.VerticalOffset(top);
-    if (!context.panelPopup.IsOpen()) context.panelPopup.IsOpen(true);
+    OpenOverlay(context, context.panelPopup);
 }
 
 // The overlay of the panels, on the right of the main window: a Popup on the window's XamlRoot, which Apple Music's
@@ -981,7 +1012,8 @@ void PlacePageHost(WindowContext& context, const xaml::XamlRoot& root) {
 void ShowPageHost(WindowContext& context, bool visible) {
     if (!context.pagePopup || !context.pageHost) return;
     context.pageHost.Visibility(visible ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
-    if (context.pagePopup.IsOpen() != visible) context.pagePopup.IsOpen(visible);
+    if (visible) OpenOverlay(context, context.pagePopup);
+    else if (context.pagePopup.IsOpen()) context.pagePopup.IsOpen(false);
 }
 
 // The host of an app page: a Popup of the window over the content area while the route points to the page (Apple
@@ -1137,8 +1169,178 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
     JournalRender(shared, "popup", surface, stats, true);
 }
 
+// ---- The fullscreen view ------------------------------------------------------------------------------------------
+// A Popup of the window that covers all of its content, above Apple Music and the other overlays, with a Close button
+// at the top right. Escape closes it too. It lives outside Apple Music's pages, so their navigation leaves it alone.
+
+UiEvent FullscreenClosed(const std::string& elementId, const std::string& session) {
+    return UiEvent{elementId, 0, false, "{\"session\":" + session + "}", "fullscreenClose"};
+}
+
+// Covers the whole window: called at each refresh, and the root's SizeChanged queues one.
+void PlaceFullscreen(WindowContext& context, const xaml::XamlRoot& root) {
+    if (!context.fullscreenPopup || !context.fullscreenHost) return;
+    auto size = root.Size();
+    double width = std::max(1.0, static_cast<double>(size.Width));
+    double height = std::max(1.0, static_cast<double>(size.Height));
+    if (context.fullscreenHost.Width() != width) context.fullscreenHost.Width(width);
+    if (context.fullscreenHost.Height() != height) context.fullscreenHost.Height(height);
+}
+
+// Hides the view and gives the focus back to what had it, so the view never keeps it once closed.
+void HideFullscreen(WindowContext& context) {
+    if (!context.fullscreenPopup || !context.fullscreenHost) return;
+    context.fullscreenHost.Visibility(xaml::Visibility::Collapsed);
+    if (context.fullscreenPopup.IsOpen()) context.fullscreenPopup.IsOpen(false);
+    xaml::UIElement previous = std::exchange(context.focusBefore, nullptr);
+    try {
+        if (previous && previous.XamlRoot()) previous.Focus(xaml::FocusState::Programmatic);
+    } catch (...) {
+        // That element left the tree meanwhile: the focus stays where XAML puts it.
+    }
+}
+
+void ShowFullscreen(WindowContext& context, const xaml::XamlRoot& root) {
+    if (!context.fullscreenPopup || !context.fullscreenHost) return;
+    if (context.fullscreenHost.Visibility() != xaml::Visibility::Visible) {
+        context.fullscreenHost.Visibility(xaml::Visibility::Visible);
+    }
+    if (context.fullscreenPopup.IsOpen()) return;
+    try {
+        context.focusBefore = xaml::Input::FocusManager::GetFocusedElement(root).try_as<xaml::UIElement>();
+    } catch (...) {
+        context.focusBefore = nullptr;
+    }
+    context.fullscreenPopup.IsOpen(true);
+    context.fullscreenRaisedAt = context.overlayOpens;
+    // The focus inside the view, so Escape reaches it at once.
+    if (context.fullscreenClose) context.fullscreenClose.Focus(xaml::FocusState::Programmatic);
+}
+
+// The user closed the view (Close button or Escape): hidden at once, the element told, and its controls released at
+// the next refresh, outside this handler. The surface stays closed until the element opens a new one.
+void DismissFullscreen(const WeakShared& weakShared, const WeakContext& weakContext) noexcept {
+    try {
+        std::shared_ptr<WindowContext> live = weakContext.lock();
+        SharedPtr shared = weakShared.lock();
+        if (!live || !shared) return;
+        HideFullscreen(*live);
+        auto found = live->surfaces.find(live->fullscreenKey);
+        if (found == live->surfaces.end() || found->second.dismissed) return;
+        found->second.dismissed = true;
+        const Surface& surface = found->second.surface;
+        if (shared->sink) shared->sink(FullscreenClosed(surface.elementId, surface.id));
+        shared->journal.Write("Interface: fullscreen view \"" + SurfaceLabel(surface) + "\" closed by the user");
+        QueueRefresh(weakShared, live);
+    } catch (...) {
+        // A handler runs inside Apple Music's XAML frame: nothing may escape it.
+    }
+}
+
+controls::Button MakeFullscreenClose() {
+    controls::Button close;
+    controls::FontIcon glyph;
+    glyph.Glyph(L"\xE711");  // Cancel
+    glyph.FontSize(16);
+    close.Content(glyph);
+    // Top left: the window's own minimize, maximize and close buttons hold the top right corner.
+    close.HorizontalAlignment(xaml::HorizontalAlignment::Left);
+    close.VerticalAlignment(xaml::VerticalAlignment::Top);
+    close.Margin(xaml::Thickness{16, 16, 0, 0});
+    close.Padding(xaml::Thickness{10, 10, 10, 10});
+    controls::ToolTipService::SetToolTip(close, winrt::box_value(L"Close"));
+    Name(close, "AMPIFY_FullscreenHost_close", "Close");
+    return close;
+}
+
+controls::Border EnsureFullscreenHost(UiService::Shared& shared, const std::shared_ptr<WindowContext>& owner,
+                                      const xaml::DependencyObject& content) {
+    WindowContext& context = *owner;
+    auto rootElement = content.try_as<xaml::UIElement>();
+    xaml::XamlRoot xamlRoot = rootElement ? rootElement.XamlRoot() : nullptr;
+    if (!xamlRoot) return nullptr;
+    if (context.fullscreenSlot) {
+        PlaceFullscreen(context, xamlRoot);
+        return context.fullscreenSlot;
+    }
+    // Opaque, so a view that does not fill the window never shows Apple Music through it.
+    controls::Grid host = LoadKitXaml(L"<Grid " + std::wstring(KitXmlns()) +
+                                      L" Background='{ThemeResource SolidBackgroundFillColorBaseBrush}'/>")
+                              .try_as<controls::Grid>();
+    if (!host) host = controls::Grid();
+    Name(host, "AMPIFY_FullscreenHost", "Fullscreen view");
+    controls::Border slot;
+    Name(slot, "AMPIFY_FullscreenSlot");
+    controls::Button close = MakeFullscreenClose();
+    host.Children().Append(slot);
+    host.Children().Append(close);
+    host.Visibility(xaml::Visibility::Collapsed);
+
+    primitives::Popup popup;
+    popup.XamlRoot(xamlRoot);
+    popup.Child(host);
+    // The handlers hold the window context weakly, never the host that holds them.
+    WeakShared weakShared = shared.weak_from_this();
+    WeakContext weakContext = owner;
+    close.Click([weakShared, weakContext](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+        DismissFullscreen(weakShared, weakContext);
+    });
+    host.KeyDown([weakShared, weakContext](IInspectable const&, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
+        try {
+            if (args.Key() != winrt::Windows::System::VirtualKey::Escape) return;
+            args.Handled(true);
+            DismissFullscreen(weakShared, weakContext);
+        } catch (...) {
+        }
+    });
+    context.fullscreenPopup = popup;
+    context.fullscreenHost = host;
+    context.fullscreenSlot = slot;
+    context.fullscreenClose = close;
+    PlaceFullscreen(context, xamlRoot);
+    shared.Once("fullscreen-host", "Interface: fullscreen host opened in a Popup of the window");
+    return slot;
+}
+
+void MountFullscreen(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
+                     const xaml::DependencyObject& content, const Surface& surface) {
+    MountedSurface& mounted = context->surfaces[surface.key];
+    mounted.surface.kind = SurfaceKind::Fullscreen;  // so Unmount knows it before the first render
+    mounted.surface.key = surface.key;
+    if (mounted.dismissed) {
+        // Closed by the user: its controls go now, outside the handler that closed it.
+        if (mounted.renderer) {
+            if (mounted.slot && mounted.slot.Child() == mounted.renderer->Root()) mounted.slot.Child(nullptr);
+            mounted.renderer.reset();
+        }
+        return;
+    }
+    controls::Border slot = EnsureFullscreenHost(shared, context, content);
+    if (!slot) return;
+    bool first = !mounted.mounted || mounted.slot != slot;
+    if (first || mounted.surface.revision != surface.revision) {
+        if (first) mounted.renderer.reset();
+        mounted.slot = slot;
+        uirender::PatchStats stats = RenderInto(shared, mounted, surface);
+        mounted.mounted = true;
+        JournalRender(shared, "fullscreen view", surface, stats, first);
+    }
+    context->fullscreenKey = surface.key;
+    auto element = content.try_as<xaml::UIElement>();
+    if (element && element.XamlRoot()) ShowFullscreen(*context, element.XamlRoot());
+}
+
 void Unmount(WindowContext& context, MountedSurface& mounted) {
     try {
+        if (mounted.surface.kind == SurfaceKind::Fullscreen) {
+            if (auto slot = mounted.slot; slot && mounted.renderer && slot.Child() == mounted.renderer->Root()) {
+                slot.Child(nullptr);
+            }
+            if (context.fullscreenKey == mounted.surface.key) {
+                HideFullscreen(context);
+                context.fullscreenKey.clear();
+            }
+        }
         if (auto dialog = mounted.dialog) dialog.Hide();
         if (mounted.surface.kind == SurfaceKind::Panel) RemoveFromParent(mounted.panelFrame);
         if (mounted.surface.kind == SurfaceKind::Page) {
@@ -1301,7 +1503,11 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
                 button.BorderThickness(xaml::Thickness{0, 0, 0, 0});
             }
             if (auto native = neighbour.try_as<controls::Control>()) {
-                if (auto style = native.Style(); style && neighbour.try_as<controls::Button>()) button.Style(style);
+                // An AppBarButton's style does not fit a Button: only a plain Button lends its style.
+                bool plainButton = winrt::get_class_name(neighbour) == L"Microsoft.UI.Xaml.Controls.Button";
+                if (auto style = native.Style(); style && plainButton) {
+                    button.Style(style);
+                }
                 button.Width(native.Width());
                 button.Height(native.Height());
                 button.MinWidth(native.MinWidth());
@@ -1388,6 +1594,7 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
                 case SurfaceKind::Panel: MountPanel(shared, context, content, surface); break;
                 case SurfaceKind::Page: MountPage(shared, context, content, surface); break;
                 case SurfaceKind::Popup: MountPopup(shared, context, content, surface); break;
+                case SurfaceKind::Fullscreen: MountFullscreen(shared, context, content, surface); break;
                 case SurfaceKind::Control: break;
             }
         } catch (const winrt::hresult_error& error) {
@@ -1409,9 +1616,19 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
     if (auto element = content.try_as<xaml::FrameworkElement>(); element && element.XamlRoot()) {
         if (context->panelPopup && context->panelHost) PlacePanelPopup(*context, element.XamlRoot());
         PlacePageHost(*context, element.XamlRoot());
+        PlaceFullscreen(*context, element.XamlRoot());
         xaml::ElementTheme mode = element.ActualTheme();
-        for (xaml::FrameworkElement overlay : {xaml::FrameworkElement(context->panelHost), xaml::FrameworkElement(context->pageHost)}) {
+        for (xaml::FrameworkElement overlay : {xaml::FrameworkElement(context->panelHost), xaml::FrameworkElement(context->pageHost),
+                                               xaml::FrameworkElement(context->fullscreenHost)}) {
             if (overlay && overlay.RequestedTheme() != mode) overlay.RequestedTheme(mode);
+        }
+        // Another overlay opened after the fullscreen view: the view opens again, on top of it.
+        if (context->fullscreenPopup && context->fullscreenPopup.IsOpen() &&
+            context->fullscreenRaisedAt != context->overlayOpens) {
+            context->fullscreenPopup.IsOpen(false);
+            context->fullscreenPopup.IsOpen(true);
+            context->fullscreenRaisedAt = context->overlayOpens;
+            if (context->fullscreenClose) context->fullscreenClose.Focus(xaml::FocusState::Programmatic);
         }
     }
 
@@ -1472,8 +1689,10 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         try {
             if (context->panelPopup) context->panelPopup.IsOpen(false);  // the overlays of the old content
             if (context->pagePopup) context->pagePopup.IsOpen(false);
+            if (context->fullscreenPopup) context->fullscreenPopup.IsOpen(false);
         } catch (...) {
         }
+        ForgetFullscreenHost(*context);
         context->panelPopup = nullptr;
         context->panelHost = nullptr;
         context->panelStack = nullptr;
@@ -1602,6 +1821,10 @@ void UiService::Run() {
             if (g_windowEvent.exchange(false) || now >= nextDiscovery) {
                 DiscoverWindows(*m_shared);
                 nextDiscovery = now + kDiscoveryPoll;
+            }
+            // An element whose fullscreen view another element took hears it as a close (the sink only queues it).
+            for (const auto& [elementId, session] : m_model.TakeDisplacedFullscreens()) {
+                if (m_shared->sink) m_shared->sink(FullscreenClosed(elementId, std::to_string(session)));
             }
             uirender::SurfaceChanges changes = tracker.Poll(m_model);
             if (!changes.Empty()) {

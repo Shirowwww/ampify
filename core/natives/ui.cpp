@@ -2,6 +2,8 @@
 // (M8). Each call needs the permission of its part of the interface.
 
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
@@ -17,6 +19,7 @@ constexpr size_t kMaxUiLabel = 60;
 constexpr size_t kMaxUiIcon = 8000;
 constexpr size_t kMaxUiTitle = 120;
 constexpr size_t kMaxUiName = 64;
+constexpr double kMaxSession = 9007199254740991.0;  // the largest whole number a JavaScript number holds exactly
 
 // Lowercase letters, digits, dashes and slashes, so that a name is never a path trick.
 bool ValidUiName(const std::string& name) {
@@ -70,6 +73,31 @@ struct UiNatives : ScriptBridge {
         return JS_UNDEFINED;
     }
 
+    // native.uiFullscreen(treeJson, session): opens the fullscreen surface (session 0) or updates it. Returns the
+    // session the tree belongs to, 0 when that session was closed meanwhile (UiModel::SetFullscreen).
+    AMPIFY_NATIVE(UiFullscreen) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.fullscreen", &failure)) return failure;
+        std::optional<Json> tree = TreeOf(ctx, String(ctx, argc, argv, 0).value_or(""), &failure);
+        if (!tree) return failure;
+        std::uint64_t session = SessionOf(ctx, argc, argv, 1);
+        return JS_NewFloat64(ctx, static_cast<double>(HostOf(ext).Ui().SetFullscreen(ext->id(), std::move(*tree), session)));
+    }
+
+    // native.uiFullscreenClose(session): closes the element's own fullscreen surface, so it needs no permission.
+    AMPIFY_NATIVE(UiFullscreenClose) {
+        ScriptExtension* ext = Owner(ctx);
+        HostOf(ext).Ui().CloseFullscreen(ext->id(), SessionOf(ctx, argc, argv, 0));
+        return JS_UNDEFINED;
+    }
+
+    static std::uint64_t SessionOf(JSContext* ctx, int argc, JSValueConst* argv, int index) {
+        double session = Number(ctx, argc, argv, index);
+        if (!std::isfinite(session) || session < 1 || session > kMaxSession) return 0;
+        return static_cast<std::uint64_t>(session);
+    }
+
     AMPIFY_NATIVE(UiPage) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
@@ -114,6 +142,8 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiControl", UiNatives::UiControl, 3);
     scope.Function("uiPanel", UiNatives::UiPanel, 2);
     scope.Function("uiPopup", UiNatives::UiPopup, 1);
+    scope.Function("uiFullscreen", UiNatives::UiFullscreen, 2);
+    scope.Function("uiFullscreenClose", UiNatives::UiFullscreenClose, 1);
     scope.Function("uiPage", UiNatives::UiPage, 2);
     scope.Function("uiNavigate", UiNatives::UiNavigate, 1);
     scope.Function("uiTitle", UiNatives::UiTitle, 1);

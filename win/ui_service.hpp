@@ -1,7 +1,7 @@
 #pragma once
 
 // The kernel's interface service in AppleMusic.exe: finds Apple Music's XAML windows, follows their pages, shows the
-// extensions' panels, popups, app pages and buttons with the native renderer (ui_renderer.hpp), and adds the
+// extensions' panels, popups, app pages, fullscreen view and buttons with the native renderer (ui_renderer.hpp), and adds the
 // "Ampify" card to the Playback page of the settings. Compiled only with AMPIFY_WITH_XAML. Not run
 // yet in Apple Music: the bench case 63-ui-surfaces checks its log lines (docs/development/testing-on-a-pc.md).
 //
@@ -26,8 +26,9 @@ namespace ampify::win {
 
 class UiService {
 public:
-    // `sink` receives the clicks and changes of the rendered trees, on the interface thread: it must only queue them
-    // for the JavaScript thread (ExtensionLoader::DeliverClickTo, DeliverEventTo).
+    // `sink` receives the clicks and changes of the rendered trees, on the interface thread, and the closes of the
+    // fullscreen view (entry "fullscreenClose"), on the interface thread or the worker: it must only queue them for
+    // the JavaScript thread (ExtensionLoader::DeliverClickTo, DeliverEventTo), which is safe from any thread.
     UiService(Journal& journal, std::filesystem::path kit, UiModel& model, UiEventSink sink);
     ~UiService();
 

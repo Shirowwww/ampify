@@ -10,8 +10,32 @@ std::string_view AmpifyDeclarations() {
 // Follows section 5 of docs/extensions/api.md. Members marked provisional may still change.
 
 type TooltipProps = { tooltip?: string; tooltipPlacement?: "top" | "bottom" | "left" | "right"; tooltipDelay?: number };
-type UiNode = TooltipProps & {
-  type: "stack" | "row" | "list" | "card" | "text" | "button" | "toggle" | "slider" | "textfield" | "image" | "icon" | "dropdown" | "option";
+type UiColor = string;  // "#RRGGBB" or "#AARRGGBB"
+// Any node. align on a text is its text alignment (left, center, right).
+type PlaceProps = {
+  opacity?: number;     // 0 to 1
+  scale?: number;       // around the centre
+  transition?: string;  // "opacity 400ms", "all 300ms", "opacity 400ms, scale 300ms", "none"
+  align?: "start" | "center" | "end" | "stretch";
+  valign?: "start" | "center" | "end" | "stretch";
+  grow?: boolean;       // takes the remaining space of a row or stack
+};
+// stack, row, layer and card (image: cornerRadius, width, height).
+type BoxProps = {
+  background?: string;  // "#RRGGBB", "#AARRGGBB", "acrylic", or "acrylic(#AARRGGBB, 0.6)": tint, tint opacity
+  padding?: number | string;                  // or "top,right,bottom,left"
+  cornerRadius?: number;
+  width?: number;
+  height?: number;
+  minWidth?: number;
+  maxWidth?: number;
+};
+type TextStyleProps = { size?: number; weight?: number; color?: UiColor; wrap?: boolean; maxLines?: number };
+type UiNode = TooltipProps & Omit<PlaceProps, "align"> & BoxProps & Omit<TextStyleProps, "size"> & {
+  type: "stack" | "row" | "list" | "layer" | "card" | "text" | "button" | "toggle" | "slider" | "textfield" | "image" | "icon" | "dropdown" | "option";
+  align?: "start" | "center" | "end" | "stretch" | "left" | "right";
+  size?: number;                          // text: 8 to 120 px; icon: its size
+  fit?: "cover" | "contain" | "fill";     // image
   children?: UiNode[];
   onClick?: number;   // callback number (button, card, image, icon)
   onChange?: number;  // callback number (toggle, slider, textfield, dropdown)
@@ -80,7 +104,7 @@ type AmpifyElement = { readonly type: unknown; readonly key: string | null; read
 type AmpifyNode = AmpifyElement | string | number | boolean | null | undefined | AmpifyNode[];
 type AmpifyComponent<P = Record<string, unknown>> = (props: P & { children?: AmpifyNode }) => AmpifyNode;
 type AmpifyContext<T> = { readonly defaultValue: T; readonly Provider: object; readonly Consumer: object };
-type AmpifyTarget = string | { panel: string } | { page: string } | { popup: string | true };
+type AmpifyTarget = string | { panel: string } | { page: string } | { popup: string | true } | { fullscreen: true };
 type AmpifyRoot = { render(element: AmpifyNode): null; unmount(): boolean };
 type ClickEvent = { type: "click"; id: number };
 type ChangeEvent = { type: "change"; id: number; value: unknown; target: { value: unknown; checked: boolean } };
@@ -98,13 +122,17 @@ type AmpifyHooks = {
 };
 type CreateElement = (type: string | symbol | object | AmpifyComponent<never>, props?: Record<string, unknown> | null,
                       ...children: AmpifyNode[]) => AmpifyElement;
-type ButtonProps = TooltipProps & { label?: string; icon?: string; disabled?: boolean; variant?: "primary" | "secondary" | "tertiary"; onClick?: (event: ClickEvent) => void };
+type ButtonProps = TooltipProps & PlaceProps & { label?: string; icon?: string; disabled?: boolean; variant?: "primary" | "secondary" | "tertiary"; onClick?: (event: ClickEvent) => void };
 type ToggleProps = TooltipProps & { label?: string; value?: boolean; checked?: boolean; disabled?: boolean; onChange?: (checked: boolean, event: ChangeEvent) => void };
 type SliderProps = TooltipProps & { label?: string; min?: number; max?: number; step?: number; value?: number; disabled?: boolean; onChange?: (value: number, event: ChangeEvent) => void };
 type TextFieldProps = TooltipProps & { label?: string; value?: string; placeholder?: string; disabled?: boolean; onChange?: (text: string, event: ChangeEvent) => void };
 type DropdownProps = TooltipProps & { label?: string; value?: string; options?: (string | { value: string; label?: string })[]; disabled?: boolean; onChange?: (value: string, event: ChangeEvent) => void };
-type CardProps = TooltipProps & { title?: string; subtitle?: string; onClick?: (event: ClickEvent) => void };
-type TextProps = TooltipProps & { text?: string; variant?: "title" | "subtitle" | "body" | "caption" };
+type CardProps = TooltipProps & PlaceProps & BoxProps & { title?: string; subtitle?: string; onClick?: (event: ClickEvent) => void };
+type TextProps = TooltipProps & Omit<PlaceProps, "align"> & TextStyleProps & {
+  text?: string;
+  variant?: "title" | "subtitle" | "body" | "caption";
+  align?: "left" | "center" | "right";
+};
 type TooltipWrapperProps = { label?: string; content?: string; placement?: "top" | "bottom" | "left" | "right"; delay?: number; showDelay?: number };
 type AudioChunk = { samples: Float32Array; channels: number; sampleRate: number; frames: number };
 type AudioAnalysis = { level: number; spectrum: number[]; tempo: number };
@@ -175,6 +203,8 @@ declare const Ampify: {
     sidebar: { addItem(item: UiButton): void };
     menu: { addItem(where: "context" | "app", item: { label: string; onClick: () => void }): void };
     popup: { open(view: UiNode): void };
+    // permission ui.fullscreen; onClose runs when the user closes it or another element takes the screen
+    fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void };
     panel: { register(id: string, view: UiNode): void };
     title: { set(text: string): void };
     page: { register(path: string, view: UiNode): void };
@@ -231,6 +261,8 @@ declare const Ampify: {
     post(message: unknown): boolean;
     on(fn: (message: any) => void): () => void;
     connected(): boolean;
+  };
+
   // 5.9 React, components and ready [provisional]
   readonly ready: Promise<void>;  // Ampify.ready.then(fn): fn runs when the kernel has started the element
   React: AmpifyHooks & {

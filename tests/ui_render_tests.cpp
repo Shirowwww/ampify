@@ -14,6 +14,7 @@
 #include "../core/ui_render/mods.hpp"
 #include "../core/ui_render/probe.hpp"
 #include "../core/ui_render/render_tree.hpp"
+#include "../core/ui_render/style.hpp"
 #include "../core/ui_render/surfaces.hpp"
 #include "../core/ui_render/svg_icon.hpp"
 #include "test.hpp"
@@ -371,6 +372,19 @@ TEST_CASE(UiRender_PlaybarButtonGoesAfterTheTransportButtons) {
     CHECK(insertion && insertion->styleFrom == skip);
 }
 
+TEST_CASE(UiRender_PlaybarButtonJoinsTheToggleButtonsOn1792) {
+    FakeTree tree;
+    int root = tree.Add(-1, "Grid", kProbePanel | kProbeGrid, "TransportBar");
+    int bar = tree.Add(root, "StackPanel", kStack | kProbeHorizontal);
+    tree.Add(bar, "Button", kProbeButtonBase, "TransportControl_SkipForward");
+    int toggles = tree.Add(root, "StackPanel", kStack | kProbeHorizontal, "NowPlayingToggleButtons");
+    int lyrics = tree.Add(toggles, "ToggleButton", kProbeButtonBase, "LyricsToggleButton");
+    std::optional<Insertion> insertion = ChoosePlaybarInsertion(tree.nodes);
+    CHECK(insertion && insertion->parent == toggles);
+    CHECK(insertion && insertion->after == -1);
+    CHECK(insertion && insertion->styleFrom == lyrics);
+}
+
 TEST_CASE(UiRender_TopbarButtonGoesAfterAppleMusicsToggleButtons) {
     FakeTree tree;
     int root = tree.Add(-1, "Grid", kProbePanel | kProbeGrid, "TransportBar");
@@ -510,4 +524,88 @@ TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {
     CHECK(IsGlyphIcon("\xEE\x9D\xA8"));  // U+E768, Play in Segoe Fluent Icons
     CHECK(!IsGlyphIcon("<svg/>"));
     CHECK(!IsGlyphIcon(""));
+}
+
+TEST_CASE(UiRender_ColorsAndBackgroundsKeepTheAlphaFirst) {
+    std::optional<Rgba> solid = ParseColor("#1E90FF");
+    CHECK(solid && solid->a == 255 && solid->r == 0x1E && solid->g == 0x90 && solid->b == 0xFF);
+    std::optional<Rgba> faded = ParseColor("#80ffffff");
+    CHECK(faded && faded->a == 0x80 && faded->r == 0xFF);
+    CHECK(!ParseColor("1E90FF"));
+    CHECK(!ParseColor("#1E90F"));
+    CHECK(!ParseColor("#GG90FF"));
+
+    std::optional<Background> acrylic = ParseBackground("acrylic(#CC101010, 0.6)");
+    CHECK(acrylic && acrylic->acrylic && !acrylic->themed && acrylic->color.a == 0xCC && acrylic->tintOpacity == 0.6);
+    std::optional<Background> themed = ParseBackground("acrylic");
+    CHECK(themed && themed->acrylic && themed->themed);
+    std::optional<Background> tintOnly = ParseBackground("acrylic(#101010)");
+    CHECK(tintOnly && tintOnly->tintOpacity == 0.6);
+    std::optional<Background> color = ParseBackground("#FF000000");
+    CHECK(color && !color->acrylic);
+    CHECK(!ParseBackground("acrylic(#101010, 1.5)"));
+    CHECK(!ParseBackground("acrylic(red)"));
+    CHECK(!ParseBackground("blur"));
+}
+
+TEST_CASE(UiRender_PaddingReadsTopRightBottomLeft) {
+    std::optional<Edges> four = ParsePadding(ampify::Json(std::string("1,2,3,4")));
+    CHECK(four && four->top == 1 && four->right == 2 && four->bottom == 3 && four->left == 4);
+    std::optional<Edges> one = ParsePadding(ampify::Json(16.0));
+    CHECK(one && one->top == 16 && one->left == 16);
+    CHECK(!ParsePadding(ampify::Json(std::string("1,2"))));
+    CHECK(!ParsePadding(ampify::Json(std::string("1,2,3,x"))));
+    CHECK(!ParsePadding(ampify::Json(-1.0)));
+    CHECK(!ParsePadding(ampify::Json(true)));
+}
+
+TEST_CASE(UiRender_TransitionsNameTheirPropertiesAndDurations) {
+    std::optional<Transitions> fade = ParseTransition("opacity 400ms");
+    CHECK(fade && fade->opacityMs == 400.0 && !fade->scaleMs && !fade->translationMs);
+    std::optional<Transitions> all = ParseTransition("all 300ms");
+    CHECK(all && all->opacityMs == 300.0 && all->scaleMs == 300.0 && all->translationMs == 300.0);
+    std::optional<Transitions> two = ParseTransition(" opacity 400ms , scale 0.25s ");
+    CHECK(two && two->opacityMs == 400.0 && two->scaleMs == 250.0);
+    std::optional<Transitions> none = ParseTransition("none");
+    CHECK(none && !none->opacityMs && !none->scaleMs);
+    CHECK(!ParseTransition("opacity"));
+    CHECK(!ParseTransition("color 300ms"));
+    CHECK(!ParseTransition("opacity 300"));
+    CHECK(!ParseTransition("opacity -3ms"));
+    CHECK(!ParseTransition("opacity 11s"));
+    CHECK(!ParseTransition(""));
+}
+
+TEST_CASE(UiRender_LayoutFollowsTheChildrenThatGrow) {
+    CHECK(LayoutOf(Tree(R"({"type":"layer","children":[{"type":"image"},{"type":"text"}]})")) == Layout::Layer);
+    CHECK(LayoutOf(Tree(R"({"type":"row","children":[{"type":"text"},{"type":"toggle"}]})")) == Layout::Pair);
+    CHECK(LayoutOf(Tree(R"({"type":"row","children":[{"type":"text"}]})")) == Layout::Panel);
+    CHECK(LayoutOf(Tree(R"({"type":"row","children":[{"type":"text","grow":true},{"type":"button"}]})")) == Layout::Grid);
+    CHECK(LayoutOf(Tree(R"({"type":"stack","children":[{"type":"text"},{"type":"stack","grow":true}]})")) == Layout::Grid);
+    CHECK(LayoutOf(Tree(R"({"type":"list","children":[{"type":"text","grow":true}]})")) == Layout::Panel);
+    CHECK(LayoutOf(Tree(R"({"type":"card","children":[]})")) == Layout::Panel);
+    CHECK(LayoutOf(Tree(R"({"type":"text"})")) == Layout::None);
+}
+
+TEST_CASE(UiRender_EachFullscreenSessionIsANewSurface) {
+    ampify::UiModel model;
+    std::uint64_t session = model.SetFullscreen("lyrics", Parse(R"({"type":"text","text":"a"})"), 0);
+    SurfaceTracker tracker;
+    SurfaceChanges first = tracker.Poll(model);
+    CHECK(first.added.size() == 1);
+    CHECK(first.added[0].kind == SurfaceKind::Fullscreen);
+    CHECK(first.added[0].id == std::to_string(session));
+    CHECK(first.added[0].key == "fullscreen|lyrics|" + std::to_string(session));
+    CHECK(first.added[0].nodeId == "fullscreen-main");
+
+    model.SetFullscreen("lyrics", Parse(R"({"type":"text","text":"b"})"), session);
+    CHECK(tracker.Poll(model).changed.size() == 1);
+
+    // Closed then opened again: the old surface goes and a new one comes, with the same node ids.
+    model.CloseFullscreen("lyrics", session);
+    model.SetFullscreen("lyrics", Parse(R"({"type":"text","text":"c"})"), 0);
+    SurfaceChanges again = tracker.Poll(model);
+    CHECK(again.removed.size() == 1 && again.added.size() == 1);
+    CHECK(again.added.size() == 1 && again.added[0].key != first.added[0].key);
+    CHECK(again.added.size() == 1 && again.added[0].nodeId == "fullscreen-main");
 }

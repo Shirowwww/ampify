@@ -371,6 +371,89 @@ TEST_CASE(React_APopupIsUpdatedInPlaceAndClosedOnUnmount) {
     CHECK(denied->lastError().find("ui.popup") != std::string::npos);
 }
 
+TEST_CASE(React_AFullscreenViewUnmountsWhenTheUserClosesIt) {
+    Fixture f;
+    auto element = f.Make("full", R"js(
+        const { h, useState, useEffect } = Ampify.React;
+        function Lyrics() {
+          const [line, setLine] = useState(0);
+          useEffect(() => () => Ampify.log("cleanup"), []);
+          return h("layer", null,
+            h("image", { src: "https://example.com/a.jpg", fit: "cover" }),
+            h("stack", { background: "acrylic(#CC000000, 0.6)", align: "center" },
+              h("text", { size: 64, weight: 700, opacity: 0.5, transition: "opacity 400ms" }, "line " + line),
+              h("button", { label: "next", onClick: () => setLine(line + 1) })));
+        }
+        Ampify.ReactDOM.render(h(Lyrics), "fullscreen:");
+    )js", R"("ui.fullscreen")");
+    CHECK(element->Start());
+    auto slot = f.host.ui.Fullscreen();
+    CHECK(slot.has_value());
+    if (!slot) return;
+    CHECK(slot->elementId == "full");
+    CHECK(FindNode(slot->tree, "text", "line 0") != nullptr);
+    const std::string session = slot->id;
+
+    element->DeliverClick(1);
+    element->Pump();
+    slot = f.host.ui.Fullscreen();
+    CHECK(slot && slot->id == session && FindNode(slot->tree, "text", "line 1") != nullptr);
+
+    // A close for another session is ignored; the current one unmounts the root.
+    element->DeliverEvent("fullscreenClose", R"({"session":)" + session + "9}");
+    element->Pump();
+    CHECK(f.host.ui.Fullscreen().has_value());
+    CHECK(!f.Logged("cleanup"));
+    element->DeliverEvent("fullscreenClose", R"({"session":)" + session + "}");
+    element->Pump();
+    CHECK(!f.host.ui.Fullscreen().has_value());
+    CHECK(f.Logged("[full] cleanup"));
+    element->Stop();
+
+    Fixture g;
+    auto denied = g.Make("nofull", R"(Ampify.ReactDOM.render(Ampify.React.h("text", null, "x"), { fullscreen: true });)", "");
+    CHECK(!denied->Start());
+    CHECK(denied->lastError().find("ui.fullscreen") != std::string::npos);
+}
+
+TEST_CASE(React_UnmountClosesTheFullscreenView) {
+    Fixture f;
+    auto element = f.Make("fullroot", R"(
+        const root = Ampify.ReactDOM.createRoot("fullscreen");
+        root.render(Ampify.React.h("text", null, "x"));
+        Ampify.ui.fullscreen.onClose(() => Ampify.log("told"));
+        Ampify.log("unmounted " + root.unmount());
+    )", R"("ui.fullscreen")");
+    CHECK(element->Start());
+    CHECK(f.Logged("unmounted true"));
+    CHECK(!f.host.ui.Fullscreen().has_value());
+    CHECK(!f.Logged("told"));  // onClose is for a close the element did not ask for
+    element->Stop();
+}
+
+TEST_CASE(Interface_FullscreenOpenUpdatesAndTellsOnClose) {
+    Fixture f;
+    auto element = f.Make("fullapi", R"(
+        Ampify.ui.fullscreen.onClose(() => Ampify.log("closed"));
+        Ampify.ui.fullscreen.open({ type: "text", text: "one" });
+        Ampify.ui.fullscreen.open({ type: "text", text: "two" });
+    )", R"("ui.fullscreen")");
+    CHECK(element->Start());
+    auto slot = f.host.ui.Fullscreen();
+    CHECK(slot && slot->tree.Dump() == R"({"type":"text","text":"two"})");
+    if (!slot) return;
+    element->DeliverEvent("fullscreenClose", R"({"session":)" + slot->id + "}");
+    element->Pump();
+    CHECK(f.Logged("[fullapi] closed"));
+    CHECK(!f.host.ui.Fullscreen().has_value());
+    element->Stop();
+
+    Fixture g;
+    auto bad = g.Make("fullbad", R"(Ampify.ui.fullscreen.open({ type: "text", size: 500 });)", R"("ui.fullscreen")");
+    CHECK(!bad->Start());
+    CHECK(bad->lastError().find("size") != std::string::npos);
+}
+
 TEST_CASE(React_ReadyResolvesOnTheFirstPump) {
     Fixture f;
     auto element = f.Make("ready", R"(Ampify.ready.then(() => Ampify.log("ready"));)", "");
@@ -505,4 +588,40 @@ TEST_CASE(React_TheReactPanelExampleRuns) {
     CHECK(f.Logged("Timer armed: 30 min"));
     element.Stop();
     CHECK(f.Logged("Timer cancelled"));
+}
+
+TEST_CASE(Interface_TheFullscreenDemoExampleRuns) {
+    Fixture f;
+    const std::string name = "fullscreen-demo";
+    fs::path dir = fs::path(AMPIFY_SOURCE_DIR) / "examples" / name;
+    std::ifstream manifestFile(dir / "manifest.json");
+    std::stringstream manifestText;
+    manifestText << manifestFile.rdbuf();
+    ampify::ManifestResult result = ampify::ParseManifest(manifestText.str(), name, 1, [&](const std::string& file) {
+        return fs::exists(dir / file);
+    });
+    CHECK(result.manifest.has_value());
+    if (!result.manifest) return;
+
+    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal);
+    CHECK(element.Start());
+    auto controls = f.host.ui.Controls();
+    CHECK(controls.size() == 1 && controls[0].placement == "topbar");
+    if (controls.empty()) return;
+    CHECK(!f.host.ui.Fullscreen().has_value());
+
+    // The kernel accepts the tree (ValidateTree runs in the native), and the user's close stops the updates.
+    element.DeliverClick(controls[0].id);
+    element.Pump();
+    auto slot = f.host.ui.Fullscreen();
+    CHECK(slot.has_value());
+    if (!slot) return;
+    std::string error;
+    CHECK(ampify::ValidateTree(slot->tree, &error));
+    CHECK(FindNode(slot->tree, "text", "Fullscreen demo") != nullptr);
+    element.DeliverEvent("fullscreenClose", R"({"session":)" + slot->id + "}");
+    element.Pump();
+    CHECK(!f.host.ui.Fullscreen().has_value());
+    CHECK(f.Logged("error") == false);
+    element.Stop();
 }

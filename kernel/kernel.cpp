@@ -78,6 +78,10 @@ void StartInterface(ampify::Journal& journal, [[maybe_unused]] const std::filesy
 
     // Never destroyed: it holds XAML objects that may only be released on the interface thread.
     static auto* ui = new ampify::win::UiService(journal, kit, model, [target = &loader](const ampify::win::UiEvent& event) {
+        if (!event.entry.empty()) {
+            target->DeliverEventTo(event.elementId, event.entry, event.valueJson);
+            return;
+        }
         if (event.click) {
             target->DeliverClickTo(event.elementId, event.callbackId);
             return;

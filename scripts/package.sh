@@ -104,7 +104,7 @@ done
 
 # The examples the guide uses: extensions with something to see or hear, and the example themes.
 extensions=(react-panel now-playing-notify hello-extension keyboard-skip sleep-timer)
-themes=(midnight large-text rounded-buttons hide-chrome glass artwork)
+themes=(greenroom midnight large-text rounded-buttons hide-chrome glass artwork)
 
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
@@ -119,6 +119,8 @@ for id in "${extensions[@]}"; do
 done
 # The Marketplace page ships with Ampify (it holds kit.manage, which the catalog refuses).
 cp -R "$root/apps/marketplace" "$pkg/examples/apps/"
+# Now Playing too: the full window view with lyrics is part of Ampify.
+cp -R "$root/extensions/now-playing" "$pkg/examples/extensions/"
 for id in "${themes[@]}"; do
     [[ -d "$root/themes/examples/$id" ]] || die "example theme not found: themes/examples/$id"
     cp -R "$root/themes/examples/$id" "$pkg/examples/themes/"

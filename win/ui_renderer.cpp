@@ -6,12 +6,16 @@
 
 #include "ui_renderer.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <limits>
 #include <utility>
 
-
 #include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Foundation.Numerics.h>
 #include <winrt/Windows.UI.h>
+#include <winrt/Windows.UI.Text.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
@@ -19,6 +23,7 @@
 
 #include "../core/json.hpp"
 #include "../core/ui_render/probe.hpp"
+#include "../core/ui_render/style.hpp"
 #include "../core/ui_render/svg_icon.hpp"
 
 namespace ampify::win {
@@ -141,8 +146,103 @@ private:
     int& m_counter;
 };
 
-bool NeedsGrid(const RenderNode& node) {
-    return node.type == "row" && node.children.size() == 2;
+using uirender::Layout;
+
+constexpr double kImageMaxHeight = 240;  // an image without fit or height, as before the style attributes
+constexpr double kInfinity = std::numeric_limits<double>::infinity();
+constexpr double kAuto = std::numeric_limits<double>::quiet_NaN();  // XAML's Width and Height when unset
+constexpr winrt::Windows::UI::Color kThemedAcrylicTint{0xFF, 0x20, 0x20, 0x20};
+
+winrt::Windows::UI::Color ToColor(const uirender::Rgba& color) {
+    return winrt::Windows::UI::Color{color.a, color.r, color.g, color.b};
+}
+
+bool SameLength(double a, double b) {
+    return (std::isnan(a) && std::isnan(b)) || a == b;
+}
+
+// A background attribute as a brush: solid, or an in-app AcrylicBrush that blurs what is under it in the window.
+media::Brush MakeBackground(const std::string& text) {
+    std::optional<uirender::Background> parsed = uirender::ParseBackground(text);
+    if (!parsed) return nullptr;
+    if (!parsed->acrylic) return media::SolidColorBrush(ToColor(parsed->color));
+    if (parsed->themed) {
+        if (auto themed = BrushResource(L"AcrylicInAppFillColorDefaultBrush")) return themed;
+    }
+    winrt::Windows::UI::Color tint = parsed->themed ? kThemedAcrylicTint : ToColor(parsed->color);
+    media::AcrylicBrush acrylic;
+    acrylic.TintColor(tint);
+    acrylic.TintOpacity(parsed->tintOpacity);
+    acrylic.FallbackColor(tint);
+    return acrylic;
+}
+
+xaml::HorizontalAlignment HorizontalOf(const std::string& value, xaml::HorizontalAlignment fallback) {
+    if (value == "start") return xaml::HorizontalAlignment::Left;
+    if (value == "center") return xaml::HorizontalAlignment::Center;
+    if (value == "end") return xaml::HorizontalAlignment::Right;
+    if (value == "stretch") return xaml::HorizontalAlignment::Stretch;
+    return fallback;
+}
+
+xaml::VerticalAlignment VerticalOf(const std::string& value, xaml::VerticalAlignment fallback) {
+    if (value == "start") return xaml::VerticalAlignment::Top;
+    if (value == "center") return xaml::VerticalAlignment::Center;
+    if (value == "end") return xaml::VerticalAlignment::Bottom;
+    if (value == "stretch") return xaml::VerticalAlignment::Stretch;
+    return fallback;
+}
+
+struct Placement {
+    xaml::HorizontalAlignment horizontal = xaml::HorizontalAlignment::Stretch;
+    xaml::VerticalAlignment vertical = xaml::VerticalAlignment::Stretch;
+};
+
+// Where a node sits in its parent when it says nothing: images and icons on the left, rows centred vertically.
+Placement TypePlacement(const RenderNode& node) {
+    Placement placement;
+    if (node.type == "image" || node.type == "icon") placement.horizontal = xaml::HorizontalAlignment::Left;
+    if (node.type == "row") placement.vertical = xaml::VerticalAlignment::Center;
+    return placement;
+}
+
+// The node's own align and valign over the parent's defaults. On a text, align is the text alignment instead.
+void Place(const xaml::FrameworkElement& element, const RenderNode& node, Placement placement) {
+    if (node.type != "text") placement.horizontal = HorizontalOf(node.Text("align"), placement.horizontal);
+    placement.vertical = VerticalOf(node.Text("valign"), placement.vertical);
+    if (element.HorizontalAlignment() != placement.horizontal) element.HorizontalAlignment(placement.horizontal);
+    if (element.VerticalAlignment() != placement.vertical) element.VerticalAlignment(placement.vertical);
+}
+
+void SetPanelBackground(const xaml::FrameworkElement& element, const media::Brush& brush) {
+    if (auto panel = element.try_as<controls::Panel>()) panel.Background(brush);
+    else if (auto border = element.try_as<controls::Border>()) border.Background(brush);
+}
+
+void SetPanelPadding(const xaml::FrameworkElement& element, const xaml::Thickness& padding) {
+    if (auto stack = element.try_as<controls::StackPanel>()) stack.Padding(padding);
+    else if (auto grid = element.try_as<controls::Grid>()) grid.Padding(padding);
+    else if (auto border = element.try_as<controls::Border>()) border.Padding(padding);
+}
+
+void SetPanelCorner(const xaml::FrameworkElement& element, const xaml::CornerRadius& corner) {
+    if (auto stack = element.try_as<controls::StackPanel>()) stack.CornerRadius(corner);
+    else if (auto grid = element.try_as<controls::Grid>()) grid.CornerRadius(corner);
+    else if (auto border = element.try_as<controls::Border>()) border.CornerRadius(corner);
+}
+
+void ClearLocal(const xaml::DependencyObject& object, const xaml::DependencyProperty& property) {
+    if (object.ReadLocalValue(property) != xaml::DependencyProperty::UnsetValue()) object.ClearValue(property);
+}
+
+winrt::Windows::Foundation::TimeSpan Milliseconds(double ms) {
+    return std::chrono::milliseconds(static_cast<std::int64_t>(ms));
+}
+
+media::Stretch StretchOf(const std::string& fit) {
+    if (fit == "cover") return media::Stretch::UniformToFill;
+    if (fit == "fill") return media::Stretch::Fill;
+    return media::Stretch::Uniform;
 }
 
 }  // namespace
@@ -181,7 +281,17 @@ struct XamlRenderer::Callbacks {
 
 struct XamlRenderer::Mounted {
     std::string type;
-    bool grid = false;  // a row drawn as a Grid of 2 columns
+    Layout layout = Layout::None;  // how the native container lays out the children (uirender::LayoutOf)
+    std::vector<bool> cells;       // Layout::Grid: the growing children the cell definitions were made for
+    // What the style attributes last set, so an update only touches what changed and a removed one is undone.
+    std::string background;
+    std::string transition;
+    std::string source;            // image address
+    bool colored = false;          // a text whose color the renderer set
+    bool centered = false;         // the scale centre follows the size
+    media::Brush baseBackground{nullptr};  // a card's own look, put back when the attribute goes
+    xaml::Thickness basePadding{};
+    xaml::CornerRadius baseCorner{};
     // All strong: in Apple Music a weak reference to a XAML object Ampify made never resolves, even while the object
     // is on screen (seen on 1.1792: the slot of a panel was lost right after it was made). The renderer is released
     // on the interface thread with its surface, and no handler holds these objects, so there is no cycle.
@@ -190,6 +300,8 @@ struct XamlRenderer::Mounted {
     controls::Panel host{nullptr};            // where the children go
     controls::TextBlock label{nullptr};       // the label of a toggle, the title of a card
     controls::TextBlock subtitle{nullptr};    // the subtitle of a card
+    media::ImageBrush brush{nullptr};         // an image: drawn by its frame's brush, so the corners can be rounded
+    controls::Image sizer{nullptr};           // an image: invisible, it gives the frame the picture's own size
     std::shared_ptr<Callbacks> callbacks;
     std::vector<Mounted> children;
 };
@@ -392,7 +504,7 @@ xaml::FrameworkElement XamlRenderer::Render(RenderNode tree, const StyleProbe& p
     rootReplaced = false;
     UpdateGuard guard(*m_updating);
 
-    bool rebuild = !m_root || !m_root->outer || (m_tree && NeedsGrid(*next) != m_root->grid && next->type == "row");
+    bool rebuild = !m_root || !m_root->outer || (m_tree && uirender::LayoutOf(*next) != m_root->layout);
     Patch patch = uirender::Reconcile(rebuild ? nullptr : m_tree.get(), *next);
     stats = uirender::CountPatch(patch);
     if (rebuild || patch.op == PatchOp::Create || patch.op == PatchOp::Replace) {
@@ -401,13 +513,34 @@ xaml::FrameworkElement XamlRenderer::Render(RenderNode tree, const StyleProbe& p
     } else {
         Apply(*m_root, patch, probe);
     }
+    if (m_root->outer) Place(m_root->outer, *next, TypePlacement(*next));
     m_tree = std::move(next);
     return Root();
+}
+
+// The native container of stack, list, row and layer, after uirender::LayoutOf.
+static controls::Panel MakeContainer(const RenderNode& node, Layout layout) {
+    if (layout == Layout::Panel) {
+        controls::StackPanel panel;
+        if (node.type == "row") panel.Orientation(controls::Orientation::Horizontal);
+        return panel;
+    }
+    controls::Grid grid;
+    if (layout == Layout::Pair) {
+        controls::ColumnDefinition first;
+        first.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
+        controls::ColumnDefinition second;
+        second.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
+        grid.ColumnDefinitions().Append(first);
+        grid.ColumnDefinitions().Append(second);
+    }
+    return grid;
 }
 
 XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StyleProbe& probe) {
     Mounted mounted;
     mounted.type = node.type;
+    mounted.layout = uirender::LayoutOf(node);
     mounted.callbacks = std::make_shared<Callbacks>();
     mounted.callbacks->elementId = m_elementId;
     mounted.callbacks->sink = m_sink;
@@ -417,27 +550,15 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
     xaml::FrameworkElement outer{nullptr};
     xaml::FrameworkElement control{nullptr};
 
-    if (node.type == "stack" || node.type == "list" || (node.type == "row" && !NeedsGrid(node))) {
-        controls::StackPanel panel;
-        if (node.type == "row") {
-            panel.Orientation(controls::Orientation::Horizontal);
-            panel.VerticalAlignment(xaml::VerticalAlignment::Center);
-        }
+    if (node.type == "stack" || node.type == "list" || node.type == "row" || node.type == "layer") {
+        controls::Panel panel = MakeContainer(node, mounted.layout);
         outer = control = panel;
         mounted.host = panel;
-    } else if (node.type == "row") {
-        controls::Grid grid;
-        controls::ColumnDefinition first;
-        first.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
-        controls::ColumnDefinition second;
-        second.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
-        grid.ColumnDefinitions().Append(first);
-        grid.ColumnDefinitions().Append(second);
-        outer = control = grid;
-        mounted.host = grid;
-        mounted.grid = true;
     } else if (node.type == "card") {
         controls::Border card = MakeCardBorder(probe);
+        mounted.baseBackground = card.Background();
+        mounted.basePadding = card.Padding();
+        mounted.baseCorner = card.CornerRadius();
         controls::StackPanel inner;
         inner.Spacing(8);
         controls::StackPanel header;
@@ -531,17 +652,22 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
         });
         outer = control = combo;
     } else if (node.type == "image") {
-        controls::Image image;
-        image.Stretch(media::Stretch::Uniform);
-        image.MaxHeight(240);
-        image.HorizontalAlignment(xaml::HorizontalAlignment::Left);
-        image.Tapped([callbacks](IInspectable const&, xaml::Input::TappedRoutedEventArgs const&) noexcept {
+        // The picture is the frame's ImageBrush, so cornerRadius rounds it (a Border does not clip an Image child).
+        // The invisible Image shares the same bitmap and gives the frame the size the picture would take.
+        controls::Border frame;
+        media::ImageBrush brush;
+        controls::Image sizer;
+        sizer.Opacity(0);
+        frame.Child(sizer);
+        frame.Background(brush);
+        frame.Tapped([callbacks](IInspectable const&, xaml::Input::TappedRoutedEventArgs const&) noexcept {
             callbacks->Fire(true, {});
         });
-        outer = control = image;
+        outer = control = frame;
+        mounted.brush = brush;
+        mounted.sizer = sizer;
     } else {  // icon, and option outside a dropdown (refused by ValidateTree, drawn empty here)
         controls::Border frame;  // holds the drawn icon, which is rebuilt when the SVG changes
-        frame.HorizontalAlignment(xaml::HorizontalAlignment::Left);
         frame.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));  // so a tap anywhere counts
         frame.Tapped([callbacks](IInspectable const&, xaml::Input::TappedRoutedEventArgs const&) noexcept {
             callbacks->Fire(true, {});
@@ -556,17 +682,186 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
     automation::AutomationProperties::SetAutomationId(control, Wide(name));
     if (outer != control) outer.Name(Wide(name + "_frame"));
 
-    SetAttributes(mounted, node, probe);
+    SetAttributes(mounted, node, probe, true);
     if (node.type == "dropdown") {
         FillOptions(mounted, node);
     } else if (mounted.host) {
         for (const RenderNode& child : node.children) mounted.children.push_back(Build(child, probe));
         Rewrite(mounted);
+        PlaceChildren(mounted, node);
     }
     return mounted;
 }
 
-void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const StyleProbe& probe) {
+// Sets the cells of a Grid layout (Auto, or Star for a growing child), and the cell and the place of each child. The
+// parent decides the defaults: the second child of a pair on the right, the children of a row centred vertically,
+// the children of a layer stretched over it.
+void XamlRenderer::PlaceChildren(Mounted& mounted, const RenderNode& node) {
+    auto grid = mounted.host ? mounted.host.try_as<controls::Grid>() : nullptr;
+    bool horizontal = node.type == "row";
+    if (grid && mounted.layout == Layout::Grid) {
+        std::vector<bool> cells;
+        for (const RenderNode& child : node.children) cells.push_back(child.Bool("grow", false));
+        if (cells != mounted.cells) {
+            grid.ColumnDefinitions().Clear();
+            grid.RowDefinitions().Clear();
+            for (bool grows : cells) {
+                xaml::GridLength length{1.0, grows ? xaml::GridUnitType::Star : xaml::GridUnitType::Auto};
+                if (horizontal) {
+                    controls::ColumnDefinition column;
+                    column.Width(length);
+                    grid.ColumnDefinitions().Append(column);
+                } else {
+                    controls::RowDefinition row;
+                    row.Height(length);
+                    grid.RowDefinitions().Append(row);
+                }
+            }
+            mounted.cells = std::move(cells);
+        }
+    }
+    std::size_t count = std::min(mounted.children.size(), node.children.size());
+    for (std::size_t index = 0; index < count; index++) {
+        xaml::FrameworkElement element = mounted.children[index].outer;
+        if (!element) continue;
+        const RenderNode& child = node.children[index];
+        Placement placement = TypePlacement(child);
+        int cell = static_cast<int>(index);
+        if (mounted.layout == Layout::Pair || (mounted.layout == Layout::Grid && horizontal)) {
+            if (controls::Grid::GetColumn(element) != cell) controls::Grid::SetColumn(element, cell);
+            placement.vertical = xaml::VerticalAlignment::Center;
+            if (mounted.layout == Layout::Pair && index == 1) placement.horizontal = xaml::HorizontalAlignment::Right;
+        } else if (mounted.layout == Layout::Grid) {
+            if (controls::Grid::GetRow(element) != cell) controls::Grid::SetRow(element, cell);
+        } else if (mounted.layout == Layout::Layer) {
+            placement = Placement{};
+        }
+        Place(element, child, placement);
+    }
+}
+
+// background, padding, cornerRadius and the size of stack, row, layer and card. A card falls back to its own look.
+void XamlRenderer::SetBox(Mounted& mounted, const RenderNode& node) {
+    xaml::FrameworkElement element = mounted.outer;
+    std::string background = node.Text("background");
+    if (background != mounted.background) {
+        media::Brush brush = background.empty() ? mounted.baseBackground : MakeBackground(background);
+        SetPanelBackground(element, brush ? brush : mounted.baseBackground);
+        mounted.background = background;
+    }
+    xaml::Thickness padding = mounted.basePadding;
+    if (node.Has("padding")) {
+        auto found = node.attributes.find("padding");
+        if (std::optional<uirender::Edges> edges = uirender::ParsePadding(found->second)) {
+            padding = xaml::Thickness{edges->left, edges->top, edges->right, edges->bottom};
+        }
+    }
+    SetPanelPadding(element, padding);
+    xaml::CornerRadius corner = mounted.baseCorner;
+    if (node.Has("cornerRadius")) {
+        double radius = node.Number("cornerRadius", 0);
+        corner = xaml::CornerRadius{radius, radius, radius, radius};
+    }
+    SetPanelCorner(element, corner);
+    double width = node.Number("width", kAuto);
+    double height = node.Number("height", kAuto);
+    double minWidth = node.Number("minWidth", 0);
+    double maxWidth = node.Number("maxWidth", kInfinity);
+    if (!SameLength(element.Width(), width)) element.Width(width);
+    if (!SameLength(element.Height(), height)) element.Height(height);
+    if (element.MinWidth() != minWidth) element.MinWidth(minWidth);
+    if (element.MaxWidth() != maxWidth) element.MaxWidth(maxWidth);
+}
+
+// size, weight, color, align, wrap and maxLines of a text. A removed attribute gives the text style's value back.
+static void SetTextStyle(const controls::TextBlock& block, const RenderNode& node, bool& colored) {
+    if (node.Has("size")) block.FontSize(node.Number("size", 14));
+    else ClearLocal(block, controls::TextBlock::FontSizeProperty());
+    if (node.Has("weight")) {
+        block.FontWeight(winrt::Windows::UI::Text::FontWeight{static_cast<std::uint16_t>(node.Number("weight", 400))});
+    } else {
+        ClearLocal(block, controls::TextBlock::FontWeightProperty());
+    }
+    if (std::optional<uirender::Rgba> color = uirender::ParseColor(node.Text("color"))) {
+        block.Foreground(media::SolidColorBrush(ToColor(*color)));
+        colored = true;
+    } else if (colored) {
+        // A caption was made with the secondary brush: it gets it back, the other texts their style's brush.
+        if (node.Text("variant") == "caption") block.Foreground(BrushResource(L"TextFillColorSecondaryBrush"));
+        else ClearLocal(block, controls::TextBlock::ForegroundProperty());
+        colored = false;
+    }
+    std::string align = node.Text("align");
+    if (align == "center") block.TextAlignment(xaml::TextAlignment::Center);
+    else if (align == "right") block.TextAlignment(xaml::TextAlignment::Right);
+    else if (align == "left") block.TextAlignment(xaml::TextAlignment::Left);
+    else ClearLocal(block, controls::TextBlock::TextAlignmentProperty());
+    bool wrap = node.Bool("wrap", true);
+    xaml::TextWrapping wrapping = wrap ? xaml::TextWrapping::Wrap : xaml::TextWrapping::NoWrap;
+    if (block.TextWrapping() != wrapping) block.TextWrapping(wrapping);
+    int lines = static_cast<int>(node.Number("maxLines", 0));
+    if (block.MaxLines() != lines) block.MaxLines(lines);
+    xaml::TextTrimming trimming = lines > 0 || !wrap ? xaml::TextTrimming::CharacterEllipsis : xaml::TextTrimming::None;
+    if (block.TextTrimming() != trimming) block.TextTrimming(trimming);
+}
+
+// opacity, scale and transition, on any node. While building, the values go first so that nothing animates in; on
+// an update, the transitions go first so that the new values animate on the compositor thread.
+void XamlRenderer::SetMotion(Mounted& mounted, const RenderNode& node, bool building) {
+    xaml::FrameworkElement element = mounted.outer;
+    auto values = [&] {
+        double opacity = node.Number("opacity", 1);
+        if (element.Opacity() != opacity) element.Opacity(opacity);
+        float scale = static_cast<float>(node.Number("scale", 1));
+        winrt::Windows::Foundation::Numerics::float3 wanted{scale, scale, 1};
+        if (element.Scale() != wanted) element.Scale(wanted);
+        if (scale != 1 && !mounted.centered) {
+            // Around the centre: the centre follows the size, which is not known before the first layout.
+            mounted.centered = true;
+            element.SizeChanged([](IInspectable const& sender, xaml::SizeChangedEventArgs const& args) noexcept {
+                try {
+                    auto size = args.NewSize();
+                    sender.as<xaml::UIElement>().CenterPoint({size.Width / 2, size.Height / 2, 0});
+                } catch (...) {
+                }
+            });
+            element.CenterPoint({static_cast<float>(element.ActualWidth() / 2), static_cast<float>(element.ActualHeight() / 2), 0});
+        }
+    };
+    auto transitions = [&] {
+        std::string text = node.Text("transition");
+        if (text == mounted.transition) return;
+        mounted.transition = text;
+        uirender::Transitions parsed = uirender::ParseTransition(text).value_or(uirender::Transitions{});
+        xaml::ScalarTransition opacity{nullptr};
+        if (parsed.opacityMs) {
+            opacity = xaml::ScalarTransition();
+            opacity.Duration(Milliseconds(*parsed.opacityMs));
+        }
+        element.OpacityTransition(opacity);
+        xaml::Vector3Transition scale{nullptr};
+        if (parsed.scaleMs) {
+            scale = xaml::Vector3Transition();
+            scale.Duration(Milliseconds(*parsed.scaleMs));
+        }
+        element.ScaleTransition(scale);
+        xaml::Vector3Transition translation{nullptr};
+        if (parsed.translationMs) {
+            translation = xaml::Vector3Transition();
+            translation.Duration(Milliseconds(*parsed.translationMs));
+        }
+        element.TranslationTransition(translation);
+    };
+    if (building) {
+        values();
+        transitions();
+    } else {
+        transitions();
+        values();
+    }
+}
+
+void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const StyleProbe& probe, bool building) {
     xaml::FrameworkElement control = mounted.control;
     if (!control) return;
     mounted.callbacks->onClick = static_cast<int>(node.Number("onClick", 0));
@@ -575,12 +870,19 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
     if (auto asControl = control.try_as<controls::Control>()) {
         if (asControl.IsEnabled() == disabled) asControl.IsEnabled(!disabled);
     }
+    if (mounted.outer) SetMotion(mounted, node, building);
 
     const std::string& type = node.type;
+    if (type == "stack" || type == "row" || type == "layer" || type == "card") SetBox(mounted, node);
     if (type == "stack" || type == "list" || type == "row") {
         double gap = node.Number("gap", type == "list" ? 4 : (type == "row" ? 12 : 8));
-        if (auto panel = control.try_as<controls::StackPanel>()) panel.Spacing(gap);
-        if (auto grid = control.try_as<controls::Grid>()) grid.ColumnSpacing(gap);
+        if (auto panel = control.try_as<controls::StackPanel>()) {
+            if (panel.Spacing() != gap) panel.Spacing(gap);
+        }
+        if (auto grid = control.try_as<controls::Grid>()) {
+            if (type == "row" && grid.ColumnSpacing() != gap) grid.ColumnSpacing(gap);
+            if (type != "row" && grid.RowSpacing() != gap) grid.RowSpacing(gap);
+        }
     } else if (type == "card") {
         if (auto title = mounted.label) {
             SetText(title, Wide(node.Text("title")));
@@ -595,6 +897,7 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
         SetText(block, Wide(node.Text("text")));
         xaml::Style style = StyleResource(TextStyleKey(node.Text("variant", "body")));
         if (style && block.Style() != style) block.Style(style);
+        SetTextStyle(block, node, mounted.colored);
     } else if (type == "button") {
         auto button = control.as<controls::Button>();
         std::string variant = node.Text("variant", "secondary");
@@ -672,17 +975,7 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
         std::string label = node.Text("label");
         combo.Header(label.empty() ? nullptr : winrt::box_value(Wide(label)));
     } else if (type == "image") {
-        auto image = control.as<controls::Image>();
-        std::string source = node.Text("src");
-        if (!source.empty()) {
-            try {
-                image.Source(media::Imaging::BitmapImage(ImageUri(source)));
-            } catch (...) {
-                image.Source(nullptr);
-            }
-        }
-        if (node.Has("width")) image.Width(node.Number("width", 0));
-        if (node.Has("height")) image.Height(node.Number("height", 0));
+        SetImage(mounted, node);
     } else if (type == "icon") {
         auto frame = control.as<controls::Border>();
         frame.Child(MakeIcon(node.Text("icon"), node.Number("size", 20), L"TextFillColorPrimaryBrush"));
@@ -699,6 +992,37 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
         automation::AutomationProperties::SetHelpText(control, Wide(tooltip));
     }
     // tooltipDelay has no per-control setting in WinUI 3: the system delay applies.
+}
+
+// src, fit, cornerRadius, width and height. The bitmap is loaded again only when the address changes, so a fade of
+// the image does not reload it.
+void XamlRenderer::SetImage(Mounted& mounted, const RenderNode& node) {
+    auto frame = mounted.control.as<controls::Border>();
+    std::string source = node.Text("src");
+    if (source != mounted.source && mounted.brush && mounted.sizer) {
+        mounted.source = source;
+        media::Imaging::BitmapImage bitmap{nullptr};
+        try {
+            if (!source.empty()) bitmap = media::Imaging::BitmapImage(ImageUri(source));
+        } catch (...) {
+            bitmap = nullptr;  // an address that is not a URI: nothing drawn
+        }
+        mounted.brush.ImageSource(bitmap);
+        mounted.sizer.Source(bitmap);
+    }
+    std::string fit = node.Text("fit");
+    media::Stretch stretch = StretchOf(fit);
+    if (mounted.brush && mounted.brush.Stretch() != stretch) mounted.brush.Stretch(stretch);
+    if (mounted.sizer && mounted.sizer.Stretch() != stretch) mounted.sizer.Stretch(stretch);
+    double radius = node.Number("cornerRadius", 0);
+    xaml::CornerRadius corner{radius, radius, radius, radius};
+    if (frame.CornerRadius() != corner) frame.CornerRadius(corner);
+    double width = node.Number("width", kAuto);
+    double height = node.Number("height", kAuto);
+    double maxHeight = node.Has("height") || !fit.empty() ? kInfinity : kImageMaxHeight;
+    if (!SameLength(frame.Width(), width)) frame.Width(width);
+    if (!SameLength(frame.Height(), height)) frame.Height(height);
+    if (frame.MaxHeight() != maxHeight) frame.MaxHeight(maxHeight);
 }
 
 void XamlRenderer::FillOptions(Mounted& mounted, const RenderNode& node) {
@@ -730,7 +1054,7 @@ void XamlRenderer::FillOptions(Mounted& mounted, const RenderNode& node) {
 
 void XamlRenderer::Apply(Mounted& mounted, const Patch& patch, const StyleProbe& probe) {
     const RenderNode& node = *patch.node;
-    if (patch.op == PatchOp::Update) SetAttributes(mounted, node, probe);
+    if (patch.op == PatchOp::Update) SetAttributes(mounted, node, probe, false);
 
     if (node.type == "dropdown") {
         bool optionsChanged = patch.reordered;
@@ -748,8 +1072,9 @@ void XamlRenderer::Apply(Mounted& mounted, const Patch& patch, const StyleProbe&
                      child.from < static_cast<int>(mounted.children.size());
         if (reuse) {
             Mounted& old = mounted.children[child.from];
-            // A row that changes between 2 children and another count changes its native panel: rebuilt.
-            bool layoutChanged = child.node->type == "row" && NeedsGrid(*child.node) != old.grid;
+            // A container whose layout changes (a row of 2 children that gets a third, a child that starts to grow)
+            // changes its native panel: rebuilt.
+            bool layoutChanged = uirender::LayoutOf(*child.node) != old.layout;
             if (old.outer && !layoutChanged) {
                 Apply(old, child, probe);
                 next.push_back(std::move(old));
@@ -761,6 +1086,7 @@ void XamlRenderer::Apply(Mounted& mounted, const Patch& patch, const StyleProbe&
     }
     mounted.children = std::move(next);
     if (rewrite) Rewrite(mounted);
+    PlaceChildren(mounted, node);  // a child's align, valign or grow may change without any move
 }
 
 void XamlRenderer::Rewrite(Mounted& mounted) {
@@ -768,17 +1094,8 @@ void XamlRenderer::Rewrite(Mounted& mounted) {
     if (!host) return;
     auto children = host.Children();
     children.Clear();
-    int column = 0;
     for (const Mounted& child : mounted.children) {
-        xaml::FrameworkElement element = child.outer;
-        if (!element) continue;
-        children.Append(element);
-        if (mounted.grid) {
-            controls::Grid::SetColumn(element, column);
-            if (column == 1) element.HorizontalAlignment(xaml::HorizontalAlignment::Right);
-            element.VerticalAlignment(xaml::VerticalAlignment::Center);
-        }
-        column++;
+        if (xaml::FrameworkElement element = child.outer) children.Append(element);
     }
 }
 

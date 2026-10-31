@@ -68,6 +68,11 @@ The Marketplace reads a public catalog. Installing from it needs the catalog add
 In Settings > Playback, the "Ampify" card has one switch per extension. The change takes effect at once. Extensions you
 install from the catalog start switched off. You see the permissions an extension asks for before you switch it on.
 
+Now Playing ships with Ampify too. Its button sits at the right of the playback bar, beside lyrics and Up Next. It
+shows the song over the whole window, with its lyrics in time with the song: Apple Music's own once its lyrics panel
+has been open for that song, otherwise those of LRCLIB, a free public library of lyrics. Escape or the Close button at
+the top left closes it.
+
 The Atmos leveler is an extension that ships with Ampify. It brings Dolby Atmos songs to the loudness of stereo songs
 without moving Apple Music's volume slider. It is off until you switch it on. In a terminal:
 

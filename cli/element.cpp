@@ -39,7 +39,7 @@ constexpr TextRule kResourcesRule{R"re([A-Za-z0-9][A-Za-z0-9._-]{0,63}\.xaml)re"
 constexpr TextRule kIconRule{R"re([A-Za-z0-9][A-Za-z0-9._-]{0,63}\.svg)re", 0, 0,
                              "a .svg file name, at the root of the folder"};
 constexpr TextRule kPermissionRule{
-    R"re((player\.read|player\.control|audio\.analyze|audio\.gain|audio\.eq|storage|notifications|ipc\.discord|midi\.input|library\.read|library\.write|services\.read|ui\.keyboard|ui\.topbar|ui\.playbar|ui\.sidebar|ui\.menu|ui\.popup|ui\.panel|ui\.page|ui\.window|ui\.tray|fs\.output|kit\.manage|network:[a-z0-9.-]{1,253}))re",
+    R"re((player\.read|player\.control|audio\.analyze|audio\.gain|audio\.eq|storage|notifications|ipc\.discord|midi\.input|library\.read|library\.write|services\.read|ui\.keyboard|ui\.topbar|ui\.playbar|ui\.sidebar|ui\.menu|ui\.popup|ui\.fullscreen|ui\.panel|ui\.page|ui\.window|ui\.tray|fs\.output|kit\.manage|network:[a-z0-9.-]{1,253}))re",
     0, 0, "a permission from docs/extensions/api.md, section 4"};
 constexpr TextRule kTypeRule{R"re(script|module)re", 0, 0, "script or module"};
 constexpr TextRule kProcessRule{R"re(ui|engine)re", 0, 0, "ui or engine"};

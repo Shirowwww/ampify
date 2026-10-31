@@ -6,6 +6,7 @@ list(APPEND AMPIFY_CORE_SOURCES
     core/ui_render/surfaces.cpp
     core/ui_render/probe.cpp
     core/ui_render/mods.cpp
-    core/ui_render/svg_icon.cpp)
+    core/ui_render/svg_icon.cpp
+    core/ui_render/style.cpp)
 
 list(APPEND AMPIFY_TESTS_SOURCES tests/ui_render_tests.cpp)

@@ -197,7 +197,7 @@ const char kReact[] = R"AMPIFYJS(
   const ALIASES = { div: "stack", section: "stack", span: "text", p: "text", label: "text", h1: "text", h2: "text",
                     h3: "text", img: "image", select: "dropdown", ul: "list" };
   const VARIANTS = { h1: "title", h2: "subtitle", h3: "subtitle" };
-  const CONTAINERS = new Set(["stack", "row", "list", "card", "dropdown"]);
+  const CONTAINERS = new Set(["stack", "row", "list", "card", "dropdown", "layer"]);
   // Where the text children of a primitive without children go.
   const TEXT_ATTRIBUTE = { text: "text", button: "label", option: "label", toggle: "label" };
 
@@ -374,13 +374,13 @@ const char kReact[] = R"AMPIFYJS(
     }
   }
 
-  const TARGETS = ["panel", "page", "popup"];
+  const TARGETS = ["panel", "page", "popup", "fullscreen"];
 
   function targetOf(target) {
     let kind;
     let id;
-    if (target === "popup") {
-      kind = "popup";
+    if (target === "popup" || target === "fullscreen") {
+      kind = target;
       id = "main";
     } else if (typeof target === "string" && target.indexOf(":") > 0) {
       kind = target.slice(0, target.indexOf(":"));
@@ -389,8 +389,10 @@ const char kReact[] = R"AMPIFYJS(
       kind = TARGETS.find((name) => target[name] !== undefined && target[name] !== null);
       if (kind) id = target[kind] === true ? "main" : text(target[kind]);
     }
+    if (kind === "fullscreen") id = "main";  // one fullscreen surface: "fullscreen:" names nothing
     if (!TARGETS.includes(kind) || !id) {
-      throw new TypeError('ReactDOM: unknown target (expected "panel:<name>", "page:/<path>" or "popup:<name>")');
+      throw new TypeError('ReactDOM: unknown target (expected "panel:<name>", "page:/<path>", "popup:<name>" or ' +
+                          '"fullscreen:")');
     }
     return { kind, id, key: kind + ":" + id };
   }
@@ -398,6 +400,7 @@ const char kReact[] = R"AMPIFYJS(
   function send(target, tree, json) {
     if (target.kind === "panel") Ampify.ui.panel.register(target.id, tree);
     else if (target.kind === "page") Ampify.ui.page.register(target.id, tree);
+    else if (target.kind === "fullscreen") Ampify.ui.fullscreen.open(tree);
     else native.reactPopup(target.id, json);
   }
 
@@ -458,6 +461,7 @@ const char kReact[] = R"AMPIFYJS(
   function destroy(root) {
     root.dead = true;
     pending.delete(root);
+    if (root.offClose) root.offClose();
     if (root.children) {
       for (const child of root.children.values()) unmount(child);
     }
@@ -468,8 +472,15 @@ const char kReact[] = R"AMPIFYJS(
     const where = targetOf(target);
     let root = roots.get(where.key);
     if (!root) {
-      root = { target: where, element: null, children: null, effects: [], sent: null, dead: false };
+      root = { target: where, element: null, children: null, effects: [], sent: null, dead: false, offClose: null };
       roots.set(where.key, root);
+      // The user closed the fullscreen view (or another element took it): the root unmounts, as unmount() would.
+      if (where.kind === "fullscreen") {
+        root.offClose = Ampify.ui.fullscreen.onClose(() => {
+          if (roots.get(where.key) === root) roots.delete(where.key);
+          destroy(root);
+        });
+      }
     }
     root.element = element;
     pending.delete(root);
@@ -484,6 +495,7 @@ const char kReact[] = R"AMPIFYJS(
     destroy(root);
     roots.delete(where.key);
     if (where.kind === "popup") native.reactClosePopup(where.id);
+    else if (where.kind === "fullscreen") Ampify.ui.fullscreen.close();
     else send(where, { type: "stack", children: [] }, "");
     return true;
   }
@@ -534,6 +546,9 @@ const char kReact[] = R"AMPIFYJS(
 
   const h = createElement;
   const TIP = ["tooltip", "tooltipPlacement", "tooltipDelay"];
+  // The style attributes of section 5.5: those of any node, and those of a box (card).
+  const PLACE = ["opacity", "scale", "transition", "align", "valign", "grow"];
+  const BOX = ["background", "padding", "cornerRadius", "width", "height", "minWidth", "maxWidth"];
 
   function pick(props, names) {
     const out = {};
@@ -552,7 +567,7 @@ const char kReact[] = R"AMPIFYJS(
   const asText = (value) => (value === undefined || value === null ? "" : String(value));
 
   function Button(props) {
-    const attributes = pick(props, ["label", "icon", "disabled", "variant", "onClick", ...TIP]);
+    const attributes = pick(props, ["label", "icon", "disabled", "variant", "onClick", ...TIP, ...PLACE]);
     return h("button", attributes, attributes.label === undefined ? props.children : undefined);
   }
   const ButtonPrimary = (props) => h(Button, Object.assign({ variant: "primary" }, props));
@@ -590,11 +605,12 @@ const char kReact[] = R"AMPIFYJS(
     return h("dropdown", attributes, options);
   }
 
-  const Card = (props) => h("card", pick(props, ["title", "subtitle", "onClick", ...TIP]), props.children);
+  const Card = (props) => h("card", pick(props, ["title", "subtitle", "onClick", ...TIP, ...PLACE, ...BOX]),
+                            props.children);
   const List = (props) => h("list", pick(props, TIP), props.children);
 
   function Text(props) {
-    const attributes = pick(props, ["text", "variant", ...TIP]);
+    const attributes = pick(props, ["text", "variant", "size", "weight", "color", "wrap", "maxLines", ...TIP, ...PLACE]);
     return h("text", attributes, attributes.text === undefined ? props.children : undefined);
   }
 

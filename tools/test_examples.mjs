@@ -367,3 +367,165 @@ test("the service examples declare exactly the permissions they use", () => {
     assert.deepEqual([...(manifest.permissions ?? [])].sort(), [...needed].sort(), name);
   }
 });
+
+test("fullscreen-demo opens a layered view from the top bar, steps its lines and stops when closed", () => {
+  const { manifest, source } = load("fullscreen-demo");
+  const granted = new Set(manifest.permissions ?? []);
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+  };
+  const world = { buttons: [], views: [], closes: 0, closers: [], stops: [], intervals: new Map(), nextTimer: 1 };
+  const ampify = {
+    onStop: (fn) => world.stops.push(fn),
+    ui: {
+      topbar: {
+        addButton: (button) => {
+          need("ui.topbar");
+          world.buttons.push(button);
+        },
+      },
+      fullscreen: {
+        open: (view) => {
+          need("ui.fullscreen");
+          world.views.push(structuredClone(view));
+        },
+        close: () => world.closes++,
+        onClose: (fn) => {
+          world.closers.push(fn);
+          return () => {};
+        },
+      },
+    },
+  };
+  const context = {
+    Ampify: ampify,
+    setInterval: (fn, ms) => {
+      const id = world.nextTimer++;
+      world.intervals.set(id, { fn, ms });
+      return id;
+    },
+    clearInterval: (id) => world.intervals.delete(id),
+  };
+  runIn(source, context);
+  assert.equal(world.buttons.length, 1);
+  assert.equal(world.views.length, 0, "nothing opens before the button is clicked");
+
+  world.buttons[0].onClick();
+  const view = world.views[0];
+  assert.equal(view.type, "layer");
+  const [image, overlay, content] = view.children;
+  assert.equal(image.type, "image");
+  assert.match(image.src, /^https:\/\//);
+  assert.equal(image.fit, "cover");
+  assert.match(overlay.background, /^acrylic\(#[0-9A-Fa-f]{8}, 0?\.\d+\)$/);
+  assert.equal(content.align, "center");
+  const title = content.children[0];
+  assert.ok(title.size >= 48 && title.align === "center");
+  const lines = (shown) => shown.children[2].children[2].children;
+  assert.deepEqual(lines(view).map((line) => line.opacity), [1, 0.35, 0.35, 0.35]);
+  assert.ok(lines(view).every((line) => /opacity \d+ms/.test(line.transition)));
+
+  assert.equal(world.intervals.size, 1);
+  [...world.intervals.values()][0].fn();
+  assert.deepEqual(lines(world.views[1]).map((line) => line.opacity), [0.35, 1, 0.35, 0.35]);
+  assert.deepEqual(lines(world.views[1]).map((line) => line.key), lines(view).map((line) => line.key));
+
+  // The user closes it: the timer stops, and the next click opens it again from the first line.
+  world.closers.forEach((fn) => fn());
+  assert.equal(world.intervals.size, 0);
+  world.buttons[0].onClick();
+  assert.deepEqual(lines(world.views.at(-1)).map((line) => line.opacity), [1, 0.35, 0.35, 0.35]);
+  world.buttons[0].onClick();
+  assert.equal(world.closes, 1);
+  assert.equal(world.intervals.size, 0);
+});
+
+// Now Playing ships with Ampify, in extensions/ rather than examples/.
+function fakeNowPlaying({ apple = null, lrclib = [], busyFirst = false } = {}) {
+  const dir = join(examples, "..", "extensions", "now-playing");
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+  const source = readFileSync(join(dir, "main.js"), "utf-8");
+  const granted = new Set(manifest.permissions ?? []);
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+  };
+  const world = { buttons: [], views: [], handlers: {}, closers: [], intervals: new Map(), nextTimer: 1, asked: [] };
+  const track = { id: "t-1", title: "Song (feat. Guest)", artist: "Artist", album: "Album", artwork: "", artworkColor: "#112233" };
+  let busy = busyFirst;
+  const ampify = {
+    onStop: () => {},
+    player: {
+      state: () => ({ playing: false, positionMs: 12500, track }),
+      lyrics: () => apple,
+      on: (name, fn) => (world.handlers[name] = fn),
+    },
+    http: {
+      get: async (url) => {
+        need("network:" + new URL(url).host);
+        world.asked.push(url);
+        if (url.startsWith("https://itunes.apple.com/")) {
+          return { status: 200, text: JSON.stringify({ results: [{ artworkUrl100: "https://is1.example/a/100x100bb.jpg" }] }) };
+        }
+        if (busy) {
+          busy = false;
+          return { status: 200, text: JSON.stringify({ name: "ServerOverloaded", statusCode: 503 }) };
+        }
+        return { status: 200, text: JSON.stringify(lrclib) };
+      },
+    },
+    ui: {
+      playbar: { addButton: (button) => (need("ui.playbar"), world.buttons.push(button)) },
+      fullscreen: {
+        open: (view) => (need("ui.fullscreen"), world.views.push(structuredClone(view))),
+        close: () => {},
+        onClose: (fn) => world.closers.push(fn),
+      },
+    },
+  };
+  const context = {
+    Ampify: ampify,
+    setInterval: (fn, ms) => {
+      const id = world.nextTimer++;
+      world.intervals.set(id, { fn, ms });
+      return id;
+    },
+    clearInterval: (id) => world.intervals.delete(id),
+    setTimeout: (fn) => setImmediate(fn),  // retries without waiting
+    Date,
+    URL,
+  };
+  runIn(source, context);
+  return world;
+}
+
+const settleNowPlaying = () => new Promise((resolve) => setTimeout(resolve, 20));
+const lyricLines = (view) => view.children[2].children[1].children.filter((node) => node.key && node.key.startsWith("line-"));
+
+test("now-playing shows the cover and LRCLIB's synced lyrics, retrying when the service is busy", async () => {
+  const lrc = "[00:05.00]first line\n[00:10.00]second line\n[00:15.00]third line";
+  const world = fakeNowPlaying({ lrclib: [{ syncedLyrics: lrc }], busyFirst: true });
+  assert.equal(world.buttons.length, 1);
+  assert.equal(world.views.length, 0, "nothing opens before the button is clicked");
+
+  world.buttons[0].onClick();
+  await settleNowPlaying();
+  const view = world.views.at(-1);
+  assert.equal(view.children[0].src, "https://is1.example/a/1200x1200bb.jpg");
+  const lines = lyricLines(view);
+  assert.deepEqual(lines.map((line) => line.text), ["first line", "second line", "third line"]);
+  assert.deepEqual(lines.map((line) => line.opacity), [0.3, 1, 0.5], "12.5 s is in the second line");
+  assert.ok(world.asked.some((url) => url.includes("track_name=Song&")), "the title is searched without its featuring");
+});
+
+test("now-playing prefers Apple's lyrics, and stops its timer when closed", async () => {
+  const apple = { synced: true, lines: [{ start: 0, end: 20000, text: "apple line" }] };
+  const world = fakeNowPlaying({ apple });
+  world.buttons[0].onClick();
+  await settleNowPlaying();
+  assert.deepEqual(lyricLines(world.views.at(-1)).map((line) => line.text), ["apple line"]);
+  assert.ok(!world.asked.some((url) => url.includes("lrclib")), "no LRCLIB request when Apple has the lyrics");
+
+  assert.equal(world.intervals.size, 1);
+  world.closers.forEach((fn) => fn());
+  assert.equal(world.intervals.size, 0);
+});

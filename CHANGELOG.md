@@ -25,6 +25,8 @@ Atmos leveler.
 
 The rest exists but is not at the same level yet. It is marked "preview" or off by default: apps (added pages), snippets,
 the equalizer, audio analysis, Discord presence, scrobbling, the local remote, MIDI and the notification-area icon.
+The fullscreen view (`Ampify.ui.fullscreen`, permission `ui.fullscreen`) and the style attributes of the interface
+primitives (`layer`, backgrounds and acrylic, text size and color, opacity, scale and transitions) are in preview too.
 
 ### Known limits
 

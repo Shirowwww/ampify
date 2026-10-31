@@ -128,7 +128,21 @@ std::optional<int> FirstNativeOf(const std::vector<ProbeNode>& nodes, int root, 
     return std::nullopt;
 }
 
+// Apple Music 1.1792: the buttons at the right of the play bar (volume, AirPlay, lyrics, queue), after which an Ampify
+// button goes.
+std::optional<Insertion> AfterToggleButtons(const std::vector<ProbeNode>& nodes) {
+    std::optional<int> toggles = FindByName(nodes, "NowPlayingToggleButtons");
+    if (!toggles || !nodes[*toggles].Is(kProbeStackPanel) || InsideModElement(nodes, *toggles)) return std::nullopt;
+    Insertion insertion;
+    insertion.parent = *toggles;
+    insertion.after = -1;
+    insertion.styleFrom = FirstNativeOf(nodes, *toggles, kProbeButtonBase).value_or(-1);
+    return insertion;
+}
+
 std::optional<Insertion> ChoosePlaybarInsertion(const std::vector<ProbeNode>& nodes) {
+    if (std::optional<Insertion> toggles = AfterToggleButtons(nodes)) return toggles;
+    // Older versions: after the transport buttons.
     std::optional<int> anchor = FindByName(nodes, "TransportControl_SkipForward");
     if (!anchor) anchor = FindByName(nodes, "TransportControl_PlayPauseStop");
     if (!anchor) return std::nullopt;
@@ -148,16 +162,8 @@ std::optional<Insertion> ChoosePlaybarInsertion(const std::vector<ProbeNode>& no
 }
 
 std::optional<Insertion> ChooseTopbarInsertion(const std::vector<ProbeNode>& nodes) {
-    // Apple Music 1.1792 has no separate top bar: its play bar is at the top, and the buttons at its right (volume,
-    // AirPlay, lyrics, queue) sit in StackPanel#NowPlayingToggleButtons. An Ampify button goes after them.
-    if (std::optional<int> toggles = FindByName(nodes, "NowPlayingToggleButtons");
-        toggles && nodes[*toggles].Is(kProbeStackPanel) && !InsideModElement(nodes, *toggles)) {
-        Insertion insertion;
-        insertion.parent = *toggles;
-        insertion.after = -1;
-        insertion.styleFrom = FirstNativeOf(nodes, *toggles, kProbeButtonBase).value_or(-1);
-        return insertion;
-    }
+    // Apple Music 1.1792 has no separate top bar: its play bar is at the top, so a top bar button joins its buttons.
+    if (std::optional<Insertion> toggles = AfterToggleButtons(nodes)) return toggles;
     std::optional<int> search = FirstNativeOf(nodes, -1, kProbeAutoSuggest);
     if (!search) return std::nullopt;
     for (int parent = nodes[*search].parent; parent >= 0; parent = nodes[parent].parent) {

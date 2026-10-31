@@ -6,9 +6,11 @@
 //
 // | primitive | control                                                                       |
 // |-----------|-------------------------------------------------------------------------------|
-// | stack     | StackPanel (vertical, Spacing = gap, 8 by default)                            |
-// | row       | Grid of 2 columns (Star, Auto) with 2 children, else horizontal StackPanel    |
+// | stack     | StackPanel (vertical, Spacing = gap, 8 by default); Grid of rows with a growing child |
+// | row       | Grid of 2 columns (Star, Auto) with 2 children, Grid of Auto/Star columns with |
+// |           | a growing child, else horizontal StackPanel                                   |
 // | list      | StackPanel (vertical, Spacing = gap, 4 by default)                            |
+// | layer     | Grid of one cell: the children on top of each other, stretched by default     |
 // | card      | Border (card brushes of the theme or of a native card) + title, subtitle      |
 // | text      | TextBlock, style Title/Subtitle/Body/Caption TextBlockStyle                    |
 // | button    | Button (AccentButtonStyle for primary, transparent for tertiary), icon + label|
@@ -16,8 +18,14 @@
 // | slider    | Slider with Header                                                            |
 // | textfield | TextBox with Header and PlaceholderText                                       |
 // | dropdown  | ComboBox with Header, one ComboBoxItem per option (Tag = value)               |
-// | image     | Image (BitmapImage from an https or file address)                             |
+// | image     | Border painted by an ImageBrush (BitmapImage from an https or file address),  |
+// |           | sized by an invisible Image of the same bitmap, so cornerRadius rounds it     |
 // | icon      | Path shapes from the SVG (theme text brush), FontIcon for a glyph             |
+//
+// The style attributes (core/ui_render/style.hpp): background (SolidColorBrush or in-app AcrylicBrush), padding,
+// cornerRadius and the sizes on the panel or Border; align and valign as the element's own alignment, set by its
+// parent; opacity, scale (UIElement.Scale around the centre) and transition (OpacityTransition, ScaleTransition,
+// TranslationTransition), which the compositor animates.
 //
 // Every node gets x:Name and AutomationId "AMPIFY_<elementId>_<nodeId>" (uirender::ElementName), an AutomationProperties
 // name, and its tooltip through ToolTipService. Clicks and changes go to the sink, which hands them to the
@@ -46,12 +54,14 @@
 
 namespace ampify::win {
 
-// A click (onClick) or a new value (onChange) on a node, for the element that drew it.
+// A click (onClick) or a new value (onChange) on a node, for the element that drew it. With `entry` set, another
+// event of the element's dispatch ("fullscreenClose"), whose payload is `valueJson` as it is.
 struct UiEvent {
     std::string elementId;
     int callbackId = 0;
     bool click = true;
     std::string valueJson;  // for a change: true, 42, "texte"
+    std::string entry;
 };
 using UiEventSink = std::function<void(const UiEvent&)>;
 
@@ -129,9 +139,13 @@ private:
 
     Mounted Build(const uirender::RenderNode& node, const StyleProbe& probe);
     void Apply(Mounted& mounted, const uirender::Patch& patch, const StyleProbe& probe);
-    void SetAttributes(Mounted& mounted, const uirender::RenderNode& node, const StyleProbe& probe);
+    void SetAttributes(Mounted& mounted, const uirender::RenderNode& node, const StyleProbe& probe, bool building);
+    void SetBox(Mounted& mounted, const uirender::RenderNode& node);
+    void SetMotion(Mounted& mounted, const uirender::RenderNode& node, bool building);
+    void SetImage(Mounted& mounted, const uirender::RenderNode& node);
     void FillOptions(Mounted& mounted, const uirender::RenderNode& node);
     void Rewrite(Mounted& mounted);
+    void PlaceChildren(Mounted& mounted, const uirender::RenderNode& node);
 
     std::string m_elementId;
     UiEventSink m_sink;

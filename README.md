@@ -12,6 +12,8 @@ does (lossless, Dolby Atmos, lyrics, your library, sync).
 - **Themes** that restyle the whole window: colors, fonts, corner radius, glass and acrylic panels, the artwork of
   the song playing behind the interface, a playback bar moved to the bottom. Spicetify `color.ini` palettes work as
   they are (`ampify theme import <github address>`).
+- **Now Playing**: the song playing over the whole window, its cover on a blurred background and its lyrics in time
+  with the song (Apple Music's own, or LRCLIB's).
 - **A Marketplace page inside Apple Music**: browse, install, update and switch themes and extensions in two clicks.
 - **Extensions in JavaScript** with an API close to Spicetify's (`Ampify.Player`, `Ampify.React`,
   `Ampify.components`, `Ampify.Platform`...): panels, pages, notifications, Discord presence, Last.fm scrobbling,

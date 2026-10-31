@@ -167,3 +167,94 @@ TEST_CASE(UiModel_NamedPopupsAreReplacedAndClosed) {
     int control = ui.AddControl("a", "topbar", "x", "");
     CHECK(ui.ReserveId() == control + 1);
 }
+
+TEST_CASE(UiTree_AcceptsALayerWithStyleAttributes) {
+    std::string error;
+    ampify::Json tree = Parse(
+        R"({"type":"layer","background":"#FF101010","children":[)"
+        R"({"type":"image","src":"https://example.com/a.jpg","fit":"cover","opacity":0.8,"cornerRadius":12},)"
+        R"j({"type":"stack","background":"acrylic(#CC000000, 0.6)","padding":"48,32,48,32","cornerRadius":0,)j"
+        R"("align":"center","valign":"stretch","maxWidth":900,"minWidth":200,"width":800,"height":600,"children":[)"
+        R"({"type":"text","text":"Song","size":64,"weight":700,"color":"#FFFFFF","align":"center","wrap":false,)"
+        R"("maxLines":2,"grow":true},)"
+        R"({"type":"text","text":"line","opacity":0.4,"scale":1.1,"transition":"opacity 400ms, scale 0.3s"}]},)"
+        R"({"type":"row","background":"acrylic","padding":8,"children":[{"type":"button","label":"x","align":"end"}]}]})");
+    CHECK(ampify::ValidateTree(tree, &error));
+    CHECK(error.empty());
+}
+
+TEST_CASE(UiTree_RefusesBadStyleValuesWithTheAttributeName) {
+    const char* bad[][2] = {
+        {R"({"type":"stack","background":"red"})", "background"},
+        {R"j({"type":"stack","background":"acrylic(#CC000000, 2)"})j", "background"},
+        {R"({"type":"stack","padding":"1,2,3"})", "padding"},
+        {R"({"type":"card","padding":-4})", "padding"},
+        {R"({"type":"layer","cornerRadius":"8"})", "cornerRadius"},
+        {R"({"type":"row","maxWidth":20000})", "maxWidth"},
+        {R"({"type":"stack","align":"middle"})", "align"},
+        {R"({"type":"text","align":"start"})", "align"},
+        {R"({"type":"button","valign":"top"})", "valign"},
+        {R"({"type":"text","grow":"yes"})", "grow"},
+        {R"({"type":"text","opacity":1.5})", "opacity"},
+        {R"({"type":"icon","scale":-1})", "scale"},
+        {R"({"type":"text","transition":"fade 300ms"})", "transition"},
+        {R"({"type":"text","transition":"opacity 20s"})", "transition"},
+        {R"({"type":"text","transition":"opacity"})", "transition"},
+        {R"({"type":"text","size":200})", "size"},
+        {R"({"type":"text","weight":50})", "weight"},
+        {R"({"type":"text","weight":450.5})", "weight"},
+        {R"({"type":"text","color":"#12345"})", "color"},
+        {R"({"type":"text","wrap":1})", "wrap"},
+        {R"({"type":"text","maxLines":1.5})", "maxLines"},
+        {R"({"type":"image","fit":"zoom"})", "fit"},
+        {R"({"type":"image","width":"100%"})", "width"},
+    };
+    for (const auto& [tree, attribute] : bad) {
+        std::string error;
+        if (ampify::ValidateTree(Parse(tree), &error) || error.find(attribute) == std::string::npos) {
+            ampify::test::ReportFailure(__FILE__, __LINE__, std::string("accepted or unclear: ") + tree + " -> " + error);
+        }
+    }
+}
+
+TEST_CASE(UiTree_StyleAttributesAreOnlyCheckedWhereTheyAreRead) {
+    // Trees written before the style attributes keep working: a size on a button or a color on a slider was never
+    // read, so it is still not refused.
+    std::string error;
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"button","label":"x","width":"100%"})"), &error));
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"slider","color":"red","size":"big"})"), &error));
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"icon","size":24})"), &error));
+}
+
+TEST_CASE(UiModel_FullscreenSessionsFollowTheLastElementThatOpens) {
+    ampify::UiModel ui;
+    std::uint64_t first = ui.SetFullscreen("a", Parse(R"({"type":"text","text":"1"})"), 0);
+    CHECK(first > 0);
+    CHECK(ui.SetFullscreen("a", Parse(R"({"type":"text","text":"2"})"), first) == first);
+    auto slot = ui.Fullscreen();
+    CHECK(slot && slot->elementId == "a" && slot->id == std::to_string(first));
+    CHECK(slot && slot->tree.Dump() == R"({"type":"text","text":"2"})");
+    CHECK(ui.TakeDisplacedFullscreens().empty());
+
+    // Another element takes the screen: a is listed once, and its late updates and closes change nothing.
+    std::uint64_t second = ui.SetFullscreen("b", Parse(R"({"type":"text","text":"b"})"), 0);
+    CHECK(second > first);
+    auto displaced = ui.TakeDisplacedFullscreens();
+    CHECK(displaced.size() == 1 && displaced[0].first == "a" && displaced[0].second == first);
+    CHECK(ui.TakeDisplacedFullscreens().empty());
+    CHECK(ui.SetFullscreen("a", Parse(R"({"type":"text","text":"3"})"), first) == 0);
+    ui.CloseFullscreen("a", first);
+    slot = ui.Fullscreen();
+    CHECK(slot && slot->elementId == "b");
+
+    // An old session of b closes nothing; its current one does.
+    ui.CloseFullscreen("b", first);
+    CHECK(ui.Fullscreen().has_value());
+    ui.CloseFullscreen("b", second);
+    CHECK(!ui.Fullscreen().has_value());
+    CHECK(ui.SetFullscreen("b", Parse(R"({"type":"text"})"), second) == 0);
+
+    ui.SetFullscreen("c", Parse(R"({"type":"text"})"), 0);
+    ui.RemoveElement("c");
+    CHECK(!ui.Fullscreen().has_value());
+}

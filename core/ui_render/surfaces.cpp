@@ -20,6 +20,7 @@ Surface FromSlot(SurfaceKind kind, const UiSlot& slot, const std::string& id, co
     surface.key = KeyOf(kind, slot.elementId, id);
     // An unnamed popup ("#2") gets the node id "popup-open-2".
     std::string forNode = !id.empty() && id[0] == '#' ? "open-" + id.substr(1) : id;
+    if (kind == SurfaceKind::Fullscreen) forNode = "main";  // the same AutomationIds from one session to the next
     surface.nodeId = SurfaceNodeId(SurfaceKindName(kind), forNode);
     surface.tree = slot.tree;
     surface.title = model.Title(slot.elementId).value_or("");
@@ -41,6 +42,7 @@ const char* SurfaceKindName(SurfaceKind kind) {
         case SurfaceKind::Page: return "page";
         case SurfaceKind::Popup: return "popup";
         case SurfaceKind::Control: return "control";
+        case SurfaceKind::Fullscreen: return "fullscreen";
     }
     return "panel";
 }
@@ -54,6 +56,9 @@ SurfaceChanges SurfaceTracker::Poll(const UiModel& model) {
         std::string id = slot.id;
         if (id.empty()) id = "#" + std::to_string(++unnamed[slot.elementId]);
         now.push_back(FromSlot(SurfaceKind::Popup, slot, id, model));
+    }
+    if (std::optional<UiSlot> fullscreen = model.Fullscreen()) {
+        now.push_back(FromSlot(SurfaceKind::Fullscreen, *fullscreen, fullscreen->id, model));
     }
     for (const UiControl& control : model.Controls()) {
         Surface surface;

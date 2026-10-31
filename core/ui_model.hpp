@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -50,6 +51,19 @@ public:
     void SetPopup(const std::string& elementId, const std::string& popupId, Json tree);
     void ClosePopup(const std::string& elementId, const std::string& popupId);
 
+    // The fullscreen surface: one for the whole interface, the last element that opens it wins. `session` is the one
+    // the element got back from its last call, 0 to open: a new session starts when it opens or when it takes the
+    // surface from another element (whose session is then listed by TakeDisplacedFullscreens, so the host tells it).
+    // A call with an older session (the user or another element closed it meanwhile) changes nothing and returns 0.
+    // Otherwise returns the session the tree now belongs to.
+    std::uint64_t SetFullscreen(const std::string& elementId, Json tree, std::uint64_t session);
+    // Closes the element's fullscreen surface, only while it is still `session` (0: whatever its session).
+    void CloseFullscreen(const std::string& elementId, std::uint64_t session);
+    // The open fullscreen surface; its id is the session, as text.
+    std::optional<UiSlot> Fullscreen() const;
+    // The (element, session) pairs whose surface another element took since the last call.
+    std::vector<std::pair<std::string, std::uint64_t>> TakeDisplacedFullscreens();
+
     // A new id for a callback inside a tree (attributes onClick and onChange). It comes from the same counter as the
     // controls, so it never equals a control id: the host reports a click with ScriptExtension::DeliverClick(id),
     // and a change with DeliverEvent("change", {"id":id,"value":...}).
@@ -81,19 +95,26 @@ private:
     std::vector<UiSlot> m_panels;
     std::vector<UiSlot> m_pages;
     std::vector<UiSlot> m_popups;
+    std::optional<UiSlot> m_fullscreen;
+    std::uint64_t m_fullscreenSession = 0;  // of m_fullscreen
+    std::uint64_t m_fullscreenSessions = 0;
+    std::vector<std::pair<std::string, std::uint64_t>> m_displaced;
     std::map<std::string, std::string> m_titles;
     std::optional<std::pair<std::string, std::string>> m_route;
     std::uint64_t m_routeSerial = 0;
 };
 
 // Checks a tree sent by an element: only the known primitives, with bounded depth, size and text. Attributes are
-// scalars, never objects or lists. On failure `error` gets one French line.
+// scalars, never objects or lists. On failure `error` gets one English line.
 //
-// Primitives: stack, row, list, card (with children), text, button, toggle, slider, textfield, image, icon,
+// Primitives: stack, row, list, layer, card (with children), text, button, toggle, slider, textfield, image, icon,
 // dropdown (whose children are options only) and option (only inside a dropdown). Checked attributes: onClick
 // (button, card, image, icon) and onChange (toggle, slider, textfield, dropdown) hold a callback id, a positive
 // integer; tooltip is a text on any primitive, tooltipPlacement is top, bottom, left or right, and tooltipDelay is
-// a number of milliseconds between 0 and 10000.
+// a number of milliseconds between 0 and 10000. The style attributes (docs/extensions/api.md, section 5.5) are
+// checked where the renderer reads them: opacity, scale, transition, align, valign and grow on any node;
+// background, padding, cornerRadius, width, height, minWidth and maxWidth on stack, row, layer and card; fit,
+// cornerRadius, width and height on image; size, weight, color, wrap and maxLines on text.
 bool ValidateTree(const Json& tree, std::string* error);
 
 // True for the placements listed above.

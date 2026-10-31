@@ -23,6 +23,42 @@ const char kUi[] = R"AMPIFYJS(
     return id;
   };
 
+  // The fullscreen surface: the session the kernel gave (0 while closed), and the onClose handlers. They run when
+  // the user closes it (button, Escape) or another element takes the screen, not on close().
+  let fullscreenSession = 0;
+  const fullscreenClosers = new Set();
+
+  const fullscreen = Object.freeze({
+    open(vue) {
+      const session = native.uiFullscreen(treeText(vue), fullscreenSession);
+      if (session) fullscreenSession = session;
+    },
+    close() {
+      if (fullscreenSession) native.uiFullscreenClose(fullscreenSession);
+      fullscreenSession = 0;
+    },
+    onClose(fn) {
+      if (typeof fn !== "function") throw new TypeError("fullscreen.onClose expects a function");
+      fullscreenClosers.add(fn);
+      return () => fullscreenClosers.delete(fn);
+    },
+  });
+
+  // From the host, as JSON text: {"session": <the session that was closed>}. An older session is ignored.
+  dispatch.fullscreenClose = (payload) => {
+    let session = 0;
+    try {
+      session = Number(JSON.parse(payload).session);
+    } catch (error) {
+      native.log("[error] fullscreenClose: " + describe(error));
+      return;
+    }
+    if (!session || session !== fullscreenSession) return;
+    fullscreenSession = 0;
+    native.uiFullscreenClose(session);
+    for (const fn of [...fullscreenClosers]) runGuarded("fullscreen onClose", fn, []);
+  };
+
   Ampify.ui = Object.freeze({
     topbar: Object.freeze({ addButton: (options) => addControl("topbar", options) }),
     playbar: Object.freeze({ addButton: (options) => addControl("playbar", options) }),
@@ -34,6 +70,7 @@ const char kUi[] = R"AMPIFYJS(
       },
     }),
     popup: Object.freeze({ open: (vue) => native.uiPopup(treeText(vue)) }),
+    fullscreen,
     panel: Object.freeze({ register: (id, vue) => native.uiPanel(text(id), treeText(vue)) }),
     page: Object.freeze({ register: (path, vue) => native.uiPage(text(path), treeText(vue)) }),
     title: Object.freeze({ set: (title) => native.uiTitle(text(title)) }),

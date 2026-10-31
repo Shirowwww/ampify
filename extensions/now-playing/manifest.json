@@ -1,0 +1,12 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "now-playing",
+  "name": "Now Playing",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "A full window view of the song playing: its cover over a blurred background, and the lyrics in time with the song.",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": ["player.read", "ui.fullscreen", "ui.playbar", "network:lrclib.net", "network:itunes.apple.com"]
+}

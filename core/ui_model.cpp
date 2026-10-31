@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <optional>
+#include <utility>
+
+#include "ui_render/style.hpp"
 
 namespace ampify {
 
@@ -25,15 +29,116 @@ bool OneOf(const std::array<std::string_view, N>& names, std::string_view name) 
 }
 
 bool IsPrimitive(const std::string& name) {
-    static const std::array<std::string_view, 13> kPrimitives = {
+    static const std::array<std::string_view, 14> kPrimitives = {
         "stack", "row", "text", "button", "toggle", "slider", "list", "image", "icon",
-        "card", "textfield", "dropdown", "option"};
+        "card", "textfield", "dropdown", "option", "layer"};
     return OneOf(kPrimitives, name);
 }
 
 bool HasChildren(const std::string& name) {
-    static const std::array<std::string_view, 5> kContainers = {"stack", "row", "list", "card", "dropdown"};
+    static const std::array<std::string_view, 6> kContainers = {"stack", "row", "list", "card", "dropdown", "layer"};
     return OneOf(kContainers, name);
+}
+
+// The containers that take a background, a padding, rounded corners and a size.
+bool IsBox(const std::string& name) {
+    static const std::array<std::string_view, 4> kBoxes = {"stack", "row", "layer", "card"};
+    return OneOf(kBoxes, name);
+}
+
+constexpr double kMaxLength = 10000;    // width, height, minWidth, maxWidth, in pixels
+constexpr double kMaxCorner = 1000;
+constexpr double kMaxScale = 10;
+constexpr double kMinTextSize = 8;
+constexpr double kMaxTextSize = 120;
+constexpr double kMaxLines = 100;
+
+bool NumberIn(const Json& value, double low, double high) {
+    const double* number = value.AsNumber();
+    return number && std::isfinite(*number) && *number >= low && *number <= high;
+}
+
+bool WholeIn(const Json& value, double low, double high) {
+    return NumberIn(value, low, high) && std::floor(*value.AsNumber()) == *value.AsNumber();
+}
+
+template <size_t N>
+bool TextOneOf(const Json& value, const std::array<std::string_view, N>& names) {
+    const std::string* text = value.AsString();
+    return text && OneOf(names, *text);
+}
+
+// The style attributes that every node takes: its opacity, scale, transitions and place in its parent.
+std::optional<bool> CheckCommonStyle(const std::string& name, const std::string& key, const Json& value,
+                                     std::string* error) {
+    static const std::array<std::string_view, 4> kPlaces = {"start", "center", "end", "stretch"};
+    static const std::array<std::string_view, 3> kTextAligns = {"left", "center", "right"};
+    if (key == "opacity") {
+        if (!NumberIn(value, 0, 1)) return Fail(error, "opacity expects a number between 0 and 1");
+    } else if (key == "scale") {
+        if (!NumberIn(value, 0, kMaxScale)) return Fail(error, "scale expects a number between 0 and 10");
+    } else if (key == "transition") {
+        const std::string* text = value.AsString();
+        if (!text || !uirender::ParseTransition(*text)) {
+            return Fail(error, "transition expects \"<opacity|scale|translation|all> <duration>ms\", comma-separated "
+                               "(10 s at most), or \"none\"");
+        }
+    } else if (key == "valign") {
+        if (!TextOneOf(value, kPlaces)) return Fail(error, "valign expects start, center, end or stretch");
+    } else if (key == "grow") {
+        if (!value.AsBool()) return Fail(error, "grow expects true or false");
+    } else if (key == "align") {
+        if (name == "text" && !TextOneOf(value, kTextAligns)) return Fail(error, "align on text expects left, center or right");
+        if (name != "text" && !TextOneOf(value, kPlaces)) return Fail(error, "align expects start, center, end or stretch");
+    } else {
+        return std::nullopt;  // not a common style attribute
+    }
+    return true;
+}
+
+bool CheckBoxStyle(const std::string& name, const std::string& key, const Json& value, std::string* error) {
+    bool box = IsBox(name);
+    bool image = name == "image";
+    if ((box || image) && key == "cornerRadius") {
+        if (!NumberIn(value, 0, kMaxCorner)) return Fail(error, "cornerRadius expects a number between 0 and 1000");
+    } else if ((box && (key == "minWidth" || key == "maxWidth")) || ((box || image) && (key == "width" || key == "height"))) {
+        if (!NumberIn(value, 0, kMaxLength)) return Fail(error, key + " expects a number of pixels between 0 and 10000");
+    } else if (box && key == "background") {
+        const std::string* text = value.AsString();
+        if (!text || !uirender::ParseBackground(*text)) {
+            return Fail(error, "background expects #RRGGBB, #AARRGGBB, acrylic or acrylic(#AARRGGBB, 0.6)");
+        }
+    } else if (box && key == "padding") {
+        if (!uirender::ParsePadding(value)) {
+            return Fail(error, "padding expects a number or \"top,right,bottom,left\" (0 to 1000 each)");
+        }
+    } else if (image && key == "fit") {
+        static const std::array<std::string_view, 3> kFits = {"cover", "contain", "fill"};
+        if (!TextOneOf(value, kFits)) return Fail(error, "fit expects cover, contain or fill");
+    }
+    return true;
+}
+
+bool CheckTextStyle(const std::string& key, const Json& value, std::string* error) {
+    if (key == "size") {
+        if (!NumberIn(value, kMinTextSize, kMaxTextSize)) return Fail(error, "size expects a number of pixels between 8 and 120");
+    } else if (key == "weight") {
+        if (!WholeIn(value, 100, 900)) return Fail(error, "weight expects a whole number between 100 and 900");
+    } else if (key == "color") {
+        const std::string* text = value.AsString();
+        if (!text || !uirender::ParseColor(*text)) return Fail(error, "color expects #RRGGBB or #AARRGGBB");
+    } else if (key == "wrap") {
+        if (!value.AsBool()) return Fail(error, "wrap expects true or false");
+    } else if (key == "maxLines") {
+        if (!WholeIn(value, 0, kMaxLines)) return Fail(error, "maxLines expects a whole number between 0 and 100");
+    }
+    return true;
+}
+
+bool CheckStyle(const std::string& name, const std::string& key, const Json& value, std::string* error) {
+    if (std::optional<bool> common = CheckCommonStyle(name, key, value, error)) return *common;
+    if (name == "text") return CheckTextStyle(key, value, error);
+    return CheckBoxStyle(name, key, value, error);
 }
 
 // The primitives that report a click, and those that report a new value.
@@ -72,7 +177,7 @@ bool CheckAttribute(const std::string& name, const std::string& key, const Json&
             return Fail(error, "tooltipDelay expects a number of milliseconds between 0 and 10000");
         }
     }
-    return true;
+    return CheckStyle(name, key, value, error);
 }
 
 bool CheckNode(const Json& node, const std::string& parent, int depth, int& nodes, std::string* error) {
@@ -170,6 +275,38 @@ void UiModel::ClosePopup(const std::string& elementId, const std::string& popupI
     m_popups.erase(std::remove_if(m_popups.begin(), m_popups.end(), same), m_popups.end());
 }
 
+std::uint64_t UiModel::SetFullscreen(const std::string& elementId, Json tree, std::uint64_t session) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    bool owner = m_fullscreen && m_fullscreen->elementId == elementId;
+    if (session != 0) {
+        if (!owner || session != m_fullscreenSession) return 0;  // closed or taken meanwhile: a late update
+        m_fullscreen->tree = std::move(tree);
+        return session;
+    }
+    if (m_fullscreen && !owner) m_displaced.emplace_back(m_fullscreen->elementId, m_fullscreenSession);
+    m_fullscreenSession = ++m_fullscreenSessions;
+    m_fullscreen = UiSlot{elementId, std::to_string(m_fullscreenSession), std::move(tree)};
+    return m_fullscreenSession;
+}
+
+void UiModel::CloseFullscreen(const std::string& elementId, std::uint64_t session) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    if (!m_fullscreen || m_fullscreen->elementId != elementId) return;
+    if (session != 0 && session != m_fullscreenSession) return;
+    m_fullscreen.reset();
+    m_fullscreenSession = 0;
+}
+
+std::optional<UiSlot> UiModel::Fullscreen() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return m_fullscreen;
+}
+
+std::vector<std::pair<std::string, std::uint64_t>> UiModel::TakeDisplacedFullscreens() {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return std::exchange(m_displaced, {});
+}
+
 int UiModel::ReserveId() {
     std::lock_guard<std::mutex> guard(m_mutex);
     return m_nextId++;
@@ -194,6 +331,12 @@ void UiModel::RemoveElement(const std::string& elementId) {
     m_pages.erase(std::remove_if(m_pages.begin(), m_pages.end(), owned), m_pages.end());
     m_popups.erase(std::remove_if(m_popups.begin(), m_popups.end(), owned), m_popups.end());
     m_titles.erase(elementId);
+    auto displaced = [&](const auto& pair) { return pair.first == elementId; };
+    m_displaced.erase(std::remove_if(m_displaced.begin(), m_displaced.end(), displaced), m_displaced.end());
+    if (m_fullscreen && m_fullscreen->elementId == elementId) {
+        m_fullscreen.reset();
+        m_fullscreenSession = 0;
+    }
     if (m_route && m_route->first == elementId) m_route.reset();
 }
 

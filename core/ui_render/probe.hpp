@@ -86,9 +86,9 @@ std::optional<int> LastNativeOf(const std::vector<ProbeNode>& nodes, int root, u
 // lists: the style probe takes the native Button, ComboBox, Slider and TextBox of the page from here.
 std::optional<int> FirstNativeOf(const std::vector<ProbeNode>& nodes, int root, unsigned flag);
 
-// Where a button of the play bar goes: the panel that holds the transport buttons
-// (TransportControl_SkipForward, TransportControl_PlayPauseStop, as x:Name or AutomationId), right after the
-// last of them. Provisional.
+// Where a button of the play bar goes: after Apple Music's buttons at the right of the bar
+// (StackPanel#NowPlayingToggleButtons, 1.1792), as Spicetify's play bar buttons; on older versions, in the panel that
+// holds the transport buttons (TransportControl_SkipForward, TransportControl_PlayPauseStop), after the last of them.
 struct Insertion {
     int parent = -1;     // the panel
     int after = -1;      // the sibling to insert after (its index in `nodes`), -1 for the end
