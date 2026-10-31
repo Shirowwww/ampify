@@ -15,7 +15,7 @@ const std::set<std::string_view> kFixedPermissions = {
     "player.read",   "player.control", "audio.analyze", "audio.gain",    "audio.eq",    "storage",     "notifications",
     "ipc.discord",   "midi.input",     "library.read",  "library.write", "services.read", "ui.keyboard",
     "ui.topbar",     "ui.playbar",     "ui.menu",       "ui.popup",      "ui.panel",    "ui.page",
-    "ui.window",     "ui.tray",       "fs.output",   "kit.manage",
+    "ui.window",     "ui.sidebar",    "ui.tray",       "fs.output",   "kit.manage",
 };
 
 const std::set<std::string_view> kKnownFields = {
@@ -87,26 +87,26 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
     std::string parseError;
     std::optional<Json> root = Json::Parse(text, &parseError);
     if (!root || !root->IsObject()) {
-        result.errors.push_back("manifest.json n'est pas un objet JSON valide" +
-                                (parseError.empty() ? std::string() : " : " + parseError));
+        result.errors.push_back("manifest.json is not a valid JSON object" +
+                                (parseError.empty() ? std::string() : ": " + parseError));
         return result;
     }
 
     for (const auto& [key, value] : *root->AsObject()) {
         (void)value;
-        if (!kKnownFields.count(key)) result.warnings.push_back("champ inconnu ignoré : " + key);
+        if (!kKnownFields.count(key)) result.warnings.push_back("unknown field ignored: " + key);
     }
 
     Manifest m;
     auto text_of = [&](const char* key, bool required) -> std::optional<std::string> {
         const Json* field = root->Find(key);
         if (!field) {
-            if (required) result.errors.push_back(std::string("champ obligatoire absent : ") + key);
+            if (required) result.errors.push_back(std::string("required field missing: ") + key);
             return std::nullopt;
         }
         const std::string* s = field->AsString();
         if (!s) {
-            result.errors.push_back(std::string("le champ ") + key + " doit être une chaîne");
+            result.errors.push_back(std::string("field ") + key + " must be a string");
             return std::nullopt;
         }
         return *s;
@@ -114,7 +114,7 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
     auto check = [&](const char* key, const std::optional<std::string>& value, const std::regex& pattern,
                      const char* rule) {
         if (value && !Matches(*value, pattern)) {
-            result.errors.push_back(std::string("le champ ") + key + " doit respecter : " + rule);
+            result.errors.push_back(std::string("field ") + key + " must be: " + rule);
         }
     };
 
@@ -122,13 +122,13 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
     if (id) {
         m.id = *id;
         check("id", id, kIdPattern, "[a-z0-9][a-z0-9-]{1,39}");
-        if (*id != folderName) result.errors.push_back("id \"" + *id + "\" doit être le nom du dossier");
+        if (*id != folderName) result.errors.push_back("id \"" + *id + "\" must be the folder name");
     }
 
     std::optional<std::string> name = text_of("name", true);
     if (name) {
         m.name = *name;
-        if (CodePoints(*name) < 1 || CodePoints(*name) > 60) result.errors.push_back("name doit faire de 1 à 60 caractères");
+        if (CodePoints(*name) < 1 || CodePoints(*name) > 60) result.errors.push_back("name must be 1 to 60 characters");
     }
 
     std::optional<std::string> version = text_of("version", true);
@@ -142,20 +142,20 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
         else if (*kind == "theme") m.kind = ElementKind::Theme;
         else if (*kind == "app") m.kind = ElementKind::App;
         else if (*kind == "snippet") m.kind = ElementKind::Snippet;
-        else result.errors.push_back("kind doit valoir extension, theme, app ou snippet");
+        else result.errors.push_back("kind must be extension, theme, app or snippet");
     }
 
     std::optional<std::string> author = text_of("author", true);
     if (author) {
         m.author = *author;
-        check("author", author, kAuthorPattern, "identifiant GitHub");
+        check("author", author, kAuthorPattern, "a GitHub username");
     }
 
     std::optional<std::string> description = text_of("description", true);
     if (description) {
         m.description = *description;
         if (CodePoints(*description) < 1 || CodePoints(*description) > 300) {
-            result.errors.push_back("description doit faire de 1 à 300 caractères");
+            result.errors.push_back("description must be 1 to 300 characters");
         }
     }
 
@@ -163,47 +163,47 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
     if (kitApi) {
         m.kitApi = *kitApi;
         if (!Matches(*kitApi, kKitApiPattern)) {
-            result.errors.push_back("kitApi doit valoir MAJEUR.MINEUR, par exemple 1.0");
+            result.errors.push_back("kitApi must be MAJOR.MINOR, for example 1.0");
         } else if (std::stoi(kitApi->substr(0, kitApi->find('.'))) != supportedKitApiMajor) {
-            result.errors.push_back("kitApi " + *kitApi + " : version majeure non prise en charge (attendue " +
+            result.errors.push_back("kitApi " + *kitApi + ": major version not supported (expected " +
                                     std::to_string(supportedKitApiMajor) + ")");
         }
     }
 
     m.homepage = text_of("homepage", false);
-    check("homepage", m.homepage, kHttpsPattern, "une URL https://");
+    check("homepage", m.homepage, kHttpsPattern, "an https:// URL");
     m.license = text_of("license", false);
     if (m.license && (CodePoints(*m.license) < 1 || CodePoints(*m.license) > 64)) {
-        result.errors.push_back("license doit faire de 1 à 64 caractères");
+        result.errors.push_back("license must be 1 to 64 characters");
     }
 
     m.main = text_of("main", false);
-    check("main", m.main, kJsFilePattern, "un fichier .js à la racine");
+    check("main", m.main, kJsFilePattern, "a .js file at the root");
     if (std::optional<std::string> type = text_of("type", false)) {
         if (*type == "module") m.module = true;
-        else if (*type != "script") result.errors.push_back("type doit valoir script ou module");
+        else if (*type != "script") result.errors.push_back("type must be script or module");
     }
     m.colors = text_of("colors", false);
-    check("colors", m.colors, kIniFilePattern, "un fichier .ini à la racine");
+    check("colors", m.colors, kIniFilePattern, "an .ini file at the root");
     m.defaultScheme = text_of("defaultScheme", false);
-    check("defaultScheme", m.defaultScheme, kSchemeNamePattern, "1 à 32 caractères sans espace");
+    check("defaultScheme", m.defaultScheme, kSchemeNamePattern, "1 to 32 characters without spaces");
     m.resources = text_of("resources", false);
-    check("resources", m.resources, kXamlFilePattern, "un fichier .xaml à la racine");
+    check("resources", m.resources, kXamlFilePattern, "a .xaml file at the root");
     m.icon = text_of("icon", false);
-    check("icon", m.icon, kSvgFilePattern, "un fichier .svg à la racine");
+    check("icon", m.icon, kSvgFilePattern, "an .svg file at the root");
 
     if (const Json* list = root->Find("permissions")) {
         if (!list->AsArray()) {
-            result.errors.push_back("permissions doit être une liste");
+            result.errors.push_back("permissions must be a list");
         } else if (list->AsArray()->size() > 32) {
-            result.errors.push_back("permissions : 32 au plus");
+            result.errors.push_back("permissions: 32 at most");
         } else {
             for (const Json& item : *list->AsArray()) {
                 const std::string* permission = item.AsString();
                 if (!permission || !IsKnownPermission(*permission)) {
-                    result.errors.push_back("permission inconnue : " + (permission ? *permission : std::string("?")));
+                    result.errors.push_back("unknown permission: " + (permission ? *permission : std::string("?")));
                 } else if (m.HasPermission(*permission)) {
-                    result.errors.push_back("permission en double : " + *permission);
+                    result.errors.push_back("duplicate permission: " + *permission);
                 } else {
                     m.permissions.push_back(*permission);
                 }
@@ -213,14 +213,14 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
 
     if (const Json* list = root->Find("appVersions")) {
         if (!list->AsArray()) {
-            result.errors.push_back("appVersions doit être une liste");
+            result.errors.push_back("appVersions must be a list");
         } else if (list->AsArray()->size() > 16) {
-            result.errors.push_back("appVersions : 16 au plus");
+            result.errors.push_back("appVersions: 16 at most");
         } else {
             for (const Json& item : *list->AsArray()) {
                 const std::string* v = item.AsString();
                 if (!v || !Matches(*v, kAppVersionPattern)) {
-                    result.errors.push_back("appVersions : version invalide");
+                    result.errors.push_back("appVersions: invalid version");
                 } else {
                     m.appVersions.push_back(*v);
                 }
@@ -231,14 +231,14 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
     if (const Json* list = root->Find("processes")) {
         m.processes.clear();
         if (!list->AsArray() || list->AsArray()->empty() || list->AsArray()->size() > 2) {
-            result.errors.push_back("processes doit être une liste d'une ou deux valeurs : ui, engine");
+            result.errors.push_back("processes must be a list of one or two values: ui, engine");
         } else {
             for (const Json& item : *list->AsArray()) {
                 const std::string* process = item.AsString();
                 if (!process || (*process != "ui" && *process != "engine")) {
-                    result.errors.push_back("processes : valeur inconnue (ui ou engine)");
+                    result.errors.push_back("processes: unknown value (ui or engine)");
                 } else if (std::find(m.processes.begin(), m.processes.end(), *process) != m.processes.end()) {
-                    result.errors.push_back("processes : valeur en double : " + *process);
+                    result.errors.push_back("processes: duplicate value: " + *process);
                 } else {
                     m.processes.push_back(*process);
                 }
@@ -246,21 +246,21 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
         }
     }
 
-    // Rules that depend on the kind, from the table in docs/extensions/MANIFEST.md.
+    // Rules that depend on the kind, from the table in docs/extensions/manifest.md.
     auto require_file = [&](const char* key, const std::optional<std::string>& file) {
-        if (file && hasFile && !hasFile(*file)) result.errors.push_back(std::string("fichier absent : ") + *file + " (" + key + ")");
+        if (file && hasFile && !hasFile(*file)) result.errors.push_back(std::string("file missing: ") + *file + " (" + key + ")");
     };
     switch (m.kind) {
         case ElementKind::Extension:
         case ElementKind::App:
-            if (!m.main) result.errors.push_back("main est obligatoire pour une extension ou une app");
+            if (!m.main) result.errors.push_back("main is required for an extension or an app");
             break;
         case ElementKind::Theme:
-            if (!m.colors && !m.resources) result.errors.push_back("un thème doit avoir colors, resources, ou les deux");
+            if (!m.colors && !m.resources) result.errors.push_back("a theme needs colors, resources, or both");
             break;
         case ElementKind::Snippet:
-            if (!m.resources) result.errors.push_back("resources est obligatoire pour un snippet");
-            if (m.main) result.errors.push_back("main n'est pas autorisé pour un snippet");
+            if (!m.resources) result.errors.push_back("resources is required for a snippet");
+            if (m.main) result.errors.push_back("main is not allowed for a snippet");
             break;
     }
     require_file("main", m.main);

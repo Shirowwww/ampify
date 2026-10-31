@@ -49,7 +49,7 @@ TEST_CASE(UiTree_RefusesTooMuchDepth) {
     std::string error;
     CHECK(ampify::ValidateTree(Parse(Nested(7)), &error));
     CHECK(!ampify::ValidateTree(Parse(Nested(9)), &error));
-    CHECK(error.find("profonde") != std::string::npos);
+    CHECK(error.find("too deep") != std::string::npos);
 }
 
 TEST_CASE(UiTree_RefusesTooManyElements) {
@@ -57,7 +57,7 @@ TEST_CASE(UiTree_RefusesTooManyElements) {
     std::string children;
     for (int i = 0; i < 300; i++) children += (i ? "," : "") + std::string(R"({"type":"text"})");
     CHECK(ampify::ValidateTree(Parse(R"({"type":"stack","children":[)" + children + "]}"), &error) == false);
-    CHECK(error.find("trop grande") != std::string::npos);
+    CHECK(error.find("too large") != std::string::npos);
 }
 
 TEST_CASE(UiTree_RefusesLongText) {
@@ -80,13 +80,14 @@ TEST_CASE(UiModel_AddsAControlAndFindsIt) {
 
 TEST_CASE(UiModel_RefusesAnUnknownPlacement) {
     ampify::UiModel model;
-    CHECK(model.AddControl("demo", "sidebar", "x", "") == 0);
+    CHECK(model.AddControl("demo", "footer", "x", "") == 0);
     CHECK(model.Controls().empty());
 }
 
 TEST_CASE(UiModel_PlacementsNeedTheMatchingPermission) {
     CHECK(ampify::PlacementPermission("topbar") == "ui.topbar");
     CHECK(ampify::PlacementPermission("playbar") == "ui.playbar");
+    CHECK(ampify::PlacementPermission("sidebar") == "ui.sidebar");
     CHECK(ampify::PlacementPermission("menu-context") == "ui.menu");
     CHECK(ampify::PlacementPermission("menu-app") == "ui.menu");
 }
@@ -130,7 +131,7 @@ TEST_CASE(UiModel_TheLastNavigationWins) {
 
 TEST_CASE(UiTree_AcceptsCardsDropdownsAndCallbackIds) {
     std::string error;
-    CHECK(ampify::ValidateTree(Parse(R"({"type":"card","title":"Réglages","onClick":3,"children":[)"
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"card","title":"Settings","onClick":3,"children":[)"
                                   R"({"type":"textfield","value":"","onChange":4},)"
                                   R"({"type":"dropdown","value":"a","onChange":5,"children":[{"type":"option","value":"a","label":"A"}]},)"
                                   R"({"type":"button","label":"OK","tooltip":"Valider","tooltipPlacement":"top","tooltipDelay":0}]})"),
@@ -155,7 +156,7 @@ TEST_CASE(UiTree_RefusesMisplacedOptionsAndCallbacks) {
 
 TEST_CASE(UiModel_NamedPopupsAreReplacedAndClosed) {
     ampify::UiModel ui;
-    ui.OpenPopup("a", Parse(R"({"type":"text","text":"une fois"})"));
+    ui.OpenPopup("a", Parse(R"({"type":"text","text":"once"})"));
     ui.SetPopup("a", "infos", Parse(R"({"type":"text","text":"1"})"));
     ui.SetPopup("a", "infos", Parse(R"({"type":"text","text":"2"})"));
     auto popups = ui.Popups();

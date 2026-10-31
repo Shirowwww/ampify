@@ -16,7 +16,8 @@
 // interface changes its identifier, and QueryInterface fails cleanly instead of calling a wrong slot.
 //
 // The identifiers come from AMExclusive (https://github.com/AntiOblivionis/AMExclusive, MIT, src/ApplePlayback.h),
-// which declares them from the same metadata for Apple Music 1.1540.23042.0. Reused with the owner's permission.
+// which declares them from the same metadata for Apple Music 1.1540.23042.0. Reused with the owner's permission. The
+// 1.1792 ones are the GuidAttribute values of AMP.Services.winmd 1.1792.
 //
 // Never called, by rule: SetVolumeAsync, SetMuteAsync and the EQ methods of IPlayer, and every FairPlay/DRM type.
 
@@ -30,9 +31,18 @@ inline constexpr char kPlayQueueClass[] = "AMP.Services.PlayQueue";
 
 // Interface identifiers (see above).
 inline constexpr char kIidPlayerStatics[] = "34D100F9-0F0A-5980-8F04-7AF57FDB29B0";  // AMP.Services.IPlayerStatics
-inline constexpr char kIidPlayer[] = "958DA6F6-2E93-5BA7-B604-28DD57FEB8E0";         // AMP.Services.IPlayer
 inline constexpr char kIidPlayerState[] = "BEFB99EB-336F-5199-9FB2-63635BC47319";  // ...CommonModels.IPlayerState
-inline constexpr char kIidNowPlayingItem[] = "E376ACB7-0569-56C5-8443-A288ACD362EA";  // ...CommonModels.INowPlayingItem
+// IPlayer and INowPlayingItem, newest Apple Music first. 1.1792 added SetPositionAsync overloads to IPlayer and
+// methods at the end of INowPlayingItem, so both identifiers changed; the slots below did not move (checked against
+// knowledge/winmd/AMP.Services.txt, read from 1.1792). The kit tries each identifier in turn.
+inline constexpr const char* kIidsPlayer[] = {
+    "F807B158-B2E7-5CF7-A512-8B0BE767DF1B",  // AMP.Services.IPlayer, 1.1792
+    "958DA6F6-2E93-5BA7-B604-28DD57FEB8E0",  // 1.1540
+};
+inline constexpr const char* kIidsNowPlayingItem[] = {
+    "2DC5F65C-28F6-58AA-87CF-E4A7DF9B9A4B",  // AMP.Services.CommonModels.INowPlayingItem, 1.1792
+    "E376ACB7-0569-56C5-8443-A288ACD362EA",  // 1.1540
+};
 
 // Microsoft.UI.Xaml.Data (WinUI 3), which Apple Music's view models implement: INotifyPropertyChanged and its
 // delegate. Source: CsWinRT, src/WinRT.Runtime/Interop/IID.g.cs (IID_MUX_INotifyPropertyChanged and
@@ -46,7 +56,7 @@ inline constexpr int kPlayerStaticsCurrent = 6;
 
 // AMP.Services.IPlayer: get_NowPlayingItem, get_PlayerState, StartOrQueueLibraryPlaybackAsync, StartVUIPlaybackAsync,
 // CreateAndPlayStationAsync, EnsureObjectGraphAsync, PlayAsync, PauseAsync, StopAsync, GoBackAsync, SkipPreviousAsync,
-// SkipNextAsync, ClearAsync, ... SetPositionAsync (22), ... SetVolumeAsync (24, never called) ...
+// SkipNextAsync, ClearAsync, ... SetPositionAsync (22), ... SetVolumeAsync (27 in 1.1792, never called) ...
 inline constexpr int kPlayerNowPlayingItem = 6;
 inline constexpr int kPlayerPlayerState = 7;
 inline constexpr int kPlayerPlayAsync = 12;

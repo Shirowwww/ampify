@@ -1,129 +1,92 @@
 # Ampify
 
-Un système qui fait pour l'app officielle **Apple Music pour Windows** ce que Spicetify fait pour Spotify :
-des extensions, des thèmes et des modes qu'on active ou désactive à volonté, sans remplacer l'app.
+Themes, extensions and apps for Apple Music on Windows. Ampify does for the official Apple Music app what
+Spicetify does for Spotify: you change how it looks and add features, and Apple Music keeps everything it already
+does (lossless, Dolby Atmos, lyrics, your library, sync).
 
-On garde toutes les fonctions d'Apple Music (lossless, Dolby Atmos, paroles, bibliothèque, synchronisation).
-On ajoute et on corrige, on ne remplace pas.
+> **Status: early.** Ampify runs on a test PC with Apple Music 1.1792.39682.0 (from the Microsoft Store) and on the
+> Windows CI bench. It is not released yet.
 
-> **État : intégration en cours.** Toutes les branches de travail sont réunies. Le lanceur et le noyau sont validés
-> sur le PC de l'utilisateur (lancement, injection, mode sans échec). Le nivellement Atmos, le runtime JavaScript, les thèmes,
-> la CLI `ampify`, l'installateur et le kit de test sont testés sous Linux et sous Wine, et attendent leur passage sur
-> Windows. Procédures : [M3](docs/tests/M3-injecteur.md), [M4](docs/tests/M4-atmos.md),
-> [M5 + M6](docs/tests/M5-M6-kit-de-test.md). Voir [PROGRESS.md](PROGRESS.md).
+## What you get
 
-## Ce qui est en place
+- **Themes** that restyle the whole window: colors, fonts, corner radius, glass and acrylic panels, the artwork of
+  the song playing behind the interface, a playback bar moved to the bottom. Spicetify `color.ini` palettes work as
+  they are (`ampify theme import <github address>`).
+- **A Marketplace page inside Apple Music**: browse, install, update and switch themes and extensions in two clicks.
+- **Extensions in JavaScript** with an API close to Spicetify's (`Ampify.Player`, `Ampify.React`,
+  `Ampify.components`, `Ampify.Platform`...): panels, pages, notifications, Discord presence, Last.fm scrobbling,
+  keyboard shortcuts, a sleep timer.
+- **An Atmos leveler**: Dolby Atmos tracks play about 4 dB quieter than stereo ones in Apple Music. The leveler
+  measures each track and corrects the gain on the decoded samples. The volume bar never moves.
+- **A command line** (`ampify.exe`) for everything: settings, themes, extensions, backups, author tools.
 
-| Partie | Dossier | État |
-|---|---|---|
-| Réglages persistants (fichier texte lisible à la main) | `core/settings.*` | fait, testé |
-| Journal | `core/journal.*` | fait, testé |
-| Mode sans échec : après deux lancements sans réponse, le suivant démarre sans extension | `core/safe_mode.*` | fait, testé |
-| Liste des versions d'Apple Music testées : sur une autre version, le noyau reste inactif | `core/version_gate.*` | fait, testé |
-| Hôte d'extensions : chargement, activation une par une, arrêt, isolement des pannes | `core/extension.*` | fait, testé |
-| API d'extensions, format du manifeste, catalogue, parité avec Spicetify | `docs/extensions/` | écrit ; implémenté en partie (voir `docs/extensions/API.md`, section 12) |
-| Runtime JavaScript : moteur QuickJS vendu, objet `Ampify`, minuteries, permissions à l'exécution | `core/js_runtime.*`, `core/ampify_prelude.*`, `core/script_extension.*`, `vendor/quickjs/` | fait, testé (Linux, Wine) |
-| Lecture du JSON et validation des manifestes côté noyau | `core/json.*`, `core/manifest.*` | fait, testé |
-| Chargeur d'éléments : dossiers, activation, rechargement, isolement des pannes | `core/extension_loader.*`, `win/win_host.*`, `kernel/` | fait, testé ; branché au noyau, à tester sur le PC |
-| Exemples d'extensions (5) | `examples/` | fait, validés et exécutés par les tests |
-| Schémas JSON et validateur (catalogue, manifestes) | `schemas/`, `tools/validate.py` | fait, testé |
-| Mesure de loudness BS.1770 (LUFS) | `extensions/atmos-leveler/loudness_meter.*` | fait, testé |
-| Politique du nivellement Atmos : cible stéréo, mémoire par morceau, plafond de crête | `extensions/atmos-leveler/leveler.*` | fait, testé |
-| Identité du paquet, décision d'injection, garde DRM | `core/apple_music.*`, `core/injection_policy.*`, `core/drm_guard.*` | fait, testé |
-| Lanceur : lancement d'Apple Music, pause du premier processus pendant l'injection, suivi du paquet | `launcher/`, `core/package_watch.*` | écrit, compilé, à tester sur Windows |
-| Noyau chargé dans les deux processus (DLL) | `kernel/` | écrit, compilé, à tester sur Windows |
-| Hooks sur `AppleMusic.exe` et `AMPLibraryAgent.exe` | à faire (M4) | |
-| CLI `ampify` : réglages, extensions, thèmes, snippets, `apply`, `launch`, `restore`, `watch`, sauvegardes, `build`, `inspect`, `dev`, `test`, `types`, `doctor`, `logs`, `profile`, `export`, `import` | `cli/`, `docs/cli/COMMANDES.md` | fait, testé (135 tests unitaires, 63 tests de bout en bout) |
-| Installation et mise à jour depuis le catalogue, SHA-256 vérifié, archives contrôlées | `cli/marketplace.cpp` | fait, testé sous Linux (`unzip`). Sous Windows : `tar.exe` et `curl.exe` |
-| Catalogue, schémas, validateur, empaquetage | `catalog/`, `schemas/`, `tools/` | fait, testé |
-| Spécification de la page Marketplace dans l'app | `docs/marketplace/PAGE.md` | écrite, la page reste à faire (M8) |
-| Installateur et désinstallation propre : copie trois fichiers, raccourci du menu Démarrer, entrée dans Paramètres > Applications. Ne touche jamais au paquet d'Apple Music | `setup/`, `win/` | écrit, testé sous Wine, à tester sur Windows |
-| Kit de test en un double-clic (`Ampify-Test.exe`) : installe, lance Apple Music, enregistre une trace ETW, collecte les journaux, écrit un rapport anonyme | `testkit/`, `core/run_report.*` | écrit, testé sous Wine, à tester sur Windows |
-| Banc de test Windows automatique : Apple Music installé, lancement, injection, mode sans échec | `bench/windows/`, `.github/workflows/windows-bench.yml` | écrit, lancé en CI, voir [docs/tests/banc-windows.md](docs/tests/banc-windows.md) |
+## Install
 
-Le nivellement Atmos est la première extension. Un élément de la communauté s'installe avec `ampify install <id>` depuis
-le catalogue, et reste désactivé tant que l'utilisateur ne l'a pas activé (voir [docs/cli/COMMANDES.md](docs/cli/COMMANDES.md)). Il mesure le son décodé et règle le gain sur les
-échantillons, jamais sur le curseur de volume : le curseur d'Apple Music ne bouge pas.
+1. Close Apple Music.
+2. Download the latest `ampify-<version>-windows-x64.zip`, right-click it, Extract all.
+3. Run `ampify_setup.exe`. Windows SmartScreen may warn that the app is not signed yet: More info, Run anyway.
+4. Start **Apple Music with Ampify** from the Start menu.
 
-## Règles qui ne changent pas
+The usual Apple Music icon still starts Apple Music without Ampify. To uninstall, use Settings > Apps > Installed
+apps > Ampify for Apple Music. Your settings stay in `%USERPROFILE%\Ampify` unless you choose to delete them.
 
-- **Pas de contournement de DRM.** Aucune extraction de clé FairPlay, aucun déchiffrement, aucune
-  capture de flux protégé. Les modifications portent sur l'interface, sur le comportement, et sur le son
-  *après* décodage.
-- **Aucun binaire Apple dans le dépôt**, aucun identifiant ni mot de passe.
-- **Aucun enregistrement de la sortie audio sur disque.** Les mesures restent en mémoire.
-- Les tests qui demandent le compte Apple Music de la personne se font sur son PC, jamais dans le cloud.
+## Use it
 
-## Compiler et tester
+Click **Ampify** at the bottom of Apple Music's sidebar to open the Marketplace (or Settings > Playback > Ampify).
+Pick a theme, choose a color scheme, done. "Turn off" or "Restore Apple Music's look" removes the theme without
+restarting.
 
-Tests sous Linux (ou tout système avec CMake 3.20+ et un compilateur C++20) :
-
-```bash
-cmake -S . -B build
-cmake --build build
-./build/ampify_tests
-```
-
-Tests de la CLI, de la marketplace et de la validation du catalogue et des manifestes (Python 3, et le binaire `ampify`
-compilé, chemin absolu) :
-
-```bash
-AMPIFY_BIN=$PWD/build/ampify python3 -m unittest discover -s tools -v
-python3 tools/validate.py catalog catalog/catalog.json
-python3 tools/validate.py manifest examples/hello-extension/manifest.json
-node --test tools/test_examples.mjs
-```
-
-Compilation croisée pour Windows x64 (produit `ampify_tests.exe`, `ampify_kernel.dll`, `ampify_launcher.exe`, `ampify_setup.exe`, `Ampify-Test.exe` et `ampify.exe`) :
-
-```bash
-sudo apt install g++-mingw-w64-x86-64
-cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-x86_64.cmake
-cmake --build build-win
-```
-
-Essais de l'installateur et du kit de test sous Wine (depuis le dossier `build-win`) :
-
-```bash
-scripts/wine-e2e.sh build-win <dossier de préfixe Wine>
-```
-
-## Organisation
+The same from a terminal:
 
 ```
-cli/                       commande `ampify` : JSON, SHA-256, manifestes, catalogue, kit, sauvegardes, commandes, plateforme
-catalog/                   catalogue public des éléments (JSON, vide pour l'instant)
-schemas/                   schémas JSON du manifeste et du catalogue
-tools/                     validateur, empaquetage (pack.py), tests Python et Node des outils et de la CLI
-docs/cli/                  référence des commandes de `ampify`
-docs/marketplace/          spécification de la page Marketplace dans l'app
-core/                      noyau portable : réglages, journal, mode sans échec, versions, extensions, injection
-kernel/                    DLL chargée dans AppleMusic.exe et AMPLibraryAgent.exe (Windows)
-launcher/                  lanceur : paquet MSIX, lancement suspendu, injection (Windows)
-win/                       aides Windows partagées par le lanceur et le noyau
-extensions/atmos-leveler/  mesure BS.1770 et politique du nivellement Atmos
-docs/extensions/           API d'extensions, format du manifeste, catalogue, parité avec Spicetify
-schemas/                   schémas JSON du manifeste et du catalogue
-catalog/                   catalogue communautaire (vide pour l'instant)
-examples/                  exemple d'extension complet
-tools/                     validateur des manifestes et du catalogue, avec ses tests
-tests/                     tests unitaires sans dépendance (même code pour Linux et Windows)
-setup/                     installateur et désinstallateur (ampify_setup.exe, Windows)
-testkit/                   kit de test M5 (Ampify-Test.exe, Windows) et trace ETW
-bench/windows/             banc de test Windows (PowerShell) : installe Apple Music, lance, vérifie les journaux
-docs/tests/                procédures de test sur le PC, une par jalon, et le banc Windows
-cmake/                     fichier de compilation croisée pour Windows
-vendor/quickjs/             moteur JavaScript quickjs-ng 0.17.0, non modifié (MIT)
-knowledge/                 relevés sur l'app : architecture, API, pièges observés
-reference/                 mod Windhawk de référence et outil de mesure LUFS
+ampify theme list
+ampify theme set glass --scheme Night
+ampify theme clear
+ampify market
+ampify install sleep-timer --yes
+ampify extension enable sleep-timer
+ampify doctor
 ```
 
-Pour comprendre le fonctionnement interne d'Apple Music, lire
-[knowledge/apple-music-internals.md](knowledge/apple-music-internals.md). Le tour des projets
-existants est dans [knowledge/ecosystem-research.md](knowledge/ecosystem-research.md).
+All commands: [docs/cli.md](docs/cli.md).
 
-## Crédits
+## Make your own
 
-La méthode de pondération K de BS.1770 (recalculée pour chaque fréquence d'échantillonnage) suit
-libebur128. Les constantes viennent de la recommandation UIT-R BS.1770-4. Le nivellement reprend les
-valeurs du mod Windhawk de référence.
+- A theme is a folder with a `manifest.json`, a `colors.ini` and a `user.css`. Start with
+  `ampify new theme my-theme` and follow the [five-minute guide](docs/themes/guide.md). Full reference:
+  [docs/themes/format.md](docs/themes/format.md).
+- An extension is a `manifest.json` and a `main.js`: [docs/extensions/api.md](docs/extensions/api.md).
+- `ampify dev <folder>` reloads your element at each save.
+
+## How it works
+
+Apple Music for Windows is a native WinUI 3 app, not a web page, so Ampify cannot inject CSS the way Spicetify
+does. The launcher starts Apple Music paused, loads `ampify_kernel.dll` into it, and lets it run. The kernel reads
+your theme, translates its CSS into XAML properties on Apple Music's own controls, and runs extensions in a small
+JavaScript engine (QuickJS). Nothing in the Apple Music package is modified, and removing a theme puts every value
+back. Details: [docs/how-it-works.md](docs/how-it-works.md).
+
+## Safety rules
+
+- Ampify never hooks FairPlay or anything related to DRM, and never records the audio output.
+- On an Apple Music version it has not been tested with, the kernel stays inactive: an Apple update cannot break
+  the app.
+- After two launches in a row that do not answer, the next one starts without extensions (safe mode).
+
+## Build from source
+
+Windows 10 or 11 x64, Visual Studio 2022 Build Tools (C++ workload) and the Windows SDK:
+
+```
+pwsh -File scripts\build-msvc.ps1 -Bench    # bench build, accepts any Apple Music version
+pwsh -File scripts\build-msvc.ps1           # release build and unit tests
+build-msvc\release\ampify_tests.exe
+```
+
+More: [docs/development/building.md](docs/development/building.md). Contribution rules:
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Credits
+
+Ampify builds on QuickJS-ng and on what AMExclusive learned about Apple Music's player. Full list:
+[CREDITS.md](CREDITS.md). Apple Music is a trademark of Apple Inc. Ampify is not affiliated with Apple.

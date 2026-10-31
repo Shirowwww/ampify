@@ -203,7 +203,7 @@ th::Selector Sel(const char* text) {
     std::optional<th::Selector> selector = th::ParseSelector(text, &problem);
     CHECK(selector.has_value());
     if (!selector) {
-        ampify::test::ReportFailure(__FILE__, __LINE__, "selector « " + std::string(text) + " » : " + problem);
+        ampify::test::ReportFailure(__FILE__, __LINE__, "selector \"" + std::string(text) + "\": " + problem);
         return {};
     }
     return *selector;
@@ -261,7 +261,7 @@ TEST_CASE(Ini_ReportsBadLinesAndKeepsTheRest) {
     CHECK(problems.size() == 3);
     CHECK(ini.Get("Base", "ok") == "1");
     CHECK(ini.Get("", "x") == "2");  // the key after a broken header is kept, in a section without a name
-    CHECK(!problems.empty() && problems[0].find("ligne 3") != std::string::npos);
+    CHECK(!problems.empty() && problems[0].find("line 3") != std::string::npos);
 }
 
 // --- Colours ---------------------------------------------------------------------------------------------
@@ -372,11 +372,11 @@ TEST_CASE(Selector_SpecificityOrdersNamesBeforeTypes) {
 TEST_CASE(Selector_RejectsWhatItDoesNotKnow) {
     std::string problem;
     CHECK(!th::ParseSelector("Grid[Name=x]", &problem));
-    CHECK(problem.find("non pris en charge") != std::string::npos);
+    CHECK(problem.find("is not supported") != std::string::npos);
     CHECK(!th::ParseSelector("Grid:focus", &problem));
     CHECK(problem.find(":focus") != std::string::npos);
     CHECK(!th::ParseSelector("Grid:hover > TextBlock", &problem));
-    CHECK(problem.find("dernier") != std::string::npos);
+    CHECK(problem.find("last element") != std::string::npos);
     CHECK(!th::ParseSelector("TextBlock >", &problem));
     CHECK(!th::ParseSelector("# ", &problem));
 }
@@ -395,8 +395,8 @@ TEST_CASE(Properties_ConvertBrushesAndImages) {
     CHECK(Converted("background", "transparent", palette, files) == "#00FFFFFF");
     CHECK(Converted("background", "url(images/bg.png)", palette, files) == "C:/themes/test/images/bg.png");
     CHECK(Converted("background", "url(\"images/bg.png\")", palette, files) == "C:/themes/test/images/bg.png");
-    CHECK(Converted("background", "url(images/missing.png)", palette, files).find("introuvable") != std::string::npos);
-    CHECK(Converted("background", "url(../secret.png)", palette, files).find("non autorisé") != std::string::npos);
+    CHECK(Converted("background", "url(images/missing.png)", palette, files).find("not found") != std::string::npos);
+    CHECK(Converted("background", "url(../secret.png)", palette, files).find("not allowed") != std::string::npos);
     CHECK(Converted("background", "nonsense", palette, files).rfind("PROBLEM", 0) == 0);
 }
 
@@ -495,7 +495,7 @@ TEST_CASE(Theme_UsesTheRequestedSchemeAndFallsBack) {
 
     th::Theme missing = Load(files, {"Light", nullptr, {}});
     CHECK(missing.scheme == "Base");  // falls back to the first scheme
-    CHECK(!ProblemContaining(missing, "schéma « Light » absent").empty());
+    CHECK(!ProblemContaining(missing, "scheme \"Light\" not found").empty());
     if (missing.assignments.size() == 1) CHECK(missing.assignments[0].value.text == "#FFFA2D48");
 }
 
@@ -518,7 +518,7 @@ TEST_CASE(Theme_RefusesResourcesOutsideTheAllowedList) {
 
     th::Theme unchecked = Load(files, {"", nullptr, {}});
     CHECK(unchecked.usable);
-    CHECK(!ProblemContaining(unchecked, "vérification non faite").empty());
+    CHECK(!ProblemContaining(unchecked, "check not done").empty());
 }
 
 // --- Spicetify's color.ini, read as is ------------------------------------------------------------------------
@@ -596,7 +596,7 @@ TEST_CASE(Theme_ArtworkIsTheSongPlayingAsABackground) {
     const th::Assignment* contain = AssignmentFor(theme, "Grid#A", "Background");
     CHECK(contain && contain->value.text == "artwork:|Uniform");
     CHECK(AssignmentFor(theme, "Grid#B", "Background") == nullptr);
-    CHECK(!ProblemContaining(theme, "ajustement d'image inconnu").empty());
+    CHECK(!ProblemContaining(theme, "unknown image fit").empty());
 }
 
 TEST_CASE(Spicetify_ReadsTheKeysOfSpicetifyOne) {
@@ -614,7 +614,7 @@ TEST_CASE(Theme_NeedsAtLeastOneThemeFile) {
     files.files["readme.txt"] = "not a theme";
     th::Theme theme = Load(files);
     CHECK(!theme.usable);
-    CHECK(!ProblemContaining(theme, "pas un thème").empty());
+    CHECK(!ProblemContaining(theme, "not a theme").empty());
 }
 
 TEST_CASE(Theme_ReportsBadRulesWithTheirLineAndKeepsTheGoodOnes) {
@@ -624,8 +624,8 @@ TEST_CASE(Theme_ReportsBadRulesWithTheirLineAndKeepsTheGoodOnes) {
     th::Theme theme = Load(files);
     CHECK(theme.usable);
     CHECK(theme.assignments.size() == 1);
-    CHECK(!ProblemContaining(theme, "ligne 2").empty());
-    CHECK(!ProblemContaining(theme, "ligne 3").empty());
+    CHECK(!ProblemContaining(theme, "line 2").empty());
+    CHECK(!ProblemContaining(theme, "line 3").empty());
     if (theme.assignments.size() == 1) CHECK(theme.assignments[0].line == 4);
 }
 
@@ -709,8 +709,8 @@ TEST_CASE(Engine_AppliesTheCascadeAndRestoresTheOriginals) {
     CHECK(tree.elements[3].properties["Foreground"].text == "#FF111111");
     CHECK(tree.elements[4].properties["Visibility"].text == "Visible");
 
-    CHECK(log.str().find("Appliqué : Page Background = #FF101010") != std::string::npos);
-    CHECK(log.str().find("Thème retiré : 8 valeur(s) restaurée(s)") != std::string::npos);
+    CHECK(log.str().find("Applied: Page Background = #FF101010") != std::string::npos);
+    CHECK(log.str().find("Theme removed: 8 value(s) restored") != std::string::npos);
 }
 
 TEST_CASE(Engine_RefusesWhatAnElementCannotTake) {
@@ -726,10 +726,10 @@ TEST_CASE(Engine_RefusesWhatAnElementCannotTake) {
     th::ThemeEngine::Report report = engine.Apply(theme, tree);
     CHECK(report.applied == 0);
     CHECK(report.refused == 1);  // the Border has no FontFamily; the refusal is written once
-    CHECK(log.str().find("Refusé : « Border#Hide » n'a pas de propriété FontFamily") != std::string::npos);
+    CHECK(log.str().find("Refused: \"Border#Hide\" has no property FontFamily") != std::string::npos);
 
     engine.Apply(theme, tree);
-    CHECK(log.str().find("Refusé") == log.str().rfind("Refusé"));
+    CHECK(log.str().find("Refused") == log.str().rfind("Refused"));
 }
 
 TEST_CASE(Engine_LeavesTheFontOfAnIconAlone) {
@@ -752,7 +752,7 @@ TEST_CASE(Engine_LeavesTheFontOfAnIconAlone) {
     CHECK(tree.Shown(text, "FontFamily").text == "Arial");
     CHECK(tree.Shown(icon, "FontFamily").text == "Segoe UI");
     CHECK(tree.Shown(icon, "FontSize").text == "20");  // the rest of the rule still applies to it
-    CHECK(log.str().find("Refusé") == std::string::npos);
+    CHECK(log.str().find("Refused") == std::string::npos);
 }
 
 TEST_CASE(Engine_ReappliesAThemeLikeLiveReloadDoes) {
@@ -815,7 +815,7 @@ TEST_CASE(Engine_AppliesColoursResourcesAndDictionaries) {
     th::ThemeEngine::Report report = engine.Apply(theme, tree);
     CHECK(tree.resources["AccentFillColorDefaultBrush"].text == "#FF0A84FF");
     CHECK(report.refused == 1);  // Ghost is not an application resource
-    CHECK(log.str().find("ressource absente de l'application : Ghost") != std::string::npos);
+    CHECK(log.str().find("resource missing from the app: Ghost") != std::string::npos);
     CHECK(tree.dictionary == theme.resourceDictionary);
 
     engine.Restore(tree);
@@ -845,7 +845,7 @@ TEST_CASE(Library_ListsOnlyFoldersWithThemeFiles) {
     std::string root = TempFolder("library");
     std::filesystem::path base(root);
     std::filesystem::create_directories(base / "midnight");
-    std::filesystem::create_directories(base / "vide");
+    std::filesystem::create_directories(base / "empty");
     std::filesystem::create_directories(base / "css");
     { std::ofstream(base / "midnight" / "colors.ini") << "[Base]\n"; }
     { std::ofstream(base / "css" / "user.css") << "Page {}\n"; }
@@ -920,13 +920,13 @@ TEST_CASE(Inspector_DumpsResourcesAndElements) {
     std::string dump = th::InspectTree(tree);
     CHECK(dump.find("Ressources de l'application (1) :") != std::string::npos);
     CHECK(dump.find("AccentFillColorDefaultBrush = #FF0A84FF") != std::string::npos);
-    CHECK(dump.find("(5 éléments)") != std::string::npos);
-    CHECK(dump.find("  Grid#Bar  sélecteur : Grid#Bar  Background=#FF0000FF") != std::string::npos);
-    CHECK(dump.find("    TextBlock  sélecteur : Grid#Bar > TextBlock") != std::string::npos);
+    CHECK(dump.find("(5 elements)") != std::string::npos);
+    CHECK(dump.find("  Grid#Bar  selector: Grid#Bar  Background=#FF0000FF") != std::string::npos);
+    CHECK(dump.find("    TextBlock  selector: Grid#Bar > TextBlock") != std::string::npos);
 
     th::InspectOptions small;
     small.maxLines = 2;
-    CHECK(th::InspectTree(tree, small).find("arrêté après 2 lignes") != std::string::npos);
+    CHECK(th::InspectTree(tree, small).find("stopped after 2 lines") != std::string::npos);
 }
 
 TEST_CASE(Inspector_ShowsTheColourOfAnAppBrushKeptAsAnObject) {
@@ -936,7 +936,7 @@ TEST_CASE(Inspector_ShowsTheColourOfAnAppBrushKeptAsAnObject) {
 
     std::string dump = th::InspectTree(tree);
     CHECK(dump.find("Background=#14FFFFFF") != std::string::npos);
-    CHECK(dump.find("BorderBrush=présent") != std::string::npos);
+    CHECK(dump.find("BorderBrush=present") != std::string::npos);
 }
 
 // --- Example themes shipped in the repository ------------------------------------------------------------
@@ -1010,7 +1010,7 @@ TEST_CASE(Session_ReturnsAnInspectorDumpOnlyWhenAsked) {
     request.inspect = true;
     std::optional<std::string> dump = session.Tick(tree, request);
     CHECK(dump.has_value());
-    if (dump) CHECK(dump->find("Arbre (5 éléments)") != std::string::npos);
+    if (dump) CHECK(dump->find("Tree (5 elements)") != std::string::npos);
 
     FakeTree empty;
     CHECK(!session.Tick(empty, request).has_value());  // no content yet: asked again on the next tick
@@ -1034,7 +1034,7 @@ TEST_CASE(Session_RefusesAThemeThatIsNotUsable) {
     request.generation = 1;
     session.Tick(tree, request);
     CHECK(!session.Active());
-    CHECK(log.str().find("« broken » refusé") != std::string::npos);
+    CHECK(log.str().find("\"broken\" refused") != std::string::npos);
 }
 
 // --- theme.parts ------------------------------------------------------------------------------------------
@@ -1084,14 +1084,14 @@ TEST_CASE(Parts_ReadBackFromSettings) {
 
 namespace {
 
-// A kit in a temporary folder, with a usable theme `midnight` (two schemes) and a refused theme `casse`.
+// A kit in a temporary folder, with a usable theme `midnight` (two schemes) and a refused theme `broken`.
 th::KitLayout MakeKit(const char* name) {
     th::KitLayout kit{std::filesystem::path(TempFolder(name))};
     std::filesystem::create_directories(kit.Themes() / "midnight");
-    std::filesystem::create_directories(kit.Themes() / "casse");
+    std::filesystem::create_directories(kit.Themes() / "broken");
     { std::ofstream(kit.Themes() / "midnight" / "colors.ini") << "[Base]\nAccent = 0A84FF\n[Dark]\nAccent = 1C1C1E\n"; }
     { std::ofstream(kit.Themes() / "midnight" / "user.css") << "Page { background: $accent; }\n"; }
-    { std::ofstream(kit.Themes() / "casse" / "resources.xaml") << "<Oops />\n"; }
+    { std::ofstream(kit.Themes() / "broken" / "resources.xaml") << "<Oops />\n"; }
     return kit;
 }
 
@@ -1107,8 +1107,8 @@ TEST_CASE(Commands_ListShowsUsableAndRefusedThemes) {
     std::ostringstream err;
     CHECK(th::RunThemeCommand(Args({"theme", "list"}), kit, out, err) == 0);
     CHECK(out.str().find("midnight") != std::string::npos);
-    CHECK(out.str().find("midnight : utilisable, schémas : Base Dark") != std::string::npos);
-    CHECK(out.str().find("casse : refusé") != std::string::npos);
+    CHECK(out.str().find("midnight: usable, schemes: Base Dark") != std::string::npos);
+    CHECK(out.str().find("broken: refused") != std::string::npos);
     std::filesystem::remove_all(kit.root);
 }
 
@@ -1122,7 +1122,7 @@ TEST_CASE(Commands_SetWritesTheThemeAndTheScheme) {
     settings.Load(kit.Settings().string());
     CHECK(settings.GetString("theme.active", "") == "midnight");
     CHECK(settings.GetString("theme.scheme", "") == "Dark");
-    CHECK(out.str().find("Thème « midnight » choisi, schéma Dark") != std::string::npos);
+    CHECK(out.str().find("Theme \"midnight\" chosen, scheme Dark") != std::string::npos);
     std::filesystem::remove_all(kit.root);
 }
 
@@ -1160,8 +1160,8 @@ TEST_CASE(Commands_SetNoneAndTheErrors) {
 
     // A missing theme, a refused theme, and a wrong command change nothing and report why.
     CHECK(th::RunThemeCommand(Args({"theme", "set", "absent"}), kit, out, err) == 2);
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "casse"}), kit, out, err) == 1);
-    CHECK(err.str().find("refusé : réglages inchangés") != std::string::npos);
+    CHECK(th::RunThemeCommand(Args({"theme", "set", "broken"}), kit, out, err) == 1);
+    CHECK(err.str().find("refused: settings unchanged") != std::string::npos);
     CHECK(th::RunThemeCommand(Args({"theme", "frobnicate"}), kit, out, err) == 2);
     CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight", "--bogus"}), kit, out, err) == 2);
     CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight", "--scheme"}), kit, out, err) == 2);
@@ -1187,13 +1187,13 @@ TEST_CASE(Commands_WatchRechecksWhenAFileChanges) {
     int status = th::RunWatch(Args({"watch", root.c_str(), "--polls", "3"}), out, err, pause);
     CHECK(status == 0);
     CHECK(pauses == 3);
-    CHECK(out.str().find("Changement détecté dans " + folder.filename().string()) != std::string::npos);
+    CHECK(out.str().find("Change detected in " + folder.filename().string()) != std::string::npos);
 
     // One check at the start, one after the change: two reports, the second one with the new rule.
     std::string text = out.str();
-    size_t first = text.find("--- vérifié");
+    size_t first = text.find("--- checked");
     CHECK(first != std::string::npos);
-    CHECK(first != std::string::npos && text.find("--- vérifié", first + 1) != std::string::npos);
+    CHECK(first != std::string::npos && text.find("--- checked", first + 1) != std::string::npos);
     CHECK(text.find("Page → Background = #FFFFFFFF") != std::string::npos);
     std::filesystem::remove_all(folder);
 }
@@ -1373,13 +1373,13 @@ TEST_CASE(Variables_RootBlockAndVar) {
     CHECK(!values.count("TextBlock Foreground"));
     CHECK(theme.variables["pad"] == "4px");
 
-    CHECK(!ProblemContaining(theme, "user.css ligne 5 : « color » dans :root").empty());
-    CHECK(!ProblemContaining(theme, "variable « --absent » non définie").empty());
-    CHECK(!ProblemContaining(theme, "variable « --local » hors de :root").empty());
+    CHECK(!ProblemContaining(theme, "user.css line 5: \"color\" inside :root").empty());
+    CHECK(!ProblemContaining(theme, "variable \"--absent\" is not defined").empty());
+    CHECK(!ProblemContaining(theme, "variable \"--local\" outside :root").empty());
 
     std::string problem;
     CHECK(!th::SubstituteVariables("var(--x", {}, &problem).has_value());
-    CHECK(problem.find("parenthèse") != std::string::npos);
+    CHECK(problem.find("parenthesis") != std::string::npos);
     CHECK(!th::SubstituteVariables("var(x)", {}, &problem).has_value());
     CHECK(th::SubstituteVariables("var(--a, var(--b, 3))", {}).value_or("") == "3");
 }
@@ -1390,16 +1390,16 @@ TEST_CASE(Fonts_RolesFromRootBlockAndDefaults) {
         ":root {\n"
         "    --font-title: \"Segoe UI Variable Display\";\n"
         "    --font-title-weight: bold;\n"
-        "    --font-titre-size: 30px;\n"
-        "    --font-texte: Inter;\n"
+        "    --font-title-size: 30px;\n"
+        "    --font-text: Inter;\n"
         "    --font-body-weight: heavy;\n"
         "}\n"
         "TextBlock#Title { font-role: title; }\n"
-        "TextBlock { font-family: var(--font-texte); }\n"
+        "TextBlock { font-family: var(--font-text); }\n"
         "Grid { font-role: nothing; }\n";
     th::Theme theme = Load(files);
 
-    std::optional<th::FontStyle> title = th::ResolveFontRole(&theme, "titre");
+    std::optional<th::FontStyle> title = th::ResolveFontRole(&theme, "title");
     CHECK(title.has_value());
     if (title) {
         CHECK(title->role == "title");
@@ -1421,7 +1421,7 @@ TEST_CASE(Fonts_RolesFromRootBlockAndDefaults) {
     }
     CHECK(titleParts == 3);
     CHECK(!ProblemContaining(theme, "--font-body-weight").empty());
-    CHECK(!ProblemContaining(theme, "rôle de police « nothing » inconnu").empty());
+    CHECK(!ProblemContaining(theme, "font role \"nothing\" is unknown").empty());
 
     std::optional<ampify::Json> json = ampify::Json::Parse(th::FontRolesJson(&theme));
     CHECK(json.has_value());
@@ -1442,12 +1442,12 @@ TEST_CASE(Snippets_LoadWithTheColoursOfTheTheme) {
 
     MemoryFiles files;
     files.files["colors.ini"] = "[Base]\nAccent = 00FF00\n";
-    files.files["resources.xaml"] = "<ResourceDictionary xmlns=\"x\">\n  <!-- rien -->\n</ResourceDictionary>";
+    files.files["resources.xaml"] = "<ResourceDictionary xmlns=\"x\">\n  <!-- nothing -->\n</ResourceDictionary>";
     files.files["user.css"] = "Page { background: $Accent; }\nTextBlock { font-role: title; }\n";
     th::Theme snippet = LoadSnippetFrom(files, "s1", &theme);
     CHECK(snippet.usable);
     CHECK(snippet.resourceDictionary.empty());  // an empty dictionary is not merged
-    CHECK(!ProblemContaining(snippet, "colors.ini ignoré").empty());
+    CHECK(!ProblemContaining(snippet, "colors.ini ignored").empty());
     CHECK(!snippet.assignments.empty());
     if (!snippet.assignments.empty()) {
         CHECK(snippet.assignments[0].value.text == "#FFFF0000");  // the theme's colour
@@ -1457,7 +1457,7 @@ TEST_CASE(Snippets_LoadWithTheColoursOfTheTheme) {
 
     // Without a theme, $names have nothing to read.
     th::Theme alone = LoadSnippetFrom(files, "s1", nullptr);
-    CHECK(!ProblemContaining(alone, "absente de [colors]").empty());
+    CHECK(!ProblemContaining(alone, "is not in [colors]").empty());
 
     MemoryFiles refused;
     refused.files["resources.xaml"] = "<ResourceDictionary><X x:Key=\"Secret\"/></ResourceDictionary>";
@@ -1491,7 +1491,7 @@ TEST_CASE(Snippets_EnabledInIdOrderAndDictionariesCombined) {
     std::string folder = TempFolder("snippet-list");
     WriteFile(std::filesystem::path(folder) / "b" / "user.css", "Page { opacity: 1; }");
     WriteFile(std::filesystem::path(folder) / "a" / "resources.xaml", "<ResourceDictionary/>");
-    WriteFile(std::filesystem::path(folder) / "c" / "notes.txt", "pas un snippet");
+    WriteFile(std::filesystem::path(folder) / "c" / "notes.txt", "not a snippet");
     CHECK((th::ListSnippetFolders(folder) == std::vector<std::string>{"a", "b"}));
 }
 
@@ -1517,7 +1517,7 @@ TEST_CASE(Snippets_BeatTheThemeInIdOrder) {
     engine.Apply(composed, tree);
     CHECK(tree.elements[1].properties["Background"].text == "#FF222222");  // a snippet type beats a theme #name
     CHECK(tree.elements[0].properties["Background"].text == "#FF303030");  // b comes after a
-    CHECK(log.str().find("(snippets/b/user.css ligne 1)") != std::string::npos);
+    CHECK(log.str().find("(snippets/b/user.css line 1)") != std::string::npos);
 }
 
 TEST_CASE(Session_SnippetsComeAndGoWithoutTouchingTheTheme) {
@@ -1527,7 +1527,7 @@ TEST_CASE(Session_SnippetsComeAndGoWithoutTouchingTheTheme) {
 
     MemoryFiles snippetFiles;
     snippetFiles.files["user.css"] = "Page { background: #FF999999; }\n#Hide { visibility: collapsed; }\nGrid { bad: 1; }\n";
-    auto snippet = Shared(LoadSnippetFrom(snippetFiles, "calme", theme.get()));
+    auto snippet = Shared(LoadSnippetFrom(snippetFiles, "calm", theme.get()));
 
     FakeTree tree = MakePage();
     std::ostringstream log;
@@ -1542,10 +1542,10 @@ TEST_CASE(Session_SnippetsComeAndGoWithoutTouchingTheTheme) {
     session.Tick(tree, request);
     CHECK(tree.elements[0].properties["Background"].text == "#FF999999");
     CHECK(tree.elements[4].properties["Visibility"].text == "Collapsed");
-    CHECK(log.str().find("Snippet « calme » chargé") != std::string::npos);
-    CHECK(log.str().find("Snippet « calme » : snippets/calme/user.css ligne 3 : propriété « bad » inconnue") !=
+    CHECK(log.str().find("Snippet \"calm\" loaded") != std::string::npos);
+    CHECK(log.str().find("Snippet \"calm\": snippets/calm/user.css line 3: property \"bad\" is unknown") !=
           std::string::npos);
-    CHECK(session.Applied() && session.Applied()->name == "test + calme");
+    CHECK(session.Applied() && session.Applied()->name == "test + calm");
 
     // The snippet is switched off: the worker sends a new generation without it.
     request.snippets.clear();
@@ -1570,29 +1570,29 @@ TEST_CASE(Session_SnippetsComeAndGoWithoutTouchingTheTheme) {
 }
 
 TEST_CASE(Scheme_ScheduleParsesAndPicksByTime) {
-    th::Schedule schedule = th::ParseSchedule("19:00=Dark, 7:00=Light; bad, 25:00=X, 12:30=, 07:00=Clair");
+    th::Schedule schedule = th::ParseSchedule("19:00=Dark, 7:00=Light; bad, 25:00=X, 12:30=, 07:00=Day");
     CHECK(schedule.entries.size() == 2);
     CHECK(schedule.problems.size() == 4);  // bad, 25:00, 12:30= and 07:00 given twice
     if (schedule.entries.size() == 2) {
         CHECK(schedule.entries[0].minute == 7 * 60);
-        CHECK(schedule.entries[0].scheme == "Clair");  // the last 07:00 counts
+        CHECK(schedule.entries[0].scheme == "Day");  // the last 07:00 counts
     }
     CHECK(th::ScheduledScheme(schedule, 6 * 60 + 59) == "Dark");  // the evening entry still holds before 07:00
-    CHECK(th::ScheduledScheme(schedule, 7 * 60) == "Clair");
-    CHECK(th::ScheduledScheme(schedule, 18 * 60 + 59) == "Clair");
+    CHECK(th::ScheduledScheme(schedule, 7 * 60) == "Day");
+    CHECK(th::ScheduledScheme(schedule, 18 * 60 + 59) == "Day");
     CHECK(th::ScheduledScheme(schedule, 23 * 60 + 59) == "Dark");
     CHECK(th::ScheduledScheme(th::ParseSchedule(""), 600).empty());
 }
 
 TEST_CASE(Scheme_SystemModePicksByName) {
     CHECK(th::SystemScheme({"Base", "Dark"}, true) == "Dark");
-    CHECK(th::IsDarkScheme("Dark") && th::IsDarkScheme("Nuit") && th::IsDarkScheme("Midnight sombre"));
+    CHECK(th::IsDarkScheme("Dark") && th::IsDarkScheme("Night") && th::IsDarkScheme("Midnight dark"));
     CHECK(!th::IsDarkScheme("Base") && !th::IsDarkScheme("Light") && !th::IsDarkScheme(""));
     CHECK(th::SystemScheme({"Base", "Dark"}, false) == "Base");
-    CHECK(th::SystemScheme({"Sombre", "Clair"}, false) == "Clair");
-    CHECK(th::SystemScheme({"Sombre", "Clair"}, true) == "Sombre");
+    CHECK(th::SystemScheme({"Dark", "Light"}, false) == "Light");
+    CHECK(th::SystemScheme({"Dark", "Light"}, true) == "Dark");
     CHECK(th::SystemScheme({"MidnightDark", "DayLight"}, false) == "DayLight");
-    CHECK(th::SystemScheme({"Nuit", "Jour"}, false) == "Jour");
+    CHECK(th::SystemScheme({"Night", "Day"}, false) == "Day");
     CHECK(th::SystemScheme({"Only"}, true).empty());
     CHECK(th::SystemScheme({}, false).empty());
 }
@@ -1601,15 +1601,15 @@ TEST_CASE(Scheme_ChoosePrefersTheScheduleThenAutoThenTheName) {
     std::vector<std::string> schemes{"Light", "Dark"};
     th::SchemeChoice choice = th::ChooseScheme("auto", "", schemes, {true, 600});
     CHECK(choice.scheme == "Dark");
-    CHECK(choice.reason == "mode sombre de Windows");
+    CHECK(choice.reason == "Windows dark mode");
 
     choice = th::ChooseScheme("Dark", "07:00=Light,19:00=Dark", schemes, {true, 12 * 60});
     CHECK(choice.scheme == "Light");
-    CHECK(choice.reason == "horaire 07:00");
+    CHECK(choice.reason == "schedule 07:00");
 
     choice = th::ChooseScheme("", "07:00=auto,22:00=Dark", schemes, {false, 9 * 60});
     CHECK(choice.scheme == "Light");
-    CHECK(choice.reason == "horaire 07:00, mode clair de Windows");
+    CHECK(choice.reason == "schedule 07:00, Windows light mode");
 
     choice = th::ChooseScheme("dark", "", schemes, {false, 0});
     CHECK(choice.scheme == "Dark");  // the name as colors.ini writes it
@@ -1647,7 +1647,7 @@ TEST_CASE(Worker_ReloadsOnlyWhenSomethingChanges) {
     std::filesystem::path kit(TempFolder("worker"));
     WriteFile(kit / "themes" / "midnight" / "colors.ini", "[Light]\nA = FFFFFF\n\n[Dark]\nA = 000000\n");
     WriteFile(kit / "themes" / "midnight" / "user.css", "Page { background: $A; }\n");
-    WriteFile(kit / "snippets" / "calme" / "user.css", "Page { opacity: 0.5; }\n");
+    WriteFile(kit / "snippets" / "calm" / "user.css", "Page { opacity: 0.5; }\n");
 
     ampify::Settings settings;
     settings.Set("theme.active", "midnight");
@@ -1657,7 +1657,7 @@ TEST_CASE(Worker_ReloadsOnlyWhenSomethingChanges) {
     worker.SetSystemDark(true);
     th::SessionRequest first = worker.Tick(settings, 600);
     CHECK(first.theme && first.theme->scheme == "Dark");
-    CHECK(first.schemeReason == "mode sombre de Windows");
+    CHECK(first.schemeReason == "Windows dark mode");
     CHECK(first.snippets.empty());
     CHECK(!first.layout);
 
@@ -1674,9 +1674,9 @@ TEST_CASE(Worker_ReloadsOnlyWhenSomethingChanges) {
     th::SessionRequest evening = worker.Tick(settings, 20 * 60);
     CHECK(evening.generation == light.generation + 1);
     CHECK(evening.theme && evening.theme->scheme == "Dark");
-    CHECK(evening.schemeReason == "horaire 19:00");
+    CHECK(evening.schemeReason == "schedule 19:00");
 
-    settings.Set("snippets.calme.enabled", "1");
+    settings.Set("snippets.calm.enabled", "1");
     th::SessionRequest withSnippet = worker.Tick(settings, 20 * 60);
     CHECK(withSnippet.generation == evening.generation + 1);
     CHECK(withSnippet.snippets.size() == 1);
@@ -1756,7 +1756,7 @@ TEST_CASE(Session_SidebarJsonHidesAndReordersThenRestores) {
     session.Tick(tree, request);
     CHECK((tree.Names() == std::vector<std::string>{"Radio", "Home", "Browse"}));
     CHECK(tree.items[2].visibility.text == "Collapsed");
-    CHECK(log.str().find("(sidebar.json ligne 3)") != std::string::npos);
+    CHECK(log.str().find("(sidebar.json line 3)") != std::string::npos);
 
     th::SessionRequest none;
     none.generation = 2;
@@ -1782,7 +1782,7 @@ TEST_CASE(Inspector_ExportsTheTreeAsJson) {
     std::optional<ampify::Json> json = ampify::Json::Parse(text, &error);
     CHECK(json.has_value());
     if (!json) {
-        ampify::test::ReportFailure(__FILE__, __LINE__, "inspector.json : " + error);
+        ampify::test::ReportFailure(__FILE__, __LINE__, "inspector.json: " + error);
         return;
     }
     CHECK(!*json->Find("truncated")->AsBool());
@@ -1842,7 +1842,7 @@ TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
             ampify::ParseManifest(manifest.value_or(""), name, 1, [&](const std::string& file) { return files.Exists(file); });
         CHECK(result.manifest.has_value() && result.manifest->kind == ampify::ElementKind::Snippet);
         for (const std::string& error : result.errors) {
-            ampify::test::ReportFailure(__FILE__, __LINE__, "snippet " + name + " manifest : " + error);
+            ampify::test::ReportFailure(__FILE__, __LINE__, "snippet " + name + " manifest: " + error);
         }
     }
 }
@@ -1867,23 +1867,23 @@ TEST_CASE(Properties_GradientsImagesAndAcrylic) {
     CHECK(Converted("color", "linear-gradient(to top right, #000, #FFF)", palette, files) ==
           "0,1,1,0;#FF000000@0;#FFFFFFFF@1");
     CHECK(Converted("background", "linear-gradient(45deg, #000 60%, #FFF 20%)", palette, files).ends_with("@0.6;#FFFFFFFF@0.6"));
-    CHECK(Converted("background", "linear-gradient(90deg, #000)", palette, files).find("deux couleurs") != std::string::npos);
+    CHECK(Converted("background", "linear-gradient(90deg, #000)", palette, files).find("two colors") != std::string::npos);
     CHECK(Converted("background", "linear-gradient(1turn, #000, #FFF)", palette, files).find("angle") != std::string::npos);
     CHECK(Converted("background", "linear-gradient(#000 150%, #FFF)", palette, files).find("position") != std::string::npos);
-    CHECK(Converted("background", "linear-gradient(#000, $Missing)", palette, files).find("absente") != std::string::npos);
+    CHECK(Converted("background", "linear-gradient(#000, $Missing)", palette, files).find("is not in [colors]") != std::string::npos);
     CHECK(Converted("background", "linear-gradient(to middle, #000, #FFF)", palette, files).rfind("PROBLEM", 0) == 0);
 
     CHECK(Converted("background", "url(images/bg.png) cover", palette, files) == "C:/themes/test/images/bg.png|UniformToFill");
     CHECK(Converted("background", "url(images/bg.png) contain", palette, files) == "C:/themes/test/images/bg.png|Uniform");
     CHECK(Converted("background", "url('images/bg.png') FILL", palette, files) == "C:/themes/test/images/bg.png|Fill");
-    CHECK(Converted("background", "url(images/bg.png) tile", palette, files).find("ajustement") != std::string::npos);
-    CHECK(Converted("background", "url(../bg.png) cover", palette, files).find("non autorisé") != std::string::npos);
+    CHECK(Converted("background", "url(images/bg.png) tile", palette, files).find("image fit") != std::string::npos);
+    CHECK(Converted("background", "url(../bg.png) cover", palette, files).find("not allowed") != std::string::npos);
 
     CHECK(th::FindProperty("backdrop")->xaml == "Background");
     CHECK(Converted("backdrop", "acrylic(#1C1C1E, 0.6)", palette, files) == "#FF1C1C1E;0.6");
     CHECK(Converted("backdrop", "acrylic($accent, 1)", palette, files) == "#FFFA2D48;1");
-    CHECK(Converted("backdrop", "acrylic(#1C1C1E, 1.5)", palette, files).find("hors de 0 à 1") != std::string::npos);
-    CHECK(Converted("backdrop", "acrylic(#1C1C1E)", palette, files).find("deux valeurs") != std::string::npos);
+    CHECK(Converted("backdrop", "acrylic(#1C1C1E, 1.5)", palette, files).find("outside 0 to 1") != std::string::npos);
+    CHECK(Converted("backdrop", "acrylic(#1C1C1E)", palette, files).find("two values") != std::string::npos);
     CHECK(Converted("backdrop", "#1C1C1E", palette, files).find("acrylic(") != std::string::npos);
 }
 
@@ -1903,11 +1903,11 @@ TEST_CASE(Properties_LayoutTransformsShadowsAndFonts) {
     CHECK(th::FindProperty("z-index")->xaml == "Canvas.ZIndex");
     CHECK(Converted("grid-row", "2", palette, files) == "2");
     CHECK(Converted("grid-column", "0", palette, files) == "0");
-    CHECK(Converted("grid-row", "-1", palette, files).find("commence à 0") != std::string::npos);
-    CHECK(Converted("grid-column-span", "0", palette, files).find("commence à 1") != std::string::npos);
+    CHECK(Converted("grid-row", "-1", palette, files).find("starts at 0") != std::string::npos);
+    CHECK(Converted("grid-column-span", "0", palette, files).find("starts at 1") != std::string::npos);
     CHECK(Converted("grid-row-span", "3", palette, files) == "3");
     CHECK(Converted("z-index", "-5", palette, files) == "-5");
-    CHECK(Converted("z-index", "1.5", palette, files).find("entier") != std::string::npos);
+    CHECK(Converted("z-index", "1.5", palette, files).find("whole number") != std::string::npos);
 
     // CompositeTransform: scaleX, scaleY, rotation, translateX, translateY.
     CHECK(Converted("transform", "scale(1.05)", palette, files) == "1.05,1.05,0,0,0");
@@ -1915,8 +1915,8 @@ TEST_CASE(Properties_LayoutTransformsShadowsAndFonts) {
     CHECK(Converted("transform", "translateY(8px) scaleX(2)", palette, files) == "2,1,0,0,8");
     CHECK(Converted("transform", "rotate(10deg) rotate(5deg)", palette, files) == "1,1,15,0,0");
     CHECK(Converted("transform", "none", palette, files) == "1,1,0,0,0");
-    CHECK(Converted("transform", "skew(4deg)", palette, files).find("inconnue") != std::string::npos);
-    CHECK(Converted("transform", "rotate(5)", palette, files).find("degrés") != std::string::npos);
+    CHECK(Converted("transform", "skew(4deg)", palette, files).find("unknown") != std::string::npos);
+    CHECK(Converted("transform", "rotate(5)", palette, files).find("degrees") != std::string::npos);
     CHECK(Converted("transform", "scale(1.05", palette, files).rfind("PROBLEM", 0) == 0);
 
     CHECK(Converted("transform-origin", "50% 50%", palette, files) == "0.5,0.5");
@@ -1925,13 +1925,26 @@ TEST_CASE(Properties_LayoutTransformsShadowsAndFonts) {
     CHECK(Converted("transform-origin", "right", palette, files) == "1,0.5");
     CHECK(Converted("transform-origin", "bottom", palette, files) == "0.5,1");
     CHECK(Converted("transform-origin", "25% 100%", palette, files) == "0.25,1");
-    CHECK(Converted("transform-origin", "10px 5px", palette, files).find("origine") != std::string::npos);
+    CHECK(Converted("transform-origin", "10px 5px", palette, files).find("origin") != std::string::npos);
     CHECK(Converted("transform-origin", "left right", palette, files).rfind("PROBLEM", 0) == 0);
+
+    // transition: the animated properties and their duration in milliseconds, transform first, then opacity, then
+    // background; the easing words are accepted and ignored.
+    CHECK(Converted("transition", "transform 200ms", palette, files) == "transform:200");
+    CHECK(Converted("transition", "opacity .15s ease, background 300ms", palette, files) == "opacity:150;background:300");
+    CHECK(Converted("transition", "all 250ms ease-out", palette, files) == "transform:250;opacity:250;background:250");
+    CHECK(Converted("transition", "background 0.2s, transform 120ms linear", palette, files) ==
+          "transform:120;background:200");
+    CHECK(Converted("transition", "none", palette, files).empty());
+    CHECK(Converted("transition", "color 200ms", palette, files).find("transform, opacity, background") !=
+          std::string::npos);
+    CHECK(Converted("transition", "transform", palette, files).find("duration") != std::string::npos);
+    CHECK(Converted("transition", "opacity 9s", palette, files).find("5 s") != std::string::npos);
 
     CHECK(Converted("box-shadow", "16px", palette, files) == "16");
     CHECK(Converted("box-shadow", "none", palette, files) == "0");
-    CHECK(Converted("box-shadow", "200", palette, files).find("0 à 100") != std::string::npos);
-    CHECK(Converted("box-shadow", "0 4px 8px #000", palette, files).find("profondeur") != std::string::npos);
+    CHECK(Converted("box-shadow", "200", palette, files).find("0 to 100") != std::string::npos);
+    CHECK(Converted("box-shadow", "0 4px 8px #000", palette, files).find("depth") != std::string::npos);
 
     // Four corners, in CSS order (top-left, top-right, bottom-right, bottom-left), kept as bottom-left first.
     CHECK(Converted("corner-radius", "8 8 0 0", palette, files) == "0,8,8,0");
@@ -1940,14 +1953,14 @@ TEST_CASE(Properties_LayoutTransformsShadowsAndFonts) {
           "file:///C:/themes/test/fonts/Inter.ttf#Inter Display");
     CHECK(Converted("font-family", "url(\"fonts/Inter.ttf#Inter\")", palette, files) ==
           "file:///C:/themes/test/fonts/Inter.ttf#Inter");
-    CHECK(Converted("font-family", "url(fonts/Inter.ttf)", palette, files).find("nom de famille") != std::string::npos);
-    CHECK(Converted("font-family", "url(fonts/Inter.woff#Inter)", palette, files).find("ttf, otf ou ttc") != std::string::npos);
-    CHECK(Converted("font-family", "url(../Inter.ttf#Inter)", palette, files).find("non autorisé") != std::string::npos);
-    CHECK(Converted("font-family", "url(fonts/Absent.otf#Absent)", palette, files).find("introuvable") != std::string::npos);
+    CHECK(Converted("font-family", "url(fonts/Inter.ttf)", palette, files).find("family name") != std::string::npos);
+    CHECK(Converted("font-family", "url(fonts/Inter.woff#Inter)", palette, files).find("ttf, otf or ttc") != std::string::npos);
+    CHECK(Converted("font-family", "url(../Inter.ttf#Inter)", palette, files).find("not allowed") != std::string::npos);
+    CHECK(Converted("font-family", "url(fonts/Absent.otf#Absent)", palette, files).find("not found") != std::string::npos);
 
     th::ValueContext noAssets{palette, files, "C:/themes/test", false};
     th::Conversion refused = th::ConvertValue(*th::FindProperty("font-family"), "url(fonts/Inter.ttf#Inter)", noAssets);
-    CHECK(!refused.value && refused.problem.find("polices désactivées") != std::string::npos);
+    CHECK(!refused.value && refused.problem.find("fonts are turned off") != std::string::npos);
 
     // A font role can point at a font of the theme too.
     files.files["user.css"] = ":root { --font-title: url(fonts/Inter.ttf#Inter); }\nTextBlock { font-role: title; }\n";
@@ -1974,7 +1987,7 @@ TEST_CASE(Css_HoverOnTheLastPartOnly) {
     MemoryFiles files;
     files.files["user.css"] = "Button, Button:hover { order: 1; opacity: 0.5; }\n";
     th::Theme theme = Load(files);
-    CHECK(!ProblemContaining(theme, "impossible sous :hover").empty());
+    CHECK(!ProblemContaining(theme, "not possible under :hover").empty());
     CHECK(theme.assignments.size() == 3);  // order and opacity for Button, opacity only for Button:hover
 }
 
@@ -2016,7 +2029,7 @@ TEST_CASE(Engine_HoverShowsUnderThePointerAndRestores) {
     CHECK(tree.handlersAttached == 1);
     CHECK(tree.Shown(2, "Background").text == "#FF111111");
     CHECK(tree.Shown(2, "RenderTransform").text == "handle:1");
-    CHECK(log.str().find("Survol : Button#Play") != std::string::npos);
+    CHECK(log.str().find("Hover: Button#Play") != std::string::npos);
 
     tree.PointerEnter(2);
     CHECK(tree.Shown(2, "Background").text == "#FF222222");

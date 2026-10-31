@@ -4,7 +4,7 @@
 //
 // NOT COMPILED IN THE CURRENT BUILD. It needs the Windows App SDK C++/WinRT headers, so it is built only when
 // AMPIFY_WITH_XAML is defined (see CMakeLists.txt). Every member must be called on the interface thread, through
-// PostToUiThread (ui_thread.hpp, DispatcherQueue of the main window). Nothing here has run against Apple Music yet: see docs/tests/M8-themes.md.
+// PostToUiThread (ui_thread.hpp, DispatcherQueue of the main window). Nothing here has run against Apple Music yet: see docs/development/testing-on-a-pc.md.
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 // ComboBox inherits SelectedItem and SelectionChanged from Selector, declared in Primitives. Without this include,
@@ -62,6 +63,12 @@ public:
     // True once the main window has closed: Apple Music is shutting down and its tree must not be touched any more.
     bool WindowClosed() const { return *m_closed; }
 
+    // Runs `pass` on the interface thread soon after the interface may hold new elements: a page navigated
+    // (Frame.Navigated, then twice more while the page fills in), rows or cards realised while scrolling
+    // (ListViewBase.ContainerContentChanging, ItemsRepeater.ElementPrepared). A burst of events makes one pass. Snapshot
+    // follows each such element once, so a theme reaches new content without waiting for the next tick.
+    void WatchChanges(std::function<void()> pass);
+
 private:
     winrt::Microsoft::UI::Xaml::DependencyObject Resolve(theme::NodeId id) const;
 
@@ -73,7 +80,7 @@ private:
     theme::Value Keep(winrt::Windows::Foundation::IInspectable object);
     winrt::Windows::Foundation::IInspectable Restore(const theme::Value& token) const;
 
-    // An object the kit made from a value (a gradient, an image or acrylic brush, a transform, a shadow) reads back as
+    // An object Ampify made from a value (a gradient, an image or acrylic brush, a transform, a shadow) reads back as
     // that value while the element still holds it: the next tick then finds the value in place and writes nothing.
     void Remember(theme::NodeId id, std::string_view property, const theme::Value& value,
                   winrt::Windows::Foundation::IInspectable object);
@@ -85,6 +92,13 @@ private:
     void FollowArtwork(const winrt::Microsoft::UI::Xaml::Media::ImageSource& artwork);
 
     void OnPointer(theme::NodeId id, bool entered) noexcept;
+    void Watch(const winrt::Microsoft::UI::Xaml::DependencyObject& object, theme::NodeId id, const std::string& type);
+    bool WriteTransition(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                         const theme::Value& value);
+    bool WriteAnimatedTransform(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element,
+                                const theme::Value& value);
+    void SchedulePass(int followUps) noexcept;
+    void RunPass() noexcept;
     void RemoveHoverHandlers(theme::NodeId id);
 
     winrt::weak_ref<winrt::Microsoft::UI::Xaml::Window> m_window;
@@ -115,9 +129,28 @@ private:
     std::map<std::string, theme::Value> m_addedKeys;  // keys added on top of the theme dictionaries, with the value before
     bool m_resourcesDirty = false;  // a resource changed: {ThemeResource} references must be resolved again
     // `background: artwork`: the image Apple Music shows for the song playing (Image#StaticArtwork in its play bar),
-    // found again on each snapshot, and the brushes the kit made from it, which follow it when the song changes.
+    // found again on each snapshot, and the brushes Ampify made from it, which follow it when the song changes.
     winrt::Microsoft::UI::Xaml::Media::ImageSource m_artwork{nullptr};
     std::vector<winrt::Microsoft::UI::Xaml::Media::ImageBrush> m_artworkBrushes;
+    // WatchChanges: the pass to run, the elements followed (frames and lists), the timer that groups their events, and
+    // the passes still due after a navigation.
+    std::function<void()> m_pass;
+    std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_watched;
+    winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_passTimer{nullptr};
+    int m_followUps = 0;
+    // `transition`: the text written to each element, the transitions it had before (put back when the text goes
+    // empty), and, for an element whose transform animates, the transform shown through UIElement.Scale, Rotation and
+    // Translation (which XAML animates by itself) instead of RenderTransform.
+    struct TransitionOriginals {
+        winrt::Microsoft::UI::Xaml::ScalarTransition opacity{nullptr};
+        winrt::Microsoft::UI::Xaml::BrushTransition background{nullptr};
+        winrt::Microsoft::UI::Xaml::Vector3Transition scale{nullptr};
+        winrt::Microsoft::UI::Xaml::ScalarTransition rotation{nullptr};
+        winrt::Microsoft::UI::Xaml::Vector3Transition translation{nullptr};
+    };
+    std::map<theme::NodeId, std::string> m_transitions;
+    std::map<theme::NodeId, TransitionOriginals> m_transitionOriginals;
+    std::map<theme::NodeId, std::string> m_facadeTransforms;
 };
 
 }  // namespace ampify::win

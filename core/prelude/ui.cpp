@@ -9,13 +9,13 @@ const char kUi[] = R"AMPIFYJS(
 
   const treeText = (vue) => {
     const json = JSON.stringify(vue);
-    if (json === undefined) throw new TypeError("l'interface doit être un objet");
+    if (json === undefined) throw new TypeError("the interface must be an object");
     return json;
   };
 
   const addControl = (placement, options) => {
     const note = options || {};
-    if (typeof note.onClick !== "function") throw new TypeError("ui : onClick attend une fonction");
+    if (typeof note.onClick !== "function") throw new TypeError("ui: onClick expects a function");
     const label = note.label === undefined ? "" : text(note.label);
     const icon = typeof note.icon === "string" ? note.icon : "";
     const id = native.uiControl(placement, label, icon);
@@ -26,9 +26,10 @@ const char kUi[] = R"AMPIFYJS(
   Ampify.ui = Object.freeze({
     topbar: Object.freeze({ addButton: (options) => addControl("topbar", options) }),
     playbar: Object.freeze({ addButton: (options) => addControl("playbar", options) }),
+    sidebar: Object.freeze({ addItem: (options) => addControl("sidebar", options) }),
     menu: Object.freeze({
       addItem(kind, options) {
-        if (kind !== "context" && kind !== "app") throw new RangeError('menu.addItem attend "context" ou "app"');
+        if (kind !== "context" && kind !== "app") throw new RangeError('menu.addItem expects "context" or "app"');
         return addControl("menu-" + kind, options);
       },
     }),
@@ -41,7 +42,7 @@ const char kUi[] = R"AMPIFYJS(
 
   dispatch.click = (id) => {
     const fn = uiCallbacks.get(id);
-    if (fn) runGuarded("bouton " + id, fn, []);
+    if (fn) runGuarded("button " + id, fn, []);
   };
 )AMPIFYJS";
 

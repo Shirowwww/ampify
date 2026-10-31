@@ -45,7 +45,7 @@ std::string Utf8(const winrt::hstring& text) {
     return winrt::to_string(text);
 }
 
-// Loads a small piece of XAML written by the kit (never text of an extension, except path data checked by
+// Loads a small piece of XAML written by Ampify (never text of an extension, except path data checked by
 // ParseSvgIcon). Null when the reader refuses it, for example when a theme resource is missing.
 template <typename T>
 T LoadXaml(const std::wstring& text) noexcept {
@@ -182,7 +182,7 @@ struct XamlRenderer::Callbacks {
 struct XamlRenderer::Mounted {
     std::string type;
     bool grid = false;  // a row drawn as a Grid of 2 columns
-    // All strong: in Apple Music a weak reference to a XAML object the kit made never resolves, even while the object
+    // All strong: in Apple Music a weak reference to a XAML object Ampify made never resolves, even while the object
     // is on screen (seen on 1.1792: the slot of a panel was lost right after it was made). The renderer is released
     // on the interface thread with its surface, and no handler holds these objects, so there is no cycle.
     xaml::FrameworkElement outer{nullptr};    // what the parent holds
@@ -482,6 +482,9 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
         toggle.HorizontalAlignment(xaml::HorizontalAlignment::Right);
         toggle.MinWidth(0);
         controls::Grid::SetColumn(toggle, 1);
+        // Ampify speaks English: without this, Windows names the states in its own language.
+        toggle.OnContent(winrt::box_value(L"On"));
+        toggle.OffContent(winrt::box_value(L"Off"));
         grid.Children().Append(label);
         grid.Children().Append(toggle);
         toggle.Toggled([callbacks](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
@@ -551,7 +554,7 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
     std::string name = uirender::ElementName(m_elementId, node.id);
     control.Name(Wide(name));
     automation::AutomationProperties::SetAutomationId(control, Wide(name));
-    if (outer != control) outer.Name(Wide(name + "_cadre"));
+    if (outer != control) outer.Name(Wide(name + "_frame"));
 
     SetAttributes(mounted, node, probe);
     if (node.type == "dropdown") {

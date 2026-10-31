@@ -5,9 +5,9 @@
   "version": "1.0.0",
   "kind": "app",
   "author": "Shirowwww",
-  "description": "Installer, retirer et choisir thèmes, schémas, extensions et apps du kit, sans quitter Apple Music.",
+  "description": "Install, remove and choose Ampify themes, schemes, extensions and apps, without leaving Apple Music.",
   "kitApi": "1.0",
   "main": "main.js",
   "icon": "icon.svg",
-  "permissions": ["kit.manage", "ui.page", "ui.topbar", "ui.window"]
+  "permissions": ["kit.manage", "ui.page", "ui.sidebar", "ui.window"]
 }

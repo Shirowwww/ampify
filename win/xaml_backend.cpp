@@ -1,11 +1,12 @@
 // NOT COMPILED IN THE CURRENT BUILD: see xaml_backend.hpp. Written against the C++/WinRT projection of the Windows App SDK.
-// The API names below are the ones documented for WinUI 3; each one is listed in docs/tests/M8-themes.md to check on the PC.
+// The API names below are the ones documented for WinUI 3; each one is listed in docs/development/testing-on-a-pc.md to check on the PC.
 
 #if defined(AMPIFY_WITH_XAML)
 
 #include "xaml_backend.hpp"
 
 #include <cctype>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <limits>
@@ -19,6 +20,7 @@
 
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
+#include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.UI.h>
@@ -344,7 +346,7 @@ media::Brush XamlTreeBackend::ArtworkBrush(const std::string& text) {
 }
 
 // Gives the brushes of `background: artwork` the image of the song playing, and lets go of those no element holds
-// any more (the theme was removed). Strong references: weak ones to what the kit made never resolve in Apple Music.
+// any more (the theme was removed). Strong references: weak ones to what Ampify made never resolve in Apple Music.
 void XamlTreeBackend::FollowArtwork(const media::ImageSource& artwork) {
     if (artwork) m_artwork = artwork;  // between two songs the image may be missing for a moment: keep the last one
     // COM identity: the brush is stored as a Brush, an interface pointer other than the ImageBrush one.
@@ -410,6 +412,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         int index = static_cast<int>(nodes.size());
         nodes.push_back(node);
         m_elements.emplace(node.id, winrt::weak_ref<xaml::DependencyObject>(item.object));
+        if (m_pass) Watch(item.object, node.id, node.type);
 
         int count = media::VisualTreeHelper::GetChildrenCount(item.object);
         for (int i = count - 1; i >= 0; i--) {
@@ -417,7 +420,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         }
     }
 
-    // What the kit remembers of destroyed elements cannot be used any more: a long session stays small.
+    // What Ampify remembers of destroyed elements cannot be used any more: a long session stays small.
     for (auto it = m_written.begin(); it != m_written.end();) {
         if (it->second.element.get()) {
             ++it;
@@ -427,6 +430,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         it = m_written.erase(it);
     }
     FollowArtwork(artwork);
+    std::erase_if(m_watched, [](const auto& entry) { return !entry.second.get(); });
     for (auto it = m_hoverHandlers.begin(); it != m_hoverHandlers.end();) {
         if (it->second.element.get()) {
             ++it;
@@ -436,6 +440,76 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         it = m_hoverHandlers.erase(it);
     }
     return nodes;
+}
+
+void XamlTreeBackend::WatchChanges(std::function<void()> pass) {
+    m_pass = std::move(pass);
+}
+
+void XamlTreeBackend::Watch(const xaml::DependencyObject& object, theme::NodeId id, const std::string& type) {
+    if (type != "Frame" && type != "ListView" && type != "GridView" && type != "ItemsRepeater") return;
+    if (auto known = m_watched.find(id); known != m_watched.end() && known->second.get() == object) return;
+    // The handlers run inside Apple Music's XAML: SchedulePass lets nothing escape, and the weak pointer makes them
+    // do nothing once the backend is gone, as for the hover handlers.
+    std::weak_ptr<bool> alive = m_alive;
+    try {
+        if (auto frame = object.try_as<controls::Frame>()) {
+            frame.Navigated([this, alive](IInspectable const&, auto const&) noexcept {
+                if (!alive.expired()) SchedulePass(2);
+            });
+        } else if (auto list = object.try_as<controls::ListViewBase>()) {
+            list.ContainerContentChanging([this, alive](auto const&, auto const&) noexcept {
+                if (!alive.expired()) SchedulePass(0);
+            });
+        } else if (auto repeater = object.try_as<controls::ItemsRepeater>()) {
+            repeater.ElementPrepared([this, alive](auto const&, auto const&) noexcept {
+                if (!alive.expired()) SchedulePass(0);
+            });
+        } else {
+            return;
+        }
+    } catch (...) {
+        return;
+    }
+    m_watched[id] = winrt::make_weak(object);
+}
+
+void XamlTreeBackend::SchedulePass(int followUps) noexcept {
+    // 60 ms groups the events of one scroll step or one page build; the follow-ups catch a page that fills in later
+    // (its data arrives after the navigation).
+    constexpr auto kSoon = std::chrono::milliseconds(60);
+    try {
+        if (*m_closed || !m_pass) return;
+        m_followUps = std::max(m_followUps, followUps);
+        if (!m_passTimer) {
+            xaml::Window window = m_window.get();
+            if (!window) return;
+            m_passTimer = window.DispatcherQueue().CreateTimer();
+            m_passTimer.IsRepeating(false);
+            std::weak_ptr<bool> alive = m_alive;
+            m_passTimer.Tick([this, alive](auto const&, auto const&) noexcept {
+                if (!alive.expired()) RunPass();
+            });
+        }
+        if (m_passTimer.IsRunning()) return;  // a pass is already due: this change rides along
+        m_passTimer.Interval(kSoon);
+        m_passTimer.Start();
+    } catch (...) {
+    }
+}
+
+void XamlTreeBackend::RunPass() noexcept {
+    constexpr auto kFollowUp = std::chrono::milliseconds(450);
+    try {
+        if (*m_closed || !m_pass) return;
+        m_pass();
+        if (m_followUps > 0 && m_passTimer) {
+            m_followUps--;
+            m_passTimer.Interval(kFollowUp);
+            m_passTimer.Start();
+        }
+    } catch (...) {
+    }
 }
 
 std::optional<theme::Value> XamlTreeBackend::Read(theme::NodeId id, std::string_view property) {
@@ -463,7 +537,7 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         }
         return kept;
     };
-    // A transform or a shadow: the value the kit wrote while the element still holds its object, a token otherwise.
+    // A transform or a shadow: the value Ampify wrote while the element still holds its object, a token otherwise.
     auto kept = [&](const IInspectable& value) -> theme::Value {
         if (std::optional<theme::Value> known = Recognize(id, property, value)) return *known;
         return Keep(value);
@@ -543,7 +617,15 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
     } else if (property == "Canvas.ZIndex") {
         if (auto element = object.try_as<xaml::UIElement>()) return number(controls::Canvas::GetZIndex(element));
     } else if (property == "RenderTransform") {
+        if (auto facade = m_facadeTransforms.find(id); facade != m_facadeTransforms.end()) {
+            return theme::Value{theme::ValueKind::Transform, facade->second};
+        }
         if (auto element = object.try_as<xaml::UIElement>()) return kept(element.RenderTransform());
+    } else if (property == "Transition") {
+        if (object.try_as<xaml::UIElement>()) {
+            auto known = m_transitions.find(id);
+            return theme::Value{theme::ValueKind::Transition, known == m_transitions.end() ? "" : known->second};
+        }
     } else if (property == "RenderTransformOrigin") {
         if (auto element = object.try_as<xaml::UIElement>()) {
             winrt::Windows::Foundation::Point origin = element.RenderTransformOrigin();
@@ -563,6 +645,108 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         }
     }
     return std::nullopt;
+}
+
+bool XamlTreeBackend::WriteTransition(theme::NodeId id, const xaml::DependencyObject& object, const theme::Value& value) {
+    auto element = object.try_as<xaml::UIElement>();
+    if (!element) return false;
+    auto span = [](double ms) {
+        return std::chrono::duration_cast<winrt::Windows::Foundation::TimeSpan>(
+            std::chrono::duration<double, std::milli>(ms));
+    };
+    // "transform:200;opacity:150;background:300": duration in ms by property.
+    std::map<std::string, double, std::less<>> durations;
+    for (const std::string& item : Split(value.text, ';')) {
+        size_t colon = item.find(':');
+        if (colon != std::string::npos) durations[item.substr(0, colon)] = std::atof(item.c_str() + colon + 1);
+    }
+    auto panel = object.try_as<controls::Panel>();
+    auto border = object.try_as<controls::Border>();
+    auto presenter = object.try_as<controls::ContentPresenter>();
+    try {
+        // The transitions Apple Music set come back when the theme stops animating this element.
+        auto [originals, first] = m_transitionOriginals.try_emplace(id);
+        if (first) {
+            originals->second.opacity = element.OpacityTransition();
+            originals->second.scale = element.ScaleTransition();
+            originals->second.rotation = element.RotationTransition();
+            originals->second.translation = element.TranslationTransition();
+            if (panel) originals->second.background = panel.BackgroundTransition();
+            else if (border) originals->second.background = border.BackgroundTransition();
+            else if (presenter) originals->second.background = presenter.BackgroundTransition();
+        }
+        const TransitionOriginals& before = originals->second;
+
+        xaml::ScalarTransition opacity = before.opacity;
+        if (auto ms = durations.find("opacity"); ms != durations.end()) {
+            opacity = xaml::ScalarTransition();
+            opacity.Duration(span(ms->second));
+        }
+        element.OpacityTransition(opacity);
+
+        xaml::BrushTransition background = before.background;
+        if (auto ms = durations.find("background"); ms != durations.end()) {
+            background = xaml::BrushTransition();
+            background.Duration(span(ms->second));
+        }
+        if (panel) panel.BackgroundTransition(background);
+        else if (border) border.BackgroundTransition(background);
+        else if (presenter) presenter.BackgroundTransition(background);
+
+        xaml::Vector3Transition scale = before.scale;
+        xaml::ScalarTransition rotation = before.rotation;
+        xaml::Vector3Transition translation = before.translation;
+        if (auto ms = durations.find("transform"); ms != durations.end()) {
+            scale = xaml::Vector3Transition();
+            scale.Duration(span(ms->second));
+            rotation = xaml::ScalarTransition();
+            rotation.Duration(span(ms->second));
+            translation = xaml::Vector3Transition();
+            translation.Duration(span(ms->second));
+        }
+        element.ScaleTransition(scale);
+        element.RotationTransition(rotation);
+        element.TranslationTransition(translation);
+    } catch (...) {
+        return false;  // an element Apple Music drives through its composition visual refuses these properties
+    }
+    if (value.text.empty()) {
+        m_transitions.erase(id);
+        m_transitionOriginals.erase(id);
+    } else {
+        m_transitions[id] = value.text;
+    }
+    return true;
+}
+
+// For an element whose transform animates: the transform goes to UIElement.Scale, Rotation and Translation, which
+// the transitions above animate, around the element's RenderTransformOrigin. A value from before the theme (Opaque)
+// animates back to no transform. False when the element refuses, and the caller writes RenderTransform instead.
+bool XamlTreeBackend::WriteAnimatedTransform(theme::NodeId id, const xaml::UIElement& element, const theme::Value& value) {
+    std::vector<double> parts{1, 1, 0, 0, 0};
+    if (value.kind == theme::ValueKind::Transform) {
+        parts = Numbers(value.text, ',');
+        if (parts.size() != 5) return false;
+    } else if (value.kind != theme::ValueKind::Opaque) {
+        return false;
+    }
+    try {
+        auto origin = element.RenderTransformOrigin();
+        auto size = element.ActualSize();
+        element.CenterPoint({size.x * origin.X, size.y * origin.Y, 0});
+        element.Scale({static_cast<float>(parts[0]), static_cast<float>(parts[1]), 1});
+        element.Rotation(static_cast<float>(parts[2]));
+        auto translation = element.Translation();
+        element.Translation({static_cast<float>(parts[3]), static_cast<float>(parts[4]), translation.z});
+    } catch (...) {
+        return false;
+    }
+    if (value.kind == theme::ValueKind::Transform) {
+        m_facadeTransforms[id] = value.text;
+    } else {
+        m_facadeTransforms.erase(id);
+    }
+    return true;
 }
 
 bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, const theme::Value& value) {
@@ -743,9 +927,18 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         return false;
     }
 
+    if (property == "Transition" && value.kind == theme::ValueKind::Transition) {
+        return WriteTransition(id, object, value);
+    }
+
     if (property == "RenderTransform") {
         auto element = object.try_as<xaml::UIElement>();
         if (!element) return false;
+        auto transition = m_transitions.find(id);
+        if (transition != m_transitions.end() && transition->second.find("transform:") != std::string::npos &&
+            WriteAnimatedTransform(id, element, value)) {
+            return true;
+        }
         if (value.kind == theme::ValueKind::Transform) {
             std::vector<double> parts = Numbers(value.text, ',');
             if (parts.size() != 5) return false;
@@ -939,7 +1132,7 @@ bool XamlTreeBackend::WriteResource(std::string_view key, const theme::Value& va
     std::string keyText(key);
     xaml::ResourceDictionary resources = xaml::Application::Current().Resources();
     IInspectable name = winrt::box_value(winrt::to_hstring(keyText));
-    // The value Apple Music had comes back: a key the kit added on top of the theme dictionaries is removed, so the
+    // The value Apple Music had comes back: a key Ampify added on top of the theme dictionaries is removed, so the
     // app's light and dark values work again, instead of the one read under the theme staying for good.
     if (auto added = m_addedKeys.find(keyText); added != m_addedKeys.end() && added->second == value) {
         m_addedKeys.erase(added);
@@ -1019,14 +1212,14 @@ bool XamlTreeBackend::EnsureSettingsSection(const std::vector<std::string>& them
     section.Name(L"AmpifyThemeSection");
 
     controls::TextBlock title;
-    title.Text(L"Thème (Ampify)");
+    title.Text(L"Ampify theme");
     section.Children().Append(title);
 
     controls::ComboBox choice;
     choice.Width(240);
     for (const std::string& name : themeNames) {
         controls::ComboBoxItem item;
-        item.Content(winrt::box_value(winrt::to_hstring(name.empty() ? std::string("Aucun") : name)));
+        item.Content(winrt::box_value(winrt::to_hstring(name.empty() ? std::string("None") : name)));
         item.Tag(winrt::box_value(winrt::to_hstring(name)));
         choice.Items().Append(item);
         if (name == activeName) choice.SelectedItem(item);

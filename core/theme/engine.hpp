@@ -73,8 +73,12 @@ private:
     std::vector<Move> m_moves;  // every change of position, in the order made
     std::map<NodeId, std::vector<HoverValue>> m_hovers;  // the :hover values the backend holds for each element
     std::string m_dictionary;  // the resource dictionary currently merged, empty when none
-    std::set<std::string> m_reported;  // refusals already written to the journal, so a timer does not repeat them
+    std::set<std::string> m_reported;  // refusals already written to the log, so a timer does not repeat them
     bool m_active = false;
+    // Passes since the theme was applied. The first one writes each value to the log; the later ones (page changes,
+    // rows realised while scrolling) only a summary, for the first few, so the log stays readable.
+    int m_passes = 0;
+    bool m_detailed = true;
 };
 
 }  // namespace ampify::theme

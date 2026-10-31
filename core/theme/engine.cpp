@@ -25,12 +25,51 @@ std::string Describe(const NodeInfo& node) {
     return text;
 }
 
+// The assignments grouped by the last compound of their selector (the element that receives them): by #name when it
+// has one, else by type, else in `any`. An element then only tries the groups of its own name and type, instead of
+// every rule of the theme: a pass over Apple Music's ~5000 elements stays short.
+struct RuleIndex {
+    std::map<std::string, std::vector<const Assignment*>, std::less<>> byName;
+    std::map<std::string, std::vector<const Assignment*>, std::less<>> byType;
+    std::vector<const Assignment*> any;
+
+    explicit RuleIndex(const std::vector<Assignment>& assignments) {
+        for (const Assignment& assignment : assignments) {
+            if (assignment.selector.parts.empty()) continue;
+            const Compound& last = assignment.selector.parts.back();
+            if (!last.name.empty()) {
+                byName[last.name].push_back(&assignment);
+            } else if (!last.type.empty()) {
+                byType[last.type].push_back(&assignment);
+            } else {
+                any.push_back(&assignment);
+            }
+        }
+    }
+
+    template <typename Visit>
+    void ForCandidates(const NodeInfo& node, Visit&& visit) const {
+        auto group = [&](const auto& map, const std::string& key) {
+            if (key.empty()) return;
+            if (auto it = map.find(key); it != map.end()) {
+                for (const Assignment* assignment : it->second) visit(*assignment);
+            }
+        };
+        group(byName, node.name);
+        group(byType, node.type);
+        if (node.fullType != node.type) group(byType, node.fullType);
+        for (const Assignment* assignment : any) visit(*assignment);
+    }
+};
+
 }  // namespace
 
 ThemeEngine::ThemeEngine(Journal& journal) : m_journal(journal) {}
 
 ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
     Report report;
+    m_detailed = m_passes == 0;
+    m_passes++;
     std::vector<NodeInfo> nodes = tree.Snapshot();
 
     // The originals of elements that have disappeared cannot be restored any more. Forget them, so a long session stays small.
@@ -47,10 +86,10 @@ ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
     ApplyAssignments(theme, tree, nodes, report);
     m_active = true;
 
-    if (report.applied > 0 || report.refused > 0) {
-        m_journal.Write("Thème « " + theme.name + " » : " + std::to_string(report.applied) + " valeur(s) appliquée(s), " +
-                        std::to_string(report.unchanged) + " déjà en place, " + std::to_string(report.refused) +
-                        " refusée(s)");
+    if ((report.applied > 0 || report.refused > 0) && (m_detailed || (report.applied > 0 && m_passes <= 5))) {
+        m_journal.Write("Theme \"" + theme.name + "\": " + std::to_string(report.applied) + " value(s) applied, " +
+                        std::to_string(report.unchanged) + " already in place, " + std::to_string(report.refused) +
+                        " refused");
     }
     return report;
 }
@@ -58,21 +97,27 @@ ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
 void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const std::vector<NodeInfo>& nodes,
                                    Report& report) {
     std::vector<PendingMove> pending;
-    for (int index = 0; index < static_cast<int>(nodes.size()); index++) {
-        const NodeInfo& node = nodes[index];
+    const RuleIndex index(theme.assignments);
+    for (int position = 0; position < static_cast<int>(nodes.size()); position++) {
+        const NodeInfo& node = nodes[position];
 
         // The winning declaration for each property of this element, and apart from them the :hover ones.
         std::map<std::string, const Assignment*> winners;
         std::map<std::string, const Assignment*> hoverWinners;
-        for (const Assignment& assignment : theme.assignments) {
-            if (!Matches(assignment.selector, nodes, index)) continue;
+        index.ForCandidates(node, [&](const Assignment& assignment) {
+            if (!Matches(assignment.selector, nodes, position)) return;
 
             auto& target = assignment.selector.hover ? hoverWinners : winners;
             auto [it, inserted] = target.try_emplace(assignment.property, &assignment);
             if (!inserted && Beats(assignment, *it->second)) it->second = &assignment;
-        }
+        });
 
+        // The transition first, so a transform or opacity written in the same pass already animates.
+        if (auto transition = winners.find("Transition"); transition != winners.end()) {
+            WriteValue(node, *transition->second, tree, report, true);
+        }
         for (const auto& [property, assignment] : winners) {
+            if (property == "Transition") continue;
             if (property == kOrderProperty) {
                 pending.push_back({&node, assignment});
                 continue;
@@ -92,7 +137,7 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const std::map<std::string, c
     std::vector<HoverValue> values;
     for (const auto& [property, assignment] : winners) {
         if (!tree.Read(node.id, property)) {
-            Refuse(Describe(node) + " " + property, "« " + Describe(node) + " » n'a pas de propriété " + property, report);
+            Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report);
             continue;
         }
         values.push_back({property, assignment->value});
@@ -106,18 +151,18 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const std::map<std::string, c
     if (known == m_hovers.end() && values.empty()) return;
 
     if (!tree.SetHover(node.id, values)) {
-        Refuse(Describe(node) + " :hover", "« " + Describe(node) + " » ne suit pas le pointeur (:hover)", report);
+        Refuse(Describe(node) + " :hover", "\"" + Describe(node) + "\" does not follow the pointer (:hover)", report);
         return;
     }
     if (values.empty()) {
         m_hovers.erase(node.id);
-        m_journal.Write("Survol retiré : " + Describe(node));
+        m_journal.Write("Hover removed: " + Describe(node));
         return;
     }
     report.applied += static_cast<int>(values.size());
     std::string list;
     for (const HoverValue& value : values) list += (list.empty() ? "" : ", ") + value.property + " = " + value.value.text;
-    m_journal.Write("Survol : " + Describe(node) + " " + list);
+    if (m_detailed) m_journal.Write("Hover: " + Describe(node) + " " + list);
     m_hovers[node.id] = std::move(values);
 }
 
@@ -131,7 +176,7 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
     }
     std::optional<Value> current = tree.Read(node.id, property);
     if (!current) {
-        Refuse(Describe(node) + " " + property, "« " + Describe(node) + " » n'a pas de propriété " + property, report);
+        Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report);
         return false;
     }
     if (*current == assignment.value) {
@@ -143,13 +188,13 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
     if (keep && !m_originals.count(key)) m_originals.emplace(key, *current);
 
     if (!tree.Write(node.id, property, assignment.value)) {
-        Refuse(Describe(node) + " " + property, "valeur refusée pour « " + Describe(node) + " " + property + " »", report);
+        Refuse(Describe(node) + " " + property, "value refused for \"" + Describe(node) + " " + property + "\"", report);
         return false;
     }
     if (!keep) m_moves.push_back({node.id, *current});
     report.applied++;
-    m_journal.Write("Appliqué : " + Describe(node) + " " + property + " = " + assignment.value.text + " (" +
-                    assignment.source + " ligne " + std::to_string(assignment.line) + ")");
+    if (m_detailed) m_journal.Write("Applied: " + Describe(node) + " " + property + " = " + assignment.value.text + " (" +
+                    assignment.source + " line " + std::to_string(assignment.line) + ")");
     return true;
 }
 
@@ -166,7 +211,7 @@ void ThemeEngine::ApplyResources(const Theme& theme, TreeBackend& tree, Report& 
     for (const ResourceOverride& resource : theme.resources) {
         std::optional<Value> current = tree.ReadResource(resource.key);
         if (!current) {
-            Refuse("resource " + resource.key, "ressource absente de l'application : " + resource.key, report);
+            Refuse("resource " + resource.key, "resource missing from the app: " + resource.key, report);
             continue;
         }
         if (*current == resource.value) {
@@ -176,11 +221,11 @@ void ThemeEngine::ApplyResources(const Theme& theme, TreeBackend& tree, Report& 
 
         if (!m_resourceOriginals.count(resource.key)) m_resourceOriginals.emplace(resource.key, *current);
         if (!tree.WriteResource(resource.key, resource.value)) {
-            Refuse("resource " + resource.key, "ressource refusée : " + resource.key, report);
+            Refuse("resource " + resource.key, "resource refused: " + resource.key, report);
             continue;
         }
         report.applied++;
-        m_journal.Write("Ressource : " + resource.key + " = " + resource.value.text);
+        m_journal.Write("Resource: " + resource.key + " = " + resource.value.text);
     }
 }
 
@@ -188,18 +233,18 @@ void ThemeEngine::ApplyDictionary(const Theme& theme, TreeBackend& tree, Report&
     if (theme.resourceDictionary == m_dictionary) return;
 
     if (!tree.SetDictionary(theme.resourceDictionary)) {
-        Refuse("dictionary", "dictionnaire de ressources refusé par l'interface", report);
+        Refuse("dictionary", "resource dictionary refused by the interface", report);
         return;
     }
     m_dictionary = theme.resourceDictionary;
     report.applied++;
-    m_journal.Write(m_dictionary.empty() ? "Dictionnaire de ressources retiré"
-                                         : "Dictionnaire de ressources fusionné (resources.xaml)");
+    m_journal.Write(m_dictionary.empty() ? "Resource dictionary removed"
+                                         : "Resource dictionary merged (resources.xaml)");
 }
 
 void ThemeEngine::Refuse(const std::string& key, const std::string& message, Report& report) {
     report.refused++;
-    if (m_reported.insert(key).second) m_journal.Write("Refusé : " + message);
+    if (m_reported.insert(key).second) m_journal.Write("Refused: " + message);
 }
 
 void ThemeEngine::Restore(TreeBackend& tree) {
@@ -251,8 +296,9 @@ void ThemeEngine::Restore(TreeBackend& tree) {
     m_moves.clear();
     m_reported.clear();
     m_active = false;
-    m_journal.Write("Thème retiré : " + std::to_string(restored) + " valeur(s) restaurée(s), " + std::to_string(gone) +
-                    " élément(s) disparu(s)");
+    m_passes = 0;
+    m_journal.Write("Theme removed: " + std::to_string(restored) + " value(s) restored, " + std::to_string(gone) +
+                    " element(s) gone");
 }
 
 }  // namespace ampify::theme

@@ -1,48 +1,49 @@
-// La Marketplace du kit : une page d'Apple Music pour installer, retirer et choisir thèmes, schémas, extensions et
-// apps. Elle ne fait rien elle-même : chaque action passe par ampify (Ampify.kit.run), avec les mêmes contrôles qu'en
-// console (SHA-256, archive vérifiée, sauvegarde avant un retrait). Spécification : docs/marketplace/PAGE.md.
+// The Marketplace: a page of Apple Music to install, remove and choose themes, schemes, extensions and apps. It does
+// nothing itself: every action goes through ampify (Ampify.kit.run), with the same checks as in the console (SHA-256,
+// verified archive, backup before a removal). Specification: docs/extensions/catalog.md.
 const { h, useState, useEffect } = Ampify.React;
 const { Card, Button, ButtonPrimary, ButtonTertiary, Toggle, Dropdown, TextField, Text } = Ampify.components;
 
-// Une phrase par permission, montrée avant l'installation et avant l'activation.
+// One sentence per permission, shown before the installation and before turning it on.
 const PERMISSIONS = {
-  "player.read": "voit le morceau en cours",
-  "player.control": "lance, met en pause et change de morceau",
-  "audio.analyze": "analyse le son (tempo, volume)",
-  "audio.gain": "change le volume interne du son, jamais la barre de volume",
-  "audio.eq": "règle un égaliseur",
-  storage: "garde ses réglages",
-  notifications: "affiche des notifications",
-  "ipc.discord": "parle à Discord (statut)",
-  "midi.input": "lit un contrôleur MIDI",
-  "library.read": "lit la bibliothèque",
-  "library.write": "modifie la bibliothèque",
-  "services.read": "lit l'état des services du kit",
-  "ui.keyboard": "ajoute des raccourcis clavier",
-  "ui.topbar": "ajoute un bouton en haut",
-  "ui.playbar": "ajoute un bouton dans la barre de lecture",
-  "ui.menu": "ajoute des entrées de menu",
-  "ui.popup": "ouvre des fenêtres surgissantes",
-  "ui.panel": "affiche un panneau à droite",
-  "ui.page": "ajoute une page",
-  "ui.window": "ouvre une fenêtre",
-  "ui.tray": "ajoute une icône près de l'horloge",
-  "fs.output": "écrit des fichiers texte dans son dossier du kit",
+  "player.read": "see the track that is playing",
+  "player.control": "play, pause and change track",
+  "audio.analyze": "analyze the sound (tempo, volume)",
+  "audio.gain": "change the internal volume of the sound, never the volume bar",
+  "audio.eq": "set an equalizer",
+  storage: "keep its settings",
+  notifications: "show notifications",
+  "ipc.discord": "talk to Discord (status)",
+  "midi.input": "read a MIDI controller",
+  "library.read": "read the library",
+  "library.write": "change the library",
+  "services.read": "read the state of Ampify's services",
+  "ui.keyboard": "add keyboard shortcuts",
+  "ui.topbar": "add a button at the top",
+  "ui.playbar": "add a button in the playback bar",
+  "ui.sidebar": "add an entry to the sidebar",
+  "ui.menu": "add menu entries",
+  "ui.popup": "open pop-up windows",
+  "ui.panel": "show a panel on the right",
+  "ui.page": "add a page",
+  "ui.window": "open a window",
+  "ui.tray": "add an icon near the clock",
+  "fs.output": "write text files in its Ampify folder",
 };
 
 const describePermission = (permission) =>
-  permission.startsWith("network:") ? "envoie des requêtes à " + permission.slice(8) : PERMISSIONS[permission] || permission;
+  permission.startsWith("network:") ? "send requests to " + permission.slice(8) : PERMISSIONS[permission] || permission;
 
 const permissionText = (list) =>
-  list && list.length ? "Peut : " + list.map(describePermission).join(", ") + "." : "Ne demande aucune permission.";
+  list && list.length ? "Can: " + list.map(describePermission).join(", ") + "." : "Asks for no permission.";
 
-const KINDS = { theme: "Thème", extension: "Extension", app: "App", snippet: "Snippet" };
+const KINDS = { theme: "Theme", extension: "Extension", app: "App", snippet: "Snippet" };
 
 const matches = (item, search) =>
   !search || [item.name, item.id, item.description, item.author].some((field) =>
     String(field || "").toLowerCase().includes(search.toLowerCase()));
 
-// La dernière ligne utile de la sortie d'ampify, pour le bandeau.
+// The last useful line of ampify's output, for the banner.
 const lastLine = (text) => String(text || "").trim().split(/\r?\n/).filter(Boolean).pop() || "";
 
 function ThemeCard({ theme, active, activeScheme, busy, run }) {
@@ -50,27 +51,30 @@ function ThemeCard({ theme, active, activeScheme, busy, run }) {
   const [scheme, setScheme] = useState(active && activeScheme ? activeScheme : schemes[0] || "");
   const [confirm, setConfirm] = useState(false);
   const choose = (wanted) =>
-    run(["theme", "set", theme.id].concat(wanted ? ["--scheme", wanted] : []), "Thème « " + theme.name + " » choisi");
-  return h(Card, { title: theme.name + (active ? "  (actif)" : ""), subtitle: (theme.author ? theme.author + " · " : "") + (theme.description || "") },
+    run(["theme", "set", theme.id].concat(wanted ? ["--scheme", wanted] : []), "Theme \"" + theme.name + "\" chosen");
+  return h(Card, { title: theme.name + (active ? "  (active)" : ""), subtitle: (theme.author ? theme.author + " · " : "") + (theme.description || "") },
     h("row", { gap: 12 },
       schemes.length > 1
         ? h(Dropdown, {
-            label: "Schéma",
+            label: "Scheme",
             value: scheme,
             options: schemes,
             disabled: busy,
             onChange: (value) => {
               setScheme(value);
-              if (active) choose(value);  // thème déjà actif : le schéma change tout de suite
+              if (active) choose(value);  // theme already active: the scheme changes right away
             },
           })
         : null,
       active
-        ? h(Text, { variant: "caption" }, "Appliqué")
-        : h(ButtonPrimary, { label: "Choisir ce thème", disabled: busy || !theme.valid, onClick: () => choose(scheme) }),
-      confirm
-        ? h(Button, { label: "Confirmer le retrait", disabled: busy, onClick: () => run(["remove", theme.id, "--yes"], "Thème retiré") })
-        : h(ButtonTertiary, { label: "Retirer", disabled: busy, onClick: () => setConfirm(true) })));
+        ? h(Text, { variant: "caption" }, "In use")
+        : h(ButtonPrimary, { label: "Use this theme", disabled: busy || !theme.valid, onClick: () => choose(scheme) }),
+      // Turning a theme off and deleting it are two different actions: only an unused theme can be uninstalled.
+      active
+        ? h(Button, { label: "Turn off", disabled: busy, onClick: () => run(["theme", "clear"], "Theme turned off") })
+        : confirm
+          ? h(Button, { label: "Confirm uninstall", disabled: busy, onClick: () => run(["remove", theme.id, "--yes"], "Theme uninstalled") })
+          : h(ButtonTertiary, { label: "Uninstall", disabled: busy, onClick: () => setConfirm(true) })));
 }
 
 function ElementCard({ element, busy, run }) {
@@ -83,13 +87,13 @@ function ElementCard({ element, busy, run }) {
       h(Toggle, {
         checked: element.enabled,
         disabled: busy || !element.valid || element.id === "marketplace",
-        onChange: (on) => run([kind, on ? "enable" : "disable", element.id], (on ? "Activé : " : "Coupé : ") + element.id),
+        onChange: (on) => run([kind, on ? "enable" : "disable", element.id], (on ? "Turned on: " : "Turned off: ") + element.id),
       }),
       element.id === "marketplace"
         ? null
         : confirm
-          ? h(Button, { label: "Confirmer le retrait", disabled: busy, onClick: () => run(["remove", element.id, "--yes"], "Retiré : " + element.id) })
-          : h(ButtonTertiary, { label: "Retirer", disabled: busy, onClick: () => setConfirm(true) })));
+          ? h(Button, { label: "Confirm uninstall", disabled: busy, onClick: () => run(["remove", element.id, "--yes"], "Uninstalled: " + element.id) })
+          : h(ButtonTertiary, { label: "Uninstall", disabled: busy, onClick: () => setConfirm(true) })));
 }
 
 function CatalogCard({ entry, installed, busy, run }) {
@@ -98,17 +102,17 @@ function CatalogCard({ entry, installed, busy, run }) {
     h(Text, { variant: "caption" }, entry.description),
     h(Text, { variant: "caption" }, permissionText(entry.permissions)),
     installed && !update
-      ? h(Text, { variant: "caption" }, "Installé")
+      ? h(Text, { variant: "caption" }, "Installed")
       : h(ButtonPrimary, {
-          label: update ? "Mettre à jour" : "Installer",
+          label: update ? "Update" : "Install",
           disabled: busy,
-          onClick: () => run([update ? "update" : "install", entry.id, "--yes"], (update ? "Mis à jour : " : "Installé : ") + entry.name),
+          onClick: () => run([update ? "update" : "install", entry.id, "--yes"], (update ? "Updated: " : "Installed: ") + entry.name),
         }));
 }
 
 function Marketplace() {
   const [state, setState] = useState(null);
-  const [message, setMessage] = useState("Lecture du catalogue…");
+  const [message, setMessage] = useState("Reading the catalog…");
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -118,16 +122,16 @@ function Marketplace() {
         setState(JSON.parse(result.out));
         setMessage(result.err ? lastLine(result.err) : "");
       } catch (error) {
-        setMessage("Impossible de lire l'état du kit : " + (lastLine(result.err) || "réponse illisible"));
+        setMessage("Cannot read the state of Ampify: " + (lastLine(result.err) || "unreadable reply"));
       }
     });
 
-  // Une action : ampify, puis l'état relu. Le bandeau dit ce qui s'est passé, ou l'erreur d'ampify telle quelle.
+  // One action: ampify, then the state read again. The banner says what happened, or ampify's error as it is.
   const run = (args, success) => {
     setBusy(true);
-    setMessage("En cours…");
+    setMessage("Working…");
     return Ampify.kit.run(args).then((result) => {
-      setMessage(result.code === 0 ? success : lastLine(result.err) || lastLine(result.out) || "Échec (code " + result.code + ")");
+      setMessage(result.code === 0 ? success : lastLine(result.err) || lastLine(result.out) || "Failed (code " + result.code + ")");
       return refresh();
     }).then(() => setBusy(false), () => setBusy(false));
   };
@@ -148,35 +152,34 @@ function Marketplace() {
 
   return h("stack", { gap: 16 },
     h("row", { gap: 12 },
-      h(TextField, { placeholder: "Chercher un thème, une extension…", value: search, onChange: setSearch }),
-      h(Button, { label: "Actualiser", disabled: busy, onClick: () => { setMessage("Lecture du catalogue…"); refresh(); } })),
+      h(TextField, { placeholder: "Search for a theme, an extension…", value: search, onChange: setSearch }),
+      h(Button, { label: "Refresh", disabled: busy, onClick: () => { setMessage("Reading the catalog…"); refresh(); } })),
     message ? h(Text, { variant: "caption" }, message) : null,
-    h(Text, { variant: "subtitle" }, "Thèmes"),
+    h(Text, { variant: "subtitle" }, "Themes"),
     h("row", { gap: 12 },
-      h(Text, { variant: "caption" }, activeTheme ? "Thème actif : " + activeTheme + (state.scheme ? " (" + state.scheme + ")" : "") : "Apple Music d'origine, sans thème"),
-      activeTheme ? h(Button, { label: "Revenir à Apple Music d'origine", disabled: busy, onClick: () => run(["theme", "clear"], "Thème retiré") }) : null),
+      h(Text, { variant: "caption" }, activeTheme ? "Theme in use: " + activeTheme + (state.scheme ? " (" + state.scheme + ")" : "") : "Apple Music's own look, no theme"),
+      activeTheme ? h(Button, { label: "Restore Apple Music's look", disabled: busy, onClick: () => run(["theme", "clear"], "Theme turned off") }) : null),
     themes.length
       ? h("list", { gap: 12 }, themes.map((theme) =>
           h(ThemeCard, { key: theme.id, theme, active: theme.id === activeTheme, activeScheme: state.scheme, busy, run })))
-      : h(Text, { variant: "caption" }, "Aucun thème installé. ampify theme import en reprend un de Spicetify."),
-    h(Text, { variant: "subtitle" }, "Extensions et apps"),
+      : h(Text, { variant: "caption" }, "No theme installed. ampify theme import brings one over from Spicetify."),
+    h(Text, { variant: "subtitle" }, "Extensions and apps"),
     others.length
       ? h("list", { gap: 12 }, others.map((element) => h(ElementCard, { key: element.kind + element.id, element, busy, run })))
-      : h(Text, { variant: "caption" }, "Aucune extension installée."),
-    h(Text, { variant: "subtitle" }, "Catalogue"),
+      : h(Text, { variant: "caption" }, "No extension installed."),
+    h(Text, { variant: "subtitle" }, "Catalog"),
     !state.catalogOk
-      ? h(Text, { variant: "caption" }, "Impossible de lire le catalogue. Réessaie quand tu es connecté.")
+      ? h(Text, { variant: "caption" }, "Cannot read the catalog. Try again when you are online.")
       : catalog.length
         ? h("list", { gap: 12 }, catalog.map((entry) => h(CatalogCard, { key: entry.kind + entry.id, entry, installed: find(entry), busy, run })))
-        : h(Text, { variant: "caption" }, "Le catalogue est vide pour l'instant."));
+        : h(Text, { variant: "caption" }, "The catalog is empty for now."));
 }
 
-// La page « /marketplace » de l'app (Ampify.ready la rend), et un bouton en haut d'Apple Music pour l'ouvrir.
+// The app's "/marketplace" page (Ampify.ready renders it), and the "Ampify" entry of the sidebar that opens it.
 function render() {
   return h(Marketplace);
 }
 globalThis.render = render;
 
-const BAG = '<svg viewBox="0 0 24 24"><path d="M4 7h16l-1.2 12.2a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8L4 7zm4 0V6a4 4 0 0 1 8 0v1h-2V6a2 2 0 0 0-4 0v1H8z"/></svg>';
 Ampify.ui.title.set("Marketplace");
-Ampify.ui.topbar.addButton({ label: "Marketplace", icon: BAG, onClick: () => Ampify.ui.navigate("/marketplace") });
+Ampify.ui.sidebar.addItem({ label: "Ampify", onClick: () => Ampify.ui.navigate("/marketplace") });

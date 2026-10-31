@@ -33,6 +33,8 @@ enum class ValueKind {
     Transform,   // a CompositeTransform: "scaleX,scaleY,rotation,translateX,translateY", rotation in degrees
     Point,       // a point relative to the element, "x,y" from 0 to 1, such as "0.5,0.5" for RenderTransformOrigin
     Shadow,      // a ThemeShadow raised by this depth in pixels (the Z of UIElement.Translation), such as "16"
+    Transition,  // the animated properties and their duration in ms, "transform:200;opacity:150;background:300",
+                 // empty for none
     Opaque,      // a token that Read gave back for an object the engine cannot express as text; Write restores it
 };
 

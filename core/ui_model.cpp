@@ -56,45 +56,45 @@ bool IsCallbackId(const Json& value) {
 bool CheckAttribute(const std::string& name, const std::string& key, const Json& value, std::string* error) {
     if (key == "onClick" || key == "onChange") {
         bool allowed = key == "onClick" ? TakesClick(name) : TakesChange(name);
-        if (!allowed) return Fail(error, key + " non autorisé sur " + name);
-        if (!IsCallbackId(value)) return Fail(error, key + " doit être un identifiant de rappel (entier positif)");
+        if (!allowed) return Fail(error, key + " is not allowed on " + name);
+        if (!IsCallbackId(value)) return Fail(error, key + " must be a callback id (a positive whole number)");
     } else if (key == "tooltip") {
-        if (!value.IsString()) return Fail(error, "tooltip doit être un texte");
+        if (!value.IsString()) return Fail(error, "tooltip must be a text");
     } else if (key == "tooltipPlacement") {
         static const std::array<std::string_view, 4> kPlacements = {"top", "bottom", "left", "right"};
         const std::string* placement = value.AsString();
         if (!placement || !OneOf(kPlacements, *placement)) {
-            return Fail(error, "tooltipPlacement attend top, bottom, left ou right");
+            return Fail(error, "tooltipPlacement expects top, bottom, left or right");
         }
     } else if (key == "tooltipDelay") {
         const double* delay = value.AsNumber();
         if (!delay || *delay < 0 || *delay > kMaxTooltipDelayMs) {
-            return Fail(error, "tooltipDelay attend un nombre de millisecondes entre 0 et 10000");
+            return Fail(error, "tooltipDelay expects a number of milliseconds between 0 and 10000");
         }
     }
     return true;
 }
 
 bool CheckNode(const Json& node, const std::string& parent, int depth, int& nodes, std::string* error) {
-    if (++nodes > kMaxTreeNodes) return Fail(error, "interface trop grande (300 éléments au plus)");
-    if (depth > kMaxTreeDepth) return Fail(error, "interface trop profonde (8 niveaux au plus)");
+    if (++nodes > kMaxTreeNodes) return Fail(error, "interface too large (300 elements at most)");
+    if (depth > kMaxTreeDepth) return Fail(error, "interface too deep (8 levels at most)");
     const Json::Object* attributes = node.AsObject();
-    if (!attributes) return Fail(error, "chaque élément de l'interface doit être un objet");
+    if (!attributes) return Fail(error, "each element of the interface must be an object");
 
     const Json* type = node.Find("type");
     const std::string* name = type ? type->AsString() : nullptr;
-    if (!name) return Fail(error, "élément sans type");
-    if (!IsPrimitive(*name)) return Fail(error, "primitive inconnue : " + *name);
+    if (!name) return Fail(error, "element without a type");
+    if (!IsPrimitive(*name)) return Fail(error, "unknown primitive: " + *name);
     if ((*name == "option") != (parent == "dropdown")) {
-        return Fail(error, *name == "option" ? "option hors d'une liste déroulante"
-                                             : "une liste déroulante ne contient que des options");
+        return Fail(error, *name == "option" ? "option outside a dropdown"
+                                             : "a dropdown only holds options");
     }
 
     for (const auto& [key, value] : *attributes) {
         if (key == "children") continue;
-        if (value.AsArray() || value.AsObject()) return Fail(error, "attribut non autorisé : " + key);
+        if (value.AsArray() || value.AsObject()) return Fail(error, "attribute not allowed: " + key);
         if (const std::string* text = value.AsString()) {
-            if (text->size() > kMaxText) return Fail(error, "texte trop long dans " + key + " (500 caractères au plus)");
+            if (text->size() > kMaxText) return Fail(error, "text too long in " + key + " (500 characters at most)");
         }
         if (!CheckAttribute(*name, key, value, error)) return false;
     }
@@ -102,8 +102,8 @@ bool CheckNode(const Json& node, const std::string& parent, int depth, int& node
     const Json* children = node.Find("children");
     if (!children) return true;
     const Json::Array* items = children->AsArray();
-    if (!items) return Fail(error, "children doit être une liste");
-    if (!items->empty() && !HasChildren(*name)) return Fail(error, "primitive " + *name + " sans enfants");
+    if (!items) return Fail(error, "children must be a list");
+    if (!items->empty() && !HasChildren(*name)) return Fail(error, "primitive " + *name + " cannot have children");
     for (const Json& child : *items) {
         if (!CheckNode(child, *name, depth + 1, nodes, error)) return false;
     }
@@ -264,12 +264,14 @@ bool ValidateTree(const Json& tree, std::string* error) {
 }
 
 bool IsPlacement(std::string_view placement) {
-    return placement == "topbar" || placement == "playbar" || placement == "menu-context" || placement == "menu-app";
+    return placement == "topbar" || placement == "playbar" || placement == "sidebar" || placement == "menu-context" ||
+           placement == "menu-app";
 }
 
 std::string_view PlacementPermission(std::string_view placement) {
     if (placement == "topbar") return "ui.topbar";
     if (placement == "playbar") return "ui.playbar";
+    if (placement == "sidebar") return "ui.sidebar";
     return "ui.menu";
 }
 

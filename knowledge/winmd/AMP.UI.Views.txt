@@ -16,6 +16,10 @@ AMP.UI.Views.AirPlayPasswordDialog
   methods: .ctor, get_ViewModel
 AMP.UI.Views.AirPlayView
   methods: .ctor, get_ViewModel
+AMP.UI.Views.ArtistPageBackgroundTemplates
+  methods: .ctor
+AMP.UI.Views.ArtistPageBackgroundView
+  methods: .ctor, get_BackgroundProvider, put_BackgroundProvider, get_ArtworkPadding, put_ArtworkPadding, get_BackgroundProviderProperty, get_ArtworkPaddingProperty
 AMP.UI.Views.ArtworkImage
   methods: .ctor, get_Artwork, put_Artwork, get_VideoArtwork, put_VideoArtwork, get_IsRound, put_IsRound, get_ArtworkMaxSize, put_ArtworkMaxSize, get_AspectRatio, put_AspectRatio, get_MeasureAlgorithm, put_MeasureAlgorithm, get_AlternativeAspectRatio, put_AlternativeAspectRatio, get_ShouldUseAlternativeAspectRatio, put_ShouldUseAlternativeAspectRatio, get_ArtworkImageSource, put_ArtworkImageSource, get_ArtworkProperty, get_VideoArtworkProperty, get_IsRoundProperty, get_ArtworkMaxSizeProperty, get_AspectRatioProperty, get_MeasureAlgorithmProperty, get_AlternativeAspectRatioProperty, get_ShouldUseAlternativeAspectRatioProperty, get_ArtworkImageSourceProperty
 AMP.UI.Views.ArtworkImageSource
@@ -30,8 +34,10 @@ AMP.UI.Views.AutoResizeWindow
   methods: .ctor
 AMP.UI.Views.Breadcrumb
   methods: .ctor, get_Label, put_Label, get_Tag, put_Tag
+AMP.UI.Views.BrickLockupTemplateSelectorItem
+  methods: .ctor, get_DisplayStyle, put_DisplayStyle
 AMP.UI.Views.ChinTextControl
-  methods: .ctor, get_ExplicitBadge, put_ExplicitBadge, get_Heading, put_Heading, get_Title, put_Title, get_SubtitleLinks, put_SubtitleLinks, get_Description, put_Description, get_TextAlignment, put_TextAlignment, get_TextBrush, put_TextBrush, get_TitleHorizontalAlignment, put_TitleHorizontalAlignment, get_ExplicitBadgeProperty, get_HeadingProperty, get_TitleProperty, get_SubtitleLinksProperty, get_DescriptionProperty, get_TextAlignmentProperty, get_TextBrushProperty, get_TitleHorizontalAlignmentProperty
+  methods: .ctor, get_AlwaysShowDescription, put_AlwaysShowDescription, get_ExplicitBadge, put_ExplicitBadge, get_Heading, put_Heading, get_Title, put_Title, get_SubtitleLinks, put_SubtitleLinks, get_Description, put_Description, get_TextAlignment, put_TextAlignment, get_TextBrush, put_TextBrush, get_TitleHorizontalAlignment, put_TitleHorizontalAlignment, get_AlwaysShowDescriptionProperty, get_ExplicitBadgeProperty, get_HeadingProperty, get_TitleProperty, get_SubtitleLinksProperty, get_DescriptionProperty, get_TextAlignmentProperty, get_TextBrushProperty, get_TitleHorizontalAlignmentProperty
 AMP.UI.Views.ClipItemToAccessibilityTextConverter
   methods: .ctor, Convert, ConvertBack
 AMP.UI.Views.CollaborationApprovePendingNotificationDialog
@@ -54,6 +60,14 @@ AMP.UI.Views.CommonModelsUtilities
   methods: .ctor, GetComposerAndArtistLinks, SetComposerAndArtistLinks, GetLinks, SetLinks, GetSpanLinks, SetSpanLinks, HasItems, HasNoItems, VisibleIfHasDescription, VisibleIfHasLinks, TryGetFirstItem, IsAccessoryBadgeKeyColor, IsAccessoryBadgeMaterial, IsRoundedArtwork, IsVideoArtwork
 AMP.UI.Views.ComponentModelTemplates
   methods: .ctor
+AMP.UI.Views.ConcertsSetDatesDialog
+  methods: .ctor, get_ViewModel
+AMP.UI.Views.ConcertsSetGenresDialog
+  methods: .ctor, get_ViewModel
+AMP.UI.Views.ConcertsSetLocationDialog
+  methods: .ctor, get_ViewModel, add_PropertyChanged, remove_PropertyChanged
+AMP.UI.Views.ConcertsTemplates
+  methods: .ctor
 AMP.UI.Views.ContainerDetailHeaderLockupTemplateSelectorItem
   methods: .ctor, get_DisplayStyle, put_DisplayStyle
 AMP.UI.Views.ContentPage
@@ -71,7 +85,7 @@ AMP.UI.Views.DataGridTemplates
 AMP.UI.Views.DebugWindow
   methods: .ctor
 AMP.UI.Views.DialogManager
-  methods: .ctor, ShowInformation, get_BottomInfoBar, put_BottomInfoBar, get_TopInfoBar, put_TopInfoBar, ShowDialogAsync
+  methods: .ctor, ShowInformation, get_BottomInfoBar, put_BottomInfoBar, get_TopInfoBar, put_TopInfoBar, ShowDialogAsync, ShowDialogAsync
 AMP.UI.Views.DragDropUtils
   methods: ConvertDragPositionToListIndex, AddDragItemsToDragData
 AMP.UI.Views.DynamicTabsContentHost
@@ -84,12 +98,12 @@ AMP.UI.Views.EditRuleControlRow
   methods: .ctor, get_ViewModel, put_ViewModel, get_SubRuleMargin, put_SubRuleMargin
 AMP.UI.Views.EditRulesDialog
   methods: .ctor, get_ViewModel, ShowEditRulesDialogAsync
+AMP.UI.Views.EmptyStateLockupImageAssetTemplateSelectorItem
+  methods: .ctor, get_Name, put_Name
 AMP.UI.Views.EqualizerControl
   methods: get_ViewModel, put_ViewModel, Show, Instance, Shutdown
 AMP.UI.Views.EqualizerView
   methods: .ctor, get_HostWindow, get_ViewModel, put_ViewModel
-AMP.UI.Views.ExplicitBadgeControl
-  methods: .ctor, get_ExplicitBadge, put_ExplicitBadge, get_Size, put_Size, get_ExplicitBadgeProperty, get_SizeProperty
 AMP.UI.Views.FilesSettingsPage
   methods: .ctor, get_ViewModel, put_ViewModel
 AMP.UI.Views.FlyoutMenuOpenStateChangingEventArgs
@@ -129,6 +143,11 @@ AMP.UI.Views.IAirPlayPasswordDialogFactory
   methods: CreateInstance
 AMP.UI.Views.IAirPlayView
   methods: get_ViewModel
+AMP.UI.Views.IArtistPageBackgroundTemplates
+AMP.UI.Views.IArtistPageBackgroundView
+  methods: get_BackgroundProvider, put_BackgroundProvider, get_ArtworkPadding, put_ArtworkPadding
+AMP.UI.Views.IArtistPageBackgroundViewStatics
+  methods: get_BackgroundProviderProperty, get_ArtworkPaddingProperty
 AMP.UI.Views.IArtworkImage
   methods: get_Artwork, put_Artwork, get_VideoArtwork, put_VideoArtwork, get_IsRound, put_IsRound, get_ArtworkMaxSize, put_ArtworkMaxSize, get_AspectRatio, put_AspectRatio, get_MeasureAlgorithm, put_MeasureAlgorithm, get_AlternativeAspectRatio, put_AlternativeAspectRatio, get_ShouldUseAlternativeAspectRatio, put_ShouldUseAlternativeAspectRatio, get_ArtworkImageSource, put_ArtworkImageSource
 AMP.UI.Views.IArtworkImageSource
@@ -152,10 +171,12 @@ AMP.UI.Views.IAutoResizeWindowFactory
   methods: CreateInstance
 AMP.UI.Views.IBreadcrumb
   methods: get_Label, put_Label, get_Tag, put_Tag
+AMP.UI.Views.IBrickLockupTemplateSelectorItem
+  methods: get_DisplayStyle, put_DisplayStyle
 AMP.UI.Views.IChinTextControl
-  methods: get_ExplicitBadge, put_ExplicitBadge, get_Heading, put_Heading, get_Title, put_Title, get_SubtitleLinks, put_SubtitleLinks, get_Description, put_Description, get_TextAlignment, put_TextAlignment, get_TextBrush, put_TextBrush, get_TitleHorizontalAlignment, put_TitleHorizontalAlignment
+  methods: get_AlwaysShowDescription, put_AlwaysShowDescription, get_ExplicitBadge, put_ExplicitBadge, get_Heading, put_Heading, get_Title, put_Title, get_SubtitleLinks, put_SubtitleLinks, get_Description, put_Description, get_TextAlignment, put_TextAlignment, get_TextBrush, put_TextBrush, get_TitleHorizontalAlignment, put_TitleHorizontalAlignment
 AMP.UI.Views.IChinTextControlStatics
-  methods: get_ExplicitBadgeProperty, get_HeadingProperty, get_TitleProperty, get_SubtitleLinksProperty, get_DescriptionProperty, get_TextAlignmentProperty, get_TextBrushProperty, get_TitleHorizontalAlignmentProperty
+  methods: get_AlwaysShowDescriptionProperty, get_ExplicitBadgeProperty, get_HeadingProperty, get_TitleProperty, get_SubtitleLinksProperty, get_DescriptionProperty, get_TextAlignmentProperty, get_TextBrushProperty, get_TitleHorizontalAlignmentProperty
 AMP.UI.Views.ICollaborationApprovePendingNotificationDialog
   methods: get_ViewModel, put_ViewModel
 AMP.UI.Views.ICollaborationApprovePendingNotificationDialogFactory
@@ -186,6 +207,13 @@ AMP.UI.Views.ICommonModelsUtilities
 AMP.UI.Views.ICommonModelsUtilitiesStatics
   methods: GetComposerAndArtistLinks, SetComposerAndArtistLinks, GetLinks, SetLinks, GetSpanLinks, SetSpanLinks, HasItems, HasNoItems, VisibleIfHasDescription, VisibleIfHasLinks, TryGetFirstItem, IsAccessoryBadgeKeyColor, IsAccessoryBadgeMaterial, IsRoundedArtwork, IsVideoArtwork
 AMP.UI.Views.IComponentModelTemplates
+AMP.UI.Views.IConcertsSetDatesDialog
+  methods: get_ViewModel
+AMP.UI.Views.IConcertsSetGenresDialog
+  methods: get_ViewModel
+AMP.UI.Views.IConcertsSetLocationDialog
+  methods: get_ViewModel
+AMP.UI.Views.IConcertsTemplates
 AMP.UI.Views.IContainerDetailHeaderLockupTemplateSelectorItem
   methods: get_DisplayStyle, put_DisplayStyle
 AMP.UI.Views.IContentPage
@@ -211,7 +239,7 @@ AMP.UI.Views.IDataGridRowControlStatics
 AMP.UI.Views.IDataGridTemplates
 AMP.UI.Views.IDebugWindow
 AMP.UI.Views.IDialogManager
-  methods: ShowInformation, get_BottomInfoBar, put_BottomInfoBar, get_TopInfoBar, put_TopInfoBar, ShowDialogAsync
+  methods: ShowInformation, get_BottomInfoBar, put_BottomInfoBar, get_TopInfoBar, put_TopInfoBar, ShowDialogAsync, ShowDialogAsync
 AMP.UI.Views.IDragDropUtils
 AMP.UI.Views.IDragDropUtilsStatics
   methods: ConvertDragPositionToListIndex, AddDragItemsToDragData
@@ -235,16 +263,14 @@ AMP.UI.Views.IEditRulesDialog
   methods: get_ViewModel, ShowEditRulesDialogAsync
 AMP.UI.Views.IEditRulesDialogFactory
   methods: CreateInstance
+AMP.UI.Views.IEmptyStateLockupImageAssetTemplateSelectorItem
+  methods: get_Name, put_Name
 AMP.UI.Views.IEqualizerControl
   methods: get_ViewModel, put_ViewModel, Show
 AMP.UI.Views.IEqualizerControlStatics
   methods: Instance, Shutdown
 AMP.UI.Views.IEqualizerView
   methods: get_HostWindow, get_ViewModel, put_ViewModel
-AMP.UI.Views.IExplicitBadgeControl
-  methods: get_ExplicitBadge, put_ExplicitBadge, get_Size, put_Size
-AMP.UI.Views.IExplicitBadgeControlStatics
-  methods: get_ExplicitBadgeProperty, get_SizeProperty
 AMP.UI.Views.IFilesSettingsPage
   methods: get_ViewModel, put_ViewModel
 AMP.UI.Views.IFlyoutMenuOpenStateChangingEventArgs
@@ -291,13 +317,27 @@ AMP.UI.Views.IInlineEditGridStatics
   methods: get_IsEditableProperty, get_MinEditWidthProperty, get_AlternativePaddingProperty, get_EditFieldProperty, get_CanStartEditProperty, get_AllowDoubleTapToEditProperty, get_AllowEmptyStringProperty
 AMP.UI.Views.IInternalSettingsPage
   methods: get_ViewModel, put_ViewModel
+AMP.UI.Views.IKaraokeLyricsLine
+  methods: get_Words, put_Words, get_Text, put_Text, get_WordByWord, put_WordByWord, get_IsCurrent, put_IsCurrent, get_IsInstrumental, put_IsInstrumental, get_IsPlaying, put_IsPlaying, get_IsSecondaryAgent, put_IsSecondaryAgent, get_PrimaryAgentIsRtl, put_PrimaryAgentIsRtl, get_Start, put_Start, get_End, put_End, get_ActiveWordId, put_ActiveWordId, get_BackgroundWords, put_BackgroundWords, get_ActiveBackgroundWordId, put_ActiveBackgroundWordId, get_PronunciationWords, put_PronunciationWords, get_ActivePronunciationWordId, put_ActivePronunciationWordId, get_PronunciationBackgroundWords, put_PronunciationBackgroundWords, get_ActivePronunciationBackgroundWordId, put_ActivePronunciationBackgroundWordId, get_PronunciationText, put_PronunciationText, get_TranslationText, put_TranslationText, get_ShowPronunciation, put_ShowPronunciation, get_ShowTranslation, put_ShowTranslation, get_Instrumental1End, put_Instrumental1End, get_Instrumental2End, put_Instrumental2End, get_Instrumental3End, put_Instrumental3End, get_LineFontSize, put_LineFontSize, get_SubLineFontSize, put_SubLineFontSize, get_SungColor, put_SungColor, get_UnsungColor, put_UnsungColor, get_BackgroundSungColor, put_BackgroundSungColor, get_TranslationColor, put_TranslationColor
+AMP.UI.Views.IKaraokeLyricsLineStatics
+  methods: get_WordsProperty, get_TextProperty, get_WordByWordProperty, get_IsCurrentProperty, get_IsInstrumentalProperty, get_IsPlayingProperty, get_IsSecondaryAgentProperty, get_PrimaryAgentIsRtlProperty, get_StartProperty, get_EndProperty, get_ActiveWordIdProperty, get_BackgroundWordsProperty, get_ActiveBackgroundWordIdProperty, get_PronunciationWordsProperty, get_ActivePronunciationWordIdProperty, get_PronunciationBackgroundWordsProperty, get_ActivePronunciationBackgroundWordIdProperty, get_PronunciationTextProperty, get_TranslationTextProperty, get_ShowPronunciationProperty, get_ShowTranslationProperty, get_Instrumental1EndProperty, get_Instrumental2EndProperty, get_Instrumental3EndProperty, get_LineFontSizeProperty, get_SubLineFontSizeProperty, get_SungColorProperty, get_UnsungColorProperty, get_BackgroundSungColorProperty, get_TranslationColorProperty
+AMP.UI.Views.IKaraokeLyricsView
+  methods: get_CurrentLineAlignment, put_CurrentLineAlignment, get_EndScrollsUp, put_EndScrollsUp, get_IsFadingEnabled, put_IsFadingEnabled, get_IsOpen, put_IsOpen, get_TSLMargin, put_TSLMargin, get_GeneralSettings, put_GeneralSettings, get_HostWindow, put_HostWindow, get_ViewModel, UnloadObject
+AMP.UI.Views.IKaraokeLyricsViewStatics
+  methods: get_CurrentLineAlignmentProperty, get_EndScrollsUpProperty, get_IsFadingEnabledProperty, get_IsOpenProperty, get_TSLMarginProperty, get_GeneralSettingsProperty
 AMP.UI.Views.ILanguageListDialog
   methods: get_ViewModel, ShowLanguageListDialogAsync
 AMP.UI.Views.ILibraryItemStatusButton
-  methods: get_ItemStatusProvider, put_ItemStatusProvider, get_EnableRemoveDownloadButton, put_EnableRemoveDownloadButton, get_ShowCheckGlyphForDownloaded, put_ShowCheckGlyphForDownloaded
+  methods: get_ItemStatusProvider, put_ItemStatusProvider, get_IsBackgroundColored, put_IsBackgroundColored, get_EnableRemoveDownloadButton, put_EnableRemoveDownloadButton, get_ShowCheckGlyphForDownloaded, put_ShowCheckGlyphForDownloaded
 AMP.UI.Views.ILibraryItemStatusButtonStatics
-  methods: get_IsHoveringProperty, get_ItemStatusProviderProperty, get_EnableRemoveDownloadButtonProperty, get_ShowCheckGlyphForDownloadedProperty
+  methods: get_IsHoveringProperty, get_ItemStatusProviderProperty, get_IsBackgroundColoredProperty, get_EnableRemoveDownloadButtonProperty, get_ShowCheckGlyphForDownloadedProperty
+AMP.UI.Views.IListSectionTemplateSelectorItem
+  methods: get_Kind, put_Kind
 AMP.UI.Views.ILockupTemplates
+AMP.UI.Views.ILyricsHostView
+  methods: get_CurrentLineAlignment, put_CurrentLineAlignment, get_EndScrollsUp, put_EndScrollsUp, get_IsFadingEnabled, put_IsFadingEnabled, get_IsOpen, put_IsOpen, get_TSLMargin, put_TSLMargin, get_GeneralSettings, put_GeneralSettings, get_HostWindow, put_HostWindow
+AMP.UI.Views.ILyricsHostViewStatics
+  methods: get_CurrentLineAlignmentProperty, get_EndScrollsUpProperty, get_IsFadingEnabledProperty, get_IsOpenProperty, get_TSLMarginProperty, get_GeneralSettingsProperty
 AMP.UI.Views.ILyricsListViewItem
   methods: get_IsCurrentLine, put_IsCurrentLine, get_IsInstrumental, put_IsInstrumental, get_LineFontSize, put_LineFontSize, get_LineState, put_LineState, get_Text, put_Text, get_End, put_End, get_Start, put_Start
 AMP.UI.Views.ILyricsListViewItemStatics
@@ -332,9 +372,9 @@ AMP.UI.Views.INavigationViewItem
 AMP.UI.Views.INavigationViewItemStatics
   methods: get_DraggableProperty, get_DroppableProperty, add_ReorderEvent, remove_ReorderEvent, FireReorderEvent
 AMP.UI.Views.INowPlayingControl
-  methods: get_IsArtworkClickEnabled, put_IsArtworkClickEnabled, get_NonDraggableElements, put_NonDraggableElements, get_ViewModel, put_ViewModel, get_TrackTitleText, put_TrackTitleText, get_ArtistTitleText, put_ArtistTitleText, add_ArtworkClick, remove_ArtworkClick
+  methods: get_IsArtworkClickEnabled, put_IsArtworkClickEnabled, get_NonDraggableElements, put_NonDraggableElements, get_ViewModel, put_ViewModel, get_TransportViewModel, put_TransportViewModel, get_TrackTitleText, put_TrackTitleText, get_ArtistTitleText, put_ArtistTitleText, add_ArtworkClick, remove_ArtworkClick
 AMP.UI.Views.INowPlayingControlStatics
-  methods: get_IsArtworkClickEnabledProperty, get_NonDraggableElementsProperty, get_ViewModelProperty
+  methods: get_IsArtworkClickEnabledProperty, get_NonDraggableElementsProperty, get_ViewModelProperty, get_TransportViewModelProperty
 AMP.UI.Views.IPageDialog
   methods: get_ContentFrame, get_ViewModel, SetDismissDialogDoneEvent, WaitForDismissDialogDoneEvent
 AMP.UI.Views.IPageDialogFactory
@@ -397,6 +437,10 @@ AMP.UI.Views.IStorePage
 AMP.UI.Views.ITVDetailHeaderLockupTemplateSelectorItem
   methods: get_DisplayStyle, put_DisplayStyle
 AMP.UI.Views.IThemeResources
+AMP.UI.Views.ITitleSubtitleControl
+  methods: get_CanFavorite, put_CanFavorite, get_ExplicitBadge, put_ExplicitBadge, get_Headline, put_Headline, get_IsBackgroundColored, put_IsBackgroundColored, get_IsFavorited, put_IsFavorited, get_ShowFavoriteSuggestLessButton, put_ShowFavoriteSuggestLessButton, get_ShowSubtitleInDestructiveAccent, put_ShowSubtitleInDestructiveAccent, get_SubtitleLinks, put_SubtitleLinks, get_Title, put_Title
+AMP.UI.Views.ITitleSubtitleControlStatics
+  methods: get_CanFavoriteProperty, get_ExplicitBadgeProperty, get_HeadlineProperty, get_IsBackgroundColoredProperty, get_IsFavoritedProperty, get_IsHoveringProperty, get_ShowFavoriteSuggestLessButtonProperty, get_ShowSubtitleInDestructiveAccentProperty, get_SubtitleLinksProperty, get_TitleProperty
 AMP.UI.Views.ITrackLockupTemplateSelectorItem
   methods: get_LayoutStyle, put_LayoutStyle
 AMP.UI.Views.ITracklistGrid
@@ -412,11 +456,9 @@ AMP.UI.Views.ITwoButtonsFooter
 AMP.UI.Views.ITwoButtonsFooterStatics
   methods: get_PrimaryButtonTitleProperty, get_SecondaryButtonTitleProperty, get_CommandProperty, get_PrimaryButtonCommandParameterProperty, get_SecondaryButtonCommandParameterProperty, get_IsPrimaryButtonEnabledProperty
 AMP.UI.Views.IUIBroker
-  methods: Initialize, Uninitialize, get_XamlRoot, put_XamlRoot, DispatchActionAsync, ShowObjectMenuAsync, get_DispatchActionCommand, get_Debug_AgentTestDuJour, get_Debug_LibraryTestDuJour, get_Debug_CloudLibraryTestDuJour, get_Debug_TestDuJour, get_Debug_StartPES, get_Debug_SavePES, get_Debug_ClosePES
+  methods: Initialize, Uninitialize, get_XamlRoot, put_XamlRoot, DispatchActionAsync, ShowObjectMenuAsync, ShowShareMenuAsync, get_DispatchActionCommand, get_Debug_AgentTestDuJour, get_Debug_LibraryTestDuJour, get_Debug_CloudLibraryTestDuJour, get_Debug_TestDuJour, get_Debug_StartPES, get_Debug_SavePES, get_Debug_ClosePES
 AMP.UI.Views.IUIBrokerStatics
-  methods: get_ServiceProvider, put_ServiceProvider, DispatchInvalidationActionOnToggled, DispatchPlayOnItemDoubleTap, DispatchDragItemsStarting, DispatchDragItemsCompleted, DispatchDropToList, ShowObjectMenuOnContextRequested, ShowObjectMenuOnRoutedEvent, DispatchKeyAction, DispatchSegueOrPlayOnItemClicked, ContentEditDone, ContentListViewSelectionChanged, ContentListViewItemClicked, FavoriteClicked, FavoriteSuggestLessClicked, RatingControlValueChanged, GlobalDispatchActionAsync, UserDisabledValueChanged, ShowModalPresentationOnClick, TypeAheadRequested, BackgroundTreatment, HorizontalAlignment, TextAlignment, WorkAround_ChildCollectionMustNotBeModified, GetImageSource, GetImageSourceAsync, GetImageURI, GetImageURIString
-AMP.UI.Views.IVerticalVideoLockupTemplateSelectorItem
-  methods: get_DisplayStyle, put_DisplayStyle
+  methods: get_ServiceProvider, put_ServiceProvider, DispatchInvalidationActionOnToggled, DispatchPlayOnItemDoubleTap, DispatchDragItemsStarting, DispatchDragItemsCompleted, DispatchDropToList, ShowObjectMenuOnContextRequested, ShowObjectMenuOnRoutedEvent, ShowShareMenuOnRoutedEvent, DispatchKeyAction, DispatchSegueOnItemClicked, DispatchSegueOrPlayOnItemClicked, ContentEditDone, ContentListViewSelectionChanged, ContentListViewItemClicked, FavoriteClicked, FavoriteSuggestLessClicked, RatingControlValueChanged, GlobalDispatchActionAsync, UserDisabledValueChanged, ShowModalPresentationOnClick, TypeAheadRequested, OverrideFontTypeIfNeeded, BackgroundTreatment, HorizontalAlignment, TextAlignment, WorkAround_ChildCollectionMustNotBeModified, GetImageSource, GetImageSource, GetImageSourceAsync, GetImageURI, ArtistCircleArtworkVisibility, ArtistWideArtworkSpacerVisibility, GetImageURIString
 AMP.UI.Views.IVideoHUDVisibilityCheckEventArgs
   methods: get_Handled, put_Handled
 AMP.UI.Views.IVideoPanelSizeChangedEventArgs
@@ -424,18 +466,22 @@ AMP.UI.Views.IVideoPanelSizeChangedEventArgs
 AMP.UI.Views.IVideoPanelSizeChangedEventArgsFactory
   methods: CreateInstance
 AMP.UI.Views.IVideoPlaybackPage
-  methods: get_ViewModel, get_VideoAdvisoryData, get_CustomTitleBar, get_CustomTitleBarHeight, GoLiveButtonForegroundColor, get_ScreenScale, put_ScreenScale, get_CurrentPositionSliderAutomationPeer, put_CurrentPositionSliderAutomationPeer, Close, SetCursor, IsPointOnControl, OnVideoSwapChainPanelSizeChanged, OnMenuFlyoutOpening, OnMenuFlyoutClosing, add_VideoPanelSizeChanged, remove_VideoPanelSizeChanged, add_VideoHUDVisibilityCheck, remove_VideoHUDVisibilityCheck, add_FlyoutMenuOpenStateChanging, remove_FlyoutMenuOpenStateChanging
+  methods: get_ViewModel, get_CustomTitleBar, get_CurrentPositionSliderAutomationPeer, put_CurrentPositionSliderAutomationPeer, Close, SetCursor, IsPointOnControl, OnVideoSwapChainPanelSizeChanged, OnMenuFlyoutOpening, OnMenuFlyoutClosing, add_VideoPanelSizeChanged, remove_VideoPanelSizeChanged, add_VideoHUDVisibilityCheck, remove_VideoHUDVisibilityCheck, add_FlyoutMenuOpenStateChanging, remove_FlyoutMenuOpenStateChanging
 AMP.UI.Views.IVideoPlaybackPageFactory
   methods: CreateInstance
 AMP.UI.Views.IVideoPlaybackPageStatics
-  methods: BoundedImageSourceWithAspectRatio, CutlImageSourceWithAspectRatio, CutlProgressText, SetVisualState, GetVisualState, SetRaiseAccessibilityTextUpdate, GetRaiseAccessibilityTextUpdate, SetRaiseAdvisoryTextUpdate, GetRaiseAdvisoryTextUpdate, SetTrackFocus, GetTrackFocus, SetHasFocus, GetHasFocus
+  methods: BoundedImageSourceWithAspectRatio, CutlImageSourceWithAspectRatio, CutlProgressText, PictogramsVisibility, SetVisualState, GetVisualState, SetRaiseAccessibilityTextUpdate, GetRaiseAccessibilityTextUpdate, SetTrackFocus, GetTrackFocus, SetHasFocus, GetHasFocus
 AMP.UI.Views.IVideoPlaybackWindow
 AMP.UI.Views.IWebDialogControl
   methods: ShowDialog, get_ViewModel
 AMP.UI.Views.IWebDialogControlFactory
   methods: CreateInstance
+AMP.UI.Views.IWhatsNewDialog
+  methods: get_ViewModel
+AMP.UI.Views.IWhatsNewDialogFactory
+  methods: CreateInstance
 AMP.UI.Views.IXamlTypeInfoWorkaround
-  methods: get_Unused_AccessoryButton, get_Unused_DefaultSectionHeader, get_Unused_ListSection, get_Unused_MenuItem, get_Unused_MenuItemSeparator, get_Unused_Page, get_Unused_ReactMenuItem, get_Unused_ShelfSection, get_Unused_SidebarItem, get_Unused_SingleItemSection, get_Unused_SuggestedSongsSection, get_Unused_SubMenuItem, get_Unused_ToggleMenuItem, get_Unused_AlbumTrackLockup, get_Unused_AlbumDetailHeaderLockup, get_Unused_ActivityWindowViewItem, get_Unused_ArtistDetailHeaderLockup, get_Unused_ArtistLatestReleaseLockup, get_Unused_BrickLockup, get_Unused_BubbleLockup, get_Unused_ColumnSectionHeader, get_Unused_ComposerSectionHeader, get_Unused_ContainerDetailHeaderLockup, get_Unused_ContainerDetailTracklistFooterLockup, get_Unused_CuratorDetailHeaderComponentModel, get_Unused_DataGridColumnInfo, get_Unused_DataGridCheckBoxCell, get_Unused_DataGridCloudDownloadCell, get_Unused_DataGridEqualizerCell, get_Unused_DataGridStatusCell, get_Unused_DataGridFavoriteCell, get_Unused_DataGridPhysicalOrderStatusCell, get_Unused_DataGridRatingCell, get_Unused_DataGridTextCell, get_Unused_DataGridTitleCell, get_Unused_DataGridRowLockup, get_Unused_DataGridSection, get_Unused_EmptyStateLockup, get_Unused_FilterAccessoryButton, get_Unused_FilterResultsAccessoryItem, get_Unused_FixedDetailListSection, get_Unused_FixedDetailListSectionHeader, get_Unused_FixedListSection, get_Unused_FlowcaseLockup, get_Unused_GroupedListSection, get_Unused_GroupedItems, get_Unused_GridSection, get_Unused_GroupTextListLockup, get_Unused_HeaderComponentModel, get_Unused_HorizontalLockup, get_Unused_HorizontalPosterLockup, get_Unused_InlineUpsell, get_Unused_HyperlinkAccessoryButton, get_Unused_IActivityViewModel, get_Unused_LinkComponentModel, get_Unused_MoreAccessoryButton, get_Unused_NotImplementedLockup, get_Unused_TallVideoLockup, get_Unused_ParagraphComponentModel, get_Unused_PlaylistDetailHeaderLockup, get_Unused_PlaylistSidebarMenuItem, get_Unused_PlaylistTrackLockup, get_Unused_PopoverAccessoryButton, get_Unused_SocialCardLockup, get_Unused_SquareArtworkPosterLockup, get_Unused_SquareArtworkPosterLockupOld, get_Unused_SuggestedSongLockup, get_Unused_TallArtworkPosterLockup, get_Unused_TallArtworkPosterLockupOld, get_Unused_RadioMenuItem, get_Unused_SearchHintsLockup, get_Unused_SearchQueryContextLockup, get_Unused_AutoplayPlayQueueSection, get_Unused_UpNextPlayQueueSection, get_Unused_HistoryPlayQueueSection, get_Unused_OtherPlayQueueSection, get_Unused_SelectableSquareLockup, get_Unused_SideListItemLockup, get_Unused_SquareLockup, get_Unused_SuperHeroLockup, get_Unused_TopSearchLockup, get_Unused_TextListComponentModel, get_Unused_TrackLockup, get_Unused_TracklistLockup, get_Unused_TVDetailHeaderLockup, get_Unused_TVMovieDescription, get_Unused_VerticalVideoLockup, get_Unused_Spacer, get_Unused_ViewOptionsAccessoryButton, get_Unused_SocialProfileDetailHeaderLockup, get_Unused_SocialProfileEditorHeaderLockup, get_Unused_SocialProfileFindFriendsButton, get_Unused_SocialProfileViewFollowRequestsHeader, get_Unused_SocialOnboardingWelcomePageLockup, get_Unused_SocialOnboardingFindFriendsPageLockup, get_Unused_SocialOnboardingPrivacySettingsPageLockup, get_Unused_SocialOnboardingUserNameHandlePageLockup, get_Unused_SocialOnboardingSharedPlaylistLockup, get_Unused_SocialOnboardingNotificationSettingsPageLockup, get_Unused_InfoPanelRowArtworkViewModel, get_Unused_InfoPanelRowCheckBoxViewModel, get_Unused_InfoPanelRowComboBoxViewModel, get_Unused_InfoPanelTabViewModel, get_Unused_InfoPanelRowNumberRangeViewModel, get_Unused_InfoPanelRowStringViewModel, get_Unused_InfoPanelRowNumberViewModel, get_Unused_InfoPanelRowRatingViewModel, get_Unused_InfoPanelRowSeparatorViewModel, get_Unused_InfoPanelRowLyricsViewModel, get_Unused_InfoPanelRowSortAsViewModel, get_Unused_InfoPanelRowStaticNumberWithActionViewModel, get_Unused_InfoPanelRowStaticStringViewModel, get_Unused_InfoPanelRowTextBoxViewModel, get_Unused_InfoPanelRowTimeViewModel, get_Unused_InfoPanelRowNameWorkMovementViewModel, get_Unused_InfoPanelRowDateViewModel, get_Unused_InfoPanelRowSliderViewModel, get_Unused_ComboBoxItem, get_Unused_ComboBoxSeparatorItem
+  methods: get_Unused_AccessoryButton, get_Unused_DefaultSectionHeader, get_Unused_ListSection, get_Unused_MenuItem, get_Unused_MenuItemSeparator, get_Unused_Page, get_Unused_ReactMenuItem, get_Unused_ShelfSection, get_Unused_SidebarItem, get_Unused_SingleItemSection, get_Unused_SuggestedSongsSection, get_Unused_SubMenuItem, get_Unused_ToggleMenuItem, get_Unused_AlbumTrackLockup, get_Unused_AlbumDetailHeaderLockup, get_Unused_ActivityWindowViewItem, get_Unused_ArtistDetailHeaderLockup, get_Unused_ArtistLatestReleaseLockup, get_Unused_CircleLockup, get_Unused_ColumnSectionHeader, get_Unused_ComposerSectionHeader, get_Unused_ContainerDetailHeaderLockup, get_Unused_ContainerDetailTracklistFooterLockup, get_Unused_CuratorDetailHeaderComponentModel, get_Unused_DataGridColumnInfo, get_Unused_DataGridCheckBoxCell, get_Unused_DataGridCloudDownloadCell, get_Unused_DataGridEqualizerCell, get_Unused_DataGridStatusCell, get_Unused_DataGridFavoriteCell, get_Unused_DataGridPhysicalOrderStatusCell, get_Unused_DataGridRatingCell, get_Unused_DataGridTextCell, get_Unused_DataGridTitleCell, get_Unused_DataGridRowLockup, get_Unused_DataGridSection, get_Unused_EmptyStateLockup, get_Unused_FilterAccessoryButton, get_Unused_FilterResultsAccessoryItem, get_Unused_FixedDetailListSection, get_Unused_FixedDetailListSectionHeader, get_Unused_FixedListSection, get_Unused_FlowcaseLockup, get_Unused_GroupedListSection, get_Unused_GroupedItems, get_Unused_GridSection, get_Unused_GroupTextListLockup, get_Unused_HeaderComponentModel, get_Unused_HorizontalLockup, get_Unused_HorizontalPosterLockup, get_Unused_InlineUpsell, get_Unused_HyperlinkAccessoryButton, get_Unused_IActivityViewModel, get_Unused_LinkComponentModel, get_Unused_MoreAccessoryButton, get_Unused_NotImplementedLockup, get_Unused_TallVideoLockup, get_Unused_ParagraphComponentModel, get_Unused_PlaylistDetailHeaderLockup, get_Unused_PlaylistSidebarMenuItem, get_Unused_PlaylistTrackLockup, get_Unused_PopoverAccessoryButton, get_Unused_SocialCardLockup, get_Unused_SquareArtworkPosterLockup, get_Unused_SquareArtworkPosterLockupOld, get_Unused_SuggestedSongLockup, get_Unused_TallArtworkPosterLockup, get_Unused_TallArtworkPosterLockupOld, get_Unused_RadioMenuItem, get_Unused_SearchHintsLockup, get_Unused_SearchQueryContextLockup, get_Unused_AutoplayPlayQueueSection, get_Unused_UpNextPlayQueueSection, get_Unused_HistoryPlayQueueSection, get_Unused_OtherPlayQueueSection, get_Unused_SelectableSquareLockup, get_Unused_SideListItemLockup, get_Unused_SquareLockup, get_Unused_SuperHeroLockup, get_Unused_TopSearchLockup, get_Unused_TextListComponentModel, get_Unused_TrackLockup, get_Unused_TracklistLockup, get_Unused_TVDetailHeaderLockup, get_Unused_TVMovieDescription, get_Unused_BrickLockup, get_Unused_Spacer, get_Unused_ViewOptionsAccessoryButton, get_Unused_SocialProfileDetailHeaderLockup, get_Unused_SocialProfileEditorHeaderLockup, get_Unused_SocialProfileFindFriendsButton, get_Unused_SocialProfileViewFollowRequestsHeader, get_Unused_SocialOnboardingWelcomePageLockup, get_Unused_SocialOnboardingFindFriendsPageLockup, get_Unused_SocialOnboardingPrivacySettingsPageLockup, get_Unused_SocialOnboardingUserNameHandlePageLockup, get_Unused_SocialOnboardingSharedPlaylistLockup, get_Unused_SocialOnboardingNotificationSettingsPageLockup, get_Unused_InfoPanelRowArtworkViewModel, get_Unused_InfoPanelRowCheckBoxViewModel, get_Unused_InfoPanelRowComboBoxViewModel, get_Unused_InfoPanelTabViewModel, get_Unused_InfoPanelRowNumberRangeViewModel, get_Unused_InfoPanelRowStringViewModel, get_Unused_InfoPanelRowNumberViewModel, get_Unused_InfoPanelRowRatingViewModel, get_Unused_InfoPanelRowSeparatorViewModel, get_Unused_InfoPanelRowLyricsViewModel, get_Unused_InfoPanelRowSortAsViewModel, get_Unused_InfoPanelRowStaticNumberWithActionViewModel, get_Unused_InfoPanelRowStaticStringViewModel, get_Unused_InfoPanelRowTextBoxViewModel, get_Unused_InfoPanelRowTimeViewModel, get_Unused_InfoPanelRowNameWorkMovementViewModel, get_Unused_InfoPanelRowDateViewModel, get_Unused_InfoPanelRowSliderViewModel, get_Unused_ComboBoxItem, get_Unused_ComboBoxSeparatorItem
 AMP.UI.Views.ImportSettingsPage
   methods: .ctor, get_ViewModel, put_ViewModel
 AMP.UI.Views.InfoPanelArtworkEditControl
@@ -456,22 +502,30 @@ AMP.UI.Views.InlineEditGrid
   methods: .ctor, get_IsEditable, put_IsEditable, get_MinEditWidth, put_MinEditWidth, get_AlternativePadding, put_AlternativePadding, get_EditField, put_EditField, get_CanStartEdit, put_CanStartEdit, get_AllowDoubleTapToEdit, put_AllowDoubleTapToEdit, get_AllowEmptyString, put_AllowEmptyString, add_EditDone, remove_EditDone, get_IsEditableProperty, get_MinEditWidthProperty, get_AlternativePaddingProperty, get_EditFieldProperty, get_CanStartEditProperty, get_AllowDoubleTapToEditProperty, get_AllowEmptyStringProperty
 AMP.UI.Views.InternalSettingsPage
   methods: .ctor, get_ViewModel, put_ViewModel
+AMP.UI.Views.KaraokeLyricsLine
+  methods: .ctor, get_Words, put_Words, get_Text, put_Text, get_WordByWord, put_WordByWord, get_IsCurrent, put_IsCurrent, get_IsInstrumental, put_IsInstrumental, get_IsPlaying, put_IsPlaying, get_IsSecondaryAgent, put_IsSecondaryAgent, get_PrimaryAgentIsRtl, put_PrimaryAgentIsRtl, get_Start, put_Start, get_End, put_End, get_ActiveWordId, put_ActiveWordId, get_BackgroundWords, put_BackgroundWords, get_ActiveBackgroundWordId, put_ActiveBackgroundWordId, get_PronunciationWords, put_PronunciationWords, get_ActivePronunciationWordId, put_ActivePronunciationWordId, get_PronunciationBackgroundWords, put_PronunciationBackgroundWords, get_ActivePronunciationBackgroundWordId, put_ActivePronunciationBackgroundWordId, get_PronunciationText, put_PronunciationText, get_TranslationText, put_TranslationText, get_ShowPronunciation, put_ShowPronunciation, get_ShowTranslation, put_ShowTranslation, get_Instrumental1End, put_Instrumental1End, get_Instrumental2End, put_Instrumental2End, get_Instrumental3End, put_Instrumental3End, get_LineFontSize, put_LineFontSize, get_SubLineFontSize, put_SubLineFontSize, get_SungColor, put_SungColor, get_UnsungColor, put_UnsungColor, get_BackgroundSungColor, put_BackgroundSungColor, get_TranslationColor, put_TranslationColor, get_WordsProperty, get_TextProperty, get_WordByWordProperty, get_IsCurrentProperty, get_IsInstrumentalProperty, get_IsPlayingProperty, get_IsSecondaryAgentProperty, get_PrimaryAgentIsRtlProperty, get_StartProperty, get_EndProperty, get_ActiveWordIdProperty, get_BackgroundWordsProperty, get_ActiveBackgroundWordIdProperty, get_PronunciationWordsProperty, get_ActivePronunciationWordIdProperty, get_PronunciationBackgroundWordsProperty, get_ActivePronunciationBackgroundWordIdProperty, get_PronunciationTextProperty, get_TranslationTextProperty, get_ShowPronunciationProperty, get_ShowTranslationProperty, get_Instrumental1EndProperty, get_Instrumental2EndProperty, get_Instrumental3EndProperty, get_LineFontSizeProperty, get_SubLineFontSizeProperty, get_SungColorProperty, get_UnsungColorProperty, get_BackgroundSungColorProperty, get_TranslationColorProperty
+AMP.UI.Views.KaraokeLyricsView
+  methods: .ctor, get_CurrentLineAlignment, put_CurrentLineAlignment, get_EndScrollsUp, put_EndScrollsUp, get_IsFadingEnabled, put_IsFadingEnabled, get_IsOpen, put_IsOpen, get_TSLMargin, put_TSLMargin, get_GeneralSettings, put_GeneralSettings, get_HostWindow, put_HostWindow, get_ViewModel, UnloadObject, get_CurrentLineAlignmentProperty, get_EndScrollsUpProperty, get_IsFadingEnabledProperty, get_IsOpenProperty, get_TSLMarginProperty, get_GeneralSettingsProperty
 AMP.UI.Views.LanguageListDialog
   methods: .ctor, get_ViewModel, ShowLanguageListDialogAsync
 AMP.UI.Views.LibraryItemStatusButton
-  methods: .ctor, get_ItemStatusProvider, put_ItemStatusProvider, get_EnableRemoveDownloadButton, put_EnableRemoveDownloadButton, get_ShowCheckGlyphForDownloaded, put_ShowCheckGlyphForDownloaded, get_IsHovering, put_IsHovering, get_IsHoveringProperty, get_ItemStatusProviderProperty, get_EnableRemoveDownloadButtonProperty, get_ShowCheckGlyphForDownloadedProperty
+  methods: .ctor, get_ItemStatusProvider, put_ItemStatusProvider, get_IsBackgroundColored, put_IsBackgroundColored, get_EnableRemoveDownloadButton, put_EnableRemoveDownloadButton, get_ShowCheckGlyphForDownloaded, put_ShowCheckGlyphForDownloaded, get_IsHovering, put_IsHovering, get_IsHoveringProperty, get_ItemStatusProviderProperty, get_IsBackgroundColoredProperty, get_EnableRemoveDownloadButtonProperty, get_ShowCheckGlyphForDownloadedProperty
+AMP.UI.Views.ListSectionTemplateSelectorItem
+  methods: .ctor, get_Kind, put_Kind, ToString
 AMP.UI.Views.ListViewBaseItemToKeyConverter
   methods: .ctor, Convert, ConvertBack
 AMP.UI.Views.LockupTemplates
   methods: .ctor
 AMP.UI.Views.Logo_Anim_Shapes
   methods: .ctor, TryCreateAnimatedVisual, get_Markers, SetColorProperty
+AMP.UI.Views.LyricsHostView
+  methods: .ctor, get_CurrentLineAlignment, put_CurrentLineAlignment, get_EndScrollsUp, put_EndScrollsUp, get_IsFadingEnabled, put_IsFadingEnabled, get_IsOpen, put_IsOpen, get_TSLMargin, put_TSLMargin, get_GeneralSettings, put_GeneralSettings, get_HostWindow, put_HostWindow, get_CurrentLineAlignmentProperty, get_EndScrollsUpProperty, get_IsFadingEnabledProperty, get_IsOpenProperty, get_TSLMarginProperty, get_GeneralSettingsProperty
 AMP.UI.Views.LyricsListViewItem
   methods: .ctor, get_IsCurrentLine, put_IsCurrentLine, get_IsInstrumental, put_IsInstrumental, get_LineFontSize, put_LineFontSize, get_LineState, put_LineState, get_Text, put_Text, get_End, put_End, get_Start, put_Start, get_IsCurrentLineProperty, get_IsInstrumentalProperty, get_LineFontSizeProperty, get_LineStateProperty, get_TextProperty, get_EndProperty, get_StartProperty
 AMP.UI.Views.LyricsView
   methods: .ctor, get_CurrentLineAlignment, put_CurrentLineAlignment, get_EndScrollsUp, put_EndScrollsUp, get_IsFadingEnabled, put_IsFadingEnabled, get_IsOpen, put_IsOpen, get_TSLMargin, put_TSLMargin, get_HostWindow, put_HostWindow, get_ViewModel, UnloadObject, get_CurrentLineAlignmentProperty, get_EndScrollsUpProperty, get_IsFadingEnabledProperty, get_IsOpenProperty, get_TSLMarginProperty
 AMP.UI.Views.MainPage
-  methods: .ctor, get_ContentFrame, get_ViewModel, get_HostWindow, UnloadObject, GetTitlebarButtonColors, GetTitleBarElement, GetNonDraggableRects, SetWindowState, add_DragRegionChanged, remove_DragRegionChanged, ShowInformation, ShowDialogAsync, DismissDialog, ShowAuthDialogAsync, ShowModalContentAsync, get_ModalContent, get_Busy, put_Busy
+  methods: .ctor, get_ContentFrame, get_ViewModel, get_HostWindow, UnloadObject, GetTitlebarButtonColors, GetTitleBarElement, GetNonDraggableRects, SetWindowState, add_DragRegionChanged, remove_DragRegionChanged, ShowInformation, ShowDialogAsync, ShowDialogAsync, DismissDialog, ShowAuthDialogAsync, ShowModalContentAsync, get_ModalContent, get_Busy, put_Busy
 AMP.UI.Views.MainSettingsPage
   methods: .ctor, get_ViewModel, put_ViewModel, get_SettingsViewModel
 AMP.UI.Views.MenuTemplates
@@ -489,7 +543,7 @@ AMP.UI.Views.NavigationViewItem
 AMP.UI.Views.NavigationViewItemReorderEventHandler
   methods: .ctor, Invoke
 AMP.UI.Views.NowPlayingControl
-  methods: .ctor, get_IsArtworkClickEnabled, put_IsArtworkClickEnabled, get_NonDraggableElements, put_NonDraggableElements, get_ViewModel, put_ViewModel, get_TrackTitleText, put_TrackTitleText, get_ArtistTitleText, put_ArtistTitleText, add_ArtworkClick, remove_ArtworkClick, get_IsArtworkClickEnabledProperty, get_NonDraggableElementsProperty, get_ViewModelProperty
+  methods: .ctor, get_IsArtworkClickEnabled, put_IsArtworkClickEnabled, get_NonDraggableElements, put_NonDraggableElements, get_ViewModel, put_ViewModel, get_TransportViewModel, put_TransportViewModel, get_TrackTitleText, put_TrackTitleText, get_ArtistTitleText, put_ArtistTitleText, add_ArtworkClick, remove_ArtworkClick, get_IsArtworkClickEnabledProperty, get_NonDraggableElementsProperty, get_ViewModelProperty, get_TransportViewModelProperty
 AMP.UI.Views.PageDialog
   methods: .ctor, get_ContentFrame, get_ViewModel, SetDismissDialogDoneEvent, WaitForDismissDialogDoneEvent
 AMP.UI.Views.PageTemplateSelectorItem
@@ -540,6 +594,8 @@ AMP.UI.Views.TVDetailHeaderLockupTemplateSelectorItem
   methods: .ctor, get_DisplayStyle, put_DisplayStyle
 AMP.UI.Views.ThemeResources
   methods: .ctor
+AMP.UI.Views.TitleSubtitleControl
+  methods: .ctor, get_CanFavorite, put_CanFavorite, get_ExplicitBadge, put_ExplicitBadge, get_Headline, put_Headline, get_IsBackgroundColored, put_IsBackgroundColored, get_IsFavorited, put_IsFavorited, get_ShowFavoriteSuggestLessButton, put_ShowFavoriteSuggestLessButton, get_ShowSubtitleInDestructiveAccent, put_ShowSubtitleInDestructiveAccent, get_SubtitleLinks, put_SubtitleLinks, get_Title, put_Title, get_IsHovering, put_IsHovering, get_CanFavoriteProperty, get_ExplicitBadgeProperty, get_HeadlineProperty, get_IsBackgroundColoredProperty, get_IsFavoritedProperty, get_IsHoveringProperty, get_ShowFavoriteSuggestLessButtonProperty, get_ShowSubtitleInDestructiveAccentProperty, get_SubtitleLinksProperty, get_TitleProperty
 AMP.UI.Views.TrackLockupTemplateSelectorItem
   methods: .ctor, get_LayoutStyle, put_LayoutStyle, ToString
 AMP.UI.Views.TracklistGrid
@@ -549,20 +605,20 @@ AMP.UI.Views.TransportControl
 AMP.UI.Views.TwoButtonsFooter
   methods: .ctor, get_PrimaryButtonTitle, put_PrimaryButtonTitle, get_SecondaryButtonTitle, put_SecondaryButtonTitle, get_Command, put_Command, get_PrimaryButtonCommandParameter, put_PrimaryButtonCommandParameter, get_SecondaryButtonCommandParameter, put_SecondaryButtonCommandParameter, get_IsPrimaryButtonEnabled, put_IsPrimaryButtonEnabled, add_PrimaryButtonClick, remove_PrimaryButtonClick, add_SecondaryButtonClick, remove_SecondaryButtonClick, get_PrimaryButtonTitleProperty, get_SecondaryButtonTitleProperty, get_CommandProperty, get_PrimaryButtonCommandParameterProperty, get_SecondaryButtonCommandParameterProperty, get_IsPrimaryButtonEnabledProperty
 AMP.UI.Views.UIBroker
-  methods: .ctor, Initialize, Uninitialize, get_XamlRoot, put_XamlRoot, DispatchActionAsync, ShowObjectMenuAsync, get_DispatchActionCommand, get_Debug_AgentTestDuJour, get_Debug_LibraryTestDuJour, get_Debug_CloudLibraryTestDuJour, get_Debug_TestDuJour, get_Debug_StartPES, get_Debug_SavePES, get_Debug_ClosePES, add_PropertyChanged, remove_PropertyChanged, GetCustomProperty, GetIndexedProperty, GetStringRepresentation, get_Type, get_ServiceProvider, put_ServiceProvider, DispatchInvalidationActionOnToggled, DispatchPlayOnItemDoubleTap, DispatchDragItemsStarting, DispatchDragItemsCompleted, DispatchDropToList, ShowObjectMenuOnContextRequested, ShowObjectMenuOnRoutedEvent, DispatchKeyAction, DispatchSegueOrPlayOnItemClicked, ContentEditDone, ContentListViewSelectionChanged, ContentListViewItemClicked, FavoriteClicked, FavoriteSuggestLessClicked, RatingControlValueChanged, GlobalDispatchActionAsync, UserDisabledValueChanged, ShowModalPresentationOnClick, TypeAheadRequested, BackgroundTreatment, HorizontalAlignment, TextAlignment, WorkAround_ChildCollectionMustNotBeModified, GetImageSource, GetImageSourceAsync, GetImageURI, GetImageURIString
-AMP.UI.Views.VerticalVideoLockupTemplateSelectorItem
-  methods: .ctor, get_DisplayStyle, put_DisplayStyle
+  methods: .ctor, Initialize, Uninitialize, get_XamlRoot, put_XamlRoot, DispatchActionAsync, ShowObjectMenuAsync, ShowShareMenuAsync, get_DispatchActionCommand, get_Debug_AgentTestDuJour, get_Debug_LibraryTestDuJour, get_Debug_CloudLibraryTestDuJour, get_Debug_TestDuJour, get_Debug_StartPES, get_Debug_SavePES, get_Debug_ClosePES, add_PropertyChanged, remove_PropertyChanged, GetCustomProperty, GetIndexedProperty, GetStringRepresentation, get_Type, get_ServiceProvider, put_ServiceProvider, DispatchInvalidationActionOnToggled, DispatchPlayOnItemDoubleTap, DispatchDragItemsStarting, DispatchDragItemsCompleted, DispatchDropToList, ShowObjectMenuOnContextRequested, ShowObjectMenuOnRoutedEvent, ShowShareMenuOnRoutedEvent, DispatchKeyAction, DispatchSegueOnItemClicked, DispatchSegueOrPlayOnItemClicked, ContentEditDone, ContentListViewSelectionChanged, ContentListViewItemClicked, FavoriteClicked, FavoriteSuggestLessClicked, RatingControlValueChanged, GlobalDispatchActionAsync, UserDisabledValueChanged, ShowModalPresentationOnClick, TypeAheadRequested, OverrideFontTypeIfNeeded, BackgroundTreatment, HorizontalAlignment, TextAlignment, WorkAround_ChildCollectionMustNotBeModified, GetImageSource, GetImageSource, GetImageSourceAsync, GetImageURI, ArtistCircleArtworkVisibility, ArtistWideArtworkSpacerVisibility, GetImageURIString
 AMP.UI.Views.VideoHUDVisibilityCheckEventArgs
   methods: .ctor, get_Handled, put_Handled
 AMP.UI.Views.VideoPanelSizeChangedEventArgs
   methods: .ctor, get_Handled, put_Handled, get_Size
 AMP.UI.Views.VideoPlaybackPage
-  methods: .ctor, get_ViewModel, get_VideoAdvisoryData, get_CustomTitleBar, get_CustomTitleBarHeight, GoLiveButtonForegroundColor, get_ScreenScale, put_ScreenScale, get_CurrentPositionSliderAutomationPeer, put_CurrentPositionSliderAutomationPeer, Close, SetCursor, IsPointOnControl, OnVideoSwapChainPanelSizeChanged, OnMenuFlyoutOpening, OnMenuFlyoutClosing, add_VideoPanelSizeChanged, remove_VideoPanelSizeChanged, add_VideoHUDVisibilityCheck, remove_VideoHUDVisibilityCheck, add_FlyoutMenuOpenStateChanging, remove_FlyoutMenuOpenStateChanging, add_PropertyChanged, remove_PropertyChanged, GetTitlebarButtonColors, GetTitleBarElement, GetNonDraggableRects, SetWindowState, add_DragRegionChanged, remove_DragRegionChanged, BoundedImageSourceWithAspectRatio, CutlImageSourceWithAspectRatio, CutlProgressText, SetVisualState, GetVisualState, SetRaiseAccessibilityTextUpdate, GetRaiseAccessibilityTextUpdate, SetRaiseAdvisoryTextUpdate, GetRaiseAdvisoryTextUpdate, SetTrackFocus, GetTrackFocus, SetHasFocus, GetHasFocus
+  methods: .ctor, get_ViewModel, get_CustomTitleBar, get_CurrentPositionSliderAutomationPeer, put_CurrentPositionSliderAutomationPeer, Close, SetCursor, IsPointOnControl, OnVideoSwapChainPanelSizeChanged, OnMenuFlyoutOpening, OnMenuFlyoutClosing, add_VideoPanelSizeChanged, remove_VideoPanelSizeChanged, add_VideoHUDVisibilityCheck, remove_VideoHUDVisibilityCheck, add_FlyoutMenuOpenStateChanging, remove_FlyoutMenuOpenStateChanging, add_PropertyChanged, remove_PropertyChanged, GetTitlebarButtonColors, GetTitleBarElement, GetNonDraggableRects, SetWindowState, add_DragRegionChanged, remove_DragRegionChanged, BoundedImageSourceWithAspectRatio, CutlImageSourceWithAspectRatio, CutlProgressText, PictogramsVisibility, SetVisualState, GetVisualState, SetRaiseAccessibilityTextUpdate, GetRaiseAccessibilityTextUpdate, SetTrackFocus, GetTrackFocus, SetHasFocus, GetHasFocus
 AMP.UI.Views.VideoPlaybackWindow
   methods: .ctor, SetVideoPlaybackTitleBar, SetTitle, UpdateVideoPresentationSize, SetWindowPresentationState, UpdateForFocusRequest, OnUIInteraction, OnVisualStateChanged, OnWindowPresenterStateChanged, Close, Foreground, IsWindowFocused, get_WindowInteractionState, put_WindowInteractionState, get_FrameInfo, put_FrameInfo, get_ScreenScale, add_OnWindowActivated, remove_OnWindowActivated, add_OnWindowInteractionStateChanged, remove_OnWindowInteractionStateChanged, add_OnWindowPresentationStateChanged, remove_OnWindowPresentationStateChanged, add_OnVideoSizeChanged, remove_OnVideoSizeChanged, RegisterPageEventHandlers
 AMP.UI.Views.WebDialogControl
   methods: .ctor, ShowDialog, get_ViewModel
+AMP.UI.Views.WhatsNewDialog
+  methods: .ctor, get_ViewModel
 AMP.UI.Views.XamlMetaDataProvider
-  methods: .ctor, GetXamlType, GetXmlnsDefinitions
+  methods: .ctor, GetXamlType, GetXamlType, GetXmlnsDefinitions
 AMP.UI.Views.XamlTypeInfoWorkaround
-  methods: .ctor, get_Unused_AccessoryButton, get_Unused_DefaultSectionHeader, get_Unused_ListSection, get_Unused_MenuItem, get_Unused_MenuItemSeparator, get_Unused_Page, get_Unused_ReactMenuItem, get_Unused_ShelfSection, get_Unused_SidebarItem, get_Unused_SingleItemSection, get_Unused_SuggestedSongsSection, get_Unused_SubMenuItem, get_Unused_ToggleMenuItem, get_Unused_AlbumTrackLockup, get_Unused_AlbumDetailHeaderLockup, get_Unused_ActivityWindowViewItem, get_Unused_ArtistDetailHeaderLockup, get_Unused_ArtistLatestReleaseLockup, get_Unused_BrickLockup, get_Unused_BubbleLockup, get_Unused_ColumnSectionHeader, get_Unused_ComposerSectionHeader, get_Unused_ContainerDetailHeaderLockup, get_Unused_ContainerDetailTracklistFooterLockup, get_Unused_CuratorDetailHeaderComponentModel, get_Unused_DataGridColumnInfo, get_Unused_DataGridCheckBoxCell, get_Unused_DataGridCloudDownloadCell, get_Unused_DataGridEqualizerCell, get_Unused_DataGridStatusCell, get_Unused_DataGridFavoriteCell, get_Unused_DataGridPhysicalOrderStatusCell, get_Unused_DataGridRatingCell, get_Unused_DataGridTextCell, get_Unused_DataGridTitleCell, get_Unused_DataGridRowLockup, get_Unused_DataGridSection, get_Unused_EmptyStateLockup, get_Unused_FilterAccessoryButton, get_Unused_FilterResultsAccessoryItem, get_Unused_FixedDetailListSection, get_Unused_FixedDetailListSectionHeader, get_Unused_FixedListSection, get_Unused_FlowcaseLockup, get_Unused_GroupedListSection, get_Unused_GroupedItems, get_Unused_GridSection, get_Unused_GroupTextListLockup, get_Unused_HeaderComponentModel, get_Unused_HorizontalLockup, get_Unused_HorizontalPosterLockup, get_Unused_InlineUpsell, get_Unused_HyperlinkAccessoryButton, get_Unused_IActivityViewModel, get_Unused_LinkComponentModel, get_Unused_MoreAccessoryButton, get_Unused_NotImplementedLockup, get_Unused_TallVideoLockup, get_Unused_ParagraphComponentModel, get_Unused_PlaylistDetailHeaderLockup, get_Unused_PlaylistSidebarMenuItem, get_Unused_PlaylistTrackLockup, get_Unused_PopoverAccessoryButton, get_Unused_SocialCardLockup, get_Unused_SquareArtworkPosterLockup, get_Unused_SquareArtworkPosterLockupOld, get_Unused_SuggestedSongLockup, get_Unused_TallArtworkPosterLockup, get_Unused_TallArtworkPosterLockupOld, get_Unused_RadioMenuItem, get_Unused_SearchHintsLockup, get_Unused_SearchQueryContextLockup, get_Unused_AutoplayPlayQueueSection, get_Unused_UpNextPlayQueueSection, get_Unused_HistoryPlayQueueSection, get_Unused_OtherPlayQueueSection, get_Unused_SelectableSquareLockup, get_Unused_SideListItemLockup, get_Unused_SquareLockup, get_Unused_SuperHeroLockup, get_Unused_TopSearchLockup, get_Unused_TextListComponentModel, get_Unused_TrackLockup, get_Unused_TracklistLockup, get_Unused_TVDetailHeaderLockup, get_Unused_TVMovieDescription, get_Unused_VerticalVideoLockup, get_Unused_Spacer, get_Unused_ViewOptionsAccessoryButton, get_Unused_SocialProfileDetailHeaderLockup, get_Unused_SocialProfileEditorHeaderLockup, get_Unused_SocialProfileFindFriendsButton, get_Unused_SocialProfileViewFollowRequestsHeader, get_Unused_SocialOnboardingWelcomePageLockup, get_Unused_SocialOnboardingFindFriendsPageLockup, get_Unused_SocialOnboardingPrivacySettingsPageLockup, get_Unused_SocialOnboardingUserNameHandlePageLockup, get_Unused_SocialOnboardingSharedPlaylistLockup, get_Unused_SocialOnboardingNotificationSettingsPageLockup, get_Unused_InfoPanelRowArtworkViewModel, get_Unused_InfoPanelRowCheckBoxViewModel, get_Unused_InfoPanelRowComboBoxViewModel, get_Unused_InfoPanelTabViewModel, get_Unused_InfoPanelRowNumberRangeViewModel, get_Unused_InfoPanelRowStringViewModel, get_Unused_InfoPanelRowNumberViewModel, get_Unused_InfoPanelRowRatingViewModel, get_Unused_InfoPanelRowSeparatorViewModel, get_Unused_InfoPanelRowLyricsViewModel, get_Unused_InfoPanelRowSortAsViewModel, get_Unused_InfoPanelRowStaticNumberWithActionViewModel, get_Unused_InfoPanelRowStaticStringViewModel, get_Unused_InfoPanelRowTextBoxViewModel, get_Unused_InfoPanelRowTimeViewModel, get_Unused_InfoPanelRowNameWorkMovementViewModel, get_Unused_InfoPanelRowDateViewModel, get_Unused_InfoPanelRowSliderViewModel, get_Unused_ComboBoxItem, get_Unused_ComboBoxSeparatorItem
+  methods: .ctor, get_Unused_AccessoryButton, get_Unused_DefaultSectionHeader, get_Unused_ListSection, get_Unused_MenuItem, get_Unused_MenuItemSeparator, get_Unused_Page, get_Unused_ReactMenuItem, get_Unused_ShelfSection, get_Unused_SidebarItem, get_Unused_SingleItemSection, get_Unused_SuggestedSongsSection, get_Unused_SubMenuItem, get_Unused_ToggleMenuItem, get_Unused_AlbumTrackLockup, get_Unused_AlbumDetailHeaderLockup, get_Unused_ActivityWindowViewItem, get_Unused_ArtistDetailHeaderLockup, get_Unused_ArtistLatestReleaseLockup, get_Unused_CircleLockup, get_Unused_ColumnSectionHeader, get_Unused_ComposerSectionHeader, get_Unused_ContainerDetailHeaderLockup, get_Unused_ContainerDetailTracklistFooterLockup, get_Unused_CuratorDetailHeaderComponentModel, get_Unused_DataGridColumnInfo, get_Unused_DataGridCheckBoxCell, get_Unused_DataGridCloudDownloadCell, get_Unused_DataGridEqualizerCell, get_Unused_DataGridStatusCell, get_Unused_DataGridFavoriteCell, get_Unused_DataGridPhysicalOrderStatusCell, get_Unused_DataGridRatingCell, get_Unused_DataGridTextCell, get_Unused_DataGridTitleCell, get_Unused_DataGridRowLockup, get_Unused_DataGridSection, get_Unused_EmptyStateLockup, get_Unused_FilterAccessoryButton, get_Unused_FilterResultsAccessoryItem, get_Unused_FixedDetailListSection, get_Unused_FixedDetailListSectionHeader, get_Unused_FixedListSection, get_Unused_FlowcaseLockup, get_Unused_GroupedListSection, get_Unused_GroupedItems, get_Unused_GridSection, get_Unused_GroupTextListLockup, get_Unused_HeaderComponentModel, get_Unused_HorizontalLockup, get_Unused_HorizontalPosterLockup, get_Unused_InlineUpsell, get_Unused_HyperlinkAccessoryButton, get_Unused_IActivityViewModel, get_Unused_LinkComponentModel, get_Unused_MoreAccessoryButton, get_Unused_NotImplementedLockup, get_Unused_TallVideoLockup, get_Unused_ParagraphComponentModel, get_Unused_PlaylistDetailHeaderLockup, get_Unused_PlaylistSidebarMenuItem, get_Unused_PlaylistTrackLockup, get_Unused_PopoverAccessoryButton, get_Unused_SocialCardLockup, get_Unused_SquareArtworkPosterLockup, get_Unused_SquareArtworkPosterLockupOld, get_Unused_SuggestedSongLockup, get_Unused_TallArtworkPosterLockup, get_Unused_TallArtworkPosterLockupOld, get_Unused_RadioMenuItem, get_Unused_SearchHintsLockup, get_Unused_SearchQueryContextLockup, get_Unused_AutoplayPlayQueueSection, get_Unused_UpNextPlayQueueSection, get_Unused_HistoryPlayQueueSection, get_Unused_OtherPlayQueueSection, get_Unused_SelectableSquareLockup, get_Unused_SideListItemLockup, get_Unused_SquareLockup, get_Unused_SuperHeroLockup, get_Unused_TopSearchLockup, get_Unused_TextListComponentModel, get_Unused_TrackLockup, get_Unused_TracklistLockup, get_Unused_TVDetailHeaderLockup, get_Unused_TVMovieDescription, get_Unused_BrickLockup, get_Unused_Spacer, get_Unused_ViewOptionsAccessoryButton, get_Unused_SocialProfileDetailHeaderLockup, get_Unused_SocialProfileEditorHeaderLockup, get_Unused_SocialProfileFindFriendsButton, get_Unused_SocialProfileViewFollowRequestsHeader, get_Unused_SocialOnboardingWelcomePageLockup, get_Unused_SocialOnboardingFindFriendsPageLockup, get_Unused_SocialOnboardingPrivacySettingsPageLockup, get_Unused_SocialOnboardingUserNameHandlePageLockup, get_Unused_SocialOnboardingSharedPlaylistLockup, get_Unused_SocialOnboardingNotificationSettingsPageLockup, get_Unused_InfoPanelRowArtworkViewModel, get_Unused_InfoPanelRowCheckBoxViewModel, get_Unused_InfoPanelRowComboBoxViewModel, get_Unused_InfoPanelTabViewModel, get_Unused_InfoPanelRowNumberRangeViewModel, get_Unused_InfoPanelRowStringViewModel, get_Unused_InfoPanelRowNumberViewModel, get_Unused_InfoPanelRowRatingViewModel, get_Unused_InfoPanelRowSeparatorViewModel, get_Unused_InfoPanelRowLyricsViewModel, get_Unused_InfoPanelRowSortAsViewModel, get_Unused_InfoPanelRowStaticNumberWithActionViewModel, get_Unused_InfoPanelRowStaticStringViewModel, get_Unused_InfoPanelRowTextBoxViewModel, get_Unused_InfoPanelRowTimeViewModel, get_Unused_InfoPanelRowNameWorkMovementViewModel, get_Unused_InfoPanelRowDateViewModel, get_Unused_InfoPanelRowSliderViewModel, get_Unused_ComboBoxItem, get_Unused_ComboBoxSeparatorItem

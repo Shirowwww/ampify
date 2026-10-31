@@ -193,7 +193,7 @@ HRESULT STDMETHODCALLTYPE Album(Facet*, HSTRING* out) {  // get_Album, slot 8
     return S_OK;
 }
 HRESULT STDMETHODCALLTYPE Name(Facet*, HSTRING* out) {  // get_Name, slot 19
-    *out = MakeString(L"Titre é");
+    *out = MakeString(L"Title é");
     return S_OK;
 }
 HRESULT STDMETHODCALLTYPE IsPlaceholder(Facet*, unsigned char* out) {  // get_IsPlaceholder, slot 24
@@ -242,7 +242,7 @@ void Build() {
     static bool built = false;
     if (built) return;
     built = true;
-    const GUID player = rt::GuidOf(ampify::amp::kIidPlayer);
+    const GUID player = rt::GuidOf(ampify::amp::kIidsPlayer[0]);
     staticsObj.facets = {{rt::GuidOf(ampify::amp::kIidPlayerStatics), &staticsF}};
     staticsVt.slots[6] = Fn(&CurrentPlayer);
 
@@ -263,7 +263,7 @@ void Build() {
     stateNotifyVt.slots[6] = Fn(&AddHandler);
     stateNotifyVt.slots[7] = Fn(&RemoveHandler);
 
-    itemObj.facets = {{rt::GuidOf(ampify::amp::kIidNowPlayingItem), &itemF}};
+    itemObj.facets = {{rt::GuidOf(ampify::amp::kIidsNowPlayingItem[0]), &itemF}};
     itemVt.slots[7] = Fn(&Artist);
     itemVt.slots[8] = Fn(&Album);
     itemVt.slots[19] = Fn(&Name);
@@ -344,7 +344,7 @@ TEST_CASE(AmpPlayer_ReadsTheStateThroughTheWinmdSlots) {
     std::optional<ampify::AmpReading> reading = player.Read();
     CHECK(reading.has_value());
     CHECK(reading->playing && !reading->paused && reading->hasItem && !reading->placeholder);
-    CHECK(reading->title == "Titre \xC3\xA9");
+    CHECK(reading->title == "Title \xC3\xA9");
     CHECK(reading->artist == "Artiste");
     CHECK(reading->album == "Album");
     CHECK(reading->positionRaw == 600'000'000 && reading->durationRaw == 1'800'000'000);
@@ -413,9 +413,9 @@ TEST_CASE(PlayerBridge_FallsBackToSmtcThenTheMediaKeysWhenApplesPlayerIsMissing)
     CHECK(bridge.Snapshot().source.empty());
     CHECK(bridge.Snapshot().source.empty());
     CHECK(bridge.AppleAttempts() == 2);
-    CHECK(log.str().find("AMP.Services.Player non activé") != std::string::npos);
-    CHECK(log.str().find("repli sur les contrôles multimédias de Windows (SMTC)") != std::string::npos);
-    CHECK(log.str().find("API SMTC indisponible") != std::string::npos);
+    CHECK(log.str().find("AMP.Services.Player not activated") != std::string::npos);
+    CHECK(log.str().find("falling back to Windows media controls (SMTC)") != std::string::npos);
+    CHECK(log.str().find("SMTC API not available") != std::string::npos);
 
     CHECK(bridge.Control(ampify::PlayerCommand::Next, 0));
     CHECK(keys.size() == 1 && keys[0] == VK_MEDIA_NEXT_TRACK);
@@ -437,11 +437,11 @@ TEST_CASE(PlayerBridge_ReadsApplesPlayerAndUsesItsCommandsOnlyWhenAllowed) {
     ampify::PlayerSnapshot s = bridge.Snapshot();
     CHECK(s.source == "apple");
     CHECK(s.playing);
-    CHECK(s.track.has_value() && s.track->title == "Titre \xC3\xA9" && s.track->lossless && !s.track->atmos);
+    CHECK(s.track.has_value() && s.track->title == "Title \xC3\xA9" && s.track->lossless && !s.track->atmos);
     CHECK(s.positionMs == 60'000 && s.durationMs == 180'000);
     CHECK(s.track->queueItemId == "42");
-    CHECK(log.str().find("AMP.Services.Player activé (test") != std::string::npos);
-    CHECK(log.str().find("premier état lu par AMP.Services.Player : en lecture=oui") != std::string::npos);
+    CHECK(log.str().find("AMP.Services.Player activated (test") != std::string::npos);
+    CHECK(log.str().find("first state read by AMP.Services.Player: playing=yes") != std::string::npos);
     CHECK(log.str().find("IPlayQueue = 66666666-7777-8888-9999-AAAAAAAAAAAA") != std::string::npos);
 
     // player.appleCommands is off: pause goes to the media key, the state being known (playing).
@@ -467,7 +467,7 @@ TEST_CASE(PlayerBridge_TheEngineNeverAsksForApplesPlayer) {
     ampify::win::PlayerBridge bridge("engine", settings, journal, TestOptions(&keys));
     CHECK(bridge.Snapshot().source.empty());
     CHECK(bridge.AppleAttempts() == 0);
-    CHECK(log.str().find("vit dans AppleMusic.exe, il n'est pas utilisé ici") != std::string::npos);
+    CHECK(log.str().find("lives in AppleMusic.exe, it is not used here") != std::string::npos);
 }
 
 TEST_CASE(PlayerBridge_TheKillSwitchKeepsApplesPlayerOff) {
@@ -481,7 +481,7 @@ TEST_CASE(PlayerBridge_TheKillSwitchKeepsApplesPlayerOff) {
     ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
     CHECK(bridge.Snapshot().source.empty());
     CHECK(bridge.AppleAttempts() == 0);
-    CHECK(log.str().find("désactivé par le réglage player.apple") != std::string::npos);
+    CHECK(log.str().find("turned off by the player.apple setting") != std::string::npos);
 }
 
 TEST_CASE(PlayerBridge_TheQueueHasTheCurrentTrackAndRefusesChangesWithAReason) {

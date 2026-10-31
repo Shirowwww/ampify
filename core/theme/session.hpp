@@ -17,7 +17,7 @@ namespace ampify::theme {
 struct SessionRequest {
     std::string themeId;                 // folder of the wanted theme, empty for none
     std::shared_ptr<const Theme> theme;  // the loaded theme, null when themeId is empty
-    std::string schemeReason;            // why this scheme (« mode sombre de Windows », « horaire 19:00 »), may be empty
+    std::string schemeReason;            // why this scheme ("Windows dark mode", "schedule 19:00"), may be empty
     std::vector<std::shared_ptr<const Theme>> snippets;  // the enabled snippets, loaded with LoadSnippet, in id order
     std::shared_ptr<const Theme> layout;  // the rules of sidebar.json and home.json, null when neither file exists
     std::uint64_t generation = 0;        // changes each time the worker loads again (settings, files, snippets, time)
@@ -33,9 +33,13 @@ public:
     // layout. So switching a snippet off (which the worker turns into a new generation) brings back what was under it.
     // The same generation applies again, which styles the elements that appeared since the last tick and writes
     // nothing else. Empty themeId with no snippet and no layout restores. The problems of each source go to the
-    // journal once per generation, with the name of the source. Returns the inspector dump when the request asks for one
+    // log once per generation, with the name of the source. Returns the inspector dump when the request asks for one
     // and the tree has elements (an empty tree waits for a later tick).
     std::optional<std::string> Tick(TreeBackend& tree, const SessionRequest& request);
+
+    // Applies the current set again, without reloading anything: for new elements (a page, rows realised while
+    // scrolling) between two ticks. Does nothing before the first tick or when nothing is applied.
+    void Reapply(TreeBackend& tree);
 
     bool Active() const { return m_engine.Active(); }
 

@@ -16,15 +16,22 @@ namespace {
 namespace slot = amp::slot;
 
 const GUID kIidPlayerStatics = rt::GuidOf(amp::kIidPlayerStatics);
-const GUID kIidPlayer = rt::GuidOf(amp::kIidPlayer);
 const GUID kIidPlayerState = rt::GuidOf(amp::kIidPlayerState);
-const GUID kIidNowPlayingItem = rt::GuidOf(amp::kIidNowPlayingItem);
 const GUID kIidNotifyPropertyChanged = rt::GuidOf(amp::kIidNotifyPropertyChanged);
 const GUID kIidPropertyChangedHandler = rt::GuidOf(amp::kIidPropertyChangedHandler);
 
 // INotifyPropertyChanged (Microsoft.UI.Xaml.Data): add_PropertyChanged 6 (handler, token*), remove_PropertyChanged 7.
 constexpr int kAddPropertyChangedSlot = 6;
 constexpr int kRemovePropertyChangedSlot = 7;
+
+// The first identifier of `iids` that `object` answers to: one per Apple Music version (core/amp_abi.hpp).
+template <size_t N>
+bool QueryAny(const rt::Ref& object, const char* const (&iids)[N], rt::Ref& out) {
+    for (const char* iid : iids) {
+        if (rt::Query(object, rt::GuidOf(iid), out)) return true;
+    }
+    return false;
+}
 
 constexpr DWORD kCommandTimeoutMs = 3000;
 constexpr unsigned long long kStringsEveryMs = 5000;
@@ -57,7 +64,7 @@ std::vector<GUID> UnknownIids(const rt::Ref& object) {
 std::string ListIids(const std::vector<GUID>& iids) {
     std::string out;
     for (const GUID& iid : iids) out += (out.empty() ? "" : ", ") + rt::GuidText(iid);
-    return out.empty() ? "aucune" : out;
+    return out.empty() ? "none" : out;
 }
 
 std::string Hex(HRESULT hr) {
@@ -85,19 +92,19 @@ bool AmpPlayer::Activate(std::string& failure) {
     rt::Ref statics;
     rt::Activation activation = rt::GetActivationFactory(L"AMP.Services.Player", kIidPlayerStatics, statics);
     if (FAILED(activation.result)) {
-        failure = "fabrique introuvable (" + activation.how + ", code " + Hex(activation.result) + ")";
+        failure = "factory not found (" + activation.how + ", code " + Hex(activation.result) + ")";
         return false;
     }
     // IPlayerStatics.get_Current (slot 6): Apple's own player, the one the interface uses. It is never constructed.
     rt::Ref current;
     HRESULT hr = rt::CallSlot(statics, slot::kPlayerStaticsCurrent, current.Put());
     if (FAILED(hr) || !current) {
-        failure = FAILED(hr) ? "Player.Current a échoué (code " + Hex(hr) + ")" : "Player.Current est encore vide";
+        failure = FAILED(hr) ? "Player.Current failed (code " + Hex(hr) + ")" : "Player.Current is still empty";
         return false;
     }
     // The identifier of IPlayer is a hash of its methods (core/amp_abi.hpp): if Apple changed them, this fails.
-    if (!rt::Query(current, kIidPlayer, m_player)) {
-        failure = "IPlayer absent : cette version d'Apple Music a changé l'interface du lecteur";
+    if (!QueryAny(current, amp::kIidsPlayer, m_player)) {
+        failure = "IPlayer missing: this version of Apple Music changed the player interface";
         return false;
     }
     m_how = activation.how;
@@ -153,7 +160,7 @@ std::optional<AmpReading> AmpPlayer::Read() {
     rt::Ref itemObject;
     rt::Ref item;
     if (SUCCEEDED(rt::CallSlot(m_player, slot::kPlayerNowPlayingItem, itemObject.Put())) &&
-        rt::Query(itemObject, kIidNowPlayingItem, item)) {
+        QueryAny(itemObject, amp::kIidsNowPlayingItem, item)) {
         reading.hasItem = true;
         unsigned char placeholder = 0;
         rt::CallSlot(item, slot::kItemIsPlaceholder, &placeholder);
@@ -203,40 +210,40 @@ bool AmpPlayer::Command(PlayerCommand command) {
 }
 
 std::string AmpPlayer::ProbeQueue() {
-    const std::string prefix = "File d'attente (sonde, lecture seule) : ";
+    const std::string prefix = "Play queue (probe, read only): ";
     const GUID activationFactory = rt::GuidOf("00000035-0000-0000-C000-000000000046");
     rt::Ref factory;
     rt::Activation activation = rt::GetActivationFactory(L"AMP.Services.PlayQueue", activationFactory, factory);
     if (FAILED(activation.result)) {
-        return prefix + "fabrique de AMP.Services.PlayQueue introuvable (code " + Hex(activation.result) + ")";
+        return prefix + "factory of AMP.Services.PlayQueue not found (code " + Hex(activation.result) + ")";
     }
 
     std::vector<GUID> staticsIids = UnknownIids(factory);
     if (staticsIids.size() != 1) {
-        return prefix + "IPlayQueueStatics pas identifiée sans doute possible (interfaces inconnues de la fabrique : " +
+        return prefix + "IPlayQueueStatics could not be identified for sure (unknown interfaces of the factory: " +
                ListIids(staticsIids) + ")";
     }
     rt::Ref statics, queue;
     // IPlayQueueStatics.get_Current (slot 6), its only method.
     if (!rt::Query(factory, staticsIids[0], statics) ||
         FAILED(rt::CallSlot(statics, slot::kPlayQueueStaticsCurrent, queue.Put())) || !queue) {
-        return prefix + "PlayQueue.Current n'a rien rendu";
+        return prefix + "PlayQueue.Current returned nothing";
     }
     std::string className = rt::ClassName(queue);
-    if (className != amp::kPlayQueueClass) return prefix + "Current n'est pas une PlayQueue (" + className + ")";
+    if (className != amp::kPlayQueueClass) return prefix + "Current is not a PlayQueue (" + className + ")";
 
     std::vector<GUID> queueIids = UnknownIids(queue);
     std::string found = prefix + "IPlayQueueStatics = " + rt::GuidText(staticsIids[0]);
-    if (queueIids.size() != 1) return found + " ; IPlayQueue pas identifiée (inconnues : " + ListIids(queueIids) + ")";
-    found += " ; IPlayQueue = " + rt::GuidText(queueIids[0]);
+    if (queueIids.size() != 1) return found + "; IPlayQueue not identified (unknown: " + ListIids(queueIids) + ")";
+    found += "; IPlayQueue = " + rt::GuidText(queueIids[0]);
 
     // IPlayQueue.get_Sections (slot 9): a collection whose element type the probe describes, without reading it.
     rt::Ref playQueue, sections;
     if (!rt::Query(queue, queueIids[0], playQueue) ||
         FAILED(rt::CallSlot(playQueue, slot::kPlayQueueSections, sections.Put())) || !sections) {
-        return found + " ; Sections vide";
+        return found + "; Sections empty";
     }
-    return found + " ; Sections = " + rt::ClassName(sections) + " (interfaces : " + ListIids(rt::Iids(sections)) + ")";
+    return found + "; Sections = " + rt::ClassName(sections) + " (interfaces: " + ListIids(rt::Iids(sections)) + ")";
 }
 
 }  // namespace ampify::win

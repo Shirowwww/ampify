@@ -36,12 +36,14 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
+#include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 
 #include "../core/ui_render/mods.hpp"
 #include "../core/ui_render/probe.hpp"
 #include "../core/ui_render/render_tree.hpp"
 #include "../core/ui_render/surfaces.hpp"
+#include "../core/ui_render/svg_icon.hpp"
 #include "xaml_host.hpp"
 
 namespace ampify::win {
@@ -167,7 +169,7 @@ struct HostWatch {
 struct MountedSurface {
     Surface surface;
     std::unique_ptr<XamlRenderer> renderer;
-    // Everything the kit makes is held strongly: in Apple Music a weak reference to a XAML object the kit made never
+    // Everything Ampify makes is held strongly: in Apple Music a weak reference to a XAML object Ampify made never
     // resolves (the weak frame was gone every 5 s, then the weak slot right after it was made: an empty panel).
     // Released on the interface thread with the context (ReleaseXaml, DropContext).
     xaml::FrameworkElement panelFrame{nullptr};
@@ -179,7 +181,7 @@ struct MountedSurface {
 };
 
 struct PlacedControl {
-    controls::Button button{nullptr};  // strong, like the panels: see MountedSurface
+    controls::Button button{nullptr};  // strong, like the panels: see MountedSurface (a sidebar entry is a Button too)
     bool reported = false;
 };
 
@@ -223,6 +225,10 @@ struct WindowContext {
     controls::TextBlock pageTitle{nullptr};
     std::map<std::string, MountedSurface> surfaces;
     std::map<std::string, PlacedControl> placed;
+    // The panel Ampify puts in the sidebar's PaneFooter for the sidebar entries, and the footer Apple Music had there
+    // (kept inside the panel, put back when the last entry goes). Strong, like the other hosts.
+    controls::StackPanel sidebarHost{nullptr};
+    xaml::UIElement sidebarOriginal{nullptr};
     std::set<std::string> closedPanels;
     std::optional<std::pair<std::string, std::string>> route;
     bool pageClosed = false;
@@ -249,8 +255,8 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     std::optional<std::pair<std::string, std::string>> pendingRoute;
 
     // Interface thread only.
-    int detachedReports = 0;  // journal lines about panels taken out of their host, at most 5
-    int goneReports = 0;      // journal lines about surfaces gone from the model, at most 5
+    int detachedReports = 0;  // log lines about panels taken out of their host, at most 5
+    int goneReports = 0;      // log lines about surfaces gone from the model, at most 5
     StyleProbe probe;  // copied from the settings page once it was seen; WinUI defaults before
 
     std::mutex onceMutex;
@@ -292,13 +298,13 @@ void QueueRefresh(const WeakShared& weakShared, const std::shared_ptr<WindowCont
                                                try {
                                                    Refresh(*shared, live);
                                                } catch (const winrt::hresult_error& error) {
-                                                   shared->journal.Write("Interface : rafraîchissement de « " +
-                                                                         WindowLabel(*live) + " » en échec (" +
+                                                   shared->journal.Write("Interface: refresh of \"" +
+                                                                         WindowLabel(*live) + "\" failed (" +
                                                                          HresultText(error.code().value) + ")");
                                                } catch (...) {
-                                                   shared->journal.Write("Interface : rafraîchissement de « " +
+                                                   shared->journal.Write("Interface: refresh of \"" +
                                                                          WindowLabel(*live) +
-                                                                         " » en échec (exception inconnue)");
+                                                                         "\" failed (unknown exception)");
                                                }
                                            })) {
             return;
@@ -353,6 +359,8 @@ void ReleaseXaml(WindowContext& context) noexcept {
         context.pageHost = nullptr;
         context.pageSlot = nullptr;
         context.pageTitle = nullptr;
+        context.sidebarHost = nullptr;
+        context.sidebarOriginal = nullptr;
         context.surfaces.clear();
         context.placed.clear();
         context.probe.clear();
@@ -383,7 +391,7 @@ void DropContext(std::shared_ptr<WindowContext> context) noexcept {
 
 // ---- Discovery ---------------------------------------------------------------------------------------------------
 
-// Bounded breadth-first walk of the window content (512 nodes), never into item lists, buttons or the kit's
+// Bounded breadth-first walk of the window content (512 nodes), never into item lists, buttons or Ampify's
 // elements. Watches Loaded, Unloaded and Content of the Frame, Page and UserControl met, so a navigation wakes the
 // refresh. Keeps the flat list of nodes for the anchors (uirender::Choose*), and notes the PlaybackSettingsPage.
 void Discover(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
@@ -487,9 +495,9 @@ void Discover(UiService::Shared& shared, const std::shared_ptr<WindowContext>& c
     context->probeObjects = std::move(objects);
     context->foundSettings = settings ? winrt::make_weak(settings) : winrt::weak_ref<xaml::FrameworkElement>{};
     shared.Once("discover|" + WindowLabel(*context) + "|" + std::to_string(revision),
-                "Interface : découverte de « " + WindowLabel(*context) + " » : " +
-                    std::to_string(context->probe.size()) + " nœud(s) parcouru(s), " + std::to_string(pages) +
-                    " page(s), " + std::to_string(context->watches.size()) + " conteneur(s) suivi(s)");
+                "Interface: discovery of \"" + WindowLabel(*context) + "\": " +
+                    std::to_string(context->probe.size()) + " node(s) walked, " + std::to_string(pages) +
+                    " page(s), " + std::to_string(context->watches.size()) + " container(s) followed");
 }
 
 // ---- The Mods card in Settings > Playback ------------------------------------------------------------------------
@@ -532,10 +540,13 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
     controls::ToggleSwitch toggle;
     if (shared.probe.toggle) toggle.Style(shared.probe.toggle);
     toggle.MinWidth(0);
+    // Ampify speaks English: without this, Windows names the states in its own language.
+    toggle.OnContent(winrt::box_value(L"On"));
+    toggle.OffContent(winrt::box_value(L"Off"));
     toggle.VerticalAlignment(xaml::VerticalAlignment::Center);
     toggle.HorizontalAlignment(xaml::HorizontalAlignment::Right);
     Name(toggle, "AMPIFY_ModsToggle_" + mod.id, mod.name);
-    automation::AutomationProperties::SetHelpText(toggle, L"Active ou coupe cette extension tout de suite");
+    automation::AutomationProperties::SetHelpText(toggle, L"Turns this extension on or off right away");
     g_modsUpdating++;
     toggle.IsOn(mod.enabled);
     g_modsUpdating--;
@@ -552,10 +563,10 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
             bool on = control.IsOn();
             std::string error;
             if (uirender::SwitchMod(kit, id, on, error)) {
-                journal->Write("Réglages : extension « " + id + " » " + (on ? "activée" : "coupée") +
-                               " depuis la carte Mods (" + (on ? "start " : "stop ") + id + " demandé)");
+                journal->Write("Settings: extension \"" + id + "\" " + (on ? "turned on" : "turned off") +
+                               " from the Ampify card (" + (on ? "start " : "stop ") + id + " requested)");
             } else {
-                journal->Write("Réglages : impossible de changer l'extension « " + id + " » : " + error);
+                journal->Write("Settings: could not change extension \"" + id + "\": " + error);
                 g_modsUpdating++;
                 control.IsOn(!on);
                 g_modsUpdating--;
@@ -570,7 +581,7 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
 controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uirender::ModEntry>& mods,
                                const xaml::FrameworkElement& templateRow) {
     controls::Border card = MakeCardBorder(shared.probe);
-    Name(card, "AMPIFY_ModsCard", "Mods (Ampify)");
+    Name(card, "AMPIFY_ModsCard", "Ampify");
     if (templateRow) {
         card.Margin(templateRow.Margin());
         card.HorizontalAlignment(templateRow.HorizontalAlignment());
@@ -594,17 +605,17 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     header.ColumnDefinitions().Append(button);
     controls::StackPanel titles;
     titles.VerticalAlignment(xaml::VerticalAlignment::Center);
-    controls::TextBlock title = MakeText(L"Mods (Ampify)", "bodyStrong", false, &shared.probe);
+    controls::TextBlock title = MakeText(L"Ampify", "bodyStrong", false, &shared.probe);
     Name(title, "AMPIFY_ModsTitle");
     titles.Children().Append(title);
-    titles.Children().Append(MakeText(L"Les extensions installées dans le kit. Un changement s'applique tout de suite.",
+    titles.Children().Append(MakeText(L"The extensions installed in Ampify. A change applies right away.",
                                       "caption", true, &shared.probe));
     header.Children().Append(titles);
     controls::Button open;
     if (shared.probe.button) open.Style(shared.probe.button);
-    open.Content(winrt::box_value(L"Ouvrir le dossier du kit"));
+    open.Content(winrt::box_value(L"Open the Ampify folder"));
     open.VerticalAlignment(xaml::VerticalAlignment::Center);
-    Name(open, "AMPIFY_ModsOpenFolder", "Ouvrir le dossier du kit");
+    Name(open, "AMPIFY_ModsOpenFolder", "Open the Ampify folder");
     std::filesystem::path kit = shared.kit;
     open.Click([kit](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
@@ -612,18 +623,18 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
         } catch (...) {
         }
     });
-    // The Marketplace page (apps/marketplace): thèmes, schémas, extensions, in the app.
+    // The Marketplace page (apps/marketplace): themes, schemes, extensions, in the app.
     controls::Button market;
     if (auto accent = ThemeResource(L"AccentButtonStyle").try_as<xaml::Style>()) market.Style(accent);
-    market.Content(winrt::box_value(L"Ouvrir la Marketplace"));
+    market.Content(winrt::box_value(L"Open the Marketplace"));
     market.VerticalAlignment(xaml::VerticalAlignment::Center);
-    Name(market, "AMPIFY_ModsOpenMarketplace", "Ouvrir la Marketplace");
+    Name(market, "AMPIFY_ModsOpenMarketplace", "Open the Marketplace");
     UiModel* model = &shared.model;
     Journal* journal = &shared.journal;
     market.Click([model, journal](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
             model->Navigate("marketplace", "/marketplace");
-            journal->Write("Réglages : Marketplace ouverte depuis la carte Mods");
+            journal->Write("Settings: Marketplace opened from the Ampify card");
         } catch (...) {
         }
     });
@@ -640,8 +651,8 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     list.Spacing(10);
     Name(list, "AMPIFY_ModsList");
     if (mods.empty()) {
-        list.Children().Append(MakeText(L"Aucune extension installée pour l'instant. Ajoute-en avec « ampify install », puis "
-                                        L"rouvre cette page.",
+        list.Children().Append(MakeText(L"No extension installed yet. Add one with \"ampify install\", then "
+                                        L"reopen this page.",
                                         "caption", true, &shared.probe));
     }
     for (const uirender::ModEntry& mod : mods) {
@@ -661,8 +672,8 @@ bool MountModsCard(UiService::Shared& shared, const xaml::FrameworkElement& page
     CollectPage(page, nodes, objects);
     std::optional<int> anchor = uirender::ChooseSettingsAnchor(nodes, 0);
     if (!anchor) {
-        shared.Once("mods-no-anchor", "Réglages : page Lecture trouvée, mais sans liste de réglages à interrupteurs (" +
-                                          std::to_string(nodes.size()) + " nœuds) : carte Mods non ajoutée");
+        shared.Once("mods-no-anchor", "Settings: Playback page found, but with no list of switch settings (" +
+                                          std::to_string(nodes.size()) + " nodes): Ampify card not added");
         return false;
     }
     auto stack = objects[*anchor].try_as<controls::StackPanel>();
@@ -683,15 +694,15 @@ bool MountModsCard(UiService::Shared& shared, const xaml::FrameworkElement& page
         auto existing = children.GetAt(index).try_as<xaml::FrameworkElement>();
         if (existing && existing.Name() == L"AMPIFY_ModsCard") {
             children.SetAt(index, card);
-            shared.journal.Write("Réglages : carte « Mods (Ampify) » rafraîchie (" +
+            shared.journal.Write("Settings: card \"Ampify\" refreshed (" +
                                  std::to_string(mods.size()) + " extension(s))");
             return true;
         }
     }
     children.Append(card);
-    shared.journal.Write("Réglages : carte « Mods (Ampify) » ajoutée à la page Lecture (" +
+    shared.journal.Write("Settings: card \"Ampify\" added to the Playback page (" +
                          std::to_string(mods.size()) + " extension(s), " + std::to_string(probe.Found()) +
-                         " valeur(s) de style natif copiée(s))");
+                         " native style value(s) copied)");
     return true;
 }
 
@@ -724,7 +735,7 @@ void WatchSettingsPage(UiService::Shared& shared, const std::shared_ptr<WindowCo
             });
             context->ticket.ArmLayout(NowMs());
             context->settingsSeenMs = NowMs();
-            shared.journal.Write("Réglages : page PlaybackSettingsPage repérée, en attente de son chargement");
+            shared.journal.Write("Settings: PlaybackSettingsPage seen, waiting for it to load");
         }
     }
     if (page && !context->settingsMounted && page.IsLoaded()) {
@@ -775,8 +786,8 @@ controls::Border MakeSurfaceFrame(const std::string& frameName, const std::strin
     close.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
     close.BorderThickness(xaml::Thickness{0, 0, 0, 0});
     close.VerticalAlignment(xaml::VerticalAlignment::Center);
-    Name(close, frameName + "_fermer", "Fermer le panneau");
-    controls::ToolTipService::SetToolTip(close, winrt::box_value(L"Fermer"));
+    Name(close, frameName + "_close", "Close the panel");
+    controls::ToolTipService::SetToolTip(close, winrt::box_value(L"Close"));
     controls::Grid::SetColumn(close, 1);
     header.Children().Append(close);
     body.Children().Append(header);
@@ -838,10 +849,10 @@ controls::StackPanel EnsurePanelHost(UiService::Shared& shared, WindowContext& c
         return context.panelStack;
     }
     if (context.panelHostsMade++ > 0 && context.panelHostsMade <= 4) {
-        shared.journal.Write("Interface : hôte des panneaux recréé (n° " + std::to_string(context.panelHostsMade) + ")");
+        shared.journal.Write("Interface: panel host recreated (no. " + std::to_string(context.panelHostsMade) + ")");
     }
     controls::Grid host;
-    Name(host, "AMPIFY_PanelHost", "Panneaux des extensions");
+    Name(host, "AMPIFY_PanelHost", "Extension panels");
     host.Width(kPanelWidth);
     host.HorizontalAlignment(xaml::HorizontalAlignment::Right);
     host.VerticalAlignment(xaml::VerticalAlignment::Stretch);
@@ -860,7 +871,7 @@ controls::StackPanel EnsurePanelHost(UiService::Shared& shared, WindowContext& c
     context.panelHost = host;
     context.panelStack = stack;
     PlacePanelPopup(context, xamlRoot);
-    shared.Once("panel-host", "Interface : hôte des panneaux ouvert dans un Popup de la fenêtre, à droite (" +
+    shared.Once("panel-host", "Interface: panel host opened in a Popup of the window, on the right (" +
                                   Utf8(winrt::get_class_name(content)) + ")");
     return stack;
 }
@@ -869,7 +880,7 @@ std::string SurfaceLabel(const Surface& surface) {
     return surface.elementId + "/" + surface.id;
 }
 
-// Renders a surface into its slot; returns the stats for the journal.
+// Renders a surface into its slot; returns the stats for the log.
 uirender::PatchStats RenderInto(UiService::Shared& shared, MountedSurface& mounted, const Surface& surface) {
     if (!mounted.renderer) mounted.renderer = std::make_unique<XamlRenderer>(surface.elementId, shared.sink);
     uirender::PatchStats stats;
@@ -890,14 +901,14 @@ uirender::PatchStats RenderInto(UiService::Shared& shared, MountedSurface& mount
 void JournalRender(UiService::Shared& shared, const char* what, const Surface& surface, const uirender::PatchStats& stats,
                    bool first) {
     if (first) {
-        shared.journal.Write(std::string("Interface : ") + what + " « " + SurfaceLabel(surface) + " » monté (" +
-                             std::to_string(stats.created) + " élément(s), AutomationId " +
+        shared.journal.Write(std::string("Interface: ") + what + " \"" + SurfaceLabel(surface) + "\" mounted (" +
+                             std::to_string(stats.created) + " element(s), AutomationId " +
                              uirender::ElementName(surface.elementId, surface.nodeId) + ")");
     } else if (!stats.Unchanged()) {
-        shared.journal.Write(std::string("Interface : ") + what + " « " + SurfaceLabel(surface) +
-                             " » mis à jour sur place (créés " + std::to_string(stats.created) + ", modifiés " +
-                             std::to_string(stats.updated) + ", reconstruits " + std::to_string(stats.replaced) +
-                             ", retirés " + std::to_string(stats.removed) + ")");
+        shared.journal.Write(std::string("Interface: ") + what + " \"" + SurfaceLabel(surface) +
+                             "\" updated in place (created " + std::to_string(stats.created) + ", changed " +
+                             std::to_string(stats.updated) + ", rebuilt " + std::to_string(stats.replaced) +
+                             ", removed " + std::to_string(stats.removed) + ")");
     }
 }
 
@@ -911,10 +922,10 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
     controls::StackPanel stack = EnsurePanelHost(shared, *context, content);
     if (!stack) return;
     if (detached) {
-        // Something took the frame out of the host: put back, and said, so the journal shows who does it and when.
+        // Something took the frame out of the host: put back, and said, so the log shows who does it and when.
         stack.Children().Append(mounted.panelFrame);
         if (shared.detachedReports++ < 5) {
-            shared.journal.Write("Interface : panneau « " + SurfaceLabel(surface) + " » sorti de son hôte, remis en place");
+            shared.journal.Write("Interface: panel \"" + SurfaceLabel(surface) + "\" taken out of its host, put back");
         }
     }
     bool first = !alive;
@@ -922,7 +933,7 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
         controls::TextBlock title{nullptr};
         controls::Border slot{nullptr};
         controls::Button close{nullptr};
-        std::string frameName = uirender::ElementName(surface.elementId, surface.nodeId) + "_panneau";
+        std::string frameName = uirender::ElementName(surface.elementId, surface.nodeId) + "_panel";
         controls::Border frame = MakeSurfaceFrame(frameName, surface.title.empty() ? surface.id : surface.title, title, slot, close);
         WeakContext weakContext = context;
         std::string key = surface.key;
@@ -938,8 +949,8 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
                     RemoveFromParent(found->second.panelFrame);
                     live->surfaces.erase(found);
                 }
-                journal->Write("Interface : panneau « " + label + " » fermé (il revient au prochain démarrage de "
-                               "l'extension)");
+                journal->Write("Interface: panel \"" + label + "\" closed (it comes back at the next start of "
+                               "the extension)");
                 (void)sender;
             } catch (...) {
             }
@@ -951,7 +962,7 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
         mounted.title = title;
     }
     uirender::PatchStats stats = RenderInto(shared, mounted, surface);
-    JournalRender(shared, "panneau", surface, stats, first);
+    JournalRender(shared, "panel", surface, stats, first);
 }
 
 // Covers the content area (under the play bar, right of the sidebar) with the page host, or hides it.
@@ -974,7 +985,7 @@ void ShowPageHost(WindowContext& context, bool visible) {
 }
 
 // The host of an app page: a Popup of the window over the content area while the route points to the page (Apple
-// Music takes out what the kit adds to its own panels). Apple Music's own frame is not replaced.
+// Music takes out what Ampify adds to its own panels). Apple Music's own frame is not replaced.
 controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr<WindowContext>& owner,
                                 const xaml::DependencyObject& content) {
     WindowContext& context = *owner;
@@ -989,7 +1000,7 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
                                       L" Background='{ThemeResource SolidBackgroundFillColorBaseBrush}'/>")
                               .try_as<controls::Grid>();
     if (!host) host = controls::Grid();
-    Name(host, "AMPIFY_PageHost", "Page d'une app du kit");
+    Name(host, "AMPIFY_PageHost", "App page");
     host.Padding(xaml::Thickness{32, 16, 32, 16});
     controls::RowDefinition headerRow;
     headerRow.Height(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
@@ -1003,8 +1014,8 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
     header.Spacing(12);
     header.Margin(xaml::Thickness{0, 0, 0, 16});
     controls::Button back;
-    back.Content(winrt::box_value(L"Retour"));
-    Name(back, "AMPIFY_PageHost_retour", "Retour");
+    back.Content(winrt::box_value(L"Back"));
+    Name(back, "AMPIFY_PageHost_back", "Back");
     controls::TextBlock title = MakeText(L"", "title", false);
     title.VerticalAlignment(xaml::VerticalAlignment::Center);
     header.Children().Append(back);
@@ -1038,7 +1049,7 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
     context.pageSlot = slot;
     context.pageTitle = title;
     PlacePageHost(context, xamlRoot);
-    shared.Once("page-host", "Interface : hôte des pages des apps ouvert dans un Popup de la fenêtre");
+    shared.Once("page-host", "Interface: app page host opened in a Popup of the window");
     return slot;
 }
 
@@ -1092,9 +1103,9 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
     dialog.XamlRoot(rootElement.XamlRoot());
     dialog.Title(winrt::box_value(Wide(surface.title.empty() ? surface.elementId : surface.title)));
     dialog.Content(root);
-    dialog.CloseButtonText(L"Fermer");
+    dialog.CloseButtonText(L"Close");
     dialog.DefaultButton(controls::ContentDialogButton::Close);
-    Name(dialog, uirender::ElementName(surface.elementId, surface.nodeId) + "_dialogue",
+    Name(dialog, uirender::ElementName(surface.elementId, surface.nodeId) + "_dialog",
          surface.title.empty() ? surface.elementId : surface.title);
 
     WeakShared weakShared = shared.weak_from_this();
@@ -1142,6 +1153,112 @@ void Unmount(WindowContext& context, MountedSurface& mounted) {
 
 // ---- Buttons of the top bar and the play bar ----------------------------------------------------------------------
 
+// Sidebar entries. Apple Music fills its menu and footer through item sources of its own view models: an item Ampify
+// added to its footer source crashed it at once (1.1792), and a NavigationViewItem anywhere in the pane would report
+// its taps to Apple Music's navigation. So the entries are flat buttons laid out like the sidebar's items, in a panel
+// that takes the place of the NavigationView's PaneFooter, with Apple Music's own footer (a separator) kept at its end.
+controls::NavigationView FindNavigation(const WindowContext& context) {
+    for (size_t i = 0; i < context.probe.size(); i++) {
+        if (!context.probe[i].Is(uirender::kProbeNavigationView)) continue;
+        if (auto navigation = context.probeObjects[i].get().try_as<controls::NavigationView>()) return navigation;
+    }
+    return nullptr;
+}
+
+controls::StackPanel EnsureSidebarHost(WindowContext& context, const controls::NavigationView& navigation) {
+    xaml::UIElement footer = navigation.PaneFooter();
+    if (context.sidebarHost && footer == context.sidebarHost) return context.sidebarHost;
+    controls::StackPanel host;
+    Name(host, "AMPIFY_SidebarHost");
+    navigation.PaneFooter(nullptr);  // frees Apple Music's footer, which becomes the last child of the panel
+    if (footer) host.Children().Append(footer);
+    navigation.PaneFooter(host);
+    context.sidebarHost = host;
+    context.sidebarOriginal = footer;
+    return host;
+}
+
+// Puts Apple Music's own footer back once no element has an entry left.
+void ReleaseSidebarHost(WindowContext& context) {
+    if (!context.sidebarHost || context.sidebarHost.Children().Size() > (context.sidebarOriginal ? 1u : 0u)) return;
+    controls::NavigationView navigation = FindNavigation(context);
+    if (navigation && navigation.PaneFooter() == context.sidebarHost) {
+        navigation.PaneFooter(nullptr);
+        context.sidebarHost.Children().Clear();
+        navigation.PaneFooter(context.sidebarOriginal);
+    }
+    context.sidebarHost = nullptr;
+    context.sidebarOriginal = nullptr;
+}
+
+// A flat button with the height, margins and corners of Apple Music's sidebar items, and the subtle hover of Fluent.
+controls::Button MakeSidebarButton(const UiControl& control) {
+    const std::wstring brushes =
+        L"<StaticResource x:Key='ButtonBackground' ResourceKey='SubtleFillColorTransparentBrush'/>"
+        L"<StaticResource x:Key='ButtonBackgroundPointerOver' ResourceKey='SubtleFillColorSecondaryBrush'/>"
+        L"<StaticResource x:Key='ButtonBackgroundPressed' ResourceKey='SubtleFillColorTertiaryBrush'/>"
+        L"<StaticResource x:Key='ButtonBorderBrush' ResourceKey='SubtleFillColorTransparentBrush'/>"
+        L"<StaticResource x:Key='ButtonBorderBrushPointerOver' ResourceKey='SubtleFillColorTransparentBrush'/>"
+        L"<StaticResource x:Key='ButtonBorderBrushPressed' ResourceKey='SubtleFillColorTransparentBrush'/>"
+        L"<StaticResource x:Key='ButtonForegroundPointerOver' ResourceKey='TextFillColorPrimaryBrush'/>"
+        L"<StaticResource x:Key='ButtonForegroundPressed' ResourceKey='TextFillColorSecondaryBrush'/>";
+    const std::wstring text =
+        L"<Button xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' "
+        L"xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' HorizontalAlignment='Stretch' "
+        L"HorizontalContentAlignment='Left' Height='36' Margin='4,2,4,2' Padding='12,0,12,0' CornerRadius='4' "
+        L"BorderThickness='0'><Button.Resources><ResourceDictionary><ResourceDictionary.ThemeDictionaries>"
+        L"<ResourceDictionary x:Key='Default'>" + brushes + L"</ResourceDictionary>"
+        L"<ResourceDictionary x:Key='Light'>" + brushes + L"</ResourceDictionary>"
+        L"</ResourceDictionary.ThemeDictionaries></ResourceDictionary></Button.Resources></Button>";
+    controls::Button button = xaml::Markup::XamlReader::Load(text).as<controls::Button>();
+    controls::StackPanel row;
+    row.Orientation(controls::Orientation::Horizontal);
+    row.Spacing(16);
+    controls::FontIcon icon;
+    icon.FontSize(16);
+    icon.Glyph(uirender::IsGlyphIcon(control.icon) ? Wide(control.icon) : winrt::hstring(L"\xE790"));  // Color
+    controls::TextBlock label;
+    label.Text(Wide(control.label));
+    label.VerticalAlignment(xaml::VerticalAlignment::Center);
+    row.Children().Append(icon);
+    row.Children().Append(label);
+    button.Content(row);
+    return button;
+}
+
+void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context, PlacedControl& placed,
+                      const UiControl& control) {
+    controls::NavigationView navigation = FindNavigation(*context);
+    if (!navigation) {
+        if (!placed.reported) {
+            placed.reported = true;
+            shared.journal.Write("Interface: sidebar not found for the entry \"" + control.label + "\" of " +
+                                 control.elementId);
+        }
+        return;
+    }
+    controls::StackPanel host = EnsureSidebarHost(*context, navigation);
+    std::uint32_t index = 0;
+    if (placed.button && host.Children().IndexOf(placed.button, index)) return;  // still in place
+
+    controls::Button button = MakeSidebarButton(control);
+    Name(button, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
+    UiEventSink sink = shared.sink;
+    std::string elementId = control.elementId;
+    int id = control.id;
+    button.Click([sink, elementId, id](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            if (sink) sink(UiEvent{elementId, id, true, {}});
+        } catch (...) {
+        }
+    });
+    // Before Apple Music's footer, which stays last.
+    std::uint32_t before = host.Children().Size() - (context->sidebarOriginal ? 1u : 0u);
+    host.Children().InsertAt(before, button);
+    placed.button = button;
+    shared.journal.Write("Interface: sidebar entry \"" + control.label + "\" of " + control.elementId + " placed");
+}
+
 void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                    const std::vector<Surface>& surfaces) {
     std::set<std::string> present;
@@ -1149,9 +1266,13 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         if (surface.kind != SurfaceKind::Control) continue;
         present.insert(surface.key);
         const UiControl& control = surface.control;
+        if (control.placement == "sidebar") {
+            PlaceSidebarItem(shared, context, context->placed[surface.key], control);
+            continue;
+        }
         if (control.placement != "topbar" && control.placement != "playbar") {
-            shared.Once("menu-" + control.placement, "Interface : les entrées de menu (" + control.placement +
-                                                         ") ne sont pas encore affichées (provisoire)");
+            shared.Once("menu-" + control.placement, "Interface: menu entries (" + control.placement +
+                                                         ") are not shown yet (provisional)");
             continue;
         }
         PlacedControl& placed = context->placed[surface.key];
@@ -1165,8 +1286,8 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         if (!parent) {
             if (!placed.reported) {
                 placed.reported = true;
-                shared.journal.Write("Interface : emplacement « " + control.placement + " » introuvable pour le bouton « " +
-                                     control.label + " » de " + control.elementId + " (repères provisoires)");
+                shared.journal.Write("Interface: placement \"" + control.placement + "\" not found for button \"" +
+                                     control.label + "\" of " + control.elementId + " (provisional landmarks)");
             }
             continue;
         }
@@ -1175,7 +1296,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         if (insertion->styleFrom >= 0) {
             auto neighbour = context->probeObjects[insertion->styleFrom].get();
             if (!neighbour.try_as<controls::Button>()) {
-                // A ToggleButton (Apple Music's lyrics or queue button): its style does not fit a Button, so the kit
+                // A ToggleButton (Apple Music's lyrics or queue button): its style does not fit a Button, so Ampify
                 // button stays flat like it, and takes its size below.
                 button.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
                 button.BorderThickness(xaml::Thickness{0, 0, 0, 0});
@@ -1212,8 +1333,8 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         if (after && children.IndexOf(after, index)) children.InsertAt(index + 1, button);
         else children.Append(button);
         placed.button = button;
-        shared.journal.Write("Interface : bouton « " + control.label + " » de " + control.elementId + " placé dans « " +
-                             control.placement + " » (repères provisoires)");
+        shared.journal.Write("Interface: button \"" + control.label + "\" of " + control.elementId + " placed in \"" +
+                             control.placement + "\" (provisional landmarks)");
     }
     for (auto it = context->placed.begin(); it != context->placed.end();) {
         if (present.count(it->first)) {
@@ -1223,6 +1344,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         RemoveFromParent(it->second.button);
         it = context->placed.erase(it);
     }
+    ReleaseSidebarHost(*context);
 }
 
 void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
@@ -1251,7 +1373,7 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
             continue;
         }
         if (shared.goneReports++ < 5) {
-            shared.journal.Write("Interface : « " + it->first + " » n'est plus dans le modèle des extensions, retiré");
+            shared.journal.Write("Interface: \"" + it->first + "\" is no longer in the extension model, removed");
         }
         Unmount(*context, it->second);
         context->closedPanels.erase(it->first);
@@ -1270,10 +1392,10 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
                 case SurfaceKind::Control: break;
             }
         } catch (const winrt::hresult_error& error) {
-            shared.journal.Write("Interface : rendu de « " + SurfaceLabel(surface) + " » en échec (" +
+            shared.journal.Write("Interface: render of \"" + SurfaceLabel(surface) + "\" failed (" +
                                  HresultText(error.code().value) + ")");
         } catch (const std::exception& error) {
-            shared.journal.Write("Interface : rendu de « " + SurfaceLabel(surface) + " » en échec (" + error.what() + ")");
+            shared.journal.Write("Interface: render of \"" + SurfaceLabel(surface) + "\" failed (" + error.what() + ")");
         }
     }
 
@@ -1297,7 +1419,7 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
     try {
         PlaceControls(shared, context, surfaces);
     } catch (...) {
-        shared.Once("controls-failed", "Interface : placement des boutons en échec");
+        shared.Once("controls-failed", "Interface: button placement failed");
     }
 }
 
@@ -1330,8 +1452,8 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
             } catch (...) {
             }
         });
-        shared.journal.Write("Interface : fenêtre « " + WindowLabel(*context) +
-                             " » liée, premier rafraîchissement exécuté par sa DispatcherQueue (fil " +
+        shared.journal.Write("Interface: window \"" + WindowLabel(*context) +
+                             "\" bound, first refresh run by its DispatcherQueue (thread " +
                              std::to_string(GetCurrentThreadId()) + ")");
     }
 
@@ -1389,8 +1511,8 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
 // Asks AMP.Utils for the windows, keeps one context per live window, and queues a refresh of each.
 void DiscoverWindows(UiService::Shared& shared) {
     if (!AppPropertyAvailable()) {
-        shared.Once("no-amp-utils", "Interface : AMP.Utils.dll ou GetAppProperty indisponible pour l'instant, la fenêtre "
-                                    "XAML n'est pas accessible (nouvel essai toutes les 5 s)");
+        shared.Once("no-amp-utils", "Interface: AMP.Utils.dll or GetAppProperty not available yet, the XAML window "
+                                    "cannot be reached (retrying every 5 s)");
         return;
     }
     std::vector<std::shared_ptr<WindowContext>> toRefresh;
@@ -1429,15 +1551,15 @@ void DiscoverWindows(UiService::Shared& shared) {
             }
         }
         if (created) {
-            shared.journal.Write("Interface : fenêtre « " + winrt::to_string(property) +
-                                 " » obtenue par AMP.Utils (GetAppProperty), travail envoyé à sa DispatcherQueue");
+            shared.journal.Write("Interface: window \"" + winrt::to_string(property) +
+                                 "\" obtained through AMP.Utils (GetAppProperty), work sent to its DispatcherQueue");
         }
         context->discoverDirty = true;
         toRefresh.push_back(context);
     }
     for (auto& context : dropped) DropContext(std::move(context));
     dropped.clear();
-    if (toRefresh.empty()) shared.Once("no-window", "Interface : AMP.Utils ne donne pas encore de fenêtre « MainWindow »");
+    if (toRefresh.empty()) shared.Once("no-window", "Interface: AMP.Utils does not give a \"MainWindow\" window yet");
     for (const auto& context : toRefresh) QueueRefresh(shared.weak_from_this(), context);
 }
 
@@ -1465,8 +1587,8 @@ void UiService::Run() {
     // Out of context: the callback runs on this thread, from its message queue, pumped below.
     HWINEVENTHOOK hook = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_SHOW, nullptr, WindowEvent,
                                          GetCurrentProcessId(), 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNTHREAD);
-    m_shared->journal.Write(std::string("Interface : service démarré (crochet WinEvent ") + (hook ? "posé" : "refusé") +
-                            ", sondage des fenêtres toutes les 5 s, du modèle toutes les 250 ms)");
+    m_shared->journal.Write(std::string("Interface: service started (WinEvent hook ") + (hook ? "set" : "refused") +
+                            ", polling the windows every 5 s, the model every 250 ms)");
 
     uirender::SurfaceTracker tracker;
     auto nextDiscovery = std::chrono::steady_clock::now();
@@ -1496,9 +1618,9 @@ void UiService::Run() {
                 }
             }
         } catch (const winrt::hresult_error& error) {
-            m_shared->Once("worker-error", "Interface : erreur du fil de surveillance (" + HresultText(error.code().value) + ")");
+            m_shared->Once("worker-error", "Interface: error on the watching thread (" + HresultText(error.code().value) + ")");
         } catch (...) {
-            m_shared->Once("worker-error", "Interface : erreur du fil de surveillance (exception inconnue)");
+            m_shared->Once("worker-error", "Interface: error on the watching thread (unknown exception)");
         }
         MsgWaitForMultipleObjects(0, nullptr, FALSE, static_cast<DWORD>(kModelPoll.count()), QS_ALLINPUT);
     }

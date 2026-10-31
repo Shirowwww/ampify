@@ -31,6 +31,10 @@ namespace {
 
 constexpr auto kTick = std::chrono::seconds(3);
 constexpr auto kAttachRetry = std::chrono::seconds(1);
+// The first passes after a change write their duration to the log, then only the slow ones.
+constexpr int kTimedPasses = 5;
+constexpr long long kSlowPassMs = 120;
+constexpr int kMaxTimedPasses = 40;
 
 // Windows apps in dark mode, for theme.scheme = auto. Light when the value cannot be read (older Windows).
 bool SystemUsesDarkMode() {
@@ -49,7 +53,7 @@ int LocalMinute() {
 }
 
 // After an inspection, writes sidebar.json when it does not exist yet: every NavigationViewItem of the tree, in the
-// current order, none hidden. The user then edits it (docs/themes/FORMAT.md, « Barre latérale et accueil »).
+// current order, none hidden. The user then edits it (docs/themes/format.md, "Sidebar and home").
 void WriteSidebarIfMissing(const std::filesystem::path& kit, theme::TreeBackend& tree) {
     std::filesystem::path file = kit / std::string(theme::LayoutFileName(theme::LayoutKind::Sidebar));
     std::error_code error;
@@ -80,6 +84,7 @@ struct UiSide {
     XamlTreeBackend backend;
     theme::ThemeSession session;
     bool attached = false;
+    int timedPasses = 0;  // passes after a change whose duration went to the log
 };
 
 ThemeService::ThemeService(Journal& journal, std::filesystem::path kit)
@@ -103,7 +108,7 @@ void ThemeService::Stop() {
 void ThemeService::Run(HINSTANCE module, DWORD processId) {
     while (m_running && !AttachUiThread(processId, module)) std::this_thread::sleep_for(kAttachRetry);
     if (!m_running) return;
-    m_journal.Write("Thèmes : fil d'interface prêt (DispatcherQueue de la fenêtre principale)");
+    m_journal.Write("Themes: interface thread ready (DispatcherQueue of the main window)");
 
     // Reads the settings, the theme, the snippets, sidebar.json and home.json, and reloads only what changed. The
     // Windows mode and the local time choose the scheme for theme.scheme = auto and theme.schedule.
@@ -116,7 +121,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
         theme::SessionRequest request = worker.Tick(settings, LocalMinute());
         std::string activeId = request.themeId;
 
-        std::vector<std::string> names{""};  // "" is the choice "Aucun"
+        std::vector<std::string> names{""};  // "" is the choice "None"
         for (const std::string& folder : theme::ListThemeFolders(m_kit / "themes")) names.push_back(folder);
 
         std::shared_ptr<UiSide> ui = m_ui;
@@ -126,6 +131,21 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             if (!ui->attached) {
                 ui->attached = ui->backend.Attach();
                 if (!ui->attached) return;
+                // New pages and rows get the theme within a fraction of a second instead of at the next tick.
+                std::weak_ptr<UiSide> weak = ui;
+                ui->backend.WatchChanges([weak, &journal] {
+                    std::shared_ptr<UiSide> side = weak.lock();
+                    if (!side || side->backend.WindowClosed()) return;
+                    auto start = std::chrono::steady_clock::now();
+                    side->session.Reapply(side->backend);
+                    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - start);
+                    bool worthLogging = side->timedPasses < kTimedPasses || ms.count() > kSlowPassMs;
+                    if (worthLogging && side->timedPasses < kMaxTimedPasses) {
+                        side->timedPasses++;
+                        journal.Write("Themes: pass after a change, " + std::to_string(ms.count()) + " ms");
+                    }
+                });
             }
             if (ui->backend.WindowClosed()) return;
 
@@ -141,7 +161,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 std::ofstream(JournalFile("inspector.json")) << theme::InspectTreeJson(ui->backend);
                 WriteSidebarIfMissing(kit, ui->backend);
                 UpdateThemeSettings(kit, [](theme::ThemeSettings& value) { value.inspect = false; });
-                journal.Write("Inspecteur : arbre écrit dans journal\\inspector.txt et inspector.json");
+                journal.Write("Inspector: tree written to logs\\inspector.txt and inspector.json");
             }
 
             // The section is built once, so the choice is compared with settings.txt as it is now, not with the theme
@@ -151,7 +171,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 current.Load((kit / "settings.txt").string());
                 if (theme::ReadThemeSettings(current).active == choice) return;  // nothing to change
                 UpdateThemeSettings(kit, [&choice](theme::ThemeSettings& value) { value.active = choice; });
-                journal.Write("Thème choisi dans Réglages : « " + (choice.empty() ? std::string("aucun") : choice) + " »");
+                journal.Write("Theme chosen in Settings: \"" + (choice.empty() ? std::string("none") : choice) + "\"");
             });
         });
 

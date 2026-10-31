@@ -1,0 +1,631 @@
+# Themes: format and rules
+
+A theme is a folder with at least one of the files below. The format follows section 6.1 of
+[the API reference](../extensions/api.md), with a layer of rules on top (`user.css`).
+
+```
+my-theme/
+├── manifest.json     id, name, version, default scheme
+├── colors.ini        colors per scheme (optional)
+├── resources.xaml    XAML resource dictionary (optional)
+├── user.css          rules for specific elements (optional)
+├── images/           images referenced by url(...)
+├── fonts/            fonts referenced by url(...) in font-family
+└── templates/        control templates referenced by url(...)
+```
+
+The folder name is the theme id. An installed theme lives in `%USERPROFILE%\Ampify\themes\`.
+
+Around themes, the Ampify folder also holds:
+
+```
+Ampify/
+├── settings.txt        settings (theme.active, theme.scheme, theme.schedule, snippets.<id>.enabled...)
+├── themes/<id>/        one folder per theme
+├── snippets/<id>/      one folder per snippet (see "Snippets")
+├── resource-keys.txt   keys allowed in resources.xaml
+├── sidebar.json        sidebar: hidden entries and order (optional)
+├── home.json           home page: hidden sections and order (optional)
+└── logs/               AppleMusic.log, inspector.txt, inspector.json
+```
+
+To start, read [guide.md](guide.md) (a theme in five minutes). To reuse a Spicetify theme, read
+[spicetify.md](spicetify.md).
+
+## colors.ini
+
+One section per scheme, for example `[Base]` and `[Dark]`. The file can also be named `color.ini`, as in Spicetify.
+A lowercase key (`main`, `sidebar`, `text`, `button`...) is a Spicetify color. Ampify translates it to Apple Music
+elements (table in [spicetify.md](spicetify.md)), and it is written `$main` or `var(--spice-main)` in `user.css`.
+A PascalCase key is the name of an app brush, and it replaces that brush. The value is a hexadecimal color, with or
+without `#`: `FA2D48`, `#FA2D48` or `#80FA2D48` (alpha first).
+
+```ini
+[Base]
+AccentFillColorDefaultBrush = 0A84FF
+
+[Dark]
+AccentFillColorDefaultBrush = 0A84FF
+SolidBackgroundFillColorBase = 1C1C1E
+```
+
+- The first scheme is the default. The setting `theme.scheme` picks another. It can also follow the Windows mode or the
+  time of day: see "Automatic scheme".
+- The same names work as named colors in `user.css`: `background: $SolidBackgroundFillColorBase;`.
+- A name that does not exist in the app is reported in the log ("missing resource") and does nothing else.
+
+## resources.xaml
+
+A XAML resource dictionary. Each `x:Key` must be in the list of allowed keys. A single key outside the list refuses the
+whole theme, and the log says which one.
+
+The list comes from the inspector: the file `resource-keys.txt` in `%USERPROFILE%\Ampify\` holds one key per line.
+Without this file the check is off, and the log says so.
+
+## user.css
+
+A subset of CSS. A rule links selectors to declarations.
+
+```css
+/* comment */
+Grid#NowPlayingBar {
+    background: #1C1C1E;
+}
+
+Grid#Bar > TextBlock {
+    color: $TextFillColorPrimaryBrush;
+    font-size: 18px;
+}
+
+#AdvertisingBanner {
+    visibility: collapsed !important;
+}
+```
+
+### Selectors
+
+| Syntax | Target |
+|---|---|
+| `Grid` | Every `Grid` (short type name) |
+| `Microsoft.UI.Xaml.Controls.Grid` | The same type, by full name |
+| `#Bar` | The element whose `x:Name` is `Bar` |
+| `*` | Every element |
+| `A B` | A `B` anywhere inside an `A` |
+| `A > B` | A `B` whose direct parent is an `A` |
+| `A:hover` | An `A`, while the pointer is over it (see "Hover") |
+
+You can combine them: `Grid#Bar > TextBlock`, `Grid#TransportBar Button:hover`. `:hover` goes only on the last element
+of the selector. Attributes (`[x=y]`) and other pseudo-classes (`:focus`...) are not supported. A rule that contains
+one is ignored, with a line in the log.
+
+### Priority
+
+When several rules target the same element and property, the most specific wins: a `#name` beats a type, and a type
+beats `*`. With equal specificity, the rule written last wins. `!important` beats everything else.
+
+Rules come from several sources, applied in this order: the theme, then each active snippet (in alphabetical order of
+their ids), then `sidebar.json` and `home.json`. A later source beats the earlier ones, whatever the specificity of
+their selectors. Only `!important` goes ahead: an `!important` rule of the theme beats a normal rule of a snippet. The
+full ranking is therefore `!important`, then source, then specificity, then place in the file.
+
+### Variables (`:root` and `var()`)
+
+A `:root` block defines variables. Their names start with `--`. A value reads them with `var(--name)`, or
+`var(--name, fallback value)` if the variable may be missing.
+
+```css
+:root {
+    --background: #1C1C1E;
+    --gap: 8px;
+    --gaps: var(--gap) 16px;
+}
+
+Page {
+    background: var(--background);
+    padding: var(--gaps);
+}
+```
+
+- Names are case-insensitive.
+- A `:root` block placed lower in the file counts too. Inside `:root`, a variable can use the ones defined before it.
+- A missing variable without a fallback makes the declaration ignored, with a line in the problems list.
+- In `:root`, only variables are read. A variable written outside `:root` is ignored.
+- A snippet sees the variables of the active theme.
+
+### Properties
+
+| CSS | XAML | Accepted values |
+|---|---|---|
+| `background` | `Background` | Color, `$name`, `transparent`, `url(images/file.png) [cover\|contain\|fill]`, `artwork`, `linear-gradient(...)` (see "Gradients and images") |
+| `backdrop` | `Background` | `acrylic(tint, opacity)`: an acrylic background (see "Acrylic") |
+| `color` or `foreground` | `Foreground` | Same as `background` |
+| `border-color` | `BorderBrush` | Same as `background` |
+| `border-width` | `BorderThickness` | 1 to 4 lengths, CSS order: top right bottom left |
+| `corner-radius` | `CornerRadius` | 1 to 4 lengths, CSS order: top-left, top-right, bottom-right, bottom-left |
+| `font-family` | `FontFamily` | A font name, quoted or not, or `url(fonts/file.ttf#Name)` (see "Theme fonts") |
+| `font-size` | `FontSize` | Number, `px` optional |
+| `font-weight` | `FontWeight` | `normal`, `bold`, or a number from 1 to 1000 |
+| `margin` | `Margin` | 1 to 4 lengths |
+| `padding` | `Padding` | 1 to 4 lengths |
+| `width`, `height` | `Width`, `Height` | A length or `auto` |
+| `opacity` | `Opacity` | A number from 0 to 1 |
+| `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`) |
+| `template` | `Template` | `url(templates/file.xaml)`, a full `ControlTemplate` |
+| `flow-direction` or `direction` | `FlowDirection` | `ltr` (left to right) or `rtl` (right to left); `left-to-right` and `right-to-left` also work |
+| `order` | Position (Ampify only) | An integer from 0: the place of the element among its parent's children |
+| `horizontal-alignment` | `HorizontalAlignment` | `left`, `center`, `right` or `stretch` |
+| `vertical-alignment` | `VerticalAlignment` | `top`, `center`, `bottom` or `stretch` |
+| `grid-row`, `grid-column` | `Grid.Row`, `Grid.Column` | An integer from 0 |
+| `grid-row-span`, `grid-column-span` | `Grid.RowSpan`, `Grid.ColumnSpan` | An integer from 1 |
+| `z-index` | `Canvas.ZIndex` | An integer, possibly negative: the highest element is drawn in front of its neighbors |
+| `transform` | `RenderTransform` | `scale(x[, y])`, `rotate(Ndeg)`, `translate(x[, y])`, `none` (see "Transforms") |
+| `transform-origin` | `RenderTransformOrigin` | One or two values: percentages, or `left`, `center`, `right`, `top`, `bottom` |
+| `box-shadow` | `Shadow` and `Translation` | A depth from 0 to 100 pixels, or `none` (see "Shadows") |
+| `transition` | `OpacityTransition`, `BackgroundTransition`, `ScaleTransition`... | `<property> <duration>, ...` for `transform`, `opacity`, `background` or `all`, or `none` (see "Transitions") |
+| `font-role` | `FontFamily`, `FontWeight`, `FontSize` | A font role, for example `title` (see "Font roles") |
+
+A property that does not exist on an element is refused without harm. The log reports it once. Like all others, these
+properties return to their original value when the theme is removed.
+
+### Gradients and images
+
+`linear-gradient` follows CSS: an optional direction, then at least two colors, each with an optional position.
+
+```css
+ContentPage {
+    background: linear-gradient(135deg, #0E1424 0%, $AccentFillColorDefaultBrush 60%, #2A1F45);
+}
+
+Grid#Bar {
+    background: linear-gradient(to right, #CC182238, transparent);
+}
+```
+
+- The direction is an angle in degrees (`0deg` up, `90deg` right, clockwise) or `to top`, `to right`,
+  `to bottom right`... Without a direction, the gradient goes down.
+- A color is written as elsewhere: `#hex`, `$name` or `transparent`. A position is a percentage from 0 to 100. A missing
+  position is placed as in CSS: the first at 0%, the last at 100%, the others evenly spaced.
+- The gradient becomes a `LinearGradientBrush` whose points are relative to the element. Its line passes through the
+  corners of a square, so on a very elongated element a slanted angle does not land exactly on the corners.
+- `color` and `border-color` also accept a gradient.
+
+An image is given with `url(...)`, followed by an optional fit:
+
+| Fit | Effect | XAML |
+|---|---|---|
+| `cover` | Fills the element and keeps proportions, cropping the image if needed | `Stretch=UniformToFill` |
+| `contain` | The whole image, keeping proportions | `Stretch=Uniform` |
+| `fill` (or nothing) | Stretches the image to the element's size | `Stretch=Fill` |
+
+The path starts at the theme folder. A path that leaves it (`..`, an absolute path, a drive letter) is refused.
+
+### The artwork of the playing song
+
+`background: artwork` sets the artwork of the song that is playing, as Apple Music shows it in its playback bar. It
+changes with the song (within 3 seconds). The fits are those of images (`cover` by default, `contain`, `fill`). Placed
+on the window background, under acrylic panels, it gives the blurred background of the Hazy or Comfy Spicetify themes:
+
+```css
+Grid#PageRoot { background: artwork cover; }
+NavigationView#NavView, ContentPage, Border#Titlebar,
+SplitView#ContentSplitView > Grid > Grid#ContentRoot > Border > Grid { background: transparent; }
+Grid#PaneRoot { backdrop: acrylic(#0B0B10, 0.62); corner-radius: 18px; margin: 10 6 10 10; }
+```
+
+Full example: `themes/examples/artwork`. With no song loaded, the background stays empty.
+
+### Layout
+
+The placement properties (`vertical-alignment`, `horizontal-alignment`, `grid-row`, `grid-column`, `margin`,
+`z-index`) move Apple Music's zones. One line puts the playback bar at the bottom, like in Spotify:
+
+```css
+Grid#TransportBar, BackDrop { vertical-alignment: bottom; }
+```
+
+`horizontal-alignment` and `vertical-alignment` place an element in the space its parent gives it. `grid-row`,
+`grid-column` and their `-span` variants move a child of a `Grid` to another cell. They are read only on an element whose
+direct parent is a `Grid`, and refused elsewhere. `z-index` puts an element in front of or behind its neighbors.
+
+```css
+Grid#TransportBar > StackPanel#NowPlayingToggleButtons {
+    grid-column: 0;
+    horizontal-alignment: left;
+}
+```
+
+The cells and the number of rows and columns come from the app. The inspector shows `Grid.Row` and `Grid.Column` of
+each element. A cell number that does not exist puts the element in the last cell.
+
+### Acrylic
+
+`backdrop: acrylic(tint, opacity)` sets an acrylic background (WinUI 3 `AcrylicBrush`): a blur of what is behind the
+element, tinted. The tint opacity goes from 0 to 1.
+
+```css
+Grid#PaneRoot {
+    backdrop: acrylic($LayerFillColorDefaultBrush, 0.55);
+}
+```
+
+- `backdrop` and `background` write the same property. The rule that wins (see "Priority") gives the background.
+- This is in-app acrylic: it blurs the elements of the window, not the desktop.
+- When Windows turns effects off (transparency disabled, battery saver), only the tint shows.
+
+### Transforms
+
+`transform` rotates, scales or moves an element without changing the space it takes: its neighbors do not move.
+
+```css
+TransportControl#TransportControl AppBarButton {
+    transform-origin: center;
+}
+
+TransportControl#TransportControl AppBarButton:hover {
+    transform: scale(1.15) rotate(-3deg);
+}
+```
+
+- Functions: `scale(x)` or `scale(x, y)`, `scaleX`, `scaleY`, `rotate(Ndeg)`, `translate(x, y)` (pixels), `translateX`,
+  `translateY`. `none` resets the element.
+- They become one `CompositeTransform`, which always applies scale, then rotation, then translation, whatever the
+  written order. Two `scale` values multiply. Two `rotate` or two `translate` values add up.
+- `transform-origin` gives the fixed point, relative to the element: `center` (or `50% 50%`), `left top`, `right`...
+  Without it, XAML starts from the top left corner. Pixels are not accepted.
+
+### Shadows
+
+`box-shadow` takes a single value: the depth, in pixels. Ampify puts a `ThemeShadow` on the element and moves it by this
+depth (`Translation`, Z axis): the higher the element, the larger and softer the shadow.
+
+```css
+SplitView#ContentSplitView > Grid > Grid#ContentRoot {
+    box-shadow: 24px;
+}
+```
+
+`Grid#ContentRoot` alone would also hit the inner `ContentRoot` of the `NavigationView` (which holds the playback bar)
+and that of the playback buttons. A name taken from WinUI templates is always targeted under a named parent.
+
+- `none` or `0` removes the shadow. The full CSS form (`0 4px 8px #000`) is not accepted: color, offset and blur come from
+  Windows.
+- A `ThemeShadow` is drawn only on what is behind the element in the window. Depending on the WinUI version, it may not
+  show outside a popup. Check it on the real app.
+- The element's old Z value returns with its original shadow when the theme is removed.
+
+### Hover
+
+A rule whose selector ends with `:hover` applies while the pointer is over the element:
+
+```css
+Frame#ContentFrame Button {
+    transform-origin: center;
+}
+
+Frame#ContentFrame Button:hover {
+    transform: scale(1.05);
+    box-shadow: 16px;
+}
+```
+
+- `:hover` rules form a separate cascade, with the same priority rules between themselves. Under the pointer, their
+  values beat those of normal rules, whatever the specificity.
+- When the pointer leaves, the element takes back exactly what it had: the theme's value, or the original one.
+- Ampify tracks the pointer (`PointerEntered` and `PointerExited`) once per element. Removing the theme, or a `:hover`
+  rule that disappears, removes that tracking and restores the values, even if the pointer is still over the element.
+- `order` is not possible under `:hover`: the declaration is ignored and reported.
+- The change is immediate, unless the element has a `transition` (next section).
+- A control that keeps the pointer event for itself does not react.
+
+### Transitions
+
+`transition` animates the changes of an element instead of jumping to the new value: a `:hover`, a theme being applied,
+a scheme change.
+
+```css
+HoverGrid#SquareLockupContent {
+    transition: transform 180ms ease-out, opacity 150ms;
+}
+
+HoverGrid#SquareLockupContent:hover {
+    transform: scale(1.04);
+}
+```
+
+- `transform`, `opacity` and `background` can be animated; `all` means the three. Durations are in `ms` or `s`, from 0
+  to 5 s. Easing words (`ease`, `linear`, `ease-in-out`...) and delays are accepted and ignored: Ampify uses XAML's own
+  quick ease-out.
+- Ampify uses XAML's implicit transitions, which run on the compositor thread: they stay smooth even while Apple Music
+  is busy. An animated `transform` is shown through the element's `Scale`, `Rotation` and `Translation` around its
+  `transform-origin`, instead of `RenderTransform`.
+- `background` animates between plain colors only (a gradient, an image or acrylic changes at once).
+- Removing the theme gives the element back the transitions it had before.
+
+### Theme fonts
+
+`font-family: url(fonts/file.ttf#Family name)` uses a font shipped in the theme folder. The name after `#` is the family
+name in the file (visible in the Windows font preview).
+
+```css
+:root {
+    --font-title: url(fonts/Inter-Bold.ttf#Inter);
+}
+
+TextBlock {
+    font-family: url("fonts/Inter-Regular.ttf#Inter");
+}
+```
+
+- Accepted files: `.ttf`, `.otf` and `.ttc`. The path starts at the theme folder, as for images.
+- Ampify gives XAML the address of the file (`file:///C:/.../fonts/file.ttf#Name`), as for images. An `ms-appx:///`
+  address would point to Apple Music's package, not to the theme.
+- With `theme.parts.assets = false`, the fonts of the folder are refused like images.
+- Font roles (`--font-<role>`) accept this form too.
+- Ampify never changes the font of a text made of icons (private-use glyphs), whatever the rule says. Changing it
+  shows empty squares.
+
+### Right-to-left languages
+
+Spicetify has a setting `remove_rtl_rule`, because Spotify's CSS contains rules for Arabic and Hebrew. Apple Music has
+no such rules to remove. Instead, `flow-direction` flips an element and everything inside it:
+
+```css
+Page {
+    flow-direction: rtl;
+}
+```
+
+`ltr` restores the usual direction. As with any value, the original direction returns when the theme is removed.
+
+### Element order
+
+`order` moves an element among its parent's children: `0` puts it first. Elements without `order` keep their order,
+after those that have one. This is not a XAML property: Ampify moves the element in the list of its parent (for example
+the entries of a `NavigationView`). A parent that cannot reorder refuses, without harm. The moves are undone, in reverse
+order, when the theme is removed. `sidebar.json` uses this.
+
+## Font roles
+
+A font role names the font of a kind of text: title, body text, caption... It is the equivalent of `getFontStyle` in
+Spicetify. A theme sets a role in `:root` with three variables, all optional:
+
+```css
+:root {
+    --font-title: "Segoe UI Variable Display";
+    --font-title-weight: bold;
+    --font-title-size: 30px;
+    --font-body: Inter;
+}
+
+TextBlock#PageTitle {
+    font-role: title;          /* family, weight and size of the role, at once */
+}
+
+TextBlock {
+    font-family: var(--font-body);
+}
+```
+
+- `--font-<role>`: the family, like `font-family`.
+- `--font-<role>-weight`: the weight, like `font-weight` (`normal`, `bold` or a number).
+- `--font-<role>-size`: the size, like `font-size`.
+
+What the theme does not set keeps the Windows 11 value:
+
+| Role | Family | Weight | Size |
+|---|---|---|---|
+| `caption` | Segoe UI Variable Small | 400 | 12 |
+| `body` | Segoe UI Variable Text | 400 | 14 |
+| `body-strong` | Segoe UI Variable Text | 600 | 14 |
+| `subtitle` | Segoe UI Variable Display | 600 | 20 |
+| `title` | Segoe UI Variable Display | 600 | 28 |
+| `title-large` | Segoe UI Variable Display | 600 | 40 |
+| `display` | Segoe UI Variable Display | 600 | 68 |
+
+A theme can also create its own roles (`--font-lyrics: ...`).
+
+On the kernel side, the function `FontRolesJson` in `core/theme/fonts.hpp` returns every role of the applied theme
+(theme and snippets together) as JSON: `{"title":{"family":"...","weight":700,"size":30,"fromTheme":true},...}`. An
+extension API to read the roles (`Ampify.fonts.style(name)`) is planned and not available yet.
+
+## Snippets
+
+A snippet is a small piece of style that you switch on alone, as in Spicetify. It goes in
+`%USERPROFILE%\Ampify\snippets\<id>\`:
+
+```
+square-corners/
+├── manifest.json     "kind": "snippet", "resources": "resources.xaml"
+├── resources.xaml    resource dictionary (required by the manifest, it can be empty)
+└── user.css          rules, as in a theme (optional)
+```
+
+- Switch it on with `ampify snippet enable <id>`, which writes `snippets.<id>.enabled = 1` in `settings.txt`.
+  `ampify snippet disable <id>` switches it off.
+- It applies on top of the active theme, or alone if there is no theme. Its rules beat the theme's (see "Priority").
+  Several snippets apply in alphabetical order of their ids.
+- Its rules see the colors (`$name`), the variables and the font roles of the active theme. A snippet has no
+  `colors.ini`: if it has one, it is ignored and reported.
+- Its `resources.xaml` follows the same list of allowed keys as themes. A key outside the list refuses the snippet, not
+  the theme. The snippet's dictionary is merged after the theme's, so it wins.
+- Switching a snippet off puts back what was under it (the theme, or the original value), with no restart.
+- A snippet's problems go to the log with its name.
+- The theme parts (`theme.parts.*`) do not affect snippets: each snippet is switched on alone.
+
+Example: [`themes/snippets/square-corners/`](../../themes/snippets/square-corners/). `ampify theme check <folder>` also
+checks a snippet.
+
+## Automatic scheme
+
+The scheme of `colors.ini` can follow the Windows mode (light or dark), or the time of day.
+
+| Setting | Effect |
+|---|---|
+| `theme.scheme = Dark` | That scheme |
+| `theme.scheme =` (empty) | The first scheme of `colors.ini` |
+| `theme.scheme = auto` | Follows the Windows mode |
+| `theme.schedule = 07:00=Light,19:00=Dark` | Follows the local time; takes priority over `theme.scheme` |
+
+**`auto`.** In dark mode, Ampify takes the first scheme named `Dark` or `Night` (or whose name contains it). In light
+mode, it takes `Light` or `Day` (or a name that contains `light`), otherwise the first scheme that is not dark. A theme
+with `[Base]` and `[Dark]` therefore works as it is. Without a dark scheme, the first scheme stays, and the log says so.
+
+**`theme.schedule`.** A list of `HH:MM=Scheme` entries separated by commas. The current scheme is the one of the last
+time that has passed. Before the first time of the day, the last scheme of the day before continues. A scheme can be
+`auto`: `07:00=auto,22:00=Night` follows Windows by day and forces `Night` in the evening. A badly written entry is
+ignored and reported.
+
+The switch happens by itself: the kernel re-reads the mode and the time every 3 seconds and reloads the theme when the
+scheme changes. `ampify theme set` keeps `theme.schedule`.
+
+## Sidebar and home (`sidebar.json`, `home.json`)
+
+The equivalent of `sidebar_config` and `home_config` in Spicetify: hide entries and change their order. Both files go in
+the Ampify folder, next to `settings.txt`. They apply with or without a theme.
+
+```json
+{
+  "version": 1,
+  "reorder": true,
+  "items": [
+    {"name": "RadioItem", "hidden": false},
+    {"name": "ListenNowItem", "hidden": false},
+    {"name": "BrowseItem", "hidden": true}
+  ]
+}
+```
+
+- `name` is the `x:Name` of the element. In `sidebar.json`, the rule targets `NavigationViewItem#<name>`. In
+  `home.json`, it targets `#<name>`, whatever the type.
+- `hidden: true` gives `visibility: collapsed`.
+- With `"reorder": true`, the place in the list gives `order`: the first entry comes first. Without `reorder` (or with
+  `false`), only hiding applies and the app's order stays. Set `reorder` only if the list is complete.
+- These rules come after the theme and the snippets. Problems go to the log (prefix "Layout").
+
+**The real names still have to be read from the app.** The names in the example are made up. Run the inspector
+(`theme.inspect = 1`) and read the `NavigationViewItem` entries in `logs\inspector.txt` or `logs\inspector.json`.
+
+**Generator.** `core/theme/layout.hpp` provides what is needed to write these files: `NamesMatching(tree,
+NavigationViewItem)` lists the entries of the real tree, `GenerateLayout(existing file, names)` keeps the order and state
+of entries already listed and adds new ones at the end, visible, and `WriteLayout` writes the text. After an inspection,
+the kernel creates `sidebar.json` if it does not exist yet: the full list, nothing hidden, the current order. Then you
+only need to set entries to `"hidden": true` or move them in the list.
+
+## Example of a full redesign: Glass
+
+[`themes/examples/glass/`](../../themes/examples/glass/) changes most of the interface: a gradient background, an acrylic
+sidebar and playback bar, content in a large rounded card with a shadow, larger text, and buttons that grow on hover.
+Its selectors use the names read on Apple Music 1.1792. Those that only target a generic type are marked provisional at
+the top of its `user.css`.
+
+## Check a theme
+
+On any PC, without Apple Music:
+
+```
+ampify_theme_check.exe C:\path\to\my-theme [Dark]
+```
+
+The tool prints the schemes, each rule kept with its line, then the problems. It exits with code 0 only if the theme is
+usable and has no problem.
+
+## Theme parts
+
+Three settings in `settings.txt` switch off a part of a theme without deleting it. All default to `true`.
+
+| Setting | Effect when `false` |
+|---|---|
+| `theme.parts.colors` | `colors.ini` writes no color resource. The colors stay usable in `user.css` with `$name`. |
+| `theme.parts.resources` | `resources.xaml` and the rules of `user.css` are read, but nothing is applied. |
+| `theme.parts.assets` | The images and fonts of the folder are refused. |
+
+A part that is off is still read: problems are reported as usual. A fourth setting, `theme.parts.script`, switches the
+theme's optional `main.js` on or off.
+
+## Commands
+
+In a terminal:
+
+```
+ampify theme list
+ampify theme set <id|none> [--scheme name]
+ampify watch <theme-folder> [--scheme name] [--polls N]
+```
+
+- `theme list`: each theme of the `themes` folder with its state, usable or refused.
+- `theme set`: selects the theme in the settings. A refused theme is not selected, and the settings stay unchanged
+  (exit code 1). `none` restores the original colors. If Apple Music is open, the change applies within 3 seconds.
+- `watch`: checks the folder at start, then checks again at each file change. Handy for writing a theme while seeing the
+  rules that are kept. `--polls N` stops after N checks (useful for tests).
+
+The Ampify folder is `%USERPROFILE%\Ampify`. The option `--kit-dir <folder>` replaces it. Exit code 2 means wrong usage
+(missing argument, theme not found).
+
+## Log
+
+In `%USERPROFILE%\Ampify\logs\AppleMusic.log`, the theme engine writes these kinds of lines (the exact wording can
+change between versions):
+
+- Theme loaded, with the scheme and the reason for the choice (for example the Windows dark mode).
+- Applied: `Grid#Bar Background = #FF1C1C1E (user.css line 3)`, one line per value written. For a snippet, the file is
+  `snippets/<id>/user.css`. For the layout, it is `sidebar.json` or `home.json` (the line is then the place in the list).
+- Snippet loaded, snippet problems, layout problems: the state and the problems of each source.
+- Refused: the element or the value was refused. One line per cause.
+- Theme removed, with the number of values restored.
+
+## Inspector
+
+With `theme.inspect = 1`, the kernel writes the interface tree on its next pass, then sets the setting back to 0:
+
+- `logs\inspector.txt`: for reading. The resources, then one element per line, with a selector and its values.
+- `logs\inspector.json`: the same tree for tools (function `InspectTreeJson` in `core/theme/inspector.hpp`). The command
+  `ampify inspect --tree` prints the text version.
+
+```json
+{
+  "version": 1,
+  "truncated": false,
+  "resources": [{"key": "AccentFillColorDefaultBrush", "value": "#FF0A84FF"}],
+  "nodes": [
+    {"index": 0, "id": "1", "type": "Page", "fullType": "", "name": "", "parent": -1, "depth": 0,
+     "selector": "Page", "properties": {"Background": "#FF000000"}},
+    {"index": 1, "id": "2", "type": "Grid", "fullType": "", "name": "Bar", "parent": 0, "depth": 1,
+     "selector": "Grid#Bar", "properties": {"Background": "#FF0000FF"}}
+  ]
+}
+```
+
+`nodes` lists parents before their children. `parent` is the index of the parent in `nodes` (-1 for a root). `id` is a
+string. Templates and objects have the value "present". After 5000 elements the list stops and `truncated` is `true`.
+
+## Windows side
+
+The engine is portable (`core/theme/`) and tested on Linux. The Windows service (`win/theme_service.cpp`) calls it:
+
+- On its worker thread, a `ThemeWorker` (`core/theme/worker.hpp`). At each pass: `SetSystemDark(dark)` with the value
+  `AppsUseLightTheme` of `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize` (0 = dark), then
+  `Tick(settings, minute)` with the local time in minutes since midnight. The result is the request to send to the UI
+  thread. Its generation changes only when a reload is needed.
+- On the UI thread, `ThemeSession::Tick` applies the request. After an inspection, the service also writes
+  `inspector.json` and creates `sidebar.json` if it is missing.
+
+The XAML backend (`win/xaml_backend.cpp`) reads and writes `FlowDirection` (`LeftToRight` or `RightToLeft`) and the
+`Order` position (moving the element in `MenuItems` or `Children` of its parent).
+
+For gradients, acrylic, transforms and shadows, the backend creates an object (brush, transform, shadow) and remembers
+the value that produced it. As long as the element keeps that object, it reads back as that value, and the next pass
+writes nothing. Hover goes through `HoverTracker` (`core/theme/hover.hpp`), the same code the tests use. Under the
+pointer, the engine reads and writes the "underneath" value without undoing the hover.
+
+## Known limits
+
+- Element names come from the app. They can change with each Apple Music update. Read them with the inspector (setting
+  `theme.inspect`) before writing rules.
+- A resource read as `StaticResource` keeps its original value until the element is recreated.
+- Images and fonts must be in the theme folder.
+- `box-shadow` only sets the depth, and the `ThemeShadow` can stay invisible on some elements. A slanted gradient is exact on a square element.
+- The names in `sidebar.json` and `home.json` have not all been read from the real app, and Apple Music's sidebar may
+  not be a `NavigationView`. If it is not, `sidebar.json` finds nothing and has no other effect.
+- `auto` and `theme.schedule` are re-read every 3 seconds, so the scheme change is not instant. New pages and rows that
+  appear while scrolling get the theme within a fraction of a second: Ampify follows page navigation and the lists of
+  the page.

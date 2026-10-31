@@ -31,7 +31,7 @@ struct Fixture {
         fs::remove_all(dir);
         fs::create_directories(dir);
         const std::string manifest =
-            R"({"id":")" + id + R"(","name":"Démo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
+            R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
             R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
         std::ofstream(dir / "manifest.json") << manifest;
         std::ofstream(dir / "main.js") << main;
@@ -102,6 +102,7 @@ const Expected kMembers[] = {
     {"uri", "object!{parse:f1=parse,build:f3=build}"},
     {"color", "object!{extract:f3=extract}"},
     {"ui", "object!{topbar:object!{addButton:f1=addButton},playbar:object!{addButton:f1=addButton},"
+           "sidebar:object!{addItem:f1=addItem},"
            "menu:object!{addItem:f2=addItem},popup:object!{open:f1=open},panel:object!{register:f2=register},"
            "page:object!{register:f2=register},title:object!{set:f1=set},navigate:f1=navigate}"},
 };
@@ -176,12 +177,12 @@ TEST_CASE(ApiModules_HaveUniqueNamesAndNatives) {
 
 TEST_CASE(Element_DeliverEventCallsTheNamedDispatchEntry) {
     Fixture f;
-    auto element = f.Make("events", R"(Ampify.keyboard.bind("ctrl+alt+right", () => Ampify.log("suivant"));)",
+    auto element = f.Make("events", R"(Ampify.keyboard.bind("ctrl+alt+right", () => Ampify.log("next"));)",
                           R"("ui.keyboard")");
     CHECK(element->Start());
     element->DeliverEvent("key", "Ctrl+Alt+Right");
     element->Pump();
-    CHECK(f.Logged("[events] suivant"));
+    CHECK(f.Logged("[events] next"));
 
     // An entry that no module defines is logged and does not stop the element.
     element->DeliverEvent("absent", "{}");
@@ -228,7 +229,7 @@ struct ChimeHost {
 
 // A host that offers EchoHost only. FakeHost comes first, so EchoHost sits at another address in the object.
 struct EchoingHost : ampify::test::FakeHost, EchoHost {
-    std::string Echo(const std::string& text) override { return "écho " + text; }
+    std::string Echo(const std::string& text) override { return "echo " + text; }
     void* QueryCapability(std::string_view name) override {
         if (void* found = Offer<EchoHost>(name, this)) return found;
         return FakeHost::QueryCapability(name);
@@ -247,6 +248,6 @@ TEST_CASE(Host_CapabilityIsNullUnlessTheHostOffersIt) {
     EchoHost* echo = host.Capability<EchoHost>();
     CHECK(echo != nullptr);
     CHECK(echo == static_cast<EchoHost*>(&echoing));
-    if (echo) CHECK(echo->Echo("bonjour") == "écho bonjour");
+    if (echo) CHECK(echo->Echo("hello") == "echo hello");
     CHECK(host.Capability<ChimeHost>() == nullptr);
 }

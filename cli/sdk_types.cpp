@@ -1,4 +1,4 @@
-// The declarations that `ampify types` writes. They follow section 5 of docs/extensions/API.md. tools/test_cli.py checks
+// The declarations that `ampify types` writes. They follow section 5 of docs/extensions/api.md. tools/test_cli.py checks
 // that every member named there appears here, so the two files cannot drift apart without a failing test.
 
 #include "internal.hpp"
@@ -6,15 +6,15 @@
 namespace ampify::cli {
 
 std::string_view AmpifyDeclarations() {
-    return R"ts(// ampify.d.ts : types de l'objet global Ampify (API d'extensions, kitApi 1.x).
-// Suit la section 5 de docs/extensions/API.md. Les membres marqués provisoires peuvent encore changer.
+    return R"ts(// ampify.d.ts: types of the global Ampify object (extension API, kitApi 1.x).
+// Follows section 5 of docs/extensions/api.md. Members marked provisional may still change.
 
 type TooltipProps = { tooltip?: string; tooltipPlacement?: "top" | "bottom" | "left" | "right"; tooltipDelay?: number };
 type UiNode = TooltipProps & {
   type: "stack" | "row" | "list" | "card" | "text" | "button" | "toggle" | "slider" | "textfield" | "image" | "icon" | "dropdown" | "option";
   children?: UiNode[];
-  onClick?: number;   // numéro de rappel (button, card, image, icon)
-  onChange?: number;  // numéro de rappel (toggle, slider, textfield, dropdown)
+  onClick?: number;   // callback number (button, card, image, icon)
+  onChange?: number;  // callback number (toggle, slider, textfield, dropdown)
   [prop: string]: unknown;
 };
 type UiButton = { label: string; icon?: string; onClick: () => void };
@@ -30,9 +30,9 @@ type PlayerState = {
     variantId: string;
     atmos: boolean;
     lossless: boolean;
-    queueItemId: string;  // entrée de la file chez Apple, "" quand la source ne la donne pas
+    queueItemId: string;  // Apple's queue entry, "" when the source does not give it
   } | null;
-  source: "apple" | "smtc" | "";  // "" : état inconnu (aucune source n'a répondu)
+  source: "apple" | "smtc" | "";  // "": unknown state (no source answered)
 };
 type QueueItem = {
   id: string;
@@ -64,7 +64,7 @@ type ExtractedColors = {
   palette: { color: string; population: number }[];
 };
 
-// 5.9 : Ampify.React, Ampify.ReactDOM, Ampify.hooks et Ampify.components.
+// 5.9: Ampify.React, Ampify.ReactDOM, Ampify.hooks and Ampify.components.
 type AmpifyElement = { readonly type: unknown; readonly key: string | null; readonly props: Readonly<Record<string, unknown>> };
 type AmpifyNode = AmpifyElement | string | number | boolean | null | undefined | AmpifyNode[];
 type AmpifyComponent<P = Record<string, unknown>> = (props: P & { children?: AmpifyNode }) => AmpifyNode;
@@ -104,7 +104,7 @@ type DiscordActivity = {
 type MidiEvent = { type: "note" | "noteoff" | "cc"; channel: number; number: number; value: number };
 
 declare const Ampify: {
-  // 5.1 Base [ferme]
+  // 5.1 Base [stable]
   readonly version: string;
   readonly kitApi: string;
   readonly process: "ui" | "engine";
@@ -112,7 +112,7 @@ declare const Ampify: {
   log(message: string): void;
   onStop(fn: () => void): void;
 
-  // 5.2 Réglages et stockage [ferme]
+  // 5.2 Settings and storage [stable]
   config: {
     get<T = unknown>(key: string, fallback?: T): T;
     set(key: string, value: unknown): void;
@@ -123,7 +123,7 @@ declare const Ampify: {
     remove(key: string): void;
   };
 
-  // 5.3 Lecteur [provisoire M4]
+  // 5.3 Player [preview]
   player: {
     state(): PlayerState;
     on(event: "trackchange" | "statechange", fn: (state: PlayerState) => void): void;
@@ -140,7 +140,7 @@ declare const Ampify: {
     };
   };
 
-  // 5.4 Son [provisoire M4]
+  // 5.4 Sound [preview]
   audio: {
     setGainDb(db: number): number;
     onFrame(fn: (frame: AudioFrame) => void): boolean;
@@ -156,10 +156,11 @@ declare const Ampify: {
     };
   };
 
-  // 5.5 Interface [provisoire M8]
+  // 5.5 Interface [preview]
   ui: {
     topbar: { addButton(button: UiButton): void };
     playbar: { addButton(button: UiButton): void };
+    sidebar: { addItem(item: UiButton): void };
     menu: { addItem(where: "context" | "app", item: { label: string; onClick: () => void }): void };
     popup: { open(view: UiNode): void };
     panel: { register(id: string, view: UiNode): void };
@@ -168,7 +169,7 @@ declare const Ampify: {
     navigate(path: string): void;
   };
 
-  // 5.6 Services [provisoire M7 et M8]
+  // 5.6 Services [provisional]
   notify(options: { title: string; text: string }): void;
   keyboard: { bind(shortcut: string, fn: () => void): void };
   http: {
@@ -177,12 +178,12 @@ declare const Ampify: {
   };
   crypto: { md5(text: string): string };
   i18n: {
-    readonly language: "fr" | "en";
-    define(messages: { fr?: Record<string, string>; en?: Record<string, string> }): void;
+    readonly language: string;
+    define(messages: Record<string, Record<string, string>>): void;
     t(key: string, vars?: Record<string, unknown>): string;
   };
 
-  // 5.7 Services locaux [provisoire M7] : false quand le réglage du service est à 0
+  // 5.7 Local services [provisional]: false when the setting of the service is 0
   discord: {
     setActivity(activity: DiscordActivity): boolean;
     clear(): void;
@@ -213,13 +214,13 @@ declare const Ampify: {
   services: { call(service: string, method: string, args?: unknown): Promise<unknown> };
   lyrics: { current(): Promise<unknown> };
 
-  // 5.8 Lien entre une app et son extension [provisoire M7]
+  // 5.8 Link between an app and its extension [provisional]
   link: {
     post(message: unknown): boolean;
     on(fn: (message: any) => void): () => void;
     connected(): boolean;
-  // 5.9 React, composants et ready [provisoire M8]
-  readonly ready: Promise<void>;  // Ampify.ready.then(fn) : fn tourne quand le noyau a démarré l'élément
+  // 5.9 React, components and ready [provisional]
+  readonly ready: Promise<void>;  // Ampify.ready.then(fn): fn runs when the kernel has started the element
   React: AmpifyHooks & {
     createElement: CreateElement;
     h: CreateElement;
