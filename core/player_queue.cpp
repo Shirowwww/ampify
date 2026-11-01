@@ -33,6 +33,14 @@ bool IsValidQueueId(std::string_view id) {
     return true;
 }
 
+bool IsCatalogId(std::string_view id) {
+    if (id.empty() || id.size() > 19) return false;
+    for (char c : id) {
+        if (c < '0' || c > '9') return false;
+    }
+    return true;
+}
+
 bool ParseQueuePosition(std::string_view text, QueuePosition& position) {
     if (text.empty() || text == "last") {
         position = QueuePosition::Last;
@@ -52,8 +60,10 @@ Json QueueJson(const QueueSnapshot& snapshot, bool available) {
         entry.emplace_back("id", Json(item.id));
         entry.emplace_back("title", Json(item.title));
         entry.emplace_back("artist", Json(item.artist));
+        entry.emplace_back("album", Json(item.album));
         entry.emplace_back("durationMs", Json(static_cast<double>(item.durationMs)));
         entry.emplace_back("section", Json(std::string(QueueSectionName(item.section))));
+        entry.emplace_back("catalogId", Json(item.catalogId));
         items.emplace_back(std::move(entry));
     }
     Json::Object members;

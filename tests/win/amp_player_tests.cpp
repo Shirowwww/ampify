@@ -5,6 +5,7 @@
 
 #include <windows.h>
 
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <sstream>
@@ -54,6 +55,10 @@ struct World {
     unsigned char haveLyrics = 1;
     int lyricsAsked = 0;          // HaveLyrics calls
     int ttmlRead = 0;             // GetTTML calls
+    bool noQueue = false;         // AMP.Services.PlayQueue is not there
+    bool sectionsChanged = false;  // get_Sections answers an object that is not an IVector<IComponentModel>
+    UINT32 longerNext = 0;        // the "next" section repeats its last entry this many more times
+    std::vector<uint64_t> deleted;  // the ids DeletePlayQueueItemsAsync received
 } g;
 
 const GUID kUnknown = rt::GuidOf("00000000-0000-0000-C000-000000000046");
@@ -61,10 +66,6 @@ const GUID kInspectable = rt::GuidOf("AF86E2E0-B12D-4C6A-9C5A-D7AA65101E90");
 const GUID kActivationFactory = rt::GuidOf("00000035-0000-0000-C000-000000000046");
 const GUID kAsyncInfo = rt::GuidOf("00000036-0000-0000-C000-000000000046");
 const GUID kNotify = rt::GuidOf("90B17601-B065-586E-83D9-9ADC3A695284");
-// Made-up identifiers for the queue interfaces, which the probe must find through GetIids.
-const GUID kFakeQueueStatics = rt::GuidOf("11111111-2222-3333-4444-555555555555");
-const GUID kFakeQueue = rt::GuidOf("66666666-7777-8888-9999-AAAAAAAAAAAA");
-const GUID kFakeVector = rt::GuidOf("BBBBBBBB-CCCC-DDDD-EEEE-FFFFFFFFFFFF");
 
 template <class F>
 void* Fn(F function) {
@@ -295,20 +296,116 @@ HRESULT STDMETHODCALLTYPE LyricsLanguage(Facet*, HSTRING* out) {  // GetLanguage
     return S_OK;
 }
 
-// ---- The queue probe ----------------------------------------------------------------------------------------------
+// ---- Apple's queue: three sections (history, current, next) of PlayQueueItem entries --------------------------------
 
-Vtable queueFactoryVt, queueStaticsVt, queueVt, queueIfaceVt, sectionsVt;
-Fake queueFactoryObj, queueObj, sectionsObj;
-Facet queueFactoryF{queueFactoryVt.slots, &queueFactoryObj}, queueStaticsF{queueStaticsVt.slots, &queueFactoryObj},
-    queueF{queueVt.slots, &queueObj}, queueIfaceF{queueIfaceVt.slots, &queueObj},
+Vtable queueStaticsVt, queueVt, sectionsVt, sectionVt, containerVt, entriesVt, entryVt, titledVt, drivenVt,
+    descriptorVt;
+Fake queueStaticsObj, queueObj, sectionsObj;
+Facet queueStaticsF{queueStaticsVt.slots, &queueStaticsObj}, queueF{queueVt.slots, &queueObj},
     sectionsF{sectionsVt.slots, &sectionsObj};
+
+struct EntryFake {
+    uint64_t id;
+    const wchar_t* title;
+    const wchar_t* artist;
+    int64_t durationMs;
+    const wchar_t* catalogId;
+    Fake obj, descriptorObj;
+    Facet item{entryVt.slots, &obj}, titled{titledVt.slots, &obj}, driven{drivenVt.slots, &obj},
+        descriptor{descriptorVt.slots, &descriptorObj};
+};
+EntryFake entries[] = {
+    {101, L"Earlier", L"Artist A", 200'000, L"1001"},
+    {102, L"Now", L"Artist B", 180'000, L"1002"},
+    {103, L"Soon", L"Artist C", 240'000, L"1003"},
+    {104, L"Later", L"Artist D", 210'000, L""},
+};
+
+struct SectionFake {
+    int32_t kind;  // PlayQueueSectionKind
+    std::vector<EntryFake*> entries;
+    Fake obj, listObj;
+    Facet section{sectionVt.slots, &obj}, container{containerVt.slots, &obj}, list{entriesVt.slots, &listObj};
+};
+SectionFake sections[] = {{1, {&entries[0]}}, {2, {&entries[1]}}, {4, {&entries[2], &entries[3]}}};
+
+// The fake whose facet `member` is `self`.
+template <class T, size_t N>
+T& Owning(T (&all)[N], Facet T::*member, Facet* self) {
+    for (T& one : all) {
+        if (&(one.*member) == self) return one;
+    }
+    ++g.unexpected;
+    return all[0];
+}
 
 HRESULT STDMETHODCALLTYPE CurrentQueue(Facet*, void** out) {  // IPlayQueueStatics.get_Current, slot 6
     *out = &queueF;
     return S_OK;
 }
 HRESULT STDMETHODCALLTYPE Sections(Facet*, void** out) {  // IPlayQueue.get_Sections, slot 9
-    *out = &sectionsF;
+    *out = g.sectionsChanged ? &queueF : &sectionsF;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE DeleteItems(Facet*, void* ids, void** out) {  // DeletePlayQueueItemsAsync, slot 15
+    UINT32 size = 0;
+    rt::CallSlot(ids, rt::kVectorSizeSlot, &size);  // IVector<UInt64>.get_Size
+    for (UINT32 i = 0; i < size; i++) {
+        uint64_t id = 0;
+        rt::CallSlot(ids, rt::kVectorGetAtSlot, i, &id);
+        g.deleted.push_back(id);
+    }
+    *out = &asyncF;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE SectionAt(Facet*, UINT32 index, void** out) {  // IVector<IComponentModel>.GetAt, 6
+    *out = &sections[index].section;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE SectionCount(Facet*, UINT32* out) {  // get_Size, 7
+    *out = static_cast<UINT32>(std::size(sections));
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE SectionKind(Facet* self, int32_t* out) {  // IPlayQueueSection.get_SectionKind, 6
+    *out = Owning(sections, &SectionFake::section, self).kind;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE SectionItems(Facet* self, void** out) {  // IComponentModelContainer.get_Items, 6
+    *out = &Owning(sections, &SectionFake::container, self).list;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE EntryAt(Facet* self, UINT32 index, void** out) {  // IVector<IComponentModel>.GetAt, 6
+    const std::vector<EntryFake*>& list = Owning(sections, &SectionFake::list, self).entries;
+    *out = &list[std::min<size_t>(index, list.size() - 1)]->item;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE EntryCount(Facet* self, UINT32* out) {  // get_Size, 7
+    const SectionFake& section = Owning(sections, &SectionFake::list, self);
+    *out = static_cast<UINT32>(section.entries.size()) + (section.kind == 4 ? g.longerNext : 0);
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE EntryId(Facet* self, uint64_t* out) {  // IPlayQueueItem.get_PlayQueueItemID, 6
+    *out = Owning(entries, &EntryFake::item, self).id;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE EntrySubtitle(Facet* self, HSTRING* out) {  // get_Subtitle, 7
+    *out = MakeString(Owning(entries, &EntryFake::item, self).artist);
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE EntryDuration(Facet* self, int64_t* out) {  // get_Duration, 10
+    *out = Owning(entries, &EntryFake::item, self).durationMs;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE EntryTitle(Facet* self, HSTRING* out) {  // ITitledComponent.get_Title, 6
+    *out = MakeString(Owning(entries, &EntryFake::titled, self).title);
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE EntryDescriptor(Facet* self, void** out) {  // get_ContentDescriptor, 6
+    *out = &Owning(entries, &EntryFake::driven, self).descriptor;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE DescriptorAdamId(Facet* self, HSTRING* out) {  // IContentDescriptor.get_AdamId, 21
+    *out = MakeString(Owning(entries, &EntryFake::descriptor, self).catalogId);
     return S_OK;
 }
 
@@ -368,16 +465,36 @@ void Build() {
     asyncObj.facets = {{kUnknown, &asyncF}, {kAsyncInfo, &asyncInfoF}};
     asyncInfoVt.slots[7] = Fn(&AsyncCompleted);
 
-    queueFactoryObj.facets = {{kActivationFactory, &queueFactoryF}, {kFakeQueueStatics, &queueStaticsF}};
-    queueFactoryObj.iids = {kActivationFactory, kFakeQueueStatics};
+    namespace amp = ampify::amp;
+    queueStaticsObj.facets = {{rt::GuidOf(amp::kIidPlayQueueStatics), &queueStaticsF}};
     queueStaticsVt.slots[6] = Fn(&CurrentQueue);
-    queueObj.facets = {{kInspectable, &queueF}, {kFakeQueue, &queueIfaceF}, {kNotify, &queueF}};
-    queueObj.className = "AMP.Services.PlayQueue";
-    queueObj.iids = {kNotify, kFakeQueue};
-    queueIfaceVt.slots[9] = Fn(&Sections);
-    sectionsObj.facets = {{kInspectable, &sectionsF}};
-    sectionsObj.className = "Windows.Foundation.Collections.IObservableVector`1<AMP.Services.IPlayQueueSection>";
-    sectionsObj.iids = {kFakeVector};
+    queueObj.facets = {{rt::GuidOf(amp::kIidPlayQueue), &queueF}};
+    queueVt.slots[9] = Fn(&Sections);
+    queueVt.slots[15] = Fn(&DeleteItems);
+    sectionsObj.facets = {{rt::GuidOf(amp::kIidVectorOfComponentModel), &sectionsF}};
+    sectionsVt.slots[6] = Fn(&SectionAt);
+    sectionsVt.slots[7] = Fn(&SectionCount);
+    for (SectionFake& section : sections) {
+        section.obj.facets = {{rt::GuidOf(amp::kIidPlayQueueSection), &section.section},
+                              {rt::GuidOf(amp::kIidComponentModelContainer), &section.container}};
+        section.listObj.facets = {{rt::GuidOf(amp::kIidVectorOfComponentModel), &section.list}};
+    }
+    sectionVt.slots[6] = Fn(&SectionKind);
+    containerVt.slots[6] = Fn(&SectionItems);
+    entriesVt.slots[6] = Fn(&EntryAt);
+    entriesVt.slots[7] = Fn(&EntryCount);
+    for (EntryFake& entry : entries) {
+        entry.obj.facets = {{rt::GuidOf(amp::kIidPlayQueueItem), &entry.item},
+                            {rt::GuidOf(amp::kIidTitledComponent), &entry.titled},
+                            {rt::GuidOf(amp::kIidContentDescriptorDriven), &entry.driven}};
+        entry.descriptorObj.facets = {{rt::GuidOf(amp::kIidContentDescriptor), &entry.descriptor}};
+    }
+    entryVt.slots[6] = Fn(&EntryId);
+    entryVt.slots[7] = Fn(&EntrySubtitle);
+    entryVt.slots[10] = Fn(&EntryDuration);
+    titledVt.slots[6] = Fn(&EntryTitle);
+    drivenVt.slots[6] = Fn(&EntryDescriptor);
+    descriptorVt.slots[21] = Fn(&DescriptorAdamId);
 }
 
 HRESULT FakeActivation(std::wstring_view name, const GUID& iid, void** out) {
@@ -387,8 +504,9 @@ HRESULT FakeActivation(std::wstring_view name, const GUID& iid, void** out) {
         *out = &staticsF;
         return S_OK;
     }
-    if (name == L"AMP.Services.PlayQueue" && IsEqualGUID(iid, kActivationFactory)) {
-        *out = &queueFactoryF;
+    if (name == L"AMP.Services.PlayQueue" && IsEqualGUID(iid, rt::GuidOf(ampify::amp::kIidPlayQueueStatics)) &&
+        !g.noQueue) {
+        *out = &queueStaticsF;
         return S_OK;
     }
     return REGDB_E_CLASSNOTREG;  // SMTC and everything else: not there
@@ -420,6 +538,10 @@ ampify::win::PlayerBridgeOptions TestOptions(std::vector<unsigned short>* keys) 
     options.waitForWindow = false;
     options.retryMs = 0;
     options.maxAttempts = 2;
+    options.onInterfaceThread = [](std::function<void()> work, unsigned) {
+        work();
+        return true;
+    };
     return options;
 }
 
@@ -551,16 +673,31 @@ TEST_CASE(AmpPlayer_CountsApplesPropertyChangedNotifications) {
     g.playerHandler->Release();
 }
 
-TEST_CASE(AmpPlayer_TheQueueProbeFindsTheInterfacesByElimination) {
-    Reset();
-    Hook hook(FakeActivation);
-    ampify::win::AmpPlayer player;
-    std::string line = player.ProbeQueue();
-    CHECK(line.find("IPlayQueueStatics = 11111111-2222-3333-4444-555555555555") != std::string::npos);
-    CHECK(line.find("IPlayQueue = 66666666-7777-8888-9999-AAAAAAAAAAAA") != std::string::npos);
-    CHECK(line.find("IObservableVector`1<AMP.Services.IPlayQueueSection>") != std::string::npos);
-    CHECK(line.find("BBBBBBBB-CCCC-DDDD-EEEE-FFFFFFFFFFFF") != std::string::npos);
-    CHECK(g.unexpected == 0);
+TEST_CASE(MakeVector_GivesItsValuesThroughEveryCollectionInterfaceAndRefusesChanges) {
+    const char* const(&ids)[4] = ampify::amp::kIidsUInt64Collections;
+    rt::VectorIids iids{rt::GuidOf(ids[0]), rt::GuidOf(ids[1]), rt::GuidOf(ids[2]), rt::GuidOf(ids[3])};
+    rt::Ref vector = rt::MakeVector(iids, std::vector<uint64_t>{7, 8, 9});
+    UINT32 size = 0;
+    uint64_t value = 0;
+    CHECK(SUCCEEDED(rt::CallSlot(vector, rt::kVectorSizeSlot, &size)) && size == 3);
+    CHECK(SUCCEEDED(rt::CallSlot(vector, rt::kVectorGetAtSlot, 1u, &value)) && value == 8);
+    CHECK(rt::CallSlot(vector, rt::kVectorGetAtSlot, 3u, &value) == E_BOUNDS);
+    CHECK(rt::CallSlot(vector, 13, uint64_t{1}) == E_ACCESSDENIED);  // IVector.Append
+
+    rt::Ref view, iterable, iterator, agile;
+    uint64_t many[4] = {};
+    UINT32 actual = 0;
+    CHECK(rt::Query(vector, iids.view, view));
+    CHECK(SUCCEEDED(rt::CallSlot(view, 9, 1u, 4u, many, &actual)) && actual == 2 && many[1] == 9);  // GetMany
+    CHECK(rt::Query(vector, iids.iterable, iterable));
+    CHECK(SUCCEEDED(rt::CallSlot(iterable, 6, iterator.Put())) && iterator);  // IIterable.First
+    unsigned char has = 0;
+    CHECK(SUCCEEDED(rt::CallSlot(iterator, 6, &value)) && value == 7);  // IIterator.get_Current
+    CHECK(SUCCEEDED(rt::CallSlot(iterator, 8, &has)) && has == 1);     // MoveNext
+    CHECK(SUCCEEDED(rt::CallSlot(iterator, 8, &has)) && has == 1);
+    CHECK(SUCCEEDED(rt::CallSlot(iterator, 8, &has)) && has == 0);
+    CHECK(rt::Query(vector, rt::GuidOf("94EA2B94-E9CC-49E0-C0FF-EE64CA8F5B90"), agile));  // IAgileObject
+    CHECK(!rt::Query(vector, rt::GuidOf(ampify::amp::kIidVectorOfComponentModel), agile));
 }
 
 TEST_CASE(PlayerBridge_FallsBackToSmtcThenTheMediaKeysWhenApplesPlayerIsMissing) {
@@ -608,7 +745,6 @@ TEST_CASE(PlayerBridge_ReadsApplesPlayerAndUsesItsCommandsOnlyWhenAllowed) {
     CHECK(bridge.Lyrics().has_value() && bridge.Lyrics()->language == "en");
     CHECK(log.str().find("AMP.Services.Player activated (test") != std::string::npos);
     CHECK(log.str().find("first state read by AMP.Services.Player: playing=yes") != std::string::npos);
-    CHECK(log.str().find("IPlayQueue = 66666666-7777-8888-9999-AAAAAAAAAAAA") != std::string::npos);
 
     // player.appleCommands is off: pause goes to the media key, the state being known (playing).
     CHECK(bridge.Control(ampify::PlayerCommand::Pause, 0));
@@ -650,8 +786,99 @@ TEST_CASE(PlayerBridge_TheKillSwitchKeepsApplesPlayerOff) {
     CHECK(log.str().find("turned off by the player.apple setting") != std::string::npos);
 }
 
-TEST_CASE(PlayerBridge_TheQueueHasTheCurrentTrackAndRefusesChangesWithAReason) {
+TEST_CASE(PlayerBridge_ListsApplesWholeQueueSectionBySection) {
     Reset();
+    Hook hook(FakeActivation);
+    ampify::Settings settings;
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    std::vector<unsigned short> keys;
+    ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
+    ampify::QueueSnapshot queue = bridge.Queue();
+    CHECK(queue.complete);
+    CHECK(queue.source == "apple");
+    CHECK(queue.items.size() == 4);
+    CHECK(queue.items[0].id == "101" && queue.items[0].section == ampify::QueueSection::History);
+    CHECK(queue.items[1].title == "Now" && queue.items[1].section == ampify::QueueSection::Current);
+    CHECK(queue.items[2].artist == "Artist C" && queue.items[2].durationMs == 240'000);
+    CHECK(queue.items[2].catalogId == "1003" && queue.items[2].section == ampify::QueueSection::Next);
+    CHECK(queue.items[3].catalogId.empty());
+    CHECK(log.str().find("queue read through AMP.Services.PlayQueue (4 entries)") != std::string::npos);
+    CHECK(g.unexpected == 0);
+}
+
+TEST_CASE(PlayerBridge_SaysWhenTheQueueIsLongerThanWhatItReads) {
+    Reset();
+    g.longerNext = 600;
+    Hook hook(FakeActivation);
+    ampify::Settings settings;
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    std::vector<unsigned short> keys;
+    ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
+    ampify::QueueSnapshot queue = bridge.Queue();
+    CHECK(!queue.complete);
+    CHECK(queue.items.size() == ampify::win::kMaxQueueEntries);
+    CHECK(queue.reason.find("first 500") != std::string::npos);
+    CHECK(g.unexpected == 0);
+
+    g.longerNext = static_cast<UINT32>(ampify::win::kMaxQueueEntries) - 4;  // exactly 500 entries
+    CHECK(bridge.Queue().complete);
+}
+
+TEST_CASE(PlayerBridge_NamesAChangedQueueCollectionInsteadOfThePanel) {
+    Reset();
+    g.sectionsChanged = true;
+    Hook hook(FakeActivation);
+    ampify::Settings settings;
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    std::vector<unsigned short> keys;
+    ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
+    ampify::QueueSnapshot queue = bridge.Queue();
+    CHECK(!queue.complete);
+    CHECK(queue.reason.find("changed") != std::string::npos);
+    CHECK(queue.reason.find("panel") == std::string::npos);
+    CHECK(g.unexpected == 0);
+}
+
+TEST_CASE(PlayerBridge_RemovesOnlyAnEntryStillToCome) {
+    Reset();
+    Hook hook(FakeActivation);
+    ampify::Settings settings;
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    std::vector<unsigned short> keys;
+    ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
+    CHECK(bridge.RemoveFromQueue("103").ok);
+    CHECK(g.deleted == std::vector<uint64_t>{103});
+    ampify::QueueResult current = bridge.RemoveFromQueue("102");
+    CHECK(!current.ok && current.reason.find("still to come") != std::string::npos);
+    CHECK(!bridge.RemoveFromQueue("101").ok);
+    ampify::QueueResult unknown = bridge.RemoveFromQueue("999");
+    CHECK(!unknown.ok && unknown.reason.find("no entry 999") != std::string::npos);
+    CHECK(g.deleted.size() == 1);
+    CHECK(g.unexpected == 0);
+}
+
+TEST_CASE(PlayerBridge_RefusesToAddWithAReason) {
+    Reset();
+    Hook hook(FakeActivation);
+    ampify::Settings settings;
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    std::vector<unsigned short> keys;
+    ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
+    ampify::QueueResult added = bridge.AddToQueue("1440833098", ampify::QueuePosition::Next);
+    CHECK(!added.ok && added.reason.find("not possible") != std::string::npos);
+    ampify::QueueResult wrong = bridge.AddToQueue("abc", ampify::QueuePosition::Next);
+    CHECK(!wrong.ok && wrong.reason.find("catalog id") != std::string::npos);
+    CHECK(g.unexpected == 0);
+}
+
+TEST_CASE(PlayerBridge_WithoutApplesQueueTheCurrentTrackIsAllThereIs) {
+    Reset();
+    g.noQueue = true;
     Hook hook(FakeActivation);
     ampify::Settings settings;
     std::ostringstream log;
@@ -661,11 +888,12 @@ TEST_CASE(PlayerBridge_TheQueueHasTheCurrentTrackAndRefusesChangesWithAReason) {
     ampify::QueueSnapshot queue = bridge.Queue();
     CHECK(!queue.complete);
     CHECK(queue.source == "apple");
+    CHECK(queue.reason.find("AMP.Services.PlayQueue not found") != std::string::npos);
     CHECK(queue.items.size() == 1);
     CHECK(queue.items[0].id == "42" && queue.items[0].section == ampify::QueueSection::Current);
-    ampify::QueueResult added = bridge.AddToQueue("1", ampify::QueuePosition::Next);
-    CHECK(!added.ok && !added.reason.empty());
-    CHECK(!bridge.RemoveFromQueue("42").ok);
+    ampify::QueueResult removed = bridge.RemoveFromQueue("42");
+    CHECK(!removed.ok && removed.reason.find("AMP.Services.PlayQueue not found") != std::string::npos);
+    CHECK(g.deleted.empty());
 }
 
 TEST_CASE(WinHost_OffersTheQueueCapability) {

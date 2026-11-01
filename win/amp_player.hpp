@@ -19,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "../core/host.hpp"
 #include "../core/lyrics.hpp"
@@ -54,11 +55,6 @@ public:
     // within 3 s.
     bool Command(PlayerCommand command);
 
-    // Looks for AMP.Services.PlayQueue and its sections, read only, and describes what it found for the log:
-    // the identifiers of the queue's interfaces are not in the winmd list, so this probe finds them at run time
-    // (GetIids), and stops at the first doubt.
-    std::string ProbeQueue();
-
 private:
     void Subscribe(const rt::Ref& object, std::optional<int64_t>& token, rt::Ref& source);
     void Unsubscribe(std::optional<int64_t>& token, rt::Ref& source);
@@ -84,5 +80,15 @@ private:
     int m_lyricsTries = 0;
     unsigned long long m_lyricsNextTry = 0;
 };
+
+// Apple's play queue (AMP.Services.PlayQueue). Its collections feed Apple's queue panel and belong to the interface
+// thread: call these there (win/ui_thread.hpp). Each fails cleanly, `failure` saying why in plain English.
+inline constexpr size_t kMaxQueueEntries = 500;
+
+// Every entry, section by section (history, current, added, next, autoplay), at most kMaxQueueEntries; `cut` is set
+// when the queue holds more.
+std::optional<std::vector<AmpQueueEntry>> ReadAppleQueue(std::string& failure, bool& cut);
+// Starts removing one entry (IPlayQueue.DeletePlayQueueItemsAsync): its IAsyncAction, empty on failure.
+rt::Ref StartAppleQueueRemove(uint64_t itemId, std::string& failure);
 
 }  // namespace ampify::win

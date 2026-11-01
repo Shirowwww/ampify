@@ -370,6 +370,11 @@ TEST_CASE(PlayerQueue_SectionsIdsAndPositions) {
     CHECK(!ampify::IsValidQueueId("a b"));
     CHECK(!ampify::IsValidQueueId(std::string(129, 'a')));
     CHECK(!ampify::IsValidQueueId("é"));
+    CHECK(ampify::IsCatalogId("1440833098"));
+    CHECK(!ampify::IsCatalogId(""));
+    CHECK(!ampify::IsCatalogId("14408a3098"));
+    CHECK(!ampify::IsCatalogId("1\"}]"));
+    CHECK(!ampify::IsCatalogId(std::string(20, '1')));
     ampify::QueuePosition position = ampify::QueuePosition::Next;
     CHECK(ampify::ParseQueuePosition("", position) && position == ampify::QueuePosition::Last);
     CHECK(ampify::ParseQueuePosition("next", position) && position == ampify::QueuePosition::Next);
@@ -380,10 +385,12 @@ TEST_CASE(PlayerQueue_JsonSaysWhatTheHostKnows) {
     ampify::QueueSnapshot snapshot;
     snapshot.source = "apple";
     snapshot.reason = "partielle";
-    snapshot.items.push_back({"42", "Title", "Artist", 180'000, ampify::QueueSection::Current});
+    snapshot.items.push_back(
+        {"42", "Title", "Artist", 180'000, ampify::QueueSection::Current, "1440833098", "Album"});
     CHECK(ampify::QueueJson(snapshot, true).Dump() ==
           R"({"available":true,"complete":false,"source":"apple","reason":"partielle","items":[{"id":"42",)"
-          R"("title":"Title","artist":"Artist","durationMs":180000,"section":"current"}]})");
+          R"("title":"Title","artist":"Artist","album":"Album","durationMs":180000,"section":"current",)"
+          R"("catalogId":"1440833098"}]})");
     std::string none = ampify::QueueJson(ampify::QueueSnapshot{}, false).Dump();
     CHECK(none.find(R"("available":false)") != std::string::npos);
     CHECK(none.find(R"("items":[])") != std::string::npos);

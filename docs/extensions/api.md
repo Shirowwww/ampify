@@ -264,9 +264,10 @@ Ampify.player.toggle()      // play if paused, pause if playing (player.control 
 Ampify.player.next()
 Ampify.player.previous()
 Ampify.player.seek(ms)
-Ampify.player.queue.list()  // -> { available, complete, source, reason, items: [{ id, title, artist, durationMs, section }] }
-Ampify.player.queue.add(trackId, { position: "next" | "last" })   // [preview]
-Ampify.player.queue.remove(itemId)                                // [preview]
+Ampify.player.queue.list()  // -> { available, complete, source, reason,
+//                                   items: [{ id, title, artist, album, durationMs, section, catalogId }] }
+Ampify.player.queue.add(catalogId, { position: "next" | "last" })  // [preview] false on Windows, see below
+Ampify.player.queue.remove(itemId)                                 // [preview]
 ```
 
 - **`track.id`** is the same whatever the source: it is computed from the title, the artist and the album (`t-` followed
@@ -292,10 +293,17 @@ Ampify.player.queue.remove(itemId)                                // [preview]
   known, so they never do the opposite. `seek` only goes through SMTC. The setting `player.appleCommands = true` makes
   `play`, `pause`, `next` and `previous` go through Apple's player first. A command that is already done (`play` while
   playing) answers `true` and sends nothing.
-- **The queue.** `list()` says what the kernel knows. `complete` is `false` when the kernel knows only part of the queue
-  (on Windows, for now, only the current track), and `reason` says why. `available` is `false` on a host with no queue.
-  `add()` and `remove()` return `false` when the host cannot change the queue, and the reason goes to the log. On
-  Windows they answer `false` until the parameters of Apple's methods are read on a real PC.
+- **The queue.** `list()` gives Apple's queue as its "Up Next" panel shows it, section by section: `section` is
+  `"history"`, `"current"`, `"next-added"` (songs added by hand), `"next"` or `"autoplay"`. `id` is the entry's id,
+  what `remove()` takes; `catalogId` is the song's Apple Music catalog id (empty for an imported file). Apple Music
+  builds its queue the first time that panel opens in a session: until then `list()` holds the current track only,
+  with `complete: false` and the reason in `reason`. A queue longer than 500 entries gives its first 500, also with
+  `complete: false`. `available` is `false` on a host with no queue.
+- **`remove(itemId)`** removes an entry still to come (`next-added`, `next` or `autoplay`). It answers `false`, with the
+  reason in the log, for the current entry, the history or an unknown id.
+- **`add(catalogId)`** answers `false` on Windows: Apple Music 1.1792 ignores the songs Ampify hands its player
+  ([knowledge/apple-music-queue.md](../../knowledge/apple-music-queue.md) says what was tried). The call stays, so that an
+  element written for it keeps working when a way is found.
 
 The absolute volume is read with `Ampify.audio.volume()` (section 5.4) and never written. An element that wants to change
 the sound sets an internal gain on the samples (section 5.4), never the slider.
@@ -784,7 +792,7 @@ Nothing is ruled out for good. Each point stays outside API 1.0 for a specific r
 | `storage.get/set/remove`: a JSON file per element, 1 MB quota | Done. Written through a temporary file then replaced. By default an element runs only in the interface, so one writer at a time | C++ tests and Wine |
 | `processes`: `ui`, `engine`, or both | Done. An element of another process is ignored, with a log line | C++ tests |
 | `player.state`, `on`, `play`, `pause`, `toggle`, `next`, `previous`, `seek` | Done. On Windows: Apple's player (`AMP.Services.Player`, in AppleMusic.exe), else SMTC, else media keys (`win/player_bridge.*`). Commands go through SMTC, then the key; through Apple's player with `player.appleCommands` | C++ tests (slots checked against `knowledge/winmd`); fake WinRT objects under Wine; real playback to check on a PC |
-| `player.queue.list`, `add`, `remove` | Runtime done (capability `QueueHost`, `core/player_queue.hpp`). On Windows `list` gives the current track (`complete: false`), and `add` and `remove` answer `false` with the reason in the log. A read-only probe describes `AMP.Services.PlayQueue` in the log | C++ tests; probe under Wine with fake objects; the real queue is still to be read on a PC |
+| `player.queue.list`, `add`, `remove` | `list` and `remove` done on Windows through `AMP.Services.PlayQueue`, read and changed on the interface thread; the whole queue once Apple's "Up Next" panel has opened, the current track before. `add` answers `false` with the reason in the log | C++ tests with fake objects under Wine; list and remove checked in Apple Music 1.1792 (the entry leaves Apple's panel) |
 | `audio.setGainDb`: capped by `audio.maxGainDb` (6 dB by default, 12 at most), back to 0 at stop | Done | C++ tests |
 | `notify` (title 120 characters, text 500) | Done. On Windows: a balloon notification (temporary icon, 8 s) and a log line | C++ tests; balloon to check on a PC |
 | `keyboard.bind` (normalized form, an F key, a media key or a modifier is required) | Done. On Windows: `RegisterHotKey`, handed back to the JavaScript thread | C++ tests; simulated press under Wine |

@@ -48,6 +48,16 @@ struct AmpReading {
     bool lyricsAvailable = false;  // ILyricsInfo.HaveLyrics said yes and the text was read
 };
 
+// One entry of Apple's play queue, as win/amp_player.cpp reads it.
+struct AmpQueueEntry {
+    uint64_t id = 0;          // IPlayQueueItem.PlayQueueItemID
+    int32_t sectionKind = 0;  // AMP.Services.PlayQueueSectionKind of the entry's section
+    std::string title;        // ITitledComponent.Title
+    std::string subtitle;     // IPlayQueueItem.Subtitle, the artist
+    int64_t durationRaw = 0;  // IPlayQueueItem.Duration, in an AmpTimeUnit
+    std::string catalogId;    // IContentDescriptor.AdamId, empty for a file that is not in the catalog
+};
+
 // What win/smtc_session.cpp reads from the Apple Music session of the Windows media controls.
 struct SmtcReading {
     int32_t status = 0;  // GlobalSystemMediaTransportControlsSessionPlaybackStatus: 4 playing, 5 paused

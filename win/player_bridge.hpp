@@ -9,13 +9,16 @@
 //   player.apple = true          read Apple's player in AppleMusic.exe (false: SMTC only, a kill switch)
 //   player.appleCommands = false send play/pause/next/previous through Apple's player (off until the PC confirms the
 //                                parameters of those methods; SMTC and the media keys answer meanwhile)
-//   player.queueProbe = true     describe AMP.Services.PlayQueue once in the log (read only)
+//
+// The queue is Apple's (AMP.Services.PlayQueue, in AppleMusic.exe), read and changed on the interface thread, which
+// owns its collections. Without Apple's player it holds the current track only.
 
 #include <functional>
 #include <memory>
 #include <optional>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "../core/host.hpp"
 #include "../core/journal.hpp"
@@ -38,6 +41,9 @@ struct PlayerBridgeOptions {
     bool waitForWindow = true;
     unsigned retryMs = 5000;  // between two activation attempts
     int maxAttempts = 24;     // 2 minutes, then SMTC for good (until the player answers again)
+    // Runs work on Apple Music's interface thread and waits for it, at most `timeoutMs`. Empty:
+    // RunOnUiThreadAndWait (win/ui_thread.hpp). The tests run it in place.
+    std::function<bool(std::function<void()> work, unsigned timeoutMs)> onInterfaceThread;
 };
 
 class PlayerBridge : public QueueHost, public LyricsHost {
@@ -66,6 +72,9 @@ private:
     void TryApple();
     void TrySmtc();
     void SayOnce(const std::string& key, const std::string& line);
+    bool OnInterfaceThread(std::function<void()> work);
+    // Apple's whole queue, or nullopt with `failure`.
+    std::optional<std::vector<AmpQueueEntry>> AppleQueue(std::string& failure, bool& cut);
 
     std::string m_process;
     Settings& m_settings;
@@ -80,7 +89,6 @@ private:
     bool m_appleGivenUp = false;
     unsigned long long m_appleNextTry = 0;
     unsigned long long m_smtcNextTry = 0;
-    bool m_probed = false;
     std::string m_lastSource = "?";
     AmpTimeUnit m_unit = AmpTimeUnit::Unknown;
     uint64_t m_coverLoggedItem = 0;  // the queue item whose raw cover went to the log

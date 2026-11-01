@@ -23,6 +23,8 @@ struct QueueItem {
     std::string artist;
     int64_t durationMs = 0;
     QueueSection section = QueueSection::Unknown;
+    std::string catalogId;  // the song's Apple Music catalog id, what add() takes; empty when unknown
+    std::string album;
 };
 
 struct QueueSnapshot {
@@ -47,7 +49,7 @@ struct QueueHost {
     virtual ~QueueHost() = default;
 
     virtual QueueSnapshot Queue() = 0;
-    // `trackId` is a track id as Ampify.player.state() gives it, or an Apple Music catalog id.
+    // `trackId` is an Apple Music catalog id (IsCatalogId).
     virtual QueueResult AddToQueue(const std::string& trackId, QueuePosition position) = 0;
     // `itemId` is a QueueItem::id.
     virtual QueueResult RemoveFromQueue(const std::string& itemId) = 0;
@@ -60,11 +62,13 @@ QueueSection QueueSectionFromKind(int32_t kind);
 
 // Ids are short printable ASCII without spaces: anything else is refused before the host sees it.
 bool IsValidQueueId(std::string_view id);
+// An Apple Music catalog id: 1 to 19 digits, as in https://music.apple.com/.../song/...?i=1440833098.
+bool IsCatalogId(std::string_view id);
 // "next" or "last" (also when empty); false for anything else.
 bool ParseQueuePosition(std::string_view text, QueuePosition& position);
 
 // What Ampify.player.queue.list() returns: { available, complete, source, reason, items: [{ id, title, artist,
-// durationMs, section }] }. `available` is false when the host has no queue service at all.
+// album, durationMs, section, catalogId }] }. `available` is false when the host has no queue service at all.
 Json QueueJson(const QueueSnapshot& snapshot, bool available);
 
 }  // namespace ampify

@@ -92,37 +92,6 @@ std::optional<RawLyrics> ReadLyrics(const rt::Ref& item) {
     return raw;
 }
 
-// Interfaces any WinRT object may list in GetIids without telling anything about Apple's types. The queue probe
-// ignores them; what is left must be exactly the one interface it looks for.
-const char* const kWellKnownIids[] = {
-    "00000000-0000-0000-C000-000000000046",  // IUnknown
-    "AF86E2E0-B12D-4C6A-9C5A-D7AA65101E90",  // IInspectable
-    "00000035-0000-0000-C000-000000000046",  // IActivationFactory
-    "00000003-0000-0000-C000-000000000046",  // IMarshal
-    "00000038-0000-0000-C000-000000000046",  // IWeakReferenceSource
-    "94EA2B94-E9CC-49E0-C0FF-EE64CA8F5B90",  // IAgileObject
-    "96369F54-8EB6-48F0-ABCE-C1B211E627C3",  // IStringable
-    "30D5A829-7FA4-4026-83BB-D75BAE4EA99E",  // IClosable
-    "90B17601-B065-586E-83D9-9ADC3A695284",  // Microsoft.UI.Xaml.Data.INotifyPropertyChanged
-    "CF75D69C-F2F4-486B-B302-BB4C09BAEBFA",  // Windows.UI.Xaml.Data.INotifyPropertyChanged
-};
-
-std::vector<GUID> UnknownIids(const rt::Ref& object) {
-    std::vector<GUID> unknown;
-    for (const GUID& iid : rt::Iids(object)) {
-        bool known = false;
-        for (const char* text : kWellKnownIids) known = known || IsEqualGUID(iid, rt::GuidOf(text));
-        if (!known) unknown.push_back(iid);
-    }
-    return unknown;
-}
-
-std::string ListIids(const std::vector<GUID>& iids) {
-    std::string out;
-    for (const GUID& iid : iids) out += (out.empty() ? "" : ", ") + rt::GuidText(iid);
-    return out.empty() ? "none" : out;
-}
-
 std::string Hex(HRESULT hr) {
     char text[16];
     std::snprintf(text, sizeof text, "0x%08lX", static_cast<unsigned long>(hr));
@@ -289,41 +258,146 @@ bool AmpPlayer::Command(PlayerCommand command) {
     return !operation || rt::Wait(operation, kCommandTimeoutMs);
 }
 
-std::string AmpPlayer::ProbeQueue() {
-    const std::string prefix = "Play queue (probe, read only): ";
-    const GUID activationFactory = rt::GuidOf("00000035-0000-0000-C000-000000000046");
-    rt::Ref factory;
-    rt::Activation activation = rt::GetActivationFactory(L"AMP.Services.PlayQueue", activationFactory, factory);
+namespace {
+
+// IPlayQueue of PlayQueue.Current, or empty with `failure`.
+rt::Ref CurrentPlayQueue(std::string& failure) {
+    rt::Ref statics, current, queue;
+    rt::Activation activation =
+        rt::GetActivationFactory(L"AMP.Services.PlayQueue", rt::GuidOf(amp::kIidPlayQueueStatics), statics);
     if (FAILED(activation.result)) {
-        return prefix + "factory of AMP.Services.PlayQueue not found (code " + Hex(activation.result) + ")";
+        failure = "AMP.Services.PlayQueue not found (code " + Hex(activation.result) + ")";
+        return {};
     }
+    // IPlayQueueStatics.get_Current (slot 6).
+    if (FAILED(rt::CallSlot(statics, slot::kPlayQueueStaticsCurrent, current.Put())) || !current) {
+        failure = "PlayQueue.Current is empty";
+        return {};
+    }
+    // The identifier is a hash of the interface's methods (core/amp_abi.hpp): a changed queue fails here.
+    if (!rt::Query(current, rt::GuidOf(amp::kIidPlayQueue), queue)) {
+        failure = "IPlayQueue missing: this version of Apple Music changed the queue interface";
+        return {};
+    }
+    return queue;
+}
 
-    std::vector<GUID> staticsIids = UnknownIids(factory);
-    if (staticsIids.size() != 1) {
-        return prefix + "IPlayQueueStatics could not be identified for sure (unknown interfaces of the factory: " +
-               ListIids(staticsIids) + ")";
+// The elements of an IVector<IComponentModel>, which Apple's observable vectors also answer. At most `limit`;
+// nullopt when the collection is not such a vector.
+std::optional<std::vector<rt::Ref>> ComponentModels(const rt::Ref& collection, size_t limit) {
+    std::vector<rt::Ref> out;
+    rt::Ref vector;
+    UINT32 size = 0;
+    if (!rt::Query(collection, rt::GuidOf(amp::kIidVectorOfComponentModel), vector) ||
+        FAILED(rt::CallSlot(vector, rt::kVectorSizeSlot, &size))) {
+        return std::nullopt;
     }
-    rt::Ref statics, queue;
-    // IPlayQueueStatics.get_Current (slot 6), its only method.
-    if (!rt::Query(factory, staticsIids[0], statics) ||
-        FAILED(rt::CallSlot(statics, slot::kPlayQueueStaticsCurrent, queue.Put())) || !queue) {
-        return prefix + "PlayQueue.Current returned nothing";
+    for (UINT32 i = 0; i < size && out.size() < limit; i++) {
+        rt::Ref element;
+        if (SUCCEEDED(rt::CallSlot(vector, rt::kVectorGetAtSlot, i, element.Put())) && element) {
+            out.push_back(std::move(element));
+        }
     }
-    std::string className = rt::ClassName(queue);
-    if (className != amp::kPlayQueueClass) return prefix + "Current is not a PlayQueue (" + className + ")";
+    return out;
+}
 
-    std::vector<GUID> queueIids = UnknownIids(queue);
-    std::string found = prefix + "IPlayQueueStatics = " + rt::GuidText(staticsIids[0]);
-    if (queueIids.size() != 1) return found + "; IPlayQueue not identified (unknown: " + ListIids(queueIids) + ")";
-    found += "; IPlayQueue = " + rt::GuidText(queueIids[0]);
-
-    // IPlayQueue.get_Sections (slot 9): a collection whose element type the probe describes, without reading it.
-    rt::Ref playQueue, sections;
-    if (!rt::Query(queue, queueIids[0], playQueue) ||
-        FAILED(rt::CallSlot(playQueue, slot::kPlayQueueSections, sections.Put())) || !sections) {
-        return found + "; Sections empty";
+// IContentDescriptorDriven.get_ContentDescriptor (slot 6) as an IContentDescriptor, or empty.
+rt::Ref DescriptorOf(const rt::Ref& model) {
+    rt::Ref driven, object, descriptor;
+    if (!rt::Query(model, rt::GuidOf(amp::kIidContentDescriptorDriven), driven) ||
+        FAILED(rt::CallSlot(driven, slot::kDrivenContentDescriptor, object.Put())) || !object) {
+        return {};
     }
-    return found + "; Sections = " + rt::ClassName(sections) + " (interfaces: " + ListIids(rt::Iids(sections)) + ")";
+    rt::Query(object, rt::GuidOf(amp::kIidContentDescriptor), descriptor);
+    return descriptor;
+}
+
+std::optional<AmpQueueEntry> ReadQueueEntry(const rt::Ref& model, int32_t sectionKind) {
+    rt::Ref item, titled;
+    // IPlayQueueItem: get_PlayQueueItemID 6, get_Subtitle 7, get_Duration 10.
+    if (!rt::Query(model, rt::GuidOf(amp::kIidPlayQueueItem), item)) return std::nullopt;
+    AmpQueueEntry entry;
+    entry.sectionKind = sectionKind;
+    if (FAILED(rt::CallSlot(item, slot::kQueueItemId, &entry.id))) return std::nullopt;
+    entry.subtitle = rt::ReadString(item, slot::kQueueItemSubtitle);
+    rt::CallSlot(item, slot::kQueueItemDuration, &entry.durationRaw);
+    // ITitledComponent.get_Title (slot 6).
+    if (rt::Query(model, rt::GuidOf(amp::kIidTitledComponent), titled)) {
+        entry.title = rt::ReadString(titled, slot::kTitledTitle);
+    }
+    // IContentDescriptor.get_AdamId (slot 21).
+    if (rt::Ref descriptor = DescriptorOf(model)) entry.catalogId = rt::ReadString(descriptor, slot::kDescriptorAdamId);
+    return entry;
+}
+
+// The sections of the queue: PlayQueueSection objects, each a container of entries (IComponentModelContainer).
+std::vector<rt::Ref> QueueSections(std::string& failure) {
+    rt::Ref queue = CurrentPlayQueue(failure);
+    rt::Ref sections;
+    // IPlayQueue.get_Sections (slot 9): IObservableVector<IComponentModel>.
+    if (queue && (FAILED(rt::CallSlot(queue, slot::kPlayQueueSections, sections.Put())) || !sections)) {
+        failure = "the queue has no sections";
+    }
+    if (!sections) return {};
+    std::optional<std::vector<rt::Ref>> models = ComponentModels(sections, kMaxQueueEntries);
+    if (!models) {
+        failure = "the queue's sections are not an IVector<IComponentModel>: this version of Apple Music changed them";
+    }
+    return models.value_or(std::vector<rt::Ref>{});
+}
+
+// The entries of one section, with the section's kind (IPlayQueueSection.get_SectionKind, slot 6).
+std::vector<rt::Ref> SectionEntries(const rt::Ref& sectionModel, int32_t& kind) {
+    rt::Ref section, container, items;
+    kind = 0;
+    if (rt::Query(sectionModel, rt::GuidOf(amp::kIidPlayQueueSection), section)) {
+        rt::CallSlot(section, slot::kSectionKind, &kind);
+    }
+    // IComponentModelContainer.get_Items (slot 6).
+    if (!rt::Query(sectionModel, rt::GuidOf(amp::kIidComponentModelContainer), container) ||
+        FAILED(rt::CallSlot(container, slot::kContainerItems, items.Put())) || !items) {
+        return {};
+    }
+    // One past the cap, so that ReadAppleQueue sees a section longer than it reads.
+    return ComponentModels(items, kMaxQueueEntries + 1).value_or(std::vector<rt::Ref>{});
+}
+
+rt::VectorIids CollectionIids(const char* const (&iids)[4]) {
+    return {rt::GuidOf(iids[0]), rt::GuidOf(iids[1]), rt::GuidOf(iids[2]), rt::GuidOf(iids[3])};
+}
+
+}  // namespace
+
+std::optional<std::vector<AmpQueueEntry>> ReadAppleQueue(std::string& failure, bool& cut) {
+    cut = false;
+    std::vector<rt::Ref> sections = QueueSections(failure);
+    if (!failure.empty()) return std::nullopt;
+    std::vector<AmpQueueEntry> entries;
+    for (const rt::Ref& sectionModel : sections) {
+        int32_t kind = 0;
+        for (const rt::Ref& model : SectionEntries(sectionModel, kind)) {
+            if (entries.size() >= kMaxQueueEntries) {
+                cut = true;
+                return entries;
+            }
+            if (std::optional<AmpQueueEntry> entry = ReadQueueEntry(model, kind)) entries.push_back(std::move(*entry));
+        }
+    }
+    return entries;
+}
+
+rt::Ref StartAppleQueueRemove(uint64_t itemId, std::string& failure) {
+    rt::Ref queue = CurrentPlayQueue(failure);
+    if (!queue) return {};
+    // IPlayQueue.DeletePlayQueueItemsAsync (slot 15): IVector<UInt64> of entry ids, then an IAsyncAction.
+    rt::Ref ids = rt::MakeVector(CollectionIids(amp::kIidsUInt64Collections), std::vector<uint64_t>{itemId});
+    rt::Ref operation;
+    HRESULT hr = rt::CallSlot(queue, slot::kPlayQueueDelete, ids.Get(), operation.Put());
+    if (FAILED(hr) || !operation) {
+        failure = "DeletePlayQueueItemsAsync failed (code " + Hex(hr) + ")";
+        return {};
+    }
+    return operation;
 }
 
 }  // namespace ampify::win

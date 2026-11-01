@@ -3,6 +3,7 @@
 #include <unknwn.h>
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <new>
 #include <utility>
@@ -230,6 +231,28 @@ bool UiThreadAttached() {
     if (const UiThreadBackend* backend = Backend()) return backend->attached();
     std::lock_guard<std::mutex> lock(State().mutex);
     return State().attached;
+}
+
+bool RunOnUiThreadAndWait(std::function<void()> work, DWORD timeoutMs) {
+    if (UiThreadId() != 0 && UiThreadId() == GetCurrentThreadId()) {
+        work();
+        return true;
+    }
+    struct Done {
+        HANDLE event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        ~Done() {
+            if (event) CloseHandle(event);
+        }
+    };
+    auto done = std::make_shared<Done>();
+    if (!done->event) return false;
+    if (!PostToUiThread([work = std::move(work), done] {
+            work();
+            SetEvent(done->event);
+        })) {
+        return false;
+    }
+    return WaitForSingleObject(done->event, timeoutMs) == WAIT_OBJECT_0;
 }
 
 }  // namespace ampify::win

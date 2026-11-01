@@ -70,11 +70,13 @@ type Lyrics = {
   text: string;
 };
 type QueueItem = {
-  id: string;
+  id: string;  // the entry, what queue.remove() takes
   title: string;
   artist: string;
+  album: string;
   durationMs: number;
   section: "history" | "current" | "next-added" | "next" | "autoplay" | "unknown";
+  catalogId: string;  // the song's Apple Music catalog id, "" for an imported file
 };
 type QueueState = { available: boolean; complete: boolean; source: string; reason: string; items: QueueItem[] };
 type AudioFrame = { bands: number[]; rms: number; peak: number; time: number };
@@ -175,7 +177,7 @@ declare const Ampify: {
     toggle(): boolean;
     queue: {
       list(): QueueState;
-      add(trackId: string | number, options?: { position?: "next" | "last" }): boolean;
+      add(catalogId: string | number, options?: { position?: "next" | "last" }): boolean;  // false on Windows for now
       remove(itemId: string | number): boolean;
     };
   };

@@ -27,7 +27,6 @@ inline constexpr int kInspectableSlots = 6;
 
 // Runtime class names, for RoGetActivationFactory.
 inline constexpr char kPlayerClass[] = "AMP.Services.Player";
-inline constexpr char kPlayQueueClass[] = "AMP.Services.PlayQueue";
 
 // Interface identifiers (see above).
 inline constexpr char kIidPlayerStatics[] = "34D100F9-0F0A-5980-8F04-7AF57FDB29B0";  // AMP.Services.IPlayerStatics
@@ -52,6 +51,32 @@ inline constexpr char kIidArtwork[] = "6F00C1EF-8302-5354-BD7E-8D1A943B4F0D";   
 inline constexpr char kIidLyricsInfo[] = "8DC3CA60-B650-5649-B901-D152B6C110F4";    // ...CommonModels.ILyricsInfo
 // Windows.Foundation.IUriRuntimeClass, from the Windows SDK (windows.foundation.h).
 inline constexpr char kIidUriRuntimeClass[] = "9E365E57-48B2-4160-956F-C7385120BBFC";
+
+// The play queue, in AMP.Services.winmd 1.1792 (GuidAttribute values; a run-time probe found the first two in Apple
+// Music 1.1792). A section of PlayQueue.Sections is a PlayQueueSection that holds its entries
+// (IComponentModelContainer); an entry is a PlayQueueItem, titled (ITitledComponent) and backed by a ContentDescriptor
+// whose AdamId is the catalog id. What was tried and learned: knowledge/apple-music-queue.md.
+inline constexpr char kIidPlayQueueStatics[] = "1CF4C1E2-8DA2-5642-911B-6F68D69D9F68";  // AMP.Services.IPlayQueueStatics
+inline constexpr char kIidPlayQueue[] = "5DA4729B-8546-5210-B8A2-066B11D68E8D";         // AMP.Services.IPlayQueue
+inline constexpr char kIidPlayQueueSection[] = "D05888FD-5CD9-5DB6-98DE-D9C14F17529B";  // ...IPlayQueueSection
+inline constexpr char kIidComponentModelContainer[] = "E4D9E42B-143E-55A0-B149-346A4AA1D6B4";  // CommonModels.
+inline constexpr char kIidPlayQueueItem[] = "72FE9B2F-3DE1-5517-8F3D-EBAAFAFD2552";            // CommonModels.
+inline constexpr char kIidTitledComponent[] = "29691940-53DC-5C20-942F-29EB78F38F1F";          // CommonModels.
+inline constexpr char kIidContentDescriptorDriven[] = "0DB3EB30-B156-5201-AC4A-1326648C307B";  // CommonModels.
+inline constexpr char kIidContentDescriptor[] = "659506EB-E228-5A4A-B8A4-0AF7125FB4E5";        // CommonModels.
+
+// Collections of a given element type. A parameterized interface's identifier is the UUID version 5 of its signature
+// in the WinRT namespace 11F47AD5-7B73-42C0-ABAE-878B1E16ADEE: in Python, uuid.uuid5(namespace,
+// "pinterface({913337e9-11a1-4345-a3a2-4e7f956e222d};u8)") for IVector<UInt64>. IVector<IComponentModel> is one of
+// the interfaces Apple Music 1.1792 lists for PlayQueue.Sections, with its IVectorView, IIterable and
+// IObservableVector computed the same way.
+inline constexpr char kIidVectorOfComponentModel[] = "2C559B4A-4165-5E91-86F1-CD3EC0884419";
+inline constexpr const char* kIidsUInt64Collections[] = {
+    "CF4A637F-456A-5A47-A927-BCF07FC69901",  // IVector<UInt64>
+    "23D156C7-7EF9-5096-AABA-1E6C9AB5CEB4",  // IVectorView<UInt64>
+    "4B3A3229-7995-5F3C-B248-6C1F7E664F01",  // IIterable<UInt64>
+    "C473ED96-76E3-5FF2-9435-47FEEBFE9539",  // IIterator<UInt64>
+};
 
 // Microsoft.UI.Xaml.Data (WinUI 3), which Apple Music's view models implement: INotifyPropertyChanged and its
 // delegate. Source: CsWinRT, src/WinRT.Runtime/Interop/IID.g.cs (IID_MUX_INotifyPropertyChanged and
@@ -123,10 +148,24 @@ inline constexpr int kLyricsTtml = 14;
 inline constexpr int kLyricsLanguage = 15;
 
 // AMP.Services.IPlayQueueStatics: get_Current. AMP.Services.IPlayQueue: get_AutoPlaySupported, get_AutoPlayEnabled,
-// get_AutoPlayActive, get_Sections, ... Their identifiers are not known: the queue probe finds them at run time
-// (win/amp_player.cpp) and only reads.
+// get_AutoPlayActive, get_Sections, add_/remove_EnginePlayQueueChanged, SetAutoPlayEnabledAsync,
+// PlayPlayQueueItemAsync, MovePlayQueueItemsAsync, DeletePlayQueueItemsAsync (IVector<UInt64>, IAsyncAction).
 inline constexpr int kPlayQueueStaticsCurrent = 6;
 inline constexpr int kPlayQueueSections = 9;
+inline constexpr int kPlayQueueDelete = 15;
+
+// AMP.Services.IPlayQueueSection: get_SectionKind (PlayQueueSectionKind, Int32), ... CommonModels:
+// IComponentModelContainer.get_Items; IPlayQueueItem: get_PlayQueueItemID (UInt64), get_Subtitle,
+// get_PlayQueueSectionKind, put_PlayQueueSectionKind, get_Duration (Int64); ITitledComponent.get_Title;
+// IContentDescriptorDriven.get_ContentDescriptor; IContentDescriptor: ... get_AdamId (16th, a string).
+inline constexpr int kSectionKind = 6;
+inline constexpr int kContainerItems = 6;
+inline constexpr int kQueueItemId = 6;
+inline constexpr int kQueueItemSubtitle = 7;
+inline constexpr int kQueueItemDuration = 10;
+inline constexpr int kTitledTitle = 6;
+inline constexpr int kDrivenContentDescriptor = 6;
+inline constexpr int kDescriptorAdamId = 21;
 }  // namespace slot
 
 // Every slot above with its interface and method, for the test against AMP.Services.txt and AMP.UI.Views.txt.
@@ -169,6 +208,15 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.CommonModels.ILyricsInfo", "GetLanguage", slot::kLyricsLanguage},
     {"AMP.Services.IPlayQueueStatics", "get_Current", slot::kPlayQueueStaticsCurrent},
     {"AMP.Services.IPlayQueue", "get_Sections", slot::kPlayQueueSections},
+    {"AMP.Services.IPlayQueue", "DeletePlayQueueItemsAsync", slot::kPlayQueueDelete},
+    {"AMP.Services.IPlayQueueSection", "get_SectionKind", slot::kSectionKind},
+    {"AMP.Services.CommonModels.IComponentModelContainer", "get_Items", slot::kContainerItems},
+    {"AMP.Services.CommonModels.IPlayQueueItem", "get_PlayQueueItemID", slot::kQueueItemId},
+    {"AMP.Services.CommonModels.IPlayQueueItem", "get_Subtitle", slot::kQueueItemSubtitle},
+    {"AMP.Services.CommonModels.IPlayQueueItem", "get_Duration", slot::kQueueItemDuration},
+    {"AMP.Services.CommonModels.ITitledComponent", "get_Title", slot::kTitledTitle},
+    {"AMP.Services.CommonModels.IContentDescriptorDriven", "get_ContentDescriptor", slot::kDrivenContentDescriptor},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_AdamId", slot::kDescriptorAdamId},
     {"AMP.UI.Views.IFullScreenPlayerStatics", "Instance", slot::kFullScreenPlayerStaticsInstance},
     {"AMP.UI.Views.IFullScreenPlayer", "get_ViewModel", slot::kFullScreenPlayerViewModel},
     {"AMP.UI.Views.IFullScreenPlayer", "Show", slot::kFullScreenPlayerShow},

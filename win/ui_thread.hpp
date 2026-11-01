@@ -37,6 +37,10 @@ void DetachUiThread();
 // that throws is dropped.
 bool PostToUiThread(std::function<void()> work);
 
+// Runs `work` on the interface thread and waits for it, at most `timeoutMs`; on that thread already, runs it now. False
+// when it could not be queued or did not end in time: it may still run later, so it must own what it touches.
+bool RunOnUiThreadAndWait(std::function<void()> work, DWORD timeoutMs);
+
 // True when attached.
 bool UiThreadAttached();
 

@@ -142,6 +142,23 @@ bool Wait(const Ref& operation, DWORD timeoutMs);
 // IAsyncAction::GetResults.
 inline constexpr int kAsyncGetResultsSlot = 8;
 
+// ---- Collections --------------------------------------------------------------------------------------------------
+
+// IVector<T> and IVectorView<T>, for every T (windows.foundation.collections.h): GetAt 6 (index, T*), get_Size 7.
+inline constexpr int kVectorGetAtSlot = 6;
+inline constexpr int kVectorSizeSlot = 7;
+
+// The identifiers of IVector<T>, IVectorView<T>, IIterable<T> and IIterator<T> for one element type T. A parameterized
+// interface has no identifier of its own: it is derived from the element's type (core/amp_abi.hpp lists the ones used).
+struct VectorIids {
+    GUID vector, view, iterable, iterator;
+};
+
+// A fixed WinRT vector of UInt64 values for the Apple methods that take an IVector<UInt64> or an IVectorView<UInt64>.
+// It answers IVector, IVectorView and IIterable; the methods that would change it answer E_ACCESSDENIED. Agile and
+// never changed once made, since an asynchronous method may read it later from another thread.
+Ref MakeVector(const VectorIids& iids, std::vector<uint64_t> values);
+
 // ---- Property change notifications --------------------------------------------------------------------------------
 
 // A delegate that counts its calls: PropertyChangedEventHandler, or any delegate whose Invoke (slot 3) takes two

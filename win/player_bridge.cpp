@@ -2,8 +2,12 @@
 
 #include <windows.h>
 
+#include <memory>
+#include <tuple>
+
 #include "amp_player.hpp"
 #include "smtc_session.hpp"
+#include "ui_thread.hpp"
 #include "winrt_abi.hpp"
 
 namespace ampify::win {
@@ -11,6 +15,20 @@ namespace ampify::win {
 namespace {
 
 constexpr unsigned long long kSmtcRetryMs = 30'000;
+constexpr unsigned kInterfaceTimeoutMs = 2000;
+constexpr DWORD kQueueChangeTimeoutMs = 3000;
+
+QueueItem QueueItemFromAmp(const AmpQueueEntry& entry) {
+    QueueItem item;
+    item.id = std::to_string(entry.id);
+    item.title = entry.title;
+    std::tie(item.artist, item.album) = SplitArtistAlbum(entry.subtitle);
+    // The unit of IPlayQueueItem.Duration is not written in the winmd either: a song lasts between 20 s and 10 h.
+    item.durationMs = AmpTimeToMs(entry.durationRaw, DetectAmpTimeUnit(entry.durationRaw, std::nullopt));
+    item.section = QueueSectionFromKind(entry.sectionKind);
+    item.catalogId = entry.catalogId;
+    return item;
+}
 
 // A media key is handled by the system and by Apple Music, as on a keyboard. It never changes the volume.
 bool SendMediaKey(unsigned short key) {
@@ -104,10 +122,6 @@ void PlayerBridge::TryApple() {
     if (std::optional<AmpReading> first = m_apple->Read()) {
         m_journal.Write("Player: first state read by AMP.Services.Player: " +
                         Describe(SnapshotFromAmp(*first, DetectAmpTimeUnit(first->durationRaw, std::nullopt))));
-    }
-    if (!m_probed && m_settings.GetBool("player.queueProbe", true)) {
-        m_probed = true;
-        m_journal.Write(m_apple->ProbeQueue());
     }
 }
 
@@ -237,13 +251,57 @@ std::optional<RawLyrics> PlayerBridge::Lyrics() {
     return m_apple->Lyrics();
 }
 
+bool PlayerBridge::OnInterfaceThread(std::function<void()> work) {
+    if (m_options.onInterfaceThread) return m_options.onInterfaceThread(std::move(work), kInterfaceTimeoutMs);
+    return RunOnUiThreadAndWait(std::move(work), kInterfaceTimeoutMs);
+}
+
+std::optional<std::vector<AmpQueueEntry>> PlayerBridge::AppleQueue(std::string& failure, bool& cut) {
+    cut = false;
+    rt::EnsureMultithreaded();
+    TryApple();
+    if (!m_apple->Active()) {
+        failure = "Apple's player is not reached";
+        return std::nullopt;
+    }
+    // Shared with the work, which may still run after a timeout.
+    struct Read {
+        std::optional<std::vector<AmpQueueEntry>> entries;
+        std::string failure;
+        bool cut = false;
+    };
+    auto read = std::make_shared<Read>();
+    if (!OnInterfaceThread([read] { read->entries = ReadAppleQueue(read->failure, read->cut); })) {
+        failure = "Apple Music's interface thread did not answer";
+        return std::nullopt;
+    }
+    cut = read->cut;
+    // Checked in Apple Music 1.1792: PlayQueue.Sections stays empty until the queue panel first shows.
+    if (read->entries && read->entries->empty()) {
+        read->entries.reset();
+        read->failure = "Apple Music builds its queue the first time its queue panel opens";
+    }
+    if (!read->entries) failure = read->failure;
+    else SayOnce("queue-apple", "Player: queue read through AMP.Services.PlayQueue (" +
+                                    std::to_string(read->entries->size()) + " entries)");
+    return read->entries;
+}
+
 QueueSnapshot PlayerBridge::Queue() {
     QueueSnapshot queue;
     PlayerSnapshot snapshot = Snapshot();
     queue.source = snapshot.source;
+    std::string failure;
+    bool cut = false;
+    if (std::optional<std::vector<AmpQueueEntry>> entries = AppleQueue(failure, cut)) {
+        queue.complete = !cut;
+        if (cut) queue.reason = "the first " + std::to_string(kMaxQueueEntries) + " entries of a longer queue";
+        queue.source = "apple";
+        for (const AmpQueueEntry& entry : *entries) queue.items.push_back(QueueItemFromAmp(entry));
+        return queue;
+    }
     queue.complete = false;
-    queue.reason = "only the current track is known: the interfaces of Apple's queue (AMP.Services.PlayQueue) "
-                   "are not mapped yet";
+    queue.reason = "only the current track is known: " + failure;
     if (snapshot.track) {
         QueueItem item;
         item.id = snapshot.track->queueItemId.empty() ? snapshot.track->id : snapshot.track->queueItemId;
@@ -256,14 +314,46 @@ QueueSnapshot PlayerBridge::Queue() {
     return queue;
 }
 
-QueueResult PlayerBridge::AddToQueue(const std::string&, QueuePosition) {
-    return {false, "adding to the queue is not possible yet: the parameters of "
-                   "IPlayer.StartOrQueueLibraryPlaybackAsync are not mapped"};
+QueueResult PlayerBridge::AddToQueue(const std::string& trackId, QueuePosition) {
+    if (!IsCatalogId(trackId)) return {false, "not an Apple Music catalog id (digits only): " + trackId};
+    // Tried in Apple Music 1.1792 (knowledge/apple-music-queue.md): IPlayer.StartOrQueueLibraryPlaybackAsync completes
+    // without queueing a catalog song, whatever the action, so nothing is called.
+    return {false, "adding to the queue is not possible: Apple Music 1.1792 ignores the songs Ampify gives its player"};
 }
 
-QueueResult PlayerBridge::RemoveFromQueue(const std::string&) {
-    return {false, "removing from the queue is not possible yet: the parameters of "
-                   "IPlayQueue.DeletePlayQueueItemsAsync are not mapped"};
+QueueResult PlayerBridge::RemoveFromQueue(const std::string& itemId) {
+    std::string failure;
+    bool cut = false;
+    std::optional<std::vector<AmpQueueEntry>> entries = AppleQueue(failure, cut);
+    if (!entries) return {false, "the queue cannot be changed: " + failure};
+    const AmpQueueEntry* entry = nullptr;
+    for (const AmpQueueEntry& candidate : *entries) {
+        if (std::to_string(candidate.id) == itemId) entry = &candidate;
+    }
+    if (!entry) {
+        std::string where = cut ? "the first " + std::to_string(kMaxQueueEntries) + " entries of the queue" : "the queue";
+        return {false, "no entry " + itemId + " in " + where};
+    }
+    QueueSection section = QueueSectionFromKind(entry->sectionKind);
+    if (section != QueueSection::NextAdded && section != QueueSection::Next && section != QueueSection::Autoplay) {
+        return {false, "only an entry still to come can be removed, not one in \"" +
+                           std::string(QueueSectionName(section)) + "\""};
+    }
+
+    struct Start {
+        rt::Ref operation;
+        std::string failure;
+    };
+    auto start = std::make_shared<Start>();
+    uint64_t id = entry->id;
+    if (!OnInterfaceThread([start, id] { start->operation = StartAppleQueueRemove(id, start->failure); })) {
+        return {false, "Apple Music's interface thread did not answer"};
+    }
+    if (!start->operation) return {false, start->failure};
+    if (!rt::Wait(start->operation, kQueueChangeTimeoutMs)) {
+        return {false, "Apple's queue did not confirm the removal within 3 s"};
+    }
+    return {true, ""};
 }
 
 }  // namespace ampify::win
