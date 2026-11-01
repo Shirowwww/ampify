@@ -17,6 +17,7 @@
 #include "../core/manifest.hpp"
 #include "../core/script_extension.hpp"
 #include "fake_host.hpp"
+#include "pump.hpp"
 #include "test.hpp"
 
 namespace {
@@ -247,4 +248,83 @@ TEST_CASE(ColorModule_ExtractsTwoColours) {
     CHECK(f.Logged("[colors] address TypeError"));
     CHECK(f.Logged("[colors] size RangeError"));
     element->Stop();
+}
+
+namespace {
+
+// Decodes any bytes to a 10 x 4 image, 7 columns red and 3 blue, and keeps what it was given.
+struct FakeImages : ampify::ImageHost {
+    std::string received;
+    uint32_t maxSide = 0;
+
+    std::optional<ampify::RgbaImage> DecodeImage(const std::string& bytes, uint32_t side) override {
+        received = bytes;
+        maxSide = side;
+        if (bytes == "not an image") return std::nullopt;
+        ampify::RgbaImage image;
+        image.width = 10;
+        image.height = 4;
+        for (uint32_t i = 0; i < 40; i++) {
+            bool red = (i % 10) < 7;
+            image.pixels.insert(image.pixels.end(), {static_cast<uint8_t>(red ? 200 : 40), static_cast<uint8_t>(red ? 40 : 70),
+                                                     static_cast<uint8_t>(red ? 40 : 200), 255});
+        }
+        return image;
+    }
+};
+
+}  // namespace
+
+TEST_CASE(ColorModule_FromArtworkDownloadsDecodesAndExtracts) {
+    Fixture f(false);
+    FakeImages images;
+    f.host.images = &images;
+    f.host.httpResponse = {200, "jpeg bytes"};
+    auto element = f.Make("artwork", R"(
+        Ampify.color.fromArtwork("https://is1-ssl.mzstatic.com/image/thumb/Music/a.jpg/1000x1000bb.jpg")
+            .then((c) => Ampify.log("colors " + c.PROMINENT + " " + c.palette.length));
+        Ampify.color.fromArtwork("https://example.org/a.jpg").catch((e) => Ampify.log("elsewhere " + e.name));
+        Ampify.color.fromArtwork("http://is1-ssl.mzstatic.com/a.jpg").catch((e) => Ampify.log("plain " + e.name));
+    )", "");
+    CHECK(element->Start());
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("colors "); }));
+    CHECK(f.Logged("[artwork] colors #c82828 2"));
+    CHECK(f.Logged("[artwork] elsewhere TypeError"));
+    CHECK(f.Logged("[artwork] plain TypeError"));
+    CHECK(images.received == "jpeg bytes");
+    CHECK(images.maxSide == 128);
+    CHECK(f.host.RequestCount() == 1);  // the refused addresses were never requested
+    element->Stop();
+}
+
+TEST_CASE(ColorModule_FromArtworkRejectsWithTheReason) {
+    Fixture f(false);
+    FakeImages images;
+    f.host.httpResponse = {404, "missing"};
+    auto element = f.Make("artwork-fail", R"(
+        const url = "https://is1-ssl.mzstatic.com/a.jpg";
+        Ampify.color.fromArtwork(url).catch((e) => Ampify.log("nodecoder " + e.message));
+    )", "");
+    CHECK(element->Start());
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("nodecoder "); }));
+    CHECK(f.Logged("[artwork-fail] nodecoder color.fromArtwork: images are not decoded by this host"));
+
+    f.host.images = &images;
+    auto missing = f.Make("artwork-404", R"(
+        Ampify.color.fromArtwork("https://is1-ssl.mzstatic.com/a.jpg").catch((e) => Ampify.log("got " + e.message));
+    )", "");
+    CHECK(missing->Start());
+    CHECK(ampify::test::PumpUntil(*missing, [&] { return f.Logged("[artwork-404] got "); }));
+    CHECK(f.Logged("the artwork could not be downloaded (status 404)"));
+
+    f.host.httpResponse = {200, "not an image"};
+    auto broken = f.Make("artwork-broken", R"(
+        Ampify.color.fromArtwork("https://is1-ssl.mzstatic.com/a.jpg").catch((e) => Ampify.log("got " + e.message));
+    )", "");
+    CHECK(broken->Start());
+    CHECK(ampify::test::PumpUntil(*broken, [&] { return f.Logged("[artwork-broken] got "); }));
+    CHECK(f.Logged("the artwork is not an image Windows can read"));
+    element->Stop();
+    missing->Stop();
+    broken->Stop();
 }

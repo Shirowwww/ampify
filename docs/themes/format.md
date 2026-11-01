@@ -573,9 +573,9 @@ What the theme does not set keeps the Windows 11 value:
 
 A theme can also create its own roles (`--font-lyrics: ...`).
 
-On the kernel side, the function `FontRolesJson` in `core/theme/fonts.hpp` returns every role of the applied theme
-(theme and snippets together) as JSON: `{"title":{"family":"...","weight":700,"size":30,"fromTheme":true},...}`. An
-extension API to read the roles (`Ampify.fonts.style(name)`) is planned and not available yet.
+Extensions read the roles of the applied theme (theme and snippets together) with `Ampify.fonts.style(name)` and
+`Ampify.fonts.roles()`: `{"title":{"family":"...","weight":700,"size":30,"fromTheme":true},...}`. See
+[the extension API](../extensions/api.md), section 5.6.
 
 ## Snippets
 

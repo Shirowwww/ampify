@@ -2,7 +2,7 @@
 # installer and the test kit. The lists are always defined; CMakeLists.txt uses them only when targeting Windows.
 # See the convention at the top of CMakeLists.txt.
 list(APPEND AMPIFY_WIN_SOURCES win/win_common.cpp win/package.cpp win/win_host.cpp win/hook.cpp win/ui_thread.cpp
-    win/kit_command.cpp)
+    win/kit_command.cpp win/wic_image.cpp)
 
 list(APPEND AMPIFY_KERNEL_SOURCES kernel/kernel.cpp extensions/atmos-leveler/atmos_windows.cpp)
 

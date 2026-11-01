@@ -20,6 +20,7 @@
 #include "../core/gain_board.hpp"
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
+#include "wic_image.hpp"
 #include "win_services.hpp"
 
 namespace ampify {
@@ -98,6 +99,7 @@ void WinHost::SetEventSink(EventSink sink) { m_services->SetEventSink(std::move(
 
 void* WinHost::QueryCapability(std::string_view name) {
     if (void* found = Offer<HttpPostHost>(name, this)) return found;
+    if (void* found = Offer<ImageHost>(name, this)) return found;
     // Ampify.player.queue, in both processes: what each one knows of the queue (win/player_bridge.*).
     if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
     // Ampify.player.lyrics: Apple's lyrics, read in the process that has Apple's player.
@@ -267,6 +269,10 @@ void WinHost::UnregisterKeys(const std::string& elementId) {
 }
 
 HttpResponse WinHost::HttpGet(const std::string& url) { return Send(L"GET", url, {}, {}); }
+
+std::optional<RgbaImage> WinHost::DecodeImage(const std::string& bytes, uint32_t maxSide) {
+    return win::DecodeWithWic(bytes, maxSide);
+}
 
 HttpResponse WinHost::HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) {
     return Send(L"POST", url, body, headers);

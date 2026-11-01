@@ -181,9 +181,9 @@ switching the element on. A function protected by an undeclared permission throw
 | `ui.panel`, `ui.window` | Side panel, secondary window | [preview] |
 | `ui.fullscreen` | `Ampify.ui.fullscreen`, a view over the whole window (a "now playing" screen with lyrics), and `Ampify.ui.applePlayer`, Apple Music's own full-screen player | [stable] |
 | `ui.page` | App pages and navigation entries | [stable] |
-| `library.read` | `Ampify.library`, reading the library and playlists | [planned] |
-| `library.write` | Writing playlists, after reading (the queue goes through `player.control`) | [planned] |
-| `services.read` | `Ampify.services.call`, read calls to an allow-list of app services | [planned] |
+| `library.read` | Reading the library and playlists | [outside 1.0] |
+| `library.write` | Writing playlists, after reading (the queue goes through `player.control`) | [outside 1.0] |
+| `services.read` | Read calls to an allow-list of app services | [outside 1.0] |
 | `ipc.discord` | `Ampify.discord`, a local pipe to the Discord client, for presence (setting `discord.enabled`) | [preview] |
 | `midi.input` | `Ampify.midi`, inputs of a MIDI controller (setting `midi.enabled`) | [preview] |
 | `ui.tray` | `Ampify.tray`, entries in the menu of the Ampify notification-area icon (setting `tray.enabled`) | [preview] |
@@ -191,8 +191,8 @@ switching the element on. A function protected by an undeclared permission throw
 | `network:<host>` | `Ampify.http.get` and `Ampify.http.post`, only to the declared host | [stable] for the mechanism |
 | `kit.manage` | `Ampify.kit.run`, which runs `ampify.exe`. Reserved to the Marketplace app that ships with Ampify. The catalog refuses it for any other element | Internal |
 
-[planned] means the permission exists in the manifest schema and the types, but the runtime does not implement the
-functions yet.
+[outside 1.0] means the name is reserved in the manifest schema, so a manifest that declares it still loads, but API
+1.0 has no function behind it. Section 11 says why and what would come first.
 
 [../spicetify-parity.md](../spicetify-parity.md) names the permission each Spicetify feature needs.
 
@@ -276,8 +276,8 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
   the song, its variant or its entry changes. Empty when the source does not give it.
 - **`track.variantId`** is the audio format given by Apple: `"lossless"`, `"hi-res-lossless"`, `"dolby-atmos"`,
   `"spatial"`, `"surround"` or `"other"`. Empty with SMTC. `atmos` and `lossless` follow from it.
-- **`track.artwork`** is the https address of the cover at about 1000 px, or `""` (SMTC, or Apple gave none). Only
-  `https://` addresses are passed on. **`track.artworkColor`** is the dominant colour of the cover, `"#RRGGBB"`, or `""`.
+- **`track.artwork`** is the https address of the cover at about 1000 px, or `""` (SMTC, or Apple gave none; Apple
+  Music 1.1792 keeps the address internal, so it is always empty there). Only `https://` addresses are passed on. **`track.artworkColor`** is the dominant colour of the cover, `"#RRGGBB"`, or `""`.
   Both come from Apple's player only.
 - **`lyrics()`** gives Apple Music's own lyrics of the song playing (permission `player.read`), or `null` when Apple Music
   has none for it, when it has not fetched them yet, or when the source is not Apple's player. Times are in
@@ -501,11 +501,11 @@ Ampify.icons.get(name) -> SVG string                // [preview]
 Ampify.color.extract(pixels, width, height)         // [preview] no permission
 // pixels: RGBA, row by row (array, Uint8Array or ArrayBuffer). Returns the keys of Spicetify's colorExtractor:
 // PROMINENT, VIBRANT, DARK_VIBRANT, LIGHT_VIBRANT, DESATURATED, VIBRANT_NON_ALARMING ("#rrggbb"),
-// and palette: [{ color, population }]. Images by address are not read yet.
-Ampify.color.fromArtwork(url) -> Promise<color>     // [planned]
-Ampify.library.playlists() / Ampify.library.tracks()   // [planned] permission library.read
-Ampify.services.call(service, method, args)         // [planned] permission services.read, allow-list
-Ampify.lyrics.current() -> Promise<lyrics>          // [planned] permission player.read
+// and palette: [{ color, population }].
+Ampify.color.fromArtwork(url) -> Promise<colors>    // [preview] no permission, the same keys as extract
+Ampify.fonts.roles() -> { [role]: { family, weight, size, fromTheme } }   // [preview] no permission
+Ampify.fonts.style(name) -> { role, family, weight, size, fromTheme } | null
+Ampify.lyrics.current() -> Promise<lyrics | null>   // [preview] permission player.read
 ```
 
 `Ampify.http.get` is only for third-party services (Last.fm, ListenBrainz, lyrics providers). It cannot reach Apple's
@@ -515,8 +515,20 @@ sent as JSON. Only the headers `content-type`, `authorization` and `accept` are 
 64 KB at most. Both calls return at once: the request runs off the JavaScript thread, so a slow server does not freeze
 the element's timers or events. An element may have 4 requests in flight; the next call rejects with a `RangeError`.
 
-`Ampify.services.call` will not create a new connection: it will call the services the app already uses, and only those
-on the allow-list published with Ampify.
+`Ampify.color.fromArtwork(url)` takes an artwork address of Apple Music, such as `track.artwork`: only
+`https://*.mzstatic.com`, Apple's image server, so it needs no network permission. The kernel downloads the image,
+Windows decodes it to 128 px at most, and the promise resolves with the keys of `extract`. It counts towards the 4
+requests in flight, and rejects with the reason when the image cannot be read. Where `track.artwork` is empty (Apple
+Music 1.1792), the `artworkUrl100` of the iTunes Search API is on the same server and works too.
+
+`Ampify.fonts` reads the font roles of the applied theme, snippets included (see "Font roles" in
+[themes/format.md](../themes/format.md)): `style("title")` gives `{ role: "title", family, weight, size, fromTheme }`,
+with the weight and the size as numbers (pixels). A role the theme does not set keeps the Windows 11 value, and
+`fromTheme` is then `false`. `text` is another name for `body`; an unknown role gives `null`. The roles follow the
+theme a fraction of a second after it is applied: read them when you need them rather than once at start. In
+`AMPLibraryAgent.exe`, which shows nothing, they are the defaults.
+
+`Ampify.lyrics.current()` is `Ampify.player.lyrics()` as a promise, for code written that way.
 
 ### 5.7 Local services [preview]
 
@@ -759,8 +771,8 @@ extension authors:
 These points must be confirmed before items move to [stable]:
 
 - the size of quickjs-ng and its behavior under MinGW and MSVC;
-- the shape of the data of `Ampify.player` and its events, on the current Apple Music version (the player interfaces
-  changed in 1.1792: the log says "IPlayer absent" and the song is not seen through Apple's player);
+- the shape of the data of `Ampify.player` and its events on later Apple Music versions (1.1792 is read through Apple's
+  player, activated from its own DLL when the system does not know the class);
 - the shape of the frames of `Ampify.audio.onFrame` and the number of bands (to confirm on a PC);
 - the places of interface elements in the XAML tree;
 - the list of allowed XAML keys for themes;
@@ -778,8 +790,16 @@ Nothing is ruled out for good. Each point stays outside API 1.0 for a specific r
   rendering.
 - **Absolute volume.** It follows the slider without ever writing it. The internal gain stays the only way to change the
   sound.
-- **Apple internal services.** An allow-list of read calls. Apple's public MusicKit API needs an Apple Developer account:
-  an option to open later.
+- **Apple internal services** (`services.read`). An allow-list of read calls, which first needs a layer that calls
+  `AMP.Services` methods by name with checked argument types. Such a call would not open a new connection: only the
+  services the app already uses, on the allow-list published with Ampify. Apple's public MusicKit API needs an Apple
+  Developer account: an option to open later.
+- **The library and playlists** (`library.read`, `library.write`, and the M3U8 import and export that need them).
+  Apple Music reads its library through its library agent (`AMP.Core.IAMPLibrary`), with fetch requests in a private
+  format. Path: the playlists the sidebar already lists, then the fetch requests once their format is written down.
+- **Adding to the queue.** `Ampify.player.queue.add` answers `false`: Apple's player ignores the songs Ampify hands it
+  ([knowledge/apple-music-queue.md](../../knowledge/apple-music-queue.md)). Path: the call that the "Play Next" entry
+  of a catalog page makes.
 - **Telemetry.** An option `telemetry.block`, off by default, that never touches license or DRM hosts.
 - **Per-version patches.** A table of byte patterns, with no fixed address, for each tested version.
 
@@ -813,7 +833,10 @@ Nothing is ruled out for good. Each point stays outside API 1.0 for a specific r
 | `remote.setState` and the local remote | Done. On Windows: Winsock on `127.0.0.1` only, in AMPLibraryAgent.exe | C++ tests; local client and refusal of other addresses under Wine |
 | `fs.writeText` | Done. `output\<id>\` of Ampify only | C++ tests and Wine |
 | `kit.run` | Done, Marketplace only | C++ tests |
-| `library`, `services`, `lyrics`, `color.fromArtwork` | Planned. Typed in `ampify.d.ts`, not implemented | |
+| `lyrics.current` | Done: `player.lyrics()` as a promise | C++ tests |
+| `color.fromArtwork` | Done. On Windows: WinHTTP, then WIC decodes the image to 128 px at most | C++ tests (fake decoder, and WIC on a PNG); in Apple Music 1.1792, a real cover gave its palette |
+| `fonts.roles`, `fonts.style` | Done. The theme service publishes the roles of the applied theme, the defaults before | C++ tests; in Apple Music 1.1792, the roles followed a theme change |
+| `library`, `services` | Outside API 1.0 (section 11): the permission names are reserved, nothing is typed | |
 
 Known limit: an element that runs in both processes and writes its storage can lose an update, which is why
 `processes` exists.

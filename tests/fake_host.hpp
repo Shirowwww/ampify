@@ -12,6 +12,7 @@
 
 #include "../core/audio/audio_host.hpp"
 #include "../core/host.hpp"
+#include "../core/image_host.hpp"
 
 namespace ampify::test {
 
@@ -115,9 +116,12 @@ struct FakeHost : Host {
 
     // Optional audio: a test that sets it (usually to an ampify::audio::AudioEngine it feeds) offers AudioHost.
     AudioHost* audio = nullptr;
+    // Optional image decoding, for Ampify.color.fromArtwork.
+    ImageHost* images = nullptr;
 
     void* QueryCapability(std::string_view name) override {
         if (audio && name == AudioHost::kCapabilityName) return audio;
+        if (images && name == ImageHost::kCapabilityName) return images;
         return Host::QueryCapability(name);
     }
 };

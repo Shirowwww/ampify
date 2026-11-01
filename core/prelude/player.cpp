@@ -49,6 +49,11 @@ const char kPlayer[] = R"AMPIFYJS(
     }),
   };
 
+  // The same lyrics as a promise, the shape Spicetify's lyrics extensions wait for. Without player.read it rejects.
+  Ampify.lyrics = Object.freeze({
+    current: () => Promise.resolve().then(() => Ampify.player.lyrics()),
+  });
+
   dispatch.player = (event, stateJson) => {
     for (const fn of trackListeners[event]) runGuarded(event, fn, [JSON.parse(stateJson)]);
   };

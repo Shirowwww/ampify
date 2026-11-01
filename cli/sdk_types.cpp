@@ -100,6 +100,7 @@ type ExtractedColors = {
   VIBRANT_NON_ALARMING: string;
   palette: { color: string; population: number }[];
 };
+type FontRole = { family: string; weight: number; size: number; fromTheme: boolean };
 
 // 5.9: Ampify.React, Ampify.ReactDOM, Ampify.hooks and Ampify.components.
 type AmpifyElement = { readonly type: unknown; readonly key: string | null; readonly props: Readonly<Record<string, unknown>> };
@@ -251,14 +252,13 @@ declare const Ampify: {
   icons: { get(name: string): string };
   color: {
     extract(pixels: ArrayLike<number> | ArrayBuffer, width: number, height: number): ExtractedColors;
-    fromArtwork(url: string): Promise<string>;
+    fromArtwork(url: string): Promise<ExtractedColors>;  // an artwork address of Apple Music, such as track.artwork
   };
-  library: {
-    playlists(): Promise<unknown[]>;
-    tracks(): Promise<unknown[]>;
+  fonts: {
+    roles(): Record<string, FontRole>;
+    style(name: string): (FontRole & { role: string }) | null;  // "text" is another name for "body"
   };
-  services: { call(service: string, method: string, args?: unknown): Promise<unknown> };
-  lyrics: { current(): Promise<unknown> };
+  lyrics: { current(): Promise<Lyrics | null> };  // Ampify.player.lyrics() as a promise
 
   // 5.8 Link between an app and its extension [provisional]
   link: {

@@ -75,6 +75,8 @@ namespace prelude { extern const char kLink[]; }
 namespace natives { void DefineLink(api::NativeScope& scope); void StartLink(ScriptExtension& extension); }
 namespace prelude { extern const char kKit[]; }
 namespace natives { void DefineKit(api::NativeScope& scope); void StopKit(ScriptExtension& extension); }
+namespace prelude { extern const char kFonts[]; }
+namespace natives { void DefineFonts(api::NativeScope& scope); }
 
 namespace api {
 
@@ -95,6 +97,7 @@ const ApiModule kModules[] = {
     {"icons", prelude::kIcons, nullptr, nullptr, nullptr},
     {"uri", prelude::kUri, nullptr, nullptr, nullptr},
     {"color", prelude::kColor, natives::DefineColor, nullptr, nullptr},
+    {"fonts", prelude::kFonts, natives::DefineFonts, nullptr, nullptr},
     {"timers", prelude::kTimers, natives::DefineTimers, nullptr, nullptr},
     {"console", prelude::kConsole, nullptr, nullptr, nullptr},
     {"ui", prelude::kUi, natives::DefineUi, natives::StartUi, natives::StopUi},

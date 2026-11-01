@@ -136,7 +136,7 @@ Settings known to `ampify config`:
 | `prefs_path` | Full path of the Apple Music preferences file, empty for the usual place | empty (`%LOCALAPPDATA%\Packages\AppleInc.AppleMusicWin_nzyj5cx40ttqa\LocalCache\Roaming\Apple Computer\Preferences\AMPLibraryAgent.exe.plist`) |
 | `app_launch_flags` | Arguments added when Apple Music starts, separated by spaces (quotes to keep a space) | empty |
 | `check_kit_update` | `1` or `0`: `ampify` reports a new Ampify version | `0` |
-| `telemetry.block` | `1` or `0`: block Apple Music's data sends. **Not active yet**: the key is accepted, the kernel does not read it | `0` |
+| `telemetry.block` | `1` or `0`: block Apple Music's data sends. **Reserved, outside 1.0**: the key is accepted, the kernel does not read it | `0` |
 | `expose_api` | `1` or `0`: at `0`, no JavaScript element (extension, app, theme script) starts | `1` |
 | `discord.enabled` | `1` or `0`: elements with `ipc.discord` can show Discord presence | `0` |
 | `tray.enabled` | `1` or `0`: Ampify icon in the notification area, with its menu | `0` |

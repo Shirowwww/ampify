@@ -371,6 +371,24 @@ TEST_CASE(PlayerLyrics_NeedsThePlayerReadPermission) {
     CHECK(out.str().find("PermissionDenied") != std::string::npos);
 }
 
+TEST_CASE(Lyrics_CurrentGivesThePlayerLyricsAsAPromise) {
+    LyricsFakeHost host;
+    host.raw = ampify::RawLyrics{"", "La la", "fr"};
+    std::ostringstream out;
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    auto element = Make(host, journal, "promised", R"("player.read")", R"(
+        Ampify.lyrics.current().then((l) => Ampify.log("current " + l.text + " " + l.language));)");
+    CHECK(element->Start());
+    element->Pump();
+    CHECK(out.str().find("[promised] current La la fr") != std::string::npos);
+
+    auto refused = Make(host, journal, "refused", "",
+                        R"(Ampify.lyrics.current().catch((e) => Ampify.log("rejected " + e.name));)");
+    CHECK(refused->Start());
+    refused->Pump();
+    CHECK(out.str().find("[refused] rejected PermissionDenied") != std::string::npos);
+}
+
 TEST_CASE(PlayerLyrics_TheLyricschangeEventReachesTheElement) {
     LyricsFakeHost host;
     std::ostringstream out;

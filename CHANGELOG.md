@@ -109,6 +109,9 @@ checked in Apple Music. It is not published yet: it waits for a listening check 
   autoplay), with each song's album and catalog id, read through Apple's own play queue. `queue.remove(id)` removes an
   entry still to come, which leaves Apple's "Up Next" panel at once. `queue.add` answers `false` with the reason: Apple's
   player ignores the songs Ampify hands it (`knowledge/apple-music-queue.md`).
+- `Ampify.fonts.roles()` and `Ampify.fonts.style(name)` give extensions the font roles of the applied theme, the
+  counterpart of Spicetify's `getFontStyle`. `Ampify.color.fromArtwork(url)` gives the palette of an artwork of Apple
+  Music, downloaded and decoded in the kernel. `Ampify.lyrics.current()` is `Ampify.player.lyrics()` as a promise.
 - A setting changed in the Ampify card is no longer lost when an extension saves one of its own keys at the same moment:
   every writer of `settings.txt` changes its keys in the file as it is now, instead of saving an older copy.
 
@@ -129,4 +132,6 @@ icon, side panels and windows, ES modules, and the engine process (`processes: [
   cover from the iTunes Search API), and Apple's lyrics only come once its lyrics panel has been open for the song.
 - Apple Music builds its queue the first time its "Up Next" panel opens in a session: until then
   `Ampify.player.queue.list()` holds the current track only, and says so.
+- Outside 1.0, with the reason in `docs/extensions/api.md` (section 11): the library and playlists, adding to the queue,
+  calls to Apple's internal services, and blocking telemetry. Their permission names are reserved.
 - The binaries are not code-signed: Windows SmartScreen can ask for a confirmation.

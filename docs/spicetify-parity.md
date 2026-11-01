@@ -37,7 +37,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 |---|---|
 | Done | Works. It may still wait for a check on a real PC, as noted |
 | Partial | Works with a limit written in the row |
-| Planned | Designed, not implemented |
+| Outside 1.0 | Not in version 1.0, for the reason in the row ([extensions/api.md](extensions/api.md), section 11) |
 | Different | Done another way, or no equivalent exists |
 
 ## 1. Installation and command line
@@ -69,7 +69,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | `prefs_path` | `prefs_path`, read-only for Ampify unless set explicitly | Done |
 | `spotify_launch_flags` | `app_launch_flags`, arguments added when Apple Music starts (Apple Music may ignore them) | Done |
 | `check_spicetify_update` | `check_kit_update`, a check at `ampify` start, never an automatic download | Done |
-| `disable_sentry`, `disable_ui_logging` | `telemetry.block`. The key is accepted but the kernel does not read it yet | Planned |
+| `disable_sentry`, `disable_ui_logging` | `telemetry.block` is reserved: the key is accepted, the kernel does not read it | Outside 1.0 |
 | `remove_rtl_rule` | Not needed: there are no right-to-left CSS rules to remove. A theme can set `flow-direction` | Different |
 | `expose_apis` | `expose_api`. At `0`, no JavaScript element starts | Done |
 | `current_theme` | `theme.active` | Done |
@@ -89,12 +89,12 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | A single JavaScript file | `main.js` in a folder with `manifest.json`, loaded by the kernel. Several files through ES modules | Done |
 | Creator (TypeScript, JSX, bundling) | `ampify new`, `dev`, `test`, `build` and `types` (`ampify.d.ts`). There is no TypeScript or JSX compiler | Partial |
 | Wait for the APIs (`setTimeout` loop) | `Ampify.ready`, a promise resolved when the element has started | Done |
-| `Player`: state, track, events | `Ampify.player.state()` and `on(...)`. Read through Apple's player in `AppleMusic.exe`, else SMTC. In Apple Music 1.1792 the player interfaces changed and the log shows "IPlayer absent", so the track comes from SMTC (no variant id) | Partial |
+| `Player`: state, track, events | `Ampify.player.state()` and `on(...)`. Read through Apple's player (`AMP.Services.Player`) in `AppleMusic.exe`, activated from Apple's own DLL in 1.1792; SMTC elsewhere | Done |
 | `Player`: play, pause, next, previous, seek | SMTC commands, then media keys. `seek` goes through SMTC only | Partial |
 | `Player`: volume | `Ampify.audio.setGainDb`: an internal gain on samples. The slider is never written, so there is no `setVolume` | Different |
 | `Platform.History` (navigation) | `Ampify.ui.navigate(path)` for app pages. No navigation to Apple Music's own pages | Partial |
-| `Platform.Library`, `Platform.Playlists` | `Ampify.library`, read-only first | Planned |
-| `CosmosAsync` | `Ampify.services.call` on an allow-list of read calls | Planned |
+| `Platform.Library`, `Platform.Playlists` | Apple Music reads its library through its library agent, with fetch requests in a private format. The permissions `library.read` and `library.write` are reserved | Outside 1.0 |
+| `CosmosAsync` | An allow-list of read calls to `AMP.Services` (`services.read`, reserved). It first needs a layer that calls those methods by name with checked argument types | Outside 1.0 |
 | `GraphQL` | No equivalent. Apple exposes none | Different |
 | `URI` | `Ampify.uri` parses and builds `music:`, `musics:`, `itms:` and `https://music.apple.com` links | Done |
 | `React`, `ReactDOM` | `Ampify.React` and `Ampify.ReactDOM`: a small engine with React's shape (hooks, fragments, props) that renders to native controls | Done |
@@ -111,12 +111,13 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | `LocalStorage` | `Ampify.storage`, one JSON file per element | Done |
 | `Config` | `Ampify.config.get` and `set`, limited to the element's keys | Done |
 | Settings pages that each extension builds (or `spcr-settings`) | `settings` in the manifest: toggles, choices, texts and numbers shown in the Ampify card of Apple Music's settings, with no code ([extensions/manifest.md](extensions/manifest.md)) | Better |
-| `Queue` | `Ampify.player.queue.list()`. On Windows it gives the current track only (`complete: false`) | Partial |
-| `addToQueue`, `removeFromQueue` | `queue.add` and `queue.remove` answer `false` until the parameters of Apple's queue methods are read on a PC | Planned |
-| `colorExtractor` | `Ampify.color.extract(pixels, width, height)` works on pixels the script supplies. `color.fromArtwork` is planned | Partial |
+| `Queue` | `Ampify.player.queue.list()`: Apple's queue section by section (history, current, added, next, autoplay), with each song's catalog id. Apple Music builds it the first time its "Up Next" panel opens in a session; before that, the current track only, with `complete: false` and the reason | Partial |
+| `removeFromQueue` | `Ampify.player.queue.remove(id)` removes an entry still to come; it leaves Apple's panel at once | Done |
+| `addToQueue` | `queue.add` answers `false`: Apple's player ignores the songs Ampify hands it ([knowledge/apple-music-queue.md](../knowledge/apple-music-queue.md) says what was tried) | Outside 1.0 |
+| `colorExtractor` | `Ampify.color.extract(pixels, width, height)` on pixels the script holds, and `Ampify.color.fromArtwork(url)` on an artwork of Apple Music, such as `track.artwork` | Done |
 | `getAudioData` | `Ampify.audio.analyze()`, `onFrame` and `loudness()`: level, spectrum, tempo, LUFS, computed in memory | Done |
 | `showNotification` | `Ampify.notify({ title, text })`, a Windows notification | Done |
-| `getFontStyle` (documented by Spicetify, absent from its code) | The theme engine has font roles. `Ampify.fonts.style(name)` to read them from an extension is not available yet | Planned |
+| `getFontStyle` (documented by Spicetify, absent from its code) | `Ampify.fonts.style(name)` and `Ampify.fonts.roles()`: the font roles of the applied theme, the Windows 11 ramp for what it does not set | Done |
 | `SVGIcons` | `Ampify.icons.get(name)` | Done |
 | `Locale` | `Ampify.locale` and `Ampify.i18n` | Done |
 
@@ -186,7 +187,8 @@ Status: relative gain done. An absolute `setVolume` that follows the slider is n
 
 The path is `Ampify.services.call(...)`, which calls the services the app already uses, through the `AMP.Services`
 projections. Calls are read-only, on an allow-list of methods published with Ampify. It opens no new connection to Apple.
-Apple's public MusicKit API needs a developer token (an Apple Developer account): an option for later. Status: planned.
+Apple's public MusicKit API needs a developer token (an Apple Developer account): an option for later. Status: outside
+1.0, since the layer that calls `AMP.Services` methods by name with checked argument types does not exist yet.
 
 ### `GraphQL`
 
@@ -201,8 +203,8 @@ rule "resolve by name".
 
 ### Telemetry preprocessor (`disable_sentry`, `disable_ui_logging`)
 
-The planned option is `telemetry.block`, off by default. The kernel would answer locally the requests sent to the telemetry
-hosts found by traffic capture. License and DRM hosts would never be on that list. Status: planned.
+The reserved option is `telemetry.block`, off by default. The kernel would answer locally the requests sent to the telemetry
+hosts found by traffic capture. License and DRM hosts would never be on that list. Status: outside 1.0.
 
 ## 9. Beyond Spicetify
 
@@ -211,7 +213,7 @@ hosts found by traffic capture. License and DRM hosts would never be on that lis
 | Atmos leveler | Built-in extension: a gain on the samples that brings Atmos to the stereo level. Passes the automated tests, with a listening check on a PC pending | Done |
 | Equalizer | `Ampify.audio.eq`: 10 bands, presets, applied to the samples in native code | Done |
 | LUFS meter | `Ampify.audio.loudness()`. The standalone tool is in `reference/loudness-meter/` | Partial |
-| Lyrics | `Ampify.lyrics.current()` through Apple's lyrics service, or an open provider through `network:` | Planned |
+| Lyrics | `Ampify.player.lyrics()` and `Ampify.lyrics.current()`: Apple Music's own lyrics, synced by line and by word when Apple times them, with a `lyricschange` event | Done |
 | Discord Rich Presence | `Ampify.discord`, through the local pipe, permission `ipc.discord` | Done |
 | Last.fm and ListenBrainz scrobbling | `Ampify.http` to the declared hosts. Example: `examples/scrobbler` | Done |
 | Media keys and global shortcuts | SMTC and `RegisterHotKey` | Done |
@@ -222,7 +224,7 @@ hosts found by traffic capture. License and DRM hosts would never be on that lis
 | "Now playing" for OBS | `Ampify.fs.writeText` to a text file. Example: `examples/now-playing-file` | Done |
 | Sleep timer | Example: `examples/sleep-timer` | Done |
 | Listening stats | Example: `examples/listen-stats`, a local JSON log of metadata only | Done |
-| M3U8 playlists import and export | Needs the library services | Planned |
+| M3U8 playlists import and export | Needs the library, outside 1.0 | Outside 1.0 |
 | Settings profiles | `ampify profile use <name>` | Done |
 | Theme that follows the system or the time | `theme.scheme = auto`, `theme.schedule` | Done |
 | Accessibility | A high contrast theme in the catalog sources, larger text theme | Partial |
@@ -234,8 +236,9 @@ hosts found by traffic capture. License and DRM hosts would never be on that lis
 ## 10. What the most used Spicetify themes and extensions need
 
 [knowledge/spicetify-top.md](../knowledge/spicetify-top.md) lists what people do most with Spicetify and what Ampify
-already covers. The main gaps are a full-screen now playing view with synchronized lyrics, animated transitions on hover,
-named targets for album and playlist pages, and a player read that works on Apple Music 1.1792.
+already covers. The gaps it named before 1.0 are closed: a full-screen now playing view with synchronized lyrics,
+transitions on hover, named targets for album and playlist pages, and the player read on Apple Music 1.1792. What
+remains is in its list "What is still missing" and in the rows marked "Outside 1.0" above.
 
 ## 11. How each feature is checked
 

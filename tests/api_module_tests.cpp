@@ -100,7 +100,8 @@ const Expected kMembers[] = {
     {"http", "object!{get:f1=get,post:f2=post}"},  // post added in kitApi 1.x, a compatible addition
     {"icons", "object!{get:f1=get,names:f0=names}"},
     {"uri", "object!{parse:f1=parse,build:f3=build}"},
-    {"color", "object!{extract:f3=extract}"},
+    {"color", "object!{extract:f3=extract,fromArtwork:f1=fromArtwork}"},
+    {"fonts", "object!{roles:f0=roles,style:f1=style}"},
     {"ui", "object!{topbar:object!{addButton:f1=addButton},playbar:object!{addButton:f1=addButton},"
            "sidebar:object!{addItem:f1=addItem},"
            "menu:object!{addItem:f2=addItem},popup:object!{open:f1=open},"

@@ -9,6 +9,7 @@
 #include <string>
 
 #include "../core/host.hpp"
+#include "../core/image_host.hpp"
 #include "../core/journal.hpp"
 #include "../core/natives/http.hpp"
 #include "../core/settings.hpp"
@@ -27,7 +28,7 @@ class Services;
 class KitCommandRunner;
 }
 
-class WinHost : public Host, public HttpPostHost {
+class WinHost : public Host, public HttpPostHost, public ImageHost {
 public:
     using KeyCallback = std::function<void(const std::string& elementId, const std::string& combo)>;
     using EventSink = std::function<void(const std::string& entry, const std::string& payload)>;
@@ -66,6 +67,7 @@ public:
 
     HttpResponse HttpGet(const std::string& url) override;
     HttpResponse HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) override;
+    std::optional<RgbaImage> DecodeImage(const std::string& bytes, uint32_t maxSide) override;
 
     UiModel& Ui() override { return m_ui; }
 

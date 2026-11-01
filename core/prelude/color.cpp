@@ -1,6 +1,6 @@
 // Module color: Ampify.color, the colours of an image (the counterpart of Spicetify's colorExtractor).
-// Natives: core/natives/color.cpp. The kernel has no access to the cover images yet, so the script hands the
-// pixels itself: RGBA bytes, row by row, with the width and the height.
+// Natives: core/natives/color.cpp. extract takes pixels the script holds (RGBA bytes, row by row, with the width and
+// the height); fromArtwork downloads and decodes an artwork of Apple Music in the kernel.
 
 namespace ampify::prelude {
 
@@ -13,7 +13,7 @@ const char kColor[] = R"AMPIFYJS(
     }
     if (Array.isArray(pixels)) return Uint8Array.from(pixels);
     if (typeof pixels === "string") {
-      throw new TypeError("color.extract: images given by address are not read yet; pass the RGBA pixels, the width and the height");
+      throw new TypeError("color.extract takes RGBA pixels; for an artwork address, use color.fromArtwork");
     }
     throw new TypeError("color.extract expects RGBA pixels: array, Uint8Array or ArrayBuffer");
   }
@@ -32,6 +32,13 @@ const char kColor[] = R"AMPIFYJS(
       const json = native.colorExtract(bytes, w, h);
       if (json === null) throw new RangeError("color.extract: image too big or fully transparent");
       return JSON.parse(json);
+    },
+    // An artwork address of Apple Music, such as track.artwork. Rejects with the reason when it cannot be read.
+    fromArtwork(url) {
+      return dispatch.request(() => native.colorFromArtwork(text(url))).then((answer) => {
+        if (answer.status !== 200) throw new Error("color.fromArtwork: " + answer.text);
+        return JSON.parse(answer.text);
+      });
     },
   };
 )AMPIFYJS";

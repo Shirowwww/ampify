@@ -8,14 +8,18 @@ extern const char kHttp[];
 const char kHttp[] = R"AMPIFYJS(
   const httpRequests = new Map();
 
+  // `start` asks the kernel for a request and returns its id; the promise resolves with the answer dispatch.http gets.
+  // A throw in `start` (URL refused, too many requests) rejects it. Ampify.color.fromArtwork goes through it too.
+  dispatch.request = (start) => new Promise((resolve) => httpRequests.set(start(), resolve));
+
   Ampify.http = {
     get(url) {
-      return new Promise((resolve) => httpRequests.set(native.httpGet(text(url)), resolve));
+      return dispatch.request(() => native.httpGet(text(url)));
     },
     // body: a string (sent as a form, application/x-www-form-urlencoded, unless headers say otherwise) or an
     // object (sent as JSON). options.headers: content-type, authorization, accept.
     post(url, body, options = {}) {
-      return new Promise((resolve) => {
+      return dispatch.request(() => {
         const headers = {};
         const given = (options && options.headers) || {};
         for (const name of Object.keys(given)) headers[name.toLowerCase()] = text(given[name]);
@@ -27,7 +31,7 @@ const char kHttp[] = R"AMPIFYJS(
           if (!headers["content-type"]) headers["content-type"] = "application/json";
         }
         if (!headers["content-type"]) headers["content-type"] = "application/x-www-form-urlencoded";
-        httpRequests.set(native.httpPost(text(url), payload, JSON.stringify(headers)), resolve);
+        return native.httpPost(text(url), payload, JSON.stringify(headers));
       });
     },
   };

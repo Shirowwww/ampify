@@ -14,11 +14,8 @@
 #include "../json.hpp"
 #include "http.hpp"
 
-namespace ampify::natives {
+namespace ampify {
 
-namespace {
-
-// The host of an https URL, lowercase, or empty when the URL has another form.
 std::string HttpsHost(const std::string& url) {
     constexpr std::string_view kPrefix = "https://";
     if (url.compare(0, kPrefix.size(), kPrefix) != 0) return {};
@@ -28,6 +25,12 @@ std::string HttpsHost(const std::string& url) {
     std::transform(host.begin(), host.end(), host.begin(), [](unsigned char c) { return std::tolower(c); });
     return host;
 }
+
+}  // namespace ampify
+
+namespace ampify::natives {
+
+namespace {
 
 constexpr size_t kMaxPostBody = 64 * 1024;
 constexpr size_t kMaxHeaderValue = 1024;

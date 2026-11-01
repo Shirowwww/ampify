@@ -18,6 +18,7 @@
 #include "xaml_backend.hpp"
 #include "../core/settings.hpp"
 #include "../core/theme/css.hpp"
+#include "../core/theme/fonts.hpp"
 #include "../core/theme/inspector.hpp"
 #include "../core/theme/layout.hpp"
 #include "../core/theme/library.hpp"
@@ -77,13 +78,15 @@ void WriteSidebarIfMissing(const std::filesystem::path& kit, theme::TreeBackend&
 }
 
 // Changes only the theme keys of settings.txt, and keeps the rest of the file as it is.
-void UpdateThemeSettings(const std::filesystem::path& kit, const std::function<void(theme::ThemeSettings&)>& change) {
-    Settings settings;
-    settings.Load((kit / "settings.txt").string());
-    theme::ThemeSettings value = theme::ReadThemeSettings(settings);
-    change(value);
-    theme::WriteThemeSettings(settings, value);
-    settings.Save((kit / "settings.txt").string());
+void UpdateThemeSettings(const std::filesystem::path& kit, Journal& journal,
+                         const std::function<void(theme::ThemeSettings&)>& change) {
+    std::string error;
+    bool written = Settings::UpdateFile((kit / "settings.txt").string(), [&](Settings& settings) {
+        theme::ThemeSettings value = theme::ReadThemeSettings(settings);
+        change(value);
+        theme::WriteThemeSettings(settings, value);
+    }, error);
+    if (!written) journal.Write("Settings: theme keys not written, " + error);
 }
 
 }  // namespace
@@ -99,6 +102,7 @@ struct UiSide {
     int timedRefreshes = 0;  // the same for the window's resource refreshes
     std::size_t heldStates = 0;  // the counts last written to the log
     std::size_t refusedStates = 0;
+    std::shared_ptr<const theme::Theme> fontsOf;  // what the published font roles come from (null: the defaults)
 };
 
 ThemeService::ThemeService(Journal& journal, std::filesystem::path kit)
@@ -165,6 +169,10 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             if (ui->backend.WindowClosed()) return;
 
             std::optional<std::string> dump = ui->session.Tick(ui->backend, request);
+            if (std::shared_ptr<const theme::Theme> applied = ui->session.Applied(); applied != ui->fontsOf) {
+                PublishFontRoles(theme::FontRolesJson(applied.get()));
+                ui->fontsOf = std::move(applied);
+            }
             std::size_t held = ui->backend.HeldStateCount();
             std::size_t refused = ui->backend.RefusedStateCount();
             if (held != ui->heldStates || refused != ui->refusedStates) {
@@ -195,7 +203,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 std::ofstream(JournalFile("inspector.txt")) << *dump;
                 std::ofstream(JournalFile("inspector.json")) << theme::InspectTreeJson(ui->backend);
                 WriteSidebarIfMissing(kit, ui->backend);
-                UpdateThemeSettings(kit, [](theme::ThemeSettings& value) { value.inspect = false; });
+                UpdateThemeSettings(kit, journal, [](theme::ThemeSettings& value) { value.inspect = false; });
                 journal.Write("Inspector: tree written to logs\\inspector.txt and inspector.json");
             }
 
@@ -205,7 +213,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 Settings current;
                 current.Load((kit / "settings.txt").string());
                 if (theme::ReadThemeSettings(current).active == choice) return;  // nothing to change
-                UpdateThemeSettings(kit, [&choice](theme::ThemeSettings& value) { value.active = choice; });
+                UpdateThemeSettings(kit, journal, [&choice](theme::ThemeSettings& value) { value.active = choice; });
                 journal.Write("Theme chosen in Settings: \"" + (choice.empty() ? std::string("none") : choice) + "\"");
             });
         });

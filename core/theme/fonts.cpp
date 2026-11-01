@@ -1,48 +1,19 @@
 #include "fonts.hpp"
 
 #include <algorithm>
-#include <cctype>
-
-#include "../json.hpp"
 
 namespace ampify::theme {
 
 namespace {
 
-// The WinUI 3 type ramp of Windows 11 (Microsoft's "Typography in Windows" guidance).
-const std::vector<FontStyle> kDefaults = {
-    {"caption", "Segoe UI Variable Small", "400", "12", false},
-    {"body", "Segoe UI Variable Text", "400", "14", false},
-    {"body-strong", "Segoe UI Variable Text", "600", "14", false},
-    {"subtitle", "Segoe UI Variable Display", "600", "20", false},
-    {"title", "Segoe UI Variable Display", "600", "28", false},
-    {"title-large", "Segoe UI Variable Display", "600", "40", false},
-    {"display", "Segoe UI Variable Display", "600", "68", false},
-};
-
 const FontStyle* FindDefault(const std::string& role) {
-    for (const FontStyle& style : kDefaults) {
+    for (const FontStyle& style : DefaultFontRoles()) {
         if (style.role == role) return &style;
     }
     return nullptr;
 }
 
-double NumberOr(const std::string& text, double fallback) {
-    try {
-        return text.empty() ? fallback : std::stod(text);
-    } catch (...) {
-        return fallback;
-    }
-}
-
 }  // namespace
-
-std::string CanonicalFontRole(std::string_view role) {
-    std::string lowered(role);
-    for (char& c : lowered) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    if (lowered == "text") return "body";
-    return lowered;
-}
 
 std::optional<FontStyle> ResolveFontRole(const std::vector<const Theme*>& layers, std::string_view role) {
     FontStyle style;
@@ -80,7 +51,7 @@ std::optional<FontStyle> ResolveFontRole(const Theme* theme, std::string_view ro
 
 std::vector<std::string> FontRoleNames(const Theme* theme) {
     std::vector<std::string> names;
-    for (const FontStyle& style : kDefaults) names.push_back(style.role);
+    for (const FontStyle& style : DefaultFontRoles()) names.push_back(style.role);
     if (!theme) return names;
     for (const auto& [role, value] : theme->fonts) {
         if (std::find(names.begin(), names.end(), role) == names.end()) names.push_back(role);
@@ -89,18 +60,11 @@ std::vector<std::string> FontRoleNames(const Theme* theme) {
 }
 
 std::string FontRolesJson(const Theme* theme) {
-    Json::Object roles;
+    std::vector<FontStyle> roles;
     for (const std::string& name : FontRoleNames(theme)) {
-        std::optional<FontStyle> style = ResolveFontRole(theme, name);
-        if (!style) continue;
-        Json::Object entry;
-        entry.emplace_back("family", Json(style->family));
-        entry.emplace_back("weight", Json(NumberOr(style->weight, 400)));
-        entry.emplace_back("size", Json(NumberOr(style->size, 14)));
-        entry.emplace_back("fromTheme", Json(style->fromTheme));
-        roles.emplace_back(name, Json(std::move(entry)));
+        if (std::optional<FontStyle> style = ResolveFontRole(theme, name)) roles.push_back(std::move(*style));
     }
-    return Json(std::move(roles)).Dump();
+    return ampify::FontRolesJson(roles);
 }
 
 }  // namespace ampify::theme

@@ -13,6 +13,9 @@ namespace ampify {
 
 using HttpHeaders = std::vector<std::pair<std::string, std::string>>;
 
+// The host of an https URL, lowercase, or empty when the URL has another form (core/natives/http.cpp).
+std::string HttpsHost(const std::string& url);
+
 struct HttpPostHost {
     static constexpr std::string_view kCapabilityName = "http.post";
     virtual ~HttpPostHost() = default;
