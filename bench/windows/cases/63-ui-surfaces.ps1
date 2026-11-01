@@ -275,7 +275,10 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
             }
             Start-Sleep -Seconds 3
             $root = Get-UiAppWindow
-            $playback = Find-UiByName -Root $root -Pattern '^(Playback|Lecture)$'
+            # Found by the AutomationId of the entry's text, the same in every language ("Lecture" also names the
+            # Play buttons of a French Windows); the button is its parent.
+            $playbackText = Find-UiById -Root $root -Id 'PlaybackNavigationViewItem'
+            $playback = if ($playbackText) { [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($playbackText) } else { $null }
             $playbackHow = Invoke-UiElement -Element $playback
             Add-Info -Ctx $Ctx -Name 'UI Automation navigation to Settings > Playback' `
                 -Detail "settings: $(if ($settingsOpened) { $settingsOpened } else { 'not found' }); Playback: $(if ($playbackHow) { $playbackHow } else { 'not found' })"

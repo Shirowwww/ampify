@@ -773,6 +773,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         m_hover.Forget(it->first);
         it = m_hoverHandlers.erase(it);
     }
+    m_animations.Sweep();
     return nodes;
 }
 
@@ -1076,11 +1077,11 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
             auto known = m_transitions.find(id);
             return theme::Value{theme::ValueKind::Transition, known == m_transitions.end() ? "" : known->second};
         }
+    } else if (property == "Animation") {
+        if (object.try_as<xaml::UIElement>()) return theme::Value{theme::ValueKind::Animation, m_animations.Read(id)};
     } else if (property == "RenderTransformOrigin") {
         if (auto element = object.try_as<xaml::UIElement>()) {
-            auto kept = m_facadeOrigins.find(id);
-            winrt::Windows::Foundation::Point origin = kept != m_facadeOrigins.end() ? kept->second
-                                                                                      : element.RenderTransformOrigin();
+            winrt::Windows::Foundation::Point origin = OriginOf(id, element);
             return theme::Value{theme::ValueKind::Point, FractionText(origin.X) + "," + FractionText(origin.Y)};
         }
     } else if (property == "Shadow") {
@@ -1190,8 +1191,7 @@ bool XamlTreeBackend::WriteAnimatedTransform(theme::NodeId id, const xaml::UIEle
     try {
         // CSS scales around the centre by default, XAML around the top left corner: an origin left at 0,0 means the
         // theme did not choose one.
-        auto kept = m_facadeOrigins.find(id);
-        auto origin = kept != m_facadeOrigins.end() ? kept->second : element.RenderTransformOrigin();
+        auto origin = OriginOf(id, element);
         if (origin.X == 0 && origin.Y == 0) origin = {0.5f, 0.5f};
         auto size = element.ActualSize();
         element.CenterPoint({size.x * origin.X, size.y * origin.Y, 0});
@@ -1208,6 +1208,11 @@ bool XamlTreeBackend::WriteAnimatedTransform(theme::NodeId id, const xaml::UIEle
         m_facadeTransforms.erase(id);
     }
     return true;
+}
+
+winrt::Windows::Foundation::Point XamlTreeBackend::OriginOf(theme::NodeId id, const xaml::UIElement& element) const {
+    auto kept = m_facadeOrigins.find(id);
+    return kept != m_facadeOrigins.end() ? kept->second : element.RenderTransformOrigin();
 }
 
 bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, const theme::Value& value) {
@@ -1426,6 +1431,11 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
 
     if (property == "Transition" && value.kind == theme::ValueKind::Transition) {
         return WriteTransition(id, object, value);
+    }
+
+    if (property == "Animation" && value.kind == theme::ValueKind::Animation) {
+        auto element = object.try_as<xaml::UIElement>();
+        return element && m_animations.Write(id, element, value.text, OriginOf(id, element));
     }
 
     if (property == "RenderTransform") {

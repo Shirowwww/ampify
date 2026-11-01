@@ -67,12 +67,14 @@ constexpr size_t kObjectGetBuffer = 3;          // ISpatialAudioObjectBase::GetB
 constexpr size_t kObjectSetVolume = 8;          // ISpatialAudioObject::SetVolume
 
 constexpr auto kPollPeriod = 300ms;
+constexpr auto kTakeoverWait = 1500ms;  // longer than a pause takes to silence the stream
 constexpr int kPollsPerReport = 30;  // about every 9 s
 constexpr auto kModuleWait = 60s;
 constexpr const wchar_t* kLevelsFileName = L"atmos-levels.txt";
 
 // AVFoundationCF (the player) and CoreFoundation (the objects it returns), resolved by name.
 using SetVolume_t = void(__cdecl*)(void* player, float volume);
+using GetRate_t = float(__cdecl*)(const void* player);
 using CopyObject_t = void*(__cdecl*)(const void* object);
 using CFRelease_t = void(__cdecl*)(const void* object);
 using CFIndex_t = long long;
@@ -91,6 +93,7 @@ constexpr unsigned kUtf8 = 0x08000100;
 
 struct Api {
     CopyObject_t CopyCurrentItem = nullptr;        // AVCFPlayerCopyCurrentItem
+    GetRate_t GetRate = nullptr;                   // AVCFPlayerGetRate
     CopyObject_t CopyItemTracks = nullptr;         // AVCFPlayerItemCopyTracks
     CopyObject_t CopyItemTrackAsset = nullptr;     // AVCFPlayerItemTrackCopyAssetTrack
     CopyObject_t CopyAssetFormats = nullptr;       // AVCFAssetTrackCopyFormatDescriptions
@@ -140,6 +143,14 @@ std::atomic<bool> g_objectVolumeSeen{false};
 // The player Apple Music set a volume on last. Retained, and changed only under g_playerLock.
 std::mutex g_playerLock;
 void* g_player = nullptr;
+std::atomic<long long> g_lastSoundTicks{0};  // steady_clock ticks of the stereo stream's last audible block
+
+// True while the stereo stream carried sound in the last half second.
+bool SoundIsPlaying() {
+    long long last = g_lastSoundTicks.load(std::memory_order_relaxed);
+    auto recent = std::chrono::duration_cast<std::chrono::steady_clock::duration>(500ms).count();
+    return last != 0 && std::chrono::steady_clock::now().time_since_epoch().count() - last < recent;
+}
 
 // Stereo stream. The entries are read from IAudioClient and IAudioClient3, which can have separate vtables.
 using Initialize_t = HRESULT(STDMETHODCALLTYPE*)(IAudioClient*, AUDCLNT_SHAREMODE, DWORD, REFERENCE_TIME,
@@ -238,6 +249,7 @@ struct Playing {
     void* item = nullptr;  // retained
     std::string variant;   // its stable variant id; empty while the item loads
     bool started = false;  // the leveler knows what this item is
+    std::chrono::steady_clock::time_point stoppedSince{};  // when its player was seen stopped; empty while it plays
     double currentDb = 0;
     double reportedDb = 0;
     int polls = 0;
@@ -329,6 +341,7 @@ bool ResolveApi() {
     constexpr const wchar_t* av = L"AVFoundationCF.dll";
     constexpr const wchar_t* cf = L"CoreFoundation.dll";
     return Resolve(av, "AVCFPlayerCopyCurrentItem", g_api.CopyCurrentItem) &&
+           Resolve(av, "AVCFPlayerGetRate", g_api.GetRate) &&
            Resolve(av, "AVCFPlayerItemCopyTracks", g_api.CopyItemTracks) &&
            Resolve(av, "AVCFPlayerItemTrackCopyAssetTrack", g_api.CopyItemTrackAsset) &&
            Resolve(av, "AVCFAssetTrackCopyFormatDescriptions", g_api.CopyAssetFormats) &&
@@ -461,7 +474,27 @@ void FollowTrack() {
     if (!player) return;
 
     void* item = g_api.CopyCurrentItem(player);
+    bool stopped = !item || g_api.GetRate(player) == 0;
     g_api.CFRelease(player);
+
+    // The followed player stopped, and sound still plays well after: another song took over, on a player Apple Music
+    // set no volume on, so it is not followed. The followed song is over, and its gain with it. A pause silences the
+    // stream within kTakeoverWait, so it ends nothing.
+    auto now = std::chrono::steady_clock::now();
+    if (!stopped) {
+        g_playing.stoppedSince = {};
+    } else if (g_playing.stoppedSince == std::chrono::steady_clock::time_point{}) {
+        g_playing.stoppedSince = now;
+    }
+    if (stopped && now - g_playing.stoppedSince >= kTakeoverWait && SoundIsPlaying()) {
+        if (item) g_api.CFRelease(item);
+        if (g_playing.started) {
+            std::lock_guard<std::mutex> guard(g_levelerLock);
+            g_leveler->EndTrack();
+        }
+        g_playing.started = false;
+        return;
+    }
     if (!item) return;
 
     // A new item, or the same item on another variant, is a new track. A variant that goes empty again while
@@ -555,7 +588,10 @@ void __cdecl SetVolume_Hook(void* player, float volume) {
             g_player = player;
         }
     }
-    if (old) g_api.CFRelease(old);
+    if (old) {
+        g_api.CFRelease(old);
+        Note("following another player");
+    }
 }
 
 // --- WASAPI: stereo stream -----------------------------------------------------------------------
@@ -644,6 +680,10 @@ HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 fr
         bool silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0;
         if (data && !silent && count > 0 && g_meteredChannels.load() == 2) {
             float* samples = reinterpret_cast<float*>(data);
+            if (std::any_of(samples, samples + count * 2, [](float s) { return std::fabs(s) > 1e-4f; })) {
+                g_lastSoundTicks.store(std::chrono::steady_clock::now().time_since_epoch().count(),
+                                       std::memory_order_relaxed);
+            }
 
             {
                 // After the player volume: the leveler divides it out.

@@ -83,10 +83,12 @@ public static class AmpifyInput {
     }
 
     // Brings the window forward. Windows only lets the process that has the last input do it: a short Alt press
-    // gives this process that right first.
+    // gives this process that right first. Never into a window already in front: Apple Music would show its access
+    // keys, which swallow the next keys (Ctrl+, or Escape).
     public static bool Foreground(IntPtr hWnd) {
         if (hWnd == IntPtr.Zero) return false;
         if (IsIconic(hWnd)) ShowWindow(hWnd, 9);  // SW_RESTORE
+        if (GetForegroundWindow() == hWnd) return true;
         keybd_event(0x12, 0, 0, UIntPtr.Zero);
         keybd_event(0x12, 0, 2, UIntPtr.Zero);
         BringWindowToTop(hWnd);

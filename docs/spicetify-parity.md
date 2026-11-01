@@ -126,7 +126,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | Spicetify | Ampify | Status |
 |---|---|---|
 | `color.ini` (sections, named colors) | `color.ini` or `colors.ini`, read as it is and translated to Apple Music elements and Fluent brushes ([themes/spicetify.md](themes/spicetify.md)) | Done |
-| `user.css` (free rules) | `user.css`: a CSS subset with XAML type and `x:Name` selectors, `:hover`, `:active`, `:focus`, `:root` variables, gradients, acrylic, transforms, shadows, grid placement ([themes/format.md](themes/format.md)). Spotify's own `user.css` cannot apply, since the HTML classes it targets do not exist | Different |
+| `user.css` (free rules) | `user.css`: a CSS subset with XAML type and `x:Name` selectors, `:hover`, `:active`, `:focus`, `:root` variables, gradients, acrylic, transforms, shadows, transitions, `@keyframes` animations, grid placement ([themes/format.md](themes/format.md)). Spotify's own `user.css` cannot apply, since the HTML classes it targets do not exist | Different |
 | `theme.js` | The theme's `main.js`, run as an extension while the theme is active | Done |
 | Color schemes (`[Base]`, `[Dark]`) | Sections of `colors.ini`, `theme.scheme`, `auto` (follows Windows) and `theme.schedule` (follows the time) | Done |
 | Theme parts | `theme.parts.*` | Done |

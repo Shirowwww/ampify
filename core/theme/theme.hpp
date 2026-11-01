@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 
+#include "animation.hpp"
 #include "color.hpp"
 #include "css.hpp"
 #include "files.hpp"
@@ -91,6 +92,8 @@ struct Theme {
     std::map<std::string, std::string> variables;
     // The font roles the theme sets itself, by canonical role name (see fonts.hpp).
     std::map<std::string, FontRole> fonts;
+    // The @keyframes blocks of user.css by name, which `animation` runs. A snippet also sees those of the active theme.
+    KeyframeSets keyframes;
 
     // French messages with the file and the line. Problems that do not stop the theme are listed here too.
     std::vector<std::string> problems;

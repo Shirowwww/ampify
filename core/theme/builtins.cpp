@@ -292,6 +292,13 @@ constexpr std::string_view kBottomBar = R"css(
     horizontal-alignment: left;
 }
 
+/* Apple Music pins the Lossless and Dolby Atmos badge to the display's top left corner, clear of its centred title.
+   The title starts there now, so the badge moves to the other corner, just before the favourite star. */
+.audio-badge {
+    horizontal-alignment: right;
+    margin: 2 36 2 1;
+}
+
 /* Volume, lyrics and queue at the right end of the bar. */
 .playbar-toggles {
     horizontal-alignment: right;

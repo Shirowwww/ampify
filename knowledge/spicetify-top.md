@@ -53,21 +53,23 @@ effect has to be taught to the engine once.
 
 ## What is still missing, by impact
 
-Updated on 2026-10-31 (see [spicetify-ecosystem.md](spicetify-ecosystem.md) for the counts behind this order).
+Updated on 2026-11-01 (see [spicetify-ecosystem.md](spicetify-ecosystem.md) for the counts behind this order).
 
-1. **Animations**: `@keyframes` (11 of 18 themes). `:active` and `:focus` (13) are done.
-2. **Names for states and sub-parts**: selected and playing rows, the parts of the progress bar, the action bar and the
+1. **Names for states and sub-parts**: selected and playing rows, the parts of the progress bar, the action bar and the
    header background of album pages, lyrics lines, scrollbars, context menus.
-3. **Apple's own player views**: the mini player and the full-screen player, with karaoke lyrics, live in a second window
+2. **Apple's own player views**: the mini player and the full-screen player, with karaoke lyrics, live in a second window
    that themes do not reach ([apple-music-native-views.md](apple-music-native-views.md)). Ampify's Now Playing exists but
    is simpler.
-4. **An animated background** (a warped artwork that moves, Kawarp): needs a Composition effect.
+3. **An animated background** (a warped artwork that moves, Kawarp): needs a Composition effect.
+4. **Animations of other properties**: `@keyframes` animate opacity and transform only, and the artworks Apple Music
+   moves itself refuse an animated transform. Spicetify themes also animate colours and backgrounds.
 5. **Spotify's CSS does not translate:** it targets HTML classes that do not exist in Apple Music. A Spicetify theme keeps
    its colors, not its layout.
 
-Done since the first survey: transitions (`transition`, see [docs/themes/format.md](../docs/themes/format.md)), names for
-cards, shelves and album headers ([docs/themes/names.md](../docs/themes/names.md)), the player on the kernel side, and a
-full-window Now Playing view.
+Done since the first survey: transitions (`transition`) and `@keyframes` animations (11 of 18 themes use them, see
+[docs/themes/format.md](../docs/themes/format.md)), `:active` and `:focus` (13), names for cards, shelves and album
+headers ([docs/themes/names.md](../docs/themes/names.md)), the player on the kernel side, and a full-window Now Playing
+view.
 
 Images looked at (addresses on the date of the survey): Hazy `github.com/Astromations/Hazy/raw/main/hazy_home.png`, Comfy
 `github.com/Comfy-Themes/Spicetify/raw/main/images/preview.png`, Lucid

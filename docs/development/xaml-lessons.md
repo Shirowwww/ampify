@@ -76,6 +76,15 @@ keys into the control's resources works before and after the groups exist.
 Names from WinUI templates (`Grid#RootGrid`, `Grid#LayoutRoot`, `Border#Root`, `ContentPresenter#ContentPresenter`) appear
 dozens of times. Always target them under a named parent.
 
+## Animations
+
+| Problem | Cause | Fix |
+|---|---|---|
+| An element with a theme `transform` refused its `@keyframes` rotation; most artworks refused an animated scale | `UIElement.Scale`, `Rotation`, `Translation` and `CenterPoint` cannot be used with `RenderTransform` or `RenderTransformOrigin` on the same element: `StartAnimation` throws. Apple Music moves many artworks itself. `Opacity` is not part of the rule | The animation is refused with a line in the log, and `format.md` tells creators to put the transform in the stops |
+| A finite animation without `forwards` stayed on its last frame | A completed composition animation leaves the property at its final value | It runs with `IterationBehavior::Forever` and `StopBehavior::SetToInitialValue`, and a `DispatcherQueueTimer` stops it when its iterations end |
+| Rotation around the top left corner | `CenterPoint` is 0,0 by default, and the element may not be laid out yet when the animation starts | An expression animation on `CenterPoint` reads `this.Target.ActualSize` (documented as an expression input), so the centre follows the size |
+| Text glyphs moved by `translate` vanished from the playback bar | The buttons clip their content | Not a bug: a theme should translate the button, not its glyph |
+
 ## Fonts and icons
 
 | Problem | Cause | Fix |

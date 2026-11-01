@@ -1,0 +1,15 @@
+/* Spinning artwork: the artwork of the playback bar turns like a record.
+   The compositor runs the animation on its own thread: it stays smooth while Apple Music loads a page.
+   Change --turn to make it faster or slower. */
+
+:root {
+    --turn: 24s;
+}
+
+.lcd-artwork-image {
+    animation: spin var(--turn) linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

@@ -191,6 +191,28 @@ Pitfalls found:
   the job writes what is on screen and the UIA tree to its log, so the names can be fixed.
 - **Atmos on a virtual output.** If the output does not offer the metadata stream, Apple Music plays the stereo version of
   the Atmos track. The case notes it (INFO) instead of failing.
+- **Names shared in French.** On a French Windows, "Lecture" names the Play buttons and also the Playback entry of
+  Settings. Settings entries and dialog buttons are found by AutomationId, which stays the same in every language:
+  `PlaybackNavigationViewItem` is the text of the Playback entry (its parent is the button), `PrimaryButton` and
+  `CloseButton` are the buttons of a dialog.
+- **Settings.** Ctrl+, opens them as a page of the main window. The sidebar's "More" button (`Sidebar_MoreButton`) opens
+  the library menu, which has no Settings entry.
+- **Dolby Atmos "Always on"** opens a confirmation ("Not supported on all speakers", with a "Don't show again" check box,
+  `AskUserCheckbox`). Escape cancels it and keeps the old value; the case presses the primary button.
+- **Disabled elements.** UI Automation's Invoke throws on a disabled element ("Unrecognized error"). In Apple Music 1.1792
+  the transport controls sit at the top of the window and stay disabled until a track is loaded (their Play button is
+  `TransportControl_PlayPauseStop`), and right after a start the Settings page shows its entries disabled for a few
+  seconds. The scripts leave the first aside and wait for the second.
+- **Forced kills in a row.** Killing Apple Music several times in a row can leave it unable to open its library (error
+  9039) or stuck on a loading spinner. A normal start without Ampify, then a normal close, brings it back.
+- **Access keys.** An Alt press shows Apple Music's access keys, which swallow the next keys (Ctrl+, or Escape).
+  `Show-AppleMusicWindow` presses Alt only when another window is in front, and Settings open with Escape, then Ctrl+,.
+- **Saved on close.** Apple Music saves a changed setting when it closes normally; a forced kill can lose it.
+  `Close-AppleMusic` closes the window first.
+- **Volume slider.** In Apple Music 1.1792 the slider lives in a flyout and is not in the tree while it is closed, so the
+  "volume slider unchanged" check is skipped.
+- **PowerShell 7.** The scripts are UTF-8 without a BOM: Windows PowerShell 5.1 misreads their accented names. Run them
+  with `pwsh`.
 - **Secrets.** Masked in the log. The kernel is never loaded during sign-in. No screenshot is taken between typing the
   identifier and the confirmed sign-in.
 - Every sign-in attempt alerts the account's devices, so automatic runs must not type a password on their own.

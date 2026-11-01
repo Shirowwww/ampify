@@ -17,7 +17,6 @@ $script:Patterns = @{
     Onboarding = '^(Continue|Continuer|Agree|Accepter|J.accepte|Get Started|Commencer|OK)$'
     Play = '^(Play|Lire|Lecture)$'
     Pause = '^(Pause)$'
-    Settings = '^(Settings|Réglages|Paramètres|Preferences|Préférences)$'
     Playback = '^(Playback|Lecture)$'
     Subscribe = 'Try It Free|Try it free|Essai gratuit|Join Apple Music|Rejoindre Apple Music|S.abonner|Subscribe'
 }
@@ -96,8 +95,11 @@ function Start-TrackPlayback {
         if (Wait-Until -TimeoutSeconds 20 -Condition $Started) { return "double click on `"$($Track.Title)`"" }
     }
 
-    # The page's own Play button is the one highest on screen (the player bar sits at the bottom).
-    $plays = @(Find-Element -NamePattern $script:Patterns.Play -ControlType 'Button' -All -VisibleOnly)
+    # The page's own Play button is the highest one left once the player bar's are set aside (TransportControl_*: they
+    # only resume what is loaded, and stay disabled until then, when UI Automation's Invoke throws on them).
+    $plays = @(Find-Element -NamePattern $script:Patterns.Play -ControlType 'Button' -All -VisibleOnly -Where {
+        param($e) $e.Current.IsEnabled -and $e.Current.AutomationId -notlike 'TransportControl_*'
+    })
     $top = $plays | Sort-Object { $_.Current.BoundingRectangle.Y } | Select-Object -First 1
     if ($top) {
         Invoke-Click -Element $top | Out-Null
@@ -120,59 +122,77 @@ function Start-TrackPlayback {
     return $null
 }
 
-# Opens Apple Music's Settings: the Settings entry of the sidebar or of the account menu, else Ctrl+, (the shortcut of
-# Apple's apps). Returns the element tree root holding the Settings page, or $null.
+# The Playback entry of Apple Music's Settings page, as the button to click, or $null. Found by the AutomationId of its
+# text, which does not change with the language: in French, "Lecture" also names every Play button. Returned once
+# enabled: while Apple Music is still loading, the page shows its entries disabled, and Invoke throws on them.
+function Find-SettingsPlaybackEntry {
+    param([int]$TimeoutSeconds = 0)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ($true) {
+        $text = Find-Element -AutomationId 'PlaybackNavigationViewItem' -VisibleOnly
+        $entry = if ($text) { [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($text) } else { $null }
+        if ($entry -and $entry.Current.IsEnabled) { return $entry }
+        if ((Get-Date) -ge $deadline) { return $null }
+        Start-Sleep -Milliseconds 500
+    }
+}
+
+# Opens Apple Music's Settings with Ctrl+, (the shortcut of Apple's apps). Returns the element tree root holding the
+# Settings page, or $null.
 function Open-AppleMusicSettings {
     Show-AppleMusicWindow | Out-Null
-    $entry = Find-Element -NamePattern $script:Patterns.Settings -TimeoutSeconds 5
-    if (-not $entry) {
-        # The account / "more" menu usually holds Settings.
-        $menu = Find-Element -ControlType 'Button' -NamePattern '^(More|Plus|Account|Compte|\.\.\.|…)' -TimeoutSeconds 3
-        if ($menu) {
-            Invoke-Click -Element $menu | Out-Null
-            $entry = Find-Element -NamePattern $script:Patterns.Settings -TimeoutSeconds 5
-        }
-    }
-    if ($entry) {
-        Invoke-Click -Element $entry | Out-Null
-    } else {
+    # Escape first: access keys left on screen by an Alt press swallow the shortcut. The second try covers a window that
+    # did not have the keyboard yet.
+    foreach ($attempt in 1..2) {
+        Send-Key Escape
         [AmpifyInput]::SendChord([uint16[]]@(0x11, 0xBC))  # Ctrl + ,
+        if (Find-SettingsPlaybackEntry -TimeoutSeconds 15) { return Get-UiaMainWindow }
     }
-    Start-Sleep -Seconds 3
-    if (Find-Element -NamePattern $script:Patterns.Playback -TimeoutSeconds 10) { return Get-UiaMainWindow }
     return $null
 }
 
 # Sets Apple Music's own "Dolby Atmos" playback setting to "Always On" through its Settings, as a user would: on a
-# device Apple Music does not know as Atmos-capable, "Automatic" plays the stereo version. Best effort; returns a
-# sentence for the report.
+# device Apple Music does not know as Atmos-capable, "Automatic" plays the stereo version. Best effort: returns a
+# sentence for the report, which also carries a failure instead of stopping the case.
 function Set-AppleMusicAtmosAlwaysOn {
-    $settings = Open-AppleMusicSettings
-    if (-not $settings) { return 'Settings not found' }
-    $playback = Find-Element -NamePattern $script:Patterns.Playback -VisibleOnly
-    if ($playback) { Invoke-Click -Element $playback | Out-Null; Start-Sleep -Seconds 2 }
-    $combo = Find-Element -ControlType 'ComboBox' -VisibleOnly -Where { param($e) $e.Current.Name -match 'Atmos' -or $e.Current.AutomationId -match 'Atmos' }
-    if (-not $combo) {
+    try {
+        $settings = Open-AppleMusicSettings
+        if (-not $settings) { return 'Settings not found' }
+        $playback = Find-SettingsPlaybackEntry
+        if ($playback) { Invoke-Click -Element $playback | Out-Null; Start-Sleep -Seconds 2 }
+        $combo = Find-Element -ControlType 'ComboBox' -VisibleOnly -Where { param($e) $e.Current.Name -match 'Atmos' -or $e.Current.AutomationId -match 'Atmos' }
+        if (-not $combo) {
+            Send-Key Escape
+            return '"Dolby Atmos" list not found on the Playback page'
+        }
+        $expand = $null
+        if ($combo.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$expand)) {
+            $expand.Expand()
+        } else {
+            Invoke-Click -Element $combo -Mouse | Out-Null
+        }
+        Start-Sleep -Seconds 1
+        $choice = Find-Element -ControlType 'ListItem' -NamePattern '^(Always On|Always on|Toujours activé|Toujours activée|Toujours)$' -TimeoutSeconds 5
+        $result = if ($choice) { "`"$($choice.Current.Name)`" chosen ($(Invoke-Click -Element $choice))" } else { '"Always On" choice not found' }
+        Start-Sleep -Seconds 1
+        if ($expand) { try { $expand.Collapse() } catch { } }
+        # Unless the user turned that message off, Apple Music asks to confirm ("Not supported on all speakers"). Its
+        # primary button keeps the choice; the Escape below would cancel it.
+        $confirm = if ($choice) { Find-Element -ControlType 'Button' -AutomationId 'PrimaryButton' -TimeoutSeconds 3 } else { $null }
+        if ($confirm) {
+            $result += "; confirmed with `"$($confirm.Current.Name)`" ($(Invoke-Click -Element $confirm))"
+            Start-Sleep -Seconds 1
+        }
+        $selection = $null
+        if ($combo.TryGetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern, [ref]$selection)) {
+            $current = @($selection.Current.GetSelection() | ForEach-Object { $_.Current.Name }) -join ', '
+            $result += "; value shown: $current"
+        }
         Send-Key Escape
-        return '"Dolby Atmos" list not found on the Playback page'
+        Start-Sleep -Seconds 1
+        return $result
+    } catch {
+        $where = ($_.ScriptStackTrace -split '\r?\n' | Select-Object -First 2) -join ' <- '
+        return "not set, set it by hand in Settings > Playback: $($_.Exception.Message) ($where)"
     }
-    $expand = $null
-    if ($combo.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$expand)) {
-        $expand.Expand()
-    } else {
-        Invoke-Click -Element $combo -Mouse | Out-Null
-    }
-    Start-Sleep -Seconds 1
-    $choice = Find-Element -ControlType 'ListItem' -NamePattern '^(Always On|Always on|Toujours activé|Toujours activée|Toujours)$' -TimeoutSeconds 5
-    $result = if ($choice) { "`"$($choice.Current.Name)`" chosen ($(Invoke-Click -Element $choice))" } else { '"Always On" choice not found' }
-    Start-Sleep -Seconds 1
-    if ($expand) { try { $expand.Collapse() } catch { } }
-    $selection = $null
-    if ($combo.TryGetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern, [ref]$selection)) {
-        $current = @($selection.Current.GetSelection() | ForEach-Object { $_.Current.Name }) -join ', '
-        $result += "; value shown: $current"
-    }
-    Send-Key Escape
-    Start-Sleep -Seconds 1
-    return $result
 }

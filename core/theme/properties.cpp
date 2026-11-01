@@ -10,7 +10,7 @@ namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 37> kProperties{{
+constexpr std::array<PropertySpec, 38> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
@@ -48,6 +48,7 @@ constexpr std::array<PropertySpec, 37> kProperties{{
     {"transform-origin", "RenderTransformOrigin", PropertyKind::TransformOrigin},
     {"box-shadow", "Shadow", PropertyKind::Shadow},
     {"transition", "Transition", PropertyKind::Transition},
+    {"animation", "Animation", PropertyKind::Animation},
 }};
 
 std::string_view Trimmed(std::string_view text) {
@@ -712,6 +713,13 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
             return ConvertShadow(raw);
         case PropertyKind::Transition:
             return ConvertTransition(raw);
+        case PropertyKind::Animation: {
+            static const KeyframeSets kNone;
+            std::string problem;
+            std::optional<std::string> text = AnimationValue(raw, context.keyframes ? *context.keyframes : kNone, &problem);
+            if (!text) return Fail(problem);
+            return Ok(ValueKind::Animation, std::move(*text));
+        }
     }
     return Fail("unknown property type");
 }

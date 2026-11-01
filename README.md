@@ -4,8 +4,13 @@ Themes, extensions and apps for Apple Music on Windows. Ampify does for the offi
 Spicetify does for Spotify: you change how it looks and add features, and Apple Music keeps everything it already
 does (lossless, Dolby Atmos, lyrics, your library, sync).
 
-> Early days: Ampify runs on a test PC with Apple Music 1.1792.39682.0 (from the Microsoft Store) and on the
-> Windows CI bench. It is not released yet.
+> [!WARNING]
+> **Experimental.** Ampify changes a running Apple Music in memory. It is a personal project tested on a few PCs, so
+> expect rough edges. The usual Apple Music icon always starts Apple Music without Ampify.
+
+Version 1.0.1, for Apple Music 1.1792 and 1.1540 from the Microsoft Store. On any other Apple Music version the kernel
+stays inactive until that version has been tested, so an Apple update never breaks the app. What changed:
+[CHANGELOG.md](CHANGELOG.md).
 
 ## What you get
 
@@ -26,7 +31,8 @@ does (lossless, Dolby Atmos, lyrics, your library, sync).
 ## Install
 
 1. Close Apple Music.
-2. Download the latest `ampify-<version>-windows-x64.zip`, right-click it, Extract all.
+2. Download `ampify-1.0.1-windows-x64.zip` from the [Releases](https://github.com/Shirowwww/ampify/releases) page,
+   right-click it, Extract all.
 3. Run `ampify_setup.exe`. Windows SmartScreen may warn that the app is not signed yet: More info, Run anyway.
 4. Start **Apple Music with Ampify** from the Start menu.
 
@@ -51,7 +57,7 @@ ampify extension enable sleep-timer
 ampify doctor
 ```
 
-All commands: [docs/cli.md](docs/cli.md).
+All commands: [docs/cli.md](docs/cli.md). A longer walk-through: [docs/getting-started.md](docs/getting-started.md).
 
 ## Make your own
 

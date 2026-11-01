@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 
+#include "animation.hpp"
 #include "color.hpp"
 #include "files.hpp"
 #include "tree.hpp"
@@ -32,6 +33,8 @@ enum class PropertyKind {
     TransformOrigin,  // one or two percentages or keywords (left, center, right, top, bottom)
     Shadow,      // a depth in pixels from 0 to 100 (ThemeShadow and Translation Z), or none
     Transition,  // `<property> <duration> [easing], ...` for transform, opacity, background or all; or none
+    Animation,   // `<name> <duration> [easing] [delay] [count] [direction] [fill], ...` running @keyframes blocks of
+                 // the theme (animation.hpp); or none
 };
 
 struct PropertySpec {
@@ -51,6 +54,7 @@ struct ValueContext {
     FileSource& files;
     std::string folder;  // absolute theme folder, with '/' separators, prefixed to image paths
     bool allowImages = true;  // false when the assets part is off: url(...) images are refused
+    const KeyframeSets* keyframes = nullptr;  // the theme's @keyframes, which `animation` names; none when null
 };
 
 // The outcome of converting one CSS value: a typed value, or an English explanation for the log.

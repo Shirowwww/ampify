@@ -176,6 +176,9 @@ Other points:
 - A `transition` is handed to XAML's own implicit transitions, so the compositor animates the change. A transform
   that animates goes through `UIElement.Scale`, `Rotation` and `Translation`, around the centre unless the theme
   chooses another origin.
+- An `animation` becomes composition keyframe animations of the same properties and `Opacity`, started with
+  `UIElement.StartAnimation` (`win/theme_animations.cpp`). The engine writes it after the element's other values, so it
+  starts from the theme's opacity and turns around the theme's origin.
 
 The engine is portable C++ in `core/theme/` and is tested on Linux. `win/theme_service.cpp` and `win/xaml_backend.cpp`
 connect it to WinUI. Formats: [themes/format.md](themes/format.md).

@@ -1,9 +1,17 @@
 # Changelog
 
-## 1.0.0 (unreleased)
+## 1.0.1 (2026-11-01)
+
+- The Atmos leveler ends a song when its player stops while another song plays. Apple Music does not set a volume on
+  every player, so the leveler did not always see the next song: the song before was never measured, and its gain
+  could stay on. A song the leveler does not see is still not measured.
+- `logs\AppleMusic.log` keeps its lines when Apple Music opens a `music://` link: the short second Apple Music process
+  adds to the log instead of emptying it.
+
+## 1.0.0 (2026-11-01)
 
 The first complete version: themes, extensions, apps, snippets, the Marketplace and the `ampify` command line, each
-checked in Apple Music. It is not published yet: it waits for a listening check of the Atmos leveler.
+checked in Apple Music.
 
 ### Included
 
@@ -21,9 +29,11 @@ checked in Apple Music. It is not published yet: it waits for a listening check 
   (play bar at the bottom), Artwork, Glass and Midnight. A button keeps the theme's colours under the pointer and while
   pressed (Greenroom's white play button used to turn black when clicked). Rules accept `border-radius` as well as
   `corner-radius`, and `min-width`, `max-width`, `min-height`, `max-height`, `compact-pane-length`, and values can
-  use `calc()`. `@media` rules follow the window's size. In a narrow window, `floating-panels` keeps the folded
+  use `calc()`. `@media` rules follow the window's size. `@keyframes` and `animation` animate opacity and transform
+  on the compositor, under `:hover` too; the `spinning-artwork` snippet turns the playback bar's artwork like a record. In a narrow window, `floating-panels` keeps the folded
   sidebar at Apple Music's 48 pixels, whole, with the same gap to the pages as when it is open, and `bottom-bar` keeps
-  the song in view. The window's own buttons
+  the song in view, with the Lossless and Dolby Atmos badge at the far end of the display, clear of the title. The
+  window's own buttons
   (minimize, maximize, close) follow the theme's light or dark mode: they were black on dark themes on a PC in light
   mode.
 - The inspector shows what each element's visual states change. It no longer walks Apple Music's resource dictionaries,
@@ -127,7 +137,10 @@ icon, side panels and windows, ES modules, and the engine process (`processes: [
   (`core/version_gate.hpp`, or the `versions.txt` downloaded by `ampify versions update`). On any other version, Apple Music
   opens normally with no mods.
 - The places of panels, of the Ampify card and of the theme choice may still move.
-- The Atmos leveler passed the automated tests, and still needs a listening check on a real PC.
+- The Atmos leveler was checked by ear on a PC with Dolby Atmos. When several songs are started one after the other,
+  it can miss some of them: those songs are not measured.
+- `logs\AppleMusic.log` starts over when Apple Music opens a `music://` link, because Windows runs a short second
+  Apple Music process for it.
 - On Apple Music 1.1792, Apple keeps the cover's address internal, so `track.artwork` is empty (Now Playing takes the
   cover from the iTunes Search API), and Apple's lyrics only come once its lyrics panel has been open for the song.
 - Apple Music builds its queue the first time its "Up Next" panel opens in a session: until then

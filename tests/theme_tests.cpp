@@ -14,6 +14,7 @@
 #include "../core/json.hpp"
 #include "../core/manifest.hpp"
 #include "../core/settings.hpp"
+#include "../core/theme/animation.hpp"
 #include "../core/theme/builtins.hpp"
 #include "../core/theme/color.hpp"
 #include "../core/theme/colour_keys.hpp"
@@ -3015,4 +3016,82 @@ TEST_CASE(Engine_NewPropertiesRestoreExactly) {
     engine.Restore(tree);
     CHECK(tree.elements[0].properties == before);
     CHECK(tree.elements[1].properties["Background"].text == "#FFFFFFFF");
+}
+
+TEST_CASE(Theme_KeyframesGiveTracksToTheAnimationsThatNameThem) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        ":root { --turn: 360deg; }\n"
+        "TextBlock { animation: pulse 2s infinite alternate; }\n"
+        "@keyframes pulse {\n"
+        "    from { opacity: 1; transform: scale(1) }\n"
+        "    to { opacity: .6; transform: scale(1.05) rotate(var(--turn)) }\n"
+        "}\n"
+        "@keyframes glow { to { background: red } }\n"
+        "Grid { animation: glow 1s }\n";
+    th::Theme theme = Load(files);
+
+    using Channel = th::AnimationTrack::Channel;
+    auto pulse = theme.keyframes.find("pulse");
+    CHECK(pulse != theme.keyframes.end());
+    if (pulse != theme.keyframes.end()) {
+        // No translation track: it stays at none in every stop.
+        CHECK(pulse->second == (th::KeyframeTracks{{Channel::Opacity, {{0, 1, 0}, {1, 0.6, 0}}},
+                                                   {Channel::Scale, {{0, 1, 1}, {1, 1.05, 1.05}}},
+                                                   {Channel::Rotation, {{0, 0, 0}, {1, 360, 0}}}}));
+    }
+    CHECK(!ProblemContaining(theme, "\"background\" does not animate").empty());
+    CHECK(!ProblemContaining(theme, "animates nothing").empty());  // glow
+    CHECK(theme.assignments.size() == 1);
+    if (theme.assignments.size() == 1) {
+        CHECK(theme.assignments[0].property == "Animation");
+        std::optional<std::vector<th::Animation>> animations = th::DecodeAnimations(theme.assignments[0].value.text);
+        CHECK(animations && animations->size() == 1 && (*animations)[0].tracks == pulse->second);
+    }
+
+    // A snippet runs the keyframes of the theme it is applied on.
+    MemoryFiles snippetFiles;
+    snippetFiles.files["user.css"] = "Border { animation: pulse 1s }\n";
+    th::Theme snippet = th::LoadSnippet("glow", "C:/snippets/glow", snippetFiles, &theme);
+    CHECK(snippet.problems.empty());
+    CHECK(snippet.assignments.size() == 1 && snippet.assignments[0].value.kind == th::ValueKind::Animation);
+}
+
+TEST_CASE(Engine_StartsAnAnimationOnceAndTakesItOffWithTheTheme) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "#Cover { animation: spin 20s linear infinite; }\n"
+        "@keyframes spin { to { transform: rotate(360deg) } }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+
+    FakeTree tree;
+    th::NodeId cover = tree.Add(-1, "Image", "Cover", {{"Animation", {th::ValueKind::Animation, ""}}});
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    th::ThemeEngine::Report report = engine.Apply(theme, tree);
+    CHECK(report.applied == 1 && report.refused == 0);
+    std::optional<std::vector<th::Animation>> running = th::DecodeAnimations(tree.Shown(cover, "Animation").text);
+    CHECK(running && running->size() == 1 && (*running)[0].iterations == 0);
+    CHECK(engine.Apply(theme, tree).applied == 0);  // the same animation is not started again
+    engine.Restore(tree);
+    CHECK(tree.Shown(cover, "Animation").text.empty());
+}
+
+TEST_CASE(Engine_SaysWhyAnElementRefusesAnAnimation) {
+    MemoryFiles files;
+    files.files["user.css"] = "#Play { animation: pop 1s }\n@keyframes pop { 50% { transform: scale(1.2) } }\n";
+    th::Theme theme = Load(files);
+
+    FakeTree tree;
+    tree.Add(-1, "AppBarButton", "Play", {{"Animation", {th::ValueKind::Animation, ""}}});
+    tree.refusedProperties.insert("Animation");
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    CHECK(engine.Apply(theme, tree).refused == 1);
+    CHECK(log.str().find("\"AppBarButton#Play\" refused the animation") != std::string::npos);
 }

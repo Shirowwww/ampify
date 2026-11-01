@@ -195,6 +195,7 @@ divided by another.
 | `transform-origin` | `RenderTransformOrigin` | One or two values: percentages, or `left`, `center`, `right`, `top`, `bottom` |
 | `box-shadow` | `Shadow` and `Translation` | A depth from 0 to 100 pixels, or `none` (see "Shadows") |
 | `transition` | `OpacityTransition`, `BackgroundTransition`, `ScaleTransition`... | `<property> <duration>, ...` for `transform`, `opacity`, `background` or `all`, or `none` (see "Transitions") |
+| `animation` | Composition animations of `Opacity`, `Scale`, `Rotation`, `Translation` | `<name> <duration> [easing] [delay] [count] [direction] [fill], ...` running a `@keyframes` block, or `none` (see "Animations") |
 | `font-role` | `FontFamily`, `FontWeight`, `FontSize` | A font role, for example `title` (see "Font roles") |
 
 A property that does not exist on an element is refused without harm. The log reports it once. Like all others, these
@@ -489,6 +490,52 @@ HoverGrid#SquareLockupContent:hover {
   `transform-origin`, instead of `RenderTransform`.
 - `background` animates between plain colors only (a gradient, an image or acrylic changes at once).
 - Removing the theme gives the element back the transitions it had before.
+
+### Animations
+
+`@keyframes` describes a movement and `animation` runs it, as in CSS:
+
+```css
+.lcd-artwork-image {
+    animation: spin 20s linear infinite;
+}
+
+.play-button:hover {
+    animation: breathe 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes breathe {
+    to { transform: scale(1.08); opacity: .8; }
+}
+```
+
+- A stop is `from`, `to` or a percentage; several can share a block (`0%, 100% { ... }`). Stops animate `opacity` and
+  `transform` (`scale`, `rotate`, `translate`), with `var()` and `calc()` as anywhere else. Any other property is
+  reported and skipped: Apple Music's compositor animates these two on its own thread, so an animation stays smooth
+  while the app loads a page.
+- A property missing from the first or the last stop starts or ends at the element's own value. The parts of a
+  transform that stay at `none` in every stop are left as they are.
+- `animation` takes, in any order: the name of the block, a duration, an easing (`linear`, `ease`, `ease-in`,
+  `ease-out`, `ease-in-out` or `cubic-bezier(x1, y1, x2, y2)`), a delay (the second time), a count (a whole number or
+  `infinite`), a direction (`normal`, `reverse`, `alternate`, `alternate-reverse`) and a fill mode (`none`,
+  `forwards`, `backwards`, `both`). Up to 4 animations go in one value, separated by commas. `none` stops them.
+- Durations and delays go up to 120 s. `steps()`, negative delays and `paused` are refused, with the reason in the
+  problems list.
+- Scale and rotation turn around the element's `transform-origin`, the centre unless the theme sets one. The centre
+  follows the element when its size changes.
+- An animation starts when its rule first applies to the element, and under `:hover`, `:active` or `:focus` each time
+  the state begins. A finite animation ends on the element's own values, or stays on its last frame with `forwards`.
+- `@keyframes` inside `@media` are not read. A snippet can run the `@keyframes` of the active theme.
+- Opacity animates on any element. Some elements refuse an animated transform: the ones Apple Music moves itself (many
+  artworks), and the ones the theme also gives a `transform`. The log says so once per element; put that transform in
+  the stops instead.
+- With "Animation effects" turned off in Windows (Settings > Accessibility > Visual effects), animations do not run.
+  The setting is read when an animation starts.
+- Removing the theme stops every animation and gives each element its values back.
 
 ### Theme fonts
 

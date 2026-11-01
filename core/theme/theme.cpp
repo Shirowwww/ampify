@@ -324,8 +324,18 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
     Stylesheet sheet = ParseStylesheet(css);
     for (const std::string& problem : sheet.problems) theme.problems.push_back(source.file + " " + problem);
 
-    // Variables first: as in CSS, a rule may use a variable that a :root block defines further down.
+    // Variables first: as in CSS, a rule may use a variable that a :root block defines further down. The @keyframes
+    // too: an `animation` may name a block written after it.
     LoadVariables(sheet, context, source, theme);
+    for (const Keyframes& block : sheet.keyframes) {
+        std::vector<std::pair<int, std::string>> problems;
+        theme.keyframes[block.name] = ReadKeyframes(block, context, theme.variables, problems);
+        for (const auto& [line, problem] : problems) {
+            theme.problems.push_back(AtLine(source.file, line) + ": " + problem + ", ignored");
+        }
+    }
+    ValueContext rules = context;
+    rules.keyframes = &theme.keyframes;
 
     int order = 0;
     for (const Rule& rule : sheet.rules) {
@@ -359,7 +369,7 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
                 continue;
             }
 
-            Conversion conversion = ConvertValue(*spec, *raw, context);
+            Conversion conversion = ConvertValue(*spec, *raw, rules);
             if (!conversion.value) {
                 theme.problems.push_back(AtLine(from.file, declaration.line) + ": " + conversion.problem +
                                          ", ignored");
@@ -420,6 +430,7 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
     if (base) {
         snippet.palette = base->palette;
         snippet.variables = base->variables;
+        snippet.keyframes = base->keyframes;
     }
 
     if (files.Exists("colors.ini")) {

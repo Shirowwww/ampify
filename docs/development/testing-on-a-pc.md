@@ -198,8 +198,10 @@ pwsh -File scripts\listen-test.ps1
 
 Close Apple Music first and sign in. The script builds the bench kit folder, then plays "Take Five" (stereo) for 45 s,
 "bad guy" (Dolby Atmos) for 45 s, and "Take Five" again, with the kernel and the leveler. It sets Apple Music's Dolby Atmos
-setting to "Always on". It reads the volume slider before and after (it must not move) and checks the logs. Sound plays:
-listen for a similar perceived loudness between the two. The report prints at the end and is saved in `results\report.md`.
+setting to "Always on" and accepts Apple Music's warning; the setting stays that way afterwards (Settings > Playback to
+change it back). It reads the volume slider before and after (it must not move) and checks the logs. Recent versions keep
+the slider in a flyout, so the report may skip that check: watch the volume yourself. Sound plays: listen for a similar
+perceived loudness between the two. The report prints at the end and is saved in `results\report.md`.
 The `-Storefront` parameter sets the store country code of the account (`fr` by default).
 
 ## JavaScript extension

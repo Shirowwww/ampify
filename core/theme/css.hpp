@@ -25,7 +25,8 @@ namespace ampify::theme {
 // `var(--name, fallback)`. The variables named --font-<role> describe the font roles (see fonts.hpp).
 //
 // `@media (max-width: 1200px) { ... }` holds rules that apply only while the window has that size: min-width,
-// max-width, min-height and max-height, joined by `and`. Other at-rules are skipped whole.
+// max-width, min-height and max-height, joined by `and`. `@keyframes name { ... }` describes an animation, which the
+// `animation` property runs (animation.hpp). Other at-rules are skipped whole.
 
 // The condition of an @media block, on the window's size in device-independent pixels, bounds included.
 struct MediaQuery {
@@ -87,8 +88,22 @@ struct Rule {
     std::optional<MediaQuery> media;  // the condition of the @media block around the rule
 };
 
+// One stop of a @keyframes block: `from`, `to` or percentages, several joined by commas, and its declarations.
+struct KeyframeStop {
+    std::vector<double> offsets;  // from 0 to 1: `from` is 0, `50%` is 0.5, `to` is 1
+    std::vector<Declaration> declarations;
+    int line = 0;
+};
+
+struct Keyframes {
+    std::string name;
+    std::vector<KeyframeStop> stops;
+    int line = 0;
+};
+
 struct Stylesheet {
     std::vector<Rule> rules;
+    std::vector<Keyframes> keyframes;  // in file order (`@-webkit-keyframes` counts as `@keyframes`)
     std::vector<std::string> problems;  // with the line number. A bad rule is skipped, the others still load.
 };
 

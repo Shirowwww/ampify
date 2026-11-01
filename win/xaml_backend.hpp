@@ -30,6 +30,7 @@
 
 #include "../core/theme/hover.hpp"
 #include "../core/theme/tree.hpp"
+#include "theme_animations.hpp"
 
 namespace ampify::win {
 
@@ -116,6 +117,8 @@ private:
                          const theme::Value& value);
     bool WriteAnimatedTransform(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element,
                                 const theme::Value& value);
+    // The theme's transform-origin of the element: RenderTransformOrigin, or the origin it refused (m_facadeOrigins).
+    winrt::Windows::Foundation::Point OriginOf(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element) const;
     void SchedulePass(int followUps) noexcept;
     void RunPass() noexcept;
     bool LearnPopups(const winrt::Microsoft::UI::Xaml::XamlRoot& root);
@@ -241,6 +244,7 @@ private:
     // The origins an element refused because its transform goes through Scale and Translation: the facade turns
     // around them instead (WriteAnimatedTransform).
     std::map<theme::NodeId, winrt::Windows::Foundation::Point> m_facadeOrigins;
+    ThemeAnimations m_animations;  // `animation`
 };
 
 }  // namespace ampify::win

@@ -29,7 +29,7 @@ Register-Case -Id 'ui-tree' -Title 'UI Automation tree of the main window and of
     }
 
     # The Settings pages are the items next to "Playback" (same parent).
-    $playback = Find-Element -NamePattern $script:Patterns.Playback -VisibleOnly
+    $playback = Find-SettingsPlaybackEntry
     $pages = @()
     if ($playback) {
         $parent = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($playback)
@@ -54,7 +54,7 @@ Register-Case -Id 'ui-tree' -Title 'UI Automation tree of the main window and of
         }
     }
 
-    $playback = Find-Element -NamePattern $script:Patterns.Playback -VisibleOnly
+    $playback = Find-SettingsPlaybackEntry
     if ($playback) { Invoke-Click -Element $playback | Out-Null; Start-Sleep -Seconds 2 }
     $settingsWindow = if ($playback) { Get-UiaWindowOf $playback } else { $null }
     if (-not $settingsWindow) { $settingsWindow = Get-UiaMainWindow }

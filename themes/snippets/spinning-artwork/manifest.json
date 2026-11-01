@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "spinning-artwork",
+  "name": "Spinning artwork",
+  "version": "0.1.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "Example snippet: the artwork of the playback bar turns like a record, with @keyframes and animation.",
+  "kitApi": "1.0",
+  "tags": [
+    "animation",
+    "artwork"
+  ]
+}

@@ -104,9 +104,14 @@ DWORD WINAPI KernelMain(LPVOID) {
     ampify::ProcessRole role = ampify::RoleOfImageName(ampify::win::ExecutablePath().string());
     if (role == ampify::ProcessRole::Unknown) return 0;
 
-    static std::ofstream file(ampify::win::JournalFile(role == ampify::ProcessRole::AppleMusic ? "AppleMusic.log"
-                                                                                        : "AMPLibraryAgent.log"),
-                              std::ios::trunc);
+    // The first process of a role starts its log afresh. A later one, such as the short AppleMusic.exe Windows starts
+    // to pass on a music:// link, adds to it instead: the mutex, never closed, marks the log as taken until the first
+    // process exits. Both append, so neither writes over the other's lines.
+    bool apple = role == ampify::ProcessRole::AppleMusic;
+    std::filesystem::path logPath = ampify::win::JournalFile(apple ? "AppleMusic.log" : "AMPLibraryAgent.log");
+    HANDLE logTaken = CreateMutexW(nullptr, FALSE, apple ? L"Local\\Ampify.AppleMusic.log" : L"Local\\Ampify.AMPLibraryAgent.log");
+    if (!logTaken || GetLastError() != ERROR_ALREADY_EXISTS) std::ofstream(logPath, std::ios::trunc).close();
+    static std::ofstream file(logPath, std::ios::app);
     static ampify::Journal journal(file, ampify::Journal::LocalTimeStamp);
 
     journal.Write("Kernel loaded in " + ampify::win::ExecutablePath().filename().string() + " (process " +

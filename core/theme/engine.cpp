@@ -142,17 +142,21 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
             }
         });
 
-        // The transition first, so a transform or opacity written in the same pass already animates.
+        // The transition first, so a transform or opacity written in the same pass already animates. The animation
+        // last, so it starts from the opacity and around the origin the theme gives the element.
         if (auto transition = winners.find("Transition"); transition != winners.end()) {
             WriteValue(node, *transition->second, tree, report, true);
         }
         for (const auto& [property, assignment] : winners) {
-            if (property == "Transition") continue;
+            if (property == "Transition" || property == "Animation") continue;
             if (property == kOrderProperty) {
                 pending.push_back({&node, assignment});
                 continue;
             }
             WriteValue(node, *assignment, tree, report, true);
+        }
+        if (auto animation = winners.find("Animation"); animation != winners.end()) {
+            WriteValue(node, *animation->second, tree, report, true);
         }
         GiveBack(node, winners, tree, report);
         // An element that lost its state rules (a theme edited live) is visited too, to take its states off.
@@ -263,6 +267,9 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
         std::string reason = property == "Transition"
                                  ? "\"" + Describe(node) + "\" is animated by Apple Music: transition refused, its "
                                    "changes apply at once"
+                             : property == "Animation"
+                                 ? "\"" + Describe(node) + "\" refused the animation: Apple Music moves this element "
+                                   "itself, or the theme also gives it a transform"
                                  : "value refused for \"" + Describe(node) + " " + property + "\"";
         Refuse(Describe(node) + " " + property, reason, report);
         return false;

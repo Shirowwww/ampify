@@ -204,9 +204,77 @@ std::optional<MediaQuery> ParseMediaQuery(std::string_view text, std::string& pr
     return query;
 }
 
-// An at-rule with a block, its head read up to `open`: @media opens a block of rules with a condition, any other is
-// skipped whole. Returns where reading goes on.
-size_t ReadAtRule(std::string_view head, size_t open, int line, std::string_view clean, std::optional<MediaQuery>& media,
+// The offsets of a keyframe stop, `from`, `to` and percentages joined by commas, from 0 to 1. Nothing when a part is
+// none of those.
+std::optional<std::vector<double>> StopOffsets(std::string_view text) {
+    std::vector<double> offsets;
+    for (const Piece& piece : SplitTopLevel(text, ',')) {
+        std::string word = LowerCopy(Trimmed(piece.text));
+        if (word == "from" || word == "to") {
+            offsets.push_back(word == "to" ? 1 : 0);
+            continue;
+        }
+        if (word.size() < 2 || word.back() != '%') return std::nullopt;
+        double percent = 0;
+        const char* last = word.data() + word.size() - 1;
+        auto [end, error] = std::from_chars(word.data(), last, percent);
+        if (error != std::errc() || end != last || percent < 0 || percent > 100) return std::nullopt;
+        offsets.push_back(percent / 100);
+    }
+    if (offsets.empty()) return std::nullopt;
+    return offsets;
+}
+
+// The stops of `@keyframes <name> { ... }`, between its braces at `open` and `close`. A stop it cannot read is reported
+// and skipped. Nothing without a name.
+std::optional<Keyframes> ParseKeyframes(std::string_view name, size_t open, size_t close, int line,
+                                        const std::string& clean, std::vector<std::string>& problems) {
+    name = Trimmed(name);
+    if (name.size() >= 2 && (name.front() == '"' || name.front() == '\'') && name.back() == name.front()) {
+        name = name.substr(1, name.size() - 2);
+    }
+    if (name.empty() || name.find_first_of(" \t\r\n\"'(),;") != std::string_view::npos) {
+        problems.push_back("line " + std::to_string(line) + ": @keyframes needs a name, such as @keyframes spin, ignored");
+        return std::nullopt;
+    }
+    Keyframes block;
+    block.name = std::string(name);
+    block.line = line;
+    size_t pos = open + 1;
+    while (pos < close) {
+        if (IsSpace(clean[pos])) {
+            pos++;
+            continue;
+        }
+        const std::string where = "line " + std::to_string(LineOf(clean, pos)) + ": ";
+        size_t brace = clean.find('{', pos);
+        size_t end = brace < close ? clean.find('}', brace) : std::string::npos;  // a stop holds declarations only
+        if (end == std::string::npos || end > close) {
+            problems.push_back(where + "a stop of @keyframes " + block.name + " has no { }, ignored");
+            break;
+        }
+        std::string_view selector = Trimmed(std::string_view(clean).substr(pos, brace - pos));
+        std::string_view body = std::string_view(clean).substr(brace + 1, end - brace - 1);
+        pos = end + 1;
+        std::optional<std::vector<double>> offsets = StopOffsets(selector);
+        if (!offsets) {
+            problems.push_back(where + "stop \"" + std::string(selector) + "\" of @keyframes " + block.name +
+                               " is not from, to or a percentage from 0% to 100%, ignored");
+            continue;
+        }
+        KeyframeStop stop;
+        stop.offsets = std::move(*offsets);
+        stop.line = LineOf(clean, brace);
+        stop.declarations = ParseDeclarations(body, brace + 1, clean, problems);
+        block.stops.push_back(std::move(stop));
+    }
+    return block;
+}
+
+// An at-rule with a block, its head read up to `open`: @media opens a block of rules with a condition, @keyframes
+// adds to `keyframes`, any other is skipped whole. Returns where reading goes on.
+size_t ReadAtRule(std::string_view head, size_t open, int line, const std::string& clean,
+                  std::optional<MediaQuery>& media, std::vector<Keyframes>& keyframes,
                   std::vector<std::string>& problems) {
     const std::string where = "line " + std::to_string(line) + ": ";
     size_t close = MatchingBrace(clean, open);
@@ -215,6 +283,18 @@ size_t ReadAtRule(std::string_view head, size_t open, int line, std::string_view
         return clean.size();
     }
     std::string lowered = LowerCopy(head);
+    for (std::string_view keyword : {std::string_view("@keyframes"), std::string_view("@-webkit-keyframes")}) {
+        if (!lowered.starts_with(keyword) || (lowered.size() > keyword.size() && !IsSpace(lowered[keyword.size()]))) {
+            continue;
+        }
+        if (media) {
+            problems.push_back(where + "@keyframes inside @media is not supported, ignored");
+        } else if (std::optional<Keyframes> block =
+                       ParseKeyframes(head.substr(keyword.size()), open, close, line, clean, problems)) {
+            keyframes.push_back(std::move(*block));
+        }
+        return close + 1;
+    }
     bool isMedia = lowered.starts_with("@media") && (lowered.size() == 6 || IsSpace(lowered[6]) || lowered[6] == '(');
     if (!isMedia) {
         problems.push_back(where + "rule \"" + std::string(head) + "\" is not supported, ignored");
@@ -443,7 +523,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
         }
         std::string_view head = Trimmed(std::string_view(clean).substr(pos, open - pos));
         if (!head.empty() && head.front() == '@') {
-            pos = ReadAtRule(head, open, line, clean, media, sheet.problems);
+            pos = ReadAtRule(head, open, line, clean, media, sheet.keyframes, sheet.problems);
             continue;
         }
 
