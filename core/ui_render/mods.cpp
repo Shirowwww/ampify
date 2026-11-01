@@ -86,21 +86,8 @@ std::vector<ModEntry> ListMods(const fs::path& kit) {
     return mods;
 }
 
-// Changes one key of settings.txt and keeps the others. A file that exists but cannot be read is left alone: saving
-// what was read would keep only the new key.
 bool WriteSetting(const fs::path& kit, const std::string& key, const std::string& value, std::string& error) {
-    Settings settings;
-    std::string settingsPath = (kit / "settings.txt").string();
-    if (!settings.Load(settingsPath)) {
-        error = "cannot read: " + settingsPath;
-        return false;
-    }
-    settings.Set(key, value);
-    if (!settings.Save(settingsPath)) {
-        error = "cannot write: " + settingsPath;
-        return false;
-    }
-    return true;
+    return Settings::UpdateFile((kit / "settings.txt").string(), key, value, error);
 }
 
 bool SwitchMod(const fs::path& kit, const std::string& id, bool enabled, std::string& error) {

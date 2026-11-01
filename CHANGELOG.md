@@ -105,6 +105,8 @@ checked in Apple Music. It is not published yet: it waits for a listening check 
 - `scripts/build-msvc.ps1` runs the compiler in the console's OEM code page and checks the prefix of its include notes:
   with a localized Visual Studio, a changed header did not rebuild the files that include it. A build folder whose
   prefix differs is configured again once.
+- A setting changed in the Ampify card is no longer lost when an extension saves one of its own keys at the same moment:
+  every writer of `settings.txt` changes its keys in the file as it is now, instead of saving an older copy.
 
 ### Preview
 

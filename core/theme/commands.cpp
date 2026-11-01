@@ -132,16 +132,17 @@ int SetTheme(const std::vector<std::string>& args, const KitLayout& kit, std::os
     value.scheme = parsed.scheme;
 
     std::filesystem::create_directories(kit.root);
-    Settings settings;
-    settings.Load(kit.Settings().string());
-    ThemeSettings current = ReadThemeSettings(settings);
-    value.liveReload = current.liveReload;
-    value.inspect = current.inspect;
-    value.parts = current.parts;
-    value.schedule = current.schedule;
-    WriteThemeSettings(settings, value);
-    if (!settings.Save(kit.Settings().string())) {
-        err << "cannot write " << kit.Settings().string() << '\n';
+    std::string error;
+    bool written = Settings::UpdateFile(kit.Settings().string(), [&](Settings& settings) {
+        ThemeSettings current = ReadThemeSettings(settings);
+        value.liveReload = current.liveReload;
+        value.inspect = current.inspect;
+        value.parts = current.parts;
+        value.schedule = current.schedule;
+        WriteThemeSettings(settings, value);
+    }, error);
+    if (!written) {
+        err << error << '\n';
         return kRefused;
     }
 

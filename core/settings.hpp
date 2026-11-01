@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -34,6 +35,13 @@ public:
 
     // Every key, sorted by name, as read from the file and set since.
     const std::map<std::string, std::string>& Values() const { return m_values; }
+
+    // Changes keys of the file as it is now and keeps every other key: the kernel, the Ampify card and the command line
+    // share settings.txt, and saving an older copy would undo another writer's change. A file that exists but cannot
+    // be read is left alone. Writers of one process take turns.
+    static bool UpdateFile(const std::string& path, const std::function<void(Settings&)>& change, std::string& error);
+    static bool UpdateFile(const std::string& path, const std::string& key, const std::string& value,
+                           std::string& error);
 
 private:
     std::map<std::string, std::string> m_values;

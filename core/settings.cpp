@@ -4,6 +4,7 @@
 #include <charconv>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <system_error>
 
 #include "text_util.hpp"
@@ -127,6 +128,27 @@ void Settings::SetInt(const std::string& key, int value) {
 
 void Settings::Remove(const std::string& key) {
     m_values.erase(key);
+}
+
+bool Settings::UpdateFile(const std::string& path, const std::function<void(Settings&)>& change, std::string& error) {
+    static std::mutex turns;
+    std::lock_guard<std::mutex> lock(turns);
+    Settings current;
+    if (!current.Load(path)) {
+        error = "cannot read: " + path;
+        return false;
+    }
+    change(current);
+    if (!current.Save(path)) {
+        error = "cannot write: " + path;
+        return false;
+    }
+    return true;
+}
+
+bool Settings::UpdateFile(const std::string& path, const std::string& key, const std::string& value,
+                          std::string& error) {
+    return UpdateFile(path, [&](Settings& settings) { settings.Set(key, value); }, error);
 }
 
 }  // namespace ampify

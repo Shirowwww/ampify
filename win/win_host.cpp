@@ -131,7 +131,10 @@ std::optional<std::string> WinHost::ReadSetting(const std::string& key) {
 
 void WinHost::WriteSetting(const std::string& key, const std::string& value) {
     m_settings.Set(key, value);
-    m_settings.Save((m_kit / "settings.txt").string());
+    std::string error;
+    if (!Settings::UpdateFile((m_kit / "settings.txt").string(), key, value, error)) {
+        m_journal.Write("Settings: " + key + " kept for this run only, " + error);
+    }
 }
 
 std::optional<std::string> WinHost::ReadStorage(const std::string& elementId) {

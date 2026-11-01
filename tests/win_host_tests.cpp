@@ -52,6 +52,23 @@ TEST_CASE(WinHost_SettingsArePersistedToSettingsTxt) {
     CHECK(!host.Locale().empty());
 }
 
+TEST_CASE(WinHost_SettingWriteKeepsAChangeMadeSinceTheKernelRead) {
+    fs::path kit = KitForTest("settings-merge");
+    ampify::Settings settings;  // the kernel's copy, read before the Ampify card writes
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    ampify::WinHost host("ui", kit, settings, journal);
+    std::string error;
+    CHECK(ampify::Settings::UpdateFile((kit / "settings.txt").string(), "extensions.demo.side", "Right", error));
+
+    host.WriteSetting("extensions.demo.volume", "7");
+
+    ampify::Settings reloaded;
+    CHECK(reloaded.Load((kit / "settings.txt").string()));
+    CHECK(reloaded.GetString("extensions.demo.side", "") == "Right");
+    CHECK(reloaded.GetInt("extensions.demo.volume", 0) == 7);
+}
+
 TEST_CASE(WinHost_ShortcutPressIsDeliveredToTheRegisteringThread) {
     fs::path kit = KitForTest("hotkeys");
     ampify::Settings settings;

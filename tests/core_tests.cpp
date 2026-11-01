@@ -89,6 +89,23 @@ TEST_CASE(Settings_BadNumbersFallBack) {
     CHECK(settings.GetBool("flag", true));
 }
 
+TEST_CASE(Settings_UpdateFileKeepsWhatAnotherWriterChanged) {
+    std::string path = (ScratchDir("settings-update") / "settings.txt").string();
+    std::string error;
+    CHECK(ampify::Settings::UpdateFile(path, "extensions.demo.size", "20", error));  // a missing file starts empty
+
+    ampify::Settings kernelCopy;  // read at start, before the card writes
+    CHECK(kernelCopy.Load(path));
+    CHECK(ampify::Settings::UpdateFile(path, "extensions.demo.side", "Right", error));  // the card
+    CHECK(ampify::Settings::UpdateFile(path, "extensions.demo.size", "21", error));     // then config.set
+
+    ampify::Settings now;
+    CHECK(now.Load(path));
+    CHECK(now.GetString("extensions.demo.side", "") == "Right");
+    CHECK(now.GetInt("extensions.demo.size", 0) == 21);
+    CHECK(error.empty());
+}
+
 TEST_CASE(SafeMode_TripsAfterTwoUnhealthyLaunchesAndRecovers) {
     std::string path = (ScratchDir("safe-mode") / "state.txt").string();
 
