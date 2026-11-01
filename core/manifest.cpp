@@ -260,7 +260,10 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
             if (!m.colors && !m.resources) result.errors.push_back("a theme needs colors, resources, or both");
             break;
         case ElementKind::Snippet:
-            if (!m.resources) result.errors.push_back("resources is required for a snippet");
+            // Its user.css is not a field: it is found in the folder, as a theme's is.
+            if (!m.resources && !(hasFile && hasFile("user.css"))) {
+                result.errors.push_back("resources or user.css: at least one of the two is required for a snippet");
+            }
             if (m.main) result.errors.push_back("main is not allowed for a snippet");
             break;
     }

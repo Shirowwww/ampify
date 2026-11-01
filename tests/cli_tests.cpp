@@ -11,6 +11,8 @@
 #include <thread>
 #include <vector>
 
+#include "../core/json.hpp"
+#include "../core/manifest.hpp"
 #include "../cli/archive.hpp"
 #include "../cli/backup.hpp"
 #include "../cli/catalog.hpp"
@@ -130,6 +132,15 @@ TEST_CASE(Json_DecodesEscapesAndSurrogatePairs) {
     CHECK(document->Items()[1].AsString() == "\xF0\x9F\x8E\xB5");  // U+1F3B5
     CHECK(document->Items()[2].AsString() == "tab\there\n");
     CHECK(document->Items()[3].AsString() == "\"q\"");
+}
+
+TEST_CASE(Json_ReadsADocumentSavedWithAByteOrderMark) {
+    // Notepad and PowerShell 5 start a UTF-8 file with EF BB BF: both readers of manifest.json skip it.
+    std::optional<ampify::Json> kernel = ampify::Json::Parse("\xEF\xBB\xBF{\"id\": \"my-theme\"}");
+    CHECK(kernel && kernel->Find("id") && kernel->Find("id")->AsString() && *kernel->Find("id")->AsString() == "my-theme");
+    std::string error;
+    std::optional<ampify::json::Value> cli = ampify::json::Parse("\xEF\xBB\xBF{\"id\": \"my-theme\"}", error);
+    CHECK(cli && cli->Find("id") && cli->Find("id")->AsString() == "my-theme");
 }
 
 TEST_CASE(Json_RejectsMalformedDocuments) {
@@ -264,8 +275,22 @@ TEST_CASE(Folder_ThemeAndSnippetRules) {
                   "description": "d", "kitApi": "1.0", "main": "x.js"})");
     WriteFile(root / "snip" / "x.js", "");
     ampify::FolderValidation snippet = ampify::ValidateElementFolder(root / "snip");
-    CHECK(MentionsField(snippet.errors, "resources: required for a snippet"));
+    CHECK(MentionsField(snippet.errors, "resources or user.css: at least one of the two is required for a snippet"));
     CHECK(MentionsField(snippet.errors, "main: not allowed for a snippet"));
+
+    // A snippet made of a user.css alone, as most Spicetify snippets are.
+    WriteFile(root / "css-only" / "manifest.json",
+              R"({"id": "css-only", "name": "S", "version": "1.0.0", "kind": "snippet", "author": "a",
+                  "description": "d", "kitApi": "1.0"})");
+    WriteFile(root / "css-only" / "user.css", ".card .artwork { corner-radius: 16; }\n");
+    ampify::FolderValidation cssOnly = ampify::ValidateElementFolder(root / "css-only");
+    CHECK(cssOnly.errors.empty());
+    std::string text = R"({"id": "css-only", "name": "S", "version": "1.0.0", "kind": "snippet", "author": "a",
+                           "description": "d", "kitApi": "1.0"})";
+    auto inFolder = [](const std::string& file) { return file == "user.css"; };
+    CHECK(ampify::ParseManifest(text, "css-only", 1, inFolder).errors.empty());
+    auto empty = [](const std::string&) { return false; };
+    CHECK(!ampify::ParseManifest(text, "css-only", 1, empty).errors.empty());
 }
 
 // ---- Catalog -----------------------------------------------------------------------------------

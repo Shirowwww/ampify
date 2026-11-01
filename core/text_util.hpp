@@ -15,6 +15,11 @@ inline std::string ToLowerAscii(std::string_view text) {
     return result;
 }
 
+// Text without the UTF-8 byte order mark that Windows editors (Notepad, PowerShell 5) put at the start of a file.
+inline std::string_view WithoutBom(std::string_view text) {
+    return text.starts_with("\xEF\xBB\xBF") ? text.substr(3) : text;
+}
+
 // The last part of a Windows or POSIX path: "C:\Apps\AppleMusic.exe" gives "AppleMusic.exe".
 inline std::string_view FileName(std::string_view path) {
     size_t cut = path.find_last_of("\\/");

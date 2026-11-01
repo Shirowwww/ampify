@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <utility>
 
+#include "../core/text_util.hpp"
+
 namespace ampify::json {
 
 namespace {
@@ -301,7 +303,7 @@ const Value* Value::Find(std::string_view key) const {
 
 std::optional<Value> Parse(std::string_view text, std::string& error) {
     try {
-        return Parser(text).ParseDocument();
+        return Parser(WithoutBom(text)).ParseDocument();
     } catch (const SyntaxError& failure) {
         error = failure.message;
         return std::nullopt;

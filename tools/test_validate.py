@@ -316,6 +316,14 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("main: not allowed for a snippet", text)
 
+    def test_snippet_of_a_user_css_alone_is_valid(self):
+        data = manifest(id="css-only", kind="snippet", main=None)
+        code, text = run("manifest", self.install(data, files=()))
+        self.assertEqual(code, 1)
+        self.assertIn("resources or user.css: at least one of the two is required for a snippet", text)
+        code, text = run("manifest", self.install(data, files=("user.css",)))
+        self.assertEqual(code, 0, text)
+
 
 try:
     from jsonschema import Draft202012Validator

@@ -85,6 +85,10 @@ Atmos leveler.
 - The theme report and the inspector show a corner radius in CSS order (top left, top right, bottom right, bottom left).
 - An answer to `Ampify.http.get` or `post` that came back while `main.js` was still running is no longer lost: its
   promise used to never settle.
+- `user.css` reads `:active` (while pressed) and `:focus` or `:focus-within` (while the keyboard focus is inside), each
+  with its own cascade like `:hover`. An `:active` colour on a button goes to its pressed state only.
+- Files saved with a byte order mark (Notepad's "UTF-8 with BOM") are read: manifests, `user.css`, `color.ini`,
+  settings. A snippet can be a `user.css` alone, without `resources.xaml`, and `ampify new snippet` makes one.
 
 ### Preview
 

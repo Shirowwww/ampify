@@ -54,10 +54,21 @@ struct Compound {
     Combinator combinator = Combinator::Descendant;  // relation to the compound before it; unused for the first
 };
 
+// When the declarations of a rule show: always, or while the element that receives them is in a state.
+enum class Trigger {
+    Always,
+    Hover,   // :hover, the pointer is over the element
+    Focus,   // :focus or :focus-within, the keyboard focus is in the element or one of its parts
+    Active,  // :active, the element is pressed
+};
+
+// ":hover", ":focus" or ":active"; empty for Always.
+const char* TriggerName(Trigger trigger);
+
 struct Selector {
     std::vector<Compound> parts;  // left to right; the last part is the element that receives the declarations
     std::string text;             // as written, for the log
-    bool hover = false;           // `:hover` on the last part: the declarations apply while the pointer is over it
+    Trigger trigger = Trigger::Always;  // a state on the last part: the declarations apply while the element is in it
 };
 
 struct Declaration {

@@ -82,10 +82,11 @@ struct ViewSize {
     double height = 0;
 };
 
-// One value of a :hover rule: shown while the pointer is over the element.
+// One value of a :hover, :focus or :active rule: shown while the element is in that state.
 struct HoverValue {
     std::string property;  // XAML name, as for Read and Write
     Value value;
+    Trigger trigger = Trigger::Hover;  // the state that shows it: :hover, :focus or :active
 
     bool operator==(const HoverValue&) const = default;
 };
@@ -128,12 +129,12 @@ public:
     // the dictionary merged last. False when the XAML is refused.
     virtual bool SetDictionary(std::string_view xaml) = 0;
 
-    // The values to show while the pointer is over the element (:hover rules), in place of the ones given before. The
-    // backend follows the pointer itself (once per element) and puts back what was there when the pointer leaves; while
-    // the pointer is over the element, Read and Write of a hovered property see and change the value underneath, so the
-    // engine never notices. An empty list takes the hover off: the values underneath come back and the backend stops
-    // following the pointer. False when the element is gone or cannot follow the pointer. HoverTracker (hover.hpp)
-    // holds the logic a backend needs.
+    // The values to show while the element is in a state (the pointer over it, the focus in it, pressed), in place of
+    // the ones given before. The backend follows those states itself (once per element) and puts back what was there
+    // when the element leaves them; meanwhile, Read and Write of a changed property see and change the value
+    // underneath, so the engine never notices. An empty list takes the states off: the values underneath come back and
+    // the backend stops following the element. False when the element is gone or cannot follow its states.
+    // HoverTracker (hover.hpp) holds the logic a backend needs.
     virtual bool SetHover(NodeId id, const std::vector<HoverValue>& values) {
         (void)id;
         return values.empty();

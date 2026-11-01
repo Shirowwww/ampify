@@ -285,6 +285,22 @@ class Authoring(AmpifyTestCase):
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         self.assertIn("CornerRadius = 16,16,16,16", check.stdout)
 
+    def test_files_saved_with_a_byte_order_mark_are_read(self):
+        # Notepad and PowerShell 5 save UTF-8 with a mark at the start: the manifest and the CSS still read.
+        self.assertEqual(self.ampify("new", "snippet", "marked", cwd=self.tmp).returncode, 0)
+        folder = os.path.join(self.tmp, "marked")
+        for name in ("manifest.json", "user.css"):
+            path = os.path.join(folder, name)
+            with open(path, encoding="utf-8") as source:
+                text = source.read()
+            with open(path, "w", encoding="utf-8-sig") as target:
+                target.write(text)
+        validate = self.ampify("validate", folder)
+        self.assertEqual(validate.returncode, 0, validate.stdout + validate.stderr)
+        check = self.ampify("theme", "check", folder)
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        self.assertIn("CornerRadius = 16,16,16,16", check.stdout)
+
 
 class SpicetifyImport(AmpifyTestCase):
     COLOR_INI = "[Nord]\nmain = 2E3440\nsidebar = 3B4252\ntext = ECEFF4\nbutton = 88C0D0\n\n[Snow]\nmain = ECEFF4\n"

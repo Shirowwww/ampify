@@ -51,7 +51,7 @@ The folder [examples/hello-extension](../../examples/hello-extension/) is a comp
 | `icon` | n/a | optional | n/a | n/a | An `.svg` icon for the sidebar |
 | `colors` | n/a | n/a | required, or `resources` | n/a | An `.ini` file of color schemes |
 | `defaultScheme` | n/a | n/a | optional | n/a | Section of `colors.ini` used by default |
-| `resources` | n/a | n/a | required, or `colors` | required | A `.xaml` resource dictionary |
+| `resources` | n/a | n/a | required, or `colors` | required, or a `user.css` in the folder | A `.xaml` resource dictionary |
 
 Fields that do not apply to the `kind` are ignored by the kernel. The validator only checks the fields required for each
 `kind`.

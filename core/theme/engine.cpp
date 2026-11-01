@@ -123,16 +123,23 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
     for (int position = 0; position < static_cast<int>(nodes.size()); position++) {
         const NodeInfo& node = nodes[position];
 
-        // The winning declaration for each property of this element, and apart from them the :hover ones.
+        // The winning declaration for each property of this element, and apart from them those of its states.
         std::map<std::string, const Assignment*> winners;
-        std::map<std::string, const Assignment*> hoverWinners;
+        StateWinners stateWinners;
+        auto keep = [](auto& target, const auto& key, const Assignment& assignment) {
+            auto [it, inserted] = target.try_emplace(key, &assignment);
+            if (!inserted && Beats(assignment, *it->second)) it->second = &assignment;
+        };
         index.ForCandidates(node, [&](const Assignment& assignment) {
             if (assignment.media && !(size && assignment.media->Matches(size->width, size->height))) return;
             if (!Matches(assignment.selector, nodes, position)) return;
 
-            auto& target = assignment.selector.hover ? hoverWinners : winners;
-            auto [it, inserted] = target.try_emplace(assignment.property, &assignment);
-            if (!inserted && Beats(assignment, *it->second)) it->second = &assignment;
+            const Trigger trigger = assignment.selector.trigger;
+            if (trigger == Trigger::Always) {
+                keep(winners, assignment.property, assignment);
+            } else {
+                keep(stateWinners, std::make_pair(trigger, assignment.property), assignment);
+            }
         });
 
         // The transition first, so a transform or opacity written in the same pass already animates.
@@ -148,8 +155,8 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
             WriteValue(node, *assignment, tree, report, true);
         }
         GiveBack(node, winners, tree, report);
-        // An element that lost its :hover rules (a theme edited live) is visited too, to take its hover off.
-        if (!hoverWinners.empty() || m_hovers.count(node.id)) ApplyHover(node, hoverWinners, tree, report);
+        // An element that lost its state rules (a theme edited live) is visited too, to take its states off.
+        if (!stateWinners.empty() || m_hovers.count(node.id)) ApplyHover(node, stateWinners, tree, report);
     }
     ApplyMoves(pending, tree, report);
 }
@@ -172,12 +179,12 @@ void ThemeEngine::GiveBack(const NodeInfo& node, const std::map<std::string, con
     }
 }
 
-// Gives the backend the :hover values of one element when they differ from the ones it holds. A property the element
-// does not have is refused here, as a plain value would be. No value left takes the hover off.
-void ThemeEngine::ApplyHover(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners,
-                             TreeBackend& tree, Report& report) {
+// Gives the backend the state values of one element when they differ from the ones it holds. A property the element
+// does not have is refused here, as a plain value would be. No value left takes the states off.
+void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, TreeBackend& tree, Report& report) {
     std::vector<HoverValue> values;
-    for (const auto& [property, assignment] : winners) {
+    for (const auto& [key, assignment] : winners) {
+        const auto& [trigger, property] = key;
         std::optional<Value> current = tree.Read(node.id, property);
         if (!current) {
             if (tree.Alive(node.id)) {
@@ -193,7 +200,7 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const std::map<std::string, c
                    report);
             continue;
         }
-        values.push_back({property, *value});
+        values.push_back({property, *value, trigger});
     }
 
     auto known = m_hovers.find(node.id);
@@ -204,7 +211,8 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const std::map<std::string, c
     if (known == m_hovers.end() && values.empty()) return;
 
     if (!tree.SetHover(node.id, values)) {
-        Refuse(Describe(node) + " :hover", "\"" + Describe(node) + "\" does not follow the pointer (:hover)", report);
+        Refuse(Describe(node) + " :hover", "\"" + Describe(node) + "\" does not follow its states (:hover, :focus, :active)",
+               report);
         return;
     }
     if (values.empty()) {
@@ -214,7 +222,10 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const std::map<std::string, c
     }
     report.applied += static_cast<int>(values.size());
     std::string list;
-    for (const HoverValue& value : values) list += (list.empty() ? "" : ", ") + value.property + " = " + value.value.text;
+    for (const HoverValue& value : values) {
+        list += (list.empty() ? "" : ", ") + value.property + " = " + ShownText(value.property, value.value);
+        if (value.trigger != Trigger::Hover) list += std::string(" (") + TriggerName(value.trigger) + ")";
+    }
     if (m_detailed) m_journal.Write("Hover: " + Describe(node) + " " + list);
     m_hovers[node.id] = std::move(values);
 }

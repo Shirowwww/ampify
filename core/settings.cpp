@@ -6,6 +6,8 @@
 #include <fstream>
 #include <system_error>
 
+#include "text_util.hpp"
+
 namespace ampify {
 
 namespace {
@@ -27,7 +29,10 @@ bool Settings::Load(const std::string& path) {
     if (!in) return !std::filesystem::exists(path);
 
     std::string line;
+    bool first = true;
     while (std::getline(in, line)) {
+        if (first) line = std::string(WithoutBom(line));
+        first = false;
         std::string trimmed = Trim(line);
         if (trimmed.empty() || trimmed[0] == '#') continue;
 

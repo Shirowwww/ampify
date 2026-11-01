@@ -397,11 +397,7 @@ std::map<std::string, std::string> Template(std::string_view kind, const std::st
     }
     if (kind == "snippet") {
         return {
-            {"manifest.json", "{\n" + common + ",\n  \"resources\": \"resources.xaml\"\n}\n"},
-            {"resources.xaml",
-             "<!-- Colors and brushes of Fluent and Apple Music, optional: the rules of user.css are often enough. -->\n"
-             "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\">\n"
-             "</ResourceDictionary>\n"},
+            {"manifest.json", "{\n" + common + "\n}\n"},
             {"user.css",
              "/* " + id + ": a small style switched on alone (ampify snippet enable " + id + "), on top of any theme.\n"
              "   It sees the theme's colors ($button...) and comes after it. */\n\n"

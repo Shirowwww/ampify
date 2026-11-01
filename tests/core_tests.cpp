@@ -65,6 +65,19 @@ TEST_CASE(Settings_ParsesHandWrittenFile) {
     CHECK(!settings.Get("broken line").has_value());
 }
 
+TEST_CASE(Settings_ReadsAFileSavedWithAByteOrderMark) {
+    std::filesystem::path dir = ScratchDir("settings-bom");
+    std::string path = (dir / "settings.txt").string();
+    {
+        std::ofstream out(path, std::ios::binary);
+        out << "\xEF\xBB\xBFtheme.active = greenroom\n";  // Notepad and PowerShell 5 start UTF-8 files with it
+    }
+
+    ampify::Settings settings;
+    CHECK(settings.Load(path));
+    CHECK(settings.GetString("theme.active", "") == "greenroom");
+}
+
 TEST_CASE(Settings_BadNumbersFallBack) {
     ampify::Settings settings;
     settings.Set("count", "twelve");

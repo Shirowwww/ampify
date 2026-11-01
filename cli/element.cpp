@@ -267,7 +267,10 @@ std::vector<std::string> CheckElementFolder(const ElementManifest& manifest, con
         errors.push_back("colors or resources: at least one of the two is required for a theme");
     }
     if (kind == "snippet") {
-        if (!manifest.resources) errors.push_back("resources: required for a snippet");
+        std::error_code ec;
+        if (!manifest.resources && !std::filesystem::is_regular_file(folder / "user.css", ec)) {
+            errors.push_back("resources or user.css: at least one of the two is required for a snippet");
+        }
         if (manifest.main) errors.push_back("main: not allowed for a snippet");
     }
 

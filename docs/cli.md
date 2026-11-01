@@ -110,7 +110,7 @@ messages go to the error output, prefixed with `ampify:`.
   extensions\<id>\          manifest.json, main.js, ...
   themes\<id>\              manifest.json, colors.ini, resources.xaml
   apps\<id>\                manifest.json, main.js, icon.svg
-  snippets\<id>\            manifest.json, resources.xaml
+  snippets\<id>\            manifest.json, user.css and/or resources.xaml
   active.txt                what must load: "extension demo 1.0.0", "theme night 2.0.0 scheme=Dark"
   reload.txt                requests to the running kernel: "start <id>", "stop <id>", "restart <id>", "rescan" (see "Immediate effect")
   backups\<yyyymmdd-hhmmss>\  copy of settings.txt and the four element folders

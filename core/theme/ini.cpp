@@ -2,6 +2,8 @@
 
 #include <cctype>
 
+#include "../text_util.hpp"
+
 namespace ampify::theme {
 
 namespace {
@@ -29,6 +31,7 @@ std::string Trimmed(std::string_view text) {
 std::vector<std::string> Ini::Parse(std::string_view text) {
     m_sections.clear();
     std::vector<std::string> problems;
+    text = WithoutBom(text);
 
     // Keys before any [section] header go in an unnamed section, so a stray key is reported, not lost.
     Section* current = nullptr;

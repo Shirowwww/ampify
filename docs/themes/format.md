@@ -101,16 +101,18 @@ Grid#Bar > TextBlock {
 | `*` | Every element |
 | `A B` | A `B` anywhere inside an `A` |
 | `A > B` | A `B` whose direct parent is an `A` |
-| `A:hover` | An `A`, while the pointer is over it (see "Hover") |
+| `A:hover` | An `A`, while the pointer is over it (see "Hover, press and focus") |
+| `A:active` | An `A`, while it is pressed |
+| `A:focus`, `A:focus-within` | An `A`, while the keyboard focus is on it or on one of its parts |
 | `A:nth-child(2)` | An `A` that is the second child of its parent (counting from 1) |
 | `A:first-child`, `A:last-child` | An `A` that is the first, or the last, child of its parent |
 | `.sidebar`, `.card`... | A stable name for a zone of Apple Music (see [names.md](names.md)) |
 
 You can combine them: `Grid#Bar > TextBlock`, `Grid#TransportBar Button:hover`,
 `Grid#TransportBar > Grid:nth-child(2)`. The structural pseudo-classes reach the many elements Apple Music leaves
-unnamed; they count every child of the parent, whatever its type. `:hover` goes only on the last element of the
-selector. Attributes (`[x=y]`) and other pseudo-classes (`:focus`...) are not supported. A rule that contains one is
-ignored, with a line in the log.
+unnamed; they count every child of the parent, whatever its type. `:hover`, `:active` and `:focus` go only on the last
+element of the selector, one of the three per selector (`Button:active:nth-child(2)` is fine). Attributes (`[x=y]`) and
+other pseudo-classes (`:checked`...) are not supported. A rule that contains one is ignored, with a line in the log.
 
 ### Priority
 
@@ -388,9 +390,10 @@ and that of the playback buttons. A name taken from WinUI templates is always ta
   show outside a popup. Check it on the real app.
 - The element's old Z value returns with its original shadow when the theme is removed.
 
-### Hover
+### Hover, press and focus
 
-A rule whose selector ends with `:hover` applies while the pointer is over the element:
+A rule whose selector ends with `:hover` applies while the pointer is over the element, `:active` while the element is
+pressed, and `:focus` while the keyboard focus is on the element or on one of its parts:
 
 ```css
 Frame#ContentFrame Button {
@@ -401,23 +404,39 @@ Frame#ContentFrame Button:hover {
     transform: scale(1.05);
     box-shadow: 16px;
 }
+
+Frame#ContentFrame Button:active {
+    transform: scale(0.95);
+}
+
+.search-area:focus {
+    background: #3A1F5C;
+}
 ```
 
-- `:hover` rules form a separate cascade, with the same priority rules between themselves. Under the pointer, their
-  values beat those of normal rules, whatever the specificity.
-- When the pointer leaves, the element takes back exactly what it had: the theme's value, or the original one.
-- Ampify tracks the pointer (`PointerEntered` and `PointerExited`) once per element. Removing the theme, or a `:hover`
-  rule that disappears, removes that tracking and restores the values, even if the pointer is still over the element.
-- `order` is not possible under `:hover`: the declaration is ignored and reported.
+- Each state has its own cascade, with the same priority rules between its rules. While the state holds, its values beat
+  those of normal rules, whatever the specificity. When several hold at once, the press beats the focus, and the focus
+  beats the hover.
+- When a state ends, the element takes back exactly what it had: the value of a state that still holds, the theme's
+  value, or the original one.
+- A press starts when a pointer button goes down on the element, even on a button that handles the click itself. It ends
+  when the button is let go, when the pointer is taken away, or when the pointer leaves the element.
+- `:focus-within` is the same as `:focus`: the state holds while the focus is anywhere inside the element, so moving
+  from the search box's text to its own buttons keeps it.
+- Ampify follows only the events of the states an element uses, once per element: `PointerEntered` and `PointerExited`
+  for `:hover`, the pointer being pressed and let go for `:active`, `GotFocus` and `LostFocus` for `:focus`. Removing
+  the theme, or a state rule that disappears, stops that and restores the values, even if the state still holds.
+- `order` is not possible under a state: the declaration is ignored and reported.
 - The change is immediate, unless the element has a `transition` (next section).
-- A control that keeps the pointer event for itself does not react.
+- A control that keeps the pointer's entry for itself does not react to `:hover`.
 
 Apple Music's buttons change their own background, text colour and border under the pointer and while pressed. A
 `background`, `color` or `border-color` given to a button, or to the root of its template (`.play-button > Grid#Root`),
 stays in those two states: Ampify writes the same brush to the keys the button's states read
 (`AppBarButtonBackgroundPointerOver`, `AppBarButtonBackgroundPressed`, `ButtonBackgroundPointerOver`...), in that
-button's own resources only. Checked, selected or "repeat on" states keep Apple Music's colours, since they say
-something. The inspector shows what each element's states change (`States=` below).
+button's own resources only. A `:hover` colour goes to both states, and an `:active` colour to the pressed one only.
+Checked, selected or "repeat on" states keep Apple Music's colours, since they say something. The inspector shows what
+each element's states change (`States=` below).
 
 The same goes for the entries of a menu, which also stay lit while their submenu is open, and for a slider: `color`
 fills the part left of the thumb, `background` the rest of the track, and its `Thumb` keeps its `background` while
@@ -563,10 +582,12 @@ A snippet is a small piece of style that you switch on alone, as in Spicetify. I
 
 ```
 square-corners/
-├── manifest.json     "kind": "snippet", "resources": "resources.xaml"
-├── resources.xaml    resource dictionary (required by the manifest, it can be empty)
+├── manifest.json     "kind": "snippet", and "resources": "resources.xaml" when there is one
+├── resources.xaml    resource dictionary (optional)
 └── user.css          rules, as in a theme (optional)
 ```
+
+A snippet needs at least one of the two files. Most are a `user.css` alone, as `ampify new snippet` writes.
 
 - Switch it on with `ampify snippet enable <id>`, which writes `snippets.<id>.enabled = 1` in `settings.txt`.
   `ampify snippet disable <id>` switches it off.

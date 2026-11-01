@@ -107,7 +107,9 @@ private:
     winrt::Microsoft::UI::Xaml::Media::Brush ArtworkBrush(const std::string& text);
     void FollowArtwork(const winrt::Microsoft::UI::Xaml::Media::ImageSource& artwork);
 
-    void OnPointer(theme::NodeId id, bool entered) noexcept;
+    void OnState(theme::NodeId id, theme::Trigger trigger, bool on) noexcept;
+    void OnFocusLost(theme::NodeId id) noexcept;
+    void FollowStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element);
     void Watch(const winrt::Microsoft::UI::Xaml::DependencyObject& object, theme::NodeId id, const std::string& type);
     bool WriteTransition(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
                          const theme::Value& value);
@@ -124,9 +126,11 @@ private:
     // The PointerOver and Pressed states of a control template write some properties of its parts above any local
     // value: a theme's background on a button's Root vanished under the pointer and while pressed (greenroom's white
     // play button showed its black icon on black). The brushes those states read ({Control}{Property}PointerOver and
-    // Pressed) get the theme's value in that control's own resources; ReleaseStates gives Apple Music's back.
+    // Pressed) get the theme's value in that control's own resources, the Pressed ones the :active value when the theme
+    // gives one; a null value leaves that state Apple Music's. ReleaseStates gives Apple Music's back.
     void HoldThroughStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
-                           std::string_view property, const winrt::Windows::Foundation::IInspectable& value) noexcept;
+                           std::string_view property, const winrt::Windows::Foundation::IInspectable& value,
+                           const winrt::Windows::Foundation::IInspectable& pressed) noexcept;
     void ReleaseStates(theme::NodeId id, std::string_view property) noexcept;
     void UpdateStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
                       std::string_view property, winrt::Windows::Foundation::IInspectable shown) noexcept;
@@ -153,10 +157,18 @@ private:
     std::map<std::pair<theme::NodeId, std::string>, Written> m_written;
     std::map<theme::NodeId, float> m_translations;  // the Z of UIElement.Translation before box-shadow raised it
     theme::HoverTracker m_hover;
+    // The events followed for the states an element's values use (FollowStates).
     struct HoverHandlers {
         winrt::weak_ref<winrt::Microsoft::UI::Xaml::UIElement> element;
+        bool hover = false;  // PointerEntered, PointerExited
         winrt::event_token entered;
         winrt::event_token exited;
+        bool active = false;  // added with handledEventsToo: a button marks its pointer events handled
+        winrt::Windows::Foundation::IInspectable pressed{nullptr};
+        winrt::Windows::Foundation::IInspectable released{nullptr};
+        bool focus = false;  // GotFocus, LostFocus, which bubble from the element's parts
+        winrt::event_token gotFocus;
+        winrt::event_token lostFocus;
     };
     std::map<theme::NodeId, HoverHandlers> m_hoverHandlers;
     struct HeldStates {

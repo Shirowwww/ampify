@@ -168,6 +168,14 @@ public:
         if (followed.count(id)) hover.Exit(id, *this);
     }
 
+    void Press(th::NodeId id, bool pressed) {
+        if (followed.count(id)) hover.Toggle(id, th::Trigger::Active, pressed, *this);
+    }
+
+    void Focus(th::NodeId id, bool focused) {
+        if (followed.count(id)) hover.Toggle(id, th::Trigger::Focus, focused, *this);
+    }
+
     // The value the element shows, whatever the hover.
     th::Value Shown(th::NodeId id, const std::string& property) {
         return ReadRaw(id, property).value_or(th::Value{th::ValueKind::Text, "ABSENT"});
@@ -295,6 +303,16 @@ TEST_CASE(Ini_ReadsSectionsKeysAndComments) {
     CHECK(ini.Get("Light", "Accent") == std::nullopt);
 }
 
+TEST_CASE(Ini_AndCss_ReadAFileSavedWithAByteOrderMark) {
+    th::Ini ini;
+    CHECK(ini.Parse("\xEF\xBB\xBF[Night]\nmain = 16131F\n").empty());
+    CHECK(ini.Get("Night", "main") == "16131F");
+
+    th::Stylesheet sheet = th::ParseStylesheet("\xEF\xBB\xBF.sidebar { corner-radius: 4 }\n");
+    CHECK(sheet.problems.empty());
+    CHECK(sheet.rules.size() == 1);
+}
+
 TEST_CASE(Ini_ReportsBadLinesAndKeepsTheRest) {
     th::Ini ini;
     std::vector<std::string> problems = ini.Parse("[Base]\nok = 1\nno equals here\n = 3\n[Broken\nx = 2\n");
@@ -413,7 +431,7 @@ TEST_CASE(Css_ClassesStandForThePathsToApplesZones) {
 
     CHECK(sheet.rules[1].selectors.size() == 2);
     const th::Selector& card = sheet.rules[1].selectors.at(0);
-    CHECK(card.hover);
+    CHECK(card.trigger == th::Trigger::Hover);
     CHECK(card.parts.back().name == "SquareLockupContent");
     const th::Selector& button = sheet.rules[1].selectors.at(1);
     CHECK(button.parts.front().name == "TransportBar");
@@ -611,8 +629,8 @@ TEST_CASE(Selector_RejectsWhatItDoesNotKnow) {
     std::string problem;
     CHECK(!th::ParseSelector("Grid[Name=x]", &problem));
     CHECK(problem.find("is not supported") != std::string::npos);
-    CHECK(!th::ParseSelector("Grid:focus", &problem));
-    CHECK(problem.find(":focus") != std::string::npos);
+    CHECK(!th::ParseSelector("Grid:checked", &problem));
+    CHECK(problem.find(":checked") != std::string::npos);
     CHECK(!th::ParseSelector("Grid:hover > TextBlock", &problem));
     CHECK(problem.find("last element") != std::string::npos);
     CHECK(!th::ParseSelector("TextBlock >", &problem));
@@ -2554,13 +2572,13 @@ TEST_CASE(Css_HoverOnTheLastPartOnly) {
     std::optional<th::Selector> hover = th::ParseSelector("Grid#TransportBar Button:hover", &problem);
     CHECK(hover.has_value());
     if (!hover) return;
-    CHECK(hover->hover);
+    CHECK(hover->trigger == th::Trigger::Hover);
     CHECK(hover->parts.size() == 2);
     CHECK(hover->parts[1].type == "Button");
     CHECK(hover->text == "Grid#TransportBar Button:hover");
     std::optional<th::Selector> named = th::ParseSelector("#Play:HOVER", &problem);
-    CHECK(named.has_value() && named->hover && named->parts[0].name == "Play");
-    CHECK(!th::ParseSelector("Button", &problem)->hover);
+    CHECK(named.has_value() && named->trigger == th::Trigger::Hover && named->parts[0].name == "Play");
+    CHECK(th::ParseSelector("Button", &problem)->trigger == th::Trigger::Always);
     // Matching is structural: the state is the backend's business.
     CHECK(th::SpecificityOf(*hover) == th::SpecificityOf(Sel("Grid#TransportBar Button")));
 
@@ -2569,6 +2587,39 @@ TEST_CASE(Css_HoverOnTheLastPartOnly) {
     th::Theme theme = Load(files);
     CHECK(!ProblemContaining(theme, "not possible under :hover").empty());
     CHECK(theme.assignments.size() == 3);  // order and opacity for Button, opacity only for Button:hover
+}
+
+TEST_CASE(Css_ActiveAndFocusOnTheLastPartOnly) {
+    std::string problem;
+    std::optional<th::Selector> active = th::ParseSelector("Grid#TransportBar Button:active", &problem);
+    CHECK(active.has_value() && active->trigger == th::Trigger::Active && active->parts.size() == 2);
+    std::optional<th::Selector> focus = th::ParseSelector("AutoSuggestBox:focus", &problem);
+    CHECK(focus.has_value() && focus->trigger == th::Trigger::Focus);
+    std::optional<th::Selector> within = th::ParseSelector("AutoSuggestBox:FOCUS-WITHIN", &problem);
+    CHECK(within.has_value() && within->trigger == th::Trigger::Focus);
+    std::optional<th::Selector> counted = th::ParseSelector("Button:active:nth-child(2)", &problem);
+    CHECK(counted.has_value() && counted->trigger == th::Trigger::Active && counted->parts[0].nth == 2);
+    CHECK(!th::ParseSelector("Button:active > Grid", &problem));
+    CHECK(problem.find("last element") != std::string::npos);
+    // A structural pseudo-class after the state does not make the part the last one.
+    CHECK(!th::ParseSelector("Button:hover:first-child Grid", &problem));
+    CHECK(problem.find("last element") != std::string::npos);
+    CHECK(!th::ParseSelector("Button:focus:nth-child(2) > Grid", &problem));
+    CHECK(problem.find("last element") != std::string::npos);
+    CHECK(!th::ParseSelector("Button:hover:active", &problem));
+    CHECK(problem.find("only one of") != std::string::npos);
+
+    th::Stylesheet sheet = th::ParseStylesheet(".play-button:active { opacity: 0.5 }\n");
+    CHECK(sheet.rules.size() == 1 && sheet.rules[0].selectors.size() == 1);
+    if (sheet.rules.size() == 1 && !sheet.rules[0].selectors.empty()) {
+        CHECK(sheet.rules[0].selectors[0].trigger == th::Trigger::Active);
+        CHECK(sheet.rules[0].selectors[0].parts.back().type == "AppBarButton");
+    }
+
+    MemoryFiles files;
+    files.files["user.css"] = "Button:active { order: 1; opacity: 0.5; }\n";
+    th::Theme theme = Load(files);
+    CHECK(!ProblemContaining(theme, "not possible under :active").empty());
 }
 
 namespace {
@@ -2640,6 +2691,92 @@ TEST_CASE(Engine_HoverShowsUnderThePointerAndRestores) {
     CHECK(tree.Shown(2, "Opacity").text == "1");
     tree.PointerEnter(2);  // nothing follows the pointer any more
     CHECK(tree.Shown(2, "Opacity").text == "1");
+}
+
+TEST_CASE(Engine_ActiveAndFocusShowInTheirStates) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "Button:hover { opacity: 0.8; }\n"
+        "Button:active { transform: scale(0.95); opacity: 0.6; }\n"
+        "#Play:focus { box-shadow: 16px; }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+
+    FakeTree tree = MakeButtonPage();
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    th::ThemeEngine::Report first = engine.Apply(theme, tree);
+    CHECK(first.applied == 4);
+    CHECK(first.refused == 0);
+    CHECK(tree.handlersAttached == 1);
+    CHECK(log.str().find("Opacity = 0.6 (:active)") != std::string::npos);
+
+    tree.PointerEnter(2);
+    CHECK(tree.Shown(2, "Opacity").text == "0.8");
+    tree.Press(2, true);
+    CHECK(tree.Shown(2, "Opacity").text == "0.6");  // pressed beats the hover
+    CHECK(tree.Shown(2, "RenderTransform").text == "0.95,0.95,0,0,0");
+    tree.Press(2, false);
+    CHECK(tree.Shown(2, "Opacity").text == "0.8");
+    CHECK(tree.Shown(2, "RenderTransform").text == "handle:1");
+
+    tree.Focus(2, true);
+    CHECK(tree.Shown(2, "Shadow").text == "16");
+    tree.PointerExit(2);
+    CHECK(tree.Shown(2, "Opacity").text == "1");
+    CHECK(tree.Shown(2, "Shadow").text == "16");  // the focus stays when the pointer leaves
+    tree.Focus(2, false);
+    CHECK(tree.Shown(2, "Shadow").text == "handle:2");
+}
+
+TEST_CASE(Hover_PressAndFocusShowOverTheHoverInOrder) {
+    struct Element final : th::HoverTracker::Access {
+        std::map<std::string, th::Value, std::less<>> values{{"Background", Brush("#FF111111")}};
+        std::optional<th::Value> ReadRaw(th::NodeId, std::string_view property) override {
+            auto it = values.find(property);
+            if (it == values.end()) return std::nullopt;
+            return it->second;
+        }
+        bool WriteRaw(th::NodeId, std::string_view property, const th::Value& value) override {
+            values[std::string(property)] = value;
+            writes++;
+            return true;
+        }
+        int writes = 0;
+    } element;
+    th::HoverTracker states;
+    states.Set(7,
+               {{"Background", Brush("#FF222222")},
+                {"Background", Brush("#FF333333"), th::Trigger::Focus},
+                {"Background", Brush("#FF444444"), th::Trigger::Active}},
+               element);
+    CHECK(states.Uses(7, th::Trigger::Hover) && states.Uses(7, th::Trigger::Focus) && states.Uses(7, th::Trigger::Active));
+    CHECK(!states.Uses(8, th::Trigger::Hover));
+
+    states.Enter(7, element);
+    CHECK(element.values["Background"] == Brush("#FF222222"));
+    states.Toggle(7, th::Trigger::Focus, true, element);
+    CHECK(element.values["Background"] == Brush("#FF333333"));  // the focus beats the hover
+    states.Toggle(7, th::Trigger::Active, true, element);
+    CHECK(element.values["Background"] == Brush("#FF444444"));  // pressed beats both
+    int writes = element.writes;
+    states.Toggle(7, th::Trigger::Active, true, element);
+    CHECK(element.writes == writes);  // already pressed: nothing written
+
+    // The engine writes underneath while the element is pressed, and reads back what it wrote.
+    CHECK(states.Write(7, "Background", Brush("#FF555555"), element));
+    CHECK(states.Read(7, "Background", element) == Brush("#FF555555"));
+    CHECK(element.values["Background"] == Brush("#FF444444"));
+
+    states.Toggle(7, th::Trigger::Active, false, element);
+    CHECK(element.values["Background"] == Brush("#FF333333"));
+    states.Exit(7, element);
+    CHECK(element.values["Background"] == Brush("#FF333333"));  // still focused
+    states.Toggle(7, th::Trigger::Focus, false, element);
+    CHECK(element.values["Background"] == Brush("#FF555555"));
+    CHECK(states.ValueOf(7, "Background", th::Trigger::Active) == Brush("#FF444444"));
+    CHECK(states.ValueOf(7, "Background") == Brush("#FF222222"));
 }
 
 TEST_CASE(Engine_HoverFollowsThemeChangesWithoutLeaking) {

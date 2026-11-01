@@ -72,8 +72,9 @@ private:
     void ApplyMoves(std::vector<PendingMove>& pending, TreeBackend& tree, Report& report);
     bool WriteValue(const NodeInfo& node, const Assignment& assignment, TreeBackend& tree, Report& report, bool keep);
     std::optional<Value> Resolve(NodeId id, const std::string& property, const Value& value, const Value& current);
-    void ApplyHover(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners, TreeBackend& tree,
-                    Report& report);
+    // The winning declaration of each state and property of an element (:hover, :focus, :active).
+    using StateWinners = std::map<std::pair<Trigger, std::string>, const Assignment*>;
+    void ApplyHover(const NodeInfo& node, const StateWinners& winners, TreeBackend& tree, Report& report);
     void GiveBack(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners, TreeBackend& tree,
                   Report& report);
 
@@ -83,7 +84,7 @@ private:
                                                                    // before the theme, which the next passes no longer read
     std::map<std::string, Value> m_resourceOriginals;             // resource key, first value seen
     std::vector<Move> m_moves;  // every change of position, in the order made
-    std::map<NodeId, std::vector<HoverValue>> m_hovers;  // the :hover values the backend holds for each element
+    std::map<NodeId, std::vector<HoverValue>> m_hovers;  // the state values the backend holds for each element
     std::string m_dictionary;  // the resource dictionary currently merged, empty when none
     std::set<std::string> m_reported;  // refusals already written to the log, so a timer does not repeat them
     bool m_active = false;

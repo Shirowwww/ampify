@@ -157,7 +157,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.track-text` | The title and the artist |
 | `.track-lines`, `.track-line` | The block of the two lines, and each line |
 | `.track-title`, `.track-artist` | Each of them |
-| `.scrubber` | The progress bar |
+| `.scrubber` | The progress bar. Apple Music draws its bar itself: a theme can place, size, fade or hide it, but `color` and `background` do not reach the bar |
 | `.current-time`, `.duration` | The time played and the length |
 | `.audio-badge` | The badge of the audio format (Lossless, Dolby Atmos) |
 | `.live-badge`, `.autoplay-badge` | The Live and Autoplay badges |

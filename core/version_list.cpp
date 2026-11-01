@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <fstream>
 
+#include "text_util.hpp"
+
 namespace ampify {
 
 namespace {
@@ -36,7 +38,7 @@ bool IsPackageVersionText(std::string_view text) {
 }
 
 std::optional<std::vector<std::string>> ParseVersionList(std::string_view text) {
-    if (text.size() >= 3 && text.substr(0, 3) == "\xEF\xBB\xBF") text.remove_prefix(3);  // a UTF-8 mark from Notepad
+    text = WithoutBom(text);
 
     std::vector<std::string> versions;
     bool header = false;

@@ -3,6 +3,7 @@
 #include <cctype>
 #include <charconv>
 
+#include "../text_util.hpp"
 #include "builtins.hpp"
 
 namespace ampify::theme {
@@ -90,6 +91,14 @@ std::string LowerCopy(std::string_view text) {
     std::string result(text);
     for (char& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return result;
+}
+
+// The state a pseudo-class names. :focus-within is :focus: the backend follows the focus of the element's parts too.
+std::optional<Trigger> StateOf(std::string_view pseudo) {
+    if (pseudo == "hover") return Trigger::Hover;
+    if (pseudo == "focus" || pseudo == "focus-within") return Trigger::Focus;
+    if (pseudo == "active") return Trigger::Active;
+    return std::nullopt;
 }
 
 std::vector<Declaration> ParseDeclarations(std::string_view body, size_t bodyOffset, const std::string& clean,
@@ -269,6 +278,16 @@ std::optional<std::vector<Selector>> ParseSelectorList(std::string_view head, st
 
 }  // namespace
 
+const char* TriggerName(Trigger trigger) {
+    switch (trigger) {
+        case Trigger::Hover: return ":hover";
+        case Trigger::Focus: return ":focus";
+        case Trigger::Active: return ":active";
+        case Trigger::Always: break;
+    }
+    return "";
+}
+
 std::optional<Selector> ParseSelector(std::string_view text, std::string* problem) {
     Selector selector;
     selector.text = std::string(Trimmed(text));
@@ -288,6 +307,12 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
         if (IsSpace(s[i])) {
             i++;
             continue;
+        }
+
+        // A state belongs to the element that receives the declarations: no part may follow it.
+        if (selector.trigger != Trigger::Always) {
+            return fail("\"" + std::string(TriggerName(selector.trigger)) + "\" is only allowed on the last element of \"" +
+                        selector.text + "\"");
         }
 
         if (s[i] == '>') {
@@ -315,8 +340,8 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
             if (compound.name.empty()) return fail("name missing after \"#\" in \"" + selector.text + "\"");
         }
 
-        // Pseudo-classes: the structural ones on any part, :hover only on the last part (the engine follows the pointer
-        // of the element it styles).
+        // Pseudo-classes: the structural ones on any part, one state (:hover, :focus, :active) only on the last part (the
+        // backend follows the state of the element it styles).
         while (i < s.size() && s[i] == ':') {
             size_t start = ++i;
             while (i < s.size() && IsNameChar(s[i])) i++;
@@ -338,14 +363,14 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
                 }
                 compound.nth = n;
                 i = close + 1;
-            } else if (pseudo == "hover") {
-                if (s.substr(i).find_first_not_of(" \t\r\n") != std::string_view::npos) {
-                    return fail("\":hover\" is only allowed on the last element of \"" + selector.text + "\"");
+            } else if (std::optional<Trigger> state = StateOf(pseudo)) {
+                if (selector.trigger != Trigger::Always) {
+                    return fail("only one of :hover, :focus and :active is allowed in \"" + selector.text + "\"");
                 }
-                selector.hover = true;
+                selector.trigger = *state;
             } else {
                 return fail("pseudo-class \":" + std::string(s.substr(start, i - start)) + "\" is not supported in \"" +
-                            selector.text + "\" (:hover, :nth-child(n), :first-child and :last-child are)");
+                            selector.text + "\" (:hover, :focus, :active, :nth-child(n), :first-child and :last-child are)");
             }
         }
 
@@ -366,7 +391,7 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
 
 Stylesheet ParseStylesheet(std::string_view css) {
     Stylesheet sheet;
-    std::string clean = WithoutComments(css);
+    std::string clean = WithoutComments(WithoutBom(css));
     size_t pos = 0;
     std::optional<MediaQuery> media;  // set inside an @media block
 

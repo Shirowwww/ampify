@@ -23,7 +23,7 @@ Settings and state
 
 Elements
   extension list|enable|disable <id>   extensions (including the built-in Atmos leveler)
-  snippet  list|enable|disable <id>    snippets (XAML fragments)
+  snippet  list|enable|disable <id>    snippets (small styles switched on alone)
   app      list|enable|disable <id>    apps (pages added to the interface)
   theme    list | set <id> [--scheme <name>] | clear
   theme    check <folder> [--scheme <name>]   reads a theme as the kernel does and shows what would apply

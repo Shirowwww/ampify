@@ -55,7 +55,7 @@ effect has to be taught to the engine once.
 
 Updated on 2026-10-31 (see [spicetify-ecosystem.md](spicetify-ecosystem.md) for the counts behind this order).
 
-1. **Feedback states beyond hover**: `:active` and `:focus` (13 of 18 themes), `@keyframes` (11).
+1. **Animations**: `@keyframes` (11 of 18 themes). `:active` and `:focus` (13) are done.
 2. **Names for states and sub-parts**: selected and playing rows, the parts of the progress bar, the action bar and the
    header background of album pages, lyrics lines, scrollbars, context menus.
 3. **Apple's own player views**: the mini player and the full-screen player, with karaoke lyrics, live in a second window

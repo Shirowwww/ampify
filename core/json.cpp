@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "text_util.hpp"
+
 namespace ampify {
 
 namespace {
@@ -287,7 +289,7 @@ void DumpString(const std::string& s, std::string& out) {
 }  // namespace
 
 std::optional<Json> Json::Parse(std::string_view text, std::string* error) {
-    return Parser(text).ParseDocument(error);
+    return Parser(WithoutBom(text)).ParseDocument(error);
 }
 
 std::string Json::Dump() const {

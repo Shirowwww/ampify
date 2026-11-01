@@ -118,7 +118,7 @@ header background, queue rows, generic buttons and toggles, lyrics lines. Missin
 | `var()`, `!important`, margin and padding, `:hover`, `transform`, borders, `:nth-child`, gradients, `>`, opacity, fonts, `z-index` | 12 to 18 | done |
 | `border-radius` | 18 | done |
 | width and height with min and max | 17 | done |
-| `:active`, `:focus` | 13 | missing |
+| `:active`, `:focus` | 13 | done (`:focus-within` too) |
 | `:not()` | 12 | missing |
 | `transition` | 12 | done for transform, opacity, background |
 | `@keyframes`, `animation` | 11 | missing |
@@ -206,7 +206,7 @@ with line numbers), `types`, `doctor`, permissions with consent, `appVersions`, 
 | 2 | Style the main zones by stable name | areas 1 to 10, 80 % of selectors | done for zones, partial for states and sub-parts |
 | 3 | Read the playing track and follow changes | 16 of 20 projects | partial |
 | 4 | Artwork background and accent | all big dynamic themes | static done; accent from artwork and animation missing |
-| 5 | Feedback states: hover, pressed, focus, transitions, keyframes | `:hover` 17, `:active`/`:focus` 13, `transition` 12, `@keyframes` 11 | hover and transitions done; the rest missing |
+| 5 | Feedback states: hover, pressed, focus, transitions, keyframes | `:hover` 17, `:active`/`:focus` 13, `transition` 12, `@keyframes` 11 | hover, pressed, focus and transitions done; keyframes missing |
 | 6 | Navigation: current page, page change, go to a page | 15 of 20 | own pages only |
 | 7 | Custom UI: pages, panels, dialogs | `React` in 8, `PopupModal` in 10 | done |
 | 8 | Notifications | 10 of 20 | done |

@@ -241,8 +241,8 @@ def check_manifest(doc, path):
     if kind == "theme" and not ({"colors", "resources"} & doc.keys()):
         errors.append("colors or resources: at least one of the two is required for a theme")
     if kind == "snippet":
-        if "resources" not in doc:
-            errors.append("resources: required for a snippet")
+        if "resources" not in doc and not os.path.isfile(os.path.join(folder, "user.css")):
+            errors.append("resources or user.css: at least one of the two is required for a snippet")
         if "main" in doc:
             errors.append("main: not allowed for a snippet")
 
