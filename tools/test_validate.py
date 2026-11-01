@@ -340,6 +340,10 @@ class ManifestTests(unittest.TestCase):
             "default must be true or false": [dict(toggle, default="yes")],
             "default must be one of the options": [{"key": "a", "label": "A", "type": "choice",
                                                     "options": ["x", "y"], "default": "z"}],
+            "options must be on one line, without spaces at either end": [
+                {"key": "a", "label": "A", "type": "choice", "options": ["x", "y "], "default": "x"}],
+            "default must be a text of 200 characters at most, on one line": [
+                {"key": "a", "label": "A", "type": "text", "default": " padded"}],
             "default must be a number between min and max": [{"key": "a", "label": "A", "type": "number",
                                                               "min": 1, "max": 5, "default": 9}],
             "min and max belong to a number": [dict(toggle, min=1)],

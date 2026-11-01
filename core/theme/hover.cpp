@@ -4,6 +4,28 @@
 
 namespace ampify::theme {
 
+namespace {
+
+// A property the element refuses must not leave the others half shown: each one is written on its own, and a refusal
+// counts as a write that did not happen.
+bool TryWrite(HoverTracker::Access& access, NodeId id, std::string_view property, const Value& value) {
+    try {
+        return access.WriteRaw(id, property, value);
+    } catch (...) {
+        return false;
+    }
+}
+
+std::optional<Value> TryRead(HoverTracker::Access& access, NodeId id, std::string_view property) {
+    try {
+        return access.ReadRaw(id, property);
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+}  // namespace
+
 HoverTracker::Change HoverTracker::Set(NodeId id, const std::vector<HoverValue>& values, Access& access) {
     auto it = m_elements.find(id);
     if (values.empty()) {
@@ -62,22 +84,22 @@ void HoverTracker::Show(NodeId id, Element& element, Access& access) {
         auto shown = element.shown.find(property);
         if (!winner) {
             if (shown == element.shown.end()) continue;
-            access.WriteRaw(id, property, shown->second.under);
+            TryWrite(access, id, property, shown->second.under);
             element.shown.erase(shown);
         } else if (shown == element.shown.end()) {
-            std::optional<Value> under = access.ReadRaw(id, property);
+            std::optional<Value> under = TryRead(access, id, property);
             if (!under) continue;  // the element has no such property: nothing to show, nothing to put back
-            if (!access.WriteRaw(id, property, winner->value)) continue;
+            if (!TryWrite(access, id, property, winner->value)) continue;
             element.shown.emplace(property, Shown{std::move(*under), winner->trigger});
         } else if (shown->second.trigger != winner->trigger) {
-            access.WriteRaw(id, property, winner->value);
+            TryWrite(access, id, property, winner->value);
             shown->second.trigger = winner->trigger;
         }
     }
 }
 
 void HoverTracker::PutBack(NodeId id, Element& element, Access& access) {
-    for (const auto& [property, shown] : element.shown) access.WriteRaw(id, property, shown.under);
+    for (const auto& [property, shown] : element.shown) TryWrite(access, id, property, shown.under);
     element.shown.clear();
 }
 

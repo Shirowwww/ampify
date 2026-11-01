@@ -225,6 +225,11 @@ def check_catalog(doc, path):
     return errors
 
 
+def fits_settings_file(text):
+    """settings.txt holds one value per line and trims its ends (core/settings.cpp): a value must survive both."""
+    return "\n" not in text and "\r" not in text and text == text.strip(" \t\n\v\f\r")
+
+
 def check_setting_value(setting, where):
     """The type-dependent rules of one declared setting (core/manifest.cpp, ReadSettingValue)."""
     kind, value = setting["type"], setting["default"]
@@ -235,10 +240,13 @@ def check_setting_value(setting, where):
         errors.append(f"{where}: min and max belong to a number")
     if kind == "toggle" and not isinstance(value, bool):
         errors.append(f"{where}: default must be true or false")
+    if kind == "choice" and not all(fits_settings_file(option) for option in setting.get("options", [])):
+        errors.append(f"{where}: options must be on one line, without spaces at either end")
     if kind == "choice" and value not in setting.get("options", []):
         errors.append(f"{where}: default must be one of the options")
-    if kind == "text" and (not isinstance(value, str) or len(value) > 200 or "\n" in value or "\r" in value):
-        errors.append(f"{where}: default must be a text of 200 characters at most, on one line")
+    if kind == "text" and (not isinstance(value, str) or len(value) > 200 or not fits_settings_file(value)):
+        errors.append(f"{where}: default must be a text of 200 characters at most, on one line, "
+                      "without spaces at either end")
     if kind == "number":
         low, high = setting.get("min", float("-inf")), setting.get("max", float("inf"))
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not low <= value <= high:

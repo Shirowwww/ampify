@@ -103,10 +103,10 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | `TippyProps` | `tooltip`, `tooltipPlacement` and `tooltipDelay` on every primitive and component | Done |
 | `Topbar` | `Ampify.ui.topbar.addButton`. The button goes in the playback bar's toggle button row, since Apple Music has no separate top bar | Done |
 | `Playbar` | `Ampify.ui.playbar.addButton` | Done |
-| `ContextMenu`, `Menu` | `Ampify.ui.menu.addItem`: entries in Apple Music's main menu (`"app"`) and in the menu of a song, an album or a playlist (`"context"`), whose `onClick` receives the item's name. Spicetify gives the items' URIs, a `shouldAdd` filter and submenus; Apple Music's menus give no identifier for their item | Partial |
+| `ContextMenu`, `Menu` | `Ampify.ui.menu.addItem`: entries in Apple Music's main menu (`"app"`) and in the menu of a song, an album or a playlist (`"context"`), whose `onClick` receives the item's name, from a click or from the keyboard (menu key, arrows, Enter). Spicetify gives the items' URIs, a `shouldAdd` filter and submenus; Apple Music's menus give no identifier for their item | Partial |
 | `PopupModal` | `Ampify.ui.popup.open`, a native dialog | Done |
 | `Panel` (documented by Spicetify, absent from its code) | `Ampify.ui.panel.register`, a 380 px column on the right | Done |
-| `AppTitle` | `Ampify.ui.title.set`, not yet checked in Apple Music | Partial |
+| `AppTitle` | `Ampify.ui.title.set`: the title of the element's panel, page and popup (checked on an app page). Apple Music's window title stays its own | Partial |
 | `Keyboard` | `Ampify.keyboard.bind` (global shortcuts through `RegisterHotKey`) | Done |
 | `LocalStorage` | `Ampify.storage`, one JSON file per element | Done |
 | `Config` | `Ampify.config.get` and `set`, limited to the element's keys | Done |
@@ -142,7 +142,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 |---|---|---|
 | `CustomApps/<name>/` | `apps/<id>/` with `manifest.json` (`kind: app`), `main.js` and an `.svg` icon | Done |
 | `render()` in React | A global `render()` in an app, or `Ampify.ReactDOM.render` to `page:/<path>` | Done |
-| Sidebar entry, normal and active icon | The code of an app runs once it is switched on. The sidebar entry and the active-state icon are not wired yet | Planned |
+| Sidebar entry, normal and active icon | The app adds its entry with `Ampify.ui.sidebar.addItem` and a Segoe Fluent Icons glyph, as the app starter does. The manifest's `icon` does not make the entry by itself, and there is no active-state icon | Partial |
 | Routing and sub-pages | `Ampify.ui.navigate(path)` and the paths the app registers | Partial |
 | Page in HTML | No. Ampify renders to native controls and uses no WebView | Different |
 | `subfiles_extension` | An app and an extension with the same id are linked and talk through `Ampify.link` | Done |

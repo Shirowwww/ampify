@@ -684,9 +684,13 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     if (!window) return nodes;
     xaml::UIElement content = window.Content();
     if (!content) return nodes;
-    if (m_pass) WatchPopups(content);
-    // A popup this pass finds first may still be filling in: it gets its passes as if the check had found it.
-    if (LearnPopups(content.XamlRoot())) SchedulePass(1);
+    // A popup this pass finds first may still be filling in: it gets its passes as if the check had found it. A popup
+    // torn down meanwhile can throw: the walk of the window still runs.
+    try {
+        if (m_pass) WatchPopups(content);
+        if (LearnPopups(content.XamlRoot())) SchedulePass(1);
+    } catch (...) {
+    }
 
     // Preorder walk with an explicit stack. A parent is added before its children, as the engine expects. The window's
     // content comes first, then each popup as a root of its own.
@@ -1524,7 +1528,17 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
     return false;
 }
 
+// A control that refuses its events or a value counts as having no states: the engine goes on with the next element
+// (Engine::Restore gives every element back in one loop).
 bool XamlTreeBackend::SetHover(theme::NodeId id, const std::vector<theme::HoverValue>& values) {
+    try {
+        return FollowHover(id, values);
+    } catch (...) {
+        return false;
+    }
+}
+
+bool XamlTreeBackend::FollowHover(theme::NodeId id, const std::vector<theme::HoverValue>& values) {
     if (*m_closed) return false;
     xaml::DependencyObject object = Resolve(id);
     xaml::UIElement element{nullptr};
@@ -1696,6 +1710,7 @@ namespace {
 struct StateKeys {
     controls::Control holder{nullptr};
     std::vector<std::wstring> keys;
+    std::vector<std::wstring> plainKeys;  // read at rest: they take the written value, not the :hover one
 };
 
 // The controls whose templates change their look under the pointer and while pressed. A page, a navigation view or
@@ -1723,6 +1738,18 @@ StateKeys PointerStateKeys(const controls::Control& control, std::string_view pr
             if (auto slider = current.try_as<controls::Slider>()) result.holder = slider;
         }
         if (result.holder.try_as<controls::Slider>() && property == "Background") bases = {"SliderThumbBackground"};
+    } else if (control.try_as<primitives::ScrollBar>()) {
+        // Away from the pointer a scroll bar is a thin line; under it, it widens to a thumb on a track. The line and the
+        // track at rest take the written value, the wide thumb and the track under the pointer the :hover one.
+        if (property == "Foreground") {
+            result.keys = {L"ScrollBarPanningThumbBackground", L"ScrollBarThumbBackground"};
+            result.plainKeys = {L"ScrollBarPanningThumbBackground"};
+        }
+        if (property == "Background") {
+            result.keys = {L"ScrollBarTrackFill", L"ScrollBarTrackFillPointerOver"};
+            result.plainKeys = {L"ScrollBarTrackFill"};
+        }
+        return result;
     } else {
         bases.push_back(ShortName(Utf8(winrt::get_class_name(control))) + std::string(property));
         if (control.try_as<primitives::ToggleButton>()) bases.push_back("ToggleButton" + std::string(property));
@@ -1738,6 +1765,16 @@ StateKeys PointerStateKeys(const controls::Control& control, std::string_view pr
         }
     }
     return result;
+}
+
+// A solid brush drawn the same, as a new object; any other brush as it is.
+IInspectable CopyBrush(const IInspectable& brush) {
+    if (auto solid = brush.try_as<media::SolidColorBrush>()) {
+        media::SolidColorBrush copy(solid.Color());
+        copy.Opacity(solid.Opacity());
+        return copy;
+    }
+    return brush;
 }
 
 // The engine builds a new brush at each write: two brushes that draw the same count as the same. Comparing gradients
@@ -1775,7 +1812,8 @@ bool SameBrush(const IInspectable& a, const IInspectable& b) {
 }  // namespace
 
 void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::DependencyObject& object, std::string_view property,
-                                        const IInspectable& value, const IInspectable& pressed) noexcept {
+                                        const IInspectable& value, const IInspectable& pressed,
+                                        const IInspectable& plain) noexcept {
     // The control itself or its template's root, which the states write to (Root.Background). A deeper part keeps the
     // control's own feedback: a list row's background must not become the highlight of the row under the pointer.
     constexpr int kTemplateDepth = 2;
@@ -1795,9 +1833,12 @@ void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::Dependency
         held.control = winrt::make_weak(states.holder);
         held.holder = winrt::get_abi(states.holder.as<winrt::Windows::Foundation::IUnknown>());
         xaml::ResourceDictionary resources = states.holder.Resources();
+        // The written brush is also the element's property value, which a dictionary refuses (0x800F0902): a copy.
+        IInspectable restCopy = states.plainKeys.empty() ? nullptr : CopyBrush(plain);
         bool changed = false;
         for (const std::wstring& key : states.keys) {
-            const IInspectable& want = key.ends_with(L"Pressed") ? pressed : value;
+            bool atRest = std::find(states.plainKeys.begin(), states.plainKeys.end(), key) != states.plainKeys.end();
+            const IInspectable& want = atRest ? restCopy : key.ends_with(L"Pressed") ? pressed : value;
             IInspectable name = winrt::box_value(winrt::hstring(key));
             auto kept = std::find_if(held.keys.begin(), held.keys.end(), [&](const auto& item) { return item.first == key; });
             if (!want) {
@@ -1818,8 +1859,15 @@ void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::Dependency
         // Only on a real change: a refresh made Apple Music reset the play button's background, which was then written
         // again, every 3 s.
         if (changed) ReadThemeAgain(states.holder);
-    } catch (...) {
+    } catch (const winrt::hresult_error& error) {
         m_refusedStates++;  // costs the states their theme value, never the value itself
+        if (m_firstRefusal.empty()) {
+            char code[16];
+            std::snprintf(code, sizeof code, "0x%08X", static_cast<unsigned>(error.code().value));
+            m_firstRefusal = std::string(property) + ": " + code + " " + Utf8(error.message());
+        }
+    } catch (...) {
+        m_refusedStates++;
     }
 }
 
@@ -1844,6 +1892,7 @@ media::Brush StateBrush(const theme::Value& value) {
 // lit after the pointer leaves it.
 void XamlTreeBackend::UpdateStates(theme::NodeId id, const xaml::DependencyObject& object, std::string_view property,
                                    IInspectable shown) noexcept {
+    IInspectable plain = shown;
     IInspectable pressed;
     try {
         if (std::optional<theme::Value> hover = m_hover.ValueOf(id, property)) {
@@ -1856,7 +1905,7 @@ void XamlTreeBackend::UpdateStates(theme::NodeId id, const xaml::DependencyObjec
     } catch (...) {
     }
     if (shown || pressed) {
-        HoldThroughStates(id, object, property, shown, pressed);
+        HoldThroughStates(id, object, property, shown, pressed, plain);
     } else {
         ReleaseStates(id, property);
     }

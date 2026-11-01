@@ -80,6 +80,9 @@ settings again.
 | `type` | `toggle`, `choice`, `text` or `number` |
 | `default` | `true` or `false` for a toggle, one of the `options` for a choice, a text of 200 characters at most on one line, or a number between `min` and `max` |
 | `options` | A choice's values, and only a choice's: 2 to 20 different texts of 1 to 40 characters |
+
+`settings.txt` keeps one value per line and trims the spaces around it, so an option or a text default must be on one
+line, without spaces at either end.
 | `min`, `max` | A number's bounds, optional. A number typed outside them is not kept |
 
 There are 16 settings at most. A text or a number is written when the field is left or when Enter is pressed.

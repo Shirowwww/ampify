@@ -24,6 +24,7 @@ const std::vector<ClassEntry> kClasses{
     {"caption-buttons-cover", {"Border#CaptionButtonsOcclusionBorder"}},
     {"modal", {"ContentPresenter#ModalContentPresenter"}},
     {"info-bar", {"InfoBar#topInfoBar", "InfoBar#bottomInfoBar"}},
+    {"scrollbar", {"ScrollBar#VerticalScrollBar", "ScrollBar#HorizontalScrollBar"}},
 
     // Sidebar
     {"sidebar", {"SplitView#RootSplitView > Grid > Grid#PaneRoot"}},

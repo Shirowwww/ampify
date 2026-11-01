@@ -170,8 +170,9 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             if (held != ui->heldStates || refused != ui->refusedStates) {
                 ui->heldStates = held;
                 ui->refusedStates = refused;
+                const std::string& why = ui->backend.FirstStateRefusal();
                 journal.Write("Themes: " + std::to_string(held) + " value(s) kept under the pointer and while pressed, " +
-                              std::to_string(ui->backend.RefusedStateCount()) + " refused");
+                              std::to_string(refused) + " refused" + (refused && !why.empty() ? " (first: " + why + ")" : ""));
             }
             // The app's own light or dark mode follows the scheme, so what the theme does not name matches what it does
             // (the midnight theme alone left light text on Apple Music's white background). The scheme's background

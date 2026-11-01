@@ -5,6 +5,7 @@ namespace ampify::prelude {
 extern const char kConfig[];
 const char kConfig[] = R"AMPIFYJS(
   const TRUE_WORDS = ["true", "on", "yes", "1"];
+  const FALSE_WORDS = ["false", "off", "no", "0"];
 
   Ampify.config = {
     get(key, fallback) {
@@ -12,9 +13,13 @@ const char kConfig[] = R"AMPIFYJS(
       if (fallback === undefined) fallback = native.configDeclared(text(key));
       const raw = native.configGet(text(key));
       if (raw === undefined) return fallback;
-      if (typeof fallback === "boolean") return TRUE_WORDS.includes(raw.toLowerCase());
+      // A value edited by hand into something else reads as the default, not as false or 0.
+      if (typeof fallback === "boolean") {
+        const word = raw.toLowerCase();
+        return TRUE_WORDS.includes(word) ? true : FALSE_WORDS.includes(word) ? false : fallback;
+      }
       if (typeof fallback === "number") {
-        const number = Number(raw);
+        const number = raw.trim() === "" ? NaN : Number(raw);
         return Number.isFinite(number) ? number : fallback;
       }
       return raw;

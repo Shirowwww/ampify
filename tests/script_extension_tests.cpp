@@ -117,11 +117,15 @@ TEST_CASE(Element_ConfigGivesTheDeclaredDefaultsWithTheirType) {
     manifest.insert(manifest.rfind('}'), R"(,"settings":[
         {"key":"seconds","label":"Seconds","type":"toggle","default":true},
         {"key":"size","label":"Size","type":"number","default":12},
-        {"key":"side","label":"Side","type":"choice","options":["Left","Right"],"default":"Left"}])");
+        {"key":"side","label":"Side","type":"choice","options":["Left","Right"],"default":"Left"},
+        {"key":"count","label":"Count","type":"number","default":3},
+        {"key":"sound","label":"Sound","type":"toggle","default":true}])");
     ampify::ManifestResult result = ampify::ParseManifest(manifest, "decl", 1, [](const std::string&) { return true; });
     CHECK(result.manifest.has_value());
     if (!result.manifest) return;
     f.host.settings["extensions.decl.size"] = "20";
+    f.host.settings["extensions.decl.count"] = "";      // emptied by hand
+    f.host.settings["extensions.decl.sound"] = "maybe";  // neither a yes nor a no
     fs::path dir = ScratchDir("decl");
     std::ofstream(dir / "main.js") << R"(
         Ampify.log("seconds=" + (Ampify.config.get("seconds") === true));
@@ -129,6 +133,8 @@ TEST_CASE(Element_ConfigGivesTheDeclaredDefaultsWithTheirType) {
         Ampify.log("side=" + Ampify.config.get("side"));
         Ampify.log("given=" + Ampify.config.get("side", "Right"));
         Ampify.log("absent=" + Ampify.config.get("absent"));
+        Ampify.log("count=" + Ampify.config.get("count"));
+        Ampify.log("sound=" + Ampify.config.get("sound"));
     )";
     ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock(), {});
     CHECK(element.Start());
@@ -137,6 +143,8 @@ TEST_CASE(Element_ConfigGivesTheDeclaredDefaultsWithTheirType) {
     CHECK(f.Logged("side=Left"));
     CHECK(f.Logged("given=Right"));  // a default given in the call wins
     CHECK(f.Logged("absent=undefined"));
+    CHECK(f.Logged("count=3"));     // an empty value is not 0
+    CHECK(f.Logged("sound=true"));  // nor is an unknown word false
 }
 
 TEST_CASE(Element_RunsOnStopHandlersInReverseOrder) {

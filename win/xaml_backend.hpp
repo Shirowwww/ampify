@@ -73,6 +73,7 @@ public:
     // How many state values hold a theme's value now (HoldThroughStates), and how many refused it, for the log.
     std::size_t HeldStateCount() const;
     std::size_t RefusedStateCount() const { return m_refusedStates; }
+    const std::string& FirstStateRefusal() const { return m_firstRefusal; }  // the property and the reason, once
     // What made the last SetAppMode read the resources again, for the log.
     const std::string& RefreshReason() const { return m_refreshReason; }
     // What the caption buttons were set to before the first theme, once, for the log; empty after.
@@ -123,14 +124,17 @@ private:
     std::vector<bool> MediaAnswers();
     void OnSizeChanged() noexcept;
     void RemoveHoverHandlers(theme::NodeId id);
+    bool FollowHover(theme::NodeId id, const std::vector<theme::HoverValue>& values);  // SetHover, unguarded
     // The PointerOver and Pressed states of a control template write some properties of its parts above any local
     // value: a theme's background on a button's Root vanished under the pointer and while pressed (greenroom's white
     // play button showed its black icon on black). The brushes those states read ({Control}{Property}PointerOver and
     // Pressed) get the theme's value in that control's own resources, the Pressed ones the :active value when the theme
-    // gives one; a null value leaves that state Apple Music's. ReleaseStates gives Apple Music's back.
+    // gives one; a null value leaves that state Apple Music's. Keys a control reads at rest (a scroll bar's) get `plain`,
+    // the written value. ReleaseStates gives Apple Music's back.
     void HoldThroughStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
                            std::string_view property, const winrt::Windows::Foundation::IInspectable& value,
-                           const winrt::Windows::Foundation::IInspectable& pressed) noexcept;
+                           const winrt::Windows::Foundation::IInspectable& pressed,
+                           const winrt::Windows::Foundation::IInspectable& plain) noexcept;
     void ReleaseStates(theme::NodeId id, std::string_view property) noexcept;
     void UpdateStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
                       std::string_view property, winrt::Windows::Foundation::IInspectable shown) noexcept;
@@ -180,6 +184,7 @@ private:
     };
     std::map<std::pair<theme::NodeId, std::string>, HeldStates> m_heldStates;
     std::size_t m_refusedStates = 0;
+    std::string m_firstRefusal;
     std::vector<theme::MediaQuery> m_mediaQueries;  // the theme's @media conditions (WatchSize)
     std::vector<bool> m_mediaAnswers;               // whether each matched at the last pass
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);  // the pointer handlers hold a weak pointer to it

@@ -245,7 +245,8 @@ An element neither reads nor writes the keys of another element.
 An extension that lists its `settings` in its manifest ([manifest.md](manifest.md), "Settings") gets them in the Ampify
 card of Apple Music's settings. `Ampify.config.get(key)` without a default then gives the manifest's default, typed: a
 boolean for a toggle, a number for a number, a text otherwise. A default given in the call wins over the manifest's. A
-change in the card restarts the extension.
+stored value that does not read as that type (an empty number, a toggle edited to `maybe`) gives the default. A change
+in the card restarts the extension.
 
 ### 5.3 Player [stable]
 

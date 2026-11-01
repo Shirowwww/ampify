@@ -1,6 +1,7 @@
 #include "manifest.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <regex>
@@ -53,13 +54,20 @@ constexpr size_t kMaxSettings = 16;
 constexpr size_t kMaxOptions = 20;
 constexpr size_t kMaxSettingText = 200;
 
+// settings.txt holds one value per line and trims its ends: a value that would not come back as written is refused.
+bool FitsSettingsFile(const std::string& text) {
+    auto space = [](char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; };
+    return text.find_first_of("\r\n") == std::string::npos &&
+           (text.empty() || (!space(text.front()) && !space(text.back())));
+}
+
 // A choice's values: 2 to 20 different texts of 1 to 40 characters.
 bool ReadOptions(const Json* field, std::vector<std::string>& options) {
     const Json::Array* list = field ? field->AsArray() : nullptr;
     if (!list || list->size() < 2 || list->size() > kMaxOptions) return false;
     for (const Json& item : *list) {
         const std::string* option = item.AsString();
-        if (!option || CodePoints(*option) < 1 || CodePoints(*option) > 40) return false;
+        if (!option || CodePoints(*option) < 1 || CodePoints(*option) > 40 || !FitsSettingsFile(*option)) return false;
         if (std::find(options.begin(), options.end(), *option) != options.end()) return false;
         options.push_back(*option);
     }
@@ -82,7 +90,9 @@ void ReadSettingValue(const Json& item, const std::string& where, SettingSpec& s
             return;
         case SettingSpec::Type::Choice:
             if (item.Find("options") && !ReadOptions(item.Find("options"), spec.options)) {
-                return errors.push_back(where + ": options must be 2 to 20 different texts of 1 to 40 characters");
+                return errors.push_back(where +
+                                        ": options must be 2 to 20 different texts of 1 to 40 characters, on one line, "
+                                        "without spaces at either end");
             }
             if (!value || !value->AsString() ||
                 std::find(spec.options.begin(), spec.options.end(), *value->AsString()) == spec.options.end()) {
@@ -92,8 +102,10 @@ void ReadSettingValue(const Json& item, const std::string& where, SettingSpec& s
             return;
         case SettingSpec::Type::Text:
             if (!value || !value->AsString() || CodePoints(*value->AsString()) > kMaxSettingText ||
-                value->AsString()->find_first_of("\r\n") != std::string::npos) {
-                return errors.push_back(where + ": default must be a text of 200 characters at most, on one line");
+                !FitsSettingsFile(*value->AsString())) {
+                return errors.push_back(where +
+                                        ": default must be a text of 200 characters at most, on one line, "
+                                        "without spaces at either end");
             }
             spec.defaultValue = *value->AsString();
             return;

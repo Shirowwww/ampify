@@ -5,6 +5,7 @@
 #include <optional>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -443,6 +444,16 @@ TEST_CASE(Css_AClassWithSeveralFormsGivesOneSelectorEach) {
     th::Stylesheet sheet = th::ParseStylesheet(".page-top-spacer { height: 8 }\n");
     CHECK(sheet.problems.empty());
     CHECK(sheet.rules.size() == 1 && sheet.rules[0].selectors.size() == 5);
+}
+
+TEST_CASE(Css_ScrollbarStandsForBothScrollBarsOfEveryList) {
+    th::Stylesheet sheet = th::ParseStylesheet(".scrollbar:hover { color: #888888 }\n");
+    CHECK(sheet.problems.empty());
+    CHECK(sheet.rules.size() == 1 && sheet.rules[0].selectors.size() == 2);
+    CHECK(sheet.rules[0].selectors.at(0).parts.back().type == "ScrollBar");
+    CHECK(sheet.rules[0].selectors.at(0).parts.back().name == "VerticalScrollBar");
+    CHECK(sheet.rules[0].selectors.at(1).parts.back().name == "HorizontalScrollBar");
+    CHECK(sheet.rules[0].selectors.at(1).trigger == th::Trigger::Hover);
 }
 
 TEST_CASE(Css_RefusesUnknownAndGluedClassesButKeepsFullTypeNames) {
@@ -1369,6 +1380,7 @@ TEST_CASE(ColourKeys_AreSortedUniqueAndNameTheFluentBrushes) {
     CHECK(std::adjacent_find(keys.begin(), keys.end(), [](auto a, auto b) { return a >= b; }) == keys.end());
     CHECK(std::binary_search(keys.begin(), keys.end(), std::string_view("TextFillColorPrimaryBrush")));
     CHECK(std::binary_search(keys.begin(), keys.end(), std::string_view("PaneBackgroundBrush")));
+    CHECK(std::binary_search(keys.begin(), keys.end(), std::string_view("ListViewItemBackgroundSelected")));
 }
 
 TEST_CASE(Inspector_DumpsResourcesAndElements) {
@@ -2909,6 +2921,39 @@ TEST_CASE(Hover_ValueOfGivesTheHoverValueWithOrWithoutThePointer) {
     hover.Set(7, {}, element);
     CHECK(!hover.ValueOf(7, "Background"));
     CHECK(element.values["Background"] == Brush("#FF111111"));
+}
+
+TEST_CASE(Hover_ARefusedPropertyLeavesTheOthersAndItsStateClean) {
+    struct Element final : th::HoverTracker::Access {
+        std::map<std::string, th::Value, std::less<>> values{{"Background", Brush("#FF111111")},
+                                                             {"Foreground", Brush("#FFAAAAAA")}};
+        bool refuseBackground = false;
+        std::optional<th::Value> ReadRaw(th::NodeId, std::string_view property) override {
+            auto it = values.find(property);
+            if (it == values.end()) return std::nullopt;
+            return it->second;
+        }
+        bool WriteRaw(th::NodeId, std::string_view property, const th::Value& value) override {
+            if (refuseBackground && property == "Background") throw std::runtime_error("refused");
+            values[std::string(property)] = value;
+            return true;
+        }
+    } element;
+    th::HoverTracker hover;
+    hover.Set(7, {{"Background", Brush("#FF222222")}, {"Foreground", Brush("#FFBBBBBB")}}, element);
+    hover.Enter(7, element);
+    CHECK(element.values["Foreground"] == Brush("#FFBBBBBB"));
+
+    // The template changed under the pointer: Background is refused, Foreground still comes back.
+    element.refuseBackground = true;
+    hover.Exit(7, element);
+    CHECK(element.values["Foreground"] == Brush("#FFAAAAAA"));
+
+    // Nothing is left shown: the next visit shows both values again once the element takes them.
+    element.refuseBackground = false;
+    hover.Enter(7, element);
+    CHECK(element.values["Background"] == Brush("#FF222222"));
+    CHECK(element.values["Foreground"] == Brush("#FFBBBBBB"));
 }
 
 TEST_CASE(Engine_NewPropertiesRestoreExactly) {

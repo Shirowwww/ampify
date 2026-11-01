@@ -436,7 +436,9 @@ stays in those two states: Ampify writes the same brush to the keys the button's
 (`AppBarButtonBackgroundPointerOver`, `AppBarButtonBackgroundPressed`, `ButtonBackgroundPointerOver`...), in that
 button's own resources only. A `:hover` colour goes to both states, and an `:active` colour to the pressed one only.
 Checked, selected or "repeat on" states keep Apple Music's colours, since they say something. The inspector shows what
-each element's states change (`States=` below).
+each element's states change (`States=` below). A theme gives the selected rows of song lists its own colour through
+`colors.ini`: `ListViewItemBackgroundSelected`, `ListViewItemBackgroundSelectedPointerOver` and
+`ListViewItemBackgroundSelectedPressed` (the `GridViewItem...` keys for grids of cards).
 
 The same goes for the entries of a menu, which also stay lit while their submenu is open, and for a slider: `color`
 fills the part left of the thumb, `background` the rest of the track, and its `Thumb` keeps its `background` while

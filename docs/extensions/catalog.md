@@ -105,7 +105,8 @@ command line, and bypasses no check.
 - Offline or remote catalog unavailable: the page shows the cached copy and says so at the top.
 - Invalid catalog: the page refuses to display it and shows the reasons, like `ampify validate`. It does not keep a partial
   list.
-- The catalog is read once per page opening. A "Refresh" button reads it again.
+- The catalog is read once per page opening. A "Refresh" button reads it again, along with what is installed and the
+  theme in use: a theme changed elsewhere while the page is open (`ampify theme set`, `settings.txt`) shows after it.
 - The page reads everything from `ampify market --json`: `catalogOk`, the `catalog` entries, the `installed` elements
   (with `valid`, `enabled`, a local `preview`, and for a theme its `schemes` and `defaultScheme`), the active `theme`
   and its `scheme`.

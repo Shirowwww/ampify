@@ -109,7 +109,8 @@ Spotify's 1,470 names.
 
 **Where Ampify's names stand** ([docs/themes/names.md](../docs/themes/names.md)): areas 1 to 4, 7 and 8 are covered.
 Partial: states of rows (selected, playing), the parts of the progress bar (track, fill, thumb), the action bar and the
-header background, queue rows, generic buttons and toggles, lyrics lines. Missing: context menus, scrollbars.
+header background, queue rows, generic buttons and toggles, lyrics lines. Covered since: context menus (`.menu`,
+`.menu-item`), scrollbars (`.scrollbar`), selected rows (`ListViewItemBackgroundSelected` in `colors.ini`).
 
 ### CSS the themes use, against Ampify's dialect
 
@@ -122,10 +123,10 @@ header background, queue rows, generic buttons and toggles, lyrics lines. Missin
 | `:not()` | 12 | missing |
 | `transition` | 12 | done for transform, opacity, background |
 | `@keyframes`, `animation` | 11 | missing |
-| `calc()` | 10 | missing |
+| `calc()` | 10 | done |
 | `overflow` | 13 | missing |
 | attribute selectors `[x=y]` | 14 | none (no attributes in XAML; names cover the need) |
-| scrollbar styling | 14 | missing |
+| scrollbar styling | 14 | done: `.scrollbar` (line at rest, thumb and track under the pointer) |
 | `::before`, `::after`, `position` | 15 to 17 | no equivalent; grid placement and alignment instead |
 | `backdrop-filter` | 7 | `backdrop: acrylic()` |
 
@@ -219,8 +220,8 @@ with line numbers), `types`, `doctor`, permissions with consent, `appVersions`, 
 | 15 | Full-screen now playing with lyrics | the most starred extensions | an Ampify view exists; Apple has its own (see apple-music-native-views.md) |
 | 16 | Style lyrics lines and background | 10 of 18 themes | missing |
 | 17 | A free overlay layer | oneko, cat-jam | missing |
-| 18 | Scrollbars and generic controls | 14 of 18 themes | missing |
-| 19 | Marketplace metadata: preview, tags, README | every card | missing |
+| 18 | Scrollbars and generic controls | 14 of 18 themes | done: `.scrollbar`; buttons and toggles keep their colours in their states |
+| 19 | Marketplace metadata: preview, tags, README | every card | partial: `preview` and `tags` in the manifest and the catalog; the detail page shows the description, not a README |
 | 20 | Survive host updates | 177 "update" issues | partial: stable names and version gate |
 | 21 | Live reload | `watch` | done |
 | 22 | TypeScript and JSX with a bundler | 9 of 17 repositories | partial (typings only) |

@@ -91,7 +91,17 @@ checked in Apple Music. It is not published yet: it waits for a listening check 
   settings. A snippet can be a `user.css` alone, without `resources.xaml`, and `ampify new snippet` makes one.
 - An extension can declare its settings in its manifest (`settings`: toggles, choices, texts, numbers). The Ampify card
   in Settings > Playback shows them under its switch, a change restarts the extension, and `Ampify.config.get(key)`
-  gives the manifest's default until the user changes it. The extension starter declares one.
+  gives the manifest's default until the user changes it. The extension starter declares one. A value edited by hand
+  into something that does not read as its type (an empty number, a toggle set to `maybe`) gives the default, and an
+  option or a text default with spaces at either end is refused, since `settings.txt` would not give it back.
+- Scroll bars take a theme's colours: `.scrollbar` gives the thin line its `color`, and the wide thumb and its track
+  their `:hover` and `background` colours. The inspector lists the keys of selected rows, which `colors.ini` colours
+  (`ListViewItemBackgroundSelected` and its pointer and pressed keys).
+- The log names the first reason a value was refused for a pointer state, with its code, next to the count. A value an
+  element refuses under the pointer no longer keeps its other values from showing, or from going back when the pointer
+  leaves.
+- An answer to `Ampify.http.get` or `post` whose body takes more than 15 seconds to arrive ends in a `network` error
+  instead of holding one of the element's 4 requests.
 - `scripts/build-msvc.ps1` runs the compiler in the console's OEM code page and checks the prefix of its include notes:
   with a localized Visual Studio, a changed header did not rebuild the files that include it. A build folder whose
   prefix differs is configured again once.

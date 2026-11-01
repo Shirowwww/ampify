@@ -36,6 +36,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.caption-buttons-cover` | The strip that keeps the minimize, maximize and close buttons readable over the playback bar |
 | `.modal` | Where Apple Music shows its dialogs |
 | `.info-bar` | The banners at the top and at the bottom of the window |
+| `.scrollbar` | The scroll bars of every list and page. Away from the pointer a scroll bar is a thin line, painted by `color`; under the pointer it widens to a thumb painted by the `:hover` colour, on a track painted by `background` (`:hover` too under the pointer) |
 
 ## Sidebar
 
@@ -149,7 +150,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.playbar-extras` | Its third column: lyrics, queue, AirPlay, volume |
 | `.transport` | The control that holds the buttons of the first column (`.transport AppBarButton` for the buttons) |
 | `.shuffle-button`, `.shuffle-dot` | Shuffle, and the dot that shows it is on |
-| `.previous-button`, `.play-button`, `.next-button` | Previous, play or pause, next |
+| `.previous-button`, `.play-button`, `.next-button` | Previous, play or pause, next. Apple Music turns them off until a song is loaded, and a button turned off gets no pointer: their `:hover` and `:active` show once a song is there |
 | `.repeat-button`, `.repeat-dot` | Repeat, and its dot |
 | `.lcd` | The display of the song playing |
 | `.lcd-artwork` | Its artwork area |

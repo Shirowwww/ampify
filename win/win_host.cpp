@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <iomanip>
 #include <fstream>
@@ -26,6 +27,7 @@ namespace ampify {
 namespace {
 
 constexpr size_t kMaxResponseBytes = size_t{1} << 20;  // a Last.fm or ListenBrainz answer is far smaller
+constexpr std::chrono::seconds kAnswerDeadline{15};       // reading the answer, after the headers came
 constexpr auto kBalloonDuration = std::chrono::seconds(8);
 
 std::wstring ToWide(const std::string& text) {
@@ -312,11 +314,18 @@ HttpResponse WinHost::Send(const wchar_t* verb, const std::string& url, const st
                             &status, &size, WINHTTP_NO_HEADER_INDEX);
         response.status = static_cast<int>(status);
 
+        // The receive timeout counts per read: a host that sends a byte every few seconds would keep the request, and
+        // the element's restart that waits for it, going for minutes. The whole answer gets a deadline instead.
+        auto deadline = std::chrono::steady_clock::now() + kAnswerDeadline;
         std::vector<char> chunk(16 * 1024);
         DWORD read = 0;
         while (response.text.size() < kMaxResponseBytes &&
                WinHttpReadData(request, chunk.data(), static_cast<DWORD>(chunk.size()), &read) && read > 0) {
             response.text.append(chunk.data(), read);
+            if (std::chrono::steady_clock::now() > deadline) {
+                response = {0, "network: the answer took longer than 15 s"};
+                break;
+            }
         }
     } else {
         response.text = "network: the request failed (code " + std::to_string(GetLastError()) + ")";
