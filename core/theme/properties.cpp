@@ -723,6 +723,20 @@ std::string FormatNumber(double number) {
     return std::string(buffer.data(), end);
 }
 
+std::string ShownText(std::string_view property, const Value& value) {
+    if (property != "CornerRadius" || value.kind != ValueKind::Thickness) return value.text;
+    std::vector<std::string_view> corners;
+    std::string_view rest = value.text;
+    for (size_t comma = rest.find(','); comma != std::string_view::npos; comma = rest.find(',')) {
+        corners.push_back(rest.substr(0, comma));
+        rest.remove_prefix(comma + 1);
+    }
+    corners.push_back(rest);
+    if (corners.size() != 4) return value.text;
+    return std::string(corners[1]) + "," + std::string(corners[2]) + "," + std::string(corners[3]) + "," +
+           std::string(corners[0]);
+}
+
 bool IsRelativeSize(const Value& value) {
     return value.kind == ValueKind::Length && value.text.ends_with('%');
 }

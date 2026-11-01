@@ -148,6 +148,17 @@ TEST_CASE(Interface_TitleNeedsTheWindowPermission) {
     CHECK(f.host.ui.Title("title-yes") == std::optional<std::string>("Demo"));
 }
 
+TEST_CASE(Interface_ASurfaceCarriesTheElementNameUntilItSetsATitle) {
+    Fixture f;
+    auto plain = f.Make("plain", "app", R"("ui.page")", R"(Ampify.ui.page.register("/plain", { type: "text" });)");
+    CHECK(plain->Start());
+    CHECK(f.host.ui.Title("plain") == std::optional<std::string>("Demo"));
+
+    auto titled = f.Make("titled", "extension", R"("ui.window")", R"(Ampify.ui.title.set("Other");)");
+    CHECK(titled->Start());
+    CHECK(f.host.ui.Title("titled") == std::optional<std::string>("Other"));
+}
+
 TEST_CASE(Interface_StopRemovesWhatTheElementAdded) {
     Fixture f;
     auto element = f.Make("gone", "extension", R"("ui.topbar", "ui.panel")",

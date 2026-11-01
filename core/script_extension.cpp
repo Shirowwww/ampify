@@ -77,6 +77,11 @@ bool ScriptExtension::Start() {
     m_runtime->Free(prelude);
     if (!built) return fail("Ampify API: " + error);
     m_dispatch = dispatch;
+    {
+        // A request made by main.js can be answered before main.js ends: the answer waits for the first Pump.
+        std::lock_guard<std::mutex> lock(m_queueMutex);
+        m_accepting = true;
+    }
 
     // "type": "module" makes main.js an ES module, with static imports. A classic script may still use import().
     bool evaluated = m_manifest.module ? m_runtime->EvalModule(*source, mainName, &error)
@@ -95,6 +100,7 @@ void ScriptExtension::Stop() {
         // Set under the queue lock, so that a Post racing with Stop cannot leave a task behind.
         std::lock_guard<std::mutex> lock(m_queueMutex);
         m_running = false;
+        m_accepting = false;
         m_queue.clear();
     }
     m_timers.clear();
@@ -113,7 +119,12 @@ void ScriptExtension::Teardown() {
         m_dispatch = JS_UNDEFINED;
     }
     m_runtime.reset();
-    m_running = false;
+    {
+        std::lock_guard<std::mutex> lock(m_queueMutex);
+        m_running = false;
+        m_accepting = false;
+        m_queue.clear();
+    }
     m_http.Cancel();
     m_gainDb = 0;
     m_timers.clear();
@@ -158,7 +169,7 @@ void ScriptExtension::Pump() {
 
 void ScriptExtension::Post(std::function<void()> task) {
     std::lock_guard<std::mutex> lock(m_queueMutex);
-    if (m_running) m_queue.push_back(std::move(task));
+    if (m_accepting) m_queue.push_back(std::move(task));
 }
 
 uint32_t ScriptExtension::SubmitHttp(std::function<HttpResponse()> request) {

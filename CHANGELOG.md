@@ -76,6 +76,15 @@ Atmos leveler.
 - Menu entries: `Ampify.ui.menu.addItem("app", ...)` adds an entry to Apple Music's main menu, and `"context"` one to
   the menu of a song, an album or a playlist (right click, the "..." of a row), whose `onClick` receives the item's
   name. They take the look of Apple Music's entries and leave the menu once it closes.
+- `ampify new` starters show something at once: the extension adds a playback bar button that shows the song playing
+  in a notification, the app opens a page with a counter from its own sidebar entry, the theme uses the stable names,
+  and the snippet rounds the card artwork. Two five-minute guides walk through them (`docs/extensions/guide.md`,
+  `docs/themes/guide.md`). An app page is titled with the app's name instead of its address.
+- `ampify dev` on a theme shows a save in under a second: the theme goes over itself, and only what changed is written.
+  It used to remove the whole theme and apply it again, which took about 4 seconds.
+- The theme report and the inspector show a corner radius in CSS order (top left, top right, bottom right, bottom left).
+- An answer to `Ampify.http.get` or `post` that came back while `main.js` was still running is no longer lost: its
+  promise used to never settle.
 
 ### Preview
 

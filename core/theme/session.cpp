@@ -1,9 +1,24 @@
 #include "session.hpp"
 
+#include <utility>
+
 #include "inspector.hpp"
 #include "snippets.hpp"
 
 namespace ampify::theme {
+
+namespace {
+
+// The rules that move elements among their siblings, as selector and position.
+std::vector<std::pair<std::string, std::string>> OrderRules(const Theme& theme) {
+    std::vector<std::pair<std::string, std::string>> rules;
+    for (const Assignment& assignment : theme.assignments) {
+        if (assignment.property == kOrderProperty) rules.emplace_back(assignment.selector.text, assignment.value.text);
+    }
+    return rules;
+}
+
+}  // namespace
 
 ThemeSession::ThemeSession(Journal& journal) : m_journal(journal), m_engine(journal) {}
 
@@ -44,7 +59,8 @@ void ThemeSession::Reapply(TreeBackend& tree) {
 
 std::optional<std::string> ThemeSession::Tick(TreeBackend& tree, const SessionRequest& request) {
     if (!m_hasGeneration || request.generation != m_generation || request.themeId != m_themeId) {
-        if (m_engine.Active()) m_engine.Restore(tree);
+        bool sameTheme = m_hasGeneration && request.themeId == m_themeId;
+        std::shared_ptr<const Theme> previous = m_composed;
         m_generation = request.generation;
         m_hasGeneration = true;
         m_themeId = request.themeId;
@@ -61,6 +77,16 @@ std::optional<std::string> ThemeSession::Tick(TreeBackend& tree, const SessionRe
         if (anything) {
             m_composed = std::make_shared<const Theme>(
                 ComposeTheme(themeWanted ? request.theme.get() : nullptr, request.snippets, request.layout.get()));
+        }
+
+        // The same theme saved again, or another of its schemes, goes over what is on screen: the engine writes what
+        // changed and gives back what is no longer set, so a save shows at once instead of undoing and redoing every
+        // value. Another theme, or a change of order (only a restore undoes a move), starts from Apple Music's values.
+        bool over = sameTheme && previous && m_composed && OrderRules(*previous) == OrderRules(*m_composed);
+        if (over) {
+            m_engine.Rearm();
+        } else if (m_engine.Active()) {
+            m_engine.Restore(tree);
         }
     }
 

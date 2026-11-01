@@ -271,6 +271,19 @@ class Authoring(AmpifyTestCase):
         check = self.ampify("theme", "check", os.path.join(self.tmp, "starter"))
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         self.assertNotIn("Attention", check.stdout)
+        # Stable names, and corners shown in XAML's order: the sidebar is rounded on the content side.
+        self.assertIn(".sidebar → CornerRadius = 0,12,12,0", check.stdout)
+
+    def test_new_starters_run_in_the_engine(self):
+        for kind in ("extension", "app"):
+            name = "run-" + kind
+            self.assertEqual(self.ampify("new", kind, name, cwd=self.tmp).returncode, 0)
+            result = self.ampify("test", os.path.join(self.tmp, name))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.ampify("new", "snippet", "run-snippet", cwd=self.tmp).returncode, 0)
+        check = self.ampify("theme", "check", os.path.join(self.tmp, "run-snippet"))
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        self.assertIn("CornerRadius = 16,16,16,16", check.stdout)
 
 
 class SpicetifyImport(AmpifyTestCase):

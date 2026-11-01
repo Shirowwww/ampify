@@ -25,6 +25,14 @@ std::optional<std::string> ReadText(const fs::path& path) {
     return buffer.str();
 }
 
+// A theme or a snippet with no script: `ampify dev` asks for its restart like any element, and the theme service, not
+// the loader, reloads its style.
+bool IsStyleFolder(const fs::path& themeRoot, const std::string& target) {
+    std::error_code ec;
+    return !themeRoot.empty() && (fs::is_directory(themeRoot / target, ec) ||
+                                  fs::is_directory(themeRoot.parent_path() / "snippets" / target, ec));
+}
+
 }  // namespace
 
 ExtensionLoader::ExtensionLoader(ExtensionHost& hosts, Host& host, Journal& journal, fs::path root, Clock clock)
@@ -247,7 +255,7 @@ void ExtensionLoader::Apply(const std::vector<ReloadRequest>& requests, const Se
                 break;
             case ReloadRequest::Action::Restart:
                 m_journal.Write("Reload requested: " + request.target);
-                if (!Restart(request.target, settings)) {
+                if (!Restart(request.target, settings) && !IsStyleFolder(m_themeRoot, request.target)) {
                     m_journal.Write("[" + request.target + "] not found in Ampify");
                 }
                 break;

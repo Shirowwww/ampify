@@ -48,49 +48,53 @@ light or dark mode of Apple Music follows the color of `main`.
 
 ## 4. Change the shapes
 
-`user.css` targets Apple Music elements by type and name, like CSS: `Grid#PaneRoot` is the grid named `PaneRoot`. The
-colors of `colors.ini` are written `$main` or `var(--spice-main)` there.
+`user.css` targets Apple Music elements with stable names written as CSS classes: `.sidebar`, `.playbar`, `.card`.
+Ampify keeps the path behind each name up to date when Apple Music changes, so a theme written with them keeps working.
+The colors of `colors.ini` are written `$main` or `var(--spice-main)` there.
 
 ```css
 /* A frosted-glass sidebar. */
-Grid#PaneRoot {
+.sidebar {
     backdrop: acrylic($sidebar, 0.6);
 }
 
 /* A gradient on the page background. */
-ContentPage {
+.page {
     background: linear-gradient(135deg, $main 0%, #2A1F45 100%);
 }
 
 /* Playback buttons grow on hover. */
-TransportControl#TransportControl AppBarButton:hover {
+.transport AppBarButton:hover {
     transform: scale(1.15);
 }
 ```
 
-The most useful elements:
+The most useful names:
 
-| Selector | Element |
+| Name | Element |
 |---|---|
-| `Grid#PaneRoot` | The sidebar |
-| `Grid#TransportBar` | The playback bar |
-| `BackDrop` | The background of the playback bar |
-| `NowPlayingControl#LCD > Grid#LCD` | The now playing display |
-| `ArtworkImage#ActualArtwork` | The artwork in the bar |
-| `TransportControl#TransportControl AppBarButton` | Previous, play, next |
-| `SplitView#ContentSplitView > Grid > Grid#ContentRoot` | The page area |
-| `ContentPage` | A page (Home, Library...) |
-| `TextBlock#AppName` | The "Apple Music" name at the top left |
+| `.sidebar` | The sidebar |
+| `.playbar` | The playback bar |
+| `.frost` | The frosted layer behind the playback bar and the page headers |
+| `.lcd` | The now playing display |
+| `.lcd-artwork-image` | The artwork in the bar |
+| `.transport AppBarButton` | Shuffle, previous, play, next, repeat |
+| `.play-button` | Play or pause |
+| `.content` | The page area |
+| `.page` | A page (Home, Library...) |
+| `.card`, `.card-title` | A square card (album, playlist, station) and its title |
+| `.track-row` | A song in an album or a playlist |
+| `.app-name` | The "Apple Music" name at the top left |
 
-The full tree is in [knowledge/apple-music-xaml-tree.md](../../knowledge/apple-music-xaml-tree.md). To see the tree of
-your own Apple Music version, run `ampify devtools`, then read `logs\inspector.txt` in the Ampify folder.
+All the names are in [names.md](names.md). Under a name, the usual XAML types still work (`.playbar TextBlock`), and so
+do the raw paths of the tree (`Grid#PaneRoot`) for the few elements without a name: the full tree is in
+[knowledge/apple-music-xaml-tree.md](../../knowledge/apple-music-xaml-tree.md), and `ampify devtools` writes the tree of
+your own Apple Music version to `logs\inspector.txt` in the Ampify folder.
 
-Three pitfalls:
+Two pitfalls:
 
-- A name like `Grid#ContentRoot`, `Border#Root` or `Grid#RootGrid` appears dozens of times in WinUI templates. Always
-  target it under a named parent. Otherwise the rule also hits the playback bar or the buttons.
-- Do not set a `z-index` below 10 on `Grid#TransportBar`. It would slide under the pages.
-- A text size set on every `TextBlock` also overrides page titles.
+- Do not set a `z-index` below 10 on `.playbar`. It would slide under the pages.
+- A text size set on every `TextBlock` also overrides page titles: scope it, as in `.track-row TextBlock`.
 
 All properties (colors, gradients, images, acrylic, margins, corners, fonts, transforms, shadows, hover, grid placement)
 are in [format.md](format.md).
@@ -105,6 +109,18 @@ ampify build my-theme
 `ampify theme check` reads the theme the way the kernel does and reports each refused rule with its line. `ampify build`
 checks the manifest, writes the `.zip`, and prints the entry to add to the catalog (see
 [the catalog](../extensions/catalog.md)).
+
+## A snippet
+
+A snippet is a small `user.css` that the user switches on alone, on top of any theme, as in Spicetify's Marketplace.
+
+```bash
+ampify new snippet my-snippet
+ampify dev my-snippet
+```
+
+The starter rounds the artwork of the cards (`.card .artwork { corner-radius: 16; }`). It sees the theme's colors and
+comes after it. Users switch it with `ampify snippet enable my-snippet` or from the Marketplace.
 
 ## Reuse a Spicetify theme
 

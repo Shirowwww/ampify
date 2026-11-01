@@ -29,8 +29,10 @@ class ThemeSession {
 public:
     explicit ThemeSession(Journal& journal);
 
-    // A new generation restores everything and applies the new set: the theme, then the snippets over it, then the
-    // layout. So switching a snippet off (which the worker turns into a new generation) brings back what was under it.
+    // A new generation applies the new set: the theme, then the snippets over it, then the layout. For the same theme
+    // (saved again, another scheme, a snippet switched on or off) it goes over what is applied: the engine writes what
+    // changed and gives back what is no longer set, so switching a snippet off brings back what was under it. Another
+    // theme, or a change of order, restores everything first.
     // The same generation applies again, which styles the elements that appeared since the last tick and writes
     // nothing else. Empty themeId with no snippet and no layout restores. The problems of each source go to the
     // log once per generation, with the name of the source. Returns the inspector dump when the request asks for one

@@ -414,7 +414,7 @@ Ampify.ui.fullscreen.close()
 Ampify.ui.fullscreen.onClose(fn)       // returns a function that removes fn
 Ampify.ui.applePlayer.open()           // permission ui.fullscreen; Apple Music's own full-screen player
 Ampify.ui.panel.register(id, view)
-Ampify.ui.title.set(text)
+Ampify.ui.title.set(text)              // title of the element's panel, page and popup; its name until then
 Ampify.ui.page.register(path, view)     // for an app
 Ampify.ui.navigate(path)
 ```

@@ -159,6 +159,11 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiTitle", UiNatives::UiTitle, 1);
 }
 
+// The panel frame, page header and popup of an element show its name until it sets a title of its own.
+void StartUi(ScriptExtension& extension) {
+    ScriptBridge::HostOf(&extension).Ui().SetTitle(extension.id(), extension.manifest().name.substr(0, kMaxUiTitle));
+}
+
 // Removes what the element added to the interface when it stops.
 void StopUi(ScriptExtension& extension) { ScriptBridge::HostOf(&extension).Ui().RemoveElement(extension.id()); }
 

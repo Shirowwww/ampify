@@ -102,6 +102,7 @@ private:
 
     std::mutex m_queueMutex;
     std::vector<std::function<void()>> m_queue;
+    bool m_accepting = false;  // under m_queueMutex: from the start of main.js to Stop, so an early answer waits its turn
     std::atomic<bool> m_running{false};
     std::string m_lastError;
     uint32_t m_lastHttpId = 0;

@@ -52,6 +52,7 @@ void DefineNotify(api::NativeScope& scope);
 void DefineHttp(api::NativeScope& scope);
 void DefineTimers(api::NativeScope& scope);
 void DefineUi(api::NativeScope& scope);
+void StartUi(ScriptExtension& extension);
 void StopUi(ScriptExtension& extension);
 void DefineAudioAnalysis(api::NativeScope& scope);
 void StopAudioAnalysis(ScriptExtension& extension);
@@ -96,7 +97,7 @@ const ApiModule kModules[] = {
     {"color", prelude::kColor, natives::DefineColor, nullptr, nullptr},
     {"timers", prelude::kTimers, natives::DefineTimers, nullptr, nullptr},
     {"console", prelude::kConsole, nullptr, nullptr, nullptr},
-    {"ui", prelude::kUi, natives::DefineUi, nullptr, natives::StopUi},
+    {"ui", prelude::kUi, natives::DefineUi, natives::StartUi, natives::StopUi},
     {"link", prelude::kLink, natives::DefineLink, natives::StartLink, nullptr},
     {"react", prelude::kReact, natives::DefineReact, nullptr, nullptr},
     {"crypto", prelude::kCrypto, natives::DefineCrypto, nullptr, nullptr},

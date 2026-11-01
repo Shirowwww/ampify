@@ -43,6 +43,13 @@ public:
     // Puts back every original value and forgets them. Elements that no longer exist are skipped.
     void Restore(TreeBackend& tree);
 
+    // Before a new version of the same set goes over the current one (a theme saved again, another scheme): the next
+    // pass is reported in the log like a first one, and refusals are reported again.
+    void Rearm() {
+        m_passes = 0;
+        m_reported.clear();
+    }
+
     bool Active() const { return m_active; }
     size_t OriginalCount() const {
         return m_originals.size() + m_resourceOriginals.size() + m_moves.size() + m_hovers.size();

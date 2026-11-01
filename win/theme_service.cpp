@@ -10,6 +10,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ui_thread.hpp"
@@ -30,6 +31,7 @@ namespace ampify::win {
 namespace {
 
 constexpr auto kTick = std::chrono::seconds(3);
+constexpr auto kChangeCheck = std::chrono::milliseconds(250);
 constexpr auto kAttachRetry = std::chrono::seconds(1);
 // The first passes after a change write their duration to the log, then only the slow ones.
 constexpr int kTimedPasses = 5;
@@ -43,6 +45,15 @@ bool SystemUsesDarkMode() {
     LONG status = RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
                                L"AppsUseLightTheme", RRF_RT_REG_DWORD, nullptr, &light, &size);
     return status == ERROR_SUCCESS && light == 0;
+}
+
+// When settings.txt and reload.txt were last written. `ampify theme set`, the Marketplace and `ampify dev` write one of
+// them: the next pass then starts at once instead of at the end of the tick.
+std::pair<std::filesystem::file_time_type, std::filesystem::file_time_type> ChangeStamp(const std::filesystem::path& kit) {
+    std::error_code error;
+    std::filesystem::file_time_type settings = std::filesystem::last_write_time(kit / "settings.txt", error);
+    std::filesystem::file_time_type reload = std::filesystem::last_write_time(kit / "reload.txt", error);
+    return {settings, reload};
 }
 
 // Local time in minutes from midnight, for theme.schedule.
@@ -118,6 +129,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
     theme::ThemeWorker worker(m_kit);
 
     while (m_running) {
+        auto stamp = ChangeStamp(m_kit);
         Settings settings;
         settings.Load((m_kit / "settings.txt").string());
         worker.SetSystemDark(SystemUsesDarkMode());
@@ -197,7 +209,10 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             });
         });
 
-        std::this_thread::sleep_for(kTick);
+        for (auto waited = std::chrono::milliseconds(0); m_running && waited < kTick; waited += kChangeCheck) {
+            std::this_thread::sleep_for(kChangeCheck);
+            if (ChangeStamp(m_kit) != stamp) break;
+        }
     }
 }
 

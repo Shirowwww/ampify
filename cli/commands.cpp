@@ -344,15 +344,31 @@ std::map<std::string, std::string> Template(std::string_view kind, const std::st
                          std::string(kind) + "\",\n  \"author\": \"" + author + "\",\n  \"description\": \"Describe it here.\",\n" +
                          "  \"kitApi\": \"1.0\"";
     if (kind == "extension") {
+        // Starters show something at once in Apple Music. The guides (docs/extensions/guide.md,
+        // docs/themes/guide.md) walk through these same files.
         return {
-            {"manifest.json", "{\n" + common + ",\n  \"main\": \"main.js\",\n  \"permissions\": []\n}\n"},
-            {"main.js", "// Extension \"" + id + "\". Started once the kernel is ready.\nAmpify.log(\"" + id + " started\");\n"
-                        "Ampify.onStop(() => Ampify.log(\"" + id + " stopped\"));\n"},
+            {"manifest.json", "{\n" + common + ",\n  \"main\": \"main.js\",\n"
+                              "  \"permissions\": [\"ui.playbar\", \"player.read\", \"notifications\"]\n}\n"},
+            {"main.js",
+             "// " + id + ": a button in the playback bar that tells the song playing.\n"
+             "// Save a change: with ampify dev, Apple Music restarts the extension at once.\n\n"
+             "Ampify.ui.playbar.addButton({\n"
+             "  label: \"What is playing?\",\n"
+             "  icon: \"\\uE946\", // a Segoe Fluent Icons glyph (Info)\n"
+             "  onClick: () => {\n"
+             "    const { track } = Ampify.player.state();\n"
+             "    Ampify.notify({\n"
+             "      title: track ? track.title : \"Nothing is playing\",\n"
+             "      text: track ? track.artist + \" - \" + track.album : \"Start a song in Apple Music.\",\n"
+             "    });\n"
+             "  },\n"
+             "});\n\n"
+             "Ampify.log(\"" + id + " started\");\n"
+             "Ampify.onStop(() => Ampify.log(\"" + id + " stopped\"));\n"},
         };
     }
     if (kind == "theme") {
-        // A starter that already looks finished: two schemes in Spicetify's names, rounded surfaces, a hover. The
-        // guide (docs/themes/guide.md) walks through these same files.
+        // A starter that already looks finished: two schemes in Spicetify's names, rounded surfaces, a hover.
         return {
             {"manifest.json", "{\n" + common + ",\n  \"colors\": \"colors.ini\",\n  \"defaultScheme\": \"Night\"\n}\n"},
             {"colors.ini",
@@ -360,36 +376,59 @@ std::map<std::string, std::string> Template(std::string_view kind, const std::st
              ";   main     page background        sidebar  sidebar             player  playback bar\n"
              ";   card     now playing display    text     text                subtext secondary text\n"
              ";   button   accent (buttons, progress bar)\n"
-             "; Change a value and save: with ampify theme watch, Apple Music follows right away.\n\n"
+             "; Change a value and save: with ampify dev, Apple Music follows right away.\n\n"
              "[Night]\nmain = 16131F\nsidebar = 1D1928\nplayer = 1D1928\ncard = 2A2438\nmain-elevated = 2A2438\n"
              "text = F3EEFF\nsubtext = B5ABCB\nbutton = FF7A85\nplayback-bar = FF7A85\nhighlight = 2F2840\n\n"
              "[Day]\nmain = FBF7F2\nsidebar = F2ECE4\nplayer = F2ECE4\ncard = FFFFFF\nmain-elevated = FFFFFF\n"
              "text = 1F1A2B\nsubtext = 6A6278\nbutton = E0525F\nplayback-bar = E0525F\nhighlight = EDE5DA\n"},
             {"user.css",
              "/* " + id + ": shapes and effects. The colors come from colors.ini ($main, $button...).\n"
-             "   The element names (Grid#PaneRoot...) are in docs/themes/guide.md; ampify devtools shows the tree. */\n\n"
+             "   The names (.sidebar, .lcd...) are in docs/themes/names.md; ampify devtools shows the whole tree. */\n\n"
              ":root {\n    --radius: 12px;\n}\n\n"
-             "/* Sidebar: rounded on the content side. */\nGrid#PaneRoot {\n"
+             "/* Sidebar: rounded on the content side. */\n.sidebar {\n"
              "    corner-radius: 0 var(--radius) var(--radius) 0;\n}\n\n"
              "/* The now playing display, in the middle of the playback bar. */\n"
-             "NowPlayingControl#LCD > Grid#LCD {\n    corner-radius: var(--radius);\n}\n\n"
-             "/* The playback buttons, round. */\nTransportControl#TransportControl AppBarButton {\n"
+             ".lcd {\n    corner-radius: var(--radius);\n}\n\n"
+             "/* The playback buttons, round. */\n.transport AppBarButton {\n"
              "    corner-radius: 50;\n}\n\n"
-             "/* The artwork grows a little on hover. */\nArtworkImage#ActualArtwork {\n"
-             "    transform-origin: center;\n}\n\nArtworkImage#ActualArtwork:hover {\n    transform: scale(1.08);\n}\n"},
+             "/* The artwork grows a little on hover. */\n.lcd-artwork-image {\n"
+             "    transform-origin: center;\n}\n\n.lcd-artwork-image:hover {\n    transform: scale(1.08);\n}\n"},
         };
     }
     if (kind == "snippet") {
         return {
             {"manifest.json", "{\n" + common + ",\n  \"resources\": \"resources.xaml\"\n}\n"},
             {"resources.xaml",
+             "<!-- Colors and brushes of Fluent and Apple Music, optional: the rules of user.css are often enough. -->\n"
              "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\">\n"
              "</ResourceDictionary>\n"},
+            {"user.css",
+             "/* " + id + ": a small style switched on alone (ampify snippet enable " + id + "), on top of any theme.\n"
+             "   It sees the theme's colors ($button...) and comes after it. */\n\n"
+             "/* Rounder artwork on the cards. */\n.card .artwork {\n    corner-radius: 16;\n}\n"},
         };
     }
     return {
-        {"manifest.json", "{\n" + common + ",\n  \"main\": \"main.js\",\n  \"icon\": \"icon.svg\"\n}\n"},
-        {"main.js", "// App \"" + id + "\". Its code runs when its page is open.\n"},
+        {"manifest.json", "{\n" + common + ",\n  \"main\": \"main.js\",\n  \"icon\": \"icon.svg\",\n"
+                          "  \"permissions\": [\"ui.page\", \"ui.sidebar\"]\n}\n"},
+        {"main.js",
+         "// " + id + ": a page of its own, opened from an entry at the bottom of Apple Music's sidebar.\n"
+         "// Save a change: with ampify dev, Apple Music restarts the app at once.\n\n"
+         "const { h, useState } = Ampify.React;\n\n"
+         "function Page() {\n"
+         "  const [count, setCount] = useState(0);\n"
+         "  return h(\"stack\", { gap: 12 },\n"
+         "    h(\"text\", { variant: \"subtitle\" }, \"Your page: edit main.js to change it.\"),\n"
+         "    h(\"text\", null, \"Clicked \" + count + \" time(s).\"),\n"
+         "    h(\"button\", { label: \"Click me\", variant: \"primary\", onClick: () => setCount(count + 1) }));\n"
+         "}\n\n"
+         "// Ampify shows what render() returns on the page /" + id + ", under the name of the manifest.\n"
+         "globalThis.render = () => h(Page);\n\n"
+         "Ampify.ui.sidebar.addItem({\n"
+         "  label: \"" + id + "\",\n"
+         "  icon: \"\\uE71D\", // a Segoe Fluent Icons glyph (AllApps)\n"
+         "  onClick: () => Ampify.ui.navigate(\"/" + id + "\"),\n"
+         "});\n"},
         {"icon.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path d=\"M12 2l10 20H2z\"/></svg>\n"},
     };
 }

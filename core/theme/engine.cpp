@@ -258,7 +258,7 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
     }
     if (!keep) m_moves.push_back({node.id, *current});
     report.applied++;
-    if (m_detailed) m_journal.Write("Applied: " + Describe(node) + " " + property + " = " + value->text + " (" +
+    if (m_detailed) m_journal.Write("Applied: " + Describe(node) + " " + property + " = " + ShownText(property, *value) + " (" +
                     assignment.source + " line " + std::to_string(assignment.line) + ")");
     return true;
 }
@@ -282,6 +282,17 @@ void ThemeEngine::ApplyMoves(std::vector<PendingMove>& pending, TreeBackend& tre
 }
 
 void ThemeEngine::ApplyResources(const Theme& theme, TreeBackend& tree, Report& report) {
+    // A resource the theme no longer sets (a key edited out, a scheme without it) gets its original back.
+    for (auto it = m_resourceOriginals.begin(); it != m_resourceOriginals.end();) {
+        bool kept = std::any_of(theme.resources.begin(), theme.resources.end(),
+                                [&](const ResourceOverride& resource) { return resource.key == it->first; });
+        if (kept) {
+            ++it;
+            continue;
+        }
+        if (tree.WriteResource(it->first, it->second)) report.applied++;
+        it = m_resourceOriginals.erase(it);
+    }
     for (const ResourceOverride& resource : theme.resources) {
         std::optional<Value> current = tree.ReadResource(resource.key);
         if (!current) {

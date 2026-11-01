@@ -147,7 +147,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.playbar-controls` | Its first column: shuffle, previous, play, next, repeat |
 | `.now-playing` | Its second column: the song playing |
 | `.playbar-extras` | Its third column: lyrics, queue, AirPlay, volume |
-| `.transport` | The buttons of the first column |
+| `.transport` | The control that holds the buttons of the first column (`.transport AppBarButton` for the buttons) |
 | `.shuffle-button`, `.shuffle-dot` | Shuffle, and the dot that shows it is on |
 | `.previous-button`, `.play-button`, `.next-button` | Previous, play or pause, next |
 | `.repeat-button`, `.repeat-dot` | Repeat, and its dot |

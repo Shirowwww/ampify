@@ -676,6 +676,18 @@ TEST_CASE(Properties_ConvertLengthsAndThickness) {
     CHECK(Converted("corner-radius", "8 -4", palette, files).rfind("PROBLEM", 0) == 0);
 }
 
+TEST_CASE(Properties_CornersShowInXamlOrder) {
+    // Kept in the order of a thickness, bottom-left first; shown the way XAML writes a CornerRadius, top-left first.
+    th::Palette palette;
+    MemoryFiles files;
+    std::string kept = Converted("corner-radius", "0 12 12 0", palette, files);
+    CHECK(kept == "0,0,12,12");
+    CHECK(th::ShownText("CornerRadius", {th::ValueKind::Thickness, kept}) == "0,12,12,0");
+    CHECK(th::ShownText("CornerRadius", {th::ValueKind::Thickness, "4,1,2,3"}) == "1,2,3,4");
+    CHECK(th::ShownText("Margin", {th::ValueKind::Thickness, "4,1,2,3"}) == "4,1,2,3");
+    CHECK(th::ShownText("CornerRadius", {th::ValueKind::Thickness, "8"}) == "8");
+}
+
 TEST_CASE(Properties_AcceptTheCssNamesThemesUseMost) {
     th::Palette palette;
     MemoryFiles files;
@@ -1424,6 +1436,49 @@ TEST_CASE(Session_RestoresOnANewGenerationAndStylesNewElements) {
     session.Tick(tree, none);
     CHECK(!session.Active());
     CHECK(tree.elements[0].properties["Background"].text == "#FF000000");
+}
+
+TEST_CASE(Session_AThemeEditedLiveGoesOverItself) {
+    MemoryFiles files;
+    files.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 0A84FF\n";
+    files.files["user.css"] = "Page { background: #FF101010; }\nGrid#Bar { background: #FF202020; }\n";
+    auto first = std::make_shared<const th::Theme>(Load(files));
+    MemoryFiles edited;
+    edited.files["user.css"] = "Page { background: #FF303030; }\n";  // the Bar rule and the accent are gone
+    auto second = std::make_shared<const th::Theme>(Load(edited));
+
+    FakeTree tree = MakePage();
+    tree.resources["AccentFillColorDefaultBrush"] = Brush("#FF000000");
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeSession session(journal);
+
+    th::SessionRequest request;
+    request.themeId = "live";
+    request.theme = first;
+    request.generation = 1;
+    session.Tick(tree, request);
+    CHECK(tree.elements[1].properties["Background"].text == "#FF202020");
+    CHECK(tree.resources["AccentFillColorDefaultBrush"].text == "#FF0A84FF");
+
+    // Saved again: the new version goes over the old one, with no restore of everything in between.
+    request.theme = second;
+    request.generation = 2;
+    session.Tick(tree, request);
+    CHECK(log.str().find("Theme removed") == std::string::npos);
+    CHECK(tree.elements[0].properties["Background"].text == "#FF303030");
+    CHECK(tree.elements[1].properties["Background"].text == "#FF0000FF");  // given back
+    CHECK(tree.resources["AccentFillColorDefaultBrush"].text == "#FF000000");
+    // The pass after the save is reported: the new background, the Bar and the accent given back.
+    CHECK(log.str().find(": 3 value(s) applied") != std::string::npos);
+
+    // Another theme still starts from Apple Music's own values.
+    request.themeId = "other";
+    request.theme = first;
+    request.generation = 3;
+    session.Tick(tree, request);
+    CHECK(log.str().find("Theme removed") != std::string::npos);
+    CHECK(tree.elements[0].properties["Background"].text == "#FF101010");
 }
 
 TEST_CASE(Session_ReturnsAnInspectorDumpOnlyWhenAsked) {

@@ -1606,6 +1606,17 @@ struct StateKeys {
     std::vector<std::wstring> keys;
 };
 
+// The controls whose templates change their look under the pointer and while pressed. A page, a navigation view or
+// another container has no such states: holding keys for one only made it read its theme again, half a second for a
+// whole page at each change of colour.
+bool HasPointerStates(const controls::Control& control) {
+    return control.try_as<primitives::ButtonBase>() || control.try_as<controls::Slider>() ||
+           control.try_as<primitives::Thumb>() || control.try_as<controls::MenuFlyoutItemBase>() ||
+           control.try_as<primitives::SelectorItem>() || control.try_as<controls::NavigationViewItem>() ||
+           control.try_as<controls::ComboBox>() || control.try_as<controls::SplitButton>() ||
+           control.try_as<primitives::ScrollBar>();
+}
+
 StateKeys PointerStateKeys(const controls::Control& control, std::string_view property) {
     constexpr int kSliderDepth = 4;  // from its thumb: the thumb, two template grids, the slider
     StateKeys result{control, {}};
@@ -1683,7 +1694,7 @@ void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::Dependency
             control = current.try_as<controls::Control>();
             current = media::VisualTreeHelper::GetParent(current);
         }
-        if (!control) return;
+        if (!control || !HasPointerStates(control)) return;
         StateKeys states = PointerStateKeys(control, property);
         if (states.keys.empty()) return;
         auto entry = std::make_pair(id, std::string(property));

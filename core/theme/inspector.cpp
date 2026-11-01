@@ -28,14 +28,14 @@ std::string Label(const NodeInfo& node) {
     return node.name.empty() ? node.type : node.type + "#" + node.name;
 }
 
-std::string ValueText(const Value& value) {
+std::string ValueText(const Value& value, std::string_view property = {}) {
     if (value.kind == ValueKind::Opaque) {
         // "handle:N;#AARRGGBB": an app brush kept as an object, with its colour (opacity included) when it is plain.
         size_t colour = value.text.find(';');
         return colour == std::string::npos ? "present" : value.text.substr(colour + 1);
     }
     if (value.kind == ValueKind::Template) return "present";
-    return value.text;
+    return ShownText(property, value);
 }
 
 }  // namespace
@@ -87,7 +87,7 @@ std::string InspectTree(TreeBackend& tree, const InspectOptions& options) {
 
         for (const char* property : kInspectedProperties) {
             std::optional<Value> value = tree.Read(node.id, property);
-            if (value) dump += "  " + std::string(property) + "=" + ValueText(*value);
+            if (value) dump += "  " + std::string(property) + "=" + ValueText(*value, property);
         }
         dump += '\n';
     }
@@ -116,7 +116,7 @@ std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options) {
         Json::Object properties;
         for (const char* property : kInspectedProperties) {
             std::optional<Value> value = tree.Read(node.id, property);
-            if (value) properties.emplace_back(property, Json(ValueText(*value)));
+            if (value) properties.emplace_back(property, Json(ValueText(*value, property)));
         }
 
         Json::Object entry;

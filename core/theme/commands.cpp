@@ -168,7 +168,7 @@ int PrintThemeReport(const Theme& theme, std::ostream& out) {
         // A template is a whole XAML document: print its size, not its text.
         std::string value = assignment.value.kind == ValueKind::Template
                                 ? "XAML template (" + std::to_string(assignment.value.text.size()) + " bytes)"
-                                : assignment.value.text;
+                                : ShownText(assignment.property, assignment.value);
         out << "  line " << assignment.line << ": " << assignment.selector.text << " → " << assignment.property
             << " = " << value << (assignment.important ? " (!important)" : "") << '\n';
     }

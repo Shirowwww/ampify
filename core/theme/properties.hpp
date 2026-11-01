@@ -64,6 +64,11 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
 // Shortest text that reads back to the same number, without trailing zeros: 18, 0.5, -4.
 std::string FormatNumber(double number);
 
+// A value as a person reads it (ampify theme check, the inspector). A CornerRadius is kept in the order of a thickness,
+// bottom-left, top-left, top-right, bottom-right (ConvertThickness), and shown in XAML's own order: top-left,
+// top-right, bottom-right, bottom-left. Any other value shows its text.
+std::string ShownText(std::string_view property, const Value& value);
+
 // A font size relative to the element's own: "120%" or "1.2em" in user.css, kept as "120%" in the Length value. The
 // engine scales each element's size with it, and the backend only ever sees pixels.
 bool IsRelativeSize(const Value& value);

@@ -28,6 +28,7 @@ Ampify adds themes, extensions and apps to Apple Music for Windows.
 
 | Page | What it covers |
 |---|---|
+| [extensions/guide.md](extensions/guide.md) | An extension in five minutes, then an app |
 | [extensions/api.md](extensions/api.md) | The `Ampify` JavaScript API, permissions and life cycle |
 | [extensions/manifest.md](extensions/manifest.md) | The `manifest.json` format |
 | [extensions/catalog.md](extensions/catalog.md) | The community catalog, how to publish, and the Marketplace page |

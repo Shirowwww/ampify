@@ -67,6 +67,18 @@ TEST_CASE(HttpPost_FollowsTheRulesOfGet) {
     }
 }
 
+TEST_CASE(HttpPost_AnAnswerThatComesBeforeTheStartEndsIsKept) {
+    ampify::test::ServiceFixture<> f;
+    // main.js keeps running after its request: the fake host answers at once, before Start returns.
+    auto element = f.Make("early", R"(
+        Ampify.http.post("https://api.example.org/form", "a=1").then((r) => Ampify.log("early " + r.status));
+        const until = Date.now() + 200;
+        while (Date.now() < until) {}
+    )", R"("network:api.example.org")");
+    CHECK(element->Start());
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("early 201"); }, std::chrono::seconds(2)));
+}
+
 TEST_CASE(HttpPost_HostWithoutTheServiceAnswersStatusZero) {
     ampify::test::ServiceFixture<ampify::test::FakeHost> f;
     auto element = f.Make("poster-plain", R"(

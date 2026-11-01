@@ -58,7 +58,10 @@ All commands: [docs/cli.md](docs/cli.md).
 - A theme is a folder with a `manifest.json`, a `colors.ini` and a `user.css`. Start with
   `ampify new theme my-theme` and follow the [five-minute guide](docs/themes/guide.md). Full reference:
   [docs/themes/format.md](docs/themes/format.md).
-- An extension is a `manifest.json` and a `main.js`: [docs/extensions/api.md](docs/extensions/api.md).
+- An extension is a `manifest.json` and a `main.js`. Start with `ampify new extension my-extension` and follow the
+  [five-minute guide](docs/extensions/guide.md). Full reference: [docs/extensions/api.md](docs/extensions/api.md).
+- An app (a page of its own) and a snippet (a small style switched on alone) start the same way:
+  `ampify new app my-app`, `ampify new snippet my-snippet`.
 - `ampify dev <folder>` reloads your element at each save.
 
 ## How it works
