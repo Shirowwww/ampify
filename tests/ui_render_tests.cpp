@@ -533,6 +533,56 @@ TEST_CASE(UiRender_ModsSwitchWritesTheSettingAndAReloadRequest) {
     CHECK(!SwitchMod(kit, "../x", true, error));
 }
 
+TEST_CASE(UiRender_ModsCarryTheirDeclaredSettingsAndValues) {
+    fs::path kit = FreshKit("mods-settings");
+    WriteFile(kit / "extensions" / "clock" / "manifest.json",
+              R"({"id":"clock","name":"Clock","version":"1.0.0","kind":"extension","author":"x","description":"Time.",)"
+              R"("kitApi":"1.0","main":"main.js","settings":[)"
+              R"({"key":"seconds","label":"Seconds","type":"toggle","default":true},)"
+              R"({"key":"side","label":"Side","type":"choice","options":["Left","Right"],"default":"Left"}]})");
+    WriteFile(kit / "extensions" / "clock" / "main.js", "");
+    WriteFile(kit / "settings.txt", "extensions.clock.side = Right\n");
+
+    std::vector<ModEntry> mods = ListMods(kit);
+    CHECK(mods.size() == 1);
+    if (mods.size() != 1) return;
+    CHECK(mods[0].settings.size() == 2);
+    CHECK(mods[0].values == std::vector<std::string>({"true", "Right"}));  // the default, then the stored value
+}
+
+TEST_CASE(UiRender_ModsSettingIsWrittenAndRestartsTheExtension) {
+    fs::path kit = FreshKit("mods-setting");
+    WriteFile(kit / "settings.txt", "extensions.clock.enabled = true\n");
+    WriteFile(kit / "reload.txt", "");
+    std::string error;
+    CHECK(SetModSetting(kit, "clock", "side", "Right", error));
+    CHECK(SetModSetting(kit, "clock", "greeting", "two\nlines", error));
+    CHECK(error.empty());
+    std::string settings = ReadFile(kit / "settings.txt");
+    CHECK(settings.find("extensions.clock.side = Right") != std::string::npos);
+    CHECK(settings.find("extensions.clock.greeting = two lines") != std::string::npos);
+    CHECK(settings.find("extensions.clock.enabled = true") != std::string::npos);
+    CHECK(ReadFile(kit / "reload.txt") == "restart clock\nrestart clock\n");
+
+    CHECK(!SetModSetting(kit, "clock", "enabled", "false", error));
+    CHECK(!SetModSetting(kit, "clock", "a.b", "1", error));
+    CHECK(!SetModSetting(kit, "app:clock", "side", "Left", error));
+    CHECK(!SetModSetting(kit, "../x", "side", "Left", error));
+    CHECK(ReadFile(kit / "settings.txt").find("extensions.clock.enabled = true") != std::string::npos);
+}
+
+TEST_CASE(UiRender_ModsSettingLeavesAnUnreadableSettingsFileAlone) {
+    fs::path kit = FreshKit("mods-unreadable");
+    fs::create_directories(kit / "settings.txt");  // exists, but cannot be read as a file
+    std::string error;
+    CHECK(!SetModSetting(kit, "clock", "side", "Right", error));
+    CHECK(error.rfind("cannot read: ", 0) == 0);
+    error.clear();
+    CHECK(!SwitchMod(kit, "clock", true, error));
+    CHECK(error.rfind("cannot read: ", 0) == 0);
+    CHECK(!fs::exists(kit / "reload.txt"));
+}
+
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {
     SvgIcon icon = ParseSvgIcon(R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>)");
     CHECK(icon.Usable());

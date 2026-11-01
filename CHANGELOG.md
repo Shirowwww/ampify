@@ -1,9 +1,9 @@
 # Changelog
 
-## 0.5.0 (unreleased)
+## 1.0.0 (unreleased)
 
-The first version meant to be tested in full on a real PC. It is not published yet: it waits for a listening check of the
-Atmos leveler.
+The first complete version: themes, extensions, apps, snippets, the Marketplace and the `ampify` command line, each
+checked in Apple Music. It is not published yet: it waits for a listening check of the Atmos leveler.
 
 ### Included
 
@@ -89,13 +89,18 @@ Atmos leveler.
   with its own cascade like `:hover`. An `:active` colour on a button goes to its pressed state only.
 - Files saved with a byte order mark (Notepad's "UTF-8 with BOM") are read: manifests, `user.css`, `color.ini`,
   settings. A snippet can be a `user.css` alone, without `resources.xaml`, and `ampify new snippet` makes one.
+- An extension can declare its settings in its manifest (`settings`: toggles, choices, texts, numbers). The Ampify card
+  in Settings > Playback shows them under its switch, a change restarts the extension, and `Ampify.config.get(key)`
+  gives the manifest's default until the user changes it. The extension starter declares one.
+- `scripts/build-msvc.ps1` runs the compiler in the console's OEM code page and checks the prefix of its include notes:
+  with a localized Visual Studio, a changed header did not rebuild the files that include it. A build folder whose
+  prefix differs is configured again once.
 
 ### Preview
 
-The rest exists but is not at the same level yet. It is marked "preview" or off by default: apps (added pages), snippets,
-the equalizer, audio analysis, Discord presence, scrobbling, the local remote, MIDI and the notification-area icon.
-The fullscreen view (`Ampify.ui.fullscreen`, permission `ui.fullscreen`) and the style attributes of the interface
-primitives (`layer`, backgrounds and acrylic, text size and color, opacity, scale and transitions) are in preview too.
+The rest exists but is not at the same level yet. It is marked "preview" in `docs/extensions/api.md` or off by default:
+the equalizer, the gain and audio analysis, Discord presence, scrobbling, the local remote, MIDI, the notification-area
+icon, side panels and windows, ES modules, and the engine process (`processes: ["engine"]`).
 
 ### Known limits
 

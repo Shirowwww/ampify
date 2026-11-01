@@ -1,5 +1,7 @@
 #include "element.hpp"
 
+#include "../core/manifest.hpp"
+
 #include <fstream>
 #include <regex>
 #include <set>
@@ -224,8 +226,10 @@ std::optional<ElementManifest> ParseManifest(std::string_view text, std::vector<
     CheckAllowedKeys(*document,
                      {"$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage",
                       "license", "main", "colors", "defaultScheme", "resources", "icon", "permissions",
-                      "appVersions", "processes", "type", "tags", "preview"},
+                      "appVersions", "processes", "type", "tags", "preview", "settings"},
                      "", errors);
+    // The kernel reads the settings: its rules are the only ones.
+    for (std::string& problem : SettingsErrors(text)) errors.push_back(std::move(problem));
 
     ElementManifest manifest;
     ReadElementInfo(*document, "", manifest, errors);

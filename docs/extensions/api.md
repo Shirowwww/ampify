@@ -170,17 +170,17 @@ switching the element on. A function protected by an undeclared permission throw
 | (none) | `Ampify.log`, `Ampify.onStop`, `Ampify.config`, `Ampify.uri`, `Ampify.locale` | [stable] |
 | (none) | `Ampify.icons`, `Ampify.i18n`, `Ampify.crypto`, `Ampify.remote` (setting `remote.enabled`) | [preview] |
 | `storage` | `Ampify.storage`, one JSON file per element, in `storage\<id>.json` | [stable] |
-| `notifications` | `Ampify.notify`, a Windows notification | [preview] |
+| `notifications` | `Ampify.notify`, a Windows notification | [stable] |
 | `ui.keyboard` | `Ampify.keyboard.bind`, global or window-only shortcuts | [preview] |
-| `player.read` | `Ampify.player.state()`, `Ampify.player.lyrics()`, player events and `Ampify.player.queue.list()` | [preview] |
-| `player.control` | `Ampify.player.play()`, `pause()`, `toggle()`, `next()`, `previous()`, `seek()`, `queue.add()`, `queue.remove()` | [preview] |
+| `player.read` | `Ampify.player.state()`, `Ampify.player.lyrics()`, player events and `Ampify.player.queue.list()` | [stable] |
+| `player.control` | `Ampify.player.play()`, `pause()`, `toggle()`, `next()`, `previous()`, `seek()`, `queue.add()`, `queue.remove()` | [stable] |
 | `audio.analyze` | `Ampify.audio.onFrame`, `analyze`, `loudness`: spectrum, levels, tempo and loudness of the decoded sound, computed in memory | [preview] |
 | `audio.gain` | `Ampify.audio.setGainDb`, a gain applied to the samples, capped by the kernel ceiling | [preview] |
 | `audio.eq` | `Ampify.audio.eq`, a 10-band equalizer applied to the samples | [preview] |
-| `ui.topbar`, `ui.playbar`, `ui.sidebar`, `ui.menu`, `ui.popup` | Adding interface elements at those places (`ui.sidebar`: an entry at the bottom of Apple Music's sidebar) | [preview] |
+| `ui.topbar`, `ui.playbar`, `ui.sidebar`, `ui.menu`, `ui.popup` | Adding interface elements at those places (`ui.sidebar`: an entry at the bottom of Apple Music's sidebar) | [stable] |
 | `ui.panel`, `ui.window` | Side panel, secondary window | [preview] |
-| `ui.fullscreen` | `Ampify.ui.fullscreen`, a view over the whole window (a "now playing" screen with lyrics), and `Ampify.ui.applePlayer`, Apple Music's own full-screen player | [preview] |
-| `ui.page` | App pages and navigation entries | [preview] |
+| `ui.fullscreen` | `Ampify.ui.fullscreen`, a view over the whole window (a "now playing" screen with lyrics), and `Ampify.ui.applePlayer`, Apple Music's own full-screen player | [stable] |
+| `ui.page` | App pages and navigation entries | [stable] |
 | `library.read` | `Ampify.library`, reading the library and playlists | [planned] |
 | `library.write` | Writing playlists, after reading (the queue goes through `player.control`) | [planned] |
 | `services.read` | `Ampify.services.call`, read calls to an allow-list of app services | [planned] |
@@ -213,7 +213,7 @@ Examples are in JavaScript. Asynchronous functions return `Promise` values.
 ### 5.1 Base [stable]
 
 ```js
-Ampify.version              // "0.5.0": version of the kernel (the Ampify version)
+Ampify.version              // "1.0.0": version of the kernel (the Ampify version)
 Ampify.kitApi               // "1.0": version of the targeted API
 Ampify.process              // "ui" or "engine" [preview], see section 2
 Ampify.log(message)         // writes to the log, prefixed with the element id
@@ -242,7 +242,12 @@ Ampify.storage.remove(key)
 
 An element neither reads nor writes the keys of another element.
 
-### 5.3 Player [preview]
+An extension that lists its `settings` in its manifest ([manifest.md](manifest.md), "Settings") gets them in the Ampify
+card of Apple Music's settings. `Ampify.config.get(key)` without a default then gives the manifest's default, typed: a
+boolean for a toggle, a number for a number, a text otherwise. A default given in the call wins over the manifest's. A
+change in the card restarts the extension.
+
+### 5.3 Player [stable]
 
 ```js
 Ampify.player.state()
@@ -335,7 +340,7 @@ process these functions do not throw: `onFrame` returns `false`, reads give `nul
 - **One equalizer per process.** The last element that sets it wins, and it goes back to flat when that element stops.
 - **What does not leave:** the raw samples. The script only receives small frames of numbers. Nothing is written to disk.
 
-### 5.5 Interface [preview]
+### 5.5 Interface [stable]
 
 An extension describes its interface in two ways that give the same result:
 
@@ -477,7 +482,7 @@ checked against a list of allowed types and properties (see section 11).
 ### 5.6 Services [preview]
 
 ```js
-Ampify.notify({ title, text })                      // [preview] permission notifications
+Ampify.notify({ title, text })                      // permission notifications
 Ampify.keyboard.bind("Ctrl+Alt+L", fn)              // [preview] permission ui.keyboard
 Ampify.http.get(url) -> Promise<{ status, text }>   // [stable] permission network:<host>
 Ampify.http.post(url, body, { headers }) -> Promise<{ status, text }>  // [preview] same rules as get
@@ -584,7 +589,7 @@ Ampify.link.connected()     // true if the other element is running
 - The app and the extension share the file `storage\<id>.json` (same id). Only one of them should write its storage. The
   other goes through `Ampify.link`.
 
-### 5.9 React, components and `Ampify.ready` [preview]
+### 5.9 React, components and `Ampify.ready` [stable]
 
 Spicetify gives React to extensions. A native app cannot run real React, so Ampify provides a small engine that accepts
 the same style, without JSX, and produces the primitive tree of section 5.5. It has no permission of its own: the target
@@ -677,7 +682,7 @@ argument of `onChange` is the full event. Full example: `examples/react-panel/`.
 
 ## 6. Themes, apps and snippets
 
-### 6.1 Themes [preview]
+### 6.1 Themes [stable]
 
 A theme is a folder with `colors.ini`, `resources.xaml`, or both, and optionally a `main.js`. The full format is in
 [../themes/format.md](../themes/format.md).
@@ -689,7 +694,7 @@ A theme is a folder with `colors.ini`, `resources.xaml`, or both, and optionally
 - `main.js` follows the manifest permissions like an extension. It runs while the theme is the active one and
   `theme.parts.script` is on.
 
-### 6.2 Apps [preview]
+### 6.2 Apps [stable]
 
 An app is an extension that adds a navigation page (`Ampify.ui.page.register`), with an SVG icon in two states (`icon`,
 and `active-icon` planned). It lives in `apps\<id>` and is switched on with `apps.<id>.enabled`
@@ -700,10 +705,10 @@ Back button; Apple Music's own navigation (sidebar, back arrow, search) closes i
 the same id, which runs at start: the two talk through `Ampify.link` (section 5.8). Its code can be split into modules
 (section 3.6).
 
-### 6.3 Snippets [preview]
+### 6.3 Snippets [stable]
 
-A snippet is a fragment of `resources.xaml`, switched on alone. It follows the same list of allowed keys as themes. It
-can also have a `user.css`, applied after the active theme. Details: [../themes/format.md](../themes/format.md), section
+A snippet is a `user.css`, a fragment of `resources.xaml`, or both, switched on alone. The `user.css` applies after the
+active theme; the fragment follows the same list of allowed keys as themes. Details: [../themes/format.md](../themes/format.md), section
 "Snippets".
 
 ## 7. Command line

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
@@ -30,6 +31,22 @@ struct ConfigNatives : ScriptBridge {
         return value ? JS_NewStringLen(ctx, value->data(), value->size()) : JS_UNDEFINED;
     }
 
+    // The default of a setting the manifest declares, typed as config.get returns it; undefined for any other key.
+    AMPIFY_NATIVE(ConfigDeclared) {
+        ScriptExtension* ext = Owner(ctx);
+        std::string key = String(ctx, argc, argv, 0).value_or("");
+        const SettingSpec* spec = ext->manifest().Setting(key);
+        if (!spec) return JS_UNDEFINED;
+        const std::string& value = spec->defaultValue;
+        if (spec->type == SettingSpec::Type::Toggle) return JS_NewBool(ctx, value == "true");
+        if (spec->type == SettingSpec::Type::Number) {
+            double number = 0;
+            std::from_chars(value.data(), value.data() + value.size(), number);
+            return JS_NewFloat64(ctx, number);
+        }
+        return JS_NewStringLen(ctx, value.data(), value.size());
+    }
+
     AMPIFY_NATIVE(ConfigSet) {
         ScriptExtension* ext = Owner(ctx);
         std::string key = String(ctx, argc, argv, 0).value_or("");
@@ -44,6 +61,7 @@ struct ConfigNatives : ScriptBridge {
 
 void DefineConfig(api::NativeScope& scope) {
     scope.Function("configGet", ConfigNatives::ConfigGet, 1);
+    scope.Function("configDeclared", ConfigNatives::ConfigDeclared, 1);
     scope.Function("configSet", ConfigNatives::ConfigSet, 2);
 }
 

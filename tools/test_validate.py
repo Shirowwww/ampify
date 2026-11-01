@@ -324,6 +324,38 @@ class ManifestTests(unittest.TestCase):
         code, text = run("manifest", self.install(data, files=("user.css",)))
         self.assertEqual(code, 0, text)
 
+    def test_declared_settings_are_valid(self):
+        settings = [
+            {"key": "seconds", "label": "Show the seconds", "type": "toggle", "default": True},
+            {"key": "side", "label": "Side", "type": "choice", "options": ["Left", "Right"], "default": "Left"},
+            {"key": "greeting", "label": "Greeting", "type": "text", "default": ""},
+            {"key": "size", "label": "Size", "type": "number", "min": 8, "max": 32, "default": 12},
+        ]
+        code, text = run("manifest", self.install(manifest(settings=settings)))
+        self.assertEqual(code, 0, text)
+
+    def test_settings_that_do_not_hold_are_refused(self):
+        toggle = {"key": "a", "label": "A", "type": "toggle", "default": True}
+        cases = {
+            "default must be true or false": [dict(toggle, default="yes")],
+            "default must be one of the options": [{"key": "a", "label": "A", "type": "choice",
+                                                    "options": ["x", "y"], "default": "z"}],
+            "default must be a number between min and max": [{"key": "a", "label": "A", "type": "number",
+                                                              "min": 1, "max": 5, "default": 9}],
+            "min and max belong to a number": [dict(toggle, min=1)],
+            "key enabled is reserved": [dict(toggle, key="enabled")],
+            "key a is already used": [toggle, dict(toggle, label="B")],
+            "property not allowed": [dict(toggle, hint="x")],
+        }
+        for message, settings in cases.items():
+            with self.subTest(message):
+                code, text = run("manifest", self.install(manifest(settings=settings)))
+                self.assertEqual(code, 1, text)
+                self.assertIn(message, text)
+        code, text = run("manifest", self.install(manifest(id="demo-app", kind="app", settings=[toggle])))
+        self.assertEqual(code, 1)
+        self.assertIn("settings: only an extension declares settings", text)
+
 
 try:
     from jsonschema import Draft202012Validator

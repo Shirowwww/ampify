@@ -8,6 +8,8 @@ const char kConfig[] = R"AMPIFYJS(
 
   Ampify.config = {
     get(key, fallback) {
+      // A setting the manifest declares has its default there, with its type.
+      if (fallback === undefined) fallback = native.configDeclared(text(key));
       const raw = native.configGet(text(key));
       if (raw === undefined) return fallback;
       if (typeof fallback === "boolean") return TRUE_WORDS.includes(raw.toLowerCase());

@@ -31,7 +31,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | Class | Zone |
 |---|---|
 | `.window` | The whole window, behind everything else |
-| `.titlebar` | The title bar strip, on the pages that show it |
+| `.titlebar` | The title bar strip, on the pages that show it. It lies over the top of the sidebar and the playback bar: a `background` on it catches their clicks, so leave it unset |
 | `.titlebar-drag-area` | The area that drags the window |
 | `.caption-buttons-cover` | The strip that keeps the minimize, maximize and close buttons readable over the playback bar |
 | `.modal` | Where Apple Music shows its dialogs |

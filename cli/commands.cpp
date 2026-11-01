@@ -348,18 +348,23 @@ std::map<std::string, std::string> Template(std::string_view kind, const std::st
         // docs/themes/guide.md) walk through these same files.
         return {
             {"manifest.json", "{\n" + common + ",\n  \"main\": \"main.js\",\n"
-                              "  \"permissions\": [\"ui.playbar\", \"player.read\", \"notifications\"]\n}\n"},
+                              "  \"permissions\": [\"ui.playbar\", \"player.read\", \"notifications\"],\n"
+                              "  \"settings\": [\n"
+                              "    {\"key\": \"show-album\", \"label\": \"Show the album\", \"type\": \"toggle\", "
+                              "\"default\": true}\n  ]\n}\n"},
             {"main.js",
              "// " + id + ": a button in the playback bar that tells the song playing.\n"
-             "// Save a change: with ampify dev, Apple Music restarts the extension at once.\n\n"
+             "// Save a change: with ampify dev, Apple Music restarts the extension at once.\n"
+             "// show-album is declared in manifest.json: the Ampify card in Settings > Playback switches it.\n\n"
              "Ampify.ui.playbar.addButton({\n"
              "  label: \"What is playing?\",\n"
              "  icon: \"\\uE946\", // a Segoe Fluent Icons glyph (Info)\n"
              "  onClick: () => {\n"
              "    const { track } = Ampify.player.state();\n"
+             "    const album = Ampify.config.get(\"show-album\") && track ? \" - \" + track.album : \"\";\n"
              "    Ampify.notify({\n"
              "      title: track ? track.title : \"Nothing is playing\",\n"
-             "      text: track ? track.artist + \" - \" + track.album : \"Start a song in Apple Music.\",\n"
+             "      text: track ? track.artist + album : \"Start a song in Apple Music.\",\n"
              "    });\n"
              "  },\n"
              "});\n\n"

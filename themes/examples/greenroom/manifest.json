@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "greenroom",
   "name": "Greenroom",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "A familiar layout from another music app: the playback bar at the bottom across the window, the track on the left, rounded dark panels and a green accent.",

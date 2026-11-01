@@ -1,6 +1,8 @@
 #include "manifest.hpp"
 
 #include <algorithm>
+#include <charconv>
+#include <cmath>
 #include <regex>
 #include <set>
 
@@ -21,7 +23,7 @@ const std::set<std::string_view> kFixedPermissions = {
 const std::set<std::string_view> kKnownFields = {
     "$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage", "license",
     "main", "colors", "defaultScheme", "resources", "icon", "permissions", "appVersions", "processes", "type",
-    "preview", "tags",
+    "preview", "tags", "settings",
 };
 
 // Length in Unicode code points, so that "é" counts as one character.
@@ -45,8 +47,138 @@ const std::regex kSvgFilePattern("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.svg$");
 const std::regex kSchemeNamePattern("^[A-Za-z0-9_-]{1,32}$");
 const std::regex kAppVersionPattern("^[0-9]+(\\.[0-9]+){1,3}$");
 const std::regex kHostPattern("^[a-z0-9.-]{1,253}$");
+const std::regex kSettingKeyPattern("^[a-z0-9][a-z0-9-]{0,31}$");
+
+constexpr size_t kMaxSettings = 16;
+constexpr size_t kMaxOptions = 20;
+constexpr size_t kMaxSettingText = 200;
+
+// A choice's values: 2 to 20 different texts of 1 to 40 characters.
+bool ReadOptions(const Json* field, std::vector<std::string>& options) {
+    const Json::Array* list = field ? field->AsArray() : nullptr;
+    if (!list || list->size() < 2 || list->size() > kMaxOptions) return false;
+    for (const Json& item : *list) {
+        const std::string* option = item.AsString();
+        if (!option || CodePoints(*option) < 1 || CodePoints(*option) > 40) return false;
+        if (std::find(options.begin(), options.end(), *option) != options.end()) return false;
+        options.push_back(*option);
+    }
+    return true;
+}
+
+// The type-dependent half of a setting: its options or bounds, and a default that fits them.
+void ReadSettingValue(const Json& item, const std::string& where, SettingSpec& spec, std::vector<std::string>& errors) {
+    const Json* value = item.Find("default");
+    if ((item.Find("options") != nullptr) != (spec.type == SettingSpec::Type::Choice)) {
+        errors.push_back(where + ": options belong to a choice, and a choice needs them");
+    }
+    if ((item.Find("min") || item.Find("max")) && spec.type != SettingSpec::Type::Number) {
+        errors.push_back(where + ": min and max belong to a number");
+    }
+    switch (spec.type) {
+        case SettingSpec::Type::Toggle:
+            if (!value || !value->AsBool()) return errors.push_back(where + ": default must be true or false");
+            spec.defaultValue = *value->AsBool() ? "true" : "false";
+            return;
+        case SettingSpec::Type::Choice:
+            if (item.Find("options") && !ReadOptions(item.Find("options"), spec.options)) {
+                return errors.push_back(where + ": options must be 2 to 20 different texts of 1 to 40 characters");
+            }
+            if (!value || !value->AsString() ||
+                std::find(spec.options.begin(), spec.options.end(), *value->AsString()) == spec.options.end()) {
+                return errors.push_back(where + ": default must be one of the options");
+            }
+            spec.defaultValue = *value->AsString();
+            return;
+        case SettingSpec::Type::Text:
+            if (!value || !value->AsString() || CodePoints(*value->AsString()) > kMaxSettingText ||
+                value->AsString()->find_first_of("\r\n") != std::string::npos) {
+                return errors.push_back(where + ": default must be a text of 200 characters at most, on one line");
+            }
+            spec.defaultValue = *value->AsString();
+            return;
+        case SettingSpec::Type::Number:
+            for (auto [name, bound] : {std::pair{"min", &spec.min}, std::pair{"max", &spec.max}}) {
+                const Json* field = item.Find(name);
+                if (!field) continue;
+                if (!field->AsNumber()) return errors.push_back(where + ": " + name + " must be a number");
+                *bound = *field->AsNumber();
+            }
+            if (!value || !value->AsNumber() || (spec.min && *value->AsNumber() < *spec.min) ||
+                (spec.max && *value->AsNumber() > *spec.max)) {
+                return errors.push_back(where + ": default must be a number between min and max");
+            }
+            spec.defaultValue = SettingNumberText(*value->AsNumber());
+            return;
+    }
+}
+
+std::optional<SettingSpec> ReadSetting(const Json& item, const std::string& where, std::vector<std::string>& errors) {
+    if (!item.IsObject()) {
+        errors.push_back(where + " must be an object");
+        return std::nullopt;
+    }
+    static const std::set<std::string_view> kFields = {"key", "label", "type", "default", "options", "min", "max"};
+    size_t before = errors.size();
+    for (const auto& [field, value] : *item.AsObject()) {
+        (void)value;
+        if (!kFields.count(field)) errors.push_back(where + ": unknown field " + field);
+    }
+    SettingSpec spec;
+    const std::string* key = item.Find("key") ? item.Find("key")->AsString() : nullptr;
+    if (!key || !Matches(*key, kSettingKeyPattern) || *key == "enabled") {
+        errors.push_back(where + ": key must be [a-z0-9][a-z0-9-]{0,31}, other than enabled");
+    } else {
+        spec.key = *key;
+    }
+    const std::string* label = item.Find("label") ? item.Find("label")->AsString() : nullptr;
+    if (!label || CodePoints(*label) < 1 || CodePoints(*label) > 60) {
+        errors.push_back(where + ": label must be 1 to 60 characters");
+    } else {
+        spec.label = *label;
+    }
+    const std::string* type = item.Find("type") ? item.Find("type")->AsString() : nullptr;
+    if (!type || (*type != "toggle" && *type != "choice" && *type != "text" && *type != "number")) {
+        errors.push_back(where + ": type must be toggle, choice, text or number");
+        return std::nullopt;
+    }
+    spec.type = *type == "toggle" ? SettingSpec::Type::Toggle
+                : *type == "choice" ? SettingSpec::Type::Choice
+                : *type == "text"   ? SettingSpec::Type::Text
+                                    : SettingSpec::Type::Number;
+    ReadSettingValue(item, where, spec, errors);
+    if (errors.size() != before) return std::nullopt;
+    return spec;
+}
+
+void ReadSettings(const Json& field, std::vector<SettingSpec>& settings, std::vector<std::string>& errors) {
+    const Json::Array* list = field.AsArray();
+    if (!list || list->empty() || list->size() > kMaxSettings) {
+        errors.push_back("settings must be a list of 1 to 16 entries");
+        return;
+    }
+    for (size_t index = 0; index < list->size(); index++) {
+        std::string where = "settings[" + std::to_string(index) + "]";
+        std::optional<SettingSpec> spec = ReadSetting((*list)[index], where, errors);
+        if (!spec) continue;
+        bool taken = std::any_of(settings.begin(), settings.end(), [&](const SettingSpec& s) { return s.key == spec->key; });
+        if (taken) errors.push_back(where + ": key " + spec->key + " is already used");
+        else settings.push_back(std::move(*spec));
+    }
+}
 
 }  // namespace
+
+std::string SettingNumberText(double value) {
+    char buffer[32];
+    auto [end, error] = std::to_chars(buffer, buffer + sizeof buffer, value);
+    return error == std::errc() ? std::string(buffer, end) : std::to_string(value);
+}
+
+const SettingSpec* Manifest::Setting(std::string_view key) const {
+    auto it = std::find_if(settings.begin(), settings.end(), [&](const SettingSpec& spec) { return spec.key == key; });
+    return it == settings.end() ? nullptr : &*it;
+}
 
 bool IsKnownPermission(std::string_view permission) {
     if (kFixedPermissions.count(permission)) return true;
@@ -247,6 +379,11 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
         }
     }
 
+    if (const Json* settings = root->Find("settings")) {
+        if (m.kind != ElementKind::Extension) result.errors.push_back("settings: only an extension declares settings");
+        else ReadSettings(*settings, m.settings, result.errors);
+    }
+
     // Rules that depend on the kind, from the table in docs/extensions/manifest.md.
     auto require_file = [&](const char* key, const std::optional<std::string>& file) {
         if (file && hasFile && !hasFile(*file)) result.errors.push_back(std::string("file missing: ") + *file + " (" + key + ")");
@@ -274,6 +411,21 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
 
     if (result.errors.empty()) result.manifest = std::move(m);
     return result;
+}
+
+std::vector<std::string> SettingsErrors(std::string_view manifestText) {
+    std::vector<std::string> errors;
+    std::optional<Json> root = Json::Parse(manifestText);
+    const Json* field = root && root->IsObject() ? root->Find("settings") : nullptr;
+    if (!field) return errors;
+    const Json* kind = root->Find("kind");
+    if (!kind || !kind->AsString() || *kind->AsString() != "extension") {
+        errors.push_back("settings: only an extension declares settings");
+        return errors;
+    }
+    std::vector<SettingSpec> settings;
+    ReadSettings(*field, settings, errors);
+    return errors;
 }
 
 }  // namespace ampify

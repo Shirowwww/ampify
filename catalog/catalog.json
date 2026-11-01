@@ -65,7 +65,7 @@
     {
       "id": "greenroom",
       "name": "Greenroom",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "kind": "theme",
       "author": "Shirowwww",
       "description": "A familiar layout from another music app: the playback bar at the bottom across the window, the track on the left, rounded dark panels and a green accent.",
@@ -76,9 +76,9 @@
         "green",
         "redesign"
       ],
-      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/greenroom-0.2.0.jpg",
-      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/greenroom-0.2.0.zip",
-      "sha256": "508d8d3865bfbb99e272644a6c3f2c97adafb540112f6ee4a72092b3e8c53b50",
+      "preview": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/greenroom-0.2.1.jpg",
+      "url": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/greenroom-0.2.1.zip",
+      "sha256": "cece47ebf3d0b9be74a03d19ab2ee4f3dc43bbf8a2cb7ef7988a59e048d65ebf",
       "permissions": []
     },
     {

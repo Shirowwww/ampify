@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Ampify VERSION 0.5.0 LANGUAGES C CXX)
+project(Ampify VERSION 1.0.0 LANGUAGES C CXX)
 
 # The Ampify version is written in three places: here (ampify --version), core/kit_layout.hpp (installer, test report) and
 # core/script_extension.hpp (Ampify.version). A release with two different numbers would confuse `ampify update`, so the

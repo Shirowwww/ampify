@@ -225,6 +225,41 @@ def check_catalog(doc, path):
     return errors
 
 
+def check_setting_value(setting, where):
+    """The type-dependent rules of one declared setting (core/manifest.cpp, ReadSettingValue)."""
+    kind, value = setting["type"], setting["default"]
+    errors = []
+    if ("options" in setting) != (kind == "choice"):
+        errors.append(f"{where}: options belong to a choice, and a choice needs them")
+    if ({"min", "max"} & setting.keys()) and kind != "number":
+        errors.append(f"{where}: min and max belong to a number")
+    if kind == "toggle" and not isinstance(value, bool):
+        errors.append(f"{where}: default must be true or false")
+    if kind == "choice" and value not in setting.get("options", []):
+        errors.append(f"{where}: default must be one of the options")
+    if kind == "text" and (not isinstance(value, str) or len(value) > 200 or "\n" in value or "\r" in value):
+        errors.append(f"{where}: default must be a text of 200 characters at most, on one line")
+    if kind == "number":
+        low, high = setting.get("min", float("-inf")), setting.get("max", float("inf"))
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not low <= value <= high:
+            errors.append(f"{where}: default must be a number between min and max")
+    return errors
+
+
+def check_settings(settings):
+    """Rules of the settings field a schema cannot express: unique keys, the reserved key, defaults that fit."""
+    errors, keys = [], set()
+    for index, setting in enumerate(settings):
+        where = f"settings[{index}]"
+        if setting["key"] == "enabled":
+            errors.append(f"{where}: key enabled is reserved")
+        elif setting["key"] in keys:
+            errors.append(f"{where}: key {setting['key']} is already used")
+        keys.add(setting["key"])
+        errors += check_setting_value(setting, where)
+    return errors
+
+
 def check_manifest(doc, path):
     """Rules a schema cannot express for a manifest: its folder, its kind and its files."""
     errors = []
@@ -245,6 +280,10 @@ def check_manifest(doc, path):
             errors.append("resources or user.css: at least one of the two is required for a snippet")
         if "main" in doc:
             errors.append("main: not allowed for a snippet")
+
+    if "settings" in doc:
+        errors += check_settings(doc["settings"]) if kind == "extension" else [
+            "settings: only an extension declares settings"]
 
     for key in ("main", "colors", "resources", "icon", "preview"):
         if key in doc and not os.path.isfile(os.path.join(folder, doc[key])):

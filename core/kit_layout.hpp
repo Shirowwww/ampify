@@ -9,7 +9,7 @@
 namespace ampify {
 
 // Version shipped in this build. Shown in the uninstall list and in the test report.
-inline constexpr std::string_view kKitVersion = "0.5.0";
+inline constexpr std::string_view kKitVersion = "1.0.0";
 
 // Folder name under %LOCALAPPDATA%\Programs (the installed kit) and under %USERPROFILE% (the user's data).
 inline constexpr std::string_view kKitFolderName = "Ampify";

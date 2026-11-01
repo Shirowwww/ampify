@@ -211,7 +211,7 @@ with line numbers), `types`, `doctor`, permissions with consent, `appVersions`, 
 | 7 | Custom UI: pages, panels, dialogs | `React` in 8, `PopupModal` in 10 | done |
 | 8 | Notifications | 10 of 20 | done |
 | 9 | Persistent settings | 177 files | done |
-| 10 | Ready-made settings UI | every big theme builds one | missing |
+| 10 | Ready-made settings UI | every big theme builds one | done for extensions: `settings` in the manifest, shown in the Ampify card |
 | 11 | Context-menu entries | 7 projects | partial (the item's name, no URI) |
 | 12 | Buttons in the play bar or top bar | 5 projects | done |
 | 13 | Library and playlist data | 3 to 5 projects | planned |

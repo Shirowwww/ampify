@@ -110,6 +110,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | `Keyboard` | `Ampify.keyboard.bind` (global shortcuts through `RegisterHotKey`) | Done |
 | `LocalStorage` | `Ampify.storage`, one JSON file per element | Done |
 | `Config` | `Ampify.config.get` and `set`, limited to the element's keys | Done |
+| Settings pages that each extension builds (or `spcr-settings`) | `settings` in the manifest: toggles, choices, texts and numbers shown in the Ampify card of Apple Music's settings, with no code ([extensions/manifest.md](extensions/manifest.md)) | Better |
 | `Queue` | `Ampify.player.queue.list()`. On Windows it gives the current track only (`complete: false`) | Partial |
 | `addToQueue`, `removeFromQueue` | `queue.add` and `queue.remove` answer `false` until the parameters of Apple's queue methods are read on a PC | Planned |
 | `colorExtractor` | `Ampify.color.extract(pixels, width, height)` works on pixels the script supplies. `color.fromArtwork` is planned | Partial |

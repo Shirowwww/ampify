@@ -166,3 +166,66 @@ TEST_CASE(Manifest_TypeIsScriptOrModule) {
     other.insert(other.find("\"main\""), "\"type\": \"commonjs\", ");
     CHECK(!Check(other, "hello-extension").manifest);
 }
+
+namespace {
+
+std::string WithSettings(const std::string& settings) {
+    std::string text = kHello;
+    text.insert(text.find("\"main\""), "\"settings\": " + settings + ", ");
+    return text;
+}
+
+}  // namespace
+
+TEST_CASE(Manifest_ReadsTheSettingsAnExtensionDeclares) {
+    ampify::ManifestResult result = Check(WithSettings(R"([
+        {"key": "seconds", "label": "Show the seconds", "type": "toggle", "default": true},
+        {"key": "side", "label": "Side", "type": "choice", "options": ["Left", "Right"], "default": "Right"},
+        {"key": "greeting", "label": "Greeting", "type": "text", "default": ""},
+        {"key": "size", "label": "Size", "type": "number", "min": 8, "max": 32, "default": 12.5}])"),
+                                          "hello-extension");
+    CHECK(result.errors.empty());
+    CHECK(result.warnings.empty());
+    if (!result.manifest) return;
+    const std::vector<ampify::SettingSpec>& settings = result.manifest->settings;
+    CHECK(settings.size() == 4);
+    if (settings.size() != 4) return;
+    CHECK(settings[0].type == ampify::SettingSpec::Type::Toggle && settings[0].defaultValue == "true");
+    CHECK(settings[1].options == std::vector<std::string>({"Left", "Right"}) && settings[1].defaultValue == "Right");
+    CHECK(settings[2].type == ampify::SettingSpec::Type::Text && settings[2].defaultValue.empty());
+    CHECK(settings[3].defaultValue == "12.5" && settings[3].min == 8.0 && settings[3].max == 32.0);
+    CHECK(result.manifest->Setting("size") == &settings[3]);
+    CHECK(result.manifest->Setting("other") == nullptr);
+    CHECK(ampify::SettingNumberText(12) == "12");
+}
+
+TEST_CASE(Manifest_RefusesSettingsThatDoNotHold) {
+    const char* wrong[] = {
+        R"([])",
+        R"({"key": "a"})",
+        R"([{"key": "enabled", "label": "A", "type": "toggle", "default": true}])",
+        R"([{"key": "Big", "label": "A", "type": "toggle", "default": true}])",
+        R"([{"key": "a", "label": "", "type": "toggle", "default": true}])",
+        R"([{"key": "a", "label": "A", "type": "slider", "default": 1}])",
+        R"([{"key": "a", "label": "A", "type": "toggle", "default": "yes"}])",
+        R"([{"key": "a", "label": "A", "type": "choice", "options": ["x"], "default": "x"}])",
+        R"([{"key": "a", "label": "A", "type": "choice", "options": ["x", "y"], "default": "z"}])",
+        R"([{"key": "a", "label": "A", "type": "choice", "default": "x"}])",
+        R"([{"key": "a", "label": "A", "type": "text", "default": "two\nlines"}])",
+        R"([{"key": "a", "label": "A", "type": "number", "min": 1, "max": 5, "default": 9}])",
+        R"([{"key": "a", "label": "A", "type": "text", "default": "x", "min": 1}])",
+        R"([{"key": "a", "label": "A", "type": "toggle", "default": true, "hint": "x"}])",
+        R"([{"key": "a", "label": "A", "type": "toggle", "default": true},
+            {"key": "a", "label": "B", "type": "toggle", "default": false}])",
+    };
+    for (const char* settings : wrong) {
+        CHECK(!Check(WithSettings(settings), "hello-extension").manifest);
+        CHECK(!ampify::SettingsErrors(WithSettings(settings)).empty());
+    }
+    CHECK(ampify::SettingsErrors(kHello).empty());
+
+    std::string app = WithSettings(R"([{"key": "a", "label": "A", "type": "toggle", "default": true}])");
+    app.replace(app.find("\"extension\""), 11, "\"app\"");
+    CHECK(!Check(app, "hello-extension").manifest);
+    CHECK(!ampify::SettingsErrors(app).empty());
+}

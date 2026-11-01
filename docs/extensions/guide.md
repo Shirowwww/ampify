@@ -12,7 +12,7 @@ The `my-extension` folder holds two files:
 
 | File | What it does |
 |---|---|
-| `manifest.json` | The id, name, author, version and the permissions the code needs |
+| `manifest.json` | The id, name, author, version, the permissions the code needs, and its settings |
 | `main.js` | The code, run by Ampify's JavaScript engine inside Apple Music |
 
 The extension already works: it adds a button to the playback bar, and a click shows the song playing in a Windows
@@ -38,13 +38,26 @@ Ampify.ui.playbar.addButton({
   icon: "", // a Segoe Fluent Icons glyph (Info)
   onClick: () => {
     const { track } = Ampify.player.state();
+    const album = Ampify.config.get("show-album") && track ? " - " + track.album : "";
     Ampify.notify({
       title: track ? track.title : "Nothing is playing",
-      text: track ? track.artist + " - " + track.album : "Start a song in Apple Music.",
+      text: track ? track.artist + album : "Start a song in Apple Music.",
     });
   },
 });
 ```
+
+`show-album` is a setting that `manifest.json` declares:
+
+```json
+"settings": [
+  {"key": "show-album", "label": "Show the album", "type": "toggle", "default": true}
+]
+```
+
+Apple Music's Settings > Playback shows it under the extension, in the "Ampify" card. Switch it off: the extension
+restarts, and the notification leaves the album out. A setting can also be a list of choices, a text or a number
+([manifest.md](manifest.md), "Settings").
 
 Each function needs a permission in `manifest.json`. Here `ui.playbar` adds the button, `player.read` reads the song and
 `notifications` shows the notification. A function called without its permission throws a `PermissionDenied` error,

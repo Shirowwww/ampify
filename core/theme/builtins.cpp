@@ -178,7 +178,8 @@ const std::vector<ClassEntry> kClasses{
 };
 
 // Rounded panels floating on the window, with even gaps and aligned edges: the sidebar on the left, the pages on the
-// right below the playback bar. Colours come from variables a theme sets in its :root.
+// right below the playback bar. Colours come from variables a theme sets in its :root. The title bar strip keeps its
+// own background: with a colour, it catches the clicks meant for the buttons under it.
 constexpr std::string_view kFloatingPanels = R"css(
 .window {
     background: var(--window-background, #0B0B0D);
@@ -187,7 +188,6 @@ constexpr std::string_view kFloatingPanels = R"css(
 .navigation,
 .main-column,
 .page,
-.titlebar,
 .content-background {
     background: transparent;
 }

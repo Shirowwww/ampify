@@ -71,6 +71,7 @@ keys into the control's resources works before and after the groups exist.
 | About a hundred native controls rebuilt when a status line appeared above the Marketplace cards | The kernel matched nodes by position, and React keys stayed in the script's tree | The key of a React element goes on the nodes it draws |
 | A kit page title looked like body text | No type ramp in the renderer | `title` 28 px and `subtitle` 20 px, semibold, as in Apple Music's own pages |
 | Folded sidebar with floating panels: the start of the account name showed, and the panel covered the page's edge | The folded `SplitView` clips `Grid#PaneRoot` to `CompactPaneLength` counted from the pane's own edge, so its left margin pushes the visible part into the page column instead of shrinking it | `compact-pane-length: 48`, and the space between the panels taken by the page's left margin (two gaps) with a negative right margin on the sidebar (one gap) |
+| Floating panels: the sidebar's More button (`···`) stopped opening its menu, and nothing in the top 64 pixels took a click | `Border#Titlebar` lies over the top of the whole window. Apple's own brush lets clicks through; a colour written by a theme, even transparent, catches them | The layout leaves `.titlebar` alone; `docs/themes/names.md` tells creators to do the same |
 
 Names from WinUI templates (`Grid#RootGrid`, `Grid#LayoutRoot`, `Border#Root`, `ContentPresenter#ContentPresenter`) appear
 dozens of times. Always target them under a named parent.

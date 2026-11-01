@@ -15,9 +15,12 @@
 
 #include <algorithm>
 #include <atomic>
+#include <charconv>
 #include <chrono>
+#include <cmath>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <new>
 #include <optional>
@@ -631,6 +634,131 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
     return row;
 }
 
+// Writes one declared setting from the card; the extension restarts with it (SetModSetting).
+void CommitSetting(UiService::Shared& shared, const std::string& id, const std::string& key, const std::string& value) {
+    std::string error;
+    if (uirender::SetModSetting(shared.kit, id, key, value, error)) {
+        shared.journal.Write("Settings: \"" + id + "\" " + key + " = " + value + " from the Ampify card (restart " + id +
+                             " requested)");
+    } else {
+        shared.journal.Write("Settings: could not change \"" + id + "\" " + key + ": " + error);
+    }
+}
+
+// A number typed in a field: the text when it reads as one within the bounds, else nothing.
+std::optional<std::string> NumberIn(const std::string& text, const SettingSpec& spec) {
+    double number = 0;
+    const char* end = text.data() + text.size();
+    auto [stop, error] = std::from_chars(text.data(), end, number);
+    if (text.empty() || error != std::errc() || stop != end || !std::isfinite(number)) return std::nullopt;
+    if ((spec.min && number < *spec.min) || (spec.max && number > *spec.max)) return std::nullopt;
+    return SettingNumberText(number);
+}
+
+// A text or number field, written when it is left or on Enter. A number that does not read puts the last value back.
+controls::TextBox SettingField(UiService::Shared& shared, const std::string& id, const SettingSpec& spec,
+                               const std::string& value) {
+    controls::TextBox box;
+    if (shared.probe.textBox) box.Style(shared.probe.textBox);
+    box.MinWidth(spec.type == SettingSpec::Type::Number ? 96 : 200);
+    box.MaxLength(200);  // the length docs/extensions/manifest.md allows a text default
+    box.Text(Wide(value));
+    auto last = std::make_shared<std::string>(value);
+    UiService::Shared* owner = &shared;
+    auto commit = [owner, id, spec, last](const controls::TextBox& field) {
+        std::string typed = Utf8(field.Text());
+        std::optional<std::string> next = spec.type == SettingSpec::Type::Number ? NumberIn(typed, spec) : typed;
+        if (!next) {
+            field.Text(Wide(*last));
+            return;
+        }
+        if (*next == *last) return;
+        *last = *next;
+        CommitSetting(*owner, id, spec.key, *next);
+    };
+    box.LostFocus([commit](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            commit(sender.as<controls::TextBox>());
+        } catch (...) {
+        }
+    });
+    box.KeyDown([commit](IInspectable const& sender, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
+        try {
+            if (args.Key() == winrt::Windows::System::VirtualKey::Enter) commit(sender.as<controls::TextBox>());
+        } catch (...) {
+        }
+    });
+    return box;
+}
+
+xaml::FrameworkElement SettingControl(UiService::Shared& shared, const std::string& id, const SettingSpec& spec,
+                                      const std::string& value) {
+    UiService::Shared* owner = &shared;
+    if (spec.type == SettingSpec::Type::Toggle) {
+        controls::ToggleSwitch toggle;
+        if (shared.probe.toggle) toggle.Style(shared.probe.toggle);
+        toggle.MinWidth(0);
+        toggle.OnContent(winrt::box_value(L"On"));
+        toggle.OffContent(winrt::box_value(L"Off"));
+        toggle.IsOn(value == "true" || value == "1" || value == "on" || value == "yes");
+        toggle.Toggled([owner, id, key = spec.key](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+            try {
+                CommitSetting(*owner, id, key, sender.as<controls::ToggleSwitch>().IsOn() ? "true" : "false");
+            } catch (...) {
+            }
+        });
+        return toggle;
+    }
+    if (spec.type == SettingSpec::Type::Choice) {
+        controls::ComboBox combo;
+        if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
+        combo.MinWidth(200);
+        for (const std::string& option : spec.options) combo.Items().Append(winrt::box_value(Wide(option)));
+        auto chosen = std::find(spec.options.begin(), spec.options.end(), value);
+        if (chosen == spec.options.end()) chosen = std::find(spec.options.begin(), spec.options.end(), spec.defaultValue);
+        combo.SelectedIndex(static_cast<int32_t>(chosen - spec.options.begin()));
+        combo.SelectionChanged([owner, id, key = spec.key](IInspectable const& sender,
+                                                           controls::SelectionChangedEventArgs const&) noexcept {
+            try {
+                auto item = sender.as<controls::ComboBox>().SelectedItem();
+                if (item) CommitSetting(*owner, id, key, Utf8(winrt::unbox_value_or<winrt::hstring>(item, L"")));
+            } catch (...) {
+            }
+        });
+        return combo;
+    }
+    return SettingField(shared, id, spec, value);
+}
+
+// The settings an extension declares, under its row: one line each, its label on the left and its control on the right.
+xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::ModEntry& mod) {
+    controls::StackPanel panel;
+    panel.Spacing(8);
+    panel.Margin(xaml::Thickness{16, 0, 0, 0});
+    for (size_t index = 0; index < mod.settings.size() && index < mod.values.size(); index++) {
+        const SettingSpec& spec = mod.settings[index];
+        controls::Grid row;
+        row.ColumnSpacing(16);
+        controls::ColumnDefinition text;
+        text.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
+        controls::ColumnDefinition control;
+        control.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
+        row.ColumnDefinitions().Append(text);
+        row.ColumnDefinitions().Append(control);
+        controls::TextBlock label = MakeText(Wide(spec.label).c_str(), "body", false, &shared.probe);
+        label.VerticalAlignment(xaml::VerticalAlignment::Center);
+        row.Children().Append(label);
+        xaml::FrameworkElement input = SettingControl(shared, mod.id, spec, mod.values[index]);
+        input.VerticalAlignment(xaml::VerticalAlignment::Center);
+        input.HorizontalAlignment(xaml::HorizontalAlignment::Right);
+        Name(input, "AMPIFY_ModsSetting_" + mod.id + "_" + spec.key, spec.label);
+        controls::Grid::SetColumn(input, 1);
+        row.Children().Append(input);
+        panel.Children().Append(row);
+    }
+    return panel;
+}
+
 controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uirender::ModEntry>& mods,
                                const xaml::FrameworkElement& templateRow) {
     controls::Border card = MakeCardBorder(shared.probe);
@@ -712,6 +840,7 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     for (const uirender::ModEntry& mod : mods) {
         list.Children().Append(MakeDivider());
         list.Children().Append(ModRow(shared, mod));
+        if (!mod.settings.empty()) list.Children().Append(ModSettings(shared, mod));
     }
     body.Children().Append(list);
     card.Child(body);

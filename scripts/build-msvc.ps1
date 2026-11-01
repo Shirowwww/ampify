@@ -68,13 +68,50 @@ if (-not (Test-Path -LiteralPath (Join-Path $gen 'winrt\Microsoft.UI.Xaml.h'))) 
 }
 
 # 3. Configure once, then build what changed.
+# Ninja learns which headers a file includes from cl's "Note: including file:" lines, matched byte for byte against the
+# prefix CMake recorded when it configured. cl writes them in the console's code page, and a localized Visual Studio
+# puts non-ASCII characters in them: the OEM code page for every run (the one CMake reads them in), and a build folder
+# whose prefix differs from what cl writes now is configured again, or a changed header would rebuild nothing.
+function Get-ShowIncludesPrefix {
+    $probe = Join-Path $out 'showincludes.cpp'
+    $answer = Join-Path $out 'showincludes.txt'
+    Set-Content -LiteralPath $probe -Value '#include <cstddef>' -Encoding ascii
+    cmd /c "cl /nologo /showIncludes /Zs `"$probe`" > `"$answer`" 2>&1"
+    $bytes = [IO.File]::ReadAllBytes($answer)
+    Remove-Item -LiteralPath $probe, $answer
+    $start = [Array]::IndexOf($bytes, [byte]10) + 1
+    for ($i = $start; $i -lt $bytes.Length - 2; $i++) {
+        if ($bytes[$i + 1] -eq [byte][char]':' -and $bytes[$i + 2] -eq [byte][char]'\') { return $bytes[$start..($i - 1)] }
+    }
+    return $null
+}
+
 $build = Join-Path $out ($(if ($Bench) { 'bench' } else { 'release' }))
 $benchFlag = if ($Bench) { 'ON' } else { 'OFF' }
-if (-not (Test-Path -LiteralPath (Join-Path $build 'build.ninja'))) {
-    cmake -S $root -B $build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl `
-        -DAMPIFY_XAML=ON "-DAMPIFY_BENCH=$benchFlag" -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DAMPIFY_WINAPPSDK_INCLUDE=$gen"
-    if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
+$consoleEncoding = [Console]::OutputEncoding
+[Console]::OutputEncoding = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
+try {
+    $rules = Join-Path $build 'CMakeFiles\rules.ninja'
+    $expected = Get-ShowIncludesPrefix
+    if ($expected -and (Test-Path -LiteralPath $rules)) {
+        $key = [Text.Encoding]::ASCII.GetBytes('msvc_deps_prefix = ')
+        $text = [IO.File]::ReadAllBytes($rules)
+        $latin1 = [Text.Encoding]::GetEncoding(28591)
+        $at = $latin1.GetString($text).IndexOf($latin1.GetString($key))
+        $recorded = if ($at -ge 0) { $latin1.GetString($text, $at + $key.Length, $expected.Length) } else { '' }
+        if ($recorded -ne $latin1.GetString([byte[]]$expected)) {
+            Write-Host "Reconfiguring ${build}: its compiler message prefix differs from what cl writes in this console"
+            Remove-Item -LiteralPath (Join-Path $build 'CMakeCache.txt'), (Join-Path $build 'CMakeFiles'), (Join-Path $build 'build.ninja') -Recurse -Force
+        }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $build 'build.ninja'))) {
+        cmake -S $root -B $build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl `
+            -DAMPIFY_XAML=ON "-DAMPIFY_BENCH=$benchFlag" -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DAMPIFY_WINAPPSDK_INCLUDE=$gen"
+        if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
+    }
+    cmake --build $build
+    if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+} finally {
+    [Console]::OutputEncoding = $consoleEncoding
 }
-cmake --build $build
-if ($LASTEXITCODE -ne 0) { throw 'build failed' }
 Write-Host "Ready: $build (ampify_launcher.exe, ampify_kernel.dll, ampify.exe)"

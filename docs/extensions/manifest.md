@@ -52,9 +52,37 @@ The folder [examples/hello-extension](../../examples/hello-extension/) is a comp
 | `colors` | n/a | n/a | required, or `resources` | n/a | An `.ini` file of color schemes |
 | `defaultScheme` | n/a | n/a | optional | n/a | Section of `colors.ini` used by default |
 | `resources` | n/a | n/a | required, or `colors` | required, or a `user.css` in the folder | A `.xaml` resource dictionary |
+| `settings` | optional | forbidden | forbidden | forbidden | Settings shown in the Ampify card (next section) |
 
 Fields that do not apply to the `kind` are ignored by the kernel. The validator only checks the fields required for each
 `kind`.
+
+## Settings
+
+An extension can list its settings. The "Ampify" card, in Apple Music's Settings > Playback, shows them under the
+extension's switch, and `Ampify.config.get(key)` gives their value: the user's choice, else the `default` below, with its
+type (a boolean for a toggle, a number for a number). A change in the card restarts the extension, which reads its
+settings again.
+
+```json
+"settings": [
+  {"key": "show-album", "label": "Show the album", "type": "toggle", "default": true},
+  {"key": "position", "label": "Position", "type": "choice", "options": ["Left", "Right"], "default": "Left"},
+  {"key": "greeting", "label": "Greeting", "type": "text", "default": "Hello"},
+  {"key": "size", "label": "Text size", "type": "number", "min": 8, "max": 32, "default": 14}
+]
+```
+
+| Member | Rule |
+|---|---|
+| `key` | `[a-z0-9][a-z0-9-]{0,31}`, unique, other than `enabled`. The value is stored as `extensions.<id>.<key>` in `settings.txt` |
+| `label` | 1 to 60 characters, shown in the card |
+| `type` | `toggle`, `choice`, `text` or `number` |
+| `default` | `true` or `false` for a toggle, one of the `options` for a choice, a text of 200 characters at most on one line, or a number between `min` and `max` |
+| `options` | A choice's values, and only a choice's: 2 to 20 different texts of 1 to 40 characters |
+| `min`, `max` | A number's bounds, optional. A number typed outside them is not kept |
+
+There are 16 settings at most. A text or a number is written when the field is left or when Enter is pressed.
 
 Files declared in the manifest are at the root of the folder. A subfolder, a relative path like `../x.js`, or a name that
 starts with a dot is refused in these fields. The folder can contain subfolders for the files that `main` imports
@@ -70,7 +98,8 @@ starts with a dot is refused in these fields. The folder can contain subfolders 
 4. the major version of `kitApi`;
 5. the fields required by `kind` (table above);
 6. that each declared file is present in the folder;
-7. that the folder contains no symbolic link (the kernel refuses to import through a link).
+7. that the folder contains no symbolic link (the kernel refuses to import through a link);
+8. that each setting's `default`, `options`, `min` and `max` fit its `type`, and that no key is used twice.
 
 `ampify validate` applies the same rules (`cli/element.cpp`), and the kernel checks them again at load time
 (`core/manifest.cpp`), without relying on the validator. Unknown permissions are refused by the schema and by the kernel.
