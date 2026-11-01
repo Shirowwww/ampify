@@ -1,11 +1,11 @@
 // Tests of theme animations: the @keyframes blocks of user.css, the `animation` property, and the text a backend
-// decodes (core/theme/animation.hpp).
+// decodes (src/core/theme/animation.hpp).
 
 #include <string>
 #include <vector>
 
-#include "../core/theme/animation.hpp"
-#include "../core/theme/css.hpp"
+#include "../src/core/theme/animation.hpp"
+#include "../src/core/theme/css.hpp"
 #include "test.hpp"
 
 namespace th = ampify::theme;

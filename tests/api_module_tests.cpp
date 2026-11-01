@@ -1,4 +1,4 @@
-// The Ampify object is assembled from one prelude fragment and one natives file per module (core/api/modules.cpp).
+// The Ampify object is assembled from one prelude fragment and one natives file per module (src/core/api/modules.cpp).
 // These tests pin what an extension sees, so that moving code between modules cannot change the API.
 
 #include <filesystem>
@@ -9,10 +9,10 @@
 #include <string>
 #include <string_view>
 
-#include "../core/api/bridge.hpp"
-#include "../core/api/module.hpp"
-#include "../core/manifest.hpp"
-#include "../core/script_extension.hpp"
+#include "../src/core/api/bridge.hpp"
+#include "../src/core/api/module.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
 #include "test.hpp"
 

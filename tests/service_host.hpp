@@ -13,15 +13,15 @@
 #include <string>
 #include <vector>
 
-#include "../core/manifest.hpp"
-#include "../core/natives/discord.hpp"
-#include "../core/natives/fs.hpp"
-#include "../core/natives/http.hpp"
-#include "../core/natives/midi.hpp"
-#include "../core/natives/remote.hpp"
-#include "../core/natives/tray.hpp"
-#include "../core/output_files.hpp"
-#include "../core/script_extension.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/core/natives/discord.hpp"
+#include "../src/core/natives/fs.hpp"
+#include "../src/core/natives/http.hpp"
+#include "../src/core/natives/midi.hpp"
+#include "../src/core/natives/remote.hpp"
+#include "../src/core/natives/tray.hpp"
+#include "../src/core/output_files.hpp"
+#include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
 
 namespace ampify::test {

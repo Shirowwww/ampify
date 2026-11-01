@@ -8,7 +8,7 @@ Register-Case -Id 'ui-inspector' -Title 'UI: the inspector writes the interface 
 
     $launcher = Join-Path $script:BenchKitRoot 'ui\ampify_launcher.exe'
     if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Skip -Ctx $Ctx -Name 'UI build present' -Reason "no UI build in this bench (MinGW does not compile XAML): $launcher"
+        Add-Skip -Ctx $Ctx -Name 'UI build present' -Reason "no UI build in this kit: $launcher"
         return
     }
 

@@ -1,11 +1,11 @@
 // The local remote control without a socket: the HTTP request parser, the loopback and token rules, the router
-// (core/remote_protocol.*), and Ampify.remote.setState.
+// (src/core/remote_protocol.*), and Ampify.remote.setState.
 
 #include <optional>
 #include <string>
 #include <vector>
 
-#include "../core/remote_protocol.hpp"
+#include "../src/core/remote_protocol.hpp"
 #include "service_host.hpp"
 #include "test.hpp"
 

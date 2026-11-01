@@ -1,6 +1,6 @@
 #include <string>
 
-#include "../core/ui_model.hpp"
+#include "../src/core/ui_model.hpp"
 #include "test.hpp"
 
 namespace {

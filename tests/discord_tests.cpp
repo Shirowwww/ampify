@@ -1,9 +1,9 @@
-// Discord Rich Presence: the IPC framing, the handshake and SET_ACTIVITY payloads (core/discord_frame.*), and
+// Discord Rich Presence: the IPC framing, the handshake and SET_ACTIVITY payloads (src/core/discord_frame.*), and
 // Ampify.discord against a host that records what it is asked to show.
 
 #include <string>
 
-#include "../core/discord_frame.hpp"
+#include "../src/core/discord_frame.hpp"
 #include "service_host.hpp"
 #include "test.hpp"
 

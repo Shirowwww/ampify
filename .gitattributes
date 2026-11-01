@@ -1,3 +1,2 @@
 # The catalog files are served byte for byte and pinned by SHA-256: the same bytes on every platform.
 catalog/*.json text eol=lf
-catalog/packages/*.zip binary

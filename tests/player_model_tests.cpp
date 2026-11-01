@@ -9,12 +9,12 @@
 #include <string>
 #include <vector>
 
-#include "../core/amp_abi.hpp"
-#include "../core/manifest.hpp"
-#include "../core/player_model.hpp"
-#include "../core/player_queue.hpp"
-#include "../core/player_watch.hpp"
-#include "../core/script_extension.hpp"
+#include "../src/core/amp_abi.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/core/player_model.hpp"
+#include "../src/core/player_queue.hpp"
+#include "../src/core/player_watch.hpp"
+#include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
 #include "test.hpp"
 

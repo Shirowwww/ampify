@@ -1,4 +1,4 @@
-// English texts: lookups, placeholders and the language code of a locale (core/i18n.*), the sanity of the Ampify and
+// English texts: lookups, placeholders and the language code of a locale (src/core/i18n.*), the sanity of the Ampify and
 // command-line tables, and Ampify.i18n for extension authors.
 
 #include <algorithm>
@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "../cli/messages.hpp"
-#include "../core/i18n.hpp"
+#include "../src/cli/messages.hpp"
+#include "../src/core/i18n.hpp"
 #include "service_host.hpp"
 #include "test.hpp"
 

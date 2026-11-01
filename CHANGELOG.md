@@ -1,10 +1,19 @@
 # Changelog
 
+## 1.0.2 (2026-11-01)
+
+- The installer puts the Marketplace and Now Playing in your Ampify folder, in place of any older copy. A new install
+  had no Marketplace at all, and an update kept the old page. `ampify update --apply` replaces them too.
+- The Marketplace and Now Playing start until you turn them off. Other extensions and apps still wait for you to switch
+  them on.
+- The download is for users: the test kit (`Ampify-Test.exe`, `prepare-test.cmd`, `TEST-GUIDE.txt`) is no longer in it.
+- The programs carry version information (file Properties > Details): product, publisher, description, version.
+
 ## 1.0.1 (2026-11-01)
 
-- The Atmos leveler ends a song when its player stops while another song plays. Apple Music does not set a volume on
-  every player, so the leveler did not always see the next song: the song before was never measured, and its gain
-  could stay on. A song the leveler does not see is still not measured.
+- The Atmos leveler measures every song. Apple Music does not set a volume on every player, so the leveler did not
+  always see the next song: that song went unmeasured, the song before was never closed, and its gain could stay on.
+  A song on a player the leveler does not follow is now measured as stereo, and it ends the song before.
 - `logs\AppleMusic.log` keeps its lines when Apple Music opens a `music://` link: the short second Apple Music process
   adds to the log instead of emptying it.
 

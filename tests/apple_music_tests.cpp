@@ -1,7 +1,7 @@
 #include <string>
 
-#include "../core/apple_music.hpp"
-#include "../core/drm_guard.hpp"
+#include "../src/core/apple_music.hpp"
+#include "../src/core/drm_guard.hpp"
 #include "test.hpp"
 
 TEST_CASE(AppleMusic_VersionComesFromThePackageFullName) {

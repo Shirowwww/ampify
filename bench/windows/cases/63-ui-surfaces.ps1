@@ -7,7 +7,7 @@
 #   5. Settings > Playback, opened through UI Automation if possible, shows the "Ampify" card.
 # A PNG capture of the window is taken at each step. The useful log lines are copied into the job log.
 # Job: MSVC (bench-msvc), with the MSVC kit (artifact ampify-msvc-kit) in $script:BenchKitRoot\ui (ampify_launcher.exe,
-# ampify_kernel.dll, themes\examples, examples\react-panel). Placement of the panels and buttons: provisional, see
+# ampify_kernel.dll, themes, examples\react-panel). Placement of the panels and buttons: provisional, see
 # docs/development/testing-on-a-pc.md ("Interface: panels, Marketplace and the Ampify card").
 
 # .NET UI Automation (WindowsDesktop), loaded once. $false when it is not available.
@@ -150,12 +150,12 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
     $ui = Join-Path $script:BenchKitRoot 'ui'
     $launcher = Join-Path $ui 'ampify_launcher.exe'
     if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Skip -Ctx $Ctx -Name 'UI build present' -Reason "no UI build in this bench (MinGW does not compile XAML): $launcher"
+        Add-Skip -Ctx $Ctx -Name 'UI build present' -Reason "no UI build in this kit: $launcher"
         return
     }
     $example = Join-Path $ui 'examples\react-panel'
     if (-not (Test-Path -LiteralPath $example)) { $example = Join-Path $repo 'examples\react-panel' }
-    $midnight = Join-Path $ui 'themes\examples\midnight'
+    $midnight = Join-Path $ui 'themes\midnight'
 
     # The Ampify folder starts clean: the extension is installed but off, to capture the interface before the mount.
     Reset-KitState

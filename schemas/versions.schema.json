@@ -39,7 +39,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "maxItems": 64,
-          "description": "Exports of AVFoundationCF.dll checked as present in this version. They must cover the ones Ampify needs (core/build_signature.hpp).",
+          "description": "Exports of AVFoundationCF.dll checked as present in this version. They must cover the ones Ampify needs (src/core/build_signature.hpp).",
           "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "maxLength": 128}
         },
         "notes": {"type": "string", "maxLength": 300}

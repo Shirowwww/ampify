@@ -2,13 +2,13 @@
 # theme.active goes back to none. The setting changes in settings.txt, not in the Settings page: the "Ampify theme"
 # section of the General page is still to be checked on a real PC.
 # Job: MSVC (msvc-build), AMPIFY_XAML=ON and AMPIFY_BENCH=ON build (otherwise the injection refuses the runner's version).
-# Needs $script:BenchKitRoot\ui\ with ampify_launcher.exe, ampify_kernel.dll, and themes\examples\midnight.
+# Needs $script:BenchKitRoot\ui\ with ampify_launcher.exe, ampify_kernel.dll, and themes\midnight.
 
 Register-Case -Id 'ui-theme-midnight' -Title 'UI: the midnight theme applies, then is removed without a restart' -Requires 'apple-music' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'ui\ampify_launcher.exe'
-    $example = Join-Path $script:BenchKitRoot 'ui\themes\examples\midnight'
+    $example = Join-Path $script:BenchKitRoot 'ui\themes\midnight'
     if (-not (Test-Path -LiteralPath $launcher) -or -not (Test-Path -LiteralPath $example)) {
         Add-Skip -Ctx $Ctx -Name 'UI build and midnight theme present' -Reason ("no UI build in this bench: " + "$launcher / $example")
         return
@@ -21,7 +21,7 @@ Register-Case -Id 'ui-theme-midnight' -Title 'UI: the midnight theme applies, th
     Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
     Copy-Item -LiteralPath $example -Destination $target -Recurse -Force
     # Glass, the complete redesign, is tried in the same launch, after midnight.
-    $glassExample = Join-Path $script:BenchKitRoot 'ui\themes\examples\glass'
+    $glassExample = Join-Path $script:BenchKitRoot 'ui\themes\glass'
     if (Test-Path -LiteralPath $glassExample) {
         Remove-Item -LiteralPath (Join-Path $themes 'glass') -Recurse -Force -ErrorAction SilentlyContinue
         Copy-Item -LiteralPath $glassExample -Destination (Join-Path $themes 'glass') -Recurse -Force

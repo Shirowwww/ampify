@@ -1,4 +1,4 @@
-#include "../core/gain_board.hpp"
+#include "../src/core/gain_board.hpp"
 #include "test.hpp"
 
 TEST_CASE(GainBoard_SumsTheElementsAndClampsToTheCeiling) {

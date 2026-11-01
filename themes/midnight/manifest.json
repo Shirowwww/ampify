@@ -1,0 +1,18 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "midnight",
+  "name": "Midnight",
+  "version": "0.2.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Night blue with a light blue accent, using the Dark scheme of colors.ini.",
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Dark",
+  "tags": [
+    "dark",
+    "blue",
+    "colors"
+  ],
+  "preview": "preview.jpg"
+}

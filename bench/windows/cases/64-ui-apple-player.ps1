@@ -1,5 +1,5 @@
 # Apple Music's own full-screen player, opened by Ampify.ui.applePlayer.open() and laid over the main window
-# (win/apple_player.cpp). The log says how it went, the captures show it, then Escape is pressed in the player to see
+# (src/win/apple_player.cpp). The log says how it went, the captures show it, then Escape is pressed in the player to see
 # what Apple Music does with it once it is a window.
 # Job: MSVC, UI shard ($script:BenchKitRoot\ui with ampify_launcher.exe and ampify_kernel.dll). Uses Set-UiSettings and
 # Show-UiAppWindow of 63-ui-surfaces.ps1.
@@ -17,16 +17,24 @@ public static class AppWindows {
     [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] static extern void mouse_event(uint flags, int dx, int dy, uint data, UIntPtr extra);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window, out RECT rect);
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
+
+    // Moves the pointer as a mouse does. With SetCursorPos and moves of zero pixels, the player saw the press but
+    // never followed (bench, 01/11): absolute moves are what a real mouse sends.
+    static void MoveTo(int x, int y) {
+        int width = GetSystemMetrics(0), height = GetSystemMetrics(1);  // SM_CXSCREEN, SM_CYSCREEN
+        mouse_event(0x8001, x * 65535 / (width - 1), y * 65535 / (height - 1), 0, UIntPtr.Zero);  // MOVE | ABSOLUTE
+    }
 
     // Left button down at (x, y), ten steps to (x + dx, y + dy), button up: what a user dragging does.
     public static void Drag(int x, int y, int dx, int dy) {
         SetCursorPos(x, y);
+        MoveTo(x, y);
         Thread.Sleep(200);
         mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);  // MOUSEEVENTF_LEFTDOWN
         Thread.Sleep(300);
         for (int step = 1; step <= 10; step++) {
-            SetCursorPos(x + dx * step / 10, y + dy * step / 10);
-            mouse_event(0x0001, 0, 0, 0, UIntPtr.Zero);  // MOUSEEVENTF_MOVE, so the move loop hears it
+            MoveTo(x + dx * step / 10, y + dy * step / 10);
             Thread.Sleep(40);
         }
         Thread.Sleep(200);

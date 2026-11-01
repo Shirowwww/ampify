@@ -10,32 +10,32 @@
 #include <string_view>
 #include <vector>
 
-#include "../core/journal.hpp"
-#include "../core/json.hpp"
-#include "../core/manifest.hpp"
-#include "../core/settings.hpp"
-#include "../core/theme/animation.hpp"
-#include "../core/theme/builtins.hpp"
-#include "../core/theme/color.hpp"
-#include "../core/theme/colour_keys.hpp"
-#include "../core/theme/css.hpp"
-#include "../core/theme/commands.hpp"
-#include "../core/theme/engine.hpp"
-#include "../core/theme/files.hpp"
-#include "../core/theme/fonts.hpp"
-#include "../core/theme/hover.hpp"
-#include "../core/theme/ini.hpp"
-#include "../core/theme/inspector.hpp"
-#include "../core/theme/layout.hpp"
-#include "../core/theme/library.hpp"
-#include "../core/theme/properties.hpp"
-#include "../core/theme/scheme_choice.hpp"
-#include "../core/theme/selector.hpp"
-#include "../core/theme/session.hpp"
-#include "../core/theme/snippets.hpp"
-#include "../core/theme/theme.hpp"
-#include "../core/theme/theme_settings.hpp"
-#include "../core/theme/worker.hpp"
+#include "../src/core/journal.hpp"
+#include "../src/core/json.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/core/settings.hpp"
+#include "../src/core/theme/animation.hpp"
+#include "../src/core/theme/builtins.hpp"
+#include "../src/core/theme/color.hpp"
+#include "../src/core/theme/colour_keys.hpp"
+#include "../src/core/theme/css.hpp"
+#include "../src/core/theme/commands.hpp"
+#include "../src/core/theme/engine.hpp"
+#include "../src/core/theme/files.hpp"
+#include "../src/core/theme/fonts.hpp"
+#include "../src/core/theme/hover.hpp"
+#include "../src/core/theme/ini.hpp"
+#include "../src/core/theme/inspector.hpp"
+#include "../src/core/theme/layout.hpp"
+#include "../src/core/theme/library.hpp"
+#include "../src/core/theme/properties.hpp"
+#include "../src/core/theme/scheme_choice.hpp"
+#include "../src/core/theme/selector.hpp"
+#include "../src/core/theme/session.hpp"
+#include "../src/core/theme/snippets.hpp"
+#include "../src/core/theme/theme.hpp"
+#include "../src/core/theme/theme_settings.hpp"
+#include "../src/core/theme/worker.hpp"
 #include "test.hpp"
 
 namespace th = ampify::theme;
@@ -1413,8 +1413,8 @@ TEST_CASE(Inspector_ShowsTheColourOfAnAppBrushKeptAsAnObject) {
 // --- Example themes shipped in the repository ------------------------------------------------------------
 
 TEST_CASE(Examples_LoadWithoutProblems) {
-    for (const char* name : {"midnight", "large-text", "rounded-buttons", "hide-chrome", "glass"}) {
-        std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "examples" / name;
+    for (const char* name : {"midnight", "greenroom", "hide-chrome", "glass", "artwork"}) {
+        std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
 
@@ -2418,11 +2418,11 @@ TEST_CASE(Inspector_ExportsTheTreeAsJson) {
 
 TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
     const std::filesystem::path source(AMPIFY_SOURCE_DIR);
-    std::vector<std::string> themes = th::ListThemeFolders(source / "themes" / "examples");
-    CHECK(themes.size() >= 4);
+    std::vector<std::string> themes = th::ListThemeFolders(source / "themes");
+    CHECK(themes.size() >= 9);
     std::shared_ptr<const th::Theme> base;
     for (const std::string& name : themes) {
-        std::filesystem::path folder = source / "themes" / "examples" / name;
+        std::filesystem::path folder = source / "themes" / name;
         th::FolderFiles files(folder);
         th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
         CHECK(theme.usable);

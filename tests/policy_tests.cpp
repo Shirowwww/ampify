@@ -2,10 +2,10 @@
 #include <string>
 #include <string_view>
 
-#include "../core/apple_music.hpp"
-#include "../core/build_signature.hpp"
-#include "../core/injection_policy.hpp"
-#include "../core/safe_mode.hpp"
+#include "../src/core/apple_music.hpp"
+#include "../src/core/build_signature.hpp"
+#include "../src/core/injection_policy.hpp"
+#include "../src/core/safe_mode.hpp"
 #include "test.hpp"
 
 namespace {

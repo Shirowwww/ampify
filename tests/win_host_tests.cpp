@@ -1,11 +1,11 @@
-// Windows only: the Host's files (settings.txt and storage\<id>.json), checked under Wine in the test run.
+// Windows only: the Host's files (settings.txt and storage\<id>.json).
 #include <windows.h>
 
 #include <filesystem>
 #include <string>
 
-#include "../core/settings.hpp"
-#include "../win/win_host.hpp"
+#include "../src/core/settings.hpp"
+#include "../src/win/win_host.hpp"
 #include "test.hpp"
 
 namespace {

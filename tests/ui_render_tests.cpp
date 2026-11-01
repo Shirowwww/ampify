@@ -1,6 +1,6 @@
 // The portable half of the native renderer: render trees, reconciliation, node names, surfaces, anchors in a fake
-// XAML tree, the bounded walk, the refresh ticket and the Mods card files. The Windows half (win/ui_renderer.cpp,
-// win/ui_service.cpp) follows these decisions; it is only compiled by the MSVC job with the WinUI projection.
+// XAML tree, the bounded walk, the refresh ticket and the Mods card files. The Windows half (src/win/ui_renderer.cpp,
+// src/win/ui_service.cpp) follows these decisions; it is only compiled by the MSVC job with the WinUI projection.
 
 #include <filesystem>
 #include <fstream>
@@ -10,13 +10,13 @@
 #include <string>
 #include <vector>
 
-#include "../core/ui_model.hpp"
-#include "../core/ui_render/mods.hpp"
-#include "../core/ui_render/probe.hpp"
-#include "../core/ui_render/render_tree.hpp"
-#include "../core/ui_render/style.hpp"
-#include "../core/ui_render/surfaces.hpp"
-#include "../core/ui_render/svg_icon.hpp"
+#include "../src/core/ui_model.hpp"
+#include "../src/core/ui_render/mods.hpp"
+#include "../src/core/ui_render/probe.hpp"
+#include "../src/core/ui_render/render_tree.hpp"
+#include "../src/core/ui_render/style.hpp"
+#include "../src/core/ui_render/surfaces.hpp"
+#include "../src/core/ui_render/svg_icon.hpp"
 #include "test.hpp"
 
 namespace {
@@ -33,7 +33,7 @@ RenderNode Tree(const std::string& text) {
     return BuildRenderTree(Parse(text), "panel-test");
 }
 
-// A fake native widget tree that applies patches the way win/ui_renderer.cpp does: Keep and Update reuse the widget,
+// A fake native widget tree that applies patches the way src/win/ui_renderer.cpp does: Keep and Update reuse the widget,
 // Create and Replace build a new one. Each widget has a serial number, so a test sees whether a control survived.
 struct Widget {
     int serial = 0;

@@ -1,0 +1,107 @@
+name: MSVC setup
+description: >
+  WinUI 1.8 metadata and its C++/WinRT projection, ccache and the MSVC environment (Ninja), shared by every job that
+  builds with MSVC. Sets WASDK_INCLUDE for the AMPIFY_WINAPPSDK_INCLUDE option of CMake.
+
+inputs:
+  cache-name:
+    description: Name of the ccache cache (one per build, so two builds never fight over the same files)
+    required: true
+  projection:
+    description: "'false' skips the WinUI projection, for builds without AMPIFY_XAML"
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    # Apple Music 1.1540+ is aligned on Windows App SDK 1.8: the projection comes from the WinUI 1.8 metadata. Only the
+    # .winmd files are extracted, no DLL is shipped. The SHA-256 of Microsoft.UI.Xaml.winmd is pinned.
+    - name: Download the WinUI 1.8 metadata (NuGet) and check their hashes
+      if: inputs.projection == 'true'
+      shell: pwsh
+      run: |
+        $metadata = Join-Path $env:RUNNER_TEMP 'winui-metadata'
+        New-Item -ItemType Directory -Force -Path $metadata | Out-Null
+        $expectedXaml = 'A824AB1E380E384C382CEC14AC5DAD9D4C1B91F519D512082F0E7E5D6AC109DE'
+        $packages = @(
+          @{ Id = 'microsoft.windowsappsdk.winui'; Version = '1.8.251222000'; Entries = @(
+            'metadata/Microsoft.UI.Xaml.winmd', 'metadata/Microsoft.UI.Text.winmd') },
+          @{ Id = 'microsoft.windowsappsdk.interactiveexperiences'; Version = '1.8.251217001'; Entries = @(
+            'metadata/10.0.17763.0/Microsoft.UI.winmd',
+            'metadata/10.0.17763.0/Microsoft.Foundation.winmd',
+            'metadata/10.0.17763.0/Microsoft.Graphics.winmd') },
+          @{ Id = 'microsoft.windowsappsdk.foundation'; Version = '1.8.251220000'; Entries = @(
+            'metadata/Microsoft.Windows.ApplicationModel.Resources.winmd') },
+          @{ Id = 'microsoft.web.webview2'; Version = '1.0.3179.45'; Entries = @(
+            'lib/Microsoft.Web.WebView2.Core.winmd') }
+        )
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        foreach ($package in $packages) {
+          $uri = "https://api.nuget.org/v3-flatcontainer/$($package.Id)/$($package.Version)/$($package.Id).$($package.Version).nupkg"
+          $archive = Join-Path $env:RUNNER_TEMP "$($package.Id).$($package.Version).nupkg"
+          Invoke-WebRequest -Uri $uri -OutFile $archive -TimeoutSec 300
+          Write-Host "$($package.Id) $($package.Version) $((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash)"
+          $zip = [IO.Compression.ZipFile]::OpenRead($archive)
+          try {
+            foreach ($entryPath in $package.Entries) {
+              $entry = $zip.GetEntry($entryPath)
+              if (-not $entry) { throw "metadata missing from $($package.Id) $($package.Version): $entryPath" }
+              [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $metadata ([IO.Path]::GetFileName($entryPath))), $true)
+            }
+          } finally {
+            $zip.Dispose()
+          }
+        }
+        $actual = (Get-FileHash -LiteralPath (Join-Path $metadata 'Microsoft.UI.Xaml.winmd') -Algorithm SHA256).Hash
+        if ($actual -ne $expectedXaml) { throw "Microsoft.UI.Xaml.winmd: unexpected hash $actual (expected $expectedXaml)" }
+
+    - name: Generate the C++/WinRT projection (cppwinrt.exe from the Windows SDK)
+      if: inputs.projection == 'true'
+      shell: pwsh
+      run: |
+        $kit = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10'
+        $cppwinrt = Get-ChildItem -LiteralPath (Join-Path $kit 'bin') -Recurse -Filter 'cppwinrt.exe' -ErrorAction SilentlyContinue |
+          Select-Object -First 1
+        if (-not $cppwinrt) { throw 'cppwinrt.exe not found in the Windows SDK' }
+        $sdkWinrt = Get-ChildItem -LiteralPath (Join-Path $kit 'Include') -Recurse -Directory -Filter 'winrt' -ErrorAction SilentlyContinue |
+          Where-Object { $_.Parent.Name -eq 'cppwinrt' } | Select-Object -First 1
+        if (-not $sdkWinrt) { throw 'cppwinrt\winrt folder not found in the Windows SDK' }
+
+        $gen = Join-Path $env:RUNNER_TEMP 'winrt-gen'
+        $arguments = @()
+        foreach ($winmd in Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'winui-metadata') -Filter '*.winmd') {
+          $arguments += @('-in', $winmd.FullName)
+        }
+        & $cppwinrt.FullName @arguments -ref sdk -out $gen
+        if ($LASTEXITCODE -ne 0) { throw "cppwinrt.exe failed (code $LASTEXITCODE)" }
+
+        # The base headers (winrt/base.h, winrt/Windows.*.h) come from the SDK: put them next to the projection.
+        $target = Join-Path $gen 'winrt'
+        New-Item -ItemType Directory -Force -Path $target | Out-Null
+        Copy-Item -Path (Join-Path $sdkWinrt.FullName '*') -Destination $target -Recurse -Force
+        if (-not (Test-Path -LiteralPath (Join-Path $target 'Microsoft.UI.Xaml.h'))) { throw 'winrt\Microsoft.UI.Xaml.h missing' }
+        "WASDK_INCLUDE=$gen" | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8
+
+    # Only the files a commit touches are compiled again. Ninja instead of the Visual Studio generator, so ccache can
+    # sit in front of cl.exe (/Z7 in CMakeLists.txt keeps the debug information cacheable).
+    - uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/ccache
+        key: ccache-${{ inputs.cache-name }}-${{ github.sha }}
+        restore-keys: ccache-${{ inputs.cache-name }}-
+
+    - name: Install ccache and open the MSVC environment
+      shell: pwsh
+      run: |
+        $version = '4.10.2'
+        $zip = Join-Path $env:RUNNER_TEMP 'ccache.zip'
+        Invoke-WebRequest -Uri "https://github.com/ccache/ccache/releases/download/v$version/ccache-$version-windows-x86_64.zip" -OutFile $zip -TimeoutSec 120
+        Expand-Archive -LiteralPath $zip -DestinationPath $env:RUNNER_TEMP -Force
+        Join-Path $env:RUNNER_TEMP "ccache-$version-windows-x86_64" | Out-File -LiteralPath $env:GITHUB_PATH -Append -Encoding utf8
+        "CCACHE_DIR=$(Join-Path $env:RUNNER_TEMP 'ccache')" | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8
+        'CCACHE_MAXSIZE=2G' | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8
+        $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath
+        $vars = cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set"
+        foreach ($line in $vars) {
+          if ($line -match '^([^=]+)=(.*)$') { "$($Matches[1])=$($Matches[2])" | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8 }
+        }

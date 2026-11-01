@@ -18,13 +18,13 @@
 #include <string>
 #include <vector>
 
-#include "../core/theme/builtins.hpp"
-#include "../core/theme/commands.hpp"
-#include "../core/theme/css.hpp"
-#include "../core/theme/files.hpp"
-#include "../core/theme/inspector.hpp"
-#include "../core/theme/selector.hpp"
-#include "../core/theme/theme.hpp"
+#include "../src/core/theme/builtins.hpp"
+#include "../src/core/theme/commands.hpp"
+#include "../src/core/theme/css.hpp"
+#include "../src/core/theme/files.hpp"
+#include "../src/core/theme/inspector.hpp"
+#include "../src/core/theme/selector.hpp"
+#include "../src/core/theme/theme.hpp"
 
 namespace th = ampify::theme;
 

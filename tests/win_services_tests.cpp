@@ -1,6 +1,6 @@
-// Windows only, run under Wine: the kit services of the Windows host. A fake Discord server on
-// \\.\pipe\discord-ipc-0, a loopback client against the remote control, the notification area icon when Wine
-// accepts it, and MIDI input without a device.
+// Windows only: the kit services of the Windows host. A fake Discord server on \\.\pipe\discord-ipc-0, a loopback
+// client against the remote control, the notification area icon when the session has one, and MIDI input without a
+// device.
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
@@ -14,15 +14,15 @@
 #include <thread>
 #include <vector>
 
-#include "../core/discord_frame.hpp"
-#include "../core/midi_map.hpp"
-#include "../core/settings.hpp"
-#include "../win/discord_ipc.hpp"
-#include "../win/midi.hpp"
-#include "../win/remote_server.hpp"
-#include "../win/tray.hpp"
-#include "../win/win_host.hpp"
-#include "../win/win_services.hpp"
+#include "../src/core/discord_frame.hpp"
+#include "../src/core/midi_map.hpp"
+#include "../src/core/settings.hpp"
+#include "../src/win/discord_ipc.hpp"
+#include "../src/win/midi.hpp"
+#include "../src/win/remote_server.hpp"
+#include "../src/win/tray.hpp"
+#include "../src/win/win_host.hpp"
+#include "../src/win/win_services.hpp"
 #include "fake_host.hpp"
 #include "test.hpp"
 
@@ -301,7 +301,7 @@ TEST_CASE(WinServices_MidiMappingWithoutADevice) {
     CHECK(events.size() == 2);  // nobody listens any more
 }
 
-TEST_CASE(WinServices_TrayIconWhenWineAcceptsIt) {
+TEST_CASE(WinServices_TrayIconWhenTheSessionHasANotificationArea) {
     fs::path kit = KitFor("tray");
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
@@ -312,7 +312,7 @@ TEST_CASE(WinServices_TrayIconWhenWineAcceptsIt) {
     services.SetEventSink([&](const std::string& entry, const std::string& payload) { events.push_back(entry + " " + payload); });
     services.Service();
     if (!services.trayRunning()) {
-        std::cout << "WinTray: Wine did not accept the notification icon (no notification area), test "
+        std::cout << "WinTray: the notification icon was refused (no notification area), test "
                      "skipped. Log: "
                   << log.str();
         CHECK(log.str().find("Windows refused") != std::string::npos);
@@ -345,7 +345,7 @@ TEST_CASE(WinTray_MenuChoicePostedToTheIconWindow) {
     std::atomic<unsigned> chosen{0};
     std::string error;
     if (!tray.Start(L"Test", [&](UINT command) { chosen = command; }, &error)) {
-        std::cout << "WinTray: icon refused by Wine (" << error << "), test skipped\n";
+        std::cout << "WinTray: icon refused (" << error << "), test skipped\n";
         return;
     }
     PostMessageW(tray.window(), WM_COMMAND, 7, 0);

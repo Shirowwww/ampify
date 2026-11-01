@@ -2,9 +2,6 @@
 
     AMPIFY_BIN=build/ampify python3 -m unittest discover -s tools -p "test_cli.py" -v
 
-Set AMPIFY_WINE=1 to run ampify.exe under Wine (AMPIFY_BIN is then the path to ampify.exe). Under Wine the tests that need
-tar.exe or curl.exe are skipped: Wine does not ship them, and Windows 10 and later do.
-
 Downloads are local: catalogues point at file:// archives. A remote catalogue is refused unless it is https.
 """
 
@@ -26,19 +23,11 @@ sys.path.insert(0, TOOLS)
 import pack  # noqa: E402
 
 Ampify = os.environ.get("AMPIFY_BIN") or os.path.join(ROOT, "build", "ampify")
-WINE = os.environ.get("AMPIFY_WINE") == "1"
 APP_ID = "AppleInc.AppleMusicWin_nzyj5cx40ttqa!App"
 
 
-def native(path):
-    """The path as ampify.exe sees it: a Windows path under Wine, the path itself elsewhere."""
-    if not WINE:
-        return path
-    return subprocess.run(["winepath", "-w", path], capture_output=True, text=True, check=True).stdout.strip()
-
-
 def file_url(path):
-    text = native(path).replace("\\", "/")
+    text = path.replace("\\", "/")
     if len(text) > 1 and text[1] == ":":
         return "file:///" + text
     return "file://" + text
@@ -64,7 +53,7 @@ class AmpifyTestCase(unittest.TestCase):
         os.makedirs(self.packages)
 
     def ampify(self, *args, input_text="", cwd=None, timeout=60):
-        command = (["wine"] if WINE else []) + [Ampify, "--kit-dir", native(self.kit)] + list(args)
+        command = [Ampify, "--kit-dir", self.kit] + list(args)
         return subprocess.run(
             command, input=input_text, capture_output=True, text=True, encoding="utf-8",
             cwd=cwd or self.tmp, timeout=timeout,
@@ -121,7 +110,7 @@ class AmpifyTestCase(unittest.TestCase):
         return entry, archive
 
     def catalog_option(self, path):
-        return ["--catalog", native(path)]
+        return ["--catalog", path]
 
     def settings_text(self):
         path = os.path.join(self.kit, "settings.txt")
@@ -150,7 +139,7 @@ class Basics(AmpifyTestCase):
         self.assertIn("unknown command", result.stderr)
 
     def test_unknown_option_is_refused(self):
-        command = (["wine"] if WINE else []) + [Ampify, "--frobnicate", "list"]
+        command = [Ampify, "--frobnicate", "list"]
         result = subprocess.run(command, capture_output=True, text=True)
         self.assertEqual(result.returncode, 2)
 
@@ -222,13 +211,11 @@ class Services(AmpifyTestCase):
     def test_examples_of_the_services_run_in_the_engine(self):
         expected = {
             "discord-presence": "clientId",
-            "now-playing-file": "output file: now-playing.txt",
             "scrobbler": "Last.fm is not set up",
-            "listen-stats": "interface",
         }
         for name, text in expected.items():
             folder = os.path.join(ROOT, "examples", name)
-            result = self.ampify("test", native(folder))
+            result = self.ampify("test", folder)
             self.assertEqual(result.returncode, 0, name + "\n" + result.stdout + result.stderr)
             self.assertIn(text, result.stdout, name)
             self.assertIn("loaded and run without error", result.stdout, name)
@@ -249,8 +236,6 @@ class Authoring(AmpifyTestCase):
         self.assertIn("main: file missing from the folder: main.js", result.stderr)
 
     def test_validate_catalog_files(self):
-        result = self.ampify("validate", os.path.join(ROOT, "catalog", "catalog.json"))
-        self.assertEqual(result.returncode, 0, result.stderr)
         local = self.write_catalog([{"id": "demo"}])
         self.assertEqual(self.ampify("validate", local).returncode, 1)
 
@@ -345,7 +330,6 @@ class SpicetifyImport(AmpifyTestCase):
         self.assertIn("Two", result.stderr)
 
 
-@unittest.skipIf(WINE, "install needs tar.exe and curl.exe, which Wine does not ship")
 class Marketplace(AmpifyTestCase):
     def setUp(self):
         super().setUp()
@@ -648,7 +632,7 @@ class Activation(AmpifyTestCase):
     def test_watch_reacts_to_an_edit(self):
         self.ampify("config", "theme.active", "")
         process = subprocess.Popen(
-            ([Ampify] if not WINE else ["wine", Ampify]) + ["--kit-dir", native(self.kit), "watch",
+            [Ampify, "--kit-dir", self.kit, "watch",
                                                       "--interval", "100", "--max-cycles", "60"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
         )
@@ -676,6 +660,8 @@ class KitUpdate(AmpifyTestCase):
         with zipfile.ZipFile(archive, "w") as bundle:
             for name in ("ampify.exe", "ampify_launcher.exe", "ampify_kernel.dll"):
                 bundle.writestr(name, f"{name} {version}")
+            for element in ("apps/marketplace", "extensions/now-playing"):  # they ship with the kit
+                bundle.writestr(f"examples/{element}/manifest.json", "{}")
         digest = sha256_of(archive)
         sums = os.path.join(bundle_dir, "SHA256SUMS.txt")
         with open(sums, "w", encoding="utf-8") as handle:
@@ -692,20 +678,17 @@ class KitUpdate(AmpifyTestCase):
             json.dump(release, handle)
         return release_path
 
-    @unittest.skipIf(WINE, "update needs tar.exe, which Wine does not ship")
     def test_check_reports_a_newer_release(self):
         release = self.make_release("9.9.9")
         result = self.ampify("update", "--check", "--release-url", file_url(release))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Version 9.9.9 is available", result.stdout)
 
-    @unittest.skipIf(WINE, "update needs tar.exe, which Wine does not ship")
     def test_same_or_older_release_is_up_to_date(self):
         release = self.make_release("0.1.0")
         result = self.ampify("update", "--release-url", file_url(release))
         self.assertIn("up to date", result.stdout)
 
-    @unittest.skipIf(WINE, "update needs tar.exe, which Wine does not ship")
     def test_apply_replaces_the_files_and_keeps_the_old_ones(self):
         release = self.make_release("9.9.9")
         install_dir = os.path.join(self.tmp, "install")
@@ -714,21 +697,24 @@ class KitUpdate(AmpifyTestCase):
             handle.write("old")
 
         result = self.ampify("update", "--apply", "--release-url", file_url(release),
-                          "--install-dir", native(install_dir))
+                          "--install-dir", install_dir)
         self.assertEqual(result.returncode, 0, result.stderr)
         with open(os.path.join(install_dir, "ampify.exe"), encoding="utf-8") as handle:
             self.assertEqual(handle.read(), "ampify.exe 9.9.9")
         with open(os.path.join(install_dir, "ampify.exe.old"), encoding="utf-8") as handle:
             self.assertEqual(handle.read(), "old")
         self.assertTrue(os.path.exists(os.path.join(install_dir, "ampify_kernel.dll")))
+        # The update puts the Marketplace and Now Playing in the user's folder too. That an older copy is replaced
+        # is tested in tests/kit_tests.cpp (InstallBundledElements).
+        self.assertTrue(os.path.exists(os.path.join(self.kit, "apps", "marketplace", "manifest.json")))
+        self.assertTrue(os.path.exists(os.path.join(self.kit, "extensions", "now-playing", "manifest.json")))
 
-    @unittest.skipIf(WINE, "update needs tar.exe, which Wine does not ship")
     def test_wrong_checksum_refuses_the_update(self):
         release = self.make_release("9.9.9", sums_hash="f" * 64)
         result = self.ampify("update", "--check", "--release-url", file_url(release))
         self.assertEqual(result.returncode, 0)  # --check only reads the version
         result = self.ampify("update", "--apply", "--release-url", file_url(release),
-                          "--install-dir", native(os.path.join(self.tmp, "install")))
+                          "--install-dir", os.path.join(self.tmp, "install"))
         self.assertEqual(result.returncode, 1)
         self.assertIn("wrong SHA-256", result.stderr)
 
@@ -744,31 +730,29 @@ def api_members():
 
 
 class Build(AmpifyTestCase):
-    @unittest.skipIf(WINE, "build reads the zip back with tar.exe, which Wine does not ship")
     def test_build_writes_a_zip_that_zipfile_reads(self):
         folder = self.write_element("demo-build", "extension")
         out = os.path.join(self.tmp, "demo-build.zip")
-        result = self.ampify("build", native(folder), native(out))
+        result = self.ampify("build", folder, out)
         self.assertEqual(result.returncode, 0, result.stderr)
         with zipfile.ZipFile(out) as bundle:
             self.assertIsNone(bundle.testzip())
             self.assertEqual(sorted(bundle.namelist()), ["main.js", "manifest.json"])
         self.assertIn(sha256_of(out), result.stdout)
 
-    @unittest.skipIf(WINE, "build reads the zip back with tar.exe, which Wine does not ship")
     def test_build_is_deterministic(self):
         folder = self.write_element("demo-same", "extension")
         first = os.path.join(self.tmp, "one.zip")
         second = os.path.join(self.tmp, "two.zip")
-        self.assertEqual(self.ampify("build", native(folder), native(first)).returncode, 0)
-        self.assertEqual(self.ampify("build", native(folder), native(second)).returncode, 0)
+        self.assertEqual(self.ampify("build", folder, first).returncode, 0)
+        self.assertEqual(self.ampify("build", folder, second).returncode, 0)
         self.assertEqual(sha256_of(first), sha256_of(second))
 
     def test_build_refuses_an_invalid_element_and_writes_nothing(self):
         folder = self.write_element("demo-bad", "extension")
         os.remove(os.path.join(folder, "main.js"))
         out = os.path.join(self.tmp, "bad.zip")
-        result = self.ampify("build", native(folder), native(out))
+        result = self.ampify("build", folder, out)
         self.assertEqual(result.returncode, 1)
         self.assertIn("invalid", result.stderr)
         self.assertFalse(os.path.exists(out))
@@ -778,15 +762,14 @@ class Build(AmpifyTestCase):
         out = os.path.join(self.tmp, "over.zip")
         with open(out, "w", encoding="utf-8") as handle:
             handle.write("busy")
-        result = self.ampify("build", native(folder), native(out))
+        result = self.ampify("build", folder, out)
         self.assertEqual(result.returncode, 1)
         self.assertIn("already exists", result.stderr)
 
-    @unittest.skipIf(WINE, "install needs tar.exe, which Wine does not ship")
     def test_built_archive_installs_from_a_local_catalog(self):
         folder = self.write_element("demo-built", "extension")
         out = os.path.join(self.tmp, "demo-built.zip")
-        built = self.ampify("build", native(folder), native(out))
+        built = self.ampify("build", folder, out)
         self.assertEqual(built.returncode, 0, built.stderr)
         entry = json.loads(built.stdout[built.stdout.index("{"):])
         entry["url"] = file_url(out)
@@ -799,13 +782,13 @@ class Build(AmpifyTestCase):
 class Inspection(AmpifyTestCase):
     def test_inspect_lists_files_with_checksums(self):
         folder = self.write_element("demo-look", "extension")
-        result = self.ampify("inspect", native(folder))
+        result = self.ampify("inspect", folder)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertRegex(result.stdout, r"[0-9a-f]{64}  main\.js")
 
     def test_inspect_an_installed_element_shows_its_state(self):
         folder = self.write_element("demo-state", "extension")
-        self.assertEqual(self.ampify("dev", native(folder), "--max-cycles", "1").returncode, 0)
+        self.assertEqual(self.ampify("dev", folder, "--max-cycles", "1").returncode, 0)
         result = self.ampify("inspect", "extension", "demo-state")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertRegex(result.stdout, r"enabled\s+yes")
@@ -817,7 +800,7 @@ class Inspection(AmpifyTestCase):
 
     def test_types_declares_every_member_of_section_5(self):
         path = os.path.join(self.tmp, "ampify.d.ts")
-        result = self.ampify("types", native(path))
+        result = self.ampify("types", path)
         self.assertEqual(result.returncode, 0, result.stderr)
         with open(path, encoding="utf-8") as handle:
             declared = handle.read()
@@ -828,12 +811,12 @@ class Inspection(AmpifyTestCase):
         path = os.path.join(self.tmp, "ampify.d.ts")
         with open(path, "w", encoding="utf-8") as handle:
             handle.write("my file")
-        result = self.ampify("types", native(path))
+        result = self.ampify("types", path)
         self.assertEqual(result.returncode, 1)
         self.assertIn("already exists", result.stderr)
         with open(path, encoding="utf-8") as handle:
             self.assertEqual(handle.read(), "my file")
-        self.assertEqual(self.ampify("types", native(path), "--yes").returncode, 0)
+        self.assertEqual(self.ampify("types", path, "--yes").returncode, 0)
 
 
 class Diagnostics(AmpifyTestCase):
@@ -841,13 +824,8 @@ class Diagnostics(AmpifyTestCase):
         result = self.ampify("doctor")
         self.assertIn("Ampify folder missing", result.stdout)
         self.assertIn("Summary", result.stdout)
-        if WINE:
-            # Wine ships neither tar.exe nor curl.exe. doctor reports them as errors, which is what it must do.
-            self.assertEqual(result.returncode, 1, result.stdout)
-            self.assertIn("tar.exe", result.stdout)
-        else:
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("Summary: 0 error(s)", result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Summary: 0 error(s)", result.stdout)
 
     def test_enabled_element_that_is_missing_is_reported(self):
         self.assertEqual(self.ampify("config", "extensions.ghost.enabled", "1").returncode, 0)
@@ -877,8 +855,8 @@ class Development(AmpifyTestCase):
 
     def test_logs_follow_prints_lines_added_later(self):
         path = self.write_journal("before\n")
-        command = (["wine"] if WINE else []) + [
-            Ampify, "--kit-dir", native(self.kit), "logs", "--follow", "--interval", "100", "--max-cycles", "40",
+        command = [
+            Ampify, "--kit-dir", self.kit, "logs", "--follow", "--interval", "100", "--max-cycles", "40",
         ]
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
         time.sleep(0.5)
@@ -890,15 +868,15 @@ class Development(AmpifyTestCase):
 
     def test_dev_copies_the_element_into_the_kit_and_enables_it(self):
         folder = self.write_element("demo-dev", "extension")
-        result = self.ampify("dev", native(folder), "--max-cycles", "1")
+        result = self.ampify("dev", folder, "--max-cycles", "1")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.kit, "extensions", "demo-dev", "main.js")))
         self.assertRegex(self.settings_text(), r"extensions\.demo-dev\.enabled\s*=\s*1")
 
     def test_dev_keeps_the_working_copy_when_an_edit_breaks_it(self):
         folder = self.write_element("demo-broken", "extension")
-        command = (["wine"] if WINE else []) + [
-            Ampify, "--kit-dir", native(self.kit), "dev", native(folder), "--interval", "100", "--max-cycles", "40",
+        command = [
+            Ampify, "--kit-dir", self.kit, "dev", folder, "--interval", "100", "--max-cycles", "40",
         ]
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
         time.sleep(0.8)
@@ -913,13 +891,13 @@ class Development(AmpifyTestCase):
     def test_dev_refuses_an_invalid_element(self):
         folder = self.write_element("demo-no-main", "extension")
         os.remove(os.path.join(folder, "main.js"))
-        result = self.ampify("dev", native(folder), "--max-cycles", "1")
+        result = self.ampify("dev", folder, "--max-cycles", "1")
         self.assertEqual(result.returncode, 1)
         self.assertFalse(os.path.exists(os.path.join(self.kit, "extensions", "demo-no-main")))
 
     def test_dev_asks_the_kernel_to_restart_the_element(self):
         folder = self.write_element("demo-restart", "extension")
-        result = self.ampify("dev", native(folder), "--max-cycles", "1")
+        result = self.ampify("dev", folder, "--max-cycles", "1")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("restart demo-restart", self.read("reload.txt").splitlines())
 
@@ -932,47 +910,33 @@ class Development(AmpifyTestCase):
 class Verification(AmpifyTestCase):
     def test_test_runs_the_example_in_the_engine(self):
         folder = os.path.join(ROOT, "examples", "hello-extension")
-        result = self.ampify("test", native(folder))
+        result = self.ampify("test", folder)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("loaded and run without error", result.stdout)
         self.assertIn("Hello, launch #1", result.stdout)
 
     def test_test_accepts_a_folder_with_a_trailing_separator(self):
-        folder = os.path.join(ROOT, "examples", "gain-boost")
-        result = self.ampify("test", native(folder) + ("\\" if WINE else "/"))
+        folder = os.path.join(ROOT, "examples", "hello-extension")
+        result = self.ampify("test", folder + os.sep)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("gain applied", result.stdout)
-
-    def test_test_runs_the_equalizer_example(self):
-        folder = os.path.join(ROOT, "examples", "equalizer")
-        result = self.ampify("test", native(folder))
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('preset "flat" applied', result.stdout)
-        self.assertIn("1 kHz 0 dB", result.stdout)
-
-    def test_test_feeds_the_visualizer_example_a_synthetic_signal(self):
-        folder = os.path.join(ROOT, "examples", "visualizer-data")
-        result = self.ampify("test", native(folder))
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("visualizer is listening", result.stdout)
-        self.assertIn("tempo 120 BPM", result.stdout)  # the test host plays clicks at 120 BPM
+        self.assertIn("Hello, launch #1", result.stdout)
 
     def test_test_refuses_a_call_without_its_permission(self):
         folder = self.write_element("demo-denied", "extension", files={"main.js": 'Ampify.storage.get("x", 0);\n'})
-        result = self.ampify("test", native(folder))
+        result = self.ampify("test", folder)
         self.assertEqual(result.returncode, 1)
         self.assertIn("missing permission: storage", result.stdout)
 
     def test_test_runs_the_react_panel_example(self):
         folder = os.path.join(ROOT, "examples", "react-panel")
-        result = self.ampify("test", native(folder))
+        result = self.ampify("test", folder)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("loaded and run without error", result.stdout)
         self.assertIn("React panel ready", result.stdout)
 
     def test_test_writes_nothing_to_the_kit(self):
         folder = os.path.join(ROOT, "examples", "sleep-timer")
-        result = self.ampify("test", native(folder))
+        result = self.ampify("test", folder)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertFalse(os.path.exists(self.kit))
 
@@ -980,9 +944,9 @@ class Verification(AmpifyTestCase):
 class Transfer(AmpifyTestCase):
     def export_one(self, name):
         folder = self.write_element(name, "extension")
-        self.assertEqual(self.ampify("dev", native(folder), "--max-cycles", "1").returncode, 0)
+        self.assertEqual(self.ampify("dev", folder, "--max-cycles", "1").returncode, 0)
         out = os.path.join(self.tmp, name + ".zip")
-        result = self.ampify("export", native(out))
+        result = self.ampify("export", out)
         self.assertEqual(result.returncode, 0, result.stderr)
         return out
 
@@ -1016,33 +980,30 @@ class Transfer(AmpifyTestCase):
         out = os.path.join(self.tmp, "taken.zip")
         with open(out, "w", encoding="utf-8") as handle:
             handle.write("busy")
-        result = self.ampify("export", native(out))
+        result = self.ampify("export", out)
         self.assertEqual(result.returncode, 1)
         self.assertIn("already exists", result.stderr)
 
-    @unittest.skipIf(WINE, "import unpacks with tar.exe, which Wine does not ship")
     def test_export_then_import_restores_elements_and_settings(self):
         out = self.export_one("demo-trans")
         shutil.rmtree(self.kit)
-        result = self.ampify("import", native(out), "--yes")
+        result = self.ampify("import", out, "--yes")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.kit, "extensions", "demo-trans", "manifest.json")))
         self.assertRegex(self.settings_text(), r"extensions\.demo-trans\.enabled\s*=\s*1")
 
-    @unittest.skipIf(WINE, "import unpacks with tar.exe, which Wine does not ship")
     def test_import_dry_run_writes_nothing(self):
         out = self.export_one("demo-dry")
         shutil.rmtree(self.kit)
-        result = self.ampify("import", native(out), "--dry-run")
+        result = self.ampify("import", out, "--dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("nothing was written", result.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.kit, "extensions")))
 
-    @unittest.skipIf(WINE, "import unpacks with tar.exe, which Wine does not ship")
     def test_import_refuses_an_archive_that_is_not_an_export(self):
         folder = self.write_element("demo-plain", "extension")
         archive, _ = self.package(folder)
-        result = self.ampify("import", native(archive), "--yes")
+        result = self.ampify("import", archive, "--yes")
         self.assertEqual(result.returncode, 1)
         self.assertIn("not an ampify export", result.stderr)
 
@@ -1083,7 +1044,7 @@ class Paths(AmpifyTestCase):
     def test_one_path_per_name(self):
         result = self.ampify("path", "kit")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), native(self.kit))
+        self.assertEqual(result.stdout.strip(), self.kit)
         self.assertTrue(self.ampify("path", "settings").stdout.strip().endswith("settings.txt"))
         for name in ("extensions", "themes", "apps", "snippets"):
             self.assertTrue(self.ampify("path", name).stdout.strip().endswith(name))
@@ -1096,13 +1057,13 @@ class Paths(AmpifyTestCase):
         result = self.ampify("path", "app")
         self.assertIn(result.returncode, (0, 1))
         # A Windows PC may really have Apple Music installed; elsewhere it is never found.
-        if not WINE and os.name != "nt":
+        if os.name != "nt":
             self.assertEqual(result.returncode, 1)
             self.assertIn("not found", result.stderr)
-        folder = native(os.path.join(self.tmp, "Apple Music"))
+        folder = os.path.join(self.tmp, "Apple Music")
         self.assertEqual(self.ampify("config", "app_path", folder).returncode, 0)
         self.assertEqual(self.ampify("path", "app").stdout.strip(), folder)
-        prefs = native(os.path.join(self.tmp, "prefs.plist"))
+        prefs = os.path.join(self.tmp, "prefs.plist")
         self.assertEqual(self.ampify("config", "prefs_path", prefs).returncode, 0)
         self.assertEqual(self.ampify("path", "prefs").stdout.strip(), prefs)
         self.assertIn(folder, self.ampify("path").stdout)
@@ -1110,7 +1071,7 @@ class Paths(AmpifyTestCase):
     def test_config_dir_names_the_kit_folder(self):
         result = self.ampify("config", "--dir", "--dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(native(self.kit), result.stdout)
+        self.assertIn(self.kit, result.stdout)
         self.assertIn("Command:", result.stdout)
         self.assertTrue(os.path.isdir(self.kit))
 
@@ -1213,21 +1174,16 @@ class TestedVersions(AmpifyTestCase):
         self.assertNotIn("1.1600.1.0", listing.stdout)
         self.assertIn("ignored", listing.stdout)
 
-    def test_repository_catalog_with_its_versions_pin_is_valid(self):
-        result = self.ampify("validate", native(os.path.join(ROOT, "catalog", "catalog.json")))
-        self.assertEqual(result.returncode, 0, result.stderr)
-
 
 class KitRelease(AmpifyTestCase):
     make_release = KitUpdate.make_release
 
-    @unittest.skipIf(WINE, "install-kit needs tar.exe, which Wine does not ship")
     def test_install_kit_takes_an_older_version(self):
         release = self.make_release("0.0.9")
         install_dir = os.path.join(self.tmp, "install")
         os.makedirs(install_dir)
         result = self.ampify("install-kit", "0.0.9", "--apply", "--release-url", file_url(release),
-                          "--install-dir", native(install_dir))
+                          "--install-dir", install_dir)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("is older than the installed one", result.stdout)
         with open(os.path.join(install_dir, "ampify.exe"), encoding="utf-8") as handle:
@@ -1244,7 +1200,6 @@ class KitRelease(AmpifyTestCase):
         self.assertEqual(self.ampify("install-kit", "latest").returncode, 1)
         self.assertEqual(self.ampify("install-kit").returncode, 2)
 
-    @unittest.skipIf(WINE, "install-kit needs tar.exe, which Wine does not ship")
     def test_install_kit_without_apply_says_how_to_finish(self):
         release = self.make_release("0.0.8")
         result = self.ampify("install-kit", "0.0.8", "--release-url", file_url(release))
@@ -1279,7 +1234,7 @@ class KitUpdateNotice(AmpifyTestCase):
 
         result = self.ampify("path", "kit", "--release-url", file_url(release))
         self.assertNotIn("disponible", result.stderr)
-        self.assertEqual(result.stdout.strip(), native(self.kit))
+        self.assertEqual(result.stdout.strip(), self.kit)
 
     def test_old_cache_is_checked_again(self):
         release = self.make_release("0.0.1")

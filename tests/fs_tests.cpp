@@ -1,4 +1,4 @@
-// The output files: the only writes an element can make, in <kit>\output\<id>\ (core/output_files.*), through
+// The output files: the only writes an element can make, in <kit>\output\<id>\ (src/core/output_files.*), through
 // Ampify.fs.writeText and the permission fs.output.
 
 #include <filesystem>
@@ -6,9 +6,9 @@
 #include <sstream>
 #include <string>
 
-#include "../cli/element.hpp"
-#include "../core/manifest.hpp"
-#include "../core/output_files.hpp"
+#include "../src/cli/element.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/core/output_files.hpp"
 #include "service_host.hpp"
 #include "test.hpp"
 

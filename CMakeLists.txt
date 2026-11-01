@@ -1,15 +1,42 @@
 cmake_minimum_required(VERSION 3.20)
-project(Ampify VERSION 1.0.1 LANGUAGES C CXX)
+project(Ampify VERSION 1.0.2 LANGUAGES C CXX)
 
-# The Ampify version is written in three places: here (ampify --version), core/kit_layout.hpp (installer, test report) and
-# core/script_extension.hpp (Ampify.version). A release with two different numbers would confuse `ampify update`, so the
+# The Ampify version is written in three places: here (ampify --version), src/core/kit_layout.hpp (installer, uninstall entry) and
+# src/core/script_extension.hpp (Ampify.version). A release with two different numbers would confuse `ampify update`, so the
 # configure step refuses to go on when they disagree.
-foreach(ampify_version_file core/kit_layout.hpp core/script_extension.hpp)
+foreach(ampify_version_file src/core/kit_layout.hpp src/core/script_extension.hpp)
     file(READ "${CMAKE_CURRENT_SOURCE_DIR}/${ampify_version_file}" ampify_version_text)
     if(NOT ampify_version_text MATCHES "(kKitVersion|kKernelVersion) = \"${PROJECT_VERSION}\"")
         message(FATAL_ERROR "${ampify_version_file} does not carry the project version ${PROJECT_VERSION}: make them agree.")
     endif()
 endforeach()
+
+# Properties > Details of the files people download: product, publisher, description and version. MSVC builds only,
+# the ones the release is made from.
+if(MSVC)
+    enable_language(RC)
+endif()
+function(ampify_version_resource target description)
+    if(NOT MSVC)
+        return()
+    endif()
+    get_target_property(ampify_rc_name ${target} OUTPUT_NAME)
+    if(NOT ampify_rc_name)
+        set(ampify_rc_name ${target})
+    endif()
+    get_target_property(ampify_rc_type ${target} TYPE)
+    if(ampify_rc_type STREQUAL "EXECUTABLE")
+        set(AMPIFY_RC_FILETYPE VFT_APP)
+        set(AMPIFY_RC_FILE "${ampify_rc_name}.exe")
+    else()
+        set(AMPIFY_RC_FILETYPE VFT_DLL)
+        set(AMPIFY_RC_FILE "${ampify_rc_name}.dll")
+    endif()
+    set(AMPIFY_RC_NAME "${ampify_rc_name}")
+    set(AMPIFY_RC_DESCRIPTION "${description}")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.rc.in" "${CMAKE_CURRENT_BINARY_DIR}/${target}.rc" @ONLY)
+    target_sources(${target} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/${target}.rc")
+endfunction()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,7 +44,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(AMPIFY_BUILD_TESTS "Build the portable unit tests" ON)
 
-# Bench build, used only by the Windows test bench in CI (.github/workflows/windows-bench.yml). It accepts any
+# Bench build, used only by the Windows test bench in CI (.github/workflows/ci.yml). It accepts any
 # installed Apple Music build, so the bench can check the injection on the version the runner has. Never ship it.
 option(AMPIFY_BENCH "Bench build: accepts any Apple Music build. Never distribute." OFF)
 if(AMPIFY_BENCH)
@@ -51,9 +78,8 @@ endif()
 #     another package's, so that parallel work does not touch the same lines;
 #   - a new target is declared below, and its list gets a name of the form AMPIFY_<TARGET>_SOURCES.
 # Lists: AMPIFY_QUICKJS_SOURCES, AMPIFY_CORE_SOURCES, AMPIFY_THEME_SOURCES, AMPIFY_THEME_CHECK_SOURCES, AMPIFY_ATMOS_SOURCES,
-# AMPIFY_WIN_SOURCES, AMPIFY_KERNEL_SOURCES, AMPIFY_FAKE_AV_SOURCES, AMPIFY_HOOK_HARNESS_SOURCES, AMPIFY_UI_THREAD_TEST_SOURCES,
-# AMPIFY_XAML_SOURCES, AMPIFY_LAUNCHER_SOURCES, AMPIFY_SETUP_SOURCES, AMPIFY_TESTKIT_SOURCES, AMPIFY_CLI_PORTABLE_SOURCES,
-# AMPIFY_CLI_SOURCES, AMPIFY_TESTS_SOURCES, AMPIFY_TESTS_WIN_SOURCES.
+# AMPIFY_WIN_SOURCES, AMPIFY_KERNEL_SOURCES, AMPIFY_UI_THREAD_TEST_SOURCES, AMPIFY_XAML_SOURCES, AMPIFY_LAUNCHER_SOURCES,
+# AMPIFY_SETUP_SOURCES, AMPIFY_CLI_PORTABLE_SOURCES, AMPIFY_CLI_SOURCES, AMPIFY_TESTS_SOURCES, AMPIFY_TESTS_WIN_SOURCES.
 file(GLOB AMPIFY_SOURCE_LISTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/sources/*.cmake")
 list(SORT AMPIFY_SOURCE_LISTS)
 foreach(source_list IN LISTS AMPIFY_SOURCE_LISTS)
@@ -67,8 +93,7 @@ add_library(ampify_quickjs STATIC ${AMPIFY_QUICKJS_SOURCES})
 set_target_properties(ampify_quickjs PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS ON)
 target_include_directories(ampify_quickjs SYSTEM PUBLIC vendor/quickjs)
 if(WIN32)
-    # Upstream's Windows defines. quickjs-ng uses Win32 threads, critical sections and condition variables there,
-    # so MinGW no longer needs winpthreads.
+    # Upstream's Windows defines: quickjs-ng uses Win32 threads, critical sections and condition variables there.
     target_compile_definitions(ampify_quickjs PRIVATE WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0601)
 else()
     target_compile_definitions(ampify_quickjs PRIVATE _GNU_SOURCE)
@@ -104,12 +129,12 @@ target_compile_options(ampify_theme_check PRIVATE ${AMPIFY_WARNINGS})
 add_library(atmos_leveler STATIC ${AMPIFY_ATMOS_SOURCES})
 target_compile_options(atmos_leveler PRIVATE ${AMPIFY_WARNINGS})
 
-# XAML theme backend (win/xaml_backend.cpp, win/theme_service.cpp). Off by default: it needs the Windows App SDK C++/WinRT
-# headers, which MinGW does not ship. CI builds it with MSVC (windows-bench.yml). See docs/development/xaml-lessons.md.
+# XAML theme backend (src/win/xaml_backend.cpp, src/win/theme_service.cpp). Off by default: it needs the C++/WinRT projection
+# of WinUI, which scripts/build-msvc.ps1 and CI (ci.yml) generate. See docs/development/xaml-lessons.md.
 option(AMPIFY_XAML "Build the XAML theme backend and native interface in the kernel (needs the Windows App SDK C++/WinRT headers)" OFF)
 set(AMPIFY_WINAPPSDK_INCLUDE "" CACHE PATH "Folder that holds winrt/Microsoft.UI.Xaml.h, from the Windows App SDK NuGet package")
 
-# Windows only: the kernel DLL, the launcher, the installer, the test kit, and the helpers they share.
+# Windows only: the kernel DLL, the launcher, the installer, and the helpers they share.
 # Built when targeting Windows. Every executable is static, so it runs without any DLL beside it.
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_library(ampify_win STATIC ${AMPIFY_WIN_SOURCES})
@@ -123,21 +148,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set_target_properties(ampify_kernel PROPERTIES PREFIX "" OUTPUT_NAME ampify_kernel)
     target_link_libraries(ampify_kernel PRIVATE ampify_core ampify_win atmos_leveler)
     target_compile_options(ampify_kernel PRIVATE ${AMPIFY_WARNINGS})
+    ampify_version_resource(ampify_kernel "Ampify kernel, loaded into Apple Music")
 
-    # Wine harness (opt-in): hooks on fake COM objects and a fake AVFoundationCF.dll, run under Wine.
-    option(AMPIFY_BUILD_HARNESS "Build the Wine hook harness" OFF)
-    if(AMPIFY_BUILD_HARNESS)
-        # Named like Apple's DLL, so the import table says "AVFoundationCF.dll" as Apple Music's would.
-        add_library(ampify_fake_av SHARED ${AMPIFY_FAKE_AV_SOURCES})
-        set_target_properties(ampify_fake_av PROPERTIES PREFIX "" OUTPUT_NAME AVFoundationCF)
-        target_compile_options(ampify_fake_av PRIVATE ${AMPIFY_WARNINGS})
-
-        add_executable(ampify_hook_harness ${AMPIFY_HOOK_HARNESS_SOURCES})
-        target_link_libraries(ampify_hook_harness PRIVATE ampify_core ampify_win atmos_leveler ampify_fake_av)
-        target_compile_options(ampify_hook_harness PRIVATE ${AMPIFY_WARNINGS})
-    endif()
-
-    # Checks the interface-thread hook with a real window. Run it under Wine with a display, or on the Windows bench.
+    # Checks the interface-thread hook with a real window. CI runs it beside ampify_tests.
     add_executable(ampify_ui_thread_test ${AMPIFY_UI_THREAD_TEST_SOURCES})
     target_link_libraries(ampify_ui_thread_test PRIVATE ampify_win)
     target_compile_options(ampify_ui_thread_test PRIVATE ${AMPIFY_WARNINGS})
@@ -149,14 +162,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
             target_include_directories(ampify_kernel PRIVATE "${AMPIFY_WINAPPSDK_INCLUDE}")
         endif()
         # C++/WinRT calls RoGetActivationFactory and RoOriginateLanguageException, exported by runtimeobject.lib.
-        # dwmapi: the visible frame of a window, to lay Apple's player over the main window (win/apple_player.cpp).
+        # dwmapi: the visible frame of a window, to lay Apple's player over the main window (src/win/apple_player.cpp).
         target_link_libraries(ampify_kernel PRIVATE ampify_theme runtimeobject dwmapi)
         # The WinUI projection gives objects with more sections than the default COFF limit.
         target_compile_options(ampify_kernel PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
         if(MSVC AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
             # The projection headers are parsed once, for the XAML files only; the other kernel files skip the PCH.
             # Not with a compiler cache (CI: ccache), which cannot cache a file built on a precompiled header.
-            target_precompile_headers(ampify_kernel PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/win/xaml_pch.hpp>")
+            target_precompile_headers(ampify_kernel PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/src/win/xaml_pch.hpp>")
             set_source_files_properties(${AMPIFY_KERNEL_SOURCES} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
         endif()
     endif()
@@ -165,18 +178,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_executable(ampify_launcher WIN32 ${AMPIFY_LAUNCHER_SOURCES})
     target_link_libraries(ampify_launcher PRIVATE ampify_core ampify_win)
     target_compile_options(ampify_launcher PRIVATE ${AMPIFY_WARNINGS})
+    ampify_version_resource(ampify_launcher "Apple Music with Ampify")
 
     # Installs the kit and uninstalls it. The same file is copied into the install folder as the uninstaller.
     add_executable(ampify_setup WIN32 ${AMPIFY_SETUP_SOURCES})
     set_target_properties(ampify_setup PROPERTIES OUTPUT_NAME ampify_setup)
     target_link_libraries(ampify_setup PRIVATE ampify_core ampify_win)
     target_compile_options(ampify_setup PRIVATE ${AMPIFY_WARNINGS})
-
-    # The M5 test kit, started by a double-click: installs, launches Apple Music, traces, writes the report.
-    add_executable(ampify_testkit WIN32 ${AMPIFY_TESTKIT_SOURCES})
-    set_target_properties(ampify_testkit PROPERTIES OUTPUT_NAME Ampify-Test)
-    target_link_libraries(ampify_testkit PRIVATE ampify_core ampify_win)
-    target_compile_options(ampify_testkit PRIVATE ${AMPIFY_WARNINGS})
+    ampify_version_resource(ampify_setup "Ampify setup and uninstaller")
 endif()
 
 # Portable part of the command line `ampify`: JSON, SHA-256, manifests, catalog, kit layout, backups.
@@ -189,6 +198,7 @@ add_executable(ampify ${AMPIFY_CLI_SOURCES})
 target_link_libraries(ampify PRIVATE ampify_cli_portable ampify_theme ampify_core)
 target_compile_options(ampify PRIVATE ${AMPIFY_WARNINGS})
 target_compile_definitions(ampify PRIVATE AMPIFY_VERSION="${PROJECT_VERSION}")
+ampify_version_resource(ampify "Ampify command line")
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_link_libraries(ampify PRIVATE shell32 ampify_win)
 endif()

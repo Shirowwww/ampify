@@ -8,7 +8,7 @@ does (lossless, Dolby Atmos, lyrics, your library, sync).
 > **Experimental.** Ampify changes a running Apple Music in memory. It is a personal project tested on a few PCs, so
 > expect rough edges. The usual Apple Music icon always starts Apple Music without Ampify.
 
-Version 1.0.1, for Apple Music 1.1792 and 1.1540 from the Microsoft Store. On any other Apple Music version the kernel
+Version 1.0.2, for Apple Music 1.1792 and 1.1540 from the Microsoft Store. On any other Apple Music version the kernel
 stays inactive until that version has been tested, so an Apple update never breaks the app. What changed:
 [CHANGELOG.md](CHANGELOG.md).
 
@@ -31,10 +31,15 @@ stays inactive until that version has been tested, so an Apple update never brea
 ## Install
 
 1. Close Apple Music.
-2. Download `ampify-1.0.1-windows-x64.zip` from the [Releases](https://github.com/Shirowwww/ampify/releases) page,
+2. Download `ampify-1.0.2-windows-x64.zip` from the [Releases](https://github.com/Shirowwww/ampify/releases) page,
    right-click it, Extract all.
 3. Run `ampify_setup.exe`. Windows SmartScreen may warn that the app is not signed yet: More info, Run anyway.
 4. Start **Apple Music with Ampify** from the Start menu.
+
+Microsoft Defender may report `ampify_setup.exe` or `ampify_launcher.exe` as a trojan (`Trojan:Win32/Cloxer`,
+`Trojan:Win32/Sabsik.FL.A!ml`). This is a false positive: the launcher starts Apple Music and loads Ampify's DLL into
+it, as some malware does, and the files are not signed yet. If you would rather not allow them, build Ampify from
+source (below).
 
 The usual Apple Music icon still starts Apple Music without Ampify. To uninstall, use Settings > Apps > Installed
 apps > Ampify for Apple Music. Your settings stay in `%USERPROFILE%\Ampify` unless you choose to delete them.

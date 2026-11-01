@@ -1,7 +1,7 @@
 #include <set>
 #include <string>
 
-#include "../core/manifest.hpp"
+#include "../src/core/manifest.hpp"
 #include "test.hpp"
 
 namespace {

@@ -3,7 +3,7 @@
 
 Set-StrictMode -Version Latest
 
-# App identity and Ampify paths on this PC (same values as core/apple_music.hpp and win/win_common.cpp).
+# App identity and Ampify paths on this PC (same values as src/core/apple_music.hpp and src/win/win_common.cpp).
 $script:PackageFamily = 'AppleInc.AppleMusicWin_nzyj5cx40ttqa'
 $script:AppUserModelId = "$($script:PackageFamily)!App"
 $script:StoreProductId = '9PFHDD62MXS1'
@@ -470,12 +470,12 @@ function Save-Screenshot {
     }
 }
 
-# Apple Music versions of the release list, read from core/version_gate.hpp to stay in line with the code.
+# Apple Music versions of the release list, read from src/core/version_gate.hpp to stay in line with the code.
 function Get-KnownAppVersions {
     param([string]$RepoRoot)
-    $header = Get-Content -LiteralPath (Join-Path $RepoRoot 'core\version_gate.hpp') -Raw
+    $header = Get-Content -LiteralPath (Join-Path $RepoRoot 'src\core\version_gate.hpp') -Raw
     $block = [regex]::Match($header, 'kKnownAppVersions\[\]\s*=\s*\{(?<body>.*?)\};', 'Singleline')
-    if (-not $block.Success) { throw 'kKnownAppVersions not found in core/version_gate.hpp' }
+    if (-not $block.Success) { throw 'kKnownAppVersions not found in src/core/version_gate.hpp' }
     return @([regex]::Matches($block.Groups['body'].Value, '"([0-9.]+)"') | ForEach-Object { $_.Groups[1].Value })
 }
 

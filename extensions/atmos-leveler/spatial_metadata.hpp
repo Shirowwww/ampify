@@ -1,9 +1,8 @@
 #pragma once
 
 // The spatial audio stream Apple Music renders Dolby Atmos with: ISpatialAudioObjectRenderStreamForMetadata, from
-// the Windows SDK's spatialaudiometadata.h. MinGW ships that header empty, so the parts the leveler touches are
-// declared here, in the order of the SDK declaration: the vtable slots below follow from it. The leveler only
-// calls through slots it hooked; the Wine harness implements these interfaces to check the slot numbers.
+// the Windows SDK's spatialaudiometadata.h. The parts the leveler touches are declared here, in the order of the
+// SDK declaration: the vtable slots below follow from it. The leveler only calls through slots it hooked.
 // Not compiled on Linux.
 
 #include <windows.h>
@@ -15,7 +14,7 @@ namespace atmos::hooks {
 // part (0xBBC9C907) on the stream Apple Music activates.
 constexpr GUID kIidRenderStreamForMetadata = {0xBBC9C907, 0x48D5, 0x4A2E, {0xA0, 0xC7, 0xF7, 0xF0, 0xD6, 0x7C, 0x1F, 0xB1}};
 
-// ISpatialAudioObjectRenderStreamForMetadata : ISpatialAudioObjectRenderStreamBase. The base (in MinGW) holds
+// ISpatialAudioObjectRenderStreamForMetadata : ISpatialAudioObjectRenderStreamBase. The base holds
 // slots 3 to 9: GetAvailableDynamicObjectCount, GetService, Start, Stop, Reset, BeginUpdatingAudioObjects (8),
 // EndUpdatingAudioObjects (9). The two activations follow, in slots 10 and 11.
 //

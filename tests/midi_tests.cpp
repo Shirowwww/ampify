@@ -1,10 +1,10 @@
-// MIDI input without a device: decoding the winmm messages, bindings, the kit's midi.map (core/midi_map.*), and
+// MIDI input without a device: decoding the winmm messages, bindings, the kit's midi.map (src/core/midi_map.*), and
 // Ampify.midi, whose JavaScript matcher must agree with midi::Matches.
 
 #include <string>
 #include <vector>
 
-#include "../core/midi_map.hpp"
+#include "../src/core/midi_map.hpp"
 #include "service_host.hpp"
 #include "test.hpp"
 

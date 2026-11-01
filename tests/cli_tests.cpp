@@ -11,18 +11,18 @@
 #include <thread>
 #include <vector>
 
-#include "../core/json.hpp"
-#include "../core/manifest.hpp"
-#include "../cli/archive.hpp"
-#include "../cli/backup.hpp"
-#include "../cli/catalog.hpp"
-#include "../cli/element.hpp"
-#include "../cli/json.hpp"
-#include "../cli/kit.hpp"
-#include "../cli/release.hpp"
-#include "../cli/sha256.hpp"
-#include "../cli/watch.hpp"
-#include "../cli/zip_writer.hpp"
+#include "../src/core/json.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/cli/archive.hpp"
+#include "../src/cli/backup.hpp"
+#include "../src/cli/catalog.hpp"
+#include "../src/cli/element.hpp"
+#include "../src/cli/json.hpp"
+#include "../src/cli/kit.hpp"
+#include "../src/cli/release.hpp"
+#include "../src/cli/sha256.hpp"
+#include "../src/cli/watch.hpp"
+#include "../src/cli/zip_writer.hpp"
 #include "test.hpp"
 
 namespace {
@@ -316,8 +316,13 @@ std::string CatalogWith(const std::string& entry) {
 
 }  // namespace
 
-TEST_CASE(Catalog_RepositoryCatalogIsValid) {
-    std::string path = std::string(AMPIFY_SOURCE_DIR) + "/catalog/catalog.json";
+// The public catalog lives in its own repository: checked when a clone of ampify-catalog sits next to this one.
+TEST_CASE(Catalog_PublicCatalogIsValid) {
+    std::string path = std::string(AMPIFY_SOURCE_DIR) + "/../ampify-catalog/catalog.json";
+    if (!std::filesystem::exists(path)) {
+        std::cout << "Catalog: no ampify-catalog clone next to the repository, test skipped\n";
+        return;
+    }
     std::vector<std::string> errors;
     std::optional<ampify::Catalog> catalog = ampify::ParseCatalog(ReadFile(path), false, errors);
     CHECK(errors.empty());
@@ -500,6 +505,16 @@ TEST_CASE(Kit_ListsValidElementsAndSkipsWorkInProgress) {
     CHECK(elements[0].kind == "extension" && elements[0].id == "demo" && elements[0].Valid());
     CHECK(elements[1].kind == "theme" && !elements[1].Valid());
     CHECK(!elements[1].errors.empty());
+}
+
+TEST_CASE(Kit_TheElementsThatShipWithTheKitAreOnUntilTurnedOff) {
+    ampify::Settings settings;  // a new install: no key written yet
+    CHECK(ampify::IsEnabled(settings, "app", "marketplace"));
+    CHECK(ampify::IsEnabled(settings, "extension", "now-playing"));
+    CHECK(!ampify::IsEnabled(settings, "app", "lyrics"));
+
+    ampify::SetEnabled(settings, "app", "marketplace", false);
+    CHECK(!ampify::IsEnabled(settings, "app", "marketplace"));
 }
 
 TEST_CASE(Kit_EnableAndDisableWriteTheRightKeys) {

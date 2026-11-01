@@ -1,6 +1,6 @@
 #include <string>
 
-#include "../core/json.hpp"
+#include "../src/core/json.hpp"
 #include "test.hpp"
 
 TEST_CASE(Json_ParsesNestedValuesAndDumpsThemBack) {

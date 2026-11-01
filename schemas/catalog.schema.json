@@ -12,7 +12,7 @@
       "type": "object",
       "required": ["url", "sha256"],
       "additionalProperties": false,
-      "description": "Where the list of tested Apple Music versions is published (catalog/versions.json), and its SHA-256. Read by ampify versions update.",
+      "description": "Where the list of tested Apple Music versions is published (versions.json in ampify-catalog), and its SHA-256. Read by ampify versions update.",
       "properties": {
         "url": {"$ref": "#/$defs/https"},
         "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}

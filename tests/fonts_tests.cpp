@@ -1,4 +1,4 @@
-// Tests of Ampify.fonts as an extension sees it: the roles the theme service publishes (core/font_roles.hpp), and the
+// Tests of Ampify.fonts as an extension sees it: the roles the theme service publishes (src/core/font_roles.hpp), and the
 // defaults before it does.
 
 #include <filesystem>
@@ -7,10 +7,10 @@
 #include <sstream>
 #include <string>
 
-#include "../core/font_roles.hpp"
-#include "../core/manifest.hpp"
-#include "../core/script_extension.hpp"
-#include "../core/theme/fonts.hpp"
+#include "../src/core/font_roles.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/core/script_extension.hpp"
+#include "../src/core/theme/fonts.hpp"
 #include "fake_host.hpp"
 #include "test.hpp"
 

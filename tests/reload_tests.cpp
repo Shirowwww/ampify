@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "../core/reload.hpp"
+#include "../src/core/reload.hpp"
 #include "test.hpp"
 
 TEST_CASE(Reload_ParsesRestartLinesOnly) {

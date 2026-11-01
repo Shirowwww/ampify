@@ -5,11 +5,11 @@
 #include <string>
 #include <vector>
 
-#include "../core/extension.hpp"
-#include "../core/journal.hpp"
-#include "../core/safe_mode.hpp"
-#include "../core/settings.hpp"
-#include "../core/version_gate.hpp"
+#include "../src/core/extension.hpp"
+#include "../src/core/journal.hpp"
+#include "../src/core/safe_mode.hpp"
+#include "../src/core/settings.hpp"
+#include "../src/core/version_gate.hpp"
 #include "test.hpp"
 
 namespace {

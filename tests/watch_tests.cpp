@@ -3,7 +3,7 @@
 #include <utility>
 #include <vector>
 
-#include "../core/package_watch.hpp"
+#include "../src/core/package_watch.hpp"
 #include "test.hpp"
 
 namespace {

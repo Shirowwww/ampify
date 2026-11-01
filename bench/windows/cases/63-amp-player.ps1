@@ -1,8 +1,8 @@
-# Ampify.player on Windows (win/player_bridge.*): the bench kernel must say in AppleMusic.log whether it activated Apple's
+# Ampify.player on Windows (src/win/player_bridge.*): the bench kernel must say in AppleMusic.log whether it activated Apple's
 # player (AMP.Services.Player), read a first state, and describe the play queue (read-only probe). Without an Apple
 # account on the runner nothing plays: the case checks the activation and the state reading, not the music. The player
 # lines are copied into the job log, so they can be read without downloading the results.
-# Build: bench\ (MinGW or MSVC, AMPIFY_BENCH=ON). No setting is changed: player.appleCommands stays off.
+# Build: bench\ (AMPIFY_BENCH=ON). No setting is changed: player.appleCommands stays off.
 
 Register-Case -Id 'amp-player' -Title 'Player: AMP.Services.Player activated (or SMTC fallback) and first state read' -Requires 'apple-music' -Action {
     param($Ctx)

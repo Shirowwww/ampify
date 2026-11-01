@@ -3,8 +3,8 @@
 //  - Dolby Atmos: the spatial audio objects, one mono buffer per object, before the slider volume. Apple Music
 //    renders them through ISpatialAudioObjectRenderStreamForMetadata, hooked on the fly when it is activated;
 //    the plain ISpatialAudioObjectRenderStream is hooked too, from a throwaway stream read at start.
-// The slot numbers are the vtable positions of the Windows SDK interfaces, checked against the MinGW headers (and
-// spatial_metadata.hpp for the metadata stream, which MinGW lacks).
+// The slot numbers are the vtable positions of the Windows SDK interfaces, checked against the SDK headers (and
+// spatial_metadata.hpp for the metadata stream).
 // The volume of the player is only read, never set: the gain goes into the samples, so the slider stays put.
 // A poll thread follows the playing item and turns the leveler's decision into the gain the hooks apply.
 
@@ -34,10 +34,10 @@
 #include <thread>
 #include <vector>
 
-#include "../../core/audio/audio_engine.hpp"
-#include "../../core/gain_board.hpp"
-#include "../../win/hook.hpp"
-#include "../../win/win_common.hpp"
+#include "../../src/core/audio/audio_engine.hpp"
+#include "../../src/core/gain_board.hpp"
+#include "../../src/win/hook.hpp"
+#include "../../src/win/win_common.hpp"
 #include "format_detection.hpp"
 #include "gain_ramp.hpp"
 #include "kit_audio.hpp"
@@ -250,6 +250,7 @@ struct Playing {
     std::string variant;   // its stable variant id; empty while the item loads
     bool started = false;  // the leveler knows what this item is
     std::chrono::steady_clock::time_point stoppedSince{};  // when its player was seen stopped; empty while it plays
+    bool unseen = false;  // a stretch played by a player that is not followed is being measured as stereo
     double currentDb = 0;
     double reportedDb = 0;
     int polls = 0;
@@ -463,6 +464,26 @@ void StartIfKnown() {
          (kind == TrackKind::Atmos ? ", starting gain " + Fixed(g_playing.currentDb, 1) + " dB" : std::string()));
 }
 
+// Sound plays and no followed player plays it: a song on a player Apple Music set no volume on, so it is not
+// followed. Its stream is stereo (an Atmos song there would play through the objects, which stay silent here), so
+// it is measured as one stereo track. Starting it ends the followed song, and its gain with it. Poll thread only.
+void MeasureUnseen() {
+    if (g_playing.unseen) return;
+    std::lock_guard<std::mutex> guard(g_levelerLock);
+    g_leveler->StartTrack("none", false);
+    g_playing.started = false;
+    g_playing.unseen = true;
+    Note("stereo track, variant none (a player the leveler does not follow)");
+}
+
+// Ends that stretch: a followed player plays again, or the stream went quiet between two songs.
+void EndUnseen() {
+    if (!g_playing.unseen) return;
+    std::lock_guard<std::mutex> guard(g_levelerLock);
+    g_leveler->EndTrack();
+    g_playing.unseen = false;
+}
+
 // Follows the player's current item and its stable variant. Poll thread only.
 void FollowTrack() {
     void* player = nullptr;
@@ -471,31 +492,29 @@ void FollowTrack() {
         player = g_player;
         if (player) g_api.CFRetain(player);
     }
-    if (!player) return;
-
-    void* item = g_api.CopyCurrentItem(player);
+    void* item = player ? g_api.CopyCurrentItem(player) : nullptr;
     bool stopped = !item || g_api.GetRate(player) == 0;
-    g_api.CFRelease(player);
+    if (player) g_api.CFRelease(player);
 
-    // The followed player stopped, and sound still plays well after: another song took over, on a player Apple Music
-    // set no volume on, so it is not followed. The followed song is over, and its gain with it. A pause silences the
-    // stream within kTakeoverWait, so it ends nothing.
+    // No followed player plays, for longer than a pause takes to silence the stream: what the stream carries now
+    // comes from a player that is not followed.
     auto now = std::chrono::steady_clock::now();
     if (!stopped) {
         g_playing.stoppedSince = {};
     } else if (g_playing.stoppedSince == std::chrono::steady_clock::time_point{}) {
         g_playing.stoppedSince = now;
     }
-    if (stopped && now - g_playing.stoppedSince >= kTakeoverWait && SoundIsPlaying()) {
+    if (stopped && now - g_playing.stoppedSince >= kTakeoverWait) {
         if (item) g_api.CFRelease(item);
-        if (g_playing.started) {
-            std::lock_guard<std::mutex> guard(g_levelerLock);
-            g_leveler->EndTrack();
+        if (SoundIsPlaying()) {
+            MeasureUnseen();
+        } else {
+            EndUnseen();
         }
-        g_playing.started = false;
         return;
     }
     if (!item) return;
+    EndUnseen();
 
     // A new item, or the same item on another variant, is a new track. A variant that goes empty again while
     // the item reloads changes nothing.
@@ -1071,17 +1090,5 @@ ampify::ExtensionInfo MakeAtmosLevelerExtension(ampify::Journal& journal, const 
     // No stop: the hooks stay in place until the process exits, so nothing is left half-patched.
     return info;
 }
-
-namespace testing {
-
-void SpatialStreamActivated(const PROPVARIANT* params, REFIID riid, void* stream) {
-    OnSpatialStreamActivated(params, riid, stream);
-}
-
-std::filesystem::path LevelsFile() {
-    return atmos::hooks::LevelsFile();
-}
-
-}  // namespace testing
 
 }  // namespace atmos::hooks

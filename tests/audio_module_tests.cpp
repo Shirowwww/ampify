@@ -13,9 +13,9 @@
 #include <thread>
 #include <vector>
 
-#include "../core/audio/audio_engine.hpp"
-#include "../core/manifest.hpp"
-#include "../core/script_extension.hpp"
+#include "../src/core/audio/audio_engine.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
 #include "pump.hpp"
 #include "test.hpp"

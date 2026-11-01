@@ -1,29 +1,23 @@
 #!/usr/bin/env bash
-# Builds the test package: dist/ampify-<version>-windows-x64.zip and dist/SHA256SUMS.txt, the two names
-# `ampify update` looks for in a release (cli/marketplace.cpp). Nothing is published: the zip is handed over by hand,
-# or uploaded as a workflow artifact by .github/workflows/package.yml. The version is the project version of
-# CMakeLists.txt.
+# Builds the package: dist/ampify-<version>-windows-x64.zip and dist/SHA256SUMS.txt, the two names `ampify update`
+# and scripts/install.ps1 look for in a release (src/cli/marketplace.cpp). Nothing is published: the zip is attached to a
+# release by hand, or uploaded as a workflow artifact by .github/workflows/package.yml. The version is the project
+# version of CMakeLists.txt.
 #
 # Usage:
-#   scripts/package.sh --msvc <ampify-msvc-kit>      the MSVC kit artifact of windows-bench.yml (preferred)
-#   scripts/package.sh --mingw [<dir>]               a MinGW build: a build folder (default build-check/win, as
-#                                                    scripts/check-all.sh makes it) or the ampify-builds artifact
+#   scripts/package.sh --msvc <dir>      the ampify-msvc-kit artifacts of ci.yml, or an MSVC build folder
 #   options: --out <dir> (default dist), --commit <sha> (written to BUILD_INFO.txt)
-#
-# Prefer the MSVC kit. Only it has the XAML binding: the theme choice in Settings > General, the Ampify card in
-# Settings > Playback and the extension panels. A MinGW kernel injects, levels Atmos and runs the extensions, but
-# draws nothing in the interface, so a MinGW package is only good for checking the packaging itself.
 #
 # Only the release build is taken (tested Apple Music versions only). A bench build (AMPIFY_BENCH=ON) is refused.
 #
 # The zip is flat, as `ampify update` and ampify_setup.exe both need: ampify.exe, ampify_launcher.exe and ampify_kernel.dll at the
-# root, next to ampify_setup.exe (the installer copies the launcher and the kernel from its own folder). The example
-# extensions and themes go under examples/, which `ampify update --apply` ignores (it only copies root files).
+# root, next to ampify_setup.exe (the installer copies the launcher and the kernel from its own folder). The elements
+# that ship with the kit (the Marketplace, Now Playing) and example extensions and themes go under examples/. The
+# installer and `ampify update --apply` put the first ones in the user's Ampify folder (src/core/kit_layout.hpp).
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/dist"
-source_kind=""
 source_dir=""
 commit=""
 
@@ -31,17 +25,14 @@ die() { echo "package: $*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --msvc) source_kind=msvc; source_dir="${2:-}"; [[ -n "$source_dir" ]] || die "--msvc needs a folder"; shift 2 ;;
-        --mingw)
-            source_kind=mingw
-            if [[ -n "${2:-}" && "${2:0:2}" != "--" ]]; then source_dir="$2"; shift 2; else source_dir="$root/build-check/win"; shift; fi ;;
+        --msvc) source_dir="${2:-}"; [[ -n "$source_dir" ]] || die "--msvc needs a folder"; shift 2 ;;
         --out) out="${2:-}"; [[ -n "$out" ]] || die "--out needs a folder"; shift 2 ;;
         --commit) commit="${2:-}"; shift 2 ;;
         -h|--help) sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die "unknown option: $1 (see --help)" ;;
     esac
 done
-[[ -n "$source_kind" ]] || die "say where the binaries come from: --msvc <ampify-msvc-kit> or --mingw [<folder>]"
+[[ -n "$source_dir" ]] || die "say where the binaries come from: --msvc <folder>"
 [[ -d "$source_dir" ]] || die "folder not found: $source_dir"
 source_dir="$(cd "$source_dir" && pwd)"
 command -v python3 >/dev/null || die "python3 is needed (zip and hashes)"
@@ -59,12 +50,7 @@ if [[ -f "$source_dir/release/ampify_setup.exe" ]]; then
     info="$source_dir/BUILD_INFO.txt"
     if [[ -f "$info" ]]; then
         [[ -z "$commit" ]] && commit="$(sed -n 's/^Commit: //p' "$info" | head -n 1)"
-        if [[ "$source_kind" == msvc ]] && ! grep -q 'MSVC' "$info"; then
-            die "$info does not mention MSVC: this is not the ampify-msvc-kit kit (use --mingw for ampify-builds)"
-        fi
-        if [[ "$source_kind" == mingw ]] && grep -q 'MSVC' "$info"; then
-            die "$info describes an MSVC kit: use --msvc"
-        fi
+        grep -q 'MSVC' "$info" || die "$info does not mention MSVC: this is not the ampify-msvc-kit kit"
     fi
 else
     layout=build
@@ -73,12 +59,6 @@ else
     cache="$source_dir/CMakeCache.txt"
     if [[ -f "$cache" ]]; then
         grep -q '^AMPIFY_BENCH:BOOL=ON' "$cache" && die "$source_dir is a bench build (AMPIFY_BENCH=ON): it is never shipped"
-        if [[ "$source_kind" == mingw ]] && ! grep -q '^CMAKE_[A-Z_]*:FILEPATH=.*mingw' "$cache"; then
-            die "$source_dir is not a MinGW build (no mingw tool in CMakeCache.txt)"
-        fi
-        if [[ "$source_kind" == msvc ]] && grep -q '^CMAKE_[A-Z_]*:FILEPATH=.*mingw' "$cache"; then
-            die "$source_dir is a MinGW build: use --mingw"
-        fi
     else
         echo "package: warning, no CMakeCache.txt in $source_dir: cannot check that this is not a bench build" >&2
     fi
@@ -89,7 +69,7 @@ if [[ -z "$commit" ]]; then
     git -C "$root" diff --quiet HEAD 2>/dev/null || commit+=" (with uncommitted changes)"
 fi
 
-binaries=(ampify_setup.exe ampify_launcher.exe ampify_kernel.dll Ampify-Test.exe)
+binaries=(ampify_setup.exe ampify_launcher.exe ampify_kernel.dll)
 for file in "${binaries[@]}"; do [[ -f "$bin_dir/$file" ]] || die "missing file: $bin_dir/$file"; done
 [[ -f "$cli_dir/ampify.exe" ]] || die "missing file: $cli_dir/ampify.exe"
 
@@ -102,9 +82,9 @@ for file in "${binaries[@]/#/$bin_dir/}" "$cli_dir/ampify.exe"; do
     [[ "$(head -c 2 "$file")" == "MZ" ]] || die "$(basename "$file") is not a Windows executable"
 done
 
-# The examples the guide uses: extensions with something to see or hear, and the example themes.
-extensions=(react-panel now-playing-notify hello-extension keyboard-skip sleep-timer lyrics-view)
-themes=(greenroom midnight large-text rounded-buttons hide-chrome glass artwork)
+# Every example extension and every theme of the repository (the snippets are for theme authors, not shipped).
+mapfile -t extensions < <(cd "$root/examples" && find . -mindepth 2 -maxdepth 2 -name manifest.json | cut -d/ -f2 | LC_ALL=C sort)
+mapfile -t themes < <(cd "$root/themes" && find . -mindepth 2 -maxdepth 2 -name manifest.json | cut -d/ -f2 | LC_ALL=C sort)
 
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
@@ -113,35 +93,21 @@ mkdir -p "$pkg/examples/extensions" "$pkg/examples/themes" "$pkg/examples/apps"
 
 for file in "${binaries[@]}"; do cp "$bin_dir/$file" "$pkg/"; done
 cp "$cli_dir/ampify.exe" "$pkg/"
-for id in "${extensions[@]}"; do
-    [[ -f "$root/examples/$id/manifest.json" ]] || die "example extension not found: examples/$id"
-    cp -R "$root/examples/$id" "$pkg/examples/extensions/"
-done
+for id in "${extensions[@]}"; do cp -R "$root/examples/$id" "$pkg/examples/extensions/"; done
 # The Marketplace page ships with Ampify (it holds kit.manage, which the catalog refuses).
 cp -R "$root/apps/marketplace" "$pkg/examples/apps/"
 # Now Playing too: its button opens Apple Music's full-screen player.
 cp -R "$root/extensions/now-playing" "$pkg/examples/extensions/"
-for id in "${themes[@]}"; do
-    [[ -d "$root/themes/examples/$id" ]] || die "example theme not found: themes/examples/$id"
-    cp -R "$root/themes/examples/$id" "$pkg/examples/themes/"
-done
+for id in "${themes[@]}"; do cp -R "$root/themes/$id" "$pkg/examples/themes/"; done
 
-# Text for Windows: CRLF, and a BOM on the files people open in Notepad. The .cmd file gets no BOM (cmd.exe would
-# read it as part of the first command).
+# Text for Windows: CRLF, and a BOM on the files people open in Notepad.
 crlf() { sed -e 's/\r$//' -e 's/$/\r/' "$1"; }
 bom() { printf '\xEF\xBB\xBF'; }
 { bom; crlf "$root/scripts/package/README.txt" | sed "s/@VERSION@/$version/"; } > "$pkg/README.txt"
-{ bom; crlf "$root/docs/development/testing-on-a-pc.md"; } > "$pkg/TEST-GUIDE.txt"
-crlf "$root/scripts/package/prepare-test.cmd" > "$pkg/prepare-test.cmd"
-if [[ "$source_kind" == msvc ]]; then
-    compiler="MSVC, with the XAML binding (themes, Ampify card, panels)"
-else
-    compiler="MinGW, WITHOUT the XAML binding: no themes, no Ampify card, no panels. To check the packaging only."
-fi
 {
     echo "Ampify $version"
     echo "Commit: $commit"
-    echo "Compiler: $compiler"
+    echo "Compiler: MSVC, with the XAML binding (themes, Ampify card, panels)"
     echo "Release build: injects the kernel only on tested Apple Music versions."
     echo "Package made on $(date -u '+%Y-%m-%d %H:%M UTC') by scripts/package.sh ($layout)."
 } | sed 's/$/\r/' > "$pkg/BUILD_INFO.txt"
@@ -173,7 +139,6 @@ with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
 PY
 (cd "$out" && sha256sum "$name.zip" > SHA256SUMS.txt)
 
-echo "Package: $out/$name.zip ($source_kind, $layout, commit $commit)"
+echo "Package: $out/$name.zip ($layout, commit $commit)"
 echo "Hashes: $out/SHA256SUMS.txt"
-[[ "$source_kind" == mingw ]] && echo "Warning: MinGW package, no interface (no themes, no Ampify card). For a real test, use --msvc." >&2
 exit 0

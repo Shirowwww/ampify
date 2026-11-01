@@ -3,10 +3,10 @@
 #include <sstream>
 #include <string>
 
-#include "../core/extension.hpp"
-#include "../core/extension_loader.hpp"
-#include "../core/reload.hpp"
-#include "../core/settings.hpp"
+#include "../src/core/extension.hpp"
+#include "../src/core/extension_loader.hpp"
+#include "../src/core/reload.hpp"
+#include "../src/core/settings.hpp"
 #include "fake_host.hpp"
 #include "test.hpp"
 
@@ -223,6 +223,32 @@ TEST_CASE(Loader_ExposeApiOffKeepsEveryScriptOff) {
     CHECK(loader.Restart("app:page", settings));
     CHECK(hosts.StateOf("ext") == ampify::ExtensionState::Running);
     CHECK(hosts.StateOf("app:page") == ampify::ExtensionState::Running);
+    hosts.StopAll();
+}
+
+TEST_CASE(Loader_AnElementThatShipsWithTheKitStartsUntilTurnedOff) {
+    fs::path root = Root("bundled");
+    WriteElement(root / "extensions", "now-playing", Manifest("now-playing", "extension"), R"(Ampify.log("np");)");
+    WriteElement(root / "apps", "marketplace", Manifest("marketplace", "app"), R"(Ampify.log("market");)");
+    WriteElement(root / "apps", "page", Manifest("page", "app"), R"(Ampify.log("page");)");
+
+    ampify::test::FakeHost host;
+    std::ostringstream out;
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::ExtensionHost hosts(journal);
+    ampify::ExtensionLoader loader(hosts, host, journal, root / "extensions");
+    loader.SetAppRoot(root / "apps");
+    CHECK(loader.Discover().loaded.size() == 3);
+
+    ampify::Settings settings;  // a new install: no key written yet
+    hosts.StartAll(settings);
+    CHECK(hosts.StateOf("now-playing") == ampify::ExtensionState::Running);
+    CHECK(hosts.StateOf("app:marketplace") == ampify::ExtensionState::Running);
+    CHECK(hosts.StateOf("app:page") == ampify::ExtensionState::Off);  // a community app waits for the user
+
+    settings.SetBool("apps.marketplace.enabled", false);  // what `ampify app disable marketplace` writes
+    loader.Restart("app:marketplace", settings);
+    CHECK(hosts.StateOf("app:marketplace") == ampify::ExtensionState::Off);
     hosts.StopAll();
 }
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Check Ampify's JSON files: the community catalog and element manifests.
 
-    python3 tools/validate.py catalog catalog/catalog.json
+    python3 tools/validate.py catalog ../ampify-catalog/catalog.json
     python3 tools/validate.py manifest examples/hello-extension/manifest.json
-    python3 tools/validate.py versions catalog/versions.json
+    python3 tools/validate.py versions ../ampify-catalog/versions.json
 
 Standard library only. The schemas in schemas/ use a small subset of JSON Schema, and this
 script refuses any keyword outside that subset, so a schema is never checked less strictly
@@ -27,11 +27,11 @@ SCHEMAS = {
     "versions": os.path.join(ROOT, "schemas", "versions.schema.json"),
 }
 
-# The exports the kit needs (core/build_signature.hpp), and every export of the relevant DLL (knowledge/exports).
-BUILD_SIGNATURE = os.path.join(ROOT, "core", "build_signature.hpp")
+# The exports the kit needs (src/core/build_signature.hpp), and every export of the relevant DLL (knowledge/exports).
+BUILD_SIGNATURE = os.path.join(ROOT, "src", "core", "build_signature.hpp")
 KNOWN_EXPORTS = os.path.join(ROOT, "knowledge", "exports", "AVFoundationCF.txt")
 
-# Largest preview image a manifest may ship (cli/element.hpp, kMaxPreviewBytes).
+# Largest preview image a manifest may ship (src/cli/element.hpp, kMaxPreviewBytes).
 MAX_PREVIEW_BYTES = 2 * 1024 * 1024
 
 # Major version of the kit API this script knows. Entries for another major version are refused.
@@ -170,12 +170,12 @@ def check_kit_api(kit_api, where):
 
 
 def required_exports():
-    """Names of kRequiredPlayerExports in core/build_signature.hpp: what a tested version must have been checked for."""
+    """Names of kRequiredPlayerExports in src/core/build_signature.hpp: what a tested version must have been checked for."""
     with open(BUILD_SIGNATURE, encoding="utf-8") as handle:
         text = handle.read()
     block = re.search(r"kRequiredPlayerExports\[\]\s*=\s*\{(.*?)\};", text, re.S)
     if block is None:
-        raise SchemaError("kRequiredPlayerExports not found in core/build_signature.hpp")
+        raise SchemaError("kRequiredPlayerExports not found in src/core/build_signature.hpp")
     return re.findall(r'"([^"]+)"', block.group(1))
 
 
@@ -226,12 +226,12 @@ def check_catalog(doc, path):
 
 
 def fits_settings_file(text):
-    """settings.txt holds one value per line and trims its ends (core/settings.cpp): a value must survive both."""
+    """settings.txt holds one value per line and trims its ends (src/core/settings.cpp): a value must survive both."""
     return "\n" not in text and "\r" not in text and text == text.strip(" \t\n\v\f\r")
 
 
 def check_setting_value(setting, where):
-    """The type-dependent rules of one declared setting (core/manifest.cpp, ReadSettingValue)."""
+    """The type-dependent rules of one declared setting (src/core/manifest.cpp, ReadSettingValue)."""
     kind, value = setting["type"], setting["default"]
     errors = []
     if ("options" in setting) != (kind == "choice"):

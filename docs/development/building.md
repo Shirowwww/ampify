@@ -120,14 +120,20 @@ It needs a `python3` command. It builds `dist/ampify-<version>-windows-x64.zip` 
   runs extensions, but draws nothing in the interface, so a MinGW package only checks the packaging.
 - `--mingw [<dir>]` takes a MinGW build folder (default `build-check/win`) or the `ampify-builds` artifact.
 - `--out <dir>` (default `dist`) and `--commit <sha>` (written to `BUILD_INFO.txt`).
+- `--test` adds the test kit for a test pass ([testing-on-a-pc.md](testing-on-a-pc.md)): `Ampify-Test.exe`,
+  `prepare-test.cmd` and `TEST-GUIDE.txt`. Without it, the zip is the one people download.
 - Only the release build is taken. A bench build is refused, and so is a kit whose `BUILD_INFO.txt` does not match the
   compiler named on the command line.
 - The script checks that the installer contains the version number, and that each binary is a Windows executable.
 
 The zip is flat, as `ampify update` and `ampify_setup.exe` need: `ampify.exe`, `ampify_launcher.exe` and `ampify_kernel.dll`
-at the root, next to `ampify_setup.exe` (the installer copies from its own folder). Example extensions, themes and apps go
-under `examples\`, which `ampify update --apply` ignores (it copies only root files). The text files get CRLF line endings
-and a BOM so Notepad opens them correctly, and `prepare-test.cmd` gets no BOM.
+at the root, next to `ampify_setup.exe` (the installer copies from its own folder). The Marketplace and Now Playing ship
+with the kit: they go under `examples\` with the example extensions and themes, and the installer and
+`ampify update --apply` put them in the user's Ampify folder, in place of any older copy (`core/kit_layout.hpp`). The text
+files get CRLF line endings and a BOM so Notepad opens them correctly, and `prepare-test.cmd` gets no BOM.
+
+The binaries of an MSVC build carry a version resource (Properties > Details): product, publisher, description and
+version, from `cmake/version.rc.in`.
 
 A manual GitHub workflow packages from a green bench run: it takes the `ampify-msvc-kit` artifact of that run and publishes
 the zip as a workflow artifact, never as a release.

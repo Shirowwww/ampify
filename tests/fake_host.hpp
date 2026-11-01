@@ -10,9 +10,9 @@
 #include <string>
 #include <vector>
 
-#include "../core/audio/audio_host.hpp"
-#include "../core/host.hpp"
-#include "../core/image_host.hpp"
+#include "../src/core/audio/audio_host.hpp"
+#include "../src/core/host.hpp"
+#include "../src/core/image_host.hpp"
 
 namespace ampify::test {
 

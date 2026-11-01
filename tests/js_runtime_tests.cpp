@@ -3,7 +3,7 @@
 #include <optional>
 #include <string>
 
-#include "../core/js_runtime.hpp"
+#include "../src/core/js_runtime.hpp"
 #include "test.hpp"
 
 namespace {

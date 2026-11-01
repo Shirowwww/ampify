@@ -1,14 +1,14 @@
 name: Test package
 
-# Builds the test package (ampify-<version>-windows-x64.zip and SHA256SUMS.txt) from the MSVC kit of a Windows bench
-# run that is already green (windows-bench.yml, artifacts ampify-msvc-kit-*). Started by hand only: the package is
+# Builds the test package (ampify-<version>-windows-x64.zip and SHA256SUMS.txt) from the MSVC kit of a CI
+# run that is already green (ci.yml, artifacts ampify-msvc-kit-*). Started by hand only: the package is
 # published as an artifact of the run, never as a release. A release needs the owner's approval.
 
 on:
   workflow_dispatch:
     inputs:
       run_id:
-        description: "Id of the windows-bench.yml run whose ampify-msvc-kit artifacts are taken"
+        description: "Id of the ci.yml run whose ampify-msvc-kit artifacts are taken"
         required: true
         type: string
 
@@ -31,7 +31,7 @@ jobs:
           case "$RUN_ID" in (''|*[!0-9]*) echo "run_id must be a number: $RUN_ID" >&2; exit 1 ;; esac
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '"sha=\(.head_sha)\nworkflow=\(.path)\nconclusion=\(.conclusion)"' >> "$GITHUB_OUTPUT"
 
-      - name: Check that the run comes from the Windows bench
+      - name: Check that the run comes from CI
         env:
           RUN_ID: ${{ inputs.run_id }}
           RUN_SHA: ${{ steps.run.outputs.sha }}
@@ -40,14 +40,14 @@ jobs:
         run: |
           echo "Run $RUN_ID: $WORKFLOW, conclusion $CONCLUSION, commit $RUN_SHA"
           case "$WORKFLOW" in
-            .github/workflows/windows-bench.yml|.github/workflows/windows-bench.yml@*) ;;
-            *) echo "this run does not come from windows-bench.yml" >&2; exit 1 ;;
+            .github/workflows/ci.yml|.github/workflows/ci.yml@*) ;;
+            *) echo "this run does not come from ci.yml" >&2; exit 1 ;;
           esac
           [ "$CONCLUSION" = "success" ] || echo "::warning::run $RUN_ID is not fully green ($CONCLUSION): check the benches before handing the package over"
 
       # The script, the guide and the examples come from the branch chosen at launch (it must contain
       # scripts/package.sh). The script refuses binaries of another version of Ampify.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Compare the commits
         env:
@@ -57,7 +57,7 @@ jobs:
             echo "::warning::kit built at commit $RUN_SHA, script and examples taken at commit $GITHUB_SHA"
           fi
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           # The two halves of the kit (ampify-msvc-kit-release, ampify-msvc-kit-bench), merged into one folder.
           pattern: ampify-msvc-kit-*
@@ -76,7 +76,7 @@ jobs:
           unzip -l dist/ampify-*-windows-x64.zip
           cat dist/SHA256SUMS.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ampify-package
           path: |

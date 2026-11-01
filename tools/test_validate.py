@@ -15,6 +15,11 @@ import unittest
 import validate
 
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+# The public catalog lives in its own repository (ampify-catalog). Its files are checked when a clone sits next to
+# this one, or where AMPIFY_CATALOG points.
+CATALOG = os.environ.get("AMPIFY_CATALOG") or os.path.join(REPO, "..", "ampify-catalog")
+needs_catalog = unittest.skipUnless(os.path.exists(os.path.join(CATALOG, "catalog.json")),
+                                    "no ampify-catalog clone next to this repository (or set AMPIFY_CATALOG)")
 
 
 def run(kind, path):
@@ -83,8 +88,9 @@ class CatalogTests(unittest.TestCase):
         write_json(self.path, apply_changes(data, changes))
         return run("catalog", self.path)
 
-    def test_repository_catalog_is_valid(self):
-        code, text = run("catalog", os.path.join(REPO, "catalog", "catalog.json"))
+    @needs_catalog
+    def test_public_catalog_is_valid(self):
+        code, text = run("catalog", os.path.join(CATALOG, "catalog.json"))
         self.assertEqual(code, 0, text)
 
     def test_valid_entry_passes(self):
@@ -182,10 +188,16 @@ class ManifestTests(unittest.TestCase):
                 handle.write("// test\n")
         return os.path.join(folder, "manifest.json")
 
-    def test_repository_example_is_valid(self):
-        path = os.path.join(REPO, "examples", "hello-extension", "manifest.json")
-        code, text = run("manifest", path)
-        self.assertEqual(code, 0, text)
+    def test_every_element_of_the_repository_is_valid(self):
+        folders = ["themes", os.path.join("themes", "snippets"), "extensions", "apps", "examples"]
+        paths = [os.path.join(REPO, parent, name, "manifest.json")
+                 for parent in folders for name in sorted(os.listdir(os.path.join(REPO, parent)))
+                 if os.path.isfile(os.path.join(REPO, parent, name, "manifest.json"))]
+        self.assertGreaterEqual(len(paths), 15)
+        for path in paths:
+            with self.subTest(path=os.path.relpath(path, REPO)):
+                code, text = run("manifest", path)
+                self.assertEqual(code, 0, text)
 
     def test_valid_extension_passes(self):
         code, text = run("manifest", self.install(manifest(permissions=["storage", "network:api.example.com"])))
@@ -394,8 +406,9 @@ class VersionsTests(unittest.TestCase):
         write_json(self.path, apply_changes(data, changes))
         return run("versions", self.path)
 
-    def test_repository_versions_are_valid(self):
-        code, text = run("versions", os.path.join(REPO, "catalog", "versions.json"))
+    @needs_catalog
+    def test_public_versions_are_valid(self):
+        code, text = run("versions", os.path.join(CATALOG, "versions.json"))
         self.assertEqual(code, 0, text)
 
     def test_required_exports_match_the_kernel(self):

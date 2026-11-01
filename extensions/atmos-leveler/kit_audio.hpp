@@ -17,8 +17,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../../core/audio/audio_engine.hpp"
-#include "../../core/audio/equalizer.hpp"
+#include "../../src/core/audio/audio_engine.hpp"
+#include "../../src/core/audio/equalizer.hpp"
 #include "gain_ramp.hpp"
 #include "live_loudness.hpp"
 #include "object_pass.hpp"

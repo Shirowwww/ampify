@@ -1,5 +1,5 @@
 # Release build (the one that ships): the kernel is injected only on a tested version, and the app stays healthy.
-# The expected verdict depends on the version installed on the runner, read from core/version_gate.hpp.
+# The expected verdict depends on the version installed on the runner, read from src/core/version_gate.hpp.
 
 Register-Case -Id 'release-version' -Title 'Release build: injection only on a tested version' -Requires 'apple-music' -Action {
     param($Ctx)

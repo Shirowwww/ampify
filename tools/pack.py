@@ -2,7 +2,7 @@
 """Packs an element folder into the zip that the catalog points to, and pins its SHA-256.
 
     python3 tools/pack.py <folder> --out <archive.zip>
-    python3 tools/pack.py <folder> --out <archive.zip> --catalog catalog/catalog.json --url https://...
+    python3 tools/pack.py <folder> --out <archive.zip> --catalog ../ampify-catalog/catalog.json --url https://...
 
 The archive holds the files of the folder at its root, with manifest.json among them, as docs/extensions/catalog.md
 requires. The zip is deterministic: entries are sorted and carry a fixed timestamp, so the same folder always gives
@@ -134,7 +134,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Packs an Ampify element and pins its SHA-256.")
     parser.add_argument("folder", help="element folder, with its manifest.json")
     parser.add_argument("--out", required=True, help="the .zip archive to create")
-    parser.add_argument("--catalog", help="catalog to update (catalog/catalog.json)")
+    parser.add_argument("--catalog", help="catalog to update (catalog.json of ampify-catalog)")
     parser.add_argument("--url", help="https:// address where the archive will be published")
     args = parser.parse_args(argv)
 

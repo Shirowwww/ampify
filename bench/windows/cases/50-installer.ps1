@@ -1,8 +1,8 @@
 # M6: install and uninstall Ampify, without Apple Music (it installs anyway). The uninstaller deletes itself: that is
-# the real path on Windows, and it cannot be tested under Wine.
+# the real path on Windows.
 
-# Runs an Ampify program and returns its exit code. Also used by 60-test-kit.ps1.
-# A program still running after the timeout is stopped and the code is -2, so a stuck installer or test kit cannot
+# Runs an Ampify program and returns its exit code.
+# A program still running after the timeout is stopped and the code is -2, so a stuck installer cannot
 # hold the whole bench until the job's own time limit.
 function Invoke-KitProgram {
     param([string]$Path, [string[]]$Arguments, [int]$TimeoutSeconds = 300)

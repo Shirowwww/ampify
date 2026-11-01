@@ -4,9 +4,9 @@
 #include <sstream>
 #include <string>
 
-#include "../core/journal.hpp"
-#include "../core/manifest.hpp"
-#include "../core/script_extension.hpp"
+#include "../src/core/journal.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
 #include "test.hpp"
 

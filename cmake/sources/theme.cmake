@@ -1,28 +1,28 @@
 # Theme engine: target ampify_theme, and the checker ampify_theme_check. See the convention at the top of CMakeLists.txt.
 list(APPEND AMPIFY_THEME_SOURCES
-    core/theme/animation.cpp
-    core/theme/builtins.cpp
-    core/theme/color.cpp
-    core/theme/colour_keys.cpp
-    core/theme/css.cpp
-    core/theme/engine.cpp
-    core/theme/files.cpp
-    core/theme/ini.cpp
-    core/theme/inspector.cpp
-    core/theme/library.cpp
-    core/theme/properties.cpp
-    core/theme/selector.cpp
-    core/theme/session.cpp
-    core/theme/theme.cpp
-    core/theme/theme_settings.cpp
-    core/theme/commands.cpp
-    core/theme/fonts.cpp
-    core/theme/hover.cpp
-    core/theme/layout.cpp
-    core/theme/scheme_choice.cpp
-    core/theme/snippets.cpp
-    core/theme/spicetify.cpp
-    core/theme/worker.cpp)
+    src/core/theme/animation.cpp
+    src/core/theme/builtins.cpp
+    src/core/theme/color.cpp
+    src/core/theme/colour_keys.cpp
+    src/core/theme/css.cpp
+    src/core/theme/engine.cpp
+    src/core/theme/files.cpp
+    src/core/theme/ini.cpp
+    src/core/theme/inspector.cpp
+    src/core/theme/library.cpp
+    src/core/theme/properties.cpp
+    src/core/theme/selector.cpp
+    src/core/theme/session.cpp
+    src/core/theme/theme.cpp
+    src/core/theme/theme_settings.cpp
+    src/core/theme/commands.cpp
+    src/core/theme/fonts.cpp
+    src/core/theme/hover.cpp
+    src/core/theme/layout.cpp
+    src/core/theme/scheme_choice.cpp
+    src/core/theme/snippets.cpp
+    src/core/theme/spicetify.cpp
+    src/core/theme/worker.cpp)
 
 list(APPEND AMPIFY_TESTS_SOURCES tests/animation_tests.cpp)
 

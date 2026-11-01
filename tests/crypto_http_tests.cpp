@@ -1,9 +1,9 @@
-// Ampify.crypto.md5 (core/md5.*, checked against the RFC 1321 vectors) and Ampify.http.post, which follows the rules of
+// Ampify.crypto.md5 (src/core/md5.*, checked against the RFC 1321 vectors) and Ampify.http.post, which follows the rules of
 // Ampify.http.get: https only, declared hosts only, and a short list of headers.
 
 #include <string>
 
-#include "../core/md5.hpp"
+#include "../src/core/md5.hpp"
 #include "pump.hpp"
 #include "service_host.hpp"
 #include "test.hpp"

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Fast checks before a push (a few seconds), so a broken manifest or example never waits for CI to say so.
+# Turn it on once per clone: git config core.hooksPath scripts/hooks
+set -e
+root="$(git rev-parse --show-toplevel)"
+cd "$root/tools"
+python -m unittest -q test_validate test_pack
+node --test test_examples.mjs > /dev/null

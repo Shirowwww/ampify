@@ -1,15 +1,13 @@
-// Windows only. Checks the interface-thread facade (win/ui_thread.hpp) the way the kernel uses it:
+// Windows only. Checks the interface-thread facade (src/win/ui_thread.hpp) the way the kernel uses it:
 //
 // 1. The main thread creates a Windows.System.DispatcherQueue (CreateDispatcherQueueController of CoreMessaging.dll,
 //    DQTYPE_THREAD_CURRENT, DQTAT_COM_NONE), adopts it, and shows a window. A worker thread attaches, queues three
 //    tasks with TryEnqueue, and each task must run on the main thread. It is the mechanism of the XAML build, where
 //    the queue is the one of Apple Music's main window (Microsoft.UI.Dispatching).
-// 2. An installed backend (the XAML build installs one, win/xaml_host.cpp) receives every call of the facade, and
+// 2. An installed backend (the XAML build installs one, src/win/xaml_host.cpp) receives every call of the facade, and
 //    removing it brings the fallback back.
 //
-// Run it on the Windows bench, or under Wine with a display (xvfb-run). When Wine lacks CreateDispatcherQueueController
-// or does not run the queue, part 1 prints SKIP with the reason and the program still exits with 0; on Windows a
-// failure there is a FAIL.
+// Built with the unit tests on Windows; CI runs it beside ampify_tests (Unit tests, Windows).
 
 #include <windows.h>
 #include <unknwn.h>
@@ -19,7 +17,7 @@
 #include <functional>
 #include <thread>
 
-#include "../win/ui_thread.hpp"
+#include "../src/win/ui_thread.hpp"
 
 namespace {
 
@@ -27,7 +25,7 @@ std::atomic<int> g_ran{0};
 std::atomic<bool> g_onInterfaceThread{true};
 DWORD g_interfaceThread = 0;
 
-// CoreMessaging's API and the controller's ABI, declared by hand (MinGW has no header for them).
+// CoreMessaging's API and the controller's ABI, declared by hand: the test needs no WinRT header.
 struct QueueOptions {
     DWORD size;
     int threadType;     // DQTYPE_THREAD_CURRENT = 2
@@ -46,11 +44,6 @@ struct ControllerAbi : InspectableAbi {
 };
 // {22F34E66-50DB-4E36-A98D-61C01B384D20}
 const IID kIidController = {0x22f34e66, 0x50db, 0x4e36, {0xa9, 0x8d, 0x61, 0xc0, 0x1b, 0x38, 0x4d, 0x20}};
-
-bool UnderWine() {
-    HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
-    return ntdll && GetProcAddress(ntdll, "wine_get_version") != nullptr;
-}
 
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     return DefWindowProcW(window, message, wParam, lParam);
@@ -101,16 +94,14 @@ bool CheckBackend() {
     return passed;
 }
 
-enum class Outcome { Pass, Fail, Skip };
-
 // Part 1: a real DispatcherQueue on the main thread, fed from a worker thread.
-Outcome CheckQueue(bool wine) {
+bool CheckQueue() {
     HMODULE messaging = LoadLibraryW(L"CoreMessaging.dll");
     auto create = messaging ? reinterpret_cast<CreateController>(reinterpret_cast<void*>(GetProcAddress(messaging, "CreateDispatcherQueueController")))
                             : nullptr;
     if (!create) {
-        std::printf("queue: SKIP CoreMessaging.dll!CreateDispatcherQueueController absent%s\n", wine ? " (Wine)" : "");
-        return wine ? Outcome::Skip : Outcome::Fail;
+        std::printf("queue: FAIL CoreMessaging.dll!CreateDispatcherQueueController absent\n");
+        return false;
     }
     IUnknown* controllerUnknown = nullptr;
     HRESULT created = create(QueueOptions{sizeof(QueueOptions), 2, 0}, &controllerUnknown);
@@ -122,10 +113,10 @@ Outcome CheckQueue(bool wine) {
     IUnknown* queue = nullptr;
     if (controller) controller->get_DispatcherQueue(&queue);
     if (!queue) {
-        std::printf("queue: %s CreateDispatcherQueueController hr=0x%08lX, no queue%s\n", wine ? "SKIP" : "FAIL",
-                    static_cast<unsigned long>(created), wine ? " (Wine)" : "");
+        std::printf("queue: FAIL CreateDispatcherQueueController hr=0x%08lX, no queue\n",
+                    static_cast<unsigned long>(created));
         if (controller) controller->Release();
-        return wine ? Outcome::Skip : Outcome::Fail;
+        return false;
     }
     bool adopted = ampify::win::AdoptCurrentThreadQueue(queue);
     queue->Release();
@@ -140,7 +131,7 @@ Outcome CheckQueue(bool wine) {
     if (!window) {
         std::printf("queue: FAIL window\n");
         controller->Release();
-        return Outcome::Fail;
+        return false;
     }
     ShowWindow(window, SW_SHOWNOACTIVATE);
     g_interfaceThread = GetCurrentThreadId();
@@ -185,22 +176,16 @@ Outcome CheckQueue(bool wine) {
                 "interface_thread=%lu\n",
                 adopted ? 1 : 0, attachedOk ? 1 : 0, postedOk ? 1 : 0, g_ran.load(), g_onInterfaceThread ? 1 : 0,
                 static_cast<unsigned long>(attachedThread.load()), static_cast<unsigned long>(g_interfaceThread));
-    if (passed) return Outcome::Pass;
-    if (wine) {
-        std::printf("queue: SKIP Wine does not run this DispatcherQueue the way Windows does\n");
-        return Outcome::Skip;
-    }
-    return Outcome::Fail;
+    return passed;
 }
 
 }  // namespace
 
 int main() {
-    bool wine = UnderWine();
-    Outcome queue = CheckQueue(wine);
+    bool queueOk = CheckQueue();
     bool backendOk = CheckBackend();
 
-    bool passed = queue != Outcome::Fail && backendOk;
-    std::printf("%s%s\n", passed ? "PASS" : "FAIL", queue == Outcome::Skip ? " (file DispatcherQueue : SKIP)" : "");
+    bool passed = queueOk && backendOk;
+    std::printf("%s\n", passed ? "PASS" : "FAIL");
     return passed ? 0 : 1;
 }

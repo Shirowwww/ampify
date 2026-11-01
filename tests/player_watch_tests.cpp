@@ -1,6 +1,6 @@
 #include <string>
 
-#include "../core/player_watch.hpp"
+#include "../src/core/player_watch.hpp"
 #include "test.hpp"
 
 namespace {

@@ -4,8 +4,8 @@
 #include <sstream>
 #include <string>
 
-#include "../core/manifest.hpp"
-#include "../core/script_extension.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
 #include "pump.hpp"
 #include "test.hpp"
@@ -340,7 +340,7 @@ TEST_CASE(Element_IsCutWhenItLoopsForever) {
 }
 
 TEST_CASE(Element_ExamplesStartWithTheirOwnPermissions) {
-    for (const char* name : {"hello-extension", "now-playing-notify", "keyboard-skip", "sleep-timer", "gain-boost"}) {
+    for (const char* name : {"hello-extension", "keyboard-skip", "sleep-timer", "discord-presence", "scrobbler"}) {
         Fixture f;
         fs::path dir = fs::path(AMPIFY_SOURCE_DIR) / "examples" / name;
         std::ifstream manifestFile(dir / "manifest.json");

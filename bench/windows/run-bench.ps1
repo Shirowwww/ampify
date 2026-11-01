@@ -11,7 +11,7 @@ on a PC where Apple Music is in use. To add a case, see docs/development/bench-a
 Folder that holds release\ (release build) and bench\ (bench build), with ampify_launcher.exe and ampify_kernel.dll.
 
 .PARAMETER RepoRoot
-Root of the repository: the list of tested versions is read from core\version_gate.hpp.
+Root of the repository: the list of tested versions is read from src\core\version_gate.hpp.
 
 .PARAMETER OutputRoot
 Results folder: results.json, report.md, winget.log, and one folder per case (logs, screenshots).
@@ -110,7 +110,7 @@ if (Test-Path -LiteralPath $buildInfo) {
 }
 
 $script:KnownVersions = @(Get-KnownAppVersions -RepoRoot $repo)
-$preparation.Add("Tested versions (core/version_gate.hpp): $($script:KnownVersions -join ', ')")
+$preparation.Add("Tested versions (src/core/version_gate.hpp): $($script:KnownVersions -join ', ')")
 
 $installState = 'install skipped (-SkipInstall)'
 if (-not $SkipInstall) {

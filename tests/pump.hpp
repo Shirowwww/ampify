@@ -7,7 +7,7 @@
 #include <functional>
 #include <thread>
 
-#include "../core/script_extension.hpp"
+#include "../src/core/script_extension.hpp"
 
 namespace ampify::test {
 

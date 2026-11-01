@@ -1,6 +1,6 @@
-// Windows only, run under Wine: Apple's player reached through fake WinRT objects whose vtables are filled slot by
+// Windows only: Apple's player reached through fake WinRT objects whose vtables are filled slot by
 // slot, with the slot numbers written here from knowledge/winmd/AMP.Services.txt (6 + position in the "methods:"
-// line). Any other slot records a mistake. So these tests prove that win/amp_player.cpp calls the slots the winmd
+// line). Any other slot records a mistake. So these tests prove that src/win/amp_player.cpp calls the slots the winmd
 // gives, and that the bridge falls back to SMTC and the media keys when Apple's player cannot be reached.
 
 #include <windows.h>
@@ -12,14 +12,14 @@
 #include <string>
 #include <vector>
 
-#include "../../core/amp_abi.hpp"
-#include "../../core/lyrics_host.hpp"
-#include "../../core/player_queue.hpp"
-#include "../../core/settings.hpp"
-#include "../../win/amp_player.hpp"
-#include "../../win/player_bridge.hpp"
-#include "../../win/win_host.hpp"
-#include "../../win/winrt_abi.hpp"
+#include "../../src/core/amp_abi.hpp"
+#include "../../src/core/lyrics_host.hpp"
+#include "../../src/core/player_queue.hpp"
+#include "../../src/core/settings.hpp"
+#include "../../src/win/amp_player.hpp"
+#include "../../src/win/player_bridge.hpp"
+#include "../../src/win/win_host.hpp"
+#include "../../src/win/winrt_abi.hpp"
 #include "../test.hpp"
 
 namespace {

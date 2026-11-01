@@ -5,10 +5,10 @@
 #include <sstream>
 #include <string>
 
-#include "../core/extension.hpp"
-#include "../core/extension_loader.hpp"
-#include "../core/reload.hpp"
-#include "../core/settings.hpp"
+#include "../src/core/extension.hpp"
+#include "../src/core/extension_loader.hpp"
+#include "../src/core/reload.hpp"
+#include "../src/core/settings.hpp"
 #include "fake_host.hpp"
 #include "test.hpp"
 

@@ -12,10 +12,10 @@
 #include <thread>
 #include <vector>
 
-#include "../core/audio/analysis.hpp"
-#include "../core/audio/audio_engine.hpp"
-#include "../core/audio/equalizer.hpp"
-#include "../core/color_extract.hpp"
+#include "../src/core/audio/analysis.hpp"
+#include "../src/core/audio/audio_engine.hpp"
+#include "../src/core/audio/equalizer.hpp"
+#include "../src/core/color_extract.hpp"
 #include "../extensions/atmos-leveler/gain_ramp.hpp"
 #include "../extensions/atmos-leveler/kit_audio.hpp"
 #include "../extensions/atmos-leveler/live_loudness.hpp"

@@ -6,7 +6,7 @@
 #include <string_view>
 #include <vector>
 
-#include "../core/build_signature.hpp"
+#include "../src/core/build_signature.hpp"
 #include "test.hpp"
 
 namespace {

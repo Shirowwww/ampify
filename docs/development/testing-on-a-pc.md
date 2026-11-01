@@ -12,6 +12,9 @@ Logs and reports contain Windows paths, with the user name in them. The test kit
 You need the PC, Apple Music for Windows signed in, headphones or speakers, and a few Dolby Atmos songs. You can stop at any
 step. Say where.
 
+The test zip is made with `scripts/package.sh --test`: it adds `prepare-test.cmd`, `Ampify-Test.exe` and this guide to the
+zip people download.
+
 1. **Download the zip** `ampify-<version>-windows-x64.zip`. Right-click it, then "Extract all". Always work from the
    extracted folder, never from inside the zip.
 2. **Close Apple Music** if it is open.

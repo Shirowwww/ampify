@@ -1,19 +1,20 @@
 // Tests of the portable pieces behind the Spicetify parity rows of the command line: the list of extra tested
-// Apple Music builds (versions.txt and catalog/versions.json), the version gate that reads it, and the splitting
+// Apple Music builds (versions.txt and versions.json of ampify-catalog), the version gate that reads it, and the splitting
 // and quoting of app_launch_flags.
 
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <string>
 #include <vector>
 
-#include "../cli/catalog.hpp"
-#include "../core/build_signature.hpp"
-#include "../core/injection_policy.hpp"
-#include "../core/launch_flags.hpp"
-#include "../core/version_gate.hpp"
-#include "../core/version_list.hpp"
+#include "../src/cli/catalog.hpp"
+#include "../src/core/build_signature.hpp"
+#include "../src/core/injection_policy.hpp"
+#include "../src/core/launch_flags.hpp"
+#include "../src/core/version_gate.hpp"
+#include "../src/core/version_list.hpp"
 #include "test.hpp"
 
 namespace {
@@ -172,8 +173,13 @@ TEST_CASE(VersionsCatalog_RefusesBadDocuments) {
                                      errors));
 }
 
-TEST_CASE(VersionsCatalog_RepositoryFileIsUsable) {
-    std::ifstream in(fs::path(AMPIFY_SOURCE_DIR) / "catalog" / "versions.json", std::ios::binary);
+TEST_CASE(VersionsCatalog_PublicFileIsUsable) {
+    fs::path path = fs::path(AMPIFY_SOURCE_DIR) / ".." / "ampify-catalog" / "versions.json";
+    if (!fs::exists(path)) {
+        std::cout << "VersionsCatalog: no ampify-catalog clone next to the repository, test skipped\n";
+        return;
+    }
+    std::ifstream in(path, std::ios::binary);
     std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     std::vector<std::string> errors;
     std::optional<ampify::VersionsCatalog> catalog = ampify::ParseVersionsCatalog(text, errors);

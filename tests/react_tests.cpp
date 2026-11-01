@@ -1,4 +1,4 @@
-// Tests of the module react (core/prelude/react.cpp): Ampify.React renders the primitive trees of core/ui_model,
+// Tests of the module react (src/core/prelude/react.cpp): Ampify.React renders the primitive trees of core/ui_model,
 // re-renders on a state change, runs and cleans up effects, passes contexts down, and Ampify.components adds the
 // tooltip attributes. The primitives and attributes it uses are tested with the model, in ui_model_tests.cpp.
 
@@ -8,10 +8,10 @@
 #include <sstream>
 #include <string>
 
-#include "../core/journal.hpp"
-#include "../core/manifest.hpp"
-#include "../core/script_extension.hpp"
-#include "../core/ui_model.hpp"
+#include "../src/core/journal.hpp"
+#include "../src/core/manifest.hpp"
+#include "../src/core/script_extension.hpp"
+#include "../src/core/ui_model.hpp"
 #include "fake_host.hpp"
 #include "test.hpp"
 
@@ -649,40 +649,4 @@ TEST_CASE(React_TheReactPanelExampleRuns) {
     CHECK(f.Logged("Timer armed: 30 min"));
     element.Stop();
     CHECK(f.Logged("Timer cancelled"));
-}
-
-TEST_CASE(Interface_TheFullscreenDemoExampleRuns) {
-    Fixture f;
-    const std::string name = "fullscreen-demo";
-    fs::path dir = fs::path(AMPIFY_SOURCE_DIR) / "examples" / name;
-    std::ifstream manifestFile(dir / "manifest.json");
-    std::stringstream manifestText;
-    manifestText << manifestFile.rdbuf();
-    ampify::ManifestResult result = ampify::ParseManifest(manifestText.str(), name, 1, [&](const std::string& file) {
-        return fs::exists(dir / file);
-    });
-    CHECK(result.manifest.has_value());
-    if (!result.manifest) return;
-
-    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal);
-    CHECK(element.Start());
-    auto controls = f.host.ui.Controls();
-    CHECK(controls.size() == 1 && controls[0].placement == "topbar");
-    if (controls.empty()) return;
-    CHECK(!f.host.ui.Fullscreen().has_value());
-
-    // The kernel accepts the tree (ValidateTree runs in the native), and the user's close stops the updates.
-    element.DeliverClick(controls[0].id);
-    element.Pump();
-    auto slot = f.host.ui.Fullscreen();
-    CHECK(slot.has_value());
-    if (!slot) return;
-    std::string error;
-    CHECK(ampify::ValidateTree(slot->tree, &error));
-    CHECK(FindNode(slot->tree, "text", "Fullscreen demo") != nullptr);
-    element.DeliverEvent("fullscreenClose", R"({"session":)" + slot->id + "}");
-    element.Pump();
-    CHECK(!f.host.ui.Fullscreen().has_value());
-    CHECK(f.Logged("error") == false);
-    element.Stop();
 }
