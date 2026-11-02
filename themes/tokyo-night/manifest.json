@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "tokyo-night",
+  "name": "Tokyo Night",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "A clean, dark theme that celebrates the lights of downtown Tokyo at night: the Night, Storm and Day palettes, a blue accent and a rounded-square play button. Palette by enkia and folke (MIT).",
+  "translations": {"fr": {"name": "Tokyo Night", "description": "Un thème sobre et sombre qui célèbre les lumières du centre de Tokyo la nuit : les palettes Night, Storm et Day, un accent bleu et un bouton lecture en carré arrondi. Palette d'enkia et folke (MIT)."}},
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Night",
+  "tags": [
+    "dark",
+    "light",
+    "blue",
+    "layout"
+  ],
+  "settings": [
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 24, "default": 8},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 8},
+    {"key": "play-button", "label": "Play button shape", "type": "choice", "options": ["Rounded square", "Circle"], "default": "Rounded square"},
+    {"key": "hide-badges", "label": "Hide the Explicit and Lossless badges", "type": "toggle", "default": false}
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "catppuccin",
+  "name": "Catppuccin",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "The soothing pastel palettes of Catppuccin (Mocha, Macchiato, Frappe, Latte) on soft, rounded floating panels, with mauve as the accent. Palette by the Catppuccin community (MIT).",
+  "translations": {"fr": {"name": "Catppuccin", "description": "Les palettes pastel apaisantes de Catppuccin (Mocha, Macchiato, Frappé, Latte) sur des panneaux flottants doux et arrondis, avec le mauve en accent. Palette de la communauté Catppuccin (MIT)."}},
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Mocha",
+  "tags": [
+    "dark",
+    "light",
+    "pastel",
+    "layout"
+  ],
+  "settings": [
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 28, "default": 16},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 10},
+    {"key": "card-highlight", "label": "Light up cards and rows under the pointer", "type": "toggle", "default": true},
+    {"key": "hide-badges", "label": "Hide the Explicit and Lossless badges", "type": "toggle", "default": false}
+  ]
+}

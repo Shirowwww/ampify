@@ -1,0 +1,26 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "dribbblish",
+  "name": "Dribbblish",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Inspired by Spicetify's Dribbblish: the sidebar is a rounded card in the accent color, and everything else is round and flat. Schemes Purple, Dark, White and Nord-dark, with no gradients.",
+  "translations": {"fr": {"name": "Dribbblish", "description": "Inspiré du thème Dribbblish de Spicetify : la barre latérale est une carte arrondie à la couleur d'accent, et tout le reste est rond et plat. Schémas Purple, Dark, White et Nord-dark, sans dégradés."}},
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Purple",
+  "tags": [
+    "dark",
+    "light",
+    "purple",
+    "rounded",
+    "layout"
+  ],
+  "settings": [
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 32, "default": 20},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 12},
+    {"key": "sidebar-card", "label": "Paint the sidebar in the accent color", "type": "toggle", "default": true},
+    {"key": "card-highlight", "label": "Light up cards and rows under the pointer", "type": "toggle", "default": true}
+  ]
+}

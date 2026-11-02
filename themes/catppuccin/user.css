@@ -1,0 +1,127 @@
+/* Catppuccin: soothing pastel palettes (Mocha, Macchiato, Frappe, Latte) on soft, rounded floating panels. The sidebar and
+   the pages float on the darkest layer, cards and rows lift onto the next one, and mauve marks what plays and what is
+   chosen. Every color comes from colors.ini, so each scheme restyles the whole file; the classes are Ampify's stable
+   names for Apple Music's zones (docs/themes/names.md). Its settings (manifest.json) show in the Ampify card of Apple
+   Music's settings. */
+
+:root {
+    --window-background: $SolidBackgroundFillColorBaseBrush;
+    --panel-background: $ApplicationPageBackgroundThemeBrush;
+    --panel-radius: var(--setting-panel-radius);
+    --gap: var(--setting-gap);
+    --band-background: $CardBackgroundFillColorDefaultBrush;
+}
+
+@import "ampify:floating-panels";
+
+/* ---- Sidebar ------------------------------------------------------------------------------------------------------ */
+
+.sidebar-item {
+    corner-radius: 12px;
+}
+
+/* ---- Playback bar ------------------------------------------------------------------------------------------------- */
+
+.lcd {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: 16px;
+}
+
+.lcd-artwork-image {
+    corner-radius: 10px;
+}
+
+/* Play: a mauve disc with a dark icon, slightly larger on hover. */
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 20px;
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+/* Apple Music animates this button itself, so the growth is immediate: a transition here would be refused. */
+.play-button:hover {
+    transform: scale(1.06);
+}
+
+.volume-slider {
+    color: $AccentFillColorDefaultBrush;
+    background: $ControlFillColorDefaultBrush;
+}
+
+.volume-slider Thumb {
+    background: $TextFillColorPrimaryBrush;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: 12px;
+}
+
+.menu-item {
+    corner-radius: 8px;
+}
+
+.menu-item:hover {
+    background: $ControlFillColorDefaultBrush;
+}
+
+/* ---- Pages -------------------------------------------------------------------------------------------------------- */
+
+.page-title {
+    font-weight: 700;
+}
+
+/* An album's artist in mauve, not Apple's blue. */
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.now-playing-indicator {
+    color: $AccentFillColorDefaultBrush;
+}
+
+.card {
+    corner-radius: 16px;
+    transition: background 180ms;
+}
+
+@setting card-highlight {
+    .card:hover {
+        background: $CardBackgroundFillColorDefaultBrush;
+    }
+}
+
+.artwork {
+    corner-radius: 12px;
+}
+
+.track-row {
+    corner-radius: 10px;
+    transition: background 120ms;
+}
+
+@setting card-highlight {
+    .track-row:hover {
+        background: $CardBackgroundFillColorDefaultBrush;
+    }
+}
+
+/* ---- Settings pages ----------------------------------------------------------------------------------------------- */
+
+.settings-card {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: 14px;
+}
+
+@setting hide-badges {
+    .explicit-badge,
+    .lossless-badge,
+    .digital-master-badge {
+        visibility: collapsed;
+    }
+}

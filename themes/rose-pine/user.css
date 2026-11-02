@@ -1,0 +1,134 @@
+/* Rose Pine: warm, round and quiet. The sidebar and the pages are generously rounded panels with wide gaps, the
+   playback display is a pill, page titles take the accent color, and iris (Main) or rose (Moon) marks what plays.
+   Every color comes from colors.ini, so the Main, Moon and Dawn schemes each restyle the whole file; the classes are
+   Ampify's stable names for Apple Music's zones (docs/themes/names.md). Its settings (manifest.json) show in the
+   Ampify card of Apple Music's settings. */
+
+:root {
+    --window-background: $SolidBackgroundFillColorBaseBrush;
+    --panel-background: $ApplicationPageBackgroundThemeBrush;
+    --panel-radius: var(--setting-panel-radius);
+    --gap: var(--setting-gap);
+    --band-background: $CardBackgroundFillColorDefaultBrush;
+}
+
+@import "ampify:floating-panels";
+
+/* ---- Sidebar ------------------------------------------------------------------------------------------------------ */
+
+.sidebar-item {
+    corner-radius: 14px;
+}
+
+/* ---- Playback bar: a pill ----------------------------------------------------------------------------------------- */
+
+.lcd {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: 24px;
+}
+
+.lcd-artwork-image {
+    corner-radius: 14px;
+}
+
+/* Play: an accent disc with a dark icon, slightly larger on hover. */
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 20px;
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+@setting play-button = Text {
+    .play-button > Grid#Root {
+        background: $TextFillColorPrimaryBrush;
+    }
+
+    .play-button FontIcon {
+        foreground: $ApplicationPageBackgroundThemeBrush;
+    }
+}
+
+/* Apple Music animates this button itself, so the growth is immediate: a transition here would be refused. */
+.play-button:hover {
+    transform: scale(1.05);
+}
+
+.volume-slider {
+    color: $AccentFillColorDefaultBrush;
+    background: $ControlFillColorDefaultBrush;
+}
+
+.volume-slider Thumb {
+    background: $TextFillColorPrimaryBrush;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: 14px;
+}
+
+.menu-item {
+    corner-radius: 10px;
+}
+
+.menu-item:hover {
+    background: $ControlFillColorDefaultBrush;
+}
+
+/* ---- Pages -------------------------------------------------------------------------------------------------------- */
+
+/* Titles in the accent color, the signature of this theme. */
+.page-title {
+    color: $AccentTextFillColorPrimaryBrush;
+    font-weight: 600;
+}
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.now-playing-indicator {
+    color: $AccentFillColorDefaultBrush;
+}
+
+.card {
+    corner-radius: 18px;
+    transition: background 180ms;
+}
+
+.card:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+.artwork {
+    corner-radius: 14px;
+}
+
+.track-row {
+    corner-radius: 14px;
+    transition: background 120ms;
+}
+
+.track-row:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+/* ---- Settings pages ----------------------------------------------------------------------------------------------- */
+
+.settings-card {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: 16px;
+}
+
+@setting hide-badges {
+    .explicit-badge,
+    .lossless-badge,
+    .digital-master-badge {
+        visibility: collapsed;
+    }
+}

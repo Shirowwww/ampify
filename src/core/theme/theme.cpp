@@ -107,18 +107,68 @@ void DefineTextOnAccent(Theme& theme, const std::set<std::string>& owned, bool a
     }
 }
 
-// WinUI's toggles, sliders, check boxes, radio buttons and links read keys of their own, which its dictionaries set to
-// the accent once, when they load: a theme's accent alone left them in Apple Music's blue (the Settings pages).
+// WinUI's toggles, sliders, check boxes, selection marks, links and the system accent brushes read keys of their own,
+// which its dictionaries set to the accent once, when they load: a theme's accent alone left them in Apple Music's
+// blue (the Settings pages, the sidebar's selection mark, "Show the whole album", the playing row's bars). The list is
+// every key the inspector found still holding Apple's accent under a theme.
 void DefineAccentControls(Theme& theme, const std::set<std::string>& owned, bool applied) {
     constexpr const char* kHover = "AccentFillColorSecondaryBrush";
     constexpr const char* kPressed = "AccentFillColorTertiaryBrush";
-    constexpr const char* kLink = "AccentTextFillColorPrimaryBrush";
+    // A theme that names no accent text colour has its links in the accent itself.
+    const char* kLink = theme.palette.Find("AccentTextFillColorPrimaryBrush") ? "AccentTextFillColorPrimaryBrush" : kAccent;
+    constexpr double kDisabled = 0.35;  // Fluent's disabled accent, #59 alpha
     struct Derived {
         const char* key;
         const char* from;
         double opacity;
     };
-    constexpr Derived kControls[] = {
+    const Derived kControls[] = {
+        {"SystemAccentColor", kAccent, 1.0},
+        {"AccentColor", kAccent, 1.0},
+        {"AccentDisabledColor", kAccent, kDisabled},
+        {"AccentFillColorDisabledBrush", kAccent, kDisabled},
+        {"AccentFillColorSelectedTextBackgroundBrush", kAccent, 1.0},
+        {"TextControlSelectionHighlightColor", kAccent, 1.0},
+        {"ListViewItemSelectionIndicatorBrush", kAccent, 1.0},
+        {"ListViewItemSelectionIndicatorPointerOverBrush", kHover, 1.0},
+        {"ListViewItemSelectionIndicatorPressedBrush", kPressed, 1.0},
+        {"ListViewItemSelectionIndicatorDisabledBrush", kAccent, kDisabled},
+        {"NavigationViewSelectionIndicatorForeground", kAccent, 1.0},
+        {"ListViewItemCheckBoxSelectedBrush", kAccent, 1.0},
+        {"ListViewItemCheckBoxSelectedDisabledBrush", kAccent, kDisabled},
+        {"GridViewItemCheckBoxSelectedBrush", kAccent, 1.0},
+        {"GridViewItemCheckBoxSelectedDisabledBrush", kAccent, kDisabled},
+        {"GridViewItemSelectedBorderBrush", kAccent, 1.0},
+        {"GridViewItemSelectedDisabledBorderBrush", kAccent, kDisabled},
+        {"ListBoxItemSelectedBackgroundThemeBrush", kAccent, 1.0},
+        {"ComboBoxItemPillFillBrush", kAccent, 1.0},
+        {"CalendarViewSelectedBorderBrush", kAccent, 1.0},
+        {"CalendarViewSelectedDisabledBorderBrush", kAccent, kDisabled},
+        {"PersonPictureEllipseBadgeFillThemeBrush", kAccent, 1.0},
+        {"ProgressRingForegroundThemeBrush", kAccent, 1.0},
+        {"VerticalThumbBrush", kAccent, 1.0},
+        {"HoverUIButtonBackgroundPointerOverBrush", kHover, 1.0},
+        {"HoverUIButtonBackgroundPressedBrush", kPressed, 1.0},
+        {"SystemControlBackgroundAccentBrush", kAccent, 1.0},
+        {"SystemControlForegroundAccentBrush", kAccent, 1.0},
+        {"SystemControlDisabledAccentBrush", kAccent, kDisabled},
+        {"SystemControlHighlightAccentBrush", kAccent, 1.0},
+        {"SystemControlHighlightAltAccentBrush", kAccent, 1.0},
+        {"SystemControlHighlightListAccentLowBrush", kAccent, 1.0},
+        {"SystemControlHighlightListAccentMediumLowBrush", kAccent, 1.0},
+        {"SystemControlHighlightListAccentMediumBrush", kAccent, 1.0},
+        {"SystemControlHighlightListAccentHighBrush", kAccent, 1.0},
+        {"SystemControlHighlightListAccentVeryHighBrush", kAccent, 1.0},
+        {"SystemControlHighlightAltListAccentLowBrush", kAccent, 1.0},
+        {"SystemControlHighlightAltListAccentMediumBrush", kAccent, 1.0},
+        {"SystemControlHighlightAltListAccentHighBrush", kAccent, 1.0},
+        {"SystemControlHyperlinkTextBrush", kLink, 1.0},
+        {"ButtonAccentTextFillColorPrimaryBrush", kLink, 1.0},
+        {"ContentDialogBorderThemeBrush", kAccent, 1.0},
+        {"SystemControlBackgroundAccentRevealBorderBrush", kAccent, 1.0},
+        {"SystemControlHighlightAccentRevealBorderBrush", kAccent, 1.0},
+        {"SystemControlHighlightAccent3RevealBackgroundBrush", kAccent, 1.0},
+        {"SystemControlHighlightAccent3RevealAccent2BackgroundBrush", kAccent, 1.0},
         {"ToggleSwitchFillOn", kAccent, 1.0},
         {"ToggleSwitchFillOnPointerOver", kHover, 1.0},
         {"ToggleSwitchFillOnPressed", kPressed, 1.0},

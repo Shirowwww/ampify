@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "dracula",
+  "name": "Dracula",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "The Dracula dark palette on floating panels: purple accent, and pink to mark what is playing. Palette by Zeno Rocha and the Dracula community (MIT).",
+  "translations": {"fr": {"name": "Dracula", "description": "La palette sombre de Dracula sur des panneaux flottants : accent violet, et du rose pour marquer ce qui joue. Palette de Zeno Rocha et de la communauté Dracula (MIT)."}},
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "tags": [
+    "dark",
+    "purple",
+    "layout"
+  ],
+  "settings": [
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 24, "default": 10},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 8},
+    {"key": "highlight", "label": "Color of what is playing", "type": "choice", "options": ["Pink", "Cyan", "Green"], "default": "Pink"},
+    {"key": "hide-badges", "label": "Hide the Explicit and Lossless badges", "type": "toggle", "default": false}
+  ]
+}

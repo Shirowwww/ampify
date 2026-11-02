@@ -1,0 +1,130 @@
+/* Tokyo Night: a clean, neon-at-night look. Tight 8 pixel panels, a rounded-square play button instead of a disc, blue
+   marking what plays and what is chosen, and lists that light up row by row. Every color comes from colors.ini, so the
+   Night, Storm and Day schemes each restyle the whole file; the classes are Ampify's stable names for Apple Music's
+   zones (docs/themes/names.md). Its settings (manifest.json) show in the Ampify card of Apple Music's settings. */
+
+:root {
+    --window-background: $SolidBackgroundFillColorBaseBrush;
+    --panel-background: $ApplicationPageBackgroundThemeBrush;
+    --panel-radius: var(--setting-panel-radius);
+    --gap: var(--setting-gap);
+    --band-background: $CardBackgroundFillColorDefaultBrush;
+}
+
+@import "ampify:floating-panels";
+
+/* ---- Sidebar ------------------------------------------------------------------------------------------------------ */
+
+.sidebar-item {
+    corner-radius: 8px;
+}
+
+/* ---- Playback bar ------------------------------------------------------------------------------------------------- */
+
+.lcd {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: 8px;
+}
+
+.lcd-artwork-image {
+    corner-radius: 5px;
+}
+
+/* Play: a rounded square in the accent color with a dark icon. */
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 12px;
+}
+
+@setting play-button = Circle {
+    .play-button > Grid#Root {
+        corner-radius: 20px;
+    }
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+/* Apple Music animates this button itself, so the growth is immediate: a transition here would be refused. */
+.play-button:hover {
+    transform: scale(1.08);
+}
+
+.volume-slider {
+    color: $AccentFillColorDefaultBrush;
+    background: $ControlFillColorDefaultBrush;
+}
+
+.volume-slider Thumb {
+    background: $AccentFillColorDefaultBrush;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-color: $ControlFillColorDefaultBrush;
+    corner-radius: 8px;
+}
+
+.menu-item:hover {
+    background: $ControlFillColorDefaultBrush;
+}
+
+/* ---- Pages -------------------------------------------------------------------------------------------------------- */
+
+.page-title {
+    font-weight: 700;
+}
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.track-title {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.now-playing-indicator {
+    color: $AccentFillColorDefaultBrush;
+}
+
+.card {
+    corner-radius: 8px;
+    transition: background 150ms;
+}
+
+.card:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+.artwork {
+    corner-radius: 6px;
+}
+
+.track-row {
+    corner-radius: 6px;
+    transition: background 100ms;
+}
+
+.track-row:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+/* ---- Settings pages ----------------------------------------------------------------------------------------------- */
+
+.settings-card {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-width: 1;
+    border-color: $ControlFillColorDefaultBrush;
+    corner-radius: 8px;
+}
+
+@setting hide-badges {
+    .explicit-badge,
+    .lossless-badge,
+    .digital-master-badge {
+        visibility: collapsed;
+    }
+}

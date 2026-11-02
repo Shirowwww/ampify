@@ -426,6 +426,7 @@ constexpr std::string_view kColourKeys[] = {
     "MuteButtonBackgroundColor",
     "NavigationViewContentGridBorderBrush",
     "NavigationViewItemBorderBrush",
+    "NavigationViewSelectionIndicatorForeground",
     "NumberBoxPopupBorderBrush",
     "PaneBackgroundBrush",
     "PersonPictureEllipseBadgeFillThemeBrush",

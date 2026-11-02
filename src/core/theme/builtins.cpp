@@ -118,11 +118,13 @@ const std::vector<ClassEntry> kClasses{
     {"now-playing-indicator", {"Grid#NowPlayingIndicator"}},
 
     // Albums, playlists and songs
-    {"album-header", {"Grid#ContainerDetailHeaderLockupRegularContent"}},
+    {"album-header", {"Grid#ContainerDetailHeaderLockupRegularContent", "Grid#AlbumDetailHeaderLockupContent"}},
     {"album-play-button", {"Button#PlayButtonElement"}},
     {"album-shuffle-button", {"Button#ShuffleButtonElement"}},
     {"album-description", {"ContentControl#DescriptionText"}},
-    {"album-artist", {"Grid#ContainerDetailHeaderLockupRegularContent > Grid > StackPanel > Grid > TextBlock"}},
+    {"album-artist",
+     {"Grid#ContainerDetailHeaderLockupRegularContent > Grid > StackPanel > Grid > TextBlock",
+      "Grid#AlbumDetailHeaderLockupContent > Grid > StackPanel > TextBlock"}},
     {"add-description-button", {"Button#AddDescriptionButton"}},
     {"share-button", {"Button#ShareButton"}},
     {"lossless-badge", {"Canvas#LosslessImage"}},

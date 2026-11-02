@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "rose-pine",
+  "name": "Rosé Pine",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "All natural pine, faux fur and a bit of soho vibes: the Rosé Pine palettes (Main, Moon, Dawn) with iris and rose accents, round panels and pill-shaped playback display. Palette by the Rosé Pine community (MIT).",
+  "translations": {"fr": {"name": "Rosé Pine", "description": "Du pin naturel, de la fausse fourrure et un air de soho : les palettes Rosé Pine (Main, Moon, Dawn) avec des accents iris et rose, des panneaux ronds et un affichage de lecture en pilule. Palette de la communauté Rosé Pine (MIT)."}},
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Main",
+  "tags": [
+    "dark",
+    "light",
+    "purple",
+    "layout"
+  ],
+  "settings": [
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 28, "default": 14},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 12},
+    {"key": "play-button", "label": "Play button", "type": "choice", "options": ["Accent", "Text"], "default": "Accent"},
+    {"key": "hide-badges", "label": "Hide the Explicit and Lossless badges", "type": "toggle", "default": false}
+  ]
+}

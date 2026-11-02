@@ -1,0 +1,122 @@
+/* Nord: an arctic, calm and flat look. The window and the panels are neighbouring shades of the same slate (Polar Night)
+   or snow (Snow Storm), so nothing shouts; thin borders and small radii replace shadows and growth, and the frost blue
+   accent is kept for what plays. Every color comes from colors.ini, so each scheme restyles the whole file; the classes
+   are Ampify's stable names for Apple Music's zones (docs/themes/names.md). Its settings (manifest.json) show in the
+   Ampify card of Apple Music's settings. */
+
+:root {
+    --window-background: $SolidBackgroundFillColorBaseBrush;
+    --panel-background: $ApplicationPageBackgroundThemeBrush;
+    --panel-radius: var(--setting-panel-radius);
+    --gap: var(--setting-gap);
+    --band-background: $CardBackgroundFillColorDefaultBrush;
+}
+
+@import "ampify:floating-panels";
+
+/* ---- Sidebar ------------------------------------------------------------------------------------------------------ */
+
+.sidebar-item {
+    corner-radius: 4px;
+}
+
+/* ---- Playback bar: no box, only a hairline ------------------------------------------------------------------------ */
+
+.lcd {
+    background: transparent;
+    border-width: 1;
+    border-color: $ControlFillColorDefaultBrush;
+    corner-radius: 6px;
+}
+
+.lcd-artwork-image {
+    corner-radius: 3px;
+}
+
+/* Play: a flat frost disc, no growth. */
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 20px;
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+.volume-slider {
+    color: $AccentFillColorDefaultBrush;
+    background: $ControlFillColorDefaultBrush;
+}
+
+.volume-slider Thumb {
+    background: $TextFillColorPrimaryBrush;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-color: $ControlFillColorDefaultBrush;
+    corner-radius: 6px;
+}
+
+.menu-item:hover {
+    background: $ControlFillColorDefaultBrush;
+}
+
+/* ---- Pages -------------------------------------------------------------------------------------------------------- */
+
+.page-title {
+    font-weight: 600;
+}
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.now-playing-indicator {
+    color: $AccentFillColorDefaultBrush;
+}
+
+.card {
+    corner-radius: 6px;
+    transition: background 180ms;
+}
+
+@setting card-highlight {
+    .card:hover {
+        background: $SubtleFillColorSecondaryBrush;
+    }
+}
+
+.artwork {
+    corner-radius: 4px;
+}
+
+.track-row {
+    corner-radius: 4px;
+    transition: background 120ms;
+}
+
+@setting card-highlight {
+    .track-row:hover {
+        background: $SubtleFillColorSecondaryBrush;
+    }
+}
+
+/* ---- Settings pages: flat cards with a hairline ------------------------------------------------------------------- */
+
+.settings-card {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-width: 1;
+    border-color: $ControlFillColorDefaultBrush;
+    corner-radius: 6px;
+}
+
+@setting hide-badges {
+    .explicit-badge,
+    .lossless-badge,
+    .digital-master-badge {
+        visibility: collapsed;
+    }
+}

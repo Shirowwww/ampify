@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "gruvbox",
+  "name": "Gruvbox",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Retro groove: the warm, earthy gruvbox palettes (Dark, Light) with a yellow accent, square-ish panels and monospaced titles. Palette by Pavel Pertsev (MIT).",
+  "translations": {"fr": {"name": "Gruvbox", "description": "Un groove rétro : les palettes chaudes et terreuses de gruvbox (Dark, Light) avec un accent jaune, des panneaux presque carrés et des titres à chasse fixe. Palette de Pavel Pertsev (MIT)."}},
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Dark",
+  "tags": [
+    "dark",
+    "light",
+    "warm",
+    "layout"
+  ],
+  "settings": [
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 20, "default": 4},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 6},
+    {"key": "mono-titles", "label": "Monospaced page titles", "type": "toggle", "default": true},
+    {"key": "card-highlight", "label": "Light up cards and rows under the pointer", "type": "toggle", "default": true}
+  ]
+}

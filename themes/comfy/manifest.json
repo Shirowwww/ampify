@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "comfy",
+  "name": "Comfy",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "A cosy slate look inspired by Spicetify's Comfy: big rounded panels with generous gaps, soft text, round artwork and a periwinkle accent. The Mono scheme keeps the shapes in greys.",
+  "translations": {"fr": {"name": "Comfy", "description": "Un style ardoise et douillet, inspiré du thème Comfy de Spicetify : de grands panneaux arrondis bien espacés, un texte adouci, des pochettes rondes et un accent pervenche. Le schéma Mono garde les formes en gris."}},
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Comfy",
+  "tags": [
+    "dark",
+    "blue",
+    "rounded",
+    "layout"
+  ],
+  "settings": [
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 32, "default": 22},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 28, "default": 16},
+    {"key": "hover-lift", "label": "Cards grow a little under the pointer", "type": "toggle", "default": true},
+    {"key": "hide-badges", "label": "Hide the Explicit and Lossless badges", "type": "toggle", "default": false}
+  ]
+}

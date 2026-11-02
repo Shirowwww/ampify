@@ -964,12 +964,17 @@ TEST_CASE(Theme_ControlsFollowTheAccent) {
     CHECK(ResourceValue(only, "CheckBoxCheckBackgroundFillChecked") == "#FF0A84FF");
     CHECK(ResourceValue(only, "HyperlinkButtonForeground") == "#FF99CCFF");
     CHECK(ResourceValue(only, "HyperlinkButtonForegroundPointerOver") == "#E699CCFF");
+    CHECK(ResourceValue(only, "SystemControlHyperlinkTextBrush") == "#FF99CCFF");
+    CHECK(ResourceValue(only, "ListViewItemSelectionIndicatorBrush") == "#FF0A84FF");
+    CHECK(ResourceValue(only, "AccentFillColorDisabledBrush") == "#590A84FF");
+    CHECK(ResourceValue(only, "NavigationViewSelectionIndicatorForeground") == "#FF0A84FF");
+    CHECK(ResourceValue(only, "ButtonAccentTextFillColorPrimaryBrush") == "#FF99CCFF");
 
     // A key the theme names stays its own.
     th::Theme own = Load(files, {"Own", nullptr, {}});
     CHECK(ResourceValue(own, "ToggleSwitchFillOn") == "#FF112233");
     CHECK(ResourceValue(own, "SliderTrackValueFill") == "#FF0A84FF");
-    CHECK(ResourceValue(own, "HyperlinkButtonForeground") == "ABSENT");
+    CHECK(ResourceValue(own, "HyperlinkButtonForeground") == "#FF0A84FF");  // no accent text colour: the accent
 }
 
 TEST_CASE(Spicetify_ThemeRulesWinOverTheTranslatedOnes) {
@@ -1437,7 +1442,8 @@ TEST_CASE(Inspector_ShowsTheColourOfAnAppBrushKeptAsAnObject) {
 // --- Example themes shipped in the repository ------------------------------------------------------------
 
 TEST_CASE(Examples_LoadWithoutProblems) {
-    for (const char* name : {"midnight", "greenroom", "hide-chrome", "glass", "artwork"}) {
+    for (const char* name : {"midnight", "greenroom", "hide-chrome", "glass", "artwork", "catppuccin", "nord", "dracula",
+                                "rose-pine", "tokyo-night", "gruvbox", "comfy", "dribbblish"}) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
@@ -1452,7 +1458,8 @@ TEST_CASE(Examples_LoadWithoutProblems) {
 
 // Each shipped theme with settings, every setting moved off its default: still no problem, and more or fewer rules.
 TEST_CASE(Examples_LoadWithEverySettingChanged) {
-    for (const char* name : {"midnight", "greenroom", "glass"}) {
+    for (const char* name : {"midnight", "greenroom", "glass", "catppuccin", "nord", "dracula", "rose-pine", "tokyo-night",
+                                "gruvbox", "comfy", "dribbblish"}) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         std::optional<std::string> manifest = files.Read("manifest.json");

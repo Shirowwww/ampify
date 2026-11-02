@@ -1,0 +1,129 @@
+/* Comfy: a cosy slate look after the idea of Spicetify's Comfy theme (no CSS copied). Big rounded panels with generous
+   gaps, round artwork, cards that rise a little under the pointer, and a periwinkle accent. The Mono scheme keeps the
+   shapes and swaps the colors for greys. Every color comes from colors.ini; the classes are Ampify's stable names for
+   Apple Music's zones (docs/themes/names.md). Its settings (manifest.json) show in the Ampify card of Apple Music's
+   settings. */
+
+:root {
+    --window-background: $SolidBackgroundFillColorBaseBrush;
+    --panel-background: $ApplicationPageBackgroundThemeBrush;
+    --panel-radius: var(--setting-panel-radius);
+    --gap: var(--setting-gap);
+    --band-background: $CardBackgroundFillColorDefaultBrush;
+}
+
+@import "ampify:floating-panels";
+
+/* ---- Sidebar ------------------------------------------------------------------------------------------------------ */
+
+.sidebar-item {
+    corner-radius: 16px;
+}
+
+/* ---- Playback bar ------------------------------------------------------------------------------------------------- */
+
+.lcd {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: 20px;
+}
+
+.lcd-artwork-image {
+    corner-radius: 16px;
+}
+
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 20px;
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+/* Apple Music animates this button itself, so the growth is immediate: a transition here would be refused. */
+.play-button:hover {
+    transform: scale(1.08);
+}
+
+.volume-slider {
+    color: $AccentFillColorDefaultBrush;
+    background: $ControlFillColorDefaultBrush;
+}
+
+.volume-slider Thumb {
+    background: $TextFillColorPrimaryBrush;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: 18px;
+}
+
+.menu-item {
+    corner-radius: 12px;
+}
+
+.menu-item:hover {
+    background: $ControlFillColorDefaultBrush;
+}
+
+/* ---- Pages -------------------------------------------------------------------------------------------------------- */
+
+.page-title {
+    font-weight: 600;
+}
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.now-playing-indicator {
+    color: $AccentFillColorDefaultBrush;
+}
+
+/* Cards: big corners, and a soft rise under the pointer. */
+.card {
+    corner-radius: 22px;
+    transform-origin: center;
+    transition: background 200ms, transform 200ms;
+}
+
+.card:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+@setting hover-lift {
+    .card:hover {
+        transform: scale(1.03);
+    }
+}
+
+.artwork {
+    corner-radius: 18px;
+}
+
+.track-row {
+    corner-radius: 16px;
+    transition: background 150ms;
+}
+
+.track-row:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+/* ---- Settings pages ----------------------------------------------------------------------------------------------- */
+
+.settings-card {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: 20px;
+}
+
+@setting hide-badges {
+    .explicit-badge,
+    .lossless-badge,
+    .digital-master-badge {
+        visibility: collapsed;
+    }
+}

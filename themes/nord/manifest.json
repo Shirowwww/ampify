@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "nord",
+  "name": "Nord",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "An arctic, calm and flat look: Polar Night (dark) or Snow Storm (light), little contrast between the panels and a frost blue accent. Palette by Arctic Ice Studio (MIT).",
+  "translations": {"fr": {"name": "Nord", "description": "Un style arctique, calme et plat : Nuit polaire (sombre) ou Tempête de neige (clair), peu de contraste entre les panneaux et un accent bleu glacier. Palette d'Arctic Ice Studio (MIT)."}},
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "defaultScheme": "Polar-Night",
+  "tags": [
+    "dark",
+    "light",
+    "blue",
+    "layout"
+  ],
+  "settings": [
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 20, "default": 8},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 8},
+    {"key": "card-highlight", "label": "Light up cards and rows under the pointer", "type": "toggle", "default": true},
+    {"key": "hide-badges", "label": "Hide the Explicit and Lossless badges", "type": "toggle", "default": false}
+  ]
+}
