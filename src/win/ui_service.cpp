@@ -1162,17 +1162,30 @@ struct ContentArea {
     double height = 0;  // 0: down to the bottom edge of the window
 };
 
+// Where a named element of Apple Music's window lies, in the window's coordinates; nothing while it is not laid out.
+std::optional<winrt::Windows::Foundation::Rect> NamedBounds(const WindowContext& context, std::string_view name) {
+    std::optional<int> index = uirender::FindByName(context.probe, name);
+    if (!index || *index >= static_cast<int>(context.probeObjects.size())) return std::nullopt;
+    auto element = context.probeObjects[*index].get().try_as<xaml::FrameworkElement>();
+    if (!element || element.ActualWidth() <= 0 || element.ActualHeight() <= 0) return std::nullopt;
+    auto origin = element.TransformToVisual(nullptr).TransformPoint({0, 0});
+    return winrt::Windows::Foundation::Rect{origin.X, origin.Y, static_cast<float>(element.ActualWidth()),
+                                            static_cast<float>(element.ActualHeight())};
+}
+
+// The bottom of the strip at the window's top that holds its buttons and takes the drags, 0 when it is not found.
+double TitlebarBottom(const WindowContext& context) noexcept {
+    try {
+        if (auto titlebar = NamedBounds(context, "Titlebar")) return titlebar->Y + titlebar->Height;
+    } catch (...) {
+        // Leaving the tree while it is measured: the next refresh places the panels again.
+    }
+    return 0;
+}
+
 ContentArea FindContentArea(const WindowContext& context, double windowHeight) {
     ContentArea area;
-    auto bounds = [&context](std::string_view name) -> std::optional<winrt::Windows::Foundation::Rect> {
-        std::optional<int> index = uirender::FindByName(context.probe, name);
-        if (!index || *index >= static_cast<int>(context.probeObjects.size())) return std::nullopt;
-        auto element = context.probeObjects[*index].get().try_as<xaml::FrameworkElement>();
-        if (!element || element.ActualWidth() <= 0 || element.ActualHeight() <= 0) return std::nullopt;
-        auto origin = element.TransformToVisual(nullptr).TransformPoint({0, 0});
-        return winrt::Windows::Foundation::Rect{origin.X, origin.Y, static_cast<float>(element.ActualWidth()),
-                                                static_cast<float>(element.ActualHeight())};
-    };
+    auto bounds = [&context](std::string_view name) { return NamedBounds(context, name); };
     try {
         std::optional<winrt::Windows::Foundation::Rect> bar = bounds("TransportBar");
         if (auto frame = bounds("ContentFrame")) {
@@ -1212,7 +1225,8 @@ void PlacePanelPopup(WindowContext& context, const xaml::XamlRoot& root) {
     ContentArea area = FindContentArea(context, size.Height);
     double bottom = area.height > 0 ? area.top + area.height : static_cast<double>(size.Height);
     double right = area.width > 0 ? area.left + area.width : static_cast<double>(size.Width);
-    double top = area.top + 8;
+    // With the play bar moved down by a theme, the pages reach the window's top, where the window's buttons are.
+    double top = std::max(area.top, TitlebarBottom(context)) + 8;
     double height = std::max(200.0, bottom - top - 16.0);
     double left = std::max(area.left, right - kPanelWidth - 16.0);
     if (context.panelHost.Height() != height) context.panelHost.Height(height);

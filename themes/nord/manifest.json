@@ -6,8 +6,9 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "An arctic, calm and flat look: Polar Night (dark) or Snow Storm (light), little contrast between the panels and a frost blue accent. Palette by Arctic Ice Studio (MIT).",
-  "translations": {"fr": {"name": "Nord", "description": "Un style arctique, calme et plat : Nuit polaire (sombre) ou Tempête de neige (clair), peu de contraste entre les panneaux et un accent bleu glacier. Palette d'Arctic Ice Studio (MIT)."}},
+  "translations": {"fr": {"name": "Nord", "description": "Un style arctique, calme et plat : Nuit polaire (sombre) ou Tempête de neige (clair), peu de contraste entre les panneaux et un accent bleu glacier. Palette d'Arctic Ice Studio (MIT).", "settings": {"panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux", "card-highlight": "Éclairer cartes et lignes au survol", "hide-badges": "Masquer les badges Explicite et Lossless"}}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "colors": "colors.ini",
   "defaultScheme": "Polar-Night",
   "tags": [

@@ -6,8 +6,9 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "The Dracula dark palette on floating panels: purple accent, and pink to mark what is playing. Palette by Zeno Rocha and the Dracula community (MIT).",
-  "translations": {"fr": {"name": "Dracula", "description": "La palette sombre de Dracula sur des panneaux flottants : accent violet, et du rose pour marquer ce qui joue. Palette de Zeno Rocha et de la communauté Dracula (MIT)."}},
+  "translations": {"fr": {"name": "Dracula", "description": "La palette sombre de Dracula sur des panneaux flottants : accent violet, et du rose pour marquer ce qui joue. Palette de Zeno Rocha et de la communauté Dracula (MIT).", "settings": {"panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux", "highlight": "Couleur de ce qui joue", "hide-badges": "Masquer les badges Explicite et Lossless"}, "options": {"Pink": "Rose", "Cyan": "Cyan", "Green": "Vert"}}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "colors": "colors.ini",
   "tags": [
     "dark",

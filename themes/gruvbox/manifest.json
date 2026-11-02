@@ -6,8 +6,9 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Retro groove: the warm, earthy gruvbox palettes (Dark, Light) with a yellow accent, square-ish panels and monospaced titles. Palette by Pavel Pertsev (MIT).",
-  "translations": {"fr": {"name": "Gruvbox", "description": "Un groove rétro : les palettes chaudes et terreuses de gruvbox (Dark, Light) avec un accent jaune, des panneaux presque carrés et des titres à chasse fixe. Palette de Pavel Pertsev (MIT)."}},
+  "translations": {"fr": {"name": "Gruvbox", "description": "Un groove rétro : les palettes chaudes et terreuses de gruvbox (Dark, Light) avec un accent jaune, des panneaux presque carrés et des titres à chasse fixe. Palette de Pavel Pertsev (MIT).", "settings": {"panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux", "mono-titles": "Titres de page en chasse fixe", "card-highlight": "Éclairer cartes et lignes au survol"}}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "colors": "colors.ini",
   "defaultScheme": "Dark",
   "tags": [

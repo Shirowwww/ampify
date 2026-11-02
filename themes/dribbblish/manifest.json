@@ -6,8 +6,9 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Inspired by Spicetify's Dribbblish: the sidebar is a rounded card in the accent color, and everything else is round and flat. Schemes Purple, Dark, White and Nord-dark, with no gradients.",
-  "translations": {"fr": {"name": "Dribbblish", "description": "Inspiré du thème Dribbblish de Spicetify : la barre latérale est une carte arrondie à la couleur d'accent, et tout le reste est rond et plat. Schémas Purple, Dark, White et Nord-dark, sans dégradés."}},
+  "translations": {"fr": {"name": "Dribbblish", "description": "Inspiré du thème Dribbblish de Spicetify : la barre latérale est une carte arrondie à la couleur d'accent, et tout le reste est rond et plat. Schémas Purple, Dark, White et Nord-dark, sans dégradés.", "settings": {"panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux", "sidebar-card": "Peindre la barre latérale de l'accent", "card-highlight": "Éclairer cartes et lignes au survol"}}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "colors": "colors.ini",
   "defaultScheme": "Purple",
   "tags": [

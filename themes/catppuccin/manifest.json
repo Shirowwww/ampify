@@ -6,8 +6,9 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "The soothing pastel palettes of Catppuccin (Mocha, Macchiato, Frappe, Latte) on soft, rounded floating panels, with mauve as the accent. Palette by the Catppuccin community (MIT).",
-  "translations": {"fr": {"name": "Catppuccin", "description": "Les palettes pastel apaisantes de Catppuccin (Mocha, Macchiato, Frappé, Latte) sur des panneaux flottants doux et arrondis, avec le mauve en accent. Palette de la communauté Catppuccin (MIT)."}},
+  "translations": {"fr": {"name": "Catppuccin", "description": "Les palettes pastel apaisantes de Catppuccin (Mocha, Macchiato, Frappé, Latte) sur des panneaux flottants doux et arrondis, avec le mauve en accent. Palette de la communauté Catppuccin (MIT).", "settings": {"panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux", "card-highlight": "Éclairer cartes et lignes au survol", "hide-badges": "Masquer les badges Explicite et Lossless"}}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "colors": "colors.ini",
   "defaultScheme": "Mocha",
   "tags": [

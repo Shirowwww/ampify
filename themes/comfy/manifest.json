@@ -6,8 +6,9 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "A cosy slate look inspired by Spicetify's Comfy: big rounded panels with generous gaps, soft text, round artwork and a periwinkle accent. The Mono scheme keeps the shapes in greys.",
-  "translations": {"fr": {"name": "Comfy", "description": "Un style ardoise et douillet, inspiré du thème Comfy de Spicetify : de grands panneaux arrondis bien espacés, un texte adouci, des pochettes rondes et un accent pervenche. Le schéma Mono garde les formes en gris."}},
+  "translations": {"fr": {"name": "Comfy", "description": "Un style ardoise et douillet, inspiré du thème Comfy de Spicetify : de grands panneaux arrondis bien espacés, un texte adouci, des pochettes rondes et un accent pervenche. Le schéma Mono garde les formes en gris.", "settings": {"panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux", "hover-lift": "Agrandir un peu les cartes au survol", "hide-badges": "Masquer les badges Explicite et Lossless"}}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "colors": "colors.ini",
   "defaultScheme": "Comfy",
   "tags": [

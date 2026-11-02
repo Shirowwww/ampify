@@ -977,6 +977,21 @@ TEST_CASE(Theme_ControlsFollowTheAccent) {
     CHECK(ResourceValue(own, "HyperlinkButtonForeground") == "#FF0A84FF");  // no accent text colour: the accent
 }
 
+TEST_CASE(Theme_AcrylicSurfacesTakeTheCardColour) {
+    MemoryFiles files;
+    files.files["colors.ini"] = "[Solid]\nCardBackgroundFillColorDefaultBrush = 141B2E\n\n"
+                                "[Clear]\nCardBackgroundFillColorDefaultBrush = 80141B2E\n";
+
+    // Ampify's panels and WinUI's flyouts lie over the page in Fluent's grey acrylic: an opaque card colour takes over.
+    th::Theme solid = Load(files, {"Solid", nullptr, {}});
+    CHECK(ResourceValue(solid, "AcrylicInAppFillColorDefaultBrush") == "#FF141B2E");
+    CHECK(ResourceValue(solid, "AcrylicBackgroundFillColorDefaultBrush") == "#FF141B2E");
+
+    // A see-through card would let the page show through a surface that lies over it.
+    th::Theme clear = Load(files, {"Clear", nullptr, {}});
+    CHECK(ResourceValue(clear, "AcrylicInAppFillColorDefaultBrush") == "ABSENT");
+}
+
 TEST_CASE(Spicetify_ThemeRulesWinOverTheTranslatedOnes) {
     MemoryFiles files;
     files.files["color.ini"] = "[Base]\nsidebar = 112233\n";

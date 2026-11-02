@@ -6,8 +6,9 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "A clean, dark theme that celebrates the lights of downtown Tokyo at night: the Night, Storm and Day palettes, a blue accent and a rounded-square play button. Palette by enkia and folke (MIT).",
-  "translations": {"fr": {"name": "Tokyo Night", "description": "Un thème sobre et sombre qui célèbre les lumières du centre de Tokyo la nuit : les palettes Night, Storm et Day, un accent bleu et un bouton lecture en carré arrondi. Palette d'enkia et folke (MIT)."}},
+  "translations": {"fr": {"name": "Tokyo Night", "description": "Un thème sobre et sombre qui célèbre les lumières du centre de Tokyo la nuit : les palettes Night, Storm et Day, un accent bleu et un bouton lecture en carré arrondi. Palette d'enkia et folke (MIT).", "settings": {"panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux", "play-button": "Forme du bouton lecture", "hide-badges": "Masquer les badges Explicite et Lossless"}, "options": {"Rounded square": "Carré arrondi", "Circle": "Cercle"}}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "colors": "colors.ini",
   "defaultScheme": "Night",
   "tags": [

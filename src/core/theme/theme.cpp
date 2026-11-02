@@ -200,6 +200,17 @@ void DefineAccentControls(Theme& theme, const std::set<std::string>& owned, bool
     }
 }
 
+// Ampify's extension panels and WinUI's flyouts lie over the page in Fluent's grey acrylic, foreign to any theme. An
+// opaque card colour takes its place; a see-through one would let the page show through them.
+void DefineAcrylicSurfaces(Theme& theme, const std::set<std::string>& owned, bool applied) {
+    constexpr const char* kCard = "CardBackgroundFillColorDefaultBrush";
+    std::optional<Argb> card = theme.palette.Find(kCard);
+    if (!card || card->a != 0xFF) return;
+    for (const char* key : {"AcrylicInAppFillColorDefaultBrush", "AcrylicBackgroundFillColorDefaultBrush"}) {
+        DefineDerived(theme, owned, kCard, key, *card, applied);
+    }
+}
+
 // The colours a theme leaves to Ampify, once its own resources.xaml is known.
 void DefineDerivedColors(Theme& theme, bool applied) {
     std::vector<std::string> keys = XamlKeys(theme.resourceDictionary);
@@ -207,6 +218,7 @@ void DefineDerivedColors(Theme& theme, bool applied) {
     DefineAccentStates(theme, owned, applied);
     DefineTextOnAccent(theme, owned, applied);
     DefineAccentControls(theme, owned, applied);
+    DefineAcrylicSurfaces(theme, owned, applied);
 }
 
 // A Spicetify colour: a $name, a --spice-name variable as in Spicetify, and the app brushes that play its part
