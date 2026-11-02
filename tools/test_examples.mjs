@@ -469,6 +469,7 @@ function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = 
     },
     ui: { title: { set: () => {} }, sidebar: { addItem: () => {} }, navigate: () => {} },
     i18n: fakeI18n(language),  // English unless a test asks for French
+    icons: { get: (name) => `<svg data-icon="${name}"/>` },
   };
   const context = { Ampify: ampify };
   runIn(readFileSync(join(examples, "..", "apps", "marketplace", "main.js"), "utf-8"), context);

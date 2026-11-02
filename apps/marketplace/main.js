@@ -158,8 +158,8 @@ const describePermission = (permission) =>
 
 const TABS = ["theme", "extension", "app", "snippet", "installed"];
 const KIND_ORDER = ["theme", "extension", "app", "snippet"];
-// Segoe Fluent Icons glyphs (Color, Puzzle, AllApps, Code) for an element without a preview picture.
-const GLYPHS = { theme: "", extension: "", app: "", snippet: "" };
+// The kit's icon of each kind (Ampify.icons), for an element without a preview picture.
+const KIND_ICONS = { theme: "drop", extension: "puzzle", app: "apps", snippet: "code" };
 const COLUMNS = 3;
 const PAGE_SIZE = 12;  // four rows of cards keep the page far below the kernel's 300 elements
 const PICTURE_HEIGHT = 180;
@@ -272,7 +272,7 @@ function Preview({ item, height, fit, onClick }) {
   }
   // A faint grey that reads on light and dark cards alike.
   return h("stack", { height, cornerRadius: 6, background: "#14808080", align: "stretch" },
-    h("icon", { icon: GLYPHS[item.kind], size: height > BAND_HEIGHT ? 32 : 24, label: kindLabel(item),
+    h("icon", { icon: Ampify.icons.get(KIND_ICONS[item.kind]), size: height > BAND_HEIGHT ? 32 : 24, label: kindLabel(item),
                 align: "center", valign: "center", grow: true }));
 }
 

@@ -3,10 +3,11 @@
 #
 #   pwsh -File scripts\build-msvc.ps1            release build (tested versions only) in build-msvc\release
 #   pwsh -File scripts\build-msvc.ps1 -Bench     bench build (any Apple Music version, never ship) in build-msvc\bench
+#   pwsh -File scripts\build-msvc.ps1 -Target ampify_tests   one target only, e.g. while Apple Music holds the kernel
 #
 # The WinUI 1.8 metadata (NuGet) and the C++/WinRT projection are made once, in build-msvc\winrt-gen; later runs only
 # compile what changed (a few seconds to a minute).
-param([switch]$Bench)
+param([switch]$Bench, [string]$Target)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $out = Join-Path $root 'build-msvc'
@@ -109,7 +110,8 @@ try {
             -DAMPIFY_XAML=ON "-DAMPIFY_BENCH=$benchFlag" -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DAMPIFY_WINAPPSDK_INCLUDE=$gen"
         if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
     }
-    cmake --build $build
+    $only = if ($Target) { @('--target', $Target) } else { @() }
+    cmake --build $build @only
     if ($LASTEXITCODE -ne 0) { throw 'build failed' }
 } finally {
     [Console]::OutputEncoding = $consoleEncoding
