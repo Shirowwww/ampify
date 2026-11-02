@@ -2167,6 +2167,15 @@ TEST_CASE(Scheme_ScheduleParsesAndPicksByTime) {
     CHECK(th::ScheduledScheme(th::ParseSchedule(""), 600).empty());
 }
 
+TEST_CASE(Scheme_AppModeLeavesAppleMusicAloneWithoutColours) {
+    CHECK(th::AppModeOf(std::nullopt, "Base") == std::nullopt);
+    CHECK(th::AppModeOf(std::nullopt, "") == std::nullopt);
+    CHECK(th::AppModeOf(std::nullopt, "Dark") == std::optional<bool>(true));
+    CHECK(th::AppModeOf(std::nullopt, "Light") == std::optional<bool>(false));
+    CHECK(th::AppModeOf(std::optional<bool>(true), "Light") == std::optional<bool>(true));
+    CHECK(th::AppModeOf(std::optional<bool>(false), "Base") == std::optional<bool>(false));
+}
+
 TEST_CASE(Scheme_SystemModePicksByName) {
     CHECK(th::SystemScheme({"Base", "Dark"}, true) == "Dark");
     CHECK(th::IsDarkScheme("Dark") && th::IsDarkScheme("Night") && th::IsDarkScheme("Midnight dark"));

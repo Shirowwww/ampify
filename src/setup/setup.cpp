@@ -7,16 +7,16 @@
 //   ampify_setup.exe /uninstall /purgedata    uninstall and delete the user's data folder too
 //   add /silent to any uninstall to skip the dialogs (without a data choice, the data is kept)
 //
-// Exit codes: 0 done (or cancelled by the user), 1 error, 3 refused because Apple Music or the launcher is open.
+// Exit codes: 0 done (or cancelled by the user), 1 error, 3 refused because Apple Music is open.
 //
 // Ampify never writes into Apple Music's package folder. Installing copies the kit's files, puts the elements that ship
-// with it (the Marketplace, Now Playing) in the user's Ampify folder, and adds a start menu shortcut and an uninstall
-// entry. Uninstalling removes the files, the shortcut and the entry, so Apple Music starts as it did before.
+// with it (the Marketplace, Now Playing) in the user's Ampify folder, writes an uninstall entry, and starts the
+// background launcher, now and at each Windows sign-in: from then on Apple Music starts with Ampify from its usual
+// icon (src/win/background.hpp). Uninstalling stops it and removes all of it, so Apple Music starts as it did before.
 
 #include <windows.h>
 #include <objbase.h>
 #include <shlobj.h>
-#include <shobjidl.h>
 #include <shellapi.h>
 
 #include <cstdint>
@@ -32,6 +32,7 @@
 #include "../core/apple_music.hpp"
 #include "../core/journal.hpp"
 #include "../core/kit_layout.hpp"
+#include "../win/background.hpp"
 #include "../win/package.hpp"
 #include "../win/win_common.hpp"
 
@@ -42,8 +43,6 @@ namespace {
 constexpr int kExitDone = 0;
 constexpr int kExitError = 1;
 constexpr int kExitRefused = 3;
-
-constexpr std::wstring_view kShortcutDescription = L"Starts Apple Music with Ampify";
 
 bool HasFlag(int argc, wchar_t** argv, const wchar_t* flag) {
     for (int i = 1; i < argc; i++) {
@@ -70,24 +69,11 @@ private:
     ampify::Journal m_journal;
 };
 
-// Creates the start menu shortcut that starts the launcher.
-bool CreateShortcut(const fs::path& shortcut, const fs::path& target, const fs::path& workingDir) {
-    IShellLinkW* link = nullptr;
-    if (FAILED(CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&link)))) return false;
-
-    link->SetPath(target.c_str());
-    link->SetWorkingDirectory(workingDir.c_str());
-    link->SetDescription(kShortcutDescription.data());
-    link->SetIconLocation(target.c_str(), 0);
-
-    IPersistFile* file = nullptr;
-    HRESULT hr = link->QueryInterface(IID_PPV_ARGS(&file));
-    if (SUCCEEDED(hr)) {
-        hr = file->Save(shortcut.c_str(), TRUE);
-        file->Release();
-    }
-    link->Release();
-    return SUCCEEDED(hr);
+// Versions up to 1.0.2 started Apple Music from their own Start menu shortcut. Removed on install and uninstall.
+void RemoveOldShortcut(Log& log) {
+    fs::path shortcut = ampify::win::KnownFolder(FOLDERID_Programs) / ampify::win::FromUtf8(ampify::kShortcutFile);
+    std::error_code error;
+    if (fs::remove(shortcut, error)) log.Write("Old Start menu shortcut removed");
 }
 
 void SetRegistryString(HKEY key, const wchar_t* name, const std::wstring& value) {
@@ -97,6 +83,105 @@ void SetRegistryString(HKEY key, const wchar_t* name, const std::wstring& value)
 
 void SetRegistryDword(HKEY key, const wchar_t* name, DWORD value) {
     RegSetValueExW(key, name, 0, REG_DWORD, reinterpret_cast<const BYTE*>(&value), sizeof(value));
+}
+
+// Reads the user's Path. Absent, it is empty and `type` is REG_EXPAND_SZ, the type Windows gives it. False when it
+// cannot be read whole, so nothing is ever written from a partial value.
+bool ReadUserPath(HKEY key, std::wstring& path, DWORD& type) {
+    DWORD size = 0;
+    LSTATUS status = RegQueryValueExW(key, L"Path", nullptr, &type, nullptr, &size);
+    if (status == ERROR_FILE_NOT_FOUND) {
+        type = REG_EXPAND_SZ;
+        path.clear();
+        return true;
+    }
+    if (status != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ)) return false;
+    path.assign(size / sizeof(wchar_t) + 1, L'\0');
+    DWORD read = static_cast<DWORD>(path.size() * sizeof(wchar_t));
+    if (RegQueryValueExW(key, L"Path", nullptr, &type, reinterpret_cast<BYTE*>(path.data()), &read) != ERROR_SUCCESS) {
+        return false;
+    }
+    path.resize(wcsnlen(path.c_str(), path.size()));
+    return true;
+}
+
+// Puts the install folder in the user's Path (HKCU\Environment), or takes it out, so `ampify` works in any new
+// terminal. The value keeps its type, so %VARIABLES% in it stay unexpanded.
+bool UpdateUserPath(const fs::path& folder, bool add) {
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Environment", 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &key) != ERROR_SUCCESS) {
+        return false;
+    }
+    std::wstring current;
+    DWORD type = REG_EXPAND_SZ;
+    if (!ReadUserPath(key, current, type)) {
+        RegCloseKey(key);
+        return false;
+    }
+    std::string before = ampify::win::ToUtf8(current);
+    std::string folderText = ampify::win::ToUtf8(folder.wstring());
+    std::string after = add ? ampify::PathWithFolder(before, folderText) : ampify::PathWithoutFolder(before, folderText);
+    bool ok = true;
+    if (after != before) {
+        std::wstring value = ampify::win::FromUtf8(after);
+        ok = value.empty() ? RegDeleteValueW(key, L"Path") == ERROR_SUCCESS
+                           : RegSetValueExW(key, L"Path", 0, type, reinterpret_cast<const BYTE*>(value.c_str()),
+                                            static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t))) == ERROR_SUCCESS;
+        // Tells Explorer, so terminals opened from now on see the new Path.
+        DWORD_PTR ignored = 0;
+        SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, 0, reinterpret_cast<LPARAM>(L"Environment"),
+                            SMTO_ABORTIFHUNG, 2000, &ignored);
+    }
+    RegCloseKey(key);
+    return ok;
+}
+
+// The kernel lives inside Apple Music: no file of Ampify may be replaced or deleted under it.
+bool AppleMusicRunning() {
+    return !ampify::win::ProcessIdsNamed(L"AppleMusic.exe").empty() ||
+           !ampify::win::ProcessIdsNamed(L"AMPLibraryAgent.exe").empty();
+}
+
+// What the install left of the automatic start, for the log and the final message.
+struct AutoStartResult {
+    bool registered = false;
+    bool started = false;
+    bool deferred = false;  // run as administrator: the launcher starts at the next sign-in instead
+};
+
+// Registers the background launcher at sign-in and starts it. An installer run as administrator does not start it:
+// a launcher with administrator rights could not be stopped by ampify restore or the uninstaller from a normal session.
+AutoStartResult SetUpAutoStart(const fs::path& launcher, Log& log) {
+    AutoStartResult result;
+    result.registered = ampify::win::RegisterBackground(launcher);
+    log.Write(result.registered ? "Background launcher registered: it starts at each Windows sign-in"
+                                : "Could not register the background launcher at sign-in");
+    result.deferred = ampify::win::IsElevated();
+    if (result.deferred) {
+        log.Write("Installer run as administrator: the background launcher starts at the next sign-in");
+        return result;
+    }
+    result.started = ampify::win::StartBackground(launcher);
+    log.Write(result.started ? "Background launcher started" : "Could not start the background launcher");
+    return result;
+}
+
+std::wstring InstalledMessage(const AutoStartResult& autoStart, bool appleMusicFound, bool bundledOk) {
+    std::wstring text = L"Ampify is installed.\n\nOpen Apple Music as usual: Ampify loads with it each time."
+                        L"\n\nIn a new terminal, ampify help lists the commands.";
+    if (autoStart.deferred) {
+        text += L"\n\nThe installer ran as administrator, so Ampify starts with your next Windows sign-in. To use it "
+                L"now, run \"ampify apply\" in a terminal that is not an administrator one.";
+    } else if (!autoStart.registered || !autoStart.started) {
+        text += L"\n\nThe background launcher could not be set up (details in logs\\install.log): run "
+                L"\"ampify apply\" in a terminal to try again.";
+    }
+    if (!appleMusicFound) text += L"\n\nApple Music for Windows was not found: install it from the Microsoft Store.";
+    if (!bundledOk) {
+        text += L"\n\nThe Marketplace or Now Playing could not be copied to your Ampify folder (details in "
+                L"logs\\install.log). Run the install again from the extracted folder.";
+    }
+    return text;
 }
 
 // The entry that makes Ampify show in Settings > Apps, and gives the uninstall command.
@@ -170,12 +255,28 @@ int Install(bool silent) {
                                     "start nothing until Apple Music is installed";
     log.Write(packageLine);
 
+    if (AppleMusicRunning()) {
+        log.Write("Apple Music is open: nothing installed");
+        if (!silent) ampify::win::ShowMessage(L"Close Apple Music, wait a few seconds, then run the install again.", true);
+        return kExitRefused;
+    }
+
+    // The background launcher runs from the install folder: it stops while its file is replaced, and starts again if
+    // the install stops half way.
+    fs::path launcher = target / ampify::win::FromUtf8(ampify::kLauncherFile);
+    bool wasRunning = ampify::win::BackgroundRunning();
+    if (!ampify::win::StopBackground()) log.Write("The background launcher did not stop: its file may stay in use");
+    auto stopHere = [&](int code) {
+        if (wasRunning) ampify::win::StartBackground(launcher);
+        return code;
+    };
+
     std::error_code error;
     fs::create_directories(target, error);
     if (error) {
         log.Write("Could not create the folder: " + error.message());
         if (!silent) ampify::win::ShowMessage(L"The install folder could not be created.", true);
-        return kExitError;
+        return stopHere(kExitError);
     }
 
     for (std::string_view name : ampify::InstalledFiles()) {
@@ -186,7 +287,7 @@ int Install(bool silent) {
                                           L". Close Apple Music, then run the install again.",
                                       true);
             }
-            return kExitRefused;
+            return stopHere(kExitRefused);
         }
     }
 
@@ -195,35 +296,24 @@ int Install(bool silent) {
     for (const std::string& line : notInstalled) log.Write("Not installed: " + line);
     if (notInstalled.empty()) log.Write("Marketplace and Now Playing installed in the Ampify folder");
 
-    fs::path shortcut = ampify::win::KnownFolder(FOLDERID_Programs) / ampify::win::FromUtf8(ampify::kShortcutFile);
-    bool shortcutOk = CreateShortcut(shortcut, target / ampify::win::FromUtf8(ampify::kLauncherFile), target);
-    log.Write(shortcutOk ? "Shortcut created in the Start menu" : "Could not create the shortcut");
+    RemoveOldShortcut(log);
+    log.Write(UpdateUserPath(target, true) ? "Install folder in the user's Path: ampify works in a new terminal"
+                                           : "Could not add the install folder to the user's Path");
+    AutoStartResult autoStart = SetUpAutoStart(launcher, log);
 
     bool entryOk = WriteUninstallEntry(target, InstalledSizeKb(target));
     log.Write(entryOk ? "Uninstall entry written (Settings > Apps)"
                       : "Could not write the uninstall entry");
 
     log.Write("Install finished in " + ampify::win::ToUtf8(target.wstring()));
-    if (!silent) {
-        std::wstring text = L"Ampify is installed.\n\nStart it from the Start menu: \"Apple Music with Ampify\".";
-        if (!package) text += L"\n\nApple Music for Windows was not found: install it from the Microsoft Store.";
-        if (!notInstalled.empty()) {
-            text += L"\n\nThe Marketplace or Now Playing could not be copied to your Ampify folder (details in "
-                    L"logs\\install.log). Run the install again from the extracted folder.";
-        }
-        ampify::win::ShowMessage(text);
-    }
+    if (!silent) ampify::win::ShowMessage(InstalledMessage(autoStart, package.has_value(), notInstalled.empty()));
     return kExitDone;
 }
 
 int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
     fs::path target = ampify::win::InstallDirectory();
 
-    // The kernel lives inside Apple Music, and the launcher keeps the app running. Nothing may be deleted under them.
-    bool running = !ampify::win::ProcessIdsNamed(L"AppleMusic.exe").empty() ||
-                   !ampify::win::ProcessIdsNamed(L"AMPLibraryAgent.exe").empty() ||
-                   !ampify::win::ProcessIdsNamed(L"ampify_launcher.exe").empty();
-    if (running) {
+    if (AppleMusicRunning()) {
         if (!silent) {
             ampify::win::ShowMessage(L"Close Apple Music, wait a few seconds, then run the uninstall again.",
                                   true);
@@ -252,6 +342,15 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
     log.Write("Uninstalling Ampify " + std::string(ampify::kKitVersion) +
               (keepData ? " (data kept)" : " (data deleted)"));
 
+    // The background launcher goes first: from now on Apple Music starts without Ampify, even if a file stays.
+    log.Write(ampify::win::UnregisterBackground() ? "Background launcher removed from sign-in"
+                                                  : "Could not remove the background launcher from sign-in");
+    if (!ampify::win::StopBackground()) {
+        log.Write("The background launcher did not stop");
+        if (!silent) ampify::win::ShowMessage(L"Ampify could not stop its background launcher. Try again.", true);
+        return kExitRefused;
+    }
+
     // Files first: if one is in use, nothing else is removed yet, so the uninstall can simply be run again.
     for (std::string_view name : ampify::InstalledFiles()) {
         std::wstring wideName = ampify::win::FromUtf8(name);
@@ -271,10 +370,9 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
         log.Write("Removed: " + std::string(name));
     }
 
-    fs::path shortcut = ampify::win::KnownFolder(FOLDERID_Programs) / ampify::win::FromUtf8(ampify::kShortcutFile);
-    std::error_code shortcutError;
-    fs::remove(shortcut, shortcutError);
-    log.Write("Start menu shortcut removed");
+    RemoveOldShortcut(log);
+    log.Write(UpdateUserPath(target, false) ? "Install folder removed from the user's Path"
+                                            : "Could not remove the install folder from the user's Path");
 
     LSTATUS status = RegDeleteTreeW(HKEY_CURRENT_USER, ampify::win::FromUtf8(ampify::kUninstallKey).c_str());
     log.Write(status == ERROR_SUCCESS || status == ERROR_FILE_NOT_FOUND ? "Uninstall entry removed"

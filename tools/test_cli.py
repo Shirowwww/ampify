@@ -46,6 +46,10 @@ def sha256_of(path):
 @unittest.skipUnless(os.path.exists(Ampify), "build ampify first (cmake --build build), or set AMPIFY_BIN")
 class AmpifyTestCase(unittest.TestCase):
     def setUp(self):
+        # The installed copy turns the automatic start on with apply: it would change the PC, not a test folder.
+        installed = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Ampify")
+        if os.name == "nt" and os.path.normcase(os.path.dirname(os.path.abspath(Ampify))) == os.path.normcase(installed):
+            self.skipTest("AMPIFY_BIN is the installed copy: point it at a build folder")
         self.tmp = tempfile.mkdtemp(prefix="ampify-e2e-")
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.kit = os.path.join(self.tmp, "kit")
@@ -616,10 +620,17 @@ class Activation(AmpifyTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("ampify_launcher.exe", result.stdout)
 
-    def test_restore_dry_run_starts_the_store_app_without_kernel(self):
+    def test_restore_dry_run_changes_nothing(self):
         result = self.ampify("restore", "--dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(APP_ID, result.stdout)
+        expected = "Would stop the background launcher" if os.name == "nt" else "nothing to turn off"
+        self.assertIn(expected, result.stdout)
+
+    def test_apply_from_a_build_folder_leaves_the_automatic_start_alone(self):
+        result = self.ampify("apply")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        if os.name == "nt":
+            self.assertIn("not the installed one", result.stdout)
 
     def test_backup_create_and_list(self):
         self.ampify("config", "theme.active", "night")
@@ -1013,7 +1024,7 @@ class Chaining(AmpifyTestCase):
         result = self.ampify("backup", "apply")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Backup created", result.stdout)
-        self.assertLess(result.stdout.index("Backup created"), result.stdout.index("Apple Music reads these settings"))
+        self.assertLess(result.stdout.index("Backup created"), result.stdout.index("Apple Music picks the changes up"))
         self.assertTrue(os.path.exists(os.path.join(self.kit, "active.txt")))
 
     def test_chain_stops_at_the_first_failure(self):

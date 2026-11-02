@@ -82,3 +82,19 @@ TEST_CASE(KitLayout_ABundledElementMissingFromThePackageIsReportedAndKept) {
     CHECK(!failures.empty() && failures[0] == "apps/marketplace: not in the package");
     CHECK(ReadAll(root / "kit" / "apps" / "marketplace" / "main.js") == "old");
 }
+
+TEST_CASE(KitLayout_TheInstallFolderIsAddedToThePathOnce) {
+    CHECK(ampify::PathWithFolder("", "C:\\A") == "C:\\A");
+    CHECK(ampify::PathWithFolder("C:\\Windows;C:\\Tools", "C:\\A") == "C:\\Windows;C:\\Tools;C:\\A");
+    // Already there, whatever the case or a trailing separator: the Path is left as it was.
+    CHECK(ampify::PathWithFolder("C:\\Windows;c:\\a\\;C:\\Tools", "C:\\A") == "C:\\Windows;c:\\a\\;C:\\Tools");
+    // Empty entries are not kept.
+    CHECK(ampify::PathWithFolder("C:\\Windows;;", "C:\\A") == "C:\\Windows;C:\\A");
+}
+
+TEST_CASE(KitLayout_TheInstallFolderLeavesThePathAndNothingElse) {
+    CHECK(ampify::PathWithoutFolder("C:\\Windows;C:\\A;C:\\Tools", "C:\\A") == "C:\\Windows;C:\\Tools");
+    CHECK(ampify::PathWithoutFolder("C:\\a\\;C:\\Windows;C:\\A", "C:\\A") == "C:\\Windows");
+    CHECK(ampify::PathWithoutFolder("C:\\Windows;C:\\AB", "C:\\A") == "C:\\Windows;C:\\AB");
+    CHECK(ampify::PathWithoutFolder("C:\\A", "C:\\A").empty());
+}

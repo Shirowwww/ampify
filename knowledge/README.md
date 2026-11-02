@@ -10,12 +10,8 @@ What was learned about Apple Music for Windows while building Ampify, and the ra
 | [apple-music-xaml-tree.md](apple-music-xaml-tree.md) | The real XAML tree of the main window, with selectors, and the duplicate-name traps |
 | [atmos-loudness.md](atmos-loudness.md) | Why Atmos plays quieter than stereo, what Apple's own leveling does, and the gain that works |
 | [amexclusive-notes.md](amexclusive-notes.md) | What the AMExclusive project teaches about finding the window, the UI thread and Apple's player |
-| [ecosystem-research.md](ecosystem-research.md) | Existing projects around Apple Music on Windows, and why Ampify modifies the official app |
 | [apple-music-native-views.md](apple-music-native-views.md) | Apple's mini player, full-screen player and karaoke lyrics, and how they compare with Ampify's Now Playing |
 | [apple-music-queue.md](apple-music-queue.md) | Apple's play queue: reading and removing work, what was tried to add a song and why it does not work yet |
-| [spicetify-top.md](spicetify-top.md) | What the most popular Spicetify themes and extensions do, and what Ampify still lacks |
-| [spicetify-internals.md](spicetify-internals.md) | How the Spicetify CLI patches Spotify, its stable class names, its runtime API, and the lessons for Ampify |
-| [spicetify-ecosystem.md](spicetify-ecosystem.md) | How people build Spicetify themes and extensions, the Marketplace, and what creators need most |
 
 ## Raw lists
 
@@ -32,4 +28,4 @@ calls the app's services by name and resolves functions by name, never by addres
 | `protocols.txt` | The URL protocols the app handles (`music:`, `musics:`, `itms:`...) | Documentation |
 
 To refresh a list after an Apple Music update, regenerate it from the new package and compare it with the old one. A changed
-method order in `winmd/AMP.Services.txt` changes the slot numbers used by `win/amp_player.cpp`.
+method order in `winmd/AMP.Services.txt` changes the slot numbers used by `src/win/amp_player.cpp`.

@@ -4,6 +4,8 @@
 
 #include <future>
 
+#include "win_common.hpp"
+
 namespace ampify::win {
 
 namespace {
@@ -50,7 +52,7 @@ bool TrayIcon::Start(const std::wstring& tooltip, OnCommand onCommand, std::stri
         FillIcon(icon, window);
         icon.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
         icon.uCallbackMessage = kCallbackMessage;
-        icon.hIcon = LoadIconW(nullptr, reinterpret_cast<LPCWSTR>(IDI_APPLICATION));  // a resource id, not a string
+        icon.hIcon = AmpifyIcon(false);
         wcsncpy_s(icon.szTip, m_tooltip.c_str(), _TRUNCATE);
         if (!Shell_NotifyIconW(NIM_ADD, &icon)) {
             DestroyWindow(window);

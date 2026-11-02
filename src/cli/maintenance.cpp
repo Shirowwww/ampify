@@ -86,7 +86,7 @@ int CmdDevtools(Context& ctx) {
         return 0;
     }
     ctx.out << "Inspector turned on (theme.inspect = 1).\n"
-            << "The next time the kernel runs in Apple Music (started with ampify launch), the interface tree is written\n"
+            << "The next time the kernel runs in Apple Music (at its next start), the interface tree is written\n"
             << "to " << Utf8(InspectorFile(ctx.kit)) << ", then the kernel sets theme.inspect back to 0.\n"
             << "Show it with: ampify inspect --tree\n"
             << "This needs a kernel with the XAML theme engine. Without it, no file is written.\n";
@@ -99,7 +99,7 @@ int CmdInspectTree(Context& ctx) {
     std::string text;
     if (!ReadWholeFile(file, text)) {
         return Failure(ctx, "no interface tree yet (" + Utf8(file) +
-                                " is missing). Run ampify devtools, then Apple Music with ampify launch.");
+                                " is missing). Run ampify devtools, then restart Apple Music.");
     }
     ctx.out << "Interface tree written by the kernel (" << Utf8(file) << "):\n" << text;
     if (!text.empty() && text.back() != '\n') ctx.out << "\n";
@@ -203,7 +203,7 @@ int CmdVersions(Context& ctx) {
     }
     for (const std::string& version : usable) ctx.out << "  tested     " << version << "\n";
     ctx.out << usable.size() << " version(s) written to " << Utf8(listFile)
-            << ". The kernel accepts them the next time Apple Music starts (ampify launch), if "
+            << ". The kernel accepts them the next time Apple Music starts, if "
             << kPlayerDllName << " still has the expected exports.\n";
     return 0;
 }

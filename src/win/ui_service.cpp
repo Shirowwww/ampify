@@ -1661,9 +1661,18 @@ controls::Button MakeSidebarButton(const UiControl& control) {
     controls::StackPanel row;
     row.Orientation(controls::Orientation::Horizontal);
     row.Spacing(16);
-    controls::FontIcon icon;
-    icon.FontSize(16);
-    icon.Glyph(uirender::IsGlyphIcon(control.icon) ? Wide(control.icon) : winrt::hstring(L"\xE790"));  // Color
+    // An SVG icon (the Marketplace gives Ampify's logo) is drawn in the text brush, like Apple Music's own icons.
+    xaml::FrameworkElement icon = nullptr;
+    if (!control.icon.empty() && !uirender::IsGlyphIcon(control.icon)) {
+        icon = MakeIconElement(control.icon, 16, L"TextFillColorPrimaryBrush");
+    }
+    if (!icon) {
+        controls::FontIcon glyph;
+        glyph.FontSize(16);
+        glyph.Glyph(uirender::IsGlyphIcon(control.icon) ? Wide(control.icon) : winrt::hstring(L"\xE790"));  // Color
+        icon = glyph;
+    }
+    icon.VerticalAlignment(xaml::VerticalAlignment::Center);
     controls::TextBlock label;
     label.Text(Wide(control.label));
     label.VerticalAlignment(xaml::VerticalAlignment::Center);

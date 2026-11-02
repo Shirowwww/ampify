@@ -88,7 +88,7 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   request times out at 20 s, then the retry succeeds). It is not a bug to blame on mods.
 - First launch: an MPEG LA licence (buttons Agree, Decline, Save As) opens before the main window, then, after sign-in, a
   "Welcome to Apple Music" screen (Start Listening). While they are open there is no XAML window.
-- Cover and lyrics of the playing item (read from the 1.1792 metadata, `core/amp_abi.hpp`): `INowPlayingItem.get_Artwork`
+- Cover and lyrics of the playing item (read from the 1.1792 metadata, `src/core/amp_abi.hpp`): `INowPlayingItem.get_Artwork`
   (slot 11) gives an `Artwork`, queried as `IArtwork`: `get_Uri` is a `Windows.Foundation.Uri` whose absolute address is
   probably an `mzstatic.com` template with `{w}`, `{h}`, `{c}` and `{f}`; `get_BGColor` is a `Windows.UI.Color` (A, R, G, B).
   `get_LyricsInfo` (slot 46) gives `ILyricsInfo`: `HaveLyrics`, `GetTTML` (timed lines and words), `GetStaticLyrics`,

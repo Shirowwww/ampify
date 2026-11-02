@@ -6,7 +6,7 @@ Ampify adds themes, extensions and apps to Apple Music for Windows.
 
 | Page | What it covers |
 |---|---|
-| [getting-started.md](getting-started.md) | Install, open Apple Music with Ampify, pick a theme in the Marketplace, safe mode, uninstall |
+| [getting-started.md](getting-started.md) | Install in one line, pick a theme in the Marketplace, turn Ampify off and on, safe mode, uninstall |
 | [cli.md](cli.md) | The `ampify` command line: commands, options, settings, files |
 | [spicetify-parity.md](spicetify-parity.md) | What Ampify covers compared with Spicetify |
 
@@ -31,7 +31,7 @@ Ampify adds themes, extensions and apps to Apple Music for Windows.
 | [extensions/guide.md](extensions/guide.md) | An extension in five minutes, then an app |
 | [extensions/api.md](extensions/api.md) | The `Ampify` JavaScript API, permissions and life cycle |
 | [extensions/manifest.md](extensions/manifest.md) | The `manifest.json` format |
-| [extensions/catalog.md](extensions/catalog.md) | The community catalog, how to publish, and the Marketplace page |
+| [extensions/catalog.md](extensions/catalog.md) | The catalog (ampify-catalog), how to publish, and the Marketplace page |
 
 ## Work on Ampify
 
@@ -41,7 +41,7 @@ Ampify adds themes, extensions and apps to Apple Music for Windows.
 | [development/building.md](development/building.md) | Repository layout, builds, tests, packaging |
 | [development/bench-and-ci.md](development/bench-and-ci.md) | The Windows bench, CI jobs, speed-ups and pitfalls |
 | [development/xaml-lessons.md](development/xaml-lessons.md) | Problems met while drawing inside Apple Music, and their fixes |
-| [development/testing-on-a-pc.md](development/testing-on-a-pc.md) | The test pass on a real PC and the listening test |
+| [development/testing-on-a-pc.md](development/testing-on-a-pc.md) | The test pass on a real PC, the checks of each area, and the listening test |
 | [../knowledge/README.md](../knowledge/README.md) | What is known about Apple Music's internals |
 | [../CHANGELOG.md](../CHANGELOG.md) | Version history |
 | [../CREDITS.md](../CREDITS.md) | Projects Ampify builds on |

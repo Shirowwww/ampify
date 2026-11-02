@@ -58,10 +58,10 @@ each view defines them for itself. A theme cannot reach them with `colors.ini` t
 
 ## Against Ampify's lyrics view
 
-Now Playing (`extensions/now-playing`) opens Apple's player since 0.5.0. The view Ampify drew before is the
-`lyrics-view` example.
+Now Playing (`extensions/now-playing`) opens Apple's player since 0.5.0. Before, Ampify drew its own lyrics view, an
+example extension that has since been removed. The comparison that led to the switch:
 
-| | Apple's full-screen player | Ampify's lyrics view (`examples/lyrics-view`) |
+| | Apple's full-screen player | Ampify's former lyrics view |
 |---|---|---|
 | Getting there | two clicks in Apple Music (artwork, then full screen); one with Now Playing | one button in the playback bar, over the main window |
 | Background | animated artwork (`ImmersionLockup`) | the cover, blurred, still |
@@ -76,11 +76,11 @@ lyrics from LRCLIB when Apple has none.
 ## What Ampify could do with Apple's views
 
 1. **Reach `MiniPlayerWindow` with themes.** The interface service already binds that window for extension surfaces
-   (`win/ui_service.cpp`, its own DispatcherQueue); the theme engine would need a second tree backend posted to that
+   (`src/win/ui_service.cpp`, its own DispatcherQueue); the theme engine would need a second tree backend posted to that
    thread, and stable names for the parts above (`.mini-player`, `.fullscreen-player`, `.fullscreen-artwork`,
    `.fullscreen-lyrics`...).
 2. **Element-scoped resources.** Writing `SungColor`, `UnsungColor`, `LyricsOpacity_Current` or `LineFontSize` into a
    view's own resources would let a theme recolour and resize Apple's karaoke lyrics, the same way Ampify already keeps
    a button's colours under the pointer (it writes `{Control}{Property}PointerOver` keys into that button's resources).
-3. **One click to Apple's full screen.** Done: `Ampify.ui.applePlayer.open()` (`win/apple_player.cpp`), used by Now
+3. **One click to Apple's full screen.** Done: `Ampify.ui.applePlayer.open()` (`src/win/apple_player.cpp`), used by Now
    Playing, opens it as a window over the main one.

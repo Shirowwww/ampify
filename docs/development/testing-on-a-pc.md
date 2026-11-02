@@ -4,146 +4,101 @@ The Windows bench ([bench-and-ci.md](bench-and-ci.md)) covers what can run with 
 how the interface looks need a PC with Apple Music, a signed-in account and headphones or speakers. This page has the full
 test pass for a tester, then the detailed checks for each area.
 
-Logs and reports contain Windows paths, with the user name in them. The test kit replaces the user name in its reports
-(except in `trace.etl`, a binary file). Read any other log before you send it.
+Logs contain Windows paths, with the user name in them. Read a log before you send it.
 
-## Full test pass (about 20 minutes, in one sitting)
+## Full test pass (about 15 minutes, in one sitting)
 
-You need the PC, Apple Music for Windows signed in, headphones or speakers, and a few Dolby Atmos songs. You can stop at any
-step. Say where.
+You need the PC, Apple Music for Windows signed in, headphones or speakers, and a few Dolby Atmos songs. You can stop at
+any step. Say where.
 
-The test zip is made with `scripts/package.sh --test`: it adds `prepare-test.cmd`, `Ampify-Test.exe` and this guide to the
-zip people download.
-
-1. **Download the zip** `ampify-<version>-windows-x64.zip`. Right-click it, then "Extract all". Always work from the
-   extracted folder, never from inside the zip.
-2. **Close Apple Music** if it is open.
-3. **Install Ampify.** Double-click `ampify_setup.exe`, then answer Yes. If Windows shows "Windows protected your PC",
-   click "More info", then "Run anyway": Ampify is not code-signed yet. At the end, a window says that "Ampify for Apple
-   Music" is installed.
-4. **Prepare the test.** Double-click `prepare-test.cmd`. A black window copies the example extensions and themes, then
-   switches on the Atmos leveler and a few extensions. It ends with "Ready". Press a key to close it.
-5. **Open Apple Music with Ampify.** In the Start menu, search "Apple Music with Ampify" and start it. Apple Music should
-   open as usual, maybe one or two seconds slower.
-6. **Look at what Ampify adds.** A panel called "React panel" appears on the right of the window. Click "Add one": the
-   counter goes to 1. Then open Apple Music's Settings, Playback page. At the bottom, a card called "Ampify" lists the
-   extensions with a switch each. Switch "React panel" off: the panel must disappear at once. Switch it on again. Take a
-   screenshot of the card.
-7. **Change the theme.** Click the small bag to the right of the lyrics and queue buttons at the top: the Marketplace
-   page opens. Under "Themes", click "Use this theme" below "Glass": the sidebar turns night blue and the playback bar
-   becomes glass. Also try "Artwork" with a song playing: its artwork becomes the background. Click "Restore Apple Music's
-   look": the original colors return. "Back" closes the page. If one of the panel, the card or the Marketplace is missing,
-   note it and continue.
-8. **Close Apple Music.** The next test starts it again by itself.
-9. **Run the test kit.** Double-click `Ampify-Test.exe`, then answer Yes. Windows may ask for permission to record a trace:
-   answer Yes (or No if you prefer, the test continues without). Apple Music opens by itself. A small window stays on top:
-   do not click OK yet.
-10. **Listen.** Set Apple Music's volume to a comfortable level and do not touch it again. Play a stereo song and listen for
-    30 seconds. Then play three Dolby Atmos songs, 30 seconds each (Apple Music's "Dolby Atmos" playlist has plenty). At
-    each change, look at Apple Music's volume slider and Windows' one: they must never move. Listen to whether the loudness
-    stays about the same from one song to the next. A Windows notification must announce each new song. Also try pause, play
-    and next. At the end, open Settings, Playback page, once.
-11. **End the test.** Click OK in the small window. The test writes its report and opens the `reports` folder. It holds a
-    `.zip` file with today's date. That file is the one to send.
-12. **Uninstall.** Close Apple Music. Open Windows Settings, Apps, Installed apps. Find "Ampify for Apple Music", click the
-    three dots, then Uninstall. Answer Yes. When it asks whether to keep your settings and reports, answer Yes.
-13. **Check that Apple Music is back to normal.** Start Apple Music from its usual icon. It must open and play as before,
-    with no panel and no Ampify card. The "Apple Music with Ampify" shortcut must be gone from the Start menu.
+1. **Close Apple Music** if it is open.
+2. **Install Ampify** with the line of the README in PowerShell, or from the zip with `ampify_setup.exe`. If Windows
+   shows "Windows protected your PC", click "More info", then "Run anyway": Ampify is not code-signed yet.
+3. **Open Apple Music from its usual icon.** It should open as usual, maybe a second slower. The sidebar ends with an
+   "Ampify" entry, with the puzzle-piece logo.
+4. **Look at what Ampify adds.** Open Apple Music's Settings, Playback page. At the bottom, a card called "Ampify" lists
+   the extensions with a switch each. Take a screenshot of the card.
+5. **Change the theme.** Click "Ampify" in the sidebar: the Marketplace page opens. Under "Themes", click "Use this
+   theme" below "Glass". Also try "Artwork" with a song playing: its artwork becomes the background. Click "Restore
+   Apple Music's look": the original colors return.
+6. **Listen.** In a terminal, run `ampify extension enable atmos-leveler`, then close and reopen Apple Music. Set the
+   volume to a comfortable level and do not touch it again. Play a stereo song for 30 seconds, then three Dolby Atmos
+   songs, 30 seconds each. At each change, Apple Music's volume slider and Windows' one must never move. Listen to
+   whether the loudness stays about the same from one song to the next. The listening test script below does the same
+   with measurements.
+7. **Turn Ampify off and on.** Run `ampify restore`, close Apple Music and open it again: no "Ampify" entry, no card.
+   Run `ampify apply`, close and reopen Apple Music: they are back.
+8. **Uninstall.** Close Apple Music. Open Windows Settings, Apps, Installed apps. Find "Ampify for Apple Music", click
+   the three dots, then Uninstall. Answer Yes. When it asks whether to keep your settings, answer Yes.
+9. **Check that Apple Music is back to normal.** Open Apple Music from its usual icon. It must open and play as before,
+   with no "Ampify" entry and no card.
 
 ### What to send back
 
-- The `.zip` file from the `reports` folder (step 11). It is also in `%USERPROFILE%\Ampify\reports\` if you closed the
-  window.
-- The screenshot of the Ampify card (step 6), and a screenshot of anything that looked odd.
-- A short answer to these questions. Did the panel, the Ampify card and the theme choice appear? Did the "midnight" theme
-  change the colors? Did a volume slider move on its own? Was the loudness steady between the stereo song and the Atmos
-  songs? If not, which one was too loud or too quiet? Did the uninstall go well, and did Apple Music start normally after?
+- The folder `%USERPROFILE%\Ampify\logs\`, read first.
+- The screenshot of the Ampify card (step 4), and a screenshot of anything that looked odd.
+- A short answer to these questions. Did the Ampify entry, the card and the themes appear? Did a volume slider move on
+  its own? Was the loudness steady between the stereo song and the Atmos songs? If not, which one was too loud or too
+  quiet? Did `ampify restore` and the uninstall give back the original app?
 
 ### If something goes wrong
 
-- The usual Apple Music icon always starts Apple Music with no mods. You can use it at any time.
-- If Apple Music crashes or freezes at start with Ampify, close it from Task Manager (Ctrl + Shift + Esc). After two failed
-  starts in a row, Ampify turns itself off: at the next start, Apple Music opens with no mods. That is safe mode. Once
-  Apple Music has run for 20 seconds, Ampify tries again with mods at the following start.
-- To remove everything, do step 12, even in the middle of the test. If the uninstall says Apple Music is open, close it,
+- `ampify restore` stops Ampify from loading with Apple Music. Close Apple Music and open it again.
+- If Apple Music crashes or freezes at start with Ampify, close it from Task Manager (Ctrl + Shift + Esc). After two
+  failed starts in a row, Ampify turns itself off: at the next start, Apple Music opens with no mods. That is safe mode.
+  Once Apple Music has run for 20 seconds, Ampify tries again at the following start.
+- To remove everything, do step 8, even in the middle of the test. If the uninstall says Apple Music is open, close it,
   wait 10 seconds and try again.
-- If an antivirus blocks a file, note the name of the threat and allow nothing before you know what it is. In every case,
-  send the folder `%USERPROFILE%\Ampify\logs\`: it says what Ampify did.
-
-## The test kit and uninstall
-
-`Ampify-Test.exe` installs Ampify, starts Apple Music through the launcher, records an ETW trace while you use the app, and
-writes a report. It has an automatic mode (no dialog, waits a set number of seconds instead of the OK button) and a switch
-that skips the ETW trace, so no administrator prompt appears. The exact switches are in the usage comment at the top of
-`testkit/testkit.cpp`.
-
-After the run, a window says "Test finished: PASSED", "NEEDS REVIEW" or "NOT RUN". The folder
-`%USERPROFILE%\Ampify\reports\<date>\` holds `report.txt` and a zip of the folder. In `report.txt`, each line starts with
-`[OK]`, `[FAIL]`, `[?]` or `[i]`:
-
-- `[OK]`: good.
-- `[FAIL]`: did not work. Note the line.
-- `[?]`: to look at. For example "0 threads resumed": nothing was suspended at launch.
-- `[i]`: information.
-
-If the "Apple Music found" line says "not found", Apple Music is not installed for the account, and the rest of the test
-does not count.
-
-Exit codes: 0 passed, 2 needs review, 4 Apple Music did not run, 1 no report.
-
-After the uninstall, check that the Start menu shortcut is gone and that `%LOCALAPPDATA%\Programs\Ampify` no longer exists.
-Apple Music from its usual icon must start and close as before, with no error window.
+- If an antivirus blocks a file, note the name of the threat and allow nothing before you know what it is. In every
+  case, send the folder `%USERPROFILE%\Ampify\logs\`: it says what Ampify did.
 
 ## Launcher and kernel
 
-What to learn: the launcher opens Apple Music and the app stays usable. The kernel loads into `AppleMusic.exe` and
-`AMPLibraryAgent.exe`. The launcher pauses the first Apple Music process while the kernel loads. The launcher stays open
-while Apple Music runs, even if the app hands over to another process at start. Without the launcher, Apple Music starts as
-usual with no kernel.
+What to learn: the background launcher loads the kernel into `AppleMusic.exe` and `AMPLibraryAgent.exe` when Apple
+Music opens from its own icon, and the app stays usable. It holds the first Apple Music process still while the kernel
+loads, follows the app while it runs (even when it hands over to another process at start), then waits for the next
+start. Once stopped, Apple Music starts as usual with no kernel.
 
-Put `ampify_launcher.exe` and `ampify_kernel.dll` in one folder. The Apple Music version must be in the tested list.
+1. Close Apple Music completely. In Task Manager, no `AppleMusic.exe` or `AMPLibraryAgent.exe` may remain.
+2. Open Apple Music from its usual icon. Use the app for 2 minutes: search an album, play a stereo song, then a Dolby
+   Atmos song, pause, next, open Settings. Close Apple Music.
+3. Read the logs in `%USERPROFILE%\Ampify\logs\`: `background.log`, `AppleMusic.log` and `AMPLibraryAgent.log`.
 
-1. Close Apple Music completely. In Task Manager, no `AppleMusic.exe` or `AMPLibraryAgent.exe` may remain. Delete the old
-   logs in `%USERPROFILE%\Ampify\logs\`.
-2. Double-click `ampify_launcher.exe`. Apple Music must open within 15 seconds, with no error window. Use the app for 2
-   minutes: search an album, play a stereo song, then a Dolby Atmos song, pause, next, open Settings. Close Apple Music.
-   The launcher must close within 10 seconds.
-3. Read the logs in `%USERPROFILE%\Ampify\logs\`: `launcher.log`, `AppleMusic.log` and `AMPLibraryAgent.log`.
+`background.log` should say, in this order (times and process numbers vary, and the wording can differ between
+versions):
 
-`launcher.log` should say, in this order (times and process numbers vary, and the wording can differ between versions):
-
-- the package found, with its version;
-- that the signature is recognized (5 exports found in `AVFoundationCF.dll`). If it says the signature is not recognized,
-  the launcher refuses the kernel;
-- that the version is tested and the kernel is injected;
+- that the background launcher started, the package found with its version, and that the signature is recognized (5
+  exports found in `AVFoundationCF.dll`). If it says the signature is not recognized, the launcher refuses the kernel;
 - that Apple Music started (process N);
-- the number of threads paused, at least 1. If it is 0, the pause did not take;
-- that the kernel loaded during the pause. If it says the load did not answer, the load may finish later: look at
-  `AppleMusic.log`;
+- that the version is tested and the kernel is injected;
+- the number of threads paused, at least 1, and that the kernel loaded during the pause. If it says the load is pending,
+  the load may finish after the resume: the next line says so;
 - the number of threads resumed, the same as paused;
 - that the kernel loaded in `AMPLibraryAgent.exe`;
-- at the end, that Apple Music closed and the launcher stops.
+- at the end, that Apple Music closed and the launcher waits for it to start again.
 
-A second "kernel loaded" line for another `AppleMusic.exe` process number, without a pause, is normal: Apple Music can hand
-over to another process at start.
+A second "kernel loaded" line for another `AppleMusic.exe` process number, without a pause, is normal: Apple Music can
+hand over to another process at start.
 
 `AppleMusic.log` shows the kernel loaded, the version tested, the extension host ready, and about 20 seconds after start
 "Healthy after 20 s". `AMPLibraryAgent.log` has the same first lines.
 
-4. Start Apple Music from the Start menu, as usual, with no launcher. Use it for 30 seconds, close it. `AppleMusic.log` must
-   be unchanged: a normal launch creates no log.
-5. **Safe mode.** It turns the kernel off after two launches that did not stay healthy for 20 seconds. To test it without
-   crashing the app: close Apple Music, open `%USERPROFILE%\Ampify\state.txt` and set `unhealthy_launches = 2`, then
-   start `ampify_launcher.exe`. `launcher.log` must say that safe mode is active and Apple Music starts without the kernel,
-   with no "kernel loaded" line. Wait 25 seconds without closing the app: `launcher.log` must say the app is healthy after
-   20 s, and `state.txt` must hold `unhealthy_launches = 0`.
+4. Run `ampify restore`, then open Apple Music, use it for 30 seconds and close it. `AppleMusic.log` must be unchanged:
+   a launch without Ampify writes no log. Run `ampify apply` to turn Ampify back on.
+5. **Safe mode.** It turns the kernel off after two launches that did not stay healthy for 20 seconds. To test it
+   without crashing the app: close Apple Music, open `%USERPROFILE%\Ampify\state.txt` and set
+   `unhealthy_launches = 2`, then open Apple Music. `background.log` must say that safe mode is active, with no "kernel
+   loaded" line. Wait 25 seconds without closing the app: `background.log` must say the app is healthy after 20 s, and
+   `state.txt` must hold `unhealthy_launches = 0`.
+
+`ampify launch` starts Apple Music through the launcher in the foreground instead (its log is `launcher.log`), which is
+how the bench starts a bench build.
 
 Problems:
 
 - Apple Music freezes at start: close it from Task Manager and keep the three logs. This is the most important case.
-- The launcher closes by itself while the app runs: keep `launcher.log`, it is an Ampify bug.
+- Nothing loads: `ampify doctor` says whether the background launcher runs and is registered at sign-in.
 - An error window from the launcher: note its exact text.
-- Nothing happens: check that `ampify_kernel.dll` sits next to `ampify_launcher.exe`. `launcher.log` says so.
 
 ## Atmos leveler
 

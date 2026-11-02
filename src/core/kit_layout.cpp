@@ -47,4 +47,48 @@ std::vector<std::string> InstallBundledElements(const std::filesystem::path& pac
     return failures;
 }
 
+namespace {
+
+std::vector<std::string_view> PathEntries(std::string_view path) {
+    std::vector<std::string_view> entries;
+    while (!path.empty()) {
+        size_t end = path.find(';');
+        std::string_view entry = path.substr(0, end);
+        if (!entry.empty()) entries.push_back(entry);
+        path = end == std::string_view::npos ? std::string_view() : path.substr(end + 1);
+    }
+    return entries;
+}
+
+bool SameFolder(std::string_view a, std::string_view b) {
+    while (!a.empty() && (a.back() == '\\' || a.back() == '/')) a.remove_suffix(1);
+    while (!b.empty() && (b.back() == '\\' || b.back() == '/')) b.remove_suffix(1);
+    return ToLowerAscii(a) == ToLowerAscii(b);
+}
+
+std::string JoinPath(const std::vector<std::string_view>& entries) {
+    std::string joined;
+    for (std::string_view entry : entries) {
+        if (!joined.empty()) joined += ';';
+        joined += entry;
+    }
+    return joined;
+}
+
+}  // namespace
+
+std::string PathWithFolder(std::string_view path, std::string_view folder) {
+    std::vector<std::string_view> entries = PathEntries(path);
+    bool present = std::any_of(entries.begin(), entries.end(), [&](std::string_view e) { return SameFolder(e, folder); });
+    if (!present) entries.push_back(folder);
+    return present ? std::string(path) : JoinPath(entries);
+}
+
+std::string PathWithoutFolder(std::string_view path, std::string_view folder) {
+    std::vector<std::string_view> entries = PathEntries(path);
+    entries.erase(std::remove_if(entries.begin(), entries.end(), [&](std::string_view e) { return SameFolder(e, folder); }),
+                  entries.end());
+    return JoinPath(entries);
+}
+
 }  // namespace ampify

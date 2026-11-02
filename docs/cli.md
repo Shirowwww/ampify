@@ -4,20 +4,21 @@
 the kernel, manages extensions, themes and snippets, installs from the catalog, and can go back. It never changes the
 Apple Music package. Everything happens in `%USERPROFILE%\Ampify`.
 
-The code is in [cli/](../cli/). The line-by-line comparison with Spicetify is in
+The code is in [src/cli/](../src/cli/). The line-by-line comparison with Spicetify is in
 [spicetify-parity.md](spicetify-parity.md).
 
 ## Get started
 
-`ampify.exe` sits next to `ampify_launcher.exe` (in `%LOCALAPPDATA%\Programs\Ampify` after the install). Open a terminal
-in that folder, or type `ampify` with its full path.
+`ampify.exe` sits next to `ampify_launcher.exe` in `%LOCALAPPDATA%\Programs\Ampify`, and the installer puts that folder
+in your Path: type `ampify` in any new terminal.
 
 ```
 ampify path                          where the files are
 ampify market                        what the catalog offers
 ampify install demo                  installs (asks for confirmation, shows the permissions)
 ampify extension enable demo         switches it on
-ampify launch                        applies and starts Apple Music with the kernel
+ampify restore                       Apple Music starts without Ampify from now on
+ampify apply                         Ampify loads with Apple Music again
 ```
 
 ## Commands
@@ -28,10 +29,10 @@ The "Spicetify" column gives the equivalent.
 
 | Command | Purpose | Spicetify |
 |---|---|---|
-| `ampify launch` (or `auto`) | Writes what must load, then starts `ampify_launcher.exe`. On Linux, `--dry-run` prints the command | `auto` |
-| `ampify restore` | Starts Apple Music with no kernel. Nothing has to be put back in the package | `restore` |
+| `ampify apply` | Writes `active.txt` and `reload.txt`, prints what loads and what does not. From the installed copy, it also makes Ampify load with Apple Music each time it starts (the background launcher, now and at each sign-in) | `apply` |
+| `ampify restore` | Ampify no longer loads with Apple Music: the background launcher stops and leaves Windows sign-in. An Apple Music already open keeps Ampify until it closes. Nothing has to be put back in the package | `restore` |
 | `ampify restore --backup <name>` | Puts back the settings and elements of a backup | `restore` (variant) |
-| `ampify apply` | Writes `active.txt` and `reload.txt`, prints what loads and what does not | `apply` |
+| `ampify launch` (or `auto`) | Writes what must load, then starts Apple Music through `ampify_launcher.exe` now. `--dry-run` prints the command | `auto` |
 | `ampify watch [--interval ms]` | Applies at each change of a theme, extension or setting | `watch` |
 | `ampify config` | Prints all settings | `config` |
 | `ampify config <key>` | Prints one setting | `config <key>` |
@@ -106,7 +107,7 @@ messages go to the error output, prefixed with `ampify:`.
 
 ```
 %USERPROFILE%\Ampify\
-  settings.txt              settings, one key = value per line (format of core/settings.*)
+  settings.txt              settings, one key = value per line (format of src/core/settings.*)
   extensions\<id>\          manifest.json, main.js, ...
   themes\<id>\              manifest.json, colors.ini, resources.xaml
   apps\<id>\                manifest.json, main.js, icon.svg
@@ -116,7 +117,6 @@ messages go to the error output, prefixed with `ampify:`.
   backups\<yyyymmdd-hhmmss>\  copy of settings.txt and the four element folders
   versions.txt              Apple Music versions tested in addition to the kernel's (written by ampify versions update)
   logs\                     logs of the kernel and the launcher, and inspector.txt (interface tree, see devtools)
-  reports\                  test kit reports
   downloads\, updates\, cache\  temporary files, the last catalog read, and cache\kit-update.txt (check_kit_update)
 ```
 
@@ -155,8 +155,9 @@ These keys match Spicetify's: `app_path` to `spotify_path`, `prefs_path` to `pre
 `spotify_launch_flags`, `check_kit_update` to `check_spicetify_update`, `telemetry.block` to `disable_sentry` and
 `disable_ui_logging`, `expose_api` to `expose_apis`.
 
-`app_launch_flags` is read by the launcher, which passes these arguments to Apple Music when it starts it (Apple Music may
-ignore them). `ampify launch --dry-run` prints the arguments that will be sent. For a value that starts with `--`, type it
+`app_launch_flags` is read by the launcher, which passes these arguments to Apple Music when it starts it itself
+(`ampify launch`; Apple Music may ignore them). When Apple Music opens from its own icon, Windows starts it and the flags
+do not apply. `ampify launch --dry-run` prints the arguments that will be sent. For a value that starts with `--`, type it
 directly: `ampify config app_launch_flags --my-option`, or in quotes when there are several:
 `ampify config app_launch_flags "--a --b"`. An invalid value (unclosed quote, control character) is refused.
 
@@ -183,7 +184,7 @@ already present when Apple Music starts: at that moment it loads everything from
 
 Themes and snippets do not use these lines: the theme engine follows its own files.
 
-If Apple Music is not running, these lines do nothing and do no harm: the next `ampify launch` loads everything.
+If Apple Music is not running, these lines do nothing and do no harm: the next start loads everything.
 
 ## Chaining commands
 
@@ -205,7 +206,7 @@ The kernel activates only on a tested Apple Music version, and only if `AVFounda
 Ampify needs. Otherwise Apple Music starts with no mods: nothing is guessed. After an Apple Music update, Ampify therefore
 stays inactive until the new version is tested.
 
-Versions tested after a release are published in `catalog/versions.json`, next to the catalog. For each version it lists
+Versions tested after a release are published in `versions.json`, next to the catalog (ampify-catalog). For each version it lists
 the verified exports. `catalog.json` pins the address and the SHA-256 of this file.
 
 - `ampify versions` prints the accepted versions (the kernel's and those of `versions.txt`), the required exports, and says
@@ -289,7 +290,7 @@ to the host, then the result. An API used without the declared permission fails 
 Ampify. A passing test does not say that the element works in Apple Music: check that on a PC.
 
 `types [file]` writes `ampify.d.ts` (by default in the current folder): the types of the `Ampify` object of section 5 of
-[extensions/api.md](extensions/api.md). The file is written by hand, in `cli/sdk_types.cpp`. The test `tools/test_cli.py`
+[extensions/api.md](extensions/api.md). The file is written by hand, in `src/cli/sdk_types.cpp`. The test `tools/test_cli.py`
 checks that every member of section 5 is in it. It is not generated from the text. It refuses to overwrite an existing
 `ampify.d.ts`, except with `--yes`.
 
@@ -328,9 +329,8 @@ AMPIFY_BIN=$PWD/build/ampify python3 -m unittest discover -s tools -v   # valida
 node --test tools/test_examples.mjs                    # example extensions, against a fake Ampify
 ```
 
-Under Wine, `AMPIFY_WINE=1 AMPIFY_BIN=build-win/ampify.exe` runs the end-to-end tests that do not need `tar.exe` or
-`curl.exe`, which Wine does not have. A real install is tested on Windows 10 or 11 (the Windows bench), and on a PC for
-Apple Music itself.
+On Windows, set `AMPIFY_BIN` to `build-msvc\release\ampify.exe`. A real install is tested on Windows 10 or 11 (the
+Windows bench), and on a PC for Apple Music itself.
 
 Not tested here: everything that touches the real Apple Music (launch, injection, reaction of the kernel). See
 [development/testing-on-a-pc.md](development/testing-on-a-pc.md).

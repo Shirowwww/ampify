@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -42,6 +43,10 @@ std::string SystemScheme(const std::vector<std::string>& schemes, bool dark);
 // True when the name is a dark scheme by the rule above (Dark, Sombre, Night, Nuit). The app is then switched to its
 // own dark mode under the theme, so the brushes the theme does not name match the ones it does.
 bool IsDarkScheme(const std::string& scheme);
+
+// The app mode a theme asks for: dark or light from its background when it has one, else from its scheme's name, else
+// none, and Apple Music keeps its own (a theme that only hides buttons must not turn the app light).
+std::optional<bool> AppModeOf(std::optional<bool> dark, const std::string& scheme);
 
 // What the Windows side reports, read on each pass of the worker.
 struct SchemeInputs {

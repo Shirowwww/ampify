@@ -161,7 +161,7 @@ jobs:
       matrix:
         include:
           - shard: launch
-            cases: normal-launch,release-version,bench-injection
+            cases: normal-launch,release-version,bench-injection,background-launch
           - shard: safety
             cases: safe-mode,atmos-leveler,cli-windows-tools,extension-hello,installer
           - shard: tools

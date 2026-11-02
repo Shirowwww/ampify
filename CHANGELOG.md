@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.0 (2026-11-01)
+
+- Ampify loads with Apple Music each time it starts, from Apple Music's own icon, as Spicetify stays applied to
+  Spotify. The installer starts a small background launcher now and at each Windows sign-in; the "Apple Music with
+  Ampify" Start menu shortcut is gone. `ampify restore` turns this off and `ampify apply` turns it back on.
+- Install in one line of PowerShell: `irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex`.
+  The installer also puts `ampify` in your Path.
+- A logo: Apple Music's tile and note as a puzzle piece. It is the icon of the programs, of the notifications and of
+  the Ampify entry in Apple Music's sidebar.
+- Fewer, better elements. The Marketplace keeps five themes, the four palettes and three example extensions, now
+  named "(example)". Large text, Rounded buttons, Output gain and Now playing notify are gone, with the less useful
+  extension examples.
+- The repository is reorganized: the C++ code is under `src/`, the themes sit directly under `themes/`, and the
+  catalog lives only in [ampify-catalog](https://github.com/Shirowwww/ampify-catalog).
+
 ## 1.0.2 (2026-11-01)
 
 - The installer puts the Marketplace and Now Playing in your Ampify folder, in place of any older copy. A new install

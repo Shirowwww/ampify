@@ -32,39 +32,14 @@ BOOL CALLBACK FindHungWindow(HWND window, LPARAM parameter) {
     return TRUE;
 }
 
-// Waits for a process with a full command line. Output goes to a file that the child inherits.
-int StartAndWait(std::wstring commandLine, const std::filesystem::path& outputFile) {
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
-    startup.dwFlags = STARTF_USESHOWWINDOW;
-    startup.wShowWindow = SW_HIDE;
-
-    HANDLE output = INVALID_HANDLE_VALUE;
-    if (!outputFile.empty()) {
-        SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
-        output = CreateFileW(outputFile.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &inherit, CREATE_ALWAYS,
-                             FILE_ATTRIBUTE_NORMAL, nullptr);
-        if (output != INVALID_HANDLE_VALUE) {
-            startup.dwFlags |= STARTF_USESTDHANDLES;
-            startup.hStdOutput = output;
-            startup.hStdError = output;
-        }
-    }
-
-    PROCESS_INFORMATION process{};
-    std::vector<wchar_t> buffer(commandLine.begin(), commandLine.end());
-    buffer.push_back(L'\0');
-    BOOL started = CreateProcessW(nullptr, buffer.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr,
-                                  &startup, &process);
-    if (output != INVALID_HANDLE_VALUE) CloseHandle(output);
-    if (!started) return -1;
-
-    WaitForSingleObject(process.hProcess, INFINITE);
-    DWORD code = 0;
-    GetExitCodeProcess(process.hProcess, &code);
-    CloseHandle(process.hThread);
-    CloseHandle(process.hProcess);
-    return static_cast<int>(code);
+// Ampify's logo at one size, from the module this code is built into. Loaded once per size and kept: LR_SHARED would
+// hand back the first size loaded whatever size is asked for.
+HICON LoadLogo(int width, int height) {
+    HMODULE module = nullptr;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       reinterpret_cast<LPCWSTR>(&LoadLogo), &module);
+    HANDLE logo = module ? LoadImageW(module, MAKEINTRESOURCEW(1), IMAGE_ICON, width, height, LR_DEFAULTCOLOR) : nullptr;
+    return logo ? static_cast<HICON>(logo) : LoadIconW(nullptr, reinterpret_cast<LPCWSTR>(IDI_APPLICATION));
 }
 
 }  // namespace
@@ -176,35 +151,18 @@ std::vector<DWORD> ProcessIdsNamed(const wchar_t* imageName) {
     return found;
 }
 
-int RunAndWait(const std::wstring& commandLine, const std::filesystem::path& outputFile) {
-    return StartAndWait(commandLine, outputFile);
-}
-
-int RunElevatedAndWait(const std::filesystem::path& program, const std::wstring& parameters) {
-    if (IsElevated()) return StartAndWait(L"\"" + program.wstring() + L"\" " + parameters, {});
-
-    SHELLEXECUTEINFOW info{};
-    info.cbSize = sizeof(info);
-    info.fMask = SEE_MASK_NOCLOSEPROCESS;
-    info.lpVerb = L"runas";
-    info.lpFile = program.c_str();
-    info.lpParameters = parameters.c_str();
-    info.nShow = SW_HIDE;
-    if (!ShellExecuteExW(&info) || !info.hProcess) return -1;
-
-    WaitForSingleObject(info.hProcess, INFINITE);
-    DWORD code = 0;
-    GetExitCodeProcess(info.hProcess, &code);
-    CloseHandle(info.hProcess);
-    return static_cast<int>(code);
-}
-
 bool AskYesNo(const std::wstring& text, const std::wstring& title) {
     return MessageBoxW(nullptr, text.c_str(), title.c_str(), MB_ICONQUESTION | MB_YESNO) == IDYES;
 }
 
 void ShowMessage(const std::wstring& text, bool error) {
     MessageBoxW(nullptr, text.c_str(), L"Ampify", (error ? MB_ICONERROR : MB_ICONINFORMATION) | MB_OK);
+}
+
+HICON AmpifyIcon(bool large) {
+    static const HICON smallLogo = LoadLogo(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+    static const HICON largeLogo = LoadLogo(GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
+    return large ? largeLogo : smallLogo;
 }
 
 }  // namespace ampify::win

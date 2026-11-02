@@ -1,8 +1,8 @@
 # Windows only: the shared helpers (ampify_win), the kernel DLL, the XAML backend, the launcher and the installer. The
 # lists are always defined; CMakeLists.txt uses them only when targeting Windows.
 # See the convention at the top of CMakeLists.txt.
-list(APPEND AMPIFY_WIN_SOURCES src/win/win_common.cpp src/win/package.cpp src/win/win_host.cpp src/win/hook.cpp src/win/ui_thread.cpp
-    src/win/kit_command.cpp src/win/wic_image.cpp)
+list(APPEND AMPIFY_WIN_SOURCES src/win/win_common.cpp src/win/package.cpp src/win/win_host.cpp src/win/hook.cpp
+    src/win/ui_thread.cpp src/win/kit_command.cpp src/win/wic_image.cpp src/win/background.cpp)
 
 list(APPEND AMPIFY_KERNEL_SOURCES src/kernel/kernel.cpp extensions/atmos-leveler/atmos_windows.cpp)
 

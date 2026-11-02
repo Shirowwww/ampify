@@ -157,7 +157,7 @@ int AnnounceSwitch(Context& ctx, std::string_view kind, const std::string& id, b
         return 0;
     }
     RequestReload(ctx, {std::string(enable ? "start " : "stop ") + ReloadTarget(kind, id)});
-    ctx.out << "If Apple Music is running with the kernel, the change applies right away. Otherwise, run ampify launch.\n";
+    ctx.out << "If Apple Music is running with the kernel, the change applies right away. Otherwise, at the next start.\n";
     return 0;
 }
 

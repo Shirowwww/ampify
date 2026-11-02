@@ -4,63 +4,34 @@
 
 | Folder | Content |
 |---|---|
-| `core/` | Portable C++ for the kernel: settings, manifests, the JavaScript host and API modules (`core/prelude`, `core/natives`, `core/api`), the theme engine (`core/theme`), audio math, safe mode, version gate, `drm_guard.cpp` |
-| `win/` | Windows code: hooks, XAML backend, UI thread, theme service, SMTC, WinHTTP, Discord, tray, MIDI, remote server |
-| `kernel/`, `launcher/`, `setup/`, `testkit/` | The entry points of `ampify_kernel.dll`, `ampify_launcher.exe`, `ampify_setup.exe` and `Ampify-Test.exe` |
-| `cli/` | `ampify.exe` |
-| `tools/` | `ampify_theme_check`, the validator (`validate.py`), `pack.py`, and the Python and Node tests |
-| `tests/` | The C++ unit tests (`ampify_tests`) |
-| `apps/`, `extensions/`, `examples/`, `themes/`, `catalog/`, `schemas/` | The Marketplace app, the built-in Atmos leveler, example elements, example themes and snippets, the catalog, the JSON schemas |
+| `src/core/` | Portable C++ for the kernel: settings, manifests, the JavaScript host and API modules (`prelude/`, `natives/`, `api/`), the theme engine (`theme/`), audio math, safe mode, version gate, `drm_guard.cpp` |
+| `src/win/` | Windows code: hooks, XAML backend, UI thread, theme service, SMTC, WinHTTP, Discord, tray, MIDI, remote server, the background launcher's registration |
+| `src/kernel/`, `src/launcher/`, `src/setup/` | The entry points of `ampify_kernel.dll`, `ampify_launcher.exe` and `ampify_setup.exe` |
+| `src/cli/` | `ampify.exe` |
+| `src/resources/` | `ampify.ico`, the logo every binary carries |
+| `themes/` | The themes and palettes of the catalog; `themes/snippets/` for snippets |
+| `extensions/`, `apps/` | What ships with Ampify: Now Playing, the built-in Atmos leveler, the Marketplace app |
+| `examples/` | Example extensions, for authors |
+| `tools/` | The validator (`validate.py`), `pack.py`, and the Python and Node tests |
+| `schemas/` | The JSON schemas of manifests, the catalog and the version list |
+| `tests/` | The C++ unit tests (`ampify_tests`, and `ampify_ui_thread_test` on Windows) |
 | `bench/windows/` | The Windows bench (PowerShell) |
-| `scripts/` | Build, bench-kit, listening test, packaging, and the all-in-one check |
-| `knowledge/`, `reference/` | What was learned about Apple Music, and the reference Atmos mod and loudness meter |
+| `scripts/` | Build, install, bench kit, listening test and packaging scripts, and the pre-push hook |
+| `knowledge/` | What was learned about Apple Music's internals |
 | `vendor/quickjs/` | quickjs-ng, vendored without changes |
 | `cmake/sources/` | One `.cmake` file per package, listing its sources and tests |
 
-## Everything that needs no Apple Music (Linux or WSL)
+The catalog the Marketplace reads is in its own repository, `ampify-catalog`. The tests that check it run when a clone
+of it sits next to this one (or where `AMPIFY_CATALOG` points), and are skipped otherwise.
 
-```bash
-scripts/check-all.sh
-```
+## Windows build with MSVC
 
-It runs, in order: the Linux build and `ampify_tests`, the Python and Node tests, catalog and manifest validation, the
-MinGW cross-build, the unit tests under Wine, the Wine hook harness (with a null PulseAudio sink, a fake Atmos stream and
-a fake `AVFoundationCF.dll`), and the installer and test kit end-to-end under Wine. It prints one line per step and exits
-with 1 if any step fails. Logs go to `build-check/` (override with `AMPIFY_CHECK_DIR`). `--linux-only` skips the Windows
-part.
-
-Needs: cmake, ninja, g++, python3, node. For the Windows part: g++-mingw-w64-x86-64, wine and pulseaudio.
-
-Run the pieces by hand:
-
-```bash
-cmake -S . -B build && cmake --build build
-./build/ampify_tests                                                    # C++ unit tests
-AMPIFY_BIN=$PWD/build/ampify python3 -m unittest discover -s tools -v   # validator, pack.py, CLI end-to-end
-node --test tools/test_examples.mjs                                     # example extensions against a fake Ampify
-```
-
-Under Wine, `AMPIFY_WINE=1 AMPIFY_BIN=build-win/ampify.exe` runs the CLI tests that do not need `tar.exe` or `curl.exe`.
-
-## CMake options
-
-| Option | Default | Effect |
-|---|---|---|
-| `AMPIFY_BUILD_TESTS` | `ON` | Builds the portable unit tests. Forced off for a bench build, because the tests check the shipping version policy |
-| `AMPIFY_BENCH` | `OFF` | Bench build: the kernel and launcher accept any Apple Music version. **Never distribute it.** The configure step prints a warning and `BUILD_INFO.txt` says so |
-| `AMPIFY_XAML` | `OFF` | Builds the XAML theme backend and native interface. Needs the Windows App SDK C++/WinRT headers (`AMPIFY_WINAPPSDK_INCLUDE`) |
-| `AMPIFY_BUILD_HARNESS` | `OFF` | Builds the Wine hook harness |
-
-The version lives in `CMakeLists.txt` (`project(Ampify VERSION ...)`). The configure step checks that the C++ constants
-agree with it.
-
-## Windows build with MSVC (XAML included)
-
-Needs Visual Studio 2022 (the C++ desktop workload and a Windows SDK) and CMake. Ninja comes with Visual Studio.
+Needs Visual Studio 2022 or later (the C++ desktop workload and a Windows SDK) and CMake. Ninja comes with Visual
+Studio.
 
 ```powershell
+pwsh -File scripts\build-msvc.ps1            # release build and tests into build-msvc\release
 pwsh -File scripts\build-msvc.ps1 -Bench     # bench build into build-msvc\bench
-pwsh -File scripts\build-msvc.ps1            # release build into build-msvc\release
 ```
 
 Close Apple Music first: a loaded kernel locks the DLL and blocks the link.
@@ -71,9 +42,49 @@ The script:
 2. Downloads the WinUI 1.8 metadata packages from NuGet once, checks the SHA-256 of `Microsoft.UI.Xaml.winmd`, and
    generates the C++/WinRT projection in `build-msvc\winrt-gen`.
 3. Picks the newest Windows SDK that has an x64 `cppwinrt.exe`. An older SDK (17763) ships C++/WinRT 1.0, which fails.
-4. Configures with `AMPIFY_XAML=ON` and compiles with `/MP`.
+4. Configures with `AMPIFY_XAML=ON` and builds with Ninja.
 
 Later runs compile only what changed, in a few seconds to a minute.
+
+## Tests
+
+```powershell
+build-msvc\release\ampify_tests.exe                  # C++ unit tests
+build-msvc\release\ampify_ui_thread_test.exe         # the interface thread hook, with a real window
+node --test tools/test_examples.mjs                  # example extensions and the Marketplace page, against a fake Ampify
+$env:AMPIFY_BIN = "$PWD\build-msvc\release\ampify.exe"
+python -m unittest discover -s tools -p "test_*.py"  # validator, pack.py, the command line end to end
+```
+
+The portable part (everything but `src/win`, the kernel, the launcher and the installer) also builds and tests on
+Linux or WSL, as the CI does:
+
+```bash
+cmake -S . -B build -G Ninja && cmake --build build --target ampify_tests ampify
+./build/ampify_tests
+AMPIFY_BIN=$PWD/build/ampify python3 -m unittest discover -s tools -p 'test_*.py'
+```
+
+`scripts/hooks/pre-push` runs the validator, packer and example tests in a few seconds before each push. Turn it on
+once per clone: `git config core.hooksPath scripts/hooks`.
+
+## CMake options
+
+| Option | Default | Effect |
+|---|---|---|
+| `AMPIFY_BUILD_TESTS` | `ON` | Builds the unit tests. Forced off for a bench build, because the tests check the shipping version policy |
+| `AMPIFY_BENCH` | `OFF` | Bench build: the kernel and launcher accept any Apple Music version. **Never distribute it.** The configure step prints a warning and `BUILD_INFO.txt` says so |
+| `AMPIFY_XAML` | `OFF` | Builds the XAML theme backend and native interface. Needs the C++/WinRT projection of WinUI (`AMPIFY_WINAPPSDK_INCLUDE`) |
+
+The version lives in `CMakeLists.txt` (`project(Ampify VERSION ...)`). The configure step checks that the C++ constants
+agree with it.
+
+## Running a build
+
+`ampify launch`, or `build-msvc\bench\ampify_launcher.exe`, starts Apple Music with the kernel in the foreground; the
+launcher stays open while the app runs. `ampify_launcher.exe --background` is what the installer starts at sign-in:
+it waits for Apple Music and loads the kernel each time the app opens (`src/win/background.hpp`). Logs are in
+`%USERPROFILE%\Ampify\logs\` (`launcher.log` or `background.log`, then `AppleMusic.log` and `AMPLibraryAgent.log`).
 
 To lay out the kit folder as the CI does and run the bench cases:
 
@@ -82,11 +93,9 @@ pwsh -File scripts\bench-kit.ps1
 pwsh -File bench\windows\run-bench.ps1 -KitRoot build-msvc\kit -Only <case> -SkipInstall
 ```
 
-`scripts\bench-kit.ps1` builds `build-msvc\kit` with `release\` (launcher, kernel, setup, test kit, `ampify.exe`), `cli\`,
-`bench\` (the bench build) and `ui\` (the bench build plus `ampify_theme_check.exe`, the example themes and
+`scripts\bench-kit.ps1` builds `build-msvc\kit` with `release\` (launcher, kernel, setup, `ampify.exe`), `cli\`,
+`bench\` (the bench build) and `ui\` (the bench build plus `ampify_theme_check.exe`, the themes and
 `examples\react-panel`). See [bench-and-ci.md](bench-and-ci.md).
-
-Start by hand: `build-msvc\bench\ampify_launcher.exe`. Logs are in `%USERPROFILE%\Ampify\logs\`.
 
 ### Reading a crash
 
@@ -112,33 +121,29 @@ Each package lists its files in `cmake/sources/<package>.cmake`, always with `li
 bash scripts/package.sh --msvc build-msvc/kit
 ```
 
-It needs a `python3` command. It builds `dist/ampify-<version>-windows-x64.zip` and `dist/SHA256SUMS.txt`, the two names
-`ampify update` looks for in a release. Nothing is published by the script.
+It needs a `python3` command. It builds `dist/ampify-<version>-windows-x64.zip` and `dist/SHA256SUMS.txt`, the two
+names `ampify update` and `scripts/install.ps1` look for in a release. Nothing is published by the script.
 
-- `--msvc <kit>` takes the MSVC kit (the CI artifact `ampify-msvc-kit` or `build-msvc\kit`). Prefer it: only the MSVC build
-  has the XAML binding (theme choice, the "Ampify" card in Settings, panels). A MinGW kernel injects, levels Atmos and
-  runs extensions, but draws nothing in the interface, so a MinGW package only checks the packaging.
-- `--mingw [<dir>]` takes a MinGW build folder (default `build-check/win`) or the `ampify-builds` artifact.
+- `--msvc <dir>` takes the MSVC kit (the CI artifacts `ampify-msvc-kit-*`, or `build-msvc\kit`) or an MSVC build folder.
 - `--out <dir>` (default `dist`) and `--commit <sha>` (written to `BUILD_INFO.txt`).
-- `--test` adds the test kit for a test pass ([testing-on-a-pc.md](testing-on-a-pc.md)): `Ampify-Test.exe`,
-  `prepare-test.cmd` and `TEST-GUIDE.txt`. Without it, the zip is the one people download.
-- Only the release build is taken. A bench build is refused, and so is a kit whose `BUILD_INFO.txt` does not match the
-  compiler named on the command line.
+- Only the release build is taken. A bench build is refused, and so is a kit whose `BUILD_INFO.txt` does not mention
+  MSVC.
 - The script checks that the installer contains the version number, and that each binary is a Windows executable.
 
-The zip is flat, as `ampify update` and `ampify_setup.exe` need: `ampify.exe`, `ampify_launcher.exe` and `ampify_kernel.dll`
-at the root, next to `ampify_setup.exe` (the installer copies from its own folder). The Marketplace and Now Playing ship
-with the kit: they go under `examples\` with the example extensions and themes, and the installer and
-`ampify update --apply` put them in the user's Ampify folder, in place of any older copy (`core/kit_layout.hpp`). The text
-files get CRLF line endings and a BOM so Notepad opens them correctly, and `prepare-test.cmd` gets no BOM.
+The zip is flat, as `ampify update` and `ampify_setup.exe` need: `ampify.exe`, `ampify_launcher.exe` and
+`ampify_kernel.dll` at the root, next to `ampify_setup.exe` (the installer copies from its own folder). The
+Marketplace and Now Playing ship with the kit: they go under `examples\` with the example extensions and the themes,
+and the installer and `ampify update --apply` put them in the user's Ampify folder, in place of any older copy
+(`src/core/kit_layout.hpp`). The text files get CRLF line endings and a BOM so Notepad opens them correctly.
 
-The binaries of an MSVC build carry a version resource (Properties > Details): product, publisher, description and
-version, from `cmake/version.rc.in`.
+The binaries carry a version resource (Properties > Details: product, publisher, description, version) and the logo,
+from `cmake/version.rc.in`.
 
-A manual GitHub workflow packages from a green bench run: it takes the `ampify-msvc-kit` artifact of that run and publishes
-the zip as a workflow artifact, never as a release.
+A manual GitHub workflow (`package.yml`) packages from a green CI run: it takes the `ampify-msvc-kit-*` artifacts of
+that run and publishes the zip as a workflow artifact, never as a release.
 
 ## Releases
 
-A release needs two files: `ampify-<version>-windows-x64.zip` and `SHA256SUMS.txt`. The binaries are not code-signed yet,
-so Windows SmartScreen asks for confirmation.
+A release needs two files: `ampify-<version>-windows-x64.zip` and `SHA256SUMS.txt`. The install line of the README
+reads `scripts/install.ps1` from `main`, and the script installs the release GitHub marks as latest. The binaries are
+not code-signed yet, so Windows SmartScreen asks for confirmation.

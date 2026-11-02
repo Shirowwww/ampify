@@ -186,9 +186,8 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             // (the midnight theme alone left light text on Apple Music's white background). The scheme's background
             // decides when it gives one (a Spicetify scheme is often named Nord or Mocha), its name otherwise.
             auto modeStart = std::chrono::steady_clock::now();
-            bool refreshed = ui->backend.SetAppMode(request.theme ? std::optional<bool>(request.theme->dark.value_or(
-                                                                        theme::IsDarkScheme(request.theme->scheme)))
-                                                                  : std::nullopt);
+            bool refreshed = ui->backend.SetAppMode(
+                request.theme ? theme::AppModeOf(request.theme->dark, request.theme->scheme) : std::nullopt);
             if (std::string note = ui->backend.TakeCaptionNote(); !note.empty()) journal.Write(note);
             if (refreshed) {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - modeStart);

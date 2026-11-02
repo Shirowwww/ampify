@@ -10,7 +10,7 @@
 namespace ampify {
 
 // Version shipped in this build. Shown in the uninstall list.
-inline constexpr std::string_view kKitVersion = "1.0.2";
+inline constexpr std::string_view kKitVersion = "1.1.0";
 
 // Folder name under %LOCALAPPDATA%\Programs (the installed kit) and under %USERPROFILE% (the user's data).
 inline constexpr std::string_view kKitFolderName = "Ampify";
@@ -22,7 +22,7 @@ inline constexpr std::string_view kKernelFile = "ampify_kernel.dll";
 inline constexpr std::string_view kSetupFile = "ampify_setup.exe";
 inline constexpr std::string_view kCliFile = "ampify.exe";  // beside the kernel, which runs it for the Marketplace page
 
-// The start menu shortcut that starts Apple Music through the launcher.
+// The Start menu shortcut of versions up to 1.0.2, which started Apple Music through the launcher. Removed on install.
 inline constexpr std::string_view kShortcutFile = "Apple Music with Ampify.lnk";
 
 // Uninstall entry under HKEY_CURRENT_USER, so the kit shows in Settings > Apps.
@@ -48,5 +48,12 @@ bool IsBundledElement(std::string_view folder, std::string_view id);
 // Copies the bundled elements from <package>\examples into the data folder `kit`, each in place of the copy already
 // there. Returns one line per element left as it was, such as one missing from the package.
 std::vector<std::string> InstallBundledElements(const std::filesystem::path& package, const std::filesystem::path& kit);
+
+// The user's Path (entries separated by ';') with `folder` added at the end, so `ampify` works in any terminal. A Path
+// that already holds it, whatever the case or a trailing separator, comes back unchanged. Empty entries are dropped.
+std::string PathWithFolder(std::string_view path, std::string_view folder);
+
+// The user's Path without `folder`, the other entries kept in their order. Used by the uninstaller.
+std::string PathWithoutFolder(std::string_view path, std::string_view folder);
 
 }  // namespace ampify

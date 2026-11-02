@@ -246,7 +246,7 @@ SplitView#ContentSplitView > Grid > Grid#ContentRoot > Border > Grid { backgroun
 Grid#PaneRoot { backdrop: acrylic(#0B0B10, 0.62); corner-radius: 18px; margin: 10 6 10 10; }
 ```
 
-Full example: `themes/examples/artwork`. With no song loaded, the background stays empty.
+Full example: `themes/artwork`. With no song loaded, the background stays empty.
 
 ### Layout
 
@@ -703,7 +703,7 @@ the Ampify folder, next to `settings.txt`. They apply with or without a theme.
 **The real names still have to be read from the app.** The names in the example are made up. Run the inspector
 (`theme.inspect = 1`) and read the `NavigationViewItem` entries in `logs\inspector.txt` or `logs\inspector.json`.
 
-**Generator.** `core/theme/layout.hpp` provides what is needed to write these files: `NamesMatching(tree,
+**Generator.** `src/core/theme/layout.hpp` provides what is needed to write these files: `NamesMatching(tree,
 NavigationViewItem)` lists the entries of the real tree, `GenerateLayout(existing file, names)` keeps the order and state
 of entries already listed and adds new ones at the end, visible, and `WriteLayout` writes the text. After an inspection,
 the kernel creates `sidebar.json` if it does not exist yet: the full list, nothing hidden, the current order. Then you
@@ -711,7 +711,7 @@ only need to set entries to `"hidden": true` or move them in the list.
 
 ## Example of a full redesign: Glass
 
-[`themes/examples/glass/`](../../themes/examples/glass/) changes most of the interface: a gradient background, an acrylic
+[`themes/glass/`](../../themes/glass/) changes most of the interface: a gradient background, an acrylic
 sidebar and playback bar, content in a large rounded card with a shadow, larger text, and buttons that grow on hover.
 Its selectors use the names read on Apple Music 1.1792. Those that only target a generic type are marked provisional at
 the top of its `user.css`.
@@ -785,7 +785,7 @@ With `theme.inspect = 1`, the kernel writes the interface tree on its next pass,
 - The resources listed are the colours and brushes Apple Music and WinUI name (about 870 in Apple Music 1.1792), each
   looked up by its key. The application's dictionaries are not walked: walking them made Apple Music crash at the next
   theme change.
-- `logs\inspector.json`: the same tree for tools (function `InspectTreeJson` in `core/theme/inspector.hpp`). The command
+- `logs\inspector.json`: the same tree for tools (function `InspectTreeJson` in `src/core/theme/inspector.hpp`). The command
   `ampify inspect --tree` prints the text version.
 
 ```json
@@ -808,21 +808,21 @@ window's content, then each popup seen open). `id` is a string. Templates and ob
 
 ## Windows side
 
-The engine is portable (`core/theme/`) and tested on Linux. The Windows service (`win/theme_service.cpp`) calls it:
+The engine is portable (`src/core/theme/`) and tested on Linux. The Windows service (`src/win/theme_service.cpp`) calls it:
 
-- On its worker thread, a `ThemeWorker` (`core/theme/worker.hpp`). At each pass: `SetSystemDark(dark)` with the value
+- On its worker thread, a `ThemeWorker` (`src/core/theme/worker.hpp`). At each pass: `SetSystemDark(dark)` with the value
   `AppsUseLightTheme` of `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize` (0 = dark), then
   `Tick(settings, minute)` with the local time in minutes since midnight. The result is the request to send to the UI
   thread. Its generation changes only when a reload is needed.
 - On the UI thread, `ThemeSession::Tick` applies the request. After an inspection, the service also writes
   `inspector.json` and creates `sidebar.json` if it is missing.
 
-The XAML backend (`win/xaml_backend.cpp`) reads and writes `FlowDirection` (`LeftToRight` or `RightToLeft`) and the
+The XAML backend (`src/win/xaml_backend.cpp`) reads and writes `FlowDirection` (`LeftToRight` or `RightToLeft`) and the
 `Order` position (moving the element in `MenuItems` or `Children` of its parent).
 
 For gradients, acrylic, transforms and shadows, the backend creates an object (brush, transform, shadow) and remembers
 the value that produced it. As long as the element keeps that object, it reads back as that value, and the next pass
-writes nothing. Hover goes through `HoverTracker` (`core/theme/hover.hpp`), the same code the tests use. Under the
+writes nothing. Hover goes through `HoverTracker` (`src/core/theme/hover.hpp`), the same code the tests use. Under the
 pointer, the engine reads and writes the "underneath" value without undoing the hover.
 
 ## Known limits

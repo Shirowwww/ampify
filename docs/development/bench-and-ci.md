@@ -9,27 +9,30 @@ See [testing-on-a-pc.md](testing-on-a-pc.md).
 
 ## Run the bench
 
-**Automatically.** `.github/workflows/windows-bench.yml` runs on each push to a working branch that touches the code. Its
-jobs:
+**Automatically.** `.github/workflows/ci.yml` runs on each push to `dev` that touches the code, and by hand on any
+branch. Its jobs:
 
 | Job | What it does |
 |---|---|
-| Linux tests | Builds and runs `ampify_tests` (ccache) |
-| MinGW build | Cross-compiles the release and bench builds for Windows x64 (ccache) |
-| MinGW bench | Runs the cases on `windows-latest` in two parallel shards (launch, tools) |
-| MSVC build | Builds the XAML kit on two machines at once: the release build with the Windows tests, and the bench build |
-| MSVC bench | Runs the cases on the MSVC kit in three parallel shards (launch, tools, interface) |
+| Unit tests (Linux) | Builds and runs `ampify_tests`, then the Python and Node tests against the Linux `ampify` (ccache) |
+| Unit tests (Windows, MSVC) | Builds and runs `ampify_tests` and `ampify_ui_thread_test` with MSVC (ccache) |
+| Build the release kit, Build the bench kit | The two MSVC kits with XAML, on two machines at once (ccache) |
+| Bench (launch, safety, tools, ui) | The cases on four parallel runners, each with its own Apple Music, about two minutes each |
+
+A run takes about five minutes when the cache is warm and a header that half the code includes has not changed. The
+MSVC setup (WinUI metadata, the C++/WinRT projection, ccache) is shared by the jobs through
+`.github/actions/msvc-setup`.
 
 The two builds are:
 
-- **release**: the build that ships. It injects only on versions of `core/version_gate.hpp`.
+- **release**: the build that ships. It injects only on versions of `src/core/version_gate.hpp`.
 - **bench**: the same code compiled with `AMPIFY_BENCH=ON`. It accepts any Apple Music version.
 
 On the Windows runner the job installs Apple Music with `winget` (Microsoft Store source), then runs
 `bench/windows/run-bench.ps1`. Results are in the job summary (a table per case) and in an artifact: `report.md`,
 `results.json`, `winget.log`, `preparation.txt`, and for each case a folder with the Ampify logs and the screenshots.
 
-**By hand.** Actions tab, workflow "Windows bench", "Run workflow".
+**By hand.** Actions tab, workflow "CI", "Run workflow".
 
 **On a PC.** Not advised on a PC where you use Apple Music. The bench closes Apple Music by force and empties
 `%USERPROFILE%\Ampify\logs` and `state.txt` (it does not touch `settings.txt`).
@@ -63,12 +66,12 @@ The cases are files named `NN-name.ps1` in `bench/windows/cases/`, run in file n
 | Normal launch | Apple Music started as usual, without the launcher: no kernel log, no `ampify_kernel.dll` module, window responds |
 | Release version gate | Release build: injection if the installed version is in the tested list, refusal otherwise. The app starts in both cases |
 | Bench injection | Bench build: signature of `AVFoundationCF.dll` recognized, kernel loaded in both processes, suspended launch (thread count resumed), app healthy after 20 s, launcher exits cleanly |
+| Background launch | The background launcher (`--background`) loads the kernel into Apple Music opened from its own icon, twice in a row, keeps one instance per session, and stops when asked |
 | Safe mode | Counter at 2: the launcher starts without the kernel, then resets the counter after 20 s |
 | CLI tools, build, install | `ampify.exe` commands on Windows, including `build` and `install` from a local catalog |
-| Installer | `ampify_setup.exe` install and uninstall |
+| Installer | `ampify_setup.exe` install and uninstall: files, sign-in entry, background launcher, user Path, uninstall entry, refusal while Apple Music is open |
 | Hello extension | An example extension loads and writes its log |
 | Atmos leveler | Hooks and measurement on the bench build |
-| Test kit | `Ampify-Test.exe` in automatic mode |
 | Player | Apple's player interfaces |
 | XAML interface | Window found through `AMP.Utils`, work run by the DispatcherQueue, `react-panel` mounted after a hot start (`reload.txt`), `AMPIFY_...` elements found with UI Automation, the "Add one" click updated in place, the midnight theme applied, the "Ampify" card in Settings > Playback if automatic navigation gets there. One PNG screenshot per step |
 | XAML inspector and examples | The inspector writes its tree, and the example themes load |
@@ -76,7 +79,7 @@ The cases are files named `NN-name.ps1` in `bench/windows/cases/`, run in file n
 ## The bench build (`AMPIFY_BENCH`)
 
 `cmake -DAMPIFY_BENCH=ON` builds a version that accepts any non-empty Apple Music version, instead of the list in
-`core/version_gate.hpp`. It tests the injection mechanism on the version installed on the runner, which is not always the
+`src/core/version_gate.hpp`. It tests the injection mechanism on the version installed on the runner, which is not always the
 one in the list. It turns off the unit tests, which check the shipping policy.
 
 **Never ship this build.** The message `AMPIFY_BENCH=ON` shows during the build, and the artifact's `BUILD_INFO.txt` says so.
@@ -87,12 +90,12 @@ inject.
 ## Build signature (`AVFoundationCF.dll`)
 
 The launcher and the kernel read the export table of `AVFoundationCF.dll` in the package folder at each launch. The
-required names are in `core/build_signature.hpp`. The kernel stores no address and resolves only by name. A tested version
+required names are in `src/core/build_signature.hpp`. The kernel stores no address and resolves only by name. A tested version
 whose DLL does not export these names is refused. The launcher log says whether the signature is recognized, with the
 number of exports found, or which exports are missing. The bench injection case checks that line on the installed version.
 
 To mark a new version as tested, both must hold: the bench injects cleanly on it, and its signature is recognized. Then add
-it to `kKnownAppVersions` (and publish it in `catalog/versions.json`).
+it to `kKnownAppVersions` (and publish it in `versions.json` of ampify-catalog).
 
 ## Add a case
 
@@ -125,7 +128,8 @@ Register-Case -Id 'my-case' -Title 'Sentence that says what is checked' -Require
   whether it closed cleanly.
 - Logs are read as the C++ writes them. In a single-quoted string, double the apostrophe (`'the app''s'`), or use double
   quotes.
-- A case that needs an executable adds it to the "build" job (in `dist/`), then reads it from `$script:KitRoot`.
+- A case that needs an executable adds it to the kit layout of the "Build the ... kit" jobs in `ci.yml`, then reads it
+  from `$script:KitRoot`. Add the case's id to one of the four bench groups, keeping them about even.
 
 Helpers in `bench/windows/lib/harness.ps1`:
 
@@ -219,15 +223,20 @@ Pitfalls found:
 
 ## CI speed-ups, in the order they mattered
 
-1. **Parallel shards** (`-Only`): MinGW bench from 25-40 min to about 7 min.
-2. **ccache** on Linux and MinGW.
-3. **`/MP`** for MSVC: the Visual Studio generator compiles the files of one project one by one. Real gain: 23.8 to
-   14 min.
-4. **Limited bench build** to `ampify_launcher ampify_kernel ampify_theme_check`.
-5. **ccache for MSVC with Ninja:** the first run fills the cache and later runs recompile only what changed. The
+1. **Parallel bench groups** (`-Only`): four runners of about two minutes each, instead of one long bench.
+2. **ccache for MSVC with Ninja:** the first run fills the cache and later runs recompile only what changed. The
    precompiled header is off with ccache, because ccache cannot cache a file compiled with a PCH.
-6. What costs time: the five XAML files (`win/xaml_backend.cpp`, `theme_service.cpp`, `xaml_host.cpp`, `ui_renderer.cpp`,
-   `ui_service.cpp`), because of WinUI's C++/WinRT headers. Splitting the two builds over two machines gained almost nothing.
+3. **Unit tests apart from the kits:** the Windows tests build their own targets, so the bench never waits for them.
+4. **Limited builds:** the bench kit builds only `ampify_launcher ampify_kernel ampify_theme_check`, and the unit test
+   job skips the WinUI projection, which it does not need.
+5. **One workflow, triggered on `dev` only:** work reaches `main` through `dev` with the same commits, so `main` and
+   pull requests need no run of their own, and a new push cancels the run in progress.
+6. What costs time: the five XAML files (`src/win/xaml_backend.cpp`, `theme_service.cpp`, `xaml_host.cpp`,
+   `ui_renderer.cpp`, `ui_service.cpp`), because of WinUI's C++/WinRT headers. A change to a header they include
+   recompiles them, which brings a kit build back to about six minutes.
+
+Before a push, `scripts/hooks/pre-push` runs the fast checks (validator, packer, examples) in a few seconds, so a broken
+manifest never waits for CI to say so (`git config core.hooksPath scripts/hooks`).
 
 ## CI pitfalls
 
@@ -237,7 +246,11 @@ Pitfalls found:
 - `vendor/quickjs/VERSION` was taken for the C++ header `<version>` (Windows ignores case): renamed `UPSTREAM.txt`.
 - XAML linking: `RoGetActivationFactory` missing, link `runtimeobject`.
 - Uninstalling crashed on `IPackageDebugSettings`: the call was removed.
-- The test kit blocked a job for 25 minutes for lack of a maximum delay: the helper that runs it (`Invoke-KitProgram`) has a
-  timeout.
+- A program the bench runs blocked a job for 25 minutes for lack of a maximum delay: the helper that runs the installer
+  (`Invoke-KitProgram`) has a timeout.
+- The cases run under strict mode: reading a registry value that may be absent as a property throws. Check that the
+  property exists first.
+- Mouse drags: `SetCursorPos` with moves of zero pixels let Apple's player see the press but never follow it. Absolute
+  `mouse_event` moves are what a real mouse sends.
 - The helper that closes the first-run dialogs returned an array, which made a `Wait-Until` condition true: add `| Out-Null`.
 - Files of the signed-in bench restarted the main bench: they are excluded from the trigger paths.

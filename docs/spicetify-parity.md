@@ -156,7 +156,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | Snippets (small CSS you switch on) | `kind: snippet`: a `resources.xaml` and an optional `user.css`, `ampify snippet enable <id>` | Done |
 | Marketplace tab in the app | The Marketplace app: a page inside Apple Music that lists the catalog and installs, updates, removes, and picks themes | Done |
 | Install and update | `ampify install <id>` and `ampify update <id>`: SHA-256 checked, permissions shown before activation | Done |
-| Public catalog | `catalog/catalog.json`, schema, validator and human review ([extensions/catalog.md](extensions/catalog.md)). The catalog has few entries so far | Partial |
+| Public catalog | [ampify-catalog](https://github.com/Shirowwww/ampify-catalog), schema, validator and human review ([extensions/catalog.md](extensions/catalog.md)). The catalog has few entries so far | Partial |
 
 ## 7. Developer tools
 
@@ -221,29 +221,28 @@ hosts found by traffic capture. License and DRM hosts would never be on that lis
 | Notification-area icon | `Ampify.tray`, permission `ui.tray`, setting `tray.enabled` | Done |
 | Local remote | HTTP on `127.0.0.1` with a token, for phones and Stream Deck | Done |
 | MIDI controller | `Ampify.midi` and `midi.map`, no light feedback | Done |
-| "Now playing" for OBS | `Ampify.fs.writeText` to a text file. Example: `examples/now-playing-file` | Done |
+| "Now playing" for OBS | `Ampify.fs.writeText` to a text file | API done, no example |
 | Sleep timer | Example: `examples/sleep-timer` | Done |
-| Listening stats | Example: `examples/listen-stats`, a local JSON log of metadata only | Done |
+| Listening stats | `Ampify.storage` and `Ampify.player.on` | API done, no example |
 | M3U8 playlists import and export | Needs the library, outside 1.0 | Outside 1.0 |
 | Settings profiles | `ampify profile use <name>` | Done |
 | Theme that follows the system or the time | `theme.scheme = auto`, `theme.schedule` | Done |
-| Accessibility | A high contrast theme in the catalog sources, larger text theme | Partial |
+| Accessibility | A high contrast theme in the catalog | Partial |
 | Diagnosis | `ampify doctor` | Done |
 | Export and import of settings | `ampify export <file.zip>` and `ampify import` | Done |
 | Interface texts in several languages | `Ampify.i18n` | Done |
-| Visualizer | `Ampify.audio.onFrame` feeds it. Example: `examples/visualizer-data` | Partial |
+| Visualizer | `Ampify.audio.onFrame` feeds it | Partial |
 
 ## 10. What the most used Spicetify themes and extensions need
 
-[knowledge/spicetify-top.md](../knowledge/spicetify-top.md) lists what people do most with Spicetify and what Ampify
-already covers. The gaps it named before 1.0 are closed: a full-screen now playing view with synchronized lyrics,
+The gaps found before 1.0, among what people do most with Spicetify, are closed: a full-screen now playing view with synchronized lyrics,
 transitions on hover, named targets for album and playlist pages, and the player read on Apple Music 1.1792. What
-remains is in its list "What is still missing" and in the rows marked "Outside 1.0" above.
+remains is in the rows marked "Outside 1.0" above.
 
 ## 11. How each feature is checked
 
 - Pure logic (JavaScript, validator, measurement, settings): tests under Node and Linux, without the app.
-- Windows mechanisms (injection, the XAML tree, SMTC, notifications): the Windows bench in CI, and the test kit on a PC.
+- Windows mechanisms (injection, the XAML tree, SMTC, notifications): the Windows bench in CI, and a test pass on a PC.
 - Internal services (winmd projections): a read-only probe calls each method and logs the result.
 - Sound (hooks, Atmos): measurements on real songs on a PC, with in-memory capture only.
 - Anything that needs the real app signed in cannot be checked in CI without an Apple account. See

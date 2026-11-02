@@ -1,6 +1,9 @@
 # Make an extension in five minutes
 
-You need Apple Music started with Ampify (`ampify launch`) and a terminal open in a working folder.
+You need Ampify installed, Apple Music open, and a terminal open in a working folder. The extensions in
+[examples/](../../examples) are short: `hello-extension` and `react-panel` are the best ones to start
+from, `sleep-timer`, `keyboard-skip`, `discord-presence` and `scrobbler` show the player, shortcuts and web
+services.
 
 ## 1. The starting extension
 

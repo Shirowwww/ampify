@@ -158,6 +158,14 @@ int CmdDoctor(Context& ctx) {
     } else {
         ok("ampify_launcher.exe present");
     }
+    platform::AutoStart autoStart = platform::AutoStartState();
+    if (!autoStart.registered) {
+        warn("Ampify does not load with Apple Music at each start: run ampify apply from the installed copy");
+    } else if (!autoStart.running) {
+        warn("the background launcher is not running: sign out and in again, or run ampify apply");
+    } else {
+        ok("Ampify loads with Apple Music each time it starts (background launcher running)");
+    }
 #endif
 
     ctx.out << "\nSummary: " << errors << " error(s), " << warnings << " warning(s).\n";

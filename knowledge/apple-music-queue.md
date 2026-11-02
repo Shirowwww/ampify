@@ -1,8 +1,8 @@
 # Apple Music's play queue
 
 What `AMP.Services.PlayQueue` gives in Apple Music 1.1792, measured in a Windows 11 virtual machine with a list of
-songs playing. The interfaces, slots and identifiers are in `core/amp_abi.hpp`; the code is in `win/amp_player.cpp` and
-`win/player_bridge.cpp`. The full signatures come from Apple's `.winmd` files run through `cppwinrt.exe` (types and
+songs playing. The interfaces, slots and identifiers are in `src/core/amp_abi.hpp`; the code is in `src/win/amp_player.cpp` and
+`src/win/player_bridge.cpp`. The full signatures come from Apple's `.winmd` files run through `cppwinrt.exe` (types and
 parameters, which the method lists in `knowledge/winmd/` do not have).
 
 ## Reading

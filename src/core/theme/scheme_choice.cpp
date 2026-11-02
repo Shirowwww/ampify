@@ -175,4 +175,11 @@ bool IsDarkScheme(const std::string& scheme) {
     return IsDark(scheme);
 }
 
+std::optional<bool> AppModeOf(std::optional<bool> dark, const std::string& scheme) {
+    if (dark) return dark;
+    if (IsDark(scheme)) return true;
+    if (IsLight(scheme)) return false;
+    return std::nullopt;
+}
+
 }  // namespace ampify::theme

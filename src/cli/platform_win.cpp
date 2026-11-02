@@ -18,7 +18,9 @@
 #include <vector>
 
 #include "../core/apple_music.hpp"
+#include "../win/background.hpp"
 #include "../win/package.hpp"
+#include "../win/win_common.hpp"
 #include "platform.hpp"
 
 namespace ampify::platform {
@@ -193,6 +195,51 @@ bool IsProcessRunning(const std::string& imageName) {
     std::error_code ec;
     std::filesystem::remove(listing, ec);
     return running;
+}
+
+AutoStart AutoStartState() {
+    return AutoStart{true, win::BackgroundRegistered(), win::BackgroundRunning()};
+}
+
+bool EnableAutoStart(const std::filesystem::path& launcher, std::string& error) {
+    if (!win::RegisterBackground(launcher)) {
+        error = "Windows refused the sign-in entry (HKCU\\...\\Run)";
+        return false;
+    }
+    if (!win::StartBackground(launcher)) {
+        error = "cannot start " + ToUtf8(launcher.wstring());
+        return false;
+    }
+    return true;
+}
+
+bool DisableAutoStart(std::string& error) {
+    if (!win::UnregisterBackground()) {
+        error = "Windows refused to remove the sign-in entry (HKCU\\...\\Run)";
+        return false;
+    }
+    if (!win::StopBackground()) {
+        error = "the background launcher did not stop";
+        return false;
+    }
+    return true;
+}
+
+bool RestartAutoStart(const std::filesystem::path& launcher, std::string& error) {
+    if (!win::StopBackground()) {
+        error = "the background launcher did not stop";
+        return false;
+    }
+    if (!win::StartBackground(launcher)) {
+        error = "cannot start " + ToUtf8(launcher.wstring());
+        return false;
+    }
+    return true;
+}
+
+bool IsInstallDirectory(const std::filesystem::path& directory) {
+    std::error_code ec;
+    return std::filesystem::equivalent(directory, win::InstallDirectory(), ec);
 }
 
 }  // namespace ampify::platform

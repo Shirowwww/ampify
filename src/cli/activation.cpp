@@ -1,10 +1,9 @@
-// What the kit does to Apple Music: write what should load, start the app with the kernel, start it without,
-// keep snapshots, and watch the folders while a theme or an extension is edited.
+// What the kit does to Apple Music: write what should load, turn the loading at each start on and off, start the app
+// with the kernel, keep snapshots, and watch the folders while a theme or an extension is edited.
 
 #include <chrono>
 #include <thread>
 
-#include "../core/apple_music.hpp"
 #include "../core/launch_flags.hpp"
 #include "backup.hpp"
 #include "internal.hpp"
@@ -50,10 +49,37 @@ void RequestReload(Context& ctx, const std::vector<std::string>& lines) {
     if (!AppendReloadRequests(ctx.kit, lines, error)) ctx.err << "ampify: " << error << "\n";
 }
 
+namespace {
+
+// apply turns the automatic start on, from the installed copy only: a build folder or an unzipped package must not
+// register itself at sign-in. Returns 1 when it was asked for and failed.
+int TurnAutoStartOn(Context& ctx) {
+    platform::AutoStart state = platform::AutoStartState();
+    if (!state.supported || ctx.options.dryRun) return 0;
+    std::filesystem::path folder = platform::ExecutableDirectory();
+    if (!platform::IsInstallDirectory(folder)) {
+        ctx.out << "This ampify is not the installed one: loading with Apple Music stays "
+                << (state.registered ? "on" : "off") << ".\n";
+        return 0;
+    }
+    std::filesystem::path launcher = folder / "ampify_launcher.exe";
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(launcher, ec)) {
+        return Failure(ctx, "ampify_launcher.exe not found next to ampify: " + Utf8(launcher));
+    }
+    std::string error;
+    if (!platform::EnableAutoStart(launcher, error)) return Failure(ctx, error);
+    ctx.out << "Ampify loads with Apple Music each time it starts (ampify restore turns it off).\n";
+    return 0;
+}
+
+}  // namespace
+
 int CmdApply(Context& ctx) {
     int code = ApplyNow(ctx);
-    ctx.out << "Apple Music reads these settings at startup: restart it with ampify launch to apply them.\n";
-    return code;
+    int started = TurnAutoStartOn(ctx);
+    ctx.out << "Apple Music picks the changes up while it runs, or at its next start.\n";
+    return code != 0 ? code : started;
 }
 
 int CmdLaunch(Context& ctx) {
@@ -77,7 +103,7 @@ int CmdLaunch(Context& ctx) {
         return Failure(ctx, "ampify_launcher.exe not found next to ampify: " + Utf8(launcher));
     }
     if (!platform::StartDetached({Utf8(launcher)})) return Failure(ctx, "cannot start: " + Utf8(launcher));
-    ctx.out << "Apple Music is starting with the kernel. The launcher stays open while the app runs.\n";
+    ctx.out << "Apple Music is starting with the kernel.\n";
     return 0;
 }
 
@@ -93,13 +119,19 @@ int CmdRestore(Context& ctx) {
         return 0;
     }
 
-    std::string target = "shell:AppsFolder\\" + std::string(kAppUserModelId);
-    if (ctx.options.dryRun) {
-        ctx.out << "Command: explorer.exe " << target << "\n";
+    // Ampify stops loading with Apple Music. Its files and settings stay: ampify apply turns it back on.
+    if (!platform::AutoStartState().supported) {
+        ctx.out << "Apple Music for Windows does not run on this system: nothing to turn off.\n";
         return 0;
     }
-    if (!platform::StartDetached({"explorer.exe", target})) return Failure(ctx, "cannot start");
-    ctx.out << "Apple Music is starting without the kernel. Nothing in the package was changed.\n";
+    if (ctx.options.dryRun) {
+        ctx.out << "Would stop the background launcher and remove it from Windows sign-in.\n";
+        return 0;
+    }
+    std::string error;
+    if (!platform::DisableAutoStart(error)) return Failure(ctx, error);
+    ctx.out << "Ampify no longer loads with Apple Music. If Apple Music is open, close it to finish."
+               "\nNothing in Apple Music's package was changed. Run ampify apply to turn Ampify back on.\n";
     return 0;
 }
 

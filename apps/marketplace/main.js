@@ -422,5 +422,12 @@ function render() {
 }
 globalThis.render = render;
 
+// Ampify's logo as a silhouette: the puzzle piece, drawn in the text color like Apple Music's own sidebar icons.
+const AMPIFY_ICON =
+  '<svg viewBox="0 0 64 64"><path d="M12.3 13L19 13C21.5 13 22.25 11.25 20.75 9.25C17.75 5 20.5 .75 26 .75' +
+  "C31.5 .75 34.25 5 31.25 9.25C29.75 11.25 30.5 13 33 13L39.7 13A11.3 11.3 0 0 1 51 24.3L51 31C51 33.5 52.75 34.25" +
+  " 54.75 32.75C59 29.75 63.25 32.5 63.25 38C63.25 43.5 59 46.25 54.75 43.25C52.75 41.75 51 42.5 51 45L51 51.7" +
+  'A11.3 11.3 0 0 1 39.7 63L12.3 63A11.3 11.3 0 0 1 1 51.7L1 24.3A11.3 11.3 0 0 1 12.3 13Z"/></svg>';
+
 Ampify.ui.title.set("Marketplace");
-Ampify.ui.sidebar.addItem({ label: "Ampify", onClick: () => Ampify.ui.navigate("/marketplace") });
+Ampify.ui.sidebar.addItem({ label: "Ampify", icon: AMPIFY_ICON, onClick: () => Ampify.ui.navigate("/marketplace") });

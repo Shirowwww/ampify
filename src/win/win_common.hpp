@@ -49,17 +49,15 @@ bool IsElevated();
 // Ids of the running processes whose image file name is `imageName`, whatever folder they run from.
 std::vector<DWORD> ProcessIdsNamed(const wchar_t* imageName);
 
-// Runs a program and waits for it. Its output goes to `outputFile` when one is given. Returns the exit code,
-// or -1 when the program did not start.
-int RunAndWait(const std::wstring& commandLine, const std::filesystem::path& outputFile = {});
-
-// Runs a program with the administrator prompt. Returns the exit code, or -1 when the user refused or it did not start.
-int RunElevatedAndWait(const std::filesystem::path& program, const std::wstring& parameters);
-
 // Yes / No question in a dialog. Returns true for Yes.
 bool AskYesNo(const std::wstring& text, const std::wstring& title);
 
 // Dialog with one OK button. `error` picks the error icon.
 void ShowMessage(const std::wstring& text, bool error = false);
+
+// Ampify's logo, from the module this code is built into (each Ampify file carries it, cmake/version.rc.in), at the
+// small size (notification area) or the large one. Windows' application icon when the module has none (the tests).
+// Kept for the life of the process: never destroy it.
+HICON AmpifyIcon(bool large);
 
 }  // namespace ampify::win

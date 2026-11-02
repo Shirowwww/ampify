@@ -58,4 +58,26 @@ std::optional<std::filesystem::path> AppPreferencesFile();
 // The command that opens a folder in the file manager: explorer.exe on Windows, xdg-open elsewhere.
 std::vector<std::string> OpenFolderCommand(const std::filesystem::path& folder);
 
+// Ampify loading with Apple Music each time it starts: on Windows, the background launcher started at sign-in
+// (src/win/background.hpp). Elsewhere it does not exist, and `supported` is false.
+struct AutoStart {
+    bool supported = false;
+    bool registered = false;  // started at each sign-in
+    bool running = false;     // running in this session
+};
+AutoStart AutoStartState();
+
+// Turns it on: `launcher` starts now and at each sign-in. False with the reason in `error`.
+bool EnableAutoStart(const std::filesystem::path& launcher, std::string& error);
+
+// Turns it off: the background launcher stops and no longer starts at sign-in. False with the reason in `error`.
+bool DisableAutoStart(std::string& error);
+
+// Stops the background launcher and starts `launcher` in its place, the sign-in entry untouched (after an update).
+bool RestartAutoStart(const std::filesystem::path& launcher, std::string& error);
+
+// True when `directory` is the folder the installer puts Ampify in. Only that copy turns the automatic start on, so
+// a build folder or an extracted zip never registers itself at sign-in.
+bool IsInstallDirectory(const std::filesystem::path& directory);
+
 }  // namespace ampify::platform

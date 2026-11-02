@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "scrobbler",
   "name": "Last.fm scrobbler (example)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from. Sends the tracks you listen to to Last.fm (scrobbling). Plays that could not be sent wait in storage.",

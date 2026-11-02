@@ -102,4 +102,26 @@ bool IsProcessRunning(const std::string& imageName) {
     return Run({"pgrep", "-x", imageName}) == 0;
 }
 
+AutoStart AutoStartState() {
+    return {};  // Apple Music for Windows does not run here
+}
+
+bool EnableAutoStart(const std::filesystem::path&, std::string& error) {
+    error = "Apple Music for Windows does not run on this system";
+    return false;
+}
+
+bool DisableAutoStart(std::string&) {
+    return true;  // nothing was ever turned on
+}
+
+bool RestartAutoStart(const std::filesystem::path&, std::string& error) {
+    error = "Apple Music for Windows does not run on this system";
+    return false;
+}
+
+bool IsInstallDirectory(const std::filesystem::path&) {
+    return false;
+}
+
 }  // namespace ampify::platform

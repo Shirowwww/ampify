@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Ampify VERSION 1.0.2 LANGUAGES C CXX)
+project(Ampify VERSION 1.1.0 LANGUAGES C CXX)
 
 # The Ampify version is written in three places: here (ampify --version), src/core/kit_layout.hpp (installer, uninstall entry) and
 # src/core/script_extension.hpp (Ampify.version). A release with two different numbers would confuse `ampify update`, so the
@@ -32,6 +32,7 @@ function(ampify_version_resource target description)
         set(AMPIFY_RC_FILETYPE VFT_DLL)
         set(AMPIFY_RC_FILE "${ampify_rc_name}.dll")
     endif()
+    set(AMPIFY_RC_ICON "${CMAKE_CURRENT_SOURCE_DIR}/src/resources/ampify.ico")
     set(AMPIFY_RC_NAME "${ampify_rc_name}")
     set(AMPIFY_RC_DESCRIPTION "${description}")
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.rc.in" "${CMAKE_CURRENT_BINARY_DIR}/${target}.rc" @ONLY)
@@ -108,7 +109,7 @@ else()
 endif()
 
 # Portable kernel: settings, journal, safe mode, version gate, extension host,
-# Apple Music identity, injection policy, DRM guard, package watch, kit file layout, test report, JSON, manifests,
+# Apple Music identity, injection policy, DRM guard, package watch, kit file layout, JSON, manifests,
 # the JavaScript runtime and the extension loader.
 add_library(ampify_core STATIC ${AMPIFY_CORE_SOURCES})
 target_compile_options(ampify_core PRIVATE ${AMPIFY_WARNINGS})
@@ -178,7 +179,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_executable(ampify_launcher WIN32 ${AMPIFY_LAUNCHER_SOURCES})
     target_link_libraries(ampify_launcher PRIVATE ampify_core ampify_win)
     target_compile_options(ampify_launcher PRIVATE ${AMPIFY_WARNINGS})
-    ampify_version_resource(ampify_launcher "Apple Music with Ampify")
+    ampify_version_resource(ampify_launcher "Ampify launcher")
 
     # Installs the kit and uninstalls it. The same file is copied into the install folder as the uninstaller.
     add_executable(ampify_setup WIN32 ${AMPIFY_SETUP_SOURCES})

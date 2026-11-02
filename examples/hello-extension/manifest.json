@@ -2,10 +2,10 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "hello-extension",
   "name": "Hello (example)",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Example to learn from. Minimal example: writes to the log and keeps a launch counter.",
+  "description": "Example to learn from, the smallest one: writes to the log and keeps a launch counter.",
   "kitApi": "1.0",
   "main": "main.js",
   "processes": [

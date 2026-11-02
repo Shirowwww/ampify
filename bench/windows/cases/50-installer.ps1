@@ -28,7 +28,19 @@ Register-Case -Id 'installer' -Title 'Install, uninstall keeping and purging dat
     $installedSetup = Join-Path $installDir 'ampify_setup.exe'
     $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'Apple Music with Ampify.lnk'
     $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Ampify'
+    $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
     $launcherFile = Join-Path $installDir 'ampify_launcher.exe'
+    $signInEntry = {
+        $values = Get-ItemProperty -Path $runKey -ErrorAction SilentlyContinue
+        if ($values -and $values.PSObject.Properties['Ampify']) { return $values.Ampify }
+        return $null
+    }
+    $inUserPath = { @(([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') | Where-Object { $_.TrimEnd('\') -eq $installDir }).Count -gt 0 }
+    $backgroundRunning = {
+        $mutex = $null
+        if ([System.Threading.Mutex]::TryOpenExisting('Local\AmpifyBackground', [ref]$mutex)) { $mutex.Dispose(); return $true }
+        return $false
+    }
 
     # A clean state: uninstall whatever a previous pass may have left.
     Reset-KitState
@@ -40,7 +52,21 @@ Register-Case -Id 'installer' -Title 'Install, uninstall keeping and purging dat
     $files = @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify_setup.exe') | Where-Object { -not (Test-Path -LiteralPath (Join-Path $installDir $_)) }
     Add-Check -Ctx $Ctx -Name 'the three files are in the install folder' -Passed (@($files).Count -eq 0) `
         -Detail "missing: $(@($files) -join ', ')"
-    Add-Check -Ctx $Ctx -Name 'Start menu shortcut created' -Passed (Test-Path -LiteralPath $shortcut)
+    Add-Check -Ctx $Ctx -Name 'no Start menu shortcut: Apple Music keeps its own icon' -Passed (-not (Test-Path -LiteralPath $shortcut))
+    $entryText = & $signInEntry
+    Add-Check -Ctx $Ctx -Name 'sign-in entry starts the background launcher' `
+        -Passed ([bool]$entryText -and $entryText -like "*$launcherFile*--background*") -Detail "$entryText"
+    Add-Check -Ctx $Ctx -Name 'install folder in the user Path (ampify in a new terminal)' -Passed (& $inUserPath)
+    # Run as administrator (CI runners are), the installer leaves the start to the next sign-in: a launcher with
+    # administrator rights could not be stopped from a normal session.
+    $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        Add-Check -Ctx $Ctx -Name 'run as administrator: no background launcher started, left to the next sign-in' `
+            -Passed ((-not (& $backgroundRunning)) -and (Test-JournalContains -FileName 'install.log' -Text 'starts at the next sign-in'))
+    } else {
+        Add-Check -Ctx $Ctx -Name 'background launcher running after the install' `
+            -Passed (Wait-Until -TimeoutSeconds 15 -Condition { & $backgroundRunning })
+    }
     $entry = Get-ItemProperty -Path $uninstallKey -ErrorAction SilentlyContinue
     Add-Check -Ctx $Ctx -Name 'uninstall entry (Settings > Installed apps)' `
         -Passed ($entry -and $entry.DisplayName -eq 'Ampify for Apple Music') -Detail "$($entry.DisplayVersion)"
@@ -65,7 +91,9 @@ Register-Case -Id 'installer' -Title 'Install, uninstall keeping and purging dat
     if ($code -ne 0) { Write-JournalTail -FileName 'uninstall.log' }
     $gone = Wait-Until -TimeoutSeconds 30 -Condition { -not (Test-Path -LiteralPath $installDir) }
     Add-Check -Ctx $Ctx -Name 'install folder deleted, uninstaller included' -Passed $gone
-    Add-Check -Ctx $Ctx -Name 'shortcut deleted' -Passed (-not (Test-Path -LiteralPath $shortcut))
+    Add-Check -Ctx $Ctx -Name 'sign-in entry deleted' -Passed (-not (& $signInEntry))
+    Add-Check -Ctx $Ctx -Name 'background launcher stopped' -Passed (-not (& $backgroundRunning))
+    Add-Check -Ctx $Ctx -Name 'install folder out of the user Path' -Passed (-not (& $inUserPath))
     Add-Check -Ctx $Ctx -Name 'uninstall entry deleted' -Passed (-not (Test-Path -LiteralPath $uninstallKey))
     Add-Check -Ctx $Ctx -Name 'data kept (Ampify folder)' -Passed (Test-Path -LiteralPath $script:KitDir)
     Copy-JournalToResults -Ctx $Ctx
@@ -78,6 +106,6 @@ Register-Case -Id 'installer' -Title 'Install, uninstall keeping and purging dat
     $gone = Wait-Until -TimeoutSeconds 30 -Condition { -not (Test-Path -LiteralPath $installDir) }
     Add-Check -Ctx $Ctx -Name 'purge: install folder deleted' -Passed $gone
     Add-Check -Ctx $Ctx -Name 'purge: data folder deleted' -Passed (-not (Test-Path -LiteralPath $script:KitDir))
-    Add-Check -Ctx $Ctx -Name 'purge: shortcut and uninstall entry deleted' `
-        -Passed ((-not (Test-Path -LiteralPath $shortcut)) -and (-not (Test-Path -LiteralPath $uninstallKey)))
+    Add-Check -Ctx $Ctx -Name 'purge: sign-in and uninstall entries deleted' `
+        -Passed ((-not (& $signInEntry)) -and (-not (Test-Path -LiteralPath $uninstallKey)))
 }

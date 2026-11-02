@@ -2,8 +2,7 @@
 
 The catalog is the public list of installable extensions, themes, apps and snippets. It lives in its own public
 repository, [Shirowwww/ampify-catalog](https://github.com/Shirowwww/ampify-catalog), with the archives and the readable
-sources of every element. [catalog/](../../catalog) in this repository holds the same files, which the tests read; the
-two stay identical. The schema is in [schemas/catalog.schema.json](../../schemas/catalog.schema.json). The format of the
+sources of every element. The tests of this repository check it when a clone of it sits next to this one. The schema is in [schemas/catalog.schema.json](../../schemas/catalog.schema.json). The format of the
 elements is in [manifest.md](manifest.md).
 
 ## Format
@@ -43,7 +42,7 @@ The example above is not in the catalog: its SHA-256 is a placeholder.
 
 The permission `kit.manage` is refused in the catalog: only the Marketplace that ships with Ampify holds it.
 
-Next to the catalog, `catalog/versions.json` lists the Apple Music versions tested after a release, with the verified
+Next to the catalog, `versions.json` lists the Apple Music versions tested after a release, with the verified
 exports of each. `catalog.json` pins its address and SHA-256. `ampify versions update` reads it (see [../cli.md](../cli.md)).
 
 ## Publish an element
@@ -56,8 +55,9 @@ exports of each. `catalog.json` pins its address and SHA-256. `ampify versions u
    manifest's `preview` picture next to the archive, under the archive's name, and points the entry to it: publish the
    picture with the archive.
 3. Compute its hash: `sha256sum <archive>.zip` (or `certutil -hashfile <archive>.zip SHA256` on Windows).
-4. Add the entry to the catalog in a pull request.
-5. Validate the catalog: `python3 tools/validate.py catalog catalog/catalog.json`.
+4. Add the entry to `catalog.json` of ampify-catalog in a pull request, with the element's files in `sources/<id>/`
+   and the archive in `packages/` (that repository's README gives the exact `tools/pack.py` line).
+5. Validate the catalog: `python3 tools/validate.py catalog <ampify-catalog>/catalog.json`.
 6. A person reviews the code before the merge. This is the main protection against a malicious element.
 
 An update is a new entry with a new `version`, a new `url` and a new `sha256`. It goes through the same review. Removing
@@ -167,7 +167,7 @@ command line, and bypasses no check.
 3. The permissions on the detail view are exactly those of `ampify extension enable`.
 4. The page closes and reopens without reading the network again if the cache is recent.
 5. The logic of the page (filters, states, messages) is tested in `tools/test_examples.mjs` with a fake `Ampify`. The
-   display is checked on a PC, with the test kit.
+   display is checked on a PC ([testing-on-a-pc.md](../development/testing-on-a-pc.md)).
 
 **Open questions**
 

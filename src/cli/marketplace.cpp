@@ -433,8 +433,16 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
         ctx.err << "ampify: not updated: " << line << "\n";
     }
     RemoveQuietly(staged);
+    // The background launcher still runs the old file (renamed *.old): it restarts from the new one.
+    platform::AutoStart autoStart = platform::AutoStartState();
+    if (autoStart.registered && platform::IsInstallDirectory(installDir)) {
+        std::string error;
+        if (!platform::RestartAutoStart(installDir / "ampify_launcher.exe", error)) {
+            ctx.err << "ampify: the background launcher did not restart (" << error << "): run ampify apply\n";
+        }
+    }
     ctx.out << "ampify " << release->version << " installed in " << Utf8(installDir)
-            << ". Start Apple Music again with ampify launch.\n";
+            << ". Open Apple Music again to use it.\n";
     return 0;
 }
 

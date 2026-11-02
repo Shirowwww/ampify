@@ -10,7 +10,7 @@ name instead, as a CSS class:
 .playbar Button { color: #FFFFFF; }
 ```
 
-Each class stands for the path to one zone of Apple Music. Ampify keeps the table of paths (`core/theme/builtins.cpp`),
+Each class stands for the path to one zone of Apple Music. Ampify keeps the table of paths (`src/core/theme/builtins.cpp`),
 so when an update of Apple Music moves a zone, the table changes once and every theme keeps working, the way
 Spicetify's `css-map.json` follows Spotify's class names.
 
@@ -269,4 +269,4 @@ ampify_theme_check.exe --names C:\trees\home.json C:\trees\album.json ...
 
 The tool prints, for each class, how many trees and elements it found, and lists the classes and the forms it found
 nowhere. It exits with code 1 when a class matches nothing in any tree: that class needs a new path in
-`core/theme/builtins.cpp`.
+`src/core/theme/builtins.cpp`.

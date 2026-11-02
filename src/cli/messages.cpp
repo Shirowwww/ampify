@@ -43,9 +43,10 @@ Marketplace
   remove <id>                  removes an element (a backup is made first)
 
 Applying
-  apply                        writes what will load (active.txt) and tells the kernel
-  launch                       applies, then starts Apple Music with the kernel (ampify_launcher.exe)
-  restore                      starts Apple Music without the kernel; nothing in the package is changed
+  apply                        writes what will load (active.txt), tells the kernel, and makes Ampify load
+                               with Apple Music each time it starts (installed copy only)
+  launch                       applies, then starts Apple Music with the kernel now (ampify_launcher.exe)
+  restore                      Ampify no longer loads with Apple Music; nothing in the package is changed
   restore --backup <name>      puts back the settings of a backup
   backup                       backs up the settings and the elements
   backup list                  lists the backups
@@ -111,7 +112,7 @@ constexpr i18n::Message kCli[] = {
     {"element.permissions", "Requested permissions: {permissions}"},
     {"element.notFound", "element not found: {kind} {id}. Install it with ampify install {id}"},
     {"element.invalid", "invalid element: {error}"},
-    {"applyHint", "Run ampify apply (or ampify launch) to apply it."},
+    {"applyHint", "Run ampify apply to apply it."},
     {"remote.tokenCreated",
      "Remote control token created (remote.token). Keep it to yourself: it gives control of playback."},
 };

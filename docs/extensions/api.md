@@ -33,7 +33,7 @@ AppleMusic.exe or AMPLibraryAgent.exe
 ```
 
 - **The JavaScript runtime** is [quickjs-ng](https://github.com/quickjs-ng/quickjs), the maintained branch of QuickJS
-  (MIT license, compiled as C with MSVC and MinGW for Windows, and on Linux for the tests). The vendored version and its
+  (MIT license, compiled as C with MSVC for Windows, and on Linux for the tests). The vendored version and its
   hash are in `vendor/quickjs/UPSTREAM.txt`. QuickJS 2021-03-27 did not compile with MSVC.
 - **Native extensions** (DLLs loaded at run time) are not open to the community. A DLL runs inside the Apple Music
   process with every right, and a public catalog cannot guarantee it. Native extensions stay built into the kernel, like
@@ -57,14 +57,14 @@ same time without editing the same lines:
 
 | Part of a module `foo` | Where |
 |---|---|
-| JavaScript (the piece of the prelude that fills the object and, if it receives events, `dispatch.foo`) | `core/prelude/foo.cpp`, constant `kFoo`. It runs in its own block, so its constants stay private. It sees `native`, the global object under construction, `dispatch` and the helpers of `core/prelude/frame.cpp` (`text`, `describe`, `runGuarded`). The frame does the final freeze, not the module |
-| Native functions (the C++ called by `native.xxx`) | `core/natives/foo.cpp`, function `DefineFoo`, plus `StartFoo` or `StopFoo` if the module must load or give something back. Shared helpers and the permission check are in `core/api/bridge.hpp` (`Require`, `HostOf`, `State<T>` for per-element state) |
-| Registration | One line in the `kModules` table of `core/api/modules.cpp` (and the declaration of `kFoo` and `DefineFoo` just above). The order of the table is the order of the prelude |
+| JavaScript (the piece of the prelude that fills the object and, if it receives events, `dispatch.foo`) | `core/prelude/foo.cpp`, constant `kFoo`. It runs in its own block, so its constants stay private. It sees `native`, the global object under construction, `dispatch` and the helpers of `src/core/prelude/frame.cpp` (`text`, `describe`, `runGuarded`). The frame does the final freeze, not the module |
+| Native functions (the C++ called by `native.xxx`) | `core/natives/foo.cpp`, function `DefineFoo`, plus `StartFoo` or `StopFoo` if the module must load or give something back. Shared helpers and the permission check are in `src/core/api/bridge.hpp` (`Require`, `HostOf`, `State<T>` for per-element state) |
+| Registration | One line in the `kModules` table of `src/core/api/modules.cpp` (and the declaration of `kFoo` and `DefineFoo` just above). The order of the table is the order of the prelude |
 | Events from the kernel | `ExtensionLoader::DeliverEvent("foo", payload)` calls `dispatch.foo(payload)` in every active element, with no new method in the shared files |
-| Host service | An optional capability, declared in the module header (`struct FooHost { static constexpr std::string_view kCapabilityName = "foo"; ... }`), read with `host.Capability<FooHost>()`, null on hosts that do not offer it. Only hosts that support it implement it (see `core/host.hpp`). The existing pure virtual methods of `Host` do not move |
+| Host service | An optional capability, declared in the module header (`struct FooHost { static constexpr std::string_view kCapabilityName = "foo"; ... }`), read with `host.Capability<FooHost>()`, null on hosts that do not offer it. Only hosts that support it implement it (see `src/core/host.hpp`). The existing pure virtual methods of `Host` do not move |
 | Build | A new file `cmake/sources/<package>.cmake` with `list(APPEND AMPIFY_CORE_SOURCES ...)` and, for tests, `list(APPEND AMPIFY_TESTS_SOURCES ...)` (convention at the top of `CMakeLists.txt`) |
 | Tests | `tests/foo_tests.cpp`, listed in the package's `.cmake` file. `tests/api_module_tests.cpp` freezes the existing members of the global object one by one: a new member does not touch it, a change to an existing member makes it fail |
-| Types and documentation | Section 5 of this document, `cli/sdk_types.cpp` (`ampify types`, checked by `tools/test_cli.py`) and, if the examples use it, the fake object of `tools/test_examples.mjs` |
+| Types and documentation | Section 5 of this document, `src/cli/sdk_types.cpp` (`ampify types`, checked by `tools/test_cli.py`) and, if the examples use it, the fake object of `tools/test_examples.mjs` |
 
 ## 3. Life cycle
 
@@ -120,7 +120,7 @@ They are then linked (section 5.8).
 
 ### 3.4 States
 
-These are the states of `core/extension.hpp`:
+These are the states of `src/core/extension.hpp`:
 
 - `Off`: switched off in the settings.
 - `Running`: started.
@@ -130,9 +130,9 @@ These are the states of `core/extension.hpp`:
 ### 3.5 Safe mode and unknown versions
 
 - After two launches where the app was never "healthy", the next launch loads no element: no extension, theme, snippet
-  or app. This is the safe mode of `core/safe_mode.*`.
+  or app. This is the safe mode of `src/core/safe_mode.*`.
 - On an Apple Music version missing from the tested list, nothing starts. The app runs untouched. This is the rule of
-  `core/version_gate.*`.
+  `src/core/version_gate.*`.
 
 ### 3.6 Several files: ES modules [preview]
 
@@ -146,7 +146,7 @@ import settings from "./settings.mjs";
 Ampify.log(format(settings.title));
 ```
 
-Rules of the module loader (`core/js_runtime.cpp`, `ResolveModuleName` and `ReadModuleFile`):
+Rules of the module loader (`src/core/js_runtime.cpp`, `ResolveModuleName` and `ReadModuleFile`):
 
 - only a path relative to the importing file is accepted: `./x.js`, `./lib/x.js`, `../x.js`;
 - the path never leaves the element's folder: `../` above the folder is refused;
@@ -357,7 +357,7 @@ An extension describes its interface in two ways that give the same result:
 - with `Ampify.React`, a small engine that accepts React's style (basic hooks, fragments, props) and produces the same
   tree. Spotify's internal components cannot be reused: use `Ampify.components` instead.
 
-In both cases the kernel renders the tree as XAML with real WinUI controls (`win/ui_renderer.cpp`). Each node carries the
+In both cases the kernel renders the tree as XAML with real WinUI controls (`src/win/ui_renderer.cpp`). Each node carries the
 name and the AutomationId `AMPIFY_<element>_<node>`. A new render only changes the nodes that changed (by position, or by
 the `key` attribute). With `Ampify.React`, the key of an element reaches the nodes it draws: `key` for one node,
 `key.<their own key or position>` for the nodes of a fragment or of a component that draws several. A status line put
@@ -368,7 +368,7 @@ of the Settings > Playback page. The places (side panel, dialog popups, bar butt
 Primitives: `stack`, `row`, `list`, `layer` and `card` (which have children), `text`, `button`, `toggle`, `slider`,
 `textfield`, `image`, `icon`, `dropdown` (its children are `option`) and `option` (only inside a `dropdown`). Each node is
 an object `{ type, ...attributes, children }`. Attributes are simple values (text, number, boolean), never objects or
-lists. The kernel checks the tree (`core/ui_model.cpp`): 8 levels, 300 nodes and 500 characters per text at most.
+lists. The kernel checks the tree (`src/core/ui_model.cpp`): 8 levels, 300 nodes and 500 characters per text at most.
 
 | Primitive | Attributes read by the renderer |
 |---|---|
@@ -770,7 +770,7 @@ extension authors:
 
 These points must be confirmed before items move to [stable]:
 
-- the size of quickjs-ng and its behavior under MinGW and MSVC;
+- the size of quickjs-ng and its behavior under MSVC;
 - the shape of the data of `Ampify.player` and its events on later Apple Music versions (1.1792 is read through Apple's
   player, activated from its own DLL when the system does not know the class);
 - the shape of the frames of `Ampify.audio.onFrame` and the number of bands (to confirm on a PC);
@@ -807,31 +807,31 @@ Nothing is ruled out for good. Each point stays outside API 1.0 for a specific r
 
 | Area | State | Verified by |
 |---|---|---|
-| `version`, `kitApi`, `process`, `locale`, `log`, `onStop` | Done | C++ tests and Wine |
+| `version`, `kitApi`, `process`, `locale`, `log`, `onStop` | Done | C++ tests, on Linux and Windows |
 | `config.get/set`: one key per element, never `enabled` | Done. `get` returns a boolean, number or text according to the default value | C++ tests |
-| `storage.get/set/remove`: a JSON file per element, 1 MB quota | Done. Written through a temporary file then replaced. By default an element runs only in the interface, so one writer at a time | C++ tests and Wine |
+| `storage.get/set/remove`: a JSON file per element, 1 MB quota | Done. Written through a temporary file then replaced. By default an element runs only in the interface, so one writer at a time | C++ tests, on Linux and Windows |
 | `processes`: `ui`, `engine`, or both | Done. An element of another process is ignored, with a log line | C++ tests |
-| `player.state`, `on`, `play`, `pause`, `toggle`, `next`, `previous`, `seek` | Done. On Windows: Apple's player (`AMP.Services.Player`, in AppleMusic.exe), else SMTC, else media keys (`win/player_bridge.*`). Commands go through SMTC, then the key; through Apple's player with `player.appleCommands` | C++ tests (slots checked against `knowledge/winmd`); fake WinRT objects under Wine; real playback to check on a PC |
-| `player.queue.list`, `add`, `remove` | `list` and `remove` done on Windows through `AMP.Services.PlayQueue`, read and changed on the interface thread; the whole queue once Apple's "Up Next" panel has opened, the current track before. `add` answers `false` with the reason in the log | C++ tests with fake objects under Wine; list and remove checked in Apple Music 1.1792 (the entry leaves Apple's panel) |
+| `player.state`, `on`, `play`, `pause`, `toggle`, `next`, `previous`, `seek` | Done. On Windows: Apple's player (`AMP.Services.Player`, in AppleMusic.exe), else SMTC, else media keys (`src/win/player_bridge.*`). Commands go through SMTC, then the key; through Apple's player with `player.appleCommands` | C++ tests (slots checked against `knowledge/winmd`); fake WinRT objects on Windows; real playback to check on a PC |
+| `player.queue.list`, `add`, `remove` | `list` and `remove` done on Windows through `AMP.Services.PlayQueue`, read and changed on the interface thread; the whole queue once Apple's "Up Next" panel has opened, the current track before. `add` answers `false` with the reason in the log | C++ tests with fake objects on Windows; list and remove checked in Apple Music 1.1792 (the entry leaves Apple's panel) |
 | `audio.setGainDb`: capped by `audio.maxGainDb` (6 dB by default, 12 at most), back to 0 at stop | Done | C++ tests |
 | `notify` (title 120 characters, text 500) | Done. On Windows: a balloon notification (temporary icon, 8 s) and a log line | C++ tests; balloon to check on a PC |
-| `keyboard.bind` (normalized form, an F key, a media key or a modifier is required) | Done. On Windows: `RegisterHotKey`, handed back to the JavaScript thread | C++ tests; simulated press under Wine |
-| `http.get`, `http.post` (https, declared host, 1 MB at most for the reply; 64 KB for a body) | Done. On Windows: WinHTTP, timeout of 5 to 10 s, an error returns status 0 instead of throwing. The request runs on a worker thread of the element and the promise resolves on a later pump; 4 requests in flight at most per element, answers that come after a stop are dropped | C++ tests; failure tested under Wine, success to check on a PC |
+| `keyboard.bind` (normalized form, an F key, a media key or a modifier is required) | Done. On Windows: `RegisterHotKey`, handed back to the JavaScript thread | C++ tests; simulated press on Windows |
+| `http.get`, `http.post` (https, declared host, 1 MB at most for the reply; 64 KB for a body) | Done. On Windows: WinHTTP, timeout of 5 to 10 s, an error returns status 0 instead of throwing. The request runs on a worker thread of the element and the promise resolves on a later pump; 4 requests in flight at most per element, answers that come after a stop are dropped | C++ tests; failure tested on Windows, success to check on a PC |
 | `crypto.md5`, `uri.parse`, `uri.build`, `icons.get`, `setTimeout`, `setInterval`, `queueMicrotask`, `console` | Done | C++ tests |
 | ES modules (`"type": "module"`, relative `import` limited to the element's folder, `import()`) | Done | C++ tests, `tools/test_validate.py` |
 | `link.post`, `link.on`, `link.connected`: app and extension with the same id | Done | C++ tests |
 | Permissions: `PermissionDenied` at run time, refusal by the manifest reader | Done | C++ tests |
-| Folder discovery (`extensions`, `apps`, theme scripts), activation, reload (`Restart`), failure isolation | Done | C++ tests and Wine |
+| Folder discovery (`extensions`, `apps`, theme scripts), activation, reload (`Restart`), failure isolation | Done | C++ tests, on Linux and Windows |
 | Immediate effect through `reload.txt`: `start`, `stop`, `restart` (manifest re-read), `rescan` | Done in the kernel | C++ tests, CLI tests |
-| `audio.onFrame`, `analyze`, `loudness`, `volume`, `eq` | Done. On Windows: wired to the Atmos leveler hooks (stereo stream and spatial objects), which must be switched on | C++ tests (synthetic signals); equalizer and analysis seen on the stereo stream under Wine; listening to do on a PC |
+| `audio.onFrame`, `analyze`, `loudness`, `volume`, `eq` | Done. On Windows: wired to the Atmos leveler hooks (stereo stream and spatial objects), which must be switched on | C++ tests (synthetic signals); listening to do on a PC |
 | `color.extract` (pixels supplied by the script) | Done | C++ tests |
 | `ui.*`, `React`, `ReactDOM`, `hooks`, `components`, `ready` | Done: native rendering (panels, popups, pages, bar buttons) and the "Ampify" card in Settings > Playback | C++ tests (tree, diff, markers on a fake tree); the interface case of the Windows bench |
 | `i18n` (`language`, `define`, `t`) | Done | C++ tests and `tools/test_cli.py` |
-| `discord.setActivity`, `clear` | Done. On Windows: pipe `\\.\pipe\discord-ipc-0` to `9`, on its own thread, retry every 15 s | C++ tests; fake Discord server under Wine; real Discord to check on a PC |
-| `tray.setMenu`, `onClick` | Done. On Windows: `Shell_NotifyIcon`, a message window on its own thread, in AppleMusic.exe | C++ tests; Wine refuses the icon (test skipped); to check on a PC |
-| `midi.on`, `devices`, and `midi.map` | Done. On Windows: `midiInOpen` (winmm), in AMPLibraryAgent.exe | C++ tests; bindings tested under Wine with no device; a real controller to check on a PC |
-| `remote.setState` and the local remote | Done. On Windows: Winsock on `127.0.0.1` only, in AMPLibraryAgent.exe | C++ tests; local client and refusal of other addresses under Wine |
-| `fs.writeText` | Done. `output\<id>\` of Ampify only | C++ tests and Wine |
+| `discord.setActivity`, `clear` | Done. On Windows: pipe `\\.\pipe\discord-ipc-0` to `9`, on its own thread, retry every 15 s | C++ tests; fake Discord server on Windows; real Discord to check on a PC |
+| `tray.setMenu`, `onClick` | Done. On Windows: `Shell_NotifyIcon`, a message window on its own thread, in AppleMusic.exe | C++ tests; the icon on Windows when the session has a notification area; to check on a PC |
+| `midi.on`, `devices`, and `midi.map` | Done. On Windows: `midiInOpen` (winmm), in AMPLibraryAgent.exe | C++ tests; bindings tested on Windows with no device; a real controller to check on a PC |
+| `remote.setState` and the local remote | Done. On Windows: Winsock on `127.0.0.1` only, in AMPLibraryAgent.exe | C++ tests; local client and refusal of other addresses on Windows |
+| `fs.writeText` | Done. `output\<id>\` of Ampify only | C++ tests, on Linux and Windows |
 | `kit.run` | Done, Marketplace only | C++ tests |
 | `lyrics.current` | Done: `player.lyrics()` as a promise | C++ tests |
 | `color.fromArtwork` | Done. On Windows: WinHTTP, then WIC decodes the image to 128 px at most | C++ tests (fake decoder, and WIC on a PNG); in Apple Music 1.1792, a real cover gave its palette |

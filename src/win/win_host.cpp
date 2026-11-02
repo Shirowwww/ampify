@@ -21,6 +21,7 @@
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
 #include "wic_image.hpp"
+#include "win_common.hpp"
 #include "win_services.hpp"
 
 namespace ampify {
@@ -230,11 +231,12 @@ void WinHost::Notify(const std::string& elementId, const std::string& title, con
     icon.hWnd = static_cast<HWND>(m_notifyWindow);
     icon.uID = 1;
     icon.uFlags = NIF_ICON | NIF_TIP | NIF_INFO;
-    icon.hIcon = LoadIconW(nullptr, reinterpret_cast<LPCWSTR>(IDI_INFORMATION));  // a resource id, not a string
+    icon.hIcon = win::AmpifyIcon(false);
     wcsncpy_s(icon.szTip, L"Ampify", _TRUNCATE);
     wcsncpy_s(icon.szInfoTitle, ToWide(title).c_str(), _TRUNCATE);
     wcsncpy_s(icon.szInfo, ToWide(text).c_str(), _TRUNCATE);
-    icon.dwInfoFlags = NIIF_INFO;
+    icon.dwInfoFlags = NIIF_USER | NIIF_LARGE_ICON;  // the balloon shows Ampify's logo
+    icon.hBalloonIcon = win::AmpifyIcon(true);
 
     DWORD action = m_iconVisible ? NIM_MODIFY : NIM_ADD;
     if (!Shell_NotifyIconW(action, &icon)) {

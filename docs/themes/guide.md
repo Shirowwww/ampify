@@ -1,6 +1,7 @@
 # Make a theme in five minutes
 
-You need Apple Music started with Ampify (`ampify launch`) and a terminal open in a working folder.
+You need Ampify installed, Apple Music open, and a terminal open in a working folder. The themes of the Marketplace
+are in [themes/](../../themes): open one next to this guide to see a finished example.
 
 ## 1. The starting theme
 

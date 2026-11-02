@@ -104,8 +104,8 @@ starts with a dot is refused in these fields. The folder can contain subfolders 
 7. that the folder contains no symbolic link (the kernel refuses to import through a link);
 8. that each setting's `default`, `options`, `min` and `max` fit its `type`, and that no key is used twice.
 
-`ampify validate` applies the same rules (`cli/element.cpp`), and the kernel checks them again at load time
-(`core/manifest.cpp`), without relying on the validator. Unknown permissions are refused by the schema and by the kernel.
+`ampify validate` applies the same rules (`src/cli/element.cpp`), and the kernel checks them again at load time
+(`src/core/manifest.cpp`), without relying on the validator. Unknown permissions are refused by the schema and by the kernel.
 
 ```bash
 python3 tools/validate.py manifest examples/hello-extension/manifest.json

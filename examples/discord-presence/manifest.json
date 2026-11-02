@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "discord-presence",
   "name": "Discord presence (example)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from. Shows the current track in your Discord status. Needs discord.enabled and the id of a Discord application.",
