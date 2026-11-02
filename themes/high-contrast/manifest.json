@@ -6,7 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Black and white, with bright colors for buttons and selections.",
-  "translations": {"fr": {"name": "Contraste élevé", "description": "Noir et blanc, avec des couleurs vives pour les boutons et les sélections."}},
+  "translations": {"fr": {"name": "Contraste élevé", "description": "Noir et blanc, avec des couleurs vives pour les boutons et les sélections."}, "de": {"name": "Hoher Kontrast", "description": "Schwarz und Weiß, mit leuchtenden Farben für Schaltflächen und Auswahl."}, "es": {"name": "Alto contraste", "description": "Blanco y negro, con colores vivos para los botones y las selecciones."}, "pt": {"name": "Alto contraste", "description": "Preto e branco, com cores vivas para os botões e as seleções."}, "ru": {"name": "Высокий контраст", "description": "Чёрный и белый, с яркими цветами для кнопок и выделения."}, "ja": {"name": "ハイコントラスト", "description": "白と黒を基調に、ボタンや選択部分には鮮やかな色を使います。"}, "zh": {"name": "高对比度", "description": "黑白配色，按钮和选中项使用鲜艳的颜色。"}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Dark",

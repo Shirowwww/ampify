@@ -6,7 +6,7 @@
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "An animated equalizer GIF at the right end of the song's display, behind its text: an example of ::before with content: url(...).",
-  "translations": {"fr": {"name": "Égaliseur dans l'afficheur", "description": "Un GIF d'égaliseur animé au bout droit de l'afficheur du morceau, derrière son texte : un exemple de ::before avec content: url(...)."}},
+  "translations": {"fr": {"name": "Égaliseur dans l'afficheur", "description": "Un GIF d'égaliseur animé au bout droit de l'afficheur du morceau, derrière son texte : un exemple de ::before avec content: url(...)."}, "de": {"name": "Equalizer in der Anzeige", "description": "Ein animiertes Equalizer-GIF am rechten Ende der Titelanzeige, hinter dem Text: ein Beispiel für ::before mit content: url(...)."}, "es": {"name": "Ecualizador en la pantalla", "description": "Un GIF de ecualizador animado en el extremo derecho de la pantalla de la canción, detrás de su texto: un ejemplo de ::before con content: url(...)."}, "pt": {"name": "Equalizador no visor", "description": "Um GIF de equalizador animado na ponta direita do visor da faixa, atrás do texto: um exemplo de ::before com content: url(...)."}, "ru": {"name": "Эквалайзер на дисплее", "description": "Анимированный GIF-эквалайзер с правого края дисплея трека, за его текстом: пример ::before с content: url(...)."}, "ja": {"name": "ディスプレイにイコライザー", "description": "曲のディスプレイの右端、文字の後ろにアニメーションのイコライザー GIF を表示します。::before と content: url(...) の例です。"}, "zh": {"name": "显示屏中的均衡器", "description": "在歌曲显示屏的右端、文字后方显示一个动画均衡器 GIF:::before 搭配 content: url(...) 的示例。"}},
   "kitApi": "1.0",
   "preview": "preview.jpg",
   "tags": [

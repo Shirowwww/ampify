@@ -213,7 +213,7 @@ void ReadTranslations(const Json& field, std::map<std::string, ManifestText>& tr
         std::string where = "translations." + code;
         if (std::find(std::begin(kTranslationLanguages), std::end(kTranslationLanguages), code) ==
             std::end(kTranslationLanguages)) {
-            errors.push_back(where + ": unknown language (fr)");
+            errors.push_back(where + ": unknown language (fr, de, es, pt, ru, ja, zh)");
             continue;
         }
         if (!entry.IsObject()) {

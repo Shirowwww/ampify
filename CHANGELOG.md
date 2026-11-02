@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Ampify speaks German, Spanish, Portuguese, Russian, Japanese and Simplified Chinese, besides English and French: the
+  Settings card, the menus, the installer, the Marketplace, and every shipped theme, snippet and extension. Any text
+  without a translation shows in English. The `language` setting (`ampify config language de`) chooses one whatever
+  the Windows language.
+- Manifests accept `translations` for de, es, pt, ru, ja and zh. Ampify 1.2.1 and older refuse those languages, so an
+  element that uses them needs this version.
+- Shorter, task-by-task documentation.
+
 ## 1.2.1 (2026-11-02)
 
 - The Playback guard restarts a song that Apple Music leaves stuck, then goes back to the second it froze at: the music

@@ -6,7 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Hides the buttons and banners most people never use: reactions, share, AirPlay, info banners.",
-  "translations": {"fr": {"name": "Interface épurée", "description": "Masque les boutons et bandeaux que presque personne n'utilise : réactions, partage, AirPlay, bandeaux d'information."}},
+  "translations": {"fr": {"name": "Interface épurée", "description": "Masque les boutons et bandeaux que presque personne n'utilise : réactions, partage, AirPlay, bandeaux d'information."}, "de": {"name": "Aufgeräumte Oberfläche", "description": "Blendet die Schaltflächen und Hinweise aus, die fast niemand benutzt: Reaktionen, Teilen, AirPlay, Infobanner."}, "es": {"name": "Interfaz despejada", "description": "Oculta los botones y avisos que casi nadie usa: reacciones, compartir, AirPlay, avisos informativos."}, "pt": {"name": "Interface limpa", "description": "Oculta os botões e avisos que quase ninguém usa: reações, compartilhar, AirPlay, avisos informativos."}, "ru": {"name": "Чистый интерфейс", "description": "Скрывает кнопки и баннеры, которыми почти никто не пользуется: реакции, «Поделиться», AirPlay, информационные баннеры."}, "ja": {"name": "すっきり表示", "description": "ほとんど使われないボタンやバナー（リアクション、共有、AirPlay、お知らせバナー）を隠します。"}, "zh": {"name": "简洁界面", "description": "隐藏几乎没人用的按钮和横幅：回应、分享、AirPlay、信息横幅。"}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "tags": [

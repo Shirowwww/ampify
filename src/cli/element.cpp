@@ -12,7 +12,7 @@ namespace ampify {
 
 namespace {
 
-// One string rule: the same pattern, length limits and French hint as the JSON schemas.
+// One string rule: the same pattern, length limits and hint as the JSON schemas.
 struct TextRule {
     const char* pattern;  // ECMAScript, must match the whole value
     size_t minLength;     // in characters, 0 for none
@@ -152,7 +152,7 @@ std::map<std::string, ManifestText> ReadTranslations(const Json& object, const s
         std::string entryLabel = label + "." + code;
         if (std::find(std::begin(kTranslationLanguages), std::end(kTranslationLanguages), code) ==
             std::end(kTranslationLanguages)) {
-            errors.push_back(entryLabel + ": unknown language (fr)");
+            errors.push_back(entryLabel + ": unknown language (fr, de, es, pt, ru, ja, zh)");
             continue;
         }
         if (!entry.IsObject()) {

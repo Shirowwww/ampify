@@ -116,6 +116,8 @@ void* WinHost::QueryCapability(std::string_view name) {
 std::string WinHost::Process() const { return m_process; }
 
 std::string WinHost::Locale() const {
+    // "language = de" in settings.txt shows Ampify in German whatever the Windows language.
+    if (std::optional<std::string> chosen = m_settings.Get("language"); chosen && !chosen->empty()) return *chosen;
     wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
     if (GetUserDefaultLocaleName(name, LOCALE_NAME_MAX_LENGTH) == 0) return "fr-FR";
     std::string narrow;

@@ -35,6 +35,60 @@ Ampify.i18n.define({
     noKey: "Last.fm : cette copie n'a pas de clé d'application. Indiquez-en une : ampify config extensions.scrobbler.apiKey <clé>",
     signedOut: "Déconnecté de Last.fm.",
   },
+  de: {
+    allow: "Erlauben Sie Ampify auf der Last.fm-Seite, die sich gerade geöffnet hat.",
+    connected: "Mit Last.fm verbunden als {name}.",
+    late: "Last.fm wurde nicht rechtzeitig erlaubt. Schalten Sie „Mein Last.fm-Konto verwenden“ aus und wieder ein.",
+    blocked: "Die Last.fm-Seite konnte nicht geöffnet werden. Schalten Sie „Mein Last.fm-Konto verwenden“ in ein paar Sekunden aus und wieder ein.",
+    waiting: "Last.fm ist noch nicht verbunden. Schalten Sie „Mein Last.fm-Konto verwenden“ aus und wieder ein, um die Seite erneut zu öffnen.",
+    noKey: "Last.fm: Diese Kopie hat keinen Anwendungsschlüssel. Geben Sie einen an: ampify config extensions.scrobbler.apiKey <Schlüssel>",
+    signedOut: "Von Last.fm abgemeldet.",
+  },
+  es: {
+    allow: "Permite Ampify en la página de Last.fm que se acaba de abrir.",
+    connected: "Conectado a Last.fm como {name}.",
+    late: "No se permitió Last.fm a tiempo. Desactiva y vuelve a activar «Usar mi cuenta de Last.fm».",
+    blocked: "No se pudo abrir la página de Last.fm. Desactiva y vuelve a activar «Usar mi cuenta de Last.fm» dentro de unos segundos.",
+    waiting: "Last.fm todavía no está conectado. Desactiva y vuelve a activar «Usar mi cuenta de Last.fm» para abrir su página otra vez.",
+    noKey: "Last.fm: esta copia no tiene clave de aplicación. Indica una: ampify config extensions.scrobbler.apiKey <clave>",
+    signedOut: "Sesión cerrada en Last.fm.",
+  },
+  pt: {
+    allow: "Autorize o Ampify na página do Last.fm que acabou de abrir.",
+    connected: "Conectado ao Last.fm como {name}.",
+    late: "O Last.fm não foi autorizado a tempo. Desative e ative novamente “Usar minha conta do Last.fm”.",
+    blocked: "Não foi possível abrir a página do Last.fm. Desative e ative novamente “Usar minha conta do Last.fm” em alguns segundos.",
+    waiting: "O Last.fm ainda não está conectado. Desative e ative novamente “Usar minha conta do Last.fm” para abrir a página outra vez.",
+    noKey: "Last.fm: esta cópia não tem chave de aplicativo. Informe uma: ampify config extensions.scrobbler.apiKey <chave>",
+    signedOut: "Desconectado do Last.fm.",
+  },
+  ru: {
+    allow: "Разрешите доступ Ampify на только что открывшейся странице Last.fm.",
+    connected: "Подключено к Last.fm как {name}.",
+    late: "Доступ к Last.fm не был разрешён вовремя. Выключите и снова включите «Использовать мой аккаунт Last.fm».",
+    blocked: "Не удалось открыть страницу Last.fm. Выключите и снова включите «Использовать мой аккаунт Last.fm» через несколько секунд.",
+    waiting: "Last.fm ещё не подключён. Выключите и снова включите «Использовать мой аккаунт Last.fm», чтобы открыть страницу заново.",
+    noKey: "Last.fm: у этой копии нет ключа приложения. Укажите его: ampify config extensions.scrobbler.apiKey <ключ>",
+    signedOut: "Выход из Last.fm выполнен.",
+  },
+  ja: {
+    allow: "いま開いた Last.fm のページで Ampify を許可してください。",
+    connected: "Last.fm に {name} として接続しました。",
+    late: "時間内に Last.fm が許可されませんでした。「自分の Last.fm アカウントを使う」をオフにして、もう一度オンにしてください。",
+    blocked: "Last.fm のページを開けませんでした。数秒待ってから「自分の Last.fm アカウントを使う」をオフにして、もう一度オンにしてください。",
+    waiting: "Last.fm にはまだ接続されていません。「自分の Last.fm アカウントを使う」をオフにして、もう一度オンにすると、ページがもう一度開きます。",
+    noKey: "Last.fm： このコピーにはアプリケーションキーがありません。次のコマンドで設定してください： ampify config extensions.scrobbler.apiKey <キー>",
+    signedOut: "Last.fm からサインアウトしました。",
+  },
+  zh: {
+    allow: "请在刚刚打开的 Last.fm 页面中允许 Ampify。",
+    connected: "已以 {name} 的身份连接到 Last.fm。",
+    late: "没有及时允许 Last.fm。请先关闭再重新开启“使用我的 Last.fm 账号”。",
+    blocked: "无法打开 Last.fm 页面。请几秒钟后先关闭再重新开启“使用我的 Last.fm 账号”。",
+    waiting: "尚未连接到 Last.fm。先关闭再重新开启“使用我的 Last.fm 账号”，即可重新打开它的页面。",
+    noKey: "Last.fm：此副本没有应用密钥。请设置一个：ampify config extensions.scrobbler.apiKey <密钥>",
+    signedOut: "已退出 Last.fm。",
+  },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
 
@@ -71,7 +125,7 @@ function call(method, values, withSession = true) {
 function parsed(answer) {
   try {
     return JSON.parse(answer.text) || {};
-  } catch (error) {
+  } catch {
     return {};
   }
 }

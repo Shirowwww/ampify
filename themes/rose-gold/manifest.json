@@ -6,7 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Warm brown-black panels and a rose gold play button, display and volume. A dark scheme and a light one.",
-  "translations": {"fr": {"name": "Or rose", "description": "Des panneaux brun-noir chaleureux, avec le bouton de lecture, l'affichage et le volume en or rose. Une variante sombre et une claire."}},
+  "translations": {"fr": {"name": "Or rose", "description": "Des panneaux brun-noir chaleureux, avec le bouton de lecture, l'affichage et le volume en or rose. Une variante sombre et une claire."}, "de": {"name": "Roségold", "description": "Warme braunschwarze Panels, mit Wiedergabetaste, Anzeige und Lautstärke in Roségold. Eine dunkle und eine helle Variante."}, "es": {"name": "Oro rosa", "description": "Paneles marrón oscuro y cálidos, con el botón de reproducir, la pantalla y el volumen en oro rosa. Una variante oscura y otra clara."}, "pt": {"name": "Ouro rosé", "description": "Painéis marrom-escuros e aconchegantes, com o botão de reproduzir, o visor e o volume em ouro rosé. Uma variante escura e uma clara."}, "ru": {"name": "Розовое золото", "description": "Тёплые коричнево-чёрные панели, а кнопка воспроизведения, дисплей и громкость — цвета розового золота. Тёмный и светлый варианты."}, "ja": {"name": "ローズゴールド", "description": "温かみのある黒に近い茶色のパネルに、再生ボタン、ディスプレイ、音量をローズゴールドで合わせました。ダークとライトの2つのバリエーションがあります。"}, "zh": {"name": "玫瑰金", "description": "温暖的黑褐色面板，播放按钮、显示屏和音量均为玫瑰金色。提供深色和浅色两种配色。"}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Dark",

@@ -32,6 +32,10 @@ TEST_CASE(I18n_LanguageCodeIsTheFirstTwoLettersOfTheLocale) {
     CHECK(ampify::i18n::LanguageCode("en_US.UTF-8") == "en");
     CHECK(ampify::i18n::LanguageCode("DE-de") == "de");
     CHECK(ampify::i18n::LanguageCode("pt") == "pt");
+    CHECK(ampify::i18n::LanguageCode("zh-CN") == "zh");
+    CHECK(ampify::i18n::LanguageCode("zh-Hans-SG") == "zh");
+    CHECK(ampify::i18n::LanguageCode("zh-TW") == "zh-hant");
+    CHECK(ampify::i18n::LanguageCode("zh-Hant-HK") == "zh-hant");
     CHECK(ampify::i18n::LanguageCode("") == "en");  // no locale: English
     CHECK(ampify::i18n::LanguageCode("C") == "en");
     CHECK(ampify::i18n::LanguageCode("C.UTF-8") == "en");
@@ -67,13 +71,36 @@ TEST_CASE(I18n_FrenchTextsForWhatPeopleSeeAndEnglishForTheRest) {
     CHECK(ampify::i18n::Text("ui.on") == "Activé");
     CHECK(ampify::i18n::Text("page.back") == "Retour");
     CHECK(ampify::i18n::Text("discord.connected") == "Discord: connected, the presence is shown");  // the log stays English
-    ampify::i18n::SetLanguage("de");
+    ampify::i18n::SetLanguage("it");
+    CHECK(ampify::i18n::Text("ui.on") == "On");  // a language without a table reads English
+    ampify::i18n::SetLanguage("zh-hant");
     CHECK(ampify::i18n::Text("ui.on") == "On");
+    ampify::i18n::SetLanguage("de");
+    CHECK(ampify::i18n::Text("ui.on") == "Ein");
+    CHECK(ampify::i18n::Text("mods.themeTitle", {{"name", "Nord"}}) == "Design: Nord");
+    CHECK(ampify::i18n::UsesDecimalComma());
+    ampify::i18n::SetLanguage("ja");
+    CHECK(!ampify::i18n::UsesDecimalComma());
+
     ampify::i18n::SetLanguage("en");
     CHECK(ampify::i18n::Text("ui.on") == "On");
     // Every French key is one of the English table, so nothing French goes untranslated back to English by mistake.
     for (const ampify::i18n::Message& message : ampify::i18n::KitMessagesIn("fr")) {
         CHECK(ampify::i18n::Lookup(ampify::i18n::KitMessages(), message.key) != message.key);
+    }
+}
+
+TEST_CASE(I18n_EveryLanguageTranslatesWhatTheFrenchTableDoes) {
+    auto french = ampify::i18n::KitMessagesIn("fr");
+    for (const char* language : {"de", "es", "pt", "ru", "ja", "zh"}) {
+        auto table = ampify::i18n::KitMessagesIn(language);
+        CheckTable(table, language);
+        CHECK(table.size() == french.size());
+        for (const ampify::i18n::Message& message : french) {
+            std::string_view text = ampify::i18n::Lookup(table, message.key);
+            CHECK(text != message.key);  // present
+            CHECK(ampify::i18n::Placeholders(text) == ampify::i18n::Placeholders(message.text));
+        }
     }
 }
 

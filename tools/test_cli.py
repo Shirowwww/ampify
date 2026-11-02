@@ -436,12 +436,12 @@ class Marketplace(AmpifyTestCase):
         folder = self.write_element("glow", "theme")
         manifest_path = os.path.join(folder, "manifest.json")
         manifest = read_json(manifest_path)
-        manifest["translations"] = {"de": {"name": "Glanz", "description": "Ein Test."}}
+        manifest["translations"] = {"it": {"name": "Bagliore", "description": "Una prova."}}
         with open(manifest_path, "w", encoding="utf-8") as handle:
             json.dump(manifest, handle)
         result = self.ampify("validate", folder)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("translations.de", result.stderr + result.stdout)
+        self.assertIn("translations.it", result.stderr + result.stdout)
 
     def test_market_json_keeps_a_catalog_preview_only_from_a_known_host(self):
         def listed(name, **changes):
@@ -1363,6 +1363,15 @@ class NewSettings(AmpifyTestCase):
             result = self.ampify("config", key, value)
             self.assertEqual(result.returncode, 0, key + ": " + result.stderr)
         self.assertEqual(self.ampify("config", "apple.close").stdout.strip(), "tray")
+
+    def test_language_takes_a_language_code_only(self):
+        for value in ("de", "pt-BR", "zh-Hant-TW", ""):
+            result = self.ampify("config", "language", value)
+            self.assertEqual(result.returncode, 0, value + ": " + result.stderr)
+        for value in ("german", "d", "de BR", "../x"):
+            result = self.ampify("config", "language", value)
+            self.assertNotEqual(result.returncode, 0, value)
+            self.assertIn("language", result.stderr)
 
     def test_restore_of_a_backup_under_dry_run_writes_nothing(self):
         self.assertEqual(self.ampify("config", "theme.active", "glass").returncode, 0)

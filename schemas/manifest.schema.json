@@ -100,9 +100,15 @@
     "translations": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Name and description in the languages Ampify speaks (fr only for now). Shown instead of the English ones when Windows is in that language.",
+      "description": "Name and description in the languages Ampify speaks (fr, de, es, pt, ru, ja, zh). Shown instead of the English ones when Windows is in that language.",
       "properties": {
-        "fr": {"$ref": "#/$defs/translation"}
+        "fr": {"$ref": "#/$defs/translation"},
+        "de": {"$ref": "#/$defs/translation"},
+        "es": {"$ref": "#/$defs/translation"},
+        "pt": {"$ref": "#/$defs/translation"},
+        "ru": {"$ref": "#/$defs/translation"},
+        "ja": {"$ref": "#/$defs/translation"},
+        "zh": {"$ref": "#/$defs/translation"}
       }
     },
     "translation": {

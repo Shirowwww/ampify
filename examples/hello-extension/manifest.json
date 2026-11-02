@@ -6,7 +6,7 @@
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from, the smallest one: writes to the log and keeps a launch counter.",
-  "translations": {"fr": {"name": "Bonjour (exemple)", "description": "Un exemple pour apprendre, le plus petit : écrit dans le journal et compte les lancements."}},
+  "translations": {"fr": {"name": "Bonjour (exemple)", "description": "Un exemple pour apprendre, le plus petit : écrit dans le journal et compte les lancements."}, "de": {"name": "Hallo (Beispiel)", "description": "Ein Beispiel zum Lernen, das kleinste: schreibt ins Protokoll und zählt die Starts."}, "es": {"name": "Hola (ejemplo)", "description": "Un ejemplo para aprender, el más pequeño: escribe en el registro y cuenta los inicios."}, "pt": {"name": "Olá (exemplo)", "description": "Um exemplo para aprender, o menor de todos: escreve no registro e conta as inicializações."}, "ru": {"name": "Привет (пример)", "description": "Пример для изучения, самый маленький: пишет в журнал и считает запуски."}, "ja": {"name": "こんにちは（サンプル）", "description": "学習用のサンプルの中でいちばん小さなものです。ログに書き込み、起動回数を数えます。"}, "zh": {"name": "你好（示例）", "description": "最小的学习示例：写入日志并统计启动次数。"}},
   "kitApi": "1.0",
   "preview": "preview.jpg",
   "main": "main.js",

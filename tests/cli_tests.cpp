@@ -745,7 +745,7 @@ TEST_CASE(Manifest_TypeIsScriptOrModuleForTheCli) {
     CHECK(MentionsField(errors, "type: invalid value"));
 }
 
-TEST_CASE(Manifest_TranslationsAreFrenchWithTheSameLengthRules) {
+TEST_CASE(Manifest_TranslationsKeepTheSameLengthRulesInEveryLanguage) {
     const std::string base =
         R"({"id": "demo", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"
         R"("description": "Test.", "kitApi": "1.0", "main": "main.js", )";
@@ -756,8 +756,8 @@ TEST_CASE(Manifest_TranslationsAreFrenchWithTheSameLengthRules) {
     CHECK(translated && translated->translations.at("fr").name == "Démo");
     CHECK(translated && translated->translations.at("fr").description == "Un test.");
 
-    CHECK(!ampify::ParseManifest(base + R"("translations": {"de": {"name": "a", "description": "b"}}})", errors).has_value());
-    CHECK(MentionsField(errors, "translations.de: unknown language"));
+    CHECK(!ampify::ParseManifest(base + R"("translations": {"it": {"name": "a", "description": "b"}}})", errors).has_value());
+    CHECK(MentionsField(errors, "translations.it: unknown language"));
     errors.clear();
     CHECK(!ampify::ParseManifest(base + R"("translations": {"fr": {"name": "Démo"}}})", errors).has_value());
     CHECK(MentionsField(errors, "translations.fr.description: required field missing"));

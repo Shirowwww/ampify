@@ -698,9 +698,9 @@ controls::TextBox SettingField(UiService::Shared& shared, const SettingOwner& ta
     if (shared.probe.textBox) box.Style(shared.probe.textBox);
     box.MinWidth(spec.type == SettingSpec::Type::Number ? 96 : 200);
     box.MaxLength(200);  // the length docs/extensions/manifest.md allows a text default
-    // settings.txt keeps a point; a French reader sees a comma, like the labels' "0,3 à 0,9".
+    // settings.txt keeps a point; a French or German reader sees a comma, like the labels' "0,3 à 0,9".
     auto shown = [number = spec.type == SettingSpec::Type::Number](std::string text) {
-        if (number && i18n::Language() == "fr") std::replace(text.begin(), text.end(), '.', ',');
+        if (number && i18n::UsesDecimalComma()) std::replace(text.begin(), text.end(), '.', ',');
         return Wide(text);
     };
     box.Text(shown(value));

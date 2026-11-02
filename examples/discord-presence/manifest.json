@@ -27,6 +27,132 @@
         "App name": "Le nom de l'application",
         "None": "Aucun"
       }
+    },
+    "de": {
+      "name": "Discord-Status",
+      "description": "Ihr Discord-Status zeigt, was Sie hören: Cover, Künstler, Album, Fortschrittsbalken, Links und Schaltflächen. Einschalten, während Discord geöffnet ist. Ein Cover, das im Apple-Katalog fehlt (eigene Dateien), geht an einen kostenlosen Host, der es nach 3 Tagen löscht; abschaltbar.",
+      "settings": {
+        "status-line": "Nach „Hört zu“ in der Mitgliederliste",
+        "show-cover": "Cover anzeigen",
+        "share-covers": "Covers teilen, die der Katalog nicht kennt",
+        "show-album": "Album anzeigen",
+        "show-progress": "Fortschrittsbalken anzeigen",
+        "clickable-links": "Titel, Künstler und Cover anklickbar",
+        "show-paused": "Status während der Pause beibehalten",
+        "button-1": "Erste Schaltfläche",
+        "button-2": "Zweite Schaltfläche"
+      },
+      "options": {
+        "Artist": "Künstler",
+        "Title": "Titel",
+        "App name": "App-Name",
+        "None": "Keine"
+      }
+    },
+    "es": {
+      "name": "Presencia en Discord",
+      "description": "Tu estado de Discord muestra lo que escuchas: carátula, artista, álbum, barra de progreso, enlaces y botones. Actívala con Discord abierto. Una carátula que falta en el catálogo de Apple (tus archivos) pasa por un alojamiento gratuito que la borra a los 3 días; se puede desactivar.",
+      "settings": {
+        "status-line": "Después de «Escuchando» en la lista de miembros",
+        "show-cover": "Mostrar la carátula",
+        "share-covers": "Compartir las carátulas que el catálogo no conoce",
+        "show-album": "Mostrar el álbum",
+        "show-progress": "Mostrar la barra de progreso",
+        "clickable-links": "Título, artista y carátula con enlace",
+        "show-paused": "Mantener el estado durante la pausa",
+        "button-1": "Primer botón",
+        "button-2": "Segundo botón"
+      },
+      "options": {
+        "Artist": "El artista",
+        "Title": "El título",
+        "App name": "El nombre de la app",
+        "None": "Ninguno"
+      }
+    },
+    "pt": {
+      "name": "Presença no Discord",
+      "description": "Seu status do Discord mostra o que você ouve: capa, artista, álbum, barra de progresso, links e botões. Ative com o Discord aberto. Uma capa que falta no catálogo da Apple (seus arquivos) vai para um serviço gratuito que a apaga em 3 dias; dá para desativar.",
+      "settings": {
+        "status-line": "Depois de “Ouvindo” na lista de membros",
+        "show-cover": "Mostrar a capa",
+        "share-covers": "Compartilhar capas que o catálogo não conhece",
+        "show-album": "Mostrar o álbum",
+        "show-progress": "Mostrar a barra de progresso",
+        "clickable-links": "Título, artista e capa clicáveis",
+        "show-paused": "Manter o status durante a pausa",
+        "button-1": "Primeiro botão",
+        "button-2": "Segundo botão"
+      },
+      "options": {
+        "Artist": "O artista",
+        "Title": "O título",
+        "App name": "O nome do app",
+        "None": "Nenhum"
+      }
+    },
+    "ru": {
+      "name": "Присутствие в Discord",
+      "description": "Ваш статус в Discord показывает, что вы слушаете: обложку, исполнителя, альбом, шкалу прогресса, ссылки и кнопки. Включайте при открытом Discord. Обложка, которой нет в каталоге Apple (ваши файлы), загружается на бесплатный хостинг, где удаляется через 3 дня; это можно отключить.",
+      "settings": {
+        "status-line": "После «Слушает» в списке участников",
+        "show-cover": "Показывать обложку",
+        "share-covers": "Делиться обложками, которых нет в каталоге",
+        "show-album": "Показывать альбом",
+        "show-progress": "Показывать шкалу прогресса",
+        "clickable-links": "Название, исполнитель и обложка как ссылки",
+        "show-paused": "Сохранять статус во время паузы",
+        "button-1": "Первая кнопка",
+        "button-2": "Вторая кнопка"
+      },
+      "options": {
+        "Artist": "Исполнитель",
+        "Title": "Название",
+        "App name": "Название приложения",
+        "None": "Нет"
+      }
+    },
+    "ja": {
+      "name": "Discord プレゼンス",
+      "description": "Discord のステータスに、聴いている曲のカバー、アーティスト、アルバム、進行バー、リンク、ボタンを表示します。Discord を開いた状態でオンにしてください。Apple のカタログにないカバー（自分のファイル）は、3 日で削除される無料のホストに送られます。この動作はオフにできます。",
+      "settings": {
+        "status-line": "メンバーリストの「リスニング中」の後ろ",
+        "show-cover": "カバーを表示",
+        "share-covers": "カタログにないカバーを共有",
+        "show-album": "アルバムを表示",
+        "show-progress": "進行バーを表示",
+        "clickable-links": "タイトル・アーティスト・カバーをクリック可能に",
+        "show-paused": "一時停止中もステータスを残す",
+        "button-1": "1つ目のボタン",
+        "button-2": "2つ目のボタン"
+      },
+      "options": {
+        "Artist": "アーティスト",
+        "Title": "タイトル",
+        "App name": "アプリ名",
+        "None": "なし"
+      }
+    },
+    "zh": {
+      "name": "Discord 状态",
+      "description": "在 Discord 状态中显示你正在听的内容：封面、艺术家、专辑、进度条、链接和按钮。请在 Discord 已打开时启用。Apple 目录中没有的封面（你自己的文件）会上传到免费主机，3 天内自动删除；也可以关闭此功能。",
+      "settings": {
+        "status-line": "成员列表中“正在听”之后",
+        "show-cover": "显示封面",
+        "share-covers": "共享目录中没有的封面",
+        "show-album": "显示专辑",
+        "show-progress": "显示进度条",
+        "clickable-links": "标题、艺术家和封面可点击",
+        "show-paused": "暂停时保留状态",
+        "button-1": "第一个按钮",
+        "button-2": "第二个按钮"
+      },
+      "options": {
+        "Artist": "艺术家",
+        "Title": "标题",
+        "App name": "应用名称",
+        "None": "无"
+      }
     }
   },
   "tags": ["example"],

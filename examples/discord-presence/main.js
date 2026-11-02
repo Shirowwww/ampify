@@ -37,12 +37,26 @@ const HOSTS = [
 ];
 const SETTLE_MS = 2000;  // Windows takes a moment to show the new track's cover
 const MAX_REMEMBERED = 200;  // tracks whose lookup is kept in storage
+// The Apple store of each language (English: the US one); the links then open in it.
+const STOREFRONTS = { fr: "fr", de: "de", es: "es", pt: "br", ru: "ru", ja: "jp", zh: "cn" };
 
 Ampify.i18n.define({
   en: { paused: "Paused", unknown: "Unknown title", listen: "Listen on Apple Music", youtube: "Find on YouTube Music",
         spotify: "Find on Spotify" },
   fr: { paused: "En pause", unknown: "Titre inconnu", listen: "Écouter sur Apple Music",
         youtube: "Trouver sur YouTube Music", spotify: "Trouver sur Spotify" },
+  de: { paused: "Pausiert", unknown: "Unbekannter Titel", listen: "Auf Apple Music anhören",
+        youtube: "Auf YouTube Music finden", spotify: "Auf Spotify finden" },
+  es: { paused: "En pausa", unknown: "Título desconocido", listen: "Escuchar en Apple Music",
+        youtube: "Buscar en YouTube Music", spotify: "Buscar en Spotify" },
+  pt: { paused: "Pausado", unknown: "Título desconhecido", listen: "Ouvir no Apple Music",
+        youtube: "Encontrar no YouTube Music", spotify: "Encontrar no Spotify" },
+  ru: { paused: "На паузе", unknown: "Неизвестное название", listen: "Слушать в Apple Music",
+        youtube: "Найти в YouTube Music", spotify: "Найти в Spotify" },
+  ja: { paused: "一時停止中", unknown: "不明なタイトル", listen: "Apple Music で聴く",
+        youtube: "YouTube Music で探す", spotify: "Spotify で探す" },
+  zh: { paused: "已暂停", unknown: "未知标题", listen: "在 Apple Music 上收听",
+        youtube: "在 YouTube Music 上查找", spotify: "在 Spotify 上查找" },
 });
 const t = (key) => Ampify.i18n.t(key);
 
@@ -112,14 +126,13 @@ function search(track) {
   // Slashes and brackets make the search miss: "A / B (Live)" is looked up as "A B Live".
   const words = (track.artist + " " + track.title).replace(/[/()[\]]+/g, " ").replace(/\s+/g, " ").trim();
   const term = encodeURIComponent(words);
-  // The store of a French Windows is the French one; the links then open in it.
-  const country = Ampify.i18n.language === "fr" ? "fr" : "us";
+  const country = STOREFRONTS[Ampify.i18n.language] || "us";
   return Ampify.http.get(SEARCH + "?media=music&entity=song&limit=25&country=" + country + "&term=" + term).then((answer) => {
     if (answer.status !== 200) return undefined;
     let results;
     try {
       results = JSON.parse(answer.text).results || [];
-    } catch (error) {
+    } catch {
       return undefined;
     }
     const match = bestMatch(results, track);
@@ -162,7 +175,7 @@ function sendTo(index, file) {
     let url = "";
     try {
       url = answer.status === 200 ? String(host.link(answer.text) || "") : "";
-    } catch (error) {
+    } catch {
       url = "";
     }
     if (url.startsWith(host.prefix)) return { cover: url, keptUntil: Date.now() + host.keepsMs };
@@ -187,7 +200,7 @@ function lookUp(track) {
 
 // --- What Discord shows ----------------------------------------------------------------------------------------------
 
-const https = (url) => (/^https:\/\//.test(url || "") && url.length <= 256 ? url : "");
+const https = (url) => (String(url || "").startsWith("https://") && url.length <= 256 ? url : "");
 
 function searchUrl(base, track) {
   return base + encodeURIComponent((track.artist + " " + track.title).trim());

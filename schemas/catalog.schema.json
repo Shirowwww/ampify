@@ -82,9 +82,15 @@
     "translations": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Copy of the manifest's translations (fr only for now), shown when Windows is in that language.",
+      "description": "Copy of the manifest's translations (fr, de, es, pt, ru, ja, zh), shown when Windows is in that language.",
       "properties": {
-        "fr": {"$ref": "#/$defs/translation"}
+        "fr": {"$ref": "#/$defs/translation"},
+        "de": {"$ref": "#/$defs/translation"},
+        "es": {"$ref": "#/$defs/translation"},
+        "pt": {"$ref": "#/$defs/translation"},
+        "ru": {"$ref": "#/$defs/translation"},
+        "ja": {"$ref": "#/$defs/translation"},
+        "zh": {"$ref": "#/$defs/translation"}
       }
     },
     "translation": {

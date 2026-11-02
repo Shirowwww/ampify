@@ -36,7 +36,7 @@ struct ManifestText {
     std::map<std::string, std::string> options;   // the text of a choice's option, by its stored value (optional)
 };
 
-inline constexpr std::string_view kTranslationLanguages[] = {"fr"};
+inline constexpr std::string_view kTranslationLanguages[] = {"fr", "de", "es", "pt", "ru", "ja", "zh"};
 
 // The fields of a manifest.json that the kernel uses. The rules are those of docs/extensions/manifest.md, which
 // tools/validate.py also enforces. The kernel checks them again, because a folder can be edited by hand.

@@ -28,7 +28,7 @@ struct ElementInfo {
     std::string kind;  // extension, theme, app or snippet
     std::string author;
     std::string description;
-    std::map<std::string, ManifestText> translations;  // name and description by language ("fr"), optional
+    std::map<std::string, ManifestText> translations;  // name and description by language ("fr", "de"...), optional
     std::string kitApi;
     std::optional<std::string> homepage;
     std::optional<std::string> license;
@@ -59,7 +59,7 @@ bool IsValidScheme(std::string_view text);
 bool IsHttpsUrl(std::string_view text);
 bool IsPreviewUrl(std::string_view text);  // https address of a .png, .jpg or .jpeg image
 
-// Parses manifest text. On failure returns nullopt and appends one French message per problem to `errors`.
+// Parses manifest text. On failure returns nullopt and appends one message per problem to `errors`.
 std::optional<ElementManifest> ParseManifest(std::string_view text, std::vector<std::string>& errors);
 
 // Parses the fields every element has. `where` prefixes each message ("extensions[2]"), empty at the top level.

@@ -8,7 +8,7 @@ namespace ampify::cli {
 
 namespace {
 
-constexpr std::array<KnownSetting, 23> kFixed = {{
+constexpr std::array<KnownSetting, 24> kFixed = {{
     {"theme.active", "", "no theme"},
     {"theme.scheme", "", "the theme's default scheme"},
     {"theme.schedule", "", "no schedule"},
@@ -32,6 +32,7 @@ constexpr std::array<KnownSetting, 23> kFixed = {{
     {"apple.notifications", "apple", ""},
     {"apple.fullscreen", "window", ""},
     {"apple.close", "quit", ""},
+    {"language", "", "the Windows language"},
 }};
 
 // Families of keys: element switches and the settings each element or theme declares in its manifest.

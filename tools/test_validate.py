@@ -150,7 +150,7 @@ class CatalogTests(unittest.TestCase):
 
     def test_bad_translations_are_refused(self):
         cases = {
-            "unknown language": {"de": {"name": "Demo", "description": "Test."}},
+            "unknown language": {"it": {"name": "Demo", "description": "Test."}},
             "missing description": {"fr": {"name": "Démo"}},
             "empty name": {"fr": {"name": "", "description": "Test."}},
             "name too long": {"fr": {"name": "a" * 61, "description": "Test."}},
@@ -296,7 +296,8 @@ class ManifestTests(unittest.TestCase):
 
     def test_bad_translations_are_refused(self):
         cases = {
-            "unknown language": {"es": {"name": "Demo", "description": "Test."}},
+            "unknown language": {"it": {"name": "Demo", "description": "Test."}},
+
             "missing name": {"fr": {"description": "Test."}},
             "description too long": {"fr": {"name": "Démo", "description": "a" * 301}},
             "extra field": {"fr": {"name": "Démo", "description": "Test.", "x": 1}},

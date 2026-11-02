@@ -6,7 +6,7 @@
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Example snippet: removes the rounding of buttons and frames, on top of any theme.",
-  "translations": {"fr": {"name": "Coins carrés", "description": "Un snippet d'exemple : supprime les angles arrondis des boutons et des cadres, par-dessus n'importe quel thème."}},
+  "translations": {"fr": {"name": "Coins carrés", "description": "Un snippet d'exemple : supprime les angles arrondis des boutons et des cadres, par-dessus n'importe quel thème."}, "de": {"name": "Eckige Ecken", "description": "Ein Beispiel-Snippet: entfernt die Rundung von Schaltflächen und Rahmen, über jedem Design."}, "es": {"name": "Esquinas cuadradas", "description": "Un snippet de ejemplo: quita el redondeo de los botones y los marcos, encima de cualquier tema."}, "pt": {"name": "Cantos quadrados", "description": "Um snippet de exemplo: remove o arredondamento de botões e molduras, por cima de qualquer tema."}, "ru": {"name": "Прямые углы", "description": "Пример сниппета: убирает скругление кнопок и рамок поверх любой темы."}, "ja": {"name": "角を四角に", "description": "サンプルのスニペットです。どのテーマの上でも、ボタンや枠の角丸をなくします。"}, "zh": {"name": "方形边角", "description": "示例代码片段：在任何主题之上，去掉按钮和边框的圆角。"}},
   "kitApi": "1.0",
   "preview": "preview.jpg",
   "resources": "resources.xaml"

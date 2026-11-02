@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <regex>
 #include <span>
 #include <sstream>
 #include <thread>
@@ -95,6 +96,15 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
         return true;
     }
 
+    if (key == "language") {
+        // Two letters, then optional subtags of 2 to 8 letters or digits: de, pt-BR, zh-Hant-TW. Empty follows Windows.
+        static const std::regex kLanguage("[A-Za-z]{2}([-_][A-Za-z0-9]{2,8})*");
+        if (!value.empty() && !std::regex_match(value, kLanguage)) {
+            problem = "language expects a language code such as de, pt-BR or zh-Hant (empty: the Windows language)";
+            return false;
+        }
+        return true;
+    }
     if (key == kLaunchFlagsKey) {
         if (!SplitLaunchFlags(value, &problem)) return false;
         return true;
@@ -587,7 +597,7 @@ int CmdHelp(Context& ctx) {
     std::string command = args[1] == "catalog" ? "market" : args[1] == "auto" ? "launch" : args[1];
     std::string lines = HelpOf(Tr("help"), command);
     if (lines.empty()) return Usage(ctx, "no command named " + args[1] + "; ampify help lists them all");
-    ctx.out << lines << "\nMore in docs/cli.md.\n";
+    ctx.out << lines << "\nMore in https://shirowwww.github.io/ampify/cli.html\n";
     return 0;
 }
 
