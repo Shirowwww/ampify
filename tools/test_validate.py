@@ -579,7 +579,23 @@ def load_schema(kind):
         return json.load(handle)
 
 
+def permission_patterns(node):
+    """Every pattern of the schema that lists the permissions (the one that accepts network:...)."""
+    if isinstance(node, dict):
+        found = [node["pattern"]] if "network:" in str(node.get("pattern", "")) else []
+        return found + [p for value in node.values() for p in permission_patterns(value)]
+    if isinstance(node, list):
+        return [p for value in node for p in permission_patterns(value)]
+    return []
+
+
 class SchemaSubsetTests(unittest.TestCase):
+    def test_the_catalog_takes_the_permissions_a_manifest_takes(self):
+        manifest = permission_patterns(load_schema("manifest"))
+        catalog = permission_patterns(load_schema("catalog"))
+        self.assertTrue(manifest and catalog)
+        self.assertEqual(set(catalog), set(manifest), "an element valid on its own must also be valid in the catalog")
+
     def test_both_repository_schemas_use_only_supported_keywords(self):
         for kind, path in validate.SCHEMAS.items():
             with open(path, encoding="utf-8") as handle:
