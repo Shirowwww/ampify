@@ -149,7 +149,7 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
 }
 
 // After an element is switched: an extension or an app starts or stops at once in a running kernel (reload.txt);
-// the other kinds wait for ampify apply or the next start.
+// a theme or a snippet follows settings.txt, which the kernel watches.
 int AnnounceSwitch(Context& ctx, std::string_view kind, const std::string& id, bool enable) {
     if (kind != "extension" && kind != "app") {
         ctx.out << Tr("applyHint") << "\n";
@@ -683,7 +683,7 @@ int CmdTheme(Context& ctx) {
         settings.Set("theme.active", "");
         settings.Remove("theme.scheme");
         if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
-        ctx.out << "No active theme. Run ampify apply to apply it.\n";
+        ctx.out << "No active theme. " << Tr("applyHint") << "\n";
         return 0;
     }
     // check and watch read a theme folder anywhere on disk, the way the kernel reads it, and print what would apply.

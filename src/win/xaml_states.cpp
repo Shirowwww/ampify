@@ -270,6 +270,9 @@ StateKeys PointerStateKeys(const controls::Control& control, std::string_view pr
     }
     std::vector<const char*> states{"PointerOver", "Pressed"};
     if (control.try_as<controls::MenuFlyoutSubItem>()) states.push_back("SubMenuOpened");
+    // Apple Music disables the play button while a page loads with nothing queued: without its own key, the disabled
+    // state wiped the theme's disc for that moment.
+    if (control.try_as<primitives::ButtonBase>()) states.push_back("Disabled");
     for (const std::string& base : bases) {
         for (const char* state : states) {
             std::wstring key = winrt::to_hstring(base + state).c_str();
@@ -287,6 +290,16 @@ IInspectable CopyBrush(const IInspectable& brush) {
         return copy;
     }
     return brush;
+}
+
+// A disabled control shows the theme's colour faded, as Fluent fades its own; another brush keeps Apple Music's look.
+IInspectable DisabledBrush(const IInspectable& brush) {
+    constexpr double kDisabledOpacity = 0.4;
+    auto solid = brush.try_as<media::SolidColorBrush>();
+    if (!solid) return nullptr;
+    media::SolidColorBrush copy(solid.Color());
+    copy.Opacity(solid.Opacity() * kDisabledOpacity);
+    return copy;
 }
 
 // The engine builds a new brush at each write: two brushes that draw the same count as the same. Comparing gradients
@@ -347,10 +360,14 @@ void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::Dependency
         xaml::ResourceDictionary resources = states.holder.Resources();
         // The written brush is also the element's property value, which a dictionary refuses (0x800F0902): a copy.
         IInspectable restCopy = states.plainKeys.empty() ? nullptr : CopyBrush(plain);
+        IInspectable disabled = plain ? DisabledBrush(plain) : nullptr;
         bool changed = false;
         for (const std::wstring& key : states.keys) {
             bool atRest = std::find(states.plainKeys.begin(), states.plainKeys.end(), key) != states.plainKeys.end();
-            const IInspectable& want = atRest ? restCopy : key.ends_with(L"Pressed") ? pressed : value;
+            const IInspectable& want = atRest                        ? restCopy
+                                       : key.ends_with(L"Disabled") ? disabled
+                                       : key.ends_with(L"Pressed")  ? pressed
+                                                                     : value;
             IInspectable name = winrt::box_value(winrt::hstring(key));
             auto kept = std::find_if(held.keys.begin(), held.keys.end(), [&](const auto& item) { return item.first == key; });
             if (!want) {

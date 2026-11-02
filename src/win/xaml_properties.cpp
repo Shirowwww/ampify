@@ -19,6 +19,7 @@
 #include <functional>
 #include <set>
 
+#include <winrt/Microsoft.UI.Xaml.Documents.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
@@ -39,6 +40,43 @@
 namespace ampify::win {
 
 using namespace xaml_detail;
+
+namespace {
+
+// A link inside a TextBlock (the album artist) and its runs keep their own colour over the TextBlock's, so the text's
+// colour goes to every inline too, and the colour read back is the last run's: Apple fills the link after the
+// theme's first pass, and a mismatch is what makes the next pass write again. shortcut: a cleared colour leaves the
+// inlines on their default, not on the colour Apple set in code; Apple sets it again when the page is built.
+void CollectInlines(const winrt::Windows::Foundation::Collections::IVector<xaml::Documents::Inline>& inlines,
+                    std::vector<xaml::Documents::Inline>& all) {
+    for (const auto& inline_ : inlines) {
+        all.push_back(inline_);
+        if (auto span = inline_.try_as<xaml::Documents::Span>()) CollectInlines(span.Inlines(), all);
+    }
+}
+
+std::vector<xaml::Documents::Inline> InlinesOf(const controls::TextBlock& text) {
+    std::vector<xaml::Documents::Inline> all;
+    CollectInlines(text.Inlines(), all);
+    return all;
+}
+
+bool HasLink(const std::vector<xaml::Documents::Inline>& inlines) {
+    return std::any_of(inlines.begin(), inlines.end(),
+                       [](const auto& inline_) { return inline_.try_as<xaml::Documents::Hyperlink>() != nullptr; });
+}
+
+// Only a text holding a link: plain runs follow the TextBlock's colour already.
+void PaintLinks(const controls::TextBlock& text, const media::Brush* brush) {
+    std::vector<xaml::Documents::Inline> inlines = InlinesOf(text);
+    if (!HasLink(inlines)) return;
+    for (const auto& inline_ : inlines) {
+        if (brush) inline_.Foreground(*brush);
+        else inline_.ClearValue(xaml::Documents::TextElement::ForegroundProperty());
+    }
+}
+
+}  // namespace
 
 std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::string_view property) {
     xaml::DependencyObject object = Resolve(id);
@@ -70,7 +108,10 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         if (auto border = object.try_as<controls::Border>()) return brush(border.Background());
     } else if (property == "Foreground") {
         if (auto control = object.try_as<controls::Control>()) return brush(control.Foreground());
-        if (auto text = object.try_as<controls::TextBlock>()) return brush(text.Foreground());
+        if (auto text = object.try_as<controls::TextBlock>()) {
+            std::vector<xaml::Documents::Inline> inlines = InlinesOf(text);
+            return brush(HasLink(inlines) ? inlines.back().Foreground() : text.Foreground());
+        }
         if (auto icon = object.try_as<controls::IconElement>()) return brush(icon.Foreground());
         if (auto presenter = object.try_as<controls::ContentPresenter>()) return brush(presenter.Foreground());
     } else if (property == "BorderBrush") {
@@ -304,6 +345,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         xaml::DependencyProperty own = OwnProperty(object, property);
         if (!own) return false;
         object.ClearValue(own);
+        if (auto text = object.try_as<controls::TextBlock>(); text && property == "Foreground") PaintLinks(text, nullptr);
         Forget(id, property);
         UpdateStates(id, object, property, nullptr);  // or its states would keep the theme's colour under the pointer
         return true;
@@ -342,7 +384,11 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
             else if (auto border = object.try_as<controls::Border>()) { border.Background(*target); written = true; }
         } else if (property == "Foreground") {
             if (auto control = object.try_as<controls::Control>()) { control.Foreground(*target); written = true; }
-            else if (auto text = object.try_as<controls::TextBlock>()) { text.Foreground(*target); written = true; }
+            else if (auto text = object.try_as<controls::TextBlock>()) {
+                text.Foreground(*target);
+                PaintLinks(text, &*target);
+                written = true;
+            }
             else if (auto icon = object.try_as<controls::IconElement>()) { icon.Foreground(*target); written = true; }
             else if (auto presenter = object.try_as<controls::ContentPresenter>()) {
                 presenter.Foreground(*target);

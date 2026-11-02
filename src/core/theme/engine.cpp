@@ -221,7 +221,7 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, 
     }
     if (values.empty()) {
         m_hovers.erase(node.id);
-        m_journal.Write("Hover removed: " + Describe(node));
+        if (m_detailed) m_journal.Write("Hover removed: " + Describe(node));  // like "Hover:", once per element
         return;
     }
     report.applied += static_cast<int>(values.size());

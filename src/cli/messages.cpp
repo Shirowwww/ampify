@@ -112,7 +112,7 @@ constexpr i18n::Message kCli[] = {
     {"element.permissions", "Requested permissions: {permissions}"},
     {"element.notFound", "element not found: {kind} {id}. Install it with ampify install {id}"},
     {"element.invalid", "invalid element: {error}"},
-    {"applyHint", "Run ampify apply to apply it."},
+    {"applyHint", "If Apple Music is running with Ampify, it changes right away. Otherwise, at the next start."},
     {"remote.tokenCreated",
      "Remote control token created (remote.token). Keep it to yourself: it gives control of playback."},
 };
