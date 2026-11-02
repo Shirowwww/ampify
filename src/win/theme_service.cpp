@@ -16,6 +16,7 @@
 #include "ui_thread.hpp"
 #include "win_common.hpp"
 #include "xaml_backend.hpp"
+#include "xaml_watcher.hpp"
 #include "../core/settings.hpp"
 #include "../core/theme/css.hpp"
 #include "../core/theme/fonts.hpp"
@@ -127,6 +128,11 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
     while (m_running && !AttachUiThread(processId, module)) std::this_thread::sleep_for(kAttachRetry);
     if (!m_running) return;
     m_journal.Write("Themes: interface thread ready (DispatcherQueue of the main window)");
+    {
+        Settings settings;
+        settings.Load((m_kit / "settings.txt").string());
+        if (settings.GetBool("xaml.watcher", false)) StartXamlWatcher(m_journal, module);
+    }
 
     // Reads the settings, the theme, the snippets, sidebar.json and home.json, and reloads only what changed. The
     // Windows mode and the local time choose the scheme for theme.scheme = auto and theme.schedule.

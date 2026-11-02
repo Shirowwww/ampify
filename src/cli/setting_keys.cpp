@@ -8,12 +8,13 @@ namespace ampify::cli {
 
 namespace {
 
-constexpr std::array<KnownSetting, 24> kFixed = {{
+constexpr std::array<KnownSetting, 25> kFixed = {{
     {"theme.active", "", "no theme"},
     {"theme.scheme", "", "the theme's default scheme"},
     {"theme.schedule", "", "no schedule"},
     {"theme.live_reload", "1", ""},
     {"theme.inspect", "0", ""},
+    {"xaml.watcher", "0", ""},
     {"catalog.url", kDefaultCatalogUrl, ""},
     {"app_launch_flags", "", "no argument"},
     {"check_kit_update", "0", ""},

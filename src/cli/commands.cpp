@@ -134,6 +134,7 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
     }
 
     bool isBooleanKey = key.rfind("theme.parts.", 0) == 0 || key == "theme.inspect" || key == "theme.live_reload" ||
+                        key == "xaml.watcher" ||
                         key == "check_kit_update" || key == "expose_api" ||
                         key == "discord.enabled" || key == "tray.enabled" || key == "remote.enabled" ||
                         key == "midi.enabled" || key == "player.apple" || key == "player.appleCommands" ||

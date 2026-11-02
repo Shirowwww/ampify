@@ -132,6 +132,7 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `theme.parts.colors`, `.resources`, `.assets`, `.script` | `1` or `0`: turn off a part of the theme | `1` |
 | `theme.live_reload` | `1` or `0`: apply the theme again when its files change | `1` |
 | `theme.inspect` | `1`: the kernel writes the interface tree once, then sets `0` | `0` |
+| `xaml.watcher` | `1`: a trial in which WinUI tells Ampify of each element it adds, written to the log. The themes do not use it yet. Seen once making the screen flash black on the Home page: leave it off | `0` |
 | `language` | `en`, `fr`, `de`, `es`, `pt`, `ru`, `ja` or `zh`; empty follows Windows' regional format | empty |
 | `apple.notifications` | `apple`, `background` (only while Apple Music is not in front) or `never` | `apple` |
 | `apple.close` | `quit`, or `tray` to keep playing behind a notification-area icon | `quit` |
