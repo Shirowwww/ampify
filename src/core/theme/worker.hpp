@@ -32,8 +32,9 @@ public:
     void SetSystemDark(bool dark) { m_systemDark = dark; }
 
     // The request for this pass. Its generation changes when the active theme, the chosen scheme (by setting, by
-    // schedule or by Windows mode), the parts, the enabled snippets, sidebar.json, home.json or resource-keys.txt
-    // change, and with theme.live_reload when a file of the theme or of an enabled snippet changes.
+    // schedule or by Windows mode), the parts, the active theme's settings (themes.<id>.<key>), the enabled snippets,
+    // sidebar.json, home.json or resource-keys.txt change, and with theme.live_reload when a file of the theme or of an
+    // enabled snippet changes.
     SessionRequest Tick(const Settings& settings, int minute);
 
     // The scheme chosen on the last pass, with its reason and its problems.

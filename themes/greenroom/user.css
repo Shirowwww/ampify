@@ -3,12 +3,14 @@
    panels on a black window; cards light up under the pointer.
 
    The two layouts place the zones with aligned edges (docs/themes/format.md, "Ready-made layouts"); the classes are
-   Ampify's stable names for Apple Music's zones (docs/themes/names.md). */
+   Ampify's stable names for Apple Music's zones (docs/themes/names.md). Its settings (manifest.json) show in the
+   Ampify card of Apple Music's settings. */
 
 :root {
     --window-background: #000000;
     --panel-background: #121212;
-    --panel-radius: 8px;
+    --panel-radius: var(--setting-panel-radius);
+    --gap: var(--setting-gap);
     --raised: #1F1F1F;
     --hover: #2A2A2A;
     --band-background: #181818;
@@ -37,6 +39,13 @@
 
 .play-button FontIcon {
     foreground: #000000;
+}
+
+/* The play-button setting: the green accent instead of white, the icon stays black. */
+@setting play-button = Green {
+    .play-button > Grid#Root {
+        background: $AccentFillColorDefaultBrush;
+    }
 }
 
 /* Apple Music animates this button itself, so the growth is immediate: a transition here would be refused. */
@@ -98,4 +107,14 @@
 
 .track-row:hover {
     background: var(--raised);
+}
+
+/* ---- Settings ----------------------------------------------------------------------------------------------------- */
+
+@setting hide-badges {
+    .explicit-badge,
+    .lossless-badge,
+    .digital-master-badge {
+        visibility: collapsed;
+    }
 }

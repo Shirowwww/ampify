@@ -290,8 +290,8 @@ def check_manifest(doc, path):
             errors.append("main: not allowed for a snippet")
 
     if "settings" in doc:
-        errors += check_settings(doc["settings"]) if kind == "extension" else [
-            "settings: only an extension declares settings"]
+        errors += check_settings(doc["settings"]) if kind in ("extension", "theme") else [
+            "settings: only an extension or a theme declares settings"]
 
     for key in ("main", "colors", "resources", "icon", "preview"):
         if key in doc and not os.path.isfile(os.path.join(folder, doc[key])):

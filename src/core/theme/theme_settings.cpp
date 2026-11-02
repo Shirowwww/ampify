@@ -39,4 +39,15 @@ void WriteThemeSettings(Settings& settings, const ThemeSettings& value) {
     settings.SetBool("theme.parts.script", value.parts.script);
 }
 
+std::map<std::string, std::string> ReadThemeValues(const Settings& settings, const std::string& id) {
+    std::map<std::string, std::string> values;
+    if (id.empty()) return values;
+    const std::string prefix = "themes." + id + ".";
+    for (auto it = settings.Values().lower_bound(prefix); it != settings.Values().end(); ++it) {
+        if (it->first.compare(0, prefix.size(), prefix) != 0) break;
+        values[it->first.substr(prefix.size())] = it->second;
+    }
+    return values;
+}
+
 }  // namespace ampify::theme

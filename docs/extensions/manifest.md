@@ -75,17 +75,23 @@ command line never change with the language.
 | `colors` | n/a | n/a | required, or `resources` | n/a | An `.ini` file of color schemes |
 | `defaultScheme` | n/a | n/a | optional | n/a | Section of `colors.ini` used by default |
 | `resources` | n/a | n/a | required, or `colors` | required, or a `user.css` in the folder | A `.xaml` resource dictionary |
-| `settings` | optional | forbidden | forbidden | forbidden | Settings shown in the Ampify card (next section) |
+| `settings` | optional | forbidden | optional | forbidden | Settings shown in the Ampify card (next section) |
 
 Fields that do not apply to the `kind` are ignored by the kernel. The validator only checks the fields required for each
 `kind`.
 
 ## Settings
 
-An extension can list its settings. The "Ampify" card, in Apple Music's Settings > Playback, shows them under the
-extension's switch, and `Ampify.config.get(key)` gives their value: the user's choice, else the `default` below, with its
+An extension or a theme can list its settings. The "Ampify" card, in Apple Music's Settings > Playback, shows them:
+under the extension's switch, or, for the active theme, under the extensions.
+
+For an extension, `Ampify.config.get(key)` gives their value: the user's choice, else the `default` below, with its
 type (a boolean for a toggle, a number for a number). A change in the card restarts the extension, which reads its
 settings again.
+
+For a theme, `user.css` reads each setting as the variable `--setting-<key>`, and a `@setting <key> { ... }` block
+holds rules that apply only while it is on (see "Theme settings" in [format.md](../themes/format.md)). A change in the
+card applies the theme again at once.
 
 ```json
 "settings": [
@@ -98,15 +104,15 @@ settings again.
 
 | Member | Rule |
 |---|---|
-| `key` | `[a-z0-9][a-z0-9-]{0,31}`, unique, other than `enabled`. The value is stored as `extensions.<id>.<key>` in `settings.txt` |
+| `key` | `[a-z0-9][a-z0-9-]{0,31}`, unique, other than `enabled`. The value is stored as `extensions.<id>.<key>`, or `themes.<id>.<key>` for a theme, in `settings.txt` |
 | `label` | 1 to 60 characters, shown in the card |
 | `type` | `toggle`, `choice`, `text` or `number` |
 | `default` | `true` or `false` for a toggle, one of the `options` for a choice, a text of 200 characters at most on one line, or a number between `min` and `max` |
 | `options` | A choice's values, and only a choice's: 2 to 20 different texts of 1 to 40 characters |
+| `min`, `max` | A number's bounds, optional. A number typed outside them is not kept |
 
 `settings.txt` keeps one value per line and trims the spaces around it, so an option or a text default must be on one
 line, without spaces at either end.
-| `min`, `max` | A number's bounds, optional. A number typed outside them is not kept |
 
 There are 16 settings at most. A text or a number is written when the field is left or when Enter is pressed.
 

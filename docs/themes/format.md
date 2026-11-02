@@ -5,7 +5,7 @@ A theme is a folder with at least one of the files below. The format follows sec
 
 ```
 my-theme/
-├── manifest.json     id, name, version, default scheme
+├── manifest.json     id, name, version, default scheme, settings (optional)
 ├── colors.ini        colors per scheme (optional)
 ├── resources.xaml    XAML resource dictionary (optional)
 ├── preview.png       picture for the Marketplace card, named by "preview" in the manifest (optional, 2 MB at most)
@@ -21,7 +21,7 @@ Around themes, the Ampify folder also holds:
 
 ```
 Ampify/
-├── settings.txt        settings (theme.active, theme.scheme, theme.schedule, snippets.<id>.enabled...)
+├── settings.txt        settings (theme.active, theme.scheme, theme.schedule, themes.<id>.<key>, snippets.<id>.enabled...)
 ├── themes/<id>/        one folder per theme
 ├── snippets/<id>/      one folder per snippet (see "Snippets")
 ├── resource-keys.txt   keys allowed in resources.xaml
@@ -165,6 +165,59 @@ divided by another.
     margin: var(--gap) var(--gap) var(--gap) calc(var(--gap) * 2);
 }
 ```
+
+### Theme settings (`--setting-<key>` and `@setting`)
+
+A theme can let people adjust it without editing its files, as Spicetify's Comfy does: it lists settings in
+`manifest.json`, with the same `settings` field as an extension ([manifest.md](../extensions/manifest.md#settings)).
+The "Ampify" card, in Apple Music's Settings > Playback, shows the settings of the active theme under the extensions.
+A change is written to `settings.txt` as `themes.<id>.<key>`, and the theme is applied again at once.
+
+```json
+"settings": [
+  {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 24, "default": 12},
+  {"key": "hide-app-name", "label": "Hide the Music title", "type": "toggle", "default": false},
+  {"key": "play-button", "label": "Play button", "type": "choice", "options": ["White", "Green"], "default": "White"}
+]
+```
+
+`user.css` reads them in two ways.
+
+Each setting is a variable, `--setting-<key>`, with the value chosen in the card, or the `default` when none is chosen
+or when the stored value does not fit (a number out of bounds, a choice that is not an option). A toggle gives `true` or
+`false`, a number gives a plain number such as `12`, which a length takes as pixels.
+
+```css
+:root {
+    --panel-radius: var(--setting-panel-radius);
+}
+```
+
+A `@setting` block holds rules that apply only while a setting is on, or has a given value:
+
+```css
+@setting hide-app-name {
+    .app-name { visibility: collapsed; }
+}
+
+@setting play-button = Green {
+    .play-button > Grid#Root { background: $AccentFillColorDefaultBrush; }
+}
+```
+
+- `@setting <key> { ... }` applies while the setting is `true`, which is meant for a toggle.
+- `@setting <key> = <value> { ... }` applies while the setting has that value, compared without case. The value may
+  be quoted: `@setting accent = "Deep pink"`. `@setting hide-app-name = false` applies while the toggle is off.
+- The block holds rules, `:root` blocks (variables that change with the setting), `@media` blocks and `@import`. A
+  `@setting` block may sit inside `@media`, and the reverse. `@setting` inside `@setting`, and `@keyframes` inside
+  `@setting`, are not supported.
+- A key the manifest does not declare makes the block ignored, with a line in the problems list.
+- A snippet sees the settings of the active theme, as it sees its variables.
+- The default values must give the theme's look before settings existed: someone who never opens the card sees no
+  change.
+
+When a setting goes off, the values its rules wrote come back to what was under them, as when a rule is deleted
+during live editing.
 
 ### Properties
 

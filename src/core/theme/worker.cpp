@@ -74,8 +74,11 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
     std::optional<std::string> keysText = ReadWholeFile(m_kit / "resource-keys.txt");
 
     // Everything that changes what is applied goes into the key. A new key is a new generation.
+    std::map<std::string, std::string> values = ReadThemeValues(settings, wanted.active);
     std::string key = (wanted.active.empty() ? std::string("none") : wanted.active) + "|" + m_scheme.scheme + "|" +
                       PartsKey(wanted.parts) + "|";
+    for (const auto& [name, value] : values) key += name + "=" + value + ",";
+    key += "|";
     for (const std::string& id : snippets) key += id + ",";
     key += "|" + sidebar.value_or("-") + "|" + home.value_or("-") + "|" +
            (keysText ? std::to_string(std::hash<std::string>{}(*keysText)) : std::string("-"));
@@ -98,6 +101,7 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
         options.scheme = m_scheme.scheme;
         options.parts = wanted.parts;
         options.allowedKeys = allowed ? &*allowed : nullptr;
+        options.settings = values;
 
         if (!wanted.active.empty()) {
             FolderFiles files(themeFolder);

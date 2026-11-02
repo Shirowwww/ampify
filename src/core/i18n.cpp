@@ -37,6 +37,11 @@ constexpr Message kKit[] = {
     {"mods.openFolder", "Open the Ampify folder"},
     {"mods.openMarketplace", "Open the Marketplace"},
     {"mods.toggleHelp", "Turns this extension on or off right away"},
+    {"mods.themeTitle", "Theme: {name}"},
+    {"mods.themeSubtitle", "The settings of the active theme. A change shows at once."},
+    {"mods.theme", "Theme"},
+    {"mods.themeHelp", "The look of Apple Music. The Marketplace has more."},
+    {"mods.themeNone", "None (Apple Music's own look)"},
 };
 
 // French texts of what people see (menus, buttons, the Settings card). The log stays in English, so a key missing here
@@ -55,6 +60,11 @@ constexpr Message kKitFr[] = {
     {"mods.openFolder", "Ouvrir le dossier Ampify"},
     {"mods.openMarketplace", "Ouvrir le Marketplace"},
     {"mods.toggleHelp", "Active ou désactive cette extension tout de suite"},
+    {"mods.themeTitle", "Thème : {name}"},
+    {"mods.themeSubtitle", "Les réglages du thème actif. Un changement se voit tout de suite."},
+    {"mods.theme", "Thème"},
+    {"mods.themeHelp", "L'apparence d'Apple Music. Le Marketplace en propose d'autres."},
+    {"mods.themeNone", "Aucun (l'apparence d'Apple Music)"},
 };
 
 std::string g_language = "en";  // set once at start, before any service reads it

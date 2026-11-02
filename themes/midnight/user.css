@@ -1,12 +1,13 @@
 /* Midnight: an ink-blue window at night. The sidebar and the pages float as two rounded panels, the playback bar stays at
    the top, and a pale moonlight blue marks what plays and what is chosen. Colors come from colors.ini; the classes are
-   Ampify's stable names for Apple Music's zones (docs/themes/names.md). */
+   Ampify's stable names for Apple Music's zones (docs/themes/names.md). Its settings (manifest.json) show in the
+   Ampify card of Apple Music's settings. */
 
 :root {
     --window-background: #05070D;
     --panel-background: #0C111E;
-    --panel-radius: 12px;
-    --gap: 10;
+    --panel-radius: var(--setting-panel-radius);
+    --gap: var(--setting-gap);
     --raised: #141B2E;
     --hover: #1B2440;
     --band-background: #10172A;
@@ -75,8 +76,10 @@
     transition: background 180ms;
 }
 
-.card:hover {
-    background: var(--raised);
+@setting card-highlight {
+    .card:hover {
+        background: var(--raised);
+    }
 }
 
 .artwork {
@@ -88,6 +91,16 @@
     transition: background 120ms;
 }
 
-.track-row:hover {
-    background: var(--raised);
+@setting card-highlight {
+    .track-row:hover {
+        background: var(--raised);
+    }
+}
+
+/* ---- Settings ----------------------------------------------------------------------------------------------------- */
+
+@setting hide-app-name {
+    .app-name {
+        visibility: collapsed;
+    }
 }

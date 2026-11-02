@@ -62,6 +62,9 @@ struct LoadOptions {
     std::string scheme;                          // the [section] of colors.ini to use; empty takes the first one
     const std::set<std::string>* allowedKeys = nullptr;  // resource keys that resources.xaml may define; null skips the check
     ThemeParts parts;                            // a part that is off is read for its problems only, and not applied
+    // The values settings.txt holds for the theme's declared settings (themes.<id>.<key>), by key. A missing or
+    // unfit value takes the manifest's default.
+    std::map<std::string, std::string> settings;
 };
 
 // A theme folder, read and checked. Layout, as in docs/extensions/api.md section 6.1:
@@ -88,8 +91,11 @@ struct Theme {
     std::string resourceDictionary;  // the XAML of resources.xaml, merged into the app's resources; empty when none
     std::vector<Assignment> assignments;
 
-    // The :root variables of user.css, by lowercase name without the leading "--", already resolved.
+    // The :root variables of user.css, by lowercase name without the leading "--", already resolved. Each declared
+    // setting is one too, as setting-<key>.
     std::map<std::string, std::string> variables;
+    // The value of each setting the manifest declares, by key (true or false for a toggle), for the @setting blocks.
+    std::map<std::string, std::string> settings;
     // The font roles the theme sets itself, by canonical role name (see fonts.hpp).
     std::map<std::string, FontRole> fonts;
     // The @keyframes blocks of user.css by name, which `animation` runs. A snippet also sees those of the active theme.

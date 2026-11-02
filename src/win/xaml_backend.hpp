@@ -59,10 +59,6 @@ public:
     std::optional<theme::ViewSize> WindowSize() override;
     void WatchSize(const std::vector<theme::MediaQuery>& queries) override;
 
-    // Adds the theme section to the first GeneralSettingsPage that has none. Returns true when it was added.
-    bool EnsureSettingsSection(const std::vector<std::string>& themeNames, const std::string& activeName,
-                               std::function<void(const std::string&)> onChoice);
-
     // The light or dark mode of the app under the theme: RequestedTheme of the main window's content. Dark for a dark
     // scheme, Light for another scheme, the app's own value back with nullopt (no theme). After a resource change, the
     // mode goes to the other one and back, which makes the elements already on screen read the new values. True when

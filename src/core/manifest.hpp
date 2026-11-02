@@ -11,8 +11,9 @@ namespace ampify {
 
 enum class ElementKind { Extension, Theme, App, Snippet };
 
-// A setting an extension declares: the Ampify card in Apple Music's settings shows it, and Ampify.config.get(key)
-// gives its default until the user changes it. The value lives in settings.txt as extensions.<id>.<key>.
+// A setting an extension or a theme declares: the Ampify card in Apple Music's settings shows it. An extension reads it
+// with Ampify.config.get(key), a theme's user.css with var(--setting-<key>) and @setting blocks. The value lives in
+// settings.txt as extensions.<id>.<key> or themes.<id>.<key>.
 struct SettingSpec {
     enum class Type { Toggle, Choice, Text, Number };
     std::string key;
@@ -80,6 +81,14 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
 
 // The rules of the settings field alone, for `ampify validate`, which reads the other fields itself.
 std::vector<std::string> SettingsErrors(std::string_view manifestText);
+
+// The settings field alone, for the theme loader and the Ampify card. Empty, with the reasons in `errors`, when one
+// of them breaks a rule, or when the kind is neither extension nor theme.
+std::vector<SettingSpec> DeclaredSettings(std::string_view manifestText, std::vector<std::string>* errors = nullptr);
+
+// The value a setting has now: `stored` (from settings.txt) when it fits the spec, else the default. A toggle comes
+// back as true or false, a number as SettingNumberText writes it.
+std::string SettingValue(const SettingSpec& spec, const std::optional<std::string>& stored);
 
 // Accepts `storage`, `player.read`, ..., or `network:<host>` with a lowercase host name.
 bool IsKnownPermission(std::string_view permission);

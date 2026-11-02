@@ -8,6 +8,7 @@
 #include <set>
 
 #include "json.hpp"
+#include "text_util.hpp"
 
 namespace ampify {
 
@@ -50,6 +51,7 @@ const std::regex kAppVersionPattern("^[0-9]+(\\.[0-9]+){1,3}$");
 const std::regex kHostPattern("^[a-z0-9.-]{1,253}$");
 const std::regex kSettingKeyPattern("^[a-z0-9][a-z0-9-]{0,31}$");
 
+constexpr const char* kSettingsKinds = "settings: only an extension or a theme declares settings";
 constexpr size_t kMaxSettings = 16;
 constexpr size_t kMaxOptions = 20;
 constexpr size_t kMaxSettingText = 200;
@@ -431,7 +433,7 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
     }
 
     if (const Json* settings = root->Find("settings")) {
-        if (m.kind != ElementKind::Extension) result.errors.push_back("settings: only an extension declares settings");
+        if (m.kind != ElementKind::Extension && m.kind != ElementKind::Theme) result.errors.push_back(kSettingsKinds);
         else ReadSettings(*settings, m.settings, result.errors);
     }
 
@@ -464,19 +466,53 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
     return result;
 }
 
-std::vector<std::string> SettingsErrors(std::string_view manifestText) {
-    std::vector<std::string> errors;
+std::vector<SettingSpec> DeclaredSettings(std::string_view manifestText, std::vector<std::string>* errors) {
+    std::vector<std::string> found;
+    std::vector<SettingSpec> settings;
     std::optional<Json> root = Json::Parse(manifestText);
     const Json* field = root && root->IsObject() ? root->Find("settings") : nullptr;
-    if (!field) return errors;
-    const Json* kind = root->Find("kind");
-    if (!kind || !kind->AsString() || *kind->AsString() != "extension") {
-        errors.push_back("settings: only an extension declares settings");
-        return errors;
+    const Json* kind = field ? root->Find("kind") : nullptr;
+    const std::string* kindText = kind ? kind->AsString() : nullptr;
+    if (field && (!kindText || (*kindText != "extension" && *kindText != "theme"))) {
+        found.push_back(kSettingsKinds);
+    } else if (field) {
+        ReadSettings(*field, settings, found);
     }
-    std::vector<SettingSpec> settings;
-    ReadSettings(*field, settings, errors);
+    if (!found.empty()) settings.clear();  // as the kernel refuses such a manifest, none of them counts
+    if (errors) *errors = std::move(found);
+    return settings;
+}
+
+std::vector<std::string> SettingsErrors(std::string_view manifestText) {
+    std::vector<std::string> errors;
+    DeclaredSettings(manifestText, &errors);
     return errors;
+}
+
+std::string SettingValue(const SettingSpec& spec, const std::optional<std::string>& stored) {
+    if (!stored) return spec.defaultValue;
+    switch (spec.type) {
+        case SettingSpec::Type::Toggle: {
+            std::string lowered = ToLowerAscii(*stored);
+            if (lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes") return "true";
+            if (lowered == "0" || lowered == "false" || lowered == "off" || lowered == "no") return "false";
+            return spec.defaultValue;
+        }
+        case SettingSpec::Type::Choice:
+            return std::find(spec.options.begin(), spec.options.end(), *stored) != spec.options.end() ? *stored
+                                                                                                      : spec.defaultValue;
+        case SettingSpec::Type::Text:
+            return *stored;
+        case SettingSpec::Type::Number: {
+            double number = 0;
+            const char* end = stored->data() + stored->size();
+            auto [stop, error] = std::from_chars(stored->data(), end, number);
+            bool fits = !stored->empty() && error == std::errc() && stop == end && std::isfinite(number) &&
+                        !(spec.min && number < *spec.min) && !(spec.max && number > *spec.max);
+            return fits ? SettingNumberText(number) : spec.defaultValue;
+        }
+    }
+    return spec.defaultValue;
 }
 
 }  // namespace ampify

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 
 #include "../settings.hpp"
@@ -17,6 +18,7 @@ namespace ampify::theme {
 //   theme.parts.resources  1 to apply resources.xaml and user.css (default 1)
 //   theme.parts.assets     1 to load the images of the theme (default 1)
 //   theme.parts.script     1 to run main.js of the active theme in AppleMusic.exe (default 1)
+//   themes.<id>.<key>      the value of a setting the theme <id> declares in its manifest (ReadThemeValues)
 struct ThemeSettings {
     std::string active;
     std::string scheme;
@@ -28,5 +30,8 @@ struct ThemeSettings {
 
 ThemeSettings ReadThemeSettings(const Settings& settings);
 void WriteThemeSettings(Settings& settings, const ThemeSettings& value);
+
+// The values of the settings a theme declares, stored as themes.<id>.<key>, by key. Empty for an empty id.
+std::map<std::string, std::string> ReadThemeValues(const Settings& settings, const std::string& id);
 
 }  // namespace ampify::theme

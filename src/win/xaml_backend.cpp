@@ -670,59 +670,6 @@ bool XamlTreeBackend::SetDictionary(std::string_view xaml) {
     return true;
 }
 
-bool XamlTreeBackend::EnsureSettingsSection(const std::vector<std::string>& themeNames, const std::string& activeName,
-                                            std::function<void(const std::string&)> onChoice) {
-    // Find the settings page, then its first panel. The panel is where the section is inserted, at the top.
-    std::vector<theme::NodeInfo> nodes = Snapshot();
-    int page = -1;
-    for (int index = 0; index < static_cast<int>(nodes.size()); index++) {
-        if (nodes[index].type == "GeneralSettingsPage") page = index;
-    }
-    if (page < 0) return false;
-
-    for (const theme::NodeInfo& node : nodes) {
-        if (node.name == "AmpifyThemeSection") return false;  // already there
-    }
-
-    controls::Panel panel{nullptr};
-    for (int index = page + 1; index < static_cast<int>(nodes.size()); index++) {
-        if (nodes[index].depth <= nodes[page].depth) break;  // left the page
-        xaml::DependencyObject candidate = Resolve(nodes[index].id);
-        if (!panel && candidate) panel = candidate.try_as<controls::Panel>();
-    }
-    if (!panel) return false;
-
-    controls::StackPanel section;
-    section.Name(L"AmpifyThemeSection");
-
-    controls::TextBlock title;
-    title.Text(L"Ampify theme");
-    section.Children().Append(title);
-
-    controls::ComboBox choice;
-    choice.Width(240);
-    for (const std::string& name : themeNames) {
-        controls::ComboBoxItem item;
-        item.Content(winrt::box_value(winrt::to_hstring(name.empty() ? std::string("None") : name)));
-        item.Tag(winrt::box_value(winrt::to_hstring(name)));
-        choice.Items().Append(item);
-        if (name == activeName) choice.SelectedItem(item);
-    }
-    // Runs inside Apple Music's XAML: an exception that escaped would come back to XAML as a failure, which raises
-    // Application.UnhandledException and ends the app.
-    choice.SelectionChanged([onChoice](const IInspectable& sender, const controls::SelectionChangedEventArgs&) noexcept {
-        try {
-            auto selected = sender.as<controls::ComboBox>().SelectedItem().try_as<controls::ComboBoxItem>();
-            if (selected) onChoice(Utf8(winrt::unbox_value_or<winrt::hstring>(selected.Tag(), L"")));
-        } catch (...) {
-        }
-    });
-    section.Children().Append(choice);
-
-    panel.Children().InsertAt(0, section);
-    return true;
-}
-
 }  // namespace ampify::win
 
 #endif  // AMPIFY_WITH_XAML

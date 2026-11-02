@@ -257,11 +257,66 @@ std::optional<Keyframes> ParseKeyframes(std::string_view name, size_t open, size
     return block;
 }
 
-// An at-rule with a block, its head read up to `open`: @media opens a block of rules with a condition, @keyframes
-// adds to `keyframes`, any other is skipped whole. Returns where reading goes on.
-size_t ReadAtRule(std::string_view head, size_t open, int line, const std::string& clean,
-                  std::optional<MediaQuery>& media, std::vector<Keyframes>& keyframes,
-                  std::vector<std::string>& problems) {
+// The blocks open around the place being read: one @media and one @setting at most, in the order they opened.
+struct Scope {
+    std::optional<MediaQuery> media;
+    std::optional<SettingCondition> setting;
+    std::vector<bool> blocks;  // true for a @setting block, false for a @media block
+};
+
+// `lowered` starts with the at-keyword, followed by a space, a bracket or nothing.
+bool IsAtKeyword(const std::string& lowered, std::string_view keyword) {
+    return lowered.starts_with(keyword) &&
+           (lowered.size() == keyword.size() || IsSpace(lowered[keyword.size()]) || lowered[keyword.size()] == '(');
+}
+
+// The condition of `@setting <key>` or `@setting <key> = <value>`, the value quoted or not.
+std::optional<SettingCondition> ParseSettingCondition(std::string_view text, std::string& problem) {
+    size_t equals = text.find('=');
+    SettingCondition condition;
+    condition.key = std::string(TrimSpace(text.substr(0, equals)));
+    bool keyOk = !condition.key.empty() && condition.key.size() <= 32 && IsNameChar(condition.key[0]) &&
+                 condition.key[0] != '-' && condition.key[0] != '_';
+    for (char c : condition.key) keyOk = keyOk && ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-');
+    if (!keyOk) {
+        problem = "@setting needs a setting key such as hide-radio, written [a-z0-9-]";
+        return std::nullopt;
+    }
+    if (equals == std::string_view::npos) return condition;
+    std::string_view value = TrimSpace(text.substr(equals + 1));
+    if (value.size() >= 2 && (value.front() == '"' || value.front() == '\'') && value.back() == value.front()) {
+        value = value.substr(1, value.size() - 2);
+    }
+    if (value.empty()) {
+        problem = "@setting " + condition.key + " = needs a value";
+        return std::nullopt;
+    }
+    condition.value = std::string(value);
+    return condition;
+}
+
+// Opens a @setting block: its rules then carry the condition, until its brace closes. Returns where reading goes on.
+size_t OpenSettingBlock(std::string_view head, size_t open, size_t close, const std::string& where, Scope& scope,
+                        std::vector<std::string>& problems) {
+    if (scope.setting) {
+        problems.push_back(where + "@setting inside @setting is not supported, ignored");
+        return close + 1;
+    }
+    std::string problem;
+    std::optional<SettingCondition> condition = ParseSettingCondition(head.substr(8), problem);
+    if (!condition) {
+        problems.push_back(where + problem + ", ignored");
+        return close + 1;
+    }
+    scope.setting = std::move(condition);
+    scope.blocks.push_back(true);
+    return open + 1;
+}
+
+// An at-rule with a block, its head read up to `open`: @media and @setting open a block of rules with a condition,
+// @keyframes adds to `keyframes`, any other is skipped whole. Returns where reading goes on.
+size_t ReadAtRule(std::string_view head, size_t open, int line, const std::string& clean, Scope& scope,
+                  std::vector<Keyframes>& keyframes, std::vector<std::string>& problems) {
     const std::string where = "line " + std::to_string(line) + ": ";
     size_t close = MatchingBrace(clean, open);
     if (close == std::string_view::npos) {
@@ -273,20 +328,21 @@ size_t ReadAtRule(std::string_view head, size_t open, int line, const std::strin
         if (!lowered.starts_with(keyword) || (lowered.size() > keyword.size() && !IsSpace(lowered[keyword.size()]))) {
             continue;
         }
-        if (media) {
-            problems.push_back(where + "@keyframes inside @media is not supported, ignored");
+        if (scope.media || scope.setting) {
+            problems.push_back(where + "@keyframes inside @" + (scope.media ? "media" : "setting") +
+                               " is not supported, ignored");
         } else if (std::optional<Keyframes> block =
                        ParseKeyframes(head.substr(keyword.size()), open, close, line, clean, problems)) {
             keyframes.push_back(std::move(*block));
         }
         return close + 1;
     }
-    bool isMedia = lowered.starts_with("@media") && (lowered.size() == 6 || IsSpace(lowered[6]) || lowered[6] == '(');
-    if (!isMedia) {
+    if (IsAtKeyword(lowered, "@setting")) return OpenSettingBlock(head, open, close, where, scope, problems);
+    if (!IsAtKeyword(lowered, "@media")) {
         problems.push_back(where + "rule \"" + std::string(head) + "\" is not supported, ignored");
         return close + 1;
     }
-    if (media) {
+    if (scope.media) {
         problems.push_back(where + "@media inside @media is not supported, ignored");
         return close + 1;
     }
@@ -296,7 +352,8 @@ size_t ReadAtRule(std::string_view head, size_t open, int line, const std::strin
         problems.push_back(where + problem + ", ignored");
         return close + 1;
     }
-    media = std::move(query);
+    scope.media = std::move(query);
+    scope.blocks.push_back(false);
     return open + 1;
 }
 
@@ -455,19 +512,50 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
     return selector;
 }
 
+namespace {
+
+// A statement without a block: `@import "ampify:<layout>";` brings the layout's rules in, under the blocks around it.
+void ReadStatement(std::string_view statement, int line, const Scope& scope, Stylesheet& sheet) {
+    std::optional<std::string> layout = BuiltinImport(statement);
+    if (!layout) {
+        sheet.problems.push_back("line " + std::to_string(line) + ": rule \"" + std::string(statement) +
+                                 "\" is not supported, ignored");
+        return;
+    }
+    std::optional<std::string_view> builtin = BuiltinStylesheet(*layout);
+    if (!builtin) {
+        sheet.problems.push_back("line " + std::to_string(line) + ": layout \"ampify:" + *layout + "\" is unknown (" +
+                                 LayoutList() + "), ignored");
+        return;
+    }
+    // Layouts hold no @import, so this goes one level deep.
+    Stylesheet imported = ParseStylesheet(*builtin);
+    for (Rule& rule : imported.rules) {
+        rule.origin = "ampify:" + *layout;
+        if (scope.media && !rule.media) rule.media = scope.media;
+        if (scope.setting && !rule.setting) rule.setting = scope.setting;
+        sheet.rules.push_back(std::move(rule));
+    }
+    for (const std::string& problem : imported.problems) sheet.problems.push_back("ampify:" + *layout + " " + problem);
+}
+
+}  // namespace
+
 Stylesheet ParseStylesheet(std::string_view css) {
     Stylesheet sheet;
     std::string clean = WithoutComments(WithoutBom(css));
     size_t pos = 0;
-    std::optional<MediaQuery> media;  // set inside an @media block
+    Scope scope;  // the @media and @setting blocks open here
 
     while (pos < clean.size()) {
         if (IsSpace(clean[pos])) {
             pos++;
             continue;
         }
-        if (media && clean[pos] == '}') {  // the end of the @media block
-            media.reset();
+        if (!scope.blocks.empty() && clean[pos] == '}') {  // the end of the innermost @media or @setting block
+            if (scope.blocks.back()) scope.setting.reset();
+            else scope.media.reset();
+            scope.blocks.pop_back();
             pos++;
             continue;
         }
@@ -480,26 +568,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
         if (semicolon != std::string::npos && (open == std::string::npos || semicolon < open)) {
             std::string_view statement = TrimSpace(std::string_view(clean).substr(pos, semicolon - pos));
             pos = semicolon + 1;
-            std::optional<std::string> layout = BuiltinImport(statement);
-            if (!layout) {
-                sheet.problems.push_back("line " + std::to_string(line) + ": rule \"" + std::string(statement) +
-                                         "\" is not supported, ignored");
-                continue;
-            }
-            std::optional<std::string_view> builtin = BuiltinStylesheet(*layout);
-            if (!builtin) {
-                sheet.problems.push_back("line " + std::to_string(line) + ": layout \"ampify:" + *layout +
-                                         "\" is unknown (" + LayoutList() + "), ignored");
-                continue;
-            }
-            // Layouts hold no @import, so this goes one level deep.
-            Stylesheet imported = ParseStylesheet(*builtin);
-            for (Rule& rule : imported.rules) {
-                rule.origin = "ampify:" + *layout;
-                if (media && !rule.media) rule.media = media;
-                sheet.rules.push_back(std::move(rule));
-            }
-            for (const std::string& problem : imported.problems) sheet.problems.push_back("ampify:" + *layout + " " + problem);
+            ReadStatement(statement, line, scope, sheet);
             continue;
         }
 
@@ -509,7 +578,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
         }
         std::string_view head = TrimSpace(std::string_view(clean).substr(pos, open - pos));
         if (!head.empty() && head.front() == '@') {
-            pos = ReadAtRule(head, open, line, clean, media, sheet.keyframes, sheet.problems);
+            pos = ReadAtRule(head, open, line, clean, scope, sheet.keyframes, sheet.problems);
             continue;
         }
 
@@ -523,9 +592,10 @@ Stylesheet ParseStylesheet(std::string_view css) {
 
         Rule rule;
         rule.line = line;
-        rule.media = media;
+        rule.media = scope.media;
+        rule.setting = scope.setting;
         if (ToLowerAscii(head) == ":root") {
-            if (media) {
+            if (scope.media) {
                 sheet.problems.push_back("line " + std::to_string(line) + ": variables inside @media are not supported, "
                                          "ignored");
                 continue;

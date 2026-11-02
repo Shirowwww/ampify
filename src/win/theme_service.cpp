@@ -138,15 +138,11 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
         settings.Load((m_kit / "settings.txt").string());
         worker.SetSystemDark(SystemUsesDarkMode());
         theme::SessionRequest request = worker.Tick(settings, LocalMinute());
-        std::string activeId = request.themeId;
-
-        std::vector<std::string> names{""};  // "" is the choice "None"
-        for (const std::string& folder : theme::ListThemeFolders(m_kit / "themes")) names.push_back(folder);
 
         std::shared_ptr<UiSide> ui = m_ui;
         Journal& journal = m_journal;
         std::filesystem::path kit = m_kit;
-        PostToUiThread([ui, request, names, activeId, kit, &journal]() {
+        PostToUiThread([ui, request, kit, &journal]() {
             if (!ui->attached) {
                 ui->attached = ui->backend.Attach();
                 if (!ui->attached) return;
@@ -205,16 +201,6 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 UpdateThemeSettings(kit, journal, [](theme::ThemeSettings& value) { value.inspect = false; });
                 journal.Write("Inspector: tree written to logs\\inspector.txt and inspector.json");
             }
-
-            // The section is built once, so the choice is compared with settings.txt as it is now, not with the theme
-            // active when the section was built (going back to that theme would be ignored).
-            ui->backend.EnsureSettingsSection(names, activeId, [kit, &journal](const std::string& choice) {
-                Settings current;
-                current.Load((kit / "settings.txt").string());
-                if (theme::ReadThemeSettings(current).active == choice) return;  // nothing to change
-                UpdateThemeSettings(kit, journal, [&choice](theme::ThemeSettings& value) { value.active = choice; });
-                journal.Write("Theme chosen in Settings: \"" + (choice.empty() ? std::string("none") : choice) + "\"");
-            });
         });
 
         for (auto waited = std::chrono::milliseconds(0); m_running && waited < kTick; waited += kChangeCheck) {

@@ -408,7 +408,17 @@ class ManifestTests(unittest.TestCase):
                 self.assertIn(message, text)
         code, text = run("manifest", self.install(manifest(id="demo-app", kind="app", settings=[toggle])))
         self.assertEqual(code, 1)
-        self.assertIn("settings: only an extension declares settings", text)
+        self.assertIn("settings: only an extension or a theme declares settings", text)
+
+    def test_a_theme_declares_settings_and_a_snippet_does_not(self):
+        toggle = {"key": "hide-radio", "label": "Hide Radio", "type": "toggle", "default": False}
+        theme = manifest(id="demo-theme", kind="theme", main=None, colors="colors.ini", settings=[toggle])
+        code, text = run("manifest", self.install(theme, files=("colors.ini",)))
+        self.assertEqual(code, 0, text)
+        snippet = manifest(id="demo-snippet", kind="snippet", main=None, settings=[toggle])
+        code, text = run("manifest", self.install(snippet, files=("user.css",)))
+        self.assertEqual(code, 1)
+        self.assertIn("settings: only an extension or a theme declares settings", text)
 
 
 try:

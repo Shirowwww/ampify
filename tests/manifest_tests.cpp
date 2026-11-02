@@ -232,3 +232,49 @@ TEST_CASE(Manifest_RefusesSettingsThatDoNotHold) {
     CHECK(!Check(app, "hello-extension").manifest);
     CHECK(!ampify::SettingsErrors(app).empty());
 }
+
+TEST_CASE(Manifest_AThemeDeclaresSettingsAndASnippetDoesNot) {
+    const std::string theme = R"({"id": "night", "name": "Night", "version": "1.0.0", "kind": "theme",
+        "author": "Shirowwww", "description": "Dark.", "kitApi": "1.0", "colors": "colors.ini",
+        "settings": [{"key": "radius", "label": "Corners", "type": "number", "min": 0, "max": 24, "default": 8},
+                     {"key": "hide-radio", "label": "Hide Radio", "type": "toggle", "default": false}]})";
+    ampify::ManifestResult result = Check(theme, "night", {"colors.ini"});
+    CHECK(result.errors.empty());
+    CHECK(result.manifest && result.manifest->settings.size() == 2);
+    CHECK(ampify::SettingsErrors(theme).empty());
+
+    std::vector<std::string> errors;
+    std::vector<ampify::SettingSpec> declared = ampify::DeclaredSettings(theme, &errors);
+    CHECK(errors.empty());
+    CHECK(declared.size() == 2 && declared[0].key == "radius" && declared[1].defaultValue == "false");
+
+    std::string snippet = theme;
+    snippet.replace(snippet.find("\"theme\""), 7, "\"snippet\"");
+    CHECK(!ampify::SettingsErrors(snippet).empty());
+    CHECK(ampify::DeclaredSettings(snippet, &errors).empty());
+}
+
+TEST_CASE(Manifest_AStoredSettingValueCountsOnlyWhenItFits) {
+    ampify::SettingSpec number;
+    number.type = ampify::SettingSpec::Type::Number;
+    number.defaultValue = "8";
+    number.min = 0;
+    number.max = 24;
+    CHECK(ampify::SettingValue(number, std::nullopt) == "8");
+    CHECK(ampify::SettingValue(number, "12.50") == "12.5");
+    CHECK(ampify::SettingValue(number, "30") == "8");
+    CHECK(ampify::SettingValue(number, "wide") == "8");
+
+    ampify::SettingSpec toggle;
+    toggle.defaultValue = "false";
+    CHECK(ampify::SettingValue(toggle, "1") == "true");
+    CHECK(ampify::SettingValue(toggle, "off") == "false");
+    CHECK(ampify::SettingValue(toggle, "maybe") == "false");
+
+    ampify::SettingSpec choice;
+    choice.type = ampify::SettingSpec::Type::Choice;
+    choice.options = {"Blue", "Pink"};
+    choice.defaultValue = "Blue";
+    CHECK(ampify::SettingValue(choice, "Pink") == "Pink");
+    CHECK(ampify::SettingValue(choice, "Green") == "Blue");
+}

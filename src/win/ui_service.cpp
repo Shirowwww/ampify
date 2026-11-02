@@ -634,14 +634,23 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
     return row;
 }
 
-// Writes one declared setting from the card; the extension restarts with it (SetModSetting).
-void CommitSetting(UiService::Shared& shared, const std::string& id, const std::string& key, const std::string& value) {
+// Whose setting a control writes: an extension's, or the active theme's.
+struct SettingOwner {
+    std::string id;
+    bool theme = false;
+};
+
+// Writes one declared setting from the card. An extension restarts with it (SetModSetting); the theme service sees
+// settings.txt change and applies the theme again (SetThemeSetting).
+void CommitSetting(UiService::Shared& shared, const SettingOwner& owner, const std::string& key, const std::string& value) {
     std::string error;
-    if (uirender::SetModSetting(shared.kit, id, key, value, error)) {
-        shared.journal.Write("Settings: \"" + id + "\" " + key + " = " + value + " from the Ampify card (restart " + id +
-                             " requested)");
+    bool written = owner.theme ? uirender::SetThemeSetting(shared.kit, owner.id, key, value, error)
+                               : uirender::SetModSetting(shared.kit, owner.id, key, value, error);
+    if (written) {
+        shared.journal.Write("Settings: \"" + owner.id + "\" " + key + " = " + value + " from the Ampify card" +
+                             (owner.theme ? std::string(" (theme)") : " (restart " + owner.id + " requested)"));
     } else {
-        shared.journal.Write("Settings: could not change \"" + id + "\" " + key + ": " + error);
+        shared.journal.Write("Settings: could not change \"" + owner.id + "\" " + key + ": " + error);
     }
 }
 
@@ -656,7 +665,7 @@ std::optional<std::string> NumberIn(const std::string& text, const SettingSpec& 
 }
 
 // A text or number field, written when it is left or on Enter. A number that does not read puts the last value back.
-controls::TextBox SettingField(UiService::Shared& shared, const std::string& id, const SettingSpec& spec,
+controls::TextBox SettingField(UiService::Shared& shared, const SettingOwner& target, const SettingSpec& spec,
                                const std::string& value) {
     controls::TextBox box;
     if (shared.probe.textBox) box.Style(shared.probe.textBox);
@@ -665,7 +674,7 @@ controls::TextBox SettingField(UiService::Shared& shared, const std::string& id,
     box.Text(Wide(value));
     auto last = std::make_shared<std::string>(value);
     UiService::Shared* owner = &shared;
-    auto commit = [owner, id, spec, last](const controls::TextBox& field) {
+    auto commit = [owner, target, spec, last](const controls::TextBox& field) {
         std::string typed = Utf8(field.Text());
         std::optional<std::string> next = spec.type == SettingSpec::Type::Number ? NumberIn(typed, spec) : typed;
         if (!next) {
@@ -674,7 +683,7 @@ controls::TextBox SettingField(UiService::Shared& shared, const std::string& id,
         }
         if (*next == *last) return;
         *last = *next;
-        CommitSetting(*owner, id, spec.key, *next);
+        CommitSetting(*owner, target, spec.key, *next);
     };
     box.LostFocus([commit](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
         try {
@@ -691,7 +700,7 @@ controls::TextBox SettingField(UiService::Shared& shared, const std::string& id,
     return box;
 }
 
-xaml::FrameworkElement SettingControl(UiService::Shared& shared, const std::string& id, const SettingSpec& spec,
+xaml::FrameworkElement SettingControl(UiService::Shared& shared, const SettingOwner& target, const SettingSpec& spec,
                                       const std::string& value) {
     UiService::Shared* owner = &shared;
     if (spec.type == SettingSpec::Type::Toggle) {
@@ -701,9 +710,9 @@ xaml::FrameworkElement SettingControl(UiService::Shared& shared, const std::stri
         toggle.OnContent(winrt::box_value(Wide(i18n::Text("ui.on"))));
         toggle.OffContent(winrt::box_value(Wide(i18n::Text("ui.off"))));
         toggle.IsOn(value == "true" || value == "1" || value == "on" || value == "yes");
-        toggle.Toggled([owner, id, key = spec.key](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        toggle.Toggled([owner, target, key = spec.key](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
             try {
-                CommitSetting(*owner, id, key, sender.as<controls::ToggleSwitch>().IsOn() ? "true" : "false");
+                CommitSetting(*owner, target, key, sender.as<controls::ToggleSwitch>().IsOn() ? "true" : "false");
             } catch (...) {
             }
         });
@@ -717,20 +726,21 @@ xaml::FrameworkElement SettingControl(UiService::Shared& shared, const std::stri
         auto chosen = std::find(spec.options.begin(), spec.options.end(), value);
         if (chosen == spec.options.end()) chosen = std::find(spec.options.begin(), spec.options.end(), spec.defaultValue);
         combo.SelectedIndex(static_cast<int32_t>(chosen - spec.options.begin()));
-        combo.SelectionChanged([owner, id, key = spec.key](IInspectable const& sender,
-                                                           controls::SelectionChangedEventArgs const&) noexcept {
+        combo.SelectionChanged([owner, target, key = spec.key](IInspectable const& sender,
+                                                               controls::SelectionChangedEventArgs const&) noexcept {
             try {
                 auto item = sender.as<controls::ComboBox>().SelectedItem();
-                if (item) CommitSetting(*owner, id, key, Utf8(winrt::unbox_value_or<winrt::hstring>(item, L"")));
+                if (item) CommitSetting(*owner, target, key, Utf8(winrt::unbox_value_or<winrt::hstring>(item, L"")));
             } catch (...) {
             }
         });
         return combo;
     }
-    return SettingField(shared, id, spec, value);
+    return SettingField(shared, target, spec, value);
 }
 
-// The settings an extension declares, under its row: one line each, its label on the left and its control on the right.
+// The settings an extension or the active theme declares, under its row: one line each, its label on the left and
+// its control on the right.
 xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::ModEntry& mod) {
     controls::StackPanel panel;
     panel.Spacing(8);
@@ -748,15 +758,103 @@ xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::Mo
         controls::TextBlock label = MakeText(Wide(spec.label).c_str(), "body", false, &shared.probe);
         label.VerticalAlignment(xaml::VerticalAlignment::Center);
         row.Children().Append(label);
-        xaml::FrameworkElement input = SettingControl(shared, mod.id, spec, mod.values[index]);
+        xaml::FrameworkElement input = SettingControl(shared, {mod.id, mod.theme}, spec, mod.values[index]);
         input.VerticalAlignment(xaml::VerticalAlignment::Center);
         input.HorizontalAlignment(xaml::HorizontalAlignment::Right);
-        Name(input, "AMPIFY_ModsSetting_" + mod.id + "_" + spec.key, spec.label);
+        Name(input, std::string(mod.theme ? "AMPIFY_ThemeSetting_" : "AMPIFY_ModsSetting_") + mod.id + "_" + spec.key,
+             spec.label);
         controls::Grid::SetColumn(input, 1);
         row.Children().Append(input);
         panel.Children().Append(row);
     }
     return panel;
+}
+
+// The active theme's settings: its name, a line on what they do, then one row per setting.
+xaml::FrameworkElement ThemeSettingsSection(UiService::Shared& shared, const uirender::ModEntry& theme) {
+    controls::StackPanel section;
+    section.Spacing(8);
+    Name(section, "AMPIFY_ThemeSettings_" + theme.id, theme.name);
+    controls::TextBlock title =
+        MakeText(Wide(i18n::Text("mods.themeTitle", {{"name", theme.name}})).c_str(), "bodyStrong", false, &shared.probe);
+    section.Children().Append(title);
+    section.Children().Append(MakeText(Wide(i18n::Text("mods.themeSubtitle")).c_str(), "caption", true, &shared.probe));
+    section.Children().Append(ModSettings(shared, theme));
+    return section;
+}
+
+// Shows the settings of the theme active now under the theme list, or nothing when it declares none.
+void FillThemeSettings(UiService::Shared& shared, const controls::StackPanel& host) {
+    host.Children().Clear();
+    if (std::optional<uirender::ModEntry> theme = uirender::ActiveThemeSettings(shared.kit)) {
+        host.Children().Append(MakeDivider());
+        host.Children().Append(ThemeSettingsSection(shared, *theme));
+    }
+}
+
+// The theme in use, chosen from the installed ones, then its settings. A choice is written to settings.txt, which the
+// theme service watches: the theme changes at once, and its settings replace the last one's.
+xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
+    controls::StackPanel section;
+    section.Spacing(10);
+    controls::Grid row;
+    row.ColumnSpacing(16);
+    controls::ColumnDefinition text;
+    text.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
+    controls::ColumnDefinition control;
+    control.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
+    row.ColumnDefinitions().Append(text);
+    row.ColumnDefinitions().Append(control);
+    controls::StackPanel titles;
+    titles.VerticalAlignment(xaml::VerticalAlignment::Center);
+    titles.Children().Append(MakeText(Wide(i18n::Text("mods.theme")).c_str(), "body", false, &shared.probe));
+    titles.Children().Append(MakeText(Wide(i18n::Text("mods.themeHelp")).c_str(), "caption", true, &shared.probe));
+    row.Children().Append(titles);
+
+    std::vector<uirender::ModEntry> themes = uirender::ListThemes(shared.kit);
+    std::string active = uirender::ActiveThemeId(shared.kit);
+    controls::ComboBox combo;
+    if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
+    combo.MinWidth(220);
+    combo.VerticalAlignment(xaml::VerticalAlignment::Center);
+    Name(combo, "AMPIFY_ThemeChoice", i18n::Text("mods.theme"));
+    auto ids = std::make_shared<std::vector<std::string>>(1, "");  // "" is the choice "None"
+    combo.Items().Append(winrt::box_value(Wide(i18n::Text("mods.themeNone"))));
+    for (const uirender::ModEntry& theme : themes) {
+        ids->push_back(theme.id);
+        combo.Items().Append(winrt::box_value(Wide(theme.NameIn(i18n::Language()))));
+    }
+    auto chosen = std::find(ids->begin(), ids->end(), active);
+    combo.SelectedIndex(chosen == ids->end() ? 0 : static_cast<int32_t>(chosen - ids->begin()));
+    controls::Grid::SetColumn(combo, 1);
+    row.Children().Append(combo);
+    section.Children().Append(row);
+
+    controls::StackPanel settingsHost;
+    settingsHost.Spacing(10);
+    FillThemeSettings(shared, settingsHost);
+    section.Children().Append(settingsHost);
+
+    UiService::Shared* owner = &shared;
+    combo.SelectionChanged([owner, ids, settingsHost](IInspectable const& sender,
+                                                      controls::SelectionChangedEventArgs const&) noexcept {
+        try {
+            int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
+            if (index < 0 || index >= static_cast<int32_t>(ids->size())) return;
+            const std::string& id = (*ids)[index];
+            if (id == uirender::ActiveThemeId(owner->kit)) return;
+            std::string error;
+            if (!uirender::ChooseTheme(owner->kit, id, error)) {
+                owner->journal.Write("Settings: could not choose the theme \"" + id + "\": " + error);
+                return;
+            }
+            owner->journal.Write("Settings: theme \"" + (id.empty() ? std::string("none") : id) +
+                                 "\" chosen from the Ampify card");
+            FillThemeSettings(*owner, settingsHost);
+        } catch (...) {
+        }
+    });
+    return section;
 }
 
 controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uirender::ModEntry>& mods,
@@ -841,6 +939,8 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
         list.Children().Append(ModRow(shared, mod));
         if (!mod.settings.empty()) list.Children().Append(ModSettings(shared, mod));
     }
+    list.Children().Append(MakeDivider());
+    list.Children().Append(ThemeChoice(shared));
     body.Children().Append(list);
     card.Child(body);
     return card;

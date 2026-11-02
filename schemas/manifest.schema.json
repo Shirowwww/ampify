@@ -70,7 +70,7 @@
       "type": "array",
       "minItems": 1,
       "maxItems": 16,
-      "description": "Settings of an extension, shown in the Ampify card of Apple Music's settings. Ampify.config.get(key) gives their value.",
+      "description": "Settings of an extension or a theme, shown in the Ampify card of Apple Music's settings. An extension reads them with Ampify.config.get(key); a theme's user.css with var(--setting-<key>) and @setting blocks.",
       "items": {"$ref": "#/$defs/setting"}
     },
     "permissions": {

@@ -1450,6 +1450,32 @@ TEST_CASE(Examples_LoadWithoutProblems) {
     }
 }
 
+// Each shipped theme with settings, every setting moved off its default: still no problem, and more or fewer rules.
+TEST_CASE(Examples_LoadWithEverySettingChanged) {
+    for (const char* name : {"midnight", "greenroom", "glass"}) {
+        std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
+        th::FolderFiles files(folder);
+        std::optional<std::string> manifest = files.Read("manifest.json");
+        std::vector<ampify::SettingSpec> specs = ampify::DeclaredSettings(manifest.value_or(""));
+        CHECK(!specs.empty());
+        th::LoadOptions options;
+        for (const ampify::SettingSpec& spec : specs) {
+            using Type = ampify::SettingSpec::Type;
+            options.settings[spec.key] = spec.type == Type::Toggle ? (spec.defaultValue == "true" ? "false" : "true")
+                                         : spec.type == Type::Choice ? spec.options.back()
+                                         : spec.type == Type::Number ? ampify::SettingNumberText(spec.min.value_or(0))
+                                                                     : "x";
+        }
+        th::Theme byDefault = th::LoadTheme(name, folder.generic_string(), files);
+        th::Theme changed = th::LoadTheme(name, folder.generic_string(), files, options);
+        CHECK(changed.usable);
+        for (const std::string& problem : changed.problems) {
+            ampify::test::ReportFailure(__FILE__, __LINE__, std::string(name) + " : " + problem);
+        }
+        CHECK(changed.assignments.size() != byDefault.assignments.size());
+    }
+}
+
 // --- Session: the decisions taken on each tick -----------------------------------------------------------
 
 TEST_CASE(Session_RestoresOnANewGenerationAndStylesNewElements) {
@@ -2189,6 +2215,136 @@ TEST_CASE(Scheme_TheThemesDefaultComesAfterTheSettings) {
     choice = th::ChooseScheme("", "", schemes, {false, 600});
     CHECK(choice.scheme.empty());
     CHECK(choice.reason == "first scheme");
+}
+
+// --- Theme settings ------------------------------------------------------------------------------------------------
+
+TEST_CASE(Css_SettingBlocksGiveTheirRulesACondition) {
+    th::Stylesheet sheet = th::ParseStylesheet(
+        "@setting hide-radio {\n"
+        "    #Radio { visibility: collapsed }\n"
+        "    @media (max-width: 900px) { #Bar { width: 1 } }\n"
+        "    :root { --gap: 4; }\n"
+        "}\n"
+        "@setting accent = \"Deep Pink\" { A { width: 2 } }\n"
+        "@media (max-width: 500px) { @setting compact { B { width: 3 } } }\n"
+        "C { width: 4 }\n"
+        "@setting Bad Key { D { width: 5 } }\n"
+        "@setting a { @setting b { E { width: 6 } } }\n");
+
+    CHECK(sheet.rules.size() == 6);
+    if (sheet.rules.size() != 6) return;
+    CHECK(sheet.rules[0].setting && sheet.rules[0].setting->key == "hide-radio" && !sheet.rules[0].setting->value);
+    CHECK(!sheet.rules[0].media);
+    CHECK(sheet.rules[1].setting && sheet.rules[1].media && sheet.rules[1].media->maxWidth == 900);
+    CHECK(sheet.rules[2].root && sheet.rules[2].setting);
+    CHECK(sheet.rules[3].setting && sheet.rules[3].setting->value == std::optional<std::string>("Deep Pink"));
+    CHECK(sheet.rules[4].setting && sheet.rules[4].media && sheet.rules[4].setting->key == "compact");
+    CHECK(!sheet.rules[5].setting && !sheet.rules[5].media);
+    CHECK(sheet.rules[5].selectors[0].parts[0].type == "C");
+    CHECK(sheet.problems.size() == 2);  // a bad key, a @setting inside @setting
+}
+
+namespace {
+
+const char* kSettingsManifest = R"({"id": "test", "kind": "theme", "settings": [
+    {"key": "radius", "label": "Corners", "type": "number", "min": 0, "max": 24, "default": 8},
+    {"key": "hide-radio", "label": "Hide Radio", "type": "toggle", "default": false},
+    {"key": "accent", "label": "Accent", "type": "choice", "options": ["Blue", "Pink"], "default": "Blue"}]})";
+
+}  // namespace
+
+TEST_CASE(Theme_SettingsBecomeVariablesAndSwitchTheirBlocks) {
+    MemoryFiles files;
+    files.files["manifest.json"] = kSettingsManifest;
+    files.files["user.css"] =
+        ":root { --corner: var(--setting-radius); }\n"
+        "@setting accent = Blue { :root { --corner: 2; } }\n"
+        "Border { corner-radius: var(--corner); }\n"
+        "@setting hide-radio { #Radio { visibility: collapsed; } }\n"
+        "@setting accent = pink { Button { background: #FF2D55; } }\n";
+
+    th::Theme defaults = Load(files);
+    CHECK(defaults.variables["setting-radius"] == "8");
+    CHECK(defaults.variables["setting-hide-radio"] == "false");
+    CHECK(defaults.variables["setting-accent"] == "Blue");
+    CHECK(defaults.assignments.size() == 1);
+    CHECK(defaults.variables["corner"] == "2");
+
+    th::LoadOptions options;
+    options.settings = {{"radius", "12"}, {"hide-radio", "true"}, {"accent", "Pink"}};
+    th::Theme chosen = Load(files, options);
+    CHECK(chosen.settings["hide-radio"] == "true");
+    CHECK(chosen.assignments.size() == 3);
+    bool corner = false, hidden = false, pink = false;
+    for (const th::Assignment& assignment : chosen.assignments) {
+        corner = corner || assignment.property == "CornerRadius";
+        hidden = hidden || assignment.property == "Visibility";
+        pink = pink || assignment.property == "Background";
+    }
+    CHECK(corner && hidden && pink);
+    CHECK(chosen.variables["corner"] == "12");
+
+    options.settings = {{"radius", "99"}, {"accent", "Green"}};  // out of bounds, not an option: the defaults
+    th::Theme wrong = Load(files, options);
+    CHECK(wrong.variables["setting-radius"] == "8");
+    CHECK(wrong.variables["setting-accent"] == "Blue");
+}
+
+TEST_CASE(Theme_ASettingBlockForAnUndeclaredKeyIsReported) {
+    MemoryFiles files;
+    files.files["user.css"] = "@setting wide { Border { width: 10 } }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.assignments.empty());
+    CHECK(!ProblemContaining(theme, "@setting wide").empty());
+
+    files.files["manifest.json"] = R"({"kind": "theme", "settings": [{"key": "a"}]})";
+    CHECK(!ProblemContaining(Load(files), "manifest.json").empty());
+}
+
+TEST_CASE(Theme_ASnippetSeesTheSettingsOfTheActiveTheme) {
+    MemoryFiles themeFiles;
+    themeFiles.files["manifest.json"] = kSettingsManifest;
+    themeFiles.files["user.css"] = "Page { opacity: 1; }\n";
+    th::LoadOptions options;
+    options.settings = {{"hide-radio", "true"}};
+    th::Theme theme = Load(themeFiles, options);
+
+    MemoryFiles snippetFiles;
+    snippetFiles.files["user.css"] = "@setting hide-radio { #Radio { width: var(--setting-radius); } }\n";
+    th::Theme snippet = th::LoadSnippet("calm", "C:/snippets/calm", snippetFiles, &theme);
+    CHECK(snippet.assignments.size() == 1);
+}
+
+TEST_CASE(Settings_ThemeValuesAreReadUnderTheirOwnPrefix) {
+    ampify::Settings settings;
+    settings.Set("themes.night.radius", "12");
+    settings.Set("themes.night.hide-radio", "true");
+    settings.Set("themes.nightfall.radius", "4");
+    settings.Set("theme.active", "night");
+    std::map<std::string, std::string> values = th::ReadThemeValues(settings, "night");
+    CHECK(values.size() == 2);
+    CHECK(values["radius"] == "12" && values["hide-radio"] == "true");
+    CHECK(th::ReadThemeValues(settings, "").empty());
+}
+
+TEST_CASE(Worker_ReloadsWhenASettingOfTheActiveThemeChanges) {
+    std::filesystem::path kit(TempFolder("worker-settings"));
+    WriteFile(kit / "themes" / "test" / "manifest.json", kSettingsManifest);
+    WriteFile(kit / "themes" / "test" / "user.css", "@setting hide-radio { #Radio { visibility: collapsed; } }\n");
+
+    ampify::Settings settings;
+    settings.Set("theme.active", "test");
+    th::ThemeWorker worker(kit);
+    th::SessionRequest first = worker.Tick(settings, 600);
+    CHECK(first.theme && first.theme->assignments.empty());
+
+    settings.Set("themes.test.hide-radio", "true");
+    th::SessionRequest second = worker.Tick(settings, 600);
+    CHECK(second.generation == first.generation + 1);
+    CHECK(second.theme && second.theme->assignments.size() == 1);
+    CHECK(worker.Tick(settings, 600).generation == second.generation);
+    std::filesystem::remove_all(kit);
 }
 
 TEST_CASE(Worker_StartsOnTheSchemeTheManifestNames) {

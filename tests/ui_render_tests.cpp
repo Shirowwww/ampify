@@ -607,6 +607,80 @@ TEST_CASE(UiRender_ModsSettingLeavesAnUnreadableSettingsFileAlone) {
     CHECK(!fs::exists(kit / "reload.txt"));
 }
 
+TEST_CASE(UiRender_TheActiveThemeCarriesItsSettings) {
+    fs::path kit = FreshKit("theme-settings");
+    WriteFile(kit / "themes" / "night" / "manifest.json",
+              R"({"id":"night","name":"Night","version":"1.0.0","kind":"theme","author":"x","description":"Dark.",)"
+              R"("kitApi":"1.0","colors":"colors.ini","settings":[)"
+              R"({"key":"radius","label":"Corners","type":"number","min":0,"max":24,"default":8},)"
+              R"({"key":"hide-radio","label":"Hide Radio","type":"toggle","default":false}]})");
+    WriteFile(kit / "themes" / "night" / "colors.ini", "[Base]\nmain = 000000\n");
+    WriteFile(kit / "themes" / "plain" / "colors.ini", "[Base]\nmain = 000000\n");
+    CHECK(!ActiveThemeSettings(kit));  // no theme chosen
+
+    WriteFile(kit / "settings.txt", "theme.active = night\nthemes.night.radius = 30\nthemes.night.hide-radio = 1\n");
+    std::optional<ModEntry> theme = ActiveThemeSettings(kit);
+    CHECK(theme && theme->id == "night" && theme->name == "Night" && theme->theme);
+    if (theme) CHECK(theme->values == std::vector<std::string>({"8", "true"}));  // 30 is out of bounds
+
+    WriteFile(kit / "settings.txt", "theme.active = plain\n");
+    CHECK(!ActiveThemeSettings(kit));  // a theme without settings shows nothing
+}
+
+TEST_CASE(UiRender_AThemeSettingIsWrittenWithoutAReloadRequest) {
+    fs::path kit = FreshKit("theme-setting");
+    WriteFile(kit / "settings.txt", "theme.active = night\n");
+    std::string error;
+    CHECK(SetThemeSetting(kit, "night", "radius", "12", error));
+    CHECK(error.empty());
+    CHECK(ReadFile(kit / "settings.txt").find("themes.night.radius = 12") != std::string::npos);
+    CHECK(ReadFile(kit / "settings.txt").find("theme.active = night") != std::string::npos);
+    CHECK(!fs::exists(kit / "reload.txt"));
+    CHECK(!SetThemeSetting(kit, "../x", "radius", "1", error));
+    CHECK(!SetThemeSetting(kit, "night", "a.b", "1", error));
+}
+
+TEST_CASE(UiRender_ThemesAreListedByNameWithTheirTranslation) {
+    fs::path kit = FreshKit("theme-list");
+    WriteFile(kit / "themes" / "rose" / "manifest.json",
+              R"({"id":"rose","name":"Rose gold","version":"1.0.0","kind":"theme","author":"x","description":"Warm.",)"
+              R"("kitApi":"1.0","colors":"colors.ini","translations":{"fr":{"name":"Or rose","description":"Chaud."}}})");
+    WriteFile(kit / "themes" / "rose" / "colors.ini", "[Base]\nmain = 000000\n");
+    WriteFile(kit / "themes" / "aurora" / "manifest.json",
+              R"({"id":"aurora","name":"Aurora","version":"1.0.0","kind":"theme","author":"x","description":"Cold.",)"
+              R"("kitApi":"1.0","colors":"colors.ini"})");
+    WriteFile(kit / "themes" / "aurora" / "colors.ini", "[Base]\nmain = 000000\n");
+    WriteFile(kit / "themes" / "snippets" / "readme.txt", "not a theme");
+    WriteFile(kit / "themes" / "broken" / "manifest.json", "{");
+
+    std::vector<ModEntry> themes = ListThemes(kit);
+    CHECK(themes.size() == 2);
+    if (themes.size() != 2) return;
+    CHECK(themes[0].id == "aurora" && themes[1].id == "rose");
+    CHECK(themes[1].NameIn("fr") == "Or rose");
+    CHECK(themes[1].theme);
+}
+
+TEST_CASE(UiRender_ChoosingAThemeKeepsOnlyASchemeThatStillMeansSomething) {
+    fs::path kit = FreshKit("theme-choose");
+    WriteFile(kit / "settings.txt", "theme.active = night\ntheme.scheme = Dark\nextensions.clock.enabled = true\n");
+    std::string error;
+    CHECK(ChooseTheme(kit, "night", error));  // the same theme keeps its scheme
+    CHECK(ReadFile(kit / "settings.txt").find("theme.scheme = Dark") != std::string::npos);
+    CHECK(ChooseTheme(kit, "rose", error));  // another theme starts on its own default scheme
+    std::string settings = ReadFile(kit / "settings.txt");
+    CHECK(settings.find("theme.active = rose") != std::string::npos);
+    CHECK(settings.find("theme.scheme") == std::string::npos);
+    CHECK(settings.find("extensions.clock.enabled = true") != std::string::npos);
+
+    WriteFile(kit / "settings.txt", "theme.active = rose\ntheme.scheme = auto\n");
+    CHECK(ChooseTheme(kit, "", error));  // none; "auto" follows Windows whatever the theme
+    settings = ReadFile(kit / "settings.txt");
+    CHECK(settings.find("theme.active = none") != std::string::npos);
+    CHECK(settings.find("theme.scheme = auto") != std::string::npos);
+    CHECK(!ChooseTheme(kit, "../x", error));
+}
+
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {
     SvgIcon icon = ParseSvgIcon(R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>)");
     CHECK(icon.Usable());

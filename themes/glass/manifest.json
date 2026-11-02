@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "glass",
   "name": "Glass",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "A complete redesign: gradient and acrylic backgrounds, large rounded cards, larger text, buttons that grow on hover, shadows.",
@@ -17,5 +17,11 @@
     "dark",
     "light"
   ],
-  "preview": "preview.jpg"
+  "preview": "preview.jpg",
+  "settings": [
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 32, "default": 18},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 12},
+    {"key": "frost", "label": "Frosted glass opacity (0.2 to 0.9)", "type": "number", "min": 0.2, "max": 0.9, "default": 0.55},
+    {"key": "hover-grow", "label": "Buttons and cards grow under the pointer", "type": "toggle", "default": true}
+  ]
 }

@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "midnight",
   "name": "Midnight",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "An ink-blue night: the sidebar and the pages float as rounded panels, with a pale moonlight accent.",
@@ -14,5 +14,11 @@
     "blue",
     "layout"
   ],
-  "preview": "preview.jpg"
+  "preview": "preview.jpg",
+  "settings": [
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 24, "default": 12},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 10},
+    {"key": "card-highlight", "label": "Light up cards and rows under the pointer", "type": "toggle", "default": true},
+    {"key": "hide-app-name", "label": "Hide the Music title", "type": "toggle", "default": false}
+  ]
 }

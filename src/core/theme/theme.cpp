@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "../json.hpp"
+#include "../manifest.hpp"
 #include "../text_util.hpp"
 #include "fonts.hpp"
 #include "ini.hpp"
@@ -293,10 +294,38 @@ void DefineFontPart(const std::string& name, const std::string& value, int line,
     theme.fonts[CanonicalFontRole(role)].*part = conversion.value->text;
 }
 
+// A rule inside @setting counts only while its condition holds. A key the theme does not declare never holds.
+bool SettingHolds(const Rule& rule, const std::string& file, Theme& theme) {
+    if (!rule.setting) return true;
+    auto it = theme.settings.find(rule.setting->key);
+    if (it == theme.settings.end()) {
+        theme.problems.push_back(AtLine(file, rule.line) + ": @setting " + rule.setting->key +
+                                 ": the theme's manifest declares no such setting, ignored");
+        return false;
+    }
+    if (!rule.setting->value) return it->second == "true";
+    return ToLowerAscii(it->second) == ToLowerAscii(*rule.setting->value);
+}
+
+// The settings manifest.json declares, with their value now: variables setting-<key>, and the @setting conditions.
+void LoadSettings(FileSource& files, const LoadOptions& options, Theme& theme) {
+    std::optional<std::string> text = files.Read("manifest.json");
+    if (!text) return;
+    std::vector<std::string> errors;
+    for (const SettingSpec& spec : DeclaredSettings(*text, &errors)) {
+        auto stored = options.settings.find(spec.key);
+        std::string value = SettingValue(spec, stored == options.settings.end() ? std::nullopt
+                                                                                : std::optional<std::string>(stored->second));
+        theme.settings[spec.key] = value;
+        theme.variables["setting-" + spec.key] = value;
+    }
+    for (const std::string& error : errors) theme.problems.push_back("manifest.json: " + error + ", settings ignored");
+}
+
 // The declarations of the :root blocks, in file order. A variable can use the ones defined before it.
 void LoadVariables(const Stylesheet& sheet, const ValueContext& context, const RuleSource& source, Theme& theme) {
     for (const Rule& rule : sheet.rules) {
-        if (!rule.root) continue;
+        if (!rule.root || !SettingHolds(rule, source.file, theme)) continue;
         for (const Declaration& declaration : rule.declarations) {
             if (!declaration.property.starts_with("--") || declaration.property.size() == 2) {
                 theme.problems.push_back(AtLine(source.file, declaration.line) + ": \"" + declaration.property +
@@ -375,6 +404,7 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
         if (rule.root) continue;
         RuleSource from = source;
         if (!rule.origin.empty()) from.file = rule.origin;
+        if (!SettingHolds(rule, from.file, theme)) continue;
         for (const Declaration& declaration : rule.declarations) {
             if (declaration.property.starts_with("--")) {
                 theme.problems.push_back(AtLine(from.file, declaration.line) + ": variable \"" +
@@ -443,6 +473,7 @@ Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& fi
 
     if (!options.parts.resources) theme.resourceDictionary.clear();
     DefineDerivedColors(theme, options.parts.colors);
+    LoadSettings(files, options, theme);
     ValueContext context{theme.palette, files, folder, options.parts.assets};
     // Spicetify's colours paint Apple Music's own elements first; the theme's user.css comes on top.
     if (std::string translated = SpicetifyStylesheet(spicetify); !translated.empty()) {
@@ -463,6 +494,7 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
     if (base) {
         snippet.palette = base->palette;
         snippet.variables = base->variables;
+        snippet.settings = base->settings;
         snippet.keyframes = base->keyframes;
     }
 
