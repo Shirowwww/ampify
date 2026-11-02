@@ -32,6 +32,7 @@
 
 #if defined(AMPIFY_WITH_XAML)
 #include "../core/json.hpp"
+#include "../win/close_to_tray.hpp"
 #include "../win/theme_service.hpp"
 #include "../win/ui_service.hpp"
 #include "../win/xaml_host.hpp"
@@ -111,12 +112,19 @@ DWORD WINAPI KernelMain(LPVOID) {
     bool apple = role == ampify::ProcessRole::AppleMusic;
     std::filesystem::path logPath = ampify::win::JournalFile(apple ? "AppleMusic.log" : "AMPLibraryAgent.log");
     HANDLE logTaken = CreateMutexW(nullptr, FALSE, apple ? L"Local\\Ampify.AppleMusic.log" : L"Local\\Ampify.AMPLibraryAgent.log");
-    if (!logTaken || GetLastError() != ERROR_ALREADY_EXISTS) std::ofstream(logPath, std::ios::trunc).close();
+    bool laterProcess = logTaken && GetLastError() == ERROR_ALREADY_EXISTS;
+    if (!laterProcess) std::ofstream(logPath, std::ios::trunc).close();
     static std::ofstream file(logPath, std::ios::app);
     static ampify::Journal journal(file, ampify::Journal::LocalTimeStamp);
 
     journal.Write("Kernel loaded in " + ampify::win::ExecutablePath().filename().string() + " (process " +
                   std::to_string(GetCurrentProcessId()) + ")");
+#if defined(AMPIFY_WITH_XAML)
+    // Apple Music started again while its window hides in the notification area: Apple would leave it hidden.
+    if (apple && laterProcess && ampify::win::WakeHiddenWindow()) {
+        journal.Write("Close to tray: asked the running Apple Music to show its window if it hides");
+    }
+#endif
 
     // Read on every start: the package may have been updated since the launcher last looked.
     std::string version = ampify::AppleMusicVersion(ampify::win::PackageFullName());

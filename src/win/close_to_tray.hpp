@@ -21,6 +21,10 @@ void FollowCloseRule(const winrt::Microsoft::UI::Xaml::Window& mainWindow, bool 
 // Any thread, for when Ampify stops: removes the icon and shows the window if it is hidden.
 void ReleaseCloseToTray() noexcept;
 
+// From a later AppleMusic.exe (started again from the Start menu, or for a music:// link): asks the first one to show
+// its window when it hides in the notification area. True when such a window was found.
+bool WakeHiddenWindow() noexcept;
+
 }  // namespace ampify::win
 
 #endif

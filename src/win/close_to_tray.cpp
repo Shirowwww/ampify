@@ -21,6 +21,7 @@ namespace {
 namespace xaml = winrt::Microsoft::UI::Xaml;
 
 constexpr UINT kTrayMessage = WM_APP + 0x41;
+constexpr UINT kWakeMessage = WM_APP + 0x42;  // from a later AppleMusic.exe (WakeHiddenWindow)
 constexpr UINT_PTR kSubclassId = 0x414D5059;  // "AMPY"
 constexpr UINT kIconId = 1;
 constexpr UINT kShowCommand = 1;
@@ -136,6 +137,10 @@ LRESULT CALLBACK TrayProc(HWND window, UINT message, WPARAM wParam, LPARAM lPara
         }
         return 0;
     }
+    if (message == kWakeMessage) {
+        if (g_iconShown) ShowAgain();
+        return 0;
+    }
     if (g_taskbarCreated && message == g_taskbarCreated && g_iconShown) {
         g_iconShown = false;  // Explorer started again without the icon
         AddIcon();
@@ -149,6 +154,8 @@ LRESULT CALLBACK MainProc(HWND window, UINT message, WPARAM wParam, LPARAM lPara
         HideToTray();
         if (g_iconShown) return 0;
     }
+    // Shown again some other way (Apple Music started again from the Start menu): the icon has nothing left to do.
+    if (message == WM_SHOWWINDOW && wParam && g_iconShown) RemoveIcon();
     if (message == WM_NCDESTROY) RemoveWindowSubclass(window, MainProc, kSubclassId);
     return DefSubclassProc(window, message, wParam, lParam);
 }
@@ -204,6 +211,17 @@ void FollowCloseRule(const xaml::Window& mainWindow, bool toTray, Journal& journ
     } catch (...) {
         Log("error while following the rule");
     }
+}
+
+bool WakeHiddenWindow() noexcept {
+    HWND tray = FindWindowW(kTrayClass, nullptr);
+    if (!tray) return false;
+    DWORD owner = 0;
+    GetWindowThreadProcessId(tray, &owner);
+    if (owner == GetCurrentProcessId()) return false;
+    // The first process may show its window: it is not in front, and SetForegroundWindow would be refused.
+    AllowSetForegroundWindow(owner);
+    return PostMessageW(tray, kWakeMessage, 0, 0) != FALSE;
 }
 
 void ReleaseCloseToTray() noexcept {
