@@ -131,6 +131,8 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | Color schemes (`[Base]`, `[Dark]`) | Sections of `colors.ini`, `theme.scheme`, `auto` (follows Windows) and `theme.schedule` (follows the time) | Done |
 | Theme parts | `theme.parts.*` | Done |
 | Images and fonts | Files in the theme folder, `url(...)` in `background` and `font-family` | Done |
+| Theme options (each theme's own `theme.js` menu, or none) | `settings` in a theme's manifest, read as `var(--setting-*)` in `user.css` and shown with translated labels in the Ampify card | Better |
+| Marketplace screenshots | `preview` in the manifest: a picture on the card and in the detail view, every bundled theme has one | Done |
 | Import a Spicetify theme | `ampify theme import <folder\|zip\|address>`. Colors carry over, layout rules do not | Partial |
 | Official theme repository | The catalog in this repository | Partial |
 | Reload a changed theme | `ampify dev`, `ampify watch`, `theme.live_reload` | Done |

@@ -1141,7 +1141,7 @@ controls::Border MakeSurfaceFrame(const std::string& frameName, const std::strin
     close.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
     close.BorderThickness(xaml::Thickness{0, 0, 0, 0});
     close.VerticalAlignment(xaml::VerticalAlignment::Center);
-    Name(close, frameName + "_close", "Close the panel");
+    Name(close, frameName + "_close", i18n::Text("ui.close"));
     controls::ToolTipService::SetToolTip(close, winrt::box_value(Wide(i18n::Text("ui.close"))));
     controls::Grid::SetColumn(close, 1);
     header.Children().Append(close);
@@ -1395,7 +1395,14 @@ void ShowPageHost(WindowContext& context, bool visible) {
     if (!context.pagePopup || !context.pageHost) return;
     context.pageHost.Visibility(visible ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
     if (visible) {
+        if (context.pagePopup.IsOpen()) return;
         OpenOverlay(context, context.pagePopup);
+        // The last Popup opened lies on top: the panels, opened first, went under the see-through page and showed
+        // through its header. Opened again, they float over the page as over Apple Music's own.
+        if (context.panelPopup && context.panelPopup.IsOpen()) {
+            context.panelPopup.IsOpen(false);
+            OpenOverlay(context, context.panelPopup);
+        }
         return;
     }
     UncoverApplePage(context);

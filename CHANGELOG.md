@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Eight new themes after the most used ones on Spicetify: Catppuccin, Comfy, Dracula, Dribbblish, Gruvbox, Nord,
+  Rosé Pine and Tokyo Night. Midnight and Rose gold have a look of their own, and Greenroom puts the whole play bar at
+  the bottom of the window, as Spotify does. Every theme shows a preview in the Marketplace.
+- A theme can declare settings (numbers, switches, choices) and translate their labels. The Ampify card in Apple
+  Music's Settings shows them, and chooses the theme and its scheme.
+- The Ampify card gains two Apple Music settings: when notifications show (as Apple Music shows them, only when it is
+  not in front, or never), and where the full-screen player opens (over the window, in place of the window, the whole
+  screen with the taskbar, or the whole screen).
+- The theme's accent reaches every selection mark, link and switch, and leaves with the theme. Extension panels take
+  the theme's colours, stay above app pages and no longer cover the window's buttons.
+
 - Elements can carry a French name and description (`translations` in the manifest). The Marketplace and the Ampify
   card in Apple Music's Settings show them on a French Windows. All bundled elements are translated.
 - `ampify theme names <inspector.json>...` replaces `ampify_theme_check --names`, and `ampify theme check` replaces

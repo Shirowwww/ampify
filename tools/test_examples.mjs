@@ -519,6 +519,16 @@ test("the Marketplace keeps the English text when the element has no translation
   assert.ok(textsOf(cardOf(bare.page, "Demo")).includes("Test demo."));
 });
 
+test("the Marketplace takes the installed copy's translation when the catalog has none", async () => {
+  const installed = [marketCopy("demo", "extension", [], { translations: frenchEntry().translations })];
+  const { page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension")], installed, language: "fr" });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  const card = cardOf(page, "Démo");
+  assert.ok(card, "the card carries the installed copy's French name");
+  assert.ok(textsOf(card).includes("Un test en français."));
+});
+
 test("the Marketplace installs an element with permissions off, then turns it on from its detail view", async () => {
   const { world, page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension", ["storage"])] });
   await settle();

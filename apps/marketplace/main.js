@@ -182,8 +182,10 @@ function newer(a, b) {
 function merge(entry, installed) {
   const source = entry || installed;
   const update = Boolean(entry && installed && newer(entry.version, installed.version));
-  // The manifest's translation for Windows' language, else the English name and description.
-  const translated = (source.translations && source.translations[Ampify.i18n.language]) || {};
+  // The translation for Windows' language, from the catalog or else the installed copy (a catalog published before the
+  // element was translated has none), else the English name and description.
+  const translationOf = (copy) => (copy && copy.translations && copy.translations[Ampify.i18n.language]) || null;
+  const translated = translationOf(entry) || translationOf(installed) || {};
   return {
     key: source.kind + ":" + source.id,
     id: source.id,
