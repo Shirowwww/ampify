@@ -785,8 +785,8 @@ function fakeReact() {
     };
     page.tree = expand(page.render(), "")[0];
     // What did not render this time is unmounted: its state starts afresh next time.
-    for (const name of [...slots.keys()]) if (!seen.has(name)) slots.delete(name);
-    for (const name of [...mounted]) if (!seen.has(name)) mounted.delete(name);
+    for (const name of Array.from(slots.keys())) if (!seen.has(name)) slots.delete(name);
+    for (const name of Array.from(mounted)) if (!seen.has(name)) mounted.delete(name);
     effects.forEach((effect) => effect());
   };
   const useState = (initial) => {
@@ -1067,7 +1067,7 @@ function fakeGuard() {
     for (let i = 0; i < seconds; i++) {
       world.now += 1000;
       if (world.state.playing && !frozen) world.state.positionMs += 1000;
-      for (const timer of [...world.timers]) {
+      for (const timer of Array.from(world.timers)) {
         if (timer.due > world.now) continue;
         timer.fn();
         if (timer.repeat) timer.due += timer.ms;

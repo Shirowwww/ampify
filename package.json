@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "scripts": {
+    "lint:js": "npx --yes oxlint@1.88.0 apps examples extensions tools docs/assets",
+    "test:js": "node --test tools/test_examples.mjs"
+  }
+}
