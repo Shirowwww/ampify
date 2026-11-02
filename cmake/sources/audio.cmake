@@ -5,6 +5,7 @@ list(APPEND AMPIFY_CORE_SOURCES
     src/core/audio/analysis.cpp
     src/core/audio/equalizer.cpp
     src/core/audio/audio_engine.cpp
+    src/core/audio/audio_share.cpp
     src/core/color_extract.cpp
     src/core/prelude/audio_analysis.cpp
     src/core/prelude/color.cpp

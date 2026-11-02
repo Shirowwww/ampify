@@ -19,6 +19,7 @@
 #include "../core/audio/audio_engine.hpp"
 #include "../core/gain_board.hpp"
 #include "../core/text_util.hpp"
+#include "audio_share.hpp"
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
 #include "smtc_session.hpp"
@@ -103,13 +104,14 @@ void* WinHost::QueryCapability(std::string_view name) {
     if (void* found = m_services->Query(name)) return found;
     // The Marketplace page runs ampify.exe from the interface process, where it is shown.
     if (m_process == "ui" && name == KitCommandHost::kCapabilityName) return static_cast<KitCommandHost*>(m_kitCommands.get());
-    // AudioHost in AMPLibraryAgent.exe only, where the audio is rendered: the process's engine, fed by the Atmos
-    // leveler's hooks.
+    // AudioHost: in AMPLibraryAgent.exe, where the audio is rendered, the process's engine, fed by the Atmos
+    // leveler's hooks; in the interface process, what that engine shares (audio_share.hpp), equalizer excepted.
     if (m_process == "engine" && name == AudioHost::kCapabilityName) {
         audio::AudioEngine& engine = audio::ProcessAudio();
         engine.StartDeliveryThread();  // analysis frames go out from their own thread, 20 a second at most
         return static_cast<AudioHost*>(&engine);
     }
+    if (m_process == "ui" && name == AudioHost::kCapabilityName) return static_cast<AudioHost*>(&win::InterfaceAudio());
     return Host::QueryCapability(name);
 }
 

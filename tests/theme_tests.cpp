@@ -1619,8 +1619,46 @@ TEST_CASE(Snippets_TheDisplayEqualizerLoadsWithoutProblems) {
 
     CHECK(snippet.usable);
     for (const std::string& problem : snippet.problems) ampify::test::ReportFailure(__FILE__, __LINE__, problem);
-    const th::Assignment* content = AssignmentFor(snippet, ".lcd::before", "Content");
-    CHECK(content && content->value.text.ends_with("/images/dance.gif"));
+    // The GIF first, for the versions of Ampify that do not know bars(); the bars come later in the rule and win.
+    std::vector<std::string> contents;
+    for (const th::Assignment& assignment : snippet.assignments) {
+        if (assignment.selector.text == ".lcd::before" && assignment.property == "Content") contents.push_back(assignment.value.text);
+    }
+    CHECK(contents.size() == 2);
+    CHECK(contents.size() == 2 && contents[0].ends_with("/images/dance.gif") && contents[1] == "bars:10");
+}
+
+TEST_CASE(Theme_BarsContentTakesACountAndAColour) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "#A::after { content: bars(); }\n"
+        "#B::after { content: bars( 24 ); color: #FF102030; }\n"
+        "#C::after { content: bars(1); }\n"
+        "#D::after { content: bars(40); }\n"
+        "#E::after { content: bars(six); }\n";
+    th::Theme theme = Load(files);
+
+    const th::Assignment* a = AssignmentFor(theme, "#A::after", "Content");
+    CHECK(a && a->value.text == "bars:12");
+    const th::Assignment* b = AssignmentFor(theme, "#B::after", "Content");
+    CHECK(b && b->value.text == "bars:24");
+    const th::Assignment* colour = AssignmentFor(theme, "#B::after", "Foreground");
+    CHECK(colour && colour->value.text == "#FF102030");
+    CHECK(!ProblemContaining(theme, "line 3: bars() takes a whole number of bars from 2 to 32").empty());
+    CHECK(!ProblemContaining(theme, "line 4: bars() takes").empty());
+    CHECK(!ProblemContaining(theme, "line 5: bars() takes").empty());
+}
+
+TEST_CASE(Engine_PutsBarsInAPanelLikeAnImage) {
+    DecorPage page;
+    th::Theme theme = page.Css("#Bar::after { content: bars(8); color: #FFFFFFFF; height: 20px; }");
+    th::ThemeEngine::Report report = page.engine.Apply(theme, page.tree);
+    CHECK(report.refused == 0);
+    const th::Decor* after = page.After();
+    CHECK(after && after->image == "bars:8");
+    CHECK(after && after->properties.size() == 2);  // Foreground and Height
+    page.engine.Restore(page.tree);
+    CHECK(page.tree.decors.empty());
 }
 
 TEST_CASE(Engine_ForgetsTheDecorOfAPanelThatWentAway) {

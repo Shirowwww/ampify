@@ -493,7 +493,7 @@ controls::Image DecorImageFrom(const std::string& text, th::PseudoElement slot) 
     return image;
 }
 
-bool KeepDecorInPlace(const controls::UIElementCollection& children, const controls::Image& image,
+bool KeepDecorInPlace(const controls::UIElementCollection& children, const xaml::UIElement& image,
                       th::PseudoElement slot) {
     std::uint32_t index = 0;
     if (!children.IndexOf(image, index)) return false;

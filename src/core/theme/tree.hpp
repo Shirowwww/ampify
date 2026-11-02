@@ -88,9 +88,17 @@ inline const Value kNoOwnValue{ValueKind::Opaque, "no-own-value"};
 // `content` of ::before and ::after: the image of a decor (Decor::image), never a property of an element.
 inline constexpr std::string_view kContentProperty = "Content";
 
-// A decorative image a theme puts into a panel with ::before or ::after and `content: url(...)`.
+// The text of `content: bars(n)`: kBarsContent then the count, such as "bars:12". Bars that follow the music.
+inline constexpr std::string_view kBarsContent = "bars:";
+inline constexpr int kMinBars = 2;
+inline constexpr int kMaxBars = 32;
+
+// A decorative image a theme puts into a panel with ::before or ::after and `content: url(...)`, or bars that move
+// with the music (`content: bars(n)`).
 struct Decor {
-    std::string image;  // the text of an Image value: absolute path, then "|Fill", "|Uniform" or "|UniformToFill"
+    // The text of an Image value: absolute path, then "|Fill", "|Uniform" or "|UniformToFill"; or kBarsContent and
+    // the count of bars.
+    std::string image;
     // The other declarations, XAML name and value in name order (Width, Margin, Grid.Row, Animation...): those
     // AppliesToDecor accepts (properties.hpp).
     std::vector<std::pair<std::string, Value>> properties;

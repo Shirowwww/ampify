@@ -27,6 +27,7 @@
 #include "../core/version_gate.hpp"
 #include "../core/version_list.hpp"
 #include "../../extensions/atmos-leveler/atmos_windows.hpp"
+#include "../win/audio_share.hpp"
 #include "../win/win_common.hpp"
 #include "../win/win_host.hpp"
 
@@ -170,6 +171,8 @@ DWORD WINAPI KernelMain(LPVOID) {
     // The Atmos leveler lives where the audio is rendered: AMPLibraryAgent.exe only.
     if (role == ampify::ProcessRole::LibraryAgent) {
         host.Add(atmos::hooks::MakeAtmosLevelerExtension(journal, settings));
+        ampify::win::StartAudioSharing(ampify::audio::ProcessAudio(), journal,  // the sound, for the interface
+                                       [] { atmos::hooks::StartSoundHooks(journal); });
     }
 
     // JavaScript runs on this one thread only: QuickJS is not thread-safe, and the shortcuts are delivered to the

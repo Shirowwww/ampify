@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <vector>
 
@@ -65,11 +66,12 @@ constexpr std::array<PropertySpec, 49> kProperties{{
     {"content", kContentProperty, PropertyKind::Content},  // ::before and ::after only
 }};
 
-// What a decorative Image takes (AppliesToDecor). Image has no CornerRadius, Padding or brush of its own.
-constexpr std::array<std::string_view, 20> kDecorProperties{
+// What a decor takes (AppliesToDecor). Image has no CornerRadius, Padding or brush of its own; Foreground is the
+// colour of bars(n), and an image ignores it.
+constexpr std::array<std::string_view, 21> kDecorProperties{
     kContentProperty, "Width", "Height", "MinWidth", "MaxWidth", "MinHeight", "MaxHeight", "Margin", "Opacity",
     "Visibility", "HorizontalAlignment", "VerticalAlignment", "Grid.Row", "Grid.Column", "Grid.RowSpan",
-    "Grid.ColumnSpan", "Canvas.ZIndex", "RenderTransform", "RenderTransformOrigin", "Animation",
+    "Grid.ColumnSpan", "Canvas.ZIndex", "RenderTransform", "RenderTransformOrigin", "Animation", "Foreground",
 };
 
 // The images BitmapImage decodes. An animated GIF plays; SVG needs another source type, so it is refused.
@@ -807,8 +809,19 @@ Conversion ConvertContent(std::string_view raw, const ValueContext& context) {
     std::string_view text = TrimSpace(raw);
     std::string lowered = ToLowerAscii(text);
     if (lowered == "none" || lowered == "normal") return Ok(ValueKind::Image, "");
+    if (lowered.starts_with("bars(") && lowered.back() == ')') {
+        std::string_view inside = TrimSpace(std::string_view(lowered).substr(5, lowered.size() - 6));
+        if (inside.empty()) return Ok(ValueKind::Image, std::string(kBarsContent) + "12");
+        int count = 0;
+        auto [end, error] = std::from_chars(inside.data(), inside.data() + inside.size(), count);
+        if (error != std::errc() || end != inside.data() + inside.size() || count < kMinBars || count > kMaxBars) {
+            return Fail("bars() takes a whole number of bars from " + std::to_string(kMinBars) + " to " +
+                        std::to_string(kMaxBars) + ", like bars(12) (\"" + std::string(text) + "\")");
+        }
+        return Ok(ValueKind::Image, std::string(kBarsContent) + std::to_string(count));
+    }
     if (!lowered.starts_with("url(")) {
-        return Fail("content takes url(image) or none: text is not supported (\"" + std::string(text) + "\")");
+        return Fail("content takes url(image), bars(n) or none: text is not supported (\"" + std::string(text) + "\")");
     }
     Conversion image = ConvertImage(text, context);
     if (!image.value) return image;

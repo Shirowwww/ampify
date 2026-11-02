@@ -31,6 +31,7 @@
 
 #include "../core/theme/hover.hpp"
 #include "../core/theme/tree.hpp"
+#include "audio_bars.hpp"
 #include "theme_animations.hpp"
 
 namespace ampify::win {
@@ -266,11 +267,12 @@ private:
     // image Ampify's: held strongly, and released here, on the interface thread (docs/development/xaml-lessons.md).
     struct DecorImage {
         winrt::weak_ref<winrt::Microsoft::UI::Xaml::Controls::Panel> panel;
-        winrt::Microsoft::UI::Xaml::Controls::Image image{nullptr};
+        winrt::Microsoft::UI::Xaml::FrameworkElement image{nullptr};  // an Image, or the Grid of bars(n)
         theme::NodeId imageId = 0;  // what Resolve answers to, so WriteRaw sets the image's size, place and animation
         theme::Decor decor;
     };
     std::map<std::pair<theme::NodeId, theme::PseudoElement>, DecorImage> m_decors;
+    AudioBars m_bars;  // the decors made by `content: bars(n)`, moved with the music
 };
 
 }  // namespace ampify::win

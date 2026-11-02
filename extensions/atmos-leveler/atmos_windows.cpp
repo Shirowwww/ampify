@@ -1019,10 +1019,28 @@ int InstallAudioHooks(AudioEntries& entries) {
 
 // Starts the leveler: waits for the Apple Music modules, hooks the player volume and the audio, then
 // runs the poll thread. Called once, from the kernel's thread for this process.
-bool StartLeveler(ampify::Journal& journal, const LevelerConfig& config) {
+std::mutex g_startLock;  // StartLeveler runs once; a second call only changes the settings
+bool g_hooksPlaced = false;
+
+// soundOnly: the hooks are wanted for the sound alone (StartSoundHooks), and settings already in place stay.
+bool StartLeveler(ampify::Journal& journal, const LevelerConfig& config, bool soundOnly = false) {
+    std::lock_guard<std::mutex> start(g_startLock);
+    if (soundOnly && g_hooksPlaced) return true;
     {
         std::lock_guard<std::mutex> guard(g_journalLock);
         g_journal = &journal;
+    }
+    if (soundOnly) Note("the sound is wanted with the leveler off: the hooks go in with no gain");
+    if (g_hooksPlaced) {
+        // The hooks went in for the sound alone (StartSoundHooks): the leveler takes them over with its settings.
+        {
+            std::lock_guard<std::mutex> guard(g_levelerLock);
+            g_config = config;
+            g_leveler = std::make_unique<AtmosLeveler>(config, 48000, 48000);
+        }
+        LoadLevels();
+        Note("leveler started on the hooks already in place");
+        return true;
     }
     g_config = config;
 
@@ -1063,6 +1081,7 @@ bool StartLeveler(ampify::Journal& journal, const LevelerConfig& config) {
     if (installed == 0) return false;
 
     std::thread(PollLoop).detach();
+    g_hooksPlaced = true;
     Note("leveler started: " + std::to_string(installed) + " audio hook(s)");
     return true;
 }
@@ -1089,6 +1108,15 @@ ampify::ExtensionInfo MakeAtmosLevelerExtension(ampify::Journal& journal, const 
     info.start = [&journal, config] { return StartLeveler(journal, config); };
     // No stop: the hooks stay in place until the process exits, so nothing is left half-patched.
     return info;
+}
+
+bool StartSoundHooks(ampify::Journal& journal) {
+    // No gain at all: no auto-level, 0 dB for every track. The samples go through untouched.
+    LevelerConfig neutral;
+    neutral.autoLevel = false;
+    neutral.fallbackGainDb = 0;
+    neutral.maxGainDb = 0;
+    return StartLeveler(journal, neutral, true);
 }
 
 }  // namespace atmos::hooks

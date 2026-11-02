@@ -14,6 +14,7 @@
 
 #include "../src/core/audio/analysis.hpp"
 #include "../src/core/audio/audio_engine.hpp"
+#include "../src/core/audio/audio_share.hpp"
 #include "../src/core/audio/equalizer.hpp"
 #include "../src/core/color_extract.hpp"
 #include "../extensions/atmos-leveler/gain_ramp.hpp"
@@ -490,4 +491,93 @@ TEST_CASE(ColorExtract_LargeImageIsSampled) {
     std::vector<uint8_t> image = TwoColours(1000, 1000, {10, 200, 30}, {250, 250, 250}, 500);
     auto colors = ampify::ExtractColors(image.data(), image.size(), 1000, 1000);
     CHECK(colors.has_value() && colors->palette.size() == 2);
+}
+
+// --- Sharing with the interface process ---------------------------------------------------------------------
+
+TEST_CASE(AudioShare_AFrameWrittenIsReadWhileFresh) {
+    ampify::audio::SharedAudio block{};
+    CHECK(ampify::audio::ClaimShared(block));
+    CHECK(ampify::audio::ClaimShared(block));  // the other process finds it Ampify's, and uses it too
+    ampify::audio::AnalysisFrame frame;
+    frame.bandsDb = {-10.0f, -20.0f, -30.0f};
+    frame.rms = 0.25f;
+    ampify::audio::WriteSharedFrame(block, frame, {120.0, 0.8}, 1000);
+
+    ampify::audio::SharedAudioReading reading;
+    CHECK(ampify::audio::ReadShared(block, 1100, reading));
+    CHECK(reading.frame.has_value());
+    CHECK(reading.frames == 1);
+    CHECK(reading.frame && reading.frame->bandsDb.size() == 3);
+    CHECK(reading.frame && reading.frame->bandsDb[1] == -20.0f);
+    CHECK_NEAR(reading.tempo.bpm, 120.0, 1e-9);
+    CHECK(!reading.volume.has_value());  // never seen
+
+    // A frame older than 300 ms means the music stopped: no frame, the count stays.
+    CHECK(ampify::audio::ReadShared(block, 1400, reading));
+    CHECK(!reading.frame.has_value());
+    CHECK(reading.frames == 1);
+}
+
+TEST_CASE(AudioShare_TheStatusCarriesTheVolumeAndTheLoudness) {
+    ampify::audio::SharedAudio block{};
+    ampify::audio::ClaimShared(block);
+    ampify::audio::WriteSharedStatus(block, 0.62, {-14.0, -15.5}, 5000);
+    ampify::audio::SharedAudioReading reading;
+    CHECK(ampify::audio::ReadShared(block, 5200, reading));
+    CHECK(reading.volume && *reading.volume == 0.62);
+    CHECK(reading.loudness.momentary && *reading.loudness.momentary == -14.0);
+    CHECK(ampify::audio::ReadShared(block, 7000, reading));
+    CHECK(!reading.loudness.momentary.has_value());  // stale after 1.5 s
+    CHECK(reading.volume && *reading.volume == 0.62);  // the volume stays known
+}
+
+TEST_CASE(AudioShare_TheInterfaceDemandLastsTwoSeconds) {
+    ampify::audio::SharedAudio block{};
+    ampify::audio::ClaimShared(block);
+    CHECK(!ampify::audio::SharedWanted(block, 10));
+    ampify::audio::DemandShared(block, 1000);
+    CHECK(ampify::audio::SharedWanted(block, 2900));
+    CHECK(!ampify::audio::SharedWanted(block, 3100));
+}
+
+TEST_CASE(AudioShare_TheVolumeAsksForTheHooksAlone) {
+    ampify::audio::SharedAudio block{};
+    ampify::audio::ClaimShared(block);
+    ampify::audio::DemandSound(block, 1000);
+    CHECK(ampify::audio::SoundWanted(block, 2900));
+    CHECK(!ampify::audio::SharedWanted(block, 2900));  // no analysis for a volume
+    CHECK(!ampify::audio::SoundWanted(block, 3100));
+    ampify::audio::DemandShared(block, 5000);
+    CHECK(ampify::audio::SoundWanted(block, 6000));  // the analysis needs the hooks too
+}
+
+TEST_CASE(AudioShare_ABlockOfAnotherLayoutIsNotRead) {
+    ampify::audio::SharedAudio block{};
+    block.magic = 0x12345678;
+    CHECK(!ampify::audio::ClaimShared(block));
+    ampify::audio::SharedAudioReading reading;
+    CHECK(!ampify::audio::ReadShared(block, 0, reading));
+}
+
+TEST_CASE(BarMeter_LoudBandsRiseAtOnceAndFallSlowly) {
+    ampify::audio::BarMeter meter(4);
+    std::vector<float> bands(16, -90.0f);
+    bands[0] = bands[1] = -12.0f;  // a kick in the lowest bands
+    meter.Update(&bands, 0.033);
+    CHECK(meter.Levels()[0] > 0.8f);
+    CHECK(meter.Levels()[3] < 0.05f);
+
+    std::vector<float> quiet(16, -90.0f);
+    meter.Update(&quiet, 0.1);
+    CHECK(meter.Levels()[0] > 0.5f);  // still falling
+    meter.Update(nullptr, 0.5);       // paused: every bar goes down
+    CHECK(meter.Levels()[0] < 0.01f);
+}
+
+TEST_CASE(BarMeter_AQuietSongStillFillsTheBars) {
+    ampify::audio::BarMeter meter(2);
+    std::vector<float> bands(16, -48.0f);
+    for (int i = 0; i < 200; i++) meter.Update(&bands, 0.05);  // ten seconds of a quiet passage
+    CHECK(meter.Levels()[0] > 0.8f);
 }

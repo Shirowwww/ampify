@@ -72,7 +72,7 @@ bool TakesDecor(const controls::Panel& panel);
 // The Image of a decor from "path|Stretch" (theme::Decor::image), named for its place.
 controls::Image DecorImageFrom(const std::string& text, th::PseudoElement slot);
 // True when the image is still in the panel, moved back first or last if the app's children moved around it.
-bool KeepDecorInPlace(const controls::UIElementCollection& children, const controls::Image& image,
+bool KeepDecorInPlace(const controls::UIElementCollection& children, const xaml::UIElement& image,
                       th::PseudoElement slot);
 bool OwnsKey(const xaml::ResourceDictionary& resources, const IInspectable& name);
 std::string DescribeStates(const xaml::FrameworkElement& element);

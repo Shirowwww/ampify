@@ -480,7 +480,11 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     if (artworkImage) SampleArtwork(artworkImage);
     std::erase_if(m_watched, [](const auto& entry) { return !entry.second.get(); });
     std::erase_if(m_touched, [](const auto& entry) { return !entry.second.get(); });
-    std::erase_if(m_decors, [](const auto& entry) { return !entry.second.panel.get(); });
+    std::erase_if(m_decors, [this](const auto& entry) {
+        if (entry.second.panel.get()) return false;
+        m_bars.Drop(entry.second.image);
+        return true;
+    });
     for (auto it = m_hoverHandlers.begin(); it != m_hoverHandlers.end();) {
         if (it->second.element.get()) {
             ++it;
@@ -796,9 +800,15 @@ theme::DecorChange XamlTreeBackend::PlaceDecor(theme::NodeId id, theme::PseudoEl
     auto known = m_decors.find(key);
     const bool same = known != m_decors.end() && known->second.decor == decor;
     if (same && KeepDecorInPlace(children, known->second.image, slot)) return theme::DecorChange::Unchanged;
-    controls::Image old{nullptr};  // held until it leaves the panel
+    xaml::FrameworkElement old{nullptr};  // held until it leaves the panel
     if (known != m_decors.end()) old = known->second.image;
-    controls::Image image = DecorImageFrom(decor.image, slot);
+    xaml::FrameworkElement image{nullptr};
+    if (decor.image.starts_with(theme::kBarsContent)) {
+        const wchar_t* name = slot == theme::PseudoElement::Before ? L"AmpifyDecorBefore" : L"AmpifyDecorAfter";
+        image = m_bars.Make(std::stoi(decor.image.substr(theme::kBarsContent.size())), name);
+    } else {
+        image = DecorImageFrom(decor.image, slot);
+    }
     auto imageId = reinterpret_cast<std::uint64_t>(winrt::get_abi(image.as<xaml::DependencyObject>()));
     m_decors[key] = DecorImage{winrt::make_weak(panel), image, imageId, decor};
     WriteDecor(imageId, panel, decor);
@@ -810,6 +820,7 @@ theme::DecorChange XamlTreeBackend::PlaceDecor(theme::NodeId id, theme::PseudoEl
     } else {
         children.Append(image);
     }
+    m_bars.Drop(old);
     // In the tree first: the compositor animates an element that has its visual.
     for (const auto& [property, value] : decor.properties) {
         if (property == "Animation") WriteRaw(imageId, property, value);
@@ -825,11 +836,23 @@ void XamlTreeBackend::WriteDecor(theme::NodeId imageId, const controls::Panel& p
     for (const auto& [property, value] : decor.properties) {
         row = row || property == "Grid.Row" || property == "Grid.RowSpan";
         column = column || property == "Grid.Column" || property == "Grid.ColumnSpan";
-        if (property != "Animation") WriteRaw(imageId, property, value);
+        if (property != "Animation" && property != "Foreground") WriteRaw(imageId, property, value);
     }
-    auto grid = panel.try_as<controls::Grid>();
     xaml::FrameworkElement element{nullptr};
     if (xaml::DependencyObject object = Resolve(imageId)) element = object.try_as<xaml::FrameworkElement>();
+    // `color` paints the bars of bars(n); an image has no colour of its own.
+    auto bars = decor.image.starts_with(theme::kBarsContent) && element ? element.try_as<controls::Grid>() : nullptr;
+    for (const auto& [property, value] : decor.properties) {
+        if (property != "Foreground" || !bars) continue;
+        media::Brush brush{nullptr};
+        if (value.kind == theme::ValueKind::Color) {
+            if (std::optional<ColorValue> color = ColorFromText(value.text)) brush = media::SolidColorBrush(*color);
+        } else if (value.kind == theme::ValueKind::Gradient) {
+            brush = GradientFrom(value.text);
+        }
+        if (brush) m_bars.SetBrush(bars, brush);
+    }
+    auto grid = panel.try_as<controls::Grid>();
     if (!grid || !element) return;
     auto span = [](std::uint32_t count) { return std::max<std::int32_t>(1, static_cast<std::int32_t>(count)); };
     if (!row) controls::Grid::SetRowSpan(element, span(grid.RowDefinitions().Size()));
@@ -841,6 +864,7 @@ theme::DecorChange XamlTreeBackend::RemoveDecor(theme::NodeId id, theme::PseudoE
     if (known == m_decors.end()) return theme::DecorChange::Unchanged;
     DecorImage held = std::move(known->second);  // released at the end of this call, on the interface thread
     m_decors.erase(known);
+    m_bars.Drop(held.image);
     controls::Panel panel = held.panel.get();
     if (!panel) return theme::DecorChange::Refused;
     controls::UIElementCollection children = panel.Children();
