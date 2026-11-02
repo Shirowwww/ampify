@@ -35,8 +35,8 @@ settings.
 <td width="50%" valign="top">
 
 **🧩 Extensions**<br>
-Your Discord status with the cover and buttons, Last.fm scrobbling, a sleep timer, global shortcuts. Each extension
-says which permissions it needs before you switch it on.
+Your Discord status as Music Presence shows it (cover, progress bar, buttons), Last.fm scrobbling, a sleep timer,
+global shortcuts. Each extension says which permissions it needs before you switch it on.
 
 </td>
 </tr>
@@ -85,6 +85,11 @@ not tested, Ampify stays off. Uninstalling puts everything back.
 <sub>16 themes · 6 extensions · 3 snippets · Spicetify <code>color.ini</code> palettes work as they are ·
 [how it compares to Spicetify and Cider](https://shirowwww.github.io/ampify/spicetify-parity.html)</sub>
 </div>
+
+**Included:** Now Playing (Apple's full-screen player with karaoke lyrics) · Atmos leveler · Playback guard, for songs
+Apple Music leaves stuck · Discord presence · Last.fm scrobbler · Sleep timer · Global shortcuts · an animated
+equalizer, a spinning artwork and square corners as snippets. The first three ship with Ampify, the rest are one click
+away in the Marketplace.
 
 ## Install
 
