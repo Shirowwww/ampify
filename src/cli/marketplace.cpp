@@ -252,7 +252,13 @@ int InstallEntry(Context& ctx, const CatalogEntry& entry, bool localCatalog, boo
     if (entry.kind == "theme") {
         ctx.out << "Use it with ampify theme set " << entry.id << ".\n";
     } else {
-        ctx.out << "It is off: run ampify " << entry.kind << " enable " << entry.id << " to turn it on.\n";
+        Settings settings;
+        settings.Load(ctx.kit.Settings().string());
+        if (IsEnabled(settings, entry.kind, entry.id)) {
+            ctx.out << "It stays on.\n";
+        } else {
+            ctx.out << "It is off: run ampify " << entry.kind << " enable " << entry.id << " to turn it on.\n";
+        }
     }
     return 0;
 }

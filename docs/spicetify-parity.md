@@ -113,7 +113,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | Creator (TypeScript, JSX, bundling) | `ampify new`, `dev`, `test`, `build` and `types` (`ampify.d.ts`). There is no TypeScript or JSX compiler | Partial |
 | Wait for the APIs (`setTimeout` loop) | `Ampify.ready`, a promise resolved when the element has started | Done |
 | `Player`: state, track, events | `Ampify.player.state()` and `on(...)`. Read through Apple's player (`AMP.Services.Player`) in `AppleMusic.exe`, activated from Apple's own DLL in 1.1792; SMTC elsewhere | Done |
-| `Player`: play, pause, next, previous, seek | SMTC commands, then media keys. `seek` goes through SMTC only | Partial |
+| `Player`: play, pause, next, previous, seek | SMTC commands, then media keys. `seek` goes through Apple's own player, which ignores the SMTC seek | Done |
 | `Player`: volume | `Ampify.audio.setGainDb`: an internal gain on samples. The slider is never written, so there is no `setVolume` | Different |
 | `Platform.History` (navigation) | `Ampify.ui.navigate(path)` for app pages. No navigation to Apple Music's own pages | Partial |
 | `Platform.Library`, `Platform.Playlists` | Apple Music reads its library through its library agent, with fetch requests in a private format. The permissions `library.read` and `library.write` are reserved | Outside 1.0 |

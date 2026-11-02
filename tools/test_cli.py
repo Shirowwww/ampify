@@ -698,6 +698,19 @@ class Marketplace(AmpifyTestCase):
         self.assertIn("updated", result.stdout)
         self.assertIn('"version": "1.1.0"', self.read("extensions", "demo", "manifest.json"))
 
+    def test_update_of_an_enabled_extension_says_it_stays_on(self):
+        self.assertEqual(self.install("demo").returncode, 0)
+        self.assertEqual(self.ampify("extension", "enable", "demo").returncode, 0)
+        newer_folder = self.write_element("demo", "extension", version="1.1.0", permissions=["storage"])
+        newer_entry, _ = self.entry_for(newer_folder)
+        catalog = self.write_catalog([newer_entry, self.night_entry, self.calm_entry])
+
+        result = self.ampify("update", "demo", "--yes", *self.catalog_option(catalog))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("It stays on", result.stdout)
+        self.assertNotIn("It is off", result.stdout)
+
     def test_broken_element_is_reported_and_not_loaded(self):
         self.assertEqual(self.install("demo").returncode, 0)
         self.ampify("extension", "enable", "demo")
