@@ -21,6 +21,7 @@
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 
+#include "../core/i18n.hpp"
 #include "../core/json.hpp"
 #include "../core/ui_render/probe.hpp"
 #include "../core/ui_render/style.hpp"
@@ -648,9 +649,9 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
         toggle.HorizontalAlignment(xaml::HorizontalAlignment::Right);
         toggle.MinWidth(0);
         controls::Grid::SetColumn(toggle, 1);
-        // Ampify speaks English: without this, Windows names the states in its own language.
-        toggle.OnContent(winrt::box_value(L"On"));
-        toggle.OffContent(winrt::box_value(L"Off"));
+        // The states in Ampify's language (Apple Music's own words in French), not in whatever Windows would pick.
+        toggle.OnContent(winrt::box_value(winrt::to_hstring(i18n::Text("ui.on"))));
+        toggle.OffContent(winrt::box_value(winrt::to_hstring(i18n::Text("ui.off"))));
         grid.Children().Append(label);
         grid.Children().Append(toggle);
         toggle.Toggled([callbacks](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {

@@ -33,7 +33,14 @@ std::string Placeholders(std::string_view pattern);
 // Texts of the kernel and of the Ampify services (tray menu, remote control, Discord, MIDI).
 std::span<const Message> KitMessages();
 
-// Lookup in KitMessages, then Format.
+// The texts people see in one language: French for "fr", English otherwise. A key missing there uses KitMessages.
+std::span<const Message> KitMessagesIn(std::string_view language);
+
+// The language of Text, as two letters ("fr"). The kernel sets it once at start from the Windows locale; "en" before.
+void SetLanguage(std::string_view code);
+const std::string& Language();
+
+// Lookup in the language's table, then in KitMessages, then Format.
 std::string Text(std::string_view key, Args args = {});
 
 // The two-letter language of a locale ("fr-FR" -> "fr", "en_US.UTF-8" -> "en"), in lower case. "en" when the locale

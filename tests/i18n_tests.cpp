@@ -61,6 +61,22 @@ TEST_CASE(I18n_EveryTextIsFilledAndEveryKeyIsUnique) {
     CHECK(help.find("config language") == std::string::npos);  // Ampify is English only
 }
 
+TEST_CASE(I18n_FrenchTextsForWhatPeopleSeeAndEnglishForTheRest) {
+    CheckTable(ampify::i18n::KitMessagesIn("fr"), "kit fr");
+    ampify::i18n::SetLanguage("fr");
+    CHECK(ampify::i18n::Text("ui.on") == "Activé");
+    CHECK(ampify::i18n::Text("page.back") == "Retour");
+    CHECK(ampify::i18n::Text("discord.connected") == "Discord: connected, the presence is shown");  // the log stays English
+    ampify::i18n::SetLanguage("de");
+    CHECK(ampify::i18n::Text("ui.on") == "On");
+    ampify::i18n::SetLanguage("en");
+    CHECK(ampify::i18n::Text("ui.on") == "On");
+    // Every French key is one of the English table, so nothing French goes untranslated back to English by mistake.
+    for (const ampify::i18n::Message& message : ampify::i18n::KitMessagesIn("fr")) {
+        CHECK(ampify::i18n::Lookup(ampify::i18n::KitMessages(), message.key) != message.key);
+    }
+}
+
 TEST_CASE(I18n_CommandLineTextsAreEnglish) {
     CHECK(ampify::cli::Tr("unknownCommand", {{"command", "x"}}) == "unknown command: x");
     CHECK(ampify::cli::Tr("needsId", {{"action", "install"}}) == "install needs an id");

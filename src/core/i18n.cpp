@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <optional>
 
 namespace ampify::i18n {
 
@@ -28,17 +29,49 @@ constexpr Message kKit[] = {
     {"service.off", "{service}: off (setting {setting} is 0)"},
     {"common.yes", "yes"},
     {"common.no", "no"},
+    {"ui.on", "On"},
+    {"ui.off", "Off"},
+    {"ui.close", "Close"},
+    {"page.back", "Back"},
+    {"mods.subtitle", "The extensions installed in Ampify. A change applies right away."},
+    {"mods.openFolder", "Open the Ampify folder"},
+    {"mods.openMarketplace", "Open the Marketplace"},
+    {"mods.toggleHelp", "Turns this extension on or off right away"},
 };
+
+// French texts of what people see (menus, buttons, the Settings card). The log stays in English, so a key missing here
+// falls back to the English text.
+constexpr Message kKitFr[] = {
+    {"tray.previous", "Morceau précédent"},
+    {"tray.next", "Morceau suivant"},
+    {"tray.openKit", "Ouvrir le dossier Ampify"},
+    {"common.yes", "oui"},
+    {"common.no", "non"},
+    {"ui.on", "Activé"},
+    {"ui.off", "Désactivé"},
+    {"ui.close", "Fermer"},
+    {"page.back", "Retour"},
+    {"mods.subtitle", "Les extensions installées dans Ampify. Un changement s'applique tout de suite."},
+    {"mods.openFolder", "Ouvrir le dossier Ampify"},
+    {"mods.openMarketplace", "Ouvrir le Marketplace"},
+    {"mods.toggleHelp", "Active ou désactive cette extension tout de suite"},
+};
+
+std::string g_language = "en";  // set once at start, before any service reads it
+
+std::optional<std::string_view> Find(std::span<const Message> table, std::string_view key) {
+    for (const Message& message : table) {
+        if (message.key == key) return message.text;
+    }
+    return std::nullopt;
+}
 
 bool IsLetter(char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0; }
 
 }  // namespace
 
 std::string_view Lookup(std::span<const Message> table, std::string_view key) {
-    for (const Message& message : table) {
-        if (message.key == key) return message.text;
-    }
-    return key;
+    return Find(table, key).value_or(key);
 }
 
 std::string Format(std::string_view pattern, Args args) {
@@ -88,7 +121,19 @@ std::string Placeholders(std::string_view pattern) {
 
 std::span<const Message> KitMessages() { return kKit; }
 
-std::string Text(std::string_view key, Args args) { return Format(Lookup(KitMessages(), key), args); }
+std::span<const Message> KitMessagesIn(std::string_view language) {
+    if (language == "fr") return kKitFr;
+    return kKit;
+}
+
+void SetLanguage(std::string_view code) { g_language = std::string(code); }
+
+const std::string& Language() { return g_language; }
+
+std::string Text(std::string_view key, Args args) {
+    std::optional<std::string_view> text = Find(KitMessagesIn(g_language), key);
+    return Format(text ? *text : Lookup(KitMessages(), key), args);
+}
 
 std::string LanguageCode(std::string_view locale) {
     bool twoLetters = locale.size() >= 2 && IsLetter(locale[0]) && IsLetter(locale[1]) &&

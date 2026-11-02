@@ -324,6 +324,21 @@ test("the service examples declare exactly the permissions they use", () => {
   }
 });
 
+// Ampify.i18n as the kernel gives it: the texts of `language`, then English, then the key itself.
+function fakeI18n(language) {
+  const tables = {};
+  return {
+    language,
+    define(messages) {
+      for (const [code, table] of Object.entries(messages)) tables[code] = { ...tables[code], ...table };
+    },
+    t(key, values = {}) {
+      const text = tables[language]?.[key] ?? tables.en?.[key] ?? key;
+      return String(text).replace(/\{(\w+)\}/g, (all, name) => (name in values ? String(values[name]) : all));
+    },
+  };
+}
+
 test("now-playing opens Apple's full-screen player from the playback bar", () => {
   const dir = join(examples, "..", "extensions", "now-playing");  // ships with Ampify, in extensions/
   const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
@@ -337,12 +352,21 @@ test("now-playing opens Apple's full-screen player from the playback bar", () =>
     playbar: { addButton: (button) => (need("ui.playbar"), buttons.push(button)) },
     applePlayer: { open: () => (need("ui.fullscreen"), opened++) },
   };
-  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify: { ui } });
+  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify: { ui, i18n: fakeI18n("en") } });
   assert.equal(buttons.length, 1);
+  assert.equal(buttons[0].label, "Now Playing");
   assert.equal(buttons[0].icon, "");
   assert.equal(opened, 0, "nothing opens before the button is clicked");
   buttons[0].onClick();
   assert.equal(opened, 1);
+});
+
+test("now-playing speaks French on a French Windows", () => {
+  const dir = join(examples, "..", "extensions", "now-playing");
+  const buttons = [];
+  const ui = { playbar: { addButton: (button) => buttons.push(button) }, applePlayer: { open: () => {} } };
+  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify: { ui, i18n: fakeI18n("fr") } });
+  assert.equal(buttons[0].label, "À l'écoute");
 });
 
 // ---- The Marketplace page ----------------------------------------------------------------------------------------
@@ -444,6 +468,7 @@ function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = 
       },
     },
     ui: { title: { set: () => {} }, sidebar: { addItem: () => {} }, navigate: () => {} },
+    i18n: fakeI18n("en"),  // the assertions below read the English texts
   };
   const context = { Ampify: ampify };
   runIn(readFileSync(join(examples, "..", "apps", "marketplace", "main.js"), "utf-8"), context);

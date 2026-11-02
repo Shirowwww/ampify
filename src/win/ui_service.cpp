@@ -45,6 +45,7 @@
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Windows.System.h>
 
+#include "../core/i18n.hpp"
 #include "../core/json.hpp"
 #include "../core/ui_render/mods.hpp"
 #include "../core/ui_render/probe.hpp"
@@ -596,13 +597,13 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
     controls::ToggleSwitch toggle;
     if (shared.probe.toggle) toggle.Style(shared.probe.toggle);
     toggle.MinWidth(0);
-    // Ampify speaks English: without this, Windows names the states in its own language.
-    toggle.OnContent(winrt::box_value(L"On"));
-    toggle.OffContent(winrt::box_value(L"Off"));
+    // The states in Ampify's language (Apple Music's own words in French), not in whatever Windows would pick.
+    toggle.OnContent(winrt::box_value(Wide(i18n::Text("ui.on"))));
+    toggle.OffContent(winrt::box_value(Wide(i18n::Text("ui.off"))));
     toggle.VerticalAlignment(xaml::VerticalAlignment::Center);
     toggle.HorizontalAlignment(xaml::HorizontalAlignment::Right);
     Name(toggle, "AMPIFY_ModsToggle_" + mod.id, mod.name);
-    automation::AutomationProperties::SetHelpText(toggle, L"Turns this extension on or off right away");
+    automation::AutomationProperties::SetHelpText(toggle, Wide(i18n::Text("mods.toggleHelp")));
     g_modsUpdating++;
     toggle.IsOn(mod.enabled);
     g_modsUpdating--;
@@ -698,8 +699,8 @@ xaml::FrameworkElement SettingControl(UiService::Shared& shared, const std::stri
         controls::ToggleSwitch toggle;
         if (shared.probe.toggle) toggle.Style(shared.probe.toggle);
         toggle.MinWidth(0);
-        toggle.OnContent(winrt::box_value(L"On"));
-        toggle.OffContent(winrt::box_value(L"Off"));
+        toggle.OnContent(winrt::box_value(Wide(i18n::Text("ui.on"))));
+        toggle.OffContent(winrt::box_value(Wide(i18n::Text("ui.off"))));
         toggle.IsOn(value == "true" || value == "1" || value == "on" || value == "yes");
         toggle.Toggled([owner, id, key = spec.key](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
             try {
@@ -789,14 +790,13 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     controls::TextBlock title = MakeText(L"Ampify", "bodyStrong", false, &shared.probe);
     Name(title, "AMPIFY_ModsTitle");
     titles.Children().Append(title);
-    titles.Children().Append(MakeText(L"The extensions installed in Ampify. A change applies right away.",
-                                      "caption", true, &shared.probe));
+    titles.Children().Append(MakeText(Wide(i18n::Text("mods.subtitle")).c_str(), "caption", true, &shared.probe));
     header.Children().Append(titles);
     controls::Button open;
     if (shared.probe.button) open.Style(shared.probe.button);
-    open.Content(winrt::box_value(L"Open the Ampify folder"));
+    open.Content(winrt::box_value(Wide(i18n::Text("mods.openFolder"))));
     open.VerticalAlignment(xaml::VerticalAlignment::Center);
-    Name(open, "AMPIFY_ModsOpenFolder", "Open the Ampify folder");
+    Name(open, "AMPIFY_ModsOpenFolder", i18n::Text("mods.openFolder"));
     std::filesystem::path kit = shared.kit;
     open.Click([kit](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
@@ -808,9 +808,9 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     controls::Button market;
     if (shared.probe.button) market.Style(shared.probe.button);
     if (controls::ControlTemplate accent = PrimaryButtonTemplate()) market.Template(accent);
-    market.Content(winrt::box_value(L"Open the Marketplace"));
+    market.Content(winrt::box_value(Wide(i18n::Text("mods.openMarketplace"))));
     market.VerticalAlignment(xaml::VerticalAlignment::Center);
-    Name(market, "AMPIFY_ModsOpenMarketplace", "Open the Marketplace");
+    Name(market, "AMPIFY_ModsOpenMarketplace", i18n::Text("mods.openMarketplace"));
     UiModel* model = &shared.model;
     Journal* journal = &shared.journal;
     market.Click([model, journal](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
@@ -970,7 +970,7 @@ controls::Border MakeSurfaceFrame(const std::string& frameName, const std::strin
     close.BorderThickness(xaml::Thickness{0, 0, 0, 0});
     close.VerticalAlignment(xaml::VerticalAlignment::Center);
     Name(close, frameName + "_close", "Close the panel");
-    controls::ToolTipService::SetToolTip(close, winrt::box_value(L"Close"));
+    controls::ToolTipService::SetToolTip(close, winrt::box_value(Wide(i18n::Text("ui.close"))));
     controls::Grid::SetColumn(close, 1);
     header.Children().Append(close);
     body.Children().Append(header);
@@ -1070,6 +1070,8 @@ controls::StackPanel EnsurePanelHost(UiService::Shared& shared, WindowContext& c
     host.VerticalAlignment(xaml::VerticalAlignment::Stretch);
     controls::ScrollViewer scroll;
     scroll.VerticalScrollBarVisibility(controls::ScrollBarVisibility::Auto);
+    scroll.HorizontalScrollMode(controls::ScrollMode::Disabled);
+    scroll.HorizontalScrollBarVisibility(controls::ScrollBarVisibility::Disabled);
     Name(scroll, "AMPIFY_PanelScroll");
     controls::StackPanel stack;
     stack.Spacing(12);
@@ -1275,7 +1277,7 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
                               .try_as<controls::Grid>();
     if (!host) host = controls::Grid();
     Name(host, "AMPIFY_PageHost", "App page");
-    host.Padding(xaml::Thickness{32, 16, 32, 16});
+    host.Padding(xaml::Thickness{32, 16, 16, 16});
     controls::RowDefinition headerRow;
     headerRow.Height(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
     controls::RowDefinition bodyRow;
@@ -1287,18 +1289,28 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
     header.Orientation(controls::Orientation::Horizontal);
     header.Spacing(12);
     header.Margin(xaml::Thickness{0, 0, 0, 16});
+    // An arrow, as Apple Music's own back button; its name stays readable for screen readers and in the tooltip.
     controls::Button back;
-    back.Content(winrt::box_value(L"Back"));
-    Name(back, "AMPIFY_PageHost_back", "Back");
+    controls::FontIcon arrow;
+    arrow.Glyph(L"\xE72B");  // Back, in Segoe Fluent Icons
+    arrow.FontSize(14);
+    back.Content(arrow);
+    controls::ToolTipService::SetToolTip(back, winrt::box_value(winrt::to_hstring(i18n::Text("page.back"))));
+    Name(back, "AMPIFY_PageHost_back", i18n::Text("page.back"));
     controls::TextBlock title = MakeText(L"", "title", false);
     title.VerticalAlignment(xaml::VerticalAlignment::Center);
     header.Children().Append(back);
     header.Children().Append(title);
     host.Children().Append(header);
 
+    // Apple Music's style lets a ScrollViewer scroll sideways, which measured the page wider than the panel and cut its
+    // right column. The right margin keeps the content clear of the scroll bar, which Windows draws over it.
     controls::ScrollViewer scroll;
     controls::Grid::SetRow(scroll, 1);
+    scroll.HorizontalScrollMode(controls::ScrollMode::Disabled);
+    scroll.HorizontalScrollBarVisibility(controls::ScrollBarVisibility::Disabled);
     controls::Border slot;
+    slot.Margin(xaml::Thickness{0, 0, 16, 0});
     scroll.Content(slot);
     host.Children().Append(scroll);
 
@@ -1380,7 +1392,7 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
     dialog.XamlRoot(rootElement.XamlRoot());
     dialog.Title(winrt::box_value(Wide(surface.title.empty() ? surface.elementId : surface.title)));
     dialog.Content(root);
-    dialog.CloseButtonText(L"Close");
+    dialog.CloseButtonText(Wide(i18n::Text("ui.close")));
     dialog.DefaultButton(controls::ContentDialogButton::Close);
     Name(dialog, uirender::ElementName(surface.elementId, surface.nodeId) + "_dialog",
          surface.title.empty() ? surface.elementId : surface.title);
@@ -1493,8 +1505,8 @@ controls::Button MakeFullscreenClose() {
     close.VerticalAlignment(xaml::VerticalAlignment::Top);
     close.Margin(xaml::Thickness{16, 16, 0, 0});
     close.Padding(xaml::Thickness{10, 10, 10, 10});
-    controls::ToolTipService::SetToolTip(close, winrt::box_value(L"Close"));
-    Name(close, "AMPIFY_FullscreenHost_close", "Close");
+    controls::ToolTipService::SetToolTip(close, winrt::box_value(Wide(i18n::Text("ui.close"))));
+    Name(close, "AMPIFY_FullscreenHost_close", i18n::Text("ui.close"));
     return close;
 }
 

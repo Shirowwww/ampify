@@ -16,6 +16,7 @@
 #include "../core/build_signature.hpp"
 #include "../core/extension.hpp"
 #include "../core/extension_loader.hpp"
+#include "../core/i18n.hpp"
 #include "../core/injection_policy.hpp"
 #include "../core/player_watch.hpp"
 #include "../core/journal.hpp"
@@ -137,6 +138,7 @@ DWORD WINAPI KernelMain(LPVOID) {
     // JavaScript elements live in %USERPROFILE%\Ampify\extensions\<id> and apps\<id>. Both processes
     // load them: an element tells them apart with Ampify.process.
     static ampify::WinHost winHost(role == ampify::ProcessRole::AppleMusic ? "ui" : "engine", kit, settings, journal);
+    ampify::i18n::SetLanguage(ampify::i18n::LanguageCode(winHost.Locale()));
     static ampify::ExtensionHost host(journal);
     static ampify::ExtensionLoader loader(host, winHost, journal, kit / "extensions");
     loader.SetAppRoot(kit / "apps");
