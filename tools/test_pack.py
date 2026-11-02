@@ -51,7 +51,7 @@ class PackTests(unittest.TestCase):
         archive = os.path.join(self.tmp, "hello.zip")
         result = pack.pack(EXAMPLE, archive)
         with zipfile.ZipFile(archive) as bundle:
-            self.assertEqual(sorted(bundle.namelist()), ["main.js", "manifest.json"])
+            self.assertEqual(sorted(bundle.namelist()), ["main.js", "manifest.json", "preview.jpg"])
         with open(archive, "rb") as handle:
             self.assertEqual(result["sha256"], hashlib.sha256(handle.read()).hexdigest())
         self.assertEqual(result["id"], "hello-extension")

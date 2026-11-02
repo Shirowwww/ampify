@@ -661,7 +661,7 @@ HoverGrid#SquareLockupContent:hover {
 `@keyframes` describes a movement and `animation` runs it, as in CSS:
 
 ```css
-.lcd-artwork-image {
+.lcd-artwork {
     animation: spin 20s linear infinite;
 }
 
@@ -696,8 +696,9 @@ HoverGrid#SquareLockupContent:hover {
   the state begins. A finite animation ends on the element's own values, or stays on its last frame with `forwards`.
 - `@keyframes` inside `@media` are not read. A snippet can run the `@keyframes` of the active theme.
 - Opacity animates on any element. Some elements refuse an animated transform: the ones Apple Music moves itself (many
-  artworks), and the ones the theme also gives a `transform`. The log says so once per element; put that transform in
-  the stops instead.
+  artworks, such as `.lcd-artwork-image`), and the ones the theme also gives a `transform`. The log says so once per
+  element; animate the element around it (`.lcd-artwork` for the playback bar's artwork), or put that transform in the
+  stops instead.
 - With "Animation effects" turned off in Windows (Settings > Accessibility > Visual effects), animations do not run.
   The setting is read when an animation starts.
 - Removing the theme stops every animation and gives each element its values back.

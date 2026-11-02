@@ -2,11 +2,12 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "square-corners",
   "name": "Square corners",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Example snippet: removes the rounding of buttons and frames, on top of any theme.",
   "translations": {"fr": {"name": "Coins carrés", "description": "Un snippet d'exemple : supprime les angles arrondis des boutons et des cadres, par-dessus n'importe quel thème."}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "resources": "resources.xaml"
 }

@@ -1,13 +1,14 @@
 {
   "$schema": "../../schemas/manifest.schema.json",
   "id": "sleep-timer",
-  "name": "Sleep timer (example)",
-  "version": "0.1.4",
+  "name": "Sleep timer",
+  "version": "0.1.5",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Example to learn from. Pauses playback after a delay, set in minutes, then lets you know.",
-  "translations": {"fr": {"name": "Minuterie de veille (exemple)", "description": "Un exemple pour apprendre. Met la lecture en pause après un délai réglé en minutes, puis vous prévient.", "settings": {"minutes": "Minutes avant la pause"}}},
+  "description": "Pauses the music after a delay set in minutes, counted from when Apple Music opens, and says so at the start.",
+  "translations": {"fr": {"name": "Minuterie de veille", "description": "Met la musique en pause après un délai en minutes, compté depuis l'ouverture d'Apple Music, et le dit au départ.", "settings": {"minutes": "Minutes avant la pause"}}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "main": "main.js",
   "permissions": [
     "player.control",

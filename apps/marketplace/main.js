@@ -45,6 +45,7 @@ Ampify.i18n.define({
     "done.inUseScheme": "{name} in use, {scheme} scheme", "done.appleLook": "Apple Music's own look is back",
     "done.on": "{name} turned on", "done.off": "{name} turned off", "done.removed": "{name} uninstalled",
     "preview": "Preview of {name}",
+    "settingsWhere": "Its settings, when it has some, are in Apple Music's Settings, under Ampify.",
   },
   fr: {
     "tab.theme": "Thèmes", "tab.extension": "Extensions", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.installed": "Installés",
@@ -85,6 +86,7 @@ Ampify.i18n.define({
     "done.inUseScheme": "{name} utilisé, variante {scheme}", "done.appleLook": "Le look d'Apple Music est revenu",
     "done.on": "{name} activé", "done.off": "{name} désactivé", "done.removed": "{name} désinstallé",
     "preview": "Aperçu de {name}",
+    "settingsWhere": "Ses réglages, s'il en a, sont dans les Réglages d'Apple Music, sous Ampify.",
   },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
@@ -191,6 +193,8 @@ function merge(entry, installed) {
     id: source.id,
     kind: source.kind,
     name: translated.name || source.name || source.id,
+    // The catalog's own name: an install that brings a translation does not move the card.
+    sortName: source.name || source.id,
     author: source.author || "",
     version: (installed || entry).version || "",
     description: translated.description || source.description || "",
@@ -216,7 +220,7 @@ function itemsOf(state) {
   const items = state.catalog.map((entry) => merge(entry, copies.get(keyOf(entry))));
   const listed = new Set(state.catalog.map(keyOf));
   installed.filter((item) => !listed.has(keyOf(item))).forEach((item) => items.push(merge(null, item)));
-  return items.sort((a, b) => a.name.localeCompare(b.name));
+  return items.sort((a, b) => a.sortName.localeCompare(b.sortName));
 }
 
 const matches = (item, search) => {
@@ -348,6 +352,7 @@ function Details({ item, activeTheme, scheme, busy, act, back, backLabel, messag
     h(Text, null, item.description),
     item.tags.length ? h(Text, { variant: "caption" }, t("tags", { tags: item.tags.join(", ") })) : null,
     h(Text, { variant: "caption" }, permissionDetails(item)),
+    item.installed && item.kind === "extension" ? h(Text, { variant: "caption" }, t("settingsWhere")) : null,
     item.installed && schemes.length > 1
       ? h(Dropdown, { label: t("scheme"), value: shownScheme(item, active ? scheme : ""), options: schemes, disabled: busy,
                       onChange: (value) => act.use(item, value) })

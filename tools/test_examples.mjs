@@ -720,21 +720,28 @@ function commandAmpify(name, { config = {}, language = "en" } = {}) {
   return world;
 }
 
-test("sleep-timer pauses after its delay, then says so", () => {
+test("sleep-timer says when it will pause, pauses after its delay, then says so", () => {
   const world = commandAmpify("sleep-timer", { config: { minutes: 1 } });
   assert.equal(world.timers.length, 1);
   assert.equal(world.timers[0].ms, 60_000);
   assert.deepEqual(world.commands, [], "nothing pauses before the delay");
+  assert.deepEqual(world.notes, [
+    { title: "Sleep timer", text: "The music pauses in 1 min. Change the delay in Settings, under Ampify." },
+  ]);
   world.timers[0].fn();
   assert.deepEqual(world.commands, ["pause"]);
-  assert.deepEqual(world.notes, [{ title: "Sleep timer", text: "Playback is paused." }]);
+  assert.deepEqual(world.notes.at(-1), { title: "Sleep timer", text: "Playback is paused." });
 });
 
 test("sleep-timer speaks French on a French Windows", () => {
   const world = commandAmpify("sleep-timer", { language: "fr" });
   assert.equal(world.timers[0].ms, 30 * 60_000, "30 minutes by default");
   world.timers[0].fn();
-  assert.deepEqual(world.notes, [{ title: "Minuterie de veille", text: "La lecture est en pause." }]);
+  assert.deepEqual(world.notes, [
+    { title: "Minuterie de veille",
+      text: "La musique se met en pause dans 30 min. Le délai se règle dans les Réglages, sous Ampify." },
+    { title: "Minuterie de veille", text: "La lecture est en pause." },
+  ]);
 });
 
 test("keyboard-skip changes track with its two shortcuts", () => {

@@ -1,15 +1,15 @@
 {
   "$schema": "../../schemas/manifest.schema.json",
   "id": "discord-presence",
-  "name": "Discord presence (example)",
-  "version": "0.2.0",
+  "name": "Discord presence",
+  "version": "0.2.1",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Example to learn from. Your Discord status shows what you listen to: cover, artist, album, progress bar, links and buttons. Turn it on with Discord open. A cover Apple's catalog lacks (your own files) goes to a free host that deletes it within 3 days; this can be turned off.",
+  "description": "Your Discord status shows what you listen to: cover, artist, album, progress bar, links and buttons. Turn it on with Discord open. A cover Apple's catalog lacks (your own files) goes to a free host that deletes it within 3 days; this can be turned off.",
   "translations": {
     "fr": {
-      "name": "Présence Discord (exemple)",
-      "description": "Un exemple pour apprendre. Votre statut Discord montre ce que vous écoutez : pochette, artiste, album, progression, liens et boutons. Activez-le avec Discord ouvert. Une pochette absente du catalogue d'Apple (vos fichiers) passe par un hébergeur gratuit qui l'efface sous 3 jours ; désactivable.",
+      "name": "Présence Discord",
+      "description": "Votre statut Discord montre ce que vous écoutez : pochette, artiste, album, progression, liens et boutons. Activez-le avec Discord ouvert. Une pochette absente du catalogue d'Apple (vos fichiers) passe par un hébergeur gratuit qui l'efface sous 3 jours ; désactivable.",
       "settings": {
         "status-line": "Après « Écoute » dans la liste des membres",
         "show-cover": "Afficher la pochette",
@@ -31,6 +31,7 @@
   },
   "tags": ["example"],
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "main": "main.js",
   "processes": ["engine"],
   "permissions": ["player.read", "storage", "ipc.discord", "network:itunes.apple.com", "network:litterbox.catbox.moe", "network:uguu.se"],

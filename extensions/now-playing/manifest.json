@@ -2,12 +2,13 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "now-playing",
   "name": "Now Playing",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "A button of the playback bar that opens Apple Music's full-screen player over the window, without its title bar.",
   "translations": {"fr": {"name": "À l'écoute", "description": "Un bouton de la barre de lecture qui ouvre le lecteur plein écran d'Apple Music sur la fenêtre, sans sa barre de titre."}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "main": "main.js",
   "permissions": ["ui.fullscreen", "ui.playbar"]
 }

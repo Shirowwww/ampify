@@ -9,6 +9,10 @@
 /* Round, so that it reads as a disc: a square turning shows its corners sweeping around. */
 .lcd-artwork-image {
     corner-radius: 100px;
+}
+
+/* The turn goes on the area around the artwork: Apple Music drives the artwork's own transform and refuses one. */
+.lcd-artwork {
     animation: spin var(--turn) linear infinite;
 }
 
