@@ -15,6 +15,7 @@
 #include "../core/i18n.hpp"
 #include "../core/launch_flags.hpp"
 #include "../core/midi_map.hpp"
+#include "../core/natives/service_flags.hpp"
 #include "../core/remote_protocol.hpp"
 #include "theme_commands.hpp"
 #include "../core/theme/files.hpp"
@@ -257,6 +258,8 @@ int SetElementState(Context& ctx, std::string_view kind, const std::string& id, 
             if (!found->Valid()) return Failure(ctx, Tr("element.invalid", {{"error", found->errors.front()}}));
             for (const std::string& permission : found->manifest->permissions) {
                 permissions += (permissions.empty() ? "" : ", ") + permission;
+                // Switching the element on is the user's consent to the service it needs, as in the Ampify card.
+                if (const char* key = ServiceSettingOf(permission)) settings.Set(key, "1");
             }
         }
     }

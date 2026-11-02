@@ -188,7 +188,7 @@ switching the element on. A function protected by an undeclared permission throw
 | `midi.input` | `Ampify.midi`, inputs of a MIDI controller (setting `midi.enabled`) | [preview] |
 | `ui.tray` | `Ampify.tray`, entries in the menu of the Ampify notification-area icon (setting `tray.enabled`) | [preview] |
 | `fs.output` | `Ampify.fs.writeText`, a text file in the `output\<id>\` folder of Ampify, and nowhere else | [preview] |
-| `network:<host>` | `Ampify.http.get` and `Ampify.http.post`, only to the declared host | [stable] for the mechanism |
+| `network:<host>` | `Ampify.http.get`, `Ampify.http.post` and `Ampify.http.open`, only to the declared host | [stable] for the mechanism |
 | `kit.manage` | `Ampify.kit.run`, which runs `ampify.exe`. Reserved to the Marketplace app that ships with Ampify. The catalog refuses it for any other element | Internal |
 
 [outside 1.0] means the name is reserved in the manifest schema, so a manifest that declares it still loads, but API
@@ -204,7 +204,10 @@ read it back, nor delete it, nor leave that folder.
 
 The Ampify services (Discord presence, notification-area icon, local remote, MIDI) are all **off by default**. Each needs
 an Ampify setting (`discord.enabled`, `tray.enabled`, `remote.enabled`, `midi.enabled`), which only the user changes,
-in addition to the element's permission. An element cannot switch them on.
+in addition to the element's permission. An element cannot switch them on. Switching an element on (Ampify card,
+Marketplace, `ampify extension enable`) turns on the services its permissions need (`ipc.discord`, `ui.tray`,
+`midi.input`): that switch is the user's consent, and the element works at once. Switching it off leaves the services
+on, since another element may use them.
 
 ## 5. The global `Ampify` object
 
@@ -378,7 +381,7 @@ lists. The kernel checks the tree (`src/core/ui_model.cpp`): 8 levels, 300 nodes
 | `text` | `text`, `variant` (`title` 28 px and `subtitle` 20 px, both semibold as in Apple Music's own pages, `body`, `caption`), and the text style below |
 | `button` | `label`, `icon` (SVG), `disabled`, `variant` (`primary`, `secondary`, `tertiary`), `onClick` |
 | `toggle` | `label`, `checked`, `disabled`, `onChange` |
-| `slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange` |
+| `slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange`. Its header shows the label and the value it is on (`Length · 10`) |
 | `textfield` | `label`, `value`, `placeholder`, `disabled`, `onChange` |
 | `dropdown` | `label`, `value`, `disabled`, `onChange`, `children` (some `option`) |
 | `option` | `value`, `label` |
@@ -498,6 +501,7 @@ Ampify.notify({ title, text })                      // permission notifications
 Ampify.keyboard.bind("Ctrl+Alt+L", fn)              // [preview] permission ui.keyboard
 Ampify.http.get(url) -> Promise<{ status, text }>   // [stable] permission network:<host>
 Ampify.http.post(url, body, { headers }) -> Promise<{ status, text }>  // [preview] same rules as get
+Ampify.http.open(url) -> boolean                    // [preview] same rules: shows the page in the browser
 Ampify.crypto.md5(text) -> hexadecimal string       // [preview] for services that sign this way (Last.fm)
 Ampify.uri.parse(text) / Ampify.uri.build(...)      // [stable] music:// and https://music.apple.com links
 Ampify.icons.get(name) -> SVG string                // [preview]
@@ -517,6 +521,10 @@ same rules (https, declared host). A text body is sent as a form (`application/x
 sent as JSON. Only the headers `content-type`, `authorization` and `accept` are accepted, with no line break. The body is
 64 KB at most. Both calls return at once: the request runs off the JavaScript thread, so a slow server does not freeze
 the element's timers or events. An element may have 4 requests in flight; the next call rejects with a `RangeError`.
+
+`Ampify.http.open(url)` shows a page in the user's browser, for a sign-in page such as Last.fm's (the scrobbler example
+uses it). Same rules: https and a declared host. It returns `true` when the browser was asked to show the page, and
+`false` within 10 seconds of the element's last page, or on a host without a browser.
 
 `Ampify.color.fromArtwork(url)` takes an artwork address of Apple Music, such as `track.artwork`: only
 `https://*.mzstatic.com`, Apple's image server, so it needs no network permission. The kernel downloads the image,

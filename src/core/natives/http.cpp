@@ -1,11 +1,15 @@
 // Natives of the module http (src/core/prelude/http.cpp). Permission: network:<host>, for each https host. get goes
-// through Host::HttpGet; post through the optional HttpPostHost (src/core/natives/http.hpp), with the same URL rules.
+// through Host::HttpGet; post through the optional HttpPostHost and open through BrowserHost
+// (src/core/natives/http.hpp), with the same URL rules.
 // The checks run here, on the JavaScript thread; the request runs on the element's HttpWorker and the answer comes
 // back as dispatch.http (ScriptExtension::SubmitHttp).
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <functional>
+#include <map>
+#include <mutex>
 #include <string_view>
 #include <vector>
 
@@ -34,6 +38,7 @@ namespace {
 
 constexpr size_t kMaxPostBody = 64 * 1024;
 constexpr size_t kMaxHeaderValue = 1024;
+constexpr std::chrono::seconds kOpenInterval{10};
 
 // The headers an element may set on a POST. Host, length, cookies and the like stay with the host.
 bool IsAllowedHeader(const std::string& name) {
@@ -111,6 +116,27 @@ struct HttpNatives : ScriptBridge {
             return poster->HttpPost(target, body, headers);
         });
     }
+
+    // native.httpOpen(url): true when the browser shows the page. Within kOpenInterval of the element's last page,
+    // or on a host without a browser, false.
+    AMPIFY_NATIVE(HttpOpen) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        std::optional<std::string> url = CheckedUrl(ctx, ext, argc, argv, &failure);
+        if (!url) return failure;
+        BrowserHost* browser = HostOf(ext).Capability<BrowserHost>();
+        if (!browser) return JS_FALSE;
+        static std::mutex mutex;  // elements run on their own threads
+        static std::map<std::string, std::chrono::steady_clock::time_point> lastOpened;
+        auto now = std::chrono::steady_clock::now();
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            auto last = lastOpened.find(ext->id());
+            if (last != lastOpened.end() && now - last->second < kOpenInterval) return JS_FALSE;
+            lastOpened[ext->id()] = now;
+        }
+        return JS_NewBool(ctx, browser->OpenInBrowser(*url));
+    }
 };
 
 }  // namespace
@@ -118,6 +144,7 @@ struct HttpNatives : ScriptBridge {
 void DefineHttp(api::NativeScope& scope) {
     scope.Function("httpGet", HttpNatives::HttpGet, 1);
     scope.Function("httpPost", HttpNatives::HttpPost, 3);
+    scope.Function("httpOpen", HttpNatives::HttpOpen, 1);
 }
 
 }  // namespace ampify::natives

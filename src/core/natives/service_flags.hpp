@@ -20,6 +20,14 @@ inline bool IsOnText(std::string_view value) {
     return lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes";
 }
 
+// The service setting a permission needs, or null. Remote control has no permission: it is the user's alone.
+inline const char* ServiceSettingOf(std::string_view permission) {
+    if (permission == "ipc.discord") return "discord.enabled";
+    if (permission == "ui.tray") return "tray.enabled";
+    if (permission == "midi.input") return "midi.enabled";
+    return nullptr;
+}
+
 inline bool ServiceEnabled(Host& host, const std::string& key) {
     std::optional<std::string> value = host.ReadSetting(key);
     return value && IsOnText(*value);

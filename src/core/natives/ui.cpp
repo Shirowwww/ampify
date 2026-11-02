@@ -7,6 +7,7 @@
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
+#include "../i18n.hpp"
 #include "../json.hpp"
 #include "../ui_model.hpp"
 
@@ -159,9 +160,15 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiTitle", UiNatives::UiTitle, 1);
 }
 
-// The panel frame, page header and popup of an element show its name until it sets a title of its own.
+// The panel frame, page header and popup of an element show its name, in the display language when the manifest
+// translates it, until it sets a title of its own.
 void StartUi(ScriptExtension& extension) {
-    ScriptBridge::HostOf(&extension).Ui().SetTitle(extension.id(), extension.manifest().name.substr(0, kMaxUiTitle));
+    const Manifest& manifest = extension.manifest();
+    auto translated = manifest.translations.find(i18n::Language());
+    const std::string& name = translated != manifest.translations.end() && !translated->second.name.empty()
+                                  ? translated->second.name
+                                  : manifest.name;
+    ScriptBridge::HostOf(&extension).Ui().SetTitle(extension.id(), name.substr(0, kMaxUiTitle));
 }
 
 // Removes what the element added to the interface when it stops.

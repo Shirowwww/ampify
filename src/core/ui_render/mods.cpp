@@ -8,6 +8,7 @@
 #include "../extension.hpp"
 #include "../json.hpp"
 #include "../manifest.hpp"
+#include "../natives/service_flags.hpp"
 #include "../reload.hpp"
 #include "../settings.hpp"
 #include "../text_util.hpp"
@@ -150,7 +151,19 @@ bool WriteSetting(const fs::path& kit, const std::string& key, const std::string
 
 bool SwitchMod(const fs::path& kit, const std::string& id, bool enabled, std::string& error) {
     if (!IsExtensionTarget(id, error)) return false;
-    if (!WriteSetting(kit, ExtensionHost::SettingKey(id), enabled ? "1" : "0", error)) return false;
+    bool written = Settings::UpdateFile((kit / "settings.txt").string(), [&](Settings& settings) {
+        settings.Set(ExtensionHost::SettingKey(id), enabled ? "1" : "0");
+        if (!enabled) return;
+        // The user switched on an element whose permissions ask for a service: the service goes on with it, so
+        // that the element works at once. An element still cannot turn a service on by itself.
+        for (const Manifest& manifest : ReadManifests(kit / "extensions", ElementKind::Extension)) {
+            if (manifest.id != id) continue;
+            for (const std::string& permission : manifest.permissions) {
+                if (const char* key = ServiceSettingOf(permission)) settings.Set(key, "1");
+            }
+        }
+    }, error);
+    if (!written) return false;
     return AppendReload(kit, (enabled ? "start " : "stop ") + id, error);
 }
 

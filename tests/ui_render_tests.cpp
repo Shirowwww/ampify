@@ -560,6 +560,27 @@ TEST_CASE(UiRender_ModsSwitchWritesTheSettingAndAReloadRequest) {
     CHECK(!SwitchMod(kit, "../x", true, error));
 }
 
+TEST_CASE(UiRender_SwitchingAnElementOnTurnsOnTheServicesItAsksFor) {
+    fs::path kit = FreshKit("mods-services");
+    WriteFile(kit / "extensions" / "presence" / "manifest.json",
+              R"({"id":"presence","name":"Presence","version":"1.0.0","kind":"extension","author":"x",)"
+              R"("description":"Discord.","kitApi":"1.0","main":"main.js","permissions":["ipc.discord","ui.tray"]})");
+    WriteFile(kit / "extensions" / "presence" / "main.js", "");
+    WriteFile(kit / "settings.txt", "tray.enabled = 0\n");
+    std::string error;
+    CHECK(SwitchMod(kit, "presence", true, error));
+    Settings settings;
+    settings.Load((kit / "settings.txt").string());
+    CHECK(settings.GetBool("discord.enabled", false));
+    CHECK(settings.GetBool("tray.enabled", false));
+    CHECK(!settings.GetBool("midi.enabled", false));  // not asked for
+
+    // Switching it off leaves the services as they are: another element may use them.
+    CHECK(SwitchMod(kit, "presence", false, error));
+    settings.Load((kit / "settings.txt").string());
+    CHECK(settings.GetBool("discord.enabled", false));
+}
+
 TEST_CASE(UiRender_ModsCarryTheirDeclaredSettingsAndValues) {
     fs::path kit = FreshKit("mods-settings");
     WriteFile(kit / "extensions" / "clock" / "manifest.json",

@@ -92,6 +92,7 @@ void WinHost::SetEventSink(EventSink sink) { m_services->SetEventSink(std::move(
 
 void* WinHost::QueryCapability(std::string_view name) {
     if (void* found = Offer<HttpPostHost>(name, this)) return found;
+    if (void* found = Offer<BrowserHost>(name, this)) return found;
     if (void* found = Offer<ImageHost>(name, this)) return found;
     // Ampify.player.queue, in both processes: what each one knows of the queue (src/win/player_bridge.*).
     if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
@@ -270,6 +271,14 @@ std::optional<RgbaImage> WinHost::DecodeImage(const std::string& bytes, uint32_t
 
 HttpResponse WinHost::HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) {
     return Send(L"POST", url, body, headers);
+}
+
+bool WinHost::OpenInBrowser(const std::string& url) {
+    // The core has checked the URL: https, a declared host, no user name or port.
+    HINSTANCE result = ShellExecuteW(nullptr, L"open", ToWide(url).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    bool opened = reinterpret_cast<INT_PTR>(result) > 32;
+    m_journal.Write(opened ? "Showed a page in the browser" : "Could not show a page in the browser");
+    return opened;
 }
 
 HttpResponse WinHost::Send(const wchar_t* verb, const std::string& url, const std::string& body,

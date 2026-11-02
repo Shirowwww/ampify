@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 
+#include "../src/core/i18n.hpp"
 #include "../src/core/journal.hpp"
 #include "../src/core/manifest.hpp"
 #include "../src/core/script_extension.hpp"
@@ -157,6 +158,25 @@ TEST_CASE(Interface_ASurfaceCarriesTheElementNameUntilItSetsATitle) {
     auto titled = f.Make("titled", "extension", R"("ui.window")", R"(Ampify.ui.title.set("Other");)");
     CHECK(titled->Start());
     CHECK(f.host.ui.Title("titled") == std::optional<std::string>("Other"));
+}
+
+TEST_CASE(Interface_TheElementNameFollowsTheDisplayLanguage) {
+    Fixture f;
+    const std::string manifest =
+        R"({"id":"translated","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)"
+        R"("description":"Test.","kitApi":"1.0","main":"main.js","translations":{"fr":{"name":"Démo","description":"Essai."}}})";
+    ampify::ManifestResult result = ampify::ParseManifest(manifest, "translated", 1, [](const std::string&) { return true; });
+    CHECK(result.manifest.has_value());
+    if (!result.manifest) return;
+    fs::path dir = fs::temp_directory_path() / "ampify-tests" / "ui-translated";
+    fs::create_directories(dir);
+    std::ofstream(dir / "main.js") << "";
+    std::string before = ampify::i18n::Language();
+    ampify::i18n::SetLanguage("fr");
+    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal);
+    CHECK(element.Start());
+    ampify::i18n::SetLanguage(before);
+    CHECK(f.host.ui.Title("translated") == std::optional<std::string>("Démo"));
 }
 
 TEST_CASE(Interface_StopRemovesWhatTheElementAdded) {

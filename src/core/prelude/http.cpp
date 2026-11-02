@@ -1,4 +1,5 @@
-// Module http: Ampify.http, GET and POST requests to the https hosts that the manifest declares.
+// Module http: Ampify.http, GET and POST requests to the https hosts that the manifest declares, and their pages
+// shown in the browser.
 // Natives: src/core/natives/http.cpp. The request runs off the JavaScript thread: the native returns an id, and the
 // promise resolves when dispatch.http gets the answer, on a later pump.
 
@@ -33,6 +34,10 @@ const char kHttp[] = R"AMPIFYJS(
         if (!headers["content-type"]) headers["content-type"] = "application/x-www-form-urlencoded";
         return native.httpPost(text(url), payload, JSON.stringify(headers));
       });
+    },
+    // Shows the page in the user's browser, for a sign-in page. One page every 10 seconds at most; true if shown.
+    open(url) {
+      return native.httpOpen(text(url));
     },
   };
 

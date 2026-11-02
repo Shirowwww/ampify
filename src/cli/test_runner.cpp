@@ -89,6 +89,7 @@ private:
 // Those services still answer "off" until their setting is on, as in the kernel, so the report shows that line.
 class TestHost : public Host,
                  public HttpPostHost,
+                 public BrowserHost,
                  public DiscordHost,
                  public TrayHost,
                  public MidiHost,
@@ -142,6 +143,10 @@ public:
         Count("network (send): " + url);
         return HttpResponse{200, "{}"};
     }
+    bool OpenInBrowser(const std::string& url) override {
+        Count("browser: " + url);  // counted, not opened
+        return true;
+    }
     bool SetActivity(const std::string&, const std::string&, const discord::Activity&) override {
         Count("discord (presence)");
         return true;
@@ -169,6 +174,7 @@ public:
     }
     void* QueryCapability(std::string_view name) override {
         if (void* found = Offer<HttpPostHost>(name, this)) return found;
+        if (void* found = Offer<BrowserHost>(name, this)) return found;
         if (void* found = Offer<DiscordHost>(name, this)) return found;
         if (void* found = Offer<TrayHost>(name, this)) return found;
         if (void* found = Offer<MidiHost>(name, this)) return found;

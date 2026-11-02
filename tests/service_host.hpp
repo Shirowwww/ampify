@@ -26,7 +26,7 @@
 
 namespace ampify::test {
 
-struct ServiceHost : FakeHost, HttpPostHost, DiscordHost, TrayHost, MidiHost, RemoteHost, OutputFilesHost {
+struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost, MidiHost, RemoteHost, OutputFilesHost {
     struct Post {
         std::string url;
         std::string body;
@@ -39,6 +39,7 @@ struct ServiceHost : FakeHost, HttpPostHost, DiscordHost, TrayHost, MidiHost, Re
     };
 
     std::vector<Post> posts;
+    std::vector<std::string> openedPages;
     HttpResponse postResponse{201, "sent"};
     std::vector<ShownActivity> activities;
     std::vector<std::string> clearedActivities;
@@ -54,6 +55,10 @@ struct ServiceHost : FakeHost, HttpPostHost, DiscordHost, TrayHost, MidiHost, Re
         std::lock_guard<std::mutex> lock(httpMutex);  // called from a worker thread
         posts.push_back({url, body, headers});
         return postResponse;
+    }
+    bool OpenInBrowser(const std::string& url) override {
+        openedPages.push_back(url);
+        return true;
     }
     bool SetActivity(const std::string& elementId, const std::string& clientId,
                      const discord::Activity& activity) override {
@@ -90,6 +95,7 @@ struct ServiceHost : FakeHost, HttpPostHost, DiscordHost, TrayHost, MidiHost, Re
 
     void* QueryCapability(std::string_view name) override {
         if (void* found = Offer<HttpPostHost>(name, this)) return found;
+        if (void* found = Offer<BrowserHost>(name, this)) return found;
         if (void* found = Offer<DiscordHost>(name, this)) return found;
         if (void* found = Offer<TrayHost>(name, this)) return found;
         if (void* found = Offer<MidiHost>(name, this)) return found;

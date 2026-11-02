@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cwchar>
 #include <limits>
 #include <utility>
 
@@ -74,6 +75,16 @@ void SetText(const controls::TextBlock& block, const winrt::hstring& text) {
 void SetVisible(const xaml::UIElement& element, bool visible) {
     xaml::Visibility wanted = visible ? xaml::Visibility::Visible : xaml::Visibility::Collapsed;
     if (element.Visibility() != wanted) element.Visibility(wanted);
+}
+
+// A slider's header: its label (kept in Tag) and the value it is on, which WinUI shows only while dragging.
+void ShowSliderValue(const controls::Slider& slider) {
+    std::wstring label(winrt::unbox_value_or<winrt::hstring>(slider.Tag(), L""));
+    double value = std::round(slider.Value() * 100) / 100;
+    wchar_t number[32];
+    std::swprintf(number, 32, L"%g", value);
+    std::wstring text = label.empty() ? number : label + L" · " + number;
+    slider.Header(winrt::box_value(winrt::hstring(text)));
 }
 
 const wchar_t* TextStyleKey(const std::string& variant) {
@@ -664,8 +675,9 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
     } else if (node.type == "slider") {
         controls::Slider slider;
         if (probe.slider) slider.Style(probe.slider);
-        slider.ValueChanged([callbacks](IInspectable const&, primitives::RangeBaseValueChangedEventArgs const& args) noexcept {
+        slider.ValueChanged([callbacks](IInspectable const& sender, primitives::RangeBaseValueChangedEventArgs const& args) noexcept {
             try {
+                ShowSliderValue(sender.as<controls::Slider>());
                 callbacks->Fire(false, Json(args.NewValue()).Dump());
             } catch (...) {
             }
@@ -1023,8 +1035,8 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
             mounted.callbacks->echo = Json(value).Dump();
             slider.Value(value);
         }
-        std::string label = node.Text("label");
-        slider.Header(label.empty() ? nullptr : winrt::box_value(Wide(label)));
+        slider.Tag(winrt::box_value(Wide(node.Text("label"))));
+        ShowSliderValue(slider);
     } else if (type == "textfield") {
         auto box = control.as<controls::TextBox>();
         winrt::hstring value = Wide(node.Text("value"));

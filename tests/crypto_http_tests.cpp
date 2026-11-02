@@ -87,3 +87,28 @@ TEST_CASE(HttpPost_HostWithoutTheServiceAnswersStatusZero) {
     CHECK(element->Start());
     CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("code 0 sending is not supported by this host"); }));
 }
+
+TEST_CASE(HttpOpen_ShowsADeclaredPageInTheBrowserOnceInAWhile) {
+    ampify::test::ServiceFixture<> f;
+    auto element = f.Make("opener", R"(
+        Ampify.log("first " + Ampify.http.open("https://www.example.org/auth?token=t"));
+        Ampify.log("again " + Ampify.http.open("https://www.example.org/other"));
+        try { Ampify.http.open("https://evil.example/"); } catch (e) { Ampify.log("host " + e.name); }
+        try { Ampify.http.open("http://www.example.org/"); } catch (e) { Ampify.log("plain " + e.name); }
+    )", R"("network:www.example.org")");
+    CHECK(element->Start());
+    CHECK(f.Logged("first true"));
+    CHECK(f.Logged("again false"));  // one page every few seconds: a faulty loop cannot flood the browser
+    CHECK(f.Logged("host PermissionDenied"));
+    CHECK(f.Logged("plain TypeError"));
+    CHECK((f.host.openedPages == std::vector<std::string>{"https://www.example.org/auth?token=t"}));
+}
+
+TEST_CASE(HttpOpen_HostWithoutABrowserAnswersFalse) {
+    ampify::test::ServiceFixture<ampify::test::FakeHost> f;
+    auto element = f.Make("opener-plain", R"(
+        Ampify.log("opened " + Ampify.http.open("https://www.example.org/"));
+    )", R"("network:www.example.org")");
+    CHECK(element->Start());
+    CHECK(f.Logged("opened false"));
+}

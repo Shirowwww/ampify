@@ -230,8 +230,8 @@ class Services(AmpifyTestCase):
 
     def test_examples_of_the_services_run_in_the_engine(self):
         expected = {
-            "discord-presence": "clientId",
-            "scrobbler": "Last.fm is not set up",
+            "discord-presence": "player (read)",
+            "scrobbler": "storage (read)",
         }
         for name, text in expected.items():
             folder = os.path.join(ROOT, "examples", name)
@@ -487,6 +487,17 @@ class Marketplace(AmpifyTestCase):
         self.assertEqual(self.ampify("extension", "disable", "demo").returncode, 0)
         self.ampify("apply")
         self.assertNotIn("extension demo", self.read("active.txt"))
+
+    def test_enable_turns_on_the_services_the_element_asks_for(self):
+        folder = self.write_element("presence", "extension", permissions=["ipc.discord"])
+        entry, _ = self.entry_for(folder)
+        self.assertEqual(self.install("presence", self.write_catalog([entry])).returncode, 0)
+        self.assertNotIn("discord.enabled", self.settings_text())
+
+        enable = self.ampify("extension", "enable", "presence")
+        self.assertEqual(enable.returncode, 0, enable.stderr)
+        self.assertIn("discord.enabled = 1", self.settings_text())
+        self.assertNotIn("tray.enabled", self.settings_text())
 
     def reload_lines(self):
         path = os.path.join(self.kit, "reload.txt")

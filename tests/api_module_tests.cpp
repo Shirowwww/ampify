@@ -97,7 +97,7 @@ const Expected kMembers[] = {
               "presets:f0=presets}}"},
     {"keyboard", "object!{bind:f2=bind}"},
     {"notify", "f1="},
-    {"http", "object!{get:f1=get,post:f2=post}"},  // post added in kitApi 1.x, a compatible addition
+    {"http", "object!{get:f1=get,post:f2=post,open:f1=open}"},  // post and open added in kitApi 1.x, compatible additions
     {"icons", "object!{get:f1=get,names:f0=names}"},
     {"uri", "object!{parse:f1=parse,build:f3=build}"},
     {"color", "object!{extract:f3=extract,fromArtwork:f1=fromArtwork}"},
