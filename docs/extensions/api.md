@@ -299,7 +299,9 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
   (`AMP.Services.Player`). Otherwise (in `AMPLibraryAgent.exe`, or if a new Apple Music version changes the interface) it
   reads the Windows media controls (SMTC). `""` means "state unknown", not "stopped".
 - **Commands** go through SMTC, then through a media key. `play` and `pause` use the play/pause key only if the state is
-  known, so they never do the opposite. `seek` only goes through SMTC. The setting `player.appleCommands = true` makes
+  known, so they never do the opposite. `seek` goes through Apple's player (`IPlayer.SetPositionAsync`) whenever it is
+  there, with no setting: Apple Music 1.1792 answers the SMTC seek but does not move. The setting
+  `player.appleCommands = true` makes
   `play`, `pause`, `next` and `previous` go through Apple's player first. A command that is already done (`play` while
   playing) answers `true` and sends nothing.
 - **The queue.** `list()` gives Apple's queue as its "Up Next" panel shows it, section by section: `section` is
@@ -831,7 +833,7 @@ Nothing is ruled out for good. Each point stays outside API 1.0 for a specific r
 | `config.get/set`: one key per element, never `enabled` | Done. `get` returns a boolean, number or text according to the default value |
 | `storage.get/set/remove`: a JSON file per element, 1 MB quota | Done. Written through a temporary file then replaced. By default an element runs only in the interface, so one writer at a time |
 | `processes`: `ui`, `engine`, or both | Done. An element of another process is ignored, with a log line |
-| `player.state`, `on`, `play`, `pause`, `toggle`, `next`, `previous`, `seek` | Done. On Windows: Apple's player (`AMP.Services.Player`, in AppleMusic.exe), else SMTC, else media keys (`src/win/player_bridge.*`). Commands go through SMTC, then the key; through Apple's player with `player.appleCommands` |
+| `player.state`, `on`, `play`, `pause`, `toggle`, `next`, `previous`, `seek` | Done. On Windows: Apple's player (`AMP.Services.Player`, in AppleMusic.exe), else SMTC, else media keys (`src/win/player_bridge.*`). Commands go through SMTC, then the key; through Apple's player with `player.appleCommands`, and `seek` always through Apple's player first (moves the song in Apple Music 1.1792) |
 | `player.queue.list`, `add`, `remove` | `list` and `remove` done on Windows through `AMP.Services.PlayQueue`, read and changed on the interface thread; the whole queue once Apple's "Up Next" panel has opened, the current track before. `add` answers `false` with the reason in the log |
 | `audio.setGainDb`: capped by `audio.maxGainDb` (6 dB by default, 12 at most), back to 0 at stop | Done |
 | `notify` (title 120 characters, text 500) | Done. On Windows: a balloon notification (temporary icon, 8 s) and a log line |

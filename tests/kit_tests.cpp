@@ -43,10 +43,18 @@ TEST_CASE(KitLayout_OnlyTheDataFolderCanBeRemovedWholesale) {
 TEST_CASE(KitLayout_TheMarketplaceAndNowPlayingShipWithTheKit) {
     CHECK(ampify::IsBundledElement("apps", "marketplace"));
     CHECK(ampify::IsBundledElement("extensions", "now-playing"));
+    CHECK(ampify::IsBundledElement("extensions", "playback-guard"));
     // A community element, or a bundled id in another folder, is not one of them.
     CHECK(!ampify::IsBundledElement("apps", "lyrics"));
     CHECK(!ampify::IsBundledElement("extensions", "marketplace"));
     CHECK(!ampify::IsBundledElement("themes", "now-playing"));
+}
+
+TEST_CASE(KitLayout_ThePlaybackGuardShipsTurnedOff) {
+    CHECK(ampify::IsOnByDefault("apps", "marketplace"));
+    CHECK(ampify::IsOnByDefault("extensions", "now-playing"));
+    CHECK(!ampify::IsOnByDefault("extensions", "playback-guard"));
+    CHECK(!ampify::IsOnByDefault("extensions", "community-thing"));
 }
 
 TEST_CASE(KitLayout_InstallReplacesTheBundledElementsWithThePackagedOnes) {

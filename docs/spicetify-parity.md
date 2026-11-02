@@ -1,7 +1,30 @@
-# Ampify and Spicetify
+# Ampify, Spicetify and Cider
 
 Ampify aims to offer what Spicetify offers for Spotify: themes, extensions, custom apps, a marketplace and a command
-line. This page compares them feature by feature and says what is done and what is not.
+line. People who want more from Apple Music on Windows also look at Cider, another app built on Apple's web API. This
+page compares the three, then Ampify and Spicetify feature by feature.
+
+## At a glance
+
+| | Ampify | Spicetify | Cider |
+|---|---|---|---|
+| What it is | A mod of the official Apple Music app | A mod of the Spotify app | A separate Apple Music player |
+| Price | Free, GPL v3 | Free, LGPL | Paid |
+| Systems | Windows 10 and 11 | Windows, macOS, Linux | Windows, macOS, Linux |
+| Lossless and Dolby Atmos | Yes, Apple's own player | No (Spotify) | No lossless: Apple's web API does not offer it |
+| Themes | 16, CSS on Apple Music's own controls, with GIFs and settings | Hundreds, free CSS on web pages | Yes, mostly colors |
+| Extensions and apps | JavaScript API, React-style UI, Marketplace | JavaScript API, React, Marketplace | Plugins, Marketplace |
+| Discord, Last.fm | Extensions in the Marketplace | Community extensions | Built in |
+| Full-screen lyrics | Apple's full-screen player, karaoke lyrics | Lyrics Plus | Built in |
+| Audio tools | 10-band equalizer, Atmos leveler, LUFS meter for extensions | None | Equalizer, audio effects |
+| Cast and AirPlay | No | Spotify Connect | Yes |
+| Remote | Local HTTP remote with a token, MIDI | No | Mobile remote app |
+
+In short: Cider is the choice for several systems and casting; Ampify keeps Apple's lossless and Atmos playback and
+goes deeper into how the app looks and what extensions can do. Sources for Cider: [cider.sh](https://cider.sh/learn-more)
+and its [release notes](https://cider.sh/changelogs/client-releases/2.5.0).
+
+## Ampify and Spicetify, feature by feature
 
 Sources for Spicetify: [commands](https://spicetify.app/docs/cli/commands),
 [configuration](https://spicetify.app/docs/customization/config-file),
@@ -16,7 +39,7 @@ for Windows is a native WinUI 3 app. There is no HTML, no CSS and no web bundle 
 Apple Music's package. It injects its kernel at start and acts inside the process. Five mechanisms cover almost
 everything:
 
-1. **Injection and kernel.** The package is started suspended, then the kernel loads into `AppleMusic.exe` and
+1. **Injection and kernel.** A small launcher waits for Apple Music to start, then the kernel loads into `AppleMusic.exe` and
    `AMPLibraryAgent.exe`.
 2. **A JavaScript engine in the kernel.** QuickJS, one instance per element, global object `Ampify`.
 3. **The XAML tree in the process.** The kernel shares the UI process. It reads the app's resources, walks the visual
@@ -45,8 +68,8 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | Spicetify | Ampify | Status |
 |---|---|---|
 | Installer, finds Spotify | `ampify_setup.exe` finds the Apple Music package and copies four files. It does not copy the app | Done |
-| `backup` and `apply` (patch the files) | `ampify launch` starts the app with the kernel injected. No package file is written. `ampify backup` saves settings and elements | Different |
-| `restore` | `ampify restore` starts the app with no kernel. Nothing needs putting back. To uninstall, use Settings > Apps | Done |
+| `backup` and `apply` (patch the files) | `ampify apply` turns on the background launcher, which loads the kernel each time Apple Music starts. No package file is written. `ampify backup` saves settings and elements | Different |
+| `restore` | `ampify restore` turns the launcher off: Apple Music starts with no kernel. Nothing needs putting back. To uninstall, use Settings > Apps | Done |
 | `auto` | `ampify launch` | Done |
 | `config` (read, write) | `ampify config [key] [value]` on `settings.txt`, value checked | Done |
 | `config <list> <item>` and `<item>-` | `ampify extension enable <id>` and `disable <id>`. `ampify config extensions +id` and `-id` also work | Done |
@@ -54,7 +77,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | `watch` | `ampify watch` and `ampify dev <folder>` reload an element or a theme at each save | Done |
 | `refresh`, `watch` (reload what changed) | Extensions reload by themselves (stop, then start). Themes remove and apply again. No Apple Music restart | Done |
 | `update` (Spicetify updates itself, then applies again) | `ampify update` | Done |
-| `enable-devtools` | `ampify devtools` writes the XAML tree to `logs\inspector.txt` and `inspector.json`. There is no WebView2 debug port | Partial |
+| `enable-devtools` | `ampify devtools` asks the running kernel for the XAML tree of the page on screen and waits for it, in `logs\inspector.txt` and `inspector.json`. There is no WebView2 debug port | Partial |
 | `upgrade` | `ampify update` reads the latest GitHub release, checks the published SHA-256 and asks for confirmation | Done |
 | `path`, `config-dir` | `ampify path [name]` and `ampify config --dir` | Done |
 | Restore after a broken update | The kernel turns itself off on an unknown Apple Music version. `ampify versions update` fetches the list of tested versions | Done |
@@ -126,7 +149,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | Spicetify | Ampify | Status |
 |---|---|---|
 | `color.ini` (sections, named colors) | `color.ini` or `colors.ini`, read as it is and translated to Apple Music elements and Fluent brushes ([themes/spicetify.md](themes/spicetify.md)) | Done |
-| `user.css` (free rules) | `user.css`: a CSS subset with XAML type and `x:Name` selectors, `:hover`, `:active`, `:focus`, `:root` variables, gradients, acrylic, transforms, shadows, transitions, `@keyframes` animations, grid placement ([themes/format.md](themes/format.md)). Spotify's own `user.css` cannot apply, since the HTML classes it targets do not exist | Different |
+| `user.css` (free rules) | `user.css`: a CSS subset with XAML type and `x:Name` selectors, `:hover`, `:active`, `:focus`, `:root` variables, gradients, acrylic, transforms, shadows, transitions, `@keyframes` animations, grid placement, `::before` and `::after` images (GIFs animate), text spacing and trimming, `+`, `~` and `:not()` ([themes/format.md](themes/format.md)). Spotify's own `user.css` cannot apply, since the HTML classes it targets do not exist | Different |
 | `theme.js` | The theme's `main.js`, run as an extension while the theme is active | Done |
 | Color schemes (`[Base]`, `[Dark]`) | Sections of `colors.ini`, `theme.scheme`, `auto` (follows Windows) and `theme.schedule` (follows the time) | Done |
 | Theme parts | `theme.parts.*` | Done |
@@ -158,15 +181,15 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 | Snippets (small CSS you switch on) | `kind: snippet`: a `resources.xaml` and an optional `user.css`, `ampify snippet enable <id>` | Done |
 | Marketplace tab in the app | The Marketplace app: a page inside Apple Music that lists the catalog and installs, updates, removes, and picks themes | Done |
 | Install and update | `ampify install <id>` and `ampify update <id>`: SHA-256 checked, permissions shown before activation | Done |
-| Public catalog | [ampify-catalog](https://github.com/Shirowwww/ampify-catalog), schema, validator and human review ([extensions/catalog.md](extensions/catalog.md)). The catalog has few entries so far | Partial |
+| Public catalog | [ampify-catalog](https://github.com/Shirowwww/ampify-catalog), schema, validator and human review ([extensions/catalog.md](extensions/catalog.md)). 25 entries at 1.2, against hundreds for Spicetify | Partial |
 
 ## 7. Developer tools
 
 | Spicetify | Ampify | Status |
 |---|---|---|
 | Developer console | `ampify logs --follow` shows the kernel log and `Ampify.log` | Done |
-| React DevTools | `ampify inspect` prints the XAML tree written by the inspector. There is no live tree | Partial |
-| Creator (project, tests, bundling) | `ampify new <kind>`, `ampify build` (validation, zip, SHA-256) and `ampify test` | Partial |
+| React DevTools | `ampify devtools` then `ampify inspect --tree` print the XAML tree of the page on screen within seconds, with each element's sizes and properties. There is no element picker | Partial |
+| Creator (project, tests, bundling) | `ampify new <kind>`, `ampify build` (validation, zip, SHA-256), `ampify test` and `ampify publish`, which opens the pull request to the catalog | Done |
 | Hot reload while developing | `ampify dev <folder>` | Done |
 | Element tests | `ampify test` runs `main.js` in QuickJS with a fake host. It needs no Apple Music | Done |
 | Editor types | `ampify types` writes `ampify.d.ts` | Done |
@@ -214,7 +237,7 @@ License and DRM hosts would never be on that list. Status: outside 1.0.
 |---|---|---|
 | Atmos leveler | Built-in extension: a gain on the samples that brings Atmos to the stereo level. Passes the automated tests, with a listening check on a PC pending | Done |
 | Equalizer | `Ampify.audio.eq`: 10 bands, presets, applied to the samples in native code | Done |
-| LUFS meter | `Ampify.audio.loudness()`. The standalone tool is in `reference/loudness-meter/` | Partial |
+| LUFS meter | `Ampify.audio.loudness()` | Done |
 | Lyrics | `Ampify.player.lyrics()` and `Ampify.lyrics.current()`: Apple Music's own lyrics, synced by line and by word when Apple times them, with a `lyricschange` event | Done |
 | Discord Rich Presence | `Ampify.discord`, through the local pipe, permission `ipc.discord` | Done |
 | Last.fm and ListenBrainz scrobbling | `Ampify.http` to the declared hosts. Example: `examples/scrobbler` | Done |

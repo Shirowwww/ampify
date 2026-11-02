@@ -244,6 +244,23 @@ The Marketplace opens from the Ampify entry at the bottom of Apple Music's sideb
 sidebar from a list it owns, and adding to the list crashed it: Ampify puts its entries in a small panel that takes the
 place of the sidebar's footer and keeps Apple Music's own separator in it.
 
+## Playback guard
+
+The playback guard (`extensions/playback-guard`) ships with Ampify, turned off: `ampify extension enable
+playback-guard`, or its switch in the Mods page. It runs in `AppleMusic.exe`.
+
+With Lossless Audio on, Apple Music 1.1792 freezes the first song played after it opens at about 15 s, on most cold
+starts (measured on 2 November 2026, with no Ampify kernel loaded and every Windhawk mod off). Apple starts the song
+from a short first file, then moves to the lossless one, and that move fails: the player still says it plays, nothing
+is heard, and pause, play and a jump are ignored. With Lossless Audio off, no song froze. Apple's loader is out of
+reach (it is the protected streaming path), so the guard repairs instead.
+
+It reads Apple's player once a second. A song that plays at a position above 0 that has not moved for 3 s is reloaded:
+next, then previous 0.4 s later, too soon for the next song to be heard. Once the song plays again from its start, the
+guard jumps back to where it froze through Apple's player (`seek`). It repairs a song twice at most. Measured: about
+10 s of silence, most of it Apple loading the song again, then about a second of the song's start before the jump.
+Position 0 is left alone: a song can take that long to load.
+
 ## Now Playing
 
 Now Playing (`extensions/now-playing`) is an extension that ships with Ampify. Its button joins the lyrics and queue

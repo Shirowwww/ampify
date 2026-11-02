@@ -241,10 +241,11 @@ CommandPlan PlanCommand(PlayerCommand command, int64_t seekMs, const PlayerSnaps
             }
             return plan;
         case PlayerCommand::Seek:
-            // IPlayer.SetPositionAsync exists, but the winmd list does not give the type of its position: only SMTC
-            // seeks, with a documented TimeSpan. There is no media key for it.
+            // Apple's IPlayer.SetPositionAsync first: Apple Music 1.1792 answers the SMTC one but does not move. There
+            // is no media key for it.
             plan.seekMs = std::max<int64_t>(0, seekMs);
             if (known.durationMs > 0) plan.seekMs = std::min(plan.seekMs, known.durationMs);
+            if (available.apple) add(CommandRoute::Apple);
             if (available.smtc) add(CommandRoute::Smtc);
             return plan;
     }

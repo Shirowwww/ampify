@@ -361,15 +361,18 @@ TEST_CASE(PlayerModel_TheToggleKeyWaitsForAKnownState) {
     CHECK(plan.steps.size() == 1 && plan.steps[0].route == ampify::CommandRoute::Smtc);
 }
 
-TEST_CASE(PlayerModel_SeekGoesThroughSmtcOnlyWithinTheTrack) {
+TEST_CASE(PlayerModel_SeekGoesThroughApplesPlayerThenSmtcWithinTheTrack) {
     ampify::PlayerSnapshot known;
     known.source = "apple";
     known.durationMs = 180'000;
     ampify::CommandPlan plan = ampify::PlanCommand(ampify::PlayerCommand::Seek, 999'999, known, {true, true, true});
-    CHECK(plan.steps.size() == 1 && plan.steps[0].route == ampify::CommandRoute::Smtc);
+    CHECK(plan.steps.size() == 2 && plan.steps[0].route == ampify::CommandRoute::Apple &&
+          plan.steps[1].route == ampify::CommandRoute::Smtc);
     CHECK(plan.seekMs == 180'000);
     CHECK(ampify::PlanCommand(ampify::PlayerCommand::Seek, -5, known, {true, true, true}).seekMs == 0);
-    CHECK(ampify::PlanCommand(ampify::PlayerCommand::Seek, 1000, known, {true, false, true}).steps.empty());
+    plan = ampify::PlanCommand(ampify::PlayerCommand::Seek, 1000, known, {false, true, true});
+    CHECK(plan.steps.size() == 1 && plan.steps[0].route == ampify::CommandRoute::Smtc);
+    CHECK(ampify::PlanCommand(ampify::PlayerCommand::Seek, 1000, known, {false, false, true}).steps.empty());
 }
 
 // ---- Queue model --------------------------------------------------------------------------------------------------

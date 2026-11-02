@@ -43,6 +43,8 @@ struct Fake {
 struct World {
     int unexpected = 0;
     int play = 0, pause = 0, next = 0, previous = 0;
+    int64_t seekTicks = -1;  // the TimeSpan SetPositionAsync received, -1 when never called
+    unsigned char seekScrubbing = 0;
     int handlersAdded = 0, handlersRemoved = 0;
     IUnknown* playerHandler = nullptr;
     bool noItem = false;
@@ -169,6 +171,12 @@ HRESULT STDMETHODCALLTYPE SkipPreviousAsync(Facet*, void** out) {  // slot 16
 }
 HRESULT STDMETHODCALLTYPE SkipNextAsync(Facet*, void** out) {  // slot 17
     ++g.next;
+    *out = &asyncF;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE SetPositionAsync(Facet*, int64_t position, unsigned char scrubbing, void** out) {  // slot 22
+    g.seekTicks = position;
+    g.seekScrubbing = scrubbing;
     *out = &asyncF;
     return S_OK;
 }
@@ -425,6 +433,7 @@ void Build() {
     playerVt.slots[13] = Fn(&PauseAsync);
     playerVt.slots[16] = Fn(&SkipPreviousAsync);
     playerVt.slots[17] = Fn(&SkipNextAsync);
+    playerVt.slots[22] = Fn(&SetPositionAsync);
     notifyVt.slots[6] = Fn(&AddHandler);
     notifyVt.slots[7] = Fn(&RemoveHandler);
 
@@ -654,8 +663,10 @@ TEST_CASE(AmpPlayer_CommandsCallTheirOwnSlotsAndNothingElse) {
     CHECK(player.Command(ampify::PlayerCommand::Pause));
     CHECK(player.Command(ampify::PlayerCommand::Next));
     CHECK(player.Command(ampify::PlayerCommand::Previous));
-    CHECK(!player.Command(ampify::PlayerCommand::Seek));  // SetPositionAsync is never called
-    CHECK(g.play == 1 && g.pause == 1 && g.next == 1 && g.previous == 1);
+    CHECK(g.play == 1 && g.pause == 1 && g.next == 1 && g.previous == 1 && g.seekTicks == -1);
+    // SetPositionAsync(TimeSpan, scrubbing): 100 ns ticks, and a jump rather than a drag of the scrubber.
+    CHECK(player.Command(ampify::PlayerCommand::Seek, 14'000));
+    CHECK(g.seekTicks == 140'000'000 && g.seekScrubbing == 0);
     CHECK(g.unexpected == 0);
 }
 
@@ -752,6 +763,10 @@ TEST_CASE(PlayerBridge_ReadsApplesPlayerAndUsesItsCommandsOnlyWhenAllowed) {
     CHECK(keys.size() == 1 && keys[0] == VK_MEDIA_PLAY_PAUSE);
     CHECK(bridge.Control(ampify::PlayerCommand::Play, 0));  // already playing: nothing sent
     CHECK(keys.size() == 1 && g.play == 0);
+
+    // Seek goes to Apple's player even so: Apple Music ignores the SMTC one.
+    CHECK(bridge.Control(ampify::PlayerCommand::Seek, 14'000));
+    CHECK(g.seekTicks == 140'000'000 && keys.size() == 1);
 
     settings.Set("player.appleCommands", "true");
     CHECK(bridge.Control(ampify::PlayerCommand::Next, 0));

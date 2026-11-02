@@ -10,7 +10,7 @@
 namespace ampify {
 
 // Version shipped in this build. Shown in the uninstall list.
-inline constexpr std::string_view kKitVersion = "1.1.0";
+inline constexpr std::string_view kKitVersion = "1.2.0";
 
 // Folder name under %LOCALAPPDATA%\Programs (the installed kit) and under %USERPROFILE% (the user's data).
 inline constexpr std::string_view kKitFolderName = "Ampify";
@@ -44,6 +44,9 @@ std::vector<std::string_view> BundledElements();
 
 // True for one of BundledElements(): `folder` is "apps" or "extensions", `id` the element's folder name.
 bool IsBundledElement(std::string_view folder, std::string_view id);
+
+// True for a bundled element that is on until the user turns it off; the others wait to be turned on.
+bool IsOnByDefault(std::string_view folder, std::string_view id);
 
 // Copies the bundled elements from <package>\examples into the data folder `kit`, each in place of the copy already
 // there. Returns one line per element left as it was, such as one missing from the package.

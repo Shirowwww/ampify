@@ -1,0 +1,13 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "playback-guard",
+  "name": "Playback guard",
+  "version": "1.1.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Reloads a song that Apple Music leaves stuck at the same second while it says it plays, then goes back to that second.",
+  "translations": {"fr": {"name": "Garde de lecture", "description": "Relance un morceau qu'Apple Music laisse bloqué sur la même seconde alors qu'il dit le lire, puis revient à cette seconde."}},
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": ["player.read", "player.control"]
+}

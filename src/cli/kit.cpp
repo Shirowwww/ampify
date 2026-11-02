@@ -79,7 +79,7 @@ std::vector<InstalledElement> ListInstalled(const KitLayout& kit) {
 
 bool IsEnabled(const Settings& settings, std::string_view kind, std::string_view id) {
     if (kind == "theme") return settings.GetString("theme.active", "") == id;
-    return settings.GetBool(EnabledKey(kind, id), IsBundledElement(FolderOfKind(kind), id));
+    return settings.GetBool(EnabledKey(kind, id), IsOnByDefault(FolderOfKind(kind), id));
 }
 
 void SetEnabled(Settings& settings, std::string_view kind, std::string_view id, bool enabled) {

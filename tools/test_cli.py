@@ -766,7 +766,7 @@ class KitUpdate(AmpifyTestCase):
         with zipfile.ZipFile(archive, "w") as bundle:
             for name in ("ampify.exe", "ampify_launcher.exe", "ampify_kernel.dll"):
                 bundle.writestr(name, f"{name} {version}")
-            for element in ("apps/marketplace", "extensions/now-playing"):  # they ship with the kit
+            for element in ("apps/marketplace", "extensions/now-playing", "extensions/playback-guard"):  # they ship with the kit
                 bundle.writestr(f"examples/{element}/manifest.json", "{}")
         digest = sha256_of(archive)
         sums = os.path.join(bundle_dir, "SHA256SUMS.txt")

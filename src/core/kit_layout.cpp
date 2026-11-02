@@ -17,14 +17,23 @@ bool IsKitDataFolder(std::string_view path) {
     return ToLowerAscii(FileName(path)) == ToLowerAscii(kKitFolderName);
 }
 
+namespace {
+// Ships, but waits for the user: it reloads songs on its own.
+constexpr std::string_view kPlaybackGuard = "extensions/playback-guard";
+}  // namespace
+
 std::vector<std::string_view> BundledElements() {
-    return {"apps/marketplace", "extensions/now-playing"};
+    return {"apps/marketplace", "extensions/now-playing", kPlaybackGuard};
 }
 
 bool IsBundledElement(std::string_view folder, std::string_view id) {
     std::string wanted = std::string(folder) + "/" + std::string(id);
     std::vector<std::string_view> bundled = BundledElements();
     return std::find(bundled.begin(), bundled.end(), wanted) != bundled.end();
+}
+
+bool IsOnByDefault(std::string_view folder, std::string_view id) {
+    return IsBundledElement(folder, id) && std::string(folder) + "/" + std::string(id) != kPlaybackGuard;
 }
 
 std::vector<std::string> InstallBundledElements(const std::filesystem::path& package, const std::filesystem::path& kit) {

@@ -51,9 +51,9 @@ public:
     // while absent (a bounded number of times). nullopt when there are none (yet).
     const std::optional<RawLyrics>& Lyrics() const { return m_lyrics; }
 
-    // Play, Pause, Next, Previous through IPlayer. False for Seek, or when the call fails or does not complete
-    // within 3 s.
-    bool Command(PlayerCommand command);
+    // Play, Pause, Next, Previous and Seek (to `seekMs`) through IPlayer. False when the call fails or does not
+    // complete within 3 s.
+    bool Command(PlayerCommand command, int64_t seekMs = 0);
 
 private:
     void Subscribe(const rt::Ref& object, std::optional<int64_t>& token, rt::Ref& source);

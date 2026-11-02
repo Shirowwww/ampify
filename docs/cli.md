@@ -42,7 +42,7 @@ The "Spicetify" column gives the equivalent.
 | `ampify path <name>` | One path on one line: `kit`, `settings`, `extensions`, `themes`, `apps`, `snippets`, `logs`, `backups`, `app` (Apple Music package), `prefs` (Apple Music preferences). `app` and `prefs` print "not found" when Apple Music is not installed, or outside Windows | `path` |
 | `ampify config --dir` | Opens the Ampify folder in Explorer (`--dry-run` only prints the folder) | `config-dir` |
 | `ampify backup` / `ampify backup list` | Backs up the settings and elements | `backup` |
-| `ampify devtools [on\|off]` | Asks the kernel to write the interface tree to `logs\inspector.txt` (setting `theme.inspect`) | `enable-devtools` |
+| `ampify devtools [on\|off]` | Asks the running kernel to write the interface tree to `logs\inspector.txt` and waits for it (setting `theme.inspect`) | `enable-devtools` |
 | `ampify versions [list]` | Apple Music versions the kernel accepts, and the installed one | none |
 | `ampify versions update` | Downloads the list of tested versions published with the catalog and writes `versions.txt` | restore after an update |
 | `ampify install-kit <version>` | Installs a specific Ampify version, even an older one (SHA-256 checked) | old versions |
@@ -293,9 +293,9 @@ the browser. `--dry-run` runs the checks, prints what it would do, and makes no 
 
 `inspect <folder>` or `inspect <kind> <id>` prints the manifest, the permissions, the activation state (for an installed
 element), and each file with its size and SHA-256. `inspect --tree` prints the last interface tree written by the kernel
-(`logs\inspector.txt`). To ask for a new one, run `ampify devtools`, then start Apple Music with `ampify launch`. The kernel
-writes the tree on its next pass and sets `theme.inspect` back to `0`. This needs a kernel built with the XAML theme engine
-(the MSVC build). Without it, no file is written.
+(`logs\inspector.txt`). To ask for a new one, run `ampify devtools` while Apple Music is open: the kernel writes the tree
+within a few seconds and sets `theme.inspect` back to `0`, and `devtools` waits for it (up to 10 seconds), so the next
+`ampify inspect --tree` shows the page you are on. With Apple Music closed, the tree is written when it next starts.
 
 `dev <folder>` validates the element, backs up Ampify if the element is already in it, switches it on, then copies it to
 Ampify at each change of the folder. Each copy writes `active.txt` and a line `restart <id>` in `reload.txt` (`restart

@@ -1033,3 +1033,84 @@ test("react-panel speaks French on a French Windows", () => {
   buttonIn(page.tree, "Ajouter un").onClick();
   assert.ok(textsOf(page.tree).includes("Clics : 1"));
 });
+
+// A player whose position the test moves, with a clock the test advances: setInterval and setTimeout both run on it.
+function fakeGuard() {
+  const dir = join(examples, "..", "extensions", "playback-guard");  // ships with Ampify, in extensions/
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+  const granted = new Set(manifest.permissions ?? []);
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+  };
+  const world = { now: 0, timers: [], commands: [], logs: [], state: { playing: false, positionMs: 0, durationMs: 0, track: null } };
+  const command = (name) => (...args) => (need("player.control"), world.commands.push([name, ...args].join(" ")), true);
+  const ampify = {
+    log: (message) => world.logs.push(String(message)),
+    player: {
+      state: () => (need("player.read"), structuredClone(world.state)),
+      next: command("next"),
+      previous: command("previous"),
+      seek: command("seek"),
+    },
+  };
+  const later = (repeat) => (fn, ms) => world.timers.push({ fn, ms, due: world.now + ms, repeat });
+  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify: ampify, setInterval: later(true), setTimeout: later(false) });
+  // Moves time forward one second at a time; a playing song advances unless the test froze it.
+  const run = (seconds, { frozen = false } = {}) => {
+    for (let i = 0; i < seconds; i++) {
+      world.now += 1000;
+      if (world.state.playing && !frozen) world.state.positionMs += 1000;
+      for (const timer of [...world.timers]) {
+        if (timer.due > world.now) continue;
+        timer.fn();
+        if (timer.repeat) timer.due += timer.ms;
+        else world.timers.splice(world.timers.indexOf(timer), 1);
+      }
+    }
+  };
+  return { world, run };
+}
+
+const rollout = (positionMs = 0) => playing({ ...song("t-rollout", "Rollout", "Artist"), queueItemId: "q1" }, 180_000, positionMs);
+const other = () => playing({ ...song("t-other", "Other", "Artist"), queueItemId: "q2" }, 180_000, 0);
+
+test("playback-guard reloads a song frozen while playing, then sends that song back where it froze", () => {
+  const { world, run } = fakeGuard();
+  world.state = rollout();
+  run(14);
+  assert.deepEqual(world.commands, [], "a song that plays is left alone");
+
+  run(5, { frozen: true });
+  assert.deepEqual(world.commands, ["next", "previous"]);
+  assert.match(world.logs.join("\n"), /Rollout.*14 s/);
+
+  world.state = other();  // the next song, for a moment
+  run(1);
+  world.state = { ...rollout(0), track: { ...rollout().track, queueItemId: "q7" } };  // back, with a new queue entry
+  run(2);
+  assert.deepEqual(world.commands, ["next", "previous", "seek 14000"]);
+  assert.match(world.logs.join("\n"), /back to 14 s \(sent\)/);
+});
+
+test("playback-guard never sends another song to where the frozen one stopped", () => {
+  const { world, run } = fakeGuard();
+  world.state = rollout(14_000);
+  run(5, { frozen: true });
+  world.state = other();
+  run(25);
+  assert.deepEqual(world.commands, ["next", "previous"]);
+  assert.match(world.logs.join("\n"), /did not play again/);
+});
+
+test("playback-guard leaves a paused song, a loading song and a song it already repaired twice", () => {
+  const { world, run } = fakeGuard();
+  world.state = { ...rollout(30_000), playing: false };
+  run(20, { frozen: true });
+  world.state = rollout(0);  // still loading: position 0
+  run(20, { frozen: true });
+  assert.deepEqual(world.commands, []);
+
+  world.state = rollout(14_000);
+  run(120, { frozen: true });
+  assert.equal(world.commands.filter((name) => name === "next").length, 2);
+});

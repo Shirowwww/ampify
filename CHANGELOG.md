@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 (2026-11-02)
+
+### Themes
 
 - Eight new themes after the most used ones on Spicetify: Catppuccin, Comfy, Dracula, Dribbblish, Gruvbox, Nord,
   Rosé Pine and Tokyo Night. Midnight and Rose gold have a look of their own, and Greenroom puts the whole play bar at
@@ -12,7 +14,34 @@
   screen with the taskbar, or the whole screen).
 - The theme's accent reaches every selection mark, link and switch, and leaves with the theme. Extension panels take
   the theme's colours, stay above app pages and no longer cover the window's buttons.
+- Themes and snippets can add images and animated GIFs to Apple Music's elements (`::before` and `::after` with
+  `content: url(...)`), set letter spacing, italics, line height, alignment and trimming, hide an element with
+  `display: none`, and use the selectors `+`, `~`, `:not()`, `:only-child` and `:nth-last-child()`. A property Ampify
+  does not know gets a hint in the log. Three snippets show it: an animated equalizer, a spinning artwork and square
+  corners.
 
+### Extensions and Apple Music
+
+- Seeking goes through Apple Music's own player, which ignores the Windows media seek. A new Playback guard
+  extension, off until you switch it on, reloads a song that Apple Music leaves stuck at the same second.
+- Discord presence shows the cover (local files too), a progress bar, clickable titles and two buttons of your choice.
+  The Last.fm scrobbler and the other examples work out of the box. Extensions can send forms and read the artwork.
+- Closing Apple Music's window can keep it in the notification area (setting `apple.close`).
+- Only one Ampify kernel loads into an Apple Music process, even when two launchers are present.
+
+### Tools
+
+- `ampify publish <folder>` checks an element, uploads it and opens the pull request to the catalog.
+- `ampify devtools` asks the running Apple Music for the element tree of the page on screen and waits for it.
+- `ampify report` writes an anonymised diagnostic report, also offered by a button of the Ampify card.
+- `ampify config` refuses unknown keys and wrong values, and `--dry-run` is honoured by every command that accepts it.
+- The local remote refuses header lines that carry control characters.
+
+### Project
+
+- Ampify is free software under the GPL v3; themes, snippets, extensions and apps made for it keep their own license,
+  and the examples are MIT. A website with a theme gallery, in English and French:
+  [shirowwww.github.io/ampify](https://shirowwww.github.io/ampify/).
 - Elements can carry a French name and description (`translations` in the manifest). The Marketplace and the Ampify
   card in Apple Music's Settings show them on a French Windows. All bundled elements are translated.
 - `ampify theme names <inspector.json>...` replaces `ampify_theme_check --names`, and `ampify theme check` replaces

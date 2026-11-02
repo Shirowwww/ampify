@@ -213,7 +213,9 @@ PlayerSnapshot PlayerBridge::Snapshot() {
 bool PlayerBridge::Control(PlayerCommand command, int64_t seekMs) {
     rt::EnsureMultithreaded();
     RouteAvailability available;
-    available.apple = m_apple->Active() && m_settings.GetBool("player.appleCommands", false);
+    // Seek needs no opt-in: SMTC is the only other route, and Apple Music ignores it there.
+    available.apple = m_apple->Active() &&
+                      (command == PlayerCommand::Seek || m_settings.GetBool("player.appleCommands", false));
     available.smtc = m_smtc->Found();
     available.mediaKeys = true;
     CommandPlan plan = PlanCommand(command, seekMs, m_last, available);
@@ -222,7 +224,7 @@ bool PlayerBridge::Control(PlayerCommand command, int64_t seekMs) {
     for (const CommandStep& step : plan.steps) {
         bool done = false;
         switch (step.route) {
-            case CommandRoute::Apple: done = m_apple->Command(command); break;
+            case CommandRoute::Apple: done = m_apple->Command(command, plan.seekMs); break;
             case CommandRoute::Smtc: done = m_smtc->Command(command, plan.seekMs); break;
             case CommandRoute::MediaKey:
                 switch (step.key) {

@@ -7,6 +7,7 @@
 
 #include "../extension.hpp"
 #include "../json.hpp"
+#include "../kit_layout.hpp"
 #include "../manifest.hpp"
 #include "../natives/service_flags.hpp"
 #include "../reload.hpp"
@@ -111,7 +112,7 @@ std::vector<ModEntry> ListMods(const fs::path& kit) {
 
     for (const Manifest& manifest : ReadManifests(kit / "extensions", ElementKind::Extension)) {
         ModEntry mod = EntryOf(manifest);
-        mod.enabled = settings.GetBool(ExtensionHost::SettingKey(mod.id), false);
+        mod.enabled = settings.GetBool(ExtensionHost::SettingKey(mod.id), IsOnByDefault("extensions", mod.id));
         mod.settings = manifest.settings;
         for (const SettingSpec& spec : mod.settings) {
             mod.values.push_back(settings.GetString("extensions." + mod.id + "." + spec.key, spec.defaultValue));

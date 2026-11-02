@@ -129,9 +129,9 @@ void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadRepo
     ExtensionInfo info;
     info.id = hostId;
     info.name = displayName;
-    // A community element never starts unless the user enables it; one that ships with the kit starts until the user
-    // turns it off.
-    bool byDefault = origin != Origin::Themes && IsBundledElement(isApp ? "apps" : "extensions", id);
+    // A community element never starts unless the user enables it; most that ship with the kit start until the user
+    // turns them off.
+    bool byDefault = origin != Origin::Themes && IsOnByDefault(isApp ? "apps" : "extensions", id);
     // expose_api = 0 keeps every JavaScript element off. An app is switched by apps.<id>.enabled, as `ampify app
     // enable` writes it; an extension by extensions.<id>.enabled.
     if (origin == Origin::Themes) {

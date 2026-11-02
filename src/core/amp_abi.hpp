@@ -110,6 +110,9 @@ inline constexpr int kPlayerPlayAsync = 12;
 inline constexpr int kPlayerPauseAsync = 13;
 inline constexpr int kPlayerSkipPreviousAsync = 16;
 inline constexpr int kPlayerSkipNextAsync = 17;
+// The first SetPositionAsync overload: (TimeSpan position, Boolean scrubbing) -> IAsyncAction. The winmd list gives no
+// parameters; these come from winmdidl run on AMP.Services.winmd 1.1792.
+inline constexpr int kPlayerSetPositionAsync = 22;
 
 // AMP.Services.CommonModels.IPlayerState: get_CanPlay, get_CanPause, ... get_IsMuted, get_IsPaused, get_IsPlaying.
 inline constexpr int kStateIsPaused = 24;
@@ -183,6 +186,7 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.IPlayer", "PauseAsync", slot::kPlayerPauseAsync},
     {"AMP.Services.IPlayer", "SkipPreviousAsync", slot::kPlayerSkipPreviousAsync},
     {"AMP.Services.IPlayer", "SkipNextAsync", slot::kPlayerSkipNextAsync},
+    {"AMP.Services.IPlayer", "SetPositionAsync", slot::kPlayerSetPositionAsync},
     {"AMP.Services.CommonModels.IPlayerState", "get_IsPaused", slot::kStateIsPaused},
     {"AMP.Services.CommonModels.IPlayerState", "get_IsPlaying", slot::kStateIsPlaying},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_Subtitle", slot::kItemSubtitle},

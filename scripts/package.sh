@@ -98,6 +98,8 @@ for id in "${extensions[@]}"; do cp -R "$root/examples/$id" "$pkg/examples/exten
 cp -R "$root/apps/marketplace" "$pkg/examples/apps/"
 # Now Playing too: its button opens Apple Music's full-screen player.
 cp -R "$root/extensions/now-playing" "$pkg/examples/extensions/"
+# And the playback guard, which reloads a song Apple Music leaves frozen.
+cp -R "$root/extensions/playback-guard" "$pkg/examples/extensions/"
 for id in "${themes[@]}"; do cp -R "$root/themes/$id" "$pkg/examples/themes/"; done
 
 # Text for Windows: CRLF, and a BOM on the files people open in Notepad.

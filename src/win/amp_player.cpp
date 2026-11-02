@@ -240,7 +240,7 @@ std::optional<AmpReading> AmpPlayer::Read() {
     return reading;
 }
 
-bool AmpPlayer::Command(PlayerCommand command) {
+bool AmpPlayer::Command(PlayerCommand command, int64_t seekMs) {
     if (!m_player) return false;
     int method = 0;
     switch (command) {
@@ -248,12 +248,15 @@ bool AmpPlayer::Command(PlayerCommand command) {
         case PlayerCommand::Pause: method = slot::kPlayerPauseAsync; break;             // IPlayer.PauseAsync
         case PlayerCommand::Next: method = slot::kPlayerSkipNextAsync; break;           // IPlayer.SkipNextAsync
         case PlayerCommand::Previous: method = slot::kPlayerSkipPreviousAsync; break;   // IPlayer.SkipPreviousAsync
-        case PlayerCommand::Seek: return false;  // SetPositionAsync: the type of its position is not known
+        case PlayerCommand::Seek: method = slot::kPlayerSetPositionAsync; break;        // IPlayer.SetPositionAsync
     }
-    // The winmd list gives the names, not the parameters: these four take none and return an asynchronous action,
-    // which is why player.appleCommands is off by default until the PC confirms them.
+    // The winmd list gives the names, not the parameters: play, pause, next and previous take none and return an
+    // asynchronous action, which is why player.appleCommands is off by default until the PC confirms them.
     rt::Ref operation;
-    HRESULT hr = rt::CallSlot(m_player, method, operation.Put());
+    // A TimeSpan is one Int64 of 100 ns ticks, passed by value; scrubbing false is a jump, not a drag of the scrubber.
+    HRESULT hr = command == PlayerCommand::Seek
+                     ? rt::CallSlot(m_player, method, seekMs * 10'000, static_cast<unsigned char>(0), operation.Put())
+                     : rt::CallSlot(m_player, method, operation.Put());
     if (FAILED(hr)) return false;
     return !operation || rt::Wait(operation, kCommandTimeoutMs);
 }

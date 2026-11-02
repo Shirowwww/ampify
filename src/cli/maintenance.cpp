@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cstdint>
 #include <iterator>
+#include <optional>
+#include <thread>
 
 #include "../core/apple_music.hpp"
 #include "../core/build_signature.hpp"
@@ -23,6 +25,7 @@ namespace {
 
 constexpr std::int64_t kUpdateCheckPeriodSeconds = 24 * 60 * 60;
 constexpr int kUpdateCheckTimeoutSeconds = 10;
+constexpr int kInspectorWaitSeconds = 10;
 
 std::filesystem::path InspectorFile(const KitLayout& kit) { return kit.Journal() / "inspector.txt"; }
 
@@ -58,6 +61,28 @@ UpdateCache ReadUpdateCache(const std::filesystem::path& file) {
     return cache;
 }
 
+std::optional<std::filesystem::file_time_type> WriteTime(const std::filesystem::path& file) {
+    std::error_code ec;
+    auto time = std::filesystem::last_write_time(file, ec);
+    if (ec) return std::nullopt;
+    return time;
+}
+
+// The running kernel reads settings.txt at each pass (about 3 s) and only in the default Ampify folder, so the tree
+// comes back live when Apple Music is open there. Elsewhere there is nothing to wait for.
+bool WaitForInspectorTree(Context& ctx, const std::filesystem::path& file) {
+    if (ctx.kit.Root() != platform::DefaultKitDirectory() || !platform::IsProcessRunning("AppleMusic.exe")) return false;
+    std::optional<std::filesystem::file_time_type> before = WriteTime(file);
+    ctx.out << "Waiting for Apple Music to write the interface tree...\n" << std::flush;
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(kInspectorWaitSeconds);
+    while (std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        std::optional<std::filesystem::file_time_type> now = WriteTime(file);
+        if (now && (!before || *now > *before)) return true;
+    }
+    return false;
+}
+
 }  // namespace
 
 int CmdDevtools(Context& ctx) {
@@ -81,11 +106,15 @@ int CmdDevtools(Context& ctx) {
         ctx.out << "Inspector turned off (theme.inspect = 0).\n";
         return 0;
     }
-    ctx.out << "Inspector turned on (theme.inspect = 1).\n"
-            << "The next time the kernel runs in Apple Music (at its next start), the interface tree is written\n"
-            << "to " << Utf8(InspectorFile(ctx.kit)) << ", then the kernel sets theme.inspect back to 0.\n"
-            << "Show it with: ampify inspect --tree\n"
-            << "This needs a kernel with the XAML theme engine. Without it, no file is written.\n";
+    std::filesystem::path file = InspectorFile(ctx.kit);
+    ctx.out << "Inspector turned on (theme.inspect = 1).\n";
+    if (WaitForInspectorTree(ctx, file)) {
+        ctx.out << "Interface tree written to " << Utf8(file) << ". Show it with: ampify inspect --tree\n";
+        return 0;
+    }
+    ctx.out << "The kernel in Apple Music writes the interface tree within a few seconds, or when Apple Music next\n"
+            << "starts, to " << Utf8(file) << ", then sets theme.inspect back to 0.\n"
+            << "Show it with: ampify inspect --tree\n";
     return 0;
 }
 
