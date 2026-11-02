@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <string_view>
 
 #include "api/module.hpp"
 #include "json.hpp"
@@ -122,6 +123,7 @@ void ScriptExtension::Teardown() {
     m_gainDb = 0;
     m_timers.clear();
     m_moduleState.clear();
+    m_failures.clear();
 }
 
 bool ScriptExtension::CallDispatch(const char* entry, int argc, JSValueConst* argv) {
@@ -132,8 +134,25 @@ bool ScriptExtension::CallDispatch(const char* entry, int argc, JSValueConst* ar
     bool ok = m_runtime->Call(fn, argc, argv, &result, &error) && m_runtime->RunJobs(&error);
     m_runtime->Free(result);
     m_runtime->Free(fn);
-    if (!ok) m_journal.Write("[" + id() + "] " + error);
+    if (!ok) {
+        m_journal.Write("[" + id() + "] " + error);
+        if (std::string_view(entry) != "stop") CountFailure(error);
+    }
     return ok;
+}
+
+// One failure never stops an element, but an element that keeps failing (throwing, out of time or memory) would
+// fill the journal and slow Apple Music: after kTripFailures within kTripWindow, Pump stops it.
+void ScriptExtension::CountFailure(const std::string& error) {
+    if (!m_running) return;  // while main.js runs or the element stops, an error says so in lastError or the journal
+    auto now = m_clock();
+    m_failures.push_back(now);
+    while (!m_failures.empty() && now - m_failures.front() > kTripWindow) m_failures.pop_front();
+    if (m_failures.size() < kTripFailures) return;
+    m_lastError = error;
+    m_journal.Write("[" + id() + "] stopped after " + std::to_string(kTripFailures) + " errors in a minute");
+    m_tripped = true;
+    m_running = false;  // the rest of this Pump dispatches nothing more
 }
 
 void ScriptExtension::Pump() {
@@ -145,7 +164,7 @@ void ScriptExtension::Pump() {
         tasks.swap(m_queue);
     }
     for (auto& task : tasks) {
-        if (!m_running) return;
+        if (!m_running) break;
         task();
     }
 
@@ -157,6 +176,10 @@ void ScriptExtension::Pump() {
         m_timers.erase(m_timers.begin());
         DispatchTimer(timer);
         dispatched++;
+    }
+    if (m_tripped) {
+        m_tripped = false;
+        Stop();
     }
 }
 

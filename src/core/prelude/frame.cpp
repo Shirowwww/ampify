@@ -30,7 +30,7 @@ const char kFrameHead[] = R"AMPIFYJS((function (native) {
     try {
       return fn(...args);
     } catch (error) {
-      native.log("[error] " + where + ": " + describe(error));
+      native.fault("[error] " + where + ": " + describe(error));
     }
     return undefined;
   }

@@ -18,6 +18,15 @@ struct CoreNatives : ScriptBridge {
         return JS_UNDEFINED;
     }
 
+    // native.fault(message): an error the prelude caught in a handler. Logged, and counted towards stopping the element.
+    AMPIFY_NATIVE(Fault) {
+        ScriptExtension* ext = Owner(ctx);
+        std::string message = String(ctx, argc, argv, 0).value_or("");
+        JournalOf(ext).Write("[" + ext->id() + "] " + message);
+        CountFailure(ext, message);
+        return JS_UNDEFINED;
+    }
+
     // native.require(permission): throws PermissionDenied when the manifest does not declare it.
     AMPIFY_NATIVE(Require) {
         ScriptExtension* ext = Owner(ctx);
@@ -31,6 +40,7 @@ struct CoreNatives : ScriptBridge {
 
 void DefineCore(api::NativeScope& scope) {
     scope.Function("log", CoreNatives::Log, 1);
+    scope.Function("fault", CoreNatives::Fault, 1);
     scope.Function("require", CoreNatives::Require, 1);
     scope.String("version", kKernelVersion);
     scope.String("kitApi", kKitApi);

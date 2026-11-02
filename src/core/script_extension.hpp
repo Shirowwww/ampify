@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -79,6 +80,7 @@ private:
     uint32_t SubmitHttp(std::function<HttpResponse()> request);
     void Teardown();
     bool CallDispatch(const char* entry, int argc, JSValueConst* argv);
+    void CountFailure(const std::string& error);
     void DispatchPlayer(const std::string& event, const std::string& stateJson);
     void DispatchKey(const std::string& combo);
     void DispatchClick(int controlId);
@@ -105,9 +107,16 @@ private:
     bool m_accepting = false;  // under m_queueMutex: from the start of main.js to Stop, so an early answer waits its turn
     std::atomic<bool> m_running{false};
     std::string m_lastError;
+    std::deque<std::chrono::steady_clock::time_point> m_failures;  // within kTripWindow, see CountFailure
+    bool m_tripped = false;
     uint32_t m_lastHttpId = 0;
     HttpWorker m_http;  // its threads call Post, so ~ScriptExtension joins them first
 };
+
+// An element that fails this many times within the window is stopped until it is turned on again or Apple Music
+// restarts.
+inline constexpr size_t kTripFailures = 5;
+inline constexpr std::chrono::seconds kTripWindow{60};
 
 // Bytes of storage one element may keep. Above it, storage.set throws a QuotaExceeded error.
 inline constexpr size_t kStorageQuotaBytes = size_t{1} << 20;

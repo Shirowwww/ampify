@@ -60,6 +60,9 @@ Ampify.log(format(settings.title));
   symbolic links.
 - A refused import throws a `ReferenceError` starting with "import refused". A classic script can still call
   `import("./x.js")` under the same rules. Modules share the element's permissions.
+- An error thrown in a handler (a timer, a listener, a click) is written to the log and the other handlers go on. An
+  element that fails 5 times within a minute, including running out of time or memory, is stopped and the log says
+  "stopped after 5 errors in a minute". It starts again when it is turned off and on, or with Apple Music.
 
 ## 4. Permissions
 

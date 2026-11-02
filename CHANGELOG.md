@@ -22,6 +22,8 @@
 - Ampify's descriptions and captions are dimmed like Apple Music's own, so names stand out in the Settings card, the
   Marketplace and extension pages. Page titles use Apple's weight, and panels no longer repeat their name.
 - The JavaScript engine is quickjs-ng 0.18.0.
+- An element that fails 5 times within a minute is stopped, with a line in the log, instead of filling it and slowing
+  Apple Music. The other elements go on.
 
 ## 1.2.1 (2026-11-02)
 

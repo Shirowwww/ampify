@@ -51,6 +51,7 @@ struct ScriptBridge {
     // Kernel services.
     static Host& HostOf(ScriptExtension* ext) { return ext->m_host; }
     static Journal& JournalOf(ScriptExtension* ext) { return ext->m_journal; }
+    static void CountFailure(ScriptExtension* ext, const std::string& error) { ext->CountFailure(error); }
     static uint32_t SubmitHttp(ScriptExtension* ext, std::function<HttpResponse()> request) {
         return ext->SubmitHttp(std::move(request));
     }

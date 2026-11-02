@@ -199,6 +199,31 @@ TEST_CASE(Element_ThrowingTimerDoesNotStopTheOthers) {
     CHECK(element->running());
 }
 
+TEST_CASE(Element_IsStoppedWhenItFailsAgainAndAgain) {
+    Fixture f;
+    auto element = f.Make("breaker", "", R"(setInterval(() => { throw new Error("again"); }, 10);)");
+    CHECK(element->Start());
+    for (int pump = 0; pump < 10 && element->running(); pump++) {
+        f.now += std::chrono::milliseconds(20);
+        element->Pump();
+    }
+    CHECK(!element->running());
+    CHECK(f.Logged("stopped after 5 errors in a minute"));
+    CHECK(element->lastError().find("again") != std::string::npos);
+}
+
+TEST_CASE(Element_KeepsRunningWhenItsErrorsAreFarApart) {
+    Fixture f;
+    auto element = f.Make("rare", "", R"(setInterval(() => { throw new Error("now and then"); }, 30000);)");
+    CHECK(element->Start());
+    for (int pump = 0; pump < 10; pump++) {
+        f.now += std::chrono::seconds(30);
+        element->Pump();
+    }
+    CHECK(element->running());
+    CHECK(!f.Logged("stopped after"));
+}
+
 TEST_CASE(Element_PlayerStateNeedsPlayerRead) {
     Fixture f;
     f.host.player.playing = true;
