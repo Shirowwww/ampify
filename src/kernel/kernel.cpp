@@ -178,7 +178,12 @@ DWORD WINAPI KernelMain(LPVOID) {
             // The player is looked at every 250 ms, and its changes go to the elements that subscribed to them.
             if (++ticks % 5 == 0) {
                 ampify::PlayerSnapshot snapshot = winHost.Player();
-                for (const std::string& event : playerWatcher.Poll(snapshot)) loader.DeliverPlayer(event, snapshot);
+                int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::steady_clock::now().time_since_epoch())
+                                    .count();
+                for (const std::string& event : playerWatcher.Poll(snapshot, nowMs)) {
+                    loader.DeliverPlayer(event, snapshot);
+                }
             }
             if (std::chrono::steady_clock::now() >= nextReload) {
                 ServiceReloadRequests(kit, reload, loader, settings);

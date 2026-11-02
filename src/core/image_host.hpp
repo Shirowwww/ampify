@@ -27,4 +27,20 @@ struct ImageHost {
     virtual std::optional<RgbaImage> DecodeImage(const std::string& bytes, uint32_t maxSide) = 0;
 };
 
+// The optional host service behind Ampify.player.artwork: the cover of what plays now, as the system's media
+// controls hold it (on Windows, the thumbnail of Apple Music's media session), files of one's own included.
+struct ArtworkHost {
+    static constexpr std::string_view kCapabilityName = "player.artwork";
+    virtual ~ArtworkHost() = default;
+
+    struct File {
+        std::string contentType;  // "image/jpeg", "image/png"...
+        std::string bytes;
+    };
+
+    // nullopt when nothing plays or the player gave no cover. Called from a worker thread of the element and may
+    // wait a few seconds.
+    virtual std::optional<File> CurrentArtwork() = 0;
+};
+
 }  // namespace ampify

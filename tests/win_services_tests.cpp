@@ -20,6 +20,7 @@
 #include "../src/win/discord_ipc.hpp"
 #include "../src/win/midi.hpp"
 #include "../src/win/remote_server.hpp"
+#include "../src/win/smtc_session.hpp"
 #include "../src/win/tray.hpp"
 #include "../src/win/win_host.hpp"
 #include "../src/win/win_services.hpp"
@@ -163,6 +164,70 @@ TEST_CASE(WinDiscord_HandshakeThenActivityReachAFakeDiscord) {
     CHECK(command.find(R"("details":"Test title")") != std::string::npos);
     CHECK(command.find(R"("pid":)" + std::to_string(GetCurrentProcessId())) != std::string::npos);
     CHECK(log.str().find("Discord: connected") != std::string::npos);
+}
+
+TEST_CASE(WinDiscord_QuickChangesAreSpacedAndOnlyTheLatestIsSent) {
+    HANDLE server = CreateNamedPipeW(L"\\\\.\\pipe\\ampify-test-discord-spacing-0",
+                                     PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
+                                     PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 4096, 4096, 0, nullptr);
+    CHECK(server != INVALID_HANDLE_VALUE);
+    if (server == INVALID_HANDLE_VALUE) return;
+    std::vector<std::string> commands;
+    std::vector<std::chrono::steady_clock::time_point> times;
+    std::thread fake([&] {
+        if (!ConnectNamedPipe(server, nullptr) && GetLastError() != ERROR_PIPE_CONNECTED) return;
+        ampify::discord::FrameReader reader;
+        if (!ReadFrame(server, reader)) return;
+        WriteFrame(server, ampify::discord::Opcode::Frame, R"({"cmd":"DISPATCH","evt":"READY","data":{"v":1}})");
+        while (auto frame = ReadFrame(server, reader)) {
+            commands.push_back(frame->json);
+            times.push_back(std::chrono::steady_clock::now());
+            std::optional<ampify::Json> parsed = ampify::Json::Parse(frame->json);
+            const ampify::Json* nonce = parsed ? parsed->Find("nonce") : nullptr;
+            WriteFrame(server, ampify::discord::Opcode::Frame,
+                       R"({"cmd":"SET_ACTIVITY","evt":null,"data":{},"nonce":")" +
+                           (nonce && nonce->AsString() ? *nonce->AsString() : std::string()) + "\"}");
+        }
+    });
+
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    {
+        ampify::win::DiscordIpc ipc(journal, L"\\\\.\\pipe\\ampify-test-discord-spacing-", 400ms);
+        auto show = [&](const std::string& title) {
+            ampify::discord::Activity activity;
+            activity.details = title;
+            ipc.Set("123456789012345678", activity);
+        };
+        show("First");
+        CHECK(WaitFor([&] { return ipc.accepted() == 1; }, [] {}));
+        show("Skipped");
+        show("Latest");
+        CHECK(WaitFor([&] { return ipc.accepted() == 2; }, [] {}));
+        std::this_thread::sleep_for(600ms);
+        CHECK(ipc.accepted() == 2);
+    }
+    fake.join();
+    CloseHandle(server);
+
+    CHECK(commands.size() == 2);
+    if (commands.size() == 2) {
+        CHECK(commands[1].find("Latest") != std::string::npos);
+        CHECK(times[1] - times[0] >= 350ms);
+    }
+}
+
+TEST_CASE(WinSmtc_TheThumbnailIsAnImageWhenAppleMusicHasOne) {
+    std::optional<ampify::ArtworkHost::File> file = ampify::win::ReadSmtcThumbnail(3000);
+    if (!file) {
+        std::cout << "WinSmtc: no Apple Music session with a cover, test skipped\n";
+        return;
+    }
+    bool jpeg = file->bytes.rfind("\xFF\xD8\xFF", 0) == 0;
+    bool png = file->bytes.rfind("\x89PNG", 0) == 0;
+    std::cout << "WinSmtc: cover " << file->contentType << ", " << file->bytes.size() << " bytes\n";
+    CHECK(jpeg || png);
+    CHECK(file->contentType.rfind("image/", 0) == 0 && file->contentType.find(',') == std::string::npos);
 }
 
 TEST_CASE(WinDiscord_NoClientMeansARetryLaterNotABlock) {

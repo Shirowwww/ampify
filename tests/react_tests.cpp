@@ -611,6 +611,7 @@ TEST_CASE(React_TopbarButtonsStillGetTheirClicks) {
 
 TEST_CASE(React_TheReactPanelExampleRuns) {
     Fixture f;
+    // The fake host's locale is fr-FR: the panel shows its French texts.
     const std::string name = "react-panel";
     fs::path dir = fs::path(AMPIFY_SOURCE_DIR) / "examples" / name;
     std::ifstream manifestFile(dir / "manifest.json");
@@ -631,18 +632,18 @@ TEST_CASE(React_TheReactPanelExampleRuns) {
     if (!slot) return;
     std::string error;
     CHECK(ampify::ValidateTree(slot->tree, &error));
-    CHECK(FindNode(slot->tree, "title", "Timer") == nullptr);
+    CHECK(FindNode(slot->tree, "title", "Minuteur") == nullptr);
 
-    int plus = CallbackOf(f.host.ui, name, "react-panel", "label", "Add one", "onClick");
+    int plus = CallbackOf(f.host.ui, name, "react-panel", "label", "Ajouter un", "onClick");
     element.DeliverClick(plus);
     element.Pump();
     slot = f.host.ui.Panel(name, "react-panel");
-    CHECK(slot && FindNode(slot->tree, "text", "Clicks: 1") != nullptr);
+    CHECK(slot && FindNode(slot->tree, "text", "Clics : 1") != nullptr);
 
-    int view = CallbackOf(f.host.ui, name, "react-panel", "label", "View", "onChange");
+    int view = CallbackOf(f.host.ui, name, "react-panel", "label", "Affichage", "onChange");
     element.DeliverEvent("change", R"({"id":)" + std::to_string(view) + R"(,"value":"full"})");
     element.Pump();
-    int toggle = CallbackOf(f.host.ui, name, "react-panel", "label", "Turn on", "onChange");
+    int toggle = CallbackOf(f.host.ui, name, "react-panel", "label", "Activer", "onChange");
     CHECK(toggle > 0);
     element.DeliverEvent("change", R"({"id":)" + std::to_string(toggle) + R"(,"value":true})");
     element.Pump();

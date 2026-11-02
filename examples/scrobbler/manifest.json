@@ -2,14 +2,17 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "scrobbler",
   "name": "Last.fm scrobbler (example)",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Example to learn from. Sends the tracks you listen to to Last.fm (scrobbling). Plays that could not be sent wait in storage.",
-  "translations": {"fr": {"name": "Scrobbler Last.fm (exemple)", "description": "Un exemple pour apprendre. Envoie à Last.fm les morceaux que vous écoutez (scrobbling). Les écoutes qui n'ont pas pu partir attendent dans le stockage."}},
+  "description": "Example to learn from. Sends the tracks you listen to to Last.fm (scrobbling). Turn it on, allow Ampify on the Last.fm page that opens, and you are done. Plays that could not be sent wait in storage.",
+  "translations": {"fr": {"name": "Scrobbler Last.fm (exemple)", "description": "Un exemple pour apprendre. Envoie à Last.fm les morceaux que vous écoutez (scrobbling). Activez-le, autorisez Ampify sur la page Last.fm qui s'ouvre, et c'est tout. Les écoutes qui n'ont pas pu partir attendent dans le stockage.", "settings": {"connect": "Connecter mon compte Last.fm"}}},
   "tags": ["example"],
   "kitApi": "1.0",
   "main": "main.js",
   "processes": ["engine"],
-  "permissions": ["player.read", "storage", "network:ws.audioscrobbler.com"]
+  "permissions": ["player.read", "storage", "notifications", "network:ws.audioscrobbler.com", "network:www.last.fm"],
+  "settings": [
+    {"key": "connect", "label": "Connect my Last.fm account", "type": "toggle", "default": true}
+  ]
 }

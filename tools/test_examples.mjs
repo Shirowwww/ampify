@@ -114,6 +114,15 @@ function serviceAmpify(manifest, { config = {}, storage = new Map(), state = nul
     logs: [],
     posts: [],
     postStatus: 200,
+    answers: {},
+    opened: [],
+    gets: [],
+    getAnswer: () => ({ status: 0, text: "" }),
+    forms: [],
+    formAnswer: { status: 0, text: "" },
+    artwork: null,
+    timeouts: [],
+    notes: [],
     activities: [],
     cleared: 0,
     files: new Map(),
@@ -159,11 +168,15 @@ function serviceAmpify(manifest, { config = {}, storage = new Map(), state = nul
         need("player.read");
         world.handlers[event].push(fn);
       },
+      artwork: () => {
+        need("player.read");
+        return Promise.resolve(world.artwork && { ...world.artwork });
+      },
     },
     discord: {
       setActivity: (activity) => {
         need("ipc.discord");
-        world.activities.push(activity);
+        world.activities.push(structuredClone(activity));
         return true;
       },
       clear: () => {
@@ -175,8 +188,32 @@ function serviceAmpify(manifest, { config = {}, storage = new Map(), state = nul
       post: (url, body) => {
         need(`network:${new URL(url).host}`);
         world.posts.push({ url, body });
-        return Promise.resolve({ status: world.postStatus, text: "{}" });
+        // world.answers: the answers of a Last.fm method, given in turn, the last one kept.
+        const queue = world.answers[new URLSearchParams(body).get("method")];
+        const answer = queue ? (queue.length > 1 ? queue.shift() : queue[0]) : { status: world.postStatus, text: "{}" };
+        return Promise.resolve({ ...answer });
       },
+      open: (url) => {
+        need(`network:${new URL(url).host}`);
+        world.opened.push(url);
+        return true;
+      },
+      get: (url) => {
+        need(`network:${new URL(url).host}`);
+        world.gets.push(url);
+        // getAnswer may throw, as Ampify rejects a request when too many are in flight.
+        return Promise.resolve().then(() => ({ ...world.getAnswer(url) }));
+      },
+      postForm: (url, fields) => {
+        need(`network:${new URL(url).host}`);
+        world.forms.push({ url, fields: structuredClone(fields) });
+        const answer = typeof world.formAnswer === "function" ? world.formAnswer(url) : world.formAnswer;
+        return Promise.resolve({ ...answer });
+      },
+    },
+    notify: (note) => {
+      need("notifications");
+      world.notes.push({ ...note });
     },
     crypto: { md5: (value) => createHash("md5").update(String(value), "utf8").digest("hex") },
     fs: {
@@ -211,8 +248,15 @@ function serviceAmpify(manifest, { config = {}, storage = new Map(), state = nul
   const context = {
     Ampify: ampify,
     Date: FakeDate,
-    setInterval: (fn, ms) => world.intervals.push({ fn, ms }),
-    setTimeout: () => {},
+    setInterval: (fn, ms) => world.intervals.push({ fn, ms }) - 1,
+    clearInterval: (id) => {
+      if (world.intervals[id]) world.intervals[id].fn = () => {};
+    },
+    setTimeout: (fn, ms) => world.timeouts.push({ fn, ms }),
+  };
+  // Runs the timeouts set so far, as if their delay had passed.
+  const runTimeouts = () => {
+    for (const { fn } of world.timeouts.splice(0)) fn();
   };
   const emit = (event, next) => {
     world.state = next;
@@ -222,7 +266,7 @@ function serviceAmpify(manifest, { config = {}, storage = new Map(), state = nul
     world.now += ms;
     for (const { fn } of world.intervals) fn();
   };
-  return { world, context, emit, tick, storage };
+  return { world, context, emit, tick, storage, runTimeouts };
 }
 
 function runIn(source, context) {
@@ -233,19 +277,102 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 const song = (id, title, artist, album = "Album") => ({ id, title, artist, album, variantId: "", atmos: false, lossless: false });
 const playing = (track, durationMs, positionMs = 0) => ({ playing: true, positionMs, durationMs, track });
 
-test("discord-presence shows the track with a countdown, and clears on pause", () => {
+// What the iTunes Search API answers for "Artist Title": a near miss first, then the track.
+const itunes = (overrides = {}) => ({
+  status: 200,
+  text: JSON.stringify({
+    results: [
+      { trackName: "Title", artistName: "Someone Else", collectionName: "Album", trackId: 9 },
+      {
+        trackName: "Title (Remastered)", artistName: "Artist", collectionName: "Album", trackId: 42,
+        artworkUrl100: "https://is1-ssl.mzstatic.com/image/thumb/a/100x100bb.jpg",
+        trackViewUrl: "https://music.apple.com/us/album/album/1?i=42",
+        artistViewUrl: "https://music.apple.com/us/artist/artist/7",
+        collectionViewUrl: "https://music.apple.com/us/album/album/1",
+        ...overrides,
+      },
+    ],
+  }),
+});
+
+test("discord-presence prefers the exact title to a remix of the same album", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest);
+  const remix = { trackName: "Flame (Club Remix)", artistName: "Artist", collectionName: "Flame - Single", trackId: 5 };
+  const original = { trackName: "Flame", artistName: "Artist", collectionName: "Other", trackId: 6 };
+  fake.world.getAnswer = () => ({ status: 200, text: JSON.stringify({ results: [remix, original] }) });
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Flame", "Artist", "Flame - Single"), 200_000));
+  await settle();
+  assert.deepEqual(fake.world.activities.at(-1).buttons.at(-1), { label: "song.link", url: "https://song.link/i/6" });
+});
+
+test("discord-presence does not take a longer title for the one playing", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest);
+  const other = { trackName: "Airbourne", artistName: "Artist", collectionName: "Album", trackId: 5 };
+  fake.world.getAnswer = () => ({ status: 200, text: JSON.stringify({ results: [other] }) });
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Air", "Artist"), 200_000));
+  await settle();
+  assert.ok(fake.world.activities.at(-1).buttons.every((button) => button.label !== "song.link"));
+});
+
+test("discord-presence leaves out a button whose link is too long for Discord", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest, { config: { "button-1": "YouTube Music", "button-2": "Spotify" } });
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "é".repeat(120), "Artist"), 200_000));
+  assert.deepEqual(fake.world.activities.at(-1).buttons, []);
+});
+
+test("discord-presence asks again for a track whose request was refused", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest);
+  fake.world.getAnswer = () => {
+    throw new RangeError("too many requests in flight");
+  };
+  runIn(source, fake.context);
+  const track = song("1", "Title", "Artist");
+  fake.emit("trackchange", playing(track, 200_000));
+  await settle();
+  fake.world.getAnswer = () => itunes();
+  fake.world.now += 11 * 60 * 1000;
+  fake.emit("statechange", playing(track, 200_000, 1_000));
+  await settle();
+  assert.equal(fake.world.gets.length, 2);
+  assert.equal(fake.world.activities.at(-1).largeImage, "https://is1-ssl.mzstatic.com/image/thumb/a/600x600bb.jpg");
+});
+
+test("discord-presence shows what is playing as Listening, with the catalog's cover, links and buttons", async () => {
   const { manifest, source } = load("discord-presence");
   const fake = serviceAmpify(manifest, { config: { clientId: "123456789012345678" } });
+  fake.world.getAnswer = () => itunes();
   runIn(source, fake.context);
   assert.equal(fake.world.cleared, 1);  // nothing playing at start
 
   fake.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000, 20_000));
+  const first = fake.world.activities.at(-1);
+  assert.equal(first.type, "listening");
+  assert.equal(first.statusDisplay, "state");
+  assert.equal(first.details, "Title");
+  assert.equal(first.state, "Artist");
+  assert.equal(first.largeText, "Album");
+  assert.equal(first.largeImage, "ampify");  // the cover comes once the catalog answers
+  assert.equal(first.startMs, fake.world.now - 20_000);
+  assert.equal(first.endMs - first.startMs, 200_000);
+  assert.match(fake.world.gets[0], /^https:\/\/itunes\.apple\.com\/search\?.*term=Artist%20Title/);
+
+  await settle();
   const shown = fake.world.activities.at(-1);
-  assert.equal(shown.clientId, "123456789012345678");
-  assert.equal(shown.details, "Title");
-  assert.equal(shown.state, "by Artist");
-  assert.equal(shown.startMs, fake.world.now - 20_000);
-  assert.equal(shown.endMs - shown.startMs, 200_000);
+  assert.equal(shown.largeImage, "https://is1-ssl.mzstatic.com/image/thumb/a/600x600bb.jpg");
+  assert.equal(shown.detailsUrl, "https://music.apple.com/us/album/album/1?i=42");
+  assert.equal(shown.stateUrl, "https://music.apple.com/us/artist/artist/7");
+  assert.equal(shown.largeUrl, "https://music.apple.com/us/album/album/1");
+  assert.deepEqual(shown.buttons, [
+    { label: "Listen on Apple Music", url: "https://music.apple.com/us/album/album/1?i=42" },
+    { label: "song.link", url: "https://song.link/i/42" },
+  ]);
 
   fake.emit("statechange", { ...fake.world.state, playing: false });
   assert.equal(fake.world.cleared, 2);
@@ -253,13 +380,155 @@ test("discord-presence shows the track with a countdown, and clears on pause", (
   assert.equal(fake.world.cleared, 3);
 });
 
-test("discord-presence without a client id only explains what to set", () => {
+test("discord-presence asks the catalog once per track, even after a restart", async () => {
+  const { manifest, source } = load("discord-presence");
+  const storage = new Map();
+  const first = serviceAmpify(manifest, { storage });
+  first.world.getAnswer = () => itunes();
+  runIn(source, first.context);
+  first.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000));
+  first.emit("statechange", playing(song("1", "Title", "Artist"), 200_000, 5_000));
+  await settle();
+  assert.equal(first.world.gets.length, 1);
+
+  const second = serviceAmpify(manifest, { storage });
+  runIn(source, second.context);
+  second.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000));
+  assert.equal(second.world.gets.length, 0);
+  assert.equal(second.world.activities.at(-1).largeImage, "https://is1-ssl.mzstatic.com/image/thumb/a/600x600bb.jpg");
+});
+
+test("discord-presence shows a file of your own with its cover, shared for three days, and search buttons", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest, { config: { "button-2": "YouTube Music" } });
+  fake.world.getAnswer = () => ({ status: 200, text: JSON.stringify({ results: [] }) });
+  fake.world.artwork = { type: "image/jpeg", base64: "/9j/AA==" };
+  fake.world.formAnswer = { status: 200, text: "https://litter.catbox.moe/abc123.jpg" };
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Demo take", "My Band"), 200_000));
+  await settle();
+  const before = fake.world.activities.at(-1);
+  assert.equal(before.largeImage, "ampify");  // until the cover is on the web
+  assert.deepEqual(before.buttons, [
+    { label: "Listen on Apple Music", url: "https://music.apple.com/search?term=My%20Band%20Demo%20take" },
+    { label: "Find on YouTube Music", url: "https://music.youtube.com/search?q=My%20Band%20Demo%20take" },
+  ]);
+
+  fake.runTimeouts();
+  await settle();
+  assert.equal(fake.world.forms.length, 1);
+  assert.equal(fake.world.forms[0].url, "https://litterbox.catbox.moe/resources/internals/api.php");
+  assert.deepEqual(fake.world.forms[0].fields, {
+    reqtype: "fileupload", time: "72h", fileToUpload: { filename: "cover.jpg", type: "image/jpeg", base64: "/9j/AA==" },
+  });
+  const shown = fake.world.activities.at(-1);
+  assert.equal(shown.largeImage, "https://litter.catbox.moe/abc123.jpg");
+  assert.equal(shown.detailsUrl, undefined);
+
+  // Three days later the host has deleted it: it is sent again.
+  fake.world.now += 71 * 3600 * 1000;
+  fake.emit("statechange", playing(song("1", "Demo take", "My Band"), 200_000, 1000));
+  await settle();
+  fake.runTimeouts();
+  await settle();
+  assert.equal(fake.world.forms.length, 2);
+});
+
+test("discord-presence tries the next host when one is down, and sends again sooner", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest);
+  fake.world.getAnswer = () => ({ status: 200, text: JSON.stringify({ results: [] }) });
+  fake.world.artwork = { type: "image/png", base64: "iVBORw==" };
+  fake.world.formAnswer = (url) => (url.startsWith("https://uguu.se/")
+    ? { status: 200, text: JSON.stringify({ success: true, files: [{ url: "https://h.uguu.se/xyz.png" }] }) }
+    : { status: 500, text: "<!doctype html>" });
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Demo take", "My Band"), 200_000));
+  await settle();
+  fake.runTimeouts();
+  await settle();
+  assert.deepEqual(fake.world.forms.map((form) => new URL(form.url).host), ["litterbox.catbox.moe", "uguu.se"]);
+  assert.deepEqual(fake.world.forms[1].fields, {
+    "files[]": { filename: "cover.png", type: "image/png", base64: "iVBORw==" },
+  });
+  assert.equal(fake.world.activities.at(-1).largeImage, "https://h.uguu.se/xyz.png");
+
+  fake.world.now += 3 * 3600 * 1000;  // uguu.se keeps it 3 hours
+  fake.emit("statechange", playing(song("1", "Demo take", "My Band"), 200_000, 1000));
+  await settle();
+  fake.runTimeouts();
+  await settle();
+  assert.equal(fake.world.forms.length, 4);
+});
+
+test("discord-presence keeps covers to itself when sharing is off", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest, { config: { "share-covers": false } });
+  fake.world.getAnswer = () => ({ status: 200, text: JSON.stringify({ results: [] }) });
+  fake.world.artwork = { type: "image/jpeg", base64: "/9j/AA==" };
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Demo take", "My Band"), 200_000));
+  await settle();
+  fake.runTimeouts();
+  await settle();
+  assert.equal(fake.world.forms.length, 0);
+  assert.equal(fake.world.activities.at(-1).largeImage, "ampify");
+});
+
+test("discord-presence does not share the cover of a track that already changed", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest);
+  fake.world.getAnswer = () => ({ status: 200, text: JSON.stringify({ results: [] }) });
+  fake.world.artwork = { type: "image/jpeg", base64: "/9j/AA==" };
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Demo take", "My Band"), 200_000));
+  await settle();
+  fake.world.state = playing(song("2", "Other", "My Band"), 200_000);
+  fake.runTimeouts();
+  await settle();
+  assert.equal(fake.world.forms.length, 0);
+});
+
+test("discord-presence follows the card: status line, cover, album, progress, links, buttons, pause", async () => {
+  const { manifest, source } = load("discord-presence");
+  const config = {
+    "status-line": "Title", "show-cover": false, "show-album": false, "show-progress": false,
+    "clickable-links": false, "show-paused": true, "button-1": "None", "button-2": "song.link",
+  };
+  const fake = serviceAmpify(manifest, { config });
+  fake.world.getAnswer = () => itunes();
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000));
+  await settle();
+  const shown = fake.world.activities.at(-1);
+  assert.equal(shown.statusDisplay, "details");
+  assert.equal(shown.largeImage, "ampify");
+  assert.equal(shown.largeText, "Apple Music");
+  assert.equal(shown.startMs, undefined);
+  assert.equal(shown.detailsUrl, undefined);
+  assert.deepEqual(shown.buttons, [{ label: "song.link", url: "https://song.link/i/42" }]);
+
+  fake.emit("statechange", { ...fake.world.state, playing: false });
+  assert.equal(fake.world.cleared, 1);  // only the one at start
+  assert.equal(fake.world.activities.at(-1).smallText, "Paused");
+  assert.equal(fake.world.activities.at(-1).smallImage, "paused");
+});
+
+test("discord-presence needs nothing set: it goes through Ampify's Discord application", () => {
   const { manifest, source } = load("discord-presence");
   const fake = serviceAmpify(manifest, { language: "en" });
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000));
-  assert.equal(fake.world.activities.length, 0);
-  assert.match(fake.world.logs[0], /Set the id of your Discord application/);
+  assert.equal(fake.world.activities.at(-1).clientId, "1566762712413904957");
+});
+
+test("discord-presence speaks French on a French Windows", () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest, { language: "fr" });
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "", "Artiste"), 200_000));
+  assert.equal(fake.world.activities.at(-1).details, "Titre inconnu");
+  assert.equal(fake.world.activities.at(-1).buttons[0].label, "Écouter sur Apple Music");
 });
 
 test("scrobbler signs its Last.fm calls and scrobbles after half the track", async () => {
@@ -308,6 +577,57 @@ test("scrobbler keeps a refused listen for later", async () => {
   assert.match(fake.world.logs.at(-1), /trying again/);
 });
 
+const lastfm = (value) => ({ status: 200, text: JSON.stringify(value) });
+
+test("scrobbler connects a Last.fm account from the page it opens", async () => {
+  const { manifest, source } = load("scrobbler");
+  const fake = serviceAmpify(manifest, { config: { apiKey: "k", apiSecret: "s" } });
+  fake.world.answers = {
+    "auth.getToken": [lastfm({ token: "tok" })],
+    "auth.getSession": [{ status: 403, text: JSON.stringify({ error: 14 }) }, lastfm({ session: { name: "lea", key: "sk1" } })],
+  };
+  runIn(source, fake.context);
+  await settle();
+  assert.deepEqual(fake.world.opened, ["https://www.last.fm/api/auth/?api_key=k&token=tok"]);
+  assert.match(fake.world.notes[0].text, /Allow Ampify/);
+
+  fake.tick(5_000);  // not allowed yet
+  await settle();
+  assert.equal(fake.storage.get("session"), undefined);
+  fake.tick(5_000);
+  await settle();
+  assert.deepEqual(fake.storage.get("session"), { name: "lea", key: "sk1" });
+  assert.equal(fake.world.notes.at(-1).text, "Connected to Last.fm as lea.");
+  const asked = fake.world.posts.length;
+  fake.tick(5_000);
+  assert.equal(fake.world.posts.length, asked, "it stops asking once connected");
+
+  fake.emit("trackchange", playing(song("1", "Title", "Artist"), 180_000));
+  assert.equal(new URLSearchParams(fake.world.posts.at(-1).body).get("sk"), "sk1");
+});
+
+test("scrobbler opens Last.fm's page once a day at most", async () => {
+  const { manifest, source } = load("scrobbler");
+  const storage = new Map([["askedAt", 1_700_000_000_000 - 3_600_000]]);
+  const fake = serviceAmpify(manifest, { config: { apiKey: "k", apiSecret: "s" }, storage, language: "fr" });
+  runIn(source, fake.context);
+  await settle();
+  assert.deepEqual(fake.world.opened, []);
+  assert.match(fake.world.logs.at(-1), /pas encore connecté/);
+});
+
+test("scrobbler signs out when its setting is turned off", async () => {
+  const { manifest, source } = load("scrobbler");
+  const storage = new Map([["session", { name: "lea", key: "sk1" }], ["askedAt", 1]]);
+  const fake = serviceAmpify(manifest, { config: { apiKey: "k", apiSecret: "s", connect: false }, storage });
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Title", "Artist"), 180_000));
+  await settle();
+  assert.equal(storage.has("session"), false);
+  assert.equal(storage.has("askedAt"), false, "turning it on again asks at once");
+  assert.deepEqual(fake.world.posts, []);
+});
+
 test("the service examples declare exactly the permissions they use", () => {
   const permissionsOf = {
     storage: ["storage"],
@@ -315,11 +635,17 @@ test("the service examples declare exactly the permissions they use", () => {
     discord: ["ipc.discord"],
     fs: ["fs.output"],
     ui: ["ui.panel"],
-    http: ["network:ws.audioscrobbler.com"],
+    notify: ["notifications"],
+  };
+  // The hosts each example reaches with Ampify.http (the other addresses it holds are links shown to people).
+  const hostsOf = {
+    "discord-presence": ["network:itunes.apple.com", "network:litterbox.catbox.moe", "network:uguu.se"],
+    scrobbler: ["network:ws.audioscrobbler.com", "network:www.last.fm"],
   };
   for (const name of ["discord-presence", "scrobbler"]) {
     const { manifest, source } = load(name);
-    const needed = new Set([...source.matchAll(/Ampify\.(\w+)/g)].flatMap((match) => permissionsOf[match[1]] ?? []));
+    const needed = new Set([...source.matchAll(/Ampify\.(\w+)/g)].flatMap((match) =>
+      match[1] === "http" ? hostsOf[name] : permissionsOf[match[1]] ?? []));
     assert.deepEqual([...(manifest.permissions ?? [])].sort(), [...needed].sort(), name);
   }
 });
@@ -369,6 +695,56 @@ test("now-playing speaks French on a French Windows", () => {
   assert.equal(buttons[0].label, "À l'écoute");
 });
 
+// ---- Sleep timer and keyboard shortcuts ---------------------------------------------------------------------------
+
+// Runs an example with a player that records its commands, the timers it sets and its notifications.
+function commandAmpify(name, { config = {}, language = "en" } = {}) {
+  const { manifest, source } = load(name);
+  const granted = new Set(manifest.permissions ?? []);
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+  };
+  const world = { commands: [], timers: [], notes: [], logs: [], bindings: new Map() };
+  const Ampify = {
+    log: (message) => world.logs.push(String(message)),
+    config: { get: (key, fallback) => (key in config ? config[key] : fallback) },
+    player: Object.fromEntries(["play", "pause", "next", "previous"].map((command) => [command, () => {
+      need("player.control");
+      world.commands.push(command);
+    }])),
+    notify: (note) => (need("notifications"), world.notes.push({ ...note })),
+    keyboard: { bind: (keys, fn) => (need("ui.keyboard"), world.bindings.set(keys, fn)) },
+    i18n: fakeI18n(language),
+  };
+  runIn(source, { Ampify, setTimeout: (fn, ms) => world.timers.push({ fn, ms }) });
+  return world;
+}
+
+test("sleep-timer pauses after its delay, then says so", () => {
+  const world = commandAmpify("sleep-timer", { config: { minutes: 1 } });
+  assert.equal(world.timers.length, 1);
+  assert.equal(world.timers[0].ms, 60_000);
+  assert.deepEqual(world.commands, [], "nothing pauses before the delay");
+  world.timers[0].fn();
+  assert.deepEqual(world.commands, ["pause"]);
+  assert.deepEqual(world.notes, [{ title: "Sleep timer", text: "Playback is paused." }]);
+});
+
+test("sleep-timer speaks French on a French Windows", () => {
+  const world = commandAmpify("sleep-timer", { language: "fr" });
+  assert.equal(world.timers[0].ms, 30 * 60_000, "30 minutes by default");
+  world.timers[0].fn();
+  assert.deepEqual(world.notes, [{ title: "Minuterie de veille", text: "La lecture est en pause." }]);
+});
+
+test("keyboard-skip changes track with its two shortcuts", () => {
+  const world = commandAmpify("keyboard-skip");
+  assert.deepEqual([...world.bindings.keys()].sort(), ["Ctrl+Alt+Left", "Ctrl+Alt+Right"]);
+  world.bindings.get("Ctrl+Alt+Right")();
+  world.bindings.get("Ctrl+Alt+Left")();
+  assert.deepEqual(world.commands, ["next", "previous"]);
+});
+
 // ---- The Marketplace page ----------------------------------------------------------------------------------------
 
 // A small stand-in for Ampify.React: function components render depth-first with their hooks kept by their place in
@@ -410,7 +786,7 @@ function fakeReact() {
     const name = slot();
     if (!slots.has(name)) slots.set(name, typeof initial === "function" ? initial() : initial);
     return [slots.get(name), (value) => {
-      slots.set(name, value);
+      slots.set(name, typeof value === "function" ? value(slots.get(name)) : value);
       draw();
     }];
   };
@@ -424,7 +800,10 @@ function fakeReact() {
     page.render = render;
     draw();
   };
-  return { React: { h, useState, useEffect }, mount, page };
+  // Contexts keep their default value: the pages tested here give no other one.
+  const createContext = (value) => ({ value, Provider: (props) => props.children });
+  const useContext = (context) => context.value;
+  return { React: { h, useState, useEffect, createContext, useContext }, mount, page };
 }
 
 const marketEntry = (id, kind, permissions = [], version = "1.0.0") => ({
@@ -615,4 +994,42 @@ test("Refresh shows the catalog's warning instead of clearing it", async () => {
   buttonIn(page.tree, "Refresh").onClick();
   await settle();
   assert.ok(textsOf(page.tree).includes("ampify: catalog unreachable, cached copy used"));
+});
+
+// ---- The React panel example -------------------------------------------------------------------------------------
+
+function reactPanel(language) {
+  const react = fakeReact();
+  const h = react.React.h;
+  const host = (type) => (props) => h(type, { ...props, text: type === "text" ? props.children.join("") : undefined }, props.children);
+  const components = Object.fromEntries(["Card", "Button", "Toggle", "Slider", "Dropdown", "Tooltip", "Text"]
+    .map((name) => [name, host(name.toLowerCase())]));
+  const Ampify = {
+    React: react.React,
+    components,
+    ReactDOM: { render: (tree, target) => (assert.equal(target, "panel:react-panel"), react.mount(() => tree)) },
+    i18n: fakeI18n(language),
+    log: () => {},
+    ready: Promise.resolve(),
+  };
+  runIn(load("react-panel").source, { Ampify, setTimeout, clearTimeout });
+  return react.page;
+}
+
+test("react-panel counts clicks and opens its timer in the full view", () => {
+  const page = reactPanel("en");
+  buttonIn(page.tree, "Add one").onClick();
+  assert.ok(textsOf(page.tree).includes("Clicks: 1"));
+  assert.ok(!allNodes(page.tree).some((node) => node.type === "slider"), "the simple view has no timer");
+  allNodes(page.tree).find((node) => node.type === "dropdown").onChange("full");
+  const slider = allNodes(page.tree).find((node) => node.type === "slider");
+  assert.equal(slider.label, "Length (min)");
+  assert.equal(slider.value, 30);
+});
+
+test("react-panel speaks French on a French Windows", () => {
+  const page = reactPanel("fr");
+  assert.ok(textsOf(page.tree).includes("Panneau React"));
+  buttonIn(page.tree, "Ajouter un").onClick();
+  assert.ok(textsOf(page.tree).includes("Clics : 1"));
 });

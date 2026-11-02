@@ -259,8 +259,10 @@ Ampify.player.state()
 //      track: { id, title, artist, album, variantId, atmos, lossless, queueItemId, artwork, artworkColor } | null,
 //      source: "apple" | "smtc" | "" }
 Ampify.player.on("trackchange" | "statechange" | "lyricschange", fn)
+// statechange: playback started or stopped, the track's length became known, or the position jumped (a seek)
 Ampify.player.lyrics()      // -> null | { source: "apple", synced, language,
 //                                         lines: [{ start, end, text, words: [{ start, end, text }] }], text }
+Ampify.player.artwork()     // -> Promise<null | { type: "image/jpeg" | "image/png", base64 }>   [preview]
 Ampify.player.play()        // true when the app accepted the command
 Ampify.player.pause()
 Ampify.player.toggle()      // play if paused, pause if playing (player.control is enough)
@@ -282,6 +284,10 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
 - **`track.artwork`** is the https address of the cover at about 1000 px, or `""` (SMTC, or Apple gave none; Apple
   Music 1.1792 keeps the address internal, so it is always empty there). Only `https://` addresses are passed on. **`track.artworkColor`** is the dominant colour of the cover, `"#RRGGBB"`, or `""`.
   Both come from Apple's player only.
+- **`artwork()`** gives the bytes of the cover of what plays now, as Windows shows it in its media flyout (the
+  thumbnail of Apple Music's media session), files of one's own included (permission `player.read`). It resolves with
+  `null` when nothing plays or there is no cover. Right after `trackchange`, Windows may still hold the previous
+  cover for a second or two: wait a moment, and check that the track is still the same.
 - **`lyrics()`** gives Apple Music's own lyrics of the song playing (permission `player.read`), or `null` when Apple Music
   has none for it, when it has not fetched them yet, or when the source is not Apple's player. Times are in
   milliseconds from the start of the song. With `synced: true`, each line has `start` and `end`, and `words` holds the
@@ -501,6 +507,7 @@ Ampify.notify({ title, text })                      // permission notifications
 Ampify.keyboard.bind("Ctrl+Alt+L", fn)              // [preview] permission ui.keyboard
 Ampify.http.get(url) -> Promise<{ status, text }>   // [stable] permission network:<host>
 Ampify.http.post(url, body, { headers }) -> Promise<{ status, text }>  // [preview] same rules as get
+Ampify.http.postForm(url, fields) -> Promise<{ status, text }>  // [preview] same rules, multipart/form-data
 Ampify.http.open(url) -> boolean                    // [preview] same rules: shows the page in the browser
 Ampify.crypto.md5(text) -> hexadecimal string       // [preview] for services that sign this way (Last.fm)
 Ampify.uri.parse(text) / Ampify.uri.build(...)      // [stable] music:// and https://music.apple.com links
@@ -521,6 +528,11 @@ same rules (https, declared host). A text body is sent as a form (`application/x
 sent as JSON. Only the headers `content-type`, `authorization` and `accept` are accepted, with no line break. The body is
 64 KB at most. Both calls return at once: the request runs off the JavaScript thread, so a slow server does not freeze
 the element's timers or events. An element may have 4 requests in flight; the next call rejects with a `RangeError`.
+
+`Ampify.http.postForm(url, fields)` sends a `multipart/form-data` request, the form an upload service expects. Each
+field is a text, or a file `{ filename, type, base64 }`; names hold letters, digits and `. _ - [ ]` only, file names
+the same without brackets.
+The whole form is 8 MB at most. The Discord example sends covers this way (see `Ampify.player.artwork`).
 
 `Ampify.http.open(url)` shows a page in the user's browser, for a sign-in page such as Last.fm's (the scrobbler example
 uses it). Same rules: https and a declared host. It returns `true` when the browser was asked to show the page, and
@@ -548,7 +560,8 @@ from the host, a call returns `false` and writes a line to the log, without thro
 
 ```js
 // Discord presence, permission ipc.discord, setting discord.enabled
-Ampify.discord.setActivity({ clientId, details, state, largeImage, largeText, smallImage, smallText, startMs, endMs })
+Ampify.discord.setActivity({ clientId, type, statusDisplay, details, state, largeImage, largeText, smallImage,
+  smallText, detailsUrl, stateUrl, largeUrl, smallUrl, buttons: [{ label, url }], startMs, endMs })
 Ampify.discord.clear()
 
 // Menu of the Ampify icon in the notification area, permission ui.tray, setting tray.enabled (AppleMusic.exe)
@@ -568,6 +581,14 @@ Ampify.fs.writeText("now-playing.txt", text)   // -> output\<id>\now-playing.txt
 
 `clientId` is the id of an application created on the Discord developer portal (17 to 20 digits). The last element that
 calls `setActivity` wins, and its presence disappears when it stops.
+
+`type` is `"playing"` (Discord's default), `"listening"`, `"watching"` or `"competing"`. `statusDisplay` picks what the
+member list shows after the verb: `"name"` (the application), `"state"` or `"details"`. The `...Url` fields are https
+links (256 bytes at most) opened by a click on that line or image. `largeImage` takes an asset key of the application
+or an https image address, animated GIF included. `buttons` holds two buttons at most, a label of 32 bytes and an https
+link of 512; Discord does not show them to their own user. Texts that are too long are cut; a wrong type, a link that
+is not https or an unknown field is refused. Discord accepts 5 updates in 20 s: Ampify sends at most one every 4 s,
+the latest one.
 
 **Local remote.** An HTTP server bound to `127.0.0.1` only, on the port `remote.port` (8974 by default). The token
 `remote.token` is created when `remote.enabled` is set to 1 (`ampify config remote.token` prints it). It goes in the

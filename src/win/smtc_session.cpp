@@ -52,6 +52,17 @@ constexpr int kTimelineLastUpdated = 11;
 constexpr int kPropertiesTitle = 6;
 constexpr int kPropertiesArtist = 9;
 constexpr int kPropertiesAlbum = 10;
+// ... TrackNumber 11, Genres 12, AlbumTrackCount 13, PlaybackType 14, Thumbnail 15.
+constexpr int kPropertiesThumbnail = 15;
+
+// Windows.Storage.Streams, from windows.storage.streams.h: IRandomAccessStreamReference.OpenReadAsync 6,
+// IContentTypeProvider.get_ContentType 6.
+const GUID kIidStreamReference = rt::GuidOf("33EE3134-1DD6-4E3A-8067-D1C162E8642B");
+const GUID kIidContentTypeProvider = rt::GuidOf("97D098A5-3B99-4DE9-88A5-E11D2F50C795");
+const GUID kIidRandomAccessStream = rt::GuidOf("905A0FE1-BC53-11DF-8C49-001E4FC686DA");
+constexpr int kReferenceOpenRead = 6;
+constexpr int kContentType = 6;
+constexpr size_t kMaxThumbnailBytes = 4 * 1024 * 1024;  // what Ampify.player.artwork() hands a script
 
 constexpr unsigned long long kSearchEveryMs = 2000;
 constexpr unsigned long long kPropertiesEveryMs = 1000;
@@ -61,6 +72,35 @@ constexpr DWORD kCommandTimeoutMs = 3000;
 bool IsAppleMusic(const std::string& appId) {
     std::string lower = ToLowerAscii(appId);
     return lower.find("applemusic") != std::string::npos;
+}
+
+// The Apple Music session among the manager's sessions. False when there is none.
+bool FindAppleMusicSession(const rt::Ref& manager, rt::Ref& found, std::string& foundAppId) {
+    rt::Ref sessions;
+    if (FAILED(rt::CallSlot(manager, kManagerGetSessions, sessions.Put())) || !sessions) return false;
+    uint32_t count = 0;
+    rt::CallSlot(sessions, kVectorViewSize, &count);
+    for (uint32_t i = 0; i < count; ++i) {
+        rt::Ref candidate, session;
+        if (FAILED(rt::CallSlot(sessions, kVectorViewGetAt, i, candidate.Put())) ||
+            !rt::Query(candidate, kIidSession, session)) {
+            continue;
+        }
+        std::string appId = rt::ReadString(session, kSessionAppId);
+        if (IsAppleMusic(appId)) {
+            found = session;
+            foundAppId = appId;
+            return true;
+        }
+    }
+    return false;
+}
+
+// Starts the asynchronous call at `slot` of `object`, waits for it and gives its result.
+bool AwaitResult(const rt::Ref& object, int slot, DWORD timeoutMs, rt::Ref& result) {
+    rt::Ref operation;
+    return SUCCEEDED(rt::CallSlot(object, slot, operation.Put())) && operation && rt::Wait(operation, timeoutMs) &&
+           SUCCEEDED(rt::CallSlot(operation, rt::kAsyncGetResultsSlot, result.Put())) && result;
 }
 
 int64_t NowFileTime() {
@@ -87,23 +127,7 @@ bool SmtcSession::Start(std::string& failure) {
 
 void SmtcSession::FindSession() {
     m_searchedAt = GetTickCount64();
-    rt::Ref sessions;
-    if (FAILED(rt::CallSlot(m_manager, kManagerGetSessions, sessions.Put())) || !sessions) return;
-    uint32_t count = 0;
-    rt::CallSlot(sessions, kVectorViewSize, &count);
-    for (uint32_t i = 0; i < count; ++i) {
-        rt::Ref candidate, session;
-        if (FAILED(rt::CallSlot(sessions, kVectorViewGetAt, i, candidate.Put())) ||
-            !rt::Query(candidate, kIidSession, session)) {
-            continue;
-        }
-        std::string appId = rt::ReadString(session, kSessionAppId);
-        if (IsAppleMusic(appId)) {
-            m_session = session;
-            m_appId = appId;
-            return;
-        }
-    }
+    FindAppleMusicSession(m_manager, m_session, m_appId);
 }
 
 std::optional<SmtcReading> SmtcSession::Read() {
@@ -187,6 +211,49 @@ bool SmtcSession::Command(PlayerCommand command, int64_t seekMs) {
     // IAsyncOperation<Boolean>.GetResults: whether the app accepted the command.
     unsigned char accepted = 0;
     return SUCCEEDED(rt::CallSlot(operation, rt::kAsyncGetResultsSlot, &accepted)) && accepted != 0;
+}
+
+std::optional<ArtworkHost::File> ReadSmtcThumbnail(DWORD timeoutMs) {
+    rt::EnsureMultithreaded();
+    rt::Ref statics, manager, session, propertiesObject, properties, thumbnailObject, thumbnail, stream;
+    std::string appId;
+    if (FAILED(rt::GetActivationFactory(L"Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager",
+                                        kIidManagerStatics, statics)
+                   .result) ||
+        !AwaitResult(statics, kStaticsRequestAsync, timeoutMs, manager) ||
+        !FindAppleMusicSession(manager, session, appId) ||
+        !AwaitResult(session, kSessionMediaPropertiesAsync, timeoutMs, propertiesObject) ||
+        !rt::Query(propertiesObject, kIidMediaProperties, properties) ||
+        FAILED(rt::CallSlot(properties, kPropertiesThumbnail, thumbnailObject.Put())) || !thumbnailObject ||
+        !rt::Query(thumbnailObject, kIidStreamReference, thumbnail) ||
+        !AwaitResult(thumbnail, kReferenceOpenRead, timeoutMs, stream)) {
+        return std::nullopt;
+    }
+    ArtworkHost::File file;
+    rt::Ref typed, randomAccess;
+    // Windows may list several names ("image/jpeg,image/jpe,image/jpg"): the first is the type.
+    if (rt::Query(stream, kIidContentTypeProvider, typed)) file.contentType = rt::ReadString(typed, kContentType);
+    file.contentType = file.contentType.substr(0, file.contentType.find(','));
+    if (file.contentType.empty()) file.contentType = "image/jpeg";
+
+    // shcore's bridge turns the WinRT stream into a plain IStream, read synchronously on this worker thread.
+    using CreateStream = HRESULT(WINAPI*)(IUnknown*, REFIID, void**);
+    static const HMODULE shcore = LoadLibraryExW(L"shcore.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    auto create = shcore ? reinterpret_cast<CreateStream>(GetProcAddress(shcore, "CreateStreamOverRandomAccessStream"))
+                         : nullptr;
+    IStream* plain = nullptr;
+    if (!create || !rt::Query(stream, kIidRandomAccessStream, randomAccess) ||
+        FAILED(create(static_cast<IUnknown*>(randomAccess.Get()), IID_IStream, reinterpret_cast<void**>(&plain)))) {
+        return std::nullopt;
+    }
+    char chunk[64 * 1024];
+    ULONG read = 0;
+    while (SUCCEEDED(plain->Read(chunk, sizeof chunk, &read)) && read > 0 && file.bytes.size() <= kMaxThumbnailBytes) {
+        file.bytes.append(chunk, read);
+    }
+    plain->Release();
+    if (file.bytes.empty() || file.bytes.size() > kMaxThumbnailBytes) return std::nullopt;
+    return file;
 }
 
 }  // namespace ampify::win

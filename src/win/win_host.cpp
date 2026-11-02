@@ -21,6 +21,7 @@
 #include "../core/text_util.hpp"
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
+#include "smtc_session.hpp"
 #include "wic_image.hpp"
 #include "win_common.hpp"
 #include "win_services.hpp"
@@ -94,6 +95,7 @@ void* WinHost::QueryCapability(std::string_view name) {
     if (void* found = Offer<HttpPostHost>(name, this)) return found;
     if (void* found = Offer<BrowserHost>(name, this)) return found;
     if (void* found = Offer<ImageHost>(name, this)) return found;
+    if (void* found = Offer<ArtworkHost>(name, this)) return found;
     // Ampify.player.queue, in both processes: what each one knows of the queue (src/win/player_bridge.*).
     if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
     // Ampify.player.lyrics: Apple's lyrics, read in the process that has Apple's player.
@@ -267,6 +269,11 @@ HttpResponse WinHost::HttpGet(const std::string& url) { return Send(L"GET", url,
 
 std::optional<RgbaImage> WinHost::DecodeImage(const std::string& bytes, uint32_t maxSide) {
     return win::DecodeWithWic(bytes, maxSide);
+}
+
+std::optional<ArtworkHost::File> WinHost::CurrentArtwork() {
+    constexpr DWORD kStepTimeoutMs = 3000;
+    return win::ReadSmtcThumbnail(kStepTimeoutMs);
 }
 
 HttpResponse WinHost::HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) {

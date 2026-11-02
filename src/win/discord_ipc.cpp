@@ -13,8 +13,8 @@ constexpr DWORD kAnswerTimeoutMs = 3000;
 
 }  // namespace
 
-DiscordIpc::DiscordIpc(Journal& journal, std::wstring pipeBase)
-    : m_journal(journal), m_pipeBase(std::move(pipeBase)) {
+DiscordIpc::DiscordIpc(Journal& journal, std::wstring pipeBase, std::chrono::milliseconds minGap)
+    : m_journal(journal), m_pipeBase(std::move(pipeBase)), m_minGap(minGap) {
     m_thread = std::thread([this] { Run(); });
 }
 
@@ -56,6 +56,11 @@ void DiscordIpc::Run() {
                 m_wake.wait(lock, ready);
             }
             if (m_stop) break;
+            // Too soon after the last update: wait, then take whatever is latest by then.
+            if (m_lastSent && std::chrono::steady_clock::now() < *m_lastSent + m_minGap) {
+                m_wake.wait_until(lock, *m_lastSent + m_minGap, [this] { return m_stop; });
+                if (m_stop) break;
+            }
             clientId = m_clientId;
             activity = m_activity;
             m_dirty = false;
@@ -82,6 +87,7 @@ void DiscordIpc::Run() {
             retry = activity.has_value();
             continue;
         }
+        m_lastSent = std::chrono::steady_clock::now();
         // Discord answers each command with the same nonce. Other frames (events) are skipped.
         auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(kAnswerTimeoutMs);
         while (std::chrono::steady_clock::now() < deadline) {

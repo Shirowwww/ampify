@@ -35,6 +35,11 @@ const char kPlayer[] = R"AMPIFYJS(
     lyrics() {
       return JSON.parse(native.playerLyrics());
     },
+    // The cover of what plays now, files of one's own included: { type: "image/jpeg", base64 }, or null.
+    artwork() {
+      return dispatch.request(() => native.playerArtwork()).then((answer) =>
+        answer.status === 200 ? JSON.parse(answer.text) : null);
+    },
     queue: Object.freeze({
       list() {
         return JSON.parse(native.queueList());

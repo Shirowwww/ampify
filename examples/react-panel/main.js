@@ -4,15 +4,29 @@
 const { h, useState, useEffect, createContext, useContext } = Ampify.React;
 const { Card, Button, Toggle, Slider, Dropdown, Tooltip, Text } = Ampify.components;
 
+// The texts follow the Windows display language, English otherwise.
+Ampify.i18n.define({
+  en: {
+    title: "React panel", view: "View", simple: "Simple", full: "Full", counter: "Counter", clicks: "Clicks: {count}",
+    addOne: "Add one", addOneHelp: "Adds one to the counter", timer: "Timer", turnOn: "Turn on", length: "Length ({unit})",
+  },
+  fr: {
+    title: "Panneau React", view: "Affichage", simple: "Simple", full: "Complet", counter: "Compteur",
+    clicks: "Clics : {count}", addOne: "Ajouter un", addOneHelp: "Ajoute un au compteur", timer: "Minuteur",
+    turnOn: "Activer", length: "Durée ({unit})",
+  },
+});
+const t = (key, values) => Ampify.i18n.t(key, values);
+
 // A setting shared by all the components of the panel.
 const Unit = createContext("min");
 
 function Counter() {
   const [count, setCount] = useState(0);
-  return h(Card, { title: "Counter" },
-    h(Text, null, "Clicks: " + count),
-    h(Tooltip, { label: "Adds one to the counter", placement: "top" },
-      h(Button, { label: "Add one", onClick: () => setCount((n) => n + 1) })));
+  return h(Card, { title: t("counter") },
+    h(Text, null, t("clicks", { count })),
+    h(Tooltip, { label: t("addOneHelp"), placement: "top" },
+      h(Button, { label: t("addOne"), onClick: () => setCount((n) => n + 1) })));
 }
 
 function SleepTimer() {
@@ -31,20 +45,20 @@ function SleepTimer() {
     };
   }, [enabled, minutes]);
 
-  return h(Card, { title: "Timer" },
-    h(Toggle, { label: "Turn on", value: enabled, onChange: setEnabled }),
-    h(Slider, { label: "Length (" + unit + ")", min: 5, max: 120, step: 5, value: minutes, onChange: setMinutes }));
+  return h(Card, { title: t("timer") },
+    h(Toggle, { label: t("turnOn"), value: enabled, onChange: setEnabled }),
+    h(Slider, { label: t("length", { unit }), min: 5, max: 120, step: 5, value: minutes, onChange: setMinutes }));
 }
 
 function Panel() {
   const [view, setView] = useState("simple");
   return h(Unit.Provider, { value: "min" },
     h("stack", null,
-      h(Text, { variant: "title" }, "React panel"),
+      h(Text, { variant: "title" }, t("title")),
       h(Dropdown, {
-        label: "View",
+        label: t("view"),
         value: view,
-        options: [{ value: "simple", label: "Simple" }, { value: "full", label: "Full" }],
+        options: [{ value: "simple", label: t("simple") }, { value: "full", label: t("full") }],
         onChange: setView,
       }),
       h(Counter),

@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "json.hpp"
 
@@ -43,22 +44,39 @@ private:
     bool m_failed = false;
 };
 
+// A link under the presence, seen by the others (Discord hides a user's own buttons from them).
+struct Button {
+    std::string label;
+    std::string url;
+};
+
 // What an element shows in Discord. Empty strings are left out of the payload. Times are Unix milliseconds,
-// 0 for none: with startMs Discord counts up ("02:13 elapsed"), with endMs it counts down.
+// 0 for none: with startMs Discord counts up ("02:13 elapsed"), with both it draws a progress bar.
 struct Activity {
+    int type = 0;                // 0 playing (Discord's default), 2 listening, 3 watching, 5 competing
+    int statusDisplay = -1;      // what the member list shows: 0 the application name, 1 state, 2 details; -1 unset
     std::string details;     // first line, such as the title
     std::string state;       // second line, such as the artist
     std::string largeImage;  // an asset key of the Discord application, or an https URL
     std::string largeText;
     std::string smallImage;
     std::string smallText;
+    std::string detailsUrl;  // https links opened by a click on the line or the image
+    std::string stateUrl;
+    std::string largeUrl;
+    std::string smallUrl;
+    std::vector<Button> buttons;  // at most kMaxButtons
     int64_t startMs = 0;
     int64_t endMs = 0;
 };
 
-// Limits of Discord: details and state from 2 to 128 bytes, image texts up to 128, image keys up to 256.
+// Limits of Discord: details and state from 2 to 128 bytes, image texts up to 128, image keys and links up to 256,
+// two buttons with a label up to 32 bytes and a link up to 512.
 inline constexpr size_t kMaxActivityText = 128;
 inline constexpr size_t kMaxImageKey = 256;
+inline constexpr size_t kMaxButtons = 2;
+inline constexpr size_t kMaxButtonLabel = 32;
+inline constexpr size_t kMaxButtonUrl = 512;
 
 // A Discord application id: 17 to 20 digits.
 bool IsValidClientId(std::string_view id);
@@ -71,8 +89,9 @@ std::string HandshakeJson(std::string_view clientId);
 std::string SetActivityJson(uint32_t pid, const std::optional<Activity>& activity, std::string_view nonce);
 
 // Reads the object an element passed to Ampify.discord.setActivity, with the field names of the API
-// (details, state, largeImage, largeText, smallImage, smallText, startMs, endMs). Unknown fields are refused, so a
-// typo does not go unnoticed. On error returns nullopt and fills `error` in English.
+// (type, statusDisplay, details, state, largeImage, largeText, smallImage, smallText, detailsUrl, stateUrl, largeUrl,
+// smallUrl, buttons, startMs, endMs). Unknown fields are refused, so a typo does not go unnoticed. Links must be
+// https. On error returns nullopt and fills `error` in English.
 std::optional<Activity> ActivityFromJson(const Json& value, std::string* error);
 
 // True when a frame read from Discord is the READY event that follows a successful handshake.

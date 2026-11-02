@@ -15,6 +15,7 @@
 #include <string>
 
 #include "../core/host.hpp"
+#include "../core/image_host.hpp"
 #include "../core/player_model.hpp"
 #include "winrt_abi.hpp"
 
@@ -51,5 +52,10 @@ private:
     unsigned long long m_propertiesAt = 0;
     std::string m_title, m_artist, m_album;
 };
+
+// The thumbnail of Apple Music's media session, the cover Windows shows in its media flyout, files of one's own
+// included. Blocking, up to about `timeoutMs` per step: call it from a worker thread. nullopt without a session or
+// a thumbnail.
+std::optional<ArtworkHost::File> ReadSmtcThumbnail(DWORD timeoutMs);
 
 }  // namespace ampify::win

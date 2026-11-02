@@ -91,13 +91,13 @@ const Expected kMembers[] = {
     {"storage", "object!{get:f2=get,set:f2=set,remove:f1=remove}"},
     // toggle, queue and lyrics added in kitApi 1.x, compatible additions
     {"player", "object!{state:f0=state,on:f2=on,play:f0=play,pause:f0=pause,next:f0=next,previous:f0=previous,"
-               "seek:f1=seek,toggle:f0=toggle,lyrics:f0=lyrics,queue:object!{list:f0=list,add:f2=add,remove:f1=remove}}"},
+               "seek:f1=seek,toggle:f0=toggle,lyrics:f0=lyrics,artwork:f0=artwork,queue:object!{list:f0=list,add:f2=add,remove:f1=remove}}"},
     {"audio", "object!{setGainDb:f1=setGainDb,onFrame:f1=onFrame,analyze:f0=analyze,loudness:f0=loudness,"
               "volume:f0=volume,eq:object!{setBand:f2=setBand,preset:f1=preset,reset:f0=reset,bands:f0=bands,"
               "presets:f0=presets}}"},
     {"keyboard", "object!{bind:f2=bind}"},
     {"notify", "f1="},
-    {"http", "object!{get:f1=get,post:f2=post,open:f1=open}"},  // post and open added in kitApi 1.x, compatible additions
+    {"http", "object!{get:f1=get,post:f2=post,postForm:f2=postForm,open:f1=open}"},  // post, postForm and open added in kitApi 1.x, compatible additions
     {"icons", "object!{get:f1=get,names:f0=names}"},
     {"uri", "object!{parse:f1=parse,build:f3=build}"},
     {"color", "object!{extract:f3=extract,fromArtwork:f1=fromArtwork}"},

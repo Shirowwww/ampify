@@ -88,6 +88,54 @@ TEST_CASE(DiscordFrame_ActivityFromJsonChecksFields) {
     CHECK(cut && cut->details.size() == 128);
 }
 
+TEST_CASE(DiscordFrame_ListeningActivityWithLinksAndButtons) {
+    std::string error;
+    auto activity = ampify::discord::ActivityFromJson(
+        *ampify::Json::Parse(R"({"type":"listening","statusDisplay":"state","details":"Title","state":"Artist",)"
+                             R"("detailsUrl":"https://music.apple.com/song/1","largeUrl":"https://example.com/a",)"
+                             R"("buttons":[{"label":"Listen on Apple Music","url":"https://music.apple.com/song/1"},)"
+                             R"({"label":"song.link","url":"https://song.link/i/1"}]})"),
+        &error);
+    CHECK(activity);
+    CHECK(error.empty());
+    if (!activity) return;
+    CHECK(activity->type == 2);
+    CHECK(activity->statusDisplay == 1);
+    CHECK(activity->buttons.size() == 2);
+
+    std::string json = ampify::discord::SetActivityJson(1, activity, "n");
+    CHECK(json.find(R"("type":2)") != std::string::npos);
+    CHECK(json.find(R"("status_display_type":1)") != std::string::npos);
+    CHECK(json.find(R"("details_url":"https://music.apple.com/song/1")") != std::string::npos);
+    CHECK(json.find(R"("large_url":"https://example.com/a")") != std::string::npos);
+    CHECK(json.find(R"("buttons":[{"label":"Listen on Apple Music","url":"https://music.apple.com/song/1"},)"
+                    R"({"label":"song.link","url":"https://song.link/i/1"}])") != std::string::npos);
+}
+
+TEST_CASE(DiscordFrame_RefusesBadLinksButtonsAndKinds) {
+    std::string error;
+    auto parse = [&](const std::string& text) {
+        error.clear();
+        return ampify::discord::ActivityFromJson(*ampify::Json::Parse(text), &error);
+    };
+    CHECK(!parse(R"({"details":"x y","type":"dancing"})") && error.find("type") != std::string::npos);
+    CHECK(!parse(R"({"details":"x y","statusDisplay":"album"})"));
+    CHECK(!parse(R"({"details":"x y","stateUrl":"http://plain.example"})") && error.find("https") != std::string::npos);
+    CHECK(!parse(R"({"details":"x y","buttons":[{"label":"a","url":"https://a.b"},{"label":"b","url":"https://a.b"},)"
+                 R"({"label":"c","url":"https://a.b"}]})"));  // three buttons
+    CHECK(!parse(R"({"details":"x y","buttons":[{"label":"","url":"https://a.b"}]})"));
+    CHECK(!parse(R"({"details":"x y","buttons":[{"label":"a","url":"javascript:1"}]})"));
+    CHECK(!parse(R"({"details":"x y","buttons":[{"label":"a","url":"https://a.b","extra":1}]})"));
+
+    // A label longer than Discord's 32 bytes is cut, like the other texts.
+    auto cut = parse(R"({"details":"x y","buttons":[{"label":"0123456789012345678901234567890123456789",)"
+                     R"("url":"https://a.b"}]})");
+    CHECK(cut && cut->buttons.size() == 1 && cut->buttons[0].label.size() == 32);
+    // Without a type, the payload keeps Discord's default (playing) and says nothing.
+    auto plain = parse(R"({"details":"x y"})");
+    CHECK(plain && ampify::discord::SetActivityJson(1, plain, "n").find("\"type\"") == std::string::npos);
+}
+
 TEST_CASE(DiscordFrame_ReadyErrorAndClientIds) {
     ampify::discord::Frame ready{Opcode::Frame, R"({"cmd":"DISPATCH","evt":"READY","data":{"v":1}})"};
     CHECK(ampify::discord::IsReady(ready));

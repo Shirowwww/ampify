@@ -5,10 +5,19 @@
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
+#include "../form_data.hpp"
+#include "../image_host.hpp"
 #include "../lyrics_host.hpp"
 #include "../player_queue.hpp"
 
 namespace ampify::natives {
+
+namespace {
+
+// A cover is a few hundred KB; past this, it is not worth carrying through the script.
+constexpr size_t kMaxArtworkBytes = 4 * 1024 * 1024;
+
+}  // namespace
 
 Json PlayerJson(const PlayerSnapshot& snapshot) {
     Json::Object members;
@@ -45,6 +54,30 @@ struct PlayerNatives : ScriptBridge {
         if (!Require(ctx, ext, "player.read", &failure)) return failure;
         std::string json = PlayerJson(HostOf(ext).Player()).Dump();
         return JS_NewStringLen(ctx, json.data(), json.size());
+    }
+
+    // native.playerArtwork(): starts reading the cover off the JavaScript thread and returns the request's id. The
+    // answer comes back as dispatch.http: status 200 and {"type","base64"}, or 204 without a cover, or 0 and why.
+    AMPIFY_NATIVE(PlayerArtwork) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "player.read", &failure)) return failure;
+        ArtworkHost* artworks = HostOf(ext).Capability<ArtworkHost>();
+        uint32_t id = SubmitHttp(ext, [artworks]() -> HttpResponse {
+            if (!artworks) return {0, "covers are not read by this host"};
+            std::optional<ArtworkHost::File> file = artworks->CurrentArtwork();
+            if (!file || file->bytes.empty()) return {204, ""};
+            if (file->bytes.size() > kMaxArtworkBytes) return {0, "the cover is too large"};
+            Json::Object answer;
+            answer.emplace_back("type", Json(file->contentType));
+            answer.emplace_back("base64", Json(Base64Encode(file->bytes)));
+            return {200, Json(std::move(answer)).Dump()};
+        });
+        if (id == 0) {
+            return Throw(ctx, "RangeError",
+                         "too many requests in flight (" + std::to_string(kMaxHttpInFlight) + " at most)");
+        }
+        return JS_NewUint32(ctx, id);
     }
 
     AMPIFY_NATIVE(PlayerControl) {
@@ -127,6 +160,7 @@ void DefinePlayer(api::NativeScope& scope) {
     scope.Function("playerState", PlayerNatives::PlayerState, 0);
     scope.Function("playerCommand", PlayerNatives::PlayerControl, 2);
     scope.Function("playerLyrics", PlayerNatives::PlayerLyrics, 0);
+    scope.Function("playerArtwork", PlayerNatives::PlayerArtwork, 0);
     scope.Function("queueList", PlayerNatives::QueueList, 0);
     scope.Function("queueAdd", PlayerNatives::QueueAdd, 2);
     scope.Function("queueRemove", PlayerNatives::QueueRemove, 1);

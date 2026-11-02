@@ -2,14 +2,47 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "discord-presence",
   "name": "Discord presence (example)",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Example to learn from. Shows the current track in your Discord status. Needs discord.enabled and the id of a Discord application.",
-  "translations": {"fr": {"name": "Présence Discord (exemple)", "description": "Un exemple pour apprendre. Affiche le morceau en cours dans votre statut Discord. Demande discord.enabled et l'identifiant d'une application Discord."}},
+  "description": "Example to learn from. Your Discord status shows what you listen to: cover, artist, album, progress bar, links and buttons. Turn it on with Discord open. A cover Apple's catalog lacks (your own files) goes to a free host that deletes it within 3 days; this can be turned off.",
+  "translations": {
+    "fr": {
+      "name": "Présence Discord (exemple)",
+      "description": "Un exemple pour apprendre. Votre statut Discord montre ce que vous écoutez : pochette, artiste, album, progression, liens et boutons. Activez-le avec Discord ouvert. Une pochette absente du catalogue d'Apple (vos fichiers) passe par un hébergeur gratuit qui l'efface sous 3 jours ; désactivable.",
+      "settings": {
+        "status-line": "Après « Écoute » dans la liste des membres",
+        "show-cover": "Afficher la pochette",
+        "share-covers": "Partager les pochettes inconnues du catalogue",
+        "show-album": "Afficher l'album",
+        "show-progress": "Afficher la barre de progression",
+        "clickable-links": "Titre, artiste et pochette cliquables",
+        "show-paused": "Garder le statut pendant la pause",
+        "button-1": "Premier bouton",
+        "button-2": "Second bouton"
+      },
+      "options": {
+        "Artist": "L'artiste",
+        "Title": "Le titre",
+        "App name": "Le nom de l'application",
+        "None": "Aucun"
+      }
+    }
+  },
   "tags": ["example"],
   "kitApi": "1.0",
   "main": "main.js",
   "processes": ["engine"],
-  "permissions": ["player.read", "ipc.discord"]
+  "permissions": ["player.read", "storage", "ipc.discord", "network:itunes.apple.com", "network:litterbox.catbox.moe", "network:uguu.se"],
+  "settings": [
+    {"key": "status-line", "label": "After \"Listening to\" in the member list", "type": "choice", "options": ["Artist", "Title", "App name"], "default": "Artist"},
+    {"key": "show-cover", "label": "Show the cover", "type": "toggle", "default": true},
+    {"key": "share-covers", "label": "Share covers the catalog does not know", "type": "toggle", "default": true},
+    {"key": "show-album", "label": "Show the album", "type": "toggle", "default": true},
+    {"key": "show-progress", "label": "Show the progress bar", "type": "toggle", "default": true},
+    {"key": "clickable-links", "label": "Clickable title, artist and cover", "type": "toggle", "default": true},
+    {"key": "show-paused", "label": "Keep the status while paused", "type": "toggle", "default": false},
+    {"key": "button-1", "label": "First button", "type": "choice", "options": ["None", "Apple Music", "song.link", "YouTube Music", "Spotify"], "default": "Apple Music"},
+    {"key": "button-2", "label": "Second button", "type": "choice", "options": ["None", "Apple Music", "song.link", "YouTube Music", "Spotify"], "default": "song.link"}
+  ]
 }

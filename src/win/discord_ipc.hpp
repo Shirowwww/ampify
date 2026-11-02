@@ -7,6 +7,7 @@
 
 #include <windows.h>
 
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
@@ -22,8 +23,10 @@ namespace ampify::win {
 
 class DiscordIpc {
 public:
-    // `pipeBase` is followed by 0 to 9. The tests keep the default name and skip when Discord holds it.
-    DiscordIpc(Journal& journal, std::wstring pipeBase = L"\\\\.\\pipe\\discord-ipc-");
+    // `pipeBase` is followed by 0 to 9. The tests keep the default name and skip when Discord holds it. Discord
+    // accepts 5 updates in 20 s: changes closer than `minGap` wait, and only the latest one is sent.
+    DiscordIpc(Journal& journal, std::wstring pipeBase = L"\\\\.\\pipe\\discord-ipc-",
+               std::chrono::milliseconds minGap = std::chrono::milliseconds(4000));
     ~DiscordIpc();
 
     DiscordIpc(const DiscordIpc&) = delete;
@@ -45,6 +48,7 @@ private:
 
     Journal& m_journal;
     std::wstring m_pipeBase;
+    std::chrono::milliseconds m_minGap;
 
     mutable std::mutex m_mutex;
     std::condition_variable m_wake;
@@ -60,6 +64,7 @@ private:
     discord::FrameReader m_reader;
     uint64_t m_nonce = 0;
     bool m_warnedUnavailable = false;
+    std::optional<std::chrono::steady_clock::time_point> m_lastSent;
 
     std::thread m_thread;
 };

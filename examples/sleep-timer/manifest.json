@@ -2,16 +2,19 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "sleep-timer",
   "name": "Sleep timer (example)",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from. Pauses playback after a delay, set in minutes, then lets you know.",
-  "translations": {"fr": {"name": "Minuterie de veille (exemple)", "description": "Un exemple pour apprendre. Met la lecture en pause après un délai réglé en minutes, puis vous prévient."}},
+  "translations": {"fr": {"name": "Minuterie de veille (exemple)", "description": "Un exemple pour apprendre. Met la lecture en pause après un délai réglé en minutes, puis vous prévient.", "settings": {"minutes": "Minutes avant la pause"}}},
   "kitApi": "1.0",
   "main": "main.js",
   "permissions": [
     "player.control",
     "notifications"
+  ],
+  "settings": [
+    {"key": "minutes", "label": "Minutes before the pause", "type": "number", "min": 1, "max": 600, "default": 30}
   ],
   "tags": [
     "example",

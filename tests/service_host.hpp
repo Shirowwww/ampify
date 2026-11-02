@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "../src/core/image_host.hpp"
 #include "../src/core/manifest.hpp"
 #include "../src/core/natives/discord.hpp"
 #include "../src/core/natives/fs.hpp"
@@ -26,7 +27,8 @@
 
 namespace ampify::test {
 
-struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost, MidiHost, RemoteHost, OutputFilesHost {
+struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost, MidiHost, RemoteHost, OutputFilesHost,
+                     ArtworkHost {
     struct Post {
         std::string url;
         std::string body;
@@ -50,6 +52,12 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
     std::map<std::string, std::string> remoteStates;
     std::vector<std::string> remoteRemoved;
     std::filesystem::path outputRoot;
+    std::optional<ArtworkHost::File> artwork;  // read from a worker thread, set by the test between reads
+
+    std::optional<ArtworkHost::File> CurrentArtwork() override {
+        std::lock_guard<std::mutex> lock(httpMutex);
+        return artwork;
+    }
 
     HttpResponse HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) override {
         std::lock_guard<std::mutex> lock(httpMutex);  // called from a worker thread
@@ -101,6 +109,7 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
         if (void* found = Offer<MidiHost>(name, this)) return found;
         if (void* found = Offer<RemoteHost>(name, this)) return found;
         if (void* found = Offer<OutputFilesHost>(name, this)) return found;
+        if (void* found = Offer<ArtworkHost>(name, this)) return found;
         return FakeHost::QueryCapability(name);
     }
 };

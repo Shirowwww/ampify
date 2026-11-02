@@ -331,6 +331,32 @@ TEST_CASE(PlayerWatcher_NoLyricsChangeWhenNothingIsLoadedOrTheFirstSnapshotHasTh
     CHECK(again.size() == 1 && again[0] == "lyricschange");
 }
 
+TEST_CASE(PlayerWatcher_StateChangesWhenTheLengthBecomesKnownOrAfterASeek) {
+    auto at = [](bool playing, int64_t positionMs, int64_t durationMs) {
+        ampify::PlayerSnapshot snapshot = Snap("a", false);
+        snapshot.playing = playing;
+        snapshot.positionMs = positionMs;
+        snapshot.durationMs = durationMs;
+        return snapshot;
+    };
+    ampify::PlayerWatcher watcher;
+    watcher.Poll(at(true, 0, 0), 1000);
+    auto known = watcher.Poll(at(true, 250, 163'000), 1250);  // the length arrives after the track
+    CHECK(known.size() == 1 && known[0] == "statechange");
+    CHECK(watcher.Poll(at(true, 500, 163'000), 1500).empty());  // plain progress
+    CHECK(watcher.Poll(at(true, 900, 163'000), 2000).empty());  // a little drift is not a seek
+    auto forward = watcher.Poll(at(true, 60'000, 163'000), 2250);
+    CHECK(forward.size() == 1 && forward[0] == "statechange");
+    auto back = watcher.Poll(at(true, 10'000, 163'000), 2500);
+    CHECK(back.size() == 1 && back[0] == "statechange");
+    watcher.Poll(at(false, 10'250, 163'000), 2750);
+    auto paused = watcher.Poll(at(false, 90'000, 163'000), 3000);  // a seek while paused
+    CHECK(paused.size() == 1 && paused[0] == "statechange");
+    CHECK(watcher.Poll(at(false, 90'000, 163'000), 9000).empty());
+    // Without the time of the poll, only the start and the stop count.
+    CHECK(watcher.Poll(at(false, 5'000, 163'000)).empty());
+}
+
 // ---- Ampify.player.lyrics() ---------------------------------------------------------------------------------------
 
 TEST_CASE(PlayerLyrics_ReturnsTheParsedLyricsToAnElementThatMayRead) {

@@ -140,9 +140,13 @@ type TooltipWrapperProps = { label?: string; content?: string; placement?: "top"
 type AudioChunk = { samples: Float32Array; channels: number; sampleRate: number; frames: number };
 type AudioAnalysis = { level: number; spectrum: number[]; tempo: number };
 type DiscordActivity = {
-  clientId: string; details?: string; state?: string; largeImage?: string; largeText?: string;
-  smallImage?: string; smallText?: string; startMs?: number; endMs?: number;
+  clientId: string; type?: "playing" | "listening" | "watching" | "competing";
+  statusDisplay?: "name" | "state" | "details"; details?: string; state?: string;
+  largeImage?: string; largeText?: string; smallImage?: string; smallText?: string;
+  detailsUrl?: string; stateUrl?: string; largeUrl?: string; smallUrl?: string;
+  buttons?: { label: string; url: string }[]; startMs?: number; endMs?: number;
 };
+type FormFile = { filename: string; type?: string; base64: string };
 type MidiEvent = { type: "note" | "noteoff" | "cc"; channel: number; number: number; value: number };
 
 declare const Ampify: {
@@ -170,6 +174,7 @@ declare const Ampify: {
     state(): PlayerState;
     on(event: "trackchange" | "statechange" | "lyricschange", fn: (state: PlayerState) => void): void;
     lyrics(): Lyrics | null;  // Apple Music's own lyrics of the song playing, null when it has none (yet)
+    artwork(): Promise<{ type: string; base64: string } | null>;  // the cover Windows shows, files of one's own included
     play(): boolean;
     pause(): boolean;
     next(): boolean;
@@ -222,6 +227,7 @@ declare const Ampify: {
   http: {
     get(url: string): Promise<{ status: number; text: string }>;
     post(url: string, body?: string | object, options?: { headers?: Record<string, string> }): Promise<{ status: number; text: string }>;
+    postForm(url: string, fields: Record<string, string | FormFile>): Promise<{ status: number; text: string }>;
   };
   crypto: { md5(text: string): string };
   i18n: {

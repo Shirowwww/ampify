@@ -35,6 +35,13 @@ const char kHttp[] = R"AMPIFYJS(
         return native.httpPost(text(url), payload, JSON.stringify(headers));
       });
     },
+    // A multipart/form-data POST, for an upload service. fields: { name: "text", file: { filename, type, base64 } }.
+    postForm(url, fields) {
+      return dispatch.request(() => {
+        if (typeof fields !== "object" || fields === null) throw new TypeError("postForm expects an object of fields");
+        return native.httpPostForm(text(url), JSON.stringify(fields));
+      });
+    },
     // Shows the page in the user's browser, for a sign-in page. One page every 10 seconds at most; true if shown.
     open(url) {
       return native.httpOpen(text(url));

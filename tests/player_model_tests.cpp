@@ -262,6 +262,21 @@ TEST_CASE(PlayerModel_PausedOrPlaceholderAppleReadings) {
     CHECK(ampify::SnapshotFromAmp(reading, ampify::AmpTimeUnit::Ticks100ns).positionMs == 180'000);
 }
 
+TEST_CASE(PlayerModel_AppleMusicsSmtcArtistHoldsTheAlbumToo) {
+    // Apple Music writes "Artist — Album" in the session's artist and leaves its album empty.
+    ampify::SmtcReading reading;
+    reading.status = ampify::kSmtcPlaying;
+    reading.title = "Rollout (feat. Jeune Morty)";
+    reading.artist = "ELIESG \xE2\x80\x94 <333*";
+    ampify::PlayerSnapshot s = ampify::SnapshotFromSmtc(reading);
+    CHECK(s.track && s.track->artist == "ELIESG" && s.track->album == "<333*");
+    CHECK(s.track->id == ampify::TrackIdOf("Rollout (feat. Jeune Morty)", "ELIESG", "<333*"));
+
+    reading.album = "Real album";  // a player that fills the album keeps its artist as it is
+    s = ampify::SnapshotFromSmtc(reading);
+    CHECK(s.track->artist == "ELIESG \xE2\x80\x94 <333*" && s.track->album == "Real album");
+}
+
 TEST_CASE(PlayerModel_AnSmtcReadingMovesOnWhilePlaying) {
     ampify::SmtcReading reading;
     reading.status = ampify::kSmtcPlaying;

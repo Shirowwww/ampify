@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <tuple>
 
 #include "amp_abi.hpp"
 #include "md5.hpp"
@@ -203,7 +204,9 @@ PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading) {
     track.title = reading.title;
     track.artist = reading.artist;
     track.album = reading.album;
-    track.id = TrackIdOf(reading.title, reading.artist, reading.album);
+    // Apple Music writes "Artist — Album" in the session's artist and leaves the album empty.
+    if (track.album.empty()) std::tie(track.artist, track.album) = SplitArtistAlbum(reading.artist);
+    track.id = TrackIdOf(track.title, track.artist, track.album);
     snapshot.track = std::move(track);
     return snapshot;
 }

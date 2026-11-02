@@ -95,3 +95,10 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   `GetLanguage`. Lyrics may come some seconds after the track starts. None of this is confirmed on a real Apple Music yet.
 - Versions: `1.1540.23042.0` and `1.1792.39682.0` are both in the tested list. In 1.1792 the interfaces of
   `AMP.Services.Player` changed ("IPlayer absent" in the log), so the player read falls back to SMTC.
+- Windows media session (SMTC), seen in 1.1792: the artist field holds "Artist — Album" and the album field is empty, so
+  the player model splits it. The length often arrives a poll after the track change. The thumbnail is the cover as a
+  JPEG of about 40 to 170 KB; its content type reads "image/jpeg,image/jpe,image/jpg", keep the first entry.
+- Closing the main window (or `taskkill` without `/F`) only hides Apple Music in the notification area: the process
+  keeps the kernel loaded and blocks a rebuild. Stop it with `Stop-Process -Force` before linking.
+- Changing an extension setting with `ampify config` does not restart the extension: `ampify extension disable <id>`
+  then `enable <id>` does.
