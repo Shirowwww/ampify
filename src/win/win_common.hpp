@@ -43,6 +43,16 @@ std::filesystem::path InstallDirectory();
 std::string ToUtf8(std::wstring_view text);
 std::wstring FromUtf8(std::string_view text);
 
+// One argument of a command line, quoted the way CommandLineToArgvW reads it back: left as it is when it has no space,
+// tab or quote; otherwise in quotes, with a quote escaped and the backslashes before a quote doubled.
+std::wstring QuoteArgument(std::wstring_view argument);
+
+// Starts a program and lets it run on its own: its handles are closed at once, none of ours is inherited. With a null
+// `application`, the first word of `commandLine` names the program. `hidden` asks for no window. False when Windows
+// refuses to start it.
+bool StartProcess(const wchar_t* application, const std::wstring& commandLine, DWORD creationFlags,
+                  const wchar_t* folder = nullptr, bool hidden = false);
+
 // True when this process runs with administrator rights.
 bool IsElevated();
 

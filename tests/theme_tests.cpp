@@ -19,7 +19,7 @@
 #include "../src/core/theme/color.hpp"
 #include "../src/core/theme/colour_keys.hpp"
 #include "../src/core/theme/css.hpp"
-#include "../src/core/theme/commands.hpp"
+#include "../src/cli/theme_commands.hpp"
 #include "../src/core/theme/engine.hpp"
 #include "../src/core/theme/files.hpp"
 #include "../src/core/theme/fonts.hpp"

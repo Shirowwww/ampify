@@ -15,7 +15,7 @@ constexpr int kMaxDepth = 64;
 
 class Parser {
 public:
-    explicit Parser(std::string_view text) : m_text(text) {}
+    Parser(std::string_view text, Json::DuplicateKeys duplicates) : m_text(text), m_duplicates(duplicates) {}
 
     std::optional<Json> ParseDocument(std::string* error) {
         std::optional<Json> value = ParseValue(0);
@@ -32,8 +32,16 @@ public:
 
 private:
     std::string_view m_text;
+    Json::DuplicateKeys m_duplicates;
     size_t m_pos = 0;
     std::string m_error;
+
+    static bool HasMember(const Json::Object& members, std::string_view key) {
+        for (const auto& member : members) {
+            if (member.first == key) return true;
+        }
+        return false;
+    }
 
     std::optional<Json> Fail(const std::string& message) {
         if (m_error.empty()) m_error = message + " at byte " + std::to_string(m_pos);
@@ -86,6 +94,9 @@ private:
             if (m_pos >= m_text.size() || m_text[m_pos] != '"') return Fail("key expected");
             std::optional<std::string> key = ParseString();
             if (!key) return std::nullopt;
+            if (m_duplicates == Json::DuplicateKeys::Refuse && HasMember(members, *key)) {
+                return Fail("duplicate member: " + *key);
+            }
             SkipSpace();
             if (m_pos >= m_text.size() || m_text[m_pos] != ':') return Fail("':' expected");
             m_pos++;
@@ -262,7 +273,7 @@ private:
     }
 };
 
-void DumpString(const std::string& s, std::string& out) {
+void DumpString(std::string_view s, std::string& out) {
     out += '"';
     for (char c : s) {
         switch (c) {
@@ -288,8 +299,14 @@ void DumpString(const std::string& s, std::string& out) {
 
 }  // namespace
 
-std::optional<Json> Json::Parse(std::string_view text, std::string* error) {
-    return Parser(WithoutBom(text)).ParseDocument(error);
+std::optional<Json> Json::Parse(std::string_view text, std::string* error, DuplicateKeys duplicates) {
+    return Parser(WithoutBom(text), duplicates).ParseDocument(error);
+}
+
+std::string Json::Quote(std::string_view text) {
+    std::string out;
+    DumpString(text, out);
+    return out;
 }
 
 std::string Json::Dump() const {

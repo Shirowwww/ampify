@@ -22,4 +22,5 @@ list(APPEND AMPIFY_CORE_SOURCES
     src/core/ui_model.cpp
     src/core/reload.cpp
     src/core/package_watch.cpp
-    src/core/kit_layout.cpp)
+    src/core/kit_layout.cpp
+    src/core/text_util.cpp)

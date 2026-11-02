@@ -5,6 +5,8 @@
 #include <fstream>
 #include <system_error>
 
+#include "text_util.hpp"
+
 namespace ampify {
 
 namespace {
@@ -31,10 +33,8 @@ bool IsValidOutputName(std::string_view name) {
     if (name.find("..") != std::string_view::npos) return false;
     size_t dot = name.rfind('.');
     if (dot == std::string_view::npos || dot == 0) return false;
-    std::string extension(name.substr(dot + 1));
-    std::string stem(name.substr(0, name.find('.')));
-    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return std::tolower(c); });
-    std::transform(stem.begin(), stem.end(), stem.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::string extension = ToLowerAscii(name.substr(dot + 1));
+    std::string stem = ToLowerAscii(name.substr(0, name.find('.')));
     if (extension != "txt" && extension != "json" && extension != "csv" && extension != "html" && extension != "xml") {
         return false;
     }

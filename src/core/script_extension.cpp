@@ -6,6 +6,7 @@
 #include "api/module.hpp"
 #include "json.hpp"
 #include "natives/player.hpp"
+#include "text_util.hpp"
 
 // The API itself is made of modules: src/core/api/modules.cpp lists them, src/core/prelude holds their JavaScript and
 // src/core/natives the C++ functions that JavaScript calls. This file runs an element: its runtime, queue and timers.
@@ -15,14 +16,6 @@ namespace ampify {
 namespace {
 
 constexpr size_t kMaxTimerDispatchesPerPump = 256;  // a repeating timer cannot starve the other work
-
-std::optional<std::string> ReadFile(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) return std::nullopt;
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-}
 
 }  // namespace
 
@@ -55,7 +48,7 @@ bool ScriptExtension::Start() {
     };
 
     std::string mainName = m_manifest.main.value_or("main.js");
-    std::optional<std::string> source = ReadFile(m_folder / mainName);
+    std::optional<std::string> source = ReadWholeFile(m_folder / mainName);
     if (!source) return fail("main.js unreadable");
 
     for (const api::ApiModule& module : api::Modules()) {

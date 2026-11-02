@@ -393,18 +393,7 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
         std::wstring command = L"cmd.exe /c ping -n 3 127.0.0.1 >nul & del /f /q \"" +
                                (target / ampify::win::FromUtf8(ampify::kSetupFile)).wstring() + L"\" & rmdir \"" +
                                target.wstring() + L"\"";
-        STARTUPINFOW startup{};
-        startup.cb = sizeof(startup);
-        startup.dwFlags = STARTF_USESHOWWINDOW;
-        startup.wShowWindow = SW_HIDE;
-        PROCESS_INFORMATION process{};
-        std::vector<wchar_t> buffer(command.begin(), command.end());
-        buffer.push_back(L'\0');
-        if (CreateProcessW(nullptr, buffer.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
-                           nullptr, nullptr, &startup, &process)) {
-            CloseHandle(process.hThread);
-            CloseHandle(process.hProcess);
-        }
+        ampify::win::StartProcess(nullptr, command, CREATE_NO_WINDOW, nullptr, true);
     } else {
         std::error_code folderError;
         fs::remove(target, folderError);

@@ -27,57 +27,14 @@ namespace ampify::platform {
 
 namespace {
 
-std::wstring ToWide(const std::string& text) {
-    if (text.empty()) return {};
-    int size = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
-    std::wstring wide(static_cast<size_t>(size), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), wide.data(), size);
-    return wide;
-}
-
-std::string ToUtf8(const std::wstring& wide) {
-    if (wide.empty()) return {};
-    int size = WideCharToMultiByte(CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()), nullptr, 0, nullptr,
-                                   nullptr);
-    std::string text(static_cast<size_t>(size), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()), text.data(), size, nullptr, nullptr);
-    return text;
-}
-
-// The quoting rules that CommandLineToArgvW reads back: backslashes are doubled only before a quote.
-std::wstring QuoteArgument(const std::wstring& argument) {
-    if (!argument.empty() && argument.find_first_of(L" \t\"") == std::wstring::npos) return argument;
-
-    std::wstring out = L"\"";
-    size_t i = 0;
-    while (true) {
-        size_t backslashes = 0;
-        while (i < argument.size() && argument[i] == L'\\') {
-            backslashes++;
-            i++;
-        }
-        if (i == argument.size()) {
-            out.append(backslashes * 2, L'\\');
-            break;
-        }
-        if (argument[i] == L'"') {
-            out.append(backslashes * 2 + 1, L'\\');
-            out += L'"';
-        } else {
-            out.append(backslashes, L'\\');
-            out += argument[i];
-        }
-        i++;
-    }
-    out += L'"';
-    return out;
-}
+using win::FromUtf8;
+using win::ToUtf8;
 
 std::wstring CommandLineOf(const std::vector<std::string>& command) {
     std::wstring line;
     for (const std::string& part : command) {
         if (!line.empty()) line += L' ';
-        line += QuoteArgument(ToWide(part));
+        line += win::QuoteArgument(FromUtf8(part));
     }
     return line;
 }
@@ -149,24 +106,11 @@ int Run(const std::vector<std::string>& command, const std::filesystem::path& st
 
 bool StartDetached(const std::vector<std::string>& command) {
     if (command.empty()) return false;
-
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
-    std::wstring line = CommandLineOf(command);
-    std::vector<wchar_t> buffer(line.begin(), line.end());
-    buffer.push_back(L'\0');
-
-    PROCESS_INFORMATION process{};
-    BOOL created = CreateProcessW(nullptr, buffer.data(), nullptr, nullptr, FALSE, CREATE_NEW_PROCESS_GROUP, nullptr,
-                                  nullptr, &startup, &process);
-    if (!created) return false;
-    CloseHandle(process.hThread);
-    CloseHandle(process.hProcess);
-    return true;
+    return win::StartProcess(nullptr, CommandLineOf(command), CREATE_NEW_PROCESS_GROUP);
 }
 
 std::optional<std::filesystem::path> AppPackageFolder() {
-    std::wstring family = ToWide(std::string(kPackageFamilyName));
+    std::wstring family = FromUtf8(kPackageFamilyName);
     std::optional<launcher::InstalledPackage> package = launcher::FindInstalledPackage(family.c_str());
     if (!package) return std::nullopt;
     return package->directory;
@@ -175,7 +119,7 @@ std::optional<std::filesystem::path> AppPackageFolder() {
 std::optional<std::filesystem::path> AppPreferencesFile() {
     const wchar_t* local = _wgetenv(L"LOCALAPPDATA");
     if (local == nullptr || *local == L'\0') return std::nullopt;
-    return std::filesystem::path(local) / L"Packages" / ToWide(std::string(kPackageFamilyName)) / L"LocalCache" /
+    return std::filesystem::path(local) / L"Packages" / FromUtf8(kPackageFamilyName) / L"LocalCache" /
            L"Roaming" / L"Apple Computer" / L"Preferences" / L"AMPLibraryAgent.exe.plist";
 }
 

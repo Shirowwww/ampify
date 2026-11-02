@@ -1,9 +1,9 @@
-#include "commands.hpp"
+#include "theme_commands.hpp"
 
-#include "files.hpp"
-#include "library.hpp"
-#include "theme_settings.hpp"
-#include "../settings.hpp"
+#include "../core/settings.hpp"
+#include "../core/theme/files.hpp"
+#include "../core/theme/library.hpp"
+#include "../core/theme/theme_settings.hpp"
 
 namespace ampify::theme {
 
@@ -156,29 +156,6 @@ int SetTheme(const std::vector<std::string>& args, const KitLayout& kit, std::os
 }
 
 }  // namespace
-
-int PrintThemeReport(const Theme& theme, std::ostream& out) {
-    out << "Theme: " << theme.name << " (folder " << theme.id << ")\n";
-    out << "Schemes: ";
-    for (const std::string& scheme : theme.schemes) out << scheme << ' ';
-    out << "\nScheme used: " << (theme.scheme.empty() ? std::string("none") : theme.scheme) << '\n';
-    out << "Colors: " << theme.resources.size() << ", rules: " << theme.assignments.size()
-        << ", dictionary: " << (theme.resourceDictionary.empty() ? "no" : "yes") << '\n';
-
-    for (const Assignment& assignment : theme.assignments) {
-        // A template is a whole XAML document: print its size, not its text.
-        std::string value = assignment.value.kind == ValueKind::Template
-                                ? "XAML template (" + std::to_string(assignment.value.text.size()) + " bytes)"
-                                : ShownText(assignment.property, assignment.value);
-        out << "  line " << assignment.line << ": " << assignment.selector.text << " → " << assignment.property
-            << " = " << value << (assignment.important ? " (!important)" : "") << '\n';
-    }
-    for (const std::string& problem : theme.problems) out << "Problem: " << problem << '\n';
-
-    bool clean = theme.usable && theme.problems.empty();
-    out << (theme.usable ? "Result: usable" : "Result: refused") << '\n';
-    return clean ? 0 : kRefused;
-}
 
 int RunThemeCommand(const std::vector<std::string>& args, const KitLayout& kit, std::ostream& out, std::ostream& err) {
     if (args.size() < 2 || args[0] != "theme") {

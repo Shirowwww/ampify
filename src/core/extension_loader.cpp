@@ -8,6 +8,7 @@
 
 #include "kit_layout.hpp"
 #include "manifest.hpp"
+#include "text_util.hpp"
 
 namespace ampify {
 
@@ -17,14 +18,6 @@ namespace fs = std::filesystem;
 
 constexpr int kSupportedKitApiMajor = 1;
 constexpr std::string_view kAppTargetPrefix = "app:";
-
-std::optional<std::string> ReadText(const fs::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) return std::nullopt;
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-}
 
 // A theme or a snippet with no script: `ampify dev` asks for its restart like any element, and the theme service, not
 // the loader, reloads its style.
@@ -86,7 +79,7 @@ void ExtensionLoader::LoadFolders(const fs::path& root, Origin origin, LoadRepor
 
 void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadReport& report) {
     std::string name = folder.filename().string();
-    std::optional<std::string> text = ReadText(folder / "manifest.json");
+    std::optional<std::string> text = ReadWholeFile(folder / "manifest.json");
     if (!text) return;  // a folder without a manifest is not an element
 
     ManifestResult result = ParseManifest(*text, name, kSupportedKitApiMajor, [&](const std::string& file) {

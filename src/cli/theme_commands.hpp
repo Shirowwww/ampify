@@ -6,7 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "theme.hpp"
+#include "../core/theme/report.hpp"
+#include "../core/theme/theme.hpp"
 
 namespace ampify::theme {
 
@@ -17,10 +18,6 @@ struct KitLayout {
     std::filesystem::path Settings() const { return root / "settings.txt"; }
     std::filesystem::path Themes() const { return root / "themes"; }
 };
-
-// Writes what the kernel would apply, as `ampify_theme_check` does. Returns 0 when the theme is usable and has no problem,
-// 1 otherwise.
-int PrintThemeReport(const Theme& theme, std::ostream& out);
 
 // `ampify theme list`, `ampify theme set <id|none> [--scheme name]`. Returns 0 when done, 1 when the theme is refused,
 // 2 for a wrong command.

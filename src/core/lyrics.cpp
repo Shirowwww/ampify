@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cctype>
 
+#include "text_util.hpp"
+
 namespace ampify {
 
 namespace {
@@ -167,9 +169,7 @@ struct Tag {
 std::string LocalLowerName(std::string_view raw) {
     size_t colon = raw.rfind(':');
     if (colon != std::string_view::npos) raw.remove_prefix(colon + 1);
-    std::string name(raw);
-    std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
-    return name;
+    return ToLowerAscii(raw);
 }
 
 // Reads the tag whose '<' is at `pos`. Returns the index after '>', or npos when the input ends inside the tag.

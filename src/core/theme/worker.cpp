@@ -10,18 +10,11 @@
 #include "library.hpp"
 #include "snippets.hpp"
 #include "theme_settings.hpp"
+#include "../text_util.hpp"
 
 namespace ampify::theme {
 
 namespace {
-
-std::optional<std::string> ReadText(const std::filesystem::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    if (!in) return std::nullopt;
-    std::ostringstream text;
-    text << in.rdbuf();
-    return text.str();
-}
 
 std::string PartsKey(const ThemeParts& parts) {
     return std::string(parts.colors ? "c" : "-") + (parts.resources ? "r" : "-") + (parts.assets ? "a" : "-");
@@ -76,9 +69,9 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
 
     const std::filesystem::path snippetRoot = m_kit / "snippets";
     std::vector<std::string> snippets = EnabledSnippets(settings, ListSnippetFolders(snippetRoot));
-    std::optional<std::string> sidebar = ReadText(m_kit / LayoutFileName(LayoutKind::Sidebar));
-    std::optional<std::string> home = ReadText(m_kit / LayoutFileName(LayoutKind::Home));
-    std::optional<std::string> keysText = ReadText(m_kit / "resource-keys.txt");
+    std::optional<std::string> sidebar = ReadWholeFile(m_kit / LayoutFileName(LayoutKind::Sidebar));
+    std::optional<std::string> home = ReadWholeFile(m_kit / LayoutFileName(LayoutKind::Home));
+    std::optional<std::string> keysText = ReadWholeFile(m_kit / "resource-keys.txt");
 
     // Everything that changes what is applied goes into the key. A new key is a new generation.
     std::string key = (wanted.active.empty() ? std::string("none") : wanted.active) + "|" + m_scheme.scheme + "|" +

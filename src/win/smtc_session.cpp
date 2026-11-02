@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
+#include "../core/text_util.hpp"
 #include "win_common.hpp"
 
 namespace ampify::win {
@@ -58,9 +59,7 @@ constexpr DWORD kCommandTimeoutMs = 3000;
 
 // Apple Music's package family is AppleInc.AppleMusicWin_nzyj5cx40ttqa; its session id contains "AppleMusic".
 bool IsAppleMusic(const std::string& appId) {
-    std::string lower = appId;
-    std::transform(lower.begin(), lower.end(), lower.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::string lower = ToLowerAscii(appId);
     return lower.find("applemusic") != std::string::npos;
 }
 

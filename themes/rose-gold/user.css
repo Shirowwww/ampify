@@ -1,0 +1,70 @@
+/* Rose gold: warm brown-black panels, and a rose gold that marks what plays: the play button, the display of the song,
+   the volume and the chosen entries. Colors come from colors.ini ($button is the rose gold of the scheme in use); the
+   classes are Ampify's stable names for Apple Music's zones (docs/themes/names.md). */
+
+/* Play: a rose gold disc with a dark icon, slightly larger on hover. */
+.play-button > Grid#Root {
+    background: $button;
+    corner-radius: 20px;
+}
+
+.play-button FontIcon {
+    foreground: $main;
+}
+
+/* Apple Music animates this button itself, so the growth is immediate: a transition here would be refused. */
+.play-button:hover {
+    transform: scale(1.06);
+}
+
+/* The display of the song: a warm raised card. */
+.lcd {
+    background: $card;
+    corner-radius: 10px;
+}
+
+.lcd-artwork-image {
+    corner-radius: 6px;
+}
+
+.volume-slider {
+    color: $button;
+    background: $selected-row;
+}
+
+.volume-slider Thumb {
+    background: $text;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $card;
+}
+
+.menu-item:hover {
+    background: $selected-row;
+}
+
+/* Pages: rounded cards and rows that warm up under the pointer. */
+.card {
+    corner-radius: 8px;
+    transition: background 180ms;
+}
+
+.card:hover {
+    background: $card;
+}
+
+.artwork {
+    corner-radius: 6px;
+}
+
+.track-row {
+    corner-radius: 4px;
+    transition: background 120ms;
+}
+
+.track-row:hover {
+    background: $card;
+}

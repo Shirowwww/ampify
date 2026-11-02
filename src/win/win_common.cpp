@@ -123,6 +123,55 @@ std::wstring FromUtf8(std::string_view text) {
     return result;
 }
 
+std::wstring QuoteArgument(std::wstring_view argument) {
+    if (!argument.empty() && argument.find_first_of(L" \t\"") == std::wstring_view::npos) return std::wstring(argument);
+
+    std::wstring out = L"\"";
+    size_t i = 0;
+    while (true) {
+        size_t backslashes = 0;
+        while (i < argument.size() && argument[i] == L'\\') {
+            backslashes++;
+            i++;
+        }
+        if (i == argument.size()) {
+            out.append(backslashes * 2, L'\\');
+            break;
+        }
+        if (argument[i] == L'"') {
+            out.append(backslashes * 2 + 1, L'\\');
+            out += L'"';
+        } else {
+            out.append(backslashes, L'\\');
+            out += argument[i];
+        }
+        i++;
+    }
+    out += L'"';
+    return out;
+}
+
+bool StartProcess(const wchar_t* application, const std::wstring& commandLine, DWORD creationFlags,
+                  const wchar_t* folder, bool hidden) {
+    // CreateProcessW may write into the command line, so it gets a copy of its own.
+    std::vector<wchar_t> buffer(commandLine.begin(), commandLine.end());
+    buffer.push_back(L'\0');
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    if (hidden) {
+        startup.dwFlags = STARTF_USESHOWWINDOW;
+        startup.wShowWindow = SW_HIDE;
+    }
+    PROCESS_INFORMATION process{};
+    if (!CreateProcessW(application, buffer.data(), nullptr, nullptr, FALSE, creationFlags, nullptr, folder, &startup,
+                        &process)) {
+        return false;
+    }
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    return true;
+}
+
 bool IsElevated() {
     HANDLE token = nullptr;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return false;

@@ -1,0 +1,468 @@
+// XamlTreeBackend: the pointer, press and focus states of an element (hover values, state handlers) and the keys
+// written into a control's own resources for its visual states. The rest of the class is in xaml_backend.cpp.
+
+#if defined(AMPIFY_WITH_XAML)
+
+#include "xaml_backend.hpp"
+
+#include <cctype>
+#include <chrono>
+#include <cstdint>
+#include <cstdio>
+#include <limits>
+#include <optional>
+#include <string_view>
+#include <utility>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
+#include <set>
+
+#include <winrt/Microsoft.UI.Xaml.Input.h>
+#include <winrt/Microsoft.UI.Xaml.Markup.h>
+#include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
+#include <winrt/Microsoft.UI.Xaml.Navigation.h>
+#include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.UI.h>
+#include <winrt/Windows.UI.Text.h>
+#include <winrt/Windows.Foundation.Numerics.h>
+
+#include "../core/theme/colour_keys.hpp"
+#include "../core/theme/properties.hpp"
+#include "../core/text_util.hpp"
+#include "../core/ui_render/render_tree.hpp"
+#include "xaml_host.hpp"
+#include "xaml_backend_detail.hpp"
+
+namespace ampify::win {
+
+using namespace xaml_detail;
+
+// A control that refuses its events or a value counts as having no states: the engine goes on with the next element
+// (Engine::Restore gives every element back in one loop).
+bool XamlTreeBackend::SetHover(theme::NodeId id, const std::vector<theme::HoverValue>& values) {
+    try {
+        return FollowHover(id, values);
+    } catch (...) {
+        return false;
+    }
+}
+
+bool XamlTreeBackend::FollowHover(theme::NodeId id, const std::vector<theme::HoverValue>& values) {
+    if (*m_closed) return false;
+    xaml::DependencyObject object = Resolve(id);
+    xaml::UIElement element{nullptr};
+    if (object) element = object.try_as<xaml::UIElement>();
+
+    // The brushes the states give or gave: the control's state keys follow them (UpdateStates).
+    std::vector<std::string> brushes;
+    for (const char* property : {"Background", "Foreground", "BorderBrush"}) {
+        bool given = std::any_of(values.begin(), values.end(), [&](const auto& value) { return value.property == property; });
+        bool gave = m_hover.ValueOf(id, property) || m_hover.ValueOf(id, property, theme::Trigger::Active);
+        if (given || gave) brushes.emplace_back(property);
+    }
+    auto follow = [&] {
+        for (const std::string& property : brushes) {
+            auto written = m_written.find(std::make_pair(id, property));
+            UpdateStates(id, object, property, written == m_written.end() ? nullptr : written->second.object);
+        }
+    };
+
+    if (values.empty()) {
+        m_hover.Set(id, values, *this);  // under the pointer, the values underneath come back first
+        RemoveHoverHandlers(id);
+        if (object) follow();
+        return static_cast<bool>(element);
+    }
+    if (!element) return false;
+
+    theme::HoverTracker::Change change = m_hover.Set(id, values, *this);
+    follow();
+    if (change == theme::HoverTracker::Change::Added) {
+        RemoveHoverHandlers(id);  // none should be left; a stale pair would apply a state twice
+    }
+    if (change == theme::HoverTracker::Change::Added || change == theme::HoverTracker::Change::Updated) {
+        FollowStates(id, element);
+    }
+    return true;
+}
+
+namespace {
+
+// What ends a press: the button let go, the pointer taken away, or the pointer gone out of the element (a press dragged
+// off an element that does not capture the pointer would otherwise stay on).
+std::array<xaml::RoutedEvent, 4> PressEnds() {
+    return {xaml::UIElement::PointerReleasedEvent(), xaml::UIElement::PointerCaptureLostEvent(),
+            xaml::UIElement::PointerCanceledEvent(), xaml::UIElement::PointerExitedEvent()};
+}
+
+// Whether the keyboard focus is on the element or one of its parts.
+bool FocusWithin(const xaml::UIElement& element) {
+    xaml::XamlRoot root = element.XamlRoot();
+    if (!root) return false;
+    auto focused = xaml::Input::FocusManager::GetFocusedElement(root).try_as<xaml::DependencyObject>();
+    for (xaml::DependencyObject current = focused; current; current = media::VisualTreeHelper::GetParent(current)) {
+        if (current == element) return true;
+    }
+    return false;
+}
+
+}  // namespace
+
+// Follows the events of the states the element's values use, and stops following the others. The handlers run inside
+// Apple Music's XAML: OnState lets nothing escape. They hold a weak pointer, so a backend destroyed before them leaves
+// them doing nothing.
+void XamlTreeBackend::FollowStates(theme::NodeId id, const xaml::UIElement& element) {
+    std::weak_ptr<bool> alive = m_alive;
+    auto to = [this, alive, id](theme::Trigger trigger, bool on) {
+        return [this, alive, id, trigger, on](IInspectable const&, auto const&) noexcept {
+            if (!alive.expired()) OnState(id, trigger, on);
+        };
+    };
+    HoverHandlers& handlers = m_hoverHandlers[id];
+    handlers.element = winrt::make_weak(element);
+
+    bool hover = m_hover.Uses(id, theme::Trigger::Hover);
+    if (hover && !handlers.hover) {
+        handlers.entered = element.PointerEntered(to(theme::Trigger::Hover, true));
+        handlers.exited = element.PointerExited(to(theme::Trigger::Hover, false));
+    } else if (!hover && handlers.hover) {
+        element.PointerEntered(handlers.entered);
+        element.PointerExited(handlers.exited);
+        m_hover.Toggle(id, theme::Trigger::Hover, false, *this);
+    }
+    handlers.hover = hover;
+
+    bool active = m_hover.Uses(id, theme::Trigger::Active);
+    if (active && !handlers.active) {
+        handlers.pressed = winrt::box_value(xaml::Input::PointerEventHandler(to(theme::Trigger::Active, true)));
+        handlers.released = winrt::box_value(xaml::Input::PointerEventHandler(to(theme::Trigger::Active, false)));
+        element.AddHandler(xaml::UIElement::PointerPressedEvent(), handlers.pressed, true);
+        for (const xaml::RoutedEvent& end : PressEnds()) element.AddHandler(end, handlers.released, true);
+    } else if (!active && handlers.active) {
+        element.RemoveHandler(xaml::UIElement::PointerPressedEvent(), handlers.pressed);
+        for (const xaml::RoutedEvent& end : PressEnds()) element.RemoveHandler(end, handlers.released);
+        handlers.pressed = handlers.released = nullptr;
+        m_hover.Toggle(id, theme::Trigger::Active, false, *this);
+    }
+    handlers.active = active;
+
+    bool focus = m_hover.Uses(id, theme::Trigger::Focus);
+    if (focus && !handlers.focus) {
+        handlers.gotFocus = element.GotFocus(to(theme::Trigger::Focus, true));
+        // Checked once the focus has moved: from the search box's text to its own buttons, it stays within the box.
+        handlers.lostFocus = element.LostFocus([this, alive, id](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+            try {
+                auto source = sender.try_as<xaml::UIElement>();
+                if (alive.expired() || !source) return;
+                source.DispatcherQueue().TryEnqueue([this, alive, id]() noexcept {
+                    if (!alive.expired()) OnFocusLost(id);
+                });
+            } catch (...) {
+            }
+        });
+        if (FocusWithin(element)) m_hover.Toggle(id, theme::Trigger::Focus, true, *this);
+    } else if (!focus && handlers.focus) {
+        element.GotFocus(handlers.gotFocus);
+        element.LostFocus(handlers.lostFocus);
+        m_hover.Toggle(id, theme::Trigger::Focus, false, *this);
+    }
+    handlers.focus = focus;
+}
+
+void XamlTreeBackend::OnState(theme::NodeId id, theme::Trigger trigger, bool on) noexcept {
+    try {
+        if (*m_closed) return;
+        m_hover.Toggle(id, trigger, on, *this);
+    } catch (...) {
+    }
+}
+
+void XamlTreeBackend::OnFocusLost(theme::NodeId id) noexcept {
+    try {
+        if (*m_closed) return;
+        auto it = m_hoverHandlers.find(id);
+        xaml::UIElement element = it == m_hoverHandlers.end() ? nullptr : it->second.element.get();
+        if (element && FocusWithin(element)) return;
+        m_hover.Toggle(id, theme::Trigger::Focus, false, *this);
+    } catch (...) {
+    }
+}
+
+void XamlTreeBackend::RemoveHoverHandlers(theme::NodeId id) {
+    auto it = m_hoverHandlers.find(id);
+    if (it == m_hoverHandlers.end()) return;
+    const HoverHandlers& handlers = it->second;
+    if (xaml::UIElement element = handlers.element.get()) {
+        if (handlers.hover) {
+            element.PointerEntered(handlers.entered);
+            element.PointerExited(handlers.exited);
+        }
+        if (handlers.active) {
+            element.RemoveHandler(xaml::UIElement::PointerPressedEvent(), handlers.pressed);
+            for (const xaml::RoutedEvent& end : PressEnds()) element.RemoveHandler(end, handlers.released);
+        }
+        if (handlers.focus) {
+            element.GotFocus(handlers.gotFocus);
+            element.LostFocus(handlers.lostFocus);
+        }
+    }
+    m_hoverHandlers.erase(it);
+}
+
+namespace {
+
+// The keys a control template reads for its pointer states, and the control whose resources hold them. WinUI names most
+// of them {Control}{Property}{State}, for the control's own type and the WinUI control it derives from (Apple's
+// transport buttons are AppBarButtons whose template reads both AppBarButton... and Button... keys). A menu entry that
+// opens a submenu stays lit while the submenu shows. A slider names its keys after its parts: the track for Background,
+// the part left of the thumb for Foreground, and the thumb, whose keys it holds.
+struct StateKeys {
+    controls::Control holder{nullptr};
+    std::vector<std::wstring> keys;
+    std::vector<std::wstring> plainKeys;  // read at rest: they take the written value, not the :hover one
+};
+
+// The controls whose templates change their look under the pointer and while pressed. A page, a navigation view or
+// another container has no such states: holding keys for one only made it read its theme again, half a second for a
+// whole page at each change of colour.
+bool HasPointerStates(const controls::Control& control) {
+    return control.try_as<primitives::ButtonBase>() || control.try_as<controls::Slider>() ||
+           control.try_as<primitives::Thumb>() || control.try_as<controls::MenuFlyoutItemBase>() ||
+           control.try_as<primitives::SelectorItem>() || control.try_as<controls::NavigationViewItem>() ||
+           control.try_as<controls::ComboBox>() || control.try_as<controls::SplitButton>() ||
+           control.try_as<primitives::ScrollBar>();
+}
+
+StateKeys PointerStateKeys(const controls::Control& control, std::string_view property) {
+    constexpr int kSliderDepth = 4;  // from its thumb: the thumb, two template grids, the slider
+    StateKeys result{control, {}};
+    std::vector<std::string> bases;
+    if (control.try_as<controls::Slider>()) {
+        if (property == "Background") bases = {"SliderTrackFill"};
+        if (property == "Foreground") bases = {"SliderTrackValueFill"};
+    } else if (control.try_as<primitives::Thumb>()) {
+        xaml::DependencyObject current = control;
+        for (int depth = 0; current && depth < kSliderDepth && !result.holder.try_as<controls::Slider>(); depth++) {
+            current = media::VisualTreeHelper::GetParent(current);
+            if (auto slider = current.try_as<controls::Slider>()) result.holder = slider;
+        }
+        if (result.holder.try_as<controls::Slider>() && property == "Background") bases = {"SliderThumbBackground"};
+    } else if (control.try_as<primitives::ScrollBar>()) {
+        // Away from the pointer a scroll bar is a thin line; under it, it widens to a thumb on a track. The line and the
+        // track at rest take the written value, the wide thumb and the track under the pointer the :hover one.
+        if (property == "Foreground") {
+            result.keys = {L"ScrollBarPanningThumbBackground", L"ScrollBarThumbBackground"};
+            result.plainKeys = {L"ScrollBarPanningThumbBackground"};
+        }
+        if (property == "Background") {
+            result.keys = {L"ScrollBarTrackFill", L"ScrollBarTrackFillPointerOver"};
+            result.plainKeys = {L"ScrollBarTrackFill"};
+        }
+        return result;
+    } else {
+        bases.push_back(ShortName(Utf8(winrt::get_class_name(control))) + std::string(property));
+        if (control.try_as<primitives::ToggleButton>()) bases.push_back("ToggleButton" + std::string(property));
+        else if (control.try_as<primitives::ButtonBase>()) bases.push_back("Button" + std::string(property));
+        else if (control.try_as<controls::MenuFlyoutItem>()) bases.push_back("MenuFlyoutItem" + std::string(property));
+    }
+    std::vector<const char*> states{"PointerOver", "Pressed"};
+    if (control.try_as<controls::MenuFlyoutSubItem>()) states.push_back("SubMenuOpened");
+    for (const std::string& base : bases) {
+        for (const char* state : states) {
+            std::wstring key = winrt::to_hstring(base + state).c_str();
+            if (std::find(result.keys.begin(), result.keys.end(), key) == result.keys.end()) result.keys.push_back(key);
+        }
+    }
+    return result;
+}
+
+// A solid brush drawn the same, as a new object; any other brush as it is.
+IInspectable CopyBrush(const IInspectable& brush) {
+    if (auto solid = brush.try_as<media::SolidColorBrush>()) {
+        media::SolidColorBrush copy(solid.Color());
+        copy.Opacity(solid.Opacity());
+        return copy;
+    }
+    return brush;
+}
+
+// The engine builds a new brush at each write: two brushes that draw the same count as the same. Comparing gradients
+// and acrylics by object made the control read its states again each time the pointer came or left.
+bool SameBrush(const IInspectable& a, const IInspectable& b) {
+    if (a == b) return true;
+    if (auto first = a.try_as<media::SolidColorBrush>()) {
+        auto second = b.try_as<media::SolidColorBrush>();
+        return second && first.Color() == second.Color() && first.Opacity() == second.Opacity();
+    }
+    if (auto first = a.try_as<media::LinearGradientBrush>()) {
+        auto second = b.try_as<media::LinearGradientBrush>();
+        if (!second || first.StartPoint() != second.StartPoint() || first.EndPoint() != second.EndPoint() ||
+            first.Opacity() != second.Opacity()) {
+            return false;
+        }
+        auto stops = first.GradientStops();
+        auto others = second.GradientStops();
+        if (stops.Size() != others.Size()) return false;
+        for (uint32_t i = 0; i < stops.Size(); i++) {
+            media::GradientStop stop = stops.GetAt(i);
+            media::GradientStop other = others.GetAt(i);
+            if (stop.Color() != other.Color() || stop.Offset() != other.Offset()) return false;
+        }
+        return true;
+    }
+    if (auto first = a.try_as<media::AcrylicBrush>()) {
+        auto second = b.try_as<media::AcrylicBrush>();
+        return second && first.TintColor() == second.TintColor() && first.TintOpacity() == second.TintOpacity() &&
+               first.FallbackColor() == second.FallbackColor() && first.Opacity() == second.Opacity();
+    }
+    return false;
+}
+
+}  // namespace
+
+void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::DependencyObject& object, std::string_view property,
+                                        const IInspectable& value, const IInspectable& pressed,
+                                        const IInspectable& plain) noexcept {
+    // The control itself or its template's root, which the states write to (Root.Background). A deeper part keeps the
+    // control's own feedback: a list row's background must not become the highlight of the row under the pointer.
+    constexpr int kTemplateDepth = 2;
+    try {
+        controls::Control control{nullptr};
+        xaml::DependencyObject current = object;
+        for (int depth = 0; current && !control && depth < kTemplateDepth; depth++) {
+            control = current.try_as<controls::Control>();
+            current = media::VisualTreeHelper::GetParent(current);
+        }
+        if (!control || !HasPointerStates(control)) return;
+        StateKeys states = PointerStateKeys(control, property);
+        if (states.keys.empty()) return;
+        auto entry = std::make_pair(id, std::string(property));
+        HeldStates& held = m_heldStates[entry];
+        held.element = winrt::make_weak(object);
+        held.control = winrt::make_weak(states.holder);
+        held.holder = winrt::get_abi(states.holder.as<winrt::Windows::Foundation::IUnknown>());
+        xaml::ResourceDictionary resources = states.holder.Resources();
+        // The written brush is also the element's property value, which a dictionary refuses (0x800F0902): a copy.
+        IInspectable restCopy = states.plainKeys.empty() ? nullptr : CopyBrush(plain);
+        bool changed = false;
+        for (const std::wstring& key : states.keys) {
+            bool atRest = std::find(states.plainKeys.begin(), states.plainKeys.end(), key) != states.plainKeys.end();
+            const IInspectable& want = atRest ? restCopy : key.ends_with(L"Pressed") ? pressed : value;
+            IInspectable name = winrt::box_value(winrt::hstring(key));
+            auto kept = std::find_if(held.keys.begin(), held.keys.end(), [&](const auto& item) { return item.first == key; });
+            if (!want) {
+                // No theme value for this state: Apple Music's own, given back if the theme held the key.
+                if (kept == held.keys.end()) continue;
+                if (kept->second) resources.Insert(name, kept->second);
+                else if (resources.HasKey(name)) resources.Remove(name);
+                held.keys.erase(kept);
+                changed = true;
+                continue;
+            }
+            IInspectable before = resources.HasKey(name) ? resources.Lookup(name) : nullptr;
+            if (kept == held.keys.end()) held.keys.emplace_back(key, KeyOriginal(held.holder, key, entry).value_or(before));
+            if (SameBrush(before, want)) continue;
+            resources.Insert(name, want);
+            changed = true;
+        }
+        // Only on a real change: a refresh made Apple Music reset the play button's background, which was then written
+        // again, every 3 s.
+        if (changed) ReadThemeAgain(states.holder);
+    } catch (const winrt::hresult_error& error) {
+        m_refusedStates++;  // costs the states their theme value, never the value itself
+        if (m_firstRefusal.empty()) {
+            char code[16];
+            std::snprintf(code, sizeof code, "0x%08X", static_cast<unsigned>(error.code().value));
+            m_firstRefusal = std::string(property) + ": " + code + " " + Utf8(error.message());
+        }
+    } catch (...) {
+        m_refusedStates++;
+    }
+}
+
+namespace {
+
+// A brush for a state key from a :hover value. Not an image: it would be decoded again at each write.
+media::Brush StateBrush(const theme::Value& value) {
+    if (value.kind == theme::ValueKind::Color) {
+        std::optional<ColorValue> color = ColorFromText(value.text);
+        return color ? media::SolidColorBrush(*color) : nullptr;
+    }
+    if (value.kind == theme::ValueKind::Gradient) return GradientFrom(value.text);
+    if (value.kind == theme::ValueKind::Acrylic) return AcrylicFrom(value.text);
+    return nullptr;
+}
+
+}  // namespace
+
+// What a control shows under the pointer and while pressed: the theme's :hover value when it gives one, else the value
+// the theme wrote (`shown`), else Apple Music's own; pressed, its :active value first. Those values are in the keys
+// before the pointer comes: a state shown for the first time reads them then, and an entry that opens a submenu stays
+// lit after the pointer leaves it.
+void XamlTreeBackend::UpdateStates(theme::NodeId id, const xaml::DependencyObject& object, std::string_view property,
+                                   IInspectable shown) noexcept {
+    IInspectable plain = shown;
+    IInspectable pressed;
+    try {
+        if (std::optional<theme::Value> hover = m_hover.ValueOf(id, property)) {
+            if (media::Brush brush = StateBrush(*hover)) shown = brush;
+        }
+        pressed = shown;
+        if (std::optional<theme::Value> active = m_hover.ValueOf(id, property, theme::Trigger::Active)) {
+            if (media::Brush brush = StateBrush(*active)) pressed = brush;
+        }
+    } catch (...) {
+    }
+    if (shown || pressed) {
+        HoldThroughStates(id, object, property, shown, pressed, plain);
+    } else {
+        ReleaseStates(id, property);
+    }
+}
+
+void XamlTreeBackend::ReleaseStates(theme::NodeId id, std::string_view property) noexcept {
+    auto it = m_heldStates.find(std::make_pair(id, std::string(property)));
+    if (it == m_heldStates.end()) return;
+    if (auto control = it->second.control.get()) {
+        for (const auto& [key, original] : it->second.keys) {
+            if (KeyOriginal(it->second.holder, key, it->first)) continue;  // another part holds it: the last gives it back
+            try {
+                IInspectable name = winrt::box_value(winrt::hstring(key));
+                if (original) control.Resources().Insert(name, original);
+                else if (control.Resources().HasKey(name)) control.Resources().Remove(name);
+            } catch (...) {
+            }
+        }
+        try {
+            ReadThemeAgain(control);
+        } catch (...) {
+        }
+    }
+    m_heldStates.erase(it);
+}
+
+// Two parts of one control can hold the same keys of its resources (a slider's two thumbs). The first records what the
+// key held before the theme; the others take that record, never the theme's value they find there.
+std::optional<IInspectable> XamlTreeBackend::KeyOriginal(void* holder, const std::wstring& key,
+                                                         const std::pair<theme::NodeId, std::string>& except) const {
+    for (const auto& [entry, held] : m_heldStates) {
+        if (entry == except || held.holder != holder) continue;
+        for (const auto& [kept, original] : held.keys) {
+            if (kept == key) return original;
+        }
+    }
+    return std::nullopt;
+}
+
+std::size_t XamlTreeBackend::HeldStateCount() const {
+    std::size_t count = 0;
+    for (const auto& entry : m_heldStates) count += entry.second.keys.size();
+    return count;
+}
+
+}  // namespace ampify::win
+
+#endif  // AMPIFY_WITH_XAML

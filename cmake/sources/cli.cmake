@@ -1,7 +1,6 @@
 # The command line `ampify`: its portable library (ampify_cli_portable) and the executable (ampify). See the convention at
 # the top of CMakeLists.txt.
 list(APPEND AMPIFY_CLI_PORTABLE_SOURCES
-    src/cli/json.cpp
     src/cli/sha256.cpp
     src/cli/element.cpp
     src/cli/catalog.cpp
@@ -10,7 +9,8 @@ list(APPEND AMPIFY_CLI_PORTABLE_SOURCES
     src/cli/archive.cpp
     src/cli/watch.cpp
     src/cli/release.cpp
-    src/cli/zip_writer.cpp)
+    src/cli/zip_writer.cpp
+    src/cli/theme_commands.cpp)
 
 list(APPEND AMPIFY_CLI_SOURCES
     src/cli/ampify.cpp

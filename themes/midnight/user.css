@@ -1,30 +1,93 @@
-/* Midnight: night blue, light blue accent. The colors come from the Dark scheme of colors.ini.
-   Apple Music's backgrounds do not read the Fluent brushes: they are targeted by their stable names
-   (docs/themes/names.md). */
+/* Midnight: an ink-blue window at night. The sidebar and the pages float as two rounded panels, the playback bar stays at
+   the top, and a pale moonlight blue marks what plays and what is chosen. Colors come from colors.ini; the classes are
+   Ampify's stable names for Apple Music's zones (docs/themes/names.md). */
 
-/* The background of the window, the sidebar and the playback bar (at the top). */
-.window,
-.navigation,
-.frost {
-    background: $SolidBackgroundFillColorBaseBrush;
+:root {
+    --window-background: #05070D;
+    --panel-background: #0C111E;
+    --panel-radius: 12px;
+    --gap: 10;
+    --raised: #141B2E;
+    --hover: #1B2440;
+    --band-background: #10172A;
 }
 
-.sidebar {
-    background: $LayerFillColorDefaultBrush;
-}
+@import "ampify:floating-panels";
 
-/* The display at the center of the playback bar. */
+/* ---- Playback bar ------------------------------------------------------------------------------------------------- */
+
 .lcd {
-    background: $CardBackgroundFillColorDefaultBrush;
-    corner-radius: 8;
+    background: var(--raised);
+    corner-radius: 10px;
 }
 
-/* The pages area. */
-.page,
-.content {
-    background: $SolidBackgroundFillColorBaseBrush;
+.lcd-artwork-image {
+    corner-radius: 6px;
 }
 
-TextBlock {
-    color: $TextFillColorPrimaryBrush;
+/* Play: a moonlight disc with an ink icon, slightly larger on hover. */
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 20px;
+}
+
+.play-button FontIcon {
+    foreground: #05070D;
+}
+
+/* Apple Music animates this button itself, so the growth is immediate: a transition here would be refused. */
+.play-button:hover {
+    transform: scale(1.06);
+}
+
+.volume-slider {
+    color: $AccentFillColorDefaultBrush;
+    background: #2A3450;
+}
+
+.volume-slider Thumb {
+    background: #EDF0FA;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: #141B2E;
+}
+
+.menu-item:hover {
+    background: #222C4A;
+}
+
+/* ---- Pages -------------------------------------------------------------------------------------------------------- */
+
+.page-title {
+    font-weight: 700;
+}
+
+/* An album's artist in moonlight, not Apple's blue. */
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.card {
+    corner-radius: 10px;
+    transition: background 180ms;
+}
+
+.card:hover {
+    background: var(--raised);
+}
+
+.artwork {
+    corner-radius: 8px;
+}
+
+.track-row {
+    corner-radius: 6px;
+    transition: background 120ms;
+}
+
+.track-row:hover {
+    background: var(--raised);
 }

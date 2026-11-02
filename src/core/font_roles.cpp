@@ -4,6 +4,7 @@
 #include <mutex>
 
 #include "json.hpp"
+#include "text_util.hpp"
 
 namespace ampify {
 
@@ -30,8 +31,7 @@ double NumberOr(const std::string& text, double fallback) {
 }  // namespace
 
 std::string CanonicalFontRole(std::string_view role) {
-    std::string lowered(role);
-    for (char& c : lowered) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    std::string lowered = ToLowerAscii(role);
     if (lowered == "text") return "body";
     return lowered;
 }

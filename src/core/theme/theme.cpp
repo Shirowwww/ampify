@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "../json.hpp"
+#include "../text_util.hpp"
 #include "fonts.hpp"
 #include "ini.hpp"
 #include "spicetify.hpp"
@@ -15,20 +16,6 @@
 namespace ampify::theme {
 
 namespace {
-
-std::string LowerText(std::string_view text) {
-    std::string result(text);
-    for (char& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return result;
-}
-
-std::string_view Trim(std::string_view text) {
-    size_t first = 0;
-    size_t last = text.size();
-    while (first < last && std::isspace(static_cast<unsigned char>(text[first]))) first++;
-    while (last > first && std::isspace(static_cast<unsigned char>(text[last - 1]))) last--;
-    return text.substr(first, last - first);
-}
 
 // Picks the scheme to use: the requested one (case-insensitive), or the first section when none is requested.
 const Ini::Section* PickScheme(const Ini& ini, const std::string& wanted, Theme& theme) {
@@ -131,13 +118,13 @@ void DefineDerivedColors(Theme& theme, bool applied) {
 // (SpicetifyResources) unless the scheme names them itself. Returns the Spicetify name.
 std::string DefineSpicetifyColor(const Ini::Entry& entry, Argb color, Theme& theme) {
     std::string key = SpicetifyKey(entry.key);
-    if (key.empty()) key = LowerText(entry.key);  // a colour of the theme's own, such as accent
+    if (key.empty()) key = ToLowerAscii(entry.key);  // a colour of the theme's own, such as accent
     if (!theme.palette.Define(key, color)) {
         theme.problems.push_back("colors.ini line " + std::to_string(entry.line) + ": \"" + entry.key +
                                  "\" defined twice, ignored");
         return {};
     }
-    if (LowerText(entry.key) != key) theme.palette.Define(LowerText(entry.key), color);  // main_fg stays usable too
+    if (ToLowerAscii(entry.key) != key) theme.palette.Define(ToLowerAscii(entry.key), color);  // main_fg stays usable too
     theme.variables["spice-" + key] = ToXamlColor(color);
     return key;
 }
@@ -277,7 +264,7 @@ void LoadVariables(const Stylesheet& sheet, const ValueContext& context, const R
                 theme.problems.push_back(AtLine(source.file, declaration.line) + ": " + problem + ", ignored");
                 continue;
             }
-            std::string name = LowerText(std::string_view(declaration.property).substr(2));
+            std::string name = ToLowerAscii(std::string_view(declaration.property).substr(2));
             theme.variables[name] = *value;
             if (name.starts_with("font-")) DefineFontPart(name, *value, declaration.line, context, source, theme);
         }
@@ -357,7 +344,7 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
                 continue;
             }
 
-            if (LowerText(declaration.property) == "font-role") {
+            if (ToLowerAscii(declaration.property) == "font-role") {
                 if (AddFontRole(rule, declaration, *raw, order, from, applied, theme)) order++;
                 continue;
             }
@@ -496,7 +483,7 @@ std::optional<std::string> SubstituteVariables(std::string_view value, const std
     // Each pass replaces the first var(...). A fallback may hold another var(), so a few passes may be needed; the
     // limit stops a value that would grow forever.
     for (int pass = 0; pass < 32; pass++) {
-        std::string lowered = LowerText(text);
+        std::string lowered = ToLowerAscii(text);
         size_t start = lowered.find("var(");
         if (start == std::string::npos) return text;
 
@@ -508,7 +495,7 @@ std::optional<std::string> SubstituteVariables(std::string_view value, const std
 
         std::string_view inside = std::string_view(text).substr(start + 4, close - start - 4);
         size_t comma = inside.find(',');
-        std::string name = LowerText(Trim(inside.substr(0, comma)));
+        std::string name = ToLowerAscii(TrimSpace(inside.substr(0, comma)));
         if (!name.starts_with("--") || name.size() == 2) {
             if (problem) *problem = "var() needs a --variable name";
             return std::nullopt;
@@ -519,7 +506,7 @@ std::optional<std::string> SubstituteVariables(std::string_view value, const std
         if (it != variables.end()) {
             replacement = it->second;
         } else if (comma != std::string_view::npos) {
-            replacement = std::string(Trim(inside.substr(comma + 1)));
+            replacement = std::string(TrimSpace(inside.substr(comma + 1)));
         } else {
             if (problem) *problem = "variable \"" + name + "\" is not defined";
             return std::nullopt;
@@ -613,7 +600,7 @@ private:
             return inner;
         }
         SkipSpaces();
-        if (LowerText(m_text.substr(m_pos, 5)) == "calc(") m_pos += 4;
+        if (ToLowerAscii(m_text.substr(m_pos, 5)) == "calc(") m_pos += 4;
         if (Take('(')) {
             std::optional<Quantity> inner = Sum();
             if (!inner) return std::nullopt;
@@ -653,7 +640,7 @@ std::string FormatQuantity(const Quantity& quantity) {
 std::optional<std::string> EvaluateCalc(std::string_view value, std::string* problem) {
     std::string text(value);
     for (int pass = 0; pass < 32; pass++) {
-        size_t start = LowerText(text).find("calc(");
+        size_t start = ToLowerAscii(text).find("calc(");
         if (start == std::string::npos) return text;
 
         size_t close = ClosingBracket(text, start + 4);
@@ -676,7 +663,7 @@ std::optional<std::string> EvaluateCalc(std::string_view value, std::string* pro
 
 bool IsEmptyDictionary(std::string_view xaml) {
     size_t open = xaml.find("<ResourceDictionary");
-    if (open == std::string_view::npos) return Trim(xaml).empty();
+    if (open == std::string_view::npos) return TrimSpace(xaml).empty();
     size_t end = xaml.find('>', open);
     if (end == std::string_view::npos) return false;
     if (end > 0 && xaml[end - 1] == '/') return true;
@@ -689,7 +676,7 @@ bool IsEmptyDictionary(std::string_view xaml) {
         size_t stop = body.find("-->", comment);
         body.erase(comment, stop == std::string::npos ? std::string::npos : stop + 3 - comment);
     }
-    return Trim(body).empty();
+    return TrimSpace(body).empty();
 }
 
 std::vector<std::string> XamlKeys(std::string_view xaml) {

@@ -15,10 +15,10 @@ list(APPEND AMPIFY_THEME_SOURCES
     src/core/theme/session.cpp
     src/core/theme/theme.cpp
     src/core/theme/theme_settings.cpp
-    src/core/theme/commands.cpp
     src/core/theme/fonts.cpp
     src/core/theme/hover.cpp
     src/core/theme/layout.cpp
+    src/core/theme/report.cpp
     src/core/theme/scheme_choice.cpp
     src/core/theme/snippets.cpp
     src/core/theme/spicetify.cpp

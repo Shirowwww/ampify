@@ -18,14 +18,6 @@ bool EqualsIgnoreCase(std::string_view left, std::string_view right) {
     return true;
 }
 
-std::string Trimmed(std::string_view text) {
-    size_t first = 0;
-    size_t last = text.size();
-    while (first < last && std::isspace(static_cast<unsigned char>(text[first]))) first++;
-    while (last > first && std::isspace(static_cast<unsigned char>(text[last - 1]))) last--;
-    return std::string(text.substr(first, last - first));
-}
-
 }  // namespace
 
 std::vector<std::string> Ini::Parse(std::string_view text) {
@@ -44,7 +36,7 @@ std::vector<std::string> Ini::Parse(std::string_view text) {
         start = end + 1;
         lineNumber++;
 
-        std::string line = Trimmed(raw);
+        std::string line(TrimSpace(raw));
         if (line.empty() || line[0] == ';' || line[0] == '#') continue;
 
         if (line.front() == '[') {
@@ -53,7 +45,7 @@ std::vector<std::string> Ini::Parse(std::string_view text) {
                 current = nullptr;
                 continue;
             }
-            m_sections.push_back({Trimmed(std::string_view(line).substr(1, line.size() - 2)), {}, lineNumber});
+            m_sections.push_back({std::string(TrimSpace(std::string_view(line).substr(1, line.size() - 2))), {}, lineNumber});
             current = &m_sections.back();
             continue;
         }
@@ -64,8 +56,8 @@ std::vector<std::string> Ini::Parse(std::string_view text) {
             continue;
         }
 
-        std::string key = Trimmed(std::string_view(line).substr(0, equals));
-        std::string value = Trimmed(std::string_view(line).substr(equals + 1));
+        std::string key(TrimSpace(std::string_view(line).substr(0, equals)));
+        std::string value(TrimSpace(std::string_view(line).substr(equals + 1)));
         if (key.empty()) {
             problems.push_back("line " + std::to_string(lineNumber) + ": empty key ignored");
             continue;

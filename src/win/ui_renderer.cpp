@@ -26,6 +26,7 @@
 #include "../core/ui_render/probe.hpp"
 #include "../core/ui_render/style.hpp"
 #include "../core/ui_render/svg_icon.hpp"
+#include "xaml_host.hpp"
 
 namespace ampify::win {
 
@@ -45,10 +46,6 @@ constexpr wchar_t kXmlns[] = L"xmlns='http://schemas.microsoft.com/winfx/2006/xa
 
 winrt::hstring Wide(const std::string& text) {
     return winrt::to_hstring(text);
-}
-
-std::string Utf8(const winrt::hstring& text) {
-    return winrt::to_string(text);
 }
 
 // Loads a small piece of XAML written by Ampify (never text of an extension, except path data checked by

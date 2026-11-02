@@ -16,7 +16,7 @@
 #include "../core/launch_flags.hpp"
 #include "../core/midi_map.hpp"
 #include "../core/remote_protocol.hpp"
-#include "../core/theme/commands.hpp"
+#include "theme_commands.hpp"
 #include "../core/theme/files.hpp"
 #include "../core/theme/theme.hpp"
 #include "archive.hpp"
@@ -50,8 +50,7 @@ bool IsKindFolderText(std::string_view text) {
 }
 
 bool ParseBoolText(std::string_view text, bool& value) {
-    std::string lowered;
-    for (char c : text) lowered += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    std::string lowered = ToLowerAscii(text);
     if (lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes") {
         value = true;
         return true;

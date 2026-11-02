@@ -17,6 +17,7 @@
 #include <optional>
 
 #include "../core/settings.hpp"
+#include "../core/text_util.hpp"
 #include "catalog.hpp"
 #include "commands.hpp"
 #include "element.hpp"
@@ -79,11 +80,9 @@ inline bool IsYes(std::string answer) {
 
 // Whole content of a file. False when it cannot be read.
 inline bool ReadWholeFile(const std::filesystem::path& file, std::string& text) {
-    std::ifstream in(file, std::ios::binary);
-    if (!in) return false;
-    std::stringstream buffer;
-    buffer << in.rdbuf();
-    text = buffer.str();
+    std::optional<std::string> content = ampify::ReadWholeFile(file);
+    if (!content) return false;
+    text = std::move(*content);
     return true;
 }
 

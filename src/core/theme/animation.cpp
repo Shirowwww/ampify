@@ -33,12 +33,6 @@ constexpr std::array<NamedEasing, 5> kEasings{{
     {"ease-in-out", {0.42, 0, 0.58, 1}},
 }};
 
-std::string_view Trim(std::string_view text) {
-    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front()))) text.remove_prefix(1);
-    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back()))) text.remove_suffix(1);
-    return text;
-}
-
 // The pieces of `text` between each `separator` outside brackets, trimmed. With `skipEmpty`, runs of separators make
 // one break, as spaces do between words.
 std::vector<std::string_view> Split(std::string_view text, char separator, bool skipEmpty = false) {
@@ -52,7 +46,7 @@ std::vector<std::string_view> Split(std::string_view text, char separator, bool 
         bool cut = end || (depth == 0 && (separator == ' ' ? std::isspace(static_cast<unsigned char>(text[i])) != 0
                                                            : text[i] == separator));
         if (!cut) continue;
-        std::string_view piece = Trim(text.substr(start, i - start));
+        std::string_view piece = TrimSpace(text.substr(start, i - start));
         if (!piece.empty() || !skipEmpty) pieces.push_back(piece);
         start = i + 1;
     }
@@ -350,7 +344,7 @@ KeyframeTracks ReadKeyframes(const Keyframes& block, const ValueContext& context
 
 std::optional<std::string> AnimationValue(std::string_view raw, const KeyframeSets& sets, std::string* problem) {
     std::string reason;
-    std::string_view text = Trim(raw);
+    std::string_view text = TrimSpace(raw);
     if (ToLowerAscii(text) == "none") return std::string();
     std::vector<std::string_view> items = Split(text, ',');
     std::vector<Animation> animations;

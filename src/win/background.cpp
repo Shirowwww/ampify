@@ -75,17 +75,7 @@ bool StartBackground(const std::filesystem::path& launcher) {
     // as Start-Process -Wait) does not wait for a launcher that runs until sign-out.
     const DWORD attempts[] = {DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB, DETACHED_PROCESS};
     for (DWORD flags : attempts) {
-        std::vector<wchar_t> buffer(command.begin(), command.end());
-        buffer.push_back(L'\0');
-        STARTUPINFOW startup{};
-        startup.cb = sizeof(startup);
-        PROCESS_INFORMATION process{};
-        if (CreateProcessW(launcher.c_str(), buffer.data(), nullptr, nullptr, FALSE, flags, nullptr, folder.c_str(),
-                           &startup, &process)) {
-            CloseHandle(process.hThread);
-            CloseHandle(process.hProcess);
-            return true;
-        }
+        if (StartProcess(launcher.c_str(), command, flags, folder.c_str())) return true;
     }
     return false;
 }

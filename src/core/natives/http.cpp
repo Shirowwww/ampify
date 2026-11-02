@@ -12,6 +12,7 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 #include "../json.hpp"
+#include "../text_util.hpp"
 #include "http.hpp"
 
 namespace ampify {
@@ -22,8 +23,7 @@ std::string HttpsHost(const std::string& url) {
     size_t end = url.find_first_of("/?#", kPrefix.size());
     std::string host = url.substr(kPrefix.size(), end == std::string::npos ? std::string::npos : end - kPrefix.size());
     if (host.empty() || host.find_first_of("@:[") != std::string::npos) return {};
-    std::transform(host.begin(), host.end(), host.begin(), [](unsigned char c) { return std::tolower(c); });
-    return host;
+    return ToLowerAscii(host);
 }
 
 }  // namespace ampify

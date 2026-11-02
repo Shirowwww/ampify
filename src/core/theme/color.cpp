@@ -2,6 +2,8 @@
 
 #include <cctype>
 
+#include "../text_util.hpp"
+
 namespace ampify::theme {
 
 namespace {
@@ -68,14 +70,12 @@ std::string ToXamlColor(Argb color) {
 bool Palette::Define(std::string_view name, Argb color) {
     if (name.empty()) return false;
 
-    std::string key;
-    for (char c : name) key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    std::string key = ToLowerAscii(name);
     return m_colors.emplace(key, color).second;
 }
 
 std::optional<Argb> Palette::Find(std::string_view name) const {
-    std::string key;
-    for (char c : name) key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    std::string key = ToLowerAscii(name);
     auto it = m_colors.find(key);
     if (it == m_colors.end()) return std::nullopt;
     return it->second;

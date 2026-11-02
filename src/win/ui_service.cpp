@@ -80,10 +80,6 @@ constexpr double kPanelWidth = 380;
 std::atomic<bool> g_windowEvent{true};  // set by the WinEvent hook, read by the worker
 int g_modsUpdating = 0;                 // interface thread only: > 0 while the Mods card sets its toggles itself
 
-std::string Utf8(const winrt::hstring& text) {
-    return winrt::to_string(text);
-}
-
 winrt::hstring Wide(const std::string& text) {
     return winrt::to_hstring(text);
 }

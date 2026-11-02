@@ -9,6 +9,7 @@
 #include "../manifest.hpp"
 #include "../reload.hpp"
 #include "../settings.hpp"
+#include "../text_util.hpp"
 
 namespace ampify::uirender {
 
@@ -18,15 +19,6 @@ namespace {
 
 constexpr int kKitApiMajor = 1;                     // the same as ExtensionLoader
 constexpr std::uintmax_t kReloadLimit = 64 * 1024;  // rewritten past this size, as ampify does
-
-bool ReadText(const fs::path& file, std::string& text) {
-    std::ifstream in(file, std::ios::binary);
-    if (!in) return false;
-    std::ostringstream buffer;
-    buffer << in.rdbuf();
-    text = buffer.str();
-    return true;
-}
 
 // One write per call, so the kernel sees a whole line; a file that grew too big starts again.
 bool AppendReload(const fs::path& kit, const std::string& line, std::string& error) {
@@ -62,9 +54,9 @@ std::vector<ModEntry> ListMods(const fs::path& kit) {
     for (const fs::directory_entry& entry : fs::directory_iterator(root, ec)) {
         std::string folder = entry.path().filename().string();
         if (folder.empty() || folder[0] == '.' || !entry.is_directory(ec)) continue;
-        std::string text;
-        if (!ReadText(entry.path() / "manifest.json", text)) continue;
-        ManifestResult result = ParseManifest(text, folder, kKitApiMajor, [&](const std::string& file) {
+        std::optional<std::string> text = ReadWholeFile(entry.path() / "manifest.json");
+        if (!text) continue;
+        ManifestResult result = ParseManifest(*text, folder, kKitApiMajor, [&](const std::string& file) {
             std::error_code fileError;
             return fs::is_regular_file(entry.path() / file, fileError);
         });

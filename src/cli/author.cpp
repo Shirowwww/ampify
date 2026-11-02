@@ -8,7 +8,7 @@
 #include "archive.hpp"
 #include "element.hpp"
 #include "internal.hpp"
-#include "json.hpp"
+#include "../core/json.hpp"
 #include "messages.hpp"
 #include "platform.hpp"
 #include "sha256.hpp"
@@ -44,25 +44,25 @@ namespace {
 std::string CatalogEntryText(const ElementManifest& manifest, const std::string& digest) {
     std::ostringstream out;
     out << "{\n"
-        << "  \"id\": " << json::Quote(manifest.id) << ",\n"
-        << "  \"name\": " << json::Quote(manifest.name) << ",\n"
-        << "  \"version\": " << json::Quote(manifest.version) << ",\n"
-        << "  \"kind\": " << json::Quote(manifest.kind) << ",\n"
-        << "  \"author\": " << json::Quote(manifest.author) << ",\n"
-        << "  \"description\": " << json::Quote(manifest.description) << ",\n"
-        << "  \"kitApi\": " << json::Quote(manifest.kitApi) << ",\n";
+        << "  \"id\": " << Json::Quote(manifest.id) << ",\n"
+        << "  \"name\": " << Json::Quote(manifest.name) << ",\n"
+        << "  \"version\": " << Json::Quote(manifest.version) << ",\n"
+        << "  \"kind\": " << Json::Quote(manifest.kind) << ",\n"
+        << "  \"author\": " << Json::Quote(manifest.author) << ",\n"
+        << "  \"description\": " << Json::Quote(manifest.description) << ",\n"
+        << "  \"kitApi\": " << Json::Quote(manifest.kitApi) << ",\n";
     if (!manifest.tags.empty()) {
         out << "  \"tags\": [";
-        for (size_t i = 0; i < manifest.tags.size(); i++) out << (i ? ", " : "") << json::Quote(manifest.tags[i]);
+        for (size_t i = 0; i < manifest.tags.size(); i++) out << (i ? ", " : "") << Json::Quote(manifest.tags[i]);
         out << "],\n";
     }
     out << "  \"permissions\": [";
     for (size_t i = 0; i < manifest.permissions.size(); i++) {
-        out << (i ? ", " : "") << json::Quote(manifest.permissions[i]);
+        out << (i ? ", " : "") << Json::Quote(manifest.permissions[i]);
     }
     out << "],\n"
         << "  \"url\": \"https://...\",\n"
-        << "  \"sha256\": " << json::Quote(digest) << "\n"
+        << "  \"sha256\": " << Json::Quote(digest) << "\n"
         << "}\n";
     return out.str();
 }

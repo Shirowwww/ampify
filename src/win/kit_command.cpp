@@ -29,24 +29,6 @@ std::filesystem::path KernelFolder() {
     return std::filesystem::path(std::wstring(path, length)).parent_path();
 }
 
-// One argument as CommandLineToArgvW reads it back: quotes around it, a quote escaped, backslashes before a quote
-// doubled.
-std::wstring Quote(const std::wstring& argument) {
-    std::wstring quoted = L"\"";
-    size_t slashes = 0;
-    for (wchar_t c : argument) {
-        if (c == L'\\') {
-            slashes++;
-            continue;
-        }
-        quoted.append(c == L'"' ? slashes * 2 + 1 : slashes, L'\\');
-        slashes = 0;
-        quoted += c;
-    }
-    quoted.append(slashes * 2, L'\\');
-    return quoted + L"\"";
-}
-
 std::string ReadAll(HANDLE pipe) {
     std::string text;
     char buffer[4096];
@@ -64,8 +46,8 @@ RunResult RunAmpify(const std::vector<std::string>& arguments) {
         result.err = "ampify.exe not found next to the kernel: " + ToUtf8(program.wstring());
         return result;
     }
-    std::wstring commandLine = Quote(program.wstring());
-    for (const std::string& argument : arguments) commandLine += L" " + Quote(FromUtf8(argument));
+    std::wstring commandLine = QuoteArgument(program.wstring());
+    for (const std::string& argument : arguments) commandLine += L" " + QuoteArgument(FromUtf8(argument));
 
     SECURITY_ATTRIBUTES inherit{sizeof(inherit), nullptr, TRUE};
     HANDLE outRead = nullptr, outWrite = nullptr, errRead = nullptr, errWrite = nullptr;

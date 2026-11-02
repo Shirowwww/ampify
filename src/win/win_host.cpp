@@ -18,6 +18,7 @@
 
 #include "../core/audio/audio_engine.hpp"
 #include "../core/gain_board.hpp"
+#include "../core/text_util.hpp"
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
 #include "wic_image.hpp"
@@ -77,15 +78,6 @@ bool ParseCombo(const std::string& combo, UINT& modifiers, UINT& key) {
     }
     key = VirtualKeyOf(std::string(rest));
     return key != 0;
-}
-
-// The file holds a plain text key, so it is read and written as bytes.
-std::optional<std::string> ReadWholeFile(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) return std::nullopt;
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
 }
 
 }  // namespace

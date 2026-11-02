@@ -3,23 +3,11 @@
 #include <algorithm>
 #include <cctype>
 
+#include "../text_util.hpp"
+
 namespace ampify::theme {
 
 namespace {
-
-std::string_view Trim(std::string_view text) {
-    size_t first = 0;
-    size_t last = text.size();
-    while (first < last && std::isspace(static_cast<unsigned char>(text[first]))) first++;
-    while (last > first && std::isspace(static_cast<unsigned char>(text[last - 1]))) last--;
-    return text.substr(first, last - first);
-}
-
-std::string Lowered(std::string_view text) {
-    std::string result(text);
-    for (char& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return result;
-}
 
 // "7:00" or "07:00" gives 420. Nothing for anything else.
 int ParseTime(std::string_view text) {
@@ -43,7 +31,7 @@ std::string TimeText(int minute) {
 }
 
 bool IsNamed(const std::string& scheme, std::initializer_list<const char*> exact, std::initializer_list<const char*> parts) {
-    std::string name = Lowered(scheme);
+    std::string name = ToLowerAscii(scheme);
     for (const char* word : exact) {
         if (name == word) return true;
     }
@@ -64,7 +52,7 @@ bool IsLight(const std::string& scheme) {
 // The name as colors.ini writes it, or empty when the theme has no such scheme (names are case-insensitive).
 std::string FindScheme(const std::vector<std::string>& schemes, const std::string& wanted) {
     for (const std::string& scheme : schemes) {
-        if (Lowered(scheme) == Lowered(wanted)) return scheme;
+        if (ToLowerAscii(scheme) == ToLowerAscii(wanted)) return scheme;
     }
     return {};
 }
@@ -77,13 +65,13 @@ Schedule ParseSchedule(std::string_view text) {
     while (start <= text.size()) {
         size_t end = text.find_first_of(",;", start);
         if (end == std::string_view::npos) end = text.size();
-        std::string_view piece = Trim(text.substr(start, end - start));
+        std::string_view piece = TrimSpace(text.substr(start, end - start));
         start = end + 1;
         if (piece.empty()) continue;
 
         size_t equals = piece.find('=');
-        int minute = equals == std::string_view::npos ? -1 : ParseTime(Trim(piece.substr(0, equals)));
-        std::string scheme = equals == std::string_view::npos ? std::string() : std::string(Trim(piece.substr(equals + 1)));
+        int minute = equals == std::string_view::npos ? -1 : ParseTime(TrimSpace(piece.substr(0, equals)));
+        std::string scheme = equals == std::string_view::npos ? std::string() : std::string(TrimSpace(piece.substr(equals + 1)));
         if (minute < 0 || scheme.empty()) {
             schedule.problems.push_back("theme.schedule: \"" + std::string(piece) + "\" ignored (write HH:MM=Scheme)");
             continue;
@@ -130,7 +118,7 @@ std::string SystemScheme(const std::vector<std::string>& schemes, bool dark) {
 SchemeChoice ChooseScheme(const std::string& scheme, const std::string& schedule, const std::vector<std::string>& schemes,
                           const SchemeInputs& inputs, const std::string& defaultScheme) {
     SchemeChoice choice;
-    std::string wanted = std::string(Trim(scheme));
+    std::string wanted = std::string(TrimSpace(scheme));
 
     Schedule parsed = ParseSchedule(schedule);
     choice.problems = parsed.problems;
@@ -142,12 +130,12 @@ SchemeChoice ChooseScheme(const std::string& scheme, const std::string& schedule
         }
         choice.reason = "schedule " + TimeText(entry->minute);
     }
-    if (wanted.empty() && !Trim(defaultScheme).empty()) {
-        wanted = std::string(Trim(defaultScheme));
+    if (wanted.empty() && !TrimSpace(defaultScheme).empty()) {
+        wanted = std::string(TrimSpace(defaultScheme));
         choice.reason = "the theme's default";
     }
 
-    if (Lowered(wanted) == "auto") {
+    if (ToLowerAscii(wanted) == "auto") {
         choice.scheme = SystemScheme(schemes, inputs.systemDark);
         std::string mode = inputs.systemDark ? "dark" : "light";
         choice.reason += (choice.reason.empty() ? "" : ", ") + std::string("Windows ") + mode + " mode";

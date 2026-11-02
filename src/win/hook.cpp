@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "../core/drm_guard.hpp"
+#include "win_common.hpp"
 
 namespace ampify::win {
 
@@ -27,11 +28,7 @@ std::string PathOfModule(HMODULE module) {
         path.resize(path.size() * 2);  // truncated: try again with more room
     }
     path.resize(length);
-
-    int size = WideCharToMultiByte(CP_UTF8, 0, path.data(), static_cast<int>(path.size()), nullptr, 0, nullptr, nullptr);
-    std::string utf8(static_cast<size_t>(size), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, path.data(), static_cast<int>(path.size()), utf8.data(), size, nullptr, nullptr);
-    return utf8;
+    return ToUtf8(path);
 }
 
 // Vtables and import tables sit in read-only sections: the page is made writable for one store.

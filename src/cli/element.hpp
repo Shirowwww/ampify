@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "json.hpp"
+#include "../core/json.hpp"
 
 namespace ampify {
 
@@ -60,11 +60,11 @@ bool IsPreviewUrl(std::string_view text);  // https address of a .png, .jpg or .
 std::optional<ElementManifest> ParseManifest(std::string_view text, std::vector<std::string>& errors);
 
 // Parses the fields every element has. `where` prefixes each message ("extensions[2]"), empty at the top level.
-bool ReadElementInfo(const json::Value& object, const std::string& where, ElementInfo& info,
+bool ReadElementInfo(const Json& object, const std::string& where, ElementInfo& info,
                      std::vector<std::string>& errors);
 
 // Rejects members that the schema does not list. `allowed` is the complete list of member names.
-void CheckAllowedKeys(const json::Value& object, std::initializer_list<std::string_view> allowed,
+void CheckAllowedKeys(const Json& object, std::initializer_list<std::string_view> allowed,
                       const std::string& where, std::vector<std::string>& errors);
 
 // Rules a schema cannot express: the id is the folder name, the files that the kind needs exist, and no symbolic

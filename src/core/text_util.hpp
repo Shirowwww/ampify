@@ -2,10 +2,18 @@
 
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 
 namespace ampify {
+
+// The text without the leading and trailing characters std::isspace accepts (space, tab, CR, LF, VT, FF).
+std::string_view TrimSpace(std::string_view text);
+
+// Every byte of a file, read in binary mode (no newline translation, a BOM is kept). Nothing when it cannot be opened.
+std::optional<std::string> ReadWholeFile(const std::filesystem::path& file);
 
 // ASCII lowercase copy. Enough for file names and package names, which are ASCII.
 inline std::string ToLowerAscii(std::string_view text) {

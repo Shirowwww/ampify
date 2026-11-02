@@ -13,6 +13,7 @@
     --gap: 10;
     /* The bar: 64 high, 10 from the top, then a gap of 10 before the pages. */
     --content-top: 84;
+    --band-background: #0FFFFFFF;
 }
 
 @import "ampify:floating-panels";
@@ -26,7 +27,8 @@
     backdrop: var(--glass-light);
 }
 
-.search-header {
+.search-header,
+.list-header {
     backdrop: var(--glass-light);
 }
 

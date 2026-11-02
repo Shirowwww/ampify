@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "json.hpp"
+#include "../core/json.hpp"
 #include "sha256.hpp"
 
 namespace ampify {
@@ -33,32 +33,32 @@ std::vector<std::uint64_t> NumericParts(std::string_view version) {
 
 std::optional<ReleaseInfo> ParseRelease(std::string_view text, std::string& error) {
     std::string syntaxError;
-    std::optional<json::Value> document = json::Parse(text, syntaxError);
+    std::optional<Json> document = Json::Parse(text, &syntaxError, Json::DuplicateKeys::Refuse);
     if (!document || !document->IsObject()) {
         error = "unreadable release answer" + (syntaxError.empty() ? std::string() : ": " + syntaxError);
         return std::nullopt;
     }
 
-    const json::Value* tag = document->Find("tag_name");
-    if (tag == nullptr || !tag->IsString() || tag->AsString().empty()) {
+    const Json* tag = document->Find("tag_name");
+    if (tag == nullptr || !tag->IsString() || tag->AsString()->empty()) {
         error = "release without tag_name";
         return std::nullopt;
     }
 
     ReleaseInfo info;
-    info.tag = tag->AsString();
+    info.tag = *tag->AsString();
     info.version = info.tag;
     if (!info.version.empty() && (info.version.front() == 'v' || info.version.front() == 'V')) {
         info.version.erase(0, 1);
     }
 
-    const json::Value* assets = document->Find("assets");
+    const Json* assets = document->Find("assets");
     if (assets != nullptr && assets->IsArray()) {
-        for (const json::Value& asset : assets->Items()) {
-            const json::Value* name = asset.Find("name");
-            const json::Value* url = asset.Find("browser_download_url");
+        for (const Json& asset : *assets->AsArray()) {
+            const Json* name = asset.Find("name");
+            const Json* url = asset.Find("browser_download_url");
             if (name && name->IsString() && url && url->IsString()) {
-                info.assets[name->AsString()] = url->AsString();
+                info.assets[*name->AsString()] = *url->AsString();
             }
         }
     }

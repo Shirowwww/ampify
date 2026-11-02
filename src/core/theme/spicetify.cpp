@@ -4,6 +4,8 @@
 #include <cctype>
 #include <utility>
 
+#include "../text_util.hpp"
+
 namespace ampify::theme {
 
 namespace {
@@ -59,16 +61,10 @@ constexpr std::array<Rule, 10> kRules = {{
     {"ScrubberControl#LCDScrubber", "color", {"playback-bar", "button"}},
 }};
 
-std::string Lower(std::string_view text) {
-    std::string result(text);
-    for (char& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return result;
-}
-
 }  // namespace
 
 std::string SpicetifyKey(std::string_view key) {
-    std::string lower = Lower(key);
+    std::string lower = ToLowerAscii(key);
     for (std::string_view known : kKeys) {
         if (lower == known) return lower;
     }

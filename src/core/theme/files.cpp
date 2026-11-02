@@ -4,6 +4,8 @@
 #include <sstream>
 #include <system_error>
 
+#include "../text_util.hpp"
+
 namespace ampify::theme {
 
 bool IsSafeRelativePath(std::string_view path) {
@@ -25,13 +27,7 @@ FolderFiles::FolderFiles(std::filesystem::path folder) : m_folder(std::move(fold
 
 std::optional<std::string> FolderFiles::Read(std::string_view path) {
     if (!IsSafeRelativePath(path)) return std::nullopt;
-
-    std::ifstream in(Resolve(path), std::ios::binary);
-    if (!in) return std::nullopt;
-
-    std::ostringstream text;
-    text << in.rdbuf();
-    return text.str();
+    return ReadWholeFile(Resolve(path));
 }
 
 bool FolderFiles::Exists(std::string_view path) {

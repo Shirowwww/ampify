@@ -8,7 +8,8 @@ list(APPEND AMPIFY_KERNEL_SOURCES src/kernel/kernel.cpp extensions/atmos-leveler
 
 list(APPEND AMPIFY_UI_THREAD_TEST_SOURCES tests/ui_thread_test.cpp)
 
-list(APPEND AMPIFY_XAML_SOURCES src/win/xaml_backend.cpp src/win/theme_animations.cpp src/win/theme_service.cpp src/win/xaml_host.cpp src/win/ui_renderer.cpp src/win/ui_service.cpp
+list(APPEND AMPIFY_XAML_SOURCES src/win/xaml_backend.cpp src/win/xaml_properties.cpp src/win/xaml_states.cpp
+    src/win/xaml_values.cpp src/win/theme_animations.cpp src/win/theme_service.cpp src/win/xaml_host.cpp src/win/ui_renderer.cpp src/win/ui_service.cpp
     src/win/apple_player.cpp)
 
 list(APPEND AMPIFY_LAUNCHER_SOURCES

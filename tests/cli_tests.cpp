@@ -17,7 +17,6 @@
 #include "../src/cli/backup.hpp"
 #include "../src/cli/catalog.hpp"
 #include "../src/cli/element.hpp"
-#include "../src/cli/json.hpp"
 #include "../src/cli/kit.hpp"
 #include "../src/cli/release.hpp"
 #include "../src/cli/sha256.hpp"
@@ -107,31 +106,39 @@ TEST_CASE(Sha256_HexFormatIsStrict) {
 
 // ---- JSON --------------------------------------------------------------------------------------
 
+namespace {
+
+// How the command line reads manifests and catalogs: strict, and a repeated key is an error.
+std::optional<ampify::Json> ParseStrict(std::string_view text, std::string& error) {
+    return ampify::Json::Parse(text, &error, ampify::Json::DuplicateKeys::Refuse);
+}
+
+}  // namespace
+
 TEST_CASE(Json_ParsesNestedDocument) {
     std::string error;
-    std::optional<ampify::json::Value> document =
-        ampify::json::Parse(R"({"a": [1, -2.5e1, true, null, "x"], "b": {"c": false}})", error);
+    std::optional<ampify::Json> document = ParseStrict(R"({"a": [1, -2.5e1, true, null, "x"], "b": {"c": false}})", error);
     CHECK(document.has_value());
     if (!document) return;
-    const ampify::json::Value* a = document->Find("a");
-    CHECK(a != nullptr && a->IsArray() && a->Items().size() == 5);
-    CHECK(a && a->Items()[1].AsNumber() == -25.0);
-    CHECK(a && a->Items()[3].IsNull());
-    const ampify::json::Value* b = document->Find("b");
-    CHECK(b && b->Find("c") && !b->Find("c")->AsBool());
+    const ampify::Json* a = document->Find("a");
+    CHECK(a != nullptr && a->IsArray() && a->AsArray()->size() == 5);
+    CHECK(a && *(*a->AsArray())[1].AsNumber() == -25.0);
+    CHECK(a && (*a->AsArray())[3].IsNull());
+    const ampify::Json* b = document->Find("b");
+    CHECK(b && b->Find("c") && !*b->Find("c")->AsBool());
     CHECK(document->Find("missing") == nullptr);
 }
 
-TEST_CASE(Json_DecodesEscapesAndSurrogatePairs) {
+TEST_CASE(Json_StrictDecodesEscapesAndSurrogatePairs) {
     std::string error;
-    std::optional<ampify::json::Value> document =
-        ampify::json::Parse(R"(["\u00e9", "\ud83c\udfb5", "tab\there\n", "\"q\""])", error);
-    CHECK(document.has_value());
-    if (!document) return;
-    CHECK(document->Items()[0].AsString() == "\xC3\xA9");          // é
-    CHECK(document->Items()[1].AsString() == "\xF0\x9F\x8E\xB5");  // U+1F3B5
-    CHECK(document->Items()[2].AsString() == "tab\there\n");
-    CHECK(document->Items()[3].AsString() == "\"q\"");
+    std::optional<ampify::Json> document = ParseStrict(R"(["é", "🎵", "tab\there\n", "\"q\""])", error);
+    CHECK(document.has_value() && document->AsArray()->size() == 4);
+    if (!document || document->AsArray()->size() != 4) return;
+    const ampify::Json::Array& items = *document->AsArray();
+    CHECK(*items[0].AsString() == "\xC3\xA9");          // é
+    CHECK(*items[1].AsString() == "\xF0\x9F\x8E\xB5");  // U+1F3B5
+    CHECK(*items[2].AsString() == "tab\there\n");
+    CHECK(*items[3].AsString() == "\"q\"");
 }
 
 TEST_CASE(Json_ReadsADocumentSavedWithAByteOrderMark) {
@@ -139,34 +146,36 @@ TEST_CASE(Json_ReadsADocumentSavedWithAByteOrderMark) {
     std::optional<ampify::Json> kernel = ampify::Json::Parse("\xEF\xBB\xBF{\"id\": \"my-theme\"}");
     CHECK(kernel && kernel->Find("id") && kernel->Find("id")->AsString() && *kernel->Find("id")->AsString() == "my-theme");
     std::string error;
-    std::optional<ampify::json::Value> cli = ampify::json::Parse("\xEF\xBB\xBF{\"id\": \"my-theme\"}", error);
-    CHECK(cli && cli->Find("id") && cli->Find("id")->AsString() == "my-theme");
+    std::optional<ampify::Json> cli = ParseStrict("\xEF\xBB\xBF{\"id\": \"my-theme\"}", error);
+    CHECK(cli && cli->Find("id") && cli->Find("id")->AsString() && *cli->Find("id")->AsString() == "my-theme");
 }
 
 TEST_CASE(Json_RejectsMalformedDocuments) {
     std::string error;
-    CHECK(!ampify::json::Parse(R"({"a": 1,})", error).has_value());
-    CHECK(!ampify::json::Parse(R"({"a": 1} x)", error).has_value());
-    CHECK(!ampify::json::Parse(R"({"a": 1, "a": 2})", error).has_value());
+    CHECK(!ParseStrict(R"({"a": 1,})", error).has_value());
+    CHECK(!ParseStrict(R"({"a": 1} x)", error).has_value());
+    error.clear();
+    CHECK(!ParseStrict(R"({"a": 1, "a": 2})", error).has_value());
     CHECK(error.find("duplicate member") != std::string::npos);
-    CHECK(!ampify::json::Parse("\"unterminated", error).has_value());
-    CHECK(!ampify::json::Parse("[01]", error).has_value());
-    CHECK(!ampify::json::Parse("\"\\ud800\"", error).has_value());
-    CHECK(!ampify::json::Parse("\"raw\ncontrol\"", error).has_value());
-    CHECK(!ampify::json::Parse("", error).has_value());
+    CHECK(ampify::Json::Parse(R"({"a": 1, "a": 2})").has_value());  // the kernel's own files allow it
+    CHECK(!ParseStrict("\"unterminated", error).has_value());
+    CHECK(!ParseStrict("[01]", error).has_value());
+    CHECK(!ParseStrict("\"\\ud800\"", error).has_value());
+    CHECK(!ParseStrict("\"raw\ncontrol\"", error).has_value());
+    CHECK(!ParseStrict("", error).has_value());
 }
 
 TEST_CASE(Json_RefusesExcessiveNesting) {
     std::string deep(100, '[');
     deep += std::string(100, ']');
     std::string error;
-    CHECK(!ampify::json::Parse(deep, error).has_value());
+    CHECK(!ParseStrict(deep, error).has_value());
     CHECK(error.find("nesting") != std::string::npos);
 }
 
 TEST_CASE(Json_QuoteEscapesControlCharacters) {
-    CHECK(ampify::json::Quote("a\"b\\c\n") == "\"a\\\"b\\\\c\\n\"");
-    CHECK(ampify::json::Quote(std::string(1, '\x01')) == "\"\\u0001\"");
+    CHECK(ampify::Json::Quote("a\"b\\c\n") == "\"a\\\"b\\\\c\\n\"");
+    CHECK(ampify::Json::Quote(std::string(1, '\x01')) == "\"\\u0001\"");
 }
 
 // ---- Manifests ---------------------------------------------------------------------------------

@@ -7,18 +7,13 @@
 #include <random>
 
 #include "json.hpp"
+#include "text_util.hpp"
 
 namespace ampify::remote {
 
 namespace {
 
 constexpr size_t kMaxTargetBytes = 1024;
-
-std::string Lower(std::string_view text) {
-    std::string out(text);
-    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return std::tolower(c); });
-    return out;
-}
 
 std::string_view Trim(std::string_view text) {
     while (!text.empty() && (text.front() == ' ' || text.front() == '\t')) text.remove_prefix(1);
@@ -94,10 +89,10 @@ std::string HostWithoutPort(std::string_view value) {
     if (!value.empty() && value.front() == '[') {
         size_t close = value.find(']');
         if (close == std::string_view::npos) return {};
-        return Lower(value.substr(0, close + 1));
+        return ToLowerAscii(value.substr(0, close + 1));
     }
     size_t colon = value.find(':');
-    return Lower(value.substr(0, colon));
+    return ToLowerAscii(value.substr(0, colon));
 }
 
 }  // namespace
@@ -172,7 +167,7 @@ ParseStatus ParseRequest(std::string_view buffer, Request& request, size_t* cons
             unsigned char u = static_cast<unsigned char>(c);
             if ((u < 0x20 && c != '\t') || u == 0x7F) return ParseStatus::Bad;
         }
-        std::string key = Lower(name);
+        std::string key = ToLowerAscii(name);
         if (key == "transfer-encoding") return ParseStatus::Bad;
         if (key == "content-length") {
             if (sawLength || value.empty() || value.size() > 6) return ParseStatus::Bad;
@@ -208,7 +203,7 @@ std::string Serialize(const Response& response) {
 bool IsLoopbackIpv4(uint32_t address) { return (address >> 24) == 127; }
 
 bool IsLoopbackText(std::string_view address) {
-    std::string text = Lower(Trim(address));
+    std::string text = ToLowerAscii(Trim(address));
     if (text == "::1" || text == "[::1]") return true;
     constexpr std::string_view kMapped = "::ffff:";
     std::string_view v4 = text;
@@ -290,7 +285,7 @@ Response Router::Handle(const Request& request, bool peerLoopback, Backend& back
         provided = *value;
     } else if (const std::string* auth = header("authorization")) {
         constexpr std::string_view kBearer = "bearer ";
-        if (Lower(std::string_view(*auth).substr(0, kBearer.size())) == kBearer) provided = auth->substr(kBearer.size());
+        if (ToLowerAscii(std::string_view(*auth).substr(0, kBearer.size())) == kBearer) provided = auth->substr(kBearer.size());
     }
     if (!TokenMatches(m_token, provided)) return Error(401, "token missing or wrong");
 

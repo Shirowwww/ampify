@@ -145,8 +145,7 @@ bool ConvertSpicetifyTheme(const std::filesystem::path& source, const std::files
     CopyIfPresent(source / "theme.js", target / "spicetify-theme.js");
     for (const auto& entry : std::filesystem::directory_iterator(source, ec)) {
         std::string name = Utf8(entry.path().filename());
-        std::string lower = name;
-        std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+        std::string lower = ToLowerAscii(name);
         if (lower.starts_with("license") || lower.starts_with("readme")) CopyIfPresent(entry.path(), target / name);
     }
     if (!colors) {

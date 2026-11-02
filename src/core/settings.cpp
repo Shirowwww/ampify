@@ -13,14 +13,6 @@ namespace ampify {
 
 namespace {
 
-std::string Trim(const std::string& text) {
-    size_t first = 0;
-    size_t last = text.size();
-    while (first < last && std::isspace(static_cast<unsigned char>(text[first]))) first++;
-    while (last > first && std::isspace(static_cast<unsigned char>(text[last - 1]))) last--;
-    return text.substr(first, last - first);
-}
-
 }  // namespace
 
 bool Settings::Load(const std::string& path) {
@@ -37,14 +29,14 @@ bool Settings::Load(const std::string& path) {
     while (std::getline(in, line)) {
         if (first) line = std::string(WithoutBom(line));
         first = false;
-        std::string trimmed = Trim(line);
+        std::string trimmed(TrimSpace(line));
         if (trimmed.empty() || trimmed[0] == '#') continue;
 
         size_t equals = trimmed.find('=');
         if (equals == std::string::npos) continue;
 
-        std::string key = Trim(trimmed.substr(0, equals));
-        std::string value = Trim(trimmed.substr(equals + 1));
+        std::string key(TrimSpace(std::string_view(trimmed).substr(0, equals)));
+        std::string value(TrimSpace(std::string_view(trimmed).substr(equals + 1)));
         if (!key.empty()) m_values[key] = value;
     }
     return !in.bad();
@@ -86,8 +78,7 @@ bool Settings::GetBool(const std::string& key, bool fallback) const {
     std::optional<std::string> value = Get(key);
     if (!value) return fallback;
 
-    std::string lowered;
-    for (char c : *value) lowered += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    std::string lowered = ToLowerAscii(*value);
     if (lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes") return true;
     if (lowered == "0" || lowered == "false" || lowered == "off" || lowered == "no") return false;
     return fallback;

@@ -15,6 +15,7 @@
     --gap: 12;
     --radius-button: 12px;
     --glass: acrylic($LayerFillColorDefaultBrush, 0.55);
+    --band-background: #0FFFFFFF;
 }
 
 @import "ampify:floating-panels";
@@ -105,9 +106,15 @@
     box-shadow: 24px;
 }
 
-/* The search header, the same glass over the results that scroll under it. */
-.search-header {
+/* The search header and the Songs column titles, the same glass over the rows that scroll under them. */
+.search-header,
+.list-header {
     backdrop: acrylic($CardBackgroundFillColorDefaultBrush, 0.4);
+}
+
+/* An album's artist in the theme's accent, not Apple's blue. */
+.album-artist {
+    color: $AccentFillColorDefaultBrush;
 }
 
 /* The font only: a common size would overwrite the page titles. */

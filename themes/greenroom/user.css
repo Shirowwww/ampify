@@ -11,6 +11,7 @@
     --panel-radius: 8px;
     --raised: #1F1F1F;
     --hover: #2A2A2A;
+    --band-background: #181818;
 }
 
 @import "ampify:floating-panels";
@@ -68,6 +69,11 @@
 
 .page-title {
     font-weight: 800;
+}
+
+/* An album's artist in the green accent, not Apple's blue. */
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
 }
 
 /* Cards: a raised tile behind the artwork and its titles under the pointer. */

@@ -2,13 +2,14 @@
 
 #include <cctype>
 
+#include "../text_util.hpp"
+
 namespace ampify::theme {
 
 ThemeSettings ReadThemeSettings(const Settings& settings) {
     ThemeSettings value;
     value.active = settings.GetString("theme.active", "");
-    std::string lowered;
-    for (char c : value.active) lowered += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    std::string lowered = ToLowerAscii(value.active);
     if (lowered == "none") value.active.clear();
     value.scheme = settings.GetString("theme.scheme", "");
     value.schedule = settings.GetString("theme.schedule", "");

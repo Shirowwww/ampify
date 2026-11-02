@@ -25,10 +25,18 @@ public:
     Json(Array value) : m_value(std::move(value)) {}
     Json(Object value) : m_value(std::move(value)) {}
 
-    static std::optional<Json> Parse(std::string_view text, std::string* error = nullptr);
+    // What Parse does with a key repeated in one object. Files that other tools check too (manifests, catalogs) refuse
+    // it: a document must not mean one thing to one reader and another to the next.
+    enum class DuplicateKeys { Allow, Refuse };
+
+    static std::optional<Json> Parse(std::string_view text, std::string* error = nullptr,
+                                     DuplicateKeys duplicates = DuplicateKeys::Allow);
 
     // Compact output, with escapes for control characters and quotes.
     std::string Dump() const;
+
+    // A JSON string literal, quotes included, escaped as Dump() does.
+    static std::string Quote(std::string_view text);
 
     bool IsNull() const { return std::holds_alternative<std::nullptr_t>(m_value); }
     bool IsBool() const { return std::holds_alternative<bool>(m_value); }

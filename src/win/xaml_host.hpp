@@ -56,6 +56,11 @@ std::uint64_t NowMs() noexcept;
 // Text of an hresult as 0x8000FFFF, for the log.
 std::string HresultText(std::int32_t code);
 
+// A WinRT string as UTF-8, for the log and the core.
+inline std::string Utf8(const winrt::hstring& text) {
+    return winrt::to_string(text);
+}
+
 }  // namespace ampify::win
 
 #endif  // AMPIFY_WITH_XAML

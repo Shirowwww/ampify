@@ -22,14 +22,6 @@ bool IsNameChar(char c) {
     return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-';
 }
 
-std::string_view Trimmed(std::string_view text) {
-    size_t first = 0;
-    size_t last = text.size();
-    while (first < last && IsSpace(text[first])) first++;
-    while (last > first && IsSpace(text[last - 1])) last--;
-    return text.substr(first, last - first);
-}
-
 // Comments become spaces, so the offsets and the line numbers of the rest stay exact.
 std::string WithoutComments(std::string_view css) {
     std::string text(css);
@@ -87,12 +79,6 @@ std::vector<Piece> SplitTopLevel(std::string_view text, char separator) {
     return pieces;
 }
 
-std::string LowerCopy(std::string_view text) {
-    std::string result(text);
-    for (char& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return result;
-}
-
 // The state a pseudo-class names. :focus-within is :focus: the backend follows the focus of the element's parts too.
 std::optional<Trigger> StateOf(std::string_view pseudo) {
     if (pseudo == "hover") return Trigger::Hover;
@@ -105,7 +91,7 @@ std::vector<Declaration> ParseDeclarations(std::string_view body, size_t bodyOff
                                            std::vector<std::string>& problems) {
     std::vector<Declaration> declarations;
     for (const Piece& piece : SplitTopLevel(body, ';')) {
-        std::string_view text = Trimmed(piece.text);
+        std::string_view text = TrimSpace(piece.text);
         if (text.empty()) continue;
 
         // The text is a view into `body`, so its distance from the start gives its exact offset in the file.
@@ -118,14 +104,14 @@ std::vector<Declaration> ParseDeclarations(std::string_view body, size_t bodyOff
         }
 
         Declaration declaration;
-        declaration.property = std::string(Trimmed(text.substr(0, colon)));
+        declaration.property = std::string(TrimSpace(text.substr(0, colon)));
         declaration.line = line;
 
-        std::string_view value = Trimmed(text.substr(colon + 1));
+        std::string_view value = TrimSpace(text.substr(colon + 1));
         const std::string_view suffix = "!important";
-        if (value.size() >= suffix.size() && LowerCopy(value.substr(value.size() - suffix.size())) == suffix) {
+        if (value.size() >= suffix.size() && ToLowerAscii(value.substr(value.size() - suffix.size())) == suffix) {
             declaration.important = true;
-            value = Trimmed(value.substr(0, value.size() - suffix.size()));
+            value = TrimSpace(value.substr(0, value.size() - suffix.size()));
         }
         declaration.value = std::string(value);
 
@@ -151,20 +137,20 @@ size_t MatchingBrace(std::string_view text, size_t open) {
 // Reads one `(min-width: 600px)` of an @media query into `query`.
 bool ReadMediaFeature(std::string_view feature, MediaQuery& query, std::string& problem) {
     size_t colon = feature.find(':');
-    std::string name = LowerCopy(Trimmed(feature.substr(0, colon)));
-    std::string_view value = colon == std::string_view::npos ? std::string_view() : Trimmed(feature.substr(colon + 1));
-    if (value.size() > 2 && LowerCopy(value.substr(value.size() - 2)) == "px") value = Trimmed(value.substr(0, value.size() - 2));
+    std::string name = ToLowerAscii(TrimSpace(feature.substr(0, colon)));
+    std::string_view value = colon == std::string_view::npos ? std::string_view() : TrimSpace(feature.substr(colon + 1));
+    if (value.size() > 2 && ToLowerAscii(value.substr(value.size() - 2)) == "px") value = TrimSpace(value.substr(0, value.size() - 2));
     double number = 0;
     auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), number);
     double* bound = name == "min-width" ? &query.minWidth : name == "max-width" ? &query.maxWidth
                   : name == "min-height" ? &query.minHeight : name == "max-height" ? &query.maxHeight : nullptr;
     if (!bound) {
-        problem = "@media (" + std::string(Trimmed(feature)) + ") is not supported: min-width, max-width, min-height "
+        problem = "@media (" + std::string(TrimSpace(feature)) + ") is not supported: min-width, max-width, min-height "
                   "and max-height are";
         return false;
     }
     if (value.empty() || error != std::errc() || end != value.data() + value.size()) {
-        problem = "@media (" + std::string(Trimmed(feature)) + ") needs a size in pixels";
+        problem = "@media (" + std::string(TrimSpace(feature)) + ") needs a size in pixels";
         return false;
     }
     *bound = number;
@@ -174,8 +160,8 @@ bool ReadMediaFeature(std::string_view feature, MediaQuery& query, std::string& 
 // The condition of `@media <text>`: an optional `screen` or `all`, then features joined by `and`.
 std::optional<MediaQuery> ParseMediaQuery(std::string_view text, std::string& problem) {
     MediaQuery query;
-    query.text = std::string(Trimmed(text));
-    std::string lowered = LowerCopy(text);
+    query.text = std::string(TrimSpace(text));
+    std::string lowered = ToLowerAscii(text);
     size_t pos = 0;
     while (pos < lowered.size()) {
         if (IsSpace(lowered[pos])) {
@@ -209,7 +195,7 @@ std::optional<MediaQuery> ParseMediaQuery(std::string_view text, std::string& pr
 std::optional<std::vector<double>> StopOffsets(std::string_view text) {
     std::vector<double> offsets;
     for (const Piece& piece : SplitTopLevel(text, ',')) {
-        std::string word = LowerCopy(Trimmed(piece.text));
+        std::string word = ToLowerAscii(TrimSpace(piece.text));
         if (word == "from" || word == "to") {
             offsets.push_back(word == "to" ? 1 : 0);
             continue;
@@ -229,7 +215,7 @@ std::optional<std::vector<double>> StopOffsets(std::string_view text) {
 // and skipped. Nothing without a name.
 std::optional<Keyframes> ParseKeyframes(std::string_view name, size_t open, size_t close, int line,
                                         const std::string& clean, std::vector<std::string>& problems) {
-    name = Trimmed(name);
+    name = TrimSpace(name);
     if (name.size() >= 2 && (name.front() == '"' || name.front() == '\'') && name.back() == name.front()) {
         name = name.substr(1, name.size() - 2);
     }
@@ -253,7 +239,7 @@ std::optional<Keyframes> ParseKeyframes(std::string_view name, size_t open, size
             problems.push_back(where + "a stop of @keyframes " + block.name + " has no { }, ignored");
             break;
         }
-        std::string_view selector = Trimmed(std::string_view(clean).substr(pos, brace - pos));
+        std::string_view selector = TrimSpace(std::string_view(clean).substr(pos, brace - pos));
         std::string_view body = std::string_view(clean).substr(brace + 1, end - brace - 1);
         pos = end + 1;
         std::optional<std::vector<double>> offsets = StopOffsets(selector);
@@ -282,7 +268,7 @@ size_t ReadAtRule(std::string_view head, size_t open, int line, const std::strin
         problems.push_back(where + "closing brace missing");
         return clean.size();
     }
-    std::string lowered = LowerCopy(head);
+    std::string lowered = ToLowerAscii(head);
     for (std::string_view keyword : {std::string_view("@keyframes"), std::string_view("@-webkit-keyframes")}) {
         if (!lowered.starts_with(keyword) || (lowered.size() > keyword.size() && !IsSpace(lowered[keyword.size()]))) {
             continue;
@@ -319,17 +305,17 @@ constexpr std::string_view kBuiltinPrefix = "ampify:";
 // The layout named by `@import "ampify:<name>"` or `@import url(ampify:<name>)`, or nothing for another statement.
 std::optional<std::string> BuiltinImport(std::string_view statement) {
     const std::string_view keyword = "@import";
-    if (LowerCopy(statement.substr(0, keyword.size())) != keyword) return std::nullopt;
+    if (ToLowerAscii(statement.substr(0, keyword.size())) != keyword) return std::nullopt;
 
-    std::string_view target = Trimmed(statement.substr(keyword.size()));
-    if (LowerCopy(target.substr(0, 4)) == "url(" && target.ends_with(')')) {
-        target = Trimmed(target.substr(4, target.size() - 5));
+    std::string_view target = TrimSpace(statement.substr(keyword.size()));
+    if (ToLowerAscii(target.substr(0, 4)) == "url(" && target.ends_with(')')) {
+        target = TrimSpace(target.substr(4, target.size() - 5));
     }
     if (target.size() >= 2 && (target.front() == '"' || target.front() == '\'') && target.back() == target.front()) {
         target = target.substr(1, target.size() - 2);
     }
-    if (LowerCopy(target.substr(0, kBuiltinPrefix.size())) != kBuiltinPrefix) return std::nullopt;
-    return LowerCopy(target.substr(kBuiltinPrefix.size()));
+    if (ToLowerAscii(target.substr(0, kBuiltinPrefix.size())) != kBuiltinPrefix) return std::nullopt;
+    return ToLowerAscii(target.substr(kBuiltinPrefix.size()));
 }
 
 std::string LayoutList() {
@@ -343,7 +329,7 @@ std::string LayoutList() {
 std::optional<std::vector<Selector>> ParseSelectorList(std::string_view head, std::string& problem) {
     std::vector<Selector> selectors;
     for (const Piece& piece : SplitTopLevel(head, ',')) {
-        std::string_view written = Trimmed(piece.text);
+        std::string_view written = TrimSpace(piece.text);
         std::optional<std::vector<std::string>> expanded = ExpandClasses(written, &problem);
         if (!expanded) return std::nullopt;
         for (const std::string& text : *expanded) {
@@ -370,7 +356,7 @@ const char* TriggerName(Trigger trigger) {
 
 std::optional<Selector> ParseSelector(std::string_view text, std::string* problem) {
     Selector selector;
-    selector.text = std::string(Trimmed(text));
+    selector.text = std::string(TrimSpace(text));
     std::string_view s = selector.text;
 
     auto fail = [&](const std::string& reason) -> std::optional<Selector> {
@@ -425,7 +411,7 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
         while (i < s.size() && s[i] == ':') {
             size_t start = ++i;
             while (i < s.size() && IsNameChar(s[i])) i++;
-            std::string pseudo = LowerCopy(s.substr(start, i - start));
+            std::string pseudo = ToLowerAscii(s.substr(start, i - start));
             if (pseudo == "first-child") {
                 compound.nth = 1;
             } else if (pseudo == "last-child") {
@@ -492,7 +478,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
         // A statement such as `@import url(a.css);` has no block: skip it, so it cannot swallow the rule after it.
         size_t semicolon = clean.find(';', pos);
         if (semicolon != std::string::npos && (open == std::string::npos || semicolon < open)) {
-            std::string_view statement = Trimmed(std::string_view(clean).substr(pos, semicolon - pos));
+            std::string_view statement = TrimSpace(std::string_view(clean).substr(pos, semicolon - pos));
             pos = semicolon + 1;
             std::optional<std::string> layout = BuiltinImport(statement);
             if (!layout) {
@@ -521,7 +507,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
             sheet.problems.push_back("line " + std::to_string(line) + ": opening brace missing");
             break;
         }
-        std::string_view head = Trimmed(std::string_view(clean).substr(pos, open - pos));
+        std::string_view head = TrimSpace(std::string_view(clean).substr(pos, open - pos));
         if (!head.empty() && head.front() == '@') {
             pos = ReadAtRule(head, open, line, clean, media, sheet.keyframes, sheet.problems);
             continue;
@@ -538,7 +524,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
         Rule rule;
         rule.line = line;
         rule.media = media;
-        if (LowerCopy(head) == ":root") {
+        if (ToLowerAscii(head) == ":root") {
             if (media) {
                 sheet.problems.push_back("line " + std::to_string(line) + ": variables inside @media are not supported, "
                                          "ignored");

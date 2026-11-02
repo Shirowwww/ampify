@@ -72,10 +72,10 @@ bool Matches(std::string_view value, const TextRule& rule) {
 }
 
 // Reads a string member. Returns nullopt when it is absent (and optional) or invalid, recording why.
-std::optional<std::string> ReadText(const json::Value& object, std::string_view key, const std::string& where,
+std::optional<std::string> ReadText(const Json& object, std::string_view key, const std::string& where,
                                     const TextRule& rule, bool required, std::vector<std::string>& errors) {
     std::string label = Label(where, key);
-    const json::Value* member = object.Find(key);
+    const Json* member = object.Find(key);
     if (member == nullptr) {
         if (required) errors.push_back(label + ": required field missing");
         return std::nullopt;
@@ -84,18 +84,18 @@ std::optional<std::string> ReadText(const json::Value& object, std::string_view 
         errors.push_back(label + ": text expected");
         return std::nullopt;
     }
-    if (!Matches(member->AsString(), rule)) {
+    if (!Matches(*member->AsString(), rule)) {
         errors.push_back(label + ": invalid value (" + rule.hint + ")");
         return std::nullopt;
     }
-    return member->AsString();
+    return *member->AsString();
 }
 
 // Reads an array of strings: unique items, each matching the rule, at most `maxItems`.
-std::vector<std::string> ReadList(const json::Value& object, std::string_view key, const std::string& where,
+std::vector<std::string> ReadList(const Json& object, std::string_view key, const std::string& where,
                                   const TextRule& rule, size_t maxItems, std::vector<std::string>& errors) {
     std::vector<std::string> result;
-    const json::Value* member = object.Find(key);
+    const Json* member = object.Find(key);
     if (member == nullptr) return result;
 
     std::string label = Label(where, key);
@@ -103,32 +103,32 @@ std::vector<std::string> ReadList(const json::Value& object, std::string_view ke
         errors.push_back(label + ": list expected");
         return result;
     }
-    if (member->Items().size() > maxItems) {
+    if (member->AsArray()->size() > maxItems) {
         errors.push_back(label + ": at most " + std::to_string(maxItems) + " items");
     }
 
     std::set<std::string> seen;
-    for (size_t i = 0; i < member->Items().size(); i++) {
-        const json::Value& item = member->Items()[i];
+    for (size_t i = 0; i < member->AsArray()->size(); i++) {
+        const Json& item = (*member->AsArray())[i];
         std::string itemLabel = label + "[" + std::to_string(i) + "]";
         if (!item.IsString()) {
             errors.push_back(itemLabel + ": text expected");
             continue;
         }
-        if (!Matches(item.AsString(), rule)) {
+        if (!Matches(*item.AsString(), rule)) {
             errors.push_back(itemLabel + ": invalid value (" + rule.hint + ")");
             continue;
         }
-        if (!seen.insert(item.AsString()).second) {
-            errors.push_back(itemLabel + ": duplicate value: " + item.AsString());
+        if (!seen.insert(*item.AsString()).second) {
+            errors.push_back(itemLabel + ": duplicate value: " + *item.AsString());
             continue;
         }
-        result.push_back(item.AsString());
+        result.push_back(*item.AsString());
     }
     return result;
 }
 
-std::optional<std::string> ReadOptionalText(const json::Value& object, std::string_view key,
+std::optional<std::string> ReadOptionalText(const Json& object, std::string_view key,
                                             const std::string& where, const TextRule& rule,
                                             std::vector<std::string>& errors) {
     return ReadText(object, key, where, rule, false, errors);
@@ -169,10 +169,11 @@ size_t CharacterCount(std::string_view text) {
     return count;
 }
 
-void CheckAllowedKeys(const json::Value& object, std::initializer_list<std::string_view> allowed,
+void CheckAllowedKeys(const Json& object, std::initializer_list<std::string_view> allowed,
                       const std::string& where, std::vector<std::string>& errors) {
     if (!object.IsObject()) return;
-    for (const std::string& key : object.Keys()) {
+    for (const auto& member : *object.AsObject()) {
+        const std::string& key = member.first;
         bool known = false;
         for (std::string_view name : allowed) {
             if (key == name) {
@@ -184,7 +185,7 @@ void CheckAllowedKeys(const json::Value& object, std::initializer_list<std::stri
     }
 }
 
-bool ReadElementInfo(const json::Value& object, const std::string& where, ElementInfo& info,
+bool ReadElementInfo(const Json& object, const std::string& where, ElementInfo& info,
                      std::vector<std::string>& errors) {
     size_t before = errors.size();
     info.id = ReadText(object, "id", where, kIdRule, true, errors).value_or("");
@@ -212,7 +213,7 @@ bool ReadElementInfo(const json::Value& object, const std::string& where, Elemen
 
 std::optional<ElementManifest> ParseManifest(std::string_view text, std::vector<std::string>& errors) {
     std::string syntaxError;
-    std::optional<json::Value> document = json::Parse(text, syntaxError);
+    std::optional<Json> document = Json::Parse(text, &syntaxError, Json::DuplicateKeys::Refuse);
     if (!document) {
         errors.push_back("invalid JSON: " + syntaxError);
         return std::nullopt;

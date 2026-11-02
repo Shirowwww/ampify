@@ -6,6 +6,8 @@
 #include <cmath>
 #include <vector>
 
+#include "../text_util.hpp"
+
 namespace ampify::theme {
 
 namespace {
@@ -51,20 +53,6 @@ constexpr std::array<PropertySpec, 38> kProperties{{
     {"animation", "Animation", PropertyKind::Animation},
 }};
 
-std::string_view Trimmed(std::string_view text) {
-    size_t first = 0;
-    size_t last = text.size();
-    while (first < last && std::isspace(static_cast<unsigned char>(text[first]))) first++;
-    while (last > first && std::isspace(static_cast<unsigned char>(text[last - 1]))) last--;
-    return text.substr(first, last - first);
-}
-
-std::string Lowered(std::string_view text) {
-    std::string result(text);
-    for (char& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return result;
-}
-
 Conversion Fail(std::string problem) {
     return {std::nullopt, std::move(problem)};
 }
@@ -75,10 +63,10 @@ Conversion Ok(ValueKind kind, std::string text) {
 
 // `url(path)` with optional quotes. Nothing when the value is not a url.
 std::optional<std::string> UrlArgument(std::string_view raw) {
-    std::string_view text = Trimmed(raw);
-    if (Lowered(text.substr(0, 4)) != "url(" || text.back() != ')') return std::nullopt;
+    std::string_view text = TrimSpace(raw);
+    if (ToLowerAscii(text.substr(0, 4)) != "url(" || text.back() != ')') return std::nullopt;
 
-    std::string_view inside = Trimmed(text.substr(4, text.size() - 5));
+    std::string_view inside = TrimSpace(text.substr(4, text.size() - 5));
     if (inside.size() >= 2 && (inside.front() == '"' || inside.front() == '\'') && inside.back() == inside.front()) {
         inside = inside.substr(1, inside.size() - 2);
     }
@@ -96,32 +84,32 @@ std::optional<double> ParseNumber(std::string_view text) {
 
 // Strips a trailing `px`, the only unit the engine accepts.
 std::optional<double> ParsePixels(std::string_view text) {
-    if (Lowered(text).ends_with("px")) text.remove_suffix(2);
-    return ParseNumber(Trimmed(text));
+    if (ToLowerAscii(text).ends_with("px")) text.remove_suffix(2);
+    return ParseNumber(TrimSpace(text));
 }
 
 // A number followed by `%`, as a fraction: `50%` is 0.5.
 std::optional<double> ParsePercent(std::string_view text) {
-    text = Trimmed(text);
+    text = TrimSpace(text);
     if (text.empty() || text.back() != '%') return std::nullopt;
-    std::optional<double> number = ParseNumber(Trimmed(text.substr(0, text.size() - 1)));
+    std::optional<double> number = ParseNumber(TrimSpace(text.substr(0, text.size() - 1)));
     if (!number) return std::nullopt;
     return *number / 100;
 }
 
 // An angle in degrees: `135deg`, or `0` alone, as CSS allows.
 std::optional<double> ParseDegrees(std::string_view text) {
-    text = Trimmed(text);
-    if (Lowered(text).ends_with("deg")) return ParseNumber(Trimmed(text.substr(0, text.size() - 3)));
+    text = TrimSpace(text);
+    if (ToLowerAscii(text).ends_with("deg")) return ParseNumber(TrimSpace(text.substr(0, text.size() - 3)));
     if (text == "0") return 0.0;
     return std::nullopt;
 }
 
 // `name(arguments)` taking the whole text, the name in any case. Nothing for another form.
 std::optional<std::string_view> FunctionArguments(std::string_view raw, std::string_view name) {
-    std::string_view text = Trimmed(raw);
-    if (text.size() < name.size() + 2 || Lowered(text.substr(0, name.size())) != name) return std::nullopt;
-    std::string_view rest = Trimmed(text.substr(name.size()));
+    std::string_view text = TrimSpace(raw);
+    if (text.size() < name.size() + 2 || ToLowerAscii(text.substr(0, name.size())) != name) return std::nullopt;
+    std::string_view rest = TrimSpace(text.substr(name.size()));
     if (rest.size() < 2 || rest.front() != '(' || rest.back() != ')') return std::nullopt;
     return rest.substr(1, rest.size() - 2);
 }
@@ -133,7 +121,7 @@ std::vector<std::string_view> SplitArguments(std::string_view text) {
     size_t start = 0;
     for (size_t i = 0; i <= text.size(); i++) {
         if (i == text.size() || (text[i] == ',' && depth == 0)) {
-            pieces.push_back(Trimmed(text.substr(start, i - start)));
+            pieces.push_back(TrimSpace(text.substr(start, i - start)));
             start = i + 1;
         } else if (text[i] == '(') {
             depth++;
@@ -166,7 +154,7 @@ std::string FormatFraction(double number) {
 
 // A plain colour: `#hex`, `$palette` name or `transparent`.
 Conversion ConvertColor(std::string_view raw, const ValueContext& context) {
-    std::string_view text = Trimmed(raw);
+    std::string_view text = TrimSpace(raw);
     if (text.empty()) return Fail("empty color");
 
     if (text.front() == '$') {
@@ -175,7 +163,7 @@ Conversion ConvertColor(std::string_view raw, const ValueContext& context) {
         return Ok(ValueKind::Color, ToXamlColor(*color));
     }
 
-    if (Lowered(text) == "transparent") return Ok(ValueKind::Color, "#00FFFFFF");
+    if (ToLowerAscii(text) == "transparent") return Ok(ValueKind::Color, "#00FFFFFF");
 
     std::optional<Argb> color = ParseColor(text);
     if (!color) return Fail("unreadable color: \"" + std::string(text) + "\"");
@@ -184,7 +172,7 @@ Conversion ConvertColor(std::string_view raw, const ValueContext& context) {
 
 // The direction of `to <side>` as an angle: to top is 0deg, to right 90deg, clockwise as in CSS.
 std::optional<double> SideAngle(std::string_view text) {
-    std::string lowered = Lowered(text);
+    std::string lowered = ToLowerAscii(text);
     std::vector<std::string_view> words = SplitWords(lowered);
     if (words.size() < 2 || words.size() > 3 || words[0] != "to") return std::nullopt;
     bool top = false, bottom = false, left = false, right = false;
@@ -210,7 +198,7 @@ Conversion ConvertGradient(std::string_view inside, const ValueContext& context)
     double angle = 180;  // CSS default: to bottom
     size_t first = 0;
     if (!pieces.empty()) {
-        std::string head = Lowered(pieces[0]);
+        std::string head = ToLowerAscii(pieces[0]);
         if (head.starts_with("to ")) {
             std::optional<double> side = SideAngle(pieces[0]);
             if (!side) return Fail("unreadable gradient direction: \"" + std::string(pieces[0]) + "\"");
@@ -287,7 +275,7 @@ Conversion ConvertImage(std::string_view text, const ValueContext& context) {
     if (!IsSafeRelativePath(*path)) return Fail("image path not allowed: " + *path);
     if (!context.files.Exists(*path)) return Fail("image not found: " + *path);
 
-    std::string fit = Lowered(Trimmed(text.substr(close + 1)));
+    std::string fit = ToLowerAscii(TrimSpace(text.substr(close + 1)));
     std::string stretch;
     if (fit == "cover") {
         stretch = "|UniformToFill";
@@ -305,7 +293,7 @@ Conversion ConvertImage(std::string_view text, const ValueContext& context) {
 // follows it: the image changes with the song.
 Conversion ConvertArtwork(std::string_view text, const ValueContext& context) {
     if (!context.allowImages) return Fail("images are turned off (assets part of the theme)");
-    std::string fit = Lowered(Trimmed(text.substr(std::string_view("artwork").size())));
+    std::string fit = ToLowerAscii(TrimSpace(text.substr(std::string_view("artwork").size())));
     if (fit.empty() || fit == "cover") return Ok(ValueKind::Image, std::string(kArtworkImage) + "|UniformToFill");
     if (fit == "contain") return Ok(ValueKind::Image, std::string(kArtworkImage) + "|Uniform");
     if (fit == "fill") return Ok(ValueKind::Image, std::string(kArtworkImage) + "|Fill");
@@ -313,11 +301,11 @@ Conversion ConvertArtwork(std::string_view text, const ValueContext& context) {
 }
 
 Conversion ConvertBrush(std::string_view raw, const ValueContext& context) {
-    std::string_view text = Trimmed(raw);
+    std::string_view text = TrimSpace(raw);
     if (text.empty()) return Fail("empty color");
 
-    if (Lowered(text.substr(0, 7)) == "artwork" && (text.size() == 7 || text[7] == ' ')) return ConvertArtwork(text, context);
-    if (Lowered(text.substr(0, 4)) == "url(") return ConvertImage(text, context);
+    if (ToLowerAscii(text.substr(0, 7)) == "artwork" && (text.size() == 7 || text[7] == ' ')) return ConvertArtwork(text, context);
+    if (ToLowerAscii(text.substr(0, 4)) == "url(") return ConvertImage(text, context);
     if (std::optional<std::string_view> inside = FunctionArguments(text, "linear-gradient")) {
         return ConvertGradient(*inside, context);
     }
@@ -341,8 +329,8 @@ Conversion ConvertBackdrop(std::string_view raw, const ValueContext& context) {
 }
 
 Conversion ConvertLength(std::string_view raw) {
-    std::string_view text = Trimmed(raw);
-    if (Lowered(text) == "auto") return Ok(ValueKind::Length, "NaN");
+    std::string_view text = TrimSpace(raw);
+    if (ToLowerAscii(text) == "auto") return Ok(ValueKind::Length, "NaN");
 
     std::optional<double> pixels = ParsePixels(text);
     if (!pixels) return Fail("unreadable length: \"" + std::string(text) + "\"");
@@ -352,11 +340,11 @@ Conversion ConvertLength(std::string_view raw) {
 // Pixels, or a size relative to the one the element had before the theme (IsRelativeSize): a theme that enlarges
 // every text keeps the titles above the body text.
 Conversion ConvertFontSize(std::string_view raw) {
-    std::string_view text = Trimmed(raw);
-    std::string lowered = Lowered(text);
+    std::string_view text = TrimSpace(raw);
+    std::string lowered = ToLowerAscii(text);
     std::optional<double> factor = ParsePercent(text);
     if (!factor && lowered.ends_with("em") && !lowered.ends_with("rem")) {
-        factor = ParseNumber(Trimmed(text.substr(0, text.size() - 2)));
+        factor = ParseNumber(TrimSpace(text.substr(0, text.size() - 2)));
     }
     if (!factor) return ConvertLength(raw);
     if (!(*factor > 0 && *factor <= 10)) {
@@ -368,7 +356,7 @@ Conversion ConvertFontSize(std::string_view raw) {
 // As in CSS, only a margin goes below zero. A negative padding, border or corner reaches a template's Border, which
 // refuses it at the next layout: WinUI then stops Apple Music.
 Conversion ConvertThickness(std::string_view raw, bool allowNegative) {
-    std::string_view text = Trimmed(raw);
+    std::string_view text = TrimSpace(raw);
     std::array<std::string, 4> parts;  // CSS order: top, right, bottom, left
     size_t count = 0;
     size_t start = 0;
@@ -399,21 +387,21 @@ Conversion ConvertThickness(std::string_view raw, bool allowNegative) {
 }
 
 Conversion ConvertVisibility(std::string_view raw) {
-    std::string value = Lowered(Trimmed(raw));
+    std::string value = ToLowerAscii(TrimSpace(raw));
     if (value == "visible") return Ok(ValueKind::Visibility, "Visible");
     if (value == "collapsed" || value == "hidden" || value == "none") return Ok(ValueKind::Visibility, "Collapsed");
-    return Fail("unknown visibility: \"" + std::string(Trimmed(raw)) + "\" (visible or collapsed)");
+    return Fail("unknown visibility: \"" + std::string(TrimSpace(raw)) + "\" (visible or collapsed)");
 }
 
 Conversion ConvertNumber(const PropertySpec& spec, std::string_view raw) {
-    std::string value = Lowered(Trimmed(raw));
+    std::string value = ToLowerAscii(TrimSpace(raw));
     if (spec.css == "font-weight") {
         if (value == "normal") return Ok(ValueKind::Number, "400");
         if (value == "bold") return Ok(ValueKind::Number, "700");
     }
 
     std::optional<double> number = ParseNumber(value);
-    if (!number) return Fail("unreadable number: \"" + std::string(Trimmed(raw)) + "\"");
+    if (!number) return Fail("unreadable number: \"" + std::string(TrimSpace(raw)) + "\"");
     if (spec.css == "opacity" && (*number < 0 || *number > 1)) return Fail("opacity outside 0 to 1");
     if (spec.css == "font-weight" && (*number < 1 || *number > 1000)) return Fail("weight outside 1 to 1000");
     return Ok(ValueKind::Number, FormatNumber(*number));
@@ -424,15 +412,15 @@ Conversion ConvertNumber(const PropertySpec& spec, std::string_view raw) {
 // package, not into the theme).
 Conversion ConvertFontFile(std::string_view argument, const ValueContext& context) {
     size_t hash = argument.find('#');
-    if (hash == std::string_view::npos || Trimmed(argument.substr(hash + 1)).empty()) {
+    if (hash == std::string_view::npos || TrimSpace(argument.substr(hash + 1)).empty()) {
         return Fail("family name missing after \"#\" (url(fonts/file.ttf#Font name))");
     }
-    std::string path(Trimmed(argument.substr(0, hash)));
-    std::string family(Trimmed(argument.substr(hash + 1)));
+    std::string path(TrimSpace(argument.substr(0, hash)));
+    std::string family(TrimSpace(argument.substr(hash + 1)));
     if (!context.allowImages) return Fail("fonts are turned off (assets part of the theme)");
     if (!IsSafeRelativePath(path)) return Fail("font path not allowed: " + path);
     size_t dot = path.find_last_of('.');
-    std::string extension = dot == std::string::npos ? std::string() : Lowered(std::string_view(path).substr(dot));
+    std::string extension = dot == std::string::npos ? std::string() : ToLowerAscii(std::string_view(path).substr(dot));
     if (extension != ".ttf" && extension != ".otf" && extension != ".ttc") {
         return Fail("unsupported font: " + path + " (ttf, otf or ttc)");
     }
@@ -445,7 +433,7 @@ Conversion ConvertFontFile(std::string_view argument, const ValueContext& contex
 Conversion ConvertText(std::string_view raw, const ValueContext& context) {
     if (std::optional<std::string> argument = UrlArgument(raw)) return ConvertFontFile(*argument, context);
 
-    std::string_view text = Trimmed(raw);
+    std::string_view text = TrimSpace(raw);
     if (text.size() >= 2 && (text.front() == '"' || text.front() == '\'') && text.back() == text.front()) {
         text = text.substr(1, text.size() - 2);
     }
@@ -455,14 +443,14 @@ Conversion ConvertText(std::string_view raw, const ValueContext& context) {
 
 // The direction in which text and children are laid out. A right-to-left language turns the whole page around.
 Conversion ConvertFlowDirection(std::string_view raw) {
-    std::string value = Lowered(Trimmed(raw));
+    std::string value = ToLowerAscii(TrimSpace(raw));
     if (value == "ltr" || value == "left-to-right" || value == "lefttoright") return Ok(ValueKind::Keyword, "LeftToRight");
     if (value == "rtl" || value == "right-to-left" || value == "righttoleft") return Ok(ValueKind::Keyword, "RightToLeft");
-    return Fail("unknown direction: \"" + std::string(Trimmed(raw)) + "\" (ltr or rtl)");
+    return Fail("unknown direction: \"" + std::string(TrimSpace(raw)) + "\" (ltr or rtl)");
 }
 
 Conversion ConvertOrder(std::string_view raw) {
-    std::string_view text = Trimmed(raw);
+    std::string_view text = TrimSpace(raw);
     if (text.empty() || text.size() > 4 || text.find_first_not_of("0123456789") != std::string_view::npos) {
         return Fail("unreadable position: \"" + std::string(text) + "\" (a whole number from 0)");
     }
@@ -471,7 +459,7 @@ Conversion ConvertOrder(std::string_view raw) {
 
 // HorizontalAlignment or VerticalAlignment, by the CSS name of the property.
 Conversion ConvertAlignment(const PropertySpec& spec, std::string_view raw) {
-    std::string value = Lowered(Trimmed(raw));
+    std::string value = ToLowerAscii(TrimSpace(raw));
     bool vertical = spec.css == "vertical-alignment";
     if (value == "center") return Ok(ValueKind::Keyword, "Center");
     if (value == "stretch") return Ok(ValueKind::Keyword, "Stretch");
@@ -479,13 +467,13 @@ Conversion ConvertAlignment(const PropertySpec& spec, std::string_view raw) {
     if (!vertical && value == "right") return Ok(ValueKind::Keyword, "Right");
     if (vertical && value == "top") return Ok(ValueKind::Keyword, "Top");
     if (vertical && value == "bottom") return Ok(ValueKind::Keyword, "Bottom");
-    return Fail("unknown alignment: \"" + std::string(Trimmed(raw)) + "\" (" +
+    return Fail("unknown alignment: \"" + std::string(TrimSpace(raw)) + "\" (" +
                 (vertical ? "top, center, bottom" : "left, center, right") + " or stretch)");
 }
 
 // A Grid row or column from 0, a span from 1, a z-index that may be negative.
 Conversion ConvertInteger(const PropertySpec& spec, std::string_view raw) {
-    std::string_view text = Trimmed(raw);
+    std::string_view text = TrimSpace(raw);
     std::string_view digits = !text.empty() && text.front() == '-' ? text.substr(1) : text;
     if (digits.empty() || digits.size() > 6 || digits.find_first_not_of("0123456789") != std::string_view::npos) {
         return Fail("unreadable whole number: \"" + std::string(text) + "\"");
@@ -502,8 +490,8 @@ Conversion ConvertInteger(const PropertySpec& spec, std::string_view raw) {
 // scale(x[, y]) rotate(<deg>) translate(x[, y]), and scaleX, scaleY, translateX, translateY: one CompositeTransform.
 // XAML applies its parts in a fixed order (scale, then rotation, then translation), whatever the order written.
 Conversion ConvertTransform(std::string_view raw) {
-    std::string_view text = Trimmed(raw);
-    if (Lowered(text) == "none") return Ok(ValueKind::Transform, "1,1,0,0,0");
+    std::string_view text = TrimSpace(raw);
+    if (ToLowerAscii(text) == "none") return Ok(ValueKind::Transform, "1,1,0,0,0");
 
     double scaleX = 1, scaleY = 1, rotation = 0, translateX = 0, translateY = 0;
     size_t i = 0;
@@ -516,7 +504,7 @@ Conversion ConvertTransform(std::string_view raw) {
         size_t open = text.find('(', i);
         size_t close = open == std::string_view::npos ? open : text.find(')', open);
         if (close == std::string_view::npos) return Fail("unreadable transform: \"" + std::string(text) + "\"");
-        std::string name = Lowered(Trimmed(text.substr(i, open - i)));
+        std::string name = ToLowerAscii(TrimSpace(text.substr(i, open - i)));
         std::string_view inside = text.substr(open + 1, close - open - 1);
         i = close + 1;
         any = true;
@@ -564,9 +552,9 @@ Conversion ConvertTransform(std::string_view raw) {
 // One or two percentages or keywords, x then y: `50% 50%`, `center`, `left top`. RenderTransformOrigin is relative
 // to the element, so pixels are not accepted.
 Conversion ConvertTransformOrigin(std::string_view raw) {
-    std::vector<std::string_view> words = SplitWords(Trimmed(raw));
+    std::vector<std::string_view> words = SplitWords(TrimSpace(raw));
     auto fail = [&]() {
-        return Fail("unreadable origin: \"" + std::string(Trimmed(raw)) +
+        return Fail("unreadable origin: \"" + std::string(TrimSpace(raw)) +
                     "\" (percentages, or left, center, right, top, bottom)");
     };
     if (words.empty() || words.size() > 2) return fail();
@@ -578,7 +566,7 @@ Conversion ConvertTransformOrigin(std::string_view raw) {
     };
     std::vector<Part> parts;
     for (std::string_view word : words) {
-        std::string lowered = Lowered(word);
+        std::string lowered = ToLowerAscii(word);
         if (lowered == "left") parts.push_back({0, 1});
         else if (lowered == "right") parts.push_back({1, 1});
         else if (lowered == "top") parts.push_back({0, 2});
@@ -595,8 +583,8 @@ Conversion ConvertTransformOrigin(std::string_view raw) {
 
 // A depth in pixels: the ThemeShadow of WinUI grows with the Z of the element. `none` or 0: no shadow.
 Conversion ConvertShadow(std::string_view raw) {
-    std::string_view text = Trimmed(raw);
-    if (Lowered(text) == "none") return Ok(ValueKind::Shadow, "0");
+    std::string_view text = TrimSpace(raw);
+    if (ToLowerAscii(text) == "none") return Ok(ValueKind::Shadow, "0");
     std::optional<double> depth = ParsePixels(text);
     if (!depth) {
         return Fail("unreadable shadow depth: \"" + std::string(text) + "\" (a number of pixels, like 16px)");
@@ -609,14 +597,14 @@ Conversion ConvertShadow(std::string_view raw) {
 // ease-out); easing words and delays are accepted and ignored. Only what XAML animates cheaply is offered.
 Conversion ConvertTransition(std::string_view raw) {
     constexpr double kMaxMs = 5000;
-    std::string lowered = Lowered(Trimmed(raw));
+    std::string lowered = ToLowerAscii(TrimSpace(raw));
     if (lowered == "none") return Ok(ValueKind::Transition, "");
     std::array<std::optional<double>, 3> durations;  // transform, opacity, background
     constexpr std::array<std::string_view, 3> kNames{"transform", "opacity", "background"};
     std::string_view rest = lowered;
     while (!rest.empty()) {
         size_t comma = rest.find(',');
-        std::string_view item = Trimmed(rest.substr(0, comma));
+        std::string_view item = TrimSpace(rest.substr(0, comma));
         rest = comma == std::string_view::npos ? std::string_view{} : rest.substr(comma + 1);
         std::vector<std::string_view> words = SplitWords(item);
         if (words.empty()) return Fail("empty transition");
@@ -668,7 +656,7 @@ std::span<const PropertySpec> KnownProperties() {
 }
 
 const PropertySpec* FindProperty(std::string_view css) {
-    std::string key = Lowered(css);
+    std::string key = ToLowerAscii(css);
     for (const PropertySpec& spec : KnownProperties()) {
         if (spec.css == key) return &spec;
     }
@@ -683,8 +671,8 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
             return ConvertBackdrop(raw, context);
         case PropertyKind::Length:
             // No limit: XAML's MaxWidth and MaxHeight default to infinity, MinWidth and MinHeight to 0 (NaN throws).
-            if (spec.css.starts_with("max-") && Lowered(Trimmed(raw)) == "none") return Ok(ValueKind::Length, "inf");
-            if (spec.css.starts_with("min-") && Lowered(Trimmed(raw)) == "auto") return Ok(ValueKind::Length, "0");
+            if (spec.css.starts_with("max-") && ToLowerAscii(TrimSpace(raw)) == "none") return Ok(ValueKind::Length, "inf");
+            if (spec.css.starts_with("min-") && ToLowerAscii(TrimSpace(raw)) == "auto") return Ok(ValueKind::Length, "0");
             if (spec.xaml == "FontSize") return ConvertFontSize(raw);
             return ConvertLength(raw);
         case PropertyKind::Thickness:

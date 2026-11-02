@@ -189,9 +189,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     ampify_version_resource(ampify_setup "Ampify setup and uninstaller")
 endif()
 
-# Portable part of the command line `ampify`: JSON, SHA-256, manifests, catalog, kit layout, backups.
+# Portable part of the command line `ampify`: SHA-256, manifests, catalog, kit layout, backups, theme commands.
 add_library(ampify_cli_portable STATIC ${AMPIFY_CLI_PORTABLE_SOURCES})
-target_link_libraries(ampify_cli_portable PUBLIC ampify_core)
+target_link_libraries(ampify_cli_portable PUBLIC ampify_theme ampify_core)
 target_compile_options(ampify_cli_portable PRIVATE ${AMPIFY_WARNINGS})
 
 # The command line `ampify`: commands, platform glue, and the marketplace.

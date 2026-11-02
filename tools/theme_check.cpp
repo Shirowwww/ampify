@@ -19,7 +19,7 @@
 #include <vector>
 
 #include "../src/core/theme/builtins.hpp"
-#include "../src/core/theme/commands.hpp"
+#include "../src/core/theme/report.hpp"
 #include "../src/core/theme/css.hpp"
 #include "../src/core/theme/files.hpp"
 #include "../src/core/theme/inspector.hpp"

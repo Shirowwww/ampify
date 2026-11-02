@@ -27,4 +27,4 @@ list(APPEND AMPIFY_TESTS_SOURCES
     tests/api_module_tests.cpp
     tests/parity_tests.cpp)
 
-list(APPEND AMPIFY_TESTS_WIN_SOURCES tests/win_host_tests.cpp)
+list(APPEND AMPIFY_TESTS_WIN_SOURCES tests/win_host_tests.cpp tests/win_common_tests.cpp)
