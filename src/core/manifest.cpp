@@ -181,8 +181,27 @@ void ReadSettings(const Json& field, std::vector<SettingSpec>& settings, std::ve
     }
 }
 
-// "translations": {"fr": {"name": ..., "description": ...}}, only for the languages Ampify speaks, with the same
-// length rules as name and description.
+// "settings" or "options" of a translation: an object of texts of 1 to 60 characters, as a setting's label.
+std::map<std::string, std::string> ReadLabels(const Json* field, const std::string& where, std::vector<std::string>& errors) {
+    std::map<std::string, std::string> labels;
+    if (!field) return labels;
+    if (!field->IsObject()) {
+        errors.push_back(where + " must be an object");
+        return labels;
+    }
+    for (const auto& [key, value] : *field->AsObject()) {
+        const std::string* text = value.AsString();
+        if (!text || CodePoints(*text) < 1 || CodePoints(*text) > 60) {
+            errors.push_back(where + "." + key + " must be 1 to 60 characters");
+        } else {
+            labels[key] = *text;
+        }
+    }
+    return labels;
+}
+
+// "translations": {"fr": {"name": ..., "description": ..., "settings": {...}, "options": {...}}}, only for the
+// languages Ampify speaks, with the same length rules as name, description and a setting's label.
 void ReadTranslations(const Json& field, std::map<std::string, ManifestText>& translations,
                       std::vector<std::string>& errors) {
     const Json::Object* languages = field.AsObject();
@@ -204,8 +223,12 @@ void ReadTranslations(const Json& field, std::map<std::string, ManifestText>& tr
         size_t before = errors.size();
         for (const auto& [member, value] : *entry.AsObject()) {
             (void)value;
-            if (member != "name" && member != "description") errors.push_back(where + ": unknown field " + member);
+            if (member != "name" && member != "description" && member != "settings" && member != "options") {
+                errors.push_back(where + ": unknown field " + member);
+            }
         }
+        std::map<std::string, std::string> settings = ReadLabels(entry.Find("settings"), where + ".settings", errors);
+        std::map<std::string, std::string> options = ReadLabels(entry.Find("options"), where + ".options", errors);
         const std::string* name = entry.Find("name") ? entry.Find("name")->AsString() : nullptr;
         if (!name || CodePoints(*name) < 1 || CodePoints(*name) > 60) {
             errors.push_back(where + ": name must be 1 to 60 characters");
@@ -214,7 +237,7 @@ void ReadTranslations(const Json& field, std::map<std::string, ManifestText>& tr
         if (!description || CodePoints(*description) < 1 || CodePoints(*description) > 300) {
             errors.push_back(where + ": description must be 1 to 300 characters");
         }
-        if (errors.size() == before) translations[code] = {*name, *description};
+        if (errors.size() == before) translations[code] = {*name, *description, std::move(settings), std::move(options)};
     }
 }
 
@@ -343,7 +366,7 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
         }
     }
 
-    if (const Json* translations = root->Find("translations")) ReadTranslations(*translations, m.translations, result.errors);
+    if (const Json* translations = root->Find("translations")) m.translations = ReadManifestTranslations(*translations, result.errors);
 
     std::optional<std::string> kitApi = text_of("kitApi", true);
     if (kitApi) {
@@ -464,6 +487,12 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
 
     if (result.errors.empty()) result.manifest = std::move(m);
     return result;
+}
+
+std::map<std::string, ManifestText> ReadManifestTranslations(const Json& field, std::vector<std::string>& errors) {
+    std::map<std::string, ManifestText> translations;
+    ReadTranslations(field, translations, errors);
+    return translations;
 }
 
 std::vector<SettingSpec> DeclaredSettings(std::string_view manifestText, std::vector<std::string>* errors) {

@@ -111,7 +111,9 @@
       "additionalProperties": false,
       "properties": {
         "name": {"type": "string", "minLength": 1, "maxLength": 60},
-        "description": {"type": "string", "minLength": 1, "maxLength": 300}
+        "description": {"type": "string", "minLength": 1, "maxLength": 300},
+        "settings": {"type": "object", "description": "The label of each declared setting, by its key.", "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 60}},
+        "options": {"type": "object", "description": "The text of each option of a choice setting, by its stored value.", "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 60}}
       }
     },
     "setting": {

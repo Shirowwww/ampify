@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+#include "json.hpp"
+
 namespace ampify {
 
 enum class ElementKind { Extension, Theme, App, Snippet };
@@ -30,6 +32,8 @@ struct SettingSpec {
 struct ManifestText {
     std::string name;
     std::string description;
+    std::map<std::string, std::string> settings;  // the label of a declared setting, by its key (optional)
+    std::map<std::string, std::string> options;   // the text of a choice's option, by its stored value (optional)
 };
 
 inline constexpr std::string_view kTranslationLanguages[] = {"fr"};
@@ -85,6 +89,9 @@ std::vector<std::string> SettingsErrors(std::string_view manifestText);
 // The settings field alone, for the theme loader and the Ampify card. Empty, with the reasons in `errors`, when one
 // of them breaks a rule, or when the kind is neither extension nor theme.
 std::vector<SettingSpec> DeclaredSettings(std::string_view manifestText, std::vector<std::string>* errors = nullptr);
+
+// The manifest's "translations" field, as ParseManifest reads it; problems go to `errors`.
+std::map<std::string, ManifestText> ReadManifestTranslations(const Json& field, std::vector<std::string>& errors);
 
 // The value a setting has now: `stored` (from settings.txt) when it fits the spec, else the default. A toggle comes
 // back as true or false, a number as SettingNumberText writes it.

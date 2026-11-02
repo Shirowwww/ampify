@@ -160,10 +160,28 @@ std::map<std::string, ManifestText> ReadTranslations(const Json& object, const s
             continue;
         }
         size_t before = errors.size();
-        CheckAllowedKeys(entry, {"name", "description"}, entryLabel, errors);
+        CheckAllowedKeys(entry, {"name", "description", "settings", "options"}, entryLabel, errors);
         std::optional<std::string> name = ReadText(entry, "name", entryLabel, kNameRule, true, errors);
         std::optional<std::string> description = ReadText(entry, "description", entryLabel, kDescriptionRule, true, errors);
-        if (errors.size() == before) result[code] = {*name, *description};
+        // The labels of the declared settings and the texts of their options: 1 to 60 characters, as a label.
+        std::map<std::string, std::string> labels[2];
+        const char* kLabelFields[2] = {"settings", "options"};
+        for (int index = 0; index < 2; index++) {
+            const Json* field = entry.Find(kLabelFields[index]);
+            if (!field) continue;
+            std::string fieldLabel = entryLabel + "." + kLabelFields[index];
+            if (!field->IsObject()) {
+                errors.push_back(fieldLabel + ": object expected");
+                continue;
+            }
+            for (const auto& [key, value] : *field->AsObject()) {
+                (void)value;
+                if (std::optional<std::string> text = ReadText(*field, key, fieldLabel, kNameRule, true, errors)) {
+                    labels[index][key] = *text;
+                }
+            }
+        }
+        if (errors.size() == before) result[code] = {*name, *description, labels[0], labels[1]};
     }
     return result;
 }

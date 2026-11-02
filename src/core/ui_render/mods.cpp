@@ -184,6 +184,10 @@ std::optional<ModEntry> ActiveThemeSettings(const fs::path& kit) {
     std::optional<Json> manifest = Json::Parse(*text);
     const Json* name = manifest ? manifest->Find("name") : nullptr;
     theme.name = name && name->AsString() && !name->AsString()->empty() ? *name->AsString() : id;
+    if (const Json* translations = manifest ? manifest->Find("translations") : nullptr) {
+        std::vector<std::string> ignored;  // a bad translation leaves the English texts, the card still shows
+        theme.translations = ReadManifestTranslations(*translations, ignored);
+    }
     for (const SettingSpec& spec : theme.settings) {
         theme.values.push_back(SettingValue(spec, settings.Get("themes." + id + "." + spec.key)));
     }

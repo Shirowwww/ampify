@@ -59,9 +59,12 @@ only for now:
 | language key | `fr`. Any other key is refused. |
 | `name` | Required, 1 to 60 characters, like `name` |
 | `description` | Required, 1 to 300 characters, like `description` |
+| `settings` | Optional. The label of each declared setting, by its `key`, 1 to 60 characters: `{"gap": "Espace autour des panneaux"}` |
+| `options` | Optional. The text of each option of a `choice` setting, by its value, 1 to 60 characters: `{"Green": "Vert"}`. The value stored in `settings.txt` stays the English one |
 
 The Marketplace (cards and detail view), the Ampify card in Apple Music's Settings and `ampify market --json` use the
 translation that matches Windows' display language, and the English `name` and `description` when there is none. The
+Ampify card also shows the translated setting labels and option texts. The
 catalog entry repeats `translations` (see [catalog.md](catalog.md)). The id, the folder name and the messages of the
 command line never change with the language.
 

@@ -56,7 +56,18 @@ std::string CatalogEntryText(const ElementManifest& manifest, const std::string&
         bool first = true;
         for (const auto& [code, text] : manifest.translations) {
             out << (first ? "" : ", ") << Json::Quote(code) << ": {\"name\": " << Json::Quote(text.name)
-                << ", \"description\": " << Json::Quote(text.description) << "}";
+                << ", \"description\": " << Json::Quote(text.description);
+            for (const auto& [field, labels] : {std::pair{"settings", &text.settings}, std::pair{"options", &text.options}}) {
+                if (labels->empty()) continue;
+                out << ", \"" << field << "\": {";
+                bool firstLabel = true;
+                for (const auto& [key, label] : *labels) {
+                    out << (firstLabel ? "" : ", ") << Json::Quote(key) << ": " << Json::Quote(label);
+                    firstLabel = false;
+                }
+                out << "}";
+            }
+            out << "}";
             first = false;
         }
         out << "},\n";
