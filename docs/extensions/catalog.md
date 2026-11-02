@@ -39,7 +39,10 @@ The example above is not in the catalog: its SHA-256 is a placeholder.
 | `tags` | no | A copy of the manifest tags: 5 at most, unique, each `[a-z0-9][a-z0-9-]{0,19}`. Shown on the card. |
 | `preview` | no | An `https://` URL ending in `.png`, `.jpg` or `.jpeg`, 512 characters at most. The page shows it only when its host is the catalog's own host or the host of the archive `url`; any other address is left out. A catalog read from a local file only has the archive `url` host. |
 | `permissions` | no | A copy of the manifest permissions. It lets the consent be shown before the download. |
-| `translations` | no | A copy of the manifest's `translations` (`fr` only: `{"fr": {"name": "...", "description": "..."}}`, same length rules as `name` and `description`). The Marketplace shows it when Windows is in French. `tools/pack.py` and `ampify build` copy it. |
+| `translations` | no | A copy of the manifest's `translations` (`fr` only: `{"fr": {"name": "...", "description": "..."}}`, same length rules as `name` and `description`). The Marketplace shows it when Windows is in French. Not written for now: Ampify 1.1.0 refuses the whole catalog for a field it does not know, so `tools/pack.py` and `ampify build` leave it out and the archive's manifest keeps it. |
+
+A field this list does not name is left aside (Ampify 1.1.0 and older refused the catalog instead), so the catalog can
+grow without cutting off the versions that read it.
 
 The permission `kit.manage` is refused in the catalog: only the Marketplace that ships with Ampify holds it.
 

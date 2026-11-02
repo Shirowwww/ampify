@@ -51,27 +51,7 @@ std::string CatalogEntryText(const ElementManifest& manifest, const std::string&
         << "  \"author\": " << Json::Quote(manifest.author) << ",\n"
         << "  \"description\": " << Json::Quote(manifest.description) << ",\n"
         << "  \"kitApi\": " << Json::Quote(manifest.kitApi) << ",\n";
-    if (!manifest.translations.empty()) {
-        out << "  \"translations\": {";
-        bool first = true;
-        for (const auto& [code, text] : manifest.translations) {
-            out << (first ? "" : ", ") << Json::Quote(code) << ": {\"name\": " << Json::Quote(text.name)
-                << ", \"description\": " << Json::Quote(text.description);
-            for (const auto& [field, labels] : {std::pair{"settings", &text.settings}, std::pair{"options", &text.options}}) {
-                if (labels->empty()) continue;
-                out << ", \"" << field << "\": {";
-                bool firstLabel = true;
-                for (const auto& [key, label] : *labels) {
-                    out << (firstLabel ? "" : ", ") << Json::Quote(key) << ": " << Json::Quote(label);
-                    firstLabel = false;
-                }
-                out << "}";
-            }
-            out << "}";
-            first = false;
-        }
-        out << "},\n";
-    }
+    // No translations: Ampify 1.1.0 refuses the whole catalog for a field it does not know. The archive keeps them.
     if (!manifest.tags.empty()) {
         out << "  \"tags\": [";
         for (size_t i = 0; i < manifest.tags.size(); i++) out << (i ? ", " : "") << Json::Quote(manifest.tags[i]);

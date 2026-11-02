@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "night-blue",
   "name": "Night blue",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Night blue theme, with a dark scheme and a light scheme.",

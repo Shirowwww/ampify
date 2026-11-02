@@ -133,6 +133,14 @@ dozens of times. Always target them under a named parent.
 - WinUI resolves `ToggleButtonBackgroundChecked`, `AccentButtonBackground` and `AccentButtonForeground` from the accent
   once, when its dictionaries load, like the other accent keys: a theme's accent alone left the checked lyrics and queue
   buttons in Windows' blue and white text on a light accent. They are derived from the accent with the rest.
+- Apple's lists (`AMP.UI.Controls.ListView`, the Songs table, album track lists) give their rows' selection colours
+  in their own style: the `ListViewItemBackgroundSelected*` keys of a theme never reach them. The row's
+  `ListViewItemPresenter` draws the selection from its own `SelectedBackground`, `SelectedPointerOverBackground` and
+  `SelectedPressedBackground`, which take a local value and keep it (`.list-item { selected-background: ... }`).
+  Checked on 02/11/2026: Catppuccin's purple veil was Apple's grey before, the measured colour after.
+- Apple's main window closes through `WM_CLOSE` (title bar button, Alt+F4, the taskbar), which WinUI turns into
+  `AppWindow.Closing`. A subclass of the main window that answers `WM_CLOSE` itself keeps Apple Music from starting
+  to shut down; `ShowWindow(SW_HIDE)` then hides it and the music goes on (`src/win/close_to_tray.cpp`).
 - First start: an MPEG LA licence (buttons Agree, Decline, Save As) shows before the main window, then, after sign-in, a
   "Welcome to Apple Music" screen (Start Listening). No XAML window exists while they are open. The bench closes them
   through UI Automation.

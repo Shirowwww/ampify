@@ -65,7 +65,7 @@ only for now:
 The Marketplace (cards and detail view), the Ampify card in Apple Music's Settings and `ampify market --json` use the
 translation that matches Windows' display language, and the English `name` and `description` when there is none. The
 Ampify card also shows the translated setting labels and option texts. The
-catalog entry repeats `translations` (see [catalog.md](catalog.md)). The id, the folder name and the messages of the
+catalog entry does not repeat them for now (see [catalog.md](catalog.md)). The id, the folder name and the messages of the
 command line never change with the language.
 
 ## Fields by `kind`

@@ -117,7 +117,7 @@ class PackTests(unittest.TestCase):
         self.assertEqual(entry["tags"], ["dark", "minimal"])
         self.assertTrue(os.path.isfile(os.path.join(self.tmp, "packages", "demo-1.0.0.jpg")))
 
-    def test_catalog_entry_keeps_the_translations(self):
+    def test_catalog_entry_leaves_the_translations_in_the_archive(self):
         folder = self.make_element()
         with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as handle:
             manifest = json.load(handle)
@@ -131,7 +131,7 @@ class PackTests(unittest.TestCase):
         pack.pack(folder, archive, catalog, "https://example.com/demo-1.0.0.zip")
         with open(catalog, encoding="utf-8") as handle:
             entry = json.load(handle)["extensions"][0]
-        self.assertEqual(entry["translations"], manifest["translations"])
+        self.assertNotIn("translations", entry)  # Ampify 1.1.0 would refuse the whole catalog
 
     def test_catalog_needs_an_https_address(self):
         folder = self.make_element()

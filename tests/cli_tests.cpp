@@ -381,11 +381,14 @@ TEST_CASE(Catalog_RejectsBadChecksumDuplicatesAndUnknownKeys) {
     CHECK(!ampify::ParseCatalog(CatalogWith(twice), false, errors).has_value());
     CHECK(MentionsField(errors, "extensions[1].id: id already in the catalog"));
 
+    // A field a later catalog adds is left aside: Ampify 1.1.0 refused the whole catalog for one, and every user of it
+    // would have lost the Marketplace when the catalog gained a field.
     errors.clear();
     std::string extra = kCatalogEntry;
     extra.insert(extra.size() - 1, R"(, "stars": 5)");
-    CHECK(!ampify::ParseCatalog(CatalogWith(extra), false, errors).has_value());
-    CHECK(MentionsField(errors, "extensions[0].stars: unknown field"));
+    std::optional<ampify::Catalog> later = ampify::ParseCatalog(CatalogWith(extra), false, errors);
+    CHECK(later.has_value() && later->entries.size() == 1);
+    CHECK(errors.empty());
 }
 
 TEST_CASE(Catalog_TagsAndPreviewAreChecked) {

@@ -100,12 +100,8 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
                 continue;
             }
 
+            // Fields this version does not know are left aside, so a catalog that gains one keeps working here.
             size_t entryBefore = errors.size();
-            CheckAllowedKeys(item,
-                             {"id", "name", "version", "kind", "author", "description", "kitApi", "url", "sha256",
-                              "homepage", "license", "permissions", "tags", "preview", "translations"},
-                             where, errors);
-
             CatalogEntry entry;
             ReadElementInfo(item, where, entry, errors);
             // kit.manage runs ampify itself: only the Marketplace that ships with the kit has it, never a download.

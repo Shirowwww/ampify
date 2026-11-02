@@ -408,7 +408,8 @@ class Marketplace(AmpifyTestCase):
         with open(manifest_path, "w", encoding="utf-8") as handle:
             json.dump(manifest, handle)
         entry, _ = self.entry_for(folder)
-        self.assertEqual(entry["translations"], translations)
+        self.assertNotIn("translations", entry)  # build leaves them out: Ampify 1.1.0 refuses the field
+        entry["translations"] = translations  # a later catalog may carry them, and they are read
         catalog = self.write_catalog([entry, self.night_entry])
         self.assertEqual(self.install("glow", catalog).returncode, 0)
         self.assertEqual(self.install("night", catalog).returncode, 0)

@@ -92,7 +92,9 @@ def catalog_entry(manifest, url, sha256, preview=None):
         key: manifest[key]
         for key in ("id", "name", "version", "kind", "author", "description", "kitApi")
     }
-    for key in ("homepage", "license", "tags", "translations"):
+    # Not the translations: Ampify 1.1.0 refuses the whole catalog for a field it does not know. They stay in the
+    # archive's manifest, which every version reads.
+    for key in ("homepage", "license", "tags"):
         if key in manifest:
             entry[key] = manifest[key]
     if preview:

@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "high-contrast",
   "name": "High contrast",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Black and white, with bright colors for buttons and selections.",
