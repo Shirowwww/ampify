@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.1 (2026-11-02)
+
+- The Playback guard restarts a song that Apple Music leaves stuck, then goes back to the second it froze at: the music
+  plays on about 2 seconds later. It used to skip to the next song and back, which Apple ignored while it was still
+  loading the next song, so another song played instead. Switch it on in the Ampify card of Apple Music's Settings.
+- The README lists what ships with Ampify.
+
 ## 1.2.0 (2026-11-02)
 
 ### Themes

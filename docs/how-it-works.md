@@ -255,11 +255,14 @@ from a short first file, then moves to the lossless one, and that move fails: th
 is heard, and pause, play and a jump are ignored. With Lossless Audio off, no song froze. Apple's loader is out of
 reach (it is the protected streaming path), so the guard repairs instead.
 
-It reads Apple's player once a second. A song that plays at a position above 0 that has not moved for 3 s is reloaded:
-next, then previous 0.4 s later, too soon for the next song to be heard. Once the song plays again from its start, the
-guard jumps back to where it froze through Apple's player (`seek`). It repairs a song twice at most. Measured: about
-10 s of silence, most of it Apple loading the song again, then about a second of the song's start before the jump.
-Position 0 is left alone: a song can take that long to load.
+It reads Apple's player once a second. A song that plays at a position above 0 that has not moved for 3 s is restarted:
+"previous" past 3 s takes the song back to its start, and Apple loads it again. Once it plays from its start, the guard
+jumps back to where it froze through Apple's player (`seek`). Measured on 2 November 2026: the song plays on 2 s after
+the guard steps in, from the second it froze at. If the song has not restarted after 6 s, the guard reloads it instead:
+next, then previous once the next song plays (Apple ignores "previous" while it still loads one). That fallback cannot
+come back from Apple's autoplay songs, after a single or the end of an album, where Apple disables "previous": the next
+song then simply plays. A song is repaired twice at most, and position 0 is left alone: a song can take that long to
+load.
 
 ## Now Playing
 

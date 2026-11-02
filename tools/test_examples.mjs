@@ -1074,32 +1074,46 @@ function fakeGuard() {
 const rollout = (positionMs = 0) => playing({ ...song("t-rollout", "Rollout", "Artist"), queueItemId: "q1" }, 180_000, positionMs);
 const other = () => playing({ ...song("t-other", "Other", "Artist"), queueItemId: "q2" }, 180_000, 0);
 
-test("playback-guard reloads a song frozen while playing, then sends that song back where it froze", () => {
+test("playback-guard restarts a song frozen while playing, then sends it back where it froze", () => {
   const { world, run } = fakeGuard();
   world.state = rollout();
   run(14);
   assert.deepEqual(world.commands, [], "a song that plays is left alone");
 
   run(5, { frozen: true });
-  assert.deepEqual(world.commands, ["next", "previous"]);
+  assert.deepEqual(world.commands, ["previous"], "past 3 s, previous restarts the same song");
   assert.match(world.logs.join("\n"), /Rollout.*14 s/);
 
-  world.state = other();  // the next song, for a moment
-  run(1);
-  world.state = { ...rollout(0), track: { ...rollout().track, queueItemId: "q7" } };  // back, with a new queue entry
+  world.state = rollout(0);  // restarted, from its start
   run(2);
-  assert.deepEqual(world.commands, ["next", "previous", "seek 14000"]);
+  assert.deepEqual(world.commands, ["previous", "seek 14000"]);
   assert.match(world.logs.join("\n"), /back to 14 s \(sent\)/);
 });
 
-test("playback-guard never sends another song to where the frozen one stopped", () => {
+test("playback-guard reloads the song through the next one when the restart does not take", () => {
   const { world, run } = fakeGuard();
   world.state = rollout(14_000);
-  run(5, { frozen: true });
+  run(10, { frozen: true });
+  assert.deepEqual(world.commands, ["previous", "next"]);
+
+  world.state = { ...other(), playing: true, positionMs: 0 };  // the next song, still loading
+  run(1, { frozen: true });
+  assert.deepEqual(world.commands, ["previous", "next"], "no previous while the next song loads: Apple ignores it then");
+  run(1);
+  assert.deepEqual(world.commands, ["previous", "next", "previous"]);
+  world.state = { ...rollout(0), track: { ...rollout().track, queueItemId: "q7" } };  // back, with a new queue entry
+  run(2);
+  assert.deepEqual(world.commands, ["previous", "next", "previous", "seek 14000"]);
+});
+
+test("playback-guard sends previous again when Apple ignored it, never past the next song's first seconds", () => {
+  const { world, run } = fakeGuard();
+  world.state = rollout(14_000);
+  run(10, { frozen: true });
   world.state = other();
   run(25);
-  assert.deepEqual(world.commands, ["next", "previous"]);
-  assert.match(world.logs.join("\n"), /did not play again/);
+  assert.deepEqual(world.commands, ["previous", "next", "previous", "previous"]);
+  assert.match(world.logs.join("\n"), /did not play again after the reload: Apple did not go back/);
 });
 
 test("playback-guard leaves a paused song, a loading song and a song it already repaired twice", () => {
@@ -1112,5 +1126,5 @@ test("playback-guard leaves a paused song, a loading song and a song it already 
 
   world.state = rollout(14_000);
   run(120, { frozen: true });
-  assert.equal(world.commands.filter((name) => name === "next").length, 2);
+  assert.equal(world.commands.filter((name) => name === "next").length, 2, "two repairs, then the song is left alone");
 });
