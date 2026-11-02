@@ -10,6 +10,7 @@ list(APPEND AMPIFY_CLI_PORTABLE_SOURCES
     src/cli/watch.cpp
     src/cli/release.cpp
     src/cli/zip_writer.cpp
+    src/cli/anonymize.cpp
     src/cli/theme_commands.cpp)
 
 list(APPEND AMPIFY_CLI_SOURCES
@@ -21,6 +22,7 @@ list(APPEND AMPIFY_CLI_SOURCES
     src/cli/sdk_types.cpp
     src/cli/develop.cpp
     src/cli/diagnose.cpp
+    src/cli/report.cpp
     src/cli/transfer.cpp
     src/cli/test_runner.cpp
     src/cli/theme_import.cpp

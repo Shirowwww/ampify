@@ -2,11 +2,11 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "artwork",
   "name": "Artwork",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "The artwork of the current track fills the window, under dark glass panels that float.",
-  "translations": {"fr": {"name": "Pochette", "description": "La pochette du morceau en cours remplit la fenêtre, sous des panneaux de verre sombre qui flottent."}},
+  "translations": {"fr": {"name": "Pochette", "description": "La pochette du morceau en cours remplit la fenêtre, sous des panneaux de verre sombre qui flottent.", "settings": {"veil": "Voile des pages (0,3 à 0,9)", "panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux"}}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Night",
@@ -16,5 +16,10 @@
     "glass",
     "immersive"
   ],
-  "preview": "preview.jpg"
+  "preview": "preview.jpg",
+  "settings": [
+    {"key": "veil", "label": "Veil over the pages (0.3 to 0.9)", "type": "number", "min": 0.3, "max": 0.9, "default": 0.75},
+    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 32, "default": 18},
+    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 10}
+  ]
 }

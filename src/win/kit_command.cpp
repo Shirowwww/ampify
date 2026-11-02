@@ -101,6 +101,20 @@ RunResult RunAmpify(const std::vector<std::string>& arguments) {
 
 }  // namespace
 
+void RunAmpifyInBackground(const std::vector<std::string>& arguments, std::function<void(int code)> done) {
+    std::thread([arguments, done = std::move(done)]() mutable {
+        int code = -1;
+        try {
+            code = RunAmpify(arguments).code;
+        } catch (...) {
+        }
+        try {
+            done(code);
+        } catch (...) {
+        }
+    }).detach();
+}
+
 KitCommandRunner::KitCommandRunner(Journal& journal) : m_journal(journal) {}
 
 void KitCommandRunner::RunKitCommand(const std::string& owner, const std::vector<std::string>& arguments, Done done) {

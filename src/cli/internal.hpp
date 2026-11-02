@@ -169,6 +169,9 @@ void NotifyKitUpdate(Context& ctx);
 // Commands in diagnose.cpp.
 int CmdDoctor(Context& ctx);
 
+// Commands in report.cpp: a zip of the state and the logs, anonymised, to attach to an issue.
+int CmdReport(Context& ctx);
+
 // Commands in test_runner.cpp.
 int CmdTest(Context& ctx);
 

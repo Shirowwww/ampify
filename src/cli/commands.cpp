@@ -787,6 +787,7 @@ int Dispatch(Context& ctx) {
     if (command == "dev") return CmdDev(ctx);
     if (command == "logs") return CmdLogs(ctx);
     if (command == "doctor") return CmdDoctor(ctx);
+    if (command == "report") return CmdReport(ctx);
     if (command == "profile") return CmdProfile(ctx);
     if (command == "export") return CmdExport(ctx);
     if (command == "import") return CmdImport(ctx);

@@ -100,8 +100,8 @@ available yet.
 | `--interval <ms>` | With `watch`: watch period |
 | `--max-cycles <n>` | With `watch`, `theme watch`, `dev` and `logs --follow`: number of passes before stopping |
 | `--json` | With `market`: prints the catalog, the installed elements and the active theme as JSON. The Marketplace app reads it |
-| `--tree` | With `inspect`: prints the last interface tree (`logs\inspector.txt`) |
-| `--dir` | With `config`: opens the Ampify folder |
+| `--tree` | With `inspect`: prints the last interface tree (`logs\inspector.txt`). With `report`: adds it to the zip |
+| `--dir` | With `config`: opens the Ampify folder. With `report`: opens the folder of the zip |
 | `--` | Everything after it is an argument, even if it starts with `--` |
 
 Exit codes: `0` success, `1` failure, `2` wrong usage. `apply` returns `1` if a switched-on element cannot load. Error
@@ -121,6 +121,7 @@ messages go to the error output, prefixed with `ampify:`.
   backups\<yyyymmdd-hhmmss>\  copy of settings.txt and the four element folders
   versions.txt              Apple Music versions tested in addition to the kernel's (written by ampify versions update)
   logs\                     logs of the kernel and the launcher, and inspector.txt (interface tree, see devtools)
+  reports\                  the anonymised zips of ampify report, to attach to an issue
   downloads\, updates\, cache\  temporary files, the last catalog read, and cache\kit-update.txt (check_kit_update)
 ```
 
@@ -303,6 +304,16 @@ It exits with code 1 only if there is an error.
 
 `ampify logs [count] [--follow]` prints the last lines (50 by default) of each log in the `logs\` folder. With `--follow` it keeps
 printing new lines. `--max-cycles <n>` stops it after n passes.
+
+`ampify report [file.zip] [--tree] [--dir]` writes one zip to attach to an issue: `system.txt` (versions of Ampify,
+Windows and Apple Music, language, displays and scale, what runs), `doctor.txt`, `settings.txt`, `active.txt`, the logs, and on
+Windows `crashes.txt` (crashes of Apple Music or Ampify that Windows recorded in the last 14 days). `--tree` adds the last
+interface tree. Without a file name it goes to `reports\ampify-report-<date>-<time>.zip` in the Ampify folder. Every file is
+masked first: the profile folder, the user and computer names, e-mail addresses, what was played (titles, artists, albums,
+artwork addresses, library and variant ids), UUIDs, long hashes, secret-looking URL parameters, and the values of settings
+whose name looks like a secret (`token`, `password`, `session`, `key`...). An extension can still write something the
+masking does not recognise, so the README in the zip asks to look through it first. Nothing is sent. The Ampify card in
+Settings, Playback has the same thing behind its **Export a report** button.
 
 `ampify profile list`, `ampify profile save <name>`, `ampify profile use <name>` and `ampify profile delete <name>` manage settings profiles: a copy of
 `settings.txt` stored in `profiles\<name>\`. A profile does not contain the elements. `profile use` backs up the current

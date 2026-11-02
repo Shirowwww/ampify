@@ -7,12 +7,13 @@
 
 :root {
     --window-background: artwork cover;
-    --glass: acrylic(#0B0B10, 0.62);
-    --glass-light: acrylic(#0B0B10, 0.45);
-    --panel-radius: 18px;
-    --gap: 10;
+    /* The pages' veil is a setting: a light artwork needs more of it for the lists to stay readable. */
+    --glass: acrylic(#0B0B10, 0.74);
+    --glass-light: acrylic(#0B0B10, var(--setting-veil));
+    --panel-radius: var(--setting-panel-radius);
+    --gap: var(--setting-gap);
     /* The bar: 64 high, 10 from the top, then a gap of 10 before the pages. */
-    --content-top: 84;
+    --content-top: calc(var(--setting-gap) + 74);
     --band-background: #0FFFFFFF;
 }
 

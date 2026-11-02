@@ -55,6 +55,12 @@ constexpr Message kKit[] = {
     {"tweaks.player.replace", "In place of the Apple Music window"},
     {"tweaks.player.workArea", "Whole screen, taskbar visible"},
     {"tweaks.player.screen", "Whole screen (Apple's way)"},
+    {"mods.report", "Diagnostic report"},
+    {"mods.reportHelp", "A zip of Ampify's state and logs, without your names, folders or music, to attach to an issue."},
+    {"mods.report.run", "Export a report"},
+    {"mods.report.running", "Writing the report…"},
+    {"mods.report.done", "Report exported"},
+    {"mods.report.failed", "The report failed"},
 };
 
 // French texts of what people see (menus, buttons, the Settings card). The log stays in English, so a key missing here
@@ -91,6 +97,12 @@ constexpr Message kKitFr[] = {
     {"tweaks.player.replace", "À la place de la fenêtre d'Apple Music"},
     {"tweaks.player.workArea", "Tout l'écran, barre des tâches visible"},
     {"tweaks.player.screen", "Tout l'écran (comme Apple)"},
+    {"mods.report", "Rapport de diagnostic"},
+    {"mods.reportHelp", "Un zip de l'état et des journaux d'Ampify, sans vos noms, dossiers ni musique, à joindre à un signalement."},
+    {"mods.report.run", "Exporter un rapport"},
+    {"mods.report.running", "Rapport en cours…"},
+    {"mods.report.done", "Rapport exporté"},
+    {"mods.report.failed", "Le rapport a échoué"},
 };
 
 std::string g_language = "en";  // set once at start, before any service reads it

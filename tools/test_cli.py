@@ -918,6 +918,50 @@ class Diagnostics(AmpifyTestCase):
         self.assertIn("ghost", result.stdout)
 
 
+class Report(AmpifyTestCase):
+    def write_kit(self):
+        logs = os.path.join(self.kit, "logs")
+        os.makedirs(logs)
+        user = os.environ.get("USERNAME") or os.environ.get("USER") or "nobody"
+        home = os.path.expanduser("~")
+        with open(os.path.join(logs, "AppleMusic.log"), "w", encoding="utf-8") as handle:
+            handle.write(
+                f"[08:00:00.000] Kernel loaded from {home}\\Ampify for {user}\n"
+                '[08:00:01.000] Player: cover of "Secret Song Title": address '
+                '"amp-artwork-id://17820666364333712412.dbid/783EDFEC-D43D-47E2-B448-8ECCFFE09C81_1.1"\n'
+                '[08:00:02.000] Theme "glass": 750 value(s) applied\n'
+            )
+        with open(os.path.join(self.kit, "settings.txt"), "w", encoding="utf-8") as handle:
+            handle.write("theme.active = glass\nextensions.scrobbler.session_key = abc123secret\n")
+        return user
+
+    def test_report_gathers_the_state_with_names_and_music_taken_out(self):
+        user = self.write_kit()
+        out = os.path.join(self.tmp, "report.zip")
+        result = self.ampify("report", out, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with zipfile.ZipFile(out) as bundle:
+            names = bundle.namelist()
+            text = "\n".join(bundle.read(name).decode("utf-8", "replace") for name in names)
+        for expected in ("README.txt", "system.txt", "doctor.txt", "settings.txt", "logs/AppleMusic.log"):
+            self.assertIn(expected, names)
+        self.assertIn('Theme "glass": 750 value(s) applied', text)
+        self.assertIn("theme.active = glass", text)
+        self.assertIn("session_key = <hidden>", text)
+        for secret in ("Secret Song", "abc123secret", "17820666364333712412", "783EDFEC"):
+            self.assertNotIn(secret, text)
+        if len(user) >= 3:
+            self.assertNotRegex(text, r"(?i)(?<![A-Za-z0-9_])" + re.escape(user) + r"(?![A-Za-z0-9_])")
+
+    def test_report_refuses_to_overwrite(self):
+        out = os.path.join(self.tmp, "taken.zip")
+        with open(out, "w", encoding="utf-8") as handle:
+            handle.write("busy")
+        result = self.ampify("report", out)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("already exists", result.stderr)
+
+
 class Development(AmpifyTestCase):
     def write_journal(self, text):
         os.makedirs(os.path.join(self.kit, "logs"), exist_ok=True)

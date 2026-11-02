@@ -13,6 +13,7 @@
 
 #include "../src/core/json.hpp"
 #include "../src/core/manifest.hpp"
+#include "../src/cli/anonymize.hpp"
 #include "../src/cli/archive.hpp"
 #include "../src/cli/backup.hpp"
 #include "../src/cli/catalog.hpp"
@@ -846,4 +847,78 @@ TEST_CASE(Folder_RefusesASymbolicLink) {
     ampify::FolderValidation linked = ampify::ValidateElementFolder(good);
     CHECK(!linked.ok());
     CHECK(MentionsField(linked.errors, "symbolic link not allowed in the element: lib/link.js"));
+}
+
+namespace {
+
+ampify::cli::Identity Someone() {
+    ampify::cli::Identity who;
+    who.homes = {"C:\\Users\\zoe.martin"};
+    who.user = "zoe.martin";
+    who.computer = "ZOE-DESKTOP";
+    return who;
+}
+
+bool Has(const std::string& text, const std::string& part) {
+    return text.find(part) != std::string::npos;
+}
+
+}  // namespace
+
+TEST_CASE(Report_HidesTheProfileFolderUserAndComputer) {
+    std::string out = ampify::cli::Anonymize(
+        "kit C:\\Users\\zoe.martin\\Ampify, also c:/users/ZOE.MARTIN/Ampify\n"
+        "D:\\Users\\other\\x and /home/zoe/.config\nmachine ZOE-DESKTOP signed in as zoe.martin",
+        Someone());
+    CHECK(Has(out, "kit <home>\\Ampify, also <home>/Ampify"));
+    CHECK(Has(out, "D:\\Users\\<user>\\x and /home/<user>/.config"));
+    CHECK(Has(out, "machine <computer> signed in as <user>"));
+    CHECK(!Has(out, "zoe") && !Has(out, "ZOE"));
+}
+
+TEST_CASE(Report_HidesWhatWasPlayed) {
+    std::string out = ampify::cli::Anonymize(
+        "[08:07:11.533] Player: cover of \"Praise The Lord\": address "
+        "\"amp-artwork-id://17820666364333712412.dbid/783EDFEC-D43D-47E2-B448-8ECCFFE09C81_1.1\", format \"\"\n"
+        "[08:07:12.000] [scrobbler] sent \"Song\" by \"Band\"\n"
+        "now playing track \"Secret Song\" from album: \"Hidden Album\" DBID:0x1A2B3C\n"
+        "atmos 0cf52051b249e48024d5d5a08cbffa5e2380314f7b9108fd5b5ffc9749c4ff68 -20.9\n"
+        "Atmos: stereo track, variant ecvyw6j2l",
+        Someone());
+    CHECK(!Has(out, "Praise") && !Has(out, "Song\"") && !Has(out, "Band") && !Has(out, "Hidden"));
+    CHECK(!Has(out, "1782066636") && !Has(out, "783EDFEC") && !Has(out, "1A2B3C") && !Has(out, "0cf52051"));
+    CHECK(Has(out, "Player: cover of \"<text>\""));
+    CHECK(Has(out, "track \"<text>\" from album: \"<text>\" DBID:<id>"));
+    CHECK(Has(out, "atmos <hash> -20.9"));
+    CHECK(Has(out, "stereo track, variant <id>"));
+}
+
+TEST_CASE(Report_KeepsWhatHelpsToDebug) {
+    std::string text =
+        "[08:07:11.781] version 1.1792.39682.0 tested: kernel injected\n"
+        "Theme \"glass\": 750 value(s) applied, 44 already in place, 0 refused\n"
+        "Grid#LCD Background = #33FFFFFF (user.css line 82)\n"
+        "C:\\Program Files\\WindowsApps\\AppleInc.AppleMusicWin_1.1792.39682.0_x64__nzyj5cx40ttqa";
+    CHECK(ampify::cli::Anonymize(text, Someone()) == text);
+}
+
+TEST_CASE(Report_HidesSecretsAndAddresses) {
+    std::string out = ampify::cli::Anonymize(
+        "GET https://ws.example.com/?method=x&api_key=abc123&sk=SESSION9 from zoe@example.org, Bearer eyJhbGciOiJIUzI1",
+        Someone());
+    CHECK(Has(out, "api_key=<hidden>&sk=<hidden>"));
+    CHECK(Has(out, "from <email>"));
+    CHECK(Has(out, "Bearer <hidden>"));
+    CHECK(!Has(out, "abc123") && !Has(out, "SESSION9") && !Has(out, "eyJ"));
+}
+
+TEST_CASE(Report_HidesSecretLookingSettings) {
+    std::string out = ampify::cli::HideSecretSettings(
+        "# comment with token = kept\ntheme.active = glass\nextensions.scrobbler.session_key = 0123abc\n"
+        "extensions.keyboard-skip.enabled = 1\nextensions.discord-presence.user = zoe");
+    CHECK(Has(out, "# comment with token = kept"));
+    CHECK(Has(out, "theme.active = glass"));
+    CHECK(Has(out, "extensions.scrobbler.session_key = <hidden>"));
+    CHECK(Has(out, "extensions.keyboard-skip.enabled = 1"));
+    CHECK(Has(out, "extensions.discord-presence.user = <hidden>"));
 }

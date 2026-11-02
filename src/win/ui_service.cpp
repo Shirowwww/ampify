@@ -55,6 +55,7 @@
 #include "../core/ui_render/surfaces.hpp"
 #include "../core/ui_render/svg_icon.hpp"
 #include "apple_player.hpp"
+#include "kit_command.hpp"
 #include "notifications.hpp"
 #include "xaml_host.hpp"
 
@@ -928,6 +929,38 @@ xaml::FrameworkElement AppleTweaksSection(UiService::Shared& shared) {
     return section;
 }
 
+// A zip of the state and the logs with names, folders and music taken out (`ampify report`), opened in Explorer once
+// written. The button says when it is done; the button is moved back to the interface thread before it is released.
+xaml::FrameworkElement ReportRow(UiService::Shared& shared) {
+    controls::Button report;
+    if (shared.probe.button) report.Style(shared.probe.button);
+    report.Content(winrt::box_value(Wide(i18n::Text("mods.report.run"))));
+    report.VerticalAlignment(xaml::VerticalAlignment::Center);
+    Name(report, "AMPIFY_ModsReport", i18n::Text("mods.report.run"));
+    Journal* journal = &shared.journal;
+    report.Click([journal](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            controls::Button button = sender.as<controls::Button>();
+            button.IsEnabled(false);
+            button.Content(winrt::box_value(Wide(i18n::Text("mods.report.running"))));
+            dispatching::DispatcherQueue queue = dispatching::DispatcherQueue::GetForCurrentThread();
+            auto held = std::make_shared<controls::Button>(button);
+            RunAmpifyInBackground({"report", "--dir"}, [queue, held, journal](int code) mutable {
+                journal->Write("Settings: report exported from the Ampify card (code " + std::to_string(code) + ")");
+                queue.TryEnqueue([held = std::move(held), code]() noexcept {
+                    try {
+                        held->IsEnabled(true);
+                        held->Content(winrt::box_value(Wide(i18n::Text(code == 0 ? "mods.report.done" : "mods.report.failed"))));
+                    } catch (...) {
+                    }
+                });
+            });
+        } catch (...) {
+        }
+    });
+    return LabelledRow(shared, i18n::Text("mods.report"), i18n::Text("mods.reportHelp"), report);
+}
+
 controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uirender::ModEntry>& mods,
                                const xaml::FrameworkElement& templateRow) {
     controls::Border card = MakeCardBorder(shared.probe);
@@ -1014,6 +1047,8 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     list.Children().Append(ThemeChoice(shared));
     list.Children().Append(MakeDivider());
     list.Children().Append(AppleTweaksSection(shared));
+    list.Children().Append(MakeDivider());
+    list.Children().Append(ReportRow(shared));
     body.Children().Append(list);
     card.Child(body);
     return card;

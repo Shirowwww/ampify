@@ -65,6 +65,7 @@ Authoring and development
 Diagnostics
   doctor                       state of Ampify: elements, settings, safe mode, log, tools
   logs [count] [--follow]      last lines of the kernel and launcher logs
+  report [file.zip] [--tree] [--dir]   writes an anonymised zip of the state and the logs, to attach to an issue
 
 Profiles and transfers
   profile list                 lists the settings profiles

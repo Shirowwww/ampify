@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -11,6 +12,9 @@
 #include "../core/natives/kit.hpp"
 
 namespace ampify::win {
+
+// Runs ampify.exe with these arguments on a thread of its own, with no window, and calls `done` there with its exit code.
+void RunAmpifyInBackground(const std::vector<std::string>& arguments, std::function<void(int code)> done);
 
 // Ampify.kit.run on Windows: runs ampify.exe, which sits beside ampify_kernel.dll, with no window and no input (a question
 // gets end of file, so only --yes acts), and reports its exit code and output.
