@@ -77,6 +77,7 @@ struct StyleProbe {
     winrt::Microsoft::UI::Xaml::Style textBox{nullptr};
     winrt::Microsoft::UI::Xaml::Style titleText{nullptr};    // first TextBlock of a native settings row
     winrt::Microsoft::UI::Xaml::Style captionText{nullptr};  // second TextBlock of that row
+    double captionOpacity = 1;  // Apple dims that second TextBlock itself (0.6) rather than through its brush
     winrt::Microsoft::UI::Xaml::Media::Brush cardBackground{nullptr};
     winrt::Microsoft::UI::Xaml::Media::Brush cardStroke{nullptr};
     std::optional<winrt::Microsoft::UI::Xaml::Thickness> cardPadding;

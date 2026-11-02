@@ -84,7 +84,6 @@ function Panel() {
   const [view, setView] = useState("simple");
   return h(Unit.Provider, { value: "min" },
     h("stack", null,
-      h(Text, { variant: "title" }, t("title")),
       h(Dropdown, {
         label: t("view"),
         value: view,
@@ -95,5 +94,6 @@ function Panel() {
       view === "full" ? h(SleepTimer) : null));
 }
 
+// The panel's frame shows the extension's name above the view, so the view does not repeat it.
 Ampify.ReactDOM.render(h(Panel), "panel:react-panel");
 Ampify.ready.then(() => Ampify.log("React panel ready"));

@@ -123,8 +123,8 @@ function StatsPage() {
   const listened = songs.reduce((sum, song) => sum + song.ms, 0);
   const plays = songs.reduce((sum, song) => sum + song.plays, 0);
   const top = [...songs].filter((song) => song.plays > 0).sort((a, b) => b.plays - a.plays || b.ms - a.ms).slice(0, TOP);
+  // The page's header already shows the app's name: the view starts with the period.
   return h("stack", null,
-    h(Text, { variant: "title" }, t("title")),
     h(Dropdown, {
       label: t("period"),
       value: period,

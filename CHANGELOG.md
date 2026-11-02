@@ -19,6 +19,8 @@
 - `@import "ampify:scrollbars"` keeps scroll bars inside rounded panels, without their arrows. Floating themes get it
   on their own.
 - `docs/spicetify-parity.md` lists every Spicetify feature with its status in Ampify.
+- Ampify's descriptions and captions are dimmed like Apple Music's own, so names stand out in the Settings card, the
+  Marketplace and extension pages. Page titles use Apple's weight, and panels no longer repeat their name.
 
 ## 1.2.1 (2026-11-02)
 

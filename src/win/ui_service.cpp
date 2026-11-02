@@ -1232,6 +1232,8 @@ controls::TextBlock TextLike(const controls::TextBlock& model, const std::string
     block.FontSize(model.FontSize());
     block.FontWeight(model.FontWeight());
     block.Foreground(model.Foreground());
+    block.Opacity(model.Opacity());  // Apple dims its descriptions by opacity (0.6), not by their brush
+    block.CharacterSpacing(model.CharacterSpacing());
     block.Margin(model.Margin());
     return block;
 }
@@ -1723,6 +1725,7 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
     controls::ToolTipService::SetToolTip(back, winrt::box_value(winrt::to_hstring(i18n::Text("page.back"))));
     Name(back, "AMPIFY_PageHost_back", i18n::Text("page.back"));
     controls::TextBlock title = MakeText(L"", "title", false);
+    title.FontWeight(winrt::Windows::UI::Text::FontWeight{600});  // as Apple's page titles (Settings, 28 or 34 px)
     title.VerticalAlignment(xaml::VerticalAlignment::Center);
     header.Children().Append(back);
     header.Children().Append(title);

@@ -310,6 +310,7 @@ struct XamlRenderer::Mounted {
     std::string source;            // image address
     bool colored = false;          // a text whose color the renderer set
     bool centered = false;         // the scale centre follows the size
+    double baseOpacity = 1;        // a dimmed secondary text: the opacity attribute scales it
     media::Brush baseBackground{nullptr};  // a card's own look, put back when the attribute goes
     xaml::Thickness basePadding{};
     xaml::CornerRadius baseCorner{};
@@ -437,7 +438,10 @@ void CaptureStyleProbe(const xaml::DependencyObject& root, StyleProbe& probe, co
                     for (int index = count - 1; index >= 0; index--) pending.push_back(media::VisualTreeHelper::GetChild(node, index));
                 }
                 if (!texts.empty() && texts[0].Style()) probe.titleText = texts[0].Style();
-                if (texts.size() > 1 && texts[1].Style()) probe.captionText = texts[1].Style();
+                if (texts.size() > 1 && texts[1].Style()) {
+                    probe.captionText = texts[1].Style();
+                    probe.captionOpacity = texts[1].Opacity();
+                }
             }
         } catch (...) {
         }
@@ -509,7 +513,14 @@ controls::TextBlock MakeText(const std::wstring& text, const std::string& varian
     if (!block) block = controls::TextBlock();
     xaml::Style style{nullptr};
     if (probe && variant == "bodyStrong" && probe->titleText) style = probe->titleText;
-    if (probe && variant == "caption" && probe->captionText) style = probe->captionText;
+    // Dimmed as Apple's own descriptions: as the native row the probe found, else as those of its Settings (0.6).
+    constexpr double kAppleCaptionOpacity = 0.6;
+    if (probe && variant == "caption" && probe->captionText) {
+        style = probe->captionText;
+        block.Opacity(probe->captionOpacity);
+    } else if (secondary) {
+        block.Opacity(kAppleCaptionOpacity);
+    }
     if (!style) style = StyleResource(TextStyleKey(variant));
     if (style) block.Style(style);
     block.TextWrapping(xaml::TextWrapping::Wrap);
@@ -636,6 +647,7 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
     } else if (node.type == "text") {
         controls::TextBlock block = MakeText(L"", node.Text("variant", "body"), node.Text("variant") == "caption", &probe);
         outer = control = block;
+        mounted.baseOpacity = block.Opacity();
     } else if (node.type == "button") {
         controls::Button button;
         button.Click([callbacks](IInspectable const&, xaml::RoutedEventArgs const&) noexcept { callbacks->Fire(true, {}); });
@@ -884,7 +896,7 @@ static void SetTextStyle(const controls::TextBlock& block, const RenderNode& nod
 void XamlRenderer::SetMotion(Mounted& mounted, const RenderNode& node, bool building) {
     xaml::FrameworkElement element = mounted.outer;
     auto values = [&] {
-        double opacity = node.Number("opacity", 1);
+        double opacity = node.Number("opacity", 1) * mounted.baseOpacity;
         if (element.Opacity() != opacity) element.Opacity(opacity);
         float scale = static_cast<float>(node.Number("scale", 1));
         winrt::Windows::Foundation::Numerics::float3 wanted{scale, scale, 1};

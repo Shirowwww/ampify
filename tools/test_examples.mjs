@@ -1132,7 +1132,8 @@ test("react-panel counts clicks and opens its timer in the full view", () => {
 
 test("react-panel speaks French on a French Windows", () => {
   const page = reactPanel("fr");
-  assert.ok(textsOf(page.tree).includes("Panneau React"));
+  assert.ok(textsOf(page.tree).includes("Clics : 0"));
+  assert.ok(!textsOf(page.tree).includes("Panneau React"), "the panel's frame shows the name, the view does not");
   buttonIn(page.tree, "Ajouter un").onClick();
   assert.ok(textsOf(page.tree).includes("Clics : 1"));
 });
