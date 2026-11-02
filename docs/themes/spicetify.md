@@ -34,7 +34,7 @@ theme cannot apply. It is kept aside, as `spicetify-user.css`, for whoever wants
 | `button-disabled` | | `AccentFillColorDisabledBrush` |
 | `main-elevated` | | `ControlFillColorDefaultBrush` |
 | `highlight` | | `SubtleFillColorSecondaryBrush` |
-| `selected-row` | | `SubtleFillColorTertiaryBrush` |
+| `selected-row` | | `SubtleFillColorTertiaryBrush`, and the selected rows and cards (`ListViewItemBackgroundSelected...`, `GridViewItemBackgroundSelected...`) |
 | `notification`, `notification-error` | | `SystemFillColorAttentionBrush`, `SystemFillColorCriticalBrush` |
 
 - Spicetify 1 keys (`main_fg`, `main_bg`, `sidebar_and_player_bg`, `slider_bg`...) are read under their current name.

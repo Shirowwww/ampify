@@ -116,7 +116,7 @@ const std::vector<ClassEntry> kClasses{
     {"download-button", {"Button#DownloadButton"}},
     {"downloaded-button", {"Button#DownloadedButton"}},
     {"download-progress", {"ProgressRing#DownloadingProgress"}},
-    {"now-playing-indicator", {"Grid#NowPlayingIndicator"}},
+    {"now-playing-indicator", {"BouncyBarControl#BouncyBarAnimation"}},  // the bars: their Grid has no colour
 
     // Albums, playlists and songs
     {"album-header", {"Grid#ContainerDetailHeaderLockupRegularContent", "Grid#AlbumDetailHeaderLockupContent"}},
@@ -139,6 +139,7 @@ const std::vector<ClassEntry> kClasses{
     {"reactions-button", {"Button#ReactionsButton"}},
     {"song-list", {"ListView#DataGridListView"}},
     {"song-row", {"StackPanel#DataGridRowStack"}},
+    {"list-item", {"ListViewItemPresenter"}},
 
     // Search
     {"search-top-spacer", {"SearchPage > Grid > Grid:first-child"}},

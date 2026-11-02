@@ -233,6 +233,9 @@ during live editing.
 | `backdrop` | `Background` | `acrylic(tint, opacity)`: an acrylic background (see "Acrylic") |
 | `color` or `foreground` | `Foreground` | Same as `background` |
 | `border-color` | `BorderBrush` | Same as `background` |
+| `selected-background` | `SelectedBackground` | A row of a list (`.list-item`) when selected; same values as `background` |
+| `selected-hover-background` | `SelectedPointerOverBackground` | The same row, selected and under the pointer |
+| `selected-active-background` | `SelectedPressedBackground` | The same row, selected and pressed |
 | `border-width` | `BorderThickness` | 1 to 4 lengths, none negative, CSS order: top right bottom left |
 | `corner-radius` or `border-radius` | `CornerRadius` | 1 to 4 lengths, none negative, CSS order: top-left, top-right, bottom-right, bottom-left |
 | `font-family` | `FontFamily` | A font name, quoted or not, or `url(fonts/file.ttf#Name)` (see "Theme fonts") |
@@ -525,6 +528,10 @@ Checked, selected or "repeat on" states keep Apple Music's colours, since they s
 each element's states change (`States=` below). A theme gives the selected rows of song lists its own colour through
 `colors.ini`: `ListViewItemBackgroundSelected`, `ListViewItemBackgroundSelectedPointerOver` and
 `ListViewItemBackgroundSelectedPressed` (the `GridViewItem...` keys for grids of cards).
+A theme that names none of them gets Spicetify's `selected-row` there when it gives one, or else its accent at 20,
+27 and 33% opacity. Apple Music's own lists never read those keys: Ampify hands them to every row through
+`.list-item { selected-background: ...; selected-hover-background: ...; selected-active-background: ...; }`, which a
+theme's `user.css` can set itself.
 
 The same goes for the entries of a menu, which also stay lit while their submenu is open, and for a slider: `color`
 fills the part left of the thumb, `background` the rest of the track, and its `Thumb` keeps its `background` while

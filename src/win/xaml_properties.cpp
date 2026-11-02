@@ -114,6 +114,8 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         }
         if (auto icon = object.try_as<controls::IconElement>()) return brush(icon.Foreground());
         if (auto presenter = object.try_as<controls::ContentPresenter>()) return brush(presenter.Foreground());
+    } else if (IsSelectionBrush(property)) {
+        if (auto row = object.try_as<primitives::ListViewItemPresenter>()) return brush(SelectionBrush(row, property));
     } else if (property == "BorderBrush") {
         if (auto control = object.try_as<controls::Control>()) return brush(control.BorderBrush());
         if (auto border = object.try_as<controls::Border>()) return brush(border.BorderBrush());
@@ -351,7 +353,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         return true;
     }
 
-    if (property == "Background" || property == "Foreground" || property == "BorderBrush") {
+    if (property == "Background" || property == "Foreground" || property == "BorderBrush" || IsSelectionBrush(property)) {
         std::optional<media::Brush> target;
         bool made = false;  // an object made from the value, remembered so that it reads back as the value
         if (value.kind == theme::ValueKind::Color) {
@@ -378,6 +380,17 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         if (!target) return false;
 
         bool written = false;
+        if (IsSelectionBrush(property)) {
+            auto row = object.try_as<primitives::ListViewItemPresenter>();
+            if (!row) return false;
+            SetSelectionBrush(row, property, *target);
+            if (made) {
+                Remember(id, property, value, *target);
+            } else {
+                Forget(id, property);
+            }
+            return true;  // the row draws these itself: no state holds them
+        }
         if (property == "Background") {
             if (auto control = object.try_as<controls::Control>()) { control.Background(*target); written = true; }
             else if (auto panel = object.try_as<controls::Panel>()) { panel.Background(*target); written = true; }

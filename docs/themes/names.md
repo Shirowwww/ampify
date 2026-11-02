@@ -143,6 +143,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.reactions-button` | The reactions button of a song |
 | `.song-list` | The table of the Songs page |
 | `.song-row` | One row of that table |
+| `.list-item` | Any row of any list, which draws its own selection (`selected-background`) |
 
 ## Search
 

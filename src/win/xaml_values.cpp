@@ -156,6 +156,12 @@ xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::
         if (text) return controls::TextBlock::ForegroundProperty();
         if (object.try_as<controls::IconElement>()) return controls::IconElement::ForegroundProperty();
         if (object.try_as<controls::ContentPresenter>()) return controls::ContentPresenter::ForegroundProperty();
+    } else if (IsSelectionBrush(property)) {
+        if (!object.try_as<primitives::ListViewItemPresenter>()) return nullptr;
+        using Presenter = primitives::ListViewItemPresenter;
+        if (property == "SelectedBackground") return Presenter::SelectedBackgroundProperty();
+        if (property == "SelectedPointerOverBackground") return Presenter::SelectedPointerOverBackgroundProperty();
+        return Presenter::SelectedPressedBackgroundProperty();
     } else if (property == "BorderBrush" || property == "Padding" || property == "BorderThickness" ||
                property == "CornerRadius") {
         return OwnBoxProperty(object, property);
@@ -181,6 +187,18 @@ xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::
         if (property == "Visibility") return xaml::UIElement::VisibilityProperty();
     }
     return nullptr;
+}
+
+media::Brush SelectionBrush(const primitives::ListViewItemPresenter& row, std::string_view property) {
+    if (property == "SelectedBackground") return row.SelectedBackground();
+    if (property == "SelectedPointerOverBackground") return row.SelectedPointerOverBackground();
+    return row.SelectedPressedBackground();
+}
+
+void SetSelectionBrush(const primitives::ListViewItemPresenter& row, std::string_view property, const media::Brush& brush) {
+    if (property == "SelectedBackground") row.SelectedBackground(brush);
+    else if (property == "SelectedPointerOverBackground") row.SelectedPointerOverBackground(brush);
+    else row.SelectedPressedBackground(brush);
 }
 
 // The order of a corner-radius value (properties.cpp): bottom-left, top-left, top-right, bottom-right.

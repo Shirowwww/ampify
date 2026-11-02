@@ -978,6 +978,29 @@ TEST_CASE(Theme_ControlsFollowTheAccent) {
     CHECK(ResourceValue(own, "HyperlinkButtonForeground") == "#FF0A84FF");  // no accent text colour: the accent
 }
 
+TEST_CASE(Theme_SelectedRowsFollowTheTheme) {
+    MemoryFiles files;
+    files.files["colors.ini"] = "[Accent]\nAccentFillColorDefaultBrush = 0A84FF\n\n"
+                                "[Spice]\nbutton = 0A84FF\nselected-row = 1E2F4A\n\n"
+                                "[Own]\nAccentFillColorDefaultBrush = 0A84FF\nListViewItemBackgroundSelected = 112233\n";
+
+    // Without a colour of their own, the selected rows and cards take a veil of the accent instead of Apple's grey.
+    th::Theme accent = Load(files, {"Accent", nullptr, {}});
+    CHECK(ResourceValue(accent, "ListViewItemBackgroundSelected") == "#330A84FF");
+    CHECK(ResourceValue(accent, "ListViewItemBackgroundSelectedPointerOver") == "#440A84FF");
+    CHECK(ResourceValue(accent, "GridViewItemBackgroundSelectedPressed") == "#550A84FF");
+
+    // Spicetify's selected-row says it outright.
+    th::Theme spice = Load(files, {"Spice", nullptr, {}});
+    CHECK(ResourceValue(spice, "ListViewItemBackgroundSelected") == "#FF1E2F4A");
+    CHECK(ResourceValue(spice, "GridViewItemBackgroundSelectedPointerOver") == "#FF1E2F4A");
+
+    // A key the theme names stays its own.
+    th::Theme own = Load(files, {"Own", nullptr, {}});
+    CHECK(ResourceValue(own, "ListViewItemBackgroundSelected") == "#FF112233");
+    CHECK(ResourceValue(own, "ListViewItemBackgroundSelectedPointerOver") == "#440A84FF");
+}
+
 TEST_CASE(Theme_AcrylicSurfacesTakeTheCardColour) {
     MemoryFiles files;
     files.files["colors.ini"] = "[Solid]\nCardBackgroundFillColorDefaultBrush = 141B2E\n\n"
@@ -1003,6 +1026,29 @@ std::string Assigned(const th::Theme& theme, std::string_view selector, std::str
 }
 std::string ScrubberMargin(const th::Theme& theme) { return Assigned(theme, ".scrubber", "Margin"); }
 }  // namespace
+
+TEST_CASE(Theme_ListRowsDrawTheThemesSelection) {
+    // Apple Music's lists never read the ListViewItem keys: the rows get them as their own selection colours.
+    MemoryFiles accent;
+    accent.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 0A84FF\n";
+    th::Theme veiled = Load(accent);
+    CHECK(Assigned(veiled, ".list-item", "SelectedBackground") == "#330A84FF");
+    CHECK(Assigned(veiled, ".list-item", "SelectedPointerOverBackground") == "#440A84FF");
+    CHECK(Assigned(veiled, ".list-item", "SelectedPressedBackground") == "#550A84FF");
+
+    // A theme that colours the rows itself keeps its colour.
+    MemoryFiles own;
+    own.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 0A84FF\n";
+    own.files["user.css"] = ".list-item { selected-background: #FF112233; }\n";
+    th::Theme kept = Load(own);
+    CHECK(Assigned(kept, ".list-item", "SelectedBackground") == "#FF112233");
+    CHECK(Assigned(kept, ".list-item", "SelectedPointerOverBackground") == "#440A84FF");
+
+    // Without a colour, the rows keep Apple Music's.
+    MemoryFiles none;
+    none.files["user.css"] = ".lcd { opacity: 0.9; }\n";
+    CHECK(Assigned(Load(none), ".list-item", "SelectedBackground") == "ABSENT");
+}
 
 TEST_CASE(Theme_AlbumArtistTakesTheThemesLinkColour) {
     MemoryFiles accent;

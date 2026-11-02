@@ -41,6 +41,14 @@ std::vector<std::string> Split(const std::string& text, char separator);
 std::string FractionText(double number);
 std::string ThicknessText(const xaml::Thickness& value);
 xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::string_view property);
+// SelectedBackground, SelectedPointerOverBackground or SelectedPressedBackground: a list row's selection colours.
+inline bool IsSelectionBrush(std::string_view property) {
+    return property == "SelectedBackground" || property == "SelectedPointerOverBackground" ||
+           property == "SelectedPressedBackground";
+}
+// The brush property of a list row behind one of those names.
+media::Brush SelectionBrush(const primitives::ListViewItemPresenter& row, std::string_view property);
+void SetSelectionBrush(const primitives::ListViewItemPresenter& row, std::string_view property, const media::Brush& brush);
 std::string CornerText(const xaml::CornerRadius& value);
 bool NoNegativeSide(const xaml::Thickness& sides);
 media::Brush GradientFrom(const std::string& text);

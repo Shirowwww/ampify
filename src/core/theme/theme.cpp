@@ -223,6 +223,25 @@ void DefineAcrylicSurfaces(Theme& theme, const std::set<std::string>& owned, boo
     }
 }
 
+// The selected rows of song lists and cards of grids stay in Apple Music's grey unless a theme names them: Spicetify's
+// selected-row when the theme gives one, otherwise a veil of the accent (#33, #44, #55 as the themes that set them).
+void DefineSelectedRows(Theme& theme, const std::set<std::string>& owned, bool applied) {
+    std::optional<Argb> row = theme.palette.Find("selected-row");
+    const char* from = row ? "selected-row" : kAccent;
+    std::optional<Argb> base = row ? row : theme.palette.Find(kAccent);
+    if (!base) return;
+    constexpr std::pair<const char*, std::uint8_t> kStates[] = {
+        {"ListViewItemBackgroundSelected", 0x33},           {"ListViewItemBackgroundSelectedPointerOver", 0x44},
+        {"ListViewItemBackgroundSelectedPressed", 0x55},    {"GridViewItemBackgroundSelected", 0x33},
+        {"GridViewItemBackgroundSelectedPointerOver", 0x44}, {"GridViewItemBackgroundSelectedPressed", 0x55},
+    };
+    for (const auto& [key, alpha] : kStates) {
+        Argb color = *base;
+        if (!row) color.a = alpha;
+        DefineDerived(theme, owned, from, key, color, applied);
+    }
+}
+
 // The colours a theme leaves to Ampify, once its own resources.xaml is known.
 void DefineDerivedColors(Theme& theme, bool applied) {
     std::vector<std::string> keys = XamlKeys(theme.resourceDictionary);
@@ -230,6 +249,7 @@ void DefineDerivedColors(Theme& theme, bool applied) {
     DefineAccentStates(theme, owned, applied);
     DefineTextOnAccent(theme, owned, applied);
     DefineAccentControls(theme, owned, applied);
+    DefineSelectedRows(theme, owned, applied);
     DefineAcrylicSurfaces(theme, owned, applied);
 }
 
@@ -575,11 +595,27 @@ std::string SearchTilesInCardColour(const Theme& theme) {
     return ".search-top-result { background: $CardBackgroundFillColorDefaultBrush; }\n";
 }
 
+// Apple Music's lists give their rows' selection colours in their own style, which never reads the ListViewItem keys
+// of colors.ini: the rows take them from these rules instead (DefineSelectedRows fills the keys a theme leaves out).
+std::string SelectedRowsInThemeColour(const Theme& theme) {
+    constexpr std::pair<const char*, const char*> kStates[] = {
+        {"selected-background", "ListViewItemBackgroundSelected"},
+        {"selected-hover-background", "ListViewItemBackgroundSelectedPointerOver"},
+        {"selected-active-background", "ListViewItemBackgroundSelectedPressed"},
+    };
+    std::string declarations;
+    for (const auto& [property, key] : kStates) {
+        if (!theme.palette.Find(key) || Sets(theme, ".list-item", FindProperty(property)->xaml)) continue;
+        declarations += std::string(" ") + property + ": $" + key + ";";
+    }
+    return declarations.empty() ? std::string() : ".list-item {" + declarations + " }\n";
+}
+
 // Rules a theme's own choices call for, below its user.css so that a theme which sets the same thing keeps its value.
 void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts& parts) {
     bool applied = parts.resources;
     std::string css = ScrubberClearOfCorners(theme);
-    if (parts.colors) css += ArtistInLinkColour(theme) + SearchTilesInCardColour(theme);
+    if (parts.colors) css += ArtistInLinkColour(theme) + SearchTilesInCardColour(theme) + SelectedRowsInThemeColour(theme);
     if (css.empty()) return;
     RuleSource source;
     source.file = "Ampify (derived from the theme)";

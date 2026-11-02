@@ -12,12 +12,16 @@ namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 38> kProperties{{
+constexpr std::array<PropertySpec, 41> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
     {"foreground", "Foreground", PropertyKind::Brush},
     {"border-color", "BorderBrush", PropertyKind::Brush},
+    // A row of a list (ListViewItemPresenter) draws its selection itself, from these three, and not from a state.
+    {"selected-background", "SelectedBackground", PropertyKind::Brush},
+    {"selected-hover-background", "SelectedPointerOverBackground", PropertyKind::Brush},
+    {"selected-active-background", "SelectedPressedBackground", PropertyKind::Brush},
     {"border-width", "BorderThickness", PropertyKind::Thickness},
     {"corner-radius", "CornerRadius", PropertyKind::Thickness},
     {"border-radius", "CornerRadius", PropertyKind::Thickness},  // the name CSS and Spicetify themes use
