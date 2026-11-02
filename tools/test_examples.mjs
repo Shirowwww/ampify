@@ -695,6 +695,102 @@ test("now-playing speaks French on a French Windows", () => {
   assert.equal(buttons[0].label, "À l'écoute");
 });
 
+test("volume-percentage shows the slider's volume in the playback bar and follows it", () => {
+  const { manifest, source } = load("volume-percentage");
+  const granted = new Set(manifest.permissions ?? []);
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+  };
+  let volume = null;
+  const buttons = [];
+  const labels = [];
+  const intervals = [];
+  const stops = [];
+  const Ampify = {
+    audio: { volume: () => (need("player.read"), volume) },
+    ui: {
+      playbar: { addButton: (button) => (need("ui.playbar"), buttons.push(button), 7) },
+      setLabel: (id, text) => labels.push([id, text]),
+    },
+    onStop: (fn) => stops.push(fn),
+  };
+  let cleared = null;
+  runIn(source, { Ampify, setInterval: (fn, ms) => intervals.push({ fn, ms }) - 1, clearInterval: (id) => (cleared = id) });
+  assert.equal(buttons[0].label, "– %", "unknown until Apple Music sets it");
+  volume = 0.1778;  // -15 dB: Apple Music's slider is half way
+  intervals[0].fn();
+  assert.deepEqual(labels, [[7, "50 %"]]);
+  intervals[0].fn();
+  assert.equal(labels.length, 1, "the same volume is not written again");
+  volume = 1;
+  buttons[0].onClick();
+  assert.deepEqual(labels.at(-1), [7, "100 %"]);
+  volume = 0;
+  intervals[0].fn();
+  assert.deepEqual(labels.at(-1), [7, "0 %"], "muted");
+  stops[0]();
+  assert.equal(cleared, 0);
+});
+
+test("listening-stats counts a play after 30 seconds of listening, once, and the time listened", () => {
+  const { manifest, source } = load("listening-stats");
+  const granted = new Set(manifest.permissions ?? []);
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+  };
+  const stored = new Map();
+  const intervals = [];
+  const listeners = {};
+  const entries = [];
+  let state = { playing: true, track: { id: "t-1", title: "Lucid Dreams", artist: "Juice WRLD" } };
+  const Ampify = {
+    React: { h: (type, props, ...children) => ({ type, props: props ?? {}, children }), useState: (v) => [v, () => {}], useEffect: () => {} },
+    components: { Card: "Card", Dropdown: "Dropdown", Text: "Text" },
+    i18n: fakeI18n("en"),
+    storage: {
+      get: (key, fallback) => (need("storage"), stored.has(key) ? structuredClone(stored.get(key)) : fallback),
+      set: (key, value) => (need("storage"), stored.set(key, structuredClone(value))),
+    },
+    player: { state: () => (need("player.read"), state), on: (name, fn) => (listeners[name] = fn) },
+    ui: { sidebar: { addItem: (item) => (need("ui.sidebar"), entries.push(item)) }, navigate: () => {} },
+    onStop: () => {},
+  };
+  const context = { Ampify, setInterval: (fn, ms) => intervals.push({ fn, ms }) - 1, clearInterval: () => {} };
+  runIn(source, context);
+  assert.equal(entries[0].label, "Listening stats");
+  assert.equal(typeof context.render, "function", "the page renders through render()");
+  const tick = intervals.find((interval) => interval.ms === 5000).fn;
+  for (let i = 0; i < 5; i++) tick();
+  assert.equal(stored.get("all").songs["t-1"].plays, 0, "25 seconds are not a play yet");
+  for (let i = 0; i < 5; i++) tick();
+  const song = stored.get("all").songs["t-1"];
+  assert.equal(song.plays, 1);
+  assert.equal(song.ms, 50000);
+  state = { playing: false, track: state.track };
+  tick();
+  assert.equal(stored.get("all").songs["t-1"].ms, 50000, "a pause adds nothing");
+  listeners.trackchange();
+  state = { playing: true, track: state.track };
+  for (let i = 0; i < 6; i++) tick();
+  assert.equal(stored.get("all").songs["t-1"].plays, 2, "played again, counted again");
+
+  // The page with its counts: function components expanded, and the interface's boolean props given booleans.
+  const expand = (node) => {
+    if (!node || typeof node !== "object") return node;
+    if (typeof node.type === "function") return expand(node.type({ ...node.props, children: node.children }));
+    return { ...node, children: node.children.flat().map(expand) };
+  };
+  const page = expand(context.render());
+  const texts = [];
+  const walk = (node) => {
+    if (!node || typeof node !== "object") return void (typeof node === "string" && texts.push(node));
+    if ("grow" in node.props) assert.equal(typeof node.props.grow, "boolean", "grow takes true or false");
+    node.children.forEach(walk);
+  };
+  walk(page);
+  assert.ok(texts.includes("Lucid Dreams · Juice WRLD"), "the top songs list the song");
+});
+
 // ---- Sleep timer and keyboard shortcuts ---------------------------------------------------------------------------
 
 // Runs an example with a player that records its commands, the timers it sets and its notifications.

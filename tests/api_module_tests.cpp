@@ -107,7 +107,8 @@ const Expected kMembers[] = {
            "menu:object!{addItem:f2=addItem},popup:object!{open:f1=open},"
            "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},"
            "panel:object!{register:f2=register},"
-           "page:object!{register:f2=register},title:object!{set:f1=set},navigate:f1=navigate}"},
+           "page:object!{register:f2=register},title:object!{set:f1=set},"
+           "setLabel:f2=setLabel,navigate:f1=navigate}"},  // setLabel added in kitApi 1.x, a compatible addition
 };
 
 const Expected kGlobals[] = {

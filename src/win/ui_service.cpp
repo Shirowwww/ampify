@@ -19,6 +19,7 @@
 #include <chrono>
 #include <cmath>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -198,6 +199,8 @@ struct MountedSurface {
 struct PlacedControl {
     controls::Button button{nullptr};  // strong, like the panels: see MountedSurface (a sidebar entry is a Button too)
     bool reported = false;
+    std::string label;     // shown now: a new one from setLabel replaces it in place
+    bool hasIcon = false;  // the label is then the tooltip only
 };
 
 // One XAML window of Apple Music (MainWindow or MiniPlayerWindow).
@@ -2346,7 +2349,15 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         }
         if (control.placement != "topbar" && control.placement != "playbar") continue;
         PlacedControl& placed = context->placed[surface.key];
-        if (placed.button && placed.button.Parent()) continue;  // taken out by Apple Music: placed again
+        if (placed.button && placed.button.Parent()) {  // in place: only its label may have changed (setLabel)
+            if (placed.label != control.label) {
+                placed.label = control.label;
+                if (!placed.hasIcon) placed.button.Content(winrt::box_value(Wide(control.label)));
+                controls::ToolTipService::SetToolTip(placed.button, winrt::box_value(Wide(control.label)));
+                automation::AutomationProperties::SetName(placed.button, Wide(control.label));
+            }
+            continue;
+        }
 
         std::optional<uirender::Insertion> insertion = control.placement == "playbar"
                                                            ? uirender::ChoosePlaybarInsertion(context->probe)
@@ -2387,8 +2398,15 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
             }
         }
         xaml::FrameworkElement icon = MakeIconElement(control.icon, 16, L"TextFillColorPrimaryBrush");
-        if (icon) button.Content(icon);
-        else button.Content(winrt::box_value(Wide(control.label)));
+        if (icon) {
+            button.Content(icon);
+        } else {
+            button.Content(winrt::box_value(Wide(control.label)));
+            if (!std::isnan(button.Width())) {  // a text is wider than Apple's icon buttons: it may grow, never shrink
+                button.MinWidth(button.Width());
+                button.Width(std::numeric_limits<double>::quiet_NaN());
+            }
+        }
         controls::ToolTipService::SetToolTip(button, winrt::box_value(Wide(control.label)));
         Name(button, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
         UiEventSink sink = shared.sink;
@@ -2407,6 +2425,8 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         if (after && children.IndexOf(after, index)) children.InsertAt(index + 1, button);
         else children.Append(button);
         placed.button = button;
+        placed.label = control.label;
+        placed.hasIcon = static_cast<bool>(icon);
         shared.journal.Write("Interface: button \"" + control.label + "\" of " + control.elementId + " placed in \"" +
                              control.placement + "\" (provisional landmarks)");
     }

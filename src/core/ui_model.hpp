@@ -37,6 +37,10 @@ public:
     int AddControl(const std::string& elementId, const std::string& placement, const std::string& label,
                    const std::string& icon);
 
+    // A new label for a control the element added: the host shows it on a top bar or play bar button (its text
+    // without an icon, its tooltip with one). False when the element has no such control.
+    bool SetControlLabel(const std::string& elementId, int controlId, const std::string& label);
+
     // Stores the tree of a panel. Registering the same panel again replaces it.
     void SetPanel(const std::string& elementId, const std::string& panelId, Json tree);
 

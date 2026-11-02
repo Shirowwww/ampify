@@ -75,6 +75,8 @@ const char kUi[] = R"AMPIFYJS(
     panel: Object.freeze({ register: (id, vue) => native.uiPanel(text(id), treeText(vue)) }),
     page: Object.freeze({ register: (path, vue) => native.uiPage(text(path), treeText(vue)) }),
     title: Object.freeze({ set: (title) => native.uiTitle(text(title)) }),
+    // A button of the top bar or the play bar this element added, by the id addButton gave.
+    setLabel: (id, label) => native.uiControlLabel(Number(id), text(label)),
     navigate(path) {
       native.uiNavigate(text(path));
       if (dispatch.pageShow) dispatch.pageShow(text(path));  // module react

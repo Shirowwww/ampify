@@ -180,15 +180,17 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
 
 ### 5.4 Audio [preview]
 
-These run in `AMPLibraryAgent.exe` (`"processes": ["engine"]`) and need the Atmos leveler switched on, whose audio
-hooks they share. Elsewhere they return `false` or `null` without throwing.
+Sound is processed in `AMPLibraryAgent.exe` (`"processes": ["engine"]`), on the audio hooks of the Atmos leveler,
+which go in by themselves when the interface asks for the sound. The interface (`AppleMusic.exe`) reads what that
+process shares: `onFrame`, `analyze()`, `loudness()` and `volume()` work there too, about 100 ms behind. The gain and
+the equalizer stay in the engine: in the interface they answer `false` and `eq.bands()` is empty, without throwing.
 
 ```js
 Ampify.audio.setGainDb(db)          // gain on the samples, capped by audio.maxGainDb, back to 0 at stop
 Ampify.audio.onFrame(fn)            // fn({ bands, rms, peak, time }), up to 20 times a second
 Ampify.audio.analyze()              // -> { tempo, confidence, loudness: { momentary, shortTerm }, rms, peak, bands, frequencies }
 Ampify.audio.loudness()             // -> { momentary, shortTerm } in LUFS, or null
-Ampify.audio.volume()               // -> the player volume as the slider shows it, 0 to 1 (permission player.read)
+Ampify.audio.volume()               // -> the player's gain, 0 to 1, or null (permission player.read)
 Ampify.audio.eq.setBand(index, gainDb)   // 10 bands, 31 Hz to 16 kHz, +/- 12 dB
 Ampify.audio.eq.preset(name)        // "flat", "rock", "jazz", "bass-booster"...
 Ampify.audio.eq.reset()
@@ -198,6 +200,8 @@ Ampify.audio.eq.presets()           // -> preset names
 
 - `bands` are 16 log-spaced bands from 40 Hz to 16 kHz, each 0 (-80 dBFS) to 1 (0 dBFS). `rms` and `peak` are linear.
 - Loudness follows BS.1770 (400 ms and 3 s), measured before the gain and the equalizer.
+- `volume()` is known once Apple Music has set it, usually when the first song starts. Apple Music's slider is in
+  decibels: its position p gives a gain of 30 × (p − 1) dB, so half way is about 0.18.
 - Order: gain, then equalizer, then a soft limiter. A flat equalizer leaves the samples untouched. There is one
   equalizer per process; the last element that sets it wins.
 - Scripts only receive these numbers, never the samples, and nothing is written to disk.
@@ -247,6 +251,7 @@ Ampify.ui.fullscreen.onClose(fn)       // returns a function that removes fn
 Ampify.ui.applePlayer.open()           // permission ui.fullscreen: Apple Music's own full-screen player
 Ampify.ui.panel.register(id, view)     // a 380 px column on the right
 Ampify.ui.title.set(text)              // title of the element's panel, page and popup
+Ampify.ui.setLabel(id, label)          // new text of a top bar or play bar button, by the id addButton returned
 Ampify.ui.page.register(path, view)    // for an app
 Ampify.ui.navigate(path)
 ```

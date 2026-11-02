@@ -52,6 +52,14 @@ struct UiNatives : ScriptBridge {
         return JS_NewInt32(ctx, HostOf(ext).Ui().AddControl(ext->id(), placement, label, icon));
     }
 
+    // No permission of its own: the element can only relabel what it added, which needed the permission already.
+    AMPIFY_NATIVE(UiControlLabel) {
+        ScriptExtension* ext = Owner(ctx);
+        int id = static_cast<int>(Number(ctx, argc, argv, 0));
+        std::string label = String(ctx, argc, argv, 1).value_or("").substr(0, kMaxUiLabel);
+        return JS_NewBool(ctx, HostOf(ext).Ui().SetControlLabel(ext->id(), id, label));
+    }
+
     AMPIFY_NATIVE(UiPanel) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
@@ -150,6 +158,7 @@ struct UiNatives : ScriptBridge {
 
 void DefineUi(api::NativeScope& scope) {
     scope.Function("uiControl", UiNatives::UiControl, 3);
+    scope.Function("uiControlLabel", UiNatives::UiControlLabel, 2);
     scope.Function("uiPanel", UiNatives::UiPanel, 2);
     scope.Function("uiPopup", UiNatives::UiPopup, 1);
     scope.Function("uiFullscreen", UiNatives::UiFullscreen, 2);

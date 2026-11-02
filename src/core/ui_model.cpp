@@ -312,6 +312,16 @@ int UiModel::ReserveId() {
     return m_nextId++;
 }
 
+bool UiModel::SetControlLabel(const std::string& elementId, int controlId, const std::string& label) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    for (UiControl& control : m_controls) {
+        if (control.id != controlId || control.elementId != elementId) continue;
+        control.label = label;
+        return true;
+    }
+    return false;
+}
+
 void UiModel::SetTitle(const std::string& elementId, const std::string& title) {
     std::lock_guard<std::mutex> guard(m_mutex);
     m_titles[elementId] = title;

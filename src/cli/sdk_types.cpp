@@ -217,6 +217,8 @@ declare const Ampify: {
     applePlayer: { open(): void };
     panel: { register(id: string, view: UiNode): void };
     title: { set(text: string): void };
+    /** A new label for a top bar or play bar button this element added: its text without an icon, its tooltip with one. */
+    setLabel(id: number, label: string): boolean;
     page: { register(path: string, view: UiNode): void };
     navigate(path: string): void;
   };

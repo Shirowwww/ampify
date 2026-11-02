@@ -1,0 +1,22 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "listening-stats",
+  "name": "Listening stats",
+  "version": "0.1.0",
+  "kind": "app",
+  "author": "Shirowwww",
+  "description": "Your top artists and songs of the last 7 days, the last 4 weeks or since the start, and your listening time, counted on this PC, like Spicetify's Stats.",
+  "translations": {"fr": {"name": "Statistiques d'écoute", "description": "Vos artistes et morceaux les plus écoutés sur 7 jours, 4 semaines ou depuis le début, et votre temps d'écoute, comptés sur ce PC, comme Stats sur Spicetify."}},
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": [
+    "player.read",
+    "storage",
+    "ui.page",
+    "ui.sidebar"
+  ],
+  "tags": [
+    "stats",
+    "history"
+  ]
+}
