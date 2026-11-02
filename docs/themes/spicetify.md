@@ -77,8 +77,29 @@ An archive goes through the same checks as `ampify install` (paths, symbolic lin
 Tried on Apple Music 1.1792: Catppuccin (`mocha` dark, `latte` light) and Sleek (19 schemes, including `Dracula` and
 `Nord`).
 
+## What ports when you rewrite the rules
+
+Spotify's selectors never match Apple Music, but most of the CSS inside the rules does, once the selector names an
+Apple Music element ([format.md](format.md)):
+
+- `display: none` hides the element, as in the many snippets that hide a part of the interface; `display: flex` and the
+  other layout modes show it.
+- `border-radius`, `opacity`, `margin`, `padding`, `width`, `height`, `transform`, `transition` and `@keyframes`
+  animations of `opacity` and `transform`.
+- The text properties: `font-family`, `font-size` (pixels, `%` or `em`), `font-weight`, `font-style`, `letter-spacing`,
+  `line-height`, `text-align`, `text-overflow: ellipsis` and `white-space: nowrap`.
+- The selectors `A > B`, `A + B`, `A ~ B`, `:first-child`, `:last-child`, `:only-child`, `:nth-child(n)`,
+  `:nth-last-child(n)`, `:not(...)`, `:hover`, `:focus` and `:active`.
+- `var(--spice-<key>)` for any color of `color.ini`.
+
+A property with no counterpart is ignored, and the theme's problems say what to write instead: `backdrop-filter` becomes
+`backdrop: acrylic(tint, opacity)`, `justify-content` and `align-items` become `horizontal-alignment` and
+`vertical-alignment` on the children, `gap` becomes a `margin` on the children.
+
 ## What does not carry over
 
-- Spotify's CSS rules: rewrite them with Apple Music's names ([guide.md](guide.md), [format.md](format.md)).
+- Spotify's selectors: rewrite them with Apple Music's names ([guide.md](guide.md), [format.md](format.md)).
+- `filter`, `pointer-events`, `cursor`, `overflow`, `mix-blend-mode`, `clip-path` and `text-transform`: Apple Music's XAML
+  has nothing to map them to.
 - Colors written `${xrdb:...}` (pywal) are refused, with the line in the theme's problems.
 - `theme.js`: Ampify only runs the `main.js` of an Ampify theme, with Ampify's own API (`Ampify`), not Spotify's.

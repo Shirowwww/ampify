@@ -1,0 +1,13 @@
+/* A small animated equalizer at the right end of the song's display, behind its text. The image lets every click
+   through. Swap images/dance.gif for any GIF, PNG or JPG of the snippet folder, or use ::after to put it in front of
+   the display's content. */
+
+.lcd::before {
+    content: url("images/dance.gif");
+    width: 36px;
+    height: 36px;
+    horizontal-alignment: right;
+    vertical-alignment: center;
+    margin: 0 44 0 0;
+    opacity: 0.55;
+}

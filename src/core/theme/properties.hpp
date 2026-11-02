@@ -21,8 +21,12 @@ enum class PropertyKind {
     Backdrop,    // `acrylic(<colour>, <opacity>)`: an AcrylicBrush, written to Background like a brush
     Length,      // a number of pixels (`px` optional), or `auto`
     Thickness,   // one to four lengths, in CSS order: top right bottom left (corners for corner-radius)
-    Visibility,  // visible, or collapsed / hidden / none
+    Visibility,  // visible, or collapsed / hidden / none; for `display`, none, or block / flex / grid... (visible)
     Number,      // a plain number, or a font weight keyword: normal, bold
+    Keyword,     // one word of a fixed list, written as the XAML enumeration member: text-align, font-style,
+                 // text-overflow, white-space
+    LetterSpacing,  // em (to XAML's thousandths of an em), px (kept as "2px" until the font size is known), or normal
+    LineHeight,     // px, or a factor of the font size (1.5, 150%, 1.5em, kept as "1.5em"), or normal (XAML's 0)
     Text,        // a font family: a name, optionally in quotes, or `url(fonts/file.ttf#Family Name)`
     Template,    // url(file) of a XAML ControlTemplate
     FlowDirection,  // ltr / left-to-right, or rtl / right-to-left (XAML LeftToRight, RightToLeft)
@@ -35,6 +39,8 @@ enum class PropertyKind {
     Transition,  // `<property> <duration> [easing], ...` for transform, opacity, background or all; or none
     Animation,   // `<name> <duration> [easing] [delay] [count] [direction] [fill], ...` running @keyframes blocks of
                  // the theme (animation.hpp); or none
+    Content,     // the image of ::before or ::after: `url(image) [cover|contain|fill]` of the theme folder (an Image
+                 // value), or `none` (an Image value with no text)
 };
 
 struct PropertySpec {
@@ -47,6 +53,14 @@ std::span<const PropertySpec> KnownProperties();
 
 // Case-insensitive lookup. Nothing for a property the engine does not know.
 const PropertySpec* FindProperty(std::string_view css);
+
+// For a CSS property the engine does not know, what a theme writes instead ("use backdrop: acrylic(tint, opacity)"),
+// or why nothing can stand in for it. Empty when there is no advice.
+std::string_view PropertyHint(std::string_view css);
+
+// True for the XAML properties a decorative image of ::before or ::after takes: its content, size, place, opacity,
+// transform and animation. The others (colours, fonts, padding...) mean nothing on an image.
+bool AppliesToDecor(std::string_view xaml);
 
 // What a conversion needs from the theme that holds the rule.
 struct ValueContext {
@@ -80,6 +94,14 @@ bool IsRelativeSize(const Value& value);
 // `relative` applied to `size`, a Length in pixels: "16.8" for "120%" of "14". Nothing when `size` is not a positive
 // number or `relative` is not a relative size.
 std::optional<Value> ScaleFontSize(const Value& relative, const Value& size);
+
+// A value measured against the element's font size, which the engine finishes when it writes: a letter-spacing in
+// pixels (a Number "2px") or a line-height factor (a Length "1.5em").
+bool NeedsFontSize(const Value& value);
+
+// `value` measured against `fontSize`, a Length in pixels: "2px" of 16 is a CharacterSpacing of 125 (thousandths of an
+// em), "1.5em" of 14 a LineHeight of 21. Nothing when `fontSize` is not a positive number or `value` needs none.
+std::optional<Value> ApplyFontSize(const Value& value, const Value& fontSize);
 
 // True for the same value, numbers compared as WinUI keeps them: in single precision, so a size written as 16.8 reads
 // back as 16.799999237060547, and must not count as a new value on every pass.

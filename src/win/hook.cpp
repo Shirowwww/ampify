@@ -142,10 +142,4 @@ std::string ModuleOf(const void* address) {
     return PathOfModule(module);
 }
 
-void RestoreHooks() {
-    std::lock_guard<std::mutex> guard(g_lock);
-    for (const auto& [entry, original] : g_replaced) WritePointer(entry, original);
-    g_replaced.clear();
-}
-
 }  // namespace ampify::win

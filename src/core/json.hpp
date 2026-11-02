@@ -39,7 +39,6 @@ public:
     static std::string Quote(std::string_view text);
 
     bool IsNull() const { return std::holds_alternative<std::nullptr_t>(m_value); }
-    bool IsBool() const { return std::holds_alternative<bool>(m_value); }
     bool IsNumber() const { return std::holds_alternative<double>(m_value); }
     bool IsString() const { return std::holds_alternative<std::string>(m_value); }
     bool IsArray() const { return std::holds_alternative<Array>(m_value); }

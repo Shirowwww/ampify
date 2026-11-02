@@ -1,0 +1,15 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "display-equalizer",
+  "name": "Display equalizer",
+  "version": "0.1.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "An animated equalizer GIF at the right end of the song's display, behind its text: an example of ::before with content: url(...).",
+  "translations": {"fr": {"name": "Égaliseur dans l'afficheur", "description": "Un GIF d'égaliseur animé au bout droit de l'afficheur du morceau, derrière son texte : un exemple de ::before avec content: url(...)."}},
+  "kitApi": "1.0",
+  "tags": [
+    "decoration",
+    "gif"
+  ]
+}

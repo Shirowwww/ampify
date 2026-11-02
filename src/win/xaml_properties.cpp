@@ -131,6 +131,8 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
     } else if (property == "FontWeight") {
         if (auto control = object.try_as<controls::Control>()) return number(control.FontWeight().Weight);
         if (auto text = object.try_as<controls::TextBlock>()) return number(text.FontWeight().Weight);
+    } else if (IsTextProperty(property)) {
+        return ReadTextProperty(object, property);
     } else if (property == "Margin") {
         if (auto element = object.try_as<xaml::FrameworkElement>()) return theme::Value{theme::ValueKind::Thickness, ThicknessText(element.Margin())};
     } else if (property == "Padding") {
@@ -444,6 +446,8 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         if (auto text = object.try_as<controls::TextBlock>()) { text.FontWeight(winrt::Windows::UI::Text::FontWeight{weight}); return true; }
         return false;
     }
+
+    if (IsTextProperty(property)) return WriteTextProperty(object, property, value);
 
     if ((property == "Margin" || property == "Padding" || property == "BorderThickness") && value.kind == theme::ValueKind::Thickness) {
         std::vector<double> sides = Numbers(value.text, ',');

@@ -15,12 +15,6 @@ namespace {
 
 constexpr size_t kMaxTargetBytes = 1024;
 
-std::string_view Trim(std::string_view text) {
-    while (!text.empty() && (text.front() == ' ' || text.front() == '\t')) text.remove_prefix(1);
-    while (!text.empty() && (text.back() == ' ' || text.back() == '\t')) text.remove_suffix(1);
-    return text;
-}
-
 bool IsTokenChar(char c) {
     unsigned char u = static_cast<unsigned char>(c);
     if (std::isalnum(u)) return true;
@@ -85,7 +79,7 @@ Response Ok(bool done) {
 
 // "127.0.0.1:8974" -> "127.0.0.1", "[::1]:8974" -> "[::1]".
 std::string HostWithoutPort(std::string_view value) {
-    value = Trim(value);
+    value = TrimSpace(value);
     if (!value.empty() && value.front() == '[') {
         size_t close = value.find(']');
         if (close == std::string_view::npos) return {};
@@ -162,11 +156,13 @@ ParseStatus ParseRequest(std::string_view buffer, Request& request, size_t* cons
         for (char c : name) {
             if (!IsTokenChar(c)) return ParseStatus::Bad;
         }
-        std::string_view value = Trim(line.substr(colon + 1));
-        for (char c : value) {
+        // Checked before trimming: TrimSpace also drops CR and LF, which must refuse the request here.
+        std::string_view raw = line.substr(colon + 1);
+        for (char c : raw) {
             unsigned char u = static_cast<unsigned char>(c);
             if ((u < 0x20 && c != '\t') || u == 0x7F) return ParseStatus::Bad;
         }
+        std::string_view value = TrimSpace(raw);
         std::string key = ToLowerAscii(name);
         if (key == "transfer-encoding") return ParseStatus::Bad;
         if (key == "content-length") {
@@ -203,7 +199,7 @@ std::string Serialize(const Response& response) {
 bool IsLoopbackIpv4(uint32_t address) { return (address >> 24) == 127; }
 
 bool IsLoopbackText(std::string_view address) {
-    std::string text = ToLowerAscii(Trim(address));
+    std::string text = ToLowerAscii(TrimSpace(address));
     if (text == "::1" || text == "[::1]") return true;
     constexpr std::string_view kMapped = "::ffff:";
     std::string_view v4 = text;

@@ -210,6 +210,26 @@ public:
         return true;
     }
 
+    // The decorative image of each panel and place (::before, ::after), as the panel holds it.
+    std::map<std::pair<th::NodeId, th::PseudoElement>, th::Decor> decors;
+    int decorsInserted = 0;
+
+    th::DecorChange SetDecor(th::NodeId id, th::PseudoElement slot, const th::Decor* decor) override {
+        Element* element = Find(id);
+        auto key = std::make_pair(id, slot);
+        if (!decor) {
+            bool held = decors.erase(key) > 0;
+            if (!element) return th::DecorChange::Refused;
+            return held ? th::DecorChange::Applied : th::DecorChange::Unchanged;
+        }
+        if (!element || !element->info.panel) return th::DecorChange::Refused;
+        auto known = decors.find(key);
+        if (known != decors.end() && known->second == *decor) return th::DecorChange::Unchanged;
+        if (known == decors.end()) decorsInserted++;
+        decors[key] = *decor;
+        return th::DecorChange::Applied;
+    }
+
 private:
     std::optional<th::Value> ReadRaw(th::NodeId id, std::string_view property) override {
         Element* element = Find(id);
@@ -638,6 +658,33 @@ TEST_CASE(Selector_SpecificityOrdersNamesBeforeTypes) {
     CHECK(th::SpecificityOf(Sel("*")) == th::SpecificityOf(Sel("*")));
 }
 
+TEST_CASE(Selector_ReadsBeforeAndAfterOnTheLastPart) {
+    th::Selector after = Sel("Grid#Bar::after");
+    CHECK(after.pseudo == th::PseudoElement::After);
+    CHECK(after.parts.size() == 1);
+    CHECK(after.parts[0].name == "Bar");
+    CHECK(Sel("Page > Grid::before").pseudo == th::PseudoElement::Before);
+    CHECK(Sel("Grid:before").pseudo == th::PseudoElement::Before);  // the older one-colon form
+    CHECK(Sel("Grid").pseudo == th::PseudoElement::None);
+
+    std::string problem;
+    CHECK(!th::ParseSelector("Grid::after > TextBlock", &problem));
+    CHECK(problem.find("must end the selector") != std::string::npos);
+    CHECK(!th::ParseSelector("Grid:hover::after", &problem));
+    CHECK(problem.find("::after") != std::string::npos);
+    CHECK(!th::ParseSelector("Grid::marker", &problem));
+    CHECK(problem.find("::marker") != std::string::npos);
+}
+
+TEST_CASE(Css_AClassTakesBeforeAndAfter) {
+    th::Stylesheet sheet = th::ParseStylesheet(".playbar::after { content: none; }");
+    CHECK(sheet.problems.empty());
+    CHECK(sheet.rules.size() == 1);
+    if (sheet.rules.size() != 1) return;
+    CHECK(sheet.rules[0].selectors[0].pseudo == th::PseudoElement::After);
+    CHECK(sheet.rules[0].selectors[0].parts.back().name == "TransportBar");
+}
+
 TEST_CASE(Selector_RejectsWhatItDoesNotKnow) {
     std::string problem;
     CHECK(!th::ParseSelector("Grid[Name=x]", &problem));
@@ -667,6 +714,23 @@ TEST_CASE(Properties_ConvertBrushesAndImages) {
     CHECK(Converted("background", "url(images/missing.png)", palette, files).find("not found") != std::string::npos);
     CHECK(Converted("background", "url(../secret.png)", palette, files).find("not allowed") != std::string::npos);
     CHECK(Converted("background", "nonsense", palette, files).rfind("PROBLEM", 0) == 0);
+}
+
+TEST_CASE(Properties_ContentIsAnImageOfTheThemeOrNone) {
+    th::Palette palette;
+    MemoryFiles files;
+    files.files["images/dance.gif"] = "GIF89a";
+    files.files["images/logo.svg"] = "<svg/>";
+
+    CHECK(Converted("content", "url(\"images/dance.gif\")", palette, files) == "C:/themes/test/images/dance.gif");
+    CHECK(Converted("content", "url(images/dance.gif) contain", palette, files) ==
+          "C:/themes/test/images/dance.gif|Uniform");
+    CHECK(Converted("content", "none", palette, files).empty());
+    CHECK(Converted("content", "\"Hello\"", palette, files).find("text is not supported") != std::string::npos);
+    CHECK(Converted("content", "url(../secret.gif)", palette, files).find("not allowed") != std::string::npos);
+    CHECK(Converted("content", "url(https://example.com/a.gif)", palette, files).find("not allowed") !=
+          std::string::npos);
+    CHECK(Converted("content", "url(images/logo.svg)", palette, files).find("png, jpg, gif") != std::string::npos);
 }
 
 TEST_CASE(Properties_ConvertLengthsAndThickness) {
@@ -1439,6 +1503,133 @@ TEST_CASE(Engine_ReportsADictionaryTheInterfaceRefuses) {
     th::ThemeEngine::Report report = engine.Apply(theme, tree);
     CHECK(report.refused == 1);
     CHECK(tree.dictionary.empty());
+}
+
+TEST_CASE(Theme_ContentAndDecorPropertiesStayOnBeforeAndAfter) {
+    MemoryFiles files;
+    files.files["dance.gif"] = "GIF89a";
+    files.files["user.css"] =
+        "Grid { content: url(dance.gif); }\n"
+        "Grid::after { content: url(dance.gif); width: 48px; font-size: 12px; }\n"
+        "Grid::after:hover { opacity: 1; }\n";
+    th::Theme theme = Load(files);
+
+    CHECK(!ProblemContaining(theme, "line 1: \"content\" only applies to ::before and ::after").empty());
+    CHECK(!ProblemContaining(theme, "line 2: \"font-size\" does not apply to ::after").empty());
+    CHECK(!ProblemContaining(theme, "line 3:").empty());
+    const th::Assignment* width = AssignmentFor(theme, "Grid::after", "Width");
+    CHECK(width && width->selector.pseudo == th::PseudoElement::After);
+    CHECK(AssignmentFor(theme, "Grid::after", "Content"));
+    CHECK(!AssignmentFor(theme, "Grid", "Content"));
+}
+
+namespace {
+
+// Page > Grid#Bar (a panel) and Border#Hide (not a panel), with a GIF in the theme folder.
+struct DecorPage {
+    FakeTree tree;
+    th::NodeId bar = 0;
+    MemoryFiles files;
+    std::ostringstream log;
+    ampify::Journal journal{log, [] { return std::string("00:00:00.000"); }};
+    th::ThemeEngine engine{journal};
+
+    DecorPage() {
+        tree.Add(-1, "Page", "");
+        bar = tree.Add(0, "Grid", "Bar", {{"Background", Brush("#FF0000FF")}});
+        tree.elements[bar - 1].info.panel = true;
+        tree.Add(0, "Border", "Hide", {{"Background", Brush("#FF000000")}});
+        files.files["dance.gif"] = "GIF89a";
+    }
+
+    th::Theme Css(const char* css) {
+        files.files["user.css"] = css;
+        return Load(files);
+    }
+
+    const th::Decor* After() {
+        auto it = tree.decors.find({bar, th::PseudoElement::After});
+        return it == tree.decors.end() ? nullptr : &it->second;
+    }
+};
+
+}  // namespace
+
+TEST_CASE(Engine_PutsADecorInAPanelOnceAndTakesItOff) {
+    DecorPage page;
+    th::Theme theme = page.Css("#Bar::after { content: url(dance.gif); width: 48px; opacity: 0.8; }\n"
+                               "#Bar::before { content: url(dance.gif) fill; }\n");
+
+    th::ThemeEngine::Report first = page.engine.Apply(theme, page.tree);
+    CHECK(first.applied == 2);
+    CHECK(first.refused == 0);
+    CHECK(page.tree.decors.size() == 2);
+    const th::Decor* after = page.After();
+    CHECK(after && after->image == "C:/themes/test/dance.gif");
+    CHECK(after && after->properties.size() == 2);  // Opacity and Width, the content apart
+    CHECK((page.tree.decors[{page.bar, th::PseudoElement::Before}].image == "C:/themes/test/dance.gif|Fill"));
+    CHECK(page.engine.OriginalCount() == 2);
+
+    // The three-second passes find it in place and insert nothing more.
+    th::ThemeEngine::Report second = page.engine.Apply(theme, page.tree);
+    CHECK(second.applied == 0);
+    CHECK(second.unchanged == 2);
+    CHECK(page.tree.decorsInserted == 2);
+
+    page.engine.Restore(page.tree);
+    CHECK(page.tree.decors.empty());
+    CHECK(page.engine.OriginalCount() == 0);
+    CHECK(page.log.str().find("Decor: Grid#Bar::after = C:/themes/test/dance.gif") != std::string::npos);
+    CHECK(page.log.str().find("Theme removed: 2 value(s) restored") != std::string::npos);
+}
+
+TEST_CASE(Engine_RefusesADecorOnAnElementThatIsNotAPanel) {
+    DecorPage page;
+    th::Theme theme = page.Css("#Hide::after { content: url(dance.gif); }\n");
+
+    th::ThemeEngine::Report report = page.engine.Apply(theme, page.tree);
+    CHECK(report.refused == 1);
+    CHECK(page.tree.decors.empty());
+    CHECK(page.log.str().find("Refused: \"#Hide::after\": ::after needs a panel (Grid, StackPanel...); Border#Hide is "
+                              "a Border") != std::string::npos);
+}
+
+TEST_CASE(Engine_UpdatesADecorInPlaceAndRemovesItWithContentNone) {
+    DecorPage page;
+    page.engine.Apply(page.Css("#Bar::after { content: url(dance.gif); width: 48px; }"), page.tree);
+    page.engine.Apply(page.Css("#Bar::after { content: url(dance.gif); width: 64px; }"), page.tree);
+    CHECK(page.tree.decorsInserted == 1);  // the same image, changed
+    const th::Decor* after = page.After();
+    CHECK(after && after->properties.size() == 1 && after->properties[0].second.text == "64");
+
+    th::ThemeEngine::Report none = page.engine.Apply(page.Css("#Bar::after { content: none; width: 64px; }"), page.tree);
+    CHECK(none.applied == 1);
+    CHECK(page.tree.decors.empty());
+    CHECK(page.engine.OriginalCount() == 0);
+
+    // No content at all inserts nothing either.
+    page.engine.Apply(page.Css("#Bar::after { width: 64px; }"), page.tree);
+    CHECK(page.tree.decors.empty());
+}
+
+TEST_CASE(Snippets_TheDisplayEqualizerLoadsWithoutProblems) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "display-equalizer";
+    th::FolderFiles files(folder);
+    th::Theme snippet = th::LoadSnippet("display-equalizer", folder.generic_string(), files, nullptr);
+
+    CHECK(snippet.usable);
+    for (const std::string& problem : snippet.problems) ampify::test::ReportFailure(__FILE__, __LINE__, problem);
+    const th::Assignment* content = AssignmentFor(snippet, ".lcd::before", "Content");
+    CHECK(content && content->value.text.ends_with("/images/dance.gif"));
+}
+
+TEST_CASE(Engine_ForgetsTheDecorOfAPanelThatWentAway) {
+    DecorPage page;
+    th::Theme theme = page.Css("#Bar::after { content: url(dance.gif); }");
+    page.engine.Apply(theme, page.tree);
+    page.tree.Remove(page.bar);
+    page.engine.Apply(theme, page.tree);
+    CHECK(page.engine.OriginalCount() == 0);
 }
 
 // --- Library, watcher and settings -----------------------------------------------------------------------
@@ -3399,4 +3590,249 @@ TEST_CASE(Selector_PlayerWindowsTakeOnlyRulesThatNameThem) {
     CHECK(!th::Matches(*plain, nodes, 1));
     CHECK(th::Matches(*scoped, nodes, 1));
     CHECK(!th::Matches(*scoped, nodes, 2));
+}
+
+// --- Text properties, display, hints and more selectors -------------------------------------------------
+
+TEST_CASE(Properties_ConvertTheTextPropertiesOfCss) {
+    th::Palette palette;
+    MemoryFiles files;
+
+    // CharacterSpacing counts thousandths of an em; pixels wait for the element's font size.
+    CHECK(Converted("letter-spacing", "0.05em", palette, files) == "50");
+    CHECK(Converted("letter-spacing", "-0.02em", palette, files) == "-20");
+    CHECK(Converted("letter-spacing", "2px", palette, files) == "2px");
+    CHECK(Converted("letter-spacing", "normal", palette, files) == "0");
+    CHECK(Converted("letter-spacing", "2", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(Converted("letter-spacing", "1rem", palette, files).rfind("PROBLEM", 0) == 0);
+
+    // LineHeight is in pixels; a plain number, a percentage or an em is a factor of the font size.
+    CHECK(Converted("line-height", "20px", palette, files) == "20");
+    CHECK(Converted("line-height", "1.5", palette, files) == "1.5em");
+    CHECK(Converted("line-height", "150%", palette, files) == "1.5em");
+    CHECK(Converted("line-height", "1.2em", palette, files) == "1.2em");
+    CHECK(Converted("line-height", "normal", palette, files) == "0");
+    CHECK(Converted("line-height", "-1", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(Converted("line-height", "-2px", palette, files).rfind("PROBLEM", 0) == 0);
+
+    CHECK(Converted("text-align", "center", palette, files) == "Center");
+    CHECK(Converted("text-align", "start", palette, files) == "Left");
+    CHECK(Converted("text-align", "END", palette, files) == "Right");
+    CHECK(Converted("text-align", "justify", palette, files) == "Justify");
+    std::string middle = Converted("text-align", "middle", palette, files);
+    CHECK(middle.rfind("PROBLEM", 0) == 0 && middle.find("left, start, center") != std::string::npos);
+    CHECK(Converted("font-style", "italic", palette, files) == "Italic");
+    CHECK(Converted("font-style", "normal", palette, files) == "Normal");
+    CHECK(Converted("text-overflow", "ellipsis", palette, files) == "CharacterEllipsis");
+    CHECK(Converted("text-overflow", "clip", palette, files) == "None");
+    CHECK(Converted("white-space", "nowrap", palette, files) == "NoWrap");
+    CHECK(Converted("white-space", "normal", palette, files) == "Wrap");
+    CHECK(Converted("white-space", "pre", palette, files).rfind("PROBLEM", 0) == 0);
+
+    // display: none hides, as Spicetify snippets write it; a layout mode shows.
+    CHECK(th::FindProperty("display") && th::FindProperty("display")->xaml == "Visibility");
+    CHECK(Converted("display", "none", palette, files) == "Collapsed");
+    CHECK(Converted("display", "flex", palette, files) == "Visible");
+    CHECK(Converted("display", "block", palette, files) == "Visible");
+    CHECK(Converted("display", "ruby", palette, files).rfind("PROBLEM", 0) == 0);
+
+    // XAML's TextBlock has no letter case: text-transform stays unknown, with a hint.
+    CHECK(th::FindProperty("text-transform") == nullptr);
+    CHECK(th::PropertyHint("text-transform").find("not available") != std::string_view::npos);
+}
+
+TEST_CASE(Properties_MeasureAgainstTheFontSize) {
+    th::Value pixels{th::ValueKind::Number, "2px"};
+    th::Value factor{th::ValueKind::Length, "1.5em"};
+    th::Value plain{th::ValueKind::Number, "50"};
+    th::Value size16{th::ValueKind::Length, "16"};
+    th::Value size14{th::ValueKind::Length, "14"};
+    th::Value none{th::ValueKind::Length, "0"};
+    CHECK(th::NeedsFontSize(pixels));
+    CHECK(th::NeedsFontSize(factor));
+    CHECK(!th::NeedsFontSize(plain));
+
+    std::optional<th::Value> spacing = th::ApplyFontSize(pixels, size16);
+    CHECK(spacing && spacing->kind == th::ValueKind::Number && spacing->text == "125");
+    std::optional<th::Value> height = th::ApplyFontSize(factor, size14);
+    CHECK(height && height->kind == th::ValueKind::Length && height->text == "21");
+    CHECK(!th::ApplyFontSize(factor, none));
+    CHECK(!th::ApplyFontSize(plain, size14));
+}
+
+TEST_CASE(Theme_AnUnknownPropertyNamesItsAmpifyEquivalent) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "Grid {\n"
+        "    backdrop-filter: blur(10px);\n"
+        "    justify-content: center;\n"
+        "    gap: 8px;\n"
+        "    cursor: pointer;\n"
+        "    background-color: #101010;\n"
+        "    bogus: 1;\n"
+        "}\n";
+    th::Theme theme = Load(files);
+
+    CHECK(ProblemContaining(theme, "\"backdrop-filter\" is unknown").find("backdrop: acrylic(") != std::string::npos);
+    CHECK(ProblemContaining(theme, "\"justify-content\" is unknown").find("horizontal-alignment") != std::string::npos);
+    CHECK(ProblemContaining(theme, "\"gap\" is unknown").find("margin") != std::string::npos);
+    CHECK(ProblemContaining(theme, "\"cursor\" is unknown").find("not available in Apple Music") != std::string::npos);
+    CHECK(ProblemContaining(theme, "\"background-color\" is unknown").find("use background") != std::string::npos);
+    std::string bogus = ProblemContaining(theme, "\"bogus\" is unknown, ignored");
+    CHECK(!bogus.empty() && bogus.find('(') == std::string::npos);
+    CHECK(th::PropertyHint("Align-Items").find("vertical-alignment") != std::string_view::npos);
+    CHECK(th::PropertyHint("border-radius").empty());  // a known property needs no hint
+}
+
+TEST_CASE(Engine_AppliesTextPropertiesAndRestoresThem) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "TextBlock#Title { letter-spacing: 2px; line-height: 1.5; text-align: center; font-style: italic;\n"
+        "    text-overflow: ellipsis; white-space: nowrap; }\n"
+        "TextBlock#Title:hover { letter-spacing: 4px; }\n"
+        "TextBlock#Caption { letter-spacing: 1px; font-size: 20px; line-height: 18px; }\n"
+        "#Ad { display: none; }\n"
+        "TextBlock#Bare { line-height: 2; }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+
+    FakeTree tree;
+    std::map<std::string, th::Value> text = {
+        {"FontSize", {th::ValueKind::Length, "16"}},        {"CharacterSpacing", {th::ValueKind::Number, "0"}},
+        {"LineHeight", {th::ValueKind::Length, "0"}},       {"TextAlignment", {th::ValueKind::Keyword, "Left"}},
+        {"FontStyle", {th::ValueKind::Keyword, "Normal"}},  {"TextTrimming", {th::ValueKind::Keyword, "None"}},
+        {"TextWrapping", {th::ValueKind::Keyword, "Wrap"}}};
+    th::NodeId title = tree.Add(-1, "TextBlock", "Title", text);
+    text["FontSize"].text = "12";
+    th::NodeId caption = tree.Add(-1, "TextBlock", "Caption", text);
+    std::map<std::string, th::Value> shown = {{"Visibility", {th::ValueKind::Visibility, "Visible"}}};
+    th::NodeId ad = tree.Add(-1, "Grid", "Ad", shown);
+    std::map<std::string, th::Value> bare = {{"LineHeight", {th::ValueKind::Length, "0"}}};
+    tree.Add(-1, "TextBlock", "Bare", bare);  // no font size to measure against
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    th::ThemeEngine::Report first = engine.Apply(theme, tree);
+    CHECK(first.refused == 1);
+    CHECK(log.str().find("TextBlock#Bare LineHeight") != std::string::npos);
+    CHECK(tree.Shown(title, "CharacterSpacing").text == "125");  // 2 px of a 16 px font
+    CHECK(tree.Shown(title, "LineHeight").text == "24");
+    CHECK(tree.Shown(title, "TextAlignment").text == "Center");
+    CHECK(tree.Shown(title, "FontStyle").text == "Italic");
+    CHECK(tree.Shown(title, "TextTrimming").text == "CharacterEllipsis");
+    CHECK(tree.Shown(title, "TextWrapping").text == "NoWrap");
+    CHECK(tree.Shown(caption, "CharacterSpacing").text == "50");  // measured in the theme's 20 px, written first
+    CHECK(tree.Shown(caption, "LineHeight").text == "18");
+    CHECK(tree.Shown(ad, "Visibility").text == "Collapsed");
+
+    CHECK(engine.Apply(theme, tree).applied == 0);
+
+    tree.PointerEnter(title);
+    CHECK(tree.Shown(title, "CharacterSpacing").text == "250");
+    tree.PointerExit(title);
+    CHECK(tree.Shown(title, "CharacterSpacing").text == "125");
+
+    engine.Restore(tree);
+    CHECK(tree.Shown(title, "CharacterSpacing").text == "0");
+    CHECK(tree.Shown(title, "LineHeight").text == "0");
+    CHECK(tree.Shown(title, "TextAlignment").text == "Left");
+    CHECK(tree.Shown(title, "FontStyle").text == "Normal");
+    CHECK(tree.Shown(title, "TextTrimming").text == "None");
+    CHECK(tree.Shown(title, "TextWrapping").text == "Wrap");
+    CHECK(tree.Shown(caption, "FontSize").text == "12");
+    CHECK(tree.Shown(caption, "CharacterSpacing").text == "0");
+    CHECK(tree.Shown(ad, "Visibility").text == "Visible");
+}
+
+TEST_CASE(Selector_ReadsNotOnlyChildAndNthLastChild) {
+    // Grid#Bar with three Grid children, the second holding a TextBlock.
+    std::vector<th::NodeInfo> nodes(5);
+    nodes[0] = {1, "Grid", "", "Bar", -1, 0};
+    nodes[1] = {2, "Grid", "", "", 0, 1};
+    nodes[2] = {3, "Grid", "", "", 0, 1};
+    nodes[3] = {4, "TextBlock", "", "", 2, 2};
+    nodes[4] = {5, "Grid", "", "", 0, 1};
+    for (int i : {1, 2, 4}) nodes[i].siblings = 3;
+    nodes[1].position = 0;
+    nodes[2].position = 1;
+    nodes[4].position = 2;
+    nodes[3].position = 0;
+    nodes[3].siblings = 1;
+
+    CHECK(th::Matches(Sel("Grid#Bar > Grid:not(:first-child)"), nodes, 2));
+    CHECK(th::Matches(Sel("Grid#Bar > Grid:not(:first-child)"), nodes, 4));
+    CHECK(!th::Matches(Sel("Grid#Bar > Grid:not(:first-child)"), nodes, 1));
+    CHECK(th::Matches(Sel("Grid:not(#Bar)"), nodes, 1));
+    CHECK(!th::Matches(Sel("Grid:not(#Bar)"), nodes, 0));
+    CHECK(th::Matches(Sel("*:not(Grid)"), nodes, 3));
+    CHECK(!th::Matches(Sel("*:not(Grid)"), nodes, 1));
+    CHECK(th::Matches(Sel("Grid:not(:nth-child(2))"), nodes, 4));
+    CHECK(!th::Matches(Sel("Grid:not(:nth-child(2))"), nodes, 2));
+    CHECK(th::Matches(Sel("Grid:nth-last-child(1)"), nodes, 4));
+    CHECK(!th::Matches(Sel("Grid:nth-last-child(1)"), nodes, 2));
+    CHECK(th::Matches(Sel("Grid:nth-last-child(3)"), nodes, 1));
+    CHECK(th::Matches(Sel("TextBlock:only-child"), nodes, 3));
+    CHECK(!th::Matches(Sel("Grid#Bar > Grid:only-child"), nodes, 1));
+    CHECK(th::SpecificityOf(Sel("Grid:not(#Bar)")) > th::SpecificityOf(Sel("Grid:nth-child(2) Grid")));
+    CHECK(th::SpecificityOf(Sel("Grid:only-child")) > th::SpecificityOf(Sel("Grid Grid")));
+
+    std::string problem;
+    CHECK(!th::ParseSelector("Grid:not()", &problem));
+    CHECK(problem.find(":not()") != std::string::npos);
+    CHECK(!th::ParseSelector("Grid:not(:hover)", &problem));
+    CHECK(problem.find(":not()") != std::string::npos);
+    CHECK(!th::ParseSelector("Grid:not(Grid TextBlock)", &problem));
+    CHECK(!th::ParseSelector("Grid:not(::after)", &problem));
+    CHECK(!th::ParseSelector("Grid:not(:first-child", &problem));
+    CHECK(!th::ParseSelector("Grid:nth-last-child(0)", &problem));
+    CHECK(problem.find("counts from 1") != std::string::npos);
+
+    th::Stylesheet sheet = th::ParseStylesheet("Grid:not(.sidebar) { width: 1 }");
+    CHECK(sheet.rules.empty());
+    CHECK(sheet.problems.size() == 1 && sheet.problems[0].find(":not()") != std::string::npos);
+}
+
+TEST_CASE(Selector_MatchesSiblingCombinators) {
+    // Page
+    //   Grid#A        (index 1)
+    //     TextBlock   (index 2)
+    //   Grid#B        (index 3)
+    //   Border#C      (index 4)
+    //     TextBlock   (index 5)
+    std::vector<th::NodeInfo> nodes(6);
+    nodes[0] = {1, "Page", "", "", -1, 0};
+    nodes[1] = {2, "Grid", "", "A", 0, 1};
+    nodes[2] = {3, "TextBlock", "", "", 1, 2};
+    nodes[3] = {4, "Grid", "", "B", 0, 1};
+    nodes[4] = {5, "Border", "", "C", 0, 1};
+    nodes[5] = {6, "TextBlock", "", "", 4, 2};
+    for (int i : {1, 3, 4}) nodes[i].siblings = 3;
+    nodes[1].position = 0;
+    nodes[3].position = 1;
+    nodes[4].position = 2;
+    nodes[2].position = 0;
+    nodes[5].position = 0;
+    nodes[2].siblings = 1;
+    nodes[5].siblings = 1;
+
+    CHECK(th::Matches(Sel("#A + Grid"), nodes, 3));  // listed just before it is A's TextBlock: A is found above it
+    CHECK(th::Matches(Sel("#A+Grid"), nodes, 3));
+    CHECK(!th::Matches(Sel("#A + *"), nodes, 4));
+    CHECK(!th::Matches(Sel("#C + Grid"), nodes, 3));
+    CHECK(th::Matches(Sel("#A ~ Border"), nodes, 4));
+    CHECK(th::Matches(Sel("#A ~ *"), nodes, 3));
+    CHECK(th::Matches(Sel("#A ~ *"), nodes, 4));
+    CHECK(!th::Matches(Sel("#A ~ *"), nodes, 1));
+    CHECK(!th::Matches(Sel("#A ~ *"), nodes, 5));
+    CHECK(th::Matches(Sel("#B + Border > TextBlock"), nodes, 5));
+    CHECK(th::Matches(Sel("Page > #A ~ #C TextBlock"), nodes, 5));
+    CHECK(!th::Matches(Sel("Page + *"), nodes, 1));
+
+    std::string problem;
+    CHECK(!th::ParseSelector("Grid +", &problem));
+    CHECK(problem.find("\"+\" has no element after it") != std::string::npos);
+    CHECK(!th::ParseSelector("~ Grid", &problem));
+    CHECK(!th::ParseSelector("Grid + > TextBlock", &problem));
+    CHECK(problem.find("misplaced \">\"") != std::string::npos);
 }

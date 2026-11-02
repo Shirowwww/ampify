@@ -19,6 +19,8 @@
 #include <functional>
 #include <set>
 
+#include <winrt/Microsoft.UI.Xaml.Automation.h>
+#include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
@@ -140,7 +142,125 @@ xaml::DependencyProperty OwnBoxProperty(const xaml::DependencyObject& object, st
     return nullptr;
 }
 
+// The text properties written as the name of an enumeration member (theme::ValueKind::Keyword), indexed by the
+// member's value: TextAlignment's Start and End are Left and Right under other names. Empty where no member is.
+struct TextEnum {
+    std::string_view property;
+    std::array<std::string_view, 5> names;
+};
+
+constexpr std::array<TextEnum, 4> kTextEnums{{
+    {"TextAlignment", {"Center", "Left", "Right", "Justify", "DetectFromContent"}},
+    {"TextTrimming", {"None", "CharacterEllipsis", "WordEllipsis", "Clip", ""}},
+    {"TextWrapping", {"", "NoWrap", "Wrap", "WrapWholeWords", ""}},
+    {"FontStyle", {"Normal", "Oblique", "Italic", "", ""}},
+}};
+
+const TextEnum* FindTextEnum(std::string_view property) {
+    for (const TextEnum& entry : kTextEnums) {
+        if (entry.property == property) return &entry;
+    }
+    return nullptr;
+}
+
+// FontStyle of a Control or a TextBlock, the others of a TextBlock only. Nothing when the element has no such value.
+std::optional<std::int32_t> ReadTextEnum(const xaml::DependencyObject& object, std::string_view property) {
+    auto text = object.try_as<controls::TextBlock>();
+    if (property == "FontStyle") {
+        if (auto control = object.try_as<controls::Control>()) return static_cast<std::int32_t>(control.FontStyle());
+        if (text) return static_cast<std::int32_t>(text.FontStyle());
+        return std::nullopt;
+    }
+    if (!text) return std::nullopt;
+    if (property == "TextAlignment") return static_cast<std::int32_t>(text.TextAlignment());
+    if (property == "TextTrimming") return static_cast<std::int32_t>(text.TextTrimming());
+    return static_cast<std::int32_t>(text.TextWrapping());
+}
+
+bool WriteTextEnum(const xaml::DependencyObject& object, std::string_view property, std::int32_t value) {
+    auto text = object.try_as<controls::TextBlock>();
+    if (property == "FontStyle") {
+        auto style = static_cast<winrt::Windows::UI::Text::FontStyle>(value);
+        if (auto control = object.try_as<controls::Control>()) {
+            control.FontStyle(style);
+            return true;
+        }
+        if (text) text.FontStyle(style);
+        return static_cast<bool>(text);
+    }
+    if (!text) return false;
+    if (property == "TextAlignment") text.TextAlignment(static_cast<xaml::TextAlignment>(value));
+    else if (property == "TextTrimming") text.TextTrimming(static_cast<xaml::TextTrimming>(value));
+    else text.TextWrapping(static_cast<xaml::TextWrapping>(value));
+    return true;
+}
+
+// CharacterSpacing and FontStyle on a Control or a TextBlock, the rest of the text properties on a TextBlock.
+xaml::DependencyProperty OwnTextProperty(const xaml::DependencyObject& object, std::string_view property) {
+    if (object.try_as<controls::Control>()) {
+        if (property == "CharacterSpacing") return controls::Control::CharacterSpacingProperty();
+        if (property == "FontStyle") return controls::Control::FontStyleProperty();
+        return nullptr;
+    }
+    if (!object.try_as<controls::TextBlock>()) return nullptr;
+    if (property == "CharacterSpacing") return controls::TextBlock::CharacterSpacingProperty();
+    if (property == "FontStyle") return controls::TextBlock::FontStyleProperty();
+    if (property == "LineHeight") return controls::TextBlock::LineHeightProperty();
+    if (property == "TextAlignment") return controls::TextBlock::TextAlignmentProperty();
+    if (property == "TextTrimming") return controls::TextBlock::TextTrimmingProperty();
+    return controls::TextBlock::TextWrappingProperty();
+}
+
 }  // namespace
+
+bool IsTextProperty(std::string_view property) {
+    return property == "CharacterSpacing" || property == "LineHeight" || FindTextEnum(property) != nullptr;
+}
+
+std::optional<th::Value> ReadTextProperty(const xaml::DependencyObject& object, std::string_view property) {
+    auto text = object.try_as<controls::TextBlock>();
+    if (property == "CharacterSpacing") {
+        if (auto control = object.try_as<controls::Control>()) {
+            return th::Value{th::ValueKind::Number, std::to_string(control.CharacterSpacing())};
+        }
+        if (text) return th::Value{th::ValueKind::Number, std::to_string(text.CharacterSpacing())};
+        return std::nullopt;
+    }
+    if (property == "LineHeight") {
+        if (text) return th::Value{th::ValueKind::Length, th::FormatNumber(text.LineHeight())};
+        return std::nullopt;
+    }
+    const TextEnum* entry = FindTextEnum(property);
+    std::optional<std::int32_t> member = entry ? ReadTextEnum(object, property) : std::nullopt;
+    if (!member || *member < 0 || *member >= static_cast<std::int32_t>(entry->names.size())) return std::nullopt;
+    std::string_view name = entry->names[static_cast<size_t>(*member)];
+    if (name.empty()) return std::nullopt;
+    return th::Value{th::ValueKind::Keyword, std::string(name)};
+}
+
+bool WriteTextProperty(const xaml::DependencyObject& object, std::string_view property, const th::Value& value) {
+    auto text = object.try_as<controls::TextBlock>();
+    if (property == "CharacterSpacing" && value.kind == th::ValueKind::Number) {
+        auto spacing = static_cast<std::int32_t>(std::lround(std::stod(value.text)));
+        if (auto control = object.try_as<controls::Control>()) {
+            control.CharacterSpacing(spacing);
+            return true;
+        }
+        if (text) text.CharacterSpacing(spacing);
+        return static_cast<bool>(text);
+    }
+    if (property == "LineHeight" && value.kind == th::ValueKind::Length) {
+        double height = ParseLength(value.text);
+        if (!text || !(height >= 0)) return false;  // XAML throws on a negative or NaN height
+        text.LineHeight(height);
+        return true;
+    }
+    const TextEnum* entry = FindTextEnum(property);
+    if (!entry || value.kind != th::ValueKind::Keyword || value.text.empty()) return false;
+    auto member = std::find(entry->names.begin(), entry->names.end(), std::string_view(value.text));
+    if (member == entry->names.end()) return false;
+    return WriteTextEnum(object, property, static_cast<std::int32_t>(member - entry->names.begin()));
+}
 
 // The dependency property behind a theme property on this element, checked in the same order as ReadRaw and WriteRaw.
 // Null for a property that is not one value on the element (a transform, the order, an attached Grid value).
@@ -175,6 +295,8 @@ xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::
             return size ? controls::TextBlock::FontSizeProperty() : family ? controls::TextBlock::FontFamilyProperty()
                                                                            : controls::TextBlock::FontWeightProperty();
         }
+    } else if (IsTextProperty(property)) {
+        return OwnTextProperty(object, property);
     } else if (object.try_as<xaml::FrameworkElement>()) {
         if (property == "Margin") return xaml::FrameworkElement::MarginProperty();
         if (property == "Width") return xaml::FrameworkElement::WidthProperty();
@@ -324,10 +446,60 @@ std::optional<std::uint32_t> ItemPosition(const xaml::DependencyObject& object, 
     auto children = panel.Children();
     std::uint32_t index = 0;
     if (!children.IndexOf(element, index)) return std::nullopt;
-    if (!target) return index;
-    if (*target >= children.Size()) return std::nullopt;
-    children.Move(index, *target);
+    // A ::before or ::after image does not count: the theme's positions are among Apple Music's own children.
+    std::vector<std::uint32_t> own;
+    for (std::uint32_t i = 0; i < children.Size(); i++) {
+        if (!IsDecor(children.GetAt(i))) own.push_back(i);
+    }
+    auto position = static_cast<std::uint32_t>(std::find(own.begin(), own.end(), index) - own.begin());
+    if (!target) return position;
+    if (*target >= own.size()) return std::nullopt;
+    children.Move(index, own[*target]);
     return *target;
+}
+
+namespace {
+
+// The ::before and ::after images carry these names (DecorImageFrom), so the walk and the positions can leave them out.
+constexpr std::wstring_view kDecorPrefix = L"AmpifyDecor";
+
+}  // namespace
+
+bool IsDecor(const xaml::DependencyObject& object) {
+    auto element = object.try_as<xaml::FrameworkElement>();
+    return element && std::wstring_view(element.Name()).starts_with(kDecorPrefix);
+}
+
+bool TakesDecor(const controls::Panel& panel) {
+    return panel && !panel.IsItemsHost() && !panel.try_as<controls::ItemsRepeater>();
+}
+
+// BitmapImage plays an animated GIF in an Image, which an ImageBrush would show still. The image never takes the
+// pointer and stays out of the accessibility tree: it is decoration.
+controls::Image DecorImageFrom(const std::string& text, th::PseudoElement slot) {
+    size_t bar = text.find('|');
+    std::string stretch = bar == std::string::npos ? std::string() : text.substr(bar + 1);
+    media::Imaging::BitmapImage bitmap;
+    bitmap.AutoPlay(true);
+    bitmap.UriSource(winrt::Windows::Foundation::Uri(FileUri(text.substr(0, bar))));
+    controls::Image image;
+    image.Name(slot == th::PseudoElement::Before ? L"AmpifyDecorBefore" : L"AmpifyDecorAfter");
+    image.IsHitTestVisible(false);
+    image.Stretch(stretch == "UniformToFill" ? media::Stretch::UniformToFill
+                  : stretch == "Fill"        ? media::Stretch::Fill
+                                             : media::Stretch::Uniform);
+    xaml::Automation::AutomationProperties::SetAccessibilityView(image, xaml::Automation::Peers::AccessibilityView::Raw);
+    image.Source(bitmap);
+    return image;
+}
+
+bool KeepDecorInPlace(const controls::UIElementCollection& children, const controls::Image& image,
+                      th::PseudoElement slot) {
+    std::uint32_t index = 0;
+    if (!children.IndexOf(image, index)) return false;
+    std::uint32_t wanted = slot == th::PseudoElement::Before ? 0 : children.Size() - 1;
+    if (index != wanted) children.Move(index, wanted);
+    return true;
 }
 
 // True when the key is in the dictionary itself, not only in its merged or theme dictionaries (HasKey looks there too).

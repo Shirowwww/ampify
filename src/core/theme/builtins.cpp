@@ -237,8 +237,10 @@ constexpr std::string_view kFloatingPanels = R"css(
     visibility: collapsed;
 }
 
+/* Apple's line under the bar started at the sidebar panel's edge, a seam against its rounded side. */
 .playbar {
     background: transparent;
+    border-width: 0;
 }
 
 .sidebar {
@@ -436,9 +438,11 @@ bool IsTypeChar(char c) {
     return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '.';
 }
 
-// A class starts a part of a selector: at the start, or after a space or ">".
+// A class starts a part of a selector: at the start, or after a space or a combinator (>, +, ~).
 bool StartsPart(std::string_view selector, size_t at) {
-    return at == 0 || selector[at - 1] == '>' || std::isspace(static_cast<unsigned char>(selector[at - 1]));
+    if (at == 0) return true;
+    char before = selector[at - 1];
+    return before == '>' || before == '+' || before == '~' || std::isspace(static_cast<unsigned char>(before));
 }
 
 }  // namespace
@@ -475,6 +479,11 @@ std::optional<std::vector<std::string>> ExpandClasses(std::string_view selector,
         std::string_view name = selector.substr(i + 1, end - i - 1);
         std::optional<std::vector<std::string>> alternatives = ClassSelectors(name);
 
+        // A class stands for a path of several parts, which :not() cannot hold.
+        if (i > 0 && selector[i - 1] == '(') {
+            return fail("a class cannot go inside :not(): write a type, a #name or a structural pseudo-class, in \"" +
+                        std::string(selector) + "\"");
+        }
         if (!StartsPart(selector, i)) {
             // A dot inside a full type name stays; a known class glued to a type is a mistake worth naming.
             if (alternatives && (end == selector.size() || !IsTypeChar(selector[end]))) {

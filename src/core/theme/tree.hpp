@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "css.hpp"
@@ -69,6 +70,9 @@ struct NodeInfo {
     // In one of Apple's player windows (full screen, mini player), not the main window. Only a selector that names that
     // player's page or view reaches it (see Matches), so the main window's rules do not leak there.
     bool player = false;
+    // A Panel whose Children Ampify may add to (Grid, StackPanel...): not the items host of a list, whose children
+    // the list makes itself. Only a panel takes a ::before or ::after image (SetDecor).
+    bool panel = false;
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";
@@ -80,6 +84,25 @@ inline constexpr std::string_view kArtworkImage = "artwork:";
 
 // The original of a property the element had no value of its own for (TreeBackend::ReadOriginal).
 inline const Value kNoOwnValue{ValueKind::Opaque, "no-own-value"};
+
+// `content` of ::before and ::after: the image of a decor (Decor::image), never a property of an element.
+inline constexpr std::string_view kContentProperty = "Content";
+
+// A decorative image a theme puts into a panel with ::before or ::after and `content: url(...)`.
+struct Decor {
+    std::string image;  // the text of an Image value: absolute path, then "|Fill", "|Uniform" or "|UniformToFill"
+    // The other declarations, XAML name and value in name order (Width, Margin, Grid.Row, Animation...): those
+    // AppliesToDecor accepts (properties.hpp).
+    std::vector<std::pair<std::string, Value>> properties;
+
+    bool operator==(const Decor&) const = default;
+};
+
+enum class DecorChange {
+    Unchanged,  // already in place as asked (or nothing to take off)
+    Applied,    // inserted, changed or taken off
+    Refused,    // the element is gone, is not a panel, or refused the image
+};
 
 // The size of the window's content, in device-independent pixels.
 struct ViewSize {
@@ -143,6 +166,16 @@ public:
     virtual bool SetHover(NodeId id, const std::vector<HoverValue>& values) {
         (void)id;
         return values.empty();
+    }
+
+    // Puts the image of `decor` into the panel `id`, as ::before (first child, behind the others) or ::after (last
+    // child, on top), or takes it off with a null `decor`. One image per panel and place: the same decor again changes
+    // nothing, another one replaces it where it stands. The image never takes the pointer and never appears in
+    // Snapshot, so no selector reaches it. Called on every pass: an image the app took out goes back in.
+    virtual DecorChange SetDecor(NodeId id, PseudoElement slot, const Decor* decor) {
+        (void)id;
+        (void)slot;
+        return decor ? DecorChange::Refused : DecorChange::Unchanged;
     }
 
     // The window's size, for @media rules. Nothing when unknown: those rules then apply nowhere.

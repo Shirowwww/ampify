@@ -284,8 +284,6 @@ std::string Services::StatusJson() {
     return m_status;
 }
 
-std::string Services::remoteStatus() { return StatusJson(); }
-
 uint16_t Services::remotePort() const { return m_remote ? m_remote->port() : 0; }
 
 std::optional<double> Services::Queue(const std::string& action, double db) {

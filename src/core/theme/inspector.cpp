@@ -12,7 +12,7 @@ namespace {
 // The properties worth seeing when choosing a rule. Each one is read with Read(), so an element that lacks it is skipped.
 constexpr const char* kInspectedProperties[] = {
     "Background", "Foreground", "BorderBrush", "CornerRadius", "FontFamily", "FontSize", "FontWeight",
-    "Margin", "Padding", "Width", "Height", "Opacity", "Visibility", "FlowDirection", "HorizontalAlignment",
+    "FontStyle", "CharacterSpacing", "LineHeight", "TextAlignment", "TextTrimming", "TextWrapping", "Margin", "Padding", "Width", "Height", "Opacity", "Visibility", "FlowDirection", "HorizontalAlignment",
     "VerticalAlignment", "Grid.Row", "Grid.Column", "Canvas.ZIndex", "States",
 };
 

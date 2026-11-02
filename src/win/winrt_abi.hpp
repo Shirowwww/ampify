@@ -110,10 +110,6 @@ bool ParseGuid(std::string_view text, GUID& out);
 GUID GuidOf(const char* text);  // for constants known to be well formed; zero when not
 std::string GuidText(const GUID& guid);
 
-// IInspectable::GetIids (slot 3) and GetRuntimeClassName (slot 4).
-std::vector<GUID> Iids(const Ref& inspectable);
-std::string ClassName(const Ref& inspectable);
-
 // ---- Activation ---------------------------------------------------------------------------------------------------
 
 // Tests replace the activation of runtime classes with fakes. With a hook set, only the hook is asked.

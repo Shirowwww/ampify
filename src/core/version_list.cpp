@@ -12,12 +12,6 @@ namespace {
 // A versions.txt is a few lines. A bigger file is not one, and is not read.
 constexpr std::streamsize kMaxFileSize = 64 * 1024;
 
-std::string_view Trim(std::string_view text) {
-    while (!text.empty() && (text.front() == ' ' || text.front() == '\t')) text.remove_prefix(1);
-    while (!text.empty() && (text.back() == ' ' || text.back() == '\t' || text.back() == '\r')) text.remove_suffix(1);
-    return text;
-}
-
 }  // namespace
 
 bool IsPackageVersionText(std::string_view text) {
@@ -46,7 +40,7 @@ std::optional<std::vector<std::string>> ParseVersionList(std::string_view text) 
     while (start <= text.size()) {
         size_t end = text.find('\n', start);
         if (end == std::string_view::npos) end = text.size();
-        std::string_view line = Trim(text.substr(start, end - start));
+        std::string_view line = TrimSpace(text.substr(start, end - start));
         start = end + 1;
 
         if (!header) {

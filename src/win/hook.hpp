@@ -28,7 +28,4 @@ size_t HookImportEverywhere(const char* dll, const char* function, void* replace
 // Full path of the module that holds `address`. Empty when there is none.
 std::string ModuleOf(const void* address);
 
-// Puts back every slot and import entry replaced so far, and forgets them.
-void RestoreHooks();
-
 }  // namespace ampify::win

@@ -211,6 +211,11 @@ void XamlTreeBackend::WriteCaption(const winrt::Microsoft::UI::Windowing::AppWin
 }
 
 xaml::DependencyObject XamlTreeBackend::Resolve(theme::NodeId id) const {
+    // A decor first: its id is the address of a new Image, which may be that of an element of the last snapshot
+    // destroyed since, still listed in m_elements with a dead reference.
+    for (const auto& [key, decor] : m_decors) {
+        if (decor.imageId == id) return decor.image;
+    }
     auto it = m_elements.find(id);
     if (it != m_elements.end()) return it->second.get();  // null when the element has been destroyed since the snapshot
     // An element written to or followed for :hover may be out of the last snapshot and still alive: the entry of a
@@ -395,6 +400,8 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     }
     stack.push_back({content, -1, 0, 0, 1});
     std::set<void*> popupsSeen;  // a popup of the window's tree, reached there first, is not walked twice
+    std::set<theme::NodeId> decorPanels;  // their ::before and ::after images are left out, so no selector meets them
+    for (const auto& [key, decor] : m_decors) decorPanels.insert(key.first);
     int lcdDepth = -1;
     media::ImageSource artwork{nullptr};
     controls::Image artworkImage{nullptr};
@@ -410,6 +417,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         node.type = ShortName(node.fullType);
         if (auto element = item.object.try_as<xaml::FrameworkElement>()) node.name = Utf8(element.Name());
         if (auto text = item.object.try_as<controls::TextBlock>()) node.icon = IsIconText(text.Text());
+        if (auto panel = item.object.try_as<controls::Panel>()) node.panel = TakesDecor(panel);
         node.parent = item.parent;
         node.depth = item.depth;
         node.position = item.position;
@@ -431,8 +439,21 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         if (m_pass) Watch(item.object, node.id, node.type);
 
         int count = media::VisualTreeHelper::GetChildrenCount(item.object);
-        for (int i = count - 1; i >= 0; i--) {
-            stack.push_back({media::VisualTreeHelper::GetChild(item.object, i), index, item.depth + 1, i, count, item.player});
+        if (decorPanels.count(node.id)) {
+            std::vector<xaml::DependencyObject> own;
+            for (int i = 0; i < count; i++) {
+                xaml::DependencyObject child = media::VisualTreeHelper::GetChild(item.object, i);
+                if (!IsDecor(child)) own.push_back(child);
+            }
+            const int shown = static_cast<int>(own.size());
+            for (int i = shown - 1; i >= 0; i--) {
+                stack.push_back({own[i], index, item.depth + 1, i, shown, item.player});
+            }
+        } else {
+            for (int i = count - 1; i >= 0; i--) {
+                stack.push_back(
+                    {media::VisualTreeHelper::GetChild(item.object, i), index, item.depth + 1, i, count, item.player});
+            }
         }
         // A popup's content is not one of its visual children.
         if (popup && count == 0) {
@@ -459,6 +480,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     if (artworkImage) SampleArtwork(artworkImage);
     std::erase_if(m_watched, [](const auto& entry) { return !entry.second.get(); });
     std::erase_if(m_touched, [](const auto& entry) { return !entry.second.get(); });
+    std::erase_if(m_decors, [](const auto& entry) { return !entry.second.panel.get(); });
     for (auto it = m_hoverHandlers.begin(); it != m_hoverHandlers.end();) {
         if (it->second.element.get()) {
             ++it;
@@ -751,6 +773,80 @@ bool XamlTreeBackend::SetDictionary(std::string_view xaml) {
     merged.Append(dictionary);
     m_merged = dictionary;
     return true;
+}
+
+// A panel that refuses a child (a sealed collection, a decode the app refuses) costs only its own image.
+theme::DecorChange XamlTreeBackend::SetDecor(theme::NodeId id, theme::PseudoElement slot, const theme::Decor* decor) {
+    if (*m_closed) return theme::DecorChange::Refused;
+    try {
+        return decor ? PlaceDecor(id, slot, *decor) : RemoveDecor(id, slot);
+    } catch (...) {
+        return theme::DecorChange::Refused;
+    }
+}
+
+// A changed decor gets a new Image where the old one stood (Children.SetAt): no value of the old one (a width the
+// rule no longer gives, a running animation) is left behind, and the panel never holds two.
+theme::DecorChange XamlTreeBackend::PlaceDecor(theme::NodeId id, theme::PseudoElement slot, const theme::Decor& decor) {
+    controls::Panel panel{nullptr};
+    if (xaml::DependencyObject object = Resolve(id)) panel = object.try_as<controls::Panel>();
+    if (!TakesDecor(panel)) return theme::DecorChange::Refused;
+    controls::UIElementCollection children = panel.Children();
+    auto key = std::make_pair(id, slot);
+    auto known = m_decors.find(key);
+    const bool same = known != m_decors.end() && known->second.decor == decor;
+    if (same && KeepDecorInPlace(children, known->second.image, slot)) return theme::DecorChange::Unchanged;
+    controls::Image old{nullptr};  // held until it leaves the panel
+    if (known != m_decors.end()) old = known->second.image;
+    controls::Image image = DecorImageFrom(decor.image, slot);
+    auto imageId = reinterpret_cast<std::uint64_t>(winrt::get_abi(image.as<xaml::DependencyObject>()));
+    m_decors[key] = DecorImage{winrt::make_weak(panel), image, imageId, decor};
+    WriteDecor(imageId, panel, decor);
+    std::uint32_t index = 0;
+    if (old && children.IndexOf(old, index)) {
+        children.SetAt(index, image);
+    } else if (slot == theme::PseudoElement::Before) {
+        children.InsertAt(0, image);
+    } else {
+        children.Append(image);
+    }
+    // In the tree first: the compositor animates an element that has its visual.
+    for (const auto& [property, value] : decor.properties) {
+        if (property == "Animation") WriteRaw(imageId, property, value);
+    }
+    return theme::DecorChange::Applied;
+}
+
+// Size, margin, alignment, cell, opacity, transform: the values AppliesToDecor lets through, written as on any element.
+// Over the whole Grid unless the theme names a row or a column, so the image lies over the panel.
+void XamlTreeBackend::WriteDecor(theme::NodeId imageId, const controls::Panel& panel, const theme::Decor& decor) {
+    bool row = false;
+    bool column = false;
+    for (const auto& [property, value] : decor.properties) {
+        row = row || property == "Grid.Row" || property == "Grid.RowSpan";
+        column = column || property == "Grid.Column" || property == "Grid.ColumnSpan";
+        if (property != "Animation") WriteRaw(imageId, property, value);
+    }
+    auto grid = panel.try_as<controls::Grid>();
+    xaml::FrameworkElement element{nullptr};
+    if (xaml::DependencyObject object = Resolve(imageId)) element = object.try_as<xaml::FrameworkElement>();
+    if (!grid || !element) return;
+    auto span = [](std::uint32_t count) { return std::max<std::int32_t>(1, static_cast<std::int32_t>(count)); };
+    if (!row) controls::Grid::SetRowSpan(element, span(grid.RowDefinitions().Size()));
+    if (!column) controls::Grid::SetColumnSpan(element, span(grid.ColumnDefinitions().Size()));
+}
+
+theme::DecorChange XamlTreeBackend::RemoveDecor(theme::NodeId id, theme::PseudoElement slot) {
+    auto known = m_decors.find(std::make_pair(id, slot));
+    if (known == m_decors.end()) return theme::DecorChange::Unchanged;
+    DecorImage held = std::move(known->second);  // released at the end of this call, on the interface thread
+    m_decors.erase(known);
+    controls::Panel panel = held.panel.get();
+    if (!panel) return theme::DecorChange::Refused;
+    controls::UIElementCollection children = panel.Children();
+    std::uint32_t index = 0;
+    if (children.IndexOf(held.image, index)) children.RemoveAt(index);
+    return theme::DecorChange::Applied;
 }
 
 }  // namespace ampify::win

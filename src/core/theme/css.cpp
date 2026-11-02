@@ -87,6 +87,154 @@ std::optional<Trigger> StateOf(std::string_view pseudo) {
     return std::nullopt;
 }
 
+std::optional<PseudoElement> PseudoElementOf(std::string_view pseudo) {
+    if (pseudo == "before") return PseudoElement::Before;
+    if (pseudo == "after") return PseudoElement::After;
+    return std::nullopt;
+}
+
+// `:nth-child(n)` or `:nth-last-child(n)` from the bracket at `i` into `target`; moves `i` past it. The reason when
+// it cannot be read.
+std::optional<std::string> ReadNthChild(std::string_view s, size_t& i, int& target, const std::string& pseudo,
+                                        const std::string& text) {
+    size_t close = s.find(')', i);
+    if (i >= s.size() || s[i] != '(' || close == std::string_view::npos) {
+        return ":" + pseudo + " needs a number in brackets, like :" + pseudo + "(2), in \"" + text + "\"";
+    }
+    std::string_view digits = s.substr(i + 1, close - i - 1);
+    int n = 0;
+    for (char c : digits) n = (c >= '0' && c <= '9' && n < 10000) ? n * 10 + (c - '0') : -1;
+    if (digits.empty() || n < 1) return ":" + pseudo + " counts from 1, like :" + pseudo + "(2), in \"" + text + "\"";
+    target = n;
+    i = close + 1;
+    return std::nullopt;
+}
+
+// The bracket that closes the one at `open`, brackets inside it included, or npos.
+size_t ClosingBracket(std::string_view s, size_t open) {
+    int depth = 0;
+    for (size_t i = open; i < s.size(); i++) {
+        if (s[i] == '(') depth++;
+        if (s[i] == ')' && --depth == 0) return i;
+    }
+    return std::string_view::npos;
+}
+
+std::optional<std::string> ReadCompound(std::string_view s, size_t& i, Compound& compound, Selector& selector);
+
+// `:not(<part>)` from the bracket at `i`; moves `i` past it. The part is one compound: a type, a #name and structural
+// pseudo-classes, no state and no pseudo-element. The reason when it cannot be read.
+std::optional<std::string> ReadNegation(std::string_view s, size_t& i, Compound& compound, const std::string& text) {
+    size_t close = i < s.size() && s[i] == '(' ? ClosingBracket(s, i) : std::string_view::npos;
+    const std::string shape = ":not() takes one part made of a type, a #name and structural pseudo-classes, like "
+                              ":not(:first-child) or :not(Grid#Bar), in \"" + text + "\"";
+    if (close == std::string_view::npos) return shape;
+    std::string_view inside = TrimSpace(s.substr(i + 1, close - i - 1));
+    if (inside.empty()) return shape;
+
+    Selector scratch;
+    scratch.text = text;
+    Compound negated;
+    size_t at = 0;
+    if (std::optional<std::string> problem = ReadCompound(inside, at, negated, scratch)) return problem;
+    if (at != inside.size() || scratch.trigger != Trigger::Always || scratch.pseudo != PseudoElement::None) return shape;
+    compound.negations.push_back(std::move(negated));
+    i = close + 1;
+    return std::nullopt;
+}
+
+// The structural pseudo-classes, which go on any part. Nothing when `pseudo` is none of them; else the reason it
+// cannot be read, empty when it was.
+std::optional<std::string> ReadStructural(const std::string& pseudo, std::string_view s, size_t& i, Compound& compound,
+                                          const std::string& text) {
+    if (pseudo == "first-child") {
+        compound.nth = 1;
+    } else if (pseudo == "last-child") {
+        compound.last = true;
+    } else if (pseudo == "only-child") {
+        compound.only = true;
+    } else if (pseudo == "nth-child" || pseudo == "nth-last-child") {
+        int& target = pseudo == "nth-child" ? compound.nth : compound.nthLast;
+        return ReadNthChild(s, i, target, pseudo, text).value_or("");
+    } else if (pseudo == "not") {
+        return ReadNegation(s, i, compound, text).value_or("");
+    } else {
+        return std::nullopt;
+    }
+    return std::string();
+}
+
+// One pseudo-class or pseudo-element from the colon at `i`; moves `i` past it. The structural ones go on any part, one
+// state (:hover, :focus, :active) only on the last part (the backend follows the state of the element it styles), and
+// ::before or ::after ends the selector. The reason when it cannot be read.
+std::optional<std::string> ReadPseudo(std::string_view s, size_t& i, Compound& compound, Selector& selector) {
+    const bool element = i + 1 < s.size() && s[i + 1] == ':';
+    size_t start = i + (element ? 2 : 1);
+    i = start;
+    while (i < s.size() && IsNameChar(s[i])) i++;
+    std::string written(s.substr(start, i - start));
+    std::string pseudo = ToLowerAscii(written);
+    if (selector.pseudo != PseudoElement::None) {
+        return "\"" + std::string(PseudoElementName(selector.pseudo)) + "\" must end the selector \"" + selector.text +
+               "\"";
+    }
+    if (std::optional<PseudoElement> decor = PseudoElementOf(pseudo)) {
+        if (selector.trigger != Trigger::Always) {
+            return std::string(TriggerName(selector.trigger)) + " before ::" + pseudo + " is not supported in \"" +
+                   selector.text + "\": a decorative image has no state of its own";
+        }
+        selector.pseudo = *decor;
+        return std::nullopt;
+    }
+    if (element) {
+        return "pseudo-element \"::" + written + "\" is not supported in \"" + selector.text +
+               "\" (::before and ::after are)";
+    }
+    if (std::optional<std::string> structural = ReadStructural(pseudo, s, i, compound, selector.text)) {
+        if (structural->empty()) return std::nullopt;
+        return structural;
+    }
+    if (std::optional<Trigger> state = StateOf(pseudo)) {
+        if (selector.trigger != Trigger::Always) {
+            return "only one of :hover, :focus and :active is allowed in \"" + selector.text + "\"";
+        }
+        selector.trigger = *state;
+        return std::nullopt;
+    }
+    return "pseudo-class \":" + written + "\" is not supported in \"" + selector.text +
+           "\" (:hover, :focus, :active, :first-child, :last-child, :only-child, :nth-child(n), :nth-last-child(n), "
+           ":not(...), ::before and ::after are)";
+}
+
+// One part of a selector from `i`: a type or `*`, a #name, then pseudo-classes. Moves `i` past what it read.
+std::optional<std::string> ReadCompound(std::string_view s, size_t& i, Compound& compound, Selector& selector) {
+    if (i < s.size() && s[i] == '*') {
+        i++;
+    } else {
+        size_t start = i;
+        while (i < s.size() && IsTypeChar(s[i])) i++;
+        compound.type = std::string(s.substr(start, i - start));
+    }
+    if (i < s.size() && s[i] == '#') {
+        i++;
+        size_t start = i;
+        while (i < s.size() && IsNameChar(s[i])) i++;
+        compound.name = std::string(s.substr(start, i - start));
+        if (compound.name.empty()) return "name missing after \"#\" in \"" + selector.text + "\"";
+    }
+    while (i < s.size() && s[i] == ':') {
+        if (std::optional<std::string> reason = ReadPseudo(s, i, compound, selector)) return reason;
+    }
+    return std::nullopt;
+}
+
+std::optional<Combinator> CombinatorOf(char c) {
+    if (c == '>') return Combinator::Child;
+    if (c == '+') return Combinator::Adjacent;
+    if (c == '~') return Combinator::Sibling;
+    return std::nullopt;
+}
+
 std::vector<Declaration> ParseDeclarations(std::string_view body, size_t bodyOffset, const std::string& clean,
                                            std::vector<std::string>& problems) {
     std::vector<Declaration> declarations;
@@ -411,6 +559,15 @@ const char* TriggerName(Trigger trigger) {
     return "";
 }
 
+const char* PseudoElementName(PseudoElement pseudo) {
+    switch (pseudo) {
+        case PseudoElement::Before: return "::before";
+        case PseudoElement::After: return "::after";
+        case PseudoElement::None: break;
+    }
+    return "";
+}
+
 std::optional<Selector> ParseSelector(std::string_view text, std::string* problem) {
     Selector selector;
     selector.text = std::string(TrimSpace(text));
@@ -424,7 +581,7 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
     if (s.empty()) return fail("empty selector");
 
     Combinator pending = Combinator::Descendant;
-    bool sawChild = false;
+    char sawCombinator = 0;  // the combinator read since the last part, waiting for the part after it
     size_t i = 0;
     while (i < s.size()) {
         if (IsSpace(s[i])) {
@@ -433,82 +590,42 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
         }
 
         // A state belongs to the element that receives the declarations: no part may follow it.
+        if (selector.pseudo != PseudoElement::None) {
+            return fail("\"" + std::string(PseudoElementName(selector.pseudo)) + "\" must end the selector \"" +
+                        selector.text + "\"");
+        }
         if (selector.trigger != Trigger::Always) {
             return fail("\"" + std::string(TriggerName(selector.trigger)) + "\" is only allowed on the last element of \"" +
                         selector.text + "\"");
         }
 
-        if (s[i] == '>') {
-            if (selector.parts.empty() || sawChild) return fail("misplaced \">\" in \"" + selector.text + "\"");
-            pending = Combinator::Child;
-            sawChild = true;
+        if (std::optional<Combinator> combinator = CombinatorOf(s[i])) {
+            if (selector.parts.empty() || sawCombinator) {
+                return fail("misplaced \"" + std::string(1, s[i]) + "\" in \"" + selector.text + "\"");
+            }
+            pending = *combinator;
+            sawCombinator = s[i];
             i++;
             continue;
         }
 
         Compound compound;
-        if (s[i] == '*') {
-            i++;
-        } else {
-            size_t start = i;
-            while (i < s.size() && IsTypeChar(s[i])) i++;
-            compound.type = std::string(s.substr(start, i - start));
-        }
-
-        if (i < s.size() && s[i] == '#') {
-            i++;
-            size_t start = i;
-            while (i < s.size() && IsNameChar(s[i])) i++;
-            compound.name = std::string(s.substr(start, i - start));
-            if (compound.name.empty()) return fail("name missing after \"#\" in \"" + selector.text + "\"");
-        }
-
-        // Pseudo-classes: the structural ones on any part, one state (:hover, :focus, :active) only on the last part (the
-        // backend follows the state of the element it styles).
-        while (i < s.size() && s[i] == ':') {
-            size_t start = ++i;
-            while (i < s.size() && IsNameChar(s[i])) i++;
-            std::string pseudo = ToLowerAscii(s.substr(start, i - start));
-            if (pseudo == "first-child") {
-                compound.nth = 1;
-            } else if (pseudo == "last-child") {
-                compound.last = true;
-            } else if (pseudo == "nth-child") {
-                size_t close = s.find(')', i);
-                if (i >= s.size() || s[i] != '(' || close == std::string_view::npos) {
-                    return fail(":nth-child needs a number in brackets, like :nth-child(2), in \"" + selector.text + "\"");
-                }
-                std::string_view digits = s.substr(i + 1, close - i - 1);
-                int n = 0;
-                for (char c : digits) n = (c >= '0' && c <= '9' && n < 10000) ? n * 10 + (c - '0') : -1;
-                if (digits.empty() || n < 1) {
-                    return fail(":nth-child counts from 1, like :nth-child(2), in \"" + selector.text + "\"");
-                }
-                compound.nth = n;
-                i = close + 1;
-            } else if (std::optional<Trigger> state = StateOf(pseudo)) {
-                if (selector.trigger != Trigger::Always) {
-                    return fail("only one of :hover, :focus and :active is allowed in \"" + selector.text + "\"");
-                }
-                selector.trigger = *state;
-            } else {
-                return fail("pseudo-class \":" + std::string(s.substr(start, i - start)) + "\" is not supported in \"" +
-                            selector.text + "\" (:hover, :focus, :active, :nth-child(n), :first-child and :last-child are)");
-            }
-        }
+        if (std::optional<std::string> reason = ReadCompound(s, i, compound, selector)) return fail(*reason);
 
         // Nothing was read (for example a stray `@`): the check below reports it, so the loop always advances.
-        if (i < s.size() && !IsSpace(s[i]) && s[i] != '>') {
+        if (i < s.size() && !IsSpace(s[i]) && !CombinatorOf(s[i])) {
             return fail("character \"" + std::string(1, s[i]) + "\" is not supported in \"" + selector.text + "\"");
         }
 
         compound.combinator = selector.parts.empty() ? Combinator::Descendant : pending;
         selector.parts.push_back(std::move(compound));
         pending = Combinator::Descendant;
-        sawChild = false;
+        sawCombinator = 0;
     }
 
-    if (sawChild) return fail("\">\" has no element after it in \"" + selector.text + "\"");
+    if (sawCombinator) {
+        return fail("\"" + std::string(1, sawCombinator) + "\" has no element after it in \"" + selector.text + "\"");
+    }
     return selector;
 }
 

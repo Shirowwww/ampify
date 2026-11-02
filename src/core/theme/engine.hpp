@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -27,6 +28,10 @@ namespace ampify::theme {
 // them while the pointer is over the element; the engine remembers what it gave, so it calls the backend only when
 // that changes, and takes every hover off in Restore (the backend then stops following the pointer).
 //
+// The ::before and ::after rules make a decorative image per panel (TreeBackend::SetDecor). The engine asks for it on
+// every pass, so the backend can put it back if the app emptied the panel, and takes it off when the rule goes or the
+// theme comes off.
+//
 // Must run on the interface thread, like the backend it drives.
 class ThemeEngine {
 public:
@@ -52,7 +57,7 @@ public:
 
     bool Active() const { return m_active; }
     size_t OriginalCount() const {
-        return m_originals.size() + m_resourceOriginals.size() + m_moves.size() + m_hovers.size();
+        return m_originals.size() + m_resourceOriginals.size() + m_moves.size() + m_hovers.size() + m_decors.size();
     }
 
 private:
@@ -71,12 +76,19 @@ private:
     };
     void ApplyMoves(std::vector<PendingMove>& pending, TreeBackend& tree, Report& report);
     bool WriteValue(const NodeInfo& node, const Assignment& assignment, TreeBackend& tree, Report& report, bool keep);
-    std::optional<Value> Resolve(NodeId id, const std::string& property, const Value& value, const Value& current);
+    std::optional<Value> Resolve(NodeId id, const std::string& property, const Value& value, const Value& current,
+                                 TreeBackend& tree);
     // The winning declaration of each state and property of an element (:hover, :focus, :active).
     using StateWinners = std::map<std::pair<Trigger, std::string>, const Assignment*>;
     void ApplyHover(const NodeInfo& node, const StateWinners& winners, TreeBackend& tree, Report& report);
     void GiveBack(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners, TreeBackend& tree,
                   Report& report);
+    // The winning declaration of each ::before and ::after property of an element.
+    using DecorWinners = std::map<std::pair<PseudoElement, std::string>, const Assignment*>;
+    void ApplyDecors(const NodeInfo& node, const DecorWinners& winners, TreeBackend& tree, Report& report);
+    void PlaceDecor(const NodeInfo& node, PseudoElement slot, const Decor& decor, const Assignment& content,
+                    TreeBackend& tree, Report& report);
+    void ForgetDecors(const std::function<bool(NodeId)>& kept, TreeBackend& tree);
 
     Journal& m_journal;
     std::map<std::pair<NodeId, std::string>, Value> m_originals;  // element and XAML property, first value seen
@@ -85,6 +97,7 @@ private:
     std::map<std::string, Value> m_resourceOriginals;             // resource key, first value seen
     std::vector<Move> m_moves;  // every change of position, in the order made
     std::map<NodeId, std::vector<HoverValue>> m_hovers;  // the state values the backend holds for each element
+    std::map<std::pair<NodeId, PseudoElement>, Decor> m_decors;  // the ::before and ::after images in each panel
     std::string m_dictionary;  // the resource dictionary currently merged, empty when none
     std::set<std::string> m_reported;  // refusals already written to the log, so a timer does not repeat them
     bool m_active = false;

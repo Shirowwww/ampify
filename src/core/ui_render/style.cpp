@@ -4,24 +4,20 @@
 #include <string>
 #include <vector>
 
+#include "../text_util.hpp"
+
 namespace ampify::uirender {
 
 namespace {
 
 constexpr std::size_t kMaxTransitionParts = 4;
 
-std::string_view Trim(std::string_view text) {
-    while (!text.empty() && (text.front() == ' ' || text.front() == '\t')) text.remove_prefix(1);
-    while (!text.empty() && (text.back() == ' ' || text.back() == '\t')) text.remove_suffix(1);
-    return text;
-}
-
 std::vector<std::string_view> Split(std::string_view text, char separator) {
     std::vector<std::string_view> parts;
     std::size_t start = 0;
     while (true) {
         std::size_t at = text.find(separator, start);
-        parts.push_back(Trim(text.substr(start, at == std::string_view::npos ? std::string_view::npos : at - start)));
+        parts.push_back(TrimSpace(text.substr(start, at == std::string_view::npos ? std::string_view::npos : at - start)));
         if (at == std::string_view::npos) return parts;
         start = at + 1;
     }
@@ -78,7 +74,7 @@ std::optional<Rgba> ParseColor(std::string_view text) {
 }
 
 std::optional<Background> ParseBackground(std::string_view text) {
-    text = Trim(text);
+    text = TrimSpace(text);
     Background background;
     if (text == "acrylic") {
         background.acrylic = true;
@@ -126,7 +122,7 @@ std::optional<Edges> ParsePadding(const Json& value) {
 }
 
 std::optional<Transitions> ParseTransition(std::string_view text) {
-    text = Trim(text);
+    text = TrimSpace(text);
     Transitions transitions;
     if (text == "none") return transitions;
     std::vector<std::string_view> parts = Split(text, ',');
@@ -135,7 +131,7 @@ std::optional<Transitions> ParseTransition(std::string_view text) {
         std::size_t space = part.find(' ');
         if (space == std::string_view::npos) return std::nullopt;
         std::string_view name = part.substr(0, space);
-        std::optional<double> ms = Duration(Trim(part.substr(space + 1)));
+        std::optional<double> ms = Duration(TrimSpace(part.substr(space + 1)));
         if (!ms || *ms > kMaxTransitionMs) return std::nullopt;
         if (name == "opacity" || name == "all") transitions.opacityMs = *ms;
         if (name == "scale" || name == "all") transitions.scaleMs = *ms;

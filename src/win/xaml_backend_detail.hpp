@@ -41,6 +41,11 @@ std::vector<std::string> Split(const std::string& text, char separator);
 std::string FractionText(double number);
 std::string ThicknessText(const xaml::Thickness& value);
 xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::string_view property);
+// CharacterSpacing, FontStyle, LineHeight, TextAlignment, TextTrimming and TextWrapping: read and written by
+// ReadTextProperty and WriteTextProperty, on a TextBlock (CharacterSpacing and FontStyle on a Control too).
+bool IsTextProperty(std::string_view property);
+std::optional<th::Value> ReadTextProperty(const xaml::DependencyObject& object, std::string_view property);
+bool WriteTextProperty(const xaml::DependencyObject& object, std::string_view property, const th::Value& value);
 // SelectedBackground, SelectedPointerOverBackground or SelectedPressedBackground: a list row's selection colours.
 inline bool IsSelectionBrush(std::string_view property) {
     return property == "SelectedBackground" || property == "SelectedPointerOverBackground" ||
@@ -59,6 +64,16 @@ std::string AlignmentText(xaml::VerticalAlignment value);
 double ParseLength(const std::string& text);
 std::string ShortName(const std::string& fullType);
 std::optional<std::uint32_t> ItemPosition(const xaml::DependencyObject& object, std::optional<std::uint32_t> target);
+// A ::before or ::after image of a theme (named AmpifyDecorBefore or AmpifyDecorAfter), which Snapshot and the Order
+// positions leave out.
+bool IsDecor(const xaml::DependencyObject& object);
+// A panel whose Children Ampify may add to: not the items host of a list, nor an ItemsRepeater.
+bool TakesDecor(const controls::Panel& panel);
+// The Image of a decor from "path|Stretch" (theme::Decor::image), named for its place.
+controls::Image DecorImageFrom(const std::string& text, th::PseudoElement slot);
+// True when the image is still in the panel, moved back first or last if the app's children moved around it.
+bool KeepDecorInPlace(const controls::UIElementCollection& children, const controls::Image& image,
+                      th::PseudoElement slot);
 bool OwnsKey(const xaml::ResourceDictionary& resources, const IInspectable& name);
 std::string DescribeStates(const xaml::FrameworkElement& element);
 void ReadThemeAgain(const xaml::FrameworkElement& element);

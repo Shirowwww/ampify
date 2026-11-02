@@ -2,17 +2,13 @@
 
 #include <algorithm>
 
+#include "text_util.hpp"
+
 namespace ampify {
 
 namespace {
 
 constexpr std::string_view kAppPrefix = "app:";
-
-std::string_view Trim(std::string_view text) {
-    while (!text.empty() && (text.front() == ' ' || text.front() == '\t' || text.front() == '\r')) text.remove_prefix(1);
-    while (!text.empty() && (text.back() == ' ' || text.back() == '\t' || text.back() == '\r')) text.remove_suffix(1);
-    return text;
-}
 
 bool IsIdText(std::string_view id) {
     if (id.empty() || id.size() > 40 || id.front() == '-') return false;
@@ -22,7 +18,7 @@ bool IsIdText(std::string_view id) {
 }
 
 std::optional<ReloadRequest> ParseLine(std::string_view line) {
-    line = Trim(line);
+    line = TrimSpace(line);
     if (line == "rescan") return ReloadRequest{ReloadRequest::Action::Rescan, ""};
 
     static const std::pair<std::string_view, ReloadRequest::Action> kVerbs[] = {
@@ -32,7 +28,7 @@ std::optional<ReloadRequest> ParseLine(std::string_view line) {
     };
     for (const auto& [verb, action] : kVerbs) {
         if (line.substr(0, verb.size()) != verb) continue;
-        std::string_view target = Trim(line.substr(verb.size()));
+        std::string_view target = TrimSpace(line.substr(verb.size()));
         if (!IsReloadTarget(target)) return std::nullopt;
         return ReloadRequest{action, std::string(target)};
     }

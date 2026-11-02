@@ -92,7 +92,6 @@ public:
     uint16_t remotePort() const;
     bool trayRunning() const;
     bool midiOpen() const;
-    std::string remoteStatus();
 
     // Commands of the kit's own items in the icon menu.
     static constexpr unsigned kTrayPrevious = 1;

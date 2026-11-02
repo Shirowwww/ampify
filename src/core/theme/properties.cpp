@@ -12,7 +12,7 @@ namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 41> kProperties{{
+constexpr std::array<PropertySpec, 49> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
@@ -28,6 +28,12 @@ constexpr std::array<PropertySpec, 41> kProperties{{
     {"font-family", "FontFamily", PropertyKind::Text},
     {"font-size", "FontSize", PropertyKind::Length},
     {"font-weight", "FontWeight", PropertyKind::Number},
+    {"font-style", "FontStyle", PropertyKind::Keyword},
+    {"letter-spacing", "CharacterSpacing", PropertyKind::LetterSpacing},
+    {"line-height", "LineHeight", PropertyKind::LineHeight},
+    {"text-align", "TextAlignment", PropertyKind::Keyword},
+    {"text-overflow", "TextTrimming", PropertyKind::Keyword},
+    {"white-space", "TextWrapping", PropertyKind::Keyword},
     {"margin", "Margin", PropertyKind::Thickness},
     {"padding", "Padding", PropertyKind::Thickness},
     {"width", "Width", PropertyKind::Length},
@@ -39,6 +45,7 @@ constexpr std::array<PropertySpec, 41> kProperties{{
     {"compact-pane-length", "CompactPaneLength", PropertyKind::Length},  // NavigationView, the folded sidebar
     {"opacity", "Opacity", PropertyKind::Number},
     {"visibility", "Visibility", PropertyKind::Visibility},
+    {"display", "Visibility", PropertyKind::Visibility},  // so the `display: none` of Spicetify snippets works
     {"template", "Template", PropertyKind::Template},
     {"flow-direction", "FlowDirection", PropertyKind::FlowDirection},
     {"direction", "FlowDirection", PropertyKind::FlowDirection},
@@ -55,7 +62,96 @@ constexpr std::array<PropertySpec, 41> kProperties{{
     {"box-shadow", "Shadow", PropertyKind::Shadow},
     {"transition", "Transition", PropertyKind::Transition},
     {"animation", "Animation", PropertyKind::Animation},
+    {"content", kContentProperty, PropertyKind::Content},  // ::before and ::after only
 }};
+
+// What a decorative Image takes (AppliesToDecor). Image has no CornerRadius, Padding or brush of its own.
+constexpr std::array<std::string_view, 20> kDecorProperties{
+    kContentProperty, "Width", "Height", "MinWidth", "MaxWidth", "MinHeight", "MaxHeight", "Margin", "Opacity",
+    "Visibility", "HorizontalAlignment", "VerticalAlignment", "Grid.Row", "Grid.Column", "Grid.RowSpan",
+    "Grid.ColumnSpan", "Canvas.ZIndex", "RenderTransform", "RenderTransformOrigin", "Animation",
+};
+
+// The images BitmapImage decodes. An animated GIF plays; SVG needs another source type, so it is refused.
+constexpr std::array<std::string_view, 7> kDecorImageTypes{".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".ico"};
+
+// The words of the Keyword properties and the XAML member each one becomes. XAML aligns `Left` to the start of the
+// line (TextAlignment.Start is the same member), so `start` is `Left` and `end` is `Right`.
+struct KeywordSpec {
+    std::string_view css;
+    std::string_view word;
+    std::string_view xaml;
+};
+
+constexpr std::array<KeywordSpec, 13> kKeywords{{
+    {"text-align", "left", "Left"},
+    {"text-align", "start", "Left"},
+    {"text-align", "center", "Center"},
+    {"text-align", "right", "Right"},
+    {"text-align", "end", "Right"},
+    {"text-align", "justify", "Justify"},
+    {"font-style", "normal", "Normal"},
+    {"font-style", "italic", "Italic"},
+    {"font-style", "oblique", "Oblique"},
+    {"text-overflow", "ellipsis", "CharacterEllipsis"},
+    {"text-overflow", "clip", "None"},
+    {"white-space", "nowrap", "NoWrap"},
+    {"white-space", "normal", "Wrap"},
+}};
+
+// The values of `display` that show an element: XAML has no layout modes to switch, only Visible and Collapsed.
+constexpr std::array<std::string_view, 11> kShownDisplays{
+    "block", "inline", "inline-block", "flex", "inline-flex", "grid", "inline-grid", "flow-root", "contents",
+    "list-item", "table",
+};
+
+constexpr std::string_view kNotInXaml = "not available in Apple Music's XAML";
+
+struct PropertyAdvice {
+    std::string_view css;
+    std::string_view advice;
+};
+
+// What Spicetify themes write most that has no property of the same name here (PropertyHint).
+constexpr std::array<PropertyAdvice, 32> kAdvice{{
+    {"background-color", "use background"},
+    {"background-image", "use background: url(images/file.png)"},
+    {"backdrop-filter", "use backdrop: acrylic(tint, opacity)"},
+    {"-webkit-backdrop-filter", "use backdrop: acrylic(tint, opacity)"},
+    {"justify-content", "use horizontal-alignment on the children"},
+    {"align-items", "use vertical-alignment on the children"},
+    {"align-content", "use vertical-alignment on the children"},
+    {"justify-self", "use horizontal-alignment"},
+    {"align-self", "use vertical-alignment"},
+    {"gap", "use margin on the children"},
+    {"row-gap", "use margin on the children"},
+    {"column-gap", "use margin on the children"},
+    {"border", "use border-width and border-color"},
+    {"outline", "use border-width and border-color"},
+    {"font", "use font-family, font-size and font-weight, or font-role"},
+    {"fill", "use color"},
+    {"position", "not available: use margin, transform: translate(...) or grid-row and grid-column"},
+    {"top", "not available: use margin or transform: translate(...)"},
+    {"left", "not available: use margin or transform: translate(...)"},
+    {"right", "not available: use margin or transform: translate(...)"},
+    {"bottom", "not available: use margin or transform: translate(...)"},
+    {"text-transform", "not available: XAML's TextBlock has no letter case"},
+    {"text-shadow", "not available: box-shadow gives an element a depth shadow"},
+    {"filter", kNotInXaml},
+    {"pointer-events", kNotInXaml},
+    {"cursor", kNotInXaml},
+    {"overflow", kNotInXaml},
+    {"overflow-x", kNotInXaml},
+    {"overflow-y", kNotInXaml},
+    {"user-select", kNotInXaml},
+    {"mix-blend-mode", kNotInXaml},
+    {"clip-path", kNotInXaml},
+}};
+
+// Letter spacing and line height beyond these are typing mistakes, and would overflow XAML's whole number.
+constexpr double kMaxSpacingEm = 10;
+constexpr double kMaxSpacingPx = 200;
+constexpr double kMaxLineFactor = 10;
 
 Conversion Fail(std::string problem) {
     return {std::nullopt, std::move(problem)};
@@ -390,7 +486,18 @@ Conversion ConvertThickness(std::string_view raw, bool allowNegative) {
     return Ok(ValueKind::Thickness, left + "," + top + "," + right + "," + bottom);
 }
 
-Conversion ConvertVisibility(std::string_view raw) {
+Conversion ConvertDisplay(std::string_view raw) {
+    std::string value = ToLowerAscii(TrimSpace(raw));
+    if (value == "none") return Ok(ValueKind::Visibility, "Collapsed");
+    if (std::find(kShownDisplays.begin(), kShownDisplays.end(), value) != kShownDisplays.end()) {
+        return Ok(ValueKind::Visibility, "Visible");
+    }
+    return Fail("unknown display: \"" + std::string(TrimSpace(raw)) +
+                "\" (none hides the element; block, flex, grid and the like show it)");
+}
+
+Conversion ConvertVisibility(const PropertySpec& spec, std::string_view raw) {
+    if (spec.css == "display") return ConvertDisplay(raw);
     std::string value = ToLowerAscii(TrimSpace(raw));
     if (value == "visible") return Ok(ValueKind::Visibility, "Visible");
     if (value == "collapsed" || value == "hidden" || value == "none") return Ok(ValueKind::Visibility, "Collapsed");
@@ -409,6 +516,58 @@ Conversion ConvertNumber(const PropertySpec& spec, std::string_view raw) {
     if (spec.css == "opacity" && (*number < 0 || *number > 1)) return Fail("opacity outside 0 to 1");
     if (spec.css == "font-weight" && (*number < 1 || *number > 1000)) return Fail("weight outside 1 to 1000");
     return Ok(ValueKind::Number, FormatNumber(*number));
+}
+
+// One word of the property's list in kKeywords, as the XAML member it stands for.
+Conversion ConvertKeyword(const PropertySpec& spec, std::string_view raw) {
+    std::string value = ToLowerAscii(TrimSpace(raw));
+    std::string words;
+    for (const KeywordSpec& keyword : kKeywords) {
+        if (keyword.css != spec.css) continue;
+        if (keyword.word == value) return Ok(ValueKind::Keyword, std::string(keyword.xaml));
+        words += (words.empty() ? "" : ", ") + std::string(keyword.word);
+    }
+    return Fail("unknown " + std::string(spec.css) + ": \"" + std::string(TrimSpace(raw)) + "\" (" + words + ")");
+}
+
+// The number before a unit of `text` (lower case), when it ends with that unit. `em` is not the end of `rem`.
+std::optional<double> NumberWithUnit(std::string_view text, std::string_view unit) {
+    if (!text.ends_with(unit) || (unit == "em" && text.ends_with("rem"))) return std::nullopt;
+    return ParseNumber(TrimSpace(text.substr(0, text.size() - unit.size())));
+}
+
+// XAML's CharacterSpacing counts thousandths of an em: an em converts here, pixels once the engine knows the element's
+// font size (ApplyFontSize).
+Conversion ConvertLetterSpacing(std::string_view raw) {
+    std::string value = ToLowerAscii(TrimSpace(raw));
+    if (value == "normal" || value == "0") return Ok(ValueKind::Number, "0");
+    if (std::optional<double> em = NumberWithUnit(value, "em"); em && std::abs(*em) <= kMaxSpacingEm) {
+        return Ok(ValueKind::Number, std::to_string(std::lround(*em * 1000)));
+    }
+    if (std::optional<double> px = NumberWithUnit(value, "px"); px && std::abs(*px) <= kMaxSpacingPx) {
+        return Ok(ValueKind::Number, FormatNumber(*px) + "px");
+    }
+    return Fail("unreadable letter spacing: \"" + std::string(TrimSpace(raw)) +
+                "\" (in em, like 0.05em, or px, like 1px, up to 10em or 200px)");
+}
+
+// XAML's LineHeight is in pixels, 0 for the font's own spacing. A plain number, a percentage or an em is a factor of
+// the font size, as in CSS: kept as "1.5em" until the engine knows that size (ApplyFontSize).
+Conversion ConvertLineHeight(std::string_view raw) {
+    std::string value = ToLowerAscii(TrimSpace(raw));
+    if (value == "normal") return Ok(ValueKind::Length, "0");
+    if (std::optional<double> px = NumberWithUnit(value, "px")) {
+        if (*px < 0) return Fail("negative line height: \"" + std::string(TrimSpace(raw)) + "\"");
+        return Ok(ValueKind::Length, FormatNumber(*px));
+    }
+    std::optional<double> factor = ParsePercent(value);
+    if (!factor) factor = NumberWithUnit(value, "em");
+    if (!factor) factor = ParseNumber(value);
+    if (!factor || !(*factor > 0 && *factor <= kMaxLineFactor)) {
+        return Fail("unreadable line height: \"" + std::string(TrimSpace(raw)) +
+                    "\" (pixels like 20px, or a factor of the font size above 0 and up to 10, like 1.5 or 150%)");
+    }
+    return Ok(ValueKind::Length, FormatNumber(std::round(*factor * 10000) / 10000) + "em");
 }
 
 // url(fonts/file.ttf#Family Name): a font shipped in the theme folder. The value is the file URI and the family, as
@@ -642,6 +801,26 @@ Conversion ConvertTransition(std::string_view raw) {
     return Ok(ValueKind::Transition, text);
 }
 
+// `content` of ::before or ::after: an image of the theme folder, as for a background, or none. Text, counters and
+// remote addresses are not offered: the decor is an Image element.
+Conversion ConvertContent(std::string_view raw, const ValueContext& context) {
+    std::string_view text = TrimSpace(raw);
+    std::string lowered = ToLowerAscii(text);
+    if (lowered == "none" || lowered == "normal") return Ok(ValueKind::Image, "");
+    if (!lowered.starts_with("url(")) {
+        return Fail("content takes url(image) or none: text is not supported (\"" + std::string(text) + "\")");
+    }
+    Conversion image = ConvertImage(text, context);
+    if (!image.value) return image;
+    std::string path = image.value->text.substr(0, image.value->text.find('|'));
+    size_t dot = path.find_last_of("./");
+    std::string extension = dot == std::string::npos || path[dot] != '.' ? std::string() : ToLowerAscii(path.substr(dot));
+    if (std::find(kDecorImageTypes.begin(), kDecorImageTypes.end(), extension) == kDecorImageTypes.end()) {
+        return Fail("unsupported image for content: " + path + " (png, jpg, gif, bmp, webp or ico)");
+    }
+    return image;
+}
+
 Conversion ConvertTemplate(std::string_view raw, const ValueContext& context) {
     std::optional<std::string> path = UrlArgument(raw);
     if (!path) return Fail("a template is written url(file.xaml)");
@@ -667,6 +846,18 @@ const PropertySpec* FindProperty(std::string_view css) {
     return nullptr;
 }
 
+std::string_view PropertyHint(std::string_view css) {
+    std::string key = ToLowerAscii(TrimSpace(css));
+    for (const PropertyAdvice& advice : kAdvice) {
+        if (advice.css == key) return advice.advice;
+    }
+    return {};
+}
+
+bool AppliesToDecor(std::string_view xaml) {
+    return std::find(kDecorProperties.begin(), kDecorProperties.end(), xaml) != kDecorProperties.end();
+}
+
 Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const ValueContext& context) {
     switch (spec.kind) {
         case PropertyKind::Brush:
@@ -682,9 +873,15 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
         case PropertyKind::Thickness:
             return ConvertThickness(raw, spec.xaml == "Margin");
         case PropertyKind::Visibility:
-            return ConvertVisibility(raw);
+            return ConvertVisibility(spec, raw);
         case PropertyKind::Number:
             return ConvertNumber(spec, raw);
+        case PropertyKind::Keyword:
+            return ConvertKeyword(spec, raw);
+        case PropertyKind::LetterSpacing:
+            return ConvertLetterSpacing(raw);
+        case PropertyKind::LineHeight:
+            return ConvertLineHeight(raw);
         case PropertyKind::Text:
             return ConvertText(raw, context);
         case PropertyKind::Template:
@@ -712,6 +909,8 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
             if (!text) return Fail(problem);
             return Ok(ValueKind::Animation, std::move(*text));
         }
+        case PropertyKind::Content:
+            return ConvertContent(raw, context);
     }
     return Fail("unknown property type");
 }
@@ -746,6 +945,22 @@ std::optional<Value> ScaleFontSize(const Value& relative, const Value& size) {
     std::optional<double> pixels = ParseNumber(size.text);
     if (!IsRelativeSize(relative) || !factor || !pixels || !(*pixels > 0)) return std::nullopt;
     return Value{ValueKind::Length, FormatNumber(std::round(*pixels * *factor * 100) / 100)};
+}
+
+bool NeedsFontSize(const Value& value) {
+    return (value.kind == ValueKind::Number && value.text.ends_with("px")) ||
+           (value.kind == ValueKind::Length && value.text.ends_with("em"));
+}
+
+std::optional<Value> ApplyFontSize(const Value& value, const Value& fontSize) {
+    std::optional<double> size = ParseNumber(fontSize.text);
+    if (!NeedsFontSize(value) || !size || !(*size > 0)) return std::nullopt;
+    std::optional<double> amount = ParseNumber(std::string_view(value.text).substr(0, value.text.size() - 2));
+    if (!amount) return std::nullopt;
+    if (value.kind == ValueKind::Number) {
+        return Value{ValueKind::Number, std::to_string(std::lround(*amount / *size * 1000))};  // thousandths of an em
+    }
+    return Value{ValueKind::Length, FormatNumber(std::round(*size * *amount * 100) / 100)};
 }
 
 bool SameValue(const Value& a, const Value& b) {

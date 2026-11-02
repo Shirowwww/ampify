@@ -111,18 +111,26 @@ Grid#Bar > TextBlock {
 | `*` | Every element |
 | `A B` | A `B` anywhere inside an `A` |
 | `A > B` | A `B` whose direct parent is an `A` |
+| `A + B` | A `B` that comes right after an `A`, both children of the same parent |
+| `A ~ B` | A `B` that comes anywhere after an `A`, both children of the same parent |
 | `A:hover` | An `A`, while the pointer is over it (see "Hover, press and focus") |
 | `A:active` | An `A`, while it is pressed |
 | `A:focus`, `A:focus-within` | An `A`, while the keyboard focus is on it or on one of its parts |
 | `A:nth-child(2)` | An `A` that is the second child of its parent (counting from 1) |
 | `A:first-child`, `A:last-child` | An `A` that is the first, or the last, child of its parent |
+| `A:nth-last-child(2)` | An `A` that is the second child of its parent, counting from the end |
+| `A:only-child` | An `A` that is the only child of its parent |
+| `A:not(B)` | An `A` that does not match `B`: one part made of a type, a `#name` and the pseudo-classes above, such as `:not(:last-child)` or `:not(Grid#Bar)` |
 | `.sidebar`, `.card`... | A stable name for a zone of Apple Music (see [names.md](names.md)) |
+| `A::before`, `A::after` | A decorative image put into `A`, behind or on top of its children (see "Decorative images") |
 
 You can combine them: `Grid#Bar > TextBlock`, `Grid#TransportBar Button:hover`,
 `Grid#TransportBar > Grid:nth-child(2)`. The structural pseudo-classes reach the many elements Apple Music leaves
 unnamed; they count every child of the parent, whatever its type. `:hover`, `:active` and `:focus` go only on the last
-element of the selector, one of the three per selector (`Button:active:nth-child(2)` is fine). Attributes (`[x=y]`) and
-other pseudo-classes (`:checked`...) are not supported. A rule that contains one is ignored, with a line in the log.
+element of the selector, one of the three per selector (`Button:active:nth-child(2)` is fine). `:not()` takes no state,
+no `::before` or `::after`, no combinator and no class (a class stands for a path of several elements). Attributes
+(`[x=y]`), the `An+B` forms of `:nth-child` (`odd`, `2n+1`) and other pseudo-classes (`:checked`...) are not supported.
+A rule that contains one is ignored, with a line in the log.
 
 ### Priority
 
@@ -241,6 +249,12 @@ during live editing.
 | `font-family` | `FontFamily` | A font name, quoted or not, or `url(fonts/file.ttf#Name)` (see "Theme fonts") |
 | `font-size` | `FontSize` | Number, `px` optional; or relative to the element's own size, `120%` or `1.2em`, so titles stay above body text |
 | `font-weight` | `FontWeight` | `normal`, `bold`, or a number from 1 to 1000 |
+| `font-style` | `FontStyle` | `normal`, `italic` or `oblique` |
+| `letter-spacing` | `CharacterSpacing` | `normal`, em (`0.05em`) or pixels (`1px`), up to 10em or 200px. XAML counts in thousandths of an em: `0.05em` is 50, and pixels are converted with the element's font size |
+| `line-height` | `LineHeight` (text) | `normal`, pixels (`20px`), or a factor of the font size: `1.5`, `150%` or `1.5em`, up to 10 |
+| `text-align` | `TextAlignment` (text) | `left`, `center`, `right`, `justify`, `start` (same as `left`) or `end` (same as `right`). XAML aligns `left` to the start of the line, so it follows a right-to-left layout |
+| `text-overflow` | `TextTrimming` (text) | `ellipsis` (cut with "…") or `clip` |
+| `white-space` | `TextWrapping` (text) | `nowrap` (one line) or `normal` (wraps) |
 | `margin` | `Margin` | 1 to 4 lengths, negative ones allowed |
 | `padding` | `Padding` | 1 to 4 lengths, none negative |
 | `width`, `height` | `Width`, `Height` | A length or `auto` |
@@ -249,6 +263,7 @@ during live editing.
 | `compact-pane-length` | `CompactPaneLength` | On `.navigation`: the width of the sidebar folded into icons (48 in Apple Music) |
 | `opacity` | `Opacity` | A number from 0 to 1 |
 | `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`) |
+| `display` | `Visibility` | `none` hides the element (`Collapsed`); `block`, `flex`, `grid`, `inline` and the other layout modes show it (`Visible`), even an element Apple Music hides itself: write them only to undo a `display: none`. XAML has no layout modes to switch |
 | `template` | `Template` | `url(templates/file.xaml)`, a full `ControlTemplate`. Not applied to a control whose padding or border is negative (Apple Music's search box buttons): WinUI would stop the app |
 | `flow-direction` or `direction` | `FlowDirection` | `ltr` (left to right) or `rtl` (right to left); `left-to-right` and `right-to-left` also work |
 | `order` | Position (Ampify only) | An integer from 0: the place of the element among its parent's children |
@@ -263,9 +278,20 @@ during live editing.
 | `transition` | `OpacityTransition`, `BackgroundTransition`, `ScaleTransition`... | `<property> <duration>, ...` for `transform`, `opacity`, `background` or `all`, or `none` (see "Transitions") |
 | `animation` | Composition animations of `Opacity`, `Scale`, `Rotation`, `Translation` | `<name> <duration> [easing] [delay] [count] [direction] [fill], ...` running a `@keyframes` block, or `none` (see "Animations") |
 | `font-role` | `FontFamily`, `FontWeight`, `FontSize` | A font role, for example `title` (see "Font roles") |
+| `content` | The image of `::before` or `::after` | `url(images/file.gif) [cover\|contain\|fill]` or `none` (see "Decorative images") |
 
 A property that does not exist on an element is refused without harm. The log reports it once. Like all others, these
 properties return to their original value when the theme is removed.
+
+The properties marked "(text)" exist on a `TextBlock` only; `font-style` and `letter-spacing` also on a control, which
+passes them to its text. A `letter-spacing` in pixels and a `line-height` factor are measured against the element's font
+size when they are written, the theme's own size included; an element without one refuses them.
+
+A property Ampify does not know is ignored, and the problem names what to write instead when there is something:
+`background-color` → `background`, `backdrop-filter` → `backdrop: acrylic(...)`, `justify-content` and `align-items` →
+`horizontal-alignment` and `vertical-alignment` on the children, `gap` → `margin` on the children, `border` →
+`border-width` and `border-color`. `filter`, `pointer-events`, `cursor`, `overflow`, `user-select`, `mix-blend-mode`
+and `clip-path` have no equivalent in Apple Music's XAML, and `text-transform` none on its texts.
 
 ### Gradients and images
 
@@ -334,6 +360,53 @@ Ampify reads the colours of that artwork and gives them as variables, so a theme
 Before the first artwork is read the variables do not exist: give each `var()` a fallback. A theme or snippet whose
 `user.css` names `--art-` is applied again when the song changes (within 3 seconds); the others are not. Example:
 the `art-tint` setting of `themes/artwork`.
+
+### Decorative images
+
+`::before` and `::after` add an image of the theme folder to a panel, as Spicetify themes do with `content: url(...)`.
+An animated GIF plays (a `background: url()` shows only its first frame).
+
+```css
+/* A small equalizer at the right end of the song's display, behind its text. */
+.lcd::before {
+    content: url("images/dance.gif");
+    width: 36px;
+    height: 36px;
+    horizontal-alignment: right;
+    vertical-alignment: center;
+    margin: 0 44 0 0;
+    opacity: 0.55;
+}
+```
+
+Pick a panel whose size matches where the image should go: with the floating panels, `.playbar` (the top bar's
+`Grid#TransportBar`) only spans the transport buttons, so an image aligned right in it lands next to them. `.lcd`,
+`.sidebar`, `.content` and `.lyrics-panel` are good hosts.
+
+- The image is an `Image` placed in the panel's children: `::before` first (behind the others), `::after` last (on
+  top). It never takes the pointer, so every click goes through it, and screen readers skip it.
+- In a `Grid`, it covers every row and column unless the rule gives `grid-row`, `grid-column` or a span.
+- Properties that apply: `content`, `width`, `height`, `min-width`, `max-width`, `min-height`, `max-height`, `margin`,
+  `horizontal-alignment`, `vertical-alignment`, `grid-row`, `grid-column`, `grid-row-span`, `grid-column-span`,
+  `z-index`, `opacity`, `visibility`, `transform`, `transform-origin` and `animation`. Any other one is reported and
+  ignored. `content` is reported and ignored on a selector without `::before` or `::after`.
+- `content: none`, or no `content`, adds nothing. Removing the rule or the theme takes the image off; editing the rule
+  replaces the image where it stands.
+- Fits: `contain` (or nothing) keeps the whole image, `cover` fills and crops, `fill` stretches. Give a `width` and a
+  `height`, or the image takes the size of the panel.
+
+Limits:
+
+- Panels only (`Grid`, `StackPanel`, `Canvas`...). On another element (a `Border`, a `Button`) or on the panel of a list,
+  the rule is refused with a line in the log, such as `::after needs a panel (Grid, StackPanel...); Border#Root is a
+  Border`.
+- Files of the theme or snippet folder only: png, jpg, gif, bmp, webp or ico. No web address, no SVG, no path leaving
+  the folder.
+- No text: `content: "..."` is refused. No state either: `::after` ends the selector, and `:hover::after` is refused.
+- The images are not in the tree the selectors see, nor in the inspector: `.playbar Image` never reaches them, and
+  `:nth-child()` and `order` count Apple Music's children only.
+
+Example: [`themes/snippets/display-equalizer/`](../../themes/snippets/display-equalizer/).
 
 ### Layout
 

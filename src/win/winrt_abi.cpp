@@ -20,9 +20,6 @@ const GUID kIidAgileObject = {0x94EA2B94, 0xE9CC, 0x49E0, {0xC0, 0xFF, 0xEE, 0x6
 // IAsyncInfo: get_Id 6, get_Status 7, get_ErrorCode 8, Cancel 9, Close 10. AsyncStatus: Started 0, Completed 1,
 // Canceled 2, Error 3.
 constexpr int kAsyncInfoStatusSlot = 7;
-// IInspectable: GetIids 3, GetRuntimeClassName 4.
-constexpr int kGetIidsSlot = 3;
-constexpr int kGetRuntimeClassNameSlot = 4;
 
 std::atomic<ActivationHook> g_hook{nullptr};
 
@@ -140,23 +137,6 @@ std::string GuidText(const GUID& g) {
                   static_cast<unsigned long>(g.Data1), g.Data2, g.Data3, g.Data4[0], g.Data4[1], g.Data4[2],
                   g.Data4[3], g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7]);
     return text;
-}
-
-std::vector<GUID> Iids(const Ref& inspectable) {
-    ULONG count = 0;
-    GUID* iids = nullptr;
-    std::vector<GUID> out;
-    if (SUCCEEDED(CallSlot(inspectable, kGetIidsSlot, &count, &iids)) && iids) {
-        out.assign(iids, iids + count);
-        CoTaskMemFree(iids);
-    }
-    return out;
-}
-
-std::string ClassName(const Ref& inspectable) {
-    HSTRING name = nullptr;
-    if (FAILED(CallSlot(inspectable, kGetRuntimeClassNameSlot, &name))) return {};
-    return TakeString(name);
 }
 
 // ---- Activation ---------------------------------------------------------------------------------------------------

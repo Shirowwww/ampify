@@ -42,9 +42,6 @@ public:
     // enabled snippet changes.
     SessionRequest Tick(const Settings& settings, int minute);
 
-    // The scheme chosen on the last pass, with its reason and its problems.
-    const SchemeChoice& LastScheme() const { return m_scheme; }
-
 private:
     std::filesystem::path m_kit;
     bool m_systemDark = false;

@@ -19,6 +19,13 @@ bool Beats(const Assignment& candidate, const Assignment& current) {
     return candidate.order > current.order;
 }
 
+// A line-height factor or a letter-spacing in pixels, measured against the element's font size now: nothing for an
+// element without one.
+std::optional<Value> WithFontSize(NodeId id, const Value& value, TreeBackend& tree) {
+    std::optional<Value> size = tree.Read(id, "FontSize");
+    return size ? ApplyFontSize(value, *size) : std::nullopt;
+}
+
 std::string Describe(const NodeInfo& node) {
     std::string text = node.type;
     if (!node.name.empty()) text += "#" + node.name;
@@ -100,6 +107,7 @@ ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
     std::erase_if(m_baseSizes, [&](const auto& entry) { return !kept(entry.first.first); });
     std::erase_if(m_moves, [&](const Move& move) { return !kept(move.id); });
     std::erase_if(m_hovers, [&](const auto& entry) { return !kept(entry.first); });
+    ForgetDecors(kept, tree);
 
     ApplyDictionary(theme, tree, report);
     ApplyResources(theme, tree, report);
@@ -123,9 +131,11 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
     for (int position = 0; position < static_cast<int>(nodes.size()); position++) {
         const NodeInfo& node = nodes[position];
 
-        // The winning declaration for each property of this element, and apart from them those of its states.
+        // The winning declaration for each property of this element, and apart from them those of its states and of
+        // its ::before and ::after images.
         std::map<std::string, const Assignment*> winners;
         StateWinners stateWinners;
+        DecorWinners decorWinners;
         auto keep = [](auto& target, const auto& key, const Assignment& assignment) {
             auto [it, inserted] = target.try_emplace(key, &assignment);
             if (!inserted && Beats(assignment, *it->second)) it->second = &assignment;
@@ -135,7 +145,9 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
             if (!Matches(assignment.selector, nodes, position)) return;
 
             const Trigger trigger = assignment.selector.trigger;
-            if (trigger == Trigger::Always) {
+            if (assignment.selector.pseudo != PseudoElement::None) {
+                keep(decorWinners, std::make_pair(assignment.selector.pseudo, assignment.property), assignment);
+            } else if (trigger == Trigger::Always) {
                 keep(winners, assignment.property, assignment);
             } else {
                 keep(stateWinners, std::make_pair(trigger, assignment.property), assignment);
@@ -144,11 +156,12 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
 
         // The transition first, so a transform or opacity written in the same pass already animates. The animation
         // last, so it starts from the opacity and around the origin the theme gives the element.
-        if (auto transition = winners.find("Transition"); transition != winners.end()) {
-            WriteValue(node, *transition->second, tree, report, true);
+        // The font size before the values measured in it (NeedsFontSize).
+        for (const char* first : {"Transition", "FontSize"}) {
+            if (auto it = winners.find(first); it != winners.end()) WriteValue(node, *it->second, tree, report, true);
         }
         for (const auto& [property, assignment] : winners) {
-            if (property == "Transition" || property == "Animation") continue;
+            if (property == "Transition" || property == "FontSize" || property == "Animation") continue;
             if (property == kOrderProperty) {
                 pending.push_back({&node, assignment});
                 continue;
@@ -161,8 +174,74 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
         GiveBack(node, winners, tree, report);
         // An element that lost its state rules (a theme edited live) is visited too, to take its states off.
         if (!stateWinners.empty() || m_hovers.count(node.id)) ApplyHover(node, stateWinners, tree, report);
+        if (!decorWinners.empty() || m_decors.count({node.id, PseudoElement::Before}) ||
+            m_decors.count({node.id, PseudoElement::After})) {
+            ApplyDecors(node, decorWinners, tree, report);
+        }
     }
     ApplyMoves(pending, tree, report);
+}
+
+// The ::before and ::after images of one element: put in or kept when a `content` image wins, taken off when none does
+// any more (`content: none`, a rule edited out, the element out of the selector).
+void ThemeEngine::ApplyDecors(const NodeInfo& node, const DecorWinners& winners, TreeBackend& tree, Report& report) {
+    for (PseudoElement slot : {PseudoElement::Before, PseudoElement::After}) {
+        auto content = winners.find({slot, std::string(kContentProperty)});
+        auto known = m_decors.find({node.id, slot});
+        if (content == winners.end() || content->second->value.text.empty()) {
+            if (known == m_decors.end()) continue;
+            if (tree.SetDecor(node.id, slot, nullptr) == DecorChange::Applied) report.applied++;
+            m_journal.Write("Decor removed: " + Describe(node) + PseudoElementName(slot));
+            m_decors.erase(known);
+            continue;
+        }
+        Decor decor{content->second->value.text, {}};
+        for (const auto& [key, assignment] : winners) {
+            if (key.first != slot || key.second == kContentProperty) continue;
+            decor.properties.emplace_back(key.second, assignment->value);
+        }
+        PlaceDecor(node, slot, decor, *content->second, tree, report);
+    }
+}
+
+void ThemeEngine::PlaceDecor(const NodeInfo& node, PseudoElement slot, const Decor& decor, const Assignment& content,
+                             TreeBackend& tree, Report& report) {
+    const std::string where = Describe(node) + PseudoElementName(slot);
+    if (!node.panel) {
+        Refuse(where, "\"" + content.selector.text + "\": " + PseudoElementName(slot) +
+                          " needs a panel (Grid, StackPanel...); " + Describe(node) + " is a " + node.type,
+               report);
+        return;
+    }
+    switch (tree.SetDecor(node.id, slot, &decor)) {
+        case DecorChange::Refused:
+            // A record already there stays, so Restore still takes off what the panel may hold.
+            Refuse(where, "\"" + where + "\" refused its image " + decor.image, report);
+            return;
+        case DecorChange::Unchanged:
+            report.unchanged++;
+            break;
+        case DecorChange::Applied:
+            report.applied++;
+            if (m_detailed) {
+                m_journal.Write("Decor: " + where + " = " + decor.image + ", " + std::to_string(decor.properties.size()) +
+                                " value(s) (" + content.source + " line " + std::to_string(content.line) + ")");
+            }
+            break;
+    }
+    m_decors[{node.id, slot}] = decor;
+}
+
+// Lets the backend release the image of a panel that no longer exists.
+void ThemeEngine::ForgetDecors(const std::function<bool(NodeId)>& kept, TreeBackend& tree) {
+    for (auto it = m_decors.begin(); it != m_decors.end();) {
+        if (kept(it->first.first)) {
+            ++it;
+            continue;
+        }
+        tree.SetDecor(it->first.first, it->first.second, nullptr);
+        it = m_decors.erase(it);
+    }
 }
 
 // Puts back the original of each property the theme no longer gives this element: an @media rule that stopped
@@ -198,7 +277,8 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, 
         }
         // A relative size under the pointer scales the size underneath, the theme's own when it has one.
         std::optional<Value> value = IsRelativeSize(assignment->value) ? ScaleFontSize(assignment->value, *current)
-                                                                       : assignment->value;
+                                     : NeedsFontSize(assignment->value) ? WithFontSize(node.id, assignment->value, tree)
+                                                                        : assignment->value;
         if (!value) {
             Refuse(Describe(node) + " " + property, "\"" + Describe(node) + " " + property + "\" has no size to scale",
                    report);
@@ -250,7 +330,7 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
         }
         return false;
     }
-    std::optional<Value> value = Resolve(node.id, property, assignment.value, *current);
+    std::optional<Value> value = Resolve(node.id, property, assignment.value, *current, tree);
     if (!value) {
         Refuse(Describe(node) + " " + property, "\"" + Describe(node) + " " + property + "\" has no size to scale", report);
         return false;
@@ -282,9 +362,11 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
 }
 
 // A relative font size becomes pixels: the factor times the size the element had before the theme, kept from the
-// first pass since the next ones read back the theme's own. Other values pass as they are.
+// first pass since the next ones read back the theme's own. A value measured in the font size takes the size the
+// element has now, the theme's own included. Other values pass as they are.
 std::optional<Value> ThemeEngine::Resolve(NodeId id, const std::string& property, const Value& value,
-                                          const Value& current) {
+                                          const Value& current, TreeBackend& tree) {
+    if (NeedsFontSize(value)) return WithFontSize(id, value, tree);
     if (!IsRelativeSize(value)) return value;
     const Value& before = m_baseSizes.try_emplace({id, property}, current).first->second;
     return ScaleFontSize(value, before);
@@ -362,6 +444,13 @@ void ThemeEngine::Restore(TreeBackend& tree) {
             gone++;
         }
     }
+    for (const auto& [key, decor] : m_decors) {
+        if (tree.SetDecor(key.first, key.second, nullptr) == DecorChange::Applied) {
+            restored++;
+        } else {
+            gone++;
+        }
+    }
     for (auto it = m_moves.rbegin(); it != m_moves.rend(); ++it) {
         if (tree.Write(it->id, kOrderProperty, it->before)) {
             restored++;
@@ -399,6 +488,7 @@ void ThemeEngine::Restore(TreeBackend& tree) {
     }
 
     m_hovers.clear();
+    m_decors.clear();
     m_originals.clear();
     m_baseSizes.clear();
     m_resourceOriginals.clear();

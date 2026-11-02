@@ -84,6 +84,9 @@ TEST_CASE(RemoteParser_AsksForMoreAndRefusesWhatItCannotRead) {
           ParseStatus::Bad);
     CHECK(ampify::remote::ParseRequest("GET /x HTTP/1.1\r\nA: b\r\n folded\r\n\r\n", request) == ParseStatus::Bad);
     CHECK(ampify::remote::ParseRequest("GET /x HTTP/1.1\r\nHost: a\r\nHost: b\r\n\r\n", request) == ParseStatus::Bad);
+    // A bare CR or LF at the edge of a value is a control character, not space to trim.
+    CHECK(ampify::remote::ParseRequest("GET /x HTTP/1.1\r\nHost: a\n\r\n\r\n", request) == ParseStatus::Bad);
+    CHECK(ampify::remote::ParseRequest("GET /x HTTP/1.1\r\nHost: \ra\r\n\r\n", request) == ParseStatus::Bad);
     CHECK(ampify::remote::ParseRequest("GET /x?a=%zz HTTP/1.1\r\n\r\n", request) == ParseStatus::Bad);
     CHECK(ampify::remote::ParseRequest("POST /x HTTP/1.1\r\nContent-Length: 999999\r\n\r\n", request) ==
           ParseStatus::TooLarge);

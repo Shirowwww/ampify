@@ -65,6 +65,9 @@ public:
     // empty list removes both handlers. The handlers hold a weak pointer to m_alive: once the backend is destroyed
     // (maybe off the interface thread, so they are not removed then) they do nothing.
     bool SetHover(theme::NodeId id, const std::vector<theme::HoverValue>& values) override;
+    // An Image named AmpifyDecorBefore or AmpifyDecorAfter in the panel's Children, which Snapshot and the Order
+    // positions leave out. It is made again when the decor changes, and put back in place where it was.
+    theme::DecorChange SetDecor(theme::NodeId id, theme::PseudoElement slot, const theme::Decor* decor) override;
     // The main window's bounds. Window.SizeChanged asks for a pass when one of the watched queries changes its answer.
     std::optional<theme::ViewSize> WindowSize() override;
     void WatchSize(const std::vector<theme::MediaQuery>& queries) override;
@@ -128,6 +131,10 @@ private:
                                 const theme::Value& value);
     // The theme's transform-origin of the element: RenderTransformOrigin, or the origin it refused (m_facadeOrigins).
     winrt::Windows::Foundation::Point OriginOf(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element) const;
+    theme::DecorChange PlaceDecor(theme::NodeId id, theme::PseudoElement slot, const theme::Decor& decor);
+    theme::DecorChange RemoveDecor(theme::NodeId id, theme::PseudoElement slot);
+    void WriteDecor(theme::NodeId imageId, const winrt::Microsoft::UI::Xaml::Controls::Panel& panel,
+                    const theme::Decor& decor);
     void SchedulePass(int followUps) noexcept;
     void RunPass() noexcept;
     bool LearnPopups(const winrt::Microsoft::UI::Xaml::XamlRoot& root);
@@ -255,6 +262,15 @@ private:
     // around them instead (WriteAnimatedTransform).
     std::map<theme::NodeId, winrt::Windows::Foundation::Point> m_facadeOrigins;
     ThemeAnimations m_animations;  // `animation`
+    // The ::before and ::after images, by panel and place. The panel is Apple Music's (a weak reference resolves), the
+    // image Ampify's: held strongly, and released here, on the interface thread (docs/development/xaml-lessons.md).
+    struct DecorImage {
+        winrt::weak_ref<winrt::Microsoft::UI::Xaml::Controls::Panel> panel;
+        winrt::Microsoft::UI::Xaml::Controls::Image image{nullptr};
+        theme::NodeId imageId = 0;  // what Resolve answers to, so WriteRaw sets the image's size, place and animation
+        theme::Decor decor;
+    };
+    std::map<std::pair<theme::NodeId, theme::PseudoElement>, DecorImage> m_decors;
 };
 
 }  // namespace ampify::win

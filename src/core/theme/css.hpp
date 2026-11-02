@@ -13,8 +13,12 @@ namespace ampify::theme {
 //   *               any element
 //   A B             a B somewhere inside an A
 //   A > B           a B whose direct parent is an A
-// Parts can be combined: `Grid#Bar > TextBlock`. One pseudo-class is read, on the last part only:
+//   A + B, A ~ B    a B right after an A among the children of one parent, or anywhere after it
+// Parts can be combined: `Grid#Bar > TextBlock`. Structural pseudo-classes go on any part: :first-child, :last-child,
+// :only-child, :nth-child(n), :nth-last-child(n), and :not(part) with one part made of a type, a #name and those.
+// A state goes on the last part only:
 //   Button:hover    a Button, while the pointer is over it (the values come back when it leaves)
+// `Grid#Bar::after` (or `::before`, or the older `:after`) ends a selector: see PseudoElement.
 // Attributes and the other pseudo-classes are not supported.
 //
 // A part may also be a stable name, written as a class (`.sidebar`, `.card:hover`, `.playbar Button`): it stands for
@@ -53,13 +57,18 @@ struct SettingCondition {
 enum class Combinator {
     Descendant,  // whitespace
     Child,       // >
+    Adjacent,    // +, the sibling just before
+    Sibling,     // ~, any sibling before
 };
 
 struct Compound {
     std::string type;  // empty means any element
     std::string name;  // without the '#', empty when absent
     int nth = 0;        // :nth-child(n), from 1 (:first-child is 1); 0 when absent
+    int nthLast = 0;    // :nth-last-child(n), from 1 counting from the end; 0 when absent
     bool last = false;  // :last-child
+    bool only = false;  // :only-child
+    std::vector<Compound> negations;  // :not(...): parts the element must not match
     Combinator combinator = Combinator::Descendant;  // relation to the compound before it; unused for the first
 };
 
@@ -74,10 +83,22 @@ enum class Trigger {
 // ":hover", ":focus" or ":active"; empty for Always.
 const char* TriggerName(Trigger trigger);
 
+// `::before` or `::after` at the end of a selector: the declarations describe a decorative image the engine puts into
+// the panel the selector names (TreeBackend::SetDecor), behind its children or on top of them.
+enum class PseudoElement {
+    None,
+    Before,
+    After,
+};
+
+// "::before" or "::after"; empty for None.
+const char* PseudoElementName(PseudoElement pseudo);
+
 struct Selector {
     std::vector<Compound> parts;  // left to right; the last part is the element that receives the declarations
     std::string text;             // as written, for the log
     Trigger trigger = Trigger::Always;  // a state on the last part: the declarations apply while the element is in it
+    PseudoElement pseudo = PseudoElement::None;  // the declarations go to the panel's decorative image
 };
 
 struct Declaration {

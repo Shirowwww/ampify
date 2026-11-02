@@ -99,6 +99,7 @@ dozens of times. Always target them under a named parent.
 |---|---|---|
 | Icons as empty squares | A `TextBlock { font-family }` rule changed the font of glyphs (private-use characters) | The engine never changes the font of a text made of icons |
 | "Primary" buttons as symbols | Apple Music's `AccentButtonStyle` draws the text in a symbol font | Use Apple Music's button style and set accent colors on top |
+| Part of an SVG icon missing or misplaced | XAML path markup does not go back to the start of a closed subpath: a relative `m` after `z` moves from the last point, not from the start as in SVG | Start each subpath after `z` with an absolute `M` (the kit's icons do) |
 
 ## Windows
 

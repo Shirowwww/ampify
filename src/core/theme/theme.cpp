@@ -438,14 +438,30 @@ void LoadVariables(const Stylesheet& sheet, const ValueContext& context, const R
     }
 }
 
+// Why a declaration cannot go with this selector, or nothing. A move is not a value that can come and go with a state:
+// the other items would shift each time. `content` makes the image of ::before and ::after, which takes only what an
+// image has.
+std::optional<std::string> MisplacedProperty(const Selector& selector, const PropertySpec& spec,
+                                             const Declaration& declaration) {
+    const std::string name = "\"" + declaration.property + "\"";
+    if (selector.trigger != Trigger::Always && spec.kind == PropertyKind::Order) {
+        return name + " is not possible under " + TriggerName(selector.trigger) + " (" + selector.text + ")";
+    }
+    if (selector.pseudo == PseudoElement::None && spec.kind == PropertyKind::Content) {
+        return name + " only applies to ::before and ::after (" + selector.text + ")";
+    }
+    if (selector.pseudo != PseudoElement::None && !AppliesToDecor(spec.xaml)) {
+        return name + " does not apply to " + PseudoElementName(selector.pseudo) + " (" + selector.text +
+               "): content, size, margin, alignment, grid cell, z-index, opacity, visibility, transform and animation do";
+    }
+    return std::nullopt;
+}
+
 void AddAssignment(const Rule& rule, const PropertySpec& spec, const Value& value, const Declaration& declaration,
                    int order, const RuleSource& source, Theme& theme) {
     for (const Selector& selector : rule.selectors) {
-        // A move is not a value that can come and go with a state: the other items would shift each time.
-        if (selector.trigger != Trigger::Always && spec.kind == PropertyKind::Order) {
-            theme.problems.push_back(AtLine(source.file, declaration.line) + ": \"" + declaration.property +
-                                     "\" is not possible under " + TriggerName(selector.trigger) + " (" + selector.text +
-                                     "), ignored");
+        if (std::optional<std::string> problem = MisplacedProperty(selector, spec, declaration)) {
+            theme.problems.push_back(AtLine(source.file, declaration.line) + ": " + *problem + ", ignored");
             continue;
         }
         Assignment assignment{selector, SpecificityOf(selector), std::string(spec.xaml), value, declaration.important,
@@ -519,8 +535,10 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
 
             const PropertySpec* spec = FindProperty(declaration.property);
             if (!spec) {
+                std::string_view hint = PropertyHint(declaration.property);
                 theme.problems.push_back(AtLine(from.file, declaration.line) + ": property \"" +
-                                         declaration.property + "\" is unknown, ignored");
+                                         declaration.property + "\" is unknown, ignored" +
+                                         (hint.empty() ? std::string() : " (" + std::string(hint) + ")"));
                 continue;
             }
 
