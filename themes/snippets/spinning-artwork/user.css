@@ -6,7 +6,9 @@
     --turn: 24s;
 }
 
+/* Round, so that it reads as a disc: a square turning shows its corners sweeping around. */
 .lcd-artwork-image {
+    corner-radius: 100px;
     animation: spin var(--turn) linear infinite;
 }
 

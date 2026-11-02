@@ -5,7 +5,11 @@
 .reactions-button,
 .share-button,
 .add-description-button,
-.airplay-button,
-.apple-logo {
+.airplay-button {
     visibility: collapsed;
+}
+
+/* Apple Music shows and hides its logo itself, following what plays: an opacity leaves that to it. */
+.apple-logo {
+    opacity: 0;
 }

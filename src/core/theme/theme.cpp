@@ -110,7 +110,8 @@ void DefineTextOnAccent(Theme& theme, const std::set<std::string>& owned, bool a
 // WinUI's toggles, sliders, check boxes, selection marks, links and the system accent brushes read keys of their own,
 // which its dictionaries set to the accent once, when they load: a theme's accent alone left them in Apple Music's
 // blue (the Settings pages, the sidebar's selection mark, "Show the whole album", the playing row's bars). The list is
-// every key the inspector found still holding Apple's accent under a theme.
+// every key the inspector found still holding Apple's accent under a theme. Brushes only: WinUI builds its own brushes
+// from the SystemAccentColor colours once, so writing those left them in the theme's accent after the theme went.
 void DefineAccentControls(Theme& theme, const std::set<std::string>& owned, bool applied) {
     constexpr const char* kHover = "AccentFillColorSecondaryBrush";
     constexpr const char* kPressed = "AccentFillColorTertiaryBrush";
@@ -123,9 +124,6 @@ void DefineAccentControls(Theme& theme, const std::set<std::string>& owned, bool
         double opacity;
     };
     const Derived kControls[] = {
-        {"SystemAccentColor", kAccent, 1.0},
-        {"AccentColor", kAccent, 1.0},
-        {"AccentDisabledColor", kAccent, kDisabled},
         {"AccentFillColorDisabledBrush", kAccent, kDisabled},
         {"AccentFillColorSelectedTextBackgroundBrush", kAccent, 1.0},
         {"TextControlSelectionHighlightColor", kAccent, 1.0},

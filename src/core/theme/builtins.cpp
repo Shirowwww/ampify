@@ -234,6 +234,12 @@ constexpr std::string_view kFloatingPanels = R"css(
     margin: var(--gap, 8) calc(var(--gap, 8) * -1) var(--gap, 8) var(--gap, 8);
 }
 
+/* Apple Music pins the back arrow to the window's corner, where it straddled the sidebar panel's rounded corner: it
+   moves into the panel, on the line of the app's name. */
+.back-button {
+    margin: var(--gap, 8) 0 0 calc(var(--gap, 8) + 4);
+}
+
 /* Folded, the sidebar shows the first 48 pixels from its own edge, so it ends a gap into the page column: the pages
    start two gaps into it, and the open sidebar reaches one gap into it. The space between the panels is one gap either
    way. Wider than 48 shows the start of the texts Apple Music hides there. */
@@ -300,8 +306,18 @@ constexpr std::string_view kBottomBar = R"css(
     grid-column: 1;
 }
 
+/* The song stands a gap in from the window's edge, and the bar's height around its 54-pixel artwork leaves it square:
+   flush with the corner, it looked cut off. */
 .now-playing {
     grid-column: 0;
+    margin: 4 0 4 var(--gap, 8);
+}
+
+/* With nothing loaded, Apple Music centres its logo in the display, far from everything else on the bar. Its opacity,
+   not its visibility: Apple Music binds the visibility to what plays, so the value read before the theme would come
+   back stale when the theme goes, and show the logo over the title. */
+.apple-logo {
+    opacity: 0;
 }
 
 /* The song's title and artist start next to its artwork instead of in the middle of the display. */
