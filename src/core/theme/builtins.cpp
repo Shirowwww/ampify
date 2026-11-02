@@ -54,7 +54,7 @@ const std::vector<ClassEntry> kClasses{
     {"content-background", {"SplitView#ContentSplitView > Grid > Grid#ContentRoot > Border > Grid"}},
     {"content-frame", {"Frame#ContentFrame"}},
     {"content-shadow", {"Grid#ContentPageShadowGrid"}},
-    {"page", {"ContentPage"}},
+    {"page", {"ContentPage", "SongsContentPage"}},
     {"page-top-spacer",
      {"Grid#FixedGridPageContent > Grid:first-child", "Grid#FixedListPageContent > Grid:first-child",
       "Grid#SideBySidePageContent > Grid:first-child", "Grid#SingleSectionPageContent > Grid:first-child",
@@ -67,6 +67,8 @@ const std::vector<ClassEntry> kClasses{
     {"filter-button", {"ToggleButton#FilterButton"}},
     {"sort-button", {"Button#SortButton"}},
     {"sticky-header-background", {"Border#StickyBackgroundBorder"}},
+    {"list-header", {"Grid#HeaderStack"}},
+    {"list-page-shelves", {"Grid#FixedListPageContent StackPanel#ShelfSectionContent"}},
 
     // Shelves and sections
     {"section-header", {"ContentControl#SectionHeader"}},
@@ -102,6 +104,7 @@ const std::vector<ClassEntry> kClasses{
     {"album-play-button", {"Button#PlayButtonElement"}},
     {"album-shuffle-button", {"Button#ShuffleButtonElement"}},
     {"album-description", {"ContentControl#DescriptionText"}},
+    {"album-artist", {"Grid#ContainerDetailHeaderLockupRegularContent > Grid > StackPanel > Grid > TextBlock"}},
     {"add-description-button", {"Button#AddDescriptionButton"}},
     {"share-button", {"Button#ShareButton"}},
     {"lossless-badge", {"Canvas#LosslessImage"}},
@@ -226,6 +229,16 @@ constexpr std::string_view kFloatingPanels = R"css(
 
 .page-top-spacer {
     height: var(--page-top, 8);
+}
+
+/* The column titles of the Songs list stay at the top as it scrolls: they take the panel's colour, not Apple's grey. */
+.list-header {
+    background: var(--panel-background, #17171A);
+}
+
+/* Under an album or a playlist, Apple paints the other shelves on a grey band: a shade of the panel instead. */
+.list-page-shelves {
+    background: var(--band-background, #1E1E22);
 }
 
 .stacked-list {

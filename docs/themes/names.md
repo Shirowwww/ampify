@@ -70,7 +70,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.content-background` | Its background layer |
 | `.content-frame` | The frame the pages are shown in |
 | `.content-shadow` | The shadow along its edge |
-| `.page` | A page |
+| `.page` | A page (the Songs list is a page of its own type, included) |
 | `.page-top-spacer` | The empty space at the top of a page, 64 pixels high, that keeps it below the playback bar |
 | `.stacked-list` | The list of Home and Search, whose top padding plays the same part |
 | `.page-header` | The title bar of a page, which stays at the top when the page scrolls |
@@ -80,6 +80,8 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.filter-button` | The button that opens it |
 | `.sort-button` | The sort button of the Songs page |
 | `.sticky-header-background` | The background of a header that stays at the top |
+| `.list-page-shelves` | The shelves under the tracks of an album or a playlist (more by the artist, videos), which Apple paints on a grey band |
+| `.list-header` | The column titles of the Songs list (Name, Duration, Artist...), which stay at the top as it scrolls |
 
 ## Shelves and sections
 
@@ -117,6 +119,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.album-header` | The header of an album or a playlist: artwork, title, buttons |
 | `.album-play-button`, `.album-shuffle-button` | Its Play and Shuffle buttons |
 | `.album-description` | Its description |
+| `.album-artist` | Its artist, a link that Apple writes in its own blue |
 | `.add-description-button` | The button that adds a description to a playlist |
 | `.share-button` | The share button |
 | `.lossless-badge`, `.digital-master-badge` | The Lossless and Apple Digital Master badges |

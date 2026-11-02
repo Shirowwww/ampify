@@ -308,6 +308,7 @@ Each layout reads variables that the theme may set in its `:root`, with these de
 | `--window-background` | `#0B0B0D` | The window, around the panels |
 | `--panel-background` | `#17171A` | Both panels |
 | `--panel-radius` | `10px` | Their corners |
+| `--band-background` | `#1E1E22` | `floating-panels`: the band under an album's or a playlist's tracks, which Apple paints grey |
 | `--gap` | `8` | The space around the panels and between them |
 | `--content-top` | `64` | `floating-panels`: where the pages start, below the playback bar at the top |
 | `--compact-pane` | `48` | `floating-panels`: the width of the sidebar folded into icons, as in Apple Music. Wider shows the start of the texts Apple Music hides there |
