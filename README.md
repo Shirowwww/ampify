@@ -20,6 +20,12 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 
 </div>
 
+> [!NOTE]
+> Ampify is experimental. It works inside an app that Apple updates on its own schedule, so an Apple Music update can
+> break something. Found a bug, or have an idea to make it better? Pull requests are welcome, from a one-line fix to a
+> new theme or extension. [Contributing](CONTRIBUTING.md) explains how, and [issues](https://github.com/Shirowwww/ampify/issues)
+> are open for anything you would rather report.
+
 ## What it does
 
 <table>
