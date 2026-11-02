@@ -418,14 +418,38 @@ constexpr std::string_view kBottomBar = R"css(
 }
 )css";
 
+// Scroll bars that sit inside their panel: off its edge, clear of its rounded corners, without the arrows Windows adds
+// with "Always show scroll bars" (they stuck out at both ends). Part of floating-panels; alone for the other layouts.
+constexpr std::string_view kScrollbars = R"css(
+ScrollBar RepeatButton#VerticalSmallDecrease,
+ScrollBar RepeatButton#VerticalSmallIncrease,
+ScrollBar RepeatButton#HorizontalSmallDecrease,
+ScrollBar RepeatButton#HorizontalSmallIncrease {
+    visibility: collapsed;
+}
+
+.scrollbar {
+    background: transparent;
+}
+
+ScrollBar#VerticalScrollBar {
+    margin: var(--panel-radius, 8px) 3 var(--panel-radius, 8px) 0;
+}
+
+ScrollBar#HorizontalScrollBar {
+    margin: 0 var(--panel-radius, 8px) 3 var(--panel-radius, 8px);
+}
+)css";
+
 struct BuiltinEntry {
     std::string_view name;
-    std::string_view css;
+    std::vector<std::string_view> parts;
 };
 
-const std::array<BuiltinEntry, 2> kBuiltins{{
-    {"floating-panels", kFloatingPanels},
-    {"bottom-bar", kBottomBar},
+const std::array<BuiltinEntry, 3> kBuiltins{{
+    {"floating-panels", {kFloatingPanels, kScrollbars}},
+    {"bottom-bar", {kBottomBar}},
+    {"scrollbars", {kScrollbars}},
 }};
 
 constexpr size_t kMaxExpansions = 32;
@@ -510,9 +534,12 @@ std::optional<std::vector<std::string>> ExpandClasses(std::string_view selector,
     return results;
 }
 
-std::optional<std::string_view> BuiltinStylesheet(std::string_view name) {
+std::optional<std::string> BuiltinStylesheet(std::string_view name) {
     for (const BuiltinEntry& entry : kBuiltins) {
-        if (entry.name == name) return entry.css;
+        if (entry.name != name) continue;
+        std::string css;
+        for (std::string_view part : entry.parts) css += part;
+        return css;
     }
     return std::nullopt;
 }

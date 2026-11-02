@@ -1,6 +1,9 @@
 /* Hides the buttons and banners most people never use, by their stable names (docs/themes/names.md). Remove a line to
    bring that element back. */
 
+/* The arrows at both ends of the scroll bars, and their place against the window's edges. */
+@import "ampify:scrollbars";
+
 .info-bar,
 .reactions-button,
 .share-button,

@@ -1,0 +1,16 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "cover-ambience",
+  "name": "Cover ambience",
+  "version": "0.1.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "The song's display glows in the colours of its artwork and changes with each song, like Spicetify's Cover Ambience.",
+  "translations": {"fr": {"name": "Halo de pochette", "description": "L'afficheur du morceau s'illumine aux couleurs de sa pochette et change à chaque morceau, comme Cover Ambience sur Spicetify."}},
+  "kitApi": "1.0",
+  "resources": "resources.xaml",
+  "tags": [
+    "artwork",
+    "colors"
+  ]
+}

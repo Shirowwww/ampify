@@ -24,7 +24,7 @@ std::vector<std::string> ClassNames();
 std::optional<std::vector<std::string>> ExpandClasses(std::string_view selector, std::string* problem = nullptr);
 
 // The CSS of a ready-made layout, or nothing for an unknown name.
-std::optional<std::string_view> BuiltinStylesheet(std::string_view name);
+std::optional<std::string> BuiltinStylesheet(std::string_view name);
 std::vector<std::string> BuiltinStylesheetNames();
 
 }  // namespace ampify::theme

@@ -2,6 +2,9 @@
    the volume and the chosen entries. Colors come from colors.ini ($button is the rose gold of the scheme in use); the
    classes are Ampify's stable names for Apple Music's zones (docs/themes/names.md). */
 
+/* Scroll bars off the window's edges, without the arrows Windows adds. */
+@import "ampify:scrollbars";
+
 /* Play: a rose gold disc with a dark icon, slightly larger on hover. */
 .play-button > Grid#Root {
     background: $button;

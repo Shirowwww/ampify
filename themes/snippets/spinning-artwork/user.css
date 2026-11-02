@@ -1,19 +1,27 @@
-/* Spinning artwork: the artwork of the playback bar turns like a record.
+/* Spinning artwork: the artwork of the playback bar becomes a record that turns, with its grooves and spindle hole.
    The compositor runs the animation on its own thread: it stays smooth while Apple Music loads a page.
-   Change --turn to make it faster or slower. */
+   Change --turn to make it faster or slower.
+
+   Apple Music drives the artwork's own transform and refuses one, so the turn goes on the area around it. That area
+   is round, and clips the artwork inside it: a square would sweep its corners around. */
 
 :root {
     --turn: 24s;
 }
 
-/* Round, so that it reads as a disc: a square turning shows its corners sweeping around. */
-.lcd-artwork-image {
-    corner-radius: 100px;
+.lcd-artwork {
+    corner-radius: 999px;
+    animation: spin var(--turn) linear infinite;
 }
 
-/* The turn goes on the area around the artwork: Apple Music drives the artwork's own transform and refuses one. */
-.lcd-artwork {
-    animation: spin var(--turn) linear infinite;
+/* Round too, so that a theme or a snippet such as Square corners never brings its corners back. */
+.lcd-artwork-image {
+    corner-radius: 999px;
+}
+
+/* The grooves, the rim and the label, over the artwork. */
+.lcd-artwork::after {
+    content: url("images/record.png") fill;
 }
 
 @keyframes spin {

@@ -639,7 +639,7 @@ void ReadStatement(std::string_view statement, int line, const Scope& scope, Sty
                                  "\" is not supported, ignored");
         return;
     }
-    std::optional<std::string_view> builtin = BuiltinStylesheet(*layout);
+    std::optional<std::string> builtin = BuiltinStylesheet(*layout);
     if (!builtin) {
         sheet.problems.push_back("line " + std::to_string(line) + ": layout \"ampify:" + *layout + "\" is unknown (" +
                                  LayoutList() + "), ignored");

@@ -265,7 +265,28 @@ its children. Animated GIFs play.
   `visibility`, `transform`, `transform-origin` and `animation`.
 - Selectors and the inspector do not see these images.
 
-Example: [`themes/snippets/display-equalizer/`](../../themes/snippets/display-equalizer/).
+Example: [`themes/snippets/spinning-artwork/`](../../themes/snippets/spinning-artwork/).
+
+### Bars that follow the music
+
+`content: bars(n)` puts `n` bars (2 to 32, 12 by default) in place of an image. They move with the song that plays and
+rest low while it is paused. `color` paints them (a colour, a gradient or `var(--art-2)`); the system accent by
+default. The other properties of `::before` and `::after` apply.
+
+```css
+.lcd::before {
+    content: url("images/dance.gif");  /* shown by Ampify versions before bars() */
+    content: bars(10);
+    color: var(--art-2, #FFFA2D48);
+    width: 44px;
+    height: 26px;
+    horizontal-alignment: right;
+    margin: 0 44 0 0;
+}
+```
+
+The sound is analysed only while bars are on screen. With Windows' animation effects off, they stand still. Example:
+[`themes/snippets/display-equalizer/`](../../themes/snippets/display-equalizer/).
 
 ### Layout and ready-made layouts
 
@@ -291,6 +312,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 |---|---|
 | `ampify:floating-panels` | The sidebar and the pages become two rounded panels on the window's background, with even gaps |
 | `ampify:bottom-bar` | The playback bar goes to the bottom across the window: the song left, buttons in the middle, volume right. Import it after `floating-panels` |
+| `ampify:scrollbars` | Scroll bars inside their panel, clear of its rounded corners, without Windows' arrows. Part of `floating-panels` |
 
 | Variable | Default | Meaning |
 |---|---|---|

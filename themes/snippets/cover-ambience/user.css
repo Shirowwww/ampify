@@ -1,0 +1,15 @@
+/* Cover ambience: the song's display glows in the colours of its artwork, strongest behind the artwork and fading
+   towards the end of the display, like Spicetify's Cover Ambience. It follows each song within 3 seconds. Raise the
+   two leading digits of each colour (00 to FF) for a stronger glow. */
+
+.lcd {
+    background: linear-gradient(to right, #A6var(--art-2-hex, 5A5A64) 0%, #4Dvar(--art-1-hex, 5A5A64) 40%, #1Avar(--art-3-hex, 5A5A64) 100%);
+    border-width: 1px;
+    border-color: #33var(--art-2-hex, FFFFFF);
+}
+
+/* The time and the progress bar keep their contrast on the glow. */
+.current-time,
+.duration {
+    color: #E6FFFFFF;
+}

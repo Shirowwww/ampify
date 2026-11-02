@@ -1,24 +1,33 @@
-/* Square corners: removes the rounding of buttons, frames and panels.
-   A snippet comes after the active theme: its rules win, whatever their specificity, and so does its :root.
+/* Square corners: removes the rounding of buttons, frames and panels, all of them, so that no panel keeps a rounded
+   corner next to a square one. A snippet comes after the active theme: its rules win, whatever their specificity.
    The --corner variable is changed here, in one place only. */
 
 :root {
     --corner: 0;
-    --panel-radius: 0;
 }
 
 Button,
 Border,
 .play-button > Grid#Root,
+.playbar,
 .sidebar,
+.sidebar-item,
 .content,
+.lyrics-panel,
+.search-header,
 .card,
+.card-brick,
+.card-wide,
+.card-track,
 .artwork,
 .track-row,
 .lcd,
 .lcd-artwork-image,
+.settings-card,
 .menu,
+.menu-item,
 .flyout,
-.tooltip {
+.tooltip,
+.fullscreen-artwork {
     corner-radius: var(--corner);
 }

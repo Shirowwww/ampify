@@ -33,18 +33,6 @@
     padding: 0 8 12 0;
 }
 
-/* With Windows' "Always show scroll bars", the sidebar's bar kept its arrows against the search box: the thumb alone,
-   kept off the panel's edge. */
-.sidebar .scrollbar RepeatButton#VerticalSmallDecrease,
-.sidebar .scrollbar RepeatButton#VerticalSmallIncrease {
-    visibility: collapsed;
-}
-
-.sidebar .scrollbar {
-    background: transparent;
-    margin: 0 3 8 0;
-}
-
 /* Quieter than the page titles: at 22 bold, the app's name outweighed everything else on the window. */
 .app-name {
     font-role: title;
