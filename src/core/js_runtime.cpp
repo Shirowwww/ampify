@@ -94,8 +94,8 @@ Runtime::~Runtime() {
 
 void Runtime::StartBudget() { m_deadline = std::chrono::steady_clock::now() + m_limits.budget; }
 
-int Runtime::InterruptHandler(JSRuntime* rt, void* opaque) {
-    (void)rt;
+int Runtime::InterruptHandler(JSContext* ctx, void* opaque) {
+    (void)ctx;
     auto* self = static_cast<Runtime*>(opaque);
     return std::chrono::steady_clock::now() > self->m_deadline ? 1 : 0;
 }

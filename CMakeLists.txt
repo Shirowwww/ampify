@@ -87,7 +87,7 @@ foreach(source_list IN LISTS AMPIFY_SOURCE_LISTS)
     include("${source_list}")
 endforeach()
 
-# quickjs-ng 0.17.0, vendored unchanged (MIT, see vendor/quickjs/LICENSE and vendor/quickjs/UPSTREAM.txt). Compiled as
+# quickjs-ng 0.18.0, vendored unchanged (MIT, see vendor/quickjs/LICENSE and vendor/quickjs/UPSTREAM.txt). Compiled as
 # C11 with its own warnings silenced: those files are upstream code, and we only change them by replacing the release.
 # The sources, defines and MSVC flags mirror the qjs library target of upstream's CMakeLists.txt.
 add_library(ampify_quickjs STATIC ${AMPIFY_QUICKJS_SOURCES})

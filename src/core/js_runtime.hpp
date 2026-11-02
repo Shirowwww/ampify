@@ -62,7 +62,7 @@ public:
 
 private:
     void StartBudget();
-    static int InterruptHandler(JSRuntime* rt, void* opaque);
+    static int InterruptHandler(JSContext* ctx, void* opaque);
     static char* NormalizeModule(JSContext* ctx, const char* base, const char* name, void* opaque);
     static JSModuleDef* LoadModule(JSContext* ctx, const char* name, void* opaque);
 
