@@ -296,6 +296,8 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     bool applePlayerPending = false;  // Ampify.ui.applePlayer.open, run by the next refresh of the main window
     bool playerCheckPending = false;  // a window showed: the next refresh looks for Apple's own full-screen player
     uirender::PlayerMode playerMode = uirender::PlayerMode::Window;  // apple.fullscreen, read by the worker
+    std::string cardTheme;   // the theme the Ampify card shows
+    bool cardStale = false;  // the theme changed elsewhere (Marketplace, ampify theme set): the card is built again
 
     // Interface thread only.
     int detachedReports = 0;  // log lines about panels taken out of their host, at most 5
@@ -846,6 +848,10 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
     section.Spacing(10);
     std::vector<uirender::ModEntry> themes = uirender::ListThemes(shared.kit);
     std::string active = uirender::ActiveThemeId(shared.kit);
+    {
+        std::lock_guard<std::mutex> lock(shared.mutex);
+        shared.cardTheme = active;
+    }
     controls::ComboBox combo;
     if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
     combo.MinWidth(220);
@@ -874,6 +880,10 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
             const std::string& id = (*ids)[index];
             if (id == uirender::ActiveThemeId(owner->kit)) return;
             std::string error;
+            {
+                std::lock_guard<std::mutex> lock(owner->mutex);
+                owner->cardTheme = id;  // the card already shows it: no rebuild
+            }
             if (!uirender::ChooseTheme(owner->kit, id, error)) {
                 owner->journal.Write("Settings: could not choose the theme \"" + id + "\": " + error);
                 return;
@@ -1097,6 +1107,11 @@ bool MountModsCard(UiService::Shared& shared, const xaml::FrameworkElement& page
 }
 
 void WatchSettingsPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
+    {
+        std::lock_guard<std::mutex> lock(shared.mutex);
+        if (shared.cardStale) context->settingsMounted = false;
+        shared.cardStale = false;
+    }
     xaml::FrameworkElement page = context->foundSettings.get();
     xaml::FrameworkElement current = context->settingsPage.get();
     if (page != current) {
@@ -2485,6 +2500,19 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
         shared.playerMode = tweaks.player;
     }
     SetNotificationRule(tweaks.notifications, shared.journal);
+
+    std::string active = uirender::ActiveThemeId(shared.kit);
+    std::vector<std::shared_ptr<WindowContext>> windows;
+    {
+        std::lock_guard<std::mutex> lock(shared.mutex);
+        if (active == shared.cardTheme) return;
+        shared.cardTheme = active;
+        shared.cardStale = true;
+        windows = shared.windows;
+    }
+    for (const auto& context : windows) {
+        if (context->property == L"MainWindow") QueueRefresh(shared.weak_from_this(), context);
+    }
 }
 
 // A window showed: the next refresh of the main window looks for Apple's full-screen player to lay it out.

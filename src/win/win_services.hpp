@@ -11,6 +11,7 @@
 // Threads: every capability method and Service() run on the JavaScript thread, as Host methods do. The service
 // threads (icon, server, winmm, Discord) never call the host: they queue, and Service() acts.
 
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <filesystem>
@@ -112,6 +113,7 @@ private:
     };
 
     void EnsureStarted();
+    void FollowNotificationRule();
     void StartTray();
     void StartRemote();
     void StartMidi();
@@ -138,6 +140,8 @@ private:
     std::map<std::string, std::string> m_remoteStates;  // element id -> JSON object
     double m_remoteGainDb = 0;
     int m_ticks = 0;
+    std::chrono::steady_clock::time_point m_nextNotificationRule{};
+    std::optional<std::filesystem::file_time_type> m_settingsStamp;
 
     std::unique_ptr<MidiInput> m_midi;
     midi::Map m_midiMap;

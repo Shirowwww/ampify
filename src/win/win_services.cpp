@@ -14,6 +14,7 @@
 #include "discord_ipc.hpp"
 #include "midi.hpp"
 #include "remote_server.hpp"
+#include "toast_hold.hpp"
 #include "tray.hpp"
 #include "win_common.hpp"
 
@@ -22,6 +23,7 @@ namespace ampify::win {
 namespace {
 
 constexpr auto kRemoteAnswerTimeout = std::chrono::seconds(2);
+constexpr auto kNotificationRulePeriod = std::chrono::seconds(2);
 
 int IntSetting(Host& host, const std::string& key, int fallback, int low, int high) {
     std::optional<std::string> raw = host.ReadSetting(key);
@@ -67,6 +69,21 @@ void Services::EnsureStarted() {
     if (m_process == "ui" && ServiceEnabled(m_host, "tray.enabled")) StartTray();
     if (m_process == "engine" && ServiceEnabled(m_host, "remote.enabled")) StartRemote();
     if (m_process == "engine" && ServiceEnabled(m_host, "midi.enabled")) StartMidi();
+}
+
+// The song notifications come from this process (toast_hold.hpp): it follows the card's rule. settings.txt is read
+// again when it changes (looked at every 2 s): the host's copy of the settings is the one of the start.
+void Services::FollowNotificationRule() {
+    auto now = std::chrono::steady_clock::now();
+    if (now < m_nextNotificationRule) return;
+    m_nextNotificationRule = now + kNotificationRulePeriod;
+    std::error_code error;
+    auto written = std::filesystem::last_write_time(m_kit / "settings.txt", error);
+    if (error || (m_settingsStamp && *m_settingsStamp == written)) return;
+    m_settingsStamp = written;
+    Settings settings;
+    settings.Load((m_kit / "settings.txt").string());
+    SetToastRule(uirender::ReadAppleTweaks(settings).notifications, m_journal);
 }
 
 void Services::Emit(const std::string& entry, const std::string& payload) {
@@ -300,6 +317,7 @@ bool Services::WriteOutputText(const std::string& elementId, const std::string& 
 
 void Services::Service() {
     EnsureStarted();
+    if (m_process == "engine") FollowNotificationRule();
 
     std::vector<uint32_t> midiMessages;
     std::vector<unsigned> trayCommands;
