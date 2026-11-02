@@ -81,6 +81,16 @@ bool WindowsResponsive(DWORD processId) {
     return !search.hung;
 }
 
+bool ClaimKernelOfProcess(DWORD processId) {
+    // The winner's handle is never closed: the name stays taken until the process exits. A mutex Windows refuses to
+    // create claims nothing, so the kernel stays idle rather than risk running twice.
+    std::wstring name = L"Local\\Ampify.Kernel." + std::to_wstring(processId);
+    HANDLE claim = CreateMutexW(nullptr, FALSE, name.c_str());
+    bool first = claim && GetLastError() != ERROR_ALREADY_EXISTS;
+    if (claim && !first) CloseHandle(claim);
+    return first;
+}
+
 std::vector<std::byte> ReadFileBytes(const std::filesystem::path& file) {
     std::ifstream stream(file, std::ios::binary | std::ios::ate);
     if (!stream) return {};

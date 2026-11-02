@@ -105,12 +105,23 @@ void StartInterface(ampify::Journal& journal, [[maybe_unused]] const std::filesy
 DWORD WINAPI KernelMain(LPVOID) {
     ampify::ProcessRole role = ampify::RoleOfImageName(ampify::win::ExecutablePath().string());
     if (role == ampify::ProcessRole::Unknown) return 0;
+    bool apple = role == ampify::ProcessRole::AppleMusic;
+    std::filesystem::path logPath = ampify::win::JournalFile(apple ? "AppleMusic.log" : "AMPLibraryAgent.log");
+    // Another Ampify kernel, from another folder, already runs here: a second one would hook the audio and the
+    // interface again. It leaves one line in the log, which the first kernel has opened.
+    if (!ampify::win::ClaimKernelOfProcess(GetCurrentProcessId())) {
+        wchar_t self[MAX_PATH] = {};
+        GetModuleFileNameW(g_module, self, MAX_PATH);
+        std::ofstream log(logPath, std::ios::app);
+        ampify::Journal(log, ampify::Journal::LocalTimeStamp)
+            .Write("Another Ampify kernel already runs in this process: this one (" + ampify::win::ToUtf8(self) +
+                   ") stays idle");
+        return 0;
+    }
 
     // The first process of a role starts its log afresh. A later one, such as the short AppleMusic.exe Windows starts
     // to pass on a music:// link, adds to it instead: the mutex, never closed, marks the log as taken until the first
     // process exits. Both append, so neither writes over the other's lines.
-    bool apple = role == ampify::ProcessRole::AppleMusic;
-    std::filesystem::path logPath = ampify::win::JournalFile(apple ? "AppleMusic.log" : "AMPLibraryAgent.log");
     HANDLE logTaken = CreateMutexW(nullptr, FALSE, apple ? L"Local\\Ampify.AppleMusic.log" : L"Local\\Ampify.AMPLibraryAgent.log");
     bool laterProcess = logTaken && GetLastError() == ERROR_ALREADY_EXISTS;
     if (!laterProcess) std::ofstream(logPath, std::ios::trunc).close();

@@ -30,6 +30,11 @@ std::string PackageFullName();
 // False while a visible top-level window of `processId` is hung. True otherwise, including when it has no window.
 bool WindowsResponsive(DWORD processId);
 
+// True for the first Ampify kernel of `processId`, false for any later one, whichever folder it was built in: two
+// launchers (the installed one and a bench build) may each load their own copy. The claim lasts until that process
+// exits.
+bool ClaimKernelOfProcess(DWORD processId);
+
 // The bytes of a file, read whole. Empty when it cannot be read, which the signature check reports as unreadable.
 std::vector<std::byte> ReadFileBytes(const std::filesystem::path& file);
 
