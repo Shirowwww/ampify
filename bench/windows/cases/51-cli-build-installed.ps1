@@ -18,6 +18,10 @@ Register-Case -Id 'cli-build-installed' -Title 'ampify build, install, export, i
         & $ampify new extension bench-cli | Out-Null
         $folder = Join-Path $work 'bench-cli'
         $zip = Join-Path $work 'bench-cli-0.1.0.zip'
+        # build refuses the starter's own author and description: fill them in, as an author would.
+        $manifest = Join-Path $folder 'manifest.json'
+        $text = [IO.File]::ReadAllText($manifest).Replace('your-github-username', 'bench').Replace('Describe it here.', 'A bench extension.')
+        [IO.File]::WriteAllText($manifest, $text)
 
         $built = (& $ampify --kit-dir $kit build $folder $zip 2>&1) | Out-String
         Add-Check -Ctx $Ctx -Name 'ampify build writes the zip' -Passed ((Test-Path -LiteralPath $zip) -and ($LASTEXITCODE -eq 0)) -Detail $built.Trim()
