@@ -992,6 +992,55 @@ TEST_CASE(Theme_AcrylicSurfacesTakeTheCardColour) {
     CHECK(ResourceValue(clear, "AcrylicInAppFillColorDefaultBrush") == "ABSENT");
 }
 
+namespace {
+std::string Assigned(const th::Theme& theme, std::string_view selector, std::string_view property) {
+    std::string value = "ABSENT";
+    for (const th::Assignment& assignment : theme.assignments) {
+        if (assignment.selector.text == selector && assignment.property == property) value = assignment.value.text;
+    }
+    return value;
+}
+std::string ScrubberMargin(const th::Theme& theme) { return Assigned(theme, ".scrubber", "Margin"); }
+}  // namespace
+
+TEST_CASE(Theme_AlbumArtistTakesTheThemesLinkColour) {
+    MemoryFiles accent;
+    accent.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 3C7D5A\n";
+    CHECK(Assigned(Load(accent), ".album-artist", "Foreground") == "#FF3C7D5A");
+
+    // A Spicetify scheme's button colour is its accent, and a theme's own rule wins.
+    MemoryFiles spicetify;
+    spicetify.files["color.ini"] = "[Base]\nbutton = 3C7D5A\n";
+    CHECK(Assigned(Load(spicetify), ".album-artist", "Foreground") == "#FF3C7D5A");
+    MemoryFiles own;
+    own.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 3C7D5A\n";
+    own.files["user.css"] = ".album-artist { color: #FF112233; }\n";
+    CHECK(Assigned(Load(own), ".album-artist", "Foreground") == "#FF112233");
+}
+
+TEST_CASE(Theme_SearchTopResultsTakeTheCardColour) {
+    MemoryFiles card;
+    card.files["colors.ini"] = "[Base]\nCardBackgroundFillColorDefaultBrush = 1C2742\n";
+    CHECK(Assigned(Load(card), ".search-top-result", "Background") == "#FF1C2742");
+    MemoryFiles none;
+    none.files["user.css"] = "Grid { margin: 1; }\n";
+    CHECK(Assigned(Load(none), ".search-top-result", "Background") == "ABSENT");
+}
+
+TEST_CASE(Theme_ProgressLineStopsBeforeARoundedDisplaysCorner) {
+    MemoryFiles rounded;
+    rounded.files["user.css"] = ".lcd { corner-radius: 14px; }\n";
+    CHECK(ScrubberMargin(Load(rounded)) == "0,0,14,0");
+
+    // A theme that places the line itself keeps its own margin, and a square display needs none.
+    MemoryFiles placed;
+    placed.files["user.css"] = ".lcd { corner-radius: 14px; }\n.scrubber { margin: 0 4 0 0; }\n";
+    CHECK(ScrubberMargin(Load(placed)) == "0,0,4,0");
+    MemoryFiles square;
+    square.files["user.css"] = ".lcd { background: #FF000000; }\n";
+    CHECK(ScrubberMargin(Load(square)) == "ABSENT");
+}
+
 TEST_CASE(Spicetify_ThemeRulesWinOverTheTranslatedOnes) {
     MemoryFiles files;
     files.files["color.ini"] = "[Base]\nsidebar = 112233\n";
@@ -1638,7 +1687,7 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
     CHECK(full.usable);
     CHECK(full.resources.size() == 1);
     CHECK(!full.resourceDictionary.empty());
-    CHECK(full.assignments.size() == 2);
+    CHECK(full.assignments.size() == 4);  // with the album's artist in the accent, in its two forms (ArtistInLinkColour)
 
     th::LoadOptions none{"", &allowed, {false, false, false}};
     th::Theme off = Load(files, none);
@@ -1650,7 +1699,7 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
 
     th::LoadOptions noAssets{"", &allowed, {true, true, false}};
     th::Theme withoutImages = Load(files, noAssets);
-    CHECK(withoutImages.assignments.size() == 1);  // the font rule stays, the image rule is refused
+    CHECK(withoutImages.assignments.size() == 3);  // the font and artist rules stay, the image rule is refused
     CHECK(!ProblemContaining(withoutImages, "assets").empty());
 }
 

@@ -70,6 +70,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.content-background` | Its background layer |
 | `.content-frame` | The frame the pages are shown in |
 | `.content-shadow` | The shadow along its edge |
+| `.page-background` | What Apple lays behind a page's list: an artist's video, a coloured backdrop |
 | `.page` | A page (the Songs list and the settings pages, which are pages of their own types, included) |
 | `.stacked-page` | A page made of stacked shelves, such as Home |
 | `.list-page` | A page with a header and a track list: an album, a playlist |
@@ -152,6 +153,7 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.search-scopes` | The buttons that choose where to search |
 | `.search-scope` | One of them: Apple Music, Library, Store |
 | `.search-status` | The status line ("No results"...) |
+| `.search-top-result` | The tile of one of the top results, under "Top Results" |
 
 ## Playback bar
 
@@ -218,6 +220,7 @@ matches nothing). A popup takes the theme the first time it opens, and keeps it.
 | Class | Zone |
 |---|---|
 | `.lyrics-panel` | The side panel of the lyrics and of Up Next |
+| `.lyrics-panel-top-spacer` | The 64 at its top that Apple keeps for its own playback bar |
 | `.lyrics` | The lyrics view |
 | `.lyrics-menu-button` | Its menu button |
 | `.lyrics-synced` | The lyrics that follow the song |

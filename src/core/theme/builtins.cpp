@@ -54,6 +54,7 @@ const std::vector<ClassEntry> kClasses{
     {"content-background", {"SplitView#ContentSplitView > Grid > Grid#ContentRoot > Border > Grid"}},
     {"content-frame", {"Frame#ContentFrame"}},
     {"content-shadow", {"Grid#ContentPageShadowGrid"}},
+    {"page-background", {"ContentPresenter#PageBackground"}},
     // Apple Music paints each settings page in code, like the content pages: they are pages too.
     {"page",
      {"ContentPage", "SongsContentPage", "SettingsPage", "MainSettingsPage", "GeneralSettingsPage",
@@ -145,6 +146,7 @@ const std::vector<ClassEntry> kClasses{
     {"search-scopes", {"Grid#SearchPageSelector"}},
     {"search-scope", {"ToggleButton#SearchAppleMusic", "ToggleButton#SearchLibrary", "ToggleButton#SearchStore"}},
     {"search-status", {"TextBlock#SearchPageStatus"}},
+    {"search-top-result", {"Frame#SearchContentFrame TileControl > HoverGrid#RootGrid > ContentPresenter > Grid"}},
 
     // Playback bar
     {"playbar", {"Grid#TransportBar"}},
@@ -194,6 +196,7 @@ const std::vector<ClassEntry> kClasses{
 
     // Lyrics and queue panels
     {"lyrics-panel", {"SplitView#ContentSplitView > Grid > Grid#PaneRoot"}},
+    {"lyrics-panel-top-spacer", {"SplitView#ContentSplitView > Grid > Grid#PaneRoot > Border > Grid > Grid:first-child"}},
     {"lyrics", {"LyricsHostView#LyricsView"}},
     {"lyrics-menu-button", {"Button#LyricsMenuButton"}},
     {"lyrics-synced", {"KaraokeLyricsView#RootControl"}},
@@ -235,9 +238,9 @@ constexpr std::string_view kFloatingPanels = R"css(
 }
 
 /* Apple Music pins the back arrow to the window's corner, where it straddled the sidebar panel's rounded corner: it
-   moves into the panel, on the line of the app's name. */
+   moves into the panel, centred on the line of the app's name (4 lower than the panel's edge plus a gap). */
 .back-button {
-    margin: var(--gap, 8) 0 0 calc(var(--gap, 8) + 4);
+    margin: calc(var(--gap, 8) + 4) 0 0 calc(var(--gap, 8) + 4);
 }
 
 /* Folded, the sidebar shows the first 48 pixels from its own edge, so it ends a gap into the page column: the pages
@@ -254,6 +257,24 @@ constexpr std::string_view kFloatingPanels = R"css(
 }
 
 .page-top-spacer {
+    height: var(--page-top, 8);
+}
+
+/* Apple Music lays an artist's video and a page's coloured backdrop 64 down, under its own playback bar. The panel
+   already starts below the bar: they go back up to its top edge, where a dark band showed above them. */
+.page-background {
+    margin: -64 0 0 0;
+}
+
+/* The lyrics and queue pane: a third panel on the right, below the bar like the pages, instead of a strip glued to the
+   window's edge and running up under its buttons. Its first 64 were room for Apple's bar: the panel starts below it. */
+.lyrics-panel {
+    background: var(--panel-background, #17171A);
+    corner-radius: var(--panel-radius, 10px);
+    margin: var(--content-top, 64) var(--gap, 8) var(--gap, 8) 0;
+}
+
+.lyrics-panel-top-spacer {
     height: var(--page-top, 8);
 }
 
@@ -364,6 +385,11 @@ constexpr std::string_view kBottomBar = R"css(
 
 .content {
     margin: var(--gap, 8) var(--gap, 8) var(--bar-room, 80) calc(var(--gap, 8) * 2);
+}
+
+/* The pane starts below the window's buttons, which sit at the top right with no bar under them any more. */
+.lyrics-panel {
+    margin: var(--caption-room, 40) var(--gap, 8) var(--bar-room, 80) 0;
 }
 
 .page-top-spacer {

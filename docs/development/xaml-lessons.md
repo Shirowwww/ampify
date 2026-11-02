@@ -124,6 +124,15 @@ dozens of times. Always target them under a named parent.
   `"MiniPlayerWindow"`, then `try_as<Window>()`. Before the window exists the call fails with `0x8000000B`: retry.
 - Use `window.DispatcherQueue().TryEnqueue(...)`. A `WH_GETMESSAGE` hook never fired on Windows Server 2025.
 - Recognize pages by class name (`PlaybackSettingsPage`), not by position.
+- Apple Music keeps the first 64 pixels of a page for its playback bar, in more places than the list's padding: the
+  page's backdrop (`ContentPresenter#PageBackground`, an artist's video) is laid 64 down, and the lyrics and queue pane
+  has a 64-high first row. A layout that moves the panels below the bar must take those 64 back too, or a dark band
+  shows. Look for a fixed 64 (`Height=64`, a margin of 64) when something sits lower than its panel's top.
+- Apple paints some surfaces in code with a fixed colour, out of any key: the search's top-result tiles (`#FF282828`),
+  an album's artist (its blue). Only a rule on the element reaches them (Ampify derives one from the theme's colours).
+- WinUI resolves `ToggleButtonBackgroundChecked`, `AccentButtonBackground` and `AccentButtonForeground` from the accent
+  once, when its dictionaries load, like the other accent keys: a theme's accent alone left the checked lyrics and queue
+  buttons in Windows' blue and white text on a light accent. They are derived from the accent with the rest.
 - First start: an MPEG LA licence (buttons Agree, Decline, Save As) shows before the main window, then, after sign-in, a
   "Welcome to Apple Music" screen (Start Listening). No XAML window exists while they are open. The bench closes them
   through UI Automation.

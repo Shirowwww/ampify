@@ -23,7 +23,8 @@
 
 /* ---- Sidebar: frosted glass ---------------------------------------------------------------------------------------- */
 
-.sidebar {
+.sidebar,
+.lyrics-panel {
     backdrop: var(--glass);
 }
 
@@ -32,9 +33,11 @@
     padding: 4 8 8 0;
 }
 
+/* Quieter than the page titles: at 22 bold, the app's name outweighed everything else on the window. */
 .app-name {
     font-role: title;
-    font-size: 22px;
+    font-size: 18px;
+    font-weight: 600;
 }
 
 .sidebar-items NavigationViewItem {
@@ -52,9 +55,10 @@
 
 /* ---- Playback bar, at the top, above the pages ------------------------------------------------------------------- */
 
+/* No band of its own: the sidebar's frost ran into it, which squared the panel's corner and left a dark notch above
+   it. The gradient shows through and the song's display floats like the panels. */
 .playbar {
-    backdrop: var(--glass);
-    padding: 6 12;
+    padding: 0 12;
 }
 
 .transport AppBarButton,
@@ -93,7 +97,6 @@
 }
 
 .track-title {
-    font-size: 15px;
     font-weight: 600;
 }
 

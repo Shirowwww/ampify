@@ -44,7 +44,7 @@ struct Rule {
     std::array<std::string_view, 2> keys;
 };
 
-constexpr std::array<Rule, 10> kRules = {{
+constexpr std::array<Rule, 9> kRules = {{
     {"ContentPage,\nSongsContentPage,\nSettingsPage,\nMainSettingsPage,\nGeneralSettingsPage,\nPlaybackSettingsPage,\n"
      "RestrictionsSettingsPage,\nFilesSettingsPage,\nAdvancedSettingsPage,\nImportSettingsPage,\nGrid#HeaderStack,\nSplitView#ContentSplitView > Grid > Grid#ContentRoot,\n"
      "Grid#PageRoot,\nNavigationView#NavView",
@@ -55,9 +55,9 @@ constexpr std::array<Rule, 10> kRules = {{
     {"Grid#PaneRoot TextBlock,\nTickerTapeControl#TrackTitleTickerTape", "color", {"text", ""}},
     // A shelf title without a link ("For You"): Apple sets its white in code, so a light scheme alone leaves it white.
     {"Grid#DefaultSectionHeaderContent TextBlock#JustTextBlock", "color", {"text", ""}},
-    // Apple paints these in code too: the grey band under an album's tracks, and its artist in Apple's blue.
+    // Apple paints this in code too: the grey band under an album's tracks. Its artist takes the accent like any theme's
+    // (theme.cpp, ArtistInLinkColour).
     {"Grid#FixedListPageContent StackPanel#ShelfSectionContent", "background", {"main-elevated", "card"}},
-    {"Grid#ContainerDetailHeaderLockupRegularContent > Grid > StackPanel > Grid > TextBlock", "color", {"button", ""}},
     {"TickerTapeControl#ArtistTitleTickerTape,\nTextBlock#CurrentTime,\nTextBlock#Duration", "color", {"subtext", ""}},
     {"ScrubberControl#LCDScrubber", "color", {"playback-bar", "button"}},
 }};

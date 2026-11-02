@@ -1,5 +1,6 @@
 #include "theme.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <charconv>
 #include <cmath>
@@ -123,7 +124,14 @@ void DefineAccentControls(Theme& theme, const std::set<std::string>& owned, bool
         const char* from;
         double opacity;
     };
+    constexpr const char* kOnAccent = "TextOnAccentFillColorPrimaryBrush";
     const Derived kControls[] = {
+        {"AccentButtonBackground", kAccent, 1.0},
+        {"AccentButtonBackgroundPointerOver", kHover, 1.0},
+        {"AccentButtonBackgroundPressed", kPressed, 1.0},
+        {"AccentButtonForeground", kOnAccent, 1.0},
+        {"AccentButtonForegroundPointerOver", kOnAccent, 1.0},
+        {"AccentButtonForegroundPressed", kOnAccent, 1.0},
         {"AccentFillColorDisabledBrush", kAccent, kDisabled},
         {"AccentFillColorSelectedTextBackgroundBrush", kAccent, 1.0},
         {"TextControlSelectionHighlightColor", kAccent, 1.0},
@@ -167,6 +175,10 @@ void DefineAccentControls(Theme& theme, const std::set<std::string>& owned, bool
         {"SystemControlHighlightAccentRevealBorderBrush", kAccent, 1.0},
         {"SystemControlHighlightAccent3RevealBackgroundBrush", kAccent, 1.0},
         {"SystemControlHighlightAccent3RevealAccent2BackgroundBrush", kAccent, 1.0},
+        {"ToggleButtonBackgroundChecked", kAccent, 1.0},
+        {"ToggleButtonBackgroundCheckedPointerOver", kHover, 1.0},
+        {"ToggleButtonBackgroundCheckedPressed", kPressed, 1.0},
+        {"ToggleButtonBorderBrushChecked", kAccent, 1.0},
         {"ToggleSwitchFillOn", kAccent, 1.0},
         {"ToggleSwitchFillOnPointerOver", kHover, 1.0},
         {"ToggleSwitchFillOnPressed", kPressed, 1.0},
@@ -509,6 +521,72 @@ void LoadRules(FileSource& files, const ValueContext& context, Theme& theme, boo
     if (std::optional<std::string> css = files.Read("user.css")) LoadRuleText(*css, context, theme, applied, source);
 }
 
+double LargestCorner(std::string_view corners) {
+    double largest = 0;
+    while (!corners.empty()) {
+        size_t comma = corners.find(',');
+        std::string_view text = TrimSpace(corners.substr(0, comma));
+        double value = 0;
+        std::from_chars(text.data(), text.data() + text.size(), value);
+        largest = std::max(largest, value);
+        corners = comma == std::string_view::npos ? std::string_view{} : corners.substr(comma + 1);
+    }
+    return largest;
+}
+
+bool Sets(const Theme& theme, std::string_view selector, std::string_view property) {
+    return std::any_of(theme.assignments.begin(), theme.assignments.end(), [&](const Assignment& assignment) {
+        return !assignment.media && assignment.selector.trigger == Trigger::Always &&
+               assignment.selector.text == selector && assignment.property == property;
+    });
+}
+
+// The progress line runs along the bottom of the song's display, up to its right edge: a theme that rounds the display
+// cut its end off with the corner. It stops before the corner.
+std::string ScrubberClearOfCorners(const Theme& theme) {
+    if (Sets(theme, ".scrubber", "Margin")) return {};
+    double radius = 0;
+    int order = -1;
+    for (const Assignment& assignment : theme.assignments) {
+        if (assignment.media || assignment.selector.trigger != Trigger::Always) continue;
+        if (assignment.selector.text == ".lcd" && assignment.property == "CornerRadius" && assignment.order >= order) {
+            order = assignment.order;
+            radius = LargestCorner(assignment.value.text);
+        }
+    }
+    if (radius <= 0) return {};
+    return ".scrubber { margin: 0 " + FormatNumber(radius) + " 0 0; }\n";
+}
+
+// Apple Music paints an album's artist in its own blue, in code: the theme's link colour takes over, as WinUI's links
+// do (DefineAccentControls). On a light theme, Apple's light blue barely read.
+std::string ArtistInLinkColour(const Theme& theme) {
+    if (Sets(theme, ".album-artist", "Foreground")) return {};
+    for (const char* key : {"AccentTextFillColorPrimaryBrush", kAccent}) {
+        if (theme.palette.Find(key)) return ".album-artist { color: $" + std::string(key) + "; }\n";
+    }
+    return {};
+}
+
+// Apple Music paints the tiles of a search's top results in its own grey, in code: the theme's card colour instead.
+std::string SearchTilesInCardColour(const Theme& theme) {
+    if (Sets(theme, ".search-top-result", "Background")) return {};
+    if (!theme.palette.Find("CardBackgroundFillColorDefaultBrush")) return {};
+    return ".search-top-result { background: $CardBackgroundFillColorDefaultBrush; }\n";
+}
+
+// Rules a theme's own choices call for, below its user.css so that a theme which sets the same thing keeps its value.
+void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts& parts) {
+    bool applied = parts.resources;
+    std::string css = ScrubberClearOfCorners(theme);
+    if (parts.colors) css += ArtistInLinkColour(theme) + SearchTilesInCardColour(theme);
+    if (css.empty()) return;
+    RuleSource source;
+    source.file = "Ampify (derived from the theme)";
+    source.layer = -1;
+    LoadRuleText(css, context, theme, applied, source);
+}
+
 }  // namespace
 
 Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& files, const LoadOptions& options) {
@@ -543,6 +621,7 @@ Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& fi
         LoadRuleText(translated, context, theme, options.parts.colors, source);
     }
     LoadRules(files, context, theme, options.parts.resources, RuleSource{});
+    AddDerivedRules(context, theme, options.parts);
     return theme;
 }
 

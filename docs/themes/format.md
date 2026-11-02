@@ -66,6 +66,12 @@ SolidBackgroundFillColorBase = 1C1C1E
   (`TextOnAccentFillColorPrimaryBrush` and `...SecondaryBrush`) turns black, as in Fluent's dark mode.
 - A key the scheme names itself is never replaced, and neither is one that `resources.xaml` defines (nor what would be
   worked out from an accent it defines).
+- An album's artist, which Apple Music paints in its own blue in code, takes the theme's link colour
+  (`AccentTextFillColorPrimaryBrush`, else the accent), unless `user.css` colours `.album-artist` itself.
+- The tiles of a search's top results, which Apple Music paints grey in code, take the card colour
+  (`CardBackgroundFillColorDefaultBrush`), unless `user.css` sets a background on `.search-top-result` itself.
+- A theme that rounds the song's display (`.lcd { corner-radius: ... }`) has its progress line stop before the right
+  corner, which cut its end off, unless `user.css` sets a margin on `.scrubber` itself.
 
 ## resources.xaml
 
