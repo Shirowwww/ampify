@@ -1,5 +1,8 @@
 #include "selector.hpp"
 
+#include <string>
+#include <string_view>
+
 namespace ampify::theme {
 
 namespace {
@@ -42,8 +45,19 @@ Specificity SpecificityOf(const Selector& selector) {
     return specificity;
 }
 
+// The types that root Apple's player windows: a selector must name one of them to reach an element there.
+bool NamesAPlayer(const Selector& selector) {
+    for (const Compound& compound : selector.parts) {
+        for (std::string_view root : {"FullScreenPlayerPage", "FullScreenPlayerView", "MiniPlayerPage", "MiniPlayerView"}) {
+            if (compound.type == root || compound.type.ends_with("." + std::string(root))) return true;
+        }
+    }
+    return false;
+}
+
 bool Matches(const Selector& selector, const std::vector<NodeInfo>& nodes, int index) {
     if (selector.parts.empty() || index < 0 || index >= static_cast<int>(nodes.size())) return false;
+    if (nodes[index].player && !NamesAPlayer(selector)) return false;
     return MatchFrom(selector.parts, selector.parts.size() - 1, nodes, index);
 }
 

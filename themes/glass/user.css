@@ -181,3 +181,8 @@
         transform: scale(1.05);
     }
 }
+
+/* Apple's full-screen player (Now Playing): its large artwork takes the panels' corners. */
+.fullscreen-artwork {
+    corner-radius: var(--panel-radius);
+}

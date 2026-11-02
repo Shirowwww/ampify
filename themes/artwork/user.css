@@ -5,11 +5,23 @@
    above it transparent and lines up the panels; each panel then takes an acrylic, which blurs what is behind it. The
    playback bar floats too, as a third panel above the pages. */
 
+/* With the art-tint setting, the glass takes the artwork's dark vibrant colour (var(--art-3)), so the panels change
+   colour with each track. Before the first artwork, and with the setting off, they stay near black. */
+:root {
+    --tint: #0B0B10;
+}
+
+@setting art-tint {
+    :root {
+        --tint: var(--art-3, #0B0B10);
+    }
+}
+
 :root {
     --window-background: artwork cover;
     /* The pages' veil is a setting: a light artwork needs more of it for the lists to stay readable. */
-    --glass: acrylic(#0B0B10, 0.74);
-    --glass-light: acrylic(#0B0B10, var(--setting-veil));
+    --glass: acrylic(var(--tint), 0.74);
+    --glass-light: acrylic(var(--tint), var(--setting-veil));
     --panel-radius: var(--setting-panel-radius);
     --gap: var(--setting-gap);
     /* The bar: 64 high, 10 from the top, then a gap of 10 before the pages. */
@@ -79,4 +91,9 @@
 
 .artwork {
     corner-radius: 10px;
+}
+
+/* Apple's full-screen player (Now Playing): its large artwork takes the panels' corners. */
+.fullscreen-artwork {
+    corner-radius: var(--panel-radius);
 }

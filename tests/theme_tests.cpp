@@ -36,6 +36,7 @@
 #include "../src/core/theme/theme.hpp"
 #include "../src/core/theme/theme_settings.hpp"
 #include "../src/core/theme/worker.hpp"
+#include "../src/core/color_extract.hpp"
 #include "test.hpp"
 
 namespace th = ampify::theme;
@@ -3282,4 +3283,74 @@ TEST_CASE(Engine_SaysWhyAnElementRefusesAnAnimation) {
 
     CHECK(engine.Apply(theme, tree).refused == 1);
     CHECK(log.str().find("\"AppBarButton#Play\" refused the animation") != std::string::npos);
+}
+
+TEST_CASE(Theme_ArtworkColoursAreVariablesWithAFallback) {
+    MemoryFiles files;
+    files.files["user.css"] = ".sidebar { background: var(--art-1, #102030); }\n.content { background: #40var(--art-1-hex, 102030); }\n";
+    CHECK(Assigned(Load(files), ".sidebar", "Background") == "#FF102030");
+    th::LoadOptions options;
+    options.artwork = {{"art-1", "#c04020"}, {"art-1-hex", "c04020"}};
+    CHECK(Assigned(Load(files, options), ".sidebar", "Background") == "#FFC04020");
+    CHECK(Assigned(Load(files, options), ".content", "Background") == "#40C04020");
+}
+
+TEST_CASE(Worker_ReloadsForANewArtworkOnlyWhenTheThemeUsesIt) {
+    std::filesystem::path kit(TempFolder("worker-artwork"));
+    WriteFile(kit / "themes" / "art" / "user.css", ".sidebar { background: var(--art-1, #000000); }\n");
+    WriteFile(kit / "themes" / "plain" / "user.css", ".sidebar { background: #000000; }\n");
+    ampify::Settings settings;
+    settings.Set("theme.active", "art");
+    th::ThemeWorker worker(kit);
+    th::SessionRequest first = worker.Tick(settings, 600);
+    worker.SetArtwork({{"art-1", "#112233"}});
+    th::SessionRequest second = worker.Tick(settings, 600);
+    CHECK(second.generation > first.generation);
+    CHECK(second.theme && Assigned(*second.theme, ".sidebar", "Background") == "#FF112233");
+    CHECK(worker.Tick(settings, 600).generation == second.generation);
+
+    settings.Set("theme.active", "plain");
+    th::SessionRequest plain = worker.Tick(settings, 600);
+    worker.SetArtwork({{"art-1", "#445566"}});
+    CHECK(worker.Tick(settings, 600).generation == plain.generation);
+    std::filesystem::remove_all(kit);
+}
+
+TEST_CASE(Artwork_VariablesGiveReadableText) {
+    ampify::ExtractedColors light;
+    light.prominent = {240, 230, 200};
+    light.vibrant = {200, 40, 40};
+    light.darkVibrant = {60, 10, 10};
+    std::map<std::string, std::string> variables = ampify::ArtworkVariables(light);
+    CHECK(variables["art-1"] == "#f0e6c8");
+    CHECK(variables["art-2"] == "#c82828");
+    CHECK(variables["art-3"] == "#3c0a0a");
+    CHECK(variables["art-text"] == "#000000");
+    CHECK(variables["art-1-hex"] == "f0e6c8");
+    ampify::ExtractedColors dark;
+    dark.prominent = {20, 20, 40};
+    CHECK(ampify::ArtworkVariables(dark)["art-text"] == "#ffffff");
+    // A pale artwork's "dark" colour is darkened until white text reads on it.
+    ampify::ExtractedColors pale;
+    pale.darkVibrant = {220, 200, 180};
+    std::string art3 = ampify::ArtworkVariables(pale)["art-3"];
+    int r = std::stoi(art3.substr(1, 2), nullptr, 16), g = std::stoi(art3.substr(3, 2), nullptr, 16);
+    CHECK(r < 120 && g < 110);
+}
+
+TEST_CASE(Selector_PlayerWindowsTakeOnlyRulesThatNameThem) {
+    std::vector<th::NodeInfo> nodes(3);
+    nodes[0].type = "FullScreenPlayerPage";
+    nodes[0].player = true;
+    nodes[1].type = "TransportControl";
+    nodes[1].parent = 0;
+    nodes[1].player = true;
+    nodes[2].type = "TransportControl";  // the main window's
+    std::optional<th::Selector> plain = th::ParseSelector("TransportControl");
+    std::optional<th::Selector> scoped = th::ParseSelector("FullScreenPlayerPage TransportControl");
+    CHECK(plain && scoped);
+    CHECK(th::Matches(*plain, nodes, 2));
+    CHECK(!th::Matches(*plain, nodes, 1));
+    CHECK(th::Matches(*scoped, nodes, 1));
+    CHECK(!th::Matches(*scoped, nodes, 2));
 }

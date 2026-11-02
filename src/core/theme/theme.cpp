@@ -612,6 +612,7 @@ Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& fi
     if (!options.parts.resources) theme.resourceDictionary.clear();
     DefineDerivedColors(theme, options.parts.colors);
     LoadSettings(files, options, theme);
+    for (const auto& [name, value] : options.artwork) theme.variables[name] = value;
     ValueContext context{theme.palette, files, folder, options.parts.assets};
     // Spicetify's colours paint Apple Music's own elements first; the theme's user.css comes on top.
     if (std::string translated = SpicetifyStylesheet(spicetify); !translated.empty()) {

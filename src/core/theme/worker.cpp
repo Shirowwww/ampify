@@ -37,6 +37,12 @@ std::shared_ptr<const Theme> LoadLayout(const std::optional<std::string>& sideba
     return layout;
 }
 
+// True when the user.css of this folder uses the artwork's colours (var(--art-1) and the others).
+bool NamesArtwork(const std::filesystem::path& folder) {
+    std::optional<std::string> css = ReadWholeFile(folder / "user.css");
+    return css && css->find("--art-") != std::string::npos;
+}
+
 }  // namespace
 
 std::optional<std::set<std::string>> ReadAllowedKeys(const std::filesystem::path& file) {
@@ -80,6 +86,11 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
     for (const auto& [name, value] : values) key += name + "=" + value + ",";
     key += "|";
     for (const std::string& id : snippets) key += id + ",";
+    bool usesArtwork = !wanted.active.empty() && NamesArtwork(themeFolder);
+    for (const std::string& id : snippets) usesArtwork = usesArtwork || NamesArtwork(snippetRoot / id);
+    if (usesArtwork) {
+        for (const auto& [name, value] : m_artwork) key += "|" + name + "=" + value;
+    }
     key += "|" + sidebar.value_or("-") + "|" + home.value_or("-") + "|" +
            (keysText ? std::to_string(std::hash<std::string>{}(*keysText)) : std::string("-"));
     if (wanted.liveReload) {
@@ -102,6 +113,7 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
         options.parts = wanted.parts;
         options.allowedKeys = allowed ? &*allowed : nullptr;
         options.settings = values;
+        options.artwork = usesArtwork ? m_artwork : std::map<std::string, std::string>{};
 
         if (!wanted.active.empty()) {
             FolderFiles files(themeFolder);

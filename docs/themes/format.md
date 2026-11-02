@@ -311,6 +311,27 @@ Grid#PaneRoot { backdrop: acrylic(#0B0B10, 0.62); corner-radius: 18px; margin: 1
 
 Full example: `themes/artwork`. With no song loaded, the background stays empty.
 
+### The colours of the artwork
+
+Ampify reads the colours of that artwork and gives them as variables, so a theme can follow each song:
+
+| Variable | Value |
+|---|---|
+| `--art-1` | the most common colour |
+| `--art-2` | the most vibrant one, for accents |
+| `--art-3` | a dark vibrant one, for backgrounds and glass |
+| `--art-text` | `#000000` or `#ffffff`, whichever reads best on `--art-1` |
+| `--art-1-hex`, `--art-2-hex`, `--art-3-hex` | the same colours without `#`, to put an alpha in front |
+
+```css
+.playbar { backdrop: acrylic(var(--art-3, #0B0B10), 0.7); }
+.lcd { background: #33var(--art-2-hex, FFFFFF); }
+```
+
+Before the first artwork is read the variables do not exist: give each `var()` a fallback. A theme or snippet whose
+`user.css` names `--art-` is applied again when the song changes (within 3 seconds); the others are not. Example:
+the `art-tint` setting of `themes/artwork`.
+
 ### Layout
 
 The placement properties (`vertical-alignment`, `horizontal-alignment`, `grid-row`, `grid-column`, `margin`,

@@ -250,4 +250,30 @@ std::optional<ExtractedColors> ExtractColors(const uint8_t* rgba, size_t size, s
     return out;
 }
 
+// Relative luminance under which white text has a contrast of 7:1: (1 + 0.05) / (L + 0.05) >= 7.
+constexpr double kDarkestForWhiteText = 0.1;
+
+std::map<std::string, std::string> ArtworkVariables(const ExtractedColors& colors) {
+    // Relative luminance (WCAG): above the middle grey, black text reads better than white.
+    auto linear = [](uint8_t channel) {
+        double c = channel / 255.0;
+        return c <= 0.03928 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4);
+    };
+    auto luminanceOf = [&](const Rgb& c) { return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b); };
+    const Rgb& base = colors.prominent;
+    double luminance = luminanceOf(base);
+    // art-3 sits under white text: darkened until white reads on it at 7:1 or more, whatever the artwork.
+    Rgb dark = colors.darkVibrant;
+    while (luminanceOf(dark) > kDarkestForWhiteText) {
+        dark = {static_cast<uint8_t>(dark.r * 9 / 10), static_cast<uint8_t>(dark.g * 9 / 10), static_cast<uint8_t>(dark.b * 9 / 10)};
+    }
+    std::map<std::string, std::string> variables = {{"art-1", base.Hex()},
+                                                    {"art-2", colors.vibrant.Hex()},
+                                                    {"art-3", dark.Hex()},
+                                                    {"art-text", luminance > 0.179 ? "#000000" : "#ffffff"}};
+    // The same without "#", so a theme can put an alpha in front: #40var(--art-1-hex).
+    for (const char* name : {"art-1", "art-2", "art-3"}) variables[std::string(name) + "-hex"] = variables[name].substr(1);
+    return variables;
+}
+
 }  // namespace ampify

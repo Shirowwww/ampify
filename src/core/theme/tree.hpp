@@ -66,6 +66,9 @@ struct NodeInfo {
     // :nth-child, :first-child and :last-child. -1 and 0 when unknown: those selectors then match nothing.
     int position = -1;
     int siblings = 0;
+    // In one of Apple's player windows (full screen, mini player), not the main window. Only a selector that names that
+    // player's page or view reaches it (see Matches), so the main window's rules do not leak there.
+    bool player = false;
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";

@@ -131,12 +131,28 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
     // Reads the settings, the theme, the snippets, sidebar.json and home.json, and reloads only what changed. The
     // Windows mode and the local time choose the scheme for theme.scheme = auto and theme.schedule.
     theme::ThemeWorker worker(m_kit);
+    // The artwork's colours (var(--art-1)...), read by the backend on the interface thread.
+    std::shared_ptr<ArtworkColours> artwork = m_ui->backend.ArtworkSample();
+    std::map<std::string, std::string> lastArtwork;
+    int artworkReports = 0;
 
     while (m_running) {
         auto stamp = ChangeStamp(m_kit);
         Settings settings;
         settings.Load((m_kit / "settings.txt").string());
         worker.SetSystemDark(SystemUsesDarkMode());
+        {
+            std::lock_guard<std::mutex> guard(artwork->lock);
+            if (artwork->variables != lastArtwork) {
+                lastArtwork = artwork->variables;
+                worker.SetArtwork(lastArtwork);
+                if (artworkReports++ < kTimedPasses) {
+                    std::string list;
+                    for (const auto& [name, value] : lastArtwork) list += (list.empty() ? "" : ", ") + name + " " + value;
+                    m_journal.Write("Themes: artwork colours " + list);
+                }
+            }
+        }
         theme::SessionRequest request = worker.Tick(settings, LocalMinute());
 
         std::shared_ptr<UiSide> ui = m_ui;

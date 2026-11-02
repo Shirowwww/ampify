@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -40,5 +41,10 @@ struct ExtractedColors {
 // the palette (2..64). Empty when the size does not match or no pixel is opaque.
 std::optional<ExtractedColors> ExtractColors(const uint8_t* rgba, size_t size, size_t width, size_t height,
                                              size_t maxColors = 16);
+
+// The theme variables of an artwork: art-1 its most common colour, art-2 its vibrant one, art-3 its dark vibrant one
+// (for backgrounds), and art-text black or white, whichever reads best on art-1. Values are "#rrggbb"; art-1-hex,
+// art-2-hex and art-3-hex hold the same without "#", for a colour with an alpha.
+std::map<std::string, std::string> ArtworkVariables(const ExtractedColors& colors);
 
 }  // namespace ampify

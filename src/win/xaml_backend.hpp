@@ -12,6 +12,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -33,6 +34,15 @@
 #include "theme_animations.hpp"
 
 namespace ampify::win {
+
+// The colours of the artwork playing (art-1... of color_extract.hpp), read from the play bar's image on the interface
+// thread and taken by the theme service's own thread, hence the lock.
+struct ArtworkColours {
+    std::mutex lock;
+    std::map<std::string, std::string> variables;
+    std::string key;    // the image they come from: its address, or the object when it has none
+    bool busy = false;  // a reading is under way
+};
 
 // The hover logic (theme::HoverTracker) reads and writes the element through ReadRaw and WriteRaw, the XAML access
 // without the hover; Read and Write go through the tracker.
@@ -67,6 +77,8 @@ public:
 
     // True once the main window has closed: Apple Music is shutting down and its tree must not be touched any more.
     bool WindowClosed() const { return *m_closed; }
+    // The colours of the artwork playing; any thread may read them under their lock.
+    std::shared_ptr<ArtworkColours> ArtworkSample() const { return m_artworkColours; }
     // How many state values hold a theme's value now (HoldThroughStates), and how many refused it, for the log.
     std::size_t HeldStateCount() const;
     std::size_t RefusedStateCount() const { return m_refusedStates; }
@@ -104,6 +116,7 @@ private:
 
     winrt::Microsoft::UI::Xaml::Media::Brush ArtworkBrush(const std::string& text);
     void FollowArtwork(const winrt::Microsoft::UI::Xaml::Media::ImageSource& artwork);
+    void SampleArtwork(const winrt::Microsoft::UI::Xaml::Controls::Image& image);
 
     void OnState(theme::NodeId id, theme::Trigger trigger, bool on) noexcept;
     void OnFocusLost(theme::NodeId id) noexcept;
@@ -207,6 +220,7 @@ private:
     // found again on each snapshot, and the brushes Ampify made from it, which follow it when the song changes.
     winrt::Microsoft::UI::Xaml::Media::ImageSource m_artwork{nullptr};
     std::vector<winrt::Microsoft::UI::Xaml::Media::ImageBrush> m_artworkBrushes;
+    std::shared_ptr<ArtworkColours> m_artworkColours = std::make_shared<ArtworkColours>();
     // WatchChanges: the pass to run, the elements followed (frames and lists), the timer that groups their events, and
     // the passes still due after a navigation.
     std::function<void()> m_pass;

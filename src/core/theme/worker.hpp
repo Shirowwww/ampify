@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -31,6 +32,10 @@ public:
 
     void SetSystemDark(bool dark) { m_systemDark = dark; }
 
+    // The colours of the artwork playing (art-1...). A theme or snippet whose user.css names --art- is loaded again
+    // when they change; the others are not.
+    void SetArtwork(std::map<std::string, std::string> variables) { m_artwork = std::move(variables); }
+
     // The request for this pass. Its generation changes when the active theme, the chosen scheme (by setting, by
     // schedule or by Windows mode), the parts, the active theme's settings (themes.<id>.<key>), the enabled snippets,
     // sidebar.json, home.json or resource-keys.txt change, and with theme.live_reload when a file of the theme or of an
@@ -43,6 +48,7 @@ public:
 private:
     std::filesystem::path m_kit;
     bool m_systemDark = false;
+    std::map<std::string, std::string> m_artwork;
     std::string m_lastKey;
     bool m_hasKey = false;
     SessionRequest m_request;

@@ -25,10 +25,12 @@
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 #include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Text.h>
 #include <winrt/Windows.Foundation.Numerics.h>
 
+#include "../core/color_extract.hpp"
 #include "../core/theme/colour_keys.hpp"
 #include "../core/theme/properties.hpp"
 #include "../core/text_util.hpp"
@@ -279,6 +281,70 @@ void XamlTreeBackend::FollowArtwork(const media::ImageSource& artwork) {
     }
 }
 
+// Reads the colours of the play bar's artwork once per image: rendered small, then median cut (color_extract.hpp).
+// A blank or failed reading leaves the key unset, so the next pass tries again.
+void XamlTreeBackend::SampleArtwork(const controls::Image& image) {
+    constexpr int kSampleSize = 48;
+    media::ImageSource source = image.Source();
+    if (!source || image.ActualWidth() < 1) return;
+    std::string key;
+    if (auto bitmap = source.try_as<media::Imaging::BitmapImage>()) {
+        if (bitmap.PixelWidth() == 0) return;  // not decoded yet
+        if (auto uri = bitmap.UriSource()) key = Utf8(uri.AbsoluteUri());
+    }
+    if (key.empty()) key = std::to_string(reinterpret_cast<std::uintptr_t>(winrt::get_abi(source)));
+    std::shared_ptr<ArtworkColours> shared = m_artworkColours;
+    {
+        std::lock_guard<std::mutex> guard(shared->lock);
+        if (shared->busy || shared->key == key) return;
+        shared->busy = true;
+    }
+    auto done = [shared](std::optional<std::map<std::string, std::string>> variables, const std::string& from) {
+        std::lock_guard<std::mutex> guard(shared->lock);
+        shared->busy = false;
+        if (!variables) return;
+        shared->variables = std::move(*variables);
+        shared->key = from;
+    };
+    try {
+        media::Imaging::RenderTargetBitmap target;
+        using winrt::Windows::Foundation::AsyncStatus;
+        target.RenderAsync(image, kSampleSize, kSampleSize)
+            .Completed([target, key, done](auto const&, AsyncStatus status) {
+                if (status != AsyncStatus::Completed) return done(std::nullopt, key);
+                target.GetPixelsAsync().Completed([target, key, done](auto const& operation, AsyncStatus read) {
+                    try {
+                        if (read != AsyncStatus::Completed) return done(std::nullopt, key);
+                        auto buffer = operation.GetResults();
+                        size_t width = static_cast<size_t>(target.PixelWidth());
+                        size_t height = static_cast<size_t>(target.PixelHeight());
+                        if (buffer.Length() != width * height * 4) return done(std::nullopt, key);
+                        // BGRA with premultiplied alpha, to the straight RGBA the extractor reads.
+                        std::vector<uint8_t> rgba(buffer.Length());
+                        const uint8_t* bgra = buffer.data();
+                        for (size_t i = 0; i < rgba.size(); i += 4) {
+                            uint8_t alpha = bgra[i + 3];
+                            auto straight = [alpha](uint8_t channel) {
+                                return alpha ? static_cast<uint8_t>(std::min(255, channel * 255 / alpha)) : uint8_t{0};
+                            };
+                            rgba[i] = straight(bgra[i + 2]);
+                            rgba[i + 1] = straight(bgra[i + 1]);
+                            rgba[i + 2] = straight(bgra[i]);
+                            rgba[i + 3] = alpha;
+                        }
+                        std::optional<ExtractedColors> colors = ExtractColors(rgba.data(), rgba.size(), width, height);
+                        if (!colors) return done(std::nullopt, key);
+                        done(ArtworkVariables(*colors), key);
+                    } catch (...) {
+                        done(std::nullopt, key);
+                    }
+                });
+            });
+    } catch (...) {
+        done(std::nullopt, key);
+    }
+}
+
 IInspectable XamlTreeBackend::Restore(const theme::Value& token) const {
     std::uint64_t number = std::stoull(token.text.substr(std::string("handle:").size()));
     auto it = m_kept.find(number);
@@ -311,15 +377,27 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         int depth;
         int position;
         int siblings;
+        bool player = false;  // in one of Apple's player windows
     };
     std::vector<Pending> stack;
     for (auto it = m_popups.rbegin(); it != m_popups.rend(); ++it) {
         if (primitives::Popup popup = it->get()) stack.push_back({popup, -1, 0, 0, 1});
     }
+    // Apple's full-screen player is a window of its own on this same thread: its content is a root as well, so themes
+    // reach it. A window on another thread (the mini player) cannot be walked from here.
+    for (const wchar_t* name : {L"FullScreenPlayerWindow", L"MiniPlayerWindow"}) {
+        try {
+            xaml::Window other = AppWindow(name);
+            if (!other || other == window || !other.DispatcherQueue().HasThreadAccess()) continue;
+            if (xaml::UIElement root = other.Content()) stack.push_back({root, -1, 0, 0, 1, true});
+        } catch (...) {
+        }
+    }
     stack.push_back({content, -1, 0, 0, 1});
     std::set<void*> popupsSeen;  // a popup of the window's tree, reached there first, is not walked twice
     int lcdDepth = -1;
     media::ImageSource artwork{nullptr};
+    controls::Image artworkImage{nullptr};
     while (!stack.empty()) {
         Pending item = stack.back();
         stack.pop_back();
@@ -336,11 +414,15 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         node.depth = item.depth;
         node.position = item.position;
         node.siblings = item.siblings;
+        node.player = item.player;
         // The play bar's artwork: the first Image#StaticArtwork under NowPlayingControl#LCD.
         if (lcdDepth >= 0 && item.depth <= lcdDepth) lcdDepth = -1;
         if (node.name == "LCD" && node.type == "NowPlayingControl") lcdDepth = item.depth;
         if (lcdDepth >= 0 && !artwork && node.name == "StaticArtwork") {
-            if (auto image = item.object.try_as<controls::Image>()) artwork = image.Source();
+            if (auto image = item.object.try_as<controls::Image>()) {
+                artwork = image.Source();
+                artworkImage = image;
+            }
         }
 
         int index = static_cast<int>(nodes.size());
@@ -350,11 +432,11 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
 
         int count = media::VisualTreeHelper::GetChildrenCount(item.object);
         for (int i = count - 1; i >= 0; i--) {
-            stack.push_back({media::VisualTreeHelper::GetChild(item.object, i), index, item.depth + 1, i, count});
+            stack.push_back({media::VisualTreeHelper::GetChild(item.object, i), index, item.depth + 1, i, count, item.player});
         }
         // A popup's content is not one of its visual children.
         if (popup && count == 0) {
-            if (xaml::UIElement child = popup.Child()) stack.push_back({child, index, item.depth + 1, 0, 1});
+            if (xaml::UIElement child = popup.Child()) stack.push_back({child, index, item.depth + 1, 0, 1, item.player});
         }
     }
 
@@ -374,6 +456,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     }
     for (const auto& [id, property] : gone) ReleaseStates(id, property);
     FollowArtwork(artwork);
+    if (artworkImage) SampleArtwork(artworkImage);
     std::erase_if(m_watched, [](const auto& entry) { return !entry.second.get(); });
     std::erase_if(m_touched, [](const auto& entry) { return !entry.second.get(); });
     for (auto it = m_hoverHandlers.begin(); it != m_hoverHandlers.end();) {

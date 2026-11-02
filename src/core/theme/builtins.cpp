@@ -147,7 +147,16 @@ const std::vector<ClassEntry> kClasses{
     {"search-scope", {"ToggleButton#SearchAppleMusic", "ToggleButton#SearchLibrary", "ToggleButton#SearchStore"}},
     {"search-status", {"TextBlock#SearchPageStatus"}},
     {"search-top-result", {"Frame#SearchContentFrame TileControl > HoverGrid#RootGrid > ContentPresenter > Grid"}},
-
+    // Apple's full-screen player, a window of its own: only selectors that name it reach it (selector.cpp).
+    {"fullscreen-player", {"FullScreenPlayerPage"}},
+    {"fullscreen-background", {"FullScreenPlayerPage ImmersionLockup#immersionLockup"}},
+    {"fullscreen-artwork", {"FullScreenPlayerView ArtworkImage#ActualArtwork"}},
+    {"fullscreen-title", {"FullScreenPlayerView TickerTapeControl#TrackTitleTickerTape TextBlock#ScrollingText"}},
+    {"fullscreen-artist", {"FullScreenPlayerView TickerTapeControl#ArtistTitleTickerTape TextBlock#ScrollingText"}},
+    {"fullscreen-transport", {"FullScreenPlayerView Grid#TransportGrid"}},
+    {"fullscreen-time", {"FullScreenPlayerView TextBlock#CurrentTime", "FullScreenPlayerView TextBlock#Duration"}},
+    {"fullscreen-lyrics", {"FullScreenPlayerView LyricsHostView#LyricsView"}},
+    {"fullscreen-exit", {"FullScreenPlayerView Button#ExitFullScreenButton", "FullScreenPlayerView Button#CloseFullScreenButton"}},
     // Playback bar
     {"playbar", {"Grid#TransportBar"}},
     {"playbar-controls", {"Grid#TransportBar > Grid:nth-child(1)"}},

@@ -154,6 +154,14 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.search-scope` | One of them: Apple Music, Library, Store |
 | `.search-status` | The status line ("No results"...) |
 | `.search-top-result` | The tile of one of the top results, under "Top Results" |
+| `.fullscreen-player` | Apple's full-screen player, a window of its own (Now Playing opens it) |
+| `.fullscreen-background` | Its animated artwork background |
+| `.fullscreen-artwork` | Its large artwork |
+| `.fullscreen-title`, `.fullscreen-artist` | The song's title and artist under the artwork |
+| `.fullscreen-transport` | Its buttons, scrubber and volume |
+| `.fullscreen-time` | The elapsed and remaining times |
+| `.fullscreen-lyrics` | Its lyrics column |
+| `.fullscreen-exit` | Its exit and close buttons |
 
 ## Playback bar
 

@@ -65,6 +65,9 @@ struct LoadOptions {
     // The values settings.txt holds for the theme's declared settings (themes.<id>.<key>), by key. A missing or
     // unfit value takes the manifest's default.
     std::map<std::string, std::string> settings;
+    // Colours of the artwork playing, as variables art-1, art-2, art-3 and art-text (ArtworkVariables in
+    // color_extract.hpp). Empty before the first artwork: var(--art-1, fallback) then takes its fallback.
+    std::map<std::string, std::string> artwork;
 };
 
 // A theme folder, read and checked. Layout, as in docs/extensions/api.md section 6.1:
