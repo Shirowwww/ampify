@@ -30,7 +30,7 @@ std::string InspectTree(TreeBackend& tree, const InspectOptions& options = {});
 std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options = {});
 
 // Reads back the `nodes` of inspector.json, for tools that check selectors against a saved tree
-// (`ampify_theme_check --names`). Each node gets its place among its parent's children from the order of the list.
+// (`ampify theme names`). Each node gets its place among its parent's children from the order of the list.
 // Nothing, with `problem` set, for a file that is not such a tree.
 std::optional<std::vector<NodeInfo>> ReadInspectorTree(std::string_view json, std::string* problem = nullptr);
 

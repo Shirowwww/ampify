@@ -6,6 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Black and white, with bright colors for buttons and selections.",
+  "translations": {"fr": {"name": "Contraste élevé", "description": "Noir et blanc, avec des couleurs vives pour les boutons et les sélections."}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Dark",

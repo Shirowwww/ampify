@@ -515,6 +515,30 @@ TEST_CASE(UiRender_ModsListsValidExtensionsWithTheirState) {
     CHECK(ListMods(FreshKit("mods-empty")).empty());
 }
 
+TEST_CASE(UiRender_ModsShowTheTranslationOfTheLanguageElseTheEnglishText) {
+    fs::path kit = FreshKit("mods-translated");
+    WriteFile(kit / "extensions" / "clock" / "manifest.json",
+              R"({"id":"clock","name":"Clock","version":"1.0.0","kind":"extension","author":"x","description":"Time.",)"
+              R"("kitApi":"1.0","main":"main.js","translations":{"fr":{"name":"Horloge","description":"L'heure."}}})");
+    WriteFile(kit / "extensions" / "clock" / "main.js", "");
+    WriteFile(kit / "extensions" / "plain" / "manifest.json",
+              R"({"id":"plain","name":"Plain","version":"1.0.0","kind":"extension","author":"x","description":"Text.",)"
+              R"("kitApi":"1.0","main":"main.js"})");
+    WriteFile(kit / "extensions" / "plain" / "main.js", "");
+
+    std::vector<ModEntry> mods = ListMods(kit);
+    CHECK(mods.size() == 2);
+    if (mods.size() != 2) return;
+    const ModEntry& clock = mods[0].id == "clock" ? mods[0] : mods[1];
+    const ModEntry& plain = mods[0].id == "clock" ? mods[1] : mods[0];
+    CHECK(clock.NameIn("fr") == "Horloge");
+    CHECK(clock.DescriptionIn("fr") == "L'heure.");
+    CHECK(clock.NameIn("en") == "Clock");
+    CHECK(clock.DescriptionIn("en") == "Time.");
+    CHECK(plain.NameIn("fr") == "Plain");
+    CHECK(plain.DescriptionIn("fr") == "Text.");
+}
+
 TEST_CASE(UiRender_ModsSwitchWritesTheSettingAndAReloadRequest) {
     fs::path kit = FreshKit("mods-switch");
     WriteFile(kit / "settings.txt", "theme.active = midnight\n");

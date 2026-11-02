@@ -6,6 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Plain, light paper theme, with an optional dark scheme.",
+  "translations": {"fr": {"name": "Papier clair", "description": "Un thème simple, couleur papier clair, avec une variante sombre en option."}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Light",

@@ -586,8 +586,11 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
 
     controls::StackPanel labels;
     labels.VerticalAlignment(xaml::VerticalAlignment::Center);
-    labels.Children().Append(MakeText(Wide(mod.name).c_str(), "body", false, &shared.probe));
-    if (!mod.description.empty()) labels.Children().Append(MakeText(Wide(mod.description).c_str(), "caption", true, &shared.probe));
+    // The manifest's translation for Windows' language, else its English name and description.
+    const std::string& shownName = mod.NameIn(i18n::Language());
+    const std::string& shownDescription = mod.DescriptionIn(i18n::Language());
+    labels.Children().Append(MakeText(Wide(shownName).c_str(), "body", false, &shared.probe));
+    if (!shownDescription.empty()) labels.Children().Append(MakeText(Wide(shownDescription).c_str(), "caption", true, &shared.probe));
     row.Children().Append(labels);
 
     controls::ToggleSwitch toggle;
@@ -598,7 +601,7 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
     toggle.OffContent(winrt::box_value(Wide(i18n::Text("ui.off"))));
     toggle.VerticalAlignment(xaml::VerticalAlignment::Center);
     toggle.HorizontalAlignment(xaml::HorizontalAlignment::Right);
-    Name(toggle, "AMPIFY_ModsToggle_" + mod.id, mod.name);
+    Name(toggle, "AMPIFY_ModsToggle_" + mod.id, shownName);
     automation::AutomationProperties::SetHelpText(toggle, Wide(i18n::Text("mods.toggleHelp")));
     g_modsUpdating++;
     toggle.IsOn(mod.enabled);

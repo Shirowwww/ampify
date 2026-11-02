@@ -1,7 +1,7 @@
 # Lays out the kit folder of the Windows bench from the local MSVC builds, as the CI job msvc-build does:
 #   release\    ampify_launcher, ampify_kernel, ampify_setup, ampify (shipping build)
 #   cli\        ampify.exe
-#   bench\, ui\ ampify_launcher, ampify_kernel (bench build), plus ampify_theme_check, themes\, examples\react-panel in ui\
+#   bench\, ui\ ampify_launcher, ampify_kernel (bench build), plus ampify.exe, themes\, examples\react-panel in ui\
 #
 #   pwsh -File scripts\build-msvc.ps1 -Bench; pwsh -File scripts\build-msvc.ps1; pwsh -File scripts\bench-kit.ps1
 #   pwsh -File bench\windows\run-bench.ps1 -KitRoot build-msvc\kit -Only ui-surfaces -SkipInstall
@@ -26,7 +26,7 @@ Remove-Item -LiteralPath $Out -Recurse -Force -ErrorAction SilentlyContinue
 Copy-Built $builds.release (Join-Path $Out 'release') @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify_setup.exe', 'ampify.exe')
 Copy-Built $builds.release (Join-Path $Out 'cli') @('ampify.exe')
 Copy-Built $builds.bench (Join-Path $Out 'bench') @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify.exe')
-Copy-Built $builds.bench (Join-Path $Out 'ui') @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify_theme_check.exe', 'ampify.exe')
+Copy-Built $builds.bench (Join-Path $Out 'ui') @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify.exe')
 New-Item -ItemType Directory -Force -Path (Join-Path $Out 'ui\examples') | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'themes') -Destination (Join-Path $Out 'ui') -Recurse
 Copy-Item -LiteralPath (Join-Path $root 'examples\react-panel') -Destination (Join-Path $Out 'ui\examples') -Recurse

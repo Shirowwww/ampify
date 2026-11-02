@@ -28,6 +28,7 @@ Elements
   theme    list | set <id> [--scheme <name>] | clear
   theme    check <folder> [--scheme <name>]   reads a theme as the kernel does and shows what would apply
   theme    watch <folder> [--scheme <name>]   reads the theme again at each save (--max-cycles N to stop)
+  theme    names <inspector.json>...          checks the stable names (.sidebar, .card...) against saved interface trees
   theme    import <folder|zip|address> [id] takes up a Spicetify theme (its color.ini works as is)
   validate <folder>            checks the manifest of an element (or a catalog.json)
   new <extension|theme|snippet|app> <id>   creates a starter element
@@ -78,6 +79,7 @@ Options
   --yes, -y                    answers yes to every question
   --max-cycles <n>             stops watch, dev or logs --follow after n passes (useful for tests)
   --follow                     logs: keeps printing new lines
+  --json                       market: prints the state as JSON (read by the Marketplace app)
   --version, --help
 
 Documentation: docs/cli.md

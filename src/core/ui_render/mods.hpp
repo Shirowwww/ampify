@@ -5,6 +5,7 @@
 // the card itself is built by src/win/ui_service.cpp.
 
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -16,9 +17,14 @@ struct ModEntry {
     std::string id;
     std::string name;         // manifest name, or the id when the manifest has none
     std::string description;  // may be empty
+    std::map<std::string, ManifestText> translations;  // name and description by language, from the manifest
     bool enabled = false;     // extensions.<id>.enabled in settings.txt
     std::vector<SettingSpec> settings;  // what the manifest declares, in its order
     std::vector<std::string> values;    // the value of each setting now: settings.txt, else the default
+
+    // The name and description to show in a language: its translation when the manifest has one, else the English text.
+    const std::string& NameIn(const std::string& language) const;
+    const std::string& DescriptionIn(const std::string& language) const;
 };
 
 // The extensions of <ampify>\extensions whose manifest is valid and whose kind is extension, sorted by name. Folders that

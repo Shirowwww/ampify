@@ -144,6 +144,26 @@ class CatalogTests(unittest.TestCase):
             code, text = self.write([entry(preview=f"https://example.com/demo.{ending}")])
             self.assertEqual(code, 0, text)
 
+    def test_translations_pass_for_french_only(self):
+        code, text = self.write([entry(translations={"fr": {"name": "Démo", "description": "Une entrée de test."}})])
+        self.assertEqual(code, 0, text)
+
+    def test_bad_translations_are_refused(self):
+        cases = {
+            "unknown language": {"de": {"name": "Demo", "description": "Test."}},
+            "missing description": {"fr": {"name": "Démo"}},
+            "empty name": {"fr": {"name": "", "description": "Test."}},
+            "name too long": {"fr": {"name": "a" * 61, "description": "Test."}},
+            "description too long": {"fr": {"name": "Démo", "description": "a" * 301}},
+            "extra field": {"fr": {"name": "Démo", "description": "Test.", "tags": []}},
+            "not an object": {"fr": "Démo"},
+        }
+        for label, translations in cases.items():
+            with self.subTest(label):
+                code, text = self.write([entry(translations=translations)])
+                self.assertEqual(code, 1)
+                self.assertIn("extensions[0].translations", text)
+
     def test_bad_tags_are_refused(self):
         cases = {
             "capital": ["Dark"],
@@ -268,6 +288,24 @@ class ManifestTests(unittest.TestCase):
         data = manifest(tags=["dark", "layout"], preview="preview.png")
         code, text = run("manifest", self.install(data, files=("main.js", "preview.png")))
         self.assertEqual(code, 0, text)
+
+    def test_translations_pass_for_french_only(self):
+        data = manifest(translations={"fr": {"name": "Démo", "description": "Un manifeste de test."}})
+        code, text = run("manifest", self.install(data))
+        self.assertEqual(code, 0, text)
+
+    def test_bad_translations_are_refused(self):
+        cases = {
+            "unknown language": {"es": {"name": "Demo", "description": "Test."}},
+            "missing name": {"fr": {"description": "Test."}},
+            "description too long": {"fr": {"name": "Démo", "description": "a" * 301}},
+            "extra field": {"fr": {"name": "Démo", "description": "Test.", "x": 1}},
+        }
+        for label, translations in cases.items():
+            with self.subTest(label):
+                code, text = run("manifest", self.install(manifest(translations=translations)))
+                self.assertEqual(code, 1)
+                self.assertIn("translations", text)
 
     def test_bad_tags_are_refused(self):
         cases = {

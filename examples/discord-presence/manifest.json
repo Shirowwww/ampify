@@ -6,6 +6,7 @@
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from. Shows the current track in your Discord status. Needs discord.enabled and the id of a Discord application.",
+  "translations": {"fr": {"name": "Présence Discord (exemple)", "description": "Un exemple pour apprendre. Affiche le morceau en cours dans votre statut Discord. Demande discord.enabled et l'identifiant d'une application Discord."}},
   "tags": ["example"],
   "kitApi": "1.0",
   "main": "main.js",

@@ -6,6 +6,7 @@
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from, the smallest one: writes to the log and keeps a launch counter.",
+  "translations": {"fr": {"name": "Bonjour (exemple)", "description": "Un exemple pour apprendre, le plus petit : écrit dans le journal et compte les lancements."}},
   "kitApi": "1.0",
   "main": "main.js",
   "processes": [

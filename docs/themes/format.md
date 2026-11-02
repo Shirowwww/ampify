@@ -726,13 +726,13 @@ the top of its `user.css`.
 On any PC, without Apple Music:
 
 ```
-ampify_theme_check.exe C:\path\to\my-theme [Dark]
+ampify theme check C:\path\to\my-theme [--scheme Dark]
 ```
 
-The tool prints the schemes, each rule kept with its line, then the problems. It exits with code 0 only if the theme is
+The command prints the schemes, each rule kept with its line, then the problems. It exits with code 0 only if the theme is
 usable and has no problem.
 
-`ampify_theme_check.exe --names <inspector.json>...` checks the stable names against trees saved by the inspector
+`ampify theme names <inspector.json>...` checks the stable names against trees saved by the inspector
 (see [names.md](names.md)).
 
 ## Theme parts

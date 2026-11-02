@@ -6,6 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Hides the buttons and banners most people never use: reactions, share, AirPlay, info banners.",
+  "translations": {"fr": {"name": "Interface épurée", "description": "Masque les boutons et bandeaux que presque personne n'utilise : réactions, partage, AirPlay, bandeaux d'information."}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "tags": [

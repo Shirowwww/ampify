@@ -6,6 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "An ink-blue night: the sidebar and the pages float as rounded panels, with a pale moonlight accent.",
+  "translations": {"fr": {"name": "Minuit", "description": "Une nuit bleu encre : la barre latérale et les pages flottent en panneaux arrondis, avec un accent pâle comme le clair de lune."}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "tags": [

@@ -105,7 +105,7 @@ jobs:
             targets: ampify_launcher ampify_kernel ampify_setup ampify
           - variant: bench
             bench: 'ON'
-            targets: ampify_launcher ampify_kernel ampify_theme_check
+            targets: ampify_launcher ampify_kernel ampify
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/msvc-setup
@@ -126,7 +126,7 @@ jobs:
           $layout = if ('${{ matrix.variant }}' -eq 'release') {
             @{ release = @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify_setup.exe', 'ampify.exe'); cli = @('ampify.exe') }
           } else {
-            @{ bench = @('ampify_launcher.exe', 'ampify_kernel.dll'); ui = @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify_theme_check.exe') }
+            @{ bench = @('ampify_launcher.exe', 'ampify_kernel.dll'); ui = @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify.exe') }
           }
           foreach ($folder in $layout.Keys) {
             $to = Join-Path $kit $folder

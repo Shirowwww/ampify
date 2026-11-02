@@ -89,20 +89,6 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
         return true;
     }
 
-    if (key == "app_path" || key == "prefs_path") {
-        if (value.empty()) return true;  // empty: back to the path found on its own
-        for (char c : value) {
-            if (static_cast<unsigned char>(c) < 0x20) {
-                problem = key + " contains a control character";
-                return false;
-            }
-        }
-        if (!PathArgument(value).is_absolute()) {
-            problem = key + " expects a full path, for example C:\\folder\\file";
-            return false;
-        }
-        return true;
-    }
     if (key == kLaunchFlagsKey) {
         if (!SplitLaunchFlags(value, &problem)) return false;
         return true;
@@ -132,7 +118,7 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
     }
 
     bool isBooleanKey = key.rfind("theme.parts.", 0) == 0 || key == "theme.inspect" || key == "theme.live_reload" ||
-                        key == "check_kit_update" || key == "telemetry.block" || key == "expose_api" ||
+                        key == "check_kit_update" || key == "expose_api" ||
                         key == "discord.enabled" || key == "tray.enabled" || key == "remote.enabled" ||
                         key == "midi.enabled" ||
                         (key.size() > 8 && key.compare(key.size() - 8, 8, ".enabled") == 0 &&
@@ -572,15 +558,15 @@ namespace {
 
 // What `ampify path <name>` prints. Nothing when the path cannot be found (Apple Music on another system).
 std::optional<std::filesystem::path> NamedPath(Context& ctx, std::string_view name) {
-    if (name == "kit" || name == "userdata") return ctx.kit.Root();
+    if (name == "kit") return ctx.kit.Root();
     if (name == "settings") return ctx.kit.Settings();
     if (name == "extensions" || name == "themes" || name == "apps" || name == "snippets") {
         return ctx.kit.Root() / std::string(name);
     }
     if (name == "logs") return ctx.kit.Journal();
     if (name == "backups") return ctx.kit.Backups();
-    if (name == "app") return PathSetting(ctx, "app_path", platform::AppPackageFolder());
-    if (name == "prefs") return PathSetting(ctx, "prefs_path", platform::AppPreferencesFile());
+    if (name == "app") return platform::AppPackageFolder();
+    if (name == "prefs") return platform::AppPreferencesFile();
     return std::nullopt;
 }
 
@@ -594,8 +580,7 @@ int CmdPath(Context& ctx) {
     if (args.size() > 2) return Usage(ctx, "path takes at most one name");
     if (args.size() == 2) {
         const std::string& name = args[1];
-        bool known = name == "userdata" ||
-                     std::find(std::begin(kPathNames), std::end(kPathNames), std::string_view(name)) != std::end(kPathNames);
+        bool known = std::find(std::begin(kPathNames), std::end(kPathNames), std::string_view(name)) != std::end(kPathNames);
         if (!known) {
             std::string names;
             for (std::string_view each : kPathNames) names += (names.empty() ? "" : ", ") + std::string(each);
@@ -605,10 +590,9 @@ int CmdPath(Context& ctx) {
         if (!path) {
             if (name == "app") {
                 return Failure(ctx, "Apple Music folder not found: Apple Music is not installed, or this system "
-                                    "is not Windows. You can set it with ampify config app_path <folder>.");
+                                    "is not Windows.");
             }
-            return Failure(ctx, "Apple Music preferences not found on this system. You can set them with "
-                                "ampify config prefs_path <file>.");
+            return Failure(ctx, "Apple Music preferences not found on this system.");
         }
         ctx.out << Utf8(*path) << "\n";
         return 0;
@@ -685,6 +669,13 @@ int CmdTheme(Context& ctx) {
         if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
         ctx.out << "No active theme. " << Tr("applyHint") << "\n";
         return 0;
+    }
+    // names checks the stable names (.sidebar, .card...) against trees saved by the inspector, after an Apple Music update.
+    if (action == "names") {
+        if (args.size() < 3) return Usage(ctx, "theme names needs one or more inspector.json files");
+        std::vector<std::filesystem::path> trees;
+        for (size_t i = 2; i < args.size(); i++) trees.push_back(PathArgument(args[i]));
+        return theme::RunNames(trees, ctx.out, ctx.err);
     }
     // check and watch read a theme folder anywhere on disk, the way the kernel reads it, and print what would apply.
     if (action == "check" || action == "watch") {

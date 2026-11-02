@@ -741,6 +741,37 @@ TEST_CASE(Manifest_TypeIsScriptOrModuleForTheCli) {
     CHECK(MentionsField(errors, "type: invalid value"));
 }
 
+TEST_CASE(Manifest_TranslationsAreFrenchWithTheSameLengthRules) {
+    const std::string base =
+        R"({"id": "demo", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"
+        R"("description": "Test.", "kitApi": "1.0", "main": "main.js", )";
+    std::vector<std::string> errors;
+    std::optional<ampify::ElementManifest> translated = ampify::ParseManifest(
+        base + R"("translations": {"fr": {"name": "Démo", "description": "Un test."}}})", errors);
+    CHECK(errors.empty());
+    CHECK(translated && translated->translations.at("fr").name == "Démo");
+    CHECK(translated && translated->translations.at("fr").description == "Un test.");
+
+    CHECK(!ampify::ParseManifest(base + R"("translations": {"de": {"name": "a", "description": "b"}}})", errors).has_value());
+    CHECK(MentionsField(errors, "translations.de: unknown language"));
+    errors.clear();
+    CHECK(!ampify::ParseManifest(base + R"("translations": {"fr": {"name": "Démo"}}})", errors).has_value());
+    CHECK(MentionsField(errors, "translations.fr.description: required field missing"));
+    errors.clear();
+    CHECK(!ampify::ParseManifest(base + R"("translations": {"fr": {"name": "", "description": "b"}}})", errors).has_value());
+    CHECK(!ampify::ParseManifest(base + R"("translations": {"fr": {"name": "a", "description": "b", "x": 1}}})", errors).has_value());
+    CHECK(MentionsField(errors, "translations.fr.x: unknown field"));
+}
+
+TEST_CASE(Catalog_TranslationsAreRead) {
+    std::string entry = kCatalogEntry;
+    entry.insert(entry.size() - 1, R"(, "translations": {"fr": {"name": "Démo", "description": "Un test."}})");
+    std::vector<std::string> errors;
+    std::optional<ampify::Catalog> catalog = ampify::ParseCatalog(CatalogWith(entry), false, errors);
+    CHECK(errors.empty());
+    CHECK(catalog && catalog->entries[0].translations.at("fr").name == "Démo");
+}
+
 TEST_CASE(Manifest_TagsAreFiveShortUniqueWords) {
     const std::string base =
         R"({"id": "demo", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"

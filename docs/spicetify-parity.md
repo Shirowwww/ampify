@@ -65,11 +65,11 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 
 | Spicetify key | Ampify | Status |
 |---|---|---|
-| `spotify_path` | `app_path` | Done |
-| `prefs_path` | `prefs_path`, read-only for Ampify unless set explicitly | Done |
+| `spotify_path` | None: Apple Music is a Store package that Windows finds by its identity, so there is no path to set. `ampify path app` prints where it is | Different |
+| `prefs_path` | None: `ampify path prefs` prints the usual place of the preferences file | Different |
 | `spotify_launch_flags` | `app_launch_flags`, arguments added when Apple Music starts (Apple Music may ignore them) | Done |
 | `check_spicetify_update` | `check_kit_update`, a check at `ampify` start, never an automatic download | Done |
-| `disable_sentry`, `disable_ui_logging` | `telemetry.block` is reserved: the key is accepted, the kernel does not read it | Outside 1.0 |
+| `disable_sentry`, `disable_ui_logging` | None: no setting exists | Outside 1.0 |
 | `remove_rtl_rule` | Not needed: there are no right-to-left CSS rules to remove. A theme can set `flow-direction` | Different |
 | `expose_apis` | `expose_api`. At `0`, no JavaScript element starts | Done |
 | `current_theme` | `theme.active` | Done |
@@ -203,8 +203,8 @@ rule "resolve by name".
 
 ### Telemetry preprocessor (`disable_sentry`, `disable_ui_logging`)
 
-The reserved option is `telemetry.block`, off by default. The kernel would answer locally the requests sent to the telemetry
-hosts found by traffic capture. License and DRM hosts would never be on that list. Status: outside 1.0.
+No setting exists. The kernel would answer locally the requests sent to the telemetry hosts found by traffic capture.
+License and DRM hosts would never be on that list. Status: outside 1.0.
 
 ## 9. Beyond Spicetify
 

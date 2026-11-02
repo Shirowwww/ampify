@@ -29,7 +29,6 @@ Rules that never change:
 | `ampify_kernel.dll` | The library injected into both Apple Music processes | `src/kernel/`, `src/core/`, `src/win/` |
 | `ampify.exe` | The command line: settings, themes, extensions, Marketplace, author tools | `src/cli/` |
 | `ampify_setup.exe` | Installer and uninstaller | `src/setup/` |
-| `ampify_theme_check.exe` | Checks a theme without Apple Music (bench) | `src/core/theme/` |
 
 ## The two Apple Music processes
 
@@ -182,7 +181,7 @@ Other points:
 - A changed theme folder (a signature of the folder is compared) is reloaded: remove, then apply again.
 - The inspector (`theme.inspect = 1`, or `ampify devtools`) writes `logs\inspector.txt` and `inspector.json`: the
   resources and the element tree with a selector for each element. It is the source of real names, and of the table of
-  stable names: `ampify_theme_check --names` checks that table against saved trees after an Apple Music update.
+  stable names: `ampify theme names` checks that table against saved trees after an Apple Music update.
 - A `transition` is handed to XAML's own implicit transitions, so the compositor animates the change. A transform
   that animates goes through `UIElement.Scale`, `Rotation` and `Translation`, around the centre unless the theme
   chooses another origin.

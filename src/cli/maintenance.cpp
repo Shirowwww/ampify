@@ -60,15 +60,6 @@ UpdateCache ReadUpdateCache(const std::filesystem::path& file) {
 
 }  // namespace
 
-std::optional<std::filesystem::path> PathSetting(const Context& ctx, const std::string& key,
-                                                 std::optional<std::filesystem::path> fallback) {
-    Settings settings;
-    settings.Load(ctx.kit.Settings().string());
-    std::string value = settings.GetString(key, "");
-    if (!value.empty()) return PathArgument(value);
-    return fallback;
-}
-
 int CmdDevtools(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() > 2) return Usage(ctx, "devtools takes on, off, or nothing (for on)");

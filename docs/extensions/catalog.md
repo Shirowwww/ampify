@@ -39,6 +39,7 @@ The example above is not in the catalog: its SHA-256 is a placeholder.
 | `tags` | no | A copy of the manifest tags: 5 at most, unique, each `[a-z0-9][a-z0-9-]{0,19}`. Shown on the card. |
 | `preview` | no | An `https://` URL ending in `.png`, `.jpg` or `.jpeg`, 512 characters at most. The page shows it only when its host is the catalog's own host or the host of the archive `url`; any other address is left out. A catalog read from a local file only has the archive `url` host. |
 | `permissions` | no | A copy of the manifest permissions. It lets the consent be shown before the download. |
+| `translations` | no | A copy of the manifest's `translations` (`fr` only: `{"fr": {"name": "...", "description": "..."}}`, same length rules as `name` and `description`). The Marketplace shows it when Windows is in French. `tools/pack.py` and `ampify build` copy it. |
 
 The permission `kit.manage` is refused in the catalog: only the Marketplace that ships with Ampify holds it.
 
@@ -109,7 +110,8 @@ command line, and bypasses no check.
   theme in use: a theme changed elsewhere while the page is open (`ampify theme set`, `settings.txt`) shows after it.
 - The page reads everything from `ampify market --json`: `catalogOk`, the `catalog` entries, the `installed` elements
   (with `valid`, `enabled`, a local `preview`, and for a theme its `schemes` and `defaultScheme`), the active `theme`
-  and its `scheme`.
+  and its `scheme`. Entries and installed elements carry `translations` when their manifest has it; the page shows
+  `translations[Ampify.i18n.language]` for the name and description (cards, detail view and search), else the English ones.
 
 **Screen**
 

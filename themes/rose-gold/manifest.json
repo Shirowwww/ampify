@@ -6,6 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Warm brown-black panels and a rose gold play button, display and volume. A dark scheme and a light one.",
+  "translations": {"fr": {"name": "Or rose", "description": "Des panneaux brun-noir chaleureux, avec le bouton de lecture, l'affichage et le volume en or rose. Une variante sombre et une claire."}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Dark",

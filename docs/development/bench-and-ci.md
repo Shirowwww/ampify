@@ -227,7 +227,7 @@ Pitfalls found:
 2. **ccache for MSVC with Ninja:** the first run fills the cache and later runs recompile only what changed. The
    precompiled header is off with ccache, because ccache cannot cache a file compiled with a PCH.
 3. **Unit tests apart from the kits:** the Windows tests build their own targets, so the bench never waits for them.
-4. **Limited builds:** the bench kit builds only `ampify_launcher ampify_kernel ampify_theme_check`, and the unit test
+4. **Limited builds:** the bench kit builds only `ampify_launcher ampify_kernel ampify`, and the unit test
    job skips the WinUI projection, which it does not need.
 5. **One workflow, triggered on `dev` only:** work reaches `main` through `dev` with the same commits, so `main` and
    pull requests need no run of their own, and a new push cancels the run in progress.

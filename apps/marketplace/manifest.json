@@ -6,6 +6,7 @@
   "kind": "app",
   "author": "Shirowwww",
   "description": "Install, remove and choose Ampify themes, schemes, extensions and apps, without leaving Apple Music.",
+  "translations": {"fr": {"name": "Marketplace", "description": "Installez, supprimez et choisissez des thèmes, variantes, extensions et apps Ampify, sans quitter Apple Music."}},
   "kitApi": "1.0",
   "main": "main.js",
   "icon": "icon.svg",

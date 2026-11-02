@@ -43,6 +43,7 @@
           "description": "GitHub login of the author."
         },
         "description": {"type": "string", "minLength": 1, "maxLength": 300},
+        "translations": {"$ref": "#/$defs/translations"},
         "kitApi": {"$ref": "#/$defs/kitApi"},
         "url": {
           "$ref": "#/$defs/https",
@@ -78,6 +79,23 @@
       }
     },
     "kind": {"enum": ["extension", "theme", "app", "snippet"]},
+    "translations": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Copy of the manifest's translations (fr only for now), shown when Windows is in that language.",
+      "properties": {
+        "fr": {"$ref": "#/$defs/translation"}
+      }
+    },
+    "translation": {
+      "type": "object",
+      "required": ["name", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 60},
+        "description": {"type": "string", "minLength": 1, "maxLength": 300}
+      }
+    },
     "kitApi": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
     "tag": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,19}$"},
     "https": {"type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 512},

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Elements can carry a French name and description (`translations` in the manifest). The Marketplace and the Ampify
+  card in Apple Music's Settings show them on a French Windows. All bundled elements are translated.
+- `ampify theme names <inspector.json>...` replaces `ampify_theme_check --names`, and `ampify theme check` replaces
+  the rest of that program, which is gone.
+- Removed the settings `app_path`, `prefs_path` and `telemetry.block`, which nothing read, and the hidden
+  `ampify path userdata`. `ampify help` and `docs/cli.md` now list the same commands.
+
 ## 1.1.0 (2026-11-01)
 
 - Ampify loads with Apple Music each time it starts, from Apple Music's own icon, as Spicetify stays applied to

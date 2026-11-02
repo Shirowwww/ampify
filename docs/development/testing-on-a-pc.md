@@ -207,7 +207,7 @@ its `key`.
 Goal: learn the real names and resources of the app, check that a test theme changes a color without a restart and
 restores it, and check the example themes.
 
-1. **Check the example themes** without Apple Music: run `ampify_theme_check.exe` on each folder of `themes\examples\`. Each
+1. **Check the example themes** without Apple Music: run `ampify theme check` on each folder of `themes\examples\`. Each
    must end as usable with no problem line.
 2. **Copy a theme** into `%USERPROFILE%\Ampify\themes\` (the `midnight` folder).
 3. **Read the names** (inspector): set `theme.inspect = 1` in `settings.txt`, start Apple Music with `ampify_launcher.exe`,

@@ -800,7 +800,8 @@ Nothing is ruled out for good. Each point stays outside API 1.0 for a specific r
 - **Adding to the queue.** `Ampify.player.queue.add` answers `false`: Apple's player ignores the songs Ampify hands it
   ([knowledge/apple-music-queue.md](../../knowledge/apple-music-queue.md)). Path: the call that the "Play Next" entry
   of a catalog page makes.
-- **Telemetry.** An option `telemetry.block`, off by default, that never touches license or DRM hosts.
+- **Telemetry.** Blocking the requests sent to telemetry hosts, which would never touch license or DRM hosts. No setting
+  exists for it today.
 - **Per-version patches.** A table of byte patterns, with no fixed address, for each tested version.
 
 ## 12. Implementation status

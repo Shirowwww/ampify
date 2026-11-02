@@ -1618,20 +1618,9 @@ TEST_CASE(Parts_ReadBackFromSettings) {
     CHECK(th::ReadThemeSettings(ampify::Settings{}).parts.colors);  // defaults are on
 }
 
-// --- Commands: ampify theme list, ampify theme set, ampify watch --------------------------------------------------
+// --- Commands: ampify theme watch and ampify theme names ----------------------------------------------------------
 
 namespace {
-
-// A kit in a temporary folder, with a usable theme `midnight` (two schemes) and a refused theme `broken`.
-th::KitLayout MakeKit(const char* name) {
-    th::KitLayout kit{std::filesystem::path(TempFolder(name))};
-    std::filesystem::create_directories(kit.Themes() / "midnight");
-    std::filesystem::create_directories(kit.Themes() / "broken");
-    { std::ofstream(kit.Themes() / "midnight" / "colors.ini") << "[Base]\nAccent = 0A84FF\n[Dark]\nAccent = 1C1C1E\n"; }
-    { std::ofstream(kit.Themes() / "midnight" / "user.css") << "Page { background: $accent; }\n"; }
-    { std::ofstream(kit.Themes() / "broken" / "resources.xaml") << "<Oops />\n"; }
-    return kit;
-}
 
 std::vector<std::string> Args(std::initializer_list<const char*> values) {
     return std::vector<std::string>(values.begin(), values.end());
@@ -1639,76 +1628,25 @@ std::vector<std::string> Args(std::initializer_list<const char*> values) {
 
 }  // namespace
 
-TEST_CASE(Commands_ListShowsUsableAndRefusedThemes) {
-    th::KitLayout kit = MakeKit("list");
-    std::ostringstream out;
-    std::ostringstream err;
-    CHECK(th::RunThemeCommand(Args({"theme", "list"}), kit, out, err) == 0);
-    CHECK(out.str().find("midnight") != std::string::npos);
-    CHECK(out.str().find("midnight: usable, schemes: Base Dark") != std::string::npos);
-    CHECK(out.str().find("broken: refused") != std::string::npos);
-    std::filesystem::remove_all(kit.root);
-}
-
-TEST_CASE(Commands_SetWritesTheThemeAndTheScheme) {
-    th::KitLayout kit = MakeKit("set");
-    std::ostringstream out;
-    std::ostringstream err;
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight", "--scheme", "Dark"}), kit, out, err) == 0);
-
-    ampify::Settings settings;
-    settings.Load(kit.Settings().string());
-    CHECK(settings.GetString("theme.active", "") == "midnight");
-    CHECK(settings.GetString("theme.scheme", "") == "Dark");
-    CHECK(out.str().find("Theme \"midnight\" chosen, scheme Dark") != std::string::npos);
-    std::filesystem::remove_all(kit.root);
-}
-
-TEST_CASE(Commands_SetKeepsTheOtherSettings) {
-    th::KitLayout kit = MakeKit("keep");
-    ampify::Settings before;
-    before.Set("extensions.atmos-leveler.enabled", "1");
-    before.SetBool("theme.live_reload", false);
-    before.SetBool("theme.parts.assets", false);
-    before.Save(kit.Settings().string());
-    { std::ofstream(kit.Themes() / "midnight" / "manifest.json") << R"({"defaultScheme": "Dark"})"; }
+TEST_CASE(Commands_NamesReportsClassesFoundInNoTree) {
+    std::string root = TempFolder("names");
+    std::filesystem::path folder(root);
+    { std::ofstream(folder / "tiny.json") << R"({"version":1,"nodes":[{"index":0,"type":"Grid","name":"Nothing","parent":-1,"depth":0}]})"; }
+    { std::ofstream(folder / "broken.json") << "[]"; }
 
     std::ostringstream out;
     std::ostringstream err;
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight"}), kit, out, err) == 0);
+    // A tree with one unknown element: no stable name matches it, so the check fails and lists them.
+    CHECK(th::RunNames({folder / "tiny.json"}, out, err) == 1);
+    CHECK(out.str().find("Stable names checked against 1 tree(s):") != std::string::npos);
+    CHECK(out.str().find("Found in no tree (") != std::string::npos);
 
-    ampify::Settings after;
-    after.Load(kit.Settings().string());
-    CHECK(after.GetString("extensions.atmos-leveler.enabled", "") == "1");
-    CHECK(!after.GetBool("theme.live_reload", true));
-    CHECK(!after.GetBool("theme.parts.assets", true));
-    CHECK(after.GetString("theme.scheme", "x").empty());  // no --scheme: the theme's default, read on each pass
-    CHECK(out.str().find("chosen, scheme Dark") != std::string::npos);
-    std::filesystem::remove_all(kit.root);
-}
-
-TEST_CASE(Commands_SetNoneAndTheErrors) {
-    th::KitLayout kit = MakeKit("none");
-    std::ostringstream out;
-    std::ostringstream err;
-
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight"}), kit, out, err) == 0);
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "none"}), kit, out, err) == 0);
-    ampify::Settings settings;
-    settings.Load(kit.Settings().string());
-    CHECK(th::ReadThemeSettings(settings).active.empty());
-
-    // A missing theme, a refused theme, and a wrong command change nothing and report why.
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "absent"}), kit, out, err) == 2);
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "broken"}), kit, out, err) == 1);
-    CHECK(err.str().find("refused: settings unchanged") != std::string::npos);
-    CHECK(th::RunThemeCommand(Args({"theme", "frobnicate"}), kit, out, err) == 2);
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight", "--bogus"}), kit, out, err) == 2);
-    CHECK(th::RunThemeCommand(Args({"theme", "set", "midnight", "--scheme"}), kit, out, err) == 2);
-
-    settings.Load(kit.Settings().string());
-    CHECK(th::ReadThemeSettings(settings).active.empty());  // still none
-    std::filesystem::remove_all(kit.root);
+    std::ostringstream badOut;
+    std::ostringstream badErr;
+    CHECK(th::RunNames({folder / "broken.json"}, badOut, badErr) == 2);
+    CHECK(badErr.str().find("broken.json") != std::string::npos);
+    CHECK(th::RunNames({folder / "absent.json"}, badOut, badErr) == 2);
+    std::filesystem::remove_all(folder);
 }
 
 TEST_CASE(Commands_WatchRechecksWhenAFileChanges) {
@@ -2275,16 +2213,6 @@ TEST_CASE(Settings_ScheduleIsKeptAndOnlyWrittenWhenSet) {
     CHECK(th::ReadThemeSettings(settings).schedule == "07:00=Light,19:00=Dark");
     th::WriteThemeSettings(settings, th::ThemeSettings{});
     CHECK(!settings.Get("theme.schedule").has_value());
-
-    std::string root = TempFolder("schedule-kept");
-    std::filesystem::path kit(root);
-    WriteFile(kit / "themes" / "midnight" / "colors.ini", "[Light]\nA = FFFFFF\n[Dark]\nA = 000000\n");
-    WriteFile(kit / "settings.txt", "theme.schedule = 07:00=Light,19:00=Dark\n");
-    std::ostringstream out, err;
-    CHECK(th::RunThemeCommand({"theme", "set", "midnight"}, th::KitLayout{kit}, out, err) == 0);
-    ampify::Settings after;
-    after.Load((kit / "settings.txt").string());
-    CHECK(after.GetString("theme.schedule", "") == "07:00=Light,19:00=Dark");
 }
 
 TEST_CASE(Worker_ReloadsOnlyWhenSomethingChanges) {

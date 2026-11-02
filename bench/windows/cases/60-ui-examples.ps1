@@ -1,13 +1,13 @@
-# Step 1 of the UI test, without Apple Music: the example themes load without a problem with ampify_theme_check.
-# Needs $script:BenchKitRoot\ui\ampify_theme_check.exe and a copy of
+# Step 1 of the UI test, without Apple Music: the example themes load without a problem with `ampify theme check`.
+# Needs $script:BenchKitRoot\ui\ampify.exe and a copy of
 # themes/ in $script:BenchKitRoot\ui\themes.
 
-Register-Case -Id 'ui-examples' -Title 'UI: the example themes are usable (ampify_theme_check)' -Action {
+Register-Case -Id 'ui-examples' -Title 'UI: the example themes are usable (ampify theme check)' -Action {
     param($Ctx)
 
-    $check = Join-Path $script:BenchKitRoot 'ui\ampify_theme_check.exe'
+    $check = Join-Path $script:BenchKitRoot 'ui\ampify.exe'
     if (-not (Test-Path -LiteralPath $check)) {
-        Add-Skip -Ctx $Ctx -Name 'ampify_theme_check.exe present' -Reason "no UI build in this kit: $check"
+        Add-Skip -Ctx $Ctx -Name 'ampify.exe present' -Reason "no UI build in this kit: $check"
         return
     }
 
@@ -15,7 +15,7 @@ Register-Case -Id 'ui-examples' -Title 'UI: the example themes are usable (ampif
     foreach ($name in Get-ChildItem -LiteralPath $examples -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'manifest.json') } | ForEach-Object Name) {
         $folder = Join-Path $examples $name
         # The text is written as UTF-8 by the C++ code: the case tests plain words and the exit code.
-        $output = (& $check $folder 2>&1 | Out-String)
+        $output = (& $check theme check $folder 2>&1 | Out-String)
         $code = $LASTEXITCODE
         Add-Check -Ctx $Ctx -Name "${name}: exit code 0" -Passed ($code -eq 0) -Detail "code $code"
         Add-Check -Ctx $Ctx -Name "${name}: theme usable" -Passed ($output -match 'usable')

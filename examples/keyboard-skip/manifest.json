@@ -6,6 +6,7 @@
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from. Global shortcuts: Ctrl+Alt+Right for the next track, Ctrl+Alt+Left for the previous one.",
+  "translations": {"fr": {"name": "Changer de morceau au clavier (exemple)", "description": "Un exemple pour apprendre. Raccourcis globaux : Ctrl+Alt+Droite pour le morceau suivant, Ctrl+Alt+Gauche pour le précédent."}},
   "kitApi": "1.0",
   "main": "main.js",
   "permissions": [

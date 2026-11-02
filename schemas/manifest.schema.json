@@ -21,6 +21,7 @@
       "description": "GitHub login of the author."
     },
     "description": {"type": "string", "minLength": 1, "maxLength": 300},
+    "translations": {"$ref": "#/$defs/translations"},
     "kitApi": {"$ref": "#/$defs/kitApi"},
     "homepage": {"$ref": "#/$defs/https"},
     "license": {"type": "string", "minLength": 1, "maxLength": 64},
@@ -96,6 +97,23 @@
   },
   "$defs": {
     "kind": {"enum": ["extension", "theme", "app", "snippet"]},
+    "translations": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Name and description in the languages Ampify speaks (fr only for now). Shown instead of the English ones when Windows is in that language.",
+      "properties": {
+        "fr": {"$ref": "#/$defs/translation"}
+      }
+    },
+    "translation": {
+      "type": "object",
+      "required": ["name", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 60},
+        "description": {"type": "string", "minLength": 1, "maxLength": 300}
+      }
+    },
     "setting": {
       "type": "object",
       "required": ["key", "label", "type", "default"],

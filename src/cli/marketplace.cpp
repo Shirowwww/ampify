@@ -455,11 +455,19 @@ Json TextList(const std::vector<std::string>& items) {
 }
 
 Json InfoJson(const ElementInfo& info) {
-    return Json::Object{{"id", info.id},           {"name", info.name},
-                        {"kind", info.kind},       {"version", info.version},
-                        {"author", info.author},   {"description", info.description},
-                        {"permissions", TextList(info.permissions)},
-                        {"tags", TextList(info.tags)}};
+    Json item = Json::Object{{"id", info.id},           {"name", info.name},
+                             {"kind", info.kind},       {"version", info.version},
+                             {"author", info.author},   {"description", info.description},
+                             {"permissions", TextList(info.permissions)},
+                             {"tags", TextList(info.tags)}};
+    if (!info.translations.empty()) {
+        Json::Object languages;
+        for (const auto& [code, text] : info.translations) {
+            languages.emplace_back(code, Json::Object{{"name", text.name}, {"description", text.description}});
+        }
+        item.Set("translations", Json(std::move(languages)));
+    }
+    return item;
 }
 
 // `ampify market --json`: what the Marketplace page shows. The catalogue (empty with catalogOk false when it cannot be

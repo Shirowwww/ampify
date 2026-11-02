@@ -6,6 +6,7 @@
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from. Pauses playback after a delay, set in minutes, then lets you know.",
+  "translations": {"fr": {"name": "Minuterie de veille (exemple)", "description": "Un exemple pour apprendre. Met la lecture en pause après un délai réglé en minutes, puis vous prévient."}},
   "kitApi": "1.0",
   "main": "main.js",
   "permissions": [

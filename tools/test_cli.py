@@ -137,6 +137,22 @@ class Basics(AmpifyTestCase):
         self.assertEqual(help_text.returncode, 0)
         self.assertIn("install <id>", help_text.stdout)
 
+    def test_docs_cli_lists_every_command_of_help(self):
+        with open(os.path.join(ROOT, "docs", "cli.md"), encoding="utf-8") as handle:
+            docs = handle.read()
+        missing = []
+        for line in self.ampify("help").stdout.split("Options")[0].splitlines():
+            if not re.match(r"  \S", line) or line.strip().startswith("ampify "):
+                continue
+            words = []
+            for word in re.split(r"\s+", re.split(r"\s{2,}", line.strip())[0]):
+                if not re.fullmatch(r"[a-z][a-z-]*", word):
+                    break
+                words.append(word)
+            if words and "ampify " + " ".join(words) not in docs:
+                missing.append(" ".join(words))
+        self.assertEqual(missing, [], "commands of `ampify help` missing from docs/cli.md")
+
     def test_unknown_command_is_a_usage_error(self):
         result = self.ampify("inventer")
         self.assertEqual(result.returncode, 2)
@@ -383,6 +399,39 @@ class Marketplace(AmpifyTestCase):
         self.assertEqual(installed["night"]["tags"], [])
         self.assertNotIn("preview", installed["night"])
 
+    def test_market_json_passes_on_the_translations_of_installed_and_catalog_elements(self):
+        translations = {"fr": {"name": "Lueur", "description": "Un thème de test."}}
+        folder = self.write_element("glow", "theme")
+        manifest_path = os.path.join(folder, "manifest.json")
+        manifest = read_json(manifest_path)
+        manifest["translations"] = translations
+        with open(manifest_path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+        entry, _ = self.entry_for(folder)
+        self.assertEqual(entry["translations"], translations)
+        catalog = self.write_catalog([entry, self.night_entry])
+        self.assertEqual(self.install("glow", catalog).returncode, 0)
+        self.assertEqual(self.install("night", catalog).returncode, 0)
+
+        state = self.market_json(catalog)
+        installed = {item["id"]: item for item in state["installed"]}
+        listed = {item["id"]: item for item in state["catalog"]}
+        self.assertEqual(installed["glow"]["translations"], translations)
+        self.assertEqual(listed["glow"]["translations"], translations)
+        self.assertNotIn("translations", installed["night"])
+        self.assertNotIn("translations", listed["night"])
+
+    def test_validate_refuses_a_translation_in_an_unknown_language(self):
+        folder = self.write_element("glow", "theme")
+        manifest_path = os.path.join(folder, "manifest.json")
+        manifest = read_json(manifest_path)
+        manifest["translations"] = {"de": {"name": "Glanz", "description": "Ein Test."}}
+        with open(manifest_path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+        result = self.ampify("validate", folder)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("translations.de", result.stderr + result.stdout)
+
     def test_market_json_keeps_a_catalog_preview_only_from_a_known_host(self):
         def listed(name, **changes):
             return {**self.night_entry, "id": name, "url": "https://cdn.example.com/" + name + ".zip", **changes}
@@ -550,6 +599,30 @@ class Marketplace(AmpifyTestCase):
         self.assertNotIn("theme.scheme", self.settings_text())
         self.ampify("apply")
         self.assertNotIn("theme night", self.read("active.txt"))
+
+    def test_theme_set_keeps_the_schedule_and_the_other_settings(self):
+        self.assertEqual(self.install("night").returncode, 0)
+        self.assertEqual(self.ampify("config", "theme.schedule", "07:00=Light,19:00=Dark").returncode, 0)
+        self.assertEqual(self.ampify("config", "theme.live_reload", "0").returncode, 0)
+        self.assertEqual(self.ampify("theme", "set", "night").returncode, 0)
+        text = self.settings_text()
+        self.assertIn("theme.schedule = 07:00=Light,19:00=Dark", text)
+        self.assertIn("theme.live_reload = 0", text)
+
+    def test_theme_names_checks_the_stable_names_against_saved_trees(self):
+        tree = os.path.join(self.tmp, "tree.json")
+        with open(tree, "w", encoding="utf-8") as handle:
+            handle.write('{"version":1,"nodes":[{"index":0,"type":"Grid","name":"Nothing","parent":-1,"depth":0}]}')
+        result = self.ampify("theme", "names", tree)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("Stable names checked against 1 tree(s):", result.stdout)
+        self.assertIn("Found in no tree", result.stdout)
+
+        broken = os.path.join(self.tmp, "broken.json")
+        with open(broken, "w", encoding="utf-8") as handle:
+            handle.write("[]")
+        self.assertEqual(self.ampify("theme", "names", broken).returncode, 2)
+        self.assertEqual(self.ampify("theme", "names").returncode, 2)
 
     def test_snippet_enable_and_plus_minus_syntax(self):
         self.assertEqual(self.install("calm").returncode, 0)
@@ -1064,20 +1137,20 @@ class Paths(AmpifyTestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("unknown name", result.stderr)
 
-    def test_app_and_prefs_follow_their_settings(self):
-        result = self.ampify("path", "app")
-        self.assertIn(result.returncode, (0, 1))
-        # A Windows PC may really have Apple Music installed; elsewhere it is never found.
-        if os.name != "nt":
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("not found", result.stderr)
-        folder = os.path.join(self.tmp, "Apple Music")
-        self.assertEqual(self.ampify("config", "app_path", folder).returncode, 0)
-        self.assertEqual(self.ampify("path", "app").stdout.strip(), folder)
-        prefs = os.path.join(self.tmp, "prefs.plist")
-        self.assertEqual(self.ampify("config", "prefs_path", prefs).returncode, 0)
-        self.assertEqual(self.ampify("path", "prefs").stdout.strip(), prefs)
-        self.assertIn(folder, self.ampify("path").stdout)
+    def test_app_and_prefs_are_found_on_their_own(self):
+        for name in ("app", "prefs"):
+            result = self.ampify("path", name)
+            self.assertIn(result.returncode, (0, 1))
+            # A Windows PC may really have Apple Music installed; elsewhere it is never found.
+            if os.name != "nt":
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("not found", result.stderr)
+            self.assertNotIn("config", result.stderr, "no setting overrides these paths")
+
+    def test_userdata_is_not_a_path_name(self):
+        result = self.ampify("path", "userdata")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unknown name", result.stderr)
 
     def test_config_dir_names_the_kit_folder(self):
         result = self.ampify("config", "--dir", "--dry-run")
@@ -1111,15 +1184,10 @@ class Devtools(AmpifyTestCase):
 
 class NewSettings(AmpifyTestCase):
     def test_booleans_are_checked_and_stored_as_1_or_0(self):
-        for key in ("check_kit_update", "telemetry.block", "expose_api", "theme.inspect", "theme.parts.assets"):
+        for key in ("check_kit_update", "expose_api", "theme.inspect", "theme.parts.assets"):
             self.assertEqual(self.ampify("config", key, "on").returncode, 0, key)
             self.assertIn(f"{key} = 1", self.settings_text())
             self.assertEqual(self.ampify("config", key, "maybe").returncode, 1, key)
-
-    def test_paths_must_be_complete(self):
-        self.assertEqual(self.ampify("config", "app_path", "relatif").returncode, 1)
-        self.assertEqual(self.ampify("config", "prefs_path", "relatif/x.plist").returncode, 1)
-        self.assertEqual(self.ampify("config", "app_path", "").returncode, 0)
 
     def test_launch_flags_are_split_and_shown_by_launch(self):
         result = self.ampify("config", "app_launch_flags", "--remote-debugging-port=9222")

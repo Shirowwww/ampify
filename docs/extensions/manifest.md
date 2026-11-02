@@ -33,6 +33,7 @@ The folder [examples/hello-extension](../../examples/hello-extension/) is a comp
 | `kind` | yes | `extension`, `theme`, `app` or `snippet` | What the element brings |
 | `author` | yes | A GitHub id | Author shown in the catalog |
 | `description` | yes | 1 to 300 characters | Summary shown in the catalog |
+| `translations` | no | Object keyed by language, `fr` only for now (section "Translations") | Name and description shown instead of the English ones when Windows is in that language |
 | `kitApi` | yes | `MAJOR.MINOR`, for example `1.0` | Version of the targeted API. The major version must be supported. |
 | `homepage` | no | `https://` URL | Project page |
 | `license` | no | 1 to 64 characters | The author's license |
@@ -41,6 +42,28 @@ The folder [examples/hello-extension](../../examples/hello-extension/) is a comp
 | `appVersions` | no | List of Apple Music versions, 16 at most | Versions where the element was tested. The kernel also applies its own list. |
 | `permissions` | no | List of 32 at most, values from section 4 of [api.md](api.md) | What the element needs. Shown before activation. |
 | `processes` | no | One or two values: `ui` (AppleMusic.exe), `engine` (AMPLibraryAgent.exe), no duplicate | Where the element runs. Default `["ui"]`: the interface only, once per launch. An element that acts on sound declares `engine`. With both, it runs twice and must avoid writing the same storage. |
+
+## Translations
+
+`name` and `description` are in English. An element can also give them in the languages Ampify speaks, which is French
+only for now:
+
+```json
+"translations": {
+  "fr": {"name": "À l'écoute", "description": "Un bouton de la barre de lecture qui ouvre le lecteur plein écran."}
+}
+```
+
+| Member | Rule |
+|---|---|
+| language key | `fr`. Any other key is refused. |
+| `name` | Required, 1 to 60 characters, like `name` |
+| `description` | Required, 1 to 300 characters, like `description` |
+
+The Marketplace (cards and detail view), the Ampify card in Apple Music's Settings and `ampify market --json` use the
+translation that matches Windows' display language, and the English `name` and `description` when there is none. The
+catalog entry repeats `translations` (see [catalog.md](catalog.md)). The id, the folder name and the messages of the
+command line never change with the language.
 
 ## Fields by `kind`
 

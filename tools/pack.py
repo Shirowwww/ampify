@@ -92,7 +92,7 @@ def catalog_entry(manifest, url, sha256, preview=None):
         key: manifest[key]
         for key in ("id", "name", "version", "kind", "author", "description", "kitApi")
     }
-    for key in ("homepage", "license", "tags"):
+    for key in ("homepage", "license", "tags", "translations"):
         if key in manifest:
             entry[key] = manifest[key]
     if preview:

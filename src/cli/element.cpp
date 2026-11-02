@@ -2,6 +2,7 @@
 
 #include "../core/manifest.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <regex>
 #include <set>
@@ -134,6 +135,39 @@ std::optional<std::string> ReadOptionalText(const Json& object, std::string_view
     return ReadText(object, key, where, rule, false, errors);
 }
 
+// "translations": one object per language Ampify speaks, each with a name and a description under the same rules as
+// the English ones.
+std::map<std::string, ManifestText> ReadTranslations(const Json& object, const std::string& where,
+                                                     std::vector<std::string>& errors) {
+    std::map<std::string, ManifestText> result;
+    const Json* member = object.Find("translations");
+    if (member == nullptr) return result;
+
+    std::string label = Label(where, "translations");
+    if (!member->IsObject()) {
+        errors.push_back(label + ": object expected");
+        return result;
+    }
+    for (const auto& [code, entry] : *member->AsObject()) {
+        std::string entryLabel = label + "." + code;
+        if (std::find(std::begin(kTranslationLanguages), std::end(kTranslationLanguages), code) ==
+            std::end(kTranslationLanguages)) {
+            errors.push_back(entryLabel + ": unknown language (fr)");
+            continue;
+        }
+        if (!entry.IsObject()) {
+            errors.push_back(entryLabel + ": object expected");
+            continue;
+        }
+        size_t before = errors.size();
+        CheckAllowedKeys(entry, {"name", "description"}, entryLabel, errors);
+        std::optional<std::string> name = ReadText(entry, "name", entryLabel, kNameRule, true, errors);
+        std::optional<std::string> description = ReadText(entry, "description", entryLabel, kDescriptionRule, true, errors);
+        if (errors.size() == before) result[code] = {*name, *description};
+    }
+    return result;
+}
+
 }  // namespace
 
 bool IsValidId(std::string_view text) {
@@ -194,6 +228,7 @@ bool ReadElementInfo(const Json& object, const std::string& where, ElementInfo& 
     info.kind = ReadText(object, "kind", where, kKindRule, true, errors).value_or("");
     info.author = ReadText(object, "author", where, kAuthorRule, true, errors).value_or("");
     info.description = ReadText(object, "description", where, kDescriptionRule, true, errors).value_or("");
+    info.translations = ReadTranslations(object, where, errors);
     info.kitApi = ReadText(object, "kitApi", where, kKitApiRule, true, errors).value_or("");
     info.homepage = ReadOptionalText(object, "homepage", where, kHttpsRule, errors);
     info.license = ReadOptionalText(object, "license", where, kLicenseRule, errors);
@@ -227,7 +262,7 @@ std::optional<ElementManifest> ParseManifest(std::string_view text, std::vector<
     CheckAllowedKeys(*document,
                      {"$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage",
                       "license", "main", "colors", "defaultScheme", "resources", "icon", "permissions",
-                      "appVersions", "processes", "type", "tags", "preview", "settings"},
+                      "appVersions", "processes", "type", "tags", "preview", "settings", "translations"},
                      "", errors);
     // The kernel reads the settings: its rules are the only ones.
     for (std::string& problem : SettingsErrors(text)) errors.push_back(std::move(problem));

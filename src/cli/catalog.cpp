@@ -103,7 +103,7 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
             size_t entryBefore = errors.size();
             CheckAllowedKeys(item,
                              {"id", "name", "version", "kind", "author", "description", "kitApi", "url", "sha256",
-                              "homepage", "license", "permissions", "tags", "preview"},
+                              "homepage", "license", "permissions", "tags", "preview", "translations"},
                              where, errors);
 
             CatalogEntry entry;

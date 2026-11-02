@@ -51,6 +51,16 @@ std::string CatalogEntryText(const ElementManifest& manifest, const std::string&
         << "  \"author\": " << Json::Quote(manifest.author) << ",\n"
         << "  \"description\": " << Json::Quote(manifest.description) << ",\n"
         << "  \"kitApi\": " << Json::Quote(manifest.kitApi) << ",\n";
+    if (!manifest.translations.empty()) {
+        out << "  \"translations\": {";
+        bool first = true;
+        for (const auto& [code, text] : manifest.translations) {
+            out << (first ? "" : ", ") << Json::Quote(code) << ": {\"name\": " << Json::Quote(text.name)
+                << ", \"description\": " << Json::Quote(text.description) << "}";
+            first = false;
+        }
+        out << "},\n";
+    }
     if (!manifest.tags.empty()) {
         out << "  \"tags\": [";
         for (size_t i = 0; i < manifest.tags.size(); i++) out << (i ? ", " : "") << Json::Quote(manifest.tags[i]);

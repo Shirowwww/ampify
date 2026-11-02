@@ -6,6 +6,7 @@
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from. A panel written like React, without JSX: counter, timer and settings with Ampify.React and Ampify.components.",
+  "translations": {"fr": {"name": "Panneau React (exemple)", "description": "Un exemple pour apprendre. Un panneau écrit comme avec React, sans JSX : compteur, minuteur et réglages avec Ampify.React et Ampify.components."}},
   "tags": ["example"],
   "kitApi": "1.0",
   "main": "main.js",

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -23,6 +24,15 @@ struct SettingSpec {
     std::optional<double> max;
 };
 
+// The name and description of an element in one language, from the manifest's "translations" field. The languages are
+// those Ampify speaks (kTranslationLanguages); the English name and description stay the fallback.
+struct ManifestText {
+    std::string name;
+    std::string description;
+};
+
+inline constexpr std::string_view kTranslationLanguages[] = {"fr"};
+
 // The fields of a manifest.json that the kernel uses. The rules are those of docs/extensions/manifest.md, which
 // tools/validate.py also enforces. The kernel checks them again, because a folder can be edited by hand.
 struct Manifest {
@@ -32,6 +42,7 @@ struct Manifest {
     ElementKind kind = ElementKind::Extension;
     std::string author;
     std::string description;
+    std::map<std::string, ManifestText> translations;  // by language code
     std::string kitApi;
     std::optional<std::string> homepage;
     std::optional<std::string> license;

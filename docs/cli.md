@@ -39,7 +39,7 @@ The "Spicetify" column gives the equivalent.
 | `ampify config <key> <value>` | Writes a setting, value checked | `config <key> <value>` |
 | `ampify config extensions +id` / `-id` | Switches an element on or off (also `apps`, `snippets`) | `config extensions +id` |
 | `ampify path` | Prints the Ampify folders, the Apple Music folder and its preferences | `path` |
-| `ampify path <name>` | One path on one line: `kit`, `settings`, `extensions`, `themes`, `apps`, `snippets`, `logs`, `backups`, `app` (Apple Music package), `prefs` (Apple Music preferences). `app` and `prefs` print "not found" outside Windows | `path` |
+| `ampify path <name>` | One path on one line: `kit`, `settings`, `extensions`, `themes`, `apps`, `snippets`, `logs`, `backups`, `app` (Apple Music package), `prefs` (Apple Music preferences). `app` and `prefs` print "not found" when Apple Music is not installed, or outside Windows | `path` |
 | `ampify config --dir` | Opens the Ampify folder in Explorer (`--dry-run` only prints the folder) | `config-dir` |
 | `ampify backup` / `ampify backup list` | Backs up the settings and elements | `backup` |
 | `ampify devtools [on\|off]` | Asks the kernel to write the interface tree to `logs\inspector.txt` (setting `theme.inspect`) | `enable-devtools` |
@@ -59,8 +59,10 @@ The "Spicetify" column gives the equivalent.
 | `ampify app enable <id>` / `disable <id>` | Apps (interface pages). The kernel loads `apps\<id>` and starts the app at once, like an extension |
 | `ampify theme list` | Installed themes |
 | `ampify theme set <id> [--scheme <name>]` | Picks the theme and its scheme. Without `--scheme`, another theme starts on its own default scheme; the same theme set again keeps its scheme, and `auto` stays for every theme |
+| `ampify theme watch <folder> [--scheme <name>]` | Reads the theme again at each save and reports what would apply. `--max-cycles <n>` stops it after n passes | none |
+| `ampify theme names <inspector.json>...` | After an Apple Music update, checks the stable names (`.sidebar`, `.card`...) against interface trees saved by the inspector (see [themes/names.md](themes/names.md)). Exit code 1 when a name is found in no tree, 2 when a tree cannot be read | none |
 | `ampify theme import <folder\|zip\|address> [id]` | Reuses a Spicetify theme: `color.ini` as it is, Spotify's `user.css` kept aside (see [themes/spicetify.md](themes/spicetify.md)) |
-| `ampify theme check <folder>` | Reads a theme like the kernel does and reports each refused rule with its line |
+| `ampify theme check <folder> [--scheme <name>]` | Reads a theme like the kernel does and reports each refused rule with its line. It replaces the former `ampify_theme_check.exe` |
 | `ampify theme clear` | No theme, and no scheme left for the next one |
 | `ampify new <kind> <id>` | Creates a starter element (extension, theme, snippet or app) in the current folder |
 | `ampify validate <folder>` | Checks the manifest and files of an element, with the same rules as `tools/validate.py` |
@@ -95,7 +97,9 @@ available yet.
 | `--install-dir <folder>` | With `update --apply`: folder to copy the files to. Default is the folder of `ampify.exe` |
 | `--scheme <name>` | With `theme set`: color scheme |
 | `--backup <name>` | With `restore`: backup to put back |
-| `--interval <ms>`, `--max-cycles <n>` | With `watch`: watch period, and number of passes before stopping |
+| `--interval <ms>` | With `watch`: watch period |
+| `--max-cycles <n>` | With `watch`, `theme watch`, `dev` and `logs --follow`: number of passes before stopping |
+| `--json` | With `market`: prints the catalog, the installed elements and the active theme as JSON. The Marketplace app reads it |
 | `--tree` | With `inspect`: prints the last interface tree (`logs\inspector.txt`) |
 | `--dir` | With `config`: opens the Ampify folder |
 | `--` | Everything after it is an argument, even if it starts with `--` |
@@ -132,11 +136,8 @@ Settings known to `ampify config`:
 | `theme.live_reload` | `1` or `0`: apply the theme again when its files change | `1` |
 | `theme.inspect` | `1` or `0`: the kernel writes the interface tree on its next pass, then sets `0` (see `ampify devtools`) | `0` |
 | `catalog.url` | `https://...` or `file://...` | the repository's catalog |
-| `app_path` | Full path of the Apple Music folder, empty to find it automatically | empty (found by Windows) |
-| `prefs_path` | Full path of the Apple Music preferences file, empty for the usual place | empty (`%LOCALAPPDATA%\Packages\AppleInc.AppleMusicWin_nzyj5cx40ttqa\LocalCache\Roaming\Apple Computer\Preferences\AMPLibraryAgent.exe.plist`) |
 | `app_launch_flags` | Arguments added when Apple Music starts, separated by spaces (quotes to keep a space) | empty |
 | `check_kit_update` | `1` or `0`: `ampify` reports a new Ampify version | `0` |
-| `telemetry.block` | `1` or `0`: block Apple Music's data sends. **Reserved, outside 1.0**: the key is accepted, the kernel does not read it | `0` |
 | `expose_api` | `1` or `0`: at `0`, no JavaScript element (extension, app, theme script) starts | `1` |
 | `discord.enabled` | `1` or `0`: elements with `ipc.discord` can show Discord presence | `0` |
 | `tray.enabled` | `1` or `0`: Ampify icon in the notification area, with its menu | `0` |
@@ -151,9 +152,10 @@ The services (`discord`, `tray`, `remote`, `midi`) are all off by default. They 
 [extensions/api.md](extensions/api.md), section 5.7. The kernel reads them when Apple Music starts: restart the app after
 a change.
 
-These keys match Spicetify's: `app_path` to `spotify_path`, `prefs_path` to `prefs_path`, `app_launch_flags` to
-`spotify_launch_flags`, `check_kit_update` to `check_spicetify_update`, `telemetry.block` to `disable_sentry` and
-`disable_ui_logging`, `expose_api` to `expose_apis`.
+These keys match Spicetify's: `app_launch_flags` to `spotify_launch_flags`, `check_kit_update` to
+`check_spicetify_update`, `expose_api` to `expose_apis`. Spicetify's `spotify_path` and `prefs_path` have no equivalent:
+Apple Music is a Store package that Windows finds by its identity, and `ampify path app` and `ampify path prefs` print
+where the package and its preferences file are.
 
 `app_launch_flags` is read by the launcher, which passes these arguments to Apple Music when it starts it itself
 (`ampify launch`; Apple Music may ignore them). When Apple Music opens from its own icon, Windows starts it and the flags
@@ -289,34 +291,34 @@ storage stay in memory, and the player and the network answer a fixed value. It 
 to the host, then the result. An API used without the declared permission fails the test (code 1). Nothing is written to
 Ampify. A passing test does not say that the element works in Apple Music: check that on a PC.
 
-`types [file]` writes `ampify.d.ts` (by default in the current folder): the types of the `Ampify` object of section 5 of
+`ampify types [file]` writes `ampify.d.ts` (by default in the current folder): the types of the `Ampify` object of section 5 of
 [extensions/api.md](extensions/api.md). The file is written by hand, in `src/cli/sdk_types.cpp`. The test `tools/test_cli.py`
 checks that every member of section 5 is in it. It is not generated from the text. It refuses to overwrite an existing
 `ampify.d.ts`, except with `--yes`.
 
-`doctor` writes a report on Ampify. Each line starts with `[OK]`, `[WARNING]` or `[ERROR]`. It checks the settings, the
+`ampify doctor` writes a report on Ampify. Each line starts with `[OK]`, `[WARNING]` or `[ERROR]`. It checks the settings, the
 installed elements, the switched-on elements that will not load, `active.txt`, safe mode, leftovers of an interrupted
 install, the last lines of the logs, the presence of `tar` (or `tar.exe`) and `curl`, and the tested Apple Music versions.
 It exits with code 1 only if there is an error.
 
-`logs [count] [--follow]` prints the last lines (50 by default) of each log in the `logs\` folder. With `--follow` it keeps
+`ampify logs [count] [--follow]` prints the last lines (50 by default) of each log in the `logs\` folder. With `--follow` it keeps
 printing new lines. `--max-cycles <n>` stops it after n passes.
 
-`profile list`, `profile save <name>`, `profile use <name>` and `profile delete <name>` manage settings profiles: a copy of
+`ampify profile list`, `ampify profile save <name>`, `ampify profile use <name>` and `ampify profile delete <name>` manage settings profiles: a copy of
 `settings.txt` stored in `profiles\<name>\`. A profile does not contain the elements. `profile use` backs up the current
 state before replacing it: `restore --backup <name>` puts it back.
 
-`export <file.zip>` writes the settings and the installed elements (`extensions`, `themes`, `apps`, `snippets`). It
+`ampify export <file.zip>` writes the settings and the installed elements (`extensions`, `themes`, `apps`, `snippets`). It
 includes neither backups, nor logs, nor profiles, nor cache, nor any file of the app. The first entry of the archive is
 `Ampify-EXPORT`.
 
-`import <file.zip> [--dry-run] [--yes]` refuses an archive without `Ampify-EXPORT`, and any entry outside the expected
+`ampify import <file.zip> [--dry-run] [--yes]` refuses an archive without `Ampify-EXPORT`, and any entry outside the expected
 folders. The archive is unpacked into a temporary folder, then each element is validated: if one fails, nothing is
 written. Otherwise the command prints the content and asks for confirmation (except with `--yes`). It then backs up
 Ampify, replaces the elements and `settings.txt`, and leaves `apply` to load them. `--dry-run` prints the content and
 writes nothing.
 
-Still missing compared with Spicetify: the live interface tree in `inspect`, and the kernel reading `telemetry.block`.
+Still missing compared with Spicetify: the live interface tree in `inspect`.
 The kernel side of the immediate effect (reading `reload.txt`, start, stop, reload, rescanning folders) is tested on Linux
 with a fake host and compiled for Windows. The CLI tests check what is written to `reload.txt`.
 

@@ -78,7 +78,7 @@ endif()
 #   - a new package (an API module, a native extension, a group of tests) adds its own new file rather than editing
 #     another package's, so that parallel work does not touch the same lines;
 #   - a new target is declared below, and its list gets a name of the form AMPIFY_<TARGET>_SOURCES.
-# Lists: AMPIFY_QUICKJS_SOURCES, AMPIFY_CORE_SOURCES, AMPIFY_THEME_SOURCES, AMPIFY_THEME_CHECK_SOURCES, AMPIFY_ATMOS_SOURCES,
+# Lists: AMPIFY_QUICKJS_SOURCES, AMPIFY_CORE_SOURCES, AMPIFY_THEME_SOURCES,AMPIFY_ATMOS_SOURCES,
 # AMPIFY_WIN_SOURCES, AMPIFY_KERNEL_SOURCES, AMPIFY_UI_THREAD_TEST_SOURCES, AMPIFY_XAML_SOURCES, AMPIFY_LAUNCHER_SOURCES,
 # AMPIFY_SETUP_SOURCES, AMPIFY_CLI_PORTABLE_SOURCES, AMPIFY_CLI_SOURCES, AMPIFY_TESTS_SOURCES, AMPIFY_TESTS_WIN_SOURCES.
 file(GLOB AMPIFY_SOURCE_LISTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/sources/*.cmake")
@@ -120,11 +120,6 @@ target_link_libraries(ampify_core PUBLIC ampify_quickjs)
 add_library(ampify_theme STATIC ${AMPIFY_THEME_SOURCES})
 target_link_libraries(ampify_theme PUBLIC ampify_core)
 target_compile_options(ampify_theme PRIVATE ${AMPIFY_WARNINGS})
-
-# Command-line checker for a theme folder: prints the problems and the rules that would apply. Runs on any host.
-add_executable(ampify_theme_check ${AMPIFY_THEME_CHECK_SOURCES})
-target_link_libraries(ampify_theme_check PRIVATE ampify_theme)
-target_compile_options(ampify_theme_check PRIVATE ${AMPIFY_WARNINGS})
 
 # Atmos leveler: BS.1770 loudness meter, gain ramp, spatial object pass and gain policy. Pure C++, no Windows API.
 add_library(atmos_leveler STATIC ${AMPIFY_ATMOS_SOURCES})

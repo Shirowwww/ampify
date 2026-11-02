@@ -6,6 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "A familiar layout from another music app: the playback bar at the bottom across the window, the track on the left, rounded dark panels and a green accent.",
+  "translations": {"fr": {"name": "Greenroom", "description": "Une disposition familière venue d'une autre appli musicale : la barre de lecture en bas sur toute la largeur, le morceau à gauche, des panneaux sombres arrondis et un accent vert."}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Dark",

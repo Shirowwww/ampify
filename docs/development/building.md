@@ -94,7 +94,7 @@ pwsh -File bench\windows\run-bench.ps1 -KitRoot build-msvc\kit -Only <case> -Ski
 ```
 
 `scripts\bench-kit.ps1` builds `build-msvc\kit` with `release\` (launcher, kernel, setup, `ampify.exe`), `cli\`,
-`bench\` (the bench build) and `ui\` (the bench build plus `ampify_theme_check.exe`, the themes and
+`bench\` (the bench build) and `ui\` (the bench build plus the themes and
 `examples\react-panel`). See [bench-and-ci.md](bench-and-ci.md).
 
 ### Reading a crash

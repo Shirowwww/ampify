@@ -182,14 +182,16 @@ function newer(a, b) {
 function merge(entry, installed) {
   const source = entry || installed;
   const update = Boolean(entry && installed && newer(entry.version, installed.version));
+  // The manifest's translation for Windows' language, else the English name and description.
+  const translated = (source.translations && source.translations[Ampify.i18n.language]) || {};
   return {
     key: source.kind + ":" + source.id,
     id: source.id,
     kind: source.kind,
-    name: source.name || source.id,
+    name: translated.name || source.name || source.id,
     author: source.author || "",
     version: (installed || entry).version || "",
-    description: source.description || "",
+    description: translated.description || source.description || "",
     tags: source.tags || [],
     // The permissions of the copy a click acts on: the installed one, or the catalog's for an install or an update.
     permissions: (installed && !update ? installed : entry).permissions || [],

@@ -6,6 +6,7 @@
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from. Sends the tracks you listen to to Last.fm (scrobbling). Plays that could not be sent wait in storage.",
+  "translations": {"fr": {"name": "Scrobbler Last.fm (exemple)", "description": "Un exemple pour apprendre. Envoie à Last.fm les morceaux que vous écoutez (scrobbling). Les écoutes qui n'ont pas pu partir attendent dans le stockage."}},
   "tags": ["example"],
   "kitApi": "1.0",
   "main": "main.js",

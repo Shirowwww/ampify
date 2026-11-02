@@ -23,7 +23,7 @@ selector mistake does.
 Some zones have several forms (the top spacer of each kind of page, the three search scopes). Their class stands for
 all of them.
 
-The table was built from inspector surveys of every page of Apple Music 1.1792. `ampify_theme_check --names` checks it
+The table was built from inspector surveys of every page of Apple Music 1.1792. `ampify theme names` checks it
 against trees saved by the inspector (see "Check the names after an update" below).
 
 ## Window
@@ -277,9 +277,9 @@ When Apple Music updates, save a few trees with the inspector (a page of each ki
 lyrics), then run:
 
 ```
-ampify_theme_check.exe --names C:\trees\home.json C:\trees\album.json ...
+ampify theme names C:\trees\home.json C:\trees\album.json ...
 ```
 
-The tool prints, for each class, how many trees and elements it found, and lists the classes and the forms it found
+The command prints, for each class, how many trees and elements it found, and lists the classes and the forms it found
 nowhere. It exits with code 1 when a class matches nothing in any tree: that class needs a new path in
 `src/core/theme/builtins.cpp`.

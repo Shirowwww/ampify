@@ -435,7 +435,7 @@ const marketCopy = (id, kind, permissions = [], extra = {}) =>
   ({ ...marketEntry(id, kind, permissions), valid: true, enabled: false, ...extra });
 
 // The Marketplace against a fake ampify: each command changes the state `market --json` gives back, as the real one.
-function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = {} } = {}) {
+function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = {}, language = "en" } = {}) {
   const react = fakeReact();
   const world = { state: { catalogOk: true, catalog, installed, theme, scheme: "" }, commands: [], marketError: "" };
   const copyOf = (id) => world.state.installed.find((item) => item.id === id);
@@ -468,7 +468,7 @@ function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = 
       },
     },
     ui: { title: { set: () => {} }, sidebar: { addItem: () => {} }, navigate: () => {} },
-    i18n: fakeI18n("en"),  // the assertions below read the English texts
+    i18n: fakeI18n(language),  // English unless a test asks for French
   };
   const context = { Ampify: ampify };
   runIn(readFileSync(join(examples, "..", "apps", "marketplace", "main.js"), "utf-8"), context);
@@ -485,6 +485,38 @@ function buttonIn(node, label) {
   assert.ok(found, `a button "${label}" is shown`);
   return found;
 }
+
+const frenchEntry = () => ({
+  ...marketEntry("demo", "extension"),
+  translations: { fr: { name: "Démo", description: "Un test en français." } },
+});
+
+test("the Marketplace shows the French name and description on a French Windows, card and detail view", async () => {
+  const { page } = fakeMarketplace({ catalog: [frenchEntry()], language: "fr" });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  const card = cardOf(page, "Démo");
+  assert.ok(card, "the card carries the French name");
+  assert.ok(textsOf(card).includes("Un test en français."));
+  assert.ok(!textsOf(card).includes("Demo"), "the English name is not shown");
+  buttonIn(card, "Détails").onClick();
+  assert.ok(textsOf(page.tree).includes("Démo"));
+  assert.ok(textsOf(page.tree).includes("Un test en français."));
+});
+
+test("the Marketplace keeps the English text when the element has no translation for the language", async () => {
+  const entry = { ...marketEntry("demo", "extension"), translations: { fr: { name: "Démo", description: "Un test." } } };
+  const english = fakeMarketplace({ catalog: [entry] });
+  await settle();
+  buttonIn(english.page.tree, "Extensions").onClick();
+  assert.ok(cardOf(english.page, "Demo"), "English Windows keeps the English name");
+
+  const bare = fakeMarketplace({ catalog: [marketEntry("demo", "extension")], language: "fr" });
+  await settle();
+  buttonIn(bare.page.tree, "Extensions").onClick();
+  assert.ok(cardOf(bare.page, "Demo"), "no translation: the English name");
+  assert.ok(textsOf(cardOf(bare.page, "Demo")).includes("Test demo."));
+});
 
 test("the Marketplace installs an element with permissions off, then turns it on from its detail view", async () => {
   const { world, page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension", ["storage"])] });

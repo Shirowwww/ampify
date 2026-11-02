@@ -6,6 +6,7 @@
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Example snippet: the artwork of the playback bar turns like a record, with @keyframes and animation.",
+  "translations": {"fr": {"name": "Pochette qui tourne", "description": "Un snippet d'exemple : la pochette de la barre de lecture tourne comme un disque, avec @keyframes et animation."}},
   "kitApi": "1.0",
   "tags": [
     "animation",

@@ -166,10 +166,6 @@ int CmdConfigDir(Context& ctx);
 // kept in cache\kit-update.txt and asked again at most once a day. Never fails the command.
 void NotifyKitUpdate(Context& ctx);
 
-// The value of a path setting (app_path, prefs_path), or `fallback` when it is empty.
-std::optional<std::filesystem::path> PathSetting(const Context& ctx, const std::string& key,
-                                                 std::optional<std::filesystem::path> fallback);
-
 // Commands in diagnose.cpp.
 int CmdDoctor(Context& ctx);
 

@@ -11,19 +11,12 @@
 
 namespace ampify::theme {
 
-// Where Ampify keeps its files: settings.txt, the themes folder, and the logs folder.
-struct KitLayout {
-    std::filesystem::path root;  // %USERPROFILE%\Ampify on Windows
+// `ampify theme names <inspector.json>...`: checks the stable names (.sidebar, .card...) against interface trees saved by
+// the inspector, to see which names a new Apple Music version broke. Returns 0 when every name is found in some tree,
+// 1 when a name is found in none, 2 when a tree cannot be read.
+int RunNames(const std::vector<std::filesystem::path>& files, std::ostream& out, std::ostream& err);
 
-    std::filesystem::path Settings() const { return root / "settings.txt"; }
-    std::filesystem::path Themes() const { return root / "themes"; }
-};
-
-// `ampify theme list`, `ampify theme set <id|none> [--scheme name]`. Returns 0 when done, 1 when the theme is refused,
-// 2 for a wrong command.
-int RunThemeCommand(const std::vector<std::string>& args, const KitLayout& kit, std::ostream& out, std::ostream& err);
-
-// `ampify watch <folder> [--scheme name] [--polls N]`: checks the theme now, then again after each change of its files.
+// `ampify theme watch <folder> [--scheme name] [--polls N]`: checks the theme now, then again after each change of its files.
 // `pause` waits between two looks at the folder. `--polls 0` (the default) watches until the process is stopped.
 int RunWatch(const std::vector<std::string>& args, std::ostream& out, std::ostream& err,
              const std::function<void()>& pause);

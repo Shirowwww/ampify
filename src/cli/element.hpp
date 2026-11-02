@@ -3,12 +3,14 @@
 #include <cstdint>
 #include <filesystem>
 #include <initializer_list>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "../core/json.hpp"
+#include "../core/manifest.hpp"
 
 namespace ampify {
 
@@ -26,6 +28,7 @@ struct ElementInfo {
     std::string kind;  // extension, theme, app or snippet
     std::string author;
     std::string description;
+    std::map<std::string, ManifestText> translations;  // name and description by language ("fr"), optional
     std::string kitApi;
     std::optional<std::string> homepage;
     std::optional<std::string> license;

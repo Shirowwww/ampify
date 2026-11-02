@@ -1,4 +1,4 @@
-# Theme engine: target ampify_theme, and the checker ampify_theme_check. See the convention at the top of CMakeLists.txt.
+# Theme engine: target ampify_theme. See the convention at the top of CMakeLists.txt.
 list(APPEND AMPIFY_THEME_SOURCES
     src/core/theme/animation.cpp
     src/core/theme/builtins.cpp
@@ -26,4 +26,3 @@ list(APPEND AMPIFY_THEME_SOURCES
 
 list(APPEND AMPIFY_TESTS_SOURCES tests/animation_tests.cpp)
 
-list(APPEND AMPIFY_THEME_CHECK_SOURCES tools/theme_check.cpp)

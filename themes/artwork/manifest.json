@@ -6,6 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "The artwork of the current track fills the window, under dark glass panels that float.",
+  "translations": {"fr": {"name": "Pochette", "description": "La pochette du morceau en cours remplit la fenêtre, sous des panneaux de verre sombre qui flottent."}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Night",

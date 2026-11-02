@@ -24,7 +24,7 @@ const std::set<std::string_view> kFixedPermissions = {
 const std::set<std::string_view> kKnownFields = {
     "$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage", "license",
     "main", "colors", "defaultScheme", "resources", "icon", "permissions", "appVersions", "processes", "type",
-    "preview", "tags", "settings",
+    "preview", "tags", "settings", "translations",
 };
 
 // Length in Unicode code points, so that "é" counts as one character.
@@ -179,6 +179,43 @@ void ReadSettings(const Json& field, std::vector<SettingSpec>& settings, std::ve
     }
 }
 
+// "translations": {"fr": {"name": ..., "description": ...}}, only for the languages Ampify speaks, with the same
+// length rules as name and description.
+void ReadTranslations(const Json& field, std::map<std::string, ManifestText>& translations,
+                      std::vector<std::string>& errors) {
+    const Json::Object* languages = field.AsObject();
+    if (!languages) {
+        errors.push_back("translations must be an object");
+        return;
+    }
+    for (const auto& [code, entry] : *languages) {
+        std::string where = "translations." + code;
+        if (std::find(std::begin(kTranslationLanguages), std::end(kTranslationLanguages), code) ==
+            std::end(kTranslationLanguages)) {
+            errors.push_back(where + ": unknown language (fr)");
+            continue;
+        }
+        if (!entry.IsObject()) {
+            errors.push_back(where + " must be an object");
+            continue;
+        }
+        size_t before = errors.size();
+        for (const auto& [member, value] : *entry.AsObject()) {
+            (void)value;
+            if (member != "name" && member != "description") errors.push_back(where + ": unknown field " + member);
+        }
+        const std::string* name = entry.Find("name") ? entry.Find("name")->AsString() : nullptr;
+        if (!name || CodePoints(*name) < 1 || CodePoints(*name) > 60) {
+            errors.push_back(where + ": name must be 1 to 60 characters");
+        }
+        const std::string* description = entry.Find("description") ? entry.Find("description")->AsString() : nullptr;
+        if (!description || CodePoints(*description) < 1 || CodePoints(*description) > 300) {
+            errors.push_back(where + ": description must be 1 to 300 characters");
+        }
+        if (errors.size() == before) translations[code] = {*name, *description};
+    }
+}
+
 }  // namespace
 
 std::string SettingNumberText(double value) {
@@ -303,6 +340,8 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
             result.errors.push_back("description must be 1 to 300 characters");
         }
     }
+
+    if (const Json* translations = root->Find("translations")) ReadTranslations(*translations, m.translations, result.errors);
 
     std::optional<std::string> kitApi = text_of("kitApi", true);
     if (kitApi) {

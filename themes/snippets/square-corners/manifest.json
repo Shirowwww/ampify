@@ -6,6 +6,7 @@
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Example snippet: removes the rounding of buttons and frames, on top of any theme.",
+  "translations": {"fr": {"name": "Coins carrés", "description": "Un snippet d'exemple : supprime les angles arrondis des boutons et des cadres, par-dessus n'importe quel thème."}},
   "kitApi": "1.0",
   "resources": "resources.xaml"
 }

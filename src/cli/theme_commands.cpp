@@ -1,17 +1,28 @@
 #include "theme_commands.hpp"
 
-#include "../core/settings.hpp"
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+
+#include "../core/theme/builtins.hpp"
 #include "../core/theme/files.hpp"
+#include "../core/theme/inspector.hpp"
 #include "../core/theme/library.hpp"
-#include "../core/theme/theme_settings.hpp"
+#include "../core/theme/selector.hpp"
 
 namespace ampify::theme {
 
 namespace {
 
 constexpr int kOk = 0;
-constexpr int kRefused = 1;
+constexpr int kMissing = 1;
 constexpr int kWrongUse = 2;
+
+int CountMatches(const Selector& selector, const std::vector<NodeInfo>& nodes) {
+    int count = 0;
+    for (int i = 0; i < static_cast<int>(nodes.size()); i++) count += Matches(selector, nodes, i) ? 1 : 0;
+    return count;
+}
 
 // The options a command accepts: `--scheme name`, `--scheme=name`, `--polls N`. Positional arguments come back in order.
 struct Parsed {
@@ -62,125 +73,64 @@ Parsed ParseArguments(const std::vector<std::string>& args, size_t first) {
     return parsed;
 }
 
-std::string SchemeName(const std::string& scheme) {
-    return scheme.empty() ? std::string("the first one") : scheme;
-}
-
-void PrintList(const KitLayout& kit, std::ostream& out) {
-    std::vector<std::string> folders = ListThemeFolders(kit.Themes());
-    if (folders.empty()) {
-        out << "No themes in " << kit.Themes().string() << '\n';
-        return;
-    }
-
-    Settings settings;
-    settings.Load(kit.Settings().string());
-    ThemeSettings current = ReadThemeSettings(settings);
-
-    for (const std::string& folder : folders) {
-        FolderFiles files(kit.Themes() / folder);
-        Theme theme = LoadTheme(folder, (kit.Themes() / folder).generic_string(), files);
-        out << (folder == current.active ? "* " : "  ") << folder;
-        if (theme.name != folder) out << " (" << theme.name << ")";
-        out << ": " << (theme.usable ? "usable" : "refused");
-        if (!theme.schemes.empty()) {
-            out << ", schemes:";
-            for (const std::string& scheme : theme.schemes) out << ' ' << scheme;
-        }
-        out << '\n';
-    }
-    out << "* : active theme\n";
-}
-
-int SetTheme(const std::vector<std::string>& args, const KitLayout& kit, std::ostream& out, std::ostream& err) {
-    Parsed parsed = ParseArguments(args, 2);
-    if (!parsed.ok) {
-        err << parsed.problem << '\n';
-        return kWrongUse;
-    }
-    if (parsed.positional.size() != 1) {
-        err << "usage: ampify theme set <id|none> [--scheme name]\n";
-        return kWrongUse;
-    }
-
-    const std::string id = parsed.positional[0];
-    const bool none = id == "none";
-    std::string scheme = parsed.scheme;  // the one the theme gets: --scheme, else its default
-    ThemeSettings value;
-    if (!none) {
-        std::vector<std::string> folders = ListThemeFolders(kit.Themes());
-        bool found = false;
-        for (const std::string& folder : folders) found = found || folder == id;
-        if (!found) {
-            err << "theme \"" << id << "\" not found in " << kit.Themes().string() << '\n';
-            return kWrongUse;
-        }
-
-        FolderFiles files(kit.Themes() / id);
-        if (scheme.empty()) scheme = ReadDefaultScheme(files);
-        LoadOptions options;
-        options.scheme = scheme;
-        Theme theme = LoadTheme(id, (kit.Themes() / id).generic_string(), files, options);
-        if (!theme.usable) {
-            PrintThemeReport(theme, err);
-            err << "theme \"" << id << "\" refused: settings unchanged\n";
-            return kRefused;
-        }
-        for (const std::string& problem : theme.problems) out << "Warning: " << problem << '\n';
-        value.active = id;
-    }
-    value.scheme = parsed.scheme;
-
-    std::filesystem::create_directories(kit.root);
-    std::string error;
-    bool written = Settings::UpdateFile(kit.Settings().string(), [&](Settings& settings) {
-        ThemeSettings current = ReadThemeSettings(settings);
-        value.liveReload = current.liveReload;
-        value.inspect = current.inspect;
-        value.parts = current.parts;
-        value.schedule = current.schedule;
-        WriteThemeSettings(settings, value);
-    }, error);
-    if (!written) {
-        err << error << '\n';
-        return kRefused;
-    }
-
-    if (none) {
-        out << "No theme: the original colors are back.\n";
-    } else {
-        out << "Theme \"" << id << "\" chosen, scheme " << SchemeName(scheme) << ".\n";
-    }
-    out << "If Apple Music is open, the change applies within 3 seconds, without a restart.\n";
-    return kOk;
-}
-
 }  // namespace
 
-int RunThemeCommand(const std::vector<std::string>& args, const KitLayout& kit, std::ostream& out, std::ostream& err) {
-    if (args.size() < 2 || args[0] != "theme") {
-        err << "usage: ampify theme list | ampify theme set <id|none> [--scheme name]\n";
-        return kWrongUse;
+int RunNames(const std::vector<std::filesystem::path>& files, std::ostream& out, std::ostream& err) {
+    std::vector<std::vector<NodeInfo>> trees;
+    for (const std::filesystem::path& file : files) {
+        std::ifstream in(file, std::ios::binary);
+        std::stringstream text;
+        text << in.rdbuf();
+        std::string problem;
+        std::optional<std::vector<NodeInfo>> tree = ReadInspectorTree(text.str(), &problem);
+        if (!tree) {
+            err << file.string() << ": " << problem << '\n';
+            return kWrongUse;
+        }
+        trees.push_back(std::move(*tree));
     }
-    if (args[1] == "list") {
-        PrintList(kit, out);
-        return kOk;
-    }
-    if (args[1] == "set") return SetTheme(args, kit, out, err);
 
-    err << "unknown command: ampify theme " << args[1] << '\n';
-    return kWrongUse;
+    out << "Stable names checked against " << trees.size() << " tree(s):\n";
+    std::vector<std::string> missing;
+    for (const std::string& name : ClassNames()) {
+        std::vector<std::string> forms = *ClassSelectors(name);
+        std::vector<int> formElements(forms.size(), 0);
+        int foundIn = 0;
+        for (const std::vector<NodeInfo>& tree : trees) {
+            bool found = false;
+            for (size_t i = 0; i < forms.size(); i++) {
+                std::optional<Selector> selector = ParseSelector(forms[i]);
+                int count = selector ? CountMatches(*selector, tree) : 0;
+                formElements[i] += count;
+                found = found || count > 0;
+            }
+            foundIn += found ? 1 : 0;
+        }
+        int elements = 0;
+        for (int count : formElements) elements += count;
+        out << "  ." << std::left << std::setw(26) << name << foundIn << "/" << trees.size() << " trees, " << elements
+            << " element(s)\n";
+        for (size_t i = 0; i < forms.size(); i++) {
+            if (formElements[i] == 0) out << "      form found nowhere: " << forms[i] << '\n';
+        }
+        if (foundIn == 0) missing.push_back(name);
+    }
+    if (missing.empty()) return kOk;
+    out << "Found in no tree (" << missing.size() << "):";
+    for (const std::string& name : missing) out << " ." << name;
+    out << '\n';
+    return kMissing;
 }
 
 int RunWatch(const std::vector<std::string>& args, std::ostream& out, std::ostream& err,
              const std::function<void()>& pause) {
     if (args.empty() || args[0] != "watch") {
-        err << "usage: ampify watch <theme-folder> [--scheme name] [--polls N]\n";
+        err << "usage: ampify theme watch <theme-folder> [--scheme name] [--max-cycles N]\n";
         return kWrongUse;
     }
     Parsed parsed = ParseArguments(args, 1);
     if (!parsed.ok || parsed.positional.size() != 1) {
-        err << (parsed.ok ? std::string("usage: ampify watch <theme-folder> [--scheme name] [--polls N]")
+        err << (parsed.ok ? std::string("usage: ampify theme watch <theme-folder> [--scheme name] [--max-cycles N]")
                           : parsed.problem)
             << '\n';
         return kWrongUse;

@@ -6,6 +6,7 @@
   "kind": "theme",
   "author": "Shirowwww",
   "description": "A complete redesign: gradient and acrylic backgrounds, large rounded cards, larger text, buttons that grow on hover, shadows.",
+  "translations": {"fr": {"name": "Verre", "description": "Une refonte complète : fonds dégradés et acryliques, grandes cartes arrondies, texte plus grand, boutons qui grossissent au survol, ombres."}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Dark",

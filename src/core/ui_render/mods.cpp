@@ -44,6 +44,16 @@ bool IsExtensionTarget(const std::string& id, std::string& error) {
 
 }  // namespace
 
+const std::string& ModEntry::NameIn(const std::string& language) const {
+    auto found = translations.find(language);
+    return found == translations.end() ? name : found->second.name;
+}
+
+const std::string& ModEntry::DescriptionIn(const std::string& language) const {
+    auto found = translations.find(language);
+    return found == translations.end() ? description : found->second.description;
+}
+
 std::vector<ModEntry> ListMods(const fs::path& kit) {
     std::vector<ModEntry> mods;
     Settings settings;
@@ -65,6 +75,7 @@ std::vector<ModEntry> ListMods(const fs::path& kit) {
         mod.id = result.manifest->id;
         mod.name = result.manifest->name.empty() ? mod.id : result.manifest->name;
         mod.description = result.manifest->description;
+        mod.translations = result.manifest->translations;
         mod.enabled = settings.GetBool(ExtensionHost::SettingKey(mod.id), false);
         mod.settings = result.manifest->settings;
         for (const SettingSpec& spec : mod.settings) {
