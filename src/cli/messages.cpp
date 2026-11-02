@@ -86,7 +86,7 @@ Options
   --version, --help
 
 One command only: ampify help <command> (or ampify <command> --help)
-Documentation: docs/cli.md
+Documentation: https://shirowwww.github.io/ampify/cli.html
 )";
 
 constexpr i18n::Message kCli[] = {

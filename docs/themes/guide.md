@@ -1,57 +1,52 @@
-# Make a theme in five minutes
+# Your first theme
 
-You need Ampify installed, Apple Music open, and a terminal open in a working folder. The themes of the Marketplace
-are in [themes/](../../themes): open one next to this guide to see a finished example.
+You need Ampify installed, Apple Music open, and a terminal in a working folder. The finished themes in
+[themes/](../../themes) are good examples to keep open next to this page.
 
-## 1. The starting theme
+## 1. Create it
 
 ```bash
 ampify new theme my-theme
 ```
 
-The `my-theme` folder holds three files:
-
-| File | What it does |
+| File | What it holds |
 |---|---|
-| `manifest.json` | The name, author, version and default color scheme |
-| `colors.ini` | The colors, one scheme per section (`[Night]` and `[Day]`) |
-| `user.css` | Shapes and effects: rounded corners, hover, sizes |
+| `manifest.json` | Name, author, version, default color scheme |
+| `colors.ini` | The colors, one section per scheme (`[Night]` and `[Day]`) |
+| `user.css` | Shapes and effects: corners, hover, sizes |
 
-The theme is already complete: a plum background, a coral accent, rounded corners, and artwork that grows on hover.
+The starter already works: a plum background, a coral accent, rounded corners, and artwork that grows on hover.
 
-## 2. See it in Apple Music
+## 2. See it live
 
 ```bash
 ampify dev my-theme
 ```
 
-`ampify dev` copies the theme into the Ampify folder, selects it, and reloads it at every save. Keep the terminal open.
-Each time you save a file, Apple Music changes within a second, with no restart.
-
-For the other scheme: `ampify theme set my-theme --scheme Day`.
+Leave the terminal open. Each time you save, Apple Music changes within a second. To see the other scheme:
+`ampify theme set my-theme --scheme Day`.
 
 ## 3. Change the colors
 
-Open `colors.ini`. The names are Spicetify's:
+`colors.ini` uses Spicetify's names:
 
-| Key | What it colors in Apple Music |
+| Key | What it colors |
 |---|---|
 | `main` | The page background |
 | `sidebar` | The sidebar |
 | `player` | The playback bar (at the top in Apple Music) |
-| `card` | The now playing display (LCD) in the middle of the bar |
+| `card` | The display of the song playing, in the middle of the bar |
 | `text`, `subtext` | Text and secondary text |
 | `button` | The accent: buttons and the progress bar |
 | `main-elevated`, `highlight` | Buttons and hover |
 
-Write a value in hexadecimal, with or without `#`: `FF7A85`, `#FF7A85`, or `#80FF7A85` with the transparency first. The
-light or dark mode of Apple Music follows the color of `main`.
+Values are hexadecimal, with or without `#`: `FF7A85`, `#FF7A85`, or `#80FF7A85` with the transparency first. Apple
+Music switches to light or dark mode to match the color of `main`.
 
 ## 4. Change the shapes
 
-`user.css` targets Apple Music elements with stable names written as CSS classes: `.sidebar`, `.playbar`, `.card`.
-Ampify keeps the path behind each name up to date when Apple Music changes, so a theme written with them keeps working.
-The colors of `colors.ini` are written `$main` or `var(--spice-main)` there.
+`user.css` targets Apple Music's zones by stable names written as CSS classes. In it, the colors of `colors.ini` are
+`$main` or `var(--spice-main)`.
 
 ```css
 /* A frosted-glass sidebar. */
@@ -70,64 +65,53 @@ The colors of `colors.ini` are written `$main` or `var(--spice-main)` there.
 }
 ```
 
-The most useful names:
+The names you will use most:
 
-| Name | Element |
+| Name | Zone |
 |---|---|
 | `.sidebar` | The sidebar |
 | `.playbar` | The playback bar |
-| `.frost` | The frosted layer behind the playback bar and the page headers |
-| `.lcd` | The now playing display |
-| `.lcd-artwork-image` | The artwork in the bar |
-| `.transport AppBarButton` | Shuffle, previous, play, next, repeat |
-| `.play-button` | Play or pause |
-| `.content` | The page area |
-| `.page` | A page (Home, Library...) |
-| `.card`, `.card-title` | A square card (album, playlist, station) and its title |
+| `.lcd`, `.lcd-artwork-image` | The display of the song playing, and its artwork |
+| `.transport AppBarButton`, `.play-button` | The playback buttons, and play or pause |
+| `.content`, `.page` | The page area, and a page |
+| `.card`, `.card-title` | An album, playlist or station card, and its title |
 | `.track-row` | A song in an album or a playlist |
-| `.app-name` | The "Apple Music" name at the top left |
 
-All the names are in [names.md](names.md). Under a name, the usual XAML types still work (`.playbar TextBlock`), and so
-do the raw paths of the tree (`Grid#PaneRoot`) for the few elements without a name: the full tree is in
-[knowledge/apple-music-xaml-tree.md](../../knowledge/apple-music-xaml-tree.md), and `ampify devtools` writes the tree of
-your own Apple Music version to `logs\inspector.txt` in the Ampify folder.
+Every name is in [names.md](names.md), and every property in [format.md](format.md). For anything without a name,
+`ampify devtools` writes the tree of the page on screen to `logs\inspector.txt`, with a selector for each element.
 
-Two pitfalls:
+Two traps:
 
-- Do not set a `z-index` below 10 on `.playbar`. It would slide under the pages.
-- A text size set on every `TextBlock` also overrides page titles: scope it, as in `.track-row TextBlock`.
-
-All properties (colors, gradients, images, acrylic, margins, corners, fonts, transforms, shadows, hover, grid placement)
-are in [format.md](format.md).
+- A `z-index` below 10 on `.playbar` slides it under the pages.
+- A text size on every `TextBlock` also changes page titles. Scope it: `.track-row TextBlock`.
 
 ## 5. Check it and share it
 
 ```bash
 ampify theme check my-theme
-ampify build my-theme
+ampify publish my-theme
 ```
 
-`ampify theme check` reads the theme the way the kernel does and reports each refused rule with its line. `ampify build`
-checks the manifest, writes the `.zip`, and prints the entry to add to the catalog (see
-[the catalog](../extensions/catalog.md)).
+`ampify theme check` reports each refused rule with its line. `ampify publish` sends the theme to the catalog
+([publishing](../extensions/catalog.md)). Replace `your-github-username` in `manifest.json` first.
 
 ## A snippet
 
-A snippet is a small `user.css` that the user switches on alone, on top of any theme, as in Spicetify's Marketplace.
+A snippet is a small `user.css` that people switch on by itself, on top of any theme.
 
 ```bash
 ampify new snippet my-snippet
 ampify dev my-snippet
 ```
 
-The starter rounds the artwork of the cards (`.card .artwork { corner-radius: 16; }`). It sees the theme's colors and
-comes after it. Users switch it with `ampify snippet enable my-snippet` or from the Marketplace.
+The starter rounds the card artwork (`.card .artwork { corner-radius: 16; }`). A snippet sees the theme's colors and
+its rules win over the theme's. People switch it on from the Marketplace or with `ampify snippet enable my-snippet`.
 
-## Reuse a Spicetify theme
+## From Spicetify
 
 ```bash
 ampify theme import https://github.com/catppuccin/spicetify
 ampify theme set catppuccin --scheme mocha
 ```
 
-The `color.ini` works as it is. Details: [spicetify.md](spicetify.md).
+The colors carry over as they are. See [spicetify.md](spicetify.md).

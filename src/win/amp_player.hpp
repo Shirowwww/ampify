@@ -35,7 +35,7 @@ public:
     AmpPlayer(const AmpPlayer&) = delete;
     AmpPlayer& operator=(const AmpPlayer&) = delete;
 
-    // Reaches Player.Current. True once it answers; `failure` says why not, in simple French.
+    // Reaches Player.Current. True once it answers; `failure` says why not, in simple words.
     bool Activate(std::string& failure);
     bool Active() const { return static_cast<bool>(m_player); }
     const std::string& ActivationPath() const { return m_how; }

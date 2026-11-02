@@ -1,12 +1,7 @@
-# Manifest format
+# Manifest
 
-Each extension, theme, app or snippet is a folder with a `manifest.json` file at its root. The folder name is the id of
-the element. The schema is in [schemas/manifest.schema.json](../../schemas/manifest.schema.json). The API these files
-use is described in [api.md](api.md).
-
-## Example
-
-The folder [examples/hello-extension](../../examples/hello-extension/) is a complete example:
+Every extension, theme, app or snippet is a folder with a `manifest.json` at its root. The folder name is the
+element's id. Schema: [schemas/manifest.schema.json](../../schemas/manifest.schema.json).
 
 ```json
 {
@@ -25,76 +20,43 @@ The folder [examples/hello-extension](../../examples/hello-extension/) is a comp
 
 ## Common fields
 
-| Field | Required | Rule | Purpose |
-|---|---|---|---|
-| `id` | yes | `[a-z0-9][a-z0-9-]{1,39}`, equal to the folder name | Stable id. It is used for setting keys. |
-| `name` | yes | 1 to 60 characters | Name shown in the interface |
-| `version` | yes | `MAJOR.MINOR.PATCH`, for example `1.2.0` | Version of the element, not of the API |
-| `kind` | yes | `extension`, `theme`, `app` or `snippet` | What the element brings |
-| `author` | yes | A GitHub id | Author shown in the catalog |
-| `description` | yes | 1 to 300 characters | Summary shown in the catalog |
-| `translations` | no | Object keyed by language, `fr` only for now (section "Translations") | Name and description shown instead of the English ones when Windows is in that language |
-| `kitApi` | yes | `MAJOR.MINOR`, for example `1.0` | Version of the targeted API. The major version must be supported. |
-| `homepage` | no | `https://` URL | Project page |
-| `license` | no | 1 to 64 characters | The author's license |
-| `tags` | no | List of 5 at most, unique, each `[a-z0-9][a-z0-9-]{0,19}` | Short lowercase words (`dark`, `layout`, `glass`, `lyrics`) shown on the Marketplace card |
-| `preview` | no | A `.png`, `.jpg` or `.jpeg` file name at the root of the folder, 2 MB at most | Picture shown on the Marketplace card. The file must exist. |
-| `appVersions` | no | List of Apple Music versions, 16 at most | Versions where the element was tested. The kernel also applies its own list. |
-| `permissions` | no | List of 32 at most, values from section 4 of [api.md](api.md) | What the element needs. Shown before activation. |
-| `processes` | no | One or two values: `ui` (AppleMusic.exe), `engine` (AMPLibraryAgent.exe), no duplicate | Where the element runs. Default `["ui"]`: the interface only, once per launch. An element that acts on sound declares `engine`. With both, it runs twice and must avoid writing the same storage. |
+| Field | Required | Rule |
+|---|---|---|
+| `id` | yes | `[a-z0-9][a-z0-9-]{1,39}`, equal to the folder name |
+| `name` | yes | 1 to 60 characters |
+| `version` | yes | `MAJOR.MINOR.PATCH`, the element's own version |
+| `kind` | yes | `extension`, `theme`, `app` or `snippet` |
+| `author` | yes | A GitHub id |
+| `description` | yes | 1 to 300 characters |
+| `kitApi` | yes | `MAJOR.MINOR`, such as `1.0`: the API version it targets |
+| `translations` | no | Name, description and setting labels in other languages (below) |
+| `homepage` | no | An `https://` URL |
+| `license` | no | 1 to 64 characters |
+| `tags` | no | Up to 5 unique words, each `[a-z0-9][a-z0-9-]{0,19}` (`dark`, `glass`, `lyrics`) |
+| `preview` | no | A `.png`, `.jpg` or `.jpeg` at the root of the folder, 2 MB at most, shown on the Marketplace card |
+| `appVersions` | no | Up to 16 Apple Music versions the element was tested on |
+| `permissions` | no | Up to 32 values from [the API](api.md#4-permissions), shown before activation |
+| `processes` | no | `ui`, `engine`, or both. Default `["ui"]` ([API, section 2](api.md#2-processes)) |
 
-## Translations
-
-`name` and `description` are in English. An element can also give them in the languages Ampify speaks, which is French
-only for now:
-
-```json
-"translations": {
-  "fr": {"name": "À l'écoute", "description": "Un bouton de la barre de lecture qui ouvre le lecteur plein écran."}
-}
-```
-
-| Member | Rule |
-|---|---|
-| language key | `fr`. Any other key is refused. |
-| `name` | Required, 1 to 60 characters, like `name` |
-| `description` | Required, 1 to 300 characters, like `description` |
-| `settings` | Optional. The label of each declared setting, by its `key`, 1 to 60 characters: `{"gap": "Espace autour des panneaux"}` |
-| `options` | Optional. The text of each option of a `choice` setting, by its value, 1 to 60 characters: `{"Green": "Vert"}`. The value stored in `settings.txt` stays the English one |
-
-The Marketplace (cards and detail view), the Ampify card in Apple Music's Settings and `ampify market --json` use the
-translation that matches Windows' display language, and the English `name` and `description` when there is none. The
-Ampify card also shows the translated setting labels and option texts. The
-catalog entry does not repeat them for now (see [catalog.md](catalog.md)). The id, the folder name and the messages of the
-command line never change with the language.
-
-## Fields by `kind`
+## Fields by kind
 
 | Field | Extension | App | Theme | Snippet | Rule |
 |---|---|---|---|---|---|
-| `main` | required | required | optional | forbidden | A `.js` script at the root of the folder |
-| `type` | optional | optional | optional | n/a | `script` (default) or `module`: `main` is then an ES module, which can import other files of the folder ([api.md](api.md), section 3.6) |
-| `icon` | n/a | optional | n/a | n/a | An `.svg` icon for the sidebar |
-| `colors` | n/a | n/a | required, or `resources` | n/a | An `.ini` file of color schemes |
-| `defaultScheme` | n/a | n/a | optional | n/a | Section of `colors.ini` used by default |
-| `resources` | n/a | n/a | required, or `colors` | required, or a `user.css` in the folder | A `.xaml` resource dictionary |
-| `settings` | optional | forbidden | optional | forbidden | Settings shown in the Ampify card (next section) |
+| `main` | required | required | optional | forbidden | A `.js` file at the root |
+| `type` | optional | optional | optional | | `script` (default) or `module` ([ES modules](api.md#31-several-files-es-modules-preview)) |
+| `icon` | | optional | | | An `.svg` icon |
+| `colors` | | | required, or `resources` | | An `.ini` file of color schemes |
+| `defaultScheme` | | | optional | | The scheme used by default |
+| `resources` | | | required, or `colors` | required, or a `user.css` | A `.xaml` resource dictionary |
+| `settings` | optional | forbidden | optional | forbidden | Settings shown in the Ampify card (below) |
 
-Fields that do not apply to the `kind` are ignored by the kernel. The validator only checks the fields required for each
-`kind`.
+Files named in the manifest sit at the root of the folder (no subfolder, no `../`, no leading dot). The folder may hold
+subfolders for files that `main` imports. A symbolic link anywhere in the folder is refused.
 
 ## Settings
 
-An extension or a theme can list its settings. The "Ampify" card, in Apple Music's Settings > Playback, shows them:
-under the extension's switch, or, for the active theme, under the extensions.
-
-For an extension, `Ampify.config.get(key)` gives their value: the user's choice, else the `default` below, with its
-type (a boolean for a toggle, a number for a number). A change in the card restarts the extension, which reads its
-settings again.
-
-For a theme, `user.css` reads each setting as the variable `--setting-<key>`, and a `@setting <key> { ... }` block
-holds rules that apply only while it is on (see "Theme settings" in [format.md](../themes/format.md)). A change in the
-card applies the theme again at once.
+An extension or a theme can declare settings. The Ampify card in Apple Music's settings shows them under the
+extension's switch, or under the extensions for the active theme.
 
 ```json
 "settings": [
@@ -107,44 +69,56 @@ card applies the theme again at once.
 
 | Member | Rule |
 |---|---|
-| `key` | `[a-z0-9][a-z0-9-]{0,31}`, unique, other than `enabled`. The value is stored as `extensions.<id>.<key>`, or `themes.<id>.<key>` for a theme, in `settings.txt` |
-| `label` | 1 to 60 characters, shown in the card |
+| `key` | `[a-z0-9][a-z0-9-]{0,31}`, unique, not `enabled`. Stored as `extensions.<id>.<key>` (or `themes.<id>.<key>`) |
+| `label` | 1 to 60 characters |
 | `type` | `toggle`, `choice`, `text` or `number` |
-| `default` | `true` or `false` for a toggle, one of the `options` for a choice, a text of 200 characters at most on one line, or a number between `min` and `max` |
-| `options` | A choice's values, and only a choice's: 2 to 20 different texts of 1 to 40 characters |
-| `min`, `max` | A number's bounds, optional. A number typed outside them is not kept |
+| `default` | `true`/`false` for a toggle, one of the `options`, a one-line text of 200 characters at most, or a number within `min` and `max` |
+| `options` | For a choice only: 2 to 20 different texts of 1 to 40 characters |
+| `min`, `max` | For a number, optional |
 
-`settings.txt` keeps one value per line and trims the spaces around it, so an option or a text default must be on one
-line, without spaces at either end.
+16 settings at most. Option values and text defaults are one line, with no space at either end. An extension reads
+its settings with `Ampify.config.get(key)`; a theme with `var(--setting-<key>)` and `@setting`
+([format](../themes/format.md#theme-settings)).
 
-There are 16 settings at most. A text or a number is written when the field is left or when Enter is pressed.
+## Translations
 
-Files declared in the manifest are at the root of the folder. A subfolder, a relative path like `../x.js`, or a name that
-starts with a dot is refused in these fields. The folder can contain subfolders for the files that `main` imports
-(`import x from "./lib/x.js"`). A symbolic link, anywhere in the folder, is refused.
+`name`, `description` and labels are in English. `translations` gives them in the other languages Ampify speaks:
+`fr`, `de`, `es`, `pt`, `ru`, `ja` and `zh`.
 
-## What the validator checks
+```json
+"translations": {
+  "fr": {"name": "À l'écoute", "description": "Un bouton qui ouvre le lecteur plein écran."},
+  "de": {
+    "name": "Läuft gerade",
+    "description": "Eine Taste, die den Vollbild-Player öffnet.",
+    "settings": {"position": "Position"},
+    "options": {"Left": "Links", "Right": "Rechts"}
+  }
+}
+```
 
-[tools/validate.py](../../tools/validate.py) checks:
+| Member | Rule |
+|---|---|
+| language key | One of `fr`, `de`, `es`, `pt`, `ru`, `ja`, `zh`. Any other key is refused |
+| `name`, `description` | Required, same lengths as the English ones |
+| `settings` | Optional: a label per setting `key`, 1 to 60 characters |
+| `options` | Optional: a text per choice value, 1 to 60 characters. The stored value stays the English one |
 
-1. the schema: types, patterns, unknown fields refused;
-2. the file name, which must be `manifest.json`;
-3. `id`, equal to the folder name;
-4. the major version of `kitApi`;
-5. the fields required by `kind` (table above);
-6. that each declared file is present in the folder;
-7. that the folder contains no symbolic link (the kernel refuses to import through a link);
-8. that each setting's `default`, `options`, `min` and `max` fit its `type`, and that no key is used twice.
+The Marketplace and the Ampify card show the translation that matches the language Ampify uses, and English
+otherwise. Ids, folder names and command-line messages never change with the language.
 
-`ampify validate` applies the same rules (`src/cli/element.cpp`), and the kernel checks them again at load time
-(`src/core/manifest.cpp`), without relying on the validator. Unknown permissions are refused by the schema and by the kernel.
+> [!NOTE]
+> Ampify 1.2.1 and older accept only `fr` in `translations` and refuse a manifest that names another language. An
+> element that uses the new languages needs the next Ampify version. The public catalog's index leaves `translations`
+> out (Ampify 1.1.0 refuses the whole catalog for a field it does not know); the archive's manifest keeps them.
+
+## Validation
+
+`ampify validate <folder>` and [tools/validate.py](../../tools/validate.py) check, with the same rules: the schema
+(unknown fields refused), `id` equal to the folder name, the `kitApi` major version, the fields required by `kind`,
+that declared files exist, that there is no symbolic link, and that each setting fits its `type`. Apple Music checks
+everything again when it loads the element.
 
 ```bash
 python3 tools/validate.py manifest examples/hello-extension/manifest.json
 ```
-
-## How the format evolves
-
-- `kitApi` is the format version. An incompatible change raises the major version.
-- A field added in a minor version is optional. A manifest valid for the old version stays valid.
-- A removed field first becomes "deprecated" in a minor version, with a warning in the log.

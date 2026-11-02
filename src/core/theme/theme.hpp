@@ -104,7 +104,7 @@ struct Theme {
     // The @keyframes blocks of user.css by name, which `animation` runs. A snippet also sees those of the active theme.
     KeyframeSets keyframes;
 
-    // French messages with the file and the line. Problems that do not stop the theme are listed here too.
+    // Messages with the file and the line. Problems that do not stop the theme are listed here too.
     std::vector<std::string> problems;
 };
 

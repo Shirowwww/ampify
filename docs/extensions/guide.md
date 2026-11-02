@@ -1,35 +1,30 @@
-# Make an extension in five minutes
+# Your first extension
 
-You need Ampify installed, Apple Music open, and a terminal open in a working folder. The extensions in
-[examples/](../../examples) are short: `hello-extension` and `react-panel` are the best ones to start
-from, `sleep-timer`, `keyboard-skip`, `discord-presence` and `scrobbler` show the player, shortcuts and web
-services.
+You need Ampify installed, Apple Music open, and a terminal in a working folder. The extensions in
+[examples/](../../examples) are short: start from `hello-extension` or `react-panel`; `sleep-timer`, `keyboard-skip`,
+`discord-presence` and `scrobbler` show the player, shortcuts and web services.
 
-## 1. The starting extension
+## 1. Create it
 
 ```bash
 ampify new extension my-extension
 ```
 
-The `my-extension` folder holds two files:
-
-| File | What it does |
+| File | What it holds |
 |---|---|
-| `manifest.json` | The id, name, author, version, the permissions the code needs, and its settings |
+| `manifest.json` | Id, name, author, version, the permissions the code needs, its settings |
 | `main.js` | The code, run by Ampify's JavaScript engine inside Apple Music |
 
-The extension already works: it adds a button to the playback bar, and a click shows the song playing in a Windows
-notification.
+The starter adds a button to the playback bar that shows the song playing in a Windows notification.
 
-## 2. See it in Apple Music
+## 2. See it live
 
 ```bash
 ampify dev my-extension
 ```
 
-`ampify dev` copies the extension into the Ampify folder, switches it on, and restarts it at every save. Keep the
-terminal open. The button, an "i" in a circle, appears at the right of the playback bar. Click it: Windows shows the
-title, the artist and the album.
+Leave the terminal open: the extension restarts at every save. Click the "i" button at the right of the playback bar
+to see the notification.
 
 ## 3. Change the code
 
@@ -38,7 +33,7 @@ title, the artist and the album.
 ```js
 Ampify.ui.playbar.addButton({
   label: "What is playing?",
-  icon: "", // a Segoe Fluent Icons glyph (Info)
+  icon: "", // a Segoe Fluent Icons glyph (Info)
   onClick: () => {
     const { track } = Ampify.player.state();
     const album = Ampify.config.get("show-album") && track ? " - " + track.album : "";
@@ -50,7 +45,8 @@ Ampify.ui.playbar.addButton({
 });
 ```
 
-`show-album` is a setting that `manifest.json` declares:
+`show-album` is a setting declared in `manifest.json`. It shows under the extension in the Ampify card of Apple
+Music's settings, and changing it restarts the extension:
 
 ```json
 "settings": [
@@ -58,57 +54,43 @@ Ampify.ui.playbar.addButton({
 ]
 ```
 
-Apple Music's Settings > Playback shows it under the extension, in the "Ampify" card. Switch it off: the extension
-restarts, and the notification leaves the album out. A setting can also be a list of choices, a text or a number
-([manifest.md](manifest.md), "Settings").
-
-Each function needs a permission in `manifest.json`. Here `ui.playbar` adds the button, `player.read` reads the song and
-`notifications` shows the notification. A function called without its permission throws a `PermissionDenied` error,
-and the log names the missing permission.
-
-What extensions use most:
+Each call needs its permission in the manifest: here `ui.playbar`, `player.read` and `notifications`. A call without
+it throws `PermissionDenied`, and the log names the missing permission.
 
 | To | Call | Permission |
 |---|---|---|
 | Add a button to the playback bar | `Ampify.ui.playbar.addButton({ label, icon, onClick })` | `ui.playbar` |
-| Add an entry to the menu of a song, an album or a playlist | `Ampify.ui.menu.addItem("context", { label, onClick })` | `ui.menu` |
+| Add an entry to a song's, album's or playlist's menu | `Ampify.ui.menu.addItem("context", { label, onClick })` | `ui.menu` |
 | Read the song playing | `Ampify.player.state()` | `player.read` |
 | React when the song changes | `Ampify.player.on("trackchange", fn)` | `player.read` |
 | Play, pause, skip | `Ampify.player.play()`, `pause()`, `next()` | `player.control` |
-| Keep a value between sessions | `Ampify.storage.get(key, fallback)`, `Ampify.storage.set(key, value)` | `storage` |
+| Keep a value | `Ampify.storage.get(key, fallback)`, `Ampify.storage.set(key, value)` | `storage` |
 | Call a web service | `Ampify.http.get(url)` | `network:<host>` |
 | Show a notification | `Ampify.notify({ title, text })` | `notifications` |
+| Show text in the user's language | `Ampify.i18n.define({ en: {...}, de: {...} })`, then `Ampify.i18n.t(key)` | none |
 
-`onClick` of a menu entry receives `{ title }`, the name of the item the menu was opened on. The whole API, with the
-status of each function, is in [api.md](api.md). For completion in your editor, `ampify types` writes `ampify.d.ts`
-in the current folder.
+Everything else is in [the API reference](api.md). `ampify types` writes `ampify.d.ts` for completion in your editor.
 
 ## 4. Follow what it does
 
 ```bash
 ampify logs --follow
-```
-
-Each `Ampify.log` line shows up with the extension's id, for example `[my-extension] my-extension started`, along with
-its errors and refused calls.
-
-```bash
 ampify test my-extension
 ```
 
-`ampify test` runs `main.js` without Apple Music, in the same JavaScript engine, with a fake player and network. It prints
-the log and each call the code made, and fails when a call lacks its permission. A test that passes still needs a look
-in Apple Music.
+`ampify logs --follow` shows each `Ampify.log` line with the extension's id, its errors and refused calls.
+`ampify test` runs `main.js` without Apple Music, with a fake player and network, prints each call, and fails when a
+call lacks its permission. Check the result in Apple Music too.
 
-## 5. Check it and share it
+## 5. Share it
+
+Replace `your-github-username` in `manifest.json`, then:
 
 ```bash
-ampify build my-extension
+ampify publish my-extension
 ```
 
-`ampify build` checks the manifest, writes `my-extension-0.1.0.zip` and prints the entry to add to the catalog, with
-its SHA-256. Replace `your-github-username` in `manifest.json` first. Publishing is described in
-[the catalog](catalog.md).
+It checks and tests the extension, then opens a pull request on the catalog. See [Publishing](catalog.md).
 
 ## An app
 
@@ -117,10 +99,8 @@ ampify new app my-app
 ampify dev my-app
 ```
 
-An app has a page of its own. The starter adds an entry at the bottom of Apple Music's sidebar. The entry opens the page
-`/my-app`, titled with the name in `manifest.json`, with a counter and a button. As in a Spicetify custom app, the page
-shows what the global `render()` function returns. It is built with `Ampify.React`, which gives `h` and the hooks
-(`useState`, `useEffect`...):
+An app has a page of its own. The starter adds an entry at the bottom of Apple Music's sidebar that opens `/my-app`.
+As in a Spicetify custom app, the page shows what the global `render()` returns, built with `Ampify.React`:
 
 ```js
 const { h, useState } = Ampify.React;
@@ -135,11 +115,10 @@ function Page() {
 globalThis.render = () => h(Page);
 ```
 
-The building blocks (`stack`, `row`, `text`, `button`, `card`, `image`...) are drawn with the same WinUI controls as
-Apple Music, so the page takes the theme's colors and the light or dark mode. They are listed in [api.md](api.md),
-section 5.5.
+The building blocks (`stack`, `row`, `text`, `button`, `card`, `image`...) are drawn with Apple Music's own WinUI
+controls, so the page follows the theme and the light or dark mode ([API, section 5.5](api.md#55-interface-stable)).
 
-## Coming from Spicetify
+## From Spicetify
 
 | Spicetify | Ampify |
 |---|---|
@@ -149,6 +128,6 @@ section 5.5.
 | `Spicetify.showNotification` | `Ampify.notify` |
 | `Spicetify.LocalStorage` | `Ampify.storage` |
 | `Spicetify.React`, `Spicetify.ReactDOM` | `Ampify.React`, `Ampify.ReactDOM` |
+| Waiting for `Spicetify.Player` | `await Ampify.ready` |
 
-Waiting for `Spicetify.Player` to exist becomes `await Ampify.ready`. The full comparison is in
-[spicetify-parity.md](../spicetify-parity.md).
+The full comparison is in [spicetify-parity.md](../spicetify-parity.md).

@@ -1,8 +1,7 @@
-# Stable names
+# Element names
 
 Apple Music names few of its elements, and the paths to them are long: the sidebar is
-`SplitView#RootSplitView > Grid > Grid#PaneRoot`, and the play button has no name at all. A theme can write a stable
-name instead, as a CSS class:
+`SplitView#RootSplitView > Grid > Grid#PaneRoot`. Write a stable name instead, as a CSS class:
 
 ```css
 .sidebar { corner-radius: 10px; }
@@ -10,21 +9,12 @@ name instead, as a CSS class:
 .playbar Button { color: #FFFFFF; }
 ```
 
-Each class stands for the path to one zone of Apple Music. Ampify keeps the table of paths (`src/core/theme/builtins.cpp`),
-so when an update of Apple Music moves a zone, the table changes once and every theme keeps working, the way
-Spicetify's `css-map.json` follows Spotify's class names.
+Each class stands for the path to one zone (`src/core/theme/builtins.cpp`). When an Apple Music update moves a zone,
+the path changes once in Ampify and themes keep working, like Spicetify's `css-map.json`.
 
-A class works anywhere a part of a selector goes: alone (`.sidebar`), with a pseudo-class (`.card:hover`,
-`.track-row:nth-child(2)`), or inside a longer selector (`.album-header TextBlock`, `.playbar > Grid`). It must start
-its own part: `Grid.card` is refused, because Ampify cannot tell it from a full type name such as
-`Microsoft.UI.Xaml.Controls.Grid`. An unknown class makes the whole rule ignored, with a line in the log, as any other
-selector mistake does.
-
-Some zones have several forms (the top spacer of each kind of page, the three search scopes). Their class stands for
-all of them.
-
-The table was built from inspector surveys of every page of Apple Music 1.1792. `ampify theme names` checks it
-against trees saved by the inspector (see "Check the names after an update" below).
+A class goes anywhere a part of a selector goes: `.sidebar`, `.card:hover`, `.album-header TextBlock`. It must start
+its part (`Grid.card` is refused). An unknown class makes the rule ignored, with a line in the log. The names were
+read on Apple Music 1.1792.
 
 ## Window
 
@@ -194,10 +184,9 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.volume-slider` | The slider in the volume flyout: `color` fills the part left of the thumb, `background` the rest of the track |
 | `.volume-mute-button` | The mute button on its left |
 
-Ampify never moves the volume. A theme can change how the volume control looks, and nothing else about it. The
-flyout that holds the slider is a `.flyout` (see "Flyouts, menus and tooltips"). The slider's thumb is
-`.volume-slider Thumb`, and its track is `.volume-slider Rectangle#HorizontalTrackRect` (its `height` gives the track's
-thickness). The track, the fill and the thumb keep the theme's colours under the pointer and while dragged.
+The volume slider sits in a `.flyout`. Its thumb is `.volume-slider Thumb`, and its track is
+`.volume-slider Rectangle#HorizontalTrackRect` (its `height` sets the thickness). They keep the theme's colors under
+the pointer and while dragged.
 
 ```css
 .volume-slider {
@@ -212,9 +201,7 @@ thickness). The track, the fill and the thumb keep the theme's colours under the
 
 ## Flyouts, menus and tooltips
 
-Apple Music opens them in popups, outside the window's tree: each popup is a root of its own in the inspector,
-`Popup`, and a selector reaches what is inside it (`.flyout Slider`), never what opened it (`.playbar .flyout`
-matches nothing). A popup takes the theme the first time it opens, and keeps it.
+They open in popups, each a root of its own: `.flyout Slider` works, `.playbar .flyout` matches nothing.
 
 | Class | Zone |
 |---|---|
@@ -238,60 +225,18 @@ matches nothing). A popup takes the theme the first time it opens, and keeps it.
 
 ## Everything else
 
-The table names the zones a theme usually styles. Every other element can still be reached as `Type#Name`, or by its
-place (`:nth-child`), and the inspector shows the selector of each element (see "Inspector" in [format.md](format.md)).
-Apple Music 1.1792 also names these elements, which have no class yet:
-
-`ArtworkImage#ArtworkHasImage`, `ArtworkImage#ArtworkIcon`, `ArtworkImage#ArtworkImage`,
-`ArtworkImage#CoverArtworkImage`, `ArtworkImage#TopSearchArtwork`, `AspectRatioGrid#AspectRatioGrid`,
-`Border#FavoriteButtonContainer`, `Border#ReactionsTapTarget`, `Border#TopNavContentOverlayAreaGrid`,
-`Button#ActionButton`, `Button#AudioBadgeButton`, `Button#CirclePlayButton`, `Button#leftPlayButton`,
-`Button#MoreButton`, `Button#NavigationViewCloseButton`, `Button#PaneAutoSuggestButton`, `Button#RightMoreButton`,
-`Button#TopNavOverflowButton`, `Button#ViewAppearedAutomationButton`, `ContentControl#HeaderContent`,
-`ContentControl#PageHeaderBar`, `ContentControl#PaneAutoSuggestBoxPresenter`,
-`ContentControl#PaneCustomContentBorder`, `ContentControl#PaneCustomContentOnTopPane`,
-`ContentControl#PaneFooterOnTopPane`, `ContentControl#PaneHeaderContentBorder`, `ContentControl#PaneHeaderOnTopPane`,
-`ContentControl#PaneTitleOnTopPane`, `ContentControl#PaneTitlePresenter`, `ContentControl#StackedPageHeader`,
-`ContentControl#TopPaneAutoSuggestBoxPresenter`, `ContentPresenter#ColumnBrowserPresenter`,
-`ContentPresenter#SocialBadgingContent`, `ContentPresenter#TransportControlsPresenter`,
-`FirstColumnAdjustableGrid#FirstColumnAdjustableGrid`, `FirstColumnAdjustableGrid#TitleContainerGrid`,
-`FontIcon#AccentThemedGlyph`, `FontIcon#AirPlayIcon`, `FontIcon#DescendingIcon`, `FontIcon#DownloadedFontIcon`,
-`FontIcon#DownloadedGlyph`, `FontIcon#FavoriteButtonIcon`, `FontIcon#FontIcon`, `FontIcon#NormalThemedGlyph`,
-`FontIcon#PersonPlusFont`, `FontIcon#RepeatButtonIcon`, `FontIcon#ShuffleButtonIcon`, `Frame#SearchContentFrame`,
-`Grid#ArtworkHoverContent`, `Grid#BottomContent`, `Grid#ButtonHolderGrid`, `Grid#ContentGridViewWrapper`,
-`Grid#ContentLeftPadding`, `Grid#ContentPaneTopPadding`, `Grid#ContentTopPadding`, `Grid#DescriptionGrid`,
-`Grid#DisplayName`, `Grid#DragIndicator`, `Grid#DummyPlayWithoutCoverArtButton`, `Grid#FixedDetailListSectionContent`,
-`Grid#FixedDetailListSectionHeaderContent`, `Grid#FixedGroupedGridSectionContent`, `Grid#GroupedItemsHeaderContent`,
-`Grid#HeaderStack`, `Grid#HostRoot`, `Grid#InnerGrid`, `Grid#ItemsContainerGrid`, `Grid#MainContent`,
-`Grid#PageFlatHeaderContent`, `Grid#PaneContentGrid`, `Grid#PaneTitleHolder`, `Grid#PaneToggleButtonGrid`,
-`Grid#RootGrid`, `Grid#ShadowCaster`, `Grid#TickerTapeGrid`, `Grid#TimedTextSourcePresenter`,
-`Grid#TogglePaneTopPadding`, `Grid#TopNavGrid`, `Grid#TopNavLeftPadding`, `Grid#TopNavTopPadding`,
-`Grid#TopPaneAutoSuggestArea`, `HoverGrid#RootGrid`, `HoverGrid#RowGrid`, `Hyperlink#Title`,
-`Image#DragIndicatorImage`, `Image#PosterImage`, `Image#StaticArtwork`, `ItemsRepeater#HeaderRepeater`,
-`ItemsRepeater#SubtitlesRepeater`, `ItemsRepeater#TopFooterMenuItemsHost`, `ListView#FixedListSectionContent`,
-`ListView#List`, `MediaPlayerPresenter#MediaPlayerPresenter`, `Rectangle#DropLocationIndicator`, `Rectangle#Frost`,
-`Rectangle#HCPaneBorder`, `Rectangle#Indeterminate`, `Rectangle#LightDismissLayer`,
-`ScrollViewer#FooterItemsScrollViewer`, `ScrollViewer#TimeBasedLyrics`, `Sidebar#MainSidebar`,
-`StackPanel#ColumnSectionHeaderContent`, `StackPanel#ContentRoot`, `StackPanel#ExplicitFavoriteContainer`,
-`StackPanel#PlayQueueViewContents`, `StackPanel#ShelfSectionContent`, `StackPanel#SingleItemSectionContent`,
-`StackPanel#StackedGridSectionContent`, `StackPanel#TopNavArea`, `TextBlock#AppleDigitalMasterText`,
-`TextBlock#AudioBadgeDot`, `TextBlock#DescriptionText`, `TextBlock#DescriptionTextBlock`,
-`TextBlock#FlowCaseSubtitle`, `TextBlock#FlowCaseTitle`, `TextBlock#HeadlineTextBlock`,
-`TextBlock#HorizontalLockupDefaultHeadline`, `TextBlock#HyperlinkTextBlock`, `TextBlock#JustTextBlock`,
-`TextBlock#LoadingTextBlock`, `TextBlock#LosslessImageDot`, `TextBlock#LosslessText`,
-`TextBlock#NotAvailableTextBlock`, `TextBlock#UnloadedTextBlock`
-
-These are template parts and inner pieces: they may change more often than the zones above.
+Any other element can be reached as `Type#Name` or by its place (`:nth-child`). `ampify devtools` writes the tree of
+the page on screen with a selector for each element, and
+[knowledge/apple-music-xaml-tree.md](../../knowledge/apple-music-xaml-tree.md) describes the whole tree. Template
+parts and inner pieces change more often than the zones above.
 
 ## Check the names after an update
 
-When Apple Music updates, save a few trees with the inspector (a page of each kind: Home, an album, Search, the
-lyrics), then run:
+After an Apple Music update, save a few trees with the inspector (Home, an album, Search, the lyrics), then run:
 
 ```
-ampify theme names C:\trees\home.json C:\trees\album.json ...
+ampify theme names C:\trees\home.json C:\trees\album.json
 ```
 
-The command prints, for each class, how many trees and elements it found, and lists the classes and the forms it found
-nowhere. It exits with code 1 when a class matches nothing in any tree: that class needs a new path in
-`src/core/theme/builtins.cpp`.
+It prints how many elements each class found, and exits with code 1 when a class matches nothing: that class needs a
+new path in `src/core/theme/builtins.cpp`.

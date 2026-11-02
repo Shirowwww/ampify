@@ -42,7 +42,7 @@ struct LayoutConfig {
 // The file name in the Ampify folder: sidebar.json or home.json.
 std::string_view LayoutFileName(LayoutKind kind);
 
-// Reads a layout file. Bad items are skipped and reported (French, one message each). Nothing when the text is not a
+// Reads a layout file. Bad items are skipped and reported (one message each). Nothing when the text is not a
 // JSON object with an "items" list.
 std::optional<LayoutConfig> ParseLayout(std::string_view json, std::vector<std::string>& problems);
 

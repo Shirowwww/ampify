@@ -1,344 +1,167 @@
 # How Ampify works
 
-## In plain words
+## Overview
 
-Apple Music for Windows is a native Windows app. It does not run on a web page, so tools like Spicetify, which edit a
-web bundle, cannot work on it. Ampify takes a different route:
+Apple Music for Windows is a native WinUI 3 app packaged as MSIX, with read-only files. Ampify works from the outside:
 
-1. A small program, the launcher, starts with Windows and waits for Apple Music. You open Apple Music from its own
-   icon, as always.
-2. As Apple Music starts, the launcher pauses it for a moment and slips a library, the kernel, into it. Then it lets
-   Apple Music continue.
-3. Inside Apple Music, the kernel changes colors and shapes of the interface while it runs, and runs small JavaScript
-   programs (extensions) that can add buttons, panels and pages.
+1. A small launcher starts with Windows and waits for Apple Music. You open Apple Music from its own icon.
+2. As Apple Music starts, the launcher pauses it, loads a library (the kernel) into it, and lets it continue.
+3. Inside, the kernel changes the interface's XAML properties while it runs, and runs JavaScript extensions.
 
-Nothing is written to Apple Music's install folder, which Windows keeps read-only. Every change lives in memory and
-disappears when Apple Music closes. When you remove a theme, Ampify puts every value back as it was, without a restart.
-
-Rules that never change:
-
-- Ampify never touches FairPlay or any copy protection.
-- Ampify never moves Apple Music's volume slider.
-- On an Apple Music version it has not been tested with, the kernel does nothing.
-
-## The pieces
+Every change lives in memory. Removing a theme puts each value back, without a restart.
 
 | Piece | Role | Source |
 |---|---|---|
-| `ampify_launcher.exe` | Runs in the background from Windows sign-in, waits for Apple Music, pauses it, injects the kernel, resumes. Or starts Apple Music itself (`ampify launch`) | `src/launcher/`, `src/win/background.cpp`, `src/win/package.cpp` |
-| `ampify_kernel.dll` | The library injected into both Apple Music processes | `src/kernel/`, `src/core/`, `src/win/` |
-| `ampify.exe` | The command line: settings, themes, extensions, Marketplace, author tools | `src/cli/` |
+| `ampify_launcher.exe` | Waits for Apple Music from sign-in, pauses it, injects the kernel, resumes it. Or starts Apple Music itself (`ampify launch`) | `src/launcher/`, `src/win/background.cpp`, `src/win/package.cpp` |
+| `ampify_kernel.dll` | The library loaded into both Apple Music processes | `src/kernel/`, `src/core/`, `src/win/` |
+| `ampify.exe` | The command line | `src/cli/` |
 | `ampify_setup.exe` | Installer and uninstaller | `src/setup/` |
 
 ## The two Apple Music processes
 
-Apple Music for Windows is a WinUI 3 app (Windows App SDK 1.8) packaged as MSIX. It runs as two processes.
-
 | Process | What it does |
 |---|---|
-| `AppleMusic.exe` | The interface (XAML). Also contains V8, `JetEngine32.dll` (Apple's engine for store pages) and WebView2 |
-| `AMPLibraryAgent.exe` | The engine: library, playback, downloads, DRM. Loads Apple's ported frameworks (`CoreFoundation`, `AVFoundationCF`, `CoreMedia`, `CoreFP`, `CoreADI64`...). It starts at the first playback, or when something activates the COM class the package declares |
+| `AppleMusic.exe` | The interface (XAML). Also holds V8, `JetEngine32.dll` (store pages) and WebView2 |
+| `AMPLibraryAgent.exe` | The engine: library, playback, downloads, DRM, with Apple's ported frameworks (`CoreFoundation`, `AVFoundationCF`, `CoreMedia`...). It starts at the first playback |
 
-The interface talks to the engine through out-of-process COM (`AMP.Core.IAMPMusicLibrary`). The kernel loads in both
-processes. The JavaScript runtime in each process runs the elements that asked for that process (the manifest field
-`processes`, `ui` by default).
-
-More detail: [knowledge/apple-music-internals.md](../knowledge/apple-music-internals.md).
+The interface talks to the engine through out-of-process COM (`AMP.Core.IAMPMusicLibrary`). The kernel loads in both,
+and each element runs in the processes its manifest asks for (`processes`, `ui` by default). More:
+[knowledge/apple-music-internals.md](../../knowledge/apple-music-internals.md).
 
 ## The launcher
 
-Spicetify patches Spotify's files once, and Spotify then starts modded from its usual icon. Apple Music's files are
-signed and read-only, so Ampify gets the same result another way: the installer registers
-`ampify_launcher.exe --background` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` and starts it.
-That background launcher (one per Windows session, held by the mutex `Local\AmpifyBackground`) looks for an
-`AppleMusic.exe` four times a second, which costs next to nothing. When one appears:
+The installer registers `ampify_launcher.exe --background` under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` and starts it. This background launcher (one per session, mutex
+`Local\AmpifyBackground`) looks for `AppleMusic.exe` four times a second. When one appears it:
 
-1. Read the package version and check the player library (`AVFoundationCF.dll`) exports.
-2. Suspend the threads of the new Apple Music process.
-3. Call `CreateRemoteThread` with `LoadLibraryW` pointing at `ampify_kernel.dll`.
-4. Resume the process, then follow it until Apple Music closes, and wait for the next start.
+1. reads the package version and checks the exports of `AVFoundationCF.dll`;
+2. suspends the new process's threads;
+3. calls `CreateRemoteThread` with `LoadLibraryW` on `ampify_kernel.dll`;
+4. resumes the process, waits for the load thread, follows the app until it closes, and loads the kernel into
+   `AMPLibraryAgent.exe` and any second `AppleMusic.exe` too.
 
-`ampify restore` sets the event `Local\AmpifyBackgroundStop`, which stops it, and removes the sign-in entry;
-`ampify apply` puts both back. `ampify launch` runs the same launcher in the foreground: it starts Apple Music through
-its package identity itself, injects, and exits when the app closes. When the background launcher runs, the foreground
-one only starts Apple Music and leaves the injection to it, so a launch is never counted twice.
+`ampify restore` sets the event `Local\AmpifyBackgroundStop` and removes the sign-in entry; `ampify apply` puts both
+back. `ampify launch` runs the same launcher in the foreground and starts Apple Music through its package identity
+(with `app_launch_flags`). When the background launcher runs, the foreground one leaves the injection to it.
 
-Details that matter:
+A proxy DLL is not possible on a signed, read-only package; the injection method is the one
+[AMExclusive](https://github.com/AntiOblivionis/AMExclusive) uses.
 
-- The load thread is kept and the launcher waits for it after resuming. The load often finishes a few milliseconds
-  after the resume. An earlier version counted that as a failure.
-- Apple Music sometimes hands control to a second process at start. The launcher keeps watching and loads the kernel
-  there too, and in `AMPLibraryAgent.exe` when it appears.
-- A proxy DLL is not possible because the package is signed and read-only. Injection is the same method as
-  [AMExclusive](https://github.com/AntiOblivionis/AMExclusive).
-- `app_launch_flags` in the settings adds arguments when the launcher starts Apple Music itself (`ampify launch`).
-- Safe mode lives here too: after two starts where the app did not stay healthy for 20 seconds, the launcher starts
-  Apple Music with no kernel. See [getting-started.md](getting-started.md).
+## Version gate and safe mode
 
-## The version gate
+The launcher and kernel load only on Apple Music versions in `src/core/version_gate.hpp` (plus `versions.txt` from
+`ampify versions update`), and only if `AVFoundationCF.dll` exports the names in `src/core/build_signature.hpp`. The
+kernel stores no addresses. A version counts as tested once the bench injects cleanly on it and its export signature is
+recognized. The bench build (`AMPIFY_BENCH=ON`) skips the version list.
 
-The kernel and the launcher load only on Apple Music versions in the tested list (`src/core/version_gate.hpp`, plus
-`versions.txt` written by `ampify versions update`), and only if `AVFoundationCF.dll` still exports the names Ampify
-needs (`src/core/build_signature.hpp`). The kernel stores no addresses and resolves everything by name. An Apple Music update
-therefore breaks nothing: Ampify stays quiet until the new version is tested.
-
-To mark a version as tested, both must hold: the bench injects cleanly on it, and its export signature is recognized.
-
-The bench build (`AMPIFY_BENCH=ON`) accepts any version. It is for tests only and must never be shipped.
+The kernel marks a launch healthy once the app has run for 20 seconds. After two launches in a row that never got there,
+the launcher starts Apple Music without the kernel (`src/core/safe_mode.*`, counter in `state.txt`).
 
 ## The kernel
 
-When the kernel loads in a process it:
+When it loads, the kernel reads `%USERPROFILE%\Ampify\settings.txt`, opens its log (`logs\AppleMusic.log` or
+`logs\AMPLibraryAgent.log`), checks safe mode and the version gate, then starts the JavaScript host and the services
+that are switched on. In `AppleMusic.exe` it starts the interface service (window, theme engine, panels); in
+`AMPLibraryAgent.exe` it installs the audio hooks when the Atmos leveler is on.
 
-1. Reads `%USERPROFILE%\Ampify\settings.txt`, opens the logs, and checks safe mode and the version gate.
-2. Starts the extension host (JavaScript runtime) and the services that are switched on.
-3. In `AppleMusic.exe`, starts the interface service (XAML window, theme engine, panels).
-4. In `AMPLibraryAgent.exe`, installs the audio hooks used by the Atmos leveler when it is switched on.
-5. About 20 seconds later, if the app is still responsive, marks the launch healthy.
+A running kernel re-reads `settings.txt` and reads new lines of `reload.txt` every 500 ms to start, stop or restart an
+element. Every hook goes through `src/core/drm_guard.cpp`.
 
-The exact order can differ between versions. The log (`logs\AppleMusic.log`, `logs\AMPLibraryAgent.log`) shows what
-happened.
+The data folder is `%USERPROFILE%\Ampify`, not `%LOCALAPPDATA%`: MSIX redirects Apple Music's writes under AppData,
+so the launcher and the kernel would not see the same files there.
 
-A running kernel re-reads `settings.txt`. It also reads new lines of `reload.txt` every 500 ms, which is how `ampify`
-starts, stops and reloads an extension without restarting Apple Music (see [cli.md](cli.md)).
+## The window and the UI thread
 
-Hooks are installed only through one gate, `src/core/drm_guard.cpp`, which refuses any target in CoreFP, CoreADI64 or the
-FairPlay path. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+- `Window::Current()` is null in a desktop WinUI 3 app. The kernel calls the `AMP.Utils.dll` export
+  `?GetAppProperty@SharedUtils@@YA?AUIInspectable@Foundation@Windows@winrt@@AEBUhstring@5@@Z` with `"MainWindow"` (or
+  `"MiniPlayerWindow"`, `"FullScreenPlayerWindow"`), then `try_as<Window>()`. Before the window exists it fails with
+  `0x8000000B`, and the kernel tries again.
+- All XAML work goes through `window.DispatcherQueue().TryEnqueue(...)`.
+- Pages are followed with WinEvent hooks, a 5-second pass, and the `Loaded`, `Unloaded` and `Content` events. A walk
+  stops at 512 elements and never enters item lists. Pages are recognized by class name (`PlaybackSettingsPage`).
+- After `Window.Closed`, nothing touches XAML. Everything XAML is released on the UI thread.
 
-## The XAML window and the UI thread
+The tree's shape: [knowledge/apple-music-xaml-tree.md](../../knowledge/apple-music-xaml-tree.md). Pitfalls:
+[xaml-lessons.md](xaml-lessons.md).
 
-Everything visual happens inside `AppleMusic.exe`.
+## Panels, pages and the Ampify card
 
-- **Finding the window.** `Window::Current()` returns null in a desktop WinUI 3 app. The kernel calls the export
-  `?GetAppProperty@SharedUtils@@YA?AUIInspectable@Foundation@Windows@winrt@@AEBUhstring@5@@Z` of `AMP.Utils.dll`
-  with `"MainWindow"` (or `"MiniPlayerWindow"`), then `try_as<Window>()`. Before the window exists, the call fails with
-  `0x8000000B` (E_BOUNDS). That is normal, and the kernel tries again.
-- **The UI thread.** All XAML work runs through `window.DispatcherQueue().TryEnqueue(...)`, one request at a time per
-  window. A `WH_GETMESSAGE` hook was tried first and never fired on Windows Server 2025.
-- **Following pages.** The kernel uses WinEvent hooks and a 5-second pass, plus the `Loaded`, `Unloaded` and `Content`
-  events of frames and pages. It never walks more than 512 elements and never enters item lists, because a library can
-  have thousands of rows.
-- **Recognizing pages.** Pages are recognized by class name (`PlaybackSettingsPage` for Settings > Playback), not by
-  position in the tree.
-- **Closing.** `Window.Closed` sets a flag, and nothing touches XAML after it.
-- **Releasing objects.** Everything XAML is released on the UI thread (`ReleaseXaml`, `DropContext`). Static services
-  are never destroyed.
-
-The shape of the tree is in [knowledge/apple-music-xaml-tree.md](../knowledge/apple-music-xaml-tree.md). The pitfalls
-met while building this are in [development/xaml-lessons.md](development/xaml-lessons.md).
-
-### Panels, pages and the Settings card
-
-Extensions describe an interface as a tree of primitives (`stack`, `text`, `button`, `toggle`...). The kernel renders
-it with real WinUI controls (`src/win/ui_renderer.cpp`). Each node gets the name and automation id
-`AMPIFY_<element>_<node>`, and a new render only changes the nodes that changed. Style, margins and colors are copied
-from the native controls of the Settings > Playback page once it has been opened.
+Extensions describe interfaces as trees of nodes, drawn with real WinUI controls (`src/win/ui_renderer.cpp`). Each
+node is named `AMPIFY_<element>_<node>`, and a new render only changes what changed. Styles are copied from the
+native controls of Settings > Playback.
 
 | Place | How it is shown |
 |---|---|
-| Panels (`Ampify.ui.panel`) | A 380 px column on the right, in a popup of the window, with a Close button |
-| Popups | A native dialog, one at a time |
-| Fullscreen view (`Ampify.ui.fullscreen`) | A popup of the window that covers all of it, above the other overlays, with a Close button and Escape |
-| App pages | Cover the content when the app calls `Ampify.ui.navigate`, with a Back button |
-| Playback bar buttons | In `StackPanel#NowPlayingToggleButtons`, next to the lyrics and queue buttons |
-| "Ampify" card | Added to the end of Settings > Playback, re-inserted each time the page loads |
+| Panels | A 380 px column on the right, in a popup of the window (Apple Music removes unknown children from `Grid#PageRoot`) |
+| Dialogs | A native dialog, one at a time |
+| Full-screen view | A popup over the whole window, closed by its button or Escape |
+| App pages | Over the content, with a Back button |
+| Playback bar buttons | In `StackPanel#NowPlayingToggleButtons` |
+| Ampify card | At the end of Settings > Playback, re-added each time the page loads. An "Ampify" row after Advanced on the Settings page scrolls to it |
+| Sidebar entries | A small panel in place of the sidebar's footer, since adding to Apple Music's own list crashed it |
 
-Panels sit in a popup because Apple Music removes unknown children from `Grid#PageRoot`.
+The card holds the extensions, the themes and their settings, and three choices for Apple Music itself, stored in
+`settings.txt` and read within a second:
 
-The card holds, in order: the extensions (a switch each, then their declared settings), the theme (a list of the
-installed themes, then the active theme's settings), and an "Apple Music" part that changes how Apple Music itself
-behaves. Its choices are stored in `settings.txt` and read again within a second:
-
-| Setting | Values | What the kernel does |
-|---|---|---|
-| `apple.notifications` | `apple` (default), `background`, `never` | Apple Music shows its notifications (a new song, among others) with `AppNotificationManager.Show` of the Windows App SDK. The first value other than `apple` replaces that method's vtable entry (`src/win/notifications.cpp`): the notification is dropped when the rule says so, such as while Apple Music is the window in front. Apple's own switch (Settings > General > Notifications) still applies first. |
-| `apple.close` | `quit` (default), `tray` | What closing Apple Music's main window does (`src/win/close_to_tray.cpp`): quit, as Apple Music does, or hide the window behind an icon of the notification area while the music goes on. A click on the icon shows the window again; its menu shows it or quits. |
-| `apple.fullscreen` | `window` (default), `replace`, `work-area`, `screen` | Where Apple's full-screen player goes, whether Ampify's Now Playing button or Apple's own button opened it (`src/win/apple_player.cpp`): over the Apple Music window, in place of it (the main window hides while the player is open and comes back where the player was), on the screen above the taskbar, or on the whole screen as Apple shows it. |
+| Setting | What the kernel does |
+|---|---|
+| `apple.notifications` | Replaces the vtable entry of `AppNotificationManager.Show` (`src/win/notifications.cpp`) and of `ToastNotifier.Show` in `AMPLibraryAgent.exe`, which shows the song notifications (`src/win/toast_hold.cpp`), to drop notifications by the chosen rule |
+| `apple.close` | `tray`: a subclass of the main window answers `WM_CLOSE` and hides it behind a notification-area icon (`src/win/close_to_tray.cpp`) |
+| `apple.fullscreen` | Places Apple's full-screen player window (`src/win/apple_player.cpp`) |
 
 ## The theme engine
 
-Spotify themes are CSS. Apple Music has no HTML, so Ampify reads a CSS subset and turns it into XAML properties. Colors
-use the file format of Spicetify, so a Spicetify `color.ini` works as it is.
+1. Sources: the active theme, each enabled snippet (alphabetical), then `sidebar.json` and `home.json`. Each brings
+   `colors.ini`, `resources.xaml` and `user.css`.
+2. Rules: a selector is a XAML type and an `x:Name`, with combinators and pseudo-classes. Stable names (`.playbar`)
+   and `@import "ampify:<layout>"` are expanded first (`src/core/theme/builtins.cpp`).
+3. Cascade: `!important`, then source, then specificity, then place in the file. The Spicetify color translation is a
+   lower layer that any `user.css` rule beats.
+4. Apply: on the UI thread, the engine reads each original value and writes the new one. A pass runs when Apple Music
+   shows something new and every 3 seconds. Rules are indexed by the name and type of their last part.
+5. Restore: every value keeps its original and is restored in reverse order.
 
-Pipeline:
+After a resource change the engine switches the light and dark mode and back, since `{ThemeResource}` is only re-read
+at a mode change. Popups get the root's `RequestedTheme` at each refresh. `transition` uses XAML's implicit transitions,
+and `animation` becomes composition keyframe animations (`src/win/theme_animations.cpp`).
 
-1. **Sources.** The active theme, then each enabled snippet in alphabetical order, then `sidebar.json` and `home.json`.
-   Each source brings `colors.ini` (named colors), `resources.xaml` (resource overrides) and `user.css` (rules).
-2. **Rules.** A selector is a XAML type and an `x:Name` (`Grid#TransportBar`), with descendant and child combinators,
-   `:nth-child` and `:hover`. A stable name written as a class (`.playbar`, `.card`) is replaced by the path it stands
-   for before the selector is read, and `@import "ampify:<layout>"` brings in a ready-made layout at its place
-   (`src/core/theme/builtins.cpp`). A declaration maps to a XAML property (`background` to `Background`, `corner-radius` to
-   `CornerRadius`, ...).
-3. **Cascade.** `!important`, then source order, then specificity, then place in the file.
-4. **Apply.** On the UI thread, the engine finds elements that match, reads the original value, and writes the new one.
-   A pass runs when Apple Music shows something new (a page navigation, list items appearing) and every 3 seconds, so a
-   new page is themed before it is drawn. Rules are indexed by the name and type of their last part, so a pass over a
-   few thousand elements takes milliseconds.
-5. **Layers.** The Spicetify color translation forms a low layer. A rule in the theme's `user.css` always beats it.
-6. **Restore.** Every written value keeps its original. Removing the theme restores all values in reverse order, with no
-   restart. A hover rule restores the previous value when the pointer leaves.
-
-Other points:
-
-- A resource override is only re-read by `{ThemeResource}` at a mode change. After each resource change the engine
-  switches light and dark, then back, so the screen updates.
-- Apple Music's backgrounds do not read the Fluent brushes (`SolidBackgroundFillColorBaseBrush`...). Overriding those
-  resources changes only what uses them. To color backgrounds, target the elements by name in `user.css`.
-- The root `RequestedTheme` follows the scheme (Dark for a dark scheme). Popups are outside the window tree, so the
-  value is copied to them at each refresh.
-- `theme.scheme = auto` follows the Windows mode, and `theme.schedule` follows the time. The engine re-reads both every
-  3 seconds.
-- A changed theme folder (a signature of the folder is compared) is reloaded: remove, then apply again.
-- The inspector (`theme.inspect = 1`, or `ampify devtools`) writes `logs\inspector.txt` and `inspector.json`: the
-  resources and the element tree with a selector for each element. It is the source of real names, and of the table of
-  stable names: `ampify theme names` checks that table against saved trees after an Apple Music update.
-- A `transition` is handed to XAML's own implicit transitions, so the compositor animates the change. A transform
-  that animates goes through `UIElement.Scale`, `Rotation` and `Translation`, around the centre unless the theme
-  chooses another origin.
-- An `animation` becomes composition keyframe animations of the same properties and `Opacity`, started with
-  `UIElement.StartAnimation` (`src/win/theme_animations.cpp`). The engine writes it after the element's other values, so it
-  starts from the theme's opacity and turns around the theme's origin.
-
-The engine is portable C++ in `src/core/theme/` and is tested on Linux. `src/win/theme_service.cpp` and `src/win/xaml_backend.cpp`
-connect it to WinUI. Formats: [themes/format.md](themes/format.md).
+The engine is portable C++ in `src/core/theme/`, tested on Linux; `src/win/theme_service.cpp` and
+`src/win/xaml_backend.cpp` connect it to WinUI.
 
 ## The JavaScript runtime
 
-Extensions are JavaScript. The runtime is [quickjs-ng](https://github.com/quickjs-ng/quickjs) 0.17.0 (MIT), vendored
-without changes in `vendor/quickjs/` (version and hash in `vendor/quickjs/UPSTREAM.txt`). QuickJS from 2021 does not
-compile with MSVC (error C2059). V8 is too large and Duktape is ES5 only.
-
-- One runtime instance per element, with a global `Ampify` object. The API follows Spicetify's shape (`Ampify.Player`,
-  `Ampify.React`, `Ampify.components`...), so Spicetify authors feel at home.
-- A sandbox: no file system, no native calls, network only to hosts the manifest declares. Every capability beyond the
-  basics needs a permission in `manifest.json`, shown to the user before an element is switched on.
-- The rendering is native XAML. There is no WebView, so the interface stays Apple Music's own and light.
-- `Ampify.React` is a small engine with React's shape (hooks, fragments, props). It produces the same primitive tree
-  as direct calls.
-- Native extensions (DLLs) are not open to the community. A DLL runs with every right inside Apple Music, and a public
-  catalog cannot vouch for it. Native features stay built into the kernel, like the Atmos leveler.
-
-The API is in [extensions/api.md](extensions/api.md) and the manifest in [extensions/manifest.md](extensions/manifest.md).
-
-### Code layout
-
-Each API module lives in its own files so that several people can add modules without editing the same lines. See
-[CONTRIBUTING.md](../CONTRIBUTING.md#add-an-api-module). The host exposes optional services through
-`Host::Capability<T>()`.
+[quickjs-ng](https://github.com/quickjs-ng/quickjs) is vendored without changes in `vendor/quickjs/` (version in
+`UPSTREAM.txt`). Each element gets its own instance and a global `Ampify` object. `Ampify.React` is a small engine
+with React's shape that produces the same node tree. Native features stay in the kernel; a public catalog cannot vouch
+for a community DLL. Adding a module: [CONTRIBUTING.md](../../CONTRIBUTING.md#add-an-api-module).
 
 ## The Marketplace
 
 The Marketplace is an app (`apps/marketplace`, built with `Ampify.React`). It reads `ampify market --json` and acts
-through `Ampify.kit.run`, which runs `ampify.exe` beside the kernel with no window and empty input, so only `--yes`
-can approve anything. Only the Marketplace holds the permission `kit.manage`, and the catalog refuses it for any other
-element. The commands it may run are limited to `market`, `install`, `remove`, `update <id>`, `theme`, `extension`,
-`app`, `snippet` and `list`.
+through `Ampify.kit.run`, which runs `ampify.exe` with no window and empty input, so only `--yes` can approve. Only the
+Marketplace holds `kit.manage`, and its commands are limited to `market`, `install`, `remove`, `update <id>`, `theme`,
+`extension`, `app`, `snippet` and `list`. Installs therefore go through the same checks as the command line.
 
-Because it calls the same command line, the page applies the same checks as `ampify install` (see
-[extensions/catalog.md](extensions/catalog.md)). Themes are chosen in two clicks.
+## Built-in extensions
 
-The catalog lives in its own public repository, Shirowwww/ampify-catalog, where every archive is pinned by SHA-256.
-`ampify` uses `tar.exe` and `curl.exe`, which ship with Windows 10 (1803) and 11, so nothing is installed for the user.
+Now Playing (`extensions/now-playing`) calls `Ampify.ui.applePlayer.open()`. The kernel calls
+`AMP.UI.Views.FullScreenPlayer.Instance().Show()` by vtable slot (`src/core/amp_abi.hpp`), waits for the
+`FullScreenPlayerWindow`, gives it an overlapped presenter with a border and no title bar, and places it as the
+`apple.fullscreen` setting says. A press and drag on its background moves the window.
 
-The Marketplace opens from the Ampify entry at the bottom of Apple Music's sidebar. Apple Music fills that part of its
-sidebar from a list it owns, and adding to the list crashed it: Ampify puts its entries in a small panel that takes the
-place of the sidebar's footer and keeps Apple Music's own separator in it.
+The playback guard (`extensions/playback-guard`) works around an Apple Music bug: with Lossless Audio on, Apple Music
+1.1792 often freezes the first song after it opens at about 15 seconds. The guard reads Apple's player once a second.
+A song stuck above position 0 for 3 seconds is restarted with "previous", then the guard seeks back to where it froze.
+If the song has not restarted after 6 seconds, it goes next then previous. A song is repaired twice at most.
 
-## Playback guard
-
-The playback guard (`extensions/playback-guard`) ships with Ampify, turned off: `ampify extension enable
-playback-guard`, or its switch in the Mods page. It runs in `AppleMusic.exe`.
-
-With Lossless Audio on, Apple Music 1.1792 freezes the first song played after it opens at about 15 s, on most cold
-starts (measured on 2 November 2026, with no Ampify kernel loaded and every Windhawk mod off). Apple starts the song
-from a short first file, then moves to the lossless one, and that move fails: the player still says it plays, nothing
-is heard, and pause, play and a jump are ignored. With Lossless Audio off, no song froze. Apple's loader is out of
-reach (it is the protected streaming path), so the guard repairs instead.
-
-It reads Apple's player once a second. A song that plays at a position above 0 that has not moved for 3 s is restarted:
-"previous" past 3 s takes the song back to its start, and Apple loads it again. Once it plays from its start, the guard
-jumps back to where it froze through Apple's player (`seek`). Measured on 2 November 2026: the song plays on 2 s after
-the guard steps in, from the second it froze at. If the song has not restarted after 6 s, the guard reloads it instead:
-next, then previous once the next song plays (Apple ignores "previous" while it still loads one). That fallback cannot
-come back from Apple's autoplay songs, after a single or the end of an album, where Apple disables "previous": the next
-song then simply plays. A song is repaired twice at most, and position 0 is left alone: a song can take that long to
-load.
-
-## Now Playing
-
-Now Playing (`extensions/now-playing`) is an extension that ships with Ampify. Its button joins the lyrics and queue
-buttons of the playback bar and opens Apple Music's own full-screen player (`Ampify.ui.applePlayer`,
-`src/win/apple_player.cpp`):
-
-- The kernel calls `AMP.UI.Views.FullScreenPlayer.Instance().Show()`, which the full-screen button of Apple's mini
-  player calls, by vtable slot (`src/core/amp_abi.hpp`). It refuses when the player has no view model yet.
-- Apple then creates the player's window, which it names `FullScreenPlayerWindow` among its app properties
-  (`GetAppProperty`, like `MainWindow`). A timer of the interface thread waits for it and for its FullScreen presenter,
-  then gives it an overlapped presenter with a border and no title bar, and places it so that its visible rectangle is
-  the main window's. Changing the Win32 style is not enough: the FullScreen presenter puts its own style back.
-- A press that no control of the player takes (its background, the artwork, the titles), then a move of a few pixels,
-  moves the window with the pointer, as a title bar would. A plain click still reaches Apple's handlers.
-
-Before 0.5.0, Ampify drew its own lyrics view. `Ampify.ui.fullscreen` still gives extensions that surface: a view over the whole
-window (`Ampify.ui.fullscreen`): a popup of the main window, above Apple Music's pages and panels, which navigation
-leaves in place.
-
-- The song comes from Apple's player (`AMP.Services`), read through the slots of its WinRT interfaces. The artist and
-  album come from the item's subtitle when Apple leaves them empty.
-- The lyrics are Apple Music's own (`ILyricsInfo.GetTTML`, parsed in `src/core/lyrics.cpp`) when Apple has fetched them. It
-  does so once its lyrics panel has been open for the song, so the view falls back on LRCLIB, a free public library
-  of synced lyrics, and switches to Apple's when they arrive.
-- Apple's cover address is internal (`amp-artwork-id://`), so the cover comes from the iTunes Search API.
-- The view is redrawn four times a second while open; the kernel only changes the lines whose state changed, and their
-  opacity animates on the compositor.
-
-## Atmos leveler
-
-Dolby Atmos songs play quieter than stereo songs in Apple Music. The leveler fixes that with a gain on the decoded
-samples. Why the obvious options fail:
-
-- Sound Check never touches Atmos items.
-- CoreMedia has its own Atmos mode (`atmos-loudness-mode`, default 8). Only mode 8 works, and it leaves Atmos about
-  4 dB below stereo. Ampify does not read or write that setting.
-- Changing the player volume (`AVCFPlayerSetVolume`) would move Apple Music's slider.
-
-What Ampify does:
+The Atmos leveler brings Dolby Atmos songs to the loudness of stereo songs with a gain on the decoded samples. Sound
+Check leaves Atmos items alone, and CoreMedia's own Atmos mode leaves them about 4 dB below stereo.
 
 - Stereo is measured on the shared-mode `IAudioRenderClient` stream (float32), after the player volume.
-- Atmos is measured on `ISpatialAudioObjectRenderStreamForMetadata` (mono objects at 48 kHz), before the volume. The
-  measurement brings both paths to the same scale.
-- Loudness is measured per song (BS.1770). One value is kept per audio variant in `atmos-levels.txt`.
-- Target: the median of the last 30 stereo songs. Gain from 0 to 15 dB, peak ceiling 0.95, soft knee from 0.94.
-- When AMExclusive is active (exclusive output), the leveler pauses, because it would break bit-perfect output.
+- Atmos is measured on `ISpatialAudioObjectRenderStreamForMetadata` (mono objects at 48 kHz), before the volume, and
+  brought to the same scale.
+- Loudness is BS.1770 per song, kept per audio variant in `atmos-levels.txt`. The target is the median of the last 30
+  stereo songs; the gain goes from 0 to 15 dB with a soft knee from 0.94 and a ceiling of 0.95.
+- While AMExclusive holds the output in exclusive mode, the leveler pauses.
 
-Details and measurements: [knowledge/atmos-loudness.md](../knowledge/atmos-loudness.md).
-
-## What stays untouched
-
-- **FairPlay and DRM.** No hook in CoreFP, CoreADI64 or anything near them. `src/core/drm_guard.cpp` refuses every request.
-  The quality lock of AMExclusive was not adopted because it edits HLS variant selection, including the protected
-  `qlac` subtype, close to the protected stream path.
-- **The volume bar.** The kernel reads the player volume and never writes it. Any gain acts on samples.
-- **The package.** Nothing is written in Apple Music's install folder.
-- **Audio output.** Samples are never recorded to disk. Scripts only receive small frames of numbers.
-
-## Files on disk
-
-```
-%USERPROFILE%\Ampify\
-  settings.txt           settings, one key = value per line
-  extensions\<id>\       manifest.json, main.js, ...
-  apps\<id>\
-  themes\<id>\
-  snippets\<id>\
-  storage\<id>.json      data of Ampify.storage
-  active.txt             what should load
-  reload.txt             requests to a running kernel (start, stop, restart, rescan)
-  backups\               copies of settings and elements
-  logs\                  AppleMusic.log, AMPLibraryAgent.log, launcher.log, inspector.txt
-  versions.txt           extra tested Apple Music versions
-  atmos-levels.txt       kept loudness values
-```
-
-The data folder is `%USERPROFILE%\Ampify`, not `%LOCALAPPDATA%`. MSIX redirects Apple Music's writes under AppData, so
-the launcher and the kernel would not see the same files there.
+Measurements: [knowledge/atmos-loudness.md](../../knowledge/atmos-loudness.md).

@@ -1,5 +1,5 @@
 # CLI case: tar.exe and curl.exe are there, and https is the only protocol accepted for a remote catalog.
-# Run by the bench (docs/development/bench-and-ci.md). Does not need Apple Music. Needs dist\cli\ampify.exe.
+# Run by the bench (docs/development/testing.md). Does not need Apple Music. Needs dist\cli\ampify.exe.
 
 Register-Case -Id 'cli-windows-tools' -Title 'ampify finds tar.exe and curl.exe, and refuses http://' -Action {
     param($Ctx)

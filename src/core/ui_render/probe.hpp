@@ -7,7 +7,7 @@
 // The rules for the settings page, the bounded walk and the refresh ticket come from AMExclusive (MIT,
 // https://github.com/AntiOblivionis/AMExclusive, mod/src/UiAdapter.cpp and mod/src/UiRefreshState.h at 91f589d),
 // adapted to Ampify. The placement of the top bar and play bar buttons is provisional until the real tree of
-// Apple Music is dumped (docs/development/testing-on-a-pc.md).
+// Apple Music is dumped (docs/development/testing.md).
 
 #include <cstdint>
 #include <deque>

@@ -5,7 +5,7 @@ Windows test bench: installs Apple Music if needed, runs the cases of bench/wind
 .DESCRIPTION
 Each file of cases/ registers one or more cases (Register-Case). A case whose requirement is missing is skipped,
 with the reason in the report. The bench closes Apple Music by force and empties the Ampify logs: do not run it
-on a PC where Apple Music is in use. To add a case, see docs/development/bench-and-ci.md.
+on a PC where Apple Music is in use. To add a case, see docs/development/testing.md.
 
 .PARAMETER KitRoot
 Folder that holds release\ (release build) and bench\ (bench build), with ampify_launcher.exe and ampify_kernel.dll.

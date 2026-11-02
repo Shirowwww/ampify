@@ -11,7 +11,7 @@ namespace ampify {
 // no backslash, no control character. `reason` says what is wrong when this returns false.
 bool IsSafeArchiveEntry(std::string_view entry, std::string& reason);
 
-// The first problem in a listing, in French, or empty when every entry is safe.
+// The first problem in a listing, or empty when every entry is safe.
 std::string CheckArchiveListing(const std::vector<std::string>& entries);
 
 // True when a symbolic link or a junction lies anywhere under `folder`. Archives may carry links to

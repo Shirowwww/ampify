@@ -23,7 +23,7 @@ public:
         int line = 0;
     };
 
-    // Returns the problems found, one French message each (with the line number). Empty when the text is clean.
+    // Returns the problems found, one message each (with the line number). Empty when the text is clean.
     // Lines that cannot be read are skipped, so the rest of the file still loads.
     std::vector<std::string> Parse(std::string_view text);
 

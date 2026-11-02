@@ -60,16 +60,8 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
     act on Atmos sound, hook `ActivateSpatialAudioStream`, `Begin/EndUpdatingAudioObjects` and
     `ISpatialAudioObject::GetBuffer`;
   - the test output was a stereo USB headset at 96 kHz float, with Dolby Atmos for Headphones.
-- **The interface shows the player volume.** If a mod changes `AVCFPlayerSetVolume`, Apple Music's slider moves (observed:
-  55% in stereo, 71.67% in Atmos with +5 dB). Never set the gain through the player volume: act on the samples.
-
-## What was already built (in `../reference/`)
-
-- `apple-music-atmos-gain.wh.cpp`: a Windhawk mod (v2.3) injected in `AMPLibraryAgent.exe`. It watches `AVCFPlayerSetVolume`
-  (without changing it), detects Atmos from the format, measures the decoded sound (BS.1770) on the WASAPI stereo stream
-  and on the spatial objects, learns the target from stereo songs leveled by Sound Check, then applies to each Atmos song
-  a gain on the samples, with a ramp and a soft limiter. It remembers the value per variant.
-- `loudness-meter/`: a C# .NET 8 tool that measures the LUFS of the output by WASAPI loopback, in memory only.
+- **The interface shows the player volume.** A change through `AVCFPlayerSetVolume` moves Apple Music's slider (observed:
+  55% in stereo, 71.67% in Atmos with +5 dB). The Atmos leveler reads that volume and applies its own gain to the samples.
 
 ## Pitfalls observed
 
@@ -79,9 +71,8 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   it has run (one rotation per launch).
 - Preferences: `...\LocalCache\Roaming\Apple Computer\Preferences\AMPLibraryAgent.exe.plist` (binary plist; `volumeWSG`,
   `losslessEnabled`, `downloadDolbyAtmos`, `crossfadeSeconds`...).
-- Injection: Windhawk (DLL injection at process start) is tolerated by Apple Music, and so is a hot reload. A Frida trial
-  coincided with Apple Music closing, but that came from another cause (another tool closed it). Nothing points to
-  anti-debugging detection, though that is not proven.
+- Injection: Apple Music accepts a DLL injected at process start (Windhawk works too), and a hot reload. Nothing points
+  to anti-debugging detection.
 - After a restart, the play queue is empty: playback can only resume by a click from the user. The Windows media commands
   (SMTC) handle play, pause, next and previous, but not choosing a song or a position.
 - A freeze of about 7 s around 15 s into the first Atmos song after a launch happens with no mod at all (a FairPlay key

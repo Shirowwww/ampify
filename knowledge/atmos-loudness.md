@@ -46,8 +46,9 @@ Methods hooked on the fly on the Atmos stream (vtable numbers): `GetBuffer` at 3
 Consequence: to compare Atmos with stereo, the measurement must bring both paths to the same scale (stereo divided by the
 player volume, or Atmos multiplied by it).
 
-**Never go through `AVCFPlayerSetVolume`:** Apple Music's slider shows the player volume and would move. The kernel reads
-this volume and never writes it.
+Apple Music's slider shows the player volume (`AVCFPlayerSetVolume`). The leveler reads it to scale its measurements and
+applies its gain to the samples.
+
 
 ## Leveling settings
 

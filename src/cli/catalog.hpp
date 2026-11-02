@@ -44,12 +44,12 @@ bool IsAllowedDownloadUrl(std::string_view url, bool localCatalog);
 std::string UrlHost(std::string_view url);
 
 // Parses catalog.json (schemas/catalog.schema.json). `localCatalog` is true when the file was read from disk.
-// On failure returns nullopt and appends one French message per problem to `errors`.
+// On failure returns nullopt and appends one message per problem to `errors`.
 std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, std::vector<std::string>& errors);
 
 const CatalogEntry* FindCatalogEntry(const Catalog& catalog, std::string_view id);
 
-// Parses versions.json. On failure returns nullopt and appends one French message per problem to `errors`.
+// Parses versions.json. On failure returns nullopt and appends one message per problem to `errors`.
 std::optional<VersionsCatalog> ParseVersionsCatalog(std::string_view text, std::vector<std::string>& errors);
 
 // The versions whose checked exports include every name of `required` (the exports this kit needs). A version

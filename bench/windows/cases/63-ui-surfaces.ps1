@@ -8,7 +8,7 @@
 # A PNG capture of the window is taken at each step. The useful log lines are copied into the job log.
 # Job: MSVC (bench-msvc), with the MSVC kit (artifact ampify-msvc-kit) in $script:BenchKitRoot\ui (ampify_launcher.exe,
 # ampify_kernel.dll, themes, examples\react-panel). Placement of the panels and buttons: provisional, see
-# docs/development/testing-on-a-pc.md ("Interface: panels, Marketplace and the Ampify card").
+# docs/development/testing.md.
 
 # .NET UI Automation (WindowsDesktop), loaded once. $false when it is not available.
 function Initialize-UiAutomation {

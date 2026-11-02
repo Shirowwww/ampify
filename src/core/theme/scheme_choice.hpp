@@ -26,7 +26,7 @@ struct ScheduleEntry {
 
 struct Schedule {
     std::vector<ScheduleEntry> entries;  // sorted by time
-    std::vector<std::string> problems;   // French, one per bad entry; the good entries are kept
+    std::vector<std::string> problems;   // one per bad entry; the good entries are kept
 };
 
 // `HH:MM=Scheme`, separated by commas or semicolons. An empty text gives an empty schedule.

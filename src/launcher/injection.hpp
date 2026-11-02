@@ -22,7 +22,7 @@ inline constexpr DWORD kDefaultRemoteLoadTimeoutMs = 10000;
 HANDLE OpenProcessForInjection(DWORD processId);
 
 // Loads `kernelDll` into `process` by running LoadLibraryW there, and waits at most `timeoutMs`.
-// On failure, `failure` says why, in French. A load that is still pending at the timeout may finish
+// On failure, `failure` says why. A load that is still pending at the timeout may finish
 // later: the thread is not killed, and the caller should check the kernel's own log.
 //
 // When `pending` is given and the load is still running at the timeout, the remote thread's handle is stored there
@@ -32,7 +32,7 @@ bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::s
                   DWORD timeoutMs = kDefaultRemoteLoadTimeoutMs, HANDLE* pending = nullptr);
 
 // Waits at most `timeoutMs` more for a load that InjectKernel left pending, then closes its handle.
-// True when LoadLibraryW returned a module. On failure, `failure` says why, in French.
+// True when LoadLibraryW returned a module. On failure, `failure` says why.
 bool FinishRemoteLoad(HANDLE thread, DWORD timeoutMs, std::string& failure);
 
 // Suspends every thread of `processId`. Returns how many were suspended.

@@ -1,14 +1,11 @@
 # XAML lessons
 
-What went wrong and what fixed it while Ampify learned to draw inside Apple Music. Read this before touching `win/`.
+Problems met while drawing inside Apple Music, and what fixed them. Read this before changing `src/win/`.
 
-General rules learned:
-
-1. **In a process you do not control, hold everything you create with a strong reference.** Release it on the UI thread.
-2. **Never trust the log without looking at a screenshot.** Several times the log said "mounted" or "applied" while
-   nothing was visible.
-3. **Compare before and after side by side.** Translating colors that are close to Apple Music's own shows nothing. A
-   real theme also changes shapes.
+1. In a process you do not control, hold everything you create with a strong reference, and release it on the UI
+   thread.
+2. Check a screenshot, since the log has said "mounted" or "applied" while nothing was visible.
+3. Compare before and after side by side. Colors close to Apple Music's own show no difference.
 
 ## Objects, popups and lifetime
 
@@ -118,13 +115,11 @@ dozens of times. Always target them under a named parent.
 | Screenshot cut off on the right | PowerShell not DPI aware, screen at 125% | `SetProcessDpiAwarenessContext(-4)` before capturing |
 | Catppuccin Latte looked the same as Apple Music's light mode | Colors close to Apple Music's own show no difference | Compare side by side, and change shapes too |
 
-## Finding the window and the UI thread
+## Apple Music's quirks
 
-- `Window::Current()` returns null in a desktop WinUI 3 app. Get the window from the `AMP.Utils.dll` export
-  `?GetAppProperty@SharedUtils@@YA?AUIInspectable@Foundation@Windows@winrt@@AEBUhstring@5@@Z` with `"MainWindow"` or
-  `"MiniPlayerWindow"`, then `try_as<Window>()`. Before the window exists the call fails with `0x8000000B`: retry.
-- Use `window.DispatcherQueue().TryEnqueue(...)`. A `WH_GETMESSAGE` hook never fired on Windows Server 2025.
-- Recognize pages by class name (`PlaybackSettingsPage`), not by position.
+Finding the window and the UI thread is described in [how-it-works.md](how-it-works.md#the-window-and-the-ui-thread).
+A `WH_GETMESSAGE` hook never fired on Windows Server 2025; the DispatcherQueue works.
+
 - Apple Music keeps the first 64 pixels of a page for its playback bar, in more places than the list's padding: the
   page's backdrop (`ContentPresenter#PageBackground`, an artist's video) is laid 64 down, and the lyrics and queue pane
   has a 64-high first row. A layout that moves the panels below the bar must take those 64 back too, or a dark band

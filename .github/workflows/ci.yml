@@ -1,7 +1,7 @@
 name: CI
 
 # Unit tests on Linux and Windows, then the bench: the cases run on a real Windows with Apple Music installed.
-# The cases and how to add one: docs/development/bench-and-ci.md.
+# The cases and how to add one: docs/development/testing.md.
 # Runs on pushes to dev that touch the code, and by hand on any branch. Work reaches main through dev with the same
 # commits, so main and pull requests need no run of their own.
 
@@ -64,6 +64,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tools -p 'test_*.py'
           node --test tools/test_examples.mjs
+          npm run lint:js
 
   # The MSVC unit tests build their own targets beside the kits, so the bench never waits for them.
   windows-tests:

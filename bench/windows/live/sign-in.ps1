@@ -73,7 +73,7 @@ if (-not $AllowSignIn) {
 }
 if (-not $env:AMPIFY_APPLE_ID -or -not $env:AMPIFY_APPLE_PASSWORD) {
     Close-AppleMusic | Out-Null
-    Stop-SignIn 1 'secrets AMPIFY_APPLE_ID and AMPIFY_APPLE_PASSWORD missing: see docs/development/bench-and-ci.md'
+    Stop-SignIn 1 'secrets AMPIFY_APPLE_ID and AMPIFY_APPLE_PASSWORD missing: see docs/development/testing.md'
 }
 
 # Before typing anything: the empty sign-in screen can be captured.

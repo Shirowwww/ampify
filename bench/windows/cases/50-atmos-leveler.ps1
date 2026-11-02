@@ -1,7 +1,7 @@
 # Steps 1 and 2 of the M4 test, without an account: the Atmos leveler turned on must neither stop Apple Music from
 # starting, nor crash the app, nor hook CoreFP, CoreADI64 or FairPlay. The leveler start is noted only if the agent
 # plays sound, which needs the Apple Music account: without playback, it is a finding. The ±1 LU check stays on a
-# real PC (docs/development/testing-on-a-pc.md).
+# real PC (docs/development/testing.md).
 
 Register-Case -Id 'atmos-leveler' -Title 'Atmos leveler on: Apple Music starts, no hook on FairPlay' -Requires 'apple-music' -Action {
     param($Ctx)

@@ -26,7 +26,7 @@ public:
     // Names of the input devices, in winmm order (the index of midi.device).
     static std::vector<std::string> Devices();
 
-    // Opens and starts device `index`. False with `error` in French (no device, already taken...).
+    // Opens and starts device `index`. False with `error` saying why (no device, already taken...).
     bool Open(unsigned index, OnMessage onMessage, std::string* error);
     void Close();
 

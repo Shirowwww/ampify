@@ -79,7 +79,7 @@ struct ActiveItem {
 
 struct ActiveReport {
     std::vector<ActiveItem> items;
-    std::vector<std::string> problems;  // French, one per problem: an enabled element that cannot load
+    std::vector<std::string> problems;  // one per problem: an enabled element that cannot load
 };
 
 ActiveReport ComputeActive(const KitLayout& kit, const Settings& settings);

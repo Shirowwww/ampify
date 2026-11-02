@@ -28,7 +28,7 @@ public:
     RemoteServer(const RemoteServer&) = delete;
     RemoteServer& operator=(const RemoteServer&) = delete;
 
-    // Binds and starts the thread. `backend` must outlive the server. False with `error` in French.
+    // Binds and starts the thread. `backend` must outlive the server. False with `error` saying why.
     bool Start(const Config& config, remote::Backend& backend, std::string* error);
     void Stop();
 

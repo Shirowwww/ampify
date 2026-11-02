@@ -1,5 +1,5 @@
 # Shared functions of the Windows test bench. Loaded by run-bench.ps1: not run on its own.
-# To add a case, see docs/development/bench-and-ci.md.
+# To add a case, see docs/development/testing.md.
 
 Set-StrictMode -Version Latest
 
