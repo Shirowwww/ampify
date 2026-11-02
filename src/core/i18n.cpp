@@ -56,7 +56,8 @@ constexpr Message kKit[] = {
     {"tweaks.player.workArea", "Whole screen, taskbar visible"},
     {"tweaks.player.screen", "Whole screen (Apple's way)"},
     {"tweaks.close", "Closing the window"},
-    {"tweaks.closeHelp", "In the notification area, the music goes on: its icon brings the window back or quits."},
+    {"tweaks.closeHelp", "What the window's close button does. In the notification area, the music goes on and the "
+                         "icon near the clock brings the window back."},
     {"tweaks.close.quit", "Quits Apple Music"},
     {"tweaks.close.tray", "Keeps it in the notification area"},
     {"tray.show", "Show Apple Music"},
@@ -67,6 +68,7 @@ constexpr Message kKit[] = {
     {"mods.report.running", "Writing the report…"},
     {"mods.report.done", "Report exported"},
     {"mods.report.failed", "The report failed"},
+    {"settings.entryHelp", "Themes, extensions and the Marketplace: what Ampify adds to Apple Music."},
 };
 
 // French texts of what people see (menus, buttons, the Settings card). The log stays in English, so a key missing here
@@ -104,7 +106,9 @@ constexpr Message kKitFr[] = {
     {"tweaks.player.workArea", "Tout l'écran, barre des tâches visible"},
     {"tweaks.player.screen", "Tout l'écran (comme Apple)"},
     {"tweaks.close", "Fermer la fenêtre"},
-    {"tweaks.closeHelp", "Dans la zone de notification, la musique continue : son icône rouvre la fenêtre ou quitte."},
+    {"tweaks.closeHelp", "Ce que fait la croix de la fenêtre. Dans la zone de notification, la musique continue et "
+                         "l'icône près de l'horloge rouvre la fenêtre."},
+    {"settings.entryHelp", "Thèmes, extensions et Marketplace : ce qu'Ampify ajoute à Apple Music."},
     {"tweaks.close.quit", "Quitte Apple Music"},
     {"tweaks.close.tray", "La garde dans la zone de notification"},
     {"tray.show", "Afficher Apple Music"},

@@ -6,6 +6,17 @@
 // (tray.hpp). The main window's WM_CLOSE is caught by a subclass, before WinUI turns it into AppWindow.Closing, so
 // Apple Music never starts to shut down. Compiled only with AMPIFY_WITH_XAML.
 
+#include <windows.h>
+
+namespace ampify::win {
+
+// The icon's hidden window, and the message that makes Apple Music quit for real (the menu's Quit). The installer posts
+// it, since closing the main window would only hide it again.
+inline constexpr wchar_t kCloseToTrayWindowClass[] = L"AmpifyCloseToTrayWindow";
+inline constexpr UINT kCloseToTrayQuitMessage = WM_APP + 0x43;
+
+}  // namespace ampify::win
+
 #if defined(AMPIFY_WITH_XAML)
 
 #include <winrt/Microsoft.UI.Xaml.h>

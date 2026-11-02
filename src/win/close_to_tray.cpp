@@ -26,7 +26,7 @@ constexpr UINT_PTR kSubclassId = 0x414D5059;  // "AMPY"
 constexpr UINT kIconId = 1;
 constexpr UINT kShowCommand = 1;
 constexpr UINT kQuitCommand = 2;
-constexpr wchar_t kTrayClass[] = L"AmpifyCloseToTrayWindow";
+constexpr const wchar_t* kTrayClass = kCloseToTrayWindowClass;
 
 std::atomic<bool> g_toTray{false};
 std::atomic<HWND> g_main{nullptr};
@@ -139,6 +139,10 @@ LRESULT CALLBACK TrayProc(HWND window, UINT message, WPARAM wParam, LPARAM lPara
     }
     if (message == kWakeMessage) {
         if (g_iconShown) ShowAgain();
+        return 0;
+    }
+    if (message == kCloseToTrayQuitMessage) {
+        Quit();
         return 0;
     }
     if (g_taskbarCreated && message == g_taskbarCreated && g_iconShown) {

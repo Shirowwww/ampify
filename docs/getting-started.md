@@ -64,9 +64,11 @@ installing needs an internet connection.
 
 ## Switch extensions on and off
 
-In Settings > Playback, the "Ampify" card has one switch per extension. The change takes effect at once. Extensions you
+Open Apple Music's Settings and click "Ampify", under Advanced: it leads to the "Ampify" card, at the bottom of Settings >
+Playback, with one switch per extension and the settings of each. The change takes effect at once. Extensions you
 install from the Marketplace start switched off, and you see the permissions an extension asks for before you switch
-it on. The extensions marked "(example)" are there to learn from; they work, but they are simple on purpose.
+it on. The extensions marked "(example)" are there to learn from; they work, but they are simple on purpose. The others
+are small and commented too, so their code is worth reading.
 
 Two extensions ship with Ampify:
 
