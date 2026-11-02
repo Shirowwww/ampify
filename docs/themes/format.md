@@ -58,6 +58,10 @@ SolidBackgroundFillColorBase = 1C1C1E
 - A scheme that gives the accent (`AccentFillColorDefaultBrush`, or Spicetify's `button`) also gives its hover and
   pressed colors, as Fluent does: `AccentFillColorSecondaryBrush` is the accent at 90%, `AccentFillColorTertiaryBrush`
   at 80%. Without them, a button under the pointer showed Apple Music's own accent.
+- The accent also reaches WinUI's toggles, sliders, check boxes, radio buttons, progress bars and links (the Settings
+  pages are full of them): `ToggleSwitchFillOn`, `SliderTrackValueFill`, `CheckBoxCheckBackgroundFillChecked`,
+  `HyperlinkButtonForeground` (from `AccentTextFillColorPrimaryBrush`) and their hover, pressed and disabled keys. WinUI
+  sets these from the accent once, when its dictionaries load, so the accent alone left them in Apple Music's blue.
 - On an accent where white text reads under 3:1 (a light cyan, Spotify's green, a yellow), the text on it
   (`TextOnAccentFillColorPrimaryBrush` and `...SecondaryBrush`) turns black, as in Fluent's dark mode.
 - A key the scheme names itself is never replaced, and neither is one that `resources.xaml` defines (nor what would be

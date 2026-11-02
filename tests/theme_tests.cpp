@@ -948,6 +948,30 @@ TEST_CASE(Theme_HoverAndPressedAccentsFollowTheAccent) {
     CHECK(ResourceValue(dictionary, "AccentFillColorTertiaryBrush") == "ABSENT");
 }
 
+TEST_CASE(Theme_ControlsFollowTheAccent) {
+    MemoryFiles files;
+    files.files["colors.ini"] =
+        "[Only]\nAccentFillColorDefaultBrush = 0A84FF\nAccentTextFillColorPrimaryBrush = 99CCFF\n\n"
+        "[Own]\nAccentFillColorDefaultBrush = 0A84FF\nToggleSwitchFillOn = 112233\n";
+
+    // WinUI's toggles, sliders, check boxes and links read their own keys, set from Apple Music's accent once: they
+    // follow the theme's.
+    th::Theme only = Load(files, {"Only", nullptr, {}});
+    CHECK(ResourceValue(only, "ToggleSwitchFillOn") == "#FF0A84FF");
+    CHECK(ResourceValue(only, "ToggleSwitchFillOnPointerOver") == "#E60A84FF");
+    CHECK(ResourceValue(only, "SliderTrackValueFill") == "#FF0A84FF");
+    CHECK(ResourceValue(only, "SliderThumbBackgroundPressed") == "#CC0A84FF");
+    CHECK(ResourceValue(only, "CheckBoxCheckBackgroundFillChecked") == "#FF0A84FF");
+    CHECK(ResourceValue(only, "HyperlinkButtonForeground") == "#FF99CCFF");
+    CHECK(ResourceValue(only, "HyperlinkButtonForegroundPointerOver") == "#E699CCFF");
+
+    // A key the theme names stays its own.
+    th::Theme own = Load(files, {"Own", nullptr, {}});
+    CHECK(ResourceValue(own, "ToggleSwitchFillOn") == "#FF112233");
+    CHECK(ResourceValue(own, "SliderTrackValueFill") == "#FF0A84FF");
+    CHECK(ResourceValue(own, "HyperlinkButtonForeground") == "ABSENT");
+}
+
 TEST_CASE(Spicetify_ThemeRulesWinOverTheTranslatedOnes) {
     MemoryFiles files;
     files.files["color.ini"] = "[Base]\nsidebar = 112233\n";

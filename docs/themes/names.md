@@ -70,7 +70,17 @@ against trees saved by the inspector (see "Check the names after an update" belo
 | `.content-background` | Its background layer |
 | `.content-frame` | The frame the pages are shown in |
 | `.content-shadow` | The shadow along its edge |
-| `.page` | A page (the Songs list is a page of its own type, included) |
+| `.page` | A page (the Songs list and the settings pages, which are pages of their own types, included) |
+| `.stacked-page` | A page made of stacked shelves, such as Home |
+| `.list-page` | A page with a header and a track list: an album, a playlist |
+| `.grid-page` | A page made of a grid of cards, such as Albums |
+| `.side-by-side-page` | A page in two columns, a list on the left and its content on the right: Artists |
+| `.table-page` | A page made of a table |
+| `.section-page` | A page made of one section, such as a "See All" page |
+| `.tracklist-page` | A page made of a plain track list |
+| `.songs-page` | The Songs page |
+| `.settings-page` | Every settings page: the main one and General, Playback, Restrictions, Files, Advanced, Import |
+| `.settings-card` | A card of the settings pages, and a row of the main settings page |
 | `.page-top-spacer` | The empty space at the top of a page, 64 pixels high, that keeps it below the playback bar |
 | `.stacked-list` | The list of Home and Search, whose top padding plays the same part |
 | `.page-header` | The title bar of a page, which stays at the top when the page scrolls |

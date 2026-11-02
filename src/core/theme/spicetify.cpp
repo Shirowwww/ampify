@@ -45,7 +45,8 @@ struct Rule {
 };
 
 constexpr std::array<Rule, 10> kRules = {{
-    {"ContentPage,\nSongsContentPage,\nGrid#HeaderStack,\nSplitView#ContentSplitView > Grid > Grid#ContentRoot,\n"
+    {"ContentPage,\nSongsContentPage,\nSettingsPage,\nMainSettingsPage,\nGeneralSettingsPage,\nPlaybackSettingsPage,\n"
+     "RestrictionsSettingsPage,\nFilesSettingsPage,\nAdvancedSettingsPage,\nImportSettingsPage,\nGrid#HeaderStack,\nSplitView#ContentSplitView > Grid > Grid#ContentRoot,\n"
      "Grid#PageRoot,\nNavigationView#NavView",
      "background", {"main", ""}},
     {"Grid#PaneRoot", "background", {"sidebar", ""}},

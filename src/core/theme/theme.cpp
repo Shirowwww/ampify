@@ -106,12 +106,58 @@ void DefineTextOnAccent(Theme& theme, const std::set<std::string>& owned, bool a
     }
 }
 
+// WinUI's toggles, sliders, check boxes, radio buttons and links read keys of their own, which its dictionaries set to
+// the accent once, when they load: a theme's accent alone left them in Apple Music's blue (the Settings pages).
+void DefineAccentControls(Theme& theme, const std::set<std::string>& owned, bool applied) {
+    constexpr const char* kHover = "AccentFillColorSecondaryBrush";
+    constexpr const char* kPressed = "AccentFillColorTertiaryBrush";
+    constexpr const char* kLink = "AccentTextFillColorPrimaryBrush";
+    struct Derived {
+        const char* key;
+        const char* from;
+        double opacity;
+    };
+    constexpr Derived kControls[] = {
+        {"ToggleSwitchFillOn", kAccent, 1.0},
+        {"ToggleSwitchFillOnPointerOver", kHover, 1.0},
+        {"ToggleSwitchFillOnPressed", kPressed, 1.0},
+        {"ToggleSwitchStrokeOn", kAccent, 1.0},
+        {"SliderTrackValueFill", kAccent, 1.0},
+        {"SliderTrackValueFillPointerOver", kHover, 1.0},
+        {"SliderTrackValueFillPressed", kPressed, 1.0},
+        {"SliderThumbBackground", kAccent, 1.0},
+        {"SliderThumbBackgroundPointerOver", kHover, 1.0},
+        {"SliderThumbBackgroundPressed", kPressed, 1.0},
+        {"SliderTrackValueFillDisabled", kAccent, 0.4},
+        {"SliderThumbBackgroundDisabled", kAccent, 0.4},
+        {"CheckBoxCheckBackgroundFillChecked", kAccent, 1.0},
+        {"CheckBoxCheckBackgroundFillCheckedPointerOver", kHover, 1.0},
+        {"CheckBoxCheckBackgroundFillCheckedPressed", kPressed, 1.0},
+        {"CheckBoxCheckBackgroundStrokeChecked", kAccent, 1.0},
+        {"RadioButtonOuterEllipseCheckedFill", kAccent, 1.0},
+        {"RadioButtonOuterEllipseCheckedFillPointerOver", kHover, 1.0},
+        {"RadioButtonOuterEllipseCheckedFillPressed", kPressed, 1.0},
+        {"RadioButtonOuterEllipseCheckedStroke", kAccent, 1.0},
+        {"ProgressBarForeground", kAccent, 1.0},
+        {"HyperlinkButtonForeground", kLink, 1.0},
+        {"HyperlinkButtonForegroundPointerOver", kLink, 0.9},
+        {"HyperlinkButtonForegroundPressed", kLink, 0.8},
+    };
+    for (const Derived& derived : kControls) {
+        std::optional<Argb> color = theme.palette.Find(derived.from);
+        if (!color) continue;
+        color->a = static_cast<std::uint8_t>(std::lround(color->a * derived.opacity));
+        DefineDerived(theme, owned, derived.from, derived.key, *color, applied);
+    }
+}
+
 // The colours a theme leaves to Ampify, once its own resources.xaml is known.
 void DefineDerivedColors(Theme& theme, bool applied) {
     std::vector<std::string> keys = XamlKeys(theme.resourceDictionary);
     std::set<std::string> owned(keys.begin(), keys.end());
     DefineAccentStates(theme, owned, applied);
     DefineTextOnAccent(theme, owned, applied);
+    DefineAccentControls(theme, owned, applied);
 }
 
 // A Spicetify colour: a $name, a --spice-name variable as in Spicetify, and the app brushes that play its part
