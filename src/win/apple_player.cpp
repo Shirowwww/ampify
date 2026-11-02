@@ -24,6 +24,7 @@
 #include <dwmapi.h>
 #include <unknwn.h>
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <initializer_list>
@@ -48,6 +49,7 @@ constexpr wchar_t kPlayerWindowProperty[] = L"FullScreenPlayerWindow";  // Apple
 constexpr auto kPollStep = std::chrono::milliseconds(50);
 constexpr int kPollTicks = 60;  // 3 s for Apple to create the window and give it its FullScreen presenter
 constexpr auto kReportDelay = std::chrono::seconds(1);
+constexpr auto kWatchStep = std::chrono::milliseconds(250);  // while laid out: notices the close soon enough
 constexpr int kPressReports = 3;     // presses described in the log, to see what takes them
 constexpr int kSearchLimit = 4000;   // elements walked to find Apple's close button
 constexpr int kDragStart = 4;        // pixels the pointer moves, button down, before the window follows: a click stays one
@@ -56,7 +58,13 @@ constexpr int kDragStart = 4;        // pixels the pointer moves, button down, b
 struct Placement {
     dispatching::DispatcherQueueTimer timer{nullptr};
     int ticks = 0;
-    bool reporting = false;  // laid over: the next tick logs where the window is
+    uirender::PlayerMode mode = uirender::PlayerMode::Window;
+    bool laid = false;           // Ampify placed the player: the timer now follows it until it closes
+    bool everLaid = false;       // Ampify placed it once: Apple then shows it again with Ampify's presenter
+    bool reportPending = false;  // the log says where the window is a second after it was placed
+    std::chrono::steady_clock::time_point reportAt;
+    bool mainWasZoomed = false;  // the main window the player replaced was maximized
+    RECT lastRect{};             // where the player was last seen, for the main window it replaced
     HWND main = nullptr;
     Journal* journal = nullptr;
     winrt::weak_ref<xaml::UIElement> hookedRoot;  // the content that already has the press and Escape handlers
@@ -71,6 +79,12 @@ struct Placement {
 Placement& State() {
     static Placement* state = new Placement();
     return *state;
+}
+
+// The main window hidden while the player takes its place; any thread may show it again (ShowMainWindowAgain).
+std::atomic<HWND>& HiddenMain() {
+    static std::atomic<HWND> hidden{nullptr};
+    return hidden;
 }
 
 using MethodNoArgument = HRESULT(STDMETHODCALLTYPE*)(void*);
@@ -297,27 +311,49 @@ void HookInput(const xaml::Window& player, HWND window) {
     State().hookedRoot = weakRoot;
 }
 
+// The rectangle of `window`'s monitor: all of it, or the part above the taskbar.
+RECT MonitorRect(HWND window, bool workArea) {
+    MONITORINFO monitor{sizeof(monitor)};
+    GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &monitor);
+    return workArea ? monitor.rcWork : monitor.rcMonitor;
+}
+
 // Where the player goes: the main window's visible rectangle, or its monitor's work area when it is minimized.
 RECT TargetRect(HWND main) {
     if (IsWindow(main) && !IsIconic(main)) return VisibleRect(main);
-    MONITORINFO monitor{sizeof(monitor)};
-    GetMonitorInfoW(MonitorFromWindow(main, MONITOR_DEFAULTTOPRIMARY), &monitor);
-    return monitor.rcWork;
+    return MonitorRect(main, true);
+}
+
+const char* ModeName(uirender::PlayerMode mode) {
+    switch (mode) {
+        case uirender::PlayerMode::Screen: return "whole screen";
+        case uirender::PlayerMode::WorkArea: return "screen above the taskbar";
+        case uirender::PlayerMode::Window: return "over the main window";
+        case uirender::PlayerMode::Replace: return "in place of the main window";
+    }
+    return "?";
 }
 
 // Apple shows its player with the FullScreen presenter, which puts its own style back on every change: an overlapped
-// presenter with a border and no title bar is what keeps the window resizable and bare.
-void MakeWindowed(const xaml::Window& player, const windowing::AppWindow& window, Journal& journal) {
+// presenter is what keeps the window where Ampify puts it. Over or in place of the main window it keeps a border and
+// resizes; above the taskbar it has neither, as a full screen that leaves the taskbar.
+void Lay(const xaml::Window& player, const windowing::AppWindow& window, Placement& state) {
     std::string before = PresenterName(window.Presenter().Kind());
+    bool screenLike = state.mode == uirender::PlayerMode::WorkArea;
     auto presenter = windowing::OverlappedPresenter::Create();
-    presenter.SetBorderAndTitleBar(true, false);
-    presenter.IsResizable(true);
+    presenter.SetBorderAndTitleBar(!screenLike, false);
+    presenter.IsResizable(!screenLike);
     window.SetPresenter(presenter);
     HWND hwnd = HwndOf(player);
-    PlaceVisible(hwnd, TargetRect(State().main));
+    PlaceVisible(hwnd, screenLike ? MonitorRect(state.main, true) : TargetRect(state.main));
     HookInput(player, hwnd);
-    journal.Write("Apple player: laid over the main window (" + before + " presenter before), " +
-                  RectText(VisibleRect(hwnd)));
+    if (state.mode == uirender::PlayerMode::Replace && IsWindowVisible(state.main)) {
+        state.mainWasZoomed = IsZoomed(state.main) != FALSE;
+        ShowWindow(state.main, SW_HIDE);
+        HiddenMain() = state.main;
+    }
+    state.journal->Write("Apple player: laid " + std::string(ModeName(state.mode)) + " (" + before +
+                         " presenter before), " + RectText(VisibleRect(hwnd)));
 }
 
 // Whether Apple Music took the window back after the change: logged once, a second later (the bench reads it).
@@ -332,28 +368,65 @@ void Report(Journal& journal) {
                   PresenterName(window.Presenter().Kind()) + " presenter, " + RectText(VisibleRect(HwndOf(player))));
 }
 
-// Waits for Apple's window and its FullScreen presenter, lays it over the main window, then reports.
+// The player closed: the main window the player replaced comes back where the player was, so the two read as one.
+void OnClosed(Placement& state) {
+    state.timer.Stop();
+    state.laid = false;
+    HWND main = HiddenMain().exchange(nullptr);
+    if (!main) {
+        state.journal->Write("Apple player: closed");
+        return;
+    }
+    if (state.mainWasZoomed) {
+        ShowWindow(main, SW_SHOWMAXIMIZED);
+    } else {
+        ShowWindow(main, SW_SHOWNOACTIVATE);
+        if (state.lastRect.right > state.lastRect.left) PlaceVisible(main, state.lastRect);
+    }
+    SetForegroundWindow(main);
+    state.journal->Write("Apple player: closed, the main window is back at " + RectText(VisibleRect(main)));
+}
+
+// One tick: first wait for Apple's window and its FullScreen presenter, lay it out, then follow it until it closes.
 void Step(Placement& state) {
     xaml::Window player = AppWindow(kPlayerWindowProperty);
     windowing::AppWindow window = player ? player.AppWindow() : nullptr;
-    if (state.reporting) {
-        state.timer.Stop();
-        if (player) HookInput(player, HwndOf(player));  // a second chance when the content came late
-        Report(*state.journal);
+    bool visible = window && window.IsVisible();
+    if (state.laid) {
+        if (!visible) return OnClosed(state);
+        HWND hwnd = HwndOf(player);
+        state.lastRect = VisibleRect(hwnd);
+        if (state.reportPending && std::chrono::steady_clock::now() >= state.reportAt) {
+            state.reportPending = false;
+            HookInput(player, hwnd);  // a second chance when the content came late
+            Report(*state.journal);
+        }
         return;
     }
-    bool ready = window && window.IsVisible() && window.Presenter().Kind() == windowing::AppWindowPresenterKind::FullScreen;
+    // Apple gives a new window the FullScreen presenter after showing it; a window Ampify laid out before keeps
+    // Ampify's presenter when it shows again, so it is ready as soon as it shows.
+    bool ready = visible && (state.everLaid || window.Presenter().Kind() == windowing::AppWindowPresenterKind::FullScreen);
     if (!ready && ++state.ticks < kPollTicks) return;
-    state.timer.Stop();
     if (!ready) {
+        state.timer.Stop();
         state.journal->Write(window ? "Apple player: its window did not go full screen within 3 s, left as it is"
                                     : "Apple player: shown, but Apple Music gave no FullScreenPlayerWindow, left as it is");
         return;
     }
-    MakeWindowed(player, window, *state.journal);
-    state.reporting = true;
-    state.timer.Interval(kReportDelay);
-    state.timer.Start();
+    if (state.mode == uirender::PlayerMode::Screen) {
+        state.timer.Stop();
+        if (window.Presenter().Kind() != windowing::AppWindowPresenterKind::FullScreen) {
+            window.SetPresenter(windowing::AppWindowPresenterKind::FullScreen);  // Ampify's from an earlier opening
+        }
+        state.journal->Write("Apple player: left on the whole screen, as Apple shows it (setting)");
+        return;
+    }
+    Lay(player, window, state);
+    state.laid = true;
+    state.everLaid = true;
+    state.reportPending = true;
+    state.reportAt = std::chrono::steady_clock::now() + kReportDelay;
+    state.timer.Interval(kWatchStep);
 }
 
 void OnTick() noexcept {
@@ -369,9 +442,28 @@ void OnTick() noexcept {
     }
 }
 
+// Starts waiting for the player's window on the main window's thread, unless a wait or a watch already runs.
+void Watch(const xaml::Window& mainWindow, Journal& journal, uirender::PlayerMode mode) {
+    Placement& state = State();
+    state.mode = mode;
+    if (state.timer && state.timer.IsRunning()) return;
+    state.main = HwndOf(mainWindow);
+    state.journal = &journal;
+    state.ticks = 0;
+    state.laid = false;
+    state.reportPending = false;
+    if (!state.timer) {
+        state.timer = mainWindow.DispatcherQueue().CreateTimer();
+        state.timer.IsRepeating(true);
+        state.timer.Tick([](auto const&, auto const&) noexcept { OnTick(); });
+    }
+    state.timer.Interval(kPollStep);
+    state.timer.Start();
+}
+
 }  // namespace
 
-void OpenApplePlayer(const xaml::Window& mainWindow, Journal& journal) noexcept {
+void OpenApplePlayer(const xaml::Window& mainWindow, Journal& journal, uirender::PlayerMode mode) noexcept {
     try {
         if (!mainWindow) {
             journal.Write("Apple player: the main window is not available");
@@ -379,7 +471,7 @@ void OpenApplePlayer(const xaml::Window& mainWindow, Journal& journal) noexcept 
         }
         Placement& state = State();
         if (state.timer && state.timer.IsRunning()) {
-            journal.Write("Apple player: already being opened, request ignored");
+            journal.Write("Apple player: already open or being opened, request ignored");
             return;
         }
         std::string failure = ShowFullScreenPlayer();
@@ -388,22 +480,31 @@ void OpenApplePlayer(const xaml::Window& mainWindow, Journal& journal) noexcept 
             return;
         }
         journal.Write("Apple player: Apple's full-screen player shown");
-        state.main = HwndOf(mainWindow);
-        state.journal = &journal;
-        state.ticks = 0;
-        state.reporting = false;
-        if (!state.timer) {
-            state.timer = mainWindow.DispatcherQueue().CreateTimer();
-            state.timer.IsRepeating(true);
-            state.timer.Tick([](auto const&, auto const&) noexcept { OnTick(); });
-        }
-        state.timer.Interval(kPollStep);
-        state.timer.Start();
+        Watch(mainWindow, journal, mode);
     } catch (const winrt::hresult_error& error) {
         journal.Write("Apple player: not opened (" + HresultText(error.code().value) + ")");
     } catch (...) {
         journal.Write("Apple player: not opened (unknown exception)");
     }
+}
+
+void FollowApplePlayer(const xaml::Window& mainWindow, Journal& journal, uirender::PlayerMode mode) noexcept {
+    try {
+        State().mode = mode;
+        if (!mainWindow || (State().timer && State().timer.IsRunning())) return;
+        if (mode == uirender::PlayerMode::Screen && !State().everLaid) return;  // Apple's own way, nothing to undo
+        xaml::Window player = AppWindow(kPlayerWindowProperty);
+        windowing::AppWindow window = player ? player.AppWindow() : nullptr;
+        bool fresh = window && window.Presenter().Kind() == windowing::AppWindowPresenterKind::FullScreen;
+        if (!window || !window.IsVisible() || !(fresh || State().everLaid)) return;
+        journal.Write("Apple player: opened by Apple Music itself");
+        Watch(mainWindow, journal, mode);
+    } catch (...) {
+    }
+}
+
+void ShowMainWindowAgain() noexcept {
+    if (HWND main = HiddenMain().exchange(nullptr)) ShowWindow(main, SW_SHOW);
 }
 
 }  // namespace ampify::win

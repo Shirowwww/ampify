@@ -10,7 +10,9 @@
 #include <string>
 #include <vector>
 
+#include "../src/core/settings.hpp"
 #include "../src/core/ui_model.hpp"
+#include "../src/core/ui_render/apple_tweaks.hpp"
 #include "../src/core/ui_render/mods.hpp"
 #include "../src/core/ui_render/probe.hpp"
 #include "../src/core/ui_render/render_tree.hpp"
@@ -23,6 +25,7 @@ namespace {
 
 namespace fs = std::filesystem;
 using namespace ampify::uirender;
+using ampify::Settings;
 
 ampify::Json Parse(const std::string& text) {
     std::optional<ampify::Json> value = ampify::Json::Parse(text);
@@ -627,6 +630,24 @@ TEST_CASE(UiRender_TheActiveThemeCarriesItsSettings) {
     CHECK(!ActiveThemeSettings(kit));  // a theme without settings shows nothing
 }
 
+TEST_CASE(UiRender_TheActiveThemeCarriesTheTranslationOfItsSettings) {
+    fs::path kit = FreshKit("theme-settings-fr");
+    WriteFile(kit / "themes" / "night" / "manifest.json",
+              R"({"id":"night","name":"Night","version":"1.0.0","kind":"theme","author":"x","description":"Dark.",)"
+              R"("kitApi":"1.0","colors":"colors.ini","settings":[)"
+              R"({"key":"play","label":"Play button","type":"choice","options":["White","Green"],"default":"White"}],)"
+              R"("translations":{"fr":{"name":"Nuit","description":"Sombre.","settings":{"play":"Bouton Lecture"},)"
+              R"("options":{"White":"Blanc","Green":"Vert"}}}})");
+    WriteFile(kit / "themes" / "night" / "colors.ini", "[Base]\nmain = 000000\n");
+    WriteFile(kit / "settings.txt", "theme.active = night\n");
+    std::optional<ModEntry> theme = ActiveThemeSettings(kit);
+    CHECK(theme && theme->NameIn("fr") == "Nuit");
+    if (!theme || !theme->translations.count("fr")) return;
+    const ampify::ManifestText& fr = theme->translations.at("fr");
+    CHECK(fr.settings.at("play") == "Bouton Lecture");
+    CHECK(fr.options.at("Green") == "Vert");
+}
+
 TEST_CASE(UiRender_AThemeSettingIsWrittenWithoutAReloadRequest) {
     fs::path kit = FreshKit("theme-setting");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
@@ -679,6 +700,48 @@ TEST_CASE(UiRender_ChoosingAThemeKeepsOnlyASchemeThatStillMeansSomething) {
     CHECK(settings.find("theme.active = none") != std::string::npos);
     CHECK(settings.find("theme.scheme = auto") != std::string::npos);
     CHECK(!ChooseTheme(kit, "../x", error));
+}
+
+TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
+    Settings settings;
+    AppleTweaks none = ReadAppleTweaks(settings);
+    CHECK(none.notifications == NotificationRule::Apple);
+    CHECK(none.player == PlayerMode::Window);  // what the Now Playing button did before the setting existed
+
+    settings.Set("apple.notifications", "Background");
+    settings.Set("apple.fullscreen", "replace");
+    AppleTweaks set = ReadAppleTweaks(settings);
+    CHECK(set.notifications == NotificationRule::Background);
+    CHECK(set.player == PlayerMode::Replace);
+
+    settings.Set("apple.notifications", "sometimes");
+    settings.Set("apple.fullscreen", "work-area");
+    AppleTweaks odd = ReadAppleTweaks(settings);
+    CHECK(odd.notifications == NotificationRule::Apple);
+    CHECK(odd.player == PlayerMode::WorkArea);
+}
+
+TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
+    fs::path kit = FreshKit("apple-tweaks");
+    WriteFile(kit / "settings.txt", "theme.active = night\n");
+    std::string error;
+    CHECK(SetAppleTweak(kit, "apple.notifications", "never", error));
+    CHECK(SetAppleTweak(kit, "apple.fullscreen", "screen", error));
+    std::string text = ReadFile(kit / "settings.txt");
+    CHECK(text.find("apple.notifications = never") != std::string::npos);
+    CHECK(text.find("apple.fullscreen = screen") != std::string::npos);
+    CHECK(text.find("theme.active = night") != std::string::npos);
+
+    CHECK(!SetAppleTweak(kit, "apple.notifications", "loud", error));
+    CHECK(!SetAppleTweak(kit, "theme.active", "screen", error));
+
+    std::vector<TweakChoice> choices = AppleTweakChoices(kit);
+    CHECK(choices.size() == 2);
+    if (choices.size() == 2) {
+        CHECK(choices[0].key == "apple.notifications" && choices[0].value == "never");
+        CHECK(choices[1].key == "apple.fullscreen" && choices[1].value == "screen");
+        CHECK(choices[1].options.size() == 4);
+    }
 }
 
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {

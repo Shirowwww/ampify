@@ -477,8 +477,11 @@ Ampify.ui.fullscreen.open({ type: "layer", children: [
 ```
 
 **Apple's player.** `Ampify.ui.applePlayer.open()` opens the full-screen player of Apple Music, the one its mini player
-opens, and lays its window over the main window: same place and size, no title bar, edges that resize, and a
-background that moves the window when dragged. Apple draws everything in it (cover, lyrics, controls). When Apple Music
+opens, and lays its window where the user chose in the Ampify card (setting `apple.fullscreen`): over the main window
+(the default: same place and size, no title bar, edges that resize, a background that moves the window when dragged),
+in place of it (the main window hides until the player closes, then comes back where the player was), on the screen
+above the taskbar, or on the whole screen as Apple shows it. Apple's own full-screen button follows the same choice.
+Apple draws everything in it (cover, lyrics, controls). When Apple Music
 refuses (its player has no view model yet, or another version of Apple Music changed its interfaces), nothing opens and
 the log says why. Now Playing (`extensions/now-playing`) is a button of the playback bar that calls it.
 

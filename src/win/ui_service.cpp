@@ -47,12 +47,15 @@
 
 #include "../core/i18n.hpp"
 #include "../core/json.hpp"
+#include "../core/settings.hpp"
+#include "../core/ui_render/apple_tweaks.hpp"
 #include "../core/ui_render/mods.hpp"
 #include "../core/ui_render/probe.hpp"
 #include "../core/ui_render/render_tree.hpp"
 #include "../core/ui_render/surfaces.hpp"
 #include "../core/ui_render/svg_icon.hpp"
 #include "apple_player.hpp"
+#include "notifications.hpp"
 #include "xaml_host.hpp"
 
 namespace ampify::win {
@@ -72,12 +75,14 @@ using uirender::SurfaceKind;
 
 constexpr auto kModelPoll = std::chrono::milliseconds(250);
 constexpr auto kDiscoveryPoll = std::chrono::seconds(5);
+constexpr auto kTweaksPoll = std::chrono::seconds(1);  // settings.txt's date, for the Apple Music part of the card
 constexpr std::size_t kDiscoveryLimit = 512;
 constexpr std::size_t kPageLimit = 4000;
 constexpr std::size_t kMaxWatches = 64;
 constexpr double kPanelWidth = 380;
 
 std::atomic<bool> g_windowEvent{true};  // set by the WinEvent hook, read by the worker
+std::atomic<bool> g_windowShown{false};  // a top-level window showed: perhaps Apple's full-screen player
 int g_modsUpdating = 0;                 // interface thread only: > 0 while the Mods card sets its toggles itself
 
 winrt::hstring Wide(const std::string& text) {
@@ -95,6 +100,7 @@ void CALLBACK WindowEvent(HWINEVENTHOOK, DWORD event, HWND window, LONG objectId
     }
     // An HWND does not say which XAML window it belongs to: the worker asks AMP.Utils again.
     g_windowEvent = true;
+    if (event == EVENT_OBJECT_SHOW) g_windowShown = true;
 }
 
 // What the discovery knows of a node, read with try_as on the projected types.
@@ -287,6 +293,8 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     std::vector<Surface> surfaces;
     std::optional<std::pair<std::string, std::string>> pendingRoute;
     bool applePlayerPending = false;  // Ampify.ui.applePlayer.open, run by the next refresh of the main window
+    bool playerCheckPending = false;  // a window showed: the next refresh looks for Apple's own full-screen player
+    uirender::PlayerMode playerMode = uirender::PlayerMode::Window;  // apple.fullscreen, read by the worker
 
     // Interface thread only.
     int detachedReports = 0;  // log lines about panels taken out of their host, at most 5
@@ -700,8 +708,18 @@ controls::TextBox SettingField(UiService::Shared& shared, const SettingOwner& ta
     return box;
 }
 
+// The text of `key` in one list of the manifest's translation (`local`, null when there is none), else `fallback`.
+const std::string& Localized(const ManifestText* local, std::map<std::string, std::string> ManifestText::*list,
+                             const std::string& key, const std::string& fallback) {
+    if (!local) return fallback;
+    auto found = (local->*list).find(key);
+    return found == (local->*list).end() ? fallback : found->second;
+}
+
+// `local` is the manifest's text in the interface's language, or null: a choice shows its options' translated texts
+// and still stores their values.
 xaml::FrameworkElement SettingControl(UiService::Shared& shared, const SettingOwner& target, const SettingSpec& spec,
-                                      const std::string& value) {
+                                      const std::string& value, const ManifestText* local) {
     UiService::Shared* owner = &shared;
     if (spec.type == SettingSpec::Type::Toggle) {
         controls::ToggleSwitch toggle;
@@ -722,15 +740,17 @@ xaml::FrameworkElement SettingControl(UiService::Shared& shared, const SettingOw
         controls::ComboBox combo;
         if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
         combo.MinWidth(200);
-        for (const std::string& option : spec.options) combo.Items().Append(winrt::box_value(Wide(option)));
+        for (const std::string& option : spec.options) {
+            combo.Items().Append(winrt::box_value(Wide(Localized(local, &ManifestText::options, option, option))));
+        }
         auto chosen = std::find(spec.options.begin(), spec.options.end(), value);
         if (chosen == spec.options.end()) chosen = std::find(spec.options.begin(), spec.options.end(), spec.defaultValue);
         combo.SelectedIndex(static_cast<int32_t>(chosen - spec.options.begin()));
-        combo.SelectionChanged([owner, target, key = spec.key](IInspectable const& sender,
-                                                               controls::SelectionChangedEventArgs const&) noexcept {
+        combo.SelectionChanged([owner, target, key = spec.key, options = spec.options](
+                                   IInspectable const& sender, controls::SelectionChangedEventArgs const&) noexcept {
             try {
-                auto item = sender.as<controls::ComboBox>().SelectedItem();
-                if (item) CommitSetting(*owner, target, key, Utf8(winrt::unbox_value_or<winrt::hstring>(item, L"")));
+                int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
+                if (index >= 0 && index < static_cast<int32_t>(options.size())) CommitSetting(*owner, target, key, options[index]);
             } catch (...) {
             }
         });
@@ -745,6 +765,8 @@ xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::Mo
     controls::StackPanel panel;
     panel.Spacing(8);
     panel.Margin(xaml::Thickness{16, 0, 0, 0});
+    auto language = mod.translations.find(i18n::Language());
+    const ManifestText* local = language == mod.translations.end() ? nullptr : &language->second;
     for (size_t index = 0; index < mod.settings.size() && index < mod.values.size(); index++) {
         const SettingSpec& spec = mod.settings[index];
         controls::Grid row;
@@ -755,14 +777,15 @@ xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::Mo
         control.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
         row.ColumnDefinitions().Append(text);
         row.ColumnDefinitions().Append(control);
-        controls::TextBlock label = MakeText(Wide(spec.label).c_str(), "body", false, &shared.probe);
+        const std::string& shown = Localized(local, &ManifestText::settings, spec.key, spec.label);
+        controls::TextBlock label = MakeText(Wide(shown).c_str(), "body", false, &shared.probe);
         label.VerticalAlignment(xaml::VerticalAlignment::Center);
         row.Children().Append(label);
-        xaml::FrameworkElement input = SettingControl(shared, {mod.id, mod.theme}, spec, mod.values[index]);
+        xaml::FrameworkElement input = SettingControl(shared, {mod.id, mod.theme}, spec, mod.values[index], local);
         input.VerticalAlignment(xaml::VerticalAlignment::Center);
         input.HorizontalAlignment(xaml::HorizontalAlignment::Right);
         Name(input, std::string(mod.theme ? "AMPIFY_ThemeSetting_" : "AMPIFY_ModsSetting_") + mod.id + "_" + spec.key,
-             spec.label);
+             shown);
         controls::Grid::SetColumn(input, 1);
         row.Children().Append(input);
         panel.Children().Append(row);
@@ -774,13 +797,36 @@ xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::Mo
 xaml::FrameworkElement ThemeSettingsSection(UiService::Shared& shared, const uirender::ModEntry& theme) {
     controls::StackPanel section;
     section.Spacing(8);
-    Name(section, "AMPIFY_ThemeSettings_" + theme.id, theme.name);
+    Name(section, "AMPIFY_ThemeSettings_" + theme.id, theme.NameIn(i18n::Language()));
     controls::TextBlock title =
-        MakeText(Wide(i18n::Text("mods.themeTitle", {{"name", theme.name}})).c_str(), "bodyStrong", false, &shared.probe);
+        MakeText(Wide(i18n::Text("mods.themeTitle", {{"name", theme.NameIn(i18n::Language())}})).c_str(), "bodyStrong",
+                 false, &shared.probe);
     section.Children().Append(title);
     section.Children().Append(MakeText(Wide(i18n::Text("mods.themeSubtitle")).c_str(), "caption", true, &shared.probe));
     section.Children().Append(ModSettings(shared, theme));
     return section;
+}
+
+// A row of the card: a label and its help on the left, a control on the right.
+controls::Grid LabelledRow(UiService::Shared& shared, const std::string& label, const std::string& help,
+                           const xaml::FrameworkElement& control) {
+    controls::Grid row;
+    row.ColumnSpacing(16);
+    controls::ColumnDefinition text;
+    text.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
+    controls::ColumnDefinition right;
+    right.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
+    row.ColumnDefinitions().Append(text);
+    row.ColumnDefinitions().Append(right);
+    controls::StackPanel titles;
+    titles.VerticalAlignment(xaml::VerticalAlignment::Center);
+    titles.Children().Append(MakeText(Wide(label).c_str(), "body", false, &shared.probe));
+    titles.Children().Append(MakeText(Wide(help).c_str(), "caption", true, &shared.probe));
+    row.Children().Append(titles);
+    control.VerticalAlignment(xaml::VerticalAlignment::Center);
+    controls::Grid::SetColumn(control, 1);
+    row.Children().Append(control);
+    return row;
 }
 
 // Shows the settings of the theme active now under the theme list, or nothing when it declares none.
@@ -797,26 +843,11 @@ void FillThemeSettings(UiService::Shared& shared, const controls::StackPanel& ho
 xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
     controls::StackPanel section;
     section.Spacing(10);
-    controls::Grid row;
-    row.ColumnSpacing(16);
-    controls::ColumnDefinition text;
-    text.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
-    controls::ColumnDefinition control;
-    control.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
-    row.ColumnDefinitions().Append(text);
-    row.ColumnDefinitions().Append(control);
-    controls::StackPanel titles;
-    titles.VerticalAlignment(xaml::VerticalAlignment::Center);
-    titles.Children().Append(MakeText(Wide(i18n::Text("mods.theme")).c_str(), "body", false, &shared.probe));
-    titles.Children().Append(MakeText(Wide(i18n::Text("mods.themeHelp")).c_str(), "caption", true, &shared.probe));
-    row.Children().Append(titles);
-
     std::vector<uirender::ModEntry> themes = uirender::ListThemes(shared.kit);
     std::string active = uirender::ActiveThemeId(shared.kit);
     controls::ComboBox combo;
     if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
     combo.MinWidth(220);
-    combo.VerticalAlignment(xaml::VerticalAlignment::Center);
     Name(combo, "AMPIFY_ThemeChoice", i18n::Text("mods.theme"));
     auto ids = std::make_shared<std::vector<std::string>>(1, "");  // "" is the choice "None"
     combo.Items().Append(winrt::box_value(Wide(i18n::Text("mods.themeNone"))));
@@ -826,9 +857,7 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
     }
     auto chosen = std::find(ids->begin(), ids->end(), active);
     combo.SelectedIndex(chosen == ids->end() ? 0 : static_cast<int32_t>(chosen - ids->begin()));
-    controls::Grid::SetColumn(combo, 1);
-    row.Children().Append(combo);
-    section.Children().Append(row);
+    section.Children().Append(LabelledRow(shared, i18n::Text("mods.theme"), i18n::Text("mods.themeHelp"), combo));
 
     controls::StackPanel settingsHost;
     settingsHost.Spacing(10);
@@ -854,6 +883,48 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
         } catch (...) {
         }
     });
+    return section;
+}
+
+// What Ampify changes in Apple Music's own behaviour (uirender::AppleTweakChoices): one choice per row. The kernel
+// reads settings.txt again within a second (UiService::Run), so a choice applies at once.
+xaml::FrameworkElement AppleTweaksSection(UiService::Shared& shared) {
+    controls::StackPanel section;
+    section.Spacing(10);
+    controls::StackPanel titles;
+    titles.Children().Append(MakeText(Wide(i18n::Text("tweaks.title")).c_str(), "bodyStrong", false, &shared.probe));
+    titles.Children().Append(MakeText(Wide(i18n::Text("tweaks.subtitle")).c_str(), "caption", true, &shared.probe));
+    section.Children().Append(titles);
+    UiService::Shared* owner = &shared;
+    for (const uirender::TweakChoice& choice : uirender::AppleTweakChoices(shared.kit)) {
+        controls::ComboBox combo;
+        if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
+        combo.MinWidth(220);
+        auto values = std::make_shared<std::vector<std::string>>();
+        for (const auto& [value, textKey] : choice.options) {
+            values->push_back(value);
+            combo.Items().Append(winrt::box_value(Wide(i18n::Text(textKey))));
+        }
+        auto chosen = std::find(values->begin(), values->end(), choice.value);
+        combo.SelectedIndex(chosen == values->end() ? 0 : static_cast<int32_t>(chosen - values->begin()));
+        Name(combo, "AMPIFY_Tweak_" + choice.key, i18n::Text(choice.labelKey));
+        combo.SelectionChanged([owner, values, key = choice.key](IInspectable const& sender,
+                                                                 controls::SelectionChangedEventArgs const&) noexcept {
+            try {
+                int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
+                if (index < 0 || index >= static_cast<int32_t>(values->size())) return;
+                std::string error;
+                if (uirender::SetAppleTweak(owner->kit, key, (*values)[index], error)) {
+                    owner->journal.Write("Settings: " + key + " = " + (*values)[index] + " from the Ampify card");
+                } else {
+                    owner->journal.Write("Settings: could not change " + key + ": " + error);
+                }
+            } catch (...) {
+            }
+        });
+        section.Children().Append(
+            LabelledRow(shared, i18n::Text(choice.labelKey), i18n::Text(choice.helpKey), combo));
+    }
     return section;
 }
 
@@ -941,6 +1012,8 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
     }
     list.Children().Append(MakeDivider());
     list.Children().Append(ThemeChoice(shared));
+    list.Children().Append(MakeDivider());
+    list.Children().Append(AppleTweaksSection(shared));
     body.Children().Append(list);
     card.Child(body);
     return card;
@@ -2106,13 +2179,19 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
     std::vector<Surface> surfaces;
     std::optional<std::pair<std::string, std::string>> route;
     bool applePlayer = false;
+    bool playerCheck = false;
+    uirender::PlayerMode playerMode;
     {
         std::lock_guard<std::mutex> lock(shared.mutex);
         surfaces = shared.surfaces;
         route = std::exchange(shared.pendingRoute, std::nullopt);
-        applePlayer = std::exchange(shared.applePlayerPending, false);
+        bool main = context->property == L"MainWindow";
+        applePlayer = main && std::exchange(shared.applePlayerPending, false);
+        playerCheck = main && std::exchange(shared.playerCheckPending, false);
+        playerMode = shared.playerMode;
     }
-    if (applePlayer) OpenApplePlayer(context->window.get(), shared.journal);
+    if (applePlayer) OpenApplePlayer(context->window.get(), shared.journal, playerMode);
+    else if (playerCheck) FollowApplePlayer(context->window.get(), shared.journal, playerMode);
     if (route) {
         context->route = route;
         context->pageClosed = false;
@@ -2335,6 +2414,36 @@ void DiscoverWindows(UiService::Shared& shared) {
     for (const auto& context : toRefresh) QueueRefresh(shared.weak_from_this(), context);
 }
 
+// Reads the Apple Music part of the Ampify card again when settings.txt changed: the notification rule applies at
+// once, the player mode at the next opening of the full-screen player.
+void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::file_time_type>& stamp) {
+    std::error_code error;
+    auto written = std::filesystem::last_write_time(shared.kit / "settings.txt", error);
+    if (error || (stamp && *stamp == written)) return;
+    stamp = written;
+    Settings settings;
+    settings.Load((shared.kit / "settings.txt").string());
+    uirender::AppleTweaks tweaks = uirender::ReadAppleTweaks(settings);
+    {
+        std::lock_guard<std::mutex> lock(shared.mutex);
+        shared.playerMode = tweaks.player;
+    }
+    SetNotificationRule(tweaks.notifications, shared.journal);
+}
+
+// A window showed: the next refresh of the main window looks for Apple's full-screen player to lay it out.
+void QueuePlayerCheck(const std::shared_ptr<UiService::Shared>& shared) {
+    std::vector<std::shared_ptr<WindowContext>> windows;
+    {
+        std::lock_guard<std::mutex> lock(shared->mutex);
+        shared->playerCheckPending = true;
+        windows = shared->windows;
+    }
+    for (const auto& context : windows) {
+        if (context->property == L"MainWindow") QueueRefresh(shared, context);
+    }
+}
+
 }  // namespace
 
 UiService::UiService(Journal& journal, std::filesystem::path kit, UiModel& model, UiEventSink sink)
@@ -2352,6 +2461,7 @@ void UiService::Start() {
 void UiService::Stop() {
     m_shared->running = false;
     if (m_worker.joinable()) m_worker.join();
+    ShowMainWindowAgain();  // never leave Apple Music without its window
 }
 
 void UiService::Run() {
@@ -2364,6 +2474,8 @@ void UiService::Run() {
 
     uirender::SurfaceTracker tracker;
     auto nextDiscovery = std::chrono::steady_clock::now();
+    auto nextTweaks = nextDiscovery;
+    std::optional<std::filesystem::file_time_type> tweaksStamp;
     while (m_shared->running) {
         MSG message{};
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
@@ -2376,6 +2488,11 @@ void UiService::Run() {
                 DiscoverWindows(*m_shared);
                 nextDiscovery = now + kDiscoveryPoll;
             }
+            if (now >= nextTweaks) {
+                ReadAppleTweaks(*m_shared, tweaksStamp);
+                nextTweaks = now + kTweaksPoll;
+            }
+            if (g_windowShown.exchange(false)) QueuePlayerCheck(m_shared);
             // An element whose fullscreen view another element took hears it as a close (the sink only queues it).
             for (const auto& [elementId, session] : m_model.TakeDisplacedFullscreens()) {
                 if (m_shared->sink) m_shared->sink(FullscreenClosed(elementId, std::to_string(session)));

@@ -6,6 +6,7 @@ list(APPEND AMPIFY_CORE_SOURCES
     src/core/ui_render/surfaces.cpp
     src/core/ui_render/probe.cpp
     src/core/ui_render/mods.cpp
+    src/core/ui_render/apple_tweaks.cpp
     src/core/ui_render/svg_icon.cpp
     src/core/ui_render/style.cpp)
 

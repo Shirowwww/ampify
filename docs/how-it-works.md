@@ -145,6 +145,15 @@ from the native controls of the Settings > Playback page once it has been opened
 
 Panels sit in a popup because Apple Music removes unknown children from `Grid#PageRoot`.
 
+The card holds, in order: the extensions (a switch each, then their declared settings), the theme (a list of the
+installed themes, then the active theme's settings), and an "Apple Music" part that changes how Apple Music itself
+behaves. Its choices are stored in `settings.txt` and read again within a second:
+
+| Setting | Values | What the kernel does |
+|---|---|---|
+| `apple.notifications` | `apple` (default), `background`, `never` | Apple Music shows its notifications (a new song, among others) with `AppNotificationManager.Show` of the Windows App SDK. The first value other than `apple` replaces that method's vtable entry (`src/win/notifications.cpp`): the notification is dropped when the rule says so, such as while Apple Music is the window in front. Apple's own switch (Settings > General > Notifications) still applies first. |
+| `apple.fullscreen` | `window` (default), `replace`, `work-area`, `screen` | Where Apple's full-screen player goes, whether Ampify's Now Playing button or Apple's own button opened it (`src/win/apple_player.cpp`): over the Apple Music window, in place of it (the main window hides while the player is open and comes back where the player was), on the screen above the taskbar, or on the whole screen as Apple shows it. |
+
 ## The theme engine
 
 Spotify themes are CSS. Apple Music has no HTML, so Ampify reads a CSS subset and turns it into XAML properties. Colors

@@ -42,6 +42,19 @@ constexpr Message kKit[] = {
     {"mods.theme", "Theme"},
     {"mods.themeHelp", "The look of Apple Music. The Marketplace has more."},
     {"mods.themeNone", "None (Apple Music's own look)"},
+    {"tweaks.title", "Apple Music"},
+    {"tweaks.subtitle", "What Ampify changes in how Apple Music behaves. A change applies at once."},
+    {"tweaks.notifications", "Notifications"},
+    {"tweaks.notificationsHelp", "Such as the one of each new song. Apple's own switch is in Settings, General."},
+    {"tweaks.notifications.apple", "As Apple Music shows them"},
+    {"tweaks.notifications.background", "Only when Apple Music is not in front"},
+    {"tweaks.notifications.never", "Never"},
+    {"tweaks.player", "Full-screen player"},
+    {"tweaks.playerHelp", "Where Now Playing and Apple's full-screen button open the player."},
+    {"tweaks.player.window", "Over the Apple Music window"},
+    {"tweaks.player.replace", "In place of the Apple Music window"},
+    {"tweaks.player.workArea", "Whole screen, taskbar visible"},
+    {"tweaks.player.screen", "Whole screen (Apple's way)"},
 };
 
 // French texts of what people see (menus, buttons, the Settings card). The log stays in English, so a key missing here
@@ -65,6 +78,19 @@ constexpr Message kKitFr[] = {
     {"mods.theme", "Thème"},
     {"mods.themeHelp", "L'apparence d'Apple Music. Le Marketplace en propose d'autres."},
     {"mods.themeNone", "Aucun (l'apparence d'Apple Music)"},
+    {"tweaks.title", "Apple Music"},
+    {"tweaks.subtitle", "Ce qu'Ampify change dans le comportement d'Apple Music. Un changement s'applique tout de suite."},
+    {"tweaks.notifications", "Notifications"},
+    {"tweaks.notificationsHelp", "Comme celle de chaque nouveau morceau. Le réglage d'Apple est dans Réglages, Général."},
+    {"tweaks.notifications.apple", "Comme Apple Music les montre"},
+    {"tweaks.notifications.background", "Seulement quand Apple Music n'est pas devant"},
+    {"tweaks.notifications.never", "Jamais"},
+    {"tweaks.player", "Lecteur plein écran"},
+    {"tweaks.playerHelp", "Où « À l'écoute » et le bouton plein écran d'Apple ouvrent le lecteur."},
+    {"tweaks.player.window", "Par-dessus la fenêtre d'Apple Music"},
+    {"tweaks.player.replace", "À la place de la fenêtre d'Apple Music"},
+    {"tweaks.player.workArea", "Tout l'écran, barre des tâches visible"},
+    {"tweaks.player.screen", "Tout l'écran (comme Apple)"},
 };
 
 std::string g_language = "en";  // set once at start, before any service reads it
