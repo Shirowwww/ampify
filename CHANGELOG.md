@@ -9,6 +9,16 @@
 - Manifests accept `translations` for de, es, pt, ru, ja and zh. Ampify 1.2.1 and older refuse those languages, so an
   element that uses them needs this version.
 - Shorter, task-by-task documentation.
+- Themes can draw bars that move with the music, with `content: bars(n)` on a `::before` or `::after`. The display
+  equalizer snippet uses them, and keeps its GIF on older Ampify. The sound is analysed only while something shows it.
+- Extensions of the interface see the sound too (`Ampify.audio`), and a button can change its label
+  (`Ampify.ui.setLabel`). Two new examples: Volume percentage, in the play bar, and Listening stats, an app page with
+  your top artists and songs.
+- A new Cover ambience snippet tints the song's display with the colours of the artwork. The spinning artwork is now a
+  round record, and square corners reach every panel.
+- `@import "ampify:scrollbars"` keeps scroll bars inside rounded panels, without their arrows. Floating themes get it
+  on their own.
+- `docs/spicetify-parity.md` lists every Spicetify feature with its status in Ampify.
 
 ## 1.2.1 (2026-11-02)
 
