@@ -28,9 +28,17 @@ const std::vector<std::pair<std::string, std::string>>& PlayerOptions() {
     return options;
 }
 
+const std::vector<std::pair<std::string, std::string>>& CloseOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"quit", "tweaks.close.quit"},
+        {"tray", "tweaks.close.tray"}};
+    return options;
+}
+
 const std::vector<std::pair<std::string, std::string>>* OptionsOf(const std::string& key) {
     if (key == kNotificationsKey) return &NotificationOptions();
     if (key == kPlayerModeKey) return &PlayerOptions();
+    if (key == kCloseKey) return &CloseOptions();
     return nullptr;
 }
 
@@ -55,6 +63,7 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
                     : player == "work-area" ? PlayerMode::WorkArea
                     : player == "screen"    ? PlayerMode::Screen
                                             : PlayerMode::Window;
+    tweaks.closeToTray = Known(settings, kCloseKey) == "tray";
     return tweaks;
 }
 
@@ -65,6 +74,7 @@ std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
         {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", NotificationOptions(),
          Known(settings, kNotificationsKey)},
         {kPlayerModeKey, "tweaks.player", "tweaks.playerHelp", PlayerOptions(), Known(settings, kPlayerModeKey)},
+        {kCloseKey, "tweaks.close", "tweaks.closeHelp", CloseOptions(), Known(settings, kCloseKey)},
     };
 }
 

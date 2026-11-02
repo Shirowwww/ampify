@@ -707,18 +707,23 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     AppleTweaks none = ReadAppleTweaks(settings);
     CHECK(none.notifications == NotificationRule::Apple);
     CHECK(none.player == PlayerMode::Window);  // what the Now Playing button did before the setting existed
+    CHECK(!none.closeToTray);                   // closing quits, as Apple Music does
 
     settings.Set("apple.notifications", "Background");
     settings.Set("apple.fullscreen", "replace");
+    settings.Set("apple.close", "tray");
     AppleTweaks set = ReadAppleTweaks(settings);
     CHECK(set.notifications == NotificationRule::Background);
     CHECK(set.player == PlayerMode::Replace);
+    CHECK(set.closeToTray);
 
     settings.Set("apple.notifications", "sometimes");
     settings.Set("apple.fullscreen", "work-area");
+    settings.Set("apple.close", "away");
     AppleTweaks odd = ReadAppleTweaks(settings);
     CHECK(odd.notifications == NotificationRule::Apple);
     CHECK(odd.player == PlayerMode::WorkArea);
+    CHECK(!odd.closeToTray);
 }
 
 TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
@@ -727,6 +732,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     std::string error;
     CHECK(SetAppleTweak(kit, "apple.notifications", "never", error));
     CHECK(SetAppleTweak(kit, "apple.fullscreen", "screen", error));
+    CHECK(SetAppleTweak(kit, "apple.close", "tray", error));
     std::string text = ReadFile(kit / "settings.txt");
     CHECK(text.find("apple.notifications = never") != std::string::npos);
     CHECK(text.find("apple.fullscreen = screen") != std::string::npos);
@@ -736,11 +742,13 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "theme.active", "screen", error));
 
     std::vector<TweakChoice> choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 2);
-    if (choices.size() == 2) {
+    CHECK(choices.size() == 3);
+    if (choices.size() == 3) {
         CHECK(choices[0].key == "apple.notifications" && choices[0].value == "never");
         CHECK(choices[1].key == "apple.fullscreen" && choices[1].value == "screen");
         CHECK(choices[1].options.size() == 4);
+        CHECK(choices[2].key == "apple.close" && choices[2].value == "tray");
+        CHECK(choices[2].options.size() == 2);
     }
 }
 

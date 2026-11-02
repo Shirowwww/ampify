@@ -55,6 +55,7 @@
 #include "../core/ui_render/surfaces.hpp"
 #include "../core/ui_render/svg_icon.hpp"
 #include "apple_player.hpp"
+#include "close_to_tray.hpp"
 #include "kit_command.hpp"
 #include "notifications.hpp"
 #include "xaml_host.hpp"
@@ -296,6 +297,7 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     bool applePlayerPending = false;  // Ampify.ui.applePlayer.open, run by the next refresh of the main window
     bool playerCheckPending = false;  // a window showed: the next refresh looks for Apple's own full-screen player
     uirender::PlayerMode playerMode = uirender::PlayerMode::Window;  // apple.fullscreen, read by the worker
+    bool closeToTray = false;  // apple.close, read by the worker
     std::string cardTheme;   // the theme the Ampify card shows
     bool cardStale = false;  // the theme changed elsewhere (Marketplace, ampify theme set): the card is built again
 
@@ -2252,15 +2254,18 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
     bool applePlayer = false;
     bool playerCheck = false;
     uirender::PlayerMode playerMode;
+    bool main = context->property == L"MainWindow";
+    bool closeToTray = false;
     {
         std::lock_guard<std::mutex> lock(shared.mutex);
         surfaces = shared.surfaces;
         route = std::exchange(shared.pendingRoute, std::nullopt);
-        bool main = context->property == L"MainWindow";
         applePlayer = main && std::exchange(shared.applePlayerPending, false);
         playerCheck = main && std::exchange(shared.playerCheckPending, false);
         playerMode = shared.playerMode;
+        closeToTray = shared.closeToTray;
     }
+    if (main) FollowCloseRule(context->window.get(), closeToTray, shared.journal);
     if (applePlayer) OpenApplePlayer(context->window.get(), shared.journal, playerMode);
     else if (playerCheck) FollowApplePlayer(context->window.get(), shared.journal, playerMode);
     if (route) {
@@ -2495,9 +2500,11 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
     Settings settings;
     settings.Load((shared.kit / "settings.txt").string());
     uirender::AppleTweaks tweaks = uirender::ReadAppleTweaks(settings);
+    bool closeChanged = false;
     {
         std::lock_guard<std::mutex> lock(shared.mutex);
         shared.playerMode = tweaks.player;
+        closeChanged = std::exchange(shared.closeToTray, tweaks.closeToTray) != tweaks.closeToTray;
     }
     SetNotificationRule(tweaks.notifications, shared.journal);
 
@@ -2505,9 +2512,12 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
     std::vector<std::shared_ptr<WindowContext>> windows;
     {
         std::lock_guard<std::mutex> lock(shared.mutex);
-        if (active == shared.cardTheme) return;
-        shared.cardTheme = active;
-        shared.cardStale = true;
+        bool themeChanged = active != shared.cardTheme;
+        if (!themeChanged && !closeChanged) return;  // the close rule reaches the window at its next refresh
+        if (themeChanged) {
+            shared.cardTheme = active;
+            shared.cardStale = true;
+        }
         windows = shared.windows;
     }
     for (const auto& context : windows) {
@@ -2546,6 +2556,7 @@ void UiService::Stop() {
     m_shared->running = false;
     if (m_worker.joinable()) m_worker.join();
     ShowMainWindowAgain();  // never leave Apple Music without its window
+    ReleaseCloseToTray();
 }
 
 void UiService::Run() {

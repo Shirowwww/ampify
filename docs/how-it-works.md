@@ -152,6 +152,7 @@ behaves. Its choices are stored in `settings.txt` and read again within a second
 | Setting | Values | What the kernel does |
 |---|---|---|
 | `apple.notifications` | `apple` (default), `background`, `never` | Apple Music shows its notifications (a new song, among others) with `AppNotificationManager.Show` of the Windows App SDK. The first value other than `apple` replaces that method's vtable entry (`src/win/notifications.cpp`): the notification is dropped when the rule says so, such as while Apple Music is the window in front. Apple's own switch (Settings > General > Notifications) still applies first. |
+| `apple.close` | `quit` (default), `tray` | What closing Apple Music's main window does (`src/win/close_to_tray.cpp`): quit, as Apple Music does, or hide the window behind an icon of the notification area while the music goes on. A click on the icon shows the window again; its menu shows it or quits. |
 | `apple.fullscreen` | `window` (default), `replace`, `work-area`, `screen` | Where Apple's full-screen player goes, whether Ampify's Now Playing button or Apple's own button opened it (`src/win/apple_player.cpp`): over the Apple Music window, in place of it (the main window hides while the player is open and comes back where the player was), on the screen above the taskbar, or on the whole screen as Apple shows it. |
 
 ## The theme engine

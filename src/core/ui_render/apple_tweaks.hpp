@@ -1,8 +1,9 @@
 #pragma once
 
 // What Ampify changes in Apple Music's own behaviour, from the "Apple Music" part of the Ampify card (Settings,
-// Playback): its notifications, and where its full-screen player goes. Stored in settings.txt; the kernel applies them
-// (src/win/notifications.cpp, src/win/apple_player.cpp). Portable, so the choices are tested under Linux.
+// Playback): its notifications, where its full-screen player goes and what closing its window does. Stored in
+// settings.txt; the kernel applies them (src/win/notifications.cpp, src/win/apple_player.cpp,
+// src/win/close_to_tray.cpp). Portable, so the choices are tested under Linux.
 
 #include <filesystem>
 #include <string>
@@ -24,10 +25,13 @@ enum class PlayerMode { Screen, WorkArea, Window, Replace };
 struct AppleTweaks {
     NotificationRule notifications = NotificationRule::Apple;
     PlayerMode player = PlayerMode::Window;
+    // Closing the window hides it behind an icon of the notification area; the music goes on (win/close_to_tray.cpp).
+    bool closeToTray = false;
 };
 
 inline constexpr char kNotificationsKey[] = "apple.notifications";
 inline constexpr char kPlayerModeKey[] = "apple.fullscreen";
+inline constexpr char kCloseKey[] = "apple.close";
 
 // An unknown value reads as the default.
 AppleTweaks ReadAppleTweaks(const Settings& settings);
