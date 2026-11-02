@@ -118,6 +118,16 @@ build-msvc\release\ampify_tests.exe
 Everything else (bench build, packaging, CI): [docs/development/building.md](docs/development/building.md).
 Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## License
+
+Ampify is free software under the [GNU GPL v3](LICENSE): you may use, study, change and share it, as long as you keep
+the credit to its authors and anyone who passes on a changed version publishes its source under the same license.
+
+What you make for Ampify is yours. As an additional permission under section 7 of the GPL, themes, snippets,
+extensions and apps that only use Ampify's documented formats and `Ampify` API are not covered by it: their authors
+choose their own license. The examples in [examples/](examples) and the starters made by `ampify new` are under the
+[MIT license](examples/LICENSE), so you can copy them freely.
+
 ## Credits
 
 Ampify builds on QuickJS-ng and on what AMExclusive learned about Apple Music's player. Full list:

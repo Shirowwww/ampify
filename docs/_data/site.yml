@@ -1,0 +1,45 @@
+# Interface texts of the site, per language. Page content lives in the pages themselves.
+en:
+  home: Home
+  themes: Themes
+  extensions: Extensions
+  create: Create
+  docs: Documentation
+  other_lang: Français
+  other_path: /fr/
+  install: Install
+  install_line: Close Apple Music, paste this line in PowerShell, then open Apple Music as usual.
+  copy: Copy
+  copied: Copied
+  footer: Ampify is free software under the GNU GPL v3. Apple Music is a trademark of Apple Inc.; Ampify is not affiliated with Apple.
+  gallery_loading: Reading the catalog…
+  gallery_error: The catalog could not be read. Open it on GitHub instead.
+  install_with: Install from the Marketplace, or
+  permissions: Asks for
+  no_permission: Asks for nothing
+  schemes: Color schemes
+  search: Search
+  gallery_empty: Nothing matches.
+  by: By
+fr:
+  home: Accueil
+  themes: Thèmes
+  extensions: Extensions
+  create: Créer
+  docs: Documentation
+  other_lang: English
+  other_path: /
+  install: Installer
+  install_line: Fermez Apple Music, collez cette ligne dans PowerShell, puis ouvrez Apple Music comme d'habitude.
+  copy: Copier
+  copied: Copié
+  footer: Ampify est un logiciel libre sous licence GNU GPL v3. Apple Music est une marque d'Apple Inc. ; Ampify n'est pas affilié à Apple.
+  gallery_loading: Lecture du catalogue…
+  gallery_error: Le catalogue n'a pas pu être lu. Ouvrez-le sur GitHub.
+  install_with: Installez-le depuis le Marketplace, ou
+  permissions: Demande
+  no_permission: Ne demande rien
+  schemes: Schémas de couleurs
+  search: Rechercher
+  gallery_empty: Rien ne correspond.
+  by: Par

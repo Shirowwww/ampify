@@ -23,6 +23,7 @@
 #include "messages.hpp"
 #include "platform.hpp"
 #include "release.hpp"
+#include "setting_keys.hpp"
 #include "sha256.hpp"
 
 #ifndef AMPIFY_VERSION
@@ -33,8 +34,6 @@ namespace ampify::cli {
 
 namespace {
 
-constexpr const char* kDefaultCatalog =
-    "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog.json";
 constexpr const char* kDefaultRelease =
     "https://api.github.com/repos/Shirowwww/ampify/releases/latest";
 // A given release, by its tag: `ampify install-kit 0.1.0` reads .../releases/tags/v0.1.0.
@@ -84,7 +83,7 @@ void RemoveQuietly(const std::filesystem::path& path) {
 bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
     Settings settings;
     settings.Load(ctx.kit.Settings().string());
-    std::string source = ctx.options.catalog ? *ctx.options.catalog : settings.GetString("catalog.url", kDefaultCatalog);
+    std::string source = ctx.options.catalog ? *ctx.options.catalog : settings.GetString("catalog.url", std::string(kDefaultCatalogUrl));
 
     std::vector<std::string> errors;
     std::string text;

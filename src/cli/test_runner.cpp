@@ -221,7 +221,7 @@ int CmdTest(Context& ctx) {
     std::filesystem::path folder = PathArgument(args[1]);
     FolderValidation validation = ValidateElementFolder(folder);
     if (!validation.ok() || !validation.errors.empty() || !validation.manifest) {
-        ctx.err << Utf8(folder) << " : invalide\n";
+        ctx.err << Utf8(folder) << ": invalid\n";
         for (const std::string& problem : validation.errors) ctx.err << "  - " << problem << "\n";
         return 1;
     }

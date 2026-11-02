@@ -27,6 +27,7 @@
 #include "kit.hpp"
 #include "messages.hpp"
 #include "platform.hpp"
+#include "setting_keys.hpp"
 
 #ifndef AMPIFY_VERSION
 #define AMPIFY_VERSION "0.0.0-dev"
@@ -67,6 +68,10 @@ bool ParseBoolText(std::string_view text, bool& value) {
 bool CheckSetting(const std::string& key, const std::string& value, std::string& stored, std::string& problem) {
     stored = value;
     bool boolean = false;
+    if (!FindSetting(key)) {
+        problem = "unknown setting: " + key + " (known: " + KnownSettingNames() + ")";
+        return false;
+    }
 
     if (key == "theme.active") {
         if (!value.empty() && !IsValidId(value)) {
@@ -121,7 +126,7 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
     bool isBooleanKey = key.rfind("theme.parts.", 0) == 0 || key == "theme.inspect" || key == "theme.live_reload" ||
                         key == "check_kit_update" || key == "expose_api" ||
                         key == "discord.enabled" || key == "tray.enabled" || key == "remote.enabled" ||
-                        key == "midi.enabled" ||
+                        key == "midi.enabled" || key == "player.apple" || key == "player.appleCommands" ||
                         (key.size() > 8 && key.compare(key.size() - 8, 8, ".enabled") == 0 &&
                          (key.rfind("extensions.", 0) == 0 || key.rfind("apps.", 0) == 0 ||
                           key.rfind("snippets.", 0) == 0));
@@ -325,12 +330,15 @@ int CmdThemeSet(Context& ctx) {
     return 0;
 }
 
+constexpr std::string_view kStarterAuthor = "your-github-username";
+constexpr std::string_view kStarterDescription = "Describe it here.";
+
 // The files that `ampify new` writes for each kind. Placeholders: the id and the author.
 std::map<std::string, std::string> Template(std::string_view kind, const std::string& id) {
-    const std::string author = "your-github-username";
+    const std::string author(kStarterAuthor);
     std::string common = "  \"id\": \"" + id + "\",\n  \"name\": \"" + id + "\",\n  \"version\": \"0.1.0\",\n  \"kind\": \"" +
-                         std::string(kind) + "\",\n  \"author\": \"" + author + "\",\n  \"description\": \"Describe it here.\",\n" +
-                         "  \"kitApi\": \"1.0\"";
+                         std::string(kind) + "\",\n  \"author\": \"" + author + "\",\n  \"description\": \"" +
+                         std::string(kStarterDescription) + "\",\n" + "  \"kitApi\": \"1.0\"";
     if (kind == "extension") {
         // Starters show something at once in Apple Music. The guides (docs/extensions/guide.md,
         // docs/themes/guide.md) walk through these same files.
@@ -547,8 +555,39 @@ bool SaveSettings(const Context& ctx, const Settings& settings, std::string& err
     return true;
 }
 
+namespace {
+
+// The lines of the general help for one command: those whose first word is the command, with the lines that continue
+// them (indented further).
+std::string HelpOf(std::string_view help, std::string_view command) {
+    std::string found;
+    bool inside = false;
+    std::istringstream lines{std::string(help)};
+    for (std::string line; std::getline(lines, line);) {
+        bool entry = line.size() > 2 && line.compare(0, 2, "  ") == 0 && line[2] != ' ';
+        if (entry) {
+            std::string_view rest = std::string_view(line).substr(2);
+            inside = rest.substr(0, rest.find(' ')) == command;
+        } else if (line.empty() || line[0] != ' ') {
+            inside = false;
+        }
+        if (inside) found += line + "\n";
+    }
+    return found;
+}
+
+}  // namespace
+
 int CmdHelp(Context& ctx) {
-    ctx.out << Tr("help");
+    const std::vector<std::string>& args = ctx.options.positional;
+    if (args.size() < 2) {
+        ctx.out << Tr("help");
+        return 0;
+    }
+    std::string command = args[1] == "catalog" ? "market" : args[1] == "auto" ? "launch" : args[1];
+    std::string lines = HelpOf(Tr("help"), command);
+    if (lines.empty()) return Usage(ctx, "no command named " + args[1] + "; ampify help lists them all");
+    ctx.out << lines << "\nMore in docs/cli.md.\n";
     return 0;
 }
 
@@ -632,8 +671,16 @@ int CmdConfig(Context& ctx) {
     }
     if (args.size() == 2) {
         std::optional<std::string> value = settings.Get(args[1]);
-        if (!value) return Failure(ctx, Tr("missingKey", {{"key", args[1]}}));
-        ctx.out << *value << "\n";
+        if (value) {
+            ctx.out << *value << "\n";
+            return 0;
+        }
+        std::optional<KnownSetting> known = FindSetting(args[1]);
+        if (!known) return Failure(ctx, Tr("missingKey", {{"key", args[1]}}));
+        // The value that applies goes to the output, for scripts; that it is a default goes to the error stream.
+        ctx.out << known->fallback << "\n";
+        ctx.err << args[1] << " is not set: default" << (known->note.empty() ? "" : ", ")
+                << std::string(known->note) << "\n";
         return 0;
     }
     return CmdConfigSet(ctx, settings);
@@ -703,6 +750,18 @@ int CmdTheme(Context& ctx) {
     return Usage(ctx, Tr("unknownAction", {{"action", std::string("theme ") + std::string(action)}}));
 }
 
+std::vector<std::string> StarterLeftovers(const ElementInfo& manifest) {
+    std::vector<std::string> left;
+    if (manifest.author == kStarterAuthor) {
+        left.push_back("manifest.json: \"author\" is still \"" + std::string(kStarterAuthor) + "\": put your GitHub name");
+    }
+    if (manifest.description == kStarterDescription) {
+        left.push_back("manifest.json: \"description\" is still \"" + std::string(kStarterDescription) +
+                       "\": say in a sentence what it does");
+    }
+    return left;
+}
+
 int CmdValidate(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() != 2) return Usage(ctx, "validate needs a folder or a catalog.json");
@@ -722,7 +781,7 @@ int CmdValidate(Context& ctx) {
     }
 
     std::ifstream in(target, std::ios::binary);
-    if (!in) return Failure(ctx, "file not found: " + args[1]);
+    if (!in) return Failure(ctx, "not found: " + args[1] + " (give an element folder or a catalog.json file)");
     std::stringstream buffer;
     buffer << in.rdbuf();
     std::vector<std::string> errors;
@@ -752,17 +811,33 @@ int CmdNew(Context& ctx) {
         std::string error;
         if (!WriteTextFile(folder / name, text, error)) return Failure(ctx, error);
     }
-    ctx.out << "Element created in " << Utf8(folder) << ". Replace your-github-username with yours,\n"
-            << "then check it with: ampify validate " << id << "\n";
+    ctx.out << "Element created in " << Utf8(folder) << ".\n"
+            << "See it live in Apple Music: ampify dev " << id << "\n"
+            << "Before sharing it, put your GitHub name and a description in manifest.json\n"
+            << "(ampify build and ampify publish refuse the starter's texts), then: ampify publish " << id << "\n";
     return 0;
 }
 
 namespace {
 
+// Commands that honour --dry-run. Any other would run for real, so the option is refused there instead.
+constexpr std::string_view kDryRunCommands[] = {"apply", "launch", "auto", "restore", "import", "publish", "devtools"};
+
+bool SupportsDryRun(const Options& options) {
+    const std::string& command = options.positional[0];
+    if (command == "config") return options.dir;
+    return std::find(std::begin(kDryRunCommands), std::end(kDryRunCommands), std::string_view(command)) !=
+           std::end(kDryRunCommands);
+}
+
 int Dispatch(Context& ctx) {
     const Options& options = ctx.options;
     if (options.positional.empty()) return CmdHelp(ctx);
     const std::string& command = options.positional[0];
+    if (options.dryRun && command != "help" && !SupportsDryRun(options)) {
+        return Usage(ctx, "--dry-run is not available for " + command + ": run it without --dry-run (" +
+                              "it works with apply, launch, restore, import, publish, devtools and config --dir)");
+    }
 
     if (command == "help") return CmdHelp(ctx);
     if (command == "version") return CmdVersion(ctx);
@@ -782,6 +857,7 @@ int Dispatch(Context& ctx) {
     if (command == "backup") return CmdBackup(ctx);
     if (command == "watch") return CmdWatch(ctx);
     if (command == "build") return CmdBuild(ctx);
+    if (command == "publish") return CmdPublish(ctx);
     if (command == "inspect") return options.tree ? CmdInspectTree(ctx) : CmdInspect(ctx);
     if (command == "devtools") return CmdDevtools(ctx);
     if (command == "versions") return CmdVersions(ctx);

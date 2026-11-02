@@ -204,7 +204,7 @@ int CmdImport(Context& ctx) {
     ctx.out << "Content of the export:\n";
     for (const Planned& item : planned) ctx.out << "  " << item.kind << " " << item.id << " " << item.version << "\n";
     if (hasSettings) ctx.out << "  settings (replace settings.txt)\n";
-    if (planned.empty() && !hasSettings) ctx.out << "  rien\n";
+    if (planned.empty() && !hasSettings) ctx.out << "  nothing\n";
 
     if (ctx.options.dryRun) {
         std::filesystem::remove_all(staging, ec);

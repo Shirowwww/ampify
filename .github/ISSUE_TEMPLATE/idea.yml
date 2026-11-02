@@ -1,0 +1,16 @@
+name: An idea or a missing name for themes
+description: A feature, an API, or a part of Apple Music a theme cannot reach yet
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+      description: What you want to make, and what stops you today. For a theme, say which part of Apple Music (a screenshot with it circled is perfect).
+    validations:
+      required: true
+  - type: textarea
+    id: spicetify
+    attributes:
+      label: The same thing elsewhere
+      description: A Spicetify extension, theme or snippet that does it, if there is one.

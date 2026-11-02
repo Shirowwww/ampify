@@ -1,0 +1,54 @@
+en:
+  title: Make Apple Music yours
+  lede: Themes, extensions and a Marketplace for the official Apple Music app on Windows. Lossless, Dolby Atmos, lyrics and your library keep working as they do.
+  install_cmd: irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
+  install_note: No administrator rights. Ampify then loads with Apple Music each time it starts, and `ampify restore` turns it off.
+  or_zip: or download the installer
+  theme_label: Theme shown
+  get_title: What changes in Apple Music
+  get:
+    - name: Themes
+      text: Colors, glass panels, the artwork of the song behind everything, rounded corners, motion. Pick one in the Marketplace and it applies at once, no restart.
+      fact: 17 themes, light and dark schemes
+    - name: Extensions
+      text: Your Discord status with the cover and buttons, Last.fm scrobbling, a sleep timer, global shortcuts. Each one says what it needs before you switch it on.
+      fact: Permissions shown before anything runs
+    - name: Built in
+      text: A Now Playing button that opens Apple's full-screen player with karaoke lyrics, and an Atmos leveler that brings Dolby Atmos songs to the loudness of stereo ones.
+      fact: Leveled to the stereo loudness, in LUFS
+  make_title: Make your own
+  make_text: A theme is a few lines of CSS on Apple Music's own elements. An extension is JavaScript with the `Ampify` object. `ampify dev` reloads your work at every save, and `ampify publish` sends it to the Marketplace.
+  make_cta: Start in five minutes
+  safe_title: Apple Music stays Apple Music
+  safe:
+    - Nothing is written into Apple Music's package; uninstalling puts everything back.
+    - Copy protection is never touched.
+    - On an Apple Music version that was not tested, Ampify stays off until it is.
+    - Every theme and extension in the Marketplace has its source on GitHub, reviewed before it is listed.
+fr:
+  title: Apple Music, à votre façon
+  lede: Des thèmes, des extensions et un Marketplace pour l'app Apple Music officielle sur Windows. Lossless, Dolby Atmos, paroles et bibliothèque marchent comme avant.
+  install_cmd: irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
+  install_note: Sans droits d'administrateur. Ampify se charge ensuite avec Apple Music à chaque démarrage, et `ampify restore` le coupe.
+  or_zip: ou téléchargez l'installateur
+  theme_label: Thème affiché
+  get_title: Ce qui change dans Apple Music
+  get:
+    - name: Thèmes
+      text: Couleurs, panneaux en verre, la pochette du morceau derrière tout, coins arrondis, mouvement. Choisissez-en un dans le Marketplace, il s'applique tout de suite, sans redémarrer.
+      fact: 17 thèmes, schémas clairs et sombres
+    - name: Extensions
+      text: Votre statut Discord avec la pochette et des boutons, le scrobbling Last.fm, une minuterie de veille, des raccourcis globaux. Chacune dit ce dont elle a besoin avant d'être activée.
+      fact: Permissions affichées avant que rien ne tourne
+    - name: Intégré
+      text: Un bouton À l'écoute qui ouvre le lecteur plein écran d'Apple avec les paroles karaoké, et un niveleur qui ramène les morceaux Dolby Atmos au volume des morceaux stéréo.
+      fact: Nivelé au volume stéréo, en LUFS
+  make_title: Créez les vôtres
+  make_text: Un thème, ce sont quelques lignes de CSS sur les éléments d'Apple Music. Une extension, c'est du JavaScript avec l'objet `Ampify`. `ampify dev` recharge votre travail à chaque sauvegarde, et `ampify publish` l'envoie au Marketplace.
+  make_cta: Commencer en cinq minutes
+  safe_title: Apple Music reste Apple Music
+  safe:
+    - Rien n'est écrit dans le paquet d'Apple Music ; désinstaller remet tout comme avant.
+    - La protection contre la copie n'est jamais touchée.
+    - Sur une version d'Apple Music pas encore testée, Ampify reste éteint jusqu'à ce qu'elle le soit.
+    - Chaque thème et extension du Marketplace a son code sur GitHub, relu avant d'être listé.

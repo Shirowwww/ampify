@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Publish a theme, extension or snippet
+    url: https://github.com/Shirowwww/ampify/blob/main/docs/extensions/catalog.md
+    about: Run `ampify publish <folder>`, or add it to the catalog by hand.

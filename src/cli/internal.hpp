@@ -146,6 +146,9 @@ int CmdBuild(Context& ctx);
 int CmdInspect(Context& ctx);
 int CmdTypes(Context& ctx);
 
+// Command in publish.cpp: checks an element, then opens a pull request on the public catalog.
+int CmdPublish(Context& ctx);
+
 // The TypeScript declarations that `ampify types` writes (sdk_types.cpp).
 std::string_view AmpifyDeclarations();
 
@@ -174,6 +177,10 @@ int CmdReport(Context& ctx);
 
 // Commands in test_runner.cpp.
 int CmdTest(Context& ctx);
+
+// The texts of `ampify new` still in a manifest, each with what to do about it. build and publish refuse an element
+// that keeps one: a starter is meant to be changed before it is shared. Empty when none is left.
+std::vector<std::string> StarterLeftovers(const ElementInfo& manifest);
 
 // Commands in transfer.cpp: profile, export and import.
 int CmdProfile(Context& ctx);

@@ -1,0 +1,30 @@
+title: Ampify
+description: Themes, extensions and a Marketplace for Apple Music on Windows.
+url: https://shirowwww.github.io
+baseurl: /ampify
+repository: Shirowwww/ampify
+# GitHub Pages turns these on by itself; they are listed so a local build shows the same site.
+plugins:
+  - jekyll-optional-front-matter
+  - jekyll-relative-links
+  - jekyll-titles-from-headings
+relative_links:
+  enabled: true
+  collections: false
+titles_from_headings:
+  enabled: true
+  strip_title: false
+optional_front_matter:
+  remove_originals: true
+# README.md is what GitHub shows in docs/; documentation.md includes it for the site.
+exclude:
+  - README.md
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+defaults:
+  - scope: { path: "" }
+    values: { layout: doc, lang: en }
+  - scope: { path: "fr" }
+    values: { lang: fr }

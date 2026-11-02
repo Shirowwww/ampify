@@ -1,0 +1,13 @@
+{%- assign t = site.data.site[page.lang] -%}
+<header class="page-head">
+  <h1>{{ page.heading }}</h1>
+  <p>{{ page.lede }}</p>
+</header>
+<section class="gallery" aria-label="{{ page.heading }}" data-gallery data-kinds="{{ page.kinds }}"
+  data-search="{{ t.search }}" data-empty="{{ t.gallery_empty }}" data-error="{{ t.gallery_error }}"
+  data-copy="{{ t.copy }}" data-copied="{{ t.copied }}" data-by="{{ t.by }}"
+  data-permissions="{{ t.permissions }}" data-no-permission="{{ t.no_permission }}">
+  <p class="status" role="status">{{ t.gallery_loading }}
+    <a href="https://github.com/Shirowwww/ampify-catalog">github.com/Shirowwww/ampify-catalog</a></p>
+</section>
+<noscript><p class="status">{{ t.gallery_error }}</p></noscript>

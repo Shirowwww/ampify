@@ -1,0 +1,31 @@
+{%- assign t = site.data.site[page.lang] -%}
+{%- assign root = '/' -%}{%- assign other = 'fr' -%}
+{%- if page.lang == 'fr' -%}{%- assign root = '/fr/' -%}{%- assign other = 'en' -%}{%- endif -%}
+<!doctype html>
+<html lang="{{ page.lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if page.title and page.home != true %}{{ page.title }} · {% endif %}Ampify</title>
+<meta name="description" content="{{ page.description | default: site.description }}">
+<meta property="og:title" content="{{ page.title | default: 'Ampify' }}">
+<meta property="og:description" content="{{ page.description | default: site.description }}">
+<meta property="og:image" content="{{ '/assets/og.jpg' | absolute_url }}">
+<link rel="icon" href="{{ '/assets/logo.svg' | relative_url }}" type="image/svg+xml">
+<link rel="stylesheet" href="{{ '/assets/site.css' | relative_url }}">
+</head>
+<body class="{{ include.kind }}" data-base="{{ '/' | relative_url }}" data-repo="https://github.com/{{ site.repository }}">
+<a class="skip" href="#main">{% if page.lang == 'fr' %}Aller au contenu{% else %}Skip to content{% endif %}</a>
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="{{ root | relative_url }}"><img src="{{ '/assets/logo.svg' | relative_url }}" alt="" width="26" height="26"> Ampify</a>
+    <nav aria-label="Site">
+      <a href="{{ root | append: 'themes.html' | relative_url }}">{{ t.themes }}</a>
+      <a href="{{ root | append: 'extensions.html' | relative_url }}">{{ t.extensions }}</a>
+      <a href="{{ root | append: 'create.html' | relative_url }}">{{ t.create }}</a>
+      <a href="{{ '/documentation.html' | relative_url }}">{{ t.docs }}</a>
+      <a href="https://github.com/{{ site.repository }}">GitHub</a>
+      <a class="lang" href="{{ t.other_path | relative_url }}" hreflang="{{ other }}">{{ t.other_lang }}</a>
+    </nav>
+  </div>
+</header>

@@ -1,0 +1,11 @@
+{%- assign t = site.data.site[page.lang] -%}
+<footer class="foot">
+  <div class="foot-in">
+    <p>{{ t.footer }}</p>
+    <p><a href="https://github.com/{{ site.repository }}">github.com/{{ site.repository }}</a></p>
+  </div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js" defer></script>
+<script src="{{ '/assets/site.js' | relative_url }}" defer></script>
+</body>
+</html>

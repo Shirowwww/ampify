@@ -93,9 +93,17 @@ same lines. For a module `foo`:
 
 ## Add an element to the catalog
 
-The Marketplace lists what is in `catalog.json` of [ampify-catalog](https://github.com/Shirowwww/ampify-catalog). See
-[docs/extensions/catalog.md](docs/extensions/catalog.md): check the manifest, pack the archive with `tools/pack.py`, and
-open a pull request on that repository. A maintainer reviews the code before the merge.
+The Marketplace lists what is in `catalog.json` of [ampify-catalog](https://github.com/Shirowwww/ampify-catalog). You
+don't need to clone it: `ampify publish <folder>` checks the element, then opens the pull request for you with the GitHub
+CLI (`gh`), or prints the steps to follow in the browser when `gh` is not there. A maintainer reads the code; once it is
+merged, a bot packs the archive and the Marketplace lists it. Details: [docs/extensions/catalog.md](docs/extensions/catalog.md).
+
+## License
+
+By contributing to this repository, you agree that your contribution is published under the
+[GNU GPL v3](LICENSE), with the exception the README describes for themes, snippets, extensions and apps. Contributions to
+[examples/](examples) are under the [MIT license](examples/LICENSE). An element you publish to the catalog stays yours,
+under the license you choose.
 
 ## Documentation
 

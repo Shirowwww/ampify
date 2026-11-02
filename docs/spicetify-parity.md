@@ -37,7 +37,7 @@ Music update. The inspector (`ampify devtools`) lists the real names for your ve
 |---|---|
 | Done | Works. It may still wait for a check on a real PC, as noted |
 | Partial | Works with a limit written in the row |
-| Outside 1.0 | Not in version 1.0, for the reason in the row ([extensions/api.md](extensions/api.md), section 11) |
+| Outside 1.0 | Not in version 1.0, for the reason in the row ([extensions/api.md](extensions/api.md), section 10) |
 | Different | Done another way, or no equivalent exists |
 
 ## 1. Installation and command line

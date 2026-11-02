@@ -446,9 +446,9 @@ Example:
 
 ```js
 Ampify.ui.playbar.addButton({
-  label: "Lyrics",
-  icon: Ampify.icons.get("lyrics"),
-  onClick: () => Ampify.ui.popup.open(lyricsView),
+  label: "About this song",
+  icon: Ampify.icons.get("info"),
+  onClick: () => Ampify.ui.popup.open(songView),
 });
 ```
 
@@ -498,7 +498,7 @@ Menus are not displayed yet.
 
 An extension cannot inject raw XAML in API 1.0. This stops a community element from touching parts of the interface that
 have not been mapped. Themes are the only case where an element ships XAML (section 6). A later version may accept XAML
-checked against a list of allowed types and properties (see section 11).
+checked against a list of allowed types and properties (see section 10).
 
 ### 5.6 Services [preview]
 
@@ -512,6 +512,7 @@ Ampify.http.open(url) -> boolean                    // [preview] same rules: sho
 Ampify.crypto.md5(text) -> hexadecimal string       // [preview] for services that sign this way (Last.fm)
 Ampify.uri.parse(text) / Ampify.uri.build(...)      // [stable] music:// and https://music.apple.com links
 Ampify.icons.get(name) -> SVG string                // [preview]
+Ampify.icons.names() -> string[]                    // [preview] every name icons.get knows
 Ampify.color.extract(pixels, width, height)         // [preview] no permission
 // pixels: RGBA, row by row (array, Uint8Array or ArrayBuffer). Returns the keys of Spicetify's colorExtractor:
 // PROMINENT, VIBRANT, DARK_VIBRANT, LIGHT_VIBRANT, DESATURATED, VIBRANT_NON_ALARMING ("#rrggbb"),
@@ -798,21 +799,7 @@ extension authors:
 - A removed function stays available for one minor version, with a warning in the log.
 - An element declares the version it targets. The kernel accepts any minor version of the same major.
 
-## 10. Open points
-
-These points must be confirmed before items move to [stable]:
-
-- the size of quickjs-ng and its behavior under MSVC;
-- the shape of the data of `Ampify.player` and its events on later Apple Music versions (1.1792 is read through Apple's
-  player, activated from its own DLL when the system does not know the class);
-- the shape of the frames of `Ampify.audio.onFrame` and the number of bands (to confirm on a PC);
-- the places of interface elements in the XAML tree;
-- the list of allowed XAML keys for themes;
-- the time and memory limits of an element (to set from measurements);
-- the paths that depend on the real app: navigation, the sidebar, the places of the top bar and the playback bar, the
-  queue, the telemetry hosts.
-
-## 11. Outside API 1.0, with their path
+## 10. Outside API 1.0, with their path
 
 Nothing is ruled out for good. Each point stays outside API 1.0 for a specific reason.
 
@@ -836,40 +823,40 @@ Nothing is ruled out for good. Each point stays outside API 1.0 for a specific r
   exists for it today.
 - **Per-version patches.** A table of byte patterns, with no fixed address, for each tested version.
 
-## 12. Implementation status
+## 11. What works today
 
-| Area | State | Verified by |
-|---|---|---|
-| `version`, `kitApi`, `process`, `locale`, `log`, `onStop` | Done | C++ tests, on Linux and Windows |
-| `config.get/set`: one key per element, never `enabled` | Done. `get` returns a boolean, number or text according to the default value | C++ tests |
-| `storage.get/set/remove`: a JSON file per element, 1 MB quota | Done. Written through a temporary file then replaced. By default an element runs only in the interface, so one writer at a time | C++ tests, on Linux and Windows |
-| `processes`: `ui`, `engine`, or both | Done. An element of another process is ignored, with a log line | C++ tests |
-| `player.state`, `on`, `play`, `pause`, `toggle`, `next`, `previous`, `seek` | Done. On Windows: Apple's player (`AMP.Services.Player`, in AppleMusic.exe), else SMTC, else media keys (`src/win/player_bridge.*`). Commands go through SMTC, then the key; through Apple's player with `player.appleCommands` | C++ tests (slots checked against `knowledge/winmd`); fake WinRT objects on Windows; real playback to check on a PC |
-| `player.queue.list`, `add`, `remove` | `list` and `remove` done on Windows through `AMP.Services.PlayQueue`, read and changed on the interface thread; the whole queue once Apple's "Up Next" panel has opened, the current track before. `add` answers `false` with the reason in the log | C++ tests with fake objects on Windows; list and remove checked in Apple Music 1.1792 (the entry leaves Apple's panel) |
-| `audio.setGainDb`: capped by `audio.maxGainDb` (6 dB by default, 12 at most), back to 0 at stop | Done | C++ tests |
-| `notify` (title 120 characters, text 500) | Done. On Windows: a balloon notification (temporary icon, 8 s) and a log line | C++ tests; balloon to check on a PC |
-| `keyboard.bind` (normalized form, an F key, a media key or a modifier is required) | Done. On Windows: `RegisterHotKey`, handed back to the JavaScript thread | C++ tests; simulated press on Windows |
-| `http.get`, `http.post` (https, declared host, 1 MB at most for the reply; 64 KB for a body) | Done. On Windows: WinHTTP, timeout of 5 to 10 s, an error returns status 0 instead of throwing. The request runs on a worker thread of the element and the promise resolves on a later pump; 4 requests in flight at most per element, answers that come after a stop are dropped | C++ tests; failure tested on Windows, success to check on a PC |
-| `crypto.md5`, `uri.parse`, `uri.build`, `icons.get`, `setTimeout`, `setInterval`, `queueMicrotask`, `console` | Done | C++ tests |
-| ES modules (`"type": "module"`, relative `import` limited to the element's folder, `import()`) | Done | C++ tests, `tools/test_validate.py` |
-| `link.post`, `link.on`, `link.connected`: app and extension with the same id | Done | C++ tests |
-| Permissions: `PermissionDenied` at run time, refusal by the manifest reader | Done | C++ tests |
-| Folder discovery (`extensions`, `apps`, theme scripts), activation, reload (`Restart`), failure isolation | Done | C++ tests, on Linux and Windows |
-| Immediate effect through `reload.txt`: `start`, `stop`, `restart` (manifest re-read), `rescan` | Done in the kernel | C++ tests, CLI tests |
-| `audio.onFrame`, `analyze`, `loudness`, `volume`, `eq` | Done. On Windows: wired to the Atmos leveler hooks (stereo stream and spatial objects), which must be switched on | C++ tests (synthetic signals); listening to do on a PC |
-| `color.extract` (pixels supplied by the script) | Done | C++ tests |
-| `ui.*`, `React`, `ReactDOM`, `hooks`, `components`, `ready` | Done: native rendering (panels, popups, pages, bar buttons) and the "Ampify" card in Settings > Playback | C++ tests (tree, diff, markers on a fake tree); the interface case of the Windows bench |
-| `i18n` (`language`, `define`, `t`) | Done | C++ tests and `tools/test_cli.py` |
-| `discord.setActivity`, `clear` | Done. On Windows: pipe `\\.\pipe\discord-ipc-0` to `9`, on its own thread, retry every 15 s | C++ tests; fake Discord server on Windows; real Discord to check on a PC |
-| `tray.setMenu`, `onClick` | Done. On Windows: `Shell_NotifyIcon`, a message window on its own thread, in AppleMusic.exe | C++ tests; the icon on Windows when the session has a notification area; to check on a PC |
-| `midi.on`, `devices`, and `midi.map` | Done. On Windows: `midiInOpen` (winmm), in AMPLibraryAgent.exe | C++ tests; bindings tested on Windows with no device; a real controller to check on a PC |
-| `remote.setState` and the local remote | Done. On Windows: Winsock on `127.0.0.1` only, in AMPLibraryAgent.exe | C++ tests; local client and refusal of other addresses on Windows |
-| `fs.writeText` | Done. `output\<id>\` of Ampify only | C++ tests, on Linux and Windows |
-| `kit.run` | Done, Marketplace only | C++ tests |
-| `lyrics.current` | Done: `player.lyrics()` as a promise | C++ tests |
-| `color.fromArtwork` | Done. On Windows: WinHTTP, then WIC decodes the image to 128 px at most | C++ tests (fake decoder, and WIC on a PNG); in Apple Music 1.1792, a real cover gave its palette |
-| `fonts.roles`, `fonts.style` | Done. The theme service publishes the roles of the applied theme, the defaults before | C++ tests; in Apple Music 1.1792, the roles followed a theme change |
-| `library`, `services` | Outside API 1.0 (section 11): the permission names are reserved, nothing is typed | |
+| Area | State |
+|---|---|
+| `version`, `kitApi`, `process`, `locale`, `log`, `onStop` | Done |
+| `config.get/set`: one key per element, never `enabled` | Done. `get` returns a boolean, number or text according to the default value |
+| `storage.get/set/remove`: a JSON file per element, 1 MB quota | Done. Written through a temporary file then replaced. By default an element runs only in the interface, so one writer at a time |
+| `processes`: `ui`, `engine`, or both | Done. An element of another process is ignored, with a log line |
+| `player.state`, `on`, `play`, `pause`, `toggle`, `next`, `previous`, `seek` | Done. On Windows: Apple's player (`AMP.Services.Player`, in AppleMusic.exe), else SMTC, else media keys (`src/win/player_bridge.*`). Commands go through SMTC, then the key; through Apple's player with `player.appleCommands` |
+| `player.queue.list`, `add`, `remove` | `list` and `remove` done on Windows through `AMP.Services.PlayQueue`, read and changed on the interface thread; the whole queue once Apple's "Up Next" panel has opened, the current track before. `add` answers `false` with the reason in the log |
+| `audio.setGainDb`: capped by `audio.maxGainDb` (6 dB by default, 12 at most), back to 0 at stop | Done |
+| `notify` (title 120 characters, text 500) | Done. On Windows: a balloon notification (temporary icon, 8 s) and a log line |
+| `keyboard.bind` (normalized form, an F key, a media key or a modifier is required) | Done. On Windows: `RegisterHotKey`, handed back to the JavaScript thread |
+| `http.get`, `http.post` (https, declared host, 1 MB at most for the reply; 64 KB for a body) | Done. On Windows: WinHTTP, timeout of 5 to 10 s, an error returns status 0 instead of throwing. The request runs on a worker thread of the element and the promise resolves on a later pump; 4 requests in flight at most per element, answers that come after a stop are dropped |
+| `crypto.md5`, `uri.parse`, `uri.build`, `icons.get`, `setTimeout`, `setInterval`, `queueMicrotask`, `console` | Done |
+| ES modules (`"type": "module"`, relative `import` limited to the element's folder, `import()`) | Done |
+| `link.post`, `link.on`, `link.connected`: app and extension with the same id | Done |
+| Permissions: `PermissionDenied` at run time, refusal by the manifest reader | Done |
+| Folder discovery (`extensions`, `apps`, theme scripts), activation, reload (`Restart`), failure isolation | Done |
+| Immediate effect through `reload.txt`: `start`, `stop`, `restart` (manifest re-read), `rescan` | Done in the kernel |
+| `audio.onFrame`, `analyze`, `loudness`, `volume`, `eq` | Done. On Windows: wired to the Atmos leveler hooks (stereo stream and spatial objects), which must be switched on |
+| `color.extract` (pixels supplied by the script) | Done |
+| `ui.*`, `React`, `ReactDOM`, `hooks`, `components`, `ready` | Done: native rendering (panels, popups, pages, bar buttons) and the "Ampify" card in Settings > Playback |
+| `i18n` (`language`, `define`, `t`) | Done |
+| `discord.setActivity`, `clear` | Done. On Windows: pipe `\\.\pipe\discord-ipc-0` to `9`, on its own thread, retry every 15 s |
+| `tray.setMenu`, `onClick` | Done. On Windows: `Shell_NotifyIcon`, a message window on its own thread, in AppleMusic.exe |
+| `midi.on`, `devices`, and `midi.map` | Done. On Windows: `midiInOpen` (winmm), in AMPLibraryAgent.exe |
+| `remote.setState` and the local remote | Done. On Windows: Winsock on `127.0.0.1` only, in AMPLibraryAgent.exe |
+| `fs.writeText` | Done. `output\<id>\` of Ampify only |
+| `kit.run` | Done, Marketplace only |
+| `lyrics.current` | Done: `player.lyrics()` as a promise |
+| `color.fromArtwork` | Done. On Windows: WinHTTP, then WIC decodes the image to 128 px at most |
+| `fonts.roles`, `fonts.style` | Done. The theme service publishes the roles of the applied theme, the defaults before |
+| `library`, `services` | Outside API 1.0 (section 10): the permission names are reserved, nothing is typed |
 
 Known limit: an element that runs in both processes and writes its storage can lose an update, which is why
 `processes` exists.

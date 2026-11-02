@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "hello-extension",
   "name": "Hello (example)",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Example to learn from, the smallest one: writes to the log and keeps a launch counter.",

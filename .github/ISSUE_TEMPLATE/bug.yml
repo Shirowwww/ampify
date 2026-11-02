@@ -1,0 +1,28 @@
+name: Something does not work
+description: Ampify, a theme or an extension misbehaves
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you saw. A screenshot helps a lot.
+    validations:
+      required: true
+  - type: input
+    id: element
+    attributes:
+      label: Theme or extension involved
+      placeholder: "glass, discord-presence, none..."
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostic report
+      description: >
+        In Apple Music, Settings > Playback > Ampify > Export a report (or `ampify report` in a terminal), then drag the
+        zip here. It holds no user name, folder or music.
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "`ampify version` and Apple Music's version (Settings > About)"

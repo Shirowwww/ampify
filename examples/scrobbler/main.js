@@ -1,7 +1,7 @@
 // Sends the tracks you listen to to Last.fm ("scrobbling"), with Last.fm's rules: a track longer than
 // 30 seconds counts once it has been played for half its length, or for 4 minutes.
 //
-// Connecting: with "Connect my Last.fm account" on (the default), the extension opens Last.fm's page in the browser
+// Connecting: with "Use my Last.fm account" on (the default), the extension opens Last.fm's page in the browser
 // and, once you allow Ampify there, keeps the session in its storage. Turning the setting off signs out; turning it
 // on again opens the page again. A play that could not be sent (network down) waits in storage and is sent later.
 // Another Last.fm application can be used: ampify config extensions.scrobbler.apiKey <key> (and apiSecret).
@@ -20,18 +20,18 @@ Ampify.i18n.define({
   en: {
     allow: "Allow Ampify on the Last.fm page that just opened.",
     connected: "Connected to Last.fm as {name}.",
-    late: "Last.fm was not allowed in time. Turn \"Connect my Last.fm account\" off and on to try again.",
-    blocked: "Last.fm's page could not open. Turn \"Connect my Last.fm account\" off and on in a few seconds.",
-    waiting: "Last.fm is not connected yet. Turn \"Connect my Last.fm account\" off and on to open its page again.",
+    late: "Last.fm was not allowed in time. Turn \"Use my Last.fm account\" off and on to try again.",
+    blocked: "Last.fm's page could not open. Turn \"Use my Last.fm account\" off and on in a few seconds.",
+    waiting: "Last.fm is not connected yet. Turn \"Use my Last.fm account\" off and on to open its page again.",
     noKey: "Last.fm: this copy has no application key. Set one: ampify config extensions.scrobbler.apiKey <key>",
     signedOut: "Signed out of Last.fm.",
   },
   fr: {
     allow: "Autorisez Ampify sur la page Last.fm qui vient de s'ouvrir.",
     connected: "Connecté à Last.fm en tant que {name}.",
-    late: "Last.fm n'a pas été autorisé à temps. Désactivez puis réactivez « Connecter mon compte Last.fm ».",
-    blocked: "La page Last.fm n'a pas pu s'ouvrir. Désactivez puis réactivez « Connecter mon compte Last.fm » dans quelques secondes.",
-    waiting: "Last.fm n'est pas encore connecté. Désactivez puis réactivez « Connecter mon compte Last.fm » pour rouvrir sa page.",
+    late: "Last.fm n'a pas été autorisé à temps. Désactivez puis réactivez « Utiliser mon compte Last.fm ».",
+    blocked: "La page Last.fm n'a pas pu s'ouvrir. Désactivez puis réactivez « Utiliser mon compte Last.fm » dans quelques secondes.",
+    waiting: "Last.fm n'est pas encore connecté. Désactivez puis réactivez « Utiliser mon compte Last.fm » pour rouvrir sa page.",
     noKey: "Last.fm : cette copie n'a pas de clé d'application. Indiquez-en une : ampify config extensions.scrobbler.apiKey <clé>",
     signedOut: "Déconnecté de Last.fm.",
   },

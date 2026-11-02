@@ -68,9 +68,12 @@ std::string CatalogEntryText(const ElementManifest& manifest, const std::string&
     return out.str();
 }
 
-void PrintProblems(Context& ctx, const std::filesystem::path& folder, const FolderValidation& validation) {
-    ctx.err << Utf8(folder) << ": invalid, nothing was written\n";
+// `outcome` says what the refusal means for the command: "nothing was written" for build, nothing for inspect.
+void PrintProblems(Context& ctx, const std::filesystem::path& folder, const FolderValidation& validation,
+                   std::string_view outcome) {
+    ctx.err << Utf8(folder) << ": invalid" << (outcome.empty() ? "" : ", ") << outcome << "\n";
     for (const std::string& problem : validation.errors) ctx.err << "  - " << problem << "\n";
+    ctx.err << "Fix the points above, then run the command again.\n";
 }
 
 }  // namespace
@@ -83,8 +86,11 @@ int CmdBuild(Context& ctx) {
 
     std::filesystem::path folder = PathArgument(args[1]);
     FolderValidation validation = ValidateElementFolder(folder);
+    if (validation.manifest) {
+        for (std::string& left : StarterLeftovers(*validation.manifest)) validation.errors.push_back(std::move(left));
+    }
     if (!validation.ok() || !validation.errors.empty() || !validation.manifest) {
-        PrintProblems(ctx, folder, validation);
+        PrintProblems(ctx, folder, validation, "nothing was written");
         return 1;
     }
     const ElementManifest& manifest = *validation.manifest;
@@ -140,7 +146,7 @@ int CmdInspect(Context& ctx) {
 
     FolderValidation validation = ValidateElementFolder(folder);
     if (!validation.ok() || !validation.errors.empty() || !validation.manifest) {
-        PrintProblems(ctx, folder, validation);
+        PrintProblems(ctx, folder, validation, "");
         return 1;
     }
     const ElementManifest& manifest = *validation.manifest;

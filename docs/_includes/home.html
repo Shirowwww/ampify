@@ -1,0 +1,80 @@
+{%- assign h = site.data.home[page.lang] -%}
+{%- assign t = site.data.site[page.lang] -%}
+{%- assign root = '/' -%}{%- if page.lang == 'fr' -%}{%- assign root = '/fr/' -%}{%- endif -%}
+{%- assign shots = "greenroom:Greenroom,glass:Glass,artwork:Artwork,comfy:Comfy,catppuccin:Catppuccin,paper-light:Paper light,midnight:Midnight" | split: "," -%}
+{%- assign raw = "https://raw.githubusercontent.com/Shirowwww/ampify/main/themes/" -%}
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-text">
+    <h1 id="hero-title">{{ h.title }}</h1>
+    <p class="lede">{{ h.lede }}</p>
+    <div class="install">
+      <p class="install-line">{{ t.install_line }}</p>
+      <div class="cmd"><code id="install-cmd">{{ h.install_cmd }}</code>
+        <button type="button" class="copy" data-copy="install-cmd" data-done="{{ t.copied }}">{{ t.copy }}</button></div>
+      <p class="install-note">{{ h.install_note | markdownify | remove: '<p>' | remove: '</p>' }}
+        <a href="https://github.com/Shirowwww/ampify/releases/latest">{{ h.or_zip }}</a>.</p>
+    </div>
+  </div>
+  <figure class="stage" data-rotate>
+    <div class="window">
+      {%- for shot in shots -%}{%- assign s = shot | split: ":" -%}
+      <img src="{{ raw }}{{ s[0] }}/preview.jpg" alt="Apple Music with the {{ s[1] }} theme" width="1200" height="600"
+        {% if forloop.first %}class="on" fetchpriority="high"{% else %}loading="lazy"{% endif %} data-theme-id="{{ s[0] }}">
+      {%- endfor -%}
+    </div>
+    <figcaption>
+      <span class="label">{{ h.theme_label }}</span>
+      <span class="chips" role="group" aria-label="{{ h.theme_label }}">
+      {%- for shot in shots -%}{%- assign s = shot | split: ":" -%}
+        <button type="button" data-show="{{ s[0] }}"{% if forloop.first %} aria-pressed="true"{% else %} aria-pressed="false"{% endif %}>{{ s[1] }}</button>
+      {%- endfor -%}
+      </span>
+    </figcaption>
+  </figure>
+</section>
+
+<section class="get" aria-labelledby="get-title">
+  <h2 id="get-title">{{ h.get_title }}</h2>
+  <ol class="get-list">
+  {%- for item in h.get -%}
+    <li>
+      <h3>{{ item.name }}</h3>
+      <p>{{ item.text }}</p>
+      <p class="fact">{{ item.fact }}</p>
+    </li>
+  {%- endfor -%}
+  </ol>
+  <p class="more"><a href="{{ root | append: 'themes.html' | relative_url }}">{{ t.themes }} →</a>
+    <a href="{{ root | append: 'extensions.html' | relative_url }}">{{ t.extensions }} →</a></p>
+</section>
+
+<section class="make" aria-labelledby="make-title">
+  <div class="make-text">
+    <h2 id="make-title">{{ h.make_title }}</h2>
+    <p>{{ h.make_text | markdownify | remove: '<p>' | remove: '</p>' }}</p>
+    <p><a class="button" href="{{ root | append: 'create.html' | relative_url }}">{{ h.make_cta }}</a></p>
+  </div>
+  <div class="code-pair">
+<pre class="code" aria-label="user.css"><span class="file">themes/my-theme/user.css</span><code>.sidebar {
+  background: $card;
+  corner-radius: 12px;
+}
+.play-button:hover {
+  transform: scale(1.08);
+  transition: transform 160ms ease-out;
+}</code></pre>
+<pre class="code" aria-label="main.js"><span class="file">extensions/now-title/main.js</span><code>Ampify.player.on("trackchange", (state) =&gt; {
+  Ampify.notify({
+    title: state.track.title,
+    text: state.track.artist,
+  });
+});</code></pre>
+  </div>
+</section>
+
+<section class="safe" aria-labelledby="safe-title">
+  <h2 id="safe-title">{{ h.safe_title }}</h2>
+  <ul>
+  {%- for line in h.safe -%}<li>{{ line }}</li>{%- endfor -%}
+  </ul>
+</section>

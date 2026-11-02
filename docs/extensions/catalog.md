@@ -51,21 +51,34 @@ exports of each. `catalog.json` pins its address and SHA-256. `ampify versions u
 
 ## Publish an element
 
-1. Prepare the element's folder and check its manifest:
-   `python3 tools/validate.py manifest <folder>/manifest.json` (or `ampify validate <folder>`).
-2. Create the `.zip` archive of the folder, without the parent folder, and publish it on `https://` (for example in a
-   GitHub release). `ampify build <folder>` does this and prints the catalog entry. Publish with one tool only:
-   `tools/pack.py` writes a compressed zip with a different SHA-256. With `--catalog`, `tools/pack.py` also copies the
-   manifest's `preview` picture next to the archive, under the archive's name, and points the entry to it: publish the
-   picture with the archive.
-3. Compute its hash: `sha256sum <archive>.zip` (or `certutil -hashfile <archive>.zip SHA256` on Windows).
-4. Add the entry to `catalog.json` of ampify-catalog in a pull request, with the element's files in `sources/<id>/`
-   and the archive in `packages/` (that repository's README gives the exact `tools/pack.py` line).
-5. Validate the catalog: `python3 tools/validate.py catalog <ampify-catalog>/catalog.json`.
-6. A person reviews the code before the merge. This is the main protection against a malicious element.
+Three steps, with no clone of any repository:
 
-An update is a new entry with a new `version`, a new `url` and a new `sha256`. It goes through the same review. Removing
-an element is also done through a pull request.
+1. **Make it.** `ampify new <kind> <id>` gives a starter. For an update, raise `version` in the manifest.
+2. **Test it.** `ampify test <folder>` runs `main.js` against a fake host. `ampify validate <folder>` checks the manifest.
+3. **Publish it.** `ampify publish <folder>` (`--dry-run` to only see the plan). It runs the checks of `validate` and
+   `test`, then, with the GitHub CLI (`gh`) installed and signed in, forks ampify-catalog, puts the folder in
+   `sources/<id>/` on a branch `add-<id>-<version>`, and opens the pull request with the name, kind, version,
+   permissions and description filled in. It prints the address of the pull request. Without `gh`, it prints the steps
+   to follow in the browser. See [../cli.md](../cli.md).
+
+The pull request only adds or changes `sources/<id>/`. It does not touch `packages/` or `catalog.json`.
+
+**Review.** A check runs on every pull request (it uses `tools/validate.py` and `tools/pack.py` of this repository) and
+comments with the result. It refuses an element when its manifest is not valid, when its `version` is not higher than
+the one in the catalog, when its code calls an API whose permission is not declared (a heuristic that reads the code),
+when a script looks minified or obfuscated (a line of more than 400 characters, names like `_0x1f3a`), or when the pull
+request changes `packages/` or `catalog.json`. A person then reads the code before the merge. This is the main protection
+against a malicious element.
+
+**After the merge.** A bot (`github-actions[bot]`) packs each changed element with `tools/pack.py`, writes
+`packages/<id>-<version>.zip` and the preview picture next to it, replaces the entry in `catalog.json` (address
+`https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/packages/<id>-<version>.zip`, SHA-256 of the archive),
+validates the catalog and commits it to `main`. An archive never changes: if a version already published is changed
+without a new `version`, the bot stops with an error. Removing an element is done by a maintainer.
+
+By hand, without `ampify publish`: put the folder in `sources/<id>/` and open the pull request yourself; the bot does the
+rest. `ampify build <folder>` still writes a zip and its catalog entry for a catalog of your own (`--catalog`); the
+public catalog's archives are always packed by the bot, so publish there with `tools/pack.py` only.
 
 ## Trust
 

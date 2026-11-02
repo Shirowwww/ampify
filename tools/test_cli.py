@@ -137,6 +137,16 @@ class Basics(AmpifyTestCase):
         self.assertEqual(help_text.returncode, 0)
         self.assertIn("install <id>", help_text.stdout)
 
+    def test_help_of_one_command_shows_its_lines_only(self):
+        result = self.ampify("help", "install")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("install <id> [--yes]", result.stdout)
+        self.assertNotIn("doctor", result.stdout)
+        option = self.ampify("theme", "--help")
+        self.assertIn("theme    check <folder>", option.stdout)
+        self.assertIn("--scheme", option.stdout)
+        self.assertEqual(self.ampify("help", "nothing-like-this").returncode, 2)
+
     def test_docs_cli_lists_every_command_of_help(self):
         with open(os.path.join(ROOT, "docs", "cli.md"), encoding="utf-8") as handle:
             docs = handle.read()
@@ -836,6 +846,14 @@ class Build(AmpifyTestCase):
             self.assertEqual(sorted(bundle.namelist()), ["main.js", "manifest.json"])
         self.assertIn(sha256_of(out), result.stdout)
 
+    def test_build_refuses_a_starter_left_as_it_is(self):
+        self.assertEqual(self.ampify("new", "theme", "fresh-theme").returncode, 0)
+        result = self.ampify("build", os.path.join(self.tmp, "fresh-theme"))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("your-github-username", result.stderr)
+        self.assertIn("Describe it here.", result.stderr)
+        self.assertEqual(self.ampify("validate", os.path.join(self.tmp, "fresh-theme")).returncode, 0)
+
     def test_build_is_deterministic(self):
         folder = self.write_element("demo-same", "extension")
         first = os.path.join(self.tmp, "one.zip")
@@ -873,6 +891,65 @@ class Build(AmpifyTestCase):
         installed = self.ampify("install", "demo-built", *self.catalog_option(catalog), "--yes")
         self.assertEqual(installed.returncode, 0, installed.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.kit, "extensions", "demo-built", "manifest.json")))
+
+
+class Publish(AmpifyTestCase):
+    """The parts of `ampify publish` that need no network: the checks, --dry-run and the path without gh."""
+
+    def ampify_without_gh(self, *args):
+        empty = os.path.join(self.tmp, "empty-path")
+        os.makedirs(empty, exist_ok=True)
+        return subprocess.run(
+            [Ampify, "--kit-dir", self.kit, *args], capture_output=True, text=True, encoding="utf-8",
+            cwd=self.tmp, timeout=60, env={**os.environ, "PATH": empty},
+        )
+
+    def test_publish_needs_a_folder(self):
+        result = self.ampify("publish")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("publish needs the element folder", result.stderr)
+
+    def test_publish_refuses_a_starter_left_as_it_is(self):
+        self.assertEqual(self.ampify("new", "snippet", "fresh-snippet").returncode, 0)
+        result = self.ampify("publish", os.path.join(self.tmp, "fresh-snippet"), "--dry-run")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("nothing was sent", result.stderr)
+        self.assertIn("your-github-username", result.stderr)
+
+    def test_publish_refuses_an_invalid_element(self):
+        folder = self.write_element("demo-pub-bad", "extension")
+        os.remove(os.path.join(folder, "main.js"))
+        result = self.ampify("publish", folder, "--dry-run")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("invalid, nothing was sent", result.stderr)
+        self.assertIn("run ampify publish again", result.stderr)
+
+    def test_publish_refuses_an_element_whose_test_fails(self):
+        folder = self.write_element("demo-pub-broken", "extension", files={"main.js": "this is not (javascript\n"})
+        result = self.ampify("publish", folder, "--dry-run")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("The test failed, nothing was sent", result.stderr)
+
+    def test_dry_run_without_gh_prints_the_numbered_steps(self):
+        folder = self.write_element("demo-pub-steps", "extension", version="0.3.0", permissions=["notifications"])
+        result = self.ampify_without_gh("publish", folder, "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("nothing was sent", result.stdout)
+        self.assertIn("(gh) is not installed", result.stdout)
+        self.assertIn("1. Sign in to GitHub and open https://github.com/Shirowwww/ampify-catalog", result.stdout)
+        self.assertIn("sources/demo-pub-steps/", result.stdout)
+        self.assertIn("add-demo-pub-steps-0.3.0", result.stdout)
+        self.assertIn("not opened", result.stdout)
+
+    @unittest.skipUnless(shutil.which("gh"), "the GitHub CLI (gh) is not installed here")
+    def test_dry_run_with_gh_prints_the_plan_and_sends_nothing(self):
+        folder = self.write_element("demo-pub-plan", "theme", version="2.0.1")
+        result = self.ampify("publish", folder, "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--dry-run: nothing was sent.", result.stdout)
+        self.assertIn("2.0.1 (theme, demo-pub-plan)", result.stdout)
+        self.assertIn("create the branch add-demo-pub-plan-2.0.1", result.stdout)
+        self.assertIn("open a pull request on Shirowwww/ampify-catalog", result.stdout)
 
 
 class Inspection(AmpifyTestCase):
@@ -1176,8 +1253,9 @@ class Chaining(AmpifyTestCase):
         self.assertIn("ampify ", result.stdout)
         result = self.ampify("apply", "devtools", "launch", "--dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Inspector turned on", result.stdout)
+        self.assertIn("Inspector would be turned on", result.stdout)
         self.assertIn("ampify_launcher.exe", result.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.kit, "settings.txt")))
 
 
 class Paths(AmpifyTestCase):
@@ -1239,6 +1317,53 @@ class Devtools(AmpifyTestCase):
 
 
 class NewSettings(AmpifyTestCase):
+    def test_unknown_key_is_refused_with_the_known_ones(self):
+        result = self.ampify("config", "theme.activ", "glass")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("unknown setting: theme.activ", result.stderr)
+        self.assertIn("theme.active", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.kit, "settings.txt")))
+
+    def test_element_and_theme_setting_keys_are_accepted(self):
+        for key, value in (("themes.glass.frost", "0.5"), ("extensions.demo.color", "red"), ("player.apple", "0")):
+            result = self.ampify("config", key, value)
+            self.assertEqual(result.returncode, 0, key + ": " + result.stderr)
+
+    def test_a_key_not_set_shows_its_default(self):
+        result = self.ampify("config", "theme.live_reload")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "1")
+        self.assertIn("default", result.stderr)
+        result = self.ampify("config", "remote.port")
+        self.assertEqual(result.stdout.strip(), "8974")
+
+    def test_dry_run_is_refused_by_commands_that_would_write(self):
+        for args in (("config", "theme.active", "glass"), ("backup",), ("types",)):
+            result = self.ampify(*args, "--dry-run")
+            self.assertEqual(result.returncode, 2, args)
+            self.assertIn("--dry-run", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.kit, "settings.txt")))
+        self.assertFalse(os.path.exists(os.path.join(self.kit, "backups")))
+
+    def test_the_apple_tweak_keys_of_the_card_are_known(self):
+        for key, value in (("apple.notifications", "never"), ("apple.fullscreen", "replace"), ("apple.close", "tray")):
+            result = self.ampify("config", key, value)
+            self.assertEqual(result.returncode, 0, key + ": " + result.stderr)
+        self.assertEqual(self.ampify("config", "apple.close").stdout.strip(), "tray")
+
+    def test_restore_of_a_backup_under_dry_run_writes_nothing(self):
+        self.assertEqual(self.ampify("config", "theme.active", "glass").returncode, 0)
+        name = re.search(r"Backup created: (\S+)", self.ampify("backup").stdout).group(1)
+        self.assertEqual(self.ampify("config", "theme.active", "midnight").returncode, 0)
+        result = self.ampify("restore", "--backup", name, "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("theme.active = midnight", self.settings_text())
+
+    def test_apply_dry_run_writes_nothing(self):
+        result = self.ampify("apply", "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.kit, "active.txt")))
+
     def test_booleans_are_checked_and_stored_as_1_or_0(self):
         for key in ("check_kit_update", "expose_api", "theme.inspect", "theme.parts.assets"):
             self.assertEqual(self.ampify("config", key, "on").returncode, 0, key)

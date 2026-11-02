@@ -255,7 +255,7 @@ declare const Ampify: {
     parse(text: string): unknown;
     build(parts: unknown): string;
   };
-  icons: { get(name: string): string };
+  icons: { get(name: string): string; names(): string[] };
   color: {
     extract(pixels: ArrayLike<number> | ArrayBuffer, width: number, height: number): ExtractedColors;
     fromArtwork(url: string): Promise<ExtractedColors>;  // an artwork address of Apple Music, such as track.artwork
@@ -307,7 +307,7 @@ declare const Ampify: {
     TextField: AmpifyComponent<TextFieldProps>;
     Dropdown: AmpifyComponent<DropdownProps>;
     Card: AmpifyComponent<CardProps>;
-    List: AmpifyComponent<TooltipProps>;
+    List: AmpifyComponent;
     Text: AmpifyComponent<TextProps>;
     TextComponent: AmpifyComponent<TextProps>;
     Tooltip: AmpifyComponent<TooltipWrapperProps>;

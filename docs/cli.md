@@ -46,7 +46,7 @@ The "Spicetify" column gives the equivalent.
 | `ampify versions [list]` | Apple Music versions the kernel accepts, and the installed one | none |
 | `ampify versions update` | Downloads the list of tested versions published with the catalog and writes `versions.txt` | restore after an update |
 | `ampify install-kit <version>` | Installs a specific Ampify version, even an older one (SHA-256 checked) | old versions |
-| `ampify version`, `ampify help` | | `--version`, `help` |
+| `ampify version`, `ampify help [command]` | `help <command>` (or `<command> --help`) shows the lines of that command only | `--version`, `help` |
 | `ampify backup apply launch` | Several commands in a row, see "Chaining commands" | `spicetify backup apply` |
 
 ### Elements: extensions, snippets, apps, themes
@@ -79,6 +79,7 @@ The "Spicetify" column gives the equivalent.
 | `ampify update` | Checks the latest Ampify release, downloads it, checks the SHA-256 |
 | `ampify update --check` | Only says whether a newer version exists |
 | `ampify update --apply` | Installs the downloaded version. Apple Music must be closed |
+| `ampify publish <folder> [--dry-run]` | For authors: checks an element, then opens a pull request on the public catalog, with no clone. See "Authoring, diagnosis and transfers" |
 
 `ampify inspect` shows the last interface tree written by the kernel. A live tree of the interface (`Ampify.React`) is not
 available yet.
@@ -89,7 +90,7 @@ available yet.
 |---|---|
 | `--kit-dir <folder>` | Ampify folder. Default `%USERPROFILE%\Ampify` |
 | `--catalog <source>` | Catalog: a local file, `file://` or `https://`. Default is the repository's catalog |
-| `--dry-run` | Prints the command that would run, without running it |
+| `--dry-run` | Shows what would happen and writes nothing. Works with `apply`, `launch`, `restore`, `import`, `publish`, `devtools` and `config --dir`; any other command refuses it rather than run for real. With `publish`: checks the element and prints the plan, with no network call |
 | `--yes`, `-y` | Answers yes to questions (install, update) |
 | `--check` | With `update`: only checks |
 | `--apply` | With `update`: installs the downloaded update |
@@ -148,6 +149,13 @@ Settings known to `ampify config`:
 | `midi.enabled` | `1` or `0`: read a MIDI controller | `0` |
 | `midi.device` | Number of the MIDI device, 0 to 255 | `0` |
 | `midi.map` | Keys linked to Ampify commands, e.g. `note:60=next;note:62=previous;cc:7=gain` | empty |
+| `audio.maxGainDb` | Highest gain an extension may add to the samples, 0 to 12 dB | `6` |
+| `player.apple` | `1` or `0`: read the player from Apple Music itself; at `0`, from Windows' media session only | `1` |
+| `player.appleCommands` | `1` or `0`: send play, pause and seek to Apple Music's own player instead of Windows' media session | `0` |
+| `themes.<id>.<key>`, `extensions.<id>.<key>` | The settings a theme or an extension declares in its manifest | the element's default |
+
+`ampify config <key>` prints the value; for a key that is not set, it prints the default and says so on the error
+stream. A key that is not in this table is refused, with the list of known keys: a typo no longer goes unnoticed.
 
 The services (`discord`, `tray`, `remote`, `midi`) are all off by default. They are described in
 [extensions/api.md](extensions/api.md), section 5.7. The kernel reads them when Apple Music starts: restart the app after
@@ -272,6 +280,16 @@ are fixed: the same folder always gives the same file. It refuses to overwrite a
 name starts with a dot are not included. **`ampify build` is the reference tool to publish**: an author only needs
 `ampify`, with no Python. `tools/pack.py` stays for the repository's CI. Its (compressed) zip has a different SHA-256, so
 publish with one of the two tools only.
+
+`publish <folder> [--dry-run]` sends an element to the public catalog ([extensions/catalog.md](extensions/catalog.md)). It
+runs the checks of `validate`, then `test` when the manifest has a `main` file, and stops at the first problem without
+sending anything. With the [GitHub CLI](https://cli.github.com) (`gh`) installed and signed in, it forks
+`Shirowwww/ampify-catalog` (or reuses your fork), creates the branch `add-<id>-<version>`, puts the folder in
+`sources/<id>/` through the GitHub API (the files of a previous version that are no longer in the folder are removed), and
+opens the pull request with the name, kind, version, permissions and description filled in. It prints the address of the
+pull request. No `git` and no clone are needed. Run again after an interruption: the branch and the files already sent are
+reused. Without `gh`, or when `gh` is not signed in, it prints numbered steps to do by hand and opens the catalog page in
+the browser. `--dry-run` runs the checks, prints what it would do, and makes no network call.
 
 `inspect <folder>` or `inspect <kind> <id>` prints the manifest, the permissions, the activation state (for an installed
 element), and each file with its size and SHA-256. `inspect --tree` prints the last interface tree written by the kernel

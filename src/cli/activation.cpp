@@ -25,14 +25,17 @@ int ApplyNow(Context& ctx, const std::vector<std::string>& restarts) {
     if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
 
     ActiveReport report = ComputeActive(ctx.kit, settings);
-    if (!WriteTextFile(ctx.kit.Active(), FormatActive(report), error)) return Failure(ctx, error);
+    if (!ctx.options.dryRun) {
+        if (!WriteTextFile(ctx.kit.Active(), FormatActive(report), error)) return Failure(ctx, error);
 
-    // The kernel and the interface watch this file to know that something changed: a counter line, then the restart
-    // requests of ampify dev. Lines are added, so a request that the kernel has not read yet stays in the file.
-    auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
-    std::vector<std::string> requests = {std::to_string(stamp.count())};
-    for (const std::string& target : restarts) requests.push_back("restart " + target);
-    if (!AppendReloadRequests(ctx.kit, requests, error)) return Failure(ctx, error);
+        // The kernel and the interface watch this file to know that something changed: a counter line, then the
+        // restart requests of ampify dev. Lines are added, so a request the kernel has not read yet stays in the file.
+        auto stamp =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+        std::vector<std::string> requests = {std::to_string(stamp.count())};
+        for (const std::string& target : restarts) requests.push_back("restart " + target);
+        if (!AppendReloadRequests(ctx.kit, requests, error)) return Failure(ctx, error);
+    }
 
     for (const ActiveItem& item : report.items) {
         ctx.out << "  loads     " << item.kind << " " << item.id << " " << item.version;
@@ -77,6 +80,10 @@ int TurnAutoStartOn(Context& ctx) {
 
 int CmdApply(Context& ctx) {
     int code = ApplyNow(ctx);
+    if (ctx.options.dryRun) {
+        ctx.out << "--dry-run: nothing was written.\n";
+        return code;
+    }
     int started = TurnAutoStartOn(ctx);
     ctx.out << "Apple Music picks the changes up while it runs, or at its next start.\n";
     return code != 0 ? code : started;
@@ -112,6 +119,11 @@ int CmdRestore(Context& ctx) {
     if (args.size() > 1) return Usage(ctx, "restore takes --backup <name>, not an argument");
 
     if (ctx.options.backup) {
+        if (ctx.options.dryRun) {
+            ctx.out << "Would restore the settings from backup " << *ctx.options.backup
+                    << ". --dry-run: nothing was written.\n";
+            return 0;
+        }
         std::string error;
         if (!RestoreBackup(ctx.kit, *ctx.options.backup, error)) return Failure(ctx, error);
         ctx.out << "Settings restored from backup " << *ctx.options.backup

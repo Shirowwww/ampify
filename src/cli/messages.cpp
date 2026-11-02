@@ -55,6 +55,7 @@ Applying
 
 Authoring and development
   build <folder> [file.zip]            builds an element: checks it, writes the zip, gives the SHA-256 and the catalog entry
+  publish <folder> [--dry-run]         checks and tests an element, then opens a pull request on the public catalog (needs gh)
   inspect <folder> | <type> <id>       shows the manifest, the files and their SHA-256
   inspect --tree                       shows the last interface tree written by the kernel
   devtools [on|off]                    asks the kernel to write the interface tree (logs\inspector.txt)
@@ -76,13 +77,15 @@ Profiles and transfers
 Options
   --kit-dir <folder>           Ampify folder (%USERPROFILE%\Ampify by default)
   --catalog <source>           catalog: local file, file:// or https://
-  --dry-run                    prints the command that would run, without running it
+  --dry-run                    shows what would happen and writes nothing (apply, launch, restore, import,
+                               publish, devtools, config --dir; other commands refuse it)
   --yes, -y                    answers yes to every question
   --max-cycles <n>             stops watch, dev or logs --follow after n passes (useful for tests)
   --follow                     logs: keeps printing new lines
   --json                       market: prints the state as JSON (read by the Marketplace app)
   --version, --help
 
+One command only: ampify help <command> (or ampify <command> --help)
 Documentation: docs/cli.md
 )";
 
@@ -95,7 +98,7 @@ constexpr i18n::Message kCli[] = {
     {"unknownAction", "unknown action: {action}"},
     {"needsId", "{action} needs an id"},
     {"tooManyArgs", "too many arguments for {command}"},
-    {"invalidId", "invalid id: {id}"},
+    {"invalidId", "invalid id: {id} (lowercase letters, digits and hyphens, 2 to 40 characters, starting with a letter or a digit)"},
     {"missingKey", "key not set: {key}"},
     {"version", "ampify {version} (extension API 1.0)"},
     {"chainStopped", "\"{command}\" failed, the next commands are not run"},

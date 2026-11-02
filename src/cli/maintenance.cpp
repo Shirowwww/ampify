@@ -65,6 +65,11 @@ int CmdDevtools(Context& ctx) {
     if (args.size() > 2) return Usage(ctx, "devtools takes on, off, or nothing (for on)");
     std::string action = args.size() == 2 ? args[1] : "on";
     if (action != "on" && action != "off") return Usage(ctx, "devtools takes on or off, not " + action);
+    if (ctx.options.dryRun) {
+        ctx.out << "Inspector would be turned " << action << " (theme.inspect = " << (action == "on" ? 1 : 0)
+                << "). --dry-run: nothing was written.\n";
+        return 0;
+    }
 
     Settings settings;
     std::string error;
