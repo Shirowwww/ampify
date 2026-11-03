@@ -81,8 +81,9 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
 
     // Everything that changes what is applied goes into the key. A new key is a new generation.
     std::map<std::string, std::string> values = ReadThemeValues(settings, wanted.active);
+    std::optional<Argb> accent = ParseAccent(wanted.accent);
     std::string key = (wanted.active.empty() ? std::string("none") : wanted.active) + "|" + m_scheme.scheme + "|" +
-                      PartsKey(wanted.parts) + "|";
+                      PartsKey(wanted.parts) + "|" + (accent ? ToXamlColor(*accent) : std::string("-")) + "|";
     for (const auto& [name, value] : values) key += name + "=" + value + ",";
     key += "|";
     std::map<std::string, std::map<std::string, std::string>> snippetValues;
@@ -120,12 +121,17 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
         options.allowedKeys = allowed ? &*allowed : nullptr;
         options.settings = values;
         options.artwork = usesArtwork ? m_artwork : std::map<std::string, std::string>{};
+        options.accent = accent;
 
         if (!wanted.active.empty()) {
             FolderFiles files(themeFolder);
             Theme theme = LoadTheme(wanted.active, themeFolder.generic_string(), files, options);
             for (const std::string& problem : m_scheme.problems) theme.problems.push_back(problem);
             request.theme = std::make_shared<const Theme>(std::move(theme));
+        } else if (accent) {
+            // No theme, but an accent: Apple Music's look in that accent.
+            request.themeId = kAccentOnlyId;
+            request.theme = std::make_shared<const Theme>(LoadAccentOnly(options));
         }
 
         const Theme* base = request.theme && request.theme->usable ? request.theme.get() : nullptr;

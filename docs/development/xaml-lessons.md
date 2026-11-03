@@ -48,6 +48,7 @@ Problems met while drawing inside Apple Music, and what fixed them. Read this be
 | The album artist stayed Apple blue under every theme, although the inspector showed the theme's colour on its `TextBlock` | The name is a `Hyperlink` inside the `TextBlock`, its runs keep their own colour, and Apple Music fills the link after the theme's first pass | A text colour also goes to the inlines of a text that holds a link, and is read back from its last run, so a later pass sees the difference and writes again |
 | A theme without colours (Hide chrome) turned a dark Apple Music light | The app mode was set from the scheme name, light when there was none | The mode follows the theme's `dark` flag, then its scheme name, and is left alone when neither says anything (`AppModeOf`) |
 | Glass: a button under the pointer showed Apple Music's red under black text | The theme gave `AccentFillColorDefaultBrush` only; the pointer-over and pressed states use `AccentFillColorSecondaryBrush` and `...TertiaryBrush` | Both are worked out from the accent at 90% and 80%, as Fluent does, unless the theme names them |
+| The artwork's colours (`--art-*`, Cover ambience) followed a new song 3 to 6 seconds late | The play bar's image was found only by the tick's walk, and the service's thread read its colours at the start of the next tick | The image is followed through `ImageOpened` and its `Source`, and new colours wake the service (a condition variable): the halo changes about 0.2 s after the song |
 | Settings pages stayed grey (#1C1C1C) and their toggles and sliders Apple blue under every theme | Each settings page is a class of its own (`PlaybackSettingsPage`...) whose background Apple sets in code; WinUI's `ToggleSwitchFillOn`, `SliderTrackValueFill`... are set from the accent once, when its dictionaries load | The settings pages are `.page` too, and the control keys are worked out from the theme's accent (`DefineAccentControls`) |
 
 The application dictionary has only one key of its own (`ContentPageShadow`). Colors are in merged and theme dictionaries.
@@ -71,7 +72,9 @@ keys into the control's resources works before and after the groups exist.
 | About a hundred native controls rebuilt when a status line appeared above the Marketplace cards | The kernel matched nodes by position, and React keys stayed in the script's tree | The key of a React element goes on the nodes it draws |
 | A kit page title looked like body text | No type ramp in the renderer | `title` 28 px and `subtitle` 20 px, semibold, as in Apple Music's own pages |
 | Folded sidebar with floating panels: the start of the account name showed, and the panel covered the page's edge | The folded `SplitView` clips `Grid#PaneRoot` to `CompactPaneLength` counted from the pane's own edge, so its left margin pushes the visible part into the page column instead of shrinking it | `compact-pane-length: 48`, and the space between the panels taken by the page's left margin (two gaps) with a negative right margin on the sidebar (one gap) |
-| Floating panels: the back arrow sat across the sidebar panel's rounded corner, half on the window | Apple pins `Button#NavigationViewBackButton` to the window's corner (margin 4,0,0,0); the panel starts one gap in | `floating-panels` moves `.back-button` one gap down and in, on the line of the app's name |
+| Floating panels: the back arrow sat across the sidebar panel's rounded corner, half on the window | Apple pins `Button#NavigationViewBackButton` to the window's corner (margin 4,0,0,0); the panel starts one gap in | `floating-panels` moves `.back-button` one gap in, and down to the middle of the app's logo (one gap less 1; one gap and 4 left it 5 pixels low, measured at 125%) |
+| Bottom bar: the buttons sat about 30 pixels left of the window's middle, the volume a column short of the right edge, and themes collapsed the window buttons' column by hand | The middle buttons and the extras spanned only the columns left of Apple's caption-button cover | `bottom-bar` spans `.playbar-controls` and `.playbar-extras` across all four columns and collapses `.caption-buttons-cover`; the times sit under the scrubber's ends |
+| `.sidebar-item:hover` lit the group above as well (Library while over Artists) | A parent `NavigationViewItem` holds its children, so `PointerEntered` fires on it too | The hover of an item counts only when the pointer's own row is under it: the first `NavigationViewItem` above `OriginalSource` must be the item itself (`PointerOnOwnRow`), checked again on `PointerMoved` |
 | Bottom bar: the song's artwork flush against the window's left and bottom edges, its placeholder stretched to the bar's height | The display filled its column from the window's edge | `bottom-bar` gives `.now-playing` a gap on the left and 4 above and below: the 54-pixel artwork is square again |
 | Apple's logo over the song's title after leaving a theme that hid it | Apple binds `Image#Apple`'s visibility to what plays, a local value: the engine recorded "Visible" before the theme and wrote it back when the theme went | Hide it by `opacity: 0`, which Apple leaves alone, so the engine clears it instead of restoring a stale value |
 | Extension panels stayed in Fluent's grey under every theme | Their frame reads `AcrylicInAppFillColorDefaultBrush`, which no theme names | The engine derives the acrylic fills from the theme's card colour when it is opaque |
@@ -88,6 +91,8 @@ dozens of times. Always target them under a named parent.
 | An element with a theme `transform` refused its `@keyframes` rotation; most artworks refused an animated scale | `UIElement.Scale`, `Rotation`, `Translation` and `CenterPoint` cannot be used with `RenderTransform` or `RenderTransformOrigin` on the same element: `StartAnimation` throws. Apple Music moves many artworks itself. `Opacity` is not part of the rule | The animation is refused with a line in the log, and `format.md` tells creators to put the transform in the stops |
 | A finite animation without `forwards` stayed on its last frame | A completed composition animation leaves the property at its final value | It runs with `IterationBehavior::Forever` and `StopBehavior::SetToInitialValue`, and a `DispatcherQueueTimer` stops it when its iterations end |
 | Rotation around the top left corner | `CenterPoint` is 0,0 by default, and the element may not be laid out yet when the animation starts | An expression animation on `CenterPoint` reads `this.Target.ActualSize` (documented as an expression input), so the centre follows the size |
+| Glass: a sidebar entry jumped 6 pixels on hover, and back, from one entry to the next | `NavigationViewItem` refuses the facade's transitions (Apple Music animates it), so `transition: transform` was refused and each hover change applied at once | The transform eases on Ampify's `CompositeTransform` through a Storyboard, from where it is (`WriteStoryTransform`); `opacity` and `background` stay refused there |
+| A button that grows on hover grew towards its bottom right corner | XAML scales around the top left corner, CSS around the centre | A `CompositeTransform` whose element has no origin of the theme's turns around its centre (`CentreOn`) |
 | Text glyphs moved by `translate` vanished from the playback bar | The buttons clip their content | Not a bug: a theme should translate the button, not its glyph |
 
 ## Fonts and icons
@@ -128,6 +133,13 @@ A `WH_GETMESSAGE` hook never fired on Windows Server 2025; the DispatcherQueue w
   shows. Look for a fixed 64 (`Height=64`, a margin of 64) when something sits lower than its panel's top.
 - Apple paints some surfaces in code with a fixed colour, out of any key: the search's top-result tiles (`#FF282828`),
   an album's artist (its blue). Only a rule on the element reaches them (Ampify derives one from the theme's colours).
+- The progress bar (`AMP.UI.Controls.ScrubberControl`) is a Slider whose template reads keys of Apple's own, at rest
+  too: `ScrubberDecreaseRectFill` / `PointerOver` / `PressedFill` / `Disabled` (played part), `ScrubberTrackRectFill` /
+  `PointerOver` / `Pressed` / `Disabled` (the rest), `ScrubberThumbNormal` / `PointerOver` / `Pressed` / `Disabled`.
+  The mini player defines them, and the Slider keys, in its own dictionary over the application's, so neither the
+  control's `Foreground` nor a theme's keys reached the bar. `HoldThroughStates` writes them in the bar's own resources
+  (found in `resources.pri`; checked on 03/11/2026: Glass 4FD1FF, Catppuccin CBA6F7 at rest, hovered and pressed, where
+  Apple's white stayed before). The volume slider reads WinUI's Slider keys and followed the accent already.
 - WinUI resolves `ToggleButtonBackgroundChecked`, `AccentButtonBackground` and `AccentButtonForeground` from the accent
   once, when its dictionaries load, like the other accent keys: a theme's accent alone left the checked lyrics and queue
   buttons in Windows' blue and white text on a light accent. They are derived from the accent with the rest.
@@ -139,6 +151,14 @@ A `WH_GETMESSAGE` hook never fired on Windows Server 2025; the DispatcherQueue w
 - Apple's main window closes through `WM_CLOSE` (title bar button, Alt+F4, the taskbar), which WinUI turns into
   `AppWindow.Closing`. A subclass of the main window that answers `WM_CLOSE` itself keeps Apple Music from starting
   to shut down; `ShowWindow(SW_HIDE)` then hides it and the music goes on (`src/win/close_to_tray.cpp`).
+- Scrolling the Home page moves in steps with or without Ampify: each wheel notch starts fast and slows down, and after a
+  few minutes of browsing the interface thread stalls for about 240 ms at a time while new shelves load (measured on
+  02/11/2026, the same in Apple Music alone). Ampify's passes after new rows add 1 to 4 seconds a minute of that thread
+  while browsing, logged as "passes after changes in the last minute" when above 200 ms.
+- XAML Diagnostics (`xaml.watcher`, `src/win/xaml_watcher.cpp`) works in 1.1792 and made no screen flash in 3,000 frames
+  of browsing and scrolling. Apple Music does not expose the hooks that release the handles it gives, so it keeps a
+  record of every element added (130,000 in five minutes): browsing rounds took 87 s instead of 55 s by the third, and UI
+  Automation calls stalled up to 2.8 s. Off by default for that reason; frames, lists and popups already ask for a pass.
 - First start: an MPEG LA licence (buttons Agree, Decline, Save As) shows before the main window, then, after sign-in, a
   "Welcome to Apple Music" screen (Start Listening). No XAML window exists while they are open. The bench closes them
   through UI Automation.

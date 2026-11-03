@@ -104,7 +104,30 @@ struct UiSide {
     std::size_t heldStates = 0;  // the counts last written to the log
     std::size_t refusedStates = 0;
     std::shared_ptr<const theme::Theme> fontsOf;  // what the published font roles come from (null: the defaults)
+    // The passes after changes over the current minute: how many, and how long they held the interface thread.
+    std::chrono::steady_clock::time_point minuteStart = std::chrono::steady_clock::now();
+    int minutePasses = 0;
+    std::chrono::steady_clock::duration minuteBusy{};
 };
+
+// Once a minute, when the passes after changes held the interface thread long enough to be felt (a scroll that builds
+// cards asks for one every few frames), their count and total go to the log.
+static void NoteMinute(UiSide& side, std::chrono::steady_clock::time_point now, std::chrono::steady_clock::duration busy,
+                       Journal& journal) {
+    constexpr auto kMinute = std::chrono::minutes(1);
+    constexpr auto kFelt = std::chrono::milliseconds(200);
+    side.minutePasses++;
+    side.minuteBusy += busy;
+    if (now - side.minuteStart < kMinute) return;
+    if (side.minuteBusy >= kFelt) {
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(side.minuteBusy).count();
+        journal.Write("Themes: " + std::to_string(side.minutePasses) + " passes after changes in the last minute, " +
+                      std::to_string(ms) + " ms in all");
+    }
+    side.minuteStart = now;
+    side.minutePasses = 0;
+    side.minuteBusy = {};
+}
 
 ThemeService::ThemeService(Journal& journal, std::filesystem::path kit)
     : m_journal(journal), m_kit(std::move(kit)), m_ui(std::make_shared<UiSide>(journal)) {}
@@ -175,13 +198,18 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                     if (!side || side->backend.WindowClosed()) return;
                     auto start = std::chrono::steady_clock::now();
                     side->session.Reapply(side->backend);
-                    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        std::chrono::steady_clock::now() - start);
+                    auto end = std::chrono::steady_clock::now();
+                    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+                    NoteMinute(*side, end, end - start, journal);
                     bool worthLogging = side->timedPasses < kTimedPasses || ms.count() > kSlowPassMs;
                     if (worthLogging && side->timedPasses < kMaxTimedPasses) {
                         side->timedPasses++;
                         journal.Write("Themes: pass after a change, " + std::to_string(ms.count()) + " ms");
                     }
+                });
+                // With xaml.watcher, every element WinUI adds asks for that pass too.
+                SetXamlWatcherListener([weak] {
+                    if (std::shared_ptr<UiSide> side = weak.lock()) side->backend.ElementAdded();
                 });
             }
             if (ui->backend.WindowClosed()) return;
@@ -225,8 +253,14 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             }
         });
 
+        // A new song's colours end the wait at once: the theme that names them follows the song without a tick's delay.
         for (auto waited = std::chrono::milliseconds(0); m_running && waited < kTick; waited += kChangeCheck) {
-            std::this_thread::sleep_for(kChangeCheck);
+            {
+                std::unique_lock<std::mutex> lock(artwork->lock);
+                if (artwork->changed.wait_for(lock, kChangeCheck, [&] { return artwork->variables != lastArtwork; })) {
+                    break;
+                }
+            }
             if (ChangeStamp(m_kit) != stamp) break;
         }
     }

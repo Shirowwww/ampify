@@ -4,15 +4,19 @@
 
 #include <windows.h>
 
+#include <functional>
+
 #include "../core/journal.hpp"
 
 namespace ampify::win {
 
-// Trial of XAML Diagnostics in Apple Music (setting xaml.watcher = 1, off by default): asks WinUI to tell Ampify of
-// every element added to or removed from the tree, instead of finding them by walking it. For now it only logs what
-// it is told, to measure whether it works and holds; the themes still follow pages as before. Call it once, from a
-// thread that is not the interface thread, after the main window exists.
+// XAML Diagnostics in Apple Music (setting xaml.watcher = 1): asks WinUI to tell Ampify of every element added to the
+// tree, so a theme reaches it at once instead of at the next tick. Call it once, from a thread that is not the
+// interface thread, after the main window exists.
 void StartXamlWatcher(Journal& journal, HINSTANCE kernel);
+
+// Called on the interface thread for each element added, once the watcher runs. Set it from that thread.
+void SetXamlWatcherListener(std::function<void()> added);
 
 }  // namespace ampify::win
 

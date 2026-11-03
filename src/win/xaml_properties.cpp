@@ -76,6 +76,33 @@ void PaintLinks(const controls::TextBlock& text, const media::Brush* brush) {
     }
 }
 
+winrt::Windows::Foundation::TimeSpan Milliseconds(double ms) {
+    return std::chrono::duration_cast<winrt::Windows::Foundation::TimeSpan>(std::chrono::duration<double, std::milli>(ms));
+}
+
+// A storyboard easing the transform's scale, rotation and translation from `from` to `to`, empty when nothing moves.
+animation::Storyboard EaseTransform(const media::CompositeTransform& transform, const double (&from)[5],
+                                    const std::vector<double>& to, double ms) {
+    animation::Storyboard story;
+    animation::CubicEase ease;
+    ease.EasingMode(animation::EasingMode::EaseOut);
+    auto duration = xaml::DurationHelper::FromTimeSpan(Milliseconds(ms));
+    constexpr const wchar_t* kParts[5] = {L"ScaleX", L"ScaleY", L"Rotation", L"TranslateX", L"TranslateY"};
+    for (int i = 0; i < 5; i++) {
+        if (from[i] == to[i]) continue;
+        animation::DoubleAnimation part;
+        part.From(from[i]);
+        part.To(to[i]);
+        part.Duration(duration);
+        part.EasingFunction(ease);
+        part.FillBehavior(animation::FillBehavior::Stop);  // the local value, already the target, shows after
+        animation::Storyboard::SetTarget(part, transform);
+        animation::Storyboard::SetTargetProperty(part, kParts[i]);
+        story.Children().Append(part);
+    }
+    return story;
+}
+
 }  // namespace
 
 std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::string_view property) {
@@ -234,10 +261,6 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
 bool XamlTreeBackend::WriteTransition(theme::NodeId id, const xaml::DependencyObject& object, const theme::Value& value) {
     auto element = object.try_as<xaml::UIElement>();
     if (!element) return false;
-    auto span = [](double ms) {
-        return std::chrono::duration_cast<winrt::Windows::Foundation::TimeSpan>(
-            std::chrono::duration<double, std::milli>(ms));
-    };
     // "transform:200;opacity:150;background:300": duration in ms by property.
     std::map<std::string, double, std::less<>> durations;
     for (const std::string& item : Split(value.text, ';')) {
@@ -264,14 +287,14 @@ bool XamlTreeBackend::WriteTransition(theme::NodeId id, const xaml::DependencyOb
         xaml::ScalarTransition opacity = before.opacity;
         if (auto ms = durations.find("opacity"); ms != durations.end()) {
             opacity = xaml::ScalarTransition();
-            opacity.Duration(span(ms->second));
+            opacity.Duration(Milliseconds(ms->second));
         }
         element.OpacityTransition(opacity);
 
         xaml::BrushTransition background = before.background;
         if (auto ms = durations.find("background"); ms != durations.end()) {
             background = xaml::BrushTransition();
-            background.Duration(span(ms->second));
+            background.Duration(Milliseconds(ms->second));
         }
         if (panel) panel.BackgroundTransition(background);
         else if (border) border.BackgroundTransition(background);
@@ -282,17 +305,29 @@ bool XamlTreeBackend::WriteTransition(theme::NodeId id, const xaml::DependencyOb
         xaml::Vector3Transition translation = before.translation;
         if (auto ms = durations.find("transform"); ms != durations.end()) {
             scale = xaml::Vector3Transition();
-            scale.Duration(span(ms->second));
+            scale.Duration(Milliseconds(ms->second));
             rotation = xaml::ScalarTransition();
-            rotation.Duration(span(ms->second));
+            rotation.Duration(Milliseconds(ms->second));
             translation = xaml::Vector3Transition();
-            translation.Duration(span(ms->second));
+            translation.Duration(Milliseconds(ms->second));
         }
         element.ScaleTransition(scale);
         element.RotationTransition(rotation);
         element.TranslationTransition(translation);
     } catch (...) {
-        return false;  // an element Apple Music drives through its composition visual refuses these properties
+        // An element Apple Music drives through its composition visual refuses these properties. A transition of the
+        // transform alone still eases, on its RenderTransform (WriteStoryTransform); any other is refused.
+        auto transform = durations.find("transform");
+        if (!value.text.empty() && (transform == durations.end() || durations.size() != 1)) return false;
+        m_transitionOriginals.erase(id);
+        if (value.text.empty()) {
+            m_storyDurations.erase(id);
+            m_transitions.erase(id);
+        } else {
+            m_storyDurations[id] = transform->second;
+            m_transitions[id] = value.text;
+        }
+        return true;
     }
     if (value.text.empty()) {
         m_transitions.erase(id);
@@ -318,7 +353,7 @@ bool XamlTreeBackend::WriteAnimatedTransform(theme::NodeId id, const xaml::UIEle
         // CSS scales around the centre by default, XAML around the top left corner: an origin left at 0,0 means the
         // theme did not choose one.
         auto origin = OriginOf(id, element);
-        if (origin.X == 0 && origin.Y == 0) origin = {0.5f, 0.5f};
+        if (origin.X == 0 && origin.Y == 0 && m_facadeOrigins.count(id) == 0) origin = {0.5f, 0.5f};
         auto size = element.ActualSize();
         element.CenterPoint({size.x * origin.X, size.y * origin.Y, 0});
         element.Scale({static_cast<float>(parts[0]), static_cast<float>(parts[1]), 1});
@@ -339,6 +374,103 @@ bool XamlTreeBackend::WriteAnimatedTransform(theme::NodeId id, const xaml::UIEle
 winrt::Windows::Foundation::Point XamlTreeBackend::OriginOf(theme::NodeId id, const xaml::UIElement& element) const {
     auto kept = m_facadeOrigins.find(id);
     return kept != m_facadeOrigins.end() ? kept->second : element.RenderTransformOrigin();
+}
+
+// A CompositeTransform turns around the element's RenderTransformOrigin by itself. Its centre takes the origin the
+// element refused, or the middle when none was chosen: CSS scales from the centre, XAML from the top left corner (a
+// hovered button grew towards its bottom right corner).
+void XamlTreeBackend::CentreOn(theme::NodeId id, const xaml::UIElement& element,
+                               const media::CompositeTransform& transform) const {
+    winrt::Windows::Foundation::Point origin = OriginOf(id, element);
+    bool refused = m_facadeOrigins.count(id) > 0;
+    if (!refused && (origin.X != 0 || origin.Y != 0)) return;
+    if (!refused) origin = {0.5f, 0.5f};
+    auto size = element.ActualSize();
+    transform.CenterX(size.x * origin.X);
+    transform.CenterY(size.y * origin.Y);
+}
+
+// For an element Apple Music animates itself, whose facade refuses the transitions: the transform eases from where it
+// is to the theme's value on Ampify's CompositeTransform, a Storyboard WinUI runs off the interface thread. Back to the
+// value from before the theme (Opaque), it eases to no transform, then puts that value back.
+bool XamlTreeBackend::WriteStoryTransform(theme::NodeId id, const xaml::UIElement& element, const theme::Value& value,
+                                          double ms) {
+    std::vector<double> target{1, 1, 0, 0, 0};
+    if (value.kind == theme::ValueKind::Transform) {
+        target = Numbers(value.text, ',');
+        if (target.size() != 5) return false;
+    } else if (value.kind != theme::ValueKind::Opaque) {
+        return false;
+    }
+    try {
+        media::CompositeTransform transform{nullptr};
+        if (auto ours = m_storyTransforms.find(id);
+            ours != m_storyTransforms.end() && ComIdentity(element.RenderTransform()) == ComIdentity(ours->second)) {
+            transform = ours->second;
+        }
+        if (!transform) {
+            if (value.kind == theme::ValueKind::Opaque) return false;  // nothing of Ampify's to ease back
+            transform = media::CompositeTransform();
+            element.RenderTransform(transform);
+            m_storyTransforms[id] = transform;
+        }
+        CentreOn(id, element, transform);
+        // Read before stopping the last storyboard, which would put its end values back.
+        const double from[5] = {transform.ScaleX(), transform.ScaleY(), transform.Rotation(), transform.TranslateX(),
+                                transform.TranslateY()};
+        if (auto running = m_stories.find(id); running != m_stories.end()) {
+            running->second.Stop();
+            m_stories.erase(running);
+        }
+        transform.ScaleX(target[0]);
+        transform.ScaleY(target[1]);
+        transform.Rotation(target[2]);
+        transform.TranslateX(target[3]);
+        transform.TranslateY(target[4]);
+
+        animation::Storyboard story = EaseTransform(transform, from, target, ms);
+        Remember(id, "RenderTransform", value, transform);
+        bool back = value.kind == theme::ValueKind::Opaque;
+        IInspectable original = back ? Restore(value) : nullptr;
+        if (story.Children().Size() == 0) {
+            if (back) {
+                m_storyTransforms.erase(id);
+                Forget(id, "RenderTransform");
+                element.RenderTransform(original.try_as<media::Transform>());
+            }
+            return true;
+        }
+        // The handler knows its storyboard by address only: holding it would keep both alive for good.
+        void* self = winrt::get_abi(story);
+        winrt::weak_ref<xaml::UIElement> weak = winrt::make_weak(element);
+        std::weak_ptr<bool> alive = m_alive;
+        story.Completed([this, alive, id, self, back, weak, original](IInspectable const&, IInspectable const&) noexcept {
+            try {
+                if (alive.expired()) return;
+                auto running = m_stories.find(id);
+                if (running == m_stories.end() || winrt::get_abi(running->second) != self) return;  // a newer motion
+                m_stories.erase(running);
+                if (!back) return;
+                // Only over Ampify's transform: a theme value written since, by another path, stays.
+                auto ours = m_storyTransforms.find(id);
+                xaml::UIElement live = weak.get();
+                if (ours == m_storyTransforms.end() || !live ||
+                    ComIdentity(live.RenderTransform()) != ComIdentity(ours->second)) {
+                    return;
+                }
+                m_storyTransforms.erase(ours);
+                Forget(id, "RenderTransform");
+                live.RenderTransform(original.try_as<media::Transform>());
+            } catch (...) {
+                // nothing may escape into Apple Music's XAML; the next write of this transform puts it right
+            }
+        });
+        m_stories[id] = story;
+        story.Begin();
+    } catch (...) {
+        return false;
+    }
+    return true;
 }
 
 bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, const theme::Value& value) {
@@ -590,6 +722,10 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
             WriteAnimatedTransform(id, element, value)) {
             return true;
         }
+        if (auto story = m_storyDurations.find(id);
+            story != m_storyDurations.end() && WriteStoryTransform(id, element, value, story->second)) {
+            return true;
+        }
         if (value.kind == theme::ValueKind::Transform) {
             std::vector<double> parts = Numbers(value.text, ',');
             if (parts.size() != 5) return false;
@@ -599,6 +735,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
             transform.Rotation(parts[2]);
             transform.TranslateX(parts[3]);
             transform.TranslateY(parts[4]);
+            CentreOn(id, element, transform);
             element.RenderTransform(transform);
             Remember(id, property, value, transform);
             return true;

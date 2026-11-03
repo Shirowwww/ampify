@@ -317,6 +317,35 @@ std::set<std::string> LoadColors(FileSource& files, const std::string& wanted, b
     return spicetify;
 }
 
+// theme.accent over the scheme: its accent and Spicetify's button and playback bar take the chosen colour. The colours a
+// scheme gives along with its own accent (hover and pressed accents, text on the accent, links) would clash with it:
+// they go, and Ampify derives them from the chosen accent (DefineDerivedColors). Keys of the theme's resources.xaml
+// stay: Ampify does not rewrite a theme's own XAML.
+void ChooseAccent(Theme& theme, Argb accent, bool applied) {
+    static const std::set<std::string> kFollowers = {
+        ToLowerAscii(kAccent),
+        "accentfillcolorsecondarybrush",
+        "accentfillcolortertiarybrush",
+        "textonaccentfillcolorprimarybrush",
+        "textonaccentfillcolorsecondarybrush",
+        "accenttextfillcolorprimarybrush",
+        "accenttextfillcolorsecondarybrush",
+        "accenttextfillcolortertiarybrush",
+    };
+    for (const std::string& key : kFollowers) theme.palette.Remove(key);
+    theme.palette.Remove("button-active");
+    std::erase_if(theme.resources, [](const ResourceOverride& resource) {
+        return kFollowers.count(ToLowerAscii(resource.key)) > 0;
+    });
+    theme.palette.Set(kAccent, accent);
+    if (applied) theme.resources.push_back({kAccent, {ValueKind::Color, ToXamlColor(accent)}});
+    for (const char* spicetify : {"button", "playback-bar"}) {
+        if (!theme.palette.Find(spicetify)) continue;
+        theme.palette.Set(spicetify, accent);
+        theme.variables[std::string("spice-") + spicetify] = ToXamlColor(accent);
+    }
+}
+
 // Returns false when the theme must be refused. Refusing is the rule the API sets: a bad key breaks the theme.
 bool LoadDictionary(FileSource& files, const LoadOptions& options, Theme& theme) {
     std::optional<std::string> xaml = files.Read("resources.xaml");
@@ -596,6 +625,14 @@ std::string ScrubberClearOfCorners(const Theme& theme) {
     return ".scrubber { margin: 0 " + FormatNumber(radius) + " 0 0; }\n";
 }
 
+// The volume slider takes the accent through WinUI's slider keys (DefineAccentControls), but Apple Music's progress line
+// reads keys of its own and stays white: it takes the accent too, as Spicetify's playback bar takes `button`.
+std::string ScrubberInAccent(const Theme& theme) {
+    if (Sets(theme, ".scrubber", "Foreground") || Sets(theme, "ScrubberControl#LCDScrubber", "Foreground")) return {};
+    if (!theme.palette.Find(kAccent)) return {};
+    return std::string(".scrubber { color: $") + kAccent + "; }\n";
+}
+
 // Apple Music paints an album's artist in its own blue, in code: the theme's link colour takes over, as WinUI's links
 // do (DefineAccentControls). On a light theme, Apple's light blue barely read.
 std::string ArtistInLinkColour(const Theme& theme) {
@@ -633,7 +670,10 @@ std::string SelectedRowsInThemeColour(const Theme& theme) {
 void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts& parts) {
     bool applied = parts.resources;
     std::string css = ScrubberClearOfCorners(theme);
-    if (parts.colors) css += ArtistInLinkColour(theme) + SearchTilesInCardColour(theme) + SelectedRowsInThemeColour(theme);
+    if (parts.colors) {
+        css += ScrubberInAccent(theme) + ArtistInLinkColour(theme) + SearchTilesInCardColour(theme) +
+               SelectedRowsInThemeColour(theme);
+    }
     if (css.empty()) return;
     RuleSource source;
     source.file = "Ampify (derived from the theme)";
@@ -664,6 +704,7 @@ Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& fi
     if (!dictionaryOk) return theme;
 
     if (!options.parts.resources) theme.resourceDictionary.clear();
+    if (options.accent) ChooseAccent(theme, *options.accent, options.parts.colors);
     DefineDerivedColors(theme, options.parts.colors);
     LoadSettings(files, options, theme);
     for (const auto& [name, value] : options.artwork) theme.variables[name] = value;
@@ -676,6 +717,31 @@ Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& fi
         LoadRuleText(translated, context, theme, options.parts.colors, source);
     }
     LoadRules(files, context, theme, options.parts.resources, RuleSource{});
+    AddDerivedRules(context, theme, options.parts);
+    return theme;
+}
+
+namespace {
+
+// The files of a theme that has none.
+class NoFiles final : public FileSource {
+public:
+    std::optional<std::string> Read(std::string_view) override { return std::nullopt; }
+    bool Exists(std::string_view) override { return false; }
+};
+
+}  // namespace
+
+Theme LoadAccentOnly(const LoadOptions& options) {
+    Theme theme;
+    theme.id = kAccentOnlyId;
+    theme.name = "accent colour";
+    theme.usable = true;
+    if (!options.accent) return theme;
+    ChooseAccent(theme, *options.accent, options.parts.colors);
+    DefineDerivedColors(theme, options.parts.colors);
+    NoFiles files;
+    ValueContext context{theme.palette, files, "", false};
     AddDerivedRules(context, theme, options.parts);
     return theme;
 }

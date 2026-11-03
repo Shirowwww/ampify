@@ -8,10 +8,11 @@ namespace ampify::cli {
 
 namespace {
 
-constexpr std::array<KnownSetting, 25> kFixed = {{
+constexpr std::array<KnownSetting, 26> kFixed = {{
     {"theme.active", "", "no theme"},
     {"theme.scheme", "", "the theme's default scheme"},
     {"theme.schedule", "", "no schedule"},
+    {"theme.accent", "", "the theme's own accent"},
     {"theme.live_reload", "1", ""},
     {"theme.inspect", "0", ""},
     {"xaml.watcher", "0", ""},

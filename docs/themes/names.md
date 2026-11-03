@@ -172,7 +172,7 @@ read on Apple Music 1.1792.
 | `.track-text` | The title and the artist |
 | `.track-lines`, `.track-line` | The block of the two lines, and each line |
 | `.track-title`, `.track-artist` | Each of them |
-| `.scrubber` | The progress bar. Apple Music draws its bar itself: a theme can place, size, fade or hide it, but `color` and `background` do not reach the bar |
+| `.scrubber` | The progress bar: `color` fills the played part (the theme's accent by default), `background` the rest of the track, `.scrubber Thumb` its thumb; they hold under the pointer and while dragged |
 | `.current-time`, `.duration` | The time played and the length |
 | `.audio-badge` | The badge of the audio format (Lossless, Dolby Atmos) |
 | `.live-badge`, `.autoplay-badge` | The Live and Autoplay badges |

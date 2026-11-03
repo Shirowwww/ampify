@@ -29,6 +29,9 @@ class Palette {
 public:
     // Returns false when the name is empty or already defined.
     bool Define(std::string_view name, Argb color);
+    // Defines the name, or replaces the colour it had.
+    void Set(std::string_view name, Argb color);
+    void Remove(std::string_view name);
     std::optional<Argb> Find(std::string_view name) const;
     const std::map<std::string, Argb>& Colors() const { return m_colors; }
 

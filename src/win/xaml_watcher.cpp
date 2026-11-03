@@ -40,6 +40,7 @@ constexpr int kEndpointAttempts = 32;    // a name already taken (another tool) 
 
 Journal* g_journal = nullptr;
 std::atomic<bool> g_started{false};
+std::function<void()> g_added;  // read and written on the interface thread only
 
 std::string Narrow(BSTR text) {
     if (!text) return {};
@@ -118,6 +119,7 @@ public:
                 g_journal->Write("XAML watcher: " + std::to_string(m_adds) + " added, " + std::to_string(m_removes) +
                                  " removed so far");
             }
+            if (mutation == Add && g_added) g_added();
         } catch (...) {
         }
         if (m_hooks) m_hooks->UnregisterInstance(element.Handle);
@@ -203,6 +205,10 @@ void StartXamlWatcher(Journal& journal, HINSTANCE kernel) {
     journal.Write(SUCCEEDED(result) ? "XAML watcher: asked WinUI for the tree's changes"
                                     : "XAML watcher: WinUI refused (hr " + std::to_string(static_cast<long>(result)) +
                                           "), maybe another tool already watches it; the themes keep looking by themselves");
+}
+
+void SetXamlWatcherListener(std::function<void()> added) {
+    g_added = std::move(added);
 }
 
 }  // namespace ampify::win

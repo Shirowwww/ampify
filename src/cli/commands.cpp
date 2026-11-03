@@ -21,6 +21,7 @@
 #include "theme_commands.hpp"
 #include "../core/theme/files.hpp"
 #include "../core/theme/theme.hpp"
+#include "../core/theme/theme_settings.hpp"
 #include "archive.hpp"
 #include "catalog.hpp"
 #include "element.hpp"
@@ -84,6 +85,13 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
     if (key == "theme.scheme") {
         if (!value.empty() && !IsValidScheme(value)) {
             problem = "invalid scheme name: " + value;
+            return false;
+        }
+        return true;
+    }
+    if (key == "theme.accent") {
+        if (!value.empty() && !theme::ParseAccent(value)) {
+            problem = "theme.accent expects a colour as RRGGBB or #RRGGBB, such as FA2D48 (empty: the theme's own accent)";
             return false;
         }
         return true;

@@ -1129,6 +1129,21 @@ TEST_CASE(Theme_AlbumArtistTakesTheThemesLinkColour) {
     CHECK(Assigned(Load(own), ".album-artist", "Foreground") == "#FF112233");
 }
 
+TEST_CASE(Theme_ProgressLineTakesTheAccent) {
+    MemoryFiles accent;
+    accent.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 4FD1FF\n";
+    CHECK(Assigned(Load(accent), ".scrubber", "Foreground") == "#FF4FD1FF");
+
+    // A theme's own colour wins, and without an accent the line keeps Apple Music's white.
+    MemoryFiles own;
+    own.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 4FD1FF\n";
+    own.files["user.css"] = ".scrubber { color: #FFFFFFFF; }\n";
+    CHECK(Assigned(Load(own), ".scrubber", "Foreground") == "#FFFFFFFF");
+    MemoryFiles none;
+    none.files["user.css"] = ".lcd { opacity: 0.9; }\n";
+    CHECK(Assigned(Load(none), ".scrubber", "Foreground") == "ABSENT");
+}
+
 TEST_CASE(Theme_SearchTopResultsTakeTheCardColour) {
     MemoryFiles card;
     card.files["colors.ini"] = "[Base]\nCardBackgroundFillColorDefaultBrush = 1C2742\n";
@@ -1980,7 +1995,9 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
     CHECK(full.usable);
     CHECK(full.resources.size() == 1);
     CHECK(!full.resourceDictionary.empty());
-    CHECK(full.assignments.size() == 4);  // with the album's artist in the accent, in its two forms (ArtistInLinkColour)
+    // With the album's artist in the accent, in its two forms (ArtistInLinkColour), and the progress line in the accent
+    // (ScrubberInAccent).
+    CHECK(full.assignments.size() == 5);
 
     th::LoadOptions none{"", &allowed, {false, false, false}};
     th::Theme off = Load(files, none);
@@ -1992,7 +2009,7 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
 
     th::LoadOptions noAssets{"", &allowed, {true, true, false}};
     th::Theme withoutImages = Load(files, noAssets);
-    CHECK(withoutImages.assignments.size() == 3);  // the font and artist rules stay, the image rule is refused
+    CHECK(withoutImages.assignments.size() == 4);  // the font, artist and progress line rules stay, not the image's
     CHECK(!ProblemContaining(withoutImages, "assets").empty());
 }
 
@@ -2733,6 +2750,77 @@ TEST_CASE(Settings_ScheduleIsKeptAndOnlyWrittenWhenSet) {
     CHECK(th::ReadThemeSettings(settings).schedule == "07:00=Light,19:00=Dark");
     th::WriteThemeSettings(settings, th::ThemeSettings{});
     CHECK(!settings.Get("theme.schedule").has_value());
+}
+
+TEST_CASE(Accent_ParsesSixDigitsWithOrWithoutHash) {
+    const th::Argb red{0xFF, 0xFA, 0x2D, 0x48};
+    CHECK(th::ParseAccent("FA2D48") == red);
+    CHECK(th::ParseAccent("#fa2d48") == red);
+    CHECK(!th::ParseAccent(""));
+    CHECK(!th::ParseAccent("FA2D4"));
+    CHECK(!th::ParseAccent("#F00"));
+    CHECK(!th::ParseAccent("#FFFA2D48"));
+    CHECK(!th::ParseAccent("GG2D48"));
+}
+
+TEST_CASE(Accent_ChosenOneReplacesTheSchemesAndWhatFollowsIt) {
+    MemoryFiles files;
+    files.files["colors.ini"] =
+        "[Base]\nAccentFillColorDefaultBrush = 1ED760\nAccentFillColorSecondaryBrush = 1DB954\n"
+        "TextOnAccentFillColorPrimaryBrush = 000000\nTextFillColorPrimaryBrush = FFFFFF\n";
+    files.files["user.css"] = ".play-button { background: $AccentFillColorDefaultBrush; }\n";
+    th::LoadOptions options;
+    options.accent = th::Argb{0xFF, 0xFA, 0x2D, 0x48};
+    th::Theme theme = Load(files, options);
+
+    CHECK(ResourceValue(theme, "AccentFillColorDefaultBrush") == "#FFFA2D48");
+    CHECK(ResourceValue(theme, "AccentFillColorSecondaryBrush") == "#E6FA2D48");  // derived again: 90%
+    CHECK(ResourceValue(theme, "SliderTrackValueFill") == "#FFFA2D48");
+    CHECK(ResourceValue(theme, "TextOnAccentFillColorPrimaryBrush") == "ABSENT");   // white reads on this red
+    CHECK(ResourceValue(theme, "TextFillColorPrimaryBrush") == "#FFFFFFFF");        // the rest of the scheme stays
+    CHECK(Assigned(theme, ".play-button", "Background") == "#FFFA2D48");
+    CHECK(Assigned(theme, ".scrubber", "Foreground") == "#FFFA2D48");
+    int accents = 0;
+    for (const th::ResourceOverride& resource : theme.resources) accents += resource.key == "AccentFillColorDefaultBrush";
+    CHECK(accents == 1);
+
+    // Without a choice, the scheme's accent stays.
+    CHECK(ResourceValue(Load(files), "AccentFillColorDefaultBrush") == "#FF1ED760");
+}
+
+TEST_CASE(Accent_ChosenOneReplacesSpicetifysButton) {
+    MemoryFiles files;
+    files.files["color.ini"] = "[Night]\nmain = 0B0B10\ntext = F5F5F7\nbutton = FF5C8A\nplayback-bar = FF5C8A\n";
+    th::LoadOptions options;
+    options.accent = th::Argb{0xFF, 0x0A, 0x84, 0xFF};
+    th::Theme theme = Load(files, options);
+    CHECK(ResourceValue(theme, "AccentFillColorDefaultBrush") == "#FF0A84FF");
+    CHECK(Assigned(theme, "ScrubberControl#LCDScrubber", "Foreground") == "#FF0A84FF");
+    CHECK(theme.variables["spice-button"] == "#FF0A84FF");
+}
+
+TEST_CASE(Accent_WithoutAThemeAppliesTheAccentAlone) {
+    th::LoadOptions options;
+    options.accent = th::Argb{0xFF, 0xFA, 0x2D, 0x48};
+    th::Theme alone = th::LoadAccentOnly(options);
+    CHECK(alone.usable && alone.id == th::kAccentOnlyId);
+    CHECK(ResourceValue(alone, "AccentFillColorDefaultBrush") == "#FFFA2D48");
+    CHECK(ResourceValue(alone, "ToggleSwitchFillOn") == "#FFFA2D48");
+    CHECK(Assigned(alone, ".scrubber", "Foreground") == "#FFFA2D48");
+    CHECK(!alone.dark.has_value());  // Apple Music keeps its own light or dark mode
+
+    std::filesystem::path kit(TempFolder("worker-accent"));
+    ampify::Settings settings;
+    th::ThemeWorker worker(kit);
+    th::SessionRequest none = worker.Tick(settings, 600);
+    CHECK(!none.theme && none.themeId.empty());
+    settings.Set("theme.accent", "#FA2D48");
+    th::SessionRequest chosen = worker.Tick(settings, 600);
+    CHECK(chosen.generation == none.generation + 1);
+    CHECK(chosen.themeId == th::kAccentOnlyId && chosen.theme && chosen.theme->usable);
+    settings.Set("theme.accent", "not a colour");
+    CHECK(!worker.Tick(settings, 600).theme);
+    std::filesystem::remove_all(kit);
 }
 
 TEST_CASE(Worker_ReloadsOnlyWhenSomethingChanges) {

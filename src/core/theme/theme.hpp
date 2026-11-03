@@ -68,7 +68,12 @@ struct LoadOptions {
     // Colours of the artwork playing, as variables art-1, art-2, art-3 and art-text (ArtworkVariables in
     // color_extract.hpp). Empty before the first artwork: var(--art-1, fallback) then takes its fallback.
     std::map<std::string, std::string> artwork;
+    // theme.accent: the accent the user chose, over the scheme's. What Ampify derives from the accent follows it.
+    std::optional<Argb> accent;
 };
+
+// The id of the theme LoadAccentOnly makes: no theme folder can have it.
+inline constexpr const char* kAccentOnlyId = "(accent)";
 
 // A theme folder, read and checked. Layout, as in docs/extensions/api.md section 6.1:
 //   colors.ini      one [section] per colour scheme, such as [Base] or [Dark]; `Key = hex` (with or without #)
@@ -110,6 +115,10 @@ struct Theme {
 
 // Reads and checks a theme. `folder` is the absolute path, used to resolve image paths.
 Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& files, const LoadOptions& options = {});
+
+// With no theme active, the accent of theme.accent alone (options.accent) on Apple Music's look, with what Ampify
+// derives from it: the controls, links, selected rows and progress line take it.
+Theme LoadAccentOnly(const LoadOptions& options);
 
 // Reads and checks a snippet: a folder with resources.xaml, user.css, or both (docs/themes/format.md, "Snippets").
 // Its rules see the colours ($name), the variables and the font roles of `base`, the active theme, which may be null.

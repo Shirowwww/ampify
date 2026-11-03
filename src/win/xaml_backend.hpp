@@ -8,6 +8,7 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -28,6 +29,7 @@
 // MSVC reported C3779 on both members (run 41071266204).
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
 
 #include "../core/theme/hover.hpp"
 #include "../core/theme/tree.hpp"
@@ -40,6 +42,7 @@ namespace ampify::win {
 // thread and taken by the theme service's own thread, hence the lock.
 struct ArtworkColours {
     std::mutex lock;
+    std::condition_variable changed;  // notified when `variables` change, so the service reloads at once
     std::map<std::string, std::string> variables;
     std::string key;    // the image they come from: its address, or the object when it has none
     bool busy = false;  // a reading is under way
@@ -98,6 +101,8 @@ public:
     // burst of events makes one pass. Snapshot follows each such element once, so a theme reaches new content without
     // waiting for the next tick.
     void WatchChanges(std::function<void()> pass);
+    // An element entered the tree (XAML Diagnostics, xaml.watcher): the same pass, grouped with the other changes.
+    void ElementAdded() noexcept { SchedulePass(0); }
 
 private:
     winrt::Microsoft::UI::Xaml::DependencyObject Resolve(theme::NodeId id) const;
@@ -121,6 +126,8 @@ private:
     winrt::Microsoft::UI::Xaml::Media::Brush ArtworkBrush(const std::string& text);
     void FollowArtwork(const winrt::Microsoft::UI::Xaml::Media::ImageSource& artwork);
     void SampleArtwork(const winrt::Microsoft::UI::Xaml::Controls::Image& image);
+    void FollowArtworkImage(const winrt::Microsoft::UI::Xaml::Controls::Image& image);
+    void OnArtworkChanged() noexcept;
 
     void OnState(theme::NodeId id, theme::Trigger trigger, bool on) noexcept;
     void OnFocusLost(theme::NodeId id) noexcept;
@@ -128,6 +135,10 @@ private:
     void Watch(const winrt::Microsoft::UI::Xaml::DependencyObject& object, theme::NodeId id, const std::string& type);
     bool WriteTransition(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
                          const theme::Value& value);
+    bool WriteStoryTransform(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element,
+                             const theme::Value& value, double ms);
+    void CentreOn(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element,
+                  const winrt::Microsoft::UI::Xaml::Media::CompositeTransform& transform) const;
     bool WriteAnimatedTransform(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element,
                                 const theme::Value& value);
     // The theme's transform-origin of the element: RenderTransformOrigin, or the origin it refused (m_facadeOrigins).
@@ -187,6 +198,7 @@ private:
         bool hover = false;  // PointerEntered, PointerExited
         winrt::event_token entered;
         winrt::event_token exited;
+        winrt::Windows::Foundation::IInspectable moved{nullptr};  // a navigation entry's: off over its sub-entries
         bool active = false;  // added with handledEventsToo: a button marks its pointer events handled
         winrt::Windows::Foundation::IInspectable pressed{nullptr};
         winrt::Windows::Foundation::IInspectable released{nullptr};
@@ -229,6 +241,12 @@ private:
     winrt::Microsoft::UI::Xaml::Media::ImageSource m_artwork{nullptr};
     std::vector<winrt::Microsoft::UI::Xaml::Media::ImageBrush> m_artworkBrushes;
     std::shared_ptr<ArtworkColours> m_artworkColours = std::make_shared<ArtworkColours>();
+    // That image is followed between passes: a new song's artwork is read as soon as it opens, not at the next tick. A
+    // reading asked while another runs is tried again shortly (m_artworkRetry).
+    winrt::weak_ref<winrt::Microsoft::UI::Xaml::Controls::Image> m_artworkImage;
+    winrt::event_token m_artworkOpened{};
+    std::int64_t m_artworkSourceToken = 0;
+    winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_artworkRetry{nullptr};
     // WatchChanges: the pass to run, the elements followed (frames and lists), the timer that groups their events, and
     // the passes still due after a navigation.
     std::function<void()> m_pass;
@@ -262,6 +280,11 @@ private:
     // The origins an element refused because its transform goes through Scale and Translation: the facade turns
     // around them instead (WriteAnimatedTransform).
     std::map<theme::NodeId, winrt::Windows::Foundation::Point> m_facadeOrigins;
+    // Elements Apple Music animates itself refuse the facade: their transform transition (ms) eases the element's
+    // CompositeTransform instead, through a Storyboard (WriteStoryTransform). Both objects are Ampify's, held strongly.
+    std::map<theme::NodeId, double> m_storyDurations;
+    std::map<theme::NodeId, winrt::Microsoft::UI::Xaml::Media::CompositeTransform> m_storyTransforms;
+    std::map<theme::NodeId, winrt::Microsoft::UI::Xaml::Media::Animation::Storyboard> m_stories;
     ThemeAnimations m_animations;  // `animation`
     // The ::before and ::after images, by panel and place. The panel is Apple Music's (a weak reference resolves), the
     // image Ampify's: held strongly, and released here, on the interface thread (docs/development/xaml-lessons.md).

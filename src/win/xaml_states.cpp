@@ -109,6 +109,17 @@ bool FocusWithin(const xaml::UIElement& element) {
     return false;
 }
 
+// A navigation entry holds its sub-entries (Library holds Artists, Albums...), so the pointer entering a sub-entry also
+// entered it: the entry is under the pointer only when no sub-entry lies between them.
+bool PointerOnOwnRow(const xaml::UIElement& element, const xaml::Input::PointerRoutedEventArgs& args) {
+    for (auto current = args.OriginalSource().try_as<xaml::DependencyObject>(); current;
+         current = media::VisualTreeHelper::GetParent(current)) {
+        if (current == element) return true;
+        if (current.try_as<controls::NavigationViewItem>()) return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 // Follows the events of the states the element's values use, and stops following the others. The handlers run inside
@@ -126,11 +137,27 @@ void XamlTreeBackend::FollowStates(theme::NodeId id, const xaml::UIElement& elem
 
     bool hover = m_hover.Uses(id, theme::Trigger::Hover);
     if (hover && !handlers.hover) {
-        handlers.entered = element.PointerEntered(to(theme::Trigger::Hover, true));
+        if (element.try_as<controls::NavigationViewItem>()) {
+            winrt::weak_ref<xaml::UIElement> weak = winrt::make_weak(element);
+            auto follow = [this, alive, id, weak](IInspectable const&, xaml::Input::PointerRoutedEventArgs const& args) noexcept {
+                try {
+                    xaml::UIElement self = weak.get();
+                    if (!alive.expired() && self) OnState(id, theme::Trigger::Hover, PointerOnOwnRow(self, args));
+                } catch (...) {
+                }
+            };
+            handlers.entered = element.PointerEntered(follow);
+            handlers.moved = winrt::box_value(xaml::Input::PointerEventHandler(follow));
+            element.AddHandler(xaml::UIElement::PointerMovedEvent(), handlers.moved, true);
+        } else {
+            handlers.entered = element.PointerEntered(to(theme::Trigger::Hover, true));
+        }
         handlers.exited = element.PointerExited(to(theme::Trigger::Hover, false));
     } else if (!hover && handlers.hover) {
         element.PointerEntered(handlers.entered);
         element.PointerExited(handlers.exited);
+        if (handlers.moved) element.RemoveHandler(xaml::UIElement::PointerMovedEvent(), handlers.moved);
+        handlers.moved = nullptr;
         m_hover.Toggle(id, theme::Trigger::Hover, false, *this);
     }
     handlers.hover = hover;
@@ -199,6 +226,7 @@ void XamlTreeBackend::RemoveHoverHandlers(theme::NodeId id) {
         if (handlers.hover) {
             element.PointerEntered(handlers.entered);
             element.PointerExited(handlers.exited);
+            if (handlers.moved) element.RemoveHandler(xaml::UIElement::PointerMovedEvent(), handlers.moved);
         }
         if (handlers.active) {
             element.RemoveHandler(xaml::UIElement::PointerPressedEvent(), handlers.pressed);
@@ -236,6 +264,27 @@ bool HasPointerStates(const controls::Control& control) {
            control.try_as<primitives::ScrollBar>();
 }
 
+// Apple Music's progress bar (ScrubberControl) reads keys of its own, at rest too, which the mini player defines in its
+// own dictionary over the theme's: written on the bar, they take the theme's value in every state.
+void AddScrubberKeys(StateKeys& result, std::string_view property, bool thumb) {
+    const wchar_t* base = thumb                       ? L"ScrubberThumb"
+                          : property == "Foreground" ? L"ScrubberDecreaseRect"
+                          : property == "Background" ? L"ScrubberTrackRect"
+                                                      : nullptr;
+    if (!base) return;
+    std::wstring rest = std::wstring(base) + (thumb ? L"Normal" : L"Fill");
+    // Apple's own spelling: ScrubberDecreaseRectPressedFill, but ScrubberTrackRectPressed.
+    std::wstring pressed = std::wstring(base) + (property == "Foreground" && !thumb ? L"PressedFill" : L"Pressed");
+    for (const std::wstring& key : {rest, std::wstring(base) + L"PointerOver", pressed, std::wstring(base) + L"Disabled"}) {
+        result.keys.push_back(key);
+    }
+    result.plainKeys.push_back(rest);
+}
+
+bool IsScrubber(const controls::Control& control) {
+    return control && ShortName(Utf8(winrt::get_class_name(control))) == "ScrubberControl";
+}
+
 StateKeys PointerStateKeys(const controls::Control& control, std::string_view property) {
     constexpr int kSliderDepth = 4;  // from its thumb: the thumb, two template grids, the slider
     StateKeys result{control, {}};
@@ -243,6 +292,7 @@ StateKeys PointerStateKeys(const controls::Control& control, std::string_view pr
     if (control.try_as<controls::Slider>()) {
         if (property == "Background") bases = {"SliderTrackFill"};
         if (property == "Foreground") bases = {"SliderTrackValueFill"};
+        if (IsScrubber(control)) AddScrubberKeys(result, property, false);
     } else if (control.try_as<primitives::Thumb>()) {
         xaml::DependencyObject current = control;
         for (int depth = 0; current && depth < kSliderDepth && !result.holder.try_as<controls::Slider>(); depth++) {
@@ -250,6 +300,7 @@ StateKeys PointerStateKeys(const controls::Control& control, std::string_view pr
             if (auto slider = current.try_as<controls::Slider>()) result.holder = slider;
         }
         if (result.holder.try_as<controls::Slider>() && property == "Background") bases = {"SliderThumbBackground"};
+        if (property == "Background" && IsScrubber(result.holder)) AddScrubberKeys(result, property, true);
     } else if (control.try_as<primitives::ScrollBar>()) {
         // Away from the pointer a scroll bar is a thin line; under it, it widens to a thumb on a track. The line and the
         // track at rest take the written value, the wide thumb and the track under the pointer the :hover one.
@@ -364,10 +415,11 @@ void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::Dependency
         bool changed = false;
         for (const std::wstring& key : states.keys) {
             bool atRest = std::find(states.plainKeys.begin(), states.plainKeys.end(), key) != states.plainKeys.end();
-            const IInspectable& want = atRest                        ? restCopy
-                                       : key.ends_with(L"Disabled") ? disabled
-                                       : key.ends_with(L"Pressed")  ? pressed
-                                                                     : value;
+            // Apple's ScrubberDecreaseRectPressedFill ends in "PressedFill".
+            const IInspectable& want = atRest                                                         ? restCopy
+                                       : key.ends_with(L"Disabled")                                  ? disabled
+                                       : key.ends_with(L"Pressed") || key.ends_with(L"PressedFill") ? pressed
+                                                                                                      : value;
             IInspectable name = winrt::box_value(winrt::hstring(key));
             auto kept = std::find_if(held.keys.begin(), held.keys.end(), [&](const auto& item) { return item.first == key; });
             if (!want) {

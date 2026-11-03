@@ -12,6 +12,7 @@ namespace ampify::theme {
 //   theme.active       folder name of the theme in use; empty or `none` for no theme
 //   theme.scheme       colour scheme inside colors.ini; empty takes the theme's default; `auto` follows the Windows mode
 //   theme.schedule     schemes by local time, such as `07:00=Light,19:00=Dark`; wins over theme.scheme (scheme_choice.hpp)
+//   theme.accent       the accent the user chose, RRGGBB or #RRGGBB, over the theme's and without one; empty for none
 //   theme.live_reload  1 to apply a theme again when its files change (default 1)
 //   theme.inspect      1 to write an inspector dump on the next pass; the kernel clears it afterwards
 //   theme.parts.colors     1 to apply the colours of colors.ini (default 1)
@@ -24,12 +25,16 @@ struct ThemeSettings {
     std::string active;
     std::string scheme;
     std::string schedule;
+    std::string accent;
     bool liveReload = true;
     bool inspect = false;
     ThemeParts parts;
 };
 
 ThemeSettings ReadThemeSettings(const Settings& settings);
+
+// The colour of theme.accent: six hexadecimal digits, with or without `#`. Nothing for an empty or unfit value.
+std::optional<Argb> ParseAccent(std::string_view text);
 void WriteThemeSettings(Settings& settings, const ThemeSettings& value);
 
 // The values of the settings a theme declares, stored as themes.<id>.<key>, by key. Empty for an empty id.

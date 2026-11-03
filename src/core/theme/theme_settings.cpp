@@ -13,6 +13,7 @@ ThemeSettings ReadThemeSettings(const Settings& settings) {
     if (lowered == "none") value.active.clear();
     value.scheme = settings.GetString("theme.scheme", "");
     value.schedule = settings.GetString("theme.schedule", "");
+    value.accent = settings.GetString("theme.accent", "");
     value.liveReload = settings.GetBool("theme.live_reload", true);
     value.inspect = settings.GetBool("theme.inspect", false);
     value.parts.colors = settings.GetBool("theme.parts.colors", true);
@@ -31,12 +32,27 @@ void WriteThemeSettings(Settings& settings, const ThemeSettings& value) {
     } else {
         settings.Set("theme.schedule", value.schedule);
     }
+    if (value.accent.empty()) {
+        settings.Remove("theme.accent");
+    } else {
+        settings.Set("theme.accent", value.accent);
+    }
     settings.SetBool("theme.live_reload", value.liveReload);
     settings.SetBool("theme.inspect", value.inspect);
     settings.SetBool("theme.parts.colors", value.parts.colors);
     settings.SetBool("theme.parts.resources", value.parts.resources);
     settings.SetBool("theme.parts.assets", value.parts.assets);
     settings.SetBool("theme.parts.script", value.parts.script);
+}
+
+std::optional<Argb> ParseAccent(std::string_view text) {
+    if (!text.empty() && text.front() == '#') text.remove_prefix(1);
+    constexpr size_t kDigits = 6;
+    if (text.size() != kDigits) return std::nullopt;
+    for (char digit : text) {
+        if (!std::isxdigit(static_cast<unsigned char>(digit))) return std::nullopt;
+    }
+    return ParseColor(text);
 }
 
 namespace {

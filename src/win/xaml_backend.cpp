@@ -229,7 +229,7 @@ xaml::DependencyObject XamlTreeBackend::Resolve(theme::NodeId id) const {
 }
 
 theme::Value XamlTreeBackend::Keep(IInspectable object) {
-    void* identity = object ? winrt::get_abi(object.as<winrt::Windows::Foundation::IUnknown>()) : nullptr;
+    void* identity = ComIdentity(object);
     auto known = m_keptTokens.find(identity);
     if (known != m_keptTokens.end()) return {theme::ValueKind::Opaque, "handle:" + std::to_string(known->second)};
 
@@ -272,12 +272,9 @@ media::Brush XamlTreeBackend::ArtworkBrush(const std::string& text) {
 void XamlTreeBackend::FollowArtwork(const media::ImageSource& artwork) {
     if (artwork) m_artwork = artwork;  // between two songs the image may be missing for a moment: keep the last one
     // COM identity: the brush is stored as a Brush, an interface pointer other than the ImageBrush one.
-    auto identity = [](const winrt::Windows::Foundation::IUnknown& object) {
-        return object ? winrt::get_abi(object.as<winrt::Windows::Foundation::IUnknown>()) : nullptr;
-    };
     std::erase_if(m_artworkBrushes, [&](const media::ImageBrush& brush) {
         for (const auto& [key, written] : m_written) {
-            if (identity(written.object) == identity(brush)) return false;
+            if (ComIdentity(written.object) == ComIdentity(brush)) return false;
         }
         return true;
     });
@@ -299,17 +296,40 @@ void XamlTreeBackend::SampleArtwork(const controls::Image& image) {
     }
     if (key.empty()) key = std::to_string(reinterpret_cast<std::uintptr_t>(winrt::get_abi(source)));
     std::shared_ptr<ArtworkColours> shared = m_artworkColours;
+    bool later = false;
     {
         std::lock_guard<std::mutex> guard(shared->lock);
-        if (shared->busy || shared->key == key) return;
+        if (shared->key == key) return;
+        later = shared->busy;
         shared->busy = true;
     }
+    if (later) {
+        // The reading of the previous image is still under way: this one is read right after it.
+        constexpr auto kRetry = std::chrono::milliseconds(120);
+        try {
+            if (!m_artworkRetry) {
+                m_artworkRetry = image.DispatcherQueue().CreateTimer();
+                m_artworkRetry.IsRepeating(false);
+                std::weak_ptr<bool> alive = m_alive;
+                m_artworkRetry.Tick([this, alive](auto const&, auto const&) noexcept {
+                    if (!alive.expired()) OnArtworkChanged();
+                });
+            }
+            m_artworkRetry.Interval(kRetry);
+            m_artworkRetry.Start();
+        } catch (...) {
+        }
+        return;
+    }
     auto done = [shared](std::optional<std::map<std::string, std::string>> variables, const std::string& from) {
-        std::lock_guard<std::mutex> guard(shared->lock);
-        shared->busy = false;
-        if (!variables) return;
-        shared->variables = std::move(*variables);
-        shared->key = from;
+        {
+            std::lock_guard<std::mutex> guard(shared->lock);
+            shared->busy = false;
+            if (!variables) return;
+            shared->variables = std::move(*variables);
+            shared->key = from;
+        }
+        shared->changed.notify_all();
     };
     try {
         media::Imaging::RenderTargetBitmap target;
@@ -347,6 +367,44 @@ void XamlTreeBackend::SampleArtwork(const controls::Image& image) {
             });
     } catch (...) {
         done(std::nullopt, key);
+    }
+}
+
+// Follows the play bar's artwork between passes: ImageOpened for an image that loads, and Source for one Apple Music
+// had already loaded (a cached artwork opens nothing). Apple's own image, so a weak reference resolves. The handlers
+// read the artwork at once, not through SchedulePass: a song's colours follow it within a quarter second, and
+// OnArtworkChanged lets nothing escape into Apple Music's XAML.
+void XamlTreeBackend::FollowArtworkImage(const controls::Image& image) {
+    controls::Image followed = m_artworkImage.get();
+    if (followed == image) return;
+    try {
+        if (followed) {
+            followed.ImageOpened(m_artworkOpened);
+            followed.UnregisterPropertyChangedCallback(controls::Image::SourceProperty(), m_artworkSourceToken);
+        }
+        std::weak_ptr<bool> alive = m_alive;
+        m_artworkOpened = image.ImageOpened([this, alive](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+            if (!alive.expired()) OnArtworkChanged();
+        });
+        m_artworkSourceToken = image.RegisterPropertyChangedCallback(
+            controls::Image::SourceProperty(),
+            [this, alive](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
+                if (!alive.expired()) OnArtworkChanged();
+            });
+        m_artworkImage = winrt::make_weak(image);
+    } catch (...) {
+        m_artworkImage = nullptr;  // the next pass tries again
+    }
+}
+
+void XamlTreeBackend::OnArtworkChanged() noexcept {
+    try {
+        if (*m_closed) return;
+        controls::Image image = m_artworkImage.get();
+        if (!image) return;
+        FollowArtwork(image.Source());
+        SampleArtwork(image);
+    } catch (...) {
     }
 }
 
@@ -477,7 +535,10 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     }
     for (const auto& [id, property] : gone) ReleaseStates(id, property);
     FollowArtwork(artwork);
-    if (artworkImage) SampleArtwork(artworkImage);
+    if (artworkImage) {
+        FollowArtworkImage(artworkImage);
+        SampleArtwork(artworkImage);
+    }
     std::erase_if(m_watched, [](const auto& entry) { return !entry.second.get(); });
     std::erase_if(m_touched, [](const auto& entry) { return !entry.second.get(); });
     std::erase_if(m_decors, [this](const auto& entry) {

@@ -38,7 +38,8 @@ AccentFillColorDefaultBrush = 0A84FF
 
 From the accent (`AccentFillColorDefaultBrush` or Spicetify's `button`), Ampify works out what WinUI would otherwise
 leave in Apple Music's blue: the hover and pressed accents (90% and 80%), toggles, sliders, check boxes, links, checked
-buttons, and black text on a light accent. It also gives the theme's link color to an album's artist, the card color
+buttons, and black text on a light accent. It also paints the played part of the progress bar in the accent (the volume
+slider already follows it), gives the theme's link color to an album's artist, the card color
 to the search's top results, and the accent at low opacity to selected rows. A key the scheme or `resources.xaml` sets
 itself is never replaced, and a rule in `user.css` on those elements wins.
 
@@ -173,7 +174,7 @@ and the theme applies again at once.
 | `text-align` | `TextAlignment` (text) | `left`, `center`, `right`, `justify`, `start`, `end` |
 | `text-overflow` | `TextTrimming` (text) | `ellipsis` or `clip` |
 | `white-space` | `TextWrapping` (text) | `nowrap` or `normal` |
-| `margin` | `Margin` | 1 to 4 lengths, negative allowed |
+| `margin` | `Margin` | 1 to 4 lengths, negative allowed. A negative margin grows an element only when it has no `width` of its own: with one, it keeps that size and only moves |
 | `padding` | `Padding` | 1 to 4 lengths, not negative |
 | `width`, `height` | `Width`, `Height` | A length or `auto` |
 | `min-width`, `min-height` | `MinWidth`, `MinHeight` | A length, or `auto` |
@@ -223,7 +224,7 @@ and the theme applies again at once.
 
 ### The artwork of the playing song
 
-`background: artwork` shows the current song's artwork and follows it (within 3 seconds). On the window, under acrylic
+`background: artwork` shows the current song's artwork and follows it as soon as it loads. On the window, under acrylic
 panels, it gives the blurred background of Spicetify's Hazy or Comfy themes. Example: `themes/artwork`.
 
 Ampify also gives the artwork's colors as variables. Before the first artwork they do not exist, so give a fallback.
@@ -311,7 +312,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | Layout | What it does |
 |---|---|
 | `ampify:floating-panels` | The sidebar and the pages become two rounded panels on the window's background, with even gaps |
-| `ampify:bottom-bar` | The playback bar goes to the bottom across the window: the song left, buttons in the middle, volume right. Import it after `floating-panels` |
+| `ampify:bottom-bar` | The playback bar goes to the bottom across the window: the song left, buttons in the middle of the window, volume right. It hides the column Apple keeps for the window buttons, so a theme needs no rule of its own for it. Import it after `floating-panels` |
 | `ampify:scrollbars` | Scroll bars inside their panel, clear of its rounded corners, without Windows' arrows. Part of `floating-panels` |
 
 | Variable | Default | Meaning |
@@ -378,7 +379,10 @@ what opened it. A popup takes the theme the first time it opens.
 
 `transform`, `opacity` and `background` (plain colors only) animate, `all` means the three, from 0 to 5 s. Easing words
 and delays are accepted and ignored: XAML's own ease-out is used. A few elements Apple Music animates itself (such as the
-playback bar's play button) refuse a transition.
+playback bar's play button and the sidebar's entries) take a transition of `transform` alone; `opacity` and
+`background` are refused there.
+
+A `scale()` without `transform-origin` grows from the element's centre, as in CSS.
 
 ### Animations
 
@@ -465,6 +469,16 @@ Switch it with `ampify snippet enable <id>` / `disable <id>`. Example:
 With `auto`, dark mode takes the first scheme named `Dark` or `Night` (or containing it), light mode takes `Light` or
 `Day`, else the first scheme that is not dark. In a schedule, the last time passed wins, and a scheme can be `auto`
 (`07:00=auto,22:00=Night`). Ampify checks both every 3 seconds.
+
+## Chosen accent
+
+`theme.accent = FA2D48` gives every theme that accent in place of its own, and gives it to Apple Music's own look when
+no theme is active. It replaces `AccentFillColorDefaultBrush` (and Spicetify's `button` and `playback-bar`) before
+Ampify derives the rest, so the hover and pressed accents, toggles, sliders, the progress bar, links and selected rows
+follow it. The colours a scheme gives along with its own accent (`AccentFillColorSecondaryBrush`,
+`AccentFillColorTertiaryBrush`, `TextOnAccentFillColor*`, `AccentTextFillColor*`) are derived again from the chosen
+one. A colour a theme writes as a hexadecimal value in `user.css` stays: name `$AccentFillColorDefaultBrush` for what
+should follow the accent. Keys the theme's `resources.xaml` defines stay as well. Empty, the theme keeps its own.
 
 ## Theme parts
 

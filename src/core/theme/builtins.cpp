@@ -14,8 +14,8 @@ struct ClassEntry {
 };
 
 // Apple Music 1.1792, from inspector surveys of every page (docs/themes/names.md describes each name). One line per
-// zone; a zone with several forms lists each. The playback bar is a Grid of three columns: buttons, the now-playing
-// display, then volume and toggles.
+// zone; a zone with several forms lists each. The playback bar is a Grid of four columns: buttons, the now-playing
+// display, volume and toggles, then the cover Apple keeps under the window buttons.
 const std::vector<ClassEntry> kClasses{
     // Window
     {"window", {"Grid#PageRoot"}},
@@ -250,9 +250,10 @@ constexpr std::string_view kFloatingPanels = R"css(
 }
 
 /* Apple Music pins the back arrow to the window's corner, where it straddled the sidebar panel's rounded corner: it
-   moves into the panel, centred on the line of the app's name (4 lower than the panel's edge plus a gap). */
+   moves into the panel, centred on the app's logo (1 higher than the panel's edge plus a gap; 4 lower left the arrow
+   5 pixels under the logo). */
 .back-button {
-    margin: calc(var(--gap, 8) + 4) 0 0 calc(var(--gap, 8) + 4);
+    margin: calc(var(--gap, 8) - 1) 0 0 calc(var(--gap, 8) + 4);
 }
 
 /* Folded, the sidebar shows the first 48 pixels from its own edge, so it ends a gap into the page column: the pages
@@ -335,8 +336,18 @@ constexpr std::string_view kBottomBar = R"css(
     }
 }
 
-.playbar-controls {
-    grid-column: 1;
+/* The buttons in the middle of the window and the toggles against its right edge: each column spans every cell of the
+   bar (four, the last a narrow one Apple keeps for the window's buttons), so Apple's column widths no longer push them
+   off centre. */
+.playbar-controls,
+.playbar-extras {
+    grid-column: 0;
+    grid-column-span: 4;
+}
+
+/* The cell kept for the window's buttons, which stay at the top: the toggles take it. */
+.caption-buttons-cover {
+    visibility: collapsed;
 }
 
 /* The song stands a gap in from the window's edge, and the bar's height around its 54-pixel artwork leaves it square:
@@ -383,8 +394,24 @@ constexpr std::string_view kBottomBar = R"css(
 
 /* Volume, lyrics and queue at the right end of the bar. */
 .playbar-toggles {
+    grid-column-span: 2;
     horizontal-alignment: right;
-    margin: 0 16 0 0;
+    margin: 0 var(--gap, 8) 0 0;
+}
+
+/* Apple shows the elapsed and remaining times under the pointer, at the bottom corners of the title block: with the
+   title and artist at the left, they covered the artist. They go down to the ends of the progress line, which leaves
+   them room. */
+.current-time {
+    margin: 0 2 -15 10;
+}
+
+.duration {
+    margin: 0 4 -15 6;
+}
+
+.scrubber {
+    margin: 0 46 0 48;
 }
 
 .frost {

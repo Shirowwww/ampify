@@ -63,6 +63,10 @@ std::string AlignmentText(xaml::HorizontalAlignment value);
 std::string AlignmentText(xaml::VerticalAlignment value);
 double ParseLength(const std::string& text);
 std::string ShortName(const std::string& fullType);
+// COM identity: two projections of one object compare equal only through their IUnknown.
+inline void* ComIdentity(const winrt::Windows::Foundation::IUnknown& object) {
+    return object ? winrt::get_abi(object.as<winrt::Windows::Foundation::IUnknown>()) : nullptr;
+}
 std::optional<std::uint32_t> ItemPosition(const xaml::DependencyObject& object, std::optional<std::uint32_t> target);
 // A ::before or ::after image of a theme (named AmpifyDecorBefore or AmpifyDecorAfter), which Snapshot and the Order
 // positions leave out.

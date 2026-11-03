@@ -74,6 +74,14 @@ bool Palette::Define(std::string_view name, Argb color) {
     return m_colors.emplace(key, color).second;
 }
 
+void Palette::Set(std::string_view name, Argb color) {
+    if (!name.empty()) m_colors[ToLowerAscii(name)] = color;
+}
+
+void Palette::Remove(std::string_view name) {
+    m_colors.erase(ToLowerAscii(name));
+}
+
 std::optional<Argb> Palette::Find(std::string_view name) const {
     std::string key = ToLowerAscii(name);
     auto it = m_colors.find(key);
