@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "artwork",
   "name": "Artwork",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "The artwork of the current track fills the window, under dark glass panels that float.",

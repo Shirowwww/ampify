@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "glass",
   "name": "Glass",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "A complete redesign: gradient and acrylic backgrounds, large rounded cards, larger text, buttons that grow on hover, shadows.",

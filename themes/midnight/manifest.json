@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "midnight",
   "name": "Midnight",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "An ink-blue night: the window fades from a deep blue sky to black behind two rounded panels edged with a faint moonlit line, and a pale moonlight blue marks what plays, what is chosen and the arrows of each shelf.",

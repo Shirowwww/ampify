@@ -189,3 +189,10 @@
 .fullscreen-artwork {
     corner-radius: var(--panel-radius);
 }
+
+/* Folded, the column of icons is the sidebar panel (ampify:floating-panels): it takes the glass. */
+@media (max-width: 1324px) {
+    .sidebar-column {
+        backdrop: var(--glass);
+    }
+}

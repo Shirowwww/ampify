@@ -149,3 +149,11 @@
     border-color: var(--line);
     corner-radius: 4px;
 }
+
+/* Folded, the column of icons is the sidebar panel (ampify:floating-panels): it takes the outline. */
+@media (max-width: 1324px) {
+    .sidebar-column {
+        border-width: 2;
+        border-color: var(--line);
+    }
+}

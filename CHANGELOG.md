@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.3 (2026-11-03)
+
+- In a narrow window, where Apple Music folds the sidebar to its icons, the floating themes cut the sidebar panel
+  square on its right and left the menu button off to the side. The column of icons is now the panel, rounded on
+  both sides, with the menu button over the icons, and the sidebar the menu opens is a rounded panel too. New names
+  for themes: `.sidebar-column` and `.sidebar-toggle-area`.
+
 ## 1.3.2 (2026-11-03)
 
 - The background launcher, which runs without administrator rights, no longer tries four times a second to open the

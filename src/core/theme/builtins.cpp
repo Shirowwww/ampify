@@ -31,6 +31,8 @@ const std::vector<ClassEntry> kClasses{
     {"navigation", {"NavigationView#NavView"}},
     {"sidebar-header", {"Grid#PaneHeaderGrid"}},
     {"sidebar-toggle", {"Button#TogglePaneButton"}},
+    {"sidebar-toggle-area", {"Grid#PaneToggleButtonGrid"}},
+    {"sidebar-column", {"SplitView#RootSplitView > Grid > Grid#PaneRoot > Border > Grid#PaneContentGrid"}},
     {"back-button", {"Button#NavigationViewBackButton"}},
     {"app-name", {"TextBlock#AppName"}},
     {"search-area", {"Grid#AutoSuggestArea"}},
@@ -261,6 +263,25 @@ constexpr std::string_view kFloatingPanels = R"css(
    way. Wider than 48 shows the start of the texts Apple Music hides there. */
 .navigation {
     compact-pane-length: var(--compact-pane, 48);
+}
+
+/* Folded, Apple Music cuts the sidebar panel at the end of its column of icons, a square edge on a rounded panel: the
+   column becomes the panel, rounded on both sides, and so does the sidebar Apple opens over the page from the menu
+   button. That button sat at the window's edge, a gap left of the icons: it moves over them. */
+@media (max-width: 1324px) {
+    .sidebar {
+        background: transparent !important;
+        border-width: 0 !important;
+    }
+
+    .sidebar-column {
+        background: var(--panel-background, #17171A);
+        corner-radius: var(--panel-radius, 10px);
+    }
+
+    .sidebar-toggle-area {
+        margin: 0 0 0 var(--gap, 8);
+    }
 }
 
 .content {

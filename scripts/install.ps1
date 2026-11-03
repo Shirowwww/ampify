@@ -6,7 +6,7 @@
 # then runs the installer it contains (ampify_setup.exe /silent). Nothing needs administrator rights: Ampify installs
 # for the current user. Works in Windows PowerShell 5.1 and PowerShell 7.
 #
-# To install a given version instead of the latest: $env:AMPIFY_VERSION = '1.3.2' before the line above.
+# To install a given version instead of the latest: $env:AMPIFY_VERSION = '1.3.3' before the line above.
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'  # the progress bar of Invoke-WebRequest slows downloads a lot in 5.1

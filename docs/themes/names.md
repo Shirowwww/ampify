@@ -36,6 +36,8 @@ read on Apple Music 1.1792.
 | `.navigation` | The navigation view that holds the sidebar and the pages |
 | `.sidebar-header` | The top of the sidebar, with the app name |
 | `.sidebar-toggle` | The button that folds the sidebar |
+| `.sidebar-toggle-area` | The area of that button, at the top of the folded sidebar |
+| `.sidebar-column` | The column of the sidebar's icons and items, all that shows of the sidebar when folded |
 | `.back-button` | The back button |
 | `.app-name` | The "Music" title |
 | `.search-area` | The area around the search box |
