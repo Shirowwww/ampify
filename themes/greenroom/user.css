@@ -14,17 +14,68 @@
     --raised: #1F1F1F;
     --hover: #2A2A2A;
     --band-background: #181818;
+    --bar-height: var(--setting-bar-height);
+    --bar-room: calc(var(--setting-bar-height) + var(--setting-gap));
 }
 
 @import "ampify:floating-panels";
-@import "ampify:bottom-bar";
 
 /* ---- Playback bar ------------------------------------------------------------------------------------------------- */
 
-/* The now-playing display loses its box: artwork, title and artist sit on the bar. */
-.lcd {
-    background: transparent;
-    border-width: 0;
+/* The bar-position setting: at the bottom across the window (the default), or at the top as Apple has it. */
+@setting bar-position = Bottom {
+    @import "ampify:bottom-bar";
+
+    /* The buttons sit in the middle of the window and the toggles against its right edge, as in Spotify: each column
+       spans every cell of the bar (four, the last a narrow one Apple keeps empty), so Apple's column widths no longer
+       push them off centre. */
+    .playbar-controls {
+        grid-column: 0;
+        grid-column-span: 4;
+    }
+
+    .playbar-extras {
+        grid-column: 0;
+        grid-column-span: 4;
+    }
+
+    /* The second cell kept room for the window's buttons, which sit at the top now: the toggles take it. */
+    .caption-buttons-cover {
+        visibility: collapsed;
+    }
+
+    .playbar-toggles {
+        grid-column-span: 2;
+        margin: 0 var(--gap) 0 0;
+    }
+
+    /* The now-playing display loses its box: artwork, title and artist sit on the bar. */
+    .lcd {
+        background: transparent;
+        border-width: 0;
+    }
+
+    /* Apple shows the elapsed and remaining times under the pointer, at the bottom corners of the title block: with
+       the title and artist at the left, they covered the artist. They go down to the progress line, one at each end,
+       and the line leaves them room. */
+    .current-time {
+        margin: 0 2 -15 10;
+    }
+
+    .duration {
+        margin: 0 4 -15 6;
+    }
+
+    .scrubber {
+        margin: 0 46 0 48;
+    }
+}
+
+/* The bar-background setting: the bar takes the colours of the playing song's artwork, fading into the window. */
+@setting bar-background = Artwork {
+    .playbar {
+        background: linear-gradient(90deg, var(--art-3, #121212) 0%, #00000000 70%);
+    }
 }
 
 .lcd-artwork-image {
@@ -48,18 +99,26 @@
     }
 }
 
-/* Apple Music animates this button itself, so the growth is immediate: a transition here would be refused. */
+/* Slightly larger under the pointer, and back, in 120 ms. Ampify versions that cannot animate this button (Apple
+   Music animates it itself) ignore the transition and grow it at once. */
+.play-button {
+    transition: transform 120ms;
+}
+
 .play-button:hover {
     transform: scale(1.06);
 }
 
 /* Volume: a white bar on a grey track. */
-.volume-slider {
+/* The progress line takes the volume's colours (older Ampify versions leave it to Apple Music). */
+.volume-slider,
+.scrubber {
     color: #FFFFFF;
     background: #4D4D4D;
 }
 
-.volume-slider Thumb {
+.volume-slider Thumb,
+.scrubber Thumb {
     background: #FFFFFF;
 }
 
@@ -86,7 +145,10 @@
 }
 
 /* Cards: a raised tile behind the artwork and its titles under the pointer. */
+/* The tile under the pointer keeps 8 around the artwork and its titles, so that they never touch its edge.
+   Apple Music sets each card's width: the padding takes the room from the artwork, as on Spotify. */
 .card {
+    padding: 8;
     corner-radius: 6px;
     transition: background 180ms;
 }

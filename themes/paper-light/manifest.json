@@ -5,15 +5,16 @@
   "version": "1.1.3",
   "kind": "theme",
   "author": "Shirowwww",
-  "description": "Plain, light paper theme, with an optional dark scheme.",
-  "translations": {"fr": {"name": "Papier clair", "description": "Un thème simple, couleur papier clair, avec une variante sombre en option."}, "de": {"name": "Helles Papier", "description": "Ein schlichtes Design in der Farbe von hellem Papier, mit einer dunklen Variante als Option."}, "es": {"name": "Papel claro", "description": "Un tema sencillo, color papel claro, con una variante oscura opcional."}, "pt": {"name": "Papel claro", "description": "Um tema simples, na cor de papel claro, com uma variante escura opcional."}, "ru": {"name": "Светлая бумага", "description": "Простая тема цвета светлой бумаги, с тёмным вариантом на выбор."}, "ja": {"name": "ライトペーパー", "description": "明るい紙のような色合いのシンプルなテーマです。ダークのバリエーションも選べます。"}, "zh": {"name": "浅色纸张", "description": "简洁的浅色纸张主题，另有可选的深色配色。"}},
+  "description": "An editorial look, as if printed: the sidebar and the pages are one sheet of warm paper parted by a hairline, titles in a serif, nearly square corners, ruled song lists and an ink-green accent. A dark scheme too.",
+  "translations": {"fr": {"name": "Papier clair", "description": "Un style éditorial, comme imprimé : la barre latérale et les pages forment une seule feuille de papier chaud séparée par un filet, titres en serif, coins presque carrés, listes réglées comme un cahier et accent vert encre. Variante sombre aussi."}, "de": {"name": "Helles Papier", "description": "Ein redaktioneller Look wie gedruckt: Seitenleiste und Seiten sind ein Blatt warmes Papier, getrennt durch eine Haarlinie, Titel in Serifenschrift, fast eckige Ecken, linierte Titellisten und ein tintengrüner Akzent. Auch dunkel."}, "es": {"name": "Papel claro", "description": "Un estilo editorial, como impreso: la barra lateral y las páginas son una sola hoja de papel cálido separada por un filete, títulos con serifa, esquinas casi rectas, listas rayadas y un acento verde tinta. También en oscuro."}, "pt": {"name": "Papel claro", "description": "Um visual editorial, como impresso: a barra lateral e as páginas são uma só folha de papel quente separada por um filete, títulos com serifa, cantos quase retos, listas pautadas e um destaque verde-tinta. Também escuro."}, "ru": {"name": "Светлая бумага", "description": "Редакционный стиль, будто напечатано: боковая панель и страницы — один лист тёплой бумаги, разделённый тонкой линией, заголовки с засечками, почти прямые углы, линованные списки и акцент цвета зелёных чернил. Есть тёмный вариант."}, "ja": {"name": "ライトペーパー", "description": "印刷物のような誌面風デザイン。サイドバーとページは細い罫線で分けた一枚の温かい紙、見出しはセリフ体、角はほぼ直角、曲の一覧は罫線入りで、アクセントはインクのような緑。ダーク版もあります。"}, "zh": {"name": "浅色纸张", "description": "如同印刷品的编辑风格：侧边栏和页面是一张由细线分隔的暖色纸张，标题使用衬线字体，边角近乎直角，歌曲列表带横线，强调色为墨绿色。另有深色配色。"}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Light",
   "tags": [
     "light",
     "minimal",
-    "colors"
+    "editorial",
+    "layout"
   ],
   "preview": "preview.jpg"
 }

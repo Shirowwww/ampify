@@ -1814,8 +1814,8 @@ TEST_CASE(Inspector_ShowsTheColourOfAnAppBrushKeptAsAnObject) {
 // --- Example themes shipped in the repository ------------------------------------------------------------
 
 TEST_CASE(Examples_LoadWithoutProblems) {
-    for (const char* name : {"midnight", "greenroom", "hide-chrome", "glass", "artwork", "catppuccin", "nord", "dracula",
-                                "rose-pine", "tokyo-night", "gruvbox", "comfy", "dribbblish"}) {
+    for (const char* name : {"midnight", "greenroom", "glass", "artwork", "palettes", "paper-light", "rose-gold",
+                                "high-contrast"}) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
@@ -1828,10 +1828,27 @@ TEST_CASE(Examples_LoadWithoutProblems) {
     }
 }
 
+// Palettes gathers the colour-only themes: each of its schemes loads alone, without a problem, and sets colours.
+TEST_CASE(Examples_EveryPaletteLoadsWithoutProblems) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "palettes";
+    th::FolderFiles files(folder);
+    th::Theme first = th::LoadTheme("palettes", folder.generic_string(), files);
+    CHECK(first.schemes.size() == 17);
+    for (const std::string& scheme : first.schemes) {
+        th::LoadOptions options;
+        options.scheme = scheme;
+        th::Theme theme = th::LoadTheme("palettes", folder.generic_string(), files, options);
+        CHECK(theme.usable);
+        for (const std::string& problem : theme.problems) {
+            ampify::test::ReportFailure(__FILE__, __LINE__, "palettes " + scheme + " : " + problem);
+        }
+        CHECK(!theme.resources.empty());
+    }
+}
+
 // Each shipped theme with settings, every setting moved off its default: still no problem, and more or fewer rules.
 TEST_CASE(Examples_LoadWithEverySettingChanged) {
-    for (const char* name : {"midnight", "greenroom", "glass", "catppuccin", "nord", "dracula", "rose-pine", "tokyo-night",
-                                "gruvbox", "comfy", "dribbblish"}) {
+    for (const char* name : {"midnight", "greenroom", "glass", "palettes", "artwork"}) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         std::optional<std::string> manifest = files.Read("manifest.json");
@@ -1851,7 +1868,17 @@ TEST_CASE(Examples_LoadWithEverySettingChanged) {
         for (const std::string& problem : changed.problems) {
             ampify::test::ReportFailure(__FILE__, __LINE__, std::string(name) + " : " + problem);
         }
-        CHECK(changed.assignments.size() != byDefault.assignments.size());
+        // A setting adds or removes rules (@setting) or changes values (--setting-<key>): either shows here.
+        auto written = [](const th::Theme& theme) {
+            std::vector<std::string> lines;
+            for (const th::Assignment& a : theme.assignments) {
+                lines.push_back(a.selector.text + " " + a.property + " " + a.value.text);
+            }
+            return lines;
+        };
+        if (written(changed) == written(byDefault)) {
+            ampify::test::ReportFailure(__FILE__, __LINE__, std::string(name) + " : the settings changed no rule");
+        }
     }
 }
 
@@ -2988,7 +3015,7 @@ TEST_CASE(Inspector_ExportsTheTreeAsJson) {
 TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
     const std::filesystem::path source(AMPIFY_SOURCE_DIR);
     std::vector<std::string> themes = th::ListThemeFolders(source / "themes");
-    CHECK(themes.size() >= 9);
+    CHECK(themes.size() >= 8);
     std::shared_ptr<const th::Theme> base;
     for (const std::string& name : themes) {
         std::filesystem::path folder = source / "themes" / name;

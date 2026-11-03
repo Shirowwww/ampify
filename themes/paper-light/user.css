@@ -1,2 +1,157 @@
-/* Thin scroll bars kept clear of the window's edges, without Windows' arrows. */
+/* Light paper: an editorial look, as if the music were printed. The sidebar and the pages are one sheet of the same
+   paper, parted by a hairline instead of two panels of different shades; titles are set in a serif; corners are nearly
+   square, and the ink-green accent marks what plays. Colors come from colors.ini; the classes are Ampify's stable names
+   for Apple Music's zones (docs/themes/names.md). */
+
+:root {
+    --window-background: $SolidBackgroundFillColorBaseBrush;
+    --panel-background: $ApplicationPageBackgroundThemeBrush;
+    --band-background: $CardBackgroundFillColorDefaultBrush;
+    --panel-radius: 0px;
+    --gap: 0;
+    --line: $ControlStrokeColorDefaultBrush;
+    --font-title: Georgia;
+    --font-title-weight: 400;
+}
+
+@import "ampify:floating-panels";
 @import "ampify:scrollbars";
+
+/* ---- One sheet, a hairline between the sidebar and the pages ----------------------------------------------------- */
+
+.sidebar {
+    border-width: 0 1 0 0;
+    border-color: var(--line);
+}
+
+/* The page column starts at the hairline: the playback bar sits on the same paper, and a line runs under it. */
+.content {
+    border-width: 1 0 0 0;
+    border-color: var(--line);
+}
+
+.sidebar-item {
+    corner-radius: 2px;
+}
+
+/* ---- Type: serif titles, quiet small captions --------------------------------------------------------------------- */
+
+.page-title {
+    font-family: Georgia;
+    font-weight: 400;
+    font-size: 115%;
+}
+
+.shelf-title,
+.section-header {
+    font-family: Georgia;
+    font-weight: 400;
+}
+
+.app-name {
+    font-family: Georgia;
+    font-weight: 400;
+}
+
+/* ---- Playback bar: printed, not boxed ----------------------------------------------------------------------------- */
+
+.lcd {
+    background: transparent;
+    border-width: 1;
+    border-color: var(--line);
+    corner-radius: 2px;
+}
+
+.lcd-artwork-image {
+    corner-radius: 0;
+}
+
+.track-title {
+    font-family: Georgia;
+}
+
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 3px;
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+/* The progress line takes the volume's colours (older Ampify versions leave it to Apple Music). */
+.volume-slider,
+.scrubber {
+    color: $AccentFillColorDefaultBrush;
+    background: var(--line);
+}
+
+.volume-slider Thumb,
+.scrubber Thumb {
+    background: $TextFillColorPrimaryBrush;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $ApplicationPageBackgroundThemeBrush;
+    border-width: 1;
+    border-color: var(--line);
+    corner-radius: 2px;
+}
+
+.menu-item:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+/* ---- Pages -------------------------------------------------------------------------------------------------------- */
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.now-playing-indicator {
+    color: $AccentFillColorDefaultBrush;
+}
+
+.shelf-arrow-left,
+.shelf-arrow-right {
+    background: $ApplicationPageBackgroundThemeBrush;
+    border-width: 1;
+    border-color: var(--line);
+    corner-radius: 2px;
+}
+
+/* The tile under the pointer keeps 8 around the artwork and its titles, so that they never touch its edge.
+   Apple Music sets each card's width: the padding takes the room from the artwork, as on Spotify. */
+.card {
+    padding: 8;
+    corner-radius: 2px;
+    transition: background 160ms;
+}
+
+.card:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+.artwork {
+    corner-radius: 0;
+}
+
+/* Rows are ruled like a ledger. */
+.track-row {
+    border-width: 0 0 1 0;
+    border-color: var(--line);
+    corner-radius: 0;
+}
+
+.track-row:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+.settings-card {
+    background: $ApplicationPageBackgroundThemeBrush;
+    border-width: 1;
+    border-color: var(--line);
+    corner-radius: 2px;
+}

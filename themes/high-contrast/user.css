@@ -1,0 +1,151 @@
+/* High contrast: black and white with one bright accent, and outlines instead of shades. Every panel, card, display
+   and menu is drawn with a 2 pixel line, what is under the pointer gets an accent outline, and corners stay small, so
+   the edges read at a glance. Colors come from colors.ini; the classes are Ampify's stable names for Apple Music's
+   zones (docs/themes/names.md). */
+
+:root {
+    --window-background: $SolidBackgroundFillColorBaseBrush;
+    --panel-background: $ApplicationPageBackgroundThemeBrush;
+    --band-background: $ApplicationPageBackgroundThemeBrush;
+    --panel-radius: 4px;
+    --gap: 8;
+    --line: $TextFillColorPrimaryBrush;
+    --accent: $AccentFillColorDefaultBrush;
+}
+
+@import "ampify:floating-panels";
+@import "ampify:scrollbars";
+
+/* ---- Panels: outlined, never shaded ------------------------------------------------------------------------------- */
+
+.sidebar,
+.content,
+.lyrics-panel {
+    border-width: 2;
+    border-color: var(--line);
+}
+
+.page-title {
+    font-weight: 800;
+}
+
+.shelf-title,
+.section-header {
+    font-weight: 700;
+}
+
+/* ---- Playback bar ------------------------------------------------------------------------------------------------- */
+
+.lcd {
+    background: $SolidBackgroundFillColorBaseBrush;
+    border-width: 2;
+    border-color: var(--line);
+    corner-radius: 4px;
+}
+
+.lcd-artwork-image {
+    corner-radius: 0;
+}
+
+/* Play: the accent, with a black outline that keeps the button's edge on any background. */
+.play-button > Grid#Root {
+    background: var(--accent);
+    border-width: 2;
+    border-color: var(--line);
+    corner-radius: 4px;
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+/* The progress line takes the volume's colours (older Ampify versions leave it to Apple Music). */
+.volume-slider,
+.scrubber {
+    color: var(--accent);
+    background: var(--line);
+}
+
+.volume-slider Thumb,
+.scrubber Thumb {
+    background: var(--accent);
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $SolidBackgroundFillColorBaseBrush;
+    border-width: 2;
+    border-color: var(--line);
+    corner-radius: 4px;
+}
+
+.menu-item:hover {
+    background: var(--accent);
+    color: $TextOnAccentFillColorPrimaryBrush;
+}
+
+/* ---- Pages: an accent outline under the pointer ------------------------------------------------------------------- */
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.now-playing-indicator {
+    color: var(--accent);
+}
+
+.shelf-arrow-left,
+.shelf-arrow-right {
+    background: $SolidBackgroundFillColorBaseBrush;
+    border-width: 2;
+    border-color: var(--line);
+    corner-radius: 4px;
+}
+
+.shelf-arrow-left:hover,
+.shelf-arrow-right:hover {
+    background: var(--accent);
+    color: $TextOnAccentFillColorPrimaryBrush;
+}
+
+/* The outline under the pointer keeps 6 around the artwork and its titles, so that they never touch its edge.
+   Apple Music sets each card's width: the padding takes the room from the artwork, as on Spotify. */
+.card {
+    padding: 6;
+    border-width: 2;
+    border-color: transparent;
+    corner-radius: 4px;
+}
+
+.card:hover {
+    border-color: var(--accent);
+}
+
+.artwork {
+    corner-radius: 0;
+}
+
+.track-row {
+    border-width: 2;
+    border-color: transparent;
+    corner-radius: 4px;
+}
+
+.track-row:hover {
+    border-color: var(--accent);
+}
+
+.settings-card {
+    background: $SolidBackgroundFillColorBaseBrush;
+    border-width: 2;
+    border-color: var(--line);
+    corner-radius: 4px;
+}
+
+.album-play-button,
+.album-shuffle-button {
+    border-width: 2;
+    border-color: var(--line);
+    corner-radius: 4px;
+}

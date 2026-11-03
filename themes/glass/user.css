@@ -45,6 +45,9 @@
     margin: 3 4;
     font-size: 15px;
     transform-origin: left center;
+    /* Without it the entry jumped by 4 pixels at once, which read as a bounce when the pointer went from one to the
+       next. Ampify versions that cannot animate this element ignore it and keep the jump. */
+    transition: transform 160ms;
 }
 
 @setting hover-grow {

@@ -76,11 +76,21 @@
     transform: scale(1.1);
 }
 
+/* The volume and the progress line take the artwork's most vibrant colour, like the window: the theme's pink only
+   until the first artwork (older Ampify versions leave the progress line to Apple Music). */
+.volume-slider,
+.scrubber {
+    color: var(--art-2, #FFFF5C8A);
+}
+
 .app-name {
     font-weight: 700;
 }
 
+/* The tile under the pointer keeps 8 around the artwork and its titles, so that they never touch its edge.
+   Apple Music sets each card's width: the padding takes the room from the artwork, as on Spotify. */
 .card {
+    padding: 8;
     corner-radius: 12px;
     transition: background 180ms;
 }
@@ -89,8 +99,9 @@
     background: #1FFFFFFF;
 }
 
+/* Square artwork, as on a record sleeve: only a hint of a corner. */
 .artwork {
-    corner-radius: 10px;
+    corner-radius: 4px;
 }
 
 /* Apple's full-screen player (Now Playing): its large artwork takes the panels' corners. */
