@@ -79,7 +79,11 @@ public:
 
 private:
     struct Seen {
-        HANDLE process = nullptr;  // null when Windows refuses to open it: tried again at the next look
+        // Null when Windows refuses to open it (an administrator's process, for a launcher without those rights):
+        // tried again after `retryIn` more looks, since opening hundreds of them four times a second costs more
+        // than the whole watch. Apple Music always opens, so an id it takes over is seen within that delay.
+        HANDLE process = nullptr;
+        unsigned retryIn = 0;
         bool named = false;
     };
     Seen Look(DWORD id) const;

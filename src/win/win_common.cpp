@@ -219,9 +219,13 @@ ProcessWatch::~ProcessWatch() {
 }
 
 ProcessWatch::Seen ProcessWatch::Look(DWORD id) const {
+    constexpr unsigned kRefusedRetryLooks = 7;  // two seconds at four looks a second
     Seen seen;
     seen.process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, id);
-    if (!seen.process) return seen;
+    if (!seen.process) {
+        seen.retryIn = kRefusedRetryLooks;
+        return seen;
+    }
     wchar_t path[MAX_PATH];
     DWORD size = MAX_PATH;
     if (QueryFullProcessImageNameW(seen.process, 0, path, &size)) {
@@ -256,6 +260,9 @@ bool ProcessWatch::Running() {
         bool known = old != m_seen.end() && old->first == id;
         if (known && old->second.process && WaitForSingleObject(old->second.process, 0) == WAIT_TIMEOUT) {
             seen = old->second;
+        } else if (known && !old->second.process && old->second.retryIn > 0) {
+            seen = old->second;
+            seen.retryIn--;
         } else {
             if (known && old->second.process) CloseHandle(old->second.process);
             seen = Look(id);

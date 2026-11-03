@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.2 (2026-11-03)
+
+- The background launcher, which runs without administrator rights, no longer tries four times a second to open the
+  programs an administrator started: it tries every two seconds. 1.5 ms of processor a second instead of 4.
+
 ## 1.3.1 (2026-11-03)
 
 - Much lighter on the processor. An endless theme animation, such as the Spinning artwork record, made Apple Music
