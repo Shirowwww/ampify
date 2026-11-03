@@ -1,0 +1,84 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "skip-list",
+  "name": "Skip list",
+  "version": "0.1.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Never hear a song, album or artist again, like Spicetify's Trash Bin and Auto Skip. Add from the context menu or the playback bar, manage the list from the main menu, and optionally skip live versions, remixes and intros.",
+  "translations": {
+    "fr": {
+      "name": "Liste d'exclusion",
+      "description": "Ne plus jamais entendre un morceau, un album ou un artiste, comme Trash Bin et Auto Skip sur Spicetify. Ajoutez depuis le menu contextuel ou la barre de lecture, gérez la liste depuis le menu principal, et passez au choix les versions live, remix et intros.",
+      "settings": {
+        "skip-live": "Passer les versions live",
+        "skip-remixes": "Passer les remix",
+        "skip-intros": "Passer les intros, interludes et skits"
+      }
+    },
+    "de": {
+      "name": "Überspringliste",
+      "description": "Einen Titel, ein Album oder einen Künstler nie wieder hören, wie Trash Bin und Auto Skip in Spicetify. Hinzufügen per Kontextmenü oder Wiedergabeleiste, Liste im Hauptmenü verwalten, auf Wunsch Live-Versionen, Remixe und Intros überspringen.",
+      "settings": {
+        "skip-live": "Live-Versionen überspringen",
+        "skip-remixes": "Remixe überspringen",
+        "skip-intros": "Intros, Interludes und Skits überspringen"
+      }
+    },
+    "es": {
+      "name": "Lista de omitidos",
+      "description": "No volver a escuchar nunca una canción, un álbum o un artista, como Trash Bin y Auto Skip en Spicetify. Añade desde el menú contextual o la barra de reproducción, gestiona la lista desde el menú principal y, si quieres, salta versiones en directo, remixes e intros.",
+      "settings": {
+        "skip-live": "Saltar las versiones en directo",
+        "skip-remixes": "Saltar los remixes",
+        "skip-intros": "Saltar intros, interludios y skits"
+      }
+    },
+    "pt": {
+      "name": "Lista de ignorados",
+      "description": "Nunca mais ouvir uma música, um álbum ou um artista, como Trash Bin e Auto Skip no Spicetify. Adicione pelo menu de contexto ou pela barra de reprodução, gerencie a lista pelo menu principal e, se quiser, pule versões ao vivo, remixes e intros.",
+      "settings": {
+        "skip-live": "Pular versões ao vivo",
+        "skip-remixes": "Pular remixes",
+        "skip-intros": "Pular intros, interlúdios e skits"
+      }
+    },
+    "ru": {
+      "name": "Список пропуска",
+      "description": "Больше никогда не слушать трек, альбом или исполнителя, как Trash Bin и Auto Skip в Spicetify. Добавляйте через контекстное меню или панель воспроизведения, управляйте списком из главного меню и при желании пропускайте концертные версии, ремиксы и интро.",
+      "settings": {
+        "skip-live": "Пропускать концертные версии",
+        "skip-remixes": "Пропускать ремиксы",
+        "skip-intros": "Пропускать интро, интерлюдии и скиты"
+      }
+    },
+    "ja": {
+      "name": "スキップリスト",
+      "description": "Spicetify の Trash Bin と Auto Skip のように、曲・アルバム・アーティストを二度と再生しません。コンテキストメニューや再生バーから追加し、メインメニューでリストを管理できます。ライブ版、リミックス、イントロのスキップも選べます。",
+      "settings": {
+        "skip-live": "ライブ版をスキップ",
+        "skip-remixes": "リミックスをスキップ",
+        "skip-intros": "イントロ・インタールード・スキットをスキップ"
+      }
+    },
+    "zh": {
+      "name": "跳过列表",
+      "description": "像 Spicetify 的 Trash Bin 和 Auto Skip 一样，不再播放某首歌、某张专辑或某位艺术家。可从右键菜单或播放栏添加，在主菜单中管理列表，还可选择跳过现场版、混音版和前奏。",
+      "settings": {
+        "skip-live": "跳过现场版",
+        "skip-remixes": "跳过混音版",
+        "skip-intros": "跳过前奏、间奏和 skit"
+      }
+    }
+  },
+  "tags": ["skip", "filter"],
+  "kitApi": "1.0",
+  "preview": "preview.jpg",
+  "main": "main.js",
+  "permissions": ["player.read", "player.control", "storage", "ui.menu", "ui.playbar", "ui.popup"],
+  "settings": [
+    {"key": "skip-live", "label": "Skip live versions", "type": "toggle", "default": false},
+    {"key": "skip-remixes", "label": "Skip remixes", "type": "toggle", "default": false},
+    {"key": "skip-intros", "label": "Skip intros, interludes and skits", "type": "toggle", "default": false}
+  ]
+}

@@ -14,9 +14,5 @@
     "player.control",
     "ui.keyboard"
   ],
-  "tags": [
-    "example",
-    "keyboard",
-    "shortcuts"
-  ]
+  "tags": ["keyboard", "shortcuts"]
 }

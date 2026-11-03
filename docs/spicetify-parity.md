@@ -144,8 +144,10 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Cover Ambience | Snippet `cover-ambience` | Done |
 | Volume Percentage | Extension `volume-percentage`: the volume of Apple Music as a percentage, in the playback bar | Done |
 | Lyrics Plus | Apple's synced lyrics and translation, in its full-screen player and lyrics pane | Done |
-| Stats | App `listening-stats`: top artists and songs over 7 days, 4 weeks or since the start, listening time, kept on the PC; no account-wide history | Done |
-| New Releases | Apple Music's own New page | Done |
+| Stats | App `listening-stats`: listening time, plays, top artists, songs and albums over 7 days, 4 weeks or since the start, day by day and hour by hour, kept on the PC; no account-wide history | Done |
+| New Releases | App `new-releases`: the recent albums and singles of the artists you play, from Apple's public catalog; Apple Music's own New page too | Done |
+| Trash Bin, Auto Skip | Extension `skip-list`: "Never play this" in the menus and a play bar button, the list in the main menu; skips live versions, remixes and intros on request | Done |
+| Full Screen settings | Snippet settings can change Apple's full-screen player, and Ampify adds shuffle and repeat around its transport buttons; the player Apple opens by itself in screen mode has neither | Partial |
 | Shuffle+ (true shuffle) | Needs `addToQueue`, which Apple ignores | Missing |
 | adblockify, Toggle DJ, "Made for you" shortcut, HomeWhereYouBelong, No Tracking Links | Spotify only: Apple Music has no ads, no DJ, and its share links carry no tracking | Missing |
 

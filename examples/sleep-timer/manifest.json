@@ -17,9 +17,5 @@
   "settings": [
     {"key": "minutes", "label": "Minutes before the pause", "type": "number", "min": 1, "max": 600, "default": 30}
   ],
-  "tags": [
-    "example",
-    "timer",
-    "sleep"
-  ]
+  "tags": ["timer", "sleep"]
 }

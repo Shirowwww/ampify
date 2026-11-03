@@ -304,7 +304,7 @@ test("discord-presence prefers the exact title to a remix of the same album", as
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "Flame", "Artist", "Flame - Single"), 200_000));
   await settle();
-  assert.deepEqual(fake.world.activities.at(-1).buttons.at(-1), { label: "song.link", url: "https://song.link/i/6" });
+  assert.deepEqual(fake.world.activities.at(-1).buttons.at(-1), { label: "Other platforms", url: "https://song.link/i/6" });
 });
 
 test("discord-presence does not take a longer title for the one playing", async () => {
@@ -315,7 +315,7 @@ test("discord-presence does not take a longer title for the one playing", async 
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "Air", "Artist"), 200_000));
   await settle();
-  assert.ok(fake.world.activities.at(-1).buttons.every((button) => button.label !== "song.link"));
+  assert.ok(fake.world.activities.at(-1).buttons.every((button) => button.label !== "Other platforms"));
 });
 
 test("discord-presence leaves out a button whose link is too long for Discord", async () => {
@@ -371,7 +371,7 @@ test("discord-presence shows what is playing as Listening, with the catalog's co
   assert.equal(shown.largeUrl, "https://music.apple.com/us/album/album/1");
   assert.deepEqual(shown.buttons, [
     { label: "Listen on Apple Music", url: "https://music.apple.com/us/album/album/1?i=42" },
-    { label: "song.link", url: "https://song.link/i/42" },
+    { label: "Other platforms", url: "https://song.link/i/42" },
   ]);
 
   fake.emit("statechange", { ...fake.world.state, playing: false });
@@ -506,7 +506,7 @@ test("discord-presence follows the card: status line, cover, album, progress, li
   assert.equal(shown.largeText, "Apple Music");
   assert.equal(shown.startMs, undefined);
   assert.equal(shown.detailsUrl, undefined);
-  assert.deepEqual(shown.buttons, [{ label: "song.link", url: "https://song.link/i/42" }]);
+  assert.deepEqual(shown.buttons, [{ label: "Other platforms", url: "https://song.link/i/42" }]);
 
   fake.emit("statechange", { ...fake.world.state, playing: false });
   assert.equal(fake.world.cleared, 1);  // only the one at start
@@ -722,14 +722,36 @@ test("volume-percentage shows the slider's volume in the playback bar and follow
   assert.deepEqual(labels, [[7, "50 %"]]);
   intervals[0].fn();
   assert.equal(labels.length, 1, "the same volume is not written again");
+  assert.equal(buttons[0].onClick, undefined, "a text of the bar, not a button");
   volume = 1;
-  buttons[0].onClick();
+  intervals[0].fn();
   assert.deepEqual(labels.at(-1), [7, "100 %"]);
   volume = 0;
   intervals[0].fn();
   assert.deepEqual(labels.at(-1), [7, "0 %"], "muted");
   stops[0]();
   assert.equal(cleared, 0);
+});
+
+test("volume-percentage still loads on an Ampify that wants an onClick", () => {
+  const { source } = load("volume-percentage");
+  const buttons = [];
+  const Ampify = {
+    audio: { volume: () => 1 },
+    ui: {
+      playbar: {
+        addButton: (button) => {
+          if (typeof button.onClick !== "function") throw new TypeError("ui: onClick expects a function");
+          return buttons.push(button);
+        },
+      },
+      setLabel: () => {},
+    },
+    onStop: () => {},
+  };
+  runIn(source, { Ampify, setInterval: () => 0, clearInterval: () => {} });
+  assert.equal(buttons.length, 1);
+  assert.equal(buttons[0].label, "100 %");
 });
 
 test("listening-stats counts a play after 30 seconds of listening, once, and the time listened", () => {
@@ -788,7 +810,55 @@ test("listening-stats counts a play after 30 seconds of listening, once, and the
     node.children.forEach(walk);
   };
   walk(page);
-  assert.ok(texts.includes("Lucid Dreams · Juice WRLD"), "the top songs list the song");
+  assert.ok(texts.includes("Lucid Dreams") && texts.includes("Juice WRLD"), "the top songs list the song");
+  const hours = stored.get("all").hours;
+  assert.equal(hours.length, 24);
+  assert.equal(hours.reduce((sum, ms) => sum + ms, 0), stored.get("all").songs["t-1"].ms, "each 5 s goes to its hour");
+  const count = (node) => (!node || typeof node !== "object" ? 0 : 1 + node.children.reduce((sum, child) => sum + count(child), 0));
+  assert.ok(count(page) < 300, "the interface takes 300 nodes at most");
+});
+
+test("listening-stats keeps the album, and stays under 300 nodes with a full month", () => {
+  const { source } = load("listening-stats");
+  const stored = new Map();
+  const day = (offset) => {
+    const date = new Date(Date.now() - offset * 86400000);
+    const two = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`;
+  };
+  const songs = {};
+  for (let i = 0; i < 40; i++) songs["t-" + i] = { title: "Song " + i, artist: "Artist " + (i % 12), album: "Album " + (i % 9), plays: i + 1, ms: 60000 * (i + 1) };
+  const days = {};
+  for (let offset = 0; offset < 28; offset++) days[day(offset)] = { songs, hours: Array.from({ length: 24 }, () => 60000) };
+  stored.set("days", days);
+  stored.set("all", { songs, hours: Array.from({ length: 24 }, () => 60000) });
+  let state = { playing: true, track: { id: "t-x", title: "New", artist: "Someone", album: "Debut" } };
+  const intervals = [];
+  const Ampify = {
+    React: { h: (type, props, ...children) => ({ type, props: props ?? {}, children }), useState: (v) => [v, () => {}], useEffect: () => {} },
+    components: { Card: "Card", Dropdown: "Dropdown", Text: "Text" },
+    i18n: fakeI18n("en"),
+    storage: { get: (key, fallback) => (stored.has(key) ? structuredClone(stored.get(key)) : fallback), set: (key, value) => stored.set(key, structuredClone(value)) },
+    player: { state: () => state, on: () => {} },
+    ui: { sidebar: { addItem: () => {} }, navigate: () => {} },
+    onStop: () => {},
+  };
+  const context = { Ampify, setInterval: (fn, ms) => intervals.push({ fn, ms }) - 1, clearInterval: () => {} };
+  runIn(source, context);
+  intervals.find((interval) => interval.ms === 5000).fn();
+  assert.equal(stored.get("all").songs["t-x"].album, "Debut");
+  const expand = (node) => {
+    if (!node || typeof node !== "object") return node;
+    if (typeof node.type === "function") return expand(node.type({ ...node.props, children: node.children }));
+    return { ...node, children: node.children.flat().map(expand) };
+  };
+  const count = (node) => (!node || typeof node !== "object" ? 0 : 1 + node.children.reduce((sum, child) => sum + count(child), 0));
+  // useState gives "week": the month and all-time views are counted through a page whose state starts there.
+  for (const period of ["week", "month", "all"]) {
+    Ampify.React.useState = (v) => [typeof v === "string" ? period : v, () => {}];
+    assert.ok(count(expand(context.render())) < 300, period + ": the interface takes 300 nodes at most");
+  }
+  state = null;
 });
 
 // ---- Sleep timer and keyboard shortcuts ---------------------------------------------------------------------------
@@ -1231,4 +1301,349 @@ test("playback-guard leaves a paused song, a loading song and a song it already 
   world.state = rollout(14_000);
   run(120, { frozen: true });
   assert.equal(world.commands.filter((name) => name === "next").length, 2, "two repairs, then the song is left alone");
+});
+
+// ---- skip-list and new-releases ---------------------------------------------------------------------------------
+
+// One stand-in for the player, the playback bar, menus, the sidebar, the panel, http and timers. `used` collects each
+// permission the script really asked for, to compare with the manifest.
+function featureAmpify(name, { config = {}, storage = new Map(), language = "en", state = null } = {}) {
+  const { manifest, source } = load(name);
+  const granted = new Set(manifest.permissions ?? []);
+  const used = new Set();
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+    used.add(permission);
+  };
+  const react = fakeReact();
+  const h = react.React.h;
+  const host = (type) => (props) => h(type, { ...props, text: type === "text" ? props.children.join("") : undefined }, props.children);
+  const world = {
+    logs: [], commands: [], buttons: [], menus: [], labels: [], sidebar: [], navigated: [], opened: [], gets: [],
+    intervals: [], stops: [], handlers: { trackchange: [], statechange: [] }, target: "", inFlight: 0, maxInFlight: 0,
+    getAnswer: () => ({ status: 0, text: "" }),
+    state: state ?? { playing: false, positionMs: 0, durationMs: 0, track: null },
+  };
+  const command = (label) => (...args) => (need("player.control"), world.commands.push([label, ...args].join(" ")), true);
+  const Ampify = {
+    log: (message) => world.logs.push(String(message)),
+    onStop: (fn) => world.stops.push(fn),
+    config: { get: (key, fallback) => (key in config ? config[key] : fallback) },
+    storage: {
+      get: (key, fallback) => (need("storage"), storage.has(key) ? structuredClone(storage.get(key)) : fallback),
+      set: (key, value) => (need("storage"), storage.set(key, structuredClone(value))),
+    },
+    player: {
+      state: () => (need("player.read"), structuredClone(world.state)),
+      on: (event, fn) => (need("player.read"), world.handlers[event].push(fn)),
+      next: command("next"),
+      seek: command("seek"),
+    },
+    ui: {
+      menu: { addItem: (kind, item) => (need("ui.menu"), world.menus.push({ kind, ...item })) },
+      playbar: { addButton: (button) => (need("ui.playbar"), world.buttons.push(button), world.buttons.length) },
+      setLabel: (id, label) => (need("ui.playbar"), world.labels.push([id, label])),
+      sidebar: { addItem: (item) => (need("ui.sidebar"), world.sidebar.push(item)) },
+      navigate: (path) => (need("ui.page"), world.navigated.push(path)),
+    },
+    React: react.React,
+    components: Object.fromEntries(["Card", "Button", "Toggle", "Dropdown", "Text"].map((n) => [n, host(n.toLowerCase())])),
+    ReactDOM: { render: (tree, target) => (need("ui." + target.split(":")[0]), (world.target = target), react.mount(() => tree)) },
+    http: {
+      get: (url) => {
+        need(`network:${new URL(url).host}`);
+        world.gets.push(url);
+        world.maxInFlight = Math.max(world.maxInFlight, ++world.inFlight);
+        return settle().then(() => ({ ...world.getAnswer(url) })).finally(() => world.inFlight--);
+      },
+      open: (url) => (need(`network:${new URL(url).host}`), world.opened.push(url), true),
+    },
+    i18n: fakeI18n(language),
+  };
+  const context = {
+    Ampify,
+    setInterval: (fn, ms) => world.intervals.push({ fn, ms, cleared: false }) - 1,
+    clearInterval: (id) => { if (world.intervals[id]) world.intervals[id].cleared = true; },
+    setTimeout: (fn) => setImmediate(fn),
+  };
+  runIn(source, context);
+  const emit = (event, next) => {
+    world.state = next;
+    for (const fn of world.handlers[event]) fn(structuredClone(next));
+  };
+  const tick = () => world.intervals.filter((interval) => !interval.cleared).forEach((interval) => interval.fn());
+  return { world, context, manifest, used, storage, emit, tick, react };
+}
+
+const declared = (manifest) => [...(manifest.permissions ?? [])].sort();
+
+test("skip-list skips a name from the context menu, whatever its case and accents, once per track", () => {
+  const fake = featureAmpify("skip-list");
+  assert.equal(fake.world.menus[0].kind, "context");
+  assert.equal(fake.world.menus[0].label, "Never play this");
+  fake.world.menus[0].onClick({ title: "BEYONCÉ" });
+  fake.world.menus[0].onClick({ title: "beyonce" });
+  assert.deepEqual(fake.storage.get("entries"), [{ name: "BEYONCÉ", artist: "" }], "the same name is listed once");
+
+  fake.emit("trackchange", playing(song("1", "Halo", "Beyoncé"), 200_000));
+  fake.emit("statechange", playing(song("1", "Halo", "Beyoncé"), 200_000, 5_000));
+  assert.deepEqual(fake.world.commands, ["next"]);
+  assert.match(fake.world.logs.at(-1), /skipped "Halo" by Beyoncé/);
+
+  fake.emit("trackchange", playing(song("2", "Halo", "Someone"), 200_000));
+  assert.deepEqual(fake.world.commands, ["next"], "another artist plays");
+});
+
+test("skip-list matches a whole name, on the title, the artist or the album", () => {
+  const entries = [{ name: "Air", artist: "" }, { name: "Greatest Hits", artist: "" }];
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", entries]]) });
+  fake.emit("trackchange", playing(song("1", "Airbourne", "Airbourne Band", "Other"), 200_000));
+  assert.deepEqual(fake.world.commands, [], "Air is not Airbourne");
+  fake.emit("trackchange", playing(song("2", "Song", "Someone", "greatest HITS"), 200_000));
+  assert.deepEqual(fake.world.commands, ["next"]);
+  fake.emit("trackchange", playing(song("3", "Air", "Someone", "Other"), 200_000));
+  assert.deepEqual(fake.world.commands, ["next", "next"]);
+});
+
+test("skip-list's button lists the playing song with its artist and skips it", () => {
+  const fake = featureAmpify("skip-list");
+  assert.equal(fake.world.buttons[0].label, "Skip and never play again");
+  fake.emit("trackchange", playing(song("1", "Halo", "Beyoncé"), 200_000));
+  fake.world.buttons[0].onClick();
+  assert.deepEqual(fake.storage.get("entries"), [{ name: "Halo", artist: "Beyoncé" }]);
+  assert.deepEqual(fake.world.commands, ["next"], "skipped once, not again by the check");
+
+  fake.emit("trackchange", playing(song("2", "Halo", "Someone"), 200_000));
+  assert.deepEqual(fake.world.commands, ["next"], "the same title by another artist plays");
+  fake.emit("trackchange", playing(song("3", "halo", "BEYONCE"), 200_000));
+  assert.deepEqual(fake.world.commands, ["next", "next"]);
+});
+
+test("skip-list leaves live versions, remixes and intros alone until its settings are on", () => {
+  const titles = ["Song (Live)", "Song - Live at Wembley", "Song [Live]", "Song (Club Remix)", "Intro", "Interlude", "Funny Skit"];
+  const fine = ["Live Forever", "Introduction", "Alive"];
+  const off = featureAmpify("skip-list");
+  titles.forEach((title, i) => off.emit("trackchange", playing(song(String(i), title, "A"), 100_000)));
+  assert.deepEqual(off.world.commands, []);
+
+  const on = featureAmpify("skip-list", { config: { "skip-live": true, "skip-remixes": true, "skip-intros": true } });
+  titles.forEach((title, i) => on.emit("trackchange", playing(song("t" + i, title, "A"), 100_000)));
+  assert.equal(on.world.commands.length, titles.length);
+  fine.forEach((title, i) => on.emit("trackchange", playing(song("f" + i, title, "A"), 100_000)));
+  assert.equal(on.world.commands.length, titles.length, "plain titles play");
+
+  const liveOnly = featureAmpify("skip-list", { config: { "skip-live": true } });
+  liveOnly.emit("trackchange", playing(song("1", "Song (Club Remix)", "A"), 100_000));
+  liveOnly.emit("trackchange", playing(song("2", "Song (Live)", "A"), 100_000));
+  assert.deepEqual(liveOnly.world.commands, ["next"], "each setting acts alone");
+});
+
+test("skip-list's list opens from Apple Music's menu only, newest first, and removes an entry", () => {
+  const entries = [{ name: "Old", artist: "" }, { name: "Halo", artist: "Beyoncé" }];
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", entries]]) });
+  assert.equal(fake.world.target, "", "nothing opens when Apple Music starts");
+  const open = fake.world.menus.find((item) => item.kind === "app");
+  assert.equal(open.label, "Skip list");
+  open.onClick({});
+  assert.equal(fake.world.target, "popup:skip-list");
+  assert.deepEqual(textsOf(fake.react.page.tree), ["Halo · Beyoncé", "Old"]);
+
+  fake.world.menus[0].onClick({ title: "New one" });
+  assert.equal(textsOf(fake.react.page.tree)[0], "New one", "the list follows the context menu");
+  buttonIn(fake.react.page.tree, "Remove").onClick();
+  assert.deepEqual(fake.storage.get("entries").map((entry) => entry.name), ["Old", "Halo"]);
+
+  const empty = featureAmpify("skip-list");
+  empty.world.menus.find((item) => item.kind === "app").onClick({});
+  assert.match(textsOf(empty.react.page.tree)[0], /Nothing is skipped yet/);
+});
+
+test("skip-list speaks French on a French Windows and declares exactly the permissions it uses", () => {
+  const fake = featureAmpify("skip-list", { language: "fr" });
+  assert.equal(fake.world.menus[0].label, "Ne jamais jouer");
+  fake.world.menus[0].onClick({ title: "X" });
+  fake.emit("trackchange", playing(song("1", "X", "A"), 100_000));
+  fake.world.buttons[0].onClick();
+  const open = fake.world.menus.find((item) => item.kind === "app");
+  assert.equal(open.label, "Liste d'exclusion");
+  open.onClick({});
+  assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+});
+
+const daysAgo = (days) => new Date(Date.now() - days * 86400000).toISOString().replace(/\.\d+Z$/, "Z");
+const album = (id, name, days, tracks, extra = {}) => ({
+  wrapperType: "collection", collectionType: "Album", collectionId: id, collectionName: name, artistName: "Beyoncé",
+  releaseDate: daysAgo(days), trackCount: tracks,
+  artworkUrl100: `https://is1-ssl.mzstatic.com/image/thumb/a${id}/100x100bb.jpg`,
+  collectionViewUrl: `https://music.apple.com/us/album/x/${id}?uo=4`, ...extra,
+});
+const catalog = (artistName = "Beyoncé") => (url) => {
+  if (url.includes("/search?")) return { status: 200, text: JSON.stringify({ results: [{ wrapperType: "artist", artistName, artistId: 123 }] }) };
+  return {
+    status: 200,
+    text: JSON.stringify({
+      results: [
+        { wrapperType: "artist", artistName: "Beyoncé", artistId: 123 },
+        album(1, "Big Album", 20, 12), album(2, "Cuff It - Single", 5, 1), album(3, "Short Thing - EP", 40, 3),
+        album(4, "Old Album", 200, 10),
+      ],
+    }),
+  };
+};
+const knownArtist = () => new Map([["artists", { beyonce: { name: "Beyoncé", plays: 3, last: 1 } }]]);
+const flush = async () => { for (let i = 0; i < 30; i++) await settle(); };
+
+test("new-releases counts the artists you play and keeps the 50 most listened", () => {
+  const fake = featureAmpify("new-releases");
+  for (let i = 0; i < 55; i++) fake.emit("trackchange", playing(song("t" + i, "Song", "Artist " + i), 100_000));
+  for (let i = 0; i < 3; i++) fake.emit("trackchange", playing(song("x", "Song", "Favorite"), 100_000));
+  fake.emit("trackchange", playing(song("n", "Song", ""), 100_000));
+  const artists = fake.storage.get("artists");
+  assert.equal(Object.keys(artists).length, 50);
+  assert.equal(artists.favorite.plays, 3);
+  assert.ok(artists["artist 54"], "among equals, the most recent stay");
+  assert.equal(artists["artist 0"], undefined);
+});
+
+test("new-releases asks the catalog for the artist, then their albums, and lists the recent ones newest first", async () => {
+  const fake = featureAmpify("new-releases", { storage: knownArtist() });
+  fake.world.getAnswer = catalog();
+  await flush();
+  assert.deepEqual(fake.world.gets, [
+    "https://itunes.apple.com/search?term=Beyonc%C3%A9&entity=musicArtist&limit=1&country=us",
+    "https://itunes.apple.com/lookup?id=123&entity=album&sort=recent&limit=10&country=us",
+  ]);
+  assert.equal(fake.storage.get("ids").beyonce.id, 123, "the artist id is cached");
+  assert.ok(fake.storage.get("checkedAt") > 0);
+
+  fake.react.mount(fake.context.render);
+  const cards = allNodes(fake.react.page.tree).filter((node) => node.type === "card");
+  assert.deepEqual(cards.map((card) => textsOf(card)[0]), ["Cuff It", "Big Album", "Short Thing"], "newest first, the 60-day window");
+  assert.deepEqual(textsOf(cards[0])[1].split(" · ").slice(0, 2), ["Beyoncé", "Single"]);
+  assert.match(textsOf(cards[1])[1], /^Beyoncé · Album · \d{4}-\d{2}-\d{2}$/);
+  assert.match(textsOf(cards[2])[1], /^Beyoncé · EP ·/);
+  assert.equal(allNodes(cards[0]).find((node) => node.type === "image").src, "https://is1-ssl.mzstatic.com/image/thumb/a2/300x300bb.jpg");
+
+  cards[0].onClick();
+  assert.deepEqual(fake.world.opened, ["https://music.apple.com/us/album/x/2"]);
+});
+
+test("new-releases looks up each name of a shared credit the catalog does not know as one artist", async () => {
+  const shared = new Map([["artists", { "ninho freeze corleone": { name: "Ninho & Freeze Corleone", plays: 3, last: 1 } }]]);
+  const fake = featureAmpify("new-releases", { storage: shared });
+  const known = { Ninho: 11, "Freeze Corleone": 22 };
+  fake.world.getAnswer = (url) => {
+    const term = decodeURIComponent((url.match(/term=([^&]+)/) || [])[1] || "");
+    if (url.includes("/search?")) {
+      const results = known[term] ? [{ wrapperType: "artist", artistName: term, artistId: known[term] }] : [];
+      return { status: 200, text: JSON.stringify({ results }) };
+    }
+    const id = Number(url.match(/id=(\d+)/)[1]);
+    return { status: 200, text: JSON.stringify({ results: [album(id, "Joint Album", 5, 12)] }) };
+  };
+  await flush();
+  const searched = fake.world.gets.filter((url) => url.includes("/search?")).map((url) => decodeURIComponent(url.match(/term=([^&]+)/)[1]));
+  assert.deepEqual(searched, ["Ninho & Freeze Corleone", "Ninho", "Freeze Corleone"]);
+  assert.equal(fake.storage.get("ids").ninho.id, 11);
+  assert.equal(fake.storage.get("releases").length, 2);
+});
+
+test("new-releases follows the period and singles choices on its page", async () => {
+  const fake = featureAmpify("new-releases", { storage: knownArtist() });
+  fake.world.getAnswer = catalog();
+  await flush();
+  fake.react.mount(fake.context.render);
+  const names = () => allNodes(fake.react.page.tree).filter((node) => node.type === "card").map((card) => textsOf(card)[0]);
+
+  allNodes(fake.react.page.tree).find((node) => node.type === "dropdown").onChange("30");
+  assert.deepEqual(names(), ["Cuff It", "Big Album"]);
+  allNodes(fake.react.page.tree).find((node) => node.type === "toggle").onChange(false);
+  assert.deepEqual(names(), ["Big Album"]);
+  allNodes(fake.react.page.tree).find((node) => node.type === "dropdown").onChange("90");
+  assert.deepEqual(names(), ["Big Album", "Short Thing"]);
+  assert.deepEqual(fake.storage.get("prefs"), { days: 90, singles: false });
+});
+
+test("new-releases uses the storefront of the language, and says so when it has no artist or nothing new", async () => {
+  const french = featureAmpify("new-releases", { storage: knownArtist(), language: "fr" });
+  french.world.getAnswer = catalog();
+  await flush();
+  assert.match(french.world.gets[0], /country=fr$/);
+  const portuguese = featureAmpify("new-releases", { storage: knownArtist(), language: "pt" });
+  portuguese.world.getAnswer = catalog();
+  await flush();
+  assert.match(portuguese.world.gets[0], /country=br$/);
+
+  const empty = featureAmpify("new-releases");
+  empty.react.mount(empty.context.render);
+  assert.ok(textsOf(empty.react.page.tree).some((text) => /No artist yet/.test(text)));
+
+  const quiet = featureAmpify("new-releases", { storage: knownArtist() });
+  quiet.world.getAnswer = () => ({ status: 200, text: JSON.stringify({ results: [{ artistName: "Beyoncé", artistId: 123 }] }) });
+  await flush();
+  quiet.react.mount(quiet.context.render);
+  assert.ok(textsOf(quiet.react.page.tree).includes("Nothing new from your artists in the last 60 days."));
+});
+
+test("new-releases ignores a search hit that is another artist, and retries after a failure", async () => {
+  const fake = featureAmpify("new-releases", { storage: knownArtist() });
+  fake.world.getAnswer = catalog("Someone Else");
+  await flush();
+  assert.equal(fake.world.gets.length, 1, "no album request for a stranger");
+  assert.equal(fake.storage.get("ids").beyonce.id, 0);
+
+  const down = featureAmpify("new-releases", { storage: knownArtist() });
+  await flush();
+  assert.equal(down.storage.get("checkedAt"), undefined, "a check where nothing answered does not count");
+  assert.equal(down.storage.get("ids"), undefined);
+  down.react.mount(down.context.render);
+  await flush();  // opening the page asks again
+  assert.equal(down.world.gets.length, 2);
+  assert.ok(textsOf(down.react.page.tree).includes("Apple's catalog did not answer. Try again later."));
+});
+
+test("new-releases checks once a day, or when the page opens on data older than 12 hours", async () => {
+  const recent = new Map([...knownArtist(), ["checkedAt", Date.now() - 3600_000], ["releases", []]]);
+  const fresh = featureAmpify("new-releases", { storage: recent });
+  fresh.world.getAnswer = catalog();
+  await flush();
+  fresh.react.mount(fresh.context.render);
+  await flush();
+  assert.equal(fresh.world.gets.length, 0, "checked an hour ago: nothing to ask");
+
+  const aged = new Map([...knownArtist(), ["checkedAt", Date.now() - 13 * 3600_000], ["releases", []]]);
+  const opened = featureAmpify("new-releases", { storage: aged });
+  opened.world.getAnswer = catalog();
+  await flush();
+  assert.equal(opened.world.gets.length, 0, "13 hours is not a day");
+  opened.react.mount(opened.context.render);
+  await flush();
+  assert.equal(opened.world.gets.length, 2, "opening the page asks");
+
+  const daily = new Map([...knownArtist(), ["checkedAt", Date.now() - 25 * 3600_000]]);
+  const start = featureAmpify("new-releases", { storage: daily });
+  start.world.getAnswer = catalog();
+  await flush();
+  assert.equal(start.world.gets.length, 2, "a day old: asked at start");
+  assert.equal(start.world.intervals[0].ms, 3600_000);
+  start.world.stops.forEach((stop) => stop());
+  assert.equal(start.world.intervals[0].cleared, true);
+});
+
+test("new-releases keeps a few requests in flight and declares exactly the permissions it uses", async () => {
+  const names = Array.from({ length: 12 }, (_, i) => ["a" + i, { name: "A" + i, plays: 1, last: i }]);
+  const fake = featureAmpify("new-releases", { storage: new Map([["artists", Object.fromEntries(names)]]) });
+  fake.world.getAnswer = catalog("A0");
+  await flush();
+  assert.ok(fake.world.maxInFlight >= 2 && fake.world.maxInFlight <= 3, `in flight: ${fake.world.maxInFlight}`);
+  assert.ok(fake.world.gets.length >= 12);
+
+  const single = featureAmpify("new-releases", { storage: knownArtist() });
+  single.world.getAnswer = catalog();
+  await flush();
+  single.react.mount(single.context.render);
+  allNodes(single.react.page.tree).find((node) => node.type === "card").onClick();
+  single.world.sidebar[0].onClick();
+  assert.deepEqual(single.world.navigated, ["/new-releases"]);
+  assert.deepEqual([...single.used].sort(), declared(single.manifest));
 });

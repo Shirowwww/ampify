@@ -11,165 +11,172 @@
       "name": "Présence Discord",
       "description": "Votre statut Discord montre ce que vous écoutez : pochette, artiste, album, progression, liens et boutons. Activez-le avec Discord ouvert. Une pochette absente du catalogue d'Apple (vos fichiers) passe par un hébergeur gratuit qui l'efface sous 3 jours ; désactivable.",
       "settings": {
-        "status-line": "Après « Écoute » dans la liste des membres",
-        "show-cover": "Afficher la pochette",
-        "share-covers": "Partager les pochettes inconnues du catalogue",
-        "show-album": "Afficher l'album",
-        "show-progress": "Afficher la barre de progression",
-        "clickable-links": "Titre, artiste et pochette cliquables",
-        "show-paused": "Garder le statut pendant la pause",
-        "button-1": "Premier bouton",
-        "button-2": "Second bouton"
+        "status-line": "Nom affiché dans la liste des membres",
+        "show-cover": "Afficher la pochette du morceau",
+        "share-covers": "Mettre en ligne les pochettes de vos fichiers",
+        "show-album": "Afficher l'album au survol de la pochette",
+        "show-progress": "Afficher le temps écoulé",
+        "clickable-links": "Titre, artiste et pochette ouvrent Apple Music",
+        "show-paused": "Rester visible pendant la pause",
+        "button-1": "Premier bouton sous le statut",
+        "button-2": "Second bouton sous le statut"
       },
       "options": {
         "Artist": "L'artiste",
         "Title": "Le titre",
         "App name": "Le nom de l'application",
-        "None": "Aucun"
+        "None": "Aucun",
+        "Other platforms": "Autres plateformes (song.link)"
       }
     },
     "de": {
       "name": "Discord-Status",
       "description": "Ihr Discord-Status zeigt, was Sie hören: Cover, Künstler, Album, Fortschrittsbalken, Links und Schaltflächen. Einschalten, während Discord geöffnet ist. Ein Cover, das im Apple-Katalog fehlt (eigene Dateien), geht an einen kostenlosen Host, der es nach 3 Tagen löscht; abschaltbar.",
       "settings": {
-        "status-line": "Nach „Hört zu“ in der Mitgliederliste",
-        "show-cover": "Cover anzeigen",
-        "share-covers": "Covers teilen, die der Katalog nicht kennt",
-        "show-album": "Album anzeigen",
-        "show-progress": "Fortschrittsbalken anzeigen",
-        "clickable-links": "Titel, Künstler und Cover anklickbar",
-        "show-paused": "Status während der Pause beibehalten",
-        "button-1": "Erste Schaltfläche",
-        "button-2": "Zweite Schaltfläche"
+        "status-line": "Name in der Mitgliederliste",
+        "show-cover": "Cover des Titels anzeigen",
+        "share-covers": "Cover eigener Dateien online stellen",
+        "show-album": "Album beim Zeigen auf das Cover anzeigen",
+        "show-progress": "Verstrichene Zeit anzeigen",
+        "clickable-links": "Titel, Künstler und Cover öffnen Apple Music",
+        "show-paused": "Während der Pause sichtbar bleiben",
+        "button-1": "Erste Schaltfläche unter dem Status",
+        "button-2": "Zweite Schaltfläche unter dem Status"
       },
       "options": {
         "Artist": "Künstler",
         "Title": "Titel",
         "App name": "App-Name",
-        "None": "Keine"
+        "None": "Keine",
+        "Other platforms": "Andere Plattformen (song.link)"
       }
     },
     "es": {
       "name": "Presencia en Discord",
       "description": "Tu estado de Discord muestra lo que escuchas: carátula, artista, álbum, barra de progreso, enlaces y botones. Actívala con Discord abierto. Una carátula que falta en el catálogo de Apple (tus archivos) pasa por un alojamiento gratuito que la borra a los 3 días; se puede desactivar.",
       "settings": {
-        "status-line": "Después de «Escuchando» en la lista de miembros",
-        "show-cover": "Mostrar la carátula",
-        "share-covers": "Compartir las carátulas que el catálogo no conoce",
-        "show-album": "Mostrar el álbum",
-        "show-progress": "Mostrar la barra de progreso",
-        "clickable-links": "Título, artista y carátula con enlace",
-        "show-paused": "Mantener el estado durante la pausa",
-        "button-1": "Primer botón",
-        "button-2": "Segundo botón"
+        "status-line": "Nombre en la lista de miembros",
+        "show-cover": "Mostrar la carátula de la canción",
+        "share-covers": "Subir las carátulas de tus archivos",
+        "show-album": "Mostrar el álbum al pasar sobre la carátula",
+        "show-progress": "Mostrar el tiempo transcurrido",
+        "clickable-links": "Título, artista y carátula abren Apple Music",
+        "show-paused": "Seguir visible en pausa",
+        "button-1": "Primer botón bajo el estado",
+        "button-2": "Segundo botón bajo el estado"
       },
       "options": {
         "Artist": "El artista",
         "Title": "El título",
         "App name": "El nombre de la app",
-        "None": "Ninguno"
+        "None": "Ninguno",
+        "Other platforms": "Otras plataformas (song.link)"
       }
     },
     "pt": {
       "name": "Presença no Discord",
       "description": "Seu status do Discord mostra o que você ouve: capa, artista, álbum, barra de progresso, links e botões. Ative com o Discord aberto. Uma capa que falta no catálogo da Apple (seus arquivos) vai para um serviço gratuito que a apaga em 3 dias; dá para desativar.",
       "settings": {
-        "status-line": "Depois de “Ouvindo” na lista de membros",
-        "show-cover": "Mostrar a capa",
-        "share-covers": "Compartilhar capas que o catálogo não conhece",
-        "show-album": "Mostrar o álbum",
-        "show-progress": "Mostrar a barra de progresso",
-        "clickable-links": "Título, artista e capa clicáveis",
-        "show-paused": "Manter o status durante a pausa",
-        "button-1": "Primeiro botão",
-        "button-2": "Segundo botão"
+        "status-line": "Nome na lista de membros",
+        "show-cover": "Mostrar a capa da música",
+        "share-covers": "Pôr online as capas dos seus arquivos",
+        "show-album": "Mostrar o álbum ao passar sobre a capa",
+        "show-progress": "Mostrar o tempo decorrido",
+        "clickable-links": "Título, artista e capa abrem o Apple Music",
+        "show-paused": "Continuar visível na pausa",
+        "button-1": "Primeiro botão sob o status",
+        "button-2": "Segundo botão sob o status"
       },
       "options": {
         "Artist": "O artista",
         "Title": "O título",
         "App name": "O nome do app",
-        "None": "Nenhum"
+        "None": "Nenhum",
+        "Other platforms": "Outras plataformas (song.link)"
       }
     },
     "ru": {
       "name": "Присутствие в Discord",
       "description": "Ваш статус в Discord показывает, что вы слушаете: обложку, исполнителя, альбом, шкалу прогресса, ссылки и кнопки. Включайте при открытом Discord. Обложка, которой нет в каталоге Apple (ваши файлы), загружается на бесплатный хостинг, где удаляется через 3 дня; это можно отключить.",
       "settings": {
-        "status-line": "После «Слушает» в списке участников",
-        "show-cover": "Показывать обложку",
-        "share-covers": "Делиться обложками, которых нет в каталоге",
-        "show-album": "Показывать альбом",
-        "show-progress": "Показывать шкалу прогресса",
-        "clickable-links": "Название, исполнитель и обложка как ссылки",
-        "show-paused": "Сохранять статус во время паузы",
-        "button-1": "Первая кнопка",
-        "button-2": "Вторая кнопка"
+        "status-line": "Имя в списке участников",
+        "show-cover": "Показывать обложку трека",
+        "share-covers": "Выкладывать обложки ваших файлов",
+        "show-album": "Альбом при наведении на обложку",
+        "show-progress": "Показывать прошедшее время",
+        "clickable-links": "Название, исполнитель и обложка ведут в Apple Music",
+        "show-paused": "Оставаться видимым на паузе",
+        "button-1": "Первая кнопка под статусом",
+        "button-2": "Вторая кнопка под статусом"
       },
       "options": {
         "Artist": "Исполнитель",
         "Title": "Название",
         "App name": "Название приложения",
-        "None": "Нет"
+        "None": "Нет",
+        "Other platforms": "Другие платформы (song.link)"
       }
     },
     "ja": {
       "name": "Discord プレゼンス",
       "description": "Discord のステータスに、聴いている曲のカバー、アーティスト、アルバム、進行バー、リンク、ボタンを表示します。Discord を開いた状態でオンにしてください。Apple のカタログにないカバー（自分のファイル）は、3 日で削除される無料のホストに送られます。この動作はオフにできます。",
       "settings": {
-        "status-line": "メンバーリストの「リスニング中」の後ろ",
-        "show-cover": "カバーを表示",
-        "share-covers": "カタログにないカバーを共有",
-        "show-album": "アルバムを表示",
-        "show-progress": "進行バーを表示",
-        "clickable-links": "タイトル・アーティスト・カバーをクリック可能に",
-        "show-paused": "一時停止中もステータスを残す",
-        "button-1": "1つ目のボタン",
-        "button-2": "2つ目のボタン"
+        "status-line": "メンバーリストに表示する名前",
+        "show-cover": "曲のカバーを表示",
+        "share-covers": "自分のファイルのカバーをアップロード",
+        "show-album": "カバーにポインターを合わせるとアルバムを表示",
+        "show-progress": "経過時間を表示",
+        "clickable-links": "タイトル・アーティスト・カバーで Apple Music を開く",
+        "show-paused": "一時停止中も表示し続ける",
+        "button-1": "ステータスの下の1つ目のボタン",
+        "button-2": "ステータスの下の2つ目のボタン"
       },
       "options": {
         "Artist": "アーティスト",
         "Title": "タイトル",
         "App name": "アプリ名",
-        "None": "なし"
+        "None": "なし",
+        "Other platforms": "ほかのサービス (song.link)"
       }
     },
     "zh": {
       "name": "Discord 状态",
       "description": "在 Discord 状态中显示你正在听的内容：封面、艺术家、专辑、进度条、链接和按钮。请在 Discord 已打开时启用。Apple 目录中没有的封面（你自己的文件）会上传到免费主机，3 天内自动删除；也可以关闭此功能。",
       "settings": {
-        "status-line": "成员列表中“正在听”之后",
-        "show-cover": "显示封面",
-        "share-covers": "共享目录中没有的封面",
-        "show-album": "显示专辑",
-        "show-progress": "显示进度条",
-        "clickable-links": "标题、艺术家和封面可点击",
-        "show-paused": "暂停时保留状态",
-        "button-1": "第一个按钮",
-        "button-2": "第二个按钮"
+        "status-line": "成员列表中显示的名称",
+        "show-cover": "显示歌曲封面",
+        "share-covers": "上传你自己文件的封面",
+        "show-album": "悬停封面时显示专辑",
+        "show-progress": "显示已播放时间",
+        "clickable-links": "标题、艺术家和封面打开 Apple Music",
+        "show-paused": "暂停时仍然显示",
+        "button-1": "状态下方的第一个按钮",
+        "button-2": "状态下方的第二个按钮"
       },
       "options": {
         "Artist": "艺术家",
         "Title": "标题",
         "App name": "应用名称",
-        "None": "无"
+        "None": "无",
+        "Other platforms": "其他平台 (song.link)"
       }
     }
   },
-  "tags": ["example"],
+  "tags": ["discord", "status"],
   "kitApi": "1.0",
   "preview": "preview.jpg",
   "main": "main.js",
   "processes": ["engine"],
   "permissions": ["player.read", "storage", "ipc.discord", "network:itunes.apple.com", "network:litterbox.catbox.moe", "network:uguu.se"],
   "settings": [
-    {"key": "status-line", "label": "After \"Listening to\" in the member list", "type": "choice", "options": ["Artist", "Title", "App name"], "default": "Artist"},
-    {"key": "show-cover", "label": "Show the cover", "type": "toggle", "default": true},
-    {"key": "share-covers", "label": "Share covers the catalog does not know", "type": "toggle", "default": true},
-    {"key": "show-album", "label": "Show the album", "type": "toggle", "default": true},
-    {"key": "show-progress", "label": "Show the progress bar", "type": "toggle", "default": true},
-    {"key": "clickable-links", "label": "Clickable title, artist and cover", "type": "toggle", "default": true},
-    {"key": "show-paused", "label": "Keep the status while paused", "type": "toggle", "default": false},
-    {"key": "button-1", "label": "First button", "type": "choice", "options": ["None", "Apple Music", "song.link", "YouTube Music", "Spotify"], "default": "Apple Music"},
-    {"key": "button-2", "label": "Second button", "type": "choice", "options": ["None", "Apple Music", "song.link", "YouTube Music", "Spotify"], "default": "song.link"}
+    {"key": "status-line", "label": "Name shown in the member list", "type": "choice", "options": ["Artist", "Title", "App name"], "default": "Artist"},
+    {"key": "show-cover", "label": "Show the song's cover", "type": "toggle", "default": true},
+    {"key": "share-covers", "label": "Put your own files' covers online", "type": "toggle", "default": true},
+    {"key": "show-album", "label": "Show the album when the cover is hovered", "type": "toggle", "default": true},
+    {"key": "show-progress", "label": "Show the time elapsed", "type": "toggle", "default": true},
+    {"key": "clickable-links", "label": "Title, artist and cover open Apple Music", "type": "toggle", "default": true},
+    {"key": "show-paused", "label": "Stay visible while paused", "type": "toggle", "default": false},
+    {"key": "button-1", "label": "First button under the status", "type": "choice", "options": ["None", "Apple Music", "Other platforms", "YouTube Music", "Spotify"], "default": "Apple Music"},
+    {"key": "button-2", "label": "Second button under the status", "type": "choice", "options": ["None", "Apple Music", "Other platforms", "YouTube Music", "Spotify"], "default": "Other platforms"}
   ]
 }

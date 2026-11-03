@@ -243,8 +243,8 @@ characters per text; attributes are plain values.
 | `text` | `size`, `weight`, `color`, `wrap`, `maxLines` | 8 to 120 px; 100 to 900; `#RRGGBB`; `false` for one line; 0 to 100 |
 
 ```js
-Ampify.ui.topbar.addButton({ label, icon, onClick })
-Ampify.ui.playbar.addButton({ label, icon, onClick })
+Ampify.ui.topbar.addButton({ label, icon, onClick })   // no onClick: a text that only shows something (1.3)
+Ampify.ui.playbar.addButton({ label, icon, onClick })  // same; any other onClick than a function throws
 Ampify.ui.sidebar.addItem({ label, icon, onClick })   // icon: a Segoe Fluent Icons glyph
 Ampify.ui.menu.addItem("context" | "app", { label, icon, onClick })
 Ampify.ui.popup.open(view)

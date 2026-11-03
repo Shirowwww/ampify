@@ -61,6 +61,19 @@ TEST_CASE(Interface_ATopbarButtonIsRecordedAndItsClickRuns) {
     element->Stop();
 }
 
+TEST_CASE(Interface_APlaybarTextWithoutOnClickIsNotClickable) {
+    Fixture f;
+    auto element = f.Make("volume", "extension", R"("ui.playbar", "ui.sidebar")",
+                          R"(Ampify.ui.playbar.addButton({ label: "50 %" });
+                             try { Ampify.ui.sidebar.addItem({ label: "Stats" }); } catch (e) { Ampify.log("refused"); })");
+    CHECK(element->Start());
+    auto controls = f.host.ui.Controls();
+    CHECK(controls.size() == 1);
+    CHECK(controls.size() == 1 && controls[0].label == "50 %" && !controls[0].clickable);
+    CHECK(f.Logged("refused"));  // a sidebar entry is there to be clicked
+    element->Stop();
+}
+
 TEST_CASE(Interface_AButtonNeedsItsPermission) {
     Fixture f;
     auto element = f.Make("nobar", "extension", "", R"(Ampify.ui.playbar.addButton({ onClick: () => {} });)");

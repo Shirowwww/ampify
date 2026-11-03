@@ -208,6 +208,34 @@ std::optional<ModEntry> ActiveThemeSettings(const fs::path& kit) {
     return theme;
 }
 
+std::vector<ModEntry> EnabledSnippetSettings(const fs::path& kit) {
+    Settings settings;
+    settings.Load((kit / "settings.txt").string());
+    std::vector<ModEntry> snippets;
+    for (const Manifest& manifest : ReadManifests(kit / "snippets", ElementKind::Snippet)) {
+        if (manifest.settings.empty() || !settings.GetBool("snippets." + manifest.id + ".enabled", false)) continue;
+        ModEntry snippet = EntryOf(manifest);
+        snippet.snippet = true;
+        snippet.enabled = true;
+        snippet.settings = manifest.settings;
+        for (const SettingSpec& spec : snippet.settings) {
+            snippet.values.push_back(SettingValue(spec, settings.Get("snippets." + snippet.id + "." + spec.key)));
+        }
+        snippets.push_back(std::move(snippet));
+    }
+    SortByName(snippets);
+    return snippets;
+}
+
+bool SetSnippetSetting(const fs::path& kit, const std::string& id, const std::string& key, const std::string& value,
+                       std::string& error) {
+    if (!IsExtensionTarget(id, error)) {
+        error = "invalid snippet id: " + id;
+        return false;
+    }
+    return IsSettingKey(key, error) && WriteSetting(kit, "snippets." + id + "." + key, OneLine(value), error);
+}
+
 bool SetThemeSetting(const fs::path& kit, const std::string& id, const std::string& key, const std::string& value,
                      std::string& error) {
     if (!IsExtensionTarget(id, error)) {

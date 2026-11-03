@@ -1,0 +1,51 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "new-releases",
+  "name": "New releases",
+  "version": "0.1.0",
+  "kind": "app",
+  "author": "Shirowwww",
+  "description": "Recent albums, EPs and singles from the artists you listen to, like Spicetify's New Releases. Checked once a day in Apple's public catalog; click a release to open it in Apple Music.",
+  "translations": {
+    "fr": {
+      "name": "Nouveautés",
+      "description": "Les albums, EP et singles récents des artistes que vous écoutez, comme New Releases sur Spicetify. Vérifiés une fois par jour dans le catalogue public d'Apple ; un clic ouvre la sortie dans Apple Music."
+    },
+    "de": {
+      "name": "Neuerscheinungen",
+      "description": "Neue Alben, EPs und Singles der Künstler, die Sie hören, wie New Releases in Spicetify. Einmal täglich im öffentlichen Apple-Katalog geprüft; ein Klick öffnet die Veröffentlichung in Apple Music."
+    },
+    "es": {
+      "name": "Novedades",
+      "description": "Álbumes, EP y sencillos recientes de los artistas que escuchas, como New Releases en Spicetify. Se revisan una vez al día en el catálogo público de Apple; un clic abre la novedad en Apple Music."
+    },
+    "pt": {
+      "name": "Lançamentos",
+      "description": "Álbuns, EPs e singles recentes dos artistas que você ouve, como o New Releases do Spicetify. Verificados uma vez por dia no catálogo público da Apple; um clique abre o lançamento no Apple Music."
+    },
+    "ru": {
+      "name": "Новинки",
+      "description": "Свежие альбомы, EP и синглы исполнителей, которых вы слушаете, как New Releases в Spicetify. Проверяются раз в день в открытом каталоге Apple; щелчок открывает релиз в Apple Music."
+    },
+    "ja": {
+      "name": "新作リリース",
+      "description": "Spicetify の New Releases のように、よく聴くアーティストの最近のアルバム、EP、シングルを一覧にします。Apple の公開カタログを1日1回確認し、クリックすると Apple Music で開きます。"
+    },
+    "zh": {
+      "name": "新发行",
+      "description": "像 Spicetify 的 New Releases 一样，列出你常听艺术家最近的专辑、EP 和单曲。每天在 Apple 公开目录中检查一次，点击即可在 Apple Music 中打开。"
+    }
+  },
+  "tags": ["releases", "discovery"],
+  "kitApi": "1.0",
+  "preview": "preview.jpg",
+  "main": "main.js",
+  "permissions": [
+    "player.read",
+    "storage",
+    "ui.page",
+    "ui.sidebar",
+    "network:itunes.apple.com",
+    "network:music.apple.com"
+  ]
+}

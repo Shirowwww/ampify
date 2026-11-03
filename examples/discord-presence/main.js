@@ -2,16 +2,21 @@
 // a progress bar, clickable lines and up to two buttons, all chosen in the Ampify card.
 //
 // Nothing to set up: switching it on in the Ampify card also turns on Ampify's Discord service, and the status goes
-// through Ampify's Discord application. Another application can be used (its name and images show in the status):
+// through Ampify's Discord application, named "Apple Music" so that Discord writes "Listening to Apple Music".
+// Another application can be used (its name and images show in the status):
 //   ampify config extensions.discord-presence.clientId <id from https://discord.com/developers/applications>
+// It needs two Rich Presence art assets: "ampify" (shown when a song has no cover) and "paused" (the small badge
+// while paused), 512 x 512 pixels at least.
 //
 // No server of Ampify is involved. The cover and the links come from Apple's public iTunes Search API, asked once
 // per track. A track the catalog does not know (a file of your own, or a song missing from the search) has its cover
 // read from Windows and, if "Share covers the catalog does not know" is on, sent to a free host that deletes it
 // later (litterbox.catbox.moe, 3 days, else uguu.se, 3 hours): Discord can only show an image that is on the web.
 
-// Ampify's Discord application: its id is public, Discord only uses it to name the status and find its images.
-const AMPIFY_CLIENT_ID = "1566762712413904957";
+// The Discord application: its id is public, Discord only uses it to name the status and find its images.
+const DEFAULT_CLIENT_ID = "1566762712413904957";
+const LOGO_IMAGE = "ampify";
+const PAUSED_IMAGE = "paused";
 const SEARCH = "https://itunes.apple.com/search";
 const COVER_SIZE = "600x600bb";
 const HOUR_MS = 3600 * 1000;
@@ -42,26 +47,26 @@ const STOREFRONTS = { fr: "fr", de: "de", es: "es", pt: "br", ru: "ru", ja: "jp"
 
 Ampify.i18n.define({
   en: { paused: "Paused", unknown: "Unknown title", listen: "Listen on Apple Music", youtube: "Find on YouTube Music",
-        spotify: "Find on Spotify" },
+        spotify: "Find on Spotify", platforms: "Other platforms" },
   fr: { paused: "En pause", unknown: "Titre inconnu", listen: "Écouter sur Apple Music",
-        youtube: "Trouver sur YouTube Music", spotify: "Trouver sur Spotify" },
+        youtube: "Trouver sur YouTube Music", spotify: "Trouver sur Spotify", platforms: "Autres plateformes" },
   de: { paused: "Pausiert", unknown: "Unbekannter Titel", listen: "Auf Apple Music anhören",
-        youtube: "Auf YouTube Music finden", spotify: "Auf Spotify finden" },
+        youtube: "Auf YouTube Music finden", spotify: "Auf Spotify finden", platforms: "Andere Plattformen" },
   es: { paused: "En pausa", unknown: "Título desconocido", listen: "Escuchar en Apple Music",
-        youtube: "Buscar en YouTube Music", spotify: "Buscar en Spotify" },
+        youtube: "Buscar en YouTube Music", spotify: "Buscar en Spotify", platforms: "Otras plataformas" },
   pt: { paused: "Pausado", unknown: "Título desconhecido", listen: "Ouvir no Apple Music",
-        youtube: "Encontrar no YouTube Music", spotify: "Encontrar no Spotify" },
+        youtube: "Encontrar no YouTube Music", spotify: "Encontrar no Spotify", platforms: "Outras plataformas" },
   ru: { paused: "На паузе", unknown: "Неизвестное название", listen: "Слушать в Apple Music",
-        youtube: "Найти в YouTube Music", spotify: "Найти в Spotify" },
+        youtube: "Найти в YouTube Music", spotify: "Найти в Spotify", platforms: "Другие платформы" },
   ja: { paused: "一時停止中", unknown: "不明なタイトル", listen: "Apple Music で聴く",
-        youtube: "YouTube Music で探す", spotify: "Spotify で探す" },
+        youtube: "YouTube Music で探す", spotify: "Spotify で探す", platforms: "ほかのサービス" },
   zh: { paused: "已暂停", unknown: "未知标题", listen: "在 Apple Music 上收听",
-        youtube: "在 YouTube Music 上查找", spotify: "在 Spotify 上查找" },
+        youtube: "在 YouTube Music 上查找", spotify: "在 Spotify 上查找", platforms: "其他平台" },
 });
 const t = (key) => Ampify.i18n.t(key);
 
 const setting = (key, fallback) => Ampify.config.get(key, fallback);
-const clientId = String(setting("clientId", "") || AMPIFY_CLIENT_ID).trim();
+const clientId = String(setting("clientId", "") || DEFAULT_CLIENT_ID).trim();
 const options = {
   statusLine: setting("status-line", "Artist"),
   showPaused: setting("show-paused", false),
@@ -70,7 +75,9 @@ const options = {
   showCover: setting("show-cover", true),
   shareCovers: setting("share-covers", true),
   clickable: setting("clickable-links", true),
-  buttons: [setting("button-1", "Apple Music"), setting("button-2", "song.link")],
+  // "song.link" is the name the "Other platforms" choice had before 0.3.
+  buttons: [setting("button-1", "Apple Music"), setting("button-2", "Other platforms")].map((name) =>
+    (name === "song.link" ? "Other platforms" : name)),
 };
 
 // --- Where a track's cover and links come from ---------------------------------------------------------------------
@@ -128,15 +135,22 @@ function search(track) {
   const term = encodeURIComponent(words);
   const country = STOREFRONTS[Ampify.i18n.language] || "us";
   return Ampify.http.get(SEARCH + "?media=music&entity=song&limit=25&country=" + country + "&term=" + term).then((answer) => {
-    if (answer.status !== 200) return undefined;
+    if (answer.status !== 200) {
+      Ampify.log("cover: the catalog search answered " + answer.status);
+      return undefined;
+    }
     let results;
     try {
       results = JSON.parse(answer.text).results || [];
     } catch {
+      Ampify.log("cover: the catalog search answered something else than JSON");
       return undefined;
     }
     const match = bestMatch(results, track);
-    if (!match) return null;
+    if (!match) {
+      Ampify.log("cover: not in the catalog (" + results.length + " results for \"" + words + "\")");
+      return null;
+    }
     // The links carry a tracking parameter (uo=4) that the page does not need.
     const clean = (url) => String(url || "").replace(/([?&])uo=\d+&?/, "$1").replace(/[?&]$/, "");
     return {
@@ -159,6 +173,8 @@ function upload(track) {
       return now && now.id === track.id ? Ampify.player.artwork() : undefined;  // the track changed meanwhile
     })
     .then((cover) => {
+      if (cover === undefined) Ampify.log("cover: the track changed before its cover could be read");
+      if (cover === null) Ampify.log("cover: Windows shows no cover for this track");
       if (!cover) return cover;
       const now = Ampify.player.state().track;
       if (!now || now.id !== track.id) return undefined;  // the cover read may already be the next track's
@@ -170,7 +186,10 @@ function upload(track) {
 // Sends the file to HOSTS[index], or to the next host when that one fails.
 function sendTo(index, file) {
   const host = HOSTS[index];
-  if (!host) return Promise.resolve(undefined);
+  if (!host) {
+    Ampify.log("cover: no host took the cover");
+    return Promise.resolve(undefined);
+  }
   return Ampify.http.postForm(host.url, host.fields(file)).then((answer) => {
     let url = "";
     try {
@@ -188,7 +207,10 @@ function lookUp(track) {
   asking.add(track.id);
   search(track)
     .then((found) => (found === null && options.shareCovers && options.showCover ? upload(track) : found))
-    .catch(() => undefined)  // too many requests at once, or a host that refused
+    .catch((error) => {  // too many requests at once, or a host that refused
+      Ampify.log("cover: lookup failed, " + error);
+      return undefined;
+    })
     .then((found) => {
       // Nothing found is asked again the next day (the catalog grows), a failure after a few minutes.
       if (found === undefined) remember(track.id, { keptUntil: Date.now() + RETRY_MS });
@@ -212,7 +234,8 @@ function buttonsFor(track, found) {
   const make = {
     "Apple Music": () => ({ label: t("listen"),
       url: (song && found.song) || searchUrl("https://music.apple.com/search?term=", track) }),
-    "song.link": () => (song ? { label: "song.link", url: "https://song.link/i/" + song } : null),
+    // song.link: one page with the song on Spotify, YouTube Music, Deezer, Tidal and the others.
+    "Other platforms": () => (song ? { label: t("platforms"), url: "https://song.link/i/" + song } : null),
     "YouTube Music": () => ({ label: t("youtube"), url: searchUrl("https://music.youtube.com/search?q=", track) }),
     "Spotify": () => ({ label: t("spotify"), url: searchUrl("https://open.spotify.com/search/", track) }),
   };
@@ -232,7 +255,7 @@ function activityFor(state) {
     statusDisplay: { Artist: "state", Title: "details", "App name": "name" }[options.statusLine] || "state",
     details: track.title || t("unknown"),
     state: track.artist || "Apple Music",
-    largeImage: (options.showCover && (https(track.artwork) || (found && https(found.cover)))) || "ampify",
+    largeImage: (options.showCover && (https(track.artwork) || (found && https(found.cover)))) || LOGO_IMAGE,
     largeText: options.showAlbum && track.album ? track.album : "Apple Music",
     buttons: buttonsFor(track, found),
   };
@@ -246,7 +269,7 @@ function activityFor(state) {
     activity.startMs = Date.now() - state.positionMs;
     activity.endMs = activity.startMs + state.durationMs;
   } else if (!state.playing) {
-    activity.smallImage = "paused";  // an image of Ampify's Discord application
+    activity.smallImage = PAUSED_IMAGE;
     activity.smallText = t("paused");
   }
   return activity;

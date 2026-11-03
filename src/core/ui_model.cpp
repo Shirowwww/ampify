@@ -218,7 +218,7 @@ bool CheckNode(const Json& node, const std::string& parent, int depth, int& node
 }  // namespace
 
 int UiModel::AddControl(const std::string& elementId, const std::string& placement, const std::string& label,
-                        const std::string& icon) {
+                        const std::string& icon, bool clickable) {
     if (!IsPlacement(placement)) return 0;
     std::lock_guard<std::mutex> guard(m_mutex);
     UiControl control;
@@ -227,6 +227,7 @@ int UiModel::AddControl(const std::string& elementId, const std::string& placeme
     control.placement = placement;
     control.label = label;
     control.icon = icon;
+    control.clickable = clickable;
     m_controls.push_back(control);
     return control.id;
 }

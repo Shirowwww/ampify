@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "../core/amp_abi.hpp"
+#include "player_controls.hpp"
 #include "winrt_abi.hpp"
 #include "xaml_host.hpp"
 
@@ -66,6 +67,7 @@ struct Placement {
     bool mainWasZoomed = false;  // the main window the player replaced was maximized
     RECT lastRect{};             // where the player was last seen, for the main window it replaced
     HWND main = nullptr;
+    winrt::weak_ref<xaml::UIElement> mainRoot;  // the main window's content, whose shuffle and repeat the player gets
     Journal* journal = nullptr;
     winrt::weak_ref<xaml::UIElement> hookedRoot;  // the content that already has the press and Escape handlers
     int pressReports = 0;
@@ -399,6 +401,7 @@ void Step(Placement& state) {
         if (state.reportPending && std::chrono::steady_clock::now() >= state.reportAt) {
             state.reportPending = false;
             HookInput(player, hwnd);  // a second chance when the content came late
+            AddPlayerControls(player.Content(), state.mainRoot.get(), *state.journal);
             Report(*state.journal);
         }
         return;
@@ -413,6 +416,7 @@ void Step(Placement& state) {
                                     : "Apple player: shown, but Apple Music gave no FullScreenPlayerWindow, left as it is");
         return;
     }
+    AddPlayerControls(player.Content(), state.mainRoot.get(), *state.journal);
     if (state.mode == uirender::PlayerMode::Screen) {
         state.timer.Stop();
         if (window.Presenter().Kind() != windowing::AppWindowPresenterKind::FullScreen) {
@@ -448,6 +452,7 @@ void Watch(const xaml::Window& mainWindow, Journal& journal, uirender::PlayerMod
     state.mode = mode;
     if (state.timer && state.timer.IsRunning()) return;
     state.main = HwndOf(mainWindow);
+    state.mainRoot = winrt::make_weak(mainWindow.Content());
     state.journal = &journal;
     state.ticks = 0;
     state.laid = false;

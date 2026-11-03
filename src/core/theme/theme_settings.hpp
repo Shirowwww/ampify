@@ -19,6 +19,7 @@ namespace ampify::theme {
 //   theme.parts.assets     1 to load the images of the theme (default 1)
 //   theme.parts.script     1 to run main.js of the active theme in AppleMusic.exe (default 1)
 //   themes.<id>.<key>      the value of a setting the theme <id> declares in its manifest (ReadThemeValues)
+//   snippets.<id>.<key>    the same for the snippet <id> (ReadSnippetValues)
 struct ThemeSettings {
     std::string active;
     std::string scheme;
@@ -33,5 +34,8 @@ void WriteThemeSettings(Settings& settings, const ThemeSettings& value);
 
 // The values of the settings a theme declares, stored as themes.<id>.<key>, by key. Empty for an empty id.
 std::map<std::string, std::string> ReadThemeValues(const Settings& settings, const std::string& id);
+
+// The same for a snippet: snippets.<id>.<key>, without snippets.<id>.enabled.
+std::map<std::string, std::string> ReadSnippetValues(const Settings& settings, const std::string& id);
 
 }  // namespace ampify::theme

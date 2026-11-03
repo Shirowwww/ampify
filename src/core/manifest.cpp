@@ -51,7 +51,7 @@ const std::regex kAppVersionPattern("^[0-9]+(\\.[0-9]+){1,3}$");
 const std::regex kHostPattern("^[a-z0-9.-]{1,253}$");
 const std::regex kSettingKeyPattern("^[a-z0-9][a-z0-9-]{0,31}$");
 
-constexpr const char* kSettingsKinds = "settings: only an extension or a theme declares settings";
+constexpr const char* kSettingsKinds = "settings: only an extension, a theme or a snippet declares settings";
 constexpr size_t kMaxSettings = 16;
 constexpr size_t kMaxOptions = 20;
 constexpr size_t kMaxSettingText = 200;
@@ -456,7 +456,7 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
     }
 
     if (const Json* settings = root->Find("settings")) {
-        if (m.kind != ElementKind::Extension && m.kind != ElementKind::Theme) result.errors.push_back(kSettingsKinds);
+        if (m.kind == ElementKind::App) result.errors.push_back(kSettingsKinds);
         else ReadSettings(*settings, m.settings, result.errors);
     }
 
@@ -502,7 +502,7 @@ std::vector<SettingSpec> DeclaredSettings(std::string_view manifestText, std::ve
     const Json* field = root && root->IsObject() ? root->Find("settings") : nullptr;
     const Json* kind = field ? root->Find("kind") : nullptr;
     const std::string* kindText = kind ? kind->AsString() : nullptr;
-    if (field && (!kindText || (*kindText != "extension" && *kindText != "theme"))) {
+    if (field && (!kindText || (*kindText != "extension" && *kindText != "theme" && *kindText != "snippet"))) {
         found.push_back(kSettingsKinds);
     } else if (field) {
         ReadSettings(*field, settings, found);

@@ -13,13 +13,16 @@ const char kUi[] = R"AMPIFYJS(
     return json;
   };
 
+  // A top bar or play bar button without onClick is a text that only shows something (Volume percentage).
   const addControl = (placement, options) => {
     const note = options || {};
-    if (typeof note.onClick !== "function") throw new TypeError("ui: onClick expects a function");
+    const bar = placement === "topbar" || placement === "playbar";
+    const clickable = !(bar && note.onClick === undefined);
+    if (clickable && typeof note.onClick !== "function") throw new TypeError("ui: onClick expects a function");
     const label = note.label === undefined ? "" : text(note.label);
     const icon = typeof note.icon === "string" ? note.icon : "";
-    const id = native.uiControl(placement, label, icon);
-    uiCallbacks.set(id, note.onClick);
+    const id = native.uiControl(placement, label, icon, clickable);
+    if (clickable) uiCallbacks.set(id, note.onClick);
     return id;
   };
 

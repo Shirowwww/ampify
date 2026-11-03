@@ -445,6 +445,10 @@ A snippet is a small style that people switch on by itself, in `%USERPROFILE%\Am
 - It applies on top of the active theme (or alone), and its rules win. Several snippets apply in alphabetical order.
 - It sees the theme's colors, variables, settings, `@keyframes` and font roles. A `colors.ini` in a snippet is ignored.
 - `theme.parts.*` do not affect snippets. A refused key in its `resources.xaml` refuses the snippet only.
+- Since Ampify 1.3 it can declare settings of its own, like a theme ([Theme settings](#theme-settings)): the Ampify
+  card shows them while the snippet is on, they are stored as `snippets.<id>.<key>`, and its `user.css` reads them
+  with `@setting` and `--setting-<key>`. A key the theme declares too is the snippet's there. Example:
+  [`themes/snippets/display-equalizer/`](../../themes/snippets/display-equalizer/).
 
 Switch it with `ampify snippet enable <id>` / `disable <id>`. Example:
 [`themes/snippets/square-corners/`](../../themes/snippets/square-corners/).

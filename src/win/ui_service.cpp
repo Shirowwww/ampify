@@ -201,7 +201,35 @@ struct PlacedControl {
     bool reported = false;
     std::string label;     // shown now: a new one from setLabel replaces it in place
     bool hasIcon = false;  // the label is then the tooltip only
+    std::string elementId;  // with id, the button's place among Ampify's buttons
+    int id = 0;
 };
+
+// Ampify's buttons keep one order whatever is switched on, off or reloaded: by element, then in the order the
+// element added them.
+bool PlacedBefore(const PlacedControl& a, const std::string& elementId, int id) {
+    return a.elementId != elementId ? a.elementId < elementId : a.id < id;
+}
+
+// Where a new button goes among the children of `parent`: after its anchor, and among the Ampify buttons already
+// there, at its place in the order above.
+std::uint32_t StableIndex(const std::map<std::string, PlacedControl>& placed, const controls::StackPanel& parent,
+                          std::optional<std::uint32_t> anchor, const std::string& elementId, int id) {
+    auto children = parent.Children();
+    std::optional<std::uint32_t> firstAfter, lastBefore;
+    for (const auto& [key, other] : placed) {
+        std::uint32_t index = 0;
+        if (!other.button || other.elementId.empty() || !children.IndexOf(other.button, index)) continue;
+        if (PlacedBefore(other, elementId, id)) {
+            if (!lastBefore || index > *lastBefore) lastBefore = index;
+        } else if (!firstAfter || index < *firstAfter) {
+            firstAfter = index;
+        }
+    }
+    if (firstAfter) return *firstAfter;
+    if (lastBefore) return *lastBefore + 1;
+    return anchor ? *anchor + 1 : children.Size();
+}
 
 // One XAML window of Apple Music (MainWindow or MiniPlayerWindow).
 struct WindowContext {
@@ -666,17 +694,21 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
 struct SettingOwner {
     std::string id;
     bool theme = false;
+    bool snippet = false;
 };
 
 // Writes one declared setting from the card. An extension restarts with it (SetModSetting); the theme service sees
-// settings.txt change and applies the theme again (SetThemeSetting).
+// settings.txt change and applies the theme and the snippets again (SetThemeSetting, SetSnippetSetting).
 void CommitSetting(UiService::Shared& shared, const SettingOwner& owner, const std::string& key, const std::string& value) {
     std::string error;
-    bool written = owner.theme ? uirender::SetThemeSetting(shared.kit, owner.id, key, value, error)
-                               : uirender::SetModSetting(shared.kit, owner.id, key, value, error);
+    bool written = owner.snippet ? uirender::SetSnippetSetting(shared.kit, owner.id, key, value, error)
+                   : owner.theme ? uirender::SetThemeSetting(shared.kit, owner.id, key, value, error)
+                                 : uirender::SetModSetting(shared.kit, owner.id, key, value, error);
     if (written) {
         shared.journal.Write("Settings: \"" + owner.id + "\" " + key + " = " + value + " from the Ampify card" +
-                             (owner.theme ? std::string(" (theme)") : " (restart " + owner.id + " requested)"));
+                             (owner.snippet ? std::string(" (snippet)")
+                              : owner.theme ? std::string(" (theme)")
+                                            : " (restart " + owner.id + " requested)"));
     } else {
         shared.journal.Write("Settings: could not change \"" + owner.id + "\" " + key + ": " + error);
     }
@@ -808,10 +840,11 @@ xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::Mo
         controls::TextBlock label = MakeText(Wide(shown).c_str(), "body", false, &shared.probe);
         label.VerticalAlignment(xaml::VerticalAlignment::Center);
         row.Children().Append(label);
-        xaml::FrameworkElement input = SettingControl(shared, {mod.id, mod.theme}, spec, mod.values[index], local);
+        xaml::FrameworkElement input = SettingControl(shared, {mod.id, mod.theme, mod.snippet}, spec, mod.values[index], local);
         input.VerticalAlignment(xaml::VerticalAlignment::Center);
         input.HorizontalAlignment(xaml::HorizontalAlignment::Right);
-        Name(input, std::string(mod.theme ? "AMPIFY_ThemeSetting_" : "AMPIFY_ModsSetting_") + mod.id + "_" + spec.key,
+        const char* prefix = mod.snippet ? "AMPIFY_SnippetSetting_" : mod.theme ? "AMPIFY_ThemeSetting_" : "AMPIFY_ModsSetting_";
+        Name(input, std::string(prefix) + mod.id + "_" + spec.key,
              shown);
         controls::Grid::SetColumn(input, 1);
         row.Children().Append(input);
@@ -824,12 +857,16 @@ xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::Mo
 xaml::FrameworkElement ThemeSettingsSection(UiService::Shared& shared, const uirender::ModEntry& theme) {
     controls::StackPanel section;
     section.Spacing(8);
-    Name(section, "AMPIFY_ThemeSettings_" + theme.id, theme.NameIn(i18n::Language()));
+    Name(section, (theme.snippet ? "AMPIFY_SnippetSettings_" : "AMPIFY_ThemeSettings_") + theme.id,
+         theme.NameIn(i18n::Language()));
     controls::TextBlock title =
-        MakeText(Wide(i18n::Text("mods.themeTitle", {{"name", theme.NameIn(i18n::Language())}})).c_str(), "bodyStrong",
-                 false, &shared.probe);
+        MakeText(Wide(i18n::Text(theme.snippet ? "mods.snippetTitle" : "mods.themeTitle",
+                                 {{"name", theme.NameIn(i18n::Language())}}))
+                     .c_str(),
+                 "bodyStrong", false, &shared.probe);
     section.Children().Append(title);
-    section.Children().Append(MakeText(Wide(i18n::Text("mods.themeSubtitle")).c_str(), "caption", true, &shared.probe));
+    section.Children().Append(MakeText(Wide(i18n::Text(theme.snippet ? "mods.snippetSubtitle" : "mods.themeSubtitle")).c_str(),
+                                       "caption", true, &shared.probe));
     section.Children().Append(ModSettings(shared, theme));
     return section;
 }
@@ -856,12 +893,17 @@ controls::Grid LabelledRow(UiService::Shared& shared, const std::string& label, 
     return row;
 }
 
-// Shows the settings of the theme active now under the theme list, or nothing when it declares none.
+// Shows the settings of the theme active now under the theme list, then those of the snippets switched on, or nothing
+// when none declares any.
 void FillThemeSettings(UiService::Shared& shared, const controls::StackPanel& host) {
     host.Children().Clear();
     if (std::optional<uirender::ModEntry> theme = uirender::ActiveThemeSettings(shared.kit)) {
         host.Children().Append(MakeDivider());
         host.Children().Append(ThemeSettingsSection(shared, *theme));
+    }
+    for (const uirender::ModEntry& snippet : uirender::EnabledSnippetSettings(shared.kit)) {
+        host.Children().Append(MakeDivider());
+        host.Children().Append(ThemeSettingsSection(shared, snippet));
     }
 }
 
@@ -2410,7 +2452,9 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
                 button.Width(std::numeric_limits<double>::quiet_NaN());
             }
         }
-        controls::ToolTipService::SetToolTip(button, winrt::box_value(Wide(control.label)));
+        // A text that only shows something: no hover, no press, the pointer goes through to the bar (so no tooltip).
+        if (control.clickable) controls::ToolTipService::SetToolTip(button, winrt::box_value(Wide(control.label)));
+        else button.IsHitTestVisible(false);
         Name(button, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
         UiEventSink sink = shared.sink;
         std::string elementId = control.elementId;
@@ -2423,13 +2467,15 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         });
 
         std::uint32_t index = 0;
-        auto children = parent.Children();
+        std::optional<std::uint32_t> anchor;
         auto after = insertion->after >= 0 ? context->probeObjects[insertion->after].get().try_as<xaml::UIElement>() : nullptr;
-        if (after && children.IndexOf(after, index)) children.InsertAt(index + 1, button);
-        else children.Append(button);
+        if (after && parent.Children().IndexOf(after, index)) anchor = index;
+        parent.Children().InsertAt(StableIndex(context->placed, parent, anchor, control.elementId, control.id), button);
         placed.button = button;
         placed.label = control.label;
         placed.hasIcon = static_cast<bool>(icon);
+        placed.elementId = control.elementId;
+        placed.id = control.id;
         shared.journal.Write("Interface: button \"" + control.label + "\" of " + control.elementId + " placed in \"" +
                              control.placement + "\" (provisional landmarks)");
     }

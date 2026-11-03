@@ -55,8 +55,8 @@ subfolders for files that `main` imports. A symbolic link anywhere in the folder
 
 ## Settings
 
-An extension or a theme can declare settings. The Ampify card in Apple Music's settings shows them under the
-extension's switch, or under the extensions for the active theme.
+An extension, a theme or a snippet can declare settings. The Ampify card in Apple Music's settings shows them under the
+extension's switch, or under the extensions for the active theme and the snippets switched on.
 
 ```json
 "settings": [

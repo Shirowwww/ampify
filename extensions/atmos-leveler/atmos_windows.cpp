@@ -89,7 +89,15 @@ using CFStringGetBytes_t = CFIndex_t(__cdecl*)(const void* string, CFRange range
                                                unsigned char lossByte, unsigned char external, unsigned char* buffer,
                                                CFIndex_t size, CFIndex_t* used);
 
+using CFTypeID_t = unsigned long long;
+using CFGetTypeID_t = CFTypeID_t(__cdecl*)(const void* object);
+using CFNumberGetTypeID_t = CFTypeID_t(__cdecl*)();
+using CFNumberGetValue_t = unsigned char(__cdecl*)(const void* number, CFIndex_t type, void* value);
+using CFStringCreateWithCString_t = const void*(__cdecl*)(const void* allocator, const char* text, unsigned encoding);
+using CFPreferencesCopyAppValue_t = const void*(__cdecl*)(const void* key, const void* application);
+
 constexpr unsigned kUtf8 = 0x08000100;
+constexpr CFIndex_t kCFNumberDoubleType = 13;
 
 struct Api {
     CopyObject_t CopyCurrentItem = nullptr;        // AVCFPlayerCopyCurrentItem
@@ -138,6 +146,7 @@ int g_journaledStreamRate = 0;  // rates last written to the log, under g_levele
 int g_journaledObjectRate = 0;
 std::atomic<float> g_targetLinear{1.0f};  // gain the audio threads apply now: the Atmos gain, or 1 for stereo
 std::atomic<float> g_playerVolume{1.0f};  // last volume Apple Music set on the player
+std::atomic<bool> g_playerVolumeSeen{false};  // once true, the player's volume replaces the stored one
 std::atomic<bool> g_objectVolumeSeen{false};
 
 // The player Apple Music set a volume on last. Retained, and changed only under g_playerLock.
@@ -577,10 +586,61 @@ void UpdateGain() {
     if (!levels.empty()) SaveLevels(levels);
 }
 
+// --- Volume stored in Apple Music's preferences ---------------------------------------------------
+
+// Apple Music sets no volume on a player until a song starts, but keeps the slider's gain in its preferences
+// (volumeWSG, AMPLibraryAgent.exe.plist): Ampify.audio.volume() reads it until the player has one.
+struct StoredVolume {
+    CFGetTypeID_t GetTypeID = nullptr;
+    CFNumberGetTypeID_t NumberTypeID = nullptr;
+    CFNumberGetValue_t NumberGetValue = nullptr;
+    CFPreferencesCopyAppValue_t CopyAppValue = nullptr;
+    const void* key = nullptr;          // "volumeWSG", kept for the life of the process
+    const void* application = nullptr;  // kCFPreferencesCurrentApplication
+};
+StoredVolume g_stored;  // poll thread only
+
+// Optional: the leveler works without it, so a missing export is noted, never fatal.
+bool ResolveStoredVolume() {
+    HMODULE cf = GetModuleHandleW(L"CoreFoundation.dll");
+    auto find = [cf](const char* name) { return cf ? reinterpret_cast<void*>(GetProcAddress(cf, name)) : nullptr; };
+    void* application = find("kCFPreferencesCurrentApplication");
+    auto createString = FromAddress<CFStringCreateWithCString_t>(find("CFStringCreateWithCString"));
+    g_stored.GetTypeID = FromAddress<CFGetTypeID_t>(find("CFGetTypeID"));
+    g_stored.NumberTypeID = FromAddress<CFNumberGetTypeID_t>(find("CFNumberGetTypeID"));
+    g_stored.NumberGetValue = FromAddress<CFNumberGetValue_t>(find("CFNumberGetValue"));
+    g_stored.CopyAppValue = FromAddress<CFPreferencesCopyAppValue_t>(find("CFPreferencesCopyAppValue"));
+    if (!application || !createString || !g_stored.GetTypeID || !g_stored.NumberTypeID || !g_stored.NumberGetValue ||
+        !g_stored.CopyAppValue) {
+        Note("CoreFoundation preferences not found: the volume is known once a song starts");
+        return false;
+    }
+    g_stored.application = *static_cast<const void* const*>(application);
+    g_stored.key = createString(nullptr, "volumeWSG", kUtf8);
+    return g_stored.application && g_stored.key;
+}
+
+void PublishStoredVolume() {
+    static bool resolved = ResolveStoredVolume();
+    static bool noted = false;
+    if (!resolved || g_playerVolumeSeen.load()) return;
+    const void* value = g_stored.CopyAppValue(g_stored.key, g_stored.application);
+    if (!value) return;
+    double gain = 0;
+    bool number = g_stored.GetTypeID(value) == g_stored.NumberTypeID() &&
+                  g_stored.NumberGetValue(value, kCFNumberDoubleType, &gain) != 0;
+    g_api.CFRelease(value);
+    if (!number || g_playerVolumeSeen.load()) return;
+    ampify::audio::ProcessAudio().PublishPlayerVolume(gain);
+    if (!noted) Note("volume read from Apple Music's preferences: " + Fixed(gain, 3));
+    noted = true;
+}
+
 void PollLoop() {
     while (true) {
         std::this_thread::sleep_for(kPollPeriod);
         try {
+            PublishStoredVolume();
             FollowTrack();
             UpdateGain();
         } catch (...) {
@@ -597,6 +657,7 @@ void __cdecl SetVolume_Hook(void* player, float volume) {
     g_setVolumeOriginal(player, volume);
 
     g_playerVolume = volume;
+    g_playerVolumeSeen = true;
     ampify::audio::ProcessAudio().PublishPlayerVolume(volume);  // Ampify.audio.volume(): read only, like the slider
     void* old = nullptr;
     {

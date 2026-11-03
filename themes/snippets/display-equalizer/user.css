@@ -1,16 +1,24 @@
-/* A small equalizer at the right end of the song's display, behind its text: its bars follow the music that plays,
-   and rest low while it is paused. They take the most vibrant colour of the artwork; change --equalizer-colour to
-   pick your own. bars(10) sets how many there are, from 2 to 32.
+/* A small equalizer in the song's display: its bars follow the music that plays, and rest low while it is paused.
+   The Ampify card (Settings > Playback) chooses where it goes, how many bars and their colour.
 
-   Before Ampify 1.3, bars() is unknown and the animated GIF of the first line shows instead. */
+   Before Ampify 1.3, bars() and the settings are unknown: the animated GIF shows at the right end instead. */
 
 :root {
     --equalizer-colour: var(--art-2, #FFFA2D48);
 }
 
+@setting colour = Accent {
+    :root { --equalizer-colour: $AccentFillColorDefaultBrush; }
+}
+
+@setting colour = White {
+    :root { --equalizer-colour: #FFFFFFFF; }
+}
+
+/* At the right end of the display, behind its text. */
 .lcd::before {
     content: url("images/dance.gif");
-    content: bars(10);
+    content: bars(var(--setting-bars, 10));
     color: var(--equalizer-colour);
     width: 44px;
     height: 26px;
@@ -18,4 +26,43 @@
     vertical-alignment: center;
     margin: 0 44 0 0;
     opacity: 0.85;
+}
+
+/* At the left of the display, just after the artwork. */
+@setting position = "Display, left" {
+    .lcd::before {
+        horizontal-alignment: left;
+        margin: 0 0 0 64;
+    }
+}
+
+/* Across the whole display, faint, behind the title and the artist. */
+@setting position = "Across the display" {
+    .lcd::before {
+        width: auto;
+        height: auto;
+        horizontal-alignment: stretch;
+        vertical-alignment: stretch;
+        margin: 4 8 4 8;
+        opacity: 0.25;
+    }
+}
+
+/* Over the bottom of the artwork, at the left end of the display: ::after lies on top of the picture, which would
+   cover ::before. The artwork's own ::after stays free for other snippets (Spinning artwork). */
+@setting position = "On the artwork" {
+    .lcd::before {
+        visibility: collapsed;
+    }
+
+    .lcd::after {
+        content: bars(var(--setting-bars, 10));
+        color: var(--equalizer-colour);
+        width: 40px;
+        height: 18px;
+        horizontal-alignment: left;
+        vertical-alignment: bottom;
+        margin: 0 0 8 8;
+        opacity: 0.9;
+    }
 }

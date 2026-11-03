@@ -706,6 +706,8 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
     if (!dictionaryOk) return snippet;
     if (IsEmptyDictionary(snippet.resourceDictionary)) snippet.resourceDictionary.clear();
 
+    // Its own settings, on top of the theme's: a key both declare is the snippet's in its user.css.
+    LoadSettings(files, options, snippet);
     ValueContext context{snippet.palette, files, folder, true};
     RuleSource source;
     source.file = "snippets/" + id + "/user.css";

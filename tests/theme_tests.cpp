@@ -1628,6 +1628,23 @@ TEST_CASE(Snippets_TheDisplayEqualizerLoadsWithoutProblems) {
     CHECK(contents.size() == 2 && contents[0].ends_with("/images/dance.gif") && contents[1] == "bars:10");
 }
 
+TEST_CASE(Snippets_ASnippetReadsItsOwnSettings) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "display-equalizer";
+    th::FolderFiles files(folder);
+    th::LoadOptions options;
+    options.settings = {{"position", "On the artwork"}, {"bars", "16"}, {"colour", "White"}};
+    th::Theme snippet = th::LoadSnippet("display-equalizer", folder.generic_string(), files, nullptr, options);
+
+    CHECK(snippet.usable);
+    for (const std::string& problem : snippet.problems) ampify::test::ReportFailure(__FILE__, __LINE__, problem);
+    const th::Assignment* bars = AssignmentFor(snippet, ".lcd::after", "Content");
+    CHECK(bars && bars->value.text == "bars:16");
+    const th::Assignment* colour = AssignmentFor(snippet, ".lcd::after", "Foreground");
+    CHECK(colour && colour->value.text == "#FFFFFFFF");
+    const th::Assignment* hidden = AssignmentFor(snippet, ".lcd::before", "Visibility");
+    CHECK(hidden != nullptr);
+}
+
 TEST_CASE(Theme_BarsContentTakesACountAndAColour) {
     MemoryFiles files;
     files.files["user.css"] =

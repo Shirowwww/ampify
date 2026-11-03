@@ -23,6 +23,7 @@ struct UiControl {
     std::string placement;
     std::string label;
     std::string icon;  // SVG text, as Ampify.icons gives it
+    bool clickable = true;  // false: a play bar or top bar text that only shows something
 };
 
 struct UiSlot {
@@ -35,7 +36,7 @@ class UiModel {
 public:
     // Returns the id of the new control, or 0 when the placement is unknown.
     int AddControl(const std::string& elementId, const std::string& placement, const std::string& label,
-                   const std::string& icon);
+                   const std::string& icon, bool clickable = true);
 
     // A new label for a control the element added: the host shows it on a top bar or play bar button (its text
     // without an icon, its tooltip with one). False when the element has no such control.

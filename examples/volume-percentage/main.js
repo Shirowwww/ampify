@@ -1,6 +1,6 @@
 // Shows the volume of Apple Music's slider as a percentage in the playback bar. The volume is read, never set: the
-// slider stays Apple Music's. It is known once Apple Music has set it, usually when the first song starts; until then
-// the button shows "– %".
+// slider stays Apple Music's, and the percentage is a text, not a button. Ampify reads it from Apple Music's
+// preferences at start, then from the player; an Ampify older than 1.3 knows it only once a song starts ("– %").
 const EVERY_MS = 300;
 // Apple Music's slider is in decibels: position p gives 30 × (p − 1) dB (measured on Apple Music 1.1792).
 const SLIDER_RANGE_DB = 30;
@@ -24,8 +24,16 @@ function refresh() {
   Ampify.ui.setLabel(button, text);
 }
 
-// A click reads the volume again at once, for a change made a moment ago.
-const button = Ampify.ui.playbar.addButton({ label: label(), onClick: refresh });
+// No onClick: a text of the bar, which the pointer goes through. Ampify before 1.3 wants an onClick: a click then
+// reads the volume again.
+function addText() {
+  try {
+    return Ampify.ui.playbar.addButton({ label: label() });
+  } catch {
+    return Ampify.ui.playbar.addButton({ label: label(), onClick: refresh });
+  }
+}
+const button = addText();
 shown = label();
 
 const timer = setInterval(refresh, EVERY_MS);

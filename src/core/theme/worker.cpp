@@ -85,7 +85,13 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
                       PartsKey(wanted.parts) + "|";
     for (const auto& [name, value] : values) key += name + "=" + value + ",";
     key += "|";
-    for (const std::string& id : snippets) key += id + ",";
+    std::map<std::string, std::map<std::string, std::string>> snippetValues;
+    for (const std::string& id : snippets) {
+        snippetValues[id] = ReadSnippetValues(settings, id);
+        key += id + "(";
+        for (const auto& [name, value] : snippetValues[id]) key += name + "=" + value + ",";
+        key += "),";
+    }
     bool usesArtwork = !wanted.active.empty() && NamesArtwork(themeFolder);
     for (const std::string& id : snippets) usesArtwork = usesArtwork || NamesArtwork(snippetRoot / id);
     if (usesArtwork) {
@@ -125,8 +131,10 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
         const Theme* base = request.theme && request.theme->usable ? request.theme.get() : nullptr;
         for (const std::string& id : snippets) {
             FolderFiles files(snippetRoot / id);
-            request.snippets.push_back(
-                std::make_shared<const Theme>(LoadSnippet(id, (snippetRoot / id).generic_string(), files, base, options)));
+            LoadOptions snippetOptions = options;
+            snippetOptions.settings = snippetValues[id];
+            request.snippets.push_back(std::make_shared<const Theme>(
+                LoadSnippet(id, (snippetRoot / id).generic_string(), files, base, snippetOptions)));
         }
         request.layout = LoadLayout(sidebar, home);
         m_request = std::move(request);

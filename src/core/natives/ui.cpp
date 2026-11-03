@@ -49,7 +49,9 @@ struct UiNatives : ScriptBridge {
         if (!Require(ctx, ext, std::string(PlacementPermission(placement)), &failure)) return failure;
         std::string label = String(ctx, argc, argv, 1).value_or("").substr(0, kMaxUiLabel);
         std::string icon = String(ctx, argc, argv, 2).value_or("").substr(0, kMaxUiIcon);
-        return JS_NewInt32(ctx, HostOf(ext).Ui().AddControl(ext->id(), placement, label, icon));
+        // Argument 3, false for a text that only shows something (no onClick); older preludes leave it out.
+        bool clickable = argc < 4 || JS_ToBool(ctx, argv[3]) != 0;
+        return JS_NewInt32(ctx, HostOf(ext).Ui().AddControl(ext->id(), placement, label, icon, clickable));
     }
 
     // No permission of its own: the element can only relabel what it added, which needed the permission already.
@@ -157,7 +159,7 @@ struct UiNatives : ScriptBridge {
 }  // namespace
 
 void DefineUi(api::NativeScope& scope) {
-    scope.Function("uiControl", UiNatives::UiControl, 3);
+    scope.Function("uiControl", UiNatives::UiControl, 4);
     scope.Function("uiControlLabel", UiNatives::UiControlLabel, 2);
     scope.Function("uiPanel", UiNatives::UiPanel, 2);
     scope.Function("uiPopup", UiNatives::UiPopup, 1);

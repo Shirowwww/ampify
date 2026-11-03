@@ -23,6 +23,7 @@ struct ModEntry {
     std::vector<SettingSpec> settings;  // what the manifest declares, in its order
     std::vector<std::string> values;    // the value of each setting now: settings.txt, else the default
     bool theme = false;  // the active theme's settings (SetThemeSetting) rather than an extension's (SetModSetting)
+    bool snippet = false;  // a snippet's settings (SetSnippetSetting)
 
     // The name and description to show in a language: its translation when the manifest has one, else the English text.
     const std::string& NameIn(const std::string& language) const;
@@ -62,5 +63,12 @@ std::optional<ModEntry> ActiveThemeSettings(const std::filesystem::path& kit);
 // service watches that file and applies the theme again, so no reload request is needed.
 bool SetThemeSetting(const std::filesystem::path& kit, const std::string& id, const std::string& key,
                      const std::string& value, std::string& error);
+
+// The snippets switched on whose manifest declares settings, with their values now, sorted by name.
+std::vector<ModEntry> EnabledSnippetSettings(const std::filesystem::path& kit);
+
+// Writes snippets.<id>.<key> = value in settings.txt; the theme service applies the snippets again, as for a theme.
+bool SetSnippetSetting(const std::filesystem::path& kit, const std::string& id, const std::string& key,
+                       const std::string& value, std::string& error);
 
 }  // namespace ampify::uirender

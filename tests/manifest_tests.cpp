@@ -233,7 +233,7 @@ TEST_CASE(Manifest_RefusesSettingsThatDoNotHold) {
     CHECK(!ampify::SettingsErrors(app).empty());
 }
 
-TEST_CASE(Manifest_AThemeDeclaresSettingsAndASnippetDoesNot) {
+TEST_CASE(Manifest_AThemeAndASnippetDeclareSettingsAndAnAppDoesNot) {
     const std::string theme = R"({"id": "night", "name": "Night", "version": "1.0.0", "kind": "theme",
         "author": "Shirowwww", "description": "Dark.", "kitApi": "1.0", "colors": "colors.ini",
         "settings": [{"key": "radius", "label": "Corners", "type": "number", "min": 0, "max": 24, "default": 8},
@@ -250,8 +250,13 @@ TEST_CASE(Manifest_AThemeDeclaresSettingsAndASnippetDoesNot) {
 
     std::string snippet = theme;
     snippet.replace(snippet.find("\"theme\""), 7, "\"snippet\"");
-    CHECK(!ampify::SettingsErrors(snippet).empty());
-    CHECK(ampify::DeclaredSettings(snippet, &errors).empty());
+    CHECK(ampify::SettingsErrors(snippet).empty());
+    CHECK(ampify::DeclaredSettings(snippet, &errors).size() == 2);
+
+    std::string app = theme;
+    app.replace(app.find("\"theme\""), 7, "\"app\"");
+    CHECK(!ampify::SettingsErrors(app).empty());
+    CHECK(ampify::DeclaredSettings(app, &errors).empty());
 }
 
 TEST_CASE(Manifest_AStoredSettingValueCountsOnlyWhenItFits) {

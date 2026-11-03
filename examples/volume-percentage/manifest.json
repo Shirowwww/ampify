@@ -8,6 +8,7 @@
   "description": "Shows Apple Music's volume as a percentage in the playback bar, next to the volume button, as Spicetify's Volume Percentage does.",
   "translations": {"fr": {"name": "Volume en pourcentage", "description": "Affiche le volume d'Apple Music en pourcentage dans la barre de lecture, à côté du bouton du volume, comme Volume Percentage sur Spicetify."}},
   "kitApi": "1.0",
+  "preview": "preview.jpg",
   "main": "main.js",
   "permissions": [
     "player.read",
