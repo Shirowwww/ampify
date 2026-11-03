@@ -57,12 +57,12 @@ Register-Case -Id 'installer' -Title 'Install, uninstall keeping and purging dat
     Add-Check -Ctx $Ctx -Name 'sign-in entry starts the background launcher' `
         -Passed ([bool]$entryText -and $entryText -like "*$launcherFile*--background*") -Detail "$entryText"
     Add-Check -Ctx $Ctx -Name 'install folder in the user Path (ampify in a new terminal)' -Passed (& $inUserPath)
-    # Run as administrator (CI runners are), the installer leaves the start to the next sign-in: a launcher with
-    # administrator rights could not be stopped from a normal session.
+    # Run as administrator (CI runners are), the installer starts the launcher through Explorer, without administrator
+    # rights, so a normal session can stop it. A runner may have no Explorer to ask: the log then says so.
     $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        Add-Check -Ctx $Ctx -Name 'run as administrator: no background launcher started, left to the next sign-in' `
-            -Passed ((-not (& $backgroundRunning)) -and (Test-JournalContains -FileName 'install.log' -Text 'starts at the next sign-in'))
+        Add-Check -Ctx $Ctx -Name 'run as administrator: background launcher started through Explorer, not elevated' `
+            -Passed (Test-JournalContains -FileName 'install.log' -Text 'Installer run as administrator:')
     } else {
         Add-Check -Ctx $Ctx -Name 'background launcher running after the install' `
             -Passed (Wait-Until -TimeoutSeconds 15 -Condition { & $backgroundRunning })

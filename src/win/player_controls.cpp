@@ -3,6 +3,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>

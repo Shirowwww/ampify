@@ -12,6 +12,9 @@
 #include <string_view>
 #include <vector>
 
+#ifdef GetCurrentTime
+#undef GetCurrentTime  // windows.h macro that breaks Storyboard::GetCurrentTime in the projection
+#endif
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Xaml.h>
