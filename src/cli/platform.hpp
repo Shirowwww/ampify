@@ -32,6 +32,10 @@ bool StartDetached(const std::vector<std::string>& command);
 // True while a process with this image name runs. Systems without the check always answer false.
 bool IsProcessRunning(const std::string& imageName);
 
+// Ends every process with this image name and waits for them a moment. True when none is left. Systems without the
+// check answer true.
+bool EndProcesses(const std::string& imageName);
+
 // A name for a temporary file that does not exist yet. The caller creates and removes it.
 std::filesystem::path TemporaryFile(const std::string& stem);
 
@@ -75,6 +79,17 @@ bool DisableAutoStart(std::string& error);
 
 // Stops the background launcher and starts `launcher` in its place, the sign-in entry untouched (after an update).
 bool RestartAutoStart(const std::filesystem::path& launcher, std::string& error);
+
+// The user's locale, such as "fr-FR" (Windows) or the LANG variable elsewhere; "en" when nothing says.
+std::string UserLocale();
+
+// A Yes / No question in a small window of its own, for `ampify update --auto` with kit_update = ask. True for Yes.
+// Systems without windows answer false.
+bool AskYesNo(const std::string& title, const std::string& text);
+
+// A notification of a few seconds near the clock (a balloon of a notification area icon that goes away after it).
+// Nothing on systems without one.
+void ShowNotice(const std::string& title, const std::string& text);
 
 // True when `directory` is the folder the installer puts Ampify in. Only that copy turns the automatic start on, so
 // a build folder or an extracted zip never registers itself at sign-in.

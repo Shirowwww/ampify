@@ -43,6 +43,13 @@ def sha256_of(path):
         return hashlib.sha256(handle.read()).hexdigest()
 
 
+def apple_music_running():
+    if os.name != "nt":
+        return False
+    listing = subprocess.run(["tasklist.exe", "/NH"], capture_output=True, text=True, errors="replace").stdout
+    return "AppleMusic.exe" in listing or "AMPLibraryAgent.exe" in listing
+
+
 @unittest.skipUnless(os.path.exists(Ampify), "build ampify first (cmake --build build), or set AMPIFY_BIN")
 class AmpifyTestCase(unittest.TestCase):
     def setUp(self):
@@ -190,6 +197,21 @@ class Basics(AmpifyTestCase):
         self.assertEqual(self.ampify("config", "theme.active", "Pas Bon").returncode, 1)
         self.assertEqual(self.ampify("config", "catalog.url", "http://example.com/c.json").returncode, 1)
         self.assertEqual(self.ampify("config", "unknown.key").returncode, 1)
+
+        self.assertEqual(self.ampify("config", "kit_update", "weekly").returncode, 1)
+        self.assertEqual(self.ampify("config", "kit_update", "off").returncode, 0)
+        self.assertIn("kit_update = off", self.settings_text())
+
+    def test_auto_update_follows_kit_update_and_never_touches_a_build_folder(self):
+        self.ampify("config", "kit_update", "off")
+        result = self.ampify("update", "--auto")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("kit_update = off", result.stdout)
+
+        self.ampify("config", "kit_update", "auto")
+        result = self.ampify("update", "--auto")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Not the installed copy", result.stdout)
 
     def test_config_lists_every_key(self):
         self.ampify("config", "theme.active", "night")
@@ -857,6 +879,45 @@ class KitUpdate(AmpifyTestCase):
         # is tested in tests/kit_tests.cpp (InstallBundledElements).
         self.assertTrue(os.path.exists(os.path.join(self.kit, "apps", "marketplace", "manifest.json")))
         self.assertTrue(os.path.exists(os.path.join(self.kit, "extensions", "now-playing", "manifest.json")))
+
+    def test_auto_update_looks_once_a_day(self):
+        release = self.make_release("0.1.0")
+        install_dir = os.path.join(self.tmp, "install")
+        os.makedirs(install_dir)
+        result = self.ampify("update", "--auto", "--release-url", file_url(release), "--install-dir", install_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("up to date", result.stdout)
+        self.assertTrue(os.path.exists(os.path.join(self.kit, "cache", "auto-update.txt")))
+
+        os.remove(release)  # a second look would fail: the day's answer must be kept
+        result = self.ampify("update", "--auto", "--release-url", file_url(release), "--install-dir", install_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    @unittest.skipIf(apple_music_running(), "Apple Music runs here: the update would end its agent")
+    def test_auto_update_installs_a_newer_release_on_its_own(self):
+        release = self.make_release("9.9.9")
+        install_dir = os.path.join(self.tmp, "install")
+        os.makedirs(install_dir)
+        result = self.ampify("update", "--auto", "--release-url", file_url(release), "--install-dir", install_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(os.path.join(install_dir, "ampify.exe"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "ampify.exe 9.9.9")
+
+    @unittest.skipUnless(os.name == "nt", "a file held open blocks its deletion on Windows only")
+    @unittest.skipIf(apple_music_running(), "Apple Music runs here: the update refuses to install")
+    def test_apply_keeps_going_when_an_older_old_file_still_runs(self):
+        release = self.make_release("9.9.9")
+        install_dir = os.path.join(self.tmp, "install")
+        os.makedirs(install_dir)
+        for name in ("ampify.exe", "ampify.exe.old"):
+            with open(os.path.join(install_dir, name), "w", encoding="utf-8") as handle:
+                handle.write(name)
+        # A launcher started before the last update still runs from ampify.exe.old: the file cannot be removed.
+        with open(os.path.join(install_dir, "ampify.exe.old"), encoding="utf-8"):
+            result = self.ampify("update", "--apply", "--release-url", file_url(release), "--install-dir", install_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(os.path.join(install_dir, "ampify.exe.1.old"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "ampify.exe")
 
     def test_wrong_checksum_refuses_the_update(self):
         release = self.make_release("9.9.9", sums_hash="f" * 64)

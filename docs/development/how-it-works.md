@@ -44,6 +44,13 @@ The installer registers `ampify_launcher.exe --background` under
 back. `ampify launch` runs the same launcher in the foreground and starts Apple Music through its package identity
 (with `app_launch_flags`). When the background launcher runs, the foreground one leaves the injection to it.
 
+While Apple Music is closed, the background launcher also runs `ampify update --auto` three minutes after sign-in, a
+minute after Apple Music quits, then every hour, with its output appended to `logs\update.log`. `ampify` reads `kit_update`, looks at the latest GitHub release
+at most once a day (`cache\auto-update.txt`), and for a newer one downloads the zip, checks it against
+`SHA256SUMS.txt`, asks first when `kit_update = ask`, ends a leftover `AMPLibraryAgent.exe`, renames the running files
+to `*.old`, copies the new ones and restarts the background launcher from them. Only the installed copy updates
+itself: a build folder never does.
+
 A proxy DLL is not possible on a signed, read-only package; the injection method is the one
 [AMExclusive](https://github.com/AntiOblivionis/AMExclusive) uses.
 

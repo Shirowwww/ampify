@@ -35,10 +35,19 @@ const std::vector<std::pair<std::string, std::string>>& CloseOptions() {
     return options;
 }
 
+const std::vector<std::pair<std::string, std::string>>& KitUpdateOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"auto", "update.auto"},
+        {"ask", "update.ask"},
+        {"off", "update.off"}};
+    return options;
+}
+
 const std::vector<std::pair<std::string, std::string>>* OptionsOf(const std::string& key) {
     if (key == kNotificationsKey) return &NotificationOptions();
     if (key == kPlayerModeKey) return &PlayerOptions();
     if (key == kCloseKey) return &CloseOptions();
+    if (key == kKitUpdateKey) return &KitUpdateOptions();
     return nullptr;
 }
 
@@ -83,13 +92,29 @@ std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
     };
 }
 
-bool SetAppleTweak(const fs::path& kit, const std::string& key, const std::string& value, std::string& error) {
+KitUpdate ReadKitUpdate(const Settings& settings) {
+    std::string value = Known(settings, kKitUpdateKey);
+    return value == "ask" ? KitUpdate::Ask : value == "off" ? KitUpdate::Off : KitUpdate::Auto;
+}
+
+TweakChoice KitUpdateChoice(const fs::path& kit) {
+    Settings settings;
+    settings.Load((kit / "settings.txt").string());
+    return {kKitUpdateKey, "update.title", "update.help", KitUpdateOptions(), Known(settings, kKitUpdateKey)};
+}
+
+bool IsAppleTweakValue(const std::string& key, const std::string& value) {
     const auto* options = OptionsOf(key);
-    if (!options) {
+    return options &&
+           std::any_of(options->begin(), options->end(), [&](const auto& option) { return option.first == value; });
+}
+
+bool SetAppleTweak(const fs::path& kit, const std::string& key, const std::string& value, std::string& error) {
+    if (!OptionsOf(key)) {
         error = "not an Apple Music setting of the card: " + key;
         return false;
     }
-    if (std::none_of(options->begin(), options->end(), [&](const auto& option) { return option.first == value; })) {
+    if (!IsAppleTweakValue(key, value)) {
         error = "invalid value for " + key + ": " + value;
         return false;
     }

@@ -186,4 +186,61 @@ bool IsInstallDirectory(const std::filesystem::path& directory) {
     return std::filesystem::equivalent(directory, win::InstallDirectory(), ec);
 }
 
+bool EndProcesses(const std::string& imageName) {
+    constexpr DWORD kEndWaitMs = 5000;
+    for (DWORD id : win::ProcessIdsNamed(FromUtf8(imageName).c_str())) {
+        HANDLE process = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, FALSE, id);
+        if (!process) continue;
+        if (TerminateProcess(process, 1)) WaitForSingleObject(process, kEndWaitMs);
+        CloseHandle(process);
+    }
+    return win::ProcessIdsNamed(FromUtf8(imageName).c_str()).empty();
+}
+
+std::string UserLocale() {
+    wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
+    if (GetUserDefaultLocaleName(name, LOCALE_NAME_MAX_LENGTH) == 0) return "en";
+    return ToUtf8(name);
+}
+
+bool AskYesNo(const std::string& title, const std::string& text) {
+    // Not forced to the front: it may come while a game runs, and then waits in the taskbar.
+    UINT style = MB_YESNO | MB_ICONQUESTION;
+    return MessageBoxW(nullptr, FromUtf8(text).c_str(), FromUtf8(title).c_str(), style) == IDYES;
+}
+
+void ShowNotice(const std::string& title, const std::string& text) {
+    // Windows shows the balloon as a notification; the icon must stay a moment, or the notification goes with it.
+    constexpr DWORD kNoticeShownMs = 8000;
+    HINSTANCE instance = GetModuleHandleW(nullptr);
+    WNDCLASSEXW windowClass{};
+    windowClass.cbSize = sizeof windowClass;
+    windowClass.lpfnWndProc = DefWindowProcW;
+    windowClass.hInstance = instance;
+    windowClass.lpszClassName = L"AmpifyUpdateNotice";
+    RegisterClassExW(&windowClass);
+    HWND window = CreateWindowExW(0, windowClass.lpszClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance,
+                                  nullptr);
+    if (!window) return;
+    NOTIFYICONDATAW icon{};
+    icon.cbSize = sizeof icon;
+    icon.hWnd = window;
+    icon.uID = 1;
+    icon.uFlags = NIF_ICON | NIF_TIP;
+    icon.hIcon = win::AmpifyIcon(false);
+    wcsncpy_s(icon.szTip, L"Ampify", _TRUNCATE);
+    if (Shell_NotifyIconW(NIM_ADD, &icon)) {
+        // The balloon goes in a second call, on an icon the shell already shows.
+        icon.uFlags = NIF_INFO;
+        icon.dwInfoFlags = NIIF_USER | NIIF_LARGE_ICON;
+        icon.hBalloonIcon = win::AmpifyIcon(true);
+        wcsncpy_s(icon.szInfoTitle, FromUtf8(title).c_str(), _TRUNCATE);
+        wcsncpy_s(icon.szInfo, FromUtf8(text).c_str(), _TRUNCATE);
+        Shell_NotifyIconW(NIM_MODIFY, &icon);
+        Sleep(kNoticeShownMs);
+        Shell_NotifyIconW(NIM_DELETE, &icon);
+    }
+    DestroyWindow(window);
+}
+
 }  // namespace ampify::platform

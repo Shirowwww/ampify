@@ -784,6 +784,27 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     CHECK(!odd.closeToTray);
 }
 
+TEST_CASE(UiRender_KitUpdateInstallsOnItsOwnUnlessToldOtherwise) {
+    Settings settings;
+    CHECK(ReadKitUpdate(settings) == KitUpdate::Auto);
+    settings.Set("kit_update", "Ask");
+    CHECK(ReadKitUpdate(settings) == KitUpdate::Ask);
+    settings.Set("kit_update", "off");
+    CHECK(ReadKitUpdate(settings) == KitUpdate::Off);
+    settings.Set("kit_update", "weekly");
+    CHECK(ReadKitUpdate(settings) == KitUpdate::Auto);
+
+    fs::path kit = FreshKit("kit-update");
+    WriteFile(kit / "settings.txt", "theme.active = night\n");
+    std::string error;
+    CHECK(SetAppleTweak(kit, "kit_update", "ask", error));
+    CHECK(!SetAppleTweak(kit, "kit_update", "weekly", error));
+    TweakChoice choice = KitUpdateChoice(kit);
+    CHECK(choice.key == "kit_update" && choice.value == "ask");
+    CHECK(choice.options.size() == 3 && choice.options.front().first == "auto");
+    CHECK(ReadFile(kit / "settings.txt").find("theme.active = night") != std::string::npos);
+}
+
 TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     fs::path kit = FreshKit("apple-tweaks");
     WriteFile(kit / "settings.txt", "theme.active = night\n");

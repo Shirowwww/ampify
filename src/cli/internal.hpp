@@ -169,6 +169,11 @@ int CmdConfigDir(Context& ctx);
 // kept in cache\kit-update.txt and asked again at most once a day. Never fails the command.
 void NotifyKitUpdate(Context& ctx);
 
+// ampify update --auto, which the background launcher runs while Apple Music is closed. Follows kit_update: installs
+// a newer release on its own (auto), after a Yes (ask), or does nothing (off). At most one look a day
+// (cache\auto-update.txt); a failed look or install is tried again on the launcher's next run.
+int CmdAutoUpdate(Context& ctx);
+
 // Commands in diagnose.cpp.
 int CmdDoctor(Context& ctx);
 

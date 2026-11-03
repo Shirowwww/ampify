@@ -22,6 +22,7 @@
 #include "../core/theme/files.hpp"
 #include "../core/theme/theme.hpp"
 #include "../core/theme/theme_settings.hpp"
+#include "../core/ui_render/apple_tweaks.hpp"
 #include "archive.hpp"
 #include "catalog.hpp"
 #include "element.hpp"
@@ -115,6 +116,13 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
     }
     if (key == kLaunchFlagsKey) {
         if (!SplitLaunchFlags(value, &problem)) return false;
+        return true;
+    }
+    if (key == uirender::kKitUpdateKey) {
+        if (!uirender::IsAppleTweakValue(key, value)) {
+            problem = "kit_update expects auto (install on its own), ask or off";
+            return false;
+        }
         return true;
     }
     if (key == "remote.port" || key == "midi.device") {
@@ -511,6 +519,8 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
             options.check = true;
         } else if (arg == "--apply") {
             options.apply = true;
+        } else if (arg == "--auto") {
+            options.autoUpdate = true;
         } else if (arg == "--follow") {
             options.follow = true;
         } else if (arg == "--json") {

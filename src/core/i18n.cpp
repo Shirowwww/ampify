@@ -90,6 +90,15 @@ constexpr Message kKit[] = {
     {"accent.blue", "Blue"},
     {"accent.purple", "Purple"},
     {"accent.orange", "Orange"},
+    {"update.title", "Ampify updates"},
+    {"update.help", "New versions of Ampify, checked once a day while Apple Music is closed."},
+    {"update.auto", "Install them on their own"},
+    {"update.ask", "Ask me first"},
+    {"update.off", "Never"},
+    {"update.askTitle", "Ampify {version} is ready"},
+    {"update.askText", "A new version of Ampify is available (you have {installed}). Install it now? It takes a few seconds, while Apple Music is closed."},
+    {"update.doneTitle", "Ampify updated"},
+    {"update.doneText", "Ampify {version} is installed. It loads the next time Apple Music opens."},
 };
 
 // French texts of what people see (menus, buttons, the Settings card). The log stays in English, so a key missing here
@@ -161,6 +170,15 @@ constexpr Message kKitFr[] = {
     {"accent.blue", "Bleu"},
     {"accent.purple", "Violet"},
     {"accent.orange", "Orange"},
+    {"update.title", "Mises à jour d'Ampify"},
+    {"update.help", "Les nouvelles versions d'Ampify, cherchées une fois par jour quand Apple Music est fermé."},
+    {"update.auto", "Les installer toutes seules"},
+    {"update.ask", "Me demander d'abord"},
+    {"update.off", "Jamais"},
+    {"update.askTitle", "Ampify {version} est prêt"},
+    {"update.askText", "Une nouvelle version d'Ampify est disponible (vous avez la {installed}). L'installer maintenant ? Cela prend quelques secondes, pendant qu'Apple Music est fermé."},
+    {"update.doneTitle", "Ampify mis à jour"},
+    {"update.doneText", "Ampify {version} est installé. Il se charge à la prochaine ouverture d'Apple Music."},
 };
 
 constexpr Message kKitDe[] = {
@@ -231,6 +249,15 @@ constexpr Message kKitDe[] = {
     {"accent.blue", "Blau"},
     {"accent.purple", "Violett"},
     {"accent.orange", "Orange"},
+    {"update.title", "Ampify-Updates"},
+    {"update.help", "Neue Versionen von Ampify, einmal am Tag gesucht, während Apple Music geschlossen ist."},
+    {"update.auto", "Selbst installieren"},
+    {"update.ask", "Vorher fragen"},
+    {"update.off", "Nie"},
+    {"update.askTitle", "Ampify {version} ist bereit"},
+    {"update.askText", "Eine neue Version von Ampify ist verfügbar (installiert: {installed}). Jetzt installieren? Das dauert ein paar Sekunden, solange Apple Music geschlossen ist."},
+    {"update.doneTitle", "Ampify aktualisiert"},
+    {"update.doneText", "Ampify {version} ist installiert. Es lädt beim nächsten Start von Apple Music."},
 };
 
 constexpr Message kKitEs[] = {
@@ -301,6 +328,15 @@ constexpr Message kKitEs[] = {
     {"accent.blue", "Azul"},
     {"accent.purple", "Morado"},
     {"accent.orange", "Naranja"},
+    {"update.title", "Actualizaciones de Ampify"},
+    {"update.help", "Las nuevas versiones de Ampify, buscadas una vez al día con Apple Music cerrado."},
+    {"update.auto", "Instalarlas solas"},
+    {"update.ask", "Preguntarme antes"},
+    {"update.off", "Nunca"},
+    {"update.askTitle", "Ampify {version} está lista"},
+    {"update.askText", "Hay una nueva versión de Ampify (tienes la {installed}). ¿Instalarla ahora? Tarda unos segundos, con Apple Music cerrado."},
+    {"update.doneTitle", "Ampify actualizado"},
+    {"update.doneText", "Ampify {version} está instalado. Se carga la próxima vez que se abra Apple Music."},
 };
 
 constexpr Message kKitPt[] = {
@@ -371,6 +407,15 @@ constexpr Message kKitPt[] = {
     {"accent.blue", "Azul"},
     {"accent.purple", "Roxo"},
     {"accent.orange", "Laranja"},
+    {"update.title", "Atualizações do Ampify"},
+    {"update.help", "As novas versões do Ampify, procuradas uma vez por dia com o Apple Music fechado."},
+    {"update.auto", "Instalar sozinhas"},
+    {"update.ask", "Perguntar antes"},
+    {"update.off", "Nunca"},
+    {"update.askTitle", "Ampify {version} está pronta"},
+    {"update.askText", "Há uma nova versão do Ampify (você tem a {installed}). Instalar agora? Leva alguns segundos, com o Apple Music fechado."},
+    {"update.doneTitle", "Ampify atualizado"},
+    {"update.doneText", "Ampify {version} está instalado. Ele carrega na próxima vez que o Apple Music abrir."},
 };
 
 constexpr Message kKitRu[] = {
@@ -441,6 +486,15 @@ constexpr Message kKitRu[] = {
     {"accent.blue", "Синий"},
     {"accent.purple", "Фиолетовый"},
     {"accent.orange", "Оранжевый"},
+    {"update.title", "Обновления Ampify"},
+    {"update.help", "Новые версии Ampify проверяются раз в день, пока Apple Music закрыт."},
+    {"update.auto", "Устанавливать сами"},
+    {"update.ask", "Сначала спрашивать"},
+    {"update.off", "Никогда"},
+    {"update.askTitle", "Ampify {version} готов"},
+    {"update.askText", "Доступна новая версия Ampify (у вас {installed}). Установить сейчас? Это займёт несколько секунд, пока Apple Music закрыт."},
+    {"update.doneTitle", "Ampify обновлён"},
+    {"update.doneText", "Ampify {version} установлен. Он загрузится при следующем запуске Apple Music."},
 };
 
 constexpr Message kKitJa[] = {
@@ -511,6 +565,15 @@ constexpr Message kKitJa[] = {
     {"accent.blue", "ブルー"},
     {"accent.purple", "パープル"},
     {"accent.orange", "オレンジ"},
+    {"update.title", "Ampify のアップデート"},
+    {"update.help", "Apple Music を閉じている間に、1 日 1 回 Ampify の新しいバージョンを確認します。"},
+    {"update.auto", "自動でインストール"},
+    {"update.ask", "先に確認する"},
+    {"update.off", "しない"},
+    {"update.askTitle", "Ampify {version} の準備ができました"},
+    {"update.askText", "Ampify の新しいバージョンがあります（現在は {installed}）。今すぐインストールしますか？ Apple Music を閉じている間、数秒で終わります。"},
+    {"update.doneTitle", "Ampify を更新しました"},
+    {"update.doneText", "Ampify {version} をインストールしました。次に Apple Music を開いたときに読み込まれます。"},
 };
 
 constexpr Message kKitZh[] = {
@@ -579,6 +642,15 @@ constexpr Message kKitZh[] = {
     {"accent.blue", "蓝色"},
     {"accent.purple", "紫色"},
     {"accent.orange", "橙色"},
+    {"update.title", "Ampify 更新"},
+    {"update.help", "在 Apple Music 关闭时，每天检查一次 Ampify 的新版本。"},
+    {"update.auto", "自动安装"},
+    {"update.ask", "先问我"},
+    {"update.off", "从不"},
+    {"update.askTitle", "Ampify {version} 已就绪"},
+    {"update.askText", "Ampify 有新版本（当前为 {installed}）。现在安装吗？Apple Music 关闭时，只需几秒钟。"},
+    {"update.doneTitle", "Ampify 已更新"},
+    {"update.doneText", "Ampify {version} 已安装，下次打开 Apple Music 时加载。"},
 };
 
 struct LanguageTable {

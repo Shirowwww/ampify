@@ -27,6 +27,7 @@ struct Options {
     bool yes = false;                         // --yes: answer yes to every question
     bool check = false;                       // --check: `update` only looks
     bool apply = false;                       // --apply: `update` installs the files it downloaded
+    bool autoUpdate = false;                  // --auto: `update` follows kit_update, as the background launcher runs it
     bool follow = false;                      // --follow: `logs` keeps printing the lines that are added
     bool json = false;                        // --json: `market` prints JSON, for the Marketplace page
     bool tree = false;                        // --tree: `inspect` prints the last interface tree of the kernel

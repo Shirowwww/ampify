@@ -124,4 +124,19 @@ bool IsInstallDirectory(const std::filesystem::path&) {
     return false;
 }
 
+bool EndProcesses(const std::string&) {
+    return true;
+}
+
+std::string UserLocale() {
+    const char* lang = std::getenv("LANG");
+    return lang && *lang ? lang : "en";
+}
+
+bool AskYesNo(const std::string&, const std::string&) {
+    return false;
+}
+
+void ShowNotice(const std::string&, const std::string&) {}
+
 }  // namespace ampify::platform

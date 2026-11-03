@@ -320,6 +320,23 @@ std::optional<ReleaseInfo> FetchRelease(Context& ctx, const std::string& source,
     return release;
 }
 
+namespace {
+
+// The first of file.old, file.1.old ... file.9.old that is free once the stale ones were removed.
+std::filesystem::path OldFileName(const std::filesystem::path& file) {
+    constexpr int kOldNames = 10;
+    std::error_code ec;
+    for (int i = 0; i < kOldNames; i++) {
+        std::filesystem::path old = file;
+        old += i == 0 ? ".old" : "." + std::to_string(i) + ".old";
+        RemoveQuietly(old);
+        if (!std::filesystem::exists(old, ec)) return old;
+    }
+    return file.string() + ".last.old";
+}
+
+}  // namespace
+
 int InstallKitRelease(Context& ctx, const std::string& source, const std::string& wanted) {
     std::string error;
     std::optional<ReleaseInfo> release = FetchRelease(ctx, source, error);
@@ -426,10 +443,9 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
         if (!file.is_regular_file(ec)) continue;
         std::filesystem::path destination = installDir / file.path().filename();
         if (std::filesystem::exists(destination, ec)) {
-            // A running program can be renamed on Windows, not overwritten. Keep the old file as *.old.
-            std::filesystem::path old = destination;
-            old += ".old";
-            RemoveQuietly(old);
+            // A running program can be renamed on Windows, not overwritten. Keep the old file as *.old, or *.1.old and
+            // so on while an older *.old still runs (a launcher started before the last update).
+            std::filesystem::path old = OldFileName(destination);
             std::filesystem::rename(destination, old, ec);
             if (ec) return Failure(ctx, "cannot replace " + Utf8(destination));
         }
@@ -443,7 +459,7 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     RemoveQuietly(staged);
     // The background launcher still runs the old file (renamed *.old): it restarts from the new one.
     platform::AutoStart autoStart = platform::AutoStartState();
-    if (autoStart.registered && platform::IsInstallDirectory(installDir)) {
+    if ((autoStart.registered || autoStart.running) && platform::IsInstallDirectory(installDir)) {
         std::string error;
         if (!platform::RestartAutoStart(installDir / "ampify_launcher.exe", error)) {
             ctx.err << "ampify: the background launcher did not restart (" << error << "): run ampify apply\n";
@@ -680,6 +696,7 @@ int CmdInstallKit(Context& ctx) {
 
 int CmdUpdate(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
+    if (args.size() == 1 && ctx.options.autoUpdate) return CmdAutoUpdate(ctx);
     if (args.size() == 1) {
         return InstallKitRelease(ctx, ctx.options.releaseUrl ? *ctx.options.releaseUrl : DefaultReleaseUrl(""), "");
     }

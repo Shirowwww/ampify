@@ -94,7 +94,13 @@ An Apple Music already open keeps Ampify until you close it. Your themes, extens
 
 ## Update
 
-Run the install line again, or `ampify update --apply` with Apple Music closed. Both keep your settings.
+Ampify updates itself. Once a day, while Apple Music is closed, it looks for a new release, checks its SHA-256,
+installs it and shows a notification; it loads with the next Apple Music start. If you keep Apple Music open in the
+notification area, the update waits until you quit it or restart the PC. In Apple Music's **Settings > Ampify >
+Ampify updates**, choose to have it ask first, or never update (`ampify config kit_update ask` or `off`).
+
+To update by hand, run the install line again, or `ampify update --apply` with Apple Music closed. Every way keeps your
+settings.
 
 ## Uninstall
 

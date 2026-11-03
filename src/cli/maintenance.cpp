@@ -9,6 +9,8 @@
 
 #include "../core/apple_music.hpp"
 #include "../core/build_signature.hpp"
+#include "../core/i18n.hpp"
+#include "../core/ui_render/apple_tweaks.hpp"
 #include "../core/version_gate.hpp"
 #include "../core/version_list.hpp"
 #include "internal.hpp"
@@ -255,6 +257,78 @@ void NotifyKitUpdate(Context& ctx) {
     if (!IsValidVersion(cache.latest) || CompareReleaseVersions(cache.latest, AMPIFY_VERSION) <= 0) return;
     ctx.err << "ampify: version " << cache.latest << " of Ampify is available (installed: " << AMPIFY_VERSION
             << "). Run ampify update to download it.\n";
+}
+
+namespace {
+
+// Whether ampify update --auto may look for a release now: kit_update allows it, this is the installed copy (a build
+// folder or an extracted zip is never replaced behind the user's back), and no look was made today.
+bool MayLookForUpdate(Context& ctx, uirender::KitUpdate mode, const std::filesystem::path& cacheFile) {
+    if (mode == uirender::KitUpdate::Off) {
+        ctx.out << "kit_update = off: no update looked for.\n";
+        return false;
+    }
+    if (!ctx.options.installDir && !platform::IsInstallDirectory(platform::ExecutableDirectory())) {
+        ctx.out << "Not the installed copy of Ampify: no update looked for.\n";
+        return false;
+    }
+    UpdateCache cache = ReadUpdateCache(cacheFile);
+    std::int64_t now = NowSeconds();
+    return cache.checked < 0 || now < cache.checked || now - cache.checked >= kUpdateCheckPeriodSeconds;
+}
+
+// Apple's library agent often stays open, with the kernel, long after Apple Music closed; Apple Music starts it again
+// when it opens. The installer ends it the same way (src/setup/setup.cpp). False while Apple Music itself is open.
+bool ReadyToInstall(Context& ctx) {
+    if (platform::IsProcessRunning("AppleMusic.exe")) return false;
+    if (platform::IsProcessRunning("AMPLibraryAgent.exe")) {
+        ctx.out << "AMPLibraryAgent.exe stayed open after Apple Music: ended before the update.\n";
+        platform::EndProcesses("AMPLibraryAgent.exe");
+    }
+    return true;
+}
+
+}  // namespace
+
+int CmdAutoUpdate(Context& ctx) {
+    Settings settings;
+    settings.Load(ctx.kit.Settings().string());
+    uirender::KitUpdate mode = uirender::ReadKitUpdate(settings);
+    std::filesystem::path file = ctx.kit.Cache() / "auto-update.txt";
+    if (!MayLookForUpdate(ctx, mode, file)) return 0;
+
+    std::string source = ctx.options.releaseUrl ? *ctx.options.releaseUrl : DefaultReleaseUrl("");
+    std::string error;
+    std::optional<ReleaseInfo> release = FetchRelease(ctx, source, error, kUpdateCheckTimeoutSeconds);
+    if (!release) return Failure(ctx, error);  // not written: offline now, looked for again on the next run
+    std::error_code ec;
+    std::filesystem::create_directories(ctx.kit.Cache(), ec);
+    std::string writeError;
+    WriteTextFile(file, "checked=" + std::to_string(NowSeconds()) + "\nlatest=" + release->version + "\n", writeError);
+    if (CompareReleaseVersions(release->version, AMPIFY_VERSION) <= 0) {
+        ctx.out << "ampify is up to date (version " << AMPIFY_VERSION << ").\n";
+        return 0;
+    }
+
+    std::string language = settings.GetString("language", "");
+    i18n::SetLanguage(i18n::LanguageCode(language.empty() ? platform::UserLocale() : language));
+    if (mode == uirender::KitUpdate::Ask &&
+        !platform::AskYesNo(i18n::Text("update.askTitle", {{"version", release->version}}),
+                            i18n::Text("update.askText", {{"installed", AMPIFY_VERSION}}))) {
+        ctx.out << "Version " << release->version << " declined: asked again tomorrow.\n";
+        return 0;
+    }
+    Options installing = ctx.options;
+    installing.apply = true;
+    Context install{installing, ctx.kit, ctx.in, ctx.out, ctx.err};
+    int code = ReadyToInstall(ctx) ? InstallKitRelease(install, source, "")
+                                   : Failure(ctx, "Apple Music is open: the update waits for it to close");
+    if (code != 0) {
+        std::filesystem::remove(file, ec);  // Apple Music opened meanwhile, or a download failed: the next run tries again
+        return code;
+    }
+    platform::ShowNotice(i18n::Text("update.doneTitle"), i18n::Text("update.doneText", {{"version", release->version}}));
+    return 0;
 }
 
 }  // namespace ampify::cli

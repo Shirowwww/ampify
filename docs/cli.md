@@ -52,7 +52,7 @@ ampify doctor                            check that everything is in order
 | `ampify install <id> [--yes]` | Downloads, checks the SHA-256, validates and installs. The element starts off ([what is checked](extensions/catalog.md#what-install-checks)) |
 | `ampify update <id> [--yes]` | Updates an element when the catalog has a newer version |
 | `ampify remove <id>` | Removes an element, after a backup |
-| `ampify update` | Downloads the latest Ampify release and checks it. `--check` only says whether one exists, `--apply` installs it (Apple Music closed) |
+| `ampify update` | Downloads the latest Ampify release and checks it. `--check` only says whether one exists, `--apply` installs it (Apple Music closed). `--auto` follows `kit_update`, at most one look a day: the background launcher runs it every hour while Apple Music is closed, with its output in `logs\update.log` |
 | `ampify install-kit <version> [--apply]` | Installs a given Ampify release, even an older one |
 | `ampify versions [list]` | The Apple Music versions Ampify accepts, and the installed one |
 | `ampify versions update` | Downloads the list of tested versions published with the catalog into `versions.txt` |
@@ -142,6 +142,7 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `catalog.url` | `https://...` or `file://...` | the public catalog |
 | `app_launch_flags` | Arguments added when `ampify launch` starts Apple Music | empty |
 | `check_kit_update` | `1`: some commands say when a new Ampify exists (checked once a day, nothing downloaded) | `0` |
+| `kit_update` | New Ampify releases: `auto` installs them while Apple Music is closed, `ask` asks first, `off` never looks | `auto` |
 | `expose_api` | `0`: no JavaScript element starts | `1` |
 | `discord.enabled` | `1`: elements with `ipc.discord` can show a Discord presence | `0` |
 | `tray.enabled` | `1`: an Ampify icon in the notification area | `0` |

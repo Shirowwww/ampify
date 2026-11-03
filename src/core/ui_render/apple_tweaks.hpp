@@ -47,6 +47,16 @@ struct TweakChoice {
 };
 std::vector<TweakChoice> AppleTweakChoices(const std::filesystem::path& kit);
 
+// New releases of Ampify (kit_update): installed on their own while Apple Music is closed, after a question, or never.
+// The background launcher runs `ampify update --auto`, which follows this choice (src/cli/maintenance.cpp).
+enum class KitUpdate { Auto, Ask, Off };
+inline constexpr char kKitUpdateKey[] = "kit_update";
+KitUpdate ReadKitUpdate(const Settings& settings);
+TweakChoice KitUpdateChoice(const std::filesystem::path& kit);
+
+// True when the card offers `value` for `key` (stored values, such as "auto" for kit_update).
+bool IsAppleTweakValue(const std::string& key, const std::string& value);
+
 // Writes one choice to settings.txt. Refused for a key or a value the card does not offer.
 bool SetAppleTweak(const std::filesystem::path& kit, const std::string& key, const std::string& value, std::string& error);
 

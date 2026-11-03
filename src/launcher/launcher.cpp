@@ -325,6 +325,91 @@ int Run(ampify::Journal& journal, const std::filesystem::path& kit) {
     return 0;
 }
 
+// While Apple Music is closed, the background launcher runs `ampify update --auto` now and then: a few minutes after
+// sign-in, a minute after Apple Music quits, then every hour. ampify follows kit_update and looks for a release at most
+// once a day, so most runs end at once. An update it installs restarts this launcher (src/cli/marketplace.cpp). Only
+// the installed copy does this. Output: logs\update.log, kept to its last runs.
+class AutoUpdater {
+public:
+    ~AutoUpdater() {
+        if (m_process) CloseHandle(m_process);
+    }
+
+    // Apple Music has just quit: the next run comes soon, for someone who keeps it open in the notification area.
+    void SoonAfterSession() { m_next = (std::min)(m_next, GetTickCount64() + kAfterSessionMs); }
+
+    void Step(ampify::Journal& journal) {
+        if (m_process) {
+            if (WaitForSingleObject(m_process, 0) != WAIT_OBJECT_0) return;
+            DWORD code = 0;
+            GetExitCodeProcess(m_process, &code);
+            if (code != 0) journal.Write("ampify update --auto ended with code " + std::to_string(code) + " (logs\\update.log)");
+            CloseHandle(m_process);
+            m_process = nullptr;
+        }
+        ULONGLONG now = GetTickCount64();
+        if (now < m_next) return;
+        m_next = now + kEveryMs;
+        Start(journal);
+    }
+
+private:
+    static constexpr ULONGLONG kFirstDelayMs = 3 * 60 * 1000;
+    static constexpr ULONGLONG kAfterSessionMs = 60 * 1000;
+    static constexpr ULONGLONG kEveryMs = 60 * 60 * 1000;
+    static constexpr LONGLONG kLogLimitBytes = 64 * 1024;
+
+    // logs\update.log, appended to so the run that installed stays readable; started again past kLogLimitBytes.
+    static HANDLE OpenLog() {
+        std::filesystem::path file = ampify::win::JournalFile("update.log");
+        std::error_code ec;
+        auto size = std::filesystem::file_size(file, ec);
+        DWORD disposition = !ec && size > static_cast<std::uintmax_t>(kLogLimitBytes) ? CREATE_ALWAYS : OPEN_ALWAYS;
+        SECURITY_ATTRIBUTES inherit{sizeof inherit, nullptr, TRUE};
+        HANDLE log = CreateFileW(file.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ, &inherit, disposition,
+                                 FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (log == INVALID_HANDLE_VALUE) return log;
+        SYSTEMTIME now{};
+        GetLocalTime(&now);
+        char line[64];
+        int length = std::snprintf(line, sizeof line, "--- %04u-%02u-%02u %02u:%02u ampify update --auto\r\n", now.wYear,
+                                   now.wMonth, now.wDay, now.wHour, now.wMinute);
+        DWORD written = 0;
+        if (length > 0) WriteFile(log, line, static_cast<DWORD>(length), &written, nullptr);
+        return log;
+    }
+
+    void Start(ampify::Journal& journal) {
+        std::filesystem::path folder = ampify::win::ExecutablePath().parent_path();
+        std::error_code ec;
+        if (!std::filesystem::equivalent(folder, ampify::win::InstallDirectory(), ec)) return;  // a build folder
+        std::filesystem::path cli = folder / L"ampify.exe";
+        if (!std::filesystem::exists(cli)) return;
+        HANDLE log = OpenLog();
+        STARTUPINFOW startup{};
+        startup.cb = sizeof startup;
+        if (log != INVALID_HANDLE_VALUE) {
+            startup.dwFlags = STARTF_USESTDHANDLES;
+            startup.hStdOutput = log;
+            startup.hStdError = log;
+        }
+        std::wstring command = L"\"" + cli.wstring() + L"\" update --auto";
+        PROCESS_INFORMATION started{};
+        // A console of its own without a window: curl and tasklist, which ampify runs, inherit it and stay hidden.
+        if (CreateProcessW(cli.c_str(), command.data(), nullptr, nullptr, log != INVALID_HANDLE_VALUE, CREATE_NO_WINDOW,
+                           nullptr, cli.parent_path().c_str(), &startup, &started)) {
+            CloseHandle(started.hThread);
+            m_process = started.hProcess;
+        } else {
+            journal.Write("ampify update --auto could not start (code " + std::to_string(GetLastError()) + ")");
+        }
+        if (log != INVALID_HANDLE_VALUE) CloseHandle(log);
+    }
+
+    ULONGLONG m_next = GetTickCount64() + kFirstDelayMs;
+    HANDLE m_process = nullptr;
+};
+
 // ampify_launcher.exe --background: waits for Apple Music, follows each session, and waits again. One per Windows
 // session; it stops when `stop` is set (ampify restore, the installer, the uninstaller).
 int RunBackground(ampify::Journal& journal, const std::filesystem::path& kit, HANDLE stop) {
@@ -336,12 +421,14 @@ int RunBackground(ampify::Journal& journal, const std::filesystem::path& kit, HA
     std::ostringstream quiet;
     ampify::Journal quietJournal(quiet, ampify::Journal::LocalTimeStamp);
     bool firstLook = true;
+    AutoUpdater updater;
     DWORD wait = 0;
     while (!WaitOrStop(stop, wait)) {
         wait = kBackgroundPollMs;
         // A name check first: it costs next to nothing, four times a second.
         if (ampify::win::ProcessIdsNamed(L"AppleMusic.exe").empty()) {
             firstLook = false;
+            updater.Step(journal);
             continue;
         }
         if (!session || session->Stale()) {
@@ -363,6 +450,7 @@ int RunBackground(ampify::Journal& journal, const std::filesystem::path& kit, HA
         }
         firstLook = false;
         if (WaitForSingleObject(stop, 0) == WAIT_OBJECT_0) break;
+        updater.SoonAfterSession();
         journal.Write("Waiting for Apple Music to start again");
         session = OpenSession(journal, kit);
     }

@@ -1150,38 +1150,41 @@ void AddRow(const controls::StackPanel& rows, const xaml::UIElement& row) {
     rows.Children().Append(row);
 }
 
+// One choice of the card as a menu row, written to settings.txt when it changes (uirender::SetAppleTweak).
+void AddTweakRow(UiService::Shared& shared, const controls::StackPanel& rows, const uirender::TweakChoice& choice) {
+    UiService::Shared* owner = &shared;
+    controls::ComboBox combo;
+    if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
+    combo.MinWidth(220);
+    auto values = std::make_shared<std::vector<std::string>>();
+    for (const auto& [value, textKey] : choice.options) {
+        values->push_back(value);
+        combo.Items().Append(winrt::box_value(Wide(i18n::Text(textKey))));
+    }
+    auto chosen = std::find(values->begin(), values->end(), choice.value);
+    combo.SelectedIndex(chosen == values->end() ? 0 : static_cast<int32_t>(chosen - values->begin()));
+    Name(combo, "AMPIFY_Tweak_" + choice.key, i18n::Text(choice.labelKey));
+    combo.SelectionChanged([owner, values, key = choice.key](IInspectable const& sender,
+                                                             controls::SelectionChangedEventArgs const&) noexcept {
+        try {
+            int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
+            if (index < 0 || index >= static_cast<int32_t>(values->size())) return;
+            std::string error;
+            if (uirender::SetAppleTweak(owner->kit, key, (*values)[index], error)) {
+                owner->journal.Write("Settings: " + key + " = " + (*values)[index] + " from the Ampify page");
+            } else {
+                owner->journal.Write("Settings: could not change " + key + ": " + error);
+            }
+        } catch (...) {
+        }
+    });
+    AddRow(rows, LabelledRow(shared, i18n::Text(choice.labelKey), i18n::Text(choice.helpKey), combo));
+}
+
 // What Ampify changes in Apple Music's own behaviour (uirender::AppleTweakChoices): one choice per row. The kernel
 // reads settings.txt again within a second (UiService::Run), so a choice applies at once.
 void AddAppleTweakRows(UiService::Shared& shared, const controls::StackPanel& rows) {
-    UiService::Shared* owner = &shared;
-    for (const uirender::TweakChoice& choice : uirender::AppleTweakChoices(shared.kit)) {
-        controls::ComboBox combo;
-        if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
-        combo.MinWidth(220);
-        auto values = std::make_shared<std::vector<std::string>>();
-        for (const auto& [value, textKey] : choice.options) {
-            values->push_back(value);
-            combo.Items().Append(winrt::box_value(Wide(i18n::Text(textKey))));
-        }
-        auto chosen = std::find(values->begin(), values->end(), choice.value);
-        combo.SelectedIndex(chosen == values->end() ? 0 : static_cast<int32_t>(chosen - values->begin()));
-        Name(combo, "AMPIFY_Tweak_" + choice.key, i18n::Text(choice.labelKey));
-        combo.SelectionChanged([owner, values, key = choice.key](IInspectable const& sender,
-                                                                 controls::SelectionChangedEventArgs const&) noexcept {
-            try {
-                int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
-                if (index < 0 || index >= static_cast<int32_t>(values->size())) return;
-                std::string error;
-                if (uirender::SetAppleTweak(owner->kit, key, (*values)[index], error)) {
-                    owner->journal.Write("Settings: " + key + " = " + (*values)[index] + " from the Ampify page");
-                } else {
-                    owner->journal.Write("Settings: could not change " + key + ": " + error);
-                }
-            } catch (...) {
-            }
-        });
-        AddRow(rows, LabelledRow(shared, i18n::Text(choice.labelKey), i18n::Text(choice.helpKey), combo));
-    }
+    for (const uirender::TweakChoice& choice : uirender::AppleTweakChoices(shared.kit)) AddTweakRow(shared, rows, choice);
 }
 
 // A zip of the state and the logs with names, folders and music taken out (`ampify report`), opened in Explorer once
@@ -1334,6 +1337,7 @@ controls::StackPanel BuildAmpifyPage(UiService::Shared& shared) {
     AddAppleTweakRows(shared, appleRows);
     page.Children().Append(Section(shared, "AppleMusic", "tweaks.title", "tweaks.subtitle", appleRows));
     controls::StackPanel helpRows;
+    AddTweakRow(shared, helpRows, uirender::KitUpdateChoice(shared.kit));
     AddRow(helpRows, FolderRow(shared));
     AddRow(helpRows, ReportRow(shared));
     page.Children().Append(Section(shared, "Help", "mods.help", "", helpRows));
