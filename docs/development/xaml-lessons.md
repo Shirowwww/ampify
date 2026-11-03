@@ -103,6 +103,8 @@ dozens of times. Always target them under a named parent.
 | Problem | Cause | Fix |
 |---|---|---|
 | Apple's full-screen player lost its resize border a moment after Ampify set `WS_THICKFRAME` | The FullScreen presenter of its AppWindow puts its own Win32 style back after any change | Give the window an `OverlappedPresenter` with `SetBorderAndTitleBar(true, false)`, on the window's interface thread |
+| Above the taskbar, Apple's player had a 3 px light line around the screen | Its window was made with `WS_DLGFRAME`, which `SetBorderAndTitleBar(false, false)` leaves, and the AppWindow puts the bit back after `SetWindowLongPtr` removes it | Place the window so its client area fills the work area, and cut the frame off with `SetWindowRgn` (removed again for the window modes) |
+| Apple's shrink button left only the mini player in a corner when Ampify placed the player | `ExitFullScreenButton` turns the player into the mini player, and the main window stays hidden behind it | Collapse that button while Ampify places the player; its close button (`CloseFullScreenButton`) and Escape bring Apple Music back |
 | Which new window is Apple's player? | Enumerating the process's windows also finds dialogs and Ampify's own windows | Ask Apple Music by name: `GetAppProperty("FullScreenPlayerWindow")`, like `MainWindow` |
 
 ## Build and capture

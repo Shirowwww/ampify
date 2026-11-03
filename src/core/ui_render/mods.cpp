@@ -1,6 +1,7 @@
 #include "mods.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <fstream>
 #include <sstream>
@@ -123,6 +124,12 @@ std::vector<ModEntry> ListMods(const fs::path& kit) {
     return mods;
 }
 
+bool IsModOn(const fs::path& kit, const std::string& id) {
+    Settings settings;
+    settings.Load((kit / "settings.txt").string());
+    return settings.GetBool(ExtensionHost::SettingKey(id), IsOnByDefault("extensions", id));
+}
+
 std::vector<ModEntry> ListThemes(const fs::path& kit) {
     std::vector<ModEntry> themes;
     for (const Manifest& manifest : ReadManifests(kit / "themes", ElementKind::Theme)) {
@@ -144,6 +151,52 @@ bool ChooseTheme(const fs::path& kit, const std::string& id, std::string& error)
         settings.Set("theme.active", id.empty() ? "none" : id);
         if (!keep) settings.Remove("theme.scheme");
     }, error);
+}
+
+namespace {
+
+constexpr char kAccentKey[] = "theme.accent";
+
+// shortcut: the same rule as theme::ParseAccent of the engine (moteur-fluidite branch); call it once both are merged.
+std::optional<std::string> NormalizeAccent(std::string_view text) {
+    if (!text.empty() && text.front() == '#') text.remove_prefix(1);
+    if (text.size() != 6) return std::nullopt;
+    std::string digits;
+    for (char c : text) {
+        if (!std::isxdigit(static_cast<unsigned char>(c))) return std::nullopt;
+        digits.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
+    }
+    return digits;
+}
+
+}  // namespace
+
+std::string ChosenAccent(const fs::path& kit) {
+    Settings settings;
+    settings.Load((kit / "settings.txt").string());
+    return NormalizeAccent(settings.GetString(kAccentKey, "")).value_or("");
+}
+
+bool ChooseAccent(const fs::path& kit, const std::string& accent, std::string& error) {
+    std::optional<std::string> digits = accent.empty() ? std::optional<std::string>("") : NormalizeAccent(accent);
+    if (!digits) {
+        error = "accent expects RRGGBB or #RRGGBB: " + accent;
+        return false;
+    }
+    return Settings::UpdateFile((kit / "settings.txt").string(), [&digits](Settings& settings) {
+        if (digits->empty()) {
+            settings.Remove(kAccentKey);
+        } else {
+            settings.Set(kAccentKey, *digits);
+        }
+    }, error);
+}
+
+const std::vector<AccentPreset>& AccentPresets() {
+    static const std::vector<AccentPreset> presets = {
+        {"FA2D48", "accent.pink"}, {"1ED760", "accent.green"}, {"0A84FF", "accent.blue"},
+        {"BF5AF2", "accent.purple"}, {"FF9F0A", "accent.orange"}};
+    return presets;
 }
 
 bool WriteSetting(const fs::path& kit, const std::string& key, const std::string& value, std::string& error) {

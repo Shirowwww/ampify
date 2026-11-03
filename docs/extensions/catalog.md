@@ -25,8 +25,13 @@ For an update, raise `version` in the manifest and publish again.
   whose `version` is not higher than the catalog's, whose code calls an API without declaring its permission, whose
   script looks minified or obfuscated, or whose pull request touches `packages/` or `catalog.json`.
 - A maintainer then reads the code before merging. That review is the main protection against a malicious element.
-- After the merge, a bot packs the element with `tools/pack.py`, writes `packages/<id>-<version>.zip` and its preview,
-  and updates `catalog.json` with the archive's address and SHA-256. A published archive never changes.
+- After the merge, a bot packs the element with `tools/pack.py`, writes `packages/<id>-<version>.zip`, its preview and
+  its README, and updates `catalog.json` with the archive's address and SHA-256. A published archive never changes.
+
+A `README.md` at the root of the element's folder is shown on its page in the Marketplace, below what it can do: what
+it is for, how to use it, its settings. It is published next to the archive as `packages/<id>-<version>.md`, with no
+field in `catalog.json`. The page shows headings, paragraphs, lists, bold text, code and links; images are left out,
+the preview is the picture.
 
 `ampify build <folder>` writes a zip and its catalog entry for a catalog of your own (`--catalog`). The public
 catalog's archives are always packed by the bot.

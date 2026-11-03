@@ -112,10 +112,10 @@ Things learned the hard way:
 You need Apple Music signed in, headphones or speakers, and a few Dolby Atmos songs.
 
 1. Close Apple Music and install Ampify (install line or `ampify_setup.exe`).
-2. Open Apple Music from its icon. The sidebar ends with an "Ampify" entry; Settings has an "Ampify" row that leads to
-   the Ampify card. Take a screenshot of the card.
+2. Open Apple Music from its icon. The sidebar ends with an "Ampify" entry; Settings has an "Ampify" row that opens
+   Ampify's settings page. Take a screenshot of the page.
 3. In the Marketplace, use Glass, then Artwork with a song playing, then "Restore Apple Music's look".
-4. Run `ampify extension enable atmos-leveler`, restart Apple Music, then play a stereo song and three Atmos songs for
+4. Switch on the Atmos leveler under Sound in Ampify's settings, then play a stereo song and three Atmos songs for
    30 seconds each at a fixed volume. The loudness should stay about the same.
 5. `ampify restore`, restart Apple Music: no Ampify entry. `ampify apply`, restart: it is back.
 6. Uninstall from Settings > Apps, keep the settings, and check that Apple Music opens and plays as before.

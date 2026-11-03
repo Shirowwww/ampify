@@ -35,6 +35,7 @@ Elements
 
 Marketplace
   market                       lists the catalog
+  market readme <id>           prints an element's README.md (installed copy, or the one published with it)
   install <id> [--yes]         installs from the catalog (SHA-256 checked)
   update <id> [--yes]          updates an installed element from the catalog
   update [--check] [--apply]   updates Ampify from the latest GitHub release

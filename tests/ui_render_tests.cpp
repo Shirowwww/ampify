@@ -560,6 +560,20 @@ TEST_CASE(UiRender_ModsSwitchWritesTheSettingAndAReloadRequest) {
     CHECK(!SwitchMod(kit, "../x", true, error));
 }
 
+TEST_CASE(UiRender_TheBuiltInLevelerIsReadAndSwitchedLikeAnExtension) {
+    fs::path kit = FreshKit("mods-leveler");
+    WriteFile(kit / "settings.txt", "theme.active = midnight\n");
+    WriteFile(kit / "reload.txt", "");
+    CHECK(!IsModOn(kit, "atmos-leveler"));  // off until asked for: it changes the sound
+    std::string error;
+    CHECK(SwitchMod(kit, "atmos-leveler", true, error));
+    CHECK(IsModOn(kit, "atmos-leveler"));
+    CHECK(ReadFile(kit / "reload.txt") == "start atmos-leveler\n");
+    CHECK(SwitchMod(kit, "atmos-leveler", false, error));
+    CHECK(!IsModOn(kit, "atmos-leveler"));
+    CHECK(error.empty());
+}
+
 TEST_CASE(UiRender_SwitchingAnElementOnTurnsOnTheServicesItAsksFor) {
     fs::path kit = FreshKit("mods-services");
     WriteFile(kit / "extensions" / "presence" / "manifest.json",
@@ -723,6 +737,29 @@ TEST_CASE(UiRender_ChoosingAThemeKeepsOnlyASchemeThatStillMeansSomething) {
     CHECK(!ChooseTheme(kit, "../x", error));
 }
 
+TEST_CASE(UiRender_AChosenAccentIsWrittenAsSixHexDigitsOrRemoved) {
+    fs::path kit = FreshKit("accent-choose");
+    WriteFile(kit / "settings.txt", "theme.active = night\n");
+    CHECK(ChosenAccent(kit).empty());  // the theme's own
+
+    std::string error;
+    CHECK(ChooseAccent(kit, "#1ed760", error));
+    CHECK(ReadFile(kit / "settings.txt").find("theme.accent = 1ED760") != std::string::npos);
+    CHECK(ChosenAccent(kit) == "1ED760");
+    CHECK(ChooseAccent(kit, "0A84FF", error));
+    CHECK(ChosenAccent(kit) == "0A84FF");
+
+    CHECK(!ChooseAccent(kit, "blue", error));  // refused: the value stays
+    CHECK(!ChooseAccent(kit, "#12345", error));
+    CHECK(!ChooseAccent(kit, "1234567", error));
+    CHECK(ChosenAccent(kit) == "0A84FF");
+
+    CHECK(ChooseAccent(kit, "", error));  // back to the theme's
+    CHECK(ReadFile(kit / "settings.txt").find("theme.accent") == std::string::npos);
+    CHECK(ReadFile(kit / "settings.txt").find("theme.active = night") != std::string::npos);
+    CHECK(!AccentPresets().empty() && AccentPresets().front().value == std::string("FA2D48"));
+}
+
 TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     Settings settings;
     AppleTweaks none = ReadAppleTweaks(settings);
@@ -762,15 +799,22 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "apple.notifications", "loud", error));
     CHECK(!SetAppleTweak(kit, "theme.active", "screen", error));
 
+    // The player and the close button first; the notifications last, where "never" (Apple's own switch does it)
+    // only shows for someone who chose it before.
     std::vector<TweakChoice> choices = AppleTweakChoices(kit);
     CHECK(choices.size() == 3);
     if (choices.size() == 3) {
-        CHECK(choices[0].key == "apple.notifications" && choices[0].value == "never");
-        CHECK(choices[1].key == "apple.fullscreen" && choices[1].value == "screen");
-        CHECK(choices[1].options.size() == 4);
-        CHECK(choices[2].key == "apple.close" && choices[2].value == "tray");
-        CHECK(choices[2].options.size() == 2);
+        CHECK(choices[0].key == "apple.fullscreen" && choices[0].value == "screen");
+        CHECK(choices[0].options.size() == 4);
+        CHECK(choices[1].key == "apple.close" && choices[1].value == "tray");
+        CHECK(choices[1].options.size() == 2);
+        CHECK(choices[2].key == "apple.notifications" && choices[2].value == "never");
+        CHECK(choices[2].options.size() == 3);
     }
+
+    CHECK(SetAppleTweak(kit, "apple.notifications", "background", error));
+    choices = AppleTweakChoices(kit);
+    CHECK(choices.size() == 3 && choices[2].options.size() == 2 && choices[2].value == "background");
 }
 
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {

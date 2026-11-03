@@ -41,6 +41,9 @@ constexpr const char* kReleaseByTag = "https://api.github.com/repos/Shirowwww/am
 constexpr const char* kKitArchiveSuffix = "-windows-x64.zip";
 constexpr const char* kChecksums = "SHA256SUMS.txt";
 constexpr const char* kRequiredKitFiles[] = {"ampify.exe", "ampify_launcher.exe", "ampify_kernel.dll"};
+// A README is a page of text: anything larger is not one, and the detail page waits on it.
+constexpr std::uintmax_t kMaxReadmeBytes = 256 * 1024;
+constexpr int kReadmeSeconds = 15;
 
 bool StartsWith(std::string_view text, std::string_view prefix) {
     return text.size() >= prefix.size() && text.substr(0, prefix.size()) == prefix;
@@ -524,10 +527,74 @@ int PrintMarketJson(Context& ctx) {
     return 0;
 }
 
+// The README published next to an archive, under its name: .../demo-1.0.0.zip gives .../demo-1.0.0.md.
+std::optional<std::string> ReadmeUrlOf(const std::string& archiveUrl) {
+    constexpr std::string_view kZip = ".zip";
+    if (archiveUrl.size() <= kZip.size() || archiveUrl.compare(archiveUrl.size() - kZip.size(), kZip.size(), kZip) != 0) {
+        return std::nullopt;
+    }
+    return archiveUrl.substr(0, archiveUrl.size() - kZip.size()) + ".md";
+}
+
+// Downloads the README of a catalog entry once per version, into the cache. False when it has none or the network
+// fails: both read as "no README" on the page.
+bool FetchReadme(Context& ctx, const CatalogEntry& entry, bool localCatalog, std::string& text) {
+    std::optional<std::string> url = ReadmeUrlOf(entry.url);
+    if (!url || !IsAllowedDownloadUrl(*url, localCatalog)) return false;
+    std::filesystem::path cached = ctx.kit.Cache() / "readme" / (entry.id + "-" + entry.version + ".md");
+    // A local catalog is a work copy: its README is read afresh each time.
+    if (!localCatalog && ReadWholeFile(cached, text)) return true;
+    std::error_code ec;
+    std::filesystem::create_directories(cached.parent_path(), ec);
+    std::filesystem::path part = cached;
+    part += ".part";
+    std::string error;
+    bool fetched = FetchTo(*url, part, error, kReadmeSeconds) && std::filesystem::file_size(part, ec) <= kMaxReadmeBytes &&
+                   !ec && ReadWholeFile(part, text);
+    if (fetched) std::filesystem::rename(part, cached, ec);
+    RemoveQuietly(part);
+    return fetched;
+}
+
+// Without its carriage returns: the output stream adds its own line ends, and a README written on Windows would get
+// each line end twice.
+int PrintText(Context& ctx, std::string text) {
+    std::erase(text, '\r');
+    ctx.out << text;
+    return 0;
+}
+
+// `ampify market readme <id>`: the element's README.md for the Marketplace's detail page. The installed copy's when it
+// is the catalog's version (or the catalog does not list it), else the one published next to the catalog's archive.
+// Prints nothing when there is none.
+int PrintReadme(Context& ctx, const std::string& id) {
+    Catalog catalog;
+    bool local = false;
+    bool catalogOk = LoadCatalog(ctx, catalog, local);
+    const CatalogEntry* entry = nullptr;
+    for (const CatalogEntry& candidate : catalog.entries) {
+        if (candidate.id == id) entry = &candidate;
+    }
+
+    std::string text;
+    std::string installedText;
+    for (const InstalledElement& element : InstalledNamed(ctx.kit, id)) {
+        if (!ReadWholeFile(ctx.kit.Element(element.kind, element.id) / "README.md", installedText)) continue;
+        bool current = !entry || (element.manifest && element.manifest->version == entry->version);
+        if (current) return PrintText(ctx, installedText);
+    }
+    if (catalogOk && entry && FetchReadme(ctx, *entry, local, text)) return PrintText(ctx, text);
+    return PrintText(ctx, installedText);  // an older copy's README is better than none
+}
+
 }  // namespace
 
 int CmdMarket(Context& ctx) {
     if (ctx.options.json) return PrintMarketJson(ctx);
+    if (ctx.options.positional.size() >= 2 && ctx.options.positional[1] == "readme") {
+        if (ctx.options.positional.size() != 3) return Usage(ctx, "market readme needs an element id");
+        return PrintReadme(ctx, ctx.options.positional[2]);
+    }
     Catalog catalog;
     bool local = false;
     if (!LoadCatalog(ctx, catalog, local)) return 1;

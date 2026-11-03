@@ -36,7 +36,7 @@ adds:
 Open Apple Music from its usual icon. With Ampify inside you see:
 
 - an **Ampify** entry at the bottom of the sidebar, which opens the Marketplace;
-- an **Ampify** row in Apple Music's Settings, under Advanced, which leads to the Ampify card;
+- an **Ampify** row in Apple Music's Settings, under Advanced, which opens Ampify's settings;
 - the **Now Playing** button at the right of the playback bar, which opens Apple Music's full-screen player with
   lyrics (Escape closes it).
 
@@ -52,13 +52,16 @@ needs an internet connection.
 
 ## Extensions
 
-Open Apple Music's Settings and click **Ampify**. The Ampify card has one switch per extension, each extension's
-settings, the active theme's settings, and a few choices for Apple Music itself (notifications, what closing the
-window does, where the full-screen player opens). Changes take effect at once.
+Open Apple Music's Settings and click **Ampify**, or click **Settings** in the Marketplace. Ampify's settings page has
+one switch per extension with its settings, a **Sound** section, the active theme's settings, and a few choices for
+Apple Music itself (where the full-screen player opens, what closing the window does, song notifications). Changes
+take effect at once.
 
 Extensions you install start switched off, and you see the permissions an extension asks for before you switch it on.
-Three ship with Ampify: Now Playing, the Atmos leveler (brings Dolby Atmos songs to the loudness of stereo ones, off
-until you switch it on) and the playback guard (restarts a song Apple Music leaves stuck, off until you switch it on).
+Three ship with Ampify: Now Playing, the playback guard (restarts a song Apple Music leaves stuck, off until you
+switch it on) and the Atmos leveler, under **Sound**: Dolby Atmos songs often play quieter than stereo ones, and the
+leveler brings them to the same loudness so you do not reach for the volume between songs. It is off until you switch
+it on.
 
 ## Languages
 
@@ -103,7 +106,7 @@ Apple Music then opens and plays as before.
 
 1. Run `ampify doctor`: it checks Ampify and lists each problem.
 2. Run `ampify report`: it writes an anonymised zip of the state and the logs in `%USERPROFILE%\Ampify\reports`
-   (the **Export a report** button of the Ampify card does the same). Look through it, then attach it to an
+   (the **Export a report** button of Ampify's settings page does the same). Look through it, then attach it to an
    [issue](https://github.com/Shirowwww/ampify/issues).
 
 The logs are in `%USERPROFILE%\Ampify\logs\`. If an antivirus blocks a file, note the threat name and allow nothing

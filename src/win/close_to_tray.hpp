@@ -1,6 +1,6 @@
 #pragma once
 
-// apple.close = tray (the Ampify card, "Closing the window"): closing Apple Music's main window hides it behind an
+// apple.close = tray (the Ampify page, "Closing the window"): closing Apple Music's main window hides it behind an
 // icon of the notification area instead of quitting, and the music goes on. A click on the icon brings the window back;
 // its menu shows it or quits. This icon is Apple Music's, shown only while the window hides, apart from Ampify's own
 // (tray.hpp). The main window's WM_CLOSE is caught by a subclass, before WinUI turns it into AppWindow.Closing, so

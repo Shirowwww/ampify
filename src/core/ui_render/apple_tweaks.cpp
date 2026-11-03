@@ -70,11 +70,16 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
 std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
     Settings settings;
     settings.Load((kit / "settings.txt").string());
+    // Apple's own switch (Settings, General) turns its notifications off: the card offers only what it does not, and
+    // keeps "never" for someone who chose it before.
+    std::string notifications = Known(settings, kNotificationsKey);
+    std::vector<std::pair<std::string, std::string>> notificationOptions = NotificationOptions();
+    if (notifications != "never") notificationOptions.pop_back();
     return {
-        {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", NotificationOptions(),
-         Known(settings, kNotificationsKey)},
         {kPlayerModeKey, "tweaks.player", "tweaks.playerHelp", PlayerOptions(), Known(settings, kPlayerModeKey)},
         {kCloseKey, "tweaks.close", "tweaks.closeHelp", CloseOptions(), Known(settings, kCloseKey)},
+        {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", std::move(notificationOptions),
+         notifications},
     };
 }
 

@@ -8,7 +8,8 @@ The archive holds the files of the folder at its root, with manifest.json among 
 requires. The zip is deterministic: entries are sorted and carry a fixed timestamp, so the same folder always gives
 the same SHA-256. With --catalog, the entry for the element is added or replaced, and the catalog is validated. The
 manifest's preview picture is copied next to the archive under the archive's name (demo-1.0.0.jpg), and the entry
-points to it next to the archive's address: publish both.
+points to it next to the archive's address. A README.md at the root of the folder is copied the same way
+(demo-1.0.0.md), for the Marketplace's detail page: publish them all.
 """
 
 import argparse
@@ -87,6 +88,14 @@ def publish_preview(folder, manifest, archive, url):
     return url.rsplit("/", 1)[0] + "/" + os.path.basename(target)
 
 
+def publish_readme(folder, archive):
+    """Copies the element's README.md next to the archive, under the archive's name (demo-1.0.0.md). The catalog gains
+    no field for it, which Ampify 1.1.0 would refuse: `ampify market readme` finds it from the archive's address."""
+    readme = os.path.join(folder, "README.md")
+    if os.path.isfile(readme):
+        shutil.copyfile(readme, os.path.splitext(archive)[0] + ".md")
+
+
 def catalog_entry(manifest, url, sha256, preview=None):
     entry = {
         key: manifest[key]
@@ -128,6 +137,7 @@ def pack(folder, archive, catalog=None, url=None):
     sha256 = build_archive(folder, archive)
     if catalog:
         preview = publish_preview(folder, manifest, archive, url)
+        publish_readme(folder, archive)
         update_catalog(catalog, catalog_entry(manifest, url, sha256, preview))
     return {"id": manifest["id"], "version": manifest["version"], "archive": archive, "sha256": sha256}
 

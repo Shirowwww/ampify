@@ -84,7 +84,7 @@ so the launcher and the kernel would not see the same files there.
 The tree's shape: [knowledge/apple-music-xaml-tree.md](../../knowledge/apple-music-xaml-tree.md). Pitfalls:
 [xaml-lessons.md](xaml-lessons.md).
 
-## Panels, pages and the Ampify card
+## Panels, pages and the Ampify settings page
 
 Extensions describe interfaces as trees of nodes, drawn with real WinUI controls (`src/win/ui_renderer.cpp`). Each
 node is named `AMPIFY_<element>_<node>`, and a new render only changes what changed. Styles are copied from the
@@ -95,9 +95,9 @@ native controls of Settings > Playback.
 | Panels | A 380 px column on the right, in a popup of the window (Apple Music removes unknown children from `Grid#PageRoot`) |
 | Dialogs | A native dialog, one at a time |
 | Full-screen view | A popup over the whole window, closed by its button or Escape |
-| App pages | Over the content, with a Back button |
+| App pages | Over the content, with a Back arrow that goes to the app's previous page (up to 16), or closes the page |
 | Playback bar buttons | In `StackPanel#NowPlayingToggleButtons` |
-| Ampify card | At the end of Settings > Playback, re-added each time the page loads. An "Ampify" row after Advanced on the Settings page scrolls to it |
+| Ampify settings page | The kernel's own page at `/ampify/settings`, drawn like an app page. The "Ampify" row after Advanced on the Settings page opens it, and so does the Marketplace's Settings button. Its styles come from Settings > Playback, read once when Apple Music shows that page |
 | Sidebar entries | A small panel in place of the sidebar's footer, since adding to Apple Music's own list crashed it |
 
 The card holds the extensions, the themes and their settings, and three choices for Apple Music itself, stored in

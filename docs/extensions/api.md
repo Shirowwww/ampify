@@ -135,7 +135,7 @@ Ampify.storage.remove(key)
 ```
 
 For a setting declared in the manifest, `config.get(key)` without a default gives the manifest's default, typed (a
-boolean for a toggle, a number for a number). A change in the Ampify card restarts the extension.
+boolean for a toggle, a number for a number). A change in Ampify's settings page restarts the extension.
 
 ### 5.3 Player [stable]
 
@@ -264,7 +264,7 @@ Ampify.ui.navigate(path)
   `"context"` adds to the menu of a song, album or playlist; `onClick` gets `{ title }`, the item's name.
 - The full-screen view covers the window, above everything. Escape or its Close button closes it. One at a time: the
   last element that opens it wins, and `onClose` runs when the user closes it or another element takes it.
-- `applePlayer.open()` opens Apple's full-screen player where the user chose in the Ampify card (`apple.fullscreen`).
+- `applePlayer.open()` opens Apple's full-screen player where the user chose in Ampify's settings page (`apple.fullscreen`).
   If Apple Music refuses, nothing opens and the log says why.
 - An app page takes the place of Apple Music's page, with a Back button; Apple Music's own navigation closes it.
 - Extensions cannot inject raw XAML. Themes are the only elements that ship XAML.
@@ -429,7 +429,10 @@ extension while the theme is active. Format: [themes/format.md](../themes/format
 
 An app lives in `apps\<id>`, is switched on with `ampify app enable <id>`, and adds pages with
 `Ampify.ui.page.register`. Its manifest `icon` does not create a sidebar entry by itself: the app adds one with
-`Ampify.ui.sidebar.addItem` and opens its page with `Ampify.ui.navigate("/<path>")`.
+`Ampify.ui.sidebar.addItem` and opens its page with `Ampify.ui.navigate("/<path>")`. A page can lead to another of
+its pages (`Ampify.ReactDOM.render(view, { page: "/<path>/item" })`, then `navigate`): the arrow of the page header
+goes back to the previous one. Each page mounts anew when it opens, so keep what must outlive it (the tab, the search)
+in a module variable. `Ampify.ui.navigate("/ampify/settings")` opens Ampify's settings page.
 
 ### 6.3 Snippets [stable]
 

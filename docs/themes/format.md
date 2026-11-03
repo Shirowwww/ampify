@@ -118,7 +118,7 @@ specificity. Within a source, `#name` beats a type, a type beats `*`, and the la
 ### Theme settings
 
 A theme can declare settings in its manifest, with the same `settings` field as an extension
-([manifest.md](../extensions/manifest.md#settings)). People change them in the Ampify card of Apple Music's settings,
+([manifest.md](../extensions/manifest.md#settings)). People change them in Ampify's settings page,
 and the theme applies again at once.
 
 ```json

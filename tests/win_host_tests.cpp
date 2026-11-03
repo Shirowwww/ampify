@@ -54,7 +54,7 @@ TEST_CASE(WinHost_SettingsArePersistedToSettingsTxt) {
 
 TEST_CASE(WinHost_SettingWriteKeepsAChangeMadeSinceTheKernelRead) {
     fs::path kit = KitForTest("settings-merge");
-    ampify::Settings settings;  // the kernel's copy, read before the Ampify card writes
+    ampify::Settings settings;  // the kernel's copy, read before Ampify's settings page writes
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
     ampify::WinHost host("ui", kit, settings, journal);

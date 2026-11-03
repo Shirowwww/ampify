@@ -80,7 +80,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Colours from the artwork (Dribbblish Dynamic) | `--art-1`, `--art-2`, `--art-3`, `--art-text` | Done |
 | An artwork background that moves (Lucid, Kawarp) | Needs a Composition effect | Missing |
 | `theme.js` | The theme's `main.js` | Done |
-| Theme settings menu (each theme codes its own) | `settings` in the manifest, shown in the Ampify card, read as `var(--setting-*)` | Done |
+| Theme settings menu (each theme codes its own) | `settings` in the manifest, shown in Ampify's settings page, read as `var(--setting-*)` | Done |
 | Fonts and images of the theme | `font-family: url(...)`, `url(...)` backgrounds | Done |
 | Context menus, tooltips, volume bar | `.menu`, `.menu-item`, `.tooltip`, `.flyout`, `.volume-slider` | Done |
 | Selected and playing rows | Selected rows (`selected-background`); no "playing" state on rows | Partial |
@@ -124,7 +124,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | `Keyboard`, `LocalStorage`, `Config`, `URI`, `Locale`, `SVGIcons`, `showNotification` | `keyboard.bind`, `storage`, `config`, `uri`, `i18n`, `icons`, `notify` | Done |
 | `colorExtractor` | `color.extract`, `color.fromArtwork` | Done |
 | `getAudioData` | `audio.analyze`, `onFrame`, `loudness`: in both processes since the interface reads what the audio process shares | Done |
-| Settings pages built by each extension | `settings` in the manifest, shown in the Ampify card | Done |
+| Settings pages built by each extension | `settings` in the manifest, shown in Ampify's settings page | Done |
 | TypeScript, JSX, bundling | `ampify new`, `dev`, `test`, `build`, `types`; no TypeScript or JSX compiler | Partial |
 
 ## Custom apps and Marketplace

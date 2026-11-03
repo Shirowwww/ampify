@@ -45,7 +45,7 @@ Ampify.ui.playbar.addButton({
 });
 ```
 
-`show-album` is a setting declared in `manifest.json`. It shows under the extension in the Ampify card of Apple
+`show-album` is a setting declared in `manifest.json`. It shows under the extension in Ampify's settings page of Apple
 Music's settings, and changing it restarts the extension:
 
 ```json

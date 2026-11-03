@@ -921,10 +921,12 @@ test("keyboard-skip changes track with its two shortcuts", () => {
 // ---- The Marketplace page ----------------------------------------------------------------------------------------
 
 // A small stand-in for Ampify.React: function components render depth-first with their hooks kept by their place in
-// the tree, a state change renders the whole page again, and host elements come out as plain nodes.
+// the tree, a state change renders the whole page again, and host elements come out as plain nodes. An effect's
+// cleanup runs when its component is no longer drawn.
 function fakeReact() {
   const slots = new Map();
   const mounted = new Set();
+  const cleanups = new Map();
   const page = { tree: null, render: null };
   let current = null;
   const flat = (children) => children.flat(Infinity).filter((child) => child !== null && child !== undefined && child !== false);
@@ -952,8 +954,14 @@ function fakeReact() {
     page.tree = expand(page.render(), "")[0];
     // What did not render this time is unmounted: its state starts afresh next time.
     for (const name of Array.from(slots.keys())) if (!seen.has(name)) slots.delete(name);
-    for (const name of Array.from(mounted)) if (!seen.has(name)) mounted.delete(name);
-    effects.forEach((effect) => effect());
+    for (const name of Array.from(mounted)) {
+      if (seen.has(name)) continue;
+      mounted.delete(name);
+      const cleanup = cleanups.get(name);
+      cleanups.delete(name);
+      if (typeof cleanup === "function") cleanup();
+    }
+    effects.forEach(({ name, effect }) => cleanups.set(name, effect()));
   };
   const useState = (initial) => {
     const name = slot();
@@ -967,7 +975,7 @@ function fakeReact() {
     const name = slot();
     if (mounted.has(name)) return;
     mounted.add(name);
-    current.effects.push(effect);
+    current.effects.push({ name, effect });
   };
   const mount = (render) => {
     page.render = render;
@@ -987,9 +995,17 @@ const marketCopy = (id, kind, permissions = [], extra = {}) =>
   ({ ...marketEntry(id, kind, permissions), valid: true, enabled: false, ...extra });
 
 // The Marketplace against a fake ampify: each command changes the state `market --json` gives back, as the real one.
-function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = {}, language = "en" } = {}) {
+// Its pages open as the kernel opens them: navigating mounts the page anew, and back() is the arrow of the page header.
+function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = {}, language = "en", readmes = {} } = {}) {
   const react = fakeReact();
-  const world = { state: { catalogOk: true, catalog, installed, theme, scheme: "" }, commands: [], marketError: "" };
+  const world = { state: { catalogOk: true, catalog, installed, theme, scheme: "" }, commands: [], reads: [],
+                  marketError: "", route: "/marketplace", routes: [] };
+  const pages = {};
+  const history = [];
+  const show = (path) => {
+    world.route = path;
+    react.mount(pages[path]);
+  };
   const copyOf = (id) => world.state.installed.find((item) => item.id === id);
   const apply = {
     install: ([id]) => world.state.installed.push(marketCopy(id, "", [], catalog.find((entry) => entry.id === id))),
@@ -1012,6 +1028,11 @@ function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = 
     kit: {
       run: (args) => {
         const command = args.join(" ");
+        if (args[0] === "market" && args[1] === "readme") {
+          world.reads.push(command);
+          if (world.offline) return Promise.resolve({ code: 1, out: "", err: "cannot reach the catalog" });
+          return Promise.resolve({ code: 0, out: readmes[args[2]] || "", err: "" });
+        }
         if (args[0] === "market") return Promise.resolve({ code: 0, out: JSON.stringify(world.state), err: world.marketError });
         world.commands.push(command);
         if (failures[command]) return Promise.resolve({ code: 1, out: "", err: `ampify: ${failures[command]}\n` });
@@ -1019,20 +1040,34 @@ function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = 
         return Promise.resolve({ code: 0, out: "", err: "" });
       },
     },
-    ui: { title: { set: () => {} }, sidebar: { addItem: () => {} }, navigate: () => {} },
+    ReactDOM: { render: (tree, target) => { pages[target.page] = () => tree; } },
+    ui: {
+      title: { set: () => {} },
+      sidebar: { addItem: () => {} },
+      // Ampify's settings page is the kernel's: the route is kept, nothing of the app is drawn.
+      navigate: (path) => {
+        world.routes.push(path);
+        if (!pages[path]) return;
+        history.push(world.route);
+        show(path);
+      },
+    },
     i18n: fakeI18n(language),  // English unless a test asks for French
     icons: { get: (name) => `<svg data-icon="${name}"/>` },
   };
   const context = { Ampify: ampify };
   runIn(readFileSync(join(examples, "..", "apps", "marketplace", "main.js"), "utf-8"), context);
-  react.mount(context.render);
-  return { world, page: react.page };
+  pages["/marketplace"] = context.render;
+  show("/marketplace");
+  return { world, page: react.page, back: () => show(history.pop()) };
 }
 
 const allNodes = (node) => (typeof node === "object" ? [node, ...node.children.flatMap(allNodes)] : []);
 const textsOf = (node) => allNodes(node).filter((child) => child.type === "text").map((child) => child.text);
 const cardOf = (page, name) =>
   allNodes(page.tree).find((node) => node.type === "card" && textsOf(node).includes(name));
+const cardTitled = (page, title) => allNodes(page.tree).find((node) => node.type === "card" && node.title === title);
+const abilitiesOf = (page) => textsOf(cardTitled(page, "What it can do"));
 function buttonIn(node, label) {
   const found = allNodes(node).find((child) => child.type === "button" && child.label === label);
   assert.ok(found, `a button "${label}" is shown`);
@@ -1088,13 +1123,26 @@ test("the Marketplace installs an element with permissions off, then turns it on
   buttonIn(cardOf(page, "Demo"), "Install").onClick();
   await settle();
   assert.deepEqual(world.commands, ["install demo --yes"], "installed, not turned on");
-  assert.ok(textsOf(page.tree).includes("It can:\n• keep its settings"), "the detail view lists the permissions");
+  assert.deepEqual(abilitiesOf(page), ["• keep its settings"], "the detail view lists the permissions");
   assert.ok(textsOf(page.tree).includes("Demo installed. Read what it can do, then turn it on."));
 
   buttonIn(page.tree, "Turn on").onClick();
   await settle();
   assert.deepEqual(world.commands, ["install demo --yes", "extension enable demo"]);
   assert.equal(world.state.installed[0].enabled, true);
+});
+
+test("installing from a card opens the detail view even after that element's page was left", async () => {
+  const { world, page, back } = fakeMarketplace({ catalog: [marketEntry("demo", "extension", ["storage"])] });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  back();
+  await settle();
+  buttonIn(cardOf(page, "Demo"), "Install").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["install demo --yes"]);
+  assert.deepEqual(abilitiesOf(page), ["• keep its settings"], "the detail view lists the permissions");
 });
 
 test("the Marketplace installs and uses a theme without permissions in one click", async () => {
@@ -1108,14 +1156,15 @@ test("the Marketplace installs and uses a theme without permissions in one click
 });
 
 test("on a card, an action that grants permissions opens the detail view instead of acting", async () => {
-  const { world, page } = fakeMarketplace({
+  const { world, page, back } = fakeMarketplace({
     catalog: [marketEntry("demo", "extension", ["storage"]), marketEntry("glow", "theme", ["player.read"])],
     installed: [marketCopy("demo", "extension", ["storage"]), marketCopy("glow", "theme", ["player.read"])],
   });
   await settle();
   buttonIn(cardOf(page, "Glow"), "Use…").onClick();
-  assert.ok(textsOf(page.tree).includes("It can:\n• see the track that is playing"));
-  buttonIn(page.tree, "‹ Themes").onClick();
+  assert.deepEqual(abilitiesOf(page), ["• see the track that is playing"]);
+  back();
+  await settle();
 
   buttonIn(page.tree, "Extensions").onClick();
   buttonIn(cardOf(page, "Demo"), "Turn on…").onClick();
@@ -1134,8 +1183,8 @@ test("an update that adds a permission to an element that is on is confirmed on 
   buttonIn(page.tree, "Extensions").onClick();
   buttonIn(cardOf(page, "Demo"), "Update…").onClick();
   assert.deepEqual(world.commands, []);
-  assert.ok(textsOf(page.tree).includes(
-    "It can:\n• keep its settings\n• send requests to api.example.com (new in version 1.1.0)"));
+  assert.deepEqual(abilitiesOf(page),
+                   ["• keep its settings", "• send requests to api.example.com (new in version 1.1.0)"]);
   buttonIn(page.tree, "Update").onClick();
   await settle();
   assert.deepEqual(world.commands, ["update demo --yes"]);
@@ -1156,7 +1205,173 @@ test("a failed uninstall keeps the detail view open with ampify's error", async 
   await settle();
   assert.deepEqual(world.commands, ["remove demo --yes"]);
   assert.ok(textsOf(page.tree).includes("ampify: cannot remove: a file is in use"));
-  buttonIn(page.tree, "‹ Extensions");
+  assert.equal(world.route, "/marketplace/item", "the detail page stays open");
+});
+
+test("an uninstall goes back to the list, which says the element is gone", async () => {
+  const { world, page } = fakeMarketplace({ installed: [marketCopy("demo", "extension")] });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  buttonIn(page.tree, "Uninstall").onClick();
+  buttonIn(page.tree, "Confirm uninstall").onClick();
+  await settle();
+  await settle();
+  assert.equal(world.route, "/marketplace");
+  assert.ok(textsOf(page.tree).includes("Demo uninstalled"), "the list keeps what the action said");
+  assert.ok(!cardOf(page, "Demo"), "and no longer shows the element");
+});
+
+test("the arrow of a detail page goes back to the list as it was left: tab and search", async () => {
+  const catalog = ["alpha", "beta", "gamma"].map((id) => marketEntry(id, "extension"));
+  const { world, page, back } = fakeMarketplace({ catalog });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  allNodes(page.tree).find((node) => node.type === "textfield").onChange({ value: "beta" });
+  buttonIn(cardOf(page, "Beta"), "Details").onClick();
+  assert.equal(world.route, "/marketplace/item");
+  assert.ok(textsOf(page.tree).includes("Test beta."));
+
+  back();
+  await settle();
+  assert.equal(world.route, "/marketplace");
+  assert.equal(allNodes(page.tree).find((node) => node.type === "textfield").value, "beta", "the search is kept");
+  assert.ok(cardOf(page, "Beta"), "the Extensions tab is still open");
+  assert.ok(!cardOf(page, "Alpha"), "and still filtered");
+});
+
+test("a detail page without picture nor description still shows what the element is and does", async () => {
+  const bare = { ...marketEntry("plain", "extension"), description: "" };
+  const { world, page } = fakeMarketplace({ catalog: [bare], installed: [marketCopy("plain", "extension", [], bare)] });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Plain"), "Details").onClick();
+  assert.ok(allNodes(page.tree).some((node) => node.type === "icon"), "a tile with the icon of its kind stands in for the picture");
+  assert.ok(textsOf(page.tree).includes("No description yet."));
+  assert.deepEqual(abilitiesOf(page), ["Asks for no permission."]);
+  const about = textsOf(cardTitled(page, "About"));
+  assert.ok(about.includes("Made by") && about.includes("Shirowwww"), "the About card says who made it");
+  buttonIn(cardTitled(page, "About"), "Open Ampify's settings").onClick();
+  assert.deepEqual(world.routes.slice(-1), ["/ampify/settings"]);
+});
+
+test("the detail page shows the element's README below the facts, read once", async () => {
+  const readme = [
+    "# Demo", "", "Shows **what is playing** on the [lock screen](https://example.com).", "",
+    "![shot](shot.png)", "", "## How to use it", "", "1. Turn it on.", "2. Play a song,", "   then look.", "",
+    "- `Ctrl+L` locks", "", "| Key | What |", "|---|---|", "| a | b |", "", "```", "const x = 1;", "```", "",
+  ].join("\n");
+  const { world, page, back } = fakeMarketplace({ catalog: [marketEntry("demo", "extension")], readmes: { demo: readme } });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  assert.ok(textsOf(page.tree).includes("Reading its description…"), "a line says it is being read");
+  await settle();
+  const shown = textsOf(cardOf(page, "How to use it"));
+  assert.deepEqual(shown, ["Demo", "Shows what is playing on the lock screen.", "How to use it", "1. Turn it on.",
+                           "2. Play a song, then look.", "• Ctrl+L locks", "Key  ·  What", "a  ·  b", "const x = 1;"]);
+  assert.ok(!textsOf(page.tree).includes("Reading its description…"));
+
+  back();
+  await settle();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  assert.ok(cardOf(page, "How to use it"), "shown at once the second time");
+  assert.deepEqual(world.reads, ["market readme demo"]);
+});
+
+test("a README that could not be read is read again the next time its page opens", async () => {
+  const { world, page, back } = fakeMarketplace({ catalog: [marketEntry("demo", "extension")], readmes: { demo: "# Usage" } });
+  world.offline = true;
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  await settle();
+  assert.ok(!textsOf(page.tree).includes("Usage"));
+
+  world.offline = false;
+  back();
+  await settle();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  await settle();
+  assert.ok(textsOf(page.tree).includes("Usage"), "shown once the catalog can be reached");
+});
+
+test("a long README stays within the kernel's 300 elements, so the detail page and its buttons still show", async () => {
+  const readme = Array.from({ length: 400 }, (_, index) => "- line " + index).join("\n");
+  const { page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension")], readmes: { demo: readme } });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  await settle();
+  assert.ok(textsOf(page.tree).includes("• line 0"));
+  assert.ok(allNodes(page.tree).length <= 300, `${allNodes(page.tree).length} elements`);
+  buttonIn(page.tree, "Install");
+});
+
+test("no text of a detail page goes over the kernel's 500 bytes, and none of its words is lost", async () => {
+  const latin = Array.from({ length: 200 }, (_, index) => "word" + index).join(" ");
+  const cyrillic = "Длинное описание ".repeat(40).trim();
+  const entry = { ...marketEntry("demo", "extension"), description: cyrillic };
+  const { page } = fakeMarketplace({ catalog: [entry], readmes: { demo: latin + "\n\n```\n" + "x".repeat(700) + "\n```\n" } });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  assert.ok(textsOf(page.tree).every((text) => Buffer.byteLength(text) <= 500), "the cards fit");
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  await settle();
+  const texts = textsOf(page.tree);
+  const long = texts.filter((text) => Buffer.byteLength(text) > 500);
+  assert.deepEqual(long, [], "every text fits");
+  assert.ok(texts.join(" ").includes("word0") && texts.join(" ").includes("word199"));
+  assert.equal(texts.filter((text) => text.startsWith("x")).join("").length, 700, "the code is all there");
+  assert.equal(texts.filter((text) => text.includes("Длинное")).join(" "), cyrillic);
+});
+
+test("a README of long paragraphs also stays within the kernel's 300 elements", async () => {
+  const paragraph = Array.from({ length: 250 }, (_, index) => "w" + index).join(" ");
+  const readme = Array.from({ length: 90 }, () => paragraph).join("\n\n");
+  const { page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension")], readmes: { demo: readme } });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  await settle();
+  assert.ok(textsOf(page.tree).some((text) => text.startsWith("w0 w1")));
+  assert.ok(allNodes(page.tree).length <= 300, `${allNodes(page.tree).length} elements`);
+});
+
+test("a word cut at its only space still leaves every piece within 500 bytes", async () => {
+  const readme = "a " + "b".repeat(498) + "中" + "c".repeat(10);
+  const { page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension")], readmes: { demo: readme } });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  await settle();
+  const pieces = textsOf(page.tree).filter((text) => text.startsWith("b") || text.endsWith("c"));
+  assert.ok(pieces.length > 0);
+  assert.deepEqual(pieces.filter((text) => Buffer.byteLength(text) > 500), []);
+});
+
+test("a detail page without README shows no README card", async () => {
+  const { page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension")] });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  await settle();
+  const cards = allNodes(page.tree).filter((node) => node.type === "card");
+  assert.deepEqual(cards.map((card) => card.title), [undefined, "What it can do", "About"]);
+});
+
+test("a card shows the whole preview, never cut", async () => {
+  const { page } = fakeMarketplace({ catalog: [{ ...marketEntry("night", "theme"), preview: "https://example.com/n.jpg" }] });
+  await settle();
+  const image = allNodes(cardOf(page, "Night")).find((node) => node.type === "image");
+  assert.equal(image.fit, "contain");
+});
+
+test("the Marketplace's Settings button opens Ampify's settings page", async () => {
+  const { world, page } = fakeMarketplace({ catalog: [marketEntry("night", "theme")] });
+  await settle();
+  buttonIn(page.tree, "Settings").onClick();
+  assert.deepEqual(world.routes, ["/ampify/settings"]);
 });
 
 test("Refresh shows the catalog's warning instead of clearing it", async () => {

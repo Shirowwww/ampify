@@ -336,6 +336,48 @@ const char* ModeName(uirender::PlayerMode mode) {
     return "?";
 }
 
+// Above the taskbar the player reads as a full screen: no frame, square corners. The overlapped presenter leaves the
+// dialog frame Apple's window was made with, a 3 px light line around the screen (02/11), and puts it back on any
+// style change: the client area fills `target` and a window region cuts the frame off.
+void FillWithClient(HWND window, const RECT& target) {
+    RECT outer{};
+    RECT client{};
+    POINT origin{0, 0};
+    GetWindowRect(window, &outer);
+    GetClientRect(window, &client);
+    ClientToScreen(window, &origin);
+    int left = origin.x - outer.left;
+    int top = origin.y - outer.top;
+    int right = outer.right - (origin.x + client.right);
+    int bottom = outer.bottom - (origin.y + client.bottom);
+    int width = target.right - target.left;
+    int height = target.bottom - target.top;
+    SetWindowPos(window, HWND_TOP, target.left - left, target.top - top, width + left + right, height + top + bottom,
+                 SWP_NOOWNERZORDER);
+    SetWindowRgn(window, CreateRectRgn(left, top, left + width, top + height), TRUE);  // the window owns the region
+}
+
+// A window mode gets the system's frame and corners back.
+void SetScreenFrame(HWND window, bool screenLike) {
+    if (!screenLike) SetWindowRgn(window, nullptr, TRUE);
+    DWM_WINDOW_CORNER_PREFERENCE corner = screenLike ? DWMWCP_DONOTROUND : DWMWCP_DEFAULT;
+    DwmSetWindowAttribute(window, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+    COLORREF border = screenLike ? DWMWA_COLOR_NONE : DWMWA_COLOR_DEFAULT;
+    DwmSetWindowAttribute(window, DWMWA_BORDER_COLOR, &border, sizeof(border));
+}
+
+// Apple's shrink button turns its player into the mini player. Laid out by Ampify, the player stands for the Apple
+// Music window: shrinking it left only the mini player in a corner (02/11), so the button goes and its close button
+// (or Escape) brings Apple Music back. Apple's own full screen keeps it.
+void ShowShrinkButton(const xaml::UIElement& root, bool shown) {
+    if (!root) return;
+    xaml::FrameworkElement shrink = FindNamed(root, {L"ExitFullScreenButton"});
+    xaml::Visibility wanted = shown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed;
+    if (!shrink || shrink.Visibility() == wanted) return;
+    shrink.Visibility(wanted);
+    if (!shown) State().journal->Write("Apple player: its shrink button hidden, its close button brings Apple Music back");
+}
+
 // Apple shows its player with the FullScreen presenter, which puts its own style back on every change: an overlapped
 // presenter is what keeps the window where Ampify puts it. Over or in place of the main window it keeps a border and
 // resizes; above the taskbar it has neither, as a full screen that leaves the taskbar.
@@ -347,8 +389,14 @@ void Lay(const xaml::Window& player, const windowing::AppWindow& window, Placeme
     presenter.IsResizable(!screenLike);
     window.SetPresenter(presenter);
     HWND hwnd = HwndOf(player);
-    PlaceVisible(hwnd, screenLike ? MonitorRect(state.main, true) : TargetRect(state.main));
+    SetScreenFrame(hwnd, screenLike);
+    if (screenLike) {
+        FillWithClient(hwnd, MonitorRect(state.main, true));
+    } else {
+        PlaceVisible(hwnd, TargetRect(state.main));
+    }
     HookInput(player, hwnd);
+    ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), false);
     if (state.mode == uirender::PlayerMode::Replace && IsWindowVisible(state.main)) {
         state.mainWasZoomed = IsZoomed(state.main) != FALSE;
         ShowWindow(state.main, SW_HIDE);
@@ -366,8 +414,12 @@ void Report(Journal& journal) {
         journal.Write("Apple player: a second later, its window is gone");
         return;
     }
+    HWND hwnd = HwndOf(player);
+    RECT cut{};
+    bool region = GetWindowRgnBox(hwnd, &cut) != ERROR;
     journal.Write("Apple player: a second later, " + std::string(window.IsVisible() ? "shown" : "hidden") + ", " +
-                  PresenterName(window.Presenter().Kind()) + " presenter, " + RectText(VisibleRect(HwndOf(player))));
+                  PresenterName(window.Presenter().Kind()) + " presenter, " +
+                  (region ? "frame cut, " : "") + RectText(VisibleRect(hwnd)));
 }
 
 // The player closed: the main window the player replaced comes back where the player was, so the two read as one.
@@ -402,6 +454,9 @@ void Step(Placement& state) {
             state.reportPending = false;
             HookInput(player, hwnd);  // a second chance when the content came late
             AddPlayerControls(player.Content(), state.mainRoot.get(), *state.journal);
+            ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), false);
+            // The presenter may still have resized the window while it settled.
+            if (state.mode == uirender::PlayerMode::WorkArea) FillWithClient(hwnd, MonitorRect(state.main, true));
             Report(*state.journal);
         }
         return;
@@ -421,6 +476,8 @@ void Step(Placement& state) {
         state.timer.Stop();
         if (window.Presenter().Kind() != windowing::AppWindowPresenterKind::FullScreen) {
             window.SetPresenter(windowing::AppWindowPresenterKind::FullScreen);  // Ampify's from an earlier opening
+            SetScreenFrame(HwndOf(player), false);
+            ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), true);
         }
         state.journal->Write("Apple player: left on the whole screen, as Apple shows it (setting)");
         return;

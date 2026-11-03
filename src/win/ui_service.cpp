@@ -85,6 +85,13 @@ constexpr std::size_t kDiscoveryLimit = 512;
 constexpr std::size_t kPageLimit = 4000;
 constexpr std::size_t kMaxWatches = 64;
 constexpr double kPanelWidth = 380;
+constexpr std::size_t kMaxRouteHistory = 16;
+constexpr double kAmpifyPageWidth = 1000;  // as wide as Apple's settings rows
+// Ampify's own settings page, shown in the host of the app pages: the Ampify row of Settings and any app with ui.page
+// (Ampify.ui.navigate) open it.
+constexpr char kAmpifyPagePath[] = "/ampify/settings";
+constexpr char kAmpifyPageOwner[] = "ampify";
+constexpr char kAtmosLeveler[] = "atmos-leveler";  // built into the kernel: no manifest, so no row of its own
 
 std::atomic<bool> g_windowEvent{true};  // set by the WinEvent hook, read by the worker
 std::atomic<bool> g_windowShown{false};  // a top-level window showed: perhaps Apple's full-screen player
@@ -272,6 +279,7 @@ struct WindowContext {
     primitives::Popup pagePopup{nullptr};  // app pages, over the content area
     controls::Grid pageHost{nullptr};      // strong, like the panels: see MountedSurface
     controls::Border pageSlot{nullptr};
+    controls::ScrollViewer pageScroll{nullptr};  // shared by the pages: back to the top for each new one
     controls::TextBlock pageTitle{nullptr};
     // While an app page shows, Apple Music's page under it is hidden, so the theme's panel shows through the host, and
     // Apple Music's navigation closes the app page. Strong until the app page closes (UncoverApplePage).
@@ -301,6 +309,11 @@ struct WindowContext {
     std::set<std::string> closedPanels;
     std::optional<std::pair<std::string, std::string>> route;
     bool pageClosed = false;
+    // The pages the host's arrow goes back to, oldest first, within one visit: Apple Music's navigation ends it.
+    std::vector<std::pair<std::string, std::string>> routeHistory;
+    bool backPending = false;          // the arrow was clicked with a page to go back to
+    controls::StackPanel ampifyPage{nullptr};  // strong, like the hosts; built again each time it is opened
+    bool ampifyPageStale = true;
     bool dialogOpen = false;
     // The entries of the extensions for Apple Music's menus (ui.menu): "app" ones for its main menu, "context" ones
     // for the menu of an item. They go into a menu while it is open, after the click or the key that opened it
@@ -335,14 +348,13 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     bool playerCheckPending = false;  // a window showed: the next refresh looks for Apple's own full-screen player
     uirender::PlayerMode playerMode = uirender::PlayerMode::Window;  // apple.fullscreen, read by the worker
     bool closeToTray = false;  // apple.close, read by the worker
-    std::string cardTheme;   // the theme the Ampify card shows
+    std::string cardTheme;   // the theme the Ampify page shows
     bool cardStale = false;  // the theme changed elsewhere (Marketplace, ampify theme set): the card is built again
 
     // Interface thread only.
     int detachedReports = 0;  // log lines about panels taken out of their host, at most 5
     int goneReports = 0;      // log lines about surfaces gone from the model, at most 5
     StyleProbe probe;  // copied from the settings page once it was seen; WinUI defaults before
-    std::uint64_t revealCardUntilMs = 0;  // the Ampify row of Settings was clicked: the card scrolls into view
 
     std::mutex onceMutex;
     std::set<std::string> logged;
@@ -459,8 +471,10 @@ void ReleaseXaml(WindowContext& context) noexcept {
         context.panelStack = nullptr;
         context.pageHost = nullptr;
         context.pageSlot = nullptr;
+        context.pageScroll = nullptr;
         context.pageTitle = nullptr;
         context.pageBackground = nullptr;
+        context.ampifyPage = nullptr;
         context.sidebarHost = nullptr;
         context.sidebarOriginal = nullptr;
         if (context.menuTimer) context.menuTimer.Stop();
@@ -676,7 +690,7 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
             std::string error;
             if (uirender::SwitchMod(kit, id, on, error)) {
                 journal->Write("Settings: extension \"" + id + "\" " + (on ? "turned on" : "turned off") +
-                               " from the Ampify card (" + (on ? "start " : "stop ") + id + " requested)");
+                               " from the Ampify page (" + (on ? "start " : "stop ") + id + " requested)");
             } else {
                 journal->Write("Settings: could not change extension \"" + id + "\": " + error);
                 g_modsUpdating++;
@@ -705,7 +719,7 @@ void CommitSetting(UiService::Shared& shared, const SettingOwner& owner, const s
                    : owner.theme ? uirender::SetThemeSetting(shared.kit, owner.id, key, value, error)
                                  : uirender::SetModSetting(shared.kit, owner.id, key, value, error);
     if (written) {
-        shared.journal.Write("Settings: \"" + owner.id + "\" " + key + " = " + value + " from the Ampify card" +
+        shared.journal.Write("Settings: \"" + owner.id + "\" " + key + " = " + value + " from the Ampify page" +
                              (owner.snippet ? std::string(" (snippet)")
                               : owner.theme ? std::string(" (theme)")
                                             : " (restart " + owner.id + " requested)"));
@@ -767,6 +781,79 @@ controls::TextBox SettingField(UiService::Shared& shared, const SettingOwner& ta
     return box;
 }
 
+// A number with both bounds: a slider, so the range shows, with its value written beside it. settings.txt is written
+// once the slider rests, not at each step of a drag: a theme applies again on every write.
+xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwner& target, const SettingSpec& spec,
+                                     const std::string& value) {
+    constexpr auto kRestDelay = std::chrono::milliseconds(350);
+    constexpr double kSliderWidth = 200;
+    const double low = *spec.min;
+    const double high = *spec.max;
+    const bool whole = std::floor(low) == low && std::floor(high) == high;
+    std::optional<std::string> stored = NumberIn(value, spec);
+    std::optional<std::string> fallback = NumberIn(spec.defaultValue, spec);
+    std::string start = SettingNumberText(low);
+    if (stored) {
+        start = *stored;
+    } else if (fallback) {
+        start = *fallback;
+    }
+
+    controls::Slider slider;
+    if (shared.probe.slider) slider.Style(shared.probe.slider);
+    slider.Minimum(low);
+    slider.Maximum(high);
+    slider.StepFrequency(whole ? 1.0 : (high - low) / 100);
+    slider.Width(kSliderWidth);
+    slider.Value(std::strtod(start.c_str(), nullptr));
+    slider.VerticalAlignment(xaml::VerticalAlignment::Center);
+
+    // A point in settings.txt, a comma for a French or German reader, as in SettingField.
+    auto shown = [](double number) {
+        std::string text = SettingNumberText(number);
+        if (i18n::UsesDecimalComma()) std::replace(text.begin(), text.end(), '.', ',');
+        return Wide(text);
+    };
+    controls::TextBlock reading = MakeText(shown(slider.Value()).c_str(), "body", false, &shared.probe);
+    reading.MinWidth(32);
+    reading.TextAlignment(xaml::TextAlignment::Right);
+    reading.VerticalAlignment(xaml::VerticalAlignment::Center);
+
+    controls::StackPanel box;
+    box.Orientation(controls::Orientation::Horizontal);
+    box.Spacing(12);
+    box.Children().Append(reading);
+    box.Children().Append(slider);
+
+    dispatching::DispatcherQueueTimer rest = dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
+    rest.Interval(kRestDelay);
+    rest.IsRepeating(false);
+    auto last = std::make_shared<std::string>(start);
+    UiService::Shared* owner = &shared;
+    winrt::weak_ref<controls::Slider> weakSlider = winrt::make_weak(slider);
+    rest.Tick([owner, target, key = spec.key, last, weakSlider](auto const&, auto const&) noexcept {
+        try {
+            controls::Slider live = weakSlider.get();
+            if (!live) return;
+            std::string next = SettingNumberText(live.Value());
+            if (next == *last) return;
+            *last = next;
+            CommitSetting(*owner, target, key, next);
+        } catch (...) {
+        }
+    });
+    slider.ValueChanged([rest, reading, shown](IInspectable const&,
+                                               primitives::RangeBaseValueChangedEventArgs const& args) noexcept {
+        try {
+            reading.Text(shown(args.NewValue()));
+            rest.Stop();
+            rest.Start();
+        } catch (...) {
+        }
+    });
+    return box;
+}
+
 // The text of `key` in one list of the manifest's translation (`local`, null when there is none), else `fallback`.
 const std::string& Localized(const ManifestText* local, std::map<std::string, std::string> ManifestText::*list,
                              const std::string& key, const std::string& fallback) {
@@ -814,6 +901,9 @@ xaml::FrameworkElement SettingControl(UiService::Shared& shared, const SettingOw
             }
         });
         return combo;
+    }
+    if (spec.type == SettingSpec::Type::Number && spec.min && spec.max && *spec.min < *spec.max) {
+        return SettingSlider(shared, target, spec, value);
     }
     return SettingField(shared, target, spec, value);
 }
@@ -907,6 +997,96 @@ void FillThemeSettings(UiService::Shared& shared, const controls::StackPanel& ho
     }
 }
 
+// Writes theme.accent ("" for the theme's own), which the theme engine follows like theme.scheme.
+bool CommitAccent(UiService::Shared& shared, const std::string& accent) {
+    std::string error;
+    if (!uirender::ChooseAccent(shared.kit, accent, error)) {
+        shared.journal.Write("Settings: could not change theme.accent: " + error);
+        return false;
+    }
+    std::string written = uirender::ChosenAccent(shared.kit);
+    shared.journal.Write("Settings: theme.accent = " + (written.empty() ? std::string("the theme's") : written) +
+                         " from the Ampify page");
+    return true;
+}
+
+// The hex field of a custom accent, written when it is left or on Enter. A colour that does not read puts the last
+// one back.
+controls::TextBox AccentField(UiService::Shared& shared, const std::string& value) {
+    controls::TextBox box;
+    if (shared.probe.textBox) box.Style(shared.probe.textBox);
+    box.MinWidth(110);
+    box.MaxLength(7);
+    box.PlaceholderText(L"#RRGGBB");
+    box.Text(Wide(value.empty() ? value : "#" + value));
+    Name(box, "AMPIFY_AccentCustom", i18n::Text("accent.custom"));
+    UiService::Shared* owner = &shared;
+    auto commit = [owner](const controls::TextBox& field) {
+        // Compared with settings.txt, not the field's last text: a preset may have been chosen since.
+        std::string current = uirender::ChosenAccent(owner->kit);
+        std::string typed = Utf8(field.Text());
+        if (typed.empty() || typed == "#" + current) return;
+        if (!CommitAccent(*owner, typed)) field.Text(Wide(current.empty() ? current : "#" + current));
+    };
+    box.LostFocus([commit](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            commit(sender.as<controls::TextBox>());
+        } catch (...) {
+        }
+    });
+    box.KeyDown([commit](IInspectable const& sender, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
+        try {
+            if (args.Key() == winrt::Windows::System::VirtualKey::Enter) commit(sender.as<controls::TextBox>());
+        } catch (...) {
+        }
+    });
+    return box;
+}
+
+// The accent over the theme's: the theme's own, a preset, or a colour typed in hex ("Custom…" shows the field).
+xaml::FrameworkElement AccentChoice(UiService::Shared& shared) {
+    std::string chosen = uirender::ChosenAccent(shared.kit);
+    controls::ComboBox combo;
+    if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
+    combo.MinWidth(220);
+    Name(combo, "AMPIFY_AccentChoice", i18n::Text("accent.title"));
+    auto values = std::make_shared<std::vector<std::string>>(1, "");  // "" is the theme's own accent
+    combo.Items().Append(winrt::box_value(Wide(i18n::Text("accent.theme"))));
+    for (const uirender::AccentPreset& preset : uirender::AccentPresets()) {
+        values->push_back(preset.value);
+        combo.Items().Append(winrt::box_value(Wide(i18n::Text(preset.textKey))));
+    }
+    combo.Items().Append(winrt::box_value(Wide(i18n::Text("accent.custom"))));
+    auto known = std::find(values->begin(), values->end(), chosen);
+    int32_t customIndex = static_cast<int32_t>(values->size());
+    combo.SelectedIndex(known == values->end() ? customIndex : static_cast<int32_t>(known - values->begin()));
+
+    controls::TextBox custom = AccentField(shared, known == values->end() ? chosen : "");
+    custom.Visibility(known == values->end() ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+    UiService::Shared* owner = &shared;
+    combo.SelectionChanged([owner, values, customIndex, custom](IInspectable const& sender,
+                                                                controls::SelectionChangedEventArgs const&) noexcept {
+        try {
+            int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
+            if (index < 0 || index > customIndex) return;
+            bool typed = index == customIndex;
+            custom.Visibility(typed ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+            if (typed) {
+                custom.Focus(xaml::FocusState::Programmatic);
+            } else if ((*values)[index] != uirender::ChosenAccent(owner->kit)) {
+                CommitAccent(*owner, (*values)[index]);
+            }
+        } catch (...) {
+        }
+    });
+    controls::StackPanel control;
+    control.Orientation(controls::Orientation::Horizontal);
+    control.Spacing(8);
+    control.Children().Append(custom);
+    control.Children().Append(combo);
+    return LabelledRow(shared, i18n::Text("accent.title"), i18n::Text("accent.help"), control);
+}
+
 // The theme in use, chosen from the installed ones, then its settings. A choice is written to settings.txt, which the
 // theme service watches: the theme changes at once, and its settings replace the last one's.
 xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
@@ -931,6 +1111,7 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
     auto chosen = std::find(ids->begin(), ids->end(), active);
     combo.SelectedIndex(chosen == ids->end() ? 0 : static_cast<int32_t>(chosen - ids->begin()));
     section.Children().Append(LabelledRow(shared, i18n::Text("mods.theme"), i18n::Text("mods.themeHelp"), combo));
+    section.Children().Append(AccentChoice(shared));
 
     controls::StackPanel settingsHost;
     settingsHost.Spacing(10);
@@ -955,7 +1136,7 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
                 return;
             }
             owner->journal.Write("Settings: theme \"" + (id.empty() ? std::string("none") : id) +
-                                 "\" chosen from the Ampify card");
+                                 "\" chosen from the Ampify page");
             FillThemeSettings(*owner, settingsHost);
         } catch (...) {
         }
@@ -963,15 +1144,15 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
     return section;
 }
 
+// Adds a row to the rows of a section's card, under a line when it is not the first.
+void AddRow(const controls::StackPanel& rows, const xaml::UIElement& row) {
+    if (rows.Children().Size() > 0) rows.Children().Append(MakeDivider());
+    rows.Children().Append(row);
+}
+
 // What Ampify changes in Apple Music's own behaviour (uirender::AppleTweakChoices): one choice per row. The kernel
 // reads settings.txt again within a second (UiService::Run), so a choice applies at once.
-xaml::FrameworkElement AppleTweaksSection(UiService::Shared& shared) {
-    controls::StackPanel section;
-    section.Spacing(10);
-    controls::StackPanel titles;
-    titles.Children().Append(MakeText(Wide(i18n::Text("tweaks.title")).c_str(), "bodyStrong", false, &shared.probe));
-    titles.Children().Append(MakeText(Wide(i18n::Text("tweaks.subtitle")).c_str(), "caption", true, &shared.probe));
-    section.Children().Append(titles);
+void AddAppleTweakRows(UiService::Shared& shared, const controls::StackPanel& rows) {
     UiService::Shared* owner = &shared;
     for (const uirender::TweakChoice& choice : uirender::AppleTweakChoices(shared.kit)) {
         controls::ComboBox combo;
@@ -992,17 +1173,15 @@ xaml::FrameworkElement AppleTweaksSection(UiService::Shared& shared) {
                 if (index < 0 || index >= static_cast<int32_t>(values->size())) return;
                 std::string error;
                 if (uirender::SetAppleTweak(owner->kit, key, (*values)[index], error)) {
-                    owner->journal.Write("Settings: " + key + " = " + (*values)[index] + " from the Ampify card");
+                    owner->journal.Write("Settings: " + key + " = " + (*values)[index] + " from the Ampify page");
                 } else {
                     owner->journal.Write("Settings: could not change " + key + ": " + error);
                 }
             } catch (...) {
             }
         });
-        section.Children().Append(
-            LabelledRow(shared, i18n::Text(choice.labelKey), i18n::Text(choice.helpKey), combo));
+        AddRow(rows, LabelledRow(shared, i18n::Text(choice.labelKey), i18n::Text(choice.helpKey), combo));
     }
-    return section;
 }
 
 // A zip of the state and the logs with names, folders and music taken out (`ampify report`), opened in Explorer once
@@ -1022,7 +1201,7 @@ xaml::FrameworkElement ReportRow(UiService::Shared& shared) {
             dispatching::DispatcherQueue queue = dispatching::DispatcherQueue::GetForCurrentThread();
             auto held = std::make_shared<controls::Button>(button);
             RunAmpifyInBackground({"report", "--dir"}, [queue, held, journal](int code) mutable {
-                journal->Write("Settings: report exported from the Ampify card (code " + std::to_string(code) + ")");
+                journal->Write("Settings: report exported from the Ampify page (code " + std::to_string(code) + ")");
                 queue.TryEnqueue([held = std::move(held), code]() noexcept {
                     try {
                         held->IsEnabled(true);
@@ -1037,43 +1216,71 @@ xaml::FrameworkElement ReportRow(UiService::Shared& shared) {
     return LabelledRow(shared, i18n::Text("mods.report"), i18n::Text("mods.reportHelp"), report);
 }
 
-controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uirender::ModEntry>& mods,
-                               const xaml::FrameworkElement& templateRow) {
-    controls::Border card = MakeCardBorder(shared.probe);
-    Name(card, "AMPIFY_ModsCard", "Ampify");
-    if (templateRow) {
-        card.Margin(templateRow.Margin());
-        card.HorizontalAlignment(templateRow.HorizontalAlignment());
-        card.MaxWidth(templateRow.MaxWidth());
-    } else if (shared.probe.cardMargin) {
-        card.Margin(*shared.probe.cardMargin);
-    } else {
-        card.Margin(xaml::Thickness{0, 4, 0, 0});
+// A button with Apple's look, or the accent's for the main action of a page.
+controls::Button MakeButton(UiService::Shared& shared, const std::string& textKey, const std::string& name, bool primary) {
+    controls::Button button;
+    if (shared.probe.button) button.Style(shared.probe.button);
+    if (primary) {
+        if (controls::ControlTemplate accent = PrimaryButtonTemplate()) button.Template(accent);
     }
+    button.Content(winrt::box_value(Wide(i18n::Text(textKey))));
+    button.VerticalAlignment(xaml::VerticalAlignment::Center);
+    Name(button, name, i18n::Text(textKey));
+    return button;
+}
 
-    controls::StackPanel body;
-    body.Spacing(12);
+// A section of the Ampify page, as Apple groups its own settings: a heading, a line on what it holds, then one card
+// whose rows are split by lines.
+controls::StackPanel Section(UiService::Shared& shared, const std::string& name, const std::string& titleKey,
+                             const std::string& subtitleKey, const controls::StackPanel& rows) {
+    controls::StackPanel section;
+    section.Spacing(4);
+    const std::string title = i18n::Text(titleKey);
+    Name(section, "AMPIFY_Settings_" + name, title);
+    controls::TextBlock heading = MakeText(Wide(title).c_str(), "subtitle", false, nullptr);
+    automation::AutomationProperties::SetHeadingLevel(heading, automation::Peers::AutomationHeadingLevel::Level2);
+    section.Children().Append(heading);
+    if (!subtitleKey.empty()) {
+        section.Children().Append(MakeText(Wide(i18n::Text(subtitleKey)).c_str(), "caption", true, &shared.probe));
+    }
+    controls::Border card = MakeCardBorder(shared.probe);
+    card.Margin(xaml::Thickness{0, 8, 0, 0});
+    rows.Spacing(12);
+    card.Child(rows);
+    section.Children().Append(card);
+    return section;
+}
 
-    controls::Grid header;
-    header.ColumnSpacing(16);
-    controls::ColumnDefinition text;
-    text.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
-    controls::ColumnDefinition button;
-    button.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
-    header.ColumnDefinitions().Append(text);
-    header.ColumnDefinitions().Append(button);
-    controls::StackPanel titles;
-    titles.VerticalAlignment(xaml::VerticalAlignment::Center);
-    controls::TextBlock title = MakeText(L"Ampify", "bodyStrong", false, &shared.probe);
-    Name(title, "AMPIFY_ModsTitle");
-    titles.Children().Append(title);
-    titles.Children().Append(MakeText(Wide(i18n::Text("mods.subtitle")).c_str(), "caption", true, &shared.probe));
-    header.Children().Append(titles);
-    controls::Button open;
-    if (shared.probe.button) open.Style(shared.probe.button);
-    open.Content(winrt::box_value(Wide(i18n::Text("mods.openFolder"))));
-    open.VerticalAlignment(xaml::VerticalAlignment::Center);
-    Name(open, "AMPIFY_ModsOpenFolder", i18n::Text("mods.openFolder"));
+// One row per installed extension, its settings under it.
+controls::StackPanel ExtensionRows(UiService::Shared& shared) {
+    controls::StackPanel rows;
+    std::vector<uirender::ModEntry> mods = uirender::ListMods(shared.kit);
+    if (mods.empty()) rows.Children().Append(MakeText(Wide(i18n::Text("mods.none")).c_str(), "caption", true, &shared.probe));
+    for (const uirender::ModEntry& mod : mods) {
+        controls::StackPanel item;
+        item.Spacing(10);
+        item.Children().Append(ModRow(shared, mod));
+        if (!mod.settings.empty()) item.Children().Append(ModSettings(shared, mod));
+        AddRow(rows, item);
+    }
+    return rows;
+}
+
+// The Atmos leveler is built into the kernel, so no manifest brings its row: it is written here, in words a beginner
+// reads, and switched like an extension (uirender::SwitchMod).
+controls::StackPanel SoundRows(UiService::Shared& shared) {
+    uirender::ModEntry leveler;
+    leveler.id = kAtmosLeveler;
+    leveler.name = i18n::Text("sound.leveler");
+    leveler.description = i18n::Text("sound.levelerHelp");
+    leveler.enabled = uirender::IsModOn(shared.kit, kAtmosLeveler);
+    controls::StackPanel rows;
+    AddRow(rows, ModRow(shared, leveler));
+    return rows;
+}
+
+xaml::FrameworkElement FolderRow(UiService::Shared& shared) {
+    controls::Button open = MakeButton(shared, "mods.openFolder", "AMPIFY_ModsOpenFolder", false);
     std::filesystem::path kit = shared.kit;
     open.Click([kit](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
@@ -1081,121 +1288,75 @@ controls::Border BuildModsCard(UiService::Shared& shared, const std::vector<uire
         } catch (...) {
         }
     });
-    // The Marketplace page (apps/marketplace): themes, schemes, extensions, in the app.
-    controls::Button market;
-    if (shared.probe.button) market.Style(shared.probe.button);
-    if (controls::ControlTemplate accent = PrimaryButtonTemplate()) market.Template(accent);
-    market.Content(winrt::box_value(Wide(i18n::Text("mods.openMarketplace"))));
-    market.VerticalAlignment(xaml::VerticalAlignment::Center);
-    Name(market, "AMPIFY_ModsOpenMarketplace", i18n::Text("mods.openMarketplace"));
+    return LabelledRow(shared, i18n::Text("mods.folder"), i18n::Text("mods.folderHelp"), open);
+}
+
+// Ampify's settings page: a line on what Ampify is and the way to the Marketplace, then one section per subject.
+controls::StackPanel BuildAmpifyPage(UiService::Shared& shared) {
+    controls::StackPanel page;
+    page.Spacing(28);
+    page.MaxWidth(kAmpifyPageWidth);
+    page.HorizontalAlignment(xaml::HorizontalAlignment::Left);
+    page.Padding(xaml::Thickness{0, 0, 0, 24});
+    Name(page, "AMPIFY_SettingsPage", "Ampify");
+
+    controls::Grid intro;
+    intro.ColumnSpacing(16);
+    controls::ColumnDefinition text;
+    text.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
+    controls::ColumnDefinition action;
+    action.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
+    intro.ColumnDefinitions().Append(text);
+    intro.ColumnDefinitions().Append(action);
+    controls::TextBlock line = MakeText(Wide(i18n::Text("mods.subtitle")).c_str(), "body", true, nullptr);
+    line.VerticalAlignment(xaml::VerticalAlignment::Center);
+    intro.Children().Append(line);
+    controls::Button market = MakeButton(shared, "mods.openMarketplace", "AMPIFY_ModsOpenMarketplace", true);
     UiModel* model = &shared.model;
     Journal* journal = &shared.journal;
     market.Click([model, journal](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
             model->Navigate("marketplace", "/marketplace");
-            journal->Write("Settings: Marketplace opened from the Ampify card");
+            journal->Write("Settings: Marketplace opened from the Ampify page");
         } catch (...) {
         }
     });
-    controls::StackPanel actions;
-    actions.Orientation(controls::Orientation::Horizontal);
-    actions.Spacing(8);
-    actions.Children().Append(market);
-    actions.Children().Append(open);
-    controls::Grid::SetColumn(actions, 1);
-    header.Children().Append(actions);
-    body.Children().Append(header);
+    controls::Grid::SetColumn(market, 1);
+    intro.Children().Append(market);
+    page.Children().Append(intro);
 
-    controls::StackPanel list;
-    list.Spacing(10);
-    Name(list, "AMPIFY_ModsList");
-    if (mods.empty()) {
-        list.Children().Append(MakeText(L"No extension installed yet. Add one with \"ampify install\", then "
-                                        L"reopen this page.",
-                                        "caption", true, &shared.probe));
-    }
-    for (const uirender::ModEntry& mod : mods) {
-        list.Children().Append(MakeDivider());
-        list.Children().Append(ModRow(shared, mod));
-        if (!mod.settings.empty()) list.Children().Append(ModSettings(shared, mod));
-    }
-    list.Children().Append(MakeDivider());
-    list.Children().Append(ThemeChoice(shared));
-    list.Children().Append(MakeDivider());
-    list.Children().Append(AppleTweaksSection(shared));
-    list.Children().Append(MakeDivider());
-    list.Children().Append(ReportRow(shared));
-    body.Children().Append(list);
-    card.Child(body);
-    return card;
+    page.Children().Append(Section(shared, "Extensions", "mods.extensions", "mods.extensionsHelp", ExtensionRows(shared)));
+    page.Children().Append(Section(shared, "Sound", "sound.title", "", SoundRows(shared)));
+    controls::StackPanel lookRows;
+    lookRows.Children().Append(ThemeChoice(shared));
+    page.Children().Append(Section(shared, "Look", "mods.look", "", lookRows));
+    controls::StackPanel appleRows;
+    AddAppleTweakRows(shared, appleRows);
+    page.Children().Append(Section(shared, "AppleMusic", "tweaks.title", "tweaks.subtitle", appleRows));
+    controls::StackPanel helpRows;
+    AddRow(helpRows, FolderRow(shared));
+    AddRow(helpRows, ReportRow(shared));
+    page.Children().Append(Section(shared, "Help", "mods.help", "", helpRows));
+    return page;
 }
 
-// Scrolls the page to `element` once it is in the tree, top aligned, as if the person had scrolled down to it.
-void RevealWhenLoaded(const xaml::FrameworkElement& element) {
-    auto done = std::make_shared<bool>(false);
-    element.Loaded([done](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
-        if (*done) return;
-        *done = true;
-        try {
-            xaml::BringIntoViewOptions options;
-            options.VerticalAlignmentRatio(0.0);
-            options.AnimationDesired(true);
-            sender.as<xaml::UIElement>().StartBringIntoView(options);
-        } catch (...) {
-        }
-    });
-}
-
-// Adds the card at the end of the StackPanel of the page that holds the most ToggleSwitch, or rebuilds it there when
-// it is already present (so the list follows what is installed). AMExclusive's cards are never touched.
-bool MountModsCard(UiService::Shared& shared, const xaml::FrameworkElement& page) {
-    std::vector<ProbeNode> nodes;
-    std::vector<xaml::DependencyObject> objects;
-    CollectPage(page, nodes, objects);
-    std::optional<int> anchor = uirender::ChooseSettingsAnchor(nodes, 0);
-    if (!anchor) {
-        shared.Once("mods-no-anchor", "Settings: Playback page found, but with no list of switch settings (" +
-                                          std::to_string(nodes.size()) + " nodes): Ampify card not added");
-        return false;
-    }
-    auto stack = objects[*anchor].try_as<controls::StackPanel>();
-    if (!stack) return false;
-
+// Copies the look of Apple's controls from Settings > Playback (switches, menus, buttons, texts) once that page was
+// seen, so the Ampify page reads like Apple's settings. Nothing is added to Apple's page. False until its rows are
+// laid out, a few layout passes after Loaded.
+bool CaptureSettingsStyle(UiService::Shared& shared, const xaml::FrameworkElement& page) {
     StyleProbe probe;
     CaptureStyleProbe(page, probe, "PlaybackSettingsPage");
+    if (probe.Found() == 0) return false;
     shared.probe = probe;
-
-    xaml::FrameworkElement templateRow{nullptr};
-    if (std::optional<int> row = uirender::ChooseTemplateRow(nodes, *anchor)) templateRow = objects[*row].try_as<xaml::FrameworkElement>();
-
-    std::vector<uirender::ModEntry> mods = uirender::ListMods(shared.kit);
-    controls::Border card = BuildModsCard(shared, mods, templateRow);
-
-    if (NowMs() < shared.revealCardUntilMs) {
-        shared.revealCardUntilMs = 0;
-        RevealWhenLoaded(card);
-    }
-    auto children = stack.Children();
-    for (std::uint32_t index = 0; index < children.Size(); index++) {
-        auto existing = children.GetAt(index).try_as<xaml::FrameworkElement>();
-        if (existing && existing.Name() == L"AMPIFY_ModsCard") {
-            children.SetAt(index, card);
-            shared.journal.Write("Settings: card \"Ampify\" refreshed (" +
-                                 std::to_string(mods.size()) + " extension(s))");
-            return true;
-        }
-    }
-    children.Append(card);
-    shared.journal.Write("Settings: card \"Ampify\" added to the Playback page (" +
-                         std::to_string(mods.size()) + " extension(s), " + std::to_string(probe.Found()) +
-                         " native style value(s) copied)");
+    shared.Once("settings-style", "Settings: the look of Apple's settings copied from the Playback page (" +
+                                      std::to_string(probe.Found()) + " native style value(s))");
     return true;
 }
 
 void WatchSettingsPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
     {
         std::lock_guard<std::mutex> lock(shared.mutex);
-        if (shared.cardStale) context->settingsMounted = false;
+        if (shared.cardStale) context->ampifyPageStale = true;
         shared.cardStale = false;
     }
     xaml::FrameworkElement page = context->foundSettings.get();
@@ -1230,7 +1391,7 @@ void WatchSettingsPage(UiService::Shared& shared, const std::shared_ptr<WindowCo
         }
     }
     if (page && !context->settingsMounted && page.IsLoaded()) {
-        if (MountModsCard(shared, page)) {
+        if (CaptureSettingsStyle(shared, page)) {
             context->settingsMounted = true;
             context->ticket.StopLayout();
         }
@@ -1280,8 +1441,8 @@ controls::TextBlock TextLike(const controls::TextBlock& model, const std::string
     return block;
 }
 
-// A row like Playback's (Apple's style, so the chevron, the hover and the press come with it). A click opens
-// Settings > Playback through Apple's own row, and the Ampify card scrolls into view there.
+// A row like Playback's (Apple's style, so the chevron, the hover and the press come with it). A click opens Ampify's
+// own settings page over Settings, as Apple's rows open theirs; Apple's back arrow or the page's own closes it.
 controls::Button BuildSettingsEntry(UiService::Shared& shared, const controls::Button& playback,
                                     const controls::TextBlock& titleModel, const controls::TextBlock& textModel) {
     controls::Grid content;
@@ -1320,22 +1481,13 @@ controls::Button BuildSettingsEntry(UiService::Shared& shared, const controls::B
     Name(entry, "AMPIFY_SettingsEntry", "Ampify");
     automation::AutomationProperties::SetHelpText(entry, Wide(i18n::Text("settings.entryHelp")));
 
-    UiService::Shared* owner = &shared;
-    winrt::weak_ref<controls::Button> target = winrt::make_weak(playback);
-    entry.Click([owner, target](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+    UiModel* model = &shared.model;
+    Journal* journal = &shared.journal;
+    entry.Click([model, journal](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
-            controls::Button row = target.get();
-            auto peer = row ? automation::Peers::FrameworkElementAutomationPeer::CreatePeerForElement(row) : nullptr;
-            auto pattern = peer ? peer.GetPattern(automation::Peers::PatternInterface::Invoke) : nullptr;
-            auto invoke = pattern.try_as<automation::Provider::IInvokeProvider>();
-            if (!invoke) {
-                owner->journal.Write("Settings: the Ampify row found no Playback row to open");
-                return;
-            }
-            owner->revealCardUntilMs = NowMs() + 5000;
-            invoke.Invoke();
+            model->Navigate(kAmpifyPageOwner, kAmpifyPagePath);
+            journal->Write("Settings: Ampify page opened from the Ampify row");
         } catch (...) {
-            owner->journal.Write("Settings: the Ampify row could not open Settings > Playback");
         }
     });
     return entry;
@@ -1790,19 +1942,28 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
     popup.Child(host);
 
     // The handler holds the window context weakly, not the host: the host holds the button that holds the handler.
+    // The arrow goes back to the page shown before (a detail view of the Marketplace to its list), as Apple Music's own
+    // arrow does; from the first page of the visit, it closes the host.
+    WeakShared weakShared = shared.weak_from_this();
     WeakContext weakContext = owner;
-    back.Click([weakContext](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+    back.Click([weakShared, weakContext](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
-            if (auto live = weakContext.lock()) {
-                live->pageClosed = true;
-                ShowPageHost(*live, false);
+            auto live = weakContext.lock();
+            if (!live) return;
+            if (!live->routeHistory.empty()) {
+                live->backPending = true;
+                QueueRefresh(weakShared, live);
+                return;
             }
+            live->pageClosed = true;
+            ShowPageHost(*live, false);
         } catch (...) {
         }
     });
     context.pagePopup = popup;
     context.pageHost = host;
     context.pageSlot = slot;
+    context.pageScroll = scroll;
     context.pageTitle = title;
     PlacePageHost(context, xamlRoot);
     shared.Once("page-host", "Interface: app page host opened in a Popup of the window");
@@ -2493,6 +2654,40 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
     if (!context->appEntries.empty() || !context->contextEntries.empty()) FollowMenus(shared, context);
 }
 
+// Keeps the page the host leaves in the history of the visit. A visit starts again after Apple Music's navigation
+// closed the host, and a link to the page just left (the Marketplace's list after an uninstall) goes back instead.
+void RememberRoute(WindowContext& context, const std::pair<std::string, std::string>& next) {
+    auto& history = context.routeHistory;
+    if (!context.route || context.pageClosed) {
+        history.clear();
+        return;
+    }
+    if (*context.route == next) return;
+    if (!history.empty() && history.back() == next) {
+        history.pop_back();
+        return;
+    }
+    history.push_back(*context.route);
+    if (history.size() > kMaxRouteHistory) history.erase(history.begin());
+}
+
+// Ampify's settings page, in the host of the app pages while the route points to it.
+void MountAmpifyPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
+                     const xaml::DependencyObject& content) {
+    if (!context->route || context->route->second != kAmpifyPagePath || context->pageClosed) return;
+    controls::Border slot = EnsurePageHost(shared, context, content);
+    if (!slot) return;
+    if (!context->ampifyPage || context->ampifyPageStale) {
+        context->ampifyPage = BuildAmpifyPage(shared);
+        context->ampifyPageStale = false;
+        shared.journal.Write("Settings: Ampify page built");
+    }
+    if (slot.Child() != context->ampifyPage) slot.Child(context->ampifyPage);
+    if (context->pageTitle && context->pageTitle.Text() != L"Ampify") context->pageTitle.Text(L"Ampify");
+    ShowPageHost(*context, true);
+    CoverApplePage(context);
+}
+
 void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                    const xaml::DependencyObject& content) {
     std::vector<Surface> surfaces;
@@ -2515,8 +2710,19 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
     if (applePlayer) OpenApplePlayer(context->window.get(), shared.journal, playerMode);
     else if (playerCheck) FollowApplePlayer(context->window.get(), shared.journal, playerMode);
     if (route) {
+        context->backPending = false;  // a navigation came after the click: it wins
+        RememberRoute(*context, *route);
+    } else if (std::exchange(context->backPending, false) && !context->routeHistory.empty()) {
+        route = context->routeHistory.back();
+        context->routeHistory.pop_back();
+    }
+    if (route) {
         context->route = route;
         context->pageClosed = false;
+        if (route->second == kAmpifyPagePath) context->ampifyPageStale = true;  // what is installed may have changed
+        if (context->pageScroll) {
+            context->pageScroll.ChangeView(nullptr, winrt::Windows::Foundation::IReference<double>(0.0), nullptr, true);
+        }
         ShowPageHost(*context, false);
         for (auto& [key, mounted] : context->surfaces) {
             if (mounted.surface.kind == SurfaceKind::Page) mounted.surface.revision = 0;  // render again for the new route
@@ -2556,6 +2762,11 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
         } catch (const std::exception& error) {
             shared.journal.Write("Interface: render of \"" + SurfaceLabel(surface) + "\" failed (" + error.what() + ")");
         }
+    }
+    try {
+        MountAmpifyPage(shared, context, content);
+    } catch (const winrt::hresult_error& error) {
+        shared.journal.Write("Settings: the Ampify page failed (" + HresultText(error.code().value) + ")");
     }
 
     bool anyPanel = false;
@@ -2653,8 +2864,11 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         context->pagePopup = nullptr;
         context->pageHost = nullptr;
         context->pageSlot = nullptr;
+        context->pageScroll = nullptr;
         context->pageTitle = nullptr;
         context->pageBackground = nullptr;
+        context->ampifyPage = nullptr;
+        context->routeHistory.clear();
         context->rootLayoutActive = false;
         // LayoutUpdated until the content is mounted: the first pages appear a few layout passes later.
         if (auto element = content.try_as<xaml::FrameworkElement>()) {
@@ -2739,7 +2953,7 @@ void DiscoverWindows(UiService::Shared& shared) {
     for (const auto& context : toRefresh) QueueRefresh(shared.weak_from_this(), context);
 }
 
-// Reads the Apple Music part of the Ampify card again when settings.txt changed: the notification rule applies at
+// Reads the Apple Music part of the Ampify page again when settings.txt changed: the notification rule applies at
 // once, the player mode at the next opening of the full-screen player.
 void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::file_time_type>& stamp) {
     std::error_code error;

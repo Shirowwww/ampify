@@ -459,6 +459,36 @@ class Marketplace(AmpifyTestCase):
         self.assertEqual(items["other-host"]["tags"], [])
         self.assertNotIn("preview", items["no-preview"])
 
+    def readme(self, name, catalog):
+        result = self.ampify("market", "readme", name, *self.catalog_option(catalog))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout
+
+    def publish_readme(self, archive, text):
+        with open(os.path.splitext(archive)[0] + ".md", "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+
+    def test_market_readme_reads_the_readme_published_next_to_the_archive(self):
+        self.publish_readme(self.demo_archive, "# Demo\n\nWhat it does, in détail.\n")
+        self.assertEqual(self.readme("demo", self.catalog), "# Demo\n\nWhat it does, in détail.\n")
+        self.assertEqual(self.readme("night", self.catalog), "", "no README: nothing, and no error")
+        self.assertEqual(self.readme("unknown", self.catalog), "")
+
+    def test_market_readme_reads_the_installed_copy_of_the_catalog_version(self):
+        folder = self.write_element("glow", "extension", files={"README.md": "# Glow\n\nInstalled text.\n"})
+        entry, archive = self.entry_for(folder)
+        catalog = self.write_catalog([entry])
+        self.assertEqual(self.install("glow", catalog).returncode, 0)
+        self.publish_readme(archive, "# Glow\n\nPublished text.\n")
+        self.assertEqual(self.readme("glow", catalog), "# Glow\n\nInstalled text.\n")
+
+        newer = self.write_element("glow", "extension", version="1.1.0", files={"README.md": "# Glow\n\nText of 1.1.0.\n"})
+        newer_entry, newer_archive = self.entry_for(newer)
+        self.publish_readme(newer_archive, "# Glow\n\nText of 1.1.0.\n")
+        catalog = self.write_catalog([newer_entry])
+        self.assertEqual(self.readme("glow", catalog), "# Glow\n\nText of 1.1.0.\n",
+                         "an update waits: the README of the catalog's version")
+
     def test_build_prints_the_tags_in_the_catalog_entry(self):
         folder = self.write_element("tagged", "theme")
         manifest_path = os.path.join(folder, "manifest.json")

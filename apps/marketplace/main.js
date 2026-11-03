@@ -46,6 +46,8 @@ Ampify.i18n.define({
     "done.on": "{name} turned on", "done.off": "{name} turned off", "done.removed": "{name} uninstalled",
     "preview": "Preview of {name}",
     "settingsWhere": "Its settings, when it has some, are in Apple Music's Settings, under Ampify.",
+    "detail.readmeLoading": "Reading its description…",
+    "action.settings": "Settings", "action.openSettings": "Open Ampify's settings", "detail.can": "What it can do", "detail.about": "About", "detail.kind": "Type", "detail.author": "Made by", "detail.version": "Version", "detail.tags": "Tags", "detail.gone": "This element is no longer in the catalog, nor installed.", "detail.noDescription": "No description yet.",
   },
   fr: {
     "tab.theme": "Thèmes", "tab.extension": "Extensions", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.installed": "Installés",
@@ -87,6 +89,8 @@ Ampify.i18n.define({
     "done.on": "{name} activé", "done.off": "{name} désactivé", "done.removed": "{name} désinstallé",
     "preview": "Aperçu de {name}",
     "settingsWhere": "Ses réglages, s'il en a, sont dans les Réglages d'Apple Music, sous Ampify.",
+    "detail.readmeLoading": "Lecture de sa présentation…",
+    "action.settings": "Réglages", "action.openSettings": "Ouvrir les réglages d'Ampify", "detail.can": "Ce qu'il peut faire", "detail.about": "À propos", "detail.kind": "Type", "detail.author": "Créé par", "detail.version": "Version", "detail.tags": "Mots-clés", "detail.gone": "Cet élément n'est plus dans le catalogue ni installé.", "detail.noDescription": "Pas encore de description.",
   },
   de: {
     "tab.theme": "Designs", "tab.extension": "Erweiterungen", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.installed": "Installiert",
@@ -128,6 +132,8 @@ Ampify.i18n.define({
     "done.on": "{name} aktiviert", "done.off": "{name} deaktiviert", "done.removed": "{name} deinstalliert",
     "preview": "Vorschau von {name}",
     "settingsWhere": "Die Einstellungen, falls vorhanden, finden Sie in den Einstellungen von Apple Music unter Ampify.",
+    "detail.readmeLoading": "Beschreibung wird gelesen…",
+    "action.settings": "Einstellungen", "action.openSettings": "Ampify-Einstellungen öffnen", "detail.can": "Was es kann", "detail.about": "Info", "detail.kind": "Typ", "detail.author": "Erstellt von", "detail.version": "Version", "detail.tags": "Stichwörter", "detail.gone": "Dieses Element ist weder im Katalog noch installiert.", "detail.noDescription": "Noch keine Beschreibung.",
   },
   es: {
     "tab.theme": "Temas", "tab.extension": "Extensiones", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.installed": "Instalados",
@@ -169,6 +175,8 @@ Ampify.i18n.define({
     "done.on": "{name} activado", "done.off": "{name} desactivado", "done.removed": "{name} desinstalado",
     "preview": "Vista previa de {name}",
     "settingsWhere": "Sus ajustes, si los tiene, están en los Ajustes de Apple Music, en Ampify.",
+    "detail.readmeLoading": "Leyendo su presentación…",
+    "action.settings": "Ajustes", "action.openSettings": "Abrir los ajustes de Ampify", "detail.can": "Lo que puede hacer", "detail.about": "Información", "detail.kind": "Tipo", "detail.author": "Creado por", "detail.version": "Versión", "detail.tags": "Etiquetas", "detail.gone": "Este elemento ya no está en el catálogo ni instalado.", "detail.noDescription": "Todavía no hay descripción.",
   },
   pt: {
     "tab.theme": "Temas", "tab.extension": "Extensões", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.installed": "Instalados",
@@ -210,6 +218,8 @@ Ampify.i18n.define({
     "done.on": "{name} ativado", "done.off": "{name} desativado", "done.removed": "{name} desinstalado",
     "preview": "Prévia de {name}",
     "settingsWhere": "Os ajustes dele, se houver, ficam nos Ajustes do Apple Music, em Ampify.",
+    "detail.readmeLoading": "Lendo a apresentação…",
+    "action.settings": "Ajustes", "action.openSettings": "Abrir os ajustes do Ampify", "detail.can": "O que ele pode fazer", "detail.about": "Sobre", "detail.kind": "Tipo", "detail.author": "Criado por", "detail.version": "Versão", "detail.tags": "Etiquetas", "detail.gone": "Este elemento não está mais no catálogo nem instalado.", "detail.noDescription": "Ainda não há descrição.",
   },
   ru: {
     "tab.theme": "Темы", "tab.extension": "Расширения", "tab.app": "Приложения", "tab.snippet": "Сниппеты", "tab.installed": "Установлено",
@@ -251,6 +261,8 @@ Ampify.i18n.define({
     "done.on": "{name} включено", "done.off": "{name} выключено", "done.removed": "{name} удалено",
     "preview": "Предпросмотр: {name}",
     "settingsWhere": "Его настройки, если они есть, находятся в настройках Apple Music, в разделе Ampify.",
+    "detail.readmeLoading": "Чтение описания…",
+    "action.settings": "Настройки", "action.openSettings": "Открыть настройки Ampify", "detail.can": "Что оно умеет", "detail.about": "Сведения", "detail.kind": "Тип", "detail.author": "Автор", "detail.version": "Версия", "detail.tags": "Теги", "detail.gone": "Этого элемента больше нет ни в каталоге, ни среди установленных.", "detail.noDescription": "Описания пока нет.",
   },
   ja: {
     "tab.theme": "テーマ", "tab.extension": "拡張機能", "tab.app": "アプリ", "tab.snippet": "スニペット", "tab.installed": "インストール済み",
@@ -292,6 +304,8 @@ Ampify.i18n.define({
     "done.on": "{name} をオンにしました", "done.off": "{name} をオフにしました", "done.removed": "{name} をアンインストールしました",
     "preview": "{name} のプレビュー",
     "settingsWhere": "設定がある場合は、Apple Music の設定の「Ampify」にあります。",
+    "detail.readmeLoading": "説明を読み込んでいます…",
+    "action.settings": "設定", "action.openSettings": "Ampify の設定を開く", "detail.can": "できること", "detail.about": "情報", "detail.kind": "種類", "detail.author": "作者", "detail.version": "バージョン", "detail.tags": "タグ", "detail.gone": "この要素はカタログにもインストール済みにもありません。", "detail.noDescription": "説明はまだありません。",
   },
   zh: {
     "tab.theme": "主题", "tab.extension": "扩展", "tab.app": "应用", "tab.snippet": "代码片段", "tab.installed": "已安装",
@@ -333,6 +347,8 @@ Ampify.i18n.define({
     "done.on": "{name} 已开启", "done.off": "{name} 已关闭", "done.removed": "{name} 已卸载",
     "preview": "{name} 的预览",
     "settingsWhere": "它的设置（如果有）在 Apple Music 的“设置”中，位于 Ampify 下。",
+    "detail.readmeLoading": "正在读取介绍…",
+    "action.settings": "设置", "action.openSettings": "打开 Ampify 设置", "detail.can": "它可以做什么", "detail.about": "关于", "detail.kind": "类型", "detail.author": "作者", "detail.version": "版本", "detail.tags": "标签", "detail.gone": "该内容已不在目录中，也未安装。", "detail.noDescription": "暂无描述。",
   },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
@@ -580,6 +596,10 @@ const COLUMNS = 3;
 const PAGE_SIZE = 12;  // four rows of cards keep the page far below the kernel's 300 elements
 const PICTURE_HEIGHT = 180;
 const BAND_HEIGHT = 72;  // a row of cards without any picture gets a short band with the kind's icon
+const SHOWCASE_HEIGHT = 360;  // the picture at the top of a detail page
+const TILE_SIZE = 160;        // the icon tile of a detail page without a picture
+const DETAIL_WIDTH = 1000;    // as wide as Apple's settings rows: a wider page leaves the eye far from the buttons
+const SETTINGS_GLYPH = "";  // Settings, in Segoe Fluent Icons
 
 // The last useful line of ampify's output, for the status line.
 const lastLine = (text) => String(text || "").trim().split(/\r?\n/).filter(Boolean).pop() || "";
@@ -668,13 +688,6 @@ function permissionsToGrant(item, activeTheme) {
   return on ? [] : item.permissions;
 }
 
-function permissionDetails(item) {
-  if (!item.permissions.length) return t("perm.none");
-  const added = new Set(addedPermissions(item));
-  return t("perm.can") + "\n" + item.permissions
-    .map((p) => "• " + describePermission(p) + (added.has(p) ? " (" + t("perm.new", { version: item.entry.version }) + ")" : ""))
-    .join("\n");
-}
 
 // The scheme a menu shows: the one in use when the theme has it ("auto" or a stale name does not), else its default.
 function shownScheme(theme, scheme) {
@@ -683,12 +696,13 @@ function shownScheme(theme, scheme) {
   return schemes.includes(theme.installed.defaultScheme) ? theme.installed.defaultScheme : schemes[0];
 }
 
-// The element's picture, or without one a band with the icon of its kind. Without a height, the picture takes the
-// width it is given at its own proportions.
-function Preview({ item, height, fit, onClick }) {
+// The element's whole picture, never cut, on a faint band when its proportions differ from the card's; without one, a
+// band with the icon of its kind.
+function Preview({ item, height, onClick }) {
   if (item.preview) {
-    return h("image", { src: item.preview, label: t("preview", { name: item.name }), fit: fit || "cover", height,
-                        cornerRadius: 6, align: "stretch", onClick });
+    return h("stack", { height, cornerRadius: 6, background: "#14808080", align: "stretch" },
+      h("image", { src: item.preview, label: t("preview", { name: item.name }), fit: "contain", grow: true,
+                   align: "stretch", onClick }));
   }
   // A faint grey that reads on light and dark cards alike.
   return h("stack", { height, cornerRadius: 6, background: "#14808080", align: "stretch" },
@@ -728,7 +742,7 @@ function ItemCard({ item, activeTheme, busy, act, open, previewHeight }) {
     h(Preview, { item, height: previewHeight, onClick: open }),
     h(Text, { weight: 600, wrap: false }, item.name),
     h(Text, { variant: "caption", wrap: false }, meta),
-    h("stack", { height: 34 }, h(Text, { variant: "caption", maxLines: 2 }, item.description)),
+    h("stack", { height: 34 }, h(Text, { variant: "caption", maxLines: 2 }, textPieces(item.description)[0])),
     h(Text, { variant: "caption", wrap: false }, [item.tags.slice(0, 3).join(" · "),
                                                   count ? t(count === 1 ? "perm.one" : "perm.count", { count }) : ""].filter(Boolean).join("   ") || " "),
     h("row", { gap: 10 },
@@ -750,45 +764,241 @@ function Grid({ items, renderCard }) {
   return h("stack", { gap: 16 }, rows);
 }
 
-function Details({ item, activeTheme, scheme, busy, act, back, backLabel, message }) {
+// The element's picture at full width, or without one a square tile with the icon of its kind.
+function Showcase({ item }) {
+  if (item.preview) {
+    return h("image", { src: item.preview, label: t("preview", { name: item.name }), fit: "contain", height: SHOWCASE_HEIGHT,
+                        cornerRadius: 8, align: "stretch" });
+  }
+  return h("stack", { width: TILE_SIZE, height: TILE_SIZE, cornerRadius: 12, background: "#14808080", valign: "start" },
+    h("icon", { icon: Ampify.icons.get(KIND_ICONS[item.kind]), size: 64, label: kindLabel(item), align: "center",
+                valign: "center", grow: true }));
+}
+
+// One line of the "About" card: what it is on the left, its value on the right.
+const Fact = ({ label, value }) =>
+  h("row", { gap: 12 },
+    h(Text, { variant: "caption", wrap: false, valign: "center" }, label),
+    h(Text, { grow: true, align: "right", valign: "center" }, value));
+
+// The kernel takes 500 bytes of UTF-8 at most in one text: a longer one is drawn as several, cut at a space when the
+// piece has one.
+const TEXT_MAX_BYTES = 500;
+const utf8Length = (char) => {
+  const code = char.codePointAt(0);
+  return code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+};
+
+function textPieces(text) {
+  const pieces = [];
+  let piece = "";
+  let size = 0;
+  for (const char of text) {
+    const bytes = utf8Length(char);
+    // A cut at a space may leave a rest still too long for this character: cut again, at worst where it stands.
+    while (size + bytes > TEXT_MAX_BYTES) {
+      const space = piece.lastIndexOf(" ");
+      pieces.push(space > 0 ? piece.slice(0, space) : piece);
+      piece = space > 0 ? piece.slice(space + 1) : "";
+      size = Array.from(piece).reduce((total, rest) => total + utf8Length(rest), 0);
+    }
+    piece += char;
+    size += bytes;
+  }
+  pieces.push(piece);
+  return pieces;
+}
+
+// One text, or a column of them when it is too long for one.
+function LongText({ props, text }) {
+  const pieces = textPieces(text);
+  if (pieces.length === 1) return h(Text, props, text);
+  return h("stack", null, pieces.map((piece, index) => h(Text, { ...props, key: "p" + index }, piece)));
+}
+
+// The README of an element, as `ampify market readme` gives it: read once per version ("" when it has none), the
+// reading itself kept while it runs so two pages opened in a row share it. A failed reading is not kept: the next
+// page tries again.
+const readmes = new Map();
+
+function readReadme(item, key) {
+  if (!readmes.has(key)) {
+    const reading = Ampify.kit.run(["market", "readme", item.id])
+      .then((result) => (result.code === 0 ? result.out : null), () => null)
+      .then((text) => {
+        if (text === null) readmes.delete(key);
+        else readmes.set(key, text);
+        return text || "";
+      });
+    readmes.set(key, reading);
+  }
+  return Promise.resolve(readmes.get(key));
+}
+
+// The README to show: null while it is read.
+function useReadme(item) {
+  // ampify reads the installed copy's, or the catalog's when an update waits: both versions name the one shown.
+  const key = [item.key, item.entry && item.entry.version, item.installed && item.installed.version].join("@");
+  const known = readmes.get(key);
+  const [text, setText] = useState(typeof known === "string" ? known : null);
+  useEffect(() => {
+    if (text === null) readReadme(item, key).then(setText);
+  }, []);
+  return text;
+}
+
+// The kernel draws 300 elements at most on a page: a README stops at this many, leaving room for the page around it.
+const README_MAX_NODES = 150;
+const RULE_LINE = /^\s*([-*_])(\s*\1){2,}\s*$/;  // ---, *** or ___: a horizontal rule
+
+// Markdown to blocks the kit can draw: headings, paragraphs, list items, code. Pictures and HTML are left out (the
+// preview is the picture); a table row reads as its cells side by side.
+function readmeBlocks(markdown) {
+  const blocks = [];
+  let paragraph = [];
+  let code = null;
+  const flush = () => {
+    if (paragraph.length) blocks.push({ kind: "paragraph", text: paragraph.join(" ") });
+    paragraph = [];
+  };
+  for (const line of markdown.split("\n")) {
+    const fence = /^\s*(```|~~~)/.test(line);
+    if (code) {
+      if (fence) blocks.push({ kind: "code", text: code.join("\n") });
+      code = fence ? null : code.concat(line);
+      continue;
+    }
+    const heading = /^(#{1,6})\s+(.*?)[\s#]*$/.exec(line);
+    const item = /^\s*([-*+]|\d+[.)])\s+(.*)$/.exec(line);
+    const last = blocks[blocks.length - 1];
+    if (fence || heading || item || !line.trim() || RULE_LINE.test(line)) flush();
+    if (fence) code = [];
+    else if (heading) blocks.push({ kind: "heading", level: heading[1].length, text: heading[2] });
+    else if (item) blocks.push({ kind: "item", mark: /\d/.test(item[1]) ? item[1].replace(")", ".") : "•", text: item[2] });
+    else if (/^\s{2,}\S/.test(line) && !paragraph.length && last && last.kind === "item") last.text += " " + line.trim();
+    else if (/^\s*\|.*\|\s*$/.test(line)) {
+      flush();
+      if (!/^[\s|:-]+$/.test(line)) blocks.push({ kind: "paragraph", text: line.trim().slice(1, -1).split("|").map((cell) => cell.trim()).join("  ·  ") });
+    } else if (line.trim() && !RULE_LINE.test(line)) paragraph.push(line.replace(/^\s*>\s?/, "").trim());
+  }
+  if (code) blocks.push({ kind: "code", text: code.join("\n") });
+  flush();
+  return blocks;
+}
+
+// The words of a line without its marks: a link keeps its text, bold and code their words, a picture or a tag goes.
+const plainInline = (text) => text
+  .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+  .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+  .replace(/<[^>]+>/g, "")
+  .replace(/(\*\*|__)(.+?)\1/g, "$2")
+  .replace(/\*(\S(?:[^*]*\S)?)\*/g, "$1")
+  .replace(/`([^`]+)`/g, "$1")
+  .trim();
+
+// The words a block shows: code as written, the rest without its marks, a list item after its bullet or number.
+function shownText(block) {
+  if (block.kind === "code") return block.text;
+  const text = plainInline(block.text);
+  return block.kind === "item" && text ? block.mark + " " + text : text;
+}
+
+// The elements a block costs the kernel: one per piece of text, one more for the column of a long one and for the
+// background of code.
+function nodesOf(block) {
+  const text = shownText(block);
+  if (!text && block.kind !== "code") return 0;
+  const pieces = textPieces(text).length;
+  return pieces + (pieces > 1 ? 1 : 0) + (block.kind === "code" ? 1 : 0);
+}
+
+function ReadmeBlock({ block }) {
+  const text = shownText(block);
+  if (block.kind === "code") {
+    return h("stack", { background: "#14808080", cornerRadius: 6, padding: 12 }, h(LongText, { text }));
+  }
+  if (!text) return null;
+  if (block.kind === "heading") {
+    return h(LongText, { props: { variant: block.level <= 2 ? "subtitle" : undefined, weight: 600 }, text });
+  }
+  if (block.kind === "item") return h(LongText, { text });
+  return h(LongText, { props: { weight: /^\s*(\*\*|__).*\1\s*$/.test(block.text) ? 600 : undefined }, text });
+}
+
+// The README below the facts, as Spicetify's Marketplace shows it; nothing at all for an element without one. It
+// stops where the kernel's 300 elements would be reached with the page around it.
+function Readme({ item }) {
+  const text = useReadme(item);
+  if (text === null) return h(Text, { variant: "caption" }, t("detail.readmeLoading"));
+  const blocks = readmeBlocks(text);
+  if (!blocks.length) return null;
+  const shown = [];
+  let budget = README_MAX_NODES;
+  for (const block of blocks) {
+    budget -= nodesOf(block);
+    if (budget < 0) break;
+    shown.push(block);
+  }
+  return h(Card, { padding: 24 }, h("stack", { gap: 12 },
+    shown.map((block, index) => h(ReadmeBlock, { key: "b" + index, block })),
+    shown.length < blocks.length ? h(Text, { key: "more", variant: "caption" }, "…") : null));
+}
+
+// The detail page of an element: its name, what it does and its actions first, then what it may do and where it
+// comes from, so a page without a picture or a long description still reads as one, then its README.
+function Details({ item, activeTheme, scheme, busy, act, message }) {
   const [confirm, setConfirm] = useState(false);
   const schemes = (item.installed && item.installed.schemes) || [];
   const active = item.kind === "theme" && item.id === activeTheme;
   const removable = item.installed && !active;
   const state = stateOf(item, activeTheme);
-  const info = h("stack", { key: "content", gap: 12, align: "start", valign: "start", width: item.preview ? 360 : undefined,
-                            maxWidth: 640 },
+  const added = new Set(addedPermissions(item));
+
+  const actions = h("row", { gap: 8 },
+    h(MainAction, { item, activeTheme, busy, act }),
+    !item.installed ? null
+      : confirm
+        ? h(Button, { label: t("action.confirmUninstall"), disabled: busy,
+                      onClick: () => act.remove(item) })
+        : h(ButtonTertiary, { label: t("action.uninstall"), disabled: busy || !removable,
+                              tooltip: removable ? "" : t("uninstall.themeFirst"), onClick: () => setConfirm(true) }),
+    // The spacer keeps the buttons on the left: a row of two children spreads them apart.
+    h("stack", { grow: true }));
+  const heading = h("stack", { gap: 8, grow: true, valign: "center" },
     h(Text, { variant: "title" }, item.name),
     h(Text, { variant: "caption" },
       [kindLabel(item), item.author && t("by", { author: item.author }), item.version && t("version", { version: item.version })]
         .filter(Boolean).join(" · ")),
     state ? h(Text, { weight: 600 }, state) : null,
-    h(Text, null, item.description),
-    item.tags.length ? h(Text, { variant: "caption" }, t("tags", { tags: item.tags.join(", ") })) : null,
-    h(Text, { variant: "caption" }, permissionDetails(item)),
-    item.installed && item.kind === "extension" ? h(Text, { variant: "caption" }, t("settingsWhere")) : null,
+    h(LongText, { text: item.description || t("detail.noDescription") }),
     item.installed && schemes.length > 1
       ? h(Dropdown, { label: t("scheme"), value: shownScheme(item, active ? scheme : ""), options: schemes, disabled: busy,
                       onChange: (value) => act.use(item, value) })
       : null,
-    // The spacer keeps both buttons on the left: a row of two children spreads them apart.
-    h("row", { gap: 8 },
-      h(MainAction, { item, activeTheme, busy, act }),
-      !item.installed ? null
-        : confirm
-          ? h(Button, { label: t("action.confirmUninstall"), disabled: busy,
-                        onClick: () => act.remove(item).then((ok) => ok && back()) })
-          : h(ButtonTertiary, { label: t("action.uninstall"), disabled: busy || !removable,
-                                tooltip: removable ? "" : t("uninstall.themeFirst"), onClick: () => setConfirm(true) }),
-      h("stack", { grow: true })));
+    actions);
+
+  const abilities = h(Card, { key: "can", title: t("detail.can"), grow: true, valign: "stretch", padding: 16 },
+    item.permissions.length
+      ? item.permissions.map((permission) => h(Text, { key: permission },
+          "• " + describePermission(permission) + (added.has(permission) ? " (" + t("perm.new", { version: item.entry.version }) + ")" : "")))
+      : h(Text, null, t("perm.none")));
+  const about = h(Card, { key: "about", title: t("detail.about"), grow: true, valign: "stretch", padding: 16 },
+    h(Fact, { label: t("detail.kind"), value: kindLabel(item) }),
+    item.author ? h(Fact, { label: t("detail.author"), value: item.author }) : null,
+    item.version ? h(Fact, { label: t("detail.version"), value: item.version }) : null,
+    item.tags.length ? h(Fact, { label: t("detail.tags"), value: item.tags.join(", ") }) : null,
+    item.installed && item.kind !== "snippet"
+      ? h("row", { gap: 8 }, h(Button, { label: t("action.openSettings"), onClick: openSettings }), h("stack", { grow: true }))
+      : null);
+
   // Keyed, as on the list: the status line coming and going leaves the rest in place.
-  return h("stack", { gap: 16 },
-    h("row", { key: "back", gap: 8 }, h(ButtonTertiary, { label: "‹ " + backLabel, onClick: back }), h("stack", { grow: true })),
+  return h("stack", { gap: 20, maxWidth: DETAIL_WIDTH },
     message ? h(Text, { key: "status", variant: "caption" }, message) : null,
     item.preview
-      ? h("row", { key: "content", gap: 24 },
-          h("stack", { grow: true, valign: "start" }, h(Preview, { item, fit: "contain" })), info)
-      : info);
+      ? h("stack", { key: "hero", gap: 20 }, h(Showcase, { item }), heading)
+      : h(Card, { key: "hero", padding: 24 }, h("row", { gap: 24 }, h(Showcase, { item }), heading)),
+    h("row", { key: "facts", gap: 16 }, abilities, about),
+    h(Readme, { key: "readme", item }));
 }
 
 function ThemeBar({ items, activeTheme, scheme, busy, act }) {
@@ -820,38 +1030,58 @@ function Pager({ page, pages, setPage }) {
     h(ButtonTertiary, { label: t("action.next"), disabled: page >= pages - 1, onClick: () => setPage(page + 1) }));
 }
 
-// The page mounts anew each time it opens: it shows the last state read at once, while ampify reads it again, on the
-// tab of the last visit.
+// The list and the detail page are two pages of the app, so the arrow of the page header goes from one back to the
+// other, as Apple Music's own arrow does. A page mounts anew each time it opens: what it shows first comes from here.
+const LIST_PAGE = "/marketplace";
+const ITEM_PAGE = "/marketplace/item";
+const SETTINGS_PAGE = "/ampify/settings";  // Ampify's own settings page, drawn by the kernel
 let lastState = null;
-let lastTab = "theme";
+// Where the person was, the element shown in detail, and what an action said before it opened another page.
+const view = { tab: "theme", search: "", page: 0, item: "", note: "" };
+const readers = new Set();  // each mounted page hears a new reading: the list is up to date when the arrow comes back
 
-function Marketplace() {
+function publish(state) {
+  lastState = state;
+  readers.forEach((read) => read(state));
+}
+
+function goTo(path, note = "") {
+  view.note = note;
+  Ampify.ui.navigate(path);
+}
+
+function openItem(item, note) {
+  view.item = item.key;
+  goTo(ITEM_PAGE, note);
+}
+
+function takeNote() {
+  const note = view.note;
+  view.note = "";
+  return note;
+}
+
+const openSettings = () => goTo(SETTINGS_PAGE);
+
+// The state of the kit and the actions on it, for one page: what it shows, its status line and whether it waits on
+// ampify. The list reads the state when it mounts; the detail page (onItemPage) shows the list's reading.
+function useMarket(onItemPage) {
   const [state, setState] = useState(lastState);
-  const [message, setMessage] = useState(lastState ? "" : t("status.reading"));
+  const [note] = useState(takeNote);  // what the action that opened this page said, kept over the first reading
+  const [message, setMessage] = useState(note || (lastState ? "" : t("status.reading")));
   const [busy, setBusy] = useState(false);
-  const [tab, setTabState] = useState(lastTab);
-  const [search, setSearchState] = useState("");
-  const [page, setPage] = useState(0);
-  const [selected, setSelected] = useState("");  // the key of the element shown in detail
 
-  const setTab = (value) => {
-    lastTab = value;
-    setTabState(value);
-    setPage(0);
-    setSelected("");
-  };
-  const setSearch = (value) => {
-    setSearchState(value);
-    setPage(0);
-  };
+  useEffect(() => {
+    readers.add(setState);
+    return () => readers.delete(setState);
+  }, []);
 
   // Reads the state again. A reading the user asked for puts the catalog's warning on the status line, or clears it;
   // after an action, the line keeps what the action said.
   const refresh = (reading) =>
     Ampify.kit.run(["market", "--json"]).then((result) => {
       try {
-        lastState = JSON.parse(result.out);
-        setState(lastState);
+        publish(JSON.parse(result.out));
         if (reading) setMessage(lastLine(result.err));
       } catch {
         setMessage(t("status.unreadable", { error: lastLine(result.err) || t("status.unreadableReply") }));
@@ -882,7 +1112,7 @@ function Marketplace() {
   };
 
   // An element without permissions is installed and put on in one click. One with permissions stays off: its detail
-  // view opens, with the list of what it may do above the button that turns it on.
+  // page opens, with the list of what it may do above the button that turns it on.
   const act = {
     install: (item) => {
       const theme = item.kind === "theme";
@@ -891,35 +1121,63 @@ function Marketplace() {
         return run([["install", item.id, "--yes"], turnOn],
                    t(theme ? "done.installedInUse" : "done.installedOn", { name: item.name }));
       }
-      return run([["install", item.id, "--yes"]], t(theme ? "done.installedUse" : "done.installedTurnOn", { name: item.name }))
-        .then((ok) => ok && setSelected(item.key));
+      const note = t(theme ? "done.installedUse" : "done.installedTurnOn", { name: item.name });
+      return run([["install", item.id, "--yes"]], note).then((ok) => ok && !onItemPage && openItem(item, note));
     },
     update: (item) => run([["update", item.id, "--yes"]], t("done.updated", { name: item.name, version: item.entry.version })),
     use: (item, scheme) => run([["theme", "set", item.id].concat(scheme ? ["--scheme", scheme] : [])],
                                scheme ? t("done.inUseScheme", { name: item.name, scheme }) : t("done.inUse", { name: item.name })),
     clearTheme: () => run([["theme", "clear"]], t("done.appleLook")),
     toggle: (item, on) => run([[item.kind, on ? "enable" : "disable", item.id]], t(on ? "done.on" : "done.off", { name: item.name })),
-    remove: (item) => run([["remove", item.id, "--yes"]], t("done.removed", { name: item.name })),
+    // Removed, the element has no detail page left: the list says so.
+    remove: (item) => {
+      const note = t("done.removed", { name: item.name });
+      return run([["remove", item.id, "--yes"]], note).then((ok) => ok && goTo(LIST_PAGE, note));
+    },
   };
 
   useEffect(() => {
-    refresh(true);
+    if (!onItemPage || !lastState) refresh(!note);
   }, []);
+
+  // settings.txt may say "none" for no theme, as the kernel reads it.
+  const activeTheme = state && state.theme && state.theme !== "none" ? state.theme : "";
+  return { state, message, busy, act, reread, activeTheme };
+}
+
+function MarketItem() {
+  const { state, message, busy, act, activeTheme } = useMarket(true);
+  if (!state) return h(Text, null, message);
+  const item = itemsOf(state).find((candidate) => candidate.key === view.item);
+  if (!item) return h(Empty, { title: t("empty.title"), text: t("detail.gone") });
+  return h(Details, { item, activeTheme, scheme: state.scheme, busy, act, message });
+}
+
+function Marketplace() {
+  const { state, message, busy, act, reread, activeTheme } = useMarket(false);
+  const [tab, setTabState] = useState(view.tab);
+  const [search, setSearchState] = useState(view.search);
+  const [page, setPageState] = useState(view.page);
+
+  const setPage = (value) => {
+    view.page = value;
+    setPageState(value);
+  };
+  const setTab = (value) => {
+    view.tab = value;
+    setTabState(value);
+    setPage(0);
+  };
+  const setSearch = (value) => {
+    view.search = value;
+    setSearchState(value);
+    setPage(0);
+  };
 
   if (!state) return h("stack", { gap: 12 }, h(Text, null, message));
 
-  // settings.txt may say "none" for no theme, as the kernel reads it.
-  const activeTheme = state.theme && state.theme !== "none" ? state.theme : "";
   const items = itemsOf(state);
   const current = TABS.includes(tab) ? tab : TABS[0];
-  const tabLabel = t("tab." + current);
-
-  const detail = selected && items.find((item) => item.key === selected);
-  if (detail) {
-    return h(Details, { item: detail, activeTheme, scheme: state.scheme, busy, act, back: () => setSelected(""),
-                        backLabel: tabLabel, message });
-  }
-
   const inTab = current === "installed"
     ? items.filter((item) => item.installed)
         .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name))
@@ -945,7 +1203,9 @@ function Marketplace() {
                                      onClick: () => setTab(kind) })),
       h("textfield", { key: "search", placeholder: t("search." + current), value: search, grow: true,
                        onChange: (event) => setSearch(event.value) }),
-      h(Button, { key: "refresh", label: t("action.refresh"), disabled: busy, onClick: reread })),
+      h(Button, { key: "refresh", label: t("action.refresh"), disabled: busy, onClick: reread }),
+      h(Button, { key: "settings", label: t("action.settings"), icon: SETTINGS_GLYPH, tooltip: t("action.openSettings"),
+                  onClick: openSettings })),
     message ? h(Text, { key: "status", variant: "caption" }, message) : null,
     current === "theme" || current === "installed"
       ? h(ThemeBar, { key: "theme", items, activeTheme, scheme: state.scheme, busy, act })
@@ -956,16 +1216,18 @@ function Marketplace() {
     visible.length
       ? h(Grid, { key: "grid", items: visible,
                   renderCard: (item, previewHeight) => h(ItemCard, { key: item.key, item, activeTheme, busy, act, previewHeight,
-                                                                     open: () => setSelected(item.key) }) })
+                                                                     open: () => openItem(item) }) })
       : empty,
     h(Pager, { key: "pager", page: shownPage, pages, setPage }));
 }
 
-// The app's "/marketplace" page (Ampify.ready renders it), and the "Ampify" entry of the sidebar that opens it.
+// The app's "/marketplace" page (Ampify.ready renders it), its detail page, and the "Ampify" entry of the sidebar that
+// opens the list.
 function render() {
   return h(Marketplace);
 }
 globalThis.render = render;
+Ampify.ReactDOM.render(h(MarketItem), { page: ITEM_PAGE });
 
 // Ampify's logo as a silhouette: the puzzle piece, drawn in the text color like Apple Music's own sidebar icons.
 const AMPIFY_ICON =
@@ -975,4 +1237,4 @@ const AMPIFY_ICON =
   'A11.3 11.3 0 0 1 39.7 63L12.3 63A11.3 11.3 0 0 1 1 51.7L1 24.3A11.3 11.3 0 0 1 12.3 13Z"/></svg>';
 
 Ampify.ui.title.set("Marketplace");
-Ampify.ui.sidebar.addItem({ label: "Ampify", icon: AMPIFY_ICON, onClick: () => Ampify.ui.navigate("/marketplace") });
+Ampify.ui.sidebar.addItem({ label: "Ampify", icon: AMPIFY_ICON, onClick: () => Ampify.ui.navigate(LIST_PAGE) });

@@ -48,14 +48,14 @@ element's id. Schema: [schemas/manifest.schema.json](../../schemas/manifest.sche
 | `colors` | | | required, or `resources` | | An `.ini` file of color schemes |
 | `defaultScheme` | | | optional | | The scheme used by default |
 | `resources` | | | required, or `colors` | required, or a `user.css` | A `.xaml` resource dictionary |
-| `settings` | optional | forbidden | optional | forbidden | Settings shown in the Ampify card (below) |
+| `settings` | optional | forbidden | optional | forbidden | Settings shown in Ampify's settings page (below) |
 
 Files named in the manifest sit at the root of the folder (no subfolder, no `../`, no leading dot). The folder may hold
 subfolders for files that `main` imports. A symbolic link anywhere in the folder is refused.
 
 ## Settings
 
-An extension, a theme or a snippet can declare settings. The Ampify card in Apple Music's settings shows them under the
+An extension, a theme or a snippet can declare settings. Ampify's settings page shows them under the
 extension's switch, or under the extensions for the active theme and the snippets switched on.
 
 ```json
@@ -104,7 +104,7 @@ its settings with `Ampify.config.get(key)`; a theme with `var(--setting-<key>)` 
 | `settings` | Optional: a label per setting `key`, 1 to 60 characters |
 | `options` | Optional: a text per choice value, 1 to 60 characters. The stored value stays the English one |
 
-The Marketplace and the Ampify card show the translation that matches the language Ampify uses, and English
+The Marketplace and Ampify's settings page show the translation that matches the language Ampify uses, and English
 otherwise. Ids, folder names and command-line messages never change with the language.
 
 > [!NOTE]

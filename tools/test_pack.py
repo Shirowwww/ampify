@@ -117,6 +117,26 @@ class PackTests(unittest.TestCase):
         self.assertEqual(entry["tags"], ["dark", "minimal"])
         self.assertTrue(os.path.isfile(os.path.join(self.tmp, "packages", "demo-1.0.0.jpg")))
 
+    def test_readme_is_published_next_to_the_archive_without_a_catalog_field(self):
+        folder = self.make_element()
+        with open(os.path.join(folder, "README.md"), "w", encoding="utf-8") as handle:
+            handle.write("# Demo\n\nWhat it does.\n")
+        catalog = os.path.join(self.tmp, "catalog.json")
+        with open(catalog, "w", encoding="utf-8") as handle:
+            json.dump({"catalogVersion": 1, "extensions": []}, handle)
+
+        archive = os.path.join(self.tmp, "packages", "demo-1.0.0.zip")
+        os.makedirs(os.path.dirname(archive))
+        pack.pack(folder, archive, catalog, "https://example.com/packages/demo-1.0.0.zip")
+
+        with open(os.path.join(self.tmp, "packages", "demo-1.0.0.md"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "# Demo\n\nWhat it does.\n")
+        with zipfile.ZipFile(archive) as bundle:
+            self.assertIn("README.md", bundle.namelist())
+        with open(catalog, encoding="utf-8") as handle:
+            entry = json.load(handle)["extensions"][0]
+        self.assertNotIn("readme", entry, "Ampify 1.1.0 refuses a catalog with a field it does not know")
+
     def test_catalog_entry_leaves_the_translations_in_the_archive(self):
         folder = self.make_element()
         with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as handle:

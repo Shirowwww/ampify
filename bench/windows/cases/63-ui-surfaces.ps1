@@ -4,7 +4,7 @@
 #      panel; UI Automation finds its "AMPIFY_..." elements in Apple Music's window;
 #   3. a click on "Add one" through UI Automation updates the panel in place;
 #   4. the midnight theme applies on top;
-#   5. Settings > Playback, opened through UI Automation if possible, shows the "Ampify" card.
+#   5. Settings, opened through UI Automation if possible, has an "Ampify" row that opens Ampify's settings page.
 # A PNG capture of the window is taken at each step. The useful log lines are copied into the job log.
 # Job: MSVC (bench-msvc), with the MSVC kit (artifact ampify-msvc-kit) in $script:BenchKitRoot\ui (ampify_launcher.exe,
 # ampify_kernel.dll, themes, examples\react-panel). Placement of the panels and buttons: provisional, see
@@ -144,7 +144,7 @@ function Set-UiSettings {
     [System.IO.File]::WriteAllLines($Path, [string[]]$lines, [System.Text.UTF8Encoding]::new($false))
 }
 
-Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, click, theme and Ampify card in Settings > Playback' -Requires 'apple-music' -Action {
+Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, click, theme and Ampify settings page' -Requires 'apple-music' -Action {
     param($Ctx)
 
     $ui = Join-Path $script:BenchKitRoot 'ui'
@@ -256,9 +256,10 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
             Add-Skip -Ctx $Ctx -Name 'midnight theme' -Reason "example theme missing from the UI build: $midnight"
         }
 
-        # 5. Settings > Playback and the Ampify card. Ctrl+, opens the settings in many apps; otherwise we look for a
-        # "Settings" entry, then the "Playback" entry. The labels are Apple Music's own, so the French ones of a French
-        # Windows are matched too.
+        # 5. Settings and Ampify's settings page. Ctrl+, opens the settings in many apps; otherwise we look for a
+        # "Settings" entry. The labels are Apple Music's own, so the French ones of a French Windows are matched too.
+        # The kernel copies the look of its page from Settings > Playback, so that entry is opened first, then the
+        # "Ampify" row the kernel adds after Advanced.
         $settingsOpened = ''
         if ($uia -and $root) {
             Show-UiAppWindow
@@ -280,23 +281,30 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
             $playbackText = Find-UiById -Root $root -Id 'PlaybackNavigationViewItem'
             $playback = if ($playbackText) { [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($playbackText) } else { $null }
             $playbackHow = Invoke-UiElement -Element $playback
-            Add-Info -Ctx $Ctx -Name 'UI Automation navigation to Settings > Playback' `
-                -Detail "settings: $(if ($settingsOpened) { $settingsOpened } else { 'not found' }); Playback: $(if ($playbackHow) { $playbackHow } else { 'not found' })"
+            Start-Sleep -Seconds 2
+            $ampifyHow = ''
+            if (Wait-Until -TimeoutSeconds 15 -Condition {
+                    Test-JournalContains -FileName 'AppleMusic.log' -Text 'Settings: row "Ampify" added' }) {
+                $root = Get-UiAppWindow
+                $ampifyHow = Invoke-UiElement -Element (Find-UiById -Root $root -Id 'AMPIFY_SettingsEntry')
+            }
+            Add-Info -Ctx $Ctx -Name 'UI Automation navigation to Ampify settings' `
+                -Detail "settings: $(if ($settingsOpened) { $settingsOpened } else { 'not found' }); Playback: $(if ($playbackHow) { $playbackHow } else { 'not found' }); Ampify row: $(if ($ampifyHow) { $ampifyHow } else { 'not found' })"
         }
         $card = Wait-Until -TimeoutSeconds 30 -Condition {
-            (Test-JournalContains -FileName 'AppleMusic.log' -Text 'Settings: card "Ampify" added') -or
-            (Test-JournalContains -FileName 'AppleMusic.log' -Text 'Settings: card "Ampify" refreshed')
+            Test-JournalContains -FileName 'AppleMusic.log' -Text 'Settings: Ampify page built'
         }
         $pageSeen = Test-JournalContains -FileName 'AppleMusic.log' -Text 'Settings: PlaybackSettingsPage seen'
         if ($card) {
-            Add-Check -Ctx $Ctx -Name 'log: Ampify card added to Settings > Playback' -Passed $true
+            Add-Check -Ctx $Ctx -Name 'log: Ampify settings page built' -Passed $true
             Start-Sleep -Seconds 2
             $root = Get-UiAppWindow
             $button = Find-UiById -Root $root -Id 'AMPIFY_ModsOpenFolder'
             $toggle = Find-UiById -Root $root -Id 'AMPIFY_ModsToggle_react-panel'
             Add-Check -Ctx $Ctx -Name 'UI Automation: "Open the Ampify folder" button and react-panel switch' `
                 -Passed (($null -ne $button) -and ($null -ne $toggle))
-            # The card comes last in the page, below the fold of the runner's screen: brought into view for the capture.
+            # The folder button comes last in the page, below the fold of the runner's screen: brought into view for
+            # the capture.
             if ($button) {
                 try {
                     $button.GetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView()
@@ -306,7 +314,7 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
             }
         } else {
             # Opening the settings by automation is a bonus: without it, the card is checked on a real PC.
-            Add-Info -Ctx $Ctx -Name 'Ampify card' -Detail "not seen (Playback page seen: $pageSeen): to check on a real PC"
+            Add-Info -Ctx $Ctx -Name 'Ampify settings page' -Detail "not seen (Playback page seen: $pageSeen): to check on a real PC"
         }
         Show-UiAppWindow
         Save-Screenshot -Ctx $Ctx -Name 'ui-settings-card' | Out-Null

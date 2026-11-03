@@ -48,6 +48,7 @@ ampify doctor                            check that everything is in order
 | Command | What it does |
 |---|---|
 | `ampify market` | Lists the catalog and what is installed (`--json` for the Marketplace app) |
+| `ampify market readme <id>` | Prints an element's `README.md`: the installed copy's, or the one published next to the catalog's archive. Nothing when it has none |
 | `ampify install <id> [--yes]` | Downloads, checks the SHA-256, validates and installs. The element starts off ([what is checked](extensions/catalog.md#what-install-checks)) |
 | `ampify update <id> [--yes]` | Updates an element when the catalog has a newer version |
 | `ampify remove <id>` | Removes an element, after a backup |

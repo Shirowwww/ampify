@@ -34,6 +34,10 @@ struct ModEntry {
 // do not hold a valid manifest are left out: the kernel would not load them either.
 std::vector<ModEntry> ListMods(const std::filesystem::path& kit);
 
+// Whether the extension <id> is on in settings.txt, its own default otherwise. Also for one built into the kernel, such
+// as atmos-leveler, which has no manifest for ListMods to find.
+bool IsModOn(const std::filesystem::path& kit, const std::string& id);
+
 // What a toggle of the card does, as `ampify extension enable|disable` would: writes extensions.<id>.enabled in
 // settings.txt (keeping the other lines), then appends `start <id>` or `stop <id>` to reload.txt, which the kernel's
 // JavaScript thread reads every 500 ms. False with an English line in `error` when a file cannot be written.
@@ -51,6 +55,21 @@ std::vector<ModEntry> ListThemes(const std::filesystem::path& kit);
 // Makes <id> the active theme, or none when it is empty, as `ampify theme set` does: a scheme belongs to the theme it
 // was chosen for, so it goes unless the theme stays the same or the scheme is "auto".
 bool ChooseTheme(const std::filesystem::path& kit, const std::string& id, std::string& error);
+
+// The accent colour the user chose over the theme's (theme.accent), as six upper-case hex digits; empty for the
+// theme's own. The engine applies it with or without a theme.
+std::string ChosenAccent(const std::filesystem::path& kit);
+
+// Writes theme.accent: "RRGGBB" or "#RRGGBB", or empty to go back to the theme's accent. Anything else is refused and
+// leaves the setting as it was.
+bool ChooseAccent(const std::filesystem::path& kit, const std::string& accent, std::string& error);
+
+// The accents the settings page offers before "Custom…", Apple Music's pink first.
+struct AccentPreset {
+    const char* value;
+    const char* textKey;
+};
+const std::vector<AccentPreset>& AccentPresets();
 
 // The theme in use (theme.active), empty for none.
 std::string ActiveThemeId(const std::filesystem::path& kit);

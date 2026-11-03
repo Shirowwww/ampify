@@ -274,7 +274,7 @@ int SetElementState(Context& ctx, std::string_view kind, const std::string& id, 
             if (!found->Valid()) return Failure(ctx, Tr("element.invalid", {{"error", found->errors.front()}}));
             for (const std::string& permission : found->manifest->permissions) {
                 permissions += (permissions.empty() ? "" : ", ") + permission;
-                // Switching the element on is the user's consent to the service it needs, as in the Ampify card.
+                // Switching the element on is the user's consent to the service it needs, as on Ampify's settings page.
                 if (const char* key = ServiceSettingOf(permission)) settings.Set(key, "1");
             }
         }
@@ -362,7 +362,7 @@ std::map<std::string, std::string> Template(std::string_view kind, const std::st
             {"main.js",
              "// " + id + ": a button in the playback bar that tells the song playing.\n"
              "// Save a change: with ampify dev, Apple Music restarts the extension at once.\n"
-             "// show-album is declared in manifest.json: the Ampify card in Settings > Playback switches it.\n\n"
+             "// show-album is declared in manifest.json: Ampify's settings page switches it.\n\n"
              "Ampify.ui.playbar.addButton({\n"
              "  label: \"What is playing?\",\n"
              "  icon: \"\\uE946\", // a Segoe Fluent Icons glyph (Info)\n"

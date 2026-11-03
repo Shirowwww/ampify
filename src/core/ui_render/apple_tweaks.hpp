@@ -1,7 +1,7 @@
 #pragma once
 
-// What Ampify changes in Apple Music's own behaviour, from the "Apple Music" part of the Ampify card (Settings,
-// Playback): its notifications, where its full-screen player goes and what closing its window does. Stored in
+// What Ampify changes in Apple Music's own behaviour, from the "Apple Music" section of Ampify's settings
+// page: its notifications, where its full-screen player goes and what closing its window does. Stored in
 // settings.txt; the kernel applies them (src/win/notifications.cpp, src/win/apple_player.cpp,
 // src/win/close_to_tray.cpp). Portable, so the choices are tested under Linux.
 
