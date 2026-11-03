@@ -68,4 +68,18 @@ std::string EncodeAnimations(const std::vector<Animation>& animations);
 // Nothing for a text that EncodeAnimations did not write.
 std::optional<std::vector<Animation>> DecodeAnimations(std::string_view text);
 
+// One channel's value: x and y as in AnimationTrack::Point.
+struct ChannelValue {
+    AnimationTrack::Channel channel = AnimationTrack::Channel::Opacity;
+    double x = 0;
+    double y = 0;
+};
+
+// The values `animation` gives `elapsedMs` after it started, one per track, for a backend that draws an endless
+// animation itself a few times a second: the compositor would redraw the whole window at every frame of the screen.
+// `own` holds the element's own values, for a track without a point at 0 or 1 and for the delay; a channel missing
+// there counts as 0 (1 for Scale, as `own` of an element that was never scaled).
+std::vector<ChannelValue> SampleAnimation(const Animation& animation, double elapsedMs,
+                                          const std::vector<ChannelValue>& own);
+
 }  // namespace ampify::theme

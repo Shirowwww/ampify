@@ -167,3 +167,48 @@ TEST_CASE(Animation_TheEncodedTextReadsBack) {
     CHECK(!th::DecodeAnimations("not an animation").has_value());
     CHECK(!th::DecodeAnimations("100;0;1;normal;none;0,0,1,1;wobble=0:1").has_value());
 }
+
+namespace {
+
+// The value of the one track of `animation` at `ms`, with the element's own values at 0.
+double At(const th::Animation& animation, double ms) {
+    std::vector<th::ChannelValue> values = th::SampleAnimation(animation, ms, {});
+    CHECK(values.size() == 1);
+    return values.empty() ? -1 : values.front().x;
+}
+
+bool Near(double a, double b) { return a > b - 0.01 && a < b + 0.01; }
+
+}  // namespace
+
+TEST_CASE(SampleAnimation_AnEndlessTurnGoesRoundAndRoundFromTheElementsOwnAngle) {
+    std::vector<th::Animation> spin = Animations("spin 24s linear infinite");
+    CHECK(spin.size() == 1);
+    if (spin.empty()) return;
+    CHECK(Near(At(spin[0], 0), 0));
+    CHECK(Near(At(spin[0], 6000), 90));
+    CHECK(Near(At(spin[0], 30000), 90));
+    std::vector<th::ChannelValue> tilted = th::SampleAnimation(spin[0], 0, {{Channel::Rotation, 45, 0}});
+    CHECK(tilted.size() == 1 && Near(tilted[0].x, 45));
+}
+
+TEST_CASE(SampleAnimation_AlternateGoesBackOnEveryOtherRound) {
+    std::vector<th::Animation> fade = Animations("fade 1s linear infinite alternate");
+    CHECK(fade.size() == 1);
+    if (fade.empty()) return;
+    CHECK(Near(At(fade[0], 250), 0.25));
+    CHECK(Near(At(fade[0], 1250), 0.75));
+    std::vector<th::Animation> reverse = Animations("fade 1s linear infinite reverse");
+    CHECK(!reverse.empty() && Near(At(reverse[0], 250), 0.75));
+}
+
+TEST_CASE(SampleAnimation_EasingAndDelayFollowCss) {
+    std::vector<th::Animation> eased = Animations("fade 1s ease infinite");
+    CHECK(!eased.empty() && Near(At(eased[0], 500), 0.8024));
+    std::vector<th::Animation> late = Animations("fade 1s linear 2s infinite");
+    CHECK(!late.empty());
+    if (late.empty()) return;
+    std::vector<th::ChannelValue> waiting = th::SampleAnimation(late[0], 1000, {{Channel::Opacity, 0.6, 0}});
+    CHECK(waiting.size() == 1 && Near(waiting[0].x, 0.6));
+    CHECK(Near(At(late[0], 2500), 0.5));
+}

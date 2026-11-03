@@ -29,3 +29,30 @@ TEST_CASE(WinCommon_Utf8RoundTrips) {
     CHECK(ampify::win::ToUtf8(ampify::win::FromUtf8(text)) == text);
     CHECK(ampify::win::ToUtf8(L"").empty());
 }
+
+TEST_CASE(WinCommon_ProcessWatchSeesAProgramStartAndEnd) {
+    wchar_t temp[MAX_PATH];
+    GetTempPathW(MAX_PATH, temp);
+    const std::wstring probe = std::wstring(temp) + L"ampify_watch_probe.exe";
+    CHECK(CopyFileW(L"C:\\Windows\\System32\\PING.EXE", probe.c_str(), FALSE) != 0);
+
+    ampify::win::ProcessWatch watch(L"ampify_watch_probe.exe");
+    ampify::win::ProcessWatch self(L"ampify_tests.exe");
+    CHECK(!watch.Running());
+    CHECK(self.Running());
+
+    std::wstring line = L"\"" + probe + L"\" -n 30 127.0.0.1";
+    STARTUPINFOW startup{sizeof(startup)};
+    PROCESS_INFORMATION started{};
+    CHECK(CreateProcessW(probe.c_str(), line.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr,
+                         &startup, &started) != 0);
+    CHECK(watch.Running());
+    CHECK(watch.Running());
+
+    TerminateProcess(started.hProcess, 0);
+    WaitForSingleObject(started.hProcess, 5000);
+    CloseHandle(started.hThread);
+    CloseHandle(started.hProcess);
+    CHECK(!watch.Running());
+    DeleteFileW(probe.c_str());
+}

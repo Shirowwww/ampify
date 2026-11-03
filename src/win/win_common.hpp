@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace ampify::win {
@@ -63,6 +64,30 @@ bool IsElevated();
 
 // Ids of the running processes whose image file name is `imageName`, whatever folder they run from.
 std::vector<DWORD> ProcessIdsNamed(const wchar_t* imageName);
+
+// Whether a process named `imageName` runs, for a loop that asks several times a second. A snapshot of every process
+// (ProcessIdsNamed) costs about 11 ms with 560 processes; this lists the ids (0.04 ms) and opens only new ones. Each
+// process seen stays open until it ends, so its id cannot pass to a new process unnoticed.
+class ProcessWatch {
+public:
+    explicit ProcessWatch(std::wstring imageName) : m_name(std::move(imageName)) {}
+    ~ProcessWatch();
+    ProcessWatch(const ProcessWatch&) = delete;
+    ProcessWatch& operator=(const ProcessWatch&) = delete;
+
+    bool Running();
+
+private:
+    struct Seen {
+        HANDLE process = nullptr;  // null when Windows refuses to open it: tried again at the next look
+        bool named = false;
+    };
+    Seen Look(DWORD id) const;
+
+    std::wstring m_name;
+    std::vector<std::pair<DWORD, Seen>> m_seen;  // sorted by id
+    std::vector<DWORD> m_ids;
+};
 
 // Yes / No question in a dialog. Returns true for Yes.
 bool AskYesNo(const std::wstring& text, const std::wstring& title);

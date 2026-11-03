@@ -47,6 +47,7 @@ bool XamlTreeBackend::Attach() {
     xaml::Window window = AppWindow(L"MainWindow");
     if (!window) return false;
     m_window = winrt::make_weak(window);
+    m_animations.Window(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(window.AppWindow().Id().Value)));
     // Walking or writing the tree while Apple Music closes crashed it in Microsoft.UI.Xaml.dll (bench, 30/10).
     std::shared_ptr<bool> closed = m_closed;
     window.Closed([closed](IInspectable const&, xaml::WindowEventArgs const&) noexcept { *closed = true; });

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.1 (2026-11-03)
+
+- Much lighter on the processor. An endless theme animation, such as the Spinning artwork record, made Apple Music
+  redraw its whole window at every frame of the screen: about 570 ms of processor a second on a 240 Hz screen, and
+  still 150 ms with the window hidden in the notification area. It now moves 30 times a second and stops while
+  Apple Music is hidden or minimized: about 70 ms shown, 30 ms hidden.
+- The background launcher looks for Apple Music without listing every process four times a second: 0.5 ms of
+  processor a second instead of 47.
+
 ## 1.3.0 (2026-11-03)
 
 ### Updates

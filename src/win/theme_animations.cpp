@@ -4,12 +4,16 @@
 
 #include "theme_animations.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <optional>
 
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Windows.Foundation.Numerics.h>
 #include <winrt/Windows.UI.ViewManagement.h>
+
+// After the projection: its macros (GetCurrentTime, GetClassName) would rename members of WinRT types.
+#include <windows.h>
 
 #include "../core/theme/animation.hpp"
 
@@ -25,6 +29,9 @@ using winrt::Windows::Foundation::Numerics::float3;
 using Channel = th::AnimationTrack::Channel;
 
 constexpr wchar_t kStartingValue[] = L"this.StartingValue";
+// Steps a second of an endless animation: smooth for a slow turn or a pulse, a fraction of what a 240 Hz screen draws.
+constexpr double kLoopFps = 30;
+constexpr double kHiddenCheckMs = 500;  // how often a hidden or minimized window is looked at again
 
 winrt::Windows::Foundation::TimeSpan Span(double ms) {
     return std::chrono::duration_cast<winrt::Windows::Foundation::TimeSpan>(std::chrono::duration<double, std::milli>(ms));
@@ -106,6 +113,29 @@ std::vector<composition::CompositionAnimation> Build(const composition::Composit
     return parts;
 }
 
+th::ChannelValue OwnValue(const xaml::UIElement& element, Channel channel) {
+    switch (channel) {
+        case Channel::Scale: return {channel, element.Scale().x, element.Scale().y};
+        case Channel::Rotation: return {channel, element.Rotation(), 0};
+        case Channel::Translation: return {channel, element.Translation().x, element.Translation().y};
+        case Channel::Opacity: break;
+    }
+    return {channel, element.Opacity(), 0};
+}
+
+void Apply(const xaml::UIElement& element, const std::vector<th::ChannelValue>& values) {
+    for (const th::ChannelValue& value : values) {
+        const float x = static_cast<float>(value.x);
+        const float y = static_cast<float>(value.y);
+        switch (value.channel) {
+            case Channel::Scale: element.Scale(float3(x, y, 1.f)); break;
+            case Channel::Rotation: element.Rotation(x); break;
+            case Channel::Translation: element.Translation(float3(x, y, element.Translation().z)); break;
+            case Channel::Opacity: element.Opacity(x); break;
+        }
+    }
+}
+
 bool Turns(const std::vector<th::Animation>& animations) {
     for (const th::Animation& animation : animations) {
         for (const th::AnimationTrack& track : animation.tracks) {
@@ -137,7 +167,12 @@ bool ThemeAnimations::Write(theme::NodeId id, const xaml::UIElement& element, co
     try {
         composition::Compositor compositor = xaml::Media::CompositionTarget::GetCompositorForCurrentThread();
         if (Turns(*animations)) Center(running, compositor, element, origin);
+        std::vector<th::Animation> loops;
         for (const th::Animation& animation : *animations) {
+            if (animation.iterations == 0) {
+                loops.push_back(animation);
+                continue;
+            }
             std::vector<composition::CompositionAnimation> parts = Build(compositor, animation, element.Translation().z);
             for (const composition::CompositionAnimation& part : parts) {
                 element.StartAnimation(part);
@@ -147,6 +182,7 @@ bool ThemeAnimations::Write(theme::NodeId id, const xaml::UIElement& element, co
                 EndAt(running, animation.delayMs + animation.durationMs * animation.iterations, std::move(parts));
             }
         }
+        if (!loops.empty()) StartLoops(running, std::move(loops));
     } catch (...) {
         Stop(running);  // an element Apple Music drives through its composition visual refuses these properties
         return false;
@@ -164,6 +200,63 @@ bool ThemeAnimations::MotionAllowed() {
     } catch (...) {
         return true;
     }
+}
+
+ThemeAnimations::~ThemeAnimations() {
+    m_alive.reset();
+    if (m_loopTimer) m_loopTimer.Stop();
+}
+
+void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> loops) {
+    xaml::UIElement element = running.element.get();
+    if (!element) return;
+    for (const th::Animation& loop : loops) {
+        for (const th::AnimationTrack& track : loop.tracks) {
+            bool known = std::any_of(running.own.begin(), running.own.end(),
+                                     [&](const th::ChannelValue& value) { return value.channel == track.channel; });
+            if (!known) running.own.push_back(OwnValue(element, track.channel));
+        }
+    }
+    running.loops = std::move(loops);
+    running.started = std::chrono::steady_clock::now();
+    if (!m_loopTimer) {
+        auto queue = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
+        if (!queue) return;
+        m_loopTimer = queue.CreateTimer();
+        m_loopTimer.IsRepeating(true);
+        std::weak_ptr<bool> alive = m_alive;
+        m_loopTimer.Tick([this, alive](auto const&, auto const&) noexcept {
+            if (!alive.expired()) StepLoops();
+        });
+    }
+    m_loopTimer.Interval(Span(1000.0 / kLoopFps));
+    if (!m_loopTimer.IsRunning()) m_loopTimer.Start();
+}
+
+void ThemeAnimations::StepLoops() {
+    const bool shown = !m_window || (IsWindowVisible(m_window) && !IsIconic(m_window));
+    const auto now = std::chrono::steady_clock::now();
+    bool any = false;
+    for (auto& [id, running] : m_running) {
+        if (running.loops.empty()) continue;
+        any = true;
+        xaml::UIElement element = shown ? running.element.get() : nullptr;
+        if (!element) continue;
+        const double ms = std::chrono::duration<double, std::milli>(now - running.started).count();
+        std::vector<th::ChannelValue> values;
+        for (const th::Animation& loop : running.loops) {
+            for (const th::ChannelValue& value : th::SampleAnimation(loop, ms, running.own)) values.push_back(value);
+        }
+        try {
+            Apply(element, values);
+        } catch (...) {
+        }
+    }
+    if (!any) {
+        m_loopTimer.Stop();
+        return;
+    }
+    m_loopTimer.Interval(Span(shown ? 1000.0 / kLoopFps : kHiddenCheckMs));
 }
 
 std::string ThemeAnimations::Read(theme::NodeId id) const {
@@ -195,6 +288,7 @@ void ThemeAnimations::Stop(Running& running) {
     for (const composition::CompositionAnimation& animation : running.animations) {
         attempt([&] { element.StopAnimation(animation); });
     }
+    if (!running.loops.empty()) attempt([&] { Apply(element, running.own); });
     if (running.center) attempt([&] { element.StopAnimation(running.center); });
     if (running.centered) attempt([&] { element.CenterPoint(running.centerBefore); });
 }

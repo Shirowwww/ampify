@@ -4,8 +4,10 @@
 #include <shlobj.h>
 #include <shellapi.h>
 #include <appmodel.h>
+#include <psapi.h>
 #include <tlhelp32.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <fstream>
 #include <system_error>
@@ -208,6 +210,65 @@ std::vector<DWORD> ProcessIdsNamed(const wchar_t* imageName) {
     }
     CloseHandle(snapshot);
     return found;
+}
+
+ProcessWatch::~ProcessWatch() {
+    for (auto& [id, seen] : m_seen) {
+        if (seen.process) CloseHandle(seen.process);
+    }
+}
+
+ProcessWatch::Seen ProcessWatch::Look(DWORD id) const {
+    Seen seen;
+    seen.process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, id);
+    if (!seen.process) return seen;
+    wchar_t path[MAX_PATH];
+    DWORD size = MAX_PATH;
+    if (QueryFullProcessImageNameW(seen.process, 0, path, &size)) {
+        const wchar_t* slash = wcsrchr(path, L'\\');
+        seen.named = _wcsicmp(slash ? slash + 1 : path, m_name.c_str()) == 0;
+    }
+    return seen;
+}
+
+bool ProcessWatch::Running() {
+    if (m_ids.empty()) m_ids.resize(1024);
+    DWORD bytes = 0;
+    for (;;) {
+        DWORD capacity = static_cast<DWORD>(m_ids.size() * sizeof(DWORD));
+        if (!EnumProcesses(m_ids.data(), capacity, &bytes)) return !ProcessIdsNamed(m_name.c_str()).empty();
+        if (bytes < capacity) break;
+        m_ids.resize(m_ids.size() * 2);
+    }
+    std::vector<DWORD> ids(m_ids.begin(), m_ids.begin() + bytes / sizeof(DWORD));
+    std::sort(ids.begin(), ids.end());
+
+    std::vector<std::pair<DWORD, Seen>> next;
+    next.reserve(ids.size());
+    auto old = m_seen.begin();
+    bool running = false;
+    for (DWORD id : ids) {
+        while (old != m_seen.end() && old->first < id) {
+            if (old->second.process) CloseHandle(old->second.process);
+            ++old;
+        }
+        Seen seen;
+        bool known = old != m_seen.end() && old->first == id;
+        if (known && old->second.process && WaitForSingleObject(old->second.process, 0) == WAIT_TIMEOUT) {
+            seen = old->second;
+        } else {
+            if (known && old->second.process) CloseHandle(old->second.process);
+            seen = Look(id);
+        }
+        if (known) ++old;
+        running = running || seen.named;
+        next.emplace_back(id, seen);
+    }
+    for (; old != m_seen.end(); ++old) {
+        if (old->second.process) CloseHandle(old->second.process);
+    }
+    m_seen = std::move(next);
+    return running;
 }
 
 bool AskYesNo(const std::wstring& text, const std::wstring& title) {

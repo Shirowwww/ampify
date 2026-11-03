@@ -1,5 +1,5 @@
 /* Spinning artwork: the artwork of the playback bar becomes a record that turns, with its grooves and spindle hole.
-   The compositor runs the animation on its own thread: it stays smooth while Apple Music loads a page.
+   Ampify turns it 30 times a second, and not while Apple Music is hidden or minimized.
    Change --turn to make it faster or slower.
 
    Apple Music drives the artwork's own transform and refuses one, so the turn goes on the area around it. That area

@@ -422,11 +422,12 @@ int RunBackground(ampify::Journal& journal, const std::filesystem::path& kit, HA
     ampify::Journal quietJournal(quiet, ampify::Journal::LocalTimeStamp);
     bool firstLook = true;
     AutoUpdater updater;
+    ampify::win::ProcessWatch appleMusic(L"AppleMusic.exe");
     DWORD wait = 0;
     while (!WaitOrStop(stop, wait)) {
         wait = kBackgroundPollMs;
         // A name check first: it costs next to nothing, four times a second.
-        if (ampify::win::ProcessIdsNamed(L"AppleMusic.exe").empty()) {
+        if (!appleMusic.Running()) {
             firstLook = false;
             updater.Step(journal);
             continue;

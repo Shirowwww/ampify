@@ -388,4 +388,71 @@ std::optional<std::vector<Animation>> DecodeAnimations(std::string_view text) {
     return animations;
 }
 
+namespace {
+
+// y of cubic-bezier(x1, y1, x2, y2) at x, as CSS eases: t is found from x by halving, close enough for a screen.
+double Ease(const std::array<double, 4>& curve, double x) {
+    auto at = [](double a, double b, double t) { return 3 * a * t * (1 - t) * (1 - t) + 3 * b * t * t * (1 - t) + t * t * t; };
+    double low = 0, high = 1, t = x;
+    for (int i = 0; i < 40; i++) {
+        t = (low + high) / 2;
+        (at(curve[0], curve[2], t) < x ? low : high) = t;
+    }
+    return at(curve[1], curve[3], t);
+}
+
+ChannelValue OwnValue(AnimationTrack::Channel channel, const std::vector<ChannelValue>& own) {
+    for (const ChannelValue& value : own) {
+        if (value.channel == channel) return value;
+    }
+    const double neutral = channel == AnimationTrack::Channel::Scale ? 1 : 0;
+    return {channel, neutral, neutral};
+}
+
+// The track at `progress` (0 to 1) of one round, eased between the two points around it.
+ChannelValue TrackAt(const AnimationTrack& track, double progress, const std::array<double, 4>& easing,
+                     const std::vector<ChannelValue>& own) {
+    ChannelValue start = OwnValue(track.channel, own);
+    std::vector<AnimationTrack::Point> points;
+    if (track.points.front().offset > 0) points.push_back({0, start.x, start.y});
+    points.insert(points.end(), track.points.begin(), track.points.end());
+    if (track.points.back().offset < 1) points.push_back({1, start.x, start.y});
+    size_t next = 1;
+    while (next + 1 < points.size() && points[next].offset < progress) next++;
+    const AnimationTrack::Point& a = points[next - 1];
+    const AnimationTrack::Point& b = points[next];
+    const double span = b.offset - a.offset;
+    const double eased = span > 0 ? Ease(easing, std::clamp((progress - a.offset) / span, 0.0, 1.0)) : 1;
+    return {track.channel, a.x + (b.x - a.x) * eased, a.y + (b.y - a.y) * eased};
+}
+
+}  // namespace
+
+std::vector<ChannelValue> SampleAnimation(const Animation& animation, double elapsedMs,
+                                          const std::vector<ChannelValue>& own) {
+    std::vector<ChannelValue> values;
+    const double running = elapsedMs - animation.delayMs;
+    const bool waiting = running < 0;
+    double rounds = animation.durationMs > 0 && !waiting ? running / animation.durationMs : 0;
+    if (animation.iterations > 0) rounds = std::min(rounds, static_cast<double>(animation.iterations));
+    const double round = std::floor(rounds);
+    double progress = rounds - round;
+    if (animation.iterations > 0 && rounds >= animation.iterations) progress = 1;
+    const bool odd = static_cast<long long>(round) % 2 == 1;
+    using Direction = Animation::Direction;
+    const bool backwards = animation.direction == Direction::Reverse ||
+                           (animation.direction == Direction::Alternate && odd) ||
+                           (animation.direction == Direction::AlternateReverse && !odd);
+    if (backwards) progress = 1 - progress;
+    for (const AnimationTrack& track : animation.tracks) {
+        if (track.points.empty()) continue;
+        if (waiting && !animation.fillBackwards) {
+            values.push_back(OwnValue(track.channel, own));
+        } else {
+            values.push_back(TrackAt(track, progress, animation.easing, own));
+        }
+    }
+    return values;
+}
+
 }  // namespace ampify::theme

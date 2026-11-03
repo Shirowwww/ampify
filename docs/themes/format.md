@@ -400,6 +400,8 @@ A `scale()` without `transform-origin` grows from the element's centre, as in CS
   `alternate-reverse`) and a fill mode (`none`, `forwards`, `backwards`, `both`). Up to 4 animations, 120 s at most.
   `steps()`, negative delays and `paused` are refused.
 - Under a state, an animation starts each time the state begins.
+- An `infinite` animation moves 30 times a second and stops while Apple Music is hidden or minimized: left to the
+  compositor, it would redraw the whole window at every frame of the screen. A finite one runs on the compositor.
 - Elements that Apple Music moves itself (many artworks, such as `.lcd-artwork-image`) or that the theme gives a
   `transform` refuse an animated transform: animate their parent (`.lcd-artwork`), or put the transform in the stops.
 - With Windows' "Animation effects" off, animations do not run. `@keyframes` inside `@media` are not read.
