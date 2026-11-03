@@ -8,7 +8,7 @@
 | Price | Free, GPL v3 | Free, LGPL | Paid |
 | Systems | Windows 10 and 11 | Windows, macOS, Linux | Windows, macOS, Linux |
 | Lossless and Dolby Atmos | Yes, Apple's own player | No (Spotify) | No lossless (Apple's web API does not offer it) |
-| Themes | 16, CSS on Apple Music's controls, with GIFs and settings | Hundreds, CSS on web pages | Yes, mostly colors |
+| Themes | 8 with 28 schemes, CSS on Apple Music's controls, with GIFs and settings | Hundreds, CSS on web pages | Yes, mostly colors |
 | Extensions and apps | JavaScript API, React-style UI, Marketplace | JavaScript API, React, Marketplace | Plugins, Marketplace |
 | Discord, Last.fm | Extensions in the Marketplace | Community extensions | Built in |
 | Full-screen lyrics | Apple's full-screen player, karaoke lyrics | Lyrics Plus | Built in |

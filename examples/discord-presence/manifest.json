@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "discord-presence",
   "name": "Discord presence",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Your Discord status shows what you listen to: cover, artist, album, progress bar, links and buttons. Turn it on with Discord open. A cover Apple's catalog lacks (your own files) goes to a free host that deletes it within 3 days; this can be turned off.",

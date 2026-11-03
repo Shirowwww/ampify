@@ -26,5 +26,6 @@ calls the app's services by name and resolves functions by name, never by addres
 | `exports/*.txt` | Export names of `AVFoundationCF.dll`, `CoreMedia.dll` and `AMPLibraryAgent.Proxies.dll` | `tools/validate.py` (the exports Ampify requires must exist in the list) |
 | `manifest-com.txt` | The COM server section of Apple Music's `AppxManifest.xml` | Documentation for the COM class `AMP.Core.IAMPMusicLibrary` |
 
-To refresh a list after an Apple Music update, regenerate it from the new package and compare it with the old one. A changed
+To refresh a list after an Apple Music update, regenerate it from the new package and compare it with the old one
+(`pwsh -File tools/dump-winmd.ps1 -Winmd <file.winmd> -Out winmd/<name>.txt` for the `winmd` lists). A changed
 method order in `winmd/AMP.Services.txt` changes the slot numbers used by `src/win/amp_player.cpp`.

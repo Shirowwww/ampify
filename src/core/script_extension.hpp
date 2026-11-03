@@ -22,7 +22,7 @@
 namespace ampify {
 
 // Version of the kernel, as Ampify.version. Same number as the kit (kKitVersion), checked by CMakeLists.txt. The API version is Ampify.kitApi.
-inline constexpr const char* kKernelVersion = "1.2.1";
+inline constexpr const char* kKernelVersion = "1.3.0";
 inline constexpr const char* kKitApi = "1.0";
 
 using Clock = std::function<std::chrono::steady_clock::time_point()>;

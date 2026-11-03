@@ -1,6 +1,34 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 (2026-11-03)
+
+### Updates
+
+- Ampify updates itself. Once a day, while Apple Music is closed, it looks for a new release, checks its SHA-256 and
+  installs it, then shows a notification. Settings > Ampify > Ampify updates chooses between installing on its own,
+  asking first, or never (`ampify config kit_update auto|ask|off`). Apple's library agent, which often stays open
+  after Apple Music closes, is ended first, as the installer does.
+
+### Themes
+
+- Palettes replaces Catppuccin, Comfy, Dracula, Gruvbox, Nord, Rosé Pine and Tokyo Night: one theme with their 17
+  schemes, the same colours and credits, and settings for corners, spacing, card hover, badges and the play bar. A copy
+  of an old theme you already installed keeps working; the Marketplace no longer lists them.
+- Dribbblish is gone (its schemes are in Palettes), and Hide Chrome becomes the Declutter snippet, which works with any
+  theme. A new Sidebar icons snippet makes the sidebar icons round or rounded squares.
+- Greenroom, Paper, Rose gold, Midnight and High contrast were reworked. Greenroom and Palettes can put the play bar at
+  the top or the bottom, on a plain background or the colours of the artwork, at the height you choose.
+- An accent colour of your choice (Settings > Ampify > Accent colour, or `theme.accent`) replaces the theme's, and
+  works without a theme too.
+- Hovering a sidebar entry no longer lights up its group, the bottom play bar centres its buttons by itself, and the
+  progress bar takes the theme's colours. Snippets can declare settings, like themes.
+
+### Extensions
+
+- The full-screen player gains shuffle and repeat buttons. Volume percentage shows the level as soon as Apple Music
+  opens, and two new examples arrive: New releases and Skip list.
+
+### Also
 
 - Ampify speaks German, Spanish, Portuguese, Russian, Japanese and Simplified Chinese, besides English and French: the
   Settings card, the menus, the installer, the Marketplace, and every shipped theme, snippet and extension. Any text

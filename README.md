@@ -16,7 +16,7 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 
 ### [Download](https://github.com/Shirowwww/ampify/releases/latest) &nbsp;·&nbsp; [Website](https://shirowwww.github.io/ampify/) &nbsp;·&nbsp; [Themes](https://shirowwww.github.io/ampify/themes.html) &nbsp;·&nbsp; [Docs](https://shirowwww.github.io/ampify/documentation.html)
 
-<img src="docs/assets/banner.webp" width="100%" alt="Apple Music with the Glass, Greenroom, Dribbblish, Paper light, Catppuccin, Artwork, Rose gold and Tokyo Night themes">
+<img src="docs/assets/banner.webp" width="100%" alt="Apple Music with the Glass, Greenroom, Palettes, Paper, Artwork, Rose gold, Midnight and High contrast themes">
 
 </div>
 
@@ -26,7 +26,8 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 
 ## What you get
 
-- 16 themes, light and dark, applied at once without a restart. Spicetify `color.ini` palettes work as they are.
+- 8 themes with 28 colour schemes, light and dark, applied at once without a restart, and an accent colour of your
+  choice. Spicetify `color.ini` palettes work as they are.
 - A Marketplace inside Apple Music (the Ampify entry at the bottom of the sidebar) with themes, extensions and
   snippets, previews, and one-click installs.
 - Extensions for Discord presence, Last.fm scrobbling, a sleep timer and global shortcuts. Each one shows the
@@ -34,6 +35,7 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 - Now Playing (Apple's full-screen player with karaoke lyrics), an Atmos leveler that brings Dolby Atmos songs to the
   loudness of stereo ones, and a playback guard for songs Apple Music leaves stuck, all shipped with Ampify.
 - English, French, German, Spanish, Portuguese, Russian, Japanese and Simplified Chinese.
+- Updates install themselves while Apple Music is closed, or after a question, as you choose in Settings > Ampify.
 - Nothing is written into Apple Music's package, and uninstalling gives the original app back. On an Apple Music
   version that was not tested, Ampify stays off.
 

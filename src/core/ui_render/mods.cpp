@@ -157,7 +157,7 @@ namespace {
 
 constexpr char kAccentKey[] = "theme.accent";
 
-// shortcut: the same rule as theme::ParseAccent of the engine (moteur-fluidite branch); call it once both are merged.
+// The same rule as theme::ParseAccent, which this library cannot call: ampify_theme links ampify_core, not the reverse.
 std::optional<std::string> NormalizeAccent(std::string_view text) {
     if (!text.empty() && text.front() == '#') text.remove_prefix(1);
     if (text.size() != 6) return std::nullopt;
