@@ -13,7 +13,7 @@ namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 51> kProperties{{
+constexpr std::array<PropertySpec, 53> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
@@ -64,6 +64,8 @@ constexpr std::array<PropertySpec, 51> kProperties{{
     {"transform", "RenderTransform", PropertyKind::Transform},
     {"transform-origin", "RenderTransformOrigin", PropertyKind::TransformOrigin},
     {"box-shadow", "Shadow", PropertyKind::Shadow},
+    {"overflow", "Clip", PropertyKind::Clip},   // hidden: the element's own rectangle
+    {"clip-path", "Clip", PropertyKind::Clip},  // inset(...) only
     {"transition", "Transition", PropertyKind::Transition},
     {"animation", "Animation", PropertyKind::Animation},
     {"content", kContentProperty, PropertyKind::Content},  // ::before and ::after only
@@ -118,7 +120,7 @@ struct PropertyAdvice {
 };
 
 // What Spicetify themes write most that has no property of the same name here (PropertyHint).
-constexpr std::array<PropertyAdvice, 32> kAdvice{{
+constexpr std::array<PropertyAdvice, 30> kAdvice{{
     {"background-color", "use background"},
     {"background-image", "use background: url(images/file.png)"},
     {"backdrop-filter", "use backdrop: acrylic(tint, opacity)"},
@@ -145,12 +147,10 @@ constexpr std::array<PropertyAdvice, 32> kAdvice{{
     {"filter", kNotInXaml},
     {"pointer-events", kNotInXaml},
     {"cursor", kNotInXaml},
-    {"overflow", kNotInXaml},
-    {"overflow-x", kNotInXaml},
-    {"overflow-y", kNotInXaml},
+    {"overflow-x", "use overflow: hidden, which clips both sides, or clip-path: inset(...)"},
+    {"overflow-y", "use overflow: hidden, which clips both sides, or clip-path: inset(...)"},
     {"user-select", kNotInXaml},
     {"mix-blend-mode", kNotInXaml},
-    {"clip-path", kNotInXaml},
 }};
 
 // Letter spacing and line height beyond these are typing mistakes, and would overflow XAML's whole number.
@@ -761,6 +761,29 @@ Conversion ConvertShadow(std::string_view raw) {
     return Ok(ValueKind::Shadow, FormatNumber(*depth));
 }
 
+// `overflow: hidden` cuts the element to its own rectangle; `clip-path: inset(...)` to a rectangle inset from its
+// edges, in pixels and in CSS order. XAML clips to rectangles only: no `round`, circle or polygon.
+Conversion ConvertClip(const PropertySpec& spec, std::string_view raw) {
+    std::string lowered = ToLowerAscii(TrimSpace(raw));
+    if (spec.css == "overflow") {
+        if (lowered == "hidden" || lowered == "clip") return Ok(ValueKind::Clip, "0,0,0,0");
+        if (lowered == "visible") return Ok(ValueKind::Clip, "");
+        return Fail("unreadable overflow: \"" + std::string(TrimSpace(raw)) +
+                    "\" (hidden, clip or visible; scrolling is Apple Music's own)");
+    }
+    if (lowered == "none") return Ok(ValueKind::Clip, "");
+    std::optional<std::string_view> inside = FunctionArguments(raw, "inset");
+    if (!inside) {
+        return Fail("unreadable clip-path: \"" + std::string(TrimSpace(raw)) + "\" (only inset(...) or none)");
+    }
+    if (ToLowerAscii(*inside).find("round") != std::string::npos) {
+        return Fail("clip-path: inset(... round) is not available: put corner-radius on the element instead");
+    }
+    Conversion insets = ConvertThickness(*inside, true);
+    if (!insets.value) return Fail("clip-path: " + insets.problem + " (pixels only)");
+    return Ok(ValueKind::Clip, insets.value->text);
+}
+
 // `transform 200ms ease, opacity .15s`: which changes animate, and for how long. The easing is Ampify's own (a quick
 // ease-out); easing words and delays are accepted and ignored. Only what XAML animates cheaply is offered.
 Conversion ConvertTransition(std::string_view raw) {
@@ -920,6 +943,8 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
             return ConvertShadow(raw);
         case PropertyKind::Transition:
             return ConvertTransition(raw);
+        case PropertyKind::Clip:
+            return ConvertClip(spec, raw);
         case PropertyKind::Animation: {
             static const KeyframeSets kNone;
             std::string problem;
@@ -984,7 +1009,8 @@ std::optional<Value> ApplyFontSize(const Value& value, const Value& fontSize) {
 bool SameValue(const Value& a, const Value& b) {
     if (a == b) return true;
     const bool numeric = a.kind == ValueKind::Length || a.kind == ValueKind::Number || a.kind == ValueKind::Thickness ||
-                         a.kind == ValueKind::Point || a.kind == ValueKind::Transform || a.kind == ValueKind::Shadow;
+                         a.kind == ValueKind::Point || a.kind == ValueKind::Transform || a.kind == ValueKind::Shadow ||
+                         a.kind == ValueKind::Clip;
     if (a.kind != b.kind || !numeric) return false;
 
     std::string_view left = a.text, right = b.text;

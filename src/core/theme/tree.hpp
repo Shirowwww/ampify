@@ -41,6 +41,8 @@ enum class ValueKind {
                  // empty for none
     Animation,   // the animations running on the element, as EncodeAnimations writes them (animation.hpp), empty for
                  // none
+    Clip,        // a rectangle inset from the element's edges, "left,top,right,bottom" in pixels (negative reaches past
+                 // them), that the element and its children are cut to; empty for no clip
     Opaque,      // a token that Read gave back for an object the engine cannot express as text; Write restores it
 };
 
@@ -73,6 +75,9 @@ struct NodeInfo {
     // A Panel whose Children Ampify may add to (Grid, StackPanel...): not the items host of a list, whose children
     // the list makes itself. Only a panel takes a ::before or ::after image (SetDecor).
     bool panel = false;
+    // A list row that shows Apple's "now playing" bars (Grid#NowPlayingIndicator visible), and every element between the
+    // row and those bars: what `:playing` matches.
+    bool playing = false;
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";

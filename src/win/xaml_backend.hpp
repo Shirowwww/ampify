@@ -194,6 +194,8 @@ private:
     };
     std::map<std::pair<theme::NodeId, std::string>, Written> m_written;
     std::map<theme::NodeId, float> m_translations;  // the Z of UIElement.Translation before box-shadow raised it
+    // `overflow` and `clip-path`: the handler that keeps each clip rectangle the size of its element.
+    std::map<theme::NodeId, winrt::Microsoft::UI::Xaml::FrameworkElement::SizeChanged_revoker> m_clipSizes;
     theme::HoverTracker m_hover;
     // The events followed for the states an element's values use (FollowStates).
     struct HoverHandlers {

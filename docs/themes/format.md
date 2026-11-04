@@ -81,11 +81,13 @@ Grid#NowPlayingBar {
 | `A:hover`, `A:active`, `A:focus`, `A:focus-within` | While the pointer is over it, while pressed, while it or a part of it has the keyboard focus |
 | `A:nth-child(2)`, `A:nth-last-child(2)` | The second child of its parent, from the start or from the end (counting from 1) |
 | `A:first-child`, `A:last-child`, `A:only-child` | Position among its parent's children |
+| `A:playing` | The list row of the song playing (the one that shows Apple's moving bars), and the elements between that row and the bars: `.list-item:playing` is the row (see [The row playing](#the-row-playing)) |
 | `A:not(B)` | An `A` that does not match `B`, where `B` is one part: a type, a `#name` and the pseudo-classes above |
 | `A::before`, `A::after` | A decorative image put into `A` (see [Decorative images](#decorative-images)) |
 
 - One state (`:hover`, `:active` or `:focus`) per selector, on its last part.
 - `:not()` takes no state, no `::before`/`::after`, no combinator and no class.
+- `:playing` goes on any part and counts as a pseudo-class.
 - Not supported: attributes (`[x=y]`), `An+B` forms (`odd`, `2n+1`) and other pseudo-classes (`:checked`...). A rule
   that uses one is ignored, with a line in the log.
 - Names from WinUI templates (`Grid#RootGrid`, `Border#Root`, `Grid#ContentRoot`) appear many times: always put them
@@ -196,6 +198,8 @@ and the theme applies again at once.
 | `transform` | `RenderTransform` | `scale(x[, y])`, `scaleX`, `scaleY`, `rotate(Ndeg)`, `translate(x[, y])`, `translateX`, `translateY`, `none` |
 | `transform-origin` | `RenderTransformOrigin` | Percentages or `left`, `center`, `right`, `top`, `bottom` (no pixels) |
 | `box-shadow` | `Shadow`, `Translation` | A depth from 0 to 100 pixels, or `none` |
+| `overflow` | `Clip` | `hidden` (or `clip`): the element and its children are cut to its own rectangle; `visible` |
+| `clip-path` | `Clip` | `inset(top [right [bottom [left]]])` in pixels, in CSS order (negative reaches past the edges), or `none` |
 | `transition` | Implicit transitions | `<property> <duration>, ...` for `transform`, `opacity`, `background` or `all`; or `none` |
 | `animation` | Composition animations | Runs a `@keyframes` block (see [Animations](#animations)) |
 | `font-role` | `FontFamily`, `FontWeight`, `FontSize` | A font role, such as `title` |
@@ -206,8 +210,9 @@ and the theme applies again at once.
   original value when the theme is removed.
 - An unknown property is ignored, and the log suggests the equivalent when there is one: `background-color` →
   `background`, `backdrop-filter` → `backdrop`, `justify-content`/`align-items` → alignment on the children, `gap` →
-  `margin` on the children, `border` → `border-width` and `border-color`. `filter`, `pointer-events`, `cursor`,
-  `overflow`, `user-select`, `mix-blend-mode`, `clip-path` and `text-transform` have no equivalent.
+  `margin` on the children, `border` → `border-width` and `border-color`, `overflow-x`/`overflow-y` → `overflow` or
+  `clip-path: inset(...)`. `filter`, `pointer-events`, `cursor`, `user-select`, `mix-blend-mode` and `text-transform`
+  have no equivalent.
 
 ### Gradients, images and acrylic
 
@@ -303,6 +308,38 @@ default. The other properties of `::before` and `::after` apply.
 
 The sound is analysed only while bars are on screen. With Windows' animation effects off, they stand still. Example:
 [`themes/snippets/display-equalizer/`](../../themes/snippets/display-equalizer/).
+
+### An image that follows the song's progress
+
+Apple's progress bar (`.scrubber`) is a slider whose thumb is hidden. Its track, `Grid#HorizontalTemplate`, keeps the
+played part in column 0 and the thumb in column 1, right after it. An image put in column 1 rides at the song's
+position (a Nyan Cat, a Kirby); negative margins as large as half its size keep it centred on that point without
+taking room from the bar:
+
+```css
+.scrubber Grid#HorizontalTemplate::after {
+    content: url("images/cat.gif") contain;
+    grid-column: 1;
+    width: 28px;
+    height: 18px;
+    margin: -8px -14px;
+}
+```
+
+It moves when Apple moves the bar: as the song plays, and on a seek. At the very start and end of a song, the half of
+the image past the bar is cut by the display around it.
+
+### The row playing
+
+`:playing` marks the list row of the song playing, in the lists where Apple shows its moving bars next to it (Library >
+Songs, for one). The row draws its colour on the `HoverGrid` inside it:
+
+```css
+.list-item:playing > * > HoverGrid { background: #FF7A1F4A; }
+.list-item:playing TextBlock { color: #FFFFD24A; }
+```
+
+The mark moves with the song, within the theme's next pass, and leaves the row it was on with its own colours.
 
 ### Layout and ready-made layouts
 
@@ -480,6 +517,9 @@ A theme can create its own roles (`--font-lyrics`). Extensions read them with `A
 
 - `box-shadow: 24px` puts a Windows `ThemeShadow` under the element at that depth. Color, offset and blur come from
   Windows, and the shadow may not show on every element.
+- `overflow: hidden` cuts what spills out of an element (a child moved by `transform`, a decorative image); many of
+  Apple's panels already cut their children. `clip-path: inset(0 0 40px 0)` cuts 40 pixels off the bottom. The clip
+  follows the element's size. Only rectangles: no `round`, `circle()` or `polygon()` (use `corner-radius`).
 - `flow-direction: rtl` flips an element and everything inside it.
 - `order` moves an element among its parent's children (`0` first). A parent that cannot reorder ignores it.
 

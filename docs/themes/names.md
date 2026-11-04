@@ -138,7 +138,7 @@ read on Apple Music 1.1792.
 | `.suggested-songs` | The box of suggested songs under a playlist |
 | `.song-list` | The table of the Songs page |
 | `.song-row` | One row of that table |
-| `.list-item` | Any row of any list, which draws its own light under the pointer (`hover-background`, `active-background`) and its selection (`selected-background`) |
+| `.list-item` | Any row of any list, which draws its own light under the pointer (`hover-background`, `active-background`) and its selection (`selected-background`). `.list-item:playing` is the row of the song playing |
 
 ## Search
 
@@ -177,7 +177,7 @@ read on Apple Music 1.1792.
 | `.track-text` | The title and the artist |
 | `.track-lines`, `.track-line` | The block of the two lines, and each line |
 | `.track-title`, `.track-artist` | Each of them |
-| `.scrubber` | The progress bar: `color` fills the played part (the theme's accent by default), `background` the rest of the track, `.scrubber Thumb` its thumb; they hold under the pointer and while dragged |
+| `.scrubber` | The progress bar: `color` fills the played part (the theme's accent by default), `background` the rest of the track, `.scrubber Thumb` its thumb; they hold under the pointer and while dragged. An image can ride at the song's position ([format.md](format.md#an-image-that-follows-the-songs-progress)) |
 | `.current-time`, `.duration` | The time played and the length |
 | `.audio-badge` | The badge of the audio format (Lossless, Dolby Atmos) |
 | `.live-badge`, `.autoplay-badge` | The Live and Autoplay badges |

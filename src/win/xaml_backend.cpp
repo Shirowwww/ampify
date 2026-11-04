@@ -35,6 +35,7 @@
 #include "../core/color_extract.hpp"
 #include "../core/theme/colour_keys.hpp"
 #include "../core/theme/properties.hpp"
+#include "../core/theme/selector.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_render/render_tree.hpp"
 #include "xaml_host.hpp"
@@ -463,6 +464,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     std::set<void*> popupsSeen;  // a popup of the window's tree, reached there first, is not walked twice
     std::set<theme::NodeId> decorPanels;  // their ::before and ::after images are left out, so no selector meets them
     for (const auto& [key, decor] : m_decors) decorPanels.insert(key.first);
+    std::vector<int> playingBars;  // the visible Grid#NowPlayingIndicator of list rows (MarkPlayingRows)
     int lcdDepth = -1;
     media::ImageSource artwork{nullptr};
     controls::Image artworkImage{nullptr};
@@ -495,6 +497,10 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         }
 
         int index = static_cast<int>(nodes.size());
+        if (node.name == "NowPlayingIndicator") {
+            auto element = item.object.try_as<xaml::UIElement>();
+            if (element && element.Visibility() == xaml::Visibility::Visible) playingBars.push_back(index);
+        }
         nodes.push_back(node);
         m_elements.emplace(node.id, winrt::weak_ref<xaml::DependencyObject>(item.object));
         if (m_pass) Watch(item.object, node.id, node.type);
@@ -522,6 +528,8 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         }
     }
 
+    theme::MarkPlayingRows(nodes, playingBars);
+
     // What Ampify remembers of destroyed elements cannot be used any more: a long session stays small.
     for (auto it = m_written.begin(); it != m_written.end();) {
         if (it->second.element.get()) {
@@ -529,6 +537,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
             continue;
         }
         m_translations.erase(it->first.first);
+        m_clipSizes.erase(it->first.first);
         it = m_written.erase(it);
     }
     // A part rebuilt by its template leaves its control behind: the keys it held there go back to Apple Music's.

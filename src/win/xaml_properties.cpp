@@ -244,6 +244,8 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         }
     } else if (property == "Shadow") {
         if (auto element = object.try_as<xaml::UIElement>()) return kept(element.Shadow());
+    } else if (property == "Clip") {
+        if (auto element = object.try_as<xaml::FrameworkElement>()) return kept(element.Clip());
     } else if (property == th::kOrderProperty) {
         if (std::optional<std::uint32_t> position = ItemPosition(object, std::nullopt)) {
             return theme::Value{theme::ValueKind::Number, std::to_string(*position)};
@@ -799,6 +801,41 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
                 element.Translation(translation);
                 m_translations.erase(before);
             }
+            Forget(id, property);
+            return true;
+        }
+        return false;
+    }
+
+    if (property == "Clip") {
+        auto element = object.try_as<xaml::FrameworkElement>();
+        if (!element) return false;
+        if (value.kind == theme::ValueKind::Clip) {
+            media::RectangleGeometry clip{nullptr};
+            if (!value.text.empty()) {
+                std::vector<double> insets = Numbers(value.text, ',');
+                if (insets.size() != 4) return false;
+                clip = media::RectangleGeometry();
+                auto fit = [clip, insets](double width, double height) {
+                    clip.Rect({static_cast<float>(insets[0]), static_cast<float>(insets[1]),
+                               static_cast<float>(std::max(0.0, width - insets[0] - insets[2])),
+                               static_cast<float>(std::max(0.0, height - insets[1] - insets[3]))});
+                };
+                fit(element.ActualWidth(), element.ActualHeight());
+                m_clipSizes[id] = element.SizeChanged(winrt::auto_revoke, [fit](const IInspectable&,
+                                                                               const xaml::SizeChangedEventArgs& args) {
+                    fit(args.NewSize().Width, args.NewSize().Height);
+                });
+            } else {
+                m_clipSizes.erase(id);
+            }
+            element.Clip(clip);
+            Remember(id, property, value, clip);
+            return true;
+        }
+        if (value.kind == theme::ValueKind::Opaque) {
+            m_clipSizes.erase(id);
+            element.Clip(Restore(value).try_as<media::RectangleGeometry>());
             Forget(id, property);
             return true;
         }

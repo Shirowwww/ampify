@@ -68,6 +68,7 @@ struct Compound {
     int nthLast = 0;    // :nth-last-child(n), from 1 counting from the end; 0 when absent
     bool last = false;  // :last-child
     bool only = false;  // :only-child
+    bool playing = false;  // :playing, the row of the song playing and its parts (NodeInfo::playing)
     std::vector<Compound> negations;  // :not(...): parts the element must not match
     Combinator combinator = Combinator::Descendant;  // relation to the compound before it; unused for the first
 };

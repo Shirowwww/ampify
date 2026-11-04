@@ -39,6 +39,8 @@ enum class PropertyKind {
     Transition,  // `<property> <duration> [easing], ...` for transform, opacity, background or all; or none
     Animation,   // `<name> <duration> [easing] [delay] [count] [direction] [fill], ...` running @keyframes blocks of
                  // the theme (animation.hpp); or none
+    Clip,        // `overflow: hidden | clip | visible`, or `clip-path: inset(<lengths>) | none`: a rectangle the element
+                 // is cut to (ValueKind::Clip)
     Content,     // the image of ::before or ::after: `url(image) [cover|contain|fill]` of the theme folder (an Image
                  // value), or `none` (an Image value with no text)
 };

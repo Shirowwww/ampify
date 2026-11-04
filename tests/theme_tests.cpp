@@ -652,6 +652,43 @@ TEST_CASE(Selector_StructuralPseudoClassesCountFromOne) {
     CHECK(th::ParseSelector("Grid:nth-child(3):hover", &problem));
 }
 
+TEST_CASE(Selector_PlayingMatchesTheRowOfTheSongPlaying) {
+    // ListView > two rows, the second holding the song playing (the backend marks it and its parts inside the row).
+    std::vector<th::NodeInfo> nodes(5);
+    nodes[0] = {1, "ListView", "", "", -1, 0};
+    nodes[1] = {2, "ListViewItemPresenter", "", "", 0, 1};
+    nodes[2] = {3, "ListViewItemPresenter", "", "", 0, 1};
+    nodes[3] = {4, "HoverGrid", "", "RootGrid", 2, 2};
+    nodes[4] = {5, "HoverGrid", "", "RootGrid", 1, 2};
+    nodes[2].playing = true;
+    nodes[3].playing = true;
+
+    CHECK(th::Matches(Sel("ListViewItemPresenter:playing"), nodes, 2));
+    CHECK(!th::Matches(Sel("ListViewItemPresenter:playing"), nodes, 1));
+    CHECK(th::Matches(Sel("HoverGrid#RootGrid:playing"), nodes, 3));
+    CHECK(!th::Matches(Sel("HoverGrid#RootGrid:playing"), nodes, 4));
+    CHECK(th::Matches(Sel("ListViewItemPresenter:not(:playing) HoverGrid"), nodes, 4));
+    CHECK(th::Matches(Sel("ListViewItemPresenter:playing:hover"), nodes, 2));
+    CHECK(th::SpecificityOf(Sel("HoverGrid:playing")) > th::SpecificityOf(Sel("Grid HoverGrid")));
+}
+
+TEST_CASE(Selector_MarkPlayingRowsStopsAtTheRow) {
+    // Page > ListView > row > HoverGrid > Grid#NowPlayingIndicator (index 4); Page > Grid#NowPlayingIndicator (index 5).
+    std::vector<th::NodeInfo> nodes(6);
+    nodes[0] = {1, "Page", "", "", -1, 0};
+    nodes[1] = {2, "ListView", "", "", 0, 1};
+    nodes[2] = {3, "ListViewItemPresenter", "", "", 1, 2};
+    nodes[3] = {4, "HoverGrid", "", "RootGrid", 2, 3};
+    nodes[4] = {5, "Grid", "", "NowPlayingIndicator", 3, 4};
+    nodes[5] = {6, "Grid", "", "NowPlayingIndicator", 0, 1};
+
+    th::MarkPlayingRows(nodes, {4, 5, 99});
+    CHECK(nodes[2].playing && nodes[3].playing);
+    CHECK(!nodes[4].playing);  // the bars themselves are `.now-playing-indicator`
+    CHECK(!nodes[0].playing && !nodes[1].playing);  // nothing above the row, and nothing for bars outside a list
+    CHECK(!nodes[5].playing);
+}
+
 TEST_CASE(Selector_SpecificityOrdersNamesBeforeTypes) {
     CHECK(th::SpecificityOf(Sel("#Bar TextBlock")) > th::SpecificityOf(Sel("Grid > TextBlock > Border")));
     CHECK(th::SpecificityOf(Sel("Grid > TextBlock")) < th::SpecificityOf(Sel("Grid#A TextBlock")));
@@ -1677,6 +1714,32 @@ TEST_CASE(Engine_PutsADecorInAPanelOnceAndTakesItOff) {
     CHECK(page.engine.OriginalCount() == 0);
     CHECK(page.log.str().find("Decor: Grid#Bar::after = C:/themes/test/dance.gif") != std::string::npos);
     CHECK(page.log.str().find("Theme removed: 2 value(s) restored") != std::string::npos);
+}
+
+// The progress bar recipe of docs/themes/format.md: an image in the column of the slider's hidden thumb, right after the
+// played part, which Apple's Slider widens as the song plays. Negative margins keep the column's width at zero.
+TEST_CASE(Engine_PutsAnImageInTheScrubbersThumbColumn) {
+    DecorPage page;
+    th::NodeId scrubber = page.tree.Add(0, "ScrubberControl", "LCDScrubber");
+    th::NodeId root = page.tree.Add(static_cast<int>(scrubber) - 1, "Grid", "");
+    th::NodeId track = page.tree.Add(static_cast<int>(root) - 1, "Grid", "HorizontalTemplate");
+    page.tree.elements[track - 1].info.panel = true;
+    th::Theme theme = page.Css(
+        ".scrubber Grid#HorizontalTemplate::after {\n"
+        "    content: url(dance.gif) contain; grid-column: 1; width: 28px; height: 18px; margin: -8px -14px;\n"
+        "}\n");
+    CHECK(theme.problems.empty());
+
+    th::ThemeEngine::Report report = page.engine.Apply(theme, page.tree);
+    CHECK(report.refused == 0);
+    auto it = page.tree.decors.find({track, th::PseudoElement::After});
+    CHECK(it != page.tree.decors.end());
+    if (it == page.tree.decors.end()) return;
+    std::map<std::string, std::string> values;
+    for (const auto& [property, value] : it->second.properties) values[property] = value.text;
+    CHECK(values["Grid.Column"] == "1");
+    CHECK(values["Margin"] == "-14,-8,-14,-8");
+    CHECK(it->second.image == "C:/themes/test/dance.gif|Uniform");
 }
 
 TEST_CASE(Engine_RefusesADecorOnAnElementThatIsNotAPanel) {
@@ -3234,6 +3297,20 @@ TEST_CASE(Properties_LayoutTransformsShadowsAndFonts) {
     CHECK(Converted("box-shadow", "200", palette, files).find("0 to 100") != std::string::npos);
     CHECK(Converted("box-shadow", "0 4px 8px #000", palette, files).find("depth") != std::string::npos);
 
+    // overflow and clip-path: a rectangle inset from the element's edges, left, top, right, bottom; empty for none.
+    CHECK(Converted("overflow", "hidden", palette, files) == "0,0,0,0");
+    CHECK(Converted("overflow", "clip", palette, files) == "0,0,0,0");
+    CHECK(Converted("overflow", "visible", palette, files).empty());
+    CHECK(Converted("overflow", "auto", palette, files).find("hidden, clip or visible") != std::string::npos);
+    CHECK(Converted("clip-path", "inset(10px)", palette, files) == "10,10,10,10");
+    CHECK(Converted("clip-path", "inset(0 20px 4px)", palette, files) == "20,0,20,4");
+    CHECK(Converted("clip-path", "inset(1 2 3 4)", palette, files) == "4,1,2,3");
+    CHECK(Converted("clip-path", "inset(-8px 0)", palette, files) == "0,-8,0,-8");  // a clip may reach past the edges
+    CHECK(Converted("clip-path", "none", palette, files).empty());
+    CHECK(Converted("clip-path", "inset(8px round 4px)", palette, files).find("corner-radius") != std::string::npos);
+    CHECK(Converted("clip-path", "circle(50%)", palette, files).find("inset(") != std::string::npos);
+    CHECK(Converted("clip-path", "inset(10%)", palette, files).rfind("PROBLEM", 0) == 0);
+
     // Four corners, in CSS order (top-left, top-right, bottom-right, bottom-left), kept as bottom-left first.
     CHECK(Converted("corner-radius", "8 8 0 0", palette, files) == "0,8,8,0");
 
@@ -3327,6 +3404,33 @@ FakeTree MakeButtonPage() {
 }
 
 }  // namespace
+
+TEST_CASE(Engine_OverflowClipsTheElementAndRestoresItsOwnClip) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "#Play { overflow: hidden; }\n"
+        "#Play:hover { clip-path: inset(0 4px); }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+
+    FakeTree tree = MakeButtonPage();
+    tree.Add(0, "Grid", "Art", {{"Clip", {th::ValueKind::Opaque, "handle:3"}}});
+    tree.elements[1].properties["Clip"] = {th::ValueKind::Opaque, "handle:4"};
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(2, "Clip") == (th::Value{th::ValueKind::Clip, "0,0,0,0"}));
+    CHECK(tree.Shown(3, "Clip").text == "handle:3");  // not named by the rule
+    tree.PointerEnter(2);
+    CHECK(tree.Shown(2, "Clip").text == "4,0,4,0");
+    tree.PointerExit(2);
+    CHECK(tree.Shown(2, "Clip").text == "0,0,0,0");
+
+    engine.Restore(tree);
+    CHECK(tree.Shown(2, "Clip").text == "handle:4");
+}
 
 TEST_CASE(Engine_HoverShowsUnderThePointerAndRestores) {
     MemoryFiles files;
@@ -3933,6 +4037,8 @@ TEST_CASE(Theme_AnUnknownPropertyNamesItsAmpifyEquivalent) {
     CHECK(!bogus.empty() && bogus.find('(') == std::string::npos);
     CHECK(th::PropertyHint("Align-Items").find("vertical-alignment") != std::string_view::npos);
     CHECK(th::PropertyHint("border-radius").empty());  // a known property needs no hint
+    CHECK(th::PropertyHint("overflow").empty());
+    CHECK(th::PropertyHint("overflow-y").find("overflow: hidden") != std::string_view::npos);
 }
 
 TEST_CASE(Engine_AppliesTextPropertiesAndRestoresThem) {

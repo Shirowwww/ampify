@@ -14,6 +14,7 @@ bool CompoundMatches(const Compound& compound, const NodeInfo& node) {
     if (compound.nthLast > 0 && (node.position < 0 || node.siblings - node.position != compound.nthLast)) return false;
     if (compound.last && (node.position < 0 || node.position != node.siblings - 1)) return false;
     if (compound.only && (node.position != 0 || node.siblings != 1)) return false;
+    if (compound.playing && !node.playing) return false;
     for (const Compound& negated : compound.negations) {
         if (CompoundMatches(negated, node)) return false;
     }
@@ -65,6 +66,7 @@ void AddSpecificity(const Compound& compound, Specificity& specificity) {
     if (compound.nthLast > 0) specificity.classes++;
     if (compound.last) specificity.classes++;
     if (compound.only) specificity.classes++;
+    if (compound.playing) specificity.classes++;
     if (!compound.type.empty()) specificity.types++;
     for (const Compound& negated : compound.negations) AddSpecificity(negated, specificity);
 }
@@ -92,6 +94,20 @@ bool Matches(const Selector& selector, const std::vector<NodeInfo>& nodes, int i
     if (selector.parts.empty() || index < 0 || index >= static_cast<int>(nodes.size())) return false;
     if (nodes[index].player && !NamesAPlayer(selector)) return false;
     return MatchFrom(selector.parts, selector.parts.size() - 1, nodes, index);
+}
+
+void MarkPlayingRows(std::vector<NodeInfo>& nodes, const std::vector<int>& bars) {
+    const int count = static_cast<int>(nodes.size());
+    for (int bar : bars) {
+        if (bar < 0 || bar >= count) continue;
+        int row = nodes[bar].parent;
+        while (row >= 0 && nodes[row].type != "ListViewItemPresenter" && nodes[row].type != "GridViewItemPresenter") {
+            row = nodes[row].parent;
+        }
+        if (row < 0) continue;
+        for (int k = nodes[bar].parent; k != row; k = nodes[k].parent) nodes[k].playing = true;
+        nodes[row].playing = true;
+    }
 }
 
 }  // namespace ampify::theme

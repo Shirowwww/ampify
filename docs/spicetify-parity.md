@@ -83,12 +83,13 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Theme settings menu (each theme codes its own) | `settings` in the manifest, shown in Ampify's settings page, read as `var(--setting-*)` | Done |
 | Fonts and images of the theme | `font-family: url(...)`, `url(...)` backgrounds | Done |
 | Context menus, tooltips, volume bar | `.menu`, `.menu-item`, `.tooltip`, `.flyout`, `.volume-slider` | Done |
-| Selected and playing rows | Selected rows (`selected-background`); no "playing" state on rows | Partial |
+| Selected and playing rows | Selected rows (`selected-background`); the row of the song playing with `:playing` (`.list-item:playing`) | Done |
 | Lyrics lines | `.lyrics`, `.lyrics-synced`, `.lyrics-line`, `.lyrics-line-content`, `.lyrics-words`, `.lyrics-background-words`, `.lyrics-instrumental`; the line being sung has no selector of its own (Apple fades the others by state) | Partial |
 | Full-screen player | Apple's player (`.fullscreen-*`) | Done |
 | Mini player | Its own window and interface thread: themes do not reach it | Missing |
 | Layout changes (bar at the bottom, columns swapped) | `ampify:bottom-bar`, `order`, `grid-*`; Apple's lists resist | Partial |
-| `overflow`, `filter`, `mix-blend-mode`, `clip-path`, `position` | No XAML equivalent; `display: none`, alignment and grid placement instead | Missing |
+| `overflow`, `clip-path` | `overflow: hidden` and `clip-path: inset(...)` cut an element to a rectangle; no rounded or shaped clips | Done |
+| `filter`, `mix-blend-mode`, `position` | No XAML equivalent; `display: none`, alignment and grid placement instead | Missing |
 | Names that survive a Spotify update | Classes for 1.1792; a new Apple Music may rename elements | Fragile |
 
 ## Snippets
@@ -102,7 +103,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Hide an element (play count, buttons, recent searches) | `display: none` on its name | Done |
 | Modern scrollbar, hide sidebar scrollbar | `.scrollbar`, `ampify:scrollbars` | Done |
 | Hover panels, dynamic sidebar | `:hover` works; a hidden panel keeps its room | Partial |
-| Nyan Cat, Kirby, bee progress bars | The image sits on the bar; it does not follow the song's position | Partial |
+| Nyan Cat, Kirby, bee progress bars | An image in the column of the bar's hidden thumb rides at the song's position ([recipe](themes/format.md#an-image-that-follows-the-songs-progress)) | Done |
 | Duotone artwork | No colour filter on an image in XAML | Missing |
 | Cover Ambience | `cover-ambience`: the display glows in the artwork's colours | Done |
 
