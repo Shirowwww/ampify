@@ -5,7 +5,7 @@ description: Make a theme, a snippet or an extension for Ampify, see it live in 
 
 # Create for Ampify
 
-A theme is a folder with a few text files. An extension is one JavaScript file and a manifest. You need Ampify
+A theme is a folder with a few text files. An extension is one JavaScript file (or TypeScript, compiled for you) and a manifest. You need Ampify
 installed, Apple Music, and a terminal open in a working folder. Nothing to compile, no account to create.
 
 1. **Start from a working element.**

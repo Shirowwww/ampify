@@ -73,7 +73,8 @@ Everything else is in [the API reference](api.md). `ampify types` writes `ampify
 
 To write it in TypeScript or JSX, keep the manifest's `"main": "main.js"` and put a `main.ts`, `main.tsx` or `main.jsx`
 next to it. `ampify dev` and `ampify build` turn it into `main.js` with esbuild, which they find in the folder's
-`node_modules` (`npm install --save-dev esbuild`) or on the PATH, and say so when it is missing. In JSX, tags become
+`node_modules` (`npm install --save-dev esbuild`), in npm's global folder (`npm install -g esbuild`) or on the PATH,
+and say so when it is missing. In JSX, tags become
 `Ampify.React.createElement` calls. `main.js` is rebuilt only when a `.ts`, `.tsx`, `.jsx`, `.js` or `.json` file of the folder is newer than it (a file
 imported from outside the folder is not watched), and a folder without a `main.ts`, `main.tsx` or `main.jsx` is left
 as it is.

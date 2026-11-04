@@ -90,7 +90,7 @@ More in [Getting started](https://shirowwww.github.io/ampify/getting-started.htm
 ## Make your own
 
 `ampify new theme my-theme` (or `extension`, `snippet`, `app`) writes a working starter, `ampify dev my-theme` reloads
-it in Apple Music at every save, and `ampify publish my-theme` sends it to the
+it in Apple Music at every save (an extension can be TypeScript or JSX), and `ampify publish my-theme` sends it to the
 [catalog](https://github.com/Shirowwww/ampify-catalog). Start with [Create](https://shirowwww.github.io/ampify/create.html).
 
 ## Documentation

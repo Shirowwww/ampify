@@ -5,7 +5,7 @@ description: Faire un thème, un snippet ou une extension pour Ampify, le voir e
 
 # Créer pour Ampify
 
-Un thème, c'est un dossier de quelques fichiers texte. Une extension, un fichier JavaScript et un manifeste. Il vous
+Un thème, c'est un dossier de quelques fichiers texte. Une extension, un fichier JavaScript (ou TypeScript, compilé pour vous) et un manifeste. Il vous
 faut Ampify installé, Apple Music et un terminal ouvert dans un dossier de travail. Rien à compiler, aucun compte à
 créer. La documentation détaillée est en anglais.
 

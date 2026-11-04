@@ -17,7 +17,7 @@ en:
       text: A Now Playing button that opens Apple's full-screen player with karaoke lyrics, and an Atmos leveler that brings Dolby Atmos songs to the loudness of stereo ones.
       fact: Leveled to the stereo loudness, in LUFS
   make_title: Make your own
-  make_text: A theme is a few lines of CSS on Apple Music's own elements. An extension is JavaScript with the `Ampify` object. `ampify dev` reloads your work at every save, and `ampify publish` sends it to the Marketplace.
+  make_text: A theme is a few lines of CSS on Apple Music's own elements. An extension is JavaScript (or TypeScript) with the `Ampify` object. `ampify dev` reloads your work at every save, and `ampify publish` sends it to the Marketplace.
   make_cta: Start in five minutes
   safe_title: Apple Music stays Apple Music
   safe:
@@ -44,7 +44,7 @@ fr:
       text: Un bouton À l'écoute qui ouvre le lecteur plein écran d'Apple avec les paroles karaoké, et un niveleur qui ramène les morceaux Dolby Atmos au volume des morceaux stéréo.
       fact: Nivelé au volume stéréo, en LUFS
   make_title: Créez les vôtres
-  make_text: Un thème, ce sont quelques lignes de CSS sur les éléments d'Apple Music. Une extension, c'est du JavaScript avec l'objet `Ampify`. `ampify dev` recharge votre travail à chaque sauvegarde, et `ampify publish` l'envoie au Marketplace.
+  make_text: Un thème, ce sont quelques lignes de CSS sur les éléments d'Apple Music. Une extension, c'est du JavaScript (ou du TypeScript) avec l'objet `Ampify`. `ampify dev` recharge votre travail à chaque sauvegarde, et `ampify publish` l'envoie au Marketplace.
   make_cta: Commencer en cinq minutes
   safe_title: Apple Music reste Apple Music
   safe:
