@@ -7,6 +7,11 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include <windows.h>  // before the projection, as in the PCH: one macro state for the whole file (the CI builds without it)
+#ifdef GetCurrentTime
+#undef GetCurrentTime  // windows.h macro that breaks Storyboard::GetCurrentTime in the projection
+#endif
+
 #include <string>
 
 #include <winrt/Microsoft.UI.Xaml.h>
