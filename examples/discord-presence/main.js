@@ -8,38 +8,63 @@
 // It needs two Rich Presence art assets: "ampify" (shown when a song has no cover) and "paused" (the small badge
 // while paused), 512 x 512 pixels at least.
 //
-// No server of Ampify is involved. The cover and the links come from Apple's public iTunes Search API, asked once
-// per track. A track the catalog does not know (a file of your own, or a song missing from the search) has its cover
-// read from Windows and, if "Share covers the catalog does not know" is on, sent to a free host that deletes it
-// later (litterbox.catbox.moe, 3 days, else uguu.se, 3 hours): Discord can only show an image that is on the web.
+// No server of Ampify is involved. The cover and the links come from Apple Music's catalog, asked once per track, as
+// Music Presence does: through the API of Apple Music's web player, with the public token that its page carries
+// (read again every few weeks), since Apple's public iTunes Search API leaves out explicit songs. Without that token,
+// the iTunes search; a song Apple's search misses is looked up on Deezer's public API: its cover, and a song.link
+// page for the other platforms. A track none knows (a file of your own) has its cover read from Windows and, if
+// "Share covers the catalog does not know" is on, sent to a free host that deletes it later (x0.at, about 100 days for
+// a cover; else uguu.se, 3 hours; else litterbox.catbox.moe, 3 days): Discord only shows an image that is on the web.
+// With "Animated covers" on, an album's motion artwork (a video on Apple's host) is made a GIF on the PC
+// (Ampify.http.gifFromVideo) and goes to the same hosts, once per album.
 
 // The Discord application: its id is public, Discord only uses it to name the status and find its images.
 const DEFAULT_CLIENT_ID = "1566762712413904957";
 const LOGO_IMAGE = "ampify";
 const PAUSED_IMAGE = "paused";
 const SEARCH = "https://itunes.apple.com/search";
+const DEEZER_SEARCH = "https://api.deezer.com/search";
+// A light page of Apple Music's web player (about 340 KB), which names its script; the script holds the token.
+const WEB_PLAYER = "https://music.apple.com";
+const WEB_PLAYER_PAGE = WEB_PLAYER + "/us/search";
+const CATALOG = "https://amp-api.music.apple.com/v1/catalog/";
 const COVER_SIZE = "600x600bb";
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const RETRY_MS = 10 * 60 * 1000;  // after a failed search or upload
+const TOKEN_KEPT_MS = 7 * DAY_MS;  // the web player's token lasts a few months: read again weekly, or when refused
 const MAX_LINK = 512;  // bytes of a button link, for Discord
 // Free hosts for a cover, tried in turn. keepsMs: a little less than the host keeps it, so it is sent again in time.
+// domain: the link must be on it or on one of its subdomains (uguu.se moved its files from h.uguu.se to d.uguu.se).
+// litterbox came first until its firewall refused every request (11/2026): x0.at keeps a small file 100 days.
 const HOSTS = [
   {
-    url: "https://litterbox.catbox.moe/resources/internals/api.php",
-    fields: (file) => ({ reqtype: "fileupload", time: "72h", fileToUpload: file }),
+    url: "https://x0.at/",
+    fields: (file) => ({ file, id_length: "16" }),
     link: (text) => text.trim(),
-    prefix: "https://litter.catbox.moe/",
-    keepsMs: 70 * HOUR_MS,
+    domain: "x0.at",
+    keepsMs: 60 * DAY_MS,
   },
   {
     url: "https://uguu.se/upload",
     fields: (file) => ({ "files[]": file }),
     link: (text) => JSON.parse(text).files[0].url,
-    prefix: "https://h.uguu.se/",
+    domain: "uguu.se",
     keepsMs: 2.5 * HOUR_MS,
   },
+  {
+    url: "https://litterbox.catbox.moe/resources/internals/api.php",
+    fields: (file) => ({ reqtype: "fileupload", time: "72h", fileToUpload: file }),
+    link: (text) => text.trim(),
+    domain: "catbox.moe",
+    keepsMs: 70 * HOUR_MS,
+  },
 ];
+// Animated covers: the album's motion artwork, a video Discord cannot show, made a GIF by Ampify on this PC and put on
+// the same free hosts. 200 pixels, 10 frames a second: a 20 second loop is under a megabyte.
+const MOTION_HOST = "mvod.itunes.apple.com";
+const GIF = { side: 200, fps: 10, seconds: 30 };
+const MAX_ANIMATIONS = 100;  // albums whose GIF is kept in storage
 const SETTLE_MS = 2000;  // Windows takes a moment to show the new track's cover
 const MAX_REMEMBERED = 200;  // tracks whose lookup is kept in storage
 // The Apple store of each language (English: the US one); the links then open in it.
@@ -73,6 +98,8 @@ const options = {
   showAlbum: setting("show-album", true),
   showProgress: setting("show-progress", true),
   showCover: setting("show-cover", true),
+  // An Ampify older than 1.0 cannot make GIFs: the setting does nothing there.
+  animatedCovers: setting("animated-covers", false) && typeof Ampify.http.gifFromVideo === "function",
   shareCovers: setting("share-covers", true),
   clickable: setting("clickable-links", true),
   // "song.link" is the name the "Other platforms" choice had before 0.3.
@@ -82,7 +109,10 @@ const options = {
 
 // --- Where a track's cover and links come from ---------------------------------------------------------------------
 
-const lookups = new Map(Object.entries(Ampify.storage.get("lookups", {})));
+// "lookups" held, before 1.0, a day of "not found" for every explicit song: dropped, they are asked again.
+const LOOKUPS_KEY = "lookups.1";
+Ampify.storage.remove("lookups");
+const lookups = new Map(Object.entries(Ampify.storage.get(LOOKUPS_KEY, {})));
 const asking = new Set();
 
 // Lower case, without accents or punctuation: "Beyoncé - Halo (Live)" ~ "beyonce halo live".
@@ -125,34 +155,111 @@ function remember(id, found) {
   lookups.delete(id);
   lookups.set(id, found);
   while (lookups.size > MAX_REMEMBERED) lookups.delete(lookups.keys().next().value);
-  Ampify.storage.set("lookups", Object.fromEntries(lookups));
+  Ampify.storage.set(LOOKUPS_KEY, Object.fromEntries(lookups));
+}
+
+// The words to search: slashes and brackets make the searches miss, "A / B (Live)" is looked up as "A B Live".
+function searchWords(track) {
+  return (track.artist + " " + track.title).replace(/[/()[\]]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+// The parsed JSON answer of a search, or undefined (logged) when it could not be read.
+function answerOf(answer, source) {
+  if (answer.status !== 200) {
+    Ampify.log("cover: the " + source + " search answered " + answer.status);
+    return undefined;
+  }
+  try {
+    return JSON.parse(answer.text);
+  } catch {
+    Ampify.log("cover: the " + source + " search answered something else than JSON");
+    return undefined;
+  }
+}
+
+// The web player's public token, kept a week in storage: { token, fresh }, token null when it could not be read or
+// when a fresh one was refused lately (an Ampify that cannot send headers yet), so that the page is not read again
+// for every song.
+function webToken() {
+  const kept = Ampify.storage.get("webToken", null);
+  if (kept && Date.now() < kept.until) return Promise.resolve({ token: kept.token || null, fresh: false });
+  return Ampify.http.get(WEB_PLAYER_PAGE)
+    .then((page) => {
+      const script = page.status === 200 ? (/\/assets\/index[~\w-]*\.js/.exec(page.text) || [])[0] : undefined;
+      return script ? Ampify.http.get(WEB_PLAYER + script) : { status: 0, text: "" };
+    })
+    .then((answer) => {
+      const token = answer.status === 200 ? (/eyJ[\w-]+\.eyJ[\w-]+\.[\w-]+/.exec(answer.text) || [])[0] : undefined;
+      if (!token) {
+        Ampify.log("cover: Apple Music's web player gave no token, the iTunes search is used");
+        Ampify.storage.set("webToken", { token: null, until: Date.now() + RETRY_MS });
+        return { token: null, fresh: true };
+      }
+      Ampify.storage.set("webToken", { token, until: Date.now() + TOKEN_KEPT_MS });
+      return { token, fresh: true };
+    });
+}
+
+// The track in Apple Music's catalog, with its artist's page: null when the catalog does not have it, undefined when
+// it could not be asked (no token, or a refused one: an old one is read again next time, a fresh one in a day).
+function searchCatalog(track) {
+  return webToken().then(({ token, fresh }) => {
+    if (!token) return undefined;
+    const country = STOREFRONTS[Ampify.i18n.language] || "us";
+    // Each song's album comes with its motion artwork only (about 13 KB more for the 25 songs).
+    const url = CATALOG + country + "/search?types=songs&limit=25&include[songs]=artists,albums" +
+      "&fields[albums]=editorialVideo&extend[albums]=editorialVideo&term=" + encodeURIComponent(searchWords(track));
+    const headers = { Authorization: "Bearer " + token, Origin: WEB_PLAYER };
+    return Ampify.http.get(url, { headers }).then((answer) => {
+      if (answer.status === 401 || answer.status === 403) {
+        if (fresh) Ampify.storage.set("webToken", { token: null, until: Date.now() + DAY_MS });
+        else Ampify.storage.remove("webToken");
+      }
+      const parsed = answerOf(answer, "Apple Music");
+      if (!parsed) return undefined;
+      const songs = ((parsed.results || {}).songs || {}).data || [];
+      const results = songs.map((song) => {
+        const about = song.attributes || {};
+        const artist = (((song.relationships || {}).artists || {}).data || [])[0] || {};
+        const album = (((song.relationships || {}).albums || {}).data || [])[0] || {};
+        const video = (album.attributes || {}).editorialVideo || {};
+        return {
+          trackName: about.name, artistName: about.artistName, collectionName: about.albumName,
+          cover: String((about.artwork || {}).url || "").replace("{w}x{h}", "600x600"),
+          song: about.url || "", artist: (artist.attributes || {}).url || "", songId: song.id || 0,
+          motion: https((video.motionDetailSquare || video.motionSquareVideo1x1 || {}).video),
+        };
+      });
+      const match = bestMatch(results, track);
+      if (!match) {
+        Ampify.log("cover: not in Apple Music's catalog (" + results.length + " results)");
+        return null;
+      }
+      return {
+        cover: match.cover, song: match.song, artist: match.artist,
+        album: match.song.replace(/\?i=\d+$/, ""),  // the song's page is its album's, at the song
+        songId: match.songId, motion: match.motion,
+      };
+    });
+  });
 }
 
 // The catalog entry of the track, null when the catalog does not have it, undefined when it could not be asked.
-function search(track) {
-  // Slashes and brackets make the search miss: "A / B (Live)" is looked up as "A B Live".
-  const words = (track.artist + " " + track.title).replace(/[/()[\]]+/g, " ").replace(/\s+/g, " ").trim();
-  const term = encodeURIComponent(words);
+function searchApple(track) {
+  const words = searchWords(track);
   const country = STOREFRONTS[Ampify.i18n.language] || "us";
-  return Ampify.http.get(SEARCH + "?media=music&entity=song&limit=25&country=" + country + "&term=" + term).then((answer) => {
-    if (answer.status !== 200) {
-      Ampify.log("cover: the catalog search answered " + answer.status);
-      return undefined;
-    }
-    let results;
-    try {
-      results = JSON.parse(answer.text).results || [];
-    } catch {
-      Ampify.log("cover: the catalog search answered something else than JSON");
-      return undefined;
-    }
+  const url = SEARCH + "?media=music&entity=song&limit=25&country=" + country + "&term=" + encodeURIComponent(words);
+  return Ampify.http.get(url).then((answer) => {
+    const parsed = answerOf(answer, "catalog");
+    if (!parsed) return undefined;
+    const results = parsed.results || [];
     const match = bestMatch(results, track);
     if (!match) {
       Ampify.log("cover: not in the catalog (" + results.length + " results for \"" + words + "\")");
       return null;
     }
     // The links carry a tracking parameter (uo=4) that the page does not need.
-    const clean = (url) => String(url || "").replace(/([?&])uo=\d+&?/, "$1").replace(/[?&]$/, "");
+    const clean = (link) => String(link || "").replace(/([?&])uo=\d+&?/, "$1").replace(/[?&]$/, "");
     return {
       cover: String(match.artworkUrl100 || "").replace(/\d+x\d+bb(?=\.\w+$)/, COVER_SIZE),
       song: clean(match.trackViewUrl),
@@ -161,6 +268,41 @@ function search(track) {
       songId: match.trackId || 0,
     };
   });
+}
+
+// The track on Deezer: its album's cover and its id (for song.link). null when Deezer does not have it either,
+// undefined when it could not be asked (Deezer answers its quota errors with a 200 and an "error" object).
+function searchDeezer(track) {
+  const words = searchWords(track);
+  return Ampify.http.get(DEEZER_SEARCH + "?limit=25&q=" + encodeURIComponent(words)).then((answer) => {
+    const parsed = answerOf(answer, "Deezer");
+    if (!parsed) return undefined;
+    if (parsed.error) {
+      Ampify.log("cover: Deezer refused the search, " + (parsed.error.message || "no reason given"));
+      return undefined;
+    }
+    const results = (parsed.data || []).map((song) => ({
+      trackName: song.title,
+      artistName: song.artist && song.artist.name,
+      collectionName: song.album && song.album.title,
+      cover: song.album && song.album.cover_xl,
+      deezerId: song.id || 0,
+    }));
+    const match = bestMatch(results, track);
+    if (!match || !https(match.cover)) {
+      Ampify.log("cover: not on Deezer either (" + results.length + " results)");
+      return null;
+    }
+    return { cover: match.cover, deezerId: match.deezerId };
+  });
+}
+
+// Apple Music's catalog first (its links open Apple Music), the iTunes search when the catalog cannot be asked, then
+// Deezer for a song Apple's searches miss.
+function search(track) {
+  return searchCatalog(track)
+    .then((found) => (found === undefined ? searchApple(track) : found))
+    .then((found) => (found === null ? searchDeezer(track) : found));
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -183,6 +325,12 @@ function upload(track) {
     });
 }
 
+// True for an https link on `domain` or one of its subdomains.
+function onDomain(url, domain) {
+  const host = (/^https:\/\/([^/?#]+)\//.exec(url) || [])[1] || "";
+  return host === domain || host.endsWith("." + domain);
+}
+
 // Sends the file to HOSTS[index], or to the next host when that one fails.
 function sendTo(index, file) {
   const host = HOSTS[index];
@@ -197,7 +345,8 @@ function sendTo(index, file) {
     } catch {
       url = "";
     }
-    if (url.startsWith(host.prefix)) return { cover: url, keptUntil: Date.now() + host.keepsMs };
+    if (onDomain(url, host.domain)) return { cover: url, keptUntil: Date.now() + host.keepsMs };
+    Ampify.log("cover: " + host.domain + " did not take the cover (" + answer.status + ")");
     return sendTo(index + 1, file);
   });
 }
@@ -220,6 +369,92 @@ function lookUp(track) {
     .finally(() => asking.delete(track.id));
 }
 
+// --- Animated covers -------------------------------------------------------------------------------------------------
+
+// The GIFs made, by motion artwork: { cover, keptUntil }, cover "" when none could be made (asked again after
+// keptUntil). The songs of an album share theirs.
+const ANIMATIONS_KEY = "animations";
+const animations = new Map(Object.entries(Ampify.storage.get(ANIMATIONS_KEY, {})));
+const animating = new Set();
+
+// The entry of the track's album, undefined when there is none yet (or it expired).
+function animation(found) {
+  if (!options.animatedCovers || !options.showCover || !found || !found.motion) return undefined;
+  const made = animations.get(found.motion);
+  return made && Date.now() < made.keptUntil ? made : undefined;
+}
+
+function rememberAnimation(motion, made) {
+  animations.delete(motion);
+  animations.set(motion, made);
+  while (animations.size > MAX_ANIMATIONS) animations.delete(animations.keys().next().value);
+  Ampify.storage.set(ANIMATIONS_KEY, Object.fromEntries(animations));
+}
+
+// `uri` of a playlist line, against the playlist at `base` (Apple names the files of a variant relative to it).
+function against(uri, base) {
+  if (uri.startsWith("https://")) return uri;
+  const page = base.replace(/[?#].*$/, "");
+  return uri.startsWith("/") ? page.replace(/^(https:\/\/[^/]+).*$/, "$1") + uri : page.replace(/[^/]*$/, "") + uri;
+}
+
+function playlist(url) {
+  return Ampify.http.get(url).then((answer) => {
+    if (answer.status !== 200) throw new Error("the motion artwork answered " + answer.status);
+    return answer.text.split(/\r?\n/);
+  });
+}
+
+// The video of a motion artwork: of its H.264 variants (Windows decodes HEVC only with a paid extension), the smallest
+// of at least the GIF's size, else the largest. Its playlist names one fragmented MP4 file, read whole. null without.
+function videoOf(motion) {
+  return playlist(motion).then((lines) => {
+    const variants = [];
+    lines.forEach((line, index) => {
+      const info = /^#EXT-X-STREAM-INF:(.*)$/.exec(line);
+      const size = info && /CODECS="[^"]*\bavc1\./.test(info[1]) && /RESOLUTION=(\d+)x(\d+)/.exec(info[1]);
+      const uri = (lines[index + 1] || "").trim();
+      if (size && uri && !uri.startsWith("#")) {
+        variants.push({ side: Math.min(Number(size[1]), Number(size[2])), url: against(uri, motion) });
+      }
+    });
+    variants.sort((a, b) => a.side - b.side);
+    const chosen = variants.find((variant) => variant.side >= GIF.side) || variants[variants.length - 1];
+    if (!chosen) return null;
+    return playlist(chosen.url).then((variant) => {
+      const map = variant.map((line) => /^#EXT-X-MAP:URI="([^"]+)"/.exec(line)).find(Boolean);
+      const file = map ? against(map[1], chosen.url) : "";
+      return onDomain(file, MOTION_HOST) ? file : null;
+    });
+  });
+}
+
+function animate(motion) {
+  if (animating.has(motion)) return;
+  animating.add(motion);
+  Promise.resolve(motion)
+    .then(videoOf)
+    .then((video) => {
+      if (!video) {
+        Ampify.log("cover: the motion artwork has no video Ampify can read");
+        return null;
+      }
+      return Ampify.http.gifFromVideo(video, GIF)
+        .then((gif) => sendTo(0, { filename: "cover.gif", type: gif.type, base64: gif.base64 }));
+    })
+    .catch((error) => {
+      Ampify.log("cover: no animated cover, " + error);
+      return undefined;
+    })
+    .then((made) => {
+      // Without a video, asked again the next day (Apple adds them); after a failure, a few minutes later.
+      if (made === null) rememberAnimation(motion, { cover: "", keptUntil: Date.now() + DAY_MS });
+      else rememberAnimation(motion, made || { cover: "", keptUntil: Date.now() + RETRY_MS });
+      show(Ampify.player.state());
+    })
+    .finally(() => animating.delete(motion));
+}
+
 // --- What Discord shows ----------------------------------------------------------------------------------------------
 
 const https = (url) => (String(url || "").startsWith("https://") && url.length <= 256 ? url : "");
@@ -235,7 +470,11 @@ function buttonsFor(track, found) {
     "Apple Music": () => ({ label: t("listen"),
       url: (song && found.song) || searchUrl("https://music.apple.com/search?term=", track) }),
     // song.link: one page with the song on Spotify, YouTube Music, Deezer, Tidal and the others.
-    "Other platforms": () => (song ? { label: t("platforms"), url: "https://song.link/i/" + song } : null),
+    "Other platforms": () => {
+      if (song) return { label: t("platforms"), url: "https://song.link/i/" + song };
+      if (found && found.deezerId) return { label: t("platforms"), url: "https://song.link/d/" + found.deezerId };
+      return null;
+    },
     "YouTube Music": () => ({ label: t("youtube"), url: searchUrl("https://music.youtube.com/search?q=", track) }),
     "Spotify": () => ({ label: t("spotify"), url: searchUrl("https://open.spotify.com/search/", track) }),
   };
@@ -255,7 +494,8 @@ function activityFor(state) {
     statusDisplay: { Artist: "state", Title: "details", "App name": "name" }[options.statusLine] || "state",
     details: track.title || t("unknown"),
     state: track.artist || "Apple Music",
-    largeImage: (options.showCover && (https(track.artwork) || (found && https(found.cover)))) || LOGO_IMAGE,
+    largeImage: (options.showCover &&
+      (https((animation(found) || {}).cover) || https(track.artwork) || (found && https(found.cover)))) || LOGO_IMAGE,
     largeText: options.showAlbum && track.album ? track.album : "Apple Music",
     buttons: buttonsFor(track, found),
   };
@@ -263,6 +503,11 @@ function activityFor(state) {
     activity.detailsUrl = https(found.song) || undefined;
     activity.stateUrl = https(found.artist) || undefined;
     activity.largeUrl = https(found.album) || undefined;
+  } else if (options.clickable && found && found.deezerId) {
+    // Found on Deezer only: the song and its artist through Apple Music's search.
+    activity.detailsUrl = https(searchUrl("https://music.apple.com/search?term=", track)) || undefined;
+    activity.stateUrl = https(searchUrl("https://music.apple.com/search?term=", { artist: track.artist, title: "" }))
+      || undefined;
   }
   if (state.playing && options.showProgress && state.durationMs > 0) {
     // Discord draws the progress bar from these two dates.
@@ -282,7 +527,11 @@ function show(state) {
     return;
   }
   Ampify.discord.setActivity(activityFor(state));
-  if (known(track) === undefined) lookUp(track);
+  const found = known(track);
+  if (found === undefined) lookUp(track);
+  else if (found && found.motion && options.animatedCovers && options.showCover && !animation(found)) {
+    animate(found.motion);
+  }
 }
 
 Ampify.player.on("trackchange", show);

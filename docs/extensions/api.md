@@ -278,10 +278,11 @@ Ampify.ui.navigate(path)
 ```js
 Ampify.notify({ title, text })                      // permission notifications
 Ampify.keyboard.bind("Ctrl+Alt+L", fn)              // permission ui.keyboard
-Ampify.http.get(url) -> Promise<{ status, text }>   // [stable] permission network:<host>
+Ampify.http.get(url, { headers }) -> Promise<{ status, text }>   // [stable] permission network:<host>
 Ampify.http.post(url, body, { headers }) -> Promise<{ status, text }>
 Ampify.http.postForm(url, fields) -> Promise<{ status, text }>   // multipart/form-data
-Ampify.http.open(url) -> boolean                    // opens the page in the browser
+Ampify.http.gifFromVideo(url, { side, fps, seconds }) -> Promise<{ type, base64 }>   // an MP4 made a looping GIF
+Ampify.http.open(url) -> boolean                    // opens the page in the browser, an Apple Music link in Apple Music
 Ampify.crypto.md5(text) -> hexadecimal string
 Ampify.uri.parse(text) / Ampify.uri.build(...)      // [stable] music:, itms: and https://music.apple.com links
 Ampify.icons.get(name) -> SVG string

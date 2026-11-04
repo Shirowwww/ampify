@@ -29,7 +29,11 @@
 namespace ampify::test {
 
 struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost, MidiHost, RemoteHost, OutputFilesHost,
-                     ArtworkHost, LibraryHost {
+                     ArtworkHost, LibraryHost, GifHost {
+    struct GifCall {
+        std::string video;
+        GifHost::Options options;
+    };
     struct Post {
         std::string url;
         std::string body;
@@ -42,6 +46,7 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
     };
 
     std::vector<Post> posts;
+    std::vector<Post> headedGets;  // GETs that carried headers, with an empty body
     std::vector<std::string> openedPages;
     HttpResponse postResponse{201, "sent"};
     std::vector<ShownActivity> activities;
@@ -54,6 +59,7 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
     std::vector<std::string> remoteRemoved;
     std::filesystem::path outputRoot;
     std::filesystem::path libraryFile;
+    std::vector<GifCall> gifCalls;
     std::optional<ArtworkHost::File> artwork;  // read from a worker thread, set by the test between reads
 
     std::optional<ArtworkHost::File> CurrentArtwork() override {
@@ -64,6 +70,11 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
     HttpResponse HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) override {
         std::lock_guard<std::mutex> lock(httpMutex);  // called from a worker thread
         posts.push_back({url, body, headers});
+        return postResponse;
+    }
+    HttpResponse HttpGetWithHeaders(const std::string& url, const HttpHeaders& headers) override {
+        std::lock_guard<std::mutex> lock(httpMutex);  // called from a worker thread
+        headedGets.push_back({url, "", headers});
         return postResponse;
     }
     bool OpenInBrowser(const std::string& url) override {
@@ -103,6 +114,17 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
         return WriteOutputFile(outputRoot, elementId, name, text, error);
     }
     std::filesystem::path LibraryFile() override { return libraryFile; }
+    // An empty video stands for one the host cannot read.
+    std::optional<std::string> GifFromVideo(const std::string& video, const GifHost::Options& options,
+                                            std::string* error) override {
+        std::lock_guard<std::mutex> lock(httpMutex);  // called from a worker thread
+        gifCalls.push_back({video, options});
+        if (video.empty()) {
+            *error = "no video stream";
+            return std::nullopt;
+        }
+        return std::string("GIF89a");
+    }
 
     void* QueryCapability(std::string_view name) override {
         if (void* found = Offer<HttpPostHost>(name, this)) return found;
@@ -114,6 +136,7 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
         if (void* found = Offer<OutputFilesHost>(name, this)) return found;
         if (void* found = Offer<ArtworkHost>(name, this)) return found;
         if (void* found = Offer<LibraryHost>(name, this)) return found;
+        if (void* found = Offer<GifHost>(name, this)) return found;
         return FakeHost::QueryCapability(name);
     }
 };

@@ -67,6 +67,28 @@ TEST_CASE(HttpPost_FollowsTheRulesOfGet) {
     }
 }
 
+// A GET may carry the same short list of headers, origin too (an API that only answers its own site's token).
+TEST_CASE(HttpGet_CarriesTheCheckedHeadersOfPost) {
+    ampify::test::ServiceFixture<> f;
+    auto element = f.Make("getter", R"(
+        Ampify.http.get("https://api.example.org/song", { headers: { Authorization: "Bearer t", Origin: "https://example.org" } })
+          .then((r) => Ampify.log("headed " + r.status + " " + r.text));
+        Ampify.http.get("https://api.example.org/", { headers: { Cookie: "x" } }).catch((e) => Ampify.log("cookie " + e.name));
+        Ampify.http.get("https://api.example.org/", { headers: { Accept: "a\r\nX-Evil: 1" } })
+          .catch((e) => Ampify.log("line " + e.name));
+    )", R"("network:api.example.org")");
+    CHECK(element->Start());
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("headed 201 sent"); }));
+    CHECK(f.Logged("cookie TypeError"));
+    CHECK(f.Logged("line TypeError"));
+    CHECK(f.host.headedGets.size() == 1);
+    if (f.host.headedGets.size() == 1) {
+        CHECK(f.host.headedGets[0].url == "https://api.example.org/song");
+        CHECK((f.host.headedGets[0].headers ==
+               ampify::HttpHeaders{{"authorization", "Bearer t"}, {"origin", "https://example.org"}}));
+    }
+}
+
 TEST_CASE(HttpPost_AnAnswerThatComesBeforeTheStartEndsIsKept) {
     ampify::test::ServiceFixture<> f;
     // main.js keeps running after its request: the fake host answers at once, before Start returns.
@@ -102,6 +124,85 @@ TEST_CASE(HttpOpen_ShowsADeclaredPageInTheBrowserOnceInAWhile) {
     CHECK(f.Logged("host PermissionDenied"));
     CHECK(f.Logged("plain TypeError"));
     CHECK((f.host.openedPages == std::vector<std::string>{"https://www.example.org/auth?token=t"}));
+}
+
+TEST_CASE(HttpOpen_AnAppleMusicLinkOpensInAppleMusic) {
+    ampify::test::ServiceFixture<> f;
+    auto element = f.Make("apple-opener", R"(
+        Ampify.log("opened " + Ampify.http.open("https://music.apple.com/fr/album/v/1?i=2"));
+    )", R"("network:music.apple.com")");
+    CHECK(element->Start());
+    CHECK(f.Logged("opened true"));
+    CHECK((f.host.openedPages == std::vector<std::string>{"music://music.apple.com/fr/album/v/1?i=2"}));
+}
+
+// The video of a declared host comes back as a GIF ready for postForm; the host makes it, the core checks and encodes.
+TEST_CASE(HttpGifFromVideo_TurnsAVideoOfADeclaredHostIntoAGif) {
+    ampify::test::ServiceFixture<> f;
+    f.host.httpResponse = {200, "video bytes"};
+    auto element = f.Make("gif-maker", R"(
+        Ampify.http.gifFromVideo("https://media.example.org/loop.mp4", { side: 120, fps: 8, seconds: 6 })
+          .then((gif) => Ampify.log("gif " + gif.type + " " + gif.base64));
+        Ampify.http.gifFromVideo("https://other.example.org/loop.mp4").catch((e) => Ampify.log("host " + e.name));
+        Ampify.http.gifFromVideo("https://media.example.org/big.mp4", { side: 5000, fps: -3, seconds: 900 })
+          .then(() => Ampify.log("clamped"));
+    )", R"("network:media.example.org")");
+    CHECK(element->Start());
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("gif image/gif R0lGODlh") && f.Logged("clamped"); }));
+    CHECK(f.Logged("host PermissionDenied"));
+    std::lock_guard<std::mutex> lock(f.host.httpMutex);
+    CHECK(f.host.gifCalls.size() == 2);
+    if (f.host.gifCalls.size() == 2) {
+        // The two requests run on two workers: either may reach the host first.
+        bool inOrder = f.host.gifCalls[0].options.side == 120;
+        const auto& asked = f.host.gifCalls[inOrder ? 0 : 1];
+        const auto& clamped = f.host.gifCalls[inOrder ? 1 : 0];
+        CHECK(asked.video == "video bytes");
+        CHECK(asked.options.side == 120);
+        CHECK(asked.options.fps == 8);
+        CHECK(asked.options.maxMs == 6000);
+        // Out of range: the largest GIF Ampify makes, and one frame a second.
+        CHECK(clamped.options.side == 480);
+        CHECK(clamped.options.fps == 1);
+        CHECK(clamped.options.maxMs == 30000);
+    }
+}
+
+// Regression: a host's answer stops at 8 MB, and a video cut there made a short GIF, kept for weeks.
+TEST_CASE(HttpGifFromVideo_RefusesAVideoCutAtTheAnswersLimit) {
+    ampify::test::ServiceFixture<> f;
+    f.host.httpResponse = {200, std::string(size_t{8} << 20, 'v')};
+    auto element = f.Make("gif-cut", R"(
+        Ampify.http.gifFromVideo("https://media.example.org/long.mp4").catch((e) => Ampify.log("cut " + e.message));
+    )", R"("network:media.example.org")");
+    CHECK(element->Start());
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("cut http.gifFromVideo: the video is over 8 MB"); }));
+    std::lock_guard<std::mutex> lock(f.host.httpMutex);
+    CHECK(f.host.gifCalls.empty());
+}
+
+TEST_CASE(HttpGifFromVideo_RejectsWithTheReason) {
+    ampify::test::ServiceFixture<> f;
+    f.host.httpResponse = {404, "missing"};
+    auto element = f.Make("gif-missing", R"(
+        Ampify.http.gifFromVideo("https://media.example.org/gone.mp4").catch((e) => Ampify.log("gone " + e.message));
+    )", R"("network:media.example.org")");
+    CHECK(element->Start());
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("gone http.gifFromVideo: the video answered 404"); }));
+
+    f.host.httpResponse = {200, ""};
+    auto unreadable = f.Make("gif-unreadable", R"(
+        Ampify.http.gifFromVideo("https://media.example.org/odd.mp4").catch((e) => Ampify.log("odd " + e.message));
+    )", R"("network:media.example.org")");
+    CHECK(unreadable->Start());
+    CHECK(ampify::test::PumpUntil(*unreadable, [&] { return f.Logged("odd http.gifFromVideo: no video stream"); }));
+
+    ampify::test::ServiceFixture<ampify::test::FakeHost> plain;
+    auto without = plain.Make("gif-plain", R"(
+        Ampify.http.gifFromVideo("https://media.example.org/loop.mp4").catch((e) => Ampify.log("plain " + e.message));
+    )", R"("network:media.example.org")");
+    CHECK(without->Start());
+    CHECK(ampify::test::PumpUntil(*without, [&] { return plain.Logged("plain http.gifFromVideo: GIFs are not made by this host"); }));
 }
 
 TEST_CASE(HttpOpen_HostWithoutABrowserAnswersFalse) {

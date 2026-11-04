@@ -1,6 +1,7 @@
 // Natives of the module http (src/core/prelude/http.cpp). Permission: network:<host>, for each https host. get goes
 // through Host::HttpGet; post through the optional HttpPostHost and open through BrowserHost
-// (src/core/natives/http.hpp), with the same URL rules.
+// (src/core/natives/http.hpp), with the same URL rules; gifFromVideo gets the video as get does, then GifHost
+// (src/core/image_host.hpp) makes the GIF.
 // The checks run here, on the JavaScript thread; the request runs on the element's HttpWorker and the answer comes
 // back as dispatch.http (ScriptExtension::SubmitHttp).
 
@@ -16,6 +17,7 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 #include "../form_data.hpp"
+#include "../image_host.hpp"
 #include "../json.hpp"
 #include "../text_util.hpp"
 #include "http.hpp"
@@ -40,6 +42,13 @@ namespace {
 constexpr size_t kMaxPostBody = 64 * 1024;
 constexpr size_t kMaxHeaderValue = 1024;
 constexpr std::chrono::seconds kOpenInterval{10};
+
+// A GIF for a status picture: Discord shows it at 120 pixels at most, and a long or large one outgrows the hosts.
+constexpr double kMaxGifSide = 480;
+constexpr double kMaxGifFps = 25;
+constexpr double kMaxGifSeconds = 30;
+// A host's answer stops at 8 MB (src/win/win_host.cpp): a video that long was cut, and would make a short GIF.
+constexpr size_t kMaxVideoBytes = 8 * 1024 * 1024;
 
 constexpr size_t kMaxFormBody = 8 * 1024 * 1024;
 constexpr size_t kMaxFormJsonOverhead = 64 * 1024;  // field names, quotes and keys around the values
@@ -107,9 +116,10 @@ std::string UniqueBoundary(const std::vector<FormField>& fields) {
     }
 }
 
-// The headers an element may set on a POST. Host, length, cookies and the like stay with the host.
+// The headers an element may set on a request. Host, length, cookies and the like stay with the host; origin lets an
+// API that only answers its own site (Apple Music's, with the token of its web player) answer an element.
 bool IsAllowedHeader(const std::string& name) {
-    return name == "content-type" || name == "authorization" || name == "accept";
+    return name == "content-type" || name == "authorization" || name == "accept" || name == "origin";
 }
 
 struct HttpNatives : ScriptBridge {
@@ -131,6 +141,33 @@ struct HttpNatives : ScriptBridge {
         return url;
     }
 
+    // The headers of argument `index`, an object of lowercase names built by the prelude, each one checked. Otherwise
+    // throws, through `failure`.
+    static std::optional<HttpHeaders> CheckedHeaders(JSContext* ctx, int argc, JSValueConst* argv, int index,
+                                                     JSValue* failure) {
+        HttpHeaders headers;
+        std::optional<Json> given = Json::Parse(String(ctx, argc, argv, index).value_or("{}"));
+        if (!given || !given->AsObject()) {
+            *failure = Throw(ctx, "TypeError", "headers must be an object");
+            return std::nullopt;
+        }
+        for (const auto& [name, value] : *given->AsObject()) {
+            if (!IsAllowedHeader(name)) {
+                *failure = Throw(ctx, "TypeError",
+                                 "header not allowed: " + name + " (content-type, authorization, accept, origin)");
+                return std::nullopt;
+            }
+            const std::string* text = value.AsString();
+            if (!text || text->size() > kMaxHeaderValue ||
+                text->find_first_of(std::string("\r\n\0", 3)) != std::string::npos) {
+                *failure = Throw(ctx, "TypeError", "header value refused: " + name);
+                return std::nullopt;
+            }
+            headers.emplace_back(name, *text);
+        }
+        return headers;
+    }
+
     // Starts the request off the JavaScript thread and returns its id; the prelude resolves the promise when
     // dispatch.http gets the answer. Over the cap, throws instead of queuing.
     static JSValue Start(JSContext* ctx, ScriptExtension* ext, std::function<HttpResponse()> request) {
@@ -142,13 +179,23 @@ struct HttpNatives : ScriptBridge {
         return JS_NewUint32(ctx, id);
     }
 
+    // native.httpGet(url[, headersJson]): with headers, through the host's HttpPostHost service.
     AMPIFY_NATIVE(HttpGet) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         std::optional<std::string> url = CheckedUrl(ctx, ext, argc, argv, &failure);
         if (!url) return failure;
-        Host* host = &HostOf(ext);
-        return Start(ctx, ext, [host, target = *url] { return host->HttpGet(target); });
+        std::optional<HttpHeaders> headers = CheckedHeaders(ctx, argc, argv, 1, &failure);
+        if (!headers) return failure;
+        if (headers->empty()) {
+            Host* host = &HostOf(ext);
+            return Start(ctx, ext, [host, target = *url] { return host->HttpGet(target); });
+        }
+        HttpPostHost* sender = HostOf(ext).Capability<HttpPostHost>();
+        if (!sender) return Start(ctx, ext, [] { return HttpResponse{0, "headers are not supported by this host"}; });
+        return Start(ctx, ext, [sender, target = *url, headers = std::move(*headers)] {
+            return sender->HttpGetWithHeaders(target, headers);
+        });
     }
 
     // native.httpPost(url, body, headersJson): headersJson is an object of lowercase names, built by the prelude.
@@ -160,26 +207,14 @@ struct HttpNatives : ScriptBridge {
         std::string body = String(ctx, argc, argv, 1).value_or("");
         if (body.size() > kMaxPostBody) return Throw(ctx, "RangeError", "request body too long (64 KB at most)");
 
-        HttpHeaders headers;
-        std::optional<Json> given = Json::Parse(String(ctx, argc, argv, 2).value_or("{}"));
-        if (!given || !given->AsObject()) return Throw(ctx, "TypeError", "headers must be an object");
-        for (const auto& [name, value] : *given->AsObject()) {
-            if (!IsAllowedHeader(name)) {
-                return Throw(ctx, "TypeError", "header not allowed: " + name + " (content-type, authorization, accept)");
-            }
-            const std::string* text = value.AsString();
-            if (!text || text->size() > kMaxHeaderValue ||
-                text->find_first_of(std::string("\r\n\0", 3)) != std::string::npos) {
-                return Throw(ctx, "TypeError", "header value refused: " + name);
-            }
-            headers.emplace_back(name, *text);
-        }
+        std::optional<HttpHeaders> headers = CheckedHeaders(ctx, argc, argv, 2, &failure);
+        if (!headers) return failure;
 
         HttpPostHost* poster = HostOf(ext).Capability<HttpPostHost>();
         if (!poster) {
             return Start(ctx, ext, [] { return HttpResponse{0, "sending is not supported by this host"}; });
         }
-        return Start(ctx, ext, [poster, target = *url, body = std::move(body), headers = std::move(headers)] {
+        return Start(ctx, ext, [poster, target = *url, body = std::move(body), headers = std::move(*headers)] {
             return poster->HttpPost(target, body, headers);
         });
     }
@@ -213,13 +248,48 @@ struct HttpNatives : ScriptBridge {
         });
     }
 
+    // native.httpGif(url, side, fps, seconds): downloads the video at url, under the rules of get, and has the host's
+    // GifHost turn it into a looping GIF. The answer's text is { type, base64 }, a file for postForm.
+    AMPIFY_NATIVE(HttpGif) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        std::optional<std::string> url = CheckedUrl(ctx, ext, argc, argv, &failure);
+        if (!url) return failure;
+        auto within = [](double value, double low, double high) {
+            return static_cast<uint32_t>(std::clamp(value != value ? low : value, low, high));  // NaN: the lowest
+        };
+        GifHost::Options options;
+        options.side = within(Number(ctx, argc, argv, 1), 16, kMaxGifSide);
+        options.fps = within(Number(ctx, argc, argv, 2), 1, kMaxGifFps);
+        options.maxMs = within(Number(ctx, argc, argv, 3), 1, kMaxGifSeconds) * 1000;
+        GifHost* gif = HostOf(ext).Capability<GifHost>();
+        if (!gif) return Start(ctx, ext, [] { return HttpResponse{0, "GIFs are not made by this host"}; });
+        Host* host = &HostOf(ext);
+        return Start(ctx, ext, [host, gif, target = *url, options] {
+            HttpResponse video = host->HttpGet(target);
+            if (video.status != 200) {
+                return HttpResponse{0, video.status == 0 ? video.text
+                                                         : "the video answered " + std::to_string(video.status)};
+            }
+            if (video.text.size() >= kMaxVideoBytes) return HttpResponse{0, "the video is over 8 MB"};
+            std::string error;
+            std::optional<std::string> bytes = gif->GifFromVideo(video.text, options, &error);
+            if (!bytes) return HttpResponse{0, error.empty() ? "the video could not be read" : error};
+            return HttpResponse{200, Json(Json::Object{{"type", Json("image/gif")}, {"base64", Json(Base64Encode(*bytes))}})
+                                         .Dump()};
+        });
+    }
+
     // native.httpOpen(url): true when the browser shows the page. Within kOpenInterval of the element's last page,
-    // or on a host without a browser, false.
+    // or on a host without a browser, false. An Apple Music link opens in Apple Music, through the music: scheme it
+    // registers: in the browser, it only offered to open Apple Music.
     AMPIFY_NATIVE(HttpOpen) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         std::optional<std::string> url = CheckedUrl(ctx, ext, argc, argv, &failure);
         if (!url) return failure;
+        constexpr std::string_view kAppleMusic = "https://music.apple.com/";
+        if (url->rfind(kAppleMusic, 0) == 0) url = "music://music.apple.com/" + url->substr(kAppleMusic.size());
         BrowserHost* browser = HostOf(ext).Capability<BrowserHost>();
         if (!browser) return JS_FALSE;
         static std::mutex mutex;  // elements run on their own threads
@@ -242,6 +312,7 @@ void DefineHttp(api::NativeScope& scope) {
     scope.Function("httpPost", HttpNatives::HttpPost, 3);
     scope.Function("httpPostForm", HttpNatives::HttpPostForm, 2);
     scope.Function("httpOpen", HttpNatives::HttpOpen, 1);
+    scope.Function("httpGif", HttpNatives::HttpGif, 4);
 }
 
 }  // namespace ampify::natives

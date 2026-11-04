@@ -43,4 +43,23 @@ struct ArtworkHost {
     virtual std::optional<File> CurrentArtwork() = 0;
 };
 
+// The optional host service behind Ampify.http.gifFromVideo: a short video (MP4, fragmented or not, as Apple Music's
+// motion artwork) turned into a GIF that loops, for a service such as Discord that shows no video. The Windows host
+// decodes with Media Foundation and encodes with WIC (src/win/video_gif.*).
+struct GifHost {
+    static constexpr std::string_view kCapabilityName = "video.gif";
+    virtual ~GifHost() = default;
+
+    struct Options {
+        uint32_t side = 200;     // the GIF fits in side x side pixels
+        uint32_t fps = 10;       // frames a second
+        uint32_t maxMs = 30000;  // the start of the video, at most this long
+    };
+
+    // The GIF's bytes, or nullopt with the reason in `error`. Called from a worker thread of the element, possibly with
+    // other calls at the same time.
+    virtual std::optional<std::string> GifFromVideo(const std::string& video, const Options& options,
+                                                    std::string* error) = 0;
+};
+
 }  // namespace ampify

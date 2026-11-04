@@ -143,6 +143,7 @@ public:
         Count("network (send): " + url);
         return HttpResponse{200, "{}"};
     }
+    HttpResponse HttpGetWithHeaders(const std::string& url, const HttpHeaders&) override { return HttpGet(url); }
     bool OpenInBrowser(const std::string& url) override {
         Count("browser: " + url);  // counted, not opened
         return true;

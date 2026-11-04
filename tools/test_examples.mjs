@@ -117,9 +117,11 @@ function serviceAmpify(manifest, { config = {}, storage = new Map(), state = nul
     answers: {},
     opened: [],
     gets: [],
+    getHeaders: [],
     getAnswer: () => ({ status: 0, text: "" }),
     forms: [],
     formAnswer: { status: 0, text: "" },
+    gifs: [],  // the videos made GIFs, with their options
     artwork: null,
     timeouts: [],
     notes: [],
@@ -198,11 +200,17 @@ function serviceAmpify(manifest, { config = {}, storage = new Map(), state = nul
         world.opened.push(url);
         return true;
       },
-      get: (url) => {
+      get: (url, options = {}) => {
         need(`network:${new URL(url).host}`);
         world.gets.push(url);
+        world.getHeaders.push(options.headers ?? null);
         // getAnswer may throw, as Ampify rejects a request when too many are in flight.
         return Promise.resolve().then(() => ({ ...world.getAnswer(url) }));
+      },
+      gifFromVideo: (url, options = {}) => {
+        need(`network:${new URL(url).host}`);
+        world.gifs.push({ url, options: { ...options } });
+        return Promise.resolve({ type: "image/gif", base64: "R0lGODlh" });
       },
       postForm: (url, fields) => {
         need(`network:${new URL(url).host}`);
@@ -277,6 +285,9 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 const song = (id, title, artist, album = "Album") => ({ id, title, artist, album, variantId: "", atmos: false, lossless: false });
 const playing = (track, durationMs, positionMs = 0) => ({ playing: true, positionMs, durationMs, track });
 
+// The searches discord-presence made, without its reads of Apple Music's web player (its page and script).
+const searches = (world) => world.gets.filter((url) => !url.startsWith("https://music.apple.com/"));
+
 // What the iTunes Search API answers for "Artist Title": a near miss first, then the track.
 const itunes = (overrides = {}) => ({
   status: 200,
@@ -340,7 +351,7 @@ test("discord-presence asks again for a track whose request was refused", async 
   fake.world.now += 11 * 60 * 1000;
   fake.emit("statechange", playing(track, 200_000, 1_000));
   await settle();
-  assert.equal(fake.world.gets.length, 2);
+  assert.equal(searches(fake.world).length, 1, "the refused request was the first one, the web player's page");
   assert.equal(fake.world.activities.at(-1).largeImage, "https://is1-ssl.mzstatic.com/image/thumb/a/600x600bb.jpg");
 });
 
@@ -361,9 +372,9 @@ test("discord-presence shows what is playing as Listening, with the catalog's co
   assert.equal(first.largeImage, "ampify");  // the cover comes once the catalog answers
   assert.equal(first.startMs, fake.world.now - 20_000);
   assert.equal(first.endMs - first.startMs, 200_000);
-  assert.match(fake.world.gets[0], /^https:\/\/itunes\.apple\.com\/search\?.*term=Artist%20Title/);
 
   await settle();
+  assert.match(searches(fake.world)[0], /^https:\/\/itunes\.apple\.com\/search\?.*term=Artist%20Title/);
   const shown = fake.world.activities.at(-1);
   assert.equal(shown.largeImage, "https://is1-ssl.mzstatic.com/image/thumb/a/600x600bb.jpg");
   assert.equal(shown.detailsUrl, "https://music.apple.com/us/album/album/1?i=42");
@@ -389,7 +400,7 @@ test("discord-presence asks the catalog once per track, even after a restart", a
   first.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000));
   first.emit("statechange", playing(song("1", "Title", "Artist"), 200_000, 5_000));
   await settle();
-  assert.equal(first.world.gets.length, 1);
+  assert.equal(searches(first.world).length, 1);
 
   const second = serviceAmpify(manifest, { storage });
   runIn(source, second.context);
@@ -398,12 +409,12 @@ test("discord-presence asks the catalog once per track, even after a restart", a
   assert.equal(second.world.activities.at(-1).largeImage, "https://is1-ssl.mzstatic.com/image/thumb/a/600x600bb.jpg");
 });
 
-test("discord-presence shows a file of your own with its cover, shared for three days, and search buttons", async () => {
+test("discord-presence shows a file of your own with its cover, shared for two months, and search buttons", async () => {
   const { manifest, source } = load("discord-presence");
   const fake = serviceAmpify(manifest, { config: { "button-2": "YouTube Music" } });
   fake.world.getAnswer = () => ({ status: 200, text: JSON.stringify({ results: [] }) });
   fake.world.artwork = { type: "image/jpeg", base64: "/9j/AA==" };
-  fake.world.formAnswer = { status: 200, text: "https://litter.catbox.moe/abc123.jpg" };
+  fake.world.formAnswer = { status: 200, text: "https://x0.at/abc123def456ghi7.jpg\n" };
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "Demo take", "My Band"), 200_000));
   await settle();
@@ -417,16 +428,16 @@ test("discord-presence shows a file of your own with its cover, shared for three
   fake.runTimeouts();
   await settle();
   assert.equal(fake.world.forms.length, 1);
-  assert.equal(fake.world.forms[0].url, "https://litterbox.catbox.moe/resources/internals/api.php");
+  assert.equal(fake.world.forms[0].url, "https://x0.at/");
   assert.deepEqual(fake.world.forms[0].fields, {
-    reqtype: "fileupload", time: "72h", fileToUpload: { filename: "cover.jpg", type: "image/jpeg", base64: "/9j/AA==" },
+    file: { filename: "cover.jpg", type: "image/jpeg", base64: "/9j/AA==" }, id_length: "16",
   });
   const shown = fake.world.activities.at(-1);
-  assert.equal(shown.largeImage, "https://litter.catbox.moe/abc123.jpg");
+  assert.equal(shown.largeImage, "https://x0.at/abc123def456ghi7.jpg");
   assert.equal(shown.detailsUrl, undefined);
 
-  // Three days later the host has deleted it: it is sent again.
-  fake.world.now += 71 * 3600 * 1000;
+  // Two months later it is sent again, well before the host deletes it.
+  fake.world.now += 61 * 24 * 3600 * 1000;
   fake.emit("statechange", playing(song("1", "Demo take", "My Band"), 200_000, 1000));
   await settle();
   fake.runTimeouts();
@@ -440,18 +451,18 @@ test("discord-presence tries the next host when one is down, and sends again soo
   fake.world.getAnswer = () => ({ status: 200, text: JSON.stringify({ results: [] }) });
   fake.world.artwork = { type: "image/png", base64: "iVBORw==" };
   fake.world.formAnswer = (url) => (url.startsWith("https://uguu.se/")
-    ? { status: 200, text: JSON.stringify({ success: true, files: [{ url: "https://h.uguu.se/xyz.png" }] }) }
+    ? { status: 200, text: JSON.stringify({ success: true, files: [{ url: "https://d.uguu.se/xyz.png" }] }) }
     : { status: 500, text: "<!doctype html>" });
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "Demo take", "My Band"), 200_000));
   await settle();
   fake.runTimeouts();
   await settle();
-  assert.deepEqual(fake.world.forms.map((form) => new URL(form.url).host), ["litterbox.catbox.moe", "uguu.se"]);
+  assert.deepEqual(fake.world.forms.map((form) => new URL(form.url).host), ["x0.at", "uguu.se"]);
   assert.deepEqual(fake.world.forms[1].fields, {
     "files[]": { filename: "cover.png", type: "image/png", base64: "iVBORw==" },
   });
-  assert.equal(fake.world.activities.at(-1).largeImage, "https://h.uguu.se/xyz.png");
+  assert.equal(fake.world.activities.at(-1).largeImage, "https://d.uguu.se/xyz.png");  // any subdomain of the host
 
   fake.world.now += 3 * 3600 * 1000;  // uguu.se keeps it 3 hours
   fake.emit("statechange", playing(song("1", "Demo take", "My Band"), 200_000, 1000));
@@ -459,6 +470,207 @@ test("discord-presence tries the next host when one is down, and sends again soo
   fake.runTimeouts();
   await settle();
   assert.equal(fake.world.forms.length, 4);
+});
+
+test("discord-presence finds on Deezer an explicit song Apple's search leaves out, with its cover and song.link", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest);
+  const deezer = [
+    { id: 1, title: "Mask Off (Karaoke)", artist: { name: "Karaoke Band" }, album: { title: "Hits", cover_xl: "https://cdn-images.dzcdn.net/images/cover/a/1000x1000.jpg" } },
+    { id: 142337683, title: "Mask Off", artist: { name: "Future" }, album: { title: "FUTURE", cover_xl: "https://cdn-images.dzcdn.net/images/cover/b/1000x1000.jpg" } },
+  ];
+  fake.world.getAnswer = (url) => (url.startsWith("https://api.deezer.com/")
+    ? { status: 200, text: JSON.stringify({ data: deezer }) }
+    : { status: 200, text: JSON.stringify({ results: [] }) });
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Mask Off", "Future", "FUTURE"), 200_000));
+  await settle();
+  assert.deepEqual(searches(fake.world).map((url) => new URL(url).host), ["itunes.apple.com", "api.deezer.com"]);
+  assert.match(searches(fake.world)[1], /\?limit=25&q=Future%20Mask%20Off$/);
+  const shown = fake.world.activities.at(-1);
+  assert.equal(shown.largeImage, "https://cdn-images.dzcdn.net/images/cover/b/1000x1000.jpg");
+  assert.equal(shown.detailsUrl, "https://music.apple.com/search?term=Future%20Mask%20Off");
+  assert.deepEqual(shown.buttons, [
+    { label: "Listen on Apple Music", url: "https://music.apple.com/search?term=Future%20Mask%20Off" },
+    { label: "Other platforms", url: "https://song.link/d/142337683" },
+  ]);
+  assert.equal(fake.world.forms.length, 0);  // found: nothing is uploaded
+});
+
+test("discord-presence asks Deezer again later when it refuses with its quota error", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest, { config: { "share-covers": false } });
+  fake.world.getAnswer = (url) => (url.startsWith("https://api.deezer.com/")
+    ? { status: 200, text: JSON.stringify({ error: { type: "Exception", message: "Quota limit exceeded", code: 4 } }) }
+    : { status: 200, text: JSON.stringify({ results: [] }) });
+  runIn(source, fake.context);
+  const track = song("1", "Mask Off", "Future");
+  fake.emit("trackchange", playing(track, 200_000));
+  await settle();
+  fake.world.now += 11 * 60 * 1000;  // a refusal is asked again after a few minutes, not the next day
+  fake.emit("statechange", playing(track, 200_000, 1_000));
+  await settle();
+  assert.equal(searches(fake.world).length, 4);
+});
+
+// Apple Music's web player as discord-presence reads it: a page naming its script, the script with the token, and the
+// catalog's answer for "Future Mask Off" (an explicit song, which the iTunes search leaves out).
+const TOKEN = "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJBTVBXZWJQbGF5In0.c2ln";
+const webPlayer = (catalog) => (url) => {
+  if (url === "https://music.apple.com/us/search") return { status: 200, text: '<script src="/assets/index~ab12.js"></script>' };
+  if (url === "https://music.apple.com/assets/index~ab12.js") return { status: 200, text: `const t="${TOKEN}";` };
+  if (url.startsWith("https://amp-api.music.apple.com/")) return catalog();
+  return { status: 200, text: JSON.stringify({ results: [] }) };
+};
+const maskOff = () => ({
+  status: 200,
+  text: JSON.stringify({ results: { songs: { data: [
+    { id: "9", attributes: { name: "Mask Off (Marshmello Remix)", artistName: "Future", albumName: "Mask Off - Single", url: "https://music.apple.com/fr/album/x/1?i=9", artwork: { url: "https://is1-ssl.mzstatic.com/r/{w}x{h}bb.jpg" } } },
+    { id: "1253106000", attributes: { name: "Mask Off", artistName: "Future", albumName: "FUTURE", url: "https://music.apple.com/fr/album/mask-off/1253105919?i=1253106000", artwork: { url: "https://is1-ssl.mzstatic.com/a/{w}x{h}bb.jpg" } },
+      relationships: { artists: { data: [{ attributes: { url: "https://music.apple.com/fr/artist/future/128050210" } }] } } },
+  ] } } }),
+});
+
+test("discord-presence finds an explicit song in Apple Music's catalog with the web player's token", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest, { language: "fr" });
+  fake.world.getAnswer = webPlayer(maskOff);
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Mask Off", "Future", "FUTURE"), 200_000));
+  await settle();
+  const asked = fake.world.gets.findIndex((url) => url.startsWith("https://amp-api.music.apple.com/"));
+  assert.match(fake.world.gets[asked], /\/v1\/catalog\/fr\/search\?types=songs&.*term=Future%20Mask%20Off$/);
+  assert.deepEqual({ ...fake.world.getHeaders[asked] }, { Authorization: "Bearer " + TOKEN, Origin: "https://music.apple.com" });
+  assert.equal(searches(fake.world).length, 1, "neither the iTunes search nor Deezer is asked");
+  const shown = fake.world.activities.at(-1);
+  assert.equal(shown.largeImage, "https://is1-ssl.mzstatic.com/a/600x600bb.jpg");
+  assert.equal(shown.detailsUrl, "https://music.apple.com/fr/album/mask-off/1253105919?i=1253106000");
+  assert.equal(shown.stateUrl, "https://music.apple.com/fr/artist/future/128050210");
+  assert.equal(shown.largeUrl, "https://music.apple.com/fr/album/mask-off/1253105919");
+  assert.equal(shown.buttons.at(-1).url, "https://song.link/i/1253106000");
+});
+
+// An album with a motion artwork, as Apple's catalog and video host answer: the master playlist lists H.264 and HEVC
+// variants, and each variant's playlist names one fragmented MP4 file, relative to it.
+const MOTION = "https://mvod.itunes.apple.com/itunes-assets/HLSMusic116/v4/7d/P1_default.m3u8";
+const VARIANT_360 = "https://mvod.itunes.apple.com/itunes-assets/HLSMusic116/v4/7e/P1_video_sdr_360x360.m3u8";
+const utopia = () => ({
+  status: 200,
+  text: JSON.stringify({ results: { songs: { data: [
+    { id: "1699712651", attributes: { name: "FE!N", artistName: "Travis Scott", albumName: "UTOPIA", url: "https://music.apple.com/us/album/fe-n/1699712635?i=1699712651", artwork: { url: "https://is1-ssl.mzstatic.com/u/{w}x{h}bb.jpg" } },
+      relationships: { albums: { data: [{ id: "1699712635", attributes: { editorialVideo: { motionDetailSquare: { video: MOTION } } } }] } } },
+  ] } } }),
+});
+const motionHost = (url) => {
+  if (url === MOTION) {
+    return { status: 200, text: [
+      "#EXTM3U",
+      '#EXT-X-STREAM-INF:BANDWIDTH=1987477,CODECS="avc1.64001f",RESOLUTION=768x768',
+      "https://mvod.itunes.apple.com/itunes-assets/HLSMusic126/v4/a9/P1_video_sdr_768x768.m3u8",
+      '#EXT-X-STREAM-INF:BANDWIDTH=1455343,CODECS="hvc1.2.20000000.L123.B0",RESOLUTION=180x180',
+      "https://mvod.itunes.apple.com/itunes-assets/HLSMusic126/v4/be/P1_video_hevc_180x180.m3u8",
+      '#EXT-X-STREAM-INF:BANDWIDTH=273236,CODECS="avc1.64001f",RESOLUTION=360x360',
+      VARIANT_360,
+    ].join("\n") };
+  }
+  if (url === VARIANT_360) {
+    return { status: 200, text: '#EXTM3U\n#EXT-X-MAP:URI="P1_video_sdr_360x360-.mp4",BYTERANGE="897@0"\n#EXTINF:2.92000,\nP1_video_sdr_360x360-.mp4\n' };
+  }
+  return webPlayer(utopia)(url);
+};
+
+test("discord-presence shows the album's motion artwork as a GIF made on this PC, once per album", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest, { config: { "animated-covers": true } });
+  fake.world.getAnswer = motionHost;
+  fake.world.formAnswer = { status: 200, text: "https://x0.at/gif0123456789abcd.gif\n" };
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
+  for (let i = 0; i < 6; i++) await settle();
+  const asked = fake.world.gets.find((url) => url.startsWith("https://amp-api.music.apple.com/"));
+  assert.match(asked, /include\[songs\]=artists,albums&fields\[albums\]=editorialVideo&extend\[albums\]=editorialVideo/);
+  // The smallest H.264 variant of at least 200 pixels, its file read whole.
+  assert.deepEqual(fake.world.gifs, [{
+    url: "https://mvod.itunes.apple.com/itunes-assets/HLSMusic116/v4/7e/P1_video_sdr_360x360-.mp4",
+    options: { side: 200, fps: 10, seconds: 30 },
+  }]);
+  assert.deepEqual(fake.world.forms[0].fields, {
+    file: { filename: "cover.gif", type: "image/gif", base64: "R0lGODlh" }, id_length: "16",
+  });
+  assert.equal(fake.world.activities.at(-1).largeImage, "https://x0.at/gif0123456789abcd.gif");
+
+  // Another song of the album: the same GIF, not made again.
+  fake.emit("trackchange", playing(song("2", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
+  for (let i = 0; i < 6; i++) await settle();
+  assert.equal(fake.world.gifs.length, 1);
+  assert.equal(fake.world.activities.at(-1).largeImage, "https://x0.at/gif0123456789abcd.gif");
+});
+
+test("discord-presence reads a variant listed with its sound first, and files named from the host's root", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest, { config: { "animated-covers": true } });
+  const variant = "https://mvod.itunes.apple.com/itunes-assets/HLSMusic126/v4/c3/P1_video_sdr_240x240.m3u8";
+  fake.world.getAnswer = (url) => {
+    if (url === MOTION) {
+      return { status: 200, text: '#EXTM3U\n#EXT-X-STREAM-INF:CODECS="mp4a.40.2,avc1.64001f",RESOLUTION=240x240\n/itunes-assets/HLSMusic126/v4/c3/P1_video_sdr_240x240.m3u8\n' };
+    }
+    if (url === variant) return { status: 200, text: '#EXTM3U\n#EXT-X-MAP:URI="/itunes-assets/HLSMusic126/v4/c3/P1-.mp4"\n' };
+    return motionHost(url);
+  };
+  fake.world.formAnswer = { status: 200, text: "https://x0.at/gif0123456789abcd.gif\n" };
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
+  for (let i = 0; i < 6; i++) await settle();
+  assert.deepEqual(fake.world.gifs.map((gif) => gif.url), ["https://mvod.itunes.apple.com/itunes-assets/HLSMusic126/v4/c3/P1-.mp4"]);
+});
+
+test("discord-presence keeps the still cover when animated covers are off, or the GIF cannot be made", async () => {
+  const { manifest, source } = load("discord-presence");
+  const off = serviceAmpify(manifest);
+  off.world.getAnswer = motionHost;
+  runIn(source, off.context);
+  off.emit("trackchange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
+  for (let i = 0; i < 6; i++) await settle();
+  assert.equal(off.world.gets.filter((url) => url.startsWith("https://mvod.itunes.apple.com/")).length, 0);
+  assert.equal(off.world.activities.at(-1).largeImage, "https://is1-ssl.mzstatic.com/u/600x600bb.jpg");
+
+  const failing = serviceAmpify(manifest, { config: { "animated-covers": true } });
+  failing.world.getAnswer = (url) => (url === VARIANT_360 ? { status: 404, text: "" } : motionHost(url));
+  runIn(source, failing.context);
+  failing.emit("trackchange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
+  for (let i = 0; i < 6; i++) await settle();
+  assert.equal(failing.world.gifs.length, 0);
+  assert.equal(failing.world.activities.at(-1).largeImage, "https://is1-ssl.mzstatic.com/u/600x600bb.jpg");
+  failing.emit("statechange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000, 1_000));
+  for (let i = 0; i < 6; i++) await settle();
+  assert.equal(failing.world.gets.filter((url) => url === MOTION).length, 1, "not asked again at once");
+});
+
+test("discord-presence keeps the web player's token, and reads it again once the catalog refuses it", async () => {
+  const { manifest, source } = load("discord-presence");
+  const storage = new Map();
+  const fake = serviceAmpify(manifest, { storage });
+  let refused = false;
+  fake.world.getAnswer = webPlayer(() => (refused ? { status: 401, text: "" } : maskOff()));
+  runIn(source, fake.context);
+  const pageReads = () => fake.world.gets.filter((url) => url === "https://music.apple.com/us/search").length;
+  fake.emit("trackchange", playing(song("1", "Mask Off", "Future"), 200_000));
+  await settle();
+  fake.emit("trackchange", playing(song("2", "Mask Off", "Future"), 200_000));
+  await settle();
+  assert.equal(pageReads(), 1, "the token is kept");
+
+  refused = true;  // a week old, or revoked: refused, dropped, and read again for the next song
+  fake.emit("trackchange", playing(song("3", "Mask Off", "Future"), 200_000));
+  await settle();
+  fake.emit("trackchange", playing(song("4", "Mask Off", "Future"), 200_000));
+  await settle();
+  assert.equal(pageReads(), 2);
+  // The fresh token refused too (an Ampify that cannot send headers): not read again for every song.
+  fake.emit("trackchange", playing(song("5", "Mask Off", "Future"), 200_000));
+  await settle();
+  assert.equal(pageReads(), 2);
+  assert.equal(searches(fake.world).filter((url) => url.startsWith("https://itunes.apple.com/")).length, 3);
 });
 
 test("discord-presence keeps covers to itself when sharing is off", async () => {
@@ -639,7 +851,9 @@ test("the service examples declare exactly the permissions they use", () => {
   };
   // The hosts each example reaches with Ampify.http (the other addresses it holds are links shown to people).
   const hostsOf = {
-    "discord-presence": ["network:itunes.apple.com", "network:litterbox.catbox.moe", "network:uguu.se"],
+    "discord-presence": ["network:music.apple.com", "network:amp-api.music.apple.com", "network:mvod.itunes.apple.com",
+      "network:itunes.apple.com",
+      "network:api.deezer.com", "network:x0.at", "network:uguu.se", "network:litterbox.catbox.moe"],
     scrobbler: ["network:ws.audioscrobbler.com", "network:www.last.fm"],
   };
   for (const name of ["discord-presence", "scrobbler"]) {

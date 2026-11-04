@@ -239,9 +239,11 @@ declare const Ampify: {
   notify(options: { title: string; text: string }): void;
   keyboard: { bind(shortcut: string, fn: () => void): void };
   http: {
-    get(url: string): Promise<{ status: number; text: string }>;
+    get(url: string, options?: { headers?: Record<string, string> }): Promise<{ status: number; text: string }>;
     post(url: string, body?: string | object, options?: { headers?: Record<string, string> }): Promise<{ status: number; text: string }>;
     postForm(url: string, fields: Record<string, string | FormFile>): Promise<{ status: number; text: string }>;
+    // An MP4 of a declared host as a looping GIF, made on the PC: a file for postForm.
+    gifFromVideo(url: string, options?: { side?: number; fps?: number; seconds?: number }): Promise<{ type: "image/gif"; base64: string }>;
   };
   crypto: { md5(text: string): string };
   i18n: {

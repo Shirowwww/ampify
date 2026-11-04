@@ -13,17 +13,26 @@ const char kHttp[] = R"AMPIFYJS(
   // A throw in `start` (URL refused, too many requests) rejects it. Ampify.color.fromArtwork goes through it too.
   dispatch.request = (start) => new Promise((resolve) => httpRequests.set(start(), resolve));
 
+  // options.headers, lowercased: content-type, authorization, accept, origin. The kernel checks each one.
+  const headersOf = (options) => {
+    const headers = {};
+    const given = (options && options.headers) || {};
+    for (const name of Object.keys(given)) headers[name.toLowerCase()] = text(given[name]);
+    return headers;
+  };
+
   Ampify.http = {
-    get(url) {
-      return dispatch.request(() => native.httpGet(text(url)));
+    get(url, options = {}) {
+      const headers = headersOf(options);
+      return dispatch.request(() => (Object.keys(headers).length === 0
+        ? native.httpGet(text(url))
+        : native.httpGet(text(url), JSON.stringify(headers))));
     },
     // body: a string (sent as a form, application/x-www-form-urlencoded, unless headers say otherwise) or an
-    // object (sent as JSON). options.headers: content-type, authorization, accept.
+    // object (sent as JSON).
     post(url, body, options = {}) {
       return dispatch.request(() => {
-        const headers = {};
-        const given = (options && options.headers) || {};
-        for (const name of Object.keys(given)) headers[name.toLowerCase()] = text(given[name]);
+        const headers = headersOf(options);
         let payload = body;
         if (payload === undefined || payload === null) {
           payload = "";
@@ -41,6 +50,16 @@ const char kHttp[] = R"AMPIFYJS(
         if (typeof fields !== "object" || fields === null) throw new TypeError("postForm expects an object of fields");
         return native.httpPostForm(text(url), JSON.stringify(fields));
       });
+    },
+    // A short video (MP4, such as an album's motion artwork) as a GIF that loops: { type: "image/gif", base64 }, a file
+    // for postForm. options: side (pixels, 200), fps (10), seconds (the start of the video, 30 at most).
+    gifFromVideo(url, options = {}) {
+      return dispatch.request(() => native.httpGif(text(url), Number(options.side) || 200, Number(options.fps) || 10,
+                                                   Number(options.seconds) || 30))
+        .then((answer) => {
+          if (answer.status !== 200) throw new Error("http.gifFromVideo: " + answer.text);
+          return JSON.parse(answer.text);
+        });
     },
     // Shows the page in the user's browser, for a sign-in page. One page every 10 seconds at most; true if shown.
     open(url) {

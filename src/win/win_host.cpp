@@ -1,6 +1,7 @@
 #include "win_host.hpp"
 
 #include <windows.h>
+#include <appmodel.h>
 #include <shellapi.h>
 #include <winhttp.h>
 
@@ -23,6 +24,7 @@
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
 #include "smtc_session.hpp"
+#include "video_gif.hpp"
 #include "wic_image.hpp"
 #include "win_common.hpp"
 #include "win_services.hpp"
@@ -31,7 +33,8 @@ namespace ampify {
 
 namespace {
 
-constexpr size_t kMaxResponseBytes = size_t{1} << 20;  // a Last.fm or ListenBrainz answer is far smaller
+// Apple Music's web player script, read for its public token every few weeks, weighs about 3.3 MB.
+constexpr size_t kMaxResponseBytes = size_t{8} << 20;
 constexpr std::chrono::seconds kAnswerDeadline{15};       // reading the answer, after the headers came
 constexpr auto kBalloonDuration = std::chrono::seconds(8);
 
@@ -97,6 +100,7 @@ void* WinHost::QueryCapability(std::string_view name) {
     if (void* found = Offer<BrowserHost>(name, this)) return found;
     if (void* found = Offer<ImageHost>(name, this)) return found;
     if (void* found = Offer<ArtworkHost>(name, this)) return found;
+    if (void* found = Offer<GifHost>(name, this)) return found;
     // Ampify.player.queue, in both processes: what each one knows of the queue (src/win/player_bridge.*).
     if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
     // Ampify.player.lyrics: Apple's lyrics, read in the process that has Apple's player.
@@ -275,6 +279,11 @@ std::optional<RgbaImage> WinHost::DecodeImage(const std::string& bytes, uint32_t
     return win::DecodeWithWic(bytes, maxSide);
 }
 
+std::optional<std::string> WinHost::GifFromVideo(const std::string& video, const GifHost::Options& options,
+                                                 std::string* error) {
+    return win::GifFromVideoWithMf(video, options, error);
+}
+
 std::optional<ArtworkHost::File> WinHost::CurrentArtwork() {
     constexpr DWORD kStepTimeoutMs = 3000;
     return win::ReadSmtcThumbnail(kStepTimeoutMs);
@@ -284,11 +293,57 @@ HttpResponse WinHost::HttpPost(const std::string& url, const std::string& body, 
     return Send(L"POST", url, body, headers);
 }
 
+HttpResponse WinHost::HttpGetWithHeaders(const std::string& url, const HttpHeaders& headers) {
+    return Send(L"GET", url, {}, headers);
+}
+
+namespace {
+
+// The ProgId Apple Music's package gives a URL scheme, from its package's capabilities. Windows has no default app for
+// "music:" until the user picks one, so a plain ShellExecute asked "Open with" instead of opening Apple Music.
+std::wstring PackageProgId(const wchar_t* scheme) {
+    UINT32 length = 0;
+    if (GetCurrentPackageFullName(&length, nullptr) != ERROR_INSUFFICIENT_BUFFER || length == 0) return {};
+    std::wstring full(length, L'\0');
+    if (GetCurrentPackageFullName(&length, full.data()) != ERROR_SUCCESS) return {};
+    full.resize(length - 1);
+    std::wstring path = L"Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppModel\\"
+                        L"Repository\\Packages\\" + full;
+    HKEY package = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, path.c_str(), 0, KEY_READ, &package) != ERROR_SUCCESS) return {};
+    std::wstring progId;
+    for (DWORD index = 0; progId.empty(); index++) {
+        wchar_t app[256];
+        DWORD size = 256;
+        if (RegEnumKeyExW(package, index, app, &size, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS) break;
+        wchar_t value[256];
+        DWORD bytes = sizeof value;
+        std::wstring associations = std::wstring(app) + L"\\Capabilities\\URLAssociations";
+        if (RegGetValueW(package, associations.c_str(), scheme, RRF_RT_REG_SZ, nullptr, value, &bytes) == ERROR_SUCCESS) {
+            progId = value;
+        }
+    }
+    RegCloseKey(package);
+    return progId;
+}
+
+}  // namespace
+
 bool WinHost::OpenInBrowser(const std::string& url) {
-    // The core has checked the URL: https, a declared host, no user name or port.
-    HINSTANCE result = ShellExecuteW(nullptr, L"open", ToWide(url).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-    bool opened = reinterpret_cast<INT_PTR>(result) > 32;
-    m_journal.Write(opened ? "Showed a page in the browser" : "Could not show a page in the browser");
+    // The core has checked the URL: https, a declared host, no user name or port; an Apple Music link comes as music:.
+    std::wstring wide = ToWide(url);
+    bool apple = url.rfind("music:", 0) == 0;
+    std::wstring progId = apple ? PackageProgId(L"music") : std::wstring();
+    SHELLEXECUTEINFOW info{};
+    info.cbSize = sizeof info;
+    info.fMask = SEE_MASK_NOASYNC | (progId.empty() ? 0 : SEE_MASK_CLASSNAME);
+    info.lpVerb = L"open";
+    info.lpFile = wide.c_str();
+    info.lpClass = progId.empty() ? nullptr : progId.c_str();
+    info.nShow = SW_SHOWNORMAL;
+    bool opened = ShellExecuteExW(&info) != FALSE;
+    std::string where = apple ? "Apple Music" : "the browser";
+    m_journal.Write((opened ? "Showed a page in " : "Could not show a page in ") + where);
     return opened;
 }
 

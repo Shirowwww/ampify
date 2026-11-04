@@ -1,10 +1,17 @@
-// Windows only: the Host's files (settings.txt and storage\<id>.json).
+// Windows only: the Host's files (settings.txt and storage\<id>.json), and the GIFs it makes of a video.
 #include <windows.h>
+#include <wincodec.h>
+#include <wrl/client.h>
 
+#include <cstdio>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <optional>
 #include <string>
 
 #include "../src/core/settings.hpp"
+#include "../src/win/video_gif.hpp"
 #include "../src/win/win_host.hpp"
 #include "test.hpp"
 
@@ -19,7 +26,96 @@ fs::path KitForTest(const std::string& name) {
     return kit;
 }
 
+// The number of `part` in `text`.
+size_t CountOf(const std::string& text, const std::string& part) {
+    size_t count = 0;
+    for (size_t at = text.find(part); at != std::string::npos; at = text.find(part, at + part.size())) count++;
+    return count;
+}
+
+// The first frame of a GIF as top-down BGRA rows, read back by WIC; empty when it cannot be read.
+std::vector<BYTE> FirstFrame(const std::string& gif, UINT* width, UINT* height) {
+    using Microsoft::WRL::ComPtr;
+    std::vector<BYTE> pixels;
+    ComPtr<IWICImagingFactory> factory;
+    ComPtr<IStream> stream;
+    ComPtr<IWICBitmapDecoder> decoder;
+    ComPtr<IWICBitmapFrameDecode> frame;
+    ComPtr<IWICBitmapSource> bgra;
+    LARGE_INTEGER start{};
+    ULONG written = 0;
+    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory))) ||
+        FAILED(CreateStreamOnHGlobal(nullptr, TRUE, &stream)) ||
+        FAILED(stream->Write(gif.data(), static_cast<ULONG>(gif.size()), &written)) ||
+        FAILED(stream->Seek(start, STREAM_SEEK_SET, nullptr)) ||
+        FAILED(factory->CreateDecoderFromStream(stream.Get(), nullptr, WICDecodeMetadataCacheOnDemand, &decoder)) ||
+        FAILED(decoder->GetFrame(0, &frame)) || FAILED(WICConvertBitmapSource(GUID_WICPixelFormat32bppBGRA, frame.Get(), &bgra)) ||
+        FAILED(bgra->GetSize(width, height))) {
+        return pixels;
+    }
+    pixels.resize(static_cast<size_t>(*width) * *height * 4);
+    if (FAILED(bgra->CopyPixels(nullptr, *width * 4, static_cast<UINT>(pixels.size()), pixels.data()))) pixels.clear();
+    return pixels;
+}
+
 }  // namespace
+
+// A fragmented MP4 as Apple Music's motion artworks are (H.264, 25 frames a second; 2 s, 96 pixels, made by ffmpeg)
+// becomes a GIF that loops, at the asked size and pace.
+TEST_CASE(WinGif_TurnsAFragmentedMp4IntoALoopingGif) {
+    std::ifstream file(fs::path(AMPIFY_SOURCE_DIR) / "tests" / "data" / "motion-loop.mp4", std::ios::binary);
+    std::string video((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    CHECK(!video.empty());
+    ampify::GifHost::Options options;
+    options.side = 48;
+    options.fps = 10;
+    std::string error;
+    std::optional<std::string> gif = ampify::win::GifFromVideoWithMf(video, options, &error);
+    CHECK(gif.has_value());
+    if (!gif) std::printf("    GIF refused: %s\n", error.c_str());
+    if (gif && gif->size() > 13) {
+        CHECK(gif->compare(0, 6, "GIF89a") == 0);
+        auto word = [&](size_t at) { return static_cast<unsigned char>((*gif)[at]) | static_cast<unsigned char>((*gif)[at + 1]) << 8; };
+        CHECK(word(6) == 48);
+        CHECK(word(8) == 48);
+        CHECK(gif->find("NETSCAPE2.0") != std::string::npos);
+        // A graphic control block per frame (21 F9 04, flags, delay): 2 s at 10 a second, each shown 10 hundredths.
+        const std::string control("\x21\xF9\x04", 3);
+        CHECK(CountOf(*gif, control) == 20);
+        size_t first = gif->find(control);
+        if (first != std::string::npos && first + 6 < gif->size()) CHECK(word(first + 4) == 10);
+
+        // The picture itself, the right way up: ffmpeg's test pattern is dark at the top, with red, blue and cyan
+        // bars from left to right at the bottom. A wrong row pitch or a bottom-up copy would move them.
+        bool com = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
+        UINT width = 0;
+        UINT height = 0;
+        std::vector<BYTE> pixels = FirstFrame(*gif, &width, &height);
+        CHECK(width == 48 && height == 48 && pixels.size() == 48 * 48 * 4);
+        if (pixels.size() == 48 * 48 * 4) {
+            auto at = [&](int x, int y) { return &pixels[(static_cast<size_t>(y) * 48 + x) * 4]; };  // B, G, R
+            const BYTE* dark = at(4, 4);
+            const BYTE* red = at(4, 28);
+            const BYTE* blue = at(28, 28);
+            const BYTE* cyan = at(44, 44);
+            CHECK(dark[0] + dark[1] + dark[2] < 300);
+            CHECK(red[2] > 180 && red[1] < 90 && red[0] < 90);
+            CHECK(blue[0] > 180 && blue[1] < 90 && blue[2] < 90);
+            CHECK(cyan[0] > 180 && cyan[1] > 180 && cyan[2] < 90);
+        }
+        if (com) CoUninitialize();
+    }
+
+    // The first second only.
+    options.maxMs = 1000;
+    std::optional<std::string> shorter = ampify::win::GifFromVideoWithMf(video, options, &error);
+    CHECK(shorter.has_value() && CountOf(*shorter, std::string("\x21\xF9\x04", 3)) == 10);
+
+    // Not a video: no GIF, and the reason.
+    std::optional<std::string> none = ampify::win::GifFromVideoWithMf("not a video", options, &error);
+    CHECK(!none.has_value());
+    CHECK(!error.empty());
+}
 
 TEST_CASE(WinHost_StorageRoundTripsThroughTheKitFolder) {
     fs::path kit = KitForTest("storage");
@@ -140,11 +236,11 @@ TEST_CASE(WinHost_DecodesAnImageScaledToFit) {
         CHECK(whole->pixels[0] == 255 && whole->pixels[1] == 0 && whole->pixels[2] == 0 && whole->pixels[3] == 255);
         CHECK(whole->pixels[12] == 0 && whole->pixels[13] == 0 && whole->pixels[14] == 255);
     }
-    std::optional<ampify::RgbaImage> small = images->DecodeImage(bytes, 2);
-    CHECK(small && small->width == 2 && small->height == 1);
-    if (small) {
-        CHECK(small->pixels[0] > 200 && small->pixels[2] < 50);  // the red half
-        CHECK(small->pixels[4] < 50 && small->pixels[6] > 200);  // the blue half
+    std::optional<ampify::RgbaImage> halved = images->DecodeImage(bytes, 2);
+    CHECK(halved && halved->width == 2 && halved->height == 1);
+    if (halved) {
+        CHECK(halved->pixels[0] > 200 && halved->pixels[2] < 50);  // the red half
+        CHECK(halved->pixels[4] < 50 && halved->pixels[6] > 200);  // the blue half
     }
     CHECK(!images->DecodeImage("not an image", 128).has_value());
     CHECK(!images->DecodeImage("", 128).has_value());

@@ -140,8 +140,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_library(ampify_win STATIC ${AMPIFY_WIN_SOURCES})
     target_compile_options(ampify_win PRIVATE ${AMPIFY_WARNINGS})
     target_compile_definitions(ampify_win PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
+    # mfuuid only holds Media Foundation's GUIDs: its DLLs are loaded when a GIF is made (src/win/video_gif.cpp).
     target_link_libraries(ampify_win PUBLIC ole32 shell32 user32 comctl32 advapi32 psapi winhttp ws2_32 winmm windowscodecs
-                          ampify_core)
+                          mfuuid ampify_core)
 
     # Loaded into AppleMusic.exe and AMPLibraryAgent.exe by the launcher.
     add_library(ampify_kernel MODULE ${AMPIFY_KERNEL_SOURCES})

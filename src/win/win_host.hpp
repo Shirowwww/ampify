@@ -28,7 +28,8 @@ class Services;
 class KitCommandRunner;
 }
 
-class WinHost : public Host, public HttpPostHost, public BrowserHost, public ImageHost, public ArtworkHost {
+class WinHost : public Host, public HttpPostHost, public BrowserHost, public ImageHost, public ArtworkHost,
+                public GifHost {
 public:
     using KeyCallback = std::function<void(const std::string& elementId, const std::string& combo)>;
     using EventSink = std::function<void(const std::string& entry, const std::string& payload)>;
@@ -67,9 +68,12 @@ public:
 
     HttpResponse HttpGet(const std::string& url) override;
     HttpResponse HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) override;
+    HttpResponse HttpGetWithHeaders(const std::string& url, const HttpHeaders& headers) override;
     bool OpenInBrowser(const std::string& url) override;
     std::optional<RgbaImage> DecodeImage(const std::string& bytes, uint32_t maxSide) override;
     std::optional<ArtworkHost::File> CurrentArtwork() override;
+    std::optional<std::string> GifFromVideo(const std::string& video, const GifHost::Options& options,
+                                            std::string* error) override;
 
     UiModel& Ui() override { return m_ui; }
 

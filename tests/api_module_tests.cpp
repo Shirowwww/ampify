@@ -97,7 +97,7 @@ const Expected kMembers[] = {
               "presets:f0=presets}}"},
     {"keyboard", "object!{bind:f2=bind}"},
     {"notify", "f1="},
-    {"http", "object!{get:f1=get,post:f2=post,postForm:f2=postForm,open:f1=open}"},  // post, postForm and open added in kitApi 1.x, compatible additions
+    {"http", "object!{get:f1=get,post:f2=post,postForm:f2=postForm,gifFromVideo:f1=gifFromVideo,open:f1=open}"},  // post, postForm, gifFromVideo and open added in kitApi 1.x, compatible additions
     {"icons", "object!{get:f1=get,names:f0=names}"},
     {"uri", "object!{parse:f1=parse,build:f3=build}"},
     {"color", "object!{extract:f3=extract,fromArtwork:f1=fromArtwork}"},
