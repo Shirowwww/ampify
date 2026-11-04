@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "../core/amp_abi.hpp"
+#include "amp_item.hpp"
 #include "win_common.hpp"
 
 namespace ampify::win {
@@ -304,17 +305,6 @@ std::optional<std::vector<rt::Ref>> ComponentModels(const rt::Ref& collection, s
     return out;
 }
 
-// IContentDescriptorDriven.get_ContentDescriptor (slot 6) as an IContentDescriptor, or empty.
-rt::Ref DescriptorOf(const rt::Ref& model) {
-    rt::Ref driven, object, descriptor;
-    if (!rt::Query(model, rt::GuidOf(amp::kIidContentDescriptorDriven), driven) ||
-        FAILED(rt::CallSlot(driven, slot::kDrivenContentDescriptor, object.Put())) || !object) {
-        return {};
-    }
-    rt::Query(object, rt::GuidOf(amp::kIidContentDescriptor), descriptor);
-    return descriptor;
-}
-
 std::optional<AmpQueueEntry> ReadQueueEntry(const rt::Ref& model, int32_t sectionKind) {
     rt::Ref item, titled;
     // IPlayQueueItem: get_PlayQueueItemID 6, get_Subtitle 7, get_Duration 10.
@@ -329,7 +319,7 @@ std::optional<AmpQueueEntry> ReadQueueEntry(const rt::Ref& model, int32_t sectio
         entry.title = rt::ReadString(titled, slot::kTitledTitle);
     }
     // IContentDescriptor.get_AdamId (slot 21).
-    if (rt::Ref descriptor = DescriptorOf(model)) entry.catalogId = rt::ReadString(descriptor, slot::kDescriptorAdamId);
+    if (rt::Ref descriptor = ContentDescriptorOf(model)) entry.catalogId = rt::ReadString(descriptor, slot::kDescriptorAdamId);
     return entry;
 }
 

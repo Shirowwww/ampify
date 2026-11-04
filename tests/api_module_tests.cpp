@@ -110,7 +110,7 @@ const Expected kMembers[] = {
            "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},"
            "panel:object!{register:f2=register},"
            "page:object!{register:f2=register},title:object!{set:f1=set},"
-           "setLabel:f2=setLabel,navigate:f1=navigate}"},  // setLabel added in kitApi 1.x, a compatible addition
+           "setLabel:f2=setLabel,setActive:f2=setActive,navigate:f1=navigate}"},  // setLabel and setActive added in kitApi 1.x, compatible additions
 };
 
 const Expected kGlobals[] = {

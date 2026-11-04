@@ -51,7 +51,11 @@ struct UiNatives : ScriptBridge {
         std::string icon = String(ctx, argc, argv, 2).value_or("").substr(0, kMaxUiIcon);
         // Argument 3, false for a text that only shows something (no onClick); older preludes leave it out.
         bool clickable = argc < 4 || JS_ToBool(ctx, argv[3]) != 0;
-        return JS_NewInt32(ctx, HostOf(ext).Ui().AddControl(ext->id(), placement, label, icon, clickable));
+        // Argument 4, the submenu an entry of a menu belongs to (0 or left out: the menu itself).
+        int parent = argc >= 5 ? static_cast<int>(Number(ctx, argc, argv, 4)) : 0;
+        int id = HostOf(ext).Ui().AddControl(ext->id(), placement, label, icon, clickable, parent);
+        if (id == 0 && parent != 0) return Throw(ctx, "RangeError", "ui: the submenu does not exist or is not of this menu");
+        return JS_NewInt32(ctx, id);
     }
 
     // No permission of its own: the element can only relabel what it added, which needed the permission already.
@@ -60,6 +64,14 @@ struct UiNatives : ScriptBridge {
         int id = static_cast<int>(Number(ctx, argc, argv, 0));
         std::string label = String(ctx, argc, argv, 1).value_or("").substr(0, kMaxUiLabel);
         return JS_NewBool(ctx, HostOf(ext).Ui().SetControlLabel(ext->id(), id, label));
+    }
+
+    // Same rule as the label: no permission of its own, the element can only touch what it added.
+    AMPIFY_NATIVE(UiControlActive) {
+        ScriptExtension* ext = Owner(ctx);
+        int id = static_cast<int>(Number(ctx, argc, argv, 0));
+        bool active = argc >= 2 && JS_ToBool(ctx, argv[1]) != 0;
+        return JS_NewBool(ctx, HostOf(ext).Ui().SetControlActive(ext->id(), id, active));
     }
 
     AMPIFY_NATIVE(UiPanel) {
@@ -159,8 +171,9 @@ struct UiNatives : ScriptBridge {
 }  // namespace
 
 void DefineUi(api::NativeScope& scope) {
-    scope.Function("uiControl", UiNatives::UiControl, 4);
+    scope.Function("uiControl", UiNatives::UiControl, 5);
     scope.Function("uiControlLabel", UiNatives::UiControlLabel, 2);
+    scope.Function("uiControlActive", UiNatives::UiControlActive, 2);
     scope.Function("uiPanel", UiNatives::UiPanel, 2);
     scope.Function("uiPopup", UiNatives::UiPopup, 1);
     scope.Function("uiFullscreen", UiNatives::UiFullscreen, 2);

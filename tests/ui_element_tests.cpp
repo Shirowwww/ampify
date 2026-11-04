@@ -90,6 +90,148 @@ TEST_CASE(Interface_AnUnknownMenuKindIsRefused) {
     CHECK(f.host.ui.Controls().empty());
 }
 
+TEST_CASE(Interface_ASubmenuHoldsItsEntriesAndEachOneClicks) {
+    Fixture f;
+    auto element = f.Make("submenu", "extension", R"("ui.menu")", R"(
+        Ampify.ui.menu.addItem("context", { label: "Tools", items: [
+          { label: "Copy title", onClick: (item) => Ampify.log("copy " + item.title) },
+          { label: "Search", onClick: (item) => Ampify.log("search " + item.title) },
+        ] });
+        Ampify.ui.menu.addItem("context", { label: "Alone", onClick: () => Ampify.log("alone") });)");
+    CHECK(element->Start());
+    std::vector<ampify::UiControl> controls = f.host.ui.Controls();
+    CHECK(controls.size() == 4);
+    if (controls.size() != 4) return;
+    CHECK(!controls[0].clickable && controls[0].parent == 0 && controls[0].label == "Tools");
+    CHECK(controls[1].clickable && controls[1].parent == controls[0].id);
+    CHECK(controls[2].clickable && controls[2].parent == controls[0].id);
+    CHECK(controls[3].clickable && controls[3].parent == 0);
+    element->DeliverEvent("menuClick", R"({"id":)" + std::to_string(controls[2].id) + R"(,"title":"Merci"})");
+    element->DeliverEvent("menuClick", R"({"id":)" + std::to_string(controls[1].id) + R"(,"title":"Merci"})");
+    element->Pump();
+    CHECK(f.Logged("[submenu] search Merci"));
+    CHECK(f.Logged("[submenu] copy Merci"));
+    element->Stop();
+    CHECK(f.host.ui.Controls().empty());
+}
+
+TEST_CASE(Interface_AContextEntryGetsTheKindAndIdentifiersOfItsItem) {
+    Fixture f;
+    auto element = f.Make("items", "extension", R"("ui.menu")", R"(
+        Ampify.ui.menu.addItem("context", { label: "Show", onClick: (detail) => Ampify.log(JSON.stringify(detail)) });)");
+    CHECK(element->Start());
+    std::vector<ampify::UiControl> controls = f.host.ui.Controls();
+    CHECK(controls.size() == 1);
+    if (controls.size() != 1) return;
+    const std::string id = std::to_string(controls[0].id);
+    element->DeliverEvent("menuClick", R"({"id":)" + id + R"(,"title":"Merci","item":{"kind":"album","id":"12","canonicalId":"c"}})");
+    element->DeliverEvent("menuClick", R"({"id":)" + id + R"(,"title":"Merci","item":{"kind":"song"}})");
+    element->DeliverEvent("menuClick", R"({"id":)" + id + R"(,"title":"Merci"})");
+    element->DeliverEvent("menuClick", R"({"id":)" + id + R"(,"title":"Merci","item":"not an object"})");
+    element->Pump();
+    CHECK(f.Logged(R"([items] {"title":"Merci","item":{"kind":"album","id":"12","canonicalId":"c"}})"));
+    CHECK(f.Logged(R"([items] {"title":"Merci","item":{"kind":"song"}})"));
+    CHECK(f.Logged(R"([items] {"title":"Merci"})"));
+    element->Stop();
+}
+
+TEST_CASE(Interface_ASubmenuIsRefusedEmptyTooLongOrNested) {
+    Fixture f;
+    auto element = f.Make("badsubmenu", "extension", R"("ui.menu")", R"(
+        const tries = [
+          { label: "Empty", items: [] },
+          { label: "Nested", items: [{ label: "Inner", items: [{ label: "x", onClick: () => {} }] }] },
+          { label: "Many", items: Array.from({ length: 21 }, () => ({ label: "x", onClick: () => {} })) },
+          { label: "Text", items: "not a list" },
+        ];
+        for (const options of tries) {
+          try { Ampify.ui.menu.addItem("context", options); Ampify.log("accepted " + options.label); }
+          catch (e) { Ampify.log("refused " + options.label + " " + e.name); }
+        })");
+    CHECK(element->Start());
+    CHECK(f.Logged("refused Empty TypeError"));
+    CHECK(f.Logged("refused Nested TypeError"));
+    CHECK(f.Logged("refused Many TypeError"));
+    CHECK(f.Logged("refused Text TypeError"));
+    CHECK(!f.Logged("accepted"));
+}
+
+TEST_CASE(Interface_ASidebarEntryCanStartOnAndBeSwitched) {
+    Fixture f;
+    auto element = f.Make("sideon", "extension", R"("ui.sidebar")", R"(
+        const id = Ampify.ui.sidebar.addItem({ label: "Stats", icon: "", onClick: () => {}, active: true });
+        Ampify.log("id " + typeof id);
+        Ampify.ui.setActive(id, false);
+        Ampify.ui.setActive(id, true);)");
+    CHECK(element->Start());
+    CHECK(f.Logged("id number"));
+    std::vector<ampify::UiControl> controls = f.host.ui.Controls();
+    CHECK(controls.size() == 1);
+    if (controls.size() != 1) return;
+    CHECK(controls[0].placement == "sidebar" && controls[0].active);
+}
+
+TEST_CASE(Interface_ASubmenuWithABadEntryLeavesNothingInTheModel) {
+    Fixture f;
+    auto element = f.Make("halfsubmenu", "extension", R"("ui.menu")", R"(
+        try {
+          Ampify.ui.menu.addItem("context", { label: "Half", items: [
+            { label: "good", onClick: () => {} },
+            { label: "no click" },
+          ] });
+          Ampify.log("accepted");
+        } catch (e) { Ampify.log("refused " + e.name); })");
+    CHECK(element->Start());
+    CHECK(f.Logged("refused TypeError"));
+    CHECK(f.host.ui.Controls().empty());
+}
+
+TEST_CASE(Interface_AnEntryCannotJoinTheSubmenuOfAnotherElementOrMenu) {
+    ampify::UiModel model;
+    int tools = model.AddControl("one", "menu-context", "Tools", "", false, 0);
+    CHECK(tools != 0);
+    CHECK(model.AddControl("one", "menu-context", "Inside", "", true, tools) != 0);
+    CHECK(model.AddControl("two", "menu-context", "Foreign", "", true, tools) == 0);  // another element's
+    CHECK(model.AddControl("one", "menu-app", "Other menu", "", true, tools) == 0);   // another menu
+    CHECK(model.AddControl("one", "menu-context", "Ghost", "", true, 999) == 0);      // no such submenu
+    CHECK(model.AddControl("one", "menu-context", "Text", "", false, tools) == 0);    // an entry must be clickable
+    int inner = model.AddControl("one", "menu-context", "Entry", "", true, tools);
+    CHECK(model.AddControl("one", "menu-context", "Deeper", "", true, inner) == 0);   // not a submenu itself
+}
+
+TEST_CASE(Interface_AButtonStartsOnAndSetActiveSwitchesItOnAndOff) {
+    Fixture f;
+    auto element = f.Make("toggle-button", "extension", R"("ui.playbar", "ui.topbar")", R"(
+        const a = Ampify.ui.playbar.addButton({ label: "A", active: true, onClick: () => {} });
+        const b = Ampify.ui.topbar.addButton({ label: "B", onClick: () => {} });
+        Ampify.log("start " + a + " " + b);
+        Ampify.log("on " + Ampify.ui.setActive(b, true));
+        Ampify.log("off " + Ampify.ui.setActive(a, false));
+        Ampify.log("unknown " + Ampify.ui.setActive(999, true));)");
+    CHECK(element->Start());
+    std::vector<ampify::UiControl> controls = f.host.ui.Controls();
+    CHECK(controls.size() == 2);
+    if (controls.size() != 2) return;
+    CHECK(!controls[0].active);  // a: started on, then switched off
+    CHECK(controls[1].active);   // b: started off, then switched on
+    CHECK(f.Logged("[toggle-button] on true"));
+    CHECK(f.Logged("[toggle-button] off true"));
+    CHECK(f.Logged("[toggle-button] unknown false"));
+    element->Stop();
+}
+
+TEST_CASE(Interface_AnElementCannotSwitchAnotherElementsButton) {
+    ampify::UiModel model;
+    int mine = model.AddControl("one", "playbar", "A", "", true, 0);
+    CHECK(!model.SetControlActive("two", mine, true));
+    CHECK(model.SetControlActive("one", mine, true));
+    bool active = false;
+    for (const ampify::UiControl& control : model.Controls()) {
+        if (control.id == mine) active = control.active;
+    }
+    CHECK(active);
+}
+
 TEST_CASE(Interface_ABadTreeIsRefusedWhenItIsRegistered) {
     Fixture f;
     auto element = f.Make("badpanel", "extension", R"("ui.panel")",

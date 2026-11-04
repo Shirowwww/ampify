@@ -16,6 +16,7 @@
 #include "../../src/core/lyrics_host.hpp"
 #include "../../src/core/player_queue.hpp"
 #include "../../src/core/settings.hpp"
+#include "../../src/win/amp_item.hpp"
 #include "../../src/win/amp_player.hpp"
 #include "../../src/win/player_bridge.hpp"
 #include "../../src/win/win_host.hpp"
@@ -61,6 +62,7 @@ struct World {
     bool sectionsChanged = false;  // get_Sections answers an object that is not an IVector<IComponentModel>
     UINT32 longerNext = 0;        // the "next" section repeats its last entry this many more times
     std::vector<uint64_t> deleted;  // the ids DeletePlayQueueItemsAsync received
+    int descriptorFlag = 0;       // the IContentDescriptor Is* slot that answers true (0: none)
 } g;
 
 const GUID kUnknown = rt::GuidOf("00000000-0000-0000-C000-000000000046");
@@ -416,6 +418,17 @@ HRESULT STDMETHODCALLTYPE DescriptorAdamId(Facet* self, HSTRING* out) {  // ICon
     *out = MakeString(Owning(entries, &EntryFake::descriptor, self).catalogId);
     return S_OK;
 }
+HRESULT STDMETHODCALLTYPE DescriptorCanonicalId(Facet* self, HSTRING* out) {  // get_CanonicalId, 22
+    std::wstring id = Owning(entries, &EntryFake::descriptor, self).catalogId;
+    *out = MakeString(id.empty() ? L"" : (L"c:" + id).c_str());
+    return S_OK;
+}
+// The Is* getters (one byte): only the slot the test turned on says yes.
+template <int Slot>
+HRESULT STDMETHODCALLTYPE DescriptorFlag(Facet*, unsigned char* out) {
+    *out = g.descriptorFlag == Slot ? 1 : 0;
+    return S_OK;
+}
 
 void Build() {
     static bool built = false;
@@ -504,6 +517,16 @@ void Build() {
     titledVt.slots[6] = Fn(&EntryTitle);
     drivenVt.slots[6] = Fn(&EntryDescriptor);
     descriptorVt.slots[21] = Fn(&DescriptorAdamId);
+    descriptorVt.slots[22] = Fn(&DescriptorCanonicalId);
+    descriptorVt.slots[11] = Fn(&DescriptorFlag<11>);
+    descriptorVt.slots[12] = Fn(&DescriptorFlag<12>);
+    descriptorVt.slots[13] = Fn(&DescriptorFlag<13>);
+    descriptorVt.slots[14] = Fn(&DescriptorFlag<14>);
+    descriptorVt.slots[15] = Fn(&DescriptorFlag<15>);
+    descriptorVt.slots[16] = Fn(&DescriptorFlag<16>);
+    descriptorVt.slots[18] = Fn(&DescriptorFlag<18>);
+    descriptorVt.slots[19] = Fn(&DescriptorFlag<19>);
+    descriptorVt.slots[20] = Fn(&DescriptorFlag<20>);
 }
 
 HRESULT FakeActivation(std::wstring_view name, const GUID& iid, void** out) {
@@ -820,6 +843,47 @@ TEST_CASE(PlayerBridge_ListsApplesWholeQueueSectionBySection) {
     CHECK(queue.items[3].catalogId.empty());
     CHECK(log.str().find("queue read through AMP.Services.PlayQueue (4 entries)") != std::string::npos);
     CHECK(g.unexpected == 0);
+}
+
+TEST_CASE(AmpItem_ReadsTheIdentifiersAndTheKindOfAnItemsDescriptor) {
+    Reset();
+    Build();
+    rt::Ref soon(&entries[2].item);
+    auto song = ampify::win::ReadItemInfo(soon, "Soon");
+    CHECK(song && song->id == "1003" && song->canonicalId == "c:1003" && song->kind == "song");
+    CHECK(ampify::win::ReadItemInfo(soon, ""));  // no name to check: the descriptor alone
+    const struct {
+        int slot;
+        const char* kind;
+    } kinds[] = {{11, "album"},  {12, "artist"},   {13, "composer"}, {14, "genre"},  {15, "playlist"},
+                 {16, "station"}, {18, "container"}, {19, "video"},    {20, "concert"}};
+    for (const auto& expected : kinds) {
+        g.descriptorFlag = expected.slot;
+        auto info = ampify::win::ReadItemInfo(soon, "Soon");
+        CHECK(info && info->kind == expected.kind);
+    }
+    CHECK(g.unexpected == 0);
+}
+
+TEST_CASE(AmpItem_ADescriptorOfAnotherNameIsNotTheItemTheMenuIsAbout) {
+    Reset();
+    Build();
+    g.descriptorFlag = 15;  // a playlist: what the page around a row is
+    CHECK(!ampify::win::ReadItemInfo(rt::Ref(&entries[2].item), "Another name"));
+    auto page = ampify::win::ReadItemInfo(rt::Ref(&entries[2].item), "Soon");
+    CHECK(page && page->kind == "playlist");
+}
+
+TEST_CASE(AmpItem_SaysNothingForAnObjectWithoutADescriptorAndKeepsWhatIsThere) {
+    Reset();
+    Build();
+    CHECK(!ampify::win::ReadItemInfo(rt::Ref(&itemF), "Now"));  // no IContentDescriptorDriven
+    auto plain = ampify::win::ReadItemInfo(rt::Ref(&entries[3].item), "Later");
+    CHECK(plain && plain->kind == "song" && plain->id.empty() && plain->canonicalId.empty());  // named, no identifier
+    g.descriptorFlag = 11;
+    auto album = ampify::win::ReadItemInfo(rt::Ref(&entries[3].item), "Later");
+    CHECK(album && album->kind == "album" && album->id.empty());  // the kind alone is still something
+    CHECK(!ampify::win::ReadItemInfo(rt::Ref(), "Later"));
 }
 
 TEST_CASE(PlayerBridge_SaysWhenTheQueueIsLongerThanWhatItReads) {

@@ -41,7 +41,13 @@ type UiNode = TooltipProps & Omit<PlaceProps, "align"> & BoxProps & Omit<TextSty
   onChange?: number;  // callback number (toggle, slider, textfield, dropdown)
   [prop: string]: unknown;
 };
-type UiButton = { label: string; icon?: string; onClick: () => void };
+// active: a top bar, play bar or sidebar entry that starts on, drawn in the accent colour (Ampify.ui.setActive changes it)
+type UiButton = { label: string; icon?: string; onClick: () => void; active?: boolean };
+// A context entry gets the item's name and, when Apple Music's data has it, its kind and identifiers (a song of the library often has no id)
+type MenuTarget = { title?: string; item?: { kind: string; id?: string; canonicalId?: string } };
+type MenuEntry = { label: string; icon?: string; onClick: (target: MenuTarget) => void };
+// A menu entry, or a submenu: `items` holds entries (one level, 20 at most) and the entry has no onClick of its own
+type MenuItem = MenuEntry | { label: string; icon?: string; items: MenuEntry[] };
 type PlayerState = {
   playing: boolean;
   positionMs: number;
@@ -199,7 +205,7 @@ declare const Ampify: {
     toggleShuffle(): boolean;
     setRepeat(mode: "off" | "all" | "one"): boolean;
     toggleRepeat(): boolean;  // off, all, one, off...
-    setVolume(volume: number): boolean;  // Apple's player volume, 0 to 1, in the audio process once a song has started
+    setVolume(volume: number): boolean;  // Apple's player volume, 0 to 1, once a song has started; moves Apple's slider from "ui"
     queue: {
       list(): QueueState;
       add(catalogId: string | number, options?: { position?: "next" | "last" }): boolean;  // false on Windows for now
@@ -225,10 +231,10 @@ declare const Ampify: {
 
   // 5.5 Interface [preview]
   ui: {
-    topbar: { addButton(button: UiButton): void };
-    playbar: { addButton(button: UiButton): void };
-    sidebar: { addItem(item: UiButton): void };
-    menu: { addItem(where: "context" | "app", item: { label: string; onClick: () => void }): void };
+    topbar: { addButton(button: UiButton): number };  // the id setLabel and setActive take
+    playbar: { addButton(button: UiButton): number };
+    sidebar: { addItem(item: UiButton): number };  // on while its own page is open, or after setActive
+    menu: { addItem(where: "context" | "app", item: MenuItem): number };
     popup: { open(view: UiNode): void };
     // permission ui.fullscreen; onClose runs when the user closes it or another element takes the screen
     fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void };
@@ -238,6 +244,8 @@ declare const Ampify: {
     title: { set(text: string): void };
     /** A new label for a top bar or play bar button this element added: its text without an icon, its tooltip with one. */
     setLabel(id: number, label: string): boolean;
+    /** Switches a top bar or play bar button this element added on or off: on, it takes the accent colour. */
+    setActive(id: number, on: boolean): boolean;
     page: { register(path: string, view: UiNode): void };
     navigate(path: string): void;
   };

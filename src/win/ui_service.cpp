@@ -33,6 +33,7 @@
 #include <vector>
 
 #include <winrt/Windows.Foundation.h>
+#include <inspectable.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
@@ -57,6 +58,7 @@
 #include "../core/ui_render/render_tree.hpp"
 #include "../core/ui_render/surfaces.hpp"
 #include "../core/ui_render/svg_icon.hpp"
+#include "amp_item.hpp"
 #include "apple_player.hpp"
 #include "close_to_tray.hpp"
 #include "kit_command.hpp"
@@ -270,9 +272,30 @@ struct PlacedControl {
     bool reported = false;
     std::string label;     // shown now: a new one from setLabel replaces it in place
     bool hasIcon = false;  // the label is then the tooltip only
+    bool active = false;   // on (Ampify.ui.setActive): drawn in the accent colour
     std::string elementId;  // with id, the button's place among Ampify's buttons
     int id = 0;
 };
+
+// The accent colour while a top bar or play bar button is on, the text colour otherwise. An icon is drawn again with the
+// colour; a text takes it as its foreground. The state is also said to screen readers.
+void TintControl(const controls::Button& button, const UiControl& control, bool hasIcon) {
+    const wchar_t* key = control.active ? L"AccentTextFillColorPrimaryBrush" : L"TextFillColorPrimaryBrush";
+    if (hasIcon) {
+        if (xaml::FrameworkElement icon = MakeIconElement(control.icon, 16, key)) {
+            // A glyph takes the button's own colour unless it is given one; a drawing already follows the key.
+            if (auto glyph = icon.try_as<controls::FontIcon>(); glyph && control.active) {
+                if (auto brush = ThemeResource(key).try_as<media::Brush>()) glyph.Foreground(brush);
+            }
+            button.Content(icon);
+        }
+    } else if (control.active) {
+        if (auto brush = ThemeResource(key).try_as<media::Brush>()) button.Foreground(brush);
+    } else {
+        button.ClearValue(controls::Control::ForegroundProperty());
+    }
+    automation::AutomationProperties::SetItemStatus(button, control.active ? L"on" : L"");
+}
 
 // Ampify's buttons keep one order whatever is switched on, off or reloaded: by element, then in the order the
 // element added them.
@@ -2352,8 +2375,51 @@ void ReleaseSidebarHost(WindowContext& context) {
     context.sidebarOriginal = nullptr;
 }
 
+// The inside of a sidebar entry: the icon and the label, and a bar at the left edge like Apple Music's own selected item.
+// An entry that is on takes the accent colour. The icon is drawn again with the colour, so a state change rebuilds it.
+xaml::UIElement SidebarContent(const UiControl& control, bool active) {
+    const wchar_t* key = active ? L"AccentTextFillColorPrimaryBrush" : L"TextFillColorPrimaryBrush";
+    const media::Brush accent = active ? ThemeResource(key).try_as<media::Brush>() : nullptr;
+    controls::StackPanel row;
+    row.Orientation(controls::Orientation::Horizontal);
+    row.Spacing(16);
+    // An SVG icon (the Marketplace gives Ampify's logo) is drawn in the text brush, like Apple Music's own icons.
+    xaml::FrameworkElement icon = nullptr;
+    if (!control.icon.empty() && !uirender::IsGlyphIcon(control.icon)) icon = MakeIconElement(control.icon, 16, key);
+    if (!icon) {
+        controls::FontIcon glyph;
+        glyph.FontSize(16);
+        glyph.Glyph(uirender::IsGlyphIcon(control.icon) ? Wide(control.icon) : winrt::hstring(L"\xE790"));  // Color
+        if (accent) glyph.Foreground(accent);
+        icon = glyph;
+    }
+    icon.VerticalAlignment(xaml::VerticalAlignment::Center);
+    controls::TextBlock label;
+    label.Text(Wide(control.label));
+    label.VerticalAlignment(xaml::VerticalAlignment::Center);
+    if (accent) label.Foreground(accent);
+    row.Children().Append(icon);
+    row.Children().Append(label);
+
+    controls::Grid content;
+    content.Children().Append(row);
+    if (active) {
+        controls::Border bar;
+        bar.Width(3);
+        bar.Height(16);
+        bar.CornerRadius(xaml::CornerRadius{1.5, 1.5, 1.5, 1.5});
+        bar.HorizontalAlignment(xaml::HorizontalAlignment::Left);
+        bar.VerticalAlignment(xaml::VerticalAlignment::Center);
+        bar.Margin(xaml::Thickness{-12, 0, 0, 0});  // on the button's own edge, in the padding
+        bar.IsHitTestVisible(false);
+        if (auto fill = ThemeResource(L"AccentFillColorDefaultBrush").try_as<media::Brush>()) bar.Background(fill);
+        content.Children().Append(bar);
+    }
+    return content;
+}
+
 // A flat button with the height, margins and corners of Apple Music's sidebar items, and the subtle hover of Fluent.
-controls::Button MakeSidebarButton(const UiControl& control) {
+controls::Button MakeSidebarButton(const UiControl& control, bool active) {
     const std::wstring brushes =
         L"<StaticResource x:Key='ButtonBackground' ResourceKey='SubtleFillColorTransparentBrush'/>"
         L"<StaticResource x:Key='ButtonBackgroundPointerOver' ResourceKey='SubtleFillColorSecondaryBrush'/>"
@@ -2372,28 +2438,14 @@ controls::Button MakeSidebarButton(const UiControl& control) {
         L"<ResourceDictionary x:Key='Light'>" + brushes + L"</ResourceDictionary>"
         L"</ResourceDictionary.ThemeDictionaries></ResourceDictionary></Button.Resources></Button>";
     controls::Button button = xaml::Markup::XamlReader::Load(text).as<controls::Button>();
-    controls::StackPanel row;
-    row.Orientation(controls::Orientation::Horizontal);
-    row.Spacing(16);
-    // An SVG icon (the Marketplace gives Ampify's logo) is drawn in the text brush, like Apple Music's own icons.
-    xaml::FrameworkElement icon = nullptr;
-    if (!control.icon.empty() && !uirender::IsGlyphIcon(control.icon)) {
-        icon = MakeIconElement(control.icon, 16, L"TextFillColorPrimaryBrush");
-    }
-    if (!icon) {
-        controls::FontIcon glyph;
-        glyph.FontSize(16);
-        glyph.Glyph(uirender::IsGlyphIcon(control.icon) ? Wide(control.icon) : winrt::hstring(L"\xE790"));  // Color
-        icon = glyph;
-    }
-    icon.VerticalAlignment(xaml::VerticalAlignment::Center);
-    controls::TextBlock label;
-    label.Text(Wide(control.label));
-    label.VerticalAlignment(xaml::VerticalAlignment::Center);
-    row.Children().Append(icon);
-    row.Children().Append(label);
-    button.Content(row);
+    button.Content(SidebarContent(control, active));
+    automation::AutomationProperties::SetItemStatus(button, active ? L"on" : L"");
     return button;
+}
+
+// An entry is on when its element asked for it (Ampify.ui.setActive), or while the page of that element is on screen.
+bool SidebarEntryIsOn(const WindowContext& context, const UiControl& control) {
+    return control.active || (context.route && !context.pageClosed && context.route->first == control.elementId);
 }
 
 void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context, PlacedControl& placed,
@@ -2408,10 +2460,19 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
         return;
     }
     controls::StackPanel host = EnsureSidebarHost(*context, navigation);
+    const bool active = SidebarEntryIsOn(*context, control);
     std::uint32_t index = 0;
-    if (placed.button && host.Children().IndexOf(placed.button, index)) return;  // still in place
+    if (placed.button && host.Children().IndexOf(placed.button, index)) {  // still in place: only its state may change
+        if (placed.active != active) {
+            placed.active = active;
+            placed.button.Content(SidebarContent(control, active));
+            automation::AutomationProperties::SetItemStatus(placed.button, active ? L"on" : L"");
+        }
+        return;
+    }
 
-    controls::Button button = MakeSidebarButton(control);
+    controls::Button button = MakeSidebarButton(control, active);
+    placed.active = active;
     Name(button, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
     UiEventSink sink = shared.sink;
     std::string elementId = control.elementId;
@@ -2473,7 +2534,41 @@ xaml::Style StyleOf(const MenuItems& items, std::wstring_view className) {
     return nullptr;
 }
 
-controls::MenuFlyoutItem MakeMenuEntry(const UiEventSink& sink, const UiControl& control, const std::string& title,
+// What a menu is about: the item's name, taken from the menu's own "Play «Name»" entry, and what Apple Music's data
+// says about it (its identifiers and kind), read once when the menu opens.
+struct MenuTarget {
+    std::string title;
+    std::optional<AmpItemInfo> item;
+};
+
+// The item the menu is about: the first data context, from the element the click came from upwards, that Apple Music
+// ties to a content descriptor and that carries the menu's own name (the row of a song list, an album's card...), not
+// the page's, which has a descriptor too.
+std::optional<AmpItemInfo> MenuItemInfo(xaml::DependencyObject node, const std::string& title) {
+    constexpr int kMaxDepth = 16;
+    for (int depth = 0; node && depth < kMaxDepth; depth++) {
+        auto element = node.try_as<xaml::FrameworkElement>();
+        if (auto data = element ? element.DataContext() : nullptr) {
+            winrt::com_ptr<::IUnknown> unknown = data.as<::IUnknown>();
+            if (auto info = ReadItemInfo(rt::Ref(unknown.detach()), title)) return info;
+        }
+        node = media::VisualTreeHelper::GetParent(node);
+    }
+    return std::nullopt;
+}
+
+std::string MenuPayload(const UiControl& control, const MenuTarget& target) {
+    Json::Object fields{{"id", Json(static_cast<double>(control.id))}, {"title", Json(target.title)}};
+    if (target.item) {
+        Json::Object item{{"kind", Json(target.item->kind)}};
+        if (!target.item->id.empty()) item.emplace_back("id", Json(target.item->id));
+        if (!target.item->canonicalId.empty()) item.emplace_back("canonicalId", Json(target.item->canonicalId));
+        fields.emplace_back("item", Json(std::move(item)));
+    }
+    return Json(std::move(fields)).Dump();
+}
+
+controls::MenuFlyoutItem MakeMenuEntry(const UiEventSink& sink, const UiControl& control, const MenuTarget& target,
                                        const xaml::Style& style) {
     controls::MenuFlyoutItem item;
     if (style) item.Style(style);
@@ -2485,7 +2580,7 @@ controls::MenuFlyoutItem MakeMenuEntry(const UiEventSink& sink, const UiControl&
         item.Icon(icon);
     }
     Name(item, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
-    std::string payload = Json(Json::Object{{"id", Json(static_cast<double>(control.id))}, {"title", Json(title)}}).Dump();
+    std::string payload = MenuPayload(control, target);
     std::string elementId = control.elementId;
     item.Click([sink, elementId, payload](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
@@ -2496,16 +2591,41 @@ controls::MenuFlyoutItem MakeMenuEntry(const UiEventSink& sink, const UiControl&
     return item;
 }
 
+// A submenu: its own entries are the controls whose parent is it. Apple Music's submenus give it their style.
+controls::MenuFlyoutSubItem MakeMenuSubmenu(const UiEventSink& sink, const UiControl& control,
+                                            const std::vector<UiControl>& entries, const MenuTarget& target,
+                                            const xaml::Style& itemStyle, const xaml::Style& submenuStyle) {
+    controls::MenuFlyoutSubItem submenu;
+    if (submenuStyle) submenu.Style(submenuStyle);
+    submenu.Text(Wide(control.label));
+    submenu.Tag(winrt::box_value(winrt::hstring(kMenuEntryTag)));
+    if (uirender::IsGlyphIcon(control.icon)) {
+        controls::FontIcon icon;
+        icon.Glyph(Wide(control.icon));
+        submenu.Icon(icon);
+    }
+    Name(submenu, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
+    for (const UiControl& child : entries) {
+        if (child.parent == control.id) submenu.Items().Append(MakeMenuEntry(sink, child, target, itemStyle));
+    }
+    return submenu;
+}
+
 // A separator, then the entries, at the end of an open menu. Apple Music keeps a menu's items from one opening to the
 // next and fills them again from its own list, so Ampify's leave once the menu has closed.
 void AppendMenuEntries(const UiEventSink& sink, const primitives::Popup& popup, const MenuItems& items,
-                       const std::vector<UiControl>& entries, const std::string& title) {
+                       const std::vector<UiControl>& entries, const MenuTarget& target) {
     xaml::Style itemStyle = StyleOf(items, L"Microsoft.UI.Xaml.Controls.MenuFlyoutItem");
+    xaml::Style submenuStyle = StyleOf(items, L"Microsoft.UI.Xaml.Controls.MenuFlyoutSubItem");
     controls::MenuFlyoutSeparator separator;
     if (xaml::Style lineStyle = StyleOf(items, L"Microsoft.UI.Xaml.Controls.MenuFlyoutSeparator")) separator.Style(lineStyle);
     separator.Tag(winrt::box_value(winrt::hstring(kMenuEntryTag)));
     items.Append(separator);
-    for (const UiControl& control : entries) items.Append(MakeMenuEntry(sink, control, title, itemStyle));
+    for (const UiControl& control : entries) {
+        if (control.parent != 0) continue;  // it is shown inside its submenu
+        if (control.clickable) items.Append(MakeMenuEntry(sink, control, target, itemStyle));
+        else items.Append(MakeMenuSubmenu(sink, control, entries, target, itemStyle, submenuStyle));
+    }
 
     auto token = std::make_shared<winrt::event_token>();
     *token = popup.Closed([items, token](IInspectable const& sender, IInspectable const&) noexcept {
@@ -2548,7 +2668,14 @@ bool AddMenuEntries(UiService::Shared& shared, WindowContext& context) {
         if (HasMenuEntries(items)) return true;  // this opening has them already
         std::string title = app ? std::string() : uirender::QuotedMenuName(MenuTexts(items));
         if (!app && title.empty()) continue;  // a menu of options, or one not filled in yet
-        AppendMenuEntries(shared.sink, popup, items, entries, title);
+        MenuTarget target{title, std::nullopt};
+        if (!app) {
+            target.item = MenuItemInfo(context.menuSource.get(), title);
+            shared.Once(target.item ? "menu-item-known" : "menu-item-unknown",
+                        target.item ? "Interface: an item's menu knows its content descriptor (identifier and kind)"
+                                    : "Interface: an item's menu has no content descriptor behind it, entries get the name only");
+        }
+        AppendMenuEntries(shared.sink, popup, items, entries, target);
         shared.Once(app ? "menu-app-open" : "menu-context-open",
                     app ? "Interface: entries added to the main menu" : "Interface: entries added to an item's menu");
         return true;
@@ -2658,6 +2785,10 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
                 controls::ToolTipService::SetToolTip(placed.button, winrt::box_value(Wide(control.label)));
                 automation::AutomationProperties::SetName(placed.button, Wide(control.label));
             }
+            if (placed.active != control.active) {
+                placed.active = control.active;
+                TintControl(placed.button, control, placed.hasIcon);
+            }
             continue;
         }
 
@@ -2709,6 +2840,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
                 button.Width(std::numeric_limits<double>::quiet_NaN());
             }
         }
+        if (control.active) TintControl(button, control, static_cast<bool>(icon));
         // A text that only shows something: no hover, no press, the pointer goes through to the bar (so no tooltip).
         if (control.clickable) controls::ToolTipService::SetToolTip(button, winrt::box_value(Wide(control.label)));
         else button.IsHitTestVisible(false);
@@ -2731,6 +2863,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         placed.button = button;
         placed.label = control.label;
         placed.hasIcon = static_cast<bool>(icon);
+        placed.active = control.active;
         placed.elementId = control.elementId;
         placed.id = control.id;
         shared.journal.Write("Interface: button \"" + control.label + "\" of " + control.elementId + " placed in \"" +

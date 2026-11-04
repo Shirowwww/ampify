@@ -218,10 +218,18 @@ bool CheckNode(const Json& node, const std::string& parent, int depth, int& node
 }  // namespace
 
 int UiModel::AddControl(const std::string& elementId, const std::string& placement, const std::string& label,
-                        const std::string& icon, bool clickable) {
+                        const std::string& icon, bool clickable, int parent) {
     if (!IsPlacement(placement)) return 0;
     std::lock_guard<std::mutex> guard(m_mutex);
+    if (parent != 0) {
+        auto submenu = std::find_if(m_controls.begin(), m_controls.end(), [&](const UiControl& other) {
+            return other.id == parent && other.elementId == elementId && other.placement == placement &&
+                   !other.clickable && other.parent == 0;
+        });
+        if (submenu == m_controls.end() || !clickable) return 0;
+    }
     UiControl control;
+    control.parent = parent;
     control.id = m_nextId++;
     control.elementId = elementId;
     control.placement = placement;
@@ -318,6 +326,16 @@ bool UiModel::SetControlLabel(const std::string& elementId, int controlId, const
     for (UiControl& control : m_controls) {
         if (control.id != controlId || control.elementId != elementId) continue;
         control.label = label;
+        return true;
+    }
+    return false;
+}
+
+bool UiModel::SetControlActive(const std::string& elementId, int controlId, bool active) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    for (UiControl& control : m_controls) {
+        if (control.id != controlId || control.elementId != elementId) continue;
+        control.active = active;
         return true;
     }
     return false;

@@ -313,6 +313,24 @@ TEST_CASE(UiRender_AnApplePlayerRequestIsReportedOnce) {
     CHECK(!tracker.Poll(model).applePlayer);
 }
 
+TEST_CASE(UiRender_SwitchingAButtonOnOrOffIsAChangeOfItsSurface) {
+    ampify::UiModel model;
+    int control = model.AddControl("x", "playbar", "Probe", "\xEE\x9C\xB4");
+    SurfaceTracker tracker;
+    CHECK(tracker.Poll(model).added.size() == 1);
+    CHECK(tracker.Poll(model).Empty());
+
+    CHECK(model.SetControlActive("x", control, true));
+    SurfaceChanges on = tracker.Poll(model);
+    CHECK(on.changed.size() == 1);
+    CHECK(on.changed.size() == 1 && on.changed[0].control.active);
+
+    CHECK(model.SetControlActive("x", control, false));
+    SurfaceChanges off = tracker.Poll(model);
+    CHECK(off.changed.size() == 1);
+    CHECK(off.changed.size() == 1 && !off.changed[0].control.active);
+}
+
 TEST_CASE(UiRender_SettingsAnchorIsTheStackWithTheMostToggles) {
     FakeTree tree;
     int root = tree.Add(-1, "Microsoft.UI.Xaml.Controls.Grid", kProbePanel | kProbeGrid);

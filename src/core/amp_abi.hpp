@@ -169,6 +169,20 @@ inline constexpr int kQueueItemDuration = 10;
 inline constexpr int kTitledTitle = 6;
 inline constexpr int kDrivenContentDescriptor = 6;
 inline constexpr int kDescriptorAdamId = 21;
+// IContentDescriptor: get_HasCloudCatalogIdentifiers, get_HasCloudIdentifiers, get_HasCloudLibraryIdentifiers,
+// get_HasLocalLibraryIdentifiers, HasMatchingIdentifiers, get_IsAlbum (11th slot), get_IsArtist, get_IsComposer,
+// get_IsGenre, get_IsPlaylist, get_IsRadioStation, MakeIdentifier, get_IsContainer, get_IsVideo, get_IsConcert,
+// get_AdamId, get_CanonicalId. The Is* getters write a Boolean (one byte).
+inline constexpr int kDescriptorIsAlbum = 11;
+inline constexpr int kDescriptorIsArtist = 12;
+inline constexpr int kDescriptorIsComposer = 13;
+inline constexpr int kDescriptorIsGenre = 14;
+inline constexpr int kDescriptorIsPlaylist = 15;
+inline constexpr int kDescriptorIsRadioStation = 16;
+inline constexpr int kDescriptorIsContainer = 18;
+inline constexpr int kDescriptorIsVideo = 19;
+inline constexpr int kDescriptorIsConcert = 20;
+inline constexpr int kDescriptorCanonicalId = 22;
 }  // namespace slot
 
 // Every slot above with its interface and method, for the test against AMP.Services.txt and AMP.UI.Views.txt.
@@ -221,6 +235,16 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.CommonModels.ITitledComponent", "get_Title", slot::kTitledTitle},
     {"AMP.Services.CommonModels.IContentDescriptorDriven", "get_ContentDescriptor", slot::kDrivenContentDescriptor},
     {"AMP.Services.CommonModels.IContentDescriptor", "get_AdamId", slot::kDescriptorAdamId},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_CanonicalId", slot::kDescriptorCanonicalId},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_IsAlbum", slot::kDescriptorIsAlbum},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_IsArtist", slot::kDescriptorIsArtist},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_IsComposer", slot::kDescriptorIsComposer},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_IsGenre", slot::kDescriptorIsGenre},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_IsPlaylist", slot::kDescriptorIsPlaylist},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_IsRadioStation", slot::kDescriptorIsRadioStation},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_IsContainer", slot::kDescriptorIsContainer},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_IsVideo", slot::kDescriptorIsVideo},
+    {"AMP.Services.CommonModels.IContentDescriptor", "get_IsConcert", slot::kDescriptorIsConcert},
     {"AMP.UI.Views.IFullScreenPlayerStatics", "Instance", slot::kFullScreenPlayerStaticsInstance},
     {"AMP.UI.Views.IFullScreenPlayer", "get_ViewModel", slot::kFullScreenPlayerViewModel},
     {"AMP.UI.Views.IFullScreenPlayer", "Show", slot::kFullScreenPlayerShow},
