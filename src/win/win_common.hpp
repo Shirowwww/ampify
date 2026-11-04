@@ -45,6 +45,11 @@ std::filesystem::path KnownFolder(const KNOWNFOLDERID& folder);
 // %LOCALAPPDATA%\Programs\Ampify, where the installer puts Ampify.
 std::filesystem::path InstallDirectory();
 
+// The version Settings > Apps shows for a program: the "DisplayVersion" of `key` under HKEY_CURRENT_USER. Only an entry
+// that exists is changed, so an update never makes an uninstall entry for a copy the installer did not install.
+// False when there is no such key or the value cannot be written.
+bool SetDisplayVersion(const std::wstring& key, const std::wstring& version);
+
 // Conversions between UTF-8 (what the logs and the report use) and UTF-16 (what Windows uses).
 std::string ToUtf8(std::wstring_view text);
 std::wstring FromUtf8(std::string_view text);

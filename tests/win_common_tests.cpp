@@ -56,3 +56,39 @@ TEST_CASE(WinCommon_ProcessWatchSeesAProgramStartAndEnd) {
     CHECK(!watch.Running());
     DeleteFileW(probe.c_str());
 }
+
+namespace {
+
+constexpr wchar_t kTestKey[] = L"Software\\AmpifyTests\\DisplayVersion";
+
+std::wstring ReadDisplayVersion() {
+    wchar_t buffer[64]{};
+    DWORD size = sizeof(buffer);
+    if (RegGetValueW(HKEY_CURRENT_USER, kTestKey, L"DisplayVersion", RRF_RT_REG_SZ, nullptr, buffer, &size) !=
+        ERROR_SUCCESS) {
+        return L"<unreadable>";
+    }
+    return buffer;
+}
+
+}  // namespace
+
+TEST_CASE(WinCommon_AnUpdateChangesTheVersionOfAnExistingUninstallEntryOnly) {
+    RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\AmpifyTests");
+    // No entry: the copy was not installed by the installer, so no entry is made for it.
+    CHECK(!ampify::win::SetDisplayVersion(kTestKey, L"1.1.0"));
+    HKEY probe = nullptr;
+    CHECK(RegOpenKeyExW(HKEY_CURRENT_USER, kTestKey, 0, KEY_READ, &probe) != ERROR_SUCCESS);
+    if (probe) RegCloseKey(probe);
+
+    HKEY key = nullptr;
+    CHECK(RegCreateKeyExW(HKEY_CURRENT_USER, kTestKey, 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr) == ERROR_SUCCESS);
+    const std::wstring before = L"1.0.0";
+    RegSetValueExW(key, L"DisplayVersion", 0, REG_SZ, reinterpret_cast<const BYTE*>(before.c_str()),
+                   static_cast<DWORD>((before.size() + 1) * sizeof(wchar_t)));
+    RegCloseKey(key);
+    CHECK(ReadDisplayVersion() == L"1.0.0");
+    CHECK(ampify::win::SetDisplayVersion(kTestKey, L"1.1.0"));
+    CHECK(ReadDisplayVersion() == L"1.1.0");
+    RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\AmpifyTests");
+}

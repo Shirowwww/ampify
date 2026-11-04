@@ -33,6 +33,11 @@ inline constexpr std::string_view kPublisher = "Shirowwww";
 // The files that make up the installed kit, in the order they are copied.
 std::vector<std::string_view> InstalledFiles();
 
+// True for a file that `ampify update --apply` leaves in the install folder besides InstalledFiles(): the old copy of
+// a program it replaced (name.old, name.1.old, name.last.old) and the text files of the package (BUILD_INFO.txt,
+// README.txt, SHA256SUMS.txt). The uninstaller removes them, and nothing else it did not put there.
+bool IsUpdateLeftover(std::string_view fileName);
+
 // True for the user's data folder, such as C:\Users\User\Ampify. The uninstaller only deletes a
 // folder that passes this check, so a wrong path can never remove something else.
 bool IsKitDataFolder(std::string_view path);

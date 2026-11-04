@@ -35,6 +35,10 @@ bool IsProcessRunning(const std::string& imageName);
 // The pointer's place on the screen, in pixels (`ampify devtools pick`). False where it cannot be read.
 bool CursorPosition(int& x, int& y);
 
+// The version Settings > Apps shows for the installed kit, after an update replaced its files. Only the entry the
+// installer made is changed. False where there is none (and on systems without one).
+bool SetInstalledVersion(const std::string& version);
+
 // Ends every process with this image name and waits for them a moment. True when none is left. Systems without the
 // check answer true.
 bool EndProcesses(const std::string& imageName);

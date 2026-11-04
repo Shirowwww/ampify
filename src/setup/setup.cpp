@@ -716,6 +716,25 @@ void ScheduleSelfDelete(const fs::path& file, Log& log) {
     }
 }
 
+// What `ampify update --apply` left beside the programs (old copies, the package's text files): without them the
+// install folder can go. A file that stays (still in use) is logged and does not stop the uninstall.
+void RemoveUpdateLeftovers(const fs::path& target, Log& log) {
+    std::vector<fs::path> found;
+    std::error_code error;
+    for (const fs::directory_entry& entry : fs::directory_iterator(target, error)) {
+        std::error_code typeError;
+        if (!entry.is_regular_file(typeError)) continue;
+        if (ampify::IsUpdateLeftover(ampify::win::ToUtf8(entry.path().filename().wstring()))) found.push_back(entry.path());
+    }
+    for (const fs::path& file : found) {
+        std::error_code removeError;
+        fs::remove(file, removeError);
+        const std::string name = ampify::win::ToUtf8(file.filename().wstring());
+        log.Write(removeError && fs::exists(file) ? "Could not remove " + name + ": " + removeError.message()
+                                                  : "Removed: " + name);
+    }
+}
+
 int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
     fs::path target = ampify::win::InstallDirectory();
 
@@ -768,6 +787,7 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
         log.Write("Removed: " + std::string(name));
     }
 
+    RemoveUpdateLeftovers(target, log);
     RemoveOldShortcut(log);
     log.Write(UpdateUserPath(target, false) ? "Install folder removed from the user's Path"
                                             : "Could not remove the install folder from the user's Path");

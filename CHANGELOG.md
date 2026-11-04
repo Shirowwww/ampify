@@ -33,6 +33,8 @@ More for extension authors, and more of Apple Music's elements within reach of a
 ### Other
 
 - The Atmos leveler's log now says which audio stream format it follows or leaves alone.
+- After an update, Settings > Apps shows the new version (it kept the one that was installed first), and uninstalling
+  removes the old copies and the package's text files that an update leaves beside the programs.
 
 ## 1.0.0 (2026-11-04)
 

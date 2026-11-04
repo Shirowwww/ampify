@@ -11,6 +11,13 @@ std::vector<std::string_view> InstalledFiles() {
     return {kLauncherFile, kKernelFile, kSetupFile, kCliFile};
 }
 
+bool IsUpdateLeftover(std::string_view fileName) {
+    const std::string name = ToLowerAscii(fileName);
+    if (name == "build_info.txt" || name == "readme.txt" || name == "sha256sums.txt") return true;
+    constexpr std::string_view kOld = ".old";
+    return name.size() > kOld.size() && name.compare(name.size() - kOld.size(), kOld.size(), kOld) == 0;
+}
+
 bool IsKitDataFolder(std::string_view path) {
     // Trailing separators do not count: "C:\Users\User\Ampify\" is the same folder.
     while (!path.empty() && (path.back() == '\\' || path.back() == '/')) path.remove_suffix(1);

@@ -128,6 +128,10 @@ bool IsInstallDirectory(const std::filesystem::path&) {
     return false;
 }
 
+bool SetInstalledVersion(const std::string&) {
+    return false;
+}
+
 bool EndProcesses(const std::string&) {
     return true;
 }

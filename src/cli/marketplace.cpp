@@ -466,6 +466,8 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
             ctx.err << "ampify: the background launcher did not restart (" << error << "): run ampify apply\n";
         }
     }
+    // Settings > Apps shows the version the installer wrote: it follows the update (only for the installed copy).
+    if (platform::IsInstallDirectory(installDir)) platform::SetInstalledVersion(release->version);
     ctx.out << "ampify " << release->version << " installed in " << Utf8(installDir)
             << ". Open Apple Music again to use it.\n";
     return 0;

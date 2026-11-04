@@ -27,6 +27,25 @@ TEST_CASE(KitLayout_InstalledFilesAreTheFourTheInstallerCopies) {
     CHECK(files[3] == "ampify.exe");  // beside the kernel: the Marketplace page runs it (Ampify.kit.run)
 }
 
+TEST_CASE(KitLayout_AnUpdateLeavesOldCopiesAndTheTextFilesOfItsPackage) {
+    // What `ampify update --apply` leaves in the install folder, and the uninstaller then removes.
+    CHECK(ampify::IsUpdateLeftover("ampify.exe.old"));
+    CHECK(ampify::IsUpdateLeftover("ampify_launcher.exe.1.old"));
+    CHECK(ampify::IsUpdateLeftover("ampify_kernel.dll.last.old"));
+    CHECK(ampify::IsUpdateLeftover("AMPIFY_SETUP.EXE.OLD"));
+    CHECK(ampify::IsUpdateLeftover("BUILD_INFO.txt"));
+    CHECK(ampify::IsUpdateLeftover("README.txt"));
+    CHECK(ampify::IsUpdateLeftover("SHA256SUMS.txt"));
+    // Nothing else of the folder: not the programs, not a file of the user's.
+    CHECK(!ampify::IsUpdateLeftover("ampify.exe"));
+    CHECK(!ampify::IsUpdateLeftover("ampify_kernel.dll"));
+    CHECK(!ampify::IsUpdateLeftover("notes.txt"));
+    CHECK(!ampify::IsUpdateLeftover("old"));
+    CHECK(!ampify::IsUpdateLeftover(".old"));
+    CHECK(!ampify::IsUpdateLeftover("folder.old.txt"));
+    CHECK(!ampify::IsUpdateLeftover(""));
+}
+
 TEST_CASE(KitLayout_OnlyTheDataFolderCanBeRemovedWholesale) {
     CHECK(ampify::IsKitDataFolder("C:\\Users\\Sam\\Ampify"));
     CHECK(ampify::IsKitDataFolder("C:\\Users\\Sam\\Ampify\\"));

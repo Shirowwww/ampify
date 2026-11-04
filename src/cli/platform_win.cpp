@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "../core/apple_music.hpp"
+#include "../core/kit_layout.hpp"
 #include "../win/background.hpp"
 #include "../win/package.hpp"
 #include "../win/win_common.hpp"
@@ -196,6 +197,10 @@ bool RestartAutoStart(const std::filesystem::path& launcher, std::string& error)
 bool IsInstallDirectory(const std::filesystem::path& directory) {
     std::error_code ec;
     return std::filesystem::equivalent(directory, win::InstallDirectory(), ec);
+}
+
+bool SetInstalledVersion(const std::string& version) {
+    return win::SetDisplayVersion(FromUtf8(kUninstallKey), FromUtf8(version));
 }
 
 bool EndProcesses(const std::string& imageName) {

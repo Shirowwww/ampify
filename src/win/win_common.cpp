@@ -278,6 +278,15 @@ bool ProcessWatch::Running() {
     return running;
 }
 
+bool SetDisplayVersion(const std::wstring& key, const std::wstring& version) {
+    HKEY handle = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, key.c_str(), 0, KEY_SET_VALUE, &handle) != ERROR_SUCCESS) return false;
+    LSTATUS status = RegSetValueExW(handle, L"DisplayVersion", 0, REG_SZ, reinterpret_cast<const BYTE*>(version.c_str()),
+                                    static_cast<DWORD>((version.size() + 1) * sizeof(wchar_t)));
+    RegCloseKey(handle);
+    return status == ERROR_SUCCESS;
+}
+
 bool AskYesNo(const std::wstring& text, const std::wstring& title) {
     return MessageBoxW(nullptr, text.c_str(), title.c_str(), MB_ICONQUESTION | MB_YESNO) == IDYES;
 }
