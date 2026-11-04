@@ -160,6 +160,8 @@ and the theme applies again at once.
 | `backdrop` | `Background` | `acrylic(tint, opacity)` |
 | `color` or `foreground` | `Foreground` | Same as `background` |
 | `border-color` | `BorderBrush` | Same as `background` |
+| `hover-background` | `PointerOverBackground` | A list row (`.list-item`) under the pointer |
+| `active-background` | `PressedBackground` | The same row while pressed |
 | `selected-background` | `SelectedBackground` | A selected list row (`.list-item`) |
 | `selected-hover-background` | `SelectedPointerOverBackground` | The same row under the pointer |
 | `selected-active-background` | `SelectedPressedBackground` | The same row while pressed |
@@ -226,6 +228,19 @@ and the theme applies again at once.
 
 `background: artwork` shows the current song's artwork and follows it as soon as it loads. On the window, under acrylic
 panels, it gives the blurred background of Spicetify's Hazy or Comfy themes. Example: `themes/artwork`.
+
+`artwork` takes a fit: `cover` (the default: fills the element and cuts the edges), `contain` (the whole picture) or
+`fill` (stretched). As the `content` of a [decorative image](#decorative-images) it becomes a layer that can move:
+
+```css
+.window::before {
+    content: artwork cover;
+    transform-origin: center;
+    animation: drift 90s linear infinite;  /* the artwork turns slowly behind the panels */
+}
+```
+
+Example: the Moving artwork setting of [`themes/glass/`](../../themes/glass/).
 
 Ampify also gives the artwork's colors as variables. Before the first artwork they do not exist, so give a fallback.
 
@@ -313,7 +328,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 |---|---|
 | `ampify:floating-panels` | The sidebar and the pages become two rounded panels on the window's background, with even gaps |
 | `ampify:bottom-bar` | The playback bar goes to the bottom across the window: the song left, buttons in the middle of the window, volume right. It hides the column Apple keeps for the window buttons, so a theme needs no rule of its own for it. Import it after `floating-panels` |
-| `ampify:scrollbars` | Scroll bars inside their panel, clear of its rounded corners, without Windows' arrows. Part of `floating-panels` |
+| `ampify:scrollbars` | Scroll bars inside their panel, clear of its rounded corners, without Windows' arrows, out of sight until the pointer reaches them. Part of `floating-panels` |
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -329,8 +344,27 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | `--bar-room` | `80` | `bottom-bar`: space the panels leave at the bottom |
 | `--bar-reach` | `calc(var(--gap) - 290)` | `bottom-bar`: how far left the bar reaches past the page column |
 | `--bar-reach-folded` | `calc(var(--gap) - var(--compact-pane))` | `bottom-bar`: the same with the sidebar folded |
+| `--caption-room` | `40` | `bottom-bar`: the strip the panels leave at the top for the window's buttons |
+| `--sidebar-top` | `var(--caption-room)` | `bottom-bar`: where the sidebar starts. The back arrow and the folded menu button follow it |
+| `--song-width` | `560` | `bottom-bar`: width of the song (artwork, title, progress line), a clear space short of the buttons |
+| `--song-width-medium`, `-folded`, `-narrow`, `-small` | `460`, `380`, `340`, `270` | The same in a window 1600, 1324, 1100 and 960 pixels wide or less |
 
 `@import url(ampify:bottom-bar);` works too. Other `@import` targets (files, URLs) are ignored.
+
+What the layouts take care of, so that a theme needs no rule for it:
+
+- `floating-panels`: with the bar at the top, Ampify's own buttons (an extension's, the volume in percent) never push
+  the volume icon out of its column: the toggles stand against the window's buttons, and the song keeps a clear space
+  before the volume icon even in the narrowest window, whatever the theme's `--gap`. A shelf's previous and next
+  arrows stand on a grey tile that reads on dark and light pages. In a window 1100 pixels wide or less, the display
+  shows only the time left under the pointer.
+- `bottom-bar`: the progress line runs from the artwork to the display's end, and the elapsed and remaining times
+  have their place at the end of the artist's line, not over the artist. Apple Music shows those times under the
+  pointer only while its display is in the bar at the top: with the bar at the bottom they stay hidden.
+
+Two variables tell snippets about the theme's shapes: `--bar-radius` (the playback bar's corners) and `--lcd-radius`
+(the song's display). A theme that rounds them sets both in its `:root`, and a snippet that draws over them, such as
+Cover ambience, follows those corners.
 
 ### Window size (`@media`)
 
@@ -451,7 +485,7 @@ A snippet is a small style that people switch on by itself, in `%USERPROFILE%\Am
 - It applies on top of the active theme (or alone), and its rules win. Several snippets apply in alphabetical order.
 - It sees the theme's colors, variables, settings, `@keyframes` and font roles. A `colors.ini` in a snippet is ignored.
 - `theme.parts.*` do not affect snippets. A refused key in its `resources.xaml` refuses the snippet only.
-- Since Ampify 1.3 it can declare settings of its own, like a theme ([Theme settings](#theme-settings)): the Ampify
+- It can declare settings of its own, like a theme ([Theme settings](#theme-settings)): the Ampify
   card shows them while the snippet is on, they are stored as `snippets.<id>.<key>`, and its `user.css` reads them
   with `@setting` and `--setting-<key>`. A key the theme declares too is the snippet's there. Example:
   [`themes/snippets/display-equalizer/`](../../themes/snippets/display-equalizer/).
@@ -481,6 +515,27 @@ follow it. The colours a scheme gives along with its own accent (`AccentFillColo
 `AccentFillColorTertiaryBrush`, `TextOnAccentFillColor*`, `AccentTextFillColor*`) are derived again from the chosen
 one. A colour a theme writes as a hexadecimal value in `user.css` stays: name `$AccentFillColorDefaultBrush` for what
 should follow the accent. Keys the theme's `resources.xaml` defines stay as well. Empty, the theme keeps its own.
+
+## What Ampify adjusts for every theme
+
+Some of Apple Music's defaults only show once a theme changes something. Ampify adds the matching rule after reading
+the theme, under its `user.css`: a theme that writes the same property for the same name keeps its own value. The log
+and the inspector list them as "Ampify (derived from the theme)".
+
+| When the theme... | Ampify adds |
+|---|---|
+| rounds `.lcd` | `.scrubber` stops before the display's corner |
+| has an accent | the progress line (`.scrubber`) takes it, like the volume slider |
+| has a link colour or an accent | `.album-artist` takes it (Apple's own blue barely reads on a light page) |
+| has a secondary text colour | `.card-subtitle`, the artist under a tile, takes it (Apple paints that link in code) |
+| has a card colour | the top results of a search take it |
+| has selected-row colours | Apple's lists use them, though their style never reads them |
+| lights `.track-row:hover` | Apple's own light of the row goes, so only one shows |
+| lights `.card:hover` | `.card` keeps 8 pixels of room around its picture and titles |
+
+With or without a theme, Ampify also keeps a flyout inside the window (the volume flyout passed its right edge), hides
+the folded sidebar's logo while the back arrow covers it, and keeps the progress row of the full-screen player wide
+enough for the Lossless badge in a narrow window.
 
 ## Theme parts
 

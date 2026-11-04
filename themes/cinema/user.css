@@ -1,0 +1,251 @@
+/* Cinema: a dark room with one screen. Everything is deep black; the pages are a centred column of a chosen width,
+   with wide black margins on both sides; the playback bar floats under it as a rounded capsule tinted by the playing
+   song's artwork, whose colours also light the bottom of the room. The sidebar is the house lights: dimmed while the
+   pointer is away, up when it comes over. Apple Music folds the sidebar to its column of icons at 1324 pixels wide
+   and less; a theme cannot fold it on a wider window. */
+
+:root {
+    --window-background: $SolidBackgroundFillColorBaseBrush;
+    --panel-background: $ApplicationPageBackgroundThemeBrush;
+    --band-background: $CardBackgroundFillColorDefaultBrush;
+    --panel-radius: 14px;
+    --radius-box: 10px;
+    --radius-small: 6px;
+    --gap: 12;
+    --compact-pane: 48;
+    --bar-height: 64;
+    --bar-room: calc(var(--bar-height) + var(--gap) * 2);
+    --bar-reach: calc(var(--gap) - 290);
+    --bar-reach-folded: calc(var(--gap) - var(--compact-pane));
+    --capsule-width: 960;
+}
+
+@import "ampify:floating-panels";
+@import "ampify:bottom-bar";
+
+/* The light of the screen on the floor: the artwork's dark colour, faint, at the bottom of the window. */
+.window {
+    background: linear-gradient(180deg, #FF000000 0%, #FF000000 62%, #30var(--art-3-hex, 202024) 100%);
+}
+
+.content,
+.sidebar {
+    background: transparent;
+}
+
+/* ---- The screen: the pages in a centred column ------------------------------------------------------------------ */
+
+.content-frame {
+    max-width: var(--setting-column-width);
+    horizontal-alignment: center;
+}
+
+.page-title {
+    font-weight: 300;
+    font-size: 120%;
+    letter-spacing: 0.03em;
+}
+
+/* ---- The house lights: the sidebar ------------------------------------------------------------------------------ */
+
+/* On the pane alone: folded, its column of icons is inside it and dims with it. */
+.sidebar {
+    opacity: 0.5;
+    transition: opacity 200ms;
+}
+
+.sidebar:hover {
+    opacity: 1;
+}
+
+.sidebar-item {
+    corner-radius: var(--radius-small);
+}
+
+/* ---- The capsule ------------------------------------------------------------------------------------------------ */
+
+@setting capsule {
+    /* Centred under the column, a gap above the window's bottom edge, rounded at both ends. */
+    .playbar {
+        horizontal-alignment: center;
+        width: var(--capsule-width);
+        height: var(--bar-height);
+        margin: 0 0 var(--gap) 0;
+        corner-radius: 32px;
+        background: #F2var(--art-3-hex, 141416);
+        border-width: 1;
+        border-color: #1FFFFFFF;
+        box-shadow: 24px;
+    }
+
+    /* The sidebar no longer has a bar under it: it runs down to the window's bottom edge, and starts a gap from the
+       top rather than under the window's buttons (the back arrow and the folded menu button follow). */
+    .sidebar {
+        margin: var(--sidebar-top) calc(var(--gap) * -1) var(--gap) var(--gap);
+    }
+
+    /* The song keeps a clear space before the buttons centred in the capsule. */
+    :root {
+        --sidebar-top: var(--gap);
+        --song-width: 330;
+        --song-width-medium: 330;
+        --song-width-folded: 330;
+        --song-width-narrow: 330;
+        --song-width-small: 210;
+    }
+
+    /* The song, clear of the capsule's round left end, as high as the capsule lets it: the artwork keeps its square
+       (a record of Spinning artwork too). A round artwork, and a display with the capsule's curve, to match it. */
+    :root {
+        --lcd-radius: 27;
+    }
+
+    .now-playing {
+        margin: 0 0 0 10;
+    }
+
+    .lcd {
+        background: transparent;
+    }
+
+    .lcd-artwork-image,
+    .lcd-placeholder {
+        corner-radius: 27px;
+    }
+
+    .playbar-toggles {
+        margin: 0 20 0 0;
+    }
+}
+
+/* A narrow window: a shorter capsule. */
+@media (max-width: 1060px) {
+    @setting capsule {
+        .playbar {
+            width: 680;
+        }
+
+        .now-playing {
+            width: 210;
+        }
+    }
+}
+
+/* ---- Controls --------------------------------------------------------------------------------------------------- */
+
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 20px;
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+.play-button {
+    transition: transform 140ms;
+}
+
+.play-button:hover {
+    transform: scale(1.08);
+}
+
+.transport AppBarButton,
+.transport ToggleButton,
+.transport Button,
+.playbar-toggles ToggleButton {
+    transform-origin: center;
+    transition: transform 120ms;
+}
+
+.transport AppBarButton:active,
+.transport ToggleButton:active,
+.transport Button:active,
+.playbar-toggles ToggleButton:active {
+    transform: scale(0.9);
+}
+
+/* The played part of the song in the artwork's vivid colour. */
+.scrubber {
+    color: var(--art-2, $AccentFillColorDefaultBrush);
+    background: #33FFFFFF;
+}
+
+.scrubber Thumb {
+    background: $TextFillColorPrimaryBrush;
+}
+
+.volume-slider {
+    color: var(--art-2, $AccentFillColorDefaultBrush);
+    background: $ControlFillColorDefaultBrush;
+}
+
+.volume-slider Thumb {
+    background: $TextFillColorPrimaryBrush;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: var(--radius-box);
+}
+
+.menu-item {
+    corner-radius: var(--radius-small);
+}
+
+.menu-item:hover {
+    background: $ControlFillColorDefaultBrush;
+}
+
+/* ---- Pages ------------------------------------------------------------------------------------------------------ */
+
+.now-playing-indicator {
+    color: var(--art-2, $AccentFillColorDefaultBrush);
+}
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.shelf-arrow-left,
+.shelf-arrow-right {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: var(--radius-small);
+}
+
+/* Cards come forward a little under the pointer, and give when pressed. */
+.card {
+    corner-radius: var(--radius-box);
+    padding: 8;
+    transform-origin: center;
+    transition: transform 180ms, background 180ms;
+}
+
+.card:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+    transform: scale(1.03);
+}
+
+.card:active {
+    transform: scale(0.99);
+}
+
+.artwork {
+    corner-radius: var(--radius-small);
+}
+
+.track-row {
+    corner-radius: var(--radius-small);
+    transition: background 120ms;
+}
+
+.track-row:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+.settings-card {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: var(--radius-box);
+}

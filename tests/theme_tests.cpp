@@ -733,6 +733,16 @@ TEST_CASE(Properties_ContentIsAnImageOfTheThemeOrNone) {
     CHECK(Converted("content", "url(images/logo.svg)", palette, files).find("png, jpg, gif") != std::string::npos);
 }
 
+TEST_CASE(Properties_ContentCanBeTheSongsArtwork) {
+    th::Palette palette;
+    MemoryFiles files;
+
+    CHECK(Converted("content", "artwork", palette, files) == std::string(th::kArtworkImage) + "|UniformToFill");
+    CHECK(Converted("content", "artwork contain", palette, files) == std::string(th::kArtworkImage) + "|Uniform");
+    CHECK(Converted("content", "artwork tiled", palette, files).find("cover, contain or fill") != std::string::npos);
+    CHECK(Converted("content", "artworks", palette, files).find("text is not supported") != std::string::npos);
+}
+
 TEST_CASE(Properties_ConvertLengthsAndThickness) {
     th::Palette palette;
     MemoryFiles files;
@@ -1112,6 +1122,77 @@ TEST_CASE(Theme_ListRowsDrawTheThemesSelection) {
     MemoryFiles none;
     none.files["user.css"] = ".lcd { opacity: 0.9; }\n";
     CHECK(Assigned(Load(none), ".list-item", "SelectedBackground") == "ABSENT");
+}
+
+TEST_CASE(Theme_ASongLitByTheThemeHasNoSecondLight) {
+    // Apple's list row lit the whole width under the pointer, beside the theme's own light on the song.
+    MemoryFiles lit;
+    lit.files["user.css"] = ".track-row:hover { background: #22FFFFFF; }\n";
+    th::Theme theme = Load(lit);
+    CHECK(Assigned(theme, ".track-list-item", "PointerOverBackground") == "#00FFFFFF");
+    CHECK(Assigned(theme, ".track-list-item", "PressedBackground") == "#00FFFFFF");
+
+    // A theme that does not light the songs keeps Apple's light, and one that sets the row's light keeps its own.
+    MemoryFiles unlit;
+    unlit.files["user.css"] = ".track-row { corner-radius: 6; }\n";
+    CHECK(Assigned(Load(unlit), ".track-list-item", "PointerOverBackground") == "ABSENT");
+    MemoryFiles own;
+    own.files["user.css"] = ".track-row:hover { background: #22FFFFFF; }\n"
+                            ".track-list-item { hover-background: #11FFFFFF; }\n";
+    CHECK(Assigned(Load(own), ".track-list-item", "PointerOverBackground") == "#11FFFFFF");
+}
+
+TEST_CASE(Theme_ATilesArtistLinkReadsLikeItsSubtitle) {
+    // The artist under a tile is a link Apple colours in code: white on a light theme's page.
+    MemoryFiles light;
+    light.files["colors.ini"] = "[Base]\nTextFillColorSecondaryBrush = 5C5A55\n";
+    CHECK(Assigned(Load(light), ".card-subtitle", "Foreground") == "#FF5C5A55");
+
+    // A theme that colours the subtitles keeps its colour, and one without the key leaves Apple's.
+    MemoryFiles own;
+    own.files["colors.ini"] = "[Base]\nTextFillColorSecondaryBrush = 5C5A55\n";
+    own.files["user.css"] = ".card-subtitle { color: #FF112233; }\n";
+    CHECK(Assigned(Load(own), ".card-subtitle", "Foreground") == "#FF112233");
+    MemoryFiles none;
+    none.files["user.css"] = ".lcd { opacity: 0.9; }\n";
+    CHECK(Assigned(Load(none), ".card-subtitle", "Foreground") == "ABSENT");
+}
+
+TEST_CASE(Theme_ALitCardKeepsRoomAroundItsTitles) {
+    // A tile lit under the pointer had its titles against the light's edge.
+    MemoryFiles lit;
+    lit.files["user.css"] = ".card:hover { background: #22FFFFFF; }\n";
+    CHECK(Assigned(Load(lit), ".card", "Padding") == "8,8,8,8");
+
+    // A tile that only grows or casts a shadow needs no room, and a theme's own padding stays.
+    MemoryFiles shadow;
+    shadow.files["user.css"] = ".card:hover { box-shadow: 22px; }\n";
+    CHECK(Assigned(Load(shadow), ".card", "Padding") == "ABSENT");
+    MemoryFiles own;
+    own.files["user.css"] = ".card:hover { background: #22FFFFFF; }\n.card { padding: 6; }\n";
+    CHECK(Assigned(Load(own), ".card", "Padding") == "6,6,6,6");
+}
+
+TEST_CASE(Theme_ArtworkCornersLeaveArtistsRound) {
+    // Apple lights an artist's round picture with a round shape: .artwork no longer reaches those pictures.
+    std::vector<th::NodeInfo> nodes(4);
+    nodes[0] = {1, "TileControl", "", "", -1, 0};
+    nodes[1] = {2, "ArtworkImage", "", "ArtworkHasImage", 0, 1};
+    nodes[2] = {3, "ArtworkImage", "", "CircleArtworkImage", 0, 1};
+    nodes[3] = {4, "ArtworkImage", "", "", 0, 1};
+    auto matches = [&](const char* name, int index) {
+        std::optional<std::vector<std::string>> selectors = th::ClassSelectors(name);
+        CHECK(selectors.has_value());
+        if (!selectors) return false;
+        return std::any_of(selectors->begin(), selectors->end(),
+                           [&](const std::string& text) { return th::Matches(Sel(text.c_str()), nodes, index); });
+    };
+    CHECK(!matches("artwork", 1));
+    CHECK(!matches("artwork", 2));
+    CHECK(matches("artwork", 3));
+    CHECK(matches("artist-artwork", 1));
+    CHECK(matches("artist-artwork", 2));
+    CHECK(!matches("artist-artwork", 3));
 }
 
 TEST_CASE(Theme_AlbumArtistTakesTheThemesLinkColour) {
@@ -1814,8 +1895,8 @@ TEST_CASE(Inspector_ShowsTheColourOfAnAppBrushKeptAsAnObject) {
 // --- Example themes shipped in the repository ------------------------------------------------------------
 
 TEST_CASE(Examples_LoadWithoutProblems) {
-    for (const char* name : {"midnight", "greenroom", "glass", "artwork", "palettes", "paper-light", "rose-gold",
-                                "high-contrast"}) {
+    for (const char* name : {"glass", "artwork", "palettes", "console", "mirror", "cinema", "paper-light", "greenroom",
+                             "high-contrast"}) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
@@ -1828,12 +1909,12 @@ TEST_CASE(Examples_LoadWithoutProblems) {
     }
 }
 
-// Palettes gathers the colour-only themes: each of its schemes loads alone, without a problem, and sets colours.
+// Palettes gathers the colour families, one scheme each: each loads alone, without a problem, and sets colours.
 TEST_CASE(Examples_EveryPaletteLoadsWithoutProblems) {
     std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "palettes";
     th::FolderFiles files(folder);
     th::Theme first = th::LoadTheme("palettes", folder.generic_string(), files);
-    CHECK(first.schemes.size() == 17);
+    CHECK(first.schemes.size() == 8);
     for (const std::string& scheme : first.schemes) {
         th::LoadOptions options;
         options.scheme = scheme;
@@ -1848,7 +1929,7 @@ TEST_CASE(Examples_EveryPaletteLoadsWithoutProblems) {
 
 // Each shipped theme with settings, every setting moved off its default: still no problem, and more or fewer rules.
 TEST_CASE(Examples_LoadWithEverySettingChanged) {
-    for (const char* name : {"midnight", "greenroom", "glass", "palettes", "artwork"}) {
+    for (const char* name : {"greenroom", "glass", "palettes", "artwork", "cinema", "console", "mirror"}) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         std::optional<std::string> manifest = files.Read("manifest.json");
@@ -3025,7 +3106,7 @@ TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
         for (const std::string& problem : theme.problems) {
             ampify::test::ReportFailure(__FILE__, __LINE__, name + " : " + problem);
         }
-        if (name == "midnight") base = Shared(std::move(theme));
+        if (name == "palettes") base = Shared(std::move(theme));
     }
 
     std::vector<std::string> snippets = th::ListSnippetFolders(source / "themes" / "snippets");

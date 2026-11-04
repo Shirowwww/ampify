@@ -2,15 +2,106 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "cover-ambience",
   "name": "Cover ambience",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "kind": "snippet",
   "author": "Shirowwww",
-  "description": "The song's display glows in the colours of its artwork and changes with each song, like Spicetify's Cover Ambience.",
-  "translations": {"fr": {"name": "Halo de pochette", "description": "L'afficheur du morceau s'illumine aux couleurs de sa pochette et change à chaque morceau, comme Cover Ambience sur Spicetify."}},
+  "description": "The song glows in the colours of its artwork and changes with each song, on the display or along the whole playback bar, like Spicetify's Cover Ambience.",
+  "translations": {
+    "fr": {
+      "name": "Halo de pochette",
+      "description": "Le morceau s'illumine aux couleurs de sa pochette et change à chaque titre, sur l'afficheur ou tout le long de la barre de lecture, comme Cover Ambience sur Spicetify.",
+      "settings": {
+        "reach": "Étendue du halo"
+      },
+      "options": {
+        "Display": "L'afficheur",
+        "Bar": "Toute la barre"
+      }
+    },
+    "de": {
+      "name": "Cover-Schein",
+      "description": "Der Titel leuchtet in den Farben seines Covers und wechselt mit jedem Song, im Display oder über die ganze Wiedergabeleiste, wie Cover Ambience bei Spicetify.",
+      "settings": {
+        "reach": "Reichweite des Scheins"
+      },
+      "options": {
+        "Display": "Das Display",
+        "Bar": "Die ganze Leiste"
+      }
+    },
+    "es": {
+      "name": "Halo de portada",
+      "description": "La canción brilla con los colores de su portada y cambia con cada tema, en la pantalla o a lo largo de toda la barra de reproducción, como Cover Ambience en Spicetify.",
+      "settings": {
+        "reach": "Alcance del halo"
+      },
+      "options": {
+        "Display": "La pantalla",
+        "Bar": "Toda la barra"
+      }
+    },
+    "pt": {
+      "name": "Halo da capa",
+      "description": "A música brilha nas cores da sua capa e muda a cada faixa, no visor ou ao longo de toda a barra de reprodução, como o Cover Ambience do Spicetify.",
+      "settings": {
+        "reach": "Alcance do halo"
+      },
+      "options": {
+        "Display": "O visor",
+        "Bar": "A barra inteira"
+      }
+    },
+    "ru": {
+      "name": "Сияние обложки",
+      "description": "Трек светится цветами своей обложки и меняется с каждой песней — на дисплее или вдоль всей панели воспроизведения, как Cover Ambience в Spicetify.",
+      "settings": {
+        "reach": "Охват сияния"
+      },
+      "options": {
+        "Display": "Дисплей",
+        "Bar": "Вся панель"
+      }
+    },
+    "ja": {
+      "name": "アートワークの光",
+      "description": "再生中の曲がアートワークの色で光り、曲ごとに変わります。表示部だけ、または再生バー全体に。Spicetify の Cover Ambience のように。",
+      "settings": {
+        "reach": "光の範囲"
+      },
+      "options": {
+        "Display": "表示部",
+        "Bar": "バー全体"
+      }
+    },
+    "zh": {
+      "name": "封面光晕",
+      "description": "正在播放的歌曲以封面的颜色发光，每首歌都会变化，可在显示区或整条播放栏上，就像 Spicetify 的 Cover Ambience。",
+      "settings": {
+        "reach": "光晕范围"
+      },
+      "options": {
+        "Display": "显示区",
+        "Bar": "整条播放栏"
+      }
+    }
+  },
   "kitApi": "1.0",
   "resources": "resources.xaml",
+  "preview": "preview.jpg",
   "tags": [
     "artwork",
     "colors"
+  ],
+  "settings": [
+    {
+      "key": "reach",
+      "label": "Reach of the glow",
+      "type": "choice",
+      "options": [
+        "Display",
+        "Bar"
+      ],
+      "default": "Display"
+    }
   ]
 }

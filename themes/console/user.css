@@ -1,0 +1,272 @@
+/* Console: Apple Music as a piece of studio hardware. Graphite panels with a faint brushed fall of light and a 1-pixel
+   edge, small square corners, and the playback bar as a rack unit along the bottom: the transport keys on the left,
+   a wide display in the middle with an equalizer that follows the music, volume and toggles on the right. Times use a
+   monospace face, like a counter. The accent comes from the scheme (Amber, Green, Ice, in colors.ini), so toggles,
+   sliders and links follow it as well. The classes are Ampify's stable names (docs/themes/names.md). */
+
+:root {
+    --window-background: $SolidBackgroundFillColorBaseBrush;
+    --panel-background: $ApplicationPageBackgroundThemeBrush;
+    --band-background: $CardBackgroundFillColorDefaultBrush;
+    --panel-radius: 3px;
+    --radius-small: 2px;
+    --gap: 6;
+    --bar-height: 92;
+    --bar-room: calc(var(--bar-height) + var(--gap) * 2);
+    --compact-pane: 48;
+    /* bottom-bar's own defaults, named here so that the faceplate's margin can use them. */
+    --bar-reach: calc(var(--gap) - 290);
+    --bar-reach-folded: calc(var(--gap) - var(--compact-pane));
+    --display-width: 540;
+    --counter-font: "Cascadia Mono, Consolas";
+}
+
+@import "ampify:floating-panels";
+@import "ampify:bottom-bar";
+
+/* ---- Panels ------------------------------------------------------------------------------------------------------- */
+
+/* Brushed metal: a light that falls from the top, and a fine edge around each panel. */
+.sidebar,
+.content {
+    background: linear-gradient(180deg, var(--spice-metal-top) 0%, var(--spice-metal-bottom) 100%);
+    border-width: 1;
+    border-color: var(--spice-edge);
+}
+
+.lyrics-panel {
+    border-width: 1;
+    border-color: var(--spice-edge);
+}
+
+/* Folded, the column of icons is the panel (floating-panels): it takes the edge. */
+@media (max-width: 1324px) {
+    .sidebar-column {
+        background: linear-gradient(180deg, var(--spice-metal-top) 0%, var(--spice-metal-bottom) 100%);
+        border-width: 1;
+        border-color: var(--spice-edge);
+    }
+}
+
+.sidebar-item {
+    corner-radius: var(--radius-small);
+}
+
+/* ---- The rack unit: the playback bar --------------------------------------------------------------------------- */
+
+/* A faceplate a gap off every edge of the window, lit from the top. */
+.playbar {
+    background: linear-gradient(180deg, $CardBackgroundFillColorDefaultBrush 0%, var(--spice-metal-bottom) 100%);
+    border-width: 1;
+    border-color: var(--spice-edge-light);
+    corner-radius: var(--panel-radius);
+    margin: 0 var(--gap) var(--gap) var(--bar-reach);
+}
+
+@media (max-width: 1324px) {
+    .playbar {
+        margin: 0 var(--gap) var(--gap) var(--bar-reach-folded);
+    }
+}
+
+/* The transport keys on the left of the faceplate instead of its middle, which the display takes. */
+.playbar-controls,
+.transport {
+    horizontal-alignment: left;
+}
+
+.transport {
+    margin: 0 0 0 calc(var(--gap) * 2);
+}
+
+/* The display: centred on the whole bar, wide, and dark like backlit glass. */
+.now-playing {
+    grid-column: 0;
+    grid-column-span: 4;
+    horizontal-alignment: center;
+    width: var(--display-width);
+    margin: 8 0 8 0;
+}
+
+@media (max-width: 1100px) {
+    .now-playing {
+        width: 380;
+    }
+}
+
+.lcd {
+    background: linear-gradient(180deg, var(--spice-lcd-top) 0%, var(--spice-lcd-glass) 100%);
+    border-width: 1;
+    border-color: var(--spice-edge);
+    corner-radius: var(--radius-small);
+}
+
+.lcd-artwork-image,
+.lcd-placeholder {
+    corner-radius: var(--radius-small);
+}
+
+.track-title TextBlock {
+    color: $AccentFillColorDefaultBrush;
+}
+
+.track-artist TextBlock {
+    color: $TextFillColorSecondaryBrush;
+}
+
+/* Counters: the elapsed and remaining times in a monospace face, so the digits do not dance as they change. */
+.current-time,
+.duration {
+    font-family: var(--counter-font);
+    font-size: 11px;
+    color: $AccentFillColorDefaultBrush;
+}
+
+.scrubber {
+    color: $AccentFillColorDefaultBrush;
+    background: var(--spice-edge-light);
+}
+
+.scrubber Thumb {
+    background: $AccentFillColorDefaultBrush;
+}
+
+/* The signature: an equalizer inside the display, at its right end, that moves with the song and rests while it is
+   paused. The title stops short of it. */
+@setting equalizer {
+    .lcd::before {
+        content: bars(20);
+        color: $AccentFillColorDefaultBrush;
+        width: 116px;
+        height: 32px;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+        margin: 0 46 0 0;
+        opacity: 0.85;
+    }
+
+    .track-lines {
+        margin: 0 176 0 12;
+    }
+}
+
+/* Transport keys: they rise a pixel under the pointer and sink when pressed, like a hardware key. */
+.transport AppBarButton,
+.transport ToggleButton,
+.transport Button,
+.playbar-toggles ToggleButton,
+.playbar-toggles Button {
+    transform-origin: center;
+    transition: transform 100ms;
+}
+
+.transport AppBarButton:hover,
+.transport ToggleButton:hover,
+.transport Button:hover,
+.playbar-toggles ToggleButton:hover,
+.playbar-toggles Button:hover {
+    transform: translateY(-1px);
+}
+
+.transport AppBarButton:active,
+.transport ToggleButton:active,
+.transport Button:active,
+.playbar-toggles ToggleButton:active,
+.playbar-toggles Button:active {
+    transform: scale(0.92);
+}
+
+/* Play: a lit square key. */
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: var(--panel-radius);
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+.volume-slider {
+    color: $AccentFillColorDefaultBrush;
+    background: $ControlFillColorDefaultBrush;
+}
+
+.volume-slider Thumb {
+    background: $AccentFillColorDefaultBrush;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-width: 1;
+    border-color: var(--spice-edge-light);
+    corner-radius: var(--panel-radius);
+}
+
+.menu-item {
+    corner-radius: var(--radius-small);
+}
+
+.menu-item:hover {
+    background: $ControlFillColorDefaultBrush;
+}
+
+/* ---- Pages -------------------------------------------------------------------------------------------------------- */
+
+.page-title {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.now-playing-indicator {
+    color: $AccentFillColorDefaultBrush;
+}
+
+.shelf-arrow-left,
+.shelf-arrow-right {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-width: 1;
+    border-color: var(--spice-edge-light);
+    corner-radius: var(--radius-small);
+}
+
+/* Cards light up under the pointer and give a little when pressed. */
+.card {
+    corner-radius: var(--panel-radius);
+    padding: 8;
+    transform-origin: center;
+    transition: background 120ms, transform 100ms;
+}
+
+.card:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+.card:active {
+    transform: scale(0.98);
+}
+
+.artwork {
+    corner-radius: var(--radius-small);
+}
+
+.track-row {
+    corner-radius: var(--radius-small);
+    transition: background 100ms;
+}
+
+.track-row:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+.settings-card {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-width: 1;
+    border-color: var(--spice-edge);
+    corner-radius: var(--panel-radius);
+}

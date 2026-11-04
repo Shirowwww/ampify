@@ -26,48 +26,10 @@
 @setting bar-position = Bottom {
     @import "ampify:bottom-bar";
 
-    /* The buttons sit in the middle of the window and the toggles against its right edge, as in Spotify: each column
-       spans every cell of the bar (four, the last a narrow one Apple keeps empty), so Apple's column widths no longer
-       push them off centre. */
-    .playbar-controls {
-        grid-column: 0;
-        grid-column-span: 4;
-    }
-
-    .playbar-extras {
-        grid-column: 0;
-        grid-column-span: 4;
-    }
-
-    /* The second cell kept room for the window's buttons, which sit at the top now: the toggles take it. */
-    .caption-buttons-cover {
-        visibility: collapsed;
-    }
-
-    .playbar-toggles {
-        grid-column-span: 2;
-        margin: 0 var(--gap) 0 0;
-    }
-
     /* The now-playing display loses its box: artwork, title and artist sit on the bar. */
     .lcd {
         background: transparent;
         border-width: 0;
-    }
-
-    /* Apple shows the elapsed and remaining times under the pointer, at the bottom corners of the title block: with
-       the title and artist at the left, they covered the artist. They go down to the progress line, one at each end,
-       and the line leaves them room. */
-    .current-time {
-        margin: 0 2 -15 10;
-    }
-
-    .duration {
-        margin: 0 4 -15 6;
-    }
-
-    .scrubber {
-        margin: 0 46 0 48;
     }
 }
 
@@ -88,8 +50,11 @@
     corner-radius: 20px;
 }
 
+/* Apple's glyph fills most of the disc: a size smaller, it reads as a button rather than a sticker. */
 .play-button FontIcon {
     foreground: #000000;
+    transform-origin: center;
+    transform: translateY(-0.5px) scale(0.8);
 }
 
 /* The play-button setting: the green accent instead of white, the icon stays black. */

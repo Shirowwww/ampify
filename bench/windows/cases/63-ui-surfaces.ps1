@@ -3,7 +3,7 @@
 #   2. the react-panel example extension, started hot through reload.txt (like ampify extension enable), mounts its
 #      panel; UI Automation finds its "AMPIFY_..." elements in Apple Music's window;
 #   3. a click on "Add one" through UI Automation updates the panel in place;
-#   4. the midnight theme applies on top;
+#   4. the palettes theme applies on top;
 #   5. Settings, opened through UI Automation if possible, has an "Ampify" row that opens Ampify's settings page.
 # A PNG capture of the window is taken at each step. The useful log lines are copied into the job log.
 # Job: MSVC (bench-msvc), with the MSVC kit (artifact ampify-msvc-kit) in $script:BenchKitRoot\ui (ampify_launcher.exe,
@@ -155,7 +155,7 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
     }
     $example = Join-Path $ui 'examples\react-panel'
     if (-not (Test-Path -LiteralPath $example)) { $example = Join-Path $repo 'examples\react-panel' }
-    $midnight = Join-Path $ui 'themes\midnight'
+    $palettes = Join-Path $ui 'themes\palettes'
 
     # The Ampify folder starts clean: the extension is installed but off, to capture the interface before the mount.
     Reset-KitState
@@ -163,10 +163,10 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
     $extensionDir = Join-Path $script:KitDir 'extensions\react-panel'
     Remove-Item -LiteralPath $extensionDir -Recurse -Force -ErrorAction SilentlyContinue
     Copy-Item -LiteralPath $example -Destination $extensionDir -Recurse -Force
-    if (Test-Path -LiteralPath $midnight) {
+    if (Test-Path -LiteralPath $palettes) {
         New-Item -ItemType Directory -Force -Path (Join-Path $script:KitDir 'themes') | Out-Null
-        Remove-Item -LiteralPath (Join-Path $script:KitDir 'themes\midnight') -Recurse -Force -ErrorAction SilentlyContinue
-        Copy-Item -LiteralPath $midnight -Destination (Join-Path $script:KitDir 'themes\midnight') -Recurse -Force
+        Remove-Item -LiteralPath (Join-Path $script:KitDir 'themes\palettes') -Recurse -Force -ErrorAction SilentlyContinue
+        Copy-Item -LiteralPath $palettes -Destination (Join-Path $script:KitDir 'themes\palettes') -Recurse -Force
     }
     $settings = Join-Path $script:KitDir 'settings.txt'
     $reload = Join-Path $script:KitDir 'reload.txt'
@@ -240,20 +240,20 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
             }
         }
 
-        # 4. The midnight theme on top of the panel.
-        if (Test-Path -LiteralPath (Join-Path $script:KitDir 'themes\midnight')) {
-            Set-UiSettings -Path $settings -Values @{ 'theme.active' = 'midnight'; 'theme.scheme' = 'Dark' }
+        # 4. The palettes theme on top of the panel.
+        if (Test-Path -LiteralPath (Join-Path $script:KitDir 'themes\palettes')) {
+            Set-UiSettings -Path $settings -Values @{ 'theme.active' = 'palettes'; 'theme.scheme' = 'Midnight' }
             $themed = Wait-Until -TimeoutSeconds 60 -Condition {
-                $null -ne (Find-JournalMatch -FileName 'AppleMusic.log' -Pattern 'Theme "midnight": \d+ value\(s\) applied')
+                $null -ne (Find-JournalMatch -FileName 'AppleMusic.log' -Pattern 'Theme "palettes": \d+ value\(s\) applied')
             }
-            Add-Check -Ctx $Ctx -Name 'midnight theme applied with the panel mounted' -Passed $themed
+            Add-Check -Ctx $Ctx -Name 'palettes theme applied with the panel mounted' -Passed $themed
             Start-Sleep -Seconds 2
             Show-UiAppWindow
             Save-Screenshot -Ctx $Ctx -Name 'ui-theme-applied' | Out-Null
             Set-UiSettings -Path $settings -Values @{ 'theme.active' = 'none' }
             Wait-Journal -FileName 'AppleMusic.log' -Text 'Theme removed: ' -TimeoutSeconds 30 | Out-Null
         } else {
-            Add-Skip -Ctx $Ctx -Name 'midnight theme' -Reason "example theme missing from the UI build: $midnight"
+            Add-Skip -Ctx $Ctx -Name 'palettes theme' -Reason "example theme missing from the UI build: $palettes"
         }
 
         # 5. Settings and Ampify's settings page. Ctrl+, opens the settings in many apps; otherwise we look for a

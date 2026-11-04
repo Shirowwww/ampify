@@ -1,4 +1,4 @@
-/* Palettes: one calm layout, many colour schemes. The sidebar and the pages float on the darkest shade of the scheme,
+/* Palettes: one calm layout, one colour scheme per family. The sidebar and the pages float on the darkest shade of the scheme,
    cards and rows lift onto the next one, and the accent marks what plays and what is chosen. Every colour comes from
    colors.ini, so each scheme restyles the whole file; the shapes come from one setting, so that every corner, from the
    panels to the play button, follows it: 0 gives a square look, 28 a round one. The classes are Ampify's stable names
@@ -24,41 +24,6 @@
 /* The bar-position setting: at the top as Apple has it (the default), or at the bottom across the window. */
 @setting bar-position = Bottom {
     @import "ampify:bottom-bar";
-
-    /* The buttons in the middle of the window and the toggles against its right edge: each column spans every cell of
-       the bar (four, the last a narrow one Apple keeps empty), so Apple's column widths no longer push them aside. */
-    .playbar-controls {
-        grid-column: 0;
-        grid-column-span: 4;
-    }
-
-    .playbar-extras {
-        grid-column: 0;
-        grid-column-span: 4;
-    }
-
-    /* The cell kept for the window's buttons, which stay at the top: the toggles take it. */
-    .caption-buttons-cover {
-        visibility: collapsed;
-    }
-
-    .playbar-toggles {
-        grid-column-span: 2;
-        margin: 0 var(--gap) 0 0;
-    }
-
-    /* The elapsed and remaining times go down to the ends of the progress line instead of covering the artist. */
-    .current-time {
-        margin: 0 2 -15 10;
-    }
-
-    .duration {
-        margin: 0 4 -15 6;
-    }
-
-    .scrubber {
-        margin: 0 46 0 48;
-    }
 }
 
 /* The bar-background setting: the bar takes the colours of the playing song's artwork, fading into the window. */

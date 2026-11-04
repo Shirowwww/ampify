@@ -1,181 +1,268 @@
-/* Glass: a complete redesign of the interface. A night gradient behind frosted panels, large rounded cards, larger and
-   airier text, buttons that grow on hover, shadows under the cards.
+/* Glass: Apple's Liquid Glass on Apple Music. The playing song's artwork fills the window; the sidebar, the pages and a
+   floating capsule for the playback bar are clear panes laid over it, tinted by the artwork's colours, with a bright
+   rim on their top edge where the light catches the glass and a soft one below. Controls are round and lift under the
+   pointer. The panes stay readable: the tint darkens as the glass gets clearer.
 
-   The floating-panels layout lines the panels up (docs/themes/format.md, "Ready-made layouts"); the classes are
-   Ampify's stable names for Apple Music's zones (docs/themes/names.md). Its settings (manifest.json) show in the
-   Ampify card of Apple Music's settings. */
+   The layouts line the panes up (docs/themes/format.md, "Ready-made layouts"); the classes are Ampify's stable names
+   for Apple Music's zones (docs/themes/names.md). Its settings show in the Marketplace and in Ampify's settings. */
 
 :root {
     --font-title: "Segoe UI Variable Display";
-    --font-title-weight: 700;
-    --font-title-size: 30px;
     --font-body: "Segoe UI Variable Text";
-    --font-body-size: 15px;
-    --window-background: linear-gradient(135deg, #0E1424 0%, #1A2240 55%, #2A1F45 100%);
+    --window-background: #0B0D12;
     --panel-radius: var(--setting-panel-radius);
-    --gap: var(--setting-gap);
-    --radius-button: 12px;
-    --glass: acrylic($LayerFillColorDefaultBrush, var(--setting-frost));
-    --band-background: #0FFFFFFF;
+    --gap: 14;
+    --bar-height: 76;
+    --bar-room: 98;
+    --bar-radius: 40;
+    --lcd-radius: 24;
+    --radius-small: calc(var(--setting-panel-radius) * 0.5);
+    /* The pane: the artwork's dark colour behind frosted acrylic, so the music colours the glass. */
+    --glass: acrylic(var(--art-3, #FF141822), var(--setting-frost));
+    /* The rim: a specular light, bright at the top left corner, gone along the middle, back at the bottom right, as
+       light catches the two edges of a pane of glass. */
+    --rim: linear-gradient(135deg, #F2FFFFFF 0%, #66FFFFFF 8%, #14FFFFFF 30%, #0AFFFFFF 55%, #29FFFFFF 80%, #A6FFFFFF 100%);
+    --band-background: #0DFFFFFF;
 }
 
 @import "ampify:floating-panels";
+@import "ampify:bottom-bar";
 
-/* ---- Sidebar: frosted glass ---------------------------------------------------------------------------------------- */
+/* ---- The window: the artwork, behind everything --------------------------------------------------------------------- */
+
+.window {
+    background: artwork;
+}
+
+/* The moving-artwork setting: the artwork turns slowly behind the glass, enlarged so that its corners never show, as
+   behind Apple Music's full-screen player. The panes blur it; Windows' animation effects off, it stands still. */
+@setting moving-artwork {
+    .window::before {
+        content: artwork cover;
+        transform-origin: center;
+        opacity: 0.85;
+        animation: drift 90s linear infinite;
+    }
+}
+
+/* A dark frost over the whole window, under the panes: the artwork reads as colour, not as a picture, and the
+   window's buttons in the strip above the panes stay readable on a light one. */
+.navigation {
+    backdrop: acrylic(#FF000000, 0.45);
+}
+
+@keyframes drift {
+    from {
+        transform: scale(1.9) rotate(0deg);
+    }
+
+    to {
+        transform: scale(1.9) rotate(360deg);
+    }
+}
+
+@setting tint = Neutral {
+    :root {
+        --glass: acrylic(#FF14161C, var(--setting-frost));
+    }
+}
+
+/* ---- Panes ----------------------------------------------------------------------------------------------------------- */
 
 .sidebar,
+.content,
 .lyrics-panel {
+    backdrop: var(--glass);
+    border-color: var(--rim);
+    border-width: 1.5px;
+    box-shadow: 28px;
+}
+
+/* Folded, the column of icons is the sidebar pane; the open pane, hidden behind the pages, keeps no glass, or it shows
+   through them as a ghost panel. */
+@media (max-width: 1324px) {
+    .sidebar-column {
+        backdrop: var(--glass);
+        border-color: var(--rim);
+        border-width: 1.5px;
+    }
+
+    .sidebar {
+        background: transparent;
+        border-width: 0;
+        box-shadow: 0;
+    }
+}
+
+.search-header,
+.list-header {
     backdrop: var(--glass);
 }
 
-/* The logo stays where Apple Music puts it: over the icons of the folded sidebar, clear of the menu button. */
-.sidebar-header {
-    padding: 0 8 12 0;
-}
-
-/* Quieter than the page titles: at 22 bold, the app's name outweighed everything else on the window. */
 .app-name {
     font-role: title;
     font-size: 18px;
     font-weight: 600;
 }
 
+/* No side margin: the icons stay on the column's axis, under the menu button. */
 .sidebar-items NavigationViewItem {
-    corner-radius: var(--radius-button);
-    margin: 3 4;
-    font-size: 15px;
+    corner-radius: 12;
+    margin: 2 0;
     transform-origin: left center;
-    /* Without it the entry jumped by 4 pixels at once, which read as a bounce when the pointer went from one to the
-       next. Ampify versions that cannot animate this element ignore it and keep the jump. */
-    transition: transform 160ms;
 }
 
 @setting hover-grow {
     .sidebar-items NavigationViewItem:hover {
-        transform: translateX(4px) scale(1.02);
+        transform: translateX(3px);
     }
 }
 
-/* ---- Playback bar, at the top, above the pages ------------------------------------------------------------------- */
+/* ---- The playback bar: a capsule floating over the bottom of the window ------------------------------------------- */
 
-/* No band of its own: the sidebar's frost ran into it, which squared the panel's corner and left a dark notch above
-   it. The gradient shows through and the song's display floats like the panels. */
 .playbar {
-    padding: 0 12;
+    backdrop: var(--glass);
+    border-color: var(--rim);
+    border-width: 1.5px;
+    corner-radius: var(--bar-radius);
+    /* The bar starts at the page column: the capsule reaches back under the sidebar, to the same edge as its pane. */
+    margin: 0 var(--gap) var(--gap) calc(var(--gap) - 290);
+    box-shadow: 32px;
 }
 
+@media (max-width: 1324px) {
+    .playbar {
+        margin: 0 var(--gap) var(--gap) calc(var(--gap) - 48);
+    }
+}
+
+.playbar-controls {
+    grid-column: 0;
+    grid-column-span: 4;
+}
+
+.playbar-extras {
+    grid-column: 0;
+    grid-column-span: 4;
+}
+
+.playbar-toggles {
+    grid-column-span: 2;
+    margin: 0 20 0 0;
+}
+
+
+/* The song sits on the capsule itself: no box, no edge of its own. */
+.lcd {
+    background: transparent;
+    border-width: 0;
+}
+
+.lcd-artwork-image {
+    corner-radius: 12px;
+    box-shadow: 10px;
+}
+
+/* Round controls that lift under the pointer and give a little when pressed, like a drop of glass. */
 .transport AppBarButton,
 .transport ToggleButton,
-.transport Button {
+.transport Button,
+.playbar-toggles ToggleButton {
     corner-radius: 50;
     transform-origin: center;
+    transition: transform 140ms;
 }
 
 @setting hover-grow {
     .transport AppBarButton:hover,
     .transport ToggleButton:hover,
-    .transport Button:hover {
-        transform: scale(1.15);
-    }
-}
-
-/* The display of the song: a light, rounded card with a shadow. */
-.lcd {
-    corner-radius: 14px;
-    background: linear-gradient(180deg, #33FFFFFF, #14FFFFFF);
-    border-color: #40FFFFFF;
-    border-width: 1px;
-    box-shadow: 12px;
-}
-
-.lcd-artwork-image {
-    box-shadow: 8px;
-    transform-origin: center;
-}
-
-@setting hover-grow {
-    .lcd-artwork-image:hover {
-        transform: scale(1.08);
-    }
-}
-
-.track-title {
-    font-weight: 600;
-}
-
-.playbar-toggles ToggleButton {
-    corner-radius: var(--radius-button);
-    transform-origin: center;
-}
-
-@setting hover-grow {
+    .transport Button:hover,
     .playbar-toggles ToggleButton:hover {
         transform: scale(1.12);
     }
 }
 
-/* ---- Pages: a large glass card ------------------------------------------------------------------------------------- */
-
-.content {
-    backdrop: acrylic($CardBackgroundFillColorDefaultBrush, 0.4);
-    box-shadow: 24px;
+.transport AppBarButton:active,
+.transport ToggleButton:active,
+.transport Button:active {
+    transform: scale(0.94);
 }
 
-/* The search header and the Songs column titles, the same glass over the rows that scroll under them. */
-.search-header,
-.list-header {
-    backdrop: acrylic($CardBackgroundFillColorDefaultBrush, 0.4);
+/* Play: a clear disc with a light rim and a white icon. */
+.play-button > Grid#Root {
+    background: linear-gradient(180deg, #4DFFFFFF, #1AFFFFFF);
+    border-color: var(--rim);
+    border-width: 1px;
+    corner-radius: 50;
 }
 
-/* An album's artist in the theme's accent, not Apple's blue. */
-.album-artist {
-    color: $AccentFillColorDefaultBrush;
+.play-button {
+    transition: transform 140ms;
 }
 
-/* The font only: a common size would overwrite the page titles. */
+.play-button:hover {
+    transform: scale(1.08);
+}
+
+.volume-slider,
+.scrubber {
+    color: #F2FFFFFF;
+    background: #33FFFFFF;
+}
+
+/* ---- Pages ---------------------------------------------------------------------------------------------------------- */
+
 .content-frame TextBlock {
     font-family: var(--font-body);
 }
 
+.album-artist {
+    color: var(--art-2, $AccentFillColorDefaultBrush);
+}
+
 .card {
-    corner-radius: 14px;
+    corner-radius: 18px;
     transform-origin: center;
-    transition: transform 160ms;
+    transition: transform 180ms;
 }
 
 .card:hover {
-    box-shadow: 20px;
+    box-shadow: 22px;
 }
 
 @setting hover-grow {
     .card:hover {
-        transform: scale(1.04);
+        transform: scale(1.03);
     }
 }
 
 .artwork {
-    corner-radius: 12px;
+    corner-radius: 14px;
 }
 
 .track-row {
-    corner-radius: 10px;
+    corner-radius: 12px;
     transition: background 120ms;
 }
 
 .track-row:hover {
-    background: #1AFFFFFF;
+    background: #14FFFFFF;
+}
+
+.list-item {
+    selected-background: #24FFFFFF;
+    selected-hover-background: #2EFFFFFF;
 }
 
 .album-play-button,
 .album-shuffle-button {
-    corner-radius: var(--radius-button);
+    corner-radius: 18;
     transform-origin: center;
     transition: transform 120ms;
 }
 
-/* Wider padding for the labelled button only: the shuffle button is an icon alone, and would push it out. */
 .album-play-button {
-    padding: 10 20;
+    padding: 10 22;
 }
 
 @setting hover-grow {
@@ -185,14 +272,19 @@
     }
 }
 
-/* Apple's full-screen player (Now Playing): its large artwork takes the panels' corners. */
-.fullscreen-artwork {
-    corner-radius: var(--panel-radius);
+/* ---- Menus and the full-screen player --------------------------------------------------------------------------- */
+
+.menu,
+.flyout,
+.tooltip {
+    corner-radius: 16px;
 }
 
-/* Folded, the column of icons is the sidebar panel (ampify:floating-panels): it takes the glass. */
-@media (max-width: 1324px) {
-    .sidebar-column {
-        backdrop: var(--glass);
-    }
+.menu-item {
+    corner-radius: 10px;
+}
+
+.fullscreen-artwork {
+    corner-radius: 24px;
+    box-shadow: 40px;
 }

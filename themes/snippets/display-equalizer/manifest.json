@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "display-equalizer",
   "name": "Display equalizer",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Bars in the song's display that move with the music. Choose in the Ampify card where they go (either end of the display, across it, or on the artwork), how many and their colour.",

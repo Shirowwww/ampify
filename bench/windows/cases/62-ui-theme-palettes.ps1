@@ -1,26 +1,26 @@
-# Steps 4 and 5 of the UI test: the midnight theme applies in Apple Music, then is removed without a restart when
+# Steps 4 and 5 of the UI test: the palettes theme applies in Apple Music, then is removed without a restart when
 # theme.active goes back to none. The setting changes in settings.txt, as the theme list of Ampify's settings page
 # does.
 # Job: MSVC (msvc-build), AMPIFY_XAML=ON and AMPIFY_BENCH=ON build (otherwise the injection refuses the runner's version).
-# Needs $script:BenchKitRoot\ui\ with ampify_launcher.exe, ampify_kernel.dll, and themes\midnight.
+# Needs $script:BenchKitRoot\ui\ with ampify_launcher.exe, ampify_kernel.dll, and themes\palettes.
 
-Register-Case -Id 'ui-theme-midnight' -Title 'UI: the midnight theme applies, then is removed without a restart' -Requires 'apple-music' -Action {
+Register-Case -Id 'ui-theme-palettes' -Title 'UI: the palettes theme applies, then is removed without a restart' -Requires 'apple-music' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'ui\ampify_launcher.exe'
-    $example = Join-Path $script:BenchKitRoot 'ui\themes\midnight'
+    $example = Join-Path $script:BenchKitRoot 'ui\themes\palettes'
     if (-not (Test-Path -LiteralPath $launcher) -or -not (Test-Path -LiteralPath $example)) {
-        Add-Skip -Ctx $Ctx -Name 'UI build and midnight theme present' -Reason ("no UI build in this bench: " + "$launcher / $example")
+        Add-Skip -Ctx $Ctx -Name 'UI build and palettes theme present' -Reason ("no UI build in this bench: " + "$launcher / $example")
         return
     }
 
-    # The midnight theme is copied into the user's Ampify folder, as in step 2 of the UI test.
+    # The palettes theme is copied into the user's Ampify folder, as in step 2 of the UI test.
     $themes = Join-Path $script:KitDir 'themes'
     New-Item -ItemType Directory -Force -Path $themes | Out-Null
-    $target = Join-Path $themes 'midnight'
+    $target = Join-Path $themes 'palettes'
     Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
     Copy-Item -LiteralPath $example -Destination $target -Recurse -Force
-    # Glass, the complete redesign, is tried in the same launch, after midnight.
+    # Glass, the complete redesign, is tried in the same launch, after palettes.
     $glassExample = Join-Path $script:BenchKitRoot 'ui\themes\glass'
     if (Test-Path -LiteralPath $glassExample) {
         Remove-Item -LiteralPath (Join-Path $themes 'glass') -Recurse -Force -ErrorAction SilentlyContinue
@@ -33,8 +33,8 @@ Register-Case -Id 'ui-theme-midnight' -Title 'UI: the midnight theme applies, th
     if (Test-Path -LiteralPath $settings) {
         $lines = @(Get-Content -LiteralPath $settings -Encoding UTF8 | Where-Object { $_ -notmatch '^\s*theme\.(active|scheme|inspect)\s*=' })
     }
-    $lines += 'theme.active = midnight'
-    $lines += 'theme.scheme = Dark'
+    $lines += 'theme.active = palettes'
+    $lines += 'theme.scheme = Midnight'
     $lines += 'theme.inspect = 0'
     Set-Content -LiteralPath $settings -Value $lines -Encoding UTF8
 
@@ -54,15 +54,15 @@ Register-Case -Id 'ui-theme-midnight' -Title 'UI: the midnight theme applies, th
     $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text 'Themes: interface thread ready (DispatcherQueue of the main window)' -TimeoutSeconds 90
     Add-Check -Ctx $Ctx -Name 'interface thread ready (DispatcherQueue)' -Passed $hooked
 
-    # 'Theme "midnight": N value(s) applied, ...': N is the number of values written.
-    $applyPattern = 'Theme "midnight": (\d+) value\(s\) applied'
+    # 'Theme "palettes": N value(s) applied, ...': N is the number of values written.
+    $applyPattern = 'Theme "palettes": (\d+) value\(s\) applied'
     $applied = Wait-Until -TimeoutSeconds 90 -Condition { $null -ne (Find-JournalMatch -FileName 'AppleMusic.log' -Pattern $applyPattern) }
     $count = 0
     if ($applied) {
         $match = Find-JournalMatch -FileName 'AppleMusic.log' -Pattern $applyPattern
         $count = [int]$match.Groups[1].Value
     }
-    Add-Check -Ctx $Ctx -Name 'midnight theme: values applied' -Passed ($applied -and $count -gt 0) `
+    Add-Check -Ctx $Ctx -Name 'palettes theme: values applied' -Passed ($applied -and $count -gt 0) `
         -Detail "$count value(s)"
 
     $log = Read-Journal 'AppleMusic.log'
@@ -70,12 +70,12 @@ Register-Case -Id 'ui-theme-midnight' -Title 'UI: the midnight theme applies, th
     Add-Info -Ctx $Ctx -Name '"Refused" lines of the log' -Detail "$($refusals.Count): $(($refusals | Select-Object -First 3) -join ' | ')"
 
     Start-Sleep -Seconds 4  # one more tick: the colours reach what is already on screen
-    Save-Screenshot -Ctx $Ctx -Name 'midnight-applied' | Out-Null
+    Save-Screenshot -Ctx $Ctx -Name 'palettes-applied' | Out-Null
 
     if (Test-Path -LiteralPath (Join-Path $themes 'glass')) {
         $switch = @(Get-Content -LiteralPath $settings -Encoding UTF8 | Where-Object { $_ -notmatch '^\s*theme\.(active|scheme)\s*=' })
         $switch += 'theme.active = glass'
-        $switch += 'theme.scheme = Dark'
+        $switch += 'theme.scheme = Midnight'
         Set-Content -LiteralPath $settings -Value $switch -Encoding UTF8
         $glassPattern = 'Theme "glass": (\d+) value\(s\) applied'
         $glassApplied = Wait-Until -TimeoutSeconds 60 -Condition { $null -ne (Find-JournalMatch -FileName 'AppleMusic.log' -Pattern $glassPattern) }
@@ -95,7 +95,7 @@ Register-Case -Id 'ui-theme-midnight' -Title 'UI: the midnight theme applies, th
     $restored = Wait-Journal -FileName 'AppleMusic.log' -Text 'Theme removed: ' -TimeoutSeconds 60
     Add-Check -Ctx $Ctx -Name 'removal without a restart: "Theme removed" in the log' -Passed $restored
 
-    Save-Screenshot -Ctx $Ctx -Name 'midnight-removed' | Out-Null
+    Save-Screenshot -Ctx $Ctx -Name 'palettes-removed' | Out-Null
 
     $closed = Close-AppleMusic
     $exited = $launcherProcess.WaitForExit(15000)

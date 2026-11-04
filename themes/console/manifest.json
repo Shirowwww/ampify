@@ -1,0 +1,26 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "console",
+  "name": "Console",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Studio hardware: graphite panels with fine edges and square corners, the playback bar as a rack unit at the bottom, and a wide display in its middle with an equalizer that follows the music. Three accents, as schemes: amber, VU green and ice.",
+  "translations": {
+    "fr": {"name": "Console", "description": "Du matériel de studio : panneaux graphite aux bords fins et coins carrés, la barre de lecture en rack en bas, et au milieu un large afficheur avec un égaliseur qui suit la musique. Trois accents, en variantes : ambre, vert vumètre et glace.", "settings": {"equalizer": "Égaliseur dans l'afficheur"}},
+    "de": {"name": "Konsole", "description": "Studiotechnik: Graphit-Panels mit feinen Kanten und eckigen Ecken, die Wiedergabeleiste als Rack-Einschub unten und in ihrer Mitte eine breite Anzeige mit einem Equalizer, der der Musik folgt. Drei Akzente als Varianten: Bernstein, VU-Grün und Eis.", "settings": {"equalizer": "Equalizer in der Anzeige"}},
+    "es": {"name": "Consola", "description": "Equipo de estudio: paneles grafito con bordes finos y esquinas rectas, la barra de reproducción como un módulo de rack abajo y, en su centro, una pantalla ancha con un ecualizador que sigue la música. Tres acentos, como variantes: ámbar, verde vúmetro y hielo.", "settings": {"equalizer": "Ecualizador en la pantalla"}},
+    "pt": {"name": "Console", "description": "Equipamento de estúdio: painéis grafite com bordas finas e cantos retos, a barra de reprodução como um módulo de rack embaixo e, no meio dela, um visor largo com um equalizador que segue a música. Três destaques, como variantes: âmbar, verde VU e gelo.", "settings": {"equalizer": "Equalizador no visor"}},
+    "ru": {"name": "Пульт", "description": "Студийная техника: графитовые панели с тонкой каймой и прямыми углами, панель воспроизведения внизу как рэковый блок, а в её центре широкий дисплей с эквалайзером, который следует за музыкой. Три акцента в виде вариантов: янтарь, зелёный VU и лёд.", "settings": {"equalizer": "Эквалайзер на дисплее"}},
+    "ja": {"name": "コンソール", "description": "スタジオ機材の佇まい。細い縁と角ばった角のグラファイトのパネル、下部にラックユニットのような再生バー、その中央に音楽に合わせて動くイコライザー付きの横長ディスプレイ。アクセントはバリエーションで 3 種類:アンバー、VU グリーン、アイス。", "settings": {"equalizer": "ディスプレイにイコライザー"}},
+    "zh": {"name": "调音台", "description": "录音室设备风格:细边框、方角的石墨面板,底部像机架单元一样的播放栏,中间是一块宽显示屏,内有随音乐跳动的均衡器。三种强调色作为配色方案:琥珀、VU 绿和冰蓝。", "settings": {"equalizer": "显示屏中的均衡器"}}
+  },
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "preview": "preview.jpg",
+  "defaultScheme": "Amber",
+  "tags": ["dark", "layout", "hardware", "equalizer", "bottom-bar"],
+  "settings": [
+    {"key": "equalizer", "label": "Equalizer in the display", "type": "toggle", "default": true}
+  ]
+}

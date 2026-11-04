@@ -1,0 +1,26 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "mirror",
+  "name": "Mirror",
+  "version": "1.0.0",
+  "kind": "theme",
+  "author": "Shirowwww",
+  "description": "Apple Music turned around: the sidebar on the right, the pages on the left, and the playback bar under them at the bottom left. Calm neutral greys, light text on dark, one sea-green accent. A setting puts the sidebar back on the left.",
+  "translations": {
+    "fr": {"name": "Miroir", "description": "Apple Music à l'envers : la barre latérale à droite, les pages à gauche, et la barre de lecture sous elles, en bas à gauche. Des gris neutres et calmes, du texte clair sur fond sombre, un seul accent vert d'eau. Un réglage remet la barre latérale à gauche.", "settings": {"sidebar-side": "Côté de la barre latérale"}, "options": {"Right": "À droite", "Left": "À gauche"}},
+    "de": {"name": "Spiegel", "description": "Apple Music andersherum: die Seitenleiste rechts, die Seiten links und die Wiedergabeleiste darunter, unten links. Ruhige neutrale Grautöne, helle Schrift auf dunklem Grund, ein einziger meergrüner Akzent. Eine Einstellung setzt die Seitenleiste wieder nach links.", "settings": {"sidebar-side": "Seite der Seitenleiste"}, "options": {"Right": "Rechts", "Left": "Links"}},
+    "es": {"name": "Espejo", "description": "Apple Music al revés: la barra lateral a la derecha, las páginas a la izquierda y la barra de reproducción debajo, abajo a la izquierda. Grises neutros y tranquilos, texto claro sobre fondo oscuro, un solo acento verde mar. Un ajuste vuelve a poner la barra lateral a la izquierda.", "settings": {"sidebar-side": "Lado de la barra lateral"}, "options": {"Right": "Derecha", "Left": "Izquierda"}},
+    "pt": {"name": "Espelho", "description": "O Apple Music ao contrário: a barra lateral à direita, as páginas à esquerda e a barra de reprodução embaixo delas, no canto inferior esquerdo. Cinzas neutros e calmos, texto claro sobre fundo escuro, um único destaque verde-água. Um ajuste devolve a barra lateral à esquerda.", "settings": {"sidebar-side": "Lado da barra lateral"}, "options": {"Right": "Direita", "Left": "Esquerda"}},
+    "ru": {"name": "Зеркало", "description": "Apple Music наоборот: боковая панель справа, страницы слева, а панель воспроизведения под ними, внизу слева. Спокойные нейтральные серые тона, светлый текст на тёмном фоне, один акцент цвета морской волны. Настройка возвращает боковую панель влево.", "settings": {"sidebar-side": "Сторона боковой панели"}, "options": {"Right": "Справа", "Left": "Слева"}},
+    "ja": {"name": "ミラー", "description": "左右を入れ替えた Apple Music。サイドバーは右、ページは左、再生バーはその下の左下に。落ち着いたニュートラルなグレー、暗い背景に明るい文字、アクセントはシーグリーンひとつ。設定でサイドバーを左に戻せます。", "settings": {"sidebar-side": "サイドバーの位置"}, "options": {"Right": "右", "Left": "左"}},
+    "zh": {"name": "镜像", "description": "左右翻转的 Apple Music:侧边栏在右,页面在左,播放栏在页面下方的左下角。沉静的中性灰,深色背景上的浅色文字,只有一种海绿色强调色。可在设置中把侧边栏放回左侧。", "settings": {"sidebar-side": "侧边栏位置"}, "options": {"Right": "右侧", "Left": "左侧"}}
+  },
+  "kitApi": "1.0",
+  "colors": "colors.ini",
+  "preview": "preview.jpg",
+  "defaultScheme": "Dark",
+  "tags": ["dark", "layout", "calm", "minimal"],
+  "settings": [
+    {"key": "sidebar-side", "label": "Sidebar side", "type": "choice", "options": ["Right", "Left"], "default": "Right"}
+  ]
+}

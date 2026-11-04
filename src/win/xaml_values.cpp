@@ -279,6 +279,8 @@ xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::
     } else if (IsSelectionBrush(property)) {
         if (!object.try_as<primitives::ListViewItemPresenter>()) return nullptr;
         using Presenter = primitives::ListViewItemPresenter;
+        if (property == "PointerOverBackground") return Presenter::PointerOverBackgroundProperty();
+        if (property == "PressedBackground") return Presenter::PressedBackgroundProperty();
         if (property == "SelectedBackground") return Presenter::SelectedBackgroundProperty();
         if (property == "SelectedPointerOverBackground") return Presenter::SelectedPointerOverBackgroundProperty();
         return Presenter::SelectedPressedBackgroundProperty();
@@ -307,18 +309,25 @@ xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::
         if (property == "MaxHeight") return xaml::FrameworkElement::MaxHeightProperty();
         if (property == "Opacity") return xaml::UIElement::OpacityProperty();
         if (property == "Visibility") return xaml::UIElement::VisibilityProperty();
+        // Inherited: read after an ancestor was flipped, the child's direction was the theme's, and putting it back
+        // froze the theme's mirror on every theme that followed.
+        if (property == "FlowDirection") return xaml::FrameworkElement::FlowDirectionProperty();
     }
     return nullptr;
 }
 
 media::Brush SelectionBrush(const primitives::ListViewItemPresenter& row, std::string_view property) {
+    if (property == "PointerOverBackground") return row.PointerOverBackground();
+    if (property == "PressedBackground") return row.PressedBackground();
     if (property == "SelectedBackground") return row.SelectedBackground();
     if (property == "SelectedPointerOverBackground") return row.SelectedPointerOverBackground();
     return row.SelectedPressedBackground();
 }
 
 void SetSelectionBrush(const primitives::ListViewItemPresenter& row, std::string_view property, const media::Brush& brush) {
-    if (property == "SelectedBackground") row.SelectedBackground(brush);
+    if (property == "PointerOverBackground") row.PointerOverBackground(brush);
+    else if (property == "PressedBackground") row.PressedBackground(brush);
+    else if (property == "SelectedBackground") row.SelectedBackground(brush);
     else if (property == "SelectedPointerOverBackground") row.SelectedPointerOverBackground(brush);
     else row.SelectedPressedBackground(brush);
 }

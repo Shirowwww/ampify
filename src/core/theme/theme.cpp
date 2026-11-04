@@ -643,6 +643,14 @@ std::string ArtistInLinkColour(const Theme& theme) {
     return {};
 }
 
+// A tile's subtitle that links to the artist keeps the colour Apple gives its link in code, for the mode the page was
+// built in: white on a light theme's page, unreadable. It takes the theme's secondary text, as the plain subtitles do.
+std::string CardLinksInSecondaryText(const Theme& theme) {
+    if (Sets(theme, ".card-subtitle", "Foreground")) return {};
+    if (!theme.palette.Find("TextFillColorSecondaryBrush")) return {};
+    return ".card-subtitle { color: $TextFillColorSecondaryBrush; }\n";
+}
+
 // Apple Music paints the tiles of a search's top results in its own grey, in code: the theme's card colour instead.
 std::string SearchTilesInCardColour(const Theme& theme) {
     if (Sets(theme, ".search-top-result", "Background")) return {};
@@ -666,13 +674,37 @@ std::string SelectedRowsInThemeColour(const Theme& theme) {
     return declarations.empty() ? std::string() : ".list-item {" + declarations + " }\n";
 }
 
+// A theme that lights a song of a list under the pointer (.track-row:hover) showed two lights: its own, and Apple's
+// list row across the whole width, a square edge out of the theme's. The theme's light stays alone.
+std::string OneLightPerSong(const Theme& theme) {
+    bool lit = std::any_of(theme.assignments.begin(), theme.assignments.end(), [](const Assignment& assignment) {
+        const Selector& selector = assignment.selector;
+        return selector.trigger == Trigger::Hover && assignment.property == "Background" && !selector.parts.empty() &&
+               selector.parts.back().type == "TracklistGrid" && selector.parts.back().name == "RootGrid";
+    });
+    if (!lit || Sets(theme, ".track-list-item", "PointerOverBackground")) return {};
+    return ".track-list-item { hover-background: transparent; active-background: transparent; }\n";
+}
+
+// A theme that lights a tile under the pointer (.card:hover) drew its light right against the artwork and the titles:
+// the tile keeps room inside, as Spotify's do.
+std::string RoomInsideALitCard(const Theme& theme) {
+    bool lit = std::any_of(theme.assignments.begin(), theme.assignments.end(), [](const Assignment& assignment) {
+        const Selector& selector = assignment.selector;
+        return selector.trigger == Trigger::Hover && assignment.property == "Background" && !selector.parts.empty() &&
+               selector.parts.back().type == "HoverGrid" && selector.parts.back().name == "SquareLockupContent";
+    });
+    if (!lit || Sets(theme, ".card", "Padding")) return {};
+    return ".card { padding: 8; }\n";
+}
+
 // Rules a theme's own choices call for, below its user.css so that a theme which sets the same thing keeps its value.
 void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts& parts) {
     bool applied = parts.resources;
-    std::string css = ScrubberClearOfCorners(theme);
+    std::string css = ScrubberClearOfCorners(theme) + OneLightPerSong(theme) + RoomInsideALitCard(theme);
     if (parts.colors) {
-        css += ScrubberInAccent(theme) + ArtistInLinkColour(theme) + SearchTilesInCardColour(theme) +
-               SelectedRowsInThemeColour(theme);
+        css += ScrubberInAccent(theme) + ArtistInLinkColour(theme) + CardLinksInSecondaryText(theme) +
+               SearchTilesInCardColour(theme) + SelectedRowsInThemeColour(theme);
     }
     if (css.empty()) return;
     RuleSource source;

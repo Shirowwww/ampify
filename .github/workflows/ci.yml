@@ -168,7 +168,7 @@ jobs:
           - shard: tools
             cases: cli-build-installed,amp-player,ui-examples,ui-inspector
           - shard: ui
-            cases: ui-theme-midnight,ui-surfaces,ui-apple-player
+            cases: ui-theme-palettes,ui-surfaces,ui-apple-player
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5

@@ -49,9 +49,10 @@ xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::
 bool IsTextProperty(std::string_view property);
 std::optional<th::Value> ReadTextProperty(const xaml::DependencyObject& object, std::string_view property);
 bool WriteTextProperty(const xaml::DependencyObject& object, std::string_view property, const th::Value& value);
-// SelectedBackground, SelectedPointerOverBackground or SelectedPressedBackground: a list row's selection colours.
+// A list row's own colours: under the pointer, pressed, and its selection in its three states.
 inline bool IsSelectionBrush(std::string_view property) {
-    return property == "SelectedBackground" || property == "SelectedPointerOverBackground" ||
+    return property == "PointerOverBackground" || property == "PressedBackground" ||
+           property == "SelectedBackground" || property == "SelectedPointerOverBackground" ||
            property == "SelectedPressedBackground";
 }
 // The brush property of a list row behind one of those names.

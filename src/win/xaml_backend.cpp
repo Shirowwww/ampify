@@ -19,6 +19,8 @@
 #include <functional>
 #include <set>
 
+#include <winrt/Microsoft.UI.Xaml.Automation.h>
+#include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
@@ -865,9 +867,17 @@ theme::DecorChange XamlTreeBackend::PlaceDecor(theme::NodeId id, theme::PseudoEl
     xaml::FrameworkElement old{nullptr};  // held until it leaves the panel
     if (known != m_decors.end()) old = known->second.image;
     xaml::FrameworkElement image{nullptr};
+    const wchar_t* name = slot == theme::PseudoElement::Before ? L"AmpifyDecorBefore" : L"AmpifyDecorAfter";
     if (decor.image.starts_with(theme::kBarsContent)) {
-        const wchar_t* name = slot == theme::PseudoElement::Before ? L"AmpifyDecorBefore" : L"AmpifyDecorAfter";
         image = m_bars.Make(std::stoi(decor.image.substr(theme::kBarsContent.size())), name);
+    } else if (decor.image.starts_with(theme::kArtworkImage)) {
+        // The song's artwork, painted by a brush FollowArtwork keeps up to date: a Border, so it moves and turns.
+        controls::Border artwork;
+        artwork.Name(name);
+        artwork.IsHitTestVisible(false);
+        xaml::Automation::AutomationProperties::SetAccessibilityView(artwork, xaml::Automation::Peers::AccessibilityView::Raw);
+        artwork.Background(ArtworkBrush(decor.image));
+        image = artwork;
     } else {
         image = DecorImageFrom(decor.image, slot);
     }

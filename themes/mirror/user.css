@@ -1,0 +1,274 @@
+/* Mirror: Apple Music turned around. The sidebar stands on the right, full height, under the window's buttons; the
+   pages take the left, and the playback bar sits under them, at the bottom left: the transport keys at its left end,
+   then the song, then volume and the toggles. Calm neutral greys and one sea-green accent.
+
+   How the sidebar moves: the split view that holds the sidebar and the pages is turned right to left, which puts its
+   pane on the right, and each of its two sides is turned back left to right, so that text, icons and lists read as
+   usual. The setting "Sidebar side" puts everything back on the left, as a fallback. */
+
+:root {
+    --window-background: $SolidBackgroundFillColorBaseBrush;
+    --panel-background: $ApplicationPageBackgroundThemeBrush;
+    --band-background: $CardBackgroundFillColorDefaultBrush;
+    --panel-radius: 12px;
+    --radius-box: 8px;
+    --radius-small: 6px;
+    --gap: 10;
+    --compact-pane: 48;
+    /* No bar at the top: the pages start one gap down, and keep room for the back arrow above their first line. */
+    --content-top: 10;
+    --page-top: 48;
+    --bar-height: 76;
+    --bar-room: calc(var(--bar-height) + var(--gap) * 2);
+    /* Room for the window's minimize, maximize and close buttons at the top right. */
+    --caption-room: 40;
+}
+
+@import "ampify:floating-panels";
+
+/* ---- The playback bar, at the bottom of the page column --------------------------------------------------------- */
+
+/* Apple's own order, left to right: transport, song, volume. Only the bar's place changes. */
+.playbar {
+    vertical-alignment: bottom;
+    height: var(--bar-height);
+    background: var(--panel-background);
+    corner-radius: var(--panel-radius);
+}
+
+/* The cell Apple keeps under the window's buttons, which are no longer above the bar: the toggles take it. */
+.caption-buttons-cover {
+    visibility: collapsed;
+}
+
+.playbar-extras {
+    grid-column: 0;
+    grid-column-span: 4;
+}
+
+.playbar-toggles {
+    grid-column-span: 2;
+    horizontal-alignment: right;
+    margin: 0 14 0 0;
+}
+
+.transport {
+    margin: 0 0 0 6;
+}
+
+.lcd {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: var(--radius-box);
+}
+
+.lcd-artwork-image {
+    corner-radius: var(--radius-small);
+}
+
+/* ---- Sidebar on the right (the default) ------------------------------------------------------------------------- */
+
+@setting sidebar-side = Right {
+    SplitView#RootSplitView {
+        flow-direction: rtl;
+    }
+
+    /* Both sides read left to right again. The sidebar's column, not the pane itself: folded, the split view shows
+       the pane's first 48 pixels from its own start, the right edge now, where the column of icons has to be. */
+    .sidebar-column,
+    .main-column {
+        flow-direction: ltr;
+    }
+
+    /* The pane's margins count from its start, now the window's right edge: one gap there, and a gap into the page
+       column (floating-panels' numbers, mirrored by the split view). It starts below the window's buttons. */
+    .sidebar {
+        margin: var(--caption-room) calc(var(--gap) * -1) var(--gap) var(--gap);
+    }
+
+    /* The page column: one gap from the window's left edge, two from the sidebar. */
+    .content {
+        margin: var(--content-top) calc(var(--gap) * 2) var(--bar-room) var(--gap);
+    }
+
+    .playbar {
+        margin: 0 calc(var(--gap) * 2) var(--gap) var(--gap);
+    }
+
+    .lyrics-panel {
+        margin: var(--content-top) calc(var(--gap) * 2) var(--bar-room) 0;
+    }
+
+    /* The back arrow stays at the window's top left corner, over the page's top: the search scopes start after it. */
+    .search-header {
+        padding: 0 16 0 48;
+    }
+
+    /* Folded, Apple's back and menu buttons stayed at the window's left edge, away from the column of icons: they go to
+       its top, on the icons' axis, as in Apple's own order. The sidebar it opens over the pages has its header start
+       where Apple leaves room for the arrow, on the left: the header comes back to the edge and stops short of them. */
+    @media (max-width: 1324px) {
+        .sidebar-toggle-area {
+            horizontal-alignment: right;
+            margin: calc(var(--caption-room) - 10) var(--gap) 0 0;
+        }
+
+        ContentControl#PaneHeaderContentBorder {
+            margin: 0 44 0 -32;
+        }
+    }
+
+    /* The signature: an entry leans towards the pages under the pointer. */
+    .sidebar-item:hover {
+        transform: translateX(-4px);
+    }
+}
+
+/* ---- Sidebar on the left (fallback) ----------------------------------------------------------------------------- */
+
+@setting sidebar-side = Left {
+    .content {
+        margin: var(--content-top) var(--gap) var(--bar-room) calc(var(--gap) * 2);
+    }
+
+    .playbar {
+        margin: 0 var(--gap) var(--gap) calc(var(--gap) * 2);
+    }
+
+    /* The window's buttons sit over the top right of the pages here. */
+    .lyrics-panel {
+        margin: var(--caption-room) var(--gap) var(--bar-room) 0;
+    }
+
+    .search-header {
+        padding: 0 150 0 16;
+    }
+
+    .sidebar-item:hover {
+        transform: translateX(4px);
+    }
+}
+
+/* ---- Sidebar ---------------------------------------------------------------------------------------------------- */
+
+.sidebar-item {
+    corner-radius: var(--radius-small);
+    transition: transform 160ms;
+}
+
+/* ---- Buttons ---------------------------------------------------------------------------------------------------- */
+
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 20px;
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+.play-button {
+    transition: transform 120ms;
+}
+
+.play-button:hover {
+    transform: scale(1.06);
+}
+
+.transport AppBarButton,
+.transport ToggleButton,
+.transport Button,
+.playbar-toggles ToggleButton {
+    transform-origin: center;
+    transition: transform 120ms;
+}
+
+.transport AppBarButton:active,
+.transport ToggleButton:active,
+.transport Button:active,
+.playbar-toggles ToggleButton:active {
+    transform: scale(0.92);
+}
+
+.volume-slider,
+.scrubber {
+    color: $AccentFillColorDefaultBrush;
+    background: $ControlFillColorDefaultBrush;
+}
+
+.volume-slider Thumb,
+.scrubber Thumb {
+    background: $TextFillColorPrimaryBrush;
+}
+
+.menu,
+.flyout,
+.tooltip {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-color: var(--spice-hairline);
+    corner-radius: var(--radius-box);
+}
+
+.menu-item {
+    corner-radius: var(--radius-small);
+}
+
+.menu-item:hover {
+    background: $ControlFillColorDefaultBrush;
+}
+
+/* ---- Pages ------------------------------------------------------------------------------------------------------ */
+
+.page-title {
+    font-weight: 600;
+}
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+.now-playing-indicator {
+    color: $AccentFillColorDefaultBrush;
+}
+
+.shelf-arrow-left,
+.shelf-arrow-right {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: var(--radius-small);
+}
+
+/* A card under the pointer: a raised tile with a hairline edge, and a small give when pressed. */
+.card {
+    corner-radius: var(--radius-box);
+    padding: 8;
+    border-width: 1;
+    border-color: transparent;
+    transform-origin: center;
+    transition: background 160ms, transform 120ms;
+}
+
+.card:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-color: var(--spice-hairline);
+}
+
+.card:active {
+    transform: scale(0.98);
+}
+
+.artwork {
+    corner-radius: var(--radius-small);
+}
+
+.track-row {
+    corner-radius: var(--radius-small);
+    transition: background 120ms;
+}
+
+.track-row:hover {
+    background: $CardBackgroundFillColorDefaultBrush;
+}
+
+.settings-card {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: var(--radius-box);
+}

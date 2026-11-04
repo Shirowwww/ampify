@@ -1,11 +1,32 @@
 /* Cover ambience: the song's display glows in the colours of its artwork, strongest behind the artwork and fading
    towards the end of the display, like Spicetify's Cover Ambience. It follows each song within 3 seconds. Raise the
-   two leading digits of each colour (00 to FF) for a stronger glow. */
+   two leading digits of each colour (00 to FF) for a stronger glow.
 
-.lcd {
-    background: linear-gradient(to right, #A6var(--art-2-hex, 5A5A64) 0%, #4Dvar(--art-1-hex, 5A5A64) 40%, #1Avar(--art-3-hex, 5A5A64) 100%);
-    border-width: 1px;
-    border-color: #33var(--art-2-hex, FFFFFF);
+   The reach setting spreads the glow over the whole playback bar, from one end to the other, behind the buttons. With
+   a theme that puts the bar at the bottom its row runs the window's width; the corners follow the theme's
+   --bar-radius when it gives one. */
+
+@setting reach = Display {
+    .lcd {
+        background: linear-gradient(to right, #A6var(--art-2-hex, 5A5A64) 0%, #4Dvar(--art-1-hex, 5A5A64) 40%, #1Avar(--art-3-hex, 5A5A64) 100%);
+        border-width: 1px;
+        border-color: #33var(--art-2-hex, FFFFFF);
+        corner-radius: var(--lcd-radius, 8px);
+    }
+}
+
+@setting reach = Bar {
+    .lcd {
+        background: transparent;
+        border-width: 0;
+    }
+
+    /* The buttons' row spans the bar: it carries the glow, under the display. */
+    .playbar-controls {
+        background: linear-gradient(to right, #A6var(--art-2-hex, 5A5A64) 0%, #4Dvar(--art-1-hex, 5A5A64) 40%, #1Avar(--art-3-hex, 5A5A64) 100%);
+        corner-radius: var(--bar-radius, 0);
+        z-index: -1;
+    }
 }
 
 /* The time and the progress bar keep their contrast on the glow. */

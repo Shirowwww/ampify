@@ -13,13 +13,16 @@ namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 49> kProperties{{
+constexpr std::array<PropertySpec, 51> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
     {"foreground", "Foreground", PropertyKind::Brush},
     {"border-color", "BorderBrush", PropertyKind::Brush},
-    // A row of a list (ListViewItemPresenter) draws its selection itself, from these three, and not from a state.
+    // A row of a list (ListViewItemPresenter) draws its light under the pointer and its selection itself, from these
+    // five, and not from a state.
+    {"hover-background", "PointerOverBackground", PropertyKind::Brush},
+    {"active-background", "PressedBackground", PropertyKind::Brush},
     {"selected-background", "SelectedBackground", PropertyKind::Brush},
     {"selected-hover-background", "SelectedPointerOverBackground", PropertyKind::Brush},
     {"selected-active-background", "SelectedPressedBackground", PropertyKind::Brush},
@@ -820,8 +823,10 @@ Conversion ConvertContent(std::string_view raw, const ValueContext& context) {
         }
         return Ok(ValueKind::Image, std::string(kBarsContent) + std::to_string(count));
     }
+    if (lowered.starts_with("artwork") && (lowered.size() == 7 || lowered[7] == ' ')) return ConvertArtwork(text, context);
     if (!lowered.starts_with("url(")) {
-        return Fail("content takes url(image), bars(n) or none: text is not supported (\"" + std::string(text) + "\")");
+        return Fail("content takes url(image), artwork, bars(n) or none: text is not supported (\"" + std::string(text) +
+                    "\")");
     }
     Conversion image = ConvertImage(text, context);
     if (!image.value) return image;

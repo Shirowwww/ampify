@@ -1,21 +1,29 @@
 /* Spinning artwork: the artwork of the playback bar becomes a record that turns, with its grooves and spindle hole.
    Ampify turns it 30 times a second, and not while Apple Music is hidden or minimized.
-   Change --turn to make it faster or slower.
+   Change --turn to make it faster or slower, --disc to make the record larger or smaller.
 
    Apple Music drives the artwork's own transform and refuses one, so the turn goes on the area around it. That area
-   is round, and clips the artwork inside it: a square would sweep its corners around. */
+   is round, and clips the artwork inside it: a square would sweep its corners around. Its slot is rarely square
+   (54 wide, 40 to 64 high from one theme to the next), so the record takes a size of its own, centred in the slot:
+   stretched, it would be an oval turning around a point off its centre. */
 
 :root {
     --turn: 24s;
+    --disc: 48;
 }
 
 .lcd-artwork {
+    width: var(--disc);
+    height: var(--disc);
+    horizontal-alignment: center;
+    vertical-alignment: center;
     corner-radius: 999px;
     animation: spin var(--turn) linear infinite;
 }
 
 /* Round too, so that a theme or a snippet such as Square corners never brings its corners back. */
-.lcd-artwork-image {
+.lcd-artwork-image,
+.lcd-placeholder {
     corner-radius: 999px;
 }
 

@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "high-contrast",
   "name": "High contrast",
-  "version": "1.1.4",
+  "version": "1.0.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Black and white with one bright accent, and outlines instead of shades: every panel, card and menu has a clear edge, and what is under the pointer gets an accent outline. A dark scheme and a light one.",

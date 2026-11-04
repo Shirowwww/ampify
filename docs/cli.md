@@ -5,7 +5,7 @@ installer puts it in your Path. Everything it changes lives in `%USERPROFILE%\Am
 Music's package.
 
 ```
-ampify theme set glass --scheme Night    use a theme
+ampify theme set glass --scheme Light    use a theme
 ampify install sleep-timer               install from the catalog (shows the permissions, asks first)
 ampify extension enable sleep-timer      switch it on
 ampify doctor                            check that everything is in order

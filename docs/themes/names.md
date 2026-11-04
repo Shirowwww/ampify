@@ -107,7 +107,8 @@ read on Apple Music 1.1792.
 | `.card-track` | A song in a shelf |
 | `.card-play-button` | The play button that shows over a card under the pointer |
 | `.card-title`, `.card-subtitle` | The two lines of text under a card |
-| `.artwork` | Every artwork, in cards, lists and the playback bar |
+| `.artwork` | Every artwork, in cards, lists and the playback bar, except artists' pictures |
+| `.artist-artwork` | Artists' round pictures, in shelves and at the top of an artist's page. Apple lights them under the pointer with a round shape: squaring them leaves a round light over a square picture |
 | `.artwork-shadow` | The shadow under an artwork |
 | `.explicit-badge` | The "E" badge |
 | `.favorite-button`, `.favorite-icon` | The star, and its icon |
@@ -130,12 +131,14 @@ read on Apple Music 1.1792.
 | `.artist-picture` | The picture of an artist |
 | `.radio-play-button` | The play button of a station |
 | `.track-list` | The list of songs |
-| `.track-row` | One song of that list |
+| `.track-row` | One song of that list. Its light under the pointer is the only one: Apple's own (`.track-list-item`) is off |
+| `.track-list-item` | The list row that holds a song of that list, as wide as the list |
 | `.track-play-button` | The play button of a song |
 | `.reactions-button` | The reactions button of a song |
+| `.suggested-songs` | The box of suggested songs under a playlist |
 | `.song-list` | The table of the Songs page |
 | `.song-row` | One row of that table |
-| `.list-item` | Any row of any list, which draws its own selection (`selected-background`) |
+| `.list-item` | Any row of any list, which draws its own light under the pointer (`hover-background`, `active-background`) and its selection (`selected-background`) |
 
 ## Search
 

@@ -2,26 +2,166 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "glass",
   "name": "Glass",
-  "version": "0.3.3",
+  "version": "1.0.0",
   "kind": "theme",
   "author": "Shirowwww",
-  "description": "A complete redesign: gradient and acrylic backgrounds, large rounded cards, larger text, buttons that grow on hover, shadows.",
-  "translations": {"fr": {"name": "Verre", "description": "Une refonte complète : fonds dégradés et acryliques, grandes cartes arrondies, texte plus grand, boutons qui grossissent au survol, ombres.", "settings": {"panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux", "frost": "Opacité du verre (0.2 à 0.9)", "hover-grow": "Boutons et cartes qui grossissent au survol"}}, "de": {"name": "Glas", "description": "Eine komplette Neugestaltung: Verlaufs- und Acrylhintergründe, große abgerundete Karten, größerer Text, Schaltflächen, die beim Darüberfahren wachsen, Schatten.", "settings": {"panel-radius": "Eckenrundung der Panels", "gap": "Abstand um die Panels", "frost": "Deckkraft des Milchglases (0,2 bis 0,9)", "hover-grow": "Schaltflächen und Karten wachsen beim Darüberfahren"}}, "es": {"name": "Cristal", "description": "Un rediseño completo: fondos degradados y acrílicos, grandes tarjetas redondeadas, texto más grande, botones que crecen al pasar el puntero y sombras.", "settings": {"panel-radius": "Redondeo de los paneles", "gap": "Espacio alrededor de los paneles", "frost": "Opacidad del cristal esmerilado (0,2 a 0,9)", "hover-grow": "Botones y tarjetas que crecen al pasar el puntero"}}, "pt": {"name": "Vidro", "description": "Um redesenho completo: fundos em degradê e acrílico, cartões grandes e arredondados, texto maior, botões que crescem ao passar o ponteiro e sombras.", "settings": {"panel-radius": "Arredondamento dos painéis", "gap": "Espaço ao redor dos painéis", "frost": "Opacidade do vidro fosco (0,2 a 0,9)", "hover-grow": "Botões e cartões que crescem ao passar o ponteiro"}}, "ru": {"name": "Стекло", "description": "Полная переработка: градиентные и акриловые фоны, крупные скруглённые карточки, более крупный текст, кнопки, которые увеличиваются при наведении, тени.", "settings": {"panel-radius": "Скругление панелей", "gap": "Отступы вокруг панелей", "frost": "Непрозрачность матового стекла (от 0,2 до 0,9)", "hover-grow": "Кнопки и карточки увеличиваются при наведении"}}, "ja": {"name": "ガラス", "description": "デザインを一新します。グラデーションとアクリルの背景、大きな角丸カード、大きめの文字、ポインターを合わせると大きくなるボタン、影。", "settings": {"panel-radius": "パネルの角丸", "gap": "パネルの周りの余白", "frost": "すりガラスの不透明度（0.2〜0.9）", "hover-grow": "ポインターを合わせたボタンとカードを拡大"}}, "zh": {"name": "玻璃", "description": "全面重新设计：渐变和亚克力背景、大圆角卡片、更大的文字、鼠标悬停时放大的按钮，以及阴影。", "settings": {"panel-radius": "面板圆角", "gap": "面板周围的间距", "frost": "磨砂玻璃不透明度（0.2 至 0.9）", "hover-grow": "鼠标悬停时放大按钮和卡片"}}},
+  "description": "Apple's Liquid Glass: the song's artwork fills the window, and the sidebar, the pages and a floating capsule for the playback bar are clear panes over it, tinted by the music, with a bright rim of light.",
+  "translations": {
+    "fr": {
+      "name": "Verre",
+      "description": "Le Liquid Glass d'Apple : la pochette du morceau remplit la fenêtre, et la barre latérale, les pages et une capsule flottante pour la lecture sont des vitres claires posées dessus, teintées par la musique, avec un liseré de lumière.",
+      "settings": {
+        "tint": "Teinte du verre",
+        "panel-radius": "Arrondi des vitres",
+        "frost": "Opacité du verre (0,2 à 0,9)",
+        "hover-grow": "Boutons et cartes qui se soulèvent au survol",
+        "moving-artwork": "Pochette animée qui tourne en fond"
+      },
+      "options": {
+        "Artwork": "Pochette",
+        "Neutral": "Neutre"
+      }
+    },
+    "de": {
+      "name": "Glas",
+      "description": "Apples Liquid Glass: Das Cover des Titels füllt das Fenster, Seitenleiste, Seiten und eine schwebende Kapsel für die Wiedergabe sind klare Scheiben darüber, von der Musik getönt, mit einem hellen Lichtrand.",
+      "settings": {
+        "tint": "Tönung des Glases",
+        "panel-radius": "Ecken der Scheiben",
+        "frost": "Deckkraft des Glases (0,2 bis 0,9)",
+        "hover-grow": "Tasten und Karten heben sich beim Darüberfahren",
+        "moving-artwork": "Cover dreht sich langsam im Hintergrund"
+      },
+      "options": {
+        "Artwork": "Cover",
+        "Neutral": "Neutral"
+      }
+    },
+    "es": {
+      "name": "Cristal",
+      "description": "El Liquid Glass de Apple: la portada de la canción llena la ventana, y la barra lateral, las páginas y una cápsula flotante para la reproducción son cristales claros encima, teñidos por la música, con un borde de luz.",
+      "settings": {
+        "tint": "Tono del cristal",
+        "panel-radius": "Esquinas de los cristales",
+        "frost": "Opacidad del cristal (0,2 a 0,9)",
+        "hover-grow": "Botones y tarjetas que se elevan al pasar el puntero",
+        "moving-artwork": "Portada animada que gira al fondo"
+      },
+      "options": {
+        "Artwork": "Portada",
+        "Neutral": "Neutro"
+      }
+    },
+    "pt": {
+      "name": "Vidro",
+      "description": "O Liquid Glass da Apple: a capa da música enche a janela, e a barra lateral, as páginas e uma cápsula flutuante para a reprodução são vidros claros por cima, tingidos pela música, com uma borda de luz.",
+      "settings": {
+        "tint": "Tom do vidro",
+        "panel-radius": "Cantos dos vidros",
+        "frost": "Opacidade do vidro (0,2 a 0,9)",
+        "hover-grow": "Botões e cartões que se erguem ao passar o ponteiro",
+        "moving-artwork": "Capa animada girando ao fundo"
+      },
+      "options": {
+        "Artwork": "Capa",
+        "Neutral": "Neutro"
+      }
+    },
+    "ru": {
+      "name": "Стекло",
+      "description": "Liquid Glass от Apple: обложка песни заполняет окно, а боковая панель, страницы и плавающая капсула воспроизведения — прозрачные стёкла поверх неё, окрашенные музыкой, со светлой кромкой.",
+      "settings": {
+        "tint": "Оттенок стекла",
+        "panel-radius": "Скругление стёкол",
+        "frost": "Непрозрачность стекла (от 0,2 до 0,9)",
+        "hover-grow": "Кнопки и карточки приподнимаются при наведении",
+        "moving-artwork": "Обложка медленно вращается на фоне"
+      },
+      "options": {
+        "Artwork": "Обложка",
+        "Neutral": "Нейтральный"
+      }
+    },
+    "ja": {
+      "name": "ガラス",
+      "description": "Apple の Liquid Glass：曲のアートワークがウインドウを満たし、サイドバー、ページ、再生用の浮かぶカプセルが、音楽の色に染まった透明なガラスとして重なり、光の縁が輝きます。",
+      "settings": {
+        "tint": "ガラスの色合い",
+        "panel-radius": "ガラスの角丸",
+        "frost": "ガラスの不透明度（0.2〜0.9）",
+        "hover-grow": "ポインターを合わせたボタンとカードが浮き上がる",
+        "moving-artwork": "背景でアートワークがゆっくり回る"
+      },
+      "options": {
+        "Artwork": "アートワーク",
+        "Neutral": "ニュートラル"
+      }
+    },
+    "zh": {
+      "name": "玻璃",
+      "description": "Apple 的 Liquid Glass：歌曲封面铺满窗口，侧边栏、页面和悬浮的播放胶囊是覆盖其上的透明玻璃，随音乐着色，并带有明亮的光边。",
+      "settings": {
+        "tint": "玻璃色调",
+        "panel-radius": "玻璃圆角",
+        "frost": "玻璃不透明度（0.2 至 0.9）",
+        "hover-grow": "鼠标悬停时按钮和卡片浮起",
+        "moving-artwork": "封面在背景中缓缓旋转"
+      },
+      "options": {
+        "Artwork": "封面",
+        "Neutral": "中性"
+      }
+    }
+  },
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Dark",
   "tags": [
     "glass",
-    "redesign",
+    "artwork",
+    "floating",
     "rounded",
-    "dark",
-    "light"
+    "dark"
   ],
   "preview": "preview.jpg",
   "settings": [
-    {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 32, "default": 18},
-    {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 12},
-    {"key": "frost", "label": "Frosted glass opacity (0.2 to 0.9)", "type": "number", "min": 0.2, "max": 0.9, "default": 0.55},
-    {"key": "hover-grow", "label": "Buttons and cards grow under the pointer", "type": "toggle", "default": true}
+    {
+      "key": "tint",
+      "label": "Glass tint",
+      "type": "choice",
+      "options": [
+        "Artwork",
+        "Neutral"
+      ],
+      "default": "Artwork"
+    },
+    {
+      "key": "panel-radius",
+      "label": "Pane corners",
+      "type": "number",
+      "min": 8,
+      "max": 36,
+      "default": 24
+    },
+    {
+      "key": "frost",
+      "label": "Glass opacity (0.2 to 0.9)",
+      "type": "number",
+      "min": 0.2,
+      "max": 0.9,
+      "default": 0.72
+    },
+    {
+      "key": "hover-grow",
+      "label": "Controls and cards lift under the pointer",
+      "type": "toggle",
+      "default": true
+    },
+    {
+      "key": "moving-artwork",
+      "label": "Artwork turning slowly in the background",
+      "type": "toggle",
+      "default": true
+    }
   ]
 }
