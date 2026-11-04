@@ -52,7 +52,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | `config` read and write, list items `+id` / `-id` | `ampify config [key] [value]`, `ampify config extensions +id` | Done |
 | `apply --extension`, `refresh`, `watch` | `ampify extension enable`, `ampify watch`, `ampify dev`: reload without restarting Apple Music | Done |
 | `update`, `upgrade` | `ampify update`, SHA-256 checked | Done |
-| `enable-devtools` | `ampify devtools`: the XAML tree of the page on screen within a few seconds. No element picker | Partial |
+| `enable-devtools` | `ampify devtools`: the XAML tree of the page on screen within a few seconds; `ampify devtools pick`: put the pointer on an element, and it prints the element under it, a selector and the elements above it | Done |
 | `path`, `config-dir`, `--help`, `--version`, chained verbs | `ampify path`, `ampify config --dir`, chained verbs | Done |
 | Restore after a broken Spotify update | The kernel stays off on an untested Apple Music; `ampify versions update` | Done |
 | `spotify_launch_flags`, `check_spicetify_update` | `app_launch_flags`, `check_kit_update` | Done |
@@ -71,7 +71,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | `:hover`, `:active`, `:focus`, `:not()`, `+`, `~`, `:nth-child()` | Same | Done |
 | `transition` | `transform`, `opacity`, `background` | Done |
 | `@keyframes`, `animation` | `opacity` and `transform`, on the compositor; artworks Apple Music moves itself refuse a transform (the element around them takes it) | Done |
-| Animated colours, backgrounds, sizes | `transition` eases plain `background` colours; `@keyframes` only move `opacity` and `transform`; sizes do not animate | Partial |
+| Animated colours, backgrounds, sizes | `transition` eases plain `background` colours; `@keyframes` also animate a plain `background` colour (stepped 30 times a second, never a gradient or an image); sizes do not animate | Partial |
 | `border-radius`, floating rounded panels | `corner-radius`; `ampify:floating-panels` rounds the sidebar, the pages and the lyrics pane with one `--panel-radius` | Done |
 | Scrollbar styling | `.scrollbar`; `ampify:scrollbars` keeps bars inside their panel, clear of the rounded corners, without Windows' arrows | Done |
 | `::before`, `::after` images and GIFs | `content: url(...)` | Done |
@@ -84,7 +84,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Fonts and images of the theme | `font-family: url(...)`, `url(...)` backgrounds | Done |
 | Context menus, tooltips, volume bar | `.menu`, `.menu-item`, `.tooltip`, `.flyout`, `.volume-slider` | Done |
 | Selected and playing rows | Selected rows (`selected-background`); no "playing" state on rows | Partial |
-| Lyrics lines | `.lyrics`, `.lyrics-synced`; single lines are not named | Partial |
+| Lyrics lines | `.lyrics`, `.lyrics-synced`, `.lyrics-line`, `.lyrics-line-content`, `.lyrics-words`, `.lyrics-background-words`, `.lyrics-instrumental`; the line being sung has no selector of its own (Apple fades the others by state) | Partial |
 | Full-screen player | Apple's player (`.fullscreen-*`) | Done |
 | Mini player | Its own window and interface thread: themes do not reach it | Missing |
 | Layout changes (bar at the bottom, columns swapped) | `ampify:bottom-bar`, `order`, `grid-*`; Apple's lists resist | Partial |
@@ -112,27 +112,27 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 |---|---|---|
 | One JavaScript file, wait for the APIs | `main.js` and `manifest.json`, ES modules, `Ampify.ready` | Done |
 | `Player`: state, track, events, play, pause, next, previous, seek | `Ampify.player`, through Apple's player and SMTC | Done |
-| `Player.setVolume` | `Ampify.player.setVolume(0 to 1)` sets Apple's player volume from the audio process once a song has started; Apple's own slider is not redrawn. `audio.volume()` reads it, `audio.setGainDb` adds a gain | Partial |
+| `Player.setVolume` | `Ampify.player.setVolume(0 to 1)` sets Apple's player volume once a song has started; from a `ui` extension it moves Apple's own slider (a decibel scale, not a straight 0 to 1). `audio.volume()` reads it, `audio.setGainDb` adds a gain | Done |
 | `Player.toggleShuffle`, `setShuffle`, `toggleRepeat`, `setRepeat` | `player.toggleShuffle()`, `setShuffle(on)`, `toggleRepeat()`, `setRepeat("off" \| "all" \| "one")`, `shuffle()`, `repeat()`: Apple's own buttons, checked on screen | Done |
 | `Platform.History` | `Ampify.ui.navigate` for Ampify's own pages; Apple Music's pages are not reachable | Partial |
 | `Platform.Library`, `Playlists`, `CosmosAsync`, `GraphQL` | `library.tracks()` reads the library file with play counts (permission `library.read`); no playlists, no writes, no Cosmos or GraphQL: Apple's internal API is private | Partial |
 | `Queue`, `removeFromQueue` | `player.queue.list()` (complete once Apple's Up Next panel was opened), `queue.remove` | Partial |
 | `addToQueue` | Apple's player ignores what Ampify hands it ([knowledge/apple-music-queue.md](../knowledge/apple-music-queue.md)) | Missing |
 | `React`, `ReactDOM`, `ReactComponent`, `ReactHook` | `Ampify.React`, `Ampify.components`, `Ampify.hooks` (no `useTheme`) | Done |
-| `Topbar`, `Playbar` buttons | `ui.topbar.addButton`, `ui.playbar.addButton`, `ui.setLabel` to change their text | Done |
-| `ContextMenu`, `Menu` | `ui.menu.addItem`: the item's name, no URI, no submenu | Partial |
+| `Topbar`, `Playbar` buttons | `ui.topbar.addButton`, `ui.playbar.addButton`, `ui.setLabel` to change their text, `active` and `ui.setActive` for a toggle drawn in the accent colour | Done |
+| `ContextMenu`, `Menu` | `ui.menu.addItem`: the item's name and, when Apple's data gives it, its kind and catalog id (no URI, no `shouldAdd` to show an entry for some items only); an entry can hold a submenu (one level, 20 entries) | Partial |
 | `PopupModal`, `Panel`, `AppTitle` | `ui.popup`, `ui.panel`, `ui.title` (Ampify's surfaces, not the window title) | Done |
 | `Keyboard`, `LocalStorage`, `Config`, `URI`, `Locale`, `SVGIcons`, `showNotification` | `keyboard.bind`, `storage`, `config`, `uri`, `i18n`, `icons`, `notify` | Done |
 | `colorExtractor` | `color.extract`, `color.fromArtwork` | Done |
 | `getAudioData` | `audio.analyze`, `onFrame`, `loudness`: in both processes since the interface reads what the audio process shares | Done |
 | Settings pages built by each extension | `settings` in the manifest, shown in Ampify's settings page | Done |
-| TypeScript, JSX, bundling | `ampify new`, `dev`, `test`, `build`, `types`; no TypeScript or JSX compiler | Partial |
+| TypeScript, JSX, bundling | `ampify new`, `dev`, `test`, `build`, `types`; `build` and `dev` turn `main.ts`, `main.tsx` or `main.jsx` into `main.js` with esbuild (the project's own, `npm install --save-dev esbuild`, or one on the PATH) | Done |
 
 ## Custom apps and Marketplace
 
 | Spicetify | Ampify | Status |
 |---|---|---|
-| Custom apps with a sidebar entry and pages | `kind: app`, `ui.sidebar.addItem`, `ui.page.register`; no active-state icon | Partial |
+| Custom apps with a sidebar entry and pages | `kind: app`, `ui.sidebar.addItem` (`active` or `setActive`: the accent colour and Apple's selection bar), `ui.page.register` | Done |
 | Marketplace in the app: tabs, search, install, update, schemes | The Marketplace page, SHA-256 checked, permissions shown before activation | Done |
 | Public catalog | [ampify-catalog](https://github.com/Shirowwww/ampify-catalog), reviewed; a few dozen items against hundreds | Partial |
 | Publish (topic and manifest) | `ampify publish` opens the pull request | Done |

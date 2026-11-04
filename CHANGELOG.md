@@ -4,6 +4,15 @@
 
 - Extensions can read and set Apple's shuffle and repeat (`Ampify.player.shuffle()`, `repeat()`, `setShuffle()`,
   `setRepeat()`, `toggleShuffle()`, `toggleRepeat()`) and set the player volume (`Ampify.player.setVolume()`).
+- `Ampify.player.setVolume()` from an interface extension moves Apple's own volume slider, and the player follows.
+- A context-menu entry gets the kind and catalog id of the item it was opened on (`{ title, item: { kind, id } }`)
+  when Apple Music's data has them, and an entry can hold a submenu.
+- Top bar, play bar and sidebar entries can be switched on (`active`, `setActive`): they take the accent colour.
+- Extensions can be written in TypeScript or JSX: `ampify` compiles them with esbuild when it packs, develops or
+  watches them. `ampify devtools pick` names the element under the pointer for a theme's CSS.
+- Themes can animate an element's `background` colour in `@keyframes`, and have names for the lyrics' lines
+  (`.lyrics-line`, `.lyrics-words`...).
+- The Spinning artwork snippet turns the record on the spot: it stayed off its centre and was not quite round.
 - The Atmos leveler's log now says which audio stream format it follows or leaves alone.
 
 ## 1.0.0 (2026-11-04)

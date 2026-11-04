@@ -94,6 +94,9 @@ dozens of times. Always target them under a named parent.
 | Glass: a sidebar entry jumped 6 pixels on hover, and back, from one entry to the next | `NavigationViewItem` refuses the facade's transitions (Apple Music animates it), so `transition: transform` was refused and each hover change applied at once | The transform eases on Ampify's `CompositeTransform` through a Storyboard, from where it is (`WriteStoryTransform`); `opacity` and `background` stay refused there |
 | A button that grows on hover grew towards its bottom right corner | XAML scales around the top left corner, CSS around the centre | A `CompositeTransform` whose element has no origin of the theme's turns around its centre (`CentreOn`) |
 | Text glyphs moved by `translate` vanished from the playback bar | The buttons clip their content | Not a bug: a theme should translate the button, not its glyph |
+| A colour animation on the play button's `Grid#Root` made the log say "1 value applied" every 3 seconds | The theme also gives that element a `background`; the colour animation draws it, so the engine read back an animated brush that was never its value and wrote again at every pass (the write itself is skipped) | The backend keeps the `background` the theme asked for while the animation owns it, and reads that back (`WantBackground`) |
+| A colour animation on the sidebar's root did nothing visible | Its children draw an opaque background over it | Not a bug: pick the element that draws the colour, with `ampify devtools pick` |
+| The spinning record drifted in a small circle (about 2.5 px) instead of turning on the spot, and was not quite round | Apple gives the artwork, its placeholder and the grid inside a fixed width of 54; a smaller record left them overflowing, a `Stretch` child wider than its slot sitting against the left edge. And the centre of the turn was an expression on the visual's size, which kept the old size | The snippet sizes those three elements to the record's size. `StepLoops` sets `CenterPoint` from `ActualSize` at each step for an element a stepped animation turns, and drops the expression (measured: the hole of the record stayed on the same pixel over twelve frames) |
 
 ## Fonts and icons
 
@@ -102,6 +105,8 @@ dozens of times. Always target them under a named parent.
 | Icons as empty squares | A `TextBlock { font-family }` rule changed the font of glyphs (private-use characters) | The engine never changes the font of a text made of icons |
 | "Primary" buttons as symbols | Apple Music's `AccentButtonStyle` draws the text in a symbol font | Use Apple Music's button style and set accent colors on top |
 | Part of an SVG icon missing or misplaced | XAML path markup does not go back to the start of a closed subpath: a relative `m` after `z` moves from the last point, not from the start as in SVG | Start each subpath after `z` with an absolute `M` (the kit's icons do) |
+| An extension's active play bar button stayed white | A glyph icon (`FontIcon`) takes the button's foreground and ignores the brush key given to `MakeIconElement`; only SVG icons follow it | `TintControl` sets the glyph's own `Foreground` to the accent brush, and leaves it unset when the button is off |
+| An extension's button did not go back to white when switched off | `SurfaceTracker` compares a control's signature, which left out `active`: the change was never seen | Every field the backend draws belongs in `Signature` (`src/core/ui_render/surfaces.cpp`) |
 
 ## Windows
 
@@ -159,6 +164,24 @@ A `WH_GETMESSAGE` hook never fired on Windows Server 2025; the DispatcherQueue w
   of browsing and scrolling. Apple Music does not expose the hooks that release the handles it gives, so it keeps a
   record of every element added (130,000 in five minutes): browsing rounds took 87 s instead of 55 s by the third, and UI
   Automation calls stalled up to 2.8 s. Off by default for that reason; frames, lists and popups already ask for a pass.
+- Menu entries of extensions are added after a real pointer release or key press on the window. A UI Automation Invoke
+  on the button does not count: to test them without the mouse, send Enter to the "Actions de la barre latérale"
+  button (`MoreButton`) with a posted key, which opens the main menu; a song's menu needs a real right click.
+- Apple's volume slider is in decibels and is the model: setting `IVolumeControl.Level` (the slider position, 0 to 1) on
+  the main window's `VolumeControl` makes Apple's own binding set the player volume and redraw the slider and glyph. The
+  control's DataContext is empty (no `IVolumeViewModel` to reach), and the ABI is written by hand in
+  `src/win/player_controls.cpp`. `src/win/win_host.cpp` is compiled without `AMPIFY_WITH_XAML`: code that needs XAML
+  there is reached through a function pointer installed from `xaml_host.cpp`, or it silently compiles to nothing.
+- The row a context menu is about: the data context of the row (a `DataGridRow` for a right click on the row, a
+  `TrackLockup` for its "..." button; both IContentDescriptorDriven and ITitledComponent).
+  `IContentDescriptorDriven.get_ContentDescriptor` gives the descriptor with the catalog id (`AdamId`), Apple's
+  `CanonicalId` and the kind flags (`src/win/amp_item.cpp`). A song of the user's library had neither id, only the
+  "local library identifiers" flag; its `ContainerContentDescriptor` is the playlist (IsPlaylist, IsContainer). The
+  page the row sits in is driven by a descriptor too (a playlist), so the walk up the tree accepts only a data context
+  titled like the menu ("Play «Name»"): the first try reported every song as a playlist.
+- Lyrics: a song timed by line draws each line in a `TextBlock#LineContainer`, one timed by word in a
+  `Border#WordByWordHost`; both sit in the line's `Grid#ContentGrid`, which Apple fades by state (`NotCurrent` 0.5,
+  `Current` 1). The tree only holds the lines Apple Music has realized (53 in one inspector snapshot).
 - First start: an MPEG LA licence (buttons Agree, Decline, Save As) shows before the main window, then, after sign-in, a
   "Welcome to Apple Music" screen (Start Listening). No XAML window exists while they are open. The bench closes them
   through UI Automation.

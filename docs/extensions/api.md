@@ -161,7 +161,7 @@ Ampify.player.setShuffle(on)        // true once the player is in that state    
 Ampify.player.setRepeat(mode)       // "off" | "all" | "one"
 Ampify.player.toggleShuffle()       // flips shuffle
 Ampify.player.toggleRepeat()        // off, all, one, off...
-Ampify.player.setVolume(volume)     // 0 to 1: Apple's player volume, audio process, [preview]
+Ampify.player.setVolume(volume)     // 0 to 1: Apple's player volume, interface or audio process, [preview]
 Ampify.player.queue.list()  // -> { available, complete, source, reason,
 //                                   items: [{ id, title, artist, album, durationMs, section, catalogId }] }
 Ampify.player.queue.add(catalogId, { position: "next" | "last" })  // [preview] answers false for now
@@ -193,9 +193,12 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
   setters `false`. They answer `null` while the window does not have its buttons (another Apple Music version). Apple
   redraws its repeat button on its own turn: the first press after Apple Music starts can take about 3 seconds, the next
   ones a tenth of a second; a setter waits for the answer up to 4 seconds and gives `false` after that.
-- `setVolume` sets Apple's player volume as Apple does, from the audio process (`"processes": ["engine"]`); in the
-  interface it answers `false`. It answers `false` until a song has started, because Apple sets its volume then.
-  `audio.volume()` follows it, but Apple's own slider is not redrawn: it shows the old value until Apple moves it.
+- `setVolume` sets Apple's player volume. From the interface process (`"processes": ["ui"]`) it moves Apple's own
+  volume slider, so the slider and the speaker icon redraw and the player follows, as if the user had dragged it; the
+  slider is in decibels, so `0.5` is not the middle of it (30 dB range: the slider shows about 80 % for a gain of 0.5).
+  From the audio process (`"processes": ["engine"]`) it sets the player's volume directly and Apple's slider keeps
+  showing the old value until Apple moves it. It answers `false` until a song has started, because Apple sets its
+  volume then; the log says why when it fails. `audio.volume()` follows it.
 
 ### 5.4 Audio [preview]
 
@@ -262,10 +265,11 @@ it, and a card lights up while it has the focus as it does under the pointer.
 | `text` | `size`, `weight`, `color`, `wrap`, `maxLines` | 8 to 120 px; 100 to 900; `#RRGGBB`; `false` for one line; 0 to 100 |
 
 ```js
-Ampify.ui.topbar.addButton({ label, icon, onClick })   // no onClick: a text that only shows something
-Ampify.ui.playbar.addButton({ label, icon, onClick })  // same; any other onClick than a function throws
-Ampify.ui.sidebar.addItem({ label, icon, onClick })   // icon: a Segoe Fluent Icons glyph
+Ampify.ui.topbar.addButton({ label, icon, onClick, active })   // no onClick: a text that only shows something
+Ampify.ui.playbar.addButton({ label, icon, onClick, active })  // same; any other onClick than a function throws
+Ampify.ui.sidebar.addItem({ label, icon, onClick, active })   // icon: a Segoe Fluent Icons glyph; returns the id
 Ampify.ui.menu.addItem("context" | "app", { label, icon, onClick })
+Ampify.ui.menu.addItem("context" | "app", { label, icon, items: [{ label, icon, onClick }, ...] })  // a submenu
 Ampify.ui.popup.open(view)
 Ampify.ui.fullscreen.open(view)        // permission ui.fullscreen; called again, updates in place
 Ampify.ui.fullscreen.close()
@@ -274,13 +278,22 @@ Ampify.ui.applePlayer.open()           // permission ui.fullscreen: Apple Music'
 Ampify.ui.panel.register(id, view)     // a 380 px column on the right
 Ampify.ui.title.set(text)              // title of the element's panel, page and popup
 Ampify.ui.setLabel(id, label)          // new text of a top bar or play bar button, by the id addButton returned
+Ampify.ui.setActive(id, on)            // on or off: a button or sidebar entry that is on takes Apple Music's accent colour
 Ampify.ui.page.register(path, view)    // for an app
 Ampify.ui.navigate(path)
 ```
 
 - Apple Music has no separate top bar, so `topbar` buttons go next to the lyrics and queue buttons, like `playbar`.
 - `menu.addItem("app", ...)` adds to the main menu (the "..." next to "Apple Music"); `onClick` gets `{}`.
-  `"context"` adds to the menu of a song, album or playlist; `onClick` gets `{ title }`, the item's name.
+  `"context"` adds to the menu of a song, album or playlist; `onClick` gets `{ title, item }`: `title` is the item's
+  name, `item` is what Apple Music's own data says about it, `{ kind, id, canonicalId }` (`kind` is `song`, `album`,
+  `artist`, `composer`, `genre`, `playlist`, `station`, `video`, `concert` or `container`; `id` is the catalog id and
+  `canonicalId` Apple's own identifier, each left out when Apple gives none: a song of the user's library often has
+  neither, only local identifiers). `item` is missing when the menu has no such data behind it: then only `title` is
+  there, and comparing it with `Ampify.player.state().track` is all that is left. With `items` the entry is a submenu holding up to 20 entries, one level only; it has no `onClick` of its own.
+- A button with `active: true`, or switched by `setActive`, is drawn in the accent colour and reads "on" to screen
+  readers: a toggle such as a sleep timer or a lyrics mode shows its state at a glance. A sidebar entry that is on also
+  gets the bar Apple Music puts before its selected item, and it is on by itself while its element's page is open.
 - The full-screen view covers the window, above everything. Escape or its Close button closes it. One at a time: the
   last element that opens it wins, and `onClose` runs when the user closes it or another element takes it.
 - `applePlayer.open()` opens Apple's full-screen player where the user chose in Ampify's settings page (`apple.fullscreen`).
