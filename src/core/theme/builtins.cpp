@@ -259,18 +259,11 @@ constexpr std::string_view kFloatingPanels = R"css(
     border-width: 0;
 }
 
-/* Apple centres the toggles in their column and stretches the song over its own: with a few more toggles, the volume
-   button stood 6 pixels from the song at most widths. The song ends two gaps short of its column instead. */
+/* Apple's column kept the song to a third of the bar: in a narrow window the title was cut while an empty stretch stood
+   before the volume. The song spans the toggles' column too, and Ampify ends it a clear space short of the first toggle,
+   whatever their number (FollowSongRoom in ui_service.cpp). */
 .now-playing {
-    margin: 0 calc(var(--gap, 8) * 2) 0 0;
-}
-
-/* In a window 1200 pixels wide or less, Ampify's buttons beside the volume reach back into the song's column: the
-   song touched the volume icon (Paper, whose gap is 0) or stood 6 pixels from it. A clear space whatever the gap. */
-@media (max-width: 1200px) {
-    .now-playing {
-        margin: 0 36 0 0;
-    }
+    grid-column-span: 2;
 }
 
 /* A narrow display has room for one time, at the top as at the bottom: the time left, which says when the song ends.

@@ -355,6 +355,10 @@ struct WindowContext {
     winrt::weak_ref<xaml::FrameworkElement> foldBack;
     winrt::weak_ref<xaml::FrameworkElement> foldLogo;
     winrt::weak_ref<xaml::FrameworkElement> foldPane;
+    // The playback bar's song column and the toggles at its right (FollowSongRoom), and the song's own margin.
+    winrt::weak_ref<xaml::FrameworkElement> songColumn;
+    winrt::weak_ref<xaml::FrameworkElement> songToggles;
+    std::optional<xaml::Thickness> songMargin;  // Apple's, while Ampify moves its right side
 
     // Main window only.
     // Strong, like the Popup: the panels stay ours even when Apple Music rebuilds the children of its page (in the
@@ -2935,6 +2939,68 @@ void FollowFoldedLogo(UiService::Shared& shared, const std::shared_ptr<WindowCon
     shared.Once("folded-logo", "Interface: the folded sidebar's logo follows its back arrow");
 }
 
+constexpr double kSongClearance = 24;  // between the song's display and the first toggle (the volume)
+
+// A layout that spans the song over the toggles' column (floating-panels) leaves its end to Ampify: Apple's columns
+// left the song a third of the bar, with an empty stretch before the volume, and the title cut in a narrow window. The
+// song ends a clear space short of the toggles, whatever their number. A layout that sizes the song itself (a width,
+// or another alignment) keeps it; a single column gets Apple's margin back.
+void FitSongRoom(WindowContext& context) {
+    xaml::FrameworkElement song = context.songColumn.get();
+    xaml::FrameworkElement toggles = context.songToggles.get();
+    auto parent = song ? media::VisualTreeHelper::GetParent(song).try_as<xaml::UIElement>() : nullptr;
+    if (!song || !toggles || !parent) return;
+    bool ours = controls::Grid::GetColumnSpan(song) >= 2 && std::isnan(song.Width()) &&
+                song.HorizontalAlignment() == xaml::HorizontalAlignment::Stretch;
+    xaml::Thickness margin = song.Margin();
+    if (!ours) {
+        if (context.songMargin) song.Margin(*context.songMargin);
+        context.songMargin.reset();
+        return;
+    }
+    if (!context.songMargin) context.songMargin = margin;
+    if (song.ActualWidth() <= 0 || toggles.ActualWidth() <= 0) return;
+    double songLeft = song.TransformToVisual(parent).TransformPoint({0, 0}).X;
+    double togglesLeft = toggles.TransformToVisual(parent).TransformPoint({0, 0}).X;
+    double slotRight = songLeft + song.ActualWidth() + margin.Right;
+    double right = std::max(context.songMargin->Right, slotRight - (togglesLeft - kSongClearance));
+    if (std::abs(right - margin.Right) < 0.5) return;
+    song.Margin({margin.Left, margin.Top, right, margin.Bottom});
+}
+
+void FollowSongRoom(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
+    const std::vector<ProbeNode>& nodes = context->probe;
+    std::optional<int> display = uirender::FindByName(nodes, "LCD");
+    std::optional<int> toggles = uirender::FindByName(nodes, "NowPlayingToggleButtons");
+    if (!display || !toggles) return;
+    auto displayElement = context->probeObjects[*display].get().try_as<xaml::FrameworkElement>();
+    auto togglesElement = context->probeObjects[*toggles].get().try_as<xaml::FrameworkElement>();
+    auto song = displayElement ? media::VisualTreeHelper::GetParent(displayElement).try_as<xaml::FrameworkElement>()
+                               : nullptr;
+    if (!song || !togglesElement || context->songColumn.get() == song) return;
+    context->songColumn = winrt::make_weak(song);
+    context->songToggles = winrt::make_weak(togglesElement);
+    context->songMargin.reset();
+    WeakContext weakContext = context;
+    auto update = [weakContext]() noexcept {
+        try {
+            if (auto live = weakContext.lock()) FitSongRoom(*live);
+        } catch (...) {
+        }
+    };
+    auto sized = [update](IInspectable const&, xaml::SizeChangedEventArgs const&) noexcept { update(); };
+    song.SizeChanged(sized);
+    togglesElement.SizeChanged(sized);
+    for (const xaml::DependencyProperty& property : {controls::Grid::ColumnSpanProperty(),
+                                                     xaml::FrameworkElement::WidthProperty(),
+                                                     xaml::FrameworkElement::HorizontalAlignmentProperty()}) {
+        song.RegisterPropertyChangedCallback(
+            property, [update](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept { update(); });
+    }
+    FitSongRoom(*context);
+    shared.Once("song-room", "Interface: the playback bar's song follows the room the toggles leave it");
+}
+
 // Keeps the page the host leaves in the history of the visit. A visit starts again after Apple Music's navigation
 // closed the host, and a link to the page just left (the Marketplace's list after an uninstall) goes back instead.
 void RememberRoute(WindowContext& context, const std::pair<std::string, std::string>& next) {
@@ -3176,6 +3242,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
     if (context->property == L"MainWindow") {
         WatchSettingsEntry(shared, context);
         FollowFoldedLogo(shared, context);
+        FollowSongRoom(shared, context);
         ApplySurfaces(shared, context, content);
     }
 }
