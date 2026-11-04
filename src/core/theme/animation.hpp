@@ -1,8 +1,9 @@
 #pragma once
 
 // Theme animations: the @keyframes blocks of user.css and the `animation` property that runs them (docs/themes/format.md,
-// "Animations"). Only what the compositor animates without the interface thread is offered: opacity, and the parts of
-// transform (scale, rotation, translation). The engine writes an `animation` like any value; the backend decodes it.
+// "Animations"). What the compositor animates without the interface thread is offered: opacity, and the parts of
+// transform (scale, rotation, translation). A plain background colour is offered too: the backend steps it itself, a few
+// times a second, as it does an endless animation. The engine writes an `animation` like any value; the backend decodes it.
 
 #include <array>
 #include <functional>
@@ -22,10 +23,11 @@ struct ValueContext;
 // One property a @keyframes block animates, with its values at offsets from 0 to 1, in order. A track without a point
 // at 0 or at 1 starts or ends at the element's own value there, as in CSS.
 struct AnimationTrack {
-    enum class Channel { Opacity, Scale, Rotation, Translation };
+    enum class Channel { Opacity, Scale, Rotation, Translation, Background };
     struct Point {
         double offset = 0;
-        double x = 0;  // the value; the horizontal one for Scale and Translation (pixels), degrees for Rotation
+        double x = 0;  // the value; the horizontal one for Scale and Translation (pixels), degrees for Rotation, the
+                       // colour for Background as one number 0xAARRGGBB (a mix goes channel by channel, not on the number)
         double y = 0;  // the vertical one for Scale and Translation, 0 otherwise
         bool operator==(const Point&) const = default;
     };

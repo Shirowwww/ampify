@@ -226,6 +226,15 @@ They open in popups, each a root of its own: `.flyout Slider` works, `.playbar .
 | `.lyrics-menu-button` | Its menu button |
 | `.lyrics-synced` | The lyrics that follow the song |
 | `.lyrics-static` | The lyrics without timing |
+| `.lyrics-message` | The text that stands in for lyrics: nothing playing, loading, not available |
+| `.lyrics-line` | One line of the synced lyrics, whole |
+| `.lyrics-line-button` | The button around a line: a click goes to that moment of the song |
+| `.lyrics-line-content` | What a line draws; Apple fades it by state (past or coming at half opacity, current at full) |
+| `.lyrics-words` | The sung text of a line: a plain text when the song is timed by line, the word by word host when it is timed by word |
+| `.lyrics-background-words` | The background vocals of a line, when it has some |
+| `.lyrics-instrumental` | The three dots of an instrumental break |
+| `.lyrics-footer` | The strip under the lyrics |
+| `.lyrics-writers` | Its credits line |
 | `.queue` | The Up Next list |
 
 ## Everything else

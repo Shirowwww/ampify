@@ -218,6 +218,15 @@ const std::vector<ClassEntry> kClasses{
     {"lyrics-menu-button", {"Button#LyricsMenuButton"}},
     {"lyrics-synced", {"KaraokeLyricsView#RootControl"}},
     {"lyrics-static", {"ListView#StaticLyrics"}},
+    {"lyrics-message", {"TextBlock#UnloadedTextBlock", "TextBlock#LoadingTextBlock", "TextBlock#NotAvailableTextBlock"}},
+    {"lyrics-line", {"KaraokeLyricsLine"}},
+    {"lyrics-line-button", {"ItemsControl#TimeBasedLyricsItemsControl > ItemsPresenter > StackPanel > ContentPresenter > Button"}},
+    {"lyrics-line-content", {"KaraokeLyricsLine Grid#ContentGrid"}},
+    {"lyrics-words", {"KaraokeLyricsLine TextBlock#LineContainer", "KaraokeLyricsLine Border#WordByWordHost"}},
+    {"lyrics-background-words", {"KaraokeLyricsLine Border#BackgroundWordByWordHost"}},
+    {"lyrics-instrumental", {"KaraokeLyricsLine StackPanel#InstrumentalContainer"}},
+    {"lyrics-footer", {"StackPanel#LyricsFooter"}},
+    {"lyrics-writers", {"TextBlock#WritersTextBlock"}},
     {"queue", {"PlayQueueView#PlayQueueView"}},
 };
 

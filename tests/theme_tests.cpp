@@ -3704,7 +3704,7 @@ TEST_CASE(Theme_KeyframesGiveTracksToTheAnimationsThatNameThem) {
         "    from { opacity: 1; transform: scale(1) }\n"
         "    to { opacity: .6; transform: scale(1.05) rotate(var(--turn)) }\n"
         "}\n"
-        "@keyframes glow { to { background: red } }\n"
+        "@keyframes glow { to { width: 200px } }\n"
         "Grid { animation: glow 1s }\n";
     th::Theme theme = Load(files);
 
@@ -3717,7 +3717,7 @@ TEST_CASE(Theme_KeyframesGiveTracksToTheAnimationsThatNameThem) {
                                                    {Channel::Scale, {{0, 1, 1}, {1, 1.05, 1.05}}},
                                                    {Channel::Rotation, {{0, 0, 0}, {1, 360, 0}}}}));
     }
-    CHECK(!ProblemContaining(theme, "\"background\" does not animate").empty());
+    CHECK(!ProblemContaining(theme, "\"width\" does not animate").empty());
     CHECK(!ProblemContaining(theme, "animates nothing").empty());  // glow
     CHECK(theme.assignments.size() == 1);
     if (theme.assignments.size() == 1) {

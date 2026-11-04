@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include "../text_util.hpp"
+#include "color.hpp"
 #include "properties.hpp"
 #include "theme.hpp"
 
@@ -18,7 +19,7 @@ using Channel = AnimationTrack::Channel;
 constexpr size_t kMaxAnimations = 4;
 constexpr double kMaxMs = 120000;
 constexpr int kMaxCount = 1000;
-constexpr std::array<std::string_view, 4> kChannels{"opacity", "scale", "rotation", "translation"};
+constexpr std::array<std::string_view, 5> kChannels{"opacity", "scale", "rotation", "translation", "background"};
 constexpr std::array<std::string_view, 4> kDirections{"normal", "reverse", "alternate", "alternate-reverse"};
 
 struct NamedEasing {
@@ -199,7 +200,7 @@ bool Complete(Item& item, std::string_view text, const KeyframeSets& sets, std::
         return false;
     }
     if (block->second.empty()) {
-        problem = "@keyframes " + item.name + " animates nothing: it changes neither opacity nor transform";
+        problem = "@keyframes " + item.name + " animates nothing: it changes neither opacity, transform nor background";
         return false;
     }
     animation.tracks = block->second;
@@ -212,14 +213,43 @@ bool IsNeutral(Channel channel, const AnimationTrack::Point& point) {
 }
 
 // Per channel, the value at each offset: a later stop or declaration at the same offset wins, as in CSS.
-using StopPoints = std::array<std::map<double, AnimationTrack::Point>, 4>;
+using StopPoints = std::array<std::map<double, AnimationTrack::Point>, 5>;
+
+// The colour as one number, 0xAARRGGBB, and back.
+double PackColor(const Argb& color) {
+    return static_cast<double>((static_cast<std::uint32_t>(color.a) << 24) | (static_cast<std::uint32_t>(color.r) << 16) |
+                               (static_cast<std::uint32_t>(color.g) << 8) | static_cast<std::uint32_t>(color.b));
+}
+
+// A colour between two packed ones, channel by channel (a number between 0xFF000000 and 0xFFFFFFFF is not a colour
+// between black and white). As in CSS the red, green and blue mix with their alpha applied: `transparent` (0x00FFFFFF)
+// fading to red passes through red at half opacity, not through a pink.
+double MixColor(double from, double to, double t) {
+    if (t <= 0) return from;
+    if (t >= 1) return to;
+    const auto a = static_cast<std::uint32_t>(from);
+    const auto b = static_cast<std::uint32_t>(to);
+    const double alphaA = (a >> 24) & 0xFF;
+    const double alphaB = (b >> 24) & 0xFF;
+    const double alpha = alphaA + (alphaB - alphaA) * t;
+    auto byte = [](double value) { return static_cast<std::uint32_t>(std::clamp(std::round(value), 0.0, 255.0)); };
+    std::uint32_t mixed = byte(alpha) << 24;
+    for (int shift = 0; shift <= 16; shift += 8) {
+        const double x = static_cast<double>((a >> shift) & 0xFF) * alphaA;
+        const double y = static_cast<double>((b >> shift) & 0xFF) * alphaB;
+        const double applied = x + (y - x) * t;
+        mixed |= byte(alpha > 0 ? applied / alpha : 0) << shift;
+    }
+    return static_cast<double>(mixed);
+}
 
 // Adds one declaration of a stop to `points`. False, with the reason, for one that cannot animate.
 bool ReadDeclaration(const Declaration& declaration, const KeyframeStop& stop, const ValueContext& context,
                      const std::map<std::string, std::string>& variables, StopPoints& points, std::string& problem) {
     std::string property = ToLowerAscii(declaration.property);
-    if (property != "opacity" && property != "transform") {
-        problem = "\"" + declaration.property + "\" does not animate: opacity and transform do";
+    if (property == "background-color") property = "background";
+    if (property != "opacity" && property != "transform" && property != "background") {
+        problem = "\"" + declaration.property + "\" does not animate: opacity, transform and background do";
         return false;
     }
     if (declaration.important) {
@@ -233,6 +263,18 @@ bool ReadDeclaration(const Declaration& declaration, const KeyframeStop& stop, c
     if (!conversion.value) {
         problem = conversion.problem;
         return false;
+    }
+    if (property == "background") {
+        std::optional<Argb> color =
+            conversion.value->kind == ValueKind::Color ? ParseColor(conversion.value->text) : std::nullopt;
+        if (!color) {
+            problem = "background animates plain colours only, not images or gradients";
+            return false;
+        }
+        for (double offset : stop.offsets) {
+            points[static_cast<size_t>(Channel::Background)][offset] = {offset, PackColor(*color), 0};
+        }
+        return true;
     }
     std::vector<double> numbers;
     for (std::string_view part : Split(conversion.value->text, ',')) numbers.push_back(Number(part).value_or(0));
@@ -336,7 +378,7 @@ KeyframeTracks ReadKeyframes(const Keyframes& block, const ValueContext& context
         // The parts of a transform that stay at none in every stop are left to the element.
         bool neutral = std::all_of(track.points.begin(), track.points.end(),
                                    [&](const AnimationTrack::Point& point) { return IsNeutral(track.channel, point); });
-        if (track.channel != Channel::Opacity && neutral) continue;
+        if (track.channel != Channel::Opacity && track.channel != Channel::Background && neutral) continue;
         tracks.push_back(std::move(track));
     }
     return tracks;
@@ -423,6 +465,7 @@ ChannelValue TrackAt(const AnimationTrack& track, double progress, const std::ar
     const AnimationTrack::Point& b = points[next];
     const double span = b.offset - a.offset;
     const double eased = span > 0 ? Ease(easing, std::clamp((progress - a.offset) / span, 0.0, 1.0)) : 1;
+    if (track.channel == Channel::Background) return {track.channel, MixColor(a.x, b.x, eased), 0};
     return {track.channel, a.x + (b.x - a.x) * eased, a.y + (b.y - a.y) * eased};
 }
 

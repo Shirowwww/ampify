@@ -8,6 +8,7 @@
 #include <chrono>
 #include <optional>
 
+#include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Windows.Foundation.Numerics.h>
 #include <winrt/Windows.UI.ViewManagement.h>
@@ -24,6 +25,8 @@ namespace {
 namespace th = ampify::theme;
 namespace composition = winrt::Microsoft::UI::Composition;
 namespace xaml = winrt::Microsoft::UI::Xaml;
+namespace controls = winrt::Microsoft::UI::Xaml::Controls;
+namespace media = winrt::Microsoft::UI::Xaml::Media;
 using winrt::Windows::Foundation::Numerics::float2;
 using winrt::Windows::Foundation::Numerics::float3;
 using Channel = th::AnimationTrack::Channel;
@@ -42,9 +45,48 @@ const wchar_t* TargetOf(Channel channel) {
         case Channel::Scale: return L"Scale";
         case Channel::Rotation: return L"Rotation";
         case Channel::Translation: return L"Translation";
-        case Channel::Opacity: break;
+        case Channel::Opacity:
+        case Channel::Background:  // never built for the compositor: it is stepped
+            break;
     }
     return L"Opacity";
+}
+
+// The brush an element draws its background with, for the kinds of element that have one.
+media::Brush BackgroundBrush(const xaml::UIElement& element) {
+    if (auto control = element.try_as<controls::Control>()) return control.Background();
+    if (auto panel = element.try_as<controls::Panel>()) return panel.Background();
+    if (auto border = element.try_as<controls::Border>()) return border.Background();
+    if (auto presenter = element.try_as<controls::ContentPresenter>()) return presenter.Background();
+    return nullptr;
+}
+
+bool SetBackgroundBrush(const xaml::UIElement& element, const media::Brush& brush) {
+    if (auto control = element.try_as<controls::Control>()) { control.Background(brush); return true; }
+    if (auto panel = element.try_as<controls::Panel>()) { panel.Background(brush); return true; }
+    if (auto border = element.try_as<controls::Border>()) { border.Background(brush); return true; }
+    if (auto presenter = element.try_as<controls::ContentPresenter>()) { presenter.Background(brush); return true; }
+    return false;
+}
+
+// The colour of a plain background as one number 0xAARRGGBB; transparent for any other brush or none.
+double PackedBackground(const xaml::UIElement& element) {
+    auto solid = BackgroundBrush(element).try_as<media::SolidColorBrush>();
+    if (!solid) return 0;
+    const winrt::Windows::UI::Color color = solid.Color();
+    return static_cast<double>((static_cast<std::uint32_t>(color.A) << 24) | (static_cast<std::uint32_t>(color.R) << 16) |
+                               (static_cast<std::uint32_t>(color.G) << 8) | static_cast<std::uint32_t>(color.B));
+}
+
+winrt::Windows::UI::Color ColorOfPacked(double packed) {
+    const auto value = static_cast<std::uint32_t>(packed);
+    return {static_cast<std::uint8_t>(value >> 24), static_cast<std::uint8_t>(value >> 16),
+            static_cast<std::uint8_t>(value >> 8), static_cast<std::uint8_t>(value)};
+}
+
+bool HasBackground(const th::Animation& animation) {
+    return std::any_of(animation.tracks.begin(), animation.tracks.end(),
+                       [](const th::AnimationTrack& track) { return track.channel == Channel::Background; });
 }
 
 composition::AnimationDirection DirectionOf(th::Animation::Direction direction) {
@@ -93,7 +135,7 @@ std::vector<composition::CompositionAnimation> Build(const composition::Composit
         float2(static_cast<float>(curve[2]), static_cast<float>(curve[3])));
     std::vector<composition::CompositionAnimation> parts;
     for (const th::AnimationTrack& track : animation.tracks) {
-        if (track.points.empty()) continue;
+        if (track.points.empty() || track.channel == Channel::Background) continue;
         composition::KeyFrameAnimation keyframes = Keyframes(compositor, track, easing, depth);
         keyframes.Duration(Span(animation.durationMs));
         keyframes.DelayTime(Span(animation.delayMs));
@@ -118,9 +160,19 @@ th::ChannelValue OwnValue(const xaml::UIElement& element, Channel channel) {
         case Channel::Scale: return {channel, element.Scale().x, element.Scale().y};
         case Channel::Rotation: return {channel, element.Rotation(), 0};
         case Channel::Translation: return {channel, element.Translation().x, element.Translation().y};
+        case Channel::Background: return {channel, PackedBackground(element), 0};
         case Channel::Opacity: break;
     }
     return {channel, element.Opacity(), 0};
+}
+
+// The element's own value of a channel, from what StartLoops noted down.
+th::ChannelValue OwnChannel(const std::vector<th::ChannelValue>& own, Channel channel) {
+    for (const th::ChannelValue& value : own) {
+        if (value.channel == channel) return value;
+    }
+    const double neutral = channel == Channel::Scale ? 1 : 0;
+    return {channel, neutral, neutral};
 }
 
 void Apply(const xaml::UIElement& element, const std::vector<th::ChannelValue>& values) {
@@ -131,6 +183,7 @@ void Apply(const xaml::UIElement& element, const std::vector<th::ChannelValue>& 
             case Channel::Scale: element.Scale(float3(x, y, 1.f)); break;
             case Channel::Rotation: element.Rotation(x); break;
             case Channel::Translation: element.Translation(float3(x, y, element.Translation().z)); break;
+            case Channel::Background: SetBackgroundBrush(element, media::SolidColorBrush(ColorOfPacked(value.x))); break;
             case Channel::Opacity: element.Opacity(x); break;
         }
     }
@@ -166,10 +219,13 @@ bool ThemeAnimations::Write(theme::NodeId id, const xaml::UIElement& element, co
     }
     try {
         composition::Compositor compositor = xaml::Media::CompositionTarget::GetCompositorForCurrentThread();
-        if (Turns(*animations)) Center(running, compositor, element, origin);
+        if (Turns(*animations)) {
+            Center(running, compositor, element, origin);
+            if (!(origin.X == 0 && origin.Y == 0)) running.origin = origin;
+        }
         std::vector<th::Animation> loops;
         for (const th::Animation& animation : *animations) {
-            if (animation.iterations == 0) {
+            if (animation.iterations == 0 || HasBackground(animation)) {  // stepped: see StepLoops
                 loops.push_back(animation);
                 continue;
             }
@@ -181,6 +237,10 @@ bool ThemeAnimations::Write(theme::NodeId id, const xaml::UIElement& element, co
             if (animation.iterations > 0 && !animation.fillForwards) {
                 EndAt(running, animation.delayMs + animation.durationMs * animation.iterations, std::move(parts));
             }
+        }
+        if (std::any_of(loops.begin(), loops.end(), HasBackground)) {
+            running.ownBackground = BackgroundBrush(element);  // what comes back when the colours stop
+            running.backgroundAnimated = true;
         }
         if (!loops.empty()) StartLoops(running, std::move(loops));
     } catch (...) {
@@ -219,6 +279,17 @@ void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> lo
     }
     running.loops = std::move(loops);
     running.started = std::chrono::steady_clock::now();
+    if (Turns(running.loops) && running.animations.empty()) {
+        // Nothing else turns the element: the centre follows its size at each step, not the expression.
+        if (running.center) {
+            try {
+                element.StopAnimation(running.center);
+            } catch (...) {
+            }
+            running.center = nullptr;
+        }
+        running.stepCentre = true;
+    }
     if (!m_loopTimer) {
         auto queue = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
         if (!queue) return;
@@ -244,12 +315,43 @@ void ThemeAnimations::StepLoops() {
         if (!element) continue;
         const double ms = std::chrono::duration<double, std::milli>(now - running.started).count();
         std::vector<th::ChannelValue> values;
-        for (const th::Animation& loop : running.loops) {
-            for (const th::ChannelValue& value : th::SampleAnimation(loop, ms, running.own)) values.push_back(value);
+        bool backgroundEnded = false;  // a finite animation without `forwards` that ended: the element's brush returns
+        for (size_t i = 0; i < running.loops.size();) {
+            const th::Animation& loop = running.loops[i];
+            const bool over = loop.iterations > 0 && ms >= loop.delayMs + loop.durationMs * loop.iterations;
+            if (over && !loop.fillForwards) {
+                // As in CSS, the element has its own values again: the channels go back, the brush is put back below.
+                for (const th::AnimationTrack& track : loop.tracks) {
+                    if (track.channel == Channel::Background) backgroundEnded = true;
+                    else values.push_back(OwnChannel(running.own, track.channel));
+                }
+            } else {
+                for (const th::ChannelValue& value : th::SampleAnimation(loop, ms, running.own)) values.push_back(value);
+            }
+            if (over) running.loops.erase(running.loops.begin() + static_cast<std::ptrdiff_t>(i));
+            else i++;
         }
         try {
+            if (running.stepCentre) {
+                const float2 size = element.ActualSize();
+                const float3 centre(size.x * running.origin.X, size.y * running.origin.Y, 0.f);
+                if (centre.x != running.steppedCentre.x || centre.y != running.steppedCentre.y) {
+                    element.CenterPoint(centre);
+                    running.steppedCentre = centre;
+                }
+            }
             Apply(element, values);
         } catch (...) {
+        }
+        if (backgroundEnded) {
+            // Apart from Apply: an element that refuses another track must still get its brush back, and the engine its
+            // background again, since the loop that ended is gone and nothing would come back to it.
+            try {
+                SetBackgroundBrush(element, running.ownBackground);
+            } catch (...) {
+            }
+            running.backgroundAnimated = false;
+            running.wantedBackground.reset();
         }
     }
     if (!any) {
@@ -257,6 +359,23 @@ void ThemeAnimations::StepLoops() {
         return;
     }
     m_loopTimer.Interval(Span(shown ? 1000.0 / kLoopFps : kHiddenCheckMs));
+}
+
+bool ThemeAnimations::OwnsBackground(theme::NodeId id) const {
+    auto known = m_running.find(id);
+    return known != m_running.end() && known->second.backgroundAnimated;
+}
+
+void ThemeAnimations::WantBackground(theme::NodeId id, const theme::Value& value) {
+    if (auto known = m_running.find(id); known != m_running.end() && known->second.backgroundAnimated) {
+        known->second.wantedBackground = value;
+    }
+}
+
+std::optional<theme::Value> ThemeAnimations::WantedBackground(theme::NodeId id) const {
+    auto known = m_running.find(id);
+    if (known == m_running.end() || !known->second.backgroundAnimated) return std::nullopt;
+    return known->second.wantedBackground;
 }
 
 std::string ThemeAnimations::Read(theme::NodeId id) const {
@@ -288,7 +407,14 @@ void ThemeAnimations::Stop(Running& running) {
     for (const composition::CompositionAnimation& animation : running.animations) {
         attempt([&] { element.StopAnimation(animation); });
     }
-    if (!running.loops.empty()) attempt([&] { Apply(element, running.own); });
+    if (!running.own.empty()) {
+        std::vector<th::ChannelValue> own;
+        for (const th::ChannelValue& value : running.own) {
+            if (value.channel != Channel::Background) own.push_back(value);  // the brush itself comes back below
+        }
+        attempt([&] { Apply(element, own); });
+    }
+    if (running.backgroundAnimated) attempt([&] { SetBackgroundBrush(element, running.ownBackground); });
     if (running.center) attempt([&] { element.StopAnimation(running.center); });
     if (running.centered) attempt([&] { element.CenterPoint(running.centerBefore); });
 }

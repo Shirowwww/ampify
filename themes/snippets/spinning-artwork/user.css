@@ -21,9 +21,17 @@
     animation: spin var(--turn) linear infinite;
 }
 
-/* Round too, so that a theme or a snippet such as Square corners never brings its corners back. */
+/* Apple Music gives the artwork, the area behind it and the grid inside a fixed width of 54, as large as its slot.
+   Left at 54 inside a smaller record, a child that stretches sits against the left edge and the others overflow: the
+   record is no longer round, and it turns around a point off its own centre. They take the record's size too. Round
+   too, so that a theme or a snippet such as Square corners never brings its corners back. */
 .lcd-artwork-image,
-.lcd-placeholder {
+.lcd-placeholder,
+.lcd-artwork-image > AspectRatioGrid {
+    width: var(--disc);
+    height: var(--disc);
+    horizontal-alignment: center;
+    vertical-alignment: center;
     corner-radius: 999px;
 }
 

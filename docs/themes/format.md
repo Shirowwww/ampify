@@ -428,7 +428,8 @@ A `scale()` without `transform-origin` grows from the element's centre, as in CS
 @keyframes breathe { to { transform: scale(1.08); opacity: .8; } }
 ```
 
-- Stops are `from`, `to` or percentages, and animate `opacity` and `transform` only.
+- Stops are `from`, `to` or percentages, and animate `opacity`, `transform` and a plain `background` colour. A colour
+  mixes channel by channel, alpha included; a gradient, an image or `acrylic` in a stop is refused.
 - `animation` takes, in any order: a name, a duration, an easing (`linear`, `ease`, `ease-in`, `ease-out`,
   `ease-in-out`, `cubic-bezier(...)`), a delay, a count or `infinite`, a direction (`normal`, `reverse`, `alternate`,
   `alternate-reverse`) and a fill mode (`none`, `forwards`, `backwards`, `both`). Up to 4 animations, 120 s at most.
@@ -436,6 +437,11 @@ A `scale()` without `transform-origin` grows from the element's centre, as in CS
 - Under a state, an animation starts each time the state begins.
 - An `infinite` animation moves 30 times a second and stops while Apple Music is hidden or minimized: left to the
   compositor, it would redraw the whole window at every frame of the screen. A finite one runs on the compositor.
+  A `background` colour is always moved this way, finite or not, 30 times a second. While it runs, the theme's own
+  `background` for that element waits; it comes back when the animation ends without `forwards`.
+- A turning or scaling animation pivots on the element's middle (or its `transform-origin`) and follows its size when
+  the theme or Apple Music changes it. A child that Apple Music gives a fixed width (the artwork's 54) still overflows
+  a smaller parent: size it too, as the Spinning artwork snippet does.
 - Elements that Apple Music moves itself (many artworks, such as `.lcd-artwork-image`) or that the theme gives a
   `transform` refuse an animated transform: animate their parent (`.lcd-artwork`), or put the transform in the stops.
 - With Windows' "Animation effects" off, animations do not run. `@keyframes` inside `@media` are not read.

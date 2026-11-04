@@ -10,12 +10,14 @@
 #include <chrono>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include <winrt/Microsoft.UI.Composition.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.h>
+#include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Windows.UI.ViewManagement.h>
 
 #include "../core/theme/animation.hpp"
@@ -45,6 +47,14 @@ public:
     // The text of the animations running on the element, empty for none. A finite animation that ended still counts:
     // it does not start again on the next pass.
     std::string Read(theme::NodeId id) const;
+    // True while an animation of the element draws its background colour: the engine must not write the element's
+    // `background` meanwhile, or the two would take turns. The element's own brush comes back when the animation stops
+    // or ends without `forwards`.
+    bool OwnsBackground(theme::NodeId id) const;
+    // The `background` the theme asked for meanwhile. It reads back as the element's value, so that the engine does not
+    // write it again at every pass; nothing when no colour animation draws this element's background.
+    void WantBackground(theme::NodeId id, const theme::Value& value);
+    std::optional<theme::Value> WantedBackground(theme::NodeId id) const;
     // Forgets the elements that were destroyed.
     void Sweep();
 
@@ -57,6 +67,11 @@ private:
         winrt::Microsoft::UI::Composition::ExpressionAnimation center{nullptr};
         bool centered = false;  // CenterPoint was changed: centerBefore goes back once the animations stop
         winrt::Windows::Foundation::Numerics::float3 centerBefore{};
+        // An element a stepped animation turns or scales has its centre set from its size at each step: the expression
+        // above followed the size of its visual, and a record the theme made smaller turned around the point of its old size.
+        winrt::Windows::Foundation::Point origin{0.5f, 0.5f};
+        bool stepCentre = false;
+        winrt::Windows::Foundation::Numerics::float3 steppedCentre{};  // the CenterPoint set at the last step
         // A finite animation without `forwards` runs on and is stopped when it ends: stopping gives the element its
         // own values back, which a completed composition animation does not. The timers hold no pointer to this
         // object, only the element and the animations to stop.
@@ -65,6 +80,10 @@ private:
         std::vector<theme::Animation> loops;
         std::vector<theme::ChannelValue> own;
         std::chrono::steady_clock::time_point started;
+        // A background colour is stepped like an endless animation. The brush the element had goes back at the end.
+        winrt::Microsoft::UI::Xaml::Media::Brush ownBackground{nullptr};
+        bool backgroundAnimated = false;
+        std::optional<theme::Value> wantedBackground;
     };
 
     static void Stop(Running& running);

@@ -109,6 +109,11 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
     xaml::DependencyObject object = Resolve(id);
     if (!object) return std::nullopt;
 
+    // While a colour animation draws the background, the theme's own value reads back: the animated brush is not it.
+    if (property == "Background") {
+        if (std::optional<theme::Value> wanted = m_animations.WantedBackground(id)) return wanted;
+    }
+
     // Apple Music's own brush is kept as the object itself: a colour would lose the brush's Opacity (its LCD is white
     // at low opacity, restored as plain white) and its theme dictionary. The colour rides along for the inspector.
     auto brush = [&](const media::Brush& value) -> theme::Value {
@@ -476,6 +481,12 @@ bool XamlTreeBackend::WriteStoryTransform(theme::NodeId id, const xaml::UIElemen
 bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, const theme::Value& value) {
     xaml::DependencyObject object = Resolve(id);
     if (!object) return false;
+
+    // A colour animation draws this background (ThemeAnimations): the theme's own value waits until it ends or stops.
+    if (property == "Background" && m_animations.OwnsBackground(id)) {
+        m_animations.WantBackground(id, value);
+        return true;
+    }
 
     if (value == theme::kNoOwnValue) {
         xaml::DependencyProperty own = OwnProperty(object, property);
