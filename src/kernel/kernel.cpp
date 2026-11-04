@@ -44,6 +44,7 @@ namespace {
 constexpr auto kHealthyAfter = std::chrono::seconds(20);
 constexpr auto kHealthyRetry = std::chrono::seconds(5);
 constexpr auto kReloadEvery = std::chrono::milliseconds(500);
+constexpr DWORD kLaterProcessWaitMs = 5000;  // a later AppleMusic.exe that only passes a link is gone by then
 
 // Reads reload.txt and runs its new requests: start, stop, restart, rescan (src/core/reload.hpp). The settings are read
 // again first, so an element that `ampify` has just enabled starts with the value on disk. A missing file counts as
@@ -137,6 +138,10 @@ DWORD WINAPI KernelMain(LPVOID) {
         journal.Write("Close to tray: asked the running Apple Music to show its window if it hides");
     }
 #endif
+    // A later AppleMusic.exe is nearly always the short one that passes a link or a new start to the running app and
+    // exits within a second: it started every element (a launch counted twice, the Marketplace read again). It waits
+    // first; a real Apple Music, started while the previous one was still closing, gets its elements a little late.
+    if (apple && laterProcess) Sleep(kLaterProcessWaitMs);
 
     // Read on every start: the package may have been updated since the launcher last looked.
     std::string version = ampify::AppleMusicVersion(ampify::win::PackageFullName());

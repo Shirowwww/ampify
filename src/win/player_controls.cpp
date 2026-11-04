@@ -13,8 +13,11 @@
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Xaml.Shapes.h>
 
+#include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -26,11 +29,14 @@ namespace {
 namespace dispatching = winrt::Microsoft::UI::Dispatching;
 namespace xaml = winrt::Microsoft::UI::Xaml;
 namespace controls = xaml::Controls;
+namespace media = xaml::Media;
 namespace peers = xaml::Automation::Peers;
 namespace provider = xaml::Automation::Provider;
 
 constexpr int kSearchLimit = 6000;  // elements walked in one window to find a button
 constexpr auto kFollowStep = std::chrono::milliseconds(400);
+constexpr int kRemeasureTicks = 10;  // the transport row's sides, measured again every 4 seconds
+constexpr double kRowGap = 8;        // between a side of the transport row and the transport: "···" touched shuffle
 
 // A button of the main window and the name of its copy in the player.
 struct Mirror {
@@ -40,13 +46,39 @@ struct Mirror {
 constexpr Mirror kShuffle{L"ShuffleButton", L"AmpifyShuffleButton"};
 constexpr Mirror kRepeat{L"RepeatButton", L"AmpifyRepeatButton"};
 
+// A width or maximum width of the transport's parents that Ampify widened: Apple's own value, and what Ampify wrote.
+// Apple sets its value again when the window is resized; the next check sees it and widens it again.
+struct Widened {
+    winrt::weak_ref<xaml::FrameworkElement> element;
+    bool maxWidth = false;
+    double apple = 0;
+    double written = 0;
+};
+
 // Interface thread only. Never freed: releasing WinRT objects while the process exits can crash it.
 struct Follow {
     dispatching::DispatcherQueueTimer timer{nullptr};
     winrt::weak_ref<xaml::UIElement> main;
-    winrt::weak_ref<controls::Primitives::ButtonBase> shuffle;
-    winrt::weak_ref<controls::Primitives::ButtonBase> repeat;
+    // The main window's two buttons, found once: walking its thousands of elements twice a step cost a few ms each.
+    winrt::weak_ref<xaml::FrameworkElement> shuffleSource;
+    winrt::weak_ref<xaml::FrameworkElement> repeatSource;
+    // Held strongly: a weak reference to an element Ampify created never resolves inside Apple Music.
+    controls::Button shuffle{nullptr};
+    controls::Button repeat{nullptr};
+    winrt::weak_ref<controls::Panel> stack;
+    winrt::weak_ref<xaml::FrameworkElement> model;  // the player's button the copies take their size from
+    winrt::weak_ref<xaml::FrameworkElement> transport;
+    winrt::weak_ref<controls::Grid> row;  // TransportGrid: the volume, the transport and the lyrics button
+    bool rowFitted = false;
+    xaml::GridLength rowMiddle{};
+    xaml::Thickness rowMargin{};
+    double rowSeen = -1;  // the row's width when its sides were last measured
+    int rowTicks = 0;
+    std::vector<Widened> widened;
+    double added = 0;  // the width of the two buttons
 };
+
+std::atomic<bool> g_shown{true};  // apple.playerControls, written by the settings worker
 
 Follow& State() {
     static Follow* state = new Follow();
@@ -89,7 +121,7 @@ bool IsOn(const xaml::FrameworkElement& source) {
 }
 
 // The copy takes the source's glyph (repeat one has its own), name and state, shown by Apple's dot under the icon.
-void Sync(const controls::Primitives::ButtonBase& copy, const xaml::FrameworkElement& source) {
+void Sync(const controls::Button& copy, const xaml::FrameworkElement& source) {
     auto glyph = FindFirst<controls::FontIcon>(source);
     auto icon = FindFirst<controls::FontIcon>(copy);
     if (glyph && icon && icon.Glyph() != glyph.Glyph()) icon.Glyph(glyph.Glyph());
@@ -99,11 +131,16 @@ void Sync(const controls::Primitives::ButtonBase& copy, const xaml::FrameworkEle
         controls::ToolTipService::SetToolTip(copy, winrt::box_value(name));
     }
     bool on = IsOn(source);
-    if (auto toggle = copy.try_as<controls::Primitives::ToggleButton>()) {
-        toggle.IsChecked(on);  // its style colours the checked state
-    } else if (glyph && icon) {
-        // Apple colours repeat's icon itself while it is on; off, the style's colours come back.
-        if (on) icon.Foreground(glyph.Foreground());
+    if (glyph && icon) {
+        // On, the icon takes the colour Apple gives its own, or its dot's when the copy has no dot; off, the player's
+        // style colours it as its neighbours.
+        media::Brush colour = glyph.Foreground();
+        if (!FindFirst<xaml::Shapes::Ellipse>(copy)) {
+            if (auto dot = FindNamed(source, std::wstring(source.Name()) + L"Dot").try_as<xaml::Shapes::Ellipse>()) {
+                colour = dot.Fill();
+            }
+        }
+        if (on) icon.Foreground(colour);
         else icon.ClearValue(controls::IconElement::ForegroundProperty());
     }
     if (auto dot = FindFirst<xaml::Shapes::Ellipse>(copy)) {
@@ -111,21 +148,30 @@ void Sync(const controls::Primitives::ButtonBase& copy, const xaml::FrameworkEle
     }
 }
 
+// The main window's button behind a copy, looked for again only once Apple has replaced it.
+xaml::FrameworkElement SourceOf(const Mirror& mirror) {
+    Follow& state = State();
+    auto& weak = mirror.source == kShuffle.source ? state.shuffleSource : state.repeatSource;  // a copy of kShuffle too
+    auto source = weak.get();
+    if (source && source.XamlRoot()) return source;
+    source = FindNamed(state.main.get(), mirror.source);
+    weak = source ? winrt::make_weak(source) : winrt::weak_ref<xaml::FrameworkElement>{};
+    return source;
+}
+
 void SyncAll() {
     Follow& state = State();
-    auto main = state.main.get();
-    for (const auto& [weak, mirror] : {std::pair{state.shuffle, kShuffle}, std::pair{state.repeat, kRepeat}}) {
-        auto copy = weak.get();
+    for (const auto& [copy, mirror] : {std::pair{state.shuffle, &kShuffle}, std::pair{state.repeat, &kRepeat}}) {
         // The player is gone or hidden (Apple keeps its window once closed): no walk through the main window.
         auto root = copy ? copy.XamlRoot() : nullptr;
         if (!root || !root.IsHostVisible()) continue;
-        if (auto source = FindNamed(main, mirror.source)) Sync(copy, source);
+        if (auto source = SourceOf(*mirror)) Sync(copy, source);
     }
 }
 
 // Presses the main window's button through its automation peer: Apple runs its own command and keeps one state.
 void Press(const Mirror& mirror) {
-    auto source = FindNamed(State().main.get(), mirror.source);
+    auto source = SourceOf(mirror);
     auto peer = source ? peers::FrameworkElementAutomationPeer::CreatePeerForElement(source) : nullptr;
     if (!peer) return;
     if (auto toggle = peer.GetPattern(peers::PatternInterface::Toggle).try_as<provider::IToggleProvider>()) {
@@ -136,16 +182,27 @@ void Press(const Mirror& mirror) {
     SyncAll();
 }
 
-// The same kind of button as the source, with its style, icon and dot, sized like the player's buttons beside it.
-controls::Primitives::ButtonBase MakeCopy(const xaml::FrameworkElement& model, const xaml::FrameworkElement& source,
-                                          const Mirror& mirror) {
-    controls::Primitives::ButtonBase copy = source.try_as<controls::Primitives::ToggleButton>()
-                                                ? controls::Primitives::ButtonBase(controls::Primitives::ToggleButton())
-                                                : controls::Primitives::ButtonBase(controls::Button());
+double ModelWidth(const xaml::FrameworkElement& model) {
+    return std::isnan(model.Width()) ? model.ActualWidth() : model.Width();
+}
+
+// A button with the style of the player's own buttons beside it, so its pointer halo has their size, and the source's
+// icon and dot. The main window's style draws a larger halo, which the player's row cut.
+controls::Button MakeCopy(const xaml::FrameworkElement& model, const xaml::FrameworkElement& source,
+                          const Mirror& mirror) {
+    // The player's buttons are AppBarButtons in recent Apple Music versions, Buttons before: the copy has its model's
+    // type, as a style refuses any other ("Cannot apply a Style with TargetType ...").
+    auto bar = model.try_as<controls::AppBarButton>();
+    controls::Button copy = bar ? controls::AppBarButton() : controls::Button();
     copy.Name(mirror.copy);
-    if (auto control = source.try_as<controls::Control>()) copy.Style(control.Style());
-    copy.Width(model.Width());
-    copy.Height(model.Height());
+    if (auto control = model.try_as<controls::Button>(); control && control.Style()) copy.Style(control.Style());
+    if (auto control = model.try_as<controls::Control>()) copy.Padding(control.Padding());
+    // A neighbour sized by its content has no Width: its laid-out size keeps the copies as large as it. Not laid out
+    // yet, it has none: SizeCopies gives it to them later, as a size of 0 hid them.
+    double width = ModelWidth(model);
+    double height = std::isnan(model.Height()) ? model.ActualHeight() : model.Height();
+    if (width > 0) copy.Width(width);
+    if (height > 0) copy.Height(height);
     copy.Margin(model.Margin());
     copy.VerticalAlignment(xaml::VerticalAlignment::Center);
     controls::Grid content;
@@ -154,11 +211,21 @@ controls::Primitives::ButtonBase MakeCopy(const xaml::FrameworkElement& model, c
         // The FontIcon's font is a path relative to the main window's page: the text that draws it has the full one.
         auto drawn = FindFirst<controls::TextBlock>(glyph);
         icon.FontFamily(drawn ? drawn.FontFamily() : glyph.FontFamily());
-        icon.FontSize(drawn ? drawn.FontSize() : glyph.FontSize());
+        // The player draws its icons larger than the main window: the size of the neighbour's icon, when it has one.
+        auto neighbour = FindFirst<controls::FontIcon>(model);
+        auto neighbourText = neighbour ? FindFirst<controls::TextBlock>(neighbour) : nullptr;
+        double size = neighbourText ? neighbourText.FontSize() : neighbour ? neighbour.FontSize() : 0;
+        icon.FontSize(size > 0 ? size : drawn ? drawn.FontSize() : glyph.FontSize());
         icon.Glyph(glyph.Glyph());
     }
-    content.Children().Append(icon);
-    if (auto sourceDot = FindNamed(source, std::wstring(mirror.source) + L"Dot").try_as<xaml::Shapes::Ellipse>()) {
+    if (bar) {
+        // Its template draws the icon alone, without a place for Apple's dot: the icon's colour shows the mode.
+        copy.as<controls::AppBarButton>().Icon(icon);
+    } else {
+        content.Children().Append(icon);
+    }
+    auto sourceDot = FindNamed(source, std::wstring(mirror.source) + L"Dot").try_as<xaml::Shapes::Ellipse>();
+    if (!bar && sourceDot) {
         xaml::Shapes::Ellipse dot;
         dot.Width(sourceDot.Width());
         dot.Height(sourceDot.Height());
@@ -169,7 +236,7 @@ controls::Primitives::ButtonBase MakeCopy(const xaml::FrameworkElement& model, c
         controls::Grid::SetRow(dot, controls::Grid::GetRow(sourceDot));
         content.Children().Append(dot);
     }
-    copy.Content(content);
+    if (!bar) copy.Content(content);
     copy.Click([mirror](auto const&, auto const&) noexcept {
         try {
             Press(mirror);
@@ -183,6 +250,9 @@ controls::Primitives::ButtonBase MakeCopy(const xaml::FrameworkElement& model, c
 // The player sizes its transport for three buttons (a maximum width of 120): left so, it would cut the two added ones
 // by half, shuffle on its left and repeat on its right. Up to the transport's grid, every fixed width makes room.
 std::string MakeRoom(const xaml::FrameworkElement& stack, double added) {
+    Follow& state = State();
+    state.widened.clear();
+    state.added = added;
     std::string widened;
     xaml::FrameworkElement child = stack;
     for (int level = 0; level < 6 && child; level++) {
@@ -191,10 +261,12 @@ std::string MakeRoom(const xaml::FrameworkElement& stack, double added) {
         std::string name = " " + winrt::to_string(parent.Name());
         if (!std::isnan(parent.Width())) {
             parent.Width(parent.Width() + added);
+            state.widened.push_back({winrt::make_weak(parent), false, parent.Width() - added, parent.Width()});
             widened += name + " width";
         }
         if (std::isfinite(parent.MaxWidth())) {
             parent.MaxWidth(parent.MaxWidth() + added);  // TransportControl: 120, three buttons of 40
+            state.widened.push_back({winrt::make_weak(parent), true, parent.MaxWidth() - added, parent.MaxWidth()});
             widened += name + " max width";
         }
         if (auto grid = parent.try_as<controls::Grid>()) {
@@ -211,6 +283,102 @@ std::string MakeRoom(const xaml::FrameworkElement& stack, double added) {
     return widened.empty() ? " nothing" : widened;
 }
 
+// Apple splits the transport's row in three equal columns: at most window sizes the middle one held three buttons, not
+// five. The middle column takes the transport's width, and the row reaches past its own column, evenly, only when the
+// volume or the lyrics button would no longer fit beside it.
+void FitTransportRow() {
+    Follow& state = State();
+    auto row = state.row.get();
+    auto transport = state.transport.get();
+    if (!row || !transport || state.added <= 0) return;
+    auto columns = row.ColumnDefinitions();
+    if (columns.Size() != 3) return;
+    if (!state.rowFitted) {
+        state.rowFitted = true;
+        state.rowMiddle = columns.GetAt(1).Width();
+        state.rowMargin = row.Margin();
+        columns.GetAt(1).Width(xaml::GridLengthHelper::Auto());
+    }
+    // A side's DesiredSize is cut to its column, which once hid the "···" button: measured unbounded, it says what it
+    // needs. Only when the row was resized, or every few seconds (Apple shows or hides "···"), as it lays the row out.
+    double width = row.ActualWidth();
+    if (width == state.rowSeen && ++state.rowTicks < kRemeasureTicks) return;
+    state.rowSeen = width;
+    state.rowTicks = 0;
+    double side = 0;
+    for (const auto& item : row.Children()) {
+        auto element = item.try_as<xaml::FrameworkElement>();
+        if (!element || controls::Grid::GetColumn(element) == 1) continue;
+        element.Measure({std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity()});
+        side = std::max(side, static_cast<double>(element.DesiredSize().Width));
+        element.InvalidateMeasure();
+    }
+    xaml::Thickness margin = row.Margin();
+    const xaml::Thickness& apple = state.rowMargin;
+    double room = row.ActualWidth() + margin.Left + margin.Right - apple.Left - apple.Right;
+    double reach = std::max(0.0, transport.DesiredSize().Width + 2 * (side + kRowGap) - room) / 2;
+    if (std::abs(margin.Left - (apple.Left - reach)) < 0.5 && std::abs(margin.Right - (apple.Right - reach)) < 0.5) return;
+    row.Margin({apple.Left - reach, margin.Top, apple.Right - reach, margin.Bottom});
+}
+
+// Apple's adaptive layout writes its widths again when the window is resized, which cut the two buttons or hid them:
+// a value that is no longer Ampify's is Apple's new one, widened in turn.
+void KeepRoom() {
+    for (Widened& entry : State().widened) {
+        auto element = entry.element.get();
+        if (!element) continue;
+        double now = entry.maxWidth ? element.MaxWidth() : element.Width();
+        if (std::isnan(now) || !std::isfinite(now) || now == entry.written) continue;
+        entry.apple = now;
+        entry.written = now + State().added;
+        if (entry.maxWidth) element.MaxWidth(entry.written);
+        else element.Width(entry.written);
+    }
+}
+
+// Opened before its first layout, the player has not sized its buttons yet: the copies take their size, and the
+// transport its room, once it has.
+void SizeCopies() {
+    Follow& state = State();
+    if (state.added > 0) return;
+    auto model = state.model.get();
+    auto stack = state.stack.get();
+    double width = model ? ModelWidth(model) : 0;
+    if (!stack || width <= 0) return;
+    double height = std::isnan(model.Height()) ? model.ActualHeight() : model.Height();
+    for (const auto& copy : {state.shuffle, state.repeat}) {
+        if (!copy) continue;
+        copy.Width(width);
+        if (height > 0) copy.Height(height);
+    }
+    MakeRoom(stack, 2 * width);
+}
+
+// apple.playerControls turned off while the player is open: the two buttons go, and Apple's widths come back.
+void RemoveCopies() {
+    Follow& state = State();
+    auto stack = state.stack.get();
+    for (const auto& copy : {state.shuffle, state.repeat}) {
+        uint32_t index = 0;
+        if (copy && stack && stack.Children().IndexOf(copy, index)) stack.Children().RemoveAt(index);
+    }
+    for (const Widened& entry : state.widened) {
+        auto element = entry.element.get();
+        if (!element) continue;
+        if (entry.maxWidth) element.MaxWidth(entry.apple);
+        else element.Width(entry.apple);
+    }
+    state.widened.clear();
+    if (auto row = state.row.get(); row && state.rowFitted) {
+        row.ColumnDefinitions().GetAt(1).Width(state.rowMiddle);
+        xaml::Thickness margin = row.Margin();
+        row.Margin({state.rowMargin.Left, margin.Top, state.rowMargin.Right, margin.Bottom});
+    }
+    state.rowFitted = false;
+    state.shuffle = nullptr;
+    state.repeat = nullptr;
+}
+
 void StartFollowing(const xaml::UIElement& playerRoot) {
     Follow& state = State();
     if (state.timer) return;
@@ -219,6 +387,10 @@ void StartFollowing(const xaml::UIElement& playerRoot) {
     state.timer.IsRepeating(true);
     state.timer.Tick([](auto const&, auto const&) noexcept {
         try {
+            if (!g_shown) return RemoveCopies();
+            SizeCopies();
+            KeepRoom();
+            FitTransportRow();
             SyncAll();  // a mode changed elsewhere (menu, keyboard, the main window)
         } catch (...) {
         }
@@ -230,7 +402,7 @@ void StartFollowing(const xaml::UIElement& playerRoot) {
 
 void AddPlayerControls(const xaml::UIElement& playerRoot, const xaml::UIElement& mainRoot, Journal& journal) noexcept {
     try {
-        if (!playerRoot || !mainRoot) return;
+        if (!playerRoot || !mainRoot || !g_shown) return;
         auto transport = FindNamed(playerRoot, L"TransportControl");
         auto stack = transport ? FindFirst<controls::StackPanel>(transport) : nullptr;
         auto model = stack && stack.Children().Size() > 0 ? stack.Children().GetAt(0).try_as<xaml::FrameworkElement>()
@@ -248,13 +420,24 @@ void AddPlayerControls(const xaml::UIElement& playerRoot, const xaml::UIElement&
         }
         Follow& state = State();
         state.main = winrt::make_weak(mainRoot);
+        state.shuffleSource = winrt::make_weak(shuffleSource);
+        state.repeatSource = winrt::make_weak(repeatSource);
         auto shuffle = MakeCopy(model, shuffleSource, kShuffle);
         auto repeat = MakeCopy(model, repeatSource, kRepeat);
         stack.Children().InsertAt(0, shuffle);
         stack.Children().Append(repeat);
-        std::string room = MakeRoom(stack, 2 * (std::isnan(model.Width()) ? model.ActualWidth() : model.Width()));
-        state.shuffle = winrt::make_weak(shuffle);
-        state.repeat = winrt::make_weak(repeat);
+        state.shuffle = shuffle;
+        state.repeat = repeat;
+        state.stack = winrt::make_weak(stack.try_as<controls::Panel>());
+        state.model = winrt::make_weak(model);
+        state.transport = winrt::make_weak(transport);
+        auto row = xaml::Media::VisualTreeHelper::GetParent(transport).try_as<controls::Grid>();
+        state.row = row && row.Name() == L"TransportGrid" ? winrt::make_weak(row) : winrt::weak_ref<controls::Grid>{};
+        state.rowFitted = false;
+        state.rowSeen = -1;
+        state.added = 0;
+        double width = ModelWidth(model);
+        std::string room = width > 0 ? MakeRoom(stack, 2 * width) : " once the player has laid out its buttons";
         StartFollowing(playerRoot);
         journal.Write("Apple player: shuffle and repeat added around its transport buttons (room made:" + room + ")");
     } catch (const winrt::hresult_error& error) {
@@ -262,6 +445,10 @@ void AddPlayerControls(const xaml::UIElement& playerRoot, const xaml::UIElement&
     } catch (...) {
         journal.Write("Apple player: shuffle and repeat not added");
     }
+}
+
+void SetPlayerControlsShown(bool shown) noexcept {
+    g_shown = shown;
 }
 
 }  // namespace ampify::win

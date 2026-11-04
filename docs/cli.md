@@ -139,6 +139,7 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `apple.notifications` | `apple`, `background` (only while Apple Music is not in front) or `never` | `apple` |
 | `apple.close` | `quit`, or `tray` to keep playing behind a notification-area icon | `quit` |
 | `apple.fullscreen` | Where Apple's full-screen player opens: `window`, `replace`, `work-area` or `screen` | `window` |
+| `apple.playerControls` | Shuffle and repeat around the full-screen player's buttons: `shown` or `hidden` | `shown` |
 | `catalog.url` | `https://...` or `file://...` | the public catalog |
 | `app_launch_flags` | Arguments added when `ampify launch` starts Apple Music | empty |
 | `check_kit_update` | `1`: some commands say when a new Ampify exists (checked once a day, nothing downloaded) | `0` |

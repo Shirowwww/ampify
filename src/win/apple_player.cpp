@@ -24,8 +24,10 @@
 #include <dwmapi.h>
 #include <unknwn.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <string>
@@ -76,6 +78,9 @@ struct Placement {
     bool dragging = false;   // past kDragStart: the window follows the pointer
     POINT pressCursor{};     // screen coordinates of the press
     POINT windowOrigin{};    // the window's top left corner at the press
+    // The row of the progress line and its two times, and Apple's margin on it (WidenScrubberRow).
+    winrt::weak_ref<xaml::FrameworkElement> scrubberRow;
+    xaml::Thickness scrubberMargin{};
 };
 
 Placement& State() {
@@ -378,6 +383,42 @@ void ShowShrinkButton(const xaml::UIElement& root, bool shown) {
     if (!shown) State().journal->Write("Apple player: its shrink button hidden, its close button brings Apple Music back");
 }
 
+// Apple stretches the artwork's box over its whole area and fits the square image in its middle: in a window wider or
+// taller than a screen, the box's outline framed two grey bands beside the image. Centred, the box is the image's size.
+void HugArtwork(const xaml::UIElement& root) {
+    if (!root) return;
+    xaml::FrameworkElement artwork = FindNamed(root, {L"ActualArtwork"});
+    if (!artwork || artwork.HorizontalAlignment() == xaml::HorizontalAlignment::Center) return;
+    artwork.HorizontalAlignment(xaml::HorizontalAlignment::Center);
+    artwork.VerticalAlignment(xaml::VerticalAlignment::Center);
+}
+
+// Apple gives the progress line's row a quarter of the window's width: in a narrow window the line shrank to a dot
+// between its two times, and the Lossless badge above it was cut to its first letters. The row reaches past its column,
+// evenly, to the width Apple gives it at its usual size, never closer than a margin to the window's edges.
+void WidenScrubberRow(Placement& state, const xaml::UIElement& root) {
+    constexpr double kRowWidth = 260;  // Apple's at 1352 pixels wide, 125 %
+    constexpr double kEdgeRoom = 48;
+    if (!root) return;
+    xaml::FrameworkElement row = state.scrubberRow.get();
+    if (!row || !row.XamlRoot()) {
+        xaml::FrameworkElement scrubber = FindNamed(root, {L"Scrubber"});
+        row = scrubber ? xaml::Media::VisualTreeHelper::GetParent(scrubber).try_as<xaml::FrameworkElement>() : nullptr;
+        if (!row) return;
+        state.scrubberRow = winrt::make_weak(row);
+        state.scrubberMargin = row.Margin();
+    }
+    xaml::Thickness margin = row.Margin();
+    const xaml::Thickness& apple = state.scrubberMargin;
+    double slot = row.ActualWidth() + margin.Left + margin.Right - apple.Left - apple.Right;
+    double wanted = std::min(kRowWidth, static_cast<double>(root.ActualSize().x) - 2 * kEdgeRoom);
+    double reach = std::max(0.0, wanted - slot) / 2;
+    if (slot <= 0 || (std::abs(margin.Left - (apple.Left - reach)) < 0.5 && std::abs(margin.Right - (apple.Right - reach)) < 0.5)) {
+        return;
+    }
+    row.Margin({apple.Left - reach, margin.Top, apple.Right - reach, margin.Bottom});
+}
+
 // Apple shows its player with the FullScreen presenter, which puts its own style back on every change: an overlapped
 // presenter is what keeps the window where Ampify puts it. Over or in place of the main window it keeps a border and
 // resizes; above the taskbar it has neither, as a full screen that leaves the taskbar.
@@ -397,6 +438,7 @@ void Lay(const xaml::Window& player, const windowing::AppWindow& window, Placeme
     }
     HookInput(player, hwnd);
     ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), false);
+    HugArtwork(player.Content().try_as<xaml::UIElement>());
     if (state.mode == uirender::PlayerMode::Replace && IsWindowVisible(state.main)) {
         state.mainWasZoomed = IsZoomed(state.main) != FALSE;
         ShowWindow(state.main, SW_HIDE);
@@ -450,11 +492,13 @@ void Step(Placement& state) {
         if (!visible) return OnClosed(state);
         HWND hwnd = HwndOf(player);
         state.lastRect = VisibleRect(hwnd);
+        WidenScrubberRow(state, player.Content().try_as<xaml::UIElement>());
         if (state.reportPending && std::chrono::steady_clock::now() >= state.reportAt) {
             state.reportPending = false;
             HookInput(player, hwnd);  // a second chance when the content came late
             AddPlayerControls(player.Content(), state.mainRoot.get(), *state.journal);
             ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), false);
+            HugArtwork(player.Content().try_as<xaml::UIElement>());
             // The presenter may still have resized the window while it settled.
             if (state.mode == uirender::PlayerMode::WorkArea) FillWithClient(hwnd, MonitorRect(state.main, true));
             Report(*state.journal);
@@ -472,6 +516,7 @@ void Step(Placement& state) {
         return;
     }
     AddPlayerControls(player.Content(), state.mainRoot.get(), *state.journal);
+    HugArtwork(player.Content().try_as<xaml::UIElement>());
     if (state.mode == uirender::PlayerMode::Screen) {
         state.timer.Stop();
         if (window.Presenter().Kind() != windowing::AppWindowPresenterKind::FullScreen) {

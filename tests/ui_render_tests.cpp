@@ -766,11 +766,14 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     CHECK(none.notifications == NotificationRule::Apple);
     CHECK(none.player == PlayerMode::Window);  // what the Now Playing button did before the setting existed
     CHECK(!none.closeToTray);                   // closing quits, as Apple Music does
+    CHECK(none.playerControls);                 // shuffle and repeat in the full-screen player
 
     settings.Set("apple.notifications", "Background");
     settings.Set("apple.fullscreen", "replace");
     settings.Set("apple.close", "tray");
+    settings.Set("apple.playerControls", "hidden");
     AppleTweaks set = ReadAppleTweaks(settings);
+    CHECK(!set.playerControls);
     CHECK(set.notifications == NotificationRule::Background);
     CHECK(set.player == PlayerMode::Replace);
     CHECK(set.closeToTray);
@@ -823,19 +826,20 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     // The player and the close button first; the notifications last, where "never" (Apple's own switch does it)
     // only shows for someone who chose it before.
     std::vector<TweakChoice> choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 3);
-    if (choices.size() == 3) {
+    CHECK(choices.size() == 4);
+    if (choices.size() == 4) {
         CHECK(choices[0].key == "apple.fullscreen" && choices[0].value == "screen");
         CHECK(choices[0].options.size() == 4);
-        CHECK(choices[1].key == "apple.close" && choices[1].value == "tray");
-        CHECK(choices[1].options.size() == 2);
-        CHECK(choices[2].key == "apple.notifications" && choices[2].value == "never");
-        CHECK(choices[2].options.size() == 3);
+        CHECK(choices[1].key == "apple.playerControls" && choices[1].value == "shown");
+        CHECK(choices[2].key == "apple.close" && choices[2].value == "tray");
+        CHECK(choices[2].options.size() == 2);
+        CHECK(choices[3].key == "apple.notifications" && choices[3].value == "never");
+        CHECK(choices[3].options.size() == 3);
     }
 
     CHECK(SetAppleTweak(kit, "apple.notifications", "background", error));
     choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 3 && choices[2].options.size() == 2 && choices[2].value == "background");
+    CHECK(choices.size() == 4 && choices[3].options.size() == 2 && choices[3].value == "background");
 }
 
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {

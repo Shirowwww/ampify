@@ -18,6 +18,9 @@ namespace ampify::win {
 void AddPlayerControls(const winrt::Microsoft::UI::Xaml::UIElement& playerRoot,
                        const winrt::Microsoft::UI::Xaml::UIElement& mainRoot, Journal& journal) noexcept;
 
+// apple.playerControls: off, the next opening adds nothing and an open player loses the two buttons. Any thread.
+void SetPlayerControlsShown(bool shown) noexcept;
+
 }  // namespace ampify::win
 
 #endif

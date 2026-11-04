@@ -61,6 +61,7 @@
 #include "close_to_tray.hpp"
 #include "kit_command.hpp"
 #include "notifications.hpp"
+#include "player_controls.hpp"
 #include "xaml_host.hpp"
 
 namespace ampify::win {
@@ -266,6 +267,10 @@ struct WindowContext {
     winrt::weak_ref<xaml::FrameworkElement> foundMainSettings;  // from the last discovery
     winrt::weak_ref<xaml::FrameworkElement> entryPage;          // the page that has the row
     controls::Button settingsEntry{nullptr};                    // strong, like the panels: see MountedSurface
+    // The sidebar's back arrow, header logo and pane, followed while the sidebar is folded (FollowFoldedLogo).
+    winrt::weak_ref<xaml::FrameworkElement> foldBack;
+    winrt::weak_ref<xaml::FrameworkElement> foldLogo;
+    winrt::weak_ref<xaml::FrameworkElement> foldPane;
 
     // Main window only.
     // Strong, like the Popup: the panels stay ours even when Apple Music rebuilds the children of its page (in the
@@ -2366,6 +2371,7 @@ using MenuItems = winrt::Windows::Foundation::Collections::IVector<controls::Men
 constexpr wchar_t kMenuEntryTag[] = L"AMPIFY_MENU_ENTRY";
 constexpr auto kMenuPoll = std::chrono::milliseconds(50);
 constexpr int kMenuTries = 10;  // half a second after the click or the key
+constexpr double kFlyoutMargin = 8;
 
 bool IsMenuEntry(const controls::MenuFlyoutItemBase& item) {
     return item && winrt::unbox_value_or<winrt::hstring>(item.Tag(), L"") == kMenuEntryTag;
@@ -2488,12 +2494,36 @@ bool AddMenuEntries(UiService::Shared& shared, WindowContext& context) {
     return false;
 }
 
+// Apple Music opens the volume flyout from the button's left edge: with the toggles against the window's right edge, it
+// ran past the window. A flyout that would moves left, a margin short of that edge. True once an open flyout has its
+// size, so a click that opens none keeps looking for half a second.
+bool KeepFlyoutInside(UiService::Shared& shared, const WindowContext& context) {
+    xaml::UIElement input = context.menuInput.get();
+    xaml::XamlRoot root = input ? input.XamlRoot() : nullptr;
+    if (!root) return true;
+    double room = root.Size().Width - kFlyoutMargin;
+    for (const primitives::Popup& popup : media::VisualTreeHelper::GetOpenPopupsForXamlRoot(root)) {
+        auto presenter = popup.Child().try_as<controls::FlyoutPresenter>();
+        if (!presenter) continue;
+        double width = presenter.ActualWidth();
+        if (width <= 0) return false;
+        if (popup.HorizontalOffset() + width > room) {
+            popup.HorizontalOffset(std::max(0.0, room - width));
+            shared.Once("flyout-inside", "Interface: a flyout that ran past the window's right edge moved left");
+        }
+        return true;
+    }
+    return false;
+}
+
 void LookForMenu(const WeakShared& weakShared, const WeakContext& weakContext) noexcept {
     try {
         SharedPtr shared = weakShared.lock();
         std::shared_ptr<WindowContext> context = weakContext.lock();
         if (!shared || !context) return;
-        if (AddMenuEntries(*shared, *context) || ++context->menuTries >= kMenuTries) {
+        bool menuDone = AddMenuEntries(*shared, *context);
+        bool flyoutDone = KeepFlyoutInside(*shared, *context);
+        if ((menuDone && flyoutDone) || ++context->menuTries >= kMenuTries) {
             if (context->menuTimer) context->menuTimer.Stop();
             return;
         }
@@ -2510,7 +2540,7 @@ void LookForMenu(const WeakShared& weakShared, const WeakContext& weakContext) n
 }
 
 // Follows the clicks and keys of the window's content, handled ones too (the button that opens a menu marks its click
-// handled), and looks for the menu they open once the input has been dealt with.
+// handled), and looks for the menu or flyout they open once the input has been dealt with.
 void FollowMenus(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
     xaml::Window window = context->window.get();
     xaml::UIElement content = window ? window.Content() : nullptr;
@@ -2520,7 +2550,7 @@ void FollowMenus(UiService::Shared& shared, const std::shared_ptr<WindowContext>
     auto look = [weakShared, weakContext](IInspectable const&, auto const& args) noexcept {
         try {
             std::shared_ptr<WindowContext> current = weakContext.lock();
-            if (!current || (current->appEntries.empty() && current->contextEntries.empty())) return;
+            if (!current) return;
             auto source = args.OriginalSource().template try_as<xaml::DependencyObject>();
             current->menuSource = source ? winrt::make_weak(source) : winrt::weak_ref<xaml::DependencyObject>();
             current->menuTries = 0;
@@ -2655,7 +2685,59 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
     ReleaseSidebarHost(*context);
     context->appEntries = std::move(appEntries);
     context->contextEntries = std::move(contextEntries);
-    if (!context->appEntries.empty() || !context->contextEntries.empty()) FollowMenus(shared, context);
+    FollowMenus(shared, context);
+}
+
+constexpr double kFoldedPaneWidth = 100;  // the folded column is 48 wide, the open sidebar 290
+
+// Folded, Apple Music moves the sidebar's header right when the back arrow shows, for the arrow and the logo to sit side
+// by side as in the open sidebar: the column cut the logo off but for 3 pixels, a sliver at its edge. The logo goes
+// while the column is folded and the arrow shows, and comes back when either changes.
+void ShowFoldedLogo(const WindowContext& context) {
+    xaml::FrameworkElement back = context.foldBack.get();
+    xaml::FrameworkElement logo = context.foldLogo.get();
+    xaml::FrameworkElement pane = context.foldPane.get();
+    if (!back || !logo || !pane) return;
+    bool pushedOut = back.Visibility() == xaml::Visibility::Visible && pane.ActualWidth() < kFoldedPaneWidth;
+    double opacity = pushedOut ? 0 : 1;
+    if (logo.Opacity() != opacity) logo.Opacity(opacity);
+}
+
+void FollowFoldedLogo(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
+    const std::vector<ProbeNode>& nodes = context->probe;
+    std::optional<int> back = uirender::FindByName(nodes, "NavigationViewBackButton");
+    std::optional<int> header = uirender::FindByName(nodes, "PaneHeaderContentBorder");
+    std::optional<int> pane = uirender::FindByName(nodes, "PaneContentGrid");
+    if (!back || !header || !pane) return;
+    std::optional<int> logo;
+    for (int node = *header + 1; node < static_cast<int>(nodes.size()); node++) {
+        if (nodes[node].className == "Microsoft.UI.Xaml.Controls.Image" && uirender::IsUnder(nodes, node, *header)) {
+            logo = node;
+            break;
+        }
+    }
+    if (!logo) return;
+    auto element = [&](int node) { return context->probeObjects[node].get().try_as<xaml::FrameworkElement>(); };
+    xaml::FrameworkElement backElement = element(*back);
+    xaml::FrameworkElement paneElement = element(*pane);
+    xaml::FrameworkElement logoElement = element(*logo);
+    if (!backElement || !paneElement || !logoElement || context->foldBack.get() == backElement) return;
+    context->foldBack = winrt::make_weak(backElement);
+    context->foldLogo = winrt::make_weak(logoElement);
+    context->foldPane = winrt::make_weak(paneElement);
+    WeakContext weakContext = context;
+    auto update = [weakContext]() noexcept {
+        try {
+            if (auto live = weakContext.lock()) ShowFoldedLogo(*live);
+        } catch (...) {
+        }
+    };
+    backElement.RegisterPropertyChangedCallback(
+        xaml::UIElement::VisibilityProperty(),
+        [update](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept { update(); });
+    paneElement.SizeChanged([update](IInspectable const&, xaml::SizeChangedEventArgs const&) noexcept { update(); });
+    ShowFoldedLogo(*context);
+    shared.Once("folded-logo", "Interface: the folded sidebar's logo follows its back arrow");
 }
 
 // Keeps the page the host leaves in the history of the visit. A visit starts again after Apple Music's navigation
@@ -2898,6 +2980,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
     WatchSettingsPage(shared, context);
     if (context->property == L"MainWindow") {
         WatchSettingsEntry(shared, context);
+        FollowFoldedLogo(shared, context);
         ApplySurfaces(shared, context, content);
     }
 }
@@ -2974,6 +3057,7 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
         closeChanged = std::exchange(shared.closeToTray, tweaks.closeToTray) != tweaks.closeToTray;
     }
     SetNotificationRule(tweaks.notifications, shared.journal);
+    SetPlayerControlsShown(tweaks.playerControls);
 
     std::string active = uirender::ActiveThemeId(shared.kit);
     std::vector<std::shared_ptr<WindowContext>> windows;

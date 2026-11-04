@@ -9,6 +9,7 @@
 #endif
 #include <windows.h>
 #include <shellapi.h>
+#include <shobjidl.h>
 
 #include <cstdlib>
 #include <fstream>
@@ -212,6 +213,9 @@ bool AskYesNo(const std::string& title, const std::string& text) {
 void ShowNotice(const std::string& title, const std::string& text) {
     // Windows shows the balloon as a notification; the icon must stay a moment, or the notification goes with it.
     constexpr DWORD kNoticeShownMs = 8000;
+    // Without an id of its own, a balloon from a console run is filed under the console's program (PowerShell), which
+    // then shows Ampify's logo on its own notifications. Windows shows this id as the notification's header.
+    SetCurrentProcessExplicitAppUserModelID(L"Ampify");
     HINSTANCE instance = GetModuleHandleW(nullptr);
     WNDCLASSEXW windowClass{};
     windowClass.cbSize = sizeof windowClass;

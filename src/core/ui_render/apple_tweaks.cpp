@@ -28,6 +28,13 @@ const std::vector<std::pair<std::string, std::string>>& PlayerOptions() {
     return options;
 }
 
+const std::vector<std::pair<std::string, std::string>>& PlayerControlsOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"shown", "tweaks.playerControls.shown"},
+        {"hidden", "tweaks.playerControls.hidden"}};
+    return options;
+}
+
 const std::vector<std::pair<std::string, std::string>>& CloseOptions() {
     static const std::vector<std::pair<std::string, std::string>> options{
         {"quit", "tweaks.close.quit"},
@@ -46,6 +53,7 @@ const std::vector<std::pair<std::string, std::string>>& KitUpdateOptions() {
 const std::vector<std::pair<std::string, std::string>>* OptionsOf(const std::string& key) {
     if (key == kNotificationsKey) return &NotificationOptions();
     if (key == kPlayerModeKey) return &PlayerOptions();
+    if (key == kPlayerControlsKey) return &PlayerControlsOptions();
     if (key == kCloseKey) return &CloseOptions();
     if (key == kKitUpdateKey) return &KitUpdateOptions();
     return nullptr;
@@ -73,6 +81,7 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
                     : player == "screen"    ? PlayerMode::Screen
                                             : PlayerMode::Window;
     tweaks.closeToTray = Known(settings, kCloseKey) == "tray";
+    tweaks.playerControls = Known(settings, kPlayerControlsKey) == "shown";
     return tweaks;
 }
 
@@ -86,6 +95,8 @@ std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
     if (notifications != "never") notificationOptions.pop_back();
     return {
         {kPlayerModeKey, "tweaks.player", "tweaks.playerHelp", PlayerOptions(), Known(settings, kPlayerModeKey)},
+        {kPlayerControlsKey, "tweaks.playerControls", "tweaks.playerControlsHelp", PlayerControlsOptions(),
+         Known(settings, kPlayerControlsKey)},
         {kCloseKey, "tweaks.close", "tweaks.closeHelp", CloseOptions(), Known(settings, kCloseKey)},
         {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", std::move(notificationOptions),
          notifications},

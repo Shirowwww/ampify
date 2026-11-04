@@ -1147,6 +1147,26 @@ bool StartLeveler(ampify::Journal& journal, const LevelerConfig& config, bool so
     return true;
 }
 
+// No gain at all: no auto-level, 0 dB for every track. The samples go through untouched.
+LevelerConfig NeutralConfig() {
+    LevelerConfig neutral;
+    neutral.autoLevel = false;
+    neutral.fallbackGainDb = 0;
+    neutral.maxGainDb = 0;
+    return neutral;
+}
+
+void StopLeveler() {
+    std::lock_guard<std::mutex> start(g_startLock);
+    if (!g_hooksPlaced) return;
+    {
+        std::lock_guard<std::mutex> guard(g_levelerLock);
+        g_config = NeutralConfig();
+        g_leveler = std::make_unique<AtmosLeveler>(g_config, 48000, 48000);
+    }
+    Note("leveler stopped: the sound goes through untouched");
+}
+
 // Reads the settings the leveler takes. Missing keys keep the reference mod's defaults; the gains are brought
 // into 0..15 dB.
 LevelerConfig ConfigFrom(const ampify::Settings& settings) {
@@ -1167,17 +1187,14 @@ ampify::ExtensionInfo MakeAtmosLevelerExtension(ampify::Journal& journal, const 
     info.name = "Atmos leveler";
     info.enabledByDefault = false;  // opt-in until it is tested on a real Dolby Atmos track
     info.start = [&journal, config] { return StartLeveler(journal, config); };
-    // No stop: the hooks stay in place until the process exits, so nothing is left half-patched.
+    // The hooks stay in place until the process exits, so nothing is left half-patched: switched off, the leveler
+    // goes neutral at once instead of keeping its gain until Apple Music restarts.
+    info.stop = [] { StopLeveler(); };
     return info;
 }
 
 bool StartSoundHooks(ampify::Journal& journal) {
-    // No gain at all: no auto-level, 0 dB for every track. The samples go through untouched.
-    LevelerConfig neutral;
-    neutral.autoLevel = false;
-    neutral.fallbackGainDb = 0;
-    neutral.maxGainDb = 0;
-    return StartLeveler(journal, neutral, true);
+    return StartLeveler(journal, NeutralConfig(), true);
 }
 
 }  // namespace atmos::hooks

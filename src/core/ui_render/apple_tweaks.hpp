@@ -27,10 +27,13 @@ struct AppleTweaks {
     PlayerMode player = PlayerMode::Window;
     // Closing the window hides it behind an icon of the notification area; the music goes on (win/close_to_tray.cpp).
     bool closeToTray = false;
+    // Shuffle and repeat added around the full-screen player's buttons (win/player_controls.cpp).
+    bool playerControls = true;
 };
 
 inline constexpr char kNotificationsKey[] = "apple.notifications";
 inline constexpr char kPlayerModeKey[] = "apple.fullscreen";
+inline constexpr char kPlayerControlsKey[] = "apple.playerControls";
 inline constexpr char kCloseKey[] = "apple.close";
 
 // An unknown value reads as the default.
