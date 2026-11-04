@@ -9,7 +9,7 @@ en:
   get:
     - name: Themes
       text: Colors, glass panels, the artwork of the song behind everything, rounded corners, motion. Pick one in the Marketplace and it applies at once, no restart.
-      fact: 8 themes, 28 light and dark schemes
+      fact: 9 themes, 21 light and dark schemes
     - name: Extensions
       text: Your Discord status with the cover and buttons, Last.fm scrobbling, a sleep timer, global shortcuts. Each one says what it needs before you switch it on.
       fact: Permissions shown before anything runs
@@ -36,7 +36,7 @@ fr:
   get:
     - name: Thèmes
       text: Couleurs, panneaux en verre, la pochette du morceau derrière tout, coins arrondis, mouvement. Choisissez-en un dans le Marketplace, il s'applique tout de suite, sans redémarrer.
-      fact: 8 thèmes, 28 schémas clairs et sombres
+      fact: 9 thèmes, 21 schémas clairs et sombres
     - name: Extensions
       text: Votre statut Discord avec la pochette et des boutons, le scrobbling Last.fm, une minuterie de veille, des raccourcis globaux. Chacune dit ce dont elle a besoin avant d'être activée.
       fact: Permissions affichées avant que rien ne tourne

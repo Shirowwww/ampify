@@ -5,10 +5,10 @@
 | | Ampify | Spicetify | Cider |
 |---|---|---|---|
 | What it is | A mod of the official Apple Music app | A mod of the Spotify app | A separate Apple Music player |
-| Price | Free, GPL v3 | Free, LGPL | Paid |
+| Price | Free, PolyForm Noncommercial | Free, LGPL | Paid |
 | Systems | Windows 10 and 11 | Windows, macOS, Linux | Windows, macOS, Linux |
 | Lossless and Dolby Atmos | Yes, Apple's own player | No (Spotify) | No lossless (Apple's web API does not offer it) |
-| Themes | 8 with 28 schemes, CSS on Apple Music's controls, with GIFs and settings | Hundreds, CSS on web pages | Yes, mostly colors |
+| Themes | 9 with 21 schemes, CSS on Apple Music's controls, with GIFs and settings | Hundreds, CSS on web pages | Yes, mostly colors |
 | Extensions and apps | JavaScript API, React-style UI, Marketplace | JavaScript API, React, Marketplace | Plugins, Marketplace |
 | Discord, Last.fm | Extensions in the Marketplace | Community extensions | Built in |
 | Full-screen lyrics | Apple's full-screen player, karaoke lyrics | Lyrics Plus | Built in |

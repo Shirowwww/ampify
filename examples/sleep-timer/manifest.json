@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "sleep-timer",
   "name": "Sleep timer",
-  "version": "0.1.6",
+  "version": "1.0.0",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Pauses the music after a delay set in minutes, counted from when Apple Music opens, and says so at the start.",

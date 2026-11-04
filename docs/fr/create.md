@@ -50,8 +50,9 @@ Un `color.ini` de Spicetify marche tel quel : posé dans le dossier d'un thème,
 
 ## Licences
 
-Ampify est sous GNU GPL v3, avec une exception écrite pour les créateurs : les thèmes, snippets, extensions et apps qui
-n'utilisent que les formats et l'API documentés d'Ampify sont à vous, sous la licence de votre choix. Les points de
+Ampify est sous licence PolyForm Noncommercial 1.0.0 : libre pour tout usage sauf commercial, en gardant le crédit.
+Cette licence ne s'étend pas à ce que vous créez : les thèmes, snippets, extensions et apps qui n'utilisent que les
+formats et l'API documentés d'Ampify sont à vous, sous la licence de votre choix, commerciale ou non. Les points de
 départ de `ampify new` et les exemples sont sous licence MIT : copiez-en ce que vous voulez.
 
 ## Aller plus loin

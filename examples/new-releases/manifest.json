@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "new-releases",
   "name": "New releases",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "kind": "app",
   "author": "Shirowwww",
   "description": "Recent albums, EPs and singles from the artists you listen to, like Spicetify's New Releases. Checked once a day in Apple's public catalog; click a release to open it in Apple Music.",

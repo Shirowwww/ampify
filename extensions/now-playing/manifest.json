@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "now-playing",
   "name": "Now Playing",
-  "version": "1.1.1",
+  "version": "1.0.0",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "A button of the playback bar that opens Apple Music's full-screen player over the window, without its title bar.",

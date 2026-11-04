@@ -108,9 +108,8 @@ The Marketplace and Ampify's settings page show the translation that matches the
 otherwise. Ids, folder names and command-line messages never change with the language.
 
 > [!NOTE]
-> Ampify 1.2.1 and older accept only `fr` in `translations` and refuse a manifest that names another language. An
-> element that uses the new languages needs the next Ampify version. The public catalog's index leaves `translations`
-> out (Ampify 1.1.0 refuses the whole catalog for a field it does not know); the archive's manifest keeps them.
+> The public catalog's index leaves `translations` out, because the test builds that came before the 1.0.0 release
+> refuse a catalog with a field they do not know; the archive's manifest keeps them.
 
 ## Validation
 

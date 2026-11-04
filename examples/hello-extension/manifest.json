@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "hello-extension",
   "name": "Hello, example for creators",
-  "version": "0.1.5",
+  "version": "1.0.0",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "For people who make extensions: it shows nothing in Apple Music. The smallest extension, to read and copy: it writes to Ampify's log and counts the launches.",

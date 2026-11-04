@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "scrobbler",
   "name": "Last.fm scrobbler",
-  "version": "0.2.2",
+  "version": "1.0.0",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Sends the tracks you listen to to Last.fm (scrobbling). Turn it on, allow Ampify on the Last.fm page that opens, and you are done. Plays that could not be sent wait in storage.",

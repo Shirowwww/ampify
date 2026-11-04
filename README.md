@@ -12,11 +12,11 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 [![Latest release](https://img.shields.io/github/v/release/Shirowwww/ampify?display_name=tag&sort=semver&style=flat-square&color=fa233b)](https://github.com/Shirowwww/ampify/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Shirowwww/ampify/total?style=flat-square&color=2ea043)](https://github.com/Shirowwww/ampify/releases)
 ![Windows 10 | 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows&style=flat-square)
-[![License](https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue?style=flat-square)](LICENSE)
 
 ### [Download](https://github.com/Shirowwww/ampify/releases/latest) &nbsp;·&nbsp; [Website](https://shirowwww.github.io/ampify/) &nbsp;·&nbsp; [Themes](https://shirowwww.github.io/ampify/themes.html) &nbsp;·&nbsp; [Docs](https://shirowwww.github.io/ampify/documentation.html)
 
-<img src="docs/assets/banner.webp" width="100%" alt="Apple Music with the Glass, Greenroom, Palettes, Paper, Artwork, Rose gold, Midnight and High contrast themes">
+<img src="docs/assets/banner.webp" width="100%" alt="Apple Music with the Glass theme, in front of Palettes and Paper">
 
 </div>
 
@@ -26,12 +26,13 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 
 ## What you get
 
-- 8 themes with 28 colour schemes, light and dark, applied at once without a restart, and an accent colour of your
+- 9 themes with 21 colour schemes, light and dark, applied at once without a restart, and an accent colour of your
   choice. Spicetify `color.ini` palettes work as they are.
 - A Marketplace inside Apple Music (the Ampify entry at the bottom of the sidebar) with themes, extensions and
   snippets, previews, and one-click installs.
-- Extensions for Discord presence, Last.fm scrobbling, a sleep timer and global shortcuts. Each one shows the
-  permissions it needs before you switch it on.
+- Extensions for Discord presence, Last.fm scrobbling, a sleep timer and global shortcuts, and pages for your
+  listening stats and the new releases of the artists you listen to. Each one shows the permissions it needs before
+  you switch it on.
 - Now Playing (Apple's full-screen player with karaoke lyrics), an Atmos leveler that brings Dolby Atmos songs to the
   loudness of stereo ones, and a playback guard for songs Apple Music leaves stuck, all shipped with Ampify.
 - English, French, German, Spanish, Portuguese, Russian, Japanese and Simplified Chinese.
@@ -77,7 +78,7 @@ extract it and run `ampify_setup.exe`. You need Windows 10 or 11 (x64) and Apple
 The same from a terminal:
 
 ```
-ampify theme set glass --scheme Night     # use a theme
+ampify theme set glass --scheme Light     # use a theme
 ampify theme clear                        # back to Apple Music's look
 ampify install sleep-timer                # install from the Marketplace
 ampify report                             # an anonymous diagnostic report, to attach to an issue
@@ -108,10 +109,11 @@ Windows 10 or 11 x64, Visual Studio 2022 or later (C++ workload) and the Windows
 
 ## Credits and license
 
-Ampify is free software under the [GNU GPL v3](LICENSE). What you make for it is yours: as an additional permission
-under section 7, themes, snippets, extensions and apps that only use Ampify's documented formats and `Ampify` API are
-not covered by the GPL, and their authors choose their own license. The [examples](examples) and the starters made by
-`ampify new` are under the [MIT license](examples/LICENSE).
+Ampify is free to use, read and change under the [PolyForm Noncommercial License 1.0.0](LICENSE): anything except
+commercial use, and any copy or fork keeps the credit line at the top of that file. What you make for it is yours:
+themes, snippets, extensions and apps that only use Ampify's documented formats and `Ampify` API are not covered by
+Ampify's license, and their authors choose their own, commercial or not. The [examples](examples) and the starters made
+by `ampify new` are under the [MIT license](examples/LICENSE).
 
 Ampify builds on QuickJS-ng and on what AMExclusive learned about Apple Music's player; full list in
 [CREDITS.md](CREDITS.md). Apple Music is a trademark of Apple Inc. Ampify is not affiliated with Apple.

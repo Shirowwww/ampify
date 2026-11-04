@@ -128,7 +128,7 @@
     wireCopy(copy, () => command);
 
     const shot = typeof item.preview === "string" && item.preview.startsWith("https://")
-      ? el("div", { class: "shot" }, [el("img", { src: item.preview, alt: "", loading: "lazy", width: "1200", height: "600" })])
+      ? el("div", { class: "shot" }, [el("img", { src: item.preview, alt: "", loading: "lazy", width: "1280", height: "720" })])
       : el("div", { class: "shot glyph", "aria-hidden": "true", text: item.name.slice(0, 1) });
     const permissions = item.permissions && item.permissions.length
       ? `${texts.permissions}: ${item.permissions.join(", ")}`

@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "volume-percentage",
   "name": "Volume percentage",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Shows Apple Music's volume as a percentage in the playback bar, next to the volume button, as Spicetify's Volume Percentage does.",

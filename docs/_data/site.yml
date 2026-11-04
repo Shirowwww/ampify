@@ -11,7 +11,7 @@ en:
   install_line: Close Apple Music, paste this line in PowerShell, then open Apple Music as usual.
   copy: Copy
   copied: Copied
-  footer: Ampify is free software under the GNU GPL v3. Apple Music is a trademark of Apple Inc.; Ampify is not affiliated with Apple.
+  footer: Ampify is free for any non-commercial use, under the PolyForm Noncommercial License 1.0.0. Apple Music is a trademark of Apple Inc.; Ampify is not affiliated with Apple.
   gallery_loading: Reading the catalog…
   gallery_error: The catalog could not be read. Open it on GitHub instead.
   install_with: Install from the Marketplace, or
@@ -33,7 +33,7 @@ fr:
   install_line: Fermez Apple Music, collez cette ligne dans PowerShell, puis ouvrez Apple Music comme d'habitude.
   copy: Copier
   copied: Copié
-  footer: Ampify est un logiciel libre sous licence GNU GPL v3. Apple Music est une marque d'Apple Inc. ; Ampify n'est pas affilié à Apple.
+  footer: Ampify est gratuit pour tout usage non commercial, sous licence PolyForm Noncommercial 1.0.0. Apple Music est une marque d'Apple Inc. ; Ampify n'est pas affilié à Apple.
   gallery_loading: Lecture du catalogue…
   gallery_error: Le catalogue n'a pas pu être lu. Ouvrez-le sur GitHub.
   install_with: Installez-le depuis le Marketplace, ou

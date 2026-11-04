@@ -65,7 +65,7 @@ catalog's archives are always packed by the bot.
 | `sha256` | yes | SHA-256 of the archive, 64 lowercase characters |
 | `homepage`, `license`, `tags`, `permissions` | no | Copies of the manifest fields |
 | `preview` | no | An `https://` `.png`/`.jpg`/`.jpeg` address on the catalog's host or the archive's host |
-| `translations` | no | A copy of the manifest's. Left out of the public catalog for now, since Ampify 1.1.0 refuses a catalog with a field it does not know |
+| `translations` | no | A copy of the manifest's. Left out of the public catalog, which the test builds before 1.0.0 would refuse for a field they do not know |
 
 Ampify reads a catalog and leaves aside any field it does not know. `kit.manage` is refused in the catalog. Next to it,
 `versions.json` lists the Apple Music versions tested after a release; `catalog.json` pins its address and SHA-256, and

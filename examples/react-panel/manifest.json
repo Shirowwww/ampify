@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "react-panel",
   "name": "React panel, example for creators",
-  "version": "0.1.4",
+  "version": "1.0.0",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "For people who make extensions: a panel written like React, without JSX, with a counter, a timer and settings (Ampify.React and Ampify.components). Nothing useful to listen with.",

@@ -91,5 +91,5 @@ change behavior, update the page that describes it. Relative links between pages
 
 ## License
 
-Contributions are published under the [GNU GPL v3](LICENSE), with the exception the README describes for themes,
-snippets, extensions and apps. Contributions to [examples/](examples) are under the [MIT license](examples/LICENSE).
+Contributions are published under the [PolyForm Noncommercial License 1.0.0](LICENSE), with the exception the README
+describes for themes, snippets, extensions and apps. Contributions to [examples/](examples) are under the [MIT license](examples/LICENSE).

@@ -47,8 +47,9 @@ needs Ampify's names instead of Spotify's classes. [What carries over, and what 
 
 ## Licenses
 
-Ampify is under the GNU GPL v3, with one exception written for creators: themes, snippets, extensions and apps that
-only use Ampify's documented formats and API are yours, under the license you choose. The starters made by
+Ampify is under the PolyForm Noncommercial License 1.0.0: free for any use except commercial, with credit kept. That
+license does not reach what you make: themes, snippets, extensions and apps that only use Ampify's documented formats
+and API are yours, under the license you choose, commercial or not. The starters made by
 `ampify new` and the examples are under the MIT license, so you can copy from them freely.
 
 ## Go further

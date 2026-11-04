@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "keyboard-skip",
   "name": "Skip tracks from the keyboard",
-  "version": "0.1.5",
+  "version": "1.0.0",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Global shortcuts: Ctrl+Alt+Right for the next track, Ctrl+Alt+Left for the previous one.",

@@ -53,7 +53,7 @@ h2 { font-size: clamp(26px, 3.2vw, 38px); font-weight: 650; letter-spacing: -.01
 .install-note code { color: var(--muted); }
 
 .stage { margin: 0; }
-.window { position: relative; aspect-ratio: 2 / 1; border-radius: var(--radius-lg); overflow: hidden; background: var(--raise);
+.window { position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius-lg); overflow: hidden; background: var(--raise);
   border: 1px solid var(--line); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .8), 0 0 0 1px rgba(255, 255, 255, .03) inset; }
 .window img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .6s var(--ease); }
 .window img.on { opacity: 1; }
@@ -106,7 +106,7 @@ h2 { font-size: clamp(26px, 3.2vw, 38px); font-weight: 650; letter-spacing: -.01
 .filters button[aria-pressed="true"] { color: var(--ink); border-color: var(--accent); background: var(--raise-2); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 26px 22px; padding-bottom: 80px; }
 .item { display: grid; gap: 10px; align-content: start; }
-.item .shot { aspect-ratio: 2 / 1; border-radius: var(--radius); overflow: hidden; background: var(--raise); border: 1px solid var(--line); }
+.item .shot { aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden; background: var(--raise); border: 1px solid var(--line); }
 .item .shot img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s var(--ease); }
 .item:hover .shot img { transform: scale(1.025); }
 .item .glyph { aspect-ratio: auto; height: 96px; display: grid; place-items: center; font: 600 28px var(--display); color: var(--faint); }

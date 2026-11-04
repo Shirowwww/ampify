@@ -1,7 +1,7 @@
 {%- assign h = site.data.home[page.lang] -%}
 {%- assign t = site.data.site[page.lang] -%}
 {%- assign root = '/' -%}{%- if page.lang == 'fr' -%}{%- assign root = '/fr/' -%}{%- endif -%}
-{%- assign shots = "greenroom:Greenroom,glass:Glass,artwork:Artwork,palettes:Palettes,paper-light:Paper light,rose-gold:Rose gold,midnight:Midnight" | split: "," -%}
+{%- assign shots = "glass:Glass,palettes:Palettes,mirror:Mirror,console:Console,cinema:Cinema,artwork:Artwork,paper-light:Paper,greenroom:Greenroom,high-contrast:High contrast" | split: "," -%}
 {%- assign raw = "https://raw.githubusercontent.com/Shirowwww/ampify/main/themes/" -%}
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-text">
@@ -18,7 +18,7 @@
   <figure class="stage" data-rotate>
     <div class="window">
       {%- for shot in shots -%}{%- assign s = shot | split: ":" -%}
-      <img src="{{ raw }}{{ s[0] }}/preview.jpg" alt="Apple Music with the {{ s[1] }} theme" width="1200" height="600"
+      <img src="{{ raw }}{{ s[0] }}/preview.jpg" alt="Apple Music with the {{ s[1] }} theme" width="1280" height="720"
         {% if forloop.first %}class="on" fetchpriority="high"{% else %}loading="lazy"{% endif %} data-theme-id="{{ s[0] }}">
       {%- endfor -%}
     </div>
