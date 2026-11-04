@@ -44,4 +44,8 @@ int ResumeProcessThreads(DWORD processId);
 // Ids of the running processes that have this image name and run from under `directory`.
 std::vector<DWORD> FindPackageProcesses(const wchar_t* imageName, const std::filesystem::path& directory);
 
+// The same for each image name, in their order, from one list of the processes: a list costs more than the rest.
+std::vector<std::vector<DWORD>> FindPackageProcesses(const std::vector<const wchar_t*>& imageNames,
+                                                     const std::filesystem::path& directory);
+
 }  // namespace ampify::launcher

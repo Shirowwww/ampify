@@ -120,7 +120,12 @@ int ResumeProcessThreads(DWORD processId) {
 }
 
 std::vector<DWORD> FindPackageProcesses(const wchar_t* imageName, const std::filesystem::path& directory) {
-    std::vector<DWORD> found;
+    return FindPackageProcesses(std::vector<const wchar_t*>{imageName}, directory).front();
+}
+
+std::vector<std::vector<DWORD>> FindPackageProcesses(const std::vector<const wchar_t*>& imageNames,
+                                                     const std::filesystem::path& directory) {
+    std::vector<std::vector<DWORD>> found(imageNames.size());
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) return found;
 
@@ -129,7 +134,9 @@ std::vector<DWORD> FindPackageProcesses(const wchar_t* imageName, const std::fil
     entry.dwSize = sizeof(entry);
     if (Process32FirstW(snapshot, &entry)) {
         do {
-            if (_wcsicmp(entry.szExeFile, imageName) != 0) continue;
+            size_t index = 0;
+            while (index < imageNames.size() && _wcsicmp(entry.szExeFile, imageNames[index]) != 0) index++;
+            if (index == imageNames.size()) continue;
 
             HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ProcessID);
             if (!process) continue;
@@ -139,7 +146,7 @@ std::vector<DWORD> FindPackageProcesses(const wchar_t* imageName, const std::fil
             if (QueryFullProcessImageNameW(process, 0, image.data(), &length)) {
                 image.resize(length);
                 if (image.size() >= prefix.size() && _wcsnicmp(image.c_str(), prefix.c_str(), prefix.size()) == 0) {
-                    found.push_back(entry.th32ProcessID);
+                    found[index].push_back(entry.th32ProcessID);
                 }
             }
             CloseHandle(process);

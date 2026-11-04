@@ -38,7 +38,9 @@ The installer registers `ampify_launcher.exe --background` under
 2. suspends the new process's threads;
 3. calls `CreateRemoteThread` with `LoadLibraryW` on `ampify_kernel.dll`;
 4. resumes the process, waits for the load thread, follows the app until it closes, and loads the kernel into
-   `AMPLibraryAgent.exe` and any second `AppleMusic.exe` too.
+   `AMPLibraryAgent.exe` and any second `AppleMusic.exe` too. It looks four times a second while the app starts, then
+   every two seconds once it has run for 30 s (and reported its health), so that an open Apple Music costs the
+   launcher a few milliseconds of processor a second.
 
 `ampify restore` sets the event `Local\AmpifyBackgroundStop` and removes the sign-in entry; `ampify apply` puts both
 back. `ampify launch` runs the same launcher in the foreground and starts Apple Music through its package identity

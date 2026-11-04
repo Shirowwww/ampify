@@ -44,6 +44,11 @@ using Clock = std::chrono::steady_clock;
 
 constexpr DWORD kPollIntervalMs = 250;
 
+// Once Apple Music has settled (ampify::PackageWatch), the watch looks this often: four looks a second, each two
+// process lists, cost about 85 ms of processor a second for as long as the app stayed open. A process that starts
+// later, such as a restarted library agent, gets the kernel within this delay.
+constexpr DWORD kSettledPollMs = 2000;
+
 // While Apple Music is closed, the background launcher looks for it this often: soon enough to hold its first
 // process early, and a process list read four times a second costs next to nothing.
 constexpr DWORD kBackgroundPollMs = 250;
@@ -138,11 +143,9 @@ ampify::WatchConfig MakeWatchConfig(bool inject, bool reportHealth) {
     return config;
 }
 
-// Ids of the running processes with this image name in the package, as the watch counts them.
-std::vector<uint32_t> PackageIds(const wchar_t* imageName, const std::filesystem::path& directory) {
-    std::vector<uint32_t> ids;
-    for (DWORD processId : ampify::launcher::FindPackageProcesses(imageName, directory)) ids.push_back(processId);
-    return ids;
+// Process ids as the watch counts them.
+std::vector<uint32_t> PackageIds(const std::vector<DWORD>& processIds) {
+    return std::vector<uint32_t>(processIds.begin(), processIds.end());
 }
 
 // Waits `ms`, or less when `stop` is set. True when it is: the caller stops. Without an event, a plain wait.
@@ -167,9 +170,12 @@ void Supervise(ampify::Journal& journal, const std::filesystem::path& packageDir
     while (true) {
         ampify::WatchSnapshot snapshot;
         snapshot.seconds = std::chrono::duration<double>(Clock::now() - started).count();
-        snapshot.appProcesses = PackageIds(L"AppleMusic.exe", packageDirectory);
-        snapshot.agentProcesses = PackageIds(L"AMPLibraryAgent.exe", packageDirectory);
+        std::vector<std::vector<DWORD>> running =
+            ampify::launcher::FindPackageProcesses({L"AppleMusic.exe", L"AMPLibraryAgent.exe"}, packageDirectory);
+        snapshot.appProcesses = PackageIds(running[0]);
+        snapshot.agentProcesses = PackageIds(running[1]);
         for (uint32_t processId : snapshot.appProcesses) {
+            if (!watch.NeedsResponsiveness()) break;
             if (ampify::win::WindowsResponsive(processId)) {
                 snapshot.appResponsive = true;
                 break;
@@ -194,7 +200,7 @@ void Supervise(ampify::Journal& journal, const std::filesystem::path& packageDir
             journal.Write(actions.stopReason + ": the launcher stops following Apple Music");
             return;
         }
-        if (WaitOrStop(stop, kPollIntervalMs)) {
+        if (WaitOrStop(stop, actions.settled ? kSettledPollMs : kPollIntervalMs)) {
             journal.Write("Asked to stop: the launcher stops following Apple Music");
             return;
         }

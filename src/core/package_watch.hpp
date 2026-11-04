@@ -21,6 +21,7 @@ struct WatchActions {
     bool markHealthy = false;      // clear the safe-mode count
     bool stop = false;             // nothing is left to follow
     std::string stopReason;        // for the journal, when `stop` is set
+    bool settled = false;          // the app has run past its start: the launcher may look less often
 };
 
 struct WatchConfig {
@@ -29,6 +30,7 @@ struct WatchConfig {
     double healthyAfter = 20;     // seconds of a responsive app before health is reported
     double goneAfter = 5;         // seconds without any app process before the watch stops
     double firstSeenWithin = 15;  // seconds allowed for the app to appear at all
+    double settleAfter = 30;      // seconds after the app appears, past its hand-overs and health, before it settles
 };
 
 // Follows one launch of Apple Music. Pure logic: the launcher feeds it one snapshot per poll.
@@ -44,6 +46,9 @@ public:
     void MarkHandled(uint32_t processId);
 
     WatchActions Step(const WatchSnapshot& snapshot);
+
+    // Whether the next snapshot needs `appResponsive`, which walks every window: only while health is awaited.
+    bool NeedsResponsiveness() const { return m_config.reportHealth && !m_healthReported; }
 
 private:
     WatchConfig m_config;

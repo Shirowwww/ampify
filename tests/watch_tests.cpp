@@ -101,6 +101,40 @@ TEST_CASE(PackageWatch_StopsOnlyAfterTheAppHasBeenGoneLongEnough) {
     CHECK(closed.stopReason == "Apple Music closed");
 }
 
+// Regression: the launcher read the process list twice and walked every window four times a second for as long as
+// Apple Music stayed open, about 85 ms of processor a second. Once the app has settled it looks less often.
+TEST_CASE(PackageWatch_SettlesThirtySecondsAfterTheAppAppears) {
+    ampify::WatchConfig config;  // the kernel reports health itself
+    ampify::PackageWatch watch(config);
+
+    CHECK(!watch.Step(Poll(0.0, {})).settled);
+    CHECK(!watch.Step(Poll(2.0, {100})).settled);
+    CHECK(!watch.Step(Poll(31.9, {100})).settled);
+    CHECK(watch.Step(Poll(32.0, {100})).settled);
+}
+
+TEST_CASE(PackageWatch_SettlesOnlyOnceHealthIsReported) {
+    ampify::PackageWatch watch(HealthOnly());
+
+    CHECK(!watch.Step(Poll(0.0, {100}, {}, false)).settled);
+    CHECK(!watch.Step(Poll(40.0, {100}, {}, false)).settled);  // hung: health still awaited
+
+    ampify::WatchActions healthy = watch.Step(Poll(41.0, {100}));
+    CHECK(healthy.markHealthy);
+    CHECK(healthy.settled);
+}
+
+TEST_CASE(PackageWatch_AsksForTheWindowsOnlyWhileHealthIsAwaited) {
+    ampify::PackageWatch reporting(HealthOnly());
+    CHECK(reporting.NeedsResponsiveness());
+    reporting.Step(Poll(0.0, {100}));
+    CHECK(reporting.Step(Poll(20.0, {100})).markHealthy);
+    CHECK(!reporting.NeedsResponsiveness());
+
+    ampify::WatchConfig config;  // the kernel reports health itself
+    CHECK(!ampify::PackageWatch(config).NeedsResponsiveness());
+}
+
 TEST_CASE(PackageWatch_GivesUpWhenTheAppNeverAppears) {
     ampify::WatchConfig config;
     ampify::PackageWatch watch(config);

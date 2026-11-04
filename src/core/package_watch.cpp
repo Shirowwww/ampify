@@ -45,6 +45,7 @@ WatchActions PackageWatch::Step(const WatchSnapshot& snapshot) {
         actions.stop = true;
         actions.stopReason = "Apple Music closed";
     }
+    actions.settled = m_appSeen && !NeedsResponsiveness() && snapshot.seconds - m_firstSeen >= m_config.settleAfter;
     return actions;
 }
 
