@@ -12,8 +12,8 @@
 namespace ampify {
 
 bool IsKitCommandAllowed(const std::vector<std::string>& arguments) {
-    static constexpr std::array<std::string_view, 9> kCommands = {
-        "market", "install", "remove", "update", "theme", "extension", "app", "snippet", "list"};
+    static constexpr std::array<std::string_view, 10> kCommands = {
+        "market", "install", "remove", "update", "theme", "extension", "app", "snippet", "list", "settings"};
     if (arguments.empty() || arguments.size() > 8) return false;
     bool known = false;
     for (std::string_view command : kCommands) known = known || arguments.front() == command;

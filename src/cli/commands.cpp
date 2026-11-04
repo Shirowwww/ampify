@@ -23,6 +23,7 @@
 #include "../core/theme/theme.hpp"
 #include "../core/theme/theme_settings.hpp"
 #include "../core/ui_render/apple_tweaks.hpp"
+#include "../core/ui_render/mods.hpp"
 #include "archive.hpp"
 #include "catalog.hpp"
 #include "element.hpp"
@@ -715,6 +716,28 @@ int CmdConfig(Context& ctx) {
     return CmdConfigSet(ctx, settings);
 }
 
+// `ampify settings <kind> <id> [<key> <value>]`: the settings an element declares, as the Marketplace shows them.
+int CmdSettings(Context& ctx) {
+    const std::vector<std::string>& args = ctx.options.positional;
+    if (args.size() != 3 && args.size() != 5) {
+        return Usage(ctx, "settings needs <kind> <id>, or <kind> <id> <key> <value>");
+    }
+    const std::string& kind = args[1];
+    const std::string& id = args[2];
+    if (args.size() == 5) {
+        std::string error;
+        if (!uirender::ChangeElementSetting(ctx.kit.Root(), kind, id, args[3], args[4], error)) return Failure(ctx, error);
+        ctx.out << id << " " << args[3] << " = " << args[4] << "\n";
+        return 0;
+    }
+    std::optional<uirender::ModEntry> element = uirender::ElementSettings(ctx.kit.Root(), kind, id);
+    if (!element) return Failure(ctx, "no installed " + kind + " \"" + id + "\" declares settings");
+    for (size_t index = 0; index < element->settings.size(); index++) {
+        ctx.out << element->settings[index].key << " = " << element->values[index] << "\n";
+    }
+    return 0;
+}
+
 int CmdList(Context& ctx) {
     return PrintElements(ctx, "");
 }
@@ -873,6 +896,7 @@ int Dispatch(Context& ctx) {
     if (command == "path") return CmdPath(ctx);
     if (command == "config") return CmdConfig(ctx);
     if (command == "list") return CmdList(ctx);
+    if (command == "settings") return CmdSettings(ctx);
     if (command == "theme") return CmdTheme(ctx);
     if (command == "validate") return CmdValidate(ctx);
     if (command == "new") return CmdNew(ctx);

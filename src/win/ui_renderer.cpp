@@ -15,6 +15,7 @@
 
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.Numerics.h>
+#include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Text.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
@@ -611,6 +612,20 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
     mounted.callbacks->sink = m_sink;
     mounted.callbacks->updating = m_updating;
     std::shared_ptr<Callbacks> callbacks = mounted.callbacks;
+    // A card, picture or icon that answers a click answers Enter and Space too, once Tab reaches it (SetAttributes).
+    auto clickOnKeys = [callbacks](const xaml::UIElement& element) {
+        element.KeyDown([callbacks](IInspectable const& sender, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
+            try {
+                auto key = args.Key();
+                if (key != winrt::Windows::System::VirtualKey::Enter && key != winrt::Windows::System::VirtualKey::Space) return;
+                // Keys bubble up from a text field or a button inside a card: only the element's own focus clicks it.
+                if (args.OriginalSource() != sender || callbacks->onClick <= 0) return;
+                args.Handled(true);
+                callbacks->Fire(true, {});
+            } catch (...) {
+            }
+        });
+    };
 
     xaml::FrameworkElement outer{nullptr};
     xaml::FrameworkElement control{nullptr};
@@ -639,6 +654,37 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
         card.Child(inner);
         card.Tapped([callbacks](IInspectable const&, xaml::Input::TappedRoutedEventArgs const&) noexcept {
             callbacks->Fire(true, {});
+        });
+        clickOnKeys(card);
+        // A card that answers a click lights up under the pointer, as the rows of Apple's lists do, and while it has the
+        // keyboard's focus, which a Border shows no other way.
+        auto resting = std::make_shared<xaml::Media::Brush>(nullptr);
+        auto light = [callbacks, resting](IInspectable const& sender) noexcept {
+            try {
+                auto border = sender.as<controls::Border>();
+                auto hover = ThemeResource(L"SubtleFillColorSecondaryBrush").try_as<xaml::Media::Brush>();
+                if (callbacks->onClick <= 0 || !hover || *resting) return;
+                *resting = border.Background();
+                border.Background(hover);
+            } catch (...) {
+            }
+        };
+        auto unlight = [resting](IInspectable const& sender) noexcept {
+            try {
+                if (!*resting) return;
+                sender.as<controls::Border>().Background(*resting);
+                *resting = nullptr;
+            } catch (...) {
+            }
+        };
+        card.PointerEntered([light](IInspectable const& sender, xaml::Input::PointerRoutedEventArgs const&) noexcept { light(sender); });
+        card.PointerExited([unlight](IInspectable const& sender, xaml::Input::PointerRoutedEventArgs const&) noexcept { unlight(sender); });
+        // Focus bubbles up from a switch or a button inside the card: only the card's own focus lights it.
+        card.GotFocus([light](IInspectable const& sender, xaml::RoutedEventArgs const& args) noexcept {
+            if (args.OriginalSource() == sender) light(sender);
+        });
+        card.LostFocus([unlight](IInspectable const& sender, xaml::RoutedEventArgs const& args) noexcept {
+            if (args.OriginalSource() == sender) unlight(sender);
         });
         outer = control = card;
         mounted.host = host;
@@ -730,6 +776,7 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
         frame.Tapped([callbacks](IInspectable const&, xaml::Input::TappedRoutedEventArgs const&) noexcept {
             callbacks->Fire(true, {});
         });
+        clickOnKeys(frame);
         outer = control = frame;
         mounted.brush = brush;
         mounted.sizer = sizer;
@@ -739,6 +786,7 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
         frame.Tapped([callbacks](IInspectable const&, xaml::Input::TappedRoutedEventArgs const&) noexcept {
             callbacks->Fire(true, {});
         });
+        clickOnKeys(frame);
         outer = control = frame;
     }
 
@@ -959,6 +1007,10 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
     if (mounted.outer) SetMotion(mounted, node, building);
 
     const std::string& type = node.type;
+    if (type == "card" || type == "image" || type == "icon") {
+        bool clickable = mounted.callbacks->onClick > 0 && !disabled;
+        if (control.IsTabStop() != clickable) control.IsTabStop(clickable);
+    }
     if (type == "stack" || type == "row" || type == "layer" || type == "card") SetBox(mounted, node);
     if (type == "stack" || type == "list" || type == "row") {
         double gap = node.Number("gap", type == "list" ? 4 : (type == "row" ? 12 : 8));

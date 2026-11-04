@@ -26,6 +26,8 @@ Elements
   snippet  list|enable|disable <id>    snippets (small styles switched on alone)
   app      list|enable|disable <id>    apps (pages added to the interface)
   theme    list | set <id> [--scheme <name>] | clear
+  settings <kind> <id>                 shows what an extension, theme or snippet lets you set, and the values now
+  settings <kind> <id> <key> <value>   changes one of them (checked against its manifest)
   theme    check <folder> [--scheme <name>]   reads a theme as the kernel does and shows what would apply
   theme    watch <folder> [--scheme <name>]   reads the theme again at each save (--max-cycles N to stop)
   theme    names <inspector.json>...          checks the stable names (.sidebar, .card...) against saved interface trees

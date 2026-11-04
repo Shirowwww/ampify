@@ -173,6 +173,67 @@ void Name(const xaml::FrameworkElement& element, const std::string& name, const 
     if (!accessible.empty()) automation::AutomationProperties::SetName(element, Wide(accessible));
 }
 
+constexpr std::size_t kScrollBarSearchLimit = 96;  // the bar and its arrows sit a few levels into the template
+
+std::vector<xaml::DependencyObject> TemplateBelow(const xaml::DependencyObject& root) {
+    std::vector<xaml::DependencyObject> queue{root};
+    for (std::size_t i = 0; i < queue.size() && queue.size() < kScrollBarSearchLimit; i++) {
+        int count = media::VisualTreeHelper::GetChildrenCount(queue[i]);
+        for (int child = 0; child < count; child++) queue.push_back(media::VisualTreeHelper::GetChild(queue[i], child));
+    }
+    return queue;
+}
+
+// The expanded state of a scroll bar brings its arrows back: no room and no ink keeps them gone.
+void HideArrows(const xaml::DependencyObject& bar) {
+    for (const auto& item : TemplateBelow(bar)) {
+        auto button = item.try_as<primitives::RepeatButton>();
+        if (!button) continue;
+        std::wstring_view name = button.Name();
+        if (name != L"VerticalSmallDecrease" && name != L"VerticalSmallIncrease") continue;
+        button.Height(0);
+        button.Opacity(0);
+    }
+}
+
+void SetOpacityOf(IInspectable const& sender, double opacity) noexcept {
+    try {
+        sender.as<xaml::UIElement>().Opacity(opacity);
+    } catch (...) {
+    }
+}
+
+// The page host is a popup, which themes leave alone, and Windows draws its scroll bar over the page with arrows at
+// both ends. It stays out of sight until the pointer reaches it, without the arrows, as the layouts do for Apple's.
+// The handlers take the bar from their sender: capturing it would make the bar hold itself.
+void QuietScrollBar(const controls::ScrollViewer& scroll) {
+    scroll.Loaded([](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            for (const auto& item : TemplateBelow(sender.as<xaml::DependencyObject>())) {
+                auto bar = item.try_as<primitives::ScrollBar>();
+                if (!bar || bar.Orientation() != controls::Orientation::Vertical) continue;
+                bar.Opacity(0);
+                using xaml::Input::PointerRoutedEventArgs;
+                bar.PointerEntered([](IInspectable const& entered, PointerRoutedEventArgs const&) noexcept {
+                    SetOpacityOf(entered, 1);
+                });
+                bar.PointerExited([](IInspectable const& exited, PointerRoutedEventArgs const&) noexcept {
+                    SetOpacityOf(exited, 0);
+                });
+                HideArrows(bar);
+                bar.Loaded([](IInspectable const& loaded, xaml::RoutedEventArgs const&) noexcept {
+                    try {
+                        HideArrows(loaded.as<xaml::DependencyObject>());
+                    } catch (...) {
+                    }
+                });
+                return;
+            }
+        } catch (...) {
+        }
+    });
+}
+
 }  // namespace
 
 // The state of the service, in a named namespace: UiService::Shared (declared in the header) holds it.
@@ -1943,6 +2004,7 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
     controls::Border slot;
     slot.Margin(xaml::Thickness{0, 0, 16, 0});
     scroll.Content(slot);
+    QuietScrollBar(scroll);
     host.Children().Append(scroll);
 
     host.Visibility(xaml::Visibility::Collapsed);

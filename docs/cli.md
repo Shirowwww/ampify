@@ -22,6 +22,8 @@ ampify doctor                            check that everything is in order
 | `ampify config <key> <value>` | Writes a setting. The key must be known and the value is checked |
 | `ampify config extensions +id` / `-id` | Switches an element on or off (also `apps`, `snippets`) |
 | `ampify config --dir` | Opens the Ampify folder in Explorer |
+| `ampify settings <kind> <id>` | Shows what an extension, theme or snippet lets you set, and the values now |
+| `ampify settings <kind> <id> <key> <value>` | Changes one of them, checked against the element's manifest |
 | `ampify path [name]` | Prints the Ampify and Apple Music folders, or one of them: `kit`, `settings`, `extensions`, `themes`, `apps`, `snippets`, `logs`, `backups`, `app` (Apple Music package), `prefs` (Apple Music preferences) |
 | `ampify list` | Every installed element with its kind, version and state |
 | `ampify version` | Ampify's version |

@@ -14,6 +14,7 @@
 #include "../core/settings.hpp"
 #include "../core/theme/files.hpp"
 #include "../core/theme/theme.hpp"
+#include "../core/ui_render/mods.hpp"
 #include "archive.hpp"
 #include "backup.hpp"
 #include "catalog.hpp"
@@ -486,12 +487,39 @@ Json InfoJson(const ElementInfo& info) {
                              {"tags", TextList(info.tags)}};
     if (!info.translations.empty()) {
         Json::Object languages;
+        auto texts = [](const std::map<std::string, std::string>& map) {
+            Json::Object object;
+            for (const auto& [key, text] : map) object.emplace_back(key, text);
+            return Json(std::move(object));
+        };
         for (const auto& [code, text] : info.translations) {
-            languages.emplace_back(code, Json::Object{{"name", text.name}, {"description", text.description}});
+            Json language = Json::Object{{"name", text.name}, {"description", text.description}};
+            // Only an element with settings translates their labels and choices.
+            if (!text.settings.empty()) language.Set("settings", texts(text.settings));
+            if (!text.options.empty()) language.Set("options", texts(text.options));
+            languages.emplace_back(code, std::move(language));
         }
         item.Set("translations", Json(std::move(languages)));
     }
     return item;
+}
+
+// The settings an installed element declares, each with its value now, for the Marketplace's settings panel.
+Json SettingsJson(const uirender::ModEntry& element) {
+    static constexpr const char* kTypes[] = {"toggle", "choice", "text", "number"};
+    Json::Array list;
+    for (size_t index = 0; index < element.settings.size(); index++) {
+        const SettingSpec& spec = element.settings[index];
+        Json setting = Json::Object{{"key", spec.key},
+                                    {"label", spec.label},
+                                    {"type", kTypes[static_cast<int>(spec.type)]},
+                                    {"value", element.values[index]}};
+        if (!spec.options.empty()) setting.Set("options", TextList(spec.options));
+        if (spec.min) setting.Set("min", *spec.min);
+        if (spec.max) setting.Set("max", *spec.max);
+        list.push_back(std::move(setting));
+    }
+    return list;
 }
 
 // `ampify market --json`: what the Marketplace page shows. The catalogue (empty with catalogOk false when it cannot be
@@ -525,6 +553,9 @@ int PrintMarketJson(Context& ctx) {
                 std::filesystem::absolute(ctx.kit.Element(element.kind, element.id) / *element.manifest->preview);
             std::error_code ec;
             if (std::filesystem::is_regular_file(image, ec)) item.Set("preview", Utf8(image));
+        }
+        if (std::optional<uirender::ModEntry> declared = uirender::ElementSettings(ctx.kit.Root(), element.kind, element.id)) {
+            item.Set("settings", SettingsJson(*declared));
         }
         if (element.kind == "theme") {
             theme::FolderFiles files(ctx.kit.Root() / "themes" / element.id);

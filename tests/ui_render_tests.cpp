@@ -946,3 +946,43 @@ TEST_CASE(UiRender_EachFullscreenSessionIsANewSurface) {
     CHECK(again.added.size() == 1 && again.added[0].key != first.added[0].key);
     CHECK(again.added.size() == 1 && again.added[0].nodeId == "fullscreen-main");
 }
+
+TEST_CASE(UiRender_ElementSettingsListWhatAnInstalledElementDeclaresWithItsValues) {
+    fs::path kit = FreshKit("element-settings");
+    WriteFile(kit / "snippets" / "icons" / "manifest.json",
+              R"({"id":"icons","name":"Icons","version":"1.0.0","kind":"snippet","author":"x","description":"d",)"
+              R"("kitApi":"1.0","settings":[{"key":"shape","label":"Shape","type":"choice",)"
+              R"("options":["Round","Square"],"default":"Round"}]})");
+    WriteFile(kit / "snippets" / "icons" / "user.css", "Page { opacity: 1; }\n");
+    WriteFile(kit / "settings.txt", "snippets.icons.shape = Square\n");
+
+    std::optional<ModEntry> icons = ElementSettings(kit, "snippet", "icons");
+    CHECK(icons && icons->snippet && icons->settings.size() == 1);
+    CHECK(icons && icons->values.size() == 1 && icons->values[0] == "Square");
+    CHECK(!ElementSettings(kit, "snippet", "missing"));
+    CHECK(!ElementSettings(kit, "theme", "icons"));
+}
+
+TEST_CASE(UiRender_ChangingAnElementSettingChecksItAgainstTheManifest) {
+    fs::path kit = FreshKit("element-setting-change");
+    WriteFile(kit / "extensions" / "clock" / "manifest.json",
+              R"({"id":"clock","name":"Clock","version":"1.0.0","kind":"extension","author":"x","description":"d",)"
+              R"("kitApi":"1.0","main":"main.js","settings":[)"
+              R"({"key":"size","label":"Size","type":"number","min":1,"max":10,"default":4},)"
+              R"({"key":"seconds","label":"Seconds","type":"toggle","default":false}]})");
+    WriteFile(kit / "extensions" / "clock" / "main.js", "");
+    std::string error;
+
+    CHECK(ChangeElementSetting(kit, "extension", "clock", "size", "7", error));
+    CHECK(ReadFile(kit / "settings.txt").find("extensions.clock.size = 7") != std::string::npos);
+    CHECK(ReadFile(kit / "reload.txt").find("restart clock") != std::string::npos);
+    CHECK(ChangeElementSetting(kit, "extension", "clock", "seconds", "on", error));
+    CHECK(ReadFile(kit / "settings.txt").find("extensions.clock.seconds = true") != std::string::npos);
+
+    CHECK(!ChangeElementSetting(kit, "extension", "clock", "size", "11", error));
+    CHECK(error.find("size") != std::string::npos);
+    CHECK(!ChangeElementSetting(kit, "extension", "clock", "seconds", "maybe", error));
+    CHECK(!ChangeElementSetting(kit, "extension", "clock", "colour", "red", error));
+    CHECK(!ChangeElementSetting(kit, "extension", "nothing", "size", "2", error));
+    CHECK(ReadFile(kit / "settings.txt").find("extensions.clock.size = 7") != std::string::npos);
+}

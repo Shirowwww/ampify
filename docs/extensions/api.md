@@ -231,6 +231,9 @@ characters per text; attributes are plain values.
 | `icon` | `icon` (SVG), `label`, `onClick` |
 | any | `tooltip`, `tooltipPlacement` (`top`, `bottom`, `left`, `right`), `tooltipDelay` (0 to 10000 ms) |
 
+A `card`, `image` or `icon` with an `onClick` works from the keyboard as well: Tab stops on it, Enter or Space clicks
+it, and a card lights up while it has the focus as it does under the pointer.
+
 | Where | Attribute | Values |
 |---|---|---|
 | any | `opacity`, `scale` | 0 to 1; 0 to 10 around the center |

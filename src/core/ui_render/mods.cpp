@@ -298,4 +298,83 @@ bool SetThemeSetting(const fs::path& kit, const std::string& id, const std::stri
     return IsSettingKey(key, error) && WriteSetting(kit, "themes." + id + "." + key, OneLine(value), error);
 }
 
+namespace {
+
+constexpr size_t kMaxSettingText = 200;  // the length docs/extensions/manifest.md allows a text
+
+struct KindFolder {
+    std::string_view kind;
+    const char* folder;
+    ElementKind element;
+};
+constexpr KindFolder kSettingKinds[] = {{"extension", "extensions", ElementKind::Extension},
+                                        {"theme", "themes", ElementKind::Theme},
+                                        {"snippet", "snippets", ElementKind::Snippet}};
+
+const KindFolder* FolderOf(std::string_view kind) {
+    for (const KindFolder& entry : kSettingKinds) {
+        if (entry.kind == kind) return &entry;
+    }
+    return nullptr;
+}
+
+// The value as settings.txt keeps it when it fits the spec: SettingValue with no default to fall back on.
+std::optional<std::string> AcceptedValue(const SettingSpec& spec, const std::string& value) {
+    if (spec.type == SettingSpec::Type::Text) {
+        bool oneLine = value.find_first_of("\r\n") == std::string::npos;
+        return oneLine && value.size() <= kMaxSettingText ? std::optional<std::string>(value) : std::nullopt;
+    }
+    SettingSpec strict = spec;
+    strict.defaultValue.clear();
+    std::string accepted = SettingValue(strict, value);
+    return accepted.empty() ? std::nullopt : std::optional<std::string>(accepted);
+}
+
+}  // namespace
+
+std::optional<ModEntry> ElementSettings(const fs::path& kit, std::string_view kind, const std::string& id) {
+    const KindFolder* folder = FolderOf(kind);
+    std::string error;
+    if (!folder || !IsExtensionTarget(id, error)) return std::nullopt;
+    for (const Manifest& manifest : ReadManifests(kit / folder->folder, folder->element)) {
+        if (manifest.id != id || manifest.settings.empty()) continue;
+        Settings settings;
+        settings.Load((kit / "settings.txt").string());
+        ModEntry entry = EntryOf(manifest);
+        entry.theme = folder->element == ElementKind::Theme;
+        entry.snippet = folder->element == ElementKind::Snippet;
+        entry.settings = manifest.settings;
+        std::string prefix = std::string(folder->folder) + "." + id + ".";
+        entry.enabled = settings.GetBool(prefix + "enabled", false);
+        for (const SettingSpec& spec : entry.settings) {
+            entry.values.push_back(SettingValue(spec, settings.Get(prefix + spec.key)));
+        }
+        return entry;
+    }
+    return std::nullopt;
+}
+
+bool ChangeElementSetting(const fs::path& kit, std::string_view kind, const std::string& id, const std::string& key,
+                          const std::string& value, std::string& error) {
+    std::optional<ModEntry> element = ElementSettings(kit, kind, id);
+    if (!element) {
+        error = "no installed " + std::string(kind) + " \"" + id + "\" declares settings";
+        return false;
+    }
+    auto spec = std::find_if(element->settings.begin(), element->settings.end(),
+                             [&key](const SettingSpec& candidate) { return candidate.key == key; });
+    if (spec == element->settings.end()) {
+        error = "\"" + id + "\" has no setting \"" + key + "\"";
+        return false;
+    }
+    std::optional<std::string> accepted = AcceptedValue(*spec, value);
+    if (!accepted) {
+        error = "\"" + value + "\" does not fit the setting \"" + key + "\" of \"" + id + "\"";
+        return false;
+    }
+    if (element->snippet) return SetSnippetSetting(kit, id, key, *accepted, error);
+    if (element->theme) return SetThemeSetting(kit, id, key, *accepted, error);
+    return SetModSetting(kit, id, key, *accepted, error);
+}
+
 }  // namespace ampify::uirender

@@ -2,7 +2,7 @@
 // nothing itself: every action goes through ampify (Ampify.kit.run), with the same checks as in the console (SHA-256,
 // verified archive, backup before a removal). Specification: docs/extensions/catalog.md.
 const { h, useState, useEffect } = Ampify.React;
-const { Card, Button, ButtonPrimary, ButtonTertiary, Dropdown, Text } = Ampify.components;
+const { Card, Button, ButtonPrimary, ButtonTertiary, Dropdown, Slider, Text, TextField, Toggle } = Ampify.components;
 
 // Texts in English, French, German, Spanish, Portuguese, Russian, Japanese and Chinese; Ampify.i18n picks the Windows
 // display language. Apple Music's own words where it has one (Activé, Désactivé, Retour, Einstellungen).
@@ -45,7 +45,7 @@ Ampify.i18n.define({
     "done.inUseScheme": "{name} in use, {scheme} scheme", "done.appleLook": "Apple Music's own look is back",
     "done.on": "{name} turned on", "done.off": "{name} turned off", "done.removed": "{name} uninstalled",
     "preview": "Preview of {name}",
-    "settingsWhere": "Its settings, when it has some, are in Apple Music's Settings, under Ampify.",
+    "detail.settings": "Settings", "detail.settingsNote": "Changes apply at once. You also find them in Apple Music's Settings, under Ampify.", "done.setting": "{name}: {setting} changed", "action.settingsOf": "Settings of {name}",
     "detail.readmeLoading": "Reading its description…",
     "action.settings": "Settings", "action.openSettings": "Open Ampify's settings", "detail.can": "What it can do", "detail.about": "About", "detail.kind": "Type", "detail.author": "Made by", "detail.version": "Version", "detail.tags": "Tags", "detail.gone": "This element is no longer in the catalog, nor installed.", "detail.noDescription": "No description yet.",
   },
@@ -88,7 +88,7 @@ Ampify.i18n.define({
     "done.inUseScheme": "{name} utilisé, variante {scheme}", "done.appleLook": "Le look d'Apple Music est revenu",
     "done.on": "{name} activé", "done.off": "{name} désactivé", "done.removed": "{name} désinstallé",
     "preview": "Aperçu de {name}",
-    "settingsWhere": "Ses réglages, s'il en a, sont dans les Réglages d'Apple Music, sous Ampify.",
+    "detail.settings": "Réglages", "detail.settingsNote": "Les changements s'appliquent tout de suite. Ils sont aussi dans les Réglages d'Apple Music, sous Ampify.", "done.setting": "{name} : {setting} modifié", "action.settingsOf": "Réglages de {name}",
     "detail.readmeLoading": "Lecture de sa présentation…",
     "action.settings": "Réglages", "action.openSettings": "Ouvrir les réglages d'Ampify", "detail.can": "Ce qu'il peut faire", "detail.about": "À propos", "detail.kind": "Type", "detail.author": "Créé par", "detail.version": "Version", "detail.tags": "Mots-clés", "detail.gone": "Cet élément n'est plus dans le catalogue ni installé.", "detail.noDescription": "Pas encore de description.",
   },
@@ -131,7 +131,7 @@ Ampify.i18n.define({
     "done.inUseScheme": "{name} in Benutzung, Variante {scheme}", "done.appleLook": "Der eigene Look von Apple Music ist zurück",
     "done.on": "{name} aktiviert", "done.off": "{name} deaktiviert", "done.removed": "{name} deinstalliert",
     "preview": "Vorschau von {name}",
-    "settingsWhere": "Die Einstellungen, falls vorhanden, finden Sie in den Einstellungen von Apple Music unter Ampify.",
+    "detail.settings": "Einstellungen", "detail.settingsNote": "Änderungen gelten sofort. Sie finden sie auch in den Einstellungen von Apple Music unter Ampify.", "done.setting": "{name}: {setting} geändert", "action.settingsOf": "Einstellungen von {name}",
     "detail.readmeLoading": "Beschreibung wird gelesen…",
     "action.settings": "Einstellungen", "action.openSettings": "Ampify-Einstellungen öffnen", "detail.can": "Was es kann", "detail.about": "Info", "detail.kind": "Typ", "detail.author": "Erstellt von", "detail.version": "Version", "detail.tags": "Stichwörter", "detail.gone": "Dieses Element ist weder im Katalog noch installiert.", "detail.noDescription": "Noch keine Beschreibung.",
   },
@@ -174,7 +174,7 @@ Ampify.i18n.define({
     "done.inUseScheme": "{name} en uso, variante {scheme}", "done.appleLook": "Ha vuelto el aspecto propio de Apple Music",
     "done.on": "{name} activado", "done.off": "{name} desactivado", "done.removed": "{name} desinstalado",
     "preview": "Vista previa de {name}",
-    "settingsWhere": "Sus ajustes, si los tiene, están en los Ajustes de Apple Music, en Ampify.",
+    "detail.settings": "Ajustes", "detail.settingsNote": "Los cambios se aplican al instante. También están en los Ajustes de Apple Music, en Ampify.", "done.setting": "{name}: {setting} cambiado", "action.settingsOf": "Ajustes de {name}",
     "detail.readmeLoading": "Leyendo su presentación…",
     "action.settings": "Ajustes", "action.openSettings": "Abrir los ajustes de Ampify", "detail.can": "Lo que puede hacer", "detail.about": "Información", "detail.kind": "Tipo", "detail.author": "Creado por", "detail.version": "Versión", "detail.tags": "Etiquetas", "detail.gone": "Este elemento ya no está en el catálogo ni instalado.", "detail.noDescription": "Todavía no hay descripción.",
   },
@@ -217,7 +217,7 @@ Ampify.i18n.define({
     "done.inUseScheme": "{name} em uso, variante {scheme}", "done.appleLook": "O visual próprio do Apple Music voltou",
     "done.on": "{name} ativado", "done.off": "{name} desativado", "done.removed": "{name} desinstalado",
     "preview": "Prévia de {name}",
-    "settingsWhere": "Os ajustes dele, se houver, ficam nos Ajustes do Apple Music, em Ampify.",
+    "detail.settings": "Ajustes", "detail.settingsNote": "As mudanças valem na hora. Também estão nos Ajustes do Apple Music, em Ampify.", "done.setting": "{name}: {setting} alterado", "action.settingsOf": "Ajustes de {name}",
     "detail.readmeLoading": "Lendo a apresentação…",
     "action.settings": "Ajustes", "action.openSettings": "Abrir os ajustes do Ampify", "detail.can": "O que ele pode fazer", "detail.about": "Sobre", "detail.kind": "Tipo", "detail.author": "Criado por", "detail.version": "Versão", "detail.tags": "Etiquetas", "detail.gone": "Este elemento não está mais no catálogo nem instalado.", "detail.noDescription": "Ainda não há descrição.",
   },
@@ -260,7 +260,7 @@ Ampify.i18n.define({
     "done.inUseScheme": "{name} используется, вариант {scheme}", "done.appleLook": "Вернулся собственный вид Apple Music",
     "done.on": "{name} включено", "done.off": "{name} выключено", "done.removed": "{name} удалено",
     "preview": "Предпросмотр: {name}",
-    "settingsWhere": "Его настройки, если они есть, находятся в настройках Apple Music, в разделе Ampify.",
+    "detail.settings": "Настройки", "detail.settingsNote": "Изменения применяются сразу. Они есть и в настройках Apple Music, в разделе Ampify.", "done.setting": "{name}: «{setting}» изменено", "action.settingsOf": "Настройки {name}",
     "detail.readmeLoading": "Чтение описания…",
     "action.settings": "Настройки", "action.openSettings": "Открыть настройки Ampify", "detail.can": "Что оно умеет", "detail.about": "Сведения", "detail.kind": "Тип", "detail.author": "Автор", "detail.version": "Версия", "detail.tags": "Теги", "detail.gone": "Этого элемента больше нет ни в каталоге, ни среди установленных.", "detail.noDescription": "Описания пока нет.",
   },
@@ -303,7 +303,7 @@ Ampify.i18n.define({
     "done.inUseScheme": "{name} を使用中（バリエーション： {scheme}）", "done.appleLook": "Apple Music 本来の見た目に戻しました",
     "done.on": "{name} をオンにしました", "done.off": "{name} をオフにしました", "done.removed": "{name} をアンインストールしました",
     "preview": "{name} のプレビュー",
-    "settingsWhere": "設定がある場合は、Apple Music の設定の「Ampify」にあります。",
+    "detail.settings": "設定", "detail.settingsNote": "変更はすぐに反映されます。Apple Music の設定の「Ampify」にもあります。", "done.setting": "{name}：{setting} を変更しました", "action.settingsOf": "{name} の設定",
     "detail.readmeLoading": "説明を読み込んでいます…",
     "action.settings": "設定", "action.openSettings": "Ampify の設定を開く", "detail.can": "できること", "detail.about": "情報", "detail.kind": "種類", "detail.author": "作者", "detail.version": "バージョン", "detail.tags": "タグ", "detail.gone": "この要素はカタログにもインストール済みにもありません。", "detail.noDescription": "説明はまだありません。",
   },
@@ -346,7 +346,7 @@ Ampify.i18n.define({
     "done.inUseScheme": "正在使用 {name}，配色方案：{scheme}", "done.appleLook": "已恢复 Apple Music 原本的外观",
     "done.on": "{name} 已开启", "done.off": "{name} 已关闭", "done.removed": "{name} 已卸载",
     "preview": "{name} 的预览",
-    "settingsWhere": "它的设置（如果有）在 Apple Music 的“设置”中，位于 Ampify 下。",
+    "detail.settings": "设置", "detail.settingsNote": "更改会立即生效。也可以在 Apple Music 的“设置”中的 Ampify 下找到。", "done.setting": "{name}：已更改 {setting}", "action.settingsOf": "{name} 的设置",
     "detail.readmeLoading": "正在读取介绍…",
     "action.settings": "设置", "action.openSettings": "打开 Ampify 设置", "detail.can": "它可以做什么", "detail.about": "关于", "detail.kind": "类型", "detail.author": "作者", "detail.version": "版本", "detail.tags": "标签", "detail.gone": "该内容已不在目录中，也未安装。", "detail.noDescription": "暂无描述。",
   },
@@ -749,6 +749,10 @@ function ItemCard({ item, activeTheme, busy, act, open, previewHeight }) {
       h(MainAction, { item, activeTheme, busy, act, open }),
       state ? h(Text, { variant: "caption", valign: "center", wrap: false }, state) : null,
       h("stack", { grow: true }),
+      item.installed && (item.installed.settings || []).length
+        ? h(ButtonTertiary, { icon: SETTINGS_GLYPH, tooltip: t("action.settingsOf", { name: item.name }),
+                              onClick: () => openItem(item, "", true) })
+        : null,
       h(ButtonTertiary, { label: t("action.details"), onClick: open })));
 }
 
@@ -944,6 +948,65 @@ function Readme({ item }) {
     shown.length < blocks.length ? h(Text, { key: "more", variant: "caption" }, "…") : null));
 }
 
+// A setting's label and option texts in Windows' language, from the element's translations, else the manifest's.
+function settingTexts(item) {
+  const copy = item.installed || {};
+  const translated = (copy.translations && copy.translations[Ampify.i18n.language]) || {};
+  return {
+    label: (setting) => (translated.settings && translated.settings[setting.key]) || setting.label,
+    option: (value) => (translated.options && translated.options[value]) || value,
+  };
+}
+
+const SETTING_DELAY_MS = 600;  // a slider or a field is written once the hand stops, not at every step
+const pendingSettings = new Map();
+
+function changeLater(key, change) {
+  clearTimeout(pendingSettings.get(key));
+  pendingSettings.set(key, setTimeout(() => {
+    pendingSettings.delete(key);
+    change();
+  }, SETTING_DELAY_MS));
+}
+
+// One declared setting as the control of its type: a switch, a menu, a slider when a number has both bounds, else a
+// field. The control shows the new value at once; ampify writes it, then the state is read again.
+function SettingControl({ item, setting, texts, act }) {
+  const [value, setValue] = useState(setting.value);
+  const label = texts.label(setting);
+  const later = (next) => {
+    setValue(next);
+    changeLater(item.key + ":" + setting.key, () => act.setting(item, setting, label, String(next)));
+  };
+  if (setting.type === "toggle") {
+    return h(Toggle, { label, checked: value === "true" || value === true,
+                       onChange: (on) => { setValue(String(on)); act.setting(item, setting, label, String(on)); } });
+  }
+  if (setting.type === "choice") {
+    return h(Dropdown, { label, value, options: setting.options.map((option) => ({ value: option, label: texts.option(option) })),
+                         onChange: (next) => { setValue(next); act.setting(item, setting, label, next); } });
+  }
+  if (setting.type === "number" && setting.min !== undefined && setting.max !== undefined) {
+    const step = Number.isInteger(setting.min) && Number.isInteger(setting.max) && setting.max - setting.min > 4 ? 1 : 0.05;
+    // The slider writes its value under the label itself.
+    return h("stack", { gap: 4 },
+      h(Text, { variant: "caption" }, label),
+      h(Slider, { min: setting.min, max: setting.max, step, value: Number(value), onChange: later }));
+  }
+  return h(TextField, { label, value, onChange: later });
+}
+
+// The element's settings on its own page, changed in place: the same ones as in Apple Music's Settings.
+function SettingsPanel({ item, act, named }) {
+  const settings = (item.installed && item.installed.settings) || [];
+  if (!settings.length) return null;
+  const texts = settingTexts(item);
+  return h(Card, { title: named ? t("action.settingsOf", { name: item.name }) : t("detail.settings"), padding: 16 },
+    h("stack", { gap: 12 },
+      h(Text, { key: "note", variant: "caption" }, t("detail.settingsNote")),
+      settings.map((setting) => h(SettingControl, { key: setting.key, item, setting, texts, act }))));
+}
+
 // The detail page of an element: its name, what it does and its actions first, then what it may do and where it
 // comes from, so a page without a picture or a long description still reads as one, then its README.
 function Details({ item, activeTheme, scheme, busy, act, message }) {
@@ -994,9 +1057,11 @@ function Details({ item, activeTheme, scheme, busy, act, message }) {
   // Keyed, as on the list: the status line coming and going leaves the rest in place.
   return h("stack", { gap: 20, maxWidth: DETAIL_WIDTH },
     message ? h(Text, { key: "status", variant: "caption" }, message) : null,
+    view.settingsFirst ? h(SettingsPanel, { key: "settings", item, act, named: true }) : null,
     item.preview
       ? h("stack", { key: "hero", gap: 20 }, h(Showcase, { item }), heading)
       : h(Card, { key: "hero", padding: 24 }, h("row", { gap: 24 }, h(Showcase, { item }), heading)),
+    view.settingsFirst ? null : h(SettingsPanel, { key: "settings", item, act }),
     h("row", { key: "facts", gap: 16 }, abilities, about),
     h(Readme, { key: "readme", item }));
 }
@@ -1037,7 +1102,7 @@ const ITEM_PAGE = "/marketplace/item";
 const SETTINGS_PAGE = "/ampify/settings";  // Ampify's own settings page, drawn by the kernel
 let lastState = null;
 // Where the person was, the element shown in detail, and what an action said before it opened another page.
-const view = { tab: "theme", search: "", page: 0, item: "", note: "" };
+const view = { tab: "theme", search: "", page: 0, item: "", note: "", settingsFirst: false };
 const readers = new Set();  // each mounted page hears a new reading: the list is up to date when the arrow comes back
 
 function publish(state) {
@@ -1050,8 +1115,10 @@ function goTo(path, note = "") {
   Ampify.ui.navigate(path);
 }
 
-function openItem(item, note) {
+// The gear of a card opens the page with the settings first, above the picture, where they are seen at once.
+function openItem(item, note, settingsFirst = false) {
   view.item = item.key;
+  view.settingsFirst = settingsFirst;
   goTo(ITEM_PAGE, note);
 }
 
@@ -1129,6 +1196,8 @@ function useMarket(onItemPage) {
                                scheme ? t("done.inUseScheme", { name: item.name, scheme }) : t("done.inUse", { name: item.name })),
     clearTheme: () => run([["theme", "clear"]], t("done.appleLook")),
     toggle: (item, on) => run([[item.kind, on ? "enable" : "disable", item.id]], t(on ? "done.on" : "done.off", { name: item.name })),
+    setting: (item, setting, label, value) => run([["settings", item.kind, item.id, setting.key, value]],
+                                                  t("done.setting", { name: item.name, setting: label })),
     // Removed, the element has no detail page left: the list says so.
     remove: (item) => {
       const note = t("done.removed", { name: item.name });

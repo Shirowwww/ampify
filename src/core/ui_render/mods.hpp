@@ -90,4 +90,14 @@ std::vector<ModEntry> EnabledSnippetSettings(const std::filesystem::path& kit);
 bool SetSnippetSetting(const std::filesystem::path& kit, const std::string& id, const std::string& key,
                        const std::string& value, std::string& error);
 
+// The settings an installed extension, theme or snippet declares, with their values now, whether it is on or not.
+// Nothing when it is not installed under that kind, its manifest is not valid, or it declares no setting.
+std::optional<ModEntry> ElementSettings(const std::filesystem::path& kit, std::string_view kind, const std::string& id);
+
+// What `ampify settings` and the Marketplace do: checks `value` against what the element declares for `key` (one of
+// a choice's options, a number within its bounds, true or false), then writes it as the Ampify card does. False with
+// an English line in `error` otherwise, and settings.txt is left as it was.
+bool ChangeElementSetting(const std::filesystem::path& kit, std::string_view kind, const std::string& id,
+                          const std::string& key, const std::string& value, std::string& error);
+
 }  // namespace ampify::uirender
