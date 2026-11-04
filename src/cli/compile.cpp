@@ -57,7 +57,8 @@ std::optional<std::string> MainName(const std::filesystem::path& folder) {
 
 struct Sources {
     std::filesystem::path entry;  // the source that has main's name: main.ts for main.js
-    std::filesystem::file_time_type newest{};  // the latest change among every source of the folder
+    // The latest change among every source of the folder. Not `{}`: that is the clock's epoch, which libstdc++ puts in 2174.
+    std::filesystem::file_time_type newest = std::filesystem::file_time_type::min();
 };
 
 std::optional<Sources> FindSources(const std::filesystem::path& folder, const std::filesystem::path& main) {
