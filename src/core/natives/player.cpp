@@ -8,6 +8,7 @@
 #include "../form_data.hpp"
 #include "../image_host.hpp"
 #include "../lyrics_host.hpp"
+#include "../player_modes.hpp"
 #include "../player_queue.hpp"
 
 namespace ampify::natives {
@@ -98,6 +99,50 @@ struct PlayerNatives : ScriptBridge {
         return JS_NewBool(ctx, HostOf(ext).Control(command, seek));
     }
 
+    // native.playerModes(): {"shuffle":true|false|null,"repeat":"off"|"all"|"one"|null} as text, null while unknown.
+    AMPIFY_NATIVE(PlayerModes) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "player.read", &failure)) return failure;
+        ampify::PlayerModesHost* host = HostOf(ext).Capability<ampify::PlayerModesHost>();
+        ampify::PlayerModes modes = host ? host->Modes() : ampify::PlayerModes{};
+        Json::Object members;
+        members.emplace_back("shuffle", modes.shuffle ? Json(*modes.shuffle) : Json());
+        members.emplace_back("repeat", IsRepeatMode(modes.repeat) ? Json(modes.repeat) : Json());
+        std::string json = Json(std::move(members)).Dump();
+        return JS_NewStringLen(ctx, json.data(), json.size());
+    }
+
+    // native.playerSetShuffle(on), native.playerSetRepeat(mode) and native.playerSetVolume(volume): true when the
+    // player is in the asked state. A host without the service answers false.
+    AMPIFY_NATIVE(PlayerSetShuffle) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "player.control", &failure)) return failure;
+        ampify::PlayerModesHost* host = HostOf(ext).Capability<ampify::PlayerModesHost>();
+        return JS_NewBool(ctx, host && host->SetShuffle(Number(ctx, argc, argv, 0) != 0));
+    }
+
+    AMPIFY_NATIVE(PlayerSetRepeat) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "player.control", &failure)) return failure;
+        std::string mode = String(ctx, argc, argv, 0).value_or("");
+        if (!IsRepeatMode(mode)) return Throw(ctx, "RangeError", "setRepeat expects \"off\", \"all\" or \"one\"");
+        ampify::PlayerModesHost* host = HostOf(ext).Capability<ampify::PlayerModesHost>();
+        return JS_NewBool(ctx, host && host->SetRepeat(mode));
+    }
+
+    AMPIFY_NATIVE(PlayerSetVolume) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "player.control", &failure)) return failure;
+        double volume = Number(ctx, argc, argv, 0);
+        if (!(volume >= 0.0 && volume <= 1.0)) return Throw(ctx, "RangeError", "setVolume expects a number from 0 to 1");
+        ampify::PlayerVolumeHost* host = HostOf(ext).Capability<ampify::PlayerVolumeHost>();
+        return JS_NewBool(ctx, host && host->SetVolume(volume));
+    }
+
     // native.playerLyrics(): the LyricsJson of src/core/lyrics.hpp, as text ("null" without lyrics or without the service).
     AMPIFY_NATIVE(PlayerLyrics) {
         ScriptExtension* ext = Owner(ctx);
@@ -159,6 +204,10 @@ struct PlayerNatives : ScriptBridge {
 void DefinePlayer(api::NativeScope& scope) {
     scope.Function("playerState", PlayerNatives::PlayerState, 0);
     scope.Function("playerCommand", PlayerNatives::PlayerControl, 2);
+    scope.Function("playerModes", PlayerNatives::PlayerModes, 0);
+    scope.Function("playerSetShuffle", PlayerNatives::PlayerSetShuffle, 1);
+    scope.Function("playerSetRepeat", PlayerNatives::PlayerSetRepeat, 1);
+    scope.Function("playerSetVolume", PlayerNatives::PlayerSetVolume, 1);
     scope.Function("playerLyrics", PlayerNatives::PlayerLyrics, 0);
     scope.Function("playerArtwork", PlayerNatives::PlayerArtwork, 0);
     scope.Function("queueList", PlayerNatives::QueueList, 0);

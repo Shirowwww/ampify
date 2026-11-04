@@ -12,6 +12,7 @@
 
 #include <objbase.h>
 
+#include "player_controls.hpp"
 #include "ui_thread.hpp"
 
 namespace ampify::win {
@@ -181,6 +182,7 @@ void EnsureMta() noexcept {
 void InstallXamlUiThread(Journal& journal) {
     State().journal = &journal;
     SetUiThreadBackend(&kXamlBackend);
+    InstallPlayerButtons(&ReadMainPlayerModes, &PressMainPlayerButton);
 }
 
 std::uint64_t NowMs() noexcept {

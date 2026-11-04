@@ -683,11 +683,29 @@ bool IsFloat32(const WAVEFORMATEX* format) {
     return reinterpret_cast<const WAVEFORMATEXTENSIBLE*>(format)->SubFormat == kSubtypeFloat;
 }
 
+// One line per distinct stream format, so a stream the leveler cannot follow (exclusive mode, 24-bit samples, more
+// than two channels) shows in the log instead of failing silently. Called under g_streamLock.
+void JournalStreamFormat(AUDCLNT_SHAREMODE mode, const WAVEFORMATEX* format, DWORD flags, bool ok, bool eligible) {
+    if (!format) return;
+    static std::string last;
+    std::string text = std::string(mode == AUDCLNT_SHAREMODE_EXCLUSIVE ? "exclusive" : "shared") + ", " +
+                       std::to_string(format->nChannels) + " ch, " + std::to_string(format->nSamplesPerSec) +
+                       " Hz, " + std::to_string(format->wBitsPerSample) + " bit, tag " +
+                       std::to_string(format->wFormatTag) + (ok ? "" : ", refused") +
+                       ((flags & AUDCLNT_STREAMFLAGS_LOOPBACK) ? ", loopback" : "") +
+                       (eligible ? ": followed" : ": not followed");
+    if (text == last) return;
+    last = text;
+    Note("audio stream " + text);
+}
+
 // Every (re)initialisation overwrites or erases the client's entry, so a client address reused by a
 // stream in another format never inherits a stale one.
-void RememberClientFormat(IAudioClient* client, const WAVEFORMATEX* format, DWORD flags, bool ok) {
+void RememberClientFormat(IAudioClient* client, AUDCLNT_SHAREMODE mode, const WAVEFORMATEX* format, DWORD flags,
+                          bool ok) {
     bool eligible = ok && !(flags & AUDCLNT_STREAMFLAGS_LOOPBACK) && IsFloat32(format) && format->nChannels == 2;
     std::lock_guard<std::mutex> guard(g_streamLock);
+    JournalStreamFormat(mode, format, flags, ok, eligible);
     if (!eligible) {
         g_clientFormats.erase(client);
         return;
@@ -700,14 +718,14 @@ HRESULT STDMETHODCALLTYPE Initialize_Hook(IAudioClient* self, AUDCLNT_SHAREMODE 
                                           REFERENCE_TIME duration, REFERENCE_TIME period, const WAVEFORMATEX* format,
                                           LPCGUID session) {
     HRESULT hr = g_initializeOriginal(self, mode, flags, duration, period, format, session);
-    RememberClientFormat(self, format, flags, SUCCEEDED(hr));
+    RememberClientFormat(self, mode, format, flags, SUCCEEDED(hr));
     return hr;
 }
 
 HRESULT STDMETHODCALLTYPE InitializeShared_Hook(IAudioClient* self, DWORD flags, UINT32 period,
                                                 const WAVEFORMATEX* format, LPCGUID session) {
     HRESULT hr = g_initializeSharedOriginal(self, flags, period, format, session);
-    RememberClientFormat(self, format, flags, SUCCEEDED(hr));
+    RememberClientFormat(self, AUDCLNT_SHAREMODE_SHARED, format, flags, SUCCEEDED(hr));
     return hr;
 }
 
@@ -1195,6 +1213,20 @@ ampify::ExtensionInfo MakeAtmosLevelerExtension(ampify::Journal& journal, const 
 
 bool StartSoundHooks(ampify::Journal& journal) {
     return StartLeveler(journal, NeutralConfig(), true);
+}
+
+bool SetPlayerVolume(double volume) {
+    void* player = nullptr;
+    {
+        std::lock_guard<std::mutex> guard(g_playerLock);
+        player = g_player;
+        if (player) g_api.CFRetain(player);
+    }
+    if (!player || !g_setVolumeOriginal) return false;
+    // Through the hook, so that the leveler and Ampify.audio.volume() follow the new value as they follow Apple's.
+    SetVolume_Hook(player, static_cast<float>(volume));
+    g_api.CFRelease(player);
+    return true;
 }
 
 }  // namespace atmos::hooks

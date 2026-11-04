@@ -32,6 +32,31 @@ const char kPlayer[] = R"AMPIFYJS(
       return native.playerCommand("seek", Math.floor(position));
     },
     toggle: () => native.playerCommand("toggle", 0),
+    // Apple's shuffle and repeat buttons (interface process): true | false | null, and "off" | "all" | "one" | null.
+    shuffle: () => JSON.parse(native.playerModes()).shuffle,
+    repeat: () => JSON.parse(native.playerModes()).repeat,
+    setShuffle: (on) => native.playerSetShuffle(on ? 1 : 0),
+    toggleShuffle() {
+      const on = Ampify.player.shuffle();
+      return on === null ? false : native.playerSetShuffle(on ? 0 : 1);
+    },
+    setRepeat(mode) {
+      if (mode !== "off" && mode !== "all" && mode !== "one") {
+        throw new RangeError("setRepeat expects \"off\", \"all\" or \"one\"");
+      }
+      return native.playerSetRepeat(mode);
+    },
+    // off, then all, then one, then off again, as Apple's own button.
+    toggleRepeat() {
+      const mode = Ampify.player.repeat();
+      return mode === null ? false : native.playerSetRepeat(mode === "off" ? "all" : mode === "all" ? "one" : "off");
+    },
+    // Apple's player volume, 0 to 1 (engine process, once a song has started). Apple's own slider is not redrawn.
+    setVolume(volume) {
+      const value = Number(volume);
+      if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError("setVolume expects a number from 0 to 1");
+      return native.playerSetVolume(value);
+    },
     lyrics() {
       return JSON.parse(native.playerLyrics());
     },

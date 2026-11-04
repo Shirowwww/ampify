@@ -74,7 +74,7 @@ A function whose permission is not declared throws `PermissionDenied` and does n
 | `storage` | `Ampify.storage`, one JSON file per element | [stable] |
 | `notifications` | `Ampify.notify` | [stable] |
 | `player.read` | Player state, events, lyrics, queue, artwork, `audio.volume` | [stable] |
-| `player.control` | Play, pause, next, previous, seek, queue changes | [stable] |
+| `player.control` | Play, pause, next, previous, seek, shuffle, repeat, volume, queue changes | [stable] |
 | `audio.analyze` | Spectrum, levels, tempo and loudness of the sound | [preview] |
 | `audio.gain` | `Ampify.audio.setGainDb`, a gain on the samples | [preview] |
 | `audio.eq` | A 10-band equalizer | [preview] |
@@ -155,6 +155,13 @@ Ampify.player.toggle()
 Ampify.player.next()
 Ampify.player.previous()
 Ampify.player.seek(ms)
+Ampify.player.shuffle()     // -> true | false | null        [preview] Apple's own shuffle and repeat buttons
+Ampify.player.repeat()      // -> "off" | "all" | "one" | null     (permission player.read, interface process)
+Ampify.player.setShuffle(on)        // true once the player is in that state    (permission player.control)
+Ampify.player.setRepeat(mode)       // "off" | "all" | "one"
+Ampify.player.toggleShuffle()       // flips shuffle
+Ampify.player.toggleRepeat()        // off, all, one, off...
+Ampify.player.setVolume(volume)     // 0 to 1: Apple's player volume, audio process, [preview]
 Ampify.player.queue.list()  // -> { available, complete, source, reason,
 //                                   items: [{ id, title, artist, album, durationMs, section, catalogId }] }
 Ampify.player.queue.add(catalogId, { position: "next" | "last" })  // [preview] answers false for now
@@ -181,6 +188,14 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
   with `complete: false` and the reason. `queue.remove(id)` removes an entry still to come.
 - `queue.add` answers `false`: Apple's player ignores the songs handed to it
   ([knowledge/apple-music-queue.md](../../knowledge/apple-music-queue.md)).
+- Shuffle and repeat press Apple's own buttons of the main window, so Apple Music keeps one state, and read them back.
+  They exist in the interface process (`"processes": ["ui"]`); in the audio process the readers answer `null` and the
+  setters `false`. They answer `null` while the window does not have its buttons (another Apple Music version). Apple
+  redraws its repeat button on its own turn: the first press after Apple Music starts can take about 3 seconds, the next
+  ones a tenth of a second; a setter waits for the answer up to 4 seconds and gives `false` after that.
+- `setVolume` sets Apple's player volume as Apple does, from the audio process (`"processes": ["engine"]`); in the
+  interface it answers `false`. It answers `false` until a song has started, because Apple sets its volume then.
+  `audio.volume()` follows it, but Apple's own slider is not redrawn: it shows the old value until Apple moves it.
 
 ### 5.4 Audio [preview]
 

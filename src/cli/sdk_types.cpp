@@ -193,6 +193,13 @@ declare const Ampify: {
     previous(): boolean;
     seek(ms: number): boolean;
     toggle(): boolean;
+    shuffle(): boolean | null;  // Apple's shuffle button, in the interface process; null when it is not known
+    repeat(): "off" | "all" | "one" | null;
+    setShuffle(on: boolean): boolean;  // true once the player is in that state
+    toggleShuffle(): boolean;
+    setRepeat(mode: "off" | "all" | "one"): boolean;
+    toggleRepeat(): boolean;  // off, all, one, off...
+    setVolume(volume: number): boolean;  // Apple's player volume, 0 to 1, in the audio process once a song has started
     queue: {
       list(): QueueState;
       add(catalogId: string | number, options?: { position?: "next" | "last" }): boolean;  // false on Windows for now

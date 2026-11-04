@@ -28,6 +28,7 @@
 #include "../core/version_list.hpp"
 #include "../../extensions/atmos-leveler/atmos_windows.hpp"
 #include "../win/audio_share.hpp"
+#include "../win/player_buttons.hpp"
 #include "../win/win_common.hpp"
 #include "../win/win_host.hpp"
 
@@ -175,6 +176,7 @@ DWORD WINAPI KernelMain(LPVOID) {
 
     // The Atmos leveler lives where the audio is rendered: AMPLibraryAgent.exe only.
     if (role == ampify::ProcessRole::LibraryAgent) {
+        ampify::win::InstallPlayerVolume(&atmos::hooks::SetPlayerVolume);  // Ampify.player.setVolume
         host.Add(atmos::hooks::MakeAtmosLevelerExtension(journal, settings));
         ampify::win::StartAudioSharing(ampify::audio::ProcessAudio(), journal,  // the sound, for the interface
                                        [] { atmos::hooks::StartSoundHooks(journal); });

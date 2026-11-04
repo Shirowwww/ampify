@@ -12,6 +12,7 @@
 #include "../core/image_host.hpp"
 #include "../core/journal.hpp"
 #include "../core/natives/http.hpp"
+#include "../core/player_modes.hpp"
 #include "../core/settings.hpp"
 
 namespace ampify {
@@ -29,7 +30,7 @@ class KitCommandRunner;
 }
 
 class WinHost : public Host, public HttpPostHost, public BrowserHost, public ImageHost, public ArtworkHost,
-                public GifHost {
+                public GifHost, public PlayerModesHost, public PlayerVolumeHost {
 public:
     using KeyCallback = std::function<void(const std::string& elementId, const std::string& combo)>;
     using EventSink = std::function<void(const std::string& entry, const std::string& payload)>;
@@ -76,6 +77,12 @@ public:
                                             std::string* error) override;
 
     UiModel& Ui() override { return m_ui; }
+
+    // Apple's shuffle and repeat buttons ("ui" process) and the player volume ("engine" process): src/core/player_modes.hpp.
+    PlayerModes Modes() override;
+    bool SetShuffle(bool on) override;
+    bool SetRepeat(const std::string& mode) override;
+    bool SetVolume(double volume) override;
 
     // AudioHost (src/core/audio/audio_host.hpp) in AMPLibraryAgent.exe only, where the audio is rendered: the process's
     // engine, fed by the Atmos leveler's hooks. QueueHost (src/core/player_queue.hpp) in both processes.

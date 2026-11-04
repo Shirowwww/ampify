@@ -23,5 +23,8 @@ ampify::ExtensionInfo MakeAtmosLevelerExtension(ampify::Journal& journal, const 
 // with its own settings. May wait up to 60 s for Apple's audio modules: call it off the interface's paths.
 bool StartSoundHooks(ampify::Journal& journal);
 
+// Sets Apple's player volume (0 to 1), as Apple does itself. False until Apple has set a volume since the hook is in
+// place (the player is not known yet). Apple's own slider is not redrawn: it shows the value until Apple moves it.
+bool SetPlayerVolume(double volume);
 
 }  // namespace atmos::hooks

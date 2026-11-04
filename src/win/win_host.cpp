@@ -6,15 +6,19 @@
 #include <winhttp.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
 #include <iomanip>
 #include <fstream>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <sstream>
 #include <string_view>
 #include <system_error>
+#include <thread>
 #include <vector>
 
 #include "../core/audio/audio_engine.hpp"
@@ -23,7 +27,9 @@
 #include "audio_share.hpp"
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
+#include "player_buttons.hpp"
 #include "smtc_session.hpp"
+#include "ui_thread.hpp"
 #include "video_gif.hpp"
 #include "wic_image.hpp"
 #include "win_common.hpp"
@@ -87,6 +93,110 @@ bool ParseCombo(const std::string& combo, UINT& modifiers, UINT& key) {
 
 }  // namespace
 
+namespace win {
+
+namespace {
+std::atomic<ReadPlayerModesFn> g_readModes{nullptr};
+std::atomic<PressPlayerButtonFn> g_pressButton{nullptr};
+std::atomic<SetPlayerVolumeFn> g_setVolume{nullptr};
+}  // namespace
+
+void InstallPlayerButtons(ReadPlayerModesFn read, PressPlayerButtonFn press) {
+    g_readModes = read;
+    g_pressButton = press;
+}
+
+void InstallPlayerVolume(SetPlayerVolumeFn setter) { g_setVolume = setter; }
+
+}  // namespace win
+
+namespace {
+
+constexpr unsigned kInterfaceTimeoutMs = 1500;
+constexpr auto kButtonSettle = std::chrono::milliseconds(60);  // Apple redraws its button on its own turn
+constexpr int kSettleChecks = 70;  // a press is read back for 4.2 s at most: Apple's first one took 2.8 s, the next 0.1 s
+std::atomic<unsigned> g_repeatGlyphSeen{0};
+
+// Apple's buttons as the interface thread reads them. The result is shared with the work, which may still run after
+// the wait ended; nullopt when the support is absent or the interface did not answer in time.
+std::optional<win::MainPlayerModes> ReadButtons() {
+    win::ReadPlayerModesFn read = win::g_readModes.load();
+    if (!read) return std::nullopt;
+    auto result = std::make_shared<win::MainPlayerModes>();
+    if (!win::RunOnUiThreadAndWait([read, result] { *result = read(); }, kInterfaceTimeoutMs)) return std::nullopt;
+    return *result;
+}
+
+bool PressButton(bool shuffle) {
+    win::PressPlayerButtonFn press = win::g_pressButton.load();
+    if (!press) return false;
+    auto pressed = std::make_shared<bool>(false);
+    if (!win::RunOnUiThreadAndWait([press, pressed, shuffle] { *pressed = press(shuffle); }, kInterfaceTimeoutMs)) {
+        return false;
+    }
+    return *pressed;
+}
+
+}  // namespace
+
+PlayerModes WinHost::Modes() {
+    PlayerModes modes;
+    std::optional<win::MainPlayerModes> read = ReadButtons();
+    if (!read) return modes;
+    if (read->shuffle >= 0) modes.shuffle = read->shuffle == 1;
+    static constexpr const char* kRepeatNames[] = {"off", "all", "one"};
+    if (read->repeat >= 0 && read->repeat <= 2) modes.repeat = kRepeatNames[read->repeat];
+    static std::mutex detailLock;
+    static std::string detailSeen;
+    {
+        std::lock_guard<std::mutex> guard(detailLock);
+        if (!read->detail.empty() && read->detail != detailSeen) {
+            detailSeen = read->detail;
+            m_journal.Write("Player: the repeat button looks like " + detailSeen);
+        }
+    }
+    if (read->repeatGlyph != g_repeatGlyphSeen.exchange(read->repeatGlyph)) {
+        std::ostringstream line;
+        line << "Player: the repeat button shows icon U+" << std::hex << std::uppercase << read->repeatGlyph << std::dec
+             << " (repeat " << (modes.repeat.empty() ? "unknown" : modes.repeat) << ")";
+        m_journal.Write(line.str());
+    }
+    return modes;
+}
+
+// Presses Apple's button until its state is the asked one: shuffle needs one press, repeat up to two (off, all, one).
+// The state is read back after each press, for Apple redraws on its own turn; never more presses than the cycle holds.
+bool WinHost::SetShuffle(bool on) {
+    std::optional<bool> now = Modes().shuffle;
+    if (!now) return false;
+    if (*now == on) return true;
+    if (!PressButton(true)) return false;
+    for (int check = 0; check < kSettleChecks; check++) {
+        std::this_thread::sleep_for(kButtonSettle);
+        if (Modes().shuffle == on) return true;
+    }
+    return false;
+}
+
+bool WinHost::SetRepeat(const std::string& mode) {
+    std::string now = Modes().repeat;
+    for (int press = 0; !now.empty() && now != mode && press < 3; press++) {
+        if (!PressButton(false)) return false;
+        std::string before = now;
+        for (int check = 0; check < kSettleChecks && now == before; check++) {
+            std::this_thread::sleep_for(kButtonSettle);
+            now = Modes().repeat;
+        }
+        if (now == before) return false;  // Apple's button did not react
+    }
+    return !now.empty() && now == mode;
+}
+
+bool WinHost::SetVolume(double volume) {
+    win::SetPlayerVolumeFn setter = win::g_setVolume.load();
+    return setter && setter(volume);
+}
+
 WinHost::WinHost(std::string process, std::filesystem::path kitDirectory, Settings& settings, Journal& journal)
     : m_process(std::move(process)), m_kit(std::move(kitDirectory)), m_settings(settings), m_journal(journal),
       m_player(std::make_unique<win::PlayerBridge>(m_process, m_settings, m_journal)),
@@ -105,6 +215,9 @@ void* WinHost::QueryCapability(std::string_view name) {
     if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
     // Ampify.player.lyrics: Apple's lyrics, read in the process that has Apple's player.
     if (name == LyricsHost::kCapabilityName) return static_cast<LyricsHost*>(m_player.get());
+    // Shuffle and repeat are buttons of the interface; the player volume is reached from the audio process.
+    if (m_process == "ui" && name == PlayerModesHost::kCapabilityName) return static_cast<PlayerModesHost*>(this);
+    if (m_process == "engine" && name == PlayerVolumeHost::kCapabilityName) return static_cast<PlayerVolumeHost*>(this);
     if (void* found = m_services->Query(name)) return found;
     // The Marketplace page runs ampify.exe from the interface process, where it is shown.
     if (m_process == "ui" && name == KitCommandHost::kCapabilityName) return static_cast<KitCommandHost*>(m_kitCommands.get());

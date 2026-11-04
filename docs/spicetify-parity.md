@@ -12,9 +12,9 @@
 | Extensions and apps | JavaScript API, React-style UI, Marketplace | JavaScript API, React, Marketplace | Plugins, Marketplace |
 | Discord, Last.fm | Extensions in the Marketplace | Community extensions | Built in |
 | Full-screen lyrics | Apple's full-screen player, karaoke lyrics | Lyrics Plus | Built in |
-| Audio tools | Equalizer, Atmos leveler, loudness meter for extensions | None | Equalizer, audio effects |
+| Audio tools | Apple Music's own equalizer stays; Ampify adds a 10-band equalizer API for extensions (no screen of its own; it reaches Dolby Atmos, which Apple's skips), an Atmos leveler, a loudness meter | None | Equalizer, audio effects |
 | Cast and AirPlay | No | Spotify Connect | Yes |
-| Remote | Local HTTP remote with a token, MIDI | No | Mobile remote app |
+| Remote | Local HTTP remote with a token (this PC only), MIDI keys and knobs | No | Mobile remote app |
 
 Cider suits people on several systems who want casting. Ampify keeps Apple's lossless and Atmos playback and goes
 further into the app's look and what extensions can do. Sources for Cider: [cider.sh](https://cider.sh/learn-more) and
@@ -52,7 +52,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | `config` read and write, list items `+id` / `-id` | `ampify config [key] [value]`, `ampify config extensions +id` | Done |
 | `apply --extension`, `refresh`, `watch` | `ampify extension enable`, `ampify watch`, `ampify dev`: reload without restarting Apple Music | Done |
 | `update`, `upgrade` | `ampify update`, SHA-256 checked | Done |
-| `enable-devtools` | `ampify devtools`: the XAML tree of the page on screen in about a second. No element picker | Partial |
+| `enable-devtools` | `ampify devtools`: the XAML tree of the page on screen within a few seconds. No element picker | Partial |
 | `path`, `config-dir`, `--help`, `--version`, chained verbs | `ampify path`, `ampify config --dir`, chained verbs | Done |
 | Restore after a broken Spotify update | The kernel stays off on an untested Apple Music; `ampify versions update` | Done |
 | `spotify_launch_flags`, `check_spicetify_update` | `app_launch_flags`, `check_kit_update` | Done |
@@ -71,14 +71,14 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | `:hover`, `:active`, `:focus`, `:not()`, `+`, `~`, `:nth-child()` | Same | Done |
 | `transition` | `transform`, `opacity`, `background` | Done |
 | `@keyframes`, `animation` | `opacity` and `transform`, on the compositor; artworks Apple Music moves itself refuse a transform (the element around them takes it) | Done |
-| Animated colours, backgrounds, sizes | Only `opacity` and `transform` animate | Missing |
+| Animated colours, backgrounds, sizes | `transition` eases plain `background` colours; `@keyframes` only move `opacity` and `transform`; sizes do not animate | Partial |
 | `border-radius`, floating rounded panels | `corner-radius`; `ampify:floating-panels` rounds the sidebar, the pages and the lyrics pane with one `--panel-radius` | Done |
 | Scrollbar styling | `.scrollbar`; `ampify:scrollbars` keeps bars inside their panel, clear of the rounded corners, without Windows' arrows | Done |
 | `::before`, `::after` images and GIFs | `content: url(...)` | Done |
 | Visualizer bars (cat-jam, equalizer GIFs) | `content: bars(n)`: bars that follow the music that plays | Done |
 | Blurred artwork background (Hazy, Comfy, Bloom) | `background: artwork` under `acrylic()` panels | Done |
 | Colours from the artwork (Dribbblish Dynamic) | `--art-1`, `--art-2`, `--art-3`, `--art-text` | Done |
-| An artwork background that moves (Lucid, Kawarp) | Needs a Composition effect | Missing |
+| An artwork background that moves (Lucid, Kawarp) | `content: artwork cover` with `@keyframes` turns the artwork behind the panes (Glass, setting `moving-artwork`); no shader warp like Kawarp's | Partial |
 | `theme.js` | The theme's `main.js` | Done |
 | Theme settings menu (each theme codes its own) | `settings` in the manifest, shown in Ampify's settings page, read as `var(--setting-*)` | Done |
 | Fonts and images of the theme | `font-family: url(...)`, `url(...)` backgrounds | Done |
@@ -112,9 +112,10 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 |---|---|---|
 | One JavaScript file, wait for the APIs | `main.js` and `manifest.json`, ES modules, `Ampify.ready` | Done |
 | `Player`: state, track, events, play, pause, next, previous, seek | `Ampify.player`, through Apple's player and SMTC | Done |
-| `Player.setVolume` | Read only (`Ampify.audio.volume()`); a gain on the samples (`audio.setGainDb`) | Partial |
+| `Player.setVolume` | `Ampify.player.setVolume(0 to 1)` sets Apple's player volume from the audio process once a song has started; Apple's own slider is not redrawn. `audio.volume()` reads it, `audio.setGainDb` adds a gain | Partial |
+| `Player.toggleShuffle`, `setShuffle`, `toggleRepeat`, `setRepeat` | `player.toggleShuffle()`, `setShuffle(on)`, `toggleRepeat()`, `setRepeat("off" \| "all" \| "one")`, `shuffle()`, `repeat()`: Apple's own buttons, checked on screen | Done |
 | `Platform.History` | `Ampify.ui.navigate` for Ampify's own pages; Apple Music's pages are not reachable | Partial |
-| `Platform.Library`, `Playlists`, `CosmosAsync`, `GraphQL` | Apple reads its library in a private format; no internal API exposed | Missing |
+| `Platform.Library`, `Playlists`, `CosmosAsync`, `GraphQL` | `library.tracks()` reads the library file with play counts (permission `library.read`); no playlists, no writes, no Cosmos or GraphQL: Apple's internal API is private | Partial |
 | `Queue`, `removeFromQueue` | `player.queue.list()` (complete once Apple's Up Next panel was opened), `queue.remove` | Partial |
 | `addToQueue` | Apple's player ignores what Ampify hands it ([knowledge/apple-music-queue.md](../knowledge/apple-music-queue.md)) | Missing |
 | `React`, `ReactDOM`, `ReactComponent`, `ReactHook` | `Ampify.React`, `Ampify.components`, `Ampify.hooks` (no `useTheme`) | Done |
@@ -153,8 +154,9 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 
 ## Beyond Spicetify
 
-Ampify also has: a 10-band equalizer and an Atmos leveler on the samples, a LUFS meter, Discord Rich Presence and
-Last.fm scrobbling as extensions, a local HTTP remote, MIDI, a notification-area icon, settings profiles, themes that
+Ampify also has: a 10-band equalizer API for extensions on the samples (Apple Music keeps its own equalizer, which it
+skips for Dolby Atmos; Ampify's has no screen and was tested with synthetic sound) and an Atmos leveler, a LUFS meter,
+Discord Rich Presence and Last.fm scrobbling as extensions, a local HTTP remote (this PC only), MIDI, a notification-area icon, settings profiles, themes that
 follow Windows or the time, tests of an element without Apple Music (`ampify test`), and an anonymous diagnosis report.
 
 ## Cider

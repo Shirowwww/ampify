@@ -2,6 +2,8 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include "xaml_host.hpp"
+
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
@@ -17,6 +19,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <string>
 #include <string_view>
@@ -449,6 +452,96 @@ void AddPlayerControls(const xaml::UIElement& playerRoot, const xaml::UIElement&
 
 void SetPlayerControlsShown(bool shown) noexcept {
     g_shown = shown;
+}
+
+namespace {
+
+// The icon Apple's repeat button shows in "repeat one" (its other states share one icon, the dot tells on from off).
+// Read from the button itself: the log says "the repeat button shows icon U+XXXX" whenever the icon changes.
+constexpr unsigned kRepeatOneGlyph = 0x10029F;  // Apple Music 1.1792; the others share U+10029E
+
+std::string BrushText(const media::Brush& brush) {
+    auto solid = brush ? brush.try_as<media::SolidColorBrush>() : nullptr;
+    if (!solid) return "none";
+    auto c = solid.Color();
+    char text[48];
+    std::snprintf(text, sizeof(text), "#%02X%02X%02X%02X*%.2f", c.A, c.R, c.G, c.B, solid.Opacity());
+    return text;
+}
+
+// How the repeat button looks, to tell its states apart: its dot (shown or not, how opaque, which colour) and its icon.
+std::string DescribeRepeat(const xaml::FrameworkElement& button, const controls::FontIcon& icon) {
+    std::string text = "name=" + winrt::to_string(xaml::Automation::AutomationProperties::GetName(button));
+    if (auto dot = FindNamed(button, std::wstring(button.Name()) + L"Dot")) {
+        text += " dot=" + std::to_string(static_cast<int>(dot.Visibility())) + "/" + std::to_string(dot.Opacity());
+        if (auto shape = dot.try_as<xaml::Shapes::Shape>()) text += "/" + BrushText(shape.Fill());
+    } else {
+        text += " dot=none";
+    }
+    if (icon) text += " icon=" + BrushText(icon.Foreground());
+    return text;
+}
+
+// Apple keeps the repeat button's dot "visible" in every state and only makes its fill transparent while repeat is
+// off (seen on 1.1792: #00FFFFFF off, the accent colour on). A button without such a dot falls back to IsOn.
+bool RepeatOn(const xaml::FrameworkElement& button) {
+    auto dot = FindNamed(button, std::wstring(button.Name()) + L"Dot");
+    auto shape = dot ? dot.try_as<xaml::Shapes::Shape>() : nullptr;
+    auto solid = shape && shape.Fill() ? shape.Fill().try_as<media::SolidColorBrush>() : nullptr;
+    if (!solid) return IsOn(button);
+    return dot.Visibility() == xaml::Visibility::Visible && dot.Opacity() > 0 && solid.Color().A > 0 &&
+           solid.Opacity() > 0;
+}
+
+// A button of the main window, found by name from its content: the player need not have been opened.
+xaml::FrameworkElement MainWindowButton(std::wstring_view name) {
+    xaml::Window window = AppWindow(L"MainWindow");
+    auto content = window ? window.Content() : nullptr;
+    return content ? FindNamed(content, name) : nullptr;
+}
+
+}  // namespace
+
+MainPlayerModes ReadMainPlayerModes() noexcept {
+    MainPlayerModes modes;
+    try {
+        if (auto shuffle = MainWindowButton(kShuffle.source)) modes.shuffle = IsOn(shuffle) ? 1 : 0;
+        if (auto repeat = MainWindowButton(kRepeat.source)) {
+            auto icon = FindFirst<controls::FontIcon>(repeat);
+            if (icon && !icon.Glyph().empty()) {
+                // Apple's icons are in the private-use planes: two UTF-16 units make one code point.
+                winrt::hstring glyph = icon.Glyph();
+                bool pair = glyph.size() >= 2 && glyph[0] >= 0xD800 && glyph[0] < 0xDC00 && glyph[1] >= 0xDC00 &&
+                            glyph[1] < 0xE000;
+                modes.repeatGlyph = pair ? 0x10000u + ((static_cast<unsigned>(glyph[0]) - 0xD800u) << 10) +
+                                               (static_cast<unsigned>(glyph[1]) - 0xDC00u)
+                                         : static_cast<unsigned>(glyph[0]);
+            }
+            bool one = modes.repeatGlyph != 0 && modes.repeatGlyph == kRepeatOneGlyph;
+            modes.repeat = !RepeatOn(repeat) ? 0 : (one ? 2 : 1);
+            modes.detail = DescribeRepeat(repeat, icon);
+        }
+    } catch (...) {
+    }
+    return modes;
+}
+
+bool PressMainPlayerButton(bool shuffle) noexcept {
+    try {
+        auto source = MainWindowButton(shuffle ? kShuffle.source : kRepeat.source);
+        auto peer = source ? peers::FrameworkElementAutomationPeer::CreatePeerForElement(source) : nullptr;
+        if (!peer) return false;
+        if (auto toggle = peer.GetPattern(peers::PatternInterface::Toggle).try_as<provider::IToggleProvider>()) {
+            toggle.Toggle();
+            return true;
+        }
+        if (auto invoke = peer.GetPattern(peers::PatternInterface::Invoke).try_as<provider::IInvokeProvider>()) {
+            invoke.Invoke();
+            return true;
+        }
+    } catch (...) {
+    }
+    return false;
 }
 
 }  // namespace ampify::win

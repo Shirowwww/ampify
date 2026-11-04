@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Extensions can read and set Apple's shuffle and repeat (`Ampify.player.shuffle()`, `repeat()`, `setShuffle()`,
+  `setRepeat()`, `toggleShuffle()`, `toggleRepeat()`) and set the player volume (`Ampify.player.setVolume()`).
+- The Atmos leveler's log now says which audio stream format it follows or leaves alone.
+
 ## 1.0.0 (2026-11-04)
 
 The first release of Ampify, themes, extensions and a Marketplace for the official Apple Music app on Windows.

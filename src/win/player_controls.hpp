@@ -10,6 +10,7 @@
 #include <winrt/Microsoft.UI.Xaml.h>
 
 #include "../core/journal.hpp"
+#include "player_buttons.hpp"
 
 namespace ampify::win {
 
@@ -20,6 +21,11 @@ void AddPlayerControls(const winrt::Microsoft::UI::Xaml::UIElement& playerRoot,
 
 // apple.playerControls: off, the next opening adds nothing and an open player loses the two buttons. Any thread.
 void SetPlayerControlsShown(bool shown) noexcept;
+
+// The main window's shuffle and repeat buttons, for Ampify.player.shuffle() and the others (src/win/player_buttons.hpp).
+// Interface thread only. Read: -1 for a button not found. Press: the button's own command, true when it was invoked.
+MainPlayerModes ReadMainPlayerModes() noexcept;
+bool PressMainPlayerButton(bool shuffle) noexcept;
 
 }  // namespace ampify::win
 
