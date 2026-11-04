@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "element_picker.hpp"
 #include "ui_thread.hpp"
 #include "win_common.hpp"
 #include "xaml_backend.hpp"
@@ -251,6 +252,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 UpdateThemeSettings(kit, journal, [](theme::ThemeSettings& value) { value.inspect = false; });
                 journal.Write("Inspector: tree written to logs\\inspector.txt and inspector.json");
             }
+            AnswerPickRequest(kit, JournalFile("picked.txt"), journal);  // ampify devtools pick
         });
 
         // A new song's colours end the wait at once: the theme that names them follows the song without a tick's delay.

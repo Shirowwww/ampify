@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "archive.hpp"
+#include "compile.hpp"
 #include "element.hpp"
 #include "internal.hpp"
 #include "../core/json.hpp"
@@ -22,7 +23,7 @@ std::vector<ZipSource> FilesUnder(const std::filesystem::path& folder, const std
     for (; !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
         const std::filesystem::path& path = it->path();
         std::string leaf = Utf8(path.filename());
-        if (!leaf.empty() && leaf[0] == '.') {
+        if ((!leaf.empty() && leaf[0] == '.') || (leaf == "node_modules" && it->is_directory(ec))) {
             if (it->is_directory(ec)) it.disable_recursion_pending();
             continue;
         }
@@ -36,6 +37,10 @@ std::vector<ZipSource> FilesUnder(const std::filesystem::path& folder, const std
         files.push_back({name, path, {}});
     }
     return files;
+}
+
+CompileOutcome CompileElementSources(const std::filesystem::path& folder, std::string& message) {
+    return CompileSources(folder, message, [](const std::vector<std::string>& command) { return platform::Run(command); });
 }
 
 namespace {
@@ -85,6 +90,10 @@ int CmdBuild(Context& ctx) {
     }
 
     std::filesystem::path folder = PathArgument(args[1]);
+    std::string compiled;
+    CompileOutcome compile = CompileElementSources(folder, compiled);
+    if (compile == CompileOutcome::Failed) return Failure(ctx, compiled);
+    if (compile == CompileOutcome::Compiled) ctx.out << compiled << "\n";
     FolderValidation validation = ValidateElementFolder(folder);
     if (validation.manifest) {
         for (std::string& left : StarterLeftovers(*validation.manifest)) validation.errors.push_back(std::move(left));

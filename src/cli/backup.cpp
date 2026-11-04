@@ -48,6 +48,8 @@ bool CopyTree(const std::filesystem::path& from, const std::filesystem::path& to
             return false;
         }
         for (const auto& entry : std::filesystem::directory_iterator(from, ec)) {
+            // An author's node_modules (esbuild, types) never goes into the kit: it can hold thousands of files.
+            if (entry.path().filename() == "node_modules") continue;
             if (!CopyTree(entry.path(), to / entry.path().filename(), error)) return false;
         }
         return true;

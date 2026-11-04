@@ -29,7 +29,11 @@ constexpr std::int64_t kUpdateCheckPeriodSeconds = 24 * 60 * 60;
 constexpr int kUpdateCheckTimeoutSeconds = 10;
 constexpr int kInspectorWaitSeconds = 10;
 
+constexpr int kPickDelaySeconds = 4;  // time to put the pointer on the element before its place is read
+
 std::filesystem::path InspectorFile(const KitLayout& kit) { return kit.Journal() / "inspector.txt"; }
+std::filesystem::path PickedFile(const KitLayout& kit) { return kit.Journal() / "picked.txt"; }
+std::filesystem::path PickRequestFile(const KitLayout& kit) { return kit.Root() / "pick.txt"; }
 
 std::int64_t NowSeconds() {
     return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
@@ -72,10 +76,13 @@ std::optional<std::filesystem::file_time_type> WriteTime(const std::filesystem::
 
 // The running kernel reads settings.txt at each pass (about 3 s) and only in the default Ampify folder, so the tree
 // comes back live when Apple Music is open there. Elsewhere there is nothing to wait for.
-bool WaitForInspectorTree(Context& ctx, const std::filesystem::path& file) {
+// `before` is the file's time read before the request that makes Apple Music write it: read later, an answer that came in
+// between would look like no answer at all (starting tasklist alone takes longer than a pass of the kernel's).
+bool WaitForInspectorTree(Context& ctx, const std::filesystem::path& file,
+                          const std::optional<std::filesystem::file_time_type>& before,
+                          const char* what = "the interface tree") {
     if (ctx.kit.Root() != platform::DefaultKitDirectory() || !platform::IsProcessRunning("AppleMusic.exe")) return false;
-    std::optional<std::filesystem::file_time_type> before = WriteTime(file);
-    ctx.out << "Waiting for Apple Music to write the interface tree...\n" << std::flush;
+    ctx.out << "Waiting for Apple Music to write " << what << "...\n" << std::flush;
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(kInspectorWaitSeconds);
     while (std::chrono::steady_clock::now() < deadline) {
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
@@ -85,19 +92,59 @@ bool WaitForInspectorTree(Context& ctx, const std::filesystem::path& file) {
     return false;
 }
 
+// `devtools pick`: after a countdown, the pointer's place goes to the kernel (pick.txt), which names the element under it
+// and the ones above it (logs\picked.txt). The place is read here, so the pointer does not have to stay still while the
+// kernel's pass comes round.
+int PickUnderPointer(Context& ctx) {
+    if (ctx.options.dryRun) {
+        ctx.out << "The pointer's place would be read in " << kPickDelaySeconds << " seconds. --dry-run: nothing was written.\n";
+        return 0;
+    }
+    if (ctx.kit.Root() != platform::DefaultKitDirectory() || !platform::IsProcessRunning("AppleMusic.exe")) {
+        return Failure(ctx, "Apple Music must be open, with Ampify, to pick an element");
+    }
+    ctx.out << "Put the pointer on the element in Apple Music: its place is read in " << kPickDelaySeconds
+            << " seconds.\n" << std::flush;
+    std::this_thread::sleep_for(std::chrono::seconds(kPickDelaySeconds));
+    int x = 0;
+    int y = 0;
+    if (!platform::CursorPosition(x, y)) return Failure(ctx, "the pointer's place can only be read on Windows");
+
+    std::filesystem::path request = PickRequestFile(ctx.kit);
+    std::filesystem::path picked = PickedFile(ctx.kit);
+    std::optional<std::filesystem::file_time_type> before = WriteTime(picked);
+    {
+        std::ofstream out(request, std::ios::binary | std::ios::trunc);
+        out << x << " " << y << " " << NowSeconds() << "\n";
+        if (!out) return Failure(ctx, "cannot write " + Utf8(request));
+    }
+    if (!WaitForInspectorTree(ctx, picked, before, "the element under the pointer")) {
+        ctx.out << "Apple Music did not answer in time: run the command again with Ampify loaded.\n";
+        return 1;
+    }
+    std::string text;
+    if (!ReadWholeFile(picked, text)) return Failure(ctx, "cannot read " + Utf8(picked));
+    ctx.out << text;
+    if (!text.empty() && text.back() != '\n') ctx.out << "\n";
+    return 0;
+}
+
 }  // namespace
 
 int CmdDevtools(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
-    if (args.size() > 2) return Usage(ctx, "devtools takes on, off, or nothing (for on)");
+    if (args.size() > 2) return Usage(ctx, "devtools takes on, off, pick, or nothing (for on)");
     std::string action = args.size() == 2 ? args[1] : "on";
-    if (action != "on" && action != "off") return Usage(ctx, "devtools takes on or off, not " + action);
+    if (action == "pick") return PickUnderPointer(ctx);
+    if (action != "on" && action != "off") return Usage(ctx, "devtools takes on, off or pick, not " + action);
     if (ctx.options.dryRun) {
         ctx.out << "Inspector would be turned " << action << " (theme.inspect = " << (action == "on" ? 1 : 0)
                 << "). --dry-run: nothing was written.\n";
         return 0;
     }
 
+    std::filesystem::path file = InspectorFile(ctx.kit);
+    std::optional<std::filesystem::file_time_type> before = WriteTime(file);
     Settings settings;
     std::string error;
     if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
@@ -108,9 +155,8 @@ int CmdDevtools(Context& ctx) {
         ctx.out << "Inspector turned off (theme.inspect = 0).\n";
         return 0;
     }
-    std::filesystem::path file = InspectorFile(ctx.kit);
     ctx.out << "Inspector turned on (theme.inspect = 1).\n";
-    if (WaitForInspectorTree(ctx, file)) {
+    if (WaitForInspectorTree(ctx, file, before)) {
         ctx.out << "Interface tree written to " << Utf8(file) << ". Show it with: ampify inspect --tree\n";
         return 0;
     }

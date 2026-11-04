@@ -11,6 +11,7 @@
 
 #include "archive.hpp"
 #include "backup.hpp"
+#include "compile.hpp"
 #include "element.hpp"
 #include "internal.hpp"
 #include "watch.hpp"
@@ -53,6 +54,13 @@ bool SyncElement(const KitLayout& kit, const std::filesystem::path& source, cons
 // A broken edit is reported and the copy that was working stays in the kit.
 void ReloadOnce(Context& ctx, const std::filesystem::path& source, const std::string& kind, const std::string& id) {
     std::string stamp = "[" + ClockText() + "] ";
+    std::string compiled;
+    CompileOutcome compile = CompileElementSources(source, compiled);
+    if (compile == CompileOutcome::Failed) {
+        ctx.err << stamp << compiled << "; Ampify keeps the previous version\n";
+        return;
+    }
+    if (compile == CompileOutcome::Compiled) ctx.out << stamp << compiled << "\n";
     FolderValidation check = ValidateElementFolder(source);
     if (!check.ok() || !check.errors.empty() || !check.manifest) {
         ctx.err << stamp << "invalid, Ampify keeps the previous version:\n";
@@ -122,6 +130,10 @@ int CmdDev(Context& ctx) {
     if (args.size() != 2) return Usage(ctx, "dev needs the folder of the element to develop");
 
     std::filesystem::path source = PathArgument(args[1]);
+    std::string compiled;
+    CompileOutcome compile = CompileElementSources(source, compiled);
+    if (compile == CompileOutcome::Failed) return Failure(ctx, compiled);
+    if (compile == CompileOutcome::Compiled) ctx.out << compiled << "\n";
     FolderValidation first = ValidateElementFolder(source);
     if (!first.ok() || !first.errors.empty() || !first.manifest) {
         ctx.err << Utf8(source) << ": invalid, nothing was copied\n";

@@ -34,6 +34,10 @@ void MixTree(std::uint64_t& hash, const std::filesystem::path& folder, const std
     if (!std::filesystem::is_directory(folder, ec)) return;
     for (auto it = std::filesystem::recursive_directory_iterator(folder, ec);
          !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+        if (it->is_directory(ec) && it->path().filename() == "node_modules") {
+            it.disable_recursion_pending();  // an author's dependencies are not part of the element
+            continue;
+        }
         if (it->is_regular_file(ec)) MixFile(hash, it->path(), base);
     }
 }

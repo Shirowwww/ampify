@@ -62,6 +62,7 @@ Authoring and development
   inspect <folder> | <type> <id>       shows the manifest, the files and their SHA-256
   inspect --tree                       shows the last interface tree written by the kernel
   devtools [on|off]                    asks the kernel to write the interface tree (logs\inspector.txt)
+  devtools pick                        names the element under the pointer, after 4 seconds (logs\picked.txt)
   dev <folder>                         copies the element into Ampify at each save and reloads it
   types [file]                         writes ampify.d.ts (types for the editor, ampify.d.ts by default)
   test <folder>                        runs main.js in the JavaScript engine, with a fake host

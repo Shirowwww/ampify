@@ -1408,6 +1408,17 @@ class Devtools(AmpifyTestCase):
         self.assertIn("theme.inspect = 0", self.settings_text())
         self.assertEqual(self.ampify("devtools", "maybe").returncode, 2)
 
+    def test_devtools_pick_needs_apple_music_in_the_default_folder(self):
+        result = self.ampify("devtools", "pick", "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("nothing was written", result.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.kit, "pick.txt")))
+        # A kit folder of the test is not the default one: there is no Apple Music with Ampify to answer.
+        result = self.ampify("devtools", "pick")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Apple Music must be open", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.kit, "pick.txt")))
+
     def test_inspect_tree_prints_the_last_dump(self):
         result = self.ampify("inspect", "--tree")
         self.assertEqual(result.returncode, 1)

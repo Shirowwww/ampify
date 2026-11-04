@@ -77,14 +77,15 @@ Commands without arguments can follow each other: `ampify backup apply launch`. 
 
 | Command | What it does |
 |---|---|
-| `ampify dev <folder>` | Copies the element into Ampify, switches it on, and reloads it at every save |
+| `ampify dev <folder>` | Copies the element into Ampify, switches it on, and reloads it at every save; a `main.ts`, `main.tsx` or `main.jsx` is built into `main.js` first (needs esbuild) |
 | `ampify test <folder>` | Runs `main.js` in the same JavaScript engine with a fake player and network. A call without its permission fails the test |
-| `ampify build <folder> [file.zip]` | Validates, writes a reproducible zip, and prints its SHA-256 and catalog entry |
+| `ampify build <folder> [file.zip]` | Builds a `main.ts`, `main.tsx` or `main.jsx` (needs esbuild), validates, writes a reproducible zip, and prints its SHA-256 and catalog entry |
 | `ampify publish <folder> [--dry-run]` | Checks and tests the element, then opens a pull request on the [public catalog](extensions/catalog.md) with the GitHub CLI (`gh`), or prints the steps to follow in the browser |
 | `ampify types [file]` | Writes `ampify.d.ts`, the types of the `Ampify` object for your editor (`--yes` to overwrite) |
 | `ampify inspect <folder>` or `<kind> <id>` | Prints the manifest, permissions, state and each file with its SHA-256 |
 | `ampify inspect --tree` | Prints the last interface tree written by the kernel (`logs\inspector.txt`) |
 | `ampify devtools [on\|off]` | Asks the running kernel for the interface tree of the page on screen, and waits for it (up to 10 s) |
+| `ampify devtools pick` | The element picker: after 4 seconds to put the pointer on an element of Apple Music, prints the element under it, the selector a theme can use, and the elements above it (`logs\picked.txt`). Windows only |
 
 ## Diagnostics and transfers
 

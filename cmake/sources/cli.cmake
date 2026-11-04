@@ -11,6 +11,7 @@ list(APPEND AMPIFY_CLI_PORTABLE_SOURCES
     src/cli/release.cpp
     src/cli/zip_writer.cpp
     src/cli/anonymize.cpp
+    src/cli/compile.cpp
     src/cli/theme_commands.cpp)
 
 list(APPEND AMPIFY_CLI_SOURCES

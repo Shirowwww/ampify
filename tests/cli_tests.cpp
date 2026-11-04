@@ -17,6 +17,7 @@
 #include "../src/cli/archive.hpp"
 #include "../src/cli/backup.hpp"
 #include "../src/cli/catalog.hpp"
+#include "../src/cli/compile.hpp"
 #include "../src/cli/element.hpp"
 #include "../src/cli/kit.hpp"
 #include "../src/cli/release.hpp"
@@ -924,4 +925,210 @@ TEST_CASE(Report_HidesSecretLookingSettings) {
     CHECK(Has(out, "extensions.scrobbler.session_key = <hidden>"));
     CHECK(Has(out, "extensions.keyboard-skip.enabled = 1"));
     CHECK(Has(out, "extensions.discord-presence.user = <hidden>"));
+}
+
+// ---- TypeScript and JSX sources ---------------------------------------------------------------------------------
+
+namespace {
+
+// An element folder with a script: its manifest names main.js, and `files` are written beside it.
+std::filesystem::path ScriptFolder(const std::string& name, const std::vector<std::string>& files) {
+    std::filesystem::path dir = ScratchDir(name);
+    WriteFile(dir / "manifest.json", R"({"id":"demo","main":"main.js"})");
+    for (const std::string& file : files) WriteFile(dir / file, "// " + file);
+    return dir;
+}
+
+void SetAge(const std::filesystem::path& file, std::chrono::hours age) {
+    std::filesystem::last_write_time(file, std::filesystem::file_time_type::clock::now() - age);
+}
+
+// A stand-in for esbuild: remembers the command it was given and answers with `code`.
+struct FakeProgram {
+    int code = 0;
+    int calls = 0;
+    std::vector<std::string> command;
+    ampify::cli::RunProgram Runner() {
+        return [this](const std::vector<std::string>& given) {
+            calls++;
+            command = given;
+            return code;
+        };
+    }
+};
+
+// An environment variable set for the length of a test, then put back as it was.
+struct ScopedEnvironment {
+    std::string name;
+    std::string before;
+    bool had = false;
+    ScopedEnvironment(const std::string& variable, const std::string& value) : name(variable) {
+        if (const char* current = std::getenv(name.c_str())) {
+            had = true;
+            before = current;
+        }
+        Set(value);
+    }
+    ~ScopedEnvironment() { Set(had ? before : std::string()); }
+    void Set(const std::string& value) const {
+#ifdef _WIN32
+        _putenv_s(name.c_str(), value.c_str());
+#else
+        if (value.empty()) unsetenv(name.c_str());
+        else setenv(name.c_str(), value.c_str(), 1);
+#endif
+    }
+};
+
+bool HasArgument(const std::vector<std::string>& command, const std::string& wanted) {
+    for (const std::string& argument : command) {
+        if (argument == wanted) return true;
+    }
+    return false;
+}
+
+}  // namespace
+
+TEST_CASE(Compile_NoSourceWithoutTypeScriptOrJsx) {
+    FakeProgram program;
+    std::string message;
+    CHECK(ampify::cli::CompileSources(ScriptFolder("compile-js", {"main.js"}), message, program.Runner()) ==
+          ampify::cli::CompileOutcome::NoSource);
+    // A declaration file is types, not code: it never makes main.js a build output.
+    CHECK(ampify::cli::CompileSources(ScriptFolder("compile-dts", {"main.js", "ampify.d.ts"}), message,
+                                      program.Runner()) == ampify::cli::CompileOutcome::NoSource);
+    CHECK(program.calls == 0);
+}
+
+TEST_CASE(Compile_NoSourceForAFolderWithoutScript) {
+    FakeProgram program;
+    std::filesystem::path dir = ScratchDir("compile-theme");
+    WriteFile(dir / "manifest.json", R"({"id":"demo","kind":"theme"})");
+    WriteFile(dir / "main.ts", "export {};");
+    std::string message;
+    CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::NoSource);
+    CHECK(program.calls == 0);
+}
+
+TEST_CASE(Compile_UpToDateWhenMainIsNewerThanEverySource) {
+    FakeProgram program;
+    std::filesystem::path dir = ScriptFolder("compile-fresh", {"main.ts", "util.tsx", "main.js"});
+    SetAge(dir / "main.ts", std::chrono::hours(3));
+    SetAge(dir / "util.tsx", std::chrono::hours(2));
+    SetAge(dir / "main.js", std::chrono::hours(1));
+    std::string message;
+    CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::UpToDate);
+    CHECK(program.calls == 0);
+}
+
+TEST_CASE(Compile_AChangedSourceRunsEsbuildOnMainWithTheJsxFactory) {
+    ScopedEnvironment roaming("APPDATA", ScratchDir("compile-no-npm").string());  // no global esbuild: the PATH one
+    FakeProgram program;
+    std::filesystem::path dir = ScriptFolder("compile-stale", {"main.tsx", "util.ts", "main.js"});
+    SetAge(dir / "main.tsx", std::chrono::hours(3));
+    SetAge(dir / "main.js", std::chrono::hours(2));
+    SetAge(dir / "util.ts", std::chrono::hours(1));  // an imported file changed after the build
+    std::string message;
+    CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Compiled);
+    CHECK(program.calls == 1);
+    CHECK(program.command.size() > 2 && program.command[0] == "esbuild");
+    CHECK(HasArgument(program.command, (dir / "main.tsx").string()));
+    CHECK(HasArgument(program.command, "--bundle"));
+    CHECK(HasArgument(program.command, "--jsx-factory=Ampify.React.createElement"));
+    CHECK(HasArgument(program.command, "--jsx-fragment=Ampify.React.Fragment"));
+    CHECK(HasArgument(program.command, "--outfile=" + (dir / "main.js").string()));
+    CHECK(Has(message, "main.tsx compiled to main.js"));
+}
+
+TEST_CASE(Compile_BuildsMainWhenItIsMissing) {
+    FakeProgram program;
+    std::filesystem::path dir = ScriptFolder("compile-first", {"main.ts"});
+    std::string message;
+    CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Compiled);
+    CHECK(program.calls == 1);
+}
+
+TEST_CASE(Compile_SaysHowToInstallEsbuildWhenItIsNotThere) {
+    FakeProgram program;
+    program.code = -1;  // the program cannot start
+    std::filesystem::path dir = ScriptFolder("compile-missing", {"main.ts"});
+    std::string message;
+    CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Failed);
+    CHECK(Has(message, "npm install --save-dev esbuild"));
+}
+
+TEST_CASE(Compile_ReportsAFailedBuild) {
+    FakeProgram program;
+    program.code = 1;
+    std::filesystem::path dir = ScriptFolder("compile-broken", {"main.ts"});
+    std::string message;
+    CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Failed);
+    CHECK(Has(message, "esbuild failed") && Has(message, "code 1"));
+}
+
+TEST_CASE(Compile_PrefersTheEsbuildInstalledInNodeModules) {
+    FakeProgram program;
+    std::filesystem::path dir = ScriptFolder("compile-local", {"main.ts"});
+    WriteFile(dir / "node_modules" / "esbuild" / "bin" / "esbuild", "// stub");
+    std::string message;
+    CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Compiled);
+    CHECK(program.command.size() > 2 && program.command[0] == "node");
+    CHECK(Has(program.command[1], "esbuild"));
+    CHECK(Has(program.command[1], "node_modules"));
+}
+
+#ifdef _WIN32
+TEST_CASE(Compile_StartsNpmsGlobalEsbuildThroughNodeOnWindows) {
+    // npm leaves only an esbuild.cmd on the PATH there, which CreateProcess cannot start.
+    std::filesystem::path roaming = ScratchDir("compile-roaming");
+    WriteFile(roaming / "npm" / "node_modules" / "esbuild" / "bin" / "esbuild", "// stub");
+    ScopedEnvironment appData("APPDATA", roaming.string());
+    FakeProgram program;
+    std::filesystem::path dir = ScriptFolder("compile-global", {"main.ts"});
+    std::string message;
+    CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Compiled);
+    CHECK(program.command.size() > 2 && program.command[0] == "node");
+    CHECK(program.command.size() > 2 && Has(program.command[1], "npm"));
+}
+#endif
+
+TEST_CASE(Compile_APlainModuleOrJsonThatChangedAfterTheBuildRunsEsbuild) {
+    FakeProgram program;
+    std::filesystem::path dir = ScriptFolder("compile-plain", {"main.ts", "helper.js", "data.json", "main.js"});
+    SetAge(dir / "main.ts", std::chrono::hours(4));
+    SetAge(dir / "helper.js", std::chrono::hours(4));
+    SetAge(dir / "main.js", std::chrono::hours(3));
+    SetAge(dir / "data.json", std::chrono::hours(1));  // bundled into main.js, changed afterwards
+    std::string message;
+    CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Compiled);
+    CHECK(program.calls == 1);
+}
+
+TEST_CASE(Compile_MainIsAFileNameAtTheRootOfTheFolder) {
+    FakeProgram program;
+    std::filesystem::path dir = ScratchDir("compile-escape");
+    WriteFile(dir.parent_path() / "escape.ts", "export {};");
+    WriteFile(dir / "main.ts", "export {};");
+    std::filesystem::create_directories(dir / "sub");
+    std::string message;
+    for (const char* name : {"../escape.js", "sub/main.js", "sub\\\\main.js", "/etc/main.js", "C:/Temp/main.js"}) {
+        WriteFile(dir / "manifest.json", std::string(R"({"id":"demo","main":")") + name + R"("})");
+        WriteFile(dir / "sub" / "main.ts", "export {};");
+        CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::NoSource);
+    }
+    CHECK(program.calls == 0);
+}
+
+TEST_CASE(Compile_IgnoresNodeModulesAndHiddenFolders) {
+    FakeProgram program;
+    std::filesystem::path dir = ScriptFolder("compile-deps", {"main.ts", "main.js"});
+    WriteFile(dir / "node_modules" / "lib" / "index.ts", "export {};");
+    WriteFile(dir / ".cache" / "old.ts", "export {};");
+    SetAge(dir / "main.ts", std::chrono::hours(3));
+    SetAge(dir / "main.js", std::chrono::hours(2));
+    SetAge(dir / "node_modules" / "lib" / "index.ts", std::chrono::hours(1));
+    SetAge(dir / ".cache" / "old.ts", std::chrono::hours(1));
+    std::string message;
+    CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::UpToDate);
+    CHECK(program.calls == 0);
 }

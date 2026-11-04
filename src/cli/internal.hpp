@@ -20,6 +20,7 @@
 #include "../core/text_util.hpp"
 #include "catalog.hpp"
 #include "commands.hpp"
+#include "compile.hpp"
 #include "element.hpp"
 #include "kit.hpp"
 #include "release.hpp"
@@ -89,6 +90,9 @@ inline bool ReadWholeFile(const std::filesystem::path& file, std::string& text) 
 // Every regular file under `folder`, named `prefix/<path inside folder>` in the archive. Folders and files whose
 // name starts with '.' are left out: they are work in progress or system files.
 std::vector<ZipSource> FilesUnder(const std::filesystem::path& folder, const std::string& prefix);
+
+// CompileSources (compile.hpp) with the real program runner: for `build` and `dev`.
+CompileOutcome CompileElementSources(const std::filesystem::path& folder, std::string& message);
 
 // Commands in commands.cpp.
 int CmdHelp(Context& ctx);

@@ -142,6 +142,17 @@ bool IsProcessRunning(const std::string& imageName) {
     return running;
 }
 
+bool CursorPosition(int& x, int& y) {
+    // Apple Music reads the place in physical pixels: a process that is not DPI aware would get scaled ones on a screen
+    // set above 100 %. Refused (and harmless) when the process already has an awareness.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    POINT point{};
+    if (!GetCursorPos(&point)) return false;
+    x = static_cast<int>(point.x);
+    y = static_cast<int>(point.y);
+    return true;
+}
+
 AutoStart AutoStartState() {
     return AutoStart{true, win::BackgroundRegistered(), win::BackgroundRunning()};
 }

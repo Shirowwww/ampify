@@ -32,6 +32,9 @@ bool StartDetached(const std::vector<std::string>& command);
 // True while a process with this image name runs. Systems without the check always answer false.
 bool IsProcessRunning(const std::string& imageName);
 
+// The pointer's place on the screen, in pixels (`ampify devtools pick`). False where it cannot be read.
+bool CursorPosition(int& x, int& y);
+
 // Ends every process with this image name and waits for them a moment. True when none is left. Systems without the
 // check answer true.
 bool EndProcesses(const std::string& imageName);

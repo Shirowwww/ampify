@@ -102,6 +102,10 @@ bool IsProcessRunning(const std::string& imageName) {
     return Run({"pgrep", "-x", imageName}) == 0;
 }
 
+bool CursorPosition(int&, int&) {
+    return false;  // Apple Music for Windows does not run here
+}
+
 AutoStart AutoStartState() {
     return {};  // Apple Music for Windows does not run here
 }
