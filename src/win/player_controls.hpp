@@ -7,6 +7,8 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include <string>
+
 #include <winrt/Microsoft.UI.Xaml.h>
 
 #include "../core/journal.hpp"
@@ -26,6 +28,12 @@ void SetPlayerControlsShown(bool shown) noexcept;
 // Interface thread only. Read: -1 for a button not found. Press: the button's own command, true when it was invoked.
 MainPlayerModes ReadMainPlayerModes() noexcept;
 bool PressMainPlayerButton(bool shuffle) noexcept;
+
+// Apple's volume: the main window's volume control gets the slider position of `gain` (0 to 1), and Apple's own code
+// sets the player volume and draws its slider. Interface thread only; true once the control holds the position.
+bool SetMainPlayerVolume(double gain) noexcept;
+// Why the last SetMainPlayerVolume failed, once (empty when it did not). Any thread.
+std::string TakeMainPlayerVolumeProblem();
 
 }  // namespace ampify::win
 

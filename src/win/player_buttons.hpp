@@ -22,8 +22,11 @@ using PressPlayerButtonFn = bool (*)(bool shuffle);  // true: shuffle, false: re
 // Both run on the interface thread. Null functions remove the support.
 void InstallPlayerButtons(ReadPlayerModesFn read, PressPlayerButtonFn press);
 
-// Apple's player volume, 0 to 1, from the audio process (src/kernel/kernel.cpp installs the leveler's setter).
+// Apple's player volume, 0 to 1: from the audio process (src/kernel/kernel.cpp installs the leveler's setter) or, in the
+// interface process, through the main window's volume model (src/win/xaml_host.cpp, which runs it on the interface
+// thread and names the reason when it fails, so the log can say why).
 using SetPlayerVolumeFn = bool (*)(double volume);
-void InstallPlayerVolume(SetPlayerVolumeFn setter);
+using PlayerVolumeProblemFn = std::string (*)();
+void InstallPlayerVolume(SetPlayerVolumeFn setter, PlayerVolumeProblemFn problem = nullptr);
 
 }  // namespace ampify::win

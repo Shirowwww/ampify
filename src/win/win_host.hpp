@@ -78,7 +78,8 @@ public:
 
     UiModel& Ui() override { return m_ui; }
 
-    // Apple's shuffle and repeat buttons ("ui" process) and the player volume ("engine" process): src/core/player_modes.hpp.
+    // Apple's shuffle and repeat buttons ("ui" process) and the player volume ("ui": Apple's slider, "engine": the player
+    // itself): src/core/player_modes.hpp.
     PlayerModes Modes() override;
     bool SetShuffle(bool on) override;
     bool SetRepeat(const std::string& mode) override;

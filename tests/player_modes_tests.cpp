@@ -1,5 +1,6 @@
 // Ampify.player.shuffle(), repeat(), setShuffle(), setRepeat(), the toggles and setVolume(), with a fake host.
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -189,4 +190,15 @@ TEST_CASE(PlayerModes_NeedThePlayerReadAndControlPermissions) {
     CHECK(Has(out, "[denied] setVolume PermissionDenied"));
     CHECK(host.modes.shuffle.value_or(false));
     CHECK(host.modes.repeat == "off");
+}
+
+TEST_CASE(PlayerVolume_TheSliderIsInDecibelsSoGainAndPositionAreNotTheSameNumber) {
+    using ampify::SliderPositionOfGain;
+    CHECK(SliderPositionOfGain(1.0) == 1.0);     // full gain is the end of the slider
+    CHECK(SliderPositionOfGain(0.0) == 0.0);     // silence is its start
+    CHECK(SliderPositionOfGain(-0.5) == 0.0);    // never below it
+    CHECK(SliderPositionOfGain(2.0) == 1.0);     // never past it
+    // 20 % of the slider is 24 dB down: a gain of 0.0631, the "20 %" the volume-percentage example shows for it.
+    CHECK(std::abs(SliderPositionOfGain(std::pow(10.0, -24.0 / 20.0)) - 0.2) < 1e-9);
+    CHECK(std::abs(SliderPositionOfGain(0.5) - 0.7993) < 1e-3);  // -6.02 dB, 6.02 / 30 below the end
 }

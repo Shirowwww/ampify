@@ -2,14 +2,25 @@
 
 // The optional host services behind Ampify.player.shuffle(), repeat(), setShuffle(), setRepeat() and setVolume().
 // See src/core/host.hpp for how a capability works. Shuffle and repeat are Apple's own buttons, which only exist in
-// AppleMusic.exe ("ui" process); the volume is Apple's player volume, reached from AMPLibraryAgent.exe ("engine"
-// process). A host without a service makes the readers answer null and the setters answer false.
+// AppleMusic.exe ("ui" process); the volume is Apple's player volume, set from the volume control of its window ("ui"
+// process, Apple then moves its own slider) or by a hook in AMPLibraryAgent.exe ("engine" process). A host without a
+// service makes the readers answer null and the setters answer false.
 
+#include <algorithm>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <string_view>
 
 namespace ampify {
+
+// Apple Music's volume slider is in decibels: its position p (0 to 1) gives 30 x (p - 1) dB (measured on 1.1792, and
+// what the volume-percentage example uses). The position that gives a player gain of `gain` (0 to 1).
+inline double SliderPositionOfGain(double gain) {
+    constexpr double kRangeDb = 30;
+    if (!(gain > 0)) return 0;
+    return std::clamp(1 + 20 * std::log10(gain) / kRangeDb, 0.0, 1.0);
+}
 
 struct PlayerModes {
     std::optional<bool> shuffle;  // nullopt: not known (the player is not on screen, another Apple Music version)

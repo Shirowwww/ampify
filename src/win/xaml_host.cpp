@@ -183,6 +183,7 @@ void InstallXamlUiThread(Journal& journal) {
     State().journal = &journal;
     SetUiThreadBackend(&kXamlBackend);
     InstallPlayerButtons(&ReadMainPlayerModes, &PressMainPlayerButton);
+    InstallPlayerVolume(&SetMainPlayerVolume, &TakeMainPlayerVolumeProblem);  // through Apple's own volume model
 }
 
 std::uint64_t NowMs() noexcept {

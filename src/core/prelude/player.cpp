@@ -51,7 +51,7 @@ const char kPlayer[] = R"AMPIFYJS(
       const mode = Ampify.player.repeat();
       return mode === null ? false : native.playerSetRepeat(mode === "off" ? "all" : mode === "all" ? "one" : "off");
     },
-    // Apple's player volume, 0 to 1 (engine process, once a song has started). Apple's own slider is not redrawn.
+    // Apple's player volume, 0 to 1, once a song has started. From the interface process it moves Apple's own slider.
     setVolume(volume) {
       const value = Number(volume);
       if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError("setVolume expects a number from 0 to 1");

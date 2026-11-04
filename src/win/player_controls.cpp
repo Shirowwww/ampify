@@ -4,6 +4,9 @@
 
 #include "xaml_host.hpp"
 
+#include "../core/player_modes.hpp"
+
+#include <inspectable.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
@@ -21,6 +24,7 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -493,6 +497,26 @@ bool RepeatOn(const xaml::FrameworkElement& button) {
            solid.Opacity() > 0;
 }
 
+// AMP.UI.Controls.IVolumeControl of AMP.UI.Controls.winmd 1.1792 (GuidAttribute 3e70ba1e-a754-535b-85df-d7b9b18c4137),
+// its slots after IInspectable. Level is a double: the position of Apple's volume slider. Apple binds it both ways (no
+// data context is involved): setting it on the control makes Apple's own code set the player volume, and its slider,
+// its icon and the volume menu follow. The player must have started, as for the audio process's setter.
+struct IVolumeControlAbi : ::IInspectable {
+    virtual HRESULT __stdcall get_CurrentVolumeGlyph(HSTRING* value) = 0;
+    virtual HRESULT __stdcall put_CurrentVolumeGlyph(HSTRING value) = 0;
+    virtual HRESULT __stdcall get_Level(double* value) = 0;
+    virtual HRESULT __stdcall put_Level(double value) = 0;
+};
+constexpr GUID kVolumeControlIid = {0x3e70ba1e, 0xa754, 0x535b, {0x85, 0xdf, 0xd7, 0xb9, 0xb1, 0x8c, 0x41, 0x37}};
+
+std::mutex g_volumeProblemLock;
+std::string g_volumeProblem;
+
+void NoteVolumeProblem(std::string text) {
+    std::lock_guard<std::mutex> guard(g_volumeProblemLock);
+    g_volumeProblem = std::move(text);
+}
+
 // A button of the main window, found by name from its content: the player need not have been opened.
 xaml::FrameworkElement MainWindowButton(std::wstring_view name) {
     xaml::Window window = AppWindow(L"MainWindow");
@@ -524,6 +548,38 @@ MainPlayerModes ReadMainPlayerModes() noexcept {
     } catch (...) {
     }
     return modes;
+}
+
+bool SetMainPlayerVolume(double gain) noexcept {
+    try {
+        auto control = MainWindowButton(L"VolumeControl");
+        if (!control) {
+            NoteVolumeProblem("no VolumeControl in the main window");
+            return false;
+        }
+        winrt::com_ptr<IVolumeControlAbi> abi;
+        if (FAILED(winrt::get_unknown(control)->QueryInterface(kVolumeControlIid, abi.put_void()))) {
+            NoteVolumeProblem("the VolumeControl is not the interface this Apple Music version has");
+            return false;
+        }
+        double position = SliderPositionOfGain(gain);
+        if (FAILED(abi->put_Level(position))) {
+            NoteVolumeProblem("the volume control refused the level");
+            return false;
+        }
+        double now = -1;
+        if (SUCCEEDED(abi->get_Level(&now)) && std::abs(now - position) < 0.01) return true;
+        NoteVolumeProblem("the volume control did not keep the level: asked " + std::to_string(position) + ", holds " +
+                          std::to_string(now));
+    } catch (...) {
+        NoteVolumeProblem("an exception while setting the volume");
+    }
+    return false;
+}
+
+std::string TakeMainPlayerVolumeProblem() {
+    std::lock_guard<std::mutex> guard(g_volumeProblemLock);
+    return std::exchange(g_volumeProblem, std::string());
 }
 
 bool PressMainPlayerButton(bool shuffle) noexcept {

@@ -14,8 +14,14 @@
 - A press takes effect on Apple's own turn: the first one after Apple Music starts took 2.8 s, the following ones 0.1 s.
   Pressing again before the state changes skips states, so a setter presses once and waits for the change.
 
-The volume (`Ampify.player.setVolume`) goes through the leveler's `AVCFPlayerSetVolume` hook with the player Apple last
-set a volume on, so it needs a song to have started. Apple's own slider is not redrawn.
+The volume (`Ampify.player.setVolume`) has two ways in. In the audio process it goes through the leveler's
+`AVCFPlayerSetVolume` hook with the player Apple last set a volume on, so it needs a song to have started, and Apple's
+own slider is not redrawn. In the interface process (`src/win/player_controls.cpp`, `SetMainPlayerVolume`) it sets
+`IVolumeControl.Level` on the main window's `VolumeControl`: that property is the slider position (0 to 1, in decibels:
+a position `p` is a gain of `10^(30(p-1)/20)`), and Apple's own binding sets the player volume and redraws the slider
+and the speaker glyph. No view model is reachable from the control (its DataContext is empty); the interface is written
+by hand in the file, with its IID read from the winmd. It too needs a song to have started: `audio.volume()` follows
+only then. Verified on 1.1792 with a song playing: 0.3, 0.1 and 0.5 each moved the slider and `audio.volume()`.
 
 ## Not understood yet
 

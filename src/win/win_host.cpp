@@ -99,6 +99,7 @@ namespace {
 std::atomic<ReadPlayerModesFn> g_readModes{nullptr};
 std::atomic<PressPlayerButtonFn> g_pressButton{nullptr};
 std::atomic<SetPlayerVolumeFn> g_setVolume{nullptr};
+std::atomic<PlayerVolumeProblemFn> g_volumeProblem{nullptr};
 }  // namespace
 
 void InstallPlayerButtons(ReadPlayerModesFn read, PressPlayerButtonFn press) {
@@ -106,7 +107,10 @@ void InstallPlayerButtons(ReadPlayerModesFn read, PressPlayerButtonFn press) {
     g_pressButton = press;
 }
 
-void InstallPlayerVolume(SetPlayerVolumeFn setter) { g_setVolume = setter; }
+void InstallPlayerVolume(SetPlayerVolumeFn setter, PlayerVolumeProblemFn problem) {
+    g_setVolume = setter;
+    g_volumeProblem = problem;
+}
 
 }  // namespace win
 
@@ -192,9 +196,23 @@ bool WinHost::SetRepeat(const std::string& mode) {
     return !now.empty() && now == mode;
 }
 
+// In the interface process the setter works on Apple's volume control, which only its own thread may touch; in the audio
+// process it hooks the player, from any thread.
 bool WinHost::SetVolume(double volume) {
     win::SetPlayerVolumeFn setter = win::g_setVolume.load();
-    return setter && setter(volume);
+    if (!setter) return false;
+    if (m_process != "ui") return setter(volume);
+    auto done = std::make_shared<bool>(false);
+    if (!win::RunOnUiThreadAndWait([setter, volume, done] { *done = setter(volume); }, kInterfaceTimeoutMs)) {
+        m_journal.Write("Player: the volume was not set: the interface thread did not answer in time");
+        return false;
+    }
+    if (!*done) {
+        win::PlayerVolumeProblemFn problem = win::g_volumeProblem.load();
+        std::string reason = problem ? problem() : std::string();
+        if (!reason.empty()) m_journal.Write("Player: the volume was not set: " + reason);
+    }
+    return *done;
 }
 
 WinHost::WinHost(std::string process, std::filesystem::path kitDirectory, Settings& settings, Journal& journal)
@@ -215,9 +233,10 @@ void* WinHost::QueryCapability(std::string_view name) {
     if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
     // Ampify.player.lyrics: Apple's lyrics, read in the process that has Apple's player.
     if (name == LyricsHost::kCapabilityName) return static_cast<LyricsHost*>(m_player.get());
-    // Shuffle and repeat are buttons of the interface; the player volume is reached from the audio process.
+    // Shuffle and repeat are buttons of the interface; the volume is set there too (Apple's volume control, whose slider
+    // then moves) or from the audio process (a hook, the slider stays).
     if (m_process == "ui" && name == PlayerModesHost::kCapabilityName) return static_cast<PlayerModesHost*>(this);
-    if (m_process == "engine" && name == PlayerVolumeHost::kCapabilityName) return static_cast<PlayerVolumeHost*>(this);
+    if (name == PlayerVolumeHost::kCapabilityName) return static_cast<PlayerVolumeHost*>(this);
     if (void* found = m_services->Query(name)) return found;
     // The Marketplace page runs ampify.exe from the interface process, where it is shown.
     if (m_process == "ui" && name == KitCommandHost::kCapabilityName) return static_cast<KitCommandHost*>(m_kitCommands.get());
