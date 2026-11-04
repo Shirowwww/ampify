@@ -60,6 +60,7 @@ void* Services::Query(std::string_view name) {
     if (name == MidiHost::kCapabilityName) return static_cast<MidiHost*>(this);
     if (name == RemoteHost::kCapabilityName) return static_cast<RemoteHost*>(this);
     if (name == OutputFilesHost::kCapabilityName) return static_cast<OutputFilesHost*>(this);
+    if (name == LibraryHost::kCapabilityName) return static_cast<LibraryHost*>(this);
     return nullptr;
 }
 
@@ -309,6 +310,13 @@ std::optional<double> Services::SetGainDb(double db) { return Queue("gain", db);
 bool Services::WriteOutputText(const std::string& elementId, const std::string& name, const std::string& text,
                                std::string* error) {
     return WriteOutputFile(m_kit / "output", elementId, name, text, error);
+}
+
+// Apple Music keeps its library under the Music known folder, which may be moved off %USERPROFILE%\Music.
+std::filesystem::path Services::LibraryFile() {
+    std::filesystem::path music = KnownFolder(FOLDERID_Music);
+    if (music.empty()) return {};
+    return music / L"Apple Music" / L"Apple Music Library.musiclibrary" / L"Library.musicdb";
 }
 
 // ---- The JavaScript thread's turn ------------------------------------------------------------------------------

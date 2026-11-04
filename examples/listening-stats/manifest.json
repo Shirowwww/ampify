@@ -2,19 +2,22 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "listening-stats",
   "name": "Listening stats",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "kind": "app",
   "author": "Shirowwww",
-  "description": "Your top artists and songs of the last 7 days, the last 4 weeks or since the start, and your listening time, counted on this PC, like Spicetify's Stats.",
-  "translations": {"fr": {"name": "Statistiques d'écoute", "description": "Vos artistes et morceaux les plus écoutés sur 7 jours, 4 semaines ou depuis le début, et votre temps d'écoute, comptés sur ce PC, comme Stats sur Spicetify."}},
+  "description": "Your top artists and songs and your listening time, like Spicetify's Stats. By default from Apple Music's own play counts, all your devices included; the last 7 days, the last 4 weeks and since the start count what plays on this PC.",
+  "translations": {"fr": {"name": "Statistiques d'écoute", "description": "Vos artistes et morceaux les plus écoutés et votre temps d'écoute, comme Stats sur Spicetify. Par défaut, les compteurs d'Apple Music, tous vos appareils compris ; 7 jours, 4 semaines et depuis le début comptent ce qui joue sur ce PC."}, "de": {"name": "Hörstatistik", "description": "Ihre meistgehörten Künstler und Titel und Ihre Hörzeit, wie Stats bei Spicetify. Standardmäßig aus den Wiedergabezählern von Apple Music, alle Geräte zusammen; 7 Tage, 4 Wochen und seit Beginn zählen, was auf diesem PC läuft."}, "es": {"name": "Estadísticas de escucha", "description": "Tus artistas y canciones más escuchados y tu tiempo de escucha, como Stats en Spicetify. Por defecto, los contadores de Apple Music, con todos tus dispositivos; 7 días, 4 semanas y desde el inicio cuentan lo que suena en este PC."}, "pt": {"name": "Estatísticas de audição", "description": "Seus artistas e músicas mais ouvidos e seu tempo de audição, como o Stats do Spicetify. Por padrão, os contadores do Apple Music, com todos os seus aparelhos; 7 dias, 4 semanas e desde o início contam o que toca neste PC."}, "ru": {"name": "Статистика прослушиваний", "description": "Ваши самые прослушиваемые исполнители и треки и время прослушивания, как Stats в Spicetify. По умолчанию счётчики Apple Music со всех ваших устройств; 7 дней, 4 недели и всё время считают то, что играет на этом ПК."}, "ja": {"name": "再生統計", "description": "よく聴くアーティストと曲、再生時間を表示します（Spicetify の Stats のように）。標準では Apple Music の再生回数（すべてのデバイスを含む）を使い、7日間・4週間・最初からは、この PC で再生した分を数えます。"}, "zh": {"name": "收听统计", "description": "你最常听的艺人和歌曲以及收听时长，类似 Spicetify 的 Stats。默认使用 Apple Music 自己的播放次数（包括你的所有设备）；7 天、4 周和从头开始的统计只计算在这台电脑上播放的内容。"}},
   "kitApi": "1.0",
   "preview": "preview.jpg",
   "main": "main.js",
   "permissions": [
     "player.read",
+    "library.read",
     "storage",
     "ui.page",
-    "ui.sidebar"
+    "ui.sidebar",
+    "network:itunes.apple.com",
+    "network:music.apple.com"
   ],
   "tags": [
     "stats",

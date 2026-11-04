@@ -114,6 +114,10 @@ endif()
 add_library(ampify_core STATIC ${AMPIFY_CORE_SOURCES})
 target_compile_options(ampify_core PRIVATE ${AMPIFY_WARNINGS})
 target_link_libraries(ampify_core PUBLIC ampify_quickjs)
+# BCrypt decrypts Apple Music's library file (src/core/library/musicdb.cpp).
+if(WIN32)
+    target_link_libraries(ampify_core PUBLIC bcrypt)
+endif()
 
 # Theme engine: colour schemes, resources, CSS-like rules, cascade, apply and restore, live reload, inspector.
 # Pure C++ over the TreeBackend interface, so it builds and tests on any host. The Windows backend implements that interface.

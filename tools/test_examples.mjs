@@ -766,8 +766,10 @@ test("listening-stats counts a play after 30 seconds of listening, once, and the
   const entries = [];
   let state = { playing: true, track: { id: "t-1", title: "Lucid Dreams", artist: "Juice WRLD" } };
   const Ampify = {
-    React: { h: (type, props, ...children) => ({ type, props: props ?? {}, children }), useState: (v) => [v, () => {}], useEffect: () => {} },
-    components: { Card: "Card", Dropdown: "Dropdown", Text: "Text" },
+    // The page opens on Apple Music's own counts, read once it shows: these counts are checked through "all".
+    React: { h: (type, props, ...children) => ({ type, props: props ?? {}, children }), useState: (v) => [v === "library" ? "all" : v, () => {}], useEffect: () => {} },
+    ReactDOM: { render: () => {} },
+    components: { Button: "Button", Card: "Card", Dropdown: "Dropdown", Text: "Text" },
     i18n: fakeI18n("en"),
     storage: {
       get: (key, fallback) => (need("storage"), stored.has(key) ? structuredClone(stored.get(key)) : fallback),
@@ -795,6 +797,12 @@ test("listening-stats counts a play after 30 seconds of listening, once, and the
   state = { playing: true, track: state.track };
   for (let i = 0; i < 6; i++) tick();
   assert.equal(stored.get("all").songs["t-1"].plays, 2, "played again, counted again");
+  // Repeat one: Apple starts the song again without a track change; its position falls back to the start.
+  state = { playing: true, positionMs: 150000, track: state.track };
+  tick();
+  state = { playing: true, positionMs: 2000, track: state.track };
+  for (let i = 0; i < 6; i++) tick();
+  assert.equal(stored.get("all").songs["t-1"].plays, 3, "repeated from its start, counted again");
 
   // The page with its counts: function components expanded, and the interface's boolean props given booleans.
   const expand = (node) => {
@@ -836,7 +844,8 @@ test("listening-stats keeps the album, and stays under 300 nodes with a full mon
   const intervals = [];
   const Ampify = {
     React: { h: (type, props, ...children) => ({ type, props: props ?? {}, children }), useState: (v) => [v, () => {}], useEffect: () => {} },
-    components: { Card: "Card", Dropdown: "Dropdown", Text: "Text" },
+    ReactDOM: { render: () => {} },
+    components: { Button: "Button", Card: "Card", Dropdown: "Dropdown", Text: "Text" },
     i18n: fakeI18n("en"),
     storage: { get: (key, fallback) => (stored.has(key) ? structuredClone(stored.get(key)) : fallback), set: (key, value) => stored.set(key, structuredClone(value)) },
     player: { state: () => state, on: () => {} },
@@ -859,6 +868,42 @@ test("listening-stats keeps the album, and stays under 300 nodes with a full mon
     assert.ok(count(expand(context.render())) < 300, period + ": the interface takes 300 nodes at most");
   }
   state = null;
+});
+
+test("listening-stats says when Apple Music's library cannot be read, and reads it once while pages open", async () => {
+  const { source } = load("listening-stats");
+  let reads = 0;
+  const Ampify = {
+    React: { h: (type, props, ...children) => ({ type, props: props ?? {}, children }), useState: (v) => [v, () => {}], useEffect: (fn) => void fn() },
+    ReactDOM: { render: () => {} },
+    components: { Button: "Button", Card: "Card", Dropdown: "Dropdown", Text: "Text" },
+    i18n: fakeI18n("en"),
+    storage: { get: (key, fallback) => fallback, set: () => {} },
+    library: { tracks: () => (reads++, Promise.reject(new Error("no library"))) },
+    log: () => {},
+    player: { state: () => null, on: () => {} },
+    ui: { sidebar: { addItem: () => {} }, navigate: () => {} },
+    onStop: () => {},
+  };
+  const context = { Ampify, setInterval: () => 0, clearInterval: () => {} };
+  runIn(source, context);
+  const expand = (node) => {
+    if (!node || typeof node !== "object") return node;
+    if (typeof node.type === "function") return expand(node.type({ ...node.props, children: node.children }));
+    return { ...node, children: node.children.flat().map(expand) };
+  };
+  const texts = (node, out = []) => {
+    if (!node || typeof node !== "object") return (typeof node === "string" && out.push(node), out);
+    node.children.forEach((child) => texts(child, out));
+    return out;
+  };
+  expand(context.render());
+  expand(context.render());
+  assert.equal(reads, 1, "a page opened again while the library is read does not read it again");
+  await new Promise((resolve) => setImmediate(resolve));
+  const shown = texts(expand(context.render()));
+  assert.ok(shown.includes("Apple Music's library could not be read. The other periods show what plays on this device."));
+  assert.ok(!shown.includes("Nothing yet: songs count after 30 seconds of listening."), "not the empty page of a new install");
 });
 
 // ---- Sleep timer and keyboard shortcuts ---------------------------------------------------------------------------

@@ -148,6 +148,18 @@ type DiscordActivity = {
 };
 type FormFile = { filename: string; type?: string; base64: string };
 type MidiEvent = { type: "note" | "noteoff" | "cc"; channel: number; number: number; value: number };
+// Dates are Unix times in milliseconds, 0 when unknown or never; durationMs is 0 when unknown.
+type LibraryTrack = {
+  persistentId: string;  // 16 hexadecimal digits
+  title: string;
+  artist: string;
+  album: string;
+  playCount: number;
+  skipCount: number;
+  lastPlayed: number;
+  dateAdded: number;
+  durationMs: number;
+};
 
 declare const Ampify: {
   // 5.1 Base [stable]
@@ -267,6 +279,8 @@ declare const Ampify: {
     style(name: string): (FontRole & { role: string }) | null;  // "text" is another name for "body"
   };
   lyrics: { current(): Promise<Lyrics | null> };  // Ampify.player.lyrics() as a promise
+  // permission library.read; rejects when Apple Music's library file cannot be read
+  library: { tracks(): Promise<LibraryTrack[]> };
 
   // 5.8 Link between an app and its extension [provisional]
   link: {

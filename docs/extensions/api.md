@@ -88,7 +88,8 @@ A function whose permission is not declared throws `PermissionDenied` and does n
 | `ui.tray` | Entries in the Ampify notification-area icon (also needs `tray.enabled`) | [preview] |
 | `fs.output` | A text file in `output\<id>\` of the Ampify folder, and nowhere else | [preview] |
 | `network:<host>` | `Ampify.http` to that host only, over https | [stable] |
-| `library.read`, `library.write`, `services.read` | Reserved names: a manifest that declares them loads, but no function uses them yet | Reserved |
+| `library.read` | `Ampify.library.tracks`, the tracks of the library with their play counts | [preview] |
+| `library.write`, `services.read` | Reserved names: a manifest that declares them loads, but no function uses them yet | Reserved |
 | `kit.manage` | `Ampify.kit.run`, which runs `ampify.exe`. Only the Marketplace holds it; the catalog refuses it elsewhere | Internal |
 
 Discord, the tray icon, the remote and MIDI are off until the user turns them on. Switching on an element that needs
@@ -291,14 +292,26 @@ Ampify.color.fromArtwork(url) -> Promise<colors>    // an https://*.mzstatic.com
 Ampify.fonts.roles() -> { [role]: { family, weight, size, fromTheme } }
 Ampify.fonts.style(name) -> { role, family, weight, size, fromTheme } | null
 Ampify.lyrics.current() -> Promise<lyrics | null>   // player.lyrics() as a promise, permission player.read
+Ampify.library.tracks() -> Promise<track[]>         // permission library.read
+//   track: { persistentId, title, artist, album, playCount, skipCount, lastPlayed, dateAdded, durationMs }
 ```
 
 - `http` calls go over https to declared hosts only. A string body is sent as a form, an object as JSON. Allowed
-  headers: `content-type`, `authorization`, `accept`. Bodies up to 64 KB (8 MB for `postForm`), replies up to 1 MB,
+  headers, on `get` and `post`: `content-type`, `authorization`, `accept`, `origin`. Bodies up to 64 KB (8 MB for `postForm`), replies up to 1 MB,
   4 requests in flight per element. An error resolves with status 0.
 - `postForm` fields are texts or files `{ filename, type, base64 }`.
+- `gifFromVideo` downloads a short video (MP4, fragmented or not, up to 8 MB) from a declared host and makes it a GIF
+  that loops, on the PC: `side` pixels at most (200, up to 480), `fps` frames a second (10, up to 25), its first
+  `seconds` (30 at most). The answer is a file for `postForm`, for a service such as Discord that shows pictures but no
+  video. Windows decodes H.264, not HEVC; a Windows N edition needs its Media Feature Pack. A failure rejects with the
+  reason.
 - `http.open` answers `false` within 10 seconds of the element's previous page.
 - `fonts` reads the font roles of the applied theme ([format](../themes/format.md#fonts)).
+- `library.tracks()` reads Apple Music's own library file, so the counts are the ones Apple Music keeps for every track
+  of the user's library. `persistentId` is Apple's id in 16 hexadecimal digits;
+  `lastPlayed` and `dateAdded` are Unix times in milliseconds, `0` when unknown or never; `durationMs` is `0` when
+  unknown. Apple Music saves its counts a little after a play. The answer is reused until the file changes. An
+  unreadable or unknown file rejects the promise with the reason. Format: [knowledge](../../knowledge/apple-music-library-file.md).
 
 ### 5.7 Local services [preview]
 
@@ -451,8 +464,8 @@ A snippet is a `user.css`, a `resources.xaml` fragment, or both, switched on by 
 
 - Community native code (DLLs).
 - Raw XAML in extensions.
-- Apple Music's library and playlists (`library.read`, `library.write`) and its internal services (`services.read`):
-  the names are reserved.
+- Playlists, and changing the library (`library.write`), and Apple Music's internal services (`services.read`): the
+  names are reserved.
 - Adding to the queue (`queue.add` answers `false`).
 
 ## 9. Versions

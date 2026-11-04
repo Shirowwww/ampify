@@ -12,6 +12,7 @@ What was learned about Apple Music for Windows while building Ampify, and the ra
 | [amexclusive-notes.md](amexclusive-notes.md) | What the AMExclusive project teaches about finding the window, the UI thread and Apple's player |
 | [apple-music-native-views.md](apple-music-native-views.md) | Apple's mini player, full-screen player and karaoke lyrics, and how they compare with Ampify's Now Playing |
 | [apple-music-queue.md](apple-music-queue.md) | Apple's play queue: reading and removing work, what was tried to add a song and why it does not work yet |
+| [apple-music-library-file.md](apple-music-library-file.md) | The library file `Library.musicdb`: encryption, records, where the play counts are, local-time dates |
 | [spicetify.md](spicetify.md) | How Spicetify patches Spotify, what its themes and extensions use, and the lessons Ampify takes |
 
 ## Raw lists

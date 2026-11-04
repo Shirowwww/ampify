@@ -1,12 +1,12 @@
 #pragma once
 
 // The kit services of the Windows host, offered to the API modules as host capabilities: Discord Rich Presence,
-// the notification area icon, the local remote control, MIDI input and the output files. Each one is off until its
-// setting is on (discord.enabled, tray.enabled, remote.enabled, midi.enabled; all 0 by default), and each element
-// still needs its permission (checked by src/core/natives).
+// the notification area icon, the local remote control, MIDI input, the output files and the place of the library
+// file. The first four are off until their setting is on (discord.enabled, tray.enabled, remote.enabled, midi.enabled;
+// all 0 by default), and each element still needs its permission (checked by src/core/natives).
 //
 // Processes: the icon lives in AppleMusic.exe ("ui"); the remote control and MIDI in AMPLibraryAgent.exe
-// ("engine"), where the player state and the internal gain are; Discord and the output files in both.
+// ("engine"), where the player state and the internal gain are; Discord, the output files and the library in both.
 //
 // Threads: every capability method and Service() run on the JavaScript thread, as Host methods do. The service
 // threads (icon, server, winmm, Discord) never call the host: they queue, and Service() acts.
@@ -30,6 +30,7 @@
 #include "../core/midi_map.hpp"
 #include "../core/natives/discord.hpp"
 #include "../core/natives/fs.hpp"
+#include "../core/natives/library.hpp"
 #include "../core/natives/midi.hpp"
 #include "../core/natives/remote.hpp"
 #include "../core/natives/tray.hpp"
@@ -47,6 +48,7 @@ class Services final : public DiscordHost,
                        public MidiHost,
                        public RemoteHost,
                        public OutputFilesHost,
+                       public LibraryHost,
                        private remote::Backend {
 public:
     // Payloads for the elements: ExtensionLoader::DeliverEvent(entry, payload) in the kernel.
@@ -85,6 +87,8 @@ public:
     // OutputFilesHost
     bool WriteOutputText(const std::string& elementId, const std::string& name, const std::string& text,
                          std::string* error) override;
+    // LibraryHost
+    std::filesystem::path LibraryFile() override;
 
     // For the tests: what a device, the icon or a remote client would send.
     void InjectMidi(uint32_t packed);

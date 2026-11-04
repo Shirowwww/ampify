@@ -77,6 +77,8 @@ namespace prelude { extern const char kKit[]; }
 namespace natives { void DefineKit(api::NativeScope& scope); void StopKit(ScriptExtension& extension); }
 namespace prelude { extern const char kFonts[]; }
 namespace natives { void DefineFonts(api::NativeScope& scope); }
+namespace prelude { extern const char kLibrary[]; }
+namespace natives { void DefineLibrary(api::NativeScope& scope); }
 
 namespace api {
 
@@ -110,6 +112,7 @@ const ApiModule kModules[] = {
     {"midi", prelude::kMidi, natives::DefineMidi, nullptr, natives::StopMidi},
     {"remote", prelude::kRemote, natives::DefineRemote, nullptr, natives::StopRemote},
     {"fs", prelude::kFs, natives::DefineFs, nullptr, nullptr},
+    {"library", prelude::kLibrary, natives::DefineLibrary, nullptr, nullptr},
     {"kit", prelude::kKit, natives::DefineKit, nullptr, natives::StopKit},
 };
 

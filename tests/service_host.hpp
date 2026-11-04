@@ -1,7 +1,7 @@
 #pragma once
 
 // A FakeHost that also offers the optional kit services (POST, Discord, icon menu, MIDI, remote control, output
-// files) and records every call, plus a fixture that runs an element against it. Shared by the module tests of
+// files, library file) and records every call, plus a fixture that runs an element against it. Shared by the module tests of
 // those services.
 
 #include <filesystem>
@@ -18,6 +18,7 @@
 #include "../src/core/natives/discord.hpp"
 #include "../src/core/natives/fs.hpp"
 #include "../src/core/natives/http.hpp"
+#include "../src/core/natives/library.hpp"
 #include "../src/core/natives/midi.hpp"
 #include "../src/core/natives/remote.hpp"
 #include "../src/core/natives/tray.hpp"
@@ -28,7 +29,7 @@
 namespace ampify::test {
 
 struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost, MidiHost, RemoteHost, OutputFilesHost,
-                     ArtworkHost {
+                     ArtworkHost, LibraryHost {
     struct Post {
         std::string url;
         std::string body;
@@ -52,6 +53,7 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
     std::map<std::string, std::string> remoteStates;
     std::vector<std::string> remoteRemoved;
     std::filesystem::path outputRoot;
+    std::filesystem::path libraryFile;
     std::optional<ArtworkHost::File> artwork;  // read from a worker thread, set by the test between reads
 
     std::optional<ArtworkHost::File> CurrentArtwork() override {
@@ -100,6 +102,7 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
                          std::string* error) override {
         return WriteOutputFile(outputRoot, elementId, name, text, error);
     }
+    std::filesystem::path LibraryFile() override { return libraryFile; }
 
     void* QueryCapability(std::string_view name) override {
         if (void* found = Offer<HttpPostHost>(name, this)) return found;
@@ -110,6 +113,7 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
         if (void* found = Offer<RemoteHost>(name, this)) return found;
         if (void* found = Offer<OutputFilesHost>(name, this)) return found;
         if (void* found = Offer<ArtworkHost>(name, this)) return found;
+        if (void* found = Offer<LibraryHost>(name, this)) return found;
         return FakeHost::QueryCapability(name);
     }
 };
