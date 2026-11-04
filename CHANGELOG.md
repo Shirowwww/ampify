@@ -1,18 +1,37 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 (2026-11-04)
+
+More for extension authors, and more of Apple Music's elements within reach of a theme.
+
+### Extensions
 
 - Extensions can read and set Apple's shuffle and repeat (`Ampify.player.shuffle()`, `repeat()`, `setShuffle()`,
-  `setRepeat()`, `toggleShuffle()`, `toggleRepeat()`) and set the player volume (`Ampify.player.setVolume()`).
-- `Ampify.player.setVolume()` from an interface extension moves Apple's own volume slider, and the player follows.
+  `setRepeat()`, `toggleShuffle()`, `toggleRepeat()`) and set the player volume (`Ampify.player.setVolume()`). From an
+  interface extension, `setVolume()` moves Apple's own volume slider and the player follows.
 - A context-menu entry gets the kind and catalog id of the item it was opened on (`{ title, item: { kind, id } }`)
-  when Apple Music's data has them, and an entry can hold a submenu.
-- Top bar, play bar and sidebar entries can be switched on (`active`, `setActive`): they take the accent colour.
-- Extensions can be written in TypeScript or JSX: `ampify` compiles them with esbuild when it packs, develops or
-  watches them. `ampify devtools pick` names the element under the pointer for a theme's CSS.
-- Themes can animate an element's `background` colour in `@keyframes`, and have names for the lyrics' lines
-  (`.lyrics-line`, `.lyrics-words`...).
+  when Apple Music's data has them, and an entry can hold a submenu (one level, 20 entries).
+- Top bar, play bar and sidebar entries can be switched on (`active`, `setActive`): they take the accent colour, and a
+  sidebar entry also gets Apple's selection bar.
+- Extensions can be written in TypeScript or JSX: `ampify` compiles `main.ts`, `main.tsx` and `main.jsx` with esbuild
+  when it builds, develops or watches them.
+
+### Themes
+
+- `overflow` and `clip-path: inset(...)` cut an element to a rectangle, and `:playing` matches the list row of the song
+  playing.
+- `@keyframes` can animate an element's `background` colour.
+- The lyrics' lines, words and messages have names (`.lyrics-line`, `.lyrics-words`...). An image can ride at the
+  song's position in the progress bar.
 - The Spinning artwork snippet turns the record on the spot: it stayed off its centre and was not quite round.
+
+### Command line
+
+- `ampify devtools pick` names the element under the pointer, for a theme's CSS. `ampify types` knows the new menu
+  and button options.
+
+### Other
+
 - The Atmos leveler's log now says which audio stream format it follows or leaves alone.
 
 ## 1.0.0 (2026-11-04)
