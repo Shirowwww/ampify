@@ -40,6 +40,15 @@ const char kColor[] = R"AMPIFYJS(
         return JSON.parse(answer.text);
       });
     },
+    // The colours of the cover playing now, songs of the library included; null without a cover. Permission
+    // player.read. Right after a song changes, it may still be the previous cover for a second or two.
+    playing() {
+      return dispatch.request(() => native.colorFromPlaying()).then((answer) => {
+        if (answer.status === 204) return null;
+        if (answer.status !== 200) throw new Error("color.playing: " + answer.text);
+        return JSON.parse(answer.text);
+      });
+    },
   };
 )AMPIFYJS";
 

@@ -188,27 +188,40 @@ PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit) {
 int64_t PositionClock::Next(const std::string& track, bool playing, int64_t reportedMs, int64_t durationMs,
                             int64_t nowMs) {
     if (track != m_track) {
+        *this = PositionClock();
         m_track = track;
-        m_baseMs = 0;
-        m_sinceMs = -1;
     }
-    if (reportedMs > 0) {
+    if (!playing && m_playing) {
+        m_baseMs += Ahead(nowMs);  // paused: the clock keeps what it counted
+        m_learntMs = m_learntMs >= 0 ? nowMs : -1;
+    }
+    if (playing && !m_playing && m_learntMs >= 0) m_learntMs = nowMs;  // resumed: the pause is not counted
+    m_playing = playing;
+    if (reportedMs > 0 && reportedMs != m_lastReported) {
+        m_lastReported = reportedMs;
         m_baseMs = reportedMs;
-        m_sinceMs = playing ? nowMs : -1;
-        return reportedMs;
+        m_learntMs = nowMs;
+        m_fromApple = true;
     }
-    if (playing && m_sinceMs < 0) m_sinceMs = nowMs;
-    if (!playing && m_sinceMs >= 0) {
-        m_baseMs += std::max<int64_t>(0, nowMs - m_sinceMs);
-        m_sinceMs = -1;
-    }
-    int64_t position = m_baseMs + (m_sinceMs >= 0 ? std::max<int64_t>(0, nowMs - m_sinceMs) : 0);
+    int64_t position = m_baseMs + Ahead(nowMs);
     return durationMs > 0 ? std::min(position, durationMs) : position;
 }
 
 void PositionClock::Seeked(int64_t positionMs, int64_t nowMs) {
     m_baseMs = std::max<int64_t>(0, positionMs);
-    if (m_sinceMs >= 0) m_sinceMs = nowMs;
+    m_learntMs = nowMs;
+    m_fromApple = false;
+}
+
+bool PositionClock::Moving(int64_t nowMs) const {
+    constexpr int64_t kStallMs = 2000;  // Apple renews its value every ~1 s, read every 250 ms
+    if (!m_playing || m_learntMs < 0) return false;
+    return !m_fromApple || nowMs - m_learntMs <= kStallMs;
+}
+
+// What the clock counts past its base: nothing while the song is not heard moving.
+int64_t PositionClock::Ahead(int64_t nowMs) const {
+    return Moving(nowMs) ? std::max<int64_t>(0, nowMs - m_learntMs) : 0;
 }
 
 PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading) {
@@ -216,12 +229,19 @@ PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading) {
     snapshot.source = "smtc";
     snapshot.playing = reading.status == kSmtcPlaying;
     if (reading.title.empty() && reading.artist.empty()) return snapshot;
+    // Apple Music 1.7's stopped entry ("Not Playing", translated): a title alone, no artist, no length, not playing.
+    const bool idle = !snapshot.playing && reading.artist.empty() && reading.album.empty() &&
+                      reading.endTicks <= reading.startTicks;
+    if (idle) return snapshot;
 
     int64_t length = std::max<int64_t>(0, reading.endTicks - reading.startTicks);
     int64_t position = std::max<int64_t>(0, reading.positionTicks - reading.startTicks);
-    if (snapshot.playing && reading.lastUpdated > 0 && reading.now > reading.lastUpdated) {
-        position += reading.now - reading.lastUpdated;
-    }
+    // A song still at 0 two seconds after the timeline was set is not heard yet (loading, or a stream that never
+    // comes): Apple renews the timeline about once a second while a song plays.
+    constexpr int64_t kNotStartedTicks = 20'000'000;
+    const int64_t since = reading.now - reading.lastUpdated;
+    const bool started = position > 0 || since <= kNotStartedTicks;
+    if (snapshot.playing && reading.lastUpdated > 0 && since > 0 && started) position += since;
     if (length > 0) position = std::min(position, length);
     snapshot.positionMs = position / kTicksPerMs;
     snapshot.durationMs = length / kTicksPerMs;

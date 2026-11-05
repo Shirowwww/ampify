@@ -61,8 +61,25 @@ inline constexpr char kIidKaraokeLyricsViewModel[] = "A454EA99-2DC3-540F-883A-05
 inline constexpr int kKaraokeLyricsViewModelCurrentLine = 6;
 inline constexpr char kIidKaraokeLyricsLine[] = "AD6B009B-E221-5827-8A3B-85DC8B27DD87";
 inline constexpr int kKaraokeLyricsLineStartTime = 17;
+
+// AMP.UI.Views.IUIBrokerStatics: GetImageSource(Artwork, Double effectivePixelScale, Double width, Double height) ->
+// ImageSource at slot 34, the loader Apple's own artwork images use (read from AMP.UI.Views.winmd 1.1792).
+inline constexpr char kClassUiBroker[] = "AMP.UI.Views.UIBroker";
+inline constexpr char kIidUiBrokerStatics[] = "AC46998B-3672-56BA-BD84-3BC95C07A943";
+inline constexpr int kUiBrokerGetImageSource = 34;
+// GlobalDispatchActionAsync(Object action) -> IAsyncAction at slot 25: how Apple runs one of its actions (an object
+// with no runtime class name, not an ICommand), such as the display's GoToNowPlayingItemAction.
+inline constexpr int kUiBrokerGlobalDispatchAction = 25;
 // Windows.Foundation.IUriRuntimeClass, from the Windows SDK (windows.foundation.h).
 inline constexpr char kIidUriRuntimeClass[] = "9E365E57-48B2-4160-956F-C7385120BBFC";
+
+// The play bar's display (NowPlayingControl#LCD) gives its view model with get_ViewModel; the model's
+// GoToNowPlayingItemAction is the command of Apple's own "go to" entry, which opens the album of the song playing (a
+// file of the library too). Read from AMP.UI.Views.winmd and AMP.Services.winmd 1.1792.
+inline constexpr char kIidNowPlayingControl[] = "2FD25B8B-F2DF-51BF-B3A2-E5340CF53735";
+inline constexpr int kNowPlayingControlViewModel = 10;
+inline constexpr char kIidNowPlayingViewModel[] = "8F9C9348-3F61-5F38-8A37-D8FD4E71EAEE";
+inline constexpr int kNowPlayingViewModelGoToItemAction = 10;
 
 // The play queue, in AMP.Services.winmd 1.1792 (GuidAttribute values; a run-time probe found the first two in Apple
 // Music 1.1792). A section of PlayQueue.Sections is a PlayQueueSection that holds its entries
@@ -125,6 +142,14 @@ inline constexpr int kPlayerSkipNextAsync = 17;
 // The first SetPositionAsync overload: (TimeSpan position, Boolean scrubbing) -> IAsyncAction. The winmd list gives no
 // parameters; these come from winmdidl run on AMP.Services.winmd 1.1792.
 inline constexpr int kPlayerSetPositionAsync = 22;
+// GetNowPlayingLyricsAsync(LyricsSource) -> IAsyncAction, read from AMP.Services.winmd 1.1792 with
+// System.Reflection.Metadata. Apple calls it when its lyrics pane opens; until then the item has no lyrics.
+inline constexpr int kPlayerNowPlayingLyricsAsync = 49;
+// GetLyricsAsync(ContentDescriptor, LyricsSource) -> IAsyncOperation<LyricsInfo>: with StoreSyllable, the lyrics
+// timed word by word that Apple's karaoke view shows, when the song has them (the item's own are often by line).
+inline constexpr int kPlayerLyricsAsync = 50;
+// AMP.Services.CommonModels.LyricsSource: Any, None, UserCustom, Store, StoreSyllable (timed word by word).
+inline constexpr int32_t kLyricsSourceStoreSyllable = 4;
 
 // AMP.Services.CommonModels.IPlayerState: get_CanPlay, get_CanPause, ... get_IsMuted, get_IsPaused, get_IsPlaying.
 inline constexpr int kStateIsPaused = 24;
@@ -213,6 +238,8 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.IPlayer", "SkipPreviousAsync", slot::kPlayerSkipPreviousAsync},
     {"AMP.Services.IPlayer", "SkipNextAsync", slot::kPlayerSkipNextAsync},
     {"AMP.Services.IPlayer", "SetPositionAsync", slot::kPlayerSetPositionAsync},
+    {"AMP.Services.IPlayer", "GetNowPlayingLyricsAsync", slot::kPlayerNowPlayingLyricsAsync},
+    {"AMP.Services.IPlayer", "GetLyricsAsync", slot::kPlayerLyricsAsync},
     {"AMP.Services.CommonModels.IPlayerState", "get_IsPaused", slot::kStateIsPaused},
     {"AMP.Services.CommonModels.IPlayerState", "get_IsPlaying", slot::kStateIsPlaying},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_Subtitle", slot::kItemSubtitle},
@@ -260,6 +287,9 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.UI.Views.IFullScreenPlayerStatics", "Instance", slot::kFullScreenPlayerStaticsInstance},
     {"AMP.UI.Views.IFullScreenPlayer", "get_ViewModel", slot::kFullScreenPlayerViewModel},
     {"AMP.UI.Views.IFullScreenPlayer", "Show", slot::kFullScreenPlayerShow},
+    {"AMP.UI.Views.INowPlayingControl", "get_ViewModel", kNowPlayingControlViewModel},
+    {"AMP.Services.CommonModels.INowPlayingViewModel", "get_GoToNowPlayingItemAction", kNowPlayingViewModelGoToItemAction},
+    {"AMP.UI.Views.IUIBrokerStatics", "GlobalDispatchActionAsync", kUiBrokerGlobalDispatchAction},
 };
 
 // AMP.Services.CommonModels.AudioFormat, in the order of its fields in AMP.Services.txt: Other, Lossless,

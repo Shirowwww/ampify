@@ -52,6 +52,8 @@ public:
 
     // Stores the tree of a panel. Registering the same panel again replaces it.
     void SetPanel(const std::string& elementId, const std::string& panelId, Json tree);
+    // Takes the panel out (the host slides it away); registering it again brings it back. False when there was none.
+    bool RemovePanel(const std::string& elementId, const std::string& panelId);
 
     // Stores the tree of an app page. Registering the same path again replaces it.
     void SetPage(const std::string& elementId, const std::string& path, Json tree);

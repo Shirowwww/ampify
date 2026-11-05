@@ -59,6 +59,8 @@ private:
     void Subscribe(const rt::Ref& object, std::optional<int64_t>& token, rt::Ref& source);
     void Unsubscribe(std::optional<int64_t>& token, rt::Ref& source);
     void Drop();
+    // False when this Apple Music has no interface with the lyrics methods: nothing to retry.
+    bool RequestLyrics(const rt::Ref& item) noexcept;
 
     rt::Ref m_player;  // AMP.Services.IPlayer
     std::string m_how;
@@ -77,6 +79,8 @@ private:
     ArtworkReading m_artwork;
 
     std::optional<RawLyrics> m_lyrics;  // of the item in m_item
+    rt::Ref m_syllable;                // GetLyricsAsync of the item, word-timed, while it runs
+    bool m_wordsObtained = false;      // GetLyricsAsync answered for the item (or cannot be asked)
     int m_lyricsTries = 0;
     unsigned long long m_lyricsNextTry = 0;
 };

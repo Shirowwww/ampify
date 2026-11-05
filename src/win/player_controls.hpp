@@ -15,6 +15,7 @@
 #include <string>
 
 #include <winrt/Microsoft.UI.Xaml.h>
+#include <winrt/Microsoft.UI.Xaml.Media.h>
 
 #include "../core/journal.hpp"
 #include "player_buttons.hpp"
@@ -40,6 +41,9 @@ bool SetMainPlayerVolume(double gain) noexcept;
 // The start in ms of the line that the main window's lyrics view lights up (src/win/player_buttons.hpp), -1 while
 // that view or its current line is not there. Interface thread only.
 long long ReadLyricsLineStart() noexcept;
+// The cover of the song playing, loaded by Apple's own artwork loader at about `pixels` wide (its library and catalog
+// images, larger than the play bar's), or null. Interface thread only.
+winrt::Microsoft::UI::Xaml::Media::ImageSource PlayingArtworkSource(double pixels) noexcept;
 
 // Why the last SetMainPlayerVolume failed, once (empty when it did not). Any thread.
 std::string TakeMainPlayerVolumeProblem();

@@ -86,6 +86,14 @@ struct UiNatives : ScriptBridge {
         return JS_UNDEFINED;
     }
 
+    AMPIFY_NATIVE(UiPanelRemove) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.panel", &failure)) return failure;
+        std::string panelId = String(ctx, argc, argv, 0).value_or("");
+        return JS_NewBool(ctx, HostOf(ext).Ui().RemovePanel(ext->id(), panelId));
+    }
+
     AMPIFY_NATIVE(UiPopup) {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
@@ -175,6 +183,7 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiControlLabel", UiNatives::UiControlLabel, 2);
     scope.Function("uiControlActive", UiNatives::UiControlActive, 2);
     scope.Function("uiPanel", UiNatives::UiPanel, 2);
+    scope.Function("uiPanelRemove", UiNatives::UiPanelRemove, 1);
     scope.Function("uiPopup", UiNatives::UiPopup, 1);
     scope.Function("uiFullscreen", UiNatives::UiFullscreen, 2);
     scope.Function("uiFullscreenClose", UiNatives::UiFullscreenClose, 1);

@@ -651,6 +651,54 @@ long long ReadLyricsLineStart() noexcept {
     }
 }
 
+namespace {
+
+template <size_t N>
+bool QueryFirst(const rt::Ref& object, const char* const (&iids)[N], rt::Ref& out) {
+    for (const char* iid : iids) {
+        if (rt::Query(object, rt::GuidOf(iid), out)) return true;
+    }
+    return false;
+}
+
+// IArtwork of the item Apple's player holds now, or an empty Ref.
+rt::Ref PlayingArtwork() {
+    rt::Ref statics, current, player, itemObject, item, artworkObject, artwork;
+    rt::Activation activation =
+        rt::GetActivationFactory(L"AMP.Services.Player", rt::GuidOf(amp::kIidPlayerStatics), statics);
+    if (FAILED(activation.result) || FAILED(rt::CallSlot(statics, amp::slot::kPlayerStaticsCurrent, current.Put())) ||
+        !current || !QueryFirst(current, amp::kIidsPlayer, player) ||
+        FAILED(rt::CallSlot(player, amp::slot::kPlayerNowPlayingItem, itemObject.Put())) || !itemObject ||
+        !rt::Query(itemObject, rt::GuidOf(amp::kIidsNowPlayingItem[0]), item) ||
+        FAILED(rt::CallSlot(item, amp::slot::kItemArtwork, artworkObject.Put())) || !artworkObject ||
+        !rt::Query(artworkObject, rt::GuidOf(amp::kIidArtwork), artwork)) {
+        return {};
+    }
+    return artwork;
+}
+
+}  // namespace
+
+media::ImageSource PlayingArtworkSource(double pixels) noexcept {
+    try {
+        rt::Ref artwork = PlayingArtwork();
+        if (!artwork) return nullptr;
+        rt::Ref broker, image;
+        rt::Activation activation = rt::GetActivationFactory(winrt::to_hstring(amp::kClassUiBroker).c_str(),
+                                                             rt::GuidOf(amp::kIidUiBrokerStatics), broker);
+        if (FAILED(activation.result) ||
+            FAILED(rt::CallSlot(broker, amp::kUiBrokerGetImageSource, artwork.Get(), 1.0, pixels, pixels, image.Put())) ||
+            !image) {
+            return nullptr;
+        }
+        media::ImageSource source{nullptr};
+        winrt::copy_from_abi(source, image.Get());
+        return source;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 bool SetMainPlayerVolume(double gain) noexcept {
     try {
         auto control = MainWindowButton(L"VolumeControl");

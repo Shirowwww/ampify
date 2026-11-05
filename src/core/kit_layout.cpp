@@ -30,7 +30,7 @@ constexpr std::string_view kPlaybackGuard = "extensions/playback-guard";
 }  // namespace
 
 std::vector<std::string_view> BundledElements() {
-    return {"apps/marketplace", "extensions/now-playing", kPlaybackGuard};
+    return {"apps/marketplace", "extensions/now-playing", "extensions/song-panel", kPlaybackGuard};
 }
 
 bool IsBundledElement(std::string_view folder, std::string_view id) {

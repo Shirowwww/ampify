@@ -453,6 +453,41 @@ TEST_CASE(React_UnmountClosesTheFullscreenView) {
     element->Stop();
 }
 
+// The user closes a panel with its Close button: the element is told, the panel leaves its model and its React root
+// unmounts, so its button shows it again with one click, mounted anew.
+TEST_CASE(React_APanelClosedByTheUserUnmountsAndComesBackOnRender) {
+    Fixture f;
+    auto element = f.Make("closable", R"(
+        const { h, useEffect } = Ampify.React;
+        function Panel() {
+          useEffect(() => { Ampify.log("mounted"); return () => Ampify.log("cleanup"); }, []);
+          return h("text", null, "song");
+        }
+        const root = Ampify.ReactDOM.createRoot("panel:song");
+        root.render(h(Panel));
+        Ampify.ui.panel.onClose("song", () => Ampify.log("told"));
+        Ampify.ui.panel.onClose("other", () => Ampify.log("wrong panel"));
+        const button = Ampify.ui.playbar.addButton({ label: "Song", onClick: () => root.render(h(Panel)) });
+        Ampify.log("button " + button);
+    )", R"("ui.panel", "ui.playbar")");
+    CHECK(element->Start());
+    CHECK(f.Panel("closable", "song") == R"({"type":"text","text":"song"})");
+
+    element->DeliverEvent("panelClose", R"({"panel":"song"})");
+    element->Pump();
+    CHECK(f.Panel("closable", "song") == "(absent)");
+    CHECK(f.Logged("[closable] cleanup"));
+    CHECK(f.Logged("[closable] told"));
+    CHECK(!f.Logged("wrong panel"));
+
+    CHECK(f.Logged("[closable] button 1"));
+    element->DeliverClick(1);  // the element's button, one click
+    element->Pump();
+    CHECK(f.Panel("closable", "song") == R"({"type":"text","text":"song"})");
+    CHECK(f.Count("[closable] mounted") == 2);
+    element->Stop();
+}
+
 TEST_CASE(Interface_FullscreenOpenUpdatesAndTellsOnClose) {
     Fixture f;
     auto element = f.Make("fullapi", R"(

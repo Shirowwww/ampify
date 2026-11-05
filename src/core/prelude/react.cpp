@@ -496,6 +496,13 @@ const char kReact[] = R"AMPIFYJS(
           destroy(root);
         });
       }
+      // The same for a panel closed with its Close button: rendered again, it mounts anew.
+      if (where.kind === "panel") {
+        root.offClose = Ampify.ui.panel.onClose(where.id, () => {
+          if (roots.get(where.key) === root) roots.delete(where.key);
+          destroy(root);
+        });
+      }
     }
     root.element = element;
     pending.delete(root);
@@ -511,6 +518,7 @@ const char kReact[] = R"AMPIFYJS(
     roots.delete(where.key);
     if (where.kind === "popup") native.reactClosePopup(where.id);
     else if (where.kind === "fullscreen") Ampify.ui.fullscreen.close();
+    else if (where.kind === "panel") native.uiPanelRemove(where.id);
     else send(where, { type: "stack", children: [] }, "");
     return true;
   }

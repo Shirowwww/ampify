@@ -218,7 +218,33 @@ PlayerSnapshot PlayerBridge::Snapshot() {
         m_lastSource = snapshot.source;
     }
     m_last = snapshot;
+    PublishFeed(snapshot);
     return snapshot;
+}
+
+// For the interface thread's karaoke (the `lyrics` node): the position as just read, and the song's lyrics parsed once.
+void PlayerBridge::PublishFeed(const PlayerSnapshot& snapshot) {
+    NowPlaying now;
+    if (snapshot.track) now.trackKey = snapshot.track->id + "|" + snapshot.track->queueItemId;
+    now.playing = snapshot.playing;
+    now.positionMs = snapshot.positionMs;
+    now.atMs = static_cast<int64_t>(GetTickCount64());
+    now.moving = snapshot.playing && (snapshot.source != "apple" || m_clock.Moving(now.atMs));
+    if (now.trackKey != m_feedKey) {
+        m_feedKey = now.trackKey;
+        m_feedLyrics.reset();
+        m_feedTtmlBytes = 0;
+    }
+    // Parsed again when Apple's text changes: the word-timed lyrics may come after those timed by line.
+    std::optional<RawLyrics> raw = snapshot.lyricsAvailable ? Lyrics() : std::nullopt;
+    size_t bytes = raw ? raw->ttml.size() + raw->staticText.size() : 0;
+    if (raw && bytes != m_feedTtmlBytes) {  // a text without lines is not parsed again at each read
+        std::optional<ampify::Lyrics> parsed = LyricsFromRaw(*raw);
+        if (parsed) m_feedLyrics = std::make_shared<const ampify::Lyrics>(std::move(*parsed));
+        m_feedTtmlBytes = bytes;
+    }
+    now.lyrics = m_feedLyrics;
+    PublishNowPlaying(std::move(now));
 }
 
 bool PlayerBridge::Control(PlayerCommand command, int64_t seekMs) {

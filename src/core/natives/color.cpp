@@ -54,7 +54,37 @@ HttpResponse ArtworkColors(Host& host, ImageHost* images, const std::string& url
     return {200, ColorsJson(*colors)};
 }
 
+// The colours of the cover playing now, the one Windows shows in its media flyout. Worker thread.
+HttpResponse PlayingColors(ArtworkHost* artworks, ImageHost* images) {
+    if (!artworks || !images) return {0, "covers are not read by this host"};
+    std::optional<ArtworkHost::File> file = artworks->CurrentArtwork();
+    if (!file || file->bytes.empty()) return {204, ""};
+    std::optional<RgbaImage> image = images->DecodeImage(file->bytes, kArtworkSide);
+    if (!image) return {0, "the cover is not an image Windows can read"};
+    std::optional<ExtractedColors> colors =
+        ExtractColors(image->pixels.data(), image->pixels.size(), image->width, image->height);
+    if (!colors) return {204, ""};
+    return {200, ColorsJson(*colors)};
+}
+
 struct ColorNatives : ScriptBridge {
+    // native.colorFromPlaying(): starts reading the colours of the cover playing (permission player.read) and returns
+    // the request's id; the answer comes back as dispatch.http, 204 without a cover.
+    AMPIFY_NATIVE(FromPlaying) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "player.read", &failure)) return failure;
+        Host* host = &HostOf(ext);
+        ArtworkHost* artworks = host->Capability<ArtworkHost>();
+        ImageHost* images = host->Capability<ImageHost>();
+        uint32_t id = SubmitHttp(ext, [artworks, images] { return PlayingColors(artworks, images); });
+        if (id == 0) {
+            return Throw(ctx, "RangeError",
+                         "too many requests in flight (" + std::to_string(kMaxHttpInFlight) + " at most)");
+        }
+        return JS_NewUint32(ctx, id);
+    }
+
     // native.colorExtract(bytes: Uint8Array, width, height): JSON text with Spicetify's keys, or null.
     AMPIFY_NATIVE(Extract) {
         if (argc < 3) return JS_NULL;
@@ -97,6 +127,7 @@ struct ColorNatives : ScriptBridge {
 void DefineColor(api::NativeScope& scope) {
     scope.Function("colorExtract", ColorNatives::Extract, 3);
     scope.Function("colorFromArtwork", ColorNatives::FromArtwork, 1);
+    scope.Function("colorFromPlaying", ColorNatives::FromPlaying, 0);
 }
 
 }  // namespace ampify::natives

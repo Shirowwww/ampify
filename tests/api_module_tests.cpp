@@ -102,15 +102,15 @@ const Expected kMembers[] = {
     {"http", "object!{get:f1=get,post:f2=post,postForm:f2=postForm,gifFromVideo:f1=gifFromVideo,open:f1=open}"},  // post, postForm, gifFromVideo and open added in kitApi 1.x, compatible additions
     {"icons", "object!{get:f1=get,names:f0=names}"},
     {"uri", "object!{parse:f1=parse,build:f3=build}"},
-    {"color", "object!{extract:f3=extract,fromArtwork:f1=fromArtwork}"},
+    {"color", "object!{extract:f3=extract,fromArtwork:f1=fromArtwork,playing:f0=playing}"},
     {"fonts", "object!{roles:f0=roles,style:f1=style}"},
     {"ui", "object!{topbar:object!{addButton:f1=addButton},playbar:object!{addButton:f1=addButton},"
            "sidebar:object!{addItem:f1=addItem},"
            "menu:object!{addItem:f2=addItem},popup:object!{open:f1=open},"
            "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},"
-           "panel:object!{register:f2=register},"
+           "panel:object!{register:f2=register,remove:f1=remove,onClose:f2=onClose},"
            "page:object!{register:f2=register},title:object!{set:f1=set},"
-           "setLabel:f2=setLabel,setActive:f2=setActive,navigate:f1=navigate}"},  // setLabel and setActive added in kitApi 1.x, compatible additions
+           "setLabel:f2=setLabel,setActive:f2=setActive,navigate:f1=navigate}"},  // setLabel, setActive, panel.onClose added in kitApi 1.x, compatible additions
 };
 
 const Expected kGlobals[] = {

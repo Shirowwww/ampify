@@ -100,9 +100,11 @@ std::string PlaysBoma(uint64_t id, uint32_t lastPlayed, uint32_t plays, uint32_t
     return boma;
 }
 
-std::string Track(uint64_t id, const std::vector<std::string>& bomas) {
+std::string Track(uint64_t id, const std::vector<std::string>& bomas, uint16_t year = 0) {
     std::string track = Record("itma", 0x178);
     Put32(track, 4, 0x178);
+    track[0xa8] = static_cast<char>(year & 0xff);
+    track[0xa9] = static_cast<char>(year >> 8);
     Put32(track, 12, static_cast<uint32_t>(bomas.size()));
     Put64(track, 16, id);
     for (const std::string& boma : bomas) track += boma;
@@ -167,7 +169,9 @@ std::string LibraryPlain() {
     std::vector<std::string> tracks = {
         Track(0x0123456789ABCDEFull,
               {TextBoma(0x2, u"Sibérie \U0001F3B5"), TextBoma(0x4, u"Artiste"), TextBoma(0x3, u"Album"),
-               Boma(0x36, 40), NumbersBoma(kAdded, 162677), PlaysBoma(0x0123456789ABCDEFull, kPlayed, 40, 1)}),
+               Boma(0x36, 40), NumbersBoma(kAdded, 162677), PlaysBoma(0x0123456789ABCDEFull, kPlayed, 40, 1),
+               TextBoma(0x5, u"Rap"), TextBoma(0xC, u"Compositrice"), TextBoma(0x1B, u"Artiste d'album")},
+              2024),
         Track(0x42, {TextBoma(0x2, u"Never played")}),
     };
     return Section(3, std::string(0xa0, '\0')) + Section(6, "playlists") + Section(1, TrackList(tracks, 2));
@@ -227,11 +231,16 @@ TEST_CASE(MusicDb_ReadsTitlesAndPlayCounts) {
     CHECK(played.playCount == 40);
     CHECK(played.skipCount == 1);
     CHECK(played.durationMs == 162677);
+    CHECK(played.genre == "Rap");
+    CHECK(played.composer == "Compositrice");
+    CHECK(played.albumArtist == "Artiste d'album");
+    CHECK(played.year == 2024);
     CHECK(played.lastPlayedMs == ampify::MacLocalTimeToUnixMs(kPlayed));
     CHECK(played.dateAddedMs == ampify::MacLocalTimeToUnixMs(kAdded));
     const LibraryTrack& never = result.tracks[1];
     CHECK(never.title == "Never played");
     CHECK(never.playCount == 0 && never.lastPlayedMs == 0 && never.dateAddedMs == 0 && never.durationMs == 0);
+    CHECK(never.genre.empty() && never.year == 0);
 }
 
 TEST_CASE(MusicDb_DatesAreLocalWallClockSeconds) {

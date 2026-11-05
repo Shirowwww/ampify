@@ -24,10 +24,12 @@
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
 #include "../core/ui_model.hpp"
+#include "../core/ui_render/apple_tweaks.hpp"
 #include "../core/version_gate.hpp"
 #include "../core/version_list.hpp"
 #include "../../extensions/atmos-leveler/atmos_windows.hpp"
 #include "../win/audio_share.hpp"
+#include "../win/network_fix.hpp"
 #include "../win/player_buttons.hpp"
 #include "../win/win_common.hpp"
 #include "../win/win_host.hpp"
@@ -42,7 +44,9 @@
 
 namespace {
 
-constexpr auto kHealthyAfter = std::chrono::seconds(20);
+// What breaks Apple Music at load does it in the first seconds (first frame, first theme pass). Twenty seconds counted
+// an app closed early twice as two failures, and safe mode left the next start without themes.
+constexpr auto kHealthyAfter = std::chrono::seconds(8);
 constexpr auto kHealthyRetry = std::chrono::seconds(5);
 constexpr auto kReloadEvery = std::chrono::milliseconds(500);
 constexpr DWORD kLaterProcessWaitMs = 5000;  // a later AppleMusic.exe that only passes a link is gone by then
@@ -160,6 +164,8 @@ DWORD WINAPI KernelMain(LPVOID) {
     std::filesystem::path kit = ampify::win::KitDirectory();
     static ampify::Settings settings;
     settings.Load((kit / "settings.txt").string());
+    // Before anything connects: the songs stuck at 0:00 where a server's IPv6 does not answer.
+    if (ampify::uirender::ReadAppleTweaks(settings).ipv4First) ampify::win::InstallIpv4First(journal);
 
     // JavaScript elements live in %USERPROFILE%\Ampify\extensions\<id> and apps\<id>. Both processes
     // load them: an element tells them apart with Ampify.process.
@@ -221,14 +227,14 @@ DWORD WINAPI KernelMain(LPVOID) {
         std::this_thread::sleep_for(kHealthyAfter);
         bool warned = false;
         while (!ampify::win::WindowsResponsive(GetCurrentProcessId())) {
-            if (!warned) journal.Write("Window not responding after 20 s: retrying every 5 s");
+            if (!warned) journal.Write("Window not responding after 8 s: retrying every 5 s");
             warned = true;
             std::this_thread::sleep_for(kHealthyRetry);
         }
 
         ampify::SafeMode safeMode((kit / "state.txt").string());
         safeMode.MarkHealthy();
-        journal.Write("Healthy after 20 s: safe mode count reset");
+        journal.Write("Healthy after 8 s: safe mode count reset");
     }
     return 0;
 }

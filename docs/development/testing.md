@@ -127,7 +127,7 @@ What the logs should show:
 
 - `background.log`: the launcher started, the package and version found, the signature recognized (5 exports), Apple
   Music started, threads paused and resumed in equal numbers, the kernel loaded (also in `AMPLibraryAgent.exe`).
-- `AppleMusic.log`: kernel loaded, version tested, extension host ready, "Healthy after 20 s" about 20 seconds later.
+- `AppleMusic.log`: kernel loaded, version tested, extension host ready, "Healthy after 8 s" about 8 seconds later.
 - Safe mode: with Apple Music closed, set `unhealthy_launches = 2` in `%USERPROFILE%\Ampify\state.txt`, then open
   it. `background.log` says safe mode is active; after 25 seconds the counter is back to 0.
 - Atmos leveler (`AMPLibraryAgent.log`): the hooks installed, a LUFS line per stereo song, and for each Atmos song the

@@ -1,0 +1,44 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "bookmarks",
+  "name": "Bookmarks",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Save songs, albums, artists and playlists from the context menu, or the exact moment of the song playing from the playback bar, like Spicetify's bookmark.js. Come back to them from the main menu.",
+  "translations": {
+    "fr": {
+      "name": "Signets",
+      "description": "Gardez des morceaux, albums, artistes et playlists depuis le menu contextuel, ou l'instant exact du morceau en cours depuis la barre de lecture, comme bookmark.js sur Spicetify. Retrouvez-les depuis le menu principal."
+    },
+    "de": {
+      "name": "Lesezeichen",
+      "description": "Titel, Alben, Künstler und Playlists über das Kontextmenü merken oder per Wiedergabeleiste die genaue Stelle des laufenden Titels, wie bookmark.js in Spicetify. Im Hauptmenü wieder aufrufen."
+    },
+    "es": {
+      "name": "Marcadores",
+      "description": "Guarda canciones, álbumes, artistas y listas desde el menú contextual, o el momento exacto de la canción que suena desde la barra de reproducción, como bookmark.js en Spicetify. Vuelve a ellos desde el menú principal."
+    },
+    "pt": {
+      "name": "Marcadores",
+      "description": "Guarde músicas, álbuns, artistas e playlists pelo menu de contexto, ou o momento exato da música que toca pela barra de reprodução, como o bookmark.js no Spicetify. Volte a eles pelo menu principal."
+    },
+    "ru": {
+      "name": "Закладки",
+      "description": "Сохраняйте треки, альбомы, исполнителей и плейлисты из контекстного меню, а точный момент играющего трека — с панели воспроизведения, как bookmark.js в Spicetify. Возвращайтесь к ним из главного меню."
+    },
+    "ja": {
+      "name": "ブックマーク",
+      "description": "Spicetify の bookmark.js のように、曲・アルバム・アーティスト・プレイリストをコンテキストメニューから、再生中の曲の正確な位置を再生バーから保存できます。メインメニューからいつでも開けます。"
+    },
+    "zh": {
+      "name": "书签",
+      "description": "像 Spicetify 的 bookmark.js 一样，可从右键菜单收藏歌曲、专辑、艺术家和播放列表，也可从播放栏记下当前歌曲的确切时刻。之后在主菜单中回到它们。"
+    }
+  },
+  "tags": ["bookmark", "library"],
+  "preview": "preview.jpg",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": ["player.read", "player.control", "storage", "ui.menu", "ui.playbar", "ui.popup", "network:music.apple.com"]
+}

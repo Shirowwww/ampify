@@ -99,19 +99,28 @@ std::pair<std::string, std::string> SplitArtistAlbum(const std::string& text);
 
 PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit);
 
-// The position of Apple's player. Apple Music 1.1792 leaves its item's CurrentPosition at 0 while a song plays, so when
-// Apple gives nothing the position comes from Apple's lyrics view (src/win/player_bridge.cpp), and the clock counts the
-// time played since the song started, or since the last value, while that view is not there either.
+// The position of Apple's player. Apple's item moves its CurrentPosition about once a second while the song is heard,
+// and leaves it still (0 at first) while the song loads or the stream stalls, though its state says playing. The
+// clock counts on from the last value that changed, for two seconds at most, and invents no time before the first.
+// Without Apple's value, a seek or the line Apple's lyrics view lights up (src/win/player_bridge.cpp) is counted on.
 class PositionClock {
 public:
     // The position to report for `track` at `nowMs` (any steady clock in ms), given what Apple reported.
     int64_t Next(const std::string& track, bool playing, int64_t reportedMs, int64_t durationMs, int64_t nowMs);
-    void Seeked(int64_t positionMs, int64_t nowMs);  // a seek made through Ampify
+    // A seek made through Ampify, or the line Apple's lyrics view lights up.
+    void Seeked(int64_t positionMs, int64_t nowMs);
+    // The song is heard moving: playing, and its position learnt lately (what the karaoke counts on with).
+    bool Moving(int64_t nowMs) const;
 
 private:
+    int64_t Ahead(int64_t nowMs) const;
+
     std::string m_track;
-    int64_t m_baseMs = 0;    // the position when the clock last started or stopped
-    int64_t m_sinceMs = -1;  // when it started, -1 while stopped
+    int64_t m_baseMs = 0;        // the position last learnt
+    int64_t m_learntMs = -1;     // when, on the caller's clock; -1 while nothing is learnt for this track
+    int64_t m_lastReported = 0;  // Apple's last value, to tell when it changes
+    bool m_fromApple = false;    // the base is Apple's value (renewed every second), not a seek or a line
+    bool m_playing = false;
 };
 // The position moves on between two SMTC updates while playing: it is extrapolated to `now`, and kept within the
 // track.

@@ -831,7 +831,7 @@ class KitUpdate(AmpifyTestCase):
         with zipfile.ZipFile(archive, "w") as bundle:
             for name in ("ampify.exe", "ampify_launcher.exe", "ampify_kernel.dll"):
                 bundle.writestr(name, f"{name} {version}")
-            for element in ("apps/marketplace", "extensions/now-playing", "extensions/playback-guard"):  # they ship with the kit
+            for element in ("apps/marketplace", "extensions/now-playing", "extensions/song-panel", "extensions/playback-guard"):  # they ship with the kit
                 bundle.writestr(f"examples/{element}/manifest.json", "{}")
         digest = sha256_of(archive)
         sums = os.path.join(bundle_dir, "SHA256SUMS.txt")
@@ -1465,6 +1465,13 @@ class NewSettings(AmpifyTestCase):
             result = self.ampify("config", key, value)
             self.assertEqual(result.returncode, 0, key + ": " + result.stderr)
         self.assertEqual(self.ampify("config", "apple.close").stdout.strip(), "tray")
+
+    def test_the_card_keys_take_only_the_values_it_offers(self):
+        for key, good in (("theme.glass", "eco"), ("ampify.entry", "header"), ("apple.network", "system")):
+            self.assertEqual(self.ampify("config", key, good).returncode, 0, key)
+            self.assertEqual(self.ampify("config", key, "bogus").returncode, 1, key)
+            self.assertEqual(self.ampify("config", key, "").returncode, 0, key)
+        self.assertIn("full, balanced, eco", self.ampify("config", "theme.glass", "bogus").stderr)
 
     def test_language_takes_a_language_code_only(self):
         for value in ("de", "pt-BR", "zh-Hant-TW", ""):

@@ -76,12 +76,10 @@ ArtworkReading ReadArtwork(const rt::Ref& item) {
     return out;
 }
 
-// The lyrics of an INowPlayingItem (1.1792), or nullopt while there are none.
-std::optional<RawLyrics> ReadLyrics(const rt::Ref& item) {
-    rt::Ref object, info;
-    // INowPlayingItem.get_LyricsInfo (slot 46), then ILyricsInfo.
-    if (FAILED(rt::CallSlot(item, slot::kItemLyricsInfo, object.Put())) || !object) return std::nullopt;
-    if (!rt::Query(object, rt::GuidOf(amp::kIidLyricsInfo), info)) return std::nullopt;
+// The lyrics an ILyricsInfo holds, or nullopt while it has none.
+std::optional<RawLyrics> ReadLyricsInfo(const rt::Ref& object) {
+    rt::Ref info;
+    if (!object || !rt::Query(object, rt::GuidOf(amp::kIidLyricsInfo), info)) return std::nullopt;
     unsigned char have = 0;  // HaveLyrics (slot 12): a WinRT Boolean, one byte
     if (FAILED(rt::CallSlot(info, slot::kLyricsHaveLyrics, &have)) || have == 0) return std::nullopt;
 
@@ -92,6 +90,16 @@ std::optional<RawLyrics> ReadLyrics(const rt::Ref& item) {
     if (raw.ttml.empty() && raw.staticText.empty()) return std::nullopt;
     return raw;
 }
+
+// The lyrics of an INowPlayingItem (1.1792): INowPlayingItem.get_LyricsInfo (slot 46), then ILyricsInfo.
+std::optional<RawLyrics> ReadLyrics(const rt::Ref& item) {
+    rt::Ref object;
+    if (FAILED(rt::CallSlot(item, slot::kItemLyricsInfo, object.Put())) || !object) return std::nullopt;
+    return ReadLyricsInfo(object);
+}
+
+// Word-timed TTML: Apple's syllable lyrics, which its own karaoke view lights word by word.
+bool TimedByWord(const RawLyrics& raw) { return raw.ttml.find("timing=\"Word\"") != std::string::npos; }
 
 std::string Hex(HRESULT hr) {
     char text[16];
@@ -205,6 +213,7 @@ std::optional<AmpReading> AmpPlayer::Read() {
             m_lyrics.reset();
             m_lyricsTries = 0;
             m_lyricsNextTry = 0;
+            m_wordsObtained = !RequestLyrics(itemObject);
         }
         bool lyricsDue = !m_lyrics && m_lyricsTries < kLyricsMaxTries && now >= m_lyricsNextTry;
 
@@ -221,11 +230,33 @@ std::optional<AmpReading> AmpPlayer::Read() {
             m_itemQueueId = reading.queueItemId;
             m_stringsAt = now;
         }
-        if (lyricsDue) {
+        // The word-timed lyrics asked for at the item's start, once Apple has them: they take the place of the item's
+        // own, which are often timed by line only.
+        if (m_syllable && rt::StateOf(m_syllable) != rt::AsyncState::Running) {
+            rt::Ref result;
+            if (rt::StateOf(m_syllable) == rt::AsyncState::Completed &&
+                SUCCEEDED(rt::CallSlot(m_syllable, rt::kAsyncGetResultsSlot, result.Put()))) {
+                std::optional<RawLyrics> words = ReadLyricsInfo(result);
+                if (words) {
+                    m_wordsObtained = true;
+                    if (TimedByWord(*words) || !m_lyrics) m_lyrics = std::move(words);
+                }
+            }
+            m_syllable.Reset();
+        }
+        // The word-timed request that failed or came back empty is made again with the item lyrics' retries, and
+        // within the same tries; the first request of an item is already running this tick.
+        const bool wordsDue = !changed && !m_wordsObtained && !m_syllable && m_lyricsTries < kLyricsMaxTries &&
+                              now >= m_lyricsNextTry;
+        lyricsDue = lyricsDue && !m_lyrics;
+        if (lyricsDue || wordsDue) {
             ++m_lyricsTries;
             m_lyricsNextTry = now + kLyricsRetryMs;
-            if (newest) m_lyrics = ReadLyrics(newest);
-            else m_lyricsTries = kLyricsMaxTries;
+            if (lyricsDue) {
+                if (newest) m_lyrics = ReadLyrics(newest);
+                else m_lyricsTries = kLyricsMaxTries;
+            }
+            if (wordsDue) m_wordsObtained = !RequestLyrics(itemObject);
         }
         reading.title = m_title;
         reading.artist = m_artist;
@@ -237,8 +268,26 @@ std::optional<AmpReading> AmpPlayer::Read() {
         m_item.Reset();
         m_artwork = ArtworkReading{};
         m_lyrics.reset();
+        m_syllable.Reset();
     }
     return reading;
+}
+
+// Apple loads a song's lyrics when its lyrics pane opens. Asking its player for them makes them come without the
+// pane: the item's lyrics info fills in when the action completes, which the next reads pick up. The item's lyrics
+// are often timed by line only, so the word-timed ones are asked for as well (GetLyricsAsync), as Apple's karaoke
+// view does.
+bool AmpPlayer::RequestLyrics(const rt::Ref& item) noexcept {
+    m_syllable.Reset();
+    // Slots 49 and 50 exist on the newest IPlayer only: the older identifier has other slots after 22.
+    rt::Ref player;
+    if (!m_player || !rt::Query(m_player, rt::GuidOf(amp::kIidsPlayer[0]), player)) return false;
+    rt::Ref operation;
+    rt::CallSlot(player, slot::kPlayerNowPlayingLyricsAsync, slot::kLyricsSourceStoreSyllable, operation.Put());
+    rt::Ref descriptor = ContentDescriptorOf(item);
+    if (!descriptor) return true;
+    rt::CallSlot(player, slot::kPlayerLyricsAsync, descriptor.Get(), slot::kLyricsSourceStoreSyllable, m_syllable.Put());
+    return true;
 }
 
 bool AmpPlayer::Command(PlayerCommand command, int64_t seekMs) {

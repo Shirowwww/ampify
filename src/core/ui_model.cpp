@@ -29,9 +29,9 @@ bool OneOf(const std::array<std::string_view, N>& names, std::string_view name) 
 }
 
 bool IsPrimitive(const std::string& name) {
-    static const std::array<std::string_view, 14> kPrimitives = {
+    static const std::array<std::string_view, 15> kPrimitives = {
         "stack", "row", "text", "button", "toggle", "slider", "list", "image", "icon",
-        "card", "textfield", "dropdown", "option", "layer"};
+        "card", "textfield", "dropdown", "option", "layer", "lyrics"};
     return OneOf(kPrimitives, name);
 }
 
@@ -137,7 +137,7 @@ bool CheckTextStyle(const std::string& key, const Json& value, std::string* erro
 
 bool CheckStyle(const std::string& name, const std::string& key, const Json& value, std::string* error) {
     if (std::optional<bool> common = CheckCommonStyle(name, key, value, error)) return *common;
-    if (name == "text") return CheckTextStyle(key, value, error);
+    if (name == "text" || name == "lyrics") return CheckTextStyle(key, value, error);
     return CheckBoxStyle(name, key, value, error);
 }
 
@@ -148,7 +148,8 @@ bool TakesClick(const std::string& name) {
 }
 
 bool TakesChange(const std::string& name) {
-    static const std::array<std::string_view, 4> kEditable = {"toggle", "slider", "textfield", "dropdown"};
+    // A lyrics node reports the start of the line the user picked, in ms.
+    static const std::array<std::string_view, 5> kEditable = {"toggle", "slider", "textfield", "dropdown", "lyrics"};
     return OneOf(kEditable, name);
 }
 
@@ -249,6 +250,15 @@ void UiModel::SetPanel(const std::string& elementId, const std::string& panelId,
     } else {
         m_panels.push_back(UiSlot{elementId, panelId, std::move(tree)});
     }
+}
+
+bool UiModel::RemovePanel(const std::string& elementId, const std::string& panelId) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    auto same = [&](const UiSlot& slot) { return slot.elementId == elementId && slot.id == panelId; };
+    auto found = std::find_if(m_panels.begin(), m_panels.end(), same);
+    if (found == m_panels.end()) return false;
+    m_panels.erase(found);
+    return true;
 }
 
 void UiModel::SetPage(const std::string& elementId, const std::string& path, Json tree) {

@@ -8,6 +8,7 @@
 #include <string>
 
 #include "../src/core/lyrics_host.hpp"
+#include "../src/core/now_playing.hpp"
 #include "../src/core/manifest.hpp"
 #include "../src/core/player_model.hpp"
 #include "../src/core/player_watch.hpp"
@@ -426,4 +427,85 @@ TEST_CASE(PlayerLyrics_TheLyricschangeEventReachesTheElement) {
     element->DeliverPlayer("lyricschange", Snap("a", true));
     element->Pump();
     CHECK(out.str().find("[listener] lyrics now La la") != std::string::npos);
+}
+
+namespace {
+
+ampify::Lyrics TwoTimedLines() {
+    ampify::Lyrics lyrics;
+    lyrics.synced = true;
+    lyrics.lines.push_back({1000, 3000, "one two", {{1000, 2000, "one"}, {2000, 3000, "two"}}});
+    lyrics.lines.push_back({5000, 6000, "three", {}});
+    return lyrics;
+}
+
+}  // namespace
+
+TEST_CASE(Karaoke_LightsTheWordsOfTheLineBeingSung) {
+    ampify::Lyrics lyrics = TwoTimedLines();
+    ampify::KaraokeFrame before = ampify::KaraokeAt(lyrics, 500);
+    CHECK(before.line == -1 && before.words.empty());
+
+    ampify::KaraokeFrame mid = ampify::KaraokeAt(lyrics, 1500);
+    CHECK(mid.line == 0 && !mid.between);
+    CHECK(mid.words.size() == 2);
+    if (mid.words.size() == 2) CHECK(mid.words[0] == 0.5 && mid.words[1] == 0.0);
+
+    ampify::KaraokeFrame second = ampify::KaraokeAt(lyrics, 2500);
+    if (second.words.size() == 2) CHECK(second.words[0] == 1.0 && second.words[1] == 0.5);
+}
+
+TEST_CASE(Karaoke_KeepsTheLastLineThroughAPauseAndHandlesLinesWithoutWords) {
+    ampify::Lyrics lyrics = TwoTimedLines();
+    ampify::KaraokeFrame gap = ampify::KaraokeAt(lyrics, 4000);
+    CHECK(gap.line == 0 && gap.between);
+
+    ampify::KaraokeFrame plain = ampify::KaraokeAt(lyrics, 5500);
+    CHECK(plain.line == 1 && !plain.between && plain.words.size() == 1);
+
+    ampify::Lyrics untimed = lyrics;
+    untimed.synced = false;
+    CHECK(ampify::KaraokeAt(untimed, 5500).line == -1);
+}
+
+TEST_CASE(NowPlaying_MovesOnWhileHeardAndKeepsTheLyricsOfItsTrack) {
+    ampify::NowPlaying now;
+    now.trackKey = "t-1";
+    now.playing = true;
+    now.moving = true;
+    now.positionMs = 10000;
+    now.atMs = 1000;
+    CHECK(now.PositionAt(1500) == 10500);
+    CHECK(now.PositionAt(900) == 10000);
+    now.moving = false;  // Apple says playing, but the song loads or stalls: the karaoke waits
+    CHECK(now.PositionAt(5000) == 10000);
+
+    ampify::PublishNowPlaying(now);
+    CHECK(ampify::CurrentNowPlaying().trackKey == "t-1");
+    CHECK(!ampify::CurrentNowPlaying().lyrics);
+}
+
+TEST_CASE(Karaoke_SpreadsALineTimedAsAWholeOverItsWordsByLength) {
+    ampify::Lyrics lyrics;
+    lyrics.synced = true;
+    lyrics.lines.push_back({0, 3000, "ab  cdef", {}});
+    ampify::KaraokeFrame early = ampify::KaraokeAt(lyrics, 500);
+    CHECK(early.words.size() == 2);
+    if (early.words.size() == 2) CHECK(early.words[0] == 0.5 && early.words[1] == 0.0);
+    ampify::KaraokeFrame late = ampify::KaraokeAt(lyrics, 2000);
+    if (late.words.size() == 2) CHECK(late.words[0] == 1.0 && late.words[1] == 0.5);
+
+    std::vector<std::string> pieces = ampify::KaraokePieces(lyrics.lines[0]);
+    CHECK(pieces.size() == 2);
+    if (pieces.size() == 2) CHECK(pieces[0] == "ab " && pieces[1] == "cdef");
+
+    ampify::LyricLine instant{4000, 4000, "no span", {}};  // no duration: nothing to spread over
+    CHECK(ampify::KaraokePieces(instant).empty());
+}
+
+TEST_CASE(Karaoke_GluesTheSyllablesOfOneWordAndSpacesTheWords) {
+    ampify::LyricLine line{0, 3000, "beautiful day", {{0, 500, "beau"}, {500, 900, "ti"}, {900, 1500, "ful"}, {1500, 3000, "day"}}};
+    std::vector<std::string> pieces = ampify::KaraokePieces(line);
+    CHECK(pieces.size() == 4);
+    if (pieces.size() == 4) CHECK(pieces[0] == "beau" && pieces[1] == "ti" && pieces[2] == "ful " && pieces[3] == "day");
 }

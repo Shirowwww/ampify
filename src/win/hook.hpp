@@ -21,9 +21,13 @@ void** VtableEntry(void* object, size_t slot);
 bool HookVtableEntry(void** entry, void* replacement, void** original, std::string& why);
 
 // Replaces the address of `function` imported from `dll` in the import table of every loaded module that
-// imports it. `original` receives the address that was replaced first. Returns how many import entries
-// were replaced. Modules that belong to a protected module are skipped.
+// imports it, delay-loaded imports included (those only when `dll` is a System32 DLL). `original` receives the
+// address that was replaced first. Returns how many import entries were replaced. Protected modules are skipped.
 size_t HookImportEverywhere(const char* dll, const char* function, void* replacement, void** original);
+
+// HookImportEverywhere, and the same for every module loaded afterwards (a loader notification). Returns how many
+// entries were replaced now. Never undone: meant for hooks that stay for the life of the process.
+size_t HookImportFromNowOn(const char* dll, const char* function, void* replacement, void** original);
 
 // Full path of the module that holds `address`. Empty when there is none.
 std::string ModuleOf(const void* address);

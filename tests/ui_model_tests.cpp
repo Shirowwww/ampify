@@ -28,6 +28,14 @@ TEST_CASE(UiTree_AcceptsStacksRowsAndControls) {
     CHECK(error.empty());
 }
 
+TEST_CASE(UiTree_AcceptsTheLyricsOfTheSongPlayingWithATextStyle) {
+    std::string error;
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"lyrics","size":26,"color":"#FFFFFF","placeholder":"None","grow":true})"),
+                               &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"lyrics","size":400})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"lyrics","children":[{"type":"text","text":"x"}]})"), &error));
+}
+
 TEST_CASE(UiTree_RefusesAnUnknownPrimitive) {
     std::string error;
     CHECK(!ampify::ValidateTree(Parse(R"({"type":"script","text":"x"})"), &error));

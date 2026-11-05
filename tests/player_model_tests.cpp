@@ -304,9 +304,26 @@ TEST_CASE(PlayerModel_AnSmtcReadingMovesOnWhilePlaying) {
     reading.now = reading.lastUpdated + 10'000'000'000;  // far past the end
     CHECK(ampify::SnapshotFromSmtc(reading).positionMs == 180'000);
 
+    // A song that never started (loading, or a stream that never comes) stays at 0: Apple renews the timeline about
+    // once a second once a song is heard.
+    reading.positionTicks = 0;
+    reading.now = reading.lastUpdated + 100'000'000;  // 10 s at 0
+    CHECK(ampify::SnapshotFromSmtc(reading).positionMs == 0);
+    reading.now = reading.lastUpdated + 5'000'000;  // half a second after it was set at 0: counted on
+    CHECK(ampify::SnapshotFromSmtc(reading).positionMs == 500);
+
     reading.title.clear();
     reading.artist.clear();
     CHECK(!ampify::SnapshotFromSmtc(reading).track.has_value());
+
+    // Nothing playing: Apple Music 1.7 publishes a stopped entry, "Not Playing" in its own language, with no artist and
+    // no length. It is no song.
+    ampify::SmtcReading idle;
+    idle.status = ampify::kSmtcPaused;
+    idle.title = "\xC3\x80 l'arr\xC3\xAAt";  // "À l'arrêt", the French one
+    CHECK(!ampify::SnapshotFromSmtc(idle).track.has_value());
+    idle.artist = "Artist";  // a real entry with an artist stays one, even without a length
+    CHECK(ampify::SnapshotFromSmtc(idle).track.has_value());
 }
 
 TEST_CASE(PlayerModel_ANewQueueEntryOfTheSameSongIsATrackChange) {
@@ -505,23 +522,59 @@ TEST_CASE(PlayerModel_StateCarriesTheSourceAndTheQueueEntry) {
     CHECK(f.Logged("[source] state apple 42 true 60000"));
 }
 
-// Apple Music 1.1792 leaves its item's CurrentPosition at 0 while a song plays: the clock counts the time played.
-TEST_CASE(PositionClock_CountsTheTimePlayedWhenAppleGivesNoPosition) {
+// A song still loading, or a stream that never starts, is "playing" for Apple with its position at 0: the karaoke
+// must not run ahead of a song nobody hears.
+TEST_CASE(PositionClock_NeverInventsTimeWhileApplesPositionStays) {
     ampify::PositionClock clock;
     CHECK(clock.Next("a", true, 0, 200000, 1000) == 0);
-    CHECK(clock.Next("a", true, 0, 200000, 4000) == 3000);
-    CHECK(clock.Next("a", false, 0, 200000, 5000) == 4000);  // paused: the clock stops
-    CHECK(clock.Next("a", false, 0, 200000, 9000) == 4000);
-    CHECK(clock.Next("a", true, 0, 200000, 10000) == 4000);  // playing again from where it stopped
-    CHECK(clock.Next("a", true, 0, 200000, 12000) == 6000);
-    CHECK(clock.Next("b", true, 0, 200000, 13000) == 0);     // a new song starts at 0
-    CHECK(clock.Next("b", true, 0, 2000, 20000) == 2000);    // never past the song's end
+    CHECK(clock.Next("a", true, 0, 200000, 9000) == 0);
+    CHECK(!clock.Moving(9000));
 }
 
-TEST_CASE(PositionClock_TrustsApplesPositionAndFollowsASeek) {
+// Apple moves its position about once a second: in between, the clock counts on from the last change.
+TEST_CASE(PositionClock_MovesOnBetweenApplesUpdates) {
     ampify::PositionClock clock;
     CHECK(clock.Next("a", true, 30000, 200000, 1000) == 30000);
-    CHECK(clock.Next("a", true, 0, 200000, 2000) == 31000);  // Apple's last value, counted on
-    clock.Seeked(90000, 3000);
-    CHECK(clock.Next("a", true, 0, 200000, 5000) == 92000);
+    CHECK(clock.Next("a", true, 30000, 200000, 1500) == 30500);
+    CHECK(clock.Moving(1500));
+    CHECK(clock.Next("a", true, 31000, 200000, 2030) == 31000);
+    CHECK(clock.Next("b", true, 0, 200000, 3000) == 0);         // a new song starts at 0
+    CHECK(clock.Next("b", true, 1990, 2000, 4000) == 1990);
+    CHECK(clock.Next("b", true, 1990, 2000, 4800) == 2000);     // never past the song's end
+}
+
+TEST_CASE(PositionClock_StopsWhenApplesPositionStallsOrPauses) {
+    ampify::PositionClock clock;
+    CHECK(clock.Next("a", true, 30000, 200000, 1000) == 30000);
+    CHECK(clock.Next("a", true, 30000, 200000, 5000) == 30000);  // buffering: Apple's value no longer moves
+    CHECK(!clock.Moving(5000));
+    CHECK(clock.Next("a", true, 31000, 200000, 6000) == 31000);  // it moves again
+    CHECK(clock.Next("a", false, 31000, 200000, 6500) == 31500); // paused: what was counted is kept
+    CHECK(!clock.Moving(6500));
+    CHECK(clock.Next("a", false, 31000, 200000, 9000) == 31500);
+}
+
+TEST_CASE(PositionClock_FollowsASeekAndApplesLyricsLine) {
+    ampify::PositionClock clock;
+    CHECK(clock.Next("a", true, 30000, 200000, 1000) == 30000);
+    clock.Seeked(90000, 1200);
+    CHECK(clock.Next("a", true, 30000, 200000, 2200) == 91000);  // Apple's value from before the seek is old news
+    CHECK(clock.Next("a", true, 91500, 200000, 2500) == 91500);
+    // Without Apple's position, the line its lyrics view lights up proves the song moves: counted on from there.
+    ampify::PositionClock lines;
+    CHECK(lines.Next("a", true, 0, 200000, 1000) == 0);
+    lines.Seeked(12000, 2000);
+    CHECK(lines.Next("a", true, 0, 200000, 6000) == 16000);
+    CHECK(lines.Moving(6000));
+}
+
+// A pause is not time played: the clock starts again from where it stopped, however long the pause lasted.
+TEST_CASE(PositionClock_ResumesWhereThePauseLeftIt) {
+    ampify::PositionClock clock;
+    CHECK(clock.Next("a", true, 0, 200000, 1000) == 0);
+    clock.Seeked(12000, 2000);
+    CHECK(clock.Next("a", true, 0, 200000, 3000) == 13000);
+    CHECK(clock.Next("a", false, 0, 200000, 3500) == 13500);
+    CHECK(clock.Next("a", true, 0, 200000, 33500) == 13500);
+    CHECK(clock.Next("a", true, 0, 200000, 34000) == 14000);
 }

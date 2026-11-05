@@ -26,8 +26,9 @@ A run of `hsma` sections: header length at 4 (0x38), type at 12, total length at
 track list. The others hold the library header (`hfma` again, type 3), playlists, albums (`lama`), artists (`lAma`).
 
 - `ltma`, the track list: header length at 4 (0x5C), track count at 8. The tracks follow.
-- `itma`, one track: header length at 4 (0x178), total length at 8, sub-record count at 12, persistent id (UInt64) at 16.
-  The sub-records follow the header.
+- `itma`, one track: header length at 4 (0x178), total length at 8, sub-record count at 12, persistent id (UInt64) at 16,
+  year (UInt16) at 0xA8 (checked on a real library in November 2026: "Timeless" gives 2024). The sub-records follow
+  the header.
 - `boma`, a sub-record: 0x14 at 4, total length at 8, subtype at 12.
 
 | Subtype | Content |
@@ -36,8 +37,9 @@ track list. The others hold the library header (`hfma` again, type 3), playlists
 | 0x1 | Numbers, 384 bytes: bit rate at 108, date added at 112, date modified at 148, duration in ms at 176 |
 | 0x17 | Plays, 72 bytes: persistent id again at 20, last played at 28, play count at 32, skip count at 36 |
 
-Other subtypes: 0x5 genre, 0x6 kind, 0xB file URL (UTF-8), 0xC composer, 0x1B album artist, 0x1E to 0x22 sort names,
-0x36 and 0x38 binary plists of cloud ids.
+Other subtypes: 0x5 genre, 0x6 kind, 0xB file URL (UTF-8), 0xC composer, 0x1B album artist (the three read by
+Ampify, same text layout as the title), 0x1E to 0x22 sort names, 0x36 and 0x38 binary plists of cloud ids
+(`cloud-album-id`, `cloud-artist-id` such as `r.agzJEin`, `cloud-universal-libray-id`: library ids, not catalog ids).
 
 ## Dates
 

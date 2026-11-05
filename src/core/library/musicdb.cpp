@@ -50,7 +50,12 @@ constexpr uint32_t kBomaNumbers = 0x1;
 constexpr uint32_t kBomaTitle = 0x2;
 constexpr uint32_t kBomaAlbum = 0x3;
 constexpr uint32_t kBomaArtist = 0x4;
+constexpr uint32_t kBomaGenre = 0x5;
+constexpr uint32_t kBomaComposer = 0xC;
 constexpr uint32_t kBomaPlays = 0x17;
+constexpr uint32_t kBomaAlbumArtist = 0x1B;
+// The track's year, a 16-bit number in the itma header.
+constexpr size_t kTrackYear = 0xA8;
 // Text sub-record: encoding at 20 (1 is UTF-16LE), byte length at 24, the text from 36.
 constexpr size_t kTextStart = 36;
 constexpr uint32_t kTextUtf16 = 1;
@@ -133,6 +138,9 @@ void ReadBoma(std::string_view boma, uint32_t subtype, LibraryTrack& track) {
         case kBomaTitle: track.title = BomaText(boma); break;
         case kBomaAlbum: track.album = BomaText(boma); break;
         case kBomaArtist: track.artist = BomaText(boma); break;
+        case kBomaGenre: track.genre = BomaText(boma); break;
+        case kBomaComposer: track.composer = BomaText(boma); break;
+        case kBomaAlbumArtist: track.albumArtist = BomaText(boma); break;
         case kBomaNumbers:
             if (boma.size() < kNumbersDuration + 4) break;
             track.dateAddedMs = MacLocalTimeToUnixMs(U32(boma, kNumbersDateAdded));
@@ -153,6 +161,9 @@ bool ReadTrack(std::string_view record, LibraryTrack& track, std::string* error)
     size_t at = U32(record, 4);
     uint32_t count = U32(record, 12);
     track.persistentId = U64(record, 16);
+    if (at >= kTrackYear + 2) {
+        track.year = static_cast<uint8_t>(record[kTrackYear]) | (static_cast<uint8_t>(record[kTrackYear + 1]) << 8);
+    }
     for (uint32_t i = 0; i < count && at < record.size(); i++) {
         std::string_view rest = record.substr(at);
         if (rest.size() < kBomaMinBytes || rest.substr(0, 4) != "boma") {

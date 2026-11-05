@@ -253,6 +253,7 @@ characters per text; attributes are plain values.
 | `dropdown`, `option` | `label`, `value`, `disabled`, `onChange`; children are `option` nodes with `value`, `label` |
 | `image` | `src` (https, a file path, or `"artwork"`: Apple's image of the song playing, following it), `label`, `onClick`, `fit` (`cover`, `contain`, `fill`), `cornerRadius`, `width`, `height` |
 | `icon` | `icon` (SVG), `label`, `onClick` |
+| `lyrics` | `size`, `color`, `placeholder`, `onChange`: the lyrics of the song playing, lit word by word as Apple's own view does, the current line larger and kept in view; `placeholder` shows while the song has none; a click on a line gives its start in ms to `onChange` |
 | any | `tooltip`, `tooltipPlacement` (`top`, `bottom`, `left`, `right`), `tooltipDelay` (0 to 10000 ms) |
 
 A `card`, `image` or `icon` with an `onClick` works from the keyboard as well: Tab stops on it, Enter or Space clicks
@@ -280,7 +281,10 @@ Ampify.ui.fullscreen.open(view)        // permission ui.fullscreen; called again
 Ampify.ui.fullscreen.close()
 Ampify.ui.fullscreen.onClose(fn)       // returns a function that removes fn
 Ampify.ui.applePlayer.open()           // permission ui.fullscreen: Apple Music's own full-screen player
-Ampify.ui.panel.register(id, view)     // a 380 px column on the right
+Ampify.ui.panel.register(id, view)     // a 380 px column on the right; it slides in from the right
+Ampify.ui.panel.remove(id)             // slides it back out; register brings it back
+Ampify.ui.panel.onClose(id, fn)        // the user closed it with its Close button: it is removed (register brings it
+                                       // back, a React root unmounts) and fn runs; returns a function that removes fn
 Ampify.ui.title.set(text)              // title of the element's panel, page and popup
 Ampify.ui.setLabel(id, label)          // new text of a top bar or play bar button, by the id addButton returned
 Ampify.ui.setActive(id, on)            // on or off: a button or sidebar entry that is on takes Apple Music's accent colour
@@ -304,6 +308,10 @@ Ampify.ui.navigate(path)
 - `applePlayer.open()` opens Apple's full-screen player where the user chose in Ampify's settings page (`apple.fullscreen`).
   If Apple Music refuses, nothing opens and the log says why.
 - An app page takes the place of Apple Music's page, with a Back button; Apple Music's own navigation closes it.
+- A `lyrics` node draws itself from Apple's player at the screen's pace: the element renders it once, with no timer of
+  its own. Give it room, as a growing child of a `stack` of fixed `height`. An `image` with `src: "artwork"` shows
+  the cover loaded large by Apple's own loader, not the play bar's small one.
+- `ReactDOM` unmounting a `panel:` target removes the panel, as `panel.remove` does.
 - Extensions cannot inject raw XAML. Themes are the only elements that ship XAML.
 
 ### 5.6 Services [preview]
@@ -323,11 +331,13 @@ Ampify.icons.names() -> string[]
 Ampify.color.extract(pixels, width, height)         // RGBA pixels -> PROMINENT, VIBRANT, DARK_VIBRANT, LIGHT_VIBRANT,
                                                     //   DESATURATED, VIBRANT_NON_ALARMING, palette
 Ampify.color.fromArtwork(url) -> Promise<colors>    // an https://*.mzstatic.com artwork, same keys
+Ampify.color.playing() -> Promise<colors | null>    // the cover playing now, library songs too (player.read)
 Ampify.fonts.roles() -> { [role]: { family, weight, size, fromTheme } }
 Ampify.fonts.style(name) -> { role, family, weight, size, fromTheme } | null
 Ampify.lyrics.current() -> Promise<lyrics | null>   // player.lyrics() as a promise, permission player.read
 Ampify.library.tracks() -> Promise<track[]>         // permission library.read
-//   track: { persistentId, title, artist, album, playCount, skipCount, lastPlayed, dateAdded, durationMs }
+//   track: { persistentId, title, artist, album, albumArtist, genre, composer, year, playCount, skipCount,
+//            lastPlayed, dateAdded, durationMs }   // text fields "" and year 0 when the library does not say
 ```
 
 - `http` calls go over https to declared hosts only. A string body is sent as a form, an object as JSON. Allowed

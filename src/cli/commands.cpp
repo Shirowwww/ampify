@@ -119,9 +119,10 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
         if (!SplitLaunchFlags(value, &problem)) return false;
         return true;
     }
-    if (key == uirender::kKitUpdateKey) {
-        if (!uirender::IsAppleTweakValue(key, value)) {
-            problem = "kit_update expects auto (install on its own), ask or off";
+    // Every choice of the Apple Music card (apple.*, theme.glass, ampify.entry, kit_update): a value it offers.
+    if (std::string offered = uirender::AppleTweakValues(key); !offered.empty()) {
+        if (!value.empty() && !uirender::IsAppleTweakValue(key, value)) {
+            problem = key + " expects one of: " + offered + " (empty: the default)";
             return false;
         }
         return true;

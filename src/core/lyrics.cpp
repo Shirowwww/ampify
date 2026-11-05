@@ -482,6 +482,76 @@ Lyrics ParseTtml(std::string_view ttml) {
     return Scanner().Run(ttml);
 }
 
+namespace {
+
+// The words of a line, timed. Apple times many lines only as a whole: their words then share the line's span by
+// length, so they still light up one after the other. Kept out of the parsed lyrics, which say only what Apple gave.
+std::vector<LyricWord> TimedWords(const LyricLine& line) {
+    if (!line.words.empty() || line.endMs <= line.startMs) return line.words;
+    std::vector<LyricWord> words;
+    size_t letters = 0;
+    for (size_t at = 0; at < line.text.size();) {
+        size_t end = line.text.find(' ', at);
+        if (end == std::string::npos) end = line.text.size();
+        if (end > at) {
+            words.push_back({0, 0, line.text.substr(at, end - at)});
+            letters += end - at;
+        }
+        at = end + 1;
+    }
+    const double span = static_cast<double>(line.endMs - line.startMs);
+    size_t before = 0;
+    for (LyricWord& word : words) {
+        word.startMs = line.startMs + static_cast<int64_t>(span * before / letters);
+        before += word.text.size();
+        word.endMs = line.startMs + static_cast<int64_t>(span * before / letters);
+    }
+    return words;
+}
+
+}  // namespace
+
+KaraokeFrame KaraokeAt(const Lyrics& lyrics, int64_t positionMs) {
+    KaraokeFrame frame;
+    if (!lyrics.synced) return frame;
+    // Lines come in time order: the last one whose start has passed.
+    auto after = std::upper_bound(lyrics.lines.begin(), lyrics.lines.end(), positionMs,
+                                  [](int64_t at, const LyricLine& line) { return at < line.startMs; });
+    if (after == lyrics.lines.begin()) return frame;
+    const LyricLine& line = *(after - 1);
+    frame.line = static_cast<int>(after - lyrics.lines.begin()) - 1;
+    frame.between = line.endMs > line.startMs && positionMs >= line.endMs;
+    const std::vector<LyricWord> words = TimedWords(line);
+    frame.words.reserve(words.size());
+    for (const LyricWord& word : words) {
+        double done = 0;
+        if (positionMs >= word.endMs) done = 1;
+        else if (positionMs > word.startMs) done = static_cast<double>(positionMs - word.startMs) / (word.endMs - word.startMs);
+        frame.words.push_back(done);
+    }
+    return frame;
+}
+
+std::vector<std::string> KaraokePieces(const LyricLine& line) {
+    const std::vector<LyricWord> words = TimedWords(line);
+    std::vector<std::string> pieces;
+    pieces.reserve(words.size());
+    size_t cursor = 0;
+    for (size_t i = 0; i < words.size(); i++) {
+        const std::string& word = words[i].text;
+        size_t at = line.text.find(word, cursor);
+        bool last = i + 1 == words.size();
+        if (at == std::string::npos) {  // a text that does not hold the word: spaces between all words
+            pieces.push_back(last ? word : word + " ");
+            continue;
+        }
+        cursor = at + word.size();
+        bool spaced = cursor < line.text.size() && line.text[cursor] == ' ';
+        pieces.push_back(spaced && !last ? word + " " : word);
+    }
+    return pieces;
+}
+
 std::optional<Lyrics> LyricsFromRaw(const RawLyrics& raw) {
     Lyrics lyrics = ParseTtml(raw.ttml);
     if (lyrics.lines.empty() && raw.staticText.size() <= kMaxLyricsBytes) lyrics = FromStatic(raw.staticText);

@@ -869,6 +869,7 @@ function fakeI18n(language) {
   const tables = {};
   return {
     language,
+    tables,
     define(messages) {
       for (const [code, table] of Object.entries(messages)) tables[code] = { ...tables[code], ...table };
     },
@@ -1781,7 +1782,7 @@ test("playback-guard leaves a paused song, a loading song and a song it already 
 
 // One stand-in for the player, the playback bar, menus, the sidebar, the panel, http and timers. `used` collects each
 // permission the script really asked for, to compare with the manifest.
-function featureAmpify(name, { config = {}, storage = new Map(), language = "en", state = null } = {}) {
+function featureAmpify(name, { config = {}, storage = new Map(), language = "en", state = null, locale = "en-US" } = {}) {
   const { manifest, source } = load(name);
   const granted = new Set(manifest.permissions ?? []);
   const used = new Set();
@@ -1795,13 +1796,16 @@ function featureAmpify(name, { config = {}, storage = new Map(), language = "en"
   const world = {
     logs: [], commands: [], buttons: [], menus: [], labels: [], sidebar: [], navigated: [], opened: [], gets: [],
     intervals: [], stops: [], handlers: { trackchange: [], statechange: [] }, target: "", inFlight: 0, maxInFlight: 0,
+    active: new Map(),
     getAnswer: () => ({ status: 0, text: "" }),
+    queue: { available: true, complete: true, items: [] },  // null: queue.list() throws
     state: state ?? { playing: false, positionMs: 0, durationMs: 0, track: null },
   };
   const command = (label) => (...args) => (need("player.control"), world.commands.push([label, ...args].join(" ")), true);
   const Ampify = {
     log: (message) => world.logs.push(String(message)),
     onStop: (fn) => world.stops.push(fn),
+    locale,
     config: { get: (key, fallback) => (key in config ? config[key] : fallback) },
     storage: {
       get: (key, fallback) => (need("storage"), storage.has(key) ? structuredClone(storage.get(key)) : fallback),
@@ -1812,16 +1816,27 @@ function featureAmpify(name, { config = {}, storage = new Map(), language = "en"
       on: (event, fn) => (need("player.read"), world.handlers[event].push(fn)),
       next: command("next"),
       seek: command("seek"),
+      queue: {
+        list: () => {
+          need("player.read");
+          if (!world.queue) throw new Error("queue unavailable");
+          return structuredClone(world.queue);
+        },
+      },
+    },
+    uri: {
+      build: (kind, id, options = {}) => `https://music.apple.com/${options.storefront || "us"}/${kind}/_/${id}`,
     },
     ui: {
       menu: { addItem: (kind, item) => (need("ui.menu"), world.menus.push({ kind, ...item })) },
       playbar: { addButton: (button) => (need("ui.playbar"), world.buttons.push(button), world.buttons.length) },
       setLabel: (id, label) => (need("ui.playbar"), world.labels.push([id, label])),
+      setActive: (id, on) => (need("ui.playbar"), world.active.set(id, on)),
       sidebar: { addItem: (item) => (need("ui.sidebar"), world.sidebar.push(item)) },
       navigate: (path) => (need("ui.page"), world.navigated.push(path)),
     },
     React: react.React,
-    components: Object.fromEntries(["Card", "Button", "Toggle", "Dropdown", "Text"].map((n) => [n, host(n.toLowerCase())])),
+    components: Object.fromEntries(["Card", "Button", "Toggle", "Dropdown", "Text", "TextField"].map((n) => [n, host(n.toLowerCase())])),
     ReactDOM: { render: (tree, target) => (need("ui." + target.split(":")[0]), (world.target = target), react.mount(() => tree)) },
     http: {
       get: (url) => {
@@ -1942,6 +1957,402 @@ test("skip-list speaks French on a French Windows and declares exactly the permi
   assert.equal(open.label, "Liste d'exclusion");
   open.onClick({});
   assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+});
+
+const catalogQueue = (title, catalogId) => ({
+  available: true, complete: true,
+  items: [
+    { id: "q0", title: "Earlier", artist: "A", section: "history", catalogId: "1" },
+    { id: "q1", title, artist: "A", section: "current", catalogId },
+  ],
+});
+const fieldsOf = (tree) => allNodes(tree).filter((node) => node.type === "textfield");
+const openAppMenu = (fake) => fake.world.menus.find((item) => item.kind === "app").onClick({});
+const buttonLabels = (tree) => allNodes(tree).filter((node) => node.type === "button").map((node) => node.label);
+const pasteAndMerge = (fake, text) => {
+  buttonIn(fake.react.page.tree, "Import").onClick();
+  fieldsOf(fake.react.page.tree)[0].onChange(text);
+  buttonIn(fake.react.page.tree, "Add to the list").onClick();
+  return textsOf(fake.react.page.tree);
+};
+
+test("skip-list keeps the kind and catalog id of a menu item, and drops what is odd", () => {
+  const fake = featureAmpify("skip-list");
+  const click = fake.world.menus[0].onClick;
+  click({ title: "Halo", item: { kind: "song", id: "123", canonicalId: "x" } });
+  click({ title: "Air", item: { kind: "artist", id: "45" } });
+  click({ title: "Odd", item: { kind: "bogus", id: "12a" } });
+  click({ title: "Local", item: { kind: "song" } });
+  click({ title: "Long", item: { kind: "album", id: "1".repeat(20) } });
+  click({ title: "Halo", item: { kind: "song", id: "123" } });
+  assert.deepEqual(fake.storage.get("entries"), [
+    { name: "Halo", artist: "", kind: "song", id: "123" },
+    { name: "Air", artist: "", kind: "artist", id: "45" },
+    { name: "Odd", artist: "" },
+    { name: "Local", artist: "", kind: "song" },
+    { name: "Long", artist: "", kind: "album" },
+  ]);
+});
+
+test("skip-list matches an album entry on the album only and an artist entry on the artist only", () => {
+  const entries = [{ name: "Greatest Hits", artist: "", kind: "album" }, { name: "Air", artist: "", kind: "artist" }];
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", entries]]) });
+  fake.emit("trackchange", playing(song("1", "Greatest Hits", "Someone", "Other"), 100_000));
+  fake.emit("trackchange", playing(song("2", "Air", "Someone", "Air"), 100_000));
+  assert.deepEqual(fake.world.commands, [], "a song or an album of that name is not the artist or the album");
+  fake.emit("trackchange", playing(song("3", "Song", "Someone", "greatest HITS"), 100_000));
+  fake.emit("trackchange", playing(song("4", "Song", "AIR", "Other"), 100_000));
+  assert.deepEqual(fake.world.commands, ["next", "next"]);
+});
+
+test("skip-list matches a song entry on its catalog id, else on its name", () => {
+  const entries = [{ name: "Old Title", artist: "", kind: "song", id: "123" }, { name: "Halo", artist: "Beyoncé", kind: "song" }];
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", entries]]) });
+  fake.world.queue = catalogQueue("Renamed", "123");
+  fake.emit("trackchange", playing(song("1", "Renamed", "Someone"), 100_000));
+  assert.deepEqual(fake.world.commands, ["next"], "the catalog id of the current queue item matches");
+
+  fake.world.queue = catalogQueue("Other", "999");
+  fake.emit("trackchange", playing(song("2", "Other", "Someone"), 100_000));
+  fake.world.queue = catalogQueue("Elsewhere", "123");
+  fake.emit("trackchange", playing(song("3", "Not that one", "Someone"), 100_000));
+  assert.deepEqual(fake.world.commands, ["next"], "another id, or a queue item that is not the playing song, does not match");
+
+  fake.emit("trackchange", playing(song("4", "halo", "BEYONCE", "Air"), 100_000));
+  fake.emit("trackchange", playing(song("5", "Halo", "Someone"), 100_000));
+  fake.emit("trackchange", playing(song("6", "Song", "Halo", "Halo"), 100_000));
+  assert.deepEqual(fake.world.commands, ["next", "next"], "the name falls back on the title and the artist, not on an album");
+});
+
+test("skip-list falls back on the name when the queue is missing, unavailable or throws", () => {
+  const entry = { name: "Halo", artist: "", kind: "song", id: "123" };
+  for (const queue of [null, { available: false, items: [] }, {}, { items: [null, { section: "current" }] }]) {
+    const fake = featureAmpify("skip-list", { storage: new Map([["entries", [entry]]]) });
+    fake.world.queue = queue;
+    fake.emit("trackchange", playing(song("1", "Halo", "Someone"), 100_000));
+    fake.emit("trackchange", playing(song("2", "Other", "Someone"), 100_000));
+    assert.deepEqual(fake.world.commands, ["next"], JSON.stringify(queue));
+  }
+});
+
+test("skip-list does not match a song entry with a known id on a same-titled song with another id", () => {
+  const entries = [{ name: "Halo", artist: "", kind: "song", id: "123" }];
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", entries]]) });
+  fake.world.queue = catalogQueue("Halo", "999");
+  fake.emit("trackchange", playing(song("1", "Halo", "Someone"), 100_000));
+  assert.deepEqual(fake.world.commands, [], "another catalog id is another song");
+  fake.world.queue = catalogQueue("Halo", "123");
+  fake.emit("trackchange", playing(song("2", "Halo", "Someone"), 100_000));
+  assert.deepEqual(fake.world.commands, ["next"]);
+});
+
+test("skip-list matches a kind it cannot read from a track on nothing, and a legacy entry on any name", () => {
+  const kinds = ["playlist", "composer", "genre", "station", "video", "concert", "container"];
+  const entries = kinds.map((kind) => ({ name: "Match", artist: "", kind }));
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", entries]]) });
+  fake.emit("trackchange", playing(song("1", "Match", "Match", "Match"), 100_000));
+  assert.deepEqual(fake.world.commands, [], "a title, artist or album of that name is not a playlist or a genre");
+
+  const legacy = featureAmpify("skip-list", { storage: new Map([["entries", [{ name: "Match", artist: "" }]]]) });
+  legacy.emit("trackchange", playing(song("2", "Song", "Someone", "match"), 100_000));
+  assert.deepEqual(legacy.world.commands, ["next"]);
+});
+
+test("skip-list cuts an export by UTF-8 bytes, so Japanese, Chinese and Russian names fit a text field", () => {
+  const long = (char) => char.repeat(190);
+  const list = [
+    ...Array.from({ length: 12 }, (_, i) => ({ name: "日本語の曲名" + i, artist: "アーティスト" + i })),
+    { name: long("中"), artist: long("Я") },
+    { name: "Ж".repeat(60), artist: "😀".repeat(60) },
+  ];
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", list]]) });
+  openAppMenu(fake);
+  buttonIn(fake.react.page.tree, "Export").onClick();
+  const parts = [];
+  for (;;) {
+    const [field] = fieldsOf(fake.react.page.tree);
+    assert.ok(Buffer.byteLength(field.value, "utf8") <= 500, "a text holds 500 bytes at most");
+    parts.push(field.value);
+    const next = allNodes(fake.react.page.tree).find((node) => node.type === "button" && node.label === "Next");
+    if (!next) break;
+    next.onClick();
+  }
+  const exported = parts.flatMap((part) => JSON.parse(part));
+  assert.equal(exported.length, list.length);
+  assert.deepEqual(exported.slice(0, 12), list.slice(0, 12));
+  assert.ok(Buffer.byteLength(exported[12].name, "utf8") <= 80, "a long name is cut by bytes");
+  assert.ok(exported[12].name.length > 0 && exported[13].artist.length > 0);
+  assert.ok(!exported.some((entry) => /�|[\ud800-\udbff](?![\udc00-\udfff])/.test(entry.name + entry.artist)), "no character cut in half");
+});
+
+test("skip-list exports its list as compact JSON, in parts a text field can hold", () => {
+  const list = Array.from({ length: 40 }, (_, i) => ({ name: "Song " + i + "x".repeat(20), artist: "Artist " + i }));
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", list]]) });
+  openAppMenu(fake);
+  buttonIn(fake.react.page.tree, "Export").onClick();
+  const parts = [];
+  for (;;) {
+    const [field] = fieldsOf(fake.react.page.tree);
+    assert.ok(field.value.length <= 500, "a text holds 500 characters at most");
+    parts.push(field.value);
+    const next = allNodes(fake.react.page.tree).find((node) => node.type === "button" && node.label === "Next");
+    if (!next) break;
+    assert.match(textsOf(fake.react.page.tree).join("|"), new RegExp(`Part ${parts.length} of \\d+`));
+    next.onClick();
+  }
+  assert.ok(parts.length > 1);
+  assert.deepEqual(parts.flatMap((part) => JSON.parse(part)), list);
+  assert.ok(parts.every((part) => !part.includes("\n") && !part.includes(": ")), "compact");
+
+  const empty = featureAmpify("skip-list", { storage: new Map([["entries", list.slice(0, 2)]]) });
+  openAppMenu(empty);
+  buttonIn(empty.react.page.tree, "Export").onClick();
+  assert.equal(fieldsOf(empty.react.page.tree)[0].value, JSON.stringify(list.slice(0, 2)));
+  assert.ok(!buttonLabels(empty.react.page.tree).includes("Next"), "one part has no Next");
+  buttonIn(empty.react.page.tree, "Done").onClick();
+  assert.equal(fieldsOf(empty.react.page.tree).length, 0);
+});
+
+test("skip-list imports what it exported, part by part", () => {
+  const list = [
+    { name: "Halo", artist: "Beyoncé", kind: "song", id: "123" }, { name: "Air", artist: "", kind: "artist" },
+    { name: "Greatest Hits", artist: "" }, { name: "He said \"no\"", artist: "A\\B" },
+  ];
+  const source = featureAmpify("skip-list", { storage: new Map([["entries", list]]) });
+  openAppMenu(source);
+  buttonIn(source.react.page.tree, "Export").onClick();
+  const exported = fieldsOf(source.react.page.tree)[0].value;
+
+  const target = featureAmpify("skip-list");
+  openAppMenu(target);
+  assert.ok(pasteAndMerge(target, exported).includes("Added 4, skipped 0."));
+  assert.deepEqual(target.storage.get("entries"), list);
+  assert.ok(pasteAndMerge(target, exported).includes("Added 0, skipped 4."), "a second import adds nothing");
+  assert.deepEqual(target.storage.get("entries"), list);
+});
+
+test("skip-list's import validates strictly, drops unknown fields and skips duplicates", () => {
+  const known = [{ name: "Known", artist: "" }];
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", known]]) });
+  openAppMenu(fake);
+  const long = "n".repeat(300);
+  const texts = pasteAndMerge(fake, JSON.stringify([
+    { name: "Halo", artist: "Beyoncé", kind: "song", id: "123", extra: "x", count: 5 },
+    { name: "halo", artist: "BEYONCÉ", kind: "song", id: "123" },
+    { name: "KNOWN" },
+    { name: "" }, { name: "  " }, { name: 5 }, "text", null, [1], { artist: "No name" },
+    { name: "Air", kind: "nope", id: "x1" },
+    { name: "Album", artist: 7 },
+    { name: long },
+  ]));
+  assert.ok(texts.includes("Added 3, skipped 10."), texts.join("|"));
+  assert.deepEqual(fake.storage.get("entries"), [
+    ...known,
+    { name: "Halo", artist: "Beyoncé", kind: "song", id: "123" },
+    { name: "Air", artist: "" },
+    { name: "n".repeat(200), artist: "" },
+  ]);
+});
+
+test("skip-list's import reports invalid text and never throws", () => {
+  const fake = featureAmpify("skip-list");
+  openAppMenu(fake);
+  for (const [text, message] of [
+    ["", "This is not valid JSON."], ["{nope", "This is not valid JSON."], ["[{\"name\":\"A\"}", "This is not valid JSON."],
+    ["{\"name\":\"A\"}", "The text must be a JSON list of entries."], ["\"text\"", "The text must be a JSON list of entries."],
+    ["null", "The text must be a JSON list of entries."], ["x".repeat(200_001), "This text is too long to import."],
+  ]) {
+    assert.ok(pasteAndMerge(fake, text).includes(message), `${text.slice(0, 20)}: ${message}`);
+  }
+  assert.equal(fake.storage.get("entries"), undefined, "nothing was stored");
+});
+
+test("skip-list's import stops at 500 entries and keeps the ones it has", () => {
+  const known = Array.from({ length: 499 }, (_, i) => ({ name: "Known " + i, artist: "" }));
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", known]]) });
+  openAppMenu(fake);
+  const texts = pasteAndMerge(fake, JSON.stringify([{ name: "New 1" }, { name: "New 2" }, { name: "New 3" }]));
+  assert.ok(texts.includes("Added 1, skipped 2."), texts.join("|"));
+  const entries = fake.storage.get("entries");
+  assert.equal(entries.length, 500);
+  assert.deepEqual(entries.slice(0, 499), known);
+  assert.equal(entries[499].name, "New 1");
+});
+
+test("skip-list's panel stays under the interface's 300 nodes with a full list, in every view", () => {
+  const full = Array.from({ length: 500 }, (_, i) => ({ name: "Entry " + i, artist: "Artist", kind: "song", id: String(i + 1) }));
+  const fake = featureAmpify("skip-list", { storage: new Map([["entries", full]]) });
+  openAppMenu(fake);
+  assert.ok(allNodes(fake.react.page.tree).length <= 300, "list");
+  buttonIn(fake.react.page.tree, "Export").onClick();
+  assert.ok(allNodes(fake.react.page.tree).length <= 300, "export");
+  buttonIn(fake.react.page.tree, "Done").onClick();
+  buttonIn(fake.react.page.tree, "Import").onClick();
+  assert.ok(allNodes(fake.react.page.tree).length <= 300, "import");
+  for (const text of textsOf(fake.react.page.tree)) assert.ok(text.length <= 500);
+});
+
+test("skip-list has every new string in all eight languages, and a new version", () => {
+  const fake = featureAmpify("skip-list");
+  const { tables } = fake.context.Ampify.i18n;
+  const english = Object.keys(tables.en).sort();
+  for (const code of ["fr", "de", "es", "pt", "ru", "ja", "zh"]) {
+    assert.deepEqual(Object.keys(tables[code]).sort(), english, code);
+    for (const key of ["export", "import", "merge", "added", "invalid"]) assert.notEqual(tables[code][key], tables.en[key], `${code}.${key}`);
+  }
+  assert.equal(fake.manifest.version, "1.1.0");
+  for (const code of ["fr", "de", "es", "pt", "ru", "ja", "zh"]) assert.ok(fake.manifest.translations[code].description.length > 20);
+});
+
+// ---- bookmarks ---------------------------------------------------------------------------------------------------
+
+const withoutDate = (list) => list.map(({ added, ...rest }) => (assert.equal(typeof added, "number"), rest));
+const rowWith = (tree, text) =>
+  allNodes(tree).find((node) => node.type === "row" && textsOf(node).some((shown) => shown.startsWith(text)));
+const bookmarked = (list, options = {}) => featureAmpify("bookmarks", { storage: new Map([["bookmarks", list]]), ...options });
+
+test("bookmarks stores a menu item with its kind and id, only the ones Apple gives", () => {
+  const fake = featureAmpify("bookmarks");
+  assert.equal(fake.world.menus[0].kind, "context");
+  assert.equal(fake.world.menus[0].label, "Bookmark");
+  const click = fake.world.menus[0].onClick;
+  click({ title: "Halo", item: { kind: "song", id: "123", canonicalId: "x" } });
+  click({ title: "Halo", item: { kind: "song", id: "123" } });
+  click({ title: "Chill", item: { kind: "playlist", id: "pl.u-abc" } });
+  click({ title: "Local song" });
+  click({ title: "Odd", item: { kind: "bogus", id: "../x" } });
+  click({ title: "" });
+  assert.deepEqual(withoutDate(fake.storage.get("bookmarks")), [
+    { title: "Halo", kind: "song", id: "123" }, { title: "Chill", kind: "playlist", id: "pl.u-abc" },
+    { title: "Local song" }, { title: "Odd" },
+  ]);
+});
+
+test("bookmarks' button saves the playing song with its position and catalog id when known", () => {
+  const fake = featureAmpify("bookmarks");
+  assert.equal(fake.world.buttons[0].label, "Bookmark this moment");
+  assert.equal(fake.world.buttons[0].icon, "");
+  fake.world.buttons[0].onClick();
+  assert.equal(fake.storage.get("bookmarks"), undefined, "nothing plays");
+
+  fake.emit("statechange", playing(song("1", "Halo", "Beyoncé"), 200_000, 83_000));
+  fake.world.queue = catalogQueue("Halo", "555");
+  fake.world.buttons[0].onClick();
+  fake.world.queue = null;
+  fake.emit("statechange", playing(song("1", "Halo", "Beyoncé"), 200_000, 90_000));
+  fake.world.buttons[0].onClick();
+  assert.deepEqual(withoutDate(fake.storage.get("bookmarks")), [
+    { title: "Halo", artist: "Beyoncé", positionMs: 83_000, catalogId: "555" },
+    { title: "Halo", artist: "Beyoncé", positionMs: 90_000 },
+  ]);
+});
+
+test("bookmarks keeps 200 at most and cuts long titles", () => {
+  const old = Array.from({ length: 200 }, (_, i) => ({ title: "Old " + i, added: i }));
+  const fake = bookmarked(old);
+  fake.world.menus[0].onClick({ title: "t".repeat(300) });
+  const stored = fake.storage.get("bookmarks");
+  assert.equal(stored.length, 200);
+  assert.equal(stored[0].title, "Old 1", "the oldest goes");
+  assert.equal(stored.at(-1).title.length, 200);
+});
+
+test("bookmarks' list opens from Apple Music's menu only, newest first, with moments as m:ss", () => {
+  const list = [
+    { title: "Old", kind: "album", id: "1", added: 1 },
+    { title: "Halo", artist: "Beyoncé", positionMs: 83_000, added: 2 },
+    { title: "Long", artist: "A", positionMs: 3_725_000, added: 3 },
+  ];
+  const fake = bookmarked(list);
+  assert.equal(fake.world.target, "");
+  const open = fake.world.menus.find((item) => item.kind === "app");
+  assert.equal(open.label, "Bookmarks");
+  open.onClick({});
+  assert.equal(fake.world.target, "popup:bookmarks");
+  assert.deepEqual(textsOf(fake.react.page.tree), ["Long · A · 62:05", "Halo · Beyoncé · 1:23", "Old"]);
+  fake.world.menus[0].onClick({ title: "New", item: { kind: "artist", id: "9" } });
+  assert.equal(textsOf(fake.react.page.tree)[0], "New", "the list follows the menu");
+
+  const empty = featureAmpify("bookmarks");
+  empty.world.menus.find((item) => item.kind === "app").onClick({});
+  assert.match(textsOf(empty.react.page.tree)[0], /Nothing is bookmarked yet/);
+});
+
+test("bookmarks opens an item in Apple Music with the link built from its kind and id", () => {
+  const list = [{ title: "Chill", kind: "playlist", id: "pl.u-abc", added: 1 }, { title: "Album", kind: "album", id: "77", added: 2 }];
+  const fake = bookmarked(list, { locale: "fr-FR" });
+  openAppMenu(fake);
+  buttonIn(rowWith(fake.react.page.tree, "Album"), "Open").onClick();
+  buttonIn(rowWith(fake.react.page.tree, "Chill"), "Open").onClick();
+  assert.deepEqual(fake.world.opened, ["https://music.apple.com/fr/album/_/77", "https://music.apple.com/fr/playlist/_/pl.u-abc"]);
+  const plain = bookmarked(list);
+  openAppMenu(plain);
+  buttonIn(rowWith(plain.react.page.tree, "Album"), "Open").onClick();
+  assert.equal(plain.world.opened[0], "https://music.apple.com/us/album/_/77");
+});
+
+test("bookmarks seeks inside the song playing now, else opens the song by its catalog id", () => {
+  const moment = { title: "Halo", artist: "Beyoncé", positionMs: 83_000, catalogId: "555", added: 1 };
+  const fake = bookmarked([moment]);
+  openAppMenu(fake);
+  fake.emit("trackchange", playing(song("9", "Other", "Someone"), 100_000));
+  buttonIn(rowWith(fake.react.page.tree, "Halo"), "Open").onClick();
+  assert.deepEqual(fake.world.opened, ["https://music.apple.com/us/song/_/555"]);
+  assert.deepEqual(fake.world.commands, []);
+
+  fake.world.queue = catalogQueue("Halo", "555");
+  fake.emit("trackchange", playing(song("1", "Halo", "Beyoncé feat. Someone"), 200_000));
+  buttonIn(rowWith(fake.react.page.tree, "Halo"), "Open").onClick();
+  assert.deepEqual(fake.world.commands, ["seek 83000"], "same catalog id");
+  assert.equal(fake.world.opened.length, 1);
+
+  const named = bookmarked([{ title: "Halo", artist: "Beyoncé", positionMs: 5_000, added: 1 }]);
+  openAppMenu(named);
+  named.emit("trackchange", playing(song("1", "HALO", "beyonce"), 200_000));
+  buttonIn(rowWith(named.react.page.tree, "Halo"), "Open").onClick();
+  assert.deepEqual(named.world.commands, ["seek 5000"], "same name and artist when no id is known");
+  named.emit("trackchange", playing(song("2", "Else", "Someone"), 200_000));
+  const row = rowWith(named.react.page.tree, "Halo");
+  assert.equal(buttonIn(row, "Open").disabled, true, "no id and not playing: nothing to open");
+  buttonIn(row, "Open").onClick();
+  assert.equal(named.world.opened.length, 0);
+});
+
+test("bookmarks removes an entry", () => {
+  const fake = bookmarked([{ title: "A", added: 1 }, { title: "B", added: 2 }]);
+  openAppMenu(fake);
+  buttonIn(rowWith(fake.react.page.tree, "B"), "Remove").onClick();
+  assert.deepEqual(withoutDate(fake.storage.get("bookmarks")), [{ title: "A" }]);
+  assert.deepEqual(textsOf(fake.react.page.tree), ["A"]);
+});
+
+test("bookmarks' panel stays under 300 nodes, speaks French, and declares exactly the permissions it uses", () => {
+  const full = Array.from({ length: 200 }, (_, i) => ({ title: "Song " + i, kind: "song", id: String(i + 1), added: i }));
+  const big = bookmarked(full);
+  openAppMenu(big);
+  assert.ok(allNodes(big.react.page.tree).length <= 300);
+
+  const fake = bookmarked([{ title: "Halo", kind: "song", id: "1", added: 1 }], { language: "fr" });
+  assert.equal(fake.world.menus[0].label, "Ajouter un signet");
+  fake.world.queue = catalogQueue("Halo", "1");
+  fake.emit("statechange", playing(song("1", "Halo", "A"), 100_000, 1_000));
+  fake.world.buttons[0].onClick();
+  openAppMenu(fake);
+  allNodes(fake.react.page.tree).filter((node) => node.label === "Ouvrir").forEach((node) => node.onClick());
+  buttonIn(fake.react.page.tree, "Retirer").onClick();
+  assert.deepEqual(fake.world.commands, ["seek 1000"]);
+  assert.equal(fake.world.opened.length, 1);
+  assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+  assert.equal(fake.manifest.version, "1.0.0");
+});
+
+test("bookmarks has every string in all eight languages", () => {
+  const fake = featureAmpify("bookmarks");
+  const { tables } = fake.context.Ampify.i18n;
+  for (const code of ["fr", "de", "es", "pt", "ru", "ja", "zh"]) {
+    assert.deepEqual(Object.keys(tables[code]).sort(), Object.keys(tables.en).sort(), code);
+    assert.ok(fake.manifest.translations[code].name && fake.manifest.translations[code].description, code);
+  }
 });
 
 const daysAgo = (days) => new Date(Date.now() - days * 86400000).toISOString().replace(/\.\d+Z$/, "Z");
@@ -2120,4 +2531,62 @@ test("new-releases keeps a few requests in flight and declares exactly the permi
   single.world.sidebar[0].onClick();
   assert.deepEqual(single.world.navigated, ["/new-releases"]);
   assert.deepEqual([...single.used].sort(), declared(single.manifest));
+});
+
+// ---- ab-loop -----------------------------------------------------------------------------------------------------
+
+const at = (positionMs, track = song("1", "Riff", "Band"), isPlaying = true) =>
+  ({ ...playing(track, 200_000, positionMs), playing: isPlaying });
+
+test("ab-loop marks a start, then an end, and goes back to the start at the end", () => {
+  const fake = featureAmpify("ab-loop");
+  const button = fake.world.buttons[0];
+  assert.equal(button.label, "Loop: mark the start");
+  button.onClick();
+  assert.equal(fake.world.labels.length, 0, "nothing plays: nothing marked");
+
+  fake.emit("statechange", at(30_000));
+  button.onClick();
+  assert.deepEqual(fake.world.labels.at(-1), [1, "Loop from 0:30: mark the end"]);
+  assert.equal(fake.world.active.get(1), true);
+  fake.emit("statechange", at(30_400));
+  button.onClick();
+  assert.equal(fake.world.intervals.length, 0, "under a second: the end is not taken");
+
+  fake.emit("statechange", at(45_000));
+  button.onClick();
+  assert.deepEqual(fake.world.labels.at(-1), [1, "Looping 0:30 to 0:45: stop"]);
+  fake.emit("statechange", at(44_000));
+  fake.tick();
+  assert.deepEqual(fake.world.commands, []);
+  fake.emit("statechange", at(45_100));
+  fake.tick();
+  assert.deepEqual(fake.world.commands, ["seek 30000"]);
+  fake.emit("statechange", at(46_000, song("1", "Riff", "Band"), false));
+  fake.tick();
+  assert.deepEqual(fake.world.commands, ["seek 30000"], "paused: it waits");
+
+  button.onClick();
+  assert.deepEqual(fake.world.labels.at(-1), [1, "Loop: mark the start"]);
+  assert.equal(fake.world.active.get(1), false);
+  assert.equal(fake.world.intervals[0].cleared, true);
+});
+
+test("ab-loop swaps points marked backwards and stops with another song", () => {
+  const fake = featureAmpify("ab-loop", { language: "fr" });
+  const button = fake.world.buttons[0];
+  fake.emit("statechange", at(90_000));
+  button.onClick();
+  fake.emit("statechange", at(60_000));
+  button.onClick();
+  assert.deepEqual(fake.world.labels.at(-1), [1, "Boucle de 1:00 à 1:30 : arrêter"]);
+  fake.emit("statechange", at(91_000));
+  fake.tick();
+  assert.deepEqual(fake.world.commands, ["seek 60000"]);
+
+  fake.emit("trackchange", at(0, song("2", "Other", "Band")));
+  assert.deepEqual(fake.world.labels.at(-1), [1, "Boucle : marquer le début"]);
+  assert.equal(fake.world.intervals[0].cleared, true);
+  fake.world.stops.forEach((stop) => stop());
+  assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
 });

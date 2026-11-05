@@ -84,6 +84,22 @@ const char kUi[] = R"AMPIFYJS(
     for (const fn of [...fullscreenClosers]) runGuarded("fullscreen onClose", fn, []);
   };
 
+  // A panel the user closed with its Close button: it leaves the element's model, as panel.remove does, so register
+  // shows it again, and its onClose handlers run (an element keeps its button's state in step with them).
+  // From the host, as JSON text: {"panel": "<id>"}.
+  const panelClosers = new Map();
+  dispatch.panelClose = (payload) => {
+    let id = "";
+    try {
+      id = String(JSON.parse(payload).panel);
+    } catch (error) {
+      native.log("[error] panelClose: " + describe(error));
+      return;
+    }
+    native.uiPanelRemove(id);
+    for (const fn of [...(panelClosers.get(id) || [])]) runGuarded("panel onClose", fn, []);
+  };
+
   Ampify.ui = Object.freeze({
     topbar: Object.freeze({ addButton: (options) => addControl("topbar", options) }),
     playbar: Object.freeze({ addButton: (options) => addControl("playbar", options) }),
@@ -97,7 +113,17 @@ const char kUi[] = R"AMPIFYJS(
     popup: Object.freeze({ open: (vue) => native.uiPopup(treeText(vue)) }),
     fullscreen,
     applePlayer: Object.freeze({ open: () => native.uiApplePlayer() }),
-    panel: Object.freeze({ register: (id, vue) => native.uiPanel(text(id), treeText(vue)) }),
+    panel: Object.freeze({
+      register: (id, vue) => native.uiPanel(text(id), treeText(vue)),
+      remove: (id) => native.uiPanelRemove(text(id)),
+      onClose(id, fn) {
+        if (typeof fn !== "function") throw new TypeError("panel.onClose expects a function");
+        const key = text(id);
+        if (!panelClosers.has(key)) panelClosers.set(key, new Set());
+        panelClosers.get(key).add(fn);
+        return () => panelClosers.get(key).delete(fn);
+      },
+    }),
     page: Object.freeze({ register: (path, vue) => native.uiPage(text(path), treeText(vue)) }),
     title: Object.freeze({ set: (title) => native.uiTitle(text(title)) }),
     // A button of the top bar or the play bar this element added, by the id addButton gave.

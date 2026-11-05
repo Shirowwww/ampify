@@ -63,7 +63,8 @@ constexpr DWORD kBackgroundPollMs = 250;
 constexpr DWORD kBackgroundRetryMs = 5000;
 
 // The first process is held still while the kernel loads, so this wait must stay short: the app would freeze for it.
-constexpr DWORD kHeldLoadTimeoutMs = 3000;
+// A load takes about 60 ms; a first one scanned by an antivirus took 3 s, and finishes after the resume instead.
+constexpr DWORD kHeldLoadTimeoutMs = 1000;
 
 // The library agent opens Apple Music's library as it starts; the kernel waits that long before it loads there.
 const DWORD kAgentSettleMs = static_cast<DWORD>(ampify::WatchConfig{}.agentSettleAfter * 1000);
@@ -518,6 +519,12 @@ int RunAttach(ampify::Journal& journal, const std::filesystem::path& kit, DWORD 
     if (!held.Opened()) {
         journal.Write(label + ": its thread could not be opened (Windows error " + std::to_string(GetLastError()) + ")");
         return 1;
+    }
+    // Windows also hands over the package's other processes (its RuntimeBroker.exe): the kernel has nothing to do
+    // there, so it is not loaded at all. A name Windows would not give proves nothing: such a process is not skipped.
+    if (!image.empty() && ampify::RoleOfImageName(image) == ampify::ProcessRole::Unknown) {
+        journal.Write(label + " started: not Apple Music's interface nor its library agent, left alone");
+        return 0;  // the held thread resumes as `held` goes
     }
     std::optional<Session> session = OpenSession(journal, kit);
     if (!session) return 1;

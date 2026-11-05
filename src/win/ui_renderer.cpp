@@ -13,6 +13,8 @@
 #include <limits>
 #include <utility>
 
+#include <winrt/Microsoft.UI.Dispatching.h>
+#include <winrt/Microsoft.UI.Xaml.Documents.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.Numerics.h>
 #include <winrt/Windows.System.h>
@@ -26,9 +28,11 @@
 
 #include "../core/i18n.hpp"
 #include "../core/json.hpp"
+#include "../core/now_playing.hpp"
 #include "../core/ui_render/probe.hpp"
 #include "../core/ui_render/style.hpp"
 #include "../core/ui_render/svg_icon.hpp"
+#include "player_controls.hpp"
 #include "xaml_host.hpp"
 
 namespace ampify::win {
@@ -302,6 +306,27 @@ struct XamlRenderer::Callbacks {
     }
 };
 
+struct LyricsView;
+
+// An image that shows the song playing (src: "artwork"): Apple's play-bar image tells when the song changes.
+struct ArtworkFollow {
+    media::ImageBrush brush{nullptr};
+    controls::Image sizer{nullptr};
+    controls::Image apple{nullptr};  // set while followed
+    int64_t token = 0;
+    bool off = false;  // the image shows something else now
+    // The large cover being loaded and its handlers, removed by token: auto_revoke goes through a weak reference,
+    // which never resolves for a XAML object Ampify made, so the handlers would stay and an old cover land late.
+    xaml::Media::Imaging::BitmapImage loading{nullptr};
+    winrt::event_token openedToken{};
+    winrt::event_token failedToken{};
+    bool pinned = false;  // the sizer held at its height while it loads the large cover
+    // The frame's Loaded and Unloaded handlers, removed when the image shows something else. The frame itself is not
+    // kept: it holds those handlers, which hold the follower.
+    winrt::event_token loadedToken{};
+    winrt::event_token unloadedToken{};
+};
+
 struct XamlRenderer::Mounted {
     std::string type;
     Layout layout = Layout::None;  // how the native container lays out the children (uirender::LayoutOf)
@@ -326,6 +351,8 @@ struct XamlRenderer::Mounted {
     controls::TextBlock subtitle{nullptr};    // the subtitle of a card
     media::ImageBrush brush{nullptr};         // an image: drawn by its frame's brush, so the corners can be rounded
     controls::Image sizer{nullptr};           // an image: invisible, it gives the frame the picture's own size
+    std::shared_ptr<ArtworkFollow> artwork;   // an image showing the song playing
+    std::shared_ptr<LyricsView> lyrics;       // a lyrics node
     std::shared_ptr<Callbacks> callbacks;
     std::vector<Mounted> children;
 };
@@ -333,6 +360,7 @@ struct XamlRenderer::Mounted {
 namespace {
 
 constexpr std::string_view kArtworkSource = "artwork";
+constexpr double kArtworkPixels = 1200;  // Apple's library covers are 600 to 1200 px wide, its catalog ones larger
 constexpr int kArtworkSearchLimit = 20000;  // elements looked at in the window, a few thousand on the busiest pages
 
 // Apple Music's image of the song playing: the first Image#StaticArtwork under NowPlayingControl#LCD, the one its play
@@ -355,32 +383,337 @@ controls::Image FindPlayingArtwork(const xaml::XamlRoot& root) {
     return nullptr;
 }
 
-// Ties an image of a view to Apple's own: a binding on its Source, so the picture follows every song without the view
-// rendering again. Bound once the view is in the window, where Apple's image can be found.
-void BindPlayingArtwork(const controls::Border& frame, const media::ImageBrush& brush, const controls::Image& sizer) {
-    auto bind = [brush, sizer](const xaml::XamlRoot& root) {
-        controls::Image apple = FindPlayingArtwork(root);
-        if (!apple) return false;
-        auto follow = [&apple](const xaml::DependencyObject& target, const xaml::DependencyProperty& property) {
-            xaml::Data::Binding binding;
-            binding.Source(apple);
-            binding.Path(xaml::PropertyPath(L"Source"));
-            binding.Mode(xaml::Data::BindingMode::OneWay);
-            xaml::Data::BindingOperations::SetBinding(target, property, binding);
-        };
-        follow(brush, media::ImageBrush::ImageSourceProperty());
-        follow(sizer, controls::Image::SourceProperty());
-        return true;
-    };
-    if (frame.XamlRoot() && bind(frame.XamlRoot())) return;
-    auto token = std::make_shared<winrt::event_token>();
-    *token = frame.Loaded([bind, token](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+// Apple empties its image between two songs: the previous cover stays until the next one, so the image keeps its
+// size and a scrolled column does not jump.
+void ShowArtwork(ArtworkFollow& follow, const media::ImageSource& source) {
+    if (!source) return;
+    follow.brush.ImageSource(source);
+    follow.sizer.Source(source);
+}
+
+winrt::Windows::Foundation::Uri AddressOf(const media::ImageSource& source) {
+    auto bitmap = source ? source.try_as<media::Imaging::BitmapImage>() : nullptr;
+    return bitmap ? bitmap.UriSource() : nullptr;
+}
+
+// The large cover's handlers, removed once fired or replaced: the bitmap would otherwise hold the follower, which
+// holds the bitmap.
+void DropLoading(ArtworkFollow& follow) {
+    if (!follow.loading) return;
+    follow.loading.ImageOpened(follow.openedToken);
+    follow.loading.ImageFailed(follow.failedToken);
+    follow.loading = nullptr;
+    if (follow.pinned) follow.sizer.ClearValue(xaml::FrameworkElement::HeightProperty());
+    follow.pinned = false;
+}
+
+// Apple's image at once, then the same cover decoded at its full size as soon as it has loaded: Apple's own bitmaps
+// are decoded at the size of where Apple shows them (a thumbnail in the play bar), though the file behind is large
+// (600 to 1200 px for the library). No empty frame between two songs.
+void RefreshArtwork(const std::shared_ptr<ArtworkFollow>& follow) {
+    if (!follow->apple) return;
+    DropLoading(*follow);
+    media::ImageSource playBar = follow->apple.Source();
+    media::ImageSource broker = PlayingArtworkSource(kArtworkPixels);
+    winrt::Windows::Foundation::Uri address = AddressOf(broker);
+    if (!address) address = AddressOf(playBar);
+    ShowArtwork(*follow, playBar);
+    if (!address) return;
+    media::Imaging::BitmapImage large;
+    large.DecodePixelWidth(static_cast<int>(kArtworkPixels));  // a 3000 px catalog cover is not decoded whole
+    follow->loading = large;
+    // Only the latest bitmap is shown: a slow cover of the previous song that opens late is ignored.
+    follow->openedToken = large.ImageOpened([follow](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
         try {
-            auto loaded = sender.as<controls::Border>();
-            if (bind(loaded.XamlRoot())) loaded.Loaded(*token);
+            auto bitmap = sender.as<media::Imaging::BitmapImage>();
+            if (follow->loading != bitmap) return;
+            if (follow->apple) follow->brush.ImageSource(bitmap);
+            DropLoading(*follow);
         } catch (...) {
         }
     });
+    follow->failedToken = large.ImageFailed([follow](IInspectable const& sender, xaml::ExceptionRoutedEventArgs const&) noexcept {
+        try {
+            if (follow->loading != sender.as<media::Imaging::BitmapImage>()) return;
+            follow->sizer.Source(follow->brush.ImageSource());
+            DropLoading(*follow);
+        } catch (...) {
+        }
+    });
+    large.UriSource(address);
+    // WinUI decodes a bitmap only once something in the window shows it: the invisible sizer loads it, held at its
+    // height meanwhile so the column does not jump, and the visible brush takes it once it has opened.
+    if (double held = follow->sizer.ActualHeight(); held > 0) {
+        follow->sizer.Height(held);
+        follow->pinned = true;
+    }
+    follow->sizer.Source(large);
+}
+
+bool StartArtwork(const std::shared_ptr<ArtworkFollow>& follow, const xaml::XamlRoot& root) {
+    if (follow->off || follow->apple) return true;
+    controls::Image apple = FindPlayingArtwork(root);
+    if (!apple) return false;
+    follow->apple = apple;
+    follow->token = apple.RegisterPropertyChangedCallback(
+        controls::Image::SourceProperty(), [follow](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
+            try {
+                RefreshArtwork(follow);
+            } catch (...) {
+            }
+        });
+    RefreshArtwork(follow);
+    return true;
+}
+
+void StopArtwork(ArtworkFollow& follow) {
+    DropLoading(follow);
+    if (!follow.apple) return;
+    follow.apple.UnregisterPropertyChangedCallback(controls::Image::SourceProperty(), follow.token);
+    follow.apple = nullptr;
+}
+
+// Ties an image of a view to Apple's own image of the song playing, which changes with every song, and shows that
+// cover loaded large. Followed while the view is in the window, where Apple's image can be found.
+std::shared_ptr<ArtworkFollow> FollowPlayingArtwork(const controls::Border& frame, const media::ImageBrush& brush,
+                                                    const controls::Image& sizer) {
+    auto follow = std::make_shared<ArtworkFollow>();
+    follow->brush = brush;
+    follow->sizer = sizer;
+    if (frame.XamlRoot()) StartArtwork(follow, frame.XamlRoot());
+    follow->loadedToken = frame.Loaded([follow](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            StartArtwork(follow, sender.as<controls::Border>().XamlRoot());
+        } catch (...) {
+        }
+    });
+    follow->unloadedToken = frame.Unloaded([follow](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            StopArtwork(*follow);
+        } catch (...) {
+        }
+    });
+    return follow;
+}
+
+constexpr double kLyricsSize = 26;
+constexpr double kLyricsIdleOpacity = 0.4;  // the lines not being sung
+constexpr double kLyricsHoverOpacity = 0.6; // such a line under the pointer
+constexpr double kLyricsUnsung = 0.3;       // a word of the current line not reached yet
+constexpr double kLyricsIdleScale = 0.92;   // the current line is drawn larger than the others
+constexpr int64_t kLyricsLeadMs = 120;      // a word lights up a little ahead, as the eye expects it
+constexpr int64_t kLyricsManualMs = 4000;   // after the user scrolls, the view stays put this long
+constexpr auto kLyricsFrame = std::chrono::milliseconds(33);
+constexpr auto kLyricsMotion = std::chrono::milliseconds(350);
+
+}  // namespace
+
+// The lyrics of the song playing (the `lyrics` node), lit word by word as in Apple's own view: one TextBlock per line,
+// one Run per word whose brush brightens as the word is sung, the current line larger and kept in view. Driven by a
+// timer of the interface thread from src/core/now_playing.hpp, so the extension does not render it again and again.
+struct LyricsView {
+    controls::ScrollViewer scroller{nullptr};
+    controls::StackPanel lines{nullptr};
+    controls::TextBlock placeholder{nullptr};
+    winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer timer{nullptr};
+    std::shared_ptr<const Lyrics> shown;
+    std::vector<std::vector<media::SolidColorBrush>> words;  // per line, per word (one per line without word times)
+    int current = -2;                                        // the line drawn as current; -2 before the first frame
+    double size = kLyricsSize;
+    winrt::Windows::UI::Color color{255, 255, 255, 255};
+    int64_t manualUntil = 0;
+    bool stale = true;  // the look changed: build the lines again
+    std::weak_ptr<LyricsView> self;
+    std::function<void(int64_t)> pick;  // a line clicked: its start, for the element's onChange
+
+    ~LyricsView() {
+        if (timer) timer.Stop();
+    }
+};
+
+namespace {
+
+winrt::Windows::UI::Color WithAlpha(winrt::Windows::UI::Color color, double alpha) {
+    color.A = static_cast<uint8_t>(std::lround(std::clamp(alpha, 0.0, 1.0) * color.A));
+    return color;
+}
+
+void SetBrushAlpha(media::SolidColorBrush& brush, winrt::Windows::UI::Color base, double alpha) {
+    winrt::Windows::UI::Color wanted = WithAlpha(base, alpha);
+    if (brush.Color() != wanted) brush.Color(wanted);
+}
+
+controls::TextBlock LyricLineBlock(LyricsView& view, const LyricLine& line, bool timed) {
+    controls::TextBlock block;
+    block.TextWrapping(xaml::TextWrapping::Wrap);
+    block.FontSize(view.size);
+    block.FontWeight(winrt::Windows::UI::Text::FontWeights::Bold());
+    xaml::ScalarTransition fade;
+    fade.Duration(kLyricsMotion);
+    block.OpacityTransition(fade);
+    xaml::Vector3Transition grow;
+    grow.Duration(kLyricsMotion);
+    block.ScaleTransition(grow);
+    std::vector<media::SolidColorBrush> brushes;
+    std::vector<std::string> pieces = KaraokePieces(line);
+    if (pieces.empty()) pieces.push_back(line.text);
+    for (const std::string& piece : pieces) {
+        winrt::Microsoft::UI::Xaml::Documents::Run run;
+        run.Text(Wide(piece));
+        media::SolidColorBrush brush(view.color);
+        run.Foreground(brush);
+        block.Inlines().Append(run);
+        brushes.push_back(brush);
+    }
+    view.words.push_back(std::move(brushes));
+    if (timed) {
+        int64_t start = line.startMs;
+        block.Tapped([weak = view.self, start](IInspectable const&, xaml::Input::TappedRoutedEventArgs const&) noexcept {
+            try {
+                std::shared_ptr<LyricsView> alive = weak.lock();
+                if (!alive || !alive->pick) return;
+                alive->manualUntil = 0;  // the view follows the song again from the line picked
+                alive->pick(start);
+            } catch (...) {
+            }
+        });
+        // A line under the pointer brightens a little, to say it can be clicked; the current one stays as it is.
+        block.PointerEntered([](IInspectable const& sender, xaml::Input::PointerRoutedEventArgs const&) noexcept {
+            try {
+                auto line = sender.as<controls::TextBlock>();
+                if (line.Opacity() < 1) line.Opacity(kLyricsHoverOpacity);
+            } catch (...) {
+            }
+        });
+        block.PointerExited([](IInspectable const& sender, xaml::Input::PointerRoutedEventArgs const&) noexcept {
+            try {
+                auto line = sender.as<controls::TextBlock>();
+                if (line.Opacity() < 1) line.Opacity(kLyricsIdleOpacity);
+            } catch (...) {
+            }
+        });
+        block.Opacity(kLyricsIdleOpacity);
+        block.Scale({static_cast<float>(kLyricsIdleScale), static_cast<float>(kLyricsIdleScale), 1});
+    }
+    return block;
+}
+
+void BuildLyricLines(LyricsView& view, const std::shared_ptr<const Lyrics>& lyrics) {
+    view.shown = lyrics;
+    view.stale = false;
+    view.current = -2;
+    view.words.clear();
+    view.lines.Children().Clear();
+    view.placeholder.Visibility(lyrics ? xaml::Visibility::Collapsed : xaml::Visibility::Visible);
+    view.placeholder.Foreground(media::SolidColorBrush(WithAlpha(view.color, kLyricsIdleOpacity)));
+    if (lyrics) {
+        for (const LyricLine& line : lyrics->lines) view.lines.Children().Append(LyricLineBlock(view, line, lyrics->synced));
+    }
+    view.scroller.ChangeView(nullptr, winrt::Windows::Foundation::IReference<double>(0.0), nullptr, true);
+}
+
+controls::TextBlock LyricLineAt(const LyricsView& view, int index) {
+    if (index < 0 || static_cast<uint32_t>(index) >= view.lines.Children().Size()) return nullptr;
+    return view.lines.Children().GetAt(index).try_as<controls::TextBlock>();
+}
+
+// Grows from the left edge of its middle, as Apple's lines do.
+void SetLineLook(const controls::TextBlock& block, bool current) {
+    float scale = current ? 1.0f : static_cast<float>(kLyricsIdleScale);
+    block.CenterPoint({0, static_cast<float>(block.ActualHeight() / 2), 0});
+    block.Scale({scale, scale, 1});
+    block.Opacity(current ? 1.0 : kLyricsIdleOpacity);
+}
+
+// The current line about a third down the view, unless the user scrolled a moment ago.
+void KeepLineInView(LyricsView& view, const controls::TextBlock& block, int64_t tick) {
+    if (tick < view.manualUntil) return;
+    if (block.ActualHeight() == 0) view.lines.UpdateLayout();  // lines just built: not measured yet, all at 0
+    auto top =block.TransformToVisual(view.lines).TransformPoint({0, 0});
+    double target = std::max(0.0, top.Y - view.scroller.ViewportHeight() * 0.3);
+    view.scroller.ChangeView(nullptr, winrt::Windows::Foundation::IReference<double>(target), nullptr, false);
+}
+
+void PaintLyrics(LyricsView& view) {
+    // The window hidden (in the notification area, minimized): 30 frames a second for nobody. The next frame shown
+    // catches up with the song at once.
+    if (auto root = view.scroller ? view.scroller.XamlRoot() : nullptr; root && !root.IsHostVisible()) return;
+    NowPlaying now = CurrentNowPlaying();
+    if (view.stale || now.lyrics != view.shown) BuildLyricLines(view, now.lyrics);
+    if (!view.shown || !view.shown->synced) return;
+    const int64_t tick = static_cast<int64_t>(GetTickCount64());
+    KaraokeFrame frame = KaraokeAt(*view.shown, now.PositionAt(tick) + kLyricsLeadMs);
+    if (frame.line != view.current) {
+        if (controls::TextBlock old = LyricLineAt(view, view.current)) {
+            SetLineLook(old, false);
+            for (media::SolidColorBrush& brush : view.words[view.current]) SetBrushAlpha(brush, view.color, 1);
+        }
+        view.current = frame.line;
+        if (controls::TextBlock line = LyricLineAt(view, frame.line)) {
+            SetLineLook(line, true);
+            KeepLineInView(view, line, tick);
+        }
+    }
+    if (frame.line < 0 || static_cast<size_t>(frame.line) >= view.words.size()) return;
+    std::vector<media::SolidColorBrush>& brushes = view.words[frame.line];
+    for (size_t i = 0; i < brushes.size(); i++) {
+        double done = frame.between || frame.words.size() != brushes.size() ? 1.0 : frame.words[i];
+        SetBrushAlpha(brushes[i], view.color, kLyricsUnsung + (1 - kLyricsUnsung) * done);
+    }
+}
+
+void RunLyrics(const std::shared_ptr<LyricsView>& view, bool run) {
+    if (!run) {
+        if (view->timer) view->timer.Stop();
+        return;
+    }
+    if (!view->timer) {
+        view->timer = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
+        view->timer.Interval(kLyricsFrame);
+        std::weak_ptr<LyricsView> weak = view;  // the timer must not keep the view alive
+        view->timer.Tick([weak](auto&&, auto&&) noexcept {
+            try {
+                if (std::shared_ptr<LyricsView> alive = weak.lock()) PaintLyrics(*alive);
+            } catch (...) {
+            }
+        });
+    }
+    view->timer.Start();
+}
+
+xaml::FrameworkElement MakeLyricsView(const std::shared_ptr<LyricsView>& view) {
+    controls::Grid root;
+    view->self = view;
+    view->lines = controls::StackPanel();
+    view->lines.Spacing(view->size * 0.6);
+    view->lines.Padding(xaml::Thickness{0, 24, 24, 240});  // the last line can still come up to its place
+    view->scroller = controls::ScrollViewer();
+    view->scroller.VerticalScrollBarVisibility(controls::ScrollBarVisibility::Hidden);
+    view->scroller.Content(view->lines);
+    view->placeholder = controls::TextBlock();
+    view->placeholder.TextWrapping(xaml::TextWrapping::Wrap);
+    view->placeholder.FontSize(16);
+    root.Children().Append(view->scroller);
+    root.Children().Append(view->placeholder);
+    std::weak_ptr<LyricsView> weak = view;
+    view->scroller.PointerWheelChanged([weak](auto&&, auto&&) noexcept {
+        if (std::shared_ptr<LyricsView> alive = weak.lock()) {
+            alive->manualUntil = static_cast<int64_t>(GetTickCount64()) + kLyricsManualMs;
+        }
+    });
+    root.Loaded([weak](auto&&, auto&&) noexcept {
+        try {
+            if (std::shared_ptr<LyricsView> alive = weak.lock()) RunLyrics(alive, true);
+        } catch (...) {
+        }
+    });
+    root.Unloaded([weak](auto&&, auto&&) noexcept {
+        try {
+            if (std::shared_ptr<LyricsView> alive = weak.lock()) RunLyrics(alive, false);
+        } catch (...) {
+        }
+    });
+    return root;
 }
 
 }  // namespace
@@ -836,6 +1169,10 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
         outer = control = frame;
         mounted.brush = brush;
         mounted.sizer = sizer;
+    } else if (node.type == "lyrics") {
+        mounted.lyrics = std::make_shared<LyricsView>();
+        mounted.lyrics->pick = [callbacks](int64_t startMs) { callbacks->Fire(false, Json(static_cast<double>(startMs)).Dump()); };
+        outer = control = MakeLyricsView(mounted.lyrics);
     } else {  // icon, and option outside a dropdown (refused by ValidateTree, drawn empty here)
         controls::Border frame;  // holds the drawn icon, which is rebuilt when the SVG changes
         frame.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));  // so a tap anywhere counts
@@ -1086,6 +1423,19 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
             SetText(subtitle, Wide(node.Text("subtitle")));
             SetVisible(subtitle, node.Has("subtitle"));
         }
+    } else if (type == "lyrics" && mounted.lyrics) {
+        LyricsView& view = *mounted.lyrics;
+        double size = node.Number("size", kLyricsSize);
+        winrt::Windows::UI::Color color{255, 255, 255, 255};
+        if (std::optional<uirender::Rgba> parsed = uirender::ParseColor(node.Text("color"))) color = ToColor(*parsed);
+        if (size != view.size || color != view.color) {
+            view.size = size;
+            view.color = color;
+            view.lines.Spacing(size * 0.6);
+            view.stale = true;
+        }
+        SetText(view.placeholder, Wide(node.Text("placeholder")));
+        if (building) PaintLyrics(view);
     } else if (type == "text") {
         auto block = control.as<controls::TextBlock>();
         SetText(block, Wide(node.Text("text")));
@@ -1192,13 +1542,21 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
 }
 
 // src, fit, cornerRadius, width and height. The bitmap is loaded again only when the address changes, so a fade of
-// the image does not reload it. `src: "artwork"` shows the song playing (BindPlayingArtwork).
+// the image does not reload it. `src: "artwork"` shows the song playing (FollowPlayingArtwork).
 void XamlRenderer::SetImage(Mounted& mounted, const RenderNode& node) {
     auto frame = mounted.control.as<controls::Border>();
     std::string source = node.Text("src");
+    if (source != mounted.source && mounted.artwork) {
+        ArtworkFollow& old = *mounted.artwork;
+        old.off = true;
+        StopArtwork(old);
+        frame.Loaded(old.loadedToken);
+        frame.Unloaded(old.unloadedToken);
+        mounted.artwork.reset();
+    }
     if (source != mounted.source && mounted.brush && mounted.sizer && source == kArtworkSource) {
         mounted.source = source;
-        BindPlayingArtwork(frame, mounted.brush, mounted.sizer);
+        mounted.artwork = FollowPlayingArtwork(frame, mounted.brush, mounted.sizer);
     } else if (source != mounted.source && mounted.brush && mounted.sizer) {
         mounted.source = source;
         mounted.brush.ClearValue(media::ImageBrush::ImageSourceProperty());

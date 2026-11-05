@@ -32,10 +32,11 @@ type BoxProps = {
 };
 type TextStyleProps = { size?: number; weight?: number; color?: UiColor; wrap?: boolean; maxLines?: number };
 type UiNode = TooltipProps & Omit<PlaceProps, "align"> & BoxProps & Omit<TextStyleProps, "size"> & {
-  type: "stack" | "row" | "list" | "layer" | "card" | "text" | "button" | "toggle" | "slider" | "textfield" | "image" | "icon" | "dropdown" | "option";
+  type: "stack" | "row" | "list" | "layer" | "card" | "text" | "button" | "toggle" | "slider" | "textfield" | "image" | "icon" | "dropdown" | "option" | "lyrics";
   align?: "start" | "center" | "end" | "stretch" | "left" | "right";
   size?: number;                          // text: 8 to 120 px; icon: its size
   fit?: "cover" | "contain" | "fill";     // image
+  placeholder?: string;                   // lyrics: shown while the song has none
   children?: UiNode[];
   onClick?: number;   // callback number (button, card, image, icon)
   onChange?: number;  // callback number (toggle, slider, textfield, dropdown)
@@ -160,6 +161,10 @@ type LibraryTrack = {
   title: string;
   artist: string;
   album: string;
+  albumArtist: string;  // "" when unknown, as genre and composer
+  genre: string;
+  composer: string;
+  year: number;  // 0 when unknown
   playCount: number;
   skipCount: number;
   lastPlayed: number;
@@ -240,7 +245,7 @@ declare const Ampify: {
     fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void };
     // permission ui.fullscreen; Apple Music's own full-screen player, laid over the window
     applePlayer: { open(): void };
-    panel: { register(id: string, view: UiNode): void };
+    panel: { register(id: string, view: UiNode): void; remove(id: string): boolean; onClose(id: string, fn: () => void): () => void };
     title: { set(text: string): void };
     /** A new label for a top bar or play bar button this element added: its text without an icon, its tooltip with one. */
     setLabel(id: number, label: string): boolean;
@@ -290,6 +295,7 @@ declare const Ampify: {
   color: {
     extract(pixels: ArrayLike<number> | ArrayBuffer, width: number, height: number): ExtractedColors;
     fromArtwork(url: string): Promise<ExtractedColors>;  // an artwork address of Apple Music, such as track.artwork
+    playing(): Promise<ExtractedColors | null>;           // the cover playing now (permission player.read)
   };
   fonts: {
     roles(): Record<string, FontRole>;

@@ -78,8 +78,8 @@ The launcher and kernel load only on Apple Music versions in `src/core/version_g
 kernel stores no addresses. A version counts as tested once the bench injects cleanly on it and its export signature is
 recognized. The bench build (`AMPIFY_BENCH=ON`) skips the version list.
 
-The kernel marks a launch healthy once the app has run for 20 seconds. After two launches in a row that never got there,
-the launcher starts Apple Music without the kernel (`src/core/safe_mode.*`, counter in `state.txt`).
+The kernel marks a launch healthy once the app has run for 8 seconds with its window responding. After two launches
+in a row that never got there, the launcher starts Apple Music without the kernel (`src/core/safe_mode.*`, counter in `state.txt`).
 
 ## The kernel
 

@@ -134,6 +134,7 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `theme.scheme` | A section of `colors.ini`, or `auto` to follow Windows' light or dark mode | the theme's default |
 | `theme.schedule` | `HH:MM=Scheme,...` ([format](themes/format.md#automatic-scheme)) | empty |
 | `theme.accent` | `RRGGBB` or `#RRGGBB`: the accent of every theme, and of Apple Music's own look with no theme. What Ampify derives from the accent follows it ([details](themes/format.md#chosen-accent)) | empty: the theme's own |
+| `theme.glass` | `full`, `balanced` or `eco`: how much glass every theme may ask of the graphics card ([details](themes/format.md#glass-level)) | `full` |
 | `theme.parts.colors`, `.resources`, `.assets`, `.script` | `1` or `0`: turn off a part of the theme | `1` |
 | `theme.live_reload` | `1` or `0`: apply the theme again when its files change | `1` |
 | `theme.inspect` | `1`: the kernel writes the interface tree once, then sets `0` | `0` |
@@ -141,8 +142,10 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `language` | `en`, `fr`, `de`, `es`, `pt`, `ru`, `ja` or `zh`; empty follows Windows' regional format | empty |
 | `apple.notifications` | `apple`, `background` (only while Apple Music is not in front) or `never` | `apple` |
 | `apple.close` | `quit`, or `tray` to keep playing behind a notification-area icon | `quit` |
+| `apple.network` | `ipv4-first` tries a server's IPv4 address before its IPv6 one (songs stuck at 0:00 where IPv6 does not answer), `system` keeps Windows' order; applies at the next start | `ipv4-first` |
 | `apple.fullscreen` | Where Apple's full-screen player opens: `window`, `replace`, `work-area` or `screen` | `window` |
 | `apple.playerControls` | Shuffle and repeat around the full-screen player's buttons: `shown` or `hidden` | `shown` |
+| `ampify.entry` | Where the entry that opens the Marketplace stands: `sidebar`, or `header` next to Apple's "···" at the top of the open sidebar | `sidebar` |
 | `catalog.url` | `https://...` or `file://...` | the public catalog |
 | `app_launch_flags` | Arguments added when `ampify launch` starts Apple Music | empty |
 | `check_kit_update` | `1`: some commands say when a new Ampify exists (checked once a day, nothing downloaded) | `0` |

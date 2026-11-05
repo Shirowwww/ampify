@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "ab-loop",
+  "name": "A-B loop",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Loops a passage of the song playing, like Spicetify's Loopy Loop: the playback bar button marks its start, then its end, and the song goes back to the start each time it reaches the end.",
+  "translations": {
+    "fr": {"name": "Boucle A-B", "description": "Fait tourner en boucle un passage du morceau en cours, comme Loopy Loop sur Spicetify : le bouton de la barre de lecture marque son début, puis sa fin, et le morceau revient au début chaque fois qu'il atteint la fin."},
+    "de": {"name": "A-B-Schleife", "description": "Wiederholt einen Abschnitt des laufenden Titels, wie Loopy Loop in Spicetify: Die Schaltfläche in der Wiedergabeleiste setzt den Anfang, dann das Ende, und der Titel springt jedes Mal zum Anfang zurück, wenn er das Ende erreicht."},
+    "es": {"name": "Bucle A-B", "description": "Repite un fragmento de la canción que suena, como Loopy Loop en Spicetify: el botón de la barra de reproducción marca su inicio y luego su final, y la canción vuelve al inicio cada vez que llega al final."},
+    "pt": {"name": "Loop A-B", "description": "Repete um trecho da música que toca, como o Loopy Loop no Spicetify: o botão da barra de reprodução marca o início, depois o fim, e a música volta ao início sempre que chega ao fim."},
+    "ru": {"name": "Повтор A-B", "description": "Повторяет фрагмент играющего трека, как Loopy Loop в Spicetify: кнопка на панели воспроизведения отмечает начало, затем конец, и трек возвращается к началу каждый раз, когда доходит до конца."},
+    "ja": {"name": "A-B ループ", "description": "Spicetify の Loopy Loop のように、再生中の曲の一部分をループします。再生バーのボタンで開始位置、続いて終了位置を設定すると、終了位置に達するたびに開始位置へ戻ります。"},
+    "zh": {"name": "A-B 循环", "description": "像 Spicetify 的 Loopy Loop 一样循环播放当前歌曲的一段：用播放栏的按钮先标记起点，再标记终点，歌曲每次到达终点都会回到起点。"}
+  },
+  "preview": "preview.jpg",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": ["player.read", "player.control", "ui.playbar"],
+  "tags": ["loop", "practice"]
+}

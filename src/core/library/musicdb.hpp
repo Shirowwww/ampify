@@ -19,6 +19,10 @@ struct LibraryTrack {
     std::string title;
     std::string artist;
     std::string album;
+    std::string albumArtist;  // empty when the file does not say, as for the fields below
+    std::string genre;
+    std::string composer;
+    uint32_t year = 0;
     uint32_t playCount = 0;
     uint32_t skipCount = 0;
     int64_t lastPlayedMs = 0;  // Unix time in milliseconds; 0 when never played

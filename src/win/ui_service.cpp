@@ -273,8 +273,13 @@ struct PlacedControl {
     std::string label;     // shown now: a new one from setLabel replaces it in place
     bool hasIcon = false;  // the label is then the tooltip only
     bool active = false;   // on (Ampify.ui.setActive): drawn in the accent colour
+    bool inHeader = false;  // a sidebar entry standing in the sidebar's header (ampify.entry = header)
     std::string elementId;  // with id, the button's place among Ampify's buttons
     int id = 0;
+    std::string icon;       // for its entry in the "More" menu
+    bool clickable = true;  // a text that only shows something never goes into the "More" menu
+    bool folded = false;    // in the playback bar's "More" menu while the bar lacks room (FoldPlaybarButtons)
+    double width = 0;       // its width when it was folded: the room it needs to come back
 };
 
 // The accent colour while a top bar or play bar button is on, the text colour otherwise. An icon is drawn again with the
@@ -359,12 +364,23 @@ struct WindowContext {
     winrt::weak_ref<xaml::FrameworkElement> songColumn;
     winrt::weak_ref<xaml::FrameworkElement> songToggles;
     std::optional<xaml::Thickness> songMargin;  // Apple's, while Ampify moves its right side
+    // What stands left of the toggles in the bar, kept clear of Ampify's buttons (FoldPlaybarButtons), and the
+    // "More" button that holds the buttons folded meanwhile. Strong, like the buttons.
+    winrt::weak_ref<xaml::FrameworkElement> songDisplay;
+    winrt::weak_ref<xaml::FrameworkElement> transport;
+    controls::Button playbarMore{nullptr};
+    bool songRoomQueued = false;  // FollowSongRoom's update waits for the layout pass to end
 
     // Main window only.
     // Strong, like the Popup: the panels stay ours even when Apple Music rebuilds the children of its page (in the
     // bench, a host added to MainPage's Grid went away within seconds and the panel was mounted again and again).
     controls::Grid panelHost{nullptr};
     bool panelDocked = false;  // the theme left the panels a column of their own (DockPanelPopup)
+    // While panels show, the pages make room for them on their right, as Spotify's side views do: the padding of the
+    // grid around Apple's pages, and the padding it had before (PushPages). Strong, released with the context.
+    controls::Grid pushedPages{nullptr};
+    xaml::Thickness pagesPadding{};
+    double pushedRight = -1;  // the right padding Ampify set, -1 when it set none
     controls::StackPanel panelStack{nullptr};
     int panelHostsMade = 0;
     // Strong: nothing else holds a Popup that is outside the tree, and its panels went with it (mounted again on every
@@ -442,6 +458,7 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     bool playerCheckPending = false;  // a window showed: the next refresh looks for Apple's own full-screen player
     uirender::PlayerMode playerMode = uirender::PlayerMode::Window;  // apple.fullscreen, read by the worker
     bool closeToTray = false;  // apple.close, read by the worker
+    std::atomic<bool> entryInHeader{false};  // ampify.entry, read on the interface thread (PlaceSidebarItem)
     std::string cardTheme;   // the theme the Ampify page shows
     bool cardStale = false;  // the theme changed elsewhere (Marketplace, ampify theme set): the card is built again
 
@@ -542,6 +559,7 @@ void ClearWatches(WindowContext& context) {
 }
 
 void UncoverApplePage(WindowContext& context) noexcept;
+void ReleasePages(WindowContext& context);
 
 // Drops what the window holds of XAML: the watches, the panel popup, the renderers and their controls, the placed
 // buttons. Interface thread only: XAML objects must not be released from the worker, which drops the contexts of
@@ -550,6 +568,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
     try {
         ClearWatches(context);
         UncoverApplePage(context);
+        ReleasePages(context);  // the pages' grid outlives the context: it takes its padding back
         if (context.panelPopup) context.panelPopup.IsOpen(false);
         if (context.pagePopup) context.pagePopup.IsOpen(false);
         if (context.fullscreenPopup) context.fullscreenPopup.IsOpen(false);
@@ -578,6 +597,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
         context.contextEntries.clear();
         context.surfaces.clear();
         context.placed.clear();
+        context.playbarMore = nullptr;
         context.probe.clear();
         context.probeObjects.clear();
         context.dialogOpen = false;
@@ -1182,6 +1202,37 @@ xaml::FrameworkElement AccentChoice(UiService::Shared& shared) {
     return LabelledRow(shared, i18n::Text("accent.title"), i18n::Text("accent.help"), control);
 }
 
+// One choice of the card as a menu row, written to settings.txt when it changes (uirender::SetAppleTweak).
+xaml::FrameworkElement TweakRow(UiService::Shared& shared, const uirender::TweakChoice& choice) {
+    UiService::Shared* owner = &shared;
+    controls::ComboBox combo;
+    if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
+    combo.MinWidth(220);
+    auto values = std::make_shared<std::vector<std::string>>();
+    for (const auto& [value, textKey] : choice.options) {
+        values->push_back(value);
+        combo.Items().Append(winrt::box_value(Wide(i18n::Text(textKey))));
+    }
+    auto chosen = std::find(values->begin(), values->end(), choice.value);
+    combo.SelectedIndex(chosen == values->end() ? 0 : static_cast<int32_t>(chosen - values->begin()));
+    Name(combo, "AMPIFY_Tweak_" + choice.key, i18n::Text(choice.labelKey));
+    combo.SelectionChanged([owner, values, key = choice.key](IInspectable const& sender,
+                                                             controls::SelectionChangedEventArgs const&) noexcept {
+        try {
+            int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
+            if (index < 0 || index >= static_cast<int32_t>(values->size())) return;
+            std::string error;
+            if (uirender::SetAppleTweak(owner->kit, key, (*values)[index], error)) {
+                owner->journal.Write("Settings: " + key + " = " + (*values)[index] + " from the Ampify page");
+            } else {
+                owner->journal.Write("Settings: could not change " + key + ": " + error);
+            }
+        } catch (...) {
+        }
+    });
+    return LabelledRow(shared, i18n::Text(choice.labelKey), i18n::Text(choice.helpKey), combo);
+}
+
 // The theme in use, chosen from the installed ones, then its settings. A choice is written to settings.txt, which the
 // theme service watches: the theme changes at once, and its settings replace the last one's.
 xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
@@ -1207,6 +1258,8 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
     combo.SelectedIndex(chosen == ids->end() ? 0 : static_cast<int32_t>(chosen - ids->begin()));
     section.Children().Append(LabelledRow(shared, i18n::Text("mods.theme"), i18n::Text("mods.themeHelp"), combo));
     section.Children().Append(AccentChoice(shared));
+    // Like the accent, the glass level holds for every theme and snippet, and the engine follows it within a tick.
+    section.Children().Append(TweakRow(shared, uirender::GlassChoice(shared.kit)));
 
     controls::StackPanel settingsHost;
     settingsHost.Spacing(10);
@@ -1247,33 +1300,7 @@ void AddRow(const controls::StackPanel& rows, const xaml::UIElement& row) {
 
 // One choice of the card as a menu row, written to settings.txt when it changes (uirender::SetAppleTweak).
 void AddTweakRow(UiService::Shared& shared, const controls::StackPanel& rows, const uirender::TweakChoice& choice) {
-    UiService::Shared* owner = &shared;
-    controls::ComboBox combo;
-    if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
-    combo.MinWidth(220);
-    auto values = std::make_shared<std::vector<std::string>>();
-    for (const auto& [value, textKey] : choice.options) {
-        values->push_back(value);
-        combo.Items().Append(winrt::box_value(Wide(i18n::Text(textKey))));
-    }
-    auto chosen = std::find(values->begin(), values->end(), choice.value);
-    combo.SelectedIndex(chosen == values->end() ? 0 : static_cast<int32_t>(chosen - values->begin()));
-    Name(combo, "AMPIFY_Tweak_" + choice.key, i18n::Text(choice.labelKey));
-    combo.SelectionChanged([owner, values, key = choice.key](IInspectable const& sender,
-                                                             controls::SelectionChangedEventArgs const&) noexcept {
-        try {
-            int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
-            if (index < 0 || index >= static_cast<int32_t>(values->size())) return;
-            std::string error;
-            if (uirender::SetAppleTweak(owner->kit, key, (*values)[index], error)) {
-                owner->journal.Write("Settings: " + key + " = " + (*values)[index] + " from the Ampify page");
-            } else {
-                owner->journal.Write("Settings: could not change " + key + ": " + error);
-            }
-        } catch (...) {
-        }
-    });
-    AddRow(rows, LabelledRow(shared, i18n::Text(choice.labelKey), i18n::Text(choice.helpKey), combo));
+    AddRow(rows, TweakRow(shared, choice));
 }
 
 // What Ampify changes in Apple Music's own behaviour (uirender::AppleTweakChoices): one choice per row. The kernel
@@ -1433,6 +1460,7 @@ controls::StackPanel BuildAmpifyPage(UiService::Shared& shared) {
     page.Children().Append(Section(shared, "AppleMusic", "tweaks.title", "tweaks.subtitle", appleRows));
     controls::StackPanel helpRows;
     AddTweakRow(shared, helpRows, uirender::KitUpdateChoice(shared.kit));
+    AddTweakRow(shared, helpRows, uirender::EntryChoice(shared.kit));
     AddRow(helpRows, FolderRow(shared));
     AddRow(helpRows, ReportRow(shared));
     page.Children().Append(Section(shared, "Help", "mods.help", "", helpRows));
@@ -1769,13 +1797,25 @@ void DressPanelFrames(WindowContext& context, bool docked) {
 // A theme that leaves room on the right of the pages, a right margin on .content as wide as a panel and two gaps, gets
 // the panels docked there: a column of its own, as high as the pages, with their background and corners. Without the
 // room, the panels float over the right of the pages.
+// The grid that holds the pages, whose padding makes the room for the panels (PushPages): themes write the pages' own
+// margin, and write it again while they run, so a margin Ampify added was undone. They never write this padding.
+controls::Grid PagesParent(const controls::Grid& pages) {
+    return pages ? media::VisualTreeHelper::GetParent(pages).try_as<controls::Grid>() : nullptr;
+}
+
+// The room on the right of the pages: their margin and their parent's padding.
+double RoomRight(const controls::Grid& pages) {
+    controls::Grid parent = PagesParent(pages);
+    return pages.Margin().Right + (parent ? parent.Padding().Right : 0);
+}
+
 bool DockPanelPopup(WindowContext& context, const winrt::Windows::Foundation::Size& size) {
-    // Apple has more than one Grid#ContentRoot: the pages are the one the theme gave the room, a right margin.
+    // Apple has more than one Grid#ContentRoot: the pages are the one given the room on the right.
     controls::Grid pages{nullptr};
     for (const auto& object : context.probeObjects) {
         auto grid = object.get().try_as<controls::Grid>();
         if (!grid || grid.Name() != L"ContentRoot" || grid.ActualWidth() <= 0) continue;
-        if (grid.Margin().Right >= kPanelWidth) {
+        if (RoomRight(grid) >= kPanelWidth) {
             pages = grid;
             break;
         }
@@ -1784,16 +1824,34 @@ bool DockPanelPopup(WindowContext& context, const winrt::Windows::Foundation::Si
     auto pagesOrigin = pages.TransformToVisual(nullptr).TransformPoint({0, 0});
     winrt::Windows::Foundation::Rect bounds{pagesOrigin.X, pagesOrigin.Y, static_cast<float>(pages.ActualWidth()),
                                             static_cast<float>(pages.ActualHeight())};
-    // The room is the margin itself: Apple's lyrics and queue pane, when open, starts right after it, and the pages'
-    // parent runs under that pane, so measuring up to the parent's edge would put the column over the pane.
-    double room = std::min(static_cast<double>(pages.Margin().Right),
-                           static_cast<double>(size.Width) - (bounds.X + bounds.Width));
+    // Without a theme, Apple's pages run under its see-through play bar at the window's top: the column starts a gap
+    // below the bar instead of over its buttons.
+    constexpr float kBarGap = 8;
+    if (auto bar = NamedBounds(context, "TransportBar"); bar && bar->Y < size.Height / 2) {
+        float top = bar->Y + bar->Height + kBarGap;
+        if (bounds.Y < top) {
+            bounds.Height = std::max(0.0f, bounds.Height - (top - bounds.Y) - kBarGap);
+            bounds.Y = top;
+        }
+    }
+    // A theme's room is the pages' margin: Apple's lyrics and queue pane, when open, starts right after it, and the
+    // pages' parent runs under that pane, so measuring up to the parent's edge would put the column over the pane.
+    // Ampify's own room is the parent's padding (PushPages): that pane, a child of the same grid, opens inside it,
+    // between the pages and the room, so the column takes the parent's right edge.
+    double start = bounds.X + bounds.Width;
+    double room = std::min(RoomRight(pages), static_cast<double>(size.Width) - start);
+    controls::Grid parent = PagesParent(pages);
+    if (double padding = parent ? parent.Padding().Right : 0; padding >= kPanelWidth + 8) {
+        double parentRight = parent.TransformToVisual(nullptr).TransformPoint({0, 0}).X + parent.ActualWidth();
+        room = std::min(padding, static_cast<double>(size.Width) - (parentRight - padding));
+        start = parentRight - padding;
+    }
     if (room < kPanelWidth + 8) return false;
     double gap = (room - kPanelWidth) / 2;
     double width = kPanelWidth;
     if (context.panelHost.Width() != width) context.panelHost.Width(width);
     if (context.panelHost.Height() != bounds.Height) context.panelHost.Height(bounds.Height);
-    double left = bounds.X + bounds.Width + gap;
+    double left = start + gap;
     if (context.panelPopup.HorizontalOffset() != left) context.panelPopup.HorizontalOffset(left);
     if (context.panelPopup.VerticalOffset() != bounds.Y) context.panelPopup.VerticalOffset(bounds.Y);
     media::Brush background = pages.Background();
@@ -1807,8 +1865,61 @@ bool DockPanelPopup(WindowContext& context, const winrt::Windows::Foundation::Si
     return true;
 }
 
+constexpr double kPushGap = 8;  // between the pages and the panels they make room for
+
+// A panel on its way out no longer takes clicks (SlidePanelOut): the pages need room only for the others.
+bool AnyPanelShown(const WindowContext& context) {
+    if (!context.panelStack) return false;
+    for (const xaml::UIElement& child : context.panelStack.Children()) {
+        if (child.IsHitTestVisible()) return true;
+    }
+    return false;
+}
+
+// The grid of Apple's pages: the Grid#ContentRoot that holds Frame#ContentFrame (Apple has more than one ContentRoot).
+controls::Grid PagesGrid(const WindowContext& context) {
+    std::optional<int> index = uirender::FindByName(context.probe, "ContentFrame");
+    if (!index || *index >= static_cast<int>(context.probeObjects.size())) return nullptr;
+    xaml::DependencyObject node = context.probeObjects[*index].get();
+    for (int up = 0; node && up < 12; up++) {
+        auto grid = node.try_as<controls::Grid>();
+        if (grid && grid.Name() == L"ContentRoot") return grid;
+        node = media::VisualTreeHelper::GetParent(node);
+    }
+    return nullptr;
+}
+
+// Panels take a column of their own instead of floating over the pages: the room on the pages' right grows by a panel
+// and two gaps, and DockPanelPopup docks them there.
+void PushPages(WindowContext& context) {
+    if (context.pushedPages) {
+        if (context.pushedPages.Padding().Right == context.pushedRight) return;
+    }
+    controls::Grid pages = PagesGrid(context);
+    if (!pages) return;
+    if (!context.pushedPages && pages.Margin().Right >= kPanelWidth) return;  // the theme left a column already
+    controls::Grid parent = context.pushedPages ? context.pushedPages : PagesParent(pages);
+    if (!parent) return;
+    xaml::Thickness padding = parent.Padding();
+    if (!context.pushedPages) context.pagesPadding = padding;
+    context.pushedPages = parent;
+    context.pushedRight = context.pagesPadding.Right + kPanelWidth + 2 * kPushGap;
+    padding.Right = context.pushedRight;
+    parent.Padding(padding);
+    parent.UpdateLayout();  // so the column docks at once rather than floating for one refresh
+}
+
+// The pages take their width back once no panel shows.
+void ReleasePages(WindowContext& context) {
+    if (!context.pushedPages) return;
+    if (context.pushedPages.Padding().Right == context.pushedRight) context.pushedPages.Padding(context.pagesPadding);
+    context.pushedPages = nullptr;
+    context.pushedRight = -1;
+}
+
 void PlacePanelPopup(WindowContext& context, const xaml::XamlRoot& root) {
     auto size = root.Size();
+    if (AnyPanelShown(context)) PushPages(context);
     if (DockPanelPopup(context, size)) {
         OpenOverlay(context, context.panelPopup);
         return;
@@ -1857,6 +1968,7 @@ controls::StackPanel EnsurePanelHost(UiService::Shared& shared, WindowContext& c
     scroll.VerticalScrollBarVisibility(controls::ScrollBarVisibility::Auto);
     scroll.HorizontalScrollMode(controls::ScrollMode::Disabled);
     scroll.HorizontalScrollBarVisibility(controls::ScrollBarVisibility::Disabled);
+    QuietScrollBar(scroll);  // as the page host's: out of sight until the pointer reaches it, without arrows
     Name(scroll, "AMPIFY_PanelScroll");
     controls::StackPanel stack;
     stack.Spacing(12);
@@ -1912,6 +2024,63 @@ void JournalRender(UiService::Shared& shared, const char* what, const Surface& s
     }
 }
 
+constexpr float kPanelSlide = 48;  // how far a panel comes from, on the right
+constexpr auto kPanelIn = std::chrono::milliseconds(280);
+constexpr auto kPanelOut = std::chrono::milliseconds(200);  // leaving is quicker than coming
+
+// A new panel comes in from the right and fades in, on the compositor thread, once it is in the window.
+void SlidePanelIn(const controls::Border& frame) {
+    frame.Translation({kPanelSlide, 0, 0});
+    frame.Opacity(0);
+    frame.Loaded([](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            auto loaded = sender.as<controls::Border>();
+            if (loaded.Opacity() != 0) return;  // shown already: a frame put back after something took it out
+            xaml::Vector3Transition slide;
+            slide.Duration(kPanelIn);
+            loaded.TranslationTransition(slide);
+            xaml::ScalarTransition fade;
+            fade.Duration(kPanelIn);
+            loaded.OpacityTransition(fade);
+            loaded.Translation({0, 0, 0});
+            loaded.Opacity(1);
+        } catch (...) {
+        }
+    });
+}
+
+// A panel taken out slides back to the right and fades, then leaves the column; the column itself goes when it is
+// empty, so a theme's docked column does not stay behind as an empty card.
+void SlidePanelOut(WindowContext& context, const xaml::FrameworkElement& frame) {
+    if (!frame) return;
+    auto timer = std::make_shared<winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer>(
+        winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer());
+    xaml::Vector3Transition slide;
+    slide.Duration(kPanelOut);
+    frame.TranslationTransition(slide);
+    xaml::ScalarTransition fade;
+    fade.Duration(kPanelOut);
+    frame.OpacityTransition(fade);
+    frame.Translation({kPanelSlide, 0, 0});
+    frame.Opacity(0);
+    frame.IsHitTestVisible(false);  // leaving (AnyPanelShown)
+    if (!AnyPanelShown(context)) ReleasePages(context);
+    controls::StackPanel stack = context.panelStack;
+    primitives::Popup popup = context.panelPopup;
+    timer->Interval(kPanelOut);
+    timer->IsRepeating(false);
+    timer->Tick([timer, frame, stack, popup](auto&&, auto&&) mutable noexcept {
+        try {
+            RemoveFromParent(frame);
+            if (stack && stack.Children().Size() == 0 && popup && popup.IsOpen()) popup.IsOpen(false);
+            timer->Stop();
+        } catch (...) {
+        }
+        timer.reset();  // the timer held this handler, which held the timer
+    });
+    timer->Start();
+}
+
 void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                 const xaml::DependencyObject& content, const Surface& surface) {
     if (context->closedPanels.count(surface.key)) return;
@@ -1936,26 +2105,40 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
         std::string frameName = uirender::ElementName(surface.elementId, surface.nodeId) + "_panel";
         controls::Border frame = MakeSurfaceFrame(frameName, surface.title.empty() ? surface.id : surface.title, title, slot, close);
         WeakContext weakContext = context;
+        WeakShared weakShared = shared.weak_from_this();
         std::string key = surface.key;
         std::string label = SurfaceLabel(surface);
         Journal* journal = &shared.journal;
-        close.Click([weakContext, key, label, journal](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        // The element is told (entry "panelClose"): its panel leaves its model, so its button can show it again with
+        // one click, and its React root unmounts. Until the model drops it, closedPanels keeps it from coming back.
+        UiEvent closed{surface.elementId, 0, false, "{\"panel\":" + Json::Quote(surface.id) + "}", "panelClose"};
+        close.Click([weakContext, weakShared, key, label, journal, closed](IInspectable const& sender,
+                                                                         xaml::RoutedEventArgs const&) noexcept {
             try {
                 auto live = weakContext.lock();
                 if (!live) return;
+                if (SharedPtr owner = weakShared.lock(); owner && owner->sink) owner->sink(closed);
                 live->closedPanels.insert(key);
                 auto found = live->surfaces.find(key);
                 if (found != live->surfaces.end()) {
                     RemoveFromParent(found->second.panelFrame);
+                    if (!AnyPanelShown(*live)) {
+                        ReleasePages(*live);
+                        if (live->panelPopup) live->panelPopup.IsOpen(false);
+                    }
                     live->surfaces.erase(found);
                 }
-                journal->Write("Interface: panel \"" + label + "\" closed (it comes back at the next start of "
-                               "the extension)");
+                journal->Write("Interface: panel \"" + label + "\" closed by the user");
                 (void)sender;
             } catch (...) {
             }
         });
+        SlidePanelIn(frame);
         stack.Children().Append(frame);
+        // The pages make room for the first panel now rather than at the next refresh.
+        if (auto element = content.try_as<xaml::UIElement>(); element && element.XamlRoot()) {
+            PlacePanelPopup(*context, element.XamlRoot());
+        }
         mounted.renderer.reset();
         mounted.panelFrame = frame;
         mounted.slot = slot;
@@ -2167,6 +2350,27 @@ void MountPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& 
     JournalRender(shared, "page", surface, stats, first);
 }
 
+// The element named `name` under `node` in the visual tree (a template part), or null.
+xaml::FrameworkElement FindPart(const xaml::DependencyObject& node, std::wstring_view name, int depth = 0) {
+    constexpr int kPartDepth = 12;
+    if (auto element = node.try_as<xaml::FrameworkElement>(); element && element.Name() == name) return element;
+    if (depth >= kPartDepth) return nullptr;
+    for (int i = 0, count = media::VisualTreeHelper::GetChildrenCount(node); i < count; ++i) {
+        if (auto found = FindPart(media::VisualTreeHelper::GetChild(node, i), name, depth + 1)) return found;
+    }
+    return nullptr;
+}
+
+// Apple's dialog template sets WebDings (its ContentControlThemeFontFamily) on the dialog's buttons, which beats any
+// style: "Close" showed as symbols (05/11). A local value beats the template: the font it gives the content.
+void GiveDialogButtonsTextFont(const controls::ContentDialog& dialog) {
+    auto content = FindPart(dialog, L"ContentScrollViewer").try_as<controls::Control>();
+    if (!content) return;
+    for (const wchar_t* name : {L"PrimaryButton", L"SecondaryButton", L"CloseButton"}) {
+        if (auto button = FindPart(dialog, name).try_as<controls::Control>()) button.FontFamily(content.FontFamily());
+    }
+}
+
 void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                 const xaml::DependencyObject& content, const Surface& surface) {
     MountedSurface& mounted = context->surfaces[surface.key];
@@ -2197,13 +2401,29 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
     dialog.Title(winrt::box_value(Wide(surface.title.empty() ? surface.elementId : surface.title)));
     dialog.Content(root);
     dialog.CloseButtonText(Wide(i18n::Text("ui.close")));
-    dialog.DefaultButton(controls::ContentDialogButton::Close);
+    // Close, alone, stands for the default button: Apple's plain style with Ampify's accent template, as Ampify's other
+    // primary buttons (Apple's AccentButtonStyle draws text in WebDings). Its font: GiveDialogButtonsTextFont.
+    auto accent = xaml::Markup::XamlReader::Load(
+                      L"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'>"
+                      L"<Setter Property='CornerRadius' Value='{ThemeResource ControlCornerRadius}'/></Style>")
+                      .as<xaml::Style>();
+    if (shared.probe.button) accent.BasedOn(shared.probe.button);
+    if (controls::ControlTemplate primary = PrimaryButtonTemplate()) {
+        accent.Setters().Append(xaml::Setter(controls::Control::TemplateProperty(), primary));
+    }
+    dialog.CloseButtonStyle(accent);
     Name(dialog, uirender::ElementName(surface.elementId, surface.nodeId) + "_dialog",
          surface.title.empty() ? surface.elementId : surface.title);
 
     WeakShared weakShared = shared.weak_from_this();
     WeakContext weakContext = context;
     std::string key = surface.key;
+    dialog.Opened([](controls::ContentDialog const& sender, controls::ContentDialogOpenedEventArgs const&) noexcept {
+        try {
+            GiveDialogButtonsTextFont(sender);
+        } catch (...) {
+        }
+    });
     dialog.Closed([weakShared, weakContext, key](controls::ContentDialog const&,
                                                  controls::ContentDialogClosedEventArgs const&) noexcept {
         try {
@@ -2403,7 +2623,7 @@ void Unmount(WindowContext& context, MountedSurface& mounted) {
             }
         }
         if (auto dialog = mounted.dialog) dialog.Hide();
-        if (mounted.surface.kind == SurfaceKind::Panel) RemoveFromParent(mounted.panelFrame);
+        if (mounted.surface.kind == SurfaceKind::Panel) SlidePanelOut(context, mounted.panelFrame);
         if (mounted.surface.kind == SurfaceKind::Page) {
             if (auto slot = mounted.slot; slot && mounted.renderer && slot.Child() == mounted.renderer->Root()) {
                 slot.Child(nullptr);
@@ -2456,23 +2676,32 @@ void ReleaseSidebarHost(WindowContext& context) {
 
 // The inside of a sidebar entry: the icon and the label, and a bar at the left edge like Apple Music's own selected item.
 // An entry that is on takes the accent colour. The icon is drawn again with the colour, so a state change rebuilds it.
-xaml::UIElement SidebarContent(const UiControl& control, bool active) {
+// The icon of a sidebar entry, in the text brush like Apple Music's own icons (the Marketplace gives Ampify's logo as
+// an SVG), or in the accent while the entry is on.
+xaml::FrameworkElement SidebarIcon(const UiControl& control, bool active) {
     const wchar_t* key = active ? L"AccentTextFillColorPrimaryBrush" : L"TextFillColorPrimaryBrush";
-    const media::Brush accent = active ? ThemeResource(key).try_as<media::Brush>() : nullptr;
-    controls::StackPanel row;
-    row.Orientation(controls::Orientation::Horizontal);
-    row.Spacing(16);
-    // An SVG icon (the Marketplace gives Ampify's logo) is drawn in the text brush, like Apple Music's own icons.
     xaml::FrameworkElement icon = nullptr;
     if (!control.icon.empty() && !uirender::IsGlyphIcon(control.icon)) icon = MakeIconElement(control.icon, 16, key);
     if (!icon) {
         controls::FontIcon glyph;
         glyph.FontSize(16);
         glyph.Glyph(uirender::IsGlyphIcon(control.icon) ? Wide(control.icon) : winrt::hstring(L"\xE790"));  // Color
-        if (accent) glyph.Foreground(accent);
+        if (active) {
+            if (auto accent = ThemeResource(key).try_as<media::Brush>()) glyph.Foreground(accent);
+        }
         icon = glyph;
     }
     icon.VerticalAlignment(xaml::VerticalAlignment::Center);
+    return icon;
+}
+
+xaml::UIElement SidebarContent(const UiControl& control, bool active) {
+    const wchar_t* key = active ? L"AccentTextFillColorPrimaryBrush" : L"TextFillColorPrimaryBrush";
+    const media::Brush accent = active ? ThemeResource(key).try_as<media::Brush>() : nullptr;
+    controls::StackPanel row;
+    row.Orientation(controls::Orientation::Horizontal);
+    row.Spacing(16);
+    xaml::FrameworkElement icon = SidebarIcon(control, active);
     controls::TextBlock label;
     label.Text(Wide(control.label));
     label.VerticalAlignment(xaml::VerticalAlignment::Center);
@@ -2522,6 +2751,42 @@ controls::Button MakeSidebarButton(const UiControl& control, bool active) {
     return button;
 }
 
+constexpr char kMarketplaceId[] = "marketplace";
+constexpr double kMoreButtonWidth = 32;  // Apple's "···" before its first layout
+constexpr double kHeaderButtonHeight = 28;  // the height of "···"
+constexpr double kHeaderSpacing = 2;
+
+// The sidebar's header (Apple's logo, its name and "···"), where Ampify's own entry stands with ampify.entry = header.
+// Nothing while the sidebar is folded: Apple hides the header then, and the entry stays in the list.
+controls::Grid EntryHeader(const UiService::Shared& shared, const controls::NavigationView& navigation,
+                           const UiControl& control) {
+    if (control.elementId != kMarketplaceId || !shared.entryInHeader || !navigation.IsPaneOpen()) return nullptr;
+    return navigation.PaneHeader().try_as<controls::Grid>();
+}
+
+// The entry's icon as a button the size of "···", just left of it in the same cell, its label as the tooltip.
+controls::Button MakeHeaderButton(const controls::Grid& header, const UiControl& control, bool active) {
+    controls::Button button = MakeSidebarButton(control, active);  // for its subtle brushes
+    button.Content(SidebarIcon(control, active));
+    button.HorizontalAlignment(xaml::HorizontalAlignment::Right);
+    button.HorizontalContentAlignment(xaml::HorizontalAlignment::Center);
+    button.VerticalAlignment(xaml::VerticalAlignment::Center);
+    button.Width(kMoreButtonWidth);
+    button.Height(kHeaderButtonHeight);
+    button.Padding(xaml::Thickness{});
+    double right = kMoreButtonWidth + kHeaderSpacing;
+    for (const xaml::UIElement& child : header.Children()) {
+        auto more = child.try_as<xaml::FrameworkElement>();
+        if (!more || more.Name() != L"MoreButton") continue;
+        right = (more.ActualWidth() > 0 ? more.ActualWidth() : kMoreButtonWidth) + more.Margin().Right + kHeaderSpacing;
+        controls::Grid::SetColumn(button, controls::Grid::GetColumn(more));
+        controls::Grid::SetRow(button, controls::Grid::GetRow(more));
+    }
+    button.Margin(xaml::Thickness{0, 0, right, 0});
+    controls::ToolTipService::SetToolTip(button, winrt::box_value(Wide(control.label)));
+    return button;
+}
+
 // An entry is on when its element asked for it (Ampify.ui.setActive), or while the page of that element is on screen.
 bool SidebarEntryIsOn(const WindowContext& context, const UiControl& control) {
     return control.active || (context.route && !context.pageClosed && context.route->first == control.elementId);
@@ -2538,20 +2803,25 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
         }
         return;
     }
-    controls::StackPanel host = EnsureSidebarHost(*context, navigation);
+    controls::Grid header = EntryHeader(shared, navigation, control);
+    const bool inHeader = static_cast<bool>(header);
+    controls::StackPanel host = inHeader ? nullptr : EnsureSidebarHost(*context, navigation);
+    controls::UIElementCollection place = inHeader ? header.Children() : host.Children();
     const bool active = SidebarEntryIsOn(*context, control);
     std::uint32_t index = 0;
-    if (placed.button && host.Children().IndexOf(placed.button, index)) {  // still in place: only its state may change
-        if (placed.active != active) {
+    if (placed.button && placed.inHeader == inHeader && place.IndexOf(placed.button, index)) {
+        if (placed.active != active) {  // still in place: only its state may change
             placed.active = active;
-            placed.button.Content(SidebarContent(control, active));
+            placed.button.Content(inHeader ? SidebarIcon(control, active) : SidebarContent(control, active));
             automation::AutomationProperties::SetItemStatus(placed.button, active ? L"on" : L"");
         }
         return;
     }
 
-    controls::Button button = MakeSidebarButton(control, active);
+    RemoveFromParent(placed.button);  // from the list to the header or back, as the sidebar folds or opens
+    controls::Button button = inHeader ? MakeHeaderButton(header, control, active) : MakeSidebarButton(control, active);
     placed.active = active;
+    placed.inHeader = inHeader;
     Name(button, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
     UiEventSink sink = shared.sink;
     std::string elementId = control.elementId;
@@ -2562,10 +2832,18 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
         } catch (...) {
         }
     });
-    // After Apple Music's separator, so the entries sit with the account, below the line that ends the list.
-    host.Children().Append(button);
+    // After Apple Music's separator, so the entries sit with the account, below the line that ends the list, in the
+    // order of the elements (an entry back from the header takes its place again).
+    if (inHeader) {
+        place.Append(button);
+    } else {
+        place.InsertAt(StableIndex(context->placed, host, std::nullopt, control.elementId, control.id), button);
+    }
     placed.button = button;
-    shared.journal.Write("Interface: sidebar entry \"" + control.label + "\" of " + control.elementId + " placed");
+    placed.elementId = control.elementId;
+    placed.id = control.id;
+    shared.journal.Write("Interface: sidebar entry \"" + control.label + "\" of " + control.elementId + " placed" +
+                         (inHeader ? " in the sidebar's header" : ""));
 }
 
 using MenuItems = winrt::Windows::Foundation::Collections::IVector<controls::MenuFlyoutItemBase>;
@@ -2835,6 +3113,8 @@ void FollowMenus(UiService::Shared& shared, const std::shared_ptr<WindowContext>
     context->menuInput = winrt::make_weak(content);
 }
 
+void QueueSongRoom(const UiEventSink& sink, const std::shared_ptr<WindowContext>& context) noexcept;
+
 void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                    const std::vector<Surface>& surfaces) {
     std::set<std::string> present;
@@ -2945,6 +3225,9 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         placed.active = control.active;
         placed.elementId = control.elementId;
         placed.id = control.id;
+        placed.icon = control.icon;
+        placed.clickable = control.clickable;
+        placed.folded = false;  // a new button shows; FoldPlaybarButtons folds it again if the bar lacks room
         shared.journal.Write("Interface: button \"" + control.label + "\" of " + control.elementId + " placed in \"" +
                              control.placement + "\" (provisional landmarks)");
     }
@@ -2960,6 +3243,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
     context->appEntries = std::move(appEntries);
     context->contextEntries = std::move(contextEntries);
     FollowMenus(shared, context);
+    QueueSongRoom(shared.sink, context);  // a button gone may leave a single one folded
 }
 
 constexpr double kFoldedPaneWidth = 100;  // the folded column is 48 wide, the open sidebar 290
@@ -3020,27 +3304,214 @@ constexpr double kSongClearance = 24;  // between the song's display and the fir
 // left the song a third of the bar, with an empty stretch before the volume, and the title cut in a narrow window. The
 // song ends a clear space short of the toggles, whatever their number. A layout that sizes the song itself (a width,
 // or another alignment) keeps it; a single column gets Apple's margin back.
-void FitSongRoom(WindowContext& context) {
+// True when it gave the song a new margin, which the next layout pass lays out.
+bool FitSongRoom(WindowContext& context) {
     xaml::FrameworkElement song = context.songColumn.get();
     xaml::FrameworkElement toggles = context.songToggles.get();
     auto parent = song ? media::VisualTreeHelper::GetParent(song).try_as<xaml::UIElement>() : nullptr;
-    if (!song || !toggles || !parent) return;
+    if (!song || !toggles || !parent) return false;
     bool ours = controls::Grid::GetColumnSpan(song) >= 2 && std::isnan(song.Width()) &&
                 song.HorizontalAlignment() == xaml::HorizontalAlignment::Stretch;
     xaml::Thickness margin = song.Margin();
     if (!ours) {
-        if (context.songMargin) song.Margin(*context.songMargin);
+        bool restored = context.songMargin.has_value();
+        if (restored) song.Margin(*context.songMargin);
         context.songMargin.reset();
-        return;
+        return restored;
     }
     if (!context.songMargin) context.songMargin = margin;
-    if (song.ActualWidth() <= 0 || toggles.ActualWidth() <= 0) return;
+    if (song.ActualWidth() <= 0 || toggles.ActualWidth() <= 0) return false;
     double songLeft = song.TransformToVisual(parent).TransformPoint({0, 0}).X;
     double togglesLeft = toggles.TransformToVisual(parent).TransformPoint({0, 0}).X;
     double slotRight = songLeft + song.ActualWidth() + margin.Right;
     double right = std::max(context.songMargin->Right, slotRight - (togglesLeft - kSongClearance));
-    if (std::abs(right - margin.Right) < 0.5) return;
+    if (std::abs(right - margin.Right) < 0.5) return false;
     song.Margin({margin.Left, margin.Top, right, margin.Bottom});
+    return true;
+}
+
+constexpr double kPlaybarClearance = 16;       // Ampify's buttons stay that far from what stands left of them
+constexpr double kDisplayRoom = 340;           // a display narrower cuts a title short (Apple keeps ~390 when narrow)
+constexpr double kUnfoldMargin = 8;            // room past that before a folded button comes back: no back and forth
+constexpr char kMoreGlyph[] = "\xEE\x9C\x92";  // U+E712, "More" in Segoe Fluent Icons
+
+
+double LeftOf(const xaml::FrameworkElement& element) {
+    return element.TransformToVisual(nullptr).TransformPoint({0, 0}).X;
+}
+
+// The toggles' spare room, negative when they lack some: their slot in the bar less their width (a bar too narrow cuts
+// them at its edge), their distance less kPlaybarClearance to what stands left of them (the transport, and Apple's
+// display unless Ampify fits the song itself: FitSongRoom keeps that one clear), and, while the display takes what
+// the toggles leave it (no width from the theme), its width less kDisplayRoom.
+std::optional<double> PlaybarRoom(const WindowContext& context, const xaml::FrameworkElement& toggles) {
+    if (toggles.ActualWidth() <= 0) return std::nullopt;
+    xaml::Thickness margin = toggles.Margin();
+    double room = std::numeric_limits<double>::infinity();
+    if (toggles.HorizontalAlignment() != xaml::HorizontalAlignment::Stretch) {  // stretched, they fill their slot
+        room = primitives::LayoutInformation::GetLayoutSlot(toggles).Width -
+               (toggles.ActualWidth() + margin.Left + margin.Right);
+    }
+    double togglesLeft = LeftOf(toggles);
+    auto measure = [&](const xaml::FrameworkElement& element) {
+        if (!element || element.ActualWidth() <= 0 || element.Visibility() != xaml::Visibility::Visible) return;
+        double left = LeftOf(element);
+        if (left >= togglesLeft) return;  // a layout put it right of the toggles: not in their way
+        room = std::min(room, togglesLeft - (left + element.ActualWidth()) - kPlaybarClearance);
+    };
+    measure(context.transport.get());
+    if (!context.songMargin) measure(context.songDisplay.get());
+    xaml::FrameworkElement display = context.songDisplay.get();
+    xaml::FrameworkElement song = context.songColumn.get();
+    if (display && song && display.ActualWidth() > 0 && std::isnan(display.Width()) && std::isnan(song.Width())) {
+        double wanted = std::min({kDisplayRoom, display.MaxWidth(), song.MaxWidth()});
+        room = std::min(room, display.ActualWidth() - wanted);
+    }
+    if (std::isinf(room)) return std::nullopt;
+    return room;
+}
+
+// Ampify's clickable buttons among the toggles, in their order (PlacedBefore).
+std::vector<PlacedControl*> PlaybarButtons(WindowContext& context, const controls::Panel& toggles) {
+    std::vector<PlacedControl*> buttons;
+    for (auto& [key, placed] : context.placed) {
+        std::uint32_t index = 0;
+        if (!placed.button || !placed.clickable || placed.elementId.empty()) continue;
+        if (toggles.Children().IndexOf(placed.button, index)) buttons.push_back(&placed);
+    }
+    std::sort(buttons.begin(), buttons.end(),
+              [](const PlacedControl* a, const PlacedControl* b) { return PlacedBefore(*a, b->elementId, b->id); });
+    return buttons;
+}
+
+// The entries of the "More" menu: the folded buttons in their order, each doing what its button does.
+void FillPlaybarMenu(const controls::MenuFlyout& menu, WindowContext& context, const UiEventSink& sink) {
+    menu.Items().Clear();
+    auto toggles = context.songToggles.get().try_as<controls::Panel>();
+    if (!toggles) return;
+    for (PlacedControl* placed : PlaybarButtons(context, toggles)) {
+        if (!placed->folded) continue;
+        controls::ToggleMenuFlyoutItem item;
+        item.Text(Wide(placed->label));
+        item.IsChecked(placed->active);
+        if (auto icon = MakeIconElement(placed->icon, 16, L"TextFillColorPrimaryBrush").try_as<controls::IconElement>()) {
+            item.Icon(icon);
+        }
+        std::string elementId = placed->elementId;
+        int id = placed->id;
+        item.Click([sink, elementId, id](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+            try {
+                if (sink) sink(UiEvent{elementId, id, true, {}});
+            } catch (...) {
+            }
+        });
+        menu.Items().Append(item);
+    }
+}
+
+// The "More" button, sized and styled like Ampify's button it follows (which took Apple's neighbour's look).
+controls::Button MakePlaybarMore(const controls::Button& model, const UiEventSink& sink, const WeakContext& weakContext) {
+    controls::Button more;
+    if (model.Style()) more.Style(model.Style());
+    more.Background(model.Background());
+    more.BorderThickness(model.BorderThickness());
+    more.Width(model.Width());
+    more.Height(model.Height());
+    more.MinWidth(model.MinWidth());
+    more.MinHeight(model.MinHeight());
+    more.Padding(model.Padding());
+    more.Margin(model.Margin());
+    more.VerticalAlignment(model.VerticalAlignment());
+    more.Content(MakeIconElement(kMoreGlyph, 16, L"TextFillColorPrimaryBrush"));
+    std::string label = i18n::Text("ui.more");
+    controls::ToolTipService::SetToolTip(more, winrt::box_value(Wide(label)));
+    Name(more, uirender::ElementName("ampify", "playbar-more"), label);
+    controls::MenuFlyout menu;
+    // The menu comes as the sender: captured, it would hold itself through its own handler.
+    menu.Opening([sink, weakContext](IInspectable const& sender, IInspectable const&) noexcept {
+        try {
+            if (auto live = weakContext.lock()) FillPlaybarMenu(sender.as<controls::MenuFlyout>(), *live, sink);
+        } catch (...) {
+        }
+    });
+    more.Flyout(menu);
+    return more;
+}
+
+// Victor's ask of 05/11: in a narrow window, Ampify's buttons go one by one into a "More" button, the last one first,
+// and come back as the room does, so the bar keeps room for the song and the transport. Apple's own buttons stay. One
+// step per call: the layout that follows calls again (SizeChanged). Folding a single button would gain nothing.
+void FoldPlaybarButtons(const UiEventSink& sink, const std::shared_ptr<WindowContext>& context) {
+    xaml::FrameworkElement togglesElement = context->songToggles.get();
+    auto toggles = togglesElement.try_as<controls::Panel>();
+    if (!toggles) return;
+    std::vector<PlacedControl*> buttons = PlaybarButtons(*context, toggles);
+    auto shown = std::find_if(buttons.rbegin(), buttons.rend(), [](const PlacedControl* p) { return !p->folded; });
+    auto folded = std::find_if(buttons.begin(), buttons.end(), [](const PlacedControl* p) { return p->folded; });
+    auto countFolded = [&buttons]() {
+        return static_cast<std::size_t>(
+            std::count_if(buttons.begin(), buttons.end(), [](const PlacedControl* p) { return p->folded; }));
+    };
+    std::size_t foldedCount = countFolded();
+    std::optional<double> room = PlaybarRoom(*context, togglesElement);
+    auto fold = [](PlacedControl& placed) {
+        placed.width = placed.button.ActualWidth() + placed.button.Margin().Left + placed.button.Margin().Right;
+        placed.folded = true;
+        placed.button.Visibility(xaml::Visibility::Collapsed);
+    };
+    auto unfold = [](PlacedControl& placed) {
+        placed.folded = false;
+        placed.button.Visibility(xaml::Visibility::Visible);
+    };
+    if (room && *room < 0 && shown != buttons.rend()) {
+        if (foldedCount == 0) {
+            if (buttons.size() < 2) return;
+            fold(**shown);  // the "More" button takes the first one's place: a second one goes with it
+            ++shown;
+        }
+        fold(**shown);
+    } else if (foldedCount > 0 && room) {
+        // The first folded button comes back, needing its width; the last two come back together, in place of the
+        // "More" button, which needs about the same.
+        double needed = (*folded)->width;
+        if (*room >= needed + kUnfoldMargin) {
+            unfold(**folded);
+            if (foldedCount == 2) unfold(**std::next(folded));
+        }
+    }
+    if (countFolded() == 0) {
+        if (context->playbarMore) context->playbarMore.Visibility(xaml::Visibility::Collapsed);
+        return;
+    }
+    if (!context->playbarMore) context->playbarMore = MakePlaybarMore(buttons.front()->button, sink, context);
+    std::uint32_t index = 0;
+    if (!toggles.Children().IndexOf(context->playbarMore, index)) {
+        RemoveFromParent(context->playbarMore);
+        toggles.Children().Append(context->playbarMore);
+    }
+    context->playbarMore.Visibility(xaml::Visibility::Visible);
+}
+
+// Fits the song and folds the buttons once the layout pass is over, a single time for all the sizes it changed: within
+// the pass, the widths read are not yet those of the step just taken, and folding on them went back and forth until
+// WinUI ended Apple Music for a layout cycle. Each step lays out again, which queues the next one.
+void QueueSongRoom(const UiEventSink& sink, const std::shared_ptr<WindowContext>& context) noexcept {
+    try {
+        if (context->songRoomQueued || !context->dispatcher) return;
+        WeakContext weakContext = context;
+        context->songRoomQueued =
+            context->dispatcher.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [weakContext, sink]() noexcept {
+                try {
+                    auto live = weakContext.lock();
+                    if (!live) return;
+                    live->songRoomQueued = false;
+                    // A new margin is laid out first: the widths read now would be those before it.
+                    if (!FitSongRoom(*live)) FoldPlaybarButtons(sink, live);
+                } catch (...) {
+                }
+            });
+    } catch (...) {
+    }
 }
 
 void FollowSongRoom(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
@@ -3057,15 +3528,24 @@ void FollowSongRoom(UiService::Shared& shared, const std::shared_ptr<WindowConte
     context->songToggles = winrt::make_weak(togglesElement);
     context->songMargin.reset();
     WeakContext weakContext = context;
-    auto update = [weakContext]() noexcept {
-        try {
-            if (auto live = weakContext.lock()) FitSongRoom(*live);
-        } catch (...) {
+    std::optional<int> transport = uirender::FindByName(nodes, "TransportControl");
+    context->songDisplay = winrt::make_weak(displayElement);
+    if (transport) {
+        if (auto element = context->probeObjects[*transport].get().try_as<xaml::FrameworkElement>()) {
+            context->transport = winrt::make_weak(element);
         }
+    }
+    UiEventSink sink = shared.sink;
+    auto update = [weakContext, sink]() noexcept {
+        if (auto live = weakContext.lock()) QueueSongRoom(sink, live);
     };
     auto sized = [update](IInspectable const&, xaml::SizeChangedEventArgs const&) noexcept { update(); };
     song.SizeChanged(sized);
     togglesElement.SizeChanged(sized);
+    // The window growing moves the toggles without resizing them: the bar's own size says so.
+    if (auto bar = media::VisualTreeHelper::GetParent(togglesElement).try_as<xaml::FrameworkElement>()) {
+        bar.SizeChanged(sized);
+    }
     for (const xaml::DependencyProperty& property : {controls::Grid::ColumnSpanProperty(),
                                                      xaml::FrameworkElement::WidthProperty(),
                                                      xaml::FrameworkElement::HorizontalAlignmentProperty()}) {
@@ -3274,6 +3754,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         context->placed.clear();
         UncoverApplePage(*context);
         try {
+            ReleasePages(*context);  // the old content's grid: the new pages make room again when a panel shows
             if (context->panelPopup) context->panelPopup.IsOpen(false);  // the overlays of the old content
             if (context->pagePopup) context->pagePopup.IsOpen(false);
             if (context->fullscreenPopup) context->fullscreenPopup.IsOpen(false);
@@ -3395,13 +3876,16 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
     }
     SetNotificationRule(tweaks.notifications, shared.journal);
     SetPlayerControlsShown(tweaks.playerControls);
+    const bool inHeader = uirender::ReadEntryInHeader(settings);
+    const bool entryMoved = shared.entryInHeader.exchange(inHeader) != inHeader;
 
     std::string active = uirender::ActiveThemeId(shared.kit);
     std::vector<std::shared_ptr<WindowContext>> windows;
     {
         std::lock_guard<std::mutex> lock(shared.mutex);
         bool themeChanged = active != shared.cardTheme;
-        if (!themeChanged && !closeChanged) return;  // the close rule reaches the window at its next refresh
+        // The close rule and Ampify's entry reach the window at its next refresh, queued here.
+        if (!themeChanged && !closeChanged && !entryMoved) return;
         if (themeChanged) {
             shared.cardTheme = active;
             shared.cardStale = true;

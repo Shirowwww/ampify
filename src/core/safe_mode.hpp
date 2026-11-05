@@ -16,7 +16,7 @@ public:
     // Call once when the kernel starts. Returns true when extensions must stay off for this launch.
     bool BeginLaunch();
 
-    // Call once the app has been up and responsive for a while (for example 20 seconds).
+    // Call once the app has been up and responsive for a while (8 seconds in the kernel).
     void MarkHealthy();
 
     int UnhealthyLaunches() const;

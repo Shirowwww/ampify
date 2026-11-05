@@ -46,6 +46,8 @@ struct World {
     int play = 0, pause = 0, next = 0, previous = 0;
     int64_t seekTicks = -1;  // the TimeSpan SetPositionAsync received, -1 when never called
     unsigned char seekScrubbing = 0;
+    int lyricsRequested = 0;     // GetNowPlayingLyricsAsync calls
+    int32_t lyricsSource = -1;   // the LyricsSource of the last one
     int handlersAdded = 0, handlersRemoved = 0;
     IUnknown* playerHandler = nullptr;
     bool noItem = false;
@@ -179,6 +181,12 @@ HRESULT STDMETHODCALLTYPE SkipNextAsync(Facet*, void** out) {  // slot 17
 HRESULT STDMETHODCALLTYPE SetPositionAsync(Facet*, int64_t position, unsigned char scrubbing, void** out) {  // slot 22
     g.seekTicks = position;
     g.seekScrubbing = scrubbing;
+    *out = &asyncF;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE NowPlayingLyricsAsync(Facet*, int32_t source, void** out) {  // slot 49
+    ++g.lyricsRequested;
+    g.lyricsSource = source;
     *out = &asyncF;
     return S_OK;
 }
@@ -447,6 +455,7 @@ void Build() {
     playerVt.slots[16] = Fn(&SkipPreviousAsync);
     playerVt.slots[17] = Fn(&SkipNextAsync);
     playerVt.slots[22] = Fn(&SetPositionAsync);
+    playerVt.slots[49] = Fn(&NowPlayingLyricsAsync);
     notifyVt.slots[6] = Fn(&AddHandler);
     notifyVt.slots[7] = Fn(&RemoveHandler);
 
@@ -649,6 +658,8 @@ TEST_CASE(AmpPlayer_ASecondTrackIsReadAgainAndLyricsLateAreRetried) {
     g.queueId = 43;
     reading = player.Read();
     CHECK(reading.has_value() && reading->lyricsAvailable && g.lyricsAsked == 2);
+    // Each new track asks Apple's player to load its word-timed lyrics, as its lyrics pane would.
+    CHECK(g.lyricsRequested == 2 && g.lyricsSource == 4);
 
     // Lyrics that show up some seconds later are found by the retry.
     g.queueId = 44;

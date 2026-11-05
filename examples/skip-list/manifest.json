@@ -2,14 +2,14 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "skip-list",
   "name": "Skip list",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "kind": "extension",
   "author": "Shirowwww",
-  "description": "Never hear a song, album or artist again, like Spicetify's Trash Bin and Auto Skip. Add from the context menu or the playback bar, manage the list from the main menu, and optionally skip live versions, remixes and intros.",
+  "description": "Never hear a song, album or artist again, like Spicetify's Trash Bin and Auto Skip. Add from the context menu or the playback bar, manage the list from the main menu, optionally skip live versions, remixes and intros, and export or import the list as JSON.",
   "translations": {
     "fr": {
       "name": "Liste d'exclusion",
-      "description": "Ne plus jamais entendre un morceau, un album ou un artiste, comme Trash Bin et Auto Skip sur Spicetify. Ajoutez depuis le menu contextuel ou la barre de lecture, gérez la liste depuis le menu principal, et passez au choix les versions live, remix et intros.",
+      "description": "Ne plus jamais entendre un morceau, un album ou un artiste, comme Trash Bin et Auto Skip sur Spicetify. Ajoutez depuis le menu contextuel ou la barre de lecture, gérez la liste depuis le menu principal, passez au choix les versions live, remix et intros, et exportez ou importez la liste en JSON.",
       "settings": {
         "skip-live": "Passer les versions live",
         "skip-remixes": "Passer les remix",
@@ -18,7 +18,7 @@
     },
     "de": {
       "name": "Überspringliste",
-      "description": "Einen Titel, ein Album oder einen Künstler nie wieder hören, wie Trash Bin und Auto Skip in Spicetify. Hinzufügen per Kontextmenü oder Wiedergabeleiste, Liste im Hauptmenü verwalten, auf Wunsch Live-Versionen, Remixe und Intros überspringen.",
+      "description": "Einen Titel, ein Album oder einen Künstler nie wieder hören, wie Trash Bin und Auto Skip in Spicetify. Hinzufügen per Kontextmenü oder Wiedergabeleiste, Liste im Hauptmenü verwalten, auf Wunsch Live-Versionen, Remixe und Intros überspringen und die Liste als JSON exportieren oder importieren.",
       "settings": {
         "skip-live": "Live-Versionen überspringen",
         "skip-remixes": "Remixe überspringen",
@@ -27,7 +27,7 @@
     },
     "es": {
       "name": "Lista de omitidos",
-      "description": "No volver a escuchar nunca una canción, un álbum o un artista, como Trash Bin y Auto Skip en Spicetify. Añade desde el menú contextual o la barra de reproducción, gestiona la lista desde el menú principal y, si quieres, salta versiones en directo, remixes e intros.",
+      "description": "Nunca más escuchar una canción, un álbum o un artista, como Trash Bin y Auto Skip en Spicetify. Añade desde el menú contextual o la barra de reproducción, gestiona la lista en el menú principal, salta versiones en directo, remixes e intros, y exporta o importa la lista en JSON.",
       "settings": {
         "skip-live": "Saltar las versiones en directo",
         "skip-remixes": "Saltar los remixes",
@@ -36,7 +36,7 @@
     },
     "pt": {
       "name": "Lista de ignorados",
-      "description": "Nunca mais ouvir uma música, um álbum ou um artista, como Trash Bin e Auto Skip no Spicetify. Adicione pelo menu de contexto ou pela barra de reprodução, gerencie a lista pelo menu principal e, se quiser, pule versões ao vivo, remixes e intros.",
+      "description": "Nunca mais ouvir uma música, um álbum ou um artista, como Trash Bin e Auto Skip no Spicetify. Adicione pelo menu de contexto ou pela barra de reprodução, gerencie a lista pelo menu principal e, se quiser, pule versões ao vivo, remixes e intros, e exporte ou importe a lista em JSON.",
       "settings": {
         "skip-live": "Pular versões ao vivo",
         "skip-remixes": "Pular remixes",
@@ -45,7 +45,7 @@
     },
     "ru": {
       "name": "Список пропуска",
-      "description": "Больше никогда не слушать трек, альбом или исполнителя, как Trash Bin и Auto Skip в Spicetify. Добавляйте через контекстное меню или панель воспроизведения, управляйте списком из главного меню и при желании пропускайте концертные версии, ремиксы и интро.",
+      "description": "Больше никогда не слушать трек, альбом или исполнителя, как Trash Bin и Auto Skip в Spicetify. Добавляйте через контекстное меню или панель воспроизведения, управляйте списком в главном меню, пропускайте концертные версии, ремиксы и интро, экспортируйте и импортируйте список в JSON.",
       "settings": {
         "skip-live": "Пропускать концертные версии",
         "skip-remixes": "Пропускать ремиксы",
@@ -54,7 +54,7 @@
     },
     "ja": {
       "name": "スキップリスト",
-      "description": "Spicetify の Trash Bin と Auto Skip のように、曲・アルバム・アーティストを二度と再生しません。コンテキストメニューや再生バーから追加し、メインメニューでリストを管理できます。ライブ版、リミックス、イントロのスキップも選べます。",
+      "description": "Spicetify の Trash Bin と Auto Skip のように、曲・アルバム・アーティストを二度と再生しません。コンテキストメニューや再生バーから追加し、メインメニューでリストを管理できます。ライブ版、リミックス、イントロのスキップも選べ、リストは JSON でエクスポート／インポートできます。",
       "settings": {
         "skip-live": "ライブ版をスキップ",
         "skip-remixes": "リミックスをスキップ",
@@ -63,7 +63,7 @@
     },
     "zh": {
       "name": "跳过列表",
-      "description": "像 Spicetify 的 Trash Bin 和 Auto Skip 一样，不再播放某首歌、某张专辑或某位艺术家。可从右键菜单或播放栏添加，在主菜单中管理列表，还可选择跳过现场版、混音版和前奏。",
+      "description": "像 Spicetify 的 Trash Bin 和 Auto Skip 一样，不再播放某首歌、某张专辑或某位艺术家。可从右键菜单或播放栏添加，在主菜单中管理列表，还可选择跳过现场版、混音版和前奏，并以 JSON 导出或导入列表。",
       "settings": {
         "skip-live": "跳过现场版",
         "skip-remixes": "跳过混音版",

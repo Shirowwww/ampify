@@ -62,15 +62,47 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   - the test output was a stereo USB headset at 96 kHz float, with Dolby Atmos for Headphones.
 - **The interface shows the player volume.** A change through `AVCFPlayerSetVolume` moves Apple Music's slider (observed:
   55% in stereo, 71.67% in Atmos with +5 dB). The Atmos leveler reads that volume and applies its own gain to the samples.
-- **Where the position of the song is (1.1792, checked 2026-11-05).** Nowhere you would look first. These all stay
-  at 0 while a song plays: `INowPlayingItem.CurrentPosition`, the SMTC timeline, the play bar's `LCDScrubber`
-  (its `Value` and the width of `HorizontalDecreaseRect`), `INowPlayingViewModel.CurrentPositionInSeconds` (held
-  by `NowPlayingControl#LCD`), and even `IKaraokeLyricsViewModel.CurrentTime`. What moves is the lyrics view:
-  `KaraokeLyricsView` → `get_ViewModel` → `CurrentLine` → `StartTime`, the line Apple lights up. Ampify anchors its
-  clock there (`src/win/player_bridge.cpp`, slots and identifiers in `src/core/amp_abi.hpp`). Apple's views are
-  bound with `x:Bind`: `DataContext` is empty all the way up, and the models come from each view's own
+- **Where the position of the song is (1.1792, measured 2026-11-05).** `INowPlayingItem.CurrentPosition` moves
+  about once a second while the song is heard, and the SMTC timeline too (about a second behind it). Both stay at 0
+  while the song loads (the first second) and for as long as its stream does not come, though Apple's state says
+  playing: a first look at the position was made on a PC where every stream stalled (see "Songs stuck at 0:00"
+  below) and concluded wrongly that the position never moves. So a clock must not count time Apple has not shown:
+  `PositionClock` (`src/core/player_model.cpp`) counts on from the last value that changed, for two seconds at
+  most. The lyrics view also tells the position: `KaraokeLyricsView` → `get_ViewModel` → `CurrentLine` →
+  `StartTime`, the line Apple lights up (used when Apple's value is 0; slots in `src/core/amp_abi.hpp`). Apple's
+  views are bound with `x:Bind`: `DataContext` is empty all the way up, and the models come from each view's own
   `get_ViewModel`. Identifiers and slots: read the `GuidAttribute` and the method order of the interface from the
   package's `.winmd` with `System.Reflection.Metadata` (`winmdidl` fails without its references).
+- **Songs stuck at 0:00 (2026-11-05).** Apple's streams (`streamingaudio`, `aod`, `mvod.itunes.apple.com`) resolve
+  first to an IPv6 address of Apple's own CDN (`2a0f:3400:…`, `*.aaplimg.com`) that some home connections cannot
+  reach, and Apple Music never falls back to the IPv4 address that answers: every song stays at 0:00 while its
+  lyrics and cover load. The songs are fetched by Windows' HTTP stack (`webio.dll` under WinHTTP, `WININET.dll`),
+  whose Winsock imports are **delay-loaded**: an import hook that only walks the regular import table never sees
+  them. Ampify puts the IPv4 addresses first in every resolver answer (`apple.network`, `src/win/network_fix.cpp`),
+  regular and delay-loaded imports of every module, also those loaded later.
+
+- **Lyrics without the pane (1.1792, slot read from the winmd).** Apple loads a song's lyrics only when its lyrics
+  pane opens: until then `ILyricsInfo.HaveLyrics` is false. Its pane calls `IPlayer.GetNowPlayingLyricsAsync(LyricsSource)`
+  (slot 49, an `IAsyncAction`; `LyricsSource` is Any, None, UserCustom, Store, StoreSyllable = 4). Ampify calls it with
+  StoreSyllable at each new item (`src/win/amp_player.cpp`). `GetLyricsAsync(descriptor, StoreSyllable)` (slot 50)
+  completes, but on 1.1792 it gave `timing="Line"` TTML for every library song tried (05/11/2026): Apple Music on
+  Windows had no word timing for them. The karaoke then spreads a line's span over its words by length
+  (`TimedWords`, `src/core/lyrics.cpp`), the parsed lyrics keep only what Apple gave.
+- **A large cover.** The play bar's `Image#StaticArtwork` is a thumbnail. Apple's own loader is a static of
+  `AMP.UI.Views.UIBroker` (`IUIBrokerStatics` AC46998B-…, slot 34 `GetImageSource(Artwork, Double scale, Double width,
+  Double height) -> ImageSource`), given the item's `IArtwork`. Library covers sit on disk in
+  `Apple Music Library.musiclibrary\artwork\<GUID>_sk1.jpeg`, mostly 600 px wide, some 800 or 1200.
+- **Artist page and credits.** No WinRT call takes an artist or song id and returns a biography or credits: Apple's
+  pages come from its JavaScript "Jet" stack (`JetEngine32.dll`), deserialized into models such as `ArtistBioHeader`
+  and `ArtistBioInfo`. Reaching them means navigating Apple's own stack (`IServiceProvider.get_NavigationService`,
+  `ArtistDetailPageDestination` built by an action, no public constructor). Not done; songwriters are in the TTML.
+- **Running one of Apple's actions (1.1792, checked with a real click on 2026-11-05).** A view model's `...Action`
+  properties (`INowPlayingViewModel.GoToNowPlayingItemAction`, `ScrubForwardAction`...) return an object with no
+  runtime class name, not an `ICommand`: `Execute` is out of reach. Apple runs them with the static
+  `IUIBrokerStatics.GlobalDispatchActionAsync(Object) -> IAsyncAction` (slot 25), as its own menus do. The display's
+  go-to action opens what the song plays from: its album, or the playlist of a library file, at that song
+  (`src/win/lcd_links.cpp`). Posted mouse messages (`PostMessage WM_LBUTTONDOWN`) never reach WinUI's `Tapped`: a
+  test of a click needs real input (`SendInput`, with the window in front).
 
 ## Pitfalls observed
 

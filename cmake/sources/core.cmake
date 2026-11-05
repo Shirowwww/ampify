@@ -23,4 +23,5 @@ list(APPEND AMPIFY_CORE_SOURCES
     src/core/reload.cpp
     src/core/package_watch.cpp
     src/core/kit_layout.cpp
-    src/core/text_util.cpp)
+    src/core/text_util.cpp
+    src/core/address_order.cpp)
