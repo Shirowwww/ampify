@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.1 (2026-11-05)
+
+Fixes for the play bar and for the full-screen player in a window.
+
+### Themes
+
+- `checked-color` sets a toggle's icon colour while it is on. Shuffle now takes the theme's accent while on, like
+  repeat, instead of Apple's blue.
+- The progress line runs to a rounded display's corner instead of stopping short.
+- Floating panels: in a narrow window, the song's title uses the room up to the shuffle and repeat buttons.
+
+### Other
+
+- The full-screen player in a window can be dragged by its background like any window: it lets go on release and
+  works with Windows' snap layouts and PowerToys FancyZones.
+- Its shuffle and repeat buttons show when they are on, and follow the main window's both ways.
+- Closing it brings the main window back where the player was, also when the main window was maximized or the player
+  was moved to a screen of another scale.
+
 ## 1.1.0 (2026-11-04)
 
 More for extension authors, and more of Apple Music's elements within reach of a theme.
