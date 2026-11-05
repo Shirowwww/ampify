@@ -63,7 +63,8 @@ const HOSTS = [
 // Animated covers: the album's motion artwork, a video Discord cannot show, made a GIF by Ampify on this PC and put on
 // the same free hosts. 200 pixels, 10 frames a second: a 20 second loop is under a megabyte.
 const MOTION_HOST = "mvod.itunes.apple.com";
-const GIF = { side: 200, fps: 10, seconds: 30 };
+// A busy video makes a heavy GIF, past what Ampify makes (3 MB, seen with Currents): lighter ones are tried in turn.
+const GIFS = [{ side: 200, fps: 10, seconds: 30 }, { side: 160, fps: 8, seconds: 20 }, { side: 120, fps: 6, seconds: 12 }];
 const MAX_ANIMATIONS = 100;  // albums whose GIF is kept in storage
 const SETTLE_MS = 2000;  // Windows takes a moment to show the new track's cover
 const MAX_REMEMBERED = 200;  // tracks whose lookup is kept in storage
@@ -145,9 +146,11 @@ function bestMatch(results, track) {
 }
 
 // What is known of a track: its catalog entry, an uploaded cover, null when neither, undefined when not asked yet.
+// An entry kept from before animated covers were on has no motion artwork field: asked again once, for its album's.
 function known(track) {
   const found = lookups.get(track.id);
   if (found && found.keptUntil && Date.now() > found.keptUntil) return undefined;
+  if (found && options.animatedCovers && found.songId && !found.keptUntil && !("motion" in found)) return undefined;
   return found;
 }
 
@@ -266,6 +269,8 @@ function searchApple(track) {
       artist: clean(match.artistViewUrl),
       album: clean(match.collectionViewUrl).replace(/\?i=\d+$/, ""),  // a single's album link points at its song
       songId: match.trackId || 0,
+      // Found while the catalog could not be asked: asked again the next day, for the catalog's motion artwork.
+      keptUntil: Date.now() + DAY_MS,
     };
   });
 }
@@ -419,13 +424,21 @@ function videoOf(motion) {
       }
     });
     variants.sort((a, b) => a.side - b.side);
-    const chosen = variants.find((variant) => variant.side >= GIF.side) || variants[variants.length - 1];
+    const chosen = variants.find((variant) => variant.side >= GIFS[0].side) || variants[variants.length - 1];
     if (!chosen) return null;
     return playlist(chosen.url).then((variant) => {
       const map = variant.map((line) => /^#EXT-X-MAP:URI="([^"]+)"/.exec(line)).find(Boolean);
       const file = map ? against(map[1], chosen.url) : "";
       return onDomain(file, MOTION_HOST) ? file : null;
     });
+  });
+}
+
+// The GIF of the video, made lighter while it would be too big; any other failure is not tried again.
+function gifOf(video, index = 0) {
+  return Ampify.http.gifFromVideo(video, GIFS[index]).catch((error) => {
+    if (index + 1 < GIFS.length && /\bover \d+ MB\b/.test(String(error))) return gifOf(video, index + 1);
+    throw error;
   });
 }
 
@@ -439,7 +452,7 @@ function animate(motion) {
         Ampify.log("cover: the motion artwork has no video Ampify can read");
         return null;
       }
-      return Ampify.http.gifFromVideo(video, GIF)
+      return gifOf(video)
         .then((gif) => sendTo(0, { filename: "cover.gif", type: gif.type, base64: gif.base64 }));
     })
     .catch((error) => {

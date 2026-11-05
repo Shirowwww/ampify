@@ -49,6 +49,20 @@ const std::vector<std::pair<std::string, std::string>>& NetworkOptions() {
     return options;
 }
 
+const std::vector<std::pair<std::string, std::string>>& ArtworkOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"sharp", "tweaks.artwork.sharp"},
+        {"apple", "tweaks.artwork.apple"}};
+    return options;
+}
+
+const std::vector<std::pair<std::string, std::string>>& MarqueeOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"hover", "tweaks.marquee.hover"},
+        {"off", "tweaks.marquee.off"}};
+    return options;
+}
+
 const std::vector<std::pair<std::string, std::string>>& KitUpdateOptions() {
     static const std::vector<std::pair<std::string, std::string>> options{
         {"auto", "update.auto"},
@@ -80,6 +94,8 @@ const std::vector<std::pair<std::string, std::string>>* OptionsOf(const std::str
     if (key == kPlayerControlsKey) return &PlayerControlsOptions();
     if (key == kCloseKey) return &CloseOptions();
     if (key == kNetworkKey) return &NetworkOptions();
+    if (key == kArtworkKey) return &ArtworkOptions();
+    if (key == kMarqueeKey) return &MarqueeOptions();
     if (key == kKitUpdateKey) return &KitUpdateOptions();
     return nullptr;
 }
@@ -108,6 +124,8 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.closeToTray = Known(settings, kCloseKey) == "tray";
     tweaks.playerControls = Known(settings, kPlayerControlsKey) == "shown";
     tweaks.ipv4First = Known(settings, kNetworkKey) == "ipv4-first";
+    tweaks.sharpArtwork = Known(settings, kArtworkKey) == "sharp";
+    tweaks.textMarquee = Known(settings, kMarqueeKey) == "hover";
     return tweaks;
 }
 
@@ -123,6 +141,8 @@ std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
         {kPlayerModeKey, "tweaks.player", "tweaks.playerHelp", PlayerOptions(), Known(settings, kPlayerModeKey)},
         {kPlayerControlsKey, "tweaks.playerControls", "tweaks.playerControlsHelp", PlayerControlsOptions(),
          Known(settings, kPlayerControlsKey)},
+        {kArtworkKey, "tweaks.artwork", "tweaks.artworkHelp", ArtworkOptions(), Known(settings, kArtworkKey)},
+        {kMarqueeKey, "tweaks.marquee", "tweaks.marqueeHelp", MarqueeOptions(), Known(settings, kMarqueeKey)},
         {kCloseKey, "tweaks.close", "tweaks.closeHelp", CloseOptions(), Known(settings, kCloseKey)},
         {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", std::move(notificationOptions),
          notifications},

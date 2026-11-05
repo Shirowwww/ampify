@@ -10,10 +10,11 @@ cover, title and artist.
 - **Name shown in the member list**: what follows "Listening to": the artist, the title, or the application's name.
 - **Show the song's cover**: the cover from Apple's catalog, or from Deezer's for the explicit songs that Apple's
   public search leaves out; without it, the Apple Music logo.
-- **Animated covers, when the album has one** (off at first): an album with a motion artwork in Apple Music shows it
-  moving in Discord, as Music Presence does. Discord shows no video, so Ampify makes the video a GIF on your PC (200
-  pixels, 10 frames a second, about a second of work) and puts it on the same free host as the covers below, once per
-  album.
+- **Animated covers, for the few albums that have one** (off at first): an album with a motion artwork in Apple Music
+  shows it moving in Discord, as Music Presence does. Discord shows no video, so Ampify makes the video a GIF on your
+  PC (200 pixels, 10 frames a second, lighter for a busy video; about a second of work) and puts it on the same free
+  host as the covers below, once per album. Apple gives a motion artwork to few albums (Currents, SOS or Midnights
+  have one, most albums and singles do not): the others keep their still cover.
 - **Put your own files' covers online**: a song neither catalog has (a file of your own) has its cover sent to a free
   host that deletes it later (x0.at keeps a cover about 100 days; Ampify sends it again after 60).
 - **Show the album when the cover is hovered**: the album's name as the cover's tooltip.

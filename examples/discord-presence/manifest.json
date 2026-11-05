@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "discord-presence",
   "name": "Discord presence",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Your Discord status shows what you listen to: cover, artist, album, progress bar, links and buttons. Turn it on with Discord open. Covers and links come from Apple Music's catalog; a cover it lacks (your own files) goes to a free host that deletes it after a few months, which can be turned off.",
@@ -13,7 +13,7 @@
       "settings": {
         "status-line": "Nom affiché dans la liste des membres",
         "show-cover": "Afficher la pochette du morceau",
-        "animated-covers": "Pochettes animées, quand l'album en a une",
+        "animated-covers": "Pochettes animées, pour les rares albums qui en ont une",
         "share-covers": "Mettre en ligne les pochettes de vos fichiers",
         "show-album": "Afficher l'album au survol de la pochette",
         "show-progress": "Afficher le temps écoulé",
@@ -36,7 +36,7 @@
       "settings": {
         "status-line": "Name in der Mitgliederliste",
         "show-cover": "Cover des Titels anzeigen",
-        "animated-covers": "Animierte Cover, wenn das Album eines hat",
+        "animated-covers": "Animierte Cover, bei den wenigen Alben, die eines haben",
         "share-covers": "Cover eigener Dateien online stellen",
         "show-album": "Album beim Zeigen auf das Cover anzeigen",
         "show-progress": "Verstrichene Zeit anzeigen",
@@ -59,7 +59,7 @@
       "settings": {
         "status-line": "Nombre en la lista de miembros",
         "show-cover": "Mostrar la carátula de la canción",
-        "animated-covers": "Carátulas animadas, si el álbum tiene una",
+        "animated-covers": "Carátulas animadas, en los pocos álbumes que tienen una",
         "share-covers": "Subir las carátulas de tus archivos",
         "show-album": "Mostrar el álbum al pasar sobre la carátula",
         "show-progress": "Mostrar el tiempo transcurrido",
@@ -82,7 +82,7 @@
       "settings": {
         "status-line": "Nome na lista de membros",
         "show-cover": "Mostrar a capa da música",
-        "animated-covers": "Capas animadas, quando o álbum tiver uma",
+        "animated-covers": "Capas animadas, nos poucos álbuns que têm uma",
         "share-covers": "Pôr online as capas dos seus arquivos",
         "show-album": "Mostrar o álbum ao passar sobre a capa",
         "show-progress": "Mostrar o tempo decorrido",
@@ -105,7 +105,7 @@
       "settings": {
         "status-line": "Имя в списке участников",
         "show-cover": "Показывать обложку трека",
-        "animated-covers": "Анимированные обложки, если они есть у альбома",
+        "animated-covers": "Анимированные обложки (они есть лишь у немногих альбомов)",
         "share-covers": "Выкладывать обложки ваших файлов",
         "show-album": "Альбом при наведении на обложку",
         "show-progress": "Показывать прошедшее время",
@@ -128,7 +128,7 @@
       "settings": {
         "status-line": "メンバーリストに表示する名前",
         "show-cover": "曲のカバーを表示",
-        "animated-covers": "アルバムにあればアニメーションのジャケット",
+        "animated-covers": "アニメーションのジャケット（対応アルバムはごく一部）",
         "share-covers": "自分のファイルのカバーをアップロード",
         "show-album": "カバーにポインターを合わせるとアルバムを表示",
         "show-progress": "経過時間を表示",
@@ -151,7 +151,7 @@
       "settings": {
         "status-line": "成员列表中显示的名称",
         "show-cover": "显示歌曲封面",
-        "animated-covers": "专辑有动态封面时显示动态封面",
+        "animated-covers": "动态封面（仅少数专辑提供）",
         "share-covers": "上传你自己文件的封面",
         "show-album": "悬停封面时显示专辑",
         "show-progress": "显示已播放时间",
@@ -178,7 +178,7 @@
   "settings": [
     {"key": "status-line", "label": "Name shown in the member list", "type": "choice", "options": ["Artist", "Title", "App name"], "default": "Artist"},
     {"key": "show-cover", "label": "Show the song's cover", "type": "toggle", "default": true},
-    {"key": "animated-covers", "label": "Animated covers, when the album has one", "type": "toggle", "default": false},
+    {"key": "animated-covers", "label": "Animated covers, for the few albums that have one", "type": "toggle", "default": false},
     {"key": "share-covers", "label": "Put your own files' covers online", "type": "toggle", "default": true},
     {"key": "show-album", "label": "Show the album when the cover is hovered", "type": "toggle", "default": true},
     {"key": "show-progress", "label": "Show the time elapsed", "type": "toggle", "default": true},

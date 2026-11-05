@@ -21,6 +21,7 @@ Problems met while drawing inside Apple Music, and what fixed them. Read this be
 | Navigating twice to the same page was not seen | Only the route was compared | A counter (`RouteSerial`) fixes it |
 | A large cover never replaced the blurry one | A `BitmapImage` that nothing in the window shows is never decoded: `ImageOpened` and `ImageFailed` never fire | Load it through an element in the tree (the invisible sizer of the image node, held at its height meanwhile), then give it to the visible brush |
 | Old handlers on a bitmap or a frame kept running | `auto_revoke` revokes through a weak reference to the source, which never resolves for an object Ampify made | Remove handlers by token (`ImageOpened(token)`), and check the sender is still the latest one |
+| The full-screen player kept the first song's cover for all the next ones | A value set on `Image.Source` of Apple's cover replaced the binding that brings each song's image | Never write a bound property of Apple's element: lay Ampify's own element over it, in the same cell, and follow Apple's with `RegisterPropertyChangedCallback` (`src/win/sharp_artwork.cpp`) |
 | Pages made room for the panels, then ran under them again | Themes write `Grid#ContentRoot`'s margin, and write it again while they run | The room is the padding of its parent grid, which themes do not write (`PushPages`) |
 
 ## Resources, colors and themes

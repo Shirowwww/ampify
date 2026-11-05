@@ -18,7 +18,16 @@ Close Apple Music, open PowerShell (Start menu, type "PowerShell") and paste:
 irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
 ```
 
-The line downloads the latest release, checks its SHA-256 and runs the installer. To install from the zip instead,
+The line downloads the latest release, checks its SHA-256 and runs the installer. To read the script before it runs,
+save it, open it, then start it yourself:
+
+```powershell
+irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 -OutFile install.ps1
+notepad install.ps1
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+`-ExecutionPolicy Bypass` lets this one script run without changing Windows' setting. To install from the zip instead,
 download it from the [Releases](https://github.com/Shirowwww/ampify/releases) page, extract it and run
 `ampify_setup.exe`. If Windows shows "Windows protected your PC", click "More info", then "Run anyway": the files are
 not code-signed yet. If Apple Music is open, the installer offers to close it.

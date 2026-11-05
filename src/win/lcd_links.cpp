@@ -244,6 +244,14 @@ void Link(const xaml::FrameworkElement& ticker, bool title) {
 
 }  // namespace
 
+std::wstring CatalogStorefront() noexcept {
+    try {
+        return Storefront();
+    } catch (...) {
+        return L"US";
+    }
+}
+
 void KeepDisplayLinks(Journal& journal) noexcept {
     try {
         Links& state = State();

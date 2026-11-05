@@ -30,6 +30,13 @@ std::string ArtworkAddress(const ArtworkReading& artwork);
 // "#RRGGBB" from the colour, or empty when Apple gave none (a fully transparent black counts as none).
 std::string ArtworkColorHex(const ArtworkReading& artwork);
 
+// Apple's public catalog lookup of a song by its catalog id, in a storefront ("FR"); empty for an id that is not digits
+// or a storefront that is not two letters.
+std::string CatalogLookupAddress(const std::string& catalogId, const std::string& storefront);
+// The catalog's cover at `pixels` square (rounded up to a hundred, 600 to 3000) from the lookup's `artworkUrl100`
+// (https://...mzstatic.com/.../100x100bb.jpg); empty for any other address.
+std::string CatalogCoverAddress(const std::string& artworkUrl100, double pixels);
+
 // What src/win/amp_player.cpp reads from AMP.Services.Player, as raw values.
 struct AmpReading {
     bool playing = false;

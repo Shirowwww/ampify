@@ -64,6 +64,8 @@
 #include "kit_command.hpp"
 #include "notifications.hpp"
 #include "player_controls.hpp"
+#include "sharp_artwork.hpp"
+#include "text_marquee.hpp"
 #include "xaml_host.hpp"
 
 namespace ampify::win {
@@ -3876,6 +3878,8 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
     }
     SetNotificationRule(tweaks.notifications, shared.journal);
     SetPlayerControlsShown(tweaks.playerControls);
+    SetSharpArtwork(tweaks.sharpArtwork);
+    SetTextMarquee(tweaks.textMarquee);
     const bool inHeader = uirender::ReadEntryInHeader(settings);
     const bool entryMoved = shared.entryInHeader.exchange(inHeader) != inHeader;
 

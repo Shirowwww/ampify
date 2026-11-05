@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <string_view>
 #include <tuple>
 
 #include "amp_abi.hpp"
@@ -76,6 +77,42 @@ std::string ArtworkColorHex(const ArtworkReading& artwork) {
     char text[8];
     std::snprintf(text, sizeof text, "#%02X%02X%02X", artwork.red, artwork.green, artwork.blue);
     return text;
+}
+
+std::string CatalogLookupAddress(const std::string& catalogId, const std::string& storefront) {
+    auto all = [](const std::string& text, int (*test)(int)) {
+        return std::all_of(text.begin(), text.end(), [test](char c) { return test(static_cast<unsigned char>(c)) != 0; });
+    };
+    if (catalogId.empty() || !all(catalogId, std::isdigit) || storefront.size() != 2 || !all(storefront, std::isalpha)) {
+        return "";
+    }
+    return "https://itunes.apple.com/lookup?id=" + catalogId + "&country=" + storefront;
+}
+
+std::string CatalogCoverAddress(const std::string& artworkUrl100, double pixels) {
+    constexpr int kSmallest = 600, kLargest = 3000, kStep = 100;
+    constexpr char kScheme[] = "https://";
+    if (!HasPrefixNoCase(artworkUrl100, kScheme)) return "";
+    size_t hostEnd = artworkUrl100.find('/', sizeof kScheme - 1);
+    std::string host = artworkUrl100.substr(sizeof kScheme - 1, hostEnd - (sizeof kScheme - 1));
+    constexpr std::string_view kHost = ".mzstatic.com";
+    if (hostEnd == std::string::npos || host.size() <= kHost.size() || !host.ends_with(kHost)) return "";
+    // Letters, digits, dots and hyphens only: "evil.com#.mzstatic.com" ends with the name, but its host is evil.com.
+    bool plainHost = std::all_of(host.begin(), host.end(), [](char c) {
+        return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '.' || c == '-';
+    });
+    if (!plainHost) return "";
+    // The last segment is "<w>x<h><crop>.<format>", such as 100x100bb.jpg.
+    size_t name = artworkUrl100.rfind('/') + 1;
+    size_t cross = artworkUrl100.find('x', name);
+    size_t crop = cross == std::string::npos ? cross : artworkUrl100.find_first_not_of("0123456789", cross + 1);
+    if (cross == std::string::npos || cross == name || crop == cross + 1 || crop == std::string::npos) return "";
+    for (size_t i = name; i < cross; ++i) {
+        if (!std::isdigit(static_cast<unsigned char>(artworkUrl100[i]))) return "";
+    }
+    int wanted = static_cast<int>(std::ceil(std::max(0.0, pixels) / kStep)) * kStep;
+    std::string side = std::to_string(std::clamp(wanted, kSmallest, kLargest));
+    return artworkUrl100.substr(0, name) + side + "x" + side + artworkUrl100.substr(crop);
 }
 
 AmpTimeUnit DetectAmpTimeUnit(int64_t durationRaw, std::optional<int64_t> smtcDurationMs) {

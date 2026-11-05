@@ -210,7 +210,8 @@ function serviceAmpify(manifest, { config = {}, storage = new Map(), state = nul
       gifFromVideo: (url, options = {}) => {
         need(`network:${new URL(url).host}`);
         world.gifs.push({ url, options: { ...options } });
-        return Promise.resolve({ type: "image/gif", base64: "R0lGODlh" });
+        // gifAnswer may throw, as Ampify rejects a GIF that would pass its size limit.
+        return Promise.resolve().then(() => (world.gifAnswer ? world.gifAnswer(options) : { type: "image/gif", base64: "R0lGODlh" }));
       },
       postForm: (url, fields) => {
         need(`network:${new URL(url).host}`);
@@ -604,6 +605,76 @@ test("discord-presence shows the album's motion artwork as a GIF made on this PC
   for (let i = 0; i < 6; i++) await settle();
   assert.equal(fake.world.gifs.length, 1);
   assert.equal(fake.world.activities.at(-1).largeImage, "https://x0.at/gif0123456789abcd.gif");
+});
+
+test("discord-presence makes a lighter GIF when a busy video's would be too big, and stops at another failure", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest, { config: { "animated-covers": true } });
+  fake.world.getAnswer = motionHost;
+  fake.world.gifAnswer = (options) => {
+    if (options.side > 160) throw new Error("http.gifFromVideo: the GIF would be over 3 MB: a smaller side, fewer frames a second or fewer seconds");
+    return { type: "image/gif", base64: "R0lGODlh" };
+  };
+  fake.world.formAnswer = { status: 200, text: "https://x0.at/gif0123456789abcd.gif\n" };
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
+  for (let i = 0; i < 10; i++) await settle();
+  assert.deepEqual(fake.world.gifs.map((gif) => gif.options), [{ side: 200, fps: 10, seconds: 30 }, { side: 160, fps: 8, seconds: 20 }]);
+  assert.equal(fake.world.activities.at(-1).largeImage, "https://x0.at/gif0123456789abcd.gif");
+
+  const broken = serviceAmpify(manifest, { config: { "animated-covers": true } });
+  broken.world.getAnswer = motionHost;
+  broken.world.gifAnswer = () => { throw new Error("http.gifFromVideo: the video could not be read"); };
+  runIn(source, broken.context);
+  broken.emit("trackchange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
+  for (let i = 0; i < 10; i++) await settle();
+  assert.equal(broken.world.gifs.length, 1);
+  assert.equal(broken.world.activities.at(-1).largeImage, "https://is1-ssl.mzstatic.com/u/600x600bb.jpg");
+});
+
+test("discord-presence asks again for a track found before animated covers were on, and shows its album's", async () => {
+  const { manifest, source } = load("discord-presence");
+  // Found by an Ampify of before (or by the iTunes search): no motion artwork field, kept with no end.
+  const storage = new Map([["lookups.1", { "1": {
+    cover: "https://is1-ssl.mzstatic.com/u/600x600bb.jpg", song: "https://music.apple.com/us/album/fe-n/1699712635?i=1699712651",
+    artist: "", album: "https://music.apple.com/us/album/fe-n/1699712635", songId: "1699712651",
+  } }]]);
+  const off = serviceAmpify(manifest, { storage });
+  off.world.getAnswer = motionHost;
+  runIn(source, off.context);
+  off.emit("trackchange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
+  for (let i = 0; i < 6; i++) await settle();
+  assert.equal(off.world.gets.length, 0, "animated covers off: the kept entry is enough");
+
+  const on = serviceAmpify(manifest, { storage, config: { "animated-covers": true } });
+  on.world.getAnswer = motionHost;
+  on.world.formAnswer = { status: 200, text: "https://x0.at/gif0123456789abcd.gif\n" };
+  runIn(source, on.context);
+  on.emit("trackchange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
+  for (let i = 0; i < 8; i++) await settle();
+  assert.equal(on.world.gets.filter((url) => url.startsWith("https://amp-api.music.apple.com/")).length, 1);
+  assert.equal(on.world.activities.at(-1).largeImage, "https://x0.at/gif0123456789abcd.gif");
+
+  // Looked up again once only: the new entry has the field.
+  on.emit("trackchange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
+  for (let i = 0; i < 4; i++) await settle();
+  assert.equal(on.world.gets.filter((url) => url.startsWith("https://amp-api.music.apple.com/")).length, 1);
+});
+
+test("discord-presence asks the iTunes search's finds again the next day, for the catalog's motion artwork", async () => {
+  const { manifest, source } = load("discord-presence");
+  const storage = new Map();
+  const fake = serviceAmpify(manifest, { storage, config: { "animated-covers": true } });
+  fake.world.getAnswer = () => itunes();
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000));
+  for (let i = 0; i < 4; i++) await settle();
+  const kept = storage.get("lookups.1")["1"];
+  assert.equal(kept.songId, 42);
+  assert.equal(kept.keptUntil, fake.world.now + 24 * 3600 * 1000);  // the fake clock stands still
+  fake.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000));
+  for (let i = 0; i < 4; i++) await settle();
+  assert.equal(searches(fake.world).length, 1, "not asked again within the day");
 });
 
 test("discord-presence reads a variant listed with its sound first, and files named from the host's root", async () => {

@@ -60,6 +60,14 @@ irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 
 It downloads the latest release, checks its SHA-256 and installs it for your Windows account, with no administrator
 rights. Then open Apple Music as usual, from its own icon.
 
+To read the script before it runs, save it, open it, then start it yourself:
+
+```powershell
+irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 -OutFile install.ps1
+notepad install.ps1
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
 Or download `ampify-<version>-windows-x64.zip` from the [latest release](https://github.com/Shirowwww/ampify/releases/latest),
 extract it and run `ampify_setup.exe`. You need Windows 10 or 11 (x64) and Apple Music from the Microsoft Store.
 

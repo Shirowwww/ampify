@@ -74,8 +74,10 @@ Register-Case -Id 'bench-injection' -Title 'Bench build: kernel in AppleMusic.ex
     $agentRunning = @(Get-Process -Name 'AMPLibraryAgent' -ErrorAction SilentlyContinue).Count
     Add-Info -Ctx $Ctx -Name 'AMPLibraryAgent.exe open at check time' -Detail "$agentRunning process(es)"
 
-    $healthy = Wait-Journal -FileName 'AppleMusic.log' -Text 'Healthy after 20 s' -TimeoutSeconds 60
-    Add-Check -Ctx $Ctx -Name 'AppleMusic.log: healthy after 20 s' -Passed $healthy
+    $healthy = Wait-Until -TimeoutSeconds 60 -Condition {
+        $null -ne (Find-JournalMatch -FileName 'AppleMusic.log' -Pattern 'Healthy after \d+ s: safe mode count reset')
+    }
+    Add-Check -Ctx $Ctx -Name 'AppleMusic.log: healthy, safe mode count reset' -Passed $healthy
 
     $kernelApp = Get-KernelState -ProcessName 'AppleMusic'
     Add-Check -Ctx $Ctx -Name 'ampify_kernel.dll present in AppleMusic.exe' `

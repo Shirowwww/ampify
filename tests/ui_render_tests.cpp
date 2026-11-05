@@ -786,13 +786,19 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     CHECK(none.player == PlayerMode::Window);  // what the Now Playing button did before the setting existed
     CHECK(!none.closeToTray);                   // closing quits, as Apple Music does
     CHECK(none.playerControls);                 // shuffle and repeat in the full-screen player
+    CHECK(none.sharpArtwork);                   // a sharper cover where Apple's is stretched
+    CHECK(none.textMarquee);                    // cut texts scroll under the pointer
 
     settings.Set("apple.notifications", "Background");
     settings.Set("apple.fullscreen", "replace");
     settings.Set("apple.close", "tray");
     settings.Set("apple.playerControls", "hidden");
+    settings.Set("apple.artwork", "Apple");
+    settings.Set("apple.marquee", "off");
     AppleTweaks set = ReadAppleTweaks(settings);
     CHECK(!set.playerControls);
+    CHECK(!set.sharpArtwork);
+    CHECK(!set.textMarquee);
     CHECK(set.notifications == NotificationRule::Background);
     CHECK(set.player == PlayerMode::Replace);
     CHECK(set.closeToTray);
@@ -864,7 +870,8 @@ TEST_CASE(UiRender_AmpifysEntryGoesInTheHeaderOnlyWhenChosen) {
 
 TEST_CASE(UiRender_TheCardListsTheValuesOfEveryKeyItKnows) {
     for (const char* key : {"apple.notifications", "apple.fullscreen", "apple.playerControls", "apple.close",
-                            "apple.network", "theme.glass", "ampify.entry", "kit_update"}) {
+                            "apple.network", "apple.artwork", "apple.marquee", "theme.glass", "ampify.entry",
+                            "kit_update"}) {
         CHECK(!AppleTweakValues(key).empty());
         CHECK(!IsAppleTweakValue(key, "not-a-value"));
     }
@@ -908,27 +915,33 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "apple.notifications", "loud", error));
     CHECK(!SetAppleTweak(kit, "theme.active", "screen", error));
 
-    // The player and the close button first; the notifications, where "never" (Apple's own switch does it) only shows
-    // for someone who chose it before; the network fix last.
+    // The player, its cover and the long texts first, then the close button; the notifications, where "never"
+    // (Apple's own switch does it) only shows for someone who chose it before; the network fix last.
     std::vector<TweakChoice> choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 5);
-    if (choices.size() == 5) {
+    CHECK(choices.size() == 7);
+    if (choices.size() == 7) {
         CHECK(choices[0].key == "apple.fullscreen" && choices[0].value == "screen");
         CHECK(choices[0].options.size() == 4);
         CHECK(choices[1].key == "apple.playerControls" && choices[1].value == "shown");
-        CHECK(choices[2].key == "apple.close" && choices[2].value == "tray");
-        CHECK(choices[2].options.size() == 2);
-        CHECK(choices[3].key == "apple.notifications" && choices[3].value == "never");
-        CHECK(choices[3].options.size() == 3);
-        CHECK(choices[4].key == "apple.network" && choices[4].value == "ipv4-first");
+        CHECK(choices[2].key == "apple.artwork" && choices[2].value == "sharp");
+        CHECK(choices[3].key == "apple.marquee" && choices[3].value == "hover");
+        CHECK(choices[4].key == "apple.close" && choices[4].value == "tray");
         CHECK(choices[4].options.size() == 2);
+        CHECK(choices[5].key == "apple.notifications" && choices[5].value == "never");
+        CHECK(choices[5].options.size() == 3);
+        CHECK(choices[6].key == "apple.network" && choices[6].value == "ipv4-first");
+        CHECK(choices[6].options.size() == 2);
     }
 
     CHECK(SetAppleTweak(kit, "apple.notifications", "background", error));
     CHECK(SetAppleTweak(kit, "apple.network", "system", error));
+    CHECK(SetAppleTweak(kit, "apple.artwork", "apple", error));
+    CHECK(SetAppleTweak(kit, "apple.marquee", "off", error));
+    CHECK(!SetAppleTweak(kit, "apple.marquee", "always", error));
     choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 5 && choices[3].options.size() == 2 && choices[3].value == "background");
-    CHECK(choices.size() == 5 && choices[4].value == "system");
+    CHECK(choices.size() == 7 && choices[5].options.size() == 2 && choices[5].value == "background");
+    CHECK(choices.size() == 7 && choices[6].value == "system");
+    CHECK(choices.size() == 7 && choices[2].value == "apple" && choices[3].value == "off");
 }
 
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {

@@ -44,6 +44,8 @@ long long ReadLyricsLineStart() noexcept;
 // The cover of the song playing, loaded by Apple's own artwork loader at about `pixels` wide (its library and catalog
 // images, larger than the play bar's), or null. Interface thread only.
 winrt::Microsoft::UI::Xaml::Media::ImageSource PlayingArtworkSource(double pixels) noexcept;
+// The catalog id (AdamId, digits) of the song playing, empty for a file that is not in the catalog. Interface thread only.
+std::string PlayingCatalogId() noexcept;
 
 // Why the last SetMainPlayerVolume failed, once (empty when it did not). Any thread.
 std::string TakeMainPlayerVolumeProblem();

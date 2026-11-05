@@ -2,6 +2,7 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include "amp_item.hpp"
 #include "winrt_abi.hpp"
 #include "xaml_host.hpp"
 
@@ -661,16 +662,25 @@ bool QueryFirst(const rt::Ref& object, const char* const (&iids)[N], rt::Ref& ou
     return false;
 }
 
-// IArtwork of the item Apple's player holds now, or an empty Ref.
-rt::Ref PlayingArtwork() {
-    rt::Ref statics, current, player, itemObject, item, artworkObject, artwork;
+// The INowPlayingItem Apple's player holds now, or an empty Ref.
+rt::Ref PlayingItem() {
+    rt::Ref statics, current, player, itemObject, item;
     rt::Activation activation =
         rt::GetActivationFactory(L"AMP.Services.Player", rt::GuidOf(amp::kIidPlayerStatics), statics);
     if (FAILED(activation.result) || FAILED(rt::CallSlot(statics, amp::slot::kPlayerStaticsCurrent, current.Put())) ||
         !current || !QueryFirst(current, amp::kIidsPlayer, player) ||
         FAILED(rt::CallSlot(player, amp::slot::kPlayerNowPlayingItem, itemObject.Put())) || !itemObject ||
-        !rt::Query(itemObject, rt::GuidOf(amp::kIidsNowPlayingItem[0]), item) ||
-        FAILED(rt::CallSlot(item, amp::slot::kItemArtwork, artworkObject.Put())) || !artworkObject ||
+        !rt::Query(itemObject, rt::GuidOf(amp::kIidsNowPlayingItem[0]), item)) {
+        return {};
+    }
+    return item;
+}
+
+// IArtwork of the item Apple's player holds now, or an empty Ref.
+rt::Ref PlayingArtwork() {
+    rt::Ref item = PlayingItem();
+    rt::Ref artworkObject, artwork;
+    if (!item || FAILED(rt::CallSlot(item, amp::slot::kItemArtwork, artworkObject.Put())) || !artworkObject ||
         !rt::Query(artworkObject, rt::GuidOf(amp::kIidArtwork), artwork)) {
         return {};
     }
@@ -696,6 +706,19 @@ media::ImageSource PlayingArtworkSource(double pixels) noexcept {
         return source;
     } catch (...) {
         return nullptr;
+    }
+}
+
+std::string PlayingCatalogId() noexcept {
+    try {
+        rt::Ref item = PlayingItem();
+        rt::Ref descriptor = item ? ContentDescriptorOf(item) : rt::Ref{};
+        std::string id = descriptor ? rt::ReadString(descriptor, amp::slot::kDescriptorAdamId) : std::string();
+        bool digits = !id.empty() && id != "0" &&
+                      std::all_of(id.begin(), id.end(), [](char c) { return c >= '0' && c <= '9'; });
+        return digits ? id : std::string();
+    } catch (...) {
+        return {};
     }
 }
 

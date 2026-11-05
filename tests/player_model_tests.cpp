@@ -568,6 +568,31 @@ TEST_CASE(PositionClock_FollowsASeekAndApplesLyricsLine) {
     CHECK(lines.Moving(6000));
 }
 
+TEST_CASE(CatalogLookupAddress_TakesDigitsAndATwoLetterStorefront) {
+    CHECK(ampify::CatalogLookupAddress("1440818588", "FR") == "https://itunes.apple.com/lookup?id=1440818588&country=FR");
+    CHECK(ampify::CatalogLookupAddress("", "FR").empty());
+    CHECK(ampify::CatalogLookupAddress("12a", "FR").empty());
+    CHECK(ampify::CatalogLookupAddress("12", "FRA").empty());
+    CHECK(ampify::CatalogLookupAddress("12", "F&").empty());
+}
+
+TEST_CASE(CatalogCoverAddress_AsksTheSizeShownOfAppleImages) {
+    const std::string thumb = "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/aa/bb/source/100x100bb.jpg";
+    CHECK(ampify::CatalogCoverAddress(thumb, 800) ==
+          "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/aa/bb/source/800x800bb.jpg");
+    CHECK(ampify::CatalogCoverAddress(thumb, 1001).find("/1100x1100bb.jpg") != std::string::npos);
+    CHECK(ampify::CatalogCoverAddress(thumb, 100).find("/600x600bb.jpg") != std::string::npos);    // never under the cache
+    CHECK(ampify::CatalogCoverAddress(thumb, 9000).find("/3000x3000bb.jpg") != std::string::npos);
+    CHECK(ampify::CatalogCoverAddress("https://example.com/a/100x100bb.jpg", 800).empty());      // not Apple's images
+    CHECK(ampify::CatalogCoverAddress("http://is1.mzstatic.com/a/100x100bb.jpg", 800).empty());
+    CHECK(ampify::CatalogCoverAddress("https://is1.mzstatic.com/a/cover.jpg", 800).empty());     // no size to change
+    // A host that only ends with Apple's name: what comes before #, ? or @ is another server.
+    CHECK(ampify::CatalogCoverAddress("https://evil.com#.mzstatic.com/a/100x100bb.jpg", 800).empty());
+    CHECK(ampify::CatalogCoverAddress("https://evil.com?.mzstatic.com/a/100x100bb.jpg", 800).empty());
+    CHECK(ampify::CatalogCoverAddress("https://u@x.mzstatic.com/a/100x100bb.jpg", 800).empty());
+    CHECK(ampify::CatalogCoverAddress("https://evil.com:443.mzstatic.com/a/100x100bb.jpg", 800).empty());
+}
+
 // A pause is not time played: the clock starts again from where it stopped, however long the pause lasted.
 TEST_CASE(PositionClock_ResumesWhereThePauseLeftIt) {
     ampify::PositionClock clock;

@@ -38,6 +38,7 @@
 
 #include "../core/amp_abi.hpp"
 #include "player_controls.hpp"
+#include "sharp_artwork.hpp"
 #include "winrt_abi.hpp"
 #include "xaml_host.hpp"
 
@@ -58,6 +59,7 @@ constexpr int kPressReports = 3;     // presses described in the log, to see wha
 constexpr int kSearchLimit = 4000;   // elements walked to find Apple's close button
 constexpr int kSettleTicks = 4;      // ticks the main window is watched after a close (a second)
 constexpr int kCaptionEvery = 2;    // ticks between two layouts of the caption regions (half a second)
+constexpr int kArtworkEvery = 4;    // ticks between two looks for the cover's image (a second)
 constexpr int kDragStart = 4;       // pixels the pointer moves, button down, before the window follows: a click stays one
 
 // Interface thread only. Never freed: releasing WinRT objects while the process exits can crash it.
@@ -88,6 +90,7 @@ struct Placement {
     bool captionSet = false;      // the background is a caption for Windows (SetCaption): Ampify moves nothing itself
     bool captionRefused = false;  // SetCaption failed once: logged once
     int captionTicks = 0;         // the regions are laid out again every few ticks
+    int artworkTicks = 0;         // the cover is looked for again every few ticks (SharpenPlayerArtwork)
     bool systemMoving = false;      // inside the system's move loop (OnMove)
     bool systemMoveFailed = false;  // the loop did not start once: the drags move the window by hand
     // The row of the progress line and its two times, and Apple's margin on it (WidenScrubberRow).
@@ -535,6 +538,7 @@ void Lay(const xaml::Window& player, const windowing::AppWindow& window, Placeme
     HookInput(player, hwnd);
     ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), false);
     HugArtwork(player.Content().try_as<xaml::UIElement>());
+    SharpenPlayerArtwork(player.Content().try_as<xaml::UIElement>(), *state.journal);
     if (screenLike) {
         ClearCaption(player, state);
     } else {
@@ -621,6 +625,9 @@ void Step(Placement& state) {
         state.lastRect = VisibleRect(hwnd);
         state.playerZoomed = IsZoomed(hwnd) != FALSE;
         WidenScrubberRow(state, player.Content().try_as<xaml::UIElement>());
+        if (++state.artworkTicks % kArtworkEvery == 0) {
+            SharpenPlayerArtwork(player.Content().try_as<xaml::UIElement>(), *state.journal);  // built once a song plays
+        }
         bool caption = state.mode != uirender::PlayerMode::WorkArea && !state.captionRefused;
         if (caption && ++state.captionTicks % kCaptionEvery == 0) SetCaption(player, state);  // follows the layout
         if (state.reportPending && std::chrono::steady_clock::now() >= state.reportAt) {
@@ -648,6 +655,7 @@ void Step(Placement& state) {
     }
     AddPlayerControls(player.Content(), state.mainRoot.get(), *state.journal);
     HugArtwork(player.Content().try_as<xaml::UIElement>());
+    SharpenPlayerArtwork(player.Content().try_as<xaml::UIElement>(), *state.journal);
     if (state.mode == uirender::PlayerMode::Screen) {
         state.timer.Stop();
         if (window.Presenter().Kind() != windowing::AppWindowPresenterKind::FullScreen) {

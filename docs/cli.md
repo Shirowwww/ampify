@@ -145,6 +145,8 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `apple.network` | `ipv4-first` tries a server's IPv4 address before its IPv6 one (songs stuck at 0:00 where IPv6 does not answer), `system` keeps Windows' order; applies at the next start | `ipv4-first` |
 | `apple.fullscreen` | Where Apple's full-screen player opens: `window`, `replace`, `work-area` or `screen` | `window` |
 | `apple.playerControls` | Shuffle and repeat around the full-screen player's buttons: `shown` or `hidden` | `shown` |
+| `apple.artwork` | The full-screen player's cover: `sharp` shows a sharper copy where Apple Music stretches a small one, `apple` leaves Apple's | `sharp` |
+| `apple.marquee` | A text cut with "…": `hover` scrolls it while the pointer is on it, `off` leaves it cut | `hover` |
 | `ampify.entry` | Where the entry that opens the Marketplace stands: `sidebar`, or `header` next to Apple's "···" at the top of the open sidebar | `sidebar` |
 | `catalog.url` | `https://...` or `file://...` | the public catalog |
 | `app_launch_flags` | Arguments added when `ampify launch` starts Apple Music | empty |
