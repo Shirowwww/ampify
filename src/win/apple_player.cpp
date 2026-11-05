@@ -8,6 +8,7 @@
 // The WinRT headers come before windows.h: its GetClassName macro would rename IAutomationPeer::GetClassName in some
 // of them and not in others (the error the CI's build without UNICODE gave).
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Graphics.h>
 #include <winrt/Microsoft.UI.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Input.h>
@@ -55,7 +56,9 @@ constexpr auto kReportDelay = std::chrono::seconds(1);
 constexpr auto kWatchStep = std::chrono::milliseconds(250);  // while laid out: notices the close soon enough
 constexpr int kPressReports = 3;     // presses described in the log, to see what takes them
 constexpr int kSearchLimit = 4000;   // elements walked to find Apple's close button
-constexpr int kDragStart = 4;        // pixels the pointer moves, button down, before the window follows: a click stays one
+constexpr int kSettleTicks = 4;      // ticks the main window is watched after a close (a second)
+constexpr int kCaptionEvery = 2;    // ticks between two layouts of the caption regions (half a second)
+constexpr int kDragStart = 4;       // pixels the pointer moves, button down, before the window follows: a click stays one
 
 // Interface thread only. Never freed: releasing WinRT objects while the process exits can crash it.
 struct Placement {
@@ -68,6 +71,10 @@ struct Placement {
     std::chrono::steady_clock::time_point reportAt;
     bool mainWasZoomed = false;  // the main window the player replaced was maximized
     RECT lastRect{};             // where the player was last seen, for the main window it replaced
+    RECT laidRect{};             // where the player settled once laid out: still there if the person moved nothing
+    bool playerZoomed = false;   // the player was last seen maximized
+    HWND settleMain = nullptr;   // the main window put back where the player was, while it settles (Settle)
+    int settleTicks = 0;
     HWND main = nullptr;
     winrt::weak_ref<xaml::UIElement> mainRoot;  // the main window's content, whose shuffle and repeat the player gets
     Journal* journal = nullptr;
@@ -78,6 +85,11 @@ struct Placement {
     bool dragging = false;   // past kDragStart: the window follows the pointer
     POINT pressCursor{};     // screen coordinates of the press
     POINT windowOrigin{};    // the window's top left corner at the press
+    bool captionSet = false;      // the background is a caption for Windows (SetCaption): Ampify moves nothing itself
+    bool captionRefused = false;  // SetCaption failed once: logged once
+    int captionTicks = 0;         // the regions are laid out again every few ticks
+    bool systemMoving = false;      // inside the system's move loop (OnMove)
+    bool systemMoveFailed = false;  // the loop did not start once: the drags move the window by hand
     // The row of the progress line and its two times, and Apple's margin on it (WidenScrubberRow).
     winrt::weak_ref<xaml::FrameworkElement> scrubberRow;
     xaml::Thickness scrubberMargin{};
@@ -189,6 +201,69 @@ windowing::AppWindow AppWindowOf(HWND window) {
         winrt::Microsoft::UI::WindowId{static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(window))});
 }
 
+// The rectangles, in the window's client pixels, of what takes a press itself, without going into it: a button, a
+// slider, a list row, a text field, or a list that scrolls (the lyrics).
+void ControlRects(const xaml::UIElement& root, double scale, std::vector<winrt::Windows::Graphics::RectInt32>& out) {
+    namespace primitives = xaml::Controls::Primitives;
+    std::vector<xaml::DependencyObject> queue{root};
+    for (std::size_t i = 0; i < queue.size() && i < static_cast<std::size_t>(kSearchLimit); i++) {
+        auto element = queue[i].try_as<xaml::FrameworkElement>();
+        if (element && (element.Visibility() != xaml::Visibility::Visible || element.ActualWidth() <= 0)) continue;
+        auto scroller = queue[i].try_as<xaml::Controls::ScrollViewer>();
+        bool takes = queue[i].try_as<primitives::ButtonBase>() || queue[i].try_as<primitives::RangeBase>() ||
+                     queue[i].try_as<primitives::SelectorItem>() || queue[i].try_as<xaml::Controls::TextBox>() ||
+                     (scroller && scroller.ScrollableHeight() > 0);
+        if (element && takes && element != root) {
+            auto box = element.TransformToVisual(root).TransformBounds(
+                {0, 0, static_cast<float>(element.ActualWidth()), static_cast<float>(element.ActualHeight())});
+            out.push_back({static_cast<int32_t>(std::floor(box.X * scale)), static_cast<int32_t>(std::floor(box.Y * scale)),
+                           static_cast<int32_t>(std::ceil(box.Width * scale)), static_cast<int32_t>(std::ceil(box.Height * scale))});
+            continue;
+        }
+        int count = xaml::Media::VisualTreeHelper::GetChildrenCount(queue[i]);
+        for (int child = 0; child < count; child++) queue.push_back(xaml::Media::VisualTreeHelper::GetChild(queue[i], child));
+    }
+}
+
+// The player's background is a caption for Windows, its controls pass through: a drag from it is the window's own, so
+// Windows' snap layouts and PowerToys FancyZones see it, and it ends on the release. Ampify's moves never could: a move
+// loop started from a press XAML had taken left the window stuck to the pointer until the next click (05/11). Laid out
+// again as the player's layout changes.
+void SetCaption(const xaml::Window& player, Placement& state) {
+    using winrt::Microsoft::UI::Input::InputNonClientPointerSource;
+    using winrt::Microsoft::UI::Input::NonClientRegionKind;
+    try {
+        auto root = player.Content().try_as<xaml::UIElement>();
+        auto xamlRoot = root ? root.XamlRoot() : nullptr;
+        if (!xamlRoot) return;
+        double scale = xamlRoot.RasterizationScale();
+        winrt::Windows::Graphics::SizeInt32 size = player.AppWindow().ClientSize();
+        std::vector<winrt::Windows::Graphics::RectInt32> controls;
+        ControlRects(root, scale, controls);
+        auto source = InputNonClientPointerSource::GetForWindowId(player.AppWindow().Id());
+        source.SetRegionRects(NonClientRegionKind::Caption, {{0, 0, size.Width, size.Height}});
+        source.SetRegionRects(NonClientRegionKind::Passthrough, controls);
+        if (!state.captionSet) {
+            state.journal->Write("Apple player: its background is a caption for Windows, " +
+                                 std::to_string(controls.size()) + " control(s) pass through");
+        }
+        state.captionSet = true;
+    } catch (const winrt::hresult_error& error) {
+        if (!state.captionRefused) state.journal->Write("Apple player: no caption regions (" + HresultText(error.code()) + ")");
+        state.captionRefused = true;
+    }
+}
+
+void ClearCaption(const xaml::Window& player, Placement& state) {
+    if (!state.captionSet || !player) return;
+    state.captionSet = false;
+    try {
+        winrt::Microsoft::UI::Input::InputNonClientPointerSource::GetForWindowId(player.AppWindow().Id()).ClearAllRegionRects();
+    } catch (const winrt::hresult_error& error) {
+        state.journal->Write("Apple player: its caption regions not cleared (" + HresultText(error.code()) + ")");
+    }
+}
+
 // Ampify's handlers act only on the window Ampify made: Apple's own full screen keeps its behaviour.
 bool Windowed(HWND window) {
     windowing::AppWindow app = AppWindowOf(window);
@@ -200,6 +275,7 @@ bool Windowed(HWND window) {
 void OnPress(HWND window, const xaml::UIElement& root, xaml::Input::PointerRoutedEventArgs const& args) {
     Placement& state = State();
     state.dragArmed = false;
+    state.dragging = false;  // a system move loop ends without a release reaching XAML
     auto point = args.GetCurrentPoint(root);
     if (!point.Properties().IsLeftButtonPressed() || !Windowed(window)) return;
     auto source = args.OriginalSource().try_as<xaml::DependencyObject>();
@@ -222,12 +298,15 @@ void OnRelease(const xaml::UIElement& root) {
     if (std::exchange(state.dragging, false)) root.ReleasePointerCaptures();
 }
 
-// Past a few pixels with the button down, the window follows the pointer, as from a title bar; a plain click never
-// gets here and reaches Apple's own handlers. Ampify moves it itself: the system's move loop (WM_NCLBUTTONDOWN with
-// HTCAPTION) did not start on this WinUI window without a title bar (bench, 31/10).
+// Past a few pixels with the button down, the window moves as from a title bar; a plain click never gets here and
+// reaches Apple's own handlers. The system's move loop first: Windows' snap layouts and PowerToys FancyZones only see a
+// window moved by it. A press on a caption, sent while the button is down, so the loop ends on the release: SC_MOVE
+// (WM_SYSCOMMAND) moved the window as from its menu, stuck to the pointer until the next click (05/11), and posted
+// rather than sent, a message ran only once the button was up. A return with the button still down means no loop
+// started (a posted press did not on the bench, 31/10), and Ampify moves the window itself from then on.
 void OnMove(HWND window, const xaml::UIElement& root, xaml::Input::PointerRoutedEventArgs const& args) {
     Placement& state = State();
-    if (!state.dragArmed) return;
+    if (!state.dragArmed || state.systemMoving || state.captionSet) return;  // with a caption, Windows moves it
     if (!args.GetCurrentPoint(root).Properties().IsLeftButtonPressed()) {
         OnRelease(root);
         return;
@@ -238,6 +317,22 @@ void OnMove(HWND window, const xaml::UIElement& root, xaml::Input::PointerRouted
     if (!state.dragging) {
         if (dx * dx + dy * dy < kDragStart * kDragStart) return;
         state.dragging = true;
+        if (!state.systemMoveFailed) {
+            args.Handled(true);
+            root.ReleasePointerCaptures();
+            ReleaseCapture();
+            state.systemMoving = true;
+            SendMessageW(window, WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(cursor.x, cursor.y));
+            state.systemMoving = false;
+            if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) {
+                if (state.dragReports++ < kPressReports) state.journal->Write("Apple player: moved by Windows' move loop");
+                state.dragging = false;
+                state.dragArmed = false;
+                return;
+            }
+            state.systemMoveFailed = true;
+            state.journal->Write("Apple player: the system's move loop did not start, the window follows the pointer");
+        }
         root.CapturePointer(args.Pointer());  // the moves keep coming while the window slides under the pointer
         if (state.dragReports++ < kPressReports) state.journal->Write("Apple player: the window follows a drag");
     }
@@ -436,9 +531,15 @@ void Lay(const xaml::Window& player, const windowing::AppWindow& window, Placeme
     } else {
         PlaceVisible(hwnd, TargetRect(state.main));
     }
+    state.laidRect = VisibleRect(hwnd);  // taken again once it settles (Step)
     HookInput(player, hwnd);
     ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), false);
     HugArtwork(player.Content().try_as<xaml::UIElement>());
+    if (screenLike) {
+        ClearCaption(player, state);
+    } else {
+        SetCaption(player, state);
+    }
     if (state.mode == uirender::PlayerMode::Replace && IsWindowVisible(state.main)) {
         state.mainWasZoomed = IsZoomed(state.main) != FALSE;
         ShowWindow(state.main, SW_HIDE);
@@ -473,18 +574,44 @@ void OnClosed(Placement& state) {
         state.journal->Write("Apple player: closed");
         return;
     }
-    if (state.mainWasZoomed) {
+    // A player moved, snapped or resized hands its place to the main window, even one that was maximized (05/11).
+    bool unmoved = EqualRect(&state.lastRect, &state.laidRect) != FALSE;
+    bool placed = false;
+    if (state.playerZoomed || (state.mainWasZoomed && unmoved)) {
         ShowWindow(main, SW_SHOWMAXIMIZED);
     } else {
         ShowWindow(main, SW_SHOWNOACTIVATE);
-        if (state.lastRect.right > state.lastRect.left) PlaceVisible(main, state.lastRect);
+        if (state.mainWasZoomed) ShowWindow(main, SW_RESTORE);
+        placed = state.lastRect.right > state.lastRect.left;
+        if (placed) PlaceVisible(main, state.lastRect);
     }
     SetForegroundWindow(main);
-    state.journal->Write("Apple player: closed, the main window is back at " + RectText(VisibleRect(main)));
+    state.journal->Write("Apple player: closed, the main window is back at " + RectText(VisibleRect(main)) +
+                         (placed ? ", the player was at " + RectText(state.lastRect) : std::string()));
+    if (!placed) return;
+    // Moved to a screen of another scale, the window takes the new scale after this call, and grows or shrinks by its
+    // ratio (too wide on a second screen, 05/11): it is put back a few times while it settles.
+    state.settleMain = main;
+    state.settleTicks = kSettleTicks;
+    state.timer.Start();
+}
+
+// While the main window settles after a close: back where the player was, as long as something else moves it.
+void Settle(Placement& state) {
+    RECT now = VisibleRect(state.settleMain);
+    if (!EqualRect(&now, &state.lastRect)) {
+        PlaceVisible(state.settleMain, state.lastRect);
+        state.journal->Write("Apple player: the main window had become " + RectText(now) + ", put back at " +
+                             RectText(VisibleRect(state.settleMain)));
+    }
+    if (--state.settleTicks > 0) return;
+    state.settleMain = nullptr;
+    state.timer.Stop();
 }
 
 // One tick: first wait for Apple's window and its FullScreen presenter, lay it out, then follow it until it closes.
 void Step(Placement& state) {
+    if (state.settleTicks > 0) return Settle(state);
     xaml::Window player = AppWindow(kPlayerWindowProperty);
     windowing::AppWindow window = player ? player.AppWindow() : nullptr;
     bool visible = window && window.IsVisible();
@@ -492,7 +619,10 @@ void Step(Placement& state) {
         if (!visible) return OnClosed(state);
         HWND hwnd = HwndOf(player);
         state.lastRect = VisibleRect(hwnd);
+        state.playerZoomed = IsZoomed(hwnd) != FALSE;
         WidenScrubberRow(state, player.Content().try_as<xaml::UIElement>());
+        bool caption = state.mode != uirender::PlayerMode::WorkArea && !state.captionRefused;
+        if (caption && ++state.captionTicks % kCaptionEvery == 0) SetCaption(player, state);  // follows the layout
         if (state.reportPending && std::chrono::steady_clock::now() >= state.reportAt) {
             state.reportPending = false;
             HookInput(player, hwnd);  // a second chance when the content came late
@@ -501,6 +631,7 @@ void Step(Placement& state) {
             HugArtwork(player.Content().try_as<xaml::UIElement>());
             // The presenter may still have resized the window while it settled.
             if (state.mode == uirender::PlayerMode::WorkArea) FillWithClient(hwnd, MonitorRect(state.main, true));
+            state.laidRect = VisibleRect(hwnd);  // settled: a later change is the person's
             Report(*state.journal);
         }
         return;
@@ -520,6 +651,7 @@ void Step(Placement& state) {
     if (state.mode == uirender::PlayerMode::Screen) {
         state.timer.Stop();
         if (window.Presenter().Kind() != windowing::AppWindowPresenterKind::FullScreen) {
+            ClearCaption(player, state);
             window.SetPresenter(windowing::AppWindowPresenterKind::FullScreen);  // Ampify's from an earlier opening
             SetScreenFrame(HwndOf(player), false);
             ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), true);
@@ -552,7 +684,8 @@ void OnTick() noexcept {
 void Watch(const xaml::Window& mainWindow, Journal& journal, uirender::PlayerMode mode) {
     Placement& state = State();
     state.mode = mode;
-    if (state.timer && state.timer.IsRunning()) return;
+    if (state.timer && state.timer.IsRunning() && state.settleTicks == 0) return;
+    state.settleTicks = 0;  // opened again while the main window settled: the player comes first
     state.main = HwndOf(mainWindow);
     state.mainRoot = winrt::make_weak(mainWindow.Content());
     state.journal = &journal;
