@@ -16,6 +16,7 @@
 // After the projection: its macros (GetCurrentTime, GetClassName) would rename members of WinRT types.
 #include <windows.h>
 
+#include "../core/now_playing.hpp"
 #include "../core/theme/animation.hpp"
 
 namespace ampify::win {
@@ -279,6 +280,9 @@ void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> lo
     }
     running.loops = std::move(loops);
     running.started = std::chrono::steady_clock::now();
+    running.lastStep = running.started;
+    running.heldMs = 0;
+    running.stillShown = false;
     if (Turns(running.loops) && running.animations.empty()) {
         // Nothing else turns the element: the centre follows its size at each step, not the expression.
         if (running.center) {
@@ -297,7 +301,10 @@ void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> lo
         m_loopTimer.IsRepeating(true);
         std::weak_ptr<bool> alive = m_alive;
         m_loopTimer.Tick([this, alive](auto const&, auto const&) noexcept {
-            if (!alive.expired()) StepLoops();
+            try {  // a XAML call that throws would end the process from a noexcept handler
+                if (!alive.expired()) StepLoops();
+            } catch (...) {
+            }
         });
     }
     m_loopTimer.Interval(Span(1000.0 / kLoopFps));
@@ -306,18 +313,38 @@ void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> lo
 
 void ThemeAnimations::StepLoops() {
     const bool shown = !m_window || (IsWindowVisible(m_window) && !IsIconic(m_window));
+    const bool playing = CurrentNowPlaying().playing;
     const auto now = std::chrono::steady_clock::now();
+    const auto waits = [&](const th::Animation& loop) { return !playing && loop.whilePlaying; };
+    // Paused, the timer ticks every kHiddenCheckMs: the stretch since the last tick was still a pause.
+    const bool resumed = playing && !m_wasPlaying;
+    m_wasPlaying = playing;
     bool any = false;
+    bool moving = false;  // a loop moves: the `playing` ones hold still while no song plays
     for (auto& [id, running] : m_running) {
         if (running.loops.empty()) continue;
         any = true;
+        const auto holds = [](const th::Animation& loop) { return loop.whilePlaying; };
+        if (std::any_of(running.loops.begin(), running.loops.end(), waits) ||
+            (resumed && std::any_of(running.loops.begin(), running.loops.end(), holds))) {
+            running.heldMs += std::chrono::duration<double, std::milli>(now - running.lastStep).count();
+        }
+        running.lastStep = now;
+        // Waiting loops show their held frame once, so the element does not stand untransformed until the first play.
+        const bool still = std::all_of(running.loops.begin(), running.loops.end(), waits);
+        if (still && running.stillShown) continue;  // its values stay as they are
+        if (!still) {
+            moving = true;
+            running.stillShown = false;
+        }
         xaml::UIElement element = shown ? running.element.get() : nullptr;
         if (!element) continue;
-        const double ms = std::chrono::duration<double, std::milli>(now - running.started).count();
+        const double elapsedMs = std::chrono::duration<double, std::milli>(now - running.started).count();
         std::vector<th::ChannelValue> values;
         bool backgroundEnded = false;  // a finite animation without `forwards` that ended: the element's brush returns
         for (size_t i = 0; i < running.loops.size();) {
             const th::Animation& loop = running.loops[i];
+            const double ms = loop.whilePlaying ? elapsedMs - running.heldMs : elapsedMs;
             const bool over = loop.iterations > 0 && ms >= loop.delayMs + loop.durationMs * loop.iterations;
             if (over && !loop.fillForwards) {
                 // As in CSS, the element has its own values again: the channels go back, the brush is put back below.
@@ -343,6 +370,7 @@ void ThemeAnimations::StepLoops() {
             Apply(element, values);
         } catch (...) {
         }
+        running.stillShown = still;
         if (backgroundEnded) {
             // Apart from Apply: an element that refuses another track must still get its brush back, and the engine its
             // background again, since the loop that ended is gone and nothing would come back to it.
@@ -358,7 +386,7 @@ void ThemeAnimations::StepLoops() {
         m_loopTimer.Stop();
         return;
     }
-    m_loopTimer.Interval(Span(shown ? 1000.0 / kLoopFps : kHiddenCheckMs));
+    m_loopTimer.Interval(Span(shown && moving ? 1000.0 / kLoopFps : kHiddenCheckMs));
 }
 
 bool ThemeAnimations::OwnsBackground(theme::NodeId id) const {

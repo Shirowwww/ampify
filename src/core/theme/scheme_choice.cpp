@@ -170,4 +170,12 @@ std::optional<bool> AppModeOf(std::optional<bool> dark, const std::string& schem
     return std::nullopt;
 }
 
+std::optional<WindowMaterial> WindowMaterialOf(std::string_view value) {
+    std::string name = ToLowerAscii(TrimSpace(value));
+    if (name == "mica") return WindowMaterial::Mica;
+    if (name == "mica-alt") return WindowMaterial::MicaAlt;
+    if (name == "acrylic") return WindowMaterial::Acrylic;
+    return std::nullopt;
+}
+
 }  // namespace ampify::theme

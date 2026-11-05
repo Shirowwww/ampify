@@ -39,11 +39,13 @@ struct MediaQuery {
     double maxWidth = 1e9;
     double minHeight = 0;
     double maxHeight = 1e9;
+    std::optional<bool> dark;  // (prefers-color-scheme: dark) or (light): the theme's scheme in use, not Windows'
     std::string text;  // as written, for the log
 
     bool Matches(double width, double height) const {
         return width >= minWidth && width <= maxWidth && height >= minHeight && height <= maxHeight;
     }
+    bool MatchesScheme(bool darkScheme) const { return !dark || *dark == darkScheme; }
     bool operator==(const MediaQuery&) const = default;
 };
 
@@ -70,6 +72,7 @@ struct Compound {
     bool only = false;  // :only-child
     bool playing = false;  // :playing, the row of the song playing and its parts (NodeInfo::playing)
     std::vector<Compound> negations;  // :not(...): parts the element must not match
+    bool counted = true;  // a negation that weighs in the specificity; not the internal :except() of a built-in name
     Combinator combinator = Combinator::Descendant;  // relation to the compound before it; unused for the first
 };
 

@@ -128,7 +128,7 @@ language Ampify does not translate. It follows Windows' regional format, or the 
 ### 5.2 Settings and storage [stable]
 
 ```js
-Ampify.config.get(key, default)     // reads extensions.<id>.<key> (apps.<id>... for an app)
+Ampify.config.get(key, default)     // reads extensions.<id>.<key> (apps.<id>... for an app, themes.<id>... for a theme)
 Ampify.config.set(key, value)       // writes it; an element only reaches its own keys
 Ampify.storage.get(key, default)    // a JSON value in storage\<id>.json (1 MB), permission storage
 Ampify.storage.set(key, value)
@@ -251,7 +251,7 @@ characters per text; attributes are plain values.
 | `slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange` |
 | `textfield` | `label`, `value`, `placeholder`, `disabled`, `onChange` |
 | `dropdown`, `option` | `label`, `value`, `disabled`, `onChange`; children are `option` nodes with `value`, `label` |
-| `image` | `src` (https or a file path), `label`, `onClick`, `fit` (`cover`, `contain`, `fill`), `cornerRadius`, `width`, `height` |
+| `image` | `src` (https, a file path, or `"artwork"`: Apple's image of the song playing, following it), `label`, `onClick`, `fit` (`cover`, `contain`, `fill`), `cornerRadius`, `width`, `height` |
 | `icon` | `icon` (SVG), `label`, `onClick` |
 | any | `tooltip`, `tooltipPlacement` (`top`, `bottom`, `left`, `right`), `tooltipDelay` (0 to 10000 ms) |
 

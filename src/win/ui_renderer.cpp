@@ -19,6 +19,7 @@
 #include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Text.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
+#include <winrt/Microsoft.UI.Xaml.Data.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
@@ -328,6 +329,61 @@ struct XamlRenderer::Mounted {
     std::shared_ptr<Callbacks> callbacks;
     std::vector<Mounted> children;
 };
+
+namespace {
+
+constexpr std::string_view kArtworkSource = "artwork";
+constexpr int kArtworkSearchLimit = 20000;  // elements looked at in the window, a few thousand on the busiest pages
+
+// Apple Music's image of the song playing: the first Image#StaticArtwork under NowPlayingControl#LCD, the one its play
+// bar shows (the same that `background: artwork` uses, src/win/xaml_backend.cpp). Null when the bar has none.
+controls::Image FindPlayingArtwork(const xaml::XamlRoot& root) {
+    if (!root || !root.Content()) return nullptr;
+    std::vector<std::pair<xaml::DependencyObject, bool>> pending{{root.Content(), false}};
+    for (int looked = 0; !pending.empty() && looked < kArtworkSearchLimit; looked++) {
+        auto [object, inDisplay] = pending.back();
+        pending.pop_back();
+        auto element = object.try_as<xaml::FrameworkElement>();
+        std::wstring_view name = element ? std::wstring_view(element.Name()) : std::wstring_view();
+        if (element && name == L"LCD" && object.try_as<controls::Control>()) inDisplay = true;
+        if (inDisplay && name == L"StaticArtwork") {
+            if (auto image = object.try_as<controls::Image>()) return image;
+        }
+        int count = media::VisualTreeHelper::GetChildrenCount(object);
+        for (int i = count - 1; i >= 0; i--) pending.emplace_back(media::VisualTreeHelper::GetChild(object, i), inDisplay);
+    }
+    return nullptr;
+}
+
+// Ties an image of a view to Apple's own: a binding on its Source, so the picture follows every song without the view
+// rendering again. Bound once the view is in the window, where Apple's image can be found.
+void BindPlayingArtwork(const controls::Border& frame, const media::ImageBrush& brush, const controls::Image& sizer) {
+    auto bind = [brush, sizer](const xaml::XamlRoot& root) {
+        controls::Image apple = FindPlayingArtwork(root);
+        if (!apple) return false;
+        auto follow = [&apple](const xaml::DependencyObject& target, const xaml::DependencyProperty& property) {
+            xaml::Data::Binding binding;
+            binding.Source(apple);
+            binding.Path(xaml::PropertyPath(L"Source"));
+            binding.Mode(xaml::Data::BindingMode::OneWay);
+            xaml::Data::BindingOperations::SetBinding(target, property, binding);
+        };
+        follow(brush, media::ImageBrush::ImageSourceProperty());
+        follow(sizer, controls::Image::SourceProperty());
+        return true;
+    };
+    if (frame.XamlRoot() && bind(frame.XamlRoot())) return;
+    auto token = std::make_shared<winrt::event_token>();
+    *token = frame.Loaded([bind, token](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            auto loaded = sender.as<controls::Border>();
+            if (bind(loaded.XamlRoot())) loaded.Loaded(*token);
+        } catch (...) {
+        }
+    });
+}
+
+}  // namespace
 
 int StyleProbe::Found() const {
     int count = 0;
@@ -1136,12 +1192,17 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
 }
 
 // src, fit, cornerRadius, width and height. The bitmap is loaded again only when the address changes, so a fade of
-// the image does not reload it.
+// the image does not reload it. `src: "artwork"` shows the song playing (BindPlayingArtwork).
 void XamlRenderer::SetImage(Mounted& mounted, const RenderNode& node) {
     auto frame = mounted.control.as<controls::Border>();
     std::string source = node.Text("src");
-    if (source != mounted.source && mounted.brush && mounted.sizer) {
+    if (source != mounted.source && mounted.brush && mounted.sizer && source == kArtworkSource) {
         mounted.source = source;
+        BindPlayingArtwork(frame, mounted.brush, mounted.sizer);
+    } else if (source != mounted.source && mounted.brush && mounted.sizer) {
+        mounted.source = source;
+        mounted.brush.ClearValue(media::ImageBrush::ImageSourceProperty());
+        mounted.sizer.ClearValue(controls::Image::SourceProperty());
         media::Imaging::BitmapImage bitmap{nullptr};
         try {
             if (!source.empty()) bitmap = media::Imaging::BitmapImage(ImageUri(source));

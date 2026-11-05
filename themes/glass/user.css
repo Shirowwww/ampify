@@ -35,13 +35,14 @@
 }
 
 /* The moving-artwork setting: the artwork turns slowly behind the glass, enlarged so that its corners never show, as
-   behind Apple Music's full-screen player. The panes blur it; Windows' animation effects off, it stands still. */
+   behind Apple Music's full-screen player, and rests in pause. The panes blur it; Windows' animation effects off, it
+   stands still. */
 @setting moving-artwork {
     .window::before {
         content: artwork cover;
         transform-origin: center;
         opacity: 0.85;
-        animation: drift 90s linear infinite;
+        animation: drift 90s linear infinite playing;
     }
 }
 
@@ -173,6 +174,11 @@
     transition: transform 140ms;
 }
 
+/* The toggles are wider than high: a radius of 50 turned their hover into an oval. */
+.playbar-toggles ToggleButton {
+    corner-radius: calc(var(--setting-panel-radius) * 0.3);
+}
+
 @setting hover-grow {
     .transport AppBarButton:hover,
     .transport ToggleButton:hover,
@@ -261,8 +267,10 @@
     transition: transform 120ms;
 }
 
+/* Play is wider than high: rounded, not a pill, which read as an oval beside the round buttons. */
 .album-play-button {
     padding: 10 22;
+    corner-radius: calc(var(--setting-panel-radius) * 0.4);
 }
 
 @setting hover-grow {
@@ -287,4 +295,45 @@
 .fullscreen-artwork {
     corner-radius: 24px;
     box-shadow: 40px;
+}
+
+/* ---- The light scheme -------------------------------------------------------------------------------------------- */
+
+/* White frosted glass, as Apple's light Liquid Glass: the cover's dark colour under the scheme's dark text read badly
+   whatever the song. The artwork still colours the panes through the blur; the frost setting moves the glass between
+   0.71 and 0.92, never so clear that the text sinks. */
+@media (prefers-color-scheme: light) {
+    .navigation {
+        backdrop: acrylic(#FFFFFFFF, 0.35);
+    }
+
+    .content,
+    .lyrics-panel,
+    .search-header,
+    .list-header,
+    .playbar {
+        backdrop: acrylic(#FFF4F8FF, calc(var(--setting-frost) * 0.3 + 0.65));
+    }
+
+    .volume-slider,
+    .scrubber {
+        color: #E60E1424;
+        background: #260E1424;
+    }
+
+    .play-button > Grid#Root {
+        background: linear-gradient(180deg, #F2FFFFFF, #B3FFFFFF);
+    }
+}
+
+@media (prefers-color-scheme: light) and (min-width: 1325px) {
+    .sidebar {
+        backdrop: acrylic(#FFF4F8FF, calc(var(--setting-frost) * 0.3 + 0.65));
+    }
+}
+
+@media (prefers-color-scheme: light) and (max-width: 1324px) {
+    .sidebar-column {
+        backdrop: acrylic(#FFF4F8FF, calc(var(--setting-frost) * 0.3 + 0.65));
+    }
 }

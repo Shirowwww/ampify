@@ -50,6 +50,9 @@ struct Animation {
     Direction direction = Direction::Normal;
     bool fillBackwards = false;  // the first values show during the delay
     bool fillForwards = false;   // the last values stay once it ends
+    // `playing`, endless animations only: it holds still while no song plays and goes on from there (a record that
+    // stops turning in pause), and the backend steps nothing for it meanwhile.
+    bool whilePlaying = false;
     std::array<double, 4> easing{0.25, 0.1, 0.25, 1};  // cubic-bezier(x1, y1, x2, y2) between two points: `ease`
     KeyframeTracks tracks;
     bool operator==(const Animation&) const = default;

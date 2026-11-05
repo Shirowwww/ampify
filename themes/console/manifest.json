@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "console",
   "name": "Console",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Studio hardware: graphite panels with fine edges and square corners, the playback bar as a rack unit at the bottom, and a wide display in its middle with an equalizer that follows the music. Three accents, as schemes: amber, VU green and ice.",

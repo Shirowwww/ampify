@@ -1,0 +1,153 @@
+/* Fluent: Apple Music as a Windows 11 app. The window is Mica, the material of Windows' own Settings and Media Player,
+   faintly coloured by the desktop behind it; the sidebar stands on it, and the pages and the lyrics lie on one light
+   layer with Windows' corners and its hairline edge. Segoe UI Variable, Windows' accent blue, 4-pixel controls.
+
+   --window-material asks the engine for the window's material (mica, mica-alt or acrylic, docs/themes/format.md). The
+   window and the panes leave it see-through. */
+
+:root {
+    --font-title: "Segoe UI Variable Display";
+    --font-body: "Segoe UI Variable Text";
+    --window-material: mica;
+    --window-background: transparent;
+    --panel-background: var(--spice-layer);
+    --band-background: var(--spice-band);
+    --panel-radius: 8px;
+    --radius-box: 8px;
+    --radius-small: 4px;
+    --gap: 6;
+}
+
+@setting material = Mica Alt {
+    :root {
+        --window-material: mica-alt;
+    }
+}
+
+@setting material = Acrylic {
+    :root {
+        --window-material: acrylic;
+    }
+}
+
+@import "ampify:floating-panels";
+
+/* ---- The window ------------------------------------------------------------------------------------------------------ */
+
+/* The sidebar stands on the window's material, as Windows' navigation panes do: no panel of its own. */
+.sidebar {
+    background: transparent;
+    border-width: 0;
+}
+
+@media (max-width: 1324px) {
+    .sidebar-column {
+        background: transparent;
+    }
+}
+
+/* One layer for the pages and one for the lyrics, edged by Windows' hairline. */
+.content,
+.lyrics-panel {
+    border-color: var(--spice-stroke);
+    border-width: 1px;
+}
+
+.search-header,
+.list-header {
+    background: transparent;
+}
+
+.app-name {
+    font-role: title;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* ---- The playback bar, on the material at the top ------------------------------------------------------------------- */
+
+.lcd {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-color: var(--spice-stroke);
+    border-width: 1px;
+    corner-radius: var(--radius-box);
+}
+
+.lcd-artwork-image {
+    corner-radius: 4px;
+}
+
+.transport AppBarButton,
+.transport ToggleButton,
+.transport Button,
+.playbar-toggles ToggleButton {
+    corner-radius: 4;
+}
+
+/* Play: Windows' accent button, a filled circle. */
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 50;
+}
+
+.play-button TextBlock,
+.play-button FontIcon {
+    color: $TextOnAccentFillColorPrimaryBrush;
+}
+
+.volume-slider,
+.scrubber {
+    color: $AccentFillColorDefaultBrush;
+}
+
+/* ---- Lists and cards --------------------------------------------------------------------------------------------------- */
+
+.sidebar-items NavigationViewItem {
+    corner-radius: 4;
+}
+
+.content-frame TextBlock {
+    font-family: var(--font-body);
+}
+
+.card {
+    corner-radius: 8px;
+}
+
+.artwork {
+    corner-radius: 4px;
+}
+
+.track-row {
+    corner-radius: 4px;
+}
+
+.track-row:hover {
+    background: $SubtleFillColorSecondaryBrush;
+}
+
+.list-item {
+    selected-background: $SubtleFillColorSecondaryBrush;
+    selected-hover-background: $SubtleFillColorTertiaryBrush;
+}
+
+.album-play-button,
+.album-shuffle-button {
+    corner-radius: 4;
+}
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+/* ---- Menus ------------------------------------------------------------------------------------------------------------ */
+
+.menu,
+.flyout {
+    corner-radius: 8px;
+}
+
+.tooltip,
+.menu-item {
+    corner-radius: 4px;
+}

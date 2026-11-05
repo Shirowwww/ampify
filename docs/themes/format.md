@@ -97,7 +97,9 @@ Grid#NowPlayingBar {
 
 The ranking is `!important`, then source, then specificity, then place in the file. Sources apply in this order: the
 theme, each active snippet (alphabetical), then `sidebar.json` and `home.json`; a later source wins whatever its
-specificity. Within a source, `#name` beats a type, a type beats `*`, and the last rule wins a tie.
+specificity. Within a source, `#name` beats a type, a type beats `*`, and the last rule wins a tie. A built-in name
+weighs what the path it stands for weighs, without the covers `.artwork` leaves out: `.lcd-artwork-image` beats
+`.artwork` wherever each is written.
 
 ### Variables and `calc()`
 
@@ -169,7 +171,7 @@ and the theme applies again at once.
 | `selected-hover-background` | `SelectedPointerOverBackground` | The same row under the pointer |
 | `selected-active-background` | `SelectedPressedBackground` | The same row while pressed |
 | `border-width` | `BorderThickness` | 1 to 4 lengths, not negative (top right bottom left) |
-| `corner-radius` or `border-radius` | `CornerRadius` | 1 to 4 lengths, not negative (top-left, top-right, bottom-right, bottom-left) |
+| `corner-radius` or `border-radius` | `CornerRadius` | 1 to 4 lengths, not negative (top-left, top-right, bottom-right, bottom-left). On a button or a hover, keep it under half the height: more turns a wide button into a pill, and a radius past both halves turns a small one into an oval |
 | `font-family` | `FontFamily` | A font name, or `url(fonts/file.ttf#Name)` |
 | `font-size` | `FontSize` | Pixels, or relative to the element's own size (`120%`, `1.2em`) |
 | `font-weight` | `FontWeight` | `normal`, `bold`, or 1 to 1000 |
@@ -190,6 +192,7 @@ and the theme applies again at once.
 | `display` | `Visibility` | `none` hides; `block`, `flex`, `grid`... show (use them to undo a `display: none`) |
 | `template` | `Template` | `url(templates/file.xaml)`, a full `ControlTemplate`. Skipped on a control with a negative padding or border |
 | `flow-direction` or `direction` | `FlowDirection` | `ltr` or `rtl` |
+| `color-scheme` | `RequestedTheme` | `light`, `dark` or `normal`: the element and everything inside it draw in that mode |
 | `order` | Position | An integer from 0: the place among the parent's children |
 | `horizontal-alignment` | `HorizontalAlignment` | `left`, `center`, `right` or `stretch` |
 | `vertical-alignment` | `VerticalAlignment` | `top`, `center`, `bottom` or `stretch` |
@@ -263,6 +266,23 @@ Ampify also gives the artwork's colors as variables. Before the first artwork th
 .lcd { background: #33var(--art-2-hex, FFFFFF); }
 ```
 
+The album or playlist on screen gives the same five colours of its own artwork, read from its page's header, with the
+prefix `page-`: `--page-art-1`, `--page-art-2`, `--page-art-3`, `--page-art-text` and their `-hex` forms. They change
+when another album or playlist opens, and keep the last one's colours elsewhere, so use them on `.list-page` and the
+names inside it. Example: the [`album-colors`](../../themes/snippets/album-colors/) snippet.
+
+```css
+.list-page { background: linear-gradient(to bottom, #FFvar(--page-art-3-hex, 000000), #00var(--page-art-3-hex, 000000) 75%); }
+```
+
+### The window's material
+
+`--window-material` in `:root` gives Apple Music's window one of Windows 11's materials: `mica` (the desktop's
+colours, faint, as in Windows' Settings), `mica-alt` (darker, for tabs and title bars) or `acrylic` (the blur of the
+windows behind). It shows wherever the theme leaves the window and its panels see-through, so set
+`--window-background: transparent` with `floating-panels`. `none`, or no variable, keeps Apple's own window. On a
+Windows that has no such material, Windows paints a plain colour instead. Example: [`themes/fluent/`](../../themes/fluent/).
+
 ### Decorative images
 
 `::before` and `::after` add an image from the theme folder to a panel, behind (`::before`) or on top of (`::after`)
@@ -314,8 +334,8 @@ The sound is analysed only while bars are on screen. With Windows' animation eff
 
 Apple's progress bar (`.scrubber`) is a slider whose thumb is hidden. Its track, `Grid#HorizontalTemplate`, keeps the
 played part in column 0 and the thumb in column 1, right after it. An image put in column 1 rides at the song's
-position (a Nyan Cat, a Kirby); negative margins as large as half its size keep it centred on that point without
-taking room from the bar:
+position (a Nyan Cat, a Kirby). Side margins as large as half its width keep it centred on that point without taking
+room from the bar; top and bottom margins sit it on the line, since the display cuts what hangs below its edge:
 
 ```css
 .scrubber Grid#HorizontalTemplate::after {
@@ -323,12 +343,14 @@ taking room from the bar:
     grid-column: 1;
     width: 28px;
     height: 18px;
-    margin: -8px -14px;
+    margin: -15px -14px -3px;
 }
 ```
 
-It moves when Apple moves the bar: as the song plays, and on a seek. At the very start and end of a song, the half of
-the image past the bar is cut by the display around it.
+It moves when Apple moves the bar: as the song plays, and on a seek. Apple's line is only 6 high and cuts what it
+holds to that: when an image goes into it, Ampify makes it 18 high and moves it 12 down, so the line stays where it
+was and the image shows whole. A theme that sets the line's own `height` or `transform` keeps them. At the very start
+and end of a song, the half of the image past the bar is cut by the display around it.
 
 ### The row playing
 
@@ -382,6 +404,8 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | `--bar-room` | `80` | `bottom-bar`: space the panels leave at the bottom |
 | `--bar-reach` | `calc(var(--gap) - 290)` | `bottom-bar`: how far left the bar reaches past the page column |
 | `--bar-reach-folded` | `calc(var(--gap) - var(--compact-pane))` | `bottom-bar`: the same with the sidebar folded |
+| `--bar-reach-end` | `0` | `bottom-bar`: how far right the bar reaches past the page column, for a sidebar on the right |
+| `--bar-reach-end-folded` | `0` | `bottom-bar`: the same with the sidebar folded |
 | `--caption-room` | `40` | `bottom-bar`: the strip the panels leave at the top for the window's buttons |
 | `--sidebar-top` | `var(--caption-room)` | `bottom-bar`: where the sidebar starts. The back arrow and the folded menu button follow it |
 | `--song-width` | `560` | `bottom-bar`: width of the song (artwork, title, progress line), a clear space short of the buttons |
@@ -400,6 +424,23 @@ What the layouts take care of, so that a theme needs no rule for it:
   have their place at the end of the artist's line, not over the artist. Apple Music shows those times under the
   pointer only while its display is in the bar at the top: with the bar at the bottom they stay hidden.
 
+#### A column for the panels
+
+The panels of elements (`Ampify.ui.panel`) float over the right of the pages. A theme that gives them a column of their
+own leaves room on the right of `.content`: a right margin at least as wide as a panel (380) and two gaps. Ampify
+docks the panels there, as high as the pages, with the pages' background and corners, and the panels' own cards
+melt into the column. Apple's lyrics and queue pane, when open, stands on the right of that room, never under it.
+Without the room (the setting off, a narrower margin), the panels float again.
+
+```css
+@import "ampify:floating-panels";
+@import "ampify:bottom-bar";
+
+@setting now-playing {
+    .content { margin: var(--caption-room, 40) calc(380 + var(--gap) * 2) var(--bar-room, 80) calc(var(--gap) * 2); }
+}
+```
+
 Two variables tell snippets about the theme's shapes: `--bar-radius` (the playback bar's corners) and `--lcd-radius`
 (the song's display). A theme that rounds them sets both in its `:root`, and a snippet that draws over them, such as
 Cover ambience, follows those corners.
@@ -414,6 +455,15 @@ Cover ambience, follows those corners.
 
 `min-width`, `max-width`, `min-height` and `max-height`, joined by `and`, in the window's pixels (bounds included).
 Apple Music folds its sidebar at 1324 pixels wide and less. No variables and no nested `@media` inside.
+
+`(prefers-color-scheme: light)` or `(dark)` holds rules for the theme's scheme in use (dark or light from its
+background colour), whatever Windows' mode; it joins the sizes with `and`:
+
+```css
+@media (prefers-color-scheme: light) and (max-width: 1324px) {
+    .sidebar-column { backdrop: acrylic(#FFF4F8FF, 0.8); }
+}
+```
 
 ### Hover, press and focus
 
@@ -456,10 +506,14 @@ playback bar's play button and the sidebar's entries) take a transition of `tran
 
 A `scale()` without `transform-origin` grows from the element's centre, as in CSS.
 
+Scale a button, not the `FontIcon` inside it. An icon's box is larger than its glyph and off the glyph's centre, so
+`.play-button FontIcon { transform: scale(0.8) }` moves the glyph about 2 px towards the bottom right of the play
+disc. The icons already sit in the middle of their buttons at their own size.
+
 ### Animations
 
 ```css
-.lcd-artwork { animation: spin 20s linear infinite; }
+.lcd-artwork { animation: spin 20s linear infinite playing; }
 .play-button:hover { animation: breathe 1.2s ease-in-out infinite alternate; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -472,6 +526,8 @@ A `scale()` without `transform-origin` grows from the element's centre, as in CS
   `ease-in-out`, `cubic-bezier(...)`), a delay, a count or `infinite`, a direction (`normal`, `reverse`, `alternate`,
   `alternate-reverse`) and a fill mode (`none`, `forwards`, `backwards`, `both`). Up to 4 animations, 120 s at most.
   `steps()`, negative delays and `paused` are refused.
+- `playing`, with `infinite`, runs the animation only while a song plays: in pause it holds still where it is and goes
+  on from there when the song plays again, like a turntable (Spinning artwork). Ampify steps nothing for it meanwhile.
 - Under a state, an animation starts each time the state begins.
 - An `infinite` animation moves 30 times a second and stops while Apple Music is hidden or minimized: left to the
   compositor, it would redraw the whole window at every frame of the screen. A finite one runs on the compositor.
@@ -522,6 +578,9 @@ A theme can create its own roles (`--font-lyrics`). Extensions read them with `A
   Apple's panels already cut their children. `clip-path: inset(0 0 40px 0)` cuts 40 pixels off the bottom. The clip
   follows the element's size. Only rectangles: no `round`, `circle()` or `polygon()` (use `corner-radius`).
 - `flow-direction: rtl` flips an element and everything inside it.
+- `color-scheme: dark` puts an element and everything inside it in dark mode, whatever the window's mode: Apple's
+  text and controls turn light, so a dark background painted on a light theme stays readable. `light` does the
+  opposite, `normal` follows the window.
 - `order` moves an element among its parent's children (`0` first). A parent that cannot reorder ignores it.
 
 ## Snippets
@@ -562,6 +621,14 @@ follow it. The colours a scheme gives along with its own accent (`AccentFillColo
 `AccentFillColorTertiaryBrush`, `TextOnAccentFillColor*`, `AccentTextFillColor*`) are derived again from the chosen
 one. A colour a theme writes as a hexadecimal value in `user.css` stays: name `$AccentFillColorDefaultBrush` for what
 should follow the accent. Keys the theme's `resources.xaml` defines stay as well. Empty, the theme keeps its own.
+
+## Glass level
+
+`theme.glass` lightens what every theme and snippet asks of the graphics card, for a laptop on battery or an older
+card. `full` (or nothing) keeps the theme as written. `balanced` stops the animations that never end (a turning
+artwork) and leaves out the depth shadows of `box-shadow`; acrylic keeps its blur. `eco` does the same and paints
+acrylic panes as plain colours, the tint made more opaque so the text keeps its contrast. A theme needs nothing for
+it: write the effects as usual. People choose it under the accent in Settings > Ampify ("Glass effects").
 
 ## What Ampify adjusts for every theme
 

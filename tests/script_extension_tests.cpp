@@ -111,6 +111,24 @@ TEST_CASE(Element_ConfigReadsTypedValuesAndWritesOnlyItsOwnKeys) {
     CHECK(f.host.settings.count("extensions.cfg.enabled") == 0);
 }
 
+// A theme's settings live under themes.<id>: its script reads the same values as its user.css.
+TEST_CASE(Element_ThemeScriptReadsTheThemesOwnSettings) {
+    Fixture f;
+    std::string manifest = Manifest("glow", "");
+    manifest.replace(manifest.find("\"extension\""), 11, "\"theme\"");
+    manifest.insert(manifest.rfind('}'), R"(,"colors":"colors.ini")");
+    ampify::ManifestResult result = ampify::ParseManifest(manifest, "glow", 1, [](const std::string&) { return true; });
+    CHECK(result.manifest.has_value());
+    if (!result.manifest) return;
+    f.host.settings["themes.glow.side-panel"] = "false";
+    f.host.settings["extensions.glow.side-panel"] = "true";
+    fs::path dir = ScratchDir("glow");
+    std::ofstream(dir / "main.js") << R"(Ampify.log("panel=" + Ampify.config.get("side-panel", true));)";
+    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock(), {});
+    CHECK(element.Start());
+    CHECK(f.Logged("panel=false"));
+}
+
 TEST_CASE(Element_ConfigGivesTheDeclaredDefaultsWithTheirType) {
     Fixture f;
     std::string manifest = Manifest("decl", "");

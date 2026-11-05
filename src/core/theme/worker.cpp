@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "files.hpp"
+#include "glass.hpp"
 #include "layout.hpp"
 #include "library.hpp"
 #include "snippets.hpp"
@@ -37,10 +38,11 @@ std::shared_ptr<const Theme> LoadLayout(const std::optional<std::string>& sideba
     return layout;
 }
 
-// True when the user.css of this folder uses the artwork's colours (var(--art-1) and the others).
+// True when the user.css of this folder uses the artwork's colours: var(--art-1) and the others, or those of the page
+// on screen, var(--page-art-1)...
 bool NamesArtwork(const std::filesystem::path& folder) {
     std::optional<std::string> css = ReadWholeFile(folder / "user.css");
-    return css && css->find("--art-") != std::string::npos;
+    return css && (css->find("--art-") != std::string::npos || css->find("--page-art-") != std::string::npos);
 }
 
 }  // namespace
@@ -82,8 +84,10 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
     // Everything that changes what is applied goes into the key. A new key is a new generation.
     std::map<std::string, std::string> values = ReadThemeValues(settings, wanted.active);
     std::optional<Argb> accent = ParseAccent(wanted.accent);
+    GlassLevel glass = GlassLevelOf(wanted.glass);
     std::string key = (wanted.active.empty() ? std::string("none") : wanted.active) + "|" + m_scheme.scheme + "|" +
-                      PartsKey(wanted.parts) + "|" + (accent ? ToXamlColor(*accent) : std::string("-")) + "|";
+                      PartsKey(wanted.parts) + "|" + (accent ? ToXamlColor(*accent) : std::string("-")) + "|" +
+                      std::to_string(static_cast<int>(glass)) + "|";
     for (const auto& [name, value] : values) key += name + "=" + value + ",";
     key += "|";
     std::map<std::string, std::map<std::string, std::string>> snippetValues;
@@ -127,6 +131,7 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
             FolderFiles files(themeFolder);
             Theme theme = LoadTheme(wanted.active, themeFolder.generic_string(), files, options);
             for (const std::string& problem : m_scheme.problems) theme.problems.push_back(problem);
+            ApplyGlassLevel(theme, glass);
             request.theme = std::make_shared<const Theme>(std::move(theme));
         } else if (accent) {
             // No theme, but an accent: Apple Music's look in that accent.
@@ -139,8 +144,9 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
             FolderFiles files(snippetRoot / id);
             LoadOptions snippetOptions = options;
             snippetOptions.settings = snippetValues[id];
-            request.snippets.push_back(std::make_shared<const Theme>(
-                LoadSnippet(id, (snippetRoot / id).generic_string(), files, base, snippetOptions)));
+            Theme snippet = LoadSnippet(id, (snippetRoot / id).generic_string(), files, base, snippetOptions);
+            ApplyGlassLevel(snippet, glass);
+            request.snippets.push_back(std::make_shared<const Theme>(std::move(snippet)));
         }
         request.layout = LoadLayout(sidebar, home);
         m_request = std::move(request);

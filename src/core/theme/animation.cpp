@@ -136,6 +136,10 @@ std::optional<bool> ReadKeyword(std::string_view lowered, std::string_view text,
         return Once(item, "fill mode", text, problem);
     }
     if (lowered == "running") return true;
+    if (lowered == "playing") {
+        animation.whilePlaying = true;
+        return Once(item, "play state", text, problem);
+    }
     if (lowered == "paused") {
         problem = "a paused animation is not supported: \"" + std::string(text) + "\"";
         return false;
@@ -192,6 +196,9 @@ bool Complete(Item& item, std::string_view text, const KeyframeSets& sets, std::
     else if (animation.durationMs > kMaxMs) problem = "durations above 120 s are not supported: " + quoted;
     else if (animation.delayMs < 0) problem = "a negative delay is not supported: " + quoted;
     else if (animation.delayMs > kMaxMs) problem = "delays above 120 s are not supported: " + quoted;
+    else if (animation.whilePlaying && animation.iterations != 0) {
+        problem = "playing holds an endless animation while no song plays: add infinite to " + quoted;
+    }
     if (!problem.empty()) return false;
 
     auto block = sets.find(item.name);
@@ -327,7 +334,7 @@ std::optional<AnimationTrack> DecodeTrack(std::string_view text) {
 
 std::optional<Animation> DecodeAnimation(std::string_view text) {
     std::vector<std::string_view> fields = Split(text, ';');
-    if (fields.size() != 7) return std::nullopt;
+    if (fields.size() != 7 && !(fields.size() == 8 && fields[7] == "playing")) return std::nullopt;
     Animation animation;
     std::optional<double> duration = Number(fields[0]), delay = Number(fields[1]), count = Number(fields[2]);
     auto direction = std::find(kDirections.begin(), kDirections.end(), fields[3]);
@@ -353,6 +360,7 @@ std::optional<Animation> DecodeAnimation(std::string_view text) {
         if (!track) return std::nullopt;
         animation.tracks.push_back(std::move(*track));
     }
+    animation.whilePlaying = fields.size() == 8;
     return animation;
 }
 
@@ -415,6 +423,7 @@ std::string EncodeAnimations(const std::vector<Animation>& animations) {
         for (size_t i = 0; i < animation.easing.size(); i++) text += (i ? "," : "") + FormatNumber(animation.easing[i]);
         text += ';';
         for (size_t i = 0; i < animation.tracks.size(); i++) text += (i ? " " : "") + EncodeTrack(animation.tracks[i]);
+        if (animation.whilePlaying) text += ";playing";
     }
     return text;
 }

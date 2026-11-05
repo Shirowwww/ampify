@@ -80,6 +80,10 @@ private:
         std::vector<theme::Animation> loops;
         std::vector<theme::ChannelValue> own;
         std::chrono::steady_clock::time_point started;
+        // The time the `playing` loops spent holding still since `started`, counted from the step before.
+        double heldMs = 0;
+        std::chrono::steady_clock::time_point lastStep;
+        bool stillShown = false;  // the held frame of the `playing` loops was applied while nothing plays
         // A background colour is stepped like an endless animation. The brush the element had goes back at the end.
         winrt::Microsoft::UI::Xaml::Media::Brush ownBackground{nullptr};
         bool backgroundAnimated = false;
@@ -96,6 +100,7 @@ private:
     void StartLoops(Running& running, std::vector<theme::Animation> loops);
     void StepLoops();
 
+    bool m_wasPlaying = true;  // at the previous step of the loops
     std::map<theme::NodeId, Running> m_running;
     HWND__* m_window = nullptr;
     winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_loopTimer{nullptr};

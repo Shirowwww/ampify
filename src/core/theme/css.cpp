@@ -124,7 +124,8 @@ std::optional<std::string> ReadCompound(std::string_view s, size_t& i, Compound&
 
 // `:not(<part>)` from the bracket at `i`; moves `i` past it. The part is one compound: a type, a #name and structural
 // pseudo-classes, no state and no pseudo-element. The reason when it cannot be read.
-std::optional<std::string> ReadNegation(std::string_view s, size_t& i, Compound& compound, const std::string& text) {
+std::optional<std::string> ReadNegation(std::string_view s, size_t& i, Compound& compound, const std::string& text,
+                                        bool counted) {
     size_t close = i < s.size() && s[i] == '(' ? ClosingBracket(s, i) : std::string_view::npos;
     const std::string shape = ":not() takes one part made of a type, a #name and structural pseudo-classes, like "
                               ":not(:first-child) or :not(Grid#Bar), in \"" + text + "\"";
@@ -138,6 +139,7 @@ std::optional<std::string> ReadNegation(std::string_view s, size_t& i, Compound&
     size_t at = 0;
     if (std::optional<std::string> problem = ReadCompound(inside, at, negated, scratch)) return problem;
     if (at != inside.size() || scratch.trigger != Trigger::Always || scratch.pseudo != PseudoElement::None) return shape;
+    negated.counted = counted;
     compound.negations.push_back(std::move(negated));
     i = close + 1;
     return std::nullopt;
@@ -158,8 +160,9 @@ std::optional<std::string> ReadStructural(const std::string& pseudo, std::string
     } else if (pseudo == "nth-child" || pseudo == "nth-last-child") {
         int& target = pseudo == "nth-child" ? compound.nth : compound.nthLast;
         return ReadNthChild(s, i, target, pseudo, text).value_or("");
-    } else if (pseudo == "not") {
-        return ReadNegation(s, i, compound, text).value_or("");
+    } else if (pseudo == "not" || pseudo == "except") {
+        // :except() is :not() without weight, for the exclusions inside a built-in name (builtins.cpp).
+        return ReadNegation(s, i, compound, text, pseudo == "not").value_or("");
     } else {
         return std::nullopt;
     }
@@ -289,14 +292,23 @@ bool ReadMediaFeature(std::string_view feature, MediaQuery& query, std::string& 
     size_t colon = feature.find(':');
     std::string name = ToLowerAscii(TrimSpace(feature.substr(0, colon)));
     std::string_view value = colon == std::string_view::npos ? std::string_view() : TrimSpace(feature.substr(colon + 1));
+    if (name == "prefers-color-scheme") {
+        std::string scheme = ToLowerAscii(value);
+        if (scheme != "dark" && scheme != "light") {
+            problem = "@media (" + std::string(TrimSpace(feature)) + ") takes dark or light";
+            return false;
+        }
+        query.dark = scheme == "dark";
+        return true;
+    }
     if (value.size() > 2 && ToLowerAscii(value.substr(value.size() - 2)) == "px") value = TrimSpace(value.substr(0, value.size() - 2));
     double number = 0;
     auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), number);
     double* bound = name == "min-width" ? &query.minWidth : name == "max-width" ? &query.maxWidth
                   : name == "min-height" ? &query.minHeight : name == "max-height" ? &query.maxHeight : nullptr;
     if (!bound) {
-        problem = "@media (" + std::string(TrimSpace(feature)) + ") is not supported: min-width, max-width, min-height "
-                  "and max-height are";
+        problem = "@media (" + std::string(TrimSpace(feature)) + ") is not supported: min-width, max-width, min-height, "
+                  "max-height and prefers-color-scheme are";
         return false;
     }
     if (value.empty() || error != std::errc() || end != value.data() + value.size()) {
@@ -332,7 +344,7 @@ std::optional<MediaQuery> ParseMediaQuery(std::string_view text, std::string& pr
         while (end < lowered.size() && !IsSpace(lowered[end]) && lowered[end] != '(') end++;
         std::string word = lowered.substr(pos, end - pos);
         if (word != "and" && word != "screen" && word != "all" && word != "only") {
-            problem = "@media " + query.text + " is not supported: only sizes are read, such as (max-width: 1200px)";
+            problem = "@media " + query.text + " is not supported: only sizes and the scheme are read, such as (max-width: 1200px)";
             return std::nullopt;
         }
         pos = end;

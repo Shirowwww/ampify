@@ -23,6 +23,7 @@
 #include "../src/core/theme/engine.hpp"
 #include "../src/core/theme/files.hpp"
 #include "../src/core/theme/fonts.hpp"
+#include "../src/core/theme/glass.hpp"
 #include "../src/core/theme/hover.hpp"
 #include "../src/core/theme/ini.hpp"
 #include "../src/core/theme/inspector.hpp"
@@ -476,6 +477,35 @@ TEST_CASE(Css_ScrollbarStandsForBothScrollBarsOfEveryList) {
     CHECK(sheet.rules[0].selectors.at(0).parts.back().name == "VerticalScrollBar");
     CHECK(sheet.rules[0].selectors.at(1).parts.back().name == "HorizontalScrollBar");
     CHECK(sheet.rules[0].selectors.at(1).trigger == th::Trigger::Hover);
+}
+
+// .artwork leaves out two named covers: those exclusions are the name's own business and add no weight, so the play
+// bar's cover rule wins over .artwork wherever each is written (every theme's bar cover lost to it, 05/11).
+TEST_CASE(Css_TheBarCoverBeatsArtworkWhicheverComesFirst) {
+    th::Stylesheet sheet = th::ParseStylesheet(".lcd-artwork-image { corner-radius: 27 }\n.artwork { corner-radius: 6 }\n");
+    CHECK(sheet.problems.empty() && sheet.rules.size() == 2);
+    th::Specificity bar = th::SpecificityOf(sheet.rules[0].selectors.at(0));
+    th::Specificity artwork = th::SpecificityOf(sheet.rules[1].selectors.at(0));
+    CHECK(bar > artwork);
+    CHECK(artwork == th::SpecificityOf(Sel("ArtworkImage")));
+    // Still excluded from what .artwork reaches, and a :not() written by hand still counts.
+    CHECK(sheet.rules[1].selectors.at(0).parts.back().negations.size() == 2);
+    CHECK(th::SpecificityOf(Sel("ArtworkImage:not(#A)")) > th::SpecificityOf(Sel("ArtworkImage")));
+}
+
+// Glass's light scheme drew dark text on panes tinted by the cover's dark colour (05/11): a theme gives each scheme its
+// own rules with (prefers-color-scheme), which follows the scheme in use, not Windows.
+TEST_CASE(Css_ColorSchemeMediaFollowsTheThemesScheme) {
+    th::Stylesheet sheet = th::ParseStylesheet(
+        "@media (prefers-color-scheme: light) and (max-width: 1200px) { Grid { margin: 1 } }\n"
+        "@media (prefers-color-scheme: dark) { Grid { margin: 2 } }\n");
+    CHECK(sheet.problems.empty() && sheet.rules.size() == 2);
+    const th::MediaQuery& light = *sheet.rules[0].media;
+    CHECK(light.dark == false && light.maxWidth == 1200);
+    CHECK(light.MatchesScheme(false) && !light.MatchesScheme(true));
+    CHECK(sheet.rules[1].media->MatchesScheme(true) && !sheet.rules[1].media->MatchesScheme(false));
+    CHECK(th::ParseStylesheet("@media (max-width: 900px) { Grid { margin: 1 } }").rules[0].media->MatchesScheme(true));
+    CHECK(!th::ParseStylesheet("@media (prefers-color-scheme: sepia) { Grid { margin: 1 } }").problems.empty());
 }
 
 TEST_CASE(Css_RefusesUnknownAndGluedClassesButKeepsFullTypeNames) {
@@ -1127,6 +1157,24 @@ TEST_CASE(Theme_AcrylicSurfacesTakeTheCardColour) {
     CHECK(ResourceValue(clear, "AcrylicInAppFillColorDefaultBrush") == "ABSENT");
 }
 
+TEST_CASE(Theme_PageHeaderFrostTakesThePageColour) {
+    MemoryFiles files;
+    files.files["colors.ini"] = "[Black]\nApplicationPageBackgroundThemeBrush = 000000\n\n"
+                                "[Own]\nApplicationPageBackgroundThemeBrush = 000000\nContentAreaBackgroundBrush = 101010\n\n"
+                                "[None]\nAccentFillColorDefaultBrush = 0A84FF\n";
+
+    // A page header's frost is tinted by ContentAreaBackgroundBrush from its first frame, before a pass hides it:
+    // in Apple Music's grey, it flashed over a black page at each album or playlist.
+    th::Theme black = Load(files, {"Black", nullptr, {}});
+    CHECK(ResourceValue(black, "ContentAreaBackgroundBrush") == "#FF000000");
+
+    // A key the theme names stays its own; a scheme without a page colour leaves Apple's.
+    th::Theme own = Load(files, {"Own", nullptr, {}});
+    CHECK(ResourceValue(own, "ContentAreaBackgroundBrush") == "#FF101010");
+    th::Theme none = Load(files, {"None", nullptr, {}});
+    CHECK(ResourceValue(none, "ContentAreaBackgroundBrush") == "ABSENT");
+}
+
 namespace {
 std::string Assigned(const th::Theme& theme, std::string_view selector, std::string_view property) {
     std::string value = "ABSENT";
@@ -1300,6 +1348,33 @@ TEST_CASE(Theme_ProgressLineStopsBeforeARoundedDisplaysCorner) {
     MemoryFiles square;
     square.files["user.css"] = ".lcd { background: #FF000000; }\n";
     CHECK(ScrubberMargin(Load(square)) == "ABSENT");
+}
+
+TEST_CASE(Theme_AnImageOnTheProgressLineGetsRoomToShow) {
+    // The line is 6 high and clips what it holds: given 18 it clips nothing, moved 12 down it stays where it was.
+    const char* mascot = ".scrubber Grid#HorizontalTemplate::after { content: url(\"cat.gif\"); grid-column: 1; }\n";
+    MemoryFiles theme;
+    theme.files["cat.gif"] = "GIF89a";
+    theme.files["user.css"] = mascot;
+    th::Theme loaded = Load(theme);
+    CHECK(Assigned(loaded, ".scrubber", "Height") == "18");
+    CHECK(Assigned(loaded, ".scrubber", "RenderTransform") == "1,1,0,0,12");
+
+    MemoryFiles snippetFiles;
+    snippetFiles.files["cat.gif"] = "GIF89a";
+    snippetFiles.files["user.css"] = mascot;
+    th::Theme snippet = th::LoadSnippet("mascot", "C:/snippets/mascot", snippetFiles, nullptr);
+    CHECK(Assigned(snippet, ".scrubber", "Height") == "18");
+
+    // A theme that sizes the line itself keeps its own height, and a line without an image keeps Apple's.
+    MemoryFiles sized;
+    sized.files["cat.gif"] = "GIF89a";
+    sized.files["user.css"] = std::string(mascot) + ".scrubber { height: 24; }\n";
+    CHECK(Assigned(Load(sized), ".scrubber", "Height") == "24");
+    CHECK(Assigned(Load(sized), ".scrubber", "RenderTransform") == "ABSENT");
+    MemoryFiles plain;
+    plain.files["user.css"] = ".scrubber { color: #FFFFFFFF; }\n";
+    CHECK(Assigned(Load(plain), ".scrubber", "Height") == "ABSENT");
 }
 
 TEST_CASE(Spicetify_ThemeRulesWinOverTheTranslatedOnes) {
@@ -1737,7 +1812,10 @@ TEST_CASE(Engine_PutsADecorInAPanelOnceAndTakesItOff) {
 // played part, which Apple's Slider widens as the song plays. Negative margins keep the column's width at zero.
 TEST_CASE(Engine_PutsAnImageInTheScrubbersThumbColumn) {
     DecorPage page;
-    th::NodeId scrubber = page.tree.Add(0, "ScrubberControl", "LCDScrubber");
+    // The line gets room for the image (RoomForImagesOnTheLine): 18 high, moved 12 down.
+    th::NodeId scrubber = page.tree.Add(0, "ScrubberControl", "LCDScrubber",
+                                        {{"Height", {th::ValueKind::Length, "6"}},
+                                         {"RenderTransform", {th::ValueKind::Opaque, "handle:1"}}});
     th::NodeId root = page.tree.Add(static_cast<int>(scrubber) - 1, "Grid", "");
     th::NodeId track = page.tree.Add(static_cast<int>(root) - 1, "Grid", "HorizontalTemplate");
     page.tree.elements[track - 1].info.panel = true;
@@ -1757,6 +1835,8 @@ TEST_CASE(Engine_PutsAnImageInTheScrubbersThumbColumn) {
     CHECK(values["Grid.Column"] == "1");
     CHECK(values["Margin"] == "-14,-8,-14,-8");
     CHECK(it->second.image == "C:/themes/test/dance.gif|Uniform");
+    CHECK(page.tree.Shown(scrubber, "Height").text == "18");
+    CHECK(page.tree.Shown(scrubber, "RenderTransform").text == "1,1,0,0,12");
 }
 
 TEST_CASE(Engine_RefusesADecorOnAnElementThatIsNotAPanel) {
@@ -2375,6 +2455,13 @@ TEST_CASE(Properties_FlowDirectionAndOrder) {
     CHECK(Converted("flow-direction", "up", palette, files).rfind("PROBLEM", 0) == 0);
     CHECK(th::FindProperty("flow-direction")->xaml == "FlowDirection");
 
+    // color-scheme: an element and its children in light or dark mode, whatever the window's mode.
+    CHECK(Converted("color-scheme", "dark", palette, files) == "Dark");
+    CHECK(Converted("color-scheme", " Light ", palette, files) == "Light");
+    CHECK(Converted("color-scheme", "normal", palette, files) == "Default");
+    CHECK(Converted("color-scheme", "sepia", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(th::FindProperty("color-scheme")->xaml == "RequestedTheme");
+
     CHECK(Converted("order", "2", palette, files) == "2");
     CHECK(Converted("order", "007", palette, files) == "7");
     CHECK(Converted("order", "-1", palette, files).rfind("PROBLEM", 0) == 0);
@@ -2731,6 +2818,93 @@ TEST_CASE(Scheme_AppModeLeavesAppleMusicAloneWithoutColours) {
     CHECK(th::AppModeOf(std::nullopt, "Light") == std::optional<bool>(false));
     CHECK(th::AppModeOf(std::optional<bool>(true), "Light") == std::optional<bool>(true));
     CHECK(th::AppModeOf(std::optional<bool>(false), "Base") == std::optional<bool>(false));
+}
+
+TEST_CASE(Scheme_WindowMaterialReadsTheThemesVariable) {
+    CHECK(th::WindowMaterialOf("mica") == std::optional<th::WindowMaterial>(th::WindowMaterial::Mica));
+    CHECK(th::WindowMaterialOf(" Mica-Alt ") == std::optional<th::WindowMaterial>(th::WindowMaterial::MicaAlt));
+    CHECK(th::WindowMaterialOf("acrylic") == std::optional<th::WindowMaterial>(th::WindowMaterial::Acrylic));
+    CHECK(th::WindowMaterialOf("none") == std::nullopt);
+    CHECK(th::WindowMaterialOf("") == std::nullopt);
+    CHECK(th::WindowMaterialOf("glass") == std::nullopt);
+}
+
+namespace {
+
+th::Assignment GlassAssignment(std::string property, th::ValueKind kind, std::string text) {
+    th::Assignment assignment;
+    assignment.property = std::move(property);
+    assignment.value = {kind, std::move(text)};
+    return assignment;
+}
+
+th::Theme GlassTheme() {
+    th::Animation endless;
+    endless.durationMs = 90000;
+    endless.iterations = 0;
+    th::Animation once;
+    once.durationMs = 300;
+    th::Theme theme;
+    theme.assignments = {GlassAssignment("Background", th::ValueKind::Acrylic, "#FF141822;0.72"),
+                         GlassAssignment("Shadow", th::ValueKind::Shadow, "28"),
+                         GlassAssignment("Animation", th::ValueKind::Animation, th::EncodeAnimations({endless})),
+                         GlassAssignment("Animation", th::ValueKind::Animation, th::EncodeAnimations({endless, once})),
+                         GlassAssignment("Background", th::ValueKind::Color, "#FF000000")};
+    return theme;
+}
+
+}  // namespace
+
+TEST_CASE(Glass_LevelReadsTheSetting) {
+    CHECK(th::GlassLevelOf("eco") == th::GlassLevel::Eco);
+    CHECK(th::GlassLevelOf(" Balanced ") == th::GlassLevel::Balanced);
+    CHECK(th::GlassLevelOf("full") == th::GlassLevel::Full);
+    CHECK(th::GlassLevelOf("") == th::GlassLevel::Full);
+    CHECK(th::GlassLevelOf("max") == th::GlassLevel::Full);
+}
+
+TEST_CASE(Glass_FullKeepsTheThemeAsWritten) {
+    th::Theme theme = GlassTheme();
+    th::ApplyGlassLevel(theme, th::GlassLevel::Full);
+    th::Theme written = GlassTheme();
+    CHECK(theme.assignments.size() == written.assignments.size());
+    if (theme.assignments.size() != written.assignments.size()) return;
+    for (std::size_t i = 0; i < written.assignments.size(); i++) {
+        CHECK(theme.assignments[i].value == written.assignments[i].value);
+    }
+}
+
+TEST_CASE(Glass_BalancedStopsEndlessAnimationsAndShadows) {
+    th::Theme theme = GlassTheme();
+    th::ApplyGlassLevel(theme, th::GlassLevel::Balanced);
+    CHECK(theme.assignments.size() == 3);
+    if (theme.assignments.size() != 3) return;
+    CHECK(theme.assignments[0].value.kind == th::ValueKind::Acrylic);
+    CHECK(theme.assignments[1].property == "Animation");
+    std::optional<std::vector<th::Animation>> kept = th::DecodeAnimations(theme.assignments[1].value.text);
+    CHECK(kept && kept->size() == 1);
+    if (!kept || kept->size() != 1) return;
+    CHECK((*kept)[0].iterations == 1);
+    CHECK(theme.assignments[2].value.text == "#FF000000");
+}
+
+TEST_CASE(Glass_BalancedKeepsAShadowThatRemovesDepth) {
+    th::Theme theme;
+    theme.assignments = {GlassAssignment("Shadow", th::ValueKind::Shadow, "0"),
+                         GlassAssignment("Shadow", th::ValueKind::Shadow, "28")};
+    th::ApplyGlassLevel(theme, th::GlassLevel::Balanced);
+    CHECK(theme.assignments.size() == 1);
+    if (theme.assignments.size() != 1) return;
+    CHECK(theme.assignments[0].value.text == "0");
+}
+
+TEST_CASE(Glass_EcoPaintsAcrylicAsAPlainColour) {
+    th::Theme theme = GlassTheme();
+    th::ApplyGlassLevel(theme, th::GlassLevel::Eco);
+    CHECK(theme.assignments.size() == 3);
+    if (theme.assignments.size() != 3) return;
+    CHECK(theme.assignments[0].value.kind == th::ValueKind::Color);
+    CHECK(theme.assignments[0].value.text == "#F7141822");  // the tint, more opaque: 0.72 + 0.25 of its alpha
 }
 
 TEST_CASE(Scheme_SystemModePicksByName) {
@@ -3904,6 +4078,16 @@ TEST_CASE(Theme_ArtworkColoursAreVariablesWithAFallback) {
     CHECK(Assigned(Load(files, options), ".content", "Background") == "#40C04020");
 }
 
+TEST_CASE(Theme_ASnippetSeesTheArtworkColoursWithoutATheme) {
+    // Album colours alone, over Apple Music's own look: the page's colours reach it all the same.
+    MemoryFiles files;
+    files.files["user.css"] = ".list-page { background: #E6var(--page-art-3-hex, 000000); }\n";
+    th::LoadOptions options;
+    options.artwork = {{"page-art-3", "#761a0e"}, {"page-art-3-hex", "761a0e"}};
+    th::Theme snippet = th::LoadSnippet("album-colors", "C:/snippets/album-colors", files, nullptr, options);
+    CHECK(Assigned(snippet, ".list-page", "Background") == "#E6761A0E");
+}
+
 TEST_CASE(Worker_ReloadsForANewArtworkOnlyWhenTheThemeUsesIt) {
     std::filesystem::path kit(TempFolder("worker-artwork"));
     WriteFile(kit / "themes" / "art" / "user.css", ".sidebar { background: var(--art-1, #000000); }\n");
@@ -3922,6 +4106,41 @@ TEST_CASE(Worker_ReloadsForANewArtworkOnlyWhenTheThemeUsesIt) {
     th::SessionRequest plain = worker.Tick(settings, 600);
     worker.SetArtwork({{"art-1", "#445566"}});
     CHECK(worker.Tick(settings, 600).generation == plain.generation);
+    std::filesystem::remove_all(kit);
+}
+
+TEST_CASE(Worker_GlassLevelLightensTheThemeAndItsSnippets) {
+    std::filesystem::path kit(TempFolder("worker-glass"));
+    WriteFile(kit / "themes" / "pane" / "user.css", ".sidebar { backdrop: acrylic(#FF141822, 0.72); box-shadow: 28px; }\n");
+    WriteFile(kit / "snippets" / "frost" / "user.css", ".content { backdrop: acrylic(#FF000000, 0.5); }\n");
+    ampify::Settings settings;
+    settings.Set("theme.active", "pane");
+    settings.Set("snippets.frost.enabled", "1");
+    th::ThemeWorker worker(kit);
+    th::SessionRequest full = worker.Tick(settings, 600);
+    CHECK(full.theme && full.theme->assignments.size() == 2);
+
+    settings.Set(th::kGlassKey, "eco");
+    th::SessionRequest eco = worker.Tick(settings, 600);
+    CHECK(eco.generation > full.generation);
+    CHECK(eco.theme && eco.theme->assignments.size() == 1);
+    CHECK(eco.theme && Assigned(*eco.theme, ".sidebar", "Background") == "#F7141822");
+    CHECK(eco.snippets.size() == 1 && eco.snippets[0]->assignments.size() == 1 &&
+          eco.snippets[0]->assignments[0].value.kind == th::ValueKind::Color);
+    std::filesystem::remove_all(kit);
+}
+
+TEST_CASE(Worker_ReloadsForANewPageArtworkWhenTheThemeUsesIt) {
+    std::filesystem::path kit(TempFolder("worker-page-artwork"));
+    WriteFile(kit / "themes" / "page" / "user.css", ".sidebar { background: var(--page-art-1, #000000); }\n");
+    ampify::Settings settings;
+    settings.Set("theme.active", "page");
+    th::ThemeWorker worker(kit);
+    th::SessionRequest first = worker.Tick(settings, 600);
+    worker.SetArtwork({{"page-art-1", "#778899"}});
+    th::SessionRequest second = worker.Tick(settings, 600);
+    CHECK(second.generation > first.generation);
+    CHECK(second.theme && Assigned(*second.theme, ".sidebar", "Background") == "#FF778899");
     std::filesystem::remove_all(kit);
 }
 

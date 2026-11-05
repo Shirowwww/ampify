@@ -14,6 +14,7 @@ ThemeSettings ReadThemeSettings(const Settings& settings) {
     value.scheme = settings.GetString("theme.scheme", "");
     value.schedule = settings.GetString("theme.schedule", "");
     value.accent = settings.GetString("theme.accent", "");
+    value.glass = settings.GetString("theme.glass", "");
     value.liveReload = settings.GetBool("theme.live_reload", true);
     value.inspect = settings.GetBool("theme.inspect", false);
     value.parts.colors = settings.GetBool("theme.parts.colors", true);
@@ -36,6 +37,11 @@ void WriteThemeSettings(Settings& settings, const ThemeSettings& value) {
         settings.Remove("theme.accent");
     } else {
         settings.Set("theme.accent", value.accent);
+    }
+    if (value.glass.empty()) {
+        settings.Remove("theme.glass");
+    } else {
+        settings.Set("theme.glass", value.glass);
     }
     settings.SetBool("theme.live_reload", value.liveReload);
     settings.SetBool("theme.inspect", value.inspect);

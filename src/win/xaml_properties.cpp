@@ -209,6 +209,13 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
             bool rtl = element.FlowDirection() == xaml::FlowDirection::RightToLeft;
             return theme::Value{theme::ValueKind::Keyword, rtl ? "RightToLeft" : "LeftToRight"};
         }
+    } else if (property == "RequestedTheme") {
+        if (auto element = object.try_as<xaml::FrameworkElement>()) {
+            xaml::ElementTheme mode = element.RequestedTheme();
+            return theme::Value{theme::ValueKind::Keyword, mode == xaml::ElementTheme::Dark    ? "Dark"
+                                                           : mode == xaml::ElementTheme::Light ? "Light"
+                                                                                               : "Default"};
+        }
     } else if (property == "HorizontalAlignment") {
         if (auto element = object.try_as<xaml::FrameworkElement>()) return theme::Value{theme::ValueKind::Keyword, AlignmentText(element.HorizontalAlignment())};
     } else if (property == "VerticalAlignment") {
@@ -736,6 +743,16 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         if (auto element = object.try_as<xaml::FrameworkElement>()) {
             element.FlowDirection(value.text == "RightToLeft" ? xaml::FlowDirection::RightToLeft
                                                                : xaml::FlowDirection::LeftToRight);
+            return true;
+        }
+        return false;
+    }
+
+    if (property == "RequestedTheme" && value.kind == theme::ValueKind::Keyword) {
+        if (auto element = object.try_as<xaml::FrameworkElement>()) {
+            element.RequestedTheme(value.text == "Dark"    ? xaml::ElementTheme::Dark
+                                   : value.text == "Light" ? xaml::ElementTheme::Light
+                                                           : xaml::ElementTheme::Default);
             return true;
         }
         return false;

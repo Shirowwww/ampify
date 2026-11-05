@@ -42,6 +42,13 @@ const std::vector<std::pair<std::string, std::string>>& CloseOptions() {
     return options;
 }
 
+const std::vector<std::pair<std::string, std::string>>& NetworkOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"ipv4-first", "tweaks.network.ipv4"},
+        {"system", "tweaks.network.system"}};
+    return options;
+}
+
 const std::vector<std::pair<std::string, std::string>>& KitUpdateOptions() {
     static const std::vector<std::pair<std::string, std::string>> options{
         {"auto", "update.auto"},
@@ -50,11 +57,29 @@ const std::vector<std::pair<std::string, std::string>>& KitUpdateOptions() {
     return options;
 }
 
+const std::vector<std::pair<std::string, std::string>>& GlassOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"full", "glass.full"},
+        {"balanced", "glass.balanced"},
+        {"eco", "glass.eco"}};
+    return options;
+}
+
+const std::vector<std::pair<std::string, std::string>>& EntryOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"sidebar", "entry.sidebar"},
+        {"header", "entry.header"}};
+    return options;
+}
+
 const std::vector<std::pair<std::string, std::string>>* OptionsOf(const std::string& key) {
+    if (key == kGlassChoiceKey) return &GlassOptions();
+    if (key == kEntryKey) return &EntryOptions();
     if (key == kNotificationsKey) return &NotificationOptions();
     if (key == kPlayerModeKey) return &PlayerOptions();
     if (key == kPlayerControlsKey) return &PlayerControlsOptions();
     if (key == kCloseKey) return &CloseOptions();
+    if (key == kNetworkKey) return &NetworkOptions();
     if (key == kKitUpdateKey) return &KitUpdateOptions();
     return nullptr;
 }
@@ -82,6 +107,7 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
                                             : PlayerMode::Window;
     tweaks.closeToTray = Known(settings, kCloseKey) == "tray";
     tweaks.playerControls = Known(settings, kPlayerControlsKey) == "shown";
+    tweaks.ipv4First = Known(settings, kNetworkKey) == "ipv4-first";
     return tweaks;
 }
 
@@ -100,6 +126,7 @@ std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
         {kCloseKey, "tweaks.close", "tweaks.closeHelp", CloseOptions(), Known(settings, kCloseKey)},
         {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", std::move(notificationOptions),
          notifications},
+        {kNetworkKey, "tweaks.network", "tweaks.networkHelp", NetworkOptions(), Known(settings, kNetworkKey)},
     };
 }
 
@@ -114,10 +141,32 @@ TweakChoice KitUpdateChoice(const fs::path& kit) {
     return {kKitUpdateKey, "update.title", "update.help", KitUpdateOptions(), Known(settings, kKitUpdateKey)};
 }
 
+bool ReadEntryInHeader(const Settings& settings) { return Known(settings, kEntryKey) == "header"; }
+
+TweakChoice EntryChoice(const fs::path& kit) {
+    Settings settings;
+    settings.Load((kit / "settings.txt").string());
+    return {kEntryKey, "entry.title", "entry.help", EntryOptions(), Known(settings, kEntryKey)};
+}
+
+TweakChoice GlassChoice(const fs::path& kit) {
+    Settings settings;
+    settings.Load((kit / "settings.txt").string());
+    return {kGlassChoiceKey, "glass.title", "glass.help", GlassOptions(), Known(settings, kGlassChoiceKey)};
+}
+
 bool IsAppleTweakValue(const std::string& key, const std::string& value) {
     const auto* options = OptionsOf(key);
     return options &&
            std::any_of(options->begin(), options->end(), [&](const auto& option) { return option.first == value; });
+}
+
+std::string AppleTweakValues(const std::string& key) {
+    const auto* options = OptionsOf(key);
+    std::string joined;
+    if (!options) return joined;
+    for (const auto& option : *options) joined += (joined.empty() ? "" : ", ") + option.first;
+    return joined;
 }
 
 bool SetAppleTweak(const fs::path& kit, const std::string& key, const std::string& value, std::string& error) {

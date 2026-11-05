@@ -9,6 +9,39 @@
     visibility: collapsed;
 }
 
+/* The bar above an album or a playlist holds only the search and sort buttons, on a row of its own: hidden, the page
+   moves up into that row. The library's grid pages keep theirs, where it carries the page's title. */
+@setting page-search {
+    .list-page .page-header {
+        visibility: collapsed;
+    }
+}
+
+/* Off unless chosen: the Lossless, Hi-Res, Dolby and Apple Digital Master badges, in the pages and in the display. */
+@setting badges {
+    .lossless-badge,
+    .digital-master-badge,
+    .audio-badge {
+        visibility: collapsed;
+    }
+}
+
+/* Off unless chosen: the "E" of explicit songs. */
+@setting explicit {
+    .explicit-badge {
+        visibility: collapsed;
+    }
+}
+
+/* Off unless chosen: Apple's suggestions under a playlist and the other shelves under an album; the page ends with
+   its songs. */
+@setting suggestions {
+    .suggested-songs,
+    .list-page-shelves {
+        visibility: collapsed;
+    }
+}
+
 /* Apple Music shows and hides its logo itself, following what plays: an opacity leaves that to it. */
 .apple-logo {
     opacity: 0;

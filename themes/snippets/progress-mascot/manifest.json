@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "progress-mascot",
+  "name": "Progress mascot",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "A little animated figure rides the progress bar at the song's position, like Spicetify's Nyan Cat bar: a comet, a bobbing note or a beating heart.",
+  "translations": {"fr": {"name": "Mascotte de progression", "description": "Une petite figure animée suit la barre de progression à la position du morceau, comme la barre Nyan Cat de Spicetify : une comète, une note qui sautille ou un cœur qui bat.", "settings": {"mascot": "Mascotte"}, "options": {"Comet": "Comète", "Note": "Note", "Heart": "Cœur"}}, "de": {"name": "Fortschrittsmaskottchen", "description": "Eine kleine animierte Figur fährt auf dem Fortschrittsbalken an der Stelle des Songs mit, wie die Nyan-Cat-Leiste von Spicetify: ein Komet, eine hüpfende Note oder ein schlagendes Herz.", "settings": {"mascot": "Maskottchen"}, "options": {"Comet": "Komet", "Note": "Note", "Heart": "Herz"}}, "es": {"name": "Mascota de progreso", "description": "Una pequeña figura animada recorre la barra de progreso en la posición de la canción, como la barra Nyan Cat de Spicetify: un cometa, una nota que salta o un corazón que late.", "settings": {"mascot": "Mascota"}, "options": {"Comet": "Cometa", "Note": "Nota", "Heart": "Corazón"}}, "pt": {"name": "Mascote de progresso", "description": "Uma pequena figura animada percorre a barra de progresso na posição da música, como a barra Nyan Cat do Spicetify: um cometa, uma nota que pula ou um coração que bate.", "settings": {"mascot": "Mascote"}, "options": {"Comet": "Cometa", "Note": "Nota", "Heart": "Coração"}}, "ru": {"name": "Талисман прогресса", "description": "Маленькая анимированная фигурка едет по полосе прогресса в точке песни, как полоса Nyan Cat в Spicetify: комета, прыгающая нота или бьющееся сердце.", "settings": {"mascot": "Талисман"}, "options": {"Comet": "Комета", "Note": "Нота", "Heart": "Сердце"}}, "ja": {"name": "進行マスコット", "description": "Spicetify の Nyan Cat バーのように、小さなアニメーションのキャラクターが曲の位置で再生バーの上を進みます。彗星、跳ねる音符、鼓動するハートから選べます。", "settings": {"mascot": "マスコット"}, "options": {"Comet": "彗星", "Note": "音符", "Heart": "ハート"}}, "zh": {"name": "进度吉祥物", "description": "一个小动画角色在进度条上随歌曲位置前进，就像 Spicetify 的 Nyan Cat 进度条：彗星、跳动的音符或跳动的心。", "settings": {"mascot": "吉祥物"}, "options": {"Comet": "彗星", "Note": "音符", "Heart": "爱心"}}},
+  "preview": "preview.jpg",
+  "kitApi": "1.0",
+  "tags": [
+    "progress",
+    "fun"
+  ],
+  "settings": [
+    {"key": "mascot", "label": "Mascot", "type": "choice", "options": ["Comet", "Note", "Heart"], "default": "Comet"}
+  ]
+}

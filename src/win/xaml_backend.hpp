@@ -15,6 +15,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -41,15 +42,19 @@
 
 namespace ampify::win {
 
-// The colours of the artwork playing (art-1... of color_extract.hpp), read from the play bar's image on the interface
-// thread and taken by the theme service's own thread, hence the lock.
+// The colours of the artworks themes read (art-1... of color_extract.hpp): the song playing, from the play bar's image,
+// and the album or playlist on screen as page-art-1..., from its header. Read on the interface thread and taken by
+// the theme service's own thread, hence the lock.
 struct ArtworkColours {
     std::mutex lock;
     std::condition_variable changed;  // notified when `variables` change, so the service reloads at once
     std::map<std::string, std::string> variables;
-    std::string key;    // the image they come from: its address, or the object when it has none
-    bool busy = false;  // a reading is under way
+    std::map<std::string, std::string> keys;  // by prefix ("" or "page-"): the image its colours come from
+    std::set<std::string> busy;               // the prefixes whose reading is under way
 };
+
+// The prefix of the colours of the album or playlist on screen (page-art-1...).
+inline constexpr char kPageArtworkPrefix[] = "page-";
 
 // The hover logic (theme::HoverTracker) reads and writes the element through ReadRaw and WriteRaw, the XAML access
 // without the hover; Read and Write go through the tracker.
@@ -87,6 +92,9 @@ public:
 
     // True once the main window has closed: Apple Music is shutting down and its tree must not be touched any more.
     bool WindowClosed() const { return *m_closed; }
+    // False while the main window is hidden (in the notification area) or minimized: nothing of it shows, so the
+    // periodic work waits. True when it cannot be told.
+    bool WindowShown() const;
     // The colours of the artwork playing; any thread may read them under their lock.
     std::shared_ptr<ArtworkColours> ArtworkSample() const { return m_artworkColours; }
     // How many state values hold a theme's value now (HoldThroughStates), and how many refused it, for the log.
@@ -117,6 +125,9 @@ private:
     // The same object always gets the same token, so a value read on each tick or each hover does not pile up.
     theme::Value Keep(winrt::Windows::Foundation::IInspectable object);
     winrt::Windows::Foundation::IInspectable Restore(const theme::Value& token) const;
+    // The brush Ampify keeps for an application resource, recoloured to `color`; IsOwnBrush tells one of them.
+    winrt::Microsoft::UI::Xaml::Media::SolidColorBrush OwnBrush(const std::string& key, winrt::Windows::UI::Color color);
+    bool IsOwnBrush(const winrt::Windows::Foundation::IInspectable& value) const;
 
     // An object Ampify made from a value (a gradient, an image or acrylic brush, a transform, a shadow) reads back as
     // that value while the element still holds it: the next tick then finds the value in place and writes nothing.
@@ -128,7 +139,7 @@ private:
 
     winrt::Microsoft::UI::Xaml::Media::Brush ArtworkBrush(const std::string& text);
     void FollowArtwork(const winrt::Microsoft::UI::Xaml::Media::ImageSource& artwork);
-    void SampleArtwork(const winrt::Microsoft::UI::Xaml::Controls::Image& image);
+    void SampleArtwork(const winrt::Microsoft::UI::Xaml::Controls::Image& image, const std::string& prefix = {});
     void FollowArtworkImage(const winrt::Microsoft::UI::Xaml::Controls::Image& image);
     void OnArtworkChanged() noexcept;
 
@@ -249,6 +260,7 @@ private:
     std::optional<CaptionColours> m_captionWritten;   // what Ampify wrote last
     std::string m_captionNote;
     std::map<std::string, theme::Value> m_addedKeys;  // keys added on top of the theme dictionaries, with the value before
+    std::map<std::string, winrt::Microsoft::UI::Xaml::Media::SolidColorBrush> m_ownBrushes;  // OwnBrush, by key
     bool m_resourcesDirty = false;  // a resource changed: {ThemeResource} references must be resolved again
     std::string m_dirtyReason;      // the first change since the last refresh, and how many followed it
     int m_dirtyCount = 0;

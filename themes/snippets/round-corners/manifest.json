@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "round-corners",
+  "name": "Round corners",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "Rounds the covers, tiles, rows, the display and the menus with one radius you choose, on top of any theme, like Spicetify's Rounded Images.",
+  "translations": {"fr": {"name": "Coins arrondis", "description": "Arrondit les pochettes, les vignettes, les lignes, l'afficheur et les menus d'un même rayon, au choix, par-dessus n'importe quel thème, comme Rounded Images sur Spicetify.", "settings": {"radius": "Rayon des coins"}}, "de": {"name": "Runde Ecken", "description": "Rundet Cover, Kacheln, Zeilen, die Anzeige und die Menüs mit einem wählbaren Radius ab, mit jedem Theme, wie Rounded Images bei Spicetify.", "settings": {"radius": "Eckenradius"}}, "es": {"name": "Esquinas redondeadas", "description": "Redondea las portadas, los mosaicos, las filas, el visor y los menús con un mismo radio a elegir, sobre cualquier tema, como Rounded Images de Spicetify.", "settings": {"radius": "Radio de las esquinas"}}, "pt": {"name": "Cantos arredondados", "description": "Arredonda as capas, os blocos, as linhas, o visor e os menus com um mesmo raio à escolha, sobre qualquer tema, como o Rounded Images do Spicetify.", "settings": {"radius": "Raio dos cantos"}}, "ru": {"name": "Скруглённые углы", "description": "Скругляет обложки, плитки, строки, дисплей и меню одним радиусом на выбор, поверх любой темы, как Rounded Images в Spicetify.", "settings": {"radius": "Радиус углов"}}, "ja": {"name": "角丸", "description": "Spicetify の Rounded Images のように、アートワーク、タイル、行、ディスプレイ、メニューを好きな半径で角丸にします。どのテーマにも重ねられます。", "settings": {"radius": "角の半径"}}, "zh": {"name": "圆角", "description": "用你选择的同一半径为封面、卡片、列表行、显示屏和菜单加上圆角，可叠加在任何主题上，就像 Spicetify 的 Rounded Images。", "settings": {"radius": "圆角半径"}}},
+  "preview": "preview.jpg",
+  "kitApi": "1.0",
+  "tags": [
+    "rounded",
+    "corners"
+  ],
+  "settings": [
+    {"key": "radius", "label": "Corner radius", "type": "number", "min": 4, "max": 28, "default": 14}
+  ]
+}

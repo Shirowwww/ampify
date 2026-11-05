@@ -14,8 +14,10 @@
 #include <vector>
 
 #include "element_picker.hpp"
+#include "lcd_links.hpp"
 #include "ui_thread.hpp"
 #include "win_common.hpp"
+#include "window_backdrop.hpp"
 #include "xaml_backend.hpp"
 #include "xaml_watcher.hpp"
 #include "../core/settings.hpp"
@@ -59,6 +61,13 @@ std::pair<std::filesystem::file_time_type, std::filesystem::file_time_type> Chan
     return {settings, reload};
 }
 
+// The window material of the theme on screen (--window-material in its :root), none without a theme.
+std::optional<theme::WindowMaterial> MaterialOf(const theme::Theme* applied) {
+    if (!applied) return std::nullopt;
+    auto value = applied->variables.find("window-material");
+    return value == applied->variables.end() ? std::nullopt : theme::WindowMaterialOf(value->second);
+}
+
 // Local time in minutes from midnight, for theme.schedule.
 int LocalMinute() {
     SYSTEMTIME now{};
@@ -100,6 +109,7 @@ struct UiSide {
     XamlTreeBackend backend;
     theme::ThemeSession session;
     bool attached = false;
+    bool ticked = false;  // a first tick ran: the theme is on the window, whatever its visibility then
     int timedPasses = 0;  // passes after a change whose duration went to the log
     int timedRefreshes = 0;  // the same for the window's resource refreshes
     std::size_t heldStates = 0;  // the counts last written to the log
@@ -214,12 +224,19 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 });
             }
             if (ui->backend.WindowClosed()) return;
+            // Hidden in the notification area (music playing, window closed to the tray) or minimized: the periodic
+            // pass waits, and the first tick once the window shows again applies what changed meanwhile. Not the very
+            // first tick: a window that starts hidden still gets its theme before it first shows.
+            if (ui->ticked && !ui->backend.WindowShown()) return;
+            ui->ticked = true;
+            KeepDisplayLinks(journal);
 
             std::optional<std::string> dump = ui->session.Tick(ui->backend, request);
             if (std::shared_ptr<const theme::Theme> applied = ui->session.Applied(); applied != ui->fontsOf) {
                 PublishFontRoles(theme::FontRolesJson(applied.get()));
                 ui->fontsOf = std::move(applied);
             }
+            KeepWindowMaterial(MaterialOf(ui->fontsOf.get()), journal);
             std::size_t held = ui->backend.HeldStateCount();
             std::size_t refused = ui->backend.RefusedStateCount();
             if (held != ui->heldStates || refused != ui->refusedStates) {

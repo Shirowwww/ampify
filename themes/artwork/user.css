@@ -115,3 +115,8 @@
         backdrop: var(--glass);
     }
 }
+
+/* An album's or a playlist's Play: the theme's corners. Apple's pill read as an oval beside the round buttons. */
+.album-play-button {
+    corner-radius: calc(var(--panel-radius) * 0.4);
+}

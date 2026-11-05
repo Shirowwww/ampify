@@ -30,6 +30,7 @@ enum class PropertyKind {
     Text,        // a font family: a name, optionally in quotes, or `url(fonts/file.ttf#Family Name)`
     Template,    // url(file) of a XAML ControlTemplate
     FlowDirection,  // ltr / left-to-right, or rtl / right-to-left (XAML LeftToRight, RightToLeft)
+    ColorScheme,    // light, dark or normal (XAML ElementTheme Light, Dark, Default): the mode of the element's brushes
     Order,       // a whole number from 0: the position of the element among the items of its parent (kOrderProperty)
     Alignment,   // left / center / right / stretch, or top / center / bottom / stretch for vertical-alignment
     Integer,     // a whole number: a Grid row or column (from 0), a span (from 1), a z-index (may be negative)

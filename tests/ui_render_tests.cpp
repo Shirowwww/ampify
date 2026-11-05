@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "../src/core/address_order.hpp"
 #include "../src/core/settings.hpp"
 #include "../src/core/ui_model.hpp"
 #include "../src/core/ui_render/apple_tweaks.hpp"
@@ -826,6 +827,72 @@ TEST_CASE(UiRender_KitUpdateInstallsOnItsOwnUnlessToldOtherwise) {
     CHECK(ReadFile(kit / "settings.txt").find("theme.active = night") != std::string::npos);
 }
 
+TEST_CASE(UiRender_TheGlassLevelIsChosenFromThreeValues) {
+    fs::path kit = FreshKit("glass-choice");
+    WriteFile(kit / "settings.txt", "theme.active = night\ntheme.glass = Balanced\n");
+    TweakChoice choice = GlassChoice(kit);
+    CHECK(choice.key == "theme.glass" && choice.value == "balanced");
+    CHECK(choice.options.size() == 3 && choice.options.front().first == "full");
+
+    std::string error;
+    CHECK(SetAppleTweak(kit, "theme.glass", "eco", error));
+    CHECK(!SetAppleTweak(kit, "theme.glass", "ultra", error));
+    std::string text = ReadFile(kit / "settings.txt");
+    CHECK(text.find("theme.glass = eco") != std::string::npos);
+    CHECK(text.find("theme.active = night") != std::string::npos);
+
+    WriteFile(kit / "settings.txt", "theme.active = night\n");
+    CHECK(GlassChoice(kit).value == "full");
+}
+
+TEST_CASE(UiRender_AmpifysEntryGoesInTheHeaderOnlyWhenChosen) {
+    Settings settings;
+    CHECK(!ReadEntryInHeader(settings));
+    settings.Set("ampify.entry", "Header");
+    CHECK(ReadEntryInHeader(settings));
+    settings.Set("ampify.entry", "top");
+    CHECK(!ReadEntryInHeader(settings));
+
+    fs::path kit = FreshKit("entry-choice");
+    WriteFile(kit / "settings.txt", "theme.active = night\n");
+    CHECK(EntryChoice(kit).value == "sidebar");
+    std::string error;
+    CHECK(SetAppleTweak(kit, "ampify.entry", "header", error));
+    CHECK(!SetAppleTweak(kit, "ampify.entry", "top", error));
+    CHECK(EntryChoice(kit).value == "header");
+}
+
+TEST_CASE(UiRender_TheCardListsTheValuesOfEveryKeyItKnows) {
+    for (const char* key : {"apple.notifications", "apple.fullscreen", "apple.playerControls", "apple.close",
+                            "apple.network", "theme.glass", "ampify.entry", "kit_update"}) {
+        CHECK(!AppleTweakValues(key).empty());
+        CHECK(!IsAppleTweakValue(key, "not-a-value"));
+    }
+    CHECK(AppleTweakValues("theme.glass") == "full, balanced, eco");
+    CHECK(AppleTweakValues("ampify.entry") == "sidebar, header");
+    CHECK(AppleTweakValues("theme.active").empty());  // not a key of the card
+}
+
+TEST_CASE(UiRender_ResolvedAddressesListIpv4FirstOnlyWhenSomethingMoves) {
+    using ampify::Ipv4FirstOrder;
+    constexpr int v4 = ampify::kFamilyIpv4, v6 = ampify::kFamilyIpv6;
+    CHECK((Ipv4FirstOrder({v6, v6, v4, v6, v4}) == std::vector<size_t>{2, 4, 0, 1, 3}));
+    CHECK(Ipv4FirstOrder({v4, v6, v6}).empty());  // already first
+    CHECK(Ipv4FirstOrder({v4, v4}).empty());
+    CHECK(Ipv4FirstOrder({v6, v6}).empty());      // IPv6 only (NAT64): nothing to fall back to
+    CHECK(Ipv4FirstOrder({}).empty());
+    CHECK((Ipv4FirstOrder({v6, v4, v6}) == std::vector<size_t>{1, 0, 2}));
+}
+
+TEST_CASE(UiRender_TheNetworkFixIsOnUnlessSystemOrderIsChosen) {
+    Settings settings;
+    CHECK(ReadAppleTweaks(settings).ipv4First);
+    settings.Set("apple.network", "System");
+    CHECK(!ReadAppleTweaks(settings).ipv4First);
+    settings.Set("apple.network", "whatever");
+    CHECK(ReadAppleTweaks(settings).ipv4First);
+}
+
 TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     fs::path kit = FreshKit("apple-tweaks");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
@@ -841,11 +908,11 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "apple.notifications", "loud", error));
     CHECK(!SetAppleTweak(kit, "theme.active", "screen", error));
 
-    // The player and the close button first; the notifications last, where "never" (Apple's own switch does it)
-    // only shows for someone who chose it before.
+    // The player and the close button first; the notifications, where "never" (Apple's own switch does it) only shows
+    // for someone who chose it before; the network fix last.
     std::vector<TweakChoice> choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 4);
-    if (choices.size() == 4) {
+    CHECK(choices.size() == 5);
+    if (choices.size() == 5) {
         CHECK(choices[0].key == "apple.fullscreen" && choices[0].value == "screen");
         CHECK(choices[0].options.size() == 4);
         CHECK(choices[1].key == "apple.playerControls" && choices[1].value == "shown");
@@ -853,11 +920,15 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
         CHECK(choices[2].options.size() == 2);
         CHECK(choices[3].key == "apple.notifications" && choices[3].value == "never");
         CHECK(choices[3].options.size() == 3);
+        CHECK(choices[4].key == "apple.network" && choices[4].value == "ipv4-first");
+        CHECK(choices[4].options.size() == 2);
     }
 
     CHECK(SetAppleTweak(kit, "apple.notifications", "background", error));
+    CHECK(SetAppleTweak(kit, "apple.network", "system", error));
     choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 4 && choices[3].options.size() == 2 && choices[3].value == "background");
+    CHECK(choices.size() == 5 && choices[3].options.size() == 2 && choices[3].value == "background");
+    CHECK(choices.size() == 5 && choices[4].value == "system");
 }
 
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {

@@ -6,6 +6,8 @@
 #include <optional>
 #include <vector>
 
+#include "scheme_choice.hpp"
+
 namespace ampify::theme {
 
 namespace {
@@ -127,6 +129,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
     std::vector<PendingMove> pending;
     const RuleIndex index(theme.assignments);
     const std::optional<ViewSize> size = tree.WindowSize();
+    const bool darkScheme = theme.dark.value_or(IsDarkScheme(theme.scheme));
     tree.WatchSize(MediaQueries(theme));
     for (int position = 0; position < static_cast<int>(nodes.size()); position++) {
         const NodeInfo& node = nodes[position];
@@ -142,6 +145,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
         };
         index.ForCandidates(node, [&](const Assignment& assignment) {
             if (assignment.media && !(size && assignment.media->Matches(size->width, size->height))) return;
+            if (assignment.media && !assignment.media->MatchesScheme(darkScheme)) return;
             if (!Matches(assignment.selector, nodes, position)) return;
 
             const Trigger trigger = assignment.selector.trigger;

@@ -116,4 +116,8 @@ private:
     std::unique_ptr<win::KitCommandRunner> m_kitCommands;  // Ampify.kit.run, in AppleMusic.exe only
 };
 
+// Opens a music: link (music://music.apple.com/...) in Apple Music, through the ProgId its package gives the scheme.
+// Any thread. False when Windows could not open it.
+bool OpenInAppleMusic(const std::string& url);
+
 }  // namespace ampify

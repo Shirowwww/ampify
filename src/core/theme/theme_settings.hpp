@@ -13,6 +13,7 @@ namespace ampify::theme {
 //   theme.scheme       colour scheme inside colors.ini; empty takes the theme's default; `auto` follows the Windows mode
 //   theme.schedule     schemes by local time, such as `07:00=Light,19:00=Dark`; wins over theme.scheme (scheme_choice.hpp)
 //   theme.accent       the accent the user chose, RRGGBB or #RRGGBB, over the theme's and without one; empty for none
+//   theme.glass        full, balanced or eco: how much glass every theme may ask of the graphics card (glass.hpp)
 //   theme.live_reload  1 to apply a theme again when its files change (default 1)
 //   theme.inspect      1 to write an inspector dump on the next pass; the kernel clears it afterwards
 //   theme.parts.colors     1 to apply the colours of colors.ini (default 1)
@@ -26,6 +27,7 @@ struct ThemeSettings {
     std::string scheme;
     std::string schedule;
     std::string accent;
+    std::string glass;
     bool liveReload = true;
     bool inspect = false;
     ThemeParts parts;

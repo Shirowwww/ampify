@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Themes
+
+- Ember: three glass panels over the colours of the song playing, the playback bar at the bottom, and a column for
+  the song with its artwork, its title and the lyrics as they come.
+- A theme that leaves a column on the right of the pages gets the panels of elements docked there, as high as the
+  pages, beside Apple's lyrics pane rather than over it.
+- An `image` node with `src: "artwork"` shows Apple's image of the song playing and follows it.
+- A theme's `main.js` reads the theme's own settings with `Ampify.config.get`.
+
+### Other
+
+- Nothing of Ampify runs in the background any more: Windows hands each Apple Music process to the launcher as it
+  starts, and the launcher exits once the kernel is in.
+- The library could stay empty and Apple Music's engine stay behind after closing: the kernel now goes into the engine
+  once it has opened the library.
+- `Ampify.player.state().positionMs` follows the song while it plays; Apple Music 1.1792 gave 0 the whole time. With
+  Apple's lyrics pane open, it follows the line Apple lights up, so a jump or a repeated song no longer leaves the
+  lyrics behind.
+- Ember's column is titled "Now playing" (in the display language) rather than with the theme's name.
+- Ember and Greenroom: the play button's icon sits in the middle of its disc again.
+- The log no longer writes a line each time a panel's text changes.
+
 ## 1.1.1 (2026-11-05)
 
 Fixes for the play bar and for the full-screen player in a window.

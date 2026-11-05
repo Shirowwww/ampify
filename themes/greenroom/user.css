@@ -50,11 +50,10 @@
     corner-radius: 20px;
 }
 
-/* Apple's glyph fills most of the disc: a size smaller, it reads as a button rather than a sticker. */
+/* The icon keeps its size: its FontIcon's box is larger than the glyph and off its centre, so a scale() pushed the
+   glyph towards the bottom right of the disc. */
 .play-button FontIcon {
     foreground: #000000;
-    transform-origin: center;
-    transform: translateY(-0.5px) scale(0.8);
 }
 
 /* The play-button setting: the green accent instead of white, the icon stays black. */
@@ -144,4 +143,9 @@
     .digital-master-badge {
         visibility: collapsed;
     }
+}
+
+/* An album's or a playlist's Play: the theme's corners. Apple's pill read as an oval beside the round buttons. */
+.album-play-button {
+    corner-radius: calc(var(--panel-radius) * 0.5);
 }

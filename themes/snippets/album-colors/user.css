@@ -1,0 +1,28 @@
+/* Album colours: an album or a playlist takes the colours of its own artwork, like Apple Music on Android. Ampify
+   reads the artwork of the page's header as --page-art-1 to --page-art-3 (art-3 is dark enough for white text), and
+   the page follows when you open another one. Works on top of any theme.
+
+   The reach setting picks a wash that fades out under the header, or the whole page in the artwork's colour. What
+   sits on the dark wash draws in dark mode (color-scheme), so its text stays light on a light theme too. */
+
+@setting reach = Fade {
+    .album-header {
+        color-scheme: dark;
+    }
+
+    .list-page {
+        background: linear-gradient(to bottom, #FFvar(--page-art-3-hex, 000000) 0%, #B3var(--page-art-3-hex, 000000) 35%, #00var(--page-art-3-hex, 000000) 75%);
+    }
+}
+
+@setting reach = Page {
+    .list-page {
+        color-scheme: dark;
+        background: linear-gradient(to bottom, #FFvar(--page-art-3-hex, 000000) 0%, #E6var(--page-art-3-hex, 000000) 100%);
+    }
+
+    /* The other shelves under the songs keep a band of their own, in a lighter shade of the same colour. */
+    .list-page-shelves {
+        background: #26var(--page-art-2-hex, FFFFFF);
+    }
+}

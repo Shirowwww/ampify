@@ -77,7 +77,9 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | `::before`, `::after` images and GIFs | `content: url(...)` | Done |
 | Visualizer bars (cat-jam, equalizer GIFs) | `content: bars(n)`: bars that follow the music that plays | Done |
 | Blurred artwork background (Hazy, Comfy, Bloom) | `background: artwork` under `acrylic()` panels | Done |
-| Colours from the artwork (Dribbblish Dynamic) | `--art-1`, `--art-2`, `--art-3`, `--art-text` | Done |
+| Colours from the artwork (Dribbblish Dynamic) | `--art-1`, `--art-2`, `--art-3`, `--art-text`; `--page-art-*` for the album or playlist on screen | Done |
+| Windows 11 look (Fluent, Bloom's Mica) | `--window-material: mica \| mica-alt \| acrylic` on the window; theme `fluent` | Done |
+| Liquid glass with refraction | Acrylic panes with a rim of light (theme `glass`); no shader bends what lies behind | Partial |
 | An artwork background that moves (Lucid, Kawarp) | `content: artwork cover` with `@keyframes` turns the artwork behind the panes (Glass, setting `moving-artwork`); no shader warp like Kawarp's | Partial |
 | `theme.js` | The theme's `main.js` | Done |
 | Theme settings menu (each theme codes its own) | `settings` in the manifest, shown in Ampify's settings page, read as `var(--setting-*)` | Done |
@@ -96,16 +98,19 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 
 | Spicetify snippet | Ampify | Status |
 |---|---|---|
-| Rotating or spinning CD cover art | `spinning-artwork`: a round record with grooves and a spindle hole, turning on the compositor | Done |
+| Rotating or spinning CD cover art | `spinning-artwork`: a round record with grooves and a spindle hole, turning while a song plays and still in pause | Done |
 | Hamsters, Oneko, Duck and other GIFs on the playback bar | `::before` / `::after` images | Done |
 | Equalizer in the bar | `display-equalizer`: `bars(10)` in the artwork's colour | Done |
 | Rounded or square images, buttons and bars (Be Square, Rounded Images) | `corner-radius`; `square-corners` squares every panel, the bar included | Done |
 | Hide an element (play count, buttons, recent searches) | `display: none` on its name | Done |
 | Modern scrollbar, hide sidebar scrollbar | `.scrollbar`, `ampify:scrollbars` | Done |
 | Hover panels, dynamic sidebar | `:hover` works; a hidden panel keeps its room | Partial |
-| Nyan Cat, Kirby, bee progress bars | An image in the column of the bar's hidden thumb rides at the song's position ([recipe](themes/format.md#an-image-that-follows-the-songs-progress)) | Done |
+| Nyan Cat, Kirby, bee progress bars | An image in the column of the bar's hidden thumb rides at the song's position ([recipe](themes/format.md#an-image-that-follows-the-songs-progress)); snippet `progress-mascot` (a comet, a note, a heart) | Done |
 | Duotone artwork | No colour filter on an image in XAML | Missing |
 | Cover Ambience | `cover-ambience`: the display glows in the artwork's colours | Done |
+| Colourful album pages | `album-colors`: an album or a playlist takes the colours of its own artwork | Done |
+| Hide the filter bar of playlists | `declutter`, setting "Hide the search bar of albums and playlists" | Done |
+| Spotify's playback bar at the bottom, across the window | `bottom-playbar`, over any theme or none; `ampify:bottom-bar` for a theme | Done |
 
 ## Extensions (JavaScript API)
 
@@ -115,7 +120,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | `Player`: state, track, events, play, pause, next, previous, seek | `Ampify.player`, through Apple's player and SMTC | Done |
 | `Player.setVolume` | `Ampify.player.setVolume(0 to 1)` sets Apple's player volume once a song has started; from a `ui` extension it moves Apple's own slider (a decibel scale, not a straight 0 to 1). `audio.volume()` reads it, `audio.setGainDb` adds a gain | Done |
 | `Player.toggleShuffle`, `setShuffle`, `toggleRepeat`, `setRepeat` | `player.toggleShuffle()`, `setShuffle(on)`, `toggleRepeat()`, `setRepeat("off" \| "all" \| "one")`, `shuffle()`, `repeat()`: Apple's own buttons, checked on screen | Done |
-| `Platform.History` | `Ampify.ui.navigate` for Ampify's own pages; Apple Music's pages are not reachable | Partial |
+| `Platform.History` | `Ampify.ui.navigate` for Ampify's own pages; `http.open` of a `music.apple.com` link (`uri.build`) opens that album, artist, playlist or song in Apple Music's own window; no back and forward of Apple's history | Done |
 | `Platform.Library`, `Playlists`, `CosmosAsync`, `GraphQL` | `library.tracks()` reads the library file with play counts (permission `library.read`); no playlists, no writes, no Cosmos or GraphQL: Apple's internal API is private | Partial |
 | `Queue`, `removeFromQueue` | `player.queue.list()` (complete once Apple's Up Next panel was opened), `queue.remove` | Partial |
 | `addToQueue` | Apple's player ignores what Ampify hands it ([knowledge/apple-music-queue.md](../knowledge/apple-music-queue.md)) | Missing |
@@ -148,7 +153,12 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Lyrics Plus | Apple's synced lyrics and translation, in its full-screen player and lyrics pane | Done |
 | Stats | App `listening-stats`: listening time, plays, top artists, songs and albums over 7 days, 4 weeks or since the start, day by day and hour by hour, kept on the PC; no account-wide history | Done |
 | New Releases | App `new-releases`: the recent albums and singles of the artists you play, from Apple's public catalog; Apple Music's own New page too | Done |
-| Trash Bin, Auto Skip | Extension `skip-list`: "Never play this" in the menus and a play bar button, the list in the main menu; skips live versions, remixes and intros on request | Done |
+| Trash Bin, Auto Skip | Extension `skip-list`: "Never play this" in the menus and a play bar button, the list in the main menu, exported and imported as text; an album or an artist by its kind, a song by its catalog id when Apple gives one; skips live versions, remixes and intros on request | Done |
+| Bookmark | Extension `bookmarks`: songs, albums, artists, playlists and moments of a song, opened again from the main menu | Done |
+| Clickable song info | The title, artist and album of the playback bar's display open their pages | Done |
+| Loopy Loop | Extension `ab-loop`: the play bar button marks the start, then the end of a passage, which loops until a third press or another song | Done |
+| Better Local Files | Apple Music already lists the files of the PC under Library, by album, artist and song, with their artwork | Built in |
+| Name That Tune | Needs a player for the catalog's previews beside Apple's; Ampify plays sound only through Apple Music | Missing |
 | Full Screen settings | Snippet settings can change Apple's full-screen player, and Ampify adds shuffle and repeat around its transport buttons; the player Apple opens by itself in screen mode has neither | Partial |
 | Shuffle+ (true shuffle) | Needs `addToQueue`, which Apple ignores | Missing |
 | adblockify, Toggle DJ, "Made for you" shortcut, HomeWhereYouBelong, No Tracking Links | Spotify only: Apple Music has no ads, no DJ, and its share links carry no tracking | Missing |

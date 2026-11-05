@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "album-colors",
+  "name": "Album colours",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "Albums and playlists take the colours of their own artwork, like Apple Music on Android: a wash under the header, or the whole page. On top of any theme.",
+  "translations": {"fr": {"name": "Couleurs de l'album", "description": "Les albums et les playlists prennent les couleurs de leur pochette, comme Apple Music sur Android : un voile sous l'en-tête, ou toute la page. Par-dessus n'importe quel thème.", "settings": {"reach": "Étendue de la couleur"}, "options": {"Fade": "Sous l'en-tête", "Page": "Toute la page"}}, "de": {"name": "Albumfarben", "description": "Alben und Playlists nehmen die Farben ihres Covers an, wie Apple Music auf Android: ein Schleier unter dem Kopfbereich oder die ganze Seite. Mit jedem Theme.", "settings": {"reach": "Reichweite der Farbe"}, "options": {"Fade": "Unter dem Kopfbereich", "Page": "Ganze Seite"}}, "es": {"name": "Colores del álbum", "description": "Los álbumes y las playlists toman los colores de su portada, como Apple Music en Android: un velo bajo la cabecera o toda la página. Sobre cualquier tema.", "settings": {"reach": "Alcance del color"}, "options": {"Fade": "Bajo la cabecera", "Page": "Toda la página"}}, "pt": {"name": "Cores do álbum", "description": "Os álbuns e as playlists assumem as cores da capa, como o Apple Music no Android: um véu sob o cabeçalho ou a página inteira. Sobre qualquer tema.", "settings": {"reach": "Alcance da cor"}, "options": {"Fade": "Sob o cabeçalho", "Page": "Página inteira"}}, "ru": {"name": "Цвета альбома", "description": "Альбомы и плейлисты окрашиваются в цвета своей обложки, как в Apple Music на Android: дымка под шапкой или вся страница. Поверх любой темы.", "settings": {"reach": "Охват цвета"}, "options": {"Fade": "Под шапкой", "Page": "Вся страница"}}, "ja": {"name": "アルバムカラー", "description": "Android 版 Apple Music のように、アルバムとプレイリストがアートワークの色に染まります。ヘッダーの下だけ、またはページ全体。どのテーマにも重ねられます。", "settings": {"reach": "色の範囲"}, "options": {"Fade": "ヘッダーの下", "Page": "ページ全体"}}, "zh": {"name": "专辑配色", "description": "专辑和歌单会染上自己封面的颜色，就像 Android 版 Apple Music：只在页眉下方，或整个页面。可叠加在任何主题上。", "settings": {"reach": "颜色范围"}, "options": {"Fade": "页眉下方", "Page": "整个页面"}}},
+  "preview": "preview.jpg",
+  "kitApi": "1.0",
+  "tags": [
+    "artwork",
+    "colors"
+  ],
+  "settings": [
+    {"key": "reach", "label": "Reach of the colour", "type": "choice", "options": ["Fade", "Page"], "default": "Fade"}
+  ]
+}

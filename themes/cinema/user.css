@@ -35,9 +35,11 @@
 
 /* ---- The screen: the pages in a centred column ------------------------------------------------------------------ */
 
+/* Stretched under a max-width, the column is centred at a steady width. Centred by alignment, it took the width of the
+   page being loaded, and the old page slid to the right at each change of tab. */
 .content-frame {
     max-width: var(--setting-column-width);
-    horizontal-alignment: center;
+    horizontal-alignment: stretch;
 }
 
 .page-title {
@@ -71,7 +73,7 @@
         width: var(--capsule-width);
         height: var(--bar-height);
         margin: 0 0 var(--gap) 0;
-        corner-radius: 32px;
+        corner-radius: var(--setting-capsule-radius);
         background: #F2var(--art-3-hex, 141416);
         border-width: 1;
         border-color: #1FFFFFFF;
@@ -95,9 +97,10 @@
     }
 
     /* The song, clear of the capsule's round left end, as high as the capsule lets it: the artwork keeps its square
-       (a record of Spinning artwork too). A round artwork, and a display with the capsule's curve, to match it. */
+       (a record of Spinning artwork too). The artwork and the display take the capsule's curve, less the 5 pixels
+       between them and its edge, so the corners nest instead of the capsule cutting into the cover. */
     :root {
-        --lcd-radius: 27;
+        --lcd-radius: calc(var(--setting-capsule-radius) - 5);  /* the setting starts at 8 */
     }
 
     .now-playing {
@@ -106,11 +109,13 @@
 
     .lcd {
         background: transparent;
+        border-color: transparent;
+        corner-radius: var(--lcd-radius);
     }
 
     .lcd-artwork-image,
     .lcd-placeholder {
-        corner-radius: 27px;
+        corner-radius: var(--lcd-radius);
     }
 
     .playbar-toggles {
@@ -247,5 +252,10 @@
 
 .settings-card {
     background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: var(--radius-box);
+}
+
+/* An album's or a playlist's Play: the theme's corners. Apple's pill read as an oval beside the round buttons. */
+.album-play-button {
     corner-radius: var(--radius-box);
 }

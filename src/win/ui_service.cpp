@@ -364,6 +364,7 @@ struct WindowContext {
     // Strong, like the Popup: the panels stay ours even when Apple Music rebuilds the children of its page (in the
     // bench, a host added to MainPage's Grid went away within seconds and the panel was mounted again and again).
     controls::Grid panelHost{nullptr};
+    bool panelDocked = false;  // the theme left the panels a column of their own (DockPanelPopup)
     controls::StackPanel panelStack{nullptr};
     int panelHostsMade = 0;
     // Strong: nothing else holds a Popup that is outside the tree, and its panels went with it (mounted again on every
@@ -561,6 +562,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
         context.panelPopup = nullptr;
         context.pagePopup = nullptr;
         context.panelHost = nullptr;
+        context.panelDocked = false;
         context.panelStack = nullptr;
         context.pageHost = nullptr;
         context.pageSlot = nullptr;
@@ -1745,8 +1747,80 @@ void OpenOverlay(WindowContext& context, const primitives::Popup& popup) {
     context.overlayOpens++;
 }
 
+// Docked, the column is the card: each panel's own card (MakeSurfaceFrame) loses its background, border and padding,
+// so a panel reads as part of the column. Floating again, the cards come back.
+void DressPanelFrames(WindowContext& context, bool docked) {
+    if (!context.panelStack) return;
+    xaml::Thickness border = docked ? xaml::Thickness{} : xaml::Thickness{1, 1, 1, 1};
+    xaml::Thickness padding = docked ? xaml::Thickness{} : xaml::Thickness{16, 12, 16, 16};
+    for (const xaml::UIElement& child : context.panelStack.Children()) {
+        auto frame = child.try_as<controls::Border>();
+        if (!frame || frame.BorderThickness() == border) continue;
+        frame.BorderThickness(border);
+        frame.Padding(padding);
+        if (docked) {
+            frame.Background(media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
+        } else if (auto brush = ThemeResource(L"AcrylicInAppFillColorDefaultBrush").try_as<media::Brush>()) {
+            frame.Background(brush);
+        }
+    }
+}
+
+// A theme that leaves room on the right of the pages, a right margin on .content as wide as a panel and two gaps, gets
+// the panels docked there: a column of its own, as high as the pages, with their background and corners. Without the
+// room, the panels float over the right of the pages.
+bool DockPanelPopup(WindowContext& context, const winrt::Windows::Foundation::Size& size) {
+    // Apple has more than one Grid#ContentRoot: the pages are the one the theme gave the room, a right margin.
+    controls::Grid pages{nullptr};
+    for (const auto& object : context.probeObjects) {
+        auto grid = object.get().try_as<controls::Grid>();
+        if (!grid || grid.Name() != L"ContentRoot" || grid.ActualWidth() <= 0) continue;
+        if (grid.Margin().Right >= kPanelWidth) {
+            pages = grid;
+            break;
+        }
+    }
+    if (!pages) return false;
+    auto pagesOrigin = pages.TransformToVisual(nullptr).TransformPoint({0, 0});
+    winrt::Windows::Foundation::Rect bounds{pagesOrigin.X, pagesOrigin.Y, static_cast<float>(pages.ActualWidth()),
+                                            static_cast<float>(pages.ActualHeight())};
+    // The room is the margin itself: Apple's lyrics and queue pane, when open, starts right after it, and the pages'
+    // parent runs under that pane, so measuring up to the parent's edge would put the column over the pane.
+    double room = std::min(static_cast<double>(pages.Margin().Right),
+                           static_cast<double>(size.Width) - (bounds.X + bounds.Width));
+    if (room < kPanelWidth + 8) return false;
+    double gap = (room - kPanelWidth) / 2;
+    double width = kPanelWidth;
+    if (context.panelHost.Width() != width) context.panelHost.Width(width);
+    if (context.panelHost.Height() != bounds.Height) context.panelHost.Height(bounds.Height);
+    double left = bounds.X + bounds.Width + gap;
+    if (context.panelPopup.HorizontalOffset() != left) context.panelPopup.HorizontalOffset(left);
+    if (context.panelPopup.VerticalOffset() != bounds.Y) context.panelPopup.VerticalOffset(bounds.Y);
+    media::Brush background = pages.Background();
+    if (context.panelHost.Background() != background) context.panelHost.Background(background);
+    xaml::CornerRadius corners = pages.CornerRadius();
+    xaml::CornerRadius held = context.panelHost.CornerRadius();
+    if (held.TopLeft != corners.TopLeft || held.BottomRight != corners.BottomRight) context.panelHost.CornerRadius(corners);
+    if (!context.panelDocked) context.panelHost.Padding(xaml::Thickness{16, 16, 16, 16});
+    context.panelDocked = true;
+    DressPanelFrames(context, true);
+    return true;
+}
+
 void PlacePanelPopup(WindowContext& context, const xaml::XamlRoot& root) {
     auto size = root.Size();
+    if (DockPanelPopup(context, size)) {
+        OpenOverlay(context, context.panelPopup);
+        return;
+    }
+    if (context.panelDocked) {
+        context.panelDocked = false;
+        context.panelHost.Width(kPanelWidth);
+        context.panelHost.Background(nullptr);
+        context.panelHost.CornerRadius(xaml::CornerRadius{});
+        context.panelHost.Padding(xaml::Thickness{});
+        DressPanelFrames(context, false);
+    }
     ContentArea area = FindContentArea(context, size.Height);
     double bottom = area.height > 0 ? area.top + area.height : static_cast<double>(size.Height);
     double right = area.width > 0 ? area.left + area.width : static_cast<double>(size.Width);
@@ -1829,7 +1903,8 @@ void JournalRender(UiService::Shared& shared, const char* what, const Surface& s
         shared.journal.Write(std::string("Interface: ") + what + " \"" + SurfaceLabel(surface) + "\" mounted (" +
                              std::to_string(stats.created) + " element(s), AutomationId " +
                              uirender::ElementName(surface.elementId, surface.nodeId) + ")");
-    } else if (!stats.Unchanged()) {
+    } else if (stats.created > 0 || stats.replaced > 0 || stats.removed > 0) {
+        // A text or a value that changed is the panel living (a clock, the lyrics): only a new shape goes to the log.
         shared.journal.Write(std::string("Interface: ") + what + " \"" + SurfaceLabel(surface) +
                              "\" updated in place (created " + std::to_string(stats.created) + ", changed " +
                              std::to_string(stats.updated) + ", rebuilt " + std::to_string(stats.replaced) +

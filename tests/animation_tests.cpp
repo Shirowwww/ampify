@@ -125,6 +125,16 @@ TEST_CASE(Animation_ReadsTheShorthandInAnyOrder) {
     CHECK(none && none->empty());
 }
 
+TEST_CASE(Animation_PlayingHoldsAnEndlessAnimationWhileNoSongPlays) {
+    std::vector<th::Animation> record = Animations("spin 24s linear infinite playing");
+    CHECK(record.size() == 1 && record[0].whilePlaying && record[0].iterations == 0);
+    std::vector<th::Animation> plain = Animations("spin 24s linear infinite");
+    CHECK(plain.size() == 1 && !plain[0].whilePlaying);
+
+    CHECK(Problem("spin 2s playing").find("infinite") != std::string::npos);
+    CHECK(Problem("spin 2s infinite playing playing").find("two play states") != std::string::npos);
+}
+
 TEST_CASE(Animation_RefusesWhatItCannotRunWithTheReason) {
     CHECK(Problem("spin").find("duration") != std::string::npos);
     CHECK(Problem("2s linear").find("name") != std::string::npos);
@@ -158,10 +168,12 @@ TEST_CASE(Animation_TheEncodedTextReadsBack) {
     second.durationMs = 300;
     second.fillForwards = true;
     second.tracks = {{Channel::Opacity, {{1, 0, 0}}}};
+    th::Animation third = first;
+    third.whilePlaying = true;
 
-    std::string text = th::EncodeAnimations({first, second});
+    std::string text = th::EncodeAnimations({first, second, third});
     std::optional<std::vector<th::Animation>> decoded = th::DecodeAnimations(text);
-    CHECK(decoded && *decoded == (std::vector<th::Animation>{first, second}));
+    CHECK(decoded && *decoded == (std::vector<th::Animation>{first, second, third}));
     CHECK(th::EncodeAnimations({}).empty());
     CHECK(th::DecodeAnimations("") && th::DecodeAnimations("")->empty());
     CHECK(!th::DecodeAnimations("not an animation").has_value());

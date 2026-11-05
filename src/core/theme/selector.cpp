@@ -59,7 +59,7 @@ bool MatchFrom(const std::vector<Compound>& parts, size_t part, const std::vecto
     return false;
 }
 
-// As in CSS, :not(x) counts what x counts.
+// As in CSS, :not(x) counts what x counts; the :except(x) of a built-in name counts nothing.
 void AddSpecificity(const Compound& compound, Specificity& specificity) {
     if (!compound.name.empty()) specificity.names++;
     if (compound.nth > 0) specificity.classes++;
@@ -68,7 +68,9 @@ void AddSpecificity(const Compound& compound, Specificity& specificity) {
     if (compound.only) specificity.classes++;
     if (compound.playing) specificity.classes++;
     if (!compound.type.empty()) specificity.types++;
-    for (const Compound& negated : compound.negations) AddSpecificity(negated, specificity);
+    for (const Compound& negated : compound.negations) {
+        if (negated.counted) AddSpecificity(negated, specificity);
+    }
 }
 
 }  // namespace

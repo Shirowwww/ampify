@@ -108,7 +108,8 @@ const std::vector<ClassEntry> kClasses{
     {"card-track", {"TileControl#TrackLockupShelfTracklistContent"}},
     // Artists' pictures are round, and so is the light Apple lays over them under the pointer (an Ellipse): .artwork
     // leaves them out, or a theme's corners squared the picture under a round light.
-    {"artwork", {"ArtworkImage:not(#ArtworkHasImage):not(#CircleArtworkImage)"}},
+    // :except(), not :not(): leaving the artist covers out must not make .artwork outweigh .lcd-artwork-image.
+    {"artwork", {"ArtworkImage:except(#ArtworkHasImage):except(#CircleArtworkImage)"}},
     {"artist-artwork", {"ArtworkImage#ArtworkHasImage", "ArtworkImage#CircleArtworkImage"}},
     {"artwork-shadow", {"Border#ShadowElement"}},
     {"card-play-button", {"HoverGrid#SquareLockupContent Button#PlayButton"}},
@@ -425,13 +426,14 @@ constexpr std::string_view kBottomBar = R"css(
 .playbar {
     vertical-alignment: bottom;
     height: var(--bar-height, 72);
-    margin: 0 0 0 var(--bar-reach, calc(var(--gap, 8) - 290));
+    margin: 0 var(--bar-reach-end, 0) 0 var(--bar-reach, calc(var(--gap, 8) - 290));
 }
 
-/* At 1324 pixels and less Apple Music folds the sidebar to its icons: the page column starts there instead. */
+/* At 1324 pixels and less Apple Music folds the sidebar to its icons: the page column starts there instead. A theme
+   with the sidebar on the right sets the -end reaches instead. */
 @media (max-width: 1324px) {
     .playbar {
-        margin: 0 0 0 var(--bar-reach-folded, calc(var(--gap, 8) - var(--compact-pane, 48)));
+        margin: 0 var(--bar-reach-end-folded, 0) 0 var(--bar-reach-folded, calc(var(--gap, 8) - var(--compact-pane, 48)));
     }
 }
 

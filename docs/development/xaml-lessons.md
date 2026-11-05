@@ -19,6 +19,9 @@ Problems met while drawing inside Apple Music, and what fixed them. Read this be
 | Crash in `Microsoft.UI.Xaml.dll` at close | The theme service walked the tree during close | `Window.Closed` sets a flag, and nothing touches XAML after it |
 | XAML objects released from another thread | Possible crashes | Everything XAML is released on the UI thread (`ReleaseXaml`, `DropContext`). Static services are never destroyed |
 | Navigating twice to the same page was not seen | Only the route was compared | A counter (`RouteSerial`) fixes it |
+| A large cover never replaced the blurry one | A `BitmapImage` that nothing in the window shows is never decoded: `ImageOpened` and `ImageFailed` never fire | Load it through an element in the tree (the invisible sizer of the image node, held at its height meanwhile), then give it to the visible brush |
+| Old handlers on a bitmap or a frame kept running | `auto_revoke` revokes through a weak reference to the source, which never resolves for an object Ampify made | Remove handlers by token (`ImageOpened(token)`), and check the sender is still the latest one |
+| Pages made room for the panels, then ran under them again | Themes write `Grid#ContentRoot`'s margin, and write it again while they run | The room is the padding of its parent grid, which themes do not write (`PushPages`) |
 
 ## Resources, colors and themes
 
@@ -83,6 +86,8 @@ keys into the control's resources works before and after the groups exist.
 | Extension panels stayed in Fluent's grey under every theme | Their frame reads `AcrylicInAppFillColorDefaultBrush`, which no theme names | The engine derives the acrylic fills from the theme's card colour when it is opaque |
 | Bottom bar: the extension panels covered the window's buttons | With the play bar moved down, the pages, and the panels placed by them, reach the window's top | The panels start under `Border#Titlebar` |
 | Floating panels: the sidebar's More button (`···`) stopped opening its menu, and nothing in the top 64 pixels took a click | `Border#Titlebar` lies over the top of the whole window. Apple's own brush lets clicks through; a colour written by a theme, even transparent, catches them | The layout leaves `.titlebar` alone; `docs/themes/names.md` tells creators to do the same |
+| Apple Music ended by WinUI (0xc000027b in `Microsoft.UI.Xaml.dll`) when the window narrowed, with the play bar's buttons folding | The fold decided inside `SizeChanged`, during the layout pass: the widths read were not yet those of the button just hidden, so it folded and unfolded in turn until WinUI stopped the layout cycle | Decide after the pass: `SizeChanged` queues one evaluation on the dispatcher (low priority, one at a time), each step lays out again and queues the next, and no fold is decided in the round where the song's margin just changed |
+| The play bar's "More" button cut at the bar's edge | A bar too narrow for its columns gives the toggles a slot narrower than they are and clips them; their gap to the transport still looked wide | The spare room also counts the toggles' slot (`LayoutInformation::GetLayoutSlot`) less their width |
 
 Names from WinUI templates (`Grid#RootGrid`, `Grid#LayoutRoot`, `Border#Root`, `ContentPresenter#ContentPresenter`) appear
 dozens of times. Always target them under a named parent.

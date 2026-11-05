@@ -1,0 +1,32 @@
+/* Round corners: rounds the covers, tiles, rows, the display and the menus with one radius, on top of any theme, like
+   Spicetify's Rounded Images. Small parts (rows, menu entries, tooltips) take half of it, so they stay in proportion.
+   The panels keep the theme's own --panel-radius. The opposite of square-corners. */
+
+:root {
+    --round: var(--setting-radius);
+    --round-small: calc(var(--setting-radius) * 0.5);
+    /* What other parts draw around the display (cover-ambience's glow) follows its corners. */
+    --lcd-radius: var(--round);
+}
+
+.card,
+.card-wide,
+.card-track,
+.artwork,
+.lcd,
+.lcd-artwork-image,
+.settings-card,
+.menu,
+.flyout,
+.fullscreen-artwork {
+    corner-radius: var(--round);
+}
+
+.track-row,
+.sidebar-item,
+.menu-item,
+.tooltip,
+.album-play-button,
+.album-shuffle-button {
+    corner-radius: var(--round-small);
+}

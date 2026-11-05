@@ -1,0 +1,31 @@
+/* Progress mascot: a little animated figure rides the progress bar at the song's position, like Spicetify's Nyan Cat
+   and Kirby bars, with Ampify's own drawings: a comet, a bobbing note or a beating heart. It moves as the song plays and
+   jumps with a seek (docs/themes/format.md, "An image that follows the song's progress").
+
+   The images are 28 by 18. The side margins, half the width, centre them on the song's position without taking room
+   from the bar; the top and bottom ones sit them on the line, inside the display that would cut what hangs below. */
+
+.scrubber Grid#HorizontalTemplate::after {
+    grid-column: 1;
+    width: 28px;
+    height: 18px;
+    margin: -15px -14px -3px;
+}
+
+@setting mascot = Comet {
+    .scrubber Grid#HorizontalTemplate::after {
+        content: url("images/comet.gif") contain;
+    }
+}
+
+@setting mascot = Note {
+    .scrubber Grid#HorizontalTemplate::after {
+        content: url("images/note.gif") contain;
+    }
+}
+
+@setting mascot = Heart {
+    .scrubber Grid#HorizontalTemplate::after {
+        content: url("images/heart.gif") contain;
+    }
+}

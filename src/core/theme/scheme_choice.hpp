@@ -48,6 +48,14 @@ bool IsDarkScheme(const std::string& scheme);
 // none, and Apple Music keeps its own (a theme that only hides buttons must not turn the app light).
 std::optional<bool> AppModeOf(std::optional<bool> dark, const std::string& scheme);
 
+// What the window shows behind the panels a theme leaves see-through: Windows 11's Mica (the desktop's colours, faint),
+// its darker Mica Alt, or the blur of the windows behind (acrylic).
+enum class WindowMaterial { Mica, MicaAlt, Acrylic };
+
+// The material a theme asks for in :root (--window-material: mica | mica-alt | acrylic), ignoring case and spaces.
+// None for `none`, an empty value or an unknown one: Apple Music's own window then stays.
+std::optional<WindowMaterial> WindowMaterialOf(std::string_view value);
+
 // What the Windows side reports, read on each pass of the worker.
 struct SchemeInputs {
     bool systemDark = false;  // Windows apps in dark mode (AppsUseLightTheme = 0)

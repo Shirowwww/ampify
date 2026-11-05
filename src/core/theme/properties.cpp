@@ -13,7 +13,7 @@ namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 54> kProperties{{
+constexpr std::array<PropertySpec, 55> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
@@ -55,6 +55,7 @@ constexpr std::array<PropertySpec, 54> kProperties{{
     {"template", "Template", PropertyKind::Template},
     {"flow-direction", "FlowDirection", PropertyKind::FlowDirection},
     {"direction", "FlowDirection", PropertyKind::FlowDirection},
+    {"color-scheme", "RequestedTheme", PropertyKind::ColorScheme},
     {"order", kOrderProperty, PropertyKind::Order},
     {"horizontal-alignment", "HorizontalAlignment", PropertyKind::Alignment},
     {"vertical-alignment", "VerticalAlignment", PropertyKind::Alignment},
@@ -619,6 +620,16 @@ Conversion ConvertFlowDirection(std::string_view raw) {
     return Fail("unknown direction: \"" + std::string(TrimSpace(raw)) + "\" (ltr or rtl)");
 }
 
+// The mode an element and its children draw in (FrameworkElement.RequestedTheme): Apple's text and control brushes
+// switch with it, so a dark wash on a light theme keeps readable text without naming every brush.
+Conversion ConvertColorScheme(std::string_view raw) {
+    std::string value = ToLowerAscii(TrimSpace(raw));
+    if (value == "dark") return Ok(ValueKind::Keyword, "Dark");
+    if (value == "light") return Ok(ValueKind::Keyword, "Light");
+    if (value == "normal" || value == "default") return Ok(ValueKind::Keyword, "Default");
+    return Fail("unknown colour scheme: \"" + std::string(TrimSpace(raw)) + "\" (light, dark or normal)");
+}
+
 Conversion ConvertOrder(std::string_view raw) {
     std::string_view text = TrimSpace(raw);
     if (text.empty() || text.size() > 4 || text.find_first_not_of("0123456789") != std::string_view::npos) {
@@ -931,6 +942,8 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
             return ConvertTemplate(raw, context);
         case PropertyKind::FlowDirection:
             return ConvertFlowDirection(raw);
+        case PropertyKind::ColorScheme:
+            return ConvertColorScheme(raw);
         case PropertyKind::Order:
             return ConvertOrder(raw);
         case PropertyKind::Alignment:

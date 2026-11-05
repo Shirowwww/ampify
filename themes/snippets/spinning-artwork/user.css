@@ -1,5 +1,6 @@
 /* Spinning artwork: the artwork of the playback bar becomes a record that turns, with its grooves and spindle hole.
-   Ampify turns it 30 times a second, and not while Apple Music is hidden or minimized.
+   It turns while a song plays and stops where it is in pause, like a turntable. Ampify turns it 30 times a second,
+   and not while Apple Music is hidden or minimized.
    Change --turn to make it faster or slower, --disc to make the record larger or smaller.
 
    Apple Music drives the artwork's own transform and refuses one, so the turn goes on the area around it. That area
@@ -18,7 +19,7 @@
     horizontal-alignment: center;
     vertical-alignment: center;
     corner-radius: 999px;
-    animation: spin var(--turn) linear infinite;
+    animation: spin var(--turn) linear infinite playing;
 }
 
 /* Apple Music gives the artwork, the area behind it and the grid inside a fixed width of 54, as large as its slot.

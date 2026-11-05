@@ -242,6 +242,15 @@ void DefineSelectedRows(Theme& theme, const std::set<std::string>& owned, bool a
     }
 }
 
+// The frost of a page header (a BackDrop in Apple's PageTemplates) is tinted by ContentAreaBackgroundBrush from its
+// first frame; the theme's pass that hides it comes a frame later, so in Apple's grey it flashed over a darker page.
+void DefinePageHeaderFrost(Theme& theme, const std::set<std::string>& owned, bool applied) {
+    constexpr const char* kPage = "ApplicationPageBackgroundThemeBrush";
+    if (std::optional<Argb> page = theme.palette.Find(kPage)) {
+        DefineDerived(theme, owned, kPage, "ContentAreaBackgroundBrush", *page, applied);
+    }
+}
+
 // The colours a theme leaves to Ampify, once its own resources.xaml is known.
 void DefineDerivedColors(Theme& theme, bool applied) {
     std::vector<std::string> keys = XamlKeys(theme.resourceDictionary);
@@ -251,6 +260,7 @@ void DefineDerivedColors(Theme& theme, bool applied) {
     DefineAccentControls(theme, owned, applied);
     DefineSelectedRows(theme, owned, applied);
     DefineAcrylicSurfaces(theme, owned, applied);
+    DefinePageHeaderFrost(theme, owned, applied);
 }
 
 // A Spicetify colour: a $name, a --spice-name variable as in Spicetify, and the app brushes that play its part
@@ -631,6 +641,18 @@ std::string ScrubberClearOfCorners(const Theme& theme) {
     return ".scrubber { margin: 0 " + FormatNumber(inset) + " 0 0; }\n";
 }
 
+// Apple Music's progress line is 6 high and its template asks for more, so the line clips what it holds to those 6: an
+// image riding it (a Nyan Cat) showed as a sliver. 18 high it clips nothing, and moved 12 down the line stays in place.
+std::string RoomForImagesOnTheLine(const Theme& theme) {
+    bool image = std::any_of(theme.assignments.begin(), theme.assignments.end(), [](const Assignment& assignment) {
+        const std::string& text = assignment.selector.text;
+        return assignment.selector.pseudo != PseudoElement::None && assignment.property == kContentProperty &&
+               (text.find(".scrubber") != std::string::npos || text.find("LCDScrubber") != std::string::npos);
+    });
+    if (!image || Sets(theme, ".scrubber", "Height") || Sets(theme, ".scrubber", "RenderTransform")) return {};
+    return ".scrubber { height: 18; transform: translateY(12px); }\n";
+}
+
 // The volume slider takes the accent through WinUI's slider keys (DefineAccentControls), but Apple Music's progress line
 // reads keys of its own and stays white: it takes the accent too, as Spicetify's playback bar takes `button`.
 std::string ScrubberInAccent(const Theme& theme) {
@@ -715,7 +737,8 @@ std::string RoomInsideALitCard(const Theme& theme) {
 // Rules a theme's own choices call for, below its user.css so that a theme which sets the same thing keeps its value.
 void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts& parts) {
     bool applied = parts.resources;
-    std::string css = ScrubberClearOfCorners(theme) + OneLightPerSong(theme) + RoomInsideALitCard(theme);
+    std::string css = ScrubberClearOfCorners(theme) + RoomForImagesOnTheLine(theme) + OneLightPerSong(theme) +
+                      RoomInsideALitCard(theme);
     if (parts.colors) {
         css += ScrubberInAccent(theme) + ShuffleInAccent(theme) + ArtistInLinkColour(theme) + CardLinksInSecondaryText(theme) +
                SearchTilesInCardColour(theme) + SelectedRowsInThemeColour(theme);
@@ -820,11 +843,19 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
 
     // Its own settings, on top of the theme's: a key both declare is the snippet's in its user.css.
     LoadSettings(files, options, snippet);
+    // The artwork's colours, also with no theme to bring them (Album colours over Apple Music's own look).
+    for (const auto& [name, value] : options.artwork) snippet.variables[name] = value;
     ValueContext context{snippet.palette, files, folder, true};
     RuleSource source;
     source.file = "snippets/" + id + "/user.css";
     source.base = base;
     LoadRules(files, context, snippet, true, source);
+    if (std::string css = RoomForImagesOnTheLine(snippet); !css.empty()) {
+        RuleSource derived;
+        derived.file = "Ampify (derived from the snippet)";
+        derived.layer = -1;
+        LoadRuleText(css, context, snippet, true, derived);
+    }
     return snippet;
 }
 

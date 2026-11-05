@@ -7,6 +7,7 @@ list(APPEND AMPIFY_THEME_SOURCES
     src/core/theme/css.cpp
     src/core/theme/engine.cpp
     src/core/theme/files.cpp
+    src/core/theme/glass.cpp
     src/core/theme/ini.cpp
     src/core/theme/inspector.cpp
     src/core/theme/library.cpp

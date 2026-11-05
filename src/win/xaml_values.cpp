@@ -312,6 +312,7 @@ xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::
         // Inherited: read after an ancestor was flipped, the child's direction was the theme's, and putting it back
         // froze the theme's mirror on every theme that followed.
         if (property == "FlowDirection") return xaml::FrameworkElement::FlowDirectionProperty();
+        if (property == "RequestedTheme") return xaml::FrameworkElement::RequestedThemeProperty();
     }
     return nullptr;
 }

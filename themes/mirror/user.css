@@ -68,6 +68,14 @@
 /* ---- Sidebar on the right (the default) ------------------------------------------------------------------------- */
 
 @setting sidebar-side = Right {
+    /* With ampify:bottom-bar (the Bottom playback bar snippet), the bar runs under the sidebar, on the right. */
+    :root {
+        --bar-reach: var(--gap);
+        --bar-reach-end: calc(var(--gap) - 290);
+        --bar-reach-folded: var(--gap);
+        --bar-reach-end-folded: calc(var(--gap) - var(--compact-pane));
+    }
+
     SplitView#RootSplitView {
         flow-direction: rtl;
     }
@@ -85,9 +93,10 @@
         margin: var(--caption-room) calc(var(--gap) * -1) var(--gap) var(--gap);
     }
 
-    /* The page column: one gap from the window's left edge, two from the sidebar. */
+    /* The page column: one gap from the window's left edge, two from the sidebar. !important: these hold when a snippet
+       brings ampify:bottom-bar, whose numbers are for a sidebar on the left. */
     .content {
-        margin: var(--content-top) calc(var(--gap) * 2) var(--bar-room) var(--gap);
+        margin: var(--content-top) calc(var(--gap) * 2) var(--bar-room) var(--gap) !important;
     }
 
     .playbar {
@@ -95,7 +104,7 @@
     }
 
     .lyrics-panel {
-        margin: var(--content-top) calc(var(--gap) * 2) var(--bar-room) 0;
+        margin: var(--content-top) calc(var(--gap) * 2) var(--bar-room) 0 !important;
     }
 
     /* The back arrow stays at the window's top left corner, over the page's top: the search scopes start after it. */
@@ -109,7 +118,7 @@
     @media (max-width: 1324px) {
         .sidebar-toggle-area {
             horizontal-alignment: right;
-            margin: calc(var(--caption-room) - 10) var(--gap) 0 0;
+            margin: calc(var(--caption-room) - 10) var(--gap) 0 0 !important;
         }
 
         ContentControl#PaneHeaderContentBorder {
@@ -270,5 +279,10 @@
 
 .settings-card {
     background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: var(--radius-box);
+}
+
+/* An album's or a playlist's Play: the theme's corners. Apple's pill read as an oval beside the round buttons. */
+.album-play-button {
     corner-radius: var(--radius-box);
 }

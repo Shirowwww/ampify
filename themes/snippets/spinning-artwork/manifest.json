@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "spinning-artwork",
   "name": "Spinning artwork",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Example snippet: the artwork of the playback bar becomes a round record with grooves and a centre hole, and turns, with @keyframes and animation.",

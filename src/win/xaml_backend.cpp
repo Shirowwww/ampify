@@ -151,6 +151,11 @@ ColourRef Grey(std::uint8_t alpha, std::uint8_t value) {
     return ColourRef(winrt::Windows::UI::Color{alpha, value, value, value});
 }
 
+// The header of a playlist's page and of an album's (.album-header in builtins.cpp).
+bool IsPageHeader(const std::string& name) {
+    return name == "ContainerDetailHeaderLockupRegularContent" || name == "AlbumDetailHeaderLockupContent";
+}
+
 }  // namespace
 
 // The system draws the caption buttons from the title bar's colours, not from the XAML tree, and Apple Music sets them
@@ -287,9 +292,10 @@ void XamlTreeBackend::FollowArtwork(const media::ImageSource& artwork) {
     }
 }
 
-// Reads the colours of the play bar's artwork once per image: rendered small, then median cut (color_extract.hpp).
-// A blank or failed reading leaves the key unset, so the next pass tries again.
-void XamlTreeBackend::SampleArtwork(const controls::Image& image) {
+// Reads the colours of an artwork once per image: rendered small, then median cut (color_extract.hpp). Each prefix
+// ("" for the play bar, kPageArtworkPrefix for the page on screen) holds its own variables and key. A blank or failed
+// reading leaves the key unset, so the next pass tries again.
+void XamlTreeBackend::SampleArtwork(const controls::Image& image, const std::string& prefix) {
     constexpr int kSampleSize = 48;
     media::ImageSource source = image.Source();
     if (!source || image.ActualWidth() < 1) return;
@@ -303,10 +309,10 @@ void XamlTreeBackend::SampleArtwork(const controls::Image& image) {
     bool later = false;
     {
         std::lock_guard<std::mutex> guard(shared->lock);
-        if (shared->key == key) return;
-        later = shared->busy;
-        shared->busy = true;
+        if (shared->keys[prefix] == key) return;
+        later = !shared->busy.insert(prefix).second;
     }
+    if (later && !prefix.empty()) return;  // the page's artwork waits for the next pass
     if (later) {
         // The reading of the previous image is still under way: this one is read right after it.
         constexpr auto kRetry = std::chrono::milliseconds(120);
@@ -325,13 +331,15 @@ void XamlTreeBackend::SampleArtwork(const controls::Image& image) {
         }
         return;
     }
-    auto done = [shared](std::optional<std::map<std::string, std::string>> variables, const std::string& from) {
+    auto done = [shared, prefix](std::optional<std::map<std::string, std::string>> variables, const std::string& from) {
         {
             std::lock_guard<std::mutex> guard(shared->lock);
-            shared->busy = false;
+            shared->busy.erase(prefix);
             if (!variables) return;
-            shared->variables = std::move(*variables);
-            shared->key = from;
+            const std::string own = prefix + "art-";
+            std::erase_if(shared->variables, [&](const auto& entry) { return entry.first.starts_with(own); });
+            for (auto& [name, value] : *variables) shared->variables[prefix + name] = std::move(value);
+            shared->keys[prefix] = from;
         }
         shared->changed.notify_all();
     };
@@ -466,8 +474,10 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     for (const auto& [key, decor] : m_decors) decorPanels.insert(key.first);
     std::vector<int> playingBars;  // the visible Grid#NowPlayingIndicator of list rows (MarkPlayingRows)
     int lcdDepth = -1;
+    int headerDepth = -1;
     media::ImageSource artwork{nullptr};
     controls::Image artworkImage{nullptr};
+    controls::Image pageImage{nullptr};
     while (!stack.empty()) {
         Pending item = stack.back();
         stack.pop_back();
@@ -495,6 +505,10 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
                 artworkImage = image;
             }
         }
+        // The artwork of the album or playlist on screen: the first Image#StaticArtwork of its page's header.
+        if (headerDepth >= 0 && item.depth <= headerDepth) headerDepth = -1;
+        if (node.type == "Grid" && IsPageHeader(node.name)) headerDepth = item.depth;
+        if (headerDepth >= 0 && !pageImage && node.name == "StaticArtwork") pageImage = item.object.try_as<controls::Image>();
 
         int index = static_cast<int>(nodes.size());
         if (node.name == "NowPlayingIndicator") {
@@ -552,6 +566,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         FollowArtworkImage(artworkImage);
         SampleArtwork(artworkImage);
     }
+    if (pageImage) SampleArtwork(pageImage, kPageArtworkPrefix);
     std::erase_if(m_watched, [](const auto& entry) { return !entry.second.get(); });
     std::erase_if(m_touched, [](const auto& entry) { return !entry.second.get(); });
     std::erase_if(m_decors, [this](const auto& entry) {
@@ -700,12 +715,23 @@ void XamlTreeBackend::WatchPopups(const xaml::UIElement& content) {
 // A popup that opens gets a pass now, and another once its content is filled in.
 void XamlTreeBackend::CheckPopups() noexcept {
     try {
-        if (*m_closed) return;
+        if (*m_closed || !WindowShown()) return;  // a hidden window opens no menu
         xaml::Window window = m_window.get();
         if (!window) return;
         xaml::UIElement content = window.Content();
         if (content && LearnPopups(content.XamlRoot())) SchedulePass(1);
     } catch (...) {
+    }
+}
+
+bool XamlTreeBackend::WindowShown() const {
+    try {
+        xaml::Window window = m_window.get();
+        xaml::UIElement content = window ? window.Content() : nullptr;
+        xaml::XamlRoot root = content ? content.XamlRoot() : nullptr;
+        return !root || root.IsHostVisible();
+    } catch (...) {
+        return true;
     }
 }
 
@@ -745,12 +771,31 @@ std::optional<theme::Value> XamlTreeBackend::ReadOriginal(theme::NodeId id, std:
         if (!object) return std::nullopt;
         if (!m_hover.Has(id)) {
             xaml::DependencyProperty own = OwnProperty(object, property);
-            if (own && object.ReadLocalValue(own) == xaml::DependencyProperty::UnsetValue()) return theme::kNoOwnValue;
+            IInspectable local = own ? object.ReadLocalValue(own) : nullptr;
+            if (own && local == xaml::DependencyProperty::UnsetValue()) return theme::kNoOwnValue;
+            // Apple painted it in code with a brush of Ampify's resources: that brush comes back, recoloured by then
+            // (OwnBrush), not the theme's colour it showed when it was read.
+            if (local && IsOwnBrush(local)) return Keep(local);
         }
         return Read(id, property);
     } catch (...) {
         return std::nullopt;
     }
+}
+
+bool XamlTreeBackend::IsOwnBrush(const IInspectable& value) const {
+    if (!value.try_as<media::SolidColorBrush>()) return false;
+    return std::any_of(m_ownBrushes.begin(), m_ownBrushes.end(),
+                       [&](const auto& own) { return own.second && own.second == value; });
+}
+
+// One brush per key for the life of the process, recoloured in place: Apple Music paints some texts in code (an
+// album's artist) with the brush it looked up then, which kept a theme's accent after the theme until a restart.
+media::SolidColorBrush XamlTreeBackend::OwnBrush(const std::string& key, ColorValue color) {
+    media::SolidColorBrush& brush = m_ownBrushes.try_emplace(key, nullptr).first->second;
+    if (!brush) brush = media::SolidColorBrush(color);
+    else if (brush.Color() != color) brush.Color(color);
+    return brush;
 }
 
 // The known colour keys the application holds. Its dictionaries are not enumerated: that realised every deferred
@@ -794,6 +839,10 @@ bool XamlTreeBackend::WriteResource(std::string_view key, const theme::Value& va
     // app's light and dark values work again, instead of the one read under the theme staying for good.
     if (auto added = m_addedKeys.find(keyText); added != m_addedKeys.end() && added->second == value) {
         m_addedKeys.erase(added);
+        std::optional<ColorValue> before = value.kind == theme::ValueKind::Color ? ColorFromText(value.text) : std::nullopt;
+        if (auto own = m_ownBrushes.find(keyText); own != m_ownBrushes.end() && own->second && before) {
+            own->second.Color(*before);  // what Apple painted with it takes Apple's colour back
+        }
         if (OwnsKey(resources, name)) resources.Remove(name);
         MarkResourcesDirty("resource " + keyText + " removed");
         return true;
@@ -806,7 +855,7 @@ bool XamlTreeBackend::WriteResource(std::string_view key, const theme::Value& va
     if (value.kind == theme::ValueKind::Color) {
         std::optional<ColorValue> color = ColorFromText(value.text);
         if (!color) return false;
-        object = media::SolidColorBrush(*color);
+        object = OwnBrush(keyText, *color);
     } else if (value.kind == theme::ValueKind::Opaque) {
         object = Restore(value);
     }
@@ -820,6 +869,8 @@ bool XamlTreeBackend::WriteResource(std::string_view key, const theme::Value& va
             object = winrt::box_value(*color);
         }
     }
+    // Our brush already holds the key: recoloured above, everything drawn with it follows, nothing to read again.
+    if (OwnsKey(resources, name) && resources.Lookup(name) == *object) return true;
     resources.Insert(name, *object);
     MarkResourcesDirty("resource " + keyText);
     return true;

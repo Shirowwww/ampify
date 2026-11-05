@@ -35,6 +35,8 @@ ScriptExtension::~ScriptExtension() {
 }
 
 std::string ScriptExtension::ConfigPrefix() const {
+    // A theme's script reads the settings its user.css reads (themes.<id>.<key>, src/core/manifest.hpp).
+    if (m_manifest.kind == ElementKind::Theme) return "themes.";
     return m_manifest.kind == ElementKind::App ? "apps." : "extensions.";
 }
 

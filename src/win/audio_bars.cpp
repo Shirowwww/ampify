@@ -52,8 +52,13 @@ controls::Grid AudioBars::Make(int count, const wchar_t* name) {
     if (!m_timer) {
         m_timer = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
         m_timer.Interval(kFrame);
-        m_timer.Tick([this, alive = std::weak_ptr<int>(m_alive)](auto&&, auto&&) {
-            if (alive.lock()) Tick();
+        // An exception out of a timer's handler is a failed HRESULT for the dispatcher, which fails fast the whole
+        // process ("stowed exception" in CoreMessaging): nothing may leave it.
+        m_timer.Tick([this, alive = std::weak_ptr<int>(m_alive)](auto&&, auto&&) noexcept {
+            try {
+                if (alive.lock()) Tick();
+            } catch (...) {
+            }
         });
     }
     if (!m_timer.IsRunning()) {
@@ -85,8 +90,14 @@ void AudioBars::Tick() {
     auto now = std::chrono::steady_clock::now();
     double elapsed = std::chrono::duration<double>(now - m_last).count();
     m_last = now;
-    // Only the bars on screen move, and only then is the analysis asked for.
-    if (std::none_of(m_sets.begin(), m_sets.end(), [](const Set& set) { return set.grid.IsLoaded(); })) return;
+    // Only the bars on screen move, and only then is the analysis asked for: loaded, in a window that shows (not one
+    // hidden in the notification area or minimized).
+    const auto onScreen = [](const Set& set) {
+        if (!set.grid.IsLoaded()) return false;
+        auto root = set.grid.XamlRoot();
+        return !root || root.IsHostVisible();
+    };
+    if (std::none_of(m_sets.begin(), m_sets.end(), onScreen)) return;
 
     const bool motion = MotionAllowed();
     std::optional<audio::AnalysisFrame> frame;

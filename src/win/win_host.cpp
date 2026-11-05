@@ -461,11 +461,11 @@ std::wstring PackageProgId(const wchar_t* scheme) {
 
 }  // namespace
 
-bool WinHost::OpenInBrowser(const std::string& url) {
-    // The core has checked the URL: https, a declared host, no user name or port; an Apple Music link comes as music:.
+namespace {
+
+// Opens a URL with Windows, through `progId` when it is not empty (the music: scheme has no default app of its own).
+bool ShellOpen(const std::string& url, const std::wstring& progId) {
     std::wstring wide = ToWide(url);
-    bool apple = url.rfind("music:", 0) == 0;
-    std::wstring progId = apple ? PackageProgId(L"music") : std::wstring();
     SHELLEXECUTEINFOW info{};
     info.cbSize = sizeof info;
     info.fMask = SEE_MASK_NOASYNC | (progId.empty() ? 0 : SEE_MASK_CLASSNAME);
@@ -473,7 +473,19 @@ bool WinHost::OpenInBrowser(const std::string& url) {
     info.lpFile = wide.c_str();
     info.lpClass = progId.empty() ? nullptr : progId.c_str();
     info.nShow = SW_SHOWNORMAL;
-    bool opened = ShellExecuteExW(&info) != FALSE;
+    return ShellExecuteExW(&info) != FALSE;
+}
+
+}  // namespace
+
+bool OpenInAppleMusic(const std::string& url) {
+    return url.rfind("music:", 0) == 0 && ShellOpen(url, PackageProgId(L"music"));
+}
+
+bool WinHost::OpenInBrowser(const std::string& url) {
+    // The core has checked the URL: https, a declared host, no user name or port; an Apple Music link comes as music:.
+    bool apple = url.rfind("music:", 0) == 0;
+    bool opened = ShellOpen(url, apple ? PackageProgId(L"music") : std::wstring());
     std::string where = apple ? "Apple Music" : "the browser";
     m_journal.Write((opened ? "Showed a page in " : "Could not show a page in ") + where);
     return opened;
