@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "package_debug.hpp"
 #include "win_common.hpp"
 
 namespace ampify::win {
@@ -12,8 +13,10 @@ namespace {
 // After the background launcher released its mutex, the time left for its process to end, so its file can be replaced.
 constexpr DWORD kExitGraceMs = 1000;
 
+constexpr wchar_t kLauncherName[] = L"ampify_launcher.exe";
+
 std::wstring RunCommand(const std::filesystem::path& launcher) {
-    return L"\"" + launcher.wstring() + L"\" " + kBackgroundArgument;
+    return L"\"" + launcher.wstring() + L"\" " + kRegisterArgument;
 }
 
 // Sets the stop event when it exists. The launcher creates it just after its mutex, so a caller that came in between
@@ -44,20 +47,29 @@ bool RegisterBackground(const std::filesystem::path& launcher) {
     LSTATUS status = RegSetValueExW(key, kRunValue, 0, REG_SZ, reinterpret_cast<const BYTE*>(command.c_str()),
                                     static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t)));
     RegCloseKey(key);
+    std::wstring fullName = AppleMusicFullName();
+    if (!fullName.empty()) EnableAttach(fullName, launcher);  // refused: StartBackground falls back to the background
     return status == ERROR_SUCCESS;
 }
 
 bool UnregisterBackground() {
+    // The package setting first: once Ampify's files are gone, Apple Music would not start while it is on.
+    std::wstring fullName = AppleMusicFullName();
+    bool detached = fullName.empty() || SUCCEEDED(DisableAttach(fullName));
     HKEY key = nullptr;
     LSTATUS opened = RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_SET_VALUE, &key);
-    if (opened == ERROR_FILE_NOT_FOUND) return true;
+    if (opened == ERROR_FILE_NOT_FOUND) return detached;
     if (opened != ERROR_SUCCESS) return false;
     LSTATUS status = RegDeleteValueW(key, kRunValue);
     RegCloseKey(key);
-    return status == ERROR_SUCCESS || status == ERROR_FILE_NOT_FOUND;
+    return detached && (status == ERROR_SUCCESS || status == ERROR_FILE_NOT_FOUND);
 }
 
 bool BackgroundRunning() {
+    return ResidentRunning() || AttachRegistered(AppleMusicFullName(), kLauncherName);
+}
+
+bool ResidentRunning() {
     HANDLE mutex = OpenMutexW(SYNCHRONIZE, FALSE, kBackgroundMutex);
     if (mutex) {
         CloseHandle(mutex);
@@ -81,16 +93,16 @@ bool StartBackground(const std::filesystem::path& launcher) {
 }
 
 bool StopBackground(DWORD timeoutMs) {
-    if (!BackgroundRunning()) return true;
+    if (!ResidentRunning()) return true;
     // The launchers running now, kept to wait for the background one to really end once its mutex is gone.
     std::vector<HANDLE> launchers;
-    for (DWORD id : ProcessIdsNamed(L"ampify_launcher.exe")) {
+    for (DWORD id : ProcessIdsNamed(kLauncherName)) {
         if (launchers.size() == MAXIMUM_WAIT_OBJECTS) break;
         if (HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, id)) launchers.push_back(process);
     }
     ULONGLONG deadline = GetTickCount64() + timeoutMs;
     bool stopped = true;
-    while (BackgroundRunning()) {
+    while (ResidentRunning()) {
         if (GetTickCount64() >= deadline) {
             stopped = false;
             break;

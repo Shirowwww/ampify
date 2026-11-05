@@ -1,11 +1,16 @@
 // ampify_launcher.exe: loads the kernel into Apple Music's processes. The package folder is never written to.
 //
 //   ampify_launcher.exe                starts Apple Music with the kernel, and stays open while it runs
-//   ampify_launcher.exe --background   runs from Windows sign-in and loads the kernel each time Apple Music starts
-//                                      (src/win/background.hpp)
+//   ampify_launcher.exe --register     from Windows sign-in: has Windows start the launcher with each process of Apple
+//                                      Music, then ends (src/win/package_debug.hpp); --background does the same, for
+//                                      the sign-in entry of Ampify 1.1. Where Windows refuses, it stays in the
+//                                      background and loads the kernel each time Apple Music starts
+//   ampify_launcher.exe --attach -p <process> -tid <thread>
+//                                      run by Windows for a process of Apple Music it holds suspended: loads the kernel
+//                                      before the process runs, then resumes it
 //
-// Either way it follows the package while Apple Music runs, so every process gets the kernel, including ones that
-// appear later (a hand-over to a new process, or AMPLibraryAgent.exe).
+// Started by hand or in the background, it follows the package while Apple Music runs, so every process gets the
+// kernel, including ones that appear later (a hand-over to a new process, or AMPLibraryAgent.exe).
 
 #include <windows.h>
 #include <objbase.h>
@@ -35,6 +40,7 @@
 #include "../core/version_list.hpp"
 #include "../win/background.hpp"
 #include "../win/package.hpp"
+#include "../win/package_debug.hpp"
 #include "../win/win_common.hpp"
 #include "injection.hpp"
 
@@ -58,6 +64,9 @@ constexpr DWORD kBackgroundRetryMs = 5000;
 
 // The first process is held still while the kernel loads, so this wait must stay short: the app would freeze for it.
 constexpr DWORD kHeldLoadTimeoutMs = 3000;
+
+// The library agent opens Apple Music's library as it starts; the kernel waits that long before it loads there.
+const DWORD kAgentSettleMs = static_cast<DWORD>(ampify::WatchConfig{}.agentSettleAfter * 1000);
 
 std::wstring ToWide(std::string_view text) {
     return std::wstring(text.begin(), text.end());
@@ -344,6 +353,9 @@ public:
     // Apple Music has just quit: the next run comes soon, for someone who keeps it open in the notification area.
     void SoonAfterSession() { m_next = (std::min)(m_next, GetTickCount64() + kAfterSessionMs); }
 
+    // One run, now, left to end on its own (sign-in, when nothing stays in the background to run it later).
+    void StartOnce(ampify::Journal& journal) { Start(journal); }
+
     void Step(ampify::Journal& journal) {
         if (m_process) {
             if (WaitForSingleObject(m_process, 0) != WAIT_OBJECT_0) return;
@@ -465,6 +477,117 @@ int RunBackground(ampify::Journal& journal, const std::filesystem::path& kit, HA
     return 0;
 }
 
+// Resumes the thread Windows held, on every path out of RunAttach: Apple Music must never stay frozen.
+class HeldThread {
+public:
+    explicit HeldThread(DWORD threadId) : m_thread(OpenThread(THREAD_SUSPEND_RESUME, FALSE, threadId)) {}
+    ~HeldThread() { Resume(); }
+    HeldThread(const HeldThread&) = delete;
+    HeldThread& operator=(const HeldThread&) = delete;
+
+    bool Opened() const { return m_thread != nullptr; }
+    void Resume() {
+        if (!m_thread) return;
+        ResumeThread(m_thread);
+        CloseHandle(m_thread);
+        m_thread = nullptr;
+    }
+
+private:
+    HANDLE m_thread;
+};
+
+std::wstring ImageName(DWORD processId) {
+    wchar_t path[MAX_PATH] = L"";
+    if (HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId)) {
+        DWORD length = MAX_PATH;
+        if (!QueryFullProcessImageNameW(process, 0, path, &length)) path[0] = L'\0';
+        CloseHandle(process);
+    }
+    return std::filesystem::path(path).filename().wstring();
+}
+
+// ampify_launcher.exe --attach -p <process> -tid <thread>: Windows created the process suspended and waits for this
+// thread to be resumed. The kernel loads first: the loader starts in the thread that runs LoadLibraryW, before any of
+// Apple Music's code. The opening of the app counts for safe mode, not its library agent nor the short AppleMusic.exe
+// that a music:// link starts while the app is open.
+int RunAttach(ampify::Journal& journal, const std::filesystem::path& kit, DWORD processId, DWORD threadId) {
+    HeldThread held(threadId);
+    std::string image = ToNarrow(ImageName(processId));
+    std::string label = (image.empty() ? std::string("process") : image) + " (" + std::to_string(processId) + ")";
+    if (!held.Opened()) {
+        journal.Write(label + ": its thread could not be opened (Windows error " + std::to_string(GetLastError()) + ")");
+        return 1;
+    }
+    std::optional<Session> session = OpenSession(journal, kit);
+    if (!session) return 1;
+
+    bool isApp = _stricmp(image.c_str(), "AppleMusic.exe") == 0;
+    bool appOpen = isApp &&
+                   ampify::launcher::FindPackageProcesses(L"AppleMusic.exe", session->package.directory).size() > 1;
+    bool counted = isApp && !appOpen;
+    ampify::SafeMode safeMode((kit / "state.txt").string());
+    ampify::PolicyVerdict verdict = session->Decide(counted ? safeMode.BeginLaunch() : safeMode.IsActive());
+    journal.Write(label + " started, held by Windows: " + verdict.reason);
+    if (!verdict.allowed || !session->kernelPresent) {
+        if (counted) safeMode.MarkHealthy();  // no kernel to report health, and nothing of Ampify can crash it
+        return 0;
+    }
+
+    HANDLE process = ampify::launcher::OpenProcessForInjection(processId);
+    if (!process) {
+        journal.Write(label + ": could not open (Windows error " + std::to_string(GetLastError()) + ")");
+        if (counted) safeMode.MarkHealthy();
+        return 1;
+    }
+    // The library agent runs first and gets the kernel a few seconds later: loaded while the agent opens the library
+    // (before it ran, or right after), the kernel left the library closed and nothing played, 13 starts out of 14 on
+    // 05/11/2026; none out of 5 with the wait. The app itself gets the kernel before it runs, for its first frame.
+    bool early = isApp;
+    if (!early) {
+        held.Resume();
+        Sleep(kAgentSettleMs);
+    }
+    std::string failure;
+    HANDLE pending = nullptr;
+    bool loaded = ampify::launcher::InjectKernel(process, session->kernelDll, failure, kHeldLoadTimeoutMs, &pending);
+    std::string when = early ? "before the process ran" : "once the agent had settled";
+    journal.Write(loaded ? label + ": kernel loaded " + when
+                         : pending ? label + ": load still pending, resuming the process" : label + ": failed, " + failure);
+    held.Resume();
+    if (pending) {
+        failure.clear();
+        loaded = ampify::launcher::FinishRemoteLoad(pending, ampify::launcher::kDefaultRemoteLoadTimeoutMs, failure);
+        journal.Write(loaded ? label + ": kernel loaded after the resume" : label + ": failed, " + failure);
+    }
+    CloseHandle(process);
+    if (!loaded && counted) safeMode.MarkHealthy();
+    return loaded ? 0 : 1;
+}
+
+// ampify_launcher.exe --register (and --background): has Windows start the launcher with each process of Apple Music,
+// checks once for an update of Ampify, and ends. Where Windows refuses the setting, the launcher stays in the
+// background instead, as Ampify 1.1 did.
+int RunRegister(ampify::Journal& journal, const std::filesystem::path& kit, HANDLE stop) {
+    std::wstring fullName = ampify::win::AppleMusicFullName();
+    std::filesystem::path self = ampify::win::ExecutablePath();
+    if (fullName.empty()) {
+        journal.Write("Apple Music for Windows not found: the launcher stays in the background to wait for it");
+        return RunBackground(journal, kit, stop);
+    }
+    HRESULT hr = ampify::win::EnableAttach(fullName, self);
+    if (FAILED(hr)) {
+        journal.Write("Windows refused to start the launcher with Apple Music (" + HResultText(hr) +
+                      "): it stays in the background instead");
+        return RunBackground(journal, kit, stop);
+    }
+    journal.Write("Windows starts the launcher with each process of " + ToNarrow(fullName) +
+                  ": nothing stays in the background");
+    AutoUpdater updater;
+    updater.StartOnce(journal);
+    return 0;
+}
+
 bool HasArgument(const wchar_t* argument) {
     int argc = 0;
     wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -476,8 +599,39 @@ bool HasArgument(const wchar_t* argument) {
 
 }  // namespace
 
+// logs\attach.log: each process of Apple Music starts a launcher, often two at once, so they append to it; it starts
+// again past kAttachLogLimit.
+int MainAttach() {
+    constexpr std::uintmax_t kAttachLogLimit = 64 * 1024;
+    int argc = 0;
+    wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    DWORD processId = 0;
+    DWORD threadId = 0;
+    bool parsed = ampify::win::ParseAttachArguments(argc, argv, processId, threadId);
+    LocalFree(argv);
+    std::filesystem::path logFile = ampify::win::JournalFile("attach.log");
+    std::error_code ec;
+    bool restart = std::filesystem::file_size(logFile, ec) > kAttachLogLimit && !ec;
+    std::ofstream file(logFile, restart ? std::ios::trunc : std::ios::app);
+    ampify::Journal journal(file, ampify::Journal::LocalTimeStamp);
+    if (!parsed) {
+        journal.Write("--attach without -p <process> -tid <thread>: nothing to do");
+        return 1;
+    }
+    HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    int code = 1;
+    try {
+        code = RunAttach(journal, ampify::win::KitDirectory(), processId, threadId);
+    } catch (const std::exception& error) {
+        journal.Write(std::string("Unexpected error: ") + error.what());
+    }
+    if (SUCCEEDED(com)) CoUninitialize();
+    return code;
+}
+
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
-    bool background = HasArgument(ampify::win::kBackgroundArgument);
+    if (HasArgument(ampify::win::kAttachArgument)) return MainAttach();
+    bool background = HasArgument(ampify::win::kBackgroundArgument) || HasArgument(ampify::win::kRegisterArgument);
     // One background launcher per session. Checked before the log is opened, which would empty the running one's.
     HANDLE single = background ? CreateMutexW(nullptr, TRUE, ampify::win::kBackgroundMutex) : nullptr;
     if (background && (!single || GetLastError() == ERROR_ALREADY_EXISTS)) {
@@ -499,7 +653,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     int code = 1;
     try {
-        code = background ? RunBackground(journal, ampify::win::KitDirectory(), stop)
+        code = background ? RunRegister(journal, ampify::win::KitDirectory(), stop)
                           : Run(journal, ampify::win::KitDirectory());
     } catch (const std::exception& error) {
         journal.Write(std::string("Unexpected error: ") + error.what());

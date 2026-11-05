@@ -175,7 +175,12 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
   there); `track.artworkColor` is `"#RRGGBB"` or `""`.
 - `source` is `"apple"` when Ampify reads Apple's own player (in `AppleMusic.exe`), `"smtc"` for Windows' media
   controls, `""` when unknown.
-- `statechange` fires when playback starts or stops, the length becomes known, or the position jumps.
+- `statechange` fires when playback starts or stops, the length becomes known, or the position jumps. Between events
+  `state().positionMs` moves on: read it on a timer to follow the song. Apple Music 1.1792 gives no position of its
+  own while playing, so Ampify counts the time played, and sets it again each time Apple's lyrics pane lights up
+  another line. While that pane is open, a jump, a repeated song or a slow start are caught up at the next line;
+  closed, they show once Apple reports a position again.
+- `lyrics()` is filled once Apple Music has loaded the song's lyrics, which it does when its lyrics pane opens.
 - `lyrics()` gives Apple Music's own lyrics, or `null` until Apple has them. Times are milliseconds. With
   `synced: true` each line has `start`, `end` and, when Apple times them, `words`. `lyricschange` fires when they
   arrive.

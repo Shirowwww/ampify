@@ -78,9 +78,38 @@ TEST_CASE(PackageWatch_InjectsEachProcessOnceAndSkipsHandledOnes) {
     CHECK(watch.Step(Poll(0.0, {100})).inject.empty());
 
     ampify::WatchActions first = watch.Step(Poll(1.0, {100, 200}, {300}));
-    CHECK(first.inject == std::vector<uint32_t>({200, 300}));
+    CHECK(first.inject == std::vector<uint32_t>({200}));  // the agent waits until it has settled
 
-    CHECK(watch.Step(Poll(2.0, {100, 200}, {300})).inject.empty());
+    ampify::WatchActions settled = watch.Step(Poll(9.0, {100, 200}, {300}));
+    CHECK(settled.inject == std::vector<uint32_t>({300}));
+
+    CHECK(watch.Step(Poll(10.0, {100, 200}, {300})).inject.empty());
+}
+
+// Regression (05/11/2026): the kernel loaded into AMPLibraryAgent.exe while it opened the library left the library
+// closed for good, and nothing played. The agent gets the kernel once it has run for agentSettleAfter seconds.
+TEST_CASE(PackageWatch_InjectsTheAgentOnlyOnceItHasSettled) {
+    ampify::WatchConfig config;
+    ampify::PackageWatch watch(config);
+
+    CHECK(watch.Step(Poll(0.0, {100})).inject == std::vector<uint32_t>({100}));
+    CHECK(watch.Step(Poll(2.0, {100}, {300})).inject.empty());
+    CHECK(watch.Step(Poll(9.9, {100}, {300})).inject.empty());
+    CHECK(watch.Step(Poll(10.0, {100}, {300})).inject == std::vector<uint32_t>({300}));
+    // A new agent, after the first one restarted, waits its own time.
+    CHECK(watch.Step(Poll(11.0, {100}, {400})).inject.empty());
+    CHECK(watch.Step(Poll(19.0, {100}, {400})).inject == std::vector<uint32_t>({400}));
+}
+
+// An agent that ends before it settled is forgotten: a later agent given the same pid waits its own time.
+TEST_CASE(PackageWatch_ForgetsAnAgentThatEndedBeforeItSettled) {
+    ampify::WatchConfig config;
+    ampify::PackageWatch watch(config);
+
+    CHECK(watch.Step(Poll(0.0, {100}, {300})).inject == std::vector<uint32_t>({100}));
+    CHECK(watch.Step(Poll(1.0, {100}, {})).inject.empty());
+    CHECK(watch.Step(Poll(9.0, {100}, {300})).inject.empty());
+    CHECK(watch.Step(Poll(17.0, {100}, {300})).inject == std::vector<uint32_t>({300}));
 }
 
 TEST_CASE(PackageWatch_InjectsNothingWhenInjectionIsOff) {

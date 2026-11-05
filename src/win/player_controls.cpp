@@ -2,8 +2,10 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include "winrt_abi.hpp"
 #include "xaml_host.hpp"
 
+#include "../core/amp_abi.hpp"
 #include "../core/player_modes.hpp"
 
 #include <inspectable.h>
@@ -42,6 +44,8 @@ namespace peers = xaml::Automation::Peers;
 namespace provider = xaml::Automation::Provider;
 
 constexpr int kSearchLimit = 6000;  // elements walked in one window to find a button
+constexpr auto kLyricsSearchEvery = std::chrono::seconds(2);  // while Apple's lyrics view is missing
+constexpr int64_t kTicksPerMs = 10'000;                       // a TimeSpan counts 100 ns ticks
 constexpr auto kFollowStep = std::chrono::milliseconds(400);
 constexpr int kRemeasureTicks = 10;  // the transport row's sides, measured again every 4 seconds
 constexpr double kRowGap = 8;        // between a side of the transport row and the transport: "···" touched shuffle
@@ -589,6 +593,62 @@ MainPlayerModes ReadMainPlayerModes() noexcept {
     } catch (...) {
     }
     return modes;
+}
+
+namespace {
+
+struct LyricsViewSeen {
+    winrt::weak_ref<xaml::FrameworkElement> element;
+    std::chrono::steady_clock::time_point nextSearch{};
+};
+
+// The main window's lyrics view, or null. Walking the window's thousands of elements costs a few ms: the view is kept,
+// and looked for again at most every kLyricsSearchEvery while it is missing (closed, or never opened).
+xaml::FrameworkElement MainLyricsView(LyricsViewSeen& seen) {
+    if (auto element = seen.element.get(); element && element.IsLoaded()) return element;
+    auto now = std::chrono::steady_clock::now();
+    if (now < seen.nextSearch) return nullptr;
+    seen.nextSearch = now + kLyricsSearchEvery;
+    xaml::Window window = AppWindow(L"MainWindow");
+    auto content = window ? window.Content() : nullptr;
+    if (!content) return nullptr;
+    const winrt::hstring wanted = winrt::to_hstring(amp::kClassKaraokeLyricsView);
+    for (const auto& item : Below(content)) {
+        if (winrt::get_class_name(item) != wanted) continue;
+        if (auto element = item.try_as<xaml::FrameworkElement>()) {
+            seen.element = winrt::make_weak(element);
+            return element;
+        }
+    }
+    return nullptr;
+}
+
+}  // namespace
+
+long long ReadLyricsLineStart() noexcept {
+    try {
+        static auto* seen = new LyricsViewSeen();
+        xaml::FrameworkElement view = MainLyricsView(*seen);
+        if (!view) return -1;
+        rt::Ref unknown(winrt::detach_abi(view.as<winrt::Windows::Foundation::IUnknown>()));
+        rt::Ref viewInterface;
+        rt::Ref inspectable;
+        rt::Ref model;
+        rt::Ref lineObject;
+        rt::Ref line;
+        if (!rt::Query(unknown, rt::GuidOf(amp::kIidKaraokeLyricsView), viewInterface) ||
+            FAILED(rt::CallSlot(viewInterface, amp::kKaraokeLyricsViewViewModel, inspectable.Put())) ||
+            !inspectable || !rt::Query(inspectable, rt::GuidOf(amp::kIidKaraokeLyricsViewModel), model) ||
+            FAILED(rt::CallSlot(model, amp::kKaraokeLyricsViewModelCurrentLine, lineObject.Put())) || !lineObject ||
+            !rt::Query(lineObject, rt::GuidOf(amp::kIidKaraokeLyricsLine), line)) {
+            return -1;
+        }
+        int64_t ticks = 0;  // Windows.Foundation.TimeSpan, passed through the out pointer
+        if (FAILED(rt::CallSlot(line, amp::kKaraokeLyricsLineStartTime, &ticks)) || ticks < 0) return -1;
+        return ticks / kTicksPerMs;
+    } catch (...) {
+        return -1;
+    }
 }
 
 bool SetMainPlayerVolume(double gain) noexcept {

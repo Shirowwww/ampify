@@ -504,3 +504,24 @@ TEST_CASE(PlayerModel_StateCarriesTheSourceAndTheQueueEntry) {
     CHECK(element->Start());
     CHECK(f.Logged("[source] state apple 42 true 60000"));
 }
+
+// Apple Music 1.1792 leaves its item's CurrentPosition at 0 while a song plays: the clock counts the time played.
+TEST_CASE(PositionClock_CountsTheTimePlayedWhenAppleGivesNoPosition) {
+    ampify::PositionClock clock;
+    CHECK(clock.Next("a", true, 0, 200000, 1000) == 0);
+    CHECK(clock.Next("a", true, 0, 200000, 4000) == 3000);
+    CHECK(clock.Next("a", false, 0, 200000, 5000) == 4000);  // paused: the clock stops
+    CHECK(clock.Next("a", false, 0, 200000, 9000) == 4000);
+    CHECK(clock.Next("a", true, 0, 200000, 10000) == 4000);  // playing again from where it stopped
+    CHECK(clock.Next("a", true, 0, 200000, 12000) == 6000);
+    CHECK(clock.Next("b", true, 0, 200000, 13000) == 0);     // a new song starts at 0
+    CHECK(clock.Next("b", true, 0, 2000, 20000) == 2000);    // never past the song's end
+}
+
+TEST_CASE(PositionClock_TrustsApplesPositionAndFollowsASeek) {
+    ampify::PositionClock clock;
+    CHECK(clock.Next("a", true, 30000, 200000, 1000) == 30000);
+    CHECK(clock.Next("a", true, 0, 200000, 2000) == 31000);  // Apple's last value, counted on
+    clock.Seeked(90000, 3000);
+    CHECK(clock.Next("a", true, 0, 200000, 5000) == 92000);
+}

@@ -172,7 +172,8 @@ bool EnableAutoStart(const std::filesystem::path& launcher, std::string& error) 
 
 bool DisableAutoStart(std::string& error) {
     if (!win::UnregisterBackground()) {
-        error = "Windows refused to remove the sign-in entry (HKCU\\...\\Run)";
+        error = "Windows refused to remove the sign-in entry (HKCU\\...\\Run) or Apple Music's start setting "
+                "(HKCU\\...\\PackagesDebug)";
         return false;
     }
     if (!win::StopBackground()) {

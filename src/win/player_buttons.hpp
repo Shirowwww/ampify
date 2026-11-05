@@ -29,4 +29,11 @@ using SetPlayerVolumeFn = bool (*)(double volume);
 using PlayerVolumeProblemFn = std::string (*)();
 void InstallPlayerVolume(SetPlayerVolumeFn setter, PlayerVolumeProblemFn problem = nullptr);
 
+// The start in ms of the lyrics line Apple's lyrics view lights up, or -1 when there is none. Apple Music 1.1792 leaves
+// the position of its player, of its media session and of its progress bar at 0 while a song plays; the line its
+// lyrics view lights up is the one sign of where the song is. Runs on the interface thread; the XAML build installs it
+// (src/win/xaml_host.cpp), src/win/player_bridge.cpp reads it.
+using ReadLyricsLineStartFn = long long (*)();
+void InstallLyricsLineStart(ReadLyricsLineStartFn read);
+
 }  // namespace ampify::win

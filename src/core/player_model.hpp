@@ -98,6 +98,21 @@ bool IsLosslessFormat(int32_t format);
 std::pair<std::string, std::string> SplitArtistAlbum(const std::string& text);
 
 PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit);
+
+// The position of Apple's player. Apple Music 1.1792 leaves its item's CurrentPosition at 0 while a song plays, so when
+// Apple gives nothing the position comes from Apple's lyrics view (src/win/player_bridge.cpp), and the clock counts the
+// time played since the song started, or since the last value, while that view is not there either.
+class PositionClock {
+public:
+    // The position to report for `track` at `nowMs` (any steady clock in ms), given what Apple reported.
+    int64_t Next(const std::string& track, bool playing, int64_t reportedMs, int64_t durationMs, int64_t nowMs);
+    void Seeked(int64_t positionMs, int64_t nowMs);  // a seek made through Ampify
+
+private:
+    std::string m_track;
+    int64_t m_baseMs = 0;    // the position when the clock last started or stopped
+    int64_t m_sinceMs = -1;  // when it started, -1 while stopped
+};
 // The position moves on between two SMTC updates while playing: it is extrapolated to `now`, and kept within the
 // track.
 PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading);

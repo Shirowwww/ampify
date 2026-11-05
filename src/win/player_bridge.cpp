@@ -2,10 +2,12 @@
 
 #include <windows.h>
 
+#include <atomic>
 #include <memory>
 #include <tuple>
 
 #include "amp_player.hpp"
+#include "player_buttons.hpp"
 #include "smtc_session.hpp"
 #include "ui_thread.hpp"
 #include "winrt_abi.hpp"
@@ -13,6 +15,8 @@
 namespace ampify::win {
 
 namespace {
+
+std::atomic<ReadLyricsLineStartFn> g_readLineStart{nullptr};
 
 constexpr unsigned long long kSmtcRetryMs = 30'000;
 constexpr unsigned kInterfaceTimeoutMs = 2000;
@@ -172,6 +176,13 @@ PlayerSnapshot PlayerBridge::Snapshot() {
             m_unit = unit;
         }
         snapshot = SnapshotFromAmp(*apple, m_unit);
+        if (snapshot.track) {
+            const bool appleGave = snapshot.positionMs > 0;
+            const int64_t now = static_cast<int64_t>(GetTickCount64());
+            snapshot.positionMs = m_clock.Next(snapshot.track->id + "|" + snapshot.track->queueItemId,
+                                               snapshot.playing, snapshot.positionMs, snapshot.durationMs, now);
+            if (!appleGave) FollowLyricsLine(snapshot, now);
+        }
         // Apple's item sometimes leaves the artist and album empty: the media session of the same track has them.
         if (snapshot.track && smtc && smtc->title == apple->title && snapshot.track->artist.empty()) {
             auto [artist, album] = SplitArtistAlbum(smtc->artist);
@@ -237,6 +248,7 @@ bool PlayerBridge::Control(PlayerCommand command, int64_t seekMs) {
         }
         std::string what = std::string(CommandName(command)) + " via " + RouteName(step.route);
         if (done) {
+            if (command == PlayerCommand::Seek) m_clock.Seeked(plan.seekMs, static_cast<int64_t>(GetTickCount64()));
             SayOnce("ok " + what, "Player: command " + what + " accepted");
             return true;
         }
@@ -251,6 +263,35 @@ bool PlayerBridge::Control(PlayerCommand command, int64_t seekMs) {
 std::optional<RawLyrics> PlayerBridge::Lyrics() {
     if (!m_apple->Active()) return std::nullopt;
     return m_apple->Lyrics();
+}
+
+void InstallLyricsLineStart(ReadLyricsLineStartFn read) {
+    g_readLineStart = read;
+}
+
+std::optional<int64_t> PlayerBridge::LyricsLineStart() {
+    if (m_options.lyricsLineStart) return m_options.lyricsLineStart();
+    ReadLyricsLineStartFn read = g_readLineStart.load();
+    if (!read) return std::nullopt;
+    auto ms = std::make_shared<long long>(-1);  // shared: the work may outlive a timed-out wait
+    if (!OnInterfaceThread([read, ms] { *ms = read(); }) || *ms < 0) return std::nullopt;
+    return static_cast<int64_t>(*ms);
+}
+
+// When Apple's lyrics view lights up another line, the song is at that line's start: the clock starts again from
+// there, so a jump made in Apple Music, a song repeated or a slow start are caught up at the next line.
+void PlayerBridge::FollowLyricsLine(PlayerSnapshot& snapshot, int64_t nowMs) {
+    std::optional<int64_t> start = LyricsLineStart();
+    if (!start) {
+        m_lineStartMs = -1;  // the view closed: its next line is taken as it comes
+        return;
+    }
+    if (*start == m_lineStartMs) return;
+    m_lineStartMs = *start;
+    if (snapshot.durationMs > 0 && *start > snapshot.durationMs) return;  // a line of the song before
+    m_clock.Seeked(*start, nowMs);
+    snapshot.positionMs = *start;
+    SayOnce("lyrics-line", "Player: position set by the line Apple's lyrics view lights up");
 }
 
 bool PlayerBridge::OnInterfaceThread(std::function<void()> work) {

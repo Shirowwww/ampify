@@ -30,9 +30,24 @@ and each element runs in the processes its manifest asks for (`processes`, `ui` 
 
 ## The launcher
 
-The installer registers `ampify_launcher.exe --background` under
-`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` and starts it. This background launcher (one per session, mutex
-`Local\AmpifyBackground`) looks for `AppleMusic.exe` four times a second. When one appears it:
+Nothing of Ampify runs while Apple Music is closed. `ampify_launcher.exe --register` asks Windows, through
+`IPackageDebugSettings::EnableDebugging` (per user, no administrator), to hand each new process of the Apple Music
+package to `ampify_launcher.exe --attach -p <pid> -tid <tid>`. Windows creates the process suspended and starts the
+launcher, which:
+
+1. checks the package version and the exports of `AVFoundationCF.dll`, as below;
+2. for `AppleMusic.exe`, loads the kernel before the process runs, then resumes it;
+3. for `AMPLibraryAgent.exe`, resumes it first and loads the kernel 8 s later (`WatchConfig::agentSettleAfter`): a
+   kernel in the agent while it opens the library stops the library from loading, and the agent outlives the app;
+4. writes `logs\attach.log` and exits.
+
+The setting is stored under `HKCU\Software\Classes\PackagesDebug\<package full name>` and belongs to one version of the
+package: after an update of Apple Music, the next `--register` (at sign-in, from the Run key) sets it again. If the
+launcher it names is missing, Windows cannot start Apple Music at all, so the uninstaller and `ampify restore` remove
+it first (`DisableAttach`). When the setting cannot be made, `--register` falls back to the resident launcher below.
+
+The resident launcher (`--background`, one per session, mutex `Local\AmpifyBackground`) looks for `AppleMusic.exe`
+four times a second. When one appears it:
 
 1. reads the package version and checks the exports of `AVFoundationCF.dll`;
 2. suspends the new process's threads;

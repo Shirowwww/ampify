@@ -37,6 +37,10 @@ bool PressMainPlayerButton(bool shuffle) noexcept;
 // Apple's volume: the main window's volume control gets the slider position of `gain` (0 to 1), and Apple's own code
 // sets the player volume and draws its slider. Interface thread only; true once the control holds the position.
 bool SetMainPlayerVolume(double gain) noexcept;
+// The start in ms of the line that the main window's lyrics view lights up (src/win/player_buttons.hpp), -1 while
+// that view or its current line is not there. Interface thread only.
+long long ReadLyricsLineStart() noexcept;
+
 // Why the last SetMainPlayerVolume failed, once (empty when it did not). Any thread.
 std::string TakeMainPlayerVolumeProblem();
 

@@ -62,6 +62,15 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   - the test output was a stereo USB headset at 96 kHz float, with Dolby Atmos for Headphones.
 - **The interface shows the player volume.** A change through `AVCFPlayerSetVolume` moves Apple Music's slider (observed:
   55% in stereo, 71.67% in Atmos with +5 dB). The Atmos leveler reads that volume and applies its own gain to the samples.
+- **Where the position of the song is (1.1792, checked 2026-11-05).** Nowhere you would look first. These all stay
+  at 0 while a song plays: `INowPlayingItem.CurrentPosition`, the SMTC timeline, the play bar's `LCDScrubber`
+  (its `Value` and the width of `HorizontalDecreaseRect`), `INowPlayingViewModel.CurrentPositionInSeconds` (held
+  by `NowPlayingControl#LCD`), and even `IKaraokeLyricsViewModel.CurrentTime`. What moves is the lyrics view:
+  `KaraokeLyricsView` → `get_ViewModel` → `CurrentLine` → `StartTime`, the line Apple lights up. Ampify anchors its
+  clock there (`src/win/player_bridge.cpp`, slots and identifiers in `src/core/amp_abi.hpp`). Apple's views are
+  bound with `x:Bind`: `DataContext` is empty all the way up, and the models come from each view's own
+  `get_ViewModel`. Identifiers and slots: read the `GuidAttribute` and the method order of the interface from the
+  package's `.winmd` with `System.Reflection.Metadata` (`winmdidl` fails without its references).
 
 ## Pitfalls observed
 

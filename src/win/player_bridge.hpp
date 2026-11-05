@@ -44,6 +44,9 @@ struct PlayerBridgeOptions {
     // Runs work on Apple Music's interface thread and waits for it, at most `timeoutMs`. Empty:
     // RunOnUiThreadAndWait (src/win/ui_thread.hpp). The tests run it in place.
     std::function<bool(std::function<void()> work, unsigned timeoutMs)> onInterfaceThread;
+    // The start in ms of the line Apple's lyrics view lights up, or nullopt. Empty: the reader that
+    // InstallLyricsLineStart installed (src/win/player_buttons.hpp), run on the interface thread. The tests replace it.
+    std::function<std::optional<int64_t>()> lyricsLineStart;
 };
 
 class PlayerBridge : public QueueHost, public LyricsHost {
@@ -73,6 +76,8 @@ private:
     void TrySmtc();
     void SayOnce(const std::string& key, const std::string& line);
     bool OnInterfaceThread(std::function<void()> work);
+    std::optional<int64_t> LyricsLineStart();
+    void FollowLyricsLine(PlayerSnapshot& snapshot, int64_t nowMs);
     // Apple's whole queue, or nullopt with `failure`.
     std::optional<std::vector<AmpQueueEntry>> AppleQueue(std::string& failure, bool& cut);
 
@@ -91,6 +96,8 @@ private:
     unsigned long long m_smtcNextTry = 0;
     std::string m_lastSource = "?";
     AmpTimeUnit m_unit = AmpTimeUnit::Unknown;
+    PositionClock m_clock;  // Apple's item gives no position while playing (1.1792)
+    int64_t m_lineStartMs = -1;  // the start of the lyrics line Apple's view lit up last, -1 without one
     uint64_t m_coverLoggedItem = 0;  // the queue item whose raw cover went to the log
     int m_coverLogs = 0;
     PlayerSnapshot m_last;

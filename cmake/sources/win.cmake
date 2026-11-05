@@ -3,7 +3,7 @@
 # See the convention at the top of CMakeLists.txt.
 list(APPEND AMPIFY_WIN_SOURCES src/win/win_common.cpp src/win/package.cpp src/win/win_host.cpp src/win/hook.cpp
     src/win/ui_thread.cpp src/win/kit_command.cpp src/win/wic_image.cpp src/win/video_gif.cpp src/win/background.cpp
-    src/win/toast_hold.cpp src/win/audio_share.cpp)
+    src/win/toast_hold.cpp src/win/audio_share.cpp src/win/package_debug.cpp)
 
 list(APPEND AMPIFY_KERNEL_SOURCES src/kernel/kernel.cpp extensions/atmos-leveler/atmos_windows.cpp)
 

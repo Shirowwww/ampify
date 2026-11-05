@@ -184,6 +184,7 @@ void InstallXamlUiThread(Journal& journal) {
     SetUiThreadBackend(&kXamlBackend);
     InstallPlayerButtons(&ReadMainPlayerModes, &PressMainPlayerButton);
     InstallPlayerVolume(&SetMainPlayerVolume, &TakeMainPlayerVolumeProblem);  // through Apple's own volume model
+    InstallLyricsLineStart(&ReadLyricsLineStart);
 }
 
 std::uint64_t NowMs() noexcept {

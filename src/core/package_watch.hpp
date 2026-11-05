@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -31,6 +32,9 @@ struct WatchConfig {
     double goneAfter = 5;         // seconds without any app process before the watch stops
     double firstSeenWithin = 15;  // seconds allowed for the app to appear at all
     double settleAfter = 30;      // seconds after the app appears, past its hand-overs and health, before it settles
+    // Seconds an AMPLibraryAgent.exe runs before it gets the kernel: loaded while the agent opens the library, the
+    // kernel left the library closed (05/11/2026). The same wait as the launcher's --attach (src/launcher).
+    double agentSettleAfter = 8;
 };
 
 // Follows one launch of Apple Music. Pure logic: the launcher feeds it one snapshot per poll.
@@ -53,6 +57,7 @@ public:
 private:
     WatchConfig m_config;
     std::set<uint32_t> m_handled;
+    std::map<uint32_t, double> m_agentSeen;  // agents not injected yet, and when each was first seen
     bool m_appSeen = false;
     double m_firstSeen = 0;  // first poll that saw an app process
     double m_lastSeen = 0;   // last poll that saw an app process

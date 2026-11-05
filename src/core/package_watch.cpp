@@ -1,5 +1,6 @@
 #include "package_watch.hpp"
 
+#include <algorithm>
 #include <initializer_list>
 
 namespace ampify {
@@ -14,10 +15,21 @@ WatchActions PackageWatch::Step(const WatchSnapshot& snapshot) {
     WatchActions actions;
 
     if (m_config.inject) {
-        for (const std::vector<uint32_t>* group : {&snapshot.appProcesses, &snapshot.agentProcesses}) {
-            for (uint32_t processId : *group) {
-                if (m_handled.insert(processId).second) actions.inject.push_back(processId);
-            }
+        for (uint32_t processId : snapshot.appProcesses) {
+            if (m_handled.insert(processId).second) actions.inject.push_back(processId);
+        }
+        // An agent gone before it settled is forgotten, so a new one given the same pid waits its own time.
+        std::erase_if(m_agentSeen, [&snapshot](const auto& entry) {
+            return std::find(snapshot.agentProcesses.begin(), snapshot.agentProcesses.end(), entry.first) ==
+                   snapshot.agentProcesses.end();
+        });
+        for (uint32_t processId : snapshot.agentProcesses) {
+            if (m_handled.count(processId)) continue;
+            double seen = m_agentSeen.emplace(processId, snapshot.seconds).first->second;
+            if (snapshot.seconds - seen < m_config.agentSettleAfter) continue;
+            m_handled.insert(processId);
+            m_agentSeen.erase(processId);
+            actions.inject.push_back(processId);
         }
     }
 

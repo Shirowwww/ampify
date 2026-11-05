@@ -49,6 +49,18 @@ inline constexpr const char* kIidsNowPlayingItem[] = {
 // QueryInterface fails, so the field is skipped.
 inline constexpr char kIidArtwork[] = "6F00C1EF-8302-5354-BD7E-8D1A943B4F0D";      // AMP.Services.CommonModels.IArtwork
 inline constexpr char kIidLyricsInfo[] = "8DC3CA60-B650-5649-B901-D152B6C110F4";    // ...CommonModels.ILyricsInfo
+// The lyrics view of the main window, the one place where Apple Music 1.1792 follows the song playing: its player
+// item, its media session, the play bar's NowPlayingViewModel and even the view model's CurrentTime stay at 0, but the
+// model's CurrentLine is the line Apple lights up. The view (found by class name) holds its model through x:Bind, no
+// DataContext, and gives it with get_ViewModel; a line's StartTime is a TimeSpan (100 ns ticks). GuidAttribute values
+// and method order read from AMP.UI.Views.winmd and AMP.Services.winmd 1.1792.
+inline constexpr char kClassKaraokeLyricsView[] = "AMP.UI.Views.KaraokeLyricsView";
+inline constexpr char kIidKaraokeLyricsView[] = "0DA7B411-6991-57FC-B8FE-6DE18C8E35E2";
+inline constexpr int kKaraokeLyricsViewViewModel = 20;
+inline constexpr char kIidKaraokeLyricsViewModel[] = "A454EA99-2DC3-540F-883A-05E1EB4FA2AE";
+inline constexpr int kKaraokeLyricsViewModelCurrentLine = 6;
+inline constexpr char kIidKaraokeLyricsLine[] = "AD6B009B-E221-5827-8A3B-85DC8B27DD87";
+inline constexpr int kKaraokeLyricsLineStartTime = 17;
 // Windows.Foundation.IUriRuntimeClass, from the Windows SDK (windows.foundation.h).
 inline constexpr char kIidUriRuntimeClass[] = "9E365E57-48B2-4160-956F-C7385120BBFC";
 

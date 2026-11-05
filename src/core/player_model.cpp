@@ -185,6 +185,32 @@ PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit) {
     return snapshot;
 }
 
+int64_t PositionClock::Next(const std::string& track, bool playing, int64_t reportedMs, int64_t durationMs,
+                            int64_t nowMs) {
+    if (track != m_track) {
+        m_track = track;
+        m_baseMs = 0;
+        m_sinceMs = -1;
+    }
+    if (reportedMs > 0) {
+        m_baseMs = reportedMs;
+        m_sinceMs = playing ? nowMs : -1;
+        return reportedMs;
+    }
+    if (playing && m_sinceMs < 0) m_sinceMs = nowMs;
+    if (!playing && m_sinceMs >= 0) {
+        m_baseMs += std::max<int64_t>(0, nowMs - m_sinceMs);
+        m_sinceMs = -1;
+    }
+    int64_t position = m_baseMs + (m_sinceMs >= 0 ? std::max<int64_t>(0, nowMs - m_sinceMs) : 0);
+    return durationMs > 0 ? std::min(position, durationMs) : position;
+}
+
+void PositionClock::Seeked(int64_t positionMs, int64_t nowMs) {
+    m_baseMs = std::max<int64_t>(0, positionMs);
+    if (m_sinceMs >= 0) m_sinceMs = nowMs;
+}
+
 PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading) {
     PlayerSnapshot snapshot;
     snapshot.source = "smtc";
