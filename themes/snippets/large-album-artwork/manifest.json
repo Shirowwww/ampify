@@ -1,0 +1,33 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "large-album-artwork",
+  "name": "Large album artwork",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "The artwork at the top of an album or playlist page gets the size you choose, from 120 to 360 pixels.",
+  "translations": {
+    "fr": {"name": "Grande pochette d'album", "description": "La pochette en haut d'une page d'album ou de playlist prend la taille de votre choix, de 120 à 360 pixels.", "settings": {"size": "Taille de la pochette (pixels)"}},
+    "de": {"name": "Großes Albumcover", "description": "Das Cover oben auf einer Album- oder Playlist-Seite bekommt die Größe deiner Wahl, von 120 bis 360 Pixel.", "settings": {"size": "Größe des Covers (Pixel)"}},
+    "es": {"name": "Portada de álbum grande", "description": "La portada en la parte superior de una página de álbum o lista recibe el tamaño que elijas, de 120 a 360 píxeles.", "settings": {"size": "Tamaño de la portada (píxeles)"}},
+    "pt": {"name": "Capa de álbum grande", "description": "A capa no topo de uma página de álbum ou playlist recebe o tamanho que você escolher, de 120 a 360 pixels.", "settings": {"size": "Tamanho da capa (pixels)"}},
+    "ru": {"name": "Крупная обложка альбома", "description": "Обложка вверху страницы альбома или плейлиста получает размер на ваш выбор: от 120 до 360 пикселей.", "settings": {"size": "Размер обложки (пиксели)"}},
+    "ja": {"name": "アルバムのアートワークを大きく", "description": "アルバムやプレイリストのページ上部のアートワークを、120〜360ピクセルの好きな大きさにします。", "settings": {"size": "アートワークの大きさ（ピクセル）"}},
+    "zh": {"name": "放大专辑封面", "description": "专辑或播放列表页面顶部的封面可以设为 120 到 360 像素之间你选择的大小。", "settings": {"size": "封面大小（像素）"}}
+  },
+  "kitApi": "1.0",
+  "tags": [
+    "artwork",
+    "layout"
+  ],
+  "settings": [
+    {
+      "key": "size",
+      "label": "Artwork size (pixels)",
+      "type": "number",
+      "min": 120,
+      "max": 360,
+      "default": 240
+    }
+  ]
+}

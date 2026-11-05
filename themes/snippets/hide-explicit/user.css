@@ -1,0 +1,6 @@
+/* Hide explicit: the small E badge that marks explicit songs goes, on top of any theme.
+   Remove the rule to bring the badge back. */
+
+.explicit-badge {
+    visibility: collapsed;
+}

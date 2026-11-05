@@ -103,7 +103,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Equalizer in the bar | `display-equalizer`: `bars(10)` in the artwork's colour | Done |
 | Rounded or square images, buttons and bars (Be Square, Rounded Images) | `corner-radius`; `square-corners` squares every panel, the bar included | Done |
 | Hide an element (play count, buttons, recent searches) | `display: none` on its name | Done |
-| Modern scrollbar, hide sidebar scrollbar | `.scrollbar`, `ampify:scrollbars` | Done |
+| Modern scrollbar, hide sidebar scrollbar, thin scrollbars | `.scrollbar`, `ampify:scrollbars`; the thin look away from the pointer is already built in, so no separate snippet | Done |
 | Hover panels, dynamic sidebar | `:hover` works; a hidden panel keeps its room | Partial |
 | Nyan Cat, Kirby, bee progress bars | An image in the column of the bar's hidden thumb rides at the song's position ([recipe](themes/format.md#an-image-that-follows-the-songs-progress)); snippet `progress-mascot` (a comet, a note, a heart) | Done |
 | Duotone artwork | No colour filter on an image in XAML | Missing |
@@ -114,6 +114,11 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Thin or thick progress bar | `progress-thickness`: the display's progress line from 1 to 6 pixels, round ends | Done |
 | Compact sidebar (Comfy) | `compact-sidebar`: rows of 32 pixels instead of 40, Ampify's entries included (`.sidebar-entry`) | Done |
 | Highlight the lyrics line being sung | `lyrics-spotlight`: a tile of the song's colour under the line, through `:current` | Done |
+| Hide the explicit badge | `hide-explicit` | Done |
+| Centred lyrics | `centred-lyrics`: the lines and the static text sit in the middle of the panel | Partial: the line being sung keeps Apple's own fade, checked by tests only |
+| Bigger album artwork | `large-album-artwork`: a size setting, 120 to 360 pixels, on the album or playlist header | Partial: checked by tests only, not on screen |
+| Hover-revealed row actions | `hover-row-actions`: favourite, add, download and reaction buttons fade in under the pointer | Partial: checked by tests only, not on screen |
+| Hide more shelves on Home and New | Missing: Apple's shelves have no names of their own, so a plain hide would empty the page | Missing |
 
 ## Extensions (JavaScript API)
 

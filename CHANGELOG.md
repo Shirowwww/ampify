@@ -81,6 +81,9 @@
   Palettes. Glass keeps its capsule there, lined up with the pages and clear of the window's buttons.
 - Progress line thickness snippet: the display's progress line from 1 to 6 pixels, with round ends. `corner-radius`
   now rounds a `Rectangle` too, such as a slider's track.
+- New snippets: `hide-explicit` (the E badge), `centred-lyrics` (the lyrics in the middle of their panel),
+  `large-album-artwork` (a size setting for the cover of an album or playlist page) and `hover-row-actions` (a song's
+  favourite, add, download and reaction buttons appear under the pointer).
 - A theme's rule for the playback bar's cover (`.lcd-artwork-image`) now wins over its rule for every cover
   (`.artwork`): every theme's bar cover had taken the radius meant for the grids.
 - A page's header no longer flashes Apple's grey frost before the theme's colour.

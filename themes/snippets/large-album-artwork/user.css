@@ -1,0 +1,7 @@
+/* Large album artwork: the cover at the top of an album or playlist page takes the size of the setting (pixels).
+   Its height and width move together, so the cover stays square. */
+
+.album-header .artwork {
+    width: var(--setting-size);
+    height: var(--setting-size);
+}

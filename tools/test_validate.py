@@ -9,6 +9,7 @@ import io
 import json
 import os
 import random
+import re
 import tempfile
 import unittest
 
@@ -632,6 +633,54 @@ class SchemaSubsetTests(unittest.TestCase):
     def test_broken_reference_is_refused(self):
         with self.assertRaises(validate.SchemaError):
             validate.resolve({"$defs": {}}, "#/$defs/absent")
+
+
+class SnippetContentTests(unittest.TestCase):
+    """Every snippet of the repository: its texts in the eight languages and the element names it uses."""
+
+    LANGUAGES = {"fr", "de", "es", "pt", "ru", "ja", "zh"}
+    SNIPPETS = os.path.join(REPO, "themes", "snippets")
+
+    @staticmethod
+    def known_names():
+        """The stable names of src/core/theme/builtins.cpp, the only ones a theme or a snippet may use."""
+        with open(os.path.join(REPO, "src", "core", "theme", "builtins.cpp"), encoding="utf-8") as handle:
+            return set(re.findall(r'\{"([a-z][a-z0-9-]*)",\s*\{', handle.read()))
+
+    @staticmethod
+    def class_names(css):
+        """The classes a stylesheet uses: comments and url(...) paths are not selectors."""
+        css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        css = re.sub(r"url\([^)]*\)", "", css)
+        return set(re.findall(r"(?<![\w-])\.([a-z][a-z0-9-]*)", css))
+
+    def snippet_folders(self):
+        return [os.path.join(self.SNIPPETS, name) for name in sorted(os.listdir(self.SNIPPETS))
+                if os.path.isfile(os.path.join(self.SNIPPETS, name, "manifest.json"))]
+
+    def test_every_snippet_has_all_eight_languages(self):
+        for folder in self.snippet_folders():
+            with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as handle:
+                data = json.load(handle)
+            with self.subTest(snippet=data["id"]):
+                self.assertEqual(set(data.get("translations", {})), self.LANGUAGES)
+                for setting in data.get("settings", []):
+                    for language, texts in data["translations"].items():
+                        self.assertIn(setting["key"], texts.get("settings", {}), language)
+                        for option in setting.get("options", []):
+                            self.assertIn(option, texts.get("options", {}), language)
+
+    def test_every_class_a_snippet_uses_is_a_known_name(self):
+        names = self.known_names()
+        self.assertGreater(len(names), 100)
+        for folder in self.snippet_folders():
+            path = os.path.join(folder, "user.css")
+            if not os.path.isfile(path):
+                continue
+            with open(path, encoding="utf-8") as handle:
+                unknown = sorted(self.class_names(handle.read()) - names)
+            with self.subTest(snippet=os.path.basename(folder)):
+                self.assertEqual(unknown, [])
 
 
 if __name__ == "__main__":
