@@ -25,6 +25,8 @@ struct SettingSpec {
     std::vector<std::string> options;  // a choice's values
     std::optional<double> min;         // a number's bounds
     std::optional<double> max;
+    std::string group;                 // the heading the setting sits under; empty for none
+    std::string description;           // one line under the label; empty for none
 };
 
 // The name and description of an element in one language, from the manifest's "translations" field. The languages are
@@ -34,6 +36,8 @@ struct ManifestText {
     std::string description;
     std::map<std::string, std::string> settings;  // the label of a declared setting, by its key (optional)
     std::map<std::string, std::string> options;   // the text of a choice's option, by its stored value (optional)
+    std::map<std::string, std::string> groups;    // the heading of a group, by its name (optional)
+    std::map<std::string, std::string> settingDescriptions;  // a setting's description, by its key (optional)
 };
 
 inline constexpr std::string_view kTranslationLanguages[] = {"fr", "de", "es", "pt", "ru", "ja", "zh"};

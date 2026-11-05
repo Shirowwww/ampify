@@ -12,6 +12,7 @@
 
 #include "../src/core/address_order.hpp"
 #include "../src/core/settings.hpp"
+#include "../src/core/theme/theme_settings.hpp"
 #include "../src/core/ui_model.hpp"
 #include "../src/core/ui_render/apple_tweaks.hpp"
 #include "../src/core/ui_render/mods.hpp"
@@ -756,6 +757,24 @@ TEST_CASE(UiRender_ChoosingAThemeKeepsOnlyASchemeThatStillMeansSomething) {
     CHECK(!ChooseTheme(kit, "../x", error));
 }
 
+TEST_CASE(UiRender_AccentCanFollowTheArtwork) {
+    fs::path kit = FreshKit("accent-artwork");
+    WriteFile(kit / "settings.txt", "theme.active = night\n");
+    std::string error;
+    CHECK(ChooseAccent(kit, "artwork", error));
+    CHECK(ReadFile(kit / "settings.txt").find("theme.accent = artwork") != std::string::npos);
+    CHECK(ChosenAccent(kit) == "artwork");
+    CHECK(ChooseAccent(kit, "0A84FF", error));
+    CHECK(ChosenAccent(kit) == "0A84FF");
+    CHECK(!ChooseAccent(kit, "artwrk", error));  // refused: the value stays
+    CHECK(ChosenAccent(kit) == "0A84FF");
+}
+
+// The engine and the settings window each keep the word; a test is the only thing that keeps them equal.
+TEST_CASE(UiRender_ArtworkAccentWordMatchesTheEngine) {
+    CHECK(std::string_view(ampify::uirender::kArtworkAccent) == ampify::theme::kArtworkAccent);
+}
+
 TEST_CASE(UiRender_AChosenAccentIsWrittenAsSixHexDigitsOrRemoved) {
     fs::path kit = FreshKit("accent-choose");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
@@ -1094,4 +1113,27 @@ TEST_CASE(UiRender_ChangingAnElementSettingChecksItAgainstTheManifest) {
     CHECK(!ChangeElementSetting(kit, "extension", "clock", "colour", "red", error));
     CHECK(!ChangeElementSetting(kit, "extension", "nothing", "size", "2", error));
     CHECK(ReadFile(kit / "settings.txt").find("extensions.clock.size = 7") != std::string::npos);
+}
+
+TEST_CASE(UiRender_ChangingSeveralElementValuesWritesAllOfThemOnceOrNone) {
+    fs::path kit = FreshKit("element-values-change");
+    WriteFile(kit / "extensions" / "clock" / "manifest.json",
+              R"({"id":"clock","name":"Clock","version":"1.0.0","kind":"extension","author":"x","description":"d",)"
+              R"("kitApi":"1.0","main":"main.js","settings":[)"
+              R"({"key":"size","label":"Size","type":"number","min":1,"max":10,"default":4},)"
+              R"({"key":"seconds","label":"Seconds","type":"toggle","default":false}]})");
+    WriteFile(kit / "extensions" / "clock" / "main.js", "");
+    std::string error;
+
+    CHECK(ChangeElementValues(kit, "extension", "clock", {{"size", "7"}, {"seconds", "true"}}, error));
+    std::string settings = ReadFile(kit / "settings.txt");
+    CHECK(settings.find("extensions.clock.size = 7") != std::string::npos);
+    CHECK(settings.find("extensions.clock.seconds = true") != std::string::npos);
+    CHECK(ReadFile(kit / "reload.txt") == "restart clock\n");
+
+    CHECK(!ChangeElementValues(kit, "extension", "clock", {{"size", "9"}, {"colour", "red"}}, error));
+    CHECK(error.find("colour") != std::string::npos);
+    CHECK(!ChangeElementValues(kit, "extension", "clock", {{"size", "11"}}, error));
+    CHECK(ReadFile(kit / "settings.txt").find("extensions.clock.size = 7") != std::string::npos);
+    CHECK(ReadFile(kit / "reload.txt") == "restart clock\n");
 }

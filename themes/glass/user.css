@@ -31,6 +31,10 @@
 @setting bar-position = Bottom {
     @import "ampify:bottom-bar";
 }
+@setting bar-position = Centred {
+    @import "ampify:bottom-bar";
+    @import "ampify:centre-bar";
+}
 
 /* ---- The window: the artwork, behind everything --------------------------------------------------------------------- */
 
@@ -154,9 +158,36 @@
         margin: 0 20 0 0;
     }
 }
+@setting bar-position = Centred {
+    /* The bar starts at the page column: the capsule reaches back under the sidebar, to the same edge as its pane. */
+    .playbar {
+        margin: 0 var(--gap) var(--gap) calc(var(--gap) - 290);
+    }
+
+    .playbar-controls {
+        grid-column: 0;
+        grid-column-span: 4;
+    }
+
+    .playbar-extras {
+        grid-column: 0;
+        grid-column-span: 4;
+    }
+
+    .playbar-toggles {
+        grid-column-span: 2;
+        margin: 0 20 0 0;
+    }
+}
 
 @media (max-width: 1324px) {
     @setting bar-position = Bottom {
+        .playbar {
+            margin: 0 var(--gap) var(--gap) calc(var(--gap) - 48);
+        }
+    }
+
+    @setting bar-position = Centred {
         .playbar {
             margin: 0 var(--gap) var(--gap) calc(var(--gap) - 48);
         }

@@ -32,6 +32,16 @@
         border-width: 0;
     }
 }
+@setting bar-position = Centred {
+    @import "ampify:bottom-bar";
+    @import "ampify:centre-bar";
+
+    /* The now-playing display loses its box: artwork, title and artist sit on the bar. */
+    .lcd {
+        background: transparent;
+        border-width: 0;
+    }
+}
 
 /* The bar-background setting: the bar takes the colours of the playing song's artwork, fading into the window. */
 @setting bar-background = Artwork {

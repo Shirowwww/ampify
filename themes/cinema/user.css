@@ -25,6 +25,10 @@
 @setting bar-position = Bottom {
     @import "ampify:bottom-bar";
 }
+@setting bar-position = Centred {
+    @import "ampify:bottom-bar";
+    @import "ampify:centre-bar";
+}
 
 /* The light of the screen on the floor: the artwork's dark colour, faint, at the bottom of the window. */
 .window {

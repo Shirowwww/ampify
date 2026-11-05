@@ -128,6 +128,8 @@ xaml::FrameworkElement AccentChoice(UiService::Shared& shared) {
         values->push_back(preset.value);
         combo.Items().Append(winrt::box_value(Wide(i18n::Text(preset.textKey))));
     }
+    values->push_back(uirender::kArtworkAccent);
+    combo.Items().Append(winrt::box_value(Wide(i18n::Text("accent.artwork"))));
     combo.Items().Append(winrt::box_value(Wide(i18n::Text("accent.custom"))));
     auto known = std::find(values->begin(), values->end(), chosen);
     int32_t customIndex = static_cast<int32_t>(values->size());

@@ -265,6 +265,19 @@ def check_settings(settings):
             errors.append(f"{where}: key {setting['key']} is already used")
         keys.add(setting["key"])
         errors += check_setting_value(setting, where)
+        errors += check_setting_texts(setting, where)
+    return errors
+
+
+def check_setting_texts(setting, where):
+    """The optional group and description of a setting: one line, within the length the kernel accepts."""
+    errors = []
+    for field, limit in (("group", 40), ("description", 200)):
+        if field not in setting:
+            continue
+        text = setting[field]
+        if not isinstance(text, str) or not 1 <= len(text) <= limit or "\n" in text or "\r" in text:
+            errors.append(f"{where}: {field} must be 1 to {limit} characters, on one line")
     return errors
 
 

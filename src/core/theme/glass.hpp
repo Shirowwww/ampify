@@ -3,7 +3,7 @@
 // a laptop on battery or an older card keeps the look, without the costliest effects.
 //   full      the theme as written (default)
 //   balanced  no animation that never ends (a turning artwork) and no depth shadows; the blur of acrylic stays
-//   eco       the same, and acrylic panes are painted as plain colours, without the blur
+//   eco       the same, and acrylic panes are painted as plain colours, and an acrylic window as Mica, without the blur
 
 #include <string_view>
 

@@ -56,12 +56,15 @@ std::vector<ModEntry> ListThemes(const std::filesystem::path& kit);
 // was chosen for, so it goes unless the theme stays the same or the scheme is "auto".
 bool ChooseTheme(const std::filesystem::path& kit, const std::string& id, std::string& error);
 
-// The accent colour the user chose over the theme's (theme.accent), as six upper-case hex digits; empty for the
-// theme's own. The engine applies it with or without a theme.
+// theme.accent value that makes the accent follow the song playing (the same word as theme::kArtworkAccent).
+inline constexpr char kArtworkAccent[] = "artwork";
+
+// The accent colour the user chose over the theme's (theme.accent), as six upper-case hex digits, or kArtworkAccent;
+// empty for the theme's own. The engine applies it with or without a theme.
 std::string ChosenAccent(const std::filesystem::path& kit);
 
-// Writes theme.accent: "RRGGBB" or "#RRGGBB", or empty to go back to the theme's accent. Anything else is refused and
-// leaves the setting as it was.
+// Writes theme.accent: "RRGGBB" or "#RRGGBB", kArtworkAccent, or empty to go back to the theme's accent. Anything else
+// is refused and leaves the setting as it was.
 bool ChooseAccent(const std::filesystem::path& kit, const std::string& accent, std::string& error);
 
 // The accents the settings page offers before "Custom…", Apple Music's pink first.
@@ -99,5 +102,10 @@ std::optional<ModEntry> ElementSettings(const std::filesystem::path& kit, std::s
 // an English line in `error` otherwise, and settings.txt is left as it was.
 bool ChangeElementSetting(const std::filesystem::path& kit, std::string_view kind, const std::string& id,
                           const std::string& key, const std::string& value, std::string& error);
+
+// The same for several settings of one element at once (Reset all, Import): every value is checked first, and when one
+// does not fit nothing is written. One write, so an extension restarts once.
+bool ChangeElementValues(const std::filesystem::path& kit, std::string_view kind, const std::string& id,
+                         const std::map<std::string, std::string>& values, std::string& error);
 
 }  // namespace ampify::uirender

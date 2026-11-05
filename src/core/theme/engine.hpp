@@ -57,7 +57,8 @@ public:
 
     bool Active() const { return m_active; }
     size_t OriginalCount() const {
-        return m_originals.size() + m_resourceOriginals.size() + m_moves.size() + m_hovers.size() + m_decors.size();
+        return m_originals.size() + m_resourceOriginals.size() + m_moves.size() + m_reparents.size() + m_hovers.size() +
+               m_decors.size();
     }
 
 private:
@@ -75,6 +76,14 @@ private:
         const Assignment* assignment = nullptr;
     };
     void ApplyMoves(std::vector<PendingMove>& pending, TreeBackend& tree, Report& report);
+    // An element moved into another container (move-to): where it was, for Restore.
+    struct Reparent {
+        NodeId id = 0;
+        NodeId parent = 0;  // the parent it had before the theme
+        int index = -1;     // its place among that parent's children
+    };
+    void ApplyReparents(const std::vector<PendingMove>& pending, const std::vector<NodeInfo>& nodes, TreeBackend& tree,
+                        Report& report);
     bool WriteValue(const NodeInfo& node, const Assignment& assignment, TreeBackend& tree, Report& report, bool keep);
     std::optional<Value> Resolve(NodeId id, const std::string& property, const Value& value, const Value& current,
                                  TreeBackend& tree);
@@ -96,6 +105,7 @@ private:
                                                                    // before the theme, which the next passes no longer read
     std::map<std::string, Value> m_resourceOriginals;             // resource key, first value seen
     std::vector<Move> m_moves;  // every change of position, in the order made
+    std::vector<Reparent> m_reparents;  // every element moved into another container, in the order moved
     std::map<NodeId, std::vector<HoverValue>> m_hovers;  // the state values the backend holds for each element
     std::map<std::pair<NodeId, PseudoElement>, Decor> m_decors;  // the ::before and ::after images in each panel
     std::string m_dictionary;  // the resource dictionary currently merged, empty when none

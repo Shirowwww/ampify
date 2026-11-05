@@ -499,6 +499,8 @@ Json InfoJson(const ElementInfo& info) {
             // Only an element with settings translates their labels and choices.
             if (!text.settings.empty()) language.Set("settings", texts(text.settings));
             if (!text.options.empty()) language.Set("options", texts(text.options));
+            if (!text.groups.empty()) language.Set("groups", texts(text.groups));
+            if (!text.settingDescriptions.empty()) language.Set("settingDescriptions", texts(text.settingDescriptions));
             languages.emplace_back(code, std::move(language));
         }
         item.Set("translations", Json(std::move(languages)));
@@ -519,6 +521,8 @@ Json SettingsJson(const uirender::ModEntry& element) {
         if (!spec.options.empty()) setting.Set("options", TextList(spec.options));
         if (spec.min) setting.Set("min", *spec.min);
         if (spec.max) setting.Set("max", *spec.max);
+        if (!spec.group.empty()) setting.Set("group", spec.group);
+        if (!spec.description.empty()) setting.Set("description", spec.description);
         list.push_back(std::move(setting));
     }
     return list;

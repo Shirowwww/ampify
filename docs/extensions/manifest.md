@@ -75,10 +75,31 @@ extension's switch, or under the extensions for the active theme and the snippet
 | `default` | `true`/`false` for a toggle, one of the `options`, a one-line text of 200 characters at most, or a number within `min` and `max` |
 | `options` | For a choice only: 2 to 20 different texts of 1 to 40 characters |
 | `min`, `max` | For a number, optional |
+| `group` | Optional, 1 to 40 characters. The heading the setting sits under; settings with the same `group` share it |
+| `description` | Optional, 1 to 200 characters. One line shown under the label |
 
 16 settings at most. Option values and text defaults are one line, with no space at either end. An extension reads
 its settings with `Ampify.config.get(key)`; a theme with `var(--setting-<key>)` and `@setting`
 ([format](../themes/format.md#theme-settings)).
+
+Without any `group`, the settings are listed one after the other, as before. With groups, the settings without one
+come first, then each group under its heading, in the order its first setting is declared.
+
+The card of an element with six settings or more also has a search box (it matches the label and the description,
+whatever the case and the accents), a **Reset** per setting (its manifest `default`, off while the setting already has
+it), a **Reset all**, and **Export** and **Import**. Export
+writes `<ampify>\exports\<kind>-<id>.json` and copies the same text to the clipboard; Import reads the clipboard. The
+file looks like this:
+
+```json
+{"format": "ampify-settings", "version": 1, "kind": "theme", "id": "night",
+ "values": {"show-album": false, "size": 16}}
+```
+
+Each value keeps its type: `true` or `false` for a toggle, a number for a number, a text for a choice or a text. Import
+refuses the whole file, and changes nothing, when it is bigger than 64 KB, is for another element or another kind, has
+a key the element does not declare, or has a value of the wrong type or outside what the setting accepts. A key the
+file leaves out keeps its value.
 
 ## Translations
 
@@ -103,6 +124,8 @@ its settings with `Ampify.config.get(key)`; a theme with `var(--setting-<key>)` 
 | `name`, `description` | Required, same lengths as the English ones |
 | `settings` | Optional: a label per setting `key`, 1 to 60 characters |
 | `options` | Optional: a text per choice value, 1 to 60 characters. The stored value stays the English one |
+| `groups` | Optional: a heading per group name, 1 to 40 characters |
+| `settingDescriptions` | Optional: a description per setting `key`, 1 to 200 characters |
 
 The Marketplace and Ampify's settings page show the translation that matches the language Ampify uses, and English
 otherwise. Ids, folder names and command-line messages never change with the language.

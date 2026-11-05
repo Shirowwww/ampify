@@ -483,7 +483,8 @@ void LoadVariables(const Stylesheet& sheet, const ValueContext& context, const R
 std::optional<std::string> MisplacedProperty(const Selector& selector, const PropertySpec& spec,
                                              const Declaration& declaration) {
     const std::string name = "\"" + declaration.property + "\"";
-    if (selector.trigger != Trigger::Always && spec.kind == PropertyKind::Order) {
+    const bool moves = spec.kind == PropertyKind::Order || spec.kind == PropertyKind::Target;
+    if (selector.trigger != Trigger::Always && moves) {
         return name + " is not possible under " + TriggerName(selector.trigger) + " (" + selector.text + ")";
     }
     if (selector.pseudo == PseudoElement::None && spec.kind == PropertyKind::Content) {
@@ -839,7 +840,6 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
         snippet.settings = base->settings;
         snippet.keyframes = base->keyframes;
     }
-
     if (files.Exists("colors.ini")) {
         snippet.problems.push_back("colors.ini ignored: a snippet uses the colors of the active theme ($name)");
     }
@@ -1021,6 +1021,24 @@ private:
         return left;
     }
 
+    // min(a, b, ...) and max(...): the smallest or the largest of several lengths of one unit.
+    std::optional<Quantity> Extremum(bool smallest) {
+        std::string name = smallest ? "min()" : "max()";
+        std::optional<Quantity> best = Sum();
+        while (best && Take(',')) {
+            std::optional<Quantity> next = Sum();
+            if (!next) return std::nullopt;
+            if (!best->unit.empty() && !next->unit.empty() && best->unit != next->unit) {
+                return Fail(name + " compares " + next->unit + " with " + best->unit);
+            }
+            best->number = smallest ? std::min(best->number, next->number) : std::max(best->number, next->number);
+            if (best->unit.empty()) best->unit = next->unit;
+        }
+        if (!best) return std::nullopt;
+        if (!Take(')')) return Fail(name + " is missing a closing parenthesis");
+        return best;
+    }
+
     std::optional<Quantity> Factor() {
         // A sign before a bracket or a number: -(1 + 2), +4.
         if (Take('+')) return Factor();
@@ -1030,6 +1048,11 @@ private:
             return inner;
         }
         SkipSpaces();
+        std::string_view word = m_text.substr(m_pos, 4);
+        if (ToLowerAscii(word) == "min(" || ToLowerAscii(word) == "max(") {
+            m_pos += 4;
+            return Extremum(ToLowerAscii(word) == "min(");
+        }
         if (ToLowerAscii(m_text.substr(m_pos, 5)) == "calc(") m_pos += 4;
         if (Take('(')) {
             std::optional<Quantity> inner = Sum();

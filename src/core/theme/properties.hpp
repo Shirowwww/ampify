@@ -32,6 +32,7 @@ enum class PropertyKind {
     FlowDirection,  // ltr / left-to-right, or rtl / right-to-left (XAML LeftToRight, RightToLeft)
     ColorScheme,    // light, dark or normal (XAML ElementTheme Light, Dark, Default): the mode of the element's brushes
     Order,       // a whole number from 0: the position of the element among the items of its parent (kOrderProperty)
+    Target,      // move-to: a selector in quotes or not, naming the element the element moves into (kMoveToProperty)
     Alignment,   // left / center / right / stretch, or top / center / bottom / stretch for vertical-alignment
     Integer,     // a whole number: a Grid row or column (from 0), a span (from 1), a z-index (may be negative)
     Transform,   // scale(x[, y]) rotate(<deg>) translate(x[, y]) and their X / Y forms, or none

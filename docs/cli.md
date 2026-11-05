@@ -133,7 +133,7 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `theme.active` | Theme id, empty for none | empty |
 | `theme.scheme` | A section of `colors.ini`, or `auto` to follow Windows' light or dark mode | the theme's default |
 | `theme.schedule` | `HH:MM=Scheme,...` ([format](themes/format.md#automatic-scheme)) | empty |
-| `theme.accent` | `RRGGBB` or `#RRGGBB`: the accent of every theme, and of Apple Music's own look with no theme. What Ampify derives from the accent follows it ([details](themes/format.md#chosen-accent)) | empty: the theme's own |
+| `theme.accent` | `RRGGBB` or `#RRGGBB`: the accent of every theme, and of Apple Music's own look with no theme. `artwork`: the accent follows the song playing. What Ampify derives from the accent follows it ([details](themes/format.md#chosen-accent)) | empty: the theme's own |
 | `theme.glass` | `full`, `balanced` or `eco`: how much glass every theme may ask of the graphics card ([details](themes/format.md#glass-level)) | `full` |
 | `theme.parts.colors`, `.resources`, `.assets`, `.script` | `1` or `0`: turn off a part of the theme | `1` |
 | `theme.live_reload` | `1` or `0`: apply the theme again when its files change | `1` |
@@ -147,7 +147,7 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `apple.playerControls` | Shuffle and repeat around the full-screen player's buttons: `shown` or `hidden` | `shown` |
 | `apple.artwork` | The full-screen player's cover: `sharp` shows a sharper copy where Apple Music stretches a small one, `apple` leaves Apple's | `sharp` |
 | `apple.marquee` | A text cut with "…": `hover` scrolls it while the pointer is on it, `off` leaves it cut | `hover` |
-| `apple.sidebar` | Apple Music's sidebar: `open` leaves it as Apple Music shows it, `hover` folds it to its icons and opens it over the pages while the pointer is on it | `open` |
+| `apple.sidebar` | Apple Music's sidebar: `open` leaves it as Apple Music shows it, `hover` folds it to its icons and opens it over the pages while the pointer is on it; the hamburger button pins it open for the session (its icon shows a pin; a second click folds it again), and the Library and Playlists groups fold with it | `open` |
 | `ampify.entry` | Where the entry that opens the Marketplace stands: `sidebar`, or `header` next to Apple's "···" at the top of the open sidebar | `sidebar` |
 | `catalog.url` | `https://...` or `file://...` | the public catalog |
 | `app_launch_flags` | Arguments added when `ampify launch` starts Apple Music | empty |

@@ -273,6 +273,14 @@ std::map<std::string, std::string> ArtworkVariables(const ExtractedColors& color
                                                     {"art-text", luminance > 0.179 ? "#000000" : "#ffffff"}};
     // The same without "#", so a theme can put an alpha in front: #40var(--art-1-hex).
     for (const char* name : {"art-1", "art-2", "art-3"}) variables[std::string(name) + "-hex"] = variables[name].substr(1);
+    // Plain numbers from 0 to 1, for a theme's own choices: how light the artwork is, and how coloured.
+    auto fraction = [](double value) {
+        char text[16];
+        std::snprintf(text, sizeof text, "%.2f", std::clamp(value, 0.0, 1.0));
+        return std::string(text);
+    };
+    variables["art-luma"] = fraction((0.299 * base.r + 0.587 * base.g + 0.114 * base.b) / 255.0);
+    variables["art-sat"] = fraction(ToHsl(base).s);
     return variables;
 }
 

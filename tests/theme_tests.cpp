@@ -108,6 +108,15 @@ public:
 
     bool Alive(th::NodeId id) override { return Find(id) != nullptr; }
 
+    // The children keep the order of the list, so a moved element is listed where it was: the index is not kept.
+    bool Reparent(th::NodeId id, th::NodeId parent, int index) override {
+        (void)index;
+        Element* element = Find(id);
+        if (!element || !Find(parent)) return false;
+        element->info.parent = static_cast<int>(parent) - 1;
+        return true;
+    }
+
     std::vector<th::NodeInfo> Snapshot() override {
         std::vector<int> position(elements.size(), -1);
         std::vector<th::NodeInfo> nodes;
@@ -596,6 +605,110 @@ TEST_CASE(Builtins_SidebarEntryIsAmpifysButtonsNotApplesFooter) {
     th::Selector entry = Sel(selectors->front().c_str());
     CHECK(th::Matches(entry, nodes, 3));
     CHECK(!th::Matches(entry, nodes, 2));
+}
+
+namespace {
+
+// True when one of the class's selectors matches the node at index.
+bool ClassReaches(const char* name, const std::vector<th::NodeInfo>& nodes, int index) {
+    std::optional<std::vector<std::string>> selectors = th::ExpandClasses(name);
+    if (!selectors) return false;
+    for (const std::string& text : *selectors) {
+        if (th::Matches(Sel(text.c_str()), nodes, index)) return true;
+    }
+    return false;
+}
+
+}  // namespace
+
+TEST_CASE(Builtins_SidebarSelectionIsOnlyTheSelectedItemsIndicator) {
+    // NavigationView > NavigationViewItem > Rectangle#SelectionIndicator (index 2), and another rectangle (index 3)
+    std::vector<th::NodeInfo> nodes(4);
+    nodes[0] = {1, "NavigationView", "", "", -1, 0};
+    nodes[1] = {2, "NavigationViewItem", "", "", 0, 1};
+    nodes[2] = {3, "Rectangle", "", "SelectionIndicator", 1, 2};
+    nodes[3] = {4, "Rectangle", "", "Other", 1, 2};
+    CHECK(ClassReaches(".sidebar-selection", nodes, 2));
+    CHECK(!ClassReaches(".sidebar-selection", nodes, 3));
+}
+
+TEST_CASE(Builtins_SearchSuggestionsIsThePopupNotItsBox) {
+    // The suggestions are a Popup of their own (a root), with a list inside it
+    std::vector<th::NodeInfo> nodes(2);
+    nodes[0] = {1, "Popup", "", "SuggestionsPopup", -1, 0};
+    nodes[1] = {2, "ListView", "", "SuggestionsList", 0, 1};
+    CHECK(ClassReaches(".search-suggestions", nodes, 0));
+    CHECK(!ClassReaches(".search-suggestions", nodes, 1));
+}
+
+TEST_CASE(Builtins_LoadingIsTheSpinnerOfTheContentPage) {
+    std::vector<th::NodeInfo> nodes(2);
+    nodes[0] = {1, "Grid", "", "", -1, 0};
+    nodes[1] = {2, "Spinner", "", "Spinner", 0, 1};
+    CHECK(ClassReaches(".loading", nodes, 1));
+    CHECK(!ClassReaches(".loading", nodes, 0));
+}
+
+TEST_CASE(Builtins_LibraryStatusIsTheAddOrDownloadGroupOfAnItem) {
+    std::vector<th::NodeInfo> nodes(2);
+    nodes[0] = {1, "Grid", "", "", -1, 0};
+    nodes[1] = {2, "LibraryItemStatusButton", "", "", 0, 1};
+    CHECK(ClassReaches(".library-status", nodes, 1));
+    CHECK(!ClassReaches(".library-status", nodes, 0));
+}
+
+TEST_CASE(Builtins_FocusRingIsTheKeyboardFocusBorder) {
+    std::vector<th::NodeInfo> nodes(2);
+    nodes[0] = {1, "Grid", "", "", -1, 0};
+    nodes[1] = {2, "Border", "", "FocusBorder", 0, 1};
+    CHECK(ClassReaches(".focus-ring", nodes, 1));
+    CHECK(!ClassReaches(".focus-ring", nodes, 0));
+}
+
+TEST_CASE(Builtins_SidebarCountIsTheBadgeNumberOfAnItem) {
+    std::vector<th::NodeInfo> nodes(3);
+    nodes[0] = {1, "ContentPresenter", "", "InfoBadgePresenter", -1, 0};
+    nodes[1] = {2, "TextBlock", "", "BadgeNumberTextBlock", 0, 1};
+    nodes[2] = {3, "TextBlock", "", "Title", -1, 0};
+    CHECK(ClassReaches(".sidebar-count", nodes, 1));
+    CHECK(!ClassReaches(".sidebar-count", nodes, 2));
+}
+
+TEST_CASE(Builtins_CoverPlayButtonIsTheOverArtworkButtonNotTheAlbumOne) {
+    std::vector<th::NodeInfo> nodes(4);
+    nodes[0] = {1, "Grid", "", "", -1, 0};
+    nodes[1] = {2, "Button", "", "PlayOverCoverArtButton", 0, 1};
+    nodes[2] = {3, "Button", "", "PlayWithoutCoverArtButton", 0, 1};
+    nodes[3] = {4, "Button", "", "PlayButtonElement", 0, 1};
+    CHECK(ClassReaches(".cover-play-button", nodes, 1));
+    CHECK(ClassReaches(".cover-play-button", nodes, 2));
+    CHECK(!ClassReaches(".cover-play-button", nodes, 3));
+}
+
+TEST_CASE(Builtins_ExplicitGroupIsTheBadgeAndTheFavouriteStar) {
+    std::vector<th::NodeInfo> nodes(2);
+    nodes[0] = {1, "Grid", "", "", -1, 0};
+    nodes[1] = {2, "StackPanel", "", "ExplicitFavoriteContainer", 0, 1};
+    CHECK(ClassReaches(".explicit-group", nodes, 1));
+    CHECK(!ClassReaches(".explicit-group", nodes, 0));
+}
+
+TEST_CASE(Builtins_PopupScrimIsTheLayerBehindMenus) {
+    std::vector<th::NodeInfo> nodes(2);
+    nodes[0] = {1, "Popup", "", "", -1, 0};
+    nodes[1] = {2, "Rectangle", "", "LightDismissLayer", 0, 1};
+    CHECK(ClassReaches(".popup-scrim", nodes, 1));
+    CHECK(!ClassReaches(".popup-scrim", nodes, 0));
+}
+
+TEST_CASE(Builtins_SidebarDragIndicatorIsTheTopAndBottomBars) {
+    std::vector<th::NodeInfo> nodes(3);
+    nodes[0] = {1, "Grid", "", "", -1, 0};
+    nodes[1] = {2, "Grid", "", "DragTopIndicator", 0, 1};
+    nodes[2] = {3, "Grid", "", "DragBottomIndicator", 0, 1};
+    CHECK(ClassReaches(".sidebar-drag-indicator", nodes, 1));
+    CHECK(ClassReaches(".sidebar-drag-indicator", nodes, 2));
+    CHECK(!ClassReaches(".sidebar-drag-indicator", nodes, 0));
 }
 
 TEST_CASE(Theme_ALayoutTakesTheThemesVariablesAndReportsUnderItsName) {
@@ -2515,6 +2628,16 @@ TEST_CASE(Properties_FlowDirectionAndOrder) {
     CHECK(th::FindProperty("order")->xaml == th::kOrderProperty);
 }
 
+TEST_CASE(Properties_MoveToNamesAContainer) {
+    th::Palette palette;
+    MemoryFiles files;
+    CHECK(Converted("move-to", "\"Grid#TransportBar > Grid:nth-child(1)\"", palette, files) ==
+          "Grid#TransportBar > Grid:nth-child(1)");
+    CHECK(Converted("move-to", "Grid#Controls", palette, files) == "Grid#Controls");
+    CHECK(Converted("move-to", "\"\"", palette, files).rfind("PROBLEM", 0) == 0);
+    CHECK(th::FindProperty("move-to")->xaml == th::kMoveToProperty);
+}
+
 TEST_CASE(Engine_AppliesFlowDirectionAndRestoresIt) {
     MemoryFiles files;
     files.files["user.css"] = "Page { flow-direction: rtl; }\n";
@@ -2552,6 +2675,72 @@ TEST_CASE(Engine_MovesItemsInOrderAndUndoesTheMoves) {
 
     engine.Restore(tree);
     CHECK((tree.Names() == std::vector<std::string>{"A", "B", "C", "D"}));
+}
+
+TEST_CASE(Engine_MovesAnElementIntoAnotherContainerAndUndoesIt) {
+    FakeTree tree;
+    tree.Add(-1, "Grid", "TransportBar");                                  // id 1
+    tree.Add(0, "Grid", "Controls");                                       // id 2
+    tree.Add(0, "Grid", "LCD");                                            // id 3
+    th::NodeId scrubber = tree.Add(2, "ScrubberControl", "LCDScrubber");  // id 4, in LCD
+    MemoryFiles files;
+    files.files["user.css"] = "ScrubberControl#LCDScrubber { move-to: \"Grid#Controls\"; }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    th::ThemeEngine::Report first = engine.Apply(theme, tree);
+    CHECK(first.applied == 1);
+    CHECK(tree.elements[scrubber - 1].info.parent == 1);  // now in Controls, id 2
+
+    th::ThemeEngine::Report second = engine.Apply(theme, tree);  // the next tick moves nothing
+    CHECK(second.applied == 0);
+    CHECK(tree.elements[scrubber - 1].info.parent == 1);
+
+    // Apple rebuilds the scrubber in its own panel: the next pass moves the new one too.
+    tree.Remove(scrubber);
+    th::NodeId rebuilt = tree.Add(2, "ScrubberControl", "LCDScrubber");
+    engine.Apply(theme, tree);
+    CHECK(tree.elements[rebuilt - 1].info.parent == 1);
+
+    engine.Restore(tree);
+    CHECK(tree.elements[rebuilt - 1].info.parent == 2);  // back in LCD
+    CHECK(engine.OriginalCount() == 0);
+}
+
+TEST_CASE(Engine_RefusesAMoveWhoseTargetIsMissing) {
+    FakeTree tree;
+    tree.Add(-1, "Grid", "LCD");
+    th::NodeId scrubber = tree.Add(0, "ScrubberControl", "LCDScrubber");
+    MemoryFiles files;
+    files.files["user.css"] = "ScrubberControl#LCDScrubber { move-to: \"Grid#Nowhere\"; }\n";
+    th::Theme theme = Load(files);
+
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    th::ThemeEngine::Report report = engine.Apply(theme, tree);
+    CHECK(report.refused == 1);
+    CHECK(report.applied == 0);
+    CHECK(tree.elements[scrubber - 1].info.parent == 0);  // still in LCD
+    CHECK(log.str().find("no element matches") != std::string::npos);
+}
+
+TEST_CASE(Builtins_CentreBarMovesTheProgressLineIntoTheControls) {
+    MemoryFiles files;
+    files.files["user.css"] = "@import \"ampify:bottom-bar\";\n@import \"ampify:centre-bar\";\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+
+    std::vector<std::string> moved;  // the selectors of the elements the module moves
+    for (const th::Assignment& assignment : theme.assignments) {
+        if (assignment.property != th::kMoveToProperty) continue;
+        moved.push_back(assignment.selector.text);
+        CHECK(assignment.value.text == "Grid#TransportBar > Grid:nth-child(1)");
+    }
+    CHECK(moved.size() == 3);  // the progress line and the two times
 }
 
 TEST_CASE(Variables_RootBlockAndVar) {
@@ -2677,8 +2866,13 @@ TEST_CASE(Calc_ComputesLengthsFromVariables) {
     CHECK(th::EvaluateCalc("#FF112233").value_or("") == "#FF112233");
     CHECK(th::EvaluateCalc("calc(-(1 + 2) * 2px) calc(+4)").value_or("") == "-6px 4");
     CHECK(!th::EvaluateCalc("calc(inf * 2)").has_value());
+    // The smaller or the larger of several lengths, for a corner that must stay under half a column.
+    CHECK(th::EvaluateCalc("calc(min(24px, 16px)) calc(max(2px, 3px + 1px))").value_or("") == "16px 4px");
+    CHECK(th::EvaluateCalc("calc(min(10px, 2 * 8px, 30px))").value_or("") == "10px");
 
     std::string problem;
+    CHECK(!th::EvaluateCalc("calc(min(1px, 2ms))", &problem).has_value());
+    CHECK(problem == "min() compares ms with px");
     CHECK(!th::EvaluateCalc("calc(1 / 0)", &problem).has_value());
     CHECK(problem == "calc() divides by zero");
     CHECK(!th::EvaluateCalc("calc(4px / 2px)", &problem).has_value());
@@ -2964,6 +3158,15 @@ TEST_CASE(Glass_BalancedStopsEndlessAnimationsAndShadows) {
     if (!kept || kept->size() != 1) return;
     CHECK((*kept)[0].iterations == 1);
     CHECK(theme.assignments[2].value.text == "#FF000000");
+}
+
+TEST_CASE(Glass_EcoShowsAnAcrylicWindowAsMica) {
+    th::Theme theme;
+    theme.variables["window-material"] = "acrylic";
+    th::ApplyGlassLevel(theme, th::GlassLevel::Balanced);
+    CHECK(theme.variables["window-material"] == "acrylic");  // balanced keeps the blur
+    th::ApplyGlassLevel(theme, th::GlassLevel::Eco);
+    CHECK(theme.variables["window-material"] == "mica");  // eco: the window's blur goes too
 }
 
 TEST_CASE(Glass_BalancedKeepsAShadowThatRemovesDepth) {
@@ -4286,6 +4489,59 @@ TEST_CASE(Artwork_VariablesGiveReadableText) {
     std::string art3 = ampify::ArtworkVariables(pale)["art-3"];
     int r = std::stoi(art3.substr(1, 2), nullptr, 16), g = std::stoi(art3.substr(3, 2), nullptr, 16);
     CHECK(r < 120 && g < 110);
+}
+
+TEST_CASE(Artwork_LumaAndSaturationArePlainNumbers) {
+    ampify::ExtractedColors grey;
+    grey.prominent = {128, 128, 128};
+    CHECK(ampify::ArtworkVariables(grey)["art-luma"] == "0.50");
+    CHECK(ampify::ArtworkVariables(grey)["art-sat"] == "0.00");
+    ampify::ExtractedColors red;
+    red.prominent = {255, 0, 0};
+    CHECK(ampify::ArtworkVariables(red)["art-luma"] == "0.30");
+    CHECK(ampify::ArtworkVariables(red)["art-sat"] == "1.00");
+}
+
+TEST_CASE(Artwork_ReachesASnippetWithNoThemeActive) {
+    MemoryFiles files;
+    files.files["user.css"] = ".sidebar { background: var(--art-1, #102030); }\n";
+    th::LoadOptions options;
+    options.artwork = {{"art-1", "#c04020"}};
+    th::Theme snippet = th::LoadSnippet("calm", "snippets/calm", files, nullptr, options);
+    CHECK(Assigned(snippet, ".sidebar", "Background") == "#FFC04020");
+}
+
+TEST_CASE(Accent_ArtworkValueIsRecognisedAndKeptLegible) {
+    CHECK(th::IsArtworkAccent("artwork"));
+    CHECK(!th::IsArtworkAccent("FA2D48"));
+    CHECK(!th::IsArtworkAccent(""));
+    const th::Argb white{0xFF, 0xFF, 0xFF, 0xFF};
+    const th::Argb black{0xFF, 0x00, 0x00, 0x00};
+    const th::Argb red{0xFF, 0xC8, 0x28, 0x28};
+    CHECK(!(th::LegibleAccent(white) == white));  // a white accent vanishes on a light page
+    CHECK(!(th::LegibleAccent(black) == black));  // and a black one on a dark page
+    CHECK(th::LegibleAccent(red) == red);         // a mid tone stays as the artwork gave it
+    CHECK(th::ArtworkAccent({{"art-2", "#c82828"}}) == red);
+    CHECK(!th::ArtworkAccent({{"art-1", "#c82828"}}));  // the accent is the vibrant colour
+}
+
+TEST_CASE(Worker_AccentArtworkFollowsTheSongAndReloadsOnlyWhenItMoves) {
+    std::filesystem::path kit(TempFolder("worker-accent-artwork"));
+    ampify::Settings settings;
+    settings.Set("theme.accent", "artwork");
+    th::ThemeWorker worker(kit);
+    th::SessionRequest waiting = worker.Tick(settings, 600);
+    CHECK(!waiting.theme);  // no artwork yet: the theme's own
+    worker.SetArtwork({{"art-2", "#c82828"}});
+    th::SessionRequest red = worker.Tick(settings, 600);
+    CHECK(red.generation > waiting.generation);
+    CHECK(red.theme && ResourceValue(*red.theme, "AccentFillColorDefaultBrush") == "#FFC82828");
+    CHECK(worker.Tick(settings, 600).generation == red.generation);
+    worker.SetArtwork({{"art-2", "#c82828"}, {"art-1", "#101010"}});  // a change that moves no accent
+    CHECK(worker.Tick(settings, 600).generation == red.generation);
+    worker.SetArtwork({{"art-2", "#2060c0"}});
+    CHECK(worker.Tick(settings, 600).generation > red.generation);
+    std::filesystem::remove_all(kit);
 }
 
 TEST_CASE(Selector_PlayerWindowsTakeOnlyRulesThatNameThem) {

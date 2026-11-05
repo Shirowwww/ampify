@@ -411,6 +411,26 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("settings: only an extension, a theme or a snippet declares settings", text)
 
+    def test_settings_may_have_a_group_and_a_description(self):
+        grouped = [
+            {"key": "seconds", "label": "Show the seconds", "type": "toggle", "default": True,
+             "group": "Clock", "description": "Adds the seconds to the clock."},
+            {"key": "halo", "label": "Halo", "type": "toggle", "default": False},
+        ]
+        code, text = run("manifest", self.install(manifest(settings=grouped)))
+        self.assertEqual(code, 0, text)
+
+    def test_a_group_or_a_description_that_does_not_fit_is_refused(self):
+        toggle = {"key": "a", "label": "A", "type": "toggle", "default": True}
+        too_long = [dict(toggle, group="x" * 41), dict(toggle, description="x" * 201), dict(toggle, group="")]
+        for settings in too_long:
+            with self.subTest(settings=settings):
+                code, text = run("manifest", self.install(manifest(settings=[settings])))
+                self.assertEqual(code, 1, text)
+        code, text = run("manifest", self.install(manifest(settings=[dict(toggle, description="two\nlines")])))
+        self.assertEqual(code, 1, text)
+        self.assertIn("description must be 1 to 200 characters, on one line", text)
+
     def test_a_theme_and_a_snippet_declare_settings(self):
         toggle = {"key": "hide-radio", "label": "Hide Radio", "type": "toggle", "default": False}
         theme = manifest(id="demo-theme", kind="theme", main=None, colors="colors.ini", settings=[toggle])

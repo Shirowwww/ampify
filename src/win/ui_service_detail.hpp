@@ -19,6 +19,7 @@
 #include <charconv>
 #include <chrono>
 #include <cmath>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <map>
@@ -50,6 +51,7 @@
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Windows.System.h>
 
+#include "../core/element_settings.hpp"
 #include "../core/i18n.hpp"
 #include "../core/json.hpp"
 #include "../core/settings.hpp"
@@ -321,6 +323,18 @@ void WatchSettingsEntry(UiService::Shared& shared, const std::shared_ptr<WindowC
 
 // ui_service_mods.cpp
 void OpenKitFolder(const std::filesystem::path& kit);
+
+// The kind of an element as the settings functions name it: "extension", "theme" or "snippet".
+inline std::string_view SettingKindOf(const uirender::ModEntry& mod) {
+    return mod.snippet ? "snippet" : mod.theme ? "theme" : "extension";
+}
+
+// Export and import of one element's settings, as a file and through the clipboard (ui_service_settings_io.cpp).
+// `say` shows a short line under the card; `refresh` builds the card again after an import.
+using SettingsSay = std::function<void(const std::string&)>;
+void ExportElementSettings(UiService::Shared& shared, const uirender::ModEntry& mod, const SettingsSay& say);
+void ImportElementSettings(UiService::Shared& shared, const uirender::ModEntry& mod, const std::function<void()>& refresh,
+                           const SettingsSay& say);
 xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntry& mod);
 xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::ModEntry& mod);
 xaml::FrameworkElement ThemeSettingsSection(UiService::Shared& shared, const uirender::ModEntry& theme);

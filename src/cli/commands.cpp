@@ -92,8 +92,8 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
         return true;
     }
     if (key == "theme.accent") {
-        if (!value.empty() && !theme::ParseAccent(value)) {
-            problem = "theme.accent expects a colour as RRGGBB or #RRGGBB, such as FA2D48 (empty: the theme's own accent)";
+        if (!value.empty() && !theme::ParseAccent(value) && !theme::IsArtworkAccent(value)) {
+            problem = "theme.accent expects a colour as RRGGBB or #RRGGBB, such as FA2D48, or artwork (empty: the theme's own accent)";
             return false;
         }
         return true;

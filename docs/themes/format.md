@@ -121,14 +121,16 @@ weighs what the path it stands for weighs, without the covers `.artwork` leaves 
   the window's width, write the rule itself inside `@media`. A `:root` inside `@setting` works, the setting being known
   at load.
 - `var(--name, fallback)` gives a fallback. A missing variable without one makes the declaration ignored.
-- `calc()` takes `+`, `-`, `*`, `/` and brackets. Lengths can be added or subtracted, not multiplied together.
+- `calc()` takes `+`, `-`, `*`, `/` and brackets. Lengths can be added or subtracted, not multiplied together. Inside it,
+  `min(a, b)` and `max(a, b)` give the smaller or larger of lengths of one unit.
 - A snippet sees the variables of the active theme.
 
 ### Theme settings
 
 A theme can declare settings in its manifest, with the same `settings` field as an extension
 ([manifest.md](../extensions/manifest.md#settings)). People change them in Ampify's settings page,
-and the theme applies again at once.
+and the theme applies again at once. The `group` and `description` of a setting group them under a heading and
+explain them in one line; the page also resets them, and exports or imports them as a file.
 
 ```json
 "settings": [
@@ -198,6 +200,7 @@ and the theme applies again at once.
 | `flow-direction` or `direction` | `FlowDirection` | `ltr` or `rtl` |
 | `color-scheme` | `RequestedTheme` | `light`, `dark` or `normal`: the element and everything inside it draw in that mode |
 | `order` | Position | An integer from 0: the place among the parent's children |
+| `move-to` | Move | A selector, quoted or not, of the element to move into, such as `"Grid#TransportBar > Grid:nth-child(1)"`: the element goes into the first one it matches, at the end of its children. Not under `:hover`, `:focus` or `:active`. It is undone with the theme, and redone when Apple Music rebuilds the element (the move is refused, and logged, when nothing matches) |
 | `horizontal-alignment` | `HorizontalAlignment` | `left`, `center`, `right` or `stretch` |
 | `vertical-alignment` | `VerticalAlignment` | `top`, `center`, `bottom` or `stretch` |
 | `grid-row`, `grid-column` | `Grid.Row`, `Grid.Column` | An integer from 0 (direct children of a `Grid` only) |
@@ -264,11 +267,21 @@ Ampify also gives the artwork's colors as variables. Before the first artwork th
 | `--art-3` | A dark vibrant one, for backgrounds and glass |
 | `--art-text` | `#000000` or `#ffffff`, whichever reads best on `--art-1` |
 | `--art-1-hex`, `--art-2-hex`, `--art-3-hex` | The same without `#`, to put an alpha in front |
+| `--art-luma` | How light the artwork is, from `0.00` (black) to `1.00` (white), a plain number |
+| `--art-sat` | How coloured it is, from `0.00` (grey) to `1.00` (full colour), a plain number |
 
 ```css
 .playbar { backdrop: acrylic(var(--art-3, #0B0B10), 0.7); }
 .lcd { background: #33var(--art-2-hex, FFFFFF); }
+/* A light cover gets a black veil, so white text still reads: the veil grows with --art-luma. */
+.playbar { backdrop: acrylic(#000000, var(--art-luma, 0.5)); }
 ```
+
+The engine does no arithmetic on these numbers: a value takes one as it is, as above. Without a cover, `--art-luma`
+and `--art-sat` have no value, so give a fallback.
+
+Snippets get the artwork's colours too, even with no theme active. A snippet using `var(--art-1)` (or `--page-art-1`)
+works on its own, as the [`cover-ambience`](../../themes/snippets/cover-ambience/) snippet does.
 
 The album or playlist on screen gives the same five colours of its own artwork, read from its page's header, with the
 prefix `page-`: `--page-art-1`, `--page-art-2`, `--page-art-3`, `--page-art-text` and their `-hex` forms. They change
@@ -392,6 +405,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 |---|---|
 | `ampify:floating-panels` | The sidebar and the pages become two rounded panels on the window's background, with even gaps |
 | `ampify:bottom-bar` | The playback bar goes to the bottom across the window: the song left, buttons in the middle of the window, volume right. It hides the column Apple keeps for the window buttons, so a theme needs no rule of its own for it. Import it after `floating-panels` |
+| `ampify:centre-bar` | `bottom-bar` with the buttons centred and the progress line under them, the elapsed time at its left end and the length at its right end. The line and the times move into the middle cell with `move-to`. Import it after `bottom-bar` |
 | `ampify:scrollbars` | Scroll bars inside their panel, clear of its rounded corners, without Windows' arrows, out of sight until the pointer reaches them. Part of `floating-panels` |
 
 | Variable | Default | Meaning |
@@ -409,6 +423,8 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | `--bar-reach` | `calc(var(--gap) - 290)` | `bottom-bar`: how far left the bar reaches past the page column |
 | `--bar-reach-folded` | `calc(var(--gap) - var(--compact-pane))` | `bottom-bar`: the same with the sidebar folded |
 | `--bar-reach-end` | `0` | `bottom-bar`: how far right the bar reaches past the page column, for a sidebar on the right |
+| `--line-inset` | `240` | `centre-bar`: space from the cell's edges to the progress line's end (the times stand in it) |
+| `--time-room` | `44` | `centre-bar`: width kept for each time at the ends of the line |
 | `--bar-reach-end-folded` | `0` | `bottom-bar`: the same with the sidebar folded |
 | `--caption-room` | `40` | `bottom-bar`: the strip the panels leave at the top for the window's buttons |
 | `--sidebar-top` | `var(--caption-room)` | `bottom-bar`: where the sidebar starts. The back arrow and the folded menu button follow it |
@@ -458,7 +474,9 @@ Cover ambience, follows those corners.
 ```
 
 `min-width`, `max-width`, `min-height` and `max-height`, joined by `and`, in the window's pixels (bounds included).
-Apple Music folds its sidebar at 1324 pixels wide and less. No variables and no nested `@media` inside.
+Apple Music folds its sidebar at 1324 pixels wide and less. With `apple.sidebar = hover`, these bounds follow the
+sidebar instead of the window (folded: the 1324 rules hold at every width), until the sidebar is pinned open. No
+variables and no nested `@media` inside.
 
 `(prefers-color-scheme: light)` or `(dark)` holds rules for the theme's scheme in use (dark or light from its
 background colour), whatever Windows' mode; it joins the sizes with `and`:
@@ -643,12 +661,19 @@ follow it. The colours a scheme gives along with its own accent (`AccentFillColo
 one. A colour a theme writes as a hexadecimal value in `user.css` stays: name `$AccentFillColorDefaultBrush` for what
 should follow the accent. Keys the theme's `resources.xaml` defines stay as well. Empty, the theme keeps its own.
 
+`theme.accent = artwork` (the last choice of Settings > Ampify, "Follows the artwork") takes the accent from the song
+playing instead: its vibrant colour, `--art-2`. It changes when the song does, and only then. Before the first cover,
+the theme keeps its own accent. The colour is kept between a lightness of 30% and 70%, so it never turns into black
+or white on a dark or a light page: a very dark or very pale cover gives a grey-tinted accent of that lightness. Text
+on the accent is still chosen for it as above.
+
 ## Glass level
 
 `theme.glass` lightens what every theme and snippet asks of the graphics card, for a laptop on battery or an older
 card. `full` (or nothing) keeps the theme as written. `balanced` stops the animations that never end (a turning
 artwork) and leaves out the depth shadows of `box-shadow`; acrylic keeps its blur. `eco` does the same and paints
-acrylic panes as plain colours, the tint made more opaque so the text keeps its contrast. A theme needs nothing for
+acrylic panes as plain colours, the tint made more opaque so the text keeps its contrast, and an acrylic window
+(`--window-material: acrylic`) as Mica. A theme needs nothing for
 it: write the effects as usual. People choose it under the accent in Settings > Ampify ("Glass effects").
 
 ## What Ampify adjusts for every theme

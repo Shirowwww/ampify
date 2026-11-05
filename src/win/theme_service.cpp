@@ -224,6 +224,9 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 SetXamlWatcherListener([weak] {
                     if (std::shared_ptr<UiSide> side = weak.lock()) side->backend.ElementAdded();
                 });
+                SetSidebarChangedListener([weak] {
+                    if (std::shared_ptr<UiSide> side = weak.lock()) side->backend.RecheckMedia();
+                });
             }
             if (ui->backend.WindowClosed()) return;
             // Hidden in the notification area (music playing, window closed to the tray) or minimized: the periodic

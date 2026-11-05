@@ -1,5 +1,7 @@
 #include "builtins.hpp"
 
+#include "builtins_css.hpp"
+
 #include <array>
 #include <cctype>
 #include <utility>
@@ -23,6 +25,8 @@ const std::vector<ClassEntry> kClasses{
     {"titlebar-drag-area", {"Canvas#DraggableTitlebarRegion"}},
     {"caption-buttons-cover", {"Border#CaptionButtonsOcclusionBorder"}},
     {"modal", {"ContentPresenter#ModalContentPresenter"}},
+    {"focus-ring", {"Border#FocusBorder"}},
+    {"popup-scrim", {"Rectangle#LightDismissLayer"}},
     {"info-bar", {"InfoBar#topInfoBar", "InfoBar#bottomInfoBar"}},
     {"scrollbar", {"ScrollBar#VerticalScrollBar", "ScrollBar#HorizontalScrollBar"}},
 
@@ -37,10 +41,14 @@ const std::vector<ClassEntry> kClasses{
     {"app-name", {"TextBlock#AppName"}},
     {"search-area", {"Grid#AutoSuggestArea"}},
     {"search-box", {"AutoSuggestBox"}},
+    {"search-suggestions", {"Popup#SuggestionsPopup"}},
     {"sidebar-scroll", {"ScrollViewer#MenuItemsScrollViewer"}},
     {"sidebar-items", {"ItemsRepeater#MenuItemsHost"}},
     {"sidebar-item", {"NavigationViewItem"}},
     {"sidebar-item-artwork", {"HoverGrid#ArtworkGrid"}},
+    {"sidebar-selection", {"NavigationViewItem Rectangle#SelectionIndicator"}},
+    {"sidebar-count", {"ContentPresenter#InfoBadgePresenter TextBlock#BadgeNumberTextBlock"}},
+    {"sidebar-drag-indicator", {"Grid#DragTopIndicator", "Grid#DragBottomIndicator"}},
     {"sidebar-play-button", {"Button#PlayButtonWithBackground"}},
     {"sidebar-footer", {"ContentControl#FooterContentBorder"}},
     {"sidebar-footer-items", {"ItemsRepeater#FooterMenuItemsHost"}},
@@ -85,6 +93,7 @@ const std::vector<ClassEntry> kClasses{
     {"stacked-list", {"Grid#StackedPageContent > ListView"}},
     {"page-header", {"Grid#PageHeaderBar"}},
     {"page-title", {"TextBlock#PageHeaderTitle"}},
+    {"loading", {"Spinner#Spinner"}},
     {"frost", {"BackDrop"}},
     {"filter-box", {"TextBox#FilterTextBox"}},
     {"filter-button", {"ToggleButton#FilterButton"}},
@@ -115,13 +124,16 @@ const std::vector<ClassEntry> kClasses{
     {"artist-artwork", {"ArtworkImage#ArtworkHasImage", "ArtworkImage#CircleArtworkImage"}},
     {"artwork-shadow", {"Border#ShadowElement"}},
     {"card-play-button", {"HoverGrid#SquareLockupContent Button#PlayButton"}},
+    {"cover-play-button", {"Button#PlayOverCoverArtButton", "Button#PlayWithoutCoverArtButton"}},
     {"card-title", {"TitleSubtitleControl TextBlock#TitleTextBlock"}},
     {"card-subtitle", {"TitleSubtitleControl TextBlock#SubtitleTextBlock"}},
     {"explicit-badge", {"FontIcon#ExplicitBadgeFontIcon"}},
+    {"explicit-group", {"StackPanel#ExplicitFavoriteContainer"}},
     {"favorite-button", {"Button#FavoriteButton"}},
     {"favorite-icon", {"FontIcon#FavoriteIcon"}},
     {"add-button", {"Button#AddButton"}},
     {"download-button", {"Button#DownloadButton"}},
+    {"library-status", {"LibraryItemStatusButton"}},
     {"downloaded-button", {"Button#DownloadedButton"}},
     {"download-progress", {"ProgressRing#DownloadingProgress"}},
     {"now-playing-indicator", {"BouncyBarControl#BouncyBarAnimation"}},  // the bars: their Grid has no colour
@@ -312,6 +324,12 @@ constexpr std::string_view kFloatingPanels = R"css(
     margin: calc(var(--gap, 8) - 1) 0 0 calc(var(--gap, 8) + 4);
 }
 
+/* The "Apple Music" title sat high against the logo: it moves 3 down, to meet the logo's centre (not measured on
+   screen; check it with a capture). A transform keeps Apple's margins. */
+.app-name {
+    transform: translateY(3px);
+}
+
 /* The profile picture at the foot of the sidebar stood 2 right of the icons above it. */
 PersonPicture#smallPersonPicture {
     margin: 0 0 0 -2;
@@ -334,16 +352,17 @@ PersonPicture#smallPersonPicture {
     }
 
     /* Apple insets the column 3 from the pane's top and bottom: it stood 3 lower and 3 shorter than the page panel. */
+    /* The column is 48 wide: a corner above half of that (24) cut the items at its ends, so it stops at 16. */
     .sidebar-column {
         background: var(--panel-background, #17171A);
-        corner-radius: var(--panel-radius, 10px);
+        corner-radius: calc(min(var(--panel-radius, 10px), var(--compact-pane, 48) / 2 - 8));
         margin: -1 0 -1 0;
     }
 
-    /* In the column, the logo and the profile picture stood 2 and 3 right of the icons' axis, the logo close under the
-       panel's top edge. */
+    /* The logo's centre on the column's axis (its 22 wide, 6 in Apple's header: (48 - 22) / 2 - 6 = 7). It stood 9 left
+       of it at -2. */
     ContentControl#PaneHeaderContentBorder > ContentPresenter > Grid > Image {
-        margin: 4 0 0 -2;
+        margin: 4 0 0 calc((var(--compact-pane, 48) - 22) / 2 - 6);
     }
 
     PersonPicture#smallPersonPicture {
@@ -628,57 +647,15 @@ HoverGrid#ThumbnailHoverGrid > Grid {
 }
 )css";
 
-// Scroll bars that sit inside their panel: off its edge, clear of its rounded corners, without the arrows Windows adds
-// with "Always show scroll bars" (they stuck out at both ends). Part of floating-panels; alone for the other layouts.
-constexpr std::string_view kScrollbars = R"css(
-ScrollBar RepeatButton#VerticalSmallDecrease,
-ScrollBar RepeatButton#VerticalSmallIncrease,
-ScrollBar RepeatButton#HorizontalSmallDecrease,
-ScrollBar RepeatButton#HorizontalSmallIncrease {
-    visibility: collapsed;
-}
-
-/* The scroll bar's expanded state animates the arrows' visibility back: no room and no ink keeps them gone. */
-ScrollBar RepeatButton#VerticalSmallDecrease,
-ScrollBar RepeatButton#VerticalSmallIncrease {
-    height: 0;
-    opacity: 0;
-}
-
-ScrollBar RepeatButton#HorizontalSmallDecrease,
-ScrollBar RepeatButton#HorizontalSmallIncrease {
-    width: 0;
-    opacity: 0;
-}
-
-/* Out of sight until the pointer reaches it: the wheel scrolls without it, and it no longer cuts into the panels. */
-.scrollbar {
-    background: transparent;
-    opacity: 0;
-    transition: opacity 160ms;
-}
-
-.scrollbar:hover {
-    opacity: 1;
-}
-
-ScrollBar#VerticalScrollBar {
-    margin: var(--panel-radius, 8px) 3 var(--panel-radius, 8px) 0;
-}
-
-ScrollBar#HorizontalScrollBar {
-    margin: 0 var(--panel-radius, 8px) 3 var(--panel-radius, 8px);
-}
-)css";
-
 struct BuiltinEntry {
     std::string_view name;
     std::vector<std::string_view> parts;
 };
 
-const std::array<BuiltinEntry, 3> kBuiltins{{
+const std::array<BuiltinEntry, 4> kBuiltins{{
     {"floating-panels", {kFloatingPanels, kScrollbars}},
     {"bottom-bar", {kBottomBar}},
+    {"centre-bar", {kCentreBar}},
     {"scrollbars", {kScrollbars}},
 }};
 

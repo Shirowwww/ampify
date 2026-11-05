@@ -12,7 +12,7 @@ namespace ampify::theme {
 //   theme.active       folder name of the theme in use; empty or `none` for no theme
 //   theme.scheme       colour scheme inside colors.ini; empty takes the theme's default; `auto` follows the Windows mode
 //   theme.schedule     schemes by local time, such as `07:00=Light,19:00=Dark`; wins over theme.scheme (scheme_choice.hpp)
-//   theme.accent       the accent the user chose, RRGGBB or #RRGGBB, over the theme's and without one; empty for none
+//   theme.accent       the accent the user chose: RRGGBB, #RRGGBB or `artwork` (the cover colour); empty for none
 //   theme.glass        full, balanced or eco: how much glass every theme may ask of the graphics card (glass.hpp)
 //   theme.live_reload  1 to apply a theme again when its files change (default 1)
 //   theme.inspect      1 to write an inspector dump on the next pass; the kernel clears it afterwards
@@ -37,6 +37,14 @@ ThemeSettings ReadThemeSettings(const Settings& settings);
 
 // The colour of theme.accent: six hexadecimal digits, with or without `#`. Nothing for an empty or unfit value.
 std::optional<Argb> ParseAccent(std::string_view text);
+
+// theme.accent set to `artwork`: the accent follows the song playing (its vibrant colour, see ArtworkAccent).
+inline constexpr std::string_view kArtworkAccent = "artwork";
+bool IsArtworkAccent(std::string_view text);
+// The accent of the artwork playing: its art-2 colour, kept within lightness limits so it reads on either page mode.
+// Nothing before the first artwork, so the theme keeps its own accent until then.
+std::optional<Argb> ArtworkAccent(const std::map<std::string, std::string>& artwork);
+Argb LegibleAccent(Argb color);
 void WriteThemeSettings(Settings& settings, const ThemeSettings& value);
 
 // The values of the settings a theme declares, stored as themes.<id>.<key>, by key. Empty for an empty id.

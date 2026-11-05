@@ -9,6 +9,7 @@
 #include "../text_util.hpp"
 #include "animation.hpp"
 #include "color.hpp"
+#include "scheme_choice.hpp"
 
 namespace ampify::theme {
 
@@ -66,6 +67,12 @@ void ApplyGlassLevel(Theme& theme, GlassLevel level) {
         kept.push_back(std::move(assignment));
     }
     theme.assignments = std::move(kept);
+    // The window's own blur (--window-material: acrylic) goes too: Mica is the plain tint of the desktop.
+    auto material = theme.variables.find("window-material");
+    if (level == GlassLevel::Eco && material != theme.variables.end() &&
+        WindowMaterialOf(material->second) == WindowMaterial::Acrylic) {
+        material->second = "mica";
+    }
 }
 
 }  // namespace ampify::theme

@@ -17,6 +17,8 @@ list(APPEND AMPIFY_TESTS_SOURCES
     tests/theme_tests.cpp
     tests/theme_color_animation_tests.cpp
     tests/gain_board_tests.cpp
+    tests/sidebar_hold_tests.cpp
+    tests/sidebar_groups_tests.cpp
     tests/player_watch_tests.cpp
     tests/ui_model_tests.cpp
     tests/ui_element_tests.cpp

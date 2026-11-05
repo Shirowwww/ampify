@@ -8,12 +8,13 @@
 #include <vector>
 
 #include "../text_util.hpp"
+#include "css.hpp"
 
 namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 55> kProperties{{
+constexpr std::array<PropertySpec, 56> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
@@ -57,6 +58,7 @@ constexpr std::array<PropertySpec, 55> kProperties{{
     {"direction", "FlowDirection", PropertyKind::FlowDirection},
     {"color-scheme", "RequestedTheme", PropertyKind::ColorScheme},
     {"order", kOrderProperty, PropertyKind::Order},
+    {"move-to", kMoveToProperty, PropertyKind::Target},
     {"horizontal-alignment", "HorizontalAlignment", PropertyKind::Alignment},
     {"vertical-alignment", "VerticalAlignment", PropertyKind::Alignment},
     {"grid-row", "Grid.Row", PropertyKind::Integer},
@@ -630,6 +632,19 @@ Conversion ConvertColorScheme(std::string_view raw) {
     return Fail("unknown colour scheme: \"" + std::string(TrimSpace(raw)) + "\" (light, dark or normal)");
 }
 
+// A selector naming the element to move into, quoted or not. It must parse now: a bad one would never move anything.
+Conversion ConvertMoveTo(std::string_view raw) {
+    std::string_view text = TrimSpace(raw);
+    if (text.size() >= 2 && (text.front() == '"' || text.front() == '\'') && text.back() == text.front()) {
+        text = text.substr(1, text.size() - 2);
+    }
+    std::string problem;
+    if (text.empty() || !ParseSelector(text, &problem)) {
+        return Fail("unreadable selector: \"" + std::string(TrimSpace(raw)) + "\" (the element to move into)");
+    }
+    return Ok(ValueKind::Text, std::string(text));
+}
+
 Conversion ConvertOrder(std::string_view raw) {
     std::string_view text = TrimSpace(raw);
     if (text.empty() || text.size() > 4 || text.find_first_not_of("0123456789") != std::string_view::npos) {
@@ -946,6 +961,8 @@ Conversion ConvertValue(const PropertySpec& spec, std::string_view raw, const Va
             return ConvertColorScheme(raw);
         case PropertyKind::Order:
             return ConvertOrder(raw);
+        case PropertyKind::Target:
+            return ConvertMoveTo(raw);
         case PropertyKind::Alignment:
             return ConvertAlignment(spec, raw);
         case PropertyKind::Integer:

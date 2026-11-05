@@ -66,6 +66,7 @@ public:
 
     std::vector<theme::NodeInfo> Snapshot() override;
     bool Alive(theme::NodeId id) override;
+    bool Reparent(theme::NodeId id, theme::NodeId parent, int index) override;
     std::optional<theme::Value> Read(theme::NodeId id, std::string_view property) override;
     bool Write(theme::NodeId id, std::string_view property, const theme::Value& value) override;
     std::optional<theme::Value> ReadOriginal(theme::NodeId id, std::string_view property) override;

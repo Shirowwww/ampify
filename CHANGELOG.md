@@ -2,8 +2,30 @@
 
 ## Unreleased
 
+### Settings
+
+- The settings of an extension, a theme or a snippet can be grouped under headings: a `group` on each setting, and a
+  `description` line under its label. Translations cover both (`groups`, `settingDescriptions`). Without groups, the
+  card looks as before.
+- Each element's settings card has a search box from six settings on (it matches labels and descriptions, whatever the
+  case and accents), a Reset per setting, a Reset all, and Export and Import: a small JSON file in the Ampify folder,
+  copied to the clipboard, read back on Import. Import refuses a file that is for another element or that holds a
+  wrong value, and says why under the card.
+
 ### Themes
 
+- Chosen accent "Follows the artwork" (Settings > Ampify, or `theme.accent = artwork`): the accent of every theme takes
+  the vibrant colour of the song playing, kept light enough to read on a dark or a light page.
+- `--art-luma` and `--art-sat` give how light and how coloured the artwork is, as plain numbers from 0 to 1.
+- Snippets get the artwork's colours (`--art-*` and `--page-art-*`) with no theme active.
+- Glass "Eco" also paints an acrylic window as Mica, as it already did for acrylic panes.
+- A `centre-bar` layout: the playback buttons centred, the progress line under them, the times at its ends. It is one more choice of the `bar-position` setting in Cinema, Ember, Glass, Greenroom and Palettes, and a setting of the Bottom playback bar snippet. Themes can move an element with the new `move-to` property.
+- Floating panels: the folded sidebar's icons sit on one axis, and the Apple Music logo is centred on it. The
+  column's corners stop at 16 pixels so the items at its ends are not cut. The "Apple Music" title moves 3 pixels
+  down to meet the logo.
+- New names: `.sidebar-selection`, `.sidebar-count`, `.sidebar-drag-indicator`, `.search-suggestions`, `.loading`,
+  `.library-status`, `.cover-play-button`, `.explicit-group`, `.focus-ring` and `.popup-scrim`.
+- `calc()` takes `min()` and `max()`, so a theme can cap a size.
 - Ember: two glass panels over the colours of the song playing, the library and the pages, with the playback bar at
   the bottom.
 - A theme that leaves a column on the right of the pages gets the panels of elements docked there, as high as the
@@ -84,6 +106,11 @@
 
 ### Other
 
+- Hover sidebar (`apple.sidebar = hover`): the hamburger button pins the sidebar open, as Apple Music's own mode does,
+  and a second click folds it again. The pin is not saved. The hamburger shows a pin while pinned, and the folded
+  column hides the Library and Playlists groups until the sidebar opens.
+- The hover sidebar stays open while you type in its search field, and only while the window is in front; it no
+  longer stays open on an idle field.
 - Nothing of Ampify runs in the background any more: Windows hands each Apple Music process to the launcher as it
   starts, and the launcher exits once the kernel is in.
 - The library could stay empty and Apple Music's engine stay behind after closing: the kernel now goes into the engine

@@ -81,6 +81,10 @@ struct NodeInfo {
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";
+// `move-to: <selector>`: the element moves into the first element the selector matches (TreeBackend::Reparent). It is
+// not a value of the element: the engine moves it once, takes it back on Restore, and moves it again when Apple
+// rebuilds it.
+inline constexpr std::string_view kMoveToProperty = "MoveTo";
 // `checked-color`: the ToggleButtonForegroundChecked keys in a control's own resources, not a property of it.
 inline constexpr std::string_view kCheckedForegroundProperty = "CheckedForeground";
 // A control's template, given back before the control's other values (ThemeEngine::Restore).
@@ -158,6 +162,15 @@ public:
 
     // False when the element is gone or does not support the property or the value.
     virtual bool Write(NodeId id, std::string_view property, const Value& value) = 0;
+
+    // Moves the element into the children of `parent`, at `index` (from 0; -1 or past the end: last). The element keeps
+    // its values. False when either element is gone or the parent holds no children. Restore moves it back.
+    virtual bool Reparent(NodeId id, NodeId parent, int index) {
+        (void)id;
+        (void)parent;
+        (void)index;
+        return false;
+    }
 
     // The value to put back when the theme comes off, read before the first write. kNoOwnValue when the element had
     // no value of its own (it showed its template's, its style's or its parent's): writing kNoOwnValue then clears the

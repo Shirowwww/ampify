@@ -1,5 +1,5 @@
 // The rows of the installed extensions and themes (what the Marketplace installs) on the settings page, and the
-// controls of their own settings (fields, sliders, switches, choices).
+// controls of their own settings (fields, sliders, switches, choices), grouped, searchable and resettable.
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -285,44 +285,264 @@ xaml::FrameworkElement SettingControl(UiService::Shared& shared, const SettingOw
     return SettingField(shared, target, spec, value);
 }
 
+// The manifest's translation in the interface's language, or null when there is none.
+const ManifestText* LocalTextOf(const uirender::ModEntry& mod) {
+    auto language = mod.translations.find(i18n::Language());
+    return language == mod.translations.end() ? nullptr : &language->second;
+}
+
+// The label and description of a setting in the language of the card, each English when no translation has it.
+settings_panel::SettingText ShownText(const uirender::ModEntry& mod, const SettingSpec& spec) {
+    const ManifestText* local = LocalTextOf(mod);
+    return {Localized(local, &ManifestText::settings, spec.key, spec.label),
+            Localized(local, &ManifestText::settingDescriptions, spec.key, spec.description)};
+}
+
+inline xaml::Visibility Show(bool shown) {
+    return shown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed;
+}
+
+// What the search and the card's refresh work on: each row with its text and group, and each group's heading (null
+// for the settings that have no group).
+struct SettingRow {
+    xaml::FrameworkElement element{nullptr};
+    settings_panel::SettingText text;
+    size_t group = 0;
+};
+struct SearchTargets {
+    std::vector<SettingRow> rows;
+    std::vector<xaml::FrameworkElement> headings;  // by group
+    xaml::FrameworkElement none{nullptr};          // the line shown when nothing matches
+};
+
+// Shows the rows that match `query`, and the headings of the groups that still have one.
+void ApplySearch(SearchTargets& targets, const std::string& query) {
+    std::vector<settings_panel::SettingText> texts;
+    for (const SettingRow& row : targets.rows) texts.push_back(row.text);
+    std::vector<size_t> matches = settings_panel::MatchingSettings(texts, query);
+    std::vector<bool> rowShown(targets.rows.size(), false);
+    std::vector<bool> groupShown(targets.headings.size(), false);
+    for (size_t index : matches) {
+        rowShown[index] = true;
+        groupShown[targets.rows[index].group] = true;
+    }
+    for (size_t index = 0; index < targets.rows.size(); index++) targets.rows[index].element.Visibility(Show(rowShown[index]));
+    for (size_t index = 0; index < targets.headings.size(); index++) {
+        if (targets.headings[index]) targets.headings[index].Visibility(Show(groupShown[index]));
+    }
+    if (targets.none) targets.none.Visibility(Show(matches.empty() && !query.empty()));
+}
+
+// The "Reset" of one setting: the manifest default is written, then the card is built again from settings.txt. It is
+// off while the setting already holds its default, so a click does not restart an extension for nothing.
+controls::Button ResetButton(UiService::Shared& shared, const SettingOwner& target, const SettingSpec& spec,
+                             const std::string& label, bool changed, const std::function<void()>& refresh) {
+    controls::Button button;
+    if (shared.probe.button) button.Style(shared.probe.button);
+    button.Content(winrt::box_value(Wide(i18n::Text("settings.reset"))));
+    button.VerticalAlignment(xaml::VerticalAlignment::Center);
+    button.IsEnabled(changed);
+    automation::AutomationProperties::SetName(button, Wide(i18n::Text("settings.reset") + " " + label));
+    UiService::Shared* owner = &shared;
+    button.Click([owner, target, key = spec.key, value = spec.defaultValue, refresh](IInspectable const&,
+                                                                                    xaml::RoutedEventArgs const&) noexcept {
+        try {
+            CommitSetting(*owner, target, key, value);
+            refresh();
+        } catch (...) {
+        }
+    });
+    return button;
+}
+
+// One setting: its label and description on the left, its control and Reset on the right.
+xaml::FrameworkElement SettingRowOf(UiService::Shared& shared, const uirender::ModEntry& mod, size_t index,
+                                    const std::function<void()>& refresh) {
+    const SettingSpec& spec = mod.settings[index];
+    settings_panel::SettingText shown = ShownText(mod, spec);
+    SettingOwner target{mod.id, mod.theme, mod.snippet};
+    controls::Grid row;
+    row.ColumnSpacing(16);
+    controls::ColumnDefinition text;
+    text.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
+    controls::ColumnDefinition control;
+    control.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
+    row.ColumnDefinitions().Append(text);
+    row.ColumnDefinitions().Append(control);
+
+    controls::StackPanel labels;
+    labels.VerticalAlignment(xaml::VerticalAlignment::Center);
+    labels.Children().Append(MakeText(Wide(shown.label).c_str(), "body", false, &shared.probe));
+    if (!shown.description.empty()) {
+        labels.Children().Append(MakeText(Wide(shown.description).c_str(), "caption", true, &shared.probe));
+    }
+    row.Children().Append(labels);
+
+    xaml::FrameworkElement input = SettingControl(shared, target, spec, mod.values[index], LocalTextOf(mod));
+    input.VerticalAlignment(xaml::VerticalAlignment::Center);
+    input.HorizontalAlignment(xaml::HorizontalAlignment::Right);
+    const char* prefix = mod.snippet ? "AMPIFY_SnippetSetting_" : mod.theme ? "AMPIFY_ThemeSetting_" : "AMPIFY_ModsSetting_";
+    Name(input, std::string(prefix) + mod.id + "_" + spec.key, shown.label);
+
+    controls::StackPanel inputRow;
+    inputRow.Orientation(controls::Orientation::Horizontal);
+    inputRow.Spacing(8);
+    inputRow.Children().Append(input);
+    inputRow.Children().Append(ResetButton(shared, target, spec, shown.label, mod.values[index] != spec.defaultValue, refresh));
+    controls::Grid::SetColumn(inputRow, 1);
+    row.Children().Append(inputRow);
+    return row;
+}
+
+// The heading of a group, in the language of the card.
+controls::TextBlock GroupHeading(UiService::Shared& shared, const uirender::ModEntry& mod, const std::string& group) {
+    const std::string& shown = Localized(LocalTextOf(mod), &ManifestText::groups, group, group);
+    controls::TextBlock heading = MakeText(Wide(shown).c_str(), "bodyStrong", false, &shared.probe);
+    heading.Margin(xaml::Thickness{0, 8, 0, 0});
+    return heading;
+}
+
+// The rows and headings of the card, group by group, in the order of the settings' groups. `targets` keeps the rows
+// for the search.
+std::vector<xaml::FrameworkElement> GroupedRows(UiService::Shared& shared, const uirender::ModEntry& mod,
+                                                SearchTargets& targets, const std::function<void()>& refresh) {
+    std::vector<xaml::FrameworkElement> body;
+    for (const settings_panel::SettingGroup& group : settings_panel::GroupSettings(mod.settings)) {
+        size_t groupIndex = targets.headings.size();
+        xaml::FrameworkElement heading{nullptr};
+        if (!group.name.empty()) {
+            heading = GroupHeading(shared, mod, group.name);
+            body.push_back(heading);
+        }
+        targets.headings.push_back(heading);
+        for (size_t index : group.settings) {
+            if (index >= mod.values.size()) continue;
+            xaml::FrameworkElement row = SettingRowOf(shared, mod, index, refresh);
+            body.push_back(row);
+            targets.rows.push_back({row, ShownText(mod, mod.settings[index]), groupIndex});
+        }
+    }
+    return body;
+}
+
+// A small button of the toolbar; its action runs on the interface thread.
+controls::Button ToolButton(UiService::Shared& shared, const char* textKey, std::function<void()> action) {
+    controls::Button button;
+    if (shared.probe.button) button.Style(shared.probe.button);
+    button.Content(winrt::box_value(Wide(i18n::Text(textKey))));
+    button.Click([action](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            action();
+        } catch (...) {
+        }
+    });
+    return button;
+}
+
+// Every setting back to its manifest default, in one write, then the card again.
+void ResetAll(UiService::Shared& shared, const uirender::ModEntry& mod, const std::function<void()>& refresh) {
+    std::string error;
+    if (uirender::ChangeElementValues(shared.kit, SettingKindOf(mod), mod.id, settings_panel::DefaultValues(mod.settings), error)) {
+        shared.journal.Write(i18n::Text("settings.resetDone", {{"id", mod.id}}));
+    } else {
+        shared.journal.Write("Settings: could not reset \"" + mod.id + "\": " + error);
+    }
+    refresh();
+}
+
+// A card with fewer settings than this has no search box: there is little to find.
+constexpr size_t kSearchFromSettings = 6;
+
+// The search box. `query` keeps what was typed, so a card built again after a change shows the same search.
+controls::TextBox SearchBox(UiService::Shared& shared, const std::shared_ptr<SearchTargets>& targets,
+                            const std::shared_ptr<std::string>& query) {
+    controls::TextBox search;
+    if (shared.probe.textBox) search.Style(shared.probe.textBox);
+    search.MinWidth(200);
+    search.PlaceholderText(Wide(i18n::Text("settings.search")));
+    automation::AutomationProperties::SetName(search, Wide(i18n::Text("settings.search")));
+    search.TextChanged([targets, query](IInspectable const& sender, controls::TextChangedEventArgs const&) noexcept {
+        try {
+            *query = Utf8(sender.as<controls::TextBox>().Text());
+            ApplySearch(*targets, *query);
+        } catch (...) {
+        }
+    });
+    search.Text(Wide(*query));
+    return search;
+}
+
+// The line above the settings: the search (when there are enough), then Reset all, Export and Import. The line under
+// them shows the result of an export or an import.
+controls::StackPanel SettingsToolbar(UiService::Shared& shared, const uirender::ModEntry& mod,
+                                     const std::function<void()>& refresh, const std::shared_ptr<SearchTargets>& targets,
+                                     const std::shared_ptr<std::string>& query) {
+    // Made first: the search box applies its text to the rows, and shows this line when nothing matches.
+    targets->none = MakeText(Wide(i18n::Text("settings.noMatch")).c_str(), "caption", true, &shared.probe);
+    targets->none.Visibility(xaml::Visibility::Collapsed);
+    controls::TextBlock status = MakeText(L"", "caption", true, &shared.probe);
+    status.Visibility(xaml::Visibility::Collapsed);
+    SettingsSay say = [weak = winrt::make_weak(status)](const std::string& line) {
+        controls::TextBlock shown = weak.get();
+        if (!shown) return;
+        shown.Text(Wide(line));
+        shown.Visibility(xaml::Visibility::Visible);
+    };
+
+    controls::StackPanel buttons;
+    buttons.Orientation(controls::Orientation::Horizontal);
+    buttons.Spacing(8);
+    if (mod.settings.size() >= kSearchFromSettings) buttons.Children().Append(SearchBox(shared, targets, query));
+    buttons.Children().Append(ToolButton(shared, "settings.resetAll", [&shared, mod, refresh] { ResetAll(shared, mod, refresh); }));
+    buttons.Children().Append(ToolButton(shared, "settings.export", [&shared, mod, say] { ExportElementSettings(shared, mod, say); }));
+    buttons.Children().Append(ToolButton(shared, "settings.import", [&shared, mod, refresh, say] {
+        ImportElementSettings(shared, mod, refresh, say);
+    }));
+
+    controls::StackPanel bar;
+    bar.Spacing(8);
+    bar.Children().Append(buttons);
+    bar.Children().Append(targets->none);
+    bar.Children().Append(status);
+    return bar;
+}
+
+// The card of one element: its toolbar, then its settings. Built again after a change, from what settings.txt holds, and
+// with the same search text.
+void FillSettings(UiService::Shared& shared, const controls::StackPanel& panel, const uirender::ModEntry& mod,
+                  const std::shared_ptr<std::string>& query) {
+    panel.Children().Clear();
+    std::function<void()> refresh = [owner = &shared, weak = winrt::make_weak(panel), kind = std::string(SettingKindOf(mod)),
+                                     id = mod.id, query]() {
+        // Next turn of the interface: the button that asked for it is still in its own click.
+        dispatching::DispatcherQueue::GetForCurrentThread().TryEnqueue([owner, weak, kind, id, query]() {
+            try {
+                controls::StackPanel live = weak.get();
+                std::optional<uirender::ModEntry> fresh = uirender::ElementSettings(owner->kit, kind, id);
+                if (live && fresh) FillSettings(*owner, live, *fresh, query);
+            } catch (...) {
+            }
+        });
+    };
+    auto targets = std::make_shared<SearchTargets>();
+    std::vector<xaml::FrameworkElement> body = GroupedRows(shared, mod, *targets, refresh);
+    panel.Children().Append(SettingsToolbar(shared, mod, refresh, targets, query));
+    for (const xaml::FrameworkElement& element : body) panel.Children().Append(element);
+}
+
 }  // namespace
 
-// The settings an extension or the active theme declares, under its row: one line each, its label on the left and
-// its control on the right.
+// The settings an extension or the active theme declares, under its row: a toolbar, then the settings by group, each
+// with its label, its description and its controls.
 xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::ModEntry& mod) {
     controls::StackPanel panel;
     panel.Spacing(8);
     panel.Margin(xaml::Thickness{16, 0, 0, 0});
-    auto language = mod.translations.find(i18n::Language());
-    const ManifestText* local = language == mod.translations.end() ? nullptr : &language->second;
-    for (size_t index = 0; index < mod.settings.size() && index < mod.values.size(); index++) {
-        const SettingSpec& spec = mod.settings[index];
-        controls::Grid row;
-        row.ColumnSpacing(16);
-        controls::ColumnDefinition text;
-        text.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
-        controls::ColumnDefinition control;
-        control.Width(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
-        row.ColumnDefinitions().Append(text);
-        row.ColumnDefinitions().Append(control);
-        const std::string& shown = Localized(local, &ManifestText::settings, spec.key, spec.label);
-        controls::TextBlock label = MakeText(Wide(shown).c_str(), "body", false, &shared.probe);
-        label.VerticalAlignment(xaml::VerticalAlignment::Center);
-        row.Children().Append(label);
-        xaml::FrameworkElement input = SettingControl(shared, {mod.id, mod.theme, mod.snippet}, spec, mod.values[index], local);
-        input.VerticalAlignment(xaml::VerticalAlignment::Center);
-        input.HorizontalAlignment(xaml::HorizontalAlignment::Right);
-        const char* prefix = mod.snippet ? "AMPIFY_SnippetSetting_" : mod.theme ? "AMPIFY_ThemeSetting_" : "AMPIFY_ModsSetting_";
-        Name(input, std::string(prefix) + mod.id + "_" + spec.key,
-             shown);
-        controls::Grid::SetColumn(input, 1);
-        row.Children().Append(input);
-        panel.Children().Append(row);
-    }
+    FillSettings(shared, panel, mod, std::make_shared<std::string>());
     return panel;
 }
 
-// The active theme's settings: its name, a line on what they do, then one row per setting.
+// The active theme's settings: its name, a line on what they do, then the settings.
 xaml::FrameworkElement ThemeSettingsSection(UiService::Shared& shared, const uirender::ModEntry& theme) {
     controls::StackPanel section;
     section.Spacing(8);

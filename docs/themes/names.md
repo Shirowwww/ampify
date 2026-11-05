@@ -25,6 +25,8 @@ read on Apple Music 1.1792.
 | `.titlebar-drag-area` | The area that drags the window |
 | `.caption-buttons-cover` | The strip that keeps the minimize, maximize and close buttons readable over the playback bar |
 | `.modal` | Where Apple Music shows its dialogs |
+| `.focus-ring` | The outline drawn around the control that has the keyboard focus |
+| `.popup-scrim` | The layer behind an open menu, which catches the clicks outside it. Keep it transparent: a painted background covers the whole window while a menu is open |
 | `.info-bar` | The banners at the top and at the bottom of the window |
 | `.scrollbar` | The scroll bars of every list and page. Away from the pointer a scroll bar is a thin line, painted by `color`; under the pointer it widens to a thumb painted by the `:hover` colour, on a track painted by `background` (`:hover` too under the pointer) |
 
@@ -42,15 +44,19 @@ read on Apple Music 1.1792.
 | `.app-name` | The "Music" title |
 | `.search-area` | The area around the search box |
 | `.search-box` | The search box |
+| `.search-suggestions` | The suggestions under the search box (a popup of its own, outside the window) |
 | `.sidebar-scroll` | The scrolling list of the sidebar |
 | `.sidebar-items` | The items of that list |
 | `.sidebar-item` | One item: Home, Radio, a playlist... |
 | `.sidebar-item-artwork` | The artwork of a pinned item |
+| `.sidebar-selection` | The bar that marks the selected item. Each item has its own, and only the selected one shows |
+| `.sidebar-count` | The number badge on a sidebar item |
 | `.sidebar-play-button` | The play button over that artwork |
 | `.sidebar-footer` | The bottom of the sidebar, with the account and the Ampify entry |
 | `.sidebar-footer-items` | The items of that bottom part |
 | `.sidebar-separator` | The line above it |
 | `.sidebar-entry` | An entry Ampify adds at the bottom of the sidebar: the Marketplace, an extension's page |
+| `.sidebar-drag-indicator` | The line shown above or below a pinned item while it is dragged to a new place |
 | `.account-picture` | The account picture |
 | `.account-name` | The account name |
 
@@ -79,6 +85,7 @@ read on Apple Music 1.1792.
 | `.stacked-list` | The list of Home and Search, whose top padding plays the same part |
 | `.page-header` | The title bar of a page, which stays at the top when the page scrolls |
 | `.page-title` | The title of a page |
+| `.loading` | The spinner shown while a page loads its content |
 | `.frost` | The frosted layer behind the playback bar and the page headers |
 | `.filter-box` | The filter box of the library pages |
 | `.filter-button` | The button that opens it |
@@ -107,14 +114,17 @@ read on Apple Music 1.1792.
 | `.card-wide` | A card with its artwork on the left |
 | `.card-track` | A song in a shelf |
 | `.card-play-button` | The play button that shows over a card under the pointer |
+| `.cover-play-button` | The play button over an album's or a playlist's cover (not the one of its header) |
 | `.card-title`, `.card-subtitle` | The two lines of text under a card |
 | `.artwork` | Every artwork, in cards, lists and the playback bar, except artists' pictures |
 | `.artist-artwork` | Artists' round pictures, in shelves and at the top of an artist's page. Apple lights them under the pointer with a round shape: squaring them leaves a round light over a square picture |
 | `.artwork-shadow` | The shadow under an artwork |
 | `.explicit-badge` | The "E" badge |
+| `.explicit-group` | The "E" badge with the favourite star, side by side |
 | `.favorite-button`, `.favorite-icon` | The star, and its icon |
 | `.add-button` | The button that adds to the library |
 | `.download-button`, `.downloaded-button`, `.download-progress` | The download button, its done state, and its progress ring |
+| `.library-status` | The add and download buttons of an item, as one group (`.add-button` and the others stay one by one) |
 | `.now-playing-indicator` | The bars that mark the song playing |
 
 ## Albums, playlists and songs
@@ -178,8 +188,8 @@ read on Apple Music 1.1792.
 | `.track-text` | The title and the artist |
 | `.track-lines`, `.track-line` | The block of the two lines, and each line |
 | `.track-title`, `.track-artist` | Each of them |
-| `.scrubber` | The progress bar: `color` fills the played part (the theme's accent by default), `background` the rest of the track, `.scrubber Thumb` its thumb; they hold under the pointer and while dragged. An image can ride at the song's position ([format.md](format.md#an-image-that-follows-the-songs-progress)) |
-| `.current-time`, `.duration` | The time played and the length |
+| `.scrubber` | The progress bar (with `ampify:centre-bar`, a line under the buttons): `color` fills the played part (the theme's accent by default), `background` the rest of the track, `.scrubber Thumb` its thumb; they hold under the pointer and while dragged. An image can ride at the song's position ([format.md](format.md#an-image-that-follows-the-songs-progress)) |
+| `.current-time`, `.duration` | The time played and the length. With `ampify:centre-bar` they stand at the ends of the progress line, under the buttons |
 | `.audio-badge` | The badge of the audio format (Lossless, Dolby Atmos) |
 | `.live-badge`, `.autoplay-badge` | The Live and Autoplay badges |
 | `.apple-logo` | The Apple logo shown when nothing plays |

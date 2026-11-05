@@ -25,6 +25,10 @@
 @setting bar-position = Bottom {
     @import "ampify:bottom-bar";
 }
+@setting bar-position = Centred {
+    @import "ampify:bottom-bar";
+    @import "ampify:centre-bar";
+}
 
 /* The bar-background setting: the bar takes the colours of the playing song's artwork, fading into the window. */
 @setting bar-background = Artwork {
@@ -48,6 +52,11 @@
 
 /* On the bar at the bottom, the song needs no box of its own. */
 @setting bar-position = Bottom {
+    .lcd {
+        background: transparent;
+    }
+}
+@setting bar-position = Centred {
     .lcd {
         background: transparent;
     }

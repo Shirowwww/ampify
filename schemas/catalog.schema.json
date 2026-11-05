@@ -101,7 +101,9 @@
         "name": {"type": "string", "minLength": 1, "maxLength": 60},
         "description": {"type": "string", "minLength": 1, "maxLength": 300},
         "settings": {"type": "object", "description": "The label of each declared setting, by its key.", "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 60}},
-        "options": {"type": "object", "description": "The text of each option of a choice setting, by its stored value.", "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 60}}
+        "options": {"type": "object", "description": "The text of each option of a choice setting, by its stored value.", "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 60}},
+        "groups": {"type": "object", "description": "The heading of each group of settings, by its name.", "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 40}},
+        "settingDescriptions": {"type": "object", "description": "The description of each setting, by its key.", "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 200}}
       }
     },
     "kitApi": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},

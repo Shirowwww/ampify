@@ -83,7 +83,8 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
 
     // Everything that changes what is applied goes into the key. A new key is a new generation.
     std::map<std::string, std::string> values = ReadThemeValues(settings, wanted.active);
-    std::optional<Argb> accent = ParseAccent(wanted.accent);
+    // theme.accent = artwork: the colour follows the song; the theme reloads only when that colour changes.
+    std::optional<Argb> accent = IsArtworkAccent(wanted.accent) ? ArtworkAccent(m_artwork) : ParseAccent(wanted.accent);
     GlassLevel glass = GlassLevelOf(wanted.glass);
     std::string key = (wanted.active.empty() ? std::string("none") : wanted.active) + "|" + m_scheme.scheme + "|" +
                       PartsKey(wanted.parts) + "|" + (accent ? ToXamlColor(*accent) : std::string("-")) + "|" +

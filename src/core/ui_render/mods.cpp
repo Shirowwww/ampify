@@ -174,11 +174,15 @@ std::optional<std::string> NormalizeAccent(std::string_view text) {
 std::string ChosenAccent(const fs::path& kit) {
     Settings settings;
     settings.Load((kit / "settings.txt").string());
-    return NormalizeAccent(settings.GetString(kAccentKey, "")).value_or("");
+    std::string value = settings.GetString(kAccentKey, "");
+    if (value == kArtworkAccent) return value;
+    return NormalizeAccent(value).value_or("");
 }
 
 bool ChooseAccent(const fs::path& kit, const std::string& accent, std::string& error) {
-    std::optional<std::string> digits = accent.empty() ? std::optional<std::string>("") : NormalizeAccent(accent);
+    std::optional<std::string> digits = accent.empty() ? std::optional<std::string>("")
+                                       : accent == kArtworkAccent ? std::optional<std::string>(accent)
+                                                                  : NormalizeAccent(accent);
     if (!digits) {
         error = "accent expects RRGGBB or #RRGGBB: " + accent;
         return false;
@@ -375,6 +379,37 @@ bool ChangeElementSetting(const fs::path& kit, std::string_view kind, const std:
     if (element->snippet) return SetSnippetSetting(kit, id, key, *accepted, error);
     if (element->theme) return SetThemeSetting(kit, id, key, *accepted, error);
     return SetModSetting(kit, id, key, *accepted, error);
+}
+
+bool ChangeElementValues(const fs::path& kit, std::string_view kind, const std::string& id,
+                         const std::map<std::string, std::string>& values, std::string& error) {
+    std::optional<ModEntry> element = ElementSettings(kit, kind, id);
+    if (!element) {
+        error = "no installed " + std::string(kind) + " \"" + id + "\" declares settings";
+        return false;
+    }
+    std::map<std::string, std::string> accepted;
+    for (const auto& [key, value] : values) {
+        auto spec = std::find_if(element->settings.begin(), element->settings.end(),
+                                 [&key](const SettingSpec& candidate) { return candidate.key == key; });
+        if (spec == element->settings.end()) {
+            error = "\"" + id + "\" has no setting \"" + key + "\"";
+            return false;
+        }
+        std::optional<std::string> fit = AcceptedValue(*spec, value);
+        if (!fit) {
+            error = "\"" + value + "\" does not fit the setting \"" + key + "\" of \"" + id + "\"";
+            return false;
+        }
+        accepted[key] = *fit;
+    }
+    // One write for all of them, so an extension restarts once and a theme applies once.
+    std::string prefix = std::string(element->snippet ? "snippets." : element->theme ? "themes." : "extensions.") + id + ".";
+    bool written = Settings::UpdateFile((kit / "settings.txt").string(), [&](Settings& settings) {
+        for (const auto& [key, value] : accepted) settings.Set(prefix + key, OneLine(value));
+    }, error);
+    if (!written || element->theme || element->snippet) return written;
+    return AppendReload(kit, "restart " + id, error);
 }
 
 }  // namespace ampify::uirender

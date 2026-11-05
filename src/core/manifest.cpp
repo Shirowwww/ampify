@@ -22,6 +22,9 @@ const std::set<std::string_view> kFixedPermissions = {
     "ui.window",     "ui.sidebar",    "ui.tray",       "fs.output",   "kit.manage",  "ui.fullscreen",
 };
 
+const std::set<std::string_view> kTranslationMembers = {"name", "description", "settings", "options", "groups",
+                                                       "settingDescriptions"};
+
 const std::set<std::string_view> kKnownFields = {
     "$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage", "license",
     "main", "colors", "defaultScheme", "resources", "icon", "permissions", "appVersions", "processes", "type",
@@ -55,6 +58,8 @@ constexpr const char* kSettingsKinds = "settings: only an extension, a theme or 
 constexpr size_t kMaxSettings = 16;
 constexpr size_t kMaxOptions = 20;
 constexpr size_t kMaxSettingText = 200;
+constexpr size_t kMaxGroupText = 40;
+constexpr size_t kMaxDescriptionText = 200;
 
 // settings.txt holds one value per line and trims its ends: a value that would not come back as written is refused.
 bool FitsSettingsFile(const std::string& text) {
@@ -127,12 +132,26 @@ void ReadSettingValue(const Json& item, const std::string& where, SettingSpec& s
     }
 }
 
+// The optional "group" or "description" of a setting: a text of 1 to `max` characters, on one line.
+void ReadSettingText(const Json& item, const char* field, size_t max, const std::string& where, std::string& out,
+                     std::vector<std::string>& errors) {
+    const Json* value = item.Find(field);
+    if (!value) return;
+    const std::string* text = value->AsString();
+    if (!text || CodePoints(*text) < 1 || CodePoints(*text) > max || text->find_first_of("\r\n") != std::string::npos) {
+        errors.push_back(where + ": " + field + " must be 1 to " + std::to_string(max) + " characters, on one line");
+        return;
+    }
+    out = *text;
+}
+
 std::optional<SettingSpec> ReadSetting(const Json& item, const std::string& where, std::vector<std::string>& errors) {
     if (!item.IsObject()) {
         errors.push_back(where + " must be an object");
         return std::nullopt;
     }
-    static const std::set<std::string_view> kFields = {"key", "label", "type", "default", "options", "min", "max"};
+    static const std::set<std::string_view> kFields = {"key", "label", "type", "default", "options", "min", "max",
+                                                       "group", "description"};
     size_t before = errors.size();
     for (const auto& [field, value] : *item.AsObject()) {
         (void)value;
@@ -160,6 +179,8 @@ std::optional<SettingSpec> ReadSetting(const Json& item, const std::string& wher
                 : *type == "choice" ? SettingSpec::Type::Choice
                 : *type == "text"   ? SettingSpec::Type::Text
                                     : SettingSpec::Type::Number;
+    ReadSettingText(item, "group", kMaxGroupText, where, spec.group, errors);
+    ReadSettingText(item, "description", kMaxDescriptionText, where, spec.description, errors);
     ReadSettingValue(item, where, spec, errors);
     if (errors.size() != before) return std::nullopt;
     return spec;
@@ -181,8 +202,10 @@ void ReadSettings(const Json& field, std::vector<SettingSpec>& settings, std::ve
     }
 }
 
-// "settings" or "options" of a translation: an object of texts of 1 to 60 characters, as a setting's label.
-std::map<std::string, std::string> ReadLabels(const Json* field, const std::string& where, std::vector<std::string>& errors) {
+// "settings", "options", "groups" or "settingDescriptions" of a translation: an object of texts of 1 to `max`
+// characters, as a setting's label.
+std::map<std::string, std::string> ReadLabels(const Json* field, const std::string& where, size_t max,
+                                              std::vector<std::string>& errors) {
     std::map<std::string, std::string> labels;
     if (!field) return labels;
     if (!field->IsObject()) {
@@ -191,8 +214,8 @@ std::map<std::string, std::string> ReadLabels(const Json* field, const std::stri
     }
     for (const auto& [key, value] : *field->AsObject()) {
         const std::string* text = value.AsString();
-        if (!text || CodePoints(*text) < 1 || CodePoints(*text) > 60) {
-            errors.push_back(where + "." + key + " must be 1 to 60 characters");
+        if (!text || CodePoints(*text) < 1 || CodePoints(*text) > max) {
+            errors.push_back(where + "." + key + " must be 1 to " + std::to_string(max) + " characters");
         } else {
             labels[key] = *text;
         }
@@ -223,12 +246,15 @@ void ReadTranslations(const Json& field, std::map<std::string, ManifestText>& tr
         size_t before = errors.size();
         for (const auto& [member, value] : *entry.AsObject()) {
             (void)value;
-            if (member != "name" && member != "description" && member != "settings" && member != "options") {
+            if (!kTranslationMembers.count(member)) {
                 errors.push_back(where + ": unknown field " + member);
             }
         }
-        std::map<std::string, std::string> settings = ReadLabels(entry.Find("settings"), where + ".settings", errors);
-        std::map<std::string, std::string> options = ReadLabels(entry.Find("options"), where + ".options", errors);
+        std::map<std::string, std::string> settings = ReadLabels(entry.Find("settings"), where + ".settings", 60, errors);
+        std::map<std::string, std::string> options = ReadLabels(entry.Find("options"), where + ".options", 60, errors);
+        std::map<std::string, std::string> groups = ReadLabels(entry.Find("groups"), where + ".groups", kMaxGroupText, errors);
+        std::map<std::string, std::string> descriptions = ReadLabels(entry.Find("settingDescriptions"),
+                                                                     where + ".settingDescriptions", kMaxDescriptionText, errors);
         const std::string* name = entry.Find("name") ? entry.Find("name")->AsString() : nullptr;
         if (!name || CodePoints(*name) < 1 || CodePoints(*name) > 60) {
             errors.push_back(where + ": name must be 1 to 60 characters");
@@ -237,7 +263,10 @@ void ReadTranslations(const Json& field, std::map<std::string, ManifestText>& tr
         if (!description || CodePoints(*description) < 1 || CodePoints(*description) > 300) {
             errors.push_back(where + ": description must be 1 to 300 characters");
         }
-        if (errors.size() == before) translations[code] = {*name, *description, std::move(settings), std::move(options)};
+        if (errors.size() == before) {
+            translations[code] = {*name, *description, std::move(settings), std::move(options), std::move(groups),
+                                  std::move(descriptions)};
+        }
     }
 }
 

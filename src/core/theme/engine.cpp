@@ -82,6 +82,16 @@ std::vector<MediaQuery> MediaQueries(const Theme& theme) {
     return queries;
 }
 
+// The index of the first element the selector matches, or -1 when none does or the selector cannot be read.
+int FindContainer(const std::string& text, const std::vector<NodeInfo>& nodes) {
+    std::optional<Selector> selector = ParseSelector(text);
+    if (!selector) return -1;
+    for (int i = 0; i < static_cast<int>(nodes.size()); i++) {
+        if (Matches(*selector, nodes, i)) return i;
+    }
+    return -1;
+}
+
 }  // namespace
 
 ThemeEngine::ThemeEngine(Journal& journal) : m_journal(journal) {}
@@ -108,6 +118,7 @@ ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
     }
     std::erase_if(m_baseSizes, [&](const auto& entry) { return !kept(entry.first.first); });
     std::erase_if(m_moves, [&](const Move& move) { return !kept(move.id); });
+    std::erase_if(m_reparents, [&](const Reparent& move) { return !kept(move.id); });
     std::erase_if(m_hovers, [&](const auto& entry) { return !kept(entry.first); });
     ForgetDecors(kept, tree);
 
@@ -127,6 +138,7 @@ ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
 void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const std::vector<NodeInfo>& nodes,
                                    Report& report) {
     std::vector<PendingMove> pending;
+    std::vector<PendingMove> reparents;
     const RuleIndex index(theme.assignments);
     const std::optional<ViewSize> size = tree.WindowSize();
     const bool darkScheme = theme.dark.value_or(IsDarkScheme(theme.scheme));
@@ -172,6 +184,10 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
                 pending.push_back({&node, assignment});
                 continue;
             }
+            if (property == kMoveToProperty) {
+                reparents.push_back({&node, assignment});
+                continue;
+            }
             WriteValue(node, *assignment, tree, report, true);
         }
         if (auto animation = winners.find("Animation"); animation != winners.end()) {
@@ -186,6 +202,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
         }
     }
     ApplyMoves(pending, tree, report);
+    ApplyReparents(reparents, nodes, tree, report);
 }
 
 // The ::before and ::after images of one element: put in or kept when a `content` image wins, taken off when none does
@@ -387,6 +404,39 @@ void ThemeEngine::ApplyMoves(std::vector<PendingMove>& pending, TreeBackend& tre
     for (const PendingMove& move : pending) WriteValue(*move.node, *move.assignment, tree, report, false);
 }
 
+// Moves each element into the first element its `move-to` selector names, unless it is there already. The place it
+// had is kept the first time only, for Restore. Each pass checks again, so an element Apple rebuilt moves too.
+void ThemeEngine::ApplyReparents(const std::vector<PendingMove>& pending, const std::vector<NodeInfo>& nodes,
+                                 TreeBackend& tree, Report& report) {
+    for (const PendingMove& move : pending) {
+        const NodeInfo& node = *move.node;
+        const std::string& selectorText = move.assignment->value.text;
+        const int container = FindContainer(selectorText, nodes);
+        if (container < 0) {
+            Refuse(Describe(node) + " move-to", "\"" + Describe(node) + "\" moves to \"" + selectorText +
+                       "\": no element matches it",
+                   report);
+            continue;
+        }
+        const NodeInfo& target = nodes[container];
+        if (node.parent < 0) continue;
+        if (nodes[node.parent].id == target.id) {
+            report.unchanged++;
+            continue;
+        }
+        if (!tree.Reparent(node.id, target.id, -1)) {
+            Refuse(Describe(node) + " move-to", "\"" + Describe(node) + "\" could not move into " + Describe(target),
+                   report);
+            continue;
+        }
+        bool recorded = std::any_of(m_reparents.begin(), m_reparents.end(),
+                                    [&](const Reparent& known) { return known.id == node.id; });
+        if (!recorded) m_reparents.push_back({node.id, nodes[node.parent].id, node.position});
+        report.applied++;
+        if (m_detailed) m_journal.Write("Moved: " + Describe(node) + " into " + Describe(target));
+    }
+}
+
 void ThemeEngine::ApplyResources(const Theme& theme, TreeBackend& tree, Report& report) {
     // A resource the theme no longer sets (a key edited out, a scheme without it) gets its original back.
     for (auto it = m_resourceOriginals.begin(); it != m_resourceOriginals.end();) {
@@ -457,6 +507,15 @@ void ThemeEngine::Restore(TreeBackend& tree) {
             gone++;
         }
     }
+    // Moved elements go back first, in the order they were moved: the places are ascending, so each one finds the
+    // children before it in place.
+    for (const Reparent& move : m_reparents) {
+        if (tree.Reparent(move.id, move.parent, move.index)) {
+            restored++;
+        } else {
+            gone++;
+        }
+    }
     for (auto it = m_moves.rbegin(); it != m_moves.rend(); ++it) {
         if (tree.Write(it->id, kOrderProperty, it->before)) {
             restored++;
@@ -499,6 +558,7 @@ void ThemeEngine::Restore(TreeBackend& tree) {
     m_baseSizes.clear();
     m_resourceOriginals.clear();
     m_moves.clear();
+    m_reparents.clear();
     m_reported.clear();
     m_active = false;
     m_passes = 0;

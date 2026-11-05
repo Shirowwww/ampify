@@ -764,6 +764,38 @@ bool XamlTreeBackend::Alive(theme::NodeId id) {
     }
 }
 
+// Puts the element into `panel` at `index` (or last). False when the panel refuses it.
+static bool InsertChild(const controls::Panel& panel, const xaml::UIElement& element, int index) noexcept {
+    try {
+        controls::UIElementCollection children = panel.Children();
+        const std::uint32_t size = children.Size();
+        const auto place = index < 0 ? size : std::min(static_cast<std::uint32_t>(index), size);
+        children.InsertAt(place, element);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+// The element leaves its panel and joins the other one at `index` (or last): the visual parent says which panel it
+// leaves, so no snapshot is needed. When the other panel refuses it, the element goes back to its old place.
+bool XamlTreeBackend::Reparent(theme::NodeId id, theme::NodeId parent, int index) {
+    try {
+        auto element = Resolve(id).try_as<xaml::UIElement>();
+        auto target = Resolve(parent).try_as<controls::Panel>();
+        if (!element || !target) return false;
+        auto from = media::VisualTreeHelper::GetParent(element).try_as<controls::Panel>();
+        std::uint32_t at = 0;
+        if (!from || !from.Children().IndexOf(element, at)) return false;
+        from.Children().RemoveAt(at);
+        if (InsertChild(target, element, index)) return true;
+        // Without this the scrubber and the times would vanish from Apple Music's bar.
+        return InsertChild(from, element, static_cast<int>(at));
+    } catch (...) {
+        return false;
+    }
+}
+
 // An icon or a text usually shows its button's colour and font, a template part its control's values: none of them
 // its own. Those read as kNoOwnValue, so that removing the theme clears them instead of freezing what they showed.
 std::optional<theme::Value> XamlTreeBackend::ReadOriginal(theme::NodeId id, std::string_view property) {
