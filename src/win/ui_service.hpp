@@ -38,7 +38,7 @@ public:
     void Start();
     void Stop();
 
-    struct Shared;  // defined in ui_service.cpp
+    struct Shared;  // defined in ui_service_detail.hpp
 
 private:
     void Run();

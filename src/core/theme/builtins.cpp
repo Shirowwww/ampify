@@ -266,7 +266,7 @@ constexpr std::string_view kFloatingPanels = R"css(
 
 /* Apple's column kept the song to a third of the bar: in a narrow window the title was cut while an empty stretch stood
    before the volume. The song spans the toggles' column too, and Ampify ends it a clear space short of the first toggle,
-   whatever their number (FollowSongRoom in ui_service.cpp). */
+   whatever their number (FollowSongRoom in ui_service_playbar.cpp). */
 .now-playing {
     grid-column-span: 2;
 }

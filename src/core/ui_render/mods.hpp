@@ -2,7 +2,7 @@
 
 // The "Ampify" card that Ampify adds to the Playback page of Apple Music's settings: the list
 // of installed extensions, and what a toggle of that card does. Portable, so the file handling is tested under Linux;
-// the card itself is built by src/win/ui_service.cpp.
+// the card itself is built by src/win/ui_service_settings.cpp and ui_service_mods.cpp.
 
 #include <filesystem>
 #include <map>

@@ -72,7 +72,7 @@ KitUpdate ReadKitUpdate(const Settings& settings);
 TweakChoice KitUpdateChoice(const std::filesystem::path& kit);
 
 // Where Ampify's own entry (the Marketplace's) stands: in the sidebar's list, or in its header next to Apple's "···"
-// while the sidebar is open (win/ui_service.cpp). Folded, Apple hides the header: the entry stays in the list.
+// while the sidebar is open (win/ui_service_sidebar.cpp). Folded, Apple hides the header: the entry stays in the list.
 inline constexpr char kEntryKey[] = "ampify.entry";
 bool ReadEntryInHeader(const Settings& settings);
 TweakChoice EntryChoice(const std::filesystem::path& kit);
