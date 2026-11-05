@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <map>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -127,10 +128,45 @@ bool IsOn(const xaml::FrameworkElement& source) {
     return dot && dot.Visibility() == xaml::Visibility::Visible && dot.Opacity() > 0;
 }
 
+bool SameColour(const media::Brush& first, const media::Brush& second) {
+    auto a = first.try_as<media::SolidColorBrush>();
+    auto b = second.try_as<media::SolidColorBrush>();
+    return a && b && a.Color() == b.Color();
+}
+
+// The copy's own icon. An AppBarButton's template has a FontIcon of its own (SubItemChevron, collapsed) above the
+// icon in the tree: found first, it took the colour and the glyph, and the copies stayed white (05/11).
+controls::FontIcon CopyIcon(const controls::Button& copy) {
+    if (auto bar = copy.try_as<controls::AppBarButton>()) return bar.Icon().try_as<controls::FontIcon>();
+    return FindFirst<controls::FontIcon>(copy);
+}
+
+std::string ColourText(const media::Brush& brush) {
+    auto solid = brush.try_as<media::SolidColorBrush>();
+    if (!solid) return brush ? "not a plain colour" : "none";
+    auto c = solid.Color();
+    char text[10];
+    std::snprintf(text, sizeof(text), "#%02X%02X%02X%02X", c.A, c.R, c.G, c.B);
+    return text;
+}
+
+Journal* g_journal = nullptr;  // AddPlayerControls's, for the reports of Sync
+
+// Once per change of a button's state: what Apple shows on its own button, and what the copy takes.
+void ReportColour(const xaml::FrameworkElement& source, bool on, const media::Brush& icon, const media::Brush& taken) {
+    static std::map<std::wstring, std::string> seen;
+    std::string line = std::string(on ? "on" : "off") + ", Apple's icon " + ColourText(icon) + ", the copy " +
+                       (on ? ColourText(taken) : std::string("the player's"));
+    std::string& last = seen[std::wstring(source.Name())];
+    if (!g_journal || last == line) return;
+    last = line;
+    g_journal->Write("Apple player: " + winrt::to_string(source.Name()) + " " + line);
+}
+
 // The copy takes the source's glyph (repeat one has its own), name and state, shown by Apple's dot under the icon.
 void Sync(const controls::Button& copy, const xaml::FrameworkElement& source) {
     auto glyph = FindFirst<controls::FontIcon>(source);
-    auto icon = FindFirst<controls::FontIcon>(copy);
+    auto icon = CopyIcon(copy);
     if (glyph && icon && icon.Glyph() != glyph.Glyph()) icon.Glyph(glyph.Glyph());
     winrt::hstring name = xaml::Automation::AutomationProperties::GetName(source);
     if (!name.empty() && xaml::Automation::AutomationProperties::GetName(copy) != name) {
@@ -139,16 +175,20 @@ void Sync(const controls::Button& copy, const xaml::FrameworkElement& source) {
     }
     bool on = IsOn(source);
     if (glyph && icon) {
-        // On, the icon takes the colour Apple gives its own, or its dot's when the copy has no dot; off, the player's
-        // style colours it as its neighbours.
+        // On, the icon takes the colour Apple gives its own (the accent, in 1.1792), or its dot's when Apple leaves the
+        // icon in the button's colour and the copy has no dot; off, the player's style colours it as its neighbours.
+        // Taken from the dot first, the copies showed no accent when on.
         media::Brush colour = glyph.Foreground();
-        if (!FindFirst<xaml::Shapes::Ellipse>(copy)) {
-            if (auto dot = FindNamed(source, std::wstring(source.Name()) + L"Dot").try_as<xaml::Shapes::Ellipse>()) {
-                colour = dot.Fill();
-            }
+        auto control = source.try_as<controls::Control>();
+        if (!FindFirst<xaml::Shapes::Ellipse>(copy) && control && SameColour(colour, control.Foreground())) {
+            // Not a clear dot: while Apple switches the mode, it read #00FFFFFF and the icon vanished.
+            auto dot = FindNamed(source, std::wstring(source.Name()) + L"Dot").try_as<xaml::Shapes::Ellipse>();
+            auto fill = dot ? dot.Fill().try_as<media::SolidColorBrush>() : nullptr;
+            if (fill && fill.Color().A > 0) colour = fill;
         }
         if (on) icon.Foreground(colour);
         else icon.ClearValue(controls::IconElement::ForegroundProperty());
+        ReportColour(source, on, glyph.Foreground(), colour);
     }
     if (auto dot = FindFirst<xaml::Shapes::Ellipse>(copy)) {
         dot.Visibility(on ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
@@ -409,6 +449,7 @@ void StartFollowing(const xaml::UIElement& playerRoot) {
 
 void AddPlayerControls(const xaml::UIElement& playerRoot, const xaml::UIElement& mainRoot, Journal& journal) noexcept {
     try {
+        g_journal = &journal;
         if (!playerRoot || !mainRoot || !g_shown) return;
         auto transport = FindNamed(playerRoot, L"TransportControl");
         auto stack = transport ? FindFirst<controls::StackPanel>(transport) : nullptr;

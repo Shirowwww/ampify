@@ -196,6 +196,18 @@ private:
     std::map<theme::NodeId, float> m_translations;  // the Z of UIElement.Translation before box-shadow raised it
     // `overflow` and `clip-path`: the handler that keeps each clip rectangle the size of its element.
     std::map<theme::NodeId, winrt::Microsoft::UI::Xaml::FrameworkElement::SizeChanged_revoker> m_clipSizes;
+    // `checked-color`: the colour written to each control, and what its ToggleButtonForegroundChecked keys held before
+    // (null: no such key of its own), given back when the theme goes.
+    struct CheckedKeys {
+        std::string colour;
+        std::vector<std::pair<std::wstring, winrt::Windows::Foundation::IInspectable>> originals;
+        // A rebuilt control can take a gone one's address, so its id: the entry is only that control's.
+        winrt::weak_ref<winrt::Microsoft::UI::Xaml::Controls::Control> control;
+    };
+    CheckedKeys* LiveChecked(theme::NodeId id, const winrt::Microsoft::UI::Xaml::Controls::Control& control);
+    std::map<theme::NodeId, CheckedKeys> m_checked;
+    bool WriteCheckedForeground(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                const theme::Value& value);
     theme::HoverTracker m_hover;
     // The events followed for the states an element's values use (FollowStates).
     struct HoverHandlers {

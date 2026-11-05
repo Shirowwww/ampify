@@ -546,6 +546,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         if (!held.element.get()) gone.push_back(entry);
     }
     for (const auto& [id, property] : gone) ReleaseStates(id, property);
+    std::erase_if(m_checked, [](const auto& entry) { return !entry.second.control.get(); });
     FollowArtwork(artwork);
     if (artworkImage) {
         FollowArtworkImage(artworkImage);

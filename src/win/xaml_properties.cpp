@@ -246,6 +246,12 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         if (auto element = object.try_as<xaml::UIElement>()) return kept(element.Shadow());
     } else if (property == "Clip") {
         if (auto element = object.try_as<xaml::FrameworkElement>()) return kept(element.Clip());
+    } else if (property == th::kCheckedForegroundProperty) {
+        if (auto control = object.try_as<controls::Control>()) {
+            CheckedKeys* known = LiveChecked(id, control);
+            if (!known) return theme::kNoOwnValue;
+            return theme::Value{theme::ValueKind::Color, known->colour};
+        }
     } else if (property == th::kOrderProperty) {
         if (std::optional<std::uint32_t> position = ItemPosition(object, std::nullopt)) {
             return theme::Value{theme::ValueKind::Number, std::to_string(*position)};
@@ -480,6 +486,61 @@ bool XamlTreeBackend::WriteStoryTransform(theme::NodeId id, const xaml::UIElemen
     return true;
 }
 
+// The entry of this very control, or none: one left by a gone control under the same id is dropped (its originals
+// belonged to that control's resources).
+XamlTreeBackend::CheckedKeys* XamlTreeBackend::LiveChecked(theme::NodeId id, const controls::Control& control) {
+    auto known = m_checked.find(id);
+    if (known == m_checked.end()) return nullptr;
+    if (known->second.control.get() == control) return &known->second;
+    m_checked.erase(known);
+    return nullptr;
+}
+
+// Apple Music gives its shuffle button its own ToggleButtonForegroundChecked keys (TransportControl.xbf), so the icon
+// stayed Apple's blue while on, whatever the theme's accent. The control's own keys take the theme's colour; the theme
+// gone, they get back what they held.
+bool XamlTreeBackend::WriteCheckedForeground(theme::NodeId id, const xaml::DependencyObject& object,
+                                             const theme::Value& value) {
+    static const std::array<std::wstring, 3> kKeys = {L"ToggleButtonForegroundChecked",
+                                                      L"ToggleButtonForegroundCheckedPointerOver",
+                                                      L"ToggleButtonForegroundCheckedPressed"};
+    auto control = object.try_as<controls::Control>();
+    if (!control) return false;
+    xaml::ResourceDictionary resources = control.Resources();
+    LiveChecked(id, control);
+    auto known = m_checked.find(id);
+    if (value == theme::kNoOwnValue) {
+        if (known == m_checked.end()) return true;
+        for (const auto& [key, original] : known->second.originals) {
+            IInspectable name = winrt::box_value(winrt::hstring(key));
+            if (original) resources.Insert(name, original);
+            else if (resources.HasKey(name)) resources.Remove(name);
+        }
+        m_checked.erase(known);
+        ReadThemeAgain(control);
+        return true;
+    }
+    if (value.kind != theme::ValueKind::Color) return false;
+    std::optional<ColorValue> color = ColorFromText(value.text);
+    if (!color) return false;
+    if (known != m_checked.end() && known->second.colour == value.text) return true;
+    if (known == m_checked.end()) {
+        CheckedKeys saved;
+        saved.control = control;
+        for (const std::wstring& key : kKeys) {
+            IInspectable name = winrt::box_value(winrt::hstring(key));
+            saved.originals.emplace_back(key, resources.HasKey(name) ? resources.Lookup(name) : nullptr);
+        }
+        known = m_checked.emplace(id, std::move(saved)).first;
+    }
+    for (const std::wstring& key : kKeys) {
+        resources.Insert(winrt::box_value(winrt::hstring(key)), media::SolidColorBrush(*color));
+    }
+    known->second.colour = value.text;
+    ReadThemeAgain(control);
+    return true;
+}
+
 bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, const theme::Value& value) {
     xaml::DependencyObject object = Resolve(id);
     if (!object) return false;
@@ -489,6 +550,8 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         m_animations.WantBackground(id, value);
         return true;
     }
+
+    if (property == th::kCheckedForegroundProperty) return WriteCheckedForeground(id, object, value);
 
     if (value == theme::kNoOwnValue) {
         xaml::DependencyProperty own = OwnProperty(object, property);

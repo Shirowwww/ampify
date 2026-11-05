@@ -13,7 +13,7 @@ namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 53> kProperties{{
+constexpr std::array<PropertySpec, 54> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
@@ -26,6 +26,8 @@ constexpr std::array<PropertySpec, 53> kProperties{{
     {"selected-background", "SelectedBackground", PropertyKind::Brush},
     {"selected-hover-background", "SelectedPointerOverBackground", PropertyKind::Brush},
     {"selected-active-background", "SelectedPressedBackground", PropertyKind::Brush},
+    // A toggle button's text or icon while it is on (shuffle): the ToggleButtonForegroundChecked keys of the control.
+    {"checked-color", kCheckedForegroundProperty, PropertyKind::Brush},
     {"border-width", "BorderThickness", PropertyKind::Thickness},
     {"corner-radius", "CornerRadius", PropertyKind::Thickness},
     {"border-radius", "CornerRadius", PropertyKind::Thickness},  // the name CSS and Spicetify themes use

@@ -639,6 +639,14 @@ std::string ScrubberInAccent(const Theme& theme) {
     return std::string(".scrubber { color: $") + kAccent + "; }\n";
 }
 
+// Apple Music's shuffle icon, while on, takes a blue of Apple's own (its button's ToggleButtonForegroundChecked keys),
+// while repeat and both dots take the accent: shuffle takes the accent too.
+std::string ShuffleInAccent(const Theme& theme) {
+    if (Sets(theme, ".shuffle-button", kCheckedForegroundProperty)) return {};
+    if (!theme.palette.Find(kAccent)) return {};
+    return std::string(".shuffle-button { checked-color: $") + kAccent + "; }\n";
+}
+
 // Apple Music paints an album's artist in its own blue, in code: the theme's link colour takes over, as WinUI's links
 // do (DefineAccentControls). On a light theme, Apple's light blue barely read.
 std::string ArtistInLinkColour(const Theme& theme) {
@@ -709,7 +717,7 @@ void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts
     bool applied = parts.resources;
     std::string css = ScrubberClearOfCorners(theme) + OneLightPerSong(theme) + RoomInsideALitCard(theme);
     if (parts.colors) {
-        css += ScrubberInAccent(theme) + ArtistInLinkColour(theme) + CardLinksInSecondaryText(theme) +
+        css += ScrubberInAccent(theme) + ShuffleInAccent(theme) + ArtistInLinkColour(theme) + CardLinksInSecondaryText(theme) +
                SearchTilesInCardColour(theme) + SelectedRowsInThemeColour(theme);
     }
     if (css.empty()) return;

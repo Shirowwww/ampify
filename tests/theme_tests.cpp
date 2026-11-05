@@ -1247,6 +1247,18 @@ TEST_CASE(Theme_AlbumArtistTakesTheThemesLinkColour) {
     CHECK(Assigned(Load(own), ".album-artist", "Foreground") == "#FF112233");
 }
 
+TEST_CASE(Theme_ShuffleIconTakesTheAccentWhileOn) {
+    MemoryFiles accent;
+    accent.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 4FD1FF\n";
+    CHECK(Assigned(Load(accent), ".shuffle-button", "CheckedForeground") == "#FF4FD1FF");
+
+    // A theme's own rule wins.
+    MemoryFiles own;
+    own.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 4FD1FF\n";
+    own.files["user.css"] = ".shuffle-button { checked-color: #FF112233; }\n";
+    CHECK(Assigned(Load(own), ".shuffle-button", "CheckedForeground") == "#FF112233");
+}
+
 TEST_CASE(Theme_ProgressLineTakesTheAccent) {
     MemoryFiles accent;
     accent.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 4FD1FF\n";
@@ -2171,9 +2183,9 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
     CHECK(full.usable);
     CHECK(full.resources.size() == 1);
     CHECK(!full.resourceDictionary.empty());
-    // With the album's artist in the accent, in its two forms (ArtistInLinkColour), and the progress line in the accent
-    // (ScrubberInAccent).
-    CHECK(full.assignments.size() == 5);
+    // With the album's artist in the accent, in its two forms (ArtistInLinkColour), the progress line in the accent
+    // (ScrubberInAccent) and the shuffle icon while on (ShuffleInAccent).
+    CHECK(full.assignments.size() == 6);
 
     th::LoadOptions none{"", &allowed, {false, false, false}};
     th::Theme off = Load(files, none);
@@ -2185,7 +2197,7 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
 
     th::LoadOptions noAssets{"", &allowed, {true, true, false}};
     th::Theme withoutImages = Load(files, noAssets);
-    CHECK(withoutImages.assignments.size() == 4);  // the font, artist and progress line rules stay, not the image's
+    CHECK(withoutImages.assignments.size() == 5);  // the font, artist, progress line and shuffle rules stay, not the image's
     CHECK(!ProblemContaining(withoutImages, "assets").empty());
 }
 

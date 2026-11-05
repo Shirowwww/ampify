@@ -81,6 +81,8 @@ struct NodeInfo {
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";
+// `checked-color`: the ToggleButtonForegroundChecked keys in a control's own resources, not a property of it.
+inline constexpr std::string_view kCheckedForegroundProperty = "CheckedForeground";
 // A control's template, given back before the control's other values (ThemeEngine::Restore).
 inline constexpr std::string_view kTemplateProperty = "Template";
 
