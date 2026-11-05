@@ -1,0 +1,18 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "audio-meter",
+  "name": "Audio meter, example",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "For people who make extensions: writes the loudness and the peak of the sound to Ampify's log. It changes no sound and shows nothing in Apple Music.",
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": [
+    "audio.analyze"
+  ],
+  "tags": [
+    "example",
+    "developer"
+  ]
+}

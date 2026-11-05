@@ -100,6 +100,31 @@ test("hello-extension declares exactly the permissions its code uses", () => {
   for (const permission of declared) assert.ok(needed.includes(permission), `permission inutile : ${permission}`);
 });
 
+// ---- Example of the audio API: the sound is read, never changed ---------------------------------------------------
+
+test("audio-meter logs the peak about once a second and reads loudness", () => {
+  const { manifest, source } = load("audio-meter");
+  const frames = [];
+  const fake = fakeAmpify(manifest);
+  fake.ampify.audio = {
+    onFrame: (fn) => frames.push(fn),
+    loudness: () => ({ momentary: -18.5, shortTerm: -17.2 }),
+  };
+  run(source, fake.ampify);
+  assert.equal(fake.logs[0], 'loudness now: {"momentary":-18.5,"shortTerm":-17.2}');
+
+  frames[0]({ bands: [], rms: 0.25, peak: 0.5, time: 1000 });
+  frames[0]({ bands: [], rms: 0.1, peak: 0.9, time: 1400 });
+  frames[0]({ bands: [], rms: 0.3, peak: 0.75, time: 2100 });
+  assert.deepEqual(fake.logs.slice(1), ["peak 0.50, rms 0.25", "peak 0.75, rms 0.30"]);
+});
+
+test("audio-meter declares exactly the permission its code uses", () => {
+  const { manifest, source } = load("audio-meter");
+  assert.deepEqual(manifest.permissions, ["audio.analyze"]);
+  assert.ok(/Ampify\.audio\./.test(source));
+});
+
 // ---- Examples of the kit services: Discord and Last.fm -----------------------------------------------------------
 
 // A fuller stand-in: player events, a clock, timers, config, POST, MD5, output files, a panel and the i18n texts.

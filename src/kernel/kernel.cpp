@@ -3,6 +3,7 @@
 
 #include <windows.h>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -20,6 +21,7 @@
 #include "../core/injection_policy.hpp"
 #include "../core/player_watch.hpp"
 #include "../core/journal.hpp"
+#include "../core/mini_player.hpp"
 #include "../core/reload.hpp"
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
@@ -37,6 +39,7 @@
 #if defined(AMPIFY_WITH_XAML)
 #include "../core/json.hpp"
 #include "../win/close_to_tray.hpp"
+#include "../win/mini_window.hpp"
 #include "../win/theme_service.hpp"
 #include "../win/ui_service.hpp"
 #include "../win/xaml_host.hpp"
@@ -73,6 +76,35 @@ void ServiceReloadRequests(const std::filesystem::path& kit, ampify::ReloadWatch
 
 HINSTANCE g_module = nullptr;  // the kernel DLL itself, passed to the interface-thread facade
 
+// The mini player's shortcut (mini.shortcut). Registered on the extension thread, which pumps the hotkeys.
+void StartMiniPlayerShortcut(ampify::WinHost& winHost, const ampify::Settings& settings, ampify::Journal& journal) {
+    std::string combo = settings.GetString(ampify::mini::kShortcutKey, ampify::mini::kDefaultShortcut);
+    if (combo.empty() || combo == "off") return;
+    if (winHost.RegisterKey(ampify::mini::kElementId, combo)) {
+        journal.Write("Mini player: shortcut " + combo + " registered");
+    } else {
+        journal.Write("Mini player: shortcut " + combo + " is not available (taken by another program, or not valid)");
+    }
+}
+
+// The mini player's data, every 250 ms: what plays, its cover while its window is open, and the buttons pressed in it.
+void FeedMiniPlayer(ampify::WinHost& winHost, const ampify::PlayerSnapshot& snapshot) {
+    ampify::mini::PublishInfo(ampify::mini::InfoFrom(snapshot));
+    for (ampify::PlayerCommand command : ampify::mini::TakeCommands()) winHost.Control(command, 0);
+    static std::atomic<bool> fetching{false};
+    if (!ampify::mini::WindowOpen() || !snapshot.track || fetching) return;
+    std::optional<ampify::mini::Artwork> shown = ampify::mini::CurrentArtwork();
+    if (shown && shown->trackId == snapshot.track->id) return;
+    fetching = true;
+    std::string trackId = snapshot.track->id;
+    // The host may wait a few seconds for the cover: a worker thread does, as the elements' own requests do.
+    std::thread([&winHost, trackId] {
+        std::optional<ampify::ArtworkHost::File> file = winHost.CurrentArtwork();
+        if (file) ampify::mini::PublishArtwork({trackId, file->contentType, file->bytes});
+        fetching = false;
+    }).detach();
+}
+
 // Themes and the native interface only touch the interface, so only AppleMusic.exe starts them. Both reach the
 // interface thread through the DispatcherQueue of Apple Music's main window (src/win/xaml_host.hpp). The clicks and
 // changes of the rendered trees go back to the JavaScript thread through the elements' queues.
@@ -84,11 +116,16 @@ void StartInterface(ampify::Journal& journal, [[maybe_unused]] const std::filesy
     // brushes, templates), and a static destructor would release them while Apple Music exits, after XAML is gone.
     static auto* themes = new ampify::win::ThemeService(journal, kit);
     themes->Start(g_module, GetCurrentProcessId());
+    ampify::mini::AddSidebarEntry(model, ampify::i18n::Text("mini.entry"));
 
     // Never destroyed: it holds XAML objects that may only be released on the interface thread.
     static auto* ui = new ampify::win::UiService(journal, kit, model, [target = &loader](const ampify::win::UiEvent& event) {
         if (!event.entry.empty()) {
             target->DeliverEventTo(event.elementId, event.entry, event.valueJson);
+            return;
+        }
+        if (event.click && event.elementId == ampify::mini::kElementId) {
+            ampify::mini::RequestWindow(ampify::mini::WindowAction::Toggle);  // the sidebar entry, not a script
             return;
         }
         if (event.click) {
@@ -188,10 +225,18 @@ DWORD WINAPI KernelMain(LPVOID) {
                                        [] { atmos::hooks::StartSoundHooks(journal); });
     }
 
+#if defined(AMPIFY_WITH_XAML)
+    if (role == ampify::ProcessRole::AppleMusic) {
+        ampify::win::miniwin::Install(journal, kit, settings.GetString(ampify::mini::kPlacementKey, ""));
+    }
+#endif
+    const bool miniHere = role == ampify::ProcessRole::AppleMusic;
+
     // JavaScript runs on this one thread only: QuickJS is not thread-safe, and the shortcuts are delivered to the
     // thread that registered them. Starting the elements here keeps that true.
-    std::thread([kit] {
+    std::thread([kit, miniHere] {
         host.StartAll(settings);
+        if (miniHere) StartMiniPlayerShortcut(winHost, settings, journal);
         journal.Write("Extension host ready");
         ampify::PlayerWatcher playerWatcher;
         int ticks = 0;
@@ -199,6 +244,10 @@ DWORD WINAPI KernelMain(LPVOID) {
         auto nextReload = std::chrono::steady_clock::now();
         while (true) {
             winHost.Service([](const std::string& elementId, const std::string& combo) {
+                if (elementId == ampify::mini::kElementId) {
+                    ampify::mini::RequestWindow(ampify::mini::WindowAction::Toggle);
+                    return;
+                }
                 loader.DeliverKey(elementId, combo);
             });
             loader.Pump();
@@ -211,6 +260,7 @@ DWORD WINAPI KernelMain(LPVOID) {
                 for (const std::string& event : playerWatcher.Poll(snapshot, nowMs)) {
                     loader.DeliverPlayer(event, snapshot);
                 }
+                if (miniHere) FeedMiniPlayer(winHost, snapshot);
             }
             if (std::chrono::steady_clock::now() >= nextReload) {
                 ServiceReloadRequests(kit, reload, loader, settings);

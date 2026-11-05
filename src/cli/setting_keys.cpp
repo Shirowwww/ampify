@@ -8,7 +8,7 @@ namespace ampify::cli {
 
 namespace {
 
-constexpr std::array<KnownSetting, 34> kFixed = {{
+constexpr std::array<KnownSetting, 36> kFixed = {{
     {"theme.active", "", "no theme"},
     {"theme.scheme", "", "the theme's default scheme"},
     {"theme.schedule", "", "no schedule"},
@@ -42,6 +42,8 @@ constexpr std::array<KnownSetting, 34> kFixed = {{
     {"apple.marquee", "hover", ""},
     {"apple.sidebar", "open", ""},
     {"ampify.entry", "sidebar", ""},
+    {"mini.shortcut", "Ctrl+Alt+M", "off turns it off"},
+    {"mini.position", "", "set when the mini player moves"},
     {"language", "", "the Windows language"},
 }};
 

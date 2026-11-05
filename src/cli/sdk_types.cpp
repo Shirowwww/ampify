@@ -67,6 +67,7 @@ type PlayerState = {
   } | null;
   source: "apple" | "smtc" | "";  // "": unknown state (no source answered)
 };
+type PlayerEvent = "trackchange" | "statechange" | "lyricschange" | "songchange" | "onplaypause";
 type LyricWord = { start: number; end: number; text: string };
 type LyricLine = { start?: number; end?: number; text: string; words: LyricWord[] };  // no start/end unless synced
 type Lyrics = {
@@ -144,8 +145,6 @@ type TextProps = TooltipProps & Omit<PlaceProps, "align"> & TextStyleProps & {
   align?: "left" | "center" | "right";
 };
 type TooltipWrapperProps = { label?: string; content?: string; placement?: "top" | "bottom" | "left" | "right"; delay?: number; showDelay?: number };
-type AudioChunk = { samples: Float32Array; channels: number; sampleRate: number; frames: number };
-type AudioAnalysis = { level: number; spectrum: number[]; tempo: number };
 type DiscordActivity = {
   clientId: string; type?: "playing" | "listening" | "watching" | "competing";
   statusDisplay?: "name" | "state" | "details"; details?: string; state?: string;
@@ -195,7 +194,9 @@ declare const Ampify: {
   // 5.3 Player [preview]
   player: {
     state(): PlayerState;
-    on(event: "trackchange" | "statechange" | "lyricschange", fn: (state: PlayerState) => void): void;
+    // songchange and onplaypause are Spicetify's names for trackchange and statechange.
+    on(event: PlayerEvent, fn: (state: PlayerState) => void): void;
+    off(event: PlayerEvent, fn: (state: PlayerState) => void): void;  // removes a listener added with on
     lyrics(): Lyrics | null;  // Apple Music's own lyrics of the song playing, null when it has none (yet)
     artwork(): Promise<{ type: string; base64: string } | null>;  // the cover Windows shows, files of one's own included
     play(): boolean;
@@ -245,6 +246,7 @@ declare const Ampify: {
     fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void };
     // permission ui.fullscreen; Apple Music's own full-screen player, laid over the window
     applePlayer: { open(): void };
+    miniPlayer: { open(): void; close(): void };
     panel: { register(id: string, view: UiNode): void; remove(id: string): boolean; onClose(id: string, fn: () => void): () => void };
     title: { set(text: string): void };
     /** A new label for a top bar or play bar button this element added: its text without an icon, its tooltip with one. */
@@ -264,6 +266,7 @@ declare const Ampify: {
     postForm(url: string, fields: Record<string, string | FormFile>): Promise<{ status: number; text: string }>;
     // An MP4 of a declared host as a looping GIF, made on the PC: a file for postForm.
     gifFromVideo(url: string, options?: { side?: number; fps?: number; seconds?: number }): Promise<{ type: "image/gif"; base64: string }>;
+    open(url: string): boolean;  // opens the page in the browser; false within 10 seconds of the previous page
   };
   crypto: { md5(text: string): string };
   i18n: {

@@ -12,6 +12,23 @@
   copied to the clipboard, read back on Import. Import refuses a file that is for another element or that holds a
   wrong value, and says why under the card.
 
+### Mini player
+
+- A small window that stays on top, with the cover, the title and artist, previous, play or pause, next, the progress
+  and a button back to the main window. It opens with Ctrl+Alt+M (`mini.shortcut`, `off` turns it off), or from an
+  extension with `Ampify.ui.miniPlayer.open()`, or from the "Mini player" entry of Apple Music's sidebar. It runs on its
+  own thread, so it never holds Apple Music's window, and it remembers where it was left. Closed until it is opened.
+- Its colours come from the theme's `--mini-background`, `--mini-foreground`, `--mini-muted` and `--mini-accent`.
+
+### Extensions
+
+- `Ampify.player.off(event, fn)` removes a listener, and `player.on` accepts Spicetify's `songchange` and
+  `onplaypause` names.
+- A manifest typo gets a suggestion: `unknown permission: storag (did you mean "storage"?)`.
+- New example `audio-meter`: the loudness and the peak of the sound, in the log. Permission `audio.analyze`.
+- Spicetify API coverage page: [docs/extensions/spicetify-api-coverage.md](docs/extensions/spicetify-api-coverage.md).
+- The TypeScript types include `http.open` and `player.off`, and no longer declare a type twice.
+
 ### Themes
 
 - Chosen accent "Follows the artwork" (Settings > Ampify, or `theme.accent = artwork`): the accent of every theme takes

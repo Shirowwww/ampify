@@ -935,7 +935,8 @@ def api_members():
         text = handle.read()
     section = text[text.index("## 5. The global `Ampify` object"):text.index("## 6. ")]
     paths = re.findall(r"Ampify\.([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)", section)
-    names = {path.split(".")[-1] for path in paths}
+    # `then` is Promise's method (Ampify.ready.then), not a member of the Ampify object.
+    names = {path.split(".")[-1] for path in paths} - {"then"}
     return sorted(names)
 
 
@@ -1081,7 +1082,9 @@ class Inspection(AmpifyTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         with open(path, encoding="utf-8") as handle:
             declared = handle.read()
-        missing = [name for name in api_members() if not re.search(r"\b%s\b" % re.escape(name), declared)]
+        # A declaration: the name followed by a parameter list, a type or an object (`get(`, `version:`, `config: {`).
+        missing = [name for name in api_members()
+                   if not re.search(r"\b%s\s*[(<:?]" % re.escape(name), declared)]
         self.assertEqual(missing, [])
 
     def test_types_refuses_to_overwrite_without_yes(self):

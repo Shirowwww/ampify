@@ -26,6 +26,7 @@ Ampify adds themes, extensions and apps to Apple Music for Windows. New here? St
 |---|---|
 | [Your first extension](extensions/guide.md) | An extension, then an app, in five minutes |
 | [The Ampify API](extensions/api.md) | Reference: the `Ampify` object and its permissions |
+| [Spicetify API coverage](extensions/spicetify-api-coverage.md) | Each part of Spicetify's API, what Ampify offers, and the top gaps |
 | [Manifest](extensions/manifest.md) | The `manifest.json` format, settings and translations |
 | [Publishing](extensions/catalog.md) | The catalog, `ampify publish`, review, what install checks |
 

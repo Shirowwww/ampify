@@ -6,6 +6,8 @@
 #include <cmath>
 #include <regex>
 #include <set>
+#include <string_view>
+#include <vector>
 
 #include "json.hpp"
 #include "text_util.hpp"
@@ -30,6 +32,38 @@ const std::set<std::string_view> kKnownFields = {
     "main", "colors", "defaultScheme", "resources", "icon", "permissions", "appVersions", "processes", "type",
     "preview", "tags", "settings", "translations",
 };
+
+// Edit distance between two names (Levenshtein), to suggest the name a person meant.
+size_t EditDistance(std::string_view a, std::string_view b) {
+    std::vector<size_t> previous(b.size() + 1);
+    std::vector<size_t> current(b.size() + 1);
+    for (size_t j = 0; j <= b.size(); j++) previous[j] = j;
+    for (size_t i = 1; i <= a.size(); i++) {
+        current[0] = i;
+        for (size_t j = 1; j <= b.size(); j++) {
+            size_t substitution = previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1);
+            current[j] = std::min({previous[j] + 1, current[j - 1] + 1, substitution});
+        }
+        std::swap(previous, current);
+    }
+    return previous[b.size()];
+}
+
+// " (did you mean \"x\"?)" for the known name closest to `text`, two edits at most; empty when none is close.
+template <typename Names>
+std::string DidYouMean(const std::string& text, const Names& names) {
+    constexpr size_t kMaxEdits = 2;
+    std::string_view best;
+    size_t bestDistance = kMaxEdits + 1;
+    for (std::string_view name : names) {
+        size_t distance = EditDistance(text, name);
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            best = name;
+        }
+    }
+    return best.empty() ? std::string() : " (did you mean \"" + std::string(best) + "\"?)";
+}
 
 // Length in Unicode code points, so that "é" counts as one character.
 size_t CodePoints(const std::string& text) {
@@ -330,7 +364,7 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
 
     for (const auto& [key, value] : *root->AsObject()) {
         (void)value;
-        if (!kKnownFields.count(key)) result.warnings.push_back("unknown field ignored: " + key);
+        if (!kKnownFields.count(key)) result.warnings.push_back("unknown field ignored: " + key + DidYouMean(key, kKnownFields));
     }
 
     Manifest m;
@@ -432,14 +466,15 @@ ManifestResult ParseManifest(std::string_view text, std::string_view folderName,
 
     if (const Json* list = root->Find("permissions")) {
         if (!list->AsArray()) {
-            result.errors.push_back("permissions must be a list");
+            result.errors.push_back("permissions must be a list, for example [\"storage\"]");
         } else if (list->AsArray()->size() > 32) {
             result.errors.push_back("permissions: 32 at most");
         } else {
             for (const Json& item : *list->AsArray()) {
                 const std::string* permission = item.AsString();
                 if (!permission || !IsKnownPermission(*permission)) {
-                    result.errors.push_back("unknown permission: " + (permission ? *permission : std::string("?")));
+                    const std::string name = permission ? *permission : std::string("?");
+                    result.errors.push_back("unknown permission: " + name + DidYouMean(name, kFixedPermissions));
                 } else if (m.HasPermission(*permission)) {
                     result.errors.push_back("duplicate permission: " + *permission);
                 } else {

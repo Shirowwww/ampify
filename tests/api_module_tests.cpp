@@ -90,7 +90,7 @@ const Expected kMembers[] = {
     {"config", "object!{get:f2=get,set:f2=set}"},
     {"storage", "object!{get:f2=get,set:f2=set,remove:f1=remove}"},
     // toggle, queue, lyrics, shuffle, repeat and setVolume added in kitApi 1.x, compatible additions
-    {"player", "object!{state:f0=state,on:f2=on,play:f0=play,pause:f0=pause,next:f0=next,previous:f0=previous,"
+    {"player", "object!{state:f0=state,on:f2=on,off:f2=off,play:f0=play,pause:f0=pause,next:f0=next,previous:f0=previous,"
                "seek:f1=seek,toggle:f0=toggle,shuffle:f0=shuffle,repeat:f0=repeat,setShuffle:f1=setShuffle,"
                "toggleShuffle:f0=toggleShuffle,setRepeat:f1=setRepeat,toggleRepeat:f0=toggleRepeat,"
                "setVolume:f1=setVolume,lyrics:f0=lyrics,artwork:f0=artwork,queue:object!{list:f0=list,add:f2=add,remove:f1=remove}}"},
@@ -107,7 +107,7 @@ const Expected kMembers[] = {
     {"ui", "object!{topbar:object!{addButton:f1=addButton},playbar:object!{addButton:f1=addButton},"
            "sidebar:object!{addItem:f1=addItem},"
            "menu:object!{addItem:f2=addItem},popup:object!{open:f1=open},"
-           "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},"
+           "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},miniPlayer:object!{open:f0=open,close:f0=close},"
            "panel:object!{register:f2=register,remove:f1=remove,onClose:f2=onClose},"
            "page:object!{register:f2=register},title:object!{set:f1=set},"
            "setLabel:f2=setLabel,setActive:f2=setActive,navigate:f1=navigate}"},  // setLabel, setActive, panel.onClose added in kitApi 1.x, compatible additions

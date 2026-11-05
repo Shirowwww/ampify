@@ -42,6 +42,44 @@ TEST_CASE(Manifest_RejectsUnknownAndDuplicatePermissions) {
     CHECK(!Check(duplicate, "hello-extension").manifest);
 }
 
+TEST_CASE(Manifest_SuggestsTheNearestPermissionName) {
+    std::string typo = kHello;
+    typo.replace(typo.find("\"storage\""), 9, "\"storag\"");
+    ampify::ManifestResult result = Check(typo, "hello-extension");
+    CHECK(!result.manifest);
+    CHECK(result.errors.size() == 1);
+    CHECK(result.errors[0] == "unknown permission: storag (did you mean \"storage\"?)");
+}
+
+TEST_CASE(Manifest_NamesNoSuggestionWhenNothingIsClose) {
+    std::string unknown = kHello;
+    unknown.replace(unknown.find("\"storage\""), 9, "\"filesystem\"");
+    ampify::ManifestResult result = Check(unknown, "hello-extension");
+    CHECK(result.errors.size() == 1);
+    CHECK(result.errors[0] == "unknown permission: filesystem");
+}
+
+TEST_CASE(Manifest_SuggestsTheNearestFieldName) {
+    std::string typo = kHello;
+    typo.insert(typo.find("\"main\""), "\"descripton\": \"x\", ");
+    ampify::ManifestResult result = Check(typo, "hello-extension");
+    CHECK(result.manifest.has_value());
+    CHECK(result.warnings.size() == 1);
+    CHECK(result.warnings[0] == "unknown field ignored: descripton (did you mean \"description\"?)");
+}
+
+TEST_CASE(Manifest_ShowsAnExampleWhenPermissionsIsNotAList) {
+    const std::string text = R"({
+  "id": "hello-extension", "name": "Hello", "version": "0.1.0", "kind": "extension",
+  "author": "Shirowwww", "description": "Example.", "kitApi": "1.0", "main": "main.js",
+  "permissions": "storage"
+})";
+    ampify::ManifestResult result = Check(text, "hello-extension");
+    CHECK(!result.manifest);
+    CHECK(result.errors.size() == 1);
+    CHECK(result.errors[0] == "permissions must be a list, for example [\"storage\"]");
+}
+
 TEST_CASE(Manifest_AcceptsEveryPermissionOfTheV2Schema) {
     for (const char* permission : {"ipc.discord", "midi.input", "library.write", "services.read", "ui.panel",
                                    "ui.window", "ui.tray", "audio.gain", "player.control"}) {

@@ -6,6 +6,16 @@ namespace ampify::prelude {
 extern const char kPlayer[];
 const char kPlayer[] = R"AMPIFYJS(
   const trackListeners = { trackchange: [], statechange: [], lyricschange: [] };
+  // Spicetify's names for two of the events, so that ported extensions keep working.
+  const eventAliases = { songchange: "trackchange", onplaypause: "statechange" };
+  const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+  const eventKey = (event) => {
+    const key = hasOwn(eventAliases, event) ? eventAliases[event] : event;
+    if (!hasOwn(trackListeners, key)) {
+      throw new RangeError("unknown event: " + event + " (trackchange, statechange, lyricschange, songchange or onplaypause)");
+    }
+    return key;
+  };
   const queueId = (value, what) => {
     if (typeof value !== "string" && typeof value !== "number") throw new TypeError(what);
     return String(value);
@@ -16,11 +26,16 @@ const char kPlayer[] = R"AMPIFYJS(
       return JSON.parse(native.playerState());
     },
     on(event, fn) {
-      const listeners = trackListeners[event];
-      if (!listeners) throw new RangeError("unknown event: " + event + " (trackchange, statechange or lyricschange)");
+      const listeners = trackListeners[eventKey(event)];
       if (typeof fn !== "function") throw new TypeError("player.on expects a function");
       native.require("player.read");
       listeners.push(fn);
+    },
+    // Removes a listener added with on, the same function. Nothing happens when it was not added.
+    off(event, fn) {
+      const listeners = trackListeners[eventKey(event)];
+      const at = listeners.indexOf(fn);
+      if (at >= 0) listeners.splice(at, 1);
     },
     play: () => native.playerCommand("play", 0),
     pause: () => native.playerCommand("pause", 0),
@@ -85,7 +100,8 @@ const char kPlayer[] = R"AMPIFYJS(
   });
 
   dispatch.player = (event, stateJson) => {
-    for (const fn of trackListeners[event]) runGuarded(event, fn, [JSON.parse(stateJson)]);
+    // A copy: a listener may remove itself or another while the event is delivered.
+    for (const fn of trackListeners[event].slice()) runGuarded(event, fn, [JSON.parse(stateJson)]);
   };
 )AMPIFYJS";
 

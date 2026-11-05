@@ -149,6 +149,8 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `apple.marquee` | A text cut with "…": `hover` scrolls it while the pointer is on it, `off` leaves it cut | `hover` |
 | `apple.sidebar` | Apple Music's sidebar: `open` leaves it as Apple Music shows it, `hover` folds it to its icons and opens it over the pages while the pointer is on it; the hamburger button pins it open for the session (its icon shows a pin; a second click folds it again), and the Library and Playlists groups fold with it | `open` |
 | `ampify.entry` | Where the entry that opens the Marketplace stands: `sidebar`, or `header` next to Apple's "···" at the top of the open sidebar | `sidebar` |
+| `mini.shortcut` | The keyboard shortcut that opens or closes the mini player, such as `Ctrl+Alt+M`; `off` turns it off | `Ctrl+Alt+M` |
+| `mini.position` | Where the mini player was last left, as `x,y,width,height` in screen pixels; Ampify writes it when the window moves | none |
 | `catalog.url` | `https://...` or `file://...` | the public catalog |
 | `app_launch_flags` | Arguments added when `ampify launch` starts Apple Music | empty |
 | `check_kit_update` | `1`: some commands say when a new Ampify exists (checked once a day, nothing downloaded) | `0` |

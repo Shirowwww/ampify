@@ -272,6 +272,52 @@ TEST_CASE(Element_PlayerEventsArriveOnThePumpNotOnTheCallingThread) {
     CHECK(f.Logged("track New"));
 }
 
+TEST_CASE(Element_PlayerOffStopsAListenerFromRunning) {
+    Fixture f;
+    auto element = f.Make("off", R"("player.read")", R"(
+        const seen = (s) => Ampify.log("seen " + s.track.title);
+        Ampify.player.on("trackchange", seen);
+        Ampify.player.off("trackchange", seen);
+    )");
+    CHECK(element->Start());
+    ampify::PlayerSnapshot snapshot;
+    ampify::TrackInfo track;
+    track.title = "Gone";
+    snapshot.track = track;
+    element->DeliverPlayer("trackchange", snapshot);
+    element->Pump();
+    CHECK(!f.Logged("seen Gone"));
+}
+
+TEST_CASE(Element_PlayerAcceptsTheSpicetifyEventNames) {
+    Fixture f;
+    auto element = f.Make("aliases", R"("player.read")", R"(
+        Ampify.player.on("songchange", (s) => Ampify.log("song " + s.track.title));
+        Ampify.player.on("onplaypause", (s) => Ampify.log("playing " + s.playing));
+    )");
+    CHECK(element->Start());
+    ampify::PlayerSnapshot snapshot;
+    ampify::TrackInfo track;
+    track.title = "Next";
+    snapshot.track = track;
+    snapshot.playing = true;
+    element->DeliverPlayer("trackchange", snapshot);
+    element->DeliverPlayer("statechange", snapshot);
+    element->Pump();
+    CHECK(f.Logged("song Next"));
+    CHECK(f.Logged("playing true"));
+}
+
+TEST_CASE(Element_PlayerRefusesAnUnknownEventNameWithTheList) {
+    Fixture f;
+    auto element = f.Make("badevent", R"("player.read")", R"(
+        try { Ampify.player.on("constructor", () => {}); } catch (e) { Ampify.log(e.name + ": " + e.message); }
+    )");
+    CHECK(element->Start());
+    CHECK(f.Logged("RangeError: unknown event: constructor"));
+    CHECK(f.Logged("songchange"));
+}
+
 TEST_CASE(Element_PlayerCommandsNeedPlayerControl) {
     Fixture f;
     auto denied = f.Make("nocontrol", "", R"(try { Ampify.player.next(); } catch (e) { Ampify.log(e.name); })");
