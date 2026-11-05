@@ -45,6 +45,14 @@ pwsh -File bench\windows\run-bench.ps1 -KitRoot <folder with release\ and bench\
 
 `-Only <id>` runs named cases, `-SkipInstall` skips installing Apple Music, `-CasesDir` picks another case folder.
 
+Four cases need no Apple Music (`65-ui-features.ps1`: `ui-hover-sidebar`, `ui-bar-position`, `ui-compact-sidebar`,
+`ui-current-lyrics`). They ask the UI build's `ampify.exe`, in a temporary `--kit-dir`, whether a setting takes its
+value and whether a snippet is valid, so they run in seconds. Whether the look is right is still checked on a PC.
+
+The inspector's stable-names check (`ui-inspector`) reports the names it finds in no tree as INFO. That case opens no
+page, so names of the lyrics, the queue or the full-screen player are missing from its tree. It becomes a gate once
+the General page survey shows which names belong to the main window.
+
 ### Add a case
 
 ```powershell
@@ -106,6 +114,35 @@ Things learned the hard way:
 - Every program the bench runs needs a timeout. In strict mode, check that a registry property exists before reading
   it.
 - For mouse drags, send absolute `mouse_event` moves; `SetCursorPos` with zero-pixel moves is not seen as a drag.
+
+## Coverage
+
+Measured on `ampify_tests.exe` with the code coverage console of Visual Studio (no admin, nothing to install):
+
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\Extensions\Microsoft\CodeCoverage.Console\Microsoft.CodeCoverage.Console.exe" collect --output coverage.cobertura.xml --output-format cobertura --nologo build-msvc\release\ampify_tests.exe
+```
+
+The file lists every line of `src/` with its hits. Counting each file and line once, the tests reach:
+
+| Scope | Before | After the bench and test pass |
+|---|---|---|
+| `src/core` | 96.5% | 97.1% |
+| all of `src/` | 90.2% | 90.8% |
+
+The least covered files of `src/core` after the pass, with the lines counted:
+
+| File | Before | After | Why it is low |
+|---|---|---|---|
+| `natives/kit.cpp` | 7.7% | 100% | Its command list and `Ampify.kit.run` are tested now |
+| `theme/tree.hpp` | 25% | 25% | Two default methods of an interface. A test calls them, but the tool still reports their lines as not run |
+| `gain_board.cpp` | 64.3% | 92.9% | `ElementGains` is tested now |
+| `natives/color.cpp` | 67.1% | 97.1% | `Ampify.color.playing` is tested now |
+| `extension.cpp` | 75.8% | 75.8% | Not changed in this pass |
+| `natives/ui.cpp` | 87.6% | 87.6% | Not changed in this pass |
+| `audio/audio_engine.cpp` | 89.5% | 89.5% | The delivery thread's loop and `ProcessAudio` are not reached |
+
+A line that runs is not a line that is checked: read a test before counting it.
 
 ## Test pass on a PC
 

@@ -134,3 +134,72 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   keeps the kernel loaded and blocks a rebuild. Stop it with `Stop-Process -Force` before linking.
 - Changing an extension setting with `ampify config` does not restart the extension: `ampify extension disable <id>`
   then `enable <id>` does.
+
+## Reliability: freezes, stuck library, error 9039 (research and code audit, 2026-11-05)
+
+Source: an online survey (about thirty pages: Apple Community, Microsoft Q&A, GitHub AMWin-RP, press). Dates are those of
+the pages. Not verified on a real Apple Music. Ranked by how often users report it and whether Ampify can act on it:
+
+1. **Slow interface, freezes, "Loading Library" that never ends** (very frequent, last seen May-June 2026). Probable
+   causes: WinUI 3 with many elements, web views for some pages, network waits. Ampify can only add its own load
+   (below). Not mitigated.
+2. **Playback stuck at 0:00 or without sound** (AMPLibraryAgent waits on the network or the audio device). The
+   IPv6 part is already fixed (`apple.network`). The rest is inside Apple's agent, out of the kernel's reach.
+3. **High CPU and memory** (the agent, the audio engine, WinUI with many elements). Not mitigated.
+4. **Freeze with the lyrics or the queue open** (AMWin-RP #193, reported 2025, still open in May 2026). A maintainer
+   suspects UI Automation tree searches block the app. This is the one case where Ampify's own code can be the cause:
+   see "UI-thread audit" below.
+5. **Slow start, first song blocked**: already described above (the 15 s block, Apple's bug).
+6. **Lyrics** (black background, sync, word timing): Apple announced word-by-word lyrics for Windows in its
+   1792 build (October 2026, press report, not checked on screen).
+7. **Scroll at about 30 frames a second** on WinUI 3 scroll bars (microsoft-ui-xaml #5850). A framework limit.
+8. **Error 9039 / error -50, library does not open**: no official fix. The cases found involve sign-in, permissions,
+   AirPlay, or a large external library. Diagnostic only; Ampify never deletes the library.
+9. **Output does not follow the default device change**: reports from 2024. Apple has not confirmed a fix, so this stays
+   open until it is seen on screen.
+10. **Dolby Atmos not offered** (Dolby Access): Apple and Dolby's problem, out of Ampify's scope (Atmos is never touched).
+11. **iPhone sync and playlist folders**: Apple Devices, out of scope.
+
+### Freeze watch (`apple.watchdog`, off by default)
+
+- The kernel queues a heartbeat to the interface thread every 200 ms (`PostToUiThread`) and a monitor thread reads
+  it every 100 ms. A silence of 300 ms or more is a stall. It is logged when the beats resume, as
+  `UI thread stalled N ms, while: <what Ampify was doing>`, and a line each minute gives the beats, the worst gap and
+  the number of stalls.
+- What Ampify was doing comes from `ActivityScope` markers (`src/core/ui_watchdog.hpp`): "theme tick" (the posted
+  tick), "theme pass after a change" (`Reapply` on each XAML change), "inspector tree", "element picker", "player
+  buttons read", "player buttons press", "player volume" and "player command" (every `PlayerBridge` call run on the
+  interface thread). Add a marker to any other interface-thread path that should be named.
+- A beat is queued only when the previous one ran (`BeatGate`), so a frozen interface thread queues one closure, not many.
+- Cost: about 5 queued calls a second and one thread waking every 100 ms. Not measured here: the coordinator must
+  measure CPU with the setting on and off.
+- Logic and tests: `src/core/ui_watchdog.*`, `tests/ui_watchdog_tests.cpp`. Thread: `src/win/ui_watchdog.*`.
+
+### UI-thread audit (static, not measured)
+
+Work that runs on the interface thread and could block it for long, found by reading the code:
+
+- `ThemeService` `WatchChanges` → `Reapply` on every change, and every element WinUI adds when `xaml.watcher` is on. The
+  pass is already timed in the log ("Themes: pass after a change, N ms"). Measure with the freeze log before changing it.
+- Visual-tree breadth-first searches by name, run on each player or lyrics event: `FindNamed` in `src/win/player_controls.cpp`,
+  `src/win/apple_player.cpp`, `src/win/lcd_links.cpp` and `src/win/sharp_artwork.cpp`. Each one walks the whole subtree
+  under the root it is given. This is the same kind of work as item 4 above. Next step: cache the found element per
+  root (it is recreated only when the template changes) and measure. Not changed here: no on-screen measurement was
+  possible in this lane.
+- `element_picker.cpp` (inspector) hit-tests on the interface thread only when asked to pick.
+
+### Stuck library agent (`apple.orphanAgent`, off by default)
+
+- A killed Apple Music can leave `AMPLibraryAgent.exe` running. It holds the library, so Apple Music cannot open it
+  (error 9039). Detection: an agent of the package runs and no `AppleMusic.exe` of the package runs.
+- The launcher waits 10 s (`kOrphanGraceMs`) for the agent to leave, then ends it with `TerminateProcess`. It never
+  ends an agent while Apple Music runs. It looks at launch (`ampify_launcher.exe`) and in the background launcher
+  while Apple Music is closed. A Start-menu launch that the background launcher does not see is not covered.
+- Logic and tests: `src/core/orphan_agent.*`, `tests/orphan_agent_tests.cpp`. Glue: `src/launcher/launcher.cpp`.
+
+### Mitigations not implemented
+
+Item 2 and item 3 would need the Apple Music process to be watched while it plays, and their effect verified on
+screen. Neither was possible in this lane, so no kernel mitigation was added beyond the two settings above. Candidate
+for later: a playback check (position still at 0:00 for N seconds while Apple reports playing) that offers to restart
+the agent, after the freeze log shows the problem on real sessions.

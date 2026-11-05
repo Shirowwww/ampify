@@ -39,6 +39,10 @@ struct AppleTweaks {
     bool textMarquee = true;
     // The sidebar folded to its icons, opening over the pages under the pointer (win/sidebar_hover.cpp).
     bool sidebarOnHover = false;
+    // Freezes of Apple Music's window written to its log, with what Ampify was doing (win/ui_watchdog.cpp). Off by default.
+    bool freezeLog = false;
+    // A library agent left behind by a killed Apple Music is ended once Apple Music is closed (launcher). Off by default.
+    bool orphanAgent = false;
 };
 
 inline constexpr char kNotificationsKey[] = "apple.notifications";
@@ -49,6 +53,8 @@ inline constexpr char kNetworkKey[] = "apple.network";
 inline constexpr char kArtworkKey[] = "apple.artwork";
 inline constexpr char kMarqueeKey[] = "apple.marquee";
 inline constexpr char kSidebarKey[] = "apple.sidebar";
+inline constexpr char kFreezeLogKey[] = "apple.watchdog";
+inline constexpr char kOrphanAgentKey[] = "apple.orphanAgent";
 
 // An unknown value reads as the default.
 AppleTweaks ReadAppleTweaks(const Settings& settings);

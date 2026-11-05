@@ -6,6 +6,7 @@
 #include <memory>
 #include <tuple>
 
+#include "../core/ui_watchdog.hpp"
 #include "amp_player.hpp"
 #include "player_buttons.hpp"
 #include "smtc_session.hpp"
@@ -321,8 +322,13 @@ void PlayerBridge::FollowLyricsLine(PlayerSnapshot& snapshot, int64_t nowMs) {
 }
 
 bool PlayerBridge::OnInterfaceThread(std::function<void()> work) {
-    if (m_options.onInterfaceThread) return m_options.onInterfaceThread(std::move(work), kInterfaceTimeoutMs);
-    return RunOnUiThreadAndWait(std::move(work), kInterfaceTimeoutMs);
+    // Named for the freeze log: a slow player command on the interface thread is then not "no Ampify work".
+    std::function<void()> named = [work = std::move(work)] {
+        ampify::ActivityScope activity("player command");
+        work();
+    };
+    if (m_options.onInterfaceThread) return m_options.onInterfaceThread(std::move(named), kInterfaceTimeoutMs);
+    return RunOnUiThreadAndWait(std::move(named), kInterfaceTimeoutMs);
 }
 
 std::optional<std::vector<AmpQueueEntry>> PlayerBridge::AppleQueue(std::string& failure, bool& cut) {

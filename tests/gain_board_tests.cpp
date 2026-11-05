@@ -40,3 +40,9 @@ TEST_CASE(GainBoard_TheCeilingCanBeZero) {
     CHECK_NEAR(board.TotalDb(), 0.0, 1e-9);
     CHECK(board.Linear() == 1.0f);
 }
+
+TEST_CASE(GainBoard_ElementGainsIsOneBoardForTheProcess) {
+    ampify::GainBoard& first = ampify::ElementGains();
+    ampify::GainBoard& second = ampify::ElementGains();
+    CHECK(&first == &second);
+}

@@ -20,14 +20,14 @@
   own thread, so it never holds Apple Music's window, and it remembers where it was left. Closed until it is opened.
 - Its colours come from the theme's `--mini-background`, `--mini-foreground`, `--mini-muted` and `--mini-accent`.
 
-### Extensions
+### Reliability
 
-- `Ampify.player.off(event, fn)` removes a listener, and `player.on` accepts Spicetify's `songchange` and
-  `onplaypause` names.
-- A manifest typo gets a suggestion: `unknown permission: storag (did you mean "storage"?)`.
-- New example `audio-meter`: the loudness and the peak of the sound, in the log. Permission `audio.analyze`.
-- Spicetify API coverage page: [docs/extensions/spicetify-api-coverage.md](docs/extensions/spicetify-api-coverage.md).
-- The TypeScript types include `http.open` and `player.off`, and no longer declare a type twice.
+- "Freeze log" in Settings > Apple Music (off by default): each time Apple Music's window stops answering for 0.3 s
+  or more, AppleMusic.log says how long and what Ampify was doing then, with a summary each minute. It shows where the
+  freezes come from, with or without the themes.
+- "Stuck library agent" in Settings > Apple Music (off by default): when Apple Music is closed and a library agent
+  left behind by a killed session still runs, Ampify ends it after 10 s, so Apple Music can open its library again
+  (error 9039). The agent is never ended while Apple Music runs.
 
 ### Themes
 
@@ -98,6 +98,12 @@
 
 ### Extensions
 
+- `Ampify.player.off(event, fn)` removes a listener, and `player.on` accepts Spicetify's `songchange` and
+  `onplaypause` names.
+- A manifest typo gets a suggestion: `unknown permission: storag (did you mean "storage"?)`.
+- New example `audio-meter`: the loudness and the peak of the sound, in the log. Permission `audio.analyze`.
+- Spicetify API coverage page: [docs/extensions/spicetify-api-coverage.md](docs/extensions/spicetify-api-coverage.md).
+- The TypeScript types include `http.open` and `player.off`, and no longer declare a type twice.
 - Song panel, shipped with Ampify: a button of the playback bar slides in a column about the song playing, with its
   cover, the lyrics lit word by word, the album with its year and genre, the artist, the credits and what comes next.
 - A `lyrics` node shows the lyrics of the song playing, lit word by word, without the element rendering it again.
@@ -153,6 +159,9 @@
   menus and Ampify's panels ("Long texts" in Settings > Ampify turns it off).
 - Ampify's entry can stand next to Apple's "···" at the top of the sidebar ("Ampify's entry" in Settings > Ampify).
 - The README shows how to download the install script and read it before running it.
+- Tests: the Marketplace's command list, the kit command limits, Ampify.color.playing and the process gain board are
+  now tested. The bench checks the new Glass bar position, the hover sidebar, the Compact sidebar and the :current
+  lyrics snippet without Apple Music. The stable-names check of the inspector is reported, not failed, until its survey.
 
 ## 1.1.1 (2026-11-05)
 

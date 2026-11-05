@@ -24,6 +24,7 @@
 #include "../core/audio/audio_engine.hpp"
 #include "../core/gain_board.hpp"
 #include "../core/text_util.hpp"
+#include "../core/ui_watchdog.hpp"
 #include "audio_share.hpp"
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
@@ -127,7 +128,11 @@ std::optional<win::MainPlayerModes> ReadButtons() {
     win::ReadPlayerModesFn read = win::g_readModes.load();
     if (!read) return std::nullopt;
     auto result = std::make_shared<win::MainPlayerModes>();
-    if (!win::RunOnUiThreadAndWait([read, result] { *result = read(); }, kInterfaceTimeoutMs)) return std::nullopt;
+    auto readOnUi = [read, result] {
+        ampify::ActivityScope activity("player buttons read");
+        *result = read();
+    };
+    if (!win::RunOnUiThreadAndWait(readOnUi, kInterfaceTimeoutMs)) return std::nullopt;
     return *result;
 }
 
@@ -135,7 +140,11 @@ bool PressButton(bool shuffle) {
     win::PressPlayerButtonFn press = win::g_pressButton.load();
     if (!press) return false;
     auto pressed = std::make_shared<bool>(false);
-    if (!win::RunOnUiThreadAndWait([press, pressed, shuffle] { *pressed = press(shuffle); }, kInterfaceTimeoutMs)) {
+    auto pressOnUi = [press, pressed, shuffle] {
+        ampify::ActivityScope activity("player buttons press");
+        *pressed = press(shuffle);
+    };
+    if (!win::RunOnUiThreadAndWait(pressOnUi, kInterfaceTimeoutMs)) {
         return false;
     }
     return *pressed;
@@ -203,7 +212,11 @@ bool WinHost::SetVolume(double volume) {
     if (!setter) return false;
     if (m_process != "ui") return setter(volume);
     auto done = std::make_shared<bool>(false);
-    if (!win::RunOnUiThreadAndWait([setter, volume, done] { *done = setter(volume); }, kInterfaceTimeoutMs)) {
+    auto setOnUi = [setter, volume, done] {
+        ampify::ActivityScope activity("player volume");
+        *done = setter(volume);
+    };
+    if (!win::RunOnUiThreadAndWait(setOnUi, kInterfaceTimeoutMs)) {
         m_journal.Write("Player: the volume was not set: the interface thread did not answer in time");
         return false;
     }

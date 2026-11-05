@@ -33,6 +33,7 @@
 #include "../win/audio_share.hpp"
 #include "../win/network_fix.hpp"
 #include "../win/player_buttons.hpp"
+#include "../win/ui_watchdog.hpp"
 #include "../win/win_common.hpp"
 #include "../win/win_host.hpp"
 
@@ -202,7 +203,8 @@ DWORD WINAPI KernelMain(LPVOID) {
     static ampify::Settings settings;
     settings.Load((kit / "settings.txt").string());
     // Before anything connects: the songs stuck at 0:00 where a server's IPv6 does not answer.
-    if (ampify::uirender::ReadAppleTweaks(settings).ipv4First) ampify::win::InstallIpv4First(journal);
+    ampify::uirender::AppleTweaks tweaks = ampify::uirender::ReadAppleTweaks(settings);
+    if (tweaks.ipv4First) ampify::win::InstallIpv4First(journal);
 
     // JavaScript elements live in %USERPROFILE%\Ampify\extensions\<id> and apps\<id>. Both processes
     // load them: an element tells them apart with Ampify.process.
@@ -271,6 +273,7 @@ DWORD WINAPI KernelMain(LPVOID) {
     }).detach();
 
     if (role == ampify::ProcessRole::AppleMusic) StartInterface(journal, kit, winHost.Ui(), loader);
+    if (role == ampify::ProcessRole::AppleMusic && tweaks.freezeLog) ampify::win::StartUiWatchdog(journal);
 
     if (role == ampify::ProcessRole::AppleMusic) {
         // The interface process is the one that proves the app is healthy. Its window must not be hung.

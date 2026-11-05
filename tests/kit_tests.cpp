@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "../src/core/kit_layout.hpp"
+#include "../src/core/natives/kit.hpp"
 #include "test.hpp"
 
 namespace {
@@ -126,4 +127,39 @@ TEST_CASE(KitLayout_TheInstallFolderLeavesThePathAndNothingElse) {
     CHECK(ampify::PathWithoutFolder("C:\\a\\;C:\\Windows;C:\\A", "C:\\A") == "C:\\Windows");
     CHECK(ampify::PathWithoutFolder("C:\\Windows;C:\\AB", "C:\\A") == "C:\\Windows;C:\\AB");
     CHECK(ampify::PathWithoutFolder("C:\\A", "C:\\A").empty());
+}
+TEST_CASE(KitCommands_TheMarketplaceCanInstallRemoveAndChoose) {
+    CHECK(ampify::IsKitCommandAllowed({"install", "spinning-artwork"}));
+    CHECK(ampify::IsKitCommandAllowed({"remove", "spinning-artwork", "--yes"}));
+    CHECK(ampify::IsKitCommandAllowed({"theme", "set", "glass", "--scheme", "Dark"}));
+    CHECK(ampify::IsKitCommandAllowed({"list", "--json"}));
+    CHECK(ampify::IsKitCommandAllowed({"market"}));
+}
+
+TEST_CASE(KitCommands_AnUpdateNeedsAnElementId) {
+    // `update` alone would update Ampify itself: a page may only update one element.
+    CHECK(!ampify::IsKitCommandAllowed({"update"}));
+    CHECK(!ampify::IsKitCommandAllowed({"update", "--apply"}));
+    CHECK(ampify::IsKitCommandAllowed({"update", "glass"}));
+}
+
+TEST_CASE(KitCommands_OnlyKnownCommandsPass) {
+    CHECK(!ampify::IsKitCommandAllowed({}));
+    CHECK(!ampify::IsKitCommandAllowed({"restore"}));
+    CHECK(!ampify::IsKitCommandAllowed({"backup"}));
+    CHECK(!ampify::IsKitCommandAllowed({"Install", "glass"}));
+}
+
+TEST_CASE(KitCommands_KitFolderOptionsStayOutOfAPage) {
+    CHECK(!ampify::IsKitCommandAllowed({"list", "--kit-dir", "C:\Other"}));
+    CHECK(!ampify::IsKitCommandAllowed({"install", "glass", "--catalog", "https://example.com/c.json"}));
+    CHECK(!ampify::IsKitCommandAllowed({"list", "--install-dir=C:\Other"}));
+}
+
+TEST_CASE(KitCommands_SizeLimitsAreEnforced) {
+    CHECK(ampify::IsKitCommandAllowed({"list", "a", "b", "c", "d", "e", "f", "g"}));       // 8 arguments: the most
+    CHECK(!ampify::IsKitCommandAllowed({"list", "a", "b", "c", "d", "e", "f", "g", "h"}));  // 9: refused
+    CHECK(!ampify::IsKitCommandAllowed({"list", ""}));                                   // empty argument
+    CHECK(ampify::IsKitCommandAllowed({"list", std::string(200, 'x')}));
+    CHECK(!ampify::IsKitCommandAllowed({"list", std::string(201, 'x')}));
 }

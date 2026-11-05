@@ -70,6 +70,20 @@ const std::vector<std::pair<std::string, std::string>>& SidebarOptions() {
     return options;
 }
 
+const std::vector<std::pair<std::string, std::string>>& FreezeLogOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"off", "ui.off"},
+        {"on", "ui.on"}};
+    return options;
+}
+
+const std::vector<std::pair<std::string, std::string>>& OrphanAgentOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"off", "ui.off"},
+        {"on", "tweaks.orphan.on"}};
+    return options;
+}
+
 const std::vector<std::pair<std::string, std::string>>& KitUpdateOptions() {
     static const std::vector<std::pair<std::string, std::string>> options{
         {"auto", "update.auto"},
@@ -104,6 +118,8 @@ const std::vector<std::pair<std::string, std::string>>* OptionsOf(const std::str
     if (key == kArtworkKey) return &ArtworkOptions();
     if (key == kMarqueeKey) return &MarqueeOptions();
     if (key == kSidebarKey) return &SidebarOptions();
+    if (key == kFreezeLogKey) return &FreezeLogOptions();
+    if (key == kOrphanAgentKey) return &OrphanAgentOptions();
     if (key == kKitUpdateKey) return &KitUpdateOptions();
     return nullptr;
 }
@@ -135,6 +151,8 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.sharpArtwork = Known(settings, kArtworkKey) == "sharp";
     tweaks.textMarquee = Known(settings, kMarqueeKey) == "hover";
     tweaks.sidebarOnHover = Known(settings, kSidebarKey) == "hover";
+    tweaks.freezeLog = Known(settings, kFreezeLogKey) == "on";
+    tweaks.orphanAgent = Known(settings, kOrphanAgentKey) == "on";
     return tweaks;
 }
 
@@ -157,6 +175,8 @@ std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
         {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", std::move(notificationOptions),
          notifications},
         {kNetworkKey, "tweaks.network", "tweaks.networkHelp", NetworkOptions(), Known(settings, kNetworkKey)},
+        {kOrphanAgentKey, "tweaks.orphan", "tweaks.orphanHelp", OrphanAgentOptions(), Known(settings, kOrphanAgentKey)},
+        {kFreezeLogKey, "tweaks.watchdog", "tweaks.watchdogHelp", FreezeLogOptions(), Known(settings, kFreezeLogKey)},
     };
 }
 

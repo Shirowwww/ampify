@@ -17,6 +17,7 @@
 #include <shellapi.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -33,6 +34,7 @@
 #include "../core/injection_policy.hpp"
 #include "../core/journal.hpp"
 #include "../core/launch_flags.hpp"
+#include "../core/orphan_agent.hpp"
 #include "../core/package_watch.hpp"
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
@@ -61,6 +63,9 @@ constexpr DWORD kBackgroundPollMs = 250;
 
 // When the package cannot be read (Apple Music being updated, or not installed), the next look waits longer.
 constexpr DWORD kBackgroundRetryMs = 5000;
+
+// The stuck-agent look reads the process list, so it runs every 2 s, not at each 250 ms poll; the 10 s grace still holds.
+constexpr ULONGLONG kOrphanLookMs = 2000;
 
 // The first process is held still while the kernel loads, so this wait must stay short: the app would freeze for it.
 // A load takes about 60 ms; a first one scanned by an antivirus took 3 s, and finishes after the resume instead.
@@ -165,6 +170,81 @@ bool WaitOrStop(HANDLE stop, DWORD ms) {
         return false;
     }
     return WaitForSingleObject(stop, ms) == WAIT_OBJECT_0;
+}
+
+// Ends one library agent that Apple Music left behind. Only called while no Apple Music runs (ampify::DecideOrphanAgent).
+void EndOrphanAgent(ampify::Journal& journal, DWORD processId) {
+    HANDLE process = OpenProcess(PROCESS_TERMINATE, FALSE, processId);
+    if (!process) {
+        journal.Write("Library agent (" + std::to_string(processId) + "): could not be opened to end it (Windows error " +
+                      std::to_string(GetLastError()) + ")");
+        return;
+    }
+    bool ended = TerminateProcess(process, 0) != FALSE;
+    CloseHandle(process);
+    journal.Write(ended ? "Library agent (" + std::to_string(processId) + ") ended: Apple Music was closed and it had not left"
+                        : "Library agent (" + std::to_string(processId) + "): could not be ended (Windows error " +
+                              std::to_string(GetLastError()) + ")");
+}
+
+// The apple.orphanAgent setting, read from settings.txt: "on" turns the recovery on, anything else leaves it off.
+bool OrphanAgentSettingOn(const std::filesystem::path& kit) {
+    ampify::Settings settings;
+    settings.Load((kit / "settings.txt").string());
+    std::string value = settings.GetString("apple.orphanAgent", "off");
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return std::tolower(c); });
+    return value == "on";
+}
+
+// One look, each time the launcher finds Apple Music closed, at a library agent of the package that is left running.
+// The agent gets kOrphanGraceMs to leave by itself; after that it is ended. Nothing is done while Apple Music runs.
+class OrphanAgentWatch {
+public:
+    explicit OrphanAgentWatch(bool enabled) : m_enabled(enabled) {}
+
+    void SetEnabled(bool enabled) {
+        m_enabled = enabled;
+        m_since = 0;
+    }
+
+    // `appRunning`: an AppleMusic.exe of the package runs. Returns what the look decided.
+    ampify::OrphanAction Step(ampify::Journal& journal, const std::filesystem::path& packageDirectory, bool appRunning) {
+        if (!m_enabled || appRunning) {
+            m_since = 0;
+            return ampify::OrphanAction::None;
+        }
+        std::vector<DWORD> agents = ampify::launcher::FindPackageProcesses(L"AMPLibraryAgent.exe", packageDirectory);
+        if (agents.empty()) {
+            m_since = 0;
+            return ampify::OrphanAction::None;
+        }
+        ULONGLONG now = GetTickCount64();
+        if (m_since == 0) {
+            m_since = now;
+            journal.Write("A library agent runs with Apple Music closed: given " +
+                          std::to_string(ampify::kOrphanGraceMs / 1000) + " s to leave");
+        }
+        ampify::OrphanAction action = ampify::DecideOrphanAgent(true, false, true, now - m_since);
+        if (action == ampify::OrphanAction::End) {
+            for (DWORD processId : agents) EndOrphanAgent(journal, processId);
+            m_since = 0;
+        }
+        return action;
+    }
+
+private:
+    bool m_enabled;
+    ULONGLONG m_since = 0;  // when the agent was first seen alone; 0 when none is
+};
+
+// Before Apple Music starts: a left-over agent would hold the library (error 9039), so it is waited for or ended first.
+void ClearOrphanAgent(ampify::Journal& journal, const std::filesystem::path& packageDirectory, bool enabled) {
+    OrphanAgentWatch watch(enabled);
+    while (true) {
+        bool appRunning = !ampify::launcher::FindPackageProcesses(L"AppleMusic.exe", packageDirectory).empty();
+        if (watch.Step(journal, packageDirectory, appRunning) != ampify::OrphanAction::WaitForExit) return;
+        Sleep(kPollIntervalMs);
+    }
 }
 
 // Follows the package until Apple Music has been gone for a while, or until `stop` is set. Each process it sees gets
@@ -308,9 +388,13 @@ std::wstring LaunchArguments(ampify::Journal& journal, const std::filesystem::pa
 // ampify_launcher.exe: starts Apple Music with the kernel.
 int Run(ampify::Journal& journal, const std::filesystem::path& kit) {
     std::wstring appId = ToWide(ampify::kAppUserModelId);
+    std::wstring appFamily = ToWide(ampify::kPackageFamilyName);
     if (ampify::win::BackgroundRunning()) {
         // The background launcher loads the kernel when the app starts: two launchers would count the launch twice.
         journal.Write("The background launcher runs: it loads the kernel, this launcher only starts Apple Music");
+        if (std::optional<ampify::launcher::InstalledPackage> package = ampify::launcher::FindInstalledPackage(appFamily.c_str())) {
+            ClearOrphanAgent(journal, package->directory, OrphanAgentSettingOn(kit));
+        }
         DWORD processId = 0;
         HRESULT hr = ampify::launcher::ActivateApp(appId.c_str(), &processId, LaunchArguments(journal, kit));
         if (FAILED(hr)) Alert(L"Apple Music could not start.");
@@ -329,6 +413,7 @@ int Run(ampify::Journal& journal, const std::filesystem::path& kit) {
         return 0;
     }
 
+    ClearOrphanAgent(journal, session->package.directory, OrphanAgentSettingOn(kit));
     DWORD processId = 0;
     HRESULT activationHr = ampify::launcher::ActivateApp(appId.c_str(), &processId, LaunchArguments(journal, kit));
     if (FAILED(activationHr)) {
@@ -442,12 +527,20 @@ int RunBackground(ampify::Journal& journal, const std::filesystem::path& kit, HA
     bool firstLook = true;
     AutoUpdater updater;
     ampify::win::ProcessWatch appleMusic(L"AppleMusic.exe");
+    // The setting is read at each session, so it applies the next time Apple Music starts.
+    OrphanAgentWatch orphanAgent(OrphanAgentSettingOn(kit));
+    ULONGLONG lastOrphanLook = 0;
     DWORD wait = 0;
     while (!WaitOrStop(stop, wait)) {
         wait = kBackgroundPollMs;
         // A name check first: it costs next to nothing, four times a second.
         if (!appleMusic.Running()) {
             firstLook = false;
+            ULONGLONG now = GetTickCount64();
+            if (session && now - lastOrphanLook >= kOrphanLookMs) {
+                lastOrphanLook = now;
+                orphanAgent.Step(journal, session->package.directory, false);
+            }
             updater.Step(journal);
             continue;
         }
@@ -473,6 +566,7 @@ int RunBackground(ampify::Journal& journal, const std::filesystem::path& kit, HA
         updater.SoonAfterSession();
         journal.Write("Waiting for Apple Music to start again");
         session = OpenSession(journal, kit);
+        orphanAgent.SetEnabled(OrphanAgentSettingOn(kit));
     }
     journal.Write("Background launcher stopped");
     return 0;

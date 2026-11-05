@@ -328,3 +328,68 @@ TEST_CASE(ColorModule_FromArtworkRejectsWithTheReason) {
     missing->Stop();
     broken->Stop();
 }
+
+namespace {
+
+// The cover of the song playing: whatever the test sets before the script asks for it.
+struct FakeArtwork : ampify::ArtworkHost {
+    std::optional<File> file;
+    std::optional<File> CurrentArtwork() override { return file; }
+};
+
+}  // namespace
+
+TEST_CASE(ColorModule_PlayingReadsTheCoverOfTheSongNow) {
+    Fixture f(false);
+    FakeImages images;
+    FakeArtwork artwork;
+    f.host.images = &images;
+
+    // Without the player.read permission, the request is refused before anything is read. The refusal arrives as a
+    // rejection: the request is made through the dispatcher, so a try block around the call does not see it.
+    auto denied = f.Make("playing-denied", R"JS(
+        Ampify.color.playing().catch((e) => Ampify.log("denied " + e.name));
+    )JS", "");
+    CHECK(denied->Start());
+    CHECK(ampify::test::PumpUntil(*denied, [&] { return f.Logged("[playing-denied] denied "); }));
+    CHECK(f.Logged("[playing-denied] denied PermissionDenied"));
+
+    // A host without the cover service says so.
+    auto off = f.Make("playing-off", R"JS(
+        Ampify.color.playing().catch((e) => Ampify.log("off " + e.message));
+    )JS", "\"player.read\"");
+    CHECK(off->Start());
+    CHECK(ampify::test::PumpUntil(*off, [&] { return f.Logged("[playing-off] off "); }));
+    CHECK(f.Logged("color.playing: covers are not read by this host"));
+
+    f.host.artwork = &artwork;
+    auto none = f.Make("playing-none", R"JS(
+        Ampify.color.playing().then((c) => Ampify.log("nocover " + (c === null)));
+    )JS", "\"player.read\"");
+    CHECK(none->Start());
+    CHECK(ampify::test::PumpUntil(*none, [&] { return f.Logged("[playing-none] nocover "); }));
+    CHECK(f.Logged("[playing-none] nocover true"));
+
+    artwork.file = ampify::ArtworkHost::File{"image/png", "jpeg bytes"};
+    auto cover = f.Make("playing-cover", R"JS(
+        Ampify.color.playing().then((c) => Ampify.log("cover " + c.PROMINENT + " " + c.palette.length));
+    )JS", "\"player.read\"");
+    CHECK(cover->Start());
+    CHECK(ampify::test::PumpUntil(*cover, [&] { return f.Logged("[playing-cover] cover "); }));
+    CHECK(f.Logged("[playing-cover] cover #c82828 2"));
+    CHECK(images.received == "jpeg bytes");
+
+    artwork.file = ampify::ArtworkHost::File{"image/png", "not an image"};
+    auto broken = f.Make("playing-broken", R"JS(
+        Ampify.color.playing().catch((e) => Ampify.log("broken " + e.message));
+    )JS", "\"player.read\"");
+    CHECK(broken->Start());
+    CHECK(ampify::test::PumpUntil(*broken, [&] { return f.Logged("[playing-broken] broken "); }));
+    CHECK(f.Logged("color.playing: the cover is not an image Windows can read"));
+
+    denied->Stop();
+    off->Stop();
+    none->Stop();
+    cover->Stop();
+    broken->Stop();
+}

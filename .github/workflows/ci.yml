@@ -162,13 +162,13 @@ jobs:
       matrix:
         include:
           - shard: launch
-            cases: normal-launch,release-version,bench-injection,background-launch
+            cases: normal-launch,release-version,bench-injection,background-launch,ui-hover-sidebar
           - shard: safety
             cases: safe-mode,atmos-leveler,cli-windows-tools,extension-hello,installer
           - shard: tools
-            cases: cli-build-installed,amp-player,ui-examples,ui-inspector
+            cases: cli-build-installed,amp-player,ui-examples,ui-inspector,ui-bar-position
           - shard: ui
-            cases: ui-theme-palettes,ui-surfaces,ui-apple-player
+            cases: ui-theme-palettes,ui-surfaces,ui-apple-player,ui-compact-sidebar,ui-current-lyrics
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5

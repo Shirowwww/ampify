@@ -1,5 +1,6 @@
 # Step 3 of the UI test: the inspector writes the tree of Apple Music's window to logs\inspector.txt, then sets
-# theme.inspect back to 0. This case opens no page: the survey of the General page is still to be done on a real PC.
+# theme.inspect back to 0, and `ampify theme names` checks the stable names against its inspector.json. This case opens
+# no page: the survey of the General page is still to be done on a real PC.
 # Job: MSVC (msvc-build), AMPIFY_XAML=ON and AMPIFY_BENCH=ON build (otherwise the injection refuses the runner's version).
 # Needs $script:BenchKitRoot\ui\ with ampify_launcher.exe and ampify_kernel.dll side by side.
 
@@ -59,6 +60,24 @@ Register-Case -Id 'ui-inspector' -Title 'UI: the inspector writes the interface 
     $selectors = ([regex]::Matches($dump, 'selector:')).Count
     Add-Check -Ctx $Ctx -Name 'inspector.txt: elements with their selector' -Passed ($selectors -gt 0) `
         -Detail "$selectors element(s)"
+    # Every stable name (.sidebar, .card...) should match something in this tree. This case opens no page, so the
+    # names that live in other views (lyrics, queue, full-screen player) are listed as "Found in no tree" here. That is
+    # reported as INFO, not FAIL, until the General page survey tells which names belong to the main window: then the
+    # check can gate the job.
+    $jsonPath = Join-Path $script:JournalDir 'inspector.json'
+    $cli = Join-Path $script:BenchKitRoot 'ui\ampify.exe'
+    if (-not (Test-Path -LiteralPath $cli)) {
+        Add-Skip -Ctx $Ctx -Name 'stable names checked against the tree' -Reason "no ampify.exe in the UI build: $cli"
+    } elseif (-not (Test-Path -LiteralPath $jsonPath)) {
+        Add-Check -Ctx $Ctx -Name 'inspector.json: written with the tree' -Passed $false -Detail 'logs\inspector.json not written'
+    } else {
+        Copy-Item -LiteralPath $jsonPath -Destination $Ctx.Dir -Force
+        $namesOutput = @(& $cli theme names $jsonPath 2>&1)
+        $namesOutput | ForEach-Object { Write-Host "  $_" }
+        $vanished = @($namesOutput | Where-Object { "$_" -match 'Found in no tree' })
+        $detail = if ($vanished.Count -gt 0) { "$vanished" } else { 'every stable name matches the tree' }
+        Add-Info -Ctx $Ctx -Name 'stable names checked against the tree' -Detail $detail
+    }
     Add-Info -Ctx $Ctx -Name 'page open during the survey' `
         -Detail 'none: this case does not open the General page, its survey is still to be done'
 

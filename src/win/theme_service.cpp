@@ -34,6 +34,7 @@
 #include "../core/theme/session.hpp"
 #include "../core/theme/theme_settings.hpp"
 #include "../core/theme/worker.hpp"
+#include "../core/ui_watchdog.hpp"
 
 namespace ampify::win {
 
@@ -203,6 +204,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
         Journal& journal = m_journal;
         std::filesystem::path kit = m_kit;
         PostToUiThread([ui, request, kit, &journal]() {
+            ampify::ActivityScope activity("theme tick");
             if (!ui->attached) {
                 ui->attached = ui->backend.Attach();
                 if (!ui->attached) return;
@@ -211,6 +213,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 ui->backend.WatchChanges([weak, &journal] {
                     std::shared_ptr<UiSide> side = weak.lock();
                     if (!side || side->backend.WindowClosed()) return;
+                    ampify::ActivityScope activity("theme pass after a change");
                     auto start = std::chrono::steady_clock::now();
                     side->session.Reapply(side->backend);
                     auto end = std::chrono::steady_clock::now();
@@ -275,12 +278,14 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
                 }
             }
             if (dump) {
+                ampify::ActivityScope inspector("inspector tree");
                 std::ofstream(JournalFile("inspector.txt")) << *dump;
                 std::ofstream(JournalFile("inspector.json")) << theme::InspectTreeJson(ui->backend);
                 WriteSidebarIfMissing(kit, ui->backend);
                 UpdateThemeSettings(kit, journal, [](theme::ThemeSettings& value) { value.inspect = false; });
                 journal.Write("Inspector: tree written to logs\\inspector.txt and inspector.json");
             }
+            ampify::ActivityScope picker("element picker");
             AnswerPickRequest(kit, JournalFile("picked.txt"), journal);  // ampify devtools pick
         });
 

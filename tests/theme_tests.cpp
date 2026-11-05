@@ -4807,3 +4807,28 @@ TEST_CASE(Selector_MatchesSiblingCombinators) {
     CHECK(!th::ParseSelector("Grid + > TextBlock", &problem));
     CHECK(problem.find("misplaced \">\"") != std::string::npos);
 }
+
+TEST_CASE(TreeBackend_DefaultsTakeNothingOffAndRefuseWhatTheyCannotShow) {
+    // A backend that overrides neither hover states nor decor images: an empty list has nothing to take off, and
+    // an image cannot be shown.
+    struct BareTree final : th::TreeBackend {
+        std::vector<th::NodeInfo> Snapshot() override { return {}; }
+        std::optional<th::Value> Read(th::NodeId, std::string_view) override { return std::nullopt; }
+        bool Write(th::NodeId, std::string_view, const th::Value&) override { return false; }
+        std::vector<std::string> ResourceKeys() override { return {}; }
+        std::optional<th::Value> ReadResource(std::string_view) override { return std::nullopt; }
+        bool WriteResource(std::string_view, const th::Value&) override { return false; }
+        bool SetDictionary(std::string_view) override { return false; }
+    };
+    BareTree tree;
+    CHECK(tree.SetHover(1, {}));
+
+    th::HoverValue value;
+    value.property = "Background";
+    CHECK(!tree.SetHover(1, {value}));
+
+    CHECK(tree.SetDecor(1, th::PseudoElement::Before, nullptr) == th::DecorChange::Unchanged);
+    th::Decor decor;
+    decor.image = "a.png";
+    CHECK(tree.SetDecor(1, th::PseudoElement::After, &decor) == th::DecorChange::Refused);
+}

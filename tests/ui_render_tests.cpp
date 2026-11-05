@@ -893,13 +893,27 @@ TEST_CASE(UiRender_AmpifysEntryGoesInTheHeaderOnlyWhenChosen) {
 TEST_CASE(UiRender_TheCardListsTheValuesOfEveryKeyItKnows) {
     for (const char* key : {"apple.notifications", "apple.fullscreen", "apple.playerControls", "apple.close",
                             "apple.network", "apple.artwork", "apple.marquee", "apple.sidebar", "theme.glass", "ampify.entry",
-                            "kit_update"}) {
+                            "kit_update", "apple.watchdog", "apple.orphanAgent"}) {
         CHECK(!AppleTweakValues(key).empty());
         CHECK(!IsAppleTweakValue(key, "not-a-value"));
     }
+    CHECK(AppleTweakValues("apple.watchdog") == "off, on");
+    CHECK(AppleTweakValues("apple.orphanAgent") == "off, on");
     CHECK(AppleTweakValues("theme.glass") == "full, balanced, eco");
     CHECK(AppleTweakValues("ampify.entry") == "sidebar, header");
     CHECK(AppleTweakValues("theme.active").empty());  // not a key of the card
+}
+
+TEST_CASE(UiRender_FreezeLogAndOrphanAgentAreOffUntilChosen) {
+    Settings settings;
+    CHECK(!ReadAppleTweaks(settings).freezeLog);
+    CHECK(!ReadAppleTweaks(settings).orphanAgent);
+    settings.Set("apple.watchdog", "on");
+    settings.Set("apple.orphanAgent", "On");
+    CHECK(ReadAppleTweaks(settings).freezeLog);
+    CHECK(ReadAppleTweaks(settings).orphanAgent);
+    settings.Set("apple.watchdog", "maybe");
+    CHECK(!ReadAppleTweaks(settings).freezeLog);
 }
 
 TEST_CASE(UiRender_ResolvedAddressesListIpv4FirstOnlyWhenSomethingMoves) {
@@ -938,10 +952,14 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "theme.active", "screen", error));
 
     // The player, its cover, the long texts and the sidebar first, then the close button; the notifications, where
-    // "never" (Apple's own switch does it) only shows for someone who chose it before; the network fix last.
+    // "never" (Apple's own switch does it) only shows for someone who chose it before; the network fix, then the
+    // stuck library agent and the freeze log, last.
     std::vector<TweakChoice> choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 8);
-    if (choices.size() == 8) {
+    CHECK(choices.size() == 10);
+    if (choices.size() == 10) {
+        CHECK(choices[8].key == "apple.orphanAgent" && choices[8].value == "off");
+        CHECK(choices[9].key == "apple.watchdog" && choices[9].value == "off");
+        CHECK(choices[9].options.size() == 2);
         CHECK(choices[0].key == "apple.fullscreen" && choices[0].value == "screen");
         CHECK(choices[0].options.size() == 4);
         CHECK(choices[1].key == "apple.playerControls" && choices[1].value == "shown");
@@ -964,10 +982,10 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(SetAppleTweak(kit, "apple.sidebar", "hover", error));
     CHECK(!SetAppleTweak(kit, "apple.sidebar", "hidden", error));
     choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 8 && choices[6].options.size() == 2 && choices[6].value == "background");
-    CHECK(choices.size() == 8 && choices[7].value == "system");
-    CHECK(choices.size() == 8 && choices[2].value == "apple" && choices[3].value == "off");
-    CHECK(choices.size() == 8 && choices[4].value == "hover");
+    CHECK(choices.size() == 10 && choices[6].options.size() == 2 && choices[6].value == "background");
+    CHECK(choices.size() == 10 && choices[7].value == "system");
+    CHECK(choices.size() == 10 && choices[2].value == "apple" && choices[3].value == "off");
+    CHECK(choices.size() == 10 && choices[4].value == "hover");
 }
 
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {

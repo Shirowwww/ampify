@@ -14,6 +14,7 @@
 #include "../src/core/manifest.hpp"
 #include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
+#include "pump.hpp"
 #include "test.hpp"
 
 namespace {
@@ -256,4 +257,74 @@ TEST_CASE(Host_CapabilityIsNullUnlessTheHostOffersIt) {
     CHECK(echo == static_cast<EchoHost*>(&echoing));
     if (echo) CHECK(echo->Echo("hello") == "echo hello");
     CHECK(host.Capability<ChimeHost>() == nullptr);
+}
+
+namespace {
+
+// Keeps each command until the test answers it, as the real runner answers from its own thread.
+struct FakeKit : ampify::KitCommandHost {
+    std::vector<std::vector<std::string>> runs;
+    std::string lastOwner;
+    Done pending;
+
+    void RunKitCommand(const std::string& owner, const std::vector<std::string>& arguments, Done done) override {
+        lastOwner = owner;
+        runs.push_back(arguments);
+        pending = std::move(done);
+    }
+    void Forget(const std::string&) override { pending = nullptr; }
+};
+
+}  // namespace
+
+TEST_CASE(KitModule_OnlyTheMarketplaceRunsTheKitCommands) {
+    Fixture f;
+    FakeKit kit;
+    f.host.kit = &kit;
+
+    auto market = f.Make("marketplace", R"JS(
+        Ampify.kit.run(["install", "glass"]).then((r) => Ampify.log("done " + r.code + " " + r.out));
+        Ampify.kit.run(["update"]).catch((e) => Ampify.log("refused " + e.name));
+        Ampify.kit.run(["list", "--kit-dir", "C:/other"]).catch((e) => Ampify.log("folder " + e.name));
+    )JS", "\"kit.manage\"");
+    CHECK(market->Start());
+    CHECK(ampify::test::PumpUntil(*market, [&] { return f.Logged("[marketplace] folder "); }));
+    CHECK(f.Logged("[marketplace] refused PermissionDenied"));
+    CHECK(f.Logged("[marketplace] folder PermissionDenied"));
+    CHECK(kit.runs.size() == 1);  // only the install reached the runner
+    CHECK(kit.runs.size() == 1 && kit.runs[0] == std::vector<std::string>({"install", "glass"}));
+    CHECK(kit.lastOwner == "marketplace");
+
+    kit.pending(0, "installed", "");
+    CHECK(ampify::test::PumpUntil(*market, [&] { return f.Logged("[marketplace] done 0 installed"); }));
+
+    // Another element with the same permission is refused: the Marketplace is the only one the kit trusts.
+    auto intruder = f.Make("kit-intruder", R"JS(
+        Ampify.kit.run(["list"]).catch((e) => Ampify.log("intruder " + e.name));
+    )JS", "\"kit.manage\"");
+    CHECK(intruder->Start());
+    CHECK(ampify::test::PumpUntil(*intruder, [&] { return f.Logged("[kit-intruder] intruder "); }));
+    CHECK(f.Logged("[kit-intruder] intruder PermissionDenied"));
+    CHECK(kit.runs.size() == 1);
+
+    auto none = f.Make("kit-none", R"JS(
+        Ampify.kit.run(["list"]).catch((e) => Ampify.log("none " + e.name));
+    )JS", "");
+    CHECK(none->Start());
+    CHECK(ampify::test::PumpUntil(*none, [&] { return f.Logged("[kit-none] none "); }));
+    CHECK(f.Logged("[kit-none] none PermissionDenied"));
+
+    // Without the runner (a process with no kit), the page is told so instead of waiting forever.
+    market->Stop();
+    f.host.kit = nullptr;
+    auto bare = f.Make("marketplace", R"JS(
+        Ampify.kit.run(["list"]).then((r) => Ampify.log("bare " + r.code + " " + r.err));
+    )JS", "\"kit.manage\"");
+    CHECK(bare->Start());
+    CHECK(ampify::test::PumpUntil(*bare, [&] { return f.Logged("[marketplace] bare "); }));
+    CHECK(f.Logged("[marketplace] bare -1 Ampify commands are not available in this process"));
+
+    intruder->Stop();
+    none->Stop();
+    bare->Stop();
 }

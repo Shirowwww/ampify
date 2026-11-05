@@ -28,6 +28,8 @@ list(APPEND AMPIFY_TESTS_SOURCES
     tests/watch_tests.cpp
     tests/kit_tests.cpp
     tests/api_module_tests.cpp
-    tests/parity_tests.cpp)
+    tests/parity_tests.cpp
+    tests/ui_watchdog_tests.cpp
+    tests/orphan_agent_tests.cpp)
 
 list(APPEND AMPIFY_TESTS_WIN_SOURCES tests/win_host_tests.cpp tests/win_common_tests.cpp tests/win/kernel_claim_tests.cpp)
