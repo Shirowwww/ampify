@@ -162,6 +162,7 @@ and the theme applies again at once.
 | `backdrop` | `Background` | `acrylic(tint, opacity)` |
 | `color` or `foreground` | `Foreground` | Same as `background` |
 | `border-color` | `BorderBrush` | Same as `background` |
+| `checked-color` | `CheckedForeground` | A toggle's icon while on (`.shuffle-button`), a color or `$name`. Themes with an accent give it to shuffle |
 | `hover-background` | `PointerOverBackground` | A list row (`.list-item`) under the pointer |
 | `active-background` | `PressedBackground` | The same row while pressed |
 | `selected-background` | `SelectedBackground` | A selected list row (`.list-item`) |
