@@ -1274,7 +1274,12 @@ TEST_CASE(Theme_SearchTopResultsTakeTheCardColour) {
 TEST_CASE(Theme_ProgressLineStopsBeforeARoundedDisplaysCorner) {
     MemoryFiles rounded;
     rounded.files["user.css"] = ".lcd { corner-radius: 14px; }\n";
-    CHECK(ScrubberMargin(Load(rounded)) == "0,0,14,0");
+    // Only as far in as the corner's curve at the line's height (2 above the edge), 14 - sqrt(14^2 - 12^2), halved and
+    // rounded up: the line's template repeats its margin inside.
+    CHECK(ScrubberMargin(Load(rounded)) == "0,0,4,0");
+    MemoryFiles slight;
+    slight.files["user.css"] = ".lcd { corner-radius: 2px; }\n";
+    CHECK(ScrubberMargin(Load(slight)) == "ABSENT");
 
     // A theme that places the line itself keeps its own margin, and a square display needs none.
     MemoryFiles placed;

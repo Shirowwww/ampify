@@ -609,7 +609,10 @@ bool Sets(const Theme& theme, std::string_view selector, std::string_view proper
 }
 
 // The progress line runs along the bottom of the song's display, up to its right edge: a theme that rounds the display
-// cut its end off with the corner. It stops before the corner.
+// cut its end off with the corner. It stops where the corner's curve meets the line, 2 above the display's edge: a
+// margin of the whole radius left a gap at the end that read as a line too short.
+constexpr double kScrubberLift = 2;
+
 std::string ScrubberClearOfCorners(const Theme& theme) {
     if (Sets(theme, ".scrubber", "Margin")) return {};
     double radius = 0;
@@ -621,8 +624,11 @@ std::string ScrubberClearOfCorners(const Theme& theme) {
             radius = LargestCorner(assignment.value.text);
         }
     }
-    if (radius <= 0) return {};
-    return ".scrubber { margin: 0 " + FormatNumber(radius) + " 0 0; }\n";
+    if (radius <= kScrubberLift) return {};
+    // Half of it: the line's template repeats its margin inside (see .scrubber in builtins.cpp).
+    double curve = radius - std::sqrt(radius * radius - (radius - kScrubberLift) * (radius - kScrubberLift));
+    double inset = std::ceil(curve / 2);
+    return ".scrubber { margin: 0 " + FormatNumber(inset) + " 0 0; }\n";
 }
 
 // The volume slider takes the accent through WinUI's slider keys (DefineAccentControls), but Apple Music's progress line
