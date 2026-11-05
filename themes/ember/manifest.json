@@ -2,18 +2,18 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "ember",
   "name": "Ember",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Two glass panels over the colours of the song playing, the library and the pages, with the playback bar along the bottom and an amber accent.",
   "translations": {
-    "fr": {"name": "Braise", "description": "Deux panneaux de verre sur les couleurs du morceau en cours, la bibliothèque et les pages, avec la barre de lecture en bas et un accent ambre.", "settings": {"panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux", "accent": "Couleur d'accent", "veil": "Voile sur la pochette (0,5 à 0,95)"}, "options": {"Amber": "Ambre", "Artwork": "Pochette"}},
-    "de": {"name": "Glut", "description": "Zwei Glasflächen über den Farben des laufenden Titels, die Mediathek und die Seiten, mit der Wiedergabeleiste unten und einem bernsteinfarbenen Akzent.", "settings": {"panel-radius": "Ecken der Flächen", "gap": "Abstand um die Flächen", "accent": "Akzentfarbe", "veil": "Schleier über dem Cover (0,5 bis 0,95)"}, "options": {"Amber": "Bernstein", "Artwork": "Cover"}},
-    "es": {"name": "Brasa", "description": "Dos paneles de cristal sobre los colores de la canción que suena, la biblioteca y las páginas, con la barra de reproducción abajo y un acento ámbar.", "settings": {"panel-radius": "Esquinas de los paneles", "gap": "Espacio alrededor de los paneles", "accent": "Color de acento", "veil": "Velo sobre la portada (0,5 a 0,95)"}, "options": {"Amber": "Ámbar", "Artwork": "Portada"}},
-    "pt": {"name": "Brasa", "description": "Dois painéis de vidro sobre as cores da música que está tocando, a biblioteca e as páginas, com a barra de reprodução embaixo e um destaque âmbar.", "settings": {"panel-radius": "Cantos dos painéis", "gap": "Espaço em volta dos painéis", "accent": "Cor de destaque", "veil": "Véu sobre a capa (0,5 a 0,95)"}, "options": {"Amber": "Âmbar", "Artwork": "Capa"}},
-    "ru": {"name": "Угли", "description": "Две стеклянные панели поверх цветов текущей песни, медиатека и страницы, с панелью воспроизведения внизу и янтарным акцентом.", "settings": {"panel-radius": "Скругление панелей", "gap": "Отступ вокруг панелей", "accent": "Цвет акцента", "veil": "Вуаль над обложкой (от 0,5 до 0,95)"}, "options": {"Amber": "Янтарь", "Artwork": "Обложка"}},
-    "ja": {"name": "残り火", "description": "再生中の曲の色の上に 2 枚のガラスパネル、ライブラリとページ。再生バーは下に、アンバーのアクセント。", "settings": {"panel-radius": "パネルの角", "gap": "パネルの間隔", "accent": "アクセントカラー", "veil": "アートワークのベール（0.5〜0.95）"}, "options": {"Amber": "アンバー", "Artwork": "アートワーク"}},
-    "zh": {"name": "余烬", "description": "在正在播放歌曲的色彩上叠放两块玻璃面板：资料库和页面，播放栏位于底部，琥珀色强调。", "settings": {"panel-radius": "面板圆角", "gap": "面板间距", "accent": "强调色", "veil": "封面上的遮罩（0.5 至 0.95）"}, "options": {"Amber": "琥珀色", "Artwork": "封面"}}
+    "fr": {"name": "Braise", "description": "Deux panneaux de verre sur les couleurs du morceau en cours, la bibliothèque et les pages, avec la barre de lecture en bas et un accent ambre.", "settings": {"panel-radius": "Arrondi des panneaux", "gap": "Espace autour des panneaux", "accent": "Couleur d'accent", "veil": "Voile sur la pochette (0,5 à 0,95)", "bar-position": "Position de la barre de lecture"}, "options": {"Amber": "Ambre", "Artwork": "Pochette", "Bottom": "En bas", "Top": "En haut"}},
+    "de": {"name": "Glut", "description": "Zwei Glasflächen über den Farben des laufenden Titels, die Mediathek und die Seiten, mit der Wiedergabeleiste unten und einem bernsteinfarbenen Akzent.", "settings": {"panel-radius": "Ecken der Flächen", "gap": "Abstand um die Flächen", "accent": "Akzentfarbe", "veil": "Schleier über dem Cover (0,5 bis 0,95)", "bar-position": "Position der Wiedergabeleiste"}, "options": {"Amber": "Bernstein", "Artwork": "Cover", "Bottom": "Unten", "Top": "Oben"}},
+    "es": {"name": "Brasa", "description": "Dos paneles de cristal sobre los colores de la canción que suena, la biblioteca y las páginas, con la barra de reproducción abajo y un acento ámbar.", "settings": {"panel-radius": "Esquinas de los paneles", "gap": "Espacio alrededor de los paneles", "accent": "Color de acento", "veil": "Velo sobre la portada (0,5 a 0,95)", "bar-position": "Posición de la barra de reproducción"}, "options": {"Amber": "Ámbar", "Artwork": "Portada", "Bottom": "Abajo", "Top": "Arriba"}},
+    "pt": {"name": "Brasa", "description": "Dois painéis de vidro sobre as cores da música que está tocando, a biblioteca e as páginas, com a barra de reprodução embaixo e um destaque âmbar.", "settings": {"panel-radius": "Cantos dos painéis", "gap": "Espaço em volta dos painéis", "accent": "Cor de destaque", "veil": "Véu sobre a capa (0,5 a 0,95)", "bar-position": "Posição da barra de reprodução"}, "options": {"Amber": "Âmbar", "Artwork": "Capa", "Bottom": "Embaixo", "Top": "No topo"}},
+    "ru": {"name": "Угли", "description": "Две стеклянные панели поверх цветов текущей песни, медиатека и страницы, с панелью воспроизведения внизу и янтарным акцентом.", "settings": {"panel-radius": "Скругление панелей", "gap": "Отступ вокруг панелей", "accent": "Цвет акцента", "veil": "Вуаль над обложкой (от 0,5 до 0,95)", "bar-position": "Положение панели воспроизведения"}, "options": {"Amber": "Янтарь", "Artwork": "Обложка", "Bottom": "Внизу", "Top": "Вверху"}},
+    "ja": {"name": "残り火", "description": "再生中の曲の色の上に 2 枚のガラスパネル、ライブラリとページ。再生バーは下に、アンバーのアクセント。", "settings": {"panel-radius": "パネルの角", "gap": "パネルの間隔", "accent": "アクセントカラー", "veil": "アートワークのベール（0.5〜0.95）", "bar-position": "再生バーの位置"}, "options": {"Amber": "アンバー", "Artwork": "アートワーク", "Bottom": "下", "Top": "上"}},
+    "zh": {"name": "余烬", "description": "在正在播放歌曲的色彩上叠放两块玻璃面板：资料库和页面，播放栏位于底部，琥珀色强调。", "settings": {"panel-radius": "面板圆角", "gap": "面板间距", "accent": "强调色", "veil": "封面上的遮罩（0.5 至 0.95）", "bar-position": "播放栏位置"}, "options": {"Amber": "琥珀色", "Artwork": "封面", "Bottom": "底部", "Top": "顶部"}}
   },
   "kitApi": "1.0",
   "colors": "colors.ini",
@@ -29,6 +29,7 @@
     {"key": "panel-radius", "label": "Panel corners", "type": "number", "min": 0, "max": 24, "default": 12},
     {"key": "gap", "label": "Space around the panels", "type": "number", "min": 0, "max": 24, "default": 8},
     {"key": "accent", "label": "Accent colour", "type": "choice", "options": ["Amber", "Artwork"], "default": "Amber"},
-    {"key": "veil", "label": "Veil over the artwork (0.5 to 0.95)", "type": "number", "min": 0.5, "max": 0.95, "default": 0.78}
+    {"key": "veil", "label": "Veil over the artwork (0.5 to 0.95)", "type": "number", "min": 0.5, "max": 0.95, "default": 0.78},
+    {"key": "bar-position", "label": "Playback bar position", "type": "choice", "options": ["Bottom", "Top"], "default": "Bottom"}
   ]
 }

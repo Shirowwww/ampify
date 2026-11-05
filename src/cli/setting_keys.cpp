@@ -8,7 +8,7 @@ namespace ampify::cli {
 
 namespace {
 
-constexpr std::array<KnownSetting, 33> kFixed = {{
+constexpr std::array<KnownSetting, 34> kFixed = {{
     {"theme.active", "", "no theme"},
     {"theme.scheme", "", "the theme's default scheme"},
     {"theme.schedule", "", "no schedule"},
@@ -40,6 +40,7 @@ constexpr std::array<KnownSetting, 33> kFixed = {{
     {"apple.network", "ipv4-first", ""},
     {"apple.artwork", "sharp", ""},
     {"apple.marquee", "hover", ""},
+    {"apple.sidebar", "open", ""},
     {"ampify.entry", "sidebar", ""},
     {"language", "", "the Windows language"},
 }};

@@ -26,7 +26,11 @@
 }
 
 @import "ampify:floating-panels";
-@import "ampify:bottom-bar";
+
+/* The bar-position setting: a capsule over the bottom of the window (the default), or at the top as Apple has it. */
+@setting bar-position = Bottom {
+    @import "ampify:bottom-bar";
+}
 
 /* ---- The window: the artwork, behind everything --------------------------------------------------------------------- */
 
@@ -126,30 +130,53 @@
     border-color: var(--rim);
     border-width: 1.5px;
     corner-radius: var(--bar-radius);
-    /* The bar starts at the page column: the capsule reaches back under the sidebar, to the same edge as its pane. */
-    margin: 0 var(--gap) var(--gap) calc(var(--gap) - 290);
     box-shadow: 32px;
 }
 
-@media (max-width: 1324px) {
+@setting bar-position = Bottom {
+    /* The bar starts at the page column: the capsule reaches back under the sidebar, to the same edge as its pane. */
     .playbar {
-        margin: 0 var(--gap) var(--gap) calc(var(--gap) - 48);
+        margin: 0 var(--gap) var(--gap) calc(var(--gap) - 290);
+    }
+
+    .playbar-controls {
+        grid-column: 0;
+        grid-column-span: 4;
+    }
+
+    .playbar-extras {
+        grid-column: 0;
+        grid-column-span: 4;
+    }
+
+    .playbar-toggles {
+        grid-column-span: 2;
+        margin: 0 20 0 0;
     }
 }
 
-.playbar-controls {
-    grid-column: 0;
-    grid-column-span: 4;
+@media (max-width: 1324px) {
+    @setting bar-position = Bottom {
+        .playbar {
+            margin: 0 var(--gap) var(--gap) calc(var(--gap) - 48);
+        }
+    }
 }
 
-.playbar-extras {
-    grid-column: 0;
-    grid-column-span: 4;
-}
+/* At the top, the capsule sits in Apple's band above the pages, clear of the window's buttons on the right. */
+@setting bar-position = Top {
+    :root {
+        --content-top: calc(64 + var(--gap) * 2);
+    }
 
-.playbar-toggles {
-    grid-column-span: 2;
-    margin: 0 20 0 0;
+    /* Two gaps into the page column, where floating-panels starts the pages: the capsule lines up with them. */
+    .playbar {
+        margin: var(--gap) 150 0 calc(var(--gap) * 2);
+    }
+
+    .caption-buttons-cover {
+        visibility: collapsed;
+    }
 }
 
 

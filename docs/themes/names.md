@@ -50,6 +50,7 @@ read on Apple Music 1.1792.
 | `.sidebar-footer` | The bottom of the sidebar, with the account and the Ampify entry |
 | `.sidebar-footer-items` | The items of that bottom part |
 | `.sidebar-separator` | The line above it |
+| `.sidebar-entry` | An entry Ampify adds at the bottom of the sidebar: the Marketplace, an extension's page |
 | `.account-picture` | The account picture |
 | `.account-name` | The account name |
 
@@ -227,7 +228,7 @@ They open in popups, each a root of its own: `.flyout Slider` works, `.playbar .
 | `.lyrics-synced` | The lyrics that follow the song |
 | `.lyrics-static` | The lyrics without timing |
 | `.lyrics-message` | The text that stands in for lyrics: nothing playing, loading, not available |
-| `.lyrics-line` | One line of the synced lyrics, whole |
+| `.lyrics-line` | One line of the synced lyrics, whole; `:current` while it is the line being sung |
 | `.lyrics-line-button` | The button around a line: a click goes to that moment of the song |
 | `.lyrics-line-content` | What a line draws; Apple fades it by state (past or coming at half opacity, current at full) |
 | `.lyrics-words` | The sung text of a line: a plain text when the song is timed by line, the word by word host when it is timed by word |

@@ -26,7 +26,11 @@
 }
 
 @import "ampify:floating-panels";
-@import "ampify:bottom-bar";
+
+/* The bar-position setting: at the bottom across the window (the default), or at the top as Apple has it. */
+@setting bar-position = Bottom {
+    @import "ampify:bottom-bar";
+}
 
 /* ---- Panels ------------------------------------------------------------------------------------------------------ */
 

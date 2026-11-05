@@ -45,6 +45,8 @@ const std::vector<ClassEntry> kClasses{
     {"sidebar-footer", {"ContentControl#FooterContentBorder"}},
     {"sidebar-footer-items", {"ItemsRepeater#FooterMenuItemsHost"}},
     {"sidebar-separator", {"NavigationViewItemSeparator#Separator"}},
+    // Ampify's own entries (the Marketplace, an extension's page), buttons in the panel that holds Apple's footer.
+    {"sidebar-entry", {"StackPanel#AMPIFY_SidebarHost > Button"}},
     {"account-picture", {"PersonPicture#smallPersonPicture"}},
     {"account-name", {"TextBlock#lowerAccountName"}},
 

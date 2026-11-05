@@ -37,6 +37,8 @@ struct AppleTweaks {
     bool sharpArtwork = true;
     // A text cut with an ellipsis scrolls under the pointer (win/text_marquee.cpp).
     bool textMarquee = true;
+    // The sidebar folded to its icons, opening over the pages under the pointer (win/sidebar_hover.cpp).
+    bool sidebarOnHover = false;
 };
 
 inline constexpr char kNotificationsKey[] = "apple.notifications";
@@ -46,6 +48,7 @@ inline constexpr char kCloseKey[] = "apple.close";
 inline constexpr char kNetworkKey[] = "apple.network";
 inline constexpr char kArtworkKey[] = "apple.artwork";
 inline constexpr char kMarqueeKey[] = "apple.marquee";
+inline constexpr char kSidebarKey[] = "apple.sidebar";
 
 // An unknown value reads as the default.
 AppleTweaks ReadAppleTweaks(const Settings& settings);

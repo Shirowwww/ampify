@@ -144,7 +144,9 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
             if (!inserted && Beats(assignment, *it->second)) it->second = &assignment;
         };
         index.ForCandidates(node, [&](const Assignment& assignment) {
-            if (assignment.media && !(size && assignment.media->Matches(size->width, size->height))) return;
+            if (assignment.media && !(size && assignment.media->Matches(size->width, size->height, size->sidebarFolded))) {
+                return;
+            }
             if (assignment.media && !assignment.media->MatchesScheme(darkScheme)) return;
             if (!Matches(assignment.selector, nodes, position)) return;
 
@@ -299,7 +301,7 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, 
     if (known == m_hovers.end() && values.empty()) return;
 
     if (!tree.SetHover(node.id, values)) {
-        Refuse(Describe(node) + " :hover", "\"" + Describe(node) + "\" does not follow its states (:hover, :focus, :active)",
+        Refuse(Describe(node) + " :hover", "\"" + Describe(node) + "\" does not follow its states (:hover, :focus, :active, :current)",
                report);
         return;
     }

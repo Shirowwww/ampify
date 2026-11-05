@@ -120,6 +120,35 @@ bool PointerOnOwnRow(const xaml::UIElement& element, const xaml::Input::PointerR
     return true;
 }
 
+constexpr int kCurrentReach = 8;  // parents walked up to the states: a lyrics line's words are 3 to 5 below them
+
+bool NamesCurrent(const xaml::VisualState& state) {
+    return state && state.Name() == L"Current";
+}
+
+// The visual states that say whether Apple shows the element as the current one: a group with a state named
+// "Current", on the element's first child (the root of a lyrics line's content), the element or one of its parents.
+xaml::VisualStateGroup CurrentStates(const xaml::UIElement& element) {
+    auto groupOf = [](const xaml::DependencyObject& node) -> xaml::VisualStateGroup {
+        auto framework = node.try_as<xaml::FrameworkElement>();
+        if (!framework) return nullptr;
+        for (const xaml::VisualStateGroup& group : xaml::VisualStateManager::GetVisualStateGroups(framework)) {
+            for (const xaml::VisualState& state : group.States()) {
+                if (NamesCurrent(state)) return group;
+            }
+        }
+        return nullptr;
+    };
+    if (media::VisualTreeHelper::GetChildrenCount(element) > 0) {
+        if (xaml::VisualStateGroup group = groupOf(media::VisualTreeHelper::GetChild(element, 0))) return group;
+    }
+    xaml::DependencyObject node = element;
+    for (int up = 0; node && up < kCurrentReach; up++, node = media::VisualTreeHelper::GetParent(node)) {
+        if (xaml::VisualStateGroup group = groupOf(node)) return group;
+    }
+    return nullptr;
+}
+
 }  // namespace
 
 // Follows the events of the states the element's values use, and stops following the others. The handlers run inside
@@ -197,6 +226,29 @@ void XamlTreeBackend::FollowStates(theme::NodeId id, const xaml::UIElement& elem
         m_hover.Toggle(id, theme::Trigger::Focus, false, *this);
     }
     handlers.focus = focus;
+
+    // An element with no such states around it never shows its :current values.
+    bool current = m_hover.Uses(id, theme::Trigger::Current);
+    if (current && !handlers.current) {
+        xaml::VisualStateGroup group = CurrentStates(element);
+        current = static_cast<bool>(group);
+        if (group) {
+            handlers.currentGroup = winrt::make_weak(group);
+            handlers.currentChanged = group.CurrentStateChanged(
+                [this, alive, id](IInspectable const&, xaml::VisualStateChangedEventArgs const& args) noexcept {
+                    try {
+                        if (!alive.expired()) OnState(id, theme::Trigger::Current, NamesCurrent(args.NewState()));
+                    } catch (...) {
+                    }
+                });
+            m_hover.Toggle(id, theme::Trigger::Current, NamesCurrent(group.CurrentState()), *this);
+        }
+    } else if (!current && handlers.current) {
+        if (xaml::VisualStateGroup group = handlers.currentGroup.get()) group.CurrentStateChanged(handlers.currentChanged);
+        handlers.currentGroup = nullptr;
+        m_hover.Toggle(id, theme::Trigger::Current, false, *this);
+    }
+    handlers.current = current;
 }
 
 void XamlTreeBackend::OnState(theme::NodeId id, theme::Trigger trigger, bool on) noexcept {
@@ -236,6 +288,9 @@ void XamlTreeBackend::RemoveHoverHandlers(theme::NodeId id) {
             element.GotFocus(handlers.gotFocus);
             element.LostFocus(handlers.lostFocus);
         }
+    }
+    if (handlers.current) {
+        if (xaml::VisualStateGroup group = handlers.currentGroup.get()) group.CurrentStateChanged(handlers.currentChanged);
     }
     m_hoverHandlers.erase(it);
 }

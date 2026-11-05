@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "progress-thickness",
+  "name": "Progress line thickness",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "A thinner or thicker progress line in the display, with round ends, on top of any theme, like Spicetify's thin and thick bar snippets.",
+  "translations": {"fr": {"name": "Épaisseur de la ligne de progression", "description": "Une ligne de progression plus fine ou plus épaisse dans l'afficheur, aux bouts arrondis, par-dessus n'importe quel thème, comme les snippets de barre fine ou épaisse de Spicetify.", "settings": {"thickness": "Épaisseur (pixels)"}}, "de": {"name": "Dicke der Fortschrittslinie", "description": "Eine dünnere oder dickere Fortschrittslinie in der Anzeige, mit runden Enden, mit jedem Theme, wie die Snippets für dünne und dicke Leisten bei Spicetify.", "settings": {"thickness": "Dicke (Pixel)"}}, "es": {"name": "Grosor de la línea de progreso", "description": "Una línea de progreso más fina o más gruesa en el visor, con extremos redondeados, sobre cualquier tema, como los snippets de barra fina o gruesa de Spicetify.", "settings": {"thickness": "Grosor (píxeles)"}}, "pt": {"name": "Espessura da linha de progresso", "description": "Uma linha de progresso mais fina ou mais grossa no visor, com pontas arredondadas, sobre qualquer tema, como os snippets de barra fina ou grossa do Spicetify.", "settings": {"thickness": "Espessura (pixels)"}}, "ru": {"name": "Толщина линии прогресса", "description": "Более тонкая или толстая линия прогресса на дисплее, со скруглёнными концами, поверх любой темы, как сниппеты тонкой и толстой полосы в Spicetify.", "settings": {"thickness": "Толщина (пиксели)"}}, "ja": {"name": "進行ラインの太さ", "description": "Spicetify の細いバー・太いバーのスニペットのように、ディスプレイの進行ラインを細く、または太くし、端を丸くします。どのテーマにも重ねられます。", "settings": {"thickness": "太さ（ピクセル）"}}, "zh": {"name": "进度线粗细", "description": "让显示屏中的进度线更细或更粗，两端圆润，可叠加在任何主题上，就像 Spicetify 的细进度条和粗进度条片段。", "settings": {"thickness": "粗细（像素）"}}},
+  "preview": "preview.jpg",
+  "kitApi": "1.0",
+  "tags": [
+    "progress",
+    "playback-bar"
+  ],
+  "settings": [
+    {"key": "thickness", "label": "Thickness (pixels)", "type": "number", "min": 1, "max": 6, "default": 5}
+  ]
+}

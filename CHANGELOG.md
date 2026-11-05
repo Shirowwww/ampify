@@ -32,6 +32,16 @@
 - Glass light: white frosted panes, so the dark text reads whatever the song; the panes took the cover's dark colour
   in both schemes.
 - `@media (prefers-color-scheme: light)` and `(dark)` give a theme rules for each of its schemes.
+- `:current` matches the lyrics line being sung and its parts, line by line as the song goes:
+  `.lyrics-line-content:current { background: ... }` lights it.
+- Lyrics spotlight snippet: the line being sung stands on a soft tile of the song's colour in Apple's lyrics pane, on
+  top of any theme.
+- Compact sidebar snippet: rows of 32 pixels instead of 40, so more playlists fit. `.sidebar-entry` names Ampify's own
+  entries at the bottom of the sidebar, which themes could not reach before.
+- Glass and Ember: "Playback bar position" puts the bar at the top, Apple's own place, as in Cinema, Greenroom and
+  Palettes. Glass keeps its capsule there, lined up with the pages and clear of the window's buttons.
+- Progress line thickness snippet: the display's progress line from 1 to 6 pixels, with round ends. `corner-radius`
+  now rounds a `Rectangle` too, such as a slider's track.
 - A theme's rule for the playback bar's cover (`.lcd-artwork-image`) now wins over its rule for every cover
   (`.artwork`): every theme's bar cover had taken the radius meant for the grids.
 - A page's header no longer flashes Apple's grey frost before the theme's colour.

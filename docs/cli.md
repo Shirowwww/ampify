@@ -147,6 +147,7 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `apple.playerControls` | Shuffle and repeat around the full-screen player's buttons: `shown` or `hidden` | `shown` |
 | `apple.artwork` | The full-screen player's cover: `sharp` shows a sharper copy where Apple Music stretches a small one, `apple` leaves Apple's | `sharp` |
 | `apple.marquee` | A text cut with "…": `hover` scrolls it while the pointer is on it, `off` leaves it cut | `hover` |
+| `apple.sidebar` | Apple Music's sidebar: `open` leaves it as Apple Music shows it, `hover` folds it to its icons and opens it over the pages while the pointer is on it | `open` |
 | `ampify.entry` | Where the entry that opens the Marketplace stands: `sidebar`, or `header` next to Apple's "···" at the top of the open sidebar | `sidebar` |
 | `catalog.url` | `https://...` or `file://...` | the public catalog |
 | `app_launch_flags` | Arguments added when `ampify launch` starts Apple Music | empty |

@@ -38,6 +38,7 @@
 #include "../core/theme/selector.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_render/render_tree.hpp"
+#include "sidebar_hover.hpp"
 #include "xaml_host.hpp"
 #include "xaml_backend_detail.hpp"
 
@@ -66,7 +67,7 @@ std::optional<theme::ViewSize> XamlTreeBackend::WindowSize() {
         xaml::Window window = m_window.get();
         if (!window) return std::nullopt;
         winrt::Windows::Foundation::Rect bounds = window.Bounds();
-        return theme::ViewSize{bounds.Width, bounds.Height};
+        return theme::ViewSize{bounds.Width, bounds.Height, SidebarKeptFolded()};
     } catch (...) {
         return std::nullopt;
     }
@@ -75,7 +76,7 @@ std::optional<theme::ViewSize> XamlTreeBackend::WindowSize() {
 std::vector<bool> XamlTreeBackend::MediaAnswers() {
     std::vector<bool> answers;
     std::optional<theme::ViewSize> size = WindowSize();
-    for (const theme::MediaQuery& query : m_mediaQueries) answers.push_back(size && query.Matches(size->width, size->height));
+    for (const theme::MediaQuery& query : m_mediaQueries) answers.push_back(size && query.Matches(size->width, size->height, size->sidebarFolded));
     return answers;
 }
 

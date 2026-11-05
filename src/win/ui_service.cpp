@@ -65,6 +65,7 @@
 #include "notifications.hpp"
 #include "player_controls.hpp"
 #include "sharp_artwork.hpp"
+#include "sidebar_hover.hpp"
 #include "text_marquee.hpp"
 #include "xaml_host.hpp"
 
@@ -3941,6 +3942,7 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
     SetPlayerControlsShown(tweaks.playerControls);
     SetSharpArtwork(tweaks.sharpArtwork);
     SetTextMarquee(tweaks.textMarquee);
+    SetSidebarOnHover(tweaks.sidebarOnHover);
     const bool inHeader = uirender::ReadEntryInHeader(settings);
     const bool entryMoved = shared.entryInHeader.exchange(inHeader) != inHeader;
 

@@ -1,0 +1,8 @@
+/* Progress line thickness: the progress line of the display, thinner or thicker than Apple's 3 pixels, with round ends,
+   like Spicetify's thin and thick bar snippets. The line stays inside the display's room for it (6 pixels). */
+
+.scrubber Rectangle#HorizontalTrackRect,
+.scrubber Rectangle#HorizontalDecreaseRect {
+    height: var(--setting-thickness);
+    corner-radius: calc(var(--setting-thickness) * 0.5);
+}

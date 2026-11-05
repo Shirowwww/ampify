@@ -51,18 +51,22 @@ void HoverTracker::Toggle(NodeId id, Trigger trigger, bool on, Access& access) {
     auto it = m_elements.find(id);
     if (it == m_elements.end()) return;
     Element& element = it->second;
-    bool& state = trigger == Trigger::Active  ? element.pressed
-                  : trigger == Trigger::Focus ? element.focused
-                                              : element.hovered;
+    bool& state = trigger == Trigger::Active    ? element.pressed
+                  : trigger == Trigger::Focus   ? element.focused
+                  : trigger == Trigger::Current ? element.current
+                                                : element.hovered;
     if (state == on) return;
     state = on;
     Show(id, element, access);
 }
 
-// The value a property shows for the states the element is in, null when none of them changes it.
+// The value a property shows for the states the element is in, null when none of them changes it. What the user does
+// to the element comes before what Apple shows it as.
 const HoverValue* HoverTracker::Winner(const Element& element, std::string_view property) {
-    const std::pair<Trigger, bool> order[] = {
-        {Trigger::Active, element.pressed}, {Trigger::Focus, element.focused}, {Trigger::Hover, element.hovered}};
+    const std::pair<Trigger, bool> order[] = {{Trigger::Active, element.pressed},
+                                              {Trigger::Focus, element.focused},
+                                              {Trigger::Hover, element.hovered},
+                                              {Trigger::Current, element.current}};
     for (const auto& [trigger, on] : order) {
         if (!on) continue;
         for (const HoverValue& value : element.values) {

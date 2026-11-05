@@ -579,6 +579,25 @@ TEST_CASE(Builtins_EveryClassAndLayoutIsDocumented) {
     for (const std::string& name : th::BuiltinStylesheetNames()) CHECK(format.find("`ampify:" + name + "`") != std::string::npos);
 }
 
+TEST_CASE(Builtins_SidebarEntryIsAmpifysButtonsNotApplesFooter) {
+    // NavigationView
+    //   StackPanel#AMPIFY_SidebarHost
+    //     NavigationViewItemSeparator#Separator   (Apple's own footer, index 2)
+    //     Button#AMPIFY_marketplace_control-8     (index 3)
+    std::vector<th::NodeInfo> nodes(4);
+    nodes[0] = {1, "NavigationView", "", "", -1, 0};
+    nodes[1] = {2, "StackPanel", "", "AMPIFY_SidebarHost", 0, 1};
+    nodes[2] = {3, "NavigationViewItemSeparator", "", "Separator", 1, 2};
+    nodes[3] = {4, "Button", "", "AMPIFY_marketplace_control-8", 1, 2};
+
+    std::optional<std::vector<std::string>> selectors = th::ExpandClasses(".sidebar-entry");
+    CHECK(selectors && selectors->size() == 1);
+    if (!selectors || selectors->size() != 1) return;
+    th::Selector entry = Sel(selectors->front().c_str());
+    CHECK(th::Matches(entry, nodes, 3));
+    CHECK(!th::Matches(entry, nodes, 2));
+}
+
 TEST_CASE(Theme_ALayoutTakesTheThemesVariablesAndReportsUnderItsName) {
     MemoryFiles files;
     files.files["user.css"] = ":root { --gap: 12; --panel-background: #FF112233; }\n@import \"ampify:floating-panels\";\n";
@@ -2606,6 +2625,38 @@ TEST_CASE(Engine_MediaRulesFollowTheWindowSize) {
     CHECK(tree.Shown(grid, "Width").text == "5");
 }
 
+TEST_CASE(Engine_TheFoldedSidebarQueryFollowsASidebarAmpifyKeepsFolded) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "@media (max-width: 1324px) { Grid { width: 20 } }\n"
+        "@media (min-width: 1325px) { TextBlock { width: 30 } }\n"
+        "@media (max-width: 1100px) { Border { width: 40 } }\n";
+    th::Theme theme = Load(files);
+
+    FakeTree tree;
+    th::NodeId grid = tree.Add(-1, "Grid", "", {{"Width", {th::ValueKind::Length, "5"}}});
+    th::NodeId text = tree.Add(0, "TextBlock", "", {{"Width", {th::ValueKind::Length, "5"}}});
+    th::NodeId border = tree.Add(0, "Border", "", {{"Width", {th::ValueKind::Length, "5"}}});
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    tree.size = th::ViewSize{1600, 900};
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(grid, "Width").text == "5");
+    CHECK(tree.Shown(text, "Width").text == "30");
+
+    // apple.sidebar = hover: the sidebar is folded at every width, so the theme's folded rules hold and its open ones
+    // do not; a query on another width still reads the window.
+    tree.size = th::ViewSize{1600, 900, true};
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(grid, "Width").text == "20");
+    CHECK(tree.Shown(text, "Width").text == "5");
+    CHECK(tree.Shown(border, "Width").text == "5");
+    CHECK(tree.watched.size() == 3 && tree.watched[1].Matches(1600, 900) && !tree.watched[1].Matches(1600, 900, true));
+    CHECK(tree.watched.size() == 3 && tree.watched[0].Matches(1600, 900, true) && !tree.watched[2].Matches(1600, 900, true));
+}
+
 TEST_CASE(Calc_ComputesLengthsFromVariables) {
     MemoryFiles files;
     files.files["user.css"] =
@@ -3789,6 +3840,50 @@ TEST_CASE(Hover_PressAndFocusShowOverTheHoverInOrder) {
     CHECK(element.values["Background"] == Brush("#FF555555"));
     CHECK(states.ValueOf(7, "Background", th::Trigger::Active) == Brush("#FF444444"));
     CHECK(states.ValueOf(7, "Background") == Brush("#FF222222"));
+}
+
+TEST_CASE(Css_CurrentIsAStateOfTheLastPart) {
+    std::string problem;
+    std::optional<th::Selector> line = th::ParseSelector("KaraokeLyricsLine:current", &problem);
+    CHECK(line.has_value() && line->trigger == th::Trigger::Current);
+    std::optional<th::Selector> words = th::ParseSelector("KaraokeLyricsLine TextBlock#LineContainer:CURRENT", &problem);
+    CHECK(words.has_value() && words->trigger == th::Trigger::Current && words->parts.size() == 2);
+    CHECK(!th::ParseSelector("KaraokeLyricsLine:current TextBlock", &problem));
+    CHECK(problem.find("last element") != std::string::npos);
+    CHECK(std::string(th::TriggerName(th::Trigger::Current)) == ":current");
+
+    th::Stylesheet sheet = th::ParseStylesheet(".lyrics-words:current { color: #FFFFFFFF }\n");
+    CHECK(sheet.rules.size() == 1 && sheet.rules[0].selectors.size() >= 1);
+    for (const th::Selector& selector : sheet.rules.empty() ? std::vector<th::Selector>{} : sheet.rules[0].selectors) {
+        CHECK(selector.trigger == th::Trigger::Current);
+    }
+}
+
+TEST_CASE(Hover_CurrentShowsUnderThePointerStates) {
+    struct Element final : th::HoverTracker::Access {
+        std::map<std::string, th::Value, std::less<>> values{{"Background", Brush("#FF111111")}};
+        std::optional<th::Value> ReadRaw(th::NodeId, std::string_view property) override {
+            auto it = values.find(property);
+            if (it == values.end()) return std::nullopt;
+            return it->second;
+        }
+        bool WriteRaw(th::NodeId, std::string_view property, const th::Value& value) override {
+            values[std::string(property)] = value;
+            return true;
+        }
+    } element;
+    th::HoverTracker states;
+    states.Set(4, {{"Background", Brush("#FF222222")}, {"Background", Brush("#FF333333"), th::Trigger::Current}}, element);
+    CHECK(states.Uses(4, th::Trigger::Current));
+
+    states.Toggle(4, th::Trigger::Current, true, element);
+    CHECK(element.values["Background"] == Brush("#FF333333"));
+    states.Enter(4, element);
+    CHECK(element.values["Background"] == Brush("#FF222222"));  // the pointer beats the line being sung
+    states.Exit(4, element);
+    CHECK(element.values["Background"] == Brush("#FF333333"));
+    states.Toggle(4, th::Trigger::Current, false, element);
+    CHECK(element.values["Background"] == Brush("#FF111111"));
 }
 
 TEST_CASE(Engine_HoverFollowsThemeChangesWithoutLeaking) {

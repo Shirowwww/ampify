@@ -83,6 +83,9 @@ public:
     // The main window's bounds. Window.SizeChanged asks for a pass when one of the watched queries changes its answer.
     std::optional<theme::ViewSize> WindowSize() override;
     void WatchSize(const std::vector<theme::MediaQuery>& queries) override;
+    // Asks for a pass when a watched query changed its answer without the window changing size (the sidebar folded
+    // or given back by apple.sidebar). Cheap: the periodic tick calls it.
+    void RecheckMedia() noexcept { OnSizeChanged(); }
 
     // The light or dark mode of the app under the theme: RequestedTheme of the main window's content. Dark for a dark
     // scheme, Light for another scheme, the app's own value back with nullopt (no theme). After a resource change, the
@@ -233,6 +236,9 @@ private:
         bool focus = false;  // GotFocus, LostFocus, which bubble from the element's parts
         winrt::event_token gotFocus;
         winrt::event_token lostFocus;
+        bool current = false;  // the visual states with a "Current" one (CurrentStates)
+        winrt::weak_ref<winrt::Microsoft::UI::Xaml::VisualStateGroup> currentGroup;
+        winrt::event_token currentChanged;
     };
     std::map<theme::NodeId, HoverHandlers> m_hoverHandlers;
     struct HeldStates {

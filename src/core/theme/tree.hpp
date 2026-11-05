@@ -123,6 +123,7 @@ enum class DecorChange {
 struct ViewSize {
     double width = 0;
     double height = 0;
+    bool sidebarFolded = false;  // Ampify keeps the sidebar folded at every width (MediaQuery::kSidebarFoldsAt)
 };
 
 // One value of a :hover, :focus or :active rule: shown while the element is in that state.

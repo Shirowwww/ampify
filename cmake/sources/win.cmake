@@ -13,7 +13,7 @@ list(APPEND AMPIFY_XAML_SOURCES src/win/xaml_backend.cpp src/win/xaml_properties
     src/win/xaml_values.cpp src/win/theme_animations.cpp src/win/theme_service.cpp src/win/xaml_host.cpp src/win/ui_renderer.cpp src/win/ui_service.cpp
     src/win/apple_player.cpp src/win/player_controls.cpp src/win/notifications.cpp src/win/close_to_tray.cpp src/win/audio_bars.cpp
     src/win/xaml_watcher.cpp src/win/element_picker.cpp src/win/lcd_links.cpp src/win/window_backdrop.cpp
-    src/win/sharp_artwork.cpp src/win/text_marquee.cpp)
+    src/win/sharp_artwork.cpp src/win/text_marquee.cpp src/win/sidebar_hover.cpp)
 
 list(APPEND AMPIFY_LAUNCHER_SOURCES
     src/launcher/launcher.cpp

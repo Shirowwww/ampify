@@ -15,6 +15,7 @@
 
 #include "element_picker.hpp"
 #include "lcd_links.hpp"
+#include "sidebar_hover.hpp"
 #include "text_marquee.hpp"
 #include "ui_thread.hpp"
 #include "win_common.hpp"
@@ -232,6 +233,8 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             ui->ticked = true;
             KeepDisplayLinks(journal);
             KeepTextMarquee(journal);
+            KeepSidebarOnHover(journal);
+            ui->backend.RecheckMedia();
 
             std::optional<std::string> dump = ui->session.Tick(ui->backend, request);
             if (std::shared_ptr<const theme::Theme> applied = ui->session.Applied(); applied != ui->fontsOf) {

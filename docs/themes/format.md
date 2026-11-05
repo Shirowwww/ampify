@@ -79,13 +79,14 @@ Grid#NowPlayingBar {
 | `A B`, `A > B` | A `B` inside an `A`; a `B` whose direct parent is an `A` |
 | `A + B`, `A ~ B` | A `B` right after an `A`; a `B` anywhere after an `A` (same parent) |
 | `A:hover`, `A:active`, `A:focus`, `A:focus-within` | While the pointer is over it, while pressed, while it or a part of it has the keyboard focus |
+| `A:current` | While Apple shows it as the current one: the lyrics line being sung, and the parts of that line (see [The line being sung](#the-line-being-sung)) |
 | `A:nth-child(2)`, `A:nth-last-child(2)` | The second child of its parent, from the start or from the end (counting from 1) |
 | `A:first-child`, `A:last-child`, `A:only-child` | Position among its parent's children |
 | `A:playing` | The list row of the song playing (the one that shows Apple's moving bars), and the elements between that row and the bars: `.list-item:playing` is the row (see [The row playing](#the-row-playing)) |
 | `A:not(B)` | An `A` that does not match `B`, where `B` is one part: a type, a `#name` and the pseudo-classes above |
 | `A::before`, `A::after` | A decorative image put into `A` (see [Decorative images](#decorative-images)) |
 
-- One state (`:hover`, `:active` or `:focus`) per selector, on its last part.
+- One state (`:hover`, `:active`, `:focus` or `:current`) per selector, on its last part.
 - `:not()` takes no state, no `::before`/`::after`, no combinator and no class.
 - `:playing` goes on any part and counts as a pseudo-class.
 - Not supported: attributes (`[x=y]`), `An+B` forms (`odd`, `2n+1`) and other pseudo-classes (`:checked`...). A rule
@@ -174,7 +175,7 @@ and the theme applies again at once.
 | `selected-hover-background` | `SelectedPointerOverBackground` | The same row under the pointer |
 | `selected-active-background` | `SelectedPressedBackground` | The same row while pressed |
 | `border-width` | `BorderThickness` | 1 to 4 lengths, not negative (top right bottom left) |
-| `corner-radius` or `border-radius` | `CornerRadius` | 1 to 4 lengths, not negative (top-left, top-right, bottom-right, bottom-left). On a button or a hover, keep it under half the height: more turns a wide button into a pill, and a radius past both halves turns a small one into an oval |
+| `corner-radius` or `border-radius` | `CornerRadius` | 1 to 4 lengths, not negative (top-left, top-right, bottom-right, bottom-left). On a button or a hover, keep it under half the height: more turns a wide button into a pill, and a radius past both halves turns a small one into an oval. A `Rectangle` (a slider's track, `.scrubber Rectangle#HorizontalTrackRect`) takes one radius for its four corners, the top-left one |
 | `font-family` | `FontFamily` | A font name, or `url(fonts/file.ttf#Name)` |
 | `font-size` | `FontSize` | Pixels, or relative to the element's own size (`120%`, `1.2em`) |
 | `font-weight` | `FontWeight` | `normal`, `bold`, or 1 to 1000 |
@@ -484,6 +485,23 @@ background colour), whatever Windows' mode; it joins the sizes with `and`:
   `border-color` you give them stays in those states; a `:hover` color goes to both hover and pressed, an `:active`
   color to pressed only. Checked and selected states keep Apple Music's colors.
 - On a slider, `color` fills the part left of the thumb and `background` the rest of the track.
+
+### The line being sung
+
+`:current` holds while Apple lights a line of the synced lyrics, on the line (`.lyrics-line`) and on anything inside it:
+
+```css
+.lyrics-line-content { corner-radius: 8; }
+.lyrics-line-content:current { background: #40FF5C8A; }
+```
+
+- It follows the song line by line, without waiting for the theme's next pass. Under the pointer, `:hover` beats it.
+- Apple fades the lines by their own states: an `opacity` on `.lyrics-line-content` loses to them, and a word-by-word
+  song draws its words in Apple's own colors. A background or a corner radius shows.
+- Leave the line's room alone: Apple sets a word-by-word line's text width when it builds the line, so a `margin`,
+  `padding` or `border` on `.lyrics-line-content` cuts off the end of its words.
+
+Example: the [`lyrics-spotlight`](../../themes/snippets/lyrics-spotlight/) snippet.
 
 ### Flyouts, menus and tooltips
 

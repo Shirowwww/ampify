@@ -63,6 +63,13 @@ const std::vector<std::pair<std::string, std::string>>& MarqueeOptions() {
     return options;
 }
 
+const std::vector<std::pair<std::string, std::string>>& SidebarOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"open", "tweaks.sidebar.open"},
+        {"hover", "tweaks.sidebar.hover"}};
+    return options;
+}
+
 const std::vector<std::pair<std::string, std::string>>& KitUpdateOptions() {
     static const std::vector<std::pair<std::string, std::string>> options{
         {"auto", "update.auto"},
@@ -96,6 +103,7 @@ const std::vector<std::pair<std::string, std::string>>* OptionsOf(const std::str
     if (key == kNetworkKey) return &NetworkOptions();
     if (key == kArtworkKey) return &ArtworkOptions();
     if (key == kMarqueeKey) return &MarqueeOptions();
+    if (key == kSidebarKey) return &SidebarOptions();
     if (key == kKitUpdateKey) return &KitUpdateOptions();
     return nullptr;
 }
@@ -126,6 +134,7 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.ipv4First = Known(settings, kNetworkKey) == "ipv4-first";
     tweaks.sharpArtwork = Known(settings, kArtworkKey) == "sharp";
     tweaks.textMarquee = Known(settings, kMarqueeKey) == "hover";
+    tweaks.sidebarOnHover = Known(settings, kSidebarKey) == "hover";
     return tweaks;
 }
 
@@ -143,6 +152,7 @@ std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
          Known(settings, kPlayerControlsKey)},
         {kArtworkKey, "tweaks.artwork", "tweaks.artworkHelp", ArtworkOptions(), Known(settings, kArtworkKey)},
         {kMarqueeKey, "tweaks.marquee", "tweaks.marqueeHelp", MarqueeOptions(), Known(settings, kMarqueeKey)},
+        {kSidebarKey, "tweaks.sidebar", "tweaks.sidebarHelp", SidebarOptions(), Known(settings, kSidebarKey)},
         {kCloseKey, "tweaks.close", "tweaks.closeHelp", CloseOptions(), Known(settings, kCloseKey)},
         {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", std::move(notificationOptions),
          notifications},

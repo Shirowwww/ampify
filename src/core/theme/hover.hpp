@@ -68,6 +68,7 @@ private:
         bool hovered = false;
         bool focused = false;
         bool pressed = false;
+        bool current = false;
     };
 
     // Writes what the states the element is in show, and puts back the properties none of them changes any more.

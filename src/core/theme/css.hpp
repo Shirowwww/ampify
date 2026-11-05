@@ -42,8 +42,16 @@ struct MediaQuery {
     std::optional<bool> dark;  // (prefers-color-scheme: dark) or (light): the theme's scheme in use, not Windows'
     std::string text;  // as written, for the log
 
-    bool Matches(double width, double height) const {
-        return width >= minWidth && width <= maxWidth && height >= minHeight && height <= maxHeight;
+    // Apple Music folds its sidebar at this width and less, and themes write (max-width: 1324px) for "folded" and
+    // (min-width: 1325px) for "open". While Ampify keeps it folded at every width (apple.sidebar = hover), those two
+    // bounds follow the sidebar instead of the window.
+    static constexpr double kSidebarFoldsAt = 1324;
+
+    bool Matches(double width, double height, bool sidebarFolded = false) const {
+        double max = maxWidth;
+        if (sidebarFolded && maxWidth == kSidebarFoldsAt) max = 1e9;
+        if (sidebarFolded && minWidth == kSidebarFoldsAt + 1) return false;
+        return width >= minWidth && width <= max && height >= minHeight && height <= maxHeight;
     }
     bool MatchesScheme(bool darkScheme) const { return !dark || *dark == darkScheme; }
     bool operator==(const MediaQuery&) const = default;
@@ -82,9 +90,10 @@ enum class Trigger {
     Hover,   // :hover, the pointer is over the element
     Focus,   // :focus or :focus-within, the keyboard focus is in the element or one of its parts
     Active,  // :active, the element is pressed
+    Current,  // :current, Apple shows the element as the current one: the lyrics line being sung, and its parts
 };
 
-// ":hover", ":focus" or ":active"; empty for Always.
+// ":hover", ":focus", ":active" or ":current"; empty for Always.
 const char* TriggerName(Trigger trigger);
 
 // `::before` or `::after` at the end of a selector: the declarations describe a decorative image the engine puts into

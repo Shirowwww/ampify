@@ -86,7 +86,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Fonts and images of the theme | `font-family: url(...)`, `url(...)` backgrounds | Done |
 | Context menus, tooltips, volume bar | `.menu`, `.menu-item`, `.tooltip`, `.flyout`, `.volume-slider` | Done |
 | Selected and playing rows | Selected rows (`selected-background`); the row of the song playing with `:playing` (`.list-item:playing`) | Done |
-| Lyrics lines | `.lyrics`, `.lyrics-synced`, `.lyrics-line`, `.lyrics-line-content`, `.lyrics-words`, `.lyrics-background-words`, `.lyrics-instrumental`; the line being sung has no selector of its own (Apple fades the others by state) | Partial |
+| Lyrics lines | `.lyrics`, `.lyrics-synced`, `.lyrics-line`, `.lyrics-line-content`, `.lyrics-words`, `.lyrics-background-words`, `.lyrics-instrumental`; the line being sung with `:current` (`.lyrics-line-content:current`, the Lyrics spotlight snippet) | Done |
 | Full-screen player | Apple's player (`.fullscreen-*`) | Done |
 | Mini player | Its own window and interface thread: themes do not reach it | Missing |
 | Layout changes (bar at the bottom, columns swapped) | `ampify:bottom-bar`, `order`, `grid-*`; Apple's lists resist | Partial |
@@ -111,6 +111,9 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Colourful album pages | `album-colors`: an album or a playlist takes the colours of its own artwork | Done |
 | Hide the filter bar of playlists | `declutter`, setting "Hide the search bar of albums and playlists" | Done |
 | Spotify's playback bar at the bottom, across the window | `bottom-playbar`, over any theme or none; `ampify:bottom-bar` for a theme | Done |
+| Thin or thick progress bar | `progress-thickness`: the display's progress line from 1 to 6 pixels, round ends | Done |
+| Compact sidebar (Comfy) | `compact-sidebar`: rows of 32 pixels instead of 40, Ampify's entries included (`.sidebar-entry`) | Done |
+| Highlight the lyrics line being sung | `lyrics-spotlight`: a tile of the song's colour under the line, through `:current` | Done |
 
 ## Extensions (JavaScript API)
 

@@ -25,6 +25,7 @@
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
+#include <winrt/Microsoft.UI.Xaml.Shapes.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Text.h>
@@ -183,6 +184,11 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         // Grid and StackPanel draw their own border in WinUI 3: a card of Apple Music is often one of them.
         if (auto grid = object.try_as<controls::Grid>()) return theme::Value{theme::ValueKind::Thickness, CornerText(grid.CornerRadius())};
         if (auto stack = object.try_as<controls::StackPanel>()) return theme::Value{theme::ValueKind::Thickness, CornerText(stack.CornerRadius())};
+        // A Rectangle (a slider's track) rounds its four corners alike, by RadiusX and RadiusY.
+        if (auto rectangle = object.try_as<xaml::Shapes::Rectangle>()) {
+            double radius = rectangle.RadiusX();
+            return theme::Value{theme::ValueKind::Thickness, CornerText(xaml::CornerRadius{radius, radius, radius, radius})};
+        }
     } else if (property == "Visibility") {
         if (auto element = object.try_as<xaml::UIElement>()) {
             return theme::Value{theme::ValueKind::Visibility, element.Visibility() == xaml::Visibility::Collapsed ? "Collapsed" : "Visible"};
@@ -701,6 +707,11 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         if (auto border = object.try_as<controls::Border>()) { border.CornerRadius(radius); return true; }
         if (auto grid = object.try_as<controls::Grid>()) { grid.CornerRadius(radius); return true; }
         if (auto stack = object.try_as<controls::StackPanel>()) { stack.CornerRadius(radius); return true; }
+        if (auto rectangle = object.try_as<xaml::Shapes::Rectangle>()) {  // one radius for all four: the top-left one
+            rectangle.RadiusX(radius.TopLeft);
+            rectangle.RadiusY(radius.TopLeft);
+            return true;
+        }
         return false;
     }
 

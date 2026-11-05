@@ -84,6 +84,7 @@ std::optional<Trigger> StateOf(std::string_view pseudo) {
     if (pseudo == "hover") return Trigger::Hover;
     if (pseudo == "focus" || pseudo == "focus-within") return Trigger::Focus;
     if (pseudo == "active") return Trigger::Active;
+    if (pseudo == "current") return Trigger::Current;
     return std::nullopt;
 }
 
@@ -568,6 +569,7 @@ const char* TriggerName(Trigger trigger) {
         case Trigger::Hover: return ":hover";
         case Trigger::Focus: return ":focus";
         case Trigger::Active: return ":active";
+        case Trigger::Current: return ":current";
         case Trigger::Always: break;
     }
     return "";
