@@ -115,6 +115,9 @@
 - New example `audio-meter`: the loudness and the peak of the sound, in the log. Permission `audio.analyze`.
 - Spicetify API coverage page: [docs/extensions/spicetify-api-coverage.md](docs/extensions/spicetify-api-coverage.md).
 - The TypeScript types include `http.open` and `player.off`, and no longer declare a type twice.
+- Three more interface nodes for apps and panels: `grid` (cells filled row by row, 1 to 12 columns), `tabs` with
+  its `tab` nodes (the one that is `selected` is highlighted), and `menu` with its `item` nodes, opened as a flyout
+  from a button. `Ampify.components` gets `Grid`, `Tabs` and `Menu`.
 - Song panel, shipped with Ampify: a button of the playback bar slides in a column about the song playing, with its
   cover, the lyrics lit word by word, the album with its year and genre, the artist, the credits and what comes next.
 - A `lyrics` node shows the lyrics of the song playing, lit word by word, without the element rendering it again.

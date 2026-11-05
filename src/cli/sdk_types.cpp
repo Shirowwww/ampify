@@ -32,7 +32,9 @@ type BoxProps = {
 };
 type TextStyleProps = { size?: number; weight?: number; color?: UiColor; wrap?: boolean; maxLines?: number };
 type UiNode = TooltipProps & Omit<PlaceProps, "align"> & BoxProps & Omit<TextStyleProps, "size"> & {
-  type: "stack" | "row" | "list" | "layer" | "card" | "text" | "button" | "toggle" | "slider" | "textfield" | "image" | "icon" | "dropdown" | "option" | "lyrics";
+  type: "stack" | "row" | "list" | "layer" | "card" | "text" | "button" | "toggle" | "slider" | "textfield" | "image" | "icon" | "dropdown" | "option" | "lyrics" | "grid" | "tabs" | "tab" | "menu" | "item";
+  columns?: number;                       // grid: 1 to 12
+  selected?: boolean;                     // tab: the one that is on
   align?: "start" | "center" | "end" | "stretch" | "left" | "right";
   size?: number;                          // text: 8 to 120 px; icon: its size
   fit?: "cover" | "contain" | "fill";     // image
@@ -138,6 +140,9 @@ type ToggleProps = TooltipProps & { label?: string; value?: boolean; checked?: b
 type SliderProps = TooltipProps & { label?: string; min?: number; max?: number; step?: number; value?: number; disabled?: boolean; onChange?: (value: number, event: ChangeEvent) => void };
 type TextFieldProps = TooltipProps & { label?: string; value?: string; placeholder?: string; disabled?: boolean; onChange?: (text: string, event: ChangeEvent) => void };
 type DropdownProps = TooltipProps & { label?: string; value?: string; options?: (string | { value: string; label?: string })[]; disabled?: boolean; onChange?: (value: string, event: ChangeEvent) => void };
+type GridProps = TooltipProps & { columns?: number; gap?: number };
+type TabsProps = TooltipProps & { value?: string; options?: (string | { value: string; label?: string })[]; onChange?: (value: string, event: ChangeEvent) => void };
+type MenuProps = TooltipProps & { label?: string; disabled?: boolean; items?: { label: string; disabled?: boolean; onClick?: (event: ClickEvent) => void }[] };
 type CardProps = TooltipProps & PlaceProps & BoxProps & { title?: string; subtitle?: string; onClick?: (event: ClickEvent) => void };
 type TextProps = TooltipProps & Omit<PlaceProps, "align"> & TextStyleProps & {
   text?: string;
@@ -243,7 +248,9 @@ declare const Ampify: {
     menu: { addItem(where: "context" | "app", item: MenuItem): number };
     popup: { open(view: UiNode): void };
     // permission ui.fullscreen; onClose runs when the user closes it or another element takes the screen
-    fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void };
+    // onKey gets F, L or Q while the view has the keyboard; onPointer runs on the pointer's moves over it (250 ms apart)
+    fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void;
+                  onKey(fn: (key: string) => void): () => void; onPointer(fn: () => void): () => void };
     // permission ui.fullscreen; Apple Music's own full-screen player, laid over the window
     applePlayer: { open(): void };
     miniPlayer: { open(): void; close(): void };
@@ -348,6 +355,9 @@ declare const Ampify: {
     Slider: AmpifyComponent<SliderProps>;
     TextField: AmpifyComponent<TextFieldProps>;
     Dropdown: AmpifyComponent<DropdownProps>;
+    Grid: AmpifyComponent<GridProps>;
+    Tabs: AmpifyComponent<TabsProps>;
+    Menu: AmpifyComponent<MenuProps>;
     Card: AmpifyComponent<CardProps>;
     List: AmpifyComponent;
     Text: AmpifyComponent<TextProps>;

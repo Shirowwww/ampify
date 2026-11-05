@@ -331,6 +331,8 @@ struct XamlRenderer::Mounted {
     std::string type;
     Layout layout = Layout::None;  // how the native container lays out the children (uirender::LayoutOf)
     std::vector<bool> cells;       // Layout::Grid: the growing children the cell definitions were made for
+    int columns = 0;               // Layout::Columns (grid): the columns and rows the cell definitions were made for
+    int rows = 0;
     // What the style attributes last set, so an update only touches what changed and a removed one is undone.
     std::string background;
     std::string transition;
@@ -973,11 +975,11 @@ xaml::FrameworkElement XamlRenderer::Render(RenderNode tree, const StyleProbe& p
     return Root();
 }
 
-// The native container of stack, list, row and layer, after uirender::LayoutOf.
+// The native container of stack, list, row, tabs and layer, after uirender::LayoutOf.
 static controls::Panel MakeContainer(const RenderNode& node, Layout layout) {
     if (layout == Layout::Panel) {
         controls::StackPanel panel;
-        if (node.type == "row") panel.Orientation(controls::Orientation::Horizontal);
+        if (node.type == "row" || node.type == "tabs") panel.Orientation(controls::Orientation::Horizontal);
         return panel;
     }
     controls::Grid grid;
@@ -1019,7 +1021,8 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
     xaml::FrameworkElement outer{nullptr};
     xaml::FrameworkElement control{nullptr};
 
-    if (node.type == "stack" || node.type == "list" || node.type == "row" || node.type == "layer") {
+    if (node.type == "stack" || node.type == "list" || node.type == "row" || node.type == "layer" ||
+        node.type == "grid" || node.type == "tabs") {
         controls::Panel panel = MakeContainer(node, mounted.layout);
         outer = control = panel;
         mounted.host = panel;
@@ -1083,7 +1086,7 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
         controls::TextBlock block = MakeText(L"", node.Text("variant", "body"), node.Text("variant") == "caption", &probe);
         outer = control = block;
         mounted.baseOpacity = block.Opacity();
-    } else if (node.type == "button") {
+    } else if (node.type == "button" || node.type == "tab" || node.type == "menu") {
         controls::Button button;
         button.Click([callbacks](IInspectable const&, xaml::RoutedEventArgs const&) noexcept { callbacks->Fire(true, {}); });
         outer = control = button;
@@ -1193,6 +1196,8 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
     SetAttributes(mounted, node, probe, true);
     if (node.type == "dropdown") {
         FillOptions(mounted, node);
+    } else if (node.type == "menu") {
+        FillMenu(mounted, node);
     } else if (mounted.host) {
         for (const RenderNode& child : node.children) mounted.children.push_back(Build(child, probe));
         Rewrite(mounted);
@@ -1207,6 +1212,7 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
 void XamlRenderer::PlaceChildren(Mounted& mounted, const RenderNode& node) {
     auto grid = mounted.host ? mounted.host.try_as<controls::Grid>() : nullptr;
     bool horizontal = node.type == "row";
+    if (mounted.layout == Layout::Columns) SetGridCells(mounted, node);
     if (grid && mounted.layout == Layout::Grid) {
         std::vector<bool> cells;
         for (const RenderNode& child : node.children) cells.push_back(child.Bool("grow", false));
@@ -1245,9 +1251,41 @@ void XamlRenderer::PlaceChildren(Mounted& mounted, const RenderNode& node) {
             if (controls::Grid::GetRow(element) != cell) controls::Grid::SetRow(element, cell);
         } else if (mounted.layout == Layout::Layer) {
             placement = Placement{};
+        } else if (mounted.layout == Layout::Columns) {
+            uirender::GridCell at = uirender::GridCellOf(index, mounted.columns);
+            if (controls::Grid::GetRow(element) != at.row) controls::Grid::SetRow(element, at.row);
+            if (controls::Grid::GetColumn(element) != at.column) controls::Grid::SetColumn(element, at.column);
+            placement.horizontal = xaml::HorizontalAlignment::Stretch;  // a cell takes the width of its column
         }
         Place(element, child, placement);
     }
+}
+
+// The cells of a grid: `columns` equal Star columns and one Auto row per line of children, with the gap between them.
+void XamlRenderer::SetGridCells(Mounted& mounted, const RenderNode& node) {
+    auto grid = mounted.host ? mounted.host.try_as<controls::Grid>() : nullptr;
+    if (!grid) return;
+    int columns = uirender::GridColumns(node);
+    std::size_t lines = (node.children.size() + static_cast<std::size_t>(columns) - 1) / static_cast<std::size_t>(columns);
+    int rows = static_cast<int>(lines);
+    double gap = node.Number("gap", 8);
+    if (grid.ColumnSpacing() != gap) grid.ColumnSpacing(gap);
+    if (grid.RowSpacing() != gap) grid.RowSpacing(gap);
+    if (columns == mounted.columns && rows == mounted.rows) return;
+    grid.ColumnDefinitions().Clear();
+    grid.RowDefinitions().Clear();
+    for (int i = 0; i < columns; i++) {
+        controls::ColumnDefinition column;
+        column.Width(xaml::GridLength{1.0, xaml::GridUnitType::Star});
+        grid.ColumnDefinitions().Append(column);
+    }
+    for (int i = 0; i < rows; i++) {
+        controls::RowDefinition row;
+        row.Height(xaml::GridLength{1.0, xaml::GridUnitType::Auto});
+        grid.RowDefinitions().Append(row);
+    }
+    mounted.columns = columns;
+    mounted.rows = rows;
 }
 
 // background, padding, cornerRadius and the size of stack, row, layer and card. A card falls back to its own look.
@@ -1405,8 +1443,8 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
         if (control.IsTabStop() != clickable) control.IsTabStop(clickable);
     }
     if (type == "stack" || type == "row" || type == "layer" || type == "card") SetBox(mounted, node);
-    if (type == "stack" || type == "list" || type == "row") {
-        double gap = node.Number("gap", type == "list" ? 4 : (type == "row" ? 12 : 8));
+    if (type == "stack" || type == "list" || type == "row" || type == "tabs") {
+        double gap = node.Number("gap", type == "list" || type == "tabs" ? 4 : (type == "row" ? 12 : 8));
         if (auto panel = control.try_as<controls::StackPanel>()) {
             if (panel.Spacing() != gap) panel.Spacing(gap);
         }
@@ -1442,9 +1480,9 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
         xaml::Style style = StyleResource(TextStyleKey(node.Text("variant", "body")));
         if (style && block.Style() != style) block.Style(style);
         SetTextStyle(block, node, mounted.colored);
-    } else if (type == "button") {
+    } else if (type == "button" || type == "tab" || type == "menu") {
         auto button = control.as<controls::Button>();
-        std::string variant = node.Text("variant", "secondary");
+        std::string variant = uirender::ButtonVariantOf(node);
         // Apple Music's own button style for every variant: its AccentButtonStyle draws text in a symbol font (the
         // label came out as icons on 1.1792). A primary button takes the accent colours on top instead.
         if (probe.button && button.Style() != probe.button) button.Style(probe.button);
@@ -1612,14 +1650,44 @@ void XamlRenderer::FillOptions(Mounted& mounted, const RenderNode& node) {
     }
 }
 
+// The entries of a menu: one MenuFlyoutItem per item node, each with its own click handler. The flyout opens from the
+// menu's button (a Button with a Flyout), and is built again whenever the items change, as the options of a dropdown.
+void XamlRenderer::FillMenu(Mounted& mounted, const RenderNode& node) {
+    auto button = mounted.control ? mounted.control.try_as<controls::Button>() : nullptr;
+    if (!button) return;
+    controls::MenuFlyout flyout;
+    for (const RenderNode& entry : node.children) {
+        std::string label = entry.Text("label");
+        controls::MenuFlyoutItem item;
+        item.Text(Wide(label));
+        item.IsEnabled(!entry.Bool("disabled", false));
+        std::string name = uirender::ElementName(m_elementId, entry.id);
+        item.Name(Wide(name));
+        automation::AutomationProperties::SetAutomationId(item, Wide(name));
+        automation::AutomationProperties::SetName(item, Wide(label));
+        auto callbacks = std::make_shared<Callbacks>();
+        callbacks->elementId = m_elementId;
+        callbacks->sink = m_sink;
+        callbacks->updating = m_updating;
+        callbacks->onClick = static_cast<int>(entry.Number("onClick", 0));
+        item.Click([callbacks](IInspectable const&, xaml::RoutedEventArgs const&) noexcept { callbacks->Fire(true, {}); });
+        flyout.Items().Append(item);
+    }
+    button.Flyout(flyout);
+}
+
 void XamlRenderer::Apply(Mounted& mounted, const Patch& patch, const StyleProbe& probe) {
     const RenderNode& node = *patch.node;
     if (patch.op == PatchOp::Update) SetAttributes(mounted, node, probe, false);
 
-    if (node.type == "dropdown") {
-        bool optionsChanged = patch.reordered;
-        for (const Patch& child : patch.children) optionsChanged = optionsChanged || child.op != PatchOp::Keep;
-        if (optionsChanged || patch.op == PatchOp::Update) FillOptions(mounted, node);
+    if (node.type == "dropdown" || node.type == "menu") {  // their entries are not children: refilled on a change
+        bool entriesChanged = patch.reordered;
+        for (const Patch& child : patch.children) entriesChanged = entriesChanged || child.op != PatchOp::Keep;
+        // A menu's flyout is rebuilt only for its entries: a redraw would close it while the user has it open.
+        if (entriesChanged || (patch.op == PatchOp::Update && node.type == "dropdown")) {
+            if (node.type == "menu") FillMenu(mounted, node);
+            else FillOptions(mounted, node);
+        }
         return;
     }
     if (!mounted.host) return;

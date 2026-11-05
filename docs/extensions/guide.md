@@ -2,7 +2,7 @@
 
 You need Ampify installed, Apple Music open, and a terminal in a working folder. The extensions in
 [examples/](../../examples) are short: start from `hello-extension` or `react-panel`; `sleep-timer`, `keyboard-skip`,
-`discord-presence` and `scrobbler` show the player, shortcuts and web services.
+`discord-presence` and `scrobbler` show the player, shortcuts and web services; `ui-palette` shows the grid, tabs and menu.
 
 ## 1. Create it
 

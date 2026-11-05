@@ -162,6 +162,53 @@ TEST_CASE(UiTree_RefusesMisplacedOptionsAndCallbacks) {
     CHECK(!ampify::ValidateTree(Parse(R"({"type":"button","tooltip":3})"), &error));
 }
 
+TEST_CASE(UiTree_AcceptsGridsTabsAndMenus) {
+    std::string error;
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"grid","columns":3,"gap":8,"children":[{"type":"text","text":"a"}]})"),
+                               &error));
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"tabs","children":[)"
+                                  R"({"type":"tab","label":"Library","selected":true,"onClick":2},)"
+                                  R"({"type":"tab","label":"Search","disabled":true}]})"),
+                            &error));
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"menu","label":"More","disabled":false,"children":[)"
+                                  R"({"type":"item","label":"Copy","onClick":3},{"type":"item","label":"Off","disabled":true}]})"),
+                            &error));
+    CHECK(error.empty());
+}
+
+TEST_CASE(UiTree_RefusesTabsAndItemsOutsideTheirContainer) {
+    std::string error;
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"tab","label":"a"})"), &error));
+    CHECK(error.find("tab") != std::string::npos);
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"item","label":"a"})"), &error));
+    CHECK(error.find("item") != std::string::npos);
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"tabs","children":[{"type":"text","text":"a"}]})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"menu","children":[{"type":"tab","label":"a"}]})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"menu","children":[{"type":"button","label":"a"}]})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"tabs","children":[{"type":"tab","label":"a","onChange":1}]})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"text","text":"a","children":[{"type":"item","label":"a"}]})"), &error));
+}
+
+TEST_CASE(UiTree_RefusesAGridWithoutAWholeColumnCount) {
+    std::string error;
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","columns":0})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","columns":13})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","columns":2.5})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","columns":"3"})"), &error));
+    CHECK(error.find("columns") != std::string::npos);
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"grid","columns":12})"), &error));
+}
+
+TEST_CASE(UiTree_RefusesAGridWithAGapOutOfRange) {
+    std::string error;
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","gap":-1})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","gap":1001})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","gap":"8"})"), &error));
+    CHECK(error.find("gap") != std::string::npos);
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"grid","gap":0})"), &error));
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"grid","gap":1000})"), &error));
+}
+
 TEST_CASE(UiModel_NamedPopupsAreReplacedAndClosed) {
     ampify::UiModel ui;
     ui.OpenPopup("a", Parse(R"({"type":"text","text":"once"})"));
@@ -265,4 +312,12 @@ TEST_CASE(UiModel_FullscreenSessionsFollowTheLastElementThatOpens) {
     ui.SetFullscreen("c", Parse(R"({"type":"text"})"), 0);
     ui.RemoveElement("c");
     CHECK(!ui.Fullscreen().has_value());
+}
+
+TEST_CASE(UiModel_FullscreenPointerIsReportedAtMostEveryQuarterSecond) {
+    // The first move is always passed on; then only once 250 ms have gone by since the last one passed.
+    CHECK(ampify::FullscreenPointerDue(0, std::nullopt));
+    CHECK(!ampify::FullscreenPointerDue(100, std::optional<std::int64_t>(0)));
+    CHECK(!ampify::FullscreenPointerDue(249, std::optional<std::int64_t>(0)));
+    CHECK(ampify::FullscreenPointerDue(250, std::optional<std::int64_t>(0)));
 }

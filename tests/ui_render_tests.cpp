@@ -1070,6 +1070,33 @@ TEST_CASE(UiRender_LayoutFollowsTheChildrenThatGrow) {
     CHECK(LayoutOf(Tree(R"({"type":"text"})")) == Layout::None);
 }
 
+TEST_CASE(UiRender_GridTabsAndMenusHaveTheirOwnLayouts) {
+    CHECK(LayoutOf(Tree(R"({"type":"grid","columns":3,"children":[{"type":"text"}]})")) == Layout::Columns);
+    CHECK(LayoutOf(Tree(R"({"type":"tabs","children":[{"type":"tab","label":"A"}]})")) == Layout::Panel);
+    CHECK(LayoutOf(Tree(R"({"type":"menu","label":"More","children":[{"type":"item","label":"A"}]})")) == Layout::None);
+}
+
+TEST_CASE(UiRender_AGridHasAsManyColumnsAsAskedAndFillsRowByRow) {
+    CHECK(GridColumns(Tree(R"({"type":"grid"})")) == 2);
+    CHECK(GridColumns(Tree(R"({"type":"grid","columns":4})")) == 4);
+    CHECK(GridColumns(Tree(R"({"type":"grid","columns":12})")) == 12);
+    CHECK(GridColumns(Tree(R"({"type":"grid","columns":0})")) == 1);
+    CHECK(GridColumns(Tree(R"({"type":"grid","columns":99})")) == 12);
+    CHECK(GridColumns(Tree(R"({"type":"grid","columns":"x"})")) == 2);
+    CHECK(GridCellOf(0, 4).row == 0 && GridCellOf(0, 4).column == 0);
+    CHECK(GridCellOf(5, 4).row == 1 && GridCellOf(5, 4).column == 1);
+    CHECK(GridCellOf(7, 1).row == 7 && GridCellOf(7, 1).column == 0);
+    CHECK(GridCellOf(3, 0).column == 0);
+}
+
+TEST_CASE(UiRender_TabsAndMenusHaveTheirButtonVariant) {
+    CHECK(ButtonVariantOf(Tree(R"({"type":"tab","selected":true})")) == "primary");
+    CHECK(ButtonVariantOf(Tree(R"({"type":"tab"})")) == "tertiary");
+    CHECK(ButtonVariantOf(Tree(R"({"type":"menu","label":"More"})")) == "secondary");
+    CHECK(ButtonVariantOf(Tree(R"({"type":"button"})")) == "secondary");
+    CHECK(ButtonVariantOf(Tree(R"({"type":"button","variant":"primary"})")) == "primary");
+}
+
 TEST_CASE(UiRender_EachFullscreenSessionIsANewSurface) {
     ampify::UiModel model;
     std::uint64_t session = model.SetFullscreen("lyrics", Parse(R"({"type":"text","text":"a"})"), 0);

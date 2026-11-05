@@ -21,6 +21,11 @@
 // | image     | Border painted by an ImageBrush (BitmapImage from an https or file address),  |
 // |           | sized by an invisible Image of the same bitmap, so cornerRadius rounds it     |
 // | icon      | Path shapes from the SVG (theme text brush), FontIcon for a glyph             |
+// | grid      | Grid of `columns` equal Star columns, the children filled row by row, Auto rows |
+// | tabs      | horizontal StackPanel of tab buttons: the one that is `selected` is primary    |
+// | tab       | Button (primary while selected, tertiary otherwise), clicks like a button     |
+// | menu      | Button (secondary) with a MenuFlyout: one MenuFlyoutItem per item node        |
+// | item      | not a control of its own: a MenuFlyoutItem of its menu, clicks and `disabled` |
 //
 // The style attributes (src/core/ui_render/style.hpp): background (SolidColorBrush or in-app AcrylicBrush), padding,
 // cornerRadius and the sizes on the panel or Border; align and valign as the element's own alignment, set by its
@@ -149,8 +154,10 @@ private:
     void SetMotion(Mounted& mounted, const uirender::RenderNode& node, bool building);
     void SetImage(Mounted& mounted, const uirender::RenderNode& node);
     void FillOptions(Mounted& mounted, const uirender::RenderNode& node);
+    void FillMenu(Mounted& mounted, const uirender::RenderNode& node);
     void Rewrite(Mounted& mounted);
     void PlaceChildren(Mounted& mounted, const uirender::RenderNode& node);
+    void SetGridCells(Mounted& mounted, const uirender::RenderNode& node);
 
     std::string m_elementId;
     UiEventSink m_sink;

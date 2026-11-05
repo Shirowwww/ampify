@@ -141,9 +141,29 @@ std::optional<Transitions> ParseTransition(std::string_view text) {
     return transitions;
 }
 
+int GridColumns(const RenderNode& node) {
+    double columns = node.Number("columns", 2);
+    if (!std::isfinite(columns)) return 2;
+    if (columns < 1) return 1;
+    if (columns > kMaxGridColumns) return kMaxGridColumns;
+    return static_cast<int>(columns);
+}
+
+GridCell GridCellOf(std::size_t index, int columns) {
+    std::size_t count = static_cast<std::size_t>(columns < 1 ? 1 : columns);
+    return GridCell{static_cast<int>(index / count), static_cast<int>(index % count)};
+}
+
+std::string ButtonVariantOf(const RenderNode& node) {
+    if (node.type == "tab") return node.Bool("selected", false) ? "primary" : "tertiary";
+    if (node.type == "menu") return "secondary";
+    return node.Text("variant", "secondary");
+}
+
 Layout LayoutOf(const RenderNode& node) {
     if (node.type == "layer") return Layout::Layer;
-    if (node.type == "card") return Layout::Panel;
+    if (node.type == "grid") return Layout::Columns;
+    if (node.type == "card" || node.type == "tabs") return Layout::Panel;
     if (node.type != "stack" && node.type != "list" && node.type != "row") return Layout::None;
     for (const RenderNode& child : node.children) {
         if (node.type != "list" && child.Bool("grow", false)) return Layout::Grid;

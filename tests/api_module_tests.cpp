@@ -108,7 +108,7 @@ const Expected kMembers[] = {
     {"ui", "object!{topbar:object!{addButton:f1=addButton},playbar:object!{addButton:f1=addButton},"
            "sidebar:object!{addItem:f1=addItem},"
            "menu:object!{addItem:f2=addItem},popup:object!{open:f1=open},"
-           "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},miniPlayer:object!{open:f0=open,close:f0=close},"
+           "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose,onKey:f1=onKey,onPointer:f1=onPointer},applePlayer:object!{open:f0=open},miniPlayer:object!{open:f0=open,close:f0=close},"
            "panel:object!{register:f2=register,remove:f1=remove,onClose:f2=onClose},"
            "page:object!{register:f2=register},title:object!{set:f1=set},"
            "setLabel:f2=setLabel,setActive:f2=setActive,navigate:f1=navigate}"},  // setLabel, setActive, panel.onClose added in kitApi 1.x, compatible additions

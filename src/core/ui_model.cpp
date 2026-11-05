@@ -29,15 +29,32 @@ bool OneOf(const std::array<std::string_view, N>& names, std::string_view name) 
 }
 
 bool IsPrimitive(const std::string& name) {
-    static const std::array<std::string_view, 15> kPrimitives = {
-        "stack", "row", "text", "button", "toggle", "slider", "list", "image", "icon",
-        "card", "textfield", "dropdown", "option", "layer", "lyrics"};
+    static const std::array<std::string_view, 20> kPrimitives = {
+        "stack", "row", "text", "button", "toggle", "slider", "list", "image", "icon", "card", "textfield",
+        "dropdown", "option", "layer", "lyrics", "grid", "tabs", "tab", "menu", "item"};
     return OneOf(kPrimitives, name);
 }
 
 bool HasChildren(const std::string& name) {
-    static const std::array<std::string_view, 6> kContainers = {"stack", "row", "list", "card", "dropdown", "layer"};
+    static const std::array<std::string_view, 9> kContainers = {"stack", "row", "list", "card", "dropdown", "layer",
+                                                                "grid", "tabs", "menu"};
     return OneOf(kContainers, name);
+}
+
+// The node a container holds and nothing else: options in a dropdown, tabs in tabs, items in a menu.
+std::string_view OnlyChildOf(const std::string& parent) {
+    if (parent == "dropdown") return "option";
+    if (parent == "tabs") return "tab";
+    if (parent == "menu") return "item";
+    return {};
+}
+
+// The container a node must sit in: option, tab and item belong to one only.
+std::string_view ContainerOf(const std::string& name) {
+    if (name == "option") return "dropdown";
+    if (name == "tab") return "tabs";
+    if (name == "item") return "menu";
+    return {};
 }
 
 // The containers that take a background, a padding, rounded corners and a size.
@@ -135,15 +152,31 @@ bool CheckTextStyle(const std::string& key, const Json& value, std::string* erro
     return true;
 }
 
+// The space between the cells of a grid, in pixels: a Grid spacing beyond it is not a layout anyone wants.
+constexpr double kMaxGridGap = 1000;
+
+bool CheckGridStyle(const std::string& key, const Json& value, std::string* error) {
+    if (key == "gap") {
+        if (!NumberIn(value, 0, kMaxGridGap)) return Fail(error, "gap expects a number of pixels between 0 and 1000");
+        return true;
+    }
+    if (key != "columns") return true;
+    if (!WholeIn(value, 1, uirender::kMaxGridColumns)) {
+        return Fail(error, "columns expects a whole number between 1 and 12");
+    }
+    return true;
+}
+
 bool CheckStyle(const std::string& name, const std::string& key, const Json& value, std::string* error) {
     if (std::optional<bool> common = CheckCommonStyle(name, key, value, error)) return *common;
     if (name == "text" || name == "lyrics") return CheckTextStyle(key, value, error);
+    if (name == "grid") return CheckGridStyle(key, value, error);
     return CheckBoxStyle(name, key, value, error);
 }
 
 // The primitives that report a click, and those that report a new value.
 bool TakesClick(const std::string& name) {
-    static const std::array<std::string_view, 4> kClickable = {"button", "card", "image", "icon"};
+    static const std::array<std::string_view, 6> kClickable = {"button", "card", "image", "icon", "tab", "item"};
     return OneOf(kClickable, name);
 }
 
@@ -191,9 +224,13 @@ bool CheckNode(const Json& node, const std::string& parent, int depth, int& node
     const std::string* name = type ? type->AsString() : nullptr;
     if (!name) return Fail(error, "element without a type");
     if (!IsPrimitive(*name)) return Fail(error, "unknown primitive: " + *name);
-    if ((*name == "option") != (parent == "dropdown")) {
-        return Fail(error, *name == "option" ? "option outside a dropdown"
-                                             : "a dropdown only holds options");
+    std::string_view container = ContainerOf(*name);
+    if (!container.empty() && container != std::string_view(parent)) {
+        return Fail(error, *name + " outside " + std::string(container));
+    }
+    std::string_view only = OnlyChildOf(parent);
+    if (!only.empty() && std::string_view(*name) != only) {
+        return Fail(error, parent + " only holds " + std::string(only) + " nodes");
     }
 
     for (const auto& [key, value] : *attributes) {
@@ -465,6 +502,10 @@ std::string_view PlacementPermission(std::string_view placement) {
     if (placement == "playbar") return "ui.playbar";
     if (placement == "sidebar") return "ui.sidebar";
     return "ui.menu";
+}
+
+bool FullscreenPointerDue(std::int64_t nowMs, std::optional<std::int64_t> lastMs) {
+    return !lastMs || nowMs - *lastMs >= kFullscreenPointerGapMs;
 }
 
 }  // namespace ampify

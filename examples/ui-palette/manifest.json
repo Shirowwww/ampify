@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "ui-palette",
+  "name": "UI palette, example for creators",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "For people who make extensions: a panel with the grid, tabs and menu components (Ampify.components.Grid, Tabs and Menu). Nothing useful to listen with.",
+  "translations": {"fr": {"name": "Palette d'interface, exemple pour créateurs", "description": "Pour qui crée des extensions : un panneau avec les composants grille, onglets et menu (Ampify.components.Grid, Tabs et Menu). Rien d'utile pour écouter."}, "de": {"name": "UI-Palette, Beispiel für Entwickler", "description": "Für alle, die Erweiterungen bauen: ein Panel mit den Komponenten Raster, Reiter und Menü (Ampify.components.Grid, Tabs und Menu). Nichts Nützliches zum Hören."}, "es": {"name": "Paleta de interfaz, ejemplo para creadores", "description": "Para quien crea extensiones: un panel con los componentes cuadrícula, pestañas y menú (Ampify.components.Grid, Tabs y Menu). Nada útil para escuchar."}, "pt": {"name": "Paleta de interface, exemplo para criadores", "description": "Para quem cria extensões: um painel com os componentes grade, abas e menu (Ampify.components.Grid, Tabs e Menu). Nada útil para ouvir."}, "ru": {"name": "Палитра интерфейса, пример для авторов", "description": "Для тех, кто пишет расширения: панель с компонентами сетки, вкладок и меню (Ampify.components.Grid, Tabs и Menu). Для прослушивания ничего полезного."}, "ja": {"name": "UI パレット(作者向けの例)", "description": "拡張機能を作る人向けです。グリッド、タブ、メニューのコンポーネントを使ったパネルです(Ampify.components.Grid、Tabs、Menu)。音楽を聴くための機能はありません。"}, "zh": {"name": "界面组件(创作者示例)", "description": "面向扩展作者：包含网格、标签页和菜单组件的面板(Ampify.components.Grid、Tabs 与 Menu)。对听歌没有实际用途。"}},
+  "tags": ["example", "developer"],
+  "kitApi": "1.0",
+  "main": "main.js",
+  "permissions": ["ui.panel"]
+}

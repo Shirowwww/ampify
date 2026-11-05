@@ -197,7 +197,7 @@ const char kReact[] = R"AMPIFYJS(
   const ALIASES = { div: "stack", section: "stack", span: "text", p: "text", label: "text", h1: "text", h2: "text",
                     h3: "text", img: "image", select: "dropdown", ul: "list" };
   const VARIANTS = { h1: "title", h2: "subtitle", h3: "subtitle" };
-  const CONTAINERS = new Set(["stack", "row", "list", "card", "dropdown", "layer"]);
+  const CONTAINERS = new Set(["stack", "row", "list", "card", "dropdown", "layer", "grid", "tabs", "menu"]);
   // Where the text children of a primitive without children go.
   const TEXT_ATTRIBUTE = { text: "text", button: "label", option: "label", toggle: "label" };
 
@@ -638,6 +638,39 @@ const char kReact[] = R"AMPIFYJS(
     return h("dropdown", attributes, options);
   }
 
+  // columns (1 to 12) and gap: the children fill the cells row by row.
+  const Grid = (props) => h("grid", pick(props, ["columns", "gap", ...TIP]), props.children);
+
+  // options as Dropdown's: the tab of `value` is selected, and a click on a tab gives its value to onChange.
+  function Tabs(props) {
+    const current = asText(props.value);
+    const tabs = Array.isArray(props.options)
+      ? props.options.map((option) => {
+          const entry = typeof option === "object" && option !== null ? option : { value: option };
+          const value = asText(entry.value);
+          const pickTab = () => {
+            if (typeof props.onChange === "function") props.onChange(value);
+          };
+          return h("tab", { key: value, value, label: entry.label === undefined ? value : asText(entry.label),
+                            selected: value === current, onClick: pickTab });
+        })
+      : props.children;
+    return h("tabs", pick(props, TIP), tabs);
+  }
+
+  // items: { label, disabled, onClick }. The menu's button opens them as a flyout under it.
+  function Menu(props) {
+    const attributes = pick(props, ["label", "disabled", ...TIP]);
+    const items = Array.isArray(props.items)
+      ? props.items.map((item, index) => {
+          const entry = typeof item === "object" && item !== null ? item : { label: item };
+          return h("item", { key: String(index), label: asText(entry.label), disabled: entry.disabled === true,
+                             onClick: entry.onClick });
+        })
+      : props.children;
+    return h("menu", attributes, items);
+  }
+
   const Card = (props) => h("card", pick(props, ["title", "subtitle", "onClick", ...TIP, ...PLACE, ...BOX]),
                             props.children);
   const List = (props) => h("list", pick(props, TIP), props.children);
@@ -668,7 +701,7 @@ const char kReact[] = R"AMPIFYJS(
   Ampify.ReactDOM = { render: renderInto, unmountComponentAtNode: unmountAt, createRoot };
   Ampify.hooks = Object.assign({ usePlayer }, hooks);
   Ampify.components = { Button, ButtonPrimary, ButtonSecondary, ButtonTertiary, Toggle, Slider, TextField, Dropdown,
-                     Card, List, Text, TextComponent: Text, Tooltip, TooltipWrapper: Tooltip };
+                     Grid, Tabs, Menu, Card, List, Text, TextComponent: Text, Tooltip, TooltipWrapper: Tooltip };
 
   // Ampify.ready resolves when the kernel has started the element: on its first Pump, after main.js ran. An app that
   // defines a global render() function, as a Spicetify custom app does, gets it rendered on its page "/<id>" first.

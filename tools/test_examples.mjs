@@ -1779,6 +1779,49 @@ test("react-panel speaks French on a French Windows", () => {
   assert.ok(textsOf(page.tree).includes("Clics : 1"));
 });
 
+// The UI palette example, with host stand-ins for Grid, Tabs and Menu (their own logic is in the C++ prelude tests).
+function uiPalette(language) {
+  const react = fakeReact();
+  const h = react.React.h;
+  const host = (type) => (props) => h(type, { ...props, text: type === "text" ? props.children.join("") : undefined }, props.children);
+  const Tabs = (props) => h("tabs", {}, props.options.map((option) =>
+    h("tab", { label: option.label, value: option.value, selected: option.value === props.value,
+               onClick: () => props.onChange(option.value) })));
+  const Menu = (props) => h("menu", { label: props.label }, props.items.map((item) =>
+    h("item", { label: item.label, disabled: item.disabled === true, onClick: item.onClick })));
+  const components = { Card: host("card"), Button: host("button"), Text: host("text"), Grid: host("grid"), Tabs, Menu };
+  const Ampify = {
+    React: react.React,
+    components,
+    ReactDOM: { render: (tree, target) => (assert.equal(target, "panel:ui-palette"), react.mount(() => tree)) },
+    i18n: fakeI18n(language),
+    log: () => {},
+    ready: Promise.resolve(),
+  };
+  runIn(load("ui-palette").source, { Ampify, setTimeout, clearTimeout });
+  return react.page;
+}
+
+test("ui-palette counts a click on each cell of its grid", () => {
+  const page = uiPalette("fr");
+  assert.ok(buttonIn(page.tree, "Case 1 : 0"), "the grid starts with four cells at zero");
+  buttonIn(page.tree, "Case 1 : 0").onClick();
+  assert.ok(buttonIn(page.tree, "Case 1 : 1"));
+  assert.ok(buttonIn(page.tree, "Case 4 : 0"));
+});
+
+test("ui-palette switches to its menu tab and resets the cells from the More flyout", () => {
+  const page = uiPalette("en");
+  buttonIn(page.tree, "Cell 1: 0").onClick();
+  allNodes(page.tree).find((node) => node.type === "tab" && node.label === "Menu").onClick();
+  const menu = allNodes(page.tree).find((node) => node.type === "menu");
+  assert.equal(menu.label, "More");
+  assert.ok(allNodes(page.tree).some((node) => node.type === "item" && node.label === "Not available" && node.disabled));
+  allNodes(page.tree).find((node) => node.type === "item" && node.label === "Reset the cells").onClick();
+  allNodes(page.tree).find((node) => node.type === "tab" && node.label === "Grid").onClick();
+  assert.ok(buttonIn(page.tree, "Cell 1: 0"), "the reset put the count back to zero");
+});
+
 // A player whose position the test moves, with a clock the test advances: setInterval and setTimeout both run on it.
 function fakeGuard() {
   const dir = join(examples, "..", "extensions", "playback-guard");  // ships with Ampify, in extensions/
@@ -2685,4 +2728,263 @@ test("ab-loop swaps points marked backwards and stops with another song", () => 
   assert.equal(fake.world.intervals[0].cleared, true);
   fake.world.stops.forEach((stop) => stop());
   assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+});
+
+// fullscreen-complete: a view over the song, opened and closed by its shortcuts, refreshed by the player's events.
+function fullscreenAmpify(manifest) {
+  const granted = new Set(manifest.permissions ?? []);
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+  };
+  const world = {
+    shortcuts: new Map(),
+    handlers: {},
+    closeHandlers: [],
+    opened: [],
+    closes: 0,
+    track: { title: "Song", artist: "Band", artwork: "" },
+    playing: true,
+    lyrics: null,
+    queue: { available: true, complete: true, items: [] },
+  };
+  const ampify = {
+    log: () => {},
+    onStop: () => {},
+    i18n: { define: () => {}, t: (key) => key },
+    keyboard: {
+      bind: (combo, fn) => {
+        need("ui.keyboard");
+        world.shortcuts.set(combo, fn);
+        return combo;
+      },
+    },
+    ui: {
+      fullscreen: {
+        open: (view) => {
+          need("ui.fullscreen");
+          world.opened.push(view);
+        },
+        close: () => {
+          need("ui.fullscreen");
+          world.closes += 1;
+        },
+        onClose: (fn) => {
+          need("ui.fullscreen");
+          world.closeHandlers.push(fn);
+          return () => {};
+        },
+        onKey: (fn) => {
+          world.onKey = fn;
+          return () => {};
+        },
+        onPointer: (fn) => {
+          world.onPointer = fn;
+          return () => {};
+        },
+      },
+    },
+    player: {
+      on: (event, fn) => {
+        need("player.read");
+        world.handlers[event] = fn;
+      },
+      state: () => {
+        need("player.read");
+        return { playing: world.playing, positionMs: 0, durationMs: 0, track: world.track, source: "apple" };
+      },
+      lyrics: () => {
+        need("player.read");
+        return world.lyrics;
+      },
+      queue: {
+        list: () => {
+          need("player.read");
+          return world.queue;
+        },
+      },
+      toggle: () => {
+        need("player.control");
+        world.playing = !world.playing;
+      },
+      next: () => need("player.control"),
+      previous: () => need("player.control"),
+    },
+  };
+  return { ampify, world };
+}
+
+function fullscreenRun(name, timers = fakeTimers()) {
+  const { manifest, source } = load(name);
+  const fake = fullscreenAmpify(manifest);
+  vm.runInNewContext(source, { Ampify: fake.ampify, setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout }, { filename: "main.js" });
+  return { ...fake, manifest, timers };
+}
+
+test("fullscreen-complete: Ctrl+Alt+F opens the song view and closes it again", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.shortcuts.get("Ctrl+Alt+F")();
+  assert.equal(world.opened.length, 1);
+  world.shortcuts.get("Ctrl+Alt+F")();
+  assert.equal(world.closes, 1);
+  assert.equal(world.opened.length, 1);
+});
+
+test("fullscreen-complete: the view follows the song while it is open, and not while closed", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.handlers.trackchange();
+  assert.equal(world.opened.length, 0);
+  world.shortcuts.get("Ctrl+Alt+F")();
+  world.track = { title: "Next song", artist: "Other", artwork: "" };
+  world.handlers.trackchange();
+  assert.equal(world.opened.length, 2);
+});
+
+test("fullscreen-complete: after the user closes the view with Escape, Ctrl+Alt+F opens it again", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.shortcuts.get("Ctrl+Alt+F")();
+  world.closeHandlers.forEach((fn) => fn());
+  world.shortcuts.get("Ctrl+Alt+F")();
+  assert.equal(world.opened.length, 2);
+  assert.equal(world.closes, 0);
+});
+
+test("fullscreen-complete: Ctrl+Alt+L opens the view with the lyrics, at most 40 lines", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  const lines = Array.from({ length: 60 }, (_, index) => ({ start: index, end: index + 1, text: `line ${index}` }));
+  world.lyrics = { source: "apple", synced: true, language: "en", lines, text: "" };
+  world.shortcuts.get("Ctrl+Alt+L")();
+  assert.equal(world.opened.length, 1);
+  const shown = JSON.stringify(world.opened[0]);
+  assert.ok(shown.includes("line 39"));
+  assert.ok(!shown.includes("line 40"));
+});
+
+test("fullscreen-complete declares exactly the permissions it needs", () => {
+  const { manifest } = fullscreenRun("fullscreen-complete");
+  assert.deepEqual([...manifest.permissions].sort(), ["player.control", "player.read", "ui.fullscreen", "ui.keyboard"]);
+});
+
+// Timers the view's idle wait runs on: fire() runs the next one, and the test checks its delay.
+function fakeTimers() {
+  const pending = new Map();
+  let next = 1;
+  return {
+    pending,
+    setTimeout: (fn, ms) => {
+      pending.set(next, { fn, ms });
+      return next++;
+    },
+    clearTimeout: (id) => pending.delete(id),
+    fire() {
+      const [id, timer] = pending.entries().next().value;
+      pending.delete(id);
+      timer.fn();
+      return timer.ms;
+    },
+  };
+}
+
+function nodesOf(node, found = []) {
+  if (!node || typeof node !== "object") return found;
+  if (Array.isArray(node)) return node.forEach((child) => nodesOf(child, found)), found;
+  found.push(node);
+  return nodesOf(node.children, found);
+}
+
+const controlsOpacity = (tree) => nodesOf(tree).find((node) => node.transition).opacity;
+const labelsOf = (tree) => nodesOf(tree).filter((node) => node.type === "text").map((node) => node.text);
+
+test("fullscreen-complete: F closes the view and L and Q open its panes while it has the keyboard", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.shortcuts.get("Ctrl+Alt+F")();
+  world.onKey("L");
+  assert.ok(labelsOf(world.opened.at(-1)).includes("lyrics"));
+  world.onKey("Q");
+  assert.ok(labelsOf(world.opened.at(-1)).includes("queue"));
+  world.onKey("X");
+  assert.equal(world.closes, 0);
+  world.onKey("F");
+  assert.equal(world.closes, 1);
+});
+
+test("fullscreen-complete: keys do nothing while the view is closed", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.onKey("F");
+  world.onKey("L");
+  assert.equal(world.opened.length, 0);
+  assert.equal(world.closes, 0);
+});
+
+test("fullscreen-complete: a key press brings faded controls back and restarts the 3 s wait", () => {
+  const { world, timers } = fullscreenRun("fullscreen-complete");
+  world.shortcuts.get("Ctrl+Alt+F")();
+  assert.equal(timers.fire(), 3000);
+  assert.equal(controlsOpacity(world.opened.at(-1)), 0);
+  world.onKey("L");
+  assert.equal(controlsOpacity(world.opened.at(-1)), 1);
+  assert.equal(timers.pending.size, 1);
+});
+
+test("fullscreen-complete: the controls fade after 3 s without movement and come back on movement", () => {
+  const { world, timers } = fullscreenRun("fullscreen-complete");
+  world.shortcuts.get("Ctrl+Alt+F")();
+  assert.equal(controlsOpacity(world.opened.at(-1)), 1);
+  assert.equal(timers.fire(), 3000);
+  assert.equal(controlsOpacity(world.opened.at(-1)), 0);
+  world.onPointer();
+  assert.equal(controlsOpacity(world.opened.at(-1)), 1);
+  assert.equal(timers.pending.size, 1);
+});
+
+test("fullscreen-complete: a pointer move while the controls show sends nothing new", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.shortcuts.get("Ctrl+Alt+F")();
+  const sent = world.opened.length;
+  world.onPointer();
+  world.onPointer();
+  assert.equal(world.opened.length, sent);
+});
+
+test("fullscreen-complete: nothing is rebuilt when the song and its state did not change", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.shortcuts.get("Ctrl+Alt+F")();
+  const sent = world.opened.length;
+  world.handlers.statechange();
+  world.handlers.trackchange();
+  assert.equal(world.opened.length, sent);
+});
+
+test("fullscreen-complete: Up Next shows the next song, with its artwork when Apple gives one", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.queue = { available: true, complete: true, items: [
+    { id: "1", title: "Now", artist: "A", section: "current" },
+    { id: "2", title: "Soon", artist: "B", section: "next-added", artwork: "https://x/cover.jpg" },
+  ] };
+  world.shortcuts.get("Ctrl+Alt+F")();
+  const tree = world.opened.at(-1);
+  const card = nodesOf(tree).find((node) => node.type === "card");
+  assert.equal(card.subtitle, "Soon · B");
+  assert.equal(card.children[0].type, "image");
+});
+
+test("fullscreen-complete: Up Next says why it is empty when it is not loaded or has nothing after", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.queue = { available: true, complete: false, items: [] };
+  world.shortcuts.get("Ctrl+Alt+F")();
+  assert.ok(labelsOf(world.opened.at(-1)).includes("noQueue"));
+  world.queue = { available: true, complete: true, items: [{ id: "1", title: "Now", section: "current" }] };
+  world.handlers.trackchange();
+  assert.ok(labelsOf(world.opened.at(-1)).includes("queueEmpty"));
+  assert.equal(nodesOf(world.opened.at(-1)).some((node) => node.type === "card"), false);
+});
+
+test("fullscreen-complete: the transport buttons call the player", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.shortcuts.get("Ctrl+Alt+F")();
+  const buttons = nodesOf(world.opened.at(-1)).filter((node) => node.type === "button");
+  assert.equal(buttons.length, 3);
+  buttons[1].onClick();
+  assert.equal(world.playing, false);
+  buttons[2].onClick();
+  buttons[0].onClick();
 });

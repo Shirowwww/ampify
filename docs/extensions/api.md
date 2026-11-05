@@ -244,6 +244,11 @@ characters per text; attributes are plain values.
 | Node | Attributes |
 |---|---|
 | `stack`, `row`, `list` | `gap`, `children` |
+| `grid` | `columns` (whole number, 1 to 12, 2 by default), `gap` (0 to 1000, as in the other containers), `children`: equal columns, the children filled row by row |
+| `tabs` | `gap`, `children`: `tab` nodes side by side |
+| `tab` | `label`, `selected` (the tab that is on, drawn in the accent colour), `disabled`, `onClick`; only in `tabs` |
+| `menu` | `label`, `disabled`, `children`: `item` nodes, opened as a flyout from the menu's button; only `item` nodes |
+| `item` | `label`, `disabled`, `onClick`; only in `menu`; no icon in this version |
 | `layer` | `children`, stacked on top of each other |
 | `card` | `title`, `subtitle`, `onClick`, `children` |
 | `text` | `text`, `variant` (`title`, `subtitle`, `body`, `caption`) and the text style below |
@@ -259,6 +264,11 @@ characters per text; attributes are plain values.
 
 A `card`, `image` or `icon` with an `onClick` works from the keyboard as well: Tab stops on it, Enter or Space clicks
 it, and a card lights up while it has the focus as it does under the pointer.
+
+A `tab` is a button that never takes a value: its `onClick` runs, and the app moves `selected` to the new tab when it
+draws again (`Ampify.components.Tabs` does this with `value` and `onChange`). A `menu` takes no `onClick` of its own;
+each `item` has one, and the flyout closes when an item is clicked. A `grid` with a child that has `grow` does not
+stretch it: every child gets one cell of the same width.
 
 | Where | Attribute | Values |
 |---|---|---|
@@ -281,6 +291,8 @@ Ampify.ui.popup.open(view)
 Ampify.ui.fullscreen.open(view)        // permission ui.fullscreen; called again, updates in place
 Ampify.ui.fullscreen.close()
 Ampify.ui.fullscreen.onClose(fn)       // returns a function that removes fn
+Ampify.ui.fullscreen.onKey(fn)         // fn("F" | "L" | "Q") while the view has the keyboard; returns a remover
+Ampify.ui.fullscreen.onPointer(fn)     // fn() when the pointer moves over the view, at most every 250 ms
 Ampify.ui.applePlayer.open()           // permission ui.fullscreen: Apple Music's own full-screen player
 Ampify.ui.miniPlayer.open()            // Ampify's mini player: a small window on top (no permission)
 Ampify.ui.miniPlayer.close()
@@ -477,6 +489,9 @@ Ampify.ready                                          // resolves once the eleme
 | `Slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange(number)` |
 | `TextField` | `label`, `value`, `placeholder`, `disabled`, `onChange(text)` |
 | `Dropdown` | `label`, `value`, `options` (texts or `{ value, label }`), `disabled`, `onChange(value)` |
+| `Grid` | `columns` (1 to 12), `gap` (0 to 1000), children |
+| `Tabs` | `value`, `options` (texts or `{ value, label }`), `onChange(value)`: a tab per option, the one of `value` on |
+| `Menu` | `label`, `disabled`, `items` (`{ label, disabled, onClick }` each): a flyout under a button |
 | `Card` | `title`, `subtitle`, `onClick`, children, box style |
 | `List` | children |
 | `Text` (`TextComponent`) | `text` or children, `variant`, `size`, `weight`, `color`, `align`, `wrap`, `maxLines` |

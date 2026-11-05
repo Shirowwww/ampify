@@ -387,6 +387,36 @@ controls::Button MakeFullscreenClose() {
     return close;
 }
 
+// The letters the view takes for its element: plain keys, as the view has the keyboard. Empty for any other key.
+std::string FullscreenKeyName(winrt::Windows::System::VirtualKey key) {
+    using winrt::Windows::System::VirtualKey;
+    if (key == VirtualKey::F) return "F";
+    if (key == VirtualKey::L) return "L";
+    if (key == VirtualKey::Q) return "Q";
+    return {};
+}
+
+// Sends the open view's element an event of its dispatch (`entry`), with its payload as JSON text.
+void SendToFullscreen(const WeakShared& weakShared, const WeakContext& weakContext, const char* entry,
+                      const std::string& payload) noexcept {
+    try {
+        std::shared_ptr<WindowContext> live = weakContext.lock();
+        SharedPtr shared = weakShared.lock();
+        if (!live || !shared || !shared->sink) return;
+        auto found = live->surfaces.find(live->fullscreenKey);
+        if (found == live->surfaces.end() || found->second.dismissed) return;
+        shared->sink(UiEvent{found->second.surface.elementId, 0, false, payload, entry});
+    } catch (...) {
+        // Called from a XAML handler: nothing may escape it.
+    }
+}
+
+// Milliseconds on the steady clock, for the pointer's gap.
+std::int64_t SteadyMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+
 controls::Border EnsureFullscreenHost(UiService::Shared& shared, const std::shared_ptr<WindowContext>& owner,
                                       const xaml::DependencyObject& content) {
     WindowContext& context = *owner;
@@ -421,11 +451,26 @@ controls::Border EnsureFullscreenHost(UiService::Shared& shared, const std::shar
     });
     host.KeyDown([weakShared, weakContext](IInspectable const&, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
         try {
-            if (args.Key() != winrt::Windows::System::VirtualKey::Escape) return;
+            if (args.Key() == winrt::Windows::System::VirtualKey::Escape) {
+                args.Handled(true);
+                DismissFullscreen(weakShared, weakContext);
+                return;
+            }
+            std::string name = FullscreenKeyName(args.Key());
+            if (name.empty()) return;
             args.Handled(true);
-            DismissFullscreen(weakShared, weakContext);
+            SendToFullscreen(weakShared, weakContext, "fullscreenKey", "{\"key\":\"" + name + "\"}");
         } catch (...) {
         }
+    });
+    // The pointer's moves keep the element's controls shown: passed on at most every 250 ms (FullscreenPointerDue).
+    auto lastPointer = std::make_shared<std::optional<std::int64_t>>();
+    host.PointerMoved([weakShared, weakContext, lastPointer](IInspectable const&,
+                                                              xaml::Input::PointerRoutedEventArgs const&) noexcept {
+        std::int64_t now = SteadyMs();
+        if (!FullscreenPointerDue(now, *lastPointer)) return;
+        *lastPointer = now;
+        SendToFullscreen(weakShared, weakContext, "fullscreenPointer", "{}");
     });
     context.fullscreenPopup = popup;
     context.fullscreenHost = host;

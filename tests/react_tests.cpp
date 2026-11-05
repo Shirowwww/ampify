@@ -511,6 +511,38 @@ TEST_CASE(Interface_FullscreenOpenUpdatesAndTellsOnClose) {
     CHECK(bad->lastError().find("size") != std::string::npos);
 }
 
+TEST_CASE(Interface_FullscreenKeysAndPointerReachTheListeners) {
+    Fixture f;
+    auto element = f.Make("fullkeys", R"(
+        Ampify.ui.fullscreen.onKey((key) => Ampify.log("key " + key));
+        Ampify.ui.fullscreen.onPointer(() => Ampify.log("pointer"));
+        Ampify.ui.fullscreen.open({ type: "text", text: "one" });
+    )", R"("ui.fullscreen")");
+    CHECK(element->Start());
+    auto slot = f.host.ui.Fullscreen();
+    CHECK(slot.has_value());
+    if (!slot) return;
+    element->DeliverEvent("fullscreenKey", R"({"key":"L"})");
+    element->DeliverEvent("fullscreenPointer", "{}");
+    element->Pump();
+    CHECK(f.Logged("[fullkeys] key L"));
+    CHECK(f.Logged("[fullkeys] pointer"));
+
+    // Garbage from the host is logged and dropped, nothing reaches the listener.
+    element->DeliverEvent("fullscreenKey", "not json");
+    element->Pump();
+    CHECK(f.Logged("fullscreenKey"));
+
+    // Once the view has closed, late keys and moves are ignored.
+    element->DeliverEvent("fullscreenClose", R"({"session":)" + slot->id + "}");
+    element->Pump();
+    element->DeliverEvent("fullscreenKey", R"({"key":"Q"})");
+    element->DeliverEvent("fullscreenPointer", "{}");
+    element->Pump();
+    CHECK(!f.Logged("[fullkeys] key Q"));
+    element->Stop();
+}
+
 TEST_CASE(React_ReadyResolvesOnTheFirstPump) {
     Fixture f;
     auto element = f.Make("ready", R"(Ampify.ready.then(() => Ampify.log("ready"));)", "");
@@ -685,4 +717,79 @@ TEST_CASE(React_TheReactPanelExampleRuns) {
     CHECK(f.Logged("Timer armed: 30 min"));
     element.Stop();
     CHECK(f.Logged("Timer cancelled"));
+}
+
+TEST_CASE(React_GridTabsAndMenusRenderTheirNodes) {
+    Fixture f;
+    auto element = f.Make("palette", R"(
+        const { h } = Ampify.React;
+        const { Grid, Tabs, Menu } = Ampify.components;
+        function App() {
+          return h("stack", null,
+            h(Grid, { columns: 2, gap: 6 }, h("text", { text: "a" }), h("text", { text: "b" })),
+            h(Tabs, { value: "b", options: ["a", { value: "b", label: "Bee" }],
+                      onChange: (value) => Ampify.log("tab " + value) }),
+            h(Menu, { label: "More", items: [{ label: "Copy", onClick: () => Ampify.log("copy") },
+                                             { label: "Off", disabled: true }] }));
+        }
+        Ampify.ReactDOM.render(h(App), "panel:palette");
+    )");
+    CHECK(element->Start());
+    std::string panel = f.Panel("palette", "palette");
+    CHECK(panel.find(R"({"type":"grid","columns":2,"gap":6,"children":[{"type":"text","text":"a"})") !=
+          std::string::npos);
+    CHECK(panel.find(R"({"type":"tabs","children":[{"type":"tab","value":"a","label":"a","selected":false,"onClick":)") !=
+          std::string::npos);
+    CHECK(panel.find(R"({"type":"tab","value":"b","label":"Bee","selected":true,"onClick":)") != std::string::npos);
+    CHECK(panel.find(R"({"type":"menu","label":"More","children":[{"type":"item","label":"Copy","disabled":false,)") !=
+          std::string::npos);
+    CHECK(panel.find(R"({"type":"item","label":"Off","disabled":true,"key":"1"}]}]})") !=
+          std::string::npos);
+
+    element->DeliverClick(CallbackOf(f.host.ui, "palette", "palette", "label", "Bee", "onClick"));
+    element->Pump();
+    CHECK(f.Logged("tab b"));
+    element->DeliverClick(CallbackOf(f.host.ui, "palette", "palette", "label", "Copy", "onClick"));
+    element->Pump();
+    CHECK(f.Logged("copy"));
+    element->Stop();
+}
+
+TEST_CASE(React_TheUiPaletteExampleRuns) {
+    Fixture f;
+    // The fake host's locale is fr-FR: the panel shows its French texts.
+    const std::string name = "ui-palette";
+    fs::path dir = fs::path(AMPIFY_SOURCE_DIR) / "examples" / name;
+    std::ifstream manifestFile(dir / "manifest.json");
+    std::stringstream manifestText;
+    manifestText << manifestFile.rdbuf();
+    ampify::ManifestResult result = ampify::ParseManifest(manifestText.str(), name, 1, [&](const std::string& file) {
+        return fs::exists(dir / file);
+    });
+    CHECK(result.manifest.has_value());
+    if (!result.manifest) return;
+
+    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal);
+    CHECK(element.Start());
+    element.Pump();
+    CHECK(f.Logged("UI palette ready"));
+    auto slot = f.host.ui.Panel(name, name);
+    CHECK(slot.has_value());
+    if (!slot) return;
+    std::string error;
+    CHECK(ampify::ValidateTree(slot->tree, &error));
+    CHECK(FindNode(slot->tree, "label", "Plus") == nullptr);
+
+    element.DeliverClick(CallbackOf(f.host.ui, name, name, "label", "Menu", "onClick"));
+    element.Pump();
+    slot = f.host.ui.Panel(name, name);
+    CHECK(slot && FindNode(slot->tree, "label", "Plus") != nullptr);
+
+    element.DeliverClick(CallbackOf(f.host.ui, name, name, "label", "Grille", "onClick"));
+    element.Pump();
+    element.DeliverClick(CallbackOf(f.host.ui, name, name, "label", "Case 1 : 0", "onClick"));
+    element.Pump();
+    slot = f.host.ui.Panel(name, name);
+    CHECK(slot && FindNode(slot->tree, "label", "Case 1 : 1") != nullptr);
+    element.Stop();
 }

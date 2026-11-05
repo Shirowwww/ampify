@@ -143,4 +143,9 @@ bool IsPlacement(std::string_view placement);
 // The permission that adds to a placement: ui.topbar, ui.playbar or ui.menu.
 std::string_view PlacementPermission(std::string_view placement);
 
+// The pointer moves over the full-screen view are passed to its element at most every 250 ms, so that a timer there
+// only wakes up a few times a second. `lastMs` is the time the last move was passed, if any.
+constexpr std::int64_t kFullscreenPointerGapMs = 250;
+bool FullscreenPointerDue(std::int64_t nowMs, std::optional<std::int64_t> lastMs);
+
 }  // namespace ampify
