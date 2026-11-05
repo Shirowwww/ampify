@@ -366,6 +366,9 @@ struct WindowContext {
     winrt::weak_ref<xaml::FrameworkElement> songColumn;
     winrt::weak_ref<xaml::FrameworkElement> songToggles;
     std::optional<xaml::Thickness> songMargin;  // Apple's, while Ampify moves its right side
+    std::optional<double> songMaxWidth;         // Apple's, while Ampify keeps the song clear of the transport
+    double songLimitedFor = 0;                  // the song's width when Ampify limited it
+    double songLimit = 0;                       // the maximum width Ampify gave it
     // What stands left of the toggles in the bar, kept clear of Ampify's buttons (FoldPlaybarButtons), and the
     // "More" button that holds the buttons folded meanwhile. Strong, like the buttons.
     winrt::weak_ref<xaml::FrameworkElement> songDisplay;
@@ -1919,9 +1922,27 @@ void ReleasePages(WindowContext& context) {
     context.pushedRight = -1;
 }
 
+constexpr double kPagesMinWidth = 720;  // narrower, a playlist's header cut its buttons: the panels float instead
+constexpr double kDockMargin = 8;       // room past that before the pages make room again: no back and forth
+
+// Whether the pages keep kPagesMinWidth beside a column of panels, measured on the pages as they are, pushed or not.
+bool PagesKeepRoom(const WindowContext& context) {
+    controls::Grid pages = PagesGrid(context);
+    if (!pages || pages.ActualWidth() <= 0) return true;
+    double width = pages.ActualWidth();
+    if (context.pushedPages) return width >= kPagesMinWidth;
+    return width - (kPanelWidth + 2 * kPushGap) >= kPagesMinWidth + kDockMargin;
+}
+
 void PlacePanelPopup(WindowContext& context, const xaml::XamlRoot& root) {
     auto size = root.Size();
-    if (AnyPanelShown(context)) PushPages(context);
+    if (AnyPanelShown(context)) {
+        if (PagesKeepRoom(context)) {
+            PushPages(context);
+        } else {
+            ReleasePages(context);  // a narrow window: the panels float over the pages rather than squeeze them
+        }
+    }
     if (DockPanelPopup(context, size)) {
         OpenOverlay(context, context.panelPopup);
         return;
@@ -3301,6 +3322,44 @@ void FollowFoldedLogo(UiService::Shared& shared, const std::shared_ptr<WindowCon
 }
 
 constexpr double kSongClearance = 24;  // between the song's display and the first toggle (the volume)
+constexpr double kSongMinWidth = 200;  // the transport guard leaves the song at least this: artwork and a few letters
+
+// A layout that sizes the song itself (bottom-bar's width) ran it under the transport in a narrow bar, the star on
+// the shuffle button: the song gets a maximum width that ends it a clear space short of the transport, and loses it
+// as the room comes back. Only a real overlap starts or narrows it: in a layout where the transport follows the song,
+// each narrowing would draw the transport after it, down to the minimum.
+// True when the song's size changes, which lays it out again and queues the next pass.
+bool KeepSongClearOfTransport(WindowContext& context, const xaml::FrameworkElement& song, const xaml::UIElement& parent) {
+    xaml::FrameworkElement transport = context.transport.get();
+    double width = song.Width();
+    double current = song.MaxWidth();
+    bool ours = context.songMaxWidth && std::abs(current - context.songLimit) < 0.5;  // not rewritten since
+    bool held = ours && context.songLimitedFor == width;                                // a new width starts again
+    double limit = std::numeric_limits<double>::infinity();
+    if (!std::isnan(width) && transport && transport.ActualWidth() > 0 && song.ActualWidth() > 0) {
+        double songLeft = song.TransformToVisual(parent).TransformPoint({0, 0}).X;
+        double transportLeft = transport.TransformToVisual(parent).TransformPoint({0, 0}).X;
+        double room = std::max(kSongMinWidth, transportLeft - kSongClearance - songLeft);
+        bool overlaps = songLeft + song.ActualWidth() > transportLeft;
+        if (transportLeft > songLeft && room < width) {
+            if (overlaps) limit = room;
+            else if (held) limit = std::max(current, room);  // widens with the room, never narrows without an overlap
+        }
+    }
+    bool binding = song.ActualWidth() >= current - 0.5;  // the song stands at its maximum now
+    if (std::isinf(limit)) {
+        if (!context.songMaxWidth) return false;
+        if (ours) song.MaxWidth(*context.songMaxWidth);  // a value someone else wrote since stays
+        context.songMaxWidth.reset();
+        return ours && binding;
+    }
+    if (!ours) context.songMaxWidth = current;
+    context.songLimitedFor = width;
+    context.songLimit = limit;
+    if (std::abs(current - limit) < 0.5) return false;
+    song.MaxWidth(limit);
+    return limit < song.ActualWidth() - 0.5 || binding;
+}
 
 // A layout that spans the song over the toggles' column (floating-panels) leaves its end to Ampify: Apple's columns
 // left the song a third of the bar, with an empty stretch before the volume, and the title cut in a narrow window. The
@@ -3319,8 +3378,9 @@ bool FitSongRoom(WindowContext& context) {
         bool restored = context.songMargin.has_value();
         if (restored) song.Margin(*context.songMargin);
         context.songMargin.reset();
-        return restored;
+        return KeepSongClearOfTransport(context, song, parent) || restored;
     }
+    if (KeepSongClearOfTransport(context, song, parent)) return true;  // gives Apple's maximum back
     if (!context.songMargin) context.songMargin = margin;
     if (song.ActualWidth() <= 0 || toggles.ActualWidth() <= 0) return false;
     double songLeft = song.TransformToVisual(parent).TransformPoint({0, 0}).X;
@@ -3529,6 +3589,7 @@ void FollowSongRoom(UiService::Shared& shared, const std::shared_ptr<WindowConte
     context->songColumn = winrt::make_weak(song);
     context->songToggles = winrt::make_weak(togglesElement);
     context->songMargin.reset();
+    context->songMaxWidth.reset();
     WeakContext weakContext = context;
     std::optional<int> transport = uirender::FindByName(nodes, "TransportControl");
     context->songDisplay = winrt::make_weak(displayElement);

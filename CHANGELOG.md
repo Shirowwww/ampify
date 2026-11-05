@@ -27,7 +27,8 @@
 - Round corners snippet: one radius of your choice for the covers, tiles, rows, the display and the menus, on top of
   any theme.
 - Cinema: the page no longer slides to the right at each change of tab. The capsule's curve no longer cuts into the
-  cover: the cover and the display take its curve, and "Capsule corner radius" sets it.
+  cover: the cover and the display take its curve, and "Capsule corner radius" sets it. "Playback bar position" puts
+  the capsule at the top, Apple's own place for the bar, where it shrinks with the window.
 - Glass light: white frosted panes, so the dark text reads whatever the song; the panes took the cover's dark colour
   in both schemes.
 - `@media (prefers-color-scheme: light)` and `(dark)` give a theme rules for each of its schemes.
@@ -36,6 +37,14 @@
 - A page's header no longer flashes Apple's grey frost before the theme's colour.
 - An album's or a playlist's Play button takes each theme's corners instead of Apple's pill, and Glass's play bar
   buttons no longer light up as ovals under the pointer.
+- A song display a theme gives a width no longer runs under the playback buttons in a narrow bar (the star on the
+  shuffle button): it shortens to end a clear space before them, and takes its width back with the room.
+- Up Next's "Clear" and its autoplay toggle take the theme's accent instead of Apple's red and blue
+  (`.queue-clear`, `.queue-autoplay`).
+- Glass dark and Artwork: the cards of the pages, the Marketplace and Settings > Ampify are a white veil on the glass
+  instead of a fixed night blue or slate, so they take the colours of the song playing.
+- The lyrics and queue pane of the floating-panel themes fits its panel: its right edge was cut (the durations, the
+  autoplay button, the History tab; most in Mirror).
 
 ### Extensions
 
@@ -43,6 +52,8 @@
   cover, the lyrics lit word by word, the album with its year and genre, the artist, the credits and what comes next.
 - A `lyrics` node shows the lyrics of the song playing, lit word by word, without the element rendering it again.
 - `Ampify.ui.panel.remove(id)` takes a panel away; panels slide in and out, and an empty column goes with them.
+- In a narrow window, panels float over the right of the pages instead of squeezing them into a column too narrow for
+  a playlist's buttons; they take their column again as the window widens.
 - When the playback bar runs out of room, or leaves the song's display too narrow for its title, the buttons
   extensions add to it go one by one into a "More" button, the last one first, and come back as the window widens;
   Apple's own buttons stay where they are.

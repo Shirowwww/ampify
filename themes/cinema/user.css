@@ -21,7 +21,10 @@
 }
 
 @import "ampify:floating-panels";
-@import "ampify:bottom-bar";
+
+@setting bar-position = Bottom {
+    @import "ampify:bottom-bar";
+}
 
 /* The light of the screen on the floor: the artwork's dark colour, faint, at the bottom of the window. */
 .window {
@@ -66,13 +69,37 @@
 
 /* ---- The capsule ------------------------------------------------------------------------------------------------ */
 
+/* At the top, Apple's own place for the bar: the capsule hangs a gap under the window's top edge, the pages start a gap
+   under it. It stretches up to its width and shrinks with the window, clear of the window's buttons; in a wide window
+   it keeps that room on both sides, to stay centred over the pages. Variables, read by the capsule's rules: without
+   the capsule, Apple's bar stays as it is. */
+@setting bar-position = Top {
+    :root {
+        --capsule-edge: top;
+        --capsule-fit: stretch;
+        --capsule-size: auto;
+        --capsule-top: var(--gap);
+        --capsule-bottom: 0;
+        --capsule-start: 150;
+        --capsule-end: 150;  /* the window's three buttons, and a gap */
+        --capsule-start-narrow: var(--gap);
+        --capsule-content-top: calc(var(--bar-height) + var(--gap) * 2);
+    }
+}
+
 @setting capsule {
+    :root {
+        --content-top: var(--capsule-content-top, 64);
+    }
+
     /* Centred under the column, a gap above the window's bottom edge, rounded at both ends. */
     .playbar {
-        horizontal-alignment: center;
-        width: var(--capsule-width);
+        vertical-alignment: var(--capsule-edge, bottom);
+        horizontal-alignment: var(--capsule-fit, center);
+        width: var(--capsule-size, var(--capsule-width));
+        max-width: var(--capsule-width);
         height: var(--bar-height);
-        margin: 0 0 var(--gap) 0;
+        margin: var(--capsule-top, 0) var(--capsule-end, 0) var(--capsule-bottom, var(--gap)) var(--capsule-start, 0);
         corner-radius: var(--setting-capsule-radius);
         background: #F2var(--art-3-hex, 141416);
         border-width: 1;
@@ -121,13 +148,30 @@
     .playbar-toggles {
         margin: 0 20 0 0;
     }
+
+    /* The window's buttons stand outside the capsule, at the top or at the bottom: the toggles take the cell Apple
+       keeps for them, which was an empty stretch at the capsule's right end. */
+    .caption-buttons-cover {
+        visibility: collapsed;
+    }
+}
+
+/* At the top in a narrower window, the capsule gives up its centre for room: it starts a gap from the sidebar, so
+   that Apple's buttons and the display fit in it. At the bottom, nothing changes. */
+@media (max-width: 1600px) {
+    @setting capsule {
+        .playbar {
+            margin: var(--capsule-top, 0) var(--capsule-end, 0) var(--capsule-bottom, var(--gap)) var(--capsule-start-narrow, 0);
+        }
+    }
 }
 
 /* A narrow window: a shorter capsule. */
 @media (max-width: 1060px) {
     @setting capsule {
         .playbar {
-            width: 680;
+            width: var(--capsule-size, 680);
+            max-width: 680;
         }
 
         .now-playing {

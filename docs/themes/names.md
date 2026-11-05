@@ -236,6 +236,8 @@ They open in popups, each a root of its own: `.flyout Slider` works, `.playbar .
 | `.lyrics-footer` | The strip under the lyrics |
 | `.lyrics-writers` | Its credits line |
 | `.queue` | The Up Next list |
+| `.queue-clear` | Its "Clear" button, in Apple's red; a theme with an accent paints it in the accent |
+| `.queue-autoplay` | Its autoplay toggle (∞), blue while on; a theme with an accent gives it `checked-color` |
 
 ## Everything else
 

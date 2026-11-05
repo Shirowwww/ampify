@@ -54,8 +54,9 @@ Register-Case -Id 'installer' -Title 'Install, uninstall keeping and purging dat
         -Detail "missing: $(@($files) -join ', ')"
     Add-Check -Ctx $Ctx -Name 'no Start menu shortcut: Apple Music keeps its own icon' -Passed (-not (Test-Path -LiteralPath $shortcut))
     $entryText = & $signInEntry
-    Add-Check -Ctx $Ctx -Name 'sign-in entry starts the background launcher' `
-        -Passed ([bool]$entryText -and $entryText -like "*$launcherFile*--background*") -Detail "$entryText"
+    # At sign-in the launcher registers itself with Windows for each Apple Music process (--register) and ends.
+    Add-Check -Ctx $Ctx -Name 'sign-in entry registers the launcher with Apple Music' `
+        -Passed ([bool]$entryText -and $entryText -like "*$launcherFile*--register*") -Detail "$entryText"
     Add-Check -Ctx $Ctx -Name 'install folder in the user Path (ampify in a new terminal)' -Passed (& $inUserPath)
     # Run as administrator (CI runners are), the installer starts the launcher through Explorer, without administrator
     # rights, so a normal session can stop it. A runner may have no Explorer to ask: the log then says so.

@@ -116,6 +116,9 @@ weighs what the path it stands for weighs, without the covers `.artwork` leaves 
 ```
 
 - Variables are defined in `:root` blocks only, names are case-insensitive, and a variable can use the ones before it.
+  They are worked out once, when the theme loads: a `:root` inside `@media` is ignored. For a value that changes with
+  the window's width, write the rule itself inside `@media`. A `:root` inside `@setting` works, the setting being known
+  at load.
 - `var(--name, fallback)` gives a fallback. A missing variable without one makes the declaration ignored.
 - `calc()` takes `+`, `-`, `*`, `/` and brackets. Lengths can be added or subtracted, not multiplied together.
 - A snippet sees the variables of the active theme.
@@ -640,6 +643,7 @@ and the inspector list them as "Ampify (derived from the theme)".
 |---|---|
 | rounds `.lcd` | `.scrubber` stops before the display's corner |
 | has an accent | the progress line (`.scrubber`) takes it, like the volume slider |
+| has an accent | Up Next's "Clear" (`.queue-clear`) and its autoplay toggle while on (`.queue-autoplay`) take it, not Apple's red and blue |
 | has a link colour or an accent | `.album-artist` takes it (Apple's own blue barely reads on a light page) |
 | has a secondary text colour | `.card-subtitle`, the artist under a tile, takes it (Apple paints that link in code) |
 | has a card colour | the top results of a search take it |

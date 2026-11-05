@@ -229,6 +229,8 @@ const std::vector<ClassEntry> kClasses{
     {"lyrics-footer", {"StackPanel#LyricsFooter"}},
     {"lyrics-writers", {"TextBlock#WritersTextBlock"}},
     {"queue", {"PlayQueueView#PlayQueueView"}},
+    {"queue-clear", {"StackPanel#PlayQueueViewContents > Border > Grid > Button"}},
+    {"queue-autoplay", {"StackPanel#PlayQueueViewContents > Border > Grid > ContentControl > ContentPresenter > ToggleButton"}},
 };
 
 // Rounded panels floating on the window, with even gaps and aligned edges: the sidebar on the left, the pages on the
@@ -374,11 +376,15 @@ PersonPicture#smallPersonPicture {
 }
 
 /* The lyrics and queue pane: a third panel on the right, below the bar like the pages, instead of a strip glued to the
-   window's edge and running up under its buttons. Its first 64 were room for Apple's bar: the panel starts below it. */
+   window's edge and running up under its buttons. Its first 64 were room for Apple's bar: the panel starts below it.
+   Apple gives it a fixed width, which a margin only clipped (the queue's durations and its autoplay button cut at the
+   right): it fills its column, less the margins. */
 .lyrics-panel {
     background: var(--panel-background, #17171A);
     corner-radius: var(--panel-radius, 10px);
     margin: var(--content-top, 64) var(--gap, 8) var(--gap, 8) 0;
+    width: auto;
+    horizontal-alignment: stretch;
 }
 
 .lyrics-panel-top-spacer {

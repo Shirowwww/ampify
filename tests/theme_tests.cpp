@@ -1186,6 +1186,15 @@ std::string Assigned(const th::Theme& theme, std::string_view selector, std::str
 std::string ScrubberMargin(const th::Theme& theme) { return Assigned(theme, ".scrubber", "Margin"); }
 }  // namespace
 
+TEST_CASE(Theme_FloatingLyricsPaneShrinksInsteadOfClippingItsRightEdge) {
+    // Apple gives the pane a fixed width: a margin around it cut the queue's durations and its autoplay button.
+    MemoryFiles files;
+    files.files["user.css"] = "@import \"ampify:floating-panels\";\n";
+    th::Theme theme = Load(files);
+    CHECK(Assigned(theme, ".lyrics-panel", "Width") == "NaN");
+    CHECK(Assigned(theme, ".lyrics-panel", "HorizontalAlignment") == "Stretch");
+}
+
 TEST_CASE(Theme_ListRowsDrawTheThemesSelection) {
     // Apple Music's lists never read the ListViewItem keys: the rows get them as their own selection colours.
     MemoryFiles accent;
@@ -1305,6 +1314,23 @@ TEST_CASE(Theme_ShuffleIconTakesTheAccentWhileOn) {
     own.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 4FD1FF\n";
     own.files["user.css"] = ".shuffle-button { checked-color: #FF112233; }\n";
     CHECK(Assigned(Load(own), ".shuffle-button", "CheckedForeground") == "#FF112233");
+}
+
+TEST_CASE(Theme_UpNextClearAndAutoplayTakeTheAccent) {
+    MemoryFiles accent;
+    accent.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 4FD1FF\n";
+    CHECK(Assigned(Load(accent), ".queue-clear", "Foreground") == "#FF4FD1FF");
+    CHECK(Assigned(Load(accent), ".queue-autoplay", "CheckedForeground") == "#FF4FD1FF");
+
+    // A theme's own rules win; without an accent, Apple's red and blue stay.
+    MemoryFiles own;
+    own.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 4FD1FF\n";
+    own.files["user.css"] = ".queue-clear { color: #FF112233; }\n.queue-autoplay { checked-color: #FF445566; }\n";
+    CHECK(Assigned(Load(own), ".queue-clear", "Foreground") == "#FF112233");
+    CHECK(Assigned(Load(own), ".queue-autoplay", "CheckedForeground") == "#FF445566");
+    MemoryFiles none;
+    none.files["user.css"] = ".queue { padding: 4; }\n";
+    CHECK(Assigned(Load(none), ".queue-clear", "Foreground") == "ABSENT");
 }
 
 TEST_CASE(Theme_ProgressLineTakesTheAccent) {
@@ -2264,8 +2290,8 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
     CHECK(full.resources.size() == 1);
     CHECK(!full.resourceDictionary.empty());
     // With the album's artist in the accent, in its two forms (ArtistInLinkColour), the progress line in the accent
-    // (ScrubberInAccent) and the shuffle icon while on (ShuffleInAccent).
-    CHECK(full.assignments.size() == 6);
+    // (ScrubberInAccent), the shuffle icon while on (ShuffleInAccent), Up Next's Clear and autoplay (UpNextInAccent).
+    CHECK(full.assignments.size() == 8);
 
     th::LoadOptions none{"", &allowed, {false, false, false}};
     th::Theme off = Load(files, none);
@@ -2277,7 +2303,7 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
 
     th::LoadOptions noAssets{"", &allowed, {true, true, false}};
     th::Theme withoutImages = Load(files, noAssets);
-    CHECK(withoutImages.assignments.size() == 5);  // the font, artist, progress line and shuffle rules stay, not the image's
+    CHECK(withoutImages.assignments.size() == 7);  // the font and accent rules stay, not the image's
     CHECK(!ProblemContaining(withoutImages, "assets").empty());
 }
 

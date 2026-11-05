@@ -669,6 +669,18 @@ std::string ShuffleInAccent(const Theme& theme) {
     return std::string(".shuffle-button { checked-color: $") + kAccent + "; }\n";
 }
 
+// Apple Music's Up Next paints "Clear" in its own red and the autoplay toggle, while on, in its own blue, colours of
+// their templates that no theme key reaches: both take the accent, so the pane reads in the theme's colours.
+std::string UpNextInAccent(const Theme& theme) {
+    if (!theme.palette.Find(kAccent)) return {};
+    std::string css;
+    if (!Sets(theme, ".queue-clear", "Foreground")) css += std::string(".queue-clear { color: $") + kAccent + "; }\n";
+    if (!Sets(theme, ".queue-autoplay", kCheckedForegroundProperty)) {
+        css += std::string(".queue-autoplay { checked-color: $") + kAccent + "; }\n";
+    }
+    return css;
+}
+
 // Apple Music paints an album's artist in its own blue, in code: the theme's link colour takes over, as WinUI's links
 // do (DefineAccentControls). On a light theme, Apple's light blue barely read.
 std::string ArtistInLinkColour(const Theme& theme) {
@@ -740,7 +752,8 @@ void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts
     std::string css = ScrubberClearOfCorners(theme) + RoomForImagesOnTheLine(theme) + OneLightPerSong(theme) +
                       RoomInsideALitCard(theme);
     if (parts.colors) {
-        css += ScrubberInAccent(theme) + ShuffleInAccent(theme) + ArtistInLinkColour(theme) + CardLinksInSecondaryText(theme) +
+        css += ScrubberInAccent(theme) + ShuffleInAccent(theme) + UpNextInAccent(theme) + ArtistInLinkColour(theme) +
+               CardLinksInSecondaryText(theme) +
                SearchTilesInCardColour(theme) + SelectedRowsInThemeColour(theme);
     }
     if (css.empty()) return;
