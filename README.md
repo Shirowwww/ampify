@@ -107,6 +107,12 @@ it in Apple Music at every save (an extension can be TypeScript or JSX), and `am
 Windows 10 or 11 x64, Visual Studio 2022 or later (C++ workload) and the Windows SDK, then
 `pwsh -File scripts\build-msvc.ps1`. Details: [Building](https://shirowwww.github.io/ampify/development/building.html).
 
+## Support the project
+
+Ampify is free and stays free. If you want to help, you can buy me a coffee:
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/shirowww)
+
 ## Credits and license
 
 Ampify is free to use, read and change under the [PolyForm Noncommercial License 1.0.0](LICENSE): anything except
