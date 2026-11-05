@@ -16,6 +16,14 @@
     --radius-box: 8px;
     --radius-small: 4px;
     --gap: 6;
+    /* The play button and the volume and progress lines: Windows' accent, or the artwork's colour (the setting). */
+    --accent: $AccentFillColorDefaultBrush;
+}
+
+@setting accent = Artwork {
+    :root {
+        --accent: var(--art-2, $AccentFillColorDefaultBrush);
+    }
 }
 
 @setting material = Mica Alt {
@@ -86,7 +94,7 @@
 
 /* Play: Windows' accent button, a filled circle. */
 .play-button > Grid#Root {
-    background: $AccentFillColorDefaultBrush;
+    background: var(--accent);
     corner-radius: 50;
 }
 
@@ -97,7 +105,7 @@
 
 .volume-slider,
 .scrubber {
-    color: $AccentFillColorDefaultBrush;
+    color: var(--accent);
 }
 
 /* ---- Lists and cards --------------------------------------------------------------------------------------------------- */

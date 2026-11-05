@@ -46,6 +46,8 @@
 - New names: `.sidebar-selection`, `.sidebar-count`, `.sidebar-drag-indicator`, `.search-suggestions`, `.loading`,
   `.library-status`, `.cover-play-button`, `.explicit-group`, `.focus-ring` and `.popup-scrim`.
 - `calc()` takes `min()` and `max()`, so a theme can cap a size.
+- Fluent: an accent colour setting, Windows' blue or the colour of the artwork (play button, volume and progress).
+- Mirror: a panel corners setting, from square to round (the default is the current look).
 - Ember: two glass panels over the colours of the song playing, the library and the pages, with the playback bar at
   the bottom.
 - A theme that leaves a column on the right of the pages gets the panels of elements docked there, as high as the
@@ -143,6 +145,8 @@
   column hides the Library and Playlists groups until the sidebar opens.
 - The hover sidebar stays open while you type in its search field, and only while the window is in front; it no
   longer stays open on an idle field.
+- The buttons of an Ampify dialog keep the text font: every button in it, its content included, not only the three
+  of the template (a button added later showed WebDings again).
 - Nothing of Ampify runs in the background any more: Windows hands each Apple Music process to the launcher as it
   starts, and the launcher exits once the kernel is in.
 - The library could stay empty and Apple Music's engine stay behind after closing: the kernel now goes into the engine

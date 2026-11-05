@@ -432,7 +432,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | `--song-width` | `560` | `bottom-bar`: width of the song (artwork, title, progress line), a clear space short of the buttons |
 | `--song-width-medium`, `-folded`, `-narrow`, `-small` | `460`, `380`, `340`, `270` | The same in a window 1600, 1324, 1100 and 960 pixels wide or less |
 
-`@import url(ampify:bottom-bar);` works too. Other `@import` targets (files, URLs) are ignored.
+`@import url(ampify:bottom-bar);` works too, in a theme or in a snippet. Other `@import` targets (files, URLs) are ignored.
 
 What the layouts take care of, so that a theme needs no rule for it:
 
@@ -648,6 +648,8 @@ A snippet is a small style that people switch on by itself, in `%USERPROFILE%\Am
 `manifest.json` with `"kind": "snippet"`, plus a `user.css`, a `resources.xaml` (named by `"resources"`), or both.
 
 - It applies on top of the active theme (or alone), and its rules win. Several snippets apply in alphabetical order.
+- It can import a ready-made layout too: `@import "ampify:bottom-bar";` is the whole of
+  [`bottom-playbar`](../../themes/snippets/bottom-playbar/), which works with any theme or none.
 - It sees the theme's colors, variables, settings, `@keyframes` and font roles. A `colors.ini` in a snippet is ignored.
 - `theme.parts.*` do not affect snippets. A refused key in its `resources.xaml` refuses the snippet only.
 - It can declare settings of its own, like a theme ([Theme settings](#theme-settings)): the Ampify

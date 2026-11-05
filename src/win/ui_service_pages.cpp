@@ -5,6 +5,8 @@
 
 #include "ui_service_detail.hpp"
 
+#include "dialog_fonts.hpp"
+
 namespace ampify::win::ui_service_detail {
 
 namespace {
@@ -217,27 +219,6 @@ void MountPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& 
     JournalRender(shared, "page", surface, stats, first);
 }
 
-// The element named `name` under `node` in the visual tree (a template part), or null.
-xaml::FrameworkElement FindPart(const xaml::DependencyObject& node, std::wstring_view name, int depth = 0) {
-    constexpr int kPartDepth = 12;
-    if (auto element = node.try_as<xaml::FrameworkElement>(); element && element.Name() == name) return element;
-    if (depth >= kPartDepth) return nullptr;
-    for (int i = 0, count = media::VisualTreeHelper::GetChildrenCount(node); i < count; ++i) {
-        if (auto found = FindPart(media::VisualTreeHelper::GetChild(node, i), name, depth + 1)) return found;
-    }
-    return nullptr;
-}
-
-// Apple's dialog template sets WebDings (its ContentControlThemeFontFamily) on the dialog's buttons, which beats any
-// style: "Close" showed as symbols (05/11). A local value beats the template: the font it gives the content.
-void GiveDialogButtonsTextFont(const controls::ContentDialog& dialog) {
-    auto content = FindPart(dialog, L"ContentScrollViewer").try_as<controls::Control>();
-    if (!content) return;
-    for (const wchar_t* name : {L"PrimaryButton", L"SecondaryButton", L"CloseButton"}) {
-        if (auto button = FindPart(dialog, name).try_as<controls::Control>()) button.FontFamily(content.FontFamily());
-    }
-}
-
 void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                 const xaml::DependencyObject& content, const Surface& surface) {
     MountedSurface& mounted = context->surfaces[surface.key];
@@ -249,6 +230,7 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
         xaml::FrameworkElement root = mounted.renderer->Render(uirender::BuildRenderTree(surface.tree, surface.nodeId),
                                                                shared.probe, stats, replaced);
         if (replaced) dialog.Content(root);
+        GiveDialogButtonsTextFont(dialog);  // the buttons of new content too
         mounted.surface = surface;
         JournalRender(shared, "popup", surface, stats, false);
         return;

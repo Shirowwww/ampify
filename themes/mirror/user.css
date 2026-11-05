@@ -10,9 +10,10 @@
     --window-background: $SolidBackgroundFillColorBaseBrush;
     --panel-background: $ApplicationPageBackgroundThemeBrush;
     --band-background: $CardBackgroundFillColorDefaultBrush;
-    --panel-radius: 12px;
-    --radius-box: 8px;
-    --radius-small: 6px;
+    /* The Corners setting sets the panels; the small radii keep their ratio to it (12 gives 8 and 6, the defaults). */
+    --panel-radius: var(--setting-panel-radius);
+    --radius-box: calc(var(--setting-panel-radius) * 2 / 3);
+    --radius-small: calc(var(--setting-panel-radius) / 2);
     --gap: 10;
     --compact-pane: 48;
     /* No bar at the top: the pages start one gap down, and keep room for the back arrow above their first line. */
