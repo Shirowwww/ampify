@@ -41,6 +41,7 @@
   shuffle button): it shortens to end a clear space before them, and takes its width back with the room.
 - Up Next's "Clear" and its autoplay toggle take the theme's accent instead of Apple's red and blue
   (`.queue-clear`, `.queue-autoplay`).
+- Palettes: Catppuccin's Macchiato, Frappé and Latte, the light one, beside Mocha.
 - Glass dark and Artwork: the cards of the pages, the Marketplace and Settings > Ampify are a white veil on the glass
   instead of a fixed night blue or slate, so they take the colours of the song playing.
 - The lyrics and queue pane of the floating-panel themes fits its panel: its right edge was cut (the durations, the

@@ -2095,12 +2095,13 @@ TEST_CASE(Examples_LoadWithoutProblems) {
     }
 }
 
-// Palettes gathers the colour families, one scheme each: each loads alone, without a problem, and sets colours.
+// Palettes gathers the colour families, one scheme each and Catppuccin's four flavours: each loads alone, without a
+// problem, and sets colours.
 TEST_CASE(Examples_EveryPaletteLoadsWithoutProblems) {
     std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "palettes";
     th::FolderFiles files(folder);
     th::Theme first = th::LoadTheme("palettes", folder.generic_string(), files);
-    CHECK(first.schemes.size() == 8);
+    CHECK(first.schemes.size() == 11);
     for (const std::string& scheme : first.schemes) {
         th::LoadOptions options;
         options.scheme = scheme;

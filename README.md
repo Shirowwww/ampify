@@ -26,7 +26,7 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 
 ## What you get
 
-- 9 themes with 21 colour schemes, light and dark, applied at once without a restart, and an accent colour of your
+- 11 themes with 27 colour schemes, light and dark, applied at once without a restart, and an accent colour of your
   choice. Spicetify `color.ini` palettes work as they are.
 - A Marketplace inside Apple Music (the Ampify entry at the bottom of the sidebar) with themes, extensions and
   snippets, previews, and one-click installs.
