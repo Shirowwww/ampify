@@ -42,6 +42,9 @@ const std::vector<ClassEntry> kClasses{
     {"search-area", {"Grid#AutoSuggestArea"}},
     {"search-box", {"AutoSuggestBox"}},
     {"search-suggestions", {"Popup#SuggestionsPopup"}},
+    // apple.topbar = search: the strip at the top of the window that holds Apple's search field and a back arrow.
+    {"topbar-back", {"Button#AMPIFY_TopbarBack"}},
+    {"topbar-search", {"Grid#AMPIFY_TopbarSearch"}},
     {"sidebar-scroll", {"ScrollViewer#MenuItemsScrollViewer"}},
     {"sidebar-items", {"ItemsRepeater#MenuItemsHost"}},
     {"sidebar-item", {"NavigationViewItem"}},

@@ -195,7 +195,7 @@ explain them in one line; the page also resets them, and exports or imports them
 | `max-width`, `max-height` | `MaxWidth`, `MaxHeight` | A length, or `none` |
 | `compact-pane-length` | `CompactPaneLength` | On `.navigation`: the width of the folded sidebar (48 in Apple Music) |
 | `opacity` | `Opacity` | 0 to 1 |
-| `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`) |
+| `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`). `visible` holds over Apple's visual states that collapse the element (the play bar's times, shown only under the pointer) |
 | `display` | `Visibility` | `none` hides; `block`, `flex`, `grid`... show (use them to undo a `display: none`) |
 | `template` | `Template` | `url(templates/file.xaml)`, a full `ControlTemplate`. Skipped on a control with a negative padding or border |
 | `flow-direction` or `direction` | `FlowDirection` | `ltr` or `rtl` |
@@ -428,7 +428,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | `--bar-reach` | `calc(var(--gap) - 290)` | `bottom-bar`: how far left the bar reaches past the page column |
 | `--bar-reach-folded` | `calc(var(--gap) - var(--compact-pane))` | `bottom-bar`: the same with the sidebar folded |
 | `--bar-reach-end` | `0` | `bottom-bar`: how far right the bar reaches past the page column, for a sidebar on the right |
-| `--line-inset` | `240` | `centre-bar`: space from the cell's edges to the progress line's end (the times stand in it) |
+| `--line-inset` | the song's width (`--song-width`... at each step), a gap and 16 | `centre-bar`: space from the cell's edges to the times; the line starts `--time-room` further in, on both sides, so it stays clear of the song and centred under the buttons |
 | `--time-room` | `44` | `centre-bar`: width kept for each time at the ends of the line |
 | `--bar-reach-end-folded` | `0` | `bottom-bar`: the same with the sidebar folded |
 | `--caption-room` | `40` | `bottom-bar`: the strip the panels leave at the top for the window's buttons |

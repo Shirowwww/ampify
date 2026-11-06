@@ -244,10 +244,11 @@ void LayoutSidebarEntry(PlacedControl& placed, const controls::NavigationView& n
 // The pane opened, folded or changed mode: every entry of the list follows it at once, not at the next walk.
 void RefreshSidebarEntries(WindowContext& context) {
     controls::NavigationView navigation = context.sidebarNavigation.get();
-    if (!navigation) return;
+    if (!navigation || !context.sidebarHost) return;
+    // context.placed also holds the buttons of the top bar and the playback bar: only the list's own entries follow.
     for (auto& item : context.placed) {
         PlacedControl& placed = item.second;
-        if (!placed.button || placed.inHeader || !placed.button.Parent()) continue;
+        if (!placed.button || placed.inHeader || placed.button.Parent() != context.sidebarHost) continue;
         LayoutSidebarEntry(placed, navigation, SidebarEntryIsOn(context, placed.entry));
     }
 }

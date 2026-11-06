@@ -42,18 +42,32 @@ std::vector<size_t> MatchingSettings(const std::vector<SettingText>& texts, std:
 // The value every setting takes when it is reset: its manifest default, by key.
 std::map<std::string, std::string> DefaultValues(const std::vector<SettingSpec>& settings);
 
+// For each setting, whether `values` (in the same order, as settings.txt keeps them) holds something other than its
+// default: what turns its Reset on. A setting with no value is unchanged.
+std::vector<bool> ChangedSettings(const std::vector<SettingSpec>& settings, const std::vector<std::string>& values);
+
 // The file that shares the settings of one element. `values` are the values as settings.txt holds them, by key; a key
 // missing from it takes its default. Each value keeps its type: true or false, a number, or a text.
 std::string ExportSettings(std::string_view kind, std::string_view id, const std::vector<SettingSpec>& settings,
                            const std::map<std::string, std::string>& values);
 
+// Why a file was refused: `reason` is the key of its text in src/core/i18n.cpp (settings.refused...), `detail` the
+// setting or the version it names, if any. The card shows it in the interface's language.
+struct ImportRefusal {
+    std::string reason;
+    std::string detail;
+};
+
+// The refusal as one line in the interface's language.
+std::string RefusalText(const ImportRefusal& refusal);
+
 // Reads a file made by ExportSettings for the element `kind` and `id`, and returns the values it holds, as settings.txt
-// keeps them. Nothing when the file is refused, with an English reason in `error`: too big, not this format or
-// version, made for another element, a key the element does not declare, or a value of the wrong type or outside
-// what the setting accepts. A key the file leaves out keeps its value.
+// keeps them. Nothing when the file is refused, with the reason in `refusal`: too big, not this format or version,
+// made for another element, a key the element does not declare, or a value of the wrong type or outside what the
+// setting accepts. A key the file leaves out keeps its value.
 std::optional<std::map<std::string, std::string>> ImportSettings(std::string_view text, std::string_view kind,
                                                                  std::string_view id,
                                                                  const std::vector<SettingSpec>& settings,
-                                                                 std::string& error);
+                                                                 ImportRefusal& refusal);
 
 }  // namespace ampify::settings_panel

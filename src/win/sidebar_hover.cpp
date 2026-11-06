@@ -86,9 +86,11 @@ struct State {
     ampify::GroupMemory<Group> groups;  // the groups collapsed while the pane is folded
 };
 
+// Never destroyed: XAML objects are released on the interface thread only, never by a static destructor (a release
+// while the process exits, after XAML has shut down, crashed Apple Music on every close).
 State& TheState() {
-    static State state;
-    return state;
+    static State* state = new State();
+    return *state;
 }
 
 // Depth-first, the first element under `root` that is a T, named `name` when one is given.

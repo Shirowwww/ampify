@@ -8,6 +8,7 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <functional>
@@ -194,6 +195,19 @@ private:
                            const winrt::Windows::Foundation::IInspectable& pressed,
                            const winrt::Windows::Foundation::IInspectable& plain) noexcept;
     void ReleaseStates(theme::NodeId id, std::string_view property) noexcept;
+    // A moved element leaves the visual states of the template it came from, and finds them again back in place.
+    void HandStatesOver(const winrt::Microsoft::UI::Xaml::UIElement& element,
+                        const winrt::Microsoft::UI::Xaml::Controls::Panel& from, std::uint32_t at,
+                        const winrt::Microsoft::UI::Xaml::Controls::Panel& to) noexcept;
+    void WithdrawStandIn(const winrt::Microsoft::UI::Xaml::UIElement& element,
+                         const winrt::Microsoft::UI::Xaml::Controls::Panel& panel) noexcept;
+    winrt::Microsoft::UI::Xaml::FrameworkElement StandIn(const winrt::Microsoft::UI::Xaml::FrameworkElement& element);
+    bool IsStandIn(const winrt::Microsoft::UI::Xaml::DependencyObject& object) const;
+    // `visibility: visible` held over Apple's own value, binding and visual states (xaml_states.cpp); ReleaseVisible lets
+    // them decide again, and says whether a hold was there.
+    void HoldVisible(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element) noexcept;
+    void OnHeldVisibility(theme::NodeId id) noexcept;
+    bool ReleaseVisible(theme::NodeId id) noexcept;
     void UpdateStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
                       std::string_view property, winrt::Windows::Foundation::IInspectable shown) noexcept;
     std::optional<winrt::Windows::Foundation::IInspectable> KeyOriginal(
@@ -260,6 +274,13 @@ private:
         std::vector<std::pair<std::wstring, winrt::Windows::Foundation::IInspectable>> keys;
     };
     std::map<std::pair<theme::NodeId, std::string>, HeldStates> m_heldStates;
+    struct VisibleHold {
+        winrt::weak_ref<winrt::Microsoft::UI::Xaml::UIElement> element;  // Apple's: a weak reference resolves
+        winrt::Microsoft::UI::Xaml::Media::Animation::Storyboard story{nullptr};  // Ampify's: held strongly
+        std::int64_t token = 0;  // the Visibility callback, removed by token
+        std::chrono::steady_clock::time_point begun{};
+    };
+    std::map<theme::NodeId, VisibleHold> m_visibleHolds;
     std::size_t m_refusedStates = 0;
     std::string m_firstRefusal;
     std::vector<theme::MediaQuery> m_mediaQueries;  // the theme's @media conditions (WatchSize)
@@ -278,6 +299,8 @@ private:
     std::string m_captionNote;
     std::map<std::string, theme::Value> m_addedKeys;  // keys added on top of the theme dictionaries, with the value before
     std::map<std::string, winrt::Microsoft::UI::Xaml::Media::SolidColorBrush> m_ownBrushes;  // OwnBrush, by key
+    std::map<std::wstring, winrt::Microsoft::UI::Xaml::FrameworkElement> m_standIns;  // StandIn, by class and name
+    std::set<void*> m_standInIds;  // the same, for the walk to leave them out
     bool m_resourcesDirty = false;  // a resource changed: {ThemeResource} references must be resolved again
     std::string m_dirtyReason;      // the first change since the last refresh, and how many followed it
     int m_dirtyCount = 0;

@@ -108,4 +108,9 @@ bool ChangeElementSetting(const std::filesystem::path& kit, std::string_view kin
 bool ChangeElementValues(const std::filesystem::path& kit, std::string_view kind, const std::string& id,
                          const std::map<std::string, std::string>& values, std::string& error);
 
+// Reset and Reset all: the settings `keys` (every declared one when empty) leave settings.txt, so they take their
+// manifest default and follow it if a new version changes it. One write; an extension restarts once.
+bool ResetElementValues(const std::filesystem::path& kit, std::string_view kind, const std::string& id,
+                        const std::vector<std::string>& keys, std::string& error);
+
 }  // namespace ampify::uirender

@@ -87,7 +87,8 @@ come first, then each group under its heading, in the order its first setting is
 
 The card of an element with six settings or more also has a search box (it matches the label and the description,
 whatever the case and the accents), a **Reset** per setting (its manifest `default`, off while the setting already has
-it), a **Reset all**, and **Export** and **Import**. Export
+it), a **Reset all**, and **Export** and **Import**. A reset takes the key out of `settings.txt`, so the setting
+follows its `default` if a later version changes it. Export
 writes `<ampify>\exports\<kind>-<id>.json` and copies the same text to the clipboard; Import reads the clipboard. The
 file looks like this:
 

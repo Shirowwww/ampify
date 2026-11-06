@@ -569,6 +569,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
     if (value == theme::kNoOwnValue) {
         xaml::DependencyProperty own = OwnProperty(object, property);
         if (!own) return false;
+        if (property == "Visibility") ReleaseVisible(id);
         object.ClearValue(own);
         if (auto text = object.try_as<controls::TextBlock>(); text && property == "Foreground") PaintLinks(text, nullptr);
         Forget(id, property);
@@ -744,7 +745,13 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
 
     if (property == "Visibility" && value.kind == theme::ValueKind::Visibility) {
         if (auto element = object.try_as<xaml::UIElement>()) {
-            element.Visibility(ToLowerAscii(value.text) == "collapsed" ? xaml::Visibility::Collapsed : xaml::Visibility::Visible);
+            // Shown by an animation of Ampify's (HoldVisible), never a local value: that would replace Apple's binding of
+            // the slider's thumb for good. Ending the hold gives back Apple's value as it is now, which a write would not.
+            if (ToLowerAscii(value.text) != "collapsed") {
+                if (element.Visibility() != xaml::Visibility::Visible) HoldVisible(id, element);
+            } else if (!ReleaseVisible(id)) {
+                element.Visibility(xaml::Visibility::Collapsed);
+            }
             return true;
         }
         return false;

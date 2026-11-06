@@ -45,6 +45,8 @@ read on Apple Music 1.1792.
 | `.search-area` | The area around the search box |
 | `.search-box` | The search box |
 | `.search-suggestions` | The suggestions under the search box (a popup of its own, outside the window) |
+| `.topbar-back` | With `apple.topbar = search`: the back arrow left of the search box, in the strip at the top of the window. It presses Apple's `.back-button`, which then stays in its place, transparent |
+| `.topbar-search` | With `apple.topbar = search`: the cell in that strip that holds Apple's own `.search-box`, centred in the window. `.search-area` stays empty and hidden in the sidebar meanwhile |
 | `.sidebar-scroll` | The scrolling list of the sidebar |
 | `.sidebar-items` | The items of that list |
 | `.sidebar-item` | One item: Home, Radio, a playlist... |

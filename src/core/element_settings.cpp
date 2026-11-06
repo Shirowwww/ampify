@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <utility>
 
+#include "i18n.hpp"
 #include "json.hpp"
 #include "text_util.hpp"
 
@@ -111,24 +112,23 @@ const std::string* TextField(const Json& object, std::string_view key) {
     return field ? field->AsString() : nullptr;
 }
 
+// Fills `refusal` and gives false, so a check can end with `return Refuse(...)`.
+bool Refuse(ImportRefusal& refusal, const char* reason, std::string detail = {}) {
+    refusal = {reason, std::move(detail)};
+    return false;
+}
+
 // The format, version, kind and id of a file: they must be those of the element that is asked for.
-bool CheckHeader(const Json& root, std::string_view kind, std::string_view id, std::string& error) {
+bool CheckHeader(const Json& root, std::string_view kind, std::string_view id, ImportRefusal& refusal) {
     const std::string* format = TextField(root, "format");
     const Json* versionField = root.Find("version");
     const double* version = versionField ? versionField->AsNumber() : nullptr;
-    if (!format || *format != kFileFormat || !version) {
-        error = "not an Ampify settings file";
-        return false;
-    }
-    if (*version != kFileVersion) {
-        error = "settings file version " + SettingNumberText(*version) + " is not supported";
-        return false;
-    }
+    if (!format || *format != kFileFormat || !version) return Refuse(refusal, "settings.refusedNotSettings");
+    if (*version != kFileVersion) return Refuse(refusal, "settings.refusedVersion", SettingNumberText(*version));
     const std::string* fileKind = TextField(root, "kind");
     const std::string* fileId = TextField(root, "id");
     if (!fileKind || *fileKind != kind || !fileId || *fileId != id) {
-        error = "this file holds the settings of another element";
-        return false;
+        return Refuse(refusal, "settings.refusedOtherElement");
     }
     return true;
 }
@@ -190,35 +190,40 @@ std::string ExportSettings(std::string_view kind, std::string_view id, const std
     return root.Dump();
 }
 
+std::vector<bool> ChangedSettings(const std::vector<SettingSpec>& settings, const std::vector<std::string>& values) {
+    std::vector<bool> changed(settings.size(), false);
+    for (size_t index = 0; index < settings.size() && index < values.size(); index++) {
+        // The default as settings.txt would keep it: a manifest's 8.0 is the 8 a slider writes.
+        changed[index] = values[index] != SettingValue(settings[index], settings[index].defaultValue);
+    }
+    return changed;
+}
+
+std::string RefusalText(const ImportRefusal& refusal) {
+    return i18n::Text(refusal.reason, {{"name", refusal.detail}, {"version", refusal.detail}});
+}
+
 std::optional<std::map<std::string, std::string>> ImportSettings(std::string_view text, std::string_view kind,
                                                                  std::string_view id,
                                                                  const std::vector<SettingSpec>& settings,
-                                                                 std::string& error) {
+                                                                 ImportRefusal& refusal) {
     if (text.size() > kMaxFileBytes) {
-        error = "the file is bigger than 64 KB";
+        Refuse(refusal, "settings.refusedTooBig");
         return std::nullopt;
     }
     std::optional<Json> root = Json::Parse(text, nullptr, Json::DuplicateKeys::Refuse);
-    if (!root || !root->IsObject()) {
-        error = "not an Ampify settings file: a JSON object is expected";
-        return std::nullopt;
-    }
-    if (!CheckHeader(*root, kind, id, error)) return std::nullopt;
-    const Json* values = root->Find("values");
+    const Json* values = root && root->IsObject() ? root->Find("values") : nullptr;
+    if (root && root->IsObject() && !CheckHeader(*root, kind, id, refusal)) return std::nullopt;
     if (!values || !values->AsObject()) {
-        error = "values must be an object";
+        Refuse(refusal, "settings.refusedNotSettings");
         return std::nullopt;
     }
     std::map<std::string, std::string> accepted;
     for (const auto& [key, value] : *values->AsObject()) {
         auto spec = std::find_if(settings.begin(), settings.end(), [&](const SettingSpec& s) { return s.key == key; });
-        if (spec == settings.end()) {
-            error = "unknown setting: " + key;
-            return std::nullopt;
-        }
-        std::optional<std::string> stored = StoredValue(*spec, value);
+        std::optional<std::string> stored = spec == settings.end() ? std::nullopt : StoredValue(*spec, value);
         if (!stored) {
-            error = "wrong value for " + key;
+            Refuse(refusal, spec == settings.end() ? "settings.refusedUnknown" : "settings.refusedWrongValue", key);
             return std::nullopt;
         }
         accepted[key] = *stored;

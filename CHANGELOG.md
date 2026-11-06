@@ -4,6 +4,12 @@
 
 ### Settings
 
+- "Top bar" in Settings > Ampify (off by default): "Search and back arrow" moves Apple Music's own search field and a
+  back arrow into the empty strip at the top of the window, next to the window buttons, as in Spotify; the sidebar's
+  field is hidden meanwhile. Typing, suggestions and going back stay Apple Music's own. It shows while the playback bar
+  is at the bottom and the window is at least 612 pixels wide, and turning it off puts everything back where it was.
+  Themes reach it as `.topbar-search` and `.topbar-back` (`apple.topbar`).
+
 - The settings of an extension, a theme or a snippet can be grouped under headings: a `group` on each setting, and a
   `description` line under its label. Translations cover both (`groups`, `settingDescriptions`). Without groups, the
   card looks as before.
@@ -48,7 +54,7 @@
 - `--art-luma` and `--art-sat` give how light and how coloured the artwork is, as plain numbers from 0 to 1.
 - Snippets get the artwork's colours (`--art-*` and `--page-art-*`) with no theme active.
 - Glass "Eco" also paints an acrylic window as Mica, as it already did for acrylic panes.
-- A `centre-bar` layout: the playback buttons centred, the progress line under them, the times at its ends. It is one more choice of the `bar-position` setting in Cinema, Ember, Glass, Greenroom and Palettes, and a setting of the Bottom playback bar snippet. Themes can move an element with the new `move-to` property.
+- A `centre-bar` layout: the playback buttons centred, the progress line under them, the times at its ends. It is one more choice of the `bar-position` setting in Cinema, Ember, Glass, Greenroom and Palettes, and a setting of the Bottom playback bar snippet. Themes can move an element with the new `move-to` property. The line keeps clear of the song at every width, shows its thumb under the pointer, and the times always show, centred on it: `visibility: visible` now holds over Apple's visual states that hide an element. An element moved out of its template no longer takes that template's pointer states with it, which closed Apple Music at the first hover of the song.
 - Floating panels: the folded sidebar's icons sit on one axis, and the Apple Music logo is centred on it. The
   column's corners stop at 16 pixels so the items at its ends are not cut. The "Apple Music" title moves 3 pixels
   down to meet the logo.

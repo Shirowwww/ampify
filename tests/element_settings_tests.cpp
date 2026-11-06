@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "../src/core/element_settings.hpp"
+#include "../src/core/i18n.hpp"
 #include "../src/core/json.hpp"
 #include "test.hpp"
 
@@ -9,6 +10,7 @@ namespace {
 
 using ampify::SettingSpec;
 using ampify::settings_panel::ExportSettings;
+using ampify::settings_panel::ImportRefusal;
 using ampify::settings_panel::ImportSettings;
 
 SettingSpec Toggle(const std::string& key, const std::string& group, bool on) {
@@ -156,7 +158,7 @@ TEST_CASE(SettingsPanel_ExportKeepsTheTypeOfEachValue) {
 TEST_CASE(SettingsPanel_ImportReadsWhatExportWrote) {
     std::map<std::string, std::string> values = {{"radius", "3"}, {"halo", "true"}};
     std::string text = ExportSettings("snippet", "gloss", {Number("radius", 0, 24, "8"), Toggle("halo", "", false)}, values);
-    std::string error;
+    ImportRefusal error;
     std::optional<std::map<std::string, std::string>> read =
         ImportSettings(text, "snippet", "gloss", {Number("radius", 0, 24, "8"), Toggle("halo", "", false)}, error);
     CHECK(read.has_value());
@@ -166,7 +168,7 @@ TEST_CASE(SettingsPanel_ImportReadsWhatExportWrote) {
 }
 
 TEST_CASE(SettingsPanel_ImportAcceptsAFileThatLeavesKeysOut) {
-    std::string error;
+    ImportRefusal error;
     std::optional<std::map<std::string, std::string>> read = ImportSettings(kFile, "theme", "night", Sample(), error);
     CHECK(read.has_value());
     if (!read) return;
@@ -179,19 +181,24 @@ TEST_CASE(SettingsPanel_ImportAcceptsAFileThatLeavesKeysOut) {
     CHECK(part.has_value() && part->size() == 4 && part->count("radius") == 0);
 }
 
-TEST_CASE(SettingsPanel_ImportRefusesAFileOfAnotherElementOrFormat) {
-    std::string error;
+TEST_CASE(SettingsPanel_ImportRefusesAFileOfAnotherElementOrFormatWithItsReason) {
+    ImportRefusal error;
     CHECK(!ImportSettings(kFile, "theme", "other", Sample(), error));
-    CHECK(error.find("another element") != std::string::npos);
+    CHECK(error.reason == "settings.refusedOtherElement");
     CHECK(!ImportSettings(kFile, "extension", "night", Sample(), error));
+    CHECK(error.reason == "settings.refusedOtherElement");
     CHECK(!ImportSettings(Replace(kFile, "ampify-settings", "other-app"), "theme", "night", Sample(), error));
+    CHECK(error.reason == "settings.refusedNotSettings");
     CHECK(!ImportSettings(Replace(kFile, "\"version\": 1", "\"version\": 2"), "theme", "night", Sample(), error));
+    CHECK(error.reason == "settings.refusedVersion" && error.detail == "2");
     CHECK(!ImportSettings("[]", "theme", "night", Sample(), error));
+    CHECK(error.reason == "settings.refusedNotSettings");
     CHECK(!ImportSettings("not json", "theme", "night", Sample(), error));
+    CHECK(error.reason == "settings.refusedNotSettings");
 }
 
 TEST_CASE(SettingsPanel_ImportRefusesAnUnknownKeyAndAWrongType) {
-    std::string error;
+    ImportRefusal error;
     const std::vector<std::string> wrong = {
         Replace(kFile, "\"halo\": true", "\"halo\": true, \"other\": 1"),  // unknown key
         Replace(kFile, "\"seconds\": false", "\"seconds\": \"no\""),      // a switch given as a text
@@ -206,13 +213,45 @@ TEST_CASE(SettingsPanel_ImportRefusesAnUnknownKeyAndAWrongType) {
     };
     for (const std::string& text : wrong) {
         CHECK(!ImportSettings(text, "theme", "night", Sample(), error));
-        CHECK(!error.empty());
+        CHECK(error.reason.rfind("settings.refused", 0) == 0);
     }
+    CHECK(!ImportSettings(wrong[0], "theme", "night", Sample(), error));
+    CHECK(error.reason == "settings.refusedUnknown" && error.detail == "other");
+    CHECK(!ImportSettings(wrong[3], "theme", "night", Sample(), error));
+    CHECK(error.reason == "settings.refusedWrongValue" && error.detail == "radius");
 }
 
 TEST_CASE(SettingsPanel_ImportRefusesAFileBiggerThanTheLimit) {
-    std::string error;
+    ImportRefusal error;
     std::string big = kFile + std::string(ampify::settings_panel::kMaxFileBytes, ' ');
     CHECK(!ImportSettings(big, "theme", "night", Sample(), error));
-    CHECK(error.find("bigger") != std::string::npos);
+    CHECK(error.reason == "settings.refusedTooBig");
+}
+
+TEST_CASE(SettingsPanel_ARefusalIsToldInTheLanguageOfTheInterface) {
+    const char* reasons[] = {"settings.refusedTooBig",       "settings.refusedNotSettings", "settings.refusedVersion",
+                             "settings.refusedOtherElement", "settings.refusedUnknown",     "settings.refusedWrongValue"};
+    for (const char* language : {"en", "fr", "de", "es", "pt", "ru", "ja", "zh"}) {
+        ampify::i18n::SetLanguage(language);
+        for (const char* reason : reasons) CHECK(ampify::i18n::Text(reason) != reason);
+    }
+    ImportRefusal refusal{"settings.refusedWrongValue", "radius"};
+    ampify::i18n::SetLanguage("fr");
+
+    std::string shown = ampify::settings_panel::RefusalText(refusal);
+
+    CHECK(shown.find("radius") != std::string::npos);
+    CHECK(shown.find("wrong value") == std::string::npos);
+    ampify::i18n::SetLanguage("en");
+    CHECK(ampify::settings_panel::RefusalText(refusal) == "wrong value for radius");
+}
+
+TEST_CASE(SettingsPanel_ASettingIsChangedOnlyWhenItsValueDiffersFromItsDefault) {
+    using ampify::settings_panel::ChangedSettings;
+    std::vector<SettingSpec> settings = {Toggle("seconds", "", true), Number("radius", 0, 24, "8.0"), Text("greeting", "hi")};
+
+    std::vector<bool> changed = ChangedSettings(settings, {"true", "8", "hello"});
+
+    CHECK(changed == std::vector<bool>({false, false, true}));
+    CHECK(ChangedSettings(settings, {"false"}) == std::vector<bool>({true, false, false}));  // a missing value: unchanged
 }

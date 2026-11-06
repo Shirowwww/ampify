@@ -144,8 +144,10 @@ bool PointerOnOwnRow(const xaml::UIElement& element, const xaml::Input::PointerR
 }
 
 // What takes the pointer away without a PointerExited on a watched element: the contact lost, the capture given up.
-std::array<xaml::RoutedEvent, 2> PointerLosses() {
-    return {xaml::UIElement::PointerCanceledEvent(), xaml::UIElement::PointerCaptureLostEvent()};
+// PointerExited too, handled or not: once a slider has been pressed, its exit comes marked handled.
+std::array<xaml::RoutedEvent, 3> PointerLosses() {
+    return {xaml::UIElement::PointerCanceledEvent(), xaml::UIElement::PointerCaptureLostEvent(),
+            xaml::UIElement::PointerExitedEvent()};
 }
 
 // Whether the pointer is within the element's bounds, in its own coordinates.
@@ -270,8 +272,8 @@ void XamlTreeBackend::FollowStates(theme::NodeId id, const xaml::UIElement& elem
 }
 
 // The pointer over the element: PointerEntered and PointerExited. An element watched by others (a song's row) also
-// hears PointerCanceled and PointerCaptureLost, and stays on while the pointer is still inside it: those events, and
-// the PointerExited of a part it holds, bubble up to it.
+// hears PointerCanceled, PointerCaptureLost and handled exits, and stays on while the pointer is still inside it:
+// those events, and the PointerExited of a part it holds, bubble up to it.
 void XamlTreeBackend::FollowPointer(theme::NodeId id, const xaml::UIElement& element, HoverHandlers& handlers) {
     std::weak_ptr<bool> alive = m_alive;
     winrt::weak_ref<xaml::UIElement> weak = winrt::make_weak(element);
@@ -650,6 +652,87 @@ std::size_t XamlTreeBackend::HeldStateCount() const {
     std::size_t count = 0;
     for (const auto& entry : m_heldStates) count += entry.second.keys.size();
     return count;
+}
+
+namespace {
+
+// Visible from the start and kept there (a storyboard holds its end by default).
+animation::Storyboard ShownStory(const xaml::UIElement& element) {
+    animation::DiscreteObjectKeyFrame frame;
+    frame.KeyTime(animation::KeyTimeHelper::FromTimeSpan(winrt::Windows::Foundation::TimeSpan{0}));
+    frame.Value(winrt::box_value(xaml::Visibility::Visible));
+    animation::ObjectAnimationUsingKeyFrames shown;
+    shown.KeyFrames().Append(frame);
+    animation::Storyboard::SetTarget(shown, element);
+    animation::Storyboard::SetTargetProperty(shown, L"(UIElement.Visibility)");
+    animation::Storyboard story;
+    story.Children().Append(shown);
+    return story;
+}
+
+// Two re-starts closer than this are a fight with Apple's states: the next pass writes the value again instead.
+constexpr std::chrono::milliseconds kHoldRetry{250};
+
+}  // namespace
+
+// `visibility: visible` as an animation of Ampify's: it ranks above a local value, a binding and a visual state begun
+// before it, and leaves them all in place under it. A later state of Apple's collapses the element again, and the hold
+// begins again.
+void XamlTreeBackend::HoldVisible(theme::NodeId id, const xaml::UIElement& element) noexcept {
+    try {
+        auto known = m_visibleHolds.find(id);
+        if (known != m_visibleHolds.end() && known->second.element.get() != element) {
+            ReleaseVisible(id);
+            known = m_visibleHolds.end();
+        }
+        if (known == m_visibleHolds.end()) {
+            VisibleHold hold{winrt::make_weak(element), ShownStory(element)};
+            std::weak_ptr<bool> alive = m_alive;
+            hold.token = element.RegisterPropertyChangedCallback(
+                xaml::UIElement::VisibilityProperty(),
+                [this, alive, id](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
+                    if (!alive.expired()) OnHeldVisibility(id);
+                });
+            known = m_visibleHolds.emplace(id, std::move(hold)).first;
+        }
+        known->second.begun = std::chrono::steady_clock::now();
+        known->second.story.Stop();
+        known->second.story.Begin();
+    } catch (...) {
+    }
+}
+
+// Not inside the change itself: Apple's storyboard is still starting then.
+void XamlTreeBackend::OnHeldVisibility(theme::NodeId id) noexcept {
+    try {
+        auto known = m_visibleHolds.find(id);
+        if (*m_closed || known == m_visibleHolds.end()) return;
+        xaml::UIElement element = known->second.element.get();
+        if (!element || element.Visibility() == xaml::Visibility::Visible) return;
+        if (std::chrono::steady_clock::now() - known->second.begun < kHoldRetry) return;
+        std::weak_ptr<bool> alive = m_alive;
+        element.DispatcherQueue().TryEnqueue([this, alive, id]() noexcept {
+            if (alive.expired() || *m_closed) return;
+            auto again = m_visibleHolds.find(id);
+            xaml::UIElement held = again == m_visibleHolds.end() ? nullptr : again->second.element.get();
+            if (held && held.Visibility() != xaml::Visibility::Visible) HoldVisible(id, held);
+        });
+    } catch (...) {
+    }
+}
+
+bool XamlTreeBackend::ReleaseVisible(theme::NodeId id) noexcept {
+    auto known = m_visibleHolds.find(id);
+    if (known == m_visibleHolds.end()) return false;
+    try {
+        known->second.story.Stop();  // Apple's own value shows again: its state, or the local value under it
+        if (xaml::UIElement element = known->second.element.get()) {
+            element.UnregisterPropertyChangedCallback(xaml::UIElement::VisibilityProperty(), known->second.token);
+        }
+    } catch (...) {
+    }
+    m_visibleHolds.erase(known);
+    return true;
 }
 
 }  // namespace ampify::win

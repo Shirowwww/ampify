@@ -2,11 +2,37 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include <filesystem>
+#include <fstream>
 #include <iterator>
+#include <regex>
+#include <set>
 #include <string>
 
 #include "../src/win/win_common.hpp"
 #include "test.hpp"
+
+// A function-local static object is destroyed while the process exits, after XAML has shut down: releasing a XAML
+// reference there crashes Apple Music on every close. State that may hold XAML lives behind `new` and is never
+// destroyed (topbar_search.cpp, lcd_links.cpp). The listed types hold no XAML reference.
+TEST_CASE(WinSources_NoStaticObjectIsDestroyedAtProcessExit) {
+    namespace fs = std::filesystem;
+    const std::set<std::string> plain = {"QueueState", "MfApi"};
+    const std::regex local(R"(^\s+static ([A-Z]\w*) \w+(\{\})?;)");
+    int scanned = 0;
+    for (const fs::directory_entry& entry : fs::directory_iterator(fs::path(AMPIFY_SOURCE_DIR) / "src" / "win")) {
+        if (entry.path().extension() != ".cpp") continue;
+        scanned++;
+        std::ifstream file(entry.path());
+        std::string line;
+        std::smatch match;
+        while (std::getline(file, line)) {
+            if (!std::regex_search(line, match, local) || plain.count(match[1].str())) continue;
+            ampify::test::ReportFailure(entry.path().filename().string().c_str(), 0, "destroyed at exit: " + line);
+        }
+    }
+    CHECK(scanned > 20);
+}
 
 TEST_CASE(WinCommon_QuotedArgumentsReadBackUnchanged) {
     CHECK(ampify::win::QuoteArgument(L"plain") == L"plain");

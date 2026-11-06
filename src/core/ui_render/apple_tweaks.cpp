@@ -84,6 +84,13 @@ const std::vector<std::pair<std::string, std::string>>& OrphanAgentOptions() {
     return options;
 }
 
+const std::vector<std::pair<std::string, std::string>>& TopbarOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"off", "tweaks.topbar.off"},
+        {"search", "tweaks.topbar.search"}};
+    return options;
+}
+
 const std::vector<std::pair<std::string, std::string>>& KitUpdateOptions() {
     static const std::vector<std::pair<std::string, std::string>> options{
         {"auto", "update.auto"},
@@ -120,6 +127,7 @@ const std::vector<std::pair<std::string, std::string>>* OptionsOf(const std::str
     if (key == kSidebarKey) return &SidebarOptions();
     if (key == kFreezeLogKey) return &FreezeLogOptions();
     if (key == kOrphanAgentKey) return &OrphanAgentOptions();
+    if (key == kTopbarKey) return &TopbarOptions();
     if (key == kKitUpdateKey) return &KitUpdateOptions();
     return nullptr;
 }
@@ -153,6 +161,7 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.sidebarOnHover = Known(settings, kSidebarKey) == "hover";
     tweaks.freezeLog = Known(settings, kFreezeLogKey) == "on";
     tweaks.orphanAgent = Known(settings, kOrphanAgentKey) == "on";
+    tweaks.topbarSearch = Known(settings, kTopbarKey) == "search";
     return tweaks;
 }
 
@@ -171,6 +180,7 @@ std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
         {kArtworkKey, "tweaks.artwork", "tweaks.artworkHelp", ArtworkOptions(), Known(settings, kArtworkKey)},
         {kMarqueeKey, "tweaks.marquee", "tweaks.marqueeHelp", MarqueeOptions(), Known(settings, kMarqueeKey)},
         {kSidebarKey, "tweaks.sidebar", "tweaks.sidebarHelp", SidebarOptions(), Known(settings, kSidebarKey)},
+        {kTopbarKey, "tweaks.topbar", "tweaks.topbarHelp", TopbarOptions(), Known(settings, kTopbarKey)},
         {kCloseKey, "tweaks.close", "tweaks.closeHelp", CloseOptions(), Known(settings, kCloseKey)},
         {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", std::move(notificationOptions),
          notifications},

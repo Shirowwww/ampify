@@ -81,12 +81,28 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
 
 namespace {
 
-// Whose setting a control writes: an extension's, or the active theme's.
+// Whose setting a control writes: an extension's, or the active theme's, and the card it sits in.
 struct SettingOwner {
     std::string id;
     bool theme = false;
     bool snippet = false;
+    std::weak_ptr<SettingsCard> card;
 };
+
+// Reads the element back from settings.txt and turns each Reset on or off by it: a change made with a control shows
+// on its Reset at once, without building the card again under the pointer.
+void FollowValues(UiService::Shared& shared, const std::weak_ptr<SettingsCard>& weak) {
+    std::shared_ptr<SettingsCard> card = weak.lock();
+    if (!card) return;
+    std::optional<uirender::ModEntry> now = uirender::ElementSettings(shared.kit, SettingKindOf(card->mod), card->mod.id);
+    if (!now) return;
+    card->mod = std::move(*now);
+    std::vector<bool> changed = settings_panel::ChangedSettings(card->mod.settings, card->mod.values);
+    for (size_t index = 0; index < changed.size(); index++) {
+        auto reset = card->resets.find(card->mod.settings[index].key);
+        if (reset != card->resets.end()) reset->second.IsEnabled(changed[index]);
+    }
+}
 
 // Writes one declared setting from the card. An extension restarts with it (SetModSetting); the theme service sees
 // settings.txt change and applies the theme and the snippets again (SetThemeSetting, SetSnippetSetting).
@@ -96,6 +112,7 @@ void CommitSetting(UiService::Shared& shared, const SettingOwner& owner, const s
                    : owner.theme ? uirender::SetThemeSetting(shared.kit, owner.id, key, value, error)
                                  : uirender::SetModSetting(shared.kit, owner.id, key, value, error);
     if (written) {
+        FollowValues(shared, owner.card);
         shared.journal.Write("Settings: \"" + owner.id + "\" " + key + " = " + value + " from the Ampify page" +
                              (owner.snippet ? std::string(" (snippet)")
                               : owner.theme ? std::string(" (theme)")
@@ -206,22 +223,23 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
     rest.Interval(kRestDelay);
     rest.IsRepeating(false);
     auto last = std::make_shared<std::string>(start);
+    // The value is kept aside rather than read from the slider: a weak reference to it would never resolve, and a
+    // strong one in the timer would make a cycle with the slider's own handler.
+    auto moved = std::make_shared<double>(slider.Value());
     UiService::Shared* owner = &shared;
-    winrt::weak_ref<controls::Slider> weakSlider = winrt::make_weak(slider);
-    rest.Tick([owner, target, key = spec.key, last, weakSlider](auto const&, auto const&) noexcept {
+    rest.Tick([owner, target, key = spec.key, last, moved](auto const&, auto const&) noexcept {
         try {
-            controls::Slider live = weakSlider.get();
-            if (!live) return;
-            std::string next = SettingNumberText(live.Value());
+            std::string next = SettingNumberText(*moved);
             if (next == *last) return;
             *last = next;
             CommitSetting(*owner, target, key, next);
         } catch (...) {
         }
     });
-    slider.ValueChanged([rest, reading, shown](IInspectable const&,
-                                               primitives::RangeBaseValueChangedEventArgs const& args) noexcept {
+    slider.ValueChanged([rest, reading, shown, moved](IInspectable const&,
+                                                      primitives::RangeBaseValueChangedEventArgs const& args) noexcept {
         try {
+            *moved = args.NewValue();
             reading.Text(shown(args.NewValue()));
             rest.Stop();
             rest.Start();
@@ -333,10 +351,11 @@ void ApplySearch(SearchTargets& targets, const std::string& query) {
     if (targets.none) targets.none.Visibility(Show(matches.empty() && !query.empty()));
 }
 
-// The "Reset" of one setting: the manifest default is written, then the card is built again from settings.txt. It is
-// off while the setting already holds its default, so a click does not restart an extension for nothing.
-controls::Button ResetButton(UiService::Shared& shared, const SettingOwner& target, const SettingSpec& spec,
-                             const std::string& label, bool changed, const std::function<void()>& refresh) {
+// The "Reset" of one setting: its key leaves settings.txt, so it takes the manifest default, then the card is built
+// again. It is off while the setting holds its default (FollowValues keeps it so), so a click does not restart an
+// extension for nothing.
+controls::Button ResetButton(UiService::Shared& shared, SettingsCard& card, const SettingSpec& spec,
+                             const std::string& label, bool changed, const SettingsRefresh& refresh) {
     controls::Button button;
     if (shared.probe.button) button.Style(shared.probe.button);
     button.Content(winrt::box_value(Wide(i18n::Text("settings.reset"))));
@@ -344,23 +363,30 @@ controls::Button ResetButton(UiService::Shared& shared, const SettingOwner& targ
     button.IsEnabled(changed);
     automation::AutomationProperties::SetName(button, Wide(i18n::Text("settings.reset") + " " + label));
     UiService::Shared* owner = &shared;
-    button.Click([owner, target, key = spec.key, value = spec.defaultValue, refresh](IInspectable const&,
-                                                                                    xaml::RoutedEventArgs const&) noexcept {
+    button.Click([owner, kind = std::string(SettingKindOf(card.mod)), id = card.mod.id, key = spec.key,
+                  refresh](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
-            CommitSetting(*owner, target, key, value);
-            refresh();
+            std::string error;
+            if (uirender::ResetElementValues(owner->kit, kind, id, {key}, error)) {
+                owner->journal.Write("Settings: \"" + id + "\" " + key + " back to its default from the Ampify page");
+            } else {
+                owner->journal.Write("Settings: could not reset \"" + id + "\" " + key + ": " + error);
+            }
+            refresh("");
         } catch (...) {
         }
     });
+    card.resets[spec.key] = button;
     return button;
 }
 
 // One setting: its label and description on the left, its control and Reset on the right.
-xaml::FrameworkElement SettingRowOf(UiService::Shared& shared, const uirender::ModEntry& mod, size_t index,
-                                    const std::function<void()>& refresh) {
+xaml::FrameworkElement SettingRowOf(UiService::Shared& shared, const std::shared_ptr<SettingsCard>& card, size_t index,
+                                    bool changed, const SettingsRefresh& refresh) {
+    const uirender::ModEntry& mod = card->mod;
     const SettingSpec& spec = mod.settings[index];
     settings_panel::SettingText shown = ShownText(mod, spec);
-    SettingOwner target{mod.id, mod.theme, mod.snippet};
+    SettingOwner target{mod.id, mod.theme, mod.snippet, card};
     controls::Grid row;
     row.ColumnSpacing(16);
     controls::ColumnDefinition text;
@@ -388,7 +414,7 @@ xaml::FrameworkElement SettingRowOf(UiService::Shared& shared, const uirender::M
     inputRow.Orientation(controls::Orientation::Horizontal);
     inputRow.Spacing(8);
     inputRow.Children().Append(input);
-    inputRow.Children().Append(ResetButton(shared, target, spec, shown.label, mod.values[index] != spec.defaultValue, refresh));
+    inputRow.Children().Append(ResetButton(shared, *card, spec, shown.label, changed, refresh));
     controls::Grid::SetColumn(inputRow, 1);
     row.Children().Append(inputRow);
     return row;
@@ -404,8 +430,10 @@ controls::TextBlock GroupHeading(UiService::Shared& shared, const uirender::ModE
 
 // The rows and headings of the card, group by group, in the order of the settings' groups. `targets` keeps the rows
 // for the search.
-std::vector<xaml::FrameworkElement> GroupedRows(UiService::Shared& shared, const uirender::ModEntry& mod,
-                                                SearchTargets& targets, const std::function<void()>& refresh) {
+std::vector<xaml::FrameworkElement> GroupedRows(UiService::Shared& shared, const std::shared_ptr<SettingsCard>& card,
+                                                SearchTargets& targets, const SettingsRefresh& refresh) {
+    const uirender::ModEntry& mod = card->mod;
+    std::vector<bool> changed = settings_panel::ChangedSettings(mod.settings, mod.values);
     std::vector<xaml::FrameworkElement> body;
     for (const settings_panel::SettingGroup& group : settings_panel::GroupSettings(mod.settings)) {
         size_t groupIndex = targets.headings.size();
@@ -417,7 +445,7 @@ std::vector<xaml::FrameworkElement> GroupedRows(UiService::Shared& shared, const
         targets.headings.push_back(heading);
         for (size_t index : group.settings) {
             if (index >= mod.values.size()) continue;
-            xaml::FrameworkElement row = SettingRowOf(shared, mod, index, refresh);
+            xaml::FrameworkElement row = SettingRowOf(shared, card, index, changed[index], refresh);
             body.push_back(row);
             targets.rows.push_back({row, ShownText(mod, mod.settings[index]), groupIndex});
         }
@@ -439,15 +467,24 @@ controls::Button ToolButton(UiService::Shared& shared, const char* textKey, std:
     return button;
 }
 
-// Every setting back to its manifest default, in one write, then the card again.
-void ResetAll(UiService::Shared& shared, const uirender::ModEntry& mod, const std::function<void()>& refresh) {
+// The line under the card's toolbar: what an export, an import or a reset did, or why it was refused.
+void SayUnder(SettingsCard& card, const std::string& line) {
+    if (!card.status) return;
+    card.status.Text(Wide(line));
+    card.status.Visibility(xaml::Visibility::Visible);
+}
+
+// Every setting back to its manifest default: their keys leave settings.txt in one write, then the card again.
+void ResetAll(UiService::Shared& shared, const uirender::ModEntry& mod, const SettingsRefresh& refresh) {
     std::string error;
-    if (uirender::ChangeElementValues(shared.kit, SettingKindOf(mod), mod.id, settings_panel::DefaultValues(mod.settings), error)) {
-        shared.journal.Write(i18n::Text("settings.resetDone", {{"id", mod.id}}));
-    } else {
+    if (!uirender::ResetElementValues(shared.kit, SettingKindOf(mod), mod.id, {}, error)) {
         shared.journal.Write("Settings: could not reset \"" + mod.id + "\": " + error);
+        refresh("");
+        return;
     }
-    refresh();
+    std::string done = i18n::Text("settings.resetDone", {{"id", mod.id}});
+    shared.journal.Write(done);
+    refresh(done);
 }
 
 // A card with fewer settings than this has no search box: there is little to find.
@@ -473,11 +510,11 @@ controls::TextBox SearchBox(UiService::Shared& shared, const std::shared_ptr<Sea
 }
 
 // The line above the settings: the search (when there are enough), then Reset all, Export and Import. The line under
-// them shows the result of an export or an import.
-controls::StackPanel SettingsToolbar(UiService::Shared& shared, const uirender::ModEntry& mod,
-                                     const std::shared_ptr<SettingsCard>& card,
-                                     const std::function<void()>& refresh, const std::shared_ptr<SearchTargets>& targets,
+// them shows the result of a reset all, an export or an import, or why it was refused.
+controls::StackPanel SettingsToolbar(UiService::Shared& shared, const std::shared_ptr<SettingsCard>& card,
+                                     const SettingsRefresh& refresh, const std::shared_ptr<SearchTargets>& targets,
                                      const std::shared_ptr<std::string>& query) {
+    const uirender::ModEntry& mod = card->mod;
     // Made first: the search box applies its text to the rows, and shows this line when nothing matches.
     targets->none = MakeText(Wide(i18n::Text("settings.noMatch")).c_str(), "caption", true, &shared.probe);
     targets->none.Visibility(xaml::Visibility::Collapsed);
@@ -485,10 +522,7 @@ controls::StackPanel SettingsToolbar(UiService::Shared& shared, const uirender::
     status.Visibility(xaml::Visibility::Collapsed);
     card->status = status;
     SettingsSay say = [weak = std::weak_ptr<SettingsCard>(card)](const std::string& line) {
-        std::shared_ptr<SettingsCard> held = weak.lock();
-        if (!held || !held->status) return;
-        held->status.Text(Wide(line));
-        held->status.Visibility(xaml::Visibility::Visible);
+        if (std::shared_ptr<SettingsCard> held = weak.lock()) SayUnder(*held, line);
     };
 
     controls::StackPanel buttons;
@@ -509,27 +543,31 @@ controls::StackPanel SettingsToolbar(UiService::Shared& shared, const uirender::
     return bar;
 }
 
-// The card of one element: its toolbar, then its settings. Built again after a change, from what settings.txt holds, and
-// with the same search text.
-void FillSettings(UiService::Shared& shared, const std::shared_ptr<SettingsCard>& card, const uirender::ModEntry& mod,
+// The card of one element: its toolbar, then its settings. Built again in the same panel after a reset or an import,
+// from what settings.txt holds, with the same search text, and then `notice` under the toolbar when there is one.
+void FillSettings(UiService::Shared& shared, const std::shared_ptr<SettingsCard>& card, uirender::ModEntry mod,
                   const std::shared_ptr<std::string>& query) {
     card->panel.Children().Clear();
     card->status = nullptr;
-    std::function<void()> refresh = [owner = &shared, weak = std::weak_ptr<SettingsCard>(card),
-                                     kind = std::string(SettingKindOf(mod)), id = mod.id, query]() {
+    card->resets.clear();
+    card->mod = std::move(mod);
+    SettingsRefresh refresh = [owner = &shared, weak = std::weak_ptr<SettingsCard>(card),
+                               kind = std::string(SettingKindOf(card->mod)), id = card->mod.id, query](const std::string& notice) {
         // Next turn of the interface: the button that asked for it is still in its own click.
-        dispatching::DispatcherQueue::GetForCurrentThread().TryEnqueue([owner, weak, kind, id, query]() {
+        dispatching::DispatcherQueue::GetForCurrentThread().TryEnqueue([owner, weak, kind, id, query, notice]() {
             try {
                 std::shared_ptr<SettingsCard> live = weak.lock();
                 std::optional<uirender::ModEntry> fresh = uirender::ElementSettings(owner->kit, kind, id);
-                if (live && fresh) FillSettings(*owner, live, *fresh, query);
+                if (!live || !fresh) return;
+                FillSettings(*owner, live, std::move(*fresh), query);
+                if (!notice.empty()) SayUnder(*live, notice);
             } catch (...) {
             }
         });
     };
     auto targets = std::make_shared<SearchTargets>();
-    std::vector<xaml::FrameworkElement> body = GroupedRows(shared, mod, *targets, refresh);
-    card->panel.Children().Append(SettingsToolbar(shared, mod, card, refresh, targets, query));
+    std::vector<xaml::FrameworkElement> body = GroupedRows(shared, card, *targets, refresh);
+    card->panel.Children().Append(SettingsToolbar(shared, card, refresh, targets, query));
     for (const xaml::FrameworkElement& element : body) card->panel.Children().Append(element);
 }
 
@@ -542,7 +580,13 @@ xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::Mo
     card->panel = controls::StackPanel();
     card->panel.Spacing(8);
     card->panel.Margin(xaml::Thickness{16, 0, 0, 0});
-    std::erase_if(shared.settingsCards, [](const std::shared_ptr<SettingsCard>& old) { return !old->panel.Parent(); });
+    // A card replaces only the one of the same element (its theme section built again). Parent() cannot tell whether
+    // a card is still in the page: WinUI gives null for an element not yet connected to the window, as the whole page
+    // is while it is built, so each new card dropped the others and only the last one built kept working.
+    std::string_view kind = SettingKindOf(mod);
+    std::erase_if(shared.settingsCards, [&](const std::shared_ptr<SettingsCard>& old) {
+        return old->mod.id == mod.id && SettingKindOf(old->mod) == kind;
+    });
     shared.settingsCards.push_back(card);
     FillSettings(shared, card, mod, std::make_shared<std::string>());
     return card->panel;

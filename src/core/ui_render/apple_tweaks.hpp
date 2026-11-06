@@ -43,6 +43,8 @@ struct AppleTweaks {
     bool freezeLog = false;
     // A library agent left behind by a killed Apple Music is ended once Apple Music is closed (launcher). Off by default.
     bool orphanAgent = false;
+    // Apple's search field and a back arrow in the strip at the top of the window (win/topbar_search.cpp). Off by default.
+    bool topbarSearch = false;
 };
 
 inline constexpr char kNotificationsKey[] = "apple.notifications";
@@ -55,6 +57,7 @@ inline constexpr char kMarqueeKey[] = "apple.marquee";
 inline constexpr char kSidebarKey[] = "apple.sidebar";
 inline constexpr char kFreezeLogKey[] = "apple.watchdog";
 inline constexpr char kOrphanAgentKey[] = "apple.orphanAgent";
+inline constexpr char kTopbarKey[] = "apple.topbar";
 
 // An unknown value reads as the default.
 AppleTweaks ReadAppleTweaks(const Settings& settings);

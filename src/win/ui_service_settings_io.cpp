@@ -75,9 +75,12 @@ bool SaveText(const std::filesystem::path& file, const std::string& text) {
 
 }  // namespace
 
+// The values come from settings.txt as it is now, not from the card's copy, which a change may have left behind.
 void ExportElementSettings(UiService::Shared& shared, const uirender::ModEntry& mod, const SettingsSay& say) {
     std::string kind(SettingKindOf(mod));
-    std::string text = settings_panel::ExportSettings(kind, mod.id, mod.settings, ValuesOf(mod));
+    std::optional<uirender::ModEntry> now = uirender::ElementSettings(shared.kit, kind, mod.id);
+    const uirender::ModEntry& current = now ? *now : mod;
+    std::string text = settings_panel::ExportSettings(kind, mod.id, current.settings, ValuesOf(current));
     std::filesystem::path file = shared.kit / "exports" / (kind + "-" + mod.id + ".json");
     if (!SaveText(file, text)) {
         shared.journal.Write("Settings: could not write " + file.string());
@@ -89,8 +92,8 @@ void ExportElementSettings(UiService::Shared& shared, const uirender::ModEntry& 
     say(done);
 }
 
-// A refusal is written to the journal and shown under the card. A change rebuilds the card, which clears that line.
-void ImportElementSettings(UiService::Shared& shared, const uirender::ModEntry& mod, const std::function<void()>& refresh,
+// A refusal is written to the journal and shown under the card. A change rebuilds the card, then shows its line.
+void ImportElementSettings(UiService::Shared& shared, const uirender::ModEntry& mod, const SettingsRefresh& refresh,
                            const SettingsSay& say) {
     auto refuse = [&shared, &say](const std::string& line) {
         shared.journal.Write(line);
@@ -102,19 +105,21 @@ void ImportElementSettings(UiService::Shared& shared, const uirender::ModEntry& 
         return;
     }
     std::string kind(SettingKindOf(mod));
-    std::string error;
+    settings_panel::ImportRefusal refusal;
     std::optional<std::map<std::string, std::string>> values =
-        settings_panel::ImportSettings(*text, kind, mod.id, mod.settings, error);
+        settings_panel::ImportSettings(*text, kind, mod.id, mod.settings, refusal);
     if (!values) {
-        refuse(i18n::Text("settings.importFailed", {{"error", error}}));
+        refuse(i18n::Text("settings.importFailed", {{"error", settings_panel::RefusalText(refusal)}}));
         return;
     }
+    std::string error;
     if (!uirender::ChangeElementValues(shared.kit, kind, mod.id, *values, error)) {
         refuse(i18n::Text("settings.importFailed", {{"error", error}}));
         return;
     }
-    shared.journal.Write(i18n::Text("settings.imported", {{"id", mod.id}}));
-    refresh();
+    std::string done = i18n::Text("settings.imported", {{"id", mod.id}});
+    shared.journal.Write(done);
+    refresh(done);
 }
 
 }  // namespace ampify::win::ui_service_detail

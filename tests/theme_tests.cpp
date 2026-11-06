@@ -2815,6 +2815,103 @@ TEST_CASE(Builtins_CentreBarMovesTheProgressLineIntoTheControls) {
     CHECK(moved.size() == 3);  // the progress line and the two times
 }
 
+namespace {
+
+// What a selector's property gets in a window `width` wide: the last declaration that holds there, as the engine
+// picks between the rules of one selector.
+std::string ValueAtWidth(const th::Theme& theme, std::string_view selector, std::string_view property, double width) {
+    std::string value;
+    int order = -1;
+    for (const th::Assignment& assignment : theme.assignments) {
+        if (assignment.selector.text != selector || assignment.property != property) continue;
+        if (assignment.order < order || (assignment.media && !assignment.media->Matches(width, 900))) continue;
+        value = assignment.value.text;
+        order = assignment.order;
+    }
+    return value;
+}
+
+// "left,top,right,bottom" as numbers.
+std::vector<double> Sides(const std::string& thickness) {
+    std::vector<double> sides;
+    std::stringstream stream(thickness);
+    for (std::string side; std::getline(stream, side, ',');) sides.push_back(std::atof(side.c_str()));
+    if (sides.size() != 4) sides.assign(4, -1);
+    return sides;
+}
+
+th::Theme CentreBar(const std::string& extra = {}) {
+    MemoryFiles files;
+    files.files["user.css"] = extra + "@import \"ampify:bottom-bar\";\n@import \"ampify:centre-bar\";\n";
+    return Load(files);
+}
+
+constexpr double kBarWidths[] = {1800, 1500, 1200, 1000, 900};
+
+}  // namespace
+
+// The line's template repeats its margin inside: a bottom margin left the 6-pixel line no height at all.
+TEST_CASE(Builtins_CentreBarGivesTheLineNoTopOrBottomMargin) {
+    th::Theme theme = CentreBar();
+    for (double width : kBarWidths) {
+        std::vector<double> line = Sides(ValueAtWidth(theme, ".scrubber", "Margin", width));
+        CHECK(line[1] == 0);
+        CHECK(line[3] == 0);
+    }
+}
+
+// On screen the line's inset is twice its margin (the template repeats it): the times stand just outside its ends.
+TEST_CASE(Builtins_CentreBarPutsTheTimesAtTheEndsOfTheLine) {
+    th::Theme theme = CentreBar();
+    for (double width : kBarWidths) {
+        std::vector<double> line = Sides(ValueAtWidth(theme, ".scrubber", "Margin", width));
+        std::vector<double> elapsed = Sides(ValueAtWidth(theme, ".current-time", "Margin", width));
+        std::vector<double> length = Sides(ValueAtWidth(theme, ".duration", "Margin", width));
+        CHECK(line[0] == line[2]);
+        CHECK(line[0] * 2 == elapsed[0] + 44);
+        CHECK(line[2] * 2 == length[2] + 44);
+    }
+}
+
+// Apple Music shows the thumb while the pointer is over the song's display, which the line has left.
+TEST_CASE(Builtins_CentreBarShowsTheThumbOverTheLine) {
+    th::Theme theme = CentreBar();
+    CHECK(ValueAtWidth(theme, ".scrubber:hover Thumb#HorizontalThumb", "Visibility", 1500) == "Visible");
+}
+
+// The 3-pixel track is at the top of the 6-pixel line: 6 under the cell's foot puts the digits' middle on it (measured).
+TEST_CASE(Builtins_CentreBarCentresTheTimesOnTheTrack) {
+    th::Theme theme = CentreBar();
+    for (double width : kBarWidths) {
+        CHECK(Sides(ValueAtWidth(theme, ".current-time", "Margin", width))[3] == -6);
+        CHECK(Sides(ValueAtWidth(theme, ".duration", "Margin", width))[3] == -6);
+    }
+}
+
+TEST_CASE(Builtins_CentreBarKeepsTheLineAndTimesClearOfTheSong) {
+    th::Theme theme = CentreBar();
+    for (double width : kBarWidths) {
+        const double song = std::atof(ValueAtWidth(theme, ".now-playing", "Width", width).c_str());
+        CHECK(song > 0);
+        CHECK(Sides(ValueAtWidth(theme, ".current-time", "Margin", width))[0] >= song + 8);
+    }
+}
+
+TEST_CASE(Builtins_CentreBarFollowsTheSongWidthOfTheTheme) {
+    th::Theme theme = CentreBar(":root { --song-width-folded: 330; }\n");
+    CHECK(Sides(ValueAtWidth(theme, ".current-time", "Margin", 1200))[0] == 330 + 8 + 16);
+}
+
+// Apple Music shows the times only while the pointer is over the song; under the buttons they always show.
+TEST_CASE(Builtins_CentreBarShowsTheTimesAlways) {
+    th::Theme theme = CentreBar();
+    CHECK(theme.problems.empty());
+    for (std::string_view time : {".current-time", ".duration"}) {
+        CHECK(ValueAtWidth(theme, time, "Visibility", 1500) == "Visible");
+        CHECK(ValueAtWidth(theme, time, "Opacity", 1500) == "1");
+    }
+}
+
 TEST_CASE(Variables_RootBlockAndVar) {
     MemoryFiles files;
     files.files["user.css"] =

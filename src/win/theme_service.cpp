@@ -17,6 +17,7 @@
 #include "element_picker.hpp"
 #include "lcd_links.hpp"
 #include "sidebar_hover.hpp"
+#include "topbar_search.hpp"
 #include "text_marquee.hpp"
 #include "ui_thread.hpp"
 #include "win_common.hpp"
@@ -242,6 +243,7 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             KeepDisplayLinks(journal);
             KeepTextMarquee(journal);
             KeepSidebarOnHover(journal);
+            KeepTopbarSearch(journal);
             ui->backend.RecheckMedia();
 
             std::optional<std::string> dump = ui->session.Tick(ui->backend, request);

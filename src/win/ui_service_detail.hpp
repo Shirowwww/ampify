@@ -261,11 +261,13 @@ struct WindowContext {
     int menuTries = 0;
 };
 
-// One element's settings card and its status line, held strongly: a weak reference to an element Ampify made never
-// resolves. Its buttons reach it through a std::weak_ptr, so they hold no cycle (UiService::Shared::settingsCards).
+// One element's settings card, held strongly: a weak reference to an element Ampify made never resolves. Its controls
+// reach it through a std::weak_ptr, so they hold no cycle (UiService::Shared::settingsCards).
 struct SettingsCard {
     controls::StackPanel panel{nullptr};
     controls::TextBlock status{nullptr};
+    uirender::ModEntry mod;                          // the element as settings.txt held it at the last change
+    std::map<std::string, controls::Button> resets;  // each setting's Reset, by key
 };
 
 using SharedPtr = std::shared_ptr<UiService::Shared>;
@@ -348,10 +350,11 @@ inline std::string_view SettingKindOf(const uirender::ModEntry& mod) {
 }
 
 // Export and import of one element's settings, as a file and through the clipboard (ui_service_settings_io.cpp).
-// `say` shows a short line under the card; `refresh` builds the card again after an import.
+// `say` shows a short line under the card; `refresh` builds the card again from settings.txt, then shows its line.
 using SettingsSay = std::function<void(const std::string&)>;
+using SettingsRefresh = std::function<void(const std::string&)>;
 void ExportElementSettings(UiService::Shared& shared, const uirender::ModEntry& mod, const SettingsSay& say);
-void ImportElementSettings(UiService::Shared& shared, const uirender::ModEntry& mod, const std::function<void()>& refresh,
+void ImportElementSettings(UiService::Shared& shared, const uirender::ModEntry& mod, const SettingsRefresh& refresh,
                            const SettingsSay& say);
 xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntry& mod);
 xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::ModEntry& mod);

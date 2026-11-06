@@ -51,11 +51,17 @@ ScrollBar#HorizontalScrollBar {
 
 // The playback bar with the buttons centred and the progress line under them, the times at its ends. Pairs with
 // bottom-bar (import it first). The line and the times move out of the song's display into the centre cell, which
-// has no rows: the buttons stand at its top, the line at its foot, so both share the cell.
+// has no rows: the buttons stand at its top, the line at its foot, so both share the cell. The line's template repeats
+// its margin inside: half the room goes on each side, and a top or bottom margin would take its 6 pixels (none drew).
 inline constexpr std::string_view kCentreBar = R"css(
 .transport {
     vertical-alignment: top;
     margin: 4 0 0 0;
+}
+
+/* The line and the times stand 10 above the bar's edge; the buttons, at the top, do not move. */
+.playbar-controls {
+    padding: 0 0 10 0;
 }
 
 .scrubber {
@@ -66,11 +72,15 @@ inline constexpr std::string_view kCentreBar = R"css(
     vertical-alignment: bottom;
     horizontal-alignment: stretch;
     height: 6;
-    margin: 0 calc(var(--line-inset, 240) + var(--time-room, 44)) 8 calc(var(--line-inset, 240) + var(--time-room, 44));
 }
 
-/* The times stand at the ends of the line, in its own cell. Their opacity, not their visibility, which Apple Music binds
-   to the pointer. Written after floating-panels, so they show on narrow windows too. */
+/* Apple Music shows the thumb while the pointer is over the song; out of it, the line shows it under the pointer. */
+.scrubber:hover Thumb#HorizontalThumb {
+    visibility: visible;
+}
+
+/* Always visible: out of the song, Apple's pointer states no longer hide them. The opacity is written after
+   floating-panels, so they show on narrow windows too. Centred on the track: 6 under the cell's foot. */
 .current-time,
 .duration {
     move-to: "Grid#TransportBar > Grid:nth-child(1)";
@@ -78,18 +88,86 @@ inline constexpr std::string_view kCentreBar = R"css(
     grid-column: 0;
     grid-column-span: 4;
     vertical-alignment: bottom;
-    margin: 0 0 4 0;
     opacity: 1;
+    visibility: visible;
 }
 
 .current-time {
     horizontal-alignment: left;
-    margin: 0 0 4 var(--line-inset, 240);
 }
 
 .duration {
     horizontal-alignment: right;
-    margin: 0 var(--line-inset, 240) 4 0;
+}
+
+/* The line keeps clear of the song on the left, and as far from the right edge: centred under the buttons at every
+   width. Each step follows the song's width in bottom-bar; --line-inset sets one inset for all of them. */
+.scrubber {
+    margin: 0 calc((var(--line-inset, calc(var(--song-width, 560) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width, 560) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+}
+
+.current-time {
+    margin: 0 0 -6 var(--line-inset, calc(var(--song-width, 560) + var(--gap, 8) + 16));
+}
+
+.duration {
+    margin: 0 var(--line-inset, calc(var(--song-width, 560) + var(--gap, 8) + 16)) -6 0;
+}
+
+@media (max-width: 1600px) {
+    .scrubber {
+        margin: 0 calc((var(--line-inset, calc(var(--song-width-medium, 460) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-medium, 460) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+    }
+
+    .current-time {
+        margin: 0 0 -6 var(--line-inset, calc(var(--song-width-medium, 460) + var(--gap, 8) + 16));
+    }
+
+    .duration {
+        margin: 0 var(--line-inset, calc(var(--song-width-medium, 460) + var(--gap, 8) + 16)) -6 0;
+    }
+}
+
+@media (max-width: 1324px) {
+    .scrubber {
+        margin: 0 calc((var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+    }
+
+    .current-time {
+        margin: 0 0 -6 var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16));
+    }
+
+    .duration {
+        margin: 0 var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16)) -6 0;
+    }
+}
+
+@media (max-width: 1100px) {
+    .scrubber {
+        margin: 0 calc((var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+    }
+
+    .current-time {
+        margin: 0 0 -6 var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16));
+    }
+
+    .duration {
+        margin: 0 var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16)) -6 0;
+    }
+}
+
+@media (max-width: 960px) {
+    .scrubber {
+        margin: 0 calc((var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+    }
+
+    .current-time {
+        margin: 0 0 -6 var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16));
+    }
+
+    .duration {
+        margin: 0 var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16)) -6 0;
+    }
 }
 )css";
 

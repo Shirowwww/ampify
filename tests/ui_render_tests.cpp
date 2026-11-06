@@ -829,6 +829,7 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     CHECK(none.sharpArtwork);                   // a sharper cover where Apple's is stretched
     CHECK(none.textMarquee);                    // cut texts scroll under the pointer
     CHECK(!none.sidebarOnHover);                // the sidebar as Apple Music shows it
+    CHECK(!none.topbarSearch);                  // the search field stays in the sidebar unless asked
 
     settings.Set("apple.notifications", "Background");
     settings.Set("apple.fullscreen", "replace");
@@ -837,7 +838,9 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     settings.Set("apple.artwork", "Apple");
     settings.Set("apple.marquee", "off");
     settings.Set("apple.sidebar", "Hover");
+    settings.Set("apple.topbar", "Search");
     AppleTweaks set = ReadAppleTweaks(settings);
+    CHECK(set.topbarSearch);
     CHECK(!set.playerControls);
     CHECK(!set.sharpArtwork);
     CHECK(!set.textMarquee);
@@ -914,10 +917,11 @@ TEST_CASE(UiRender_AmpifysEntryGoesInTheHeaderOnlyWhenChosen) {
 TEST_CASE(UiRender_TheCardListsTheValuesOfEveryKeyItKnows) {
     for (const char* key : {"apple.notifications", "apple.fullscreen", "apple.playerControls", "apple.close",
                             "apple.network", "apple.artwork", "apple.marquee", "apple.sidebar", "theme.glass", "ampify.entry",
-                            "kit_update", "apple.watchdog", "apple.orphanAgent"}) {
+                            "kit_update", "apple.watchdog", "apple.orphanAgent", "apple.topbar"}) {
         CHECK(!AppleTweakValues(key).empty());
         CHECK(!IsAppleTweakValue(key, "not-a-value"));
     }
+    CHECK(AppleTweakValues("apple.topbar") == "off, search");
     CHECK(AppleTweakValues("apple.watchdog") == "off, on");
     CHECK(AppleTweakValues("apple.orphanAgent") == "off, on");
     CHECK(AppleTweakValues("theme.glass") == "full, balanced, eco");
@@ -972,27 +976,29 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "apple.notifications", "loud", error));
     CHECK(!SetAppleTweak(kit, "theme.active", "screen", error));
 
-    // The player, its cover, the long texts and the sidebar first, then the close button; the notifications, where
-    // "never" (Apple's own switch does it) only shows for someone who chose it before; the network fix, then the
-    // stuck library agent and the freeze log, last.
+    // The player, its cover, the long texts, the sidebar and the top bar first, then the close button; the
+    // notifications, where "never" (Apple's own switch does it) only shows for someone who chose it before; the network
+    // fix, then the stuck library agent and the freeze log, last.
     std::vector<TweakChoice> choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 10);
-    if (choices.size() == 10) {
-        CHECK(choices[8].key == "apple.orphanAgent" && choices[8].value == "off");
-        CHECK(choices[9].key == "apple.watchdog" && choices[9].value == "off");
-        CHECK(choices[9].options.size() == 2);
+    CHECK(choices.size() == 11);
+    if (choices.size() == 11) {
+        CHECK(choices[9].key == "apple.orphanAgent" && choices[9].value == "off");
+        CHECK(choices[10].key == "apple.watchdog" && choices[10].value == "off");
+        CHECK(choices[10].options.size() == 2);
         CHECK(choices[0].key == "apple.fullscreen" && choices[0].value == "screen");
         CHECK(choices[0].options.size() == 4);
         CHECK(choices[1].key == "apple.playerControls" && choices[1].value == "shown");
         CHECK(choices[2].key == "apple.artwork" && choices[2].value == "sharp");
         CHECK(choices[3].key == "apple.marquee" && choices[3].value == "hover");
         CHECK(choices[4].key == "apple.sidebar" && choices[4].value == "open");
-        CHECK(choices[5].key == "apple.close" && choices[5].value == "tray");
+        CHECK(choices[5].key == "apple.topbar" && choices[5].value == "off");  // off by default
         CHECK(choices[5].options.size() == 2);
-        CHECK(choices[6].key == "apple.notifications" && choices[6].value == "never");
-        CHECK(choices[6].options.size() == 3);
-        CHECK(choices[7].key == "apple.network" && choices[7].value == "ipv4-first");
-        CHECK(choices[7].options.size() == 2);
+        CHECK(choices[6].key == "apple.close" && choices[6].value == "tray");
+        CHECK(choices[6].options.size() == 2);
+        CHECK(choices[7].key == "apple.notifications" && choices[7].value == "never");
+        CHECK(choices[7].options.size() == 3);
+        CHECK(choices[8].key == "apple.network" && choices[8].value == "ipv4-first");
+        CHECK(choices[8].options.size() == 2);
     }
 
     CHECK(SetAppleTweak(kit, "apple.notifications", "background", error));
@@ -1002,11 +1008,14 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "apple.marquee", "always", error));
     CHECK(SetAppleTweak(kit, "apple.sidebar", "hover", error));
     CHECK(!SetAppleTweak(kit, "apple.sidebar", "hidden", error));
+    CHECK(SetAppleTweak(kit, "apple.topbar", "search", error));
+    CHECK(!SetAppleTweak(kit, "apple.topbar", "always", error));
     choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 10 && choices[6].options.size() == 2 && choices[6].value == "background");
-    CHECK(choices.size() == 10 && choices[7].value == "system");
-    CHECK(choices.size() == 10 && choices[2].value == "apple" && choices[3].value == "off");
-    CHECK(choices.size() == 10 && choices[4].value == "hover");
+    CHECK(choices.size() == 11 && choices[7].options.size() == 2 && choices[7].value == "background");
+    CHECK(choices.size() == 11 && choices[8].value == "system");
+    CHECK(choices.size() == 11 && choices[2].value == "apple" && choices[3].value == "off");
+    CHECK(choices.size() == 11 && choices[4].value == "hover");
+    CHECK(choices.size() == 11 && choices[5].value == "search");
 }
 
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {
@@ -1202,4 +1211,31 @@ TEST_CASE(UiRender_ChangingSeveralElementValuesWritesAllOfThemOnceOrNone) {
     CHECK(!ChangeElementValues(kit, "extension", "clock", {{"size", "11"}}, error));
     CHECK(ReadFile(kit / "settings.txt").find("extensions.clock.size = 7") != std::string::npos);
     CHECK(ReadFile(kit / "reload.txt") == "restart clock\n");
+}
+
+TEST_CASE(UiRender_ResettingElementSettingsRemovesTheirKeysFromTheFile) {
+    fs::path kit = FreshKit("element-values-reset");
+    WriteFile(kit / "themes" / "glass" / "manifest.json",
+              R"({"id":"glass","name":"Glass","version":"1.0.0","kind":"theme","author":"x","description":"d",)"
+              R"("kitApi":"1.0","colors":"colors.ini","settings":[)"
+              R"({"key":"radius","label":"Radius","type":"number","min":0,"max":40,"default":24},)"
+              R"({"key":"grow","label":"Grow","type":"toggle","default":true}]})");
+    WriteFile(kit / "themes" / "glass" / "colors.ini", "[Base]\nmain = 000000\n");
+    WriteFile(kit / "settings.txt", "theme.active = glass\nthemes.glass.radius = 36\nthemes.glass.grow = false\n");
+    std::string error;
+
+    bool one = ResetElementValues(kit, "theme", "glass", {"radius"}, error);
+    std::string afterOne = ReadFile(kit / "settings.txt");
+    bool all = ResetElementValues(kit, "theme", "glass", {}, error);
+    std::string afterAll = ReadFile(kit / "settings.txt");
+
+    CHECK(one && all);
+    CHECK(afterOne.find("themes.glass.radius") == std::string::npos);
+    CHECK(afterOne.find("themes.glass.grow = false") != std::string::npos);
+    CHECK(afterAll.find("themes.glass.") == std::string::npos);
+    CHECK(afterAll.find("theme.active = glass") != std::string::npos);
+    std::optional<ModEntry> glass = ElementSettings(kit, "theme", "glass");
+    CHECK(glass && glass->values == std::vector<std::string>({"24", "true"}));
+    CHECK(!ResetElementValues(kit, "theme", "glass", {"colour"}, error));
+    CHECK(error.find("colour") != std::string::npos);
 }

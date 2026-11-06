@@ -8,7 +8,7 @@ namespace ampify::cli {
 
 namespace {
 
-constexpr std::array<KnownSetting, 38> kFixed = {{
+constexpr std::array<KnownSetting, 39> kFixed = {{
     {"theme.active", "", "no theme"},
     {"theme.scheme", "", "the theme's default scheme"},
     {"theme.schedule", "", "no schedule"},
@@ -43,6 +43,7 @@ constexpr std::array<KnownSetting, 38> kFixed = {{
     {"apple.sidebar", "open", ""},
     {"apple.watchdog", "off", ""},
     {"apple.orphanAgent", "off", ""},
+    {"apple.topbar", "off", ""},
     {"ampify.entry", "sidebar", ""},
     {"mini.shortcut", "Ctrl+Alt+M", "off turns it off"},
     {"mini.position", "", "set when the mini player moves"},

@@ -334,6 +334,11 @@ std::optional<std::string> AcceptedValue(const SettingSpec& spec, const std::str
     return accepted.empty() ? std::nullopt : std::optional<std::string>(accepted);
 }
 
+// Where settings.txt keeps the element's settings: "themes.glass." for the theme glass.
+std::string KeyPrefix(const ModEntry& element) {
+    return std::string(element.snippet ? "snippets." : element.theme ? "themes." : "extensions.") + element.id + ".";
+}
+
 }  // namespace
 
 std::optional<ModEntry> ElementSettings(const fs::path& kit, std::string_view kind, const std::string& id) {
@@ -404,9 +409,36 @@ bool ChangeElementValues(const fs::path& kit, std::string_view kind, const std::
         accepted[key] = *fit;
     }
     // One write for all of them, so an extension restarts once and a theme applies once.
-    std::string prefix = std::string(element->snippet ? "snippets." : element->theme ? "themes." : "extensions.") + id + ".";
+    std::string prefix = KeyPrefix(*element);
     bool written = Settings::UpdateFile((kit / "settings.txt").string(), [&](Settings& settings) {
         for (const auto& [key, value] : accepted) settings.Set(prefix + key, OneLine(value));
+    }, error);
+    if (!written || element->theme || element->snippet) return written;
+    return AppendReload(kit, "restart " + id, error);
+}
+
+bool ResetElementValues(const fs::path& kit, std::string_view kind, const std::string& id,
+                        const std::vector<std::string>& keys, std::string& error) {
+    std::optional<ModEntry> element = ElementSettings(kit, kind, id);
+    if (!element) {
+        error = "no installed " + std::string(kind) + " \"" + id + "\" declares settings";
+        return false;
+    }
+    std::vector<std::string> removed = keys;
+    if (removed.empty()) {
+        for (const SettingSpec& spec : element->settings) removed.push_back(spec.key);
+    }
+    for (const std::string& key : removed) {
+        bool declared = std::any_of(element->settings.begin(), element->settings.end(),
+                                    [&key](const SettingSpec& spec) { return spec.key == key; });
+        if (!declared) {
+            error = "\"" + id + "\" has no setting \"" + key + "\"";
+            return false;
+        }
+    }
+    std::string prefix = KeyPrefix(*element);
+    bool written = Settings::UpdateFile((kit / "settings.txt").string(), [&](Settings& settings) {
+        for (const std::string& key : removed) settings.Remove(prefix + key);
     }, error);
     if (!written || element->theme || element->snippet) return written;
     return AppendReload(kit, "restart " + id, error);

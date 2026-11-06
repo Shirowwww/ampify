@@ -135,6 +135,25 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
 - Changing an extension setting with `ampify config` does not restart the extension: `ampify extension disable <id>`
   then `enable <id>` does.
 
+## Top bar: search and back in the title strip (`apple.topbar`, 2026-11-06)
+
+- Apple Music's history goes back only. The 1.1792 metadata (`knowledge/winmd/AMP.Services.txt`) has `GoBack` and
+  `CanGoBack` on `ISidebarViewModel`, `IBackNavigationHost` (with `ClearBackStack`, `AddToBackStack`) and the web view
+  host, and `PushNavigationStack` / `PopNavigationStack` on `INavigationService`; no `GoForward`, `CanGoForward` or
+  forward stack anywhere. A forward arrow would need a history of Ampify's own that does not see Apple's own
+  navigations, so the strip has none.
+- No Apple method is called, and no vtable slot was needed. The field is Apple's own: the NavigationView's
+  `ContentControl#PaneAutoSuggestBoxPresenter` moves from `Grid#AutoSuggestArea` into a cell of Ampify's strip (a Popup
+  of the window), so the `AutoSuggestBox` inside keeps its handlers (text, suggestions, submit); the cell takes the data
+  context the presenter inherited. The NavigationView binds `Content` on the same presenter object, wherever it is.
+  Its `ClosedCompact` state (sidebar folded and closed) collapses that presenter and shows `PaneAutoSuggestButton`;
+  while the field is in the strip Ampify puts the NavigationView back in `NotClosedCompact` (`GoToState`), an empty
+  state that only takes those two setters off, and on release in the state `UpdateIsClosedCompact` would pick. The arrow is Ampify's button; a click invokes Apple's `Button#NavigationViewBackButton` through its automation
+  peer (as a click on it would), and Apple's arrow stays in place with opacity 0.
+- Apple's own layout and a theme's top bar put `Grid#TransportBar` in the strip: the strip shows only when the bar
+  starts lower than 40 pixels. The window's passthrough regions (`InputNonClientPointerSource`) are Apple's plus
+  Ampify's, merged every quarter second, since Apple sets its own again as its layout changes.
+
 ## Reliability: freezes, stuck library, error 9039 (research and code audit, 2026-11-05)
 
 Source: an online survey (about thirty pages: Apple Community, Microsoft Q&A, GitHub AMWin-RP, press). Dates are those of

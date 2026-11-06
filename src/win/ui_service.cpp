@@ -7,6 +7,7 @@
 
 #include "ui_service_detail.hpp"
 #include "sidebar_hover.hpp"
+#include "topbar_search.hpp"
 
 namespace ampify::win {
 
@@ -517,6 +518,7 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
     SetSharpArtwork(tweaks.sharpArtwork);
     SetTextMarquee(tweaks.textMarquee);
     SetSidebarOnHover(tweaks.sidebarOnHover);
+    SetTopbarSearch(tweaks.topbarSearch);
     const bool inHeader = uirender::ReadEntryInHeader(settings);
     const bool entryMoved = shared.entryInHeader.exchange(inHeader) != inHeader;
 
