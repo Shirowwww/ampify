@@ -51,16 +51,21 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 
 ## Install
 
-Close Apple Music, then paste this line in PowerShell:
+You need Windows 10 or 11 (x64) and Apple Music from the Microsoft Store. Close Apple Music first (also from the
+notification area, next to the clock), then:
+
+1. Download `ampify-<version>-windows-x64.zip` from the [latest release](https://github.com/Shirowwww/ampify/releases/latest).
+2. Extract the whole zip (right-click, Extract All), then double-click `ampify_setup.exe` in the new folder. Running it
+   from inside the zip does not work.
+
+Or, if you prefer a terminal, paste this line in PowerShell (Start menu, type "PowerShell"):
 
 ```powershell
 irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
 ```
 
 It downloads the latest release, checks its SHA-256 and installs it for your Windows account, with no administrator
-rights. Then open Apple Music as usual, from its own icon.
-
-To read the script before it runs, save it, open it, then start it yourself:
+rights. To read the script before it runs, save it, open it, then start it yourself:
 
 ```powershell
 irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 -OutFile install.ps1
@@ -68,8 +73,7 @@ notepad install.ps1
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-Or download `ampify-<version>-windows-x64.zip` from the [latest release](https://github.com/Shirowwww/ampify/releases/latest),
-extract it and run `ampify_setup.exe`. You need Windows 10 or 11 (x64) and Apple Music from the Microsoft Store.
+Then open Apple Music as usual, from its own icon: there is no special shortcut.
 
 > [!WARNING]
 > **Windows Defender or SmartScreen warns about a file?** The programs are not code-signed yet, and the launcher loads
@@ -79,14 +83,20 @@ extract it and run `ampify_setup.exe`. You need Windows 10 or 11 (x64) and Apple
 
 ## Use it
 
+Apple Music looks the same right after the install: no theme is on yet.
+
 1. Open Apple Music and click **Ampify** at the bottom of the sidebar.
-2. Under **Themes**, click **Use this theme** on the one you like.
+2. Under **Themes** (this needs the internet), click **Install** on the one you like, then **Use**.
 3. Switch extensions on and off in Apple Music's **Settings > Ampify**.
+
+To go back to Apple Music's own look, click **Use Apple Music's look** in the Marketplace. More ways back, from a
+single theme to a full uninstall, are in [Getting started](https://shirowwww.github.io/ampify/getting-started.html#go-back-to-apple-music).
 
 The same from a terminal:
 
 ```
-ampify theme set glass --scheme Light     # use a theme
+ampify install glass                      # get a theme from the Marketplace
+ampify theme set glass --scheme Light     # use it
 ampify theme clear                        # back to Apple Music's look
 ampify install sleep-timer                # install from the Marketplace
 ampify report                             # an anonymous diagnostic report, to attach to an issue

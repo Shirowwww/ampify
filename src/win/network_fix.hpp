@@ -5,7 +5,6 @@
 // addresses before its IPv6 ones, IPv6 kept after. Where a server's IPv6 does not answer, that stack never falls back
 // and songs stay at 0:00 (05/11/2026: streamingaudio, aod and mvod.itunes.apple.com). Installed once per process, in
 // AppleMusic.exe and AMPLibraryAgent.exe; nothing in a protected (DRM) module is hooked, and no code is patched.
-
 //
 // apple.proxy = no-autodetect (off by default): DetectAutoProxyUrl, which Apple's network library (CFNetwork.dll)
 // calls when Windows' "Automatically detect settings" is on, answers "nothing found" at once instead of waiting for

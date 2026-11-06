@@ -146,24 +146,33 @@ constexpr Texts kBundledFailed = {
     "重新运行安装。",
 };
 constexpr Texts kOpenNow = {
-    "\n\nOpen Apple Music now? Ampify loads with it each time.",
-    "\n\nOuvrir Apple Music maintenant ? Ampify se charge avec lui à chaque fois.",
-    "\n\nApple Music jetzt öffnen? Ampify wird jedes Mal mitgeladen.",
-    "\n\n¿Abrir Apple Music ahora? Ampify se carga con él cada vez.",
-    "\n\nAbrir o Apple Music agora? O Ampify carrega junto toda vez.",
-    "\n\nОткрыть Apple Music сейчас? Ampify будет загружаться вместе с ним каждый раз.",
-    "\n\n今すぐ Apple Music を開きますか? Ampify は毎回一緒に読み込まれます。",
-    "\n\n现在打开 Apple Music 吗？Ampify 每次都会随它一起加载。",
+    "\n\nOpen Apple Music now? Then click Ampify at the bottom of the left sidebar to pick a theme. Ampify loads "
+    "with Apple Music each time.",
+    "\n\nOuvrir Apple Music maintenant ? Cliquez ensuite sur Ampify en bas de la barre latérale pour choisir un "
+    "thème. Ampify se charge avec lui à chaque fois.",
+    "\n\nApple Music jetzt öffnen? Klicken Sie danach unten in der Seitenleiste auf Ampify, um ein Design zu "
+    "wählen. Ampify wird jedes Mal mitgeladen.",
+    "\n\n¿Abrir Apple Music ahora? Después, haz clic en Ampify, al final de la barra lateral, para elegir un tema. "
+    "Ampify se carga con él cada vez.",
+    "\n\nAbrir o Apple Music agora? Depois, clique em Ampify no fim da barra lateral para escolher um tema. O "
+    "Ampify carrega junto toda vez.",
+    "\n\nОткрыть Apple Music сейчас? Затем нажмите Ampify внизу боковой панели, чтобы выбрать тему. Ampify будет "
+    "загружаться вместе с ним каждый раз.",
+    "\n\n今すぐ Apple Music を開きますか? 開いたら、サイドバー下部の Ampify をクリックしてテーマを選べます。Ampify は毎回一緒に読み込まれます。",
+    "\n\n现在打开 Apple Music 吗？打开后，点击侧边栏底部的 Ampify 即可选择主题。Ampify 每次都会随它一起加载。",
 };
 constexpr Texts kFileMissing = {
-    "A file is missing next to the installer: {name}",
-    "Un fichier manque à côté de l'installateur : {name}",
-    "Neben dem Installationsprogramm fehlt eine Datei: {name}",
-    "Falta un archivo junto al instalador: {name}",
-    "Falta um arquivo ao lado do instalador: {name}",
-    "Рядом с установщиком не хватает файла: {name}",
-    "インストーラーと同じ場所にファイルがありません: {name}",
-    "安装程序旁缺少一个文件：{name}",
+    "A file is missing next to the installer: {name}\n\nExtract the whole zip first, then run the installer again.",
+    "Un fichier manque à côté de l'installateur : {name}\n\nExtrayez d'abord tout le zip, puis relancez "
+    "l'installateur.",
+    "Neben dem Installationsprogramm fehlt eine Datei: {name}\n\nEntpacken Sie zuerst das gesamte Zip-Archiv und starten Sie das "
+    "Installationsprogramm dann erneut.",
+    "Falta un archivo junto al instalador: {name}\n\nExtrae primero todo el zip y vuelve a ejecutar el instalador.",
+    "Falta um arquivo ao lado do instalador: {name}\n\nExtraia primeiro todo o zip e execute o instalador de novo.",
+    "Рядом с установщиком не хватает файла: {name}\n\nСначала распакуйте весь zip-архив, затем снова запустите "
+    "установщик.",
+    "インストーラーと同じ場所にファイルがありません: {name}\n\nまず zip をすべて展開してから、もう一度インストーラーを実行してください。",
+    "安装程序旁缺少一个文件：{name}\n\n请先解压整个 zip，再重新运行安装程序。",
 };
 constexpr Texts kFolderFailed = {
     "The install folder could not be created.",

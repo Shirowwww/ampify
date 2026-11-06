@@ -67,6 +67,7 @@ bool Runs(const std::vector<std::string>& processes, std::string_view image) {
 // Apple Music's own troubles that Ampify can see but not mend: a stuck library agent, programs known to crash it,
 // and its recent crashes. Windows only: elsewhere every reading is empty and nothing is written.
 void CheckAppleMusicSurroundings(const std::function<void(const std::string&)>& ok,
+                                 const std::function<void(const std::string&)>& info,
                                  const std::function<void(const std::string&)>& warn) {
     if (std::optional<std::string> version = platform::AppPackageVersion()) ok("Apple Music package: version " + *version);
     std::vector<std::string> processes = platform::RunningProcessNames();
@@ -80,6 +81,10 @@ void CheckAppleMusicSurroundings(const std::function<void(const std::string&)>& 
         warn(conflict.name + " runs, known to crash Apple Music: " + conflict.advice);
     }
     if (std::optional<std::filesystem::path> dumps = platform::CrashDumpsFolder()) {
+        if (!CrashDumpsAreRecorded(*dumps)) {
+            info("Windows records no crash dumps on this PC (no CrashDumps folder), so crashes of Apple Music are not listed");
+            return;
+        }
         std::vector<std::string> recent = RecentAppleCrashDumps(*dumps, kCrashDays);
         if (recent.empty()) {
             ok("no crash of Apple Music in the last " + std::to_string(kCrashDays) + " days (crash dumps)");
@@ -98,6 +103,7 @@ int CmdDoctor(Context& ctx) {
     int errors = 0;
     int warnings = 0;
     auto ok = [&](const std::string& text) { ctx.out << "[OK]        " << text << "\n"; };
+    auto info = [&](const std::string& text) { ctx.out << "[INFO]      " << text << "\n"; };
     auto warn = [&](const std::string& text) {
         ctx.out << "[WARNING]   " << text << "\n";
         warnings++;
@@ -177,7 +183,7 @@ int CmdDoctor(Context& ctx) {
     ok(std::string("Apple Music ") +
        (platform::IsProcessRunning("AppleMusic.exe") ? "is open" : "is closed") +
        " (process check)");
-    CheckAppleMusicSurroundings(ok, warn);
+    CheckAppleMusicSurroundings(ok, info, warn);
 
     if (platform::ToolWorks(kArchiveTool)) {
         ok("archive tool available: " + kArchiveTool.front());

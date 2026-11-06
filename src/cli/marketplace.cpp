@@ -102,7 +102,8 @@ bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
         if (!platform::DownloadHttps(source, part, error) || !ReadWholeFile(part, text)) {
             RemoveQuietly(part);
             if (!ReadWholeFile(cached, text)) {
-                ctx.err << "ampify: catalog unreachable: " << error << "\n";
+                ctx.err << "ampify: catalog unreachable: " << error
+                        << ". Check the internet connection, then try again.\n";
                 return false;
             }
             ctx.err << "ampify: remote catalog unreachable, using the local copy\n";
@@ -553,6 +554,7 @@ int PrintMarketJson(Context& ctx) {
     for (const InstalledElement& element : ListInstalled(ctx.kit)) {
         Json item = element.manifest ? InfoJson(*element.manifest) : Json(Json::Object{{"id", element.id}, {"kind", element.kind}});
         item.Set("valid", element.Valid());
+        if (!element.Valid()) item.Set("errors", TextList(element.errors));  // the detail page says why it cannot load
         item.Set("enabled", IsEnabled(settings, element.kind, element.id));
         if (element.manifest && element.manifest->preview) {
             std::filesystem::path image =

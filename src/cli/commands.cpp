@@ -575,7 +575,7 @@ std::string Utf8(const std::filesystem::path& path) {
 
 bool LoadSettings(const Context& ctx, Settings& settings, std::string& error) {
     if (!settings.Load(ctx.kit.Settings().string())) {
-        error = "cannot read: " + Utf8(ctx.kit.Settings());
+        error = "cannot read: " + Utf8(ctx.kit.Settings()) + ". Close any program that has it open, then try again.";
         return false;
     }
     return true;
@@ -883,7 +883,7 @@ int CmdNew(Context& ctx) {
 namespace {
 
 // Commands that honour --dry-run. Any other would run for real, so the option is refused there instead.
-constexpr std::string_view kDryRunCommands[] = {"apply", "launch", "auto", "restore", "import", "publish", "devtools"};
+constexpr std::string_view kDryRunCommands[] = {"apply", "launch", "auto", "restore", "import", "publish", "devtools", "notice"};
 
 bool SupportsDryRun(const Options& options) {
     const std::string& command = options.positional[0];
@@ -898,7 +898,7 @@ int Dispatch(Context& ctx) {
     const std::string& command = options.positional[0];
     if (options.dryRun && command != "help" && !SupportsDryRun(options)) {
         return Usage(ctx, "--dry-run is not available for " + command + ": run it without --dry-run (" +
-                              "it works with apply, launch, restore, import, publish, devtools and config --dir)");
+                              "it works with apply, launch, restore, import, publish, devtools, notice and config --dir)");
     }
 
     if (command == "help") return CmdHelp(ctx);
@@ -924,6 +924,7 @@ int Dispatch(Context& ctx) {
     if (command == "inspect") return options.tree ? CmdInspectTree(ctx) : CmdInspect(ctx);
     if (command == "devtools") return CmdDevtools(ctx);
     if (command == "versions") return CmdVersions(ctx);
+    if (command == "notice") return CmdNotice(ctx);
     if (command == "install-kit") return CmdInstallKit(ctx);
     if (command == "types") return CmdTypes(ctx);
     if (command == "dev") return CmdDev(ctx);

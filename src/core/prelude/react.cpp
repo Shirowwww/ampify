@@ -412,10 +412,14 @@ const char kReact[] = R"AMPIFYJS(
     return { kind, id, key: kind + ":" + id };
   }
 
+  // What a root that renders nothing (null, false, a ConfirmDialog with isOpen: false) sends.
+  const EMPTY_TREE = JSON.stringify({ type: "stack", children: [] });
+
   function send(target, tree, json) {
     if (target.kind === "panel") Ampify.ui.panel.register(target.id, tree);
     else if (target.kind === "page") Ampify.ui.page.register(target.id, tree);
     else if (target.kind === "fullscreen") Ampify.ui.fullscreen.open(tree);
+    else if (json === EMPTY_TREE) native.reactClosePopup(target.id);  // an empty dialog would stay on screen
     else native.reactPopup(target.id, json);
   }
 

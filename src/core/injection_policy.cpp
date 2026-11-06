@@ -4,12 +4,16 @@ namespace ampify {
 
 PolicyVerdict DecideInjection(std::string_view appVersion, bool safeMode, const BuildSignature& signature,
                               std::span<const std::string_view> known) {
-    if (safeMode) return {false, "safe mode active: Apple Music starts without the kernel"};
+    if (safeMode) return {false, "safe mode active: Apple Music starts without the kernel", OffCause::SafeMode};
     if (appVersion.empty()) return {false, "Apple Music version not found: Apple Music starts without the kernel"};
     if (!IsKnownAppVersion(appVersion, known)) {
-        return {false, "version " + std::string(appVersion) + " not tested: Apple Music starts without the kernel"};
+        return {false, "version " + std::string(appVersion) + " not tested: Apple Music starts without the kernel",
+                OffCause::UntestedVersion};
     }
-    if (!SignatureMatches(signature)) return {false, DescribeSignature(signature) + ": Apple Music starts without the kernel"};
+    if (!SignatureMatches(signature)) {
+        return {false, DescribeSignature(signature) + ": Apple Music starts without the kernel",
+                OffCause::WrongExports};
+    }
     return {true, "version " + std::string(appVersion) + " tested: kernel injected"};
 }
 

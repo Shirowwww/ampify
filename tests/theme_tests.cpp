@@ -2425,6 +2425,40 @@ TEST_CASE(Snippets_ASnippetReadsItsOwnSettings) {
     CHECK(hidden != nullptr);
 }
 
+TEST_CASE(Snippets_DeclutterHidesTheAccountNameOnlyWhenAsked) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "declutter";
+    th::FolderFiles files(folder);
+    th::Theme off = th::LoadSnippet("declutter", folder.generic_string(), files, nullptr);
+    CHECK(AssignmentFor(off, ".account-name", "Visibility") == nullptr);
+
+    th::LoadOptions options;
+    options.settings = {{"account-name", "true"}};
+    th::Theme on = th::LoadSnippet("declutter", folder.generic_string(), files, nullptr, options);
+    const th::Assignment* hidden = AssignmentFor(on, ".account-name", "Visibility");
+    CHECK(hidden && hidden->value.text == "Collapsed");
+}
+
+TEST_CASE(Snippets_ProgressThicknessLeavesTheVolumeSliderAloneByDefault) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "progress-thickness";
+    th::FolderFiles files(folder);
+    th::LoadOptions options;
+    options.settings = {{"thickness", "5"}, {"volume", "4"}};
+    auto volumeRules = [&](const th::Theme& theme) {
+        int count = 0;
+        for (const th::Assignment& assignment : theme.assignments) {
+            if (assignment.selector.text.find(".volume-slider") != std::string::npos) count++;
+        }
+        return count;
+    };
+    th::Theme byDefault = th::LoadSnippet("progress-thickness", folder.generic_string(), files, nullptr, options);
+    CHECK(AssignmentFor(byDefault, ".scrubber Rectangle#HorizontalTrackRect", "Height") != nullptr);
+    CHECK(volumeRules(byDefault) == 0);
+
+    options.settings["custom-volume"] = "true";
+    th::Theme chosen = th::LoadSnippet("progress-thickness", folder.generic_string(), files, nullptr, options);
+    CHECK(volumeRules(chosen) > 0);
+}
+
 TEST_CASE(Theme_BarsContentTakesACountAndAColour) {
     MemoryFiles files;
     files.files["user.css"] =

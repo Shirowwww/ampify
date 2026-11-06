@@ -30,7 +30,8 @@
         transition: opacity 200ms;
     }
 
-    .fullscreen-transport:hover {
+    .fullscreen-transport:hover,
+    .fullscreen-transport:focus-within {
         opacity: 1;
     }
 }

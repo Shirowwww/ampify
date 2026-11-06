@@ -10,6 +10,9 @@ Usage: ampify [options] <command> [arguments]
        ampify backup apply launch       several commands without arguments in a row (stops at the first failure):
                                      backup, apply, launch, auto, restore, devtools, doctor, version
 
+New here? The everyday commands are: install <id> (then theme set <id> for a theme), list, market, restore and apply
+(Ampify off and on), doctor (what is wrong) and report. The rest is for people who make themes and extensions.
+
 Settings and state
   config                       shows every setting
   config <key>                 shows one setting

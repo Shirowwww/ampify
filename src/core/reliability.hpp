@@ -68,4 +68,7 @@ bool ThreeDxIgnoresAppleMusic(const std::filesystem::path& programFiles);
 // AMPLibraryAgent.exe.<id>.dmp) during the last `days` days, file names only, newest first.
 std::vector<std::string> RecentAppleCrashDumps(const std::filesystem::path& folder, int days);
 
+// True when `folder` exists. Without it Windows records no crash dumps, so "none found" would prove nothing.
+bool CrashDumpsAreRecorded(const std::filesystem::path& folder);
+
 }  // namespace ampify

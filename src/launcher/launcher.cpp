@@ -34,6 +34,7 @@
 #include "../core/injection_policy.hpp"
 #include "../core/journal.hpp"
 #include "../core/launch_flags.hpp"
+#include "../core/off_notice.hpp"
 #include "../core/orphan_agent.hpp"
 #include "../core/package_watch.hpp"
 #include "../core/safe_mode.hpp"
@@ -336,6 +337,7 @@ void Supervise(ampify::Journal& journal, const std::filesystem::path& packageDir
 struct Session {
     ampify::launcher::InstalledPackage package;
     std::string version;
+    std::filesystem::path kit;
     ampify::BuildSignature signature;
     std::filesystem::path kernelDll;
     bool kernelPresent = false;
@@ -368,6 +370,7 @@ std::optional<Session> OpenSession(ampify::Journal& journal, const std::filesyst
     session.package = *package;
     std::string fullName = ToNarrow(package->fullName);
     session.version = ampify::AppleMusicVersion(fullName);
+    session.kit = kit;
     journal.Write("Package found: " + fullName + " (folder " + package->directory.string() + ")");
 
     std::error_code timeError;
@@ -382,11 +385,28 @@ std::optional<Session> OpenSession(ampify::Journal& journal, const std::filesyst
     return session;
 }
 
+// Tells the person, once, why Ampify stays off: Apple Music updated itself to a build that was not tested, or safe
+// mode. It is `ampify notice` in a process of its own, so neither this launcher nor a held Apple Music waits for it.
+void TellIfOff(ampify::Journal& journal, const Session& session, const ampify::PolicyVerdict& verdict) {
+    if (!ampify::TakeOffNotice(session.kit / "cache" / "off-notice.txt", verdict, session.version)) return;
+    std::filesystem::path folder = ampify::win::ExecutablePath().parent_path();
+    std::filesystem::path cli = folder / L"ampify.exe";
+    if (!std::filesystem::exists(cli)) return;
+    std::wstring what = L"version ";
+    if (verdict.cause == ampify::OffCause::SafeMode) what = L"safe-mode";
+    else if (verdict.cause == ampify::OffCause::WrongExports) what = L"exports ";
+    if (verdict.cause != ampify::OffCause::SafeMode) what += ToWide(session.version);
+    std::wstring command = L"\"" + cli.wstring() + L"\" notice " + what;
+    bool started = ampify::win::StartProcess(cli.c_str(), command, CREATE_NO_WINDOW, folder.c_str(), true);
+    journal.Write(started ? "Ampify is off: the person is told once" : "Ampify is off: the notice could not start");
+}
+
 // Apple Music was already open: nothing was started, so this is not a launch to count.
 void FollowOpenApp(ampify::Journal& journal, const Session& session, ampify::SafeMode& safeMode, DWORD processId,
                    HANDLE stop) {
     ampify::PolicyVerdict verdict = session.Decide(safeMode.IsActive());
     bool inject = verdict.allowed && session.kernelPresent;
+    TellIfOff(journal, session, verdict);
     journal.Write("Apple Music already open (process " + std::to_string(processId) + "): " + verdict.reason);
 
     bool injected = inject && InjectInto(journal, processId, session.kernelDll,
@@ -402,6 +422,7 @@ void FollowNewApp(ampify::Journal& journal, const Session& session, ampify::Safe
                   HANDLE stop) {
     ampify::PolicyVerdict verdict = session.Decide(safeMode.BeginLaunch());
     journal.Write(verdict.reason);
+    TellIfOff(journal, session, verdict);
     bool inject = verdict.allowed && session.kernelPresent;
     bool injected = inject && InjectWhileHeld(journal, processId, session.kernelDll);
     Supervise(journal, session.package.directory, session.kernelDll, MakeWatchConfig(inject, !injected), processId,
@@ -664,6 +685,7 @@ int RunAttach(ampify::Journal& journal, const std::filesystem::path& kit, DWORD 
     ampify::SafeMode safeMode((kit / "state.txt").string());
     ampify::PolicyVerdict verdict = session->Decide(counted ? safeMode.BeginLaunch() : safeMode.IsActive());
     journal.Write(label + " started, held by Windows: " + verdict.reason);
+    TellIfOff(journal, *session, verdict);
     if (!verdict.allowed || !session->kernelPresent) {
         if (counted) safeMode.MarkHealthy();  // no kernel to report health, and nothing of Ampify can crash it
         return 0;

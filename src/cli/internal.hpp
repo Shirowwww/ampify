@@ -166,6 +166,11 @@ std::vector<std::filesystem::path> JournalFiles(const KitLayout& kit);
 // Commands in maintenance.cpp: devtools, versions, and the notice about a new kit release.
 int CmdDevtools(Context& ctx);
 int CmdVersions(Context& ctx);
+
+// ampify notice safe-mode | version <Apple Music version>: the Windows notification that tells why Ampify stayed off
+// for this start (src/core/off_notice.hpp). The launcher starts it, once per cause. For a version it first looks for
+// a newer list of tested versions, and says so when the list now has it. --dry-run prints the text instead.
+int CmdNotice(Context& ctx);
 int CmdInspectTree(Context& ctx);
 int CmdConfigDir(Context& ctx);
 

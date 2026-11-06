@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iterator>
 #include <optional>
+#include <sstream>
 #include <thread>
 
 #include "../core/apple_music.hpp"
@@ -307,6 +308,12 @@ void NotifyKitUpdate(Context& ctx) {
 
 namespace {
 
+// The texts of the notices follow the `language` setting, or else the Windows display language.
+void UseUserLanguage(const Settings& settings) {
+    std::string language = settings.GetString("language", "");
+    i18n::SetLanguage(i18n::LanguageCode(language.empty() ? platform::UserLocale() : language));
+}
+
 // Whether ampify update --auto may look for a release now: kit_update allows it, this is the installed copy (a build
 // folder or an extracted zip is never replaced behind the user's back), and no look was made today.
 bool MayLookForUpdate(Context& ctx, uirender::KitUpdate mode, const std::filesystem::path& cacheFile) {
@@ -356,8 +363,7 @@ int CmdAutoUpdate(Context& ctx) {
         return 0;
     }
 
-    std::string language = settings.GetString("language", "");
-    i18n::SetLanguage(i18n::LanguageCode(language.empty() ? platform::UserLocale() : language));
+    UseUserLanguage(settings);
     if (mode == uirender::KitUpdate::Ask &&
         !platform::AskYesNo(i18n::Text("update.askTitle", {{"version", release->version}}),
                             i18n::Text("update.askText", {{"installed", AMPIFY_VERSION}}))) {
@@ -374,6 +380,54 @@ int CmdAutoUpdate(Context& ctx) {
         return code;
     }
     platform::ShowNotice(i18n::Text("update.doneTitle"), i18n::Text("update.doneText", {{"version", release->version}}));
+    return 0;
+}
+
+namespace {
+
+bool OnTheList(Context& ctx, const std::string& version) {
+    std::vector<std::string> extra = LoadVersionList(ctx.kit.Root() / std::string(kVersionListFile));
+    return IsKnownAppVersion(version, KnownAppVersionsWith(extra));
+}
+
+// Looks for a newer list of tested versions, with no output, and says whether `version` came onto the list just now:
+// a version that was already on it (so Ampify is off for another reason) gains nothing from a restart.
+bool VersionListGained(Context& ctx, const std::string& version) {
+    if (OnTheList(ctx, version)) return false;
+    std::ostringstream out;
+    std::ostringstream err;
+    Options updating = ctx.options;
+    updating.positional = {"versions", "update"};
+    Context quiet{updating, ctx.kit, ctx.in, out, err};
+    CmdVersions(quiet);
+    return OnTheList(ctx, version);
+}
+
+}  // namespace
+
+int CmdNotice(Context& ctx) {
+    const std::vector<std::string>& args = ctx.options.positional;
+    bool safeMode = args.size() == 2 && args[1] == "safe-mode";
+    bool version = args.size() == 3 && args[1] == "version" && !args[2].empty();
+    bool exports = args.size() == 3 && args[1] == "exports" && !args[2].empty();
+    if (!safeMode && !version && !exports) {
+        return Usage(ctx, "notice takes safe-mode, or version or exports and an Apple Music version");
+    }
+
+    Settings settings;
+    settings.Load(ctx.kit.Settings().string());
+    UseUserLanguage(settings);
+    std::string key = "off.safe";
+    // A dry run asks nothing of the network: it shows the text of an untested version.
+    if (exports) key = "off.exports";
+    if (version) key = ctx.options.dryRun || !VersionListGained(ctx, args[2]) ? "off.version" : "off.listed";
+    std::string title = i18n::Text(key + "Title");
+    std::string text = i18n::Text(key + "Text", {{"version", version ? args[2] : ""}});
+    if (ctx.options.dryRun) {
+        ctx.out << title << "\n" << text << "\n";
+        return 0;
+    }
+    platform::ShowNotice(title, text);
     return 0;
 }
 

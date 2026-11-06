@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "../src/cli/element.hpp"
 #include "../src/cli/messages.hpp"
 #include "../src/core/i18n.hpp"
 #include "service_host.hpp"
@@ -100,6 +101,20 @@ TEST_CASE(I18n_EveryLanguageTranslatesWhatTheFrenchTableDoes) {
             std::string_view text = ampify::i18n::Lookup(table, message.key);
             CHECK(text != message.key);  // present
             CHECK(ampify::i18n::Placeholders(text) == ampify::i18n::Placeholders(message.text));
+        }
+    }
+}
+
+// A Windows balloon cuts a title at 63 characters and a text at 255; the notices of a stopped Ampify must fit.
+TEST_CASE(I18n_TheOffNoticesFitInABalloonInEveryLanguage) {
+    for (const char* language : {"en", "fr", "de", "es", "pt", "ru", "ja", "zh"}) {
+        auto table = std::string_view(language) == "en" ? ampify::i18n::KitMessages() : ampify::i18n::KitMessagesIn(language);
+        for (const char* group : {"off.version", "off.listed", "off.exports", "off.safe"}) {
+            std::string title = std::string(ampify::i18n::Lookup(table, std::string(group) + "Title"));
+            std::string text = std::string(ampify::i18n::Lookup(table, std::string(group) + "Text"));
+            CHECK(ampify::CharacterCount(title) < 64);
+            CHECK(ampify::CharacterCount(text) < 256);
+            CHECK(title.find("off.") == std::string::npos);
         }
     }
 }

@@ -10,10 +10,15 @@
 
 namespace ampify {
 
+// Why Ampify stays off when it does, for the person to be told (src/core/off_notice.hpp). None when the reason is
+// not one they can act on or wait out: a missing version, or the verdict of a process that is not Apple Music's.
+enum class OffCause { None, SafeMode, UntestedVersion, WrongExports };
+
 // A yes or no, with the reason in English for the log.
 struct PolicyVerdict {
     bool allowed = false;
     std::string reason;
+    OffCause cause = OffCause::None;
 };
 
 // Launcher side, once per launch: inject the kernel into Apple Music? Safe mode, an unknown build, and a build

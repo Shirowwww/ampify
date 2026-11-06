@@ -1627,6 +1627,28 @@ test("a failed uninstall keeps the detail view open with ampify's error", async 
   assert.equal(world.route, "/marketplace/item", "the detail page stays open");
 });
 
+test("each catalog tab says in one line what its kind is, and Installed does not", async () => {
+  const { page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension")] });
+  await settle();
+  assert.ok(textsOf(page.tree).some((text) => text.startsWith("A theme changes how Apple Music looks")));
+  buttonIn(page.tree, "Snippets").onClick();
+  assert.ok(textsOf(page.tree).some((text) => text.startsWith("A snippet is a small tweak")));
+  assert.ok(!textsOf(page.tree).some((text) => text.includes("ampify new")), "no command for someone without a terminal");
+  buttonIn(page.tree, "Installed").onClick();
+  assert.ok(!textsOf(page.tree).some((text) => text.startsWith("A snippet is")));
+});
+
+test("an element that cannot load says why on its detail page, not to run ampify doctor", async () => {
+  const broken = marketCopy("demo", "extension", [], { valid: false, errors: ["main.js is missing"] });
+  const { page } = fakeMarketplace({ installed: [broken] });
+  await settle();
+  buttonIn(page.tree, "Installed").onClick();
+  assert.ok(textsOf(page.tree).includes("Cannot load: open Details to see why"));
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  assert.ok(textsOf(page.tree).includes("• main.js is missing"));
+  assert.ok(!textsOf(page.tree).some((text) => text.includes("doctor")));
+});
+
 test("an uninstall goes back to the list, which says the element is gone", async () => {
   const { world, page } = fakeMarketplace({ installed: [marketCopy("demo", "extension")] });
   await settle();

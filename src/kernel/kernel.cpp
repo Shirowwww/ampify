@@ -227,7 +227,7 @@ DWORD WINAPI KernelMain(LPVOID) {
 
     if (role == ampify::ProcessRole::AppleMusic) StartInterface(journal, kit, winHost.Ui(), loader);
     if (role == ampify::ProcessRole::AppleMusic && tweaks.freezeLog) ampify::win::StartUiWatchdog(journal);
-    if (tweaks.freezeLog) ampify::win::StartMemoryWatch(journal, ampify::win::ExecutablePath().filename().string());
+    if (tweaks.freezeLog && !laterProcess) ampify::win::StartMemoryWatch(journal, ampify::win::ExecutablePath().filename().string());
     // Once per start of Apple Music: the short process that passes a link on would only repeat it.
     if (role == ampify::ProcessRole::AppleMusic && !laterProcess) ampify::win::LogKnownConflicts(journal);
 

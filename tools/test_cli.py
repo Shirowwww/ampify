@@ -1553,6 +1553,30 @@ class TestedVersions(AmpifyTestCase):
         self.assertIn("SHA-256 differs", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.kit, "versions.txt")))
 
+    def test_notice_dry_run_prints_the_text_for_an_untested_version_and_for_safe_mode(self):
+        self.assertEqual(self.ampify("config", "language", "en").returncode, 0)
+        version = self.ampify("notice", "version", "1.9999.1.0", "--dry-run")
+        self.assertEqual(version.returncode, 0, version.stderr)
+        self.assertIn("Ampify is off for now", version.stdout)
+        self.assertIn("not checked yet", version.stdout)
+        safe = self.ampify("notice", "safe-mode", "--dry-run")
+        self.assertEqual(safe.returncode, 0, safe.stderr)
+        self.assertIn("Ampify skipped this start", safe.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.kit, "versions.txt")))
+
+    def test_notice_for_wrong_exports_never_promises_a_restart(self):
+        self.assertEqual(self.ampify("config", "language", "en").returncode, 0)
+        result = self.ampify("notice", "exports", "1.1540.23042.0", "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("does not support yet", result.stdout)
+        self.assertNotIn("nearly back", result.stdout)
+
+    def test_notice_needs_a_cause(self):
+        for args in (("notice",), ("notice", "version"), ("notice", "weather")):
+            result = self.ampify(*args, "--dry-run")
+            self.assertEqual(result.returncode, 2, args)
+            self.assertIn("notice takes", result.stderr)
+
     def test_catalog_without_versions_is_reported(self):
         catalog = self.write_catalog([])
         result = self.ampify("versions", "update", *self.catalog_option(catalog))

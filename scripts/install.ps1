@@ -55,7 +55,7 @@ function Install-Ampify {
         $process.WaitForExit()
         switch ($process.ExitCode) {
             0 { }
-            3 { throw 'Apple Music is open: close it, wait a few seconds, then run the same line again.' }
+            3 { throw 'Apple Music is open: close it (also from the notification area, next to the clock), wait a few seconds, then run the same line again.' }
             default { throw "the installer stopped with code $($process.ExitCode) (details in $env:USERPROFILE\Ampify\logs\install.log)" }
         }
     } finally {
@@ -65,7 +65,7 @@ function Install-Ampify {
     $installed = Join-Path $env:LOCALAPPDATA 'Programs\Ampify'
     Write-Host ''
     Write-Host "Ampify $($release.tag_name.TrimStart('v')) is installed in $installed."
-    Write-Host 'Open Apple Music as usual: Ampify loads with it each time it starts.'
+    Write-Host 'Open Apple Music as usual, then click Ampify at the bottom of the left sidebar to pick a theme. Ampify loads with Apple Music each time.'
     $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host 'This PowerShell runs as administrator: Ampify starts with your next Windows sign-in, or now with ampify apply in a normal terminal.'

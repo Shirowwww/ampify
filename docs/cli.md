@@ -5,8 +5,9 @@ installer puts it in your Path. Everything it changes lives in `%USERPROFILE%\Am
 Music's package.
 
 ```
-ampify theme set glass --scheme Light    use a theme
-ampify install sleep-timer               install from the catalog (shows the permissions, asks first)
+ampify install glass                     install a theme from the catalog (shows the permissions, asks first)
+ampify theme set glass --scheme Light    use it (a theme must be installed first)
+ampify install sleep-timer               install an extension the same way
 ampify extension enable sleep-timer      switch it on
 ampify doctor                            check that everything is in order
 ```
@@ -61,6 +62,7 @@ ampify doctor                            check that everything is in order
 | `ampify install-kit <version> [--apply]` | Installs a given Ampify release, even an older one |
 | `ampify versions [list]` | The Apple Music versions Ampify accepts, and the installed one |
 | `ampify versions update` | Downloads the list of tested versions published with the catalog into `versions.txt` |
+| `ampify notice safe-mode` / `notice version <v>` / `notice exports <v>` | The Windows notification the launcher starts, once, when Ampify stays off (safe mode, an Apple Music version not tested yet, or a tested one whose player library no longer matches; only the first can say a new list just arrived). `--dry-run` prints its text instead |
 
 ## Applying
 

@@ -40,6 +40,7 @@ list(APPEND AMPIFY_TESTS_SOURCES
     tests/parity_tests.cpp
     tests/ui_watchdog_tests.cpp
     tests/orphan_agent_tests.cpp
-    tests/reliability_tests.cpp)
+    tests/reliability_tests.cpp
+    tests/off_notice_tests.cpp)
 
 list(APPEND AMPIFY_TESTS_WIN_SOURCES tests/win_host_tests.cpp tests/win_common_tests.cpp tests/win/kernel_claim_tests.cpp)

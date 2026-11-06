@@ -53,6 +53,12 @@ struct Fixture {
     }
 
     bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
+    bool HasPopup(const std::string& id) {
+        for (const auto& popup : host.ui.Popups()) {
+            if (popup.id == id) return true;
+        }
+        return false;
+    }
 };
 
 }  // namespace
@@ -255,6 +261,34 @@ TEST_CASE(ApiExtras_ConfirmDialogShowsTwoButtonsInTheDisplayLanguage) {
         CHECK(tree.find(ampify::i18n::Text("ui.cancel")) != std::string::npos);
     }
     CHECK(shown);
+    CHECK(!f.HasPopup("closed"));
+}
+
+TEST_CASE(ApiExtras_ConfirmDialogClosesWhenRenderedClosed) {
+    Fixture f;
+    auto element = f.Make("confirm", R"("ui.popup", "ui.menu")", R"(
+        const { h } = Ampify.React;
+        const show = (isOpen) => Ampify.ReactDOM.render(
+          h(Ampify.components.ConfirmDialog, { isOpen, titleText: "Delete?" }), "popup:confirm");
+        show(true);
+        const drop = Ampify.ui.menu.addItem("app", { label: "Drop", onClick: () => show(false) });
+        const ask = Ampify.ui.menu.addItem("app", { label: "Ask", onClick: () => show(true) });
+        Ampify.log("entries " + drop + " " + ask);)");
+    CHECK(element->Start());
+    CHECK(f.HasPopup("confirm"));
+    std::string log = f.out.str();
+    std::size_t at = log.find("[confirm] entries ");
+    CHECK(at != std::string::npos);
+    int drop = 0;
+    int ask = 0;
+    std::istringstream(log.substr(at + 18)) >> drop >> ask;
+    element->DeliverClick(drop);
+    element->Pump();
+    CHECK(!f.HasPopup("confirm"));
+    element->DeliverClick(ask);
+    element->Pump();
+    CHECK(f.HasPopup("confirm"));
+    element->Stop();
 }
 
 TEST_CASE(ApiExtras_UseArtworkColorIsNullWithoutATrack) {

@@ -129,3 +129,15 @@ TEST_CASE(Reliability_OnlyRecentDumpsOfAppleMusicsProcessesAreCounted) {
     CHECK(recent.size() == 2);
     CHECK(ampify::RecentAppleCrashDumps(dumps / "missing", 7).empty());
 }
+
+TEST_CASE(Reliability_AnUpperCaseDmpExtensionIsCounted) {
+    fs::path dumps = FreshFolder("dumps-upper");
+    Touch(dumps / "AppleMusic.exe.31.DMP");
+    CHECK(ampify::RecentAppleCrashDumps(dumps, 7).size() == 1);
+}
+
+TEST_CASE(Reliability_CrashDumpsAreRecordedOnlyWhereTheFolderExists) {
+    fs::path dumps = FreshFolder("dumps-recorded");
+    CHECK(ampify::CrashDumpsAreRecorded(dumps));
+    CHECK(!ampify::CrashDumpsAreRecorded(dumps / "missing"));
+}

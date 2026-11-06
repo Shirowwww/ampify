@@ -101,17 +101,26 @@ std::vector<std::string> RecentAppleCrashDumps(const std::filesystem::path& fold
     const auto since = fs::file_time_type::clock::now() - std::chrono::hours(24) * days;
     std::vector<std::pair<fs::file_time_type, std::string>> found;
     std::error_code ec;
-    for (const auto& entry : fs::directory_iterator(folder, ec)) {
-        std::string name = ToLowerAscii(entry.path().filename().string());
+    fs::directory_iterator end;
+    // Incrementing with an error_code: a file that vanishes mid-listing must not throw.
+    for (fs::directory_iterator it(folder, ec); !ec && it != end; it.increment(ec)) {
+        const fs::path& path = it->path();
+        std::string name = ToLowerAscii(path.filename().string());
         bool apple = name.rfind("applemusic.exe.", 0) == 0 || name.rfind("amplibraryagent.exe.", 0) == 0;
-        if (!apple || entry.path().extension() != ".dmp") continue;
-        fs::file_time_type written = entry.last_write_time(ec);
-        if (!ec && written >= since) found.emplace_back(written, entry.path().filename().string());
+        if (!apple || ToLowerAscii(path.extension().string()) != ".dmp") continue;
+        std::error_code timeError;
+        fs::file_time_type written = it->last_write_time(timeError);
+        if (!timeError && written >= since) found.emplace_back(written, path.filename().string());
     }
     std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
     std::vector<std::string> names;
     for (const auto& item : found) names.push_back(item.second);
     return names;
+}
+
+bool CrashDumpsAreRecorded(const std::filesystem::path& folder) {
+    std::error_code ec;
+    return std::filesystem::is_directory(folder, ec);
 }
 
 }  // namespace ampify

@@ -11,6 +11,7 @@ list(APPEND AMPIFY_CORE_SOURCES
     src/core/apple_music.cpp
     src/core/build_signature.cpp
     src/core/injection_policy.cpp
+    src/core/off_notice.cpp
     src/core/drm_guard.cpp
     src/core/json.cpp
     src/core/manifest.cpp

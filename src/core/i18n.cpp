@@ -163,6 +163,14 @@ constexpr Message kKit[] = {
     {"update.askText", "A new version of Ampify is available (you have {installed}). Install it now? It takes a few seconds, while Apple Music is closed."},
     {"update.doneTitle", "Ampify updated"},
     {"update.doneText", "Ampify {version} is installed. It loads the next time Apple Music opens."},
+    {"off.versionTitle", "Ampify is off for now"},
+    {"off.versionText", "Apple Music updated to a version Ampify has not checked yet, so it opens without your theme. Nothing is broken: Ampify turns back on once that version is checked."},
+    {"off.exportsTitle", "Ampify can't load on this version"},
+    {"off.exportsText", "This Apple Music build changed in a way Ampify does not support yet, so it opens without your theme. Nothing is broken: Ampify turns back on with an update that supports it."},
+    {"off.listedTitle", "Ampify is nearly back"},
+    {"off.listedText", "Apple Music updated, and Ampify just got the new list of checked versions. Close Apple Music completely (also from the notification area), then open it again to get your theme back."},
+    {"off.safeTitle", "Ampify skipped this start"},
+    {"off.safeText", "Apple Music closed by itself twice in a row, so Ampify stayed off this time to keep it working. It tries again the next time you open Apple Music."},
 };
 
 // French texts of what people see (menus, buttons, the Settings card). The log stays in English, so a key missing here
@@ -307,6 +315,14 @@ constexpr Message kKitFr[] = {
     {"update.askText", "Une nouvelle version d'Ampify est disponible (vous avez la {installed}). L'installer maintenant ? Cela prend quelques secondes, pendant qu'Apple Music est fermé."},
     {"update.doneTitle", "Ampify mis à jour"},
     {"update.doneText", "Ampify {version} est installé. Il se charge à la prochaine ouverture d'Apple Music."},
+    {"off.versionTitle", "Ampify est coupé pour le moment"},
+    {"off.versionText", "Apple Music s'est mis à jour vers une version qu'Ampify n'a pas encore vérifiée, il s'ouvre donc sans votre thème. Rien n'est cassé : Ampify se remet en route dès que cette version est vérifiée."},
+    {"off.exportsTitle", "Ampify ne se charge pas ici"},
+    {"off.exportsText", "Cette version d'Apple Music a changé d'une façon qu'Ampify ne gère pas encore, elle s'ouvre donc sans votre thème. Rien n'est cassé : Ampify se remet en route avec une mise à jour qui la prend en charge."},
+    {"off.listedTitle", "Ampify est presque de retour"},
+    {"off.listedText", "Apple Music s'est mis à jour, et Ampify vient de recevoir la nouvelle liste des versions vérifiées. Fermez complètement Apple Music (aussi depuis la zone de notification), puis rouvrez-le pour retrouver votre thème."},
+    {"off.safeTitle", "Ampify a sauté ce démarrage"},
+    {"off.safeText", "Apple Music s'est fermé tout seul deux fois de suite, donc Ampify est resté coupé cette fois pour qu'il fonctionne. Il réessaie à la prochaine ouverture d'Apple Music."},
 };
 
 constexpr Message kKitDe[] = {
@@ -450,6 +466,14 @@ constexpr Message kKitDe[] = {
     {"update.askText", "Eine neue Version von Ampify ist verfügbar (installiert: {installed}). Jetzt installieren? Das dauert ein paar Sekunden, solange Apple Music geschlossen ist."},
     {"update.doneTitle", "Ampify aktualisiert"},
     {"update.doneText", "Ampify {version} ist installiert. Es lädt beim nächsten Start von Apple Music."},
+    {"off.versionTitle", "Ampify ist vorerst aus"},
+    {"off.versionText", "Apple Music wurde auf eine Version aktualisiert, die Ampify noch nicht geprüft hat, und startet deshalb ohne Ihr Design. Nichts ist kaputt: Ampify schaltet sich wieder ein, sobald diese Version geprüft ist."},
+    {"off.exportsTitle", "Ampify kann hier nicht starten"},
+    {"off.exportsText", "Diese Apple-Music-Version hat sich auf eine Weise geändert, die Ampify noch nicht unterstützt, und startet deshalb ohne Ihr Design. Nichts ist kaputt: Mit einem Update, das sie unterstützt, läuft Ampify wieder."},
+    {"off.listedTitle", "Ampify ist fast wieder da"},
+    {"off.listedText", "Apple Music wurde aktualisiert, und Ampify hat gerade die neue Liste geprüfter Versionen erhalten. Beenden Sie Apple Music vollständig (auch im Infobereich) und öffnen Sie es erneut, dann ist Ihr Design wieder da."},
+    {"off.safeTitle", "Ampify hat diesen Start übersprungen"},
+    {"off.safeText", "Apple Music hat sich zweimal hintereinander von selbst geschlossen, deshalb blieb Ampify diesmal aus. Beim nächsten Öffnen von Apple Music versucht es Ampify erneut."},
 };
 
 constexpr Message kKitEs[] = {
@@ -593,6 +617,14 @@ constexpr Message kKitEs[] = {
     {"update.askText", "Hay una nueva versión de Ampify (tienes la {installed}). ¿Instalarla ahora? Tarda unos segundos, con Apple Music cerrado."},
     {"update.doneTitle", "Ampify actualizado"},
     {"update.doneText", "Ampify {version} está instalado. Se carga la próxima vez que se abra Apple Music."},
+    {"off.versionTitle", "Ampify está apagado por ahora"},
+    {"off.versionText", "Apple Music se actualizó a una versión que Ampify aún no ha comprobado, así que se abre sin tu tema. No se ha roto nada: Ampify se vuelve a encender cuando se compruebe esa versión."},
+    {"off.exportsTitle", "Ampify no puede cargarse aquí"},
+    {"off.exportsText", "Esta versión de Apple Music cambió de una forma que Ampify aún no admite, así que se abre sin tu tema. No se ha roto nada: Ampify volverá con una actualización que la admita."},
+    {"off.listedTitle", "Ampify casi ha vuelto"},
+    {"off.listedText", "Apple Music se actualizó y Ampify acaba de recibir la nueva lista de versiones comprobadas. Cierra Apple Music del todo (también desde el área de notificaciones) y ábrelo de nuevo para recuperar tu tema."},
+    {"off.safeTitle", "Ampify se saltó este inicio"},
+    {"off.safeText", "Apple Music se cerró solo dos veces seguidas, así que Ampify se quedó apagado esta vez para que funcione. Lo intenta de nuevo la próxima vez que abras Apple Music."},
 };
 
 constexpr Message kKitPt[] = {
@@ -736,6 +768,14 @@ constexpr Message kKitPt[] = {
     {"update.askText", "Há uma nova versão do Ampify (você tem a {installed}). Instalar agora? Leva alguns segundos, com o Apple Music fechado."},
     {"update.doneTitle", "Ampify atualizado"},
     {"update.doneText", "Ampify {version} está instalado. Ele carrega na próxima vez que o Apple Music abrir."},
+    {"off.versionTitle", "O Ampify está desligado por enquanto"},
+    {"off.versionText", "O Apple Music foi atualizado para uma versão que o Ampify ainda não verificou, por isso abre sem o seu tema. Nada está quebrado: o Ampify volta a ligar quando essa versão for verificada."},
+    {"off.exportsTitle", "O Ampify não consegue carregar"},
+    {"off.exportsText", "Esta versão do Apple Music mudou de um jeito que o Ampify ainda não suporta, então abre sem o seu tema. Nada está quebrado: o Ampify volta com uma atualização que a suporte."},
+    {"off.listedTitle", "O Ampify está quase de volta"},
+    {"off.listedText", "O Apple Music foi atualizado e o Ampify acabou de receber a nova lista de versões verificadas. Feche o Apple Music por completo (também na área de notificação) e abra-o de novo para ter o seu tema de volta."},
+    {"off.safeTitle", "O Ampify pulou esta abertura"},
+    {"off.safeText", "O Apple Music fechou sozinho duas vezes seguidas, então o Ampify ficou desligado desta vez para ele funcionar. Ele tenta de novo na próxima vez que você abrir o Apple Music."},
 };
 
 constexpr Message kKitRu[] = {
@@ -879,6 +919,14 @@ constexpr Message kKitRu[] = {
     {"update.askText", "Доступна новая версия Ampify (у вас {installed}). Установить сейчас? Это займёт несколько секунд, пока Apple Music закрыт."},
     {"update.doneTitle", "Ampify обновлён"},
     {"update.doneText", "Ampify {version} установлен. Он загрузится при следующем запуске Apple Music."},
+    {"off.versionTitle", "Ampify пока отключён"},
+    {"off.versionText", "Apple Music обновился до версии, которую Ampify ещё не проверил, поэтому он открылся без вашей темы. Ничего не сломано: Ampify включится снова, как только эту версию проверят."},
+    {"off.exportsTitle", "Ampify не может загрузиться"},
+    {"off.exportsText", "Эта версия Apple Music изменилась так, как Ampify пока не поддерживает, поэтому она открывается без вашей темы. Ничего не сломано: Ampify вернётся с обновлением, которое её поддержит."},
+    {"off.listedTitle", "Ampify почти вернулся"},
+    {"off.listedText", "Apple Music обновился, а Ampify только что получил новый список проверенных версий. Полностью закройте Apple Music (в том числе в области уведомлений) и откройте его снова, чтобы вернуть тему."},
+    {"off.safeTitle", "Ampify пропустил этот запуск"},
+    {"off.safeText", "Apple Music дважды подряд закрылся сам, поэтому в этот раз Ampify остался выключен, чтобы он работал. При следующем запуске Apple Music Ampify попробует снова."},
 };
 
 constexpr Message kKitJa[] = {
@@ -1022,6 +1070,14 @@ constexpr Message kKitJa[] = {
     {"update.askText", "Ampify の新しいバージョンがあります（現在は {installed}）。今すぐインストールしますか？ Apple Music を閉じている間、数秒で終わります。"},
     {"update.doneTitle", "Ampify を更新しました"},
     {"update.doneText", "Ampify {version} をインストールしました。次に Apple Music を開いたときに読み込まれます。"},
+    {"off.versionTitle", "Ampify は一時的にオフです"},
+    {"off.versionText", "Apple Music が Ampify の未確認のバージョンに更新されたため、テーマなしで開きます。故障ではありません。そのバージョンの確認が済むと、Ampify は自動でオンに戻ります。"},
+    {"off.exportsTitle", "Ampify を読み込めません"},
+    {"off.exportsText", "この Apple Music のビルドは Ampify がまだ対応していない形で変更されているため、テーマなしで開きます。問題はありません。対応する更新が出れば、Ampify は再び有効になります。"},
+    {"off.listedTitle", "Ampify がもうすぐ戻ります"},
+    {"off.listedText", "Apple Music が更新され、Ampify が確認済みバージョンの新しい一覧を受け取りました。Apple Music を通知領域も含めて完全に閉じ、もう一度開くとテーマが戻ります。"},
+    {"off.safeTitle", "Ampify は今回の起動をスキップしました"},
+    {"off.safeText", "Apple Music が 2 回続けて自動で閉じたため、動作を保つために今回は Ampify をオフにしました。次に Apple Music を開くときにもう一度試します。"},
 };
 
 constexpr Message kKitZh[] = {
@@ -1163,6 +1219,14 @@ constexpr Message kKitZh[] = {
     {"update.askText", "Ampify 有新版本（当前为 {installed}）。现在安装吗？Apple Music 关闭时，只需几秒钟。"},
     {"update.doneTitle", "Ampify 已更新"},
     {"update.doneText", "Ampify {version} 已安装，下次打开 Apple Music 时加载。"},
+    {"off.versionTitle", "Ampify 暂时关闭"},
+    {"off.versionText", "Apple Music 已更新到 Ampify 尚未检查过的版本，因此打开时不带你的主题。一切正常：该版本检查完成后，Ampify 会自动重新开启。"},
+    {"off.exportsTitle", "Ampify 暂时无法加载"},
+    {"off.exportsText", "此 Apple Music 版本的变化超出了 Ampify 目前的支持范围，因此将不带主题打开。一切正常：待更新支持后，Ampify 会恢复运行。"},
+    {"off.listedTitle", "Ampify 快回来了"},
+    {"off.listedText", "Apple Music 已更新，Ampify 刚获得最新的已检查版本列表。请完全关闭 Apple Music（包括通知区域中的），再重新打开，即可恢复你的主题。"},
+    {"off.safeTitle", "Ampify 跳过了这次启动"},
+    {"off.safeText", "Apple Music 连续两次自行关闭，所以这次 Ampify 保持关闭以确保其正常运行。下次打开 Apple Music 时会再试一次。"},
 };
 
 struct LanguageTable {
