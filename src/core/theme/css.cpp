@@ -2,9 +2,10 @@
 
 #include <cctype>
 #include <charconv>
+#include <iterator>
 
 #include "../text_util.hpp"
-#include "builtins.hpp"
+#include "css_values.hpp"
 
 namespace ampify::theme {
 
@@ -12,10 +13,6 @@ namespace {
 
 bool IsSpace(char c) {
     return std::isspace(static_cast<unsigned char>(c)) != 0;
-}
-
-bool IsTypeChar(char c) {
-    return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '.';
 }
 
 bool IsNameChar(char c) {
@@ -46,45 +43,11 @@ int LineOf(std::string_view text, size_t offset) {
     return line;
 }
 
-struct Piece {
-    std::string_view text;
-    size_t offset;
-};
 
-// Splits on `separator` outside quotes and parentheses, so `url(a;b)` and "x;y" stay whole.
-std::vector<Piece> SplitTopLevel(std::string_view text, char separator) {
-    std::vector<Piece> pieces;
-    int depth = 0;
-    char quote = 0;
-    size_t start = 0;
-    for (size_t i = 0; i <= text.size(); i++) {
-        if (i == text.size()) {
-            pieces.push_back({text.substr(start), start});
-            break;
-        }
-        char c = text[i];
-        if (quote) {
-            if (c == quote) quote = 0;
-        } else if (c == '"' || c == '\'') {
-            quote = c;
-        } else if (c == '(') {
-            depth++;
-        } else if (c == ')') {
-            depth--;
-        } else if (c == separator && depth == 0) {
-            pieces.push_back({text.substr(start, i - start), start});
-            start = i + 1;
-        }
-    }
-    return pieces;
-}
-
-// The state a pseudo-class names. :focus-within is :focus: the backend follows the focus of the element's parts too.
 std::optional<Trigger> StateOf(std::string_view pseudo) {
-    if (pseudo == "hover") return Trigger::Hover;
-    if (pseudo == "focus" || pseudo == "focus-within") return Trigger::Focus;
-    if (pseudo == "active") return Trigger::Active;
-    if (pseudo == "current") return Trigger::Current;
+    for (const StateClass& state : kStateClasses) {
+        if (state.name.substr(1) == pseudo) return state.trigger;
+    }
     return std::nullopt;
 }
 
@@ -109,16 +72,6 @@ std::optional<std::string> ReadNthChild(std::string_view s, size_t& i, int& targ
     target = n;
     i = close + 1;
     return std::nullopt;
-}
-
-// The bracket that closes the one at `open`, brackets inside it included, or npos.
-size_t ClosingBracket(std::string_view s, size_t open) {
-    int depth = 0;
-    for (size_t i = open; i < s.size(); i++) {
-        if (s[i] == '(') depth++;
-        if (s[i] == ')' && --depth == 0) return i;
-    }
-    return std::string_view::npos;
 }
 
 std::optional<std::string> ReadCompound(std::string_view s, size_t& i, Compound& compound, Selector& selector);
@@ -202,14 +155,14 @@ std::optional<std::string> ReadPseudo(std::string_view s, size_t& i, Compound& c
     }
     if (std::optional<Trigger> state = StateOf(pseudo)) {
         if (selector.trigger != Trigger::Always) {
-            return "only one of :hover, :focus and :active is allowed in \"" + selector.text + "\"";
+            return "only one of " + StateList(" and ") + " is allowed in \"" + selector.text + "\"";
         }
         selector.trigger = *state;
         selector.statePart = selector.parts.size();  // the part being read, pushed once it is complete
         return std::nullopt;
     }
     return "pseudo-class \":" + written + "\" is not supported in \"" + selector.text +
-           "\" (:hover, :focus, :active, :first-child, :last-child, :only-child, :nth-child(n), :nth-last-child(n), "
+           "\" (" + StateList(", ") + ", :first-child, :last-child, :only-child, :nth-child(n), :nth-last-child(n), "
            ":playing, :not(...), ::before and ::after are)";
 }
 
@@ -245,8 +198,8 @@ std::optional<Combinator> CombinatorOf(char c) {
 std::vector<Declaration> ParseDeclarations(std::string_view body, size_t bodyOffset, const std::string& clean,
                                            std::vector<std::string>& problems) {
     std::vector<Declaration> declarations;
-    for (const Piece& piece : SplitTopLevel(body, ';')) {
-        std::string_view text = TrimSpace(piece.text);
+    for (std::string_view piece : SplitTopLevel(body, ';')) {
+        std::string_view text = TrimSpace(piece);
         if (text.empty()) continue;
 
         // The text is a view into `body`, so its distance from the start gives its exact offset in the file.
@@ -358,8 +311,8 @@ std::optional<MediaQuery> ParseMediaQuery(std::string_view text, std::string& pr
 // none of those.
 std::optional<std::vector<double>> StopOffsets(std::string_view text) {
     std::vector<double> offsets;
-    for (const Piece& piece : SplitTopLevel(text, ',')) {
-        std::string word = ToLowerAscii(TrimSpace(piece.text));
+    for (std::string_view piece : SplitTopLevel(text, ',')) {
+        std::string word = ToLowerAscii(TrimSpace(piece));
         if (word == "from" || word == "to") {
             offsets.push_back(word == "to" ? 1 : 0);
             continue;
@@ -379,10 +332,7 @@ std::optional<std::vector<double>> StopOffsets(std::string_view text) {
 // and skipped. Nothing without a name.
 std::optional<Keyframes> ParseKeyframes(std::string_view name, size_t open, size_t close, int line,
                                         const std::string& clean, std::vector<std::string>& problems) {
-    name = TrimSpace(name);
-    if (name.size() >= 2 && (name.front() == '"' || name.front() == '\'') && name.back() == name.front()) {
-        name = name.substr(1, name.size() - 2);
-    }
+    name = Unquoted(TrimSpace(name));
     if (name.empty() || name.find_first_of(" \t\r\n\"'(),;") != std::string_view::npos) {
         problems.push_back("line " + std::to_string(line) + ": @keyframes needs a name, such as @keyframes spin, ignored");
         return std::nullopt;
@@ -446,18 +396,12 @@ std::optional<SettingCondition> ParseSettingCondition(std::string_view text, std
         operatorSize = 1;
     }
     condition.key = std::string(TrimSpace(text.substr(0, equals)));
-    bool keyOk = !condition.key.empty() && condition.key.size() <= 32 && IsNameChar(condition.key[0]) &&
-                 condition.key[0] != '-' && condition.key[0] != '_';
-    for (char c : condition.key) keyOk = keyOk && ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-');
-    if (!keyOk) {
+    if (!IsSettingKey(condition.key)) {
         problem = "@setting needs a setting key such as hide-radio, written [a-z0-9-]";
         return std::nullopt;
     }
     if (equals == std::string_view::npos) return condition;
-    std::string_view value = TrimSpace(text.substr(equals + operatorSize));
-    if (value.size() >= 2 && (value.front() == '"' || value.front() == '\'') && value.back() == value.front()) {
-        value = value.substr(1, value.size() - 2);
-    }
+    std::string_view value = Unquoted(TrimSpace(text.substr(equals + operatorSize)));
     if (value.empty()) {
         problem = "@setting " + condition.key + (condition.negated ? " != " : " = ") + "needs a value";
         return std::nullopt;
@@ -536,26 +480,25 @@ std::optional<std::string> BuiltinImport(std::string_view statement) {
     if (ToLowerAscii(target.substr(0, 4)) == "url(" && target.ends_with(')')) {
         target = TrimSpace(target.substr(4, target.size() - 5));
     }
-    if (target.size() >= 2 && (target.front() == '"' || target.front() == '\'') && target.back() == target.front()) {
-        target = target.substr(1, target.size() - 2);
-    }
+    target = Unquoted(target);
     if (ToLowerAscii(target.substr(0, kBuiltinPrefix.size())) != kBuiltinPrefix) return std::nullopt;
     return ToLowerAscii(target.substr(kBuiltinPrefix.size()));
 }
 
-std::string LayoutList() {
+std::string LayoutList(const StylesheetNames& names) {
     std::string list;
-    for (const std::string& name : BuiltinStylesheetNames()) list += (list.empty() ? "" : ", ") + name;
+    for (const std::string& name : names.LayoutNames()) list += (list.empty() ? "" : ", ") + name;
     return list;
 }
 
 // The selectors of a rule head, each class replaced by the path it stands for. Nothing, with `problem` set, when one
 // of them is wrong: the whole rule is then skipped, as in CSS.
-std::optional<std::vector<Selector>> ParseSelectorList(std::string_view head, std::string& problem) {
+std::optional<std::vector<Selector>> ParseSelectorList(std::string_view head, const StylesheetNames& names,
+                                                     std::string& problem) {
     std::vector<Selector> selectors;
-    for (const Piece& piece : SplitTopLevel(head, ',')) {
-        std::string_view written = TrimSpace(piece.text);
-        std::optional<std::vector<std::string>> expanded = ExpandClasses(written, &problem);
+    for (std::string_view piece : SplitTopLevel(head, ',')) {
+        std::string_view written = TrimSpace(piece);
+        std::optional<std::vector<std::string>> expanded = names.Expand(written, &problem);
         if (!expanded) return std::nullopt;
         for (const std::string& text : *expanded) {
             std::optional<Selector> selector = ParseSelector(text, &problem);
@@ -570,14 +513,19 @@ std::optional<std::vector<Selector>> ParseSelectorList(std::string_view head, st
 }  // namespace
 
 const char* TriggerName(Trigger trigger) {
-    switch (trigger) {
-        case Trigger::Hover: return ":hover";
-        case Trigger::Focus: return ":focus";
-        case Trigger::Active: return ":active";
-        case Trigger::Current: return ":current";
-        case Trigger::Always: break;
+    for (const StateClass& state : kStateClasses) {
+        if (state.trigger == trigger) return state.name.data();
     }
     return "";
+}
+
+std::string StateList(std::string_view last) {
+    std::string list;
+    for (size_t i = 0; i < std::size(kStateClasses); i++) {
+        if (i > 0) list += i + 1 == std::size(kStateClasses) ? last : std::string_view(", ");
+        list += kStateClasses[i].name;
+    }
+    return list;
 }
 
 const char* PseudoElementName(PseudoElement pseudo) {
@@ -648,21 +596,22 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
 namespace {
 
 // A statement without a block: `@import "ampify:<layout>";` brings the layout's rules in, under the blocks around it.
-void ReadStatement(std::string_view statement, int line, const Scope& scope, Stylesheet& sheet) {
+void ReadStatement(std::string_view statement, int line, const Scope& scope, const StylesheetNames& names,
+                   Stylesheet& sheet) {
     std::optional<std::string> layout = BuiltinImport(statement);
     if (!layout) {
         sheet.problems.push_back("line " + std::to_string(line) + ": rule \"" + std::string(statement) +
                                  "\" is not supported, ignored");
         return;
     }
-    std::optional<std::string> builtin = BuiltinStylesheet(*layout);
+    std::optional<std::string> builtin = names.Layout(*layout);
     if (!builtin) {
         sheet.problems.push_back("line " + std::to_string(line) + ": layout \"ampify:" + *layout + "\" is unknown (" +
-                                 LayoutList() + "), ignored");
+                                 LayoutList(names) + "), ignored");
         return;
     }
     // Layouts hold no @import, so this goes one level deep.
-    Stylesheet imported = ParseStylesheet(*builtin);
+    Stylesheet imported = ParseStylesheet(*builtin, names);
     for (Rule& rule : imported.rules) {
         rule.origin = "ampify:" + *layout;
         if (scope.media && !rule.media) rule.media = scope.media;
@@ -674,7 +623,7 @@ void ReadStatement(std::string_view statement, int line, const Scope& scope, Sty
 
 }  // namespace
 
-Stylesheet ParseStylesheet(std::string_view css) {
+Stylesheet ParseStylesheet(std::string_view css, const StylesheetNames& names) {
     Stylesheet sheet;
     std::string clean = WithoutComments(WithoutBom(css));
     size_t pos = 0;
@@ -701,7 +650,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
         if (semicolon != std::string::npos && (open == std::string::npos || semicolon < open)) {
             std::string_view statement = TrimSpace(std::string_view(clean).substr(pos, semicolon - pos));
             pos = semicolon + 1;
-            ReadStatement(statement, line, scope, sheet);
+            ReadStatement(statement, line, scope, names, sheet);
             continue;
         }
 
@@ -739,7 +688,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
             continue;
         }
         std::string problem;
-        std::optional<std::vector<Selector>> selectors = ParseSelectorList(head, problem);
+        std::optional<std::vector<Selector>> selectors = ParseSelectorList(head, names, problem);
         if (!selectors) {
             sheet.problems.push_back("line " + std::to_string(line) + ": " + problem + ", rule ignored");
             continue;

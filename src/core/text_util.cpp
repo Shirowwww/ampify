@@ -113,6 +113,13 @@ std::string ShortestNumberText(double value) {
     return error == std::errc() ? std::string(buffer, end) : std::to_string(value);
 }
 
+bool IsSettingKey(std::string_view key) {
+    constexpr size_t kMaxSettingKey = 32;
+    const auto lowerOrDigit = [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'); };
+    if (key.empty() || key.size() > kMaxSettingKey || !lowerOrDigit(key.front())) return false;
+    return std::all_of(key.begin(), key.end(), [&](char c) { return lowerOrDigit(c) || c == '-'; });
+}
+
 int CompareDottedVersions(std::string_view left, std::string_view right) {
     left = WithoutVersionPrefix(left);
     right = WithoutVersionPrefix(right);

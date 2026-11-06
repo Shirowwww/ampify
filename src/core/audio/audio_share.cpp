@@ -10,20 +10,9 @@ namespace {
 
 constexpr int64_t kWantedForMs = 2000;
 constexpr int64_t kFrameFreshMs = 300;
-constexpr int64_t kStatusFreshMs = 1500;
 constexpr int kReadAttempts = 8;
 
-constexpr float kRange = 42.0f;        // dB from the reference down to an empty bar
-constexpr float kReferenceFloor = -60.0f;
-constexpr float kReferenceFall = 4.0f;  // dB per second: a song that gets quieter fills the bars again within seconds
-constexpr float kBarFall = 3.0f;       // of the full height per second
-
 constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
-
-std::optional<double> Known(double value) {
-    if (std::isnan(value)) return std::nullopt;
-    return value;
-}
 
 void BeginWrite(SharedAudio& block) {
     block.sequence.fetch_add(1, std::memory_order_relaxed);
@@ -55,10 +44,14 @@ bool SharedUsable(const SharedAudio& block) {
            block.layout.load(std::memory_order_acquire) == SharedAudio::kLayout;
 }
 
-void WriteSharedFrame(SharedAudio& block, const AnalysisFrame& frame, const TempoEstimate& tempo, int64_t nowMs) {
+void WriteSharedFrame(SharedAudio& block, const AnalysisFrame& frame, const TempoEstimate& tempo,
+                      const std::vector<double>& bandFrequencies, int64_t nowMs) {
     BeginWrite(block);
     block.bandCount = static_cast<uint32_t>(std::min(frame.bandsDb.size(), SharedAudio::kMaxBands));
     std::copy_n(frame.bandsDb.begin(), block.bandCount, block.bandsDb);
+    for (uint32_t i = 0; i < block.bandCount; i++) {
+        block.bandHz[i] = i < bandFrequencies.size() ? static_cast<float>(bandFrequencies[i]) : 0.0f;
+    }
     block.rms = frame.rms;
     block.peak = frame.peak;
     block.bpm = tempo.bpm;
@@ -101,6 +94,7 @@ bool ReadShared(const SharedAudio& block, int64_t nowMs, SharedAudioReading& out
         SharedAudio copy{};
         uint32_t bands = std::min<uint32_t>(block.bandCount, SharedAudio::kMaxBands);
         std::copy_n(block.bandsDb, bands, copy.bandsDb);
+        std::copy_n(block.bandHz, bands, copy.bandHz);
         copy.rms = block.rms;
         copy.peak = block.peak;
         copy.bpm = block.bpm;
@@ -116,6 +110,7 @@ bool ReadShared(const SharedAudio& block, int64_t nowMs, SharedAudioReading& out
 
         out = SharedAudioReading{};
         out.frames = copy.frames;
+        if (copy.frames > 0) out.bandFrequencies.assign(copy.bandHz, copy.bandHz + bands);
         if (copy.frames > 0 && nowMs - copy.frameAtMs <= kFrameFreshMs) {
             AnalysisFrame frame;
             frame.bandsDb.assign(copy.bandsDb, copy.bandsDb + bands);
@@ -124,37 +119,13 @@ bool ReadShared(const SharedAudio& block, int64_t nowMs, SharedAudioReading& out
             out.frame = std::move(frame);
             out.tempo = {copy.bpm, copy.confidence};
         }
-        out.volume = Known(copy.volume);
-        if (copy.statusAtMs > 0 && nowMs - copy.statusAtMs <= kStatusFreshMs) {
-            out.loudness = {Known(copy.momentary), Known(copy.shortTerm)};
+        out.volume = KnownValue(copy.volume);
+        if (copy.statusAtMs > 0 && nowMs - copy.statusAtMs <= kLoudnessFreshMs) {
+            out.loudness = {KnownValue(copy.momentary), KnownValue(copy.shortTerm)};
         }
         return true;
     }
     return false;
-}
-
-BarMeter::BarMeter(size_t count) : m_levels(std::clamp<size_t>(count, 1, SharedAudio::kMaxBands), 0.0f) {}
-
-void BarMeter::Update(const std::vector<float>* bandsDb, double elapsedSeconds) {
-    const float dt = static_cast<float>(std::clamp(elapsedSeconds, 0.0, 0.5));
-    const size_t bars = m_levels.size();
-    if (!bandsDb || bandsDb->empty()) {
-        for (float& level : m_levels) level = std::max(0.0f, level - kBarFall * dt);
-        return;
-    }
-    const size_t bands = bandsDb->size();
-    const float loudest = *std::max_element(bandsDb->begin(), bandsDb->end());
-    m_reference = std::max({loudest, m_reference - kReferenceFall * dt, kReferenceFloor});
-    for (size_t i = 0; i < bars; i++) {
-        // Each bar takes the loudest of its bands; with more bars than bands, neighbours share one.
-        size_t first = i * bands / bars;
-        size_t last = std::max(first + 1, (i + 1) * bands / bars);
-        float db = *std::max_element(bandsDb->begin() + static_cast<std::ptrdiff_t>(first),
-                                     bandsDb->begin() + static_cast<std::ptrdiff_t>(std::min(last, bands)));
-        float target = std::clamp((db - (m_reference - kRange)) / kRange, 0.0f, 1.0f);
-        target = target * target;  // the quiet end stays low, so the beats stand out
-        m_levels[i] = std::max(target, m_levels[i] - kBarFall * dt);
-    }
 }
 
 }  // namespace ampify::audio

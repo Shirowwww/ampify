@@ -126,7 +126,7 @@ void AtmosLeveler::EndTrack() {
 }
 
 void AtmosLeveler::Feed(const float* interleaved, size_t frames, float volume) {
-    if (!m_active || volume <= 0.0f) return;
+    if (!m_active || volume <= ampify::audio::kLowestPlayerVolume) return;
 
     m_volume = volume;
 

@@ -2,8 +2,8 @@
 
 // The process's AudioHost: the analysis, the equalizer settings, the loudness and the player volume that the
 // sample path publishes, and the delivery of analysis frames to the elements. Portable: the Windows kernel feeds it
-// from the Atmos leveler's hooks (extensions/atmos-leveler/kit_audio.*), the tests and `ampify test` feed it
-// synthetic signals.
+// from the audio hooks (src/win/audio/, through sample_path.hpp), the tests and `ampify test` feed it synthetic
+// signals.
 //
 // Threads: the audio threads call FeedAnalysis and the Publish* methods, and read Eq(); they never block (the
 // analysis is skipped for a block when the JavaScript thread holds it). Everything else may come from any thread.
@@ -42,7 +42,7 @@ public:
     // volume for a stream that already has it). Never blocks: a block is skipped when the analysis is busy.
     void FeedAnalysis(const float* interleaved, size_t frames, int channels, double sampleRate, float scale = 1.0f);
 
-    // The live loudness. A reading older than 1.5 s counts as unknown: the music is paused or stopped.
+    // The live loudness. A reading older than kLoudnessFreshMs counts as unknown.
     void PublishLoudness(const LoudnessReading& reading);
     void PublishPlayerVolume(double volume);
 
@@ -58,7 +58,6 @@ public:
 
     void SubscribeFrames(const std::string& elementId, FrameSink sink) override;
     AudioAnalysisResult Analyze(const std::string& elementId) override;
-    std::vector<double> BandFrequencies() override;
     LoudnessReading Loudness() override;
     std::optional<double> PlayerVolume() override;
     std::vector<EqBandState> EqBands() override;

@@ -40,6 +40,10 @@ std::string_view ClipUtf8(std::string_view text, size_t maxBytes);
 // 9e15 is written in full, never with an exponent.
 std::string ShortestNumberText(double value);
 
+// The form of a setting key, [a-z0-9][a-z0-9-]{0,31}: the manifest declares it, a theme's @setting block names it,
+// the settings page writes it. Here so that the CSS parser reads it without the manifest.
+bool IsSettingKey(std::string_view key);
+
 // Orders two dotted versions part by part (1.10.0 comes after 1.9.0): -1, 0 or 1. A leading "v" is ignored, a missing
 // part counts as 0, and any character that is not a digit ends a part.
 int CompareDottedVersions(std::string_view left, std::string_view right);

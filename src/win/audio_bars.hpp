@@ -1,8 +1,8 @@
 #pragma once
 
 // The bars of a theme's `content: bars(n)`: a Grid of thin rounded Borders that rise and fall with the music, from
-// the analysis AMPLibraryAgent.exe shares (audio_share.hpp). One timer of the interface thread moves every set of
-// bars, 30 times a second, and only while one is on screen; it asks for the analysis as it goes, so the engine
+// the analysis AMPLibraryAgent.exe shares (audio/audio_sharing.hpp). One timer of the interface thread moves every set
+// of bars, 30 times a second, and only while one is on screen; it asks for the analysis as it goes, so the engine
 // analyses nothing once the bars are gone. Built with the Windows App SDK headers only (AMPIFY_WITH_XAML); every
 // member runs on the interface thread.
 
@@ -18,7 +18,7 @@
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Windows.UI.ViewManagement.h>
 
-#include "../core/audio/audio_share.hpp"
+#include "../core/audio/bar_meter.hpp"
 
 namespace ampify::win {
 

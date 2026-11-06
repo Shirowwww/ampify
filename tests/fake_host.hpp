@@ -27,6 +27,7 @@ struct FakeHost : Host, KeyUnbindHost {
     PlayerSnapshot player;
     std::vector<PlayerCommand> commands;
     std::vector<std::pair<std::string, double>> gains;  // (element, dB) as set
+    bool gainReachesSamples = true;                      // false: a process the sound does not pass through
     std::vector<std::string> notifications;             // "title|text"
     std::map<std::string, std::string> keys;            // combo -> element id
     std::vector<std::string> unregistered;              // element ids
@@ -61,7 +62,11 @@ struct FakeHost : Host, KeyUnbindHost {
         return true;
     }
 
-    void SetGainDb(const std::string& elementId, double db) override { gains.emplace_back(elementId, db); }
+    bool SetGainDb(const std::string& elementId, double db) override {
+        if (!gainReachesSamples) return false;
+        gains.emplace_back(elementId, db);
+        return true;
+    }
     UiModel& Ui() override { return ui; }
 
     void Notify(const std::string& elementId, const std::string& title, const std::string& text) override {

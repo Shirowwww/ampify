@@ -1,15 +1,17 @@
-#include "audio_share.hpp"
+#include "audio_sharing.hpp"
 
 #include <windows.h>
 
 #include <chrono>
+#include <string>
 #include <thread>
 
 namespace ampify::win {
 
 namespace {
 
-constexpr wchar_t kMappingName[] = L"Local\\Ampify.Audio.1";
+// Named after the layout, so builds of two layouts never map the same block.
+std::wstring MappingName() { return L"Local\\Ampify.Audio." + std::to_wstring(audio::SharedAudio::kLayout); }
 constexpr const char* kShareUser = "ampify:interface";  // the engine's analysis user for the interface process
 constexpr auto kStatusEvery = std::chrono::milliseconds(100);
 constexpr auto kPollEvery = std::chrono::milliseconds(50);
@@ -23,7 +25,7 @@ audio::SharedAudio* SharedAudioBlock() {
     static audio::SharedAudio* block = [] () -> audio::SharedAudio* {
         // Never unmapped: the other process and this one's threads may use it until the process exits.
         HANDLE mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0,
-                                            static_cast<DWORD>(sizeof(audio::SharedAudio)), kMappingName);
+                                            static_cast<DWORD>(sizeof(audio::SharedAudio)), MappingName().c_str());
         if (!mapping) return nullptr;
         void* view = MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(audio::SharedAudio));
         if (!view) {
@@ -63,9 +65,10 @@ void StartAudioSharing(audio::AudioEngine& engine, Journal& journal, std::functi
                 if (wanted && !subscribed) {
                     engine.StartDeliveryThread();
                     engine.SubscribeFrames(kShareUser, [&engine, block](const audio::AnalysisFrame& frame) {
-                        audio::TempoEstimate tempo = engine.Analyze(kShareUser).tempo;
+                        AudioAnalysisResult analysis = engine.Analyze(kShareUser);
                         std::lock_guard<std::mutex> writing(g_writeLock);
-                        audio::WriteSharedFrame(*block, frame, tempo, SharedAudioNowMs());
+                        audio::WriteSharedFrame(*block, frame, analysis.tempo, analysis.bandFrequencies,
+                                                SharedAudioNowMs());
                     });
                     journal.Write("Audio sharing: the interface asks for the analysis");
                 } else if (!wanted && subscribed) {
@@ -109,6 +112,9 @@ void SharedAudioHost::Poll() {
 
 AudioAnalysisResult SharedAudioHost::Analyze(const std::string&) {
     AudioAnalysisResult result;
+    // Until the engine wrote a frame: the layout the analysis starts with, as the engine answers before any audio.
+    static const auto* starting = new std::vector<double>(audio::AudioAnalyzer().BandCentres());  // read until exit
+    result.bandFrequencies = *starting;
     audio::SharedAudio* block = SharedAudioBlock();
     if (!block) return result;
     int64_t now = SharedAudioNowMs();
@@ -118,10 +124,9 @@ AudioAnalysisResult SharedAudioHost::Analyze(const std::string&) {
     result.tempo = reading.tempo;
     result.loudness = reading.loudness;
     result.frame = reading.frame;
+    if (!reading.bandFrequencies.empty()) result.bandFrequencies = std::move(reading.bandFrequencies);
     return result;
 }
-
-std::vector<double> SharedAudioHost::BandFrequencies() { return audio::AudioAnalyzer().BandCentres(); }
 
 LoudnessReading SharedAudioHost::Loudness() {
     audio::SharedAudio* block = SharedAudioBlock();

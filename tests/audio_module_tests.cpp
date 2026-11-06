@@ -190,6 +190,30 @@ TEST_CASE(AudioModule_WithoutAudioNothingThrows) {
     element->Stop();
 }
 
+namespace {
+
+// The interface process's AudioHost: what the engine shares, read only, with no equalizer bands.
+struct ReadOnlyAudio : ampify::audio::AudioEngine {
+    ampify::AudioReach Reach() const override { return ampify::AudioReach::AnalysisOnly; }
+    std::vector<ampify::EqBandState> EqBands() override { return {}; }
+};
+
+}  // namespace
+
+TEST_CASE(AudioModule_ReadOnlyAudioRefusesTheEqualizer) {
+    Fixture f(false);
+    ReadOnlyAudio audio;
+    f.host.audio = &audio;
+    auto element = f.Make("readonly", R"(
+        Ampify.log("eq " + Ampify.audio.eq.setBand(0, 3) + " " + Ampify.audio.eq.preset("pop"));
+    )", R"("audio.eq")");
+    CHECK(element->Start());
+    CHECK(f.Logged("[readonly] eq false false"));
+    CHECK(f.Count("the equalizer is only applied in") == 1);
+    CHECK(audio.Eq().IsFlat());
+    element->Stop();
+}
+
 TEST_CASE(AudioModule_ListenerErrorsAreLoggedAndOthersStillRun) {
     Fixture f;
     auto element = f.Make("guarded", R"(

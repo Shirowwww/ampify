@@ -88,7 +88,7 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   StoreSyllable at each new item (`src/win/amp_player.cpp`). `GetLyricsAsync(descriptor, StoreSyllable)` (slot 50)
   completes, but on 1.1792 it gave `timing="Line"` TTML for every library song tried (05/11/2026): Apple Music on
   Windows had no word timing for them. The karaoke then spreads a line's span over its words by length
-  (`TimedWords`, `src/core/lyrics.cpp`), the parsed lyrics keep only what Apple gave.
+  (`KaraokeWords`, `src/core/lyrics.cpp`), the parsed lyrics keep only what Apple gave.
 - **A large cover.** The play bar's `Image#StaticArtwork` is a thumbnail. Apple's own loader is a static of
   `AMP.UI.Views.UIBroker` (`IUIBrokerStatics` AC46998B-…, slot 34 `GetImageSource(Artwork, Double scale, Double width,
   Double height) -> ImageSource`), given the item's `IArtwork`. Library covers sit on disk in

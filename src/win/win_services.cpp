@@ -34,6 +34,17 @@ int IntSetting(Host& host, const std::string& key, int fallback, int low, int hi
     return static_cast<int>(value);
 }
 
+// No default case: an action not mapped here sends no command, never another one.
+std::optional<PlayerCommand> CommandOf(remote::Action action) {
+    switch (action) {
+        case remote::Action::Play: return PlayerCommand::Play;
+        case remote::Action::Pause: return PlayerCommand::Pause;
+        case remote::Action::Next: return PlayerCommand::Next;
+        case remote::Action::Previous: return PlayerCommand::Previous;
+    }
+    return std::nullopt;
+}
+
 }  // namespace
 
 Services::Services(Host& host, std::string process, std::filesystem::path kit, Journal& journal)
@@ -287,7 +298,7 @@ std::string Services::StatusJson() {
 
 uint16_t Services::remotePort() const { return m_remote ? m_remote->port() : 0; }
 
-std::optional<double> Services::Queue(const std::string& action, double db) {
+std::optional<double> Services::Queue(std::optional<remote::Action> action, double db) {
     auto task = std::make_shared<RemoteTask>();
     task->action = action;
     task->db = db;
@@ -302,10 +313,10 @@ std::optional<double> Services::Queue(const std::string& action, double db) {
 }
 
 bool Services::Command(remote::Action action) {
-    return Queue(std::string(remote::ActionName(action)), 0).has_value();
+    return Queue(action, 0).has_value();
 }
 
-std::optional<double> Services::SetGainDb(double db) { return Queue("gain", db); }
+std::optional<double> Services::SetGainDb(double db) { return Queue(std::nullopt, db); }
 
 // ---- Output files ----------------------------------------------------------------------------------------------
 
@@ -339,17 +350,14 @@ void Services::Service() {
 
     for (const std::shared_ptr<RemoteTask>& task : remoteTasks) {
         std::optional<double> result;
-        if (task->action == "gain") {
+        if (!task->action) {
             // The internal gain on the samples, under Ampify's ceiling. The volume slider never moves.
-            m_host.SetGainDb("remote", task->db);
-            m_remoteGainDb = task->db;
-            result = task->db;
-        } else {
-            PlayerCommand command = task->action == "play"    ? PlayerCommand::Play
-                                    : task->action == "pause" ? PlayerCommand::Pause
-                                    : task->action == "next"  ? PlayerCommand::Next
-                                                              : PlayerCommand::Previous;
-            if (m_host.Control(command, 0)) result = 0.0;
+            if (m_host.SetGainDb("remote", task->db)) {
+                m_remoteGainDb = task->db;
+                result = task->db;
+            }
+        } else if (std::optional<PlayerCommand> command = CommandOf(*task->action)) {
+            if (m_host.Control(*command, 0)) result = 0.0;
         }
         task->done.set_value(result);
     }

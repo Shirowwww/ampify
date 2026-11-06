@@ -428,7 +428,7 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, 
     if (known == m_hovers.end() && values.empty()) return;
 
     if (!tree.SetHover(node.id, values)) {
-        Refuse(Describe(node) + " :hover", "\"" + Describe(node) + "\" does not follow its states (:hover, :focus, :active, :current)",
+        Refuse(Describe(node) + " :hover", "\"" + Describe(node) + "\" does not follow its states (" + StateList(", ") + ")",
                report, node.id);
         return;
     }

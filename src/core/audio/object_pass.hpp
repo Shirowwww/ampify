@@ -6,9 +6,9 @@
 #include <vector>
 
 #include "gain_ramp.hpp"
-#include "loudness_meter.hpp"
+#include "k_weighting.hpp"
 
-namespace atmos {
+namespace ampify::audio {
 
 // One spatial audio object's mono buffer for the current update pass. `key` identifies the object
 // across passes, such as its address.
@@ -45,4 +45,4 @@ private:
     PassLevels m_levels;
 };
 
-}  // namespace atmos
+}  // namespace ampify::audio

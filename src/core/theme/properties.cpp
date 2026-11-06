@@ -10,6 +10,7 @@
 #include "../text_util.hpp"
 #include "colour_keys.hpp"
 #include "css.hpp"
+#include "css_values.hpp"
 
 namespace ampify::theme {
 
@@ -181,20 +182,7 @@ std::optional<std::string> UrlArgument(std::string_view raw) {
     std::string_view text = TrimSpace(raw);
     if (ToLowerAscii(text.substr(0, 4)) != "url(" || text.back() != ')') return std::nullopt;
 
-    std::string_view inside = TrimSpace(text.substr(4, text.size() - 5));
-    if (inside.size() >= 2 && (inside.front() == '"' || inside.front() == '\'') && inside.back() == inside.front()) {
-        inside = inside.substr(1, inside.size() - 2);
-    }
-    return std::string(inside);
-}
-
-std::optional<double> ParseNumber(std::string_view text) {
-    double value = 0;
-    const char* first = text.data();
-    const char* last = first + text.size();
-    auto [end, error] = std::from_chars(first, last, value);
-    if (error != std::errc() || end != last || !std::isfinite(value)) return std::nullopt;
-    return value;
+    return std::string(Unquoted(TrimSpace(text.substr(4, text.size() - 5))));
 }
 
 // Strips a trailing `px`, the only unit the engine accepts.
@@ -227,37 +215,6 @@ std::optional<std::string_view> FunctionArguments(std::string_view raw, std::str
     std::string_view rest = TrimSpace(text.substr(name.size()));
     if (rest.size() < 2 || rest.front() != '(' || rest.back() != ')') return std::nullopt;
     return rest.substr(1, rest.size() - 2);
-}
-
-// Splits on commas outside parentheses; each piece trimmed.
-std::vector<std::string_view> SplitArguments(std::string_view text) {
-    std::vector<std::string_view> pieces;
-    int depth = 0;
-    size_t start = 0;
-    for (size_t i = 0; i <= text.size(); i++) {
-        if (i == text.size() || (text[i] == ',' && depth == 0)) {
-            pieces.push_back(TrimSpace(text.substr(start, i - start)));
-            start = i + 1;
-        } else if (text[i] == '(') {
-            depth++;
-        } else if (text[i] == ')') {
-            depth--;
-        }
-    }
-    return pieces;
-}
-
-// Splits on whitespace; empty pieces are dropped.
-std::vector<std::string_view> SplitWords(std::string_view text) {
-    std::vector<std::string_view> words;
-    size_t i = 0;
-    while (i < text.size()) {
-        while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i]))) i++;
-        size_t start = i;
-        while (i < text.size() && !std::isspace(static_cast<unsigned char>(text[i]))) i++;
-        if (i > start) words.push_back(text.substr(start, i - start));
-    }
-    return words;
 }
 
 // Four decimals are plenty for a point relative to an element, and keep the text the same from one load to the next.
@@ -623,10 +580,7 @@ Conversion ConvertFontFile(std::string_view argument, const ValueContext& contex
 Conversion ConvertText(std::string_view raw, const ValueContext& context) {
     if (std::optional<std::string> argument = UrlArgument(raw)) return ConvertFontFile(*argument, context);
 
-    std::string_view text = TrimSpace(raw);
-    if (text.size() >= 2 && (text.front() == '"' || text.front() == '\'') && text.back() == text.front()) {
-        text = text.substr(1, text.size() - 2);
-    }
+    std::string_view text = Unquoted(TrimSpace(raw));
     if (text.empty()) return Fail("empty font name");
     return Ok(ValueKind::Text, std::string(text));
 }
@@ -651,10 +605,7 @@ Conversion ConvertColorScheme(std::string_view raw) {
 
 // A selector naming the element to move into, quoted or not. It must parse now: a bad one would never move anything.
 Conversion ConvertMoveTo(std::string_view raw) {
-    std::string_view text = TrimSpace(raw);
-    if (text.size() >= 2 && (text.front() == '"' || text.front() == '\'') && text.back() == text.front()) {
-        text = text.substr(1, text.size() - 2);
-    }
+    std::string_view text = Unquoted(TrimSpace(raw));
     std::string problem;
     if (text.empty() || !ParseSelector(text, &problem)) {
         return Fail("unreadable selector: \"" + std::string(TrimSpace(raw)) + "\" (the element to move into)");

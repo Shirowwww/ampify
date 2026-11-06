@@ -27,8 +27,8 @@
 #include "../core/ui_render/apple_tweaks.hpp"
 #include "../core/version_gate.hpp"
 #include "../core/version_list.hpp"
-#include "../../extensions/atmos-leveler/atmos_windows.hpp"
-#include "../win/audio_share.hpp"
+#include "../win/audio/audio_hooks.hpp"
+#include "../win/audio/audio_sharing.hpp"
 #include "../win/network_fix.hpp"
 #include "../win/player_buttons.hpp"
 #include "../win/reliability_watch.hpp"
@@ -43,6 +43,9 @@
 #include "../win/ui_service.hpp"
 #include "../win/xaml_host.hpp"
 #endif
+
+// The Atmos leveler, built into the kernel: the header comes through the include folders of its library target.
+#include "atmos-leveler/atmos_windows.hpp"
 
 namespace {
 
@@ -184,12 +187,12 @@ DWORD WINAPI KernelMain(LPVOID) {
     journal.Write("JavaScript elements accepted: " + std::to_string(report.loaded.size()) + ", rejected: " +
                   std::to_string(report.rejected.size()));
 
-    // The Atmos leveler lives where the audio is rendered: AMPLibraryAgent.exe only.
+    // The audio platform and the Atmos leveler live where the audio is rendered: AMPLibraryAgent.exe only.
     if (role == ampify::ProcessRole::LibraryAgent) {
-        ampify::win::InstallPlayerVolume(&atmos::hooks::SetPlayerVolume);  // Ampify.player.setVolume
+        ampify::win::InstallPlayerVolume(&ampify::win::audio_hooks::SetPlayerVolume);  // Ampify.player.setVolume
         host.Add(atmos::hooks::MakeAtmosLevelerExtension(journal, settings));
         ampify::win::StartAudioSharing(ampify::audio::ProcessAudio(), journal,  // the sound, for the interface
-                                       [] { atmos::hooks::StartSoundHooks(journal); });
+                                       [] { ampify::win::audio_hooks::StartSoundHooks(journal); });
     }
 
     // JavaScript runs on this one thread only: QuickJS is not thread-safe, and the shortcuts are delivered to the

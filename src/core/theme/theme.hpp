@@ -133,15 +133,6 @@ std::vector<std::string> ReadSchemes(FileSource& files);
 // The scheme manifest.json names as the theme's default (`defaultScheme`). Empty when the manifest has none.
 std::string ReadDefaultScheme(FileSource& files);
 
-// Replaces each `var(--name)` or `var(--name, fallback)` of `value` with the variable (names are case-insensitive).
-// Nothing when a variable is missing and has no fallback; `problem` then says which one.
-std::optional<std::string> SubstituteVariables(std::string_view value, const std::map<std::string, std::string>& variables,
-                                               std::string* problem = nullptr);
-
-// Replaces each `calc(...)` of `value` with its result: numbers with an optional unit (`px`, `ms`...), + - * / and
-// brackets, after the variables are in. Nothing when an expression cannot be computed; `problem` then says why.
-std::optional<std::string> EvaluateCalc(std::string_view value, std::string* problem = nullptr);
-
 // True for a dictionary with no entry at all, such as `<ResourceDictionary/>`: merging it would change nothing.
 bool IsEmptyDictionary(std::string_view xaml);
 

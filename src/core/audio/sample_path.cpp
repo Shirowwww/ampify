@@ -1,17 +1,20 @@
-#include "kit_audio.hpp"
+#include "sample_path.hpp"
 
 #include <algorithm>
 
-namespace atmos {
+namespace ampify::audio {
 
 namespace {
 
+// Render clients come one or two at a time; a handful of filter states covers a device change.
+constexpr size_t kStreamEqProcessors = 8;
+
 // 1 / player volume, or 0 when the slider is too low to divide by: that block is not measured.
-float Unscale(float volume) { return volume > 0.001f ? 1.0f / volume : 0.0f; }
+float Unscale(float volume) { return volume > kLowestPlayerVolume ? 1.0f / volume : 0.0f; }
 
 }  // namespace
 
-EqStage::EqStage(const ampify::audio::EqSettings& settings, size_t maxProcessors)
+EqStage::EqStage(const EqSettings& settings, size_t maxProcessors)
     : m_settings(settings), m_max(std::max<size_t>(1, maxProcessors)) {}
 
 bool EqStage::Active() {
@@ -34,19 +37,19 @@ void EqStage::Run(const void* key, float* interleaved, size_t frames, int channe
     if (found == m_processors.end()) {
         // Objects come and go. Past the limit the states are dropped rather than the table grown without end.
         if (m_processors.size() >= m_max) m_processors.clear();
-        found = m_processors.emplace(key, std::make_unique<ampify::audio::EqProcessor>(m_settings)).first;
+        found = m_processors.emplace(key, std::make_unique<EqProcessor>(m_settings)).first;
     }
     found->second->Process(interleaved, frames, channels, m_rate);
 }
 
-KitAudio::KitAudio(ampify::audio::AudioEngine& engine)
+SamplePath::SamplePath(AudioEngine& engine)
     : m_engine(engine),
-      m_streamEq(engine.Eq(), 8),
-      m_objectEq(engine.Eq()),
-      m_streamLoudness(48000, 2),
-      m_objectLoudness(48000, 1) {}
+      m_streamEq(engine.Eq(), kStreamEqProcessors),
+      m_objectEq(engine.Eq(), ObjectPass::kMaxObjects),
+      m_streamLoudness(kStartSampleRate, 2),
+      m_objectLoudness(kStartSampleRate, 1) {}
 
-void KitAudio::BeforeStream(const float* samples, size_t frames, int channels, int sampleRate, float playerVolume) {
+void SamplePath::BeforeStream(const float* samples, size_t frames, int channels, int sampleRate, float playerVolume) {
     float scale = Unscale(playerVolume);
     if (channels != 2 || scale == 0.0f || sampleRate <= 0) return;
     m_streamLoudness.SetSampleRate(sampleRate);
@@ -54,24 +57,24 @@ void KitAudio::BeforeStream(const float* samples, size_t frames, int channels, i
     m_engine.PublishLoudness({m_streamLoudness.MomentaryLufs(), m_streamLoudness.ShortTermLufs()});
 }
 
-SampleStage* KitAudio::StreamStage(int sampleRate) {
+SampleStage* SamplePath::StreamStage(int sampleRate) {
     m_streamEq.SetSampleRate(sampleRate);
     return &m_streamEq;
 }
 
-void KitAudio::AfterStream(const float* samples, size_t frames, int channels, int sampleRate, float playerVolume) {
+void SamplePath::AfterStream(const float* samples, size_t frames, int channels, int sampleRate, float playerVolume) {
     float scale = Unscale(playerVolume);
     if (scale == 0.0f) return;
     m_engine.FeedAnalysis(samples, frames, channels, sampleRate, scale);
 }
 
-SampleStage* KitAudio::ObjectStage(int sampleRate) {
+SampleStage* SamplePath::ObjectStage(int sampleRate) {
     m_objectEq.SetSampleRate(sampleRate);
     return &m_objectEq;
 }
 
-void KitAudio::AfterObjects(std::span<const ObjectBuffer> objects, size_t frames, int sampleRate,
-                            const PassLevels& levels) {
+void SamplePath::AfterObjects(std::span<const ObjectBuffer> objects, size_t frames, int sampleRate,
+                              const PassLevels& levels) {
     if (sampleRate <= 0 || frames == 0) return;
     m_objectLoudness.SetSampleRate(sampleRate);
     m_objectLoudness.ProcessPower(levels.framePower.data(), std::min(frames, levels.framePower.size()));
@@ -85,4 +88,4 @@ void KitAudio::AfterObjects(std::span<const ObjectBuffer> objects, size_t frames
     m_engine.FeedAnalysis(m_mix.data(), frames, 1, sampleRate);
 }
 
-}  // namespace atmos
+}  // namespace ampify::audio

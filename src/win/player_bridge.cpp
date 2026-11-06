@@ -222,15 +222,10 @@ void PlayerBridge::PublishFeed(const PlayerSnapshot& snapshot) {
     if (now.trackKey != m_feedKey) {
         m_feedKey = now.trackKey;
         m_feedLyrics.reset();
-        m_feedTtmlBytes = 0;
     }
-    // Parsed again when Apple's text changes: the word-timed lyrics may come after those timed by line.
-    std::optional<RawLyrics> raw = snapshot.lyricsAvailable ? Lyrics() : std::nullopt;
-    size_t bytes = raw ? raw->ttml.size() + raw->staticText.size() : 0;
-    if (raw && bytes != m_feedTtmlBytes) {  // a text without lines is not parsed again at each read
-        std::optional<ampify::Lyrics> parsed = LyricsFromRaw(*raw);
-        if (parsed) m_feedLyrics = std::make_shared<const ampify::Lyrics>(std::move(*parsed));
-        m_feedTtmlBytes = bytes;
+    // A new text replaces the parsed copy: the word-timed lyrics may come after those timed by line.
+    if (std::optional<RawLyrics> raw = snapshot.lyricsAvailable ? Lyrics() : std::nullopt) {
+        if (std::shared_ptr<const ampify::Lyrics> parsed = SharedLyrics(*raw)) m_feedLyrics = std::move(parsed);
     }
     now.lyrics = m_feedLyrics;
     PublishNowPlaying(std::move(now));

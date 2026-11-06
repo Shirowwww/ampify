@@ -150,7 +150,8 @@ struct PlayerNatives : ScriptBridge {
         if (!Require(ctx, ext, "player.read", &failure)) return failure;
         LyricsHost* source = HostOf(ext).Capability<LyricsHost>();
         std::optional<RawLyrics> raw = source ? source->Lyrics() : std::nullopt;
-        std::string json = LyricsJson(raw ? LyricsFromRaw(*raw) : std::nullopt).Dump();
+        std::shared_ptr<const Lyrics> lyrics = raw ? SharedLyrics(*raw) : nullptr;
+        std::string json = LyricsJson(lyrics.get()).Dump();
         return JS_NewStringLen(ctx, json.data(), json.size());
     }
 

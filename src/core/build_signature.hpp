@@ -24,8 +24,9 @@ struct BuildSignature {
 // without exports gives an empty list.
 std::optional<std::vector<std::string>> PeExportNames(std::span<const std::byte> image);
 
-// Checks `image` against the required names: by default the exports of kPlayerDllName that the Atmos leveler
-// resolves (extensions/atmos-leveler/atmos_windows.cpp). Bytes that cannot be read are never a match.
+// Checks `image` against the required names: by default the exports of kPlayerDllName that the audio hooks and the
+// Atmos leveler resolve (src/win/audio/, extensions/atmos-leveler/atmos_windows.cpp). Bytes that cannot be read are
+// never a match.
 BuildSignature CheckBuildSignature(std::span<const std::byte> image,
                                    std::span<const std::string_view> required = kRequiredPlayerExports);
 

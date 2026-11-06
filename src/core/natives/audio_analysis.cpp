@@ -2,12 +2,14 @@
 // volume and equalizer, through the host's AudioHost capability (src/core/audio/audio_host.hpp). Permissions:
 // audio.analyze (frames, analyze, loudness), audio.eq (equalizer), player.read (volume).
 //
-// Without the capability (the interface process, or a host without audio) nothing throws: the frames never come,
-// the readings are null and the equalizer answers false. A missing permission throws PermissionDenied as usual.
+// Without the capability (a host without audio) nothing throws: the frames never come, the readings are null and the
+// equalizer answers false, as it does where the capability is read only (the interface process). A missing
+// permission throws PermissionDenied as usual.
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <mutex>
 #include <string>
 
@@ -16,44 +18,67 @@
 #include "../apple_music.hpp"
 #include "../audio/audio_host.hpp"
 #include "../audio/equalizer.hpp"
+#include "../json.hpp"
 
 namespace ampify::natives {
 
 namespace {
 
-// Numbers for the JSON handed to the script: six significant digits are plenty, and keep the frames small.
-std::string Num(double value) {
-    if (!std::isfinite(value)) return "null";
+// Numbers handed to the script: six significant digits are plenty, and keep the frames small. Not finite: null.
+Json Num(double value) {
+    if (!std::isfinite(value)) return Json();
     char text[32];
     std::snprintf(text, sizeof(text), "%.6g", value);
-    return text;
+    return Json(std::strtod(text, nullptr));
 }
 
-std::string Num(const std::optional<double>& value) { return value ? Num(*value) : "null"; }
-
-std::string Quoted(const std::string& text) {
-    return "\"" + text + "\"";  // only kit-made names reach this: no escaping needed
-}
+Json Num(const std::optional<double>& value) { return value ? Num(*value) : Json(); }
 
 // A band level in dBFS as 0..1: 0 at -80 dB or below, 1 at 0 dB.
 double BandValue(float db) { return std::clamp((static_cast<double>(db) + 80.0) / 80.0, 0.0, 1.0); }
 
-std::string BandsJson(const std::vector<float>& bandsDb) {
-    std::string out = "[";
-    for (size_t i = 0; i < bandsDb.size(); i++) {
-        if (i) out += ",";
-        out += Num(std::round(BandValue(bandsDb[i]) * 1000.0) / 1000.0);
-    }
-    return out + "]";
+Json BandsJson(const std::vector<float>& bandsDb) {
+    Json::Array bands;
+    for (float db : bandsDb) bands.push_back(Num(std::round(BandValue(db) * 1000.0) / 1000.0));
+    return Json(std::move(bands));
 }
 
 std::string FrameJson(const audio::AnalysisFrame& frame) {
-    return "{\"bands\":" + BandsJson(frame.bandsDb) + ",\"rms\":" + Num(frame.rms) + ",\"peak\":" + Num(frame.peak) +
-           ",\"time\":" + Num(frame.seconds) + "}";
+    Json::Object members;
+    members.emplace_back("bands", BandsJson(frame.bandsDb));
+    members.emplace_back("rms", Num(frame.rms));
+    members.emplace_back("peak", Num(frame.peak));
+    members.emplace_back("time", Num(frame.seconds));
+    return Json(std::move(members)).Dump();
 }
 
-std::string LoudnessJson(const LoudnessReading& reading) {
-    return "{\"momentary\":" + Num(reading.momentary) + ",\"shortTerm\":" + Num(reading.shortTerm) + "}";
+Json LoudnessJson(const LoudnessReading& reading) {
+    return Json(Json::Object{{"momentary", Num(reading.momentary)}, {"shortTerm", Num(reading.shortTerm)}});
+}
+
+std::string AnalysisJson(const AudioAnalysisResult& result) {
+    Json::Object members;
+    members.emplace_back("tempo", result.tempo.bpm > 0 ? Num(result.tempo.bpm) : Json());
+    members.emplace_back("confidence", Num(result.tempo.confidence));
+    members.emplace_back("loudness", LoudnessJson(result.loudness));
+    members.emplace_back("rms", result.frame ? Num(result.frame->rms) : Json());
+    members.emplace_back("peak", result.frame ? Num(result.frame->peak) : Json());
+    members.emplace_back("bands", result.frame ? BandsJson(result.frame->bandsDb) : Json(Json::Array{}));
+    Json::Array frequencies;
+    for (double hz : result.bandFrequencies) frequencies.push_back(Num(std::round(hz)));
+    members.emplace_back("frequencies", Json(std::move(frequencies)));
+    return Json(std::move(members)).Dump();
+}
+
+std::string EqBandsJson(const std::vector<EqBandState>& bands) {
+    Json::Array out;
+    for (const EqBandState& band : bands) {
+        out.push_back(Json(Json::Object{{"frequency", Num(band.frequency)},
+                                        {"gainDb", Num(band.gainDb)},
+                                        {"q", Num(band.q)},
+                                        {"type", Json(band.kind)}}));
+    }
+    return Json(std::move(out)).Dump();
 }
 
 // The newest frame for one element, until its script takes it. A frame that arrives before the previous one was
@@ -62,18 +87,41 @@ struct FrameMailbox {
     std::mutex lock;
     std::string latest;
     bool pending = false;  // a dispatch.audioFrame call is queued
-    bool unavailableNoted = false;
+};
+
+// What the element was told once in the log, so a script that keeps asking does not fill it.
+struct AudioNotes {
+    bool unavailable = false;
+    bool equalizerElsewhere = false;
 };
 
 struct AudioAnalysisNatives : ScriptBridge {
     static AudioHost* Audio(ScriptExtension* ext) { return HostOf(ext).Capability<AudioHost>(); }
 
     static void NoteUnavailable(ScriptExtension* ext) {
-        FrameMailbox& box = State<FrameMailbox>(ext);
-        if (box.unavailableNoted) return;
-        box.unavailableNoted = true;
+        AudioNotes& notes = State<AudioNotes>(ext);
+        if (notes.unavailable) return;
+        notes.unavailable = true;
         JournalOf(ext).Write("[" + ext->id() + "] audio analysis is not available in this process (" +
                              HostOf(ext).Process() + "): sound is only processed in " + std::string(kLibraryAgentImage));
+    }
+
+    // The host when the equalizer runs in this process; otherwise null, said once in the log.
+    static AudioHost* Equalizer(ScriptExtension* ext) {
+        AudioHost* audio = Audio(ext);
+        if (!audio) {
+            NoteUnavailable(ext);
+            return nullptr;
+        }
+        if (audio->Reach() == AudioReach::Full) return audio;
+        AudioNotes& notes = State<AudioNotes>(ext);
+        if (!notes.equalizerElsewhere) {
+            notes.equalizerElsewhere = true;
+            JournalOf(ext).Write("[" + ext->id() + "] the equalizer is only applied in " +
+                                 std::string(kLibraryAgentImage) + ", not in this process (" + HostOf(ext).Process() +
+                                 ")");
+        }
+        return nullptr;
     }
 
     static JSValue Text(JSContext* ctx, const std::string& text) { return JS_NewStringLen(ctx, text.data(), text.size()); }
@@ -119,26 +167,12 @@ struct AudioAnalysisNatives : ScriptBridge {
         if (!Require(ctx, ext, "audio.analyze", &failure)) return failure;
         AudioHost* audio = Audio(ext);
         AudioAnalysisResult result;
-        std::vector<double> frequencies;
         if (audio) {
             result = audio->Analyze(ext->id());
-            frequencies = audio->BandFrequencies();
         } else {
             NoteUnavailable(ext);
         }
-        std::string json = "{\"tempo\":" + (result.tempo.bpm > 0 ? Num(result.tempo.bpm) : std::string("null")) +
-                           ",\"confidence\":" + Num(result.tempo.confidence) +
-                           ",\"loudness\":" + LoudnessJson(result.loudness);
-        if (result.frame) {
-            json += ",\"rms\":" + Num(result.frame->rms) + ",\"peak\":" + Num(result.frame->peak) +
-                    ",\"bands\":" + BandsJson(result.frame->bandsDb);
-        } else {
-            json += ",\"rms\":null,\"peak\":null,\"bands\":[]";
-        }
-        json += ",\"frequencies\":[";
-        for (size_t i = 0; i < frequencies.size(); i++) json += (i ? "," : "") + Num(std::round(frequencies[i]));
-        json += "]}";
-        return Text(ctx, json);
+        return Text(ctx, AnalysisJson(result));
     }
 
     AMPIFY_NATIVE(Loudness) {
@@ -146,7 +180,7 @@ struct AudioAnalysisNatives : ScriptBridge {
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.analyze", &failure)) return failure;
         AudioHost* audio = Audio(ext);
-        return Text(ctx, LoudnessJson(audio ? audio->Loudness() : LoudnessReading{}));
+        return Text(ctx, LoudnessJson(audio ? audio->Loudness() : LoudnessReading{}).Dump());
     }
 
     AMPIFY_NATIVE(Volume) {
@@ -164,7 +198,7 @@ struct AudioAnalysisNatives : ScriptBridge {
         if (count == 0) return JS_FALSE;
         if (!(index >= 0) || index >= static_cast<double>(count) || index != std::floor(index)) {
             return Throw(ctx, "RangeError",
-                         "unknown equalizer band: " + Num(index) + " (0 to " + std::to_string(count - 1) + ")");
+                         "unknown equalizer band: " + Num(index).Dump() + " (0 to " + std::to_string(count - 1) + ")");
         }
         return JS_NewBool(ctx, audio->SetEqBand(ext->id(), static_cast<size_t>(index), gainDb));
     }
@@ -173,11 +207,8 @@ struct AudioAnalysisNatives : ScriptBridge {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.eq", &failure)) return failure;
-        AudioHost* audio = Audio(ext);
-        if (!audio) {
-            NoteUnavailable(ext);
-            return JS_FALSE;
-        }
+        AudioHost* audio = Equalizer(ext);
+        if (!audio) return JS_FALSE;
         return SetBand(ctx, ext, audio, Number(ctx, argc, argv, 0), Number(ctx, argc, argv, 1));
     }
 
@@ -192,11 +223,8 @@ struct AudioAnalysisNatives : ScriptBridge {
             for (const std::string& known : audio::PresetNames()) names += (names.empty() ? "" : ", ") + known;
             return Throw(ctx, "RangeError", "unknown preset: " + name + " (" + names + ")");
         }
-        AudioHost* audio = Audio(ext);
-        if (!audio) {
-            NoteUnavailable(ext);
-            return JS_FALSE;
-        }
+        AudioHost* audio = Equalizer(ext);
+        if (!audio) return JS_FALSE;
         size_t count = std::min(gains->size(), audio->EqBands().size());
         for (size_t i = 0; i < count; i++) audio->SetEqBand(ext->id(), i, (*gains)[i]);
         return JS_TRUE;
@@ -207,23 +235,14 @@ struct AudioAnalysisNatives : ScriptBridge {
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.eq", &failure)) return failure;
         AudioHost* audio = Audio(ext);
-        std::string json = "[";
-        if (audio) {
-            std::vector<EqBandState> bands = audio->EqBands();
-            for (size_t i = 0; i < bands.size(); i++) {
-                json += (i ? "," : "");
-                json += "{\"frequency\":" + Num(bands[i].frequency) + ",\"gainDb\":" + Num(bands[i].gainDb) +
-                        ",\"q\":" + Num(bands[i].q) + ",\"type\":" + Quoted(bands[i].kind) + "}";
-            }
-        }
-        return Text(ctx, json + "]");
+        return Text(ctx, EqBandsJson(audio ? audio->EqBands() : std::vector<EqBandState>{}));
     }
 };
 
 std::string PresetNamesJson() {
-    std::string json = "[";
-    for (const std::string& name : audio::PresetNames()) json += (json.size() > 1 ? "," : "") + Quoted(name);
-    return json + "]";
+    Json::Array names;
+    for (const std::string& name : audio::PresetNames()) names.emplace_back(name);
+    return Json(std::move(names)).Dump();
 }
 
 }  // namespace

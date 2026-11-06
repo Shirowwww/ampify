@@ -1,8 +1,8 @@
 #pragma once
 
-// Ampify's own processing on the leveler's sample path, for Ampify.audio: the equalizer (after the leveler's gain,
-// before the soft knee), the live loudness and the analysis frames. The Windows hooks (atmos_windows.cpp) call it;
-// it has no Windows code, so the tests drive it with synthetic buffers.
+// Ampify.audio's steps on the rendered samples: the equalizer (after the gain, before the soft knee), the live
+// loudness and the analysis frames. The Windows hooks (src/win/audio/audio_hooks.cpp) call it; it has no Windows code,
+// so the tests drive it with synthetic buffers.
 //
 // It works on Ampify's own hooks, the stereo IAudioRenderClient stream and the Dolby Atmos spatial objects, and
 // never on Apple's audio tap, which Apple skips for Atmos (knowledge/atmos-loudness.md). The samples stay in the
@@ -17,19 +17,20 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../../src/core/audio/audio_engine.hpp"
-#include "../../src/core/audio/equalizer.hpp"
-#include "gain_ramp.hpp"
+#include "audio_engine.hpp"
+#include "equalizer.hpp"
 #include "live_loudness.hpp"
 #include "object_pass.hpp"
+#include "sample_stage.hpp"
 
-namespace atmos {
+namespace ampify::audio {
 
-// The equalizer of one path: one EqProcessor per stream or per spatial object, over the engine's settings.
-// Inactive (the samples untouched) while the settings are flat and every processor has rung out.
+// The equalizer of one path: one EqProcessor per stream or per spatial object, over the engine's settings, at most
+// `maxProcessors` of them. Inactive (the samples untouched) while the settings are flat and every processor has rung
+// out.
 class EqStage : public SampleStage {
 public:
-    explicit EqStage(const ampify::audio::EqSettings& settings, size_t maxProcessors = ObjectPass::kMaxObjects);
+    EqStage(const EqSettings& settings, size_t maxProcessors);
 
     void SetSampleRate(double sampleRate) { m_rate = sampleRate; }
 
@@ -39,20 +40,20 @@ public:
     size_t Processors() const { return m_processors.size(); }
 
 private:
-    const ampify::audio::EqSettings& m_settings;
+    const EqSettings& m_settings;
     size_t m_max;
-    double m_rate = 48000;
+    double m_rate = kStartSampleRate;
     bool m_running = false;
-    std::unordered_map<const void*, std::unique_ptr<ampify::audio::EqProcessor>> m_processors;
+    std::unordered_map<const void*, std::unique_ptr<EqProcessor>> m_processors;
 };
 
-class KitAudio {
+class SamplePath {
 public:
-    explicit KitAudio(ampify::audio::AudioEngine& engine);
+    explicit SamplePath(AudioEngine& engine);
 
     // ---- Stereo stream (IAudioRenderClient, after the player volume) ----
 
-    // Before the gain: the live loudness, divided by the player volume as the leveler does.
+    // Before the gain: the live loudness, divided by the player volume.
     void BeforeStream(const float* samples, size_t frames, int channels, int sampleRate, float playerVolume);
     // The equalizer stage for ApplyCurve, at the stream's rate.
     SampleStage* StreamStage(int sampleRate);
@@ -68,7 +69,7 @@ public:
     void AfterObjects(std::span<const ObjectBuffer> objects, size_t frames, int sampleRate, const PassLevels& levels);
 
 private:
-    ampify::audio::AudioEngine& m_engine;
+    AudioEngine& m_engine;
     EqStage m_streamEq;
     EqStage m_objectEq;
     LiveLoudness m_streamLoudness;
@@ -76,4 +77,4 @@ private:
     std::vector<float> m_mix;  // objects summed, spatial thread only
 };
 
-}  // namespace atmos
+}  // namespace ampify::audio

@@ -175,20 +175,22 @@ TEST_CASE(Lyrics_NothingUsableIsNull) {
     raw.ttml = "<tt><body></body></tt>";
     raw.staticText = " \n ";
     CHECK(!ampify::LyricsFromRaw(raw).has_value());
-    CHECK(ampify::LyricsJson(std::nullopt).Dump() == "null");
+    CHECK(ampify::LyricsJson(nullptr).Dump() == "null");
 }
 
 TEST_CASE(Lyrics_TheJsonHasTheDocumentedShape) {
     ampify::RawLyrics raw;
     raw.ttml = "<tt><body><p begin=\"1.5\" end=\"2\"><span begin=\"1.5\" end=\"2\">Hi</span></p></body></tt>";
     raw.language = "en";
-    std::string json = ampify::LyricsJson(ampify::LyricsFromRaw(raw)).Dump();
+    std::optional<ampify::Lyrics> parsed = ampify::LyricsFromRaw(raw);
+    std::string json = ampify::LyricsJson(&*parsed).Dump();
     CHECK(json == "{\"source\":\"apple\",\"synced\":true,\"language\":\"en\",\"lines\":[{\"start\":1500,\"end\":2000,"
                   "\"text\":\"Hi\",\"words\":[{\"start\":1500,\"end\":2000,\"text\":\"Hi\"}]}],\"text\":\"Hi\"}");
 
     ampify::RawLyrics plain;
     plain.staticText = "Only text";
-    json = ampify::LyricsJson(ampify::LyricsFromRaw(plain)).Dump();
+    parsed = ampify::LyricsFromRaw(plain);
+    json = ampify::LyricsJson(&*parsed).Dump();
     CHECK(json.find("\"synced\":false") != std::string::npos);
     CHECK(json.find("\"start\"") == std::string::npos);
     CHECK(json.find("\"lines\":[{\"text\":\"Only text\",\"words\":[]}]") != std::string::npos);
@@ -428,8 +430,8 @@ namespace {
 ampify::Lyrics TwoTimedLines() {
     ampify::Lyrics lyrics;
     lyrics.synced = true;
-    lyrics.lines.push_back({1000, 3000, "one two", {{1000, 2000, "one"}, {2000, 3000, "two"}}});
-    lyrics.lines.push_back({5000, 6000, "three", {}});
+    lyrics.lines.push_back({1000, 3000, "one two", {{1000, 2000, "one", true}, {2000, 3000, "two"}}, ampify::LyricTiming::ByWord});
+    lyrics.lines.push_back({5000, 6000, "three", {}, ampify::LyricTiming::ByLine});
     return lyrics;
 }
 
@@ -482,24 +484,44 @@ TEST_CASE(NowPlaying_MovesOnWhileHeardAndKeepsTheLyricsOfItsTrack) {
 TEST_CASE(Karaoke_SpreadsALineTimedAsAWholeOverItsWordsByLength) {
     ampify::Lyrics lyrics;
     lyrics.synced = true;
-    lyrics.lines.push_back({0, 3000, "ab  cdef", {}});
+    lyrics.lines.push_back({0, 3000, "ab  cdef", {}, ampify::LyricTiming::ByLine});
     ampify::KaraokeFrame early = ampify::KaraokeAt(lyrics, 500);
     CHECK(early.words.size() == 2);
     if (early.words.size() == 2) CHECK(early.words[0] == 0.5 && early.words[1] == 0.0);
     ampify::KaraokeFrame late = ampify::KaraokeAt(lyrics, 2000);
     if (late.words.size() == 2) CHECK(late.words[0] == 1.0 && late.words[1] == 0.5);
 
-    std::vector<std::string> pieces = ampify::KaraokePieces(lyrics.lines[0]);
-    CHECK(pieces.size() == 2);
-    if (pieces.size() == 2) CHECK(pieces[0] == "ab " && pieces[1] == "cdef");
+    std::vector<ampify::KaraokeWord> words = ampify::KaraokeWords(lyrics.lines[0]);
+    CHECK(words.size() == 2);
+    if (words.size() == 2) CHECK(words[0].piece == "ab " && words[1].piece == "cdef");
 
-    ampify::LyricLine instant{4000, 4000, "no span", {}};  // no duration: nothing to spread over
-    CHECK(ampify::KaraokePieces(instant).empty());
+    ampify::LyricLine instant{4000, 4000, "no span", {}, ampify::LyricTiming::ByLine};  // no duration: nothing to spread over
+    words = ampify::KaraokeWords(instant);
+    CHECK(words.size() == 1);
+    if (words.size() == 1) CHECK(words[0].piece == "no span");
+    ampify::LyricLine plain{0, 0, "just text", {}};
+    CHECK(ampify::KaraokeWords(plain).size() == 1);
 }
 
 TEST_CASE(Karaoke_GluesTheSyllablesOfOneWordAndSpacesTheWords) {
-    ampify::LyricLine line{0, 3000, "beautiful day", {{0, 500, "beau"}, {500, 900, "ti"}, {900, 1500, "ful"}, {1500, 3000, "day"}}};
-    std::vector<std::string> pieces = ampify::KaraokePieces(line);
-    CHECK(pieces.size() == 4);
-    if (pieces.size() == 4) CHECK(pieces[0] == "beau" && pieces[1] == "ti" && pieces[2] == "ful " && pieces[3] == "day");
+    ampify::Lyrics lyrics = ampify::ParseTtml(
+        "<tt><body><p begin=\"0\" end=\"3\"><span begin=\"0\" end=\"0.5\">beau</span><span begin=\"0.5\" end=\"0.9\">ti</span>"
+        "<span begin=\"0.9\" end=\"1.5\">ful</span> <span begin=\"1.5\" end=\"3\">day </span></p></body></tt>");
+    CHECK(lyrics.lines.size() == 1);
+    if (lyrics.lines.size() != 1) return;
+    CHECK(lyrics.lines[0].timing == ampify::LyricTiming::ByWord);
+    std::vector<ampify::KaraokeWord> words = ampify::KaraokeWords(lyrics.lines[0]);
+    CHECK(words.size() == 4);
+    if (words.size() == 4) CHECK(words[0].piece == "beau" && words[1].piece == "ti" && words[2].piece == "ful " && words[3].piece == "day");
+}
+
+TEST_CASE(Lyrics_ARevisedTextOfTheSameLengthIsParsedAgainAndTheSameTextIsShared) {
+    ampify::RawLyrics raw;
+    raw.ttml = "<tt><body><p begin=\"1\" end=\"2\"><span begin=\"1\" end=\"2\">cat</span></p></body></tt>";
+    std::shared_ptr<const ampify::Lyrics> first = ampify::SharedLyrics(raw);
+    CHECK(first && first == ampify::SharedLyrics(raw));
+    raw.ttml.replace(raw.ttml.find("cat"), 3, "dog");
+    std::shared_ptr<const ampify::Lyrics> revised = ampify::SharedLyrics(raw);
+    CHECK(revised && revised != first && revised->text == "dog");
+    CHECK(!ampify::SharedLyrics(ampify::RawLyrics{}));
 }

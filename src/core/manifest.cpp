@@ -88,7 +88,6 @@ const std::regex kSvgFilePattern("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.svg$");
 const std::regex kSchemeNamePattern("^[A-Za-z0-9_-]{1,32}$");
 const std::regex kAppVersionPattern("^[0-9]+(\\.[0-9]+){1,3}$");
 const std::regex kHostPattern("^[a-z0-9.-]{1,253}$");
-const std::regex kSettingKeyPattern("^[a-z0-9][a-z0-9-]{0,31}$");
 
 constexpr const char* kSettingsKinds = "settings: only an extension, a theme or a snippet declares settings";
 constexpr size_t kMaxSettings = 16;
@@ -195,7 +194,7 @@ std::optional<SettingSpec> ReadSetting(const Json& item, const std::string& wher
     }
     SettingSpec spec;
     const std::string* key = item.Find("key") ? item.Find("key")->AsString() : nullptr;
-    if (!key || !Matches(*key, kSettingKeyPattern) || *key == "enabled") {
+    if (!key || !IsSettingKey(*key) || *key == "enabled") {
         errors.push_back(where + ": key must be [a-z0-9][a-z0-9-]{0,31}, other than enabled");
     } else {
         spec.key = *key;

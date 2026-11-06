@@ -18,9 +18,6 @@ namespace ampify::remote {
 // The playback commands a client can send. The backend never receives a name it has to guess at.
 enum class Action { Play, Pause, Next, Previous };
 
-// "play", "pause", "next" or "previous": the route name.
-std::string_view ActionName(Action action);
-
 // What the routes ask of the kit. The Windows server calls it from its own thread, so it must be thread-safe.
 class Backend {
 public:

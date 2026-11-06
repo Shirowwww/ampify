@@ -46,10 +46,8 @@ bool IsExtensionTarget(const std::string& id, std::string& error) {
 }
 
 // A key a manifest may declare, never the activation key.
-bool IsSettingKey(const std::string& key, std::string& error) {
-    bool valid = !key.empty() && key != "enabled" && std::all_of(key.begin(), key.end(), [](char c) {
-        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
-    });
+bool IsDeclaredKey(const std::string& key, std::string& error) {
+    bool valid = key != "enabled" && IsSettingKey(key);
     if (!valid) error = "invalid setting key: " + key;
     return valid;
 }
@@ -227,7 +225,7 @@ bool SwitchMod(const fs::path& kit, const std::string& id, bool enabled, std::st
 
 bool SetModSetting(const fs::path& kit, const std::string& id, const std::string& key, const std::string& value,
                    std::string& error) {
-    if (!IsExtensionTarget(id, error) || !IsSettingKey(key, error)) return false;
+    if (!IsExtensionTarget(id, error) || !IsDeclaredKey(key, error)) return false;
     if (!WriteSetting(kit, "extensions." + id + "." + key, OneLine(value), error)) return false;
     return AppendReload(kit, "restart " + id, error);
 }
@@ -290,7 +288,7 @@ bool SetSnippetSetting(const fs::path& kit, const std::string& id, const std::st
         error = "invalid snippet id: " + id;
         return false;
     }
-    return IsSettingKey(key, error) && WriteSetting(kit, "snippets." + id + "." + key, OneLine(value), error);
+    return IsDeclaredKey(key, error) && WriteSetting(kit, "snippets." + id + "." + key, OneLine(value), error);
 }
 
 bool SetThemeSetting(const fs::path& kit, const std::string& id, const std::string& key, const std::string& value,
@@ -299,7 +297,7 @@ bool SetThemeSetting(const fs::path& kit, const std::string& id, const std::stri
         error = "invalid theme id: " + id;
         return false;
     }
-    return IsSettingKey(key, error) && WriteSetting(kit, "themes." + id + "." + key, OneLine(value), error);
+    return IsDeclaredKey(key, error) && WriteSetting(kit, "themes." + id + "." + key, OneLine(value), error);
 }
 
 namespace {

@@ -3,13 +3,14 @@
 #include <algorithm>
 #include <cmath>
 
-namespace atmos {
+namespace ampify::audio {
 
 namespace {
 
 constexpr float kKnee = 0.94f;
 
-// About 0.1 s time constant: 95 % of the way to the target after 0.3 s, as in the reference mod.
+// About 0.1 s time constant: 95 % of the way to the target after 0.3 s. Unmeasured: taken from the Windhawk reference
+// mod, no listen test has confirmed it yet.
 constexpr double kRatePerSecond = 10.0;
 
 }  // namespace
@@ -47,32 +48,27 @@ float GainRamp::Limit(float sample) {
     return std::copysign(knee, sample);
 }
 
-void ApplyCurve(float* samples, size_t frames, int channels, const std::vector<float>& curve) {
-    const size_t width = static_cast<size_t>(channels);
-    for (size_t frame = 0; frame < frames; frame++) {
-        for (size_t channel = 0; channel < width; channel++) {
-            float& sample = samples[frame * width + channel];
-            sample = GainRamp::Limit(sample * curve[frame]);
-        }
-    }
-}
-
 void ApplyCurve(float* samples, size_t frames, int channels, const std::vector<float>& curve, bool unity,
                 SampleStage* stage, const void* key) {
     const bool staged = stage && stage->Active();
+    if (unity && !staged) return;
+    const size_t width = static_cast<size_t>(channels);
     if (!staged) {
-        if (!unity) ApplyCurve(samples, frames, channels, curve);
+        for (size_t frame = 0; frame < frames; frame++) {
+            for (size_t channel = 0; channel < width; channel++) {
+                float& sample = samples[frame * width + channel];
+                sample = GainRamp::Limit(sample * curve[frame]);
+            }
+        }
         return;
     }
-    const size_t count = frames * static_cast<size_t>(channels);
     if (!unity) {
-        const size_t width = static_cast<size_t>(channels);
         for (size_t frame = 0; frame < frames; frame++) {
             for (size_t channel = 0; channel < width; channel++) samples[frame * width + channel] *= curve[frame];
         }
     }
     stage->Run(key, samples, frames, channels);
-    for (size_t i = 0; i < count; i++) samples[i] = GainRamp::Limit(samples[i]);
+    for (size_t i = 0; i < frames * width; i++) samples[i] = GainRamp::Limit(samples[i]);
 }
 
-}  // namespace atmos
+}  // namespace ampify::audio

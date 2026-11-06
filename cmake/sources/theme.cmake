@@ -5,6 +5,7 @@ list(APPEND AMPIFY_THEME_SOURCES
     src/core/theme/color.cpp
     src/core/theme/colour_keys.cpp
     src/core/theme/css.cpp
+    src/core/theme/css_values.cpp
     src/core/theme/engine.cpp
     src/core/theme/files.cpp
     src/core/theme/glass.cpp

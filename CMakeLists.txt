@@ -71,7 +71,7 @@ endif()
 #   - a new package (an API module, a native extension, a group of tests) adds its own new file rather than editing
 #     another package's, so that parallel work does not touch the same lines;
 #   - a new target is declared below, and its list gets a name of the form AMPIFY_<TARGET>_SOURCES.
-# Lists: AMPIFY_QUICKJS_SOURCES, AMPIFY_CORE_SOURCES, AMPIFY_THEME_SOURCES,AMPIFY_ATMOS_SOURCES,
+# Lists: AMPIFY_QUICKJS_SOURCES, AMPIFY_CORE_SOURCES, AMPIFY_THEME_SOURCES, AMPIFY_ATMOS_SOURCES, AMPIFY_ATMOS_WIN_SOURCES,
 # AMPIFY_WIN_SOURCES, AMPIFY_KERNEL_SOURCES, AMPIFY_XAML_SOURCES, AMPIFY_LAUNCHER_SOURCES,
 # AMPIFY_SETUP_SOURCES, AMPIFY_CLI_PORTABLE_SOURCES, AMPIFY_CLI_SOURCES, AMPIFY_TESTS_SOURCES, AMPIFY_TESTS_WIN_SOURCES.
 file(GLOB AMPIFY_SOURCE_LISTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/sources/*.cmake")
@@ -119,8 +119,11 @@ add_library(ampify_theme STATIC ${AMPIFY_THEME_SOURCES})
 target_link_libraries(ampify_theme PUBLIC ampify_core)
 target_compile_options(ampify_theme PRIVATE ${AMPIFY_WARNINGS})
 
-# Atmos leveler: BS.1770 loudness meter, gain ramp, spatial object pass and gain policy. Pure C++, no Windows API.
+# Atmos leveler: BS.1770 integrated meter, track kinds, gain policy and levels file, over the portable audio of
+# ampify_core. Pure C++, no Windows API. Its files include the tree from src/ ("core/audio/...").
 add_library(atmos_leveler STATIC ${AMPIFY_ATMOS_SOURCES})
+target_include_directories(atmos_leveler PUBLIC extensions src)
+target_link_libraries(atmos_leveler PUBLIC ampify_core)
 target_compile_options(atmos_leveler PRIVATE ${AMPIFY_WARNINGS})
 
 # XAML theme backend (src/win/xaml_backend.cpp, src/win/theme_service.cpp). Off by default: it needs the C++/WinRT projection
@@ -138,9 +141,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_link_libraries(ampify_win PUBLIC ole32 shell32 user32 comctl32 advapi32 psapi winhttp ws2_32 winmm windowscodecs
                           mfuuid ampify_core)
 
+    # The Atmos leveler's Windows side: the gain policy it plugs into the audio platform of ampify_win (src/win/audio/).
+    add_library(atmos_leveler_win STATIC ${AMPIFY_ATMOS_WIN_SOURCES})
+    target_link_libraries(atmos_leveler_win PUBLIC atmos_leveler ampify_win)
+    target_compile_options(atmos_leveler_win PRIVATE ${AMPIFY_WARNINGS})
+
     # Loaded into AppleMusic.exe and AMPLibraryAgent.exe by the launcher.
     add_library(ampify_kernel MODULE ${AMPIFY_KERNEL_SOURCES})
-    target_link_libraries(ampify_kernel PRIVATE ampify_core ampify_win atmos_leveler)
+    target_link_libraries(ampify_kernel PRIVATE ampify_core ampify_win atmos_leveler_win)
     target_compile_options(ampify_kernel PRIVATE ${AMPIFY_WARNINGS})
     ampify_version_resource(ampify_kernel kernel "Ampify kernel, loaded into Apple Music")
 

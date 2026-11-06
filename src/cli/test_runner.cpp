@@ -32,38 +32,38 @@ namespace {
 
 constexpr std::chrono::seconds kRequestWait{3};  // how long a test run waits for the fake network calls to answer
 
-// Ampify.audio during a test run: the kernel's real analysis and equalizer, fed with a synthetic signal instead of a
-// sound card (see PlaySyntheticAudio). The loudness and the player volume are fixed values.
-class TestAudio : public audio::AudioEngine {
+// Ampify.audio during a test run: the kernel's real analysis and equalizer (an AudioEngine), fed with a synthetic
+// signal instead of a sound card (see PlaySyntheticAudio), each call counted. The loudness and the player volume are
+// fixed values.
+class TestAudio final : public AudioHost {
 public:
-    explicit TestAudio(std::function<void(const std::string&)> count) : m_count(std::move(count)) {
-        PublishPlayerVolume(0.5);
-    }
+    explicit TestAudio(std::function<void(const std::string&)> count) : m_count(std::move(count)) {}
 
     void SubscribeFrames(const std::string& elementId, FrameSink sink) override {
         m_count("audio: analysis frames");
-        AudioEngine::SubscribeFrames(elementId, std::move(sink));
+        m_engine.SubscribeFrames(elementId, std::move(sink));
     }
     AudioAnalysisResult Analyze(const std::string& elementId) override {
         m_count("audio: analysis");
-        return AudioEngine::Analyze(elementId);
+        AudioAnalysisResult result = m_engine.Analyze(elementId);
+        result.loudness = Loudness();
+        return result;
     }
-    LoudnessReading Loudness() override {
-        PublishLoudness({-14.0, -14.0});
-        return AudioEngine::Loudness();
-    }
+    LoudnessReading Loudness() override { return {-14.0, -14.0}; }
     std::optional<double> PlayerVolume() override {
         m_count("audio: volume (read)");
-        return AudioEngine::PlayerVolume();
+        return 0.5;
     }
+    std::vector<EqBandState> EqBands() override { return m_engine.EqBands(); }
     bool SetEqBand(const std::string& elementId, size_t band, double gainDb) override {
         m_count("audio: equalizer");
-        return AudioEngine::SetEqBand(elementId, band, gainDb);
+        return m_engine.SetEqBand(elementId, band, gainDb);
     }
+    void Release(const std::string& elementId) override { m_engine.Release(elementId); }
 
     // 8 s of a 440 Hz tone with a click every 0.5 s (120 BPM), at 48 kHz, then one delivery of the newest frame.
     void PlaySyntheticAudio() {
-        if (!AnalysisWanted()) return;
+        if (!m_engine.AnalysisWanted()) return;
         constexpr double kRate = 48000;
         constexpr size_t kBlock = 480;
         std::vector<float> block(2 * kBlock);
@@ -74,13 +74,14 @@ public:
                 double click = (n % 24000) < 240 ? 0.5 : 0.0;
                 block[2 * i] = block[2 * i + 1] = static_cast<float>(tone + click);
             }
-            FeedAnalysis(block.data(), kBlock, 2, kRate);
+            m_engine.FeedAnalysis(block.data(), kBlock, 2, kRate);
         }
-        DeliverPending();
+        m_engine.DeliverPending();
     }
 
 private:
     std::function<void(const std::string&)> m_count;
+    audio::AudioEngine m_engine;
 };
 
 // The host of a test run. Settings and storage live in memory. Every other call answers with a fixed value, and each
@@ -128,7 +129,10 @@ public:
         Count("player (command)");
         return true;
     }
-    void SetGainDb(const std::string&, double) override { Count("audio gain"); }
+    bool SetGainDb(const std::string&, double) override {
+        Count("audio gain");
+        return true;
+    }
     void Notify(const std::string&, const std::string&, const std::string&) override { Count("notification"); }
     bool RegisterKey(const std::string&, const std::string&) override {
         Count("shortcut");

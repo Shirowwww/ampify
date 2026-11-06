@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "../src/core/theme/animation.hpp"
+#include "../src/core/theme/builtins.hpp"
 #include "../src/core/theme/css.hpp"
 #include "test.hpp"
 
@@ -43,7 +44,7 @@ std::string Problem(std::string_view raw) {
 }  // namespace
 
 TEST_CASE(Keyframes_StylesheetReadsTheStopsAndTheirOffsets) {
-    th::Stylesheet sheet = th::ParseStylesheet(
+    th::Stylesheet sheet = th::ParseThemeStylesheet(
         "@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }\n"
         "@-webkit-keyframes pulse {\n"
         "    0%, 100% { opacity: 1 }\n"
@@ -73,7 +74,7 @@ TEST_CASE(Keyframes_StylesheetReadsTheStopsAndTheirOffsets) {
 }
 
 TEST_CASE(Keyframes_BadStopsAndPlacesAreReportedAndSkipped) {
-    th::Stylesheet sheet = th::ParseStylesheet(
+    th::Stylesheet sheet = th::ParseThemeStylesheet(
         "@keyframes a { middle { opacity: 1 } 120% { opacity: 0 } 50% { opacity: .5 } }\n"
         "@keyframes { from { opacity: 0 } }\n"
         "@media (max-width: 900px) { @keyframes b { to { opacity: 1 } } }\n"

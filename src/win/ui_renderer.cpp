@@ -658,11 +658,9 @@ controls::TextBlock LyricLineBlock(LyricsView& view, const LyricLine& line, bool
     grow.Duration(kLyricsMotion);
     block.ScaleTransition(grow);
     std::vector<media::SolidColorBrush> brushes;
-    std::vector<std::string> pieces = KaraokePieces(line);
-    if (pieces.empty()) pieces.push_back(line.text);
-    for (const std::string& piece : pieces) {
+    for (const KaraokeWord& word : KaraokeWords(line)) {
         winrt::Microsoft::UI::Xaml::Documents::Run run;
-        run.Text(Wide(piece));
+        run.Text(Wide(word.piece));
         media::SolidColorBrush brush(view.color);
         run.Foreground(brush);
         block.Inlines().Append(run);
@@ -760,7 +758,7 @@ void PaintLyrics(LyricsView& view) {
     if (frame.line < 0 || static_cast<size_t>(frame.line) >= view.words.size()) return;
     std::vector<media::SolidColorBrush>& brushes = view.words[frame.line];
     for (size_t i = 0; i < brushes.size(); i++) {
-        double done = frame.between || frame.words.size() != brushes.size() ? 1.0 : frame.words[i];
+        double done = frame.between ? 1.0 : frame.words[i];
         SetBrushAlpha(brushes[i], view.color, kLyricsUnsung + (1 - kLyricsUnsung) * done);
     }
 }

@@ -9,8 +9,11 @@ namespace ampify::audio {
 namespace {
 
 constexpr float kFloorDb = -120.0f;
-constexpr size_t kRingSize = 4096;     // the largest spectrum FFT
+constexpr size_t kSpectrumFftSize = 2048;          // up to 48 kHz: about 43 ms
+constexpr size_t kHighRateSpectrumFftSize = 4096;  // above 60 kHz, for the same 43 ms
+constexpr size_t kRingSize = kHighRateSpectrumFftSize;  // holds the largest block the spectrum reads
 constexpr size_t kOnsetFftSize = 1024;  // about 21 ms at 48 kHz: enough to see a beat arrive
+static_assert(kRingSize >= kOnsetFftSize, "a block longer than the ring would read wrapped data");
 constexpr double kLowHz = 40.0;
 constexpr double kHighHz = 16000.0;
 
@@ -232,7 +235,7 @@ TempoEstimate TempoEstimator::Current() const {
 
 AudioAnalyzer::AudioAnalyzer()
     : m_ring(kRingSize, 0.0f),
-      m_spectrum(2048, kBands, kLowHz, kHighHz),
+      m_spectrum(kSpectrumFftSize, kBands, kLowHz, kHighHz),
       m_onsetFft(kOnsetFftSize),
       m_onsetWindow(HannWindow(kOnsetFftSize)),
       m_onsetWork(kOnsetFftSize),
@@ -251,7 +254,8 @@ void AudioAnalyzer::Restart(double sampleRate) {
     m_hop = std::max<size_t>(1, static_cast<size_t>(std::lround(sampleRate / TempoEstimator::kEnvelopeRate)));
     m_frameLength = std::max<size_t>(1, static_cast<size_t>(std::lround(sampleRate * kFrameSeconds)));
     // About 43 ms per spectrum block, whatever the rate: 2048 points up to 48 kHz, 4096 above.
-    m_spectrum = SpectrumAnalyzer(sampleRate > 60000 ? 4096 : 2048, kBands, kLowHz, std::min(kHighHz, sampleRate * 0.45));
+    const size_t fftSize = sampleRate > 60000 ? kHighRateSpectrumFftSize : kSpectrumFftSize;
+    m_spectrum = SpectrumAnalyzer(fftSize, kBands, kLowHz, std::min(kHighHz, sampleRate * 0.45));
     std::fill(m_ring.begin(), m_ring.end(), 0.0f);
     std::fill(m_previousMagnitudes.begin(), m_previousMagnitudes.end(), 0.0f);
     m_ringNext = 0;

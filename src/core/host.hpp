@@ -71,8 +71,9 @@ public:
     virtual bool Control(PlayerCommand command, int64_t seekMs) = 0;
 
     // Gain in dB applied to the decoded samples of the current track, for one element. The kernel adds the
-    // gains of all elements and clamps the total to the ceiling. 0 removes the element's gain.
-    virtual void SetGainDb(const std::string& elementId, double db) = 0;
+    // gains of all elements and clamps the total to the ceiling. 0 removes the element's gain. False when the samples
+    // do not pass through this process (in Apple Music, any process but AMPLibraryAgent.exe): nothing is kept.
+    virtual bool SetGainDb(const std::string& elementId, double db) = 0;
 
     virtual void Notify(const std::string& elementId, const std::string& title, const std::string& text) = 0;
 

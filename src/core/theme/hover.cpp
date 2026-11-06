@@ -24,8 +24,6 @@ std::optional<Value> TryRead(HoverTracker::Access& access, NodeId id, std::strin
     }
 }
 
-constexpr Trigger kStates[] = {Trigger::Hover, Trigger::Focus, Trigger::Active, Trigger::Current};
-
 }  // namespace
 
 HoverTracker::Change HoverTracker::Set(NodeId id, const std::vector<HoverValue>& values, Access& access) {
@@ -79,7 +77,7 @@ bool HoverTracker::Shows(NodeId id, const Element& element, NodeId watched, std:
 // comes before what Apple shows the element as; among values of one state, the first in the list (the engine puts the
 // winner of the cascade first).
 const HoverValue* HoverTracker::Winner(NodeId id, const Element& element, std::string_view property) const {
-    for (Trigger trigger : {Trigger::Active, Trigger::Focus, Trigger::Hover, Trigger::Current}) {
+    for (Trigger trigger : kStatesByPriority) {
         for (const HoverValue& value : element.values) {
             if (value.property != property || value.trigger != trigger) continue;
             if (m_on.count({Watched(id, value), trigger})) return &value;
@@ -184,7 +182,7 @@ std::vector<NodeId> HoverTracker::WatchedBy(NodeId id) const {
 void HoverTracker::Forget(NodeId id, Access& access) {
     m_elements.erase(id);
     bool was = false;
-    for (Trigger trigger : kStates) was = m_on.erase({id, trigger}) > 0 || was;
+    for (Trigger trigger : kStatesByPriority) was = m_on.erase({id, trigger}) > 0 || was;
     if (!was) return;
     for (auto& [target, element] : m_elements) {
         if (Shows(target, element, id, std::nullopt)) Show(target, element, access);

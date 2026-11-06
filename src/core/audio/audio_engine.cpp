@@ -10,16 +10,10 @@ namespace ampify::audio {
 namespace {
 
 constexpr double kUnknown = std::numeric_limits<double>::quiet_NaN();
-constexpr int64_t kLoudnessStaleMs = 1500;
 
 int64_t NowMs() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
         .count();
-}
-
-std::optional<double> Known(double value) {
-    if (std::isnan(value)) return std::nullopt;
-    return value;
 }
 
 }  // namespace
@@ -108,24 +102,20 @@ AudioAnalysisResult AudioEngine::Analyze(const std::string& elementId) {
     std::lock_guard<std::mutex> guard(m_analyzerLock);
     result.tempo = m_analyzer.Tempo();
     if (m_analyzer.FrameCount() > 0) result.frame = m_analyzer.Latest();
+    // Before any audio: the layout the analysis starts with.
+    result.bandFrequencies = m_analyzer.SampleRate() > 0 ? m_analyzer.BandCentres() : AudioAnalyzer().BandCentres();
     return result;
-}
-
-std::vector<double> AudioEngine::BandFrequencies() {
-    std::lock_guard<std::mutex> guard(m_analyzerLock);
-    if (m_analyzer.SampleRate() > 0) return m_analyzer.BandCentres();
-    return AudioAnalyzer().BandCentres();  // before any audio: the layout the analysis starts with
 }
 
 LoudnessReading AudioEngine::Loudness() {
     LoudnessReading reading;
-    if (NowMs() - m_loudnessAtMs.load(std::memory_order_relaxed) > kLoudnessStaleMs) return reading;
-    reading.momentary = Known(m_momentary.load(std::memory_order_relaxed));
-    reading.shortTerm = Known(m_shortTerm.load(std::memory_order_relaxed));
+    if (NowMs() - m_loudnessAtMs.load(std::memory_order_relaxed) > kLoudnessFreshMs) return reading;
+    reading.momentary = KnownValue(m_momentary.load(std::memory_order_relaxed));
+    reading.shortTerm = KnownValue(m_shortTerm.load(std::memory_order_relaxed));
     return reading;
 }
 
-std::optional<double> AudioEngine::PlayerVolume() { return Known(m_volume.load(std::memory_order_relaxed)); }
+std::optional<double> AudioEngine::PlayerVolume() { return KnownValue(m_volume.load(std::memory_order_relaxed)); }
 
 std::vector<EqBandState> AudioEngine::EqBands() {
     std::vector<EqBandState> bands;

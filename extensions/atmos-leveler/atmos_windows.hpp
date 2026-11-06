@@ -1,30 +1,18 @@
 #pragma once
 
-// The Atmos leveler as an extension of the kernel. Registered in AMPLibraryAgent.exe only: that is where
-// the audio is decoded and rendered. Not compiled on Linux.
+// The Atmos leveler as an extension of the kernel, in AMPLibraryAgent.exe only: that is where the audio is decoded
+// and rendered. It is the gain policy of the audio platform (src/win/audio/audio_hooks.hpp): it follows the playing
+// item, measures it from the samples the platform hands it, and decides the gain the platform applies. Not compiled
+// on Linux.
 
-#include <windows.h>
-#include <propidl.h>
-
-#include <filesystem>
-
-#include "../../src/core/extension.hpp"
-#include "../../src/core/journal.hpp"
-#include "../../src/core/settings.hpp"
+#include "core/extension.hpp"
+#include "core/journal.hpp"
+#include "core/settings.hpp"
 
 namespace atmos::hooks {
 
 // Reads extensions.atmos-leveler.auto_level, fallback_db and max_db, with the reference mod's defaults. The two
-// gains are brought into 0..15 dB.
+// gains are brought into 0..kGainLimitDb. Installs the leveler as the platform's policy, neutral until it starts.
 ampify::ExtensionInfo MakeAtmosLevelerExtension(ampify::Journal& journal, const ampify::Settings& settings);
-
-// Puts the sample hooks in place with no gain, so the sound can be analysed (a theme's bars(n)) while the leveler
-// is off. Once only, and nothing when the leveler already placed them; the leveler starting later takes them over
-// with its own settings. May wait up to 60 s for Apple's audio modules: call it off the interface's paths.
-bool StartSoundHooks(ampify::Journal& journal);
-
-// Sets Apple's player volume (0 to 1), as Apple does itself. False until Apple has set a volume since the hook is in
-// place (the player is not known yet). Apple's own slider is not redrawn: it shows the value until Apple moves it.
-bool SetPlayerVolume(double volume);
 
 }  // namespace atmos::hooks

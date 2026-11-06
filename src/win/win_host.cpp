@@ -26,7 +26,7 @@
 #include "../core/gain_board.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_watchdog.hpp"
-#include "audio_share.hpp"
+#include "audio/audio_sharing.hpp"
 #include "clipboard.hpp"
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
@@ -258,8 +258,8 @@ void* WinHost::QueryCapability(std::string_view name) {
     if (void* found = m_services->Query(name)) return found;
     // The Marketplace page runs ampify.exe from the interface process, where it is shown.
     if (m_process == "ui" && name == KitCommandHost::kCapabilityName) return static_cast<KitCommandHost*>(m_kitCommands.get());
-    // AudioHost: in AMPLibraryAgent.exe, where the audio is rendered, the process's engine, fed by the Atmos
-    // leveler's hooks; in the interface process, what that engine shares (audio_share.hpp), equalizer excepted.
+    // AudioHost: in AMPLibraryAgent.exe, where the audio is rendered, the process's engine, fed by the audio hooks
+    // (src/win/audio/); in the interface process, what that engine shares (audio/audio_sharing.hpp), read only.
     if (m_process == "engine" && name == AudioHost::kCapabilityName) {
         audio::AudioEngine& engine = audio::ProcessAudio();
         engine.StartDeliveryThread();  // analysis frames go out from their own thread, 20 a second at most
@@ -310,24 +310,20 @@ PlayerSnapshot WinHost::Player() { return m_player->Snapshot(); }
 
 bool WinHost::Control(PlayerCommand command, int64_t seekMs) { return m_player->Control(command, seekMs); }
 
-void WinHost::SetGainDb(const std::string& elementId, double db) {
+bool WinHost::SetGainDb(const std::string& elementId, double db) {
     // Only AMPLibraryAgent.exe renders the audio, so only there does the gain reach the samples.
     if (m_process != "engine") {
         static bool noticed = false;
         if (!noticed) m_journal.Write("audio gain: applied only in " + std::string(kLibraryAgentImage) + ", ignored here");
         noticed = true;
-        return;
+        return false;
     }
-    // The same ceiling as the script side: audio.maxGainDb, from 0 to 12 dB, 6 by default.
-    double ceiling = 6.0;
-    if (std::optional<std::string> raw = ReadSetting("audio.maxGainDb")) {
-        ceiling = std::clamp(std::strtod(raw->c_str(), nullptr), 0.0, 12.0);
-    }
-    ElementGains().Set(elementId, db, ceiling);
+    ElementGains().Set(elementId, db, GainCeilingDb(ReadSetting(kGainCeilingSetting)));
     std::ostringstream line;
     line << std::fixed << std::setprecision(1) << "[" << elementId << "] audio gain: " << db
          << " dB requested, total " << ElementGains().TotalDb() << " dB";
     m_journal.Write(line.str());
+    return true;
 }
 
 WinHost::~WinHost() {

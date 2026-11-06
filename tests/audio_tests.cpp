@@ -1,5 +1,5 @@
 // Tests of the audio pieces behind Ampify.audio and Ampify.color, on synthetic signals: the spectrum, the tempo, the
-// equalizer, the live loudness, the kit's steps on the leveler's sample path, the engine, and colour extraction.
+// equalizer, the live loudness, Ampify's steps on the sample path, the engine, and colour extraction.
 
 #include <algorithm>
 #include <atomic>
@@ -15,12 +15,13 @@
 #include "../src/core/audio/analysis.hpp"
 #include "../src/core/audio/audio_engine.hpp"
 #include "../src/core/audio/audio_share.hpp"
+#include "../src/core/audio/bar_meter.hpp"
 #include "../src/core/audio/equalizer.hpp"
+#include "../src/core/audio/gain_ramp.hpp"
+#include "../src/core/audio/live_loudness.hpp"
+#include "../src/core/audio/object_pass.hpp"
+#include "../src/core/audio/sample_path.hpp"
 #include "../src/core/color_extract.hpp"
-#include "../extensions/atmos-leveler/gain_ramp.hpp"
-#include "../extensions/atmos-leveler/kit_audio.hpp"
-#include "../extensions/atmos-leveler/live_loudness.hpp"
-#include "../extensions/atmos-leveler/object_pass.hpp"
 #include "support.hpp"
 #include "test.hpp"
 
@@ -255,7 +256,7 @@ TEST_CASE(Equalizer_SettingsClampAndPresets) {
 TEST_CASE(LiveLoudness_SineAtMinusTwentyLufs) {
     // A 997 Hz sine of amplitude 0.1 on both channels is -20 LUFS.
     for (double rate : {44100.0, 48000.0, 96000.0}) {
-        atmos::LiveLoudness meter(rate, 2);
+        ampify::audio::LiveLoudness meter(rate, 2);
         std::vector<float> sine = Sine(997, 0.1, rate, static_cast<size_t>(rate * 0.3));
         meter.Process(sine.data(), sine.size() / 2);
         CHECK(!meter.MomentaryLufs().has_value());  // under 400 ms
@@ -268,7 +269,7 @@ TEST_CASE(LiveLoudness_SineAtMinusTwentyLufs) {
 }
 
 TEST_CASE(LiveLoudness_MomentaryFollowsAChange) {
-    atmos::LiveLoudness meter(48000, 2);
+    ampify::audio::LiveLoudness meter(48000, 2);
     std::vector<float> loud = Sine(997, 0.1, 48000, 48000 * 3);
     meter.Process(loud.data(), loud.size() / 2);
     std::vector<float> quiet = Sine(997, 0.01, 48000, 48000);
@@ -277,21 +278,21 @@ TEST_CASE(LiveLoudness_MomentaryFollowsAChange) {
     CHECK(meter.ShortTermLufs().value_or(0) > -30.0);  // 2 s of the loud part still in the 3 s window
 }
 
-// ---- The kit's steps on the sample path -----------------------------------------------------------------------------
+// ---- Ampify's steps on the sample path -------------------------------------------------------------------------------
 
-TEST_CASE(KitAudio_UnityGainAndFlatEqLeaveTheStreamUntouched) {
+TEST_CASE(SamplePath_UnityGainAndFlatEqLeaveTheStreamUntouched) {
     ampify::audio::AudioEngine engine;
-    atmos::KitAudio kit(engine);
+    ampify::audio::SamplePath kit(engine);
     std::vector<float> input = Sine(440, 0.99, 48000, 4800);  // above the knee: the knee must not run either
     std::vector<float> samples = input;
     std::vector<float> curve(4800, 1.0f);
-    atmos::ApplyCurve(samples.data(), 4800, 2, curve, true, kit.StreamStage(48000), &kit);
+    ampify::audio::ApplyCurve(samples.data(), 4800, 2, curve, true, kit.StreamStage(48000), &kit);
     CHECK(std::memcmp(samples.data(), input.data(), input.size() * sizeof(float)) == 0);
 }
 
-TEST_CASE(KitAudio_EqualizerRunsAfterTheGainAndBeforeTheKnee) {
+TEST_CASE(SamplePath_EqualizerRunsAfterTheGainAndBeforeTheKnee) {
     ampify::audio::AudioEngine engine;
-    atmos::KitAudio kit(engine);
+    ampify::audio::SamplePath kit(engine);
     engine.Eq().SetGainDb(5, 6.0206);  // x2 at 1 kHz
     const double rate = 48000;
     const size_t frames = 48000;
@@ -299,30 +300,30 @@ TEST_CASE(KitAudio_EqualizerRunsAfterTheGainAndBeforeTheKnee) {
 
     // 0.1 x 2 (gain) x 2 (equalizer) = 0.4: under the knee, so the product shows.
     std::vector<float> quiet = Sine(1000, 0.1, rate, frames);
-    atmos::ApplyCurve(quiet.data(), frames, 2, curve, false, kit.StreamStage(48000), &kit);
+    ampify::audio::ApplyCurve(quiet.data(), frames, 2, curve, false, kit.StreamStage(48000), &kit);
     float peak = 0;
     for (size_t i = frames; i < quiet.size(); i++) peak = std::max(peak, std::fabs(quiet[i]));
     CHECK_NEAR(peak, 0.4, 0.01);
 
     // 0.3 x 2 x 2 = 1.2: the knee comes last and keeps it under full scale.
     std::vector<float> loud = Sine(1000, 0.3, rate, frames);
-    atmos::ApplyCurve(loud.data(), frames, 2, curve, false, kit.StreamStage(48000), &kit);
+    ampify::audio::ApplyCurve(loud.data(), frames, 2, curve, false, kit.StreamStage(48000), &kit);
     float loudPeak = 0;
     for (float sample : loud) loudPeak = std::max(loudPeak, std::fabs(sample));
     CHECK(loudPeak < 1.0f && loudPeak > 0.94f);
 }
 
-TEST_CASE(KitAudio_EqualizerOnSpatialObjects) {
+TEST_CASE(SamplePath_EqualizerOnSpatialObjects) {
     ampify::audio::AudioEngine engine;
-    atmos::KitAudio kit(engine);
+    ampify::audio::SamplePath kit(engine);
     engine.Eq().SetGainDb(5, 6.0);
-    atmos::ObjectPass pass(48000);
+    ampify::audio::ObjectPass pass(48000);
     std::vector<float> a = Sine(1000, 0.1, 48000, 48000, 1);
     std::vector<float> b = Sine(1000, 0.1, 48000, 48000, 1);
     std::vector<float> reference = a;
     for (size_t start = 0; start < 48000; start += 480) {
-        atmos::ObjectBuffer objects[] = {{&a, a.data() + start}, {&b, b.data() + start}};
-        const atmos::PassLevels& levels = pass.Process(objects, 480, 1.0, kit.ObjectStage(48000));
+        ampify::audio::ObjectBuffer objects[] = {{&a, a.data() + start}, {&b, b.data() + start}};
+        const ampify::audio::PassLevels& levels = pass.Process(objects, 480, 1.0, kit.ObjectStage(48000));
         kit.AfterObjects(objects, 480, 48000, levels);
     }
     CHECK_NEAR(RmsDb(a, 24000) - RmsDb(reference, 24000), 6.0, 0.2);
@@ -330,9 +331,9 @@ TEST_CASE(KitAudio_EqualizerOnSpatialObjects) {
     CHECK(engine.Loudness().momentary.has_value());  // the objects' power, published as they play
 }
 
-TEST_CASE(KitAudio_LoudnessAndAnalysisIgnoreTheSlider) {
+TEST_CASE(SamplePath_LoudnessAndAnalysisIgnoreTheSlider) {
     ampify::audio::AudioEngine engine;
-    atmos::KitAudio kit(engine);
+    ampify::audio::SamplePath kit(engine);
     engine.SubscribeFrames("demo", [](const ampify::audio::AnalysisFrame&) {});
     const float volume = 0.5f;
     std::vector<float> curve;
@@ -341,7 +342,7 @@ TEST_CASE(KitAudio_LoudnessAndAnalysisIgnoreTheSlider) {
         std::vector<float> block = Sine(997, 0.1 * volume, 48000, 480, 2, start);
         kit.BeforeStream(block.data(), 480, 2, 48000, volume);
         curve.assign(480, 1.0f);
-        atmos::ApplyCurve(block.data(), 480, 2, curve, true, kit.StreamStage(48000), &kit);
+        ampify::audio::ApplyCurve(block.data(), 480, 2, curve, true, kit.StreamStage(48000), &kit);
         kit.AfterStream(block.data(), 480, 2, 48000, volume);
     }
     CHECK_NEAR(engine.Loudness().momentary.value_or(0), -20.0, 0.2);
@@ -398,7 +399,7 @@ TEST_CASE(AudioEngine_VolumeAndLoudnessAreReadOnlyReadings) {
     engine.PublishLoudness({-12.5, std::nullopt});
     CHECK_NEAR(engine.Loudness().momentary.value_or(0), -12.5, 1e-9);
     CHECK(!engine.Loudness().shortTerm.has_value());
-    CHECK(engine.BandFrequencies().size() == AudioAnalyzer::kBands);
+    CHECK(engine.Analyze("reader").bandFrequencies.size() == AudioAnalyzer::kBands);  // before any audio too
 }
 
 TEST_CASE(AudioEngine_DeliveryThreadSendsFrames) {
@@ -482,7 +483,7 @@ TEST_CASE(AudioShare_AFrameWrittenIsReadWhileFresh) {
     ampify::audio::AnalysisFrame frame;
     frame.bandsDb = {-10.0f, -20.0f, -30.0f};
     frame.rms = 0.25f;
-    ampify::audio::WriteSharedFrame(block, frame, {120.0, 0.8}, 1000);
+    ampify::audio::WriteSharedFrame(block, frame, {120.0, 0.8}, {60.0, 1000.0, 8000.0}, 1000);
 
     ampify::audio::SharedAudioReading reading;
     CHECK(ampify::audio::ReadShared(block, 1100, reading));
@@ -492,11 +493,14 @@ TEST_CASE(AudioShare_AFrameWrittenIsReadWhileFresh) {
     CHECK(reading.frame && reading.frame->bandsDb[1] == -20.0f);
     CHECK_NEAR(reading.tempo.bpm, 120.0, 1e-9);
     CHECK(!reading.volume.has_value());  // never seen
+    REQUIRE(reading.bandFrequencies.size() == 3);
+    CHECK(reading.bandFrequencies[1] == 1000.0);
 
     // A frame older than 300 ms means the music stopped: no frame, the count stays.
     CHECK(ampify::audio::ReadShared(block, 1400, reading));
     CHECK(!reading.frame.has_value());
     CHECK(reading.frames == 1);
+    CHECK(reading.bandFrequencies.size() == 3);  // the engine's band layout stays known
 }
 
 TEST_CASE(AudioShare_TheStatusCarriesTheVolumeAndTheLoudness) {

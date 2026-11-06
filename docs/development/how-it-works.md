@@ -86,7 +86,8 @@ in a row that never got there, the launcher starts Apple Music without the kerne
 When it loads, the kernel reads `%USERPROFILE%\Ampify\settings.txt`, opens its log (`logs\AppleMusic.log` or
 `logs\AMPLibraryAgent.log`), checks safe mode and the version gate, then starts the JavaScript host and the services
 that are switched on. In `AppleMusic.exe` it starts the interface service (window, theme engine, panels); in
-`AMPLibraryAgent.exe` it installs the audio hooks when the Atmos leveler is on.
+`AMPLibraryAgent.exe` it installs the audio hooks (`src/win/audio/`) when the Atmos leveler is on or the interface
+asks for the sound.
 
 A running kernel re-reads `settings.txt` and reads new lines of `reload.txt` every 500 ms to start, stop or restart an
 element. Every hook goes through `src/core/drm_guard.cpp`.
@@ -191,6 +192,8 @@ If the song has not restarted after 6 seconds, it goes next then previous. A son
 
 The Atmos leveler brings Dolby Atmos songs to the loudness of stereo songs with a gain on the decoded samples. Sound
 Check leaves Atmos items alone, and CoreMedia's own Atmos mode leaves them about 4 dB below stereo.
+It is a gain policy on Ampify's audio platform: `src/win/audio/` hooks the samples and runs the gain, the equalizer and
+the analysis on them; `extensions/atmos-leveler/` follows the songs, measures them and decides the gain.
 
 - Stereo is measured on the shared-mode `IAudioRenderClient` stream (float32), after the player volume.
 - Atmos is measured on `ISpatialAudioObjectRenderStreamForMetadata` (mono objects at 48 kHz), before the volume, and

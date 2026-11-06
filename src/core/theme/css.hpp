@@ -1,5 +1,8 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -97,8 +100,34 @@ enum class Trigger {
     Current,  // :current, Apple shows the element as the current one: the lyrics line being sung, and its parts
 };
 
+struct StateClass {
+    std::string_view name;
+    Trigger trigger;
+    size_t priority;  // 0 wins over 1 when several states hold (HoverTracker)
+};
+
+// The pseudo-classes that name a state, in the order the messages list them. :focus-within is :focus: the backend
+// follows the focus of the element's parts too. The first one of a state is its name. Priority: what the user does,
+// pressed before focused before hovered, then what Apple shows the element as.
+inline constexpr StateClass kStateClasses[] = {
+    {":hover", Trigger::Hover, 2},   {":focus", Trigger::Focus, 1},     {":focus-within", Trigger::Focus, 1},
+    {":active", Trigger::Active, 0}, {":current", Trigger::Current, 3},
+};
+
+// Every state once, by priority, from the table above.
+inline constexpr std::array<Trigger, 4> kStatesByPriority = [] {
+    std::array<Trigger, 4> states{};
+    for (const StateClass& state : kStateClasses) states[state.priority] = state.trigger;
+    return states;
+}();
+static_assert(std::ranges::none_of(kStatesByPriority, [](Trigger state) { return state == Trigger::Always; }),
+              "each priority of kStateClasses names one state");
+
 // ":hover", ":focus", ":active" or ":current"; empty for Always.
 const char* TriggerName(Trigger trigger);
+
+// Every pseudo-class that names a state, for the messages: ":hover, :focus, ... and :current" with `last` " and ".
+std::string StateList(std::string_view last);
 
 // `::before` or `::after` at the end of a selector: the declarations describe a decorative image the engine puts into
 // the panel the selector names (TreeBackend::SetDecor), behind its children or on top of them.
@@ -155,7 +184,19 @@ struct Stylesheet {
     std::vector<std::string> problems;  // with the line number. A bad rule is skipped, the others still load.
 };
 
-Stylesheet ParseStylesheet(std::string_view css);
+// What the names of a stylesheet stand for, which its syntax does not say: the classes (`.sidebar`) and the layouts
+// of `@import "ampify:<layout>"`. The zone table of Apple Music gives them (ZoneNames in builtins.hpp).
+class StylesheetNames {
+public:
+    virtual ~StylesheetNames() = default;
+    // The selectors `selector` stands for once its classes are replaced. Nothing, with `problem` set, when it cannot.
+    virtual std::optional<std::vector<std::string>> Expand(std::string_view selector, std::string* problem) const = 0;
+    // The CSS of a layout, or nothing for an unknown name.
+    virtual std::optional<std::string> Layout(std::string_view name) const = 0;
+    virtual std::vector<std::string> LayoutNames() const = 0;
+};
+
+Stylesheet ParseStylesheet(std::string_view css, const StylesheetNames& names);
 
 // Parses one selector. On failure returns nothing and, when `problem` is given, writes the reason.
 std::optional<Selector> ParseSelector(std::string_view text, std::string* problem = nullptr);

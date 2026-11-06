@@ -23,7 +23,7 @@ namespace ampify {
 // The kernel's Host on Windows. Settings live in settings.txt and each element's storage in
 // storage\<id>.json, both under the data folder. Shortcuts are registered on the thread that runs the
 // JavaScript, and Service() on that same thread receives their presses. HTTPS goes through WinHTTP.
-// The audio gain (M4) is not connected yet: it does nothing. Nothing here throws, because an exception
+// The elements' audio gain reaches the samples in AMPLibraryAgent.exe only. Nothing here throws, because an exception
 // cannot cross the C frames of QuickJS. The Ampify services (Discord, icon, remote control, MIDI, output files) are
 // capabilities kept in src/win/win_services.*.
 namespace win {
@@ -64,7 +64,7 @@ public:
     PlayerSnapshot Player() override;
     bool Control(PlayerCommand command, int64_t seekMs) override;
 
-    void SetGainDb(const std::string& elementId, double db) override;
+    bool SetGainDb(const std::string& elementId, double db) override;
 
     void Notify(const std::string& elementId, const std::string& title, const std::string& text) override;
 
@@ -96,8 +96,8 @@ public:
     bool SetRepeat(const std::string& mode) override;
     bool SetVolume(double volume) override;
 
-    // AudioHost (src/core/audio/audio_host.hpp) in AMPLibraryAgent.exe only, where the audio is rendered: the process's
-    // engine, fed by the Atmos leveler's hooks. QueueHost (src/core/player_queue.hpp) in both processes.
+    // AudioHost (src/core/audio/audio_host.hpp): in full in AMPLibraryAgent.exe, where the audio is rendered, read
+    // only in the interface process. QueueHost (src/core/player_queue.hpp) in both processes.
     void* QueryCapability(std::string_view name) override;
 
 private:

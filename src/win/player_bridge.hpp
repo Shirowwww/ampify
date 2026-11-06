@@ -102,7 +102,6 @@ private:
     int64_t m_lineStartMs = -1;  // the start of the lyrics line Apple's view lit up last, -1 without one
     std::string m_feedKey;       // the song the published lyrics belong to (src/core/now_playing.hpp)
     std::shared_ptr<const ampify::Lyrics> m_feedLyrics;
-    size_t m_feedTtmlBytes = 0;  // the size of the text m_feedLyrics was parsed from
     uint64_t m_coverLoggedItem = 0;  // the queue item whose raw cover went to the log
     int m_coverLogs = 0;
     PlayerSnapshot m_last;

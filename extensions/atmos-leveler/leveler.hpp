@@ -6,26 +6,28 @@
 #include <string>
 #include <vector>
 
+#include "core/audio/sample_stage.hpp"
 #include "loudness_meter.hpp"
 
 namespace atmos {
 
-// Tuning of the Atmos leveler. Defaults are the values of the Windhawk reference mod.
+// Highest gain the settings may ask for, in dB: the leveler's own cap, apart from the elements' audio.maxGainDb.
+constexpr double kGainLimitDb = 15.0;
+
+// Tuning of the Atmos leveler. Unmeasured: every default is the value of the Windhawk reference mod, and no listen
+// test on a real Dolby Atmos track has confirmed them yet (docs/development/testing.md).
 struct LevelerConfig {
     bool autoLevel = true;
-    double fallbackGainDb = 5.0;      // used until the level is known, or when auto-levelling is off
-    double maxGainDb = 15.0;          // never boost an Atmos track by more than this
-    double peakCeiling = 0.95;        // linear: keeps measured peaks under about -0.5 dBFS
-    double slewDbPerPoll = 0.15;      // largest change per Poll while converging on a track
-    double settleSeconds = 8.0;       // skipped at the start of each track (crossfade)
-    double minSecondsToLevel = 10.0;  // measured audio needed before the gain follows the track
-    double minSecondsToStore = 30.0;  // measured audio needed before a track is remembered
-    size_t stereoHistory = 30;        // stereo tracks kept for the target
-    size_t minStereoTracks = 2;       // stereo tracks needed before the target is trusted
+    double fallbackGainDb = 5.0;          // used until the level is known, or when auto-levelling is off
+    double maxGainDb = kGainLimitDb;      // never boost an Atmos track by more than this
+    double peakCeiling = 0.95;            // linear: keeps measured peaks under about -0.5 dBFS
+    double slewDbPerPoll = 0.15;          // largest change per Poll while converging: 0.5 dB/s at one Poll per 300 ms
+    double settleSeconds = 8.0;           // skipped at the start of each track (crossfade)
+    double minSecondsToLevel = 10.0;      // measured audio needed before the gain follows the track
+    double minSecondsToStore = 30.0;      // measured audio needed before a track is remembered
+    size_t stereoHistory = 30;            // stereo tracks kept for the target
+    size_t minStereoTracks = 2;           // stereo tracks needed before the target is trusted
 };
-
-// Highest gain the settings may ask for, in dB. The leveler never boosts more than this.
-constexpr double kGainLimitDb = 15.0;
 
 // The config with fallbackGainDb and maxGainDb brought into 0..kGainLimitDb. A value that is not a number
 // takes its default back.
@@ -102,7 +104,7 @@ struct TrackLevel {
 };
 
 // The Atmos gain (dB) the track should have now. Pure: the caller keeps `currentDb` and calls
-// this about every 300 ms. `target` is the stereo level from TargetHistory, if known.
+// this about every 300 ms (slewDbPerPoll). `target` is the stereo level from TargetHistory, if known.
 double NextGainDb(const LevelerConfig& config, std::optional<double> target, const TrackLevel& track,
                   double currentDb);
 
@@ -114,7 +116,8 @@ double NextGainDb(const LevelerConfig& config, std::optional<double> target, con
 // audio gets as a stereo stream, say).
 class AtmosLeveler {
 public:
-    explicit AtmosLeveler(const LevelerConfig& config, double streamRate = 48000, double objectRate = 48000);
+    explicit AtmosLeveler(const LevelerConfig& config, double streamRate = ampify::audio::kStartSampleRate,
+                          double objectRate = ampify::audio::kStartSampleRate);
 
     // Ends the previous track, storing it if it was measured long enough, then starts this one.
     // An Atmos track with an empty variant id is measured but never stored.

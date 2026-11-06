@@ -307,6 +307,17 @@ TEST_CASE(Element_GainIsClampedToTheKernelCeilingAndResetOnStop) {
     CHECK(f.host.gains.back().second == 0.0);
 }
 
+TEST_CASE(Element_GainWhereTheSoundDoesNotPassIsZeroAndNotKept) {
+    Fixture f;
+    f.host.gainReachesSamples = false;
+    auto element = f.Make("gain", R"("audio.gain")", R"(Ampify.log("gain=" + Ampify.audio.setGainDb(2));)");
+    CHECK(element->Start());
+    CHECK(f.Logged("gain=0"));
+    f.host.gainReachesSamples = true;
+    element->Stop();  // nothing was kept, so nothing to remove
+    CHECK(f.host.gains.empty());
+}
+
 TEST_CASE(Element_NotifyNeedsPermissionAndTruncates) {
     Fixture f;
     std::string text(600, 'x');

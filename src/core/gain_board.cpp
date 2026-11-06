@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace ampify {
 
@@ -20,6 +21,13 @@ void GainBoard::Set(const std::string& elementId, double db, double ceilingDb) {
 GainBoard& ElementGains() {
     static GainBoard board;
     return board;
+}
+
+double GainCeilingDb(const std::optional<std::string>& setting) {
+    constexpr double kDefaultDb = 6.0;
+    constexpr double kHighestDb = 12.0;
+    if (!setting) return kDefaultDb;
+    return std::clamp(std::strtod(setting->c_str(), nullptr), 0.0, kHighestDb);
 }
 
 }  // namespace ampify

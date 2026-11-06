@@ -2,10 +2,10 @@
 #include <numbers>
 #include <vector>
 
-#include "../extensions/atmos-leveler/level_file.hpp"
-#include "../extensions/atmos-leveler/leveler.hpp"
-#include "../extensions/atmos-leveler/loudness_meter.hpp"
-#include "../extensions/atmos-leveler/object_pass.hpp"
+#include "../src/core/audio/object_pass.hpp"
+#include "atmos-leveler/level_file.hpp"
+#include "atmos-leveler/leveler.hpp"
+#include "atmos-leveler/loudness_meter.hpp"
 #include "support.hpp"
 #include "test.hpp"
 
@@ -40,11 +40,11 @@ void FeedObjects(atmos::AtmosLeveler& leveler, const std::vector<float>& stereo,
         right[frame] = stereo[frame * 2 + 1];
     }
 
-    atmos::ObjectPass pass(sampleRate);
+    ampify::audio::ObjectPass pass(sampleRate);
     const size_t passFrames = static_cast<size_t>(sampleRate / 100);
     for (size_t start = 0; start + passFrames <= frames; start += passFrames) {
-        std::vector<atmos::ObjectBuffer> buffers = {{&left, left.data() + start}, {&right, right.data() + start}};
-        const atmos::PassLevels& levels = pass.Process(buffers, passFrames, 1.0);
+        std::vector<ampify::audio::ObjectBuffer> buffers = {{&left, left.data() + start}, {&right, right.data() + start}};
+        const ampify::audio::PassLevels& levels = pass.Process(buffers, passFrames, 1.0);
         leveler.FeedPower(levels.framePower, levels.peak);
     }
 }
@@ -311,6 +311,24 @@ TEST_CASE(Leveler_StereoAt96kAndAtmosAt48kAreBothMeasured) {
     CHECK(finished && finished->path == atmos::AudioPath::Objects);
     CHECK(finished && finished->stored);
     CHECK_NEAR(leveler.Store().Find("atmos").value_or(atmos::StoredLevel{}).lufs, -20.0, 0.05);
+}
+
+TEST_CASE(Leveler_ASliderAtOrBelowTheLowestPlayerVolumeIsNotMeasured) {
+    constexpr double kRate = 48000;
+    atmos::LevelerConfig config;
+    atmos::AtmosLeveler leveler(config, kRate, kRate);
+    const std::vector<float> tone = ToneAtLufs(kRate, 2, 40.0, -16.0);
+
+    // The platform's one "slider too low" threshold (0.001): 1 / volume would blow the samples up.
+    for (float volume : {0.0005f, 0.002f}) {
+        std::vector<float> heard = tone;
+        for (float& sample : heard) sample *= volume;
+        leveler.StartTrack(volume < 0.001f ? "too-low" : "low", false);
+        leveler.Feed(heard.data(), heard.size() / 2, volume);
+        leveler.EndTrack();
+    }
+    REQUIRE(leveler.StereoHistory().Size() == 1);
+    CHECK_NEAR(leveler.StereoHistory().Values().back(), -16.0, 0.05);
 }
 
 TEST_CASE(Leveler_DefaultHistoryKeepsThirtyStereoTracks) {

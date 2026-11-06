@@ -1,16 +1,14 @@
 // Natives of the module audio (src/core/prelude/audio.cpp). Permission: audio.gain.
 
 #include <algorithm>
-#include <cstdlib>
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
+#include "../gain_board.hpp"
 
 namespace ampify::natives {
 
 namespace {
-
-constexpr double kDefaultGainCeilingDb = 6.0;
 
 struct AudioNatives : ScriptBridge {
     AMPIFY_NATIVE(SetGain) {
@@ -18,13 +16,10 @@ struct AudioNatives : ScriptBridge {
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "audio.gain", &failure)) return failure;
         // The ceiling belongs to the kernel's settings, never to the extension.
-        double ceiling = kDefaultGainCeilingDb;
-        if (std::optional<std::string> raw = HostOf(ext).ReadSetting("audio.maxGainDb")) {
-            ceiling = std::clamp(std::strtod(raw->c_str(), nullptr), 0.0, 12.0);
-        }
+        double ceiling = GainCeilingDb(HostOf(ext).ReadSetting(kGainCeilingSetting));
         double db = std::clamp(Number(ctx, argc, argv, 0), -ceiling, ceiling);
+        if (!HostOf(ext).SetGainDb(ext->id(), db)) return JS_NewFloat64(ctx, 0);  // the host logs it once
         GainDbOf(ext) = db;
-        HostOf(ext).SetGainDb(ext->id(), db);
         return JS_NewFloat64(ctx, db);
     }
 };

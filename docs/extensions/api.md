@@ -230,10 +230,11 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
 
 ### 5.4 Audio [preview]
 
-Sound is processed in `AMPLibraryAgent.exe` (`"processes": ["engine"]`), on the audio hooks of the Atmos leveler,
+Sound is processed in `AMPLibraryAgent.exe` (`"processes": ["engine"]`), on Ampify's audio hooks (`src/win/audio/`),
 which go in by themselves when the interface asks for the sound. The interface (`AppleMusic.exe`) reads what that
 process shares: `onFrame`, `analyze()`, `loudness()` and `volume()` work there too, about 100 ms behind. The gain and
-the equalizer stay in the engine: in the interface they answer `false` and `eq.bands()` is empty, without throwing.
+the equalizer stay in the engine: in the interface `setGainDb` answers 0, the equalizer `false` and `eq.bands()` is
+empty, without throwing.
 
 ```js
 Ampify.audio.setGainDb(db)          // gain on the samples, capped by audio.maxGainDb, back to 0 at stop

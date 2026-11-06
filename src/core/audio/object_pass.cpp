@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace atmos {
+namespace ampify::audio {
 
 ObjectPass::ObjectPass(double sampleRate) : m_sampleRate(sampleRate), m_ramp(sampleRate) {}
 
@@ -31,4 +31,4 @@ const PassLevels& ObjectPass::Process(std::span<const ObjectBuffer> objects, siz
     return m_levels;
 }
 
-}  // namespace atmos
+}  // namespace ampify::audio

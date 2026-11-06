@@ -1,6 +1,7 @@
 #include "builtins.hpp"
 
 #include "builtins_css.hpp"
+#include "css_values.hpp"
 
 #include <array>
 #include <cctype>
@@ -797,10 +798,6 @@ bool IsClassChar(char c) {
     return std::islower(static_cast<unsigned char>(c)) || std::isdigit(static_cast<unsigned char>(c)) || c == '-';
 }
 
-bool IsTypeChar(char c) {
-    return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '.';
-}
-
 // A class starts a part of a selector: at the start, or after a space or a combinator (>, +, ~).
 bool StartsPart(std::string_view selector, size_t at) {
     if (at == 0) return true;
@@ -887,6 +884,24 @@ std::vector<std::string> BuiltinStylesheetNames() {
     std::vector<std::string> names;
     for (const BuiltinEntry& entry : kBuiltins) names.emplace_back(entry.name);
     return names;
+}
+
+namespace {
+
+class Zones final : public StylesheetNames {
+public:
+    std::optional<std::vector<std::string>> Expand(std::string_view selector, std::string* problem) const override {
+        return ExpandClasses(selector, problem);
+    }
+    std::optional<std::string> Layout(std::string_view name) const override { return BuiltinStylesheet(name); }
+    std::vector<std::string> LayoutNames() const override { return BuiltinStylesheetNames(); }
+};
+
+}  // namespace
+
+const StylesheetNames& ZoneNames() {
+    static const Zones zones;
+    return zones;
 }
 
 }  // namespace ampify::theme

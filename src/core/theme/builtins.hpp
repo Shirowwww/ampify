@@ -12,6 +12,8 @@
 #include <string_view>
 #include <vector>
 
+#include "css.hpp"
+
 namespace ampify::theme {
 
 // The selectors a class stands for (several when the zone has several forms), or nothing for an unknown class.
@@ -26,5 +28,13 @@ std::optional<std::vector<std::string>> ExpandClasses(std::string_view selector,
 // The CSS of a ready-made layout, or nothing for an unknown name.
 std::optional<std::string> BuiltinStylesheet(std::string_view name);
 std::vector<std::string> BuiltinStylesheetNames();
+
+// The classes and the layouts above, for the parser.
+const StylesheetNames& ZoneNames();
+
+// A theme's or a snippet's user.css, its classes and layouts given by the table above.
+inline Stylesheet ParseThemeStylesheet(std::string_view css) {
+    return ParseStylesheet(css, ZoneNames());
+}
 
 }  // namespace ampify::theme

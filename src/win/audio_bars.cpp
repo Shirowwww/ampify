@@ -10,7 +10,7 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
 
-#include "audio_share.hpp"
+#include "audio/audio_sharing.hpp"
 
 namespace ampify::win {
 

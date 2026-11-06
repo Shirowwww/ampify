@@ -2,7 +2,8 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
+
+#include "css_values.hpp"
 
 namespace ampify::theme {
 
@@ -10,13 +11,6 @@ namespace {
 
 constexpr std::string_view kPaneName = "PaneRoot";
 constexpr std::string_view kSplitViewType = "SplitView";
-
-std::optional<double> ParseNumber(std::string_view text) {
-    double number = 0;
-    auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), number);
-    if (error != std::errc() || end != text.data() + text.size()) return std::nullopt;
-    return number;
-}
 
 }  // namespace
 

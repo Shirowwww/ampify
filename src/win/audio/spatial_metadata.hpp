@@ -1,14 +1,14 @@
 #pragma once
 
 // The spatial audio stream Apple Music renders Dolby Atmos with: ISpatialAudioObjectRenderStreamForMetadata, from
-// the Windows SDK's spatialaudiometadata.h. The parts the leveler touches are declared here, in the order of the
-// SDK declaration: the vtable slots below follow from it. The leveler only calls through slots it hooked.
+// the Windows SDK's spatialaudiometadata.h. The parts the audio hooks touch are declared here, in the order of the
+// SDK declaration: the vtable slots below follow from it. The hooks only call through slots they hooked.
 // Not compiled on Linux.
 
 #include <windows.h>
 #include <spatialaudioclient.h>
 
-namespace atmos::hooks {
+namespace ampify::win::audio_hooks {
 
 // {BBC9C907-48D5-4A2E-A0C7-F7F0D67C1FB1}, as declared in spatialaudiometadata.h. Field notes give the Data1
 // part (0xBBC9C907) on the stream Apple Music activates.
@@ -19,7 +19,7 @@ constexpr GUID kIidRenderStreamForMetadata = {0xBBC9C907, 0x48D5, 0x4A2E, {0xA0,
 // EndUpdatingAudioObjects (9). The two activations follow, in slots 10 and 11.
 //
 // The objects they return, ISpatialAudioObjectForMetadataCommands and ISpatialAudioObjectForMetadataItems, both
-// derive from ISpatialAudioObjectBase, whose GetBuffer is slot 3; their own methods come after it. The leveler
+// derive from ISpatialAudioObjectBase, whose GetBuffer is slot 3; their own methods come after it. The hooks
 // only uses GetBuffer, so they are typed as the base here.
 struct ISpatialAudioObjectRenderStreamForMetadataLite : public ISpatialAudioObjectRenderStreamBase {
     virtual HRESULT STDMETHODCALLTYPE ActivateSpatialAudioObjectForMetadataCommands(
@@ -44,4 +44,4 @@ struct SpatialAudioObjectRenderStreamForMetadataActivationParamsLite {
     ISpatialAudioObjectRenderStreamNotify* NotifyObject;
 };
 
-}  // namespace atmos::hooks
+}  // namespace ampify::win::audio_hooks

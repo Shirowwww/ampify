@@ -101,6 +101,19 @@ TEST_CASE(TextUtil_CompareDottedVersionsAgreesWithTheReleaseComparison) {
     CHECK(ampify::CompareDottedVersions("1.2", "1.2.0.0") == 0);
 }
 
+TEST_CASE(TextUtil_IsSettingKeyKeepsTheManifestForm) {
+    const std::string longest(32, 'k');
+    const std::string tooLong(33, 'k');
+    for (std::string_view key : {std::string_view("hide-radio"), std::string_view("a"), std::string_view("0"),
+                                 std::string_view("x-"), std::string_view(longest)}) {
+        CHECK(ampify::IsSettingKey(key));
+    }
+    for (std::string_view key : {std::string_view(""), std::string_view("-a"), std::string_view("Hide"),
+                                 std::string_view("a_b"), std::string_view("a b"), std::string_view(tooLong)}) {
+        CHECK(!ampify::IsSettingKey(key));
+    }
+}
+
 TEST_CASE(TextUtil_AppendUtf8WritesOneToFourBytes) {
     std::string out;
     ampify::AppendUtf8(out, 'A');

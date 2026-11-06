@@ -110,7 +110,7 @@ private:
     std::optional<double> SetGainDb(double db) override;
 
     struct RemoteTask {
-        std::string action;  // "play", "pause", "next", "previous" or "gain"
+        std::optional<remote::Action> action;  // empty: set the gain to `db`
         double db = 0;
         std::promise<std::optional<double>> done;
     };
@@ -123,7 +123,7 @@ private:
     void RebuildTrayMenu();
     void RefreshStatus();
     void Emit(const std::string& entry, const std::string& payload);
-    std::optional<double> Queue(const std::string& action, double db);
+    std::optional<double> Queue(std::optional<remote::Action> action, double db);
 
     Host& m_host;
     std::string m_process;

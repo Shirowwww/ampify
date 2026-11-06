@@ -7,8 +7,8 @@
 
 #include "../text_util.hpp"
 #include "color.hpp"
+#include "css_values.hpp"
 #include "properties.hpp"
-#include "theme.hpp"
 
 namespace ampify::theme {
 
@@ -34,39 +34,11 @@ constexpr std::array<NamedEasing, 5> kEasings{{
     {"ease-in-out", {0.42, 0, 0.58, 1}},
 }};
 
-// The pieces of `text` between each `separator` outside brackets, trimmed. With `skipEmpty`, runs of separators make
-// one break, as spaces do between words.
-std::vector<std::string_view> Split(std::string_view text, char separator, bool skipEmpty = false) {
-    std::vector<std::string_view> pieces;
-    int depth = 0;
-    size_t start = 0;
-    for (size_t i = 0; i <= text.size(); i++) {
-        bool end = i == text.size();
-        if (!end && text[i] == '(') depth++;
-        if (!end && text[i] == ')') depth--;
-        bool cut = end || (depth == 0 && (separator == ' ' ? std::isspace(static_cast<unsigned char>(text[i])) != 0
-                                                           : text[i] == separator));
-        if (!cut) continue;
-        std::string_view piece = TrimSpace(text.substr(start, i - start));
-        if (!piece.empty() || !skipEmpty) pieces.push_back(piece);
-        start = i + 1;
-    }
-    return pieces;
-}
-
-std::optional<double> Number(std::string_view text) {
-    double value = 0;
-    const char* last = text.data() + text.size();
-    auto [end, error] = std::from_chars(text.data(), last, value);
-    if (text.empty() || error != std::errc() || end != last || !std::isfinite(value)) return std::nullopt;
-    return value;
-}
-
 // `2s` or `150ms`, in milliseconds. Nothing for another word.
 std::optional<double> Milliseconds(std::string_view word) {
-    if (word.ends_with("ms")) return Number(word.substr(0, word.size() - 2));
+    if (word.ends_with("ms")) return ParseNumber(word.substr(0, word.size() - 2));
     if (!word.ends_with('s')) return std::nullopt;
-    std::optional<double> seconds = Number(word.substr(0, word.size() - 1));
+    std::optional<double> seconds = ParseNumber(word.substr(0, word.size() - 1));
     if (!seconds) return std::nullopt;
     return *seconds * 1000;
 }
@@ -75,11 +47,12 @@ std::optional<double> Milliseconds(std::string_view word) {
 std::optional<std::array<double, 4>> CubicBezier(std::string_view lowered) {
     constexpr std::string_view kStart = "cubic-bezier(";
     if (!lowered.starts_with(kStart) || !lowered.ends_with(')')) return std::nullopt;
-    std::vector<std::string_view> numbers = Split(lowered.substr(kStart.size(), lowered.size() - kStart.size() - 1), ',');
+    std::vector<std::string_view> numbers =
+        SplitArguments(lowered.substr(kStart.size(), lowered.size() - kStart.size() - 1));
     if (numbers.size() != 4) return std::nullopt;
     std::array<double, 4> curve{};
     for (size_t i = 0; i < 4; i++) {
-        std::optional<double> number = Number(numbers[i]);
+        std::optional<double> number = ParseNumber(numbers[i]);
         if (!number || (i % 2 == 0 && (*number < 0 || *number > 1))) return std::nullopt;
         curve[i] = *number;
     }
@@ -158,8 +131,8 @@ bool ReadWord(std::string_view word, std::string_view text, Item& item, std::str
         item.times.push_back(*ms);
         return true;
     }
-    if (lowered == "infinite" || Number(lowered)) {
-        std::optional<double> count = lowered == "infinite" ? 0.0 : Number(lowered);
+    if (lowered == "infinite" || ParseNumber(lowered)) {
+        std::optional<double> count = lowered == "infinite" ? 0.0 : ParseNumber(lowered);
         if (lowered != "infinite" && (*count < 1 || *count > kMaxCount || *count != std::floor(*count))) {
             problem = "the count is a whole number from 1 to 1000, or infinite: \"" + std::string(word) + "\"";
             return false;
@@ -263,8 +236,7 @@ bool ReadDeclaration(const Declaration& declaration, const KeyframeStop& stop, c
         problem = "!important does not apply inside @keyframes";
         return false;
     }
-    std::optional<std::string> raw = SubstituteVariables(declaration.value, variables, &problem);
-    if (raw) raw = EvaluateCalc(*raw, &problem);
+    std::optional<std::string> raw = ResolveValue(declaration.value, variables, &problem);
     if (!raw) return false;
     Conversion conversion = ConvertValue(*FindProperty(property), *raw, context);
     if (!conversion.value) {
@@ -284,7 +256,7 @@ bool ReadDeclaration(const Declaration& declaration, const KeyframeStop& stop, c
         return true;
     }
     std::vector<double> numbers;
-    for (std::string_view part : Split(conversion.value->text, ',')) numbers.push_back(Number(part).value_or(0));
+    for (std::string_view part : SplitArguments(conversion.value->text)) numbers.push_back(ParseNumber(part).value_or(0));
     for (double offset : stop.offsets) {
         if (property == "opacity") {
             points[static_cast<size_t>(Channel::Opacity)][offset] = {offset, numbers.at(0), 0};
@@ -321,11 +293,11 @@ std::optional<AnimationTrack> DecodeTrack(std::string_view text) {
     AnimationTrack track;
     track.channel = static_cast<Channel>(channel - kChannels.begin());
     const size_t parts = track.channel == Channel::Scale || track.channel == Channel::Translation ? 3 : 2;
-    for (std::string_view point : Split(text.substr(equals + 1), '/')) {
-        std::vector<std::string_view> numbers = Split(point, ':');
+    for (std::string_view point : SplitArguments(text.substr(equals + 1), '/')) {
+        std::vector<std::string_view> numbers = SplitArguments(point, ':');
         if (numbers.size() != parts) return std::nullopt;
-        std::optional<double> offset = Number(numbers[0]), x = Number(numbers[1]);
-        std::optional<double> y = parts == 3 ? Number(numbers[2]) : std::optional<double>(0);
+        std::optional<double> offset = ParseNumber(numbers[0]), x = ParseNumber(numbers[1]);
+        std::optional<double> y = parts == 3 ? ParseNumber(numbers[2]) : std::optional<double>(0);
         if (!offset || !x || !y) return std::nullopt;
         track.points.push_back({*offset, *x, *y});
     }
@@ -333,10 +305,11 @@ std::optional<AnimationTrack> DecodeTrack(std::string_view text) {
 }
 
 std::optional<Animation> DecodeAnimation(std::string_view text) {
-    std::vector<std::string_view> fields = Split(text, ';');
+    std::vector<std::string_view> fields = SplitArguments(text, ';');
     if (fields.size() != 7 && !(fields.size() == 8 && fields[7] == "playing")) return std::nullopt;
     Animation animation;
-    std::optional<double> duration = Number(fields[0]), delay = Number(fields[1]), count = Number(fields[2]);
+    std::optional<double> duration = ParseNumber(fields[0]), delay = ParseNumber(fields[1]);
+    std::optional<double> count = ParseNumber(fields[2]);
     auto direction = std::find(kDirections.begin(), kDirections.end(), fields[3]);
     if (!duration || !delay || !count || direction == kDirections.end()) return std::nullopt;
     animation.durationMs = *duration;
@@ -348,14 +321,14 @@ std::optional<Animation> DecodeAnimation(std::string_view text) {
     }
     animation.fillBackwards = fields[4] == "backwards" || fields[4] == "both";
     animation.fillForwards = fields[4] == "forwards" || fields[4] == "both";
-    std::vector<std::string_view> curve = Split(fields[5], ',');
+    std::vector<std::string_view> curve = SplitArguments(fields[5], ',');
     if (curve.size() != 4) return std::nullopt;
     for (size_t i = 0; i < 4; i++) {
-        std::optional<double> number = Number(curve[i]);
+        std::optional<double> number = ParseNumber(curve[i]);
         if (!number) return std::nullopt;
         animation.easing[i] = *number;
     }
-    for (std::string_view piece : Split(fields[6], ' ', true)) {
+    for (std::string_view piece : SplitArguments(fields[6], ' ', true)) {
         std::optional<AnimationTrack> track = DecodeTrack(piece);
         if (!track) return std::nullopt;
         animation.tracks.push_back(std::move(*track));
@@ -396,12 +369,12 @@ std::optional<std::string> AnimationValue(std::string_view raw, const KeyframeSe
     std::string reason;
     std::string_view text = TrimSpace(raw);
     if (ToLowerAscii(text) == "none") return std::string();
-    std::vector<std::string_view> items = Split(text, ',');
+    std::vector<std::string_view> items = SplitArguments(text, ',');
     std::vector<Animation> animations;
     if (items.size() > kMaxAnimations) reason = "animation runs 4 animations at most: \"" + std::string(text) + "\"";
     for (size_t i = 0; reason.empty() && i < items.size(); i++) {
         Item item;
-        for (std::string_view word : Split(items[i], ' ', true)) {
+        for (std::string_view word : SplitArguments(items[i], ' ', true)) {
             if (!ReadWord(word, items[i], item, reason)) break;
         }
         if (reason.empty() && Complete(item, items[i], sets, reason)) animations.push_back(std::move(item.animation));
@@ -431,7 +404,7 @@ std::string EncodeAnimations(const std::vector<Animation>& animations) {
 std::optional<std::vector<Animation>> DecodeAnimations(std::string_view text) {
     std::vector<Animation> animations;
     if (text.empty()) return animations;
-    for (std::string_view piece : Split(text, '|')) {
+    for (std::string_view piece : SplitArguments(text, '|')) {
         std::optional<Animation> animation = DecodeAnimation(piece);
         if (!animation) return std::nullopt;
         animations.push_back(std::move(*animation));

@@ -23,7 +23,7 @@ Register-Case -Id 'background-launch' -Title 'Launcher started by Windows: Apple
         Add-Check -Ctx $Ctx -Name 'bench build present' -Passed $false -Detail $launcher
         return
     }
-    $fullName = (Get-AppxPackage -Name 'AppleInc.AppleMusicWin' -ErrorAction SilentlyContinue | Select-Object -First 1).PackageFullName
+    $fullName = (Get-AppxPackage -Name $script:AppleFacts.package.name -ErrorAction SilentlyContinue | Select-Object -First 1).PackageFullName
 
     Reset-KitState
     $since = Get-Date

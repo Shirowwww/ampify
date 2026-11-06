@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <mutex>
 
 #include "text_util.hpp"
 
@@ -15,12 +16,7 @@ constexpr size_t kMaxTimeDigits = 9;
 
 bool IsSpace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f'; }
 
-std::string Trimmed(std::string_view text) {
-    size_t begin = 0, end = text.size();
-    while (begin < end && IsSpace(text[begin])) ++begin;
-    while (end > begin && IsSpace(text[end - 1])) --end;
-    return std::string(text.substr(begin, end - begin));
-}
+std::string Trimmed(std::string_view text) { return std::string(TrimSpace(text)); }
 
 // The text of one entity, without & and ;. False when it is not one this scanner knows.
 bool DecodeEntity(std::string_view name, std::string& out) {
@@ -240,6 +236,8 @@ struct PendingLine {
     std::vector<Timing> wordEnds;  // parallel to line.words: the end each word declared
 };
 
+constexpr int kNoWord = -1;
+
 class Scanner {
 public:
     Lyrics Run(std::string_view in) {
@@ -295,6 +293,7 @@ private:
         if (tag.name == "br") {
             if (InLine() && !Ignored()) {
                 while (!m_text.empty() && m_text.back() == ' ') m_text.pop_back();
+                ForgetSpaceAfterWord();
                 if (!m_text.empty() && m_text.back() != '\n') m_text += '\n';
             }
             return;
@@ -302,6 +301,7 @@ private:
         if (tag.name == "p") {
             FinishLine();
             m_line = PendingLine{};
+            m_gapWord = kNoWord;
             m_line.timing = TimingOf(tag);
             m_inLine = true;
         }
@@ -334,8 +334,11 @@ private:
         if (frame.name == "span" && frame.word && !frame.ignored && InLine()) {
             std::string text = Trimmed(frame.own);
             if (!text.empty()) {
-                m_line.line.words.push_back({*frame.timing.begin, frame.timing.end.value_or(*frame.timing.begin), text});
+                const bool spaced = !m_text.empty() && m_text.back() == ' ';
+                m_line.line.words.push_back(
+                    {*frame.timing.begin, frame.timing.end.value_or(*frame.timing.begin), text, spaced});
                 m_line.wordEnds.push_back(frame.timing);
+                m_gapWord = static_cast<int>(m_line.line.words.size()) - 1;
             }
         }
         if (frame.name == "p") FinishLine();
@@ -350,8 +353,24 @@ private:
 
     void AddText(std::string_view text) {
         if (!InLine() || Ignored()) return;
+        const size_t before = m_text.size();
         AppendFolded(m_text, text);
         if (!m_stack.empty() && m_stack.back().name == "span") AppendFolded(m_stack.back().own, text);
+        NoteSpaceAfterWord(before);
+    }
+
+    // The text added from `before` on follows the last word closed: a space first means the word is spaced, any
+    // other character ends the gap between that word and the next.
+    void NoteSpaceAfterWord(size_t before) {
+        if (m_gapWord == kNoWord || m_text.size() == before) return;
+        if (m_text[before] == ' ') m_line.line.words[m_gapWord].spaceAfter = true;
+        if (m_text.back() != ' ') m_gapWord = kNoWord;
+    }
+
+    // A line break right after a word takes the space away: the line text no longer has one there.
+    void ForgetSpaceAfterWord() {
+        if (m_gapWord != kNoWord) m_line.line.words[m_gapWord].spaceAfter = false;
+        m_gapWord = kNoWord;
     }
 
     void FinishLine() {
@@ -359,6 +378,7 @@ private:
         m_inLine = false;
         std::string text = Trimmed(m_text);
         m_text.clear();
+        m_gapWord = kNoWord;
         if (text.empty()) return;
         m_line.line.text = std::move(text);
         m_lines.push_back(std::move(m_line));
@@ -398,6 +418,7 @@ private:
                     }
                     word.endMs = std::max(word.endMs, word.startMs);
                 }
+                line.timing = line.words.empty() ? LyricTiming::ByLine : LyricTiming::ByWord;
             } else {
                 line.words.clear();
             }
@@ -414,6 +435,7 @@ private:
     std::vector<PendingLine> m_lines;
     PendingLine m_line;
     bool m_inLine = false;
+    int m_gapWord = kNoWord;  // the last word of the line while only white space follows it
     std::string m_text;
     std::string m_language;
 };
@@ -466,32 +488,45 @@ Lyrics ParseTtml(std::string_view ttml) {
 
 namespace {
 
-// The words of a line, timed. Apple times many lines only as a whole: their words then share the line's span by
-// length, so they still light up one after the other. Kept out of the parsed lyrics, which say only what Apple gave.
-std::vector<LyricWord> TimedWords(const LyricLine& line) {
-    if (!line.words.empty() || line.endMs <= line.startMs) return line.words;
-    std::vector<LyricWord> words;
+// Apple times many lines only as a whole: their words then share the line's span by length, so they still light up
+// one after the other. Kept out of the parsed lyrics, which say only what Apple gave.
+std::vector<KaraokeWord> SpreadOverLine(const LyricLine& line) {
+    std::vector<KaraokeWord> words;
     size_t letters = 0;
     for (size_t at = 0; at < line.text.size();) {
         size_t end = line.text.find(' ', at);
         if (end == std::string::npos) end = line.text.size();
         if (end > at) {
-            words.push_back({0, 0, line.text.substr(at, end - at)});
+            words.push_back({line.text.substr(at, end - at), 0, 0});
             letters += end - at;
         }
         at = end + 1;
     }
     const double span = static_cast<double>(line.endMs - line.startMs);
     size_t before = 0;
-    for (LyricWord& word : words) {
+    for (KaraokeWord& word : words) {
         word.startMs = line.startMs + static_cast<int64_t>(span * before / letters);
-        before += word.text.size();
+        before += word.piece.size();
         word.endMs = line.startMs + static_cast<int64_t>(span * before / letters);
     }
     return words;
 }
 
 }  // namespace
+
+std::vector<KaraokeWord> KaraokeWords(const LyricLine& line) {
+    std::vector<KaraokeWord> words;
+    if (line.timing == LyricTiming::ByWord) {
+        for (const LyricWord& word : line.words) words.push_back({word.text, word.startMs, word.endMs});
+    } else if (line.timing == LyricTiming::ByLine && line.endMs > line.startMs) {
+        words = SpreadOverLine(line);
+    }
+    if (words.empty()) return {{line.text, line.startMs, line.endMs}};
+    for (size_t i = 0; i + 1 < words.size(); ++i) {
+        if (line.timing != LyricTiming::ByWord || line.words[i].spaceAfter) words[i].piece += ' ';
+    }
+    return words;
+}
 
 KaraokeFrame KaraokeAt(const Lyrics& lyrics, int64_t positionMs) {
     KaraokeFrame frame;
@@ -503,35 +538,15 @@ KaraokeFrame KaraokeAt(const Lyrics& lyrics, int64_t positionMs) {
     const LyricLine& line = *(after - 1);
     frame.line = static_cast<int>(after - lyrics.lines.begin()) - 1;
     frame.between = line.endMs > line.startMs && positionMs >= line.endMs;
-    const std::vector<LyricWord> words = TimedWords(line);
+    const std::vector<KaraokeWord> words = KaraokeWords(line);
     frame.words.reserve(words.size());
-    for (const LyricWord& word : words) {
+    for (const KaraokeWord& word : words) {
         double done = 0;
         if (positionMs >= word.endMs) done = 1;
         else if (positionMs > word.startMs) done = static_cast<double>(positionMs - word.startMs) / (word.endMs - word.startMs);
         frame.words.push_back(done);
     }
     return frame;
-}
-
-std::vector<std::string> KaraokePieces(const LyricLine& line) {
-    const std::vector<LyricWord> words = TimedWords(line);
-    std::vector<std::string> pieces;
-    pieces.reserve(words.size());
-    size_t cursor = 0;
-    for (size_t i = 0; i < words.size(); i++) {
-        const std::string& word = words[i].text;
-        size_t at = line.text.find(word, cursor);
-        bool last = i + 1 == words.size();
-        if (at == std::string::npos) {  // a text that does not hold the word: spaces between all words
-            pieces.push_back(last ? word : word + " ");
-            continue;
-        }
-        cursor = at + word.size();
-        bool spaced = cursor < line.text.size() && line.text[cursor] == ' ';
-        pieces.push_back(spaced && !last ? word + " " : word);
-    }
-    return pieces;
 }
 
 std::optional<Lyrics> LyricsFromRaw(const RawLyrics& raw) {
@@ -542,7 +557,21 @@ std::optional<Lyrics> LyricsFromRaw(const RawLyrics& raw) {
     return lyrics;
 }
 
-Json LyricsJson(const std::optional<Lyrics>& lyrics) {
+std::shared_ptr<const Lyrics> SharedLyrics(const RawLyrics& raw) {
+    static std::mutex mutex;
+    static std::optional<RawLyrics> parsedFrom;
+    static std::shared_ptr<const Lyrics> parsed;
+    std::lock_guard lock(mutex);
+    if (!parsedFrom || parsedFrom->ttml != raw.ttml || parsedFrom->staticText != raw.staticText ||
+        parsedFrom->language != raw.language) {
+        std::optional<Lyrics> fresh = LyricsFromRaw(raw);
+        parsed = fresh ? std::make_shared<const Lyrics>(std::move(*fresh)) : nullptr;
+        parsedFrom = raw;
+    }
+    return parsed;
+}
+
+Json LyricsJson(const Lyrics* lyrics) {
     if (!lyrics) return Json();
     Json::Array lines;
     for (const LyricLine& line : lyrics->lines) {

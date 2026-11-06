@@ -21,6 +21,7 @@
 #include "../src/core/theme/color.hpp"
 #include "../src/core/theme/colour_keys.hpp"
 #include "../src/core/theme/css.hpp"
+#include "../src/core/theme/css_values.hpp"
 #include "../src/cli/theme_commands.hpp"
 #include "../src/core/theme/engine.hpp"
 #include "../src/core/theme/files.hpp"
@@ -350,7 +351,7 @@ TEST_CASE(Ini_AndCss_ReadAFileSavedWithAByteOrderMark) {
     CHECK(ini.Parse("\xEF\xBB\xBF[Night]\nmain = 16131F\n").empty());
     CHECK(ini.Get("Night", "main") == "16131F");
 
-    th::Stylesheet sheet = th::ParseStylesheet("\xEF\xBB\xBF.sidebar { corner-radius: 4 }\n");
+    th::Stylesheet sheet = th::ParseThemeStylesheet("\xEF\xBB\xBF.sidebar { corner-radius: 4 }\n");
     CHECK(sheet.problems.empty());
     CHECK(sheet.rules.size() == 1);
 }
@@ -390,7 +391,7 @@ TEST_CASE(Palette_NamesAreCaseInsensitiveAndUnique) {
 // --- CSS subset ------------------------------------------------------------------------------------------
 
 TEST_CASE(Css_ParsesSelectorsDeclarationsAndLines) {
-    th::Stylesheet sheet = th::ParseStylesheet(
+    th::Stylesheet sheet = th::ParseThemeStylesheet(
         "/* top */\nGrid#Bar > TextBlock, Button {\n  background: #FFF;\n  visibility: collapsed !important;\n}\n");
 
     CHECK(sheet.problems.empty());
@@ -416,7 +417,7 @@ TEST_CASE(Css_ParsesSelectorsDeclarationsAndLines) {
 }
 
 TEST_CASE(Css_MediaBlocksGiveTheirRulesACondition) {
-    th::Stylesheet sheet = th::ParseStylesheet(
+    th::Stylesheet sheet = th::ParseThemeStylesheet(
         "@media (max-width: 1000px) {\n"
         "    .sidebar { margin: 1 }\n"
         "    Border { width: 2 }\n"
@@ -443,7 +444,7 @@ TEST_CASE(Css_MediaBlocksGiveTheirRulesACondition) {
 }
 
 TEST_CASE(Css_SkipsBadRulesAndKeepsTheOthers) {
-    th::Stylesheet sheet = th::ParseStylesheet(
+    th::Stylesheet sheet = th::ParseThemeStylesheet(
         "Grid > { color: red; }\n"
         "@import url(x.css);\n"
         "Grid#A { margin: 4 }\n"
@@ -459,7 +460,8 @@ TEST_CASE(Css_SkipsBadRulesAndKeepsTheOthers) {
 }
 
 TEST_CASE(Css_ClassesStandForThePathsToApplesZones) {
-    th::Stylesheet sheet = th::ParseStylesheet(".sidebar { margin: 8 }\n.card:hover, .playbar Button { opacity: 0.5 }\n");
+    th::Stylesheet sheet =
+        th::ParseThemeStylesheet(".sidebar { margin: 8 }\n.card:hover, .playbar Button { opacity: 0.5 }\n");
 
     CHECK(sheet.problems.empty());
     CHECK(sheet.rules.size() == 2);
@@ -482,13 +484,13 @@ TEST_CASE(Css_ClassesStandForThePathsToApplesZones) {
 }
 
 TEST_CASE(Css_AClassWithSeveralFormsGivesOneSelectorEach) {
-    th::Stylesheet sheet = th::ParseStylesheet(".page-top-spacer { height: 8 }\n");
+    th::Stylesheet sheet = th::ParseThemeStylesheet(".page-top-spacer { height: 8 }\n");
     CHECK(sheet.problems.empty());
     CHECK(sheet.rules.size() == 1 && sheet.rules[0].selectors.size() == 5);
 }
 
 TEST_CASE(Css_ScrollbarStandsForBothScrollBarsOfEveryList) {
-    th::Stylesheet sheet = th::ParseStylesheet(".scrollbar:hover { color: #888888 }\n");
+    th::Stylesheet sheet = th::ParseThemeStylesheet(".scrollbar:hover { color: #888888 }\n");
     CHECK(sheet.problems.empty());
     CHECK(sheet.rules.size() == 1 && sheet.rules[0].selectors.size() == 2);
     CHECK(sheet.rules[0].selectors.at(0).parts.back().type == "ScrollBar");
@@ -500,7 +502,8 @@ TEST_CASE(Css_ScrollbarStandsForBothScrollBarsOfEveryList) {
 // .artwork leaves out two named covers: those exclusions are the name's own business and add no weight, so the play
 // bar's cover rule wins over .artwork wherever each is written (every theme's bar cover lost to it, 05/11).
 TEST_CASE(Css_TheBarCoverBeatsArtworkWhicheverComesFirst) {
-    th::Stylesheet sheet = th::ParseStylesheet(".lcd-artwork-image { corner-radius: 27 }\n.artwork { corner-radius: 6 }\n");
+    th::Stylesheet sheet =
+        th::ParseThemeStylesheet(".lcd-artwork-image { corner-radius: 27 }\n.artwork { corner-radius: 6 }\n");
     CHECK(sheet.problems.empty() && sheet.rules.size() == 2);
     th::Specificity bar = th::SpecificityOf(sheet.rules[0].selectors.at(0));
     th::Specificity artwork = th::SpecificityOf(sheet.rules[1].selectors.at(0));
@@ -514,7 +517,7 @@ TEST_CASE(Css_TheBarCoverBeatsArtworkWhicheverComesFirst) {
 // Glass's light scheme drew dark text on panes tinted by the cover's dark colour (05/11): a theme gives each scheme its
 // own rules with (prefers-color-scheme), which follows the scheme in use, not Windows.
 TEST_CASE(Css_ColorSchemeMediaFollowsTheThemesScheme) {
-    th::Stylesheet sheet = th::ParseStylesheet(
+    th::Stylesheet sheet = th::ParseThemeStylesheet(
         "@media (prefers-color-scheme: light) and (max-width: 1200px) { Grid { margin: 1 } }\n"
         "@media (prefers-color-scheme: dark) { Grid { margin: 2 } }\n");
     CHECK(sheet.problems.empty() && sheet.rules.size() == 2);
@@ -522,8 +525,9 @@ TEST_CASE(Css_ColorSchemeMediaFollowsTheThemesScheme) {
     CHECK(light.dark == false && light.maxWidth == 1200);
     CHECK(light.MatchesScheme(false) && !light.MatchesScheme(true));
     CHECK(sheet.rules[1].media->MatchesScheme(true) && !sheet.rules[1].media->MatchesScheme(false));
-    CHECK(th::ParseStylesheet("@media (max-width: 900px) { Grid { margin: 1 } }").rules[0].media->MatchesScheme(true));
-    CHECK(!th::ParseStylesheet("@media (prefers-color-scheme: sepia) { Grid { margin: 1 } }").problems.empty());
+    th::Stylesheet bySize = th::ParseThemeStylesheet("@media (max-width: 900px) { Grid { margin: 1 } }");
+    CHECK(bySize.rules[0].media->MatchesScheme(true));
+    CHECK(!th::ParseThemeStylesheet("@media (prefers-color-scheme: sepia) { Grid { margin: 1 } }").problems.empty());
 }
 
 TEST_CASE(Css_RefusesUnknownAndGluedClassesButKeepsFullTypeNames) {
@@ -537,13 +541,13 @@ TEST_CASE(Css_RefusesUnknownAndGluedClassesButKeepsFullTypeNames) {
     std::optional<std::vector<std::string>> full = th::ExpandClasses("Microsoft.UI.Xaml.Controls.Grid > .lcd");
     CHECK(full && full->size() == 1 && full->at(0).starts_with("Microsoft.UI.Xaml.Controls.Grid > NowPlayingControl"));
 
-    th::Stylesheet sheet = th::ParseStylesheet(".nope, Grid { margin: 1 }\nGrid#A { margin: 2 }\n");
+    th::Stylesheet sheet = th::ParseThemeStylesheet(".nope, Grid { margin: 1 }\nGrid#A { margin: 2 }\n");
     CHECK(sheet.problems.size() == 1);
     CHECK(sheet.rules.size() == 1);
 }
 
 TEST_CASE(Css_ImportBringsAReadyMadeLayoutAtItsPlace) {
-    th::Stylesheet sheet = th::ParseStylesheet(
+    th::Stylesheet sheet = th::ParseThemeStylesheet(
         "@import \"ampify:floating-panels\";\n@import url(ampify:bottom-bar);\n.sidebar { margin: 1 }\n");
 
     CHECK(sheet.problems.empty());
@@ -553,10 +557,57 @@ TEST_CASE(Css_ImportBringsAReadyMadeLayoutAtItsPlace) {
     CHECK(sheet.rules[sheet.rules.size() - 2].origin == "ampify:bottom-bar");
     CHECK(sheet.rules.back().origin.empty());  // the stylesheet's own rule comes last, so it wins at equal weight
 
-    th::Stylesheet unknown = th::ParseStylesheet("@import \"ampify:nope\";\n@import url(x.css);\nGrid { margin: 1 }\n");
+    th::Stylesheet unknown =
+        th::ParseThemeStylesheet("@import \"ampify:nope\";\n@import url(x.css);\nGrid { margin: 1 }\n");
     CHECK(unknown.problems.size() == 2);
     CHECK(!unknown.problems.empty() && unknown.problems[0].find("bottom-bar") != std::string::npos);
     CHECK(unknown.rules.size() == 1);
+}
+
+namespace {
+
+// A table of names that is not Apple Music's: the parser reads whatever table it is given.
+class OneZone final : public th::StylesheetNames {
+public:
+    std::optional<std::vector<std::string>> Expand(std::string_view selector, std::string*) const override {
+        if (selector != ".zone") return std::vector<std::string>{std::string(selector)};
+        return std::vector<std::string>{"Grid#Zone", "Border#Zone"};
+    }
+    std::optional<std::string> Layout(std::string_view name) const override {
+        if (name != "demo") return std::nullopt;
+        return std::string("Grid#Demo { margin: 2 }");
+    }
+    std::vector<std::string> LayoutNames() const override { return {"demo"}; }
+};
+
+}  // namespace
+
+TEST_CASE(Css_TheParserReadsNamesFromTheTableItIsGiven) {
+    th::Stylesheet sheet = th::ParseStylesheet("@import \"ampify:demo\";\n.zone { margin: 1 }\n", OneZone());
+
+    CHECK(sheet.problems.empty());
+    CHECK(sheet.rules.size() == 2);
+    if (sheet.rules.size() != 2) return;
+    CHECK(sheet.rules[0].origin == "ampify:demo");
+    CHECK(sheet.rules[1].selectors.size() == 2);
+    CHECK(sheet.rules[1].selectors[0].parts[0].type == "Grid");
+    CHECK(sheet.rules[1].selectors[1].text == ".zone");
+
+    th::Stylesheet unknown = th::ParseStylesheet("@import \"ampify:floating-panels\";\n", OneZone());
+    CHECK(unknown.problems.size() == 1);
+    CHECK(!unknown.problems.empty() && unknown.problems[0].find("(demo)") != std::string::npos);
+}
+
+TEST_CASE(CssValues_SplitsOutsideBracketsAndQuotes) {
+    CHECK(th::SplitTopLevel("a:url(b;c);\"d;e\";f", ';').size() == 3);
+    CHECK(th::SplitArguments(" a , rgb(1, 2) ,b").size() == 3);
+    CHECK(th::SplitArguments("a  b", ' ', true).size() == 2);
+    CHECK(th::SplitWords("rgba(0, 0)").size() == 2);
+    CHECK(th::Unquoted("'x'") == "x");
+    CHECK(th::Unquoted("\"x'") == "\"x'");
+    CHECK(th::ParseNumber("1.5").value_or(0) == 1.5);
+    CHECK(!th::ParseNumber("12px"));
+    CHECK(th::ClosingBracket("f(a(b)c)d", 1) == 7);
 }
 
 TEST_CASE(Builtins_EveryClassAndLayoutIsValid) {
@@ -571,7 +622,7 @@ TEST_CASE(Builtins_EveryClassAndLayoutIsValid) {
         }
     }
     for (const std::string& name : th::BuiltinStylesheetNames()) {
-        th::Stylesheet sheet = th::ParseStylesheet(*th::BuiltinStylesheet(name));
+        th::Stylesheet sheet = th::ParseThemeStylesheet(*th::BuiltinStylesheet(name));
         CHECK(sheet.problems.empty());
         for (const th::Rule& rule : sheet.rules) {
             for (const th::Declaration& declaration : rule.declarations) CHECK(th::FindProperty(declaration.property));
@@ -973,7 +1024,7 @@ TEST_CASE(Selector_ReadsBeforeAndAfterOnTheLastPart) {
 }
 
 TEST_CASE(Css_AClassTakesBeforeAndAfter) {
-    th::Stylesheet sheet = th::ParseStylesheet(".playbar::after { content: none; }");
+    th::Stylesheet sheet = th::ParseThemeStylesheet(".playbar::after { content: none; }");
     CHECK(sheet.problems.empty());
     CHECK(sheet.rules.size() == 1);
     if (sheet.rules.size() != 1) return;
@@ -989,6 +1040,9 @@ TEST_CASE(Selector_RejectsWhatItDoesNotKnow) {
     CHECK(problem.find(":checked") != std::string::npos);
     CHECK(!th::ParseSelector("Grid:hover:focus > TextBlock", &problem));
     CHECK(problem.find("only one of") != std::string::npos);
+    CHECK(problem.find(":focus-within, :active and :current") != std::string::npos);
+    CHECK(!th::ParseSelector("Grid:checked", &problem));
+    CHECK(problem.find("(:hover, :focus, :focus-within, :active, :current, :first-child") != std::string::npos);
     CHECK(!th::ParseSelector("TextBlock >", &problem));
     CHECK(!th::ParseSelector("# ", &problem));
 }
@@ -1462,6 +1516,8 @@ TEST_CASE(Pane_FitsItsOpenLengthLessItsSideMargins) {
     CHECK(!th::FittedPaneWidth("360", "0,64"));
     CHECK(!th::FittedPaneWidth("360", "a,b,c,d"));
     CHECK(!th::FittedPaneWidth("NaN?", "0,0,0,0"));
+    CHECK(!th::FittedPaneWidth("inf", "0,0,0,0"));  // a number, but not a width
+    CHECK(!th::FittedPaneWidth("360", "0,nan,0,0"));
     CHECK(th::TemplatePlacesPane("HorizontalAlignment") && th::TemplatePlacesPane("Grid.ColumnSpan"));
     CHECK(!th::TemplatePlacesPane("Margin") && !th::TemplatePlacesPane("Width"));
 }
@@ -3537,6 +3593,11 @@ TEST_CASE(Calc_ComputesLengthsFromVariables) {
 
     CHECK(th::EvaluateCalc("4 calc(10 - 2 * 3) calc((1 + 2) * 3px)").value_or("") == "4 4 9px");
     CHECK(th::EvaluateCalc("CALC(7 / 2)").value_or("") == "3.5");
+
+    std::string missing;
+    CHECK(th::ResolveValue("calc(var(--Gap) * 2px)", {{"gap", "3"}}).value_or("") == "6px");
+    CHECK(!th::ResolveValue("calc(var(--missing) * 2)", {}, &missing));
+    CHECK(missing.find("--missing") != std::string::npos);
     CHECK(th::EvaluateCalc("calc(calc(0.1 + 0.2) * 10ms)").value_or("") == "3ms");
     CHECK(th::EvaluateCalc("#FF112233").value_or("") == "#FF112233");
     CHECK(th::EvaluateCalc("calc(-(1 + 2) * 2px) calc(+4)").value_or("") == "-6px 4");
@@ -3935,7 +3996,7 @@ TEST_CASE(Scheme_TheThemesDefaultComesAfterTheSettings) {
 // --- Theme settings ------------------------------------------------------------------------------------------------
 
 TEST_CASE(Css_SettingBlocksGiveTheirRulesACondition) {
-    th::Stylesheet sheet = th::ParseStylesheet(
+    th::Stylesheet sheet = th::ParseThemeStylesheet(
         "@setting hide-radio {\n"
         "    #Radio { visibility: collapsed }\n"
         "    @media (max-width: 900px) { #Bar { width: 1 } }\n"
@@ -3965,7 +4026,7 @@ TEST_CASE(Css_SettingBlocksGiveTheirRulesACondition) {
 }
 
 TEST_CASE(Css_SettingNotEqualIsReadAsANegatedCondition) {
-    th::Stylesheet sheet = th::ParseStylesheet(
+    th::Stylesheet sheet = th::ParseThemeStylesheet(
         "@setting bar-height != 72 { A { width: 1 } }\n"
         "@setting accent != \"Deep Pink\" { B { width: 2 } }\n"
         "@setting accent = Blue { C { width: 3 } }\n"
@@ -4654,7 +4715,7 @@ TEST_CASE(Css_ActiveAndFocusGoOnAnyPart) {
     CHECK(!th::ParseSelector("Button:hover:active", &problem));
     CHECK(problem.find("only one of") != std::string::npos);
 
-    th::Stylesheet sheet = th::ParseStylesheet(".play-button:active { opacity: 0.5 }\n");
+    th::Stylesheet sheet = th::ParseThemeStylesheet(".play-button:active { opacity: 0.5 }\n");
     CHECK(sheet.rules.size() == 1 && sheet.rules[0].selectors.size() == 1);
     if (sheet.rules.size() == 1 && !sheet.rules[0].selectors.empty()) {
         CHECK(sheet.rules[0].selectors[0].trigger == th::Trigger::Active);
@@ -4861,7 +4922,7 @@ TEST_CASE(Css_CurrentIsAStateOfAnyPart) {
     CHECK(inside.has_value() && inside->trigger == th::Trigger::Current && inside->statePart == 0);
     CHECK(std::string(th::TriggerName(th::Trigger::Current)) == ":current");
 
-    th::Stylesheet sheet = th::ParseStylesheet(".lyrics-words:current { color: #FFFFFFFF }\n");
+    th::Stylesheet sheet = th::ParseThemeStylesheet(".lyrics-words:current { color: #FFFFFFFF }\n");
     CHECK(sheet.rules.size() == 1 && sheet.rules[0].selectors.size() >= 1);
     for (const th::Selector& selector : sheet.rules.empty() ? std::vector<th::Selector>{} : sheet.rules[0].selectors) {
         CHECK(selector.trigger == th::Trigger::Current);
@@ -4904,7 +4965,7 @@ TEST_CASE(Css_StateOnAnAncestorRecordsThePartItSitsOn) {
     CHECK(!th::ParseSelector("Grid:hover Button::after", &problem));
     CHECK(problem.find("decorative image") != std::string::npos);
 
-    th::Stylesheet sheet = th::ParseStylesheet(".track-row:hover .favorite-button { opacity: 1 }\n");
+    th::Stylesheet sheet = th::ParseThemeStylesheet(".track-row:hover .favorite-button { opacity: 1 }\n");
     CHECK(sheet.problems.empty());
     CHECK(sheet.rules.size() == 1 && !sheet.rules[0].selectors.empty());
     for (const th::Selector& selector : sheet.rules.empty() ? std::vector<th::Selector>{} : sheet.rules[0].selectors) {
@@ -5790,7 +5851,7 @@ TEST_CASE(Selector_ReadsNotOnlyChildAndNthLastChild) {
     CHECK(!th::ParseSelector("Grid:nth-last-child(0)", &problem));
     CHECK(problem.find("counts from 1") != std::string::npos);
 
-    th::Stylesheet sheet = th::ParseStylesheet("Grid:not(.sidebar) { width: 1 }");
+    th::Stylesheet sheet = th::ParseThemeStylesheet("Grid:not(.sidebar) { width: 1 }");
     CHECK(sheet.rules.empty());
     CHECK(sheet.problems.size() == 1 && sheet.problems[0].find(":not()") != std::string::npos);
 }

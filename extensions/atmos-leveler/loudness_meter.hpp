@@ -4,34 +4,15 @@
 #include <optional>
 #include <vector>
 
+#include "core/audio/k_weighting.hpp"
+
 namespace atmos {
-
-// BS.1770 K-weighting of one channel: a high shelf modelling the head, then the RLB high-pass.
-// The coefficients are derived for the actual sample rate, as libebur128 does.
-class KWeighting {
-public:
-    explicit KWeighting(double sampleRate);
-
-    double Process(double x);
-    void Reset();
-
-private:
-    struct Biquad {
-        double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0;
-        double z1 = 0, z2 = 0;
-
-        double Process(double x);
-    };
-
-    Biquad m_shelf;
-    Biquad m_highPass;
-};
 
 // Integrated loudness (ITU-R BS.1770-4, in LUFS) of interleaved float audio.
 //
-// Each channel is K-weighted, then measured in 100 ms chunks. A 400 ms block is four chunks
-// (75 % overlap). Blocks are gated at -70 LUFS, then at -10 LU below the average of the blocks
-// that passed the first gate.
+// Each channel is K-weighted, then measured in 100 ms chunks (ampify::audio::ChunkedPower). A 400 ms block is four
+// chunks (75 % overlap). Blocks are gated at -70 LUFS, then at -10 LU below the average of the blocks that passed the
+// first gate.
 class LoudnessMeter {
 public:
     LoudnessMeter(double sampleRate, int channels);
@@ -64,14 +45,7 @@ public:
     void Reset();
 
 private:
-    void AddFramePower(double power);
-
-    double m_sampleRate;
-    size_t m_chunkFrames;
-
-    std::vector<KWeighting> m_filters;
-    double m_chunkPower = 0;  // sum over the channels and frames of the chunk being filled
-    size_t m_framesInChunk = 0;
+    ampify::audio::ChunkedPower m_power;
     std::vector<double> m_chunkPowers;  // mean power per 100 ms chunk
 
     double m_seconds = 0;  // frames / rate, summed: stays right across a rate change

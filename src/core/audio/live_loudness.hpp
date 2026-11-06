@@ -3,20 +3,19 @@
 #include <array>
 #include <cstddef>
 #include <optional>
-#include <vector>
 
-#include "loudness_meter.hpp"
+#include "k_weighting.hpp"
 
-namespace atmos {
+namespace ampify::audio {
 
-// Momentary (400 ms) and short-term (3 s) loudness of a live stream, in LUFS (ITU-R BS.1770, EBU R128 windows).
-// Same K-weighting and 100 ms chunks as LoudnessMeter, but over sliding windows, without gating, and with a fixed
-// amount of memory, so it can run for hours. Feeds Ampify.audio.loudness(). Not thread-safe.
+// Momentary (400 ms) and short-term (3 s) loudness of a live stream, in LUFS (ITU-R BS.1770, EBU R128 windows), over
+// sliding windows, without gating, and with a fixed amount of memory, so it can run for hours. Feeds
+// Ampify.audio.loudness(). Not thread-safe.
 class LiveLoudness {
 public:
     LiveLoudness(double sampleRate, int channels);
 
-    // Interleaved samples. `gain` scales them first (1 / player volume, as LoudnessMeter::Process).
+    // Interleaved samples. `gain` scales them first (1 / player volume).
     void Process(const float* interleaved, size_t frames, float gain = 1.0f);
 
     // Spatial objects: K-weighted power summed over the objects, per frame (ObjectPass), times `scale`.
@@ -27,7 +26,7 @@ public:
 
     // Re-derives the weighting for another rate. The windows start again.
     void SetSampleRate(double sampleRate);
-    double SampleRate() const { return m_sampleRate; }
+    double SampleRate() const { return m_power.SampleRate(); }
 
     void Reset();
 
@@ -35,17 +34,13 @@ private:
     static constexpr size_t kShortTermChunks = 30;
     static constexpr size_t kMomentaryChunks = 4;
 
-    void AddFramePower(double power);
+    void AddChunk(double meanPower);
     std::optional<double> Window(size_t chunks) const;
 
-    double m_sampleRate;
-    size_t m_chunkFrames;
-    std::vector<KWeighting> m_filters;
-    double m_chunkPower = 0;
-    size_t m_framesInChunk = 0;
+    ChunkedPower m_power;
     std::array<double, kShortTermChunks> m_chunks{};  // mean power of the last chunks, a ring
     size_t m_next = 0;
     size_t m_count = 0;
 };
 
-}  // namespace atmos
+}  // namespace ampify::audio

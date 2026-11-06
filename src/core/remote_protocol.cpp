@@ -62,13 +62,6 @@ Response HandleVolume(const Request& request, Backend& backend) {
 
 }  // namespace
 
-std::string_view ActionName(Action action) {
-    for (const ActionRoute& route : kActionRoutes) {
-        if (route.action == action) return route.path.substr(1);
-    }
-    return {};
-}
-
 Response Handle(const Request& request, bool peerLoopback, std::string_view token, Backend& backend) {
     if (std::optional<Response> refusal = Authorize(request, peerLoopback, token)) return *refusal;
 

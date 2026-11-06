@@ -16,12 +16,12 @@ using ampify::remote::ParseStatus;
 const std::string kToken = "abcdefghijklmnopqrstuvwxyz0123456789ABCD";
 
 struct FakeBackend : ampify::remote::Backend {
-    std::vector<std::string> commands;
+    std::vector<ampify::remote::Action> commands;
     std::vector<double> gains;
     bool accept = true;
     std::string StatusJson() override { return R"({"playing":true})"; }
     bool Command(ampify::remote::Action action) override {
-        commands.emplace_back(ampify::remote::ActionName(action));
+        commands.push_back(action);
         return accept;
     }
     std::optional<double> SetGainDb(double db) override {
@@ -95,12 +95,7 @@ TEST_CASE(RemoteParser_AsksForMoreAndRefusesWhatItCannotRead) {
           ParseStatus::Bad);
 }
 
-TEST_CASE(RemoteProtocol_NamesTheActionsAndAnswersUnreadableRequests) {
-    using ampify::remote::Action;
-    CHECK(ampify::remote::ActionName(Action::Play) == "play");
-    CHECK(ampify::remote::ActionName(Action::Pause) == "pause");
-    CHECK(ampify::remote::ActionName(Action::Next) == "next");
-    CHECK(ampify::remote::ActionName(Action::Previous) == "previous");
+TEST_CASE(RemoteProtocol_AnswersUnreadableRequests) {
     CHECK(ampify::remote::UnreadableResponse(ParseStatus::TooLarge).status == 413);
     CHECK(ampify::remote::UnreadableResponse(ParseStatus::Bad).status == 400);
 }
@@ -157,7 +152,8 @@ TEST_CASE(RemoteRouter_RoutesStatusCommandsAndVolume) {
         auto answer = Handle(WithToken("POST", std::string("/") + action), backend);
         CHECK(answer.status == 200 && answer.body == R"({"ok":true})");
     }
-    CHECK((backend.commands == std::vector<std::string>{"play", "pause", "next", "previous"}));
+    using ampify::remote::Action;
+    CHECK((backend.commands == std::vector<Action>{Action::Play, Action::Pause, Action::Next, Action::Previous}));
     CHECK(Handle(WithToken("GET", "/next"), backend).status == 405);
 
     auto volume = Handle(WithToken("POST", "/volume?db=-6"), backend);

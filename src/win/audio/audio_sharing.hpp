@@ -13,9 +13,9 @@
 #include <mutex>
 #include <string>
 
-#include "../core/audio/audio_engine.hpp"
-#include "../core/audio/audio_share.hpp"
-#include "../core/journal.hpp"
+#include "../../core/audio/audio_engine.hpp"
+#include "../../core/audio/audio_share.hpp"
+#include "../../core/journal.hpp"
 
 namespace ampify::win {
 
@@ -32,9 +32,9 @@ void StartAudioSharing(audio::AudioEngine& engine, Journal& journal, std::functi
 // second, and only while the music plays. The equalizer is the engine's: here it has no bands.
 class SharedAudioHost final : public AudioHost {
 public:
+    AudioReach Reach() const override { return AudioReach::AnalysisOnly; }
     void SubscribeFrames(const std::string& elementId, FrameSink sink) override;
     AudioAnalysisResult Analyze(const std::string& elementId) override;
-    std::vector<double> BandFrequencies() override;
     LoudnessReading Loudness() override;
     std::optional<double> PlayerVolume() override;
     std::vector<EqBandState> EqBands() override { return {}; }
