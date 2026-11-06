@@ -3207,6 +3207,21 @@ TEST_CASE(Glass_LevelReadsTheSetting) {
     CHECK(th::GlassLevelOf("max") == th::GlassLevel::Full);
 }
 
+TEST_CASE(Glass_ArtworkCrossFadesExceptInEcoOrWithoutAnimations) {
+    CHECK(th::ArtworkFadeMs(th::GlassLevel::Full, true) == th::kArtworkFadeMs);
+    CHECK(th::ArtworkFadeMs(th::GlassLevel::Balanced, true) == th::kArtworkFadeMs);
+    CHECK(th::ArtworkFadeMs(th::GlassLevel::Eco, true) == 0);
+    CHECK(th::ArtworkFadeMs(th::GlassLevel::Full, false) == 0);
+    CHECK(th::kArtworkFadeMs >= 400 && th::kArtworkFadeMs <= 600);
+}
+
+TEST_CASE(Glass_TheCurrentLevelIsTheOneLastSet) {
+    th::SetCurrentGlassLevel(th::GlassLevel::Eco);
+    CHECK(th::CurrentGlassLevel() == th::GlassLevel::Eco);
+    th::SetCurrentGlassLevel(th::GlassLevel::Full);
+    CHECK(th::CurrentGlassLevel() == th::GlassLevel::Full);
+}
+
 TEST_CASE(Glass_FullKeepsTheThemeAsWritten) {
     th::Theme theme = GlassTheme();
     th::ApplyGlassLevel(theme, th::GlassLevel::Full);

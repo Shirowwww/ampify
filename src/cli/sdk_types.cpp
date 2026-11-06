@@ -19,6 +19,7 @@ type PlaceProps = {
   align?: "start" | "center" | "end" | "stretch";
   valign?: "start" | "center" | "end" | "stretch";
   grow?: boolean;       // takes the remaining space of a row or stack
+  inert?: boolean;      // with everything under it: no clicks, no hover, no keyboard focus (still drawn)
 };
 // stack, row, layer and card (image: cornerRadius, width, height).
 type BoxProps = {
@@ -87,6 +88,7 @@ type QueueItem = {
   durationMs: number;
   section: "history" | "current" | "next-added" | "next" | "autoplay" | "unknown";
   catalogId: string;  // the song's Apple Music catalog id, "" for an imported file
+  artwork: string;    // an image node's src: an https address, "artwork:<id>" (Apple's loader), or ""
 };
 type QueueState = { available: boolean; complete: boolean; source: string; reason: string; items: QueueItem[] };
 type AudioFrame = { bands: number[]; rms: number; peak: number; time: number };

@@ -65,6 +65,7 @@ struct World {
     UINT32 longerNext = 0;        // the "next" section repeats its last entry this many more times
     std::vector<uint64_t> deleted;  // the ids DeletePlayQueueItemsAsync received
     int descriptorFlag = 0;       // the IContentDescriptor Is* slot that answers true (0: none)
+    int entriesRead = 0;          // GetAt calls on a section's entries
 } g;
 
 const GUID kUnknown = rt::GuidOf("00000000-0000-0000-C000-000000000046");
@@ -317,7 +318,7 @@ HRESULT STDMETHODCALLTYPE LyricsLanguage(Facet*, HSTRING* out) {  // GetLanguage
 // ---- Apple's queue: three sections (history, current, next) of PlayQueueItem entries --------------------------------
 
 Vtable queueStaticsVt, queueVt, sectionsVt, sectionVt, containerVt, entriesVt, entryVt, titledVt, drivenVt,
-    descriptorVt;
+    descriptorVt, lockupVt;
 Fake queueStaticsObj, queueObj, sectionsObj;
 Facet queueStaticsF{queueStaticsVt.slots, &queueStaticsObj}, queueF{queueVt.slots, &queueObj},
     sectionsF{sectionsVt.slots, &sectionsObj};
@@ -330,7 +331,7 @@ struct EntryFake {
     const wchar_t* catalogId;
     Fake obj, descriptorObj;
     Facet item{entryVt.slots, &obj}, titled{titledVt.slots, &obj}, driven{drivenVt.slots, &obj},
-        descriptor{descriptorVt.slots, &descriptorObj};
+        descriptor{descriptorVt.slots, &descriptorObj}, lockup{lockupVt.slots, &obj};
 };
 EntryFake entries[] = {
     {101, L"Earlier", L"Artist A", 200'000, L"1001"},
@@ -393,6 +394,7 @@ HRESULT STDMETHODCALLTYPE SectionItems(Facet* self, void** out) {  // IComponent
     return S_OK;
 }
 HRESULT STDMETHODCALLTYPE EntryAt(Facet* self, UINT32 index, void** out) {  // IVector<IComponentModel>.GetAt, 6
+    ++g.entriesRead;
     const std::vector<EntryFake*>& list = Owning(sections, &SectionFake::list, self).entries;
     *out = &list[std::min<size_t>(index, list.size() - 1)]->item;
     return S_OK;
@@ -429,6 +431,10 @@ HRESULT STDMETHODCALLTYPE DescriptorAdamId(Facet* self, HSTRING* out) {  // ICon
 HRESULT STDMETHODCALLTYPE DescriptorCanonicalId(Facet* self, HSTRING* out) {  // get_CanonicalId, 22
     std::wstring id = Owning(entries, &EntryFake::descriptor, self).catalogId;
     *out = MakeString(id.empty() ? L"" : (L"c:" + id).c_str());
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE EntryLockupArtwork(Facet*, void** out) {  // ILockup.get_Artwork, 6
+    *out = &artworkF;
     return S_OK;
 }
 // The Is* getters (one byte): only the slot the test turned on says yes.
@@ -520,6 +526,8 @@ void Build() {
                             {rt::GuidOf(amp::kIidContentDescriptorDriven), &entry.driven}};
         entry.descriptorObj.facets = {{rt::GuidOf(amp::kIidContentDescriptor), &entry.descriptor}};
     }
+    entries[2].obj.facets.push_back({rt::GuidOf(amp::kIidLockup), &entries[2].lockup});  // "Soon" alone has a cover
+    lockupVt.slots[6] = Fn(&EntryLockupArtwork);
     entryVt.slots[6] = Fn(&EntryId);
     entryVt.slots[7] = Fn(&EntrySubtitle);
     entryVt.slots[10] = Fn(&EntryDuration);
@@ -914,6 +922,42 @@ TEST_CASE(PlayerBridge_SaysWhenTheQueueIsLongerThanWhatItReads) {
 
     g.longerNext = static_cast<UINT32>(ampify::win::kMaxQueueEntries) - 4;  // exactly 500 entries
     CHECK(bridge.Queue().complete);
+}
+
+TEST_CASE(AmpPlayer_AQueueEntrysCoverComesFromTheLastReadWithoutWalkingTheQueue) {
+    Reset();
+    Hook hook(FakeActivation);
+    ampify::win::ForgetQueuedArtworkForTests();
+    ampify::Settings settings;
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("t"); });
+    std::vector<unsigned short> keys;
+    ampify::win::PlayerBridge bridge("ui", settings, journal, TestOptions(&keys));
+    CHECK(bridge.Queue().items.size() == 4);
+    g.entriesRead = 0;
+
+    rt::Ref cover = ampify::win::QueuedArtwork(103);
+    rt::Ref none = ampify::win::QueuedArtwork(104);  // in the queue, without a cover
+
+    CHECK(cover && cover.SameObject(rt::Ref(&artworkF)));
+    CHECK(!none);
+    CHECK(g.entriesRead == 0);
+    CHECK(g.unexpected == 0);
+}
+
+TEST_CASE(AmpPlayer_AnUnknownQueueEntryWalksTheQueueOnceAndNotForEveryImage) {
+    Reset();
+    Hook hook(FakeActivation);
+    ampify::win::ForgetQueuedArtworkForTests();
+
+    rt::Ref cover = ampify::win::QueuedArtwork(103);  // nothing read yet: one walk
+    const int firstWalk = g.entriesRead;
+    for (int image = 0; image < 20; image++) CHECK(!ampify::win::QueuedArtwork(999));
+
+    CHECK(cover && cover.SameObject(rt::Ref(&artworkF)));
+    CHECK(firstWalk == 4);
+    CHECK(g.entriesRead == firstWalk);
+    CHECK(g.unexpected == 0);
 }
 
 TEST_CASE(PlayerBridge_NamesAChangedQueueCollectionInsteadOfThePanel) {

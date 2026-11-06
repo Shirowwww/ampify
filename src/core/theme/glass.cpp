@@ -1,6 +1,7 @@
 #include "glass.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <optional>
 #include <string>
@@ -40,6 +41,22 @@ std::optional<std::string> WithoutEndless(const std::string& text) {
 }
 
 }  // namespace
+
+namespace {
+std::atomic<GlassLevel> g_currentLevel{GlassLevel::Full};
+}  // namespace
+
+void SetCurrentGlassLevel(GlassLevel level) {
+    g_currentLevel.store(level, std::memory_order_relaxed);
+}
+
+GlassLevel CurrentGlassLevel() {
+    return g_currentLevel.load(std::memory_order_relaxed);
+}
+
+int ArtworkFadeMs(GlassLevel level, bool animationsOn) {
+    return animationsOn && level != GlassLevel::Eco ? kArtworkFadeMs : 0;
+}
 
 GlassLevel GlassLevelOf(std::string_view value) {
     std::string name = ToLowerAscii(TrimSpace(value));

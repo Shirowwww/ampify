@@ -190,6 +190,21 @@ std::pair<std::string, std::string> SplitArtistAlbum(const std::string& text) {
     return {text.substr(0, at), text.substr(at + kSeparator.size())};
 }
 
+QueueItem QueueItemFromAmp(const AmpQueueEntry& entry) {
+    QueueItem item;
+    item.id = std::to_string(entry.id);
+    item.title = entry.title;
+    std::tie(item.artist, item.album) = SplitArtistAlbum(entry.subtitle);
+    // The unit of IPlayQueueItem.Duration is not written in the winmd either: a song lasts between 20 s and 10 h.
+    item.durationMs = AmpTimeToMs(entry.durationRaw, DetectAmpTimeUnit(entry.durationRaw, std::nullopt));
+    item.section = QueueSectionFromKind(entry.sectionKind);
+    item.catalogId = entry.catalogId;
+    // Apple Music 1.1792 keeps its covers' addresses internal: Apple's loader then draws the entry's cover.
+    item.artwork = ArtworkAddress(entry.artwork);
+    if (item.artwork.empty() && entry.hasArtwork) item.artwork = QueueArtworkSource(entry.id);
+    return item;
+}
+
 PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit) {
     PlayerSnapshot snapshot;
     snapshot.source = "apple";

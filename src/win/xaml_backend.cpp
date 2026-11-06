@@ -273,23 +273,49 @@ media::Brush XamlTreeBackend::ArtworkBrush(const std::string& text) {
                   : stretch == "Fill"  ? media::Stretch::Fill
                                        : media::Stretch::UniformToFill);
     if (m_artwork) brush.ImageSource(m_artwork);
-    m_artworkBrushes.push_back(brush);
+    m_artworkLayers.push_back(ArtworkLayer{brush, nullptr, {}});
     return brush;
 }
 
-// Gives the brushes of `background: artwork` the image of the song playing, and lets go of those no element holds
-// any more (the theme was removed). Strong references: weak ones to what Ampify made never resolve in Apple Music.
+// `content: artwork`: a Border painted by an artwork brush, with the layer that fades the previous cover out on top.
+controls::Border XamlTreeBackend::ArtworkDecor(const std::string& text, const wchar_t* name) {
+    controls::Border artwork;
+    artwork.Name(name);
+    artwork.IsHitTestVisible(false);
+    xaml::Automation::AutomationProperties::SetAccessibilityView(artwork, xaml::Automation::Peers::AccessibilityView::Raw);
+    auto brush = ArtworkBrush(text).as<media::ImageBrush>();
+    ArtworkLayer& layer = m_artworkLayers.back();
+    layer.owner = artwork;
+    layer.fade = MakeArtworkFade(brush.Stretch());
+    artwork.Background(brush);
+    artwork.Child(layer.fade.layer);
+    return artwork;
+}
+
+bool XamlTreeBackend::DecorHolds(const controls::Border& owner) const {
+    for (const auto& [key, decor] : m_decors) {
+        if (decor.image && ComIdentity(decor.image) == ComIdentity(owner)) return true;
+    }
+    return false;
+}
+
+// Gives the artwork brushes the image of the song playing, and lets go of those nothing holds any more (the theme was
+// removed, the decor replaced). Strong references: weak ones to what Ampify made never resolve in Apple Music.
 void XamlTreeBackend::FollowArtwork(const media::ImageSource& artwork) {
     if (artwork) m_artwork = artwork;  // between two songs the image may be missing for a moment: keep the last one
     // COM identity: the brush is stored as a Brush, an interface pointer other than the ImageBrush one.
-    std::erase_if(m_artworkBrushes, [&](const media::ImageBrush& brush) {
+    std::erase_if(m_artworkLayers, [&](const ArtworkLayer& layer) {
+        if (layer.owner) return !DecorHolds(layer.owner);
         for (const auto& [key, written] : m_written) {
-            if (ComIdentity(written.object) == ComIdentity(brush)) return false;
+            if (ComIdentity(written.object) == ComIdentity(layer.brush)) return false;
         }
         return true;
     });
-    for (media::ImageBrush& brush : m_artworkBrushes) {
-        if (m_artwork && brush.ImageSource() != m_artwork) brush.ImageSource(m_artwork);
+    for (ArtworkLayer& layer : m_artworkLayers) {
+        media::ImageSource shown = layer.brush.ImageSource();
+        if (!m_artwork || shown == m_artwork) continue;
+        if (layer.owner) FadeFromPrevious(layer.fade, shown, layer.owner.CornerRadius());
+        layer.brush.ImageSource(m_artwork);
     }
 }
 
@@ -966,12 +992,7 @@ theme::DecorChange XamlTreeBackend::PlaceDecor(theme::NodeId id, theme::PseudoEl
         image = m_bars.Make(std::stoi(decor.image.substr(theme::kBarsContent.size())), name);
     } else if (decor.image.starts_with(theme::kArtworkImage)) {
         // The song's artwork, painted by a brush FollowArtwork keeps up to date: a Border, so it moves and turns.
-        controls::Border artwork;
-        artwork.Name(name);
-        artwork.IsHitTestVisible(false);
-        xaml::Automation::AutomationProperties::SetAccessibilityView(artwork, xaml::Automation::Peers::AccessibilityView::Raw);
-        artwork.Background(ArtworkBrush(decor.image));
-        image = artwork;
+        image = ArtworkDecor(decor.image, name);
     } else {
         image = DecorImageFrom(decor.image, slot);
     }

@@ -2936,6 +2936,17 @@ test("fullscreen-complete: the controls fade after 3 s without movement and come
   assert.equal(timers.pending.size, 1);
 });
 
+test("fullscreen-complete: faded controls are inert, so clicks there reach nothing invisible", () => {
+  const { world, timers } = fullscreenRun("fullscreen-complete");
+  const controls = () => nodesOf(world.opened.at(-1)).find((node) => node.transition);
+  world.shortcuts.get("Ctrl+Alt+F")();
+  assert.equal(controls().inert, false);
+  timers.fire();
+  assert.equal(controls().inert, true);
+  world.onPointer();
+  assert.equal(controls().inert, false);
+});
+
 test("fullscreen-complete: a pointer move while the controls show sends nothing new", () => {
   const { world } = fullscreenRun("fullscreen-complete");
   world.shortcuts.get("Ctrl+Alt+F")();

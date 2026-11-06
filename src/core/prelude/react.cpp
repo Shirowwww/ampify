@@ -580,7 +580,7 @@ const char kReact[] = R"AMPIFYJS(
   const h = createElement;
   const TIP = ["tooltip", "tooltipPlacement", "tooltipDelay"];
   // The style attributes of section 5.5: those of any node, and those of a box (card).
-  const PLACE = ["opacity", "scale", "transition", "align", "valign", "grow"];
+  const PLACE = ["opacity", "scale", "transition", "align", "valign", "grow", "inert"];
   const BOX = ["background", "padding", "cornerRadius", "width", "height", "minWidth", "maxWidth"];
 
   function pick(props, names) {

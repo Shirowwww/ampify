@@ -259,6 +259,10 @@ panels, it gives the blurred background of Spicetify's Hazy or Comfy themes. Exa
 
 Example: the Moving artwork setting of [`themes/glass/`](../../themes/glass/).
 
+On a new song, a `content: artwork` layer cross-fades: the previous cover fades out over the new one in 500 ms. In eco
+glass (`theme.glass = eco`) or with Windows' animation effects off, it changes at once. A `background: artwork` changes
+at once.
+
 Ampify also gives the artwork's colors as variables. Before the first artwork they do not exist, so give a fallback.
 
 | Variable | Value |

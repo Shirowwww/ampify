@@ -132,7 +132,7 @@ private:
 // (button, card, image, icon) and onChange (toggle, slider, textfield, dropdown) hold a callback id, a positive
 // integer; tooltip is a text on any primitive, tooltipPlacement is top, bottom, left or right, and tooltipDelay is
 // a number of milliseconds between 0 and 10000. The style attributes (docs/extensions/api.md, section 5.5) are
-// checked where the renderer reads them: opacity, scale, transition, align, valign and grow on any node;
+// checked where the renderer reads them: opacity, scale, transition, align, valign, grow and inert on any node;
 // background, padding, cornerRadius, width, height, minWidth and maxWidth on stack, row, layer and card; fit,
 // cornerRadius, width and height on image; size, weight, color, wrap and maxLines on text.
 bool ValidateTree(const Json& tree, std::string* error);

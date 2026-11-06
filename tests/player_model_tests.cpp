@@ -425,10 +425,51 @@ TEST_CASE(PlayerQueue_JsonSaysWhatTheHostKnows) {
     CHECK(ampify::QueueJson(snapshot, true).Dump() ==
           R"({"available":true,"complete":false,"source":"apple","reason":"partielle","items":[{"id":"42",)"
           R"("title":"Title","artist":"Artist","album":"Album","durationMs":180000,"section":"current",)"
-          R"("catalogId":"1440833098"}]})");
+          R"("catalogId":"1440833098","artwork":""}]})");
     std::string none = ampify::QueueJson(ampify::QueueSnapshot{}, false).Dump();
     CHECK(none.find(R"("available":false)") != std::string::npos);
     CHECK(none.find(R"("items":[])") != std::string::npos);
+}
+
+TEST_CASE(PlayerQueue_AnEntryCarriesTheAddressOfTheArtworkAppleGives) {
+    ampify::AmpQueueEntry entry;
+    entry.id = 42;
+    entry.sectionKind = 4;
+    entry.title = "Soon";
+    entry.subtitle = "Band \xE2\x80\x94 Record";
+    entry.artwork.uri = "https://is1-ssl.mzstatic.com/image/thumb/a/{w}x{h}{c}.{f}";
+    entry.artwork.cropCode = "bb";
+    entry.artwork.format = "jpg";
+    ampify::QueueItem item = ampify::QueueItemFromAmp(entry);
+    CHECK(item.id == "42");
+    CHECK(item.section == ampify::QueueSection::Next);
+    CHECK(item.artist == "Band" && item.album == "Record");
+    CHECK(item.artwork == "https://is1-ssl.mzstatic.com/image/thumb/a/1000x1000bb.jpg");
+
+    ampify::QueueSnapshot snapshot;
+    snapshot.items.push_back(item);
+    CHECK(ampify::QueueJson(snapshot, true).Dump().find(R"("artwork":"https://is1-ssl.mzstatic.com/image/thumb/a/1000x1000bb.jpg")") !=
+          std::string::npos);
+}
+
+TEST_CASE(PlayerQueue_AnEntryWhoseArtworkAppleKeepsInternalIsLoadedThroughApple) {
+    ampify::AmpQueueEntry entry;
+    entry.id = 42;
+    CHECK(ampify::QueueItemFromAmp(entry).artwork.empty());
+    entry.hasArtwork = true;
+    entry.artwork.uri = "ms-appdata:///local/cover.jpg";
+    CHECK(ampify::QueueItemFromAmp(entry).artwork == "artwork:42");
+}
+
+TEST_CASE(PlayerQueue_AnArtworkSourceNamesOneQueueEntry) {
+    CHECK(ampify::QueueArtworkSource(7) == "artwork:7");
+    CHECK(ampify::QueueArtworkItem("artwork:18446744073709551615") == std::optional<std::uint64_t>(18446744073709551615ull));
+    CHECK(!ampify::QueueArtworkItem("artwork"));
+    CHECK(!ampify::QueueArtworkItem("artwork:"));
+    CHECK(!ampify::QueueArtworkItem("artwork:12a"));
+    CHECK(!ampify::QueueArtworkItem("artwork:-3"));
+    CHECK(!ampify::QueueArtworkItem("artwork:18446744073709551616"));
+    CHECK(!ampify::QueueArtworkItem("https://x/artwork:3"));
 }
 
 // ---- Ampify.player.queue and toggle ----------------------------------------------------------------------------------

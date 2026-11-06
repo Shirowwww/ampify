@@ -4,6 +4,8 @@
 #include "amp_player.hpp"
 
 #include <cstdio>
+#include <mutex>
+#include <unordered_map>
 #include <vector>
 
 #include "../core/amp_abi.hpp"
@@ -46,14 +48,12 @@ struct WinRtColor {
     uint8_t a = 0, r = 0, g = 0, b = 0;
 };
 
-// The cover of an INowPlayingItem (1.1792). Every call survives a null object, a refused QueryInterface or a failed
+// The fields of an Artwork object (1.1792). Every call survives a null object, a refused QueryInterface or a failed
 // getter: the field stays empty. Getters only, never a put_*.
-ArtworkReading ReadArtwork(const rt::Ref& item) {
+ArtworkReading ReadArtworkObject(const rt::Ref& object) {
     ArtworkReading out;
-    rt::Ref object, artwork;
-    // INowPlayingItem.get_Artwork (slot 11), then IArtwork.
-    if (FAILED(rt::CallSlot(item, slot::kItemArtwork, object.Put())) || !object) return out;
-    if (!rt::Query(object, rt::GuidOf(amp::kIidArtwork), artwork)) return out;
+    rt::Ref artwork;
+    if (!object || !rt::Query(object, rt::GuidOf(amp::kIidArtwork), artwork)) return out;
 
     WinRtColor color;
     out.hasColor = SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkBgColor, &color));  // slot 6
@@ -74,6 +74,13 @@ ArtworkReading ReadArtwork(const rt::Ref& item) {
         out.uri = rt::ReadString(uri, slot::kUriAbsoluteUri);
     }
     return out;
+}
+
+// The cover of an INowPlayingItem: its get_Artwork (slot 11).
+ArtworkReading ReadArtwork(const rt::Ref& item) {
+    rt::Ref object;
+    if (FAILED(rt::CallSlot(item, slot::kItemArtwork, object.Put()))) return {};
+    return ReadArtworkObject(object);
 }
 
 // The lyrics an ILyricsInfo holds, or nullopt while it has none.
@@ -354,7 +361,18 @@ std::optional<std::vector<rt::Ref>> ComponentModels(const rt::Ref& collection, s
     return out;
 }
 
-std::optional<AmpQueueEntry> ReadQueueEntry(const rt::Ref& model, int32_t sectionKind) {
+// ILockup.get_Artwork (slot 6) of a queue entry, as an IArtwork: the cover Apple's Up Next pane shows. Empty without.
+rt::Ref QueueEntryArtwork(const rt::Ref& model) {
+    rt::Ref lockup, object, artwork;
+    if (!rt::Query(model, rt::GuidOf(amp::kIidLockup), lockup) ||
+        FAILED(rt::CallSlot(lockup, slot::kLockupArtwork, object.Put())) || !object ||
+        !rt::Query(object, rt::GuidOf(amp::kIidArtwork), artwork)) {
+        return {};
+    }
+    return artwork;
+}
+
+std::optional<AmpQueueEntry> ReadQueueEntry(const rt::Ref& model, int32_t sectionKind, rt::Ref& artworkOut) {
     rt::Ref item, titled;
     // IPlayQueueItem: get_PlayQueueItemID 6, get_Subtitle 7, get_Duration 10.
     if (!rt::Query(model, rt::GuidOf(amp::kIidPlayQueueItem), item)) return std::nullopt;
@@ -369,6 +387,12 @@ std::optional<AmpQueueEntry> ReadQueueEntry(const rt::Ref& model, int32_t sectio
     }
     // IContentDescriptor.get_AdamId (slot 21).
     if (rt::Ref descriptor = ContentDescriptorOf(model)) entry.catalogId = rt::ReadString(descriptor, slot::kDescriptorAdamId);
+    // ILockup.get_Artwork (slot 6): the same Artwork as the now playing item's, the cover Apple's Up Next pane shows.
+    if (rt::Ref artwork = QueueEntryArtwork(model)) {
+        entry.artwork = ReadArtworkObject(artwork);
+        entry.hasArtwork = true;
+        artworkOut = std::move(artwork);
+    }
     return entry;
 }
 
@@ -404,6 +428,48 @@ std::vector<rt::Ref> SectionEntries(const rt::Ref& sectionModel, int32_t& kind) 
     return ComponentModels(items, kMaxQueueEntries + 1).value_or(std::vector<rt::Ref>{});
 }
 
+// The covers of the entries last read, by PlayQueueItemID, so an image of a queue entry costs one lookup and not a
+// walk of the queue. Never freed: Apple's objects must not be released while the process exits (see ~WinHost).
+struct QueueArtworkIndex {
+    std::mutex lock;
+    std::unordered_map<uint64_t, rt::Ref> byId;
+    unsigned long long builtAt = 0;  // GetTickCount64 of the last walk, 0 before any
+};
+constexpr unsigned long long kQueueArtworkRewalkMs = 1000;  // a missing id walks the queue again at most this often
+
+QueueArtworkIndex& QueueArtworks() {
+    static QueueArtworkIndex* index = new QueueArtworkIndex();
+    return *index;
+}
+
+void StoreQueueArtworks(std::unordered_map<uint64_t, rt::Ref> byId, unsigned long long builtAt) {
+    QueueArtworkIndex& index = QueueArtworks();
+    std::lock_guard<std::mutex> guard(index.lock);
+    index.byId.swap(byId);
+    index.builtAt = builtAt;
+}
+
+// One walk of the queue, at most kMaxQueueEntries entries in all: the cover of each entry, by its id.
+std::unordered_map<uint64_t, rt::Ref> WalkQueueArtworks() {
+    std::unordered_map<uint64_t, rt::Ref> byId;
+    std::string failure;
+    size_t walked = 0;
+    for (const rt::Ref& sectionModel : QueueSections(failure)) {
+        int32_t kind = 0;
+        for (const rt::Ref& model : SectionEntries(sectionModel, kind)) {
+            if (walked++ >= kMaxQueueEntries) return byId;
+            rt::Ref item;
+            uint64_t id = 0;
+            if (!rt::Query(model, rt::GuidOf(amp::kIidPlayQueueItem), item) ||
+                FAILED(rt::CallSlot(item, slot::kQueueItemId, &id))) {
+                continue;
+            }
+            if (rt::Ref artwork = QueueEntryArtwork(model)) byId.emplace(id, std::move(artwork));
+        }
+    }
+    return byId;
+}
+
 rt::VectorIids CollectionIids(const char* const (&iids)[4]) {
     return {rt::GuidOf(iids[0]), rt::GuidOf(iids[1]), rt::GuidOf(iids[2]), rt::GuidOf(iids[3])};
 }
@@ -415,18 +481,41 @@ std::optional<std::vector<AmpQueueEntry>> ReadAppleQueue(std::string& failure, b
     std::vector<rt::Ref> sections = QueueSections(failure);
     if (!failure.empty()) return std::nullopt;
     std::vector<AmpQueueEntry> entries;
+    std::unordered_map<uint64_t, rt::Ref> artworks;
     for (const rt::Ref& sectionModel : sections) {
         int32_t kind = 0;
         for (const rt::Ref& model : SectionEntries(sectionModel, kind)) {
             if (entries.size() >= kMaxQueueEntries) {
                 cut = true;
+                StoreQueueArtworks(std::move(artworks), GetTickCount64());
                 return entries;
             }
-            if (std::optional<AmpQueueEntry> entry = ReadQueueEntry(model, kind)) entries.push_back(std::move(*entry));
+            rt::Ref artwork;
+            std::optional<AmpQueueEntry> entry = ReadQueueEntry(model, kind, artwork);
+            if (!entry) continue;
+            if (artwork) artworks.emplace(entry->id, std::move(artwork));
+            entries.push_back(std::move(*entry));
         }
     }
+    StoreQueueArtworks(std::move(artworks), GetTickCount64());
     return entries;
 }
+
+rt::Ref QueuedArtwork(uint64_t itemId) {
+    QueueArtworkIndex& index = QueueArtworks();
+    {
+        std::lock_guard<std::mutex> guard(index.lock);
+        if (auto found = index.byId.find(itemId); found != index.byId.end()) return found->second;
+        if (index.builtAt != 0 && GetTickCount64() - index.builtAt < kQueueArtworkRewalkMs) return {};
+    }
+    std::unordered_map<uint64_t, rt::Ref> byId = WalkQueueArtworks();
+    auto found = byId.find(itemId);
+    rt::Ref artwork = found != byId.end() ? found->second : rt::Ref{};
+    StoreQueueArtworks(std::move(byId), GetTickCount64());
+    return artwork;
+}
+
+void ForgetQueuedArtworkForTests() { StoreQueueArtworks({}, 0); }
 
 rt::Ref StartAppleQueueRemove(uint64_t itemId, std::string& failure) {
     rt::Ref queue = CurrentPlayQueue(failure);

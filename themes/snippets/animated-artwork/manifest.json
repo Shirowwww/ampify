@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "animated-artwork",
+  "name": "Animated artwork",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "The window's background is the artwork of the song, in two layers that turn slowly in opposite directions. It stops in pause and while Apple Music is hidden.",
+  "translations": {
+    "fr": {"name": "Pochette animée", "description": "Le fond de la fenêtre est la pochette du morceau, en deux couches qui tournent lentement en sens contraire. Elle s'arrête en pause et quand Apple Music est caché."},
+    "de": {"name": "Animiertes Cover", "description": "Der Fensterhintergrund ist das Cover des Titels, in zwei Ebenen, die sich langsam in entgegengesetzte Richtungen drehen. Er hält bei Pause und wenn Apple Music ausgeblendet ist an."},
+    "es": {"name": "Portada animada", "description": "El fondo de la ventana es la portada de la canción, en dos capas que giran lentamente en sentidos opuestos. Se detiene en pausa y cuando Apple Music está oculto."},
+    "pt": {"name": "Capa animada", "description": "O fundo da janela é a capa da música, em duas camadas que giram devagar em sentidos opostos. Para em pausa e quando o Apple Music está oculto."},
+    "ru": {"name": "Анимированная обложка", "description": "Фон окна — обложка трека в двух слоях, которые медленно вращаются в противоположные стороны. Останавливается на паузе и когда Apple Music скрыта."},
+    "ja": {"name": "動くアートワーク", "description": "ウィンドウの背景に曲のアートワークを2層で表示し、ゆっくり逆向きに回転させます。一時停止中や Apple Music が隠れている間は止まります。"},
+    "zh": {"name": "动态封面背景", "description": "窗口背景是当前歌曲的封面，分两层沿相反方向缓慢旋转。暂停和 Apple Music 隐藏时会停止。"}
+  },
+  "kitApi": "1.0",
+  "tags": ["animation", "artwork", "background"]
+}

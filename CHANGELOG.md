@@ -30,6 +30,15 @@
   to leave when Apple Music is started from Ampify's launcher, and where the background launcher runs, 10 s after
   Apple Music is closed. The agent is never ended while Apple Music runs, and a refused end is not tried again.
 
+### Extensions
+
+- Full screen, complete (example): inside the view, F closes it, L shows the lyrics and Q shows Up Next. The controls
+  fade after 3 seconds without pointer movement. New `Ampify.ui.fullscreen.onKey` and `onPointer` events.
+- `inert: true` on any node of a view: the node and everything under it take no click, hover or keyboard focus. The
+  faded controls of the full-screen view use it, so a click there no longer presses an invisible button.
+- Each entry of `Ampify.player.queue.list()` has an `artwork`, ready for an `image` node's `src`; the full-screen
+  view's Up Next card shows the next song's cover.
+
 ### Themes
 
 - Ampify's own sidebar entries (Marketplace, extensions) fit the folded sidebar: a centred icon in the column, with
@@ -48,6 +57,10 @@
 - `calc()` takes `min()` and `max()`, so a theme can cap a size.
 - Fluent: an accent colour setting, Windows' blue or the colour of the artwork (play button, volume and progress).
 - Mirror: a panel corners setting, from square to round (the default is the current look).
+- Animated artwork (snippet, off by default): the window's background is the song's artwork in two slowly turning
+  layers. It stops in pause and while Apple Music is hidden.
+- On a new song, `content: artwork` and an `image` node with `src: "artwork"` cross-fade from the previous cover in
+  500 ms; at once in eco glass or with Windows' animation effects off.
 - Ember: two glass panels over the colours of the song playing, the library and the pages, with the playback bar at
   the bottom.
 - A theme that leaves a column on the right of the pages gets the panels of elements docked there, as high as the

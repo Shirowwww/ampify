@@ -93,6 +93,7 @@ inline constexpr char kIidPlayQueueItem[] = "72FE9B2F-3DE1-5517-8F3D-EBAAFAFD255
 inline constexpr char kIidTitledComponent[] = "29691940-53DC-5C20-942F-29EB78F38F1F";          // CommonModels.
 inline constexpr char kIidContentDescriptorDriven[] = "0DB3EB30-B156-5201-AC4A-1326648C307B";  // CommonModels.
 inline constexpr char kIidContentDescriptor[] = "659506EB-E228-5A4A-B8A4-0AF7125FB4E5";        // CommonModels.
+inline constexpr char kIidLockup[] = "9FE979C2-14FE-57AF-AF3A-5A23505F16FF";                   // CommonModels.ILockup
 
 // Collections of a given element type. A parameterized interface's identifier is the UUID version 5 of its signature
 // in the WinRT namespace 11F47AD5-7B73-42C0-ABAE-878B1E16ADEE: in Python, uuid.uuid5(namespace,
@@ -203,6 +204,8 @@ inline constexpr int kContainerItems = 6;
 inline constexpr int kQueueItemId = 6;
 inline constexpr int kQueueItemSubtitle = 7;
 inline constexpr int kQueueItemDuration = 10;
+// CommonModels.ILockup, which PlayQueueItem implements: get_Artwork, put_Artwork, get_Headline...
+inline constexpr int kLockupArtwork = 6;
 inline constexpr int kTitledTitle = 6;
 inline constexpr int kDrivenContentDescriptor = 6;
 inline constexpr int kDescriptorAdamId = 21;
@@ -271,6 +274,7 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.CommonModels.IPlayQueueItem", "get_PlayQueueItemID", slot::kQueueItemId},
     {"AMP.Services.CommonModels.IPlayQueueItem", "get_Subtitle", slot::kQueueItemSubtitle},
     {"AMP.Services.CommonModels.IPlayQueueItem", "get_Duration", slot::kQueueItemDuration},
+    {"AMP.Services.CommonModels.ILockup", "get_Artwork", slot::kLockupArtwork},
     {"AMP.Services.CommonModels.ITitledComponent", "get_Title", slot::kTitledTitle},
     {"AMP.Services.CommonModels.IContentDescriptorDriven", "get_ContentDescriptor", slot::kDrivenContentDescriptor},
     {"AMP.Services.CommonModels.IContentDescriptor", "get_AdamId", slot::kDescriptorAdamId},

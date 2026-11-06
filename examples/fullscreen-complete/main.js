@@ -3,14 +3,14 @@
 // The controls fade after 3 s without pointer movement and come back on movement. Escape closes the view itself.
 
 Ampify.i18n.define({
-  en: { full: "Full screen", lyrics: "Lyrics", queue: "Up next", nothing: "Nothing playing", noLyrics: "No lyrics yet", noQueue: "Up Next is not loaded yet", queueEmpty: "Nothing after this song", play: "Play", pause: "Pause", next: "Next", previous: "Previous", after: "Then", hint: "F: close · L: lyrics · Q: up next" },
-  fr: { full: "Plein écran", lyrics: "Paroles", queue: "À suivre", nothing: "Rien en lecture", noLyrics: "Pas encore de paroles", noQueue: "À suivre n'est pas encore chargé", queueEmpty: "Rien après ce morceau", play: "Lecture", pause: "Pause", next: "Suivant", previous: "Précédent", after: "Ensuite", hint: "F : fermer · L : paroles · Q : à suivre" },
-  de: { full: "Vollbild", lyrics: "Songtext", queue: "Als Nächstes", nothing: "Nichts läuft", noLyrics: "Noch kein Songtext", noQueue: "Als Nächstes ist noch nicht geladen", queueEmpty: "Danach kommt nichts", play: "Abspielen", pause: "Pause", next: "Weiter", previous: "Zurück", after: "Danach", hint: "F: schließen · L: Songtext · Q: Als Nächstes" },
-  es: { full: "Pantalla completa", lyrics: "Letra", queue: "A continuación", nothing: "No suena nada", noLyrics: "Aún no hay letra", noQueue: "A continuación aún no está cargado", queueEmpty: "Nada después de esta canción", play: "Reproducir", pause: "Pausa", next: "Siguiente", previous: "Anterior", after: "Después", hint: "F: cerrar · L: letra · Q: a continuación" },
-  pt: { full: "Tela cheia", lyrics: "Letra", queue: "A seguir", nothing: "Nada a tocar", noLyrics: "Ainda sem letra", noQueue: "A seguir ainda não foi carregado", queueEmpty: "Nada depois desta música", play: "Tocar", pause: "Pausa", next: "Seguinte", previous: "Anterior", after: "Depois", hint: "F: fechar · L: letra · Q: a seguir" },
-  ru: { full: "Во весь экран", lyrics: "Текст", queue: "Далее", nothing: "Ничего не играет", noLyrics: "Текста пока нет", noQueue: "Список «Далее» ещё не загружен", queueEmpty: "После этого трека ничего нет", play: "Играть", pause: "Пауза", next: "Следующий", previous: "Предыдущий", after: "Потом", hint: "F: закрыть · L: текст · Q: далее" },
-  ja: { full: "全画面", lyrics: "歌詞", queue: "次に再生", nothing: "再生していません", noLyrics: "歌詞はまだありません", noQueue: "次に再生はまだ読み込まれていません", queueEmpty: "この曲の後はありません", play: "再生", pause: "一時停止", next: "次へ", previous: "前へ", after: "その後", hint: "F: 閉じる · L: 歌詞 · Q: 次に再生" },
-  zh: { full: "全屏", lyrics: "歌词", queue: "接下来", nothing: "没有正在播放", noLyrics: "暂无歌词", noQueue: "“接下来”尚未加载", queueEmpty: "这首之后没有歌曲", play: "播放", pause: "暂停", next: "下一首", previous: "上一首", after: "然后", hint: "F：关闭 · L：歌词 · Q：接下来" },
+  en: { full: "Full screen", lyrics: "Lyrics", queue: "Up next", nothing: "Nothing playing", noLyrics: "No lyrics yet", noQueue: "Up Next is not loaded yet", queueEmpty: "Nothing after this song", play: "Play", pause: "Pause", next: "Next", previous: "Previous", after: "Then", hint: "F or Ctrl+Alt+F: close · L: lyrics · Q: up next" },
+  fr: { full: "Plein écran", lyrics: "Paroles", queue: "À suivre", nothing: "Rien en lecture", noLyrics: "Pas encore de paroles", noQueue: "À suivre n'est pas encore chargé", queueEmpty: "Rien après ce morceau", play: "Lecture", pause: "Pause", next: "Suivant", previous: "Précédent", after: "Ensuite", hint: "F ou Ctrl+Alt+F : fermer · L : paroles · Q : à suivre" },
+  de: { full: "Vollbild", lyrics: "Songtext", queue: "Als Nächstes", nothing: "Nichts läuft", noLyrics: "Noch kein Songtext", noQueue: "Als Nächstes ist noch nicht geladen", queueEmpty: "Danach kommt nichts", play: "Abspielen", pause: "Pause", next: "Weiter", previous: "Zurück", after: "Danach", hint: "F oder Strg+Alt+F: schließen · L: Songtext · Q: Als Nächstes" },
+  es: { full: "Pantalla completa", lyrics: "Letra", queue: "A continuación", nothing: "No suena nada", noLyrics: "Aún no hay letra", noQueue: "A continuación aún no está cargado", queueEmpty: "Nada después de esta canción", play: "Reproducir", pause: "Pausa", next: "Siguiente", previous: "Anterior", after: "Después", hint: "F o Ctrl+Alt+F: cerrar · L: letra · Q: a continuación" },
+  pt: { full: "Tela cheia", lyrics: "Letra", queue: "A seguir", nothing: "Nada a tocar", noLyrics: "Ainda sem letra", noQueue: "A seguir ainda não foi carregado", queueEmpty: "Nada depois desta música", play: "Tocar", pause: "Pausa", next: "Seguinte", previous: "Anterior", after: "Depois", hint: "F ou Ctrl+Alt+F: fechar · L: letra · Q: a seguir" },
+  ru: { full: "Во весь экран", lyrics: "Текст", queue: "Далее", nothing: "Ничего не играет", noLyrics: "Текста пока нет", noQueue: "Список «Далее» ещё не загружен", queueEmpty: "После этого трека ничего нет", play: "Играть", pause: "Пауза", next: "Следующий", previous: "Предыдущий", after: "Потом", hint: "F или Ctrl+Alt+F: закрыть · L: текст · Q: далее" },
+  ja: { full: "全画面", lyrics: "歌詞", queue: "次に再生", nothing: "再生していません", noLyrics: "歌詞はまだありません", noQueue: "次に再生はまだ読み込まれていません", queueEmpty: "この曲の後はありません", play: "再生", pause: "一時停止", next: "次へ", previous: "前へ", after: "その後", hint: "F / Ctrl+Alt+F: 閉じる · L: 歌詞 · Q: 次に再生" },
+  zh: { full: "全屏", lyrics: "歌词", queue: "接下来", nothing: "没有正在播放", noLyrics: "暂无歌词", noQueue: "“接下来”尚未加载", queueEmpty: "这首之后没有歌曲", play: "播放", pause: "暂停", next: "下一首", previous: "上一首", after: "然后", hint: "F 或 Ctrl+Alt+F：关闭 · L：歌词 · Q：接下来" },
 });
 
 const LYRIC_LINES = 40;
@@ -52,7 +52,7 @@ function upNextNode(queue) {
   if (!item) return { type: "stack", gap: 4, children: [caption, textNode(upNextEmptyText(queue), "body")] };
   const subtitle = item.title + (item.artist ? " · " + item.artist : "");
   const card = { type: "card", title: Ampify.i18n.t("after"), subtitle, children: [] };
-  // Apple's queue entries carry no artwork today: the picture shows only when one is given.
+  // item.artwork is an image source (an address, or "artwork:<id>" drawn by Apple's loader), empty without a cover.
   if (item.artwork) card.children.push(artworkNode(item.artwork, 64));
   return { type: "stack", gap: 4, children: [caption, card] };
 }
@@ -76,12 +76,14 @@ function transportNode(state) {
   };
 }
 
-// The buttons and the key hint fade out after IDLE_MS without pointer movement, and come back with it.
+// The buttons and the key hint fade out after IDLE_MS without pointer movement, and come back with it. Faded, they
+// are inert: a click there reaches the view, not an invisible button.
 function controlsNode(state) {
   return {
     type: "stack",
     gap: 8,
     opacity: view.idle ? 0 : 1,
+    inert: view.idle,
     transition: "opacity 400ms",
     children: [transportNode(state), textNode(Ampify.i18n.t("hint"), "caption")],
   };

@@ -1,0 +1,42 @@
+/* Animated artwork: the window's background is the artwork of the song, in two layers that turn slowly in opposite
+   directions. Both stop in pause, hold while Apple Music is hidden or minimized, and stand still with Windows'
+   "Animation effects" off. Change --veil to make the artwork stronger or fainter behind the panes.
+   On a new song the engine cross-fades each layer from the previous cover (at once in eco glass). */
+
+:root {
+    --veil: 0.5;
+}
+
+.window::before {
+    content: artwork cover;
+    transform-origin: center;
+    opacity: 0.85;
+    animation: drift 90s linear infinite playing;
+}
+
+.window::after {
+    content: artwork cover;
+    transform-origin: center;
+    opacity: var(--veil);
+    animation: drift-back 110s linear infinite playing;
+}
+
+@keyframes drift {
+    from {
+        transform: scale(1.9) rotate(0deg);
+    }
+
+    to {
+        transform: scale(1.9) rotate(360deg);
+    }
+}
+
+@keyframes drift-back {
+    from {
+        transform: scale(2) rotate(360deg);
+    }
+
+    to {
+        transform: scale(2) rotate(0deg);
+    }
+}

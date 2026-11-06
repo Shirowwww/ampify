@@ -86,6 +86,7 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
     // theme.accent = artwork: the colour follows the song; the theme reloads only when that colour changes.
     std::optional<Argb> accent = IsArtworkAccent(wanted.accent) ? ArtworkAccent(m_artwork) : ParseAccent(wanted.accent);
     GlassLevel glass = GlassLevelOf(wanted.glass);
+    SetCurrentGlassLevel(glass);
     std::string key = (wanted.active.empty() ? std::string("none") : wanted.active) + "|" + m_scheme.scheme + "|" +
                       PartsKey(wanted.parts) + "|" + (accent ? ToXamlColor(*accent) : std::string("-")) + "|" +
                       std::to_string(static_cast<int>(glass)) + "|";

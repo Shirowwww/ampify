@@ -23,18 +23,6 @@ constexpr unsigned long long kSmtcRetryMs = 30'000;
 constexpr unsigned kInterfaceTimeoutMs = 2000;
 constexpr DWORD kQueueChangeTimeoutMs = 3000;
 
-QueueItem QueueItemFromAmp(const AmpQueueEntry& entry) {
-    QueueItem item;
-    item.id = std::to_string(entry.id);
-    item.title = entry.title;
-    std::tie(item.artist, item.album) = SplitArtistAlbum(entry.subtitle);
-    // The unit of IPlayQueueItem.Duration is not written in the winmd either: a song lasts between 20 s and 10 h.
-    item.durationMs = AmpTimeToMs(entry.durationRaw, DetectAmpTimeUnit(entry.durationRaw, std::nullopt));
-    item.section = QueueSectionFromKind(entry.sectionKind);
-    item.catalogId = entry.catalogId;
-    return item;
-}
-
 // A media key is handled by the system and by Apple Music, as on a keyboard. It never changes the volume.
 bool SendMediaKey(unsigned short key) {
     INPUT inputs[2] = {};

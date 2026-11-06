@@ -164,7 +164,7 @@ Ampify.player.toggleShuffle()       // flips shuffle
 Ampify.player.toggleRepeat()        // off, all, one, off...
 Ampify.player.setVolume(volume)     // 0 to 1: Apple's player volume, interface or audio process, [preview]
 Ampify.player.queue.list()  // -> { available, complete, source, reason,
-//                                   items: [{ id, title, artist, album, durationMs, section, catalogId }] }
+//                                   items: [{ id, title, artist, album, durationMs, section, catalogId, artwork }] }
 Ampify.player.queue.add(catalogId, { position: "next" | "last" })  // [preview] answers false for now
 Ampify.player.queue.remove(itemId)                                 // [preview]
 ```
@@ -174,6 +174,8 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
 - `track.variantId` is `"lossless"`, `"hi-res-lossless"`, `"dolby-atmos"`, `"spatial"`, `"surround"`, `"other"`, or
   empty. `track.artwork` is an https cover address or `""` (Apple Music 1.1792 keeps it internal, so it is empty
   there); `track.artworkColor` is `"#RRGGBB"` or `""`.
+- A queue item's `artwork` goes straight into an `image` node's `src`: an https address, or `"artwork:<id>"` when Apple
+  keeps the address internal (Apple's own loader then draws that entry's cover), or `""` for an entry without one.
 - `source` is `"apple"` when Ampify reads Apple's own player (in `AppleMusic.exe`), `"smtc"` for Windows' media
   controls, `""` when unknown.
 - `statechange` fires when playback starts or stops, the length becomes known, or the position jumps. Between events
@@ -257,7 +259,7 @@ characters per text; attributes are plain values.
 | `slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange` |
 | `textfield` | `label`, `value`, `placeholder`, `disabled`, `onChange` |
 | `dropdown`, `option` | `label`, `value`, `disabled`, `onChange`; children are `option` nodes with `value`, `label` |
-| `image` | `src` (https, a file path, or `"artwork"`: Apple's image of the song playing, following it), `label`, `onClick`, `fit` (`cover`, `contain`, `fill`), `cornerRadius`, `width`, `height` |
+| `image` | `src` (https, a file path, `"artwork"`: Apple's image of the song playing, following it, the previous cover fading out in 500 ms on a new song except in eco glass or with Windows' animation effects off, or `"artwork:<id>"`: the cover of a queue entry, as `queue.list()` gives it), `label`, `onClick`, `fit` (`cover`, `contain`, `fill`), `cornerRadius`, `width`, `height` |
 | `icon` | `icon` (SVG), `label`, `onClick` |
 | `lyrics` | `size`, `color`, `placeholder`, `onChange`: the lyrics of the song playing, lit word by word as Apple's own view does, the current line larger and kept in view; `placeholder` shows while the song has none; a click on a line gives its start in ms to `onChange` |
 | any | `tooltip`, `tooltipPlacement` (`top`, `bottom`, `left`, `right`), `tooltipDelay` (0 to 10000 ms) |
@@ -276,6 +278,7 @@ stretch it: every child gets one cell of the same width.
 | any | `transition` | `"opacity 400ms"`, `"scale 0.3s"`, `"translation 200ms"`, `"all 300ms"` (comma-separated, 10 s max) or `"none"` |
 | any | `align`, `valign` | `start`, `center`, `end`, `stretch` (on a `text`, `align` is `left`, `center`, `right`) |
 | any | `grow` | `true`: takes the space left in its `row` or `stack` |
+| any | `inert` | `true`: the node and everything under it take no click, no hover and no keyboard focus, and the pointer reaches what lies beneath. It is still drawn: pair it with `opacity: 0` for controls that fade out, which would take clicks otherwise |
 | `stack`, `row`, `layer`, `card` | `background` | `#RRGGBB`, `#AARRGGBB`, `acrylic`, or `acrylic(#AARRGGBB, 0.6)` |
 | `stack`, `row`, `layer`, `card` | `padding` | A number, or `"top,right,bottom,left"` |
 | containers, `image` | `cornerRadius`, `width`, `height`, `minWidth`, `maxWidth` | Pixels |

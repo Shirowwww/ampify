@@ -409,6 +409,27 @@ TEST_CASE(UiRender_DiscoveryDoesNotWalkIntoListsButtonsOrKitElements) {
     CHECK(ShouldDescend(foreign));  // walked (read only), never changed
 }
 
+TEST_CASE(UiRender_AnInertNodeMakesItsWholeSubtreeInert) {
+    RenderNode node = Tree(R"({"type":"row","children":[{"type":"stack","inert":true,"children":[)"
+                           R"({"type":"row","children":[{"type":"button","label":"Play"}]}]},{"type":"button","label":"Next"}]})");
+    CHECK(!node.Bool("inert", false));
+    CHECK(node.children[0].Bool("inert", false));
+    CHECK(node.children[0].children[0].Bool("inert", false));
+    CHECK(node.children[0].children[0].children[0].Bool("inert", false));
+    CHECK(!node.children[1].Bool("inert", false));
+}
+
+TEST_CASE(UiRender_FadingControlsOutUpdatesEveryControlUnderThem) {
+    RenderNode shown = Tree(R"({"type":"stack","opacity":1,"children":[{"type":"button","label":"Play"}]})");
+    RenderNode faded = Tree(R"({"type":"stack","opacity":0,"inert":true,"children":[{"type":"button","label":"Play"}]})");
+    Patch patch = Reconcile(&shown, faded);
+    CHECK(patch.op == PatchOp::Update);
+    CHECK(patch.children[0].op == PatchOp::Update);
+    CHECK(patch.children[0].changed == std::vector<std::string>{"inert"});
+    Patch back = Reconcile(&faded, shown);
+    CHECK(back.children[0].changed == std::vector<std::string>{"inert"});
+}
+
 TEST_CASE(UiRender_PlaybarButtonGoesAfterTheTransportButtons) {
     FakeTree tree;
     int root = tree.Add(-1, "Grid", kProbePanel | kProbeGrid);

@@ -5,6 +5,7 @@
 // makes Ampify.player.queue.list() answer { available: false }.
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,7 +26,16 @@ struct QueueItem {
     QueueSection section = QueueSection::Unknown;
     std::string catalogId;  // the song's Apple Music catalog id, what add() takes; empty when unknown
     std::string album;
+    // The entry's cover for an image node's src: its https address (about 1000 px), or QueueArtworkSource when Apple
+    // keeps the address internal; empty when the entry has no cover.
+    std::string artwork;
 };
+
+// "artwork:<entry id>": an image node with this src shows that queue entry's cover, loaded by Apple's own loader, as
+// "artwork" does for the song playing.
+std::string QueueArtworkSource(uint64_t itemId);
+// The entry id of such a source; nullopt for anything else.
+std::optional<uint64_t> QueueArtworkItem(std::string_view source);
 
 struct QueueSnapshot {
     // False when the host only knows part of the queue (for example the current track alone). `reason` says why.

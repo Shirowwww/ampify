@@ -92,6 +92,11 @@ inline constexpr size_t kMaxQueueEntries = 500;
 // Every entry, section by section (history, current, added, next, autoplay), at most kMaxQueueEntries; `cut` is set
 // when the queue holds more.
 std::optional<std::vector<AmpQueueEntry>> ReadAppleQueue(std::string& failure, bool& cut);
+// The IArtwork of the entry whose PlayQueueItemID is `itemId`, empty when it is gone or has no cover. Looked up among
+// the covers ReadAppleQueue last met; an id missing from them walks the queue again, at most once a second.
+rt::Ref QueuedArtwork(uint64_t itemId);
+// Empties that lookup, for a test to start from nothing.
+void ForgetQueuedArtworkForTests();
 // Starts removing one entry (IPlayQueue.DeletePlayQueueItemsAsync): its IAsyncAction, empty on failure.
 rt::Ref StartAppleQueueRemove(uint64_t itemId, std::string& failure);
 

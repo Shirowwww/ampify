@@ -37,6 +37,7 @@
 
 #include "../core/theme/hover.hpp"
 #include "../core/theme/tree.hpp"
+#include "artwork_fade.hpp"
 #include "audio_bars.hpp"
 #include "theme_animations.hpp"
 
@@ -142,6 +143,8 @@ private:
     void Forget(theme::NodeId id, std::string_view property);
 
     winrt::Microsoft::UI::Xaml::Media::Brush ArtworkBrush(const std::string& text);
+    winrt::Microsoft::UI::Xaml::Controls::Border ArtworkDecor(const std::string& text, const wchar_t* name);
+    bool DecorHolds(const winrt::Microsoft::UI::Xaml::Controls::Border& owner) const;
     void FollowArtwork(const winrt::Microsoft::UI::Xaml::Media::ImageSource& artwork);
     void SampleArtwork(const winrt::Microsoft::UI::Xaml::Controls::Image& image, const std::string& prefix = {});
     void FollowArtworkImage(const winrt::Microsoft::UI::Xaml::Controls::Image& image);
@@ -281,8 +284,15 @@ private:
     std::string m_refreshReason;
     // `background: artwork`: the image Apple Music shows for the song playing (Image#StaticArtwork in its play bar),
     // found again on each snapshot, and the brushes Ampify made from it, which follow it when the song changes.
+    // A `content: artwork` decor also keeps its Border (`owner`, while m_decors holds it) and the layer that fades the
+    // previous cover out; a `background: artwork` brush lives while a written value holds it, and changes at once.
+    struct ArtworkLayer {
+        winrt::Microsoft::UI::Xaml::Media::ImageBrush brush{nullptr};
+        winrt::Microsoft::UI::Xaml::Controls::Border owner{nullptr};
+        ArtworkFade fade;
+    };
     winrt::Microsoft::UI::Xaml::Media::ImageSource m_artwork{nullptr};
-    std::vector<winrt::Microsoft::UI::Xaml::Media::ImageBrush> m_artworkBrushes;
+    std::vector<ArtworkLayer> m_artworkLayers;
     std::shared_ptr<ArtworkColours> m_artworkColours = std::make_shared<ArtworkColours>();
     // That image is followed between passes: a new song's artwork is read as soon as it opens, not at the next tick. A
     // reading asked while another runs is tried again shortly (m_artworkRetry).

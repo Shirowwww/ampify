@@ -3,6 +3,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "amp_item.hpp"
+#include "amp_player.hpp"
 #include "winrt_abi.hpp"
 #include "xaml_host.hpp"
 
@@ -687,23 +688,35 @@ rt::Ref PlayingArtwork() {
     return artwork;
 }
 
+// An IArtwork drawn by Apple's own loader (UIBroker.GetImageSource) at about `pixels` wide, or null.
+media::ImageSource BrokerImage(const rt::Ref& artwork, double pixels) {
+    if (!artwork) return nullptr;
+    rt::Ref broker, image;
+    rt::Activation activation = rt::GetActivationFactory(winrt::to_hstring(amp::kClassUiBroker).c_str(),
+                                                         rt::GuidOf(amp::kIidUiBrokerStatics), broker);
+    if (FAILED(activation.result) ||
+        FAILED(rt::CallSlot(broker, amp::kUiBrokerGetImageSource, artwork.Get(), 1.0, pixels, pixels, image.Put())) ||
+        !image) {
+        return nullptr;
+    }
+    media::ImageSource source{nullptr};
+    winrt::copy_from_abi(source, image.Get());
+    return source;
+}
+
 }  // namespace
 
 media::ImageSource PlayingArtworkSource(double pixels) noexcept {
     try {
-        rt::Ref artwork = PlayingArtwork();
-        if (!artwork) return nullptr;
-        rt::Ref broker, image;
-        rt::Activation activation = rt::GetActivationFactory(winrt::to_hstring(amp::kClassUiBroker).c_str(),
-                                                             rt::GuidOf(amp::kIidUiBrokerStatics), broker);
-        if (FAILED(activation.result) ||
-            FAILED(rt::CallSlot(broker, amp::kUiBrokerGetImageSource, artwork.Get(), 1.0, pixels, pixels, image.Put())) ||
-            !image) {
-            return nullptr;
-        }
-        media::ImageSource source{nullptr};
-        winrt::copy_from_abi(source, image.Get());
-        return source;
+        return BrokerImage(PlayingArtwork(), pixels);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+media::ImageSource QueueArtworkImage(uint64_t itemId, double pixels) noexcept {
+    try {
+        return BrokerImage(QueuedArtwork(itemId), pixels);
     } catch (...) {
         return nullptr;
     }

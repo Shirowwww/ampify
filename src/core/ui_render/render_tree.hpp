@@ -35,7 +35,8 @@ struct RenderNode {
 // [A-Za-z0-9-] replaced by '-'.
 std::string SurfaceNodeId(std::string_view kind, std::string_view id);
 
-// Builds the render tree of `tree` (already checked by ValidateTree). `rootId` is the id of the root node.
+// Builds the render tree of `tree` (already checked by ValidateTree). `rootId` is the id of the root node. Every node
+// under an `inert` one gets `inert: true` as well.
 RenderNode BuildRenderTree(const Json& tree, const std::string& rootId);
 
 // The x:Name and AutomationId of the native element: "AMPIFY_<elementId>_<nodeId>". Characters that XAML refuses in a

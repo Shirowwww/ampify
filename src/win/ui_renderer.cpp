@@ -29,9 +29,11 @@
 #include "../core/i18n.hpp"
 #include "../core/json.hpp"
 #include "../core/now_playing.hpp"
+#include "../core/player_queue.hpp"
 #include "../core/ui_render/probe.hpp"
 #include "../core/ui_render/style.hpp"
 #include "../core/ui_render/svg_icon.hpp"
+#include "artwork_fade.hpp"
 #include "player_controls.hpp"
 #include "xaml_host.hpp"
 
@@ -325,6 +327,9 @@ struct ArtworkFollow {
     // kept: it holds those handlers, which hold the follower.
     winrt::event_token loadedToken{};
     winrt::event_token unloadedToken{};
+    // The song playing only: the previous cover fades out over the new one, rounded like the frame.
+    ArtworkFade fade;
+    xaml::CornerRadius corner{};
 };
 
 struct XamlRenderer::Mounted {
@@ -389,6 +394,8 @@ controls::Image FindPlayingArtwork(const xaml::XamlRoot& root) {
 // size and a scrolled column does not jump.
 void ShowArtwork(ArtworkFollow& follow, const media::ImageSource& source) {
     if (!source) return;
+    media::ImageSource previous = follow.brush.ImageSource();
+    if (previous != source) FadeFromPrevious(follow.fade, previous, follow.corner);
     follow.brush.ImageSource(source);
     follow.sizer.Source(source);
 }
@@ -412,14 +419,12 @@ void DropLoading(ArtworkFollow& follow) {
 // Apple's image at once, then the same cover decoded at its full size as soon as it has loaded: Apple's own bitmaps
 // are decoded at the size of where Apple shows them (a thumbnail in the play bar), though the file behind is large
 // (600 to 1200 px for the library). No empty frame between two songs.
-void RefreshArtwork(const std::shared_ptr<ArtworkFollow>& follow) {
-    if (!follow->apple) return;
+void ShowCover(const std::shared_ptr<ArtworkFollow>& follow, const media::ImageSource& shown,
+               const media::ImageSource& broker) {
     DropLoading(*follow);
-    media::ImageSource playBar = follow->apple.Source();
-    media::ImageSource broker = PlayingArtworkSource(kArtworkPixels);
     winrt::Windows::Foundation::Uri address = AddressOf(broker);
-    if (!address) address = AddressOf(playBar);
-    ShowArtwork(*follow, playBar);
+    if (!address) address = AddressOf(shown);
+    ShowArtwork(*follow, shown);
     if (!address) return;
     media::Imaging::BitmapImage large;
     large.DecodePixelWidth(static_cast<int>(kArtworkPixels));  // a 3000 px catalog cover is not decoded whole
@@ -429,7 +434,7 @@ void RefreshArtwork(const std::shared_ptr<ArtworkFollow>& follow) {
         try {
             auto bitmap = sender.as<media::Imaging::BitmapImage>();
             if (follow->loading != bitmap) return;
-            if (follow->apple) follow->brush.ImageSource(bitmap);
+            if (!follow->off) follow->brush.ImageSource(bitmap);
             DropLoading(*follow);
         } catch (...) {
         }
@@ -450,6 +455,24 @@ void RefreshArtwork(const std::shared_ptr<ArtworkFollow>& follow) {
         follow->pinned = true;
     }
     follow->sizer.Source(large);
+}
+
+// Apple's image of the song playing at once, then its cover large (ShowCover).
+void RefreshArtwork(const std::shared_ptr<ArtworkFollow>& follow) {
+    if (!follow->apple) return;
+    ShowCover(follow, follow->apple.Source(), PlayingArtworkSource(kArtworkPixels));
+}
+
+// A queue entry's cover (QueueArtworkSource): Apple's loader draws it, then it is decoded large. It does not follow
+// anything, as the entry keeps its cover; the image gets a new src when the view shows another entry.
+std::shared_ptr<ArtworkFollow> ShowQueueArtwork(const media::ImageBrush& brush, const controls::Image& sizer,
+                                                std::uint64_t itemId) {
+    auto follow = std::make_shared<ArtworkFollow>();
+    follow->brush = brush;
+    follow->sizer = sizer;
+    media::ImageSource broker = QueueArtworkImage(itemId, kArtworkPixels);
+    ShowCover(follow, broker, broker);
+    return follow;
 }
 
 bool StartArtwork(const std::shared_ptr<ArtworkFollow>& follow, const xaml::XamlRoot& root) {
@@ -475,6 +498,18 @@ void StopArtwork(ArtworkFollow& follow) {
     follow.apple = nullptr;
 }
 
+// The image shows something else now: what it followed stops, and its fade layer leaves the frame.
+void DropFollow(const controls::Border& frame, ArtworkFollow& follow) {
+    follow.off = true;
+    StopArtwork(follow);
+    if (follow.loadedToken.value) frame.Loaded(follow.loadedToken);
+    if (follow.unloadedToken.value) frame.Unloaded(follow.unloadedToken);
+    if (follow.fade.story) follow.fade.story.Stop();
+    auto layers = frame.Child().try_as<controls::Grid>();
+    std::uint32_t index = 0;
+    if (follow.fade.layer && layers && layers.Children().IndexOf(follow.fade.layer, index)) layers.Children().RemoveAt(index);
+}
+
 // Ties an image of a view to Apple's own image of the song playing, which changes with every song, and shows that
 // cover loaded large. Followed while the view is in the window, where Apple's image can be found.
 std::shared_ptr<ArtworkFollow> FollowPlayingArtwork(const controls::Border& frame, const media::ImageBrush& brush,
@@ -482,6 +517,9 @@ std::shared_ptr<ArtworkFollow> FollowPlayingArtwork(const controls::Border& fram
     auto follow = std::make_shared<ArtworkFollow>();
     follow->brush = brush;
     follow->sizer = sizer;
+    follow->fade = MakeArtworkFade(brush.Stretch());
+    follow->corner = frame.CornerRadius();
+    if (auto layers = frame.Child().try_as<controls::Grid>()) layers.Children().Append(follow->fade.layer);
     if (frame.XamlRoot()) StartArtwork(follow, frame.XamlRoot());
     follow->loadedToken = frame.Loaded([follow](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
         try {
@@ -1158,12 +1196,15 @@ XamlRenderer::Mounted XamlRenderer::Build(const RenderNode& node, const StylePro
         outer = control = combo;
     } else if (node.type == "image") {
         // The picture is the frame's ImageBrush, so cornerRadius rounds it (a Border does not clip an Image child).
-        // The invisible Image shares the same bitmap and gives the frame the size the picture would take.
+        // The invisible Image shares the same bitmap and gives the frame the size the picture would take. The grid
+        // around it takes the layer that fades the previous cover out (src "artwork").
         controls::Border frame;
         media::ImageBrush brush;
         controls::Image sizer;
         sizer.Opacity(0);
-        frame.Child(sizer);
+        controls::Grid layers;
+        layers.Children().Append(sizer);
+        frame.Child(layers);
         frame.Background(brush);
         frame.Tapped([callbacks](IInspectable const&, xaml::Input::TappedRoutedEventArgs const&) noexcept {
             callbacks->Fire(true, {});
@@ -1370,6 +1411,22 @@ static void SetTextStyle(const controls::TextBlock& block, const RenderNode& nod
     if (block.TextTrimming() != trimming) block.TextTrimming(trimming);
 }
 
+// inert: neither the pointer nor Tab reaches the node (BuildRenderTree marks its whole subtree). An element at opacity 0
+// still takes clicks in XAML, so a faded control needs this to let them through. Cards, images and icons set their
+// own tab stop from it (SetAttributes).
+static bool SetInert(const xaml::FrameworkElement& outer, const xaml::FrameworkElement& control, const RenderNode& node) {
+    bool inert = node.Bool("inert", false);
+    for (const xaml::FrameworkElement& element : {outer, control}) {
+        if (element && element.IsHitTestVisible() == inert) element.IsHitTestVisible(!inert);
+    }
+    const bool ownTabStop = node.type == "card" || node.type == "image" || node.type == "icon";
+    if (control && !ownTabStop) {
+        if (inert) control.IsTabStop(false);
+        else ClearLocal(control, xaml::UIElement::IsTabStopProperty());
+    }
+    return inert;
+}
+
 // opacity, scale and transition, on any node. While building, the values go first so that nothing animates in; on
 // an update, the transitions go first so that the new values animate on the compositor thread.
 void XamlRenderer::SetMotion(Mounted& mounted, const RenderNode& node, bool building) {
@@ -1436,10 +1493,11 @@ void XamlRenderer::SetAttributes(Mounted& mounted, const RenderNode& node, const
         if (asControl.IsEnabled() == disabled) asControl.IsEnabled(!disabled);
     }
     if (mounted.outer) SetMotion(mounted, node, building);
+    bool inert = SetInert(mounted.outer, control, node);
 
     const std::string& type = node.type;
     if (type == "card" || type == "image" || type == "icon") {
-        bool clickable = mounted.callbacks->onClick > 0 && !disabled;
+        bool clickable = mounted.callbacks->onClick > 0 && !disabled && !inert;
         if (control.IsTabStop() != clickable) control.IsTabStop(clickable);
     }
     if (type == "stack" || type == "row" || type == "layer" || type == "card") SetBox(mounted, node);
@@ -1585,16 +1643,18 @@ void XamlRenderer::SetImage(Mounted& mounted, const RenderNode& node) {
     auto frame = mounted.control.as<controls::Border>();
     std::string source = node.Text("src");
     if (source != mounted.source && mounted.artwork) {
-        ArtworkFollow& old = *mounted.artwork;
-        old.off = true;
-        StopArtwork(old);
-        frame.Loaded(old.loadedToken);
-        frame.Unloaded(old.unloadedToken);
+        DropFollow(frame, *mounted.artwork);
         mounted.artwork.reset();
     }
+    std::optional<std::uint64_t> queued = ampify::QueueArtworkItem(source);
     if (source != mounted.source && mounted.brush && mounted.sizer && source == kArtworkSource) {
         mounted.source = source;
         mounted.artwork = FollowPlayingArtwork(frame, mounted.brush, mounted.sizer);
+    } else if (source != mounted.source && mounted.brush && mounted.sizer && queued) {
+        mounted.source = source;
+        mounted.brush.ClearValue(media::ImageBrush::ImageSourceProperty());
+        mounted.sizer.ClearValue(controls::Image::SourceProperty());
+        mounted.artwork = ShowQueueArtwork(mounted.brush, mounted.sizer, *queued);
     } else if (source != mounted.source && mounted.brush && mounted.sizer) {
         mounted.source = source;
         mounted.brush.ClearValue(media::ImageBrush::ImageSourceProperty());
@@ -1615,6 +1675,10 @@ void XamlRenderer::SetImage(Mounted& mounted, const RenderNode& node) {
     double radius = node.Number("cornerRadius", 0);
     xaml::CornerRadius corner{radius, radius, radius, radius};
     if (frame.CornerRadius() != corner) frame.CornerRadius(corner);
+    if (mounted.artwork) {
+        mounted.artwork->corner = corner;
+        if (ArtworkFade& fade = mounted.artwork->fade; fade.brush && fade.brush.Stretch() != stretch) fade.brush.Stretch(stretch);
+    }
     double width = node.Number("width", kAuto);
     double height = node.Number("height", kAuto);
     double maxHeight = node.Has("height") || !fit.empty() ? kInfinity : kImageMaxHeight;

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "host.hpp"
+#include "player_queue.hpp"
 
 namespace ampify {
 
@@ -63,7 +64,12 @@ struct AmpQueueEntry {
     std::string subtitle;     // IPlayQueueItem.Subtitle, the artist
     int64_t durationRaw = 0;  // IPlayQueueItem.Duration, in an AmpTimeUnit
     std::string catalogId;    // IContentDescriptor.AdamId, empty for a file that is not in the catalog
+    ArtworkReading artwork;   // ILockup.Artwork of the PlayQueueItem; every field may be missing
+    bool hasArtwork = false;  // ILockup.Artwork gave an IArtwork, whatever its fields
 };
+
+// What Ampify.player.queue.list() gives for an entry of Apple's queue, its artwork as ArtworkAddress makes it.
+QueueItem QueueItemFromAmp(const AmpQueueEntry& entry);
 
 // What src/win/smtc_session.cpp reads from the Apple Music session of the Windows media controls.
 struct SmtcReading {

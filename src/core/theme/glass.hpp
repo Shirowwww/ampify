@@ -21,4 +21,14 @@ GlassLevel GlassLevelOf(std::string_view value);
 // Lightens the theme's values for that level (see above). Full leaves them as they are.
 void ApplyGlassLevel(Theme& theme, GlassLevel level);
 
+// The level the themes were last worked out with (the theme worker sets it), for what is drawn outside the theme's
+// values, such as the artwork's cross-fade. Full until then. Any thread.
+void SetCurrentGlassLevel(GlassLevel level);
+GlassLevel CurrentGlassLevel();
+
+// How long a new song's artwork fades in over the previous one (`content: artwork`, an image node with src
+// "artwork"): none in eco or with Windows' animation effects off, where it changes at once.
+inline constexpr int kArtworkFadeMs = 500;
+int ArtworkFadeMs(GlassLevel level, bool animationsOn);
+
 }  // namespace ampify::theme

@@ -281,6 +281,13 @@ TEST_CASE(UiTree_StyleAttributesAreOnlyCheckedWhereTheyAreRead) {
     CHECK(ampify::ValidateTree(Parse(R"({"type":"icon","size":24})"), &error));
 }
 
+TEST_CASE(UiTree_InertIsABooleanOnAnyNode) {
+    std::string error;
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"stack","inert":true,"children":[{"type":"button","label":"x","inert":false}]})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"text","text":"x","inert":"yes"})"), &error));
+    CHECK(error.find("inert") != std::string::npos);
+}
+
 TEST_CASE(UiModel_FullscreenSessionsFollowTheLastElementThatOpens) {
     ampify::UiModel ui;
     std::uint64_t first = ui.SetFullscreen("a", Parse(R"({"type":"text","text":"1"})"), 0);

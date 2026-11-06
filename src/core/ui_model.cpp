@@ -104,6 +104,8 @@ std::optional<bool> CheckCommonStyle(const std::string& name, const std::string&
         if (!TextOneOf(value, kPlaces)) return Fail(error, "valign expects start, center, end or stretch");
     } else if (key == "grow") {
         if (!value.AsBool()) return Fail(error, "grow expects true or false");
+    } else if (key == "inert") {
+        if (!value.AsBool()) return Fail(error, "inert expects true or false");
     } else if (key == "align") {
         if (name == "text" && !TextOneOf(value, kTextAligns)) return Fail(error, "align on text expects left, center or right");
         if (name != "text" && !TextOneOf(value, kPlaces)) return Fail(error, "align expects start, center, end or stretch");

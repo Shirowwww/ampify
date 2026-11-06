@@ -1,5 +1,8 @@
 #include "player_queue.hpp"
 
+#include <charconv>
+#include <system_error>
+
 namespace ampify {
 
 const char* QueueSectionName(QueueSection section) {
@@ -41,6 +44,23 @@ bool IsCatalogId(std::string_view id) {
     return true;
 }
 
+namespace {
+constexpr std::string_view kQueueArtworkPrefix = "artwork:";
+}  // namespace
+
+std::string QueueArtworkSource(uint64_t itemId) {
+    return std::string(kQueueArtworkPrefix) + std::to_string(itemId);
+}
+
+std::optional<uint64_t> QueueArtworkItem(std::string_view source) {
+    if (!source.starts_with(kQueueArtworkPrefix)) return std::nullopt;
+    std::string_view digits = source.substr(kQueueArtworkPrefix.size());
+    uint64_t id = 0;
+    auto [end, error] = std::from_chars(digits.data(), digits.data() + digits.size(), id);
+    if (digits.empty() || error != std::errc() || end != digits.data() + digits.size()) return std::nullopt;
+    return id;
+}
+
 bool ParseQueuePosition(std::string_view text, QueuePosition& position) {
     if (text.empty() || text == "last") {
         position = QueuePosition::Last;
@@ -64,6 +84,7 @@ Json QueueJson(const QueueSnapshot& snapshot, bool available) {
         entry.emplace_back("durationMs", Json(static_cast<double>(item.durationMs)));
         entry.emplace_back("section", Json(std::string(QueueSectionName(item.section))));
         entry.emplace_back("catalogId", Json(item.catalogId));
+        entry.emplace_back("artwork", Json(item.artwork));
         items.emplace_back(std::move(entry));
     }
     Json::Object members;

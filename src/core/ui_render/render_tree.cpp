@@ -34,7 +34,9 @@ std::string KeyOf(const Json& node) {
     return {};
 }
 
-void Build(const Json& tree, const std::string& id, RenderNode& out) {
+// `inertAbove`: an ancestor is inert, so this node is too, whatever its own attribute says (as in HTML). The
+// renderer then turns hit-testing and keyboard focus off on every control below, not only on the inert box.
+void Build(const Json& tree, const std::string& id, RenderNode& out, bool inertAbove) {
     out.id = id;
     if (const Json* type = tree.Find("type")) {
         if (const std::string* text = type->AsString()) out.type = *text;
@@ -45,6 +47,8 @@ void Build(const Json& tree, const std::string& id, RenderNode& out) {
         if (key == "type" || key == "children") continue;
         out.attributes[key] = value;
     }
+    if (inertAbove) out.attributes["inert"] = Json(true);
+    const bool inert = out.Bool("inert", false);
     const Json* children = tree.Find("children");
     const Json::Array* items = children ? children->AsArray() : nullptr;
     if (!items) return;
@@ -56,7 +60,7 @@ void Build(const Json& tree, const std::string& id, RenderNode& out) {
         if (segment.empty() || std::find(used.begin(), used.end(), segment) != used.end()) segment = std::to_string(index);
         used.push_back(segment);
         RenderNode child;
-        Build((*items)[index], id + "." + segment, child);
+        Build((*items)[index], id + "." + segment, child, inert);
         out.children.push_back(std::move(child));
     }
 }
@@ -134,7 +138,7 @@ std::string SurfaceNodeId(std::string_view kind, std::string_view id) {
 
 RenderNode BuildRenderTree(const Json& tree, const std::string& rootId) {
     RenderNode root;
-    Build(tree, rootId, root);
+    Build(tree, rootId, root, false);
     return root;
 }
 
