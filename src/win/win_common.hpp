@@ -70,6 +70,9 @@ bool IsElevated();
 // Ids of the running processes whose image file name is `imageName`, whatever folder they run from.
 std::vector<DWORD> ProcessIdsNamed(const wchar_t* imageName);
 
+// The image file names of the running processes, in UTF-8, each once. Empty when they cannot be listed.
+std::vector<std::string> RunningImageNames();
+
 // Whether a process named `imageName` runs, for a loop that asks several times a second. A snapshot of every process
 // (ProcessIdsNamed) costs about 11 ms with 560 processes; this lists the ids (0.04 ms) and opens only new ones. Each
 // process seen stays open until it ends, so its id cannot pass to a new process unnoticed.

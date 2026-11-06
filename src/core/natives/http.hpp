@@ -31,6 +31,12 @@ struct HttpPostHost {
     virtual HttpResponse HttpGetWithHeaders(const std::string&, const HttpHeaders&) {
         return HttpResponse{0, "headers on a GET are not supported by this host"};
     }
+
+    // A PUT, PATCH or DELETE (`method`, always one of those three), under the same rules. A host without it answers
+    // status 0.
+    virtual HttpResponse HttpSend(const std::string& method, const std::string&, const std::string&, const HttpHeaders&) {
+        return HttpResponse{0, method + " is not supported by this host"};
+    }
 };
 
 // The optional host service behind Ampify.http.open: shows a page in the user's browser, for a sign-in page such as

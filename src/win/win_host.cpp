@@ -21,11 +21,13 @@
 #include <thread>
 #include <vector>
 
+#include "../core/apple_music.hpp"
 #include "../core/audio/audio_engine.hpp"
 #include "../core/gain_board.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_watchdog.hpp"
 #include "audio_share.hpp"
+#include "clipboard.hpp"
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
 #include "player_buttons.hpp"
@@ -242,6 +244,9 @@ void* WinHost::QueryCapability(std::string_view name) {
     if (void* found = Offer<ImageHost>(name, this)) return found;
     if (void* found = Offer<ArtworkHost>(name, this)) return found;
     if (void* found = Offer<GifHost>(name, this)) return found;
+    if (void* found = Offer<KeyUnbindHost>(name, this)) return found;
+    if (void* found = Offer<ClipboardHost>(name, this)) return found;
+    if (void* found = Offer<AppInfoHost>(name, this)) return found;
     // Ampify.player.queue, in both processes: what each one knows of the queue (src/win/player_bridge.*).
     if (name == QueueHost::kCapabilityName) return static_cast<QueueHost*>(m_player.get());
     // Ampify.player.lyrics: Apple's lyrics, read in the process that has Apple's player.
@@ -365,13 +370,9 @@ void WinHost::Notify(const std::string& elementId, const std::string& title, con
     m_journal.Write("[" + elementId + "] notification: " + title + (text.empty() ? "" : " - " + text));
 
     // A balloon needs a notification icon. A message-only window owns it, and the icon is removed after the balloon.
-    if (!m_notifyWindow) {
-        m_notifyWindow = CreateWindowExW(0, L"STATIC", L"AmpifyNotify", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
-                                         GetModuleHandleW(nullptr), nullptr);
-        if (!m_notifyWindow) {
-            m_journal.Write("[" + elementId + "] notification not shown: could not create the window");
-            return;
-        }
+    if (!MessageWindow()) {
+        m_journal.Write("[" + elementId + "] notification not shown: could not create the window");
+        return;
     }
 
     NOTIFYICONDATAW icon{};
@@ -393,6 +394,25 @@ void WinHost::Notify(const std::string& elementId, const std::string& title, con
     }
     m_iconVisible = true;
     m_balloonUntil = std::chrono::steady_clock::now() + kBalloonDuration;
+}
+
+void* WinHost::MessageWindow() {
+    if (!m_notifyWindow) {
+        m_notifyWindow = CreateWindowExW(0, L"STATIC", L"AmpifyNotify", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
+                                         GetModuleHandleW(nullptr), nullptr);
+    }
+    return m_notifyWindow;
+}
+
+bool WinHost::CopyText(const std::string& text) { return win::CopyTextToClipboard(MessageWindow(), text); }
+
+std::optional<std::string> WinHost::PasteText() { return win::ReadClipboardText(); }
+
+std::string WinHost::AppVersion() { return AppleMusicVersion(win::PackageFullName()); }
+
+std::string WinHost::ActiveTheme() {
+    std::string id = m_settings.Get("theme.active").value_or("");
+    return id == "none" ? std::string() : id;
 }
 
 bool WinHost::RegisterKey(const std::string& elementId, const std::string& combo) {
@@ -418,6 +438,16 @@ void WinHost::UnregisterKeys(const std::string& elementId) {
     }
 }
 
+bool WinHost::UnregisterKey(const std::string& elementId, const std::string& combo) {
+    for (auto it = m_hotkeys.begin(); it != m_hotkeys.end(); ++it) {
+        if (it->second.elementId != elementId || it->second.combo != combo) continue;
+        UnregisterHotKey(nullptr, it->first);
+        m_hotkeys.erase(it);
+        return true;
+    }
+    return false;
+}
+
 HttpResponse WinHost::HttpGet(const std::string& url) { return Send(L"GET", url, {}, {}); }
 
 std::optional<RgbaImage> WinHost::DecodeImage(const std::string& bytes, uint32_t maxSide) {
@@ -440,6 +470,11 @@ HttpResponse WinHost::HttpPost(const std::string& url, const std::string& body, 
 
 HttpResponse WinHost::HttpGetWithHeaders(const std::string& url, const HttpHeaders& headers) {
     return Send(L"GET", url, {}, headers);
+}
+
+HttpResponse WinHost::HttpSend(const std::string& method, const std::string& url, const std::string& body,
+                               const HttpHeaders& headers) {
+    return Send(ToWide(method).c_str(), url, body, headers);
 }
 
 namespace {

@@ -29,6 +29,14 @@
   session still runs, Ampify ends it so Apple Music can open its library again (error 9039). It gives the agent 10 s
   to leave when Apple Music is started from Ampify's launcher, and where the background launcher runs, 10 s after
   Apple Music is closed. The agent is never ended while Apple Music runs, and a refused end is not tried again.
+- "Proxy detection" in Settings > Apple Music (off by default): "Skip automatic detection" stops Apple Music from
+  waiting for Windows' automatic proxy detection (WPAD) before it loads a page or a song. A proxy set by hand or by a
+  script address still applies (`apple.proxy`).
+- The freeze log also writes name lookups and proxy detections that took 0.3 s or more, and the memory of each Apple
+  Music process as it grows by 512 MB, and names Ampify's searches of the player's tree when one is under way.
+- `AppleMusic.log` names, once per start, a running program known to crash Apple Music (3Dconnexion's driver, and
+  RivaTuner, which draws MSI Afterburner's on-screen display) with its fix. `ampify doctor` says the same, and also gives the Apple Music version, a
+  library agent left running without Apple Music, and Apple Music's crash dumps of the last 7 days.
 
 ### Extensions
 
@@ -42,6 +50,15 @@
   run as in a React tree; they were dropped before.
 - An `image` with `src: "artwork"` stays sharp when Apple shows the same cover again, as for two songs of one album; it
   kept Apple's small thumbnail stretched.
+- More of Spicetify's API: a `progress` event (`onprogress`) once per second of the song, `player.skipForward`,
+  `skipBack`, `formatTime` and `progress()`, mute (`muted`, `setMute`, `toggleMute`) and volume steps on Apple's
+  slider, `keyboard.unbind`, `Ampify.clipboard` (permissions `clipboard.write` and `clipboard.read`), `http.put`,
+  `patch` and `del`, `storage.clear`, the `uri.isSong`/`isAlbum`... predicates and `itmss:` links,
+  `Ampify.appVersion` and `activeTheme()`, `Ampify.components.ConfirmDialog` and `hooks.useArtworkColor()`.
+- Buttons and menu entries can be taken out (`ui.topbar.remove(id)`, `playbar`, `sidebar`, `menu`) and greyed
+  (`disabled`, `ui.setDisabled`); a context entry can keep to some kinds of item (`kinds: ["song"]`). Named popups
+  open and close by code (`ui.popup.show(name, view)`, `ui.popup.close(name)`), and `ui.title` has `get` and `reset`.
+- New example `copy-link`: copies an item's link from its menu, and what plays now with Ctrl+Alt+C.
 
 ### Themes
 

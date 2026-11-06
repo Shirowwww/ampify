@@ -3,6 +3,7 @@
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
+#include "../app_info.hpp"
 
 namespace ampify::natives {
 
@@ -34,6 +35,13 @@ struct CoreNatives : ScriptBridge {
         if (!Require(ctx, ext, String(ctx, argc, argv, 0).value_or(""), &failure)) return failure;
         return JS_UNDEFINED;
     }
+
+    // native.activeTheme(): the id of the theme in use, or "" for none. Read each time: the user may change it.
+    AMPIFY_NATIVE(ActiveTheme) {
+        AppInfoHost* info = HostOf(Owner(ctx)).Capability<AppInfoHost>();
+        std::string id = info ? info->ActiveTheme() : std::string();
+        return JS_NewStringLen(ctx, id.data(), id.size());
+    }
 };
 
 }  // namespace
@@ -46,6 +54,9 @@ void DefineCore(api::NativeScope& scope) {
     scope.String("kitApi", kKitApi);
     scope.String("process", ScriptBridge::HostOf(&scope.extension()).Process());
     scope.String("locale", ScriptBridge::HostOf(&scope.extension()).Locale());
+    scope.Function("activeTheme", CoreNatives::ActiveTheme, 0);
+    AppInfoHost* info = ScriptBridge::HostOf(&scope.extension()).Capability<AppInfoHost>();
+    scope.String("appVersion", info ? info->AppVersion() : std::string());
 }
 
 }  // namespace ampify::natives

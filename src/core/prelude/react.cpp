@@ -552,6 +552,7 @@ const char kReact[] = R"AMPIFYJS(
       return;
     }
     native.reactClosePopup(name);
+    dispatch.uiPopupClosed(name);  // a popup.show of the module ui
     const key = "popup:" + name;
     const root = roots.get(key);
     if (!root) return;
@@ -714,6 +715,41 @@ const char kReact[] = R"AMPIFYJS(
       isValidElement(child) ? cloneElement(child, extra) : h("text", Object.assign({ text: asText(child) }, extra)));
   }
 
+  // Spicetify's ConfirmDialog: nothing while isOpen is false; otherwise a title, a text and two buttons. Rendered into
+  // a popup (ReactDOM.render(h(ConfirmDialog, props), "popup:confirm")), as Spicetify renders it into a modal.
+  function ConfirmDialog(props) {
+    if (!props.isOpen) return null;
+    const shown = (value, key) => (value === undefined ? native.i18nKitShown(key) : asText(value));
+    const run = (fn) => () => {
+      if (typeof fn === "function") fn();
+    };
+    return h("stack", { gap: 12, padding: 16 },
+      props.titleText === undefined ? null : h("text", { text: asText(props.titleText), variant: "subtitle" }),
+      props.descriptionText === undefined ? null : h("text", { text: asText(props.descriptionText), wrap: true }),
+      h("row", { gap: 8, align: "end" },
+        h("button", { label: shown(props.cancelText, "ui.cancel"), variant: "secondary", onClick: run(props.onClose) }),
+        h("button", { label: shown(props.confirmText, "ui.confirm"), variant: "primary", onClick: run(props.onConfirm) })));
+  }
+
+  // The colours of the cover playing now (Ampify.color.playing), null while there is none; again at each new track.
+  function useArtworkColor() {
+    const state = usePlayer();
+    const key = state.track ? state.track.id + "|" + state.track.queueItemId : "";
+    const [colors, setColors] = useState(null);
+    useEffect(() => {
+      if (!key) {
+        setColors(null);
+        return undefined;
+      }
+      let live = true;
+      Ampify.color.playing().then((found) => live && setColors(found), () => live && setColors(null));
+      return () => {
+        live = false;
+      };
+    }, [key]);
+    return colors;
+  }
+
   // ---- The API ----------------------------------------------------------------------------------------------
 
   const hooks = { useState, useReducer, useEffect, useLayoutEffect: useEffect, useRef, useMemo, useCallback,
@@ -722,9 +758,10 @@ const char kReact[] = R"AMPIFYJS(
   Ampify.React = Object.assign({ createElement, h: createElement, Fragment, isValidElement, cloneElement, Children,
                               createContext, memo }, hooks);
   Ampify.ReactDOM = { render: renderInto, unmountComponentAtNode: unmountAt, createRoot };
-  Ampify.hooks = Object.assign({ usePlayer }, hooks);
+  Ampify.hooks = Object.assign({ usePlayer, useArtworkColor }, hooks);
   Ampify.components = { Button, ButtonPrimary, ButtonSecondary, ButtonTertiary, Toggle, Slider, TextField, Dropdown,
-                     Grid, Tabs, Menu, Card, List, Text, TextComponent: Text, Tooltip, TooltipWrapper: Tooltip };
+                     Grid, Tabs, Menu, Card, List, Text, TextComponent: Text, Tooltip, TooltipWrapper: Tooltip,
+                     ConfirmDialog };
 
   // Ampify.ready resolves when the kernel has started the element: on its first Pump, after main.js ran. An app that
   // defines a global render() function, as a Spicetify custom app does, gets it rendered on its page "/<id>" first.

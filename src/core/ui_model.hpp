@@ -26,6 +26,9 @@ struct UiControl {
     bool clickable = true;  // false: a play bar or top bar text that only shows something, or a menu's submenu
     int parent = 0;         // the submenu (a menu control that is not clickable) this menu entry sits in; 0: the menu itself
     bool active = false;    // a top bar or play bar button that is on: it takes the accent colour
+    bool disabled = false;  // drawn greyed and ignores clicks (top bar, play bar, menu entry)
+    // A context menu entry shows only in the menus of these kinds of item (IsMenuItemKind); empty: in every one.
+    std::vector<std::string> kinds;
 };
 
 struct UiSlot {
@@ -49,6 +52,15 @@ public:
     // The "on" state of a control the element added (the host colours a top bar or play bar button with the accent).
     // False when the element has no such control.
     bool SetControlActive(const std::string& elementId, int controlId, bool active);
+
+    // Greys a control the element added, or brings it back. False when the element has no such control.
+    bool SetControlDisabled(const std::string& elementId, int controlId, bool disabled);
+
+    // The kinds of item a context menu entry is for (see UiControl::kinds). False when the element has no such control.
+    bool SetControlKinds(const std::string& elementId, int controlId, std::vector<std::string> kinds);
+
+    // Takes out a control the element added, and the entries of a submenu with it. False when it has no such control.
+    bool RemoveControl(const std::string& elementId, int controlId);
 
     // Stores the tree of a panel. Registering the same panel again replaces it.
     void SetPanel(const std::string& elementId, const std::string& panelId, Json tree);
@@ -139,6 +151,13 @@ bool ValidateTree(const Json& tree, std::string* error);
 
 // True for the placements listed above.
 bool IsPlacement(std::string_view placement);
+
+// The kinds of item Apple Music's data gives a menu: song, album, artist, composer, genre, playlist, station, video,
+// concert and container.
+bool IsMenuItemKind(std::string_view kind);
+
+// Whether a context menu entry goes in the menu of an item of `kind` (empty when Apple's data does not say).
+bool ShowsForItem(const UiControl& control, std::string_view kind);
 
 // The permission that adds to a placement: ui.topbar, ui.playbar or ui.menu.
 std::string_view PlacementPermission(std::string_view placement);

@@ -2,6 +2,7 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include "../core/ui_watchdog.hpp"
 #include "amp_item.hpp"
 #include "amp_player.hpp"
 #include "winrt_abi.hpp"
@@ -100,6 +101,7 @@ Follow& State() {
 }
 
 std::vector<xaml::DependencyObject> Below(const xaml::DependencyObject& root) {
+    ampify::ActivityScope activity("player buttons tree search");
     std::vector<xaml::DependencyObject> queue{root};
     for (std::size_t i = 0; i < queue.size() && queue.size() < static_cast<std::size_t>(kSearchLimit); i++) {
         int count = xaml::Media::VisualTreeHelper::GetChildrenCount(queue[i]);

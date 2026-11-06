@@ -73,3 +73,28 @@ TEST_CASE(PlayerWatcher_NothingLoadedIsAState) {
     CHECK(events.size() == 2);
     CHECK(events[0] == "trackchange");
 }
+
+TEST_CASE(PlayerWatcher_ProgressFollowsEachNewSecondOfTheTrack) {
+    auto at = [](bool playing, int64_t positionMs) {
+        ampify::PlayerSnapshot snapshot = Snapshot("1", "v1", playing);
+        snapshot.positionMs = positionMs;
+        snapshot.durationMs = 200'000;
+        return snapshot;
+    };
+    ampify::PlayerWatcher watcher;
+    watcher.Poll(at(true, 1'200), 0);
+    CHECK(!watcher.Progressed());  // the first snapshot only records the state
+    watcher.Poll(at(true, 1'450), 250);
+    CHECK(!watcher.Progressed());  // the same second
+    watcher.Poll(at(true, 2'000), 800);
+    CHECK(watcher.Progressed());
+    CHECK(watcher.Poll(at(true, 2'250), 1'050).empty());  // progress is not one of Poll's events
+    CHECK(!watcher.Progressed());
+    watcher.Poll(at(false, 90'000), 1'300);  // a pause with a seek: the position moved
+    CHECK(watcher.Progressed());
+    watcher.Poll(at(false, 90'000), 5'000);
+    CHECK(!watcher.Progressed());
+    ampify::PlayerSnapshot none;
+    watcher.Poll(none, 5'250);
+    CHECK(!watcher.Progressed());  // nothing loaded: no position to follow
+}

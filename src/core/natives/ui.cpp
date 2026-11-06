@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
@@ -28,6 +30,16 @@ bool ValidUiName(const std::string& name) {
     return std::all_of(name.begin(), name.end(), [](char c) {
         return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '/';
     });
+}
+
+// The element's name, translated when its manifest has the display language.
+std::string DefaultTitle(const ScriptExtension& extension) {
+    const Manifest& manifest = extension.manifest();
+    auto translated = manifest.translations.find(i18n::Language());
+    const std::string& name = translated != manifest.translations.end() && !translated->second.name.empty()
+                                  ? translated->second.name
+                                  : manifest.name;
+    return name.substr(0, kMaxUiTitle);
 }
 
 struct UiNatives : ScriptBridge {
@@ -72,6 +84,36 @@ struct UiNatives : ScriptBridge {
         int id = static_cast<int>(Number(ctx, argc, argv, 0));
         bool active = argc >= 2 && JS_ToBool(ctx, argv[1]) != 0;
         return JS_NewBool(ctx, HostOf(ext).Ui().SetControlActive(ext->id(), id, active));
+    }
+
+    // Same rule again: the element can only grey or take out what it added.
+    AMPIFY_NATIVE(UiControlDisabled) {
+        ScriptExtension* ext = Owner(ctx);
+        int id = static_cast<int>(Number(ctx, argc, argv, 0));
+        bool disabled = argc >= 2 && JS_ToBool(ctx, argv[1]) != 0;
+        return JS_NewBool(ctx, HostOf(ext).Ui().SetControlDisabled(ext->id(), id, disabled));
+    }
+
+    AMPIFY_NATIVE(UiControlRemove) {
+        ScriptExtension* ext = Owner(ctx);
+        int id = static_cast<int>(Number(ctx, argc, argv, 0));
+        return JS_NewBool(ctx, HostOf(ext).Ui().RemoveControl(ext->id(), id));
+    }
+
+    // native.uiControlKinds(id, "song,album"): the kinds of item a context menu entry is for.
+    AMPIFY_NATIVE(UiControlKinds) {
+        ScriptExtension* ext = Owner(ctx);
+        int id = static_cast<int>(Number(ctx, argc, argv, 0));
+        std::vector<std::string> kinds;
+        std::string list = String(ctx, argc, argv, 1).value_or("");
+        for (size_t start = 0; start <= list.size();) {
+            size_t comma = std::min(list.find(',', start), list.size());
+            std::string kind = list.substr(start, comma - start);
+            if (!IsMenuItemKind(kind)) return Throw(ctx, "RangeError", "menu.addItem: unknown kind of item: " + kind);
+            kinds.push_back(kind);
+            start = comma + 1;
+        }
+        return JS_NewBool(ctx, HostOf(ext).Ui().SetControlKinds(ext->id(), id, std::move(kinds)));
     }
 
     AMPIFY_NATIVE(UiPanel) {
@@ -174,6 +216,22 @@ struct UiNatives : ScriptBridge {
         HostOf(ext).Ui().SetTitle(ext->id(), String(ctx, argc, argv, 0).value_or("").substr(0, kMaxUiTitle));
         return JS_UNDEFINED;
     }
+
+    // native.uiTitleGet(): the title the element's frames show now. No permission: it only reads its own.
+    AMPIFY_NATIVE(UiTitleGet) {
+        ScriptExtension* ext = Owner(ctx);
+        std::string title = HostOf(ext).Ui().Title(ext->id()).value_or("");
+        return JS_NewStringLen(ctx, title.data(), title.size());
+    }
+
+    // native.uiTitleReset(): back to the element's name, as when it started.
+    AMPIFY_NATIVE(UiTitleReset) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.window", &failure)) return failure;
+        HostOf(ext).Ui().SetTitle(ext->id(), DefaultTitle(*ext));
+        return JS_UNDEFINED;
+    }
 };
 
 }  // namespace
@@ -182,6 +240,9 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiControl", UiNatives::UiControl, 5);
     scope.Function("uiControlLabel", UiNatives::UiControlLabel, 2);
     scope.Function("uiControlActive", UiNatives::UiControlActive, 2);
+    scope.Function("uiControlDisabled", UiNatives::UiControlDisabled, 2);
+    scope.Function("uiControlRemove", UiNatives::UiControlRemove, 1);
+    scope.Function("uiControlKinds", UiNatives::UiControlKinds, 2);
     scope.Function("uiPanel", UiNatives::UiPanel, 2);
     scope.Function("uiPanelRemove", UiNatives::UiPanelRemove, 1);
     scope.Function("uiPopup", UiNatives::UiPopup, 1);
@@ -191,17 +252,14 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiPage", UiNatives::UiPage, 2);
     scope.Function("uiNavigate", UiNatives::UiNavigate, 1);
     scope.Function("uiTitle", UiNatives::UiTitle, 1);
+    scope.Function("uiTitleGet", UiNatives::UiTitleGet, 0);
+    scope.Function("uiTitleReset", UiNatives::UiTitleReset, 0);
 }
 
 // The panel frame, page header and popup of an element show its name, in the display language when the manifest
 // translates it, until it sets a title of its own.
 void StartUi(ScriptExtension& extension) {
-    const Manifest& manifest = extension.manifest();
-    auto translated = manifest.translations.find(i18n::Language());
-    const std::string& name = translated != manifest.translations.end() && !translated->second.name.empty()
-                                  ? translated->second.name
-                                  : manifest.name;
-    ScriptBridge::HostOf(&extension).Ui().SetTitle(extension.id(), name.substr(0, kMaxUiTitle));
+    ScriptBridge::HostOf(&extension).Ui().SetTitle(extension.id(), DefaultTitle(extension));
 }
 
 // Removes what the element added to the interface when it stops.

@@ -46,6 +46,15 @@ const char kKeyboard[] = R"AMPIFYJS(
       keyHandlers.set(normalized, fn);
       return normalized;
     },
+    // Lets go of a shortcut this element bound, so that a later bind (or another program) can take it. False when
+    // the element had not bound it.
+    unbind(combo) {
+      const normalized = normalizeCombo(combo);
+      if (!keyHandlers.has(normalized)) return false;
+      native.unbindKey(normalized);
+      keyHandlers.delete(normalized);
+      return true;
+    },
   };
 
   dispatch.key = (combo) => {

@@ -47,6 +47,7 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
 
     std::vector<Post> posts;
     std::vector<Post> headedGets;  // GETs that carried headers, with an empty body
+    std::vector<Post> sent;        // PUT, PATCH and DELETE: url is "<method> <url>"
     std::vector<std::string> openedPages;
     HttpResponse postResponse{201, "sent"};
     std::vector<ShownActivity> activities;
@@ -70,6 +71,12 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
     HttpResponse HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) override {
         std::lock_guard<std::mutex> lock(httpMutex);  // called from a worker thread
         posts.push_back({url, body, headers});
+        return postResponse;
+    }
+    HttpResponse HttpSend(const std::string& method, const std::string& url, const std::string& body,
+                          const HttpHeaders& headers) override {
+        std::lock_guard<std::mutex> lock(httpMutex);  // called from a worker thread
+        sent.push_back({method + " " + url, body, headers});
         return postResponse;
     }
     HttpResponse HttpGetWithHeaders(const std::string& url, const HttpHeaders& headers) override {

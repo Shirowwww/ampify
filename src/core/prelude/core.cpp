@@ -1,4 +1,4 @@
-// Module core: Ampify.version, kitApi, process, locale, log and onStop. Natives: src/core/natives/core.cpp.
+// Module core: Ampify.version, kitApi, process, locale, appVersion, activeTheme, log and onStop. Natives: src/core/natives/core.cpp.
 
 namespace ampify::prelude {
 
@@ -11,6 +11,9 @@ const char kCore[] = R"AMPIFYJS(
     kitApi: native.kitApi,
     process: native.process,
     locale: native.locale,
+    // Apple Music's version, "" when unknown, and the id of the theme in use, null for none.
+    appVersion: native.appVersion,
+    activeTheme: () => native.activeTheme() || null,
     log: (message) => native.log(text(message)),
     onStop(fn) {
       if (typeof fn !== "function") throw new TypeError("onStop expects a function");

@@ -390,6 +390,37 @@ bool UiModel::SetControlActive(const std::string& elementId, int controlId, bool
     return false;
 }
 
+bool UiModel::SetControlDisabled(const std::string& elementId, int controlId, bool disabled) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    for (UiControl& control : m_controls) {
+        if (control.id != controlId || control.elementId != elementId) continue;
+        control.disabled = disabled;
+        return true;
+    }
+    return false;
+}
+
+bool UiModel::SetControlKinds(const std::string& elementId, int controlId, std::vector<std::string> kinds) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    for (UiControl& control : m_controls) {
+        if (control.id != controlId || control.elementId != elementId) continue;
+        control.kinds = std::move(kinds);
+        return true;
+    }
+    return false;
+}
+
+bool UiModel::RemoveControl(const std::string& elementId, int controlId) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    auto gone = [&](const UiControl& control) {
+        return control.elementId == elementId && (control.id == controlId || control.parent == controlId);
+    };
+    auto from = std::remove_if(m_controls.begin(), m_controls.end(), gone);
+    bool removed = from != m_controls.end();
+    m_controls.erase(from, m_controls.end());
+    return removed;
+}
+
 void UiModel::SetTitle(const std::string& elementId, const std::string& title) {
     std::lock_guard<std::mutex> guard(m_mutex);
     m_titles[elementId] = title;
@@ -497,6 +528,17 @@ bool ValidateTree(const Json& tree, std::string* error) {
 bool IsPlacement(std::string_view placement) {
     return placement == "topbar" || placement == "playbar" || placement == "sidebar" || placement == "menu-context" ||
            placement == "menu-app";
+}
+
+bool IsMenuItemKind(std::string_view kind) {
+    static constexpr std::array<std::string_view, 10> kKinds = {
+        "song", "album", "artist", "composer", "genre", "playlist", "station", "video", "concert", "container"};
+    return std::find(kKinds.begin(), kKinds.end(), kind) != kKinds.end();
+}
+
+bool ShowsForItem(const UiControl& control, std::string_view kind) {
+    if (control.kinds.empty()) return true;
+    return std::find(control.kinds.begin(), control.kinds.end(), kind) != control.kinds.end();
 }
 
 std::string_view PlacementPermission(std::string_view placement) {

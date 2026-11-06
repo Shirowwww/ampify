@@ -22,6 +22,7 @@ const std::set<std::string_view> kFixedPermissions = {
     "ipc.discord",   "midi.input",     "library.read",  "library.write", "services.read", "ui.keyboard",
     "ui.topbar",     "ui.playbar",     "ui.menu",       "ui.popup",      "ui.panel",    "ui.page",
     "ui.window",     "ui.sidebar",    "ui.tray",       "fs.output",   "kit.manage",  "ui.fullscreen",
+    "clipboard.read", "clipboard.write",
 };
 
 const std::set<std::string_view> kTranslationMembers = {"name", "description", "settings", "options", "groups",

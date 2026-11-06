@@ -219,6 +219,29 @@ struct HttpNatives : ScriptBridge {
         });
     }
 
+    // native.httpSend(method, url, body, headersJson): PUT, PATCH or DELETE, under the rules of post.
+    AMPIFY_NATIVE(HttpSend) {
+        ScriptExtension* ext = Owner(ctx);
+        std::string method = String(ctx, argc, argv, 0).value_or("");
+        if (method != "PUT" && method != "PATCH" && method != "DELETE") {
+            return Throw(ctx, "TypeError", "http: unknown method " + method + " (PUT, PATCH or DELETE)");
+        }
+        JSValue failure = JS_UNDEFINED;
+        std::optional<std::string> url = CheckedUrl(ctx, ext, argc - 1, argv + 1, &failure);
+        if (!url) return failure;
+        std::string body = String(ctx, argc, argv, 2).value_or("");
+        if (body.size() > kMaxPostBody) return Throw(ctx, "RangeError", "request body too long (64 KB at most)");
+        std::optional<HttpHeaders> headers = CheckedHeaders(ctx, argc, argv, 3, &failure);
+        if (!headers) return failure;
+        HttpPostHost* sender = HostOf(ext).Capability<HttpPostHost>();
+        if (!sender) {
+            return Start(ctx, ext, [] { return HttpResponse{0, "sending is not supported by this host"}; });
+        }
+        return Start(ctx, ext, [sender, method, target = *url, body = std::move(body), headers = std::move(*headers)] {
+            return sender->HttpSend(method, target, body, headers);
+        });
+    }
+
     // native.httpPostForm(url, fieldsJson): a multipart/form-data POST, for an upload service. fieldsJson maps each
     // name to a text, or to { filename, type, base64 } for a file.
     AMPIFY_NATIVE(HttpPostForm) {
@@ -310,6 +333,7 @@ struct HttpNatives : ScriptBridge {
 void DefineHttp(api::NativeScope& scope) {
     scope.Function("httpGet", HttpNatives::HttpGet, 1);
     scope.Function("httpPost", HttpNatives::HttpPost, 3);
+    scope.Function("httpSend", HttpNatives::HttpSend, 4);
     scope.Function("httpPostForm", HttpNatives::HttpPostForm, 2);
     scope.Function("httpOpen", HttpNatives::HttpOpen, 1);
     scope.Function("httpGif", HttpNatives::HttpGif, 4);

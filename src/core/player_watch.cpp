@@ -8,6 +8,7 @@ namespace {
 
 // A position this far from where steady playback would be counts as a seek.
 constexpr int64_t kSeekToleranceMs = 3000;
+constexpr int64_t kMsPerSecond = 1000;
 
 }  // namespace
 
@@ -24,6 +25,7 @@ std::vector<std::string> PlayerWatcher::Poll(const PlayerSnapshot& snapshot, int
         if (snapshot.playing != m_playing || (sameTrack && Moved(snapshot, nowMs))) events.push_back("statechange");
         if (lyrics && !(sameTrack && m_lyrics)) events.push_back("lyricschange");
     }
+    m_progressed = m_known && track && snapshot.positionMs / kMsPerSecond != m_positionMs / kMsPerSecond;
     m_track = track;
     m_playing = snapshot.playing;
     m_lyrics = lyrics;

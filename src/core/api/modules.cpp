@@ -79,6 +79,8 @@ namespace prelude { extern const char kFonts[]; }
 namespace natives { void DefineFonts(api::NativeScope& scope); }
 namespace prelude { extern const char kLibrary[]; }
 namespace natives { void DefineLibrary(api::NativeScope& scope); }
+namespace prelude { extern const char kClipboard[]; }
+namespace natives { void DefineClipboard(api::NativeScope& scope); }
 
 namespace api {
 
@@ -113,6 +115,7 @@ const ApiModule kModules[] = {
     {"remote", prelude::kRemote, natives::DefineRemote, nullptr, natives::StopRemote},
     {"fs", prelude::kFs, natives::DefineFs, nullptr, nullptr},
     {"library", prelude::kLibrary, natives::DefineLibrary, nullptr, nullptr},
+    {"clipboard", prelude::kClipboard, natives::DefineClipboard, nullptr, nullptr},
     {"kit", prelude::kKit, natives::DefineKit, nullptr, natives::StopKit},
 };
 

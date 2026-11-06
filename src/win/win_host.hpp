@@ -8,10 +8,13 @@
 #include <optional>
 #include <string>
 
+#include "../core/app_info.hpp"
 #include "../core/host.hpp"
 #include "../core/image_host.hpp"
 #include "../core/journal.hpp"
+#include "../core/natives/clipboard.hpp"
 #include "../core/natives/http.hpp"
+#include "../core/natives/keyboard.hpp"
 #include "../core/player_modes.hpp"
 #include "../core/settings.hpp"
 
@@ -30,7 +33,8 @@ class KitCommandRunner;
 }
 
 class WinHost : public Host, public HttpPostHost, public BrowserHost, public ImageHost, public ArtworkHost,
-                public GifHost, public PlayerModesHost, public PlayerVolumeHost {
+                public GifHost, public PlayerModesHost, public PlayerVolumeHost, public KeyUnbindHost,
+                public ClipboardHost, public AppInfoHost {
 public:
     using KeyCallback = std::function<void(const std::string& elementId, const std::string& combo)>;
     using EventSink = std::function<void(const std::string& entry, const std::string& payload)>;
@@ -66,10 +70,17 @@ public:
 
     bool RegisterKey(const std::string& elementId, const std::string& combo) override;
     void UnregisterKeys(const std::string& elementId) override;
+    bool UnregisterKey(const std::string& elementId, const std::string& combo) override;
+    bool CopyText(const std::string& text) override;
+    std::string AppVersion() override;
+    std::string ActiveTheme() override;
+    std::optional<std::string> PasteText() override;
 
     HttpResponse HttpGet(const std::string& url) override;
     HttpResponse HttpPost(const std::string& url, const std::string& body, const HttpHeaders& headers) override;
     HttpResponse HttpGetWithHeaders(const std::string& url, const HttpHeaders& headers) override;
+    HttpResponse HttpSend(const std::string& method, const std::string& url, const std::string& body,
+                          const HttpHeaders& headers) override;
     bool OpenInBrowser(const std::string& url) override;
     std::optional<RgbaImage> DecodeImage(const std::string& bytes, uint32_t maxSide) override;
     std::optional<ArtworkHost::File> CurrentArtwork() override;
@@ -107,7 +118,9 @@ private:
     std::map<int, Hotkey> m_hotkeys;
     int m_nextHotkeyId = 1;
 
-    void* m_notifyWindow = nullptr;  // a message-only window that owns the notification icon
+    // The message-only window of the JavaScript thread, made on first use; null when Windows refused it.
+    void* MessageWindow();
+    void* m_notifyWindow = nullptr;  // a message-only window that owns the notification icon and the copied text
     bool m_iconVisible = false;
     std::chrono::steady_clock::time_point m_balloonUntil;
 

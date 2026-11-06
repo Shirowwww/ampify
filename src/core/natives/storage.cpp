@@ -70,6 +70,17 @@ struct StorageNatives : ScriptBridge {
         if (StorageOf(ext).erase(String(ctx, argc, argv, 0).value_or("")) > 0) Persist(ext);
         return JS_UNDEFINED;
     }
+
+    AMPIFY_NATIVE(StorageClear) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "storage", &failure)) return failure;
+        if (!StorageOf(ext).empty()) {
+            StorageOf(ext).clear();
+            Persist(ext);
+        }
+        return JS_UNDEFINED;
+    }
 };
 
 }  // namespace
@@ -78,6 +89,7 @@ void DefineStorage(api::NativeScope& scope) {
     scope.Function("storageGet", StorageNatives::StorageGet, 1);
     scope.Function("storageSet", StorageNatives::StorageSet, 2);
     scope.Function("storageRemove", StorageNatives::StorageRemove, 1);
+    scope.Function("storageClear", StorageNatives::StorageClear, 0);
 }
 
 // Loads the element's values before main.js runs.

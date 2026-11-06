@@ -6,6 +6,7 @@
 #include "player_controls.hpp"
 
 #include "../core/journal.hpp"
+#include "../core/ui_watchdog.hpp"
 #include "../core/player_model.hpp"
 
 #ifdef GetCurrentTime
@@ -82,6 +83,7 @@ void Refresh(Sharp& state);
 // The first element under `root`, breadth first, that `match` accepts.
 template <typename Match>
 xaml::DependencyObject FindUnder(const xaml::DependencyObject& root, Match match) {
+    ampify::ActivityScope activity("sharp artwork tree search");
     std::vector<xaml::DependencyObject> queue{root};
     for (size_t i = 0; i < queue.size() && i < static_cast<size_t>(kSearchLimit); ++i) {
         if (i > 0 && match(queue[i])) return queue[i];

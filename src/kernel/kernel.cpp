@@ -31,6 +31,7 @@
 #include "../win/audio_share.hpp"
 #include "../win/network_fix.hpp"
 #include "../win/player_buttons.hpp"
+#include "../win/reliability_watch.hpp"
 #include "../win/ui_watchdog.hpp"
 #include "../win/win_common.hpp"
 #include "../win/win_host.hpp"
@@ -165,9 +166,10 @@ DWORD WINAPI KernelMain(LPVOID) {
     std::filesystem::path kit = ampify::win::KitDirectory();
     static ampify::Settings settings;
     settings.Load((kit / "settings.txt").string());
-    // Before anything connects: the songs stuck at 0:00 where a server's IPv6 does not answer.
+    // Before anything connects: the songs stuck at 0:00 where a server's IPv6 does not answer, the proxy detection
+    // that waits for the network, and the timing of both for the freeze log.
     ampify::uirender::AppleTweaks tweaks = ampify::uirender::ReadAppleTweaks(settings);
-    if (tweaks.ipv4First) ampify::win::InstallIpv4First(journal);
+    ampify::win::InstallNetworkFixes(journal, {tweaks.ipv4First, tweaks.proxyNoAutodetect, tweaks.freezeLog});
 
     // JavaScript elements live in %USERPROFILE%\Ampify\extensions\<id> and apps\<id>. Both processes
     // load them: an element tells them apart with Ampify.process.
@@ -213,6 +215,7 @@ DWORD WINAPI KernelMain(LPVOID) {
                 for (const std::string& event : playerWatcher.Poll(snapshot, nowMs)) {
                     loader.DeliverPlayer(event, snapshot);
                 }
+                if (playerWatcher.Progressed()) loader.DeliverPlayer("progress", snapshot);
             }
             if (std::chrono::steady_clock::now() >= nextReload) {
                 ServiceReloadRequests(kit, reload, loader, settings);
@@ -224,6 +227,9 @@ DWORD WINAPI KernelMain(LPVOID) {
 
     if (role == ampify::ProcessRole::AppleMusic) StartInterface(journal, kit, winHost.Ui(), loader);
     if (role == ampify::ProcessRole::AppleMusic && tweaks.freezeLog) ampify::win::StartUiWatchdog(journal);
+    if (tweaks.freezeLog) ampify::win::StartMemoryWatch(journal, ampify::win::ExecutablePath().filename().string());
+    // Once per start of Apple Music: the short process that passes a link on would only repeat it.
+    if (role == ampify::ProcessRole::AppleMusic && !laterProcess) ampify::win::LogKnownConflicts(journal);
 
     if (role == ampify::ProcessRole::AppleMusic) {
         // The interface process is the one that proves the app is healthy. Its window must not be hung.

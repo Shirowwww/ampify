@@ -96,6 +96,10 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
                 placed.active = control.active;
                 TintControl(placed.button, control, placed.hasIcon);
             }
+            if (placed.disabled != control.disabled) {
+                placed.disabled = control.disabled;
+                placed.button.IsEnabled(!control.disabled);
+            }
             continue;
         }
 
@@ -148,6 +152,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
             }
         }
         if (control.active) TintControl(button, control, static_cast<bool>(icon));
+        if (control.disabled) button.IsEnabled(false);
         // A text that only shows something: no hover, no press, the pointer goes through to the bar (so no tooltip).
         if (control.clickable) controls::ToolTipService::SetToolTip(button, winrt::box_value(Wide(control.label)));
         else button.IsHitTestVisible(false);
@@ -171,6 +176,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         placed.label = control.label;
         placed.hasIcon = static_cast<bool>(icon);
         placed.active = control.active;
+        placed.disabled = control.disabled;
         placed.elementId = control.elementId;
         placed.id = control.id;
         placed.icon = control.icon;
@@ -330,6 +336,7 @@ void FillPlaybarMenu(const controls::MenuFlyout& menu, WindowContext& context, c
         controls::ToggleMenuFlyoutItem item;
         item.Text(Wide(placed->label));
         item.IsChecked(placed->active);
+        item.IsEnabled(!placed->disabled);
         if (auto icon = MakeIconElement(placed->icon, 16, L"TextFillColorPrimaryBrush").try_as<controls::IconElement>()) {
             item.Icon(icon);
         }

@@ -83,6 +83,7 @@ A function whose permission is not declared throws `PermissionDenied` and does n
 | `ui.fullscreen` | A view over the whole window, and Apple's own full-screen player | [stable] |
 | `ui.page` | App pages and navigation | [stable] |
 | `ui.keyboard` | Global or window shortcuts | [preview] |
+| `clipboard.write`, `clipboard.read` | `Ampify.clipboard.copy` and `paste`: text put on, and read from, the Windows clipboard | [preview] |
 | `ipc.discord` | Discord presence (also needs the setting `discord.enabled`) | [preview] |
 | `midi.input` | A MIDI controller (also needs `midi.enabled`) | [preview] |
 | `ui.tray` | Entries in the Ampify notification-area icon (also needs `tray.enabled`) | [preview] |
@@ -111,6 +112,8 @@ Ampify.process              // "ui" or "engine"
 Ampify.log(message)         // writes to the log, prefixed with the element id
 Ampify.onStop(fn)           // fn runs when the element stops
 Ampify.locale               // the app locale, e.g. "en-US"
+Ampify.appVersion           // Apple Music's version, e.g. "1.1792.23042.0", "" when unknown   [preview]
+Ampify.activeTheme()        // the id of the theme in use, null for none; read it again, the user may change it
 ```
 
 Texts in several languages [preview]:
@@ -133,6 +136,7 @@ Ampify.config.set(key, value)       // writes it; an element only reaches its ow
 Ampify.storage.get(key, default)    // a JSON value in storage\<id>.json (1 MB), permission storage
 Ampify.storage.set(key, value)
 Ampify.storage.remove(key)
+Ampify.storage.clear()              // every value of the element
 ```
 
 For a setting declared in the manifest, `config.get(key)` without a default gives the manifest's default, typed (a
@@ -145,7 +149,7 @@ Ampify.player.state()
 // -> { playing, positionMs, durationMs,
 //      track: { id, title, artist, album, variantId, atmos, lossless, queueItemId, artwork, artworkColor } | null,
 //      source: "apple" | "smtc" | "" }
-Ampify.player.on("trackchange" | "statechange" | "lyricschange", fn)   // "songchange" and "onplaypause" are Spicetify's names (onplaypause also fires on a position jump)
+Ampify.player.on("trackchange" | "statechange" | "lyricschange" | "progress", fn)   // "songchange", "onplaypause" and "onprogress" are Spicetify's names (onplaypause also fires on a position jump)
 Ampify.player.off(event, fn)   // removes a listener added with on
 Ampify.player.lyrics()      // -> null | { source: "apple", synced, language,
 //                                         lines: [{ start, end, text, words: [{ start, end, text }] }], text }
@@ -163,6 +167,15 @@ Ampify.player.setRepeat(mode)       // "off" | "all" | "one"
 Ampify.player.toggleShuffle()       // flips shuffle
 Ampify.player.toggleRepeat()        // off, all, one, off...
 Ampify.player.setVolume(volume)     // 0 to 1: Apple's player volume, interface or audio process, [preview]
+Ampify.player.skipForward(ms)       // seeks 15 s on (or ms), within the song; false without a track
+Ampify.player.skipBack(ms)
+Ampify.player.progress()            // 0 to 1, how far the song has gone; 0 while its length is unknown
+Ampify.player.formatTime(ms)        // "3:07", "1:02:05"
+Ampify.player.muted()               // -> true | false | null   [preview] (permission player.read)
+Ampify.player.setMute(on)           // and toggleMute(): also player.control
+Ampify.player.toggleMute()
+Ampify.player.increaseVolume(step)  // a tenth of Apple's slider (or step, above 0 up to 1)
+Ampify.player.decreaseVolume(step)
 Ampify.player.queue.list()  // -> { available, complete, source, reason,
 //                                   items: [{ id, title, artist, album, durationMs, section, catalogId, artwork }] }
 Ampify.player.queue.add(catalogId, { position: "next" | "last" })  // [preview] answers false for now
@@ -179,7 +192,8 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
 - `source` is `"apple"` when Ampify reads Apple's own player (in `AppleMusic.exe`), `"smtc"` for Windows' media
   controls, `""` when unknown.
 - `statechange` fires when playback starts or stops, the length becomes known, or the position jumps. Between events
-  `state().positionMs` moves on: read it on a timer to follow the song. Apple Music 1.1792 gives no position of its
+  `state().positionMs` moves on: `progress` fires each time it reaches another whole second (while playing, or after
+  a seek), with the state, so a time display needs no timer of its own. Apple Music 1.1792 gives no position of its
   own while playing, so Ampify counts the time played, and sets it again each time Apple's lyrics pane lights up
   another line. While that pane is open, a jump, a repeated song or a slow start are caught up at the next line;
   closed, they show once Apple reports a position again.
@@ -207,6 +221,12 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
   From the audio process (`"processes": ["engine"]`) it sets the player's volume directly and Apple's slider keeps
   showing the old value until Apple moves it. It answers `false` until a song has started, because Apple sets its
   volume then; the log says why when it fails. `audio.volume()` follows it.
+- Mute and the volume steps work on the position of Apple's slider, as the user sees it: muted is the slider at its
+  bottom, a step of `0.1` moves it a tenth of its length. `setMute(false)` puts back the level the element muted from,
+  or half the slider when it does not know it. They need the volume known (`audio.volume()` not `null`), and answer
+  `null` or `false` until then. From the interface process, the volume they read comes from the audio process, about
+  100 ms behind.
+- `skipForward` and `skipBack` seek from `state().positionMs`, never before the start or past the end.
 
 ### 5.4 Audio [preview]
 
@@ -289,9 +309,13 @@ stretch it: every child gets one cell of the same width.
 Ampify.ui.topbar.addButton({ label, icon, onClick, active })   // no onClick: a text that only shows something
 Ampify.ui.playbar.addButton({ label, icon, onClick, active })  // same; any other onClick than a function throws
 Ampify.ui.sidebar.addItem({ label, icon, onClick, active })   // icon: a Segoe Fluent Icons glyph; returns the id
-Ampify.ui.menu.addItem("context" | "app", { label, icon, onClick })
+Ampify.ui.menu.addItem("context" | "app", { label, icon, onClick, disabled })
 Ampify.ui.menu.addItem("context" | "app", { label, icon, items: [{ label, icon, onClick }, ...] })  // a submenu
+Ampify.ui.menu.addItem("context", { label, onClick, kinds: ["song", "album"] })  // only in those items' menus
+Ampify.ui.topbar.remove(id)            // also playbar.remove, sidebar.remove, menu.remove: false when not its own
 Ampify.ui.popup.open(view)
+Ampify.ui.popup.show(name, view)       // a named popup: shown again under the same name, it changes in place
+Ampify.ui.popup.close(name)
 Ampify.ui.fullscreen.open(view)        // permission ui.fullscreen; called again, updates in place
 Ampify.ui.fullscreen.close()
 Ampify.ui.fullscreen.onClose(fn)       // returns a function that removes fn
@@ -301,8 +325,11 @@ Ampify.ui.panel.remove(id)             // slides it back out; register brings it
 Ampify.ui.panel.onClose(id, fn)        // the user closed it with its Close button: it is removed (register brings it
                                        // back, a React root unmounts) and fn runs; returns a function that removes fn
 Ampify.ui.title.set(text)              // title of the element's panel, page and popup
+Ampify.ui.title.get()                  // the title shown now
+Ampify.ui.title.reset()                // back to the element's name
 Ampify.ui.setLabel(id, label)          // new text of a top bar or play bar button, by the id addButton returned
 Ampify.ui.setActive(id, on)            // on or off: a button or sidebar entry that is on takes Apple Music's accent colour
+Ampify.ui.setDisabled(id, disabled)    // a top bar or play bar button, or a menu entry, greyed: it ignores clicks
 Ampify.ui.page.register(path, view)    // for an app
 Ampify.ui.navigate(path)
 ```
@@ -315,6 +342,14 @@ Ampify.ui.navigate(path)
   `canonicalId` Apple's own identifier, each left out when Apple gives none: a song of the user's library often has
   neither, only local identifiers). `item` is missing when the menu has no such data behind it: then only `title` is
   there, and comparing it with `Ampify.player.state().track` is all that is left. With `items` the entry is a submenu holding up to 20 entries, one level only; it has no `onClick` of its own.
+- `kinds` keeps a context entry to the menus of those kinds of item (the `kind` above); a menu Apple Music's data does
+  not describe then leaves it out, and a submenu whose entries are all left out goes too. It takes the place of
+  Spicetify's `shouldAdd`: Apple's menu opens on the interface thread before an element could answer, so the choice is
+  given beforehand. `disabled: true` (or `setDisabled`) shows an entry or a button greyed. `remove` takes out an entry
+  or a button with its click handler, and a submenu with its entries.
+- `popup.close(name)` closes a popup opened with `popup.show(name, ...)` or `ReactDOM.render(..., "popup:<name>")`, as
+  the user's Close would. A popup of `popup.open` has no name and only closes by the user's hand. Names are lowercase
+  letters, digits and dashes.
 - A button with `active: true`, or switched by `setActive`, is drawn in the accent colour and reads "on" to screen
   readers: a toggle such as a sleep timer or a lyrics mode shows its state at a glance. A sidebar entry that is on also
   gets the bar Apple Music puts before its selected item, and it is on by itself while its element's page is open.
@@ -336,13 +371,18 @@ Ampify.ui.navigate(path)
 ```js
 Ampify.notify({ title, text })                      // permission notifications
 Ampify.keyboard.bind("Ctrl+Alt+L", fn)              // permission ui.keyboard
+Ampify.keyboard.unbind("Ctrl+Alt+L")                // gives it back; false when this element had not bound it
+Ampify.clipboard.copy(text) -> boolean              // permission clipboard.write, 1 MB at most
+Ampify.clipboard.paste() -> string | null           // permission clipboard.read: null when it holds no text
 Ampify.http.get(url, { headers }) -> Promise<{ status, text }>   // [stable] permission network:<host>
 Ampify.http.post(url, body, { headers }) -> Promise<{ status, text }>
+Ampify.http.put(url, body, { headers }) / Ampify.http.patch(url, body, { headers }) / Ampify.http.del(url, { headers })
 Ampify.http.postForm(url, fields) -> Promise<{ status, text }>   // multipart/form-data
 Ampify.http.gifFromVideo(url, { side, fps, seconds }) -> Promise<{ type, base64 }>   // an MP4 made a looping GIF
 Ampify.http.open(url) -> boolean                    // opens the page in the browser, an Apple Music link in Apple Music
 Ampify.crypto.md5(text) -> hexadecimal string
-Ampify.uri.parse(text) / Ampify.uri.build(...)      // [stable] music:, itms: and https://music.apple.com links
+Ampify.uri.parse(text) / Ampify.uri.build(...)      // [stable] https, music:, itms: and itmss: links of music.apple.com
+Ampify.uri.isSong(link) / isAlbum / isPlaylist / isArtist / isStation   // a link, or what parse gave
 Ampify.icons.get(name) -> SVG string
 Ampify.icons.names() -> string[]
 Ampify.color.extract(pixels, width, height)         // RGBA pixels -> PROMINENT, VIBRANT, DARK_VIBRANT, LIGHT_VIBRANT,
@@ -358,7 +398,7 @@ Ampify.library.tracks() -> Promise<track[]>         // permission library.read
 ```
 
 - `http` calls go over https to declared hosts only. A string body is sent as a form, an object as JSON. Allowed
-  headers, on `get` and `post`: `content-type`, `authorization`, `accept`, `origin`. Bodies up to 64 KB (8 MB for `postForm`), replies up to 1 MB,
+  headers, on `get`, `post`, `put`, `patch` and `del`: `content-type`, `authorization`, `accept`, `origin`. Bodies up to 64 KB (8 MB for `postForm`), replies up to 1 MB,
   4 requests in flight per element. An error resolves with status 0.
 - `postForm` fields are texts or files `{ filename, type, base64 }`.
 - `gifFromVideo` downloads a short video (MP4, fragmented or not, up to 8 MB) from a declared host and makes it a GIF
@@ -367,6 +407,11 @@ Ampify.library.tracks() -> Promise<track[]>         // permission library.read
   video. Windows decodes H.264, not HEVC; a Windows N edition needs its Media Feature Pack. A failure rejects with the
   reason.
 - `http.open` answers `false` within 10 seconds of the element's previous page.
+- `uri.isSong` is true for a song link and for an album link that names one of its songs (`?i=`); `isAlbum` for an
+  album link without one.
+- `keyboard.unbind` frees the shortcut for a later `bind`, or for another program.
+- The clipboard holds what the user copied last, from any program: `clipboard.read` is a permission of its own, shown
+  apart in the Marketplace, so an element that only copies never reads it.
 - `fonts` reads the font roles of the applied theme ([format](../themes/format.md#fonts)).
 - `library.tracks()` reads Apple Music's own library file, so the counts are the ones Apple Music keeps for every track
   of the user's library. `persistentId` is Apple's id in 16 hexadecimal digits;
@@ -464,6 +509,7 @@ Ampify.React.memo(component)
 Ampify.React.useState(initial)                        // also useReducer, useEffect, useLayoutEffect,
 Ampify.React.useContext(context)                      //   useRef, useMemo, useCallback
 Ampify.hooks.usePlayer()                              // player state, kept up to date (permission player.read)
+Ampify.hooks.useArtworkColor()                        // colors of the cover playing (color.playing), or null
 Ampify.ReactDOM.render(element, target)
 Ampify.ReactDOM.createRoot(target)                    // -> { render(element), unmount() }
 Ampify.ReactDOM.unmountComponentAtNode(target)
@@ -496,8 +542,12 @@ Ampify.ready                                          // resolves once the eleme
 | `List` | children |
 | `Text` (`TextComponent`) | `text` or children, `variant`, `size`, `weight`, `color`, `align`, `wrap`, `maxLines` |
 | `Tooltip` (`TooltipWrapper`) | `label` or `content`, `placement`, `delay`, children |
+| `ConfirmDialog` | `isOpen`, `titleText`, `descriptionText`, `confirmText`, `cancelText` (Ampify's "Confirm" and "Cancel" in the display language by default), `onConfirm`, `onClose`: render it into a popup; it closes when the element renders it with `isOpen: false` or unmounts it |
 
 Every component accepts `tooltip`, `tooltipPlacement` and `tooltipDelay`. Full example: `examples/react-panel/`.
+
+`useArtworkColor()` reads the cover again at each new track. Right after the change, Windows may still give the
+previous cover for a second or two (`player.artwork`).
 
 ## 6. Themes, apps and snippets
 

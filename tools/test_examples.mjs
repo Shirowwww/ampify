@@ -1274,6 +1274,51 @@ test("keyboard-skip changes track with its two shortcuts", () => {
   assert.deepEqual(world.commands, ["next", "previous"]);
 });
 
+// copy-link: a context entry kept to songs, albums and playlists, and a shortcut, both copying to the clipboard.
+function copyLinkAmpify({ state = { track: null, positionMs: 0 }, language = "en" } = {}) {
+  const { manifest, source } = load("copy-link");
+  const granted = new Set(manifest.permissions ?? []);
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+  };
+  const world = { copied: [], entries: [], bindings: new Map() };
+  const Ampify = {
+    i18n: fakeI18n(language),
+    ui: { menu: { addItem: (where, entry) => (need("ui.menu"), world.entries.push({ where, ...entry })) } },
+    keyboard: { bind: (keys, fn) => (need("ui.keyboard"), world.bindings.set(keys, fn)) },
+    clipboard: { copy: (text) => (need("clipboard.write"), world.copied.push(text), true) },
+    uri: { build: (kind, id) => `https://music.apple.com/us/${kind}/_/${id}` },
+    player: {
+      state: () => (need("player.read"), state),
+      formatTime: (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`,
+    },
+  };
+  runIn(source, { Ampify });
+  return world;
+}
+
+test("copy-link copies an item's link from its menu, or its name without a catalog id", () => {
+  const world = copyLinkAmpify({ language: "fr" });
+  assert.equal(world.entries.length, 1);
+  const [entry] = world.entries;
+  assert.equal(entry.where, "context");
+  assert.equal(entry.label, "Copier le lien");
+  assert.deepEqual([...entry.kinds], ["song", "album", "playlist"]);
+  entry.onClick({ title: "Album", item: { kind: "album", id: "123" } });
+  entry.onClick({ title: "My song", item: { kind: "song" } });
+  entry.onClick({ title: "Untold" });
+  assert.deepEqual(world.copied, ["https://music.apple.com/us/album/_/123", "My song", "Untold"]);
+});
+
+test("copy-link copies what plays now with its time, and nothing without a track", () => {
+  const playing = copyLinkAmpify({ state: { track: { title: "Song", artist: "Artist" }, positionMs: 83_000 } });
+  playing.bindings.get("Ctrl+Alt+C")();
+  assert.deepEqual(playing.copied, ["Song - Artist (1:23)"]);
+  const idle = copyLinkAmpify();
+  idle.bindings.get("Ctrl+Alt+C")();
+  assert.deepEqual(idle.copied, []);
+});
+
 // ---- The Marketplace page ----------------------------------------------------------------------------------------
 
 // A small stand-in for Ampify.React: function components render depth-first with their hooks kept by their place in

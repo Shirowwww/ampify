@@ -133,6 +133,7 @@ struct PlacedControl {
     std::string label;     // shown now: a new one from setLabel replaces it in place
     bool hasIcon = false;  // the label is then the tooltip only
     bool active = false;   // on (Ampify.ui.setActive): drawn in the accent colour
+    bool disabled = false;  // greyed (Ampify.ui.setDisabled)
     bool inHeader = false;  // a sidebar entry standing in the sidebar's header (ampify.entry = header)
     // A sidebar entry in the list: the pane state it was laid out for, and its control, for a change of pane.
     bool laidOut = false;

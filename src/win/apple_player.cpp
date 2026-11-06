@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "../core/amp_abi.hpp"
+#include "../core/ui_watchdog.hpp"
 #include "player_controls.hpp"
 #include "sharp_artwork.hpp"
 #include "winrt_abi.hpp"
@@ -345,6 +346,7 @@ void OnMove(HWND window, const xaml::UIElement& root, xaml::Input::PointerRouted
 }
 
 xaml::FrameworkElement FindNamed(const xaml::UIElement& root, std::initializer_list<std::wstring_view> names) {
+    ampify::ActivityScope activity("full-screen player tree search");
     std::vector<xaml::DependencyObject> queue{root};
     for (std::size_t i = 0; i < queue.size() && i < static_cast<std::size_t>(kSearchLimit); i++) {
         if (auto element = queue[i].try_as<xaml::FrameworkElement>()) {

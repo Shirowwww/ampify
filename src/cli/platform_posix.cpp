@@ -102,6 +102,22 @@ bool IsProcessRunning(const std::string& imageName) {
     return Run({"pgrep", "-x", imageName}) == 0;
 }
 
+std::vector<std::string> RunningProcessNames() {
+    return {};  // the programs that crash Apple Music for Windows run on Windows only
+}
+
+std::optional<std::string> AppPackageVersion() {
+    return std::nullopt;
+}
+
+std::optional<std::filesystem::path> ProgramFilesFolder() {
+    return std::nullopt;
+}
+
+std::optional<std::filesystem::path> CrashDumpsFolder() {
+    return std::nullopt;
+}
+
 bool CursorPosition(int&, int&) {
     return false;  // Apple Music for Windows does not run here
 }

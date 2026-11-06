@@ -18,6 +18,10 @@ public:
     // poll, needed to tell a seek from playback; without it (-1), seeks are not reported.
     std::vector<std::string> Poll(const PlayerSnapshot& snapshot, int64_t nowMs = -1);
 
+    // The last Poll found the loaded track in another whole second than the poll before (playing on, or a seek):
+    // the "progress" event, kept out of Poll's list because it fires about once a second.
+    bool Progressed() const { return m_progressed; }
+
 private:
     // Same track: its length changed, or its position is not where steady playback would have taken it.
     bool Moved(const PlayerSnapshot& snapshot, int64_t nowMs) const;
@@ -29,6 +33,7 @@ private:
     int64_t m_durationMs = 0;
     int64_t m_polledAtMs = -1;
     bool m_known = false;
+    bool m_progressed = false;
 };
 
 }  // namespace ampify

@@ -32,6 +32,9 @@ struct AppleTweaks {
     // Servers' IPv4 addresses tried before their IPv6 ones (core/address_order.hpp, win/network_fix.cpp): songs stuck
     // at 0:00 where a server's IPv6 does not answer. Read at start: a change applies when Apple Music starts again.
     bool ipv4First = true;
+    // Windows' automatic proxy detection (WPAD) skipped by Apple's network library, which waits for the network
+    // before it answers (CFNetwork.dll, DetectAutoProxyUrl). Off by default; read at start (win/network_fix.cpp).
+    bool proxyNoAutodetect = false;
     // The full-screen player's cover replaced by a sharper one when Apple's is shown larger than it is
     // (win/sharp_artwork.cpp).
     bool sharpArtwork = true;
@@ -52,6 +55,7 @@ inline constexpr char kPlayerModeKey[] = "apple.fullscreen";
 inline constexpr char kPlayerControlsKey[] = "apple.playerControls";
 inline constexpr char kCloseKey[] = "apple.close";
 inline constexpr char kNetworkKey[] = "apple.network";
+inline constexpr char kProxyKey[] = "apple.proxy";
 inline constexpr char kArtworkKey[] = "apple.artwork";
 inline constexpr char kMarqueeKey[] = "apple.marquee";
 inline constexpr char kSidebarKey[] = "apple.sidebar";

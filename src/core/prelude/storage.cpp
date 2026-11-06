@@ -17,6 +17,10 @@ const char kStorage[] = R"AMPIFYJS(
     remove(key) {
       native.storageRemove(text(key));
     },
+    // Every value of this element, gone.
+    clear() {
+      native.storageClear();
+    },
   };
 )AMPIFYJS";
 

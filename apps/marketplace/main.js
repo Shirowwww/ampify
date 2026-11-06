@@ -381,6 +381,8 @@ const PERMISSIONS = {
     "ui.fullscreen": "cover the window with a full-screen view",
     "fs.output": "write text files in its Ampify folder",
     "kit.manage": "install and remove elements through ampify",
+    "clipboard.read": "read what you copied",
+    "clipboard.write": "copy text to the clipboard",
     network: "send requests to {host}",
   },
   fr: {
@@ -409,6 +411,8 @@ const PERMISSIONS = {
     "ui.fullscreen": "couvrir la fenêtre d'une vue plein écran",
     "fs.output": "écrire des fichiers texte dans son dossier Ampify",
     "kit.manage": "installer et retirer des éléments avec ampify",
+    "clipboard.read": "lire ce que vous avez copié",
+    "clipboard.write": "copier du texte dans le presse-papiers",
     network: "envoyer des requêtes à {host}",
   },
   de: {
@@ -437,6 +441,8 @@ const PERMISSIONS = {
     "ui.fullscreen": "das Fenster mit einer Vollbildansicht überdecken",
     "fs.output": "Textdateien in seinen Ampify-Ordner schreiben",
     "kit.manage": "Elemente über ampify installieren und entfernen",
+    "clipboard.read": "lesen, was Sie kopiert haben",
+    "clipboard.write": "Text in die Zwischenablage kopieren",
     network: "Anfragen an {host} senden",
   },
   es: {
@@ -465,6 +471,8 @@ const PERMISSIONS = {
     "ui.fullscreen": "cubrir la ventana con una vista a pantalla completa",
     "fs.output": "escribir archivos de texto en su carpeta de Ampify",
     "kit.manage": "instalar y quitar elementos con ampify",
+    "clipboard.read": "leer lo que ha copiado",
+    "clipboard.write": "copiar texto al portapapeles",
     network: "enviar solicitudes a {host}",
   },
   pt: {
@@ -493,6 +501,8 @@ const PERMISSIONS = {
     "ui.fullscreen": "cobrir a janela com uma visualização em tela cheia",
     "fs.output": "gravar arquivos de texto em sua pasta do Ampify",
     "kit.manage": "instalar e remover elementos pelo ampify",
+    "clipboard.read": "ler o que você copiou",
+    "clipboard.write": "copiar texto para a área de transferência",
     network: "enviar solicitações para {host}",
   },
   ru: {
@@ -521,6 +531,8 @@ const PERMISSIONS = {
     "ui.fullscreen": "закрывать окно полноэкранным представлением",
     "fs.output": "записывать текстовые файлы в свою папку Ampify",
     "kit.manage": "устанавливать и удалять элементы через ampify",
+    "clipboard.read": "читать то, что вы скопировали",
+    "clipboard.write": "копировать текст в буфер обмена",
     network: "отправлять запросы на {host}",
   },
   ja: {
@@ -549,6 +561,8 @@ const PERMISSIONS = {
     "ui.fullscreen": "ウィンドウ全体をフルスクリーン表示でおおう",
     "fs.output": "自分の Ampify フォルダにテキストファイルを書き込む",
     "kit.manage": "ampify を通じて要素をインストール・削除する",
+    "clipboard.read": "コピーした内容を読み取る",
+    "clipboard.write": "テキストをクリップボードにコピーする",
     network: "{host} にリクエストを送る",
   },
   zh: {
@@ -577,6 +591,8 @@ const PERMISSIONS = {
     "ui.fullscreen": "用全屏视图覆盖窗口",
     "fs.output": "在自己的 Ampify 文件夹中写入文本文件",
     "kit.manage": "通过 ampify 安装和移除内容",
+    "clipboard.read": "读取你复制的内容",
+    "clipboard.write": "将文本复制到剪贴板",
     network: "向 {host} 发送请求",
   },
 };

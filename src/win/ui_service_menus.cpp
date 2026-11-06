@@ -2,6 +2,10 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include <set>
+#include <string_view>
+#include <vector>
+
 #include "ui_service_detail.hpp"
 
 namespace ampify::win::ui_service_detail {
@@ -87,12 +91,32 @@ std::string MenuPayload(const UiControl& control, const MenuTarget& target) {
     return Json(std::move(fields)).Dump();
 }
 
+// A context entry with kinds goes only in the menu of an item Apple's data names, of one of those kinds.
+bool ShowsFor(const UiControl& control, const MenuTarget& target) {
+    return ShowsForItem(control, target.item ? std::string_view(target.item->kind) : std::string_view());
+}
+
+// The entries of the open menu: those for its item, and no submenu left without entries.
+std::vector<UiControl> EntriesFor(const std::vector<UiControl>& entries, const MenuTarget& target) {
+    std::set<int> filled;  // the submenus that keep at least one entry
+    for (const UiControl& control : entries) {
+        if (control.parent != 0 && ShowsFor(control, target)) filled.insert(control.parent);
+    }
+    std::vector<UiControl> shown;
+    for (const UiControl& control : entries) {
+        bool submenu = !control.clickable && control.parent == 0;
+        if (ShowsFor(control, target) && (!submenu || filled.count(control.id) > 0)) shown.push_back(control);
+    }
+    return shown;
+}
+
 controls::MenuFlyoutItem MakeMenuEntry(const UiEventSink& sink, const UiControl& control, const MenuTarget& target,
                                        const xaml::Style& style) {
     controls::MenuFlyoutItem item;
     if (style) item.Style(style);
     item.Text(Wide(control.label));
     item.Tag(winrt::box_value(winrt::hstring(kMenuEntryTag)));
+    item.IsEnabled(!control.disabled);
     if (uirender::IsGlyphIcon(control.icon)) {
         controls::FontIcon icon;
         icon.Glyph(Wide(control.icon));
@@ -118,6 +142,7 @@ controls::MenuFlyoutSubItem MakeMenuSubmenu(const UiEventSink& sink, const UiCon
     if (submenuStyle) submenu.Style(submenuStyle);
     submenu.Text(Wide(control.label));
     submenu.Tag(winrt::box_value(winrt::hstring(kMenuEntryTag)));
+    submenu.IsEnabled(!control.disabled);
     if (uirender::IsGlyphIcon(control.icon)) {
         controls::FontIcon icon;
         icon.Glyph(Wide(control.icon));
@@ -125,7 +150,9 @@ controls::MenuFlyoutSubItem MakeMenuSubmenu(const UiEventSink& sink, const UiCon
     }
     Name(submenu, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
     for (const UiControl& child : entries) {
-        if (child.parent == control.id) submenu.Items().Append(MakeMenuEntry(sink, child, target, itemStyle));
+        if (child.parent == control.id && ShowsFor(child, target)) {
+            submenu.Items().Append(MakeMenuEntry(sink, child, target, itemStyle));
+        }
     }
     return submenu;
 }
@@ -133,7 +160,9 @@ controls::MenuFlyoutSubItem MakeMenuSubmenu(const UiEventSink& sink, const UiCon
 // A separator, then the entries, at the end of an open menu. Apple Music keeps a menu's items from one opening to the
 // next and fills them again from its own list, so Ampify's leave once the menu has closed.
 void AppendMenuEntries(const UiEventSink& sink, const primitives::Popup& popup, const MenuItems& items,
-                       const std::vector<UiControl>& entries, const MenuTarget& target) {
+                       const std::vector<UiControl>& allEntries, const MenuTarget& target) {
+    const std::vector<UiControl> entries = EntriesFor(allEntries, target);
+    if (entries.empty()) return;
     xaml::Style itemStyle = StyleOf(items, L"Microsoft.UI.Xaml.Controls.MenuFlyoutItem");
     xaml::Style submenuStyle = StyleOf(items, L"Microsoft.UI.Xaml.Controls.MenuFlyoutSubItem");
     controls::MenuFlyoutSeparator separator;

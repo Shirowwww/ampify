@@ -196,7 +196,12 @@ the pages. Not verified on a real Apple Music. Ranked by how often users report 
 - What Ampify was doing comes from `ActivityScope` markers (`src/core/ui_watchdog.hpp`): "theme tick" (the posted
   tick), "theme pass after a change" (`Reapply` on each XAML change), "inspector tree", "element picker", "player
   buttons read", "player buttons press", "player volume" and "player command" (every `PlayerBridge` call run on the
-  interface thread). Add a marker to any other interface-thread path that should be named.
+  interface thread), and since 2026-11-06 the four tree searches of the audit below: "player buttons tree search",
+  "full-screen player tree search", "player display tree search" and "sharp artwork tree search". Add a marker to any
+  other interface-thread path that should be named.
+- The same setting times name lookups and the automatic proxy detection (`Network: ... took N ms`, with "on the
+  interface thread" when the window waited) and follows each process's private memory (`Memory: <process> uses N MB`,
+  then `grew to` at each new step of 512 MB). See "Where Apple Music waits" below.
 - A beat is queued only when the previous one ran (`BeatGate`), so a frozen interface thread queues one closure, not many.
 - Cost: about 5 queued calls a second and one thread waking every 100 ms. Not measured here: the coordinator must
   measure CPU with the setting on and off.
@@ -211,8 +216,8 @@ Work that runs on the interface thread and could block it for long, found by rea
 - Visual-tree breadth-first searches by name, run on each player or lyrics event: `FindNamed` in `src/win/player_controls.cpp`,
   `src/win/apple_player.cpp`, `src/win/lcd_links.cpp` and `src/win/sharp_artwork.cpp`. Each one walks the whole subtree
   under the root it is given. This is the same kind of work as item 4 above. Next step: cache the found element per
-  root (it is recreated only when the template changes) and measure. Not changed here: no on-screen measurement was
-  possible in this lane.
+  root (it is recreated only when the template changes) and measure. Each search now names itself in the freeze log;
+  the cache waits for a stall line that names one of them.
 - `element_picker.cpp` (inspector) hit-tests on the interface thread only when asked to pick.
 
 ### Stuck library agent (`apple.orphanAgent`, off by default)
@@ -234,3 +239,48 @@ Item 2 and item 3 would need the Apple Music process to be watched while it play
 screen. Neither was possible in this lane, so no kernel mitigation was added beyond the two settings above. Candidate
 for later: a playback check (position still at 0:00 for N seconds while Apple reports playing) that offers to restart
 the agent, after the freeze log shows the problem on real sessions.
+
+### Where Apple Music waits (binaries and Apple's own logs, 2026-11-06)
+
+Apple Music 1.1792.39682.0, read from files only (import tables, strings, a decompiler on `CFNetwork.dll`); CoreFP,
+CoreADI64 and FairPlay were not opened.
+
+- `AppleMusic.exe` is a shell (46 imported DLLs, no network, database or image decoding). The work is in
+  `AMP.Services.dll`, `AMP.UI.Views.dll` and `AMPLibraryAgent.exe`.
+- Apple's network library is `CFNetwork.dll` (Apple's CFNetwork ported to Windows) on raw Winsock (`getaddrinfo`,
+  `gethostbyname`, `select`), SQLite for its cache and WinINet for the proxy. `AMP.Services.dll` also calls Winsock
+  directly. Songs stream through WinHTTP in `CoreMedia.dll`, which is why the IPv4 fix also covers delay-loaded imports.
+- **Synchronous WPAD.** A function of `CFNetwork.dll` reads Windows' proxy settings (`InternetQueryOptionA`, option
+  0x4B) and, when "Automatically detect settings" is on, calls WinINet's `DetectAutoProxyUrl(buffer, 0x2000, 3)`
+  (DHCP and DNS), which returns only once the network has answered. Who calls that function, how often and on which
+  thread was not found (indirect call). The same file can run a PAC script synchronously ("Executing PAC file
+  synchronously"). Ampify can time it and skip it (`apple.proxy = no-autodetect`, off by default: a company network that
+  relies on WPAD would lose its proxy).
+- `CoreMedia.dll` and `AVFoundationCF.dll` import blocking waits (`dispatch_semaphore_wait`, `dispatch_group_wait`,
+  `dispatch_sync_f`); their thread is unknown. The agent has "SyncDispatchActionToMainThread" waits on its own main thread.
+- Apple watches its agent itself: `AMPMediaAppClient` has `get_AgentIsHung`, `get_AgentPhase`, `get_AgentStatus` and
+  `KillAgent` (`knowledge/winmd/AMP.Services.txt`). Not read by Ampify yet: first check the object is reachable from
+  the kernel.
+- Apple's ETW logs (`...\LocalState\Logs\SavedLogs\*.etl`, nine launches on one PC, possibly with Ampify loaded): the
+  159 `ExecAgentCommandSync` calls and the 103 library reads never ran on the main thread (slowest command "play or
+  queue", median 525 ms; library reads median 6 ms, at most 227 ms for 1763 songs). On the main thread,
+  `DispatchIntentAsync` (a request to Apple's "Jet" JavaScript stack that builds the pages) took a median of 164 ms,
+  12 of 200 over 1 s, at most 5 s; `ContentPageViewModel::TryLoadAsync` a median of 1.1 s. Those cover asynchronous
+  work: they say how long a page takes to arrive, not that the window froze. Only the freeze log measures that.
+- At start: `RunLibraryAgentStartUp` 402 to 453 ms, the agent's first iCloud sync up to 1.1 s, `wWinMain` 73 ms median.
+
+Not to touch: the FairPlay key request behind the first song's freeze at about 15 s (CoreFP, forbidden; the playback
+guard is the only workaround); the threads or waits of Apple's code (`dispatch_semaphore_wait`,
+`SyncDispatchActionToMainThread`), without proof that they block; the library database and `ExecAgentCommandSync`,
+which are not slow here; Jet's slow pages (Apple's server and JavaScript engine).
+
+### Programs known to crash Apple Music
+
+Reports on Apple's forums (2023 and 2024): 3Dconnexion's 3DxWare driver makes Apple Music vanish as soon as it starts
+(fixed by adding `<ExecutableName>AppleMusic.exe</ExecutableName>` to
+`C:\Program Files\3Dconnexion\3DxWare\3DxWinCore\Cfg\IgnoredApps.xml`); MSI Afterburner's on-screen display and
+RivaTuner Statistics Server crash it (fixed by turning the overlay off for `AppleMusic.exe`). Ampify cannot repair
+those from inside: `AppleMusic.log` names them once per start, and `ampify doctor` too, with the fix
+(`src/core/reliability.*`). Afterburner alone is not named: its overlay is RivaTuner's (`RTSS.exe`), and without it
+Afterburner draws nothing in other programs. `ampify doctor` also lists Apple Music crash dumps of the last 7 days
+(`%LOCALAPPDATA%\CrashDumps`) and a library agent running without Apple Music.

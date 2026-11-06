@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "../src/core/natives/keyboard.hpp"
 #include "../src/core/natives/kit.hpp"
 
 #include "../src/core/audio/audio_host.hpp"
@@ -18,7 +19,7 @@
 
 namespace ampify::test {
 
-struct FakeHost : Host {
+struct FakeHost : Host, KeyUnbindHost {
     std::string process = "ui";  // elements run in the interface unless their manifest asks for the engine
     std::string locale = "fr-FR";
     std::map<std::string, std::string> settings;
@@ -71,6 +72,12 @@ struct FakeHost : Host {
     bool RegisterKey(const std::string& elementId, const std::string& combo) override {
         if (keys.count(combo)) return false;
         keys[combo] = elementId;
+        return true;
+    }
+    bool UnregisterKey(const std::string& elementId, const std::string& combo) override {
+        auto found = keys.find(combo);
+        if (found == keys.end() || found->second != elementId) return false;
+        keys.erase(found);
         return true;
     }
     void UnregisterKeys(const std::string& elementId) override {
@@ -130,6 +137,7 @@ struct FakeHost : Host {
         if (images && name == ImageHost::kCapabilityName) return images;
         if (artwork && name == ArtworkHost::kCapabilityName) return artwork;
         if (kit && name == KitCommandHost::kCapabilityName) return kit;
+        if (void* found = Offer<KeyUnbindHost>(name, this)) return found;
         return Host::QueryCapability(name);
     }
 };

@@ -8,6 +8,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <knownfolders.h>
 #include <shellapi.h>
 #include <shobjidl.h>
 
@@ -127,6 +128,29 @@ std::optional<std::filesystem::path> AppPreferencesFile() {
 
 std::vector<std::string> OpenFolderCommand(const std::filesystem::path& folder) {
     return {"explorer.exe", ToUtf8(folder.wstring())};
+}
+
+std::vector<std::string> RunningProcessNames() {
+    return win::RunningImageNames();
+}
+
+std::optional<std::string> AppPackageVersion() {
+    std::wstring family = FromUtf8(kPackageFamilyName);
+    std::optional<launcher::InstalledPackage> package = launcher::FindInstalledPackage(family.c_str());
+    if (!package) return std::nullopt;
+    std::string version = AppleMusicVersion(ToUtf8(package->fullName));
+    return version.empty() ? std::nullopt : std::optional<std::string>(version);
+}
+
+std::optional<std::filesystem::path> ProgramFilesFolder() {
+    std::filesystem::path folder = win::KnownFolder(FOLDERID_ProgramFiles);
+    return folder.empty() ? std::nullopt : std::optional<std::filesystem::path>(folder);
+}
+
+std::optional<std::filesystem::path> CrashDumpsFolder() {
+    const wchar_t* local = _wgetenv(L"LOCALAPPDATA");
+    if (local == nullptr || *local == L'\0') return std::nullopt;
+    return std::filesystem::path(local) / L"CrashDumps";
 }
 
 bool IsProcessRunning(const std::string& imageName) {

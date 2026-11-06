@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <fstream>
+#include <set>
 #include <system_error>
 #include <vector>
 
@@ -209,6 +210,24 @@ std::vector<DWORD> ProcessIdsNamed(const wchar_t* imageName) {
         } while (Process32NextW(snapshot, &entry));
     }
     CloseHandle(snapshot);
+    return found;
+}
+
+std::vector<std::string> RunningImageNames() {
+    std::set<std::wstring> names;
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return {};
+
+    PROCESSENTRY32W entry{};
+    entry.dwSize = sizeof(entry);
+    if (Process32FirstW(snapshot, &entry)) {
+        do {
+            names.insert(entry.szExeFile);
+        } while (Process32NextW(snapshot, &entry));
+    }
+    CloseHandle(snapshot);
+    std::vector<std::string> found;
+    for (const std::wstring& name : names) found.push_back(ToUtf8(name));
     return found;
 }
 

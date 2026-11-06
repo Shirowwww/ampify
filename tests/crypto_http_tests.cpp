@@ -67,6 +67,47 @@ TEST_CASE(HttpPost_FollowsTheRulesOfGet) {
     }
 }
 
+TEST_CASE(HttpSend_PutPatchAndDeleteFollowTheRulesOfPost) {
+    ampify::test::ServiceFixture<> f;
+    auto element = f.Make("sender", R"(
+        Ampify.http.put("https://api.example.org/a", { on: true }).then((r) => Ampify.log("put " + r.status));
+        Ampify.http.patch("https://api.example.org/b", "x=1").then((r) => Ampify.log("patch " + r.status));
+        Ampify.http.del("https://api.example.org/c", { headers: { Authorization: "Token k" } })
+          .then((r) => Ampify.log("del " + r.status));
+        Ampify.http.put("https://evil.example/", "").catch((e) => Ampify.log("host " + e.name));
+        Ampify.http.del("https://api.example.org/", { headers: { Cookie: "x" } }).catch((e) => Ampify.log("cookie " + e.name));
+    )", R"("network:api.example.org")");
+    CHECK(element->Start());
+    CHECK(ampify::test::PumpUntil(*element, [&] {
+        return f.Logged("put 201") && f.Logged("patch 201") && f.Logged("del 201");
+    }));
+    CHECK(f.Logged("host PermissionDenied"));
+    CHECK(f.Logged("cookie TypeError"));
+    CHECK(f.host.sent.size() == 3);
+    for (const auto& request : f.host.sent) {
+        if (request.url == "PUT https://api.example.org/a") {
+            CHECK(request.body == R"({"on":true})");
+            CHECK((request.headers == ampify::HttpHeaders{{"content-type", "application/json"}}));
+        } else if (request.url == "PATCH https://api.example.org/b") {
+            CHECK(request.body == "x=1");
+        } else {
+            CHECK(request.url == "DELETE https://api.example.org/c");
+            CHECK(request.body.empty());
+            CHECK((request.headers == ampify::HttpHeaders{{"authorization", "Token k"}}));
+        }
+    }
+    CHECK(f.host.posts.empty());
+}
+
+TEST_CASE(HttpSend_HostWithoutTheServiceAnswersStatusZero) {
+    ampify::test::ServiceFixture<ampify::test::FakeHost> f;
+    auto element = f.Make("plain", R"(
+        Ampify.http.del("https://api.example.org/c").then((r) => Ampify.log("del " + r.status));
+    )", R"("network:api.example.org")");
+    CHECK(element->Start());
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("del 0"); }));
+}
+
 // A GET may carry the same short list of headers, origin too (an API that only answers its own site's token).
 TEST_CASE(HttpGet_CarriesTheCheckedHeadersOfPost) {
     ampify::test::ServiceFixture<> f;

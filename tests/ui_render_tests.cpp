@@ -976,6 +976,22 @@ TEST_CASE(UiRender_TheNetworkFixIsOnUnlessSystemOrderIsChosen) {
     CHECK(ReadAppleTweaks(settings).ipv4First);
 }
 
+TEST_CASE(UiRender_ProxyDetectionIsSkippedOnlyWhenChosen) {
+    Settings settings;
+    CHECK(!ReadAppleTweaks(settings).proxyNoAutodetect);
+    settings.Set("apple.proxy", "No-Autodetect");
+    CHECK(ReadAppleTweaks(settings).proxyNoAutodetect);
+    settings.Set("apple.proxy", "off");
+    CHECK(!ReadAppleTweaks(settings).proxyNoAutodetect);
+    CHECK(AppleTweakValues("apple.proxy") == "system, no-autodetect");
+
+    fs::path kit = FreshKit("proxy-choice");
+    WriteFile(kit / "settings.txt", "theme.active = night\n");
+    std::string error;
+    CHECK(SetAppleTweak(kit, "apple.proxy", "no-autodetect", error));
+    CHECK(!SetAppleTweak(kit, "apple.proxy", "direct", error));
+}
+
 TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     fs::path kit = FreshKit("apple-tweaks");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
@@ -993,13 +1009,15 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
 
     // The player, its cover, the long texts, the sidebar and the top bar first, then the close button; the
     // notifications, where "never" (Apple's own switch does it) only shows for someone who chose it before; the network
-    // fix, then the stuck library agent and the freeze log, last.
+    // fixes, then the stuck library agent and the freeze log, last.
     std::vector<TweakChoice> choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 11);
-    if (choices.size() == 11) {
-        CHECK(choices[9].key == "apple.orphanAgent" && choices[9].value == "off");
-        CHECK(choices[10].key == "apple.watchdog" && choices[10].value == "off");
-        CHECK(choices[10].options.size() == 2);
+    CHECK(choices.size() == 12);
+    if (choices.size() == 12) {
+        CHECK(choices[9].key == "apple.proxy" && choices[9].value == "system");  // off by default
+        CHECK(choices[9].options.size() == 2);
+        CHECK(choices[10].key == "apple.orphanAgent" && choices[10].value == "off");
+        CHECK(choices[11].key == "apple.watchdog" && choices[11].value == "off");
+        CHECK(choices[11].options.size() == 2);
         CHECK(choices[0].key == "apple.fullscreen" && choices[0].value == "screen");
         CHECK(choices[0].options.size() == 4);
         CHECK(choices[1].key == "apple.playerControls" && choices[1].value == "shown");
@@ -1026,11 +1044,11 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(SetAppleTweak(kit, "apple.topbar", "search", error));
     CHECK(!SetAppleTweak(kit, "apple.topbar", "always", error));
     choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 11 && choices[7].options.size() == 2 && choices[7].value == "background");
-    CHECK(choices.size() == 11 && choices[8].value == "system");
-    CHECK(choices.size() == 11 && choices[2].value == "apple" && choices[3].value == "off");
-    CHECK(choices.size() == 11 && choices[4].value == "hover");
-    CHECK(choices.size() == 11 && choices[5].value == "search");
+    CHECK(choices.size() == 12 && choices[7].options.size() == 2 && choices[7].value == "background");
+    CHECK(choices.size() == 12 && choices[8].value == "system");
+    CHECK(choices.size() == 12 && choices[2].value == "apple" && choices[3].value == "off");
+    CHECK(choices.size() == 12 && choices[4].value == "hover");
+    CHECK(choices.size() == 12 && choices[5].value == "search");
 }
 
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {

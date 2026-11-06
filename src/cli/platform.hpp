@@ -98,6 +98,16 @@ bool AskYesNo(const std::string& title, const std::string& text);
 // Nothing on systems without one.
 void ShowNotice(const std::string& title, const std::string& text);
 
+// The image names of the running processes (`ampify doctor`: programs known to crash Apple Music). Empty where they
+// cannot be listed, and always outside Windows.
+std::vector<std::string> RunningProcessNames();
+
+// What `ampify doctor` reads about Apple Music's surroundings on Windows, nothing elsewhere: the installed package's
+// version, the Program Files folder (3Dconnexion's settings), and the folder of crash dumps (%LOCALAPPDATA%\CrashDumps).
+std::optional<std::string> AppPackageVersion();
+std::optional<std::filesystem::path> ProgramFilesFolder();
+std::optional<std::filesystem::path> CrashDumpsFolder();
+
 // True when `directory` is the folder the installer puts Ampify in. Only that copy turns the automatic start on, so
 // a build folder or an extracted zip never registers itself at sign-in.
 bool IsInstallDirectory(const std::filesystem::path& directory);

@@ -46,12 +46,14 @@ type UiNode = TooltipProps & Omit<PlaceProps, "align"> & BoxProps & Omit<TextSty
   [prop: string]: unknown;
 };
 // active: a top bar, play bar or sidebar entry that starts on, drawn in the accent colour (Ampify.ui.setActive changes it)
-type UiButton = { label: string; icon?: string; onClick: () => void; active?: boolean };
+type UiButton = { label: string; icon?: string; onClick: () => void; active?: boolean; disabled?: boolean };
 // A context entry gets the item's name and, when Apple Music's data has it, its kind and identifiers (a song of the library often has no id)
 type MenuTarget = { title?: string; item?: { kind: string; id?: string; canonicalId?: string } };
-type MenuEntry = { label: string; icon?: string; onClick: (target: MenuTarget) => void };
+// The kinds of item Apple Music's data gives a context menu; `kinds` keeps an entry to the menus of some of them
+type MenuItemKind = "song" | "album" | "artist" | "composer" | "genre" | "playlist" | "station" | "video" | "concert" | "container";
+type MenuEntry = { label: string; icon?: string; onClick: (target: MenuTarget) => void; disabled?: boolean; kinds?: MenuItemKind[] };
 // A menu entry, or a submenu: `items` holds entries (one level, 20 at most) and the entry has no onClick of its own
-type MenuItem = MenuEntry | { label: string; icon?: string; items: MenuEntry[] };
+type MenuItem = MenuEntry | { label: string; icon?: string; items: MenuEntry[]; disabled?: boolean; kinds?: MenuItemKind[] };
 type PlayerState = {
   playing: boolean;
   positionMs: number;
@@ -70,7 +72,7 @@ type PlayerState = {
   } | null;
   source: "apple" | "smtc" | "";  // "": unknown state (no source answered)
 };
-type PlayerEvent = "trackchange" | "statechange" | "lyricschange" | "songchange" | "onplaypause";
+type PlayerEvent = "trackchange" | "statechange" | "lyricschange" | "progress" | "songchange" | "onplaypause" | "onprogress";
 type LyricWord = { start: number; end: number; text: string };
 type LyricLine = { start?: number; end?: number; text: string; words: LyricWord[] };  // no start/end unless synced
 type Lyrics = {
@@ -145,6 +147,9 @@ type DropdownProps = TooltipProps & { label?: string; value?: string; options?: 
 type GridProps = TooltipProps & { columns?: number; gap?: number };
 type TabsProps = TooltipProps & { value?: string; options?: (string | { value: string; label?: string })[]; onChange?: (value: string, event: ChangeEvent) => void };
 type MenuProps = TooltipProps & { label?: string; disabled?: boolean; items?: { label: string; disabled?: boolean; onClick?: (event: ClickEvent) => void }[] };
+// Spicetify's ConfirmDialog, rendered into a popup; the defaults are Ampify's "Confirm" and "Cancel"
+type ConfirmDialogProps = { isOpen: boolean; titleText?: string; descriptionText?: string; confirmText?: string;
+  cancelText?: string; onConfirm?: () => void; onClose?: () => void };
 type CardProps = TooltipProps & PlaceProps & BoxProps & { title?: string; subtitle?: string; onClick?: (event: ClickEvent) => void };
 type TextProps = TooltipProps & Omit<PlaceProps, "align"> & TextStyleProps & {
   text?: string;
@@ -184,6 +189,8 @@ declare const Ampify: {
   readonly kitApi: string;
   readonly process: "ui" | "engine";
   readonly locale: string;
+  readonly appVersion: string;  // Apple Music's version, "" when unknown
+  activeTheme(): string | null;  // the id of the theme in use, null for none
   log(message: string): void;
   onStop(fn: () => void): void;
 
@@ -196,12 +203,13 @@ declare const Ampify: {
     get<T = unknown>(key: string, fallback?: T): T;
     set(key: string, value: unknown): void;
     remove(key: string): void;
+    clear(): void;
   };
 
   // 5.3 Player [preview]
   player: {
     state(): PlayerState;
-    // songchange and onplaypause are Spicetify's names for trackchange and statechange.
+    // songchange, onplaypause and onprogress are Spicetify's names for trackchange, statechange and progress.
     on(event: PlayerEvent, fn: (state: PlayerState) => void): void;
     off(event: PlayerEvent, fn: (state: PlayerState) => void): void;  // removes a listener added with on
     lyrics(): Lyrics | null;  // Apple Music's own lyrics of the song playing, null when it has none (yet)
@@ -219,6 +227,15 @@ declare const Ampify: {
     setRepeat(mode: "off" | "all" | "one"): boolean;
     toggleRepeat(): boolean;  // off, all, one, off...
     setVolume(volume: number): boolean;  // Apple's player volume, 0 to 1, once a song has started; moves Apple's slider from "ui"
+    skipForward(ms?: number): boolean;  // 15 s by default, within the song
+    skipBack(ms?: number): boolean;
+    progress(): number;  // 0 to 1; 0 while the length is unknown
+    formatTime(ms: number): string;  // "3:07", "1:02:05"
+    muted(): boolean | null;  // Apple's slider at its bottom; null while the volume is unknown
+    setMute(on: boolean): boolean;  // unmuting puts back the level the element muted from
+    toggleMute(): boolean;
+    increaseVolume(step?: number): boolean;  // a share of Apple's slider, 0.1 by default
+    decreaseVolume(step?: number): boolean;
     queue: {
       list(): QueueState;
       add(catalogId: string | number, options?: { position?: "next" | "last" }): boolean;  // false on Windows for now
@@ -244,31 +261,39 @@ declare const Ampify: {
 
   // 5.5 Interface [preview]
   ui: {
-    topbar: { addButton(button: UiButton): number };  // the id setLabel and setActive take
-    playbar: { addButton(button: UiButton): number };
-    sidebar: { addItem(item: UiButton): number };  // on while its own page is open, or after setActive
-    menu: { addItem(where: "context" | "app", item: MenuItem): number };
-    popup: { open(view: UiNode): void };
+    topbar: { addButton(button: UiButton): number; remove(id: number): boolean };  // the id setLabel and setActive take
+    playbar: { addButton(button: UiButton): number; remove(id: number): boolean };
+    sidebar: { addItem(item: UiButton): number; remove(id: number): boolean };  // on while its own page is open, or after setActive
+    menu: { addItem(where: "context" | "app", item: MenuItem): number; remove(id: number): boolean };
+    // show: a named popup (lowercase letters, digits, dashes), changed in place when shown again; close closes it
+    popup: { open(view: UiNode): void; show(name: string, view: UiNode): void; close(name: string): void };
     // permission ui.fullscreen; onClose runs when the user closes it or another element takes the screen
     fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void };
     // permission ui.fullscreen; Apple Music's own full-screen player, laid over the window
     applePlayer: { open(): void };
     panel: { register(id: string, view: UiNode): void; remove(id: string): boolean; onClose(id: string, fn: () => void): () => void };
-    title: { set(text: string): void };
+    title: { set(text: string): void; get(): string; reset(): void };
     /** A new label for a top bar or play bar button this element added: its text without an icon, its tooltip with one. */
     setLabel(id: number, label: string): boolean;
     /** Switches a top bar or play bar button this element added on or off: on, it takes the accent colour. */
     setActive(id: number, on: boolean): boolean;
+    /** Greys a top bar or play bar button, or a menu entry, this element added: it ignores clicks. */
+    setDisabled(id: number, disabled: boolean): boolean;
     page: { register(path: string, view: UiNode): void };
     navigate(path: string): void;
   };
 
   // 5.6 Services [provisional]
   notify(options: { title: string; text: string }): void;
-  keyboard: { bind(shortcut: string, fn: () => void): void };
+  keyboard: { bind(shortcut: string, fn: () => void): void; unbind(shortcut: string): boolean };
+  // copy: permission clipboard.write; paste: permission clipboard.read, null when the clipboard holds no text
+  clipboard: { copy(text: string): boolean; paste(): string | null };
   http: {
     get(url: string, options?: { headers?: Record<string, string> }): Promise<{ status: number; text: string }>;
     post(url: string, body?: string | object, options?: { headers?: Record<string, string> }): Promise<{ status: number; text: string }>;
+    put(url: string, body?: string | object, options?: { headers?: Record<string, string> }): Promise<{ status: number; text: string }>;
+    patch(url: string, body?: string | object, options?: { headers?: Record<string, string> }): Promise<{ status: number; text: string }>;
+    del(url: string, options?: { headers?: Record<string, string> }): Promise<{ status: number; text: string }>;
     postForm(url: string, fields: Record<string, string | FormFile>): Promise<{ status: number; text: string }>;
     // An MP4 of a declared host as a looping GIF, made on the PC: a file for postForm.
     gifFromVideo(url: string, options?: { side?: number; fps?: number; seconds?: number }): Promise<{ type: "image/gif"; base64: string }>;
@@ -299,6 +324,12 @@ declare const Ampify: {
   uri: {
     parse(text: string): unknown;
     build(parts: unknown): string;
+    // A link, or what parse gave
+    isSong(link: unknown): boolean;  // a song link, or an album link naming one of its songs (?i=)
+    isAlbum(link: unknown): boolean;
+    isPlaylist(link: unknown): boolean;
+    isArtist(link: unknown): boolean;
+    isStation(link: unknown): boolean;
   };
   icons: { get(name: string): string; names(): string[] };
   color: {
@@ -344,7 +375,7 @@ declare const Ampify: {
     createRoot(target: AmpifyTarget): AmpifyRoot;
     unmountComponentAtNode(target: AmpifyTarget): boolean;
   };
-  hooks: AmpifyHooks & { usePlayer(): PlayerState };
+  hooks: AmpifyHooks & { usePlayer(): PlayerState; useArtworkColor(): ExtractedColors | null };
   components: {
     Button: AmpifyComponent<ButtonProps>;
     ButtonPrimary: AmpifyComponent<ButtonProps>;
@@ -363,6 +394,7 @@ declare const Ampify: {
     TextComponent: AmpifyComponent<TextProps>;
     Tooltip: AmpifyComponent<TooltipWrapperProps>;
     TooltipWrapper: AmpifyComponent<TooltipWrapperProps>;
+    ConfirmDialog: AmpifyComponent<ConfirmDialogProps>;
   };
 };
 )ts";

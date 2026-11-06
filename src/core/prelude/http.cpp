@@ -21,6 +21,24 @@ const char kHttp[] = R"AMPIFYJS(
     return headers;
   };
 
+  // A body as post takes it: a string (a form unless headers say otherwise), an object (JSON), or nothing.
+  const bodyOf = (body, headers) => {
+    let payload = body;
+    if (payload === undefined || payload === null) {
+      payload = "";
+    } else if (typeof payload !== "string") {
+      payload = JSON.stringify(payload);
+      if (!headers["content-type"]) headers["content-type"] = "application/json";
+    }
+    if (payload !== "" && !headers["content-type"]) headers["content-type"] = "application/x-www-form-urlencoded";
+    return payload;
+  };
+  const send = (method, url, body, options) => dispatch.request(() => {
+    const headers = headersOf(options);
+    const payload = bodyOf(body, headers);
+    return native.httpSend(method, text(url), payload, JSON.stringify(headers));
+  });
+
   Ampify.http = {
     get(url, options = {}) {
       const headers = headersOf(options);
@@ -44,6 +62,10 @@ const char kHttp[] = R"AMPIFYJS(
         return native.httpPost(text(url), payload, JSON.stringify(headers));
       });
     },
+    // PUT, PATCH and DELETE, under the rules of post (del is Spicetify's name; delete is a word of JavaScript).
+    put: (url, body, options = {}) => send("PUT", url, body, options),
+    patch: (url, body, options = {}) => send("PATCH", url, body, options),
+    del: (url, options = {}) => send("DELETE", url, undefined, options),
     // A multipart/form-data POST, for an upload service. fields: { name: "text", file: { filename, type, base64 } }.
     postForm(url, fields) {
       return dispatch.request(() => {

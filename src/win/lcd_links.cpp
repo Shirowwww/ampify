@@ -7,6 +7,7 @@
 #include "xaml_host.hpp"
 
 #include "../core/amp_abi.hpp"
+#include "../core/ui_watchdog.hpp"
 #include "../core/journal.hpp"
 #include "../core/now_playing.hpp"
 
@@ -71,6 +72,7 @@ Links& State() {
 
 xaml::FrameworkElement FindNamed(const xaml::DependencyObject& root, std::wstring_view name,
                                  std::wstring_view className = {}) {
+    ampify::ActivityScope activity("player display tree search");
     std::vector<xaml::DependencyObject> queue{root};
     for (std::size_t i = 0; i < queue.size() && queue.size() < static_cast<std::size_t>(kSearchLimit); i++) {
         if (auto element = queue[i].try_as<xaml::FrameworkElement>(); element && element.Name() == name &&

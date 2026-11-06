@@ -29,8 +29,10 @@ Surface FromSlot(SurfaceKind kind, const UiSlot& slot, const std::string& id, co
 
 std::string Signature(const Surface& surface) {
     if (surface.kind == SurfaceKind::Control) {
+        std::string kinds;
+        for (const std::string& kind : surface.control.kinds) kinds += kind + ",";
         return surface.control.placement + "\n" + surface.control.label + "\n" + surface.control.icon + "\n" +
-               (surface.control.active ? "on" : "off");
+               (surface.control.active ? "on" : "off") + (surface.control.disabled ? " disabled\n" : "\n") + kinds;
     }
     return surface.title + "\n" + surface.tree.Dump();
 }

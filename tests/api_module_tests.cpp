@@ -89,29 +89,37 @@ const Expected kMembers[] = {
     {"log", "f1=log"},
     {"onStop", "f1=onStop"},
     {"config", "object!{get:f2=get,set:f2=set}"},
-    {"storage", "object!{get:f2=get,set:f2=set,remove:f1=remove}"},
-    // toggle, queue, lyrics, shuffle, repeat and setVolume added in kitApi 1.x, compatible additions
+    {"storage", "object!{get:f2=get,set:f2=set,remove:f1=remove,clear:f0=clear}"},  // clear added in kitApi 1.x
+    // toggle, queue, lyrics, shuffle, repeat, setVolume, skipForward to decreaseVolume added in kitApi 1.x, compatible additions
     {"player", "object!{state:f0=state,on:f2=on,off:f2=off,play:f0=play,pause:f0=pause,next:f0=next,previous:f0=previous,"
                "seek:f1=seek,toggle:f0=toggle,shuffle:f0=shuffle,repeat:f0=repeat,setShuffle:f1=setShuffle,"
                "toggleShuffle:f0=toggleShuffle,setRepeat:f1=setRepeat,toggleRepeat:f0=toggleRepeat,"
-               "setVolume:f1=setVolume,lyrics:f0=lyrics,artwork:f0=artwork,queue:object!{list:f0=list,add:f2=add,remove:f1=remove}}"},
+               "setVolume:f1=setVolume,skipForward:f1=skipForward,skipBack:f1=skipBack,progress:f0=progress,"
+               "formatTime:f1=formatTime,muted:f0=muted,setMute:f1=setMute,toggleMute:f0=toggleMute,"
+               "increaseVolume:f1=increaseVolume,decreaseVolume:f1=decreaseVolume,lyrics:f0=lyrics,artwork:f0=artwork,"
+               "queue:object!{list:f0=list,add:f2=add,remove:f1=remove}}"},
     {"audio", "object!{setGainDb:f1=setGainDb,onFrame:f1=onFrame,analyze:f0=analyze,loudness:f0=loudness,"
               "volume:f0=volume,eq:object!{setBand:f2=setBand,preset:f1=preset,reset:f0=reset,bands:f0=bands,"
               "presets:f0=presets}}"},
-    {"keyboard", "object!{bind:f2=bind}"},
+    {"keyboard", "object!{bind:f2=bind,unbind:f1=unbind}"},  // unbind added in kitApi 1.x
     {"notify", "f1="},
-    {"http", "object!{get:f1=get,post:f2=post,postForm:f2=postForm,gifFromVideo:f1=gifFromVideo,open:f1=open}"},  // post, postForm, gifFromVideo and open added in kitApi 1.x, compatible additions
+    // post, put, patch, del, postForm, gifFromVideo and open added in kitApi 1.x, compatible additions
+    {"http", "object!{get:f1=get,post:f2=post,put:f2=put,patch:f2=patch,del:f1=del,postForm:f2=postForm,"
+             "gifFromVideo:f1=gifFromVideo,open:f1=open}"},
     {"icons", "object!{get:f1=get,names:f0=names}"},
-    {"uri", "object!{parse:f1=parse,build:f3=build}"},
+    {"uri", "object!{parse:f1=parse,build:f3=build,isSong:f1=isSong,isAlbum:f1=isAlbum,isPlaylist:f1=isPlaylist,"
+            "isArtist:f1=isArtist,isStation:f1=isStation}"},  // the predicates added in kitApi 1.x
     {"color", "object!{extract:f3=extract,fromArtwork:f1=fromArtwork,playing:f0=playing}"},
     {"fonts", "object!{roles:f0=roles,style:f1=style}"},
-    {"ui", "object!{topbar:object!{addButton:f1=addButton},playbar:object!{addButton:f1=addButton},"
-           "sidebar:object!{addItem:f1=addItem},"
-           "menu:object!{addItem:f2=addItem},popup:object!{open:f1=open},"
+    // setLabel, setActive, setDisabled, panel.onClose, the removes, popup.show and close, title.get and reset added in
+    // kitApi 1.x, compatible additions
+    {"ui", "object!{topbar:object!{addButton:f1=addButton,remove:f1=remove},"
+           "playbar:object!{addButton:f1=addButton,remove:f1=remove},sidebar:object!{addItem:f1=addItem,remove:f1=remove},"
+           "menu:object!{addItem:f2=addItem,remove:f1=remove},popup:object!{open:f1=open,show:f2=show,close:f1=close},"
            "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},"
            "panel:object!{register:f2=register,remove:f1=remove,onClose:f2=onClose},"
-           "page:object!{register:f2=register},title:object!{set:f1=set},"
-           "setLabel:f2=setLabel,setActive:f2=setActive,navigate:f1=navigate}"},  // setLabel, setActive, panel.onClose added in kitApi 1.x, compatible additions
+           "page:object!{register:f2=register},title:object!{set:f1=set,get:f0=get,reset:f0=reset},"
+           "setLabel:f2=setLabel,setActive:f2=setActive,setDisabled:f2=setDisabled,navigate:f1=navigate}"},
 };
 
 const Expected kGlobals[] = {

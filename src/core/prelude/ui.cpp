@@ -68,6 +68,20 @@ const char kUi[] = R"AMPIFYJS(
     rawSlots.delete(surface);
   };
 
+  // A named popup (popup.show): shown again under the same name, it changes in place. popup.close takes the path of
+  // the user's Close (dispatch.popupClose, module react), which also unmounts a ReactDOM popup of that name.
+  const showPopup = (name, vue) => {
+    const surface = "popup:" + text(name);
+    const fresh = !rawSlots.has(surface);  // a refused update leaves the popup on screen, with its handlers
+    try {
+      native.reactPopup(text(name), treeText(vue, surface));
+    } catch (error) {
+      if (fresh) dropSurface(surface);
+      throw error;
+    }
+  };
+  dispatch.uiPopupClosed = (name) => dropSurface("popup:" + text(name));
+
   // Each popup.open is a popup of its own, stacked over the others: one surface each, so two popups of the same shape
   // never share a callback id. The host tells nothing when an unnamed popup closes, so its handlers stay.
   let popupSerial = 0;
@@ -84,6 +98,7 @@ const char kUi[] = R"AMPIFYJS(
   // A top bar or play bar button without onClick is a text that only shows something (Volume percentage).
   const addControl = (placement, options, parent) => {
     const note = options || {};
+    const kinds = kindsOf(placement, note.kinds);
     const bar = placement === "topbar" || placement === "playbar";
     const clickable = !(bar && note.onClick === undefined);
     if (clickable && typeof note.onClick !== "function") throw new TypeError("ui: onClick expects a function");
@@ -92,7 +107,39 @@ const char kUi[] = R"AMPIFYJS(
     const id = native.uiControl(placement, label, icon, clickable, parent || 0);
     if (clickable) uiCallbacks.set(id, note.onClick);
     if (note.active) native.uiControlActive(id, true);
+    if (note.disabled) native.uiControlDisabled(id, true);
+    applyKinds(id, kinds);
     return id;
+  };
+
+  // The kernel checks each kind's name; an unknown one takes the new entry out again before throwing.
+  const applyKinds = (id, kinds) => {
+    if (!kinds) return;
+    try {
+      native.uiControlKinds(id, kinds);
+    } catch (error) {
+      native.uiControlRemove(id);
+      uiCallbacks.delete(id);
+      throw error;
+    }
+  };
+
+  // A context menu entry's `kinds` (["song", "album"]): the menus it goes in. Checked before the entry exists, as text.
+  const kindsOf = (placement, kinds) => {
+    if (kinds === undefined) return "";
+    if (placement !== "menu-context") throw new TypeError("ui: kinds is for the entries of context menus");
+    if (!Array.isArray(kinds) || kinds.length === 0 || kinds.some((kind) => typeof kind !== "string" || kind.includes(","))) {
+      throw new TypeError("menu.addItem: kinds expects a list of kinds of item, such as [\"song\", \"album\"]");
+    }
+    return kinds.join(",");
+  };
+
+  // Takes out a button or menu entry this element added; its click handler and a submenu's entries go with it.
+  const removeControl = (id) => {
+    const control = Number(id);
+    const removed = native.uiControlRemove(control);
+    if (removed) uiCallbacks.delete(control);
+    return removed;
   };
 
   const kMaxSubmenuEntries = 20;
@@ -105,6 +152,7 @@ const char kUi[] = R"AMPIFYJS(
       throw new TypeError("menu.addItem: items expects 1 to " + kMaxSubmenuEntries + " entries");
     }
     // Every entry is checked before the submenu exists: a bad one must not leave a half-built menu behind.
+    const kinds = kindsOf(placement, note.kinds);
     for (const entry of note.items) {
       if (entry && entry.items !== undefined) throw new TypeError("menu.addItem: a submenu holds entries, not submenus");
       if (!entry || typeof entry.onClick !== "function") throw new TypeError("menu.addItem: each entry expects an onClick function");
@@ -112,6 +160,8 @@ const char kUi[] = R"AMPIFYJS(
     const label = note.label === undefined ? "" : text(note.label);
     const icon = typeof note.icon === "string" ? note.icon : "";
     const submenu = native.uiControl(placement, label, icon, false, 0);
+    if (note.disabled) native.uiControlDisabled(submenu, true);
+    applyKinds(submenu, kinds);
     for (const entry of note.items) addControl(placement, entry, submenu);
     return submenu;
   };
@@ -172,16 +222,21 @@ const char kUi[] = R"AMPIFYJS(
   };
 
   Ampify.ui = Object.freeze({
-    topbar: Object.freeze({ addButton: (options) => addControl("topbar", options) }),
-    playbar: Object.freeze({ addButton: (options) => addControl("playbar", options) }),
-    sidebar: Object.freeze({ addItem: (options) => addControl("sidebar", options) }),
+    topbar: Object.freeze({ addButton: (options) => addControl("topbar", options), remove: (id) => removeControl(id) }),
+    playbar: Object.freeze({ addButton: (options) => addControl("playbar", options), remove: (id) => removeControl(id) }),
+    sidebar: Object.freeze({ addItem: (options) => addControl("sidebar", options), remove: (id) => removeControl(id) }),
     menu: Object.freeze({
       addItem(kind, options) {
         if (kind !== "context" && kind !== "app") throw new RangeError('menu.addItem expects "context" or "app"');
         return addMenuItem("menu-" + kind, options);
       },
+      remove: (id) => removeControl(id),
     }),
-    popup: Object.freeze({ open: (vue) => openPopup(vue) }),
+    popup: Object.freeze({
+      open: (vue) => openPopup(vue),
+      show: (name, vue) => showPopup(name, vue),
+      close: (name) => dispatch.popupClose(JSON.stringify({ popup: text(name) })),
+    }),
     fullscreen,
     applePlayer: Object.freeze({ open: () => native.uiApplePlayer() }),
     panel: Object.freeze({
@@ -200,11 +255,17 @@ const char kUi[] = R"AMPIFYJS(
       },
     }),
     page: Object.freeze({ register: (path, vue) => native.uiPage(text(path), treeText(vue, "page:" + text(path))) }),
-    title: Object.freeze({ set: (title) => native.uiTitle(text(title)) }),
+    title: Object.freeze({
+      set: (title) => native.uiTitle(text(title)),
+      get: () => native.uiTitleGet(),
+      reset: () => native.uiTitleReset(),
+    }),
     // A button of the top bar or the play bar this element added, by the id addButton gave.
     setLabel: (id, label) => native.uiControlLabel(Number(id), text(label)),
     // A top bar or play bar button this element added, on or off: on, it takes the accent colour (addButton's `active`).
     setActive: (id, on) => native.uiControlActive(Number(id), Boolean(on)),
+    // A button or menu entry this element added, greyed (it ignores clicks) or back to normal.
+    setDisabled: (id, disabled) => native.uiControlDisabled(Number(id), Boolean(disabled)),
     navigate(path) {
       native.uiNavigate(text(path));
       if (dispatch.pageShow) dispatch.pageShow(text(path));  // module react

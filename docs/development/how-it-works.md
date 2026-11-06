@@ -91,6 +91,17 @@ that are switched on. In `AppleMusic.exe` it starts the interface service (windo
 A running kernel re-reads `settings.txt` and reads new lines of `reload.txt` every 500 ms to start, stop or restart an
 element. Every hook goes through `src/core/drm_guard.cpp`.
 
+Before anything connects, both processes install the network fixes that are on (`src/win/network_fix.cpp`), all by
+import-table hooks, never in a protected module and never by patching code: `apple.network = ipv4-first` (the
+default) puts IPv4 addresses first in every resolver answer; `apple.proxy = no-autodetect` (off by default) makes
+WinINet's `DetectAutoProxyUrl`, which Apple's `CFNetwork.dll` calls synchronously when Windows' "Automatically detect
+settings" is on, answer "nothing found" at once; `apple.watchdog = on` times the lookups and the proxy detection and
+logs those of 300 ms or more, and follows each process's memory in steps of 512 MB (`src/win/reliability_watch.cpp`).
+Once per start, `AppleMusic.log` names any running program known to crash Apple Music (3Dconnexion's driver, and
+RivaTuner, which draws MSI Afterburner's on-screen display) with its fix; `ampify doctor` gives the same lines. The logic is portable and tested
+(`src/core/reliability.*`). What Apple's own code does here: [knowledge/apple-music-internals.md](../../knowledge/apple-music-internals.md),
+"Where Apple Music waits".
+
 The data folder is `%USERPROFILE%\Ampify`, not `%LOCALAPPDATA%`: MSIX redirects Apple Music's writes under AppData,
 so the launcher and the kernel would not see the same files there.
 

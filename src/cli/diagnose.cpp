@@ -2,10 +2,14 @@
 
 #include <algorithm>
 #include <fstream>
+#include <functional>
+#include <optional>
 #include <system_error>
 #include <vector>
 
+#include "../core/reliability.hpp"
 #include "../core/safe_mode.hpp"
+#include "../core/text_util.hpp"
 #include "../core/version_gate.hpp"
 #include "../core/version_list.hpp"
 #include "element.hpp"
@@ -51,6 +55,39 @@ std::vector<std::filesystem::path> Leftovers(const KitLayout& kit) {
         }
     }
     return found;
+}
+
+constexpr int kCrashDays = 7;
+
+bool Runs(const std::vector<std::string>& processes, std::string_view image) {
+    return std::any_of(processes.begin(), processes.end(),
+                       [&](const std::string& name) { return ToLowerAscii(name) == ToLowerAscii(image); });
+}
+
+// Apple Music's own troubles that Ampify can see but not mend: a stuck library agent, programs known to crash it,
+// and its recent crashes. Windows only: elsewhere every reading is empty and nothing is written.
+void CheckAppleMusicSurroundings(const std::function<void(const std::string&)>& ok,
+                                 const std::function<void(const std::string&)>& warn) {
+    if (std::optional<std::string> version = platform::AppPackageVersion()) ok("Apple Music package: version " + *version);
+    std::vector<std::string> processes = platform::RunningProcessNames();
+    if (!processes.empty() && Runs(processes, "AMPLibraryAgent.exe") && !Runs(processes, "AppleMusic.exe")) {
+        warn("a library agent runs without Apple Music: it can keep the library from opening (error 9039); "
+             "apple.orphanAgent = on ends it");
+    }
+    std::optional<std::filesystem::path> programFiles = platform::ProgramFilesFolder();
+    bool threeDxFixed = programFiles && ThreeDxIgnoresAppleMusic(*programFiles);
+    for (const KnownConflict& conflict : FindKnownConflicts(processes, threeDxFixed)) {
+        warn(conflict.name + " runs, known to crash Apple Music: " + conflict.advice);
+    }
+    if (std::optional<std::filesystem::path> dumps = platform::CrashDumpsFolder()) {
+        std::vector<std::string> recent = RecentAppleCrashDumps(*dumps, kCrashDays);
+        if (recent.empty()) {
+            ok("no crash of Apple Music in the last " + std::to_string(kCrashDays) + " days (crash dumps)");
+        } else {
+            warn(std::to_string(recent.size()) + " crash dump(s) of Apple Music in the last " + std::to_string(kCrashDays) +
+                 " days, newest " + recent.front() + " in %LOCALAPPDATA%\\CrashDumps");
+        }
+    }
 }
 
 }  // namespace
@@ -140,6 +177,7 @@ int CmdDoctor(Context& ctx) {
     ok(std::string("Apple Music ") +
        (platform::IsProcessRunning("AppleMusic.exe") ? "is open" : "is closed") +
        " (process check)");
+    CheckAppleMusicSurroundings(ok, warn);
 
     if (platform::ToolWorks(kArchiveTool)) {
         ok("archive tool available: " + kArchiveTool.front());

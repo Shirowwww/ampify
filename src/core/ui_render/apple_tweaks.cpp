@@ -49,6 +49,13 @@ const std::vector<std::pair<std::string, std::string>>& NetworkOptions() {
     return options;
 }
 
+const std::vector<std::pair<std::string, std::string>>& ProxyOptions() {
+    static const std::vector<std::pair<std::string, std::string>> options{
+        {"system", "tweaks.proxy.system"},
+        {"no-autodetect", "tweaks.proxy.noAutodetect"}};
+    return options;
+}
+
 const std::vector<std::pair<std::string, std::string>>& ArtworkOptions() {
     static const std::vector<std::pair<std::string, std::string>> options{
         {"sharp", "tweaks.artwork.sharp"},
@@ -122,6 +129,7 @@ const std::vector<std::pair<std::string, std::string>>* OptionsOf(const std::str
     if (key == kPlayerControlsKey) return &PlayerControlsOptions();
     if (key == kCloseKey) return &CloseOptions();
     if (key == kNetworkKey) return &NetworkOptions();
+    if (key == kProxyKey) return &ProxyOptions();
     if (key == kArtworkKey) return &ArtworkOptions();
     if (key == kMarqueeKey) return &MarqueeOptions();
     if (key == kSidebarKey) return &SidebarOptions();
@@ -156,6 +164,7 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.closeToTray = Known(settings, kCloseKey) == "tray";
     tweaks.playerControls = Known(settings, kPlayerControlsKey) == "shown";
     tweaks.ipv4First = Known(settings, kNetworkKey) == "ipv4-first";
+    tweaks.proxyNoAutodetect = Known(settings, kProxyKey) == "no-autodetect";
     tweaks.sharpArtwork = Known(settings, kArtworkKey) == "sharp";
     tweaks.textMarquee = Known(settings, kMarqueeKey) == "hover";
     tweaks.sidebarOnHover = Known(settings, kSidebarKey) == "hover";
@@ -185,6 +194,7 @@ std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
         {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", std::move(notificationOptions),
          notifications},
         {kNetworkKey, "tweaks.network", "tweaks.networkHelp", NetworkOptions(), Known(settings, kNetworkKey)},
+        {kProxyKey, "tweaks.proxy", "tweaks.proxyHelp", ProxyOptions(), Known(settings, kProxyKey)},
         {kOrphanAgentKey, "tweaks.orphan", "tweaks.orphanHelp", OrphanAgentOptions(), Known(settings, kOrphanAgentKey)},
         {kFreezeLogKey, "tweaks.watchdog", "tweaks.watchdogHelp", FreezeLogOptions(), Known(settings, kFreezeLogKey)},
     };
