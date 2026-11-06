@@ -724,7 +724,8 @@ and the inspector list them as "Ampify (derived from the theme)".
 | has an accent | the bars next to the row playing (`.now-playing-indicator`) take it, and follow it when it changes with the song |
 | has an accent | Up Next's "Clear" (`.queue-clear`) and its autoplay toggle while on (`.queue-autoplay`) take it, not Apple's red and blue |
 | has a link colour or an accent | `.album-artist` takes it (Apple's own blue barely reads on a light page) |
-| has a secondary text colour | `.card-subtitle`, the artist under a tile, takes it (Apple paints that link in code) |
+| has a secondary text colour | `.card-subtitle`, the artist under a tile, takes it (Apple paints that link in code), at full opacity: Apple fades it to 70% for its own grey |
+| has a secondary text colour and a dark scheme | Apple's own `SecondaryTextBrush` (shelf headers, captions, the search field's hint) takes it. A light scheme leaves Apple's: its dark captions over artwork read that key too |
 | has a card colour | the top results of a search take it |
 | has selected-row colours | Apple's lists use them, though their style never reads them |
 | lights `.track-row:hover` | Apple's own light of the row goes, so only one shows |

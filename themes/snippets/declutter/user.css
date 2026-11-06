@@ -1,7 +1,6 @@
 /* Declutter: hides the buttons and banners most people never use, by their stable names (docs/themes/names.md), on
    top of any theme. Remove a line to bring that element back. */
 
-.info-bar,
 .reactions-button,
 .share-button,
 .add-description-button,
@@ -42,7 +41,18 @@
     }
 }
 
-/* Apple Music shows and hides its logo itself, following what plays: an opacity leaves that to it. */
-.apple-logo {
-    opacity: 0;
+/* On unless turned off: Apple's banners at the top and the bottom of the window. They also say when Apple Music is
+   offline or cannot play, so they have a switch of their own. */
+@setting info-banners {
+    .info-bar {
+        visibility: collapsed;
+    }
+}
+
+/* On unless turned off. Apple Music shows and hides its logo itself, following what plays: an opacity leaves that
+   to it. */
+@setting apple-logo {
+    .apple-logo {
+        opacity: 0;
+    }
 }

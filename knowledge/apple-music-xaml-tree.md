@@ -40,6 +40,31 @@ MainPage (AMP.UI.Views.MainPage)                      content of the window "Mai
    └─ Rectangle#Frost (collapsed)
 ```
 
+## A dialog
+
+Read on the welcome dialog (`GDPRWelcomeDialog`) of the CI bench, 1.1792. A dialog is a root of its own: a `Popup` that
+holds the dialog, beside a second `Popup` whose only child is the veil (`Rectangle#SmokeLayerBackground`, the size of the
+window). The dialog's type changes with each dialog; the template under it does not, which is what `.dialog` and the
+names after it (docs/themes/names.md) stand on.
+
+```
+Popup
+└─ GDPRWelcomeDialog            (Background and CornerRadius of the box are set here too)
+   └─ Border#Container
+      └─ Grid#LayoutRoot
+         └─ Border#BackgroundElement     the painted box
+            └─ Grid#DialogSpace
+               ├─ ScrollViewer#ContentScrollViewer
+               │  └─ ... ContentControl#Title (collapsed when the dialog has none), ContentPresenter#Content
+               └─ Grid#CommandSpace (collapsed here: the dialog draws its own button)
+                  └─ Button#PrimaryButton, Button#SecondaryButton, Button#CloseButton
+Popup
+└─ Rectangle#SmokeLayerBackground
+```
+
+Not read yet, to take from a dialog that is open: the title of a dialog that has one, a check box (`AskUserCheckbox`), and
+the name of every other dialog's own content.
+
 ## What to know for themes and extensions
 
 - **The playback bar is at the top**, in the content of the `NavigationView`, not at the bottom: `Grid#TransportBar`.

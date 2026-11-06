@@ -28,7 +28,34 @@ const std::vector<ClassEntry> kClasses{
     {"focus-ring", {"Border#FocusBorder"}},
     {"popup-scrim", {"Rectangle#LightDismissLayer"}},
     {"info-bar", {"InfoBar#topInfoBar", "InfoBar#bottomInfoBar"}},
+    {"info-bar-icon", {"InfoBar Grid#StandardIconArea", "InfoBar Viewbox#UserIconBox"}},
+    {"info-bar-title", {"InfoBar TextBlock#Title"}},
+    {"info-bar-message", {"InfoBar TextBlock#Message"}},
+    {"info-bar-content", {"InfoBar ContentPresenter#ContentArea"}},
+    {"info-bar-close", {"InfoBar Button#CloseButton"}},
     {"scrollbar", {"ScrollBar#VerticalScrollBar", "ScrollBar#HorizontalScrollBar"}},
+    {"scrollbar-thumb", {"ScrollBar#VerticalScrollBar Thumb", "ScrollBar#HorizontalScrollBar Thumb"}},
+    {"scrollbar-track",
+     {"ScrollBar#VerticalScrollBar Rectangle#VerticalTrackRect",
+      "ScrollBar#HorizontalScrollBar Rectangle#HorizontalTrackRect"}},
+    {"scrollbar-arrow",
+     {"ScrollBar#VerticalScrollBar RepeatButton#VerticalSmallDecrease",
+      "ScrollBar#VerticalScrollBar RepeatButton#VerticalSmallIncrease",
+      "ScrollBar#HorizontalScrollBar RepeatButton#HorizontalSmallDecrease",
+      "ScrollBar#HorizontalScrollBar RepeatButton#HorizontalSmallIncrease"}},
+
+    // Dialogs: a ContentDialog's template, whatever the dialog's own type (GDPRWelcomeDialog, AskUserDialog...). Each
+    // opens in a popup of its own, so a rule must start at the dialog: `.window .dialog` matches nothing. The box is the
+    // painted layer: its colour and corners are the dialog's.
+    {"dialog", {"Border#Container > Grid#LayoutRoot > Border#BackgroundElement"}},
+    {"dialog-scrim", {"Popup > Rectangle#SmokeLayerBackground"}},
+    {"dialog-title", {"Border#BackgroundElement ContentControl#Title"}},
+    {"dialog-content", {"Border#BackgroundElement ContentPresenter#Content"}},
+    {"dialog-buttons", {"Border#BackgroundElement Grid#CommandSpace"}},
+    {"dialog-primary", {"Border#BackgroundElement Grid#CommandSpace > Button#PrimaryButton"}},
+    {"dialog-secondary", {"Border#BackgroundElement Grid#CommandSpace > Button#SecondaryButton"}},
+    {"dialog-close", {"Border#BackgroundElement Grid#CommandSpace > Button#CloseButton"}},
+    {"dialog-checkbox", {"Border#BackgroundElement CheckBox"}},
 
     // Sidebar
     {"sidebar", {"SplitView#RootSplitView > Grid > Grid#PaneRoot"}},
@@ -42,6 +69,16 @@ const std::vector<ClassEntry> kClasses{
     {"search-area", {"Grid#AutoSuggestArea"}},
     {"search-box", {"AutoSuggestBox"}},
     {"search-suggestions", {"Popup#SuggestionsPopup"}},
+    {"search-input", {"AutoSuggestBox TextBox#TextBox"}},
+    {"search-placeholder", {"AutoSuggestBox ContentControl#PlaceholderTextContentPresenter"}},
+    {"search-button", {"AutoSuggestBox Button#QueryButton"}},
+    {"search-clear", {"AutoSuggestBox Button#DeleteButton"}},
+    // The "..." button at the top of the sidebar (its menu holds Settings). .lcd-more-button was its first name, written
+    // for the playback bar's display, which has no such button.
+    {"more-button", {"ContentControl#PaneHeaderContentBorder MenuButton#MoreButton"}},
+    {"more-icon", {"ContentControl#PaneHeaderContentBorder MenuButton#MoreButton ContentPresenter#Icon"}},
+    // The row of buttons that replaces the sidebar's header in a narrow window.
+    {"topnav", {"StackPanel#TopNavArea"}},
     // apple.topbar = search: the strip at the top of the window that holds Apple's search field and a back arrow.
     {"topbar-back", {"Button#AMPIFY_TopbarBack"}},
     {"topbar-search", {"Grid#AMPIFY_TopbarSearch"}},
@@ -49,6 +86,11 @@ const std::vector<ClassEntry> kClasses{
     {"sidebar-items", {"ItemsRepeater#MenuItemsHost"}},
     {"sidebar-item", {"NavigationViewItem"}},
     {"sidebar-item-artwork", {"HoverGrid#ArtworkGrid"}},
+    {"sidebar-item-image", {"NavigationViewItem ArtworkImage#ArtworkIcon"}},
+    {"sidebar-subitems", {"ItemsRepeater#NavigationViewItemMenuItemsHost"}},
+    {"sidebar-chevron", {"NavigationViewItem AnimatedIcon#ExpandCollapseChevronIcon"}},
+    {"sidebar-border",
+     {"SplitView#RootSplitView > Grid > Grid#PaneRoot > Rectangle#HCPaneBorder"}},  // the high contrast edge
     {"sidebar-selection", {"NavigationViewItem Rectangle#SelectionIndicator"}},
     {"sidebar-count", {"ContentPresenter#InfoBadgePresenter TextBlock#BadgeNumberTextBlock"}},
     {"sidebar-drag-indicator", {"Grid#DragTopIndicator", "Grid#DragBottomIndicator"}},
@@ -58,7 +100,9 @@ const std::vector<ClassEntry> kClasses{
     {"sidebar-separator", {"NavigationViewItemSeparator#Separator"}},
     // Ampify's own entries (the Marketplace, an extension's page), buttons in the panel that holds Apple's footer.
     {"sidebar-entry", {"StackPanel#AMPIFY_SidebarHost > Button"}},
+    {"sidebar-footer-scroll", {"ScrollViewer#FooterItemsScrollViewer"}},
     {"account-picture", {"PersonPicture#smallPersonPicture"}},
+    {"account-badge", {"PersonPicture#smallPersonPicture Grid#BadgeGrid"}},
     {"account-name", {"TextBlock#lowerAccountName"}},
 
     // Content and pages
@@ -109,6 +153,19 @@ const std::vector<ClassEntry> kClasses{
     {"section-header", {"ContentControl#SectionHeader"}},
     {"shelf", {"ShelfView"}},
     {"shelf-title", {"Grid#DefaultSectionHeaderContent"}},
+    // The title as Apple's own link control, and the text in it (a link that goes somewhere, or a plain text).
+    {"shelf-title-link", {"Grid#DefaultSectionHeaderContent Hyperlink#Title"}},
+    {"shelf-title-text",
+     {"Grid#DefaultSectionHeaderContent Hyperlink#Title TextBlock#JustTextBlock",
+      "Grid#DefaultSectionHeaderContent Hyperlink#Title TextBlock#HyperlinkTextBlock"}},
+    {"shelf-subtitles", {"Grid#DefaultSectionHeaderContent ItemsRepeater#SubtitlesRepeater"}},
+    {"stacked-page-header", {"ContentControl#StackedPageHeader"}},
+    // The scroller of a page made of a list: Home, an album, a playlist, the Songs table. A shelf's own sideways
+    // scroller is a GridView's, and stays out.
+    {"page-scroll",
+     {"Grid#StackedPageContent > ListView > Border > ScrollViewer#ScrollViewer",
+      "Grid#FixedListPageContent > ListView > Border > ScrollViewer#ScrollViewer",
+      "ListView#DataGridListView > Border > ScrollViewer#ScrollViewer"}},
     {"shelf-grid", {"GridView#ContentGridView"}},
     {"shelf-arrows", {"Grid#ArrowGrid"}},
     {"shelf-arrow-left", {"Button#LeftArrowButton"}},
@@ -133,6 +190,7 @@ const std::vector<ClassEntry> kClasses{
     {"artwork-shadow", {"Border#ShadowElement"}},
     {"card-play-button", {"HoverGrid#SquareLockupContent Button#PlayButton"}},
     {"cover-play-button", {"Button#PlayOverCoverArtButton", "Button#PlayWithoutCoverArtButton"}},
+    {"card-text-grid", {"TitleSubtitleControl > Grid > FirstColumnAdjustableGrid#FirstColumnAdjustableGrid"}},
     {"card-title", {"TitleSubtitleControl TextBlock#TitleTextBlock"}},
     {"card-subtitle", {"TitleSubtitleControl TextBlock#SubtitleTextBlock"}},
     {"explicit-badge", {"FontIcon#ExplicitBadgeFontIcon"}},
@@ -189,6 +247,17 @@ const std::vector<ClassEntry> kClasses{
     {"fullscreen-time", {"FullScreenPlayerView TextBlock#CurrentTime", "FullScreenPlayerView TextBlock#Duration"}},
     {"fullscreen-lyrics", {"FullScreenPlayerView LyricsHostView#LyricsView"}},
     {"fullscreen-exit", {"FullScreenPlayerView Button#ExitFullScreenButton", "FullScreenPlayerView Button#CloseFullScreenButton"}},
+    {"fullscreen-volume", {"FullScreenPlayerView VolumeControl"}},
+    {"fullscreen-airplay", {"FullScreenPlayerView AirPlayButton"}},
+    {"fullscreen-reactions", {"FullScreenPlayerView Button#ReactionsButton"}},
+    {"fullscreen-audio-badge", {"FullScreenPlayerView AudioBadgeControl"}},
+    // Apple's mini player, a window of its own like the full-screen one: it opens from the artwork in the playback bar.
+    {"mini-player", {"MiniPlayerPage"}},
+    {"mini-player-background", {"MiniPlayerPage ImmersionLockup"}},
+    {"mini-lcd", {"MiniPlayerPage MiniNowPlayingControl"}},
+    {"mini-player-lyrics", {"MiniPlayerPage LyricsHostView"}},
+    {"mini-player-queue", {"MiniPlayerPage PlayQueueView"}},
+    {"mini-player-volume", {"MiniPlayerPage VolumeControl"}},
     // Playback bar
     {"playbar", {"Grid#TransportBar"}},
     {"playbar-controls", {"Grid#TransportBar > Grid:nth-child(1)"}},
@@ -197,14 +266,19 @@ const std::vector<ClassEntry> kClasses{
     {"transport", {"TransportControl#TransportControl"}},
     {"shuffle-button", {"ToggleButton#ShuffleButton"}},
     {"shuffle-dot", {"Ellipse#ShuffleButtonDot"}},
+    {"shuffle-icon", {"FontIcon#ShuffleButtonIcon"}},
+    {"transport-icon", {"TransportControl#TransportControl AppBarButton Viewbox#ContentViewbox"}},
     {"previous-button", {"TransportControl#TransportControl > StackPanel > AppBarButton:nth-child(2)"}},
     {"play-button", {"TransportControl#TransportControl > StackPanel > AppBarButton:nth-child(3)"}},
     {"next-button", {"TransportControl#TransportControl > StackPanel > AppBarButton:nth-child(4)"}},
     {"repeat-button", {"Button#RepeatButton"}},
     {"repeat-dot", {"Ellipse#RepeatButtonDot"}},
+    {"repeat-icon", {"FontIcon#RepeatButtonIcon"}},
     {"lcd", {"NowPlayingControl#LCD > Grid#LCD"}},
     {"lcd-artwork", {"HoverGrid#ThumbnailHoverGrid"}},
     {"lcd-artwork-image", {"ArtworkImage#ActualArtwork"}},
+    {"lcd-artwork-hover", {"HoverGrid#ThumbnailHoverGrid Grid#ArtworkHoverContent"}},  // shown under the pointer
+    {"lcd-loading", {"NowPlayingControl#LCD Rectangle#Indeterminate"}},
     {"lcd-placeholder", {"Border#PlaceHolderArtwork"}},
     {"track-text", {"StackPanel#TrackTitleAndArtist"}},
     {"track-lines", {"Grid#TickerTapeGrid"}},
@@ -220,11 +294,12 @@ const std::vector<ClassEntry> kClasses{
     {"live-badge", {"Grid#Live"}},
     {"autoplay-badge", {"Border#AutoPlayBadge"}},
     {"apple-logo", {"Image#Apple"}},
-    {"lcd-more-button", {"MenuButton#MoreButton"}},
+    {"lcd-more-button", {"MenuButton#MoreButton"}},  // kept for themes that wrote it: the same button as .more-button
     {"playbar-toggles", {"StackPanel#NowPlayingToggleButtons"}},
     {"lyrics-button", {"ToggleButton#LyricsToggleButton"}},
     {"queue-button", {"ToggleButton#PlayQueueToggleButton"}},
     {"airplay-button", {"Button#AirPlayButton"}},
+    {"airplay-icon", {"FontIcon#AirPlayIcon"}},
     {"volume", {"VolumeControl#VolumeControl"}},
     {"volume-button", {"Button#VolumeButton"}},
     {"volume-slider", {"Slider#VolumeSlider"}},
@@ -239,6 +314,7 @@ const std::vector<ClassEntry> kClasses{
 
     // Lyrics and queue panels
     {"lyrics-panel", {"SplitView#ContentSplitView > Grid > Grid#PaneRoot"}},
+    {"lyrics-panel-border", {"SplitView#ContentSplitView > Grid > Grid#PaneRoot > Rectangle#HCPaneBorder"}},
     {"lyrics-panel-top-spacer", {"SplitView#ContentSplitView > Grid > Grid#PaneRoot > Border > Grid > Grid:first-child"}},
     {"lyrics", {"LyricsHostView#LyricsView"}},
     {"lyrics-menu-button", {"Button#LyricsMenuButton"}},
@@ -256,6 +332,23 @@ const std::vector<ClassEntry> kClasses{
     {"queue", {"PlayQueueView#PlayQueueView"}},
     {"queue-clear", {"StackPanel#PlayQueueViewContents > Border > Grid > Button"}},
     {"queue-autoplay", {"StackPanel#PlayQueueViewContents > Border > Grid > ContentControl > ContentPresenter > ToggleButton"}},
+
+    // Apple's other views, by their type (knowledge/winmd): a name finds the view wherever Apple opens it.
+    // Types read from the metadata and not yet seen in a saved tree: names.md lists them as unconfirmed.
+    {"airplay-panel", {"AirPlayView"}},
+    {"airplay-device", {"AirPlayDeviceItem"}},
+    {"audio-quality-flyout", {"AudioQualityFlyout"}},
+    {"reactions-panel", {"ReactionsView"}},
+    {"equalizer", {"EqualizerView"}},
+    {"eq-slider", {"EQSlider"}},
+    {"sound-enhance-slider", {"SoundEnhanceSlider"}},
+    {"info-panel", {"InfoPanelControl"}},
+    {"activity-window", {"ActivityWindowControl"}},
+    {"activity-status-button", {"ActivityWindowItemStatusButton"}},
+    {"video-page", {"VideoPlaybackPage"}},
+    {"column-browser", {"ColumnBrowserView"}},
+    {"breadcrumb", {"Breadcrumb"}},
+    {"rating", {"RatingControl"}},
 };
 
 // Rounded panels floating on the window, with even gaps and aligned edges: the sidebar on the left, the pages on the

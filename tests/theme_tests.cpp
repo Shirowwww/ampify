@@ -1657,6 +1657,42 @@ TEST_CASE(Accent_ChosenOneReachesTheBarsAfterASongChange) {
     CHECK(Assigned(th::LoadAccentOnly(grey), ".now-playing-indicator", "Foreground") == "#FF808080");
 }
 
+// Apple fades a tile's subtitle to 70% for its own grey: the theme's secondary text, faded too, fell under 4.5:1.
+TEST_CASE(Theme_CardSubtitleTakesTheSecondaryTextAtFullOpacity) {
+    MemoryFiles secondary;
+    secondary.files["colors.ini"] = "[Base]\nTextFillColorSecondaryBrush = A3A19B\n";
+    CHECK(Assigned(Load(secondary), ".card-subtitle", "Foreground") == "#FFA3A19B");
+    CHECK(Assigned(Load(secondary), ".card-subtitle", "Opacity") == "1");
+
+    // A theme that fades the subtitle itself keeps its opacity; without a secondary text, Apple's stays.
+    MemoryFiles own;
+    own.files["colors.ini"] = "[Base]\nTextFillColorSecondaryBrush = A3A19B\n";
+    own.files["user.css"] = ".card-subtitle { opacity: 0.8; }\n";
+    CHECK(Assigned(Load(own), ".card-subtitle", "Opacity") == "0.8");
+    CHECK(Assigned(Load(own), ".card-subtitle", "Foreground") == "#FFA3A19B");
+    MemoryFiles none;
+    none.files["user.css"] = "Grid { margin: 1; }\n";
+    CHECK(Assigned(Load(none), ".card-subtitle", "Opacity") == "ABSENT");
+}
+
+// Apple's shelf headers, tile captions and the search field's hint read Apple's own SecondaryTextBrush (white at
+// 51%), which on a lighter page than Apple's (Nord's 3B4252) read at 3.99:1.
+TEST_CASE(Theme_ApplesSecondaryTextFollowsADarkSchemesSecondaryText) {
+    MemoryFiles files;
+    files.files["colors.ini"] =
+        "[Nord]\nApplicationPageBackgroundThemeBrush = 3B4252\nTextFillColorSecondaryBrush = D8DEE9\n\n"
+        "[Latte]\nApplicationPageBackgroundThemeBrush = EFF1F5\nTextFillColorSecondaryBrush = 54576C\n\n"
+        "[Own]\nApplicationPageBackgroundThemeBrush = 3B4252\nTextFillColorSecondaryBrush = D8DEE9\n"
+        "SecondaryTextBrush = 112233\n\n"
+        "[Bare]\nApplicationPageBackgroundThemeBrush = 3B4252\n";
+    CHECK(ResourceValue(Load(files, {"Nord", nullptr, {}}), "SecondaryTextBrush") == "#FFD8DEE9");
+
+    // Apple's dark captions over artwork read the same key: a light scheme's dark text would sink into the cover.
+    CHECK(ResourceValue(Load(files, {"Latte", nullptr, {}}), "SecondaryTextBrush") == "ABSENT");
+    CHECK(ResourceValue(Load(files, {"Own", nullptr, {}}), "SecondaryTextBrush") == "#FF112233");
+    CHECK(ResourceValue(Load(files, {"Bare", nullptr, {}}), "SecondaryTextBrush") == "ABSENT");
+}
+
 TEST_CASE(Theme_SearchTopResultsTakeTheCardColour) {
     MemoryFiles card;
     card.files["colors.ini"] = "[Base]\nCardBackgroundFillColorDefaultBrush = 1C2742\n";

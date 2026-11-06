@@ -24,11 +24,17 @@ read on Apple Music 1.1792.
 | `.titlebar` | The title bar strip, on the pages that show it. It lies over the top of the sidebar and the playback bar: a `background` on it catches their clicks, so leave it unset |
 | `.titlebar-drag-area` | The area that drags the window |
 | `.caption-buttons-cover` | The strip that keeps the minimize, maximize and close buttons readable over the playback bar |
-| `.modal` | Where Apple Music shows its dialogs |
+| `.modal` | The place in the window where Apple Music shows some of its dialogs (the dialogs themselves are in [Dialogs](#dialogs)) |
 | `.focus-ring` | The outline drawn around the control that has the keyboard focus |
 | `.popup-scrim` | The layer behind an open menu, which catches the clicks outside it. Keep it transparent: a painted background covers the whole window while a menu is open |
 | `.info-bar` | The banners at the top and at the bottom of the window |
+| `.info-bar-icon` | The icon of a banner: Apple's severity glyph, or the icon a banner brings |
+| `.info-bar-title`, `.info-bar-message` | The bold first line of a banner, and its text |
+| `.info-bar-content` | The area for content that a banner shows with its text |
+| `.info-bar-close` | The button that closes a banner |
 | `.scrollbar` | The scroll bars of every list and page. Away from the pointer a scroll bar is a thin line, painted by `color`; under the pointer it widens to a thumb painted by the `:hover` colour, on a track painted by `background` (`:hover` too under the pointer) |
+| `.scrollbar-thumb`, `.scrollbar-track` | The thumb and the track of a scroll bar, for a rule of their own (`.scrollbar-thumb { corner-radius: 2px; }`) |
+| `.scrollbar-arrow` | The small arrow buttons at the ends of a scroll bar, shown when it widens |
 
 ## Sidebar
 
@@ -45,12 +51,22 @@ read on Apple Music 1.1792.
 | `.search-area` | The area around the search box |
 | `.search-box` | The search box |
 | `.search-suggestions` | The suggestions under the search box (a popup of its own, outside the window) |
+| `.search-input` | The text field inside the search box |
+| `.search-placeholder` | The hint shown in it while it is empty |
+| `.search-button`, `.search-clear` | The magnifier button of the search box, and the button that empties it |
+| `.more-button` | The "..." button at the top of the sidebar, whose menu holds Settings |
+| `.more-icon` | The dots drawn in it |
+| `.topnav` | The row of buttons that takes the place of the sidebar's header in a narrow window |
 | `.topbar-back` | With `apple.topbar = search`: the back arrow left of the search box, in the strip at the top of the window. It presses Apple's `.back-button`, which then stays in its place, transparent |
 | `.topbar-search` | With `apple.topbar = search`: the cell in that strip that holds Apple's own `.search-box`, centred in the window. `.search-area` stays empty and hidden in the sidebar meanwhile |
 | `.sidebar-scroll` | The scrolling list of the sidebar |
 | `.sidebar-items` | The items of that list |
 | `.sidebar-item` | One item: Home, Radio, a playlist... |
-| `.sidebar-item-artwork` | The artwork of a pinned item |
+| `.sidebar-item-artwork` | The frame of a pinned item's artwork (with the play button over it) |
+| `.sidebar-item-image` | The picture in that frame |
+| `.sidebar-subitems` | The items inside a folder of playlists, under its row |
+| `.sidebar-chevron` | The arrow that opens and closes such a folder |
+| `.sidebar-border` | The edge of the sidebar that Apple draws in high contrast |
 | `.sidebar-selection` | The bar that marks the selected item. Each item has its own, and only the selected one shows |
 | `.sidebar-count` | The number badge on a sidebar item |
 | `.sidebar-play-button` | The play button over that artwork |
@@ -59,7 +75,9 @@ read on Apple Music 1.1792.
 | `.sidebar-separator` | The line above it |
 | `.sidebar-entry` | An entry Ampify adds at the bottom of the sidebar: the Marketplace, an extension's page. Folded, it is a centred icon as wide as the column less its margins; open, the full row. Its icon sits on the axis of Apple's own icons, wherever a theme moves them. Ampify sets that width and the padding itself, at each pass over the sidebar, so a `width` or `padding` here does not hold. Margin, height and colours are the theme's |
 | `.sidebar-drag-indicator` | The line shown above or below a pinned item while it is dragged to a new place |
+| `.sidebar-footer-scroll` | The scrolling list at the bottom of the sidebar |
 | `.account-picture` | The account picture |
+| `.account-badge` | The small badge on that picture |
 | `.account-name` | The account name |
 
 ## Content and pages
@@ -85,6 +103,8 @@ read on Apple Music 1.1792.
 | `.settings-card` | A card of the settings pages, and a row of the main settings page |
 | `.page-top-spacer` | The empty space at the top of a page, 64 pixels high, that keeps it below the playback bar |
 | `.stacked-list` | The list of Home and Search, whose top padding plays the same part |
+| `.stacked-page-header` | The header at the top of a stacked page, above its first shelf |
+| `.page-scroll` | The scroller of a page made of a list: Home, an album, a playlist, the Songs table. A shelf's sideways scroller is not one |
 | `.page-header` | The title bar of a page, which stays at the top when the page scrolls |
 | `.page-title` | The title of a page |
 | `.loading` | The spinner shown while a page loads its content |
@@ -102,7 +122,10 @@ read on Apple Music 1.1792.
 |---|---|
 | `.section-header` | The header of a section |
 | `.shelf` | A row of cards that scrolls sideways |
-| `.shelf-title` | Its title |
+| `.shelf-title` | Its title row: the title and the subtitles |
+| `.shelf-title-link` | The title as Apple's link control |
+| `.shelf-title-text` | The text of the title, a link or a plain text |
+| `.shelf-subtitles` | The lines under the title, when a shelf has some |
 | `.shelf-grid` | The cards of the row |
 | `.shelf-arrows` | The arrows that scroll it |
 | `.shelf-arrow-left`, `.shelf-arrow-right` | Each arrow |
@@ -119,6 +142,7 @@ read on Apple Music 1.1792.
 | `.card-poster-chin` | The band under a large editorial tile's text, rounded at the bottom only: give it `0 0 r r` |
 | `.card-play-button` | The play button that shows over a card under the pointer |
 | `.cover-play-button` | The play button over an album's or a playlist's cover (not the one of its header) |
+| `.card-text-grid` | The grid that lays out the title and the subtitle of a brick card |
 | `.card-title`, `.card-subtitle` | The two lines of text under a card |
 | `.artwork` | Every artwork, in cards, lists and the playback bar, except artists' pictures |
 | `.artist-artwork` | Artists' round pictures, in shelves and at the top of an artist's page. Apple lights them under the pointer with a round shape: squaring them leaves a round light over a square picture |
@@ -173,6 +197,12 @@ read on Apple Music 1.1792.
 | `.fullscreen-time` | The elapsed and remaining times |
 | `.fullscreen-lyrics` | Its lyrics column |
 | `.fullscreen-exit` | Its exit and close buttons |
+| `.fullscreen-volume`, `.fullscreen-airplay`, `.fullscreen-reactions`, `.fullscreen-audio-badge` | Its volume control, and its AirPlay, reactions and audio format buttons |
+| `.mini-player` | Apple's mini player, a window of its own that opens from the artwork in the playback bar |
+| `.mini-player-background` | Its animated artwork background |
+| `.mini-lcd` | Its display of the song playing |
+| `.mini-player-lyrics`, `.mini-player-queue` | Its lyrics and Up Next views, when open |
+| `.mini-player-volume` | Its volume control |
 
 ## Playback bar
 
@@ -184,11 +214,15 @@ read on Apple Music 1.1792.
 | `.playbar-extras` | Its third column: lyrics, queue, AirPlay, volume |
 | `.transport` | The control that holds the buttons of the first column (`.transport AppBarButton` for the buttons) |
 | `.shuffle-button`, `.shuffle-dot` | Shuffle, and the dot that shows it is on |
+| `.shuffle-icon`, `.repeat-icon`, `.airplay-icon` | The glyph of each of those buttons |
+| `.transport-icon` | The icon of the previous, play and next buttons |
 | `.previous-button`, `.play-button`, `.next-button` | Previous, play or pause, next. Apple Music turns them off until a song is loaded, and a button turned off gets no pointer: their `:hover` and `:active` show once a song is there |
 | `.repeat-button`, `.repeat-dot` | Repeat, and its dot |
 | `.lcd` | The display of the song playing |
 | `.lcd-artwork` | Its artwork area |
 | `.lcd-artwork-image`, `.lcd-placeholder` | The artwork, and what shows when there is none |
+| `.lcd-artwork-hover` | The layer Apple shows over the artwork under the pointer |
+| `.lcd-loading` | The line that runs along the display while a song loads |
 | `.track-text` | The title and the artist |
 | `.track-lines`, `.track-line` | The block of the two lines, and each line |
 | `.track-title`, `.track-artist` | Each of them |
@@ -198,7 +232,7 @@ read on Apple Music 1.1792.
 | `.audio-badge` | The badge of the audio format (Lossless, Dolby Atmos) |
 | `.live-badge`, `.autoplay-badge` | The Live and Autoplay badges |
 | `.apple-logo` | The Apple logo shown when nothing plays |
-| `.lcd-more-button` | The "..." button of the song playing |
+| `.lcd-more-button` | Kept for themes that already use it: the sidebar's "..." button, now `.more-button`. The display has no such button of its own |
 | `.playbar-toggles` | The buttons of the third column |
 | `.lyrics-button`, `.queue-button`, `.airplay-button` | Lyrics, Up Next, AirPlay |
 | `.volume`, `.volume-button` | The volume control, and its speaker button |
@@ -232,11 +266,58 @@ They open in popups, each a root of its own: `.flyout Slider` works, `.playbar .
 | `.menu-separator` | The line between two groups of entries |
 | `.tooltip` | The tip that shows under a button after a moment |
 
+## Dialogs
+
+Apple Music's dialogs (the welcome and terms screens, "Edit playlist", the confirmations Ampify asks for) are all built
+on one template, which these names reach whatever the dialog's own type is. A dialog opens in a popup of its own, like a
+flyout: a rule must start at the dialog, and `.window .dialog` matches nothing. Only one dialog is open at a time.
+
+| Class | Zone |
+|---|---|
+| `.dialog` | The box: its `background`, `corner-radius` and `border-color` |
+| `.dialog-scrim` | The veil Apple lays over the window behind a dialog |
+| `.dialog-title` | The title, when the dialog has one in its template |
+| `.dialog-content` | What the dialog says or asks |
+| `.dialog-buttons` | The row of buttons at the foot |
+| `.dialog-primary`, `.dialog-secondary`, `.dialog-close` | Its three buttons: the main one (in the accent colour by default), the second choice, and the one that closes. A dialog shows the ones it needs |
+| `.dialog-checkbox` | A check box in a dialog, such as "do not ask again" |
+
+```css
+.dialog { corner-radius: 14px; }
+.dialog-primary { background: #FF3B7A; color: #FFFFFF; }
+```
+
+## Apple's other views
+
+These are named by their type, so a name finds the view wherever Apple opens it: in a pane, a flyout or a window of its
+own. Their insides are not named yet; reach them with `Type#Name` (`ampify devtools` lists them).
+
+| Class | Zone |
+|---|---|
+| `.airplay-panel`, `.airplay-device` | The AirPlay list, and one device in it |
+| `.audio-quality-flyout` | The audio quality choice, from the audio badge |
+| `.reactions-panel` | The reactions of a song |
+| `.equalizer`, `.eq-slider` | The equalizer, and each of its sliders |
+| `.sound-enhance-slider` | The slider of the Sound Enhancer |
+| `.info-panel` | The information panel of an item |
+| `.activity-window`, `.activity-status-button` | The activity window (downloads, uploads), and the status button of one item in it |
+| `.video-page` | The page that plays a music video |
+| `.column-browser` | The column view of the library |
+| `.breadcrumb`, `.rating` | The trail of a settings page, and the star rating |
+
+**Not confirmed on screen.** These names come from the types in Apple's metadata (`knowledge/winmd`), not from a saved
+tree: none of them is in the recorded trees yet, so a class may find no element if Apple instantiates the view under
+another type. The same holds for `.mini-player*` and `.mini-lcd`, `.fullscreen-volume`, `.fullscreen-airplay`,
+`.fullscreen-reactions` and `.fullscreen-audio-badge`. To confirm one: open the view, save the tree (`ampify devtools`,
+which writes `inspector.json`), and run `ampify theme names` on it; a class that finds nothing prints "0 elements".
+`.equalizer` only looks for `EqualizerView` until the other type (`EqualizerControl`) is seen in a tree.
+
 ## Lyrics and queue
 
 | Class | Zone |
 |---|---|
 | `.lyrics-panel` | The side panel of the lyrics and of Up Next. Its `SplitView` places it: `horizontal-alignment`, `grid-column` and `grid-column-span` are refused there, and `width: auto` fits it to its column less its margins |
+| `.lyrics-panel-border` | Its edge in high contrast |
 | `.lyrics-panel-top-spacer` | The 64 at its top that Apple keeps for its own playback bar |
 | `.lyrics` | The lyrics view |
 | `.lyrics-menu-button` | Its menu button |

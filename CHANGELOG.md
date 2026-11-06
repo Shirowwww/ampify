@@ -60,6 +60,17 @@
   the axis of its folded column on the right, and the back arrow takes its place while it shows.
 - New names: `.sidebar-selection`, `.sidebar-count`, `.sidebar-drag-indicator`, `.search-suggestions`, `.loading`,
   `.library-status`, `.cover-play-button`, `.explicit-group`, `.focus-ring` and `.popup-scrim`.
+- Dialogs have names: `.dialog` (the box), `.dialog-scrim`, `.dialog-title`, `.dialog-content`, `.dialog-buttons`,
+  `.dialog-primary`, `.dialog-secondary`, `.dialog-close` and `.dialog-checkbox`, found whatever the dialog's type.
+- More names for Apple Music's own parts: the sidebar (`.more-button`, `.more-icon`, `.sidebar-subitems`,
+  `.sidebar-chevron`, `.sidebar-item-image`, `.sidebar-footer-scroll`, `.sidebar-border`, `.account-badge`, `.topnav`),
+  the search box (`.search-input`, `.search-placeholder`, `.search-button`, `.search-clear`), the banners
+  (`.info-bar-icon`, `-title`, `-message`, `-content`, `-close`), the scroll bars (`.scrollbar-thumb`, `-track`,
+  `-arrow`), Home (`.shelf-title-link`, `.shelf-title-text`, `.shelf-subtitles`, `.stacked-page-header`, `.page-scroll`,
+  `.card-text-grid`), the playback bar (`.shuffle-icon`, `.repeat-icon`, `.airplay-icon`, `.transport-icon`,
+  `.lcd-loading`, `.lcd-artwork-hover`), the full-screen player's controls, Apple's mini player (`.mini-player`...) and
+  Apple's other views (AirPlay, reactions, equalizer, info panel, activity window...). `.lcd-more-button` named the
+  sidebar's "..." button, not one of the display: it stays, and `.more-button` is its right name.
 - `calc()` takes `min()` and `max()`, so a theme can cap a size.
 - Fluent: an accent colour setting, Windows' blue or the colour of the artwork (play button, volume and progress).
 - Mirror: a panel corners setting, from square to round (the default is the current look).
@@ -129,6 +140,11 @@
 - A state can sit on any part of a selector, not only the last: `.track-row:hover .favorite-button { opacity: 1 }`
   shows a song's buttons while the pointer is over its row, and gives them back when it leaves. `:active`, `:focus` and
   `:current` work the same way.
+- Texts keep 4.5:1 under every theme with a dark scheme: Apple's shelf headers, captions and the search field's hint
+  take the theme's secondary text instead of Apple's white at 51%, and a tile's subtitle shows the theme's secondary
+  text at full opacity, not faded to 70%. Palettes Frappé and Latte get darker or lighter shades of their own family.
+- Declutter: Apple's info banners and its logo in the display each have a switch, on by default as before.
+- Square corners keeps Apple's round buttons and badges round.
 
 ### Extensions
 

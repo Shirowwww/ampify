@@ -6,8 +6,9 @@
     --corner: 0;
 }
 
-Button,
-Border,
+/* Apple's round buttons and badges are circles, not rounded corners: they stay round. */
+Button:not(#RadioPlayButton):not(#PlayButton):not(#leftPlayButton):not(#RightMoreButton),
+Border:not(#AutoPlayBadge),
 .play-button > Grid#Root,
 .playbar,
 .sidebar,
@@ -31,4 +32,10 @@ Border,
 .tooltip,
 .fullscreen-artwork {
     corner-radius: var(--corner);
+}
+
+/* The round button beside a station's Play has no name to leave out above: it gets back Apple's half of its 32.
+   !important because the names left out above weigh more than this one. */
+.radio-play-button + Button {
+    corner-radius: 16 !important;
 }

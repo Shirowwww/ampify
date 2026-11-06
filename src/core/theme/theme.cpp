@@ -242,6 +242,17 @@ void DefinePageHeaderFrost(Theme& theme, const std::set<std::string>& owned, boo
     }
 }
 
+// Apple's shelf headers, captions and the search field's hint read Apple's own SecondaryTextBrush, white at 51%: on a
+// theme's page lighter than Apple's it fell under 4.5:1, so it takes the theme's secondary text. Only for a dark
+// scheme: Apple's dark-mode captions over artwork read the same key, where a light scheme's dark text would sink.
+void DefineAppleSecondaryText(Theme& theme, const std::set<std::string>& owned, bool applied) {
+    constexpr const char* kSecondary = "TextFillColorSecondaryBrush";
+    std::optional<Argb> secondary = theme.palette.Find(kSecondary);
+    std::optional<bool> dark = DarkFromPalette(theme.palette);
+    if (!secondary || !dark || !*dark) return;
+    DefineDerived(theme, owned, kSecondary, "SecondaryTextBrush", *secondary, applied);
+}
+
 // The colours a theme leaves to Ampify, once its own resources.xaml is known.
 void DefineDerivedColors(Theme& theme, bool applied) {
     std::vector<std::string> keys = XamlKeys(theme.resourceDictionary);
@@ -252,6 +263,7 @@ void DefineDerivedColors(Theme& theme, bool applied) {
     DefineSelectedRows(theme, owned, applied);
     DefineAcrylicSurfaces(theme, owned, applied);
     DefinePageHeaderFrost(theme, owned, applied);
+    DefineAppleSecondaryText(theme, owned, applied);
 }
 
 // A Spicetify colour: a $name, a --spice-name variable as in Spicetify, and the app brushes that play its part
@@ -692,11 +704,14 @@ std::string ArtistInLinkColour(const Theme& theme) {
 }
 
 // A tile's subtitle that links to the artist keeps the colour Apple gives its link in code, for the mode the page was
-// built in: white on a light theme's page, unreadable. It takes the theme's secondary text, as the plain subtitles do.
+// built in: white on a light theme's page, unreadable. It takes the theme's secondary text, as the plain subtitles do,
+// at full opacity: Apple fades it to 70% for its own grey, which put a theme's secondary text under 4.5:1.
 std::string CardLinksInSecondaryText(const Theme& theme) {
-    if (Sets(theme, ".card-subtitle", "Foreground")) return {};
     if (!theme.palette.Find("TextFillColorSecondaryBrush")) return {};
-    return ".card-subtitle { color: $TextFillColorSecondaryBrush; }\n";
+    std::string declarations;
+    if (!Sets(theme, ".card-subtitle", "Foreground")) declarations += " color: $TextFillColorSecondaryBrush;";
+    if (!Sets(theme, ".card-subtitle", "Opacity")) declarations += " opacity: 1;";
+    return declarations.empty() ? std::string() : ".card-subtitle {" + declarations + " }\n";
 }
 
 // Apple Music paints the tiles of a search's top results in its own grey, in code: the theme's card colour instead.

@@ -16,6 +16,7 @@ list(APPEND AMPIFY_TESTS_SOURCES
     tests/pipeline_tests.cpp
     tests/theme_tests.cpp
     tests/replay_tests.cpp
+    tests/theme_names_tests.cpp
     tests/replay_report_tests.cpp
     tests/replay_cli_tests.cpp
     tests/replay_contrast_tests.cpp
