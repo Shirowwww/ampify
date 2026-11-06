@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <tuple>
@@ -88,6 +89,9 @@ private:
                         Report& report);
     void GiveBackReparents(const std::vector<PendingMove>& pending, const std::vector<NodeInfo>& nodes,
                            TreeBackend& tree, Report& report);
+    // A SplitView's pane keeps its template's placement (pane.hpp): `fitted` holds the width written instead of auto.
+    void PlacePane(const std::vector<NodeInfo>& nodes, int position, std::map<std::string, const Assignment*>& winners,
+                   std::optional<Assignment>& fitted, TreeBackend& tree, Report& report);
     bool WriteValue(const NodeInfo& node, const Assignment& assignment, TreeBackend& tree, Report& report, bool keep);
     std::optional<Value> Resolve(NodeId id, const std::string& property, const Value& value, const Value& current,
                                  TreeBackend& tree);

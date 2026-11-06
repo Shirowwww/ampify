@@ -577,6 +577,7 @@ const char kReact[] = R"AMPIFYJS(
   };
 
   // A new value from the host, as JSON text: {"id": <callback id>, "value": <boolean, number or text>}.
+  const controlChange = dispatch.change;  // module ui: the changes of a hand-written tree
   dispatch.change = (payload) => {
     let data;
     try {
@@ -587,7 +588,11 @@ const char kReact[] = R"AMPIFYJS(
     }
     const id = Number(data && data.id);
     const entry = handlers.get(id);
-    if (!entry || typeof entry.fn !== "function") return;
+    if (!entry) {
+      if (controlChange) controlChange(payload);
+      return;
+    }
+    if (typeof entry.fn !== "function") return;
     const value = data.value;
     runGuarded("change " + id, entry.fn, [{ type: "change", id, value, target: { value, checked: value === true } }]);
   };

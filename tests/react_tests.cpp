@@ -543,6 +543,31 @@ TEST_CASE(Interface_FullscreenOpenUpdatesAndTellsOnClose) {
     CHECK(bad->lastError().find("size") != std::string::npos);
 }
 
+// A tree written by hand takes onClick functions as a React tree does: each becomes a callback id, the same id when
+// the tree is sent again, and the click runs the function of the latest tree.
+TEST_CASE(Interface_HandWrittenTreeRunsItsClickFunctions) {
+    Fixture f;
+    auto element = f.Make("rawclick", R"(
+        const tree = (word) => ({ type: "stack", children: [
+          { type: "button", key: "go", label: "Go", onClick: () => Ampify.log("clicked " + word) }] });
+        Ampify.ui.fullscreen.open(tree("one"));
+        Ampify.ui.fullscreen.open(tree("two"));
+    )", R"("ui.fullscreen")");
+    CHECK(element->Start());
+    auto slot = f.host.ui.Fullscreen();
+    CHECK(slot.has_value());
+    if (!slot) return;
+    const ampify::Json* button = FindNode(slot->tree, "label", "Go");
+    const ampify::Json* id = button ? button->Find("onClick") : nullptr;
+    CHECK(id && id->AsNumber());
+    if (!id || !id->AsNumber()) return;
+    element->DeliverClick(static_cast<int>(*id->AsNumber()));
+    element->Pump();
+    CHECK(f.Logged("[rawclick] clicked two"));
+    CHECK(!f.Logged("[rawclick] clicked one"));
+    element->Stop();
+}
+
 TEST_CASE(Interface_FullscreenKeysAndPointerReachTheListeners) {
     Fixture f;
     auto element = f.Make("fullkeys", R"(

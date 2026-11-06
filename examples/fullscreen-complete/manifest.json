@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "fullscreen-complete",
   "name": "Full screen, complete",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "A full-screen view of the song with its lyrics, Up Next and the controls. Ctrl+Alt+F opens it; inside it, F closes it, L shows the lyrics and Q shows Up Next. The controls fade after 3 seconds without pointer movement.",

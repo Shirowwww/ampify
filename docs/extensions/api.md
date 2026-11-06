@@ -241,7 +241,8 @@ Ampify.audio.eq.presets()           // -> preset names
 An interface is a tree of nodes `{ type, ...attributes, children }`, written directly or with `Ampify.React`
 (section 5.9). Ampify draws it with WinUI controls and, on each render, only changes the nodes that changed (matched by
 position or `key`). Each node gets the AutomationId `AMPIFY_<element>_<node>`. Limits: 8 levels, 300 nodes, 500
-characters per text; attributes are plain values.
+characters per text; attributes are plain values, except `onClick` and `onChange`, which take a function in a tree
+written by hand as in a React one.
 
 | Node | Attributes |
 |---|---|
@@ -321,7 +322,10 @@ Ampify.ui.navigate(path)
 - A button with `active: true`, or switched by `setActive`, is drawn in the accent colour and reads "on" to screen
   readers: a toggle such as a sleep timer or a lyrics mode shows its state at a glance. A sidebar entry that is on also
   gets the bar Apple Music puts before its selected item, and it is on by itself while its element's page is open.
-- The full-screen view covers the window, above everything. Escape or its Close button closes it. One at a time: the
+- The full-screen view covers the window, above everything. Escape or its Close button closes it. The view's tree
+  starts 64 px from the top, under the Close button, and fills the rest: give its root `valign: "stretch"` to lay
+  columns as tall as the window (a `lyrics` node that grows then scrolls within them). `onPointer` runs only when the
+  pointer really moves, not when the view is redrawn under a still pointer. One at a time: the
   last element that opens it wins, and `onClose` runs when the user closes it or another element takes it.
 - `applePlayer.open()` opens Apple's full-screen player where the user chose in Ampify's settings page (`apple.fullscreen`).
   If Apple Music refuses, nothing opens and the log says why.

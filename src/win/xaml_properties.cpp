@@ -211,6 +211,10 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         if (auto nav = object.try_as<controls::NavigationView>()) {
             return theme::Value{theme::ValueKind::Length, th::FormatNumber(nav.CompactPaneLength())};
         }
+    } else if (property == "OpenPaneLength") {  // read only: the engine fits a pane's `width: auto` to it (pane.hpp)
+        if (auto split = object.try_as<controls::SplitView>()) {
+            return theme::Value{theme::ValueKind::Length, th::FormatNumber(split.OpenPaneLength())};
+        }
     } else if (property == "FlowDirection") {
         if (auto element = object.try_as<xaml::FrameworkElement>()) {
             bool rtl = element.FlowDirection() == xaml::FlowDirection::RightToLeft;
@@ -764,7 +768,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
             // the slider's thumb for good. Ending the hold gives back Apple's value as it is now, which a write would not.
             if (ToLowerAscii(value.text) != "collapsed") {
                 if (element.Visibility() != xaml::Visibility::Visible) HoldVisible(id, element);
-            } else if (!ReleaseVisible(id)) {
+            } else if (!ReleaseVisible(id, element)) {
                 element.Visibility(xaml::Visibility::Collapsed);
             }
             return true;

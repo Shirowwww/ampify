@@ -114,16 +114,25 @@
     }
 
     /* Folded, Apple's back and menu buttons stayed at the window's left edge, away from the column of icons: they go to
-       its top, on the icons' axis, as in Apple's own order. The sidebar it opens over the pages has its header start
-       where Apple leaves room for the arrow, on the left: the header comes back to the edge and stops short of them. */
+       its top, on the icons' axis, as in Apple's own order. */
     @media (max-width: 1324px) {
         .sidebar-toggle-area {
             horizontal-alignment: right;
             margin: calc(var(--caption-room) - 10) var(--gap) 0 0 !important;
         }
 
+        /* Apple widens the header's first columns while the arrow shows, for an arrow on the left; here it is on the
+           right. The header takes all its columns from Apple's grid edge, 26 left of the column, plus the 15 the
+           other themes get before the logo (41): the logo stays on the axis, arrow or not. A right margin here left
+           the folded header no room for the logo: "···" keeps the title clear of the buttons instead. */
         ContentControl#PaneHeaderContentBorder {
-            margin: 0 44 0 -32;
+            grid-column: 0;
+            grid-column-span: 3;
+            margin: 0 0 0 41;
+        }
+
+        ContentControl#PaneHeaderContentBorder MenuButton#MoreButton {
+            margin: 2 48 0 0;
         }
     }
 

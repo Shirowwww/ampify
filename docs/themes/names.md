@@ -236,7 +236,7 @@ They open in popups, each a root of its own: `.flyout Slider` works, `.playbar .
 
 | Class | Zone |
 |---|---|
-| `.lyrics-panel` | The side panel of the lyrics and of Up Next |
+| `.lyrics-panel` | The side panel of the lyrics and of Up Next. Its `SplitView` places it: `horizontal-alignment`, `grid-column` and `grid-column-span` are refused there, and `width: auto` fits it to its column less its margins |
 | `.lyrics-panel-top-spacer` | The 64 at its top that Apple keeps for its own playback bar |
 | `.lyrics` | The lyrics view |
 | `.lyrics-menu-button` | Its menu button |

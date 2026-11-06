@@ -7,8 +7,55 @@ extern const char kUi[];
 const char kUi[] = R"AMPIFYJS(
   const uiCallbacks = new Map();
 
-  const treeText = (vue) => {
-    const json = JSON.stringify(vue);
+  // A tree written by hand may hold onClick and onChange functions, as a React tree does: each becomes a callback id
+  // kept per surface and node path, so a tree sent again reuses its ids and the handlers of a gone node are dropped.
+  const rawCallbacks = new Map();  // callback id -> function
+  const rawSlots = new Map();      // surface -> Map(node path and event -> callback id)
+
+  const callbackFor = (slots, slot, fn) => {
+    let id = slots.get(slot);
+    if (id === undefined) {
+      id = native.reactHandlerId();
+      slots.set(slot, id);
+    }
+    rawCallbacks.set(id, fn);
+    return id;
+  };
+
+  const childPath = (path, child, index) =>
+    path + "/" + (child && typeof child === "object" && child.key !== undefined ? "k" + child.key : index);
+
+  const withCallbacks = (node, slots, path, used) => {
+    if (!node || typeof node !== "object" || Array.isArray(node)) return node;
+    const copy = {};
+    for (const key of Object.keys(node)) {
+      const value = node[key];
+      if ((key === "onClick" || key === "onChange") && typeof value === "function") {
+        used.add(path + "." + key);
+        copy[key] = callbackFor(slots, path + "." + key, value);
+      } else if (key === "children" && Array.isArray(value)) {
+        copy.children = value.map((child, index) => withCallbacks(child, slots, childPath(path, child, index), used));
+      } else {
+        copy[key] = value;
+      }
+    }
+    return copy;
+  };
+
+  const treeText = (vue, surface) => {
+    let tree = vue;
+    if (surface !== undefined) {
+      const slots = rawSlots.get(surface) || new Map();
+      rawSlots.set(surface, slots);
+      const used = new Set();
+      tree = withCallbacks(vue, slots, "", used);
+      for (const [slot, id] of [...slots]) {
+        if (used.has(slot)) continue;
+        slots.delete(slot);
+        rawCallbacks.delete(id);
+      }
+    }
+    const json = JSON.stringify(tree);
     if (json === undefined) throw new TypeError("the interface must be an object");
     return json;
   };
@@ -57,7 +104,7 @@ const char kUi[] = R"AMPIFYJS(
 
   const fullscreen = Object.freeze({
     open(vue) {
-      const session = native.uiFullscreen(treeText(vue), fullscreenSession);
+      const session = native.uiFullscreen(treeText(vue, "fullscreen"), fullscreenSession);
       if (session) fullscreenSession = session;
     },
     close() {
@@ -140,7 +187,7 @@ const char kUi[] = R"AMPIFYJS(
         return addMenuItem("menu-" + kind, options);
       },
     }),
-    popup: Object.freeze({ open: (vue) => native.uiPopup(treeText(vue)) }),
+    popup: Object.freeze({ open: (vue) => native.uiPopup(treeText(vue, "popup")) }),
     fullscreen,
     applePlayer: Object.freeze({ open: () => native.uiApplePlayer() }),
     miniPlayer: Object.freeze({
@@ -148,7 +195,7 @@ const char kUi[] = R"AMPIFYJS(
       close: () => native.uiMiniPlayer(false),
     }),
     panel: Object.freeze({
-      register: (id, vue) => native.uiPanel(text(id), treeText(vue)),
+      register: (id, vue) => native.uiPanel(text(id), treeText(vue, "panel:" + text(id))),
       remove: (id) => native.uiPanelRemove(text(id)),
       onClose(id, fn) {
         if (typeof fn !== "function") throw new TypeError("panel.onClose expects a function");
@@ -158,7 +205,7 @@ const char kUi[] = R"AMPIFYJS(
         return () => panelClosers.get(key).delete(fn);
       },
     }),
-    page: Object.freeze({ register: (path, vue) => native.uiPage(text(path), treeText(vue)) }),
+    page: Object.freeze({ register: (path, vue) => native.uiPage(text(path), treeText(vue, "page:" + text(path))) }),
     title: Object.freeze({ set: (title) => native.uiTitle(text(title)) }),
     // A button of the top bar or the play bar this element added, by the id addButton gave.
     setLabel: (id, label) => native.uiControlLabel(Number(id), text(label)),
@@ -172,7 +219,25 @@ const char kUi[] = R"AMPIFYJS(
 
   dispatch.click = (id) => {
     const fn = uiCallbacks.get(id);
-    if (fn) runGuarded("button " + id, fn, []);
+    if (fn) return runGuarded("button " + id, fn, []);
+    const raw = rawCallbacks.get(id);
+    if (raw) runGuarded("click " + id, raw, [{ type: "click", id }]);
+  };
+
+  // A new value for a hand-written tree, as JSON text: {"id": <callback id>, "value": <boolean, number or text>}.
+  dispatch.change = (payload) => {
+    let data;
+    try {
+      data = JSON.parse(payload);
+    } catch (error) {
+      native.log("[error] change: " + describe(error));
+      return;
+    }
+    const id = Number(data && data.id);
+    const raw = rawCallbacks.get(id);
+    if (!raw) return;
+    const value = data.value;
+    runGuarded("change " + id, raw, [{ type: "change", id, value, target: { value, checked: value === true } }]);
   };
 
   // An entry of Apple Music's menus: a context entry receives the name of the item its menu is about and, when Apple

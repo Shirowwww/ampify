@@ -6,6 +6,8 @@
 #include <optional>
 #include <vector>
 
+#include "pane.hpp"
+#include "properties.hpp"
 #include "scheme_choice.hpp"
 
 namespace ampify::theme {
@@ -181,6 +183,8 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
                 keep(stateWinners, std::make_tuple(selector.trigger, assignment.property, watched), assignment);
             }
         });
+        std::optional<Assignment> fittedWidth;  // `winners` may point to it until the end of this element
+        PlacePane(nodes, position, winners, fittedWidth, tree, report);
 
         // The transition first, so a transform or opacity written in the same pass already animates. The animation
         // last, so it starts from the opacity and around the origin the theme gives the element.
@@ -312,6 +316,7 @@ void ThemeEngine::GiveBack(const NodeInfo& node, const std::map<std::string, con
                 continue;
             }
             if (tree.Write(node.id, it->first.second, it->second)) report.applied++;
+            tree.GaveBack(node.id, it->first.second);
             m_baseSizes.erase(it->first);
             it = m_originals.erase(it);
         }
@@ -389,6 +394,40 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, 
     }
     if (m_detailed) m_journal.Write("Hover: " + Describe(node) + " " + list);
     m_hovers[node.id] = std::move(values);
+}
+
+// The values the template sets on its pane leave `winners`, so GiveBack also takes back one written before. `width:
+// auto` becomes the width that fits the pane's column: a pane sized by its content loops WinUI's layout.
+void ThemeEngine::PlacePane(const std::vector<NodeInfo>& nodes, int position,
+                            std::map<std::string, const Assignment*>& winners, std::optional<Assignment>& fitted,
+                            TreeBackend& tree, Report& report) {
+    const int owner = PaneOwner(nodes, position);
+    if (owner < 0) return;
+    const NodeInfo& node = nodes[position];
+    const std::string where = "\"" + Describe(node) + "\" is placed by its SplitView's template: ";
+    for (auto it = winners.begin(); it != winners.end();) {
+        if (!TemplatePlacesPane(it->first)) {
+            ++it;
+            continue;
+        }
+        Refuse(Describe(node) + " " + it->first, where + it->first, report);
+        it = winners.erase(it);
+    }
+    auto width = winners.find("Width");
+    if (width == winners.end() || width->second->value.text != "NaN") return;
+    auto margin = winners.find("Margin");
+    std::optional<Value> sides = margin != winners.end() ? std::optional<Value>(margin->second->value)
+                                                         : tree.Read(node.id, "Margin");
+    std::optional<Value> length = tree.Read(nodes[owner].id, "OpenPaneLength");
+    std::optional<double> fit = sides && length ? FittedPaneWidth(length->text, sides->text) : std::nullopt;
+    if (!fit) {
+        Refuse(Describe(node) + " Width", where + "Width auto, with no open pane length to fit", report);
+        winners.erase(width);
+        return;
+    }
+    fitted = *width->second;
+    fitted->value = Value{ValueKind::Length, FormatNumber(*fit)};
+    width->second = &*fitted;
 }
 
 // Writes one value when it differs from the current one. `keep` stores the first value seen, for Restore.
@@ -587,6 +626,7 @@ void ThemeEngine::Restore(TreeBackend& tree) {
             } else {
                 gone++;
             }
+            tree.GaveBack(key.first, key.second);
         }
     }
     for (const auto& [key, original] : m_resourceOriginals) {

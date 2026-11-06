@@ -180,6 +180,13 @@ public:
     // property, and the element follows them again. Writing back the value it showed would freeze it there.
     virtual std::optional<Value> ReadOriginal(NodeId id, std::string_view property) { return Read(id, property); }
 
+    // Told once the engine has written back the original of a property (Restore, or a rule that stopped applying):
+    // the backend lets go of what it kept up for the theme's value, which writing the original alone cannot tell.
+    virtual void GaveBack(NodeId id, std::string_view property) {
+        (void)id;
+        (void)property;
+    }
+
     // Application-level resources, such as brushes in the app dictionaries. Keys are the resource names.
     virtual std::vector<std::string> ResourceKeys() = 0;
     virtual std::optional<Value> ReadResource(std::string_view key) = 0;

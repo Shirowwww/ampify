@@ -721,18 +721,35 @@ void XamlTreeBackend::OnHeldVisibility(theme::NodeId id) noexcept {
     }
 }
 
-bool XamlTreeBackend::ReleaseVisible(theme::NodeId id) noexcept {
+bool XamlTreeBackend::ReleaseVisible(theme::NodeId id, const xaml::UIElement& element) noexcept {
     auto known = m_visibleHolds.find(id);
     if (known == m_visibleHolds.end()) return false;
+    bool same = true;
     try {
         known->second.story.Stop();  // Apple's own value shows again: its state, or the local value under it
-        if (xaml::UIElement element = known->second.element.get()) {
-            element.UnregisterPropertyChangedCallback(xaml::UIElement::VisibilityProperty(), known->second.token);
-        }
+        xaml::UIElement held = known->second.element.get();
+        same = !element || held == element;
+        if (held) held.UnregisterPropertyChangedCallback(xaml::UIElement::VisibilityProperty(), known->second.token);
     } catch (...) {
     }
     m_visibleHolds.erase(known);
-    return true;
+    return same;
+}
+
+// A row Apple rebuilt or recycled away: its hold would keep Ampify's storyboard, and perhaps the row, for good.
+void XamlTreeBackend::DropDeadHolds() noexcept {
+    std::vector<theme::NodeId> gone;
+    for (const auto& [id, hold] : m_visibleHolds) {
+        try {
+            xaml::UIElement held = hold.element.get();
+            auto element = held ? held.try_as<xaml::FrameworkElement>() : nullptr;
+            bool detached = element && !element.IsLoaded() && !media::VisualTreeHelper::GetParent(element);
+            if (!held || detached) gone.push_back(id);
+        } catch (...) {
+            gone.push_back(id);
+        }
+    }
+    for (theme::NodeId id : gone) ReleaseVisible(id);
 }
 
 }  // namespace ampify::win

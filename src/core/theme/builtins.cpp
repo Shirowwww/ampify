@@ -370,10 +370,17 @@ PersonPicture#smallPersonPicture {
         margin: -1 0 -1 0;
     }
 
-    /* The logo's centre on the column's axis (its 22 wide, 6 in Apple's header: (48 - 22) / 2 - 6 = 7). It stood 9 left
-       of it at -2. */
+    /* The logo's centre on the column's axis. It is 22 wide, and Apple's header starts it 15 in from the column's edge
+       (the header's margin of 6, then a column of 9 before its content): at 7, it stood 9 to 12 pixels right of the
+       icons in every theme, measured at 125%. */
     ContentControl#PaneHeaderContentBorder > ContentPresenter > Grid > Image {
-        margin: 4 0 0 calc((var(--compact-pane, 48) - 22) / 2 - 6);
+        margin: 4 0 0 calc((var(--compact-pane, 48) - 22) / 2 - 15);
+    }
+
+    /* "···" sat 2 above the logo's centre: it goes 2 down (4 put it 2 below, measured at 125%), with Apple's 4 on the
+       right. */
+    ContentControl#PaneHeaderContentBorder MenuButton#MoreButton {
+        margin: 2 4 0 0;
     }
 
     PersonPicture#smallPersonPicture {
@@ -410,13 +417,12 @@ PersonPicture#smallPersonPicture {
 /* The lyrics and queue pane: a third panel on the right, below the bar like the pages, instead of a strip glued to the
    window's edge and running up under its buttons. Its first 64 were room for Apple's bar: the panel starts below it.
    Apple gives it a fixed width, which a margin only clipped (the queue's durations and its autoplay button cut at the
-   right): it fills its column, less the margins. */
+   right): `width: auto` on a pane is its column less the margins, which the engine works out. */
 .lyrics-panel {
     background: var(--panel-background, #17171A);
     corner-radius: var(--panel-radius, 10px);
     margin: var(--content-top, 64) var(--gap, 8) var(--gap, 8) 0;
     width: auto;
-    horizontal-alignment: stretch;
 }
 
 .lyrics-panel-top-spacer {

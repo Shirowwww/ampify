@@ -597,9 +597,11 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     if (pageImage) SampleArtwork(pageImage, kPageArtworkPrefix);
     std::erase_if(m_watched, [](const auto& entry) { return !entry.second.get(); });
     std::erase_if(m_touched, [](const auto& entry) { return !entry.second.get(); });
+    DropDeadHolds();
     std::erase_if(m_decors, [this](const auto& entry) {
         if (entry.second.panel.get()) return false;
         m_bars.Drop(entry.second.image);
+        m_animations.Forget(entry.second.imageId);
         return true;
     });
     for (auto it = m_hoverHandlers.begin(); it != m_hoverHandlers.end();) {
@@ -651,20 +653,40 @@ void XamlTreeBackend::FollowAppleRewrites(theme::NodeId id, const xaml::Dependen
     // Apple writes a lyrics line's alignment again in code (wrapped rows went back to the left for up to a tick).
     auto text = object.try_as<controls::TextBlock>();
     if (!text || property != "TextAlignment") return;
-    if (auto known = m_rewritesFollowed.find(id); known != m_rewritesFollowed.end() && known->second.get() == object) return;
-    for (auto it = m_rewritesFollowed.begin(); it != m_rewritesFollowed.end();) {
-        it = it->second.get() ? std::next(it) : m_rewritesFollowed.erase(it);
+    if (auto known = m_rewritesFollowed.find(id); known != m_rewritesFollowed.end()) {
+        if (known->second.text.get() == text) return;
+        StopFollowingRewrites(id);
     }
+    std::erase_if(m_rewritesFollowed, [](const auto& entry) { return !entry.second.text.get(); });
     std::weak_ptr<bool> alive = m_alive;
+    RewriteFollow follow{winrt::make_weak(text)};
     try {
-        text.RegisterPropertyChangedCallback(controls::TextBlock::TextAlignmentProperty(),
-                                             [this, alive](auto const&, auto const&) noexcept {
-                                                 if (!alive.expired()) SchedulePass(0);
-                                             });
+        follow.token = text.RegisterPropertyChangedCallback(controls::TextBlock::TextAlignmentProperty(),
+                                                            [this, alive](auto const&, auto const&) noexcept {
+                                                                if (!alive.expired()) SchedulePass(0);
+                                                            });
     } catch (...) {
         return;
     }
-    m_rewritesFollowed[id] = winrt::make_weak(object);
+    m_rewritesFollowed[id] = std::move(follow);
+}
+
+void XamlTreeBackend::StopFollowingRewrites(theme::NodeId id) noexcept {
+    auto known = m_rewritesFollowed.find(id);
+    if (known == m_rewritesFollowed.end()) return;
+    try {
+        if (controls::TextBlock text = known->second.text.get()) {
+            text.UnregisterPropertyChangedCallback(controls::TextBlock::TextAlignmentProperty(), known->second.token);
+        }
+    } catch (...) {
+    }
+    m_rewritesFollowed.erase(known);
+}
+
+// The theme's value is gone: nothing of Ampify's keeps it up any more (an alignment followed, a `visible` held).
+void XamlTreeBackend::GaveBack(theme::NodeId id, std::string_view property) {
+    if (property == "TextAlignment") StopFollowingRewrites(id);
+    if (property == "Visibility") ReleaseVisible(id);
 }
 
 void XamlTreeBackend::SchedulePass(int followUps) noexcept {
@@ -1145,7 +1167,10 @@ theme::DecorChange XamlTreeBackend::PlaceDecor(theme::NodeId id, theme::PseudoEl
     const bool same = known != m_decors.end() && known->second.decor == decor;
     if (same && KeepDecorInPlace(children, known->second.image, slot)) return theme::DecorChange::Unchanged;
     xaml::FrameworkElement old{nullptr};  // held until it leaves the panel
-    if (known != m_decors.end()) old = known->second.image;
+    if (known != m_decors.end()) {
+        old = known->second.image;
+        m_animations.Forget(known->second.imageId);
+    }
     xaml::FrameworkElement image{nullptr};
     const wchar_t* name = slot == theme::PseudoElement::Before ? L"AmpifyDecorBefore" : L"AmpifyDecorAfter";
     if (decor.image.starts_with(theme::kBarsContent)) {
@@ -1212,6 +1237,7 @@ theme::DecorChange XamlTreeBackend::RemoveDecor(theme::NodeId id, theme::PseudoE
     DecorImage held = std::move(known->second);  // released at the end of this call, on the interface thread
     m_decors.erase(known);
     m_bars.Drop(held.image);
+    m_animations.Forget(held.imageId);
     controls::Panel panel = held.panel.get();
     if (!panel) return theme::DecorChange::Refused;
     controls::UIElementCollection children = panel.Children();

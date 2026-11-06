@@ -28,6 +28,9 @@
 
 ### Reliability
 
+- Opening the lyrics over a song with lyrics no longer ends Apple Music under Glass and the other floating-panel
+  themes: the pane keeps the place its `SplitView` gives it, at a fixed width that fits its panel, for every theme.
+
 - "Freeze log" in Settings > Apple Music (off by default): each time Apple Music's window stops answering for 0.3 s
   or more, AppleMusic.log says how long and what Ampify was doing then, with a summary each minute. It shows where the
   freezes come from, with or without the themes.
@@ -44,8 +47,22 @@
   faded controls of the full-screen view use it, so a click there no longer presses an invisible button.
 - Each entry of `Ampify.player.queue.list()` has an `artwork`, ready for an `image` node's `src`; the full-screen
   view's Up Next card shows the next song's cover.
+- Full screen, complete: the song's cover shows (it stayed blank), the view is centred in the window and never under
+  its Close button, the lyrics column is as tall as the window and scrolls with the song, Up Next lists only the songs
+  to come with their covers (three under the title, eight in its column) and follows the queue while the view is
+  open. The controls fade 3 seconds after the pointer stops, even while the view redraws.
+- An `image` with `src: "artwork"` shows the song playing even where Apple's play-bar image cannot be found, through
+  Apple's own loader, and follows each new song.
+- A view written as a plain tree, without `Ampify.React`, can give its nodes `onClick` and `onChange` functions; they
+  run as in a React tree. The full-screen view's Previous, Play and Next buttons did nothing before.
+- An `image` with `src: "artwork"` stays sharp when Apple shows the same cover again, as for two songs of one album; it
+  kept Apple's small thumbnail stretched.
+- Full screen, complete: sized so the song column and the three columns side by side fit even the smallest window
+  Apple Music allows; the cover and the controls were cut at the top and bottom, and the song column at the left.
 
 ### Themes
+
+- An `animation` on a `::before` or `::after` decor runs: the Animated artwork snippet's two layers turn again.
 
 - Ampify's own sidebar entries (Marketplace, extensions) fit the folded sidebar: a centred icon in the column, with
   the label as its tooltip; the full row with its label when the sidebar is open, including the hover overlay.
@@ -57,7 +74,8 @@
 - A `centre-bar` layout: the playback buttons centred, the progress line under them, the times at its ends. It is one more choice of the `bar-position` setting in Cinema, Ember, Glass, Greenroom and Palettes, and a setting of the Bottom playback bar snippet. Themes can move an element with the new `move-to` property. The line keeps clear of the song at every width, shows its thumb under the pointer, and the times always show, centred on it: `visibility: visible` now holds over Apple's visual states that hide an element. An element moved out of its template no longer takes that template's pointer states with it, which closed Apple Music at the first hover of the song.
 - Floating panels: the folded sidebar's icons sit on one axis, and the Apple Music logo is centred on it. The
   column's corners stop at 16 pixels so the items at its ends are not cut. The "Apple Music" title moves 3 pixels
-  down to meet the logo.
+  down to meet the logo, and the "···" button of the open sidebar is level with it. Mirror keeps the whole logo on
+  the axis of its folded column on the right, and the back arrow takes its place while it shows.
 - New names: `.sidebar-selection`, `.sidebar-count`, `.sidebar-drag-indicator`, `.search-suggestions`, `.loading`,
   `.library-status`, `.cover-play-button`, `.explicit-group`, `.focus-ring` and `.popup-scrim`.
 - `calc()` takes `min()` and `max()`, so a theme can cap a size.

@@ -29,6 +29,7 @@
 #include "../src/core/theme/inspector.hpp"
 #include "../src/core/theme/layout.hpp"
 #include "../src/core/theme/library.hpp"
+#include "../src/core/theme/pane.hpp"
 #include "../src/core/theme/properties.hpp"
 #include "../src/core/theme/scheme_choice.hpp"
 #include "../src/core/theme/selector.hpp"
@@ -153,6 +154,9 @@ public:
         if (notOwn.count({id, std::string(property)})) return th::kNoOwnValue;
         return Read(id, property);
     }
+
+    std::vector<std::pair<th::NodeId, std::string>> givenBack;  // each original the engine wrote back, in order
+    void GaveBack(th::NodeId id, std::string_view property) override { givenBack.emplace_back(id, property); }
 
     std::optional<th::ViewSize> size;  // the window, for @media; unknown by default
     std::vector<th::MediaQuery> watched;
@@ -789,6 +793,37 @@ TEST_CASE(Theme_ALayoutTakesTheThemesVariablesAndReportsUnderItsName) {
     CHECK(margins[".content"] == "24,64,12,12");
 }
 
+namespace {
+
+// The Margin floating-panels gives the elements whose selector ends with `tail`, keyed by the column's width.
+std::string FoldedHeaderMargin(const char* compactPane, std::string_view tail) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        std::string(":root { --compact-pane: ") + compactPane + "; }\n@import \"ampify:floating-panels\";\n";
+    th::Theme theme = Load(files);
+    std::string margin;
+    for (const th::Assignment& assignment : theme.assignments) {
+        const std::string& text = assignment.selector.text;
+        bool ends = text.size() >= tail.size() && text.compare(text.size() - tail.size(), tail.size(), tail) == 0;
+        if (ends && assignment.property == "Margin" && assignment.media) margin = assignment.value.text;
+    }
+    return margin;
+}
+
+}  // namespace
+
+TEST_CASE(Builtins_FoldedLogoSitsOnTheIconsAxisWhateverTheColumnWidth) {
+    // Apple's header starts its content 15 in from the column's edge (its margin of 6 and a column of 9): a 22-wide
+    // logo is centred on a 48 column at -2, on a 56 column at 2. XAML order: left, top, right, bottom.
+    CHECK(FoldedHeaderMargin("48", "> Grid > Image") == "-2,4,0,0");
+    CHECK(FoldedHeaderMargin("56", "> Grid > Image") == "2,4,0,0");
+}
+
+TEST_CASE(Builtins_FoldedMoreButtonSitsLevelWithTheLogo) {
+    // "···" sat 2 above the logo's centre: it goes 2 down (4 put it 2 below, measured), with Apple's 4 on the right.
+    CHECK(FoldedHeaderMargin("48", "ContentControl#PaneHeaderContentBorder MenuButton#MoreButton") == "0,2,4,0");
+}
+
 TEST_CASE(Inspector_ReadsASavedTreeWithEachPlace) {
     std::optional<std::vector<th::NodeInfo>> nodes = th::ReadInspectorTree(R"({"version":1,"nodes":[
         {"index":0,"type":"Grid","fullType":"","name":"TransportBar","parent":-1,"depth":0},
@@ -1384,7 +1419,64 @@ TEST_CASE(Theme_FloatingLyricsPaneShrinksInsteadOfClippingItsRightEdge) {
     files.files["user.css"] = "@import \"ampify:floating-panels\";\n";
     th::Theme theme = Load(files);
     CHECK(Assigned(theme, ".lyrics-panel", "Width") == "NaN");
-    CHECK(Assigned(theme, ".lyrics-panel", "HorizontalAlignment") == "Stretch");
+    // The SplitView's template places its pane: an alignment there made WinUI's layout loop over the lyrics.
+    CHECK(Assigned(theme, ".lyrics-panel", "HorizontalAlignment") == "ABSENT");
+}
+
+TEST_CASE(Pane_FoundOnlyUnderTheSplitViewThatPlacesIt) {
+    std::vector<th::NodeInfo> nodes(5);
+    nodes[0] = {1, "SplitView", "", "ContentSplitView", -1, 0};
+    nodes[1] = {2, "Grid", "", "", 0, 1};
+    nodes[2] = {3, "Grid", "", "PaneRoot", 1, 2};
+    nodes[3] = {4, "Grid", "", "PaneRoot", -1, 0};  // a grid of the same name elsewhere
+    nodes[4] = {5, "Grid", "", "PaneRoot", 2, 3};   // one level too deep
+
+    CHECK(th::PaneOwner(nodes, 2) == 0);
+    CHECK(th::PaneOwner(nodes, 3) == -1);
+    CHECK(th::PaneOwner(nodes, 4) == -1);
+    CHECK(th::PaneOwner(nodes, 1) == -1);
+}
+
+TEST_CASE(Pane_FitsItsOpenLengthLessItsSideMargins) {
+    CHECK(th::FittedPaneWidth("360", "0,64,14,98") == 346.0);
+    CHECK(th::FittedPaneWidth("360", "8,0,8,0") == 344.0);
+    CHECK(th::FittedPaneWidth("10", "8,0,8,0") == 0.0);  // never a negative width
+    CHECK(!th::FittedPaneWidth("360", "0,64"));
+    CHECK(!th::FittedPaneWidth("360", "a,b,c,d"));
+    CHECK(!th::FittedPaneWidth("NaN?", "0,0,0,0"));
+    CHECK(th::TemplatePlacesPane("HorizontalAlignment") && th::TemplatePlacesPane("Grid.ColumnSpan"));
+    CHECK(!th::TemplatePlacesPane("Margin") && !th::TemplatePlacesPane("Width"));
+}
+
+TEST_CASE(Engine_FitsASplitViewPaneInsteadOfLettingItFollowItsContent) {
+    MemoryFiles files;
+    files.files["user.css"] = "SplitView > Grid > Grid#PaneRoot { width: auto; horizontal-alignment: stretch; "
+                              "margin: 64 14 98 0; }\n";
+    th::Theme theme = Load(files);
+
+    FakeTree tree;
+    tree.Add(-1, "SplitView", "ContentSplitView", {{"OpenPaneLength", {th::ValueKind::Length, "360"}}});
+    tree.Add(0, "Grid", "");
+    th::NodeId pane = tree.Add(1, "Grid", "PaneRoot", {{"Width", {th::ValueKind::Length, "360"}},
+                                                      {"HorizontalAlignment", {th::ValueKind::Keyword, "Left"}},
+                                                      {"Margin", {th::ValueKind::Thickness, "0,0,0,0"}}});
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    engine.Apply(theme, tree);
+    // A fixed width that fits the column, never one that follows the lyrics; the template keeps its alignment.
+    CHECK(tree.Shown(pane, "Width").text == "346");
+    CHECK(tree.Shown(pane, "HorizontalAlignment").text == "Left");
+    CHECK(log.str().find("Refused: \"Grid#PaneRoot\" is placed by its SplitView's template: HorizontalAlignment") !=
+          std::string::npos);
+
+    int writesBefore = tree.writes;
+    CHECK(engine.Apply(theme, tree).applied == 0);
+    CHECK(tree.writes == writesBefore);
+
+    engine.Restore(tree);
+    CHECK(tree.Shown(pane, "Width").text == "360");
 }
 
 TEST_CASE(Theme_ListRowsDrawTheThemesSelection) {
@@ -1734,6 +1826,49 @@ TEST_CASE(Engine_RestoreClearsWhatTheElementOnlyInherited) {
     // The icon gets no fixed colour back, so it follows its button again; the text had its own and gets it back.
     CHECK(tree.Shown(icon, "Foreground") == th::kNoOwnValue);
     CHECK(tree.Shown(text, "Foreground").text == "#FF111111");
+}
+
+TEST_CASE(Engine_TellsTheTreeEachOriginalItGivesBackOnRestore) {
+    MemoryFiles files;
+    files.files["user.css"] = "TextBlock { text-align: center; visibility: visible; }\n";
+    FakeTree tree;
+    th::NodeId line = tree.Add(-1, "TextBlock", "", {{"TextAlignment", {th::ValueKind::Keyword, "Left"}},
+                                                     {"Visibility", {th::ValueKind::Visibility, "Collapsed"}}});
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    engine.Apply(Load(files), tree);
+    CHECK(tree.givenBack.empty());
+
+    engine.Restore(tree);
+
+    const auto given = [&](const char* property) {
+        return std::count(tree.givenBack.begin(), tree.givenBack.end(), std::make_pair(line, std::string(property)));
+    };
+    CHECK(tree.givenBack.size() == 2);
+    CHECK(given("TextAlignment") == 1);
+    CHECK(given("Visibility") == 1);
+}
+
+TEST_CASE(Engine_TellsTheTreeAnOriginalGivenBackWhenItsMediaStopsMatching) {
+    MemoryFiles files;
+    files.files["user.css"] = "@media (max-width: 1000px) { TextBlock { visibility: visible; } }\n";
+    FakeTree tree;
+    tree.size = th::ViewSize{800, 600};
+    th::NodeId time = tree.Add(-1, "TextBlock", "Time", {{"Visibility", {th::ValueKind::Visibility, "Collapsed"}}});
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    th::Theme theme = Load(files);
+    engine.Apply(theme, tree);
+    CHECK(tree.elements[0].properties["Visibility"].text == "Visible");
+    CHECK(tree.givenBack.empty());
+
+    tree.size = th::ViewSize{1200, 600};
+    engine.Apply(theme, tree);
+
+    CHECK(tree.givenBack.size() == 1);
+    CHECK(!tree.givenBack.empty() && tree.givenBack[0] == std::make_pair(time, std::string("Visibility")));
 }
 
 TEST_CASE(Engine_AppliesTheCascadeAndRestoresTheOriginals) {

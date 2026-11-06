@@ -190,7 +190,7 @@ explain them in one line; the page also resets them, and exports or imports them
 | `white-space` | `TextWrapping` (text) | `nowrap` or `normal` |
 | `margin` | `Margin` | 1 to 4 lengths, negative allowed. A negative margin grows an element only when it has no `width` of its own: with one, it keeps that size and only moves |
 | `padding` | `Padding` | 1 to 4 lengths, not negative |
-| `width`, `height` | `Width`, `Height` | A length or `auto`. On an artwork (`.artwork`), a size above Apple's own cap (270 at the top of an album page) lifts that cap, so the cover is not cut |
+| `width`, `height` | `Width`, `Height` | A length or `auto`. On an artwork (`.artwork`), a size above Apple's own cap (270 at the top of an album page) lifts that cap, so the cover is not cut. On a side pane (`.sidebar`, `.lyrics-panel`), `auto` is the pane's open length less its left and right margins, so it fits its column |
 | `min-width`, `min-height` | `MinWidth`, `MinHeight` | A length, or `auto` |
 | `max-width`, `max-height` | `MaxWidth`, `MaxHeight` | A length, or `none` |
 | `compact-pane-length` | `CompactPaneLength` | On `.navigation`: the width of the folded sidebar (48 in Apple Music) |

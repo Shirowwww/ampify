@@ -175,15 +175,18 @@ controls::Button MakeHeaderButton(const controls::Grid& header, const UiControl&
     button.Width(kMoreButtonWidth);
     button.Height(kHeaderButtonHeight);
     button.Padding(xaml::Thickness{});
-    double right = kMoreButtonWidth + kHeaderSpacing;
+    // The top and bottom of "···" too: a theme moves it down to its logo's level, and the entry stays level with it.
+    xaml::Thickness margin{0, 0, kMoreButtonWidth + kHeaderSpacing, 0};
     for (const xaml::UIElement& child : header.Children()) {
         auto more = child.try_as<xaml::FrameworkElement>();
         if (!more || more.Name() != L"MoreButton") continue;
-        right = (more.ActualWidth() > 0 ? more.ActualWidth() : kMoreButtonWidth) + more.Margin().Right + kHeaderSpacing;
+        xaml::Thickness moreMargin = more.Margin();
+        double width = more.ActualWidth() > 0 ? more.ActualWidth() : kMoreButtonWidth;
+        margin = xaml::Thickness{0, moreMargin.Top, width + moreMargin.Right + kHeaderSpacing, moreMargin.Bottom};
         controls::Grid::SetColumn(button, controls::Grid::GetColumn(more));
         controls::Grid::SetRow(button, controls::Grid::GetRow(more));
     }
-    button.Margin(xaml::Thickness{0, 0, right, 0});
+    button.Margin(margin);
     controls::ToolTipService::SetToolTip(button, winrt::box_value(Wide(control.label)));
     return button;
 }

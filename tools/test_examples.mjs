@@ -2866,15 +2866,39 @@ test("fullscreen-complete: after the user closes the view with Escape, Ctrl+Alt+
   assert.equal(world.closes, 0);
 });
 
-test("fullscreen-complete: Ctrl+Alt+L opens the view with the lyrics, at most 40 lines", () => {
+test("fullscreen-complete: Ctrl+Alt+L opens the view with a lyrics node that takes the column's height", () => {
   const { world } = fullscreenRun("fullscreen-complete");
-  const lines = Array.from({ length: 60 }, (_, index) => ({ start: index, end: index + 1, text: `line ${index}` }));
-  world.lyrics = { source: "apple", synced: true, language: "en", lines, text: "" };
+
   world.shortcuts.get("Ctrl+Alt+L")();
+
   assert.equal(world.opened.length, 1);
-  const shown = JSON.stringify(world.opened[0]);
-  assert.ok(shown.includes("line 39"));
-  assert.ok(!shown.includes("line 40"));
+  const lyrics = nodesOf(world.opened[0]).find((node) => node.type === "lyrics");
+  assert.equal(lyrics.grow, true);
+  assert.equal(lyrics.placeholder, "noLyrics");
+  assert.equal(world.opened[0].valign, "stretch");
+});
+
+test("fullscreen-complete: the cover follows the song playing through Apple's own image", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+
+  world.shortcuts.get("Ctrl+Alt+F")();
+
+  const cover = nodesOf(world.opened.at(-1)).find((node) => node.type === "image");
+  assert.equal(cover.src, "artwork");
+});
+
+test("fullscreen-complete: the view keeps three columns whatever pane is open, so none is rebuilt", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.shortcuts.get("Ctrl+Alt+F")();
+  const widths = [world.opened.at(-1).children.length];
+
+  world.onKey("L");
+  widths.push(world.opened.at(-1).children.length);
+  world.onKey("Q");
+  widths.push(world.opened.at(-1).children.length);
+
+  assert.deepEqual(widths, [3, 3, 3]);
+  assert.equal(world.opened.at(-1).align, "center");
 });
 
 test("fullscreen-complete declares exactly the permissions it needs", () => {
@@ -2910,6 +2934,7 @@ function nodesOf(node, found = []) {
 }
 
 const controlsOpacity = (tree) => nodesOf(tree).find((node) => node.transition).opacity;
+const idleWaits = (timers) => [...timers.pending.values()].filter((timer) => timer.ms === 3000).length;
 const labelsOf = (tree) => nodesOf(tree).filter((node) => node.type === "text").map((node) => node.text);
 
 test("fullscreen-complete: F closes the view and L and Q open its panes while it has the keyboard", () => {
@@ -2940,7 +2965,7 @@ test("fullscreen-complete: a key press brings faded controls back and restarts t
   assert.equal(controlsOpacity(world.opened.at(-1)), 0);
   world.onKey("L");
   assert.equal(controlsOpacity(world.opened.at(-1)), 1);
-  assert.equal(timers.pending.size, 1);
+  assert.equal(idleWaits(timers), 1);
 });
 
 test("fullscreen-complete: the controls fade after 3 s without movement and come back on movement", () => {
@@ -2951,7 +2976,7 @@ test("fullscreen-complete: the controls fade after 3 s without movement and come
   assert.equal(controlsOpacity(world.opened.at(-1)), 0);
   world.onPointer();
   assert.equal(controlsOpacity(world.opened.at(-1)), 1);
-  assert.equal(timers.pending.size, 1);
+  assert.equal(idleWaits(timers), 1);
 });
 
 test("fullscreen-complete: faded controls are inert, so clicks there reach nothing invisible", () => {
@@ -2983,17 +3008,55 @@ test("fullscreen-complete: nothing is rebuilt when the song and its state did no
   assert.equal(world.opened.length, sent);
 });
 
-test("fullscreen-complete: Up Next shows the next song, with its artwork when Apple gives one", () => {
+const queueOf = (...entries) => ({ available: true, complete: true, items: entries.map(([id, section]) => (
+  { id, title: `Song ${id}`, artist: `Artist ${id}`, section, artwork: `artwork:${id}` })) });
+const coversOf = (tree) => nodesOf(tree).filter((node) => node.type === "image" && node.src !== "artwork").map((node) => node.src);
+
+test("fullscreen-complete: under the title, Up Next shows the next three songs with their covers", () => {
   const { world } = fullscreenRun("fullscreen-complete");
-  world.queue = { available: true, complete: true, items: [
-    { id: "1", title: "Now", artist: "A", section: "current" },
-    { id: "2", title: "Soon", artist: "B", section: "next-added", artwork: "https://x/cover.jpg" },
-  ] };
+  world.queue = queueOf(["1", "history"], ["2", "current"], ["3", "next-added"], ["4", "next"], ["5", "next"], ["6", "next"]);
+
   world.shortcuts.get("Ctrl+Alt+F")();
+
   const tree = world.opened.at(-1);
-  const card = nodesOf(tree).find((node) => node.type === "card");
-  assert.equal(card.subtitle, "Soon · B");
-  assert.equal(card.children[0].type, "image");
+  assert.deepEqual(coversOf(tree), ["artwork:3", "artwork:4", "artwork:5"]);
+  assert.ok(labelsOf(tree).includes("Song 3"));
+  assert.ok(!labelsOf(tree).includes("Song 2"));
+});
+
+test("fullscreen-complete: the Up Next column lists only the songs to come, and its caption shows once", () => {
+  const { world } = fullscreenRun("fullscreen-complete");
+  world.queue = queueOf(["1", "history"], ["2", "current"], ["3", "next"], ["4", "next"]);
+  world.shortcuts.get("Ctrl+Alt+F")();
+
+  world.onKey("Q");
+
+  const tree = world.opened.at(-1);
+  assert.deepEqual(coversOf(tree), ["artwork:3", "artwork:4"]);
+  assert.equal(labelsOf(tree).filter((label) => label === "queue").length, 1);
+});
+
+test("fullscreen-complete: Up Next is looked at again every 2 s while the view is open", () => {
+  const { world, timers } = fullscreenRun("fullscreen-complete");
+  world.queue = queueOf(["2", "current"], ["3", "next"]);
+  world.shortcuts.get("Ctrl+Alt+F")();
+  world.queue = queueOf(["3", "current"], ["4", "next"]);
+
+  const poll = [...timers.pending.entries()].find(([, timer]) => timer.ms === 2000);
+  timers.pending.delete(poll[0]);
+  poll[1].fn();
+
+  assert.deepEqual(coversOf(world.opened.at(-1)), ["artwork:4"]);
+  assert.ok([...timers.pending.values()].some((timer) => timer.ms === 2000));
+});
+
+test("fullscreen-complete: closing the view stops its timers", () => {
+  const { world, timers } = fullscreenRun("fullscreen-complete");
+  world.shortcuts.get("Ctrl+Alt+F")();
+
+  world.onKey("F");
+
+  assert.equal(timers.pending.size, 0);
 });
 
 test("fullscreen-complete: Up Next says why it is empty when it is not loaded or has nothing after", () => {
@@ -3004,7 +3067,7 @@ test("fullscreen-complete: Up Next says why it is empty when it is not loaded or
   world.queue = { available: true, complete: true, items: [{ id: "1", title: "Now", section: "current" }] };
   world.handlers.trackchange();
   assert.ok(labelsOf(world.opened.at(-1)).includes("queueEmpty"));
-  assert.equal(nodesOf(world.opened.at(-1)).some((node) => node.type === "card"), false);
+  assert.deepEqual(coversOf(world.opened.at(-1)), []);
 });
 
 test("fullscreen-complete: the transport buttons call the player", () => {

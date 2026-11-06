@@ -72,6 +72,7 @@ public:
     std::optional<theme::Value> Read(theme::NodeId id, std::string_view property) override;
     bool Write(theme::NodeId id, std::string_view property, const theme::Value& value) override;
     std::optional<theme::Value> ReadOriginal(theme::NodeId id, std::string_view property) override;
+    void GaveBack(theme::NodeId id, std::string_view property) override;
     std::vector<std::string> ResourceKeys() override;
     std::optional<theme::Value> ReadResource(std::string_view key) override;
     bool WriteResource(std::string_view key, const theme::Value& value) override;
@@ -207,10 +208,12 @@ private:
     winrt::Microsoft::UI::Xaml::FrameworkElement StandIn(const winrt::Microsoft::UI::Xaml::FrameworkElement& element);
     bool IsStandIn(const winrt::Microsoft::UI::Xaml::DependencyObject& object) const;
     // `visibility: visible` held over Apple's own value, binding and visual states (xaml_states.cpp); ReleaseVisible lets
-    // them decide again, and says whether a hold was there.
+    // them decide again, and says whether a hold was there on `element` (any element when null): an id is an address,
+    // so a new element may get the id of one that died holding. DropDeadHolds lets go of elements gone from the tree.
     void HoldVisible(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element) noexcept;
     void OnHeldVisibility(theme::NodeId id) noexcept;
-    bool ReleaseVisible(theme::NodeId id) noexcept;
+    bool ReleaseVisible(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element = nullptr) noexcept;
+    void DropDeadHolds() noexcept;
     void UpdateStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
                       std::string_view property, winrt::Windows::Foundation::IInspectable shown) noexcept;
     std::optional<winrt::Windows::Foundation::IInspectable> KeyOriginal(
@@ -330,7 +333,12 @@ private:
     // the passes still due after a navigation.
     std::function<void()> m_pass;
     std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_watched;
-    std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_rewritesFollowed;
+    struct RewriteFollow {
+        winrt::weak_ref<winrt::Microsoft::UI::Xaml::Controls::TextBlock> text;  // Apple's: a weak reference resolves
+        std::int64_t token = 0;  // the TextAlignment callback, removed by token
+    };
+    std::map<theme::NodeId, RewriteFollow> m_rewritesFollowed;
+    void StopFollowingRewrites(theme::NodeId id) noexcept;
     winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_passTimer{nullptr};
     int m_followUps = 0;
     // Flyouts, menus and tooltips open in popups outside the window's tree. Each popup seen open is walked from then on,

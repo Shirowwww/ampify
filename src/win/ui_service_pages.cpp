@@ -5,6 +5,8 @@
 
 #include "ui_service_detail.hpp"
 
+#include <winrt/Microsoft.UI.Input.h>
+
 #include "dialog_fonts.hpp"
 
 namespace ampify::win::ui_service_detail {
@@ -391,6 +393,8 @@ void DismissFullscreen(const WeakShared& weakShared, const WeakContext& weakCont
     }
 }
 
+constexpr double kFullscreenCloseBand = 64;  // the Close button's margin (16) and height (38), and a gap
+
 controls::Button MakeFullscreenClose() {
     controls::Button close;
     controls::FontIcon glyph;
@@ -455,6 +459,8 @@ controls::Border EnsureFullscreenHost(UiService::Shared& shared, const std::shar
     Name(host, "AMPIFY_FullscreenHost", "Fullscreen view");
     controls::Border slot;
     Name(slot, "AMPIFY_FullscreenSlot");
+    // The view starts under the Close button's band, so its first line is never drawn beneath the button.
+    slot.Margin(xaml::Thickness{0, kFullscreenCloseBand, 0, 0});
     controls::Button close = MakeFullscreenClose();
     host.Children().Append(slot);
     host.Children().Append(close);
@@ -483,14 +489,16 @@ controls::Border EnsureFullscreenHost(UiService::Shared& shared, const std::shar
         } catch (...) {
         }
     });
-    // The pointer's moves keep the element's controls shown: passed on at most every 250 ms (FullscreenPointerDue).
-    auto lastPointer = std::make_shared<std::optional<std::int64_t>>();
-    host.PointerMoved([weakShared, weakContext, lastPointer](IInspectable const&,
-                                                              xaml::Input::PointerRoutedEventArgs const&) noexcept {
-        std::int64_t now = SteadyMs();
-        if (!FullscreenPointerDue(now, *lastPointer)) return;
-        *lastPointer = now;
-        SendToFullscreen(weakShared, weakContext, "fullscreenPointer", "{}");
+    // The pointer's moves keep the element's controls shown: real moves only, at most every 250 ms.
+    auto gate = std::make_shared<FullscreenPointerGate>();
+    host.PointerMoved([weakShared, weakContext, gate](IInspectable const& sender,
+                                                      xaml::Input::PointerRoutedEventArgs const& args) noexcept {
+        try {
+            auto at = args.GetCurrentPoint(sender.as<xaml::UIElement>()).Position();
+            if (!gate->Pass(SteadyMs(), at.X, at.Y)) return;
+            SendToFullscreen(weakShared, weakContext, "fullscreenPointer", "{}");
+        } catch (...) {
+        }
     });
     context.fullscreenPopup = popup;
     context.fullscreenHost = host;

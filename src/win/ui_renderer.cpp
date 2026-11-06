@@ -330,6 +330,13 @@ struct ArtworkFollow {
     // The song playing only: the previous cover fades out over the new one, rounded like the frame.
     ArtworkFade fade;
     xaml::CornerRadius corner{};
+    // Without Apple's play-bar image in the window, Apple's loader gives the cover of each new song (PollArtwork).
+    winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer poll{nullptr};
+    std::string polledKey;  // the song whose cover the loader last gave
+
+    ~ArtworkFollow() {
+        if (poll) poll.Stop();
+    }
 };
 
 struct XamlRenderer::Mounted {
@@ -405,6 +412,17 @@ winrt::Windows::Foundation::Uri AddressOf(const media::ImageSource& source) {
     return bitmap ? bitmap.UriSource() : nullptr;
 }
 
+// The image already shows this file decoded large. Apple sets its play-bar image again with the same file (two songs of
+// one album, a redraw of its bar); a new bitmap of an address WinUI holds decoded may never raise ImageOpened, which
+// left the thumbnail upscaled in place of the cover.
+bool ShowsLarge(const ArtworkFollow& follow, const winrt::Windows::Foundation::Uri& address) {
+    if (!address) return false;
+    auto shown = follow.brush.ImageSource().try_as<media::Imaging::BitmapImage>();
+    if (!shown || shown.DecodePixelWidth() != static_cast<int>(kArtworkPixels)) return false;
+    winrt::Windows::Foundation::Uri current = shown.UriSource();
+    return current && current.Equals(address);
+}
+
 // The large cover's handlers, removed once fired or replaced: the bitmap would otherwise hold the follower, which
 // holds the bitmap.
 void DropLoading(ArtworkFollow& follow) {
@@ -424,6 +442,9 @@ void ShowCover(const std::shared_ptr<ArtworkFollow>& follow, const media::ImageS
     DropLoading(*follow);
     winrt::Windows::Foundation::Uri address = AddressOf(broker);
     if (!address) address = AddressOf(shown);
+    winrt::Windows::Foundation::Uri shownAddress = AddressOf(shown);
+    // Apple's image of another file means a new song even while the loader still gives the previous cover.
+    if (ShowsLarge(*follow, address) && (!shownAddress || shownAddress.Equals(address))) return;
     ShowArtwork(*follow, shown);
     if (!address) return;
     media::Imaging::BitmapImage large;
@@ -475,10 +496,47 @@ std::shared_ptr<ArtworkFollow> ShowQueueArtwork(const media::ImageBrush& brush, 
     return follow;
 }
 
+constexpr auto kArtworkPoll = std::chrono::milliseconds(500);
+
+// The cover of the song playing from Apple's loader, once per song: the key of the now-playing feed tells a new one.
+void PollArtwork(const std::shared_ptr<ArtworkFollow>& follow) {
+    std::string key = CurrentNowPlaying().trackKey;
+    if (follow->off || follow->apple || key == follow->polledKey) return;
+    media::ImageSource broker = PlayingArtworkSource(kArtworkPixels);
+    if (!broker) return;  // Apple has no cover yet: the next tick asks again
+    follow->polledKey = key;
+    ShowCover(follow, broker, broker);
+}
+
+// Apple's play-bar image was not found in the window (a view in a popup over a page too large to walk, or a layout
+// without it): the image would have stayed blank. It follows the song through Apple's loader instead.
+void PollArtworkWithoutApple(const std::shared_ptr<ArtworkFollow>& follow) {
+    PollArtwork(follow);
+    if (!follow->poll) {
+        auto queue = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
+        if (!queue) return;
+        follow->poll = queue.CreateTimer();
+        follow->poll.Interval(kArtworkPoll);
+        follow->poll.IsRepeating(true);
+        std::weak_ptr<ArtworkFollow> weak = follow;
+        follow->poll.Tick([weak](auto const&, auto const&) noexcept {
+            try {
+                if (std::shared_ptr<ArtworkFollow> alive = weak.lock()) PollArtwork(alive);
+            } catch (...) {
+            }
+        });
+    }
+    if (!follow->poll.IsRunning()) follow->poll.Start();
+}
+
 bool StartArtwork(const std::shared_ptr<ArtworkFollow>& follow, const xaml::XamlRoot& root) {
     if (follow->off || follow->apple) return true;
     controls::Image apple = FindPlayingArtwork(root);
-    if (!apple) return false;
+    if (!apple) {
+        PollArtworkWithoutApple(follow);
+        return false;
+    }
+    if (follow->poll) follow->poll.Stop();
     follow->apple = apple;
     follow->token = apple.RegisterPropertyChangedCallback(
         controls::Image::SourceProperty(), [follow](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
@@ -493,6 +551,8 @@ bool StartArtwork(const std::shared_ptr<ArtworkFollow>& follow, const xaml::Xaml
 
 void StopArtwork(ArtworkFollow& follow) {
     DropLoading(follow);
+    if (follow.poll) follow.poll.Stop();
+    follow.polledKey.clear();  // shown again when the image comes back to the window
     if (!follow.apple) return;
     follow.apple.UnregisterPropertyChangedCallback(controls::Image::SourceProperty(), follow.token);
     follow.apple = nullptr;

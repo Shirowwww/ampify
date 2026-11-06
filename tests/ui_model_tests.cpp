@@ -328,3 +328,32 @@ TEST_CASE(UiModel_FullscreenPointerIsReportedAtMostEveryQuarterSecond) {
     CHECK(!ampify::FullscreenPointerDue(249, std::optional<std::int64_t>(0)));
     CHECK(ampify::FullscreenPointerDue(250, std::optional<std::int64_t>(0)));
 }
+
+TEST_CASE(UiModel_FullscreenPointerGatePassesTheFirstMove) {
+    ampify::FullscreenPointerGate gate;
+
+    bool passed = gate.Pass(0, 10, 10);
+
+    CHECK(passed);
+}
+
+TEST_CASE(UiModel_FullscreenPointerGateIgnoresAnEventOfAStillPointer) {
+    // WinUI raises a pointer event when the view is redrawn under a pointer that did not move.
+    ampify::FullscreenPointerGate gate;
+    gate.Pass(0, 10, 10);
+
+    bool passed = gate.Pass(1000, 10.2, 9.8);
+
+    CHECK(!passed);
+}
+
+TEST_CASE(UiModel_FullscreenPointerGatePassesARealMoveOnceTheGapIsOver) {
+    ampify::FullscreenPointerGate gate;
+    gate.Pass(0, 10, 10);
+
+    bool tooSoon = gate.Pass(100, 40, 10);
+    bool afterGap = gate.Pass(300, 60, 10);
+
+    CHECK(!tooSoon);
+    CHECK(afterGap);
+}

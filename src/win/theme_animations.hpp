@@ -57,10 +57,16 @@ public:
     std::optional<theme::Value> WantedBackground(theme::NodeId id) const;
     // Forgets the elements that were destroyed.
     void Sweep();
+    // Stops and forgets the animations of an element Ampify made (a ::before or ::after decor) that leaves the tree:
+    // such an element is held strongly, so Sweep never sees it go.
+    void Forget(theme::NodeId id);
 
 private:
     struct Running {
         winrt::weak_ref<winrt::Microsoft::UI::Xaml::UIElement> element;
+        // Set instead for an element Ampify made: a weak reference to it never resolves inside Apple Music, and the
+        // stepped loops of a decor (the turning artwork) never ran.
+        winrt::Microsoft::UI::Xaml::UIElement held{nullptr};
         std::string text;
         std::vector<winrt::Microsoft::UI::Composition::CompositionAnimation> animations;
         // Keeps the centre of scale and rotation on the origin while the element changes size.
@@ -90,6 +96,7 @@ private:
         std::optional<theme::Value> wantedBackground;
     };
 
+    static winrt::Microsoft::UI::Xaml::UIElement Target(const Running& running);
     static void Stop(Running& running);
     static void Center(Running& running, const winrt::Microsoft::UI::Composition::Compositor& compositor,
                        const winrt::Microsoft::UI::Xaml::UIElement& element, winrt::Windows::Foundation::Point origin);

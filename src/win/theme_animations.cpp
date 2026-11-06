@@ -213,6 +213,7 @@ bool ThemeAnimations::Write(theme::NodeId id, const xaml::UIElement& element, co
 
     Running running;
     running.element = element;
+    if (!running.element.get()) running.held = element;  // made by Ampify: held strongly until Forget
     running.text = text;
     if (!MotionAllowed()) {
         m_running.emplace(id, std::move(running));  // kept as written, so it is not tried again on every pass
@@ -269,7 +270,7 @@ ThemeAnimations::~ThemeAnimations() {
 }
 
 void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> loops) {
-    xaml::UIElement element = running.element.get();
+    xaml::UIElement element = Target(running);
     if (!element) return;
     for (const th::Animation& loop : loops) {
         for (const th::AnimationTrack& track : loop.tracks) {
@@ -337,7 +338,7 @@ void ThemeAnimations::StepLoops() {
             moving = true;
             running.stillShown = false;
         }
-        xaml::UIElement element = shown ? running.element.get() : nullptr;
+        xaml::UIElement element = shown ? Target(running) : nullptr;
         if (!element) continue;
         const double elapsedMs = std::chrono::duration<double, std::milli>(now - running.started).count();
         std::vector<th::ChannelValue> values;
@@ -413,7 +414,7 @@ std::string ThemeAnimations::Read(theme::NodeId id) const {
 
 void ThemeAnimations::Sweep() {
     for (auto it = m_running.begin(); it != m_running.end();) {
-        if (it->second.element.get()) {
+        if (Target(it->second)) {
             ++it;
             continue;
         }
@@ -422,9 +423,20 @@ void ThemeAnimations::Sweep() {
     }
 }
 
+void ThemeAnimations::Forget(theme::NodeId id) {
+    auto known = m_running.find(id);
+    if (known == m_running.end()) return;
+    Stop(known->second);
+    m_running.erase(known);
+}
+
+xaml::UIElement ThemeAnimations::Target(const Running& running) {
+    return running.held ? running.held : running.element.get();
+}
+
 void ThemeAnimations::Stop(Running& running) {
     for (const auto& timer : running.ends) timer.Stop();
-    xaml::UIElement element = running.element.get();
+    xaml::UIElement element = Target(running);
     if (!element) return;
     auto attempt = [](auto&& action) {
         try {
@@ -474,9 +486,9 @@ void ThemeAnimations::EndAt(Running& running, double ms, std::vector<composition
     auto timer = queue.CreateTimer();
     timer.Interval(Span(ms));
     timer.IsRepeating(false);
-    timer.Tick([element = running.element, parts = std::move(parts)](auto const&, auto const&) noexcept {
+    timer.Tick([element = running.element, held = running.held, parts = std::move(parts)](auto const&, auto const&) noexcept {
         try {
-            if (xaml::UIElement target = element.get()) {
+            if (xaml::UIElement target = held ? held : element.get()) {
                 for (const composition::CompositionAnimation& part : parts) target.StopAnimation(part);
             }
         } catch (...) {
