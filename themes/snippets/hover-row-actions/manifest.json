@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "hover-row-actions",
   "name": "Actions on hover",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "The favourite, add, download and reaction buttons of a song appear only when the pointer is over its row, which keeps the lists calm.",

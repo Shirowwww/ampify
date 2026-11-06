@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "hide-explicit",
   "name": "Hide explicit badge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Hides the small E badge that marks explicit songs, on top of any theme.",

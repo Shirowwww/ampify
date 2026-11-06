@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "square-corners",
   "name": "Square corners",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Example snippet: removes the rounding of buttons and frames, on top of any theme.",

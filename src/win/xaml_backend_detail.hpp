@@ -85,6 +85,8 @@ bool KeepDecorInPlace(const controls::UIElementCollection& children, const xaml:
 bool OwnsKey(const xaml::ResourceDictionary& resources, const IInspectable& name);
 std::string DescribeStates(const xaml::FrameworkElement& element);
 void ReadThemeAgain(const xaml::FrameworkElement& element);
+// Composition sprites of one colour under the control (its foreground drawn by hand) take the Foreground it has now.
+void FollowForegroundInSprites(const controls::Control& control) noexcept;
 void ReadPopupsAgain(const xaml::XamlRoot& root) noexcept;
 
 }  // namespace ampify::win::xaml_detail

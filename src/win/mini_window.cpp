@@ -22,6 +22,7 @@
 
 #include <windows.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -102,11 +103,14 @@ void Log(const std::string& line) {
     if (GetState().journal) GetState().journal->Write("Mini player: " + line);
 }
 
-// "#AARRGGBB" from the core, as a brush. The core only gives valid colours.
-media::SolidColorBrush Brush(const std::string& hex) {
+// "#AARRGGBB" from the core, as a colour. The core only gives valid colours.
+winrt::Windows::UI::Color Colour(const std::string& hex) {
     auto channel = [&hex](size_t at) { return static_cast<std::uint8_t>(std::stoul(hex.substr(at, 2), nullptr, 16)); };
-    winrt::Windows::UI::Color colour{channel(1), channel(3), channel(5), channel(7)};
-    return media::SolidColorBrush(colour);
+    return winrt::Windows::UI::Color{channel(1), channel(3), channel(5), channel(7)};
+}
+
+media::SolidColorBrush Brush(const std::string& hex) {
+    return media::SolidColorBrush(Colour(hex));
 }
 
 void Place(const xaml::UIElement& element, const core::Rect& rect) {
@@ -203,7 +207,31 @@ void LayoutParts(Parts& parts, double width, double height) {
     Size(parts.back, layout.back);
 }
 
+// The system draws the title bar and its close button: they follow the theme through the title bar's colours.
+void ApplyCaption(Parts& parts, const core::Colours& colours) {
+    using ColourRef = winrt::Windows::Foundation::IReference<winrt::Windows::UI::Color>;
+    if (!windowing::AppWindowTitleBar::IsCustomizationSupported()) return;
+    const core::Caption caption = core::CaptionFrom(colours);
+    const ColourRef background(Colour(caption.background));
+    const ColourRef foreground(Colour(caption.foreground));
+    const ColourRef inactive(Colour(caption.inactiveForeground));
+    windowing::AppWindowTitleBar bar = parts.window.AppWindow().TitleBar();
+    bar.BackgroundColor(background);
+    bar.InactiveBackgroundColor(background);
+    bar.ForegroundColor(foreground);
+    bar.InactiveForegroundColor(inactive);
+    bar.ButtonBackgroundColor(background);
+    bar.ButtonInactiveBackgroundColor(background);
+    bar.ButtonForegroundColor(foreground);
+    bar.ButtonInactiveForegroundColor(inactive);
+    bar.ButtonHoverBackgroundColor(ColourRef(Colour(caption.hoverBackground)));
+    bar.ButtonHoverForegroundColor(foreground);
+    bar.ButtonPressedBackgroundColor(ColourRef(Colour(caption.pressedBackground)));
+    bar.ButtonPressedForegroundColor(foreground);
+}
+
 void ApplyColours(Parts& parts, const core::Colours& colours) {
+    ApplyCaption(parts, colours);
     parts.root.Background(Brush(colours.background));
     parts.title.Foreground(Brush(colours.foreground));
     parts.artist.Foreground(Brush(colours.muted));
@@ -282,7 +310,7 @@ void SavePlacement(Parts& parts, bool force) {
     parts.lastSave = now;
     windowing::AppWindow app = parts.window.AppWindow();
     const auto position = app.Position();
-    const auto size = app.Size();
+    const auto size = app.ClientSize();
     const core::Placement placement{position.X, position.Y, size.Width, size.Height};
     const std::string text = core::FormatPlacement(placement);
     if (text == GetState().placement) return;
@@ -313,19 +341,35 @@ void WireButtons(Parts& parts) {
     parts.back.Click([](auto&&, auto&&) { PostToUiThread([] { ShowMainWindow(); }); });
 }
 
-// The window's place: the saved one, kept on a screen, or the default corner of the work area of the screen it is on.
-void PlaceWindow(Parts& parts) {
-    windowing::AppWindow app = parts.window.AppWindow();
-    // Not XamlRoot's scale: there is no XamlRoot before Activate, and 1 made the window too small from 125 % on.
+// The screen's scale for the window. Not XamlRoot's: there is none before Activate, and 1 made the window too small.
+double ScaleOf(const windowing::AppWindow& app) {
     const UINT dpi = GetDpiForWindow(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(app.Id().Value)));
-    const double scale = dpi ? dpi / static_cast<double>(USER_DEFAULT_SCREEN_DPI) : 1.0;
+    return dpi ? dpi / static_cast<double>(USER_DEFAULT_SCREEN_DPI) : 1.0;
+}
+
+// The title bar and borders around the content, which differ with the screen's scale.
+core::Frame FrameOf(const windowing::AppWindow& app) {
+    const auto outer = app.Size();
+    const auto client = app.ClientSize();
+    return core::Frame{std::max(0, outer.Width - client.Width), std::max(0, outer.Height - client.Height)};
+}
+
+// The window's place: the saved one, kept on a screen, or the default corner of the work area of the screen it is on.
+// The size is the content's (the title bar comes on top), so the layout gets the room it was made for at every scale.
+std::string PlaceWindow(Parts& parts) {
+    windowing::AppWindow app = parts.window.AppWindow();
+    const std::optional<core::Placement> saved = core::ParsePlacement(GetState().placement);
+    if (saved) app.Move(winrt::Windows::Graphics::PointInt32{saved->x, saved->y});  // scale and frame of that screen
+    const double scale = ScaleOf(app);
+    const core::Frame frame = FrameOf(app);
     const auto work = windowing::DisplayArea::GetFromWindowId(app.Id(), windowing::DisplayAreaFallback::Nearest).WorkArea();
     const core::Rect area{work.X, work.Y, work.Width, work.Height};
-    core::Placement placement = core::ParsePlacement(GetState().placement).value_or(core::DefaultPlacement(area, scale));
-    placement = core::FitInto(placement, area, scale);
-    app.MoveAndResize(winrt::Windows::Graphics::RectInt32{placement.x, placement.y, placement.width, placement.height});
+    core::Placement placement = saved.value_or(core::DefaultPlacement(area, scale, frame));
+    placement = core::FitInto(placement, area, scale, frame);
+    app.Move(winrt::Windows::Graphics::PointInt32{placement.x, placement.y});
+    app.ResizeClient(winrt::Windows::Graphics::SizeInt32{placement.width, placement.height});
     LayoutParts(parts, placement.width / scale, placement.height / scale);
-    Log("window placed at " + core::FormatPlacement(placement));
+    return core::FormatPlacement(placement);
 }
 
 void OnClosed(Parts& parts) {
@@ -356,8 +400,9 @@ void FollowMainWindow(Parts& parts) {
     parts.followsMain = true;
 }
 
-// Creates the window on the interface thread, with the controls, the placement, the presenter and the events.
-void MakeWindow(Parts& parts) {
+// Creates the window on the interface thread, with the controls, the placement, the presenter and the events. Gives
+// the placement, for the one log line of the opening.
+std::string MakeWindow(Parts& parts) {
     BuildContent(parts);
     WireButtons(parts);
     parts.window = xaml::Window();
@@ -382,22 +427,26 @@ void MakeWindow(Parts& parts) {
     parts.timer = parts.window.DispatcherQueue().CreateTimer();
     parts.timer.Interval(kTick);
     parts.timer.Tick([](auto&&, auto&&) { Refresh(GetState().parts); });
-    PlaceWindow(parts);
+    std::string placement = PlaceWindow(parts);
     FollowMainWindow(parts);
     parts.alive = true;
     parts.shown = false;
+    parts.coloured = false;
     parts.coverTrack.clear();
+    return placement;
 }
 
-// Shows the window, made first when it is not open, and starts the refresh.
+// Shows the window, made first when it is not open, and starts the refresh. An open window is only brought forward,
+// without a log line: the log has one line per opening and one per closing.
 void OpenWindow(Parts& parts, bool open) {
     try {
-        if (!open) MakeWindow(parts);
+        std::string placement;
+        if (!open) placement = MakeWindow(parts);
+        Refresh(parts);  // before Activate: the title bar shows in the theme's colours from the first frame
         parts.window.Activate();
         parts.timer.Start();
         core::SetWindowOpen(true);
-        Refresh(parts);
-        Log("window opened");
+        if (!open) Log("window opened at " + placement);
     } catch (const winrt::hresult_error& error) {
         Log("the window could not be opened: " + HresultText(error.code()));
         parts.alive = false;

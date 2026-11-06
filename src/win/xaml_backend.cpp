@@ -646,6 +646,27 @@ void XamlTreeBackend::Watch(const xaml::DependencyObject& object, theme::NodeId 
     m_watched[id] = winrt::make_weak(object);
 }
 
+void XamlTreeBackend::FollowAppleRewrites(theme::NodeId id, const xaml::DependencyObject& object,
+                                          std::string_view property) {
+    // Apple writes a lyrics line's alignment again in code (wrapped rows went back to the left for up to a tick).
+    auto text = object.try_as<controls::TextBlock>();
+    if (!text || property != "TextAlignment") return;
+    if (auto known = m_rewritesFollowed.find(id); known != m_rewritesFollowed.end() && known->second.get() == object) return;
+    for (auto it = m_rewritesFollowed.begin(); it != m_rewritesFollowed.end();) {
+        it = it->second.get() ? std::next(it) : m_rewritesFollowed.erase(it);
+    }
+    std::weak_ptr<bool> alive = m_alive;
+    try {
+        text.RegisterPropertyChangedCallback(controls::TextBlock::TextAlignmentProperty(),
+                                             [this, alive](auto const&, auto const&) noexcept {
+                                                 if (!alive.expired()) SchedulePass(0);
+                                             });
+    } catch (...) {
+        return;
+    }
+    m_rewritesFollowed[id] = winrt::make_weak(object);
+}
+
 void XamlTreeBackend::SchedulePass(int followUps) noexcept {
     // 60 ms groups the events of one scroll step or one page build; the follow-ups catch a page that fills in later
     // (its data arrives after the navigation).

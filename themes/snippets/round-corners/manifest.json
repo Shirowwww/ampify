@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "round-corners",
   "name": "Round corners",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Rounds the covers, tiles, rows, the display and the menus with one radius you choose, on top of any theme, like Spicetify's Rounded Images.",

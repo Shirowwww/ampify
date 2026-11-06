@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "centred-lyrics",
   "name": "Centred lyrics",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "The lyrics sit in the middle of their panel, line by line, like a centred lyrics theme on Spicetify.",

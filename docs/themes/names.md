@@ -115,13 +115,15 @@ read on Apple Music 1.1792.
 | `.card-brick` | A wide card, such as the categories of Search |
 | `.card-wide` | A card with its artwork on the left |
 | `.card-track` | A song in a shelf |
+| `.card-poster` | A large editorial tile, such as the picks for you on Home: the tile and its artwork frame, which clip with their own corner. Round or square it with the covers |
+| `.card-poster-chin` | The band under a large editorial tile's text, rounded at the bottom only: give it `0 0 r r` |
 | `.card-play-button` | The play button that shows over a card under the pointer |
 | `.cover-play-button` | The play button over an album's or a playlist's cover (not the one of its header) |
 | `.card-title`, `.card-subtitle` | The two lines of text under a card |
 | `.artwork` | Every artwork, in cards, lists and the playback bar, except artists' pictures |
 | `.artist-artwork` | Artists' round pictures, in shelves and at the top of an artist's page. Apple lights them under the pointer with a round shape: squaring them leaves a round light over a square picture |
 | `.artwork-shadow` | The shadow under an artwork |
-| `.explicit-badge` | The "E" badge |
+| `.explicit-badge` | The "E" badge of a song in a list (`.lcd-explicit-badge` for the song playing) |
 | `.explicit-group` | The "E" badge with the favourite star, side by side |
 | `.favorite-button`, `.favorite-icon` | The star, and its icon |
 | `.add-button` | The button that adds to the library |
@@ -144,7 +146,7 @@ read on Apple Music 1.1792.
 | `.artist-picture` | The picture of an artist |
 | `.radio-play-button` | The play button of a station |
 | `.track-list` | The list of songs |
-| `.track-row` | One song of that list. Its light under the pointer is the only one: Apple's own (`.track-list-item`) is off |
+| `.track-row` | One song of that list, on a playlist page and on an album page. Its light under the pointer is the only one: Apple's own (`.track-list-item`) is off |
 | `.track-list-item` | The list row that holds a song of that list, as wide as the list |
 | `.track-play-button` | The play button of a song |
 | `.reactions-button` | The reactions button of a song |
@@ -190,6 +192,7 @@ read on Apple Music 1.1792.
 | `.track-text` | The title and the artist |
 | `.track-lines`, `.track-line` | The block of the two lines, and each line |
 | `.track-title`, `.track-artist` | Each of them |
+| `.lcd-explicit-badge` | The "E" badge beside the title of an explicit song. Apple shows and hides it with each song: hide it with `opacity: 0` (and `width: 0; margin: 0` to give its room back), not `visibility`, or a later song may show it wrongly once the rule goes |
 | `.scrubber` | The progress bar (with `ampify:centre-bar`, a line under the buttons): `color` fills the played part (the theme's accent by default), `background` the rest of the track, `.scrubber Thumb` its thumb; they hold under the pointer and while dragged. An image can ride at the song's position ([format.md](format.md#an-image-that-follows-the-songs-progress)) |
 | `.current-time`, `.duration` | The time played and the length. With `ampify:centre-bar` they stand at the ends of the progress line, under the buttons |
 | `.audio-badge` | The badge of the audio format (Lossless, Dolby Atmos) |
@@ -268,9 +271,9 @@ one keeps Ampify's default.
 
 | Variable | What it colours | Default |
 |---|---|---|
-| `--mini-background` | the window | `#1C1C1E` |
-| `--mini-foreground` | the title and the buttons | `#FFFFFF` |
-| `--mini-muted` | the artist line, the frame of the cover, the rest of the progress bar | `#A1A1A6` |
+| `--mini-background` | the window and its title bar | `#1C1C1E` |
+| `--mini-foreground` | the title, the buttons, and the title bar's text and close button | `#FFFFFF` |
+| `--mini-muted` | the artist line, the frame of the cover, the rest of the progress bar, the title bar's text while the window is not in front | `#A1A1A6` |
 | `--mini-accent` | the part of the progress bar already played | `#FA2D48` |
 
 ```css

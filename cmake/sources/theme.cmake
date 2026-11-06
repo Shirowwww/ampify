@@ -8,6 +8,7 @@ list(APPEND AMPIFY_THEME_SOURCES
     src/core/theme/engine.cpp
     src/core/theme/files.cpp
     src/core/theme/glass.cpp
+    src/core/theme/glyph_rows.cpp
     src/core/theme/ini.cpp
     src/core/theme/inspector.cpp
     src/core/theme/library.cpp
@@ -25,5 +26,5 @@ list(APPEND AMPIFY_THEME_SOURCES
     src/core/theme/spicetify.cpp
     src/core/theme/worker.cpp)
 
-list(APPEND AMPIFY_TESTS_SOURCES tests/animation_tests.cpp)
+list(APPEND AMPIFY_TESTS_SOURCES tests/animation_tests.cpp tests/glyph_rows_tests.cpp)
 

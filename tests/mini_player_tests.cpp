@@ -114,6 +114,13 @@ TEST_CASE(MiniPlayer_LayoutSquaresTheArtwork) {
     CHECK(layout.artwork.width > 60);
 }
 
+TEST_CASE(MiniPlayer_LayoutGivesTheArtworkEqualMarginsAboveAndBelowAtTheDefaultSize) {
+    mini::Layout layout = mini::LayoutFor(mini::kDefaultWidth, mini::kDefaultHeight);
+    const int below = mini::kDefaultHeight - (layout.artwork.y + layout.artwork.height);
+    CHECK(below == layout.artwork.y);
+    CHECK(layout.artwork.y + layout.artwork.height == layout.next.y + layout.next.height);
+}
+
 TEST_CASE(MiniPlayer_LayoutPutsTheBackButtonInTheTopRightCorner) {
     mini::Layout layout = mini::LayoutFor(340, 140);
     CHECK(layout.back.x + layout.back.width > 340 - 24);
@@ -217,6 +224,84 @@ TEST_CASE(MiniPlayer_DefaultPlacementSitsInTheBottomRightCorner) {
     CHECK(placed.y + placed.height <= 1040);
     CHECK(placed.x > 1920 / 2);
     CHECK(placed.y > 1040 / 2);
+}
+
+TEST_CASE(MiniPlayer_FitKeepsTheWholeWindowWithItsFrameOnTheScreen) {
+    const mini::Rect area{0, 0, 1920, 1040};
+    const mini::Frame frame{16, 46};
+    mini::Placement placed{1700, 950, 340, 140};
+
+    mini::Placement fitted = mini::FitInto(placed, area, 1.0, frame);
+
+    CHECK(fitted.width == 340 && fitted.height == 140);
+    CHECK(fitted.x + fitted.width + frame.width <= 1920);
+    CHECK(fitted.y + fitted.height + frame.height <= 1040);
+}
+
+TEST_CASE(MiniPlayer_FitShrinksTheContentToTheAreaLessTheFrame) {
+    const mini::Rect area{0, 0, 300, 200};
+    const mini::Frame frame{10, 40};
+    mini::Placement placed{0, 0, 900, 900};
+
+    mini::Placement fitted = mini::FitInto(placed, area, 1.0, frame);
+
+    CHECK(fitted.width == 290);
+    CHECK(fitted.height == 160);
+}
+
+TEST_CASE(MiniPlayer_DefaultPlacementGivesTheContentItsFullSizeAtEveryScale) {
+    const mini::Rect area{0, 0, 2560, 1392};
+    for (double scale : {1.0, 1.25, 1.5, 2.0}) {
+        const mini::Frame frame{static_cast<int>(16 * scale), static_cast<int>(31 * scale)};
+
+        mini::Placement placed = mini::DefaultPlacement(area, scale, frame);
+
+        CHECK(placed.width == static_cast<int>(mini::kDefaultWidth * scale + 0.5));
+        CHECK(placed.height == static_cast<int>(mini::kDefaultHeight * scale + 0.5));
+        CHECK(placed.x + placed.width + frame.width <= 2560);
+        CHECK(placed.y + placed.height + frame.height <= 1392);
+    }
+}
+
+TEST_CASE(MiniPlayer_CaptionTakesTheBodyColours) {
+    mini::Colours colours;
+    colours.background = "#FF101820";
+    colours.foreground = "#FFF0F0F0";
+    colours.muted = "#FF808080";
+
+    mini::Caption caption = mini::CaptionFrom(colours);
+
+    CHECK(caption.background == "#FF101820");
+    CHECK(caption.foreground == "#FFF0F0F0");
+    CHECK(caption.inactiveForeground == "#FF808080");
+}
+
+TEST_CASE(MiniPlayer_CaptionButtonStatesAreOpaqueShadesBetweenBackgroundAndText) {
+    mini::Colours colours;
+    colours.background = "#FF000000";
+    colours.foreground = "#FFFFFFFF";
+
+    mini::Caption caption = mini::CaptionFrom(colours);
+
+    CHECK(caption.hoverBackground.substr(0, 3) == "#FF");
+    CHECK(caption.pressedBackground.substr(0, 3) == "#FF");
+    CHECK(caption.hoverBackground != colours.background && caption.hoverBackground != colours.foreground);
+    CHECK(caption.pressedBackground > caption.hoverBackground);  // pressed is a step further from black
+}
+
+TEST_CASE(MiniPlayer_ShortcutRefusalNamesTheOtherProgramAndTheSetting) {
+    std::string line = mini::ShortcutRefusal("Ctrl+Alt+M", true);
+
+    CHECK(line.find("Ctrl+Alt+M") != std::string::npos);
+    CHECK(line.find("another program") != std::string::npos);
+    CHECK(line.find("mini.shortcut") != std::string::npos);
+}
+
+TEST_CASE(MiniPlayer_ShortcutRefusalSaysWhenTheShortcutIsNotValid) {
+    std::string line = mini::ShortcutRefusal("Ctrl+Banana", false);
+
+    CHECK(line.find("not a valid shortcut") != std::string::npos);
+    CHECK(line.find("another program") == std::string::npos);
 }
 
 TEST_CASE(MiniPlayer_ColoursComeFromTheThemeVariables) {

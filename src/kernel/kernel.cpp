@@ -81,11 +81,13 @@ HINSTANCE g_module = nullptr;  // the kernel DLL itself, passed to the interface
 void StartMiniPlayerShortcut(ampify::WinHost& winHost, const ampify::Settings& settings, ampify::Journal& journal) {
     std::string combo = settings.GetString(ampify::mini::kShortcutKey, ampify::mini::kDefaultShortcut);
     if (combo.empty() || combo == "off") return;
+    SetLastError(ERROR_SUCCESS);  // a combo that does not parse never reaches RegisterHotKey, which sets the error
     if (winHost.RegisterKey(ampify::mini::kElementId, combo)) {
         journal.Write("Mini player: shortcut " + combo + " registered");
-    } else {
-        journal.Write("Mini player: shortcut " + combo + " is not available (taken by another program, or not valid)");
+        return;
     }
+    const bool taken = GetLastError() == ERROR_HOTKEY_ALREADY_REGISTERED;
+    journal.Write(ampify::mini::ShortcutRefusal(combo, taken));
 }
 
 // The cover of `track`. Right after a song change Windows may still hold the previous song's thumbnail, so an image

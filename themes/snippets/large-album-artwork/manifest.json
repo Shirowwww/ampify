@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "large-album-artwork",
   "name": "Large album artwork",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "The artwork at the top of an album or playlist page gets the size you choose, from 120 to 360 pixels.",

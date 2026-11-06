@@ -185,12 +185,12 @@ explain them in one line; the page also resets them, and exports or imports them
 | `font-style` | `FontStyle` | `normal`, `italic` or `oblique` |
 | `letter-spacing` | `CharacterSpacing` | `normal`, em (`0.05em`) or pixels, up to 10em or 200px |
 | `line-height` | `LineHeight` (text) | `normal`, pixels, or a factor (`1.5`, `150%`, `1.5em`) up to 10 |
-| `text-align` | `TextAlignment` (text) | `left`, `center`, `right`, `justify`, `start`, `end` |
+| `text-align` | `TextAlignment` (text) | `left`, `center`, `right`, `justify`, `start`, `end`. Also on the word-by-word lyrics (`.lyrics-words`, `.lyrics-background-words`), which Apple draws without a text element: each wrapped row moves to the centre or the right; `left` and `justify` give Apple's own placement back |
 | `text-overflow` | `TextTrimming` (text) | `ellipsis` or `clip` |
 | `white-space` | `TextWrapping` (text) | `nowrap` or `normal` |
 | `margin` | `Margin` | 1 to 4 lengths, negative allowed. A negative margin grows an element only when it has no `width` of its own: with one, it keeps that size and only moves |
 | `padding` | `Padding` | 1 to 4 lengths, not negative |
-| `width`, `height` | `Width`, `Height` | A length or `auto` |
+| `width`, `height` | `Width`, `Height` | A length or `auto`. On an artwork (`.artwork`), a size above Apple's own cap (270 at the top of an album page) lifts that cap, so the cover is not cut |
 | `min-width`, `min-height` | `MinWidth`, `MinHeight` | A length, or `auto` |
 | `max-width`, `max-height` | `MaxWidth`, `MaxHeight` | A length, or `none` |
 | `compact-pane-length` | `CompactPaneLength` | On `.navigation`: the width of the folded sidebar (48 in Apple Music) |
@@ -712,6 +712,7 @@ and the inspector list them as "Ampify (derived from the theme)".
 |---|---|
 | rounds `.lcd` | `.scrubber` stops before the display's corner |
 | has an accent | the progress line (`.scrubber`) takes it, like the volume slider |
+| has an accent | the bars next to the row playing (`.now-playing-indicator`) take it, and follow it when it changes with the song |
 | has an accent | Up Next's "Clear" (`.queue-clear`) and its autoplay toggle while on (`.queue-autoplay`) take it, not Apple's red and blue |
 | has a link colour or an accent | `.album-artist` takes it (Apple's own blue barely reads on a light page) |
 | has a secondary text colour | `.card-subtitle`, the artist under a tile, takes it (Apple paints that link in code) |

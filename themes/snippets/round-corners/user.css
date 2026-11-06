@@ -12,6 +12,7 @@
 .card,
 .card-wide,
 .card-track,
+.card-poster,
 .artwork,
 .lcd,
 .lcd-artwork-image,
@@ -20,6 +21,10 @@
 .flyout,
 .fullscreen-artwork {
     corner-radius: var(--round);
+}
+
+.card-poster-chin {
+    corner-radius: 0 0 var(--round) var(--round);
 }
 
 .track-row,

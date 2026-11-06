@@ -81,6 +81,7 @@ Layout LayoutFor(int width, int height);
 
 // ---- Where the window goes -----------------------------------------------------------------------------------------
 
+// The window's top left corner, and the size of its content (the client area, under the title bar).
 struct Placement {
     int x = 0;
     int y = 0;
@@ -88,14 +89,21 @@ struct Placement {
     int height = kDefaultHeight;
 };
 
+// What the window adds around its content: borders and title bar, in screen pixels.
+struct Frame {
+    int width = 0;
+    int height = 0;
+};
+
 std::string FormatPlacement(const Placement& placement);
 // Four integers separated by commas. Nothing when the text is anything else.
 std::optional<Placement> ParsePlacement(std::string_view text);
 // A placement holds screen pixels: `scale` is the screen's scale (1.25 at 125%), which the sizes of the limits follow.
-// The placement with its size kept within the limits and the window moved (or shrunk) so that it lies in `area`.
-Placement FitInto(Placement placement, const Rect& area, double scale = 1);
+// The placement with its size kept within the limits and the window, frame included, moved (or its content shrunk)
+// so that it lies in `area`.
+Placement FitInto(Placement placement, const Rect& area, double scale = 1, Frame frame = {});
 // The default place: the bottom right corner of `area`, with a margin, at the default size.
-Placement DefaultPlacement(const Rect& area, double scale = 1);
+Placement DefaultPlacement(const Rect& area, double scale = 1, Frame frame = {});
 
 // ---- Colours -------------------------------------------------------------------------------------------------------
 
@@ -111,6 +119,23 @@ struct Colours {
 };
 
 Colours ColoursFrom(const std::map<std::string, std::string>& themeVariables);
+
+// The title bar's colours, from the body's: the system draws it, so it follows the theme only through them. The
+// caption buttons' hover and pressed shades are opaque: alpha is honoured only on a title bar extended into the content.
+struct Caption {
+    std::string background;
+    std::string foreground;
+    std::string inactiveForeground;
+    std::string hoverBackground;
+    std::string pressedBackground;
+};
+
+Caption CaptionFrom(const Colours& colours);
+
+// ---- Shortcut ------------------------------------------------------------------------------------------------------
+
+// The log line when the shortcut could not be registered: `taken` when another program holds it.
+std::string ShortcutRefusal(const std::string& combo, bool taken);
 
 // ---- Feed between the kernel's threads and the mini player's ---------------------------------------------------------
 

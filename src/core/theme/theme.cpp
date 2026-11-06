@@ -662,6 +662,14 @@ std::string ScrubberInAccent(const Theme& theme) {
     return std::string(".scrubber { color: $") + kAccent + "; }\n";
 }
 
+// Apple's "now playing" bars take the accent once, when their row is built: a new song's row is built before its
+// accent comes (theme.accent = artwork) and kept the colour of the song before. Set on the bars, it follows each change.
+std::string NowPlayingBarsInAccent(const Theme& theme) {
+    if (Sets(theme, ".now-playing-indicator", "Foreground")) return {};
+    if (!theme.palette.Find(kAccent)) return {};
+    return std::string(".now-playing-indicator { color: $") + kAccent + "; }\n";
+}
+
 // Apple Music's shuffle icon, while on, takes a blue of Apple's own (its button's ToggleButtonForegroundChecked keys),
 // while repeat and both dots take the accent: shuffle takes the accent too.
 std::string ShuffleInAccent(const Theme& theme) {
@@ -753,7 +761,8 @@ void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts
     std::string css = ScrubberClearOfCorners(theme) + RoomForImagesOnTheLine(theme) + OneLightPerSong(theme) +
                       RoomInsideALitCard(theme);
     if (parts.colors) {
-        css += ScrubberInAccent(theme) + ShuffleInAccent(theme) + UpNextInAccent(theme) + ArtistInLinkColour(theme) +
+        css += ScrubberInAccent(theme) + NowPlayingBarsInAccent(theme) + ShuffleInAccent(theme) + UpNextInAccent(theme) +
+               ArtistInLinkColour(theme) +
                CardLinksInSecondaryText(theme) +
                SearchTilesInCardColour(theme) + SelectedRowsInThemeColour(theme);
     }

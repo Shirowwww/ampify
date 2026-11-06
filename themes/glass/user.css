@@ -270,8 +270,16 @@
 
 .volume-slider,
 .scrubber {
-    color: #F2FFFFFF;
     background: #33FFFFFF;
+}
+
+.volume-slider {
+    color: #F2FFFFFF;
+}
+
+/* In the accent, so that a chosen accent (Orange, the artwork's) reaches the line as it reaches the rest. */
+.scrubber {
+    color: $AccentFillColorDefaultBrush;
 }
 
 /* ---- Pages ---------------------------------------------------------------------------------------------------------- */
@@ -375,8 +383,11 @@
 
     .volume-slider,
     .scrubber {
-        color: #E60E1424;
         background: #260E1424;
+    }
+
+    .volume-slider {
+        color: #E60E1424;
     }
 
     .play-button > Grid#Root {

@@ -35,6 +35,7 @@
 #include "../core/theme/properties.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_render/render_tree.hpp"
+#include "artwork_cap.hpp"
 #include "xaml_host.hpp"
 #include "xaml_backend_detail.hpp"
 
@@ -571,7 +572,13 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         if (!own) return false;
         if (property == "Visibility") ReleaseVisible(id);
         object.ClearValue(own);
+        if (auto control = object.try_as<controls::Control>(); control && property == "Foreground") {
+            FollowForegroundInSprites(control);
+        }
         if (auto text = object.try_as<controls::TextBlock>(); text && property == "Foreground") PaintLinks(text, nullptr);
+        if (auto element = object.try_as<xaml::FrameworkElement>(); element && (property == "Width" || property == "Height")) {
+            FollowArtworkCap(element);
+        }
         Forget(id, property);
         UpdateStates(id, object, property, nullptr);  // or its states would keep the theme's colour under the pointer
         return true;
@@ -620,8 +627,11 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
             else if (auto panel = object.try_as<controls::Panel>()) { panel.Background(*target); written = true; }
             else if (auto border = object.try_as<controls::Border>()) { border.Background(*target); written = true; }
         } else if (property == "Foreground") {
-            if (auto control = object.try_as<controls::Control>()) { control.Foreground(*target); written = true; }
-            else if (auto text = object.try_as<controls::TextBlock>()) {
+            if (auto control = object.try_as<controls::Control>()) {
+                control.Foreground(*target);
+                FollowForegroundInSprites(control);
+                written = true;
+            } else if (auto text = object.try_as<controls::TextBlock>()) {
                 text.Foreground(*target);
                 PaintLinks(text, &*target);
                 written = true;
@@ -669,7 +679,11 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         return false;
     }
 
-    if (IsTextProperty(property)) return WriteTextProperty(object, property, value);
+    if (IsTextProperty(property)) {
+        bool written = WriteTextProperty(object, property, value);
+        if (written) FollowAppleRewrites(id, object, property);
+        return written;
+    }
 
     if ((property == "Margin" || property == "Padding" || property == "BorderThickness") && value.kind == theme::ValueKind::Thickness) {
         std::vector<double> sides = Numbers(value.text, ',');
@@ -728,6 +742,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         else if (property == "MaxWidth") element.MaxWidth(length);
         else if (property == "MinHeight") element.MinHeight(length);
         else element.MaxHeight(length);
+        if (property == "Width" || property == "Height") FollowArtworkCap(element);
         return true;
     }
 

@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "ember",
   "name": "Ember",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Two glass panels over the colours of the song playing, the library and the pages, with the playback bar along the bottom and an amber accent.",

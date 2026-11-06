@@ -183,8 +183,9 @@
     background: var(--raised);
 }
 
+/* No hover light on the list item itself: the song row inside has its own, and an album's row is offset from its
+   item, which drew two lights side by side. */
 .list-item {
-    hover-background: var(--raised);
     selected-background: #1FFFFFFF;
 }
 

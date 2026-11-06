@@ -63,6 +63,9 @@
 - `calc()` takes `min()` and `max()`, so a theme can cap a size.
 - Fluent: an accent colour setting, Windows' blue or the colour of the artwork (play button, volume and progress).
 - Mirror: a panel corners setting, from square to round (the default is the current look).
+- `.card-poster` and `.card-poster-chin`: Home's large editorial tiles and the band under their text, which clip with a
+  corner of their own and stayed rounded under square corners. Mirror's corners setting, Square corners and Round
+  corners now reach them.
 - Animated artwork (snippet, off by default): the window's background is the song's artwork in two slowly turning
   layers. It stops in pause and while Apple Music is hidden.
 - On a new song, `content: artwork` and an `image` node with `src: "artwork"` cross-fade from the previous cover in

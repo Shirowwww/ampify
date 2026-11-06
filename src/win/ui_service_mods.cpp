@@ -569,6 +569,8 @@ void FillSettings(UiService::Shared& shared, const std::shared_ptr<SettingsCard>
     std::vector<xaml::FrameworkElement> body = GroupedRows(shared, card, *targets, refresh);
     card->panel.Children().Append(SettingsToolbar(shared, card, refresh, targets, query));
     for (const xaml::FrameworkElement& element : body) card->panel.Children().Append(element);
+    // The search box gets its text back, but its TextChanged did not filter the new rows (seen on screen): filter here.
+    if (!query->empty()) ApplySearch(*targets, *query);
 }
 
 }  // namespace

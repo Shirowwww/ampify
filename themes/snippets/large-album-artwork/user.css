@@ -1,7 +1,14 @@
 /* Large album artwork: the cover at the top of an album or playlist page takes the size of the setting (pixels).
-   Its height and width move together, so the cover stays square. */
+   Its height and width move together, so the cover stays square; above Apple's 270 the engine lifts Apple's cap.
+   Apple's glow behind the cover takes the same size and place, or it stays where the old cover was. */
 
-.album-header .artwork {
+.album-header .artwork,
+.album-header .artwork-shadow {
     width: var(--setting-size);
     height: var(--setting-size);
+}
+
+.album-header .artwork-shadow {
+    horizontal-alignment: center;
+    vertical-alignment: bottom;
 }

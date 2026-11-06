@@ -19,8 +19,10 @@
 #include <functional>
 #include <set>
 
+#include <winrt/Microsoft.UI.Composition.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
+#include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
@@ -35,6 +37,7 @@
 #include "../core/theme/properties.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_render/render_tree.hpp"
+#include "hosted_text_align.hpp"
 #include "xaml_host.hpp"
 #include "xaml_backend_detail.hpp"
 
@@ -230,6 +233,11 @@ std::optional<th::Value> ReadTextProperty(const xaml::DependencyObject& object, 
         if (text) return th::Value{th::ValueKind::Length, th::FormatNumber(text.LineHeight())};
         return std::nullopt;
     }
+    if (property == "TextAlignment") {
+        if (controls::Border host = DrawnTextHost(object)) {
+            return th::Value{th::ValueKind::Keyword, std::string(HostedTextAlign(host))};
+        }
+    }
     const TextEnum* entry = FindTextEnum(property);
     std::optional<std::int32_t> member = entry ? ReadTextEnum(object, property) : std::nullopt;
     if (!member || *member < 0 || *member >= static_cast<std::int32_t>(entry->names.size())) return std::nullopt;
@@ -259,6 +267,12 @@ bool WriteTextProperty(const xaml::DependencyObject& object, std::string_view pr
     if (!entry || value.kind != th::ValueKind::Keyword || value.text.empty()) return false;
     auto member = std::find(entry->names.begin(), entry->names.end(), std::string_view(value.text));
     if (member == entry->names.end()) return false;
+    if (property == "TextAlignment") {
+        if (controls::Border host = DrawnTextHost(object)) {
+            SetHostedTextAlign(host, th::RowAlignOf(value.text));
+            return true;
+        }
+    }
     return WriteTextEnum(object, property, static_cast<std::int32_t>(member - entry->names.begin()));
 }
 
@@ -616,6 +630,77 @@ void ReadPopupsAgain(const xaml::XamlRoot& root) noexcept {
             } catch (...) {
             }
         }
+    } catch (...) {
+    }
+}
+
+namespace {
+
+namespace comp = winrt::Microsoft::UI::Composition;
+using Colour = winrt::Windows::UI::Color;
+using Brushes = std::vector<comp::CompositionColorBrush>;
+
+// A control's own sprites hang a few levels down: BouncyBarControl > Grid#barsGrid > Canvas#bar0Host.
+constexpr int kSpriteDepth = 3;
+
+bool SameColour(const Colour& a, const Colour& b) {
+    return a.A == b.A && a.R == b.R && a.G == b.G && a.B == b.B;
+}
+
+void AddBrush(const comp::CompositionBrush& brush, Brushes& found) {
+    if (auto plain = brush ? brush.try_as<comp::CompositionColorBrush>() : nullptr) found.push_back(plain);
+}
+
+void AddShapeBrushes(const comp::CompositionShape& shape, Brushes& found) {
+    if (auto sprite = shape.try_as<comp::CompositionSpriteShape>()) {
+        AddBrush(sprite.FillBrush(), found);
+        AddBrush(sprite.StrokeBrush(), found);
+    } else if (auto group = shape.try_as<comp::CompositionContainerShape>()) {
+        for (const comp::CompositionShape& child : group.Shapes()) AddShapeBrushes(child, found);
+    }
+}
+
+// The bars are a ShapeVisual of sprite shapes; a plain SpriteVisual and nested visuals are taken the same way.
+void AddVisualBrushes(const comp::Visual& visual, Brushes& found) {
+    if (auto sprite = visual.try_as<comp::SpriteVisual>()) AddBrush(sprite.Brush(), found);
+    if (auto shapes = visual.try_as<comp::ShapeVisual>()) {
+        for (const comp::CompositionShape& shape : shapes.Shapes()) AddShapeBrushes(shape, found);
+    }
+    if (auto container = visual.try_as<comp::ContainerVisual>()) {
+        for (const comp::Visual& child : container.Children()) AddVisualBrushes(child, found);
+    }
+}
+
+void AddChildVisualBrushes(const xaml::DependencyObject& element, int depth, Brushes& found) {
+    if (auto ui = element.try_as<xaml::UIElement>()) {
+        if (comp::Visual visual = xaml::Hosting::ElementCompositionPreview::GetElementChildVisual(ui)) {
+            AddVisualBrushes(visual, found);
+        }
+    }
+    if (depth == 0) return;
+    int count = media::VisualTreeHelper::GetChildrenCount(element);
+    for (int index = 0; index < count; ++index) {
+        AddChildVisualBrushes(media::VisualTreeHelper::GetChild(element, index), depth - 1, found);
+    }
+}
+
+}  // namespace
+
+// Apple's now-playing bars are composition sprites painted from their control's Foreground once, when built: a row
+// built before a new song's accent came kept the colour before, whatever Foreground said after. Sprites of one colour
+// are the control's foreground drawn by hand: they take the one it has now. Several colours are a drawing: left alone.
+void FollowForegroundInSprites(const controls::Control& control) noexcept {
+    try {
+        auto now = control.Foreground().try_as<media::SolidColorBrush>();
+        if (!now) return;
+        Brushes found;
+        AddChildVisualBrushes(control, kSpriteDepth, found);
+        if (found.empty()) return;
+        Colour drawn = found.front().Color();
+        bool single = std::all_of(found.begin(), found.end(),
+                                  [&](const comp::CompositionColorBrush& brush) { return SameColour(brush.Color(), drawn); });
+        if (!single || SameColour(drawn, now.Color())) return;
+        for (const comp::CompositionColorBrush& brush : found) brush.Color(now.Color());
     } catch (...) {
     }
 }

@@ -1,3 +1,4 @@
+#include <optional>
 #include <string>
 
 #include "../src/core/json.hpp"
@@ -42,6 +43,14 @@ TEST_CASE(Json_DumpEscapesStringsAndWritesIntegersWithoutDecimals) {
     CHECK(value.Dump() == "\"a\\\"b\\\\c\\n\\u0001\"");
     CHECK(ampify::Json(3.0).Dump() == "3");
     CHECK(ampify::Json(0.5).Dump() == "0.5");
+}
+
+TEST_CASE(Json_DumpWritesTheShortestNumberThatReadsBackTheSame) {
+    CHECK(ampify::Json(0.72).Dump() == "0.72");
+    CHECK(ampify::Json(0.1 + 0.2).Dump() == "0.30000000000000004");
+    CHECK(ampify::Json(1e300).Dump() == "1e+300");
+    std::optional<ampify::Json> back = ampify::Json::Parse(ampify::Json(0.72).Dump());
+    CHECK(back && back->AsNumber() && *back->AsNumber() == 0.72);
 }
 
 TEST_CASE(Json_SetReplacesAnExistingMember) {

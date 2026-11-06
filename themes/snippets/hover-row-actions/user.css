@@ -1,5 +1,5 @@
 /* Actions on hover: the favourite, add, download and reaction buttons of a song stay hidden until the pointer is over
-   its row. They fade in and out, and keep working while hidden. */
+   its row, on playlist and album pages. They fade in and out, and keep working while hidden. */
 
 .track-row .favorite-button,
 .track-row .add-button,

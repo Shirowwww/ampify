@@ -269,6 +269,16 @@
     corner-radius: var(--radius-small);
 }
 
+/* Home's large editorial tiles clip their artwork with a corner of their own (Apple's 12): the panels' corner, which
+   the setting sets and whose default of 12 is Apple's. The band under the text is rounded at the bottom only. */
+.card-poster {
+    corner-radius: var(--panel-radius);
+}
+
+.card-poster-chin {
+    corner-radius: 0 0 var(--panel-radius) var(--panel-radius);
+}
+
 .track-row {
     corner-radius: var(--radius-small);
     transition: background 120ms;

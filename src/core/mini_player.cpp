@@ -71,6 +71,22 @@ std::string ColourOf(const std::map<std::string, std::string>& variables, const 
     return colour ? theme::ToXamlColor(*colour) : fallback;
 }
 
+// The caption buttons' shades: how far each goes from the background towards the text (Apple uses 0x33 and 0x66).
+constexpr double kHoverShare = 0x33 / 255.0;
+constexpr double kPressedShare = 0x66 / 255.0;
+
+theme::Argb Opaque(theme::Argb colour) {
+    colour.a = 0xFF;
+    return colour;
+}
+
+theme::Argb Toward(theme::Argb from, theme::Argb to, double share) {
+    auto mix = [share](std::uint8_t a, std::uint8_t b) {
+        return static_cast<std::uint8_t>(std::lround(a + (b - a) * share));
+    };
+    return theme::Argb{0xFF, mix(from.r, to.r), mix(from.g, to.g), mix(from.b, to.b)};
+}
+
 struct Feed {
     std::mutex mutex;
     Info info;
@@ -121,7 +137,8 @@ Layout LayoutFor(int requestedWidth, int requestedHeight) {
     layout.titleSize = Clamp(height / 9, 14, 22);
     layout.artistSize = std::max(11, layout.titleSize - 4);
 
-    const int side = std::max(kMinArtwork, std::min(height - 2 * kPad, width / 3));
+    // The artwork fills the height between the margins when the width allows, its bottom on the button row's bottom.
+    const int side = std::max(kMinArtwork, std::min(height - 2 * kPad, width * 2 / 5));
     layout.artwork = {kPad, kPad, side, side};
 
     const int textX = kPad + side + kGap;
@@ -159,24 +176,26 @@ std::optional<Placement> ParsePlacement(std::string_view text) {
     return Placement{values[0], values[1], values[2], values[3]};
 }
 
-Placement FitInto(Placement placement, const Rect& area, double scale) {
+Placement FitInto(Placement placement, const Rect& area, double scale, Frame frame) {
     placement.width = Clamp(placement.width, Scaled(kMinWidth, scale), Scaled(kMaxWidth, scale));
     placement.height = Clamp(placement.height, Scaled(kMinHeight, scale), Scaled(kMaxHeight, scale));
     if (area.width <= 0 || area.height <= 0) return placement;
-    placement.width = std::min(placement.width, area.width);
-    placement.height = std::min(placement.height, area.height);
-    placement.x = Clamp(placement.x, area.x, area.x + area.width - placement.width);
-    placement.y = Clamp(placement.y, area.y, area.y + area.height - placement.height);
+    frame.width = std::clamp(frame.width, 0, area.width);
+    frame.height = std::clamp(frame.height, 0, area.height);
+    placement.width = std::min(placement.width, area.width - frame.width);
+    placement.height = std::min(placement.height, area.height - frame.height);
+    placement.x = Clamp(placement.x, area.x, area.x + area.width - placement.width - frame.width);
+    placement.y = Clamp(placement.y, area.y, area.y + area.height - placement.height - frame.height);
     return placement;
 }
 
-Placement DefaultPlacement(const Rect& area, double scale) {
+Placement DefaultPlacement(const Rect& area, double scale, Frame frame) {
     Placement placement;
     placement.width = Scaled(kDefaultWidth, scale);
     placement.height = Scaled(kDefaultHeight, scale);
-    placement.x = area.x + area.width - placement.width - Scaled(kDefaultMargin, scale);
-    placement.y = area.y + area.height - placement.height - Scaled(kTaskbarAllowance, scale);
-    return FitInto(placement, area, scale);
+    placement.x = area.x + area.width - placement.width - frame.width - Scaled(kDefaultMargin, scale);
+    placement.y = area.y + area.height - placement.height - frame.height - Scaled(kTaskbarAllowance, scale);
+    return FitInto(placement, area, scale, frame);
 }
 
 Colours ColoursFrom(const std::map<std::string, std::string>& themeVariables) {
@@ -187,6 +206,25 @@ Colours ColoursFrom(const std::map<std::string, std::string>& themeVariables) {
     colours.muted = ColourOf(themeVariables, "mini-muted", defaults.muted);
     colours.accent = ColourOf(themeVariables, "mini-accent", defaults.accent);
     return colours;
+}
+
+Caption CaptionFrom(const Colours& colours) {
+    const theme::Argb back = theme::ParseColor(colours.background).value_or(theme::Argb{});
+    const theme::Argb ink = theme::ParseColor(colours.foreground).value_or(theme::Argb{0xFF, 0xFF, 0xFF, 0xFF});
+    Caption caption;
+    caption.background = theme::ToXamlColor(Opaque(back));
+    caption.foreground = colours.foreground;
+    caption.inactiveForeground = colours.muted;
+    caption.hoverBackground = theme::ToXamlColor(Toward(back, ink, kHoverShare));
+    caption.pressedBackground = theme::ToXamlColor(Toward(back, ink, kPressedShare));
+    return caption;
+}
+
+std::string ShortcutRefusal(const std::string& combo, bool taken) {
+    const std::string change = "; change it with mini.shortcut (ampify config mini.shortcut Ctrl+Alt+Shift+M), "
+                               "then restart Apple Music";
+    if (taken) return "Mini player: shortcut " + combo + " is held by another program" + change;
+    return "Mini player: shortcut " + combo + " is not a valid shortcut" + change;
 }
 
 void AddSidebarEntry(UiModel& model, const std::string& label) {

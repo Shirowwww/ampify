@@ -120,6 +120,11 @@ const std::vector<ClassEntry> kClasses{
      {"HoverGrid#BrickLockupContent", "HoverGrid#BrickLockupSmallContent", "HoverGrid#SearchLandingBrickLockup"}},
     {"card-wide", {"TileControl#HorizontalLockupContent"}},
     {"card-track", {"TileControl#TrackLockupShelfTracklistContent"}},
+    // Home's large editorial tiles: the item's grid and the artwork frame in it clip with Apple's own corner, so
+    // .artwork alone left them rounded. A bare HoverGrid#RootGrid also names the hover grid inside wide tiles.
+    {"card-poster", {"ListViewItemPresenter#Root > HoverGrid#RootGrid", "HoverGrid#RootGrid > AspectRatioGrid"}},
+    // The band under a poster's text, rounded at the bottom only: themes give it "0 0 r r".
+    {"card-poster-chin", {"HoverGrid#RootGrid Grid#BottomContent > Border"}},
     // Artists' pictures are round, and so is the light Apple lays over them under the pointer (an Ellipse): .artwork
     // leaves them out, or a theme's corners squared the picture under a round light.
     // :except(), not :not(): leaving the artist covers out must not make .artwork outweigh .lcd-artwork-image.
@@ -157,7 +162,8 @@ const std::vector<ClassEntry> kClasses{
     {"artist-picture", {"PersonPicture#ArtworkPicture"}},
     {"radio-play-button", {"Button#RadioPlayButton"}},
     {"track-list", {"TracklistGrid#ColumnsTracklistGrid"}},
-    {"track-row", {"TracklistGrid#RootGrid"}},
+    // A playlist's rows are TracklistGrids; an album's are HoverGrids in a UserControl, the row's only child.
+    {"track-row", {"TracklistGrid#RootGrid", "ListViewItemPresenter > UserControl > HoverGrid#RootGrid"}},
     {"track-play-button", {"Button#PlayPauseButton"}},
     {"reactions-button", {"Button#ReactionsButton"}},
     {"song-list", {"ListView#DataGridListView"}},
@@ -205,6 +211,8 @@ const std::vector<ClassEntry> kClasses{
     {"track-line", {"Grid#TickerTapeGrid > Grid"}},
     {"track-title", {"TickerTapeControl#TrackTitleTickerTape"}},
     {"track-artist", {"TickerTapeControl#ArtistTitleTickerTape"}},
+    // Unnamed, beside the title; Apple binds its visibility to the song, so hide it with opacity, not visibility.
+    {"lcd-explicit-badge", {"Grid#TickerTapeGrid > Grid > StackPanel > FontIcon"}},
     {"scrubber", {"ScrubberControl#LCDScrubber"}},
     {"current-time", {"TextBlock#CurrentTime"}},
     {"duration", {"TextBlock#Duration"}},

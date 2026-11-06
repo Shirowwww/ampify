@@ -1,5 +1,6 @@
-/* Centred lyrics: each line of the synced lyrics, and the static text, sits in the middle of the lyrics panel.
-   Apple Music keeps its own fading by state, so the sung line stays the brightest. */
+/* Centred lyrics: each line of the synced lyrics, and the static text, sits in the middle of the lyrics panel, and
+   so does each row of a line that wraps, word-by-word lyrics included. Apple Music keeps its own fading by state, so
+   the sung line stays the brightest. */
 
 .lyrics-line-content {
     horizontal-alignment: center;

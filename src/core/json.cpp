@@ -1,6 +1,7 @@
 #include "json.hpp"
 
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -320,7 +321,8 @@ std::string Json::Dump() const {
         if (std::floor(*n) == *n && std::fabs(*n) < 9e15) {
             std::snprintf(buffer, sizeof buffer, "%lld", static_cast<long long>(*n));
         } else {
-            std::snprintf(buffer, sizeof buffer, "%.17g", *n);
+            // The shortest text that reads back as the same double: 0.72, not 0.71999999999999997.
+            *std::to_chars(buffer, buffer + sizeof buffer - 1, *n).ptr = '\0';
         }
         out = buffer;
     } else if (const std::string* s = AsString()) {

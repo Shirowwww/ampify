@@ -649,6 +649,31 @@ TEST_CASE(Builtins_SearchSuggestionsIsThePopupNotItsBox) {
     CHECK(!ClassReaches(".search-suggestions", nodes, 1));
 }
 
+TEST_CASE(Builtins_PosterCardIsTheEditorialTileAndItsFrameNotOtherTiles) {
+    // Home's large editorial tile, as the live tree shows it: the item's HoverGrid#RootGrid, its artwork frame, and
+    // the chin band under the text. A wide tile has a HoverGrid#RootGrid of its own, inside its TileControl.
+    std::vector<th::NodeInfo> nodes(10);
+    nodes[0] = {1, "ListViewItemPresenter", "", "Root", -1, 0};
+    nodes[1] = {2, "HoverGrid", "", "RootGrid", 0, 1};
+    nodes[2] = {3, "AspectRatioGrid", "", "", 1, 2};
+    nodes[3] = {4, "ArtworkImage", "", "", 2, 3};
+    nodes[4] = {5, "AspectRatioGrid", "", "AspectRatioGrid", 3, 4};
+    nodes[5] = {6, "Grid", "", "BottomContent", 2, 3};
+    nodes[6] = {7, "Border", "", "", 5, 4};
+    nodes[7] = {8, "TileControl", "", "HorizontalLockupContent", -1, 0};
+    nodes[8] = {9, "HoverGrid", "", "RootGrid", 7, 1};
+    nodes[9] = {10, "Grid", "", "", 8, 2};
+    CHECK(ClassReaches(".card-poster", nodes, 1));
+    CHECK(ClassReaches(".card-poster", nodes, 2));
+    CHECK(!ClassReaches(".card-poster", nodes, 4));
+    CHECK(!ClassReaches(".card-poster", nodes, 6));
+    CHECK(!ClassReaches(".card-poster", nodes, 8));
+    CHECK(!ClassReaches(".card-poster", nodes, 9));
+    CHECK(ClassReaches(".card-poster-chin", nodes, 6));
+    CHECK(!ClassReaches(".card-poster-chin", nodes, 5));
+    CHECK(!ClassReaches(".card-poster-chin", nodes, 1));
+}
+
 TEST_CASE(Builtins_LoadingIsTheSpinnerOfTheContentPage) {
     std::vector<th::NodeInfo> nodes(2);
     nodes[0] = {1, "Grid", "", "", -1, 0};
@@ -699,6 +724,33 @@ TEST_CASE(Builtins_ExplicitGroupIsTheBadgeAndTheFavouriteStar) {
     nodes[1] = {2, "StackPanel", "", "ExplicitFavoriteContainer", 0, 1};
     CHECK(ClassReaches(".explicit-group", nodes, 1));
     CHECK(!ClassReaches(".explicit-group", nodes, 0));
+}
+
+TEST_CASE(Builtins_LcdExplicitBadgeIsTheIconBesideThePlayingTitleNotTheMoreButtonGlyph) {
+    // Grid#TickerTapeGrid > Grid > StackPanel > {FontIcon (the E), Button#ActionButton > ContentPresenter > FontIcon}
+    std::vector<th::NodeInfo> nodes(6);
+    nodes[0] = {1, "Grid", "", "TickerTapeGrid", -1, 0};
+    nodes[1] = {2, "Grid", "", "", 0, 1};
+    nodes[2] = {3, "StackPanel", "", "", 1, 2};
+    nodes[3] = {4, "FontIcon", "", "", 2, 3};
+    nodes[4] = {5, "Button", "", "ActionButton", 2, 3};
+    nodes[5] = {6, "FontIcon", "", "", 4, 4};
+    CHECK(ClassReaches(".lcd-explicit-badge", nodes, 3));
+    CHECK(!ClassReaches(".lcd-explicit-badge", nodes, 5));
+    CHECK(!ClassReaches(".explicit-badge", nodes, 3));
+}
+
+TEST_CASE(Builtins_TrackRowCoversPlaylistAndAlbumRowsButNotSearchTiles) {
+    std::vector<th::NodeInfo> nodes(6);
+    nodes[0] = {1, "TracklistGrid", "", "RootGrid", -1, 0};
+    nodes[1] = {2, "ListViewItemPresenter", "", "Root", -1, 0};
+    nodes[2] = {3, "UserControl", "", "", 1, 1};
+    nodes[3] = {4, "HoverGrid", "", "RootGrid", 2, 2};
+    nodes[4] = {5, "TileControl", "", "", -1, 0};
+    nodes[5] = {6, "HoverGrid", "", "RootGrid", 4, 1};
+    CHECK(ClassReaches(".track-row", nodes, 0));
+    CHECK(ClassReaches(".track-row", nodes, 3));
+    CHECK(!ClassReaches(".track-row", nodes, 5));
 }
 
 TEST_CASE(Builtins_PopupScrimIsTheLayerBehindMenus) {
@@ -1488,6 +1540,31 @@ TEST_CASE(Theme_ProgressLineTakesTheAccent) {
     CHECK(Assigned(Load(none), ".scrubber", "Foreground") == "ABSENT");
 }
 
+// Apple's bars keep the colour they had when the row was built: a new song's row kept the accent of the song before.
+TEST_CASE(Theme_NowPlayingBarsTakeTheAccent) {
+    MemoryFiles accent;
+    accent.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 4FD1FF\n";
+    CHECK(Assigned(Load(accent), ".now-playing-indicator", "Foreground") == "#FF4FD1FF");
+
+    // A theme's own colour wins, and without an accent the bars keep Apple Music's.
+    MemoryFiles own;
+    own.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 4FD1FF\n";
+    own.files["user.css"] = ".now-playing-indicator { color: #FF112233; }\n";
+    CHECK(Assigned(Load(own), ".now-playing-indicator", "Foreground") == "#FF112233");
+    MemoryFiles none;
+    none.files["user.css"] = ".lcd { opacity: 0.9; }\n";
+    CHECK(Assigned(Load(none), ".now-playing-indicator", "Foreground") == "ABSENT");
+}
+
+TEST_CASE(Accent_ChosenOneReachesTheBarsAfterASongChange) {
+    th::LoadOptions first;
+    first.accent = th::Argb{0xFF, 0xE2, 0x76, 0x39};
+    th::LoadOptions grey;
+    grey.accent = th::Argb{0xFF, 0x80, 0x80, 0x80};
+    CHECK(Assigned(th::LoadAccentOnly(first), ".now-playing-indicator", "Foreground") == "#FFE27639");
+    CHECK(Assigned(th::LoadAccentOnly(grey), ".now-playing-indicator", "Foreground") == "#FF808080");
+}
+
 TEST_CASE(Theme_SearchTopResultsTakeTheCardColour) {
     MemoryFiles card;
     card.files["colors.ini"] = "[Base]\nCardBackgroundFillColorDefaultBrush = 1C2742\n";
@@ -2235,6 +2312,20 @@ TEST_CASE(Examples_LoadWithoutProblems) {
     }
 }
 
+// Glass's progress line is in its accent, so a chosen accent (Orange, the artwork's) reaches it in both schemes.
+TEST_CASE(Examples_GlassProgressLineFollowsTheChosenAccent) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "glass";
+    for (const char* scheme : {"Dark", "Light"}) {
+        th::FolderFiles files(folder);
+        th::LoadOptions options;
+        options.scheme = scheme;
+        options.accent = th::Argb{0xFF, 0xE2, 0x76, 0x39};
+        th::Theme theme = th::LoadTheme("glass", folder.generic_string(), files, options);
+        CHECK(Assigned(theme, ".scrubber", "Foreground") == "#FFE27639");
+        CHECK(Assigned(theme, ".now-playing-indicator", "Foreground") == "#FFE27639");
+    }
+}
+
 // Palettes gathers the colour families, one scheme each and Catppuccin's four flavours: each loads alone, without a
 // problem, and sets colours.
 TEST_CASE(Examples_EveryPaletteLoadsWithoutProblems) {
@@ -2431,8 +2522,9 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
     CHECK(full.resources.size() == 1);
     CHECK(!full.resourceDictionary.empty());
     // With the album's artist in the accent, in its two forms (ArtistInLinkColour), the progress line in the accent
-    // (ScrubberInAccent), the shuffle icon while on (ShuffleInAccent), Up Next's Clear and autoplay (UpNextInAccent).
-    CHECK(full.assignments.size() == 8);
+    // (ScrubberInAccent), the now-playing bars (NowPlayingBarsInAccent), the shuffle icon while on (ShuffleInAccent),
+    // Up Next's Clear and autoplay (UpNextInAccent).
+    CHECK(full.assignments.size() == 9);
 
     th::LoadOptions none{"", &allowed, {false, false, false}};
     th::Theme off = Load(files, none);
@@ -2444,7 +2536,7 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
 
     th::LoadOptions noAssets{"", &allowed, {true, true, false}};
     th::Theme withoutImages = Load(files, noAssets);
-    CHECK(withoutImages.assignments.size() == 7);  // the font and accent rules stay, not the image's
+    CHECK(withoutImages.assignments.size() == 8);  // the font and accent rules stay, not the image's
     CHECK(!ProblemContaining(withoutImages, "assets").empty());
 }
 
@@ -4291,7 +4383,10 @@ TEST_CASE(Css_StateOnAnAncestorRecordsThePartItSitsOn) {
     for (const th::Selector& selector : sheet.rules.empty() ? std::vector<th::Selector>{} : sheet.rules[0].selectors) {
         CHECK(selector.trigger == th::Trigger::Hover);
         CHECK(selector.statePart + 1 < selector.parts.size());
-        CHECK(selector.parts[selector.statePart].type == "TracklistGrid");
+        // The row itself, in either form (a playlist's TracklistGrid, an album's HoverGrid), not one of its ancestors
+        const std::string& row = selector.parts[selector.statePart].type;
+        CHECK(row == "TracklistGrid" || row == "HoverGrid");
+        CHECK(selector.parts[selector.statePart].name == "RootGrid");
         CHECK(selector.parts.back().name == "FavoriteButton");
     }
 }

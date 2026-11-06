@@ -170,6 +170,9 @@ private:
     void WriteDecor(theme::NodeId imageId, const winrt::Microsoft::UI::Xaml::Controls::Panel& panel,
                     const theme::Decor& decor);
     void SchedulePass(int followUps) noexcept;
+    // A value Apple sets again in code (a lyrics line's TextAlignment) asks for a pass at once, not at the next tick.
+    void FollowAppleRewrites(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                             std::string_view property);
     void RunPass() noexcept;
     bool LearnPopups(const winrt::Microsoft::UI::Xaml::XamlRoot& root);
     void WatchPopups(const winrt::Microsoft::UI::Xaml::UIElement& content);
@@ -327,6 +330,7 @@ private:
     // the passes still due after a navigation.
     std::function<void()> m_pass;
     std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_watched;
+    std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_rewritesFollowed;
     winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_passTimer{nullptr};
     int m_followUps = 0;
     // Flyouts, menus and tooltips open in popups outside the window's tree. Each popup seen open is walked from then on,
