@@ -270,13 +270,13 @@ void ThemeEngine::PlaceDecor(const NodeInfo& node, PseudoElement slot, const Dec
     if (!node.panel) {
         Refuse(where, "\"" + content.selector.text + "\": " + PseudoElementName(slot) +
                           " needs a panel (Grid, StackPanel...); " + Describe(node) + " is a " + node.type,
-               report);
+               report, node.id);
         return;
     }
     switch (tree.SetDecor(node.id, slot, &decor)) {
         case DecorChange::Refused:
             // A record already there stays, so Restore still takes off what the panel may hold.
-            Refuse(where, "\"" + where + "\" refused its image " + decor.image, report);
+            Refuse(where, "\"" + where + "\" refused its image " + decor.image, report, node.id);
             return;
         case DecorChange::Unchanged:
             report.unchanged++;
@@ -334,7 +334,7 @@ std::vector<HoverValue> ThemeEngine::StateValues(const NodeInfo& node, const Sta
         std::optional<Value> current = tree.Read(node.id, property);
         if (!current) {
             if (tree.Alive(node.id)) {
-                Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report);
+                Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report, node.id);
             }
             continue;
         }
@@ -344,7 +344,7 @@ std::vector<HoverValue> ThemeEngine::StateValues(const NodeInfo& node, const Sta
                                                                         : assignment->value;
         if (!value) {
             Refuse(Describe(node) + " " + property, "\"" + Describe(node) + " " + property + "\" has no size to scale",
-                   report);
+                   report, node.id);
             continue;
         }
         const NodeId watch = watched < 0 ? 0 : nodes[watched].id;
@@ -374,7 +374,7 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, 
 
     if (!tree.SetHover(node.id, values)) {
         Refuse(Describe(node) + " :hover", "\"" + Describe(node) + "\" does not follow its states (:hover, :focus, :active, :current)",
-               report);
+               report, node.id);
         return;
     }
     if (values.empty()) {
@@ -442,13 +442,13 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
     if (!current) {
         // Gone since the snapshot, or a template part WinUI never realized: nothing the theme did wrong.
         if (tree.Alive(node.id)) {
-            Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report);
+            Refuse(Describe(node) + " " + property, "\"" + Describe(node) + "\" has no property " + property, report, node.id);
         }
         return false;
     }
     std::optional<Value> value = Resolve(node.id, property, assignment.value, *current, tree);
     if (!value) {
-        Refuse(Describe(node) + " " + property, "\"" + Describe(node) + " " + property + "\" has no size to scale", report);
+        Refuse(Describe(node) + " " + property, "\"" + Describe(node) + " " + property + "\" has no size to scale", report, node.id);
         return false;
     }
     if (SameValue(*current, *value)) {
@@ -467,7 +467,7 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
                                  ? "\"" + Describe(node) + "\" refused the animation: Apple Music moves this element "
                                    "itself, or the theme also gives it a transform"
                                  : "value refused for \"" + Describe(node) + " " + property + "\"";
-        Refuse(Describe(node) + " " + property, reason, report);
+        Refuse(Describe(node) + " " + property, reason, report, node.id);
         return false;
     }
     if (!keep) m_moves.push_back({node.id, *current});
@@ -508,7 +508,7 @@ void ThemeEngine::ApplyReparents(const std::vector<PendingMove>& pending, const 
         if (container < 0) {
             Refuse(Describe(node) + " move-to", "\"" + Describe(node) + "\" moves to \"" + selectorText +
                        "\": no element matches it",
-                   report);
+                   report, node.id);
             continue;
         }
         const NodeInfo& target = nodes[container];
@@ -519,7 +519,7 @@ void ThemeEngine::ApplyReparents(const std::vector<PendingMove>& pending, const 
         }
         if (!tree.Reparent(node.id, target.id, -1)) {
             Refuse(Describe(node) + " move-to", "\"" + Describe(node) + "\" could not move into " + Describe(target),
-                   report);
+                   report, node.id);
             continue;
         }
         bool recorded = std::any_of(m_reparents.begin(), m_reparents.end(),
@@ -576,8 +576,11 @@ void ThemeEngine::ApplyDictionary(const Theme& theme, TreeBackend& tree, Report&
                                          : "Resource dictionary merged (resources.xaml)");
 }
 
-void ThemeEngine::Refuse(const std::string& key, const std::string& message, Report& report) {
+void ThemeEngine::Refuse(const std::string& key, const std::string& message, Report& report, NodeId node) {
     report.refused++;
+    Refusal& refusal = m_refusals[key];
+    if (refusal.message.empty()) refusal.message = message;
+    if (node) refusal.elements.insert(node);
     if (m_reported.insert(key).second) m_journal.Write("Refused: " + message);
 }
 
@@ -654,6 +657,7 @@ void ThemeEngine::Restore(TreeBackend& tree) {
     m_moves.clear();
     m_reparents.clear();
     m_reported.clear();
+    m_refusals.clear();
     m_active = false;
     m_passes = 0;
     m_journal.Write("Theme removed: " + std::to_string(restored) + " value(s) restored, " + std::to_string(gone) +

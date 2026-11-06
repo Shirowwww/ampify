@@ -101,6 +101,10 @@ std::map<std::string, ManifestText> ReadManifestTranslations(const Json& field, 
 // back as true or false, a number as SettingNumberText writes it.
 std::string SettingValue(const SettingSpec& spec, const std::optional<std::string>& stored);
 
+// Why `stored` does not fit the spec (a toggle that is not on or off, a choice not offered, a number out of its
+// bounds), empty when it fits. SettingValue takes the default for such a value.
+std::string SettingProblem(const SettingSpec& spec, std::string_view stored);
+
 // Accepts `storage`, `player.read`, ..., or `network:<host>` with a lowercase host name.
 bool IsKnownPermission(std::string_view permission);
 

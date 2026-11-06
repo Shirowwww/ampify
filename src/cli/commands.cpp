@@ -19,6 +19,7 @@
 #include "../core/natives/service_flags.hpp"
 #include "../core/remote_protocol.hpp"
 #include "theme_commands.hpp"
+#include "theme_replay.hpp"
 #include "../core/theme/files.hpp"
 #include "../core/theme/theme.hpp"
 #include "../core/theme/theme_settings.hpp"
@@ -490,6 +491,10 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
         // `ampify config app_launch_flags --remote-debugging-port=9222` stores the flag instead of refusing it.
         bool flagsValue = options.positional.size() == 2 && options.positional[0] == "config" &&
                           options.positional[1] == kLaunchFlagsKey;
+        // `theme replay`, `theme diff` and `theme scrub` take options of their own (--tree, --out, --set...).
+        flagsValue = flagsValue || (options.positional.size() >= 2 && options.positional[0] == "theme" &&
+                                    (options.positional[1] == "replay" || options.positional[1] == "diff" ||
+                                     options.positional[1] == "scrub"));
         if (onlyArguments || flagsValue) {
             options.positional.push_back(arg);
             continue;
@@ -779,6 +784,10 @@ int CmdTheme(Context& ctx) {
         std::vector<std::filesystem::path> trees;
         for (size_t i = 2; i < args.size(); i++) trees.push_back(PathArgument(args[i]));
         return theme::RunNames(trees, ctx.out, ctx.err);
+    }
+    // The offline bench: the engine on a saved tree (they read their own options, ParseOptions passes them through).
+    if (action == "replay" || action == "diff" || action == "scrub") {
+        return theme::RunReplayCommand(std::vector<std::string>(args.begin() + 1, args.end()), ctx.out, ctx.err);
     }
     // check and watch read a theme folder anywhere on disk, the way the kernel reads it, and print what would apply.
     if (action == "check" || action == "watch") {

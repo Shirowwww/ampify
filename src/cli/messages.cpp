@@ -31,6 +31,10 @@ Elements
   theme    check <folder> [--scheme <name>]   reads a theme as the kernel does and shows what would apply
   theme    watch <folder> [--scheme <name>]   reads the theme again at each save (--max-cycles N to stop)
   theme    names <inspector.json>...          checks the stable names (.sidebar, .card...) against saved interface trees
+  theme    replay <folder|none> --tree <inspector.json> --out <folder>   runs the theme engine on a saved tree,
+                               without Apple Music: report.json and wireframe.svg (docs/development/offline-bench.md)
+  theme    diff <report|folder> <report|folder>   what changed between two replays
+  theme    scrub <inspector.json> <out.json>      a copy of a saved tree with texts, free names and addresses removed
   theme    import <folder|zip|address> [id] takes up a Spicetify theme (its color.ini works as is)
   validate <folder>            checks the manifest of an element (or a catalog.json)
   new <extension|theme|snippet|app> <id>   creates a starter element

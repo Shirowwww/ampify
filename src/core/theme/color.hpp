@@ -24,6 +24,15 @@ std::optional<Argb> ParseColor(std::string_view text);
 // The text XAML expects for a colour: `#AARRGGBB`.
 std::string ToXamlColor(Argb color);
 
+// WCAG relative luminance, 0 (black) to 1 (white); the alpha is not counted.
+double RelativeLuminance(Argb color);
+
+// WCAG contrast ratio of two opaque colours, from 1 (the same) to 21 (black on white).
+double ContrastRatio(Argb a, Argb b);
+
+// `top` laid over `under` with `alpha` (0 to 1, the top colour's own alpha already counted in), as an opaque colour.
+Argb Blend(Argb under, Argb top, double alpha);
+
 // Named colours of a theme, written `$name` in its rules. Names are case-insensitive.
 class Palette {
 public:

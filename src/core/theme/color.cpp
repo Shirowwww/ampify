@@ -1,6 +1,8 @@
 #include "color.hpp"
 
+#include <algorithm>
 #include <cctype>
+#include <cmath>
 
 #include "../text_util.hpp"
 
@@ -65,6 +67,28 @@ std::string ToXamlColor(Argb color) {
         text += kDigits[channel & 0x0F];
     }
     return text;
+}
+
+double RelativeLuminance(Argb color) {
+    auto linear = [](std::uint8_t channel) {
+        double value = channel / 255.0;
+        return value <= 0.04045 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
+}
+
+double ContrastRatio(Argb a, Argb b) {
+    double first = RelativeLuminance(a);
+    double second = RelativeLuminance(b);
+    return (std::max(first, second) + 0.05) / (std::min(first, second) + 0.05);
+}
+
+Argb Blend(Argb under, Argb top, double alpha) {
+    alpha = std::clamp(alpha, 0.0, 1.0);
+    auto mix = [&](std::uint8_t low, std::uint8_t high) {
+        return static_cast<std::uint8_t>(std::lround(low + (high - low) * alpha));
+    };
+    return {0xFF, mix(under.r, top.r), mix(under.g, top.g), mix(under.b, top.b)};
 }
 
 bool Palette::Define(std::string_view name, Argb color) {

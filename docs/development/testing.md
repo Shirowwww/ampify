@@ -179,7 +179,8 @@ writes `results\report.md`. `-Storefront` sets the account's country (`fr` by de
 
 The theme inspector. `ampify devtools` (or `theme.inspect = 1`) makes the running kernel write the page on screen to
 `logs\inspector.txt` and `logs\inspector.json`: each element with its selector, sizes, properties and visual states
-(`States=`). It is the quickest way to find a name or see why a rule does not apply.
+(`States=`). It is the quickest way to find a name or see why a rule does not apply. The saved `inspector.json` then
+replays a theme without Apple Music: see [offline-bench.md](offline-bench.md).
 
 Screenshots without bringing Apple Music forward. `PrintWindow(hwnd, dc, PW_RENDERFULLCONTENT)` captures the window
 even behind others. Make the capturing process DPI aware (`SetProcessDpiAwarenessContext(-4)`), or a screen at 125%

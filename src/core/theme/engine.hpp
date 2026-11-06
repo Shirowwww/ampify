@@ -56,9 +56,21 @@ public:
     void Rearm() {
         m_passes = 0;
         m_reported.clear();
+        m_refusals.clear();
     }
 
+    // What the engine refused since the theme went on (or since Rearm), by the key the log names it once under: its
+    // message and every element it was refused on (none for a resource or the dictionary). The log line stays single,
+    // so a timer does not repeat it; the offline bench counts the elements here.
+    struct Refusal {
+        std::string message;
+        std::set<NodeId> elements;
+    };
+    const std::map<std::string, Refusal>& Refusals() const { return m_refusals; }
+
     bool Active() const { return m_active; }
+    // The value each changed element and property gets back at Restore, for the inspector (inspector.json).
+    const std::map<std::pair<NodeId, std::string>, Value>& Originals() const { return m_originals; }
     size_t OriginalCount() const {
         return m_originals.size() + m_resourceOriginals.size() + m_moves.size() + m_reparents.size() + m_hovers.size() +
                m_decors.size();
@@ -68,7 +80,7 @@ private:
     void ApplyAssignments(const Theme& theme, TreeBackend& tree, const std::vector<NodeInfo>& nodes, Report& report);
     void ApplyResources(const Theme& theme, TreeBackend& tree, Report& report);
     void ApplyDictionary(const Theme& theme, TreeBackend& tree, Report& report);
-    void Refuse(const std::string& key, const std::string& message, Report& report);
+    void Refuse(const std::string& key, const std::string& message, Report& report, NodeId node = 0);
 
     struct Move {
         NodeId id = 0;
@@ -122,6 +134,7 @@ private:
     std::map<std::pair<NodeId, PseudoElement>, Decor> m_decors;  // the ::before and ::after images in each panel
     std::string m_dictionary;  // the resource dictionary currently merged, empty when none
     std::set<std::string> m_reported;  // refusals already written to the log, so a timer does not repeat them
+    std::map<std::string, Refusal> m_refusals;
     bool m_active = false;
     // Passes since the theme was applied. The first one writes each value to the log; the later ones (page changes,
     // rows realised while scrolling) only a summary, for the first few, so the log stays readable.

@@ -58,15 +58,6 @@ std::optional<bool> DarkFromPalette(const Palette& palette) {
     return std::nullopt;
 }
 
-// WCAG relative luminance, 0 (black) to 1 (white).
-double RelativeLuminance(Argb color) {
-    auto linear = [](std::uint8_t channel) {
-        double value = channel / 255.0;
-        return value <= 0.04045 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4);
-    };
-    return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
-}
-
 constexpr const char* kAccent = "AccentFillColorDefaultBrush";
 
 // A brush the theme does not name, worked out from one it does. The theme's resources.xaml has the last word: a key

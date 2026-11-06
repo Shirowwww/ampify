@@ -12,7 +12,12 @@ list(APPEND AMPIFY_CLI_PORTABLE_SOURCES
     src/cli/zip_writer.cpp
     src/cli/anonymize.cpp
     src/cli/compile.cpp
-    src/cli/theme_commands.cpp)
+    src/cli/theme_commands.cpp
+    src/cli/theme_replay.cpp
+    src/cli/theme_diff.cpp
+    src/cli/replay_command.cpp
+    src/cli/replay_wireframe.cpp
+    src/cli/dump_scrub.cpp)
 
 list(APPEND AMPIFY_CLI_SOURCES
     src/cli/ampify.cpp

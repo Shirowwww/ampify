@@ -836,6 +836,19 @@ bool XamlTreeBackend::Alive(theme::NodeId id) {
     }
 }
 
+// Only the inspector asks, once per dump: an element out of the live tree (a closed menu's entries) throws and has none.
+std::optional<theme::NodeBox> XamlTreeBackend::Box(theme::NodeId id) {
+    try {
+        auto element = Resolve(id).try_as<xaml::FrameworkElement>();
+        if (!element || !element.XamlRoot()) return std::nullopt;
+        winrt::Windows::Foundation::Point origin =
+            element.TransformToVisual(nullptr).TransformPoint(winrt::Windows::Foundation::Point{0, 0});
+        return theme::NodeBox{origin.X, origin.Y, element.ActualWidth(), element.ActualHeight()};
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
 // Puts the element into `panel` at `index` (or last). False when the panel refuses it.
 static bool InsertChild(const controls::Panel& panel, const xaml::UIElement& element, int index) noexcept {
     try {

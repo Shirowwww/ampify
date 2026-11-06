@@ -39,5 +39,6 @@ Ampify adds themes, extensions and apps to Apple Music for Windows. New here? St
 | [Testing](development/testing.md) | The Windows bench, CI, the test pass on a PC, debugging tips |
 | [How it works](development/how-it-works.md) | Launcher, kernel, theme engine, JavaScript runtime, Marketplace, audio |
 | [XAML lessons](development/xaml-lessons.md) | Problems met while drawing inside Apple Music, and their fixes |
+| [Offline bench](development/offline-bench.md) | Checking a theme on a saved interface tree, without Apple Music on screen |
 | [Apple Music internals](../knowledge/README.md) | What is known about Apple Music for Windows |
 | [Changelog](../CHANGELOG.md) · [Credits](../CREDITS.md) | Version history and the projects Ampify builds on |

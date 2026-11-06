@@ -278,7 +278,10 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             if (dump) {
                 ampify::ActivityScope inspector("inspector tree");
                 std::ofstream(JournalFile("inspector.txt")) << *dump;
-                std::ofstream(JournalFile("inspector.json")) << theme::InspectTreeJson(ui->backend);
+                theme::InspectOptions recorded;
+                recorded.theme = request.themeId;
+                recorded.originals = &ui->session.Originals();
+                std::ofstream(JournalFile("inspector.json")) << theme::InspectTreeJson(ui->backend, recorded);
                 WriteSidebarIfMissing(kit, ui->backend);
                 UpdateThemeSettings(kit, journal, [](theme::ThemeSettings& value) { value.inspect = false; });
                 journal.Write("Inspector: tree written to logs\\inspector.txt and inspector.json");

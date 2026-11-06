@@ -321,3 +321,24 @@ TEST_CASE(Manifest_AStoredSettingValueCountsOnlyWhenItFits) {
     CHECK(ampify::SettingValue(choice, "Pink") == "Pink");
     CHECK(ampify::SettingValue(choice, "Green") == "Blue");
 }
+
+TEST_CASE(Manifest_SaysWhyAStoredSettingValueDoesNotFit) {
+    ampify::SettingSpec number;
+    number.type = ampify::SettingSpec::Type::Number;
+    number.min = 0;
+    number.max = 24;
+    CHECK(ampify::SettingProblem(number, "12.5").empty());
+    CHECK(ampify::SettingProblem(number, "30").find("above its maximum, 24") != std::string::npos);
+    CHECK(ampify::SettingProblem(number, "-1").find("below its minimum, 0") != std::string::npos);
+    CHECK(ampify::SettingProblem(number, "wide").find("not a number") != std::string::npos);
+
+    ampify::SettingSpec toggle;
+    CHECK(ampify::SettingProblem(toggle, "Yes").empty());
+    CHECK(ampify::SettingProblem(toggle, "maybe").find("not on or off") != std::string::npos);
+
+    ampify::SettingSpec choice;
+    choice.type = ampify::SettingSpec::Type::Choice;
+    choice.options = {"Blue", "Pink"};
+    CHECK(ampify::SettingProblem(choice, "Pink").empty());
+    CHECK(ampify::SettingProblem(choice, "Green") == "\"Green\" is not one of its choices: Blue, Pink");
+}

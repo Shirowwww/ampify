@@ -15,6 +15,11 @@ list(APPEND AMPIFY_TESTS_SOURCES
     tests/loader_tests.cpp
     tests/pipeline_tests.cpp
     tests/theme_tests.cpp
+    tests/replay_tests.cpp
+    tests/replay_report_tests.cpp
+    tests/replay_cli_tests.cpp
+    tests/replay_contrast_tests.cpp
+    tests/replay_removal_tests.cpp
     tests/theme_color_animation_tests.cpp
     tests/gain_board_tests.cpp
     tests/sidebar_hold_tests.cpp

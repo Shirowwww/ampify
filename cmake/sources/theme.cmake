@@ -13,6 +13,8 @@ list(APPEND AMPIFY_THEME_SOURCES
     src/core/theme/inspector.cpp
     src/core/theme/library.cpp
     src/core/theme/properties.cpp
+    src/core/theme/replay.cpp
+    src/core/theme/replay_contrast.cpp
     src/core/theme/selector.cpp
     src/core/theme/session.cpp
     src/core/theme/theme.cpp

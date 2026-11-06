@@ -41,6 +41,9 @@ ampify doctor                            check that everything is in order
 | `ampify theme check <folder> [--scheme <name>]` | Reads a theme as the kernel does and reports each refused rule with its line |
 | `ampify theme watch <folder> [--scheme <name>]` | Checks the theme again at each save |
 | `ampify theme names <inspector.json>...` | Checks the [stable names](themes/names.md) against saved interface trees. Exit code 1 when a name matches nothing |
+| `ampify theme replay <folder\|none> --tree <inspector.json> --out <folder>` | Runs the theme engine on a saved tree, without Apple Music: a report and a wireframe ([offline bench](development/offline-bench.md)). Exit code 1 when it does not settle |
+| `ampify theme diff <report\|folder> <report\|folder> [--out <file>]` | What changed between two replays. Exit code 1 when something did |
+| `ampify theme scrub <inspector.json> <out.json>` | A copy of a saved tree without texts, free names or addresses |
 | `ampify theme import <folder\|zip\|address> [id]` | Brings in a Spicetify theme ([details](themes/spicetify.md)) |
 | `ampify new <extension\|theme\|snippet\|app> <id>` | Writes a working starter in the current folder |
 | `ampify validate <folder>` | Checks an element's manifest and files with the catalog's rules (or a `catalog.json`) |

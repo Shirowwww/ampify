@@ -582,28 +582,65 @@ std::vector<std::string> SettingsErrors(std::string_view manifestText) {
     return errors;
 }
 
-std::string SettingValue(const SettingSpec& spec, const std::optional<std::string>& stored) {
-    if (!stored) return spec.defaultValue;
+namespace {
+
+bool IsOn(std::string_view lowered) {
+    return lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes";
+}
+
+bool IsOff(std::string_view lowered) {
+    return lowered == "0" || lowered == "false" || lowered == "off" || lowered == "no";
+}
+
+std::optional<double> SettingNumber(std::string_view text) {
+    double number = 0;
+    const char* end = text.data() + text.size();
+    auto [stop, error] = std::from_chars(text.data(), end, number);
+    if (text.empty() || error != std::errc() || stop != end || !std::isfinite(number)) return std::nullopt;
+    return number;
+}
+
+}  // namespace
+
+std::string SettingProblem(const SettingSpec& spec, std::string_view stored) {
     switch (spec.type) {
         case SettingSpec::Type::Toggle: {
-            std::string lowered = ToLowerAscii(*stored);
-            if (lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes") return "true";
-            if (lowered == "0" || lowered == "false" || lowered == "off" || lowered == "no") return "false";
-            return spec.defaultValue;
+            std::string lowered = ToLowerAscii(stored);
+            return IsOn(lowered) || IsOff(lowered) ? std::string() : "\"" + std::string(stored) + "\" is not on or off";
         }
+        case SettingSpec::Type::Choice: {
+            if (std::find(spec.options.begin(), spec.options.end(), stored) != spec.options.end()) return {};
+            std::string offered;
+            for (const std::string& option : spec.options) offered += (offered.empty() ? "" : ", ") + option;
+            return "\"" + std::string(stored) + "\" is not one of its choices: " + offered;
+        }
+        case SettingSpec::Type::Text:
+            return {};
+        case SettingSpec::Type::Number: {
+            std::optional<double> number = SettingNumber(stored);
+            if (!number) return "\"" + std::string(stored) + "\" is not a number";
+            if (spec.min && *number < *spec.min) {
+                return std::string(stored) + " is below its minimum, " + SettingNumberText(*spec.min);
+            }
+            if (spec.max && *number > *spec.max) {
+                return std::string(stored) + " is above its maximum, " + SettingNumberText(*spec.max);
+            }
+            return {};
+        }
+    }
+    return {};
+}
+
+std::string SettingValue(const SettingSpec& spec, const std::optional<std::string>& stored) {
+    if (!stored || !SettingProblem(spec, *stored).empty()) return spec.defaultValue;
+    switch (spec.type) {
+        case SettingSpec::Type::Toggle:
+            return IsOn(ToLowerAscii(*stored)) ? "true" : "false";
+        case SettingSpec::Type::Number:
+            return SettingNumberText(*SettingNumber(*stored));
         case SettingSpec::Type::Choice:
-            return std::find(spec.options.begin(), spec.options.end(), *stored) != spec.options.end() ? *stored
-                                                                                                      : spec.defaultValue;
         case SettingSpec::Type::Text:
             return *stored;
-        case SettingSpec::Type::Number: {
-            double number = 0;
-            const char* end = stored->data() + stored->size();
-            auto [stop, error] = std::from_chars(stored->data(), end, number);
-            bool fits = !stored->empty() && error == std::errc() && stop == end && std::isfinite(number) &&
-                        !(spec.min && number < *spec.min) && !(spec.max && number > *spec.max);
-            return fits ? SettingNumberText(number) : spec.defaultValue;
-        }
     }
     return spec.defaultValue;
 }

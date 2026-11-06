@@ -1,6 +1,7 @@
 #include "inspector.hpp"
 
 #include <algorithm>
+#include <span>
 
 #include "../json.hpp"
 #include "properties.hpp"
@@ -94,6 +95,56 @@ std::string InspectTree(TreeBackend& tree, const InspectOptions& options) {
     return dump;
 }
 
+std::span<const char* const> InspectedProperties() {
+    return kInspectedProperties;
+}
+
+namespace {
+
+// The originals the engine holds for one element, as inspector.json writes them.
+Json::Object OriginalsOf(NodeId id, const OriginalValues* originals) {
+    Json::Object entries;
+    if (!originals) return entries;
+    for (auto it = originals->lower_bound({id, std::string()}); it != originals->end() && it->first.first == id; ++it) {
+        const std::string& property = it->first.second;
+        const std::string text = it->second == kNoOwnValue ? std::string(kNoOwnValueText) : ValueText(it->second, property);
+        entries.emplace_back(property, Json(text));
+    }
+    return entries;
+}
+
+std::string NodeJson(TreeBackend& tree, const std::vector<NodeInfo>& nodes, int index, const InspectOptions& options) {
+    const NodeInfo& node = nodes[index];
+    Json::Object properties;
+    for (const char* property : kInspectedProperties) {
+        std::optional<Value> value = tree.Read(node.id, property);
+        if (value) properties.emplace_back(property, Json(ValueText(*value, property)));
+    }
+
+    Json::Object entry;
+    entry.emplace_back("index", Json(static_cast<double>(index)));
+    entry.emplace_back("id", Json(std::to_string(node.id)));
+    entry.emplace_back("type", Json(node.type));
+    entry.emplace_back("fullType", Json(node.fullType));
+    entry.emplace_back("name", Json(node.name));
+    entry.emplace_back("parent", Json(static_cast<double>(node.parent)));
+    entry.emplace_back("depth", Json(static_cast<double>(node.depth)));
+    entry.emplace_back("selector", Json(SuggestSelector(nodes, index)));
+    entry.emplace_back("icon", Json(node.icon));
+    entry.emplace_back("panel", Json(node.panel));
+    entry.emplace_back("player", Json(node.player));
+    entry.emplace_back("playing", Json(node.playing));
+    if (std::optional<NodeBox> box = tree.Box(node.id)) {
+        entry.emplace_back("box", Json(Json::Array{Json(box->x), Json(box->y), Json(box->width), Json(box->height)}));
+    }
+    entry.emplace_back("properties", Json(std::move(properties)));
+    Json::Object originals = OriginalsOf(node.id, options.originals);
+    if (!originals.empty()) entry.emplace_back("originals", Json(std::move(originals)));
+    return Json(std::move(entry)).Dump();
+}
+
+}  // namespace
+
 std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options) {
     std::vector<std::string> resources;
     for (const std::string& key : tree.ResourceKeys()) {
@@ -112,28 +163,19 @@ std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options) {
             truncated = true;
             break;
         }
-        const NodeInfo& node = nodes[index];
-        Json::Object properties;
-        for (const char* property : kInspectedProperties) {
-            std::optional<Value> value = tree.Read(node.id, property);
-            if (value) properties.emplace_back(property, Json(ValueText(*value, property)));
-        }
-
-        Json::Object entry;
-        entry.emplace_back("index", Json(static_cast<double>(index)));
-        entry.emplace_back("id", Json(std::to_string(node.id)));
-        entry.emplace_back("type", Json(node.type));
-        entry.emplace_back("fullType", Json(node.fullType));
-        entry.emplace_back("name", Json(node.name));
-        entry.emplace_back("parent", Json(static_cast<double>(node.parent)));
-        entry.emplace_back("depth", Json(static_cast<double>(node.depth)));
-        entry.emplace_back("selector", Json(SuggestSelector(nodes, index)));
-        entry.emplace_back("properties", Json(std::move(properties)));
-        list.push_back(Json(std::move(entry)).Dump());
+        list.push_back(NodeJson(tree, nodes, index, options));
     }
 
-    return std::string("{\n  \"version\": 1,\n  \"truncated\": ") + (truncated ? "true" : "false") +
-           ",\n  \"resources\": " + JsonLines(resources) + ",\n  \"nodes\": " + JsonLines(list) + "\n}\n";
+    std::string head = std::string("{\n  \"version\": 2,\n  \"truncated\": ") + (truncated ? "true" : "false") +
+                       ",\n  \"theme\": " + Json(options.theme).Dump();
+    if (std::optional<ViewSize> size = tree.WindowSize()) {
+        Json::Object window;
+        window.emplace_back("width", Json(size->width));
+        window.emplace_back("height", Json(size->height));
+        window.emplace_back("sidebarFolded", Json(size->sidebarFolded));
+        head += ",\n  \"window\": " + Json(std::move(window)).Dump();
+    }
+    return head + ",\n  \"resources\": " + JsonLines(resources) + ",\n  \"nodes\": " + JsonLines(list) + "\n}\n";
 }
 
 std::optional<std::vector<NodeInfo>> ReadInspectorTree(std::string_view text, std::string* problem) {
@@ -167,6 +209,14 @@ std::optional<std::vector<NodeInfo>> ReadInspectorTree(std::string_view text, st
         node.name = textOf(item, "name");
         node.parent = static_cast<int>(*parent->AsNumber());
         node.depth = static_cast<int>(*depth->AsNumber());
+        auto flag = [&](std::string_view key) {
+            const Json* member = item.Find(key);
+            return member && member->AsBool() && *member->AsBool();
+        };
+        node.icon = flag("icon");  // version 2 on: a version 1 tree leaves them all false
+        node.panel = flag("panel");
+        node.player = flag("player");
+        node.playing = flag("playing");
         if (node.parent < -1 || node.parent >= static_cast<int>(nodes.size())) {
             return fail("node " + std::to_string(nodes.size()) + " comes before its parent");
         }

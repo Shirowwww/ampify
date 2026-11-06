@@ -87,6 +87,8 @@ public:
     // The main window's bounds. Window.SizeChanged asks for a pass when one of the watched queries changes its answer.
     std::optional<theme::ViewSize> WindowSize() override;
     void WatchSize(const std::vector<theme::MediaQuery>& queries) override;
+    // The element's place against its window's root (TransformToVisual) and its actual size, for the inspector.
+    std::optional<theme::NodeBox> Box(theme::NodeId id) override;
     // Asks for a pass when a watched query changed its answer without the window changing size (the sidebar folded
     // or given back by apple.sidebar). Cheap: the periodic tick calls it.
     void RecheckMedia() noexcept { OnSizeChanged(); }
