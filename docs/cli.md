@@ -149,9 +149,9 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `apple.marquee` | A text cut with "…": `hover` scrolls it while the pointer is on it, `off` leaves it cut | `hover` |
 | `apple.sidebar` | Apple Music's sidebar: `open` leaves it as Apple Music shows it, `hover` folds it to its icons and opens it over the pages while the pointer is on it; the hamburger button pins it open for the session (its icon shows a pin; a second click folds it again), and the Library and Playlists groups fold with it | `open` |
 | `apple.watchdog` | `on` writes to `logs\AppleMusic.log` each freeze of Apple Music's window of 0.3 s or more, with what Ampify was doing, and a summary each minute; `off` writes nothing. Applies at the next start of Apple Music | `off` |
-| `apple.orphanAgent` | `on` ends a library agent left running by a killed Apple Music, 10 s after Apple Music is closed, so the library opens again (error 9039); never while Apple Music runs. Applies the next time Apple Music starts | `off` |
+| `apple.orphanAgent` | `on` ends a library agent left running by a killed Apple Music, so the library opens again (error 9039): when Apple Music is started from Ampify's launcher, after giving the agent 10 s to leave, and also 10 s after Apple Music is closed where the background launcher runs (Windows refused to start the launcher with Apple Music). Never while Apple Music runs. Applies the next time Apple Music starts | `off` |
 | `ampify.entry` | Where the entry that opens the Marketplace stands: `sidebar`, or `header` next to Apple's "···" at the top of the open sidebar | `sidebar` |
-| `mini.shortcut` | The keyboard shortcut that opens or closes the mini player, such as `Ctrl+Alt+M`; `off` turns it off | `Ctrl+Alt+M` |
+| `mini.shortcut` | The keyboard shortcut that opens or closes the mini player, such as `Ctrl+Alt+M`; `off` turns it off. It works in every app: Ctrl+Alt is AltGr on many keyboards, so choose another one (such as `Ctrl+Alt+Shift+M`) if you type AltGr with that letter | `Ctrl+Alt+M` |
 | `mini.position` | Where the mini player was last left, as `x,y,width,height` in screen pixels; Ampify writes it when the window moves | none |
 | `catalog.url` | `https://...` or `file://...` | the public catalog |
 | `app_launch_flags` | Arguments added when `ampify launch` starts Apple Music | empty |

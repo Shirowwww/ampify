@@ -88,6 +88,21 @@ void StartMiniPlayerShortcut(ampify::WinHost& winHost, const ampify::Settings& s
     }
 }
 
+// The cover of `track`. Right after a song change Windows may still hold the previous song's thumbnail, so an image
+// read with another title is read again once, a moment later. `refused` is set when both reads were of another song.
+std::optional<ampify::ArtworkHost::File> FetchArtworkOf(ampify::WinHost& winHost, const ampify::TrackInfo& track,
+                                                        bool& refused) {
+    constexpr auto kSecondReadAfter = std::chrono::milliseconds(800);
+    for (int attempt = 0; attempt < 2; attempt++) {
+        if (attempt > 0) std::this_thread::sleep_for(kSecondReadAfter);
+        std::optional<ampify::ArtworkHost::File> file = winHost.CurrentArtwork();
+        if (!file) return std::nullopt;
+        if (ampify::mini::ArtworkIsFor(track, file->title, file->artist)) return file;
+    }
+    refused = true;
+    return std::nullopt;
+}
+
 // The mini player's data, every 250 ms: what plays, its cover while its window is open, and the buttons pressed in it.
 void FeedMiniPlayer(ampify::WinHost& winHost, const ampify::PlayerSnapshot& snapshot) {
     ampify::mini::PublishInfo(ampify::mini::InfoFrom(snapshot));
@@ -96,12 +111,15 @@ void FeedMiniPlayer(ampify::WinHost& winHost, const ampify::PlayerSnapshot& snap
     if (!ampify::mini::WindowOpen() || !snapshot.track || fetching) return;
     std::optional<ampify::mini::Artwork> shown = ampify::mini::CurrentArtwork();
     if (shown && shown->trackId == snapshot.track->id) return;
+    static std::string refusedTrack;  // read and written only while `fetching` is held
+    if (refusedTrack == snapshot.track->id) return;
     fetching = true;
-    std::string trackId = snapshot.track->id;
     // The host may wait a few seconds for the cover: a worker thread does, as the elements' own requests do.
-    std::thread([&winHost, trackId] {
-        std::optional<ampify::ArtworkHost::File> file = winHost.CurrentArtwork();
-        if (file) ampify::mini::PublishArtwork({trackId, file->contentType, file->bytes});
+    std::thread([&winHost, track = *snapshot.track] {
+        bool refused = false;
+        std::optional<ampify::ArtworkHost::File> file = FetchArtworkOf(winHost, track, refused);
+        if (file) ampify::mini::PublishArtwork({track.id, file->contentType, file->bytes});
+        if (refused) refusedTrack = track.id;
         fetching = false;
     }).detach();
 }

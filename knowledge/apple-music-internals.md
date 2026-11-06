@@ -162,9 +162,10 @@ the pages. Not verified on a real Apple Music. Ranked by how often users report 
 
 ### Freeze watch (`apple.watchdog`, off by default)
 
-- The kernel queues a heartbeat to the interface thread every 200 ms (`PostToUiThread`) and a monitor thread reads
-  it every 100 ms. A silence of 300 ms or more is a stall. It is logged when the beats resume, as
-  `UI thread stalled N ms, while: <what Ampify was doing>`, and a line each minute gives the beats, the worst gap and
+- The kernel queues a heartbeat to the interface thread about every 200 ms (`PostToUiThread`, one at a time) and a
+  monitor thread looks every 100 ms. Each beat is stamped when queued: the wait until it runs is the block, without
+  the beat period. A wait of 300 ms or more is a stall. It is logged when the beat runs, as
+  `UI thread stalled N ms, while: <what Ampify was doing>`, and a line each minute gives the beats, the worst delay and
   the number of stalls.
 - What Ampify was doing comes from `ActivityScope` markers (`src/core/ui_watchdog.hpp`): "theme tick" (the posted
   tick), "theme pass after a change" (`Reapply` on each XAML change), "inspector tree", "element picker", "player
@@ -192,9 +193,13 @@ Work that runs on the interface thread and could block it for long, found by rea
 
 - A killed Apple Music can leave `AMPLibraryAgent.exe` running. It holds the library, so Apple Music cannot open it
   (error 9039). Detection: an agent of the package runs and no `AppleMusic.exe` of the package runs.
-- The launcher waits 10 s (`kOrphanGraceMs`) for the agent to leave, then ends it with `TerminateProcess`. It never
-  ends an agent while Apple Music runs. It looks at launch (`ampify_launcher.exe`) and in the background launcher
-  while Apple Music is closed. A Start-menu launch that the background launcher does not see is not covered.
+- The launcher waits 10 s (`kOrphanGraceMs`) for the agent to leave, then ends it with `TerminateProcess`, on a
+  handle whose image path it checks again first (an id can go to another process), and waits up to 2 s for it to be
+  gone. A refused end is tried once per process id. It never ends an agent while Apple Music runs. It looks at launch
+  (`ampify_launcher.exe`) and in the background launcher while Apple Music is closed. When Windows starts the launcher
+  with each process (`--attach`), no background launcher runs, so only a launch through `ampify_launcher.exe` clears
+  the agent: the attach path cannot, since it runs while an `AppleMusic.exe` is already there. A Start-menu launch of
+  Apple Music itself is not covered.
 - Logic and tests: `src/core/orphan_agent.*`, `tests/orphan_agent_tests.cpp`. Glue: `src/launcher/launcher.cpp`.
 
 ### Mitigations not implemented

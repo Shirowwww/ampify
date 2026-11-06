@@ -3,7 +3,7 @@
 // The mini player: Ampify's own small window, always on top, with the cover, the title and artist, previous, play or
 // pause, next, the progress and a button back to the main window. This is the portable half: what it shows, where its
 // parts sit, where its window goes, its colours from the active theme, and the feed between the kernel's threads and
-// the mini player's own interface thread (src/win/mini_player.*, compiled with AMPIFY_WITH_XAML). Every function here is
+// the interface thread that runs its window (src/win/mini_window.*, compiled with AMPIFY_WITH_XAML). Every function here is
 // safe from any thread. Apple's own mini player (MiniPlayerWindow) is a different window; see knowledge/.
 
 #include <cstdint>
@@ -20,7 +20,8 @@
 namespace ampify::mini {
 
 inline constexpr char kPlacementKey[] = "mini.position";  // "x,y,width,height", written when the window moves
-inline constexpr char kShortcutKey[] = "mini.shortcut";    // "Ctrl+Alt+M" by default; "off" or empty turns it off
+inline constexpr char kShortcutKey[] = "mini.shortcut";  // "off" or empty turns it off
+// A system-wide hotkey. Ctrl+Alt is AltGr on many keyboards: whoever needs AltGr+M changes it (mini.shortcut).
 inline constexpr char kDefaultShortcut[] = "Ctrl+Alt+M";
 inline constexpr char kElementId[] = "ampify.mini";  // the id the shortcut and the sidebar entry are registered under
 
@@ -124,6 +125,10 @@ Info CurrentInfo();
 void PublishColours(Colours colours);
 Colours CurrentColours();
 void PublishArtwork(Artwork artwork);
+// True when the media session's title and artist, read with its thumbnail, are those of `track`: right after a song
+// change Windows may still hand the previous song's thumbnail. The session's artist may be "Artist — Album".
+// An empty session title (nothing to compare) counts as a match.
+bool ArtworkIsFor(const TrackInfo& track, const std::string& sessionTitle, const std::string& sessionArtist);
 std::optional<Artwork> CurrentArtwork();
 
 // The player buttons pressed in the mini player. The kernel takes them on its JavaScript thread and sends them to Apple.
@@ -139,7 +144,7 @@ using WindowHandler = std::function<void(WindowAction action)>;
 void InstallWindow(WindowHandler handler);  // null removes it
 // True when a handler took the request.
 bool RequestWindow(WindowAction action);
-// Set by the window's thread: the kernel fetches the cover only while the window is on screen.
+// Set by the window: the kernel fetches the cover only while the window is on screen.
 void SetWindowOpen(bool open);
 bool WindowOpen();
 

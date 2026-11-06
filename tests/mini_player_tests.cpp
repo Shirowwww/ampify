@@ -1,5 +1,5 @@
 // The mini player's portable half: what it shows, where its parts sit, where its window goes, its colours from the
-// theme, and the feed between the kernel's threads and the mini player's own thread.
+// theme, and the feed between the kernel's threads and the window's interface thread.
 
 #include <map>
 #include <string>
@@ -261,6 +261,33 @@ TEST_CASE(MiniPlayer_FeedKeepsTheArtworkOfTheLastPublish) {
     CHECK(artwork->trackId == "track-9");
     CHECK(artwork->contentType == "image/jpeg");
     CHECK(artwork->bytes == "bytes");
+}
+
+TEST_CASE(MiniPlayer_ArtworkOfTheSameSongInTheSessionIsAccepted) {
+    TrackInfo track;
+    track.title = "Halo";
+    track.artist = "Beyonce";
+
+    CHECK(mini::ArtworkIsFor(track, "Halo", "Beyonce"));
+    CHECK(mini::ArtworkIsFor(track, "Halo", "Beyonce \xE2\x80\x94 I Am... Sasha Fierce"));
+}
+
+TEST_CASE(MiniPlayer_ArtworkOfThePreviousSongInTheSessionIsRefused) {
+    TrackInfo track;
+    track.title = "Halo";
+    track.artist = "Beyonce";
+
+    CHECK(!mini::ArtworkIsFor(track, "Crazy in Love", "Beyonce"));
+    CHECK(!mini::ArtworkIsFor(track, "Halo", "Someone Else \xE2\x80\x94 Covers"));
+}
+
+TEST_CASE(MiniPlayer_ArtworkWithoutSessionTitleIsAcceptedAsBefore) {
+    TrackInfo track;
+    track.title = "Halo";
+    track.artist = "Beyonce";
+
+    CHECK(mini::ArtworkIsFor(track, "", ""));
+    CHECK(mini::ArtworkIsFor(track, "Halo", ""));
 }
 
 TEST_CASE(MiniPlayer_CommandsAreTakenOnceInOrder) {

@@ -9,6 +9,7 @@
 #include <system_error>
 #include <utility>
 
+#include "player_model.hpp"
 #include "theme/color.hpp"
 
 namespace ampify::mini {
@@ -220,6 +221,13 @@ void PublishArtwork(Artwork artwork) {
     Feed& feed = FeedState();
     std::lock_guard<std::mutex> lock(feed.mutex);
     feed.artwork = std::move(artwork);
+}
+
+bool ArtworkIsFor(const TrackInfo& track, const std::string& sessionTitle, const std::string& sessionArtist) {
+    if (sessionTitle.empty()) return true;
+    if (sessionTitle != track.title) return false;
+    if (track.artist.empty() || sessionArtist.empty()) return true;
+    return sessionArtist == track.artist || SplitArtistAlbum(sessionArtist).first == track.artist;
 }
 
 std::optional<Artwork> CurrentArtwork() {

@@ -28,9 +28,10 @@ void Watch(Journal& journal) {
     for (int step = 0;; ++step) {
         // A beat is queued only when the last one ran: a frozen interface thread must not pile up closures.
         if (step % kBeatEveryMonitorSteps == 0 && gate->TryTake()) {
-            // The beat only reads the clock on the interface thread; the copies keep the monitor alive for late beats.
+            // Stamped when queued: the wait until it runs is the block. The copies keep the monitor alive for late beats.
+            monitor->Posted(NowMs());
             bool queued = PostToUiThread([monitor, gate] {
-                monitor->Beat(NowMs());
+                monitor->Ran(NowMs());
                 gate->Release();
             });
             if (!queued) {

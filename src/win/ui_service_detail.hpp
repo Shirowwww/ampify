@@ -134,6 +134,10 @@ struct PlacedControl {
     bool hasIcon = false;  // the label is then the tooltip only
     bool active = false;   // on (Ampify.ui.setActive): drawn in the accent colour
     bool inHeader = false;  // a sidebar entry standing in the sidebar's header (ampify.entry = header)
+    // A sidebar entry in the list: the pane state it was laid out for, and its control, for a change of pane.
+    bool laidOut = false;
+    bool paneOpen = false;
+    UiControl entry;
     std::string elementId;  // with id, the button's place among Ampify's buttons
     int id = 0;
     std::string icon;       // for its entry in the "More" menu
@@ -233,6 +237,10 @@ struct WindowContext {
     // (kept inside the panel, put back when the last entry goes). Strong, like the other hosts.
     controls::StackPanel sidebarHost{nullptr};
     xaml::UIElement sidebarOriginal{nullptr};
+    // The NavigationView the entries follow: its pane opening, folding or changing mode lays them out again.
+    winrt::weak_ref<controls::NavigationView> sidebarNavigation;
+    std::int64_t sidebarPaneToken = 0;
+    std::int64_t sidebarModeToken = 0;
     std::set<std::string> closedPanels;
     std::optional<std::pair<std::string, std::string>> route;
     bool pageClosed = false;
@@ -251,6 +259,13 @@ struct WindowContext {
     winrt::weak_ref<xaml::DependencyObject> menuSource;  // what the last click or key went to
     dispatching::DispatcherQueueTimer menuTimer{nullptr};
     int menuTries = 0;
+};
+
+// One element's settings card and its status line, held strongly: a weak reference to an element Ampify made never
+// resolves. Its buttons reach it through a std::weak_ptr, so they hold no cycle (UiService::Shared::settingsCards).
+struct SettingsCard {
+    controls::StackPanel panel{nullptr};
+    controls::TextBlock status{nullptr};
 };
 
 using SharedPtr = std::shared_ptr<UiService::Shared>;
@@ -295,6 +310,9 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     int detachedReports = 0;  // log lines about panels taken out of their host, at most 5
     int goneReports = 0;      // log lines about surfaces gone from the model, at most 5
     StyleProbe probe;  // copied from the settings page once it was seen; WinUI defaults before
+    // The settings cards of the Ampify page, which owns them: dropped when the page is built again, and a card out of
+    // the page (its theme section rebuilt) when the next card is made.
+    std::vector<std::shared_ptr<ui_service_detail::SettingsCard>> settingsCards;
 
     std::mutex onceMutex;
     std::set<std::string> logged;

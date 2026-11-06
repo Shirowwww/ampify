@@ -475,6 +475,7 @@ controls::TextBox SearchBox(UiService::Shared& shared, const std::shared_ptr<Sea
 // The line above the settings: the search (when there are enough), then Reset all, Export and Import. The line under
 // them shows the result of an export or an import.
 controls::StackPanel SettingsToolbar(UiService::Shared& shared, const uirender::ModEntry& mod,
+                                     const std::shared_ptr<SettingsCard>& card,
                                      const std::function<void()>& refresh, const std::shared_ptr<SearchTargets>& targets,
                                      const std::shared_ptr<std::string>& query) {
     // Made first: the search box applies its text to the rows, and shows this line when nothing matches.
@@ -482,11 +483,12 @@ controls::StackPanel SettingsToolbar(UiService::Shared& shared, const uirender::
     targets->none.Visibility(xaml::Visibility::Collapsed);
     controls::TextBlock status = MakeText(L"", "caption", true, &shared.probe);
     status.Visibility(xaml::Visibility::Collapsed);
-    SettingsSay say = [weak = winrt::make_weak(status)](const std::string& line) {
-        controls::TextBlock shown = weak.get();
-        if (!shown) return;
-        shown.Text(Wide(line));
-        shown.Visibility(xaml::Visibility::Visible);
+    card->status = status;
+    SettingsSay say = [weak = std::weak_ptr<SettingsCard>(card)](const std::string& line) {
+        std::shared_ptr<SettingsCard> held = weak.lock();
+        if (!held || !held->status) return;
+        held->status.Text(Wide(line));
+        held->status.Visibility(xaml::Visibility::Visible);
     };
 
     controls::StackPanel buttons;
@@ -509,15 +511,16 @@ controls::StackPanel SettingsToolbar(UiService::Shared& shared, const uirender::
 
 // The card of one element: its toolbar, then its settings. Built again after a change, from what settings.txt holds, and
 // with the same search text.
-void FillSettings(UiService::Shared& shared, const controls::StackPanel& panel, const uirender::ModEntry& mod,
+void FillSettings(UiService::Shared& shared, const std::shared_ptr<SettingsCard>& card, const uirender::ModEntry& mod,
                   const std::shared_ptr<std::string>& query) {
-    panel.Children().Clear();
-    std::function<void()> refresh = [owner = &shared, weak = winrt::make_weak(panel), kind = std::string(SettingKindOf(mod)),
-                                     id = mod.id, query]() {
+    card->panel.Children().Clear();
+    card->status = nullptr;
+    std::function<void()> refresh = [owner = &shared, weak = std::weak_ptr<SettingsCard>(card),
+                                     kind = std::string(SettingKindOf(mod)), id = mod.id, query]() {
         // Next turn of the interface: the button that asked for it is still in its own click.
         dispatching::DispatcherQueue::GetForCurrentThread().TryEnqueue([owner, weak, kind, id, query]() {
             try {
-                controls::StackPanel live = weak.get();
+                std::shared_ptr<SettingsCard> live = weak.lock();
                 std::optional<uirender::ModEntry> fresh = uirender::ElementSettings(owner->kit, kind, id);
                 if (live && fresh) FillSettings(*owner, live, *fresh, query);
             } catch (...) {
@@ -526,8 +529,8 @@ void FillSettings(UiService::Shared& shared, const controls::StackPanel& panel, 
     };
     auto targets = std::make_shared<SearchTargets>();
     std::vector<xaml::FrameworkElement> body = GroupedRows(shared, mod, *targets, refresh);
-    panel.Children().Append(SettingsToolbar(shared, mod, refresh, targets, query));
-    for (const xaml::FrameworkElement& element : body) panel.Children().Append(element);
+    card->panel.Children().Append(SettingsToolbar(shared, mod, card, refresh, targets, query));
+    for (const xaml::FrameworkElement& element : body) card->panel.Children().Append(element);
 }
 
 }  // namespace
@@ -535,11 +538,14 @@ void FillSettings(UiService::Shared& shared, const controls::StackPanel& panel, 
 // The settings an extension or the active theme declares, under its row: a toolbar, then the settings by group, each
 // with its label, its description and its controls.
 xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::ModEntry& mod) {
-    controls::StackPanel panel;
-    panel.Spacing(8);
-    panel.Margin(xaml::Thickness{16, 0, 0, 0});
-    FillSettings(shared, panel, mod, std::make_shared<std::string>());
-    return panel;
+    auto card = std::make_shared<SettingsCard>();
+    card->panel = controls::StackPanel();
+    card->panel.Spacing(8);
+    card->panel.Margin(xaml::Thickness{16, 0, 0, 0});
+    std::erase_if(shared.settingsCards, [](const std::shared_ptr<SettingsCard>& old) { return !old->panel.Parent(); });
+    shared.settingsCards.push_back(card);
+    FillSettings(shared, card, mod, std::make_shared<std::string>());
+    return card->panel;
 }
 
 // The active theme's settings: its name, a line on what they do, then the settings.

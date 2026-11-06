@@ -1,5 +1,6 @@
-// The mini player's window, written against the C++/WinRT projection of Windows App SDK 1.8. Everything XAML is created,
-// read and released on the window's own thread (docs/development/xaml-lessons.md, "Objects, popups and lifetime").
+// The mini player's window, written against the C++/WinRT projection of Windows App SDK 1.8. It lives on Apple Music's
+// interface thread: WinUI documents secondary windows on the thread of the app's own, and Apple's resources belong to
+// that thread. Everything XAML is created, read and released there (docs/development/xaml-lessons.md).
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -9,9 +10,9 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Graphics.h>
-#include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.h>
+#include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Windowing.h>
 #include <winrt/Microsoft.UI.Xaml.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
@@ -25,7 +26,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <system_error>
@@ -43,9 +43,9 @@ namespace {
 
 namespace core = ampify::mini;
 namespace controls = winrt::Microsoft::UI::Xaml::Controls;
+namespace dispatching = winrt::Microsoft::UI::Dispatching;
 namespace media = winrt::Microsoft::UI::Xaml::Media;
 namespace windowing = winrt::Microsoft::UI::Windowing;
-namespace system = winrt::Windows::System;
 namespace xaml = winrt::Microsoft::UI::Xaml;
 
 constexpr wchar_t kIconFont[] = L"Segoe MDL2 Assets";
@@ -59,7 +59,7 @@ constexpr double kCornerRadius = 4;  // small corners only: never a pill
 constexpr auto kTick = std::chrono::milliseconds(250);
 constexpr auto kSaveGap = std::chrono::milliseconds(500);
 
-// The XAML objects of the window. Touched on the window's thread only.
+// The XAML objects of the window. Touched on the interface thread only.
 struct Parts {
     xaml::Window window{nullptr};
     controls::Canvas root{nullptr};
@@ -73,8 +73,9 @@ struct Parts {
     controls::Button next{nullptr};
     controls::Button back{nullptr};
     controls::FontIcon playIcon{nullptr};
-    system::DispatcherQueueTimer timer{nullptr};
+    dispatching::DispatcherQueueTimer timer{nullptr};
     bool alive = false;  // a window exists and is not closing
+    bool followsMain = false;  // closes with Apple Music's main window
     bool shown = false;  // the texts and the state of the buttons match `info`
     core::Info info;
     bool coloured = false;
@@ -85,12 +86,9 @@ struct Parts {
 };
 
 struct State {
-    std::mutex createMutex;
     Journal* journal = nullptr;
     std::filesystem::path kit;
     std::string placement;  // mini.position, read at Install and written when the window moves
-    system::DispatcherQueueController controller{nullptr};
-    system::DispatcherQueue queue{nullptr};
     Parts parts;
 };
 
@@ -238,7 +236,8 @@ void ShowInfo(Parts& parts, const core::Info& info) {
     parts.shown = true;
 }
 
-// The cover of the track on screen, written to a file (the image control reads files), two names alternating.
+// The cover of the track on screen, written to a file (the image control reads files), two names alternating. The
+// image cache is skipped: a name comes back every other song, and the cache would show the older song's cover.
 void ShowCover(Parts& parts, const core::Info& info) {
     std::optional<core::Artwork> artwork = core::CurrentArtwork();
     if (!info.hasTrack || !artwork || artwork->trackId != info.trackId) return;  // keep the last cover until the new one
@@ -256,6 +255,7 @@ void ShowCover(Parts& parts, const core::Info& info) {
     std::wstring uri = L"file:///" + file.generic_wstring();
     for (size_t at = uri.find(L' '); at != std::wstring::npos; at = uri.find(L' ', at + 3)) uri.replace(at, 1, L"%20");
     media::Imaging::BitmapImage image;
+    image.CreateOptions(media::Imaging::BitmapCreateOptions::IgnoreImageCache);
     image.UriSource(winrt::Windows::Foundation::Uri(uri));
     parts.cover.Source(image);
     parts.coverTrack = artwork->trackId;
@@ -294,7 +294,7 @@ void SavePlacement(Parts& parts, bool force) {
     GetState().placement = text;
 }
 
-// On the main window's thread: brings Apple Music's window back in front.
+// Brings Apple Music's window back in front.
 void ShowMainWindow() {
     xaml::Window main = AppWindow(L"MainWindow");
     if (!main) return;
@@ -303,7 +303,7 @@ void ShowMainWindow() {
     SetForegroundWindow(hwnd);
 }
 
-// The transport buttons send their command to the kernel's thread, which owns the player. Back goes to the main thread.
+// The transport buttons send their command to the kernel's thread, which owns the player. Back runs after the click.
 void WireButtons(Parts& parts) {
     parts.previous.Click([](auto&&, auto&&) { core::RequestCommand(PlayerCommand::Previous); });
     parts.next.Click([](auto&&, auto&&) { core::RequestCommand(PlayerCommand::Next); });
@@ -316,7 +316,9 @@ void WireButtons(Parts& parts) {
 // The window's place: the saved one, kept on a screen, or the default corner of the work area of the screen it is on.
 void PlaceWindow(Parts& parts) {
     windowing::AppWindow app = parts.window.AppWindow();
-    const double scale = parts.root.XamlRoot() ? parts.root.XamlRoot().RasterizationScale() : 1.0;
+    // Not XamlRoot's scale: there is no XamlRoot before Activate, and 1 made the window too small from 125 % on.
+    const UINT dpi = GetDpiForWindow(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(app.Id().Value)));
+    const double scale = dpi ? dpi / static_cast<double>(USER_DEFAULT_SCREEN_DPI) : 1.0;
     const auto work = windowing::DisplayArea::GetFromWindowId(app.Id(), windowing::DisplayAreaFallback::Nearest).WorkArea();
     const core::Rect area{work.X, work.Y, work.Width, work.Height};
     core::Placement placement = core::ParsePlacement(GetState().placement).value_or(core::DefaultPlacement(area, scale));
@@ -330,14 +332,31 @@ void OnClosed(Parts& parts) {
     SavePlacement(parts, true);
     parts.alive = false;
     if (parts.timer) parts.timer.Stop();
+    parts.timer = nullptr;
     core::SetWindowOpen(false);
     Log("window closed");
     // The window is released on the next pass of the queue: it is still inside its own Closed event here.
     xaml::Window keep = parts.window;
-    if (GetState().queue) GetState().queue.TryEnqueue([keep]() mutable { keep = nullptr; });
+    PostToUiThread([keep]() mutable { keep = nullptr; });
 }
 
-// Creates the window on this thread, with the controls, the placement, the presenter and the events.
+// A second window keeps a WinUI app running: the mini player closes with Apple Music's main window. Subscribed once.
+void FollowMainWindow(Parts& parts) {
+    if (parts.followsMain) return;
+    xaml::Window main = AppWindow(L"MainWindow");
+    if (!main) return;
+    main.Closed([](auto&&, auto&&) noexcept {
+        try {
+            Parts& live = GetState().parts;
+            if (live.alive && live.window) live.window.Close();
+        } catch (const winrt::hresult_error& error) {
+            Log("the window could not close with Apple Music: " + HresultText(error.code()));
+        }
+    });
+    parts.followsMain = true;
+}
+
+// Creates the window on the interface thread, with the controls, the placement, the presenter and the events.
 void MakeWindow(Parts& parts) {
     BuildContent(parts);
     WireButtons(parts);
@@ -360,53 +379,50 @@ void MakeWindow(Parts& parts) {
     });
     parts.window.Closed([](auto&&, auto&&) { OnClosed(GetState().parts); });
 
-    parts.timer = GetState().queue.CreateTimer();
+    parts.timer = parts.window.DispatcherQueue().CreateTimer();
     parts.timer.Interval(kTick);
     parts.timer.Tick([](auto&&, auto&&) { Refresh(GetState().parts); });
     PlaceWindow(parts);
+    FollowMainWindow(parts);
     parts.alive = true;
     parts.shown = false;
     parts.coverTrack.clear();
 }
 
-// On the window's thread: opens, closes or toggles the window.
-void Perform(core::WindowAction action) {
-    Parts& parts = GetState().parts;
-    const bool open = parts.alive && parts.window;
-    if (action == core::WindowAction::Toggle) action = open ? core::WindowAction::Close : core::WindowAction::Open;
-    if (action == core::WindowAction::Close) {
-        if (open) parts.window.Close();
-        return;
-    }
+// Shows the window, made first when it is not open, and starts the refresh.
+void OpenWindow(Parts& parts, bool open) {
     try {
         if (!open) MakeWindow(parts);
         parts.window.Activate();
+        parts.timer.Start();
         core::SetWindowOpen(true);
         Refresh(parts);
         Log("window opened");
     } catch (const winrt::hresult_error& error) {
-        Log("the window could not be opened: " + std::to_string(static_cast<std::int32_t>(error.code())));
+        Log("the window could not be opened: " + HresultText(error.code()));
+        parts.alive = false;
+        if (parts.timer) parts.timer.Stop();
+        if (!open && parts.window) parts.window.Close();  // a half-made window never shows: let it go
     }
 }
 
-// The queue of the window's thread, started on the first request. Any thread.
-system::DispatcherQueue EnsureQueue() {
-    EnsureMta();  // the extensions' thread is not in an apartment yet
-    State& state = GetState();
-    std::lock_guard<std::mutex> lock(state.createMutex);
-    if (!state.queue) {
-        state.controller = system::DispatcherQueueController::CreateOnDedicatedThread();
-        state.queue = state.controller.DispatcherQueue();
-        Log("its interface thread is started");
+// On the interface thread: opens, closes or toggles the window.
+void Perform(core::WindowAction action) {
+    Parts& parts = GetState().parts;
+    const bool open = parts.alive && parts.window;
+    if (action == core::WindowAction::Toggle) action = open ? core::WindowAction::Close : core::WindowAction::Open;
+    if (action == core::WindowAction::Open) return OpenWindow(parts, open);
+    if (!open) return;
+    try {
+        parts.window.Close();
+    } catch (const winrt::hresult_error& error) {
+        Log("the window could not be closed: " + HresultText(error.code()));
     }
-    return state.queue;
 }
 
 // The shortcut and the extensions come here, on any thread.
 void Dispatch(core::WindowAction action) {
-    system::DispatcherQueue queue = EnsureQueue();
-    if (!queue) return;
-    queue.TryEnqueue([action] { Perform(action); });
+    if (!PostToUiThread([action] { Perform(action); })) Log("Apple Music's interface thread is not reachable yet");
 }
 
 }  // namespace

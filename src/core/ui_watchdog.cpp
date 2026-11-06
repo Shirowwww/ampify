@@ -26,37 +26,43 @@ void BeatGate::Release() {
     m_pending.store(false, std::memory_order_release);
 }
 
-UiStallMonitor::UiStallMonitor(int64_t startMs) : m_last(startMs), m_seen(startMs), m_windowStart(startMs) {}
+UiStallMonitor::UiStallMonitor(int64_t startMs) : m_windowStart(startMs) {}
 
-void UiStallMonitor::Beat(int64_t nowMs) {
-    int64_t previous = m_last.exchange(nowMs, std::memory_order_acq_rel);
-    int64_t gap = nowMs - previous;
-    int64_t worst = m_worstGap.load(std::memory_order_relaxed);
-    // A compare-and-swap keeps the largest gap of the minute, even when two beats race.
-    while (gap > worst && !m_worstGap.compare_exchange_weak(worst, gap, std::memory_order_relaxed)) {
+void UiStallMonitor::Posted(int64_t nowMs) {
+    m_postedAt.store(nowMs, std::memory_order_release);
+}
+
+void UiStallMonitor::Ran(int64_t nowMs) {
+    int64_t posted = m_postedAt.exchange(kNone, std::memory_order_acq_rel);
+    if (posted == kNone) return;
+    int64_t delay = nowMs - posted;
+    int64_t worst = m_worstDelay.load(std::memory_order_relaxed);
+    while (delay > worst && !m_worstDelay.compare_exchange_weak(worst, delay, std::memory_order_relaxed)) {
     }
     m_beats.fetch_add(1, std::memory_order_relaxed);
+    m_lastDelay.store(delay, std::memory_order_release);
 }
 
 std::vector<std::string> UiStallMonitor::Check(int64_t nowMs, const char* activity) {
     std::vector<std::string> lines;
-    int64_t last = m_last.load(std::memory_order_acquire);
-    if (last != m_seen) {
-        if (m_inStall) {
-            lines.push_back(StallLine(last - m_stallSince, m_stallActivity));
-            m_inStall = false;
+    const std::string now = activity ? activity : "";
+    int64_t delay = m_lastDelay.exchange(kNone, std::memory_order_acq_rel);
+    if (delay != kNone) {
+        if (delay >= kStallMs) {
+            lines.push_back(StallLine(delay, m_inStall ? m_stallActivity : now));
             m_stallsInWindow++;
         }
-        m_seen = last;
+        m_inStall = false;
     }
-    if (!m_inStall && nowMs - last >= kStallMs) {
+    int64_t posted = m_postedAt.load(std::memory_order_acquire);
+    if (!m_inStall && posted != kNone && nowMs - posted >= kStallMs) {
         m_inStall = true;
-        m_stallSince = last;
-        m_stallActivity = activity ? activity : "";
+        m_stallActivity = now;
     }
     if (nowMs - m_windowStart >= kSummaryMs) {
-        lines.push_back("UI watchdog, last minute: " + std::to_string(m_beats.exchange(0)) + " beats, worst gap " +
-                        std::to_string(m_worstGap.exchange(0)) + " ms, " + std::to_string(m_stallsInWindow) + " stall(s)");
+        lines.push_back("UI watchdog, last minute: " + std::to_string(m_beats.exchange(0)) + " beats, worst delay " +
+                        std::to_string(m_worstDelay.exchange(0)) + " ms, " + std::to_string(m_stallsInWindow) +
+                        " stall(s)");
         m_stallsInWindow = 0;
         m_windowStart = nowMs;
     }

@@ -379,6 +379,7 @@ xaml::FrameworkElement FolderRow(UiService::Shared& shared) {
 
 // Ampify's settings page: a line on what Ampify is and the way to the Marketplace, then one section per subject.
 controls::StackPanel BuildAmpifyPage(UiService::Shared& shared) {
+    shared.settingsCards.clear();  // the page shown until now is replaced, its cards with it
     controls::StackPanel page;
     page.Spacing(28);
     page.MaxWidth(kAmpifyPageWidth);

@@ -16,8 +16,8 @@
 
 - A small window that stays on top, with the cover, the title and artist, previous, play or pause, next, the progress
   and a button back to the main window. It opens with Ctrl+Alt+M (`mini.shortcut`, `off` turns it off), or from an
-  extension with `Ampify.ui.miniPlayer.open()`, or from the "Mini player" entry of Apple Music's sidebar. It runs on its
-  own thread, so it never holds Apple Music's window, and it remembers where it was left. Closed until it is opened.
+  extension with `Ampify.ui.miniPlayer.open()`, or from the "Mini player" entry of Apple Music's sidebar. It
+  remembers where it was left, follows the screen's scale, and closes with Apple Music. Closed until it is opened.
 - Its colours come from the theme's `--mini-background`, `--mini-foreground`, `--mini-muted` and `--mini-accent`.
 
 ### Reliability
@@ -25,12 +25,15 @@
 - "Freeze log" in Settings > Apple Music (off by default): each time Apple Music's window stops answering for 0.3 s
   or more, AppleMusic.log says how long and what Ampify was doing then, with a summary each minute. It shows where the
   freezes come from, with or without the themes.
-- "Stuck library agent" in Settings > Apple Music (off by default): when Apple Music is closed and a library agent
-  left behind by a killed session still runs, Ampify ends it after 10 s, so Apple Music can open its library again
-  (error 9039). The agent is never ended while Apple Music runs.
+- "Stuck library agent" in Settings > Apple Music (off by default): when a library agent left behind by a killed
+  session still runs, Ampify ends it so Apple Music can open its library again (error 9039). It gives the agent 10 s
+  to leave when Apple Music is started from Ampify's launcher, and where the background launcher runs, 10 s after
+  Apple Music is closed. The agent is never ended while Apple Music runs, and a refused end is not tried again.
 
 ### Themes
 
+- Ampify's own sidebar entries (Marketplace, extensions) fit the folded sidebar: a centred icon in the column, with
+  the label as its tooltip; the full row with its label when the sidebar is open, including the hover overlay.
 - Chosen accent "Follows the artwork" (Settings > Ampify, or `theme.accent = artwork`): the accent of every theme takes
   the vibrant colour of the song playing, kept light enough to read on a dark or a light page.
 - `--art-luma` and `--art-sat` give how light and how coloured the artwork is, as plain numbers from 0 to 1.

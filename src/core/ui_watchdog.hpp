@@ -1,8 +1,9 @@
 #pragma once
 
 // Freeze watch of the interface thread: the logic, without Windows. The heartbeat and the monitor thread are in
-// src/win/ui_watchdog.*. The interface thread beats every 200 ms; a silence of 300 ms or more is a stall, logged once
-// the beats resume, with what the interface was doing (ActivityScope).
+// src/win/ui_watchdog.*. A beat is queued to the interface thread about every 200 ms, one at a time; each is stamped
+// when queued, and the delay until it runs is the time the thread was blocked. A beat that waits 300 ms or more is a
+// stall, logged once it runs, with what the interface was doing when the wait was noticed (ActivityScope).
 
 #include <atomic>
 #include <cstdint>
@@ -47,22 +48,25 @@ class UiStallMonitor {
 public:
     explicit UiStallMonitor(int64_t startMs);
 
-    // The interface thread is alive at `nowMs`. Any thread.
-    void Beat(int64_t nowMs);
+    // Monitor thread: a beat is queued at `nowMs`. Call it before queuing, one beat at a time (BeatGate).
+    void Posted(int64_t nowMs);
+
+    // Interface thread: the queued beat runs at `nowMs`.
+    void Ran(int64_t nowMs);
 
     // Called by the monitor thread every 100 ms or so. Returns the lines to log now.
     std::vector<std::string> Check(int64_t nowMs, const char* activity);
 
 private:
-    std::atomic<int64_t> m_last;
+    static constexpr int64_t kNone = -1;
+    std::atomic<int64_t> m_postedAt{kNone};   // the beat waiting to run, kNone when none waits
+    std::atomic<int64_t> m_lastDelay{kNone};  // of the last beat that ran, until Check reads it
     std::atomic<int64_t> m_beats{0};
-    std::atomic<int64_t> m_worstGap{0};
+    std::atomic<int64_t> m_worstDelay{0};
 
     // Monitor thread only.
-    int64_t m_seen;
     int64_t m_windowStart;
     bool m_inStall = false;
-    int64_t m_stallSince = 0;
     std::string m_stallActivity;
     int m_stallsInWindow = 0;
 };

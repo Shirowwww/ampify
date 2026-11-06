@@ -5,6 +5,10 @@
 
 #include "ui_service_detail.hpp"
 
+#include "../core/sidebar_entry.hpp"
+
+#include <limits>
+
 namespace ampify::win::ui_service_detail {
 
 namespace {
@@ -21,6 +25,23 @@ controls::NavigationView FindNavigation(const WindowContext& context) {
         if (auto navigation = context.probeObjects[i].get().try_as<controls::NavigationView>()) return navigation;
     }
     return nullptr;
+}
+
+// Takes the pane's watches off (FollowSidebarPane), when the entries leave the list.
+void StopFollowingSidebarPane(WindowContext& context) {
+    if (auto navigation = context.sidebarNavigation.get()) {
+        if (context.sidebarPaneToken) {
+            navigation.UnregisterPropertyChangedCallback(controls::NavigationView::IsPaneOpenProperty(),
+                                                         context.sidebarPaneToken);
+        }
+        if (context.sidebarModeToken) {
+            navigation.UnregisterPropertyChangedCallback(controls::NavigationView::DisplayModeProperty(),
+                                                         context.sidebarModeToken);
+        }
+    }
+    context.sidebarNavigation = winrt::weak_ref<controls::NavigationView>{nullptr};
+    context.sidebarPaneToken = 0;
+    context.sidebarModeToken = 0;
 }
 
 controls::StackPanel EnsureSidebarHost(WindowContext& context, const controls::NavigationView& navigation) {
@@ -47,6 +68,7 @@ void ReleaseSidebarHost(WindowContext& context) {
         context.sidebarHost.Children().Clear();
         navigation.PaneFooter(context.sidebarOriginal);
     }
+    StopFollowingSidebarPane(context);
     context.sidebarHost = nullptr;
     context.sidebarOriginal = nullptr;
 }
@@ -106,7 +128,7 @@ xaml::UIElement SidebarContent(const UiControl& control, bool active) {
 }
 
 // A flat button with the height, margins and corners of Apple Music's sidebar items, and the subtle hover of Fluent.
-controls::Button MakeSidebarButton(const UiControl& control, bool active) {
+controls::Button MakeSidebarButton(bool active) {
     const std::wstring brushes =
         L"<StaticResource x:Key='ButtonBackground' ResourceKey='SubtleFillColorTransparentBrush'/>"
         L"<StaticResource x:Key='ButtonBackgroundPointerOver' ResourceKey='SubtleFillColorSecondaryBrush'/>"
@@ -119,13 +141,12 @@ controls::Button MakeSidebarButton(const UiControl& control, bool active) {
     const std::wstring text =
         L"<Button xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' "
         L"xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' HorizontalAlignment='Stretch' "
-        L"HorizontalContentAlignment='Left' Height='36' Margin='4,2,4,2' Padding='12,0,12,0' CornerRadius='4' "
+        L"HorizontalContentAlignment='Left' MinWidth='0' Height='36' Margin='4,2,4,2' Padding='12,0,12,0' CornerRadius='4' "
         L"BorderThickness='0'><Button.Resources><ResourceDictionary><ResourceDictionary.ThemeDictionaries>"
         L"<ResourceDictionary x:Key='Default'>" + brushes + L"</ResourceDictionary>"
         L"<ResourceDictionary x:Key='Light'>" + brushes + L"</ResourceDictionary>"
         L"</ResourceDictionary.ThemeDictionaries></ResourceDictionary></Button.Resources></Button>";
     controls::Button button = xaml::Markup::XamlReader::Load(text).as<controls::Button>();
-    button.Content(SidebarContent(control, active));
     automation::AutomationProperties::SetItemStatus(button, active ? L"on" : L"");
     return button;
 }
@@ -145,7 +166,7 @@ controls::Grid EntryHeader(const UiService::Shared& shared, const controls::Navi
 
 // The entry's icon as a button the size of "···", just left of it in the same cell, its label as the tooltip.
 controls::Button MakeHeaderButton(const controls::Grid& header, const UiControl& control, bool active) {
-    controls::Button button = MakeSidebarButton(control, active);  // for its subtle brushes
+    controls::Button button = MakeSidebarButton(active);  // for its subtle brushes
     button.Content(SidebarIcon(control, active));
     button.HorizontalAlignment(xaml::HorizontalAlignment::Right);
     button.HorizontalContentAlignment(xaml::HorizontalAlignment::Center);
@@ -171,6 +192,114 @@ bool SidebarEntryIsOn(const WindowContext& context, const UiControl& control) {
     return control.active || (context.route && !context.pageClosed && context.route->first == control.elementId);
 }
 
+// Folded: the icon alone, centred; the label is the tooltip. Open: the row of SidebarContent.
+xaml::FrameworkElement SidebarCompactContent(const UiControl& control, bool active) {
+    xaml::FrameworkElement icon = SidebarIcon(control, active);
+    icon.HorizontalAlignment(xaml::HorizontalAlignment::Center);
+    return icon;
+}
+
+const double kAutoWidth = std::numeric_limits<double>::quiet_NaN();  // open: the row fills the sidebar
+
+// The open button's padding is the markup's; folded, the icon gets the whole width (the column is narrow).
+void LayoutOpenEntry(PlacedControl& placed, bool active) {
+    placed.button.Width(kAutoWidth);
+    placed.button.HorizontalAlignment(xaml::HorizontalAlignment::Stretch);
+    placed.button.HorizontalContentAlignment(xaml::HorizontalAlignment::Left);
+    placed.button.Padding(xaml::Thickness{12, 0, 12, 0});
+    placed.button.Content(SidebarContent(placed.entry, active));
+    controls::ToolTipService::SetToolTip(placed.button, nullptr);
+}
+
+void LayoutFoldedEntry(PlacedControl& placed, double width, bool active) {
+    placed.button.Width(width);
+    placed.button.HorizontalAlignment(xaml::HorizontalAlignment::Center);
+    placed.button.HorizontalContentAlignment(xaml::HorizontalAlignment::Center);
+    placed.button.Padding(xaml::Thickness{});
+    placed.button.Content(SidebarCompactContent(placed.entry, active));
+    controls::ToolTipService::SetToolTip(placed.button, winrt::box_value(Wide(placed.entry.label)));
+}
+
+// Lays an entry out for the pane's state. Writes only what the button does not show yet, so a width a theme wrote on
+// it is put back. Margin, height and colours stay the theme's (names.md). Centred, so the entry sits in the column
+// whichever way the sidebar flows.
+void LayoutSidebarEntry(PlacedControl& placed, const controls::NavigationView& navigation, bool active) {
+    const bool paneOpen = navigation.IsPaneOpen();
+    const xaml::Thickness margin = placed.button.Margin();
+    const double width =
+        paneOpen ? kAutoWidth : ampify::FoldedEntryWidth(navigation.CompactPaneLength(), margin.Left, margin.Right);
+    const ampify::EntryLayout shown{placed.paneOpen, placed.active, placed.button.Width()};
+    if (placed.laidOut && !ampify::EntryLayoutChanged(shown, ampify::EntryLayout{paneOpen, active, width})) return;
+    placed.laidOut = true;
+    placed.paneOpen = paneOpen;
+    placed.active = active;
+    if (paneOpen) {
+        LayoutOpenEntry(placed, active);
+    } else {
+        LayoutFoldedEntry(placed, width, active);
+    }
+    automation::AutomationProperties::SetItemStatus(placed.button, active ? L"on" : L"");
+}
+
+// The pane opened, folded or changed mode: every entry of the list follows it at once, not at the next walk.
+void RefreshSidebarEntries(WindowContext& context) {
+    controls::NavigationView navigation = context.sidebarNavigation.get();
+    if (!navigation) return;
+    for (auto& item : context.placed) {
+        PlacedControl& placed = item.second;
+        if (!placed.button || placed.inHeader || !placed.button.Parent()) continue;
+        LayoutSidebarEntry(placed, navigation, SidebarEntryIsOn(context, placed.entry));
+    }
+}
+
+// Watches the pane's state of this NavigationView. The callbacks hold the context weakly and lock it when they run.
+void FollowSidebarPane(const std::shared_ptr<WindowContext>& context, const controls::NavigationView& navigation) {
+    StopFollowingSidebarPane(*context);
+    WeakContext weakContext = context;
+    auto changed = [weakContext](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
+        try {
+            if (auto live = weakContext.lock()) RefreshSidebarEntries(*live);
+        } catch (...) {
+        }
+    };
+    context->sidebarNavigation = winrt::make_weak(navigation);
+    context->sidebarPaneToken =
+        navigation.RegisterPropertyChangedCallback(controls::NavigationView::IsPaneOpenProperty(), changed);
+    context->sidebarModeToken =
+        navigation.RegisterPropertyChangedCallback(controls::NavigationView::DisplayModeProperty(), changed);
+}
+
+}  // namespace
+
+namespace {
+
+// An entry that stays where it is: a header entry changes its icon, a list entry follows the pane (LayoutSidebarEntry).
+void UpdatePlacedEntry(PlacedControl& placed, const UiControl& control, const controls::NavigationView& navigation,
+                       bool inHeader, bool active) {
+    if (!inHeader) {
+        placed.entry = control;
+        LayoutSidebarEntry(placed, navigation, active);
+        return;
+    }
+    if (placed.active == active) return;
+    placed.active = active;
+    placed.button.Content(SidebarIcon(control, active));
+    automation::AutomationProperties::SetItemStatus(placed.button, active ? L"on" : L"");
+}
+
+// A click on the entry goes to the element that added it, as an event of the control.
+void WireSidebarClick(const controls::Button& button, const UiService::Shared& shared, const UiControl& control) {
+    UiEventSink sink = shared.sink;
+    std::string elementId = control.elementId;
+    int id = control.id;
+    button.Click([sink, elementId, id](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            if (sink) sink(UiEvent{elementId, id, true, {}});
+        } catch (...) {
+        }
+    });
+}
+
 }  // namespace
 
 void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context, PlacedControl& placed,
@@ -189,30 +318,25 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
     controls::StackPanel host = inHeader ? nullptr : EnsureSidebarHost(*context, navigation);
     controls::UIElementCollection place = inHeader ? header.Children() : host.Children();
     const bool active = SidebarEntryIsOn(*context, control);
+    if (!inHeader && context->sidebarNavigation.get() != navigation) FollowSidebarPane(context, navigation);
     std::uint32_t index = 0;
     if (placed.button && placed.inHeader == inHeader && place.IndexOf(placed.button, index)) {
-        if (placed.active != active) {  // still in place: only its state may change
-            placed.active = active;
-            placed.button.Content(inHeader ? SidebarIcon(control, active) : SidebarContent(control, active));
-            automation::AutomationProperties::SetItemStatus(placed.button, active ? L"on" : L"");
-        }
+        UpdatePlacedEntry(placed, control, navigation, inHeader, active);  // still in place: only its state may change
         return;
     }
 
     RemoveFromParent(placed.button);  // from the list to the header or back, as the sidebar folds or opens
-    controls::Button button = inHeader ? MakeHeaderButton(header, control, active) : MakeSidebarButton(control, active);
+    controls::Button button = inHeader ? MakeHeaderButton(header, control, active) : MakeSidebarButton(active);
     placed.active = active;
     placed.inHeader = inHeader;
+    placed.laidOut = false;
+    if (!inHeader) {
+        placed.button = button;
+        placed.entry = control;
+        LayoutSidebarEntry(placed, navigation, active);  // the pane's state, before the entry shows
+    }
     Name(button, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
-    UiEventSink sink = shared.sink;
-    std::string elementId = control.elementId;
-    int id = control.id;
-    button.Click([sink, elementId, id](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
-        try {
-            if (sink) sink(UiEvent{elementId, id, true, {}});
-        } catch (...) {
-        }
-    });
+    WireSidebarClick(button, shared, control);
     // After Apple Music's separator, so the entries sit with the account, below the line that ends the list, in the
     // order of the elements (an entry back from the header takes its place again).
     if (inHeader) {

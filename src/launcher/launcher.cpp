@@ -172,19 +172,49 @@ bool WaitOrStop(HANDLE stop, DWORD ms) {
     return WaitForSingleObject(stop, ms) == WAIT_OBJECT_0;
 }
 
+// True when `image` is the library agent of the package in `packageDirectory`.
+bool IsPackageAgent(const std::wstring& image, const std::filesystem::path& packageDirectory) {
+    const std::wstring prefix = packageDirectory.wstring();
+    return image.size() > prefix.size() && _wcsnicmp(image.c_str(), prefix.c_str(), prefix.size()) == 0 &&
+           _wcsicmp(std::filesystem::path(image).filename().c_str(), L"AMPLibraryAgent.exe") == 0;
+}
+
+// The full image path of `process`, empty when Windows does not give it.
+std::wstring ImagePathOf(HANDLE process) {
+    std::wstring image(32768, L'\0');
+    DWORD length = static_cast<DWORD>(image.size());
+    if (!QueryFullProcessImageNameW(process, 0, image.data(), &length)) return {};
+    image.resize(length);
+    return image;
+}
+
 // Ends one library agent that Apple Music left behind. Only called while no Apple Music runs (ampify::DecideOrphanAgent).
-void EndOrphanAgent(ampify::Journal& journal, DWORD processId) {
-    HANDLE process = OpenProcess(PROCESS_TERMINATE, FALSE, processId);
+// The image is checked again on the handle that ends it, since the id may have gone to another process since the list,
+// and the agent is given a moment to be gone before Apple Music starts. False when Windows refused to end it.
+bool EndOrphanAgent(ampify::Journal& journal, DWORD processId, const std::filesystem::path& packageDirectory) {
+    constexpr DWORD kExitWaitMs = 2000;
+    const std::string label = "Library agent (" + std::to_string(processId) + ")";
+    HANDLE process = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
     if (!process) {
-        journal.Write("Library agent (" + std::to_string(processId) + "): could not be opened to end it (Windows error " +
-                      std::to_string(GetLastError()) + ")");
-        return;
+        journal.Write(label + ": could not be opened to end it (Windows error " + std::to_string(GetLastError()) + ")");
+        return false;
     }
-    bool ended = TerminateProcess(process, 0) != FALSE;
+    if (!IsPackageAgent(ImagePathOf(process), packageDirectory)) {
+        CloseHandle(process);
+        journal.Write(label + ": that id is no longer Apple Music's library agent, left alone");
+        return true;
+    }
+    if (!TerminateProcess(process, 0)) {
+        DWORD error = GetLastError();
+        CloseHandle(process);
+        journal.Write(label + ": could not be ended (Windows error " + std::to_string(error) + "), not tried again");
+        return false;
+    }
+    bool gone = WaitForSingleObject(process, kExitWaitMs) == WAIT_OBJECT_0;
     CloseHandle(process);
-    journal.Write(ended ? "Library agent (" + std::to_string(processId) + ") ended: Apple Music was closed and it had not left"
-                        : "Library agent (" + std::to_string(processId) + "): could not be ended (Windows error " +
-                              std::to_string(GetLastError()) + ")");
+    journal.Write(label + " ended: Apple Music was closed and it had not left" +
+                  (gone ? std::string() : std::string(" (still exiting after 2 s)")));
+    return true;
 }
 
 // The apple.orphanAgent setting, read from settings.txt: "on" turns the recovery on, anything else leaves it off.
@@ -213,7 +243,8 @@ public:
             m_since = 0;
             return ampify::OrphanAction::None;
         }
-        std::vector<DWORD> agents = ampify::launcher::FindPackageProcesses(L"AMPLibraryAgent.exe", packageDirectory);
+        std::vector<uint32_t> agents =
+            m_refusals.Untried(PackageIds(ampify::launcher::FindPackageProcesses(L"AMPLibraryAgent.exe", packageDirectory)));
         if (agents.empty()) {
             m_since = 0;
             return ampify::OrphanAction::None;
@@ -226,7 +257,9 @@ public:
         }
         ampify::OrphanAction action = ampify::DecideOrphanAgent(true, false, true, now - m_since);
         if (action == ampify::OrphanAction::End) {
-            for (DWORD processId : agents) EndOrphanAgent(journal, processId);
+            for (uint32_t processId : agents) {
+                if (!EndOrphanAgent(journal, processId, packageDirectory)) m_refusals.Refused(processId);
+            }
             m_since = 0;
         }
         return action;
@@ -235,6 +268,7 @@ public:
 private:
     bool m_enabled;
     ULONGLONG m_since = 0;  // when the agent was first seen alone; 0 when none is
+    ampify::OrphanRefusals m_refusals;
 };
 
 // Before Apple Music starts: a left-over agent would hold the library (error 9039), so it is waited for or ended first.
