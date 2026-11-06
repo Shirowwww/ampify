@@ -412,12 +412,24 @@ std::string ThemeAnimations::Read(theme::NodeId id) const {
     return known == m_running.end() ? std::string() : known->second.text;
 }
 
-void ThemeAnimations::Sweep() {
+// An element of Ampify's is held strongly, so it never dies here: one out of the tree (a sidebar entry or a kit node
+// rebuilt) is let go too, or its loops would step a detached copy for the rest of the session. A decor is not: Apple
+// may take it out between passes and the pass puts it back, still turning; Forget lets it go.
+void ThemeAnimations::Sweep(const std::function<bool(theme::NodeId)>& isDecor) {
     for (auto it = m_running.begin(); it != m_running.end();) {
-        if (Target(it->second)) {
+        bool gone = !Target(it->second);
+        if (!gone && it->second.held && !isDecor(it->first)) {
+            try {
+                auto element = it->second.held.try_as<xaml::FrameworkElement>();
+                gone = element && !element.IsLoaded() && !xaml::Media::VisualTreeHelper::GetParent(element);
+            } catch (...) {
+            }
+        }
+        if (!gone) {
             ++it;
             continue;
         }
+        if (it->second.held) Stop(it->second);
         for (const auto& timer : it->second.ends) timer.Stop();
         it = m_running.erase(it);
     }

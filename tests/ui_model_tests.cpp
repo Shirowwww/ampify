@@ -357,3 +357,15 @@ TEST_CASE(UiModel_FullscreenPointerGatePassesARealMoveOnceTheGapIsOver) {
     CHECK(!tooSoon);
     CHECK(afterGap);
 }
+
+TEST_CASE(UiModel_FullscreenPointerGateAddsUpASlowMoveUnderAPixelPerEvent) {
+    // At 125 %, one screen pixel is 0.8 DIP: a slow move must still count once its steps add up.
+    ampify::FullscreenPointerGate gate;
+    gate.Pass(0, 10, 10);
+
+    bool firstStep = gate.Pass(300, 10.8, 10);
+    bool secondStep = gate.Pass(600, 11.6, 10);
+
+    CHECK(!firstStep);
+    CHECK(secondStep);
+}

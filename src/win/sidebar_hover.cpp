@@ -83,6 +83,8 @@ struct State {
     IInspectable dismissHit{nullptr};    // its local values before Ampify, or the unset value: put back as they were
     IInspectable dismissFill{nullptr};
     int64_t paneToken = 0;  // the IsPaneOpen callback, taken off by this token in Release
+    winrt::event_token closingToken{};  // PaneClosing, taken off by this token in Release
+    bool repinning = false;  // RepinForWidth closes the pinned pane on purpose
     ampify::GroupMemory<Group> groups;  // the groups collapsed while the pane is folded
 };
 
@@ -410,12 +412,26 @@ void WatchPaneOpen(State& state, const controls::NavigationView& navigation) {
     state.paneToken = navigation.RegisterPropertyChangedCallback(controls::NavigationView::IsPaneOpenProperty(), changed);
 }
 
+// Over narrow pages the pinned pane is LeftCompact, which WinUI closes itself after a click on an item: refused while
+// pinned, rather than reopened at the next tick. The hamburger unpins after WinUI's own toggle, and ApplyPin closes it.
+void KeepPinnedOpen(State& state, const controls::NavigationView& navigation) {
+    state.closingToken = navigation.PaneClosing(
+        [](controls::NavigationView const&, controls::NavigationViewPaneClosingEventArgs const& args) noexcept {
+            try {
+                const State& live = TheState();
+                if (live.pinned && !live.repinning) args.Cancel(true);
+            } catch (...) {
+            }
+        });
+}
+
 // What the hover needs from Apple's pane once taken: the pin, the dismiss layer, the groups and the pane watch.
 void TakeChrome(State& state, const controls::NavigationView& navigation, const controls::Button& toggle) {
     if (toggle) AddPinGlyph(state, toggle);
     ShowGlyph(state, false);
     SetDismissLayer(state, navigation, !state.pinned);
     WatchPaneOpen(state, navigation);
+    KeepPinnedOpen(state, navigation);
     SyncGroups(state, navigation);
 }
 
@@ -425,9 +441,13 @@ void ReleaseChrome(State& state) {
         if (auto navigation = state.navigation.get(); navigation && state.paneToken != 0) {
             navigation.UnregisterPropertyChangedCallback(controls::NavigationView::IsPaneOpenProperty(), state.paneToken);
         }
+        if (auto navigation = state.navigation.get(); navigation && state.closingToken.value != 0) {
+            navigation.PaneClosing(state.closingToken);
+        }
     } catch (...) {
     }
     state.paneToken = 0;
+    state.closingToken = {};
     try {
         RestoreGlyph(state);
         RestoreDismissLayer(state);
@@ -452,7 +472,12 @@ PaneMode PinnedMode(const controls::NavigationView& navigation) {
 void RepinForWidth(State& state, const controls::NavigationView& navigation) {
     auto pane = state.pane.get();
     if (pane) ParkFocus(state, pane);  // off the search field, which WinUI picks as the header changes
-    navigation.IsPaneOpen(false);
+    state.repinning = true;
+    try {
+        navigation.IsPaneOpen(false);
+    } catch (...) {
+    }
+    state.repinning = false;
     navigation.PaneDisplayMode(PinnedMode(navigation));
     if (pane) ParkFocus(state, pane);
 }

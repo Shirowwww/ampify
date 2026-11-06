@@ -134,3 +134,26 @@ TEST_CASE(LiftedBound_LeavesNoMaximumOrALargerOneAlone) {
     CHECK(Near(th::LiftedBound(400, 360), 400));
     CHECK(Near(th::LiftedBound(270, 120), 270));
 }
+
+TEST_CASE(ShiftsInPlace_HoldsWhenEveryWordSitsWhereItsRowIsAligned) {
+    // Arrange: the shifts written last pass, read back from the visuals in single precision
+    std::vector<double> wanted{40.0, 40.0, 70.0};
+    std::vector<double> current{40.0000019, 39.9999981, 70.0};
+
+    // Act
+    bool inPlace = th::ShiftsInPlace(current, wanted);
+
+    // Assert
+    CHECK(inPlace);
+}
+
+TEST_CASE(ShiftsInPlace_FailsForWordsAppleDrewAgainAtTheLeft) {
+    // A recycled line: new word visuals with no shift, in a host whose size did not change
+    CHECK(!th::ShiftsInPlace({0.0, 0.0}, {35.0, 35.0}));
+    CHECK(!th::ShiftsInPlace({35.0, 0.0}, {35.0, 35.0}));
+}
+
+TEST_CASE(ShiftsInPlace_FailsWhenTheNumberOfWordsChanged) {
+    CHECK(!th::ShiftsInPlace({35.0, 35.0}, {35.0, 35.0, 12.0}));
+    CHECK(th::ShiftsInPlace({}, {}));
+}

@@ -165,17 +165,9 @@ controls::Grid EntryHeader(const UiService::Shared& shared, const controls::Navi
     return navigation.PaneHeader().try_as<controls::Grid>();
 }
 
-// The entry's icon as a button the size of "···", just left of it in the same cell, its label as the tooltip.
-controls::Button MakeHeaderButton(const controls::Grid& header, const UiControl& control, bool active) {
-    controls::Button button = MakeSidebarButton(active);  // for its subtle brushes
-    button.Content(SidebarIcon(control, active));
-    button.HorizontalAlignment(xaml::HorizontalAlignment::Right);
-    button.HorizontalContentAlignment(xaml::HorizontalAlignment::Center);
-    button.VerticalAlignment(xaml::VerticalAlignment::Center);
-    button.Width(kMoreButtonWidth);
-    button.Height(kHeaderButtonHeight);
-    button.Padding(xaml::Thickness{});
-    // The top and bottom of "···" too: a theme moves it down to its logo's level, and the entry stays level with it.
+// Just left of "···" and level with it. Read again on each update: a theme's @media moves "···" as the window changes
+// size, or writes its margin after the entry was placed.
+void KeepBesideMore(const controls::Grid& header, const controls::Button& button) {
     xaml::Thickness margin{0, 0, kMoreButtonWidth + kHeaderSpacing, 0};
     for (const xaml::UIElement& child : header.Children()) {
         auto more = child.try_as<xaml::FrameworkElement>();
@@ -186,7 +178,20 @@ controls::Button MakeHeaderButton(const controls::Grid& header, const UiControl&
         controls::Grid::SetColumn(button, controls::Grid::GetColumn(more));
         controls::Grid::SetRow(button, controls::Grid::GetRow(more));
     }
-    button.Margin(margin);
+    if (button.Margin() != margin) button.Margin(margin);
+}
+
+// The entry's icon as a button the size of "···", just left of it in the same cell, its label as the tooltip.
+controls::Button MakeHeaderButton(const controls::Grid& header, const UiControl& control, bool active) {
+    controls::Button button = MakeSidebarButton(active);  // for its subtle brushes
+    button.Content(SidebarIcon(control, active));
+    button.HorizontalAlignment(xaml::HorizontalAlignment::Right);
+    button.HorizontalContentAlignment(xaml::HorizontalAlignment::Center);
+    button.VerticalAlignment(xaml::VerticalAlignment::Center);
+    button.Width(kMoreButtonWidth);
+    button.Height(kHeaderButtonHeight);
+    button.Padding(xaml::Thickness{});
+    KeepBesideMore(header, button);
     controls::ToolTipService::SetToolTip(button, winrt::box_value(Wide(control.label)));
     return button;
 }
@@ -268,7 +273,9 @@ xaml::FrameworkElement FindItemIcon(const xaml::DependencyObject& item) {
 xaml::FrameworkElement AppleItemIcon(WindowContext& context) {
     if (auto icon = context.sidebarAppleIcon.get(); icon && icon.IsLoaded() && icon.ActualWidth() > 0) return icon;
     std::optional<int> list = uirender::FindByName(context.probe, "MenuItemsHost");
-    xaml::DependencyObject repeater = list ? context.probeObjects[*list].get() : nullptr;
+    xaml::DependencyObject repeater =
+        list && *list >= 0 && *list < static_cast<int>(context.probeObjects.size()) ? context.probeObjects[*list].get()
+                                                                                    : nullptr;
     int count = repeater ? media::VisualTreeHelper::GetChildrenCount(repeater) : 0;
     for (int i = 0; i < count; i++) {
         auto item = media::VisualTreeHelper::GetChild(repeater, i).try_as<controls::NavigationViewItem>();
@@ -364,13 +371,14 @@ namespace {
 
 // An entry that stays where it is: a header entry changes its icon, a list entry follows the pane (LayoutSidebarEntry).
 void UpdatePlacedEntry(WindowContext& context, PlacedControl& placed, const UiControl& control,
-                       const controls::NavigationView& navigation, bool inHeader, bool active) {
-    if (!inHeader) {
+                       const controls::NavigationView& navigation, const controls::Grid& header, bool active) {
+    if (!header) {
         placed.entry = control;
         MeasureIconShift(context, placed, navigation);
         LayoutSidebarEntry(placed, navigation, active, EntryShift(context, navigation));
         return;
     }
+    KeepBesideMore(header, placed.button);
     if (placed.active == active) return;
     placed.active = active;
     placed.button.Content(SidebarIcon(control, active));
@@ -411,7 +419,7 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
     if (!inHeader && context->sidebarNavigation.get() != navigation) FollowSidebarPane(context, navigation);
     std::uint32_t index = 0;
     if (placed.button && placed.inHeader == inHeader && place.IndexOf(placed.button, index)) {
-        UpdatePlacedEntry(*context, placed, control, navigation, inHeader, active);  // in place: its state may change
+        UpdatePlacedEntry(*context, placed, control, navigation, header, active);  // in place: its state may change
         return;
     }
 

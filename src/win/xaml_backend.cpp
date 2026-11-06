@@ -612,7 +612,9 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         m_hover.Forget(it->first, *this);
         it = m_hoverHandlers.erase(it);
     }
-    m_animations.Sweep();
+    m_animations.Sweep([this](theme::NodeId id) {
+        return std::any_of(m_decors.begin(), m_decors.end(), [id](const auto& entry) { return entry.second.imageId == id; });
+    });
     return nodes;
 }
 

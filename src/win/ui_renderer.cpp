@@ -335,7 +335,10 @@ struct ArtworkFollow {
     std::string polledKey;  // the song whose cover the loader last gave
 
     ~ArtworkFollow() {
-        if (poll) poll.Stop();
+        try {
+            if (poll) poll.Stop();
+        } catch (...) {  // off the interface thread, or once its queue has stopped: never terminate over a timer
+        }
     }
 };
 

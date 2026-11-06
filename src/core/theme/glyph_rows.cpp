@@ -75,4 +75,13 @@ double LiftedBound(double appleMax, double cap) {
     return std::isfinite(appleMax) && appleMax < cap ? cap : appleMax;
 }
 
+bool ShiftsInPlace(const std::vector<double>& current, const std::vector<double>& wanted) {
+    constexpr double kTolerance = 0.5;
+    if (current.size() != wanted.size()) return false;
+    for (size_t i = 0; i < current.size(); ++i) {
+        if (std::abs(current[i] - wanted[i]) > kTolerance) return false;
+    }
+    return true;
+}
+
 }  // namespace ampify::theme

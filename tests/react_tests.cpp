@@ -568,6 +568,89 @@ TEST_CASE(Interface_HandWrittenTreeRunsItsClickFunctions) {
     element->Stop();
 }
 
+namespace {
+
+int CallbackIn(const ampify::Json& tree, const std::string& label, const std::string& event) {
+    const ampify::Json* node = FindNode(tree, "label", label);
+    const ampify::Json* id = node ? node->Find(event) : nullptr;
+    return id && id->AsNumber() ? static_cast<int>(*id->AsNumber()) : 0;
+}
+
+}  // namespace
+
+// Two popups of the same shape open at once ("Delete A?" then "Delete B?"): OK in the first runs the first's function.
+TEST_CASE(Interface_TwoPopupsOfTheSameShapeKeepTheirOwnClicks) {
+    Fixture f;
+    auto element = f.Make("rawpopups", R"(
+        const ask = (word) => ({ type: "stack", children: [
+          { type: "button", label: "OK", onClick: () => Ampify.log("delete " + word) }] });
+        Ampify.ui.popup.open(ask("A"));
+        Ampify.ui.popup.open(ask("B"));
+    )", R"("ui.popup")");
+    CHECK(element->Start());
+    auto popups = f.host.ui.Popups();
+    CHECK(popups.size() == 2);
+    if (popups.size() != 2) return;
+    int first = CallbackIn(popups[0].tree, "OK", "onClick");
+    int second = CallbackIn(popups[1].tree, "OK", "onClick");
+    CHECK(first != 0 && second != 0 && first != second);
+
+    element->DeliverClick(first);
+    element->Pump();
+
+    CHECK(f.Logged("[rawpopups] delete A"));
+    CHECK(!f.Logged("[rawpopups] delete B"));
+    element->Stop();
+}
+
+// onChange of a hand-written tree goes through module react's change relay to module ui, with the new value.
+TEST_CASE(Interface_HandWrittenTreeRunsItsChangeFunctions) {
+    Fixture f;
+    auto element = f.Make("rawchange", R"(
+        Ampify.ui.fullscreen.open({ type: "stack", children: [
+          { type: "slider", label: "Level", min: 0, max: 100, value: 10,
+            onChange: (event) => Ampify.log("level " + event.value) }] });
+    )", R"("ui.fullscreen")");
+    CHECK(element->Start());
+    auto slot = f.host.ui.Fullscreen();
+    CHECK(slot.has_value());
+    if (!slot) return;
+    int id = CallbackIn(slot->tree, "Level", "onChange");
+    CHECK(id != 0);
+
+    element->DeliverEvent("change", R"({"id":)" + std::to_string(id) + R"(,"value":42})");
+    element->Pump();
+
+    CHECK(f.Logged("[rawchange] level 42"));
+    element->Stop();
+}
+
+// A panel taken off lets go of its handlers: a late click from the host on its old button runs nothing.
+TEST_CASE(Interface_ARemovedPanelDropsItsHandlers) {
+    Fixture f;
+    auto element = f.Make("rawpanel", R"(
+        Ampify.ui.panel.register("tools", { type: "stack", children: [
+          { type: "button", label: "Go", onClick: () => Ampify.log("went") },
+          { type: "button", label: "Remove", onClick: () => Ampify.ui.panel.remove("tools") }] });
+    )");
+    CHECK(element->Start());
+    auto slot = f.host.ui.Panel("rawpanel", "tools");
+    CHECK(slot.has_value());
+    if (!slot) return;
+    int go = CallbackIn(slot->tree, "Go", "onClick");
+    int remove = CallbackIn(slot->tree, "Remove", "onClick");
+    CHECK(go != 0 && remove != 0);
+    element->DeliverClick(remove);
+    element->Pump();
+    CHECK(!f.host.ui.Panel("rawpanel", "tools").has_value());
+
+    element->DeliverClick(go);
+    element->Pump();
+
+    CHECK(!f.Logged("[rawpanel] went"));
+    element->Stop();
+}
+
 TEST_CASE(Interface_FullscreenKeysAndPointerReachTheListeners) {
     Fixture f;
     auto element = f.Make("fullkeys", R"(

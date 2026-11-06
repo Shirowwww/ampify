@@ -69,16 +69,34 @@ th::GlyphBox BoxOf(const comp::Visual& visual) {
     return box;
 }
 
-void AlignRows(const controls::Border& host, th::RowAlign align) {
-    comp::ContainerVisual layer = GlyphLayer(host);
-    if (!layer) return;
+struct Rows {
     std::vector<comp::Visual> visuals;
+    std::vector<double> shifts;  // where `align` puts each visual
+};
+
+Rows RowsOf(const controls::Border& host, th::RowAlign align) {
+    Rows rows;
+    comp::ContainerVisual layer = GlyphLayer(host);
+    if (!layer) return rows;
     std::vector<th::GlyphBox> boxes;
     for (const comp::Visual& visual : layer.Children()) {
-        visuals.push_back(visual);
+        rows.visuals.push_back(visual);
         boxes.push_back(BoxOf(visual));
     }
-    std::vector<double> shifts = th::RowShifts(boxes, host.ActualWidth(), align);
+    rows.shifts = th::RowShifts(boxes, host.ActualWidth(), align);
+    return rows;
+}
+
+// Without a SizeChanged, Apple may still have drawn new words in the host: the shifts read back tell.
+bool RowsInPlace(const controls::Border& host, th::RowAlign align) {
+    Rows rows = RowsOf(host, align);
+    std::vector<double> current;
+    for (const comp::Visual& visual : rows.visuals) current.push_back(visual.TransformMatrix().m41);
+    return th::ShiftsInPlace(current, rows.shifts);
+}
+
+void AlignRows(const controls::Border& host, th::RowAlign align) {
+    auto [visuals, shifts] = RowsOf(host, align);
     for (size_t i = 0; i < visuals.size(); ++i) {
         visuals[i].TransformMatrix(
             winrt::Windows::Foundation::Numerics::make_float4x4_translation(static_cast<float>(shifts[i]), 0.0f, 0.0f));
@@ -113,6 +131,11 @@ controls::Border DrawnTextHost(const xaml::DependencyObject& object) {
 std::string_view HostedTextAlign(const controls::Border& host) noexcept {
     auto found = States().find(winrt::get_abi(host));
     if (found == States().end() || found->second.host.get() != host) return th::RowAlignKeyword(th::RowAlign::Start);
+    // Words drawn again at the left read as Start, so the pass writes the theme's alignment again.
+    try {
+        if (!found->second.queued && !RowsInPlace(host, found->second.align)) return th::RowAlignKeyword(th::RowAlign::Start);
+    } catch (...) {
+    }
     return th::RowAlignKeyword(found->second.align);
 }
 

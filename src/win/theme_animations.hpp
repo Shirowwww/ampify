@@ -8,6 +8,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -55,8 +56,8 @@ public:
     // write it again at every pass; nothing when no colour animation draws this element's background.
     void WantBackground(theme::NodeId id, const theme::Value& value);
     std::optional<theme::Value> WantedBackground(theme::NodeId id) const;
-    // Forgets the elements that were destroyed.
-    void Sweep();
+    // Forgets the elements that were destroyed, and those of Ampify's out of the tree that are not decors.
+    void Sweep(const std::function<bool(theme::NodeId)>& isDecor);
     // Stops and forgets the animations of an element Ampify made (a ::before or ::after decor) that leaves the tree:
     // such an element is held strongly, so Sweep never sees it go.
     void Forget(theme::NodeId id);

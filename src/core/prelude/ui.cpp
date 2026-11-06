@@ -60,6 +60,27 @@ const char kUi[] = R"AMPIFYJS(
     return json;
   };
 
+  // A surface that is gone (a panel removed or closed, the fullscreen view closed) lets go of its handlers.
+  const dropSurface = (surface) => {
+    const slots = rawSlots.get(surface);
+    if (!slots) return;
+    for (const id of slots.values()) rawCallbacks.delete(id);
+    rawSlots.delete(surface);
+  };
+
+  // Each popup.open is a popup of its own, stacked over the others: one surface each, so two popups of the same shape
+  // never share a callback id. The host tells nothing when an unnamed popup closes, so its handlers stay.
+  let popupSerial = 0;
+  const openPopup = (vue) => {
+    const surface = "popup:#" + ++popupSerial;
+    try {
+      return native.uiPopup(treeText(vue, surface));
+    } catch (error) {
+      dropSurface(surface);
+      throw error;
+    }
+  };
+
   // A top bar or play bar button without onClick is a text that only shows something (Volume percentage).
   const addControl = (placement, options, parent) => {
     const note = options || {};
@@ -110,6 +131,7 @@ const char kUi[] = R"AMPIFYJS(
     close() {
       if (fullscreenSession) native.uiFullscreenClose(fullscreenSession);
       fullscreenSession = 0;
+      dropSurface("fullscreen");
     },
     onClose(fn) {
       if (typeof fn !== "function") throw new TypeError("fullscreen.onClose expects a function");
@@ -158,6 +180,7 @@ const char kUi[] = R"AMPIFYJS(
     if (!session || session !== fullscreenSession) return;
     fullscreenSession = 0;
     native.uiFullscreenClose(session);
+    dropSurface("fullscreen");
     for (const fn of [...fullscreenClosers]) runGuarded("fullscreen onClose", fn, []);
   };
 
@@ -174,6 +197,7 @@ const char kUi[] = R"AMPIFYJS(
       return;
     }
     native.uiPanelRemove(id);
+    dropSurface("panel:" + id);
     for (const fn of [...(panelClosers.get(id) || [])]) runGuarded("panel onClose", fn, []);
   };
 
@@ -187,7 +211,7 @@ const char kUi[] = R"AMPIFYJS(
         return addMenuItem("menu-" + kind, options);
       },
     }),
-    popup: Object.freeze({ open: (vue) => native.uiPopup(treeText(vue, "popup")) }),
+    popup: Object.freeze({ open: (vue) => openPopup(vue) }),
     fullscreen,
     applePlayer: Object.freeze({ open: () => native.uiApplePlayer() }),
     miniPlayer: Object.freeze({
@@ -196,7 +220,11 @@ const char kUi[] = R"AMPIFYJS(
     }),
     panel: Object.freeze({
       register: (id, vue) => native.uiPanel(text(id), treeText(vue, "panel:" + text(id))),
-      remove: (id) => native.uiPanelRemove(text(id)),
+      remove(id) {
+        const removed = native.uiPanelRemove(text(id));
+        dropSurface("panel:" + text(id));
+        return removed;
+      },
       onClose(id, fn) {
         if (typeof fn !== "function") throw new TypeError("panel.onClose expects a function");
         const key = text(id);

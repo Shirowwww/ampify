@@ -30,7 +30,6 @@
 
 - Opening the lyrics over a song with lyrics no longer ends Apple Music under Glass and the other floating-panel
   themes: the pane keeps the place its `SplitView` gives it, at a fixed width that fits its panel, for every theme.
-
 - "Freeze log" in Settings > Apple Music (off by default): each time Apple Music's window stops answering for 0.3 s
   or more, AppleMusic.log says how long and what Ampify was doing then, with a summary each minute. It shows where the
   freezes come from, with or without the themes.
@@ -63,7 +62,6 @@
 ### Themes
 
 - An `animation` on a `::before` or `::after` decor runs: the Animated artwork snippet's two layers turn again.
-
 - Ampify's own sidebar entries (Marketplace, extensions) fit the folded sidebar: a centred icon in the column, with
   the label as its tooltip; the full row with its label when the sidebar is open, including the hover overlay.
 - Chosen accent "Follows the artwork" (Settings > Ampify, or `theme.accent = artwork`): the accent of every theme takes
