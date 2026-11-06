@@ -114,6 +114,13 @@ inline constexpr const char* kIidsUInt64Collections[] = {
 inline constexpr char kIidNotifyPropertyChanged[] = "90B17601-B065-586E-83D9-9ADC3A695284";
 inline constexpr char kIidPropertyChangedHandler[] = "E3DE52F6-1E32-5DA6-BB2D-B5B6096C962D";
 
+// Apple's progress line, in AMP.UI.Controls.winmd 1.1792 (GuidAttribute values of IScrubberControl and
+// IScrubberControlStatics): the statics give the dependency properties of its track (TrackHeight and TrackRectRadius,
+// Doubles) and thumb (ThumbVisibility, a Visibility). The instance interface only tells an element of that class.
+inline constexpr char kClassScrubberControl[] = "AMP.UI.Controls.ScrubberControl";
+inline constexpr char kIidScrubberControl[] = "CAADEFAD-5CAA-5920-B208-56A674247DAC";
+inline constexpr char kIidScrubberControlStatics[] = "89DAA287-A18B-50D3-A979-4E957F02233A";
+
 // Apple's own full-screen player, in AMP.UI.Views.winmd 1.1792 (GuidAttribute values of IFullScreenPlayerStatics and
 // IFullScreenPlayer). The full-screen button of Apple's mini player shows the same object. Opened by
 // Ampify.ui.applePlayer (src/win/apple_player.cpp).
@@ -223,9 +230,15 @@ inline constexpr int kDescriptorIsContainer = 18;
 inline constexpr int kDescriptorIsVideo = 19;
 inline constexpr int kDescriptorIsConcert = 20;
 inline constexpr int kDescriptorCanonicalId = 22;
+
+// AMP.UI.Controls.IScrubberControlStatics: get_ThumbVisibilityProperty, get_TrackHeightProperty,
+// get_TrackRectRadiusProperty, each a DependencyProperty.
+inline constexpr int kScrubberThumbVisibilityProperty = 6;
+inline constexpr int kScrubberTrackHeightProperty = 7;
+inline constexpr int kScrubberTrackRectRadiusProperty = 8;
 }  // namespace slot
 
-// Every slot above with its interface and method, for the test against AMP.Services.txt and AMP.UI.Views.txt.
+// Every slot above with its interface and method, for the test against the lists of knowledge/winmd/.
 struct SlotEvidence {
     const char* interfaceName;
     const char* method;
@@ -294,6 +307,9 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.UI.Views.INowPlayingControl", "get_ViewModel", kNowPlayingControlViewModel},
     {"AMP.Services.CommonModels.INowPlayingViewModel", "get_GoToNowPlayingItemAction", kNowPlayingViewModelGoToItemAction},
     {"AMP.UI.Views.IUIBrokerStatics", "GlobalDispatchActionAsync", kUiBrokerGlobalDispatchAction},
+    {"AMP.UI.Controls.IScrubberControlStatics", "get_ThumbVisibilityProperty", slot::kScrubberThumbVisibilityProperty},
+    {"AMP.UI.Controls.IScrubberControlStatics", "get_TrackHeightProperty", slot::kScrubberTrackHeightProperty},
+    {"AMP.UI.Controls.IScrubberControlStatics", "get_TrackRectRadiusProperty", slot::kScrubberTrackRectRadiusProperty},
 };
 
 // AMP.Services.CommonModels.AudioFormat, in the order of its fields in AMP.Services.txt: Other, Lossless,

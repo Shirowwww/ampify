@@ -35,6 +35,7 @@
 #include "../core/theme/properties.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_render/render_tree.hpp"
+#include "apple_properties.hpp"
 #include "artwork_cap.hpp"
 #include "xaml_host.hpp"
 #include "xaml_backend_detail.hpp"
@@ -110,6 +111,7 @@ animation::Storyboard EaseTransform(const media::CompositeTransform& transform, 
 std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::string_view property) {
     xaml::DependencyObject object = Resolve(id);
     if (!object) return std::nullopt;
+    if (IsAppleProperty(property)) return ReadAppleProperty(object, property);
 
     // While a colour animation draws the background, the theme's own value reads back: the animated brush is not it.
     if (property == "Background") {
@@ -591,6 +593,8 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         UpdateStates(id, object, property, nullptr);  // or its states would keep the theme's colour under the pointer
         return true;
     }
+
+    if (IsAppleProperty(property)) return WriteAppleProperty(object, property, value);
 
     if (property == "Background" || property == "Foreground" || property == "BorderBrush" || IsSelectionBrush(property)) {
         std::optional<media::Brush> target;

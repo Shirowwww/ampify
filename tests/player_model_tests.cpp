@@ -38,10 +38,10 @@ void ReadWinmdList(std::istream& file, std::map<std::string, std::vector<std::st
     }
 }
 
-// "AMP.Services.IPlayer" -> its methods, in order, from knowledge/winmd/AMP.Services.txt and AMP.UI.Views.txt.
+// "AMP.Services.IPlayer" -> its methods, in order, from the lists of knowledge/winmd/.
 std::map<std::string, std::vector<std::string>> WinmdMethods() {
     std::map<std::string, std::vector<std::string>> types;
-    for (const char* name : {"AMP.Services.txt", "AMP.UI.Views.txt"}) {
+    for (const char* name : {"AMP.Services.txt", "AMP.UI.Views.txt", "AMP.UI.Controls.txt"}) {
         std::ifstream file(fs::path(AMPIFY_SOURCE_DIR) / "knowledge" / "winmd" / name);
         ReadWinmdList(file, types);
     }

@@ -1,0 +1,280 @@
+/* Cosy: a soft, flat evening look. The sidebar and the pages are one sheet of the same colour, with no line between
+   them; the playback bar runs along the bottom with a large rounded artwork; albums and playlists start under a soft
+   wash of their own colours; corners are round and generous. Colours come from colors.ini, one hue per scheme; the
+   classes are Ampify's stable names for Apple Music's zones (docs/themes/names.md). */
+
+:root {
+    --page: $ApplicationPageBackgroundThemeBrush;
+    --base: $SolidBackgroundFillColorBaseBrush;
+    --window-background: var(--page);
+    --panel-background: var(--page);
+    --band-background: $CardBackgroundFillColorDefaultBrush;
+    --panel-radius: var(--setting-panel-radius);
+    --radius-box: calc(var(--setting-panel-radius) * 0.75);
+    --radius-small: calc(var(--setting-panel-radius) * 0.5);
+    --gap: 10;
+    --raised: $CardBackgroundFillColorDefaultBrush;
+    --hover: $SubtleFillColorSecondaryBrush;
+    --artwork-size: var(--setting-artwork-size);
+    --bar-height: calc(var(--setting-artwork-size) + 24);
+    --bar-room: calc(var(--setting-artwork-size) + 24 + 10);
+    --font-title: "Segoe UI Variable Display";
+    --font-title-weight: 700;
+}
+
+/* The flat setting: one sheet (the default), two panels on a deeper window, or one sheet in the deeper shade. */
+@setting flat = "Two panels" {
+    :root {
+        --window-background: var(--base);
+    }
+}
+
+@setting flat = Deeper {
+    :root {
+        --window-background: var(--base);
+        --panel-background: var(--base);
+    }
+}
+
+@import "ampify:floating-panels";
+
+/* ---- Playback bar: along the bottom, a large artwork -------------------------------------------------------------- */
+
+@setting bar-position = Bottom {
+    @import "ampify:bottom-bar";
+}
+@setting bar-position = Centred {
+    @import "ampify:bottom-bar";
+    @import "ampify:centre-bar";
+}
+
+/* The artwork grows with the bar, which is the artwork and 12 above and below it. At the top, Apple's bar keeps its
+   height and its artwork. */
+@setting bar-position = Bottom {
+    .lcd-artwork-image,
+    .lcd-placeholder {
+        width: var(--artwork-size);
+        height: var(--artwork-size);
+    }
+}
+@setting bar-position = Centred {
+    .lcd-artwork-image,
+    .lcd-placeholder {
+        width: var(--artwork-size);
+        height: var(--artwork-size);
+    }
+}
+
+/* The song sits on the sheet itself, without the display's box. */
+.lcd {
+    background: transparent;
+    border-width: 0;
+}
+
+.lcd-artwork-image,
+.lcd-placeholder {
+    corner-radius: var(--setting-artwork-radius);
+}
+
+.track-title {
+    font-weight: 600;
+}
+
+/* The times setting. Apple shows them under the pointer only with the bar at the top; visibility: visible holds over
+   that state, and the opacity does the showing. A narrow display keeps only the time left (ampify:floating-panels). */
+@setting times = "Under the pointer" {
+    .current-time,
+    .duration {
+        visibility: visible;
+        opacity: 0;
+        transition: opacity 150ms;
+    }
+
+    .playbar:hover .duration {
+        opacity: 1;
+    }
+
+    @media (min-width: 1101px) {
+        .playbar:hover .current-time {
+            opacity: 1;
+        }
+    }
+}
+
+@setting times = Always {
+    .current-time,
+    .duration {
+        visibility: visible;
+    }
+
+    .duration {
+        opacity: 1;
+    }
+
+    @media (min-width: 1101px) {
+        .current-time {
+            opacity: 1;
+        }
+    }
+}
+
+/* Hidden in every layout: at the top Apple shows them under the pointer, and the centred bar keeps them visible. */
+@setting times = Hidden {
+    .current-time,
+    .duration {
+        visibility: collapsed;
+    }
+}
+
+/* Play: a round accent button, a little larger under the pointer. */
+.play-button > Grid#Root {
+    background: $AccentFillColorDefaultBrush;
+    corner-radius: 20px;
+}
+
+.play-button FontIcon {
+    foreground: $TextOnAccentFillColorPrimaryBrush;
+}
+
+.play-button {
+    transition: transform 120ms;
+}
+
+.play-button:hover {
+    transform: scale(1.06);
+}
+
+.play-button:active {
+    transform: scale(0.96);
+}
+
+.transport AppBarButton,
+.playbar-toggles ToggleButton {
+    corner-radius: var(--radius-small);
+}
+
+/* A thin line in the accent on a quiet track; the volume the same. */
+.volume-slider,
+.scrubber {
+    color: $AccentFillColorDefaultBrush;
+    background: $ControlStrokeColorDefaultBrush;
+}
+
+.volume-slider Thumb,
+.scrubber Thumb {
+    background: $TextFillColorPrimaryBrush;
+}
+
+/* Menus, flyouts and tooltips: raised cards with soft corners. */
+.menu,
+.flyout,
+.tooltip {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-color: $ControlStrokeColorDefaultBrush;
+    corner-radius: var(--radius-box);
+}
+
+.menu-item {
+    corner-radius: var(--radius-small);
+}
+
+.menu-item:hover {
+    background: $ControlFillColorDefaultBrush;
+}
+
+/* ---- Sidebar ------------------------------------------------------------------------------------------------------ */
+
+.sidebar-item {
+    corner-radius: var(--radius-small);
+}
+
+.app-name {
+    font-weight: 700;
+}
+
+/* ---- Pages -------------------------------------------------------------------------------------------------------- */
+
+.page-title {
+    font-role: title;
+}
+
+.shelf-title,
+.section-header {
+    font-weight: 700;
+}
+
+.album-artist {
+    color: $AccentTextFillColorPrimaryBrush;
+}
+
+/* Cards: a soft raised tile behind the artwork and its titles under the pointer, which keeps 8 around them. */
+.card {
+    padding: 8;
+    corner-radius: var(--radius-box);
+    transition: background 160ms;
+}
+
+.card:hover {
+    background: var(--raised);
+}
+
+.artwork {
+    corner-radius: var(--radius-small);
+}
+
+.track-row {
+    corner-radius: var(--radius-small);
+    transition: background 120ms;
+}
+
+.track-row:hover {
+    background: var(--hover);
+}
+
+.album-play-button,
+.album-shuffle-button {
+    corner-radius: calc(var(--setting-panel-radius) * 0.6);
+}
+
+.fullscreen-artwork {
+    corner-radius: var(--panel-radius);
+}
+
+/* ---- The wash under an album's or a playlist's header ---------------------------------------------------------------- */
+
+/* On a dark scheme, the artwork's dark colour (--page-art-3, dark enough for light text) fades out down the page; on
+   Linen, a light veil of its vibrant colour, under which the dark text stays dark. */
+@media (prefers-color-scheme: dark) {
+    @setting header-wash = Soft {
+        .list-page {
+            background: linear-gradient(to bottom, #B3var(--page-art-3-hex, 1F1B21) 0%, #66var(--page-art-3-hex, 1F1B21) 30%, #00var(--page-art-3-hex, 1F1B21) 70%);
+        }
+    }
+
+    @setting header-wash = Strong {
+        .list-page {
+            background: linear-gradient(to bottom, #FFvar(--page-art-3-hex, 1F1B21) 0%, #B3var(--page-art-3-hex, 1F1B21) 35%, #00var(--page-art-3-hex, 1F1B21) 75%);
+        }
+    }
+}
+
+@media (prefers-color-scheme: light) {
+    @setting header-wash = Soft {
+        .list-page {
+            background: linear-gradient(to bottom, #33var(--page-art-2-hex, B4552D) 0%, #00var(--page-art-2-hex, B4552D) 60%);
+        }
+    }
+
+    @setting header-wash = Strong {
+        .list-page {
+            background: linear-gradient(to bottom, #59var(--page-art-2-hex, B4552D) 0%, #00var(--page-art-2-hex, B4552D) 70%);
+        }
+    }
+}
+
+/* ---- Settings ----------------------------------------------------------------------------------------------------- */
+
+.settings-card {
+    background: $CardBackgroundFillColorDefaultBrush;
+    corner-radius: var(--radius-box);
+}

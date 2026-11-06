@@ -14,7 +14,8 @@ namespace {
 constexpr const char* kInspectedProperties[] = {
     "Background", "Foreground", "BorderBrush", "CornerRadius", "FontFamily", "FontSize", "FontWeight",
     "FontStyle", "CharacterSpacing", "LineHeight", "TextAlignment", "TextTrimming", "TextWrapping", "Margin", "Padding", "Width", "Height", "Opacity", "Visibility", "FlowDirection", "HorizontalAlignment",
-    "VerticalAlignment", "Grid.Row", "Grid.Column", "Canvas.ZIndex", "States",
+    "VerticalAlignment", "Grid.Row", "Grid.Column", "Canvas.ZIndex", "TrackHeight", "TrackRectRadius",
+    "ThumbVisibility", "States",
 };
 
 // Items of a JSON list, one per line, for a file a person may open.

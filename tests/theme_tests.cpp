@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include "../src/core/element_settings.hpp"
 #include "../src/core/journal.hpp"
 #include "../src/core/json.hpp"
 #include "../src/core/manifest.hpp"
@@ -1104,6 +1105,13 @@ TEST_CASE(Properties_AcceptTheCssNamesThemesUseMost) {
     // The width of the folded sidebar, for layouts that put margins around it.
     CHECK(th::FindProperty("compact-pane-length") && th::FindProperty("compact-pane-length")->xaml == "CompactPaneLength");
     CHECK(Converted("compact-pane-length", "60px", palette, files) == "60");
+    // Apple's progress line sizes its track and shows its thumb from properties of its own.
+    CHECK(th::FindProperty("track-height") && th::FindProperty("track-height")->xaml == "TrackHeight");
+    CHECK(Converted("track-height", "4px", palette, files) == "4");
+    CHECK(th::FindProperty("track-radius") && th::FindProperty("track-radius")->xaml == "TrackRectRadius");
+    CHECK(Converted("track-radius", "2", palette, files) == "2");
+    CHECK(th::FindProperty("thumb-visibility") && th::FindProperty("thumb-visibility")->xaml == "ThumbVisibility");
+    CHECK(Converted("thumb-visibility", "visible", palette, files) == "Visible");
 }
 
 TEST_CASE(Properties_ConvertVisibilityNumbersAndText) {
@@ -2319,6 +2327,42 @@ TEST_CASE(Engine_PutsAnImageInTheScrubbersThumbColumn) {
     CHECK(page.tree.Shown(scrubber, "RenderTransform").text == "1,1,0,0,12");
 }
 
+// The room follows the image: one taller than what the line's template asks for gets its own height, and the line
+// moves down by what it gained, so its first 6 pixels stay where Apple had them.
+TEST_CASE(Engine_GivesATallImageOnTheLineItsOwnHeight) {
+    DecorPage page;
+    th::NodeId scrubber = page.tree.Add(0, "ScrubberControl", "LCDScrubber",
+                                        {{"Height", {th::ValueKind::Length, "6"}},
+                                         {"RenderTransform", {th::ValueKind::Opaque, "handle:1"}}});
+    th::NodeId track = page.tree.Add(static_cast<int>(scrubber) - 1, "Grid", "HorizontalTemplate");
+    page.tree.elements[track - 1].info.panel = true;
+    th::Theme theme = page.Css(
+        "ScrubberControl#LCDScrubber Grid#HorizontalTemplate::after {\n"
+        "    content: url(dance.gif); grid-column: 1; height: 32px; margin: -2px -16px 0;\n"
+        "}\n");
+    CHECK(theme.problems.empty());
+
+    page.engine.Apply(theme, page.tree);
+    CHECK(page.tree.Shown(scrubber, "Height").text == "30");
+    CHECK(page.tree.Shown(scrubber, "RenderTransform").text == "1,1,0,0,24");
+}
+
+TEST_CASE(Engine_KeepsTheLinesHeightAThemeGivesUnderAnImage) {
+    DecorPage page;
+    th::NodeId scrubber = page.tree.Add(0, "ScrubberControl", "LCDScrubber",
+                                        {{"Height", {th::ValueKind::Length, "6"}},
+                                         {"RenderTransform", {th::ValueKind::Opaque, "handle:1"}}});
+    th::NodeId track = page.tree.Add(static_cast<int>(scrubber) - 1, "Grid", "HorizontalTemplate");
+    page.tree.elements[track - 1].info.panel = true;
+    th::Theme theme = page.Css(
+        ".scrubber Grid#HorizontalTemplate::after { content: url(dance.gif); height: 40px; }\n"
+        "ScrubberControl#LCDScrubber { height: 24; }\n");
+
+    page.engine.Apply(theme, page.tree);
+    CHECK(page.tree.Shown(scrubber, "Height").text == "24");
+    CHECK(page.tree.Shown(scrubber, "RenderTransform").text == "handle:1");
+}
+
 TEST_CASE(Engine_RefusesADecorOnAnElementThatIsNotAPanel) {
     DecorPage page;
     th::Theme theme = page.Css("#Hide::after { content: url(dance.gif); }\n");
@@ -2567,7 +2611,7 @@ TEST_CASE(Inspector_ShowsTheColourOfAnAppBrushKeptAsAnObject) {
 
 TEST_CASE(Examples_LoadWithoutProblems) {
     for (const char* name : {"glass", "artwork", "palettes", "console", "mirror", "cinema", "paper-light", "greenroom",
-                             "high-contrast"}) {
+                             "high-contrast", "ember", "fluent", "cosy"}) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
@@ -2613,9 +2657,29 @@ TEST_CASE(Examples_EveryPaletteLoadsWithoutProblems) {
     }
 }
 
+// Cosy has a scheme per hue and one light: each loads alone, without a problem, and its flat sheet takes the page's
+// colour for the window.
+TEST_CASE(Examples_EveryCosySchemeLoadsWithoutProblems) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "cosy";
+    th::FolderFiles files(folder);
+    th::Theme first = th::LoadTheme("cosy", folder.generic_string(), files);
+    CHECK(first.schemes == (std::vector<std::string>{"Dusk", "Night", "Moss", "Linen"}));
+    for (const std::string& scheme : first.schemes) {
+        th::LoadOptions options;
+        options.scheme = scheme;
+        th::Theme theme = th::LoadTheme("cosy", folder.generic_string(), files, options);
+        CHECK(theme.usable);
+        for (const std::string& problem : theme.problems) {
+            ampify::test::ReportFailure(__FILE__, __LINE__, "cosy " + scheme + " : " + problem);
+        }
+    }
+    CHECK(Assigned(first, ".window", "Background") == "#FF1F1B21");
+}
+
 // Each shipped theme with settings, every setting moved off its default: still no problem, and more or fewer rules.
 TEST_CASE(Examples_LoadWithEverySettingChanged) {
-    for (const char* name : {"greenroom", "glass", "palettes", "artwork", "cinema", "console", "mirror"}) {
+    for (const char* name : {"greenroom", "glass", "palettes", "artwork", "cinema", "console", "mirror", "ember", "fluent",
+                             "high-contrast", "paper-light", "cosy"}) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         std::optional<std::string> manifest = files.Read("manifest.json");
@@ -3912,6 +3976,38 @@ TEST_CASE(Worker_ReloadsWhenASettingOfTheActiveThemeChanges) {
     CHECK(second.generation == first.generation + 1);
     CHECK(second.theme && second.theme->assignments.size() == 1);
     CHECK(worker.Tick(settings, 600).generation == second.generation);
+    std::filesystem::remove_all(kit);
+}
+
+// Import writes the file's values into settings.txt and Reset all takes the keys out: both must apply the theme again,
+// as a click on the card does, and a reset must give the manifest's default back.
+TEST_CASE(Worker_ReloadsAfterAnImportAndAfterAReset) {
+    std::filesystem::path kit(TempFolder("worker-import"));
+    WriteFile(kit / "themes" / "test" / "manifest.json", kSettingsManifest);
+    WriteFile(kit / "themes" / "test" / "user.css", "@setting hide-radio { #Radio { visibility: collapsed; } }\n");
+
+    ampify::Settings settings;
+    settings.Set("theme.active", "test");
+    th::ThemeWorker worker(kit);
+    th::SessionRequest first = worker.Tick(settings, 600);
+
+    std::vector<ampify::SettingSpec> specs = ampify::DeclaredSettings(kSettingsManifest);
+    ampify::settings_panel::ImportRefusal refusal;
+    std::optional<std::map<std::string, std::string>> imported = ampify::settings_panel::ImportSettings(
+        R"({"format": "ampify-settings", "version": 1, "kind": "theme", "id": "test", "values": {"hide-radio": true}})",
+        "theme", "test", specs, refusal);
+    CHECK(imported.has_value());
+    for (const auto& [key, value] : imported.value_or(std::map<std::string, std::string>{})) {
+        settings.Set("themes.test." + key, value);
+    }
+    th::SessionRequest afterImport = worker.Tick(settings, 600);
+    CHECK(afterImport.generation == first.generation + 1);
+    CHECK(afterImport.theme && afterImport.theme->assignments.size() == 1);
+
+    settings.Remove("themes.test.hide-radio");
+    th::SessionRequest afterReset = worker.Tick(settings, 600);
+    CHECK(afterReset.generation == afterImport.generation + 1);
+    CHECK(afterReset.theme && afterReset.theme->assignments.empty());
     std::filesystem::remove_all(kit);
 }
 

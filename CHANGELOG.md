@@ -45,6 +45,25 @@
 
 ### Themes
 
+- Cosy, a twelfth theme: a soft, flat evening look where the sidebar and the pages share one colour, the playback bar
+  runs along the bottom with a large rounded artwork, and albums start under a wash of their own colours. Four
+  schemes (Dusk, Night, Moss, Linen) and grouped settings: bar position, corners, artwork size and corners, flat or two
+  panels, the strength of the wash, and the times on the bar.
+- The settings of Artwork, Cinema, Ember, Glass, Greenroom and Palettes are grouped under headings (Layout, Shapes,
+  Colours, Details), with a line of help where a setting needs one.
+- Artwork and Fluent: "Playback bar position" puts the bar at the bottom, across or centred; the top stays the
+  default. Glass and Mirror: "Space around the panels". High contrast: "Outline width". Paper: "Title face", serif or
+  Windows' own.
+- Ember's amber follows the accent chosen in Settings > Ampify, as Fluent's blue already did.
+- Accent colour in Settings > Ampify: red, yellow and teal join the presets.
+- Playback bar times, a snippet: the time played and the length under the pointer or always, also with the bar at
+  the bottom, where Apple hides them.
+- Album colours: a strength for the wash under the header (strong, medium, soft).
+- An image a theme or snippet puts on the progress line gets the room it takes: the line grows to the image's height
+  (with its margins) when that is more than the 18 pixels it was given before, and keeps its place in the display.
+- Experimental: `track-height`, `track-radius` and `thumb-visibility` on `.scrubber` write Apple's own properties of
+  the progress line for the height and corners of its track and for its thumb. The inspector lists them. Their effect
+  in the play bar is not checked on screen yet, nor whether the track can grow past the line's 6 pixels.
 - An `animation` on a `::before` or `::after` decor runs: the Animated artwork snippet's two layers turn again.
 - Ampify's own sidebar entries (Marketplace, extensions) fit the folded sidebar: a centred icon in the column, with
   the label as its tooltip; the full row with its label when the sidebar is open, including the hover overlay.

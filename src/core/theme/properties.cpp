@@ -15,7 +15,7 @@ namespace ampify::theme {
 
 namespace {
 
-constexpr std::array<PropertySpec, 56> kProperties{{
+constexpr std::array<PropertySpec, 59> kProperties{{
     {"background", "Background", PropertyKind::Brush},
     {"backdrop", "Background", PropertyKind::Backdrop},
     {"color", "Foreground", PropertyKind::Brush},
@@ -51,6 +51,10 @@ constexpr std::array<PropertySpec, 56> kProperties{{
     {"min-height", "MinHeight", PropertyKind::Length},
     {"max-height", "MaxHeight", PropertyKind::Length},
     {"compact-pane-length", "CompactPaneLength", PropertyKind::Length},  // NavigationView, the folded sidebar
+    // Apple's progress line (ScrubberControl): the height and corners of its track, and its thumb, inside the control
+    {"track-height", "TrackHeight", PropertyKind::Length},
+    {"track-radius", "TrackRectRadius", PropertyKind::Length},
+    {"thumb-visibility", "ThumbVisibility", PropertyKind::Visibility},
     {"opacity", "Opacity", PropertyKind::Number},
     {"visibility", "Visibility", PropertyKind::Visibility},
     {"display", "Visibility", PropertyKind::Visibility},  // so the `display: none` of Spicetify snippets works

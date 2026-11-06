@@ -645,16 +645,72 @@ std::string ScrubberClearOfCorners(const Theme& theme) {
     return ".scrubber { margin: 0 " + FormatNumber(inset) + " 0 0; }\n";
 }
 
-// Apple Music's progress line is 6 high and its template asks for more, so the line clips what it holds to those 6: an
-// image riding it (a Nyan Cat) showed as a sliver. 18 high it clips nothing, and moved 12 down the line stays in place.
-std::string RoomForImagesOnTheLine(const Theme& theme) {
-    bool image = std::any_of(theme.assignments.begin(), theme.assignments.end(), [](const Assignment& assignment) {
-        const std::string& text = assignment.selector.text;
-        return assignment.selector.pseudo != PseudoElement::None && assignment.property == kContentProperty &&
-               (text.find(".scrubber") != std::string::npos || text.find("LCDScrubber") != std::string::npos);
-    });
-    if (!image || Sets(theme, ".scrubber", "Height") || Sets(theme, ".scrubber", "RenderTransform")) return {};
-    return ".scrubber { height: 18; transform: translateY(12px); }\n";
+// An element of Apple Music's whose height Apple fixes below what its template asks for: WinUI then clips the template
+// and all it holds to that height, so a ::before or ::after image put inside showed as a sliver (a Nyan Cat on the
+// progress line, 6 high, whose template asks for 18). Apple's bottom-aligned slots grow upwards: moved down by what
+// they gained, their first `height` pixels stay where they were.
+struct FixedSlot {
+    std::string_view name;      // the stable name (builtins.cpp)
+    std::string_view selector;  // the element it names, for a theme that writes it in full
+    double height;              // Apple's
+    double asked;               // what its template asks for: the least room that clips nothing
+};
+
+constexpr FixedSlot kFixedSlots[] = {
+    {".scrubber", "ScrubberControl#LCDScrubber", 6, 18},
+};
+
+bool InSlot(const std::string& selector, const FixedSlot& slot) {
+    std::string_view element = slot.selector.substr(slot.selector.find('#') + 1);
+    return selector.find(slot.name) != std::string::npos || selector.find(element) != std::string::npos;
+}
+
+double LengthOrZero(std::string_view text) {
+    double value = 0;
+    auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+    return error == std::errc() && std::isfinite(value) ? value : 0;
+}
+
+// The height a decor takes in its panel's layout: its own, plus its top and bottom margins (negative ones give room
+// back, as the progress mascot's do, so it takes none).
+double DecorLayoutHeight(const Theme& theme, const Assignment& content) {
+    double height = 0;
+    double margins = 0;
+    for (const Assignment& assignment : theme.assignments) {
+        if (assignment.selector.text != content.selector.text || assignment.selector.pseudo != content.selector.pseudo) {
+            continue;
+        }
+        if (assignment.property == "Height") height = LengthOrZero(assignment.value.text);
+        if (assignment.property == "Margin") {
+            std::string_view sides = assignment.value.text;  // left,top,right,bottom
+            size_t top = sides.find(','), right = sides.find(',', top + 1), bottom = sides.find(',', right + 1);
+            if (bottom == std::string_view::npos) continue;
+            margins = LengthOrZero(sides.substr(top + 1, right - top - 1)) + LengthOrZero(sides.substr(bottom + 1));
+        }
+    }
+    return std::max(0.0, height + margins);
+}
+
+std::string RoomForDecors(const Theme& theme) {
+    std::string css;
+    for (const FixedSlot& slot : kFixedSlots) {
+        double room = 0;
+        for (const Assignment& assignment : theme.assignments) {
+            if (assignment.selector.pseudo == PseudoElement::None || assignment.property != kContentProperty ||
+                assignment.value.text.empty() || !InSlot(assignment.selector.text, slot)) {
+                continue;
+            }
+            room = std::max({room, slot.asked, DecorLayoutHeight(theme, assignment)});
+        }
+        const std::string full(slot.selector);
+        if (room <= slot.height || Sets(theme, slot.name, "Height") || Sets(theme, full, "Height") ||
+            Sets(theme, slot.name, "RenderTransform") || Sets(theme, full, "RenderTransform")) {
+            continue;
+        }
+        css += std::string(slot.name) + " { height: " + FormatNumber(room) + "; transform: translateY(" +
+               FormatNumber(room - slot.height) + "px); }\n";
+    }
+    return css;
 }
 
 // The volume slider takes the accent through WinUI's slider keys (DefineAccentControls), but Apple Music's progress line
@@ -764,7 +820,7 @@ std::string RoomInsideALitCard(const Theme& theme) {
 // Rules a theme's own choices call for, below its user.css so that a theme which sets the same thing keeps its value.
 void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts& parts) {
     bool applied = parts.resources;
-    std::string css = ScrubberClearOfCorners(theme) + RoomForImagesOnTheLine(theme) + OneLightPerSong(theme) +
+    std::string css = ScrubberClearOfCorners(theme) + RoomForDecors(theme) + OneLightPerSong(theme) +
                       RoomInsideALitCard(theme);
     if (parts.colors) {
         css += ScrubberInAccent(theme) + NowPlayingBarsInAccent(theme) + ShuffleInAccent(theme) + UpNextInAccent(theme) +
@@ -878,7 +934,7 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
     source.file = "snippets/" + id + "/user.css";
     source.base = base;
     LoadRules(files, context, snippet, true, source);
-    if (std::string css = RoomForImagesOnTheLine(snippet); !css.empty()) {
+    if (std::string css = RoomForDecors(snippet); !css.empty()) {
         RuleSource derived;
         derived.file = "Ampify (derived from the snippet)";
         derived.layer = -1;

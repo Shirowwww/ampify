@@ -37,6 +37,7 @@
 #include "../core/theme/properties.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_render/render_tree.hpp"
+#include "apple_properties.hpp"
 #include "hosted_text_align.hpp"
 #include "xaml_host.hpp"
 #include "xaml_backend_detail.hpp"
@@ -279,6 +280,7 @@ bool WriteTextProperty(const xaml::DependencyObject& object, std::string_view pr
 // The dependency property behind a theme property on this element, checked in the same order as ReadRaw and WriteRaw.
 // Null for a property that is not one value on the element (a transform, the order, an attached Grid value).
 xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::string_view property) {
+    if (IsAppleProperty(property)) return AppleProperty(object, property);
     const bool control = static_cast<bool>(object.try_as<controls::Control>());
     const bool text = static_cast<bool>(object.try_as<controls::TextBlock>());
     if (property == "Background") {

@@ -70,7 +70,16 @@ bool IsThicknessProperty(std::string_view property) {
 bool IsLengthProperty(std::string_view property) {
     return property == "FontSize" || property == "Width" || property == "Height" || property == "MinWidth" ||
            property == "MaxWidth" || property == "MinHeight" || property == "MaxHeight" || property == "LineHeight" ||
-           property == "CompactPaneLength";
+           property == "CompactPaneLength" || property == "TrackHeight" || property == "TrackRectRadius";
+}
+
+// Apple's progress line's own (src/win/apple_properties.cpp).
+bool IsScrubberProperty(std::string_view property) {
+    return property == "TrackHeight" || property == "TrackRectRadius" || property == "ThumbVisibility";
+}
+
+bool IsVisibilityProperty(std::string_view property) {
+    return property == "Visibility" || property == "ThumbVisibility";
 }
 
 bool IsNumberProperty(std::string_view property) {
@@ -136,6 +145,8 @@ std::optional<Value> Derived(const ReplayBackend::Node& node, std::string_view p
         if (framework) return Value{ValueKind::Length, "inf"};
     } else if (property == "CompactPaneLength") {
         if (node.type == "NavigationView") return Value{ValueKind::Length, "48"};
+    } else if (IsScrubberProperty(property)) {
+        if (node.type == "ScrubberControl") return none;  // Apple's own values, which no dump has recorded yet
     } else if (property == "RequestedTheme") {
         if (framework) return Value{ValueKind::Keyword, "Default"};
     } else if (property == "Grid.RowSpan" || property == "Grid.ColumnSpan") {
@@ -196,7 +207,7 @@ std::string KindRefusal(std::string_view property, const Value& value) {
         if (property == "FontWeight" && (*number < 1 || *number > 999)) return where + ": a weight goes from 1 to 999";
         if ((property == "Grid.RowSpan" || property == "Grid.ColumnSpan") && *number < 1) return where + ": a span starts at 1";
         if (property == kOrderProperty && *number < 0) return where + ": a position starts at 0";
-    } else if (property == "Visibility") {
+    } else if (IsVisibilityProperty(property)) {
         if (value.text != "Visible" && value.text != "Collapsed") return where + ": Visible or Collapsed";
     } else if (!KeywordsOf(property).empty()) {
         std::span<const std::string_view> members = KeywordsOf(property);
@@ -292,7 +303,7 @@ std::optional<Value> RecordedValue(std::string_view property, std::string_view t
         return Value{ValueKind::Length, std::isnan(*length) ? std::string("NaN") : copy};
     }
     if (IsNumberProperty(property)) return Value{ValueKind::Number, copy};
-    if (property == "Visibility") return Value{ValueKind::Visibility, copy};
+    if (IsVisibilityProperty(property)) return Value{ValueKind::Visibility, copy};
     if (!KeywordsOf(property).empty()) return Value{ValueKind::Keyword, copy};
     return Value{ValueKind::Text, copy};  // FontFamily, States
 }
@@ -494,7 +505,8 @@ std::optional<Value> ReplayBackend::ReadRaw(NodeId id, std::string_view property
         auto place = std::find(siblings.begin(), siblings.end(), index) - siblings.begin();
         return Value{ValueKind::Number, std::to_string(place)};
     }
-    if (property == "States" || IsInspected(property)) return std::nullopt;  // read by the inspector: not there
+    // Read by the inspector: not there. The scrubber's own properties are newer than the first dumps.
+    if (property == "States" || (IsInspected(property) && !IsScrubberProperty(property))) return std::nullopt;
     return Derived(node, property);
 }
 

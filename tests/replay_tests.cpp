@@ -118,6 +118,24 @@ TEST_CASE(Replay_RefusesWhatTheLiveBackendWouldAndRecordsEveryWrite) {
     }
 }
 
+// The progress line's track and thumb, which dumps older than these properties never recorded: present on the line
+// only, and checked as the live backend checks them.
+TEST_CASE(Replay_GivesTheProgressLineItsTrackAndThumb) {
+    std::unique_ptr<th::ReplayBackend> tree = th::ReplayBackend::Load(ReadFile(Fixture()));
+    CHECK(tree != nullptr);
+    if (!tree) return;
+    int scrubber = IndexNamed(*tree, "LCDScrubber");
+    CHECK(scrubber >= 0);
+    if (scrubber < 0) return;
+    const th::NodeId line = th::ReplayBackend::IdOf(scrubber);
+    tree->BeginPass(1);
+    CHECK(tree->Read(line, "TrackHeight").has_value());
+    CHECK(tree->Write(line, "TrackHeight", {th::ValueKind::Length, "4"}));
+    CHECK(tree->Write(line, "ThumbVisibility", {th::ValueKind::Visibility, "Visible"}));
+    CHECK(!tree->Write(line, "TrackRectRadius", {th::ValueKind::Length, "-2"}));
+    CHECK(!tree->Read(th::ReplayBackend::IdOf(0), "TrackHeight").has_value());
+}
+
 TEST_CASE(Replay_RunsTheEngineUntilItSettlesAndReportsEachRule) {
     fs::path dir = Scratch("settle");
     fs::path theme = ThemeFolder(dir, "night",

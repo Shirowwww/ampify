@@ -43,6 +43,38 @@ Leave the terminal open. Each time you save, Apple Music changes within a second
 Values are hexadecimal, with or without `#`: `FF7A85`, `#FF7A85`, or `#80FF7A85` with the transparency first. Apple
 Music switches to light or dark mode to match the color of `main`.
 
+### Several schemes: one hue, two modes
+
+A theme with many schemes stays easy to keep when each scheme is one hue in one mode, every scheme has the same
+keys, and a comment says what each key paints, once, at the top. People pick a hue and its mode in the Marketplace,
+or both modes of a hue with a schedule (`theme.schedule = 07:00=Blue Light,19:00=Blue Dark`).
+
+```ini
+; main = the page, sidebar = the sidebar, text / subtext = the two text colours (4.5:1 on main),
+; button = the accent, main-elevated = the cards and the hover of a row.
+
+[Blue Dark]
+main = 1B1E28
+sidebar = 161922
+text = E6E9F5
+subtext = AEB4CC
+button = 8EA8F0
+main-elevated = 262A38
+
+[Blue Light]
+main = F4F6FB
+sidebar = E9EDF5
+text = 1F2330
+subtext = 4E566B
+button = 2F5BD3
+main-elevated = E2E7F1
+```
+
+Name the pair `<Hue> Dark` and `<Hue> Light`. `theme.scheme = auto` takes only the first scheme whose name has
+`Dark` or `Night` in dark mode, and `Light` or `Day` in light mode ([Automatic scheme](format.md#automatic-scheme)):
+put the pair people should get first. Check every text against
+`main` and against `main-elevated`, in both modes: `ampify theme replay` reports each text under 4.5:1
+([offline bench](../development/offline-bench.md)).
 ## 4. Change the shapes
 
 `user.css` targets Apple Music's zones by stable names written as CSS classes. In it, the colors of `colors.ini` are

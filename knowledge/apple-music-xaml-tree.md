@@ -89,3 +89,23 @@ the name of every other dialog's own content.
 - **MainPage is not a panel:** its content is `Grid#PageRoot`. Apple Music removes the children it does not know from it (a
   host added by Ampify disappeared within seconds). Ampify's panels go through a Popup of the window.
 - **Settings:** `PlaybackSettingsPage` (the Playback page), recognized by its class name, as AMExclusive does.
+
+## Where Apple Music cuts what a theme adds
+
+Apple 1.1792. "Seen" comes from a file or a dump, "deduced" from two facts, "to check" was never looked at on screen.
+
+| Element | What limits it | How Ampify or a theme gets around it |
+|---|---|---|
+| Progress line, `ScrubberControl#LCDScrubber` (`.scrubber`) | `Height` 6, bottom-aligned (seen in the dump); its template asks for about 18, so WinUI clips the template and all it holds to 6 (seen on screen). The display around it, `Grid#LCD`, has corners of 8 and cuts what passes its edge at the start and end of a song (deduced) | An image put inside makes the line grow to fit it and move down by what it gained (`RoomForDecors`, `src/core/theme/theme.cpp`; the table of such slots is there). `track-height`, `track-radius` and `thumb-visibility` write the line's own `TrackHeight`, `TrackRectRadius` and `ThumbVisibility` (`IScrubberControl`, `src/win/apple_properties.cpp`); whether the track grows past 6 is to check |
+| Display artwork, `ArtworkImage#ActualArtwork`, `Border#PlaceHolderArtwork`, `AspectRatioGrid` | Width 54 each; `NowPlayingControl.xbf` defines `ArtworkDimension`, `ActionButtonHeight`, `ActionButtonWidth`, `TickerTapeHeight` in its own resources (seen) | Size the three together (the spinning-artwork snippet). Writing those keys in the control's resources is to check: a `StaticResource` would freeze them at load |
+| `ArtworkImage` elsewhere (album header, cards, queue) | `ArtworkMaxSize` and Apple's own `MaxHeight` 270 (seen) | `FollowArtworkCap` lifts both with a theme's size |
+| Karaoke lyrics (`KaraokeLyricsLine`, `LyricsListViewItem`) | `SungColor`, `UnsungColor`, `LyricsOpacity_*`, `LineFontSize` are keys local to those views, not in the app's dictionaries; margins come from `TSLMargin` (seen) | None yet |
+| Sidebar (`Sidebar#MainSidebar`) | Narrow mode at 1324 px and below; the folded `SplitView` clips `Grid#PaneRoot` to `CompactPaneLength`. `Sidebar` has a public `ExpandedModeThresholdWidth` (seen) | `compact-pane-length` and `PinPushesPages`; the threshold is to check |
+| Play bar buttons (`RepeatButton`, `ShuffleButton` 40 by 40, `AppBarButton`) | Fixed sizes; a button clips its content (seen) | Move the button, not its glyph; no `padding` on every `Button` |
+| `Grid#TransportBar` | 76 high, and the first 64 pixels of each page are kept for it (`BackDrop` 64) (seen) | Take those 64 back where they are when panels move |
+| Cards and artworks Apple animates (`Translation`, `Scale`, `Rotation`) | Their composition visual cannot be taken (seen) | `overflow` uses `UIElement.Clip`, rectangles only |
+
+The names above come from the string tables of Apple's compiled XAML: `makepri dump /if AMP.UI.Controls.pri /of
+out.xml /dt detailed` (Windows SDK) gives each `.xbf` in Base64, and a `.xbf`'s string table starts 8 bytes before its
+first `http://` in UTF-16 (see `knowledge/apple-music-native-views.md`). Its node stream, where the numbers are, is not
+decoded. The properties of Apple's classes come from their winmd (`knowledge/winmd/`).

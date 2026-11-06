@@ -198,6 +198,8 @@ explain them in one line; the page also resets them, and exports or imports them
 | `min-width`, `min-height` | `MinWidth`, `MinHeight` | A length, or `auto` |
 | `max-width`, `max-height` | `MaxWidth`, `MaxHeight` | A length, or `none` |
 | `compact-pane-length` | `CompactPaneLength` | On `.navigation`: the width of the folded sidebar (48 in Apple Music) |
+| `track-height`, `track-radius` | `TrackHeight`, `TrackRectRadius` | On `.scrubber`: properties of Apple's progress line itself, the height and corner radius its template gives the track. A length, not negative and not `auto`. Unlike `height`, they leave the control's place in the display alone. Not yet checked on screen: whether the line grows past the control's 6 pixels |
+| `thumb-visibility` | `ThumbVisibility` | On `.scrubber`: `visible` or `collapsed`, the line's thumb (Apple hides it in the play bar). Not yet checked on screen |
 | `opacity` | `Opacity` | 0 to 1 |
 | `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`). `visible` holds over Apple's visual states that collapse the element (the play bar's times, shown only under the pointer) |
 | `display` | `Visibility` | `none` hides; `block`, `flex`, `grid`... show (use them to undo a `display: none`) |
@@ -379,8 +381,10 @@ room from the bar; top and bottom margins sit it on the line, since the display 
 ```
 
 It moves when Apple moves the bar: as the song plays, and on a seek. Apple's line is only 6 high and cuts what it
-holds to that: when an image goes into it, Ampify makes it 18 high and moves it 12 down, so the line stays where it
-was and the image shows whole. A theme that sets the line's own `height` or `transform` keeps them. At the very start
+holds to that: when an image goes into it, Ampify makes it as high as its template asks (18), or as high as the image
+takes in its column (its `height` plus its top and bottom margins) when that is more, and moves it down by what it
+gained, so the line stays where it was and the image shows whole. Negative margins, as above, take no room. A theme
+that sets the line's own `height` or `transform` keeps them. At the very start
 and end of a song, the half of the image past the bar is cut by the display around it.
 
 ### The row playing
@@ -726,6 +730,7 @@ and the inspector list them as "Ampify (derived from the theme)".
 | When the theme... | Ampify adds |
 |---|---|
 | rounds `.lcd` | `.scrubber` stops before the display's corner |
+| puts a `::before` or `::after` image in `.scrubber` | the line grows to fit it, keeping its place (see "An image that follows the song's progress") |
 | has an accent | the progress line (`.scrubber`) takes it, like the volume slider |
 | has an accent | the bars next to the row playing (`.now-playing-indicator`) take it, and follow it when it changes with the song |
 | has an accent | Up Next's "Clear" (`.queue-clear`) and its autoplay toggle while on (`.queue-autoplay`) take it, not Apple's red and blue |
