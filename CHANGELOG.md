@@ -98,6 +98,9 @@
   instead of a fixed night blue or slate, so they take the colours of the song playing.
 - The lyrics and queue pane of the floating-panel themes fits its panel: its right edge was cut (the durations, the
   autoplay button, the History tab; most in Mirror).
+- A state can sit on any part of a selector, not only the last: `.track-row:hover .favorite-button { opacity: 1 }`
+  shows a song's buttons while the pointer is over its row, and gives them back when it leaves. `:active`, `:focus` and
+  `:current` work the same way.
 
 ### Extensions
 

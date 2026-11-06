@@ -86,7 +86,8 @@ Grid#NowPlayingBar {
 | `A:not(B)` | An `A` that does not match `B`, where `B` is one part: a type, a `#name` and the pseudo-classes above |
 | `A::before`, `A::after` | A decorative image put into `A` (see [Decorative images](#decorative-images)) |
 
-- One state (`:hover`, `:active`, `:focus` or `:current`) per selector, on its last part.
+- One state (`:hover`, `:active`, `:focus` or `:current`) per selector, on any part: on an earlier part, it is the
+  state of that ancestor (see [A state on an ancestor](#a-state-on-an-ancestor)).
 - `:not()` takes no state, no `::before`/`::after`, no combinator and no class.
 - `:playing` goes on any part and counts as a pseudo-class.
 - Not supported: attributes (`[x=y]`), `An+B` forms (`odd`, `2n+1`) and other pseudo-classes (`:checked`...). A rule
@@ -503,6 +504,25 @@ background colour), whatever Windows' mode; it joins the sizes with `and`:
   `border-color` you give them stays in those states; a `:hover` color goes to both hover and pressed, an `:active`
   color to pressed only. Checked and selected states keep Apple Music's colors.
 - On a slider, `color` fills the part left of the thumb and `background` the rest of the track.
+
+#### A state on an ancestor
+
+A state written on an earlier part belongs to the element that part matches. The rule styles the last part while that
+ancestor is in the state:
+
+```css
+.track-row .favorite-button { opacity: 0; transition: opacity 150ms; }
+.track-row:hover .favorite-button { opacity: 1; }
+```
+
+- The favourite button of a song shows while the pointer is anywhere over its row, the button included, and fades
+  out when the pointer leaves the row. The `transition` declared on the button applies both ways.
+- `:active` (the row pressed), `:focus` (the focus anywhere in the row) and `:current` work the same way.
+- When several ancestors match the part, the nearest one counts. A list reuses its rows as it scrolls: each pass looks
+  for the row the element sits in again, so a value never stays on a row it no longer belongs to.
+- A rule with a state on the ancestor and one with a state on the element itself both apply; while both states hold,
+  the usual priority decides between them.
+- `::before` and `::after` take no state, on any part.
 
 ### The line being sung
 

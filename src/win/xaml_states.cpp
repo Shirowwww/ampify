@@ -19,6 +19,7 @@
 #include <functional>
 #include <set>
 
+#include <winrt/Microsoft.UI.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
@@ -56,10 +57,13 @@ bool XamlTreeBackend::FollowHover(theme::NodeId id, const std::vector<theme::Hov
     xaml::UIElement element{nullptr};
     if (object) element = object.try_as<xaml::UIElement>();
 
-    // The brushes the states give or gave: the control's state keys follow them (UpdateStates).
+    // The brushes the element's own states give or gave: the control's state keys follow them (UpdateStates). A value
+    // shown in the state of another element is not one of this control's states.
     std::vector<std::string> brushes;
     for (const char* property : {"Background", "Foreground", "BorderBrush"}) {
-        bool given = std::any_of(values.begin(), values.end(), [&](const auto& value) { return value.property == property; });
+        bool given = std::any_of(values.begin(), values.end(), [&](const auto& value) {
+            return value.property == property && (value.watch == 0 || value.watch == id);
+        });
         bool gave = m_hover.ValueOf(id, property) || m_hover.ValueOf(id, property, theme::Trigger::Active);
         if (given || gave) brushes.emplace_back(property);
     }
@@ -69,10 +73,18 @@ bool XamlTreeBackend::FollowHover(theme::NodeId id, const std::vector<theme::Hov
             UpdateStates(id, object, property, written == m_written.end() ? nullptr : written->second.object);
         }
     };
+    // The elements watched before and now: each is followed while some value still watches it.
+    std::vector<theme::NodeId> watched = m_hover.WatchedBy(id);
+    for (const theme::HoverValue& value : values) {
+        if (value.watch && value.watch != id && std::find(watched.begin(), watched.end(), value.watch) == watched.end()) {
+            watched.push_back(value.watch);
+        }
+    }
 
     if (values.empty()) {
         m_hover.Set(id, values, *this);  // under the pointer, the values underneath come back first
-        RemoveHoverHandlers(id);
+        Refollow(id);
+        for (theme::NodeId other : watched) Refollow(other);
         if (object) follow();
         return static_cast<bool>(element);
     }
@@ -84,9 +96,20 @@ bool XamlTreeBackend::FollowHover(theme::NodeId id, const std::vector<theme::Hov
         RemoveHoverHandlers(id);  // none should be left; a stale pair would apply a state twice
     }
     if (change == theme::HoverTracker::Change::Added || change == theme::HoverTracker::Change::Updated) {
-        FollowStates(id, element);
+        Refollow(id);
+        for (theme::NodeId other : watched) Refollow(other);
     }
     return true;
+}
+
+void XamlTreeBackend::Refollow(theme::NodeId id) {
+    xaml::DependencyObject object = m_hover.UsesAny(id) ? Resolve(id) : nullptr;
+    xaml::UIElement element = object ? object.try_as<xaml::UIElement>() : nullptr;
+    if (element) {
+        FollowStates(id, element);
+    } else {
+        RemoveHoverHandlers(id);
+    }
 }
 
 namespace {
@@ -118,6 +141,19 @@ bool PointerOnOwnRow(const xaml::UIElement& element, const xaml::Input::PointerR
         if (current.try_as<controls::NavigationViewItem>()) return false;
     }
     return true;
+}
+
+// What takes the pointer away without a PointerExited on a watched element: the contact lost, the capture given up.
+std::array<xaml::RoutedEvent, 2> PointerLosses() {
+    return {xaml::UIElement::PointerCanceledEvent(), xaml::UIElement::PointerCaptureLostEvent()};
+}
+
+// Whether the pointer is within the element's bounds, in its own coordinates.
+bool PointerInside(const xaml::UIElement& element, const xaml::Input::PointerRoutedEventArgs& args) {
+    auto framework = element.try_as<xaml::FrameworkElement>();
+    if (!framework) return false;
+    const winrt::Windows::Foundation::Point at = args.GetCurrentPoint(element).Position();
+    return at.X >= 0 && at.Y >= 0 && at.X < framework.ActualWidth() && at.Y < framework.ActualHeight();
 }
 
 constexpr int kCurrentReach = 8;  // parents walked up to the states: a lyrics line's words are 3 to 5 below them
@@ -166,27 +202,9 @@ void XamlTreeBackend::FollowStates(theme::NodeId id, const xaml::UIElement& elem
 
     bool hover = m_hover.Uses(id, theme::Trigger::Hover);
     if (hover && !handlers.hover) {
-        if (element.try_as<controls::NavigationViewItem>()) {
-            winrt::weak_ref<xaml::UIElement> weak = winrt::make_weak(element);
-            auto follow = [this, alive, id, weak](IInspectable const&, xaml::Input::PointerRoutedEventArgs const& args) noexcept {
-                try {
-                    xaml::UIElement self = weak.get();
-                    if (!alive.expired() && self) OnState(id, theme::Trigger::Hover, PointerOnOwnRow(self, args));
-                } catch (...) {
-                }
-            };
-            handlers.entered = element.PointerEntered(follow);
-            handlers.moved = winrt::box_value(xaml::Input::PointerEventHandler(follow));
-            element.AddHandler(xaml::UIElement::PointerMovedEvent(), handlers.moved, true);
-        } else {
-            handlers.entered = element.PointerEntered(to(theme::Trigger::Hover, true));
-        }
-        handlers.exited = element.PointerExited(to(theme::Trigger::Hover, false));
+        FollowPointer(id, element, handlers);
     } else if (!hover && handlers.hover) {
-        element.PointerEntered(handlers.entered);
-        element.PointerExited(handlers.exited);
-        if (handlers.moved) element.RemoveHandler(xaml::UIElement::PointerMovedEvent(), handlers.moved);
-        handlers.moved = nullptr;
+        StopFollowingPointer(element, handlers);
         m_hover.Toggle(id, theme::Trigger::Hover, false, *this);
     }
     handlers.hover = hover;
@@ -251,6 +269,57 @@ void XamlTreeBackend::FollowStates(theme::NodeId id, const xaml::UIElement& elem
     handlers.current = current;
 }
 
+// The pointer over the element: PointerEntered and PointerExited. An element watched by others (a song's row) also
+// hears PointerCanceled and PointerCaptureLost, and stays on while the pointer is still inside it: those events, and
+// the PointerExited of a part it holds, bubble up to it.
+void XamlTreeBackend::FollowPointer(theme::NodeId id, const xaml::UIElement& element, HoverHandlers& handlers) {
+    std::weak_ptr<bool> alive = m_alive;
+    winrt::weak_ref<xaml::UIElement> weak = winrt::make_weak(element);
+    if (element.try_as<controls::NavigationViewItem>()) {
+        auto follow = [this, alive, id, weak](IInspectable const&, xaml::Input::PointerRoutedEventArgs const& args) noexcept {
+            try {
+                xaml::UIElement self = weak.get();
+                if (!alive.expired() && self) OnState(id, theme::Trigger::Hover, PointerOnOwnRow(self, args));
+            } catch (...) {
+            }
+        };
+        handlers.entered = element.PointerEntered(follow);
+        handlers.moved = winrt::box_value(xaml::Input::PointerEventHandler(follow));
+        element.AddHandler(xaml::UIElement::PointerMovedEvent(), handlers.moved, true);
+    } else {
+        handlers.entered = element.PointerEntered([this, alive, id](IInspectable const&, auto const&) noexcept {
+            if (!alive.expired()) OnState(id, theme::Trigger::Hover, true);
+        });
+    }
+    auto leave = [this, alive, id, weak](bool exited) {
+        return [this, alive, id, weak, exited](IInspectable const&, xaml::Input::PointerRoutedEventArgs const& args) noexcept {
+            try {
+                if (alive.expired() || *m_closed) return;
+                bool watched = m_hover.WatchedByOthers(id, theme::Trigger::Hover);
+                if (!exited && !watched) return;  // the element's own :hover follows PointerExited only, as it always did
+                xaml::UIElement self = weak.get();
+                if (watched && self && PointerInside(self, args)) return;
+                OnState(id, theme::Trigger::Hover, false);
+            } catch (...) {
+            }
+        };
+    };
+    handlers.exited = element.PointerExited(leave(true));
+    handlers.lost = winrt::box_value(xaml::Input::PointerEventHandler(leave(false)));
+    for (const xaml::RoutedEvent& end : PointerLosses()) element.AddHandler(end, handlers.lost, true);
+}
+
+void XamlTreeBackend::StopFollowingPointer(const xaml::UIElement& element, HoverHandlers& handlers) {
+    element.PointerEntered(handlers.entered);
+    element.PointerExited(handlers.exited);
+    if (handlers.moved) element.RemoveHandler(xaml::UIElement::PointerMovedEvent(), handlers.moved);
+    if (handlers.lost) {
+        for (const xaml::RoutedEvent& end : PointerLosses()) element.RemoveHandler(end, handlers.lost);
+    }
+    handlers.moved = nullptr;
+    handlers.lost = nullptr;
+}
+
 void XamlTreeBackend::OnState(theme::NodeId id, theme::Trigger trigger, bool on) noexcept {
     try {
         if (*m_closed) return;
@@ -273,13 +342,9 @@ void XamlTreeBackend::OnFocusLost(theme::NodeId id) noexcept {
 void XamlTreeBackend::RemoveHoverHandlers(theme::NodeId id) {
     auto it = m_hoverHandlers.find(id);
     if (it == m_hoverHandlers.end()) return;
-    const HoverHandlers& handlers = it->second;
+    HoverHandlers& handlers = it->second;
     if (xaml::UIElement element = handlers.element.get()) {
-        if (handlers.hover) {
-            element.PointerEntered(handlers.entered);
-            element.PointerExited(handlers.exited);
-            if (handlers.moved) element.RemoveHandler(xaml::UIElement::PointerMovedEvent(), handlers.moved);
-        }
+        if (handlers.hover) StopFollowingPointer(element, handlers);
         if (handlers.active) {
             element.RemoveHandler(xaml::UIElement::PointerPressedEvent(), handlers.pressed);
             for (const xaml::RoutedEvent& end : PressEnds()) element.RemoveHandler(end, handlers.released);

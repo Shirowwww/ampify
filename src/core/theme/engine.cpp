@@ -34,6 +34,14 @@ std::string Describe(const NodeInfo& node) {
     return text;
 }
 
+// The ancestor a state value watches, for the log; a sibling (`A:hover + B`) is not looked for.
+std::string WatchedName(const NodeInfo& node, NodeId watch, const std::vector<NodeInfo>& nodes) {
+    for (int k = node.parent; k >= 0; k = nodes[k].parent) {
+        if (nodes[k].id == watch) return Describe(nodes[k]);
+    }
+    return "a sibling";
+}
+
 // The assignments grouped by the last compound of their selector (the element that receives them): by #name when it
 // has one, else by type, else in `any`. An element then only tries the groups of its own name and type, instead of
 // every rule of the theme: a pass over Apple Music's ~5000 elements stays short.
@@ -162,13 +170,15 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
             if (assignment.media && !assignment.media->MatchesScheme(darkScheme)) return;
             if (!Matches(assignment.selector, nodes, position)) return;
 
-            const Trigger trigger = assignment.selector.trigger;
-            if (assignment.selector.pseudo != PseudoElement::None) {
-                keep(decorWinners, std::make_pair(assignment.selector.pseudo, assignment.property), assignment);
-            } else if (trigger == Trigger::Always) {
+            const Selector& selector = assignment.selector;
+            if (selector.pseudo != PseudoElement::None) {
+                keep(decorWinners, std::make_pair(selector.pseudo, assignment.property), assignment);
+            } else if (selector.trigger == Trigger::Always) {
                 keep(winners, assignment.property, assignment);
             } else {
-                keep(stateWinners, std::make_pair(trigger, assignment.property), assignment);
+                const bool own = selector.statePart + 1 >= selector.parts.size();
+                const int watched = own ? -1 : MatchedElement(selector, nodes, position, selector.statePart);
+                keep(stateWinners, std::make_tuple(selector.trigger, assignment.property, watched), assignment);
             }
         });
 
@@ -195,14 +205,37 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
         }
         GiveBack(node, winners, tree, report);
         // An element that lost its state rules (a theme edited live) is visited too, to take its states off.
-        if (!stateWinners.empty() || m_hovers.count(node.id)) ApplyHover(node, stateWinners, tree, report);
+        if (!stateWinners.empty() || m_hovers.count(node.id)) ApplyHover(node, stateWinners, nodes, tree, report);
         if (!decorWinners.empty() || m_decors.count({node.id, PseudoElement::Before}) ||
             m_decors.count({node.id, PseudoElement::After})) {
             ApplyDecors(node, decorWinners, tree, report);
         }
     }
     ApplyMoves(pending, tree, report);
+    GiveBackReparents(reparents, nodes, tree, report);
     ApplyReparents(reparents, nodes, tree, report);
+}
+
+// Moves back each element of the snapshot that a `move-to` rule no longer moves: a setting changed, an @media stopped
+// matching, a rule edited out. The session goes over the same theme without a Restore then, so nothing else would.
+void ThemeEngine::GiveBackReparents(const std::vector<PendingMove>& pending, const std::vector<NodeInfo>& nodes,
+                                    TreeBackend& tree, Report& report) {
+    if (m_reparents.empty()) return;
+    std::set<NodeId> moving;
+    for (const PendingMove& move : pending) moving.insert(move.node->id);
+    std::map<NodeId, const NodeInfo*> listed;
+    for (const NodeInfo& node : nodes) listed.emplace(node.id, &node);
+    // In the order they were moved, as Restore does: the places are ascending.
+    for (auto it = m_reparents.begin(); it != m_reparents.end();) {
+        auto node = listed.find(it->id);
+        if (moving.count(it->id) || node == listed.end()) {
+            ++it;
+            continue;
+        }
+        if (tree.Reparent(it->id, it->parent, it->index)) report.applied++;
+        m_journal.Write("Moved back: " + Describe(*node->second));
+        it = m_reparents.erase(it);
+    }
 }
 
 // The ::before and ::after images of one element: put in or kept when a `content` image wins, taken off when none does
@@ -285,12 +318,14 @@ void ThemeEngine::GiveBack(const NodeInfo& node, const std::map<std::string, con
     }
 }
 
-// Gives the backend the state values of one element when they differ from the ones it holds. A property the element
-// does not have is refused here, as a plain value would be. No value left takes the states off.
-void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, TreeBackend& tree, Report& report) {
-    std::vector<HoverValue> values;
+// The state values of one element, in the order of the cascade among the values of one state and property, so the
+// backend shows the winner when several watched elements are in that state. A property the element does not have is
+// refused here, as a plain value would be.
+std::vector<HoverValue> ThemeEngine::StateValues(const NodeInfo& node, const StateWinners& winners,
+                                                 const std::vector<NodeInfo>& nodes, TreeBackend& tree, Report& report) {
+    std::vector<std::pair<HoverValue, const Assignment*>> ranked;
     for (const auto& [key, assignment] : winners) {
-        const auto& [trigger, property] = key;
+        const auto& [trigger, property, watched] = key;
         std::optional<Value> current = tree.Read(node.id, property);
         if (!current) {
             if (tree.Alive(node.id)) {
@@ -307,9 +342,24 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, 
                    report);
             continue;
         }
-        values.push_back({property, *value, trigger});
+        const NodeId watch = watched < 0 ? 0 : nodes[watched].id;
+        ranked.push_back({HoverValue{property, *value, trigger, watch}, assignment});
     }
+    std::stable_sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) {
+        if (a.first.trigger != b.first.trigger) return a.first.trigger < b.first.trigger;
+        if (a.first.property != b.first.property) return a.first.property < b.first.property;
+        return Beats(*a.second, *b.second);
+    });
+    std::vector<HoverValue> values;
+    for (auto& entry : ranked) values.push_back(std::move(entry.first));
+    return values;
+}
 
+// Gives the backend the state values of one element when they differ from the ones it holds. No value left takes the
+// states off.
+void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, const std::vector<NodeInfo>& nodes,
+                             TreeBackend& tree, Report& report) {
+    std::vector<HoverValue> values = StateValues(node, winners, nodes, tree, report);
     auto known = m_hovers.find(node.id);
     if (known != m_hovers.end() && known->second == values) {
         report.unchanged += static_cast<int>(values.size());
@@ -331,7 +381,11 @@ void ThemeEngine::ApplyHover(const NodeInfo& node, const StateWinners& winners, 
     std::string list;
     for (const HoverValue& value : values) {
         list += (list.empty() ? "" : ", ") + value.property + " = " + ShownText(value.property, value.value);
-        if (value.trigger != Trigger::Hover) list += std::string(" (") + TriggerName(value.trigger) + ")";
+        if (value.watch != 0) {
+            list += std::string(" (") + TriggerName(value.trigger) + " of " + WatchedName(node, value.watch, nodes) + ")";
+        } else if (value.trigger != Trigger::Hover) {
+            list += std::string(" (") + TriggerName(value.trigger) + ")";
+        }
     }
     if (m_detailed) m_journal.Write("Hover: " + Describe(node) + " " + list);
     m_hovers[node.id] = std::move(values);

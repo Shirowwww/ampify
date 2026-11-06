@@ -23,6 +23,11 @@ Specificity SpecificityOf(const Selector& selector);
 // True when the element at `index` of `nodes` matches the selector. Combinators look at the visual parents.
 bool Matches(const Selector& selector, const std::vector<NodeInfo>& nodes, int index);
 
+// The index in `nodes` of the element that matched the compound `part` of the selector, when the element at `index`
+// matches it (`part` of the last compound gives `index`); the nearest one when several would do. -1 when the selector
+// does not match.
+int MatchedElement(const Selector& selector, const std::vector<NodeInfo>& nodes, int index, size_t part);
+
 // Sets NodeInfo::playing on the list row (ListViewItemPresenter or GridViewItemPresenter) that holds each of `bars`, the
 // indexes of Apple's visible "now playing" bars, and on every element between the row and the bars. Bars outside a
 // list row mark nothing, so `:playing` never reaches a page.

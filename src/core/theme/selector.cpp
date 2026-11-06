@@ -32,31 +32,48 @@ int PreviousSibling(const std::vector<NodeInfo>& nodes, int index) {
     return -1;
 }
 
-// `part` is the index of the compound to match against `nodes[index]`. The compounds before it must match
-// the ancestors or the earlier siblings, as their combinators say. Descendant and sibling combinators backtrack.
-bool MatchFrom(const std::vector<Compound>& parts, size_t part, const std::vector<NodeInfo>& nodes, int index) {
-    if (!CompoundMatches(parts[part], nodes[index])) return false;
-    if (part == 0) return true;
+// Where a match is going and what it records: the element that matched the compound `wanted`, written to `found`.
+struct Match {
+    const std::vector<Compound>& parts;
+    const std::vector<NodeInfo>& nodes;
+    size_t wanted = static_cast<size_t>(-1);
+    int found = -1;
+};
 
-    const Combinator combinator = parts[part].combinator;
+bool MatchFrom(Match& match, size_t part, int index);
+
+// The compounds before `part` against the ancestors or the earlier siblings of `nodes[index]`, as the combinator of
+// `part` says. Descendant and sibling combinators backtrack.
+bool MatchBefore(Match& match, size_t part, int index) {
+    const std::vector<NodeInfo>& nodes = match.nodes;
+    const Combinator combinator = match.parts[part].combinator;
     if (combinator == Combinator::Child) {
         int parent = nodes[index].parent;
-        return parent >= 0 && MatchFrom(parts, part - 1, nodes, parent);
+        return parent >= 0 && MatchFrom(match, part - 1, parent);
     }
     if (combinator == Combinator::Adjacent) {
         int previous = PreviousSibling(nodes, index);
-        return previous >= 0 && MatchFrom(parts, part - 1, nodes, previous);
+        return previous >= 0 && MatchFrom(match, part - 1, previous);
     }
     if (combinator == Combinator::Sibling) {
         for (int previous = PreviousSibling(nodes, index); previous >= 0; previous = PreviousSibling(nodes, previous)) {
-            if (MatchFrom(parts, part - 1, nodes, previous)) return true;
+            if (MatchFrom(match, part - 1, previous)) return true;
         }
         return false;
     }
     for (int ancestor = nodes[index].parent; ancestor >= 0; ancestor = nodes[ancestor].parent) {
-        if (MatchFrom(parts, part - 1, nodes, ancestor)) return true;
+        if (MatchFrom(match, part - 1, ancestor)) return true;
     }
     return false;
+}
+
+// `part` is the index of the compound to match against `nodes[index]`. Every caller stops at the first success, so the
+// element recorded for `wanted` belongs to the match that is kept: the nearest one.
+bool MatchFrom(Match& match, size_t part, int index) {
+    if (!CompoundMatches(match.parts[part], match.nodes[index])) return false;
+    if (part > 0 && !MatchBefore(match, part, index)) return false;
+    if (part == match.wanted) match.found = index;
+    return true;
 }
 
 // As in CSS, :not(x) counts what x counts; the :except(x) of a built-in name counts nothing.
@@ -93,9 +110,16 @@ bool NamesAPlayer(const Selector& selector) {
 }
 
 bool Matches(const Selector& selector, const std::vector<NodeInfo>& nodes, int index) {
-    if (selector.parts.empty() || index < 0 || index >= static_cast<int>(nodes.size())) return false;
-    if (nodes[index].player && !NamesAPlayer(selector)) return false;
-    return MatchFrom(selector.parts, selector.parts.size() - 1, nodes, index);
+    if (selector.parts.empty()) return false;
+    return MatchedElement(selector, nodes, index, selector.parts.size() - 1) >= 0;
+}
+
+int MatchedElement(const Selector& selector, const std::vector<NodeInfo>& nodes, int index, size_t part) {
+    if (selector.parts.empty() || part >= selector.parts.size()) return -1;
+    if (index < 0 || index >= static_cast<int>(nodes.size())) return -1;
+    if (nodes[index].player && !NamesAPlayer(selector)) return -1;
+    Match match{selector.parts, nodes, part};
+    return MatchFrom(match, selector.parts.size() - 1, index) ? match.found : -1;
 }
 
 void MarkPlayingRows(std::vector<NodeInfo>& nodes, const std::vector<int>& bars) {

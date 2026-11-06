@@ -110,12 +110,13 @@ public:
 
     // The children keep the order of the list, so a moved element is listed where it was: the index is not kept.
     bool Reparent(th::NodeId id, th::NodeId parent, int index) override {
-        (void)index;
         Element* element = Find(id);
         if (!element || !Find(parent)) return false;
         element->info.parent = static_cast<int>(parent) - 1;
+        reparented.emplace_back(id, parent, index);
         return true;
     }
+    std::vector<std::tuple<th::NodeId, th::NodeId, int>> reparented;  // each move made: element, parent, index
 
     std::vector<th::NodeInfo> Snapshot() override {
         std::vector<int> position(elements.size(), -1);
@@ -173,20 +174,27 @@ public:
         return true;
     }
 
+    // The backend follows an element with values of its own, and one that another element's values watch.
     void PointerEnter(th::NodeId id) {
-        if (followed.count(id)) hover.Enter(id, *this);
+        if (followed.count(id) || hover.Uses(id, th::Trigger::Hover)) hover.Enter(id, *this);
     }
 
     void PointerExit(th::NodeId id) {
-        if (followed.count(id)) hover.Exit(id, *this);
+        if (followed.count(id) || hover.Uses(id, th::Trigger::Hover)) hover.Exit(id, *this);
     }
 
     void Press(th::NodeId id, bool pressed) {
-        if (followed.count(id)) hover.Toggle(id, th::Trigger::Active, pressed, *this);
+        if (followed.count(id) || hover.Uses(id, th::Trigger::Active)) hover.Toggle(id, th::Trigger::Active, pressed, *this);
     }
 
     void Focus(th::NodeId id, bool focused) {
-        if (followed.count(id)) hover.Toggle(id, th::Trigger::Focus, focused, *this);
+        if (followed.count(id) || hover.Uses(id, th::Trigger::Focus)) hover.Toggle(id, th::Trigger::Focus, focused, *this);
+    }
+
+    // The element is destroyed, as the backend sees it when its weak reference no longer resolves.
+    void Destroy(th::NodeId id) {
+        Remove(id);
+        hover.Forget(id, *this);
     }
 
     // The value the element shows, whatever the hover.
@@ -890,8 +898,8 @@ TEST_CASE(Selector_RejectsWhatItDoesNotKnow) {
     CHECK(problem.find("is not supported") != std::string::npos);
     CHECK(!th::ParseSelector("Grid:checked", &problem));
     CHECK(problem.find(":checked") != std::string::npos);
-    CHECK(!th::ParseSelector("Grid:hover > TextBlock", &problem));
-    CHECK(problem.find("last element") != std::string::npos);
+    CHECK(!th::ParseSelector("Grid:hover:focus > TextBlock", &problem));
+    CHECK(problem.find("only one of") != std::string::npos);
     CHECK(!th::ParseSelector("TextBlock >", &problem));
     CHECK(!th::ParseSelector("# ", &problem));
 }
@@ -2710,6 +2718,70 @@ TEST_CASE(Engine_MovesAnElementIntoAnotherContainerAndUndoesIt) {
     CHECK(engine.OriginalCount() == 0);
 }
 
+namespace {
+
+// TransportBar > Controls, and LCD > Time, LCDScrubber: the scrubber is the second child of LCD.
+FakeTree MakeTransportBar() {
+    FakeTree tree;
+    tree.Add(-1, "Grid", "TransportBar");                // id 1
+    tree.Add(0, "Grid", "Controls");                     // id 2
+    tree.Add(0, "Grid", "LCD");                          // id 3
+    tree.Add(2, "TextBlock", "Time");                    // id 4
+    tree.Add(2, "ScrubberControl", "LCDScrubber");       // id 5
+    return tree;
+}
+
+}  // namespace
+
+TEST_CASE(Engine_GivesBackAMovedElementWhenItsRuleGoesWithoutARestore) {
+    FakeTree tree = MakeTransportBar();
+    MemoryFiles moved;
+    moved.files["user.css"] = "ScrubberControl#LCDScrubber { move-to: \"Grid#Controls\"; }\n";
+    MemoryFiles notMoved;
+    notMoved.files["user.css"] = "TextBlock#Time { opacity: 0.5; }\n";
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    engine.Apply(Load(moved), tree);
+    CHECK(tree.elements[4].info.parent == 1);  // in Controls
+
+    // Another value of a setting of the same theme: the session goes over it without a Restore.
+    engine.Rearm();
+    engine.Apply(Load(notMoved), tree);
+
+    CHECK(tree.elements[4].info.parent == 2);  // back in LCD
+    CHECK(!tree.reparented.empty() && tree.reparented.back() == std::make_tuple(th::NodeId{5}, th::NodeId{3}, 1));
+    CHECK(log.str().find("Moved back: ScrubberControl#LCDScrubber") != std::string::npos);
+    engine.Restore(tree);
+    CHECK(tree.elements[4].info.parent == 2);  // nothing left to undo
+}
+
+TEST_CASE(Engine_GivesBackAMovedElementWhenItsMediaStopsMatching) {
+    FakeTree tree = MakeTransportBar();
+    tree.size = th::ViewSize{800, 600};
+    MemoryFiles files;
+    files.files["user.css"] =
+        "@media (max-width: 1000px) { ScrubberControl#LCDScrubber { move-to: \"Grid#Controls\"; } }\n";
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    engine.Apply(theme, tree);
+    CHECK(tree.elements[4].info.parent == 1);
+
+    tree.size = th::ViewSize{1200, 600};
+    engine.Apply(theme, tree);
+
+    CHECK(tree.elements[4].info.parent == 2);
+    CHECK(!tree.reparented.empty() && tree.reparented.back() == std::make_tuple(th::NodeId{5}, th::NodeId{3}, 1));
+    CHECK(engine.OriginalCount() == 0);
+
+    tree.size = th::ViewSize{800, 600};  // narrow again: it moves again
+    engine.Apply(theme, tree);
+    CHECK(tree.elements[4].info.parent == 1);
+}
+
 TEST_CASE(Engine_RefusesAMoveWhoseTargetIsMissing) {
     FakeTree tree;
     tree.Add(-1, "Grid", "LCD");
@@ -3828,23 +3900,26 @@ TEST_CASE(Css_HoverOnTheLastPartOnly) {
     CHECK(theme.assignments.size() == 3);  // order and opacity for Button, opacity only for Button:hover
 }
 
-TEST_CASE(Css_ActiveAndFocusOnTheLastPartOnly) {
+TEST_CASE(Css_ActiveAndFocusGoOnAnyPart) {
     std::string problem;
     std::optional<th::Selector> active = th::ParseSelector("Grid#TransportBar Button:active", &problem);
     CHECK(active.has_value() && active->trigger == th::Trigger::Active && active->parts.size() == 2);
+    CHECK(active.has_value() && active->statePart == 1);
     std::optional<th::Selector> focus = th::ParseSelector("AutoSuggestBox:focus", &problem);
     CHECK(focus.has_value() && focus->trigger == th::Trigger::Focus);
     std::optional<th::Selector> within = th::ParseSelector("AutoSuggestBox:FOCUS-WITHIN", &problem);
     CHECK(within.has_value() && within->trigger == th::Trigger::Focus);
     std::optional<th::Selector> counted = th::ParseSelector("Button:active:nth-child(2)", &problem);
     CHECK(counted.has_value() && counted->trigger == th::Trigger::Active && counted->parts[0].nth == 2);
-    CHECK(!th::ParseSelector("Button:active > Grid", &problem));
-    CHECK(problem.find("last element") != std::string::npos);
-    // A structural pseudo-class after the state does not make the part the last one.
-    CHECK(!th::ParseSelector("Button:hover:first-child Grid", &problem));
-    CHECK(problem.find("last element") != std::string::npos);
-    CHECK(!th::ParseSelector("Button:focus:nth-child(2) > Grid", &problem));
-    CHECK(problem.find("last element") != std::string::npos);
+    std::optional<th::Selector> pressedRow = th::ParseSelector("Button:active > Grid", &problem);
+    CHECK(pressedRow.has_value() && pressedRow->trigger == th::Trigger::Active && pressedRow->statePart == 0);
+    // A structural pseudo-class after the state stays on the same part.
+    std::optional<th::Selector> first = th::ParseSelector("Button:hover:first-child Grid", &problem);
+    CHECK(first.has_value() && first->statePart == 0 && first->parts[0].nth == 1);
+    std::optional<th::Selector> focused = th::ParseSelector("Button:focus:nth-child(2) > Grid", &problem);
+    CHECK(focused.has_value() && focused->trigger == th::Trigger::Focus && focused->statePart == 0);
+    CHECK(!th::ParseSelector("Button:hover Grid:active", &problem));
+    CHECK(problem.find("only one of") != std::string::npos);
     CHECK(!th::ParseSelector("Button:hover:active", &problem));
     CHECK(problem.find("only one of") != std::string::npos);
 
@@ -4045,14 +4120,14 @@ TEST_CASE(Hover_PressAndFocusShowOverTheHoverInOrder) {
     CHECK(states.ValueOf(7, "Background") == Brush("#FF222222"));
 }
 
-TEST_CASE(Css_CurrentIsAStateOfTheLastPart) {
+TEST_CASE(Css_CurrentIsAStateOfAnyPart) {
     std::string problem;
     std::optional<th::Selector> line = th::ParseSelector("KaraokeLyricsLine:current", &problem);
     CHECK(line.has_value() && line->trigger == th::Trigger::Current);
     std::optional<th::Selector> words = th::ParseSelector("KaraokeLyricsLine TextBlock#LineContainer:CURRENT", &problem);
     CHECK(words.has_value() && words->trigger == th::Trigger::Current && words->parts.size() == 2);
-    CHECK(!th::ParseSelector("KaraokeLyricsLine:current TextBlock", &problem));
-    CHECK(problem.find("last element") != std::string::npos);
+    std::optional<th::Selector> inside = th::ParseSelector("KaraokeLyricsLine:current TextBlock", &problem);
+    CHECK(inside.has_value() && inside->trigger == th::Trigger::Current && inside->statePart == 0);
     CHECK(std::string(th::TriggerName(th::Trigger::Current)) == ":current");
 
     th::Stylesheet sheet = th::ParseStylesheet(".lyrics-words:current { color: #FFFFFFFF }\n");
@@ -4087,6 +4162,228 @@ TEST_CASE(Hover_CurrentShowsUnderThePointerStates) {
     CHECK(element.values["Background"] == Brush("#FF333333"));
     states.Toggle(4, th::Trigger::Current, false, element);
     CHECK(element.values["Background"] == Brush("#FF111111"));
+}
+
+TEST_CASE(Css_StateOnAnAncestorRecordsThePartItSitsOn) {
+    std::string problem;
+    std::optional<th::Selector> row = th::ParseSelector("Grid#Row:hover > Button#Favorite", &problem);
+    CHECK(row.has_value() && row->trigger == th::Trigger::Hover && row->statePart == 0 && row->parts.size() == 2);
+    std::optional<th::Selector> own = th::ParseSelector("Grid#Row Button:hover", &problem);
+    CHECK(own.has_value() && own->statePart == 1);
+    CHECK(!th::ParseSelector("Grid:hover Button::after", &problem));
+    CHECK(problem.find("decorative image") != std::string::npos);
+
+    th::Stylesheet sheet = th::ParseStylesheet(".track-row:hover .favorite-button { opacity: 1 }\n");
+    CHECK(sheet.problems.empty());
+    CHECK(sheet.rules.size() == 1 && !sheet.rules[0].selectors.empty());
+    for (const th::Selector& selector : sheet.rules.empty() ? std::vector<th::Selector>{} : sheet.rules[0].selectors) {
+        CHECK(selector.trigger == th::Trigger::Hover);
+        CHECK(selector.statePart + 1 < selector.parts.size());
+        CHECK(selector.parts[selector.statePart].type == "TracklistGrid");
+        CHECK(selector.parts.back().name == "FavoriteButton");
+    }
+}
+
+TEST_CASE(Selector_MatchedElementGivesTheNearestElementOfThePart) {
+    FakeTree tree;
+    tree.Add(-1, "Page", "");
+    tree.Add(0, "Grid", "Row");
+    tree.Add(1, "Grid", "Row");
+    tree.Add(2, "Button", "Favorite");
+    std::vector<th::NodeInfo> nodes = tree.Snapshot();
+
+    th::Selector descendant = Sel("Grid#Row:hover Button");
+    th::Selector child = Sel("Page:hover > Grid > Grid > Button");
+
+    CHECK(th::MatchedElement(descendant, nodes, 3, 0) == 2);  // the nearer of the two rows
+    CHECK(th::MatchedElement(descendant, nodes, 3, 1) == 3);
+    CHECK(th::MatchedElement(child, nodes, 3, 0) == 0);
+    CHECK(th::MatchedElement(descendant, nodes, 1, 0) == -1);  // a row is not a Button
+    CHECK(th::MatchedElement(descendant, nodes, 3, 5) == -1);
+}
+
+namespace {
+
+// Page > Grid#Row > Button#Favorite, a song's row and one of its buttons.
+FakeTree MakeSongRow() {
+    FakeTree tree;
+    tree.Add(-1, "Page", "");
+    tree.Add(0, "Grid", "Row", {{"Background", Brush("#FF000000")}});
+    tree.Add(1, "Button", "Favorite", {{"Opacity", {th::ValueKind::Number, "1"}}});
+    return tree;
+}
+
+constexpr const char* kRowActionsCss =
+    "Grid#Row Button { opacity: 0.2; }\n"
+    "Grid#Row:hover Button { opacity: 0.9; }\n";
+
+}  // namespace
+
+TEST_CASE(Engine_AncestorHoverShowsOnTheElementWhileThePointerIsOverTheAncestor) {
+    MemoryFiles files;
+    files.files["user.css"] = kRowActionsCss;
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+    FakeTree tree = MakeSongRow();
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(3, "Opacity").text == "0.2");
+    CHECK(log.str().find("Opacity = 0.9 (:hover of Grid#Row)") != std::string::npos);
+
+    tree.PointerEnter(2);
+    CHECK(tree.Shown(3, "Opacity").text == "0.9");
+    tree.PointerEnter(3);  // over the button itself, still over the row
+    tree.PointerExit(3);
+    CHECK(tree.Shown(3, "Opacity").text == "0.9");
+
+    // The next tick, under the pointer: the engine sees its own values and leaves the state alone.
+    th::ThemeEngine::Report second = engine.Apply(theme, tree);
+    CHECK(second.applied == 0);
+    CHECK(tree.Shown(3, "Opacity").text == "0.9");
+
+    tree.PointerExit(2);
+    CHECK(tree.Shown(3, "Opacity").text == "0.2");
+}
+
+TEST_CASE(Engine_AncestorHoverGivesTheOriginalBackWhenTheThemeComesOffUnderThePointer) {
+    MemoryFiles files;
+    files.files["user.css"] = kRowActionsCss;
+    th::Theme theme = Load(files);
+    FakeTree tree = MakeSongRow();
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    engine.Apply(theme, tree);
+    tree.PointerEnter(2);
+
+    engine.Restore(tree);
+
+    CHECK(engine.OriginalCount() == 0);
+    CHECK(tree.Shown(3, "Opacity").text == "1");
+    tree.PointerExit(2);
+    tree.PointerEnter(2);  // nothing follows the row any more
+    CHECK(tree.Shown(3, "Opacity").text == "1");
+}
+
+TEST_CASE(Engine_AncestorHoverComesOffWithItsRule) {
+    MemoryFiles withHover;
+    withHover.files["user.css"] = kRowActionsCss;
+    MemoryFiles withoutHover;
+    withoutHover.files["user.css"] = "Grid#Row Button { opacity: 0.2; }\n";
+    FakeTree tree = MakeSongRow();
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    engine.Apply(Load(withHover), tree);
+    tree.PointerEnter(2);
+
+    engine.Apply(Load(withoutHover), tree);
+
+    CHECK(tree.Shown(3, "Opacity").text == "0.2");
+    tree.PointerExit(2);
+    tree.PointerEnter(2);
+    CHECK(tree.Shown(3, "Opacity").text == "0.2");
+}
+
+TEST_CASE(Engine_AncestorHoverFollowsTheRowTheElementSitsIn) {
+    MemoryFiles files;
+    files.files["user.css"] = kRowActionsCss;
+    th::Theme theme = Load(files);
+    FakeTree tree;
+    tree.Add(-1, "Page", "");
+    tree.Add(0, "Grid", "Row");  // id 2
+    tree.Add(0, "Grid", "Row");  // id 3
+    tree.Add(1, "Button", "", {{"Opacity", {th::ValueKind::Number, "1"}}});  // id 4, in the first row
+    tree.Add(2, "Button", "", {{"Opacity", {th::ValueKind::Number, "1"}}});  // id 5, in the second row
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    engine.Apply(theme, tree);
+
+    tree.PointerEnter(2);
+    CHECK(tree.Shown(4, "Opacity").text == "0.9");
+    CHECK(tree.Shown(5, "Opacity").text == "0.2");
+
+    // A recycled list puts the button in the other row while the pointer is over the first one.
+    tree.Reparent(4, 3, -1);
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(4, "Opacity").text == "0.2");
+
+    tree.PointerExit(2);
+    tree.PointerEnter(3);
+    CHECK(tree.Shown(4, "Opacity").text == "0.9");
+    CHECK(tree.Shown(5, "Opacity").text == "0.9");
+    tree.PointerExit(3);
+    CHECK(tree.Shown(4, "Opacity").text == "0.2");
+    CHECK(tree.Shown(5, "Opacity").text == "0.2");
+}
+
+TEST_CASE(Engine_OwnAndAncestorHoverFollowTheCascade) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "Grid:hover Button { opacity: 0.9; }\n"
+        "Button#Favorite:hover { opacity: 0.5; }\n";  // more specific: wins while both are under the pointer
+    th::Theme theme = Load(files);
+    FakeTree tree = MakeSongRow();
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+    engine.Apply(theme, tree);
+
+    tree.PointerEnter(2);
+    CHECK(tree.Shown(3, "Opacity").text == "0.9");
+    tree.PointerEnter(3);
+    CHECK(tree.Shown(3, "Opacity").text == "0.5");
+    tree.PointerExit(3);
+    CHECK(tree.Shown(3, "Opacity").text == "0.9");
+    tree.PointerExit(2);
+    CHECK(tree.Shown(3, "Opacity").text == "1");
+}
+
+TEST_CASE(Hover_AncestorStateShowsOnEveryElementThatWatchesIt) {
+    struct Elements final : th::HoverTracker::Access {
+        std::map<th::NodeId, std::map<std::string, th::Value, std::less<>>> values;
+        std::optional<th::Value> ReadRaw(th::NodeId id, std::string_view property) override {
+            auto it = values[id].find(property);
+            if (it == values[id].end()) return std::nullopt;
+            return it->second;
+        }
+        bool WriteRaw(th::NodeId id, std::string_view property, const th::Value& value) override {
+            auto it = values[id].find(property);
+            if (it == values[id].end()) return false;
+            it->second = value;
+            return true;
+        }
+    } elements;
+    const th::Value rest{th::ValueKind::Number, "0.2"};
+    const th::Value lit{th::ValueKind::Number, "0.9"};
+    for (th::NodeId id : {5, 6, 7}) elements.values[id]["Opacity"] = rest;
+    const std::vector<th::HoverValue> watchRow{{"Opacity", lit, th::Trigger::Hover, 9}};
+    th::HoverTracker states;
+    states.Set(5, watchRow, elements);
+    states.Set(6, watchRow, elements);
+
+    CHECK(states.Uses(9, th::Trigger::Hover) && states.WatchedByOthers(9, th::Trigger::Hover));
+    CHECK(!states.Uses(5, th::Trigger::Hover));
+    CHECK(states.WatchedBy(5) == std::vector<th::NodeId>{9});
+    CHECK(!states.ValueOf(5, "Opacity"));  // not a value of the element's own states
+
+    states.Enter(9, elements);
+    CHECK(elements.values[5]["Opacity"] == lit && elements.values[6]["Opacity"] == lit);
+    states.Set(7, watchRow, elements);  // a button the row shows once the pointer is already over it
+    CHECK(elements.values[7]["Opacity"] == lit);
+
+    states.Forget(9, elements);  // the row is gone: its buttons put back what was underneath
+    CHECK(elements.values[5]["Opacity"] == rest && elements.values[6]["Opacity"] == rest);
+    CHECK(elements.values[7]["Opacity"] == rest);
+
+    states.Enter(9, elements);
+    for (th::NodeId id : {5, 6, 7}) states.Set(id, {}, elements);
+    states.Set(5, watchRow, elements);  // no element watched the row in between: it starts outside the state
+    CHECK(elements.values[5]["Opacity"] == rest);
 }
 
 TEST_CASE(Engine_HoverFollowsThemeChangesWithoutLeaking) {

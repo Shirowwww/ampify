@@ -4,6 +4,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -25,7 +26,8 @@ namespace ampify::theme {
 // and Restore undoes them in the reverse order.
 //
 // The :hover rules make a cascade of their own. Their winners go to the backend (TreeBackend::SetHover), which shows
-// them while the pointer is over the element; the engine remembers what it gave, so it calls the backend only when
+// them while the pointer is over the element, or over the element a value watches (`Grid#Row:hover Button`: the row
+// that holds the button, found again on every pass); the engine remembers what it gave, so it calls the backend only when
 // that changes, and takes every hover off in Restore (the backend then stops following the pointer).
 //
 // The ::before and ::after rules make a decorative image per panel (TreeBackend::SetDecor). The engine asks for it on
@@ -84,12 +86,18 @@ private:
     };
     void ApplyReparents(const std::vector<PendingMove>& pending, const std::vector<NodeInfo>& nodes, TreeBackend& tree,
                         Report& report);
+    void GiveBackReparents(const std::vector<PendingMove>& pending, const std::vector<NodeInfo>& nodes,
+                           TreeBackend& tree, Report& report);
     bool WriteValue(const NodeInfo& node, const Assignment& assignment, TreeBackend& tree, Report& report, bool keep);
     std::optional<Value> Resolve(NodeId id, const std::string& property, const Value& value, const Value& current,
                                  TreeBackend& tree);
-    // The winning declaration of each state and property of an element (:hover, :focus, :active).
-    using StateWinners = std::map<std::pair<Trigger, std::string>, const Assignment*>;
-    void ApplyHover(const NodeInfo& node, const StateWinners& winners, TreeBackend& tree, Report& report);
+    // The winning declaration of each state, property and watched element of an element (:hover, :focus, :active).
+    // The watched element is an index in the snapshot, -1 for the element itself (HoverValue::watch).
+    using StateWinners = std::map<std::tuple<Trigger, std::string, int>, const Assignment*>;
+    void ApplyHover(const NodeInfo& node, const StateWinners& winners, const std::vector<NodeInfo>& nodes,
+                    TreeBackend& tree, Report& report);
+    std::vector<HoverValue> StateValues(const NodeInfo& node, const StateWinners& winners,
+                                        const std::vector<NodeInfo>& nodes, TreeBackend& tree, Report& report);
     void GiveBack(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners, TreeBackend& tree,
                   Report& report);
     // The winning declaration of each ::before and ::after property of an element.

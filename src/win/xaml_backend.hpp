@@ -174,6 +174,12 @@ private:
     void OnSizeChanged() noexcept;
     void RemoveHoverHandlers(theme::NodeId id);
     bool FollowHover(theme::NodeId id, const std::vector<theme::HoverValue>& values);  // SetHover, unguarded
+    // Follows the states some value shows in, the element's own or those of the elements that watch it (a song's row
+    // for `Grid#Row:hover Button`), and stops following the element once none does.
+    void Refollow(theme::NodeId id);
+    struct HoverHandlers;
+    void FollowPointer(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element, HoverHandlers& handlers);
+    static void StopFollowingPointer(const winrt::Microsoft::UI::Xaml::UIElement& element, HoverHandlers& handlers);
     // The PointerOver and Pressed states of a control template write some properties of its parts above any local
     // value: a theme's background on a button's Root vanished under the pointer and while pressed (greenroom's white
     // play button showed its black icon on black). The brushes those states read ({Control}{Property}PointerOver and
@@ -231,6 +237,7 @@ private:
         winrt::event_token entered;
         winrt::event_token exited;
         winrt::Windows::Foundation::IInspectable moved{nullptr};  // a navigation entry's: off over its sub-entries
+        winrt::Windows::Foundation::IInspectable lost{nullptr};   // PointerCanceled, PointerCaptureLost
         bool active = false;  // added with handledEventsToo: a button marks its pointer events handled
         winrt::Windows::Foundation::IInspectable pressed{nullptr};
         winrt::Windows::Foundation::IInspectable released{nullptr};

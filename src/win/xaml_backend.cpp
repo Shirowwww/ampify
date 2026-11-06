@@ -580,7 +580,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
             ++it;
             continue;
         }
-        m_hover.Forget(it->first);
+        m_hover.Forget(it->first, *this);
         it = m_hoverHandlers.erase(it);
     }
     m_animations.Sweep();

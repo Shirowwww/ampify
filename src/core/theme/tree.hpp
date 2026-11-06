@@ -130,11 +130,14 @@ struct ViewSize {
     bool sidebarFolded = false;  // Ampify keeps the sidebar folded at every width (MediaQuery::kSidebarFoldsAt)
 };
 
-// One value of a :hover, :focus or :active rule: shown while the element is in that state.
+// One value of a :hover, :focus or :active rule: shown while the element, or the one it watches, is in that state.
 struct HoverValue {
     std::string property;  // XAML name, as for Read and Write
     Value value;
     Trigger trigger = Trigger::Hover;  // the state that shows it: :hover, :focus or :active
+    // The element whose state shows it, for a state written on an earlier part (`Grid#Row:hover Button`): that row. 0
+    // for the element itself.
+    NodeId watch = 0;
 
     bool operator==(const HoverValue&) const = default;
 };
@@ -187,8 +190,8 @@ public:
     virtual bool SetDictionary(std::string_view xaml) = 0;
 
     // The values to show while the element is in a state (the pointer over it, the focus in it, pressed), in place of
-    // the ones given before. The backend follows those states itself (once per element) and puts back what was there
-    // when the element leaves them; meanwhile, Read and Write of a changed property see and change the value
+    // the ones given before. The backend follows those states itself (once per element), on the element or on the one
+    // a value watches (HoverValue::watch), and puts back what was there when it leaves them; meanwhile, Read and Write of a changed property see and change the value
     // underneath, so the engine never notices. An empty list takes the states off: the values underneath come back and
     // the backend stops following the element. False when the element is gone or cannot follow its states.
     // HoverTracker (hover.hpp) holds the logic a backend needs.

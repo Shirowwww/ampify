@@ -170,9 +170,9 @@ std::optional<std::string> ReadStructural(const std::string& pseudo, std::string
     return std::string();
 }
 
-// One pseudo-class or pseudo-element from the colon at `i`; moves `i` past it. The structural ones go on any part, one
-// state (:hover, :focus, :active) only on the last part (the backend follows the state of the element it styles), and
-// ::before or ::after ends the selector. The reason when it cannot be read.
+// One pseudo-class or pseudo-element from the colon at `i`; moves `i` past it. The structural ones and one state
+// (:hover, :focus, :active, :current) go on any part, and ::before or ::after ends the selector. The reason when it
+// cannot be read.
 std::optional<std::string> ReadPseudo(std::string_view s, size_t& i, Compound& compound, Selector& selector) {
     const bool element = i + 1 < s.size() && s[i + 1] == ':';
     size_t start = i + (element ? 2 : 1);
@@ -205,6 +205,7 @@ std::optional<std::string> ReadPseudo(std::string_view s, size_t& i, Compound& c
             return "only one of :hover, :focus and :active is allowed in \"" + selector.text + "\"";
         }
         selector.trigger = *state;
+        selector.statePart = selector.parts.size();  // the part being read, pushed once it is complete
         return std::nullopt;
     }
     return "pseudo-class \":" + written + "\" is not supported in \"" + selector.text +
@@ -605,13 +606,8 @@ std::optional<Selector> ParseSelector(std::string_view text, std::string* proble
             continue;
         }
 
-        // A state belongs to the element that receives the declarations: no part may follow it.
         if (selector.pseudo != PseudoElement::None) {
             return fail("\"" + std::string(PseudoElementName(selector.pseudo)) + "\" must end the selector \"" +
-                        selector.text + "\"");
-        }
-        if (selector.trigger != Trigger::Always) {
-            return fail("\"" + std::string(TriggerName(selector.trigger)) + "\" is only allowed on the last element of \"" +
                         selector.text + "\"");
         }
 

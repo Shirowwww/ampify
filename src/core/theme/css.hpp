@@ -16,8 +16,9 @@ namespace ampify::theme {
 //   A + B, A ~ B    a B right after an A among the children of one parent, or anywhere after it
 // Parts can be combined: `Grid#Bar > TextBlock`. Structural pseudo-classes go on any part: :first-child, :last-child,
 // :only-child, :nth-child(n), :nth-last-child(n), and :not(part) with one part made of a type, a #name and those.
-// A state goes on the last part only:
-//   Button:hover    a Button, while the pointer is over it (the values come back when it leaves)
+// One state per selector, on any part:
+//   Button:hover           a Button, while the pointer is over it (the values come back when it leaves)
+//   Grid#Row:hover Button  a Button inside Grid#Row, while the pointer is over that Grid#Row
 // `Grid#Bar::after` (or `::before`, or the older `:after`) ends a selector: see PseudoElement.
 // Attributes and the other pseudo-classes are not supported.
 //
@@ -84,7 +85,8 @@ struct Compound {
     Combinator combinator = Combinator::Descendant;  // relation to the compound before it; unused for the first
 };
 
-// When the declarations of a rule show: always, or while the element that receives them is in a state.
+// When the declarations of a rule show: always, or while an element of the selector is in a state: the one that
+// receives them, or the one that matched the part the state is written on (Selector::statePart).
 enum class Trigger {
     Always,
     Hover,   // :hover, the pointer is over the element
@@ -110,7 +112,8 @@ const char* PseudoElementName(PseudoElement pseudo);
 struct Selector {
     std::vector<Compound> parts;  // left to right; the last part is the element that receives the declarations
     std::string text;             // as written, for the log
-    Trigger trigger = Trigger::Always;  // a state on the last part: the declarations apply while the element is in it
+    Trigger trigger = Trigger::Always;  // the declarations apply while the element of `statePart` is in that state
+    size_t statePart = 0;               // the index in `parts` of the part the state is written on
     PseudoElement pseudo = PseudoElement::None;  // the declarations go to the panel's decorative image
 };
 
