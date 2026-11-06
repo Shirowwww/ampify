@@ -482,7 +482,8 @@ Ampify.ready                                          // resolves once the eleme
 - State changes in one handler give one render. More than 50 renders in a row are stopped. An error in a later render
   is logged and the previous tree stays.
 - Targets: `"panel:<name>"`, `"page:/<path>"`, `"popup:<name>"` (or `"popup"`), `"fullscreen"`. A page mounts again at
-  each visit, so its state starts over; keep lasting values outside the component.
+  each visit, so its state starts over; keep lasting values outside the component. A named popup the user closes
+  unmounts; rendering it again under the same name opens it anew.
 - An app that defines a global `render()` gets its result shown on the page `/<id>`.
 
 | Component | Props |

@@ -435,6 +435,28 @@ void ReleaseChrome(State& state) {
     }
 }
 
+bool PinPushes(const controls::NavigationView& navigation) {
+    xaml::XamlRoot root = navigation.XamlRoot();
+    return root && ampify::PinPushesPages(root.Size().Width);
+}
+
+// Left, not Apple's Auto: Auto reads the NavigationView's own width, narrower than the window under a theme with side
+// panels (1171 of 1500 under Glass), and stays an overlay below 1325 instead of pushing the pages. Where the window
+// itself is that narrow, the pinned pane stays over the pages (PinPushesPages).
+PaneMode PinnedMode(const controls::NavigationView& navigation) {
+    return PinPushes(navigation) ? PaneMode::Left : PaneMode::LeftCompact;
+}
+
+// The window crossed the width while pinned. Switched under the open pane, the template stays folded (a squashed column
+// over the pages): the pane closes with the switch, and the next tick opens it again (ApplyPin).
+void RepinForWidth(State& state, const controls::NavigationView& navigation) {
+    auto pane = state.pane.get();
+    if (pane) ParkFocus(state, pane);  // off the search field, which WinUI picks as the header changes
+    navigation.IsPaneOpen(false);
+    navigation.PaneDisplayMode(PinnedMode(navigation));
+    if (pane) ParkFocus(state, pane);
+}
+
 // Opens the pane as Apple Music does when pinned, or folds it back to hover. A click asks the theme for a pass.
 void ApplyPin(State& state, bool notify = true) {
     auto navigation = state.navigation.get();
@@ -442,11 +464,10 @@ void ApplyPin(State& state, bool notify = true) {
     if (!navigation || !pane) return;
     if (state.pinned) {
         if (state.watch) state.watch.Stop();
-        // Left, not Apple's Auto: Auto reads the NavigationView's own width, narrower than the window under a theme
-        // with side panels (1171 of 1500 under Glass), and stays an overlay below 1325 instead of pushing the pages.
-        navigation.PaneDisplayMode(PaneMode::Left);
+        const bool pushes = PinPushes(navigation);
+        navigation.PaneDisplayMode(PinnedMode(navigation));
         navigation.IsPaneOpen(true);
-        SetDismissLayer(state, navigation, false);
+        SetDismissLayer(state, navigation, !pushes);  // over the pages, a click on them must not close the pane
         g_folded = false;
     } else {
         ParkFocus(state, pane);  // the header's buttons go away as the pane folds: WinUI would pick the search field
@@ -603,9 +624,13 @@ void KeepSidebarOnHover(Journal& journal) noexcept {
         }
         // Cheap once in place: the tree is searched again only when Apple rebuilt it.
         if (auto navigation = state.navigation.get(); navigation && navigation.IsLoaded()) {
-            // Apple puts its own mode back as the window changes size: fold it again, unless the pane is pinned.
+            // Apple puts its own mode back as the window changes size: fold it again, or pin again for the new width.
             if (!state.pinned && navigation.PaneDisplayMode() != PaneMode::LeftCompact) {
                 navigation.PaneDisplayMode(PaneMode::LeftCompact);
+            } else if (state.pinned && navigation.PaneDisplayMode() != PinnedMode(navigation)) {
+                RepinForWidth(state, navigation);
+            } else if (state.pinned && !navigation.IsPaneOpen()) {
+                ApplyPin(state);
             }
             return;
         }

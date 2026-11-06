@@ -40,6 +40,7 @@ void StopFollowingSidebarPane(WindowContext& context) {
         }
     }
     context.sidebarNavigation = winrt::weak_ref<controls::NavigationView>{nullptr};
+    context.sidebarAppleIcon = winrt::weak_ref<xaml::FrameworkElement>{nullptr};
     context.sidebarPaneToken = 0;
     context.sidebarModeToken = 0;
 }
@@ -200,45 +201,129 @@ xaml::FrameworkElement SidebarCompactContent(const UiControl& control, bool acti
 }
 
 const double kAutoWidth = std::numeric_limits<double>::quiet_NaN();  // open: the row fills the sidebar
+constexpr double kOpenPadding = 12;     // the open row's side padding, as in the markup
+constexpr std::size_t kItemSearchLimit = 64;  // the icon sits a few levels into the item's template
 
-// The open button's padding is the markup's; folded, the icon gets the whole width (the column is narrow).
-void LayoutOpenEntry(PlacedControl& placed, bool active) {
+// The open button's padding is the markup's; folded, the icon gets the whole width (the column is narrow). Both move
+// the icon by `shift`, onto the axis of Apple's own icons.
+void LayoutOpenEntry(PlacedControl& placed, bool active, double shift) {
     placed.button.Width(kAutoWidth);
     placed.button.HorizontalAlignment(xaml::HorizontalAlignment::Stretch);
     placed.button.HorizontalContentAlignment(xaml::HorizontalAlignment::Left);
-    placed.button.Padding(xaml::Thickness{12, 0, 12, 0});
+    placed.button.Padding(xaml::Thickness{kOpenPadding + shift, 0, kOpenPadding, 0});
     placed.button.Content(SidebarContent(placed.entry, active));
     controls::ToolTipService::SetToolTip(placed.button, nullptr);
 }
 
-void LayoutFoldedEntry(PlacedControl& placed, double width, bool active) {
+void LayoutFoldedEntry(PlacedControl& placed, double width, bool active, double shift) {
     placed.button.Width(width);
     placed.button.HorizontalAlignment(xaml::HorizontalAlignment::Center);
     placed.button.HorizontalContentAlignment(xaml::HorizontalAlignment::Center);
     placed.button.Padding(xaml::Thickness{});
-    placed.button.Content(SidebarCompactContent(placed.entry, active));
+    xaml::FrameworkElement icon = SidebarCompactContent(placed.entry, active);
+    icon.Margin(xaml::Thickness{shift, 0, -shift, 0});
+    placed.button.Content(icon);
     controls::ToolTipService::SetToolTip(placed.button, winrt::box_value(Wide(placed.entry.label)));
 }
 
 // Lays an entry out for the pane's state. Writes only what the button does not show yet, so a width a theme wrote on
 // it is put back. Margin, height and colours stay the theme's (names.md). Centred, so the entry sits in the column
 // whichever way the sidebar flows.
-void LayoutSidebarEntry(PlacedControl& placed, const controls::NavigationView& navigation, bool active) {
+void LayoutSidebarEntry(PlacedControl& placed, const controls::NavigationView& navigation, bool active, double shift) {
     const bool paneOpen = navigation.IsPaneOpen();
     const xaml::Thickness margin = placed.button.Margin();
     const double width =
         paneOpen ? kAutoWidth : ampify::FoldedEntryWidth(navigation.CompactPaneLength(), margin.Left, margin.Right);
-    const ampify::EntryLayout shown{placed.paneOpen, placed.active, placed.button.Width()};
-    if (placed.laidOut && !ampify::EntryLayoutChanged(shown, ampify::EntryLayout{paneOpen, active, width})) return;
+    const ampify::EntryLayout shown{placed.paneOpen, placed.active, placed.button.Width(), placed.iconShift};
+    const ampify::EntryLayout wanted{paneOpen, active, width, shift};
+    if (placed.laidOut && !ampify::EntryLayoutChanged(shown, wanted)) return;
     placed.laidOut = true;
     placed.paneOpen = paneOpen;
     placed.active = active;
+    placed.iconShift = shift;
     if (paneOpen) {
-        LayoutOpenEntry(placed, active);
+        LayoutOpenEntry(placed, active, shift);
     } else {
-        LayoutFoldedEntry(placed, width, active);
+        LayoutFoldedEntry(placed, width, active, shift);
     }
     automation::AutomationProperties::SetItemStatus(placed.button, active ? L"on" : L"");
+}
+
+xaml::FrameworkElement FindItemIcon(const xaml::DependencyObject& item) {
+    std::vector<xaml::DependencyObject> queue{item};
+    for (std::size_t i = 0; i < queue.size() && queue.size() < kItemSearchLimit; i++) {
+        auto element = queue[i].try_as<xaml::FrameworkElement>();
+        if (element && element.Name() == L"IconBox" && element.ActualWidth() > 0) return element;
+        int count = media::VisualTreeHelper::GetChildrenCount(queue[i]);
+        for (int child = 0; child < count; child++) queue.push_back(media::VisualTreeHelper::GetChild(queue[i], child));
+    }
+    return nullptr;
+}
+
+// The icon of Apple's first laid-out item in its sidebar list (MenuItemsHost, which the discovery lists but does not
+// enter), found again only when Apple rebuilt the list.
+xaml::FrameworkElement AppleItemIcon(WindowContext& context) {
+    if (auto icon = context.sidebarAppleIcon.get(); icon && icon.IsLoaded() && icon.ActualWidth() > 0) return icon;
+    std::optional<int> list = uirender::FindByName(context.probe, "MenuItemsHost");
+    xaml::DependencyObject repeater = list ? context.probeObjects[*list].get() : nullptr;
+    int count = repeater ? media::VisualTreeHelper::GetChildrenCount(repeater) : 0;
+    for (int i = 0; i < count; i++) {
+        auto item = media::VisualTreeHelper::GetChild(repeater, i).try_as<controls::NavigationViewItem>();
+        xaml::FrameworkElement icon = item ? FindItemIcon(item) : nullptr;
+        if (!icon) continue;
+        context.sidebarAppleIcon = winrt::make_weak(icon);
+        return icon;
+    }
+    return nullptr;
+}
+
+// The x of an Apple icon's middle in `host`, from its item's arranged offset: a theme's hover that slides the item
+// (Glass's hover-grow) moves its render transform, not its offset, so the axis holds still under the pointer.
+std::optional<double> AppleIconAxis(const xaml::FrameworkElement& icon, const xaml::UIElement& host) {
+    xaml::DependencyObject at = icon;
+    while (at && !at.try_as<controls::NavigationViewItem>()) at = media::VisualTreeHelper::GetParent(at);
+    auto item = at ? at.try_as<controls::NavigationViewItem>() : nullptr;
+    auto list = item ? media::VisualTreeHelper::GetParent(item).try_as<xaml::UIElement>() : nullptr;
+    if (!list) return std::nullopt;
+    const float inItem = icon.TransformToVisual(item).TransformPoint({static_cast<float>(icon.ActualWidth() / 2), 0}).X;
+    const float listX = list.TransformToVisual(host).TransformPoint({0, 0}).X;
+    return listX + item.ActualOffset().x + inItem;
+}
+
+// The x of a folded entry's icon in its host, before any shift: the middle of the button where it was arranged. Not
+// from its slot: a host narrower than the button (Glass) makes the button overflow its slot, off the slot's middle.
+double FoldedEntryAxis(const controls::Button& button) {
+    return button.ActualOffset().x + button.ActualWidth() / 2;
+}
+
+// The x of an open entry's icon in its host, before any shift: the first child of its row (SidebarContent), less the
+// shift its padding already holds.
+std::optional<double> OpenEntryAxis(const PlacedControl& placed) {
+    auto content = placed.button.Content().try_as<controls::Panel>();
+    auto row = content && content.Children().Size() ? content.Children().GetAt(0).try_as<controls::Panel>() : nullptr;
+    auto icon = row && row.Children().Size() ? row.Children().GetAt(0).try_as<xaml::FrameworkElement>() : nullptr;
+    if (!icon || icon.ActualWidth() <= 0) return std::nullopt;
+    const float inButton =
+        icon.TransformToVisual(placed.button).TransformPoint({static_cast<float>(icon.ActualWidth() / 2), 0}).X;
+    return placed.button.ActualOffset().x + inButton - placed.iconShift;
+}
+
+// The shift for the pane's state: the open row's icon does not sit where the folded one is centred, so each state has
+// its own, measured while an entry is laid out in that state.
+double EntryShift(const WindowContext& context, const controls::NavigationView& navigation) {
+    return navigation.IsPaneOpen() ? context.sidebarOpenIconShift : context.sidebarIconShift;
+}
+
+// Measured on an entry laid out for the pane's current state and on screen, where both axes are current.
+void MeasureIconShift(WindowContext& context, const PlacedControl& placed, const controls::NavigationView& navigation) {
+    const bool open = navigation.IsPaneOpen();
+    if (!placed.laidOut || placed.paneOpen != open || placed.button.ActualWidth() <= 0) return;
+    if (!context.sidebarHost || placed.button.Parent() != context.sidebarHost) return;
+    xaml::FrameworkElement icon = AppleItemIcon(context);
+    std::optional<double> apple = icon ? AppleIconAxis(icon, context.sidebarHost) : std::nullopt;
+    std::optional<double> entry = open ? OpenEntryAxis(placed) : std::optional<double>{FoldedEntryAxis(placed.button)};
+    if (!apple || !entry) return;
+    (open ? context.sidebarOpenIconShift : context.sidebarIconShift) = ampify::EntryIconShift(*apple, *entry);
 }
 
 // The pane opened, folded or changed mode: every entry of the list follows it at once, not at the next walk.
@@ -249,7 +334,7 @@ void RefreshSidebarEntries(WindowContext& context) {
     for (auto& item : context.placed) {
         PlacedControl& placed = item.second;
         if (!placed.button || placed.inHeader || placed.button.Parent() != context.sidebarHost) continue;
-        LayoutSidebarEntry(placed, navigation, SidebarEntryIsOn(context, placed.entry));
+        LayoutSidebarEntry(placed, navigation, SidebarEntryIsOn(context, placed.entry), EntryShift(context, navigation));
     }
 }
 
@@ -275,11 +360,12 @@ void FollowSidebarPane(const std::shared_ptr<WindowContext>& context, const cont
 namespace {
 
 // An entry that stays where it is: a header entry changes its icon, a list entry follows the pane (LayoutSidebarEntry).
-void UpdatePlacedEntry(PlacedControl& placed, const UiControl& control, const controls::NavigationView& navigation,
-                       bool inHeader, bool active) {
+void UpdatePlacedEntry(WindowContext& context, PlacedControl& placed, const UiControl& control,
+                       const controls::NavigationView& navigation, bool inHeader, bool active) {
     if (!inHeader) {
         placed.entry = control;
-        LayoutSidebarEntry(placed, navigation, active);
+        MeasureIconShift(context, placed, navigation);
+        LayoutSidebarEntry(placed, navigation, active, EntryShift(context, navigation));
         return;
     }
     if (placed.active == active) return;
@@ -322,7 +408,7 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
     if (!inHeader && context->sidebarNavigation.get() != navigation) FollowSidebarPane(context, navigation);
     std::uint32_t index = 0;
     if (placed.button && placed.inHeader == inHeader && place.IndexOf(placed.button, index)) {
-        UpdatePlacedEntry(placed, control, navigation, inHeader, active);  // still in place: only its state may change
+        UpdatePlacedEntry(*context, placed, control, navigation, inHeader, active);  // in place: its state may change
         return;
     }
 
@@ -334,7 +420,7 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
     if (!inHeader) {
         placed.button = button;
         placed.entry = control;
-        LayoutSidebarEntry(placed, navigation, active);  // the pane's state, before the entry shows
+        LayoutSidebarEntry(placed, navigation, active, EntryShift(*context, navigation));  // before the entry shows
     }
     Name(button, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
     WireSidebarClick(button, shared, control);

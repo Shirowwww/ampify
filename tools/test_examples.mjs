@@ -1379,6 +1379,7 @@ function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = 
       ButtonPrimary: (props) => h("button", { ...props, variant: "accent" }),
       ButtonTertiary: (props) => h("button", { ...props, variant: "tertiary" }),
       Dropdown: (props) => h("dropdown", props),
+      Slider: (props) => h("slider", props),
       Text: (props) => h("text", { ...props, text: props.children.join("") }),
     },
     kit: {
@@ -1446,6 +1447,23 @@ test("the Marketplace shows the French name and description on a French Windows,
   buttonIn(card, "Détails").onClick();
   assert.ok(textsOf(page.tree).includes("Démo"));
   assert.ok(textsOf(page.tree).includes("Un test en français."));
+});
+
+test("the Marketplace labels a number setting on its slider, like the menu of a choice setting", async () => {
+  const settings = [
+    { key: "side", label: "Sidebar side", type: "choice", options: ["Right", "Left"], value: "Right" },
+    { key: "radius", label: "Panel corners", type: "number", min: 0, max: 24, value: "12" },
+  ];
+  const installed = [marketCopy("demo", "theme", [], { settings })];
+  const { page } = fakeMarketplace({ catalog: [marketEntry("demo", "theme")], installed });
+  await settle();
+  buttonIn(page.tree, "Themes").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  const panel = cardTitled(page, "Settings");
+  const slider = allNodes(panel).find((node) => node.type === "slider");
+  assert.equal(slider.label, "Panel corners", "the slider's own header carries the label");
+  assert.equal(allNodes(panel).find((node) => node.type === "dropdown").label, "Sidebar side");
+  assert.ok(!textsOf(panel).includes("Panel corners"), "no separate caption in the dim secondary text");
 });
 
 test("the Marketplace keeps the English text when the element has no translation for the language", async () => {

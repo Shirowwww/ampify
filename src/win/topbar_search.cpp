@@ -72,6 +72,9 @@ struct State {
     uint32_t presenterIndex = 0;
     controls::Button appleBack{nullptr};
     int64_t visibilityToken = 0;  // the presenter's Visibility callback, taken off by this token in Release
+    xaml::VisualState closedCompact{nullptr};  // Apple's state, and the setter taken out of it (TakePresenterSetter)
+    xaml::SetterBase presenterSetter{nullptr};
+    uint32_t presenterSetterIndex = 0;
     std::vector<Saved> saved;
     // Ampify's: held strongly, since a weak reference to an element Ampify made never resolves (xaml-lessons.md).
     primitives::Popup popup{nullptr};
@@ -181,9 +184,9 @@ void BuildStrip(State& state, const xaml::XamlRoot& root) {
     state.popup.Child(state.strip);
 }
 
-// The NavigationView's ClosedCompact state (the sidebar folded and closed) collapses the presenter and shows a search
-// button in the column. While the field is in the strip the NavigationView stays in NotClosedCompact, an empty state:
-// the presenter shows and the button stays collapsed, nothing else changes (WinUI's NavigationView.xaml).
+// Fallback when the presenter's setter could not be taken out of ClosedCompact (TakePresenterSetter): the NavigationView
+// is held in NotClosedCompact. Apple's template also shows the hamburger and resizes the header in ClosedCompact, so the
+// folded sidebar loses its hamburger meanwhile.
 void KeepPresenterShown(State& state) {
     auto navigation = state.navigation.get();
     if (!navigation || !state.presenter || state.presenter.Visibility() == xaml::Visibility::Visible) return;
@@ -198,6 +201,61 @@ void PutBackPaneState(const controls::NavigationView& navigation) {
     bool compact = mode == controls::SplitViewDisplayMode::CompactOverlay || mode == controls::SplitViewDisplayMode::CompactInline;
     xaml::VisualStateManager::GoToState(navigation, !split.IsPaneOpen() && compact ? L"ClosedCompact" : L"NotClosedCompact",
                                         false);
+}
+
+// Apple's ClosedCompact state, in the PaneStateGroup of its NavigationView template, or null.
+xaml::VisualState ClosedCompactState(const controls::NavigationView& navigation) {
+    if (media::VisualTreeHelper::GetChildrenCount(navigation) == 0) return nullptr;
+    auto root = media::VisualTreeHelper::GetChild(navigation, 0).try_as<xaml::FrameworkElement>();
+    if (!root) return nullptr;
+    for (const xaml::VisualStateGroup& group : xaml::VisualStateManager::GetVisualStateGroups(root)) {
+        if (group.Name() != L"PaneStateGroup") continue;
+        for (const xaml::VisualState& visual : group.States()) {
+            if (visual.Name() == L"ClosedCompact") return visual;
+        }
+    }
+    return nullptr;
+}
+
+bool TargetsVisibilityOf(const xaml::SetterBase& base, const xaml::FrameworkElement& element) {
+    auto setter = base.try_as<xaml::Setter>();
+    auto target = setter ? setter.Target() : nullptr;
+    auto path = target ? target.Path() : nullptr;
+    return path && path.Path() == L"Visibility" && target.Target() == element;
+}
+
+// ClosedCompact (the sidebar folded and closed) collapses the presenter, and in Apple's template also shows the
+// hamburger and a search button and sets the header's height. Only the presenter's setter leaves the state while the
+// field is in the strip, so the folded sidebar keeps the rest. The state is left before the setter goes, so WinUI
+// undoes the collapse it applied; false when the setter was not found or the collection refused the change.
+bool TakePresenterSetter(State& state, const controls::NavigationView& navigation) {
+    try {
+        xaml::VisualState visual = ClosedCompactState(navigation);
+        if (!visual) return false;
+        auto setters = visual.Setters();
+        for (uint32_t i = 0; i < setters.Size(); i++) {
+            xaml::SetterBase setter = setters.GetAt(i);
+            if (!TargetsVisibilityOf(setter, state.presenter)) continue;
+            xaml::VisualStateManager::GoToState(navigation, L"NotClosedCompact", false);
+            setters.RemoveAt(i);
+            state.closedCompact = visual;
+            state.presenterSetter = setter;
+            state.presenterSetterIndex = i;
+            PutBackPaneState(navigation);
+            return true;
+        }
+    } catch (const winrt::hresult_error& error) {
+        Note(state, "Top bar: Apple Music's folded sidebar state kept as it is (" + HresultText(error.code()) + ")");
+    }
+    return false;
+}
+
+// The setter back in its place, entered again from NotClosedCompact so a folded sidebar collapses the presenter anew.
+void PutBackPresenterSetter(State& state, const controls::NavigationView& navigation) {
+    if (!state.closedCompact || !state.presenterSetter) return;
+    if (navigation) xaml::VisualStateManager::GoToState(navigation, L"NotClosedCompact", false);
+    auto setters = state.closedCompact.Setters();
+    setters.InsertAt(std::min(state.presenterSetterIndex, setters.Size()), state.presenterSetter);
 }
 
 // The state change is answered after it, never inside WinUI's own GoToState.
@@ -249,7 +307,7 @@ bool Take(State& state, const xaml::UIElement& content, const controls::Navigati
     state.presenterIndex = index;
     state.navigation = winrt::make_weak(navigation);
     HideApples(state, navigation);
-    WatchPresenter(state);
+    if (!TakePresenterSetter(state, navigation)) WatchPresenter(state);
     KeepPresenterShown(state);
     state.popup.IsOpen(true);
     return true;
@@ -303,7 +361,9 @@ void Release(State& state) {
     state.visibilityToken = 0;
     try {
         GiveBackPresenter(state);
-        if (auto navigation = state.navigation.get()) PutBackPaneState(navigation);
+        auto navigation = state.navigation.get();
+        PutBackPresenterSetter(state, navigation);
+        if (navigation) PutBackPaneState(navigation);
     } catch (...) {
     }
     PutBackAll(state);
@@ -318,6 +378,8 @@ void Release(State& state) {
     state.presenter = nullptr;
     state.area = nullptr;
     state.appleBack = nullptr;
+    state.closedCompact = nullptr;
+    state.presenterSetter = nullptr;
     state.regions.clear();
 }
 
@@ -364,13 +426,23 @@ void AddSuggestions(const State& state, double scale, std::vector<DeviceRect>& r
     rects.push_back(ToDeviceRect(TopbarRect{origin.X, origin.Y, list.ActualWidth(), list.ActualHeight()}, scale));
 }
 
+// The caption buttons' height as Windows draws them now (Apple may ask for a tall title bar); the standard one if unread.
+double CaptionHeight(const State& state, double scale) {
+    try {
+        auto window = winrt::Microsoft::UI::Windowing::AppWindow::GetFromWindowId(state.windowId);
+        return TopbarCaptionHeight(window ? window.TitleBar().Height() : 0, scale);
+    } catch (const winrt::hresult_error&) {
+        return kTopbarCaptionHeight;
+    }
+}
+
 // Places the strip for the window's width, follows Apple's back button and mode, and sets the passthrough regions in
 // device pixels at the window's current scale.
 void LayOut(State& state, const xaml::UIElement& content) {
     KeepPresenterShown(state);
     xaml::XamlRoot root = content.XamlRoot();
     const double scale = root.RasterizationScale();
-    const TopbarLayout layout = LayOutTopbar(root.Size().Width);
+    const TopbarLayout layout = LayOutTopbar(root.Size().Width, CaptionHeight(state, scale));
     state.popup.HorizontalOffset(layout.back.x);
     state.popup.VerticalOffset(layout.back.y);
     state.field.Width(layout.search.width);

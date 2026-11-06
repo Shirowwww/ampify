@@ -66,6 +66,7 @@
 - `.card-poster` and `.card-poster-chin`: Home's large editorial tiles and the band under their text, which clip with a
   corner of their own and stayed rounded under square corners. Mirror's corners setting, Square corners and Round
   corners now reach them.
+- The Marketplace writes a number setting's label on its slider, in the same text as the other settings' labels.
 - Animated artwork (snippet, off by default): the window's background is the song's artwork in two slowly turning
   layers. It stops in pause and while Apple Music is hidden.
 - On a new song, `content: artwork` and an `image` node with `src: "artwork"` cross-fade from the previous cover in

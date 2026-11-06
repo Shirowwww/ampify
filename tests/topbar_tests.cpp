@@ -33,14 +33,33 @@ TEST_CASE(Topbar_SearchFieldIsCentredWithinBounds) {
 
 TEST_CASE(Topbar_BackSitsLeftOfTheCentredFieldAndBothClearTheCaptionButtons) {
     for (double width : {kTopbarMinWidth, 900.0, 1324.0, 2560.0}) {
-        TopbarLayout layout = LayOutTopbar(width);
+        TopbarLayout layout = LayOutTopbar(width, kTopbarCaptionHeight);
         CHECK(layout.search.x + layout.search.width / 2 == width / 2);
         CHECK(layout.back.x + layout.back.width + kTopbarGap == layout.search.x);
         CHECK(layout.back.x >= 0);
         CHECK(layout.search.x + layout.search.width <= width - kTopbarCaptionWidth);
         CHECK(layout.back.height == kTopbarControlHeight && layout.search.height == kTopbarControlHeight);
-        CHECK(layout.back.y == (kTopbarHeight - kTopbarControlHeight) / 2);
     }
+}
+
+TEST_CASE(Topbar_ControlsCentreOnTheCaptionButtonsNotOnTheStrip) {
+    for (double caption : {kTopbarCaptionHeight, 40.0, 48.0}) {
+        TopbarLayout layout = LayOutTopbar(1140, caption);
+        CHECK(layout.back.y + layout.back.height / 2 == caption / 2);
+        CHECK(layout.search.y + layout.search.height / 2 == caption / 2);
+    }
+}
+
+TEST_CASE(Topbar_ControlsNeverRiseAboveTheWindowUnderAShortCaption) {
+    TopbarLayout layout = LayOutTopbar(1140, 24);
+    CHECK(layout.back.y == 0 && layout.search.y == 0);
+}
+
+TEST_CASE(Topbar_CaptionHeightIsReadInDevicePixelsOrFallsBackToStandard) {
+    CHECK(TopbarCaptionHeight(40, 1.25) == 32);                   // Windows' standard caption at 125%
+    CHECK(TopbarCaptionHeight(60, 1.25) == 48);                   // a tall caption
+    CHECK(TopbarCaptionHeight(0, 1.25) == kTopbarCaptionHeight);  // not extended into the title bar yet
+    CHECK(TopbarCaptionHeight(40, 0) == kTopbarCaptionHeight);    // no scale known
 }
 
 TEST_CASE(Topbar_PassthroughRoundsOutwardInDevicePixels) {

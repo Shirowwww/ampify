@@ -219,6 +219,68 @@ void MountPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& 
     JournalRender(shared, "page", surface, stats, first);
 }
 
+// The dialog of a popup. Close, alone, stands for the default button: Apple's plain style with Ampify's accent
+// template, as Ampify's other primary buttons (Apple's AccentButtonStyle draws text in WebDings). Its font, and that of
+// the content's buttons: GiveDialogButtonsTextFont, once open.
+controls::ContentDialog MakePopupDialog(UiService::Shared& shared, const Surface& surface,
+                                        const xaml::FrameworkElement& root, const xaml::XamlRoot& xamlRoot) {
+    controls::ContentDialog dialog;
+    if (auto style = ThemeResource(L"DefaultContentDialogStyle").try_as<xaml::Style>()) dialog.Style(style);
+    dialog.XamlRoot(xamlRoot);
+    dialog.Title(winrt::box_value(Wide(surface.title.empty() ? surface.elementId : surface.title)));
+    dialog.Content(root);
+    dialog.CloseButtonText(Wide(i18n::Text("ui.close")));
+    auto accent = xaml::Markup::XamlReader::Load(
+                      L"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'>"
+                      L"<Setter Property='CornerRadius' Value='{ThemeResource ControlCornerRadius}'/></Style>")
+                      .as<xaml::Style>();
+    if (shared.probe.button) accent.BasedOn(shared.probe.button);
+    if (controls::ControlTemplate primary = PrimaryButtonTemplate()) {
+        accent.Setters().Append(xaml::Setter(controls::Control::TemplateProperty(), primary));
+    }
+    dialog.CloseButtonStyle(accent);
+    Name(dialog, uirender::ElementName(surface.elementId, surface.nodeId) + "_dialog",
+         surface.title.empty() ? surface.elementId : surface.title);
+    dialog.Opened([](controls::ContentDialog const& sender, controls::ContentDialogOpenedEventArgs const&) noexcept {
+        try {
+            GiveDialogButtonsTextFont(sender);
+        } catch (...) {
+        }
+    });
+    return dialog;
+}
+
+// A named popup closed by the user leaves the element's model (entry "popupClose"), so rendering the same name opens
+// it again; until the model drops it, `dismissed` keeps it shut. Unnamed ones ("#n") are new at each open.
+void WatchPopupClose(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context, const Surface& surface,
+                     const controls::ContentDialog& dialog) {
+    WeakShared weakShared = shared.weak_from_this();
+    WeakContext weakContext = context;
+    std::string key = surface.key;
+    std::optional<UiEvent> closedEvent;
+    if (!surface.id.empty() && surface.id[0] != '#') {
+        closedEvent = UiEvent{surface.elementId, 0, false, "{\"popup\":" + Json::Quote(surface.id) + "}", "popupClose"};
+    }
+    dialog.Closed([weakShared, weakContext, key, closedEvent](controls::ContentDialog const& sender,
+                                                              controls::ContentDialogClosedEventArgs const&) noexcept {
+        try {
+            auto live = weakContext.lock();
+            if (!live) return;
+            live->dialogOpen = false;
+            auto found = live->surfaces.find(key);
+            // Still this surface's dialog: the user closed it. One the model removed is gone from `surfaces` already.
+            bool byUser = found != live->surfaces.end() && found->second.dialog == sender;
+            if (SharedPtr owner = weakShared.lock(); byUser && closedEvent && owner && owner->sink) owner->sink(*closedEvent);
+            if (found != live->surfaces.end()) {
+                found->second.dismissed = true;
+                found->second.dialog = nullptr;
+            }
+            QueueRefresh(weakShared, live);  // the next popup, if one waits
+        } catch (...) {
+        }
+    });
+}
+
 void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                 const xaml::DependencyObject& content, const Surface& surface) {
     MountedSurface& mounted = context->surfaces[surface.key];
@@ -244,50 +306,8 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
     bool replaced = false;
     xaml::FrameworkElement root = mounted.renderer->Render(uirender::BuildRenderTree(surface.tree, surface.nodeId),
                                                            shared.probe, stats, replaced);
-    controls::ContentDialog dialog;
-    if (auto style = ThemeResource(L"DefaultContentDialogStyle").try_as<xaml::Style>()) dialog.Style(style);
-    dialog.XamlRoot(rootElement.XamlRoot());
-    dialog.Title(winrt::box_value(Wide(surface.title.empty() ? surface.elementId : surface.title)));
-    dialog.Content(root);
-    dialog.CloseButtonText(Wide(i18n::Text("ui.close")));
-    // Close, alone, stands for the default button: Apple's plain style with Ampify's accent template, as Ampify's other
-    // primary buttons (Apple's AccentButtonStyle draws text in WebDings). Its font: GiveDialogButtonsTextFont.
-    auto accent = xaml::Markup::XamlReader::Load(
-                      L"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'>"
-                      L"<Setter Property='CornerRadius' Value='{ThemeResource ControlCornerRadius}'/></Style>")
-                      .as<xaml::Style>();
-    if (shared.probe.button) accent.BasedOn(shared.probe.button);
-    if (controls::ControlTemplate primary = PrimaryButtonTemplate()) {
-        accent.Setters().Append(xaml::Setter(controls::Control::TemplateProperty(), primary));
-    }
-    dialog.CloseButtonStyle(accent);
-    Name(dialog, uirender::ElementName(surface.elementId, surface.nodeId) + "_dialog",
-         surface.title.empty() ? surface.elementId : surface.title);
-
-    WeakShared weakShared = shared.weak_from_this();
-    WeakContext weakContext = context;
-    std::string key = surface.key;
-    dialog.Opened([](controls::ContentDialog const& sender, controls::ContentDialogOpenedEventArgs const&) noexcept {
-        try {
-            GiveDialogButtonsTextFont(sender);
-        } catch (...) {
-        }
-    });
-    dialog.Closed([weakShared, weakContext, key](controls::ContentDialog const&,
-                                                 controls::ContentDialogClosedEventArgs const&) noexcept {
-        try {
-            auto live = weakContext.lock();
-            if (!live) return;
-            live->dialogOpen = false;
-            auto found = live->surfaces.find(key);
-            if (found != live->surfaces.end()) {
-                found->second.dismissed = true;
-                found->second.dialog = nullptr;
-            }
-            QueueRefresh(weakShared, live);  // the next popup, if one waits
-        } catch (...) {
-        }
-    });
+    controls::ContentDialog dialog = MakePopupDialog(shared, surface, root, rootElement.XamlRoot());
+    WatchPopupClose(shared, context, surface, dialog);
     try {
         dialog.ShowAsync();
     } catch (...) {

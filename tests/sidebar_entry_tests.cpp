@@ -41,3 +41,28 @@ TEST_CASE(SidebarEntry_LayoutPutsBackAWidthAThemeWrote) {
     CHECK(ampify::EntryLayoutChanged({false, false, 60}, {false, false, 40}));
     CHECK(ampify::EntryLayoutChanged({true, false, 120}, {true, false, kAuto}));
 }
+
+TEST_CASE(SidebarEntry_IconShiftMovesTheIconOntoApplesAxis) {
+    CHECK(ampify::EntryIconShift(25.5, 24) == 1.5);
+    CHECK(ampify::EntryIconShift(22, 24) == -2);
+}
+
+TEST_CASE(SidebarEntry_IconShiftSnapsToHalfPixels) {
+    CHECK(ampify::EntryIconShift(25.6, 24) == 1.5);
+    CHECK(ampify::EntryIconShift(25.8, 24) == 2);
+}
+
+TEST_CASE(SidebarEntry_IconShiftIgnoresLessThanHalfAPixel) {
+    CHECK(ampify::EntryIconShift(24.2, 24) == 0);
+    CHECK(ampify::EntryIconShift(23.8, 24) == 0);
+}
+
+TEST_CASE(SidebarEntry_IconShiftIgnoresAnAxisFarOffTheColumn) {
+    CHECK(ampify::EntryIconShift(24 + ampify::kMaxEntryIconShift + 1, 24) == 0);
+    CHECK(ampify::EntryIconShift(-100, 24) == 0);
+}
+
+TEST_CASE(SidebarEntry_LayoutChangesWhenTheIconShiftChanges) {
+    CHECK(ampify::EntryLayoutChanged({false, false, 40, 0}, {false, false, 40, 1.5}));
+    CHECK(!ampify::EntryLayoutChanged({true, false, kAuto, 1.5}, {true, false, kAuto, 1.5}));
+}

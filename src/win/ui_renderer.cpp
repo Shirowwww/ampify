@@ -1720,6 +1720,8 @@ void XamlRenderer::FillMenu(Mounted& mounted, const RenderNode& node) {
     auto button = mounted.control ? mounted.control.try_as<controls::Button>() : nullptr;
     if (!button) return;
     controls::MenuFlyout flyout;
+    // A flyout opens above its button by default (Top), over what sits there, such as the tabs above a menu.
+    flyout.Placement(primitives::FlyoutPlacementMode::BottomEdgeAlignedLeft);
     for (const RenderNode& entry : node.children) {
         std::string label = entry.Text("label");
         controls::MenuFlyoutItem item;

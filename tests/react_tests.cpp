@@ -488,6 +488,38 @@ TEST_CASE(React_APanelClosedByTheUserUnmountsAndComesBackOnRender) {
     element->Stop();
 }
 
+// The user closes a named popup: it leaves the model and its React root unmounts, so the menu entry that rendered it
+// opens it again with the same name, mounted anew.
+TEST_CASE(React_APopupClosedByTheUserOpensAgainOnTheNextRender) {
+    Fixture f;
+    auto element = f.Make("marks", R"(
+        const { h, useEffect } = Ampify.React;
+        function List() {
+          useEffect(() => { Ampify.log("mounted"); return () => Ampify.log("cleanup"); }, []);
+          return h("text", null, "list");
+        }
+        Ampify.ReactDOM.render(h(List), "popup:marks");
+        const entry = Ampify.ui.menu.addItem("app", { label: "List", onClick: () => Ampify.ReactDOM.render(h(List), "popup:marks") });
+        Ampify.log("entry " + entry);
+    )", R"("ui.popup", "ui.menu")");
+    CHECK(element->Start());
+    CHECK(f.host.ui.Popups().size() == 1);
+
+    element->DeliverEvent("popupClose", R"({"popup":"marks"})");
+    element->Pump();
+    CHECK(f.host.ui.Popups().empty());
+    CHECK(f.Logged("[marks] cleanup"));
+
+    CHECK(f.Logged("[marks] entry 1"));
+    element->DeliverClick(1);
+    element->Pump();
+    auto popups = f.host.ui.Popups();
+    CHECK(popups.size() == 1);
+    CHECK(popups.size() == 1 && popups[0].id == "marks");
+    CHECK(f.Count("[marks] mounted") == 2);
+    element->Stop();
+}
+
 TEST_CASE(Interface_FullscreenOpenUpdatesAndTellsOnClose) {
     Fixture f;
     auto element = f.Make("fullapi", R"(

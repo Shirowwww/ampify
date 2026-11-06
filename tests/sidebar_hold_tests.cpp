@@ -55,3 +55,10 @@ TEST_CASE(SidebarHold_ForgetStartsOver) {
     tracker.Look(L"abcde", start);
     CHECK(!ampify::HoldsForTyping(true, true, tracker.SinceTyped(start)));
 }
+
+TEST_CASE(SidebarHold_PinPushesThePagesOnlyWhereAppleOpensItsSidebar) {
+    CHECK(ampify::PinPushesPages(1325));
+    CHECK(ampify::PinPushesPages(1920));
+    CHECK(!ampify::PinPushesPages(1324));
+    CHECK(!ampify::PinPushesPages(1094));
+}

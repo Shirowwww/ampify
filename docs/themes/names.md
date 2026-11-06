@@ -57,7 +57,7 @@ read on Apple Music 1.1792.
 | `.sidebar-footer` | The bottom of the sidebar, with the account and the Ampify entry |
 | `.sidebar-footer-items` | The items of that bottom part |
 | `.sidebar-separator` | The line above it |
-| `.sidebar-entry` | An entry Ampify adds at the bottom of the sidebar: the Marketplace, an extension's page. Folded, it is a centred icon as wide as the column less its margins; open, the full row. Ampify sets that width and the padding itself, at each pass over the sidebar, so a `width` or `padding` here does not hold. Margin, height and colours are the theme's |
+| `.sidebar-entry` | An entry Ampify adds at the bottom of the sidebar: the Marketplace, an extension's page. Folded, it is a centred icon as wide as the column less its margins; open, the full row. Its icon sits on the axis of Apple's own icons, wherever a theme moves them. Ampify sets that width and the padding itself, at each pass over the sidebar, so a `width` or `padding` here does not hold. Margin, height and colours are the theme's |
 | `.sidebar-drag-indicator` | The line shown above or below a pinned item while it is dragged to a new place |
 | `.account-picture` | The account picture |
 | `.account-name` | The account name |

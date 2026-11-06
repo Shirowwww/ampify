@@ -137,6 +137,7 @@ struct PlacedControl {
     // A sidebar entry in the list: the pane state it was laid out for, and its control, for a change of pane.
     bool laidOut = false;
     bool paneOpen = false;
+    double iconShift = 0;
     UiControl entry;
     std::string elementId;  // with id, the button's place among Ampify's buttons
     int id = 0;
@@ -241,6 +242,11 @@ struct WindowContext {
     winrt::weak_ref<controls::NavigationView> sidebarNavigation;
     std::int64_t sidebarPaneToken = 0;
     std::int64_t sidebarModeToken = 0;
+    // The icon of Apple's first sidebar item (Apple's own, so weak resolves), and how far the entries' icons move to
+    // sit on its axis (EntryIconShift), folded and open, each measured while the pane is in that state.
+    winrt::weak_ref<xaml::FrameworkElement> sidebarAppleIcon;
+    double sidebarIconShift = 0;
+    double sidebarOpenIconShift = 0;
     std::set<std::string> closedPanels;
     std::optional<std::pair<std::string, std::string>> route;
     bool pageClosed = false;

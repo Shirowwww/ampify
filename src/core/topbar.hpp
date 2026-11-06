@@ -9,10 +9,11 @@
 namespace ampify {
 
 inline constexpr double kTopbarHeight = 40;         // the strip themes leave above the panels (--caption-room)
-inline constexpr double kTopbarControlHeight = 32;  // Apple's search box and the back arrow, centred in the strip
+inline constexpr double kTopbarControlHeight = 32;  // Apple's search box and the back arrow
 inline constexpr double kTopbarBackWidth = 40;
 inline constexpr double kTopbarGap = 8;             // between the back arrow and the field
 inline constexpr double kTopbarCaptionWidth = 138;  // the Windows 11 caption buttons
+inline constexpr double kTopbarCaptionHeight = 32;  // their standard height, which Apple Music keeps
 inline constexpr double kTopbarSearchMaxWidth = 480;
 inline constexpr double kTopbarSearchMinWidth = 240;
 // Room for Back, the search field and the caption buttons; a narrower window keeps Apple's own layout and no strip.
@@ -57,11 +58,18 @@ inline double TopbarSearchWidth(double windowWidth) {
     return std::clamp(room, kTopbarSearchMinWidth, kTopbarSearchMaxWidth);
 }
 
-// The field in the middle of the window, the back arrow just left of it, as Spotify lays them out.
-inline TopbarLayout LayOutTopbar(double windowWidth) {
+// The caption buttons' height in device-independent pixels, from the title bar's height in device pixels; Windows'
+// standard height while the window has not extended its content into the title bar (a height of 0).
+inline double TopbarCaptionHeight(int devicePixels, double scale) {
+    return devicePixels > 0 && scale > 0 ? devicePixels / scale : kTopbarCaptionHeight;
+}
+
+// The field in the middle of the window, the back arrow just left of it, as Spotify lays them out. Both centre on the
+// caption buttons, not on the strip: centred on the strip they sat 4 pixels (5 to 6 at 125%) under the buttons' glyphs.
+inline TopbarLayout LayOutTopbar(double windowWidth, double captionHeight) {
     const double width = TopbarSearchWidth(windowWidth);
     const double left = (windowWidth - width) / 2;
-    const double top = (kTopbarHeight - kTopbarControlHeight) / 2;
+    const double top = std::max(0.0, (captionHeight - kTopbarControlHeight) / 2);
     return TopbarLayout{{left - kTopbarGap - kTopbarBackWidth, top, kTopbarBackWidth, kTopbarControlHeight},
                         {left, top, width, kTopbarControlHeight}};
 }

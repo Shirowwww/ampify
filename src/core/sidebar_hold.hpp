@@ -2,6 +2,8 @@
 // The hover sidebar stays open while someone uses it: typing in its search field, or a menu open in it, and only
 // while the window is in front.
 
+#include "theme/css.hpp"
+
 #include <chrono>
 #include <optional>
 #include <string>
@@ -19,6 +21,12 @@ inline bool HoldsForTyping(bool focusInPane, bool windowInFront, std::chrono::mi
 // A menu or a suggestion list is open in the pane.
 inline bool HoldsForMenu(bool windowInFront, bool menuOpen) {
     return windowInFront && menuOpen;
+}
+
+// A pin pushes the pages aside only where Apple Music opens its own sidebar beside them. Narrower, Apple's narrow
+// layout clips a pane opened beside the pages and hides the hamburger: the pinned pane stays over the pages instead.
+inline bool PinPushesPages(double windowWidth) {
+    return windowWidth > theme::MediaQuery::kSidebarFoldsAt;
 }
 
 // Notes when the search text last changed while the keyboard was in the field. The first look is not typing.

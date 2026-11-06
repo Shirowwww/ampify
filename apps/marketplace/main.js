@@ -988,10 +988,8 @@ function SettingControl({ item, setting, texts, act }) {
   }
   if (setting.type === "number" && setting.min !== undefined && setting.max !== undefined) {
     const step = Number.isInteger(setting.min) && Number.isInteger(setting.max) && setting.max - setting.min > 4 ? 1 : 0.05;
-    // The slider writes its value under the label itself.
-    return h("stack", { gap: 4 },
-      h(Text, { variant: "caption" }, label),
-      h(Slider, { min: setting.min, max: setting.max, step, value: Number(value), onChange: later }));
+    // The slider's own header carries the label and its value, in the same text as the menus' and switches' labels.
+    return h(Slider, { label, min: setting.min, max: setting.max, step, value: Number(value), onChange: later });
   }
   return h(TextField, { label, value, onChange: later });
 }

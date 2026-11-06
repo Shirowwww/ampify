@@ -147,9 +147,16 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   of the window), so the `AutoSuggestBox` inside keeps its handlers (text, suggestions, submit); the cell takes the data
   context the presenter inherited. The NavigationView binds `Content` on the same presenter object, wherever it is.
   Its `ClosedCompact` state (sidebar folded and closed) collapses that presenter and shows `PaneAutoSuggestButton`;
-  while the field is in the strip Ampify puts the NavigationView back in `NotClosedCompact` (`GoToState`), an empty
-  state that only takes those two setters off, and on release in the state `UpdateIsClosedCompact` would pick. The arrow is Ampify's button; a click invokes Apple's `Button#NavigationViewBackButton` through its automation
-  peer (as a click on it would), and Apple's arrow stays in place with opacity 0.
+  Apple's own template (`AMP.UI.Controls.pri`) also shows `TogglePaneButton`, the hamburger, and sets
+  `PaneHeaderGrid.Height` there, so `NotClosedCompact` is not an empty state: holding the NavigationView in it hid the
+  folded sidebar's hamburger. While the field is in the strip Ampify takes only the presenter's `Visibility` setter out
+  of `ClosedCompact` (after leaving the state, so WinUI undoes the collapse) and puts it back on release, entering the
+  state again from `NotClosedCompact`. Holding `NotClosedCompact` stays as a fallback if the setter cannot be found or
+  the collection refuses the change. The arrow is Ampify's button; a click invokes Apple's
+  `Button#NavigationViewBackButton` through its automation peer (as a click on it would), and Apple's arrow stays in
+  place with opacity 0.
+- The field and the arrow centre on the caption buttons, whose height is the AppWindow title bar's (`TitleBar.Height`,
+  device pixels; 32 at 100%), not on the 40-pixel strip: centred on the strip they sat 5 to 6 pixels low at 125%.
 - Apple's own layout and a theme's top bar put `Grid#TransportBar` in the strip: the strip shows only when the bar
   starts lower than 40 pixels. The window's passthrough regions (`InputNonClientPointerSource`) are Apple's plus
   Ampify's, merged every quarter second, since Apple sets its own again as its layout changes.

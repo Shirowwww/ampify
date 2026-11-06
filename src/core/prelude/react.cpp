@@ -541,6 +541,24 @@ const char kReact[] = R"AMPIFYJS(
     schedule(root);
   };
 
+  // A named popup the user closed leaves the model and its root unmounts, as unmount() would: rendered again under the
+  // same name (a menu entry that opens it on each click), it opens anew. From the host, as JSON: {"popup": "<name>"}.
+  dispatch.popupClose = (payload) => {
+    let name = "";
+    try {
+      name = String(JSON.parse(payload).popup);
+    } catch (error) {
+      native.log("[error] popupClose: " + describe(error));
+      return;
+    }
+    native.reactClosePopup(name);
+    const key = "popup:" + name;
+    const root = roots.get(key);
+    if (!root) return;
+    roots.delete(key);
+    destroy(root);
+  };
+
   // The element stops: every effect cleanup runs. The interface itself is removed by the module ui.
   Ampify.onStop(() => {
     for (const root of roots.values()) destroy(root);
