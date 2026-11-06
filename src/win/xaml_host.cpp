@@ -56,7 +56,7 @@ void Log(const std::string& line) {
     if (Journal* journal = State().journal) journal->Write(line);
 }
 
-bool XamlAttach(DWORD, HINSTANCE) {
+bool XamlAttach() {
     DispatchState& state = State();
     {
         std::lock_guard<std::mutex> lock(state.mutex);
@@ -108,7 +108,7 @@ bool XamlPost(std::function<void()> work) {
     if (windowGone) {
         // The main window was closed and maybe replaced: take the current one.
         XamlDetach();
-        if (!XamlAttach(0, nullptr)) return false;
+        if (!XamlAttach()) return false;
         std::lock_guard<std::mutex> lock(state.mutex);
         queue = state.queue;
     }

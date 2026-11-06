@@ -15,6 +15,8 @@
 #include "element.hpp"
 #include "internal.hpp"
 #include "platform.hpp"
+#include "apple_facts.hpp"
+#include "release_facts.hpp"
 
 namespace ampify::cli {
 
@@ -71,7 +73,7 @@ void CheckAppleMusicSurroundings(const std::function<void(const std::string&)>& 
                                  const std::function<void(const std::string&)>& warn) {
     if (std::optional<std::string> version = platform::AppPackageVersion()) ok("Apple Music package: version " + *version);
     std::vector<std::string> processes = platform::RunningProcessNames();
-    if (!processes.empty() && Runs(processes, "AMPLibraryAgent.exe") && !Runs(processes, "AppleMusic.exe")) {
+    if (!processes.empty() && Runs(processes, kLibraryAgentImage) && !Runs(processes, kAppleMusicImage)) {
         warn("a library agent runs without Apple Music: it can keep the library from opening (error 9039); "
              "apple.orphanAgent = on ends it");
     }
@@ -181,7 +183,7 @@ int CmdDoctor(Context& ctx) {
     }
     ok("tested Apple Music versions: " + versions + (extra.empty() ? "" : " (with versions.txt)"));
     ok(std::string("Apple Music ") +
-       (platform::IsProcessRunning("AppleMusic.exe") ? "is open" : "is closed") +
+       (platform::IsProcessRunning(std::string(kAppleMusicImage)) ? "is open" : "is closed") +
        " (process check)");
     CheckAppleMusicSurroundings(ok, info, warn);
 
@@ -197,10 +199,10 @@ int CmdDoctor(Context& ctx) {
     }
 
 #ifdef _WIN32
-    if (!std::filesystem::is_regular_file(platform::ExecutableDirectory() / "ampify_launcher.exe", ec)) {
-        warn("ampify_launcher.exe missing next to ampify: ampify launch cannot start Apple Music with the kernel");
+    if (!std::filesystem::is_regular_file(platform::ExecutableDirectory() / kLauncherFile, ec)) {
+        warn(std::string(kLauncherFile) + " missing next to ampify: ampify launch cannot start Apple Music with the kernel");
     } else {
-        ok("ampify_launcher.exe present");
+        ok(std::string(kLauncherFile) + " present");
     }
     platform::AutoStart autoStart = platform::AutoStartState();
     if (!autoStart.registered) {

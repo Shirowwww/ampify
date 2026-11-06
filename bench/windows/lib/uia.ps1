@@ -1,7 +1,6 @@
 # UI Automation helpers for the live bench (bench/windows/live): find Apple Music's elements, click them, type into
 # them like a user, and dump the tree into the job log. Loaded after harness.ps1 (it reuses Get-AppleMusicWindow and
 # the AmpifyWindowCapture type). Works in Windows PowerShell 5.1 and PowerShell 7.
-# Secrets: every text that reaches the log goes through Protect-UiaText, which hides the registered values.
 
 Set-StrictMode -Version Latest
 
@@ -99,35 +98,6 @@ public static class AmpifyInput {
 }
 '@
 }
-
-$script:UiaSecrets = New-Object System.Collections.Generic.List[string]
-
-# Values that must never reach the log, a file or an artifact. Protect-UiaText replaces them with ***.
-function Register-UiaSecret {
-    param([string]$Value)
-    if ($Value -and $Value.Length -ge 3 -and -not $script:UiaSecrets.Contains($Value)) { $script:UiaSecrets.Add($Value) }
-}
-
-function Protect-UiaText {
-    param([string]$Text)
-    if (-not $Text) { return $Text }
-    foreach ($secret in $script:UiaSecrets) {
-        $Text = [regex]::Replace($Text, [regex]::Escape($secret), '***', 'IgnoreCase')
-    }
-    return $Text
-}
-
-# The account and the code come from the workflow's environment: they are registered as soon as this file loads.
-foreach ($uiaSecretName in 'AMPIFY_APPLE_ID', 'AMPIFY_APPLE_PASSWORD', 'AMPIFY_CODE_2FA') {
-    $uiaSecretValue = [Environment]::GetEnvironmentVariable($uiaSecretName)
-    if (-not $uiaSecretValue) { continue }
-    Register-UiaSecret $uiaSecretValue
-    if ($uiaSecretName -eq 'AMPIFY_APPLE_ID' -and $uiaSecretValue.Contains('@')) {
-        $uiaSecretLocal = $uiaSecretValue.Substring(0, $uiaSecretValue.IndexOf('@'))
-        if ($uiaSecretLocal.Length -ge 4) { Register-UiaSecret $uiaSecretLocal }
-    }
-}
-Remove-Variable -Name uiaSecretName, uiaSecretValue, uiaSecretLocal -ErrorAction SilentlyContinue
 
 $script:UiaVirtualKeys = @{
     Enter = 0x0D; Tab = 0x09; Escape = 0x1B; Space = 0x20; Back = 0x08; Delete = 0x2E
@@ -270,34 +240,7 @@ function Find-Element {
     return $null
 }
 
-# Same search, with a timeout that defaults to 30 s. -Required throws when nothing appears.
-function Wait-ForElement {
-    param(
-        $Root = $null,
-        [string]$Name,
-        [string]$NamePattern,
-        [string]$AutomationId,
-        [string]$AutomationIdPattern,
-        [string]$ControlType,
-        [int]$TimeoutSeconds = 30,
-        [switch]$VisibleOnly,
-        [switch]$Required,
-        [string]$Description = ''
-    )
-    $search = @{}
-    foreach ($key in 'Root', 'Name', 'NamePattern', 'AutomationId', 'AutomationIdPattern', 'ControlType') {
-        $value = Get-Variable -Name $key -ValueOnly
-        if ($null -ne $value -and "$value" -ne '') { $search[$key] = $value }
-    }
-    $element = Find-Element @search -TimeoutSeconds $TimeoutSeconds -VisibleOnly:$VisibleOnly
-    if (-not $element -and $Required) {
-        $what = if ($Description) { $Description } else { ($search.Keys | Where-Object { $_ -ne 'Root' } | ForEach-Object { "$_=$($search[$_])" }) -join ', ' }
-        throw "element not found after $TimeoutSeconds s: $what"
-    }
-    return $element
-}
-
-# One line describing an element, for the log (masked).
+# One line describing an element, for the log.
 function Format-Element {
     param($Element)
     try {
@@ -313,7 +256,7 @@ function Format-Element {
         if ($c.AutomationId) { $text += " id=$($c.AutomationId)" }
         if ($c.ClassName) { $text += " class=$($c.ClassName)" }
         if ($flags.Count) { $text += " (" + ($flags -join ', ') + ")" }
-        return (Protect-UiaText $text)
+        return $text
     } catch {
         return '[element gone]'
     }
@@ -352,32 +295,22 @@ function Invoke-Click {
     return 'mouse click'
 }
 
-# Types text into an element like a user: focus, Ctrl+A and Delete to clear it, then Unicode key events. -Secret
-# changes nothing to the typing; the text is never logged anyway. -UseValuePattern sets the value directly instead,
-# which web pages may not notice. Returns how it typed.
+# Types text into an element like a user: focus, Ctrl+A and Delete to clear it, then Unicode key events. Returns how it
+# typed.
 function Set-Text {
-    param([Parameter(Mandatory)]$Element, [Parameter(Mandatory)][string]$Text, [switch]$Secret, [switch]$NoClear, [switch]$UseValuePattern)
-    if ($UseValuePattern) {
-        $value = $null
-        if ($Element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$value) -and -not $value.Current.IsReadOnly) {
-            $value.SetValue($Text)
-            return 'ValuePattern'
-        }
-    }
+    param([Parameter(Mandatory)]$Element, [Parameter(Mandatory)][string]$Text)
     Show-AppleMusicWindow | Out-Null
     try { $Element.SetFocus() } catch { Invoke-Click -Element $Element -Mouse | Out-Null }
     Start-Sleep -Milliseconds 200
-    if (-not $NoClear) {
-        Send-Key Control, A
-        Send-Key Delete
-    }
+    Send-Key Control, A
+    Send-Key Delete
     $sent = [AmpifyInput]::SendText($Text, 25)
     if ($sent -ne $Text.Length) { throw "incomplete typing: $sent character(s) out of $($Text.Length)" }
     return 'keyboard'
 }
 
 # The tree under an element, one line per element, indented by depth (Control view by default, -Raw for every
-# element). Returns at most -MaxLines lines, masked.
+# element). Returns at most -MaxLines lines.
 function Get-TreeDump {
     param([Parameter(Mandatory)]$Root, [int]$MaxDepth = 30, [int]$MaxLines = 400, [switch]$Raw)
     $walker = if ($Raw) { [System.Windows.Automation.TreeWalker]::RawViewWalker } else { [System.Windows.Automation.TreeWalker]::ControlViewWalker }

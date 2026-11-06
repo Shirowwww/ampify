@@ -448,13 +448,10 @@ except ImportError:  # optional: the cross-check only runs where jsonschema is i
     Draft202012Validator = None
 
 
-REQUIRED_EXPORTS = [
-    "AVCFPlayerCopyCurrentItem",
-    "AVCFPlayerItemCopyCurrentStableVariantID",
-    "AVCFPlayerItemCopyTracks",
-    "AVCFPlayerItemTrackCopyAssetTrack",
-    "AVCFPlayerSetVolume",
-]
+with open(os.path.join(REPO, "facts", "apple.json"), encoding="utf-8") as _facts:
+    REQUIRED_EXPORTS = json.load(_facts)["requiredPlayerExports"]
+with open(os.path.join(REPO, "facts", "release.json"), encoding="utf-8") as _facts:
+    LANGUAGES = {language["code"] for language in json.load(_facts)["languages"]}
 
 
 def tested_version(**changes):
@@ -480,8 +477,9 @@ class VersionsTests(unittest.TestCase):
         code, text = run("versions", os.path.join(CATALOG, "versions.json"))
         self.assertEqual(code, 0, text)
 
-    def test_required_exports_match_the_kernel(self):
+    def test_required_exports_are_those_the_kernel_is_built_with(self):
         self.assertEqual(validate.required_exports(), REQUIRED_EXPORTS)
+        self.assertIn("AVCFPlayerSetVolume", REQUIRED_EXPORTS)
 
     def test_valid_version_passes(self):
         code, text = self.write([tested_version()])
@@ -638,7 +636,6 @@ class SchemaSubsetTests(unittest.TestCase):
 class SnippetContentTests(unittest.TestCase):
     """Every snippet of the repository: its texts in the eight languages and the element names it uses."""
 
-    LANGUAGES = {"fr", "de", "es", "pt", "ru", "ja", "zh"}
     SNIPPETS = os.path.join(REPO, "themes", "snippets")
 
     @staticmethod
@@ -663,7 +660,7 @@ class SnippetContentTests(unittest.TestCase):
             with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as handle:
                 data = json.load(handle)
             with self.subTest(snippet=data["id"]):
-                self.assertEqual(set(data.get("translations", {})), self.LANGUAGES)
+                self.assertEqual(set(data.get("translations", {})), LANGUAGES)
                 for setting in data.get("settings", []):
                     for language, texts in data["translations"].items():
                         self.assertIn(setting["key"], texts.get("settings", {}), language)

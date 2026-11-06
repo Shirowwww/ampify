@@ -41,6 +41,8 @@
 #include "../src/core/theme/theme_settings.hpp"
 #include "../src/core/theme/worker.hpp"
 #include "../src/core/color_extract.hpp"
+#include "../src/core/text_util.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace th = ampify::theme;
@@ -324,13 +326,6 @@ std::string ProblemContaining(const th::Theme& theme, std::string_view fragment)
         if (problem.find(fragment) != std::string::npos) return problem;
     }
     return {};
-}
-
-std::string TempFolder(const char* name) {
-    std::filesystem::path folder = std::filesystem::temp_directory_path() / ("ampify-theme-test-" + std::string(name));
-    std::filesystem::remove_all(folder);
-    std::filesystem::create_directories(folder);
-    return folder.string();
 }
 
 }  // namespace
@@ -2566,7 +2561,8 @@ TEST_CASE(Engine_ForgetsTheDecorOfAPanelThatWentAway) {
 // --- Library, watcher and settings -----------------------------------------------------------------------
 
 TEST_CASE(Library_ListsOnlyFoldersWithThemeFiles) {
-    std::string root = TempFolder("library");
+    ampify::test::ScratchDir rootDir("library");
+    std::string root = rootDir.string();
     std::filesystem::path base(root);
     std::filesystem::create_directories(base / "midnight");
     std::filesystem::create_directories(base / "empty");
@@ -2584,7 +2580,8 @@ TEST_CASE(Library_ListsOnlyFoldersWithThemeFiles) {
 }
 
 TEST_CASE(Library_SignatureChangesWhenAFileChanges) {
-    std::string root = TempFolder("signature");
+    ampify::test::ScratchDir rootDir("signature");
+    std::string root = rootDir.string();
     std::filesystem::path folder(root);
     { std::ofstream(folder / "colors.ini") << "[Base]\nA = 111111\n"; }
     std::string before = th::FolderSignature(folder);
@@ -2773,7 +2770,7 @@ TEST_CASE(Examples_LoadWithEverySettingChanged) {
             using Type = ampify::SettingSpec::Type;
             options.settings[spec.key] = spec.type == Type::Toggle ? (spec.defaultValue == "true" ? "false" : "true")
                                          : spec.type == Type::Choice ? spec.options.back()
-                                         : spec.type == Type::Number ? ampify::SettingNumberText(spec.min.value_or(0))
+                                         : spec.type == Type::Number ? ampify::ShortestNumberText(spec.min.value_or(0))
                                                                      : "x";
         }
         th::Theme byDefault = th::LoadTheme(name, folder.generic_string(), files);
@@ -2978,7 +2975,8 @@ std::vector<std::string> Args(std::initializer_list<const char*> values) {
 }  // namespace
 
 TEST_CASE(Commands_NamesReportsClassesFoundInNoTree) {
-    std::string root = TempFolder("names");
+    ampify::test::ScratchDir rootDir("names");
+    std::string root = rootDir.string();
     std::filesystem::path folder(root);
     { std::ofstream(folder / "tiny.json") << R"({"version":1,"nodes":[{"index":0,"type":"Grid","name":"Nothing","parent":-1,"depth":0}]})"; }
     { std::ofstream(folder / "broken.json") << "[]"; }
@@ -2999,7 +2997,8 @@ TEST_CASE(Commands_NamesReportsClassesFoundInNoTree) {
 }
 
 TEST_CASE(Commands_WatchRechecksWhenAFileChanges) {
-    std::string root = TempFolder("watch");
+    ampify::test::ScratchDir rootDir("watch");
+    std::string root = rootDir.string();
     std::filesystem::path folder(root);
     { std::ofstream(folder / "colors.ini") << "[Base]\nAccent = 0A84FF\n"; }
 
@@ -3663,7 +3662,8 @@ TEST_CASE(Snippets_EnabledInIdOrderAndDictionariesCombined) {
     CHECK(combined.find("<?xml") == std::string::npos);
     CHECK(combined.find("<A x:Key") < combined.find("<B x:Key"));  // the snippet comes last, so it wins
 
-    std::string folder = TempFolder("snippet-list");
+    ampify::test::ScratchDir folderDir("snippet-list");
+    std::string folder = folderDir.string();
     WriteFile(std::filesystem::path(folder) / "b" / "user.css", "Page { opacity: 1; }");
     WriteFile(std::filesystem::path(folder) / "a" / "resources.xaml", "<ResourceDictionary/>");
     WriteFile(std::filesystem::path(folder) / "c" / "notes.txt", "not a snippet");
@@ -4097,7 +4097,7 @@ TEST_CASE(Settings_ThemeValuesAreReadUnderTheirOwnPrefix) {
 }
 
 TEST_CASE(Worker_ReloadsWhenASettingOfTheActiveThemeChanges) {
-    std::filesystem::path kit(TempFolder("worker-settings"));
+    ampify::test::ScratchDir kit("worker-settings");
     WriteFile(kit / "themes" / "test" / "manifest.json", kSettingsManifest);
     WriteFile(kit / "themes" / "test" / "user.css", "@setting hide-radio { #Radio { visibility: collapsed; } }\n");
 
@@ -4118,7 +4118,7 @@ TEST_CASE(Worker_ReloadsWhenASettingOfTheActiveThemeChanges) {
 // Import writes the file's values into settings.txt and Reset all takes the keys out: both must apply the theme again,
 // as a click on the card does, and a reset must give the manifest's default back.
 TEST_CASE(Worker_ReloadsAfterAnImportAndAfterAReset) {
-    std::filesystem::path kit(TempFolder("worker-import"));
+    ampify::test::ScratchDir kit("worker-import");
     WriteFile(kit / "themes" / "test" / "manifest.json", kSettingsManifest);
     WriteFile(kit / "themes" / "test" / "user.css", "@setting hide-radio { #Radio { visibility: collapsed; } }\n");
 
@@ -4148,7 +4148,7 @@ TEST_CASE(Worker_ReloadsAfterAnImportAndAfterAReset) {
 }
 
 TEST_CASE(Worker_StartsOnTheSchemeTheManifestNames) {
-    std::filesystem::path kit(TempFolder("worker-default"));
+    ampify::test::ScratchDir kit("worker-default");
     WriteFile(kit / "themes" / "midnight" / "colors.ini", "[Base]\nA = FFFFFF\n\n[Dark]\nA = 000000\n");
     WriteFile(kit / "themes" / "midnight" / "manifest.json", R"({"id": "midnight", "defaultScheme": "Dark"})");
 
@@ -4228,7 +4228,7 @@ TEST_CASE(Accent_WithoutAThemeAppliesTheAccentAlone) {
     CHECK(Assigned(alone, ".scrubber", "Foreground") == "#FFFA2D48");
     CHECK(!alone.dark.has_value());  // Apple Music keeps its own light or dark mode
 
-    std::filesystem::path kit(TempFolder("worker-accent"));
+    ampify::test::ScratchDir kit("worker-accent");
     ampify::Settings settings;
     th::ThemeWorker worker(kit);
     th::SessionRequest none = worker.Tick(settings, 600);
@@ -4243,7 +4243,7 @@ TEST_CASE(Accent_WithoutAThemeAppliesTheAccentAlone) {
 }
 
 TEST_CASE(Worker_ReloadsOnlyWhenSomethingChanges) {
-    std::filesystem::path kit(TempFolder("worker"));
+    ampify::test::ScratchDir kit("worker");
     WriteFile(kit / "themes" / "midnight" / "colors.ini", "[Light]\nA = FFFFFF\n\n[Dark]\nA = 000000\n");
     WriteFile(kit / "themes" / "midnight" / "user.css", "Page { background: $A; }\n");
     WriteFile(kit / "snippets" / "calm" / "user.css", "Page { opacity: 0.5; }\n");
@@ -5445,7 +5445,7 @@ TEST_CASE(Theme_ASnippetSeesTheArtworkColoursWithoutATheme) {
 }
 
 TEST_CASE(Worker_ReloadsForANewArtworkOnlyWhenTheThemeUsesIt) {
-    std::filesystem::path kit(TempFolder("worker-artwork"));
+    ampify::test::ScratchDir kit("worker-artwork");
     WriteFile(kit / "themes" / "art" / "user.css", ".sidebar { background: var(--art-1, #000000); }\n");
     WriteFile(kit / "themes" / "plain" / "user.css", ".sidebar { background: #000000; }\n");
     ampify::Settings settings;
@@ -5466,7 +5466,7 @@ TEST_CASE(Worker_ReloadsForANewArtworkOnlyWhenTheThemeUsesIt) {
 }
 
 TEST_CASE(Worker_GlassLevelLightensTheThemeAndItsSnippets) {
-    std::filesystem::path kit(TempFolder("worker-glass"));
+    ampify::test::ScratchDir kit("worker-glass");
     WriteFile(kit / "themes" / "pane" / "user.css", ".sidebar { backdrop: acrylic(#FF141822, 0.72); box-shadow: 28px; }\n");
     WriteFile(kit / "snippets" / "frost" / "user.css", ".content { backdrop: acrylic(#FF000000, 0.5); }\n");
     ampify::Settings settings;
@@ -5487,7 +5487,7 @@ TEST_CASE(Worker_GlassLevelLightensTheThemeAndItsSnippets) {
 }
 
 TEST_CASE(Worker_ReloadsForANewPageArtworkWhenTheThemeUsesIt) {
-    std::filesystem::path kit(TempFolder("worker-page-artwork"));
+    ampify::test::ScratchDir kit("worker-page-artwork");
     WriteFile(kit / "themes" / "page" / "user.css", ".sidebar { background: var(--page-art-1, #000000); }\n");
     ampify::Settings settings;
     settings.Set("theme.active", "page");
@@ -5557,7 +5557,7 @@ TEST_CASE(Accent_ArtworkValueIsRecognisedAndKeptLegible) {
 }
 
 TEST_CASE(Worker_AccentArtworkFollowsTheSongAndReloadsOnlyWhenItMoves) {
-    std::filesystem::path kit(TempFolder("worker-accent-artwork"));
+    ampify::test::ScratchDir kit("worker-accent-artwork");
     ampify::Settings settings;
     settings.Set("theme.accent", "artwork");
     th::ThemeWorker worker(kit);

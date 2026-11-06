@@ -33,6 +33,7 @@
 #include "../core/build_signature.hpp"
 #include "../core/injection_policy.hpp"
 #include "../core/journal.hpp"
+#include "../core/kit_layout.hpp"
 #include "../core/launch_flags.hpp"
 #include "../core/off_notice.hpp"
 #include "../core/orphan_agent.hpp"
@@ -115,7 +116,7 @@ bool InjectInto(ampify::Journal& journal, DWORD processId, const std::filesystem
 // it), so the hold begins when ActivateApp returns. The app may already have run for a moment by then: the
 // log says how many threads were held and whether the kernel loaded during the hold.
 bool InjectWhileHeld(ampify::Journal& journal, DWORD processId, const std::filesystem::path& kernelDll) {
-    std::string label = "AppleMusic.exe (" + std::to_string(processId) + ")";
+    std::string label = std::string(ampify::kAppleMusicImage) + " (" + std::to_string(processId) + ")";
     HANDLE process = ampify::launcher::OpenProcessForInjection(processId);
     if (!process) {
         journal.Write(label + ": could not open, no pause (Windows error " +
@@ -177,7 +178,7 @@ bool WaitOrStop(HANDLE stop, DWORD ms) {
 bool IsPackageAgent(const std::wstring& image, const std::filesystem::path& packageDirectory) {
     const std::wstring prefix = packageDirectory.wstring();
     return image.size() > prefix.size() && _wcsnicmp(image.c_str(), prefix.c_str(), prefix.size()) == 0 &&
-           _wcsicmp(std::filesystem::path(image).filename().c_str(), L"AMPLibraryAgent.exe") == 0;
+           _wcsicmp(std::filesystem::path(image).filename().c_str(), ampify::kLibraryAgentImageW) == 0;
 }
 
 // The full image path of `process`, empty when Windows does not give it.
@@ -245,7 +246,7 @@ public:
             return ampify::OrphanAction::None;
         }
         std::vector<uint32_t> agents =
-            m_refusals.Untried(PackageIds(ampify::launcher::FindPackageProcesses(L"AMPLibraryAgent.exe", packageDirectory)));
+            m_refusals.Untried(PackageIds(ampify::launcher::FindPackageProcesses(ampify::kLibraryAgentImageW, packageDirectory)));
         if (agents.empty()) {
             m_since = 0;
             return ampify::OrphanAction::None;
@@ -276,7 +277,7 @@ private:
 void ClearOrphanAgent(ampify::Journal& journal, const std::filesystem::path& packageDirectory, bool enabled) {
     OrphanAgentWatch watch(enabled);
     while (true) {
-        bool appRunning = !ampify::launcher::FindPackageProcesses(L"AppleMusic.exe", packageDirectory).empty();
+        bool appRunning = !ampify::launcher::FindPackageProcesses(ampify::kAppleMusicImageW, packageDirectory).empty();
         if (watch.Step(journal, packageDirectory, appRunning) != ampify::OrphanAction::WaitForExit) return;
         Sleep(kPollIntervalMs);
     }
@@ -296,7 +297,7 @@ void Supervise(ampify::Journal& journal, const std::filesystem::path& packageDir
         ampify::WatchSnapshot snapshot;
         snapshot.seconds = std::chrono::duration<double>(Clock::now() - started).count();
         std::vector<std::vector<DWORD>> running =
-            ampify::launcher::FindPackageProcesses({L"AppleMusic.exe", L"AMPLibraryAgent.exe"}, packageDirectory);
+            ampify::launcher::FindPackageProcesses({ampify::kAppleMusicImageW, ampify::kLibraryAgentImageW}, packageDirectory);
         snapshot.appProcesses = PackageIds(running[0]);
         snapshot.agentProcesses = PackageIds(running[1]);
         for (uint32_t processId : snapshot.appProcesses) {
@@ -311,7 +312,7 @@ void Supervise(ampify::Journal& journal, const std::filesystem::path& packageDir
         for (uint32_t processId : actions.inject) {
             bool isApp = std::find(snapshot.appProcesses.begin(), snapshot.appProcesses.end(), processId) !=
                          snapshot.appProcesses.end();
-            std::string image = isApp ? "AppleMusic.exe" : "AMPLibraryAgent.exe";
+            std::string image(isApp ? ampify::kAppleMusicImage : ampify::kLibraryAgentImage);
             InjectInto(journal, processId, kernelDll, image + " (" + std::to_string(processId) + ")");
         }
 
@@ -378,9 +379,9 @@ std::optional<Session> OpenSession(ampify::Journal& journal, const std::filesyst
     session.signature = ampify::CheckBuildSignature(ampify::win::ReadFileBytes(session.PlayerDll()));
     journal.Write(ampify::DescribeSignature(session.signature));
 
-    session.kernelDll = ampify::win::ExecutablePath().parent_path() / L"ampify_kernel.dll";
+    session.kernelDll = ampify::win::ExecutablePath().parent_path() / ampify::kKernelFile;
     session.kernelPresent = std::filesystem::exists(session.kernelDll);
-    if (!session.kernelPresent) journal.Write("ampify_kernel.dll not found next to the launcher");
+    if (!session.kernelPresent) journal.Write(std::string(ampify::kKernelFile) + " not found next to the launcher");
     session.extraVersions = ampify::LoadVersionList(kit / std::string(ampify::kVersionListFile));
     return session;
 }
@@ -410,7 +411,7 @@ void FollowOpenApp(ampify::Journal& journal, const Session& session, ampify::Saf
     journal.Write("Apple Music already open (process " + std::to_string(processId) + "): " + verdict.reason);
 
     bool injected = inject && InjectInto(journal, processId, session.kernelDll,
-                                         "AppleMusic.exe (" + std::to_string(processId) + ")");
+                                         std::string(ampify::kAppleMusicImage) + " (" + std::to_string(processId) + ")");
     Supervise(journal, session.package.directory, session.kernelDll, MakeWatchConfig(inject, !injected), processId,
               &safeMode, stop);
 }
@@ -462,7 +463,7 @@ int Run(ampify::Journal& journal, const std::filesystem::path& kit) {
         return 1;
     }
     ampify::SafeMode safeMode((kit / "state.txt").string());
-    std::vector<DWORD> running = ampify::launcher::FindPackageProcesses(L"AppleMusic.exe", session->package.directory);
+    std::vector<DWORD> running = ampify::launcher::FindPackageProcesses(ampify::kAppleMusicImageW, session->package.directory);
     if (!running.empty()) {
         FollowOpenApp(journal, *session, safeMode, running.front(), nullptr);
         return 0;
@@ -542,7 +543,7 @@ private:
         std::filesystem::path folder = ampify::win::ExecutablePath().parent_path();
         std::error_code ec;
         if (!std::filesystem::equivalent(folder, ampify::win::InstallDirectory(), ec)) return;  // a build folder
-        std::filesystem::path cli = folder / L"ampify.exe";
+        std::filesystem::path cli = folder / ampify::kCliFile;
         if (!std::filesystem::exists(cli)) return;
         HANDLE log = OpenLog();
         STARTUPINFOW startup{};
@@ -578,10 +579,10 @@ int RunBackground(ampify::Journal& journal, const std::filesystem::path& kit, HA
     // Read again after an Apple Music update, and after each session. Missing, it is looked for again quietly.
     std::optional<Session> session = OpenSession(journal, kit);
     std::ostringstream quiet;
-    ampify::Journal quietJournal(quiet, ampify::Journal::LocalTimeStamp);
+    ampify::Journal quietJournal(quiet);
     bool firstLook = true;
     AutoUpdater updater;
-    ampify::win::ProcessWatch appleMusic(L"AppleMusic.exe");
+    ampify::win::ProcessWatch appleMusic(ampify::kAppleMusicImageW);
     // The setting is read at each session, so it applies the next time Apple Music starts.
     OrphanAgentWatch orphanAgent(OrphanAgentSettingOn(kit));
     ULONGLONG lastOrphanLook = 0;
@@ -604,7 +605,7 @@ int RunBackground(ampify::Journal& journal, const std::filesystem::path& kit, HA
             quiet.str({});
         }
         std::vector<DWORD> running;
-        if (session) running = ampify::launcher::FindPackageProcesses(L"AppleMusic.exe", session->package.directory);
+        if (session) running = ampify::launcher::FindPackageProcesses(ampify::kAppleMusicImageW, session->package.directory);
         if (running.empty()) {
             wait = kBackgroundRetryMs;  // an AppleMusic.exe from somewhere else, or Apple Music not installed
             continue;
@@ -678,9 +679,9 @@ int RunAttach(ampify::Journal& journal, const std::filesystem::path& kit, DWORD 
     std::optional<Session> session = OpenSession(journal, kit);
     if (!session) return 1;
 
-    bool isApp = _stricmp(image.c_str(), "AppleMusic.exe") == 0;
+    bool isApp = ampify::RoleOfImageName(image) == ampify::ProcessRole::AppleMusic;
     bool appOpen = isApp &&
-                   ampify::launcher::FindPackageProcesses(L"AppleMusic.exe", session->package.directory).size() > 1;
+                   ampify::launcher::FindPackageProcesses(ampify::kAppleMusicImageW, session->package.directory).size() > 1;
     bool counted = isApp && !appOpen;
     ampify::SafeMode safeMode((kit / "state.txt").string());
     ampify::PolicyVerdict verdict = session->Decide(counted ? safeMode.BeginLaunch() : safeMode.IsActive());
@@ -770,7 +771,7 @@ int MainAttach() {
     std::error_code ec;
     bool restart = std::filesystem::file_size(logFile, ec) > kAttachLogLimit && !ec;
     std::ofstream file(logFile, restart ? std::ios::trunc : std::ios::app);
-    ampify::Journal journal(file, ampify::Journal::LocalTimeStamp);
+    ampify::Journal journal(file);
     if (!parsed) {
         journal.Write("--attach without -p <process> -tid <thread>: nothing to do");
         return 1;
@@ -806,7 +807,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
     std::ofstream file(ampify::win::JournalFile(background ? "background.log" : "launcher.log"), std::ios::trunc);
-    ampify::Journal journal(file, ampify::Journal::LocalTimeStamp);
+    ampify::Journal journal(file);
 
     int code = 1;
     try {

@@ -5,16 +5,12 @@
 #include <string_view>
 #include <vector>
 
+#include "apple_facts.hpp"
+
 namespace ampify {
 
-// Builds of Apple Music the kernel has been tested on, as shown by the package version
-// (`AppleInc.AppleMusicWin_<version>_x64__...`). Hooks are only installed on these builds.
-// On any other build the kernel stays idle: the app runs untouched, nothing is guessed by address.
-inline constexpr std::string_view kKnownAppVersions[] = {
-    "1.1540.23042.0",
-    "1.1792.39682.0",  // Windows bench, 30/10/2026: injection in both processes, export signature recognized
-};
-
+// Hooks are only installed on the builds of kKnownAppVersions (facts/apple.json) or versions.txt. On any other build
+// the kernel stays idle: the app runs untouched, nothing is guessed by address.
 bool IsKnownAppVersion(std::string_view version,
                        std::span<const std::string_view> known = kKnownAppVersions);
 

@@ -61,8 +61,8 @@ struct UiNatives : ScriptBridge {
         if (!Require(ctx, ext, std::string(PlacementPermission(placement)), &failure)) return failure;
         std::string label = String(ctx, argc, argv, 1).value_or("").substr(0, kMaxUiLabel);
         std::string icon = String(ctx, argc, argv, 2).value_or("").substr(0, kMaxUiIcon);
-        // Argument 3, false for a text that only shows something (no onClick); older preludes leave it out.
-        bool clickable = argc < 4 || JS_ToBool(ctx, argv[3]) != 0;
+        // Argument 3, false for a text that only shows something (no onClick).
+        bool clickable = JS_ToBool(ctx, argv[3]) != 0;
         // Argument 4, the submenu an entry of a menu belongs to (0 or left out: the menu itself).
         int parent = argc >= 5 ? static_cast<int>(Number(ctx, argc, argv, 4)) : 0;
         int id = HostOf(ext).Ui().AddControl(ext->id(), placement, label, icon, clickable, parent);

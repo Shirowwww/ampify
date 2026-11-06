@@ -151,9 +151,9 @@ ThemeService::~ThemeService() {
     Stop();
 }
 
-void ThemeService::Start(HINSTANCE module, DWORD processId) {
+void ThemeService::Start(HINSTANCE module) {
     if (m_running.exchange(true)) return;
-    m_worker = std::thread([this, module, processId] { Run(module, processId); });
+    m_worker = std::thread([this, module] { Run(module); });
 }
 
 void ThemeService::Stop() {
@@ -162,8 +162,8 @@ void ThemeService::Stop() {
     DetachUiThread();
 }
 
-void ThemeService::Run(HINSTANCE module, DWORD processId) {
-    while (m_running && !AttachUiThread(processId, module)) std::this_thread::sleep_for(kAttachRetry);
+void ThemeService::Run(HINSTANCE module) {
+    while (m_running && !AttachUiThread()) std::this_thread::sleep_for(kAttachRetry);
     if (!m_running) return;
     m_journal.Write("Themes: interface thread ready (DispatcherQueue of the main window)");
     {

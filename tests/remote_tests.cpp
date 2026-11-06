@@ -1,5 +1,5 @@
-// The local remote control without a socket: the HTTP request parser, the loopback and token rules, the router
-// (src/core/remote_protocol.*), and Ampify.remote.setState.
+// The local remote control without a socket: the HTTP request parser, the loopback and token rules
+// (src/core/remote_http.*), the routes (src/core/remote_protocol.*), and Ampify.remote.setState.
 
 #include <optional>
 #include <string>
@@ -20,8 +20,8 @@ struct FakeBackend : ampify::remote::Backend {
     std::vector<double> gains;
     bool accept = true;
     std::string StatusJson() override { return R"({"playing":true})"; }
-    bool Command(std::string_view action) override {
-        commands.emplace_back(action);
+    bool Command(ampify::remote::Action action) override {
+        commands.emplace_back(ampify::remote::ActionName(action));
         return accept;
     }
     std::optional<double> SetGainDb(double db) override {
@@ -33,10 +33,7 @@ struct FakeBackend : ampify::remote::Backend {
 
 ampify::remote::Request Parse(const std::string& text) {
     ampify::remote::Request request;
-    size_t used = 0;
-    ParseStatus status = ampify::remote::ParseRequest(text, request, &used);
-    CHECK(status == ParseStatus::Complete);
-    CHECK(used == text.size());
+    CHECK(ampify::remote::ParseRequest(text, request) == ParseStatus::Complete);
     return request;
 }
 
@@ -53,8 +50,7 @@ std::string WithToken(const std::string& method, const std::string& target, cons
 }
 
 ampify::remote::Response Handle(const std::string& text, FakeBackend& backend, bool loopback = true) {
-    ampify::remote::Router router(kToken);
-    return router.Handle(Parse(text), loopback, backend);
+    return ampify::remote::Handle(Parse(text), loopback, kToken, backend);
 }
 
 }  // namespace
@@ -92,6 +88,21 @@ TEST_CASE(RemoteParser_AsksForMoreAndRefusesWhatItCannotRead) {
           ParseStatus::TooLarge);
     CHECK(ampify::remote::ParseRequest("GET /x HTTP/1.1\r\nA: " + std::string(9000, 'a'), request) ==
           ParseStatus::TooLarge);
+    // Just above the body bound is too large; a number that is not a plausible length is unreadable.
+    CHECK(ampify::remote::ParseRequest("POST /x HTTP/1.1\r\nContent-Length: 4097\r\n\r\n", request) ==
+          ParseStatus::TooLarge);
+    CHECK(ampify::remote::ParseRequest("POST /x HTTP/1.1\r\nContent-Length: 9999999\r\n\r\n", request) ==
+          ParseStatus::Bad);
+}
+
+TEST_CASE(RemoteProtocol_NamesTheActionsAndAnswersUnreadableRequests) {
+    using ampify::remote::Action;
+    CHECK(ampify::remote::ActionName(Action::Play) == "play");
+    CHECK(ampify::remote::ActionName(Action::Pause) == "pause");
+    CHECK(ampify::remote::ActionName(Action::Next) == "next");
+    CHECK(ampify::remote::ActionName(Action::Previous) == "previous");
+    CHECK(ampify::remote::UnreadableResponse(ParseStatus::TooLarge).status == 413);
+    CHECK(ampify::remote::UnreadableResponse(ParseStatus::Bad).status == 400);
 }
 
 TEST_CASE(RemoteProtocol_LoopbackAndTokens) {
@@ -131,8 +142,7 @@ TEST_CASE(RemoteRouter_RefusesOtherPeersHostsPagesAndMissingTokens) {
     CHECK(Handle(Raw("GET", "/status?token=" + kToken), backend).status == 400);
     CHECK(backend.commands.empty());
 
-    ampify::remote::Router unconfigured("");
-    CHECK(unconfigured.Handle(Parse(WithToken("GET", "/status")), true, backend).status == 503);
+    CHECK(ampify::remote::Handle(Parse(WithToken("GET", "/status")), true, "", backend).status == 503);
 }
 
 TEST_CASE(RemoteRouter_RoutesStatusCommandsAndVolume) {

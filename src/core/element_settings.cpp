@@ -78,7 +78,7 @@ std::optional<std::string> StoredValue(const SettingSpec& spec, const Json& valu
             const double* number = value.AsNumber();
             if (!number || !std::isfinite(*number)) return std::nullopt;
             if ((spec.min && *number < *spec.min) || (spec.max && *number > *spec.max)) return std::nullopt;
-            return SettingNumberText(*number);
+            return ShortestNumberText(*number);
         }
         case SettingSpec::Type::Choice: {
             const std::string* text = value.AsString();
@@ -124,7 +124,7 @@ bool CheckHeader(const Json& root, std::string_view kind, std::string_view id, I
     const Json* versionField = root.Find("version");
     const double* version = versionField ? versionField->AsNumber() : nullptr;
     if (!format || *format != kFileFormat || !version) return Refuse(refusal, "settings.refusedNotSettings");
-    if (*version != kFileVersion) return Refuse(refusal, "settings.refusedVersion", SettingNumberText(*version));
+    if (*version != kFileVersion) return Refuse(refusal, "settings.refusedVersion", ShortestNumberText(*version));
     const std::string* fileKind = TextField(root, "kind");
     const std::string* fileId = TextField(root, "id");
     if (!fileKind || *fileKind != kind || !fileId || *fileId != id) {

@@ -27,15 +27,16 @@ SCHEMAS = {
     "versions": os.path.join(ROOT, "schemas", "versions.schema.json"),
 }
 
-# The exports the kit needs (src/core/build_signature.hpp), and every export of the relevant DLL (knowledge/exports).
-BUILD_SIGNATURE = os.path.join(ROOT, "src", "core", "build_signature.hpp")
+# The exports the kit needs (facts/apple.json), and every export of the relevant DLL (knowledge/exports).
+APPLE_FACTS = os.path.join(ROOT, "facts", "apple.json")
 KNOWN_EXPORTS = os.path.join(ROOT, "knowledge", "exports", "AVFoundationCF.txt")
 
 # Largest preview image a manifest may ship (src/cli/element.hpp, kMaxPreviewBytes).
 MAX_PREVIEW_BYTES = 2 * 1024 * 1024
 
-# Major version of the kit API this script knows. Entries for another major version are refused.
-KIT_API_MAJOR = 1
+# Major version of the kit API (facts/release.json). Entries for another major version are refused.
+with open(os.path.join(ROOT, "facts", "release.json"), encoding="utf-8") as _facts:
+    KIT_API_MAJOR = int(json.load(_facts)["kitApi"].split(".")[0])
 
 # Keywords that are accepted and ignored.
 ANNOTATIONS = {"$schema", "$id", "$comment", "title", "description", "default", "examples"}
@@ -47,8 +48,6 @@ RULES = {
 }
 # Keywords whose value maps names to subschemas.
 SUBSCHEMA_MAPS = ("properties", "$defs")
-# Keywords whose value is a subschema (or a boolean, for additionalProperties).
-SUBSCHEMA_KEYWORDS = ("items", "additionalProperties")
 
 TYPE_CHECKS = {
     "object": lambda v: isinstance(v, dict),
@@ -170,17 +169,15 @@ def check_kit_api(kit_api, where):
 
 
 def required_exports():
-    """Names of kRequiredPlayerExports in src/core/build_signature.hpp: what a tested version must have been checked for."""
-    with open(BUILD_SIGNATURE, encoding="utf-8") as handle:
-        text = handle.read()
-    block = re.search(r"kRequiredPlayerExports\[\]\s*=\s*\{(.*?)\};", text, re.S)
-    if block is None:
-        raise SchemaError("kRequiredPlayerExports not found in src/core/build_signature.hpp")
-    return re.findall(r'"([^"]+)"', block.group(1))
+    """requiredPlayerExports of facts/apple.json: what a tested version must have been checked for."""
+    with open(APPLE_FACTS, encoding="utf-8") as handle:
+        return json.load(handle)["requiredPlayerExports"]
 
 
-def check_versions(doc, path):
-    """Rules a schema cannot express for versions.json: unique versions, and exports that cover what Ampify needs."""
+def check_versions(doc, _path):
+    """Rules a schema cannot express for versions.json: unique versions, and exports that cover what Ampify needs.
+
+    Every semantic check takes the document and its path; this one needs no path."""
     errors = []
     required = required_exports()
     known = None
@@ -321,7 +318,11 @@ def check_manifest(doc, path):
     return errors
 
 
-SEMANTIC_CHECKS = {"catalog": check_catalog, "manifest": check_manifest, "versions": check_versions}
+SEMANTIC_CHECKS = {
+    "catalog": check_catalog,
+    "manifest": check_manifest,
+    "versions": check_versions,
+}
 
 
 def main(argv=None):

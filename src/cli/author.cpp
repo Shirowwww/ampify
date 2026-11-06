@@ -89,7 +89,7 @@ int CmdBuild(Context& ctx) {
         return Usage(ctx, "build needs a folder, and optionally the .zip file to write");
     }
 
-    std::filesystem::path folder = PathArgument(args[1]);
+    std::filesystem::path folder = Utf8ToPath(args[1]);
     std::string compiled;
     CompileOutcome compile = CompileElementSources(folder, compiled);
     if (compile == CompileOutcome::Failed) return Failure(ctx, compiled);
@@ -104,8 +104,8 @@ int CmdBuild(Context& ctx) {
     }
     const ElementManifest& manifest = *validation.manifest;
 
-    std::filesystem::path archive = args.size() == 3 ? PathArgument(args[2])
-                                                     : PathArgument(manifest.id + "-" + manifest.version + ".zip");
+    std::filesystem::path archive = args.size() == 3 ? Utf8ToPath(args[2])
+                                                     : Utf8ToPath(manifest.id + "-" + manifest.version + ".zip");
     std::error_code ec;
     if (std::filesystem::exists(archive, ec)) return Failure(ctx, "the file already exists: " + Utf8(archive));
 
@@ -141,7 +141,7 @@ int CmdInspect(Context& ctx) {
     bool installed = false;
 
     if (args.size() == 2) {
-        folder = PathArgument(args[1]);
+        folder = Utf8ToPath(args[1]);
     } else if (args.size() == 3) {
         if (FolderOfKind(args[1]).empty()) {
             return Failure(ctx, "unknown type: " + args[1] + " (extension, theme, snippet or app)");
@@ -202,7 +202,7 @@ int CmdTypes(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() > 2) return Usage(ctx, "types takes a file, or nothing for ampify.d.ts in the current folder");
 
-    std::filesystem::path target = args.size() == 2 ? PathArgument(args[1]) : std::filesystem::current_path() / "ampify.d.ts";
+    std::filesystem::path target = args.size() == 2 ? Utf8ToPath(args[1]) : std::filesystem::current_path() / "ampify.d.ts";
     std::error_code ec;
     if (std::filesystem::is_directory(target, ec)) target /= "ampify.d.ts";
     if (std::filesystem::exists(target, ec) && !ctx.options.yes) {

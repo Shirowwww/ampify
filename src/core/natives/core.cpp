@@ -4,6 +4,7 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 #include "../app_info.hpp"
+#include "release_facts.hpp"
 
 namespace ampify::natives {
 
@@ -50,8 +51,8 @@ void DefineCore(api::NativeScope& scope) {
     scope.Function("log", CoreNatives::Log, 1);
     scope.Function("fault", CoreNatives::Fault, 1);
     scope.Function("require", CoreNatives::Require, 1);
-    scope.String("version", kKernelVersion);
-    scope.String("kitApi", kKitApi);
+    scope.String("version", std::string(kKitVersion));
+    scope.String("kitApi", std::string(kKitApi));
     scope.String("process", ScriptBridge::HostOf(&scope.extension()).Process());
     scope.String("locale", ScriptBridge::HostOf(&scope.extension()).Locale());
     scope.Function("activeTheme", CoreNatives::ActiveTheme, 0);

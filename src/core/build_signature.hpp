@@ -11,19 +11,9 @@
 #include <string_view>
 #include <vector>
 
+#include "apple_facts.hpp"
+
 namespace ampify {
-
-// The player DLL that holds the playback calls the kit needs. M3 checks them; M4 hooks them.
-inline constexpr std::string_view kPlayerDllName = "AVFoundationCF.dll";
-
-// Exports of kPlayerDllName that the kit depends on. Names from knowledge/exports/AVFoundationCF.txt.
-inline constexpr std::string_view kRequiredPlayerExports[] = {
-    "AVCFPlayerCopyCurrentItem",
-    "AVCFPlayerItemCopyCurrentStableVariantID",
-    "AVCFPlayerItemCopyTracks",
-    "AVCFPlayerItemTrackCopyAssetTrack",
-    "AVCFPlayerSetVolume",
-};
 
 struct BuildSignature {
     bool readable = false;             // the bytes are a PE image with a readable export table
@@ -34,7 +24,8 @@ struct BuildSignature {
 // without exports gives an empty list.
 std::optional<std::vector<std::string>> PeExportNames(std::span<const std::byte> image);
 
-// Checks `image` against the required names. Bytes that cannot be read are never a match.
+// Checks `image` against the required names: by default the exports of kPlayerDllName that the Atmos leveler
+// resolves (extensions/atmos-leveler/atmos_windows.cpp). Bytes that cannot be read are never a match.
 BuildSignature CheckBuildSignature(std::span<const std::byte> image,
                                    std::span<const std::string_view> required = kRequiredPlayerExports);
 

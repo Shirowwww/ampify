@@ -2,10 +2,10 @@
 
 #include <psapi.h>
 
-#include <algorithm>
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <vector>
 
 #include "../core/drm_guard.hpp"
@@ -29,6 +29,20 @@ std::string PathOfModule(HMODULE module) {
     }
     path.resize(length);
     return ToUtf8(path);
+}
+
+HMODULE ModuleHolding(const void* address) {
+    HMODULE module = nullptr;
+    constexpr DWORD flags = GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT;
+    return GetModuleHandleExW(flags, reinterpret_cast<LPCWSTR>(address), &module) ? module : nullptr;
+}
+
+// Protected modules are known by path, and reading a path asks the loader, documented to hold its lock while
+// OnDllLoaded waits for g_lock: so this runs before g_lock is taken, never under it. The path, when it is protected.
+std::optional<std::string> ProtectedPath(HMODULE module) {
+    std::string path = module ? PathOfModule(module) : std::string();
+    if (!IsProtectedModule(path)) return std::nullopt;
+    return path;
 }
 
 // Vtables and import tables sit in read-only sections: the page is made writable for one store.
@@ -195,12 +209,11 @@ bool HookVtableEntry(void** entry, void* replacement, void** original, std::stri
         return false;
     }
 
-    std::lock_guard<std::mutex> guard(g_lock);
-    std::string module = ModuleOf(*entry);
-    if (IsProtectedModule(module)) {
-        why = "refused: " + module + " is a protected module";
+    if (std::optional<std::string> module = ProtectedPath(ModuleHolding(*entry))) {
+        why = "refused: " + *module + " is a protected module";
         return false;
     }
+    std::lock_guard<std::mutex> guard(g_lock);
     if (!Replace(entry, replacement, original)) {
         why = "vtable slot cannot be modified";
         return false;
@@ -210,19 +223,28 @@ bool HookVtableEntry(void** entry, void* replacement, void** original, std::stri
 
 namespace {
 
-size_t PatchEveryModule(const char* dll, const char* function, void* replacement, void** original, void* exported) {
+// Every module loaded now. Modules can load between two calls, so it asks again until the list fits.
+std::vector<HMODULE> LoadedModules() {
     std::vector<HMODULE> modules(1024);
-    DWORD needed = 0;
-    if (!EnumProcessModules(GetCurrentProcess(), modules.data(),
-                            static_cast<DWORD>(modules.size() * sizeof(HMODULE)), &needed)) {
-        return 0;
+    while (true) {
+        DWORD needed = 0;
+        if (!EnumProcessModules(GetCurrentProcess(), modules.data(),
+                                static_cast<DWORD>(modules.size() * sizeof(HMODULE)), &needed)) {
+            return {};
+        }
+        size_t count = needed / sizeof(HMODULE);
+        if (count <= modules.size()) {
+            modules.resize(count);
+            return modules;
+        }
+        modules.resize(count + 64);
     }
-    modules.resize(std::min<size_t>(needed / sizeof(HMODULE), modules.size()));
-    // The paths are read before taking g_lock: GetModuleFileName takes the loader lock, which OnDllLoaded holds when
-    // it waits for g_lock.
+}
+
+size_t PatchEveryModule(const char* dll, const char* function, void* replacement, void** original, void* exported) {
     std::vector<HMODULE> allowed;
-    for (HMODULE module : modules) {
-        if (!IsProtectedModule(PathOfModule(module))) allowed.push_back(module);
+    for (HMODULE module : LoadedModules()) {
+        if (!ProtectedPath(module)) allowed.push_back(module);
     }
 
     std::lock_guard<std::mutex> guard(g_lock);
@@ -253,10 +275,8 @@ size_t HookImportFromNowOn(const char* dll, const char* function, void* replacem
 }
 
 std::string ModuleOf(const void* address) {
-    HMODULE module = nullptr;
-    constexpr DWORD flags = GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT;
-    if (!GetModuleHandleExW(flags, reinterpret_cast<LPCWSTR>(address), &module)) return {};
-    return PathOfModule(module);
+    HMODULE module = ModuleHolding(address);
+    return module ? PathOfModule(module) : std::string();
 }
 
 }  // namespace ampify::win

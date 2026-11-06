@@ -43,7 +43,7 @@ std::string Generic(const fs::path& path) {
 }  // namespace
 
 TEST_CASE(ReplayCli_ChecksEachSetAgainstTheManifestBeforeReplaying) {
-    fs::path dir = Scratch("cli-set");
+    ScratchDir dir("cli-set");
     const std::string theme = Generic(ThemeFolder(dir, "night", "Grid#TransportBar { background: #FF112233; }\n",
                                                   kThemeManifest));
     const std::string tree = Generic(Fixture());
@@ -76,7 +76,7 @@ TEST_CASE(ReplayCli_ChecksEachSetAgainstTheManifestBeforeReplaying) {
 }
 
 TEST_CASE(ReplayCli_RefusesAFileForOutAThemeAsASnippetAndAnEmptyWindow) {
-    fs::path dir = Scratch("cli-edges");
+    ScratchDir dir("cli-edges");
     const std::string theme = Generic(ThemeFolder(dir, "night", "Grid#TransportBar { background: #FF112233; }\n",
                                                   kThemeManifest));
     const std::string snippet = Generic(ThemeFolder(dir, "bars", "Grid#TransportBar { opacity: 0.5; }\n",

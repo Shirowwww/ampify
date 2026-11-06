@@ -22,11 +22,13 @@ function Copy-Built {
     }
 }
 
+$files = (Get-Content -LiteralPath (Join-Path $root 'facts\release.json') -Raw | ConvertFrom-Json).files
+
 Remove-Item -LiteralPath $Out -Recurse -Force -ErrorAction SilentlyContinue
-Copy-Built $builds.release (Join-Path $Out 'release') @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify_setup.exe', 'ampify.exe')
-Copy-Built $builds.release (Join-Path $Out 'cli') @('ampify.exe')
-Copy-Built $builds.bench (Join-Path $Out 'bench') @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify.exe')
-Copy-Built $builds.bench (Join-Path $Out 'ui') @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify.exe')
+Copy-Built $builds.release (Join-Path $Out 'release') @($files.launcher, $files.kernel, $files.setup, $files.cli)
+Copy-Built $builds.release (Join-Path $Out 'cli') @($files.cli)
+Copy-Built $builds.bench (Join-Path $Out 'bench') @($files.launcher, $files.kernel, $files.cli)
+Copy-Built $builds.bench (Join-Path $Out 'ui') @($files.launcher, $files.kernel, $files.cli)
 New-Item -ItemType Directory -Force -Path (Join-Path $Out 'ui\examples') | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'themes') -Destination (Join-Path $Out 'ui') -Recurse
 Copy-Item -LiteralPath (Join-Path $root 'examples\react-panel') -Destination (Join-Path $Out 'ui\examples') -Recurse

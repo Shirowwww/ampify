@@ -5,9 +5,10 @@
 #include "../test.hpp"
 
 // Two launchers built in different folders each load their own kernel into the same process. Only the first one may
-// run there; the second must find the process taken. A process id no test runs as keeps the real one free.
+// run there; the second must find the process taken. An id with the top bit set is no real process, and carrying this
+// run's id keeps two runs of the suite at once apart.
 TEST_CASE(WinCommon_OnlyTheFirstKernelClaimsAProcess) {
-    constexpr DWORD kProcess = 0xFFFFFFF0;
+    const DWORD kProcess = 0x80000000u | GetCurrentProcessId();
     CHECK(ampify::win::ClaimKernelOfProcess(kProcess));
     CHECK(!ampify::win::ClaimKernelOfProcess(kProcess));
 }

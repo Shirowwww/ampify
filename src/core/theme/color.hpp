@@ -42,7 +42,6 @@ public:
     void Set(std::string_view name, Argb color);
     void Remove(std::string_view name);
     std::optional<Argb> Find(std::string_view name) const;
-    const std::map<std::string, Argb>& Colors() const { return m_colors; }
 
 private:
     std::map<std::string, Argb> m_colors;  // keys are lowercase

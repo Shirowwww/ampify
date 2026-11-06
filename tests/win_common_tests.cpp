@@ -17,7 +17,7 @@
 // destroyed (topbar_search.cpp, lcd_links.cpp). The listed types hold no XAML reference.
 TEST_CASE(WinSources_NoStaticObjectIsDestroyedAtProcessExit) {
     namespace fs = std::filesystem;
-    const std::set<std::string> plain = {"QueueState", "MfApi"};
+    const std::set<std::string> plain = {"MfApi"};
     const std::regex local(R"(^\s+static ([A-Z]\w*) \w+(\{\})?;)");
     int scanned = 0;
     for (const fs::directory_entry& entry : fs::directory_iterator(fs::path(AMPIFY_SOURCE_DIR) / "src" / "win")) {
@@ -117,4 +117,9 @@ TEST_CASE(WinCommon_AnUpdateChangesTheVersionOfAnExistingUninstallEntryOnly) {
     CHECK(ampify::win::SetDisplayVersion(kTestKey, L"1.1.0"));
     CHECK(ReadDisplayVersion() == L"1.1.0");
     RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\AmpifyTests");
+}
+
+TEST_CASE(WinCommon_CatalogStorefrontIsTwoLetters) {
+    std::wstring storefront = ampify::win::CatalogStorefront();
+    CHECK(storefront.size() == 2);
 }

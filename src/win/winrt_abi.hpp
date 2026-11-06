@@ -23,7 +23,6 @@ namespace ampify::win::rt {
 
 // The combase.dll functions the player needs. Null when combase.dll or one of them is missing.
 struct Combase {
-    HRESULT(WINAPI* RoInitialize)(int type) = nullptr;
     HRESULT(WINAPI* RoGetActivationFactory)(HSTRING classId, REFIID iid, void** factory) = nullptr;
     HRESULT(WINAPI* WindowsCreateString)(LPCWSTR text, UINT32 length, HSTRING* out) = nullptr;
     HRESULT(WINAPI* WindowsDeleteString)(HSTRING text) = nullptr;
@@ -99,16 +98,11 @@ private:
     HSTRING m_h = nullptr;
 };
 
-// The text of an HSTRING returned by a method, as UTF-8; deletes it.
-std::string TakeString(HSTRING text);
-
 // Reads a string property (a getter whose only parameter is HSTRING*) and returns it as UTF-8. Empty on failure.
 std::string ReadString(const Ref& object, int slot);
 
-// "34D100F9-0F0A-5980-8F04-7AF57FDB29B0", with or without braces. False when malformed.
-bool ParseGuid(std::string_view text, GUID& out);
-GUID GuidOf(const char* text);  // for constants known to be well formed; zero when not
-std::string GuidText(const GUID& guid);
+// "34D100F9-0F0A-5980-8F04-7AF57FDB29B0", with or without braces; for constants known to be well formed. Zero when not.
+GUID GuidOf(const char* text);
 
 // ---- Activation ---------------------------------------------------------------------------------------------------
 

@@ -14,6 +14,7 @@
 #include "../src/core/theme/inspector.hpp"
 #include "../src/core/theme/replay.hpp"
 #include "replay_support.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace th = ampify::theme;
@@ -137,7 +138,7 @@ TEST_CASE(Replay_GivesTheProgressLineItsTrackAndThumb) {
 }
 
 TEST_CASE(Replay_RunsTheEngineUntilItSettlesAndReportsEachRule) {
-    fs::path dir = Scratch("settle");
+    ampify::test::ScratchDir dir("settle");
     fs::path theme = ThemeFolder(dir, "night",
                                  "Grid#TransportBar { background: #FF112233; }\n"
                                  "TextBlock#CurrentTime { color: #FFFF0000; font-size: 120%; }\n"
@@ -221,7 +222,7 @@ TEST_CASE(Replay_Version2GivesTheOriginalsBackAndDrawsTheBoxes) {
     const ampify::Json& title = (*dump->Find("nodes")->AsArray())[1];
     CHECK(Text(title.Find("originals")->Find("Foreground")) == "no-own-value");
 
-    fs::path dir = Scratch("boxes");
+    ampify::test::ScratchDir dir("boxes");
     std::ofstream(dir / "tree.json", std::ios::binary) << kVersion2;
     th::ReplayRequest request;
     request.theme = ThemeFolder(dir, "red", "Grid#Bar { background: #FFFF0000; }\n");
@@ -235,7 +236,7 @@ TEST_CASE(Replay_Version2GivesTheOriginalsBackAndDrawsTheBoxes) {
 }
 
 TEST_CASE(Replay_DiffTellsTwoThemesApartAndATwinFromItself) {
-    fs::path dir = Scratch("diff");
+    ampify::test::ScratchDir dir("diff");
     th::ReplayRequest request;
     request.tree = Fixture();
     request.theme = ThemeFolder(dir, "blue", "Grid#TransportBar { background: #FF0000FF; }\n");

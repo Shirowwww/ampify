@@ -36,6 +36,7 @@
 
 #include "../../src/core/audio/audio_engine.hpp"
 #include "../../src/core/gain_board.hpp"
+#include "../../src/core/kit_layout.hpp"
 #include "../../src/win/hook.hpp"
 #include "../../src/win/win_common.hpp"
 #include "format_detection.hpp"
@@ -1203,7 +1204,8 @@ ampify::ExtensionInfo MakeAtmosLevelerExtension(ampify::Journal& journal, const 
     ampify::ExtensionInfo info;
     info.id = "atmos-leveler";
     info.name = "Atmos leveler";
-    info.enabledByDefault = false;  // opt-in until it is tested on a real Dolby Atmos track
+    // Opt-in until it is tested on a real Dolby Atmos track (startsOn in facts/release.json).
+    info.enabledByDefault = ampify::IsOnByDefault("extensions", info.id);
     info.start = [&journal, config] { return StartLeveler(journal, config); };
     // The hooks stay in place until the process exits, so nothing is left half-patched: switched off, the leveler
     // goes neutral at once instead of keeping its gain until Apple Music restarts.

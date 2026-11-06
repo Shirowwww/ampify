@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Builds the package: dist/ampify-<version>-windows-x64.zip and dist/SHA256SUMS.txt, the two names `ampify update`
 # and scripts/install.ps1 look for in a release (src/cli/marketplace.cpp). Nothing is published: the zip is attached to a
-# release by hand, or uploaded as a workflow artifact by .github/workflows/package.yml. The version is the project
-# version of CMakeLists.txt.
+# release by hand, or uploaded as a workflow artifact by .github/workflows/package.yml. The version, the file names and
+# the elements that ship with the kit come from facts/release.json.
 #
 # Usage:
 #   scripts/package.sh --msvc <dir>      the ampify-msvc-kit artifacts of ci.yml, or an MSVC build folder
@@ -37,13 +37,36 @@ done
 source_dir="$(cd "$source_dir" && pwd)"
 command -v python3 >/dev/null || die "python3 is needed (zip and hashes)"
 
-# The version, from CMakeLists.txt (the configure step checks that the C++ constants agree with it).
-version="$(sed -n 's/^project(Ampify VERSION \([0-9][0-9.]*\) .*/\1/p' "$root/CMakeLists.txt")"
-[[ -n "$version" ]] || die "no project version found in CMakeLists.txt"
-name="ampify-$version-windows-x64"
+# Python on Windows ends its lines with CR LF; the CR goes.
+CR=$'\r'
+# One text of facts/release.json, by its path, such as files.setup.
+fact() {
+    python3 -I - "$root/facts/release.json" "$1" <<'PY' | tr -d "$CR"
+import json, sys
+value = json.load(open(sys.argv[1], encoding="utf-8"))
+for key in sys.argv[2].split("."):
+    value = value[key]
+print(value)
+PY
+}
+version="$(fact version)" || die "no version in facts/release.json"
+package_name="$(fact package.prefix)$version$(fact package.suffix)"
+name="${package_name%.zip}"
+checksums="$(fact package.checksums)"
+setup_file="$(fact files.setup)"
+cli_file="$(fact files.cli)"
+binaries=("$setup_file" "$(fact files.launcher)" "$(fact files.kernel)")
+# The bundled elements that ship as a folder, as <folder>/<id> (the built-in ones live in the kernel).
+mapfile -t bundled < <(python3 -I - "$root/facts/release.json" <<'PY' | tr -d "$CR"
+import json, sys
+for element in json.load(open(sys.argv[1], encoding="utf-8"))["elements"]:
+    if not element["builtIn"]:
+        print(f"{element['folder']}/{element['id']}")
+PY
+)
 
 # Where each binary is, for the two layouts: a kit (release/ and cli/, the CI artifacts) or a build folder.
-if [[ -f "$source_dir/release/ampify_setup.exe" ]]; then
+if [[ -f "$source_dir/release/$setup_file" ]]; then
     layout=kit
     bin_dir="$source_dir/release"
     cli_dir="$source_dir/cli"
@@ -69,17 +92,28 @@ if [[ -z "$commit" ]]; then
     git -C "$root" diff --quiet HEAD 2>/dev/null || commit+=" (with uncommitted changes)"
 fi
 
-binaries=(ampify_setup.exe ampify_launcher.exe ampify_kernel.dll)
 for file in "${binaries[@]}"; do [[ -f "$bin_dir/$file" ]] || die "missing file: $bin_dir/$file"; done
-[[ -f "$cli_dir/ampify.exe" ]] || die "missing file: $cli_dir/ampify.exe"
+[[ -f "$cli_dir/$cli_file" ]] || die "missing file: $cli_dir/$cli_file"
 
-# Binaries left over from another version would install under the wrong number. The installer writes the version
-# into the uninstall entry, so its text is in ampify_setup.exe (elsewhere the compiler may fold it into code).
-grep -aq "$version" "$bin_dir/ampify_setup.exe" ||
-    die "ampify_setup.exe does not contain version $version: binaries of another version (older run?)"
-# A Windows PE file starts with MZ. Anything else is a Linux binary or a broken download.
-for file in "${binaries[@]/#/$bin_dir/}" "$cli_dir/ampify.exe"; do
+# The file version of a binary, from the VS_FIXEDFILEINFO of its version resource (cmake/version.rc.in), as 1.2.3.
+file_version() {
+    python3 -I - "$1" <<'PY' | tr -d "$CR"
+import struct, sys
+data = open(sys.argv[1], "rb").read()
+at = data.find(struct.pack("<I", 0xFEEF04BD))
+if at < 0:
+    sys.exit(1)
+high, low = struct.unpack_from("<II", data, at + 8)
+print(f"{high >> 16}.{high & 0xFFFF}.{low >> 16}")
+PY
+}
+# A Windows PE file starts with MZ. Anything else is a Linux binary or a broken download. Binaries left over from
+# another version would install under the wrong number: each one's version resource must be the release's.
+for file in "${binaries[@]/#/$bin_dir/}" "$cli_dir/$cli_file"; do
     [[ "$(head -c 2 "$file")" == "MZ" ]] || die "$(basename "$file") is not a Windows executable"
+    found="$(file_version "$file")" || die "$(basename "$file") has no version resource"
+    [[ "$found" == "$version" ]] ||
+        die "$(basename "$file") is version $found, not $version: binaries of another version (older run?)"
 done
 
 # Every example extension and every theme of the repository (the snippets are for theme authors, not shipped).
@@ -92,16 +126,9 @@ pkg="$stage/$name"
 mkdir -p "$pkg/examples/extensions" "$pkg/examples/themes" "$pkg/examples/apps"
 
 for file in "${binaries[@]}"; do cp "$bin_dir/$file" "$pkg/"; done
-cp "$cli_dir/ampify.exe" "$pkg/"
+cp "$cli_dir/$cli_file" "$pkg/"
 for id in "${extensions[@]}"; do cp -R "$root/examples/$id" "$pkg/examples/extensions/"; done
-# The Marketplace page ships with Ampify (it holds kit.manage, which the catalog refuses).
-cp -R "$root/apps/marketplace" "$pkg/examples/apps/"
-# Now Playing too: its button opens Apple Music's full-screen player.
-cp -R "$root/extensions/now-playing" "$pkg/examples/extensions/"
-# The song panel: lyrics, credits and queue beside the pages.
-cp -R "$root/extensions/song-panel" "$pkg/examples/extensions/"
-# And the playback guard, which reloads a song Apple Music leaves frozen.
-cp -R "$root/extensions/playback-guard" "$pkg/examples/extensions/"
+for element in "${bundled[@]}"; do cp -R "$root/$element" "$pkg/examples/${element%/*}/"; done
 for id in "${themes[@]}"; do cp -R "$root/themes/$id" "$pkg/examples/themes/"; done
 
 # Text for Windows: CRLF, and a BOM on the files people open in Notepad.
@@ -117,12 +144,12 @@ bom() { printf '\xEF\xBB\xBF'; }
 } | sed 's/$/\r/' > "$pkg/BUILD_INFO.txt"
 
 # SHA256SUMS.txt inside the zip lists every file of the package; the one next to the zip lists the zip itself.
-(cd "$pkg" && find . -type f ! -name SHA256SUMS.txt | sed 's|^\./||' | LC_ALL=C sort | xargs -d '\n' sha256sum) > "$stage/sums"
-mv "$stage/sums" "$pkg/SHA256SUMS.txt"
+(cd "$pkg" && find . -type f ! -name "$checksums" | sed 's|^\./||' | LC_ALL=C sort | xargs -d '\n' sha256sum) > "$stage/sums"
+mv "$stage/sums" "$pkg/$checksums"
 
 mkdir -p "$out"
 out="$(cd "$out" && pwd)"
-rm -f "$out/$name.zip" "$out/SHA256SUMS.txt"
+rm -f "$out/$name.zip" "$out/$checksums"
 # Entries are stored at the root of the zip (no top folder), sorted, with a fixed date, so the same inputs give
 # the same zip.
 python3 -I - "$pkg" "$out/$name.zip" <<'PY'
@@ -141,8 +168,8 @@ with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         with open(os.path.join(src, rel), "rb") as f:
             z.writestr(info, f.read())
 PY
-(cd "$out" && sha256sum "$name.zip" > SHA256SUMS.txt)
+(cd "$out" && sha256sum "$name.zip" > "$checksums")
 
 echo "Package: $out/$name.zip ($layout, commit $commit)"
-echo "Hashes: $out/SHA256SUMS.txt"
+echo "Hashes: $out/$checksums"
 exit 0

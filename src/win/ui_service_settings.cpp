@@ -5,6 +5,8 @@
 
 #include "ui_service_detail.hpp"
 
+#include "../core/kit_layout.hpp"
+
 namespace ampify::win::ui_service_detail {
 
 namespace {
@@ -14,7 +16,8 @@ constexpr std::size_t kPageLimit = 4000;
 constexpr double kAmpifyPageWidth = 1000;  // as wide as Apple's settings rows
 
 constexpr char kAmpifyPageOwner[] = "ampify";
-constexpr char kAtmosLeveler[] = "atmos-leveler";  // built into the kernel: no manifest, so no row of its own
+constexpr char kAtmosLeveler[] = "atmos-leveler";
+static_assert(IsBuiltInExtension(kAtmosLeveler), "SoundRows writes the row of an extension built into the kernel");
 
 // ---- The Mods card in Settings > Playback ------------------------------------------------------------------------
 

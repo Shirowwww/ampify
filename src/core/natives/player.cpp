@@ -5,7 +5,7 @@
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
-#include "../form_data.hpp"
+#include "../base64.hpp"
 #include "../image_host.hpp"
 #include "../lyrics_host.hpp"
 #include "../player_modes.hpp"

@@ -23,6 +23,7 @@ on:
       - 'themes/**'
       - 'tools/**'
       - 'cmake/**'
+      - 'facts/**'
       - 'CMakeLists.txt'
       - '.github/workflows/ci.yml'
       - '.github/actions/**'
@@ -77,19 +78,15 @@ jobs:
         with:
           cache-name: msvc-tests
           projection: 'false'
-      - name: Build and run ampify_tests and ampify_ui_thread_test
+      - name: Build and run ampify_tests
         shell: pwsh
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
           if ($LASTEXITCODE -ne 0) { throw 'configuration failed' }
-          cmake --build build --parallel --target ampify_tests ampify_ui_thread_test
+          cmake --build build --parallel --target ampify_tests
           if ($LASTEXITCODE -ne 0) { throw 'build failed' }
-          $failed = @()
-          foreach ($exe in 'ampify_tests.exe', 'ampify_ui_thread_test.exe') {
-            & (Join-Path build $exe)
-            if ($LASTEXITCODE -ne 0) { $failed += $exe }
-          }
-          if ($failed.Count -gt 0) { throw "tests failed: $($failed -join ', ')" }
+          & (Join-Path build 'ampify_tests.exe')
+          if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
 
   # Two kits side by side: release (tested Apple Music versions only, what ships) and bench (any version, plus the
   # files of the interface cases). Never ship the bench kit.
@@ -124,10 +121,11 @@ jobs:
         shell: pwsh
         run: |
           $kit = Join-Path $PWD 'msvc-kit'
+          $files = (Get-Content -LiteralPath facts/release.json -Raw | ConvertFrom-Json).files
           $layout = if ('${{ matrix.variant }}' -eq 'release') {
-            @{ release = @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify_setup.exe', 'ampify.exe'); cli = @('ampify.exe') }
+            @{ release = @($files.launcher, $files.kernel, $files.setup, $files.cli); cli = @($files.cli) }
           } else {
-            @{ bench = @('ampify_launcher.exe', 'ampify_kernel.dll'); ui = @('ampify_launcher.exe', 'ampify_kernel.dll', 'ampify.exe') }
+            @{ bench = @($files.launcher, $files.kernel); ui = @($files.launcher, $files.kernel, $files.cli) }
           }
           foreach ($folder in $layout.Keys) {
             $to = Join-Path $kit $folder

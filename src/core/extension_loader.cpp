@@ -16,7 +16,6 @@ namespace {
 
 namespace fs = std::filesystem;
 
-constexpr int kSupportedKitApiMajor = 1;
 constexpr std::string_view kAppTargetPrefix = "app:";
 
 // A theme or a snippet with no script: `ampify dev` asks for its restart like any element, and the theme service, not
@@ -82,7 +81,7 @@ void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadRepo
     std::optional<std::string> text = ReadWholeFile(folder / "manifest.json");
     if (!text) return;  // a folder without a manifest is not an element
 
-    ManifestResult result = ParseManifest(*text, name, kSupportedKitApiMajor, [&](const std::string& file) {
+    ManifestResult result = ParseManifest(*text, name, kKitApiMajor, [&](const std::string& file) {
         std::error_code fileError;
         return fs::is_regular_file(folder / file, fileError);
     });

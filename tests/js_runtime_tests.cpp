@@ -4,6 +4,7 @@
 #include <string>
 
 #include "../src/core/js_runtime.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -84,13 +85,6 @@ namespace {
 
 namespace fs = std::filesystem;
 
-fs::path ModuleDir(const std::string& name) {
-    fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("modules-" + name);
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    return dir;
-}
-
 void Write(const fs::path& path, const std::string& text) {
     fs::create_directories(path.parent_path());
     std::ofstream(path, std::ios::binary) << text;
@@ -122,7 +116,7 @@ TEST_CASE(Modules_ResolveOnlyRelativePathsInsideTheFolder) {
 }
 
 TEST_CASE(Modules_RelativeImportWorks) {
-    fs::path dir = ModuleDir("import");
+    ampify::test::ScratchDir dir("modules-import");
     Write(dir / "lib.js", "export default function double(x) { return x * 2; }\nexport const name = 'lib';\n");
     Write(dir / "sub" / "util.mjs", "import double from '../lib.js';\nexport const four = double(2);\n");
     ampify::js::Runtime runtime;
@@ -137,7 +131,7 @@ TEST_CASE(Modules_RelativeImportWorks) {
 }
 
 TEST_CASE(Modules_DynamicImportWorksFromAClassicScript) {
-    fs::path dir = ModuleDir("dynamic");
+    ampify::test::ScratchDir dir("modules-dynamic");
     Write(dir / "lazy.js", "export const value = 7;\n");
     ampify::js::Runtime runtime;
     runtime.SetModuleRoot(dir);
@@ -148,8 +142,10 @@ TEST_CASE(Modules_DynamicImportWorksFromAClassicScript) {
 }
 
 TEST_CASE(Modules_AnEscapeIsRefused) {
-    fs::path dir = ModuleDir("escape");
-    Write(dir.parent_path() / "modules-escape-secret.js", "export default 'secret';\n");
+    ampify::test::ScratchDir outer("modules-escape");
+    fs::path dir = outer / "module";
+    fs::create_directories(dir);
+    Write(outer / "modules-escape-secret.js", "export default 'secret';\n");
     ampify::js::Runtime runtime;
     runtime.SetModuleRoot(dir);
     std::string error;
@@ -162,14 +158,13 @@ TEST_CASE(Modules_AnEscapeIsRefused) {
 }
 
 TEST_CASE(Modules_ASymbolicLinkIsRefused) {
-    fs::path dir = ModuleDir("link");
-    fs::path outside = dir.parent_path() / "modules-link-target";
-    fs::remove_all(outside);
+    ampify::test::ScratchDir dir("modules-link");
+    ampify::test::ScratchDir outside("modules-link-target");
     Write(outside / "secret.js", "export default 'secret';\n");
     std::error_code ec;
     fs::create_symlink(outside / "secret.js", dir / "file.js", ec);
     fs::create_directory_symlink(outside, dir / "folder", ec);
-    if (ec) return;  // no symbolic links on this system (Windows without the right): nothing to test
+    if (ec) SKIP("this account may not create symbolic links");
     ampify::js::Runtime runtime;
     runtime.SetModuleRoot(dir);
     std::string error;
@@ -187,7 +182,7 @@ TEST_CASE(Modules_WithoutARootNothingIsImported) {
 }
 
 TEST_CASE(Modules_AnExceptionInTheModuleIsReported) {
-    fs::path dir = ModuleDir("throws");
+    ampify::test::ScratchDir dir("modules-throws");
     Write(dir / "bad.js", "throw new Error('module failure');\n");
     ampify::js::Runtime runtime;
     runtime.SetModuleRoot(dir);

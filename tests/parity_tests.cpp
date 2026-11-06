@@ -15,18 +15,12 @@
 #include "../src/core/launch_flags.hpp"
 #include "../src/core/version_gate.hpp"
 #include "../src/core/version_list.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
 
 namespace fs = std::filesystem;
-
-fs::path Scratch(const std::string& name) {
-    fs::path dir = fs::temp_directory_path() / "ampify-parity-tests" / name;
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    return dir;
-}
 
 void Write(const fs::path& file, const std::string& text) {
     std::ofstream out(file, std::ios::binary);
@@ -39,9 +33,14 @@ ampify::BuildSignature GoodSignature() {
     return signature;
 }
 
-const std::string kAllExports =
-    R"(["AVCFPlayerCopyCurrentItem", "AVCFPlayerItemCopyCurrentStableVariantID", "AVCFPlayerItemCopyTracks",)"
-    R"( "AVCFPlayerItemTrackCopyAssetTrack", "AVCFPlayerSetVolume"])";
+// Every export the kit requires, as the "exports" array of a versions.json entry.
+std::string AllExportsJson() {
+    std::string json = "[";
+    for (std::string_view name : ampify::kRequiredPlayerExports) {
+        json += (json.size() > 1 ? ", \"" : "\"") + std::string(name) + "\"";
+    }
+    return json + "]";
+}
 
 }  // namespace
 
@@ -81,7 +80,7 @@ TEST_CASE(VersionList_FormatReadsBack) {
 }
 
 TEST_CASE(VersionGate_BuiltInOnlyWhenThereIsNoFile) {
-    fs::path dir = Scratch("builtin-only");
+    ampify::test::ScratchDir dir("builtin-only");
     std::vector<std::string> extra = ampify::LoadVersionList(dir / "versions.txt");
     CHECK(extra.empty());
     std::vector<std::string_view> known = ampify::KnownAppVersionsWith(extra);
@@ -91,7 +90,7 @@ TEST_CASE(VersionGate_BuiltInOnlyWhenThereIsNoFile) {
 }
 
 TEST_CASE(VersionGate_FileAddsAVersion) {
-    fs::path dir = Scratch("adds");
+    ampify::test::ScratchDir dir("adds");
     Write(dir / "versions.txt", "ampify-versions 1\n1.1600.1.0\n1.1540.23042.0\n");
     std::vector<std::string> extra = ampify::LoadVersionList(dir / "versions.txt");
     std::vector<std::string_view> known = ampify::KnownAppVersionsWith(extra);
@@ -109,7 +108,7 @@ TEST_CASE(VersionGate_FileAddsAVersion) {
 }
 
 TEST_CASE(VersionGate_MalformedFileIsIgnored) {
-    fs::path dir = Scratch("malformed");
+    ampify::test::ScratchDir dir("malformed");
     Write(dir / "versions.txt", "ampify-versions 1\n1.1600.1.0\nn'importe quoi\n");
     std::vector<std::string> extra = ampify::LoadVersionList(dir / "versions.txt");
     CHECK(extra.empty());
@@ -122,7 +121,7 @@ TEST_CASE(VersionGate_MalformedFileIsIgnored) {
 }
 
 TEST_CASE(VersionGate_SignatureIsStillRequired) {
-    fs::path dir = Scratch("signature");
+    ampify::test::ScratchDir dir("signature");
     Write(dir / "versions.txt", "ampify-versions 1\n1.1600.1.0\n");
     std::vector<std::string> extra = ampify::LoadVersionList(dir / "versions.txt");
     std::vector<std::string_view> known = ampify::KnownAppVersionsWith(extra);
@@ -139,7 +138,7 @@ TEST_CASE(VersionGate_SignatureIsStillRequired) {
 
 TEST_CASE(VersionsCatalog_ParsesAndKeepsOnlyFullySignedVersions) {
     std::string text = R"({"versionsFormat": 1, "playerDll": "AVFoundationCF.dll", "versions": [)"
-                       R"({"version": "1.1600.1.0", "tested": "2026-10-30", "exports": )" + kAllExports + R"(},)"
+                       R"({"version": "1.1600.1.0", "tested": "2026-10-30", "exports": )" + AllExportsJson() + R"(},)"
                        R"({"version": "1.1700.2.0", "tested": "2026-10-30", "exports": ["AVCFPlayerSetVolume"]}]})";
     std::vector<std::string> errors;
     std::optional<ampify::VersionsCatalog> catalog = ampify::ParseVersionsCatalog(text, errors);

@@ -1,7 +1,6 @@
 #include "json.hpp"
 
 #include <cctype>
-#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -176,24 +175,6 @@ private:
         return Json(value);
     }
 
-    static void AppendUtf8(std::string& out, unsigned code) {
-        if (code < 0x80) {
-            out += static_cast<char>(code);
-        } else if (code < 0x800) {
-            out += static_cast<char>(0xC0 | (code >> 6));
-            out += static_cast<char>(0x80 | (code & 0x3F));
-        } else if (code < 0x10000) {
-            out += static_cast<char>(0xE0 | (code >> 12));
-            out += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
-            out += static_cast<char>(0x80 | (code & 0x3F));
-        } else {
-            out += static_cast<char>(0xF0 | (code >> 18));
-            out += static_cast<char>(0x80 | ((code >> 12) & 0x3F));
-            out += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
-            out += static_cast<char>(0x80 | (code & 0x3F));
-        }
-    }
-
     std::optional<unsigned> ParseHex4() {
         if (m_pos + 4 > m_text.size()) return std::nullopt;
         unsigned value = 0;
@@ -317,14 +298,7 @@ std::string Json::Dump() const {
     } else if (const bool* b = AsBool()) {
         out = *b ? "true" : "false";
     } else if (const double* n = AsNumber()) {
-        char buffer[32];
-        if (std::floor(*n) == *n && std::fabs(*n) < 9e15) {
-            std::snprintf(buffer, sizeof buffer, "%lld", static_cast<long long>(*n));
-        } else {
-            // The shortest text that reads back as the same double: 0.72, not 0.71999999999999997.
-            *std::to_chars(buffer, buffer + sizeof buffer - 1, *n).ptr = '\0';
-        }
-        out = buffer;
+        out = ShortestNumberText(*n);
     } else if (const std::string* s = AsString()) {
         DumpString(*s, out);
     } else if (const Array* items = AsArray()) {

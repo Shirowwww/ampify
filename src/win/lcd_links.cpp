@@ -2,6 +2,7 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include "win_common.hpp"
 #include "win_host.hpp"
 #include "winrt_abi.hpp"
 #include "xaml_host.hpp"
@@ -123,12 +124,6 @@ bool GoToAlbum(const xaml::FrameworkElement& display) {
     return true;
 }
 
-// The two letters of the Windows region (FR, US...), Apple's storefront for the catalog search.
-std::wstring Storefront() {
-    wchar_t geo[16] = {};
-    if (GetUserDefaultGeoName(geo, static_cast<int>(std::size(geo))) == 0 || std::wcslen(geo) != 2) return L"US";
-    return geo;
-}
 
 bool SameName(const winrt::hstring& a, std::wstring_view b) {
     return CompareStringOrdinal(a.c_str(), static_cast<int>(a.size()), b.data(), static_cast<int>(b.size()), TRUE) ==
@@ -166,7 +161,7 @@ winrt::fire_and_forget OpenArtist(std::wstring name) {
     Journal* journal = State().journal;
     try {
         std::wstring url = L"https://itunes.apple.com/search?entity=musicArtist&limit=" + std::to_wstring(kCatalogResults) +
-                           L"&country=" + Storefront() + L"&term=" +
+                           L"&country=" + CatalogStorefront() + L"&term=" +
                            std::wstring(winrt::Windows::Foundation::Uri::EscapeComponent(name));
         winrt::Windows::Web::Http::HttpClient client;
         winrt::hstring reply = co_await client.GetStringAsync(winrt::Windows::Foundation::Uri(url));
@@ -246,13 +241,6 @@ void Link(const xaml::FrameworkElement& ticker, bool title) {
 
 }  // namespace
 
-std::wstring CatalogStorefront() noexcept {
-    try {
-        return Storefront();
-    } catch (...) {
-        return L"US";
-    }
-}
 
 void KeepDisplayLinks(Journal& journal) noexcept {
     try {

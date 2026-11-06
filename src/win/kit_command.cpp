@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <thread>
 
+#include "release_facts.hpp"
 #include "win_common.hpp"
 
 namespace ampify::win {
@@ -41,9 +42,9 @@ std::string ReadAll(HANDLE pipe) {
 
 RunResult RunAmpify(const std::vector<std::string>& arguments) {
     RunResult result;
-    std::filesystem::path program = KernelFolder() / "ampify.exe";
+    std::filesystem::path program = KernelFolder() / kCliFile;
     if (!std::filesystem::exists(program)) {
-        result.err = "ampify.exe not found next to the kernel: " + ToUtf8(program.wstring());
+        result.err = std::string(kCliFile) + " not found next to the kernel: " + ToUtf8(program.wstring());
         return result;
     }
     std::wstring commandLine = QuoteArgument(program.wstring());
@@ -75,7 +76,7 @@ RunResult RunAmpify(const std::vector<std::string>& arguments) {
     if (!started) {
         CloseHandle(outRead);
         CloseHandle(errRead);
-        result.err = "ampify.exe did not start (error " + std::to_string(GetLastError()) + ")";
+        result.err = std::string(kCliFile) + " did not start (error " + std::to_string(GetLastError()) + ")";
         return result;
     }
 

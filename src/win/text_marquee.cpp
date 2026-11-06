@@ -80,7 +80,6 @@ struct Hooked {
 
 // Interface thread only. Never freed: releasing WinRT objects while the process exits can crash it.
 struct Marquee {
-    Journal* journal = nullptr;
     bool told = false;
     IInspectable moved{nullptr};   // the boxed handlers, kept to take them off again
     IInspectable exited{nullptr};
@@ -417,7 +416,6 @@ void HookAll(Marquee& state, const xaml::UIElement& content) {
 void KeepTextMarquee(Journal& journal) noexcept {
     try {
         Marquee& state = State();
-        state.journal = &journal;
         if (!g_enabled) {
             if (state.trailing) state.trailing.Stop();
             StopAll(state);

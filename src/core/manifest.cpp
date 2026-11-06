@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "json.hpp"
+#include "release_facts.hpp"
 #include "text_util.hpp"
 
 namespace ampify {
@@ -162,7 +163,7 @@ void ReadSettingValue(const Json& item, const std::string& where, SettingSpec& s
                 (spec.max && *value->AsNumber() > *spec.max)) {
                 return errors.push_back(where + ": default must be a number between min and max");
             }
-            spec.defaultValue = SettingNumberText(*value->AsNumber());
+            spec.defaultValue = ShortestNumberText(*value->AsNumber());
             return;
     }
 }
@@ -271,7 +272,7 @@ void ReadTranslations(const Json& field, std::map<std::string, ManifestText>& tr
         std::string where = "translations." + code;
         if (std::find(std::begin(kTranslationLanguages), std::end(kTranslationLanguages), code) ==
             std::end(kTranslationLanguages)) {
-            errors.push_back(where + ": unknown language (fr, de, es, pt, ru, ja, zh)");
+            errors.push_back(where + ": unknown language (" + std::string(kTranslationLanguageList) + ")");
             continue;
         }
         if (!entry.IsObject()) {
@@ -306,12 +307,6 @@ void ReadTranslations(const Json& field, std::map<std::string, ManifestText>& tr
 }
 
 }  // namespace
-
-std::string SettingNumberText(double value) {
-    char buffer[32];
-    auto [end, error] = std::to_chars(buffer, buffer + sizeof buffer, value);
-    return error == std::errc() ? std::string(buffer, end) : std::to_string(value);
-}
 
 const SettingSpec* Manifest::Setting(std::string_view key) const {
     auto it = std::find_if(settings.begin(), settings.end(), [&](const SettingSpec& spec) { return spec.key == key; });
@@ -621,10 +616,10 @@ std::string SettingProblem(const SettingSpec& spec, std::string_view stored) {
             std::optional<double> number = SettingNumber(stored);
             if (!number) return "\"" + std::string(stored) + "\" is not a number";
             if (spec.min && *number < *spec.min) {
-                return std::string(stored) + " is below its minimum, " + SettingNumberText(*spec.min);
+                return std::string(stored) + " is below its minimum, " + ShortestNumberText(*spec.min);
             }
             if (spec.max && *number > *spec.max) {
-                return std::string(stored) + " is above its maximum, " + SettingNumberText(*spec.max);
+                return std::string(stored) + " is above its maximum, " + ShortestNumberText(*spec.max);
             }
             return {};
         }
@@ -638,7 +633,7 @@ std::string SettingValue(const SettingSpec& spec, const std::optional<std::strin
         case SettingSpec::Type::Toggle:
             return IsOn(ToLowerAscii(*stored)) ? "true" : "false";
         case SettingSpec::Type::Number:
-            return SettingNumberText(*SettingNumber(*stored));
+            return ShortestNumberText(*SettingNumber(*stored));
         case SettingSpec::Type::Choice:
         case SettingSpec::Type::Text:
             return *stored;

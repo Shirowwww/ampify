@@ -57,7 +57,11 @@ if (-not $PSScriptRoot -or -not $env:USERPROFILE) {
 }
 
 . (Join-Path $PSScriptRoot 'lib\harness.ps1')
-Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot $CasesDir) -Filter '*.ps1' | Sort-Object Name | ForEach-Object {
+# A case folder's shared helpers sit beside it as <parent>-common.ps1 (live\live-common.ps1 for live\cases).
+$casesPath = Get-Item -LiteralPath (Join-Path $PSScriptRoot $CasesDir)
+$caseHelpers = Join-Path $casesPath.Parent.FullName ($casesPath.Parent.Name + '-common.ps1')
+if (Test-Path -LiteralPath $caseHelpers) { . $caseHelpers }
+Get-ChildItem -LiteralPath $casesPath.FullName -Filter '*.ps1' | Sort-Object Name | ForEach-Object {
     . $_.FullName
 }
 
@@ -75,7 +79,7 @@ function Test-Requirement {
     param([string]$Name)
     switch ($Name) {
         'apple-music' { return $script:AppleMusicInstalled }
-        # Set by the signed-in bench after bench/windows/live/sign-in.ps1: Apple Music is signed in to the test account.
+        # Set by scripts/listen-test.ps1: Apple Music is signed in on this PC.
         'apple-account' { return ($script:AppleMusicInstalled -and $env:AMPIFY_SIGNED_IN -eq 'true') }
         default { throw "Unknown requirement: $Name" }
     }
@@ -110,7 +114,7 @@ if (Test-Path -LiteralPath $buildInfo) {
 }
 
 $script:KnownVersions = @(Get-KnownAppVersions -RepoRoot $repo)
-$preparation.Add("Tested versions (src/core/version_gate.hpp): $($script:KnownVersions -join ', ')")
+$preparation.Add("Tested versions (facts/apple.json): $($script:KnownVersions -join ', ')")
 
 $installState = 'install skipped (-SkipInstall)'
 if (-not $SkipInstall) {

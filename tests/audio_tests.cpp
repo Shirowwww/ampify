@@ -21,6 +21,7 @@
 #include "../extensions/atmos-leveler/kit_audio.hpp"
 #include "../extensions/atmos-leveler/live_loudness.hpp"
 #include "../extensions/atmos-leveler/object_pass.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -31,29 +32,8 @@ using ampify::audio::EqSettings;
 
 constexpr double kPi = std::numbers::pi;
 
-// Interleaved sine, the same on every channel.
-std::vector<float> Sine(double frequency, double amplitude, double rate, size_t frames, int channels = 2,
-                        size_t phase = 0) {
-    std::vector<float> out(frames * static_cast<size_t>(channels));
-    for (size_t i = 0; i < frames; i++) {
-        float value = static_cast<float>(amplitude * std::sin(2 * kPi * frequency * static_cast<double>(i + phase) / rate));
-        for (int c = 0; c < channels; c++) out[i * static_cast<size_t>(channels) + static_cast<size_t>(c)] = value;
-    }
-    return out;
-}
-
-// A click (a 2 ms burst) every 60 / bpm seconds, stereo.
-std::vector<float> Clicks(double bpm, double rate, double seconds) {
-    size_t frames = static_cast<size_t>(seconds * rate);
-    std::vector<float> out(frames * 2, 0.0f);
-    double period = 60.0 / bpm * rate;
-    size_t width = static_cast<size_t>(rate * 0.002);
-    for (double start = 0; start < static_cast<double>(frames); start += period) {
-        size_t first = static_cast<size_t>(start);
-        for (size_t i = first; i < std::min(frames, first + width); i++) out[2 * i] = out[2 * i + 1] = 0.8f;
-    }
-    return out;
-}
+using ampify::test::Clicks;
+using ampify::test::Sine;
 
 void FeedInBlocks(AudioAnalyzer& analyzer, const std::vector<float>& samples, int channels, double rate,
                   size_t block = 480) {

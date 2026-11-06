@@ -8,16 +8,18 @@
 // (src/win/network_fix.cpp). Portable, so the order is tested under Linux.
 
 #include <cstddef>
+#include <optional>
 #include <vector>
 
 namespace ampify {
 
-inline constexpr int kFamilyIpv4 = 2;   // AF_INET
-inline constexpr int kFamilyIpv6 = 23;  // AF_INET6 on Windows
+// WinSock's values, so the order runs under Linux; network_fix.cpp checks them against AF_INET and AF_INET6.
+inline constexpr int kFamilyIpv4 = 2;
+inline constexpr int kFamilyIpv6 = 23;
 
 // The positions of `families` (one address family per resolved address, in the order the resolver gave) with every
-// IPv4 address first, each group in its own order. Empty when nothing would move: one family only, or IPv4 already
+// IPv4 address first, each group in its own order. Nothing when nothing would move: one family only, or IPv4 already
 // first.
-std::vector<size_t> Ipv4FirstOrder(const std::vector<int>& families);
+std::optional<std::vector<size_t>> Ipv4FirstOrder(const std::vector<int>& families);
 
 }  // namespace ampify

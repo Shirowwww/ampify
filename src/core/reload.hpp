@@ -32,9 +32,6 @@ bool IsReloadTarget(std::string_view target);
 // The requests of complete lines, in file order, without repeats. Blank and unknown lines are skipped.
 std::vector<ReloadRequest> ParseReloadRequests(std::string_view text);
 
-// The targets named by `restart` lines, in file order, without repeats.
-std::vector<std::string> ParseRestartRequests(std::string_view text);
-
 // Follows the content of reload.txt. The first text only sets the baseline: the elements were just loaded, so the
 // requests already in the file are not repeated. After that, when the new text extends the old one (ampify appended),
 // only the added lines count; when it was rewritten, every line of the new text counts. A line counts once it ends
@@ -42,9 +39,6 @@ std::vector<std::string> ParseRestartRequests(std::string_view text);
 class ReloadWatcher {
 public:
     std::vector<ReloadRequest> Requests(const std::string& text);
-
-    // The targets of the `restart` lines among Requests(text).
-    std::vector<std::string> Changed(const std::string& text);
 
 private:
     std::optional<std::string> m_consumed;  // the text up to its last newline, already handled

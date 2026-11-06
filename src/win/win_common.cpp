@@ -9,10 +9,14 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cwchar>
 #include <fstream>
+#include <iterator>
 #include <set>
 #include <system_error>
 #include <vector>
+
+#include "release_facts.hpp"
 
 namespace ampify::win {
 
@@ -49,8 +53,8 @@ HICON LoadLogo(int width, int height) {
 
 std::filesystem::path KitDirectory() {
     std::filesystem::path profilePath = KnownFolder(FOLDERID_Profile);
-    if (profilePath.empty()) return std::filesystem::temp_directory_path() / L"Ampify";
-    return profilePath / L"Ampify";
+    if (profilePath.empty()) return std::filesystem::temp_directory_path() / kKitFolderName;
+    return profilePath / kKitFolderName;
 }
 
 std::filesystem::path JournalFile(const std::string& name) {
@@ -115,7 +119,7 @@ std::filesystem::path KnownFolder(const KNOWNFOLDERID& folder) {
 }
 
 std::filesystem::path InstallDirectory() {
-    return KnownFolder(FOLDERID_LocalAppData) / L"Programs" / L"Ampify";
+    return KnownFolder(FOLDERID_LocalAppData) / L"Programs" / kKitFolderName;
 }
 
 std::string ToUtf8(std::wstring_view text) {
@@ -312,6 +316,12 @@ bool AskYesNo(const std::wstring& text, const std::wstring& title) {
 
 void ShowMessage(const std::wstring& text, bool error) {
     MessageBoxW(nullptr, text.c_str(), L"Ampify", (error ? MB_ICONERROR : MB_ICONINFORMATION) | MB_OK);
+}
+
+std::wstring CatalogStorefront() {
+    wchar_t geo[16] = {};
+    if (GetUserDefaultGeoName(geo, static_cast<int>(std::size(geo))) == 0 || std::wcslen(geo) != 2) return L"US";
+    return geo;
 }
 
 HICON AmpifyIcon(bool large) {

@@ -35,6 +35,12 @@ inline void ReportFailure(const char* file, int line, const std::string& message
     Failures()++;
 }
 
+// Thrown by REQUIRE (the failure is already reported) and by SKIP; the runner ends the case quietly.
+struct StopCase {};
+struct SkipCase {
+    std::string reason;
+};
+
 }  // namespace ampify::test
 
 #define TEST_CASE(name)                                                    \
@@ -46,6 +52,18 @@ inline void ReportFailure(const char* file, int line, const std::string& message
     do {                                                                                    \
         if (!(condition)) ampify::test::ReportFailure(__FILE__, __LINE__, "CHECK(" #condition ")"); \
     } while (0)
+
+// Like CHECK, but ends the case: for a precondition the rest of the case cannot run without.
+#define REQUIRE(condition)                                                                \
+    do {                                                                                  \
+        if (!(condition)) {                                                               \
+            ampify::test::ReportFailure(__FILE__, __LINE__, "REQUIRE(" #condition ")");   \
+            throw ampify::test::StopCase{};                                               \
+        }                                                                                 \
+    } while (0)
+
+// Ends the case as not run, with the reason; the summary counts it apart from the passes.
+#define SKIP(reason) throw ampify::test::SkipCase{reason}
 
 #define CHECK_NEAR(actual, expected, tolerance)                                                    \
     do {                                                                                           \

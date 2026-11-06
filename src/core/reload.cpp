@@ -61,14 +61,6 @@ std::vector<ReloadRequest> ParseReloadRequests(std::string_view text) {
     return requests;
 }
 
-std::vector<std::string> ParseRestartRequests(std::string_view text) {
-    std::vector<std::string> ids;
-    for (const ReloadRequest& request : ParseReloadRequests(text)) {
-        if (request.action == ReloadRequest::Action::Restart) ids.push_back(request.target);
-    }
-    return ids;
-}
-
 std::vector<ReloadRequest> ReloadWatcher::Requests(const std::string& text) {
     std::string_view complete = CompleteLines(text);
     if (!m_consumed) {
@@ -84,14 +76,6 @@ std::vector<ReloadRequest> ReloadWatcher::Requests(const std::string& text) {
     std::vector<ReloadRequest> requests = ParseReloadRequests(added);
     m_consumed = std::string(complete);
     return requests;
-}
-
-std::vector<std::string> ReloadWatcher::Changed(const std::string& text) {
-    std::vector<std::string> ids;
-    for (const ReloadRequest& request : Requests(text)) {
-        if (request.action == ReloadRequest::Action::Restart) ids.push_back(request.target);
-    }
-    return ids;
 }
 
 }  // namespace ampify

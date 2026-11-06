@@ -59,8 +59,8 @@ std::vector<std::string> Initialize(int, char**) {
 
 std::filesystem::path DefaultKitDirectory() {
     const wchar_t* profile = _wgetenv(L"USERPROFILE");
-    if (profile == nullptr || *profile == L'\0') return std::filesystem::current_path() / "Ampify";
-    return std::filesystem::path(profile) / L"Ampify";
+    if (profile == nullptr || *profile == L'\0') return std::filesystem::current_path() / kKitFolderName;
+    return std::filesystem::path(profile) / kKitFolderName;
 }
 
 std::filesystem::path ExecutableDirectory() {
@@ -123,7 +123,7 @@ std::optional<std::filesystem::path> AppPreferencesFile() {
     const wchar_t* local = _wgetenv(L"LOCALAPPDATA");
     if (local == nullptr || *local == L'\0') return std::nullopt;
     return std::filesystem::path(local) / L"Packages" / FromUtf8(kPackageFamilyName) / L"LocalCache" /
-           L"Roaming" / L"Apple Computer" / L"Preferences" / L"AMPLibraryAgent.exe.plist";
+           L"Roaming" / L"Apple Computer" / L"Preferences" / FromUtf8(std::string(kLibraryAgentImage) + ".plist");
 }
 
 std::vector<std::string> OpenFolderCommand(const std::filesystem::path& folder) {

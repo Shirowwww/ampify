@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <initializer_list>
 
 #include "../text_util.hpp"
 
@@ -30,23 +31,21 @@ std::string TimeText(int minute) {
     return text.size() == 4 ? "0" + text : text;
 }
 
-bool IsNamed(const std::string& scheme, std::initializer_list<const char*> exact, std::initializer_list<const char*> parts) {
-    std::string name = ToLowerAscii(scheme);
-    for (const char* word : exact) {
-        if (name == word) return true;
-    }
-    for (const char* word : parts) {
+bool ContainsAny(const std::string& name, std::initializer_list<const char*> words) {
+    for (const char* word : words) {
         if (name.find(word) != std::string::npos) return true;
     }
     return false;
 }
 
 bool IsDark(const std::string& scheme) {
-    return IsNamed(scheme, {"dark", "night"}, {"dark", "night"});
+    return ContainsAny(ToLowerAscii(scheme), {"dark", "night"});
 }
 
+// "day" only as the whole name, so that "birthday" does not count.
 bool IsLight(const std::string& scheme) {
-    return IsNamed(scheme, {"light", "day"}, {"light"});
+    std::string name = ToLowerAscii(scheme);
+    return name == "day" || ContainsAny(name, {"light"});
 }
 
 // The name as colors.ini writes it, or empty when the theme has no such scheme (names are case-insensitive).

@@ -13,18 +13,12 @@
 #include "../src/core/settings.hpp"
 #include "../src/win/video_gif.hpp"
 #include "../src/win/win_host.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
 
 namespace fs = std::filesystem;
-
-fs::path KitForTest(const std::string& name) {
-    fs::path kit = fs::temp_directory_path() / "ampify-tests" / ("win-host-" + name);
-    fs::remove_all(kit);
-    fs::create_directories(kit);
-    return kit;
-}
 
 // The number of `part` in `text`.
 size_t CountOf(const std::string& text, const std::string& part) {
@@ -118,7 +112,7 @@ TEST_CASE(WinGif_TurnsAFragmentedMp4IntoALoopingGif) {
 }
 
 TEST_CASE(WinHost_StorageRoundTripsThroughTheKitFolder) {
-    fs::path kit = KitForTest("storage");
+    ampify::test::ScratchDir kit("storage");
     ampify::Settings settings;
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
@@ -132,7 +126,7 @@ TEST_CASE(WinHost_StorageRoundTripsThroughTheKitFolder) {
 }
 
 TEST_CASE(WinHost_SettingsArePersistedToSettingsTxt) {
-    fs::path kit = KitForTest("settings");
+    ampify::test::ScratchDir kit("settings");
     ampify::Settings settings;
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
@@ -149,7 +143,7 @@ TEST_CASE(WinHost_SettingsArePersistedToSettingsTxt) {
 }
 
 TEST_CASE(WinHost_SettingWriteKeepsAChangeMadeSinceTheKernelRead) {
-    fs::path kit = KitForTest("settings-merge");
+    ampify::test::ScratchDir kit("settings-merge");
     ampify::Settings settings;  // the kernel's copy, read before Ampify's settings page writes
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
@@ -166,7 +160,7 @@ TEST_CASE(WinHost_SettingWriteKeepsAChangeMadeSinceTheKernelRead) {
 }
 
 TEST_CASE(WinHost_ShortcutPressIsDeliveredToTheRegisteringThread) {
-    fs::path kit = KitForTest("hotkeys");
+    ampify::test::ScratchDir kit("hotkeys");
     ampify::Settings settings;
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
@@ -189,7 +183,7 @@ TEST_CASE(WinHost_ShortcutPressIsDeliveredToTheRegisteringThread) {
 }
 
 TEST_CASE(WinHost_HttpFailureComesBackAsAnErrorValue) {
-    fs::path kit = KitForTest("http");
+    ampify::test::ScratchDir kit("http");
     ampify::Settings settings;
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
@@ -201,7 +195,7 @@ TEST_CASE(WinHost_HttpFailureComesBackAsAnErrorValue) {
 }
 
 TEST_CASE(WinHost_NotifyWritesTheJournalLine) {
-    fs::path kit = KitForTest("notify");
+    ampify::test::ScratchDir kit("notify");
     ampify::Settings settings;
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
@@ -212,7 +206,7 @@ TEST_CASE(WinHost_NotifyWritesTheJournalLine) {
 }
 
 TEST_CASE(WinHost_DecodesAnImageScaledToFit) {
-    fs::path kit = KitForTest("image");
+    ampify::test::ScratchDir kit("image");
     ampify::Settings settings;
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });

@@ -1,35 +1,9 @@
 #include "release.hpp"
 
-#include <cstdint>
-#include <vector>
-
 #include "../core/json.hpp"
 #include "sha256.hpp"
 
 namespace ampify {
-
-namespace {
-
-std::vector<std::uint64_t> NumericParts(std::string_view version) {
-    if (!version.empty() && (version.front() == 'v' || version.front() == 'V')) version.remove_prefix(1);
-    std::vector<std::uint64_t> parts;
-    std::uint64_t current = 0;
-    bool any = false;
-    for (char c : version) {
-        if (c >= '0' && c <= '9') {
-            current = current * 10 + static_cast<std::uint64_t>(c - '0');
-            any = true;
-        } else {
-            parts.push_back(current);
-            current = 0;
-            any = false;
-        }
-    }
-    if (any || version.empty() || version.back() == '.') parts.push_back(current);
-    return parts;
-}
-
-}  // namespace
 
 std::optional<ReleaseInfo> ParseRelease(std::string_view text, std::string& error) {
     std::string syntaxError;
@@ -86,18 +60,6 @@ std::map<std::string, std::string> ParseChecksums(std::string_view text) {
         sums[std::string(name)] = std::string(hash);
     }
     return sums;
-}
-
-int CompareReleaseVersions(std::string_view left, std::string_view right) {
-    std::vector<std::uint64_t> a = NumericParts(left);
-    std::vector<std::uint64_t> b = NumericParts(right);
-    size_t count = a.size() > b.size() ? a.size() : b.size();
-    for (size_t i = 0; i < count; i++) {
-        std::uint64_t x = i < a.size() ? a[i] : 0;
-        std::uint64_t y = i < b.size() ? b[i] : 0;
-        if (x != y) return x < y ? -1 : 1;
-    }
-    return 0;
 }
 
 }  // namespace ampify

@@ -21,7 +21,7 @@ namespace ampify::test {
 
 struct FakeHost : Host, KeyUnbindHost {
     std::string process = "ui";  // elements run in the interface unless their manifest asks for the engine
-    std::string locale = "fr-FR";
+    std::string locale = "en-US";
     std::map<std::string, std::string> settings;
     std::map<std::string, std::string> storage;  // element id -> JSON object text
     PlayerSnapshot player;

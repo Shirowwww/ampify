@@ -12,6 +12,8 @@ import vm from "node:vm";
 import { createHash } from "node:crypto";
 
 const examples = join(dirname(fileURLToPath(import.meta.url)), "..", "examples");
+const releaseFacts = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "facts", "release.json"), "utf8"));
+const languages = releaseFacts.languages.map((language) => language.code);
 
 // A stand-in for the kernel's Ampify object, following docs/extensions/api.md. Permission checks
 // mirror the kernel: a function protected by a permission the manifest did not declare throws.
@@ -2420,12 +2422,12 @@ test("skip-list has every new string in all eight languages, and a new version",
   const fake = featureAmpify("skip-list");
   const { tables } = fake.context.Ampify.i18n;
   const english = Object.keys(tables.en).sort();
-  for (const code of ["fr", "de", "es", "pt", "ru", "ja", "zh"]) {
+  for (const code of languages) {
     assert.deepEqual(Object.keys(tables[code]).sort(), english, code);
     for (const key of ["export", "import", "merge", "added", "invalid"]) assert.notEqual(tables[code][key], tables.en[key], `${code}.${key}`);
   }
   assert.equal(fake.manifest.version, "1.1.0");
-  for (const code of ["fr", "de", "es", "pt", "ru", "ja", "zh"]) assert.ok(fake.manifest.translations[code].description.length > 20);
+  for (const code of languages) assert.ok(fake.manifest.translations[code].description.length > 20);
 });
 
 // ---- bookmarks ---------------------------------------------------------------------------------------------------
@@ -2573,7 +2575,7 @@ test("bookmarks' panel stays under 300 nodes, speaks French, and declares exactl
 test("bookmarks has every string in all eight languages", () => {
   const fake = featureAmpify("bookmarks");
   const { tables } = fake.context.Ampify.i18n;
-  for (const code of ["fr", "de", "es", "pt", "ru", "ja", "zh"]) {
+  for (const code of languages) {
     assert.deepEqual(Object.keys(tables[code]).sort(), Object.keys(tables.en).sort(), code);
     assert.ok(fake.manifest.translations[code].name && fake.manifest.translations[code].description, code);
   }

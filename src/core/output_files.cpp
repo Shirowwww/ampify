@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <fstream>
 #include <system_error>
 
 #include "text_util.hpp"
@@ -14,12 +13,6 @@ namespace {
 bool Fail(std::string* error, const std::string& message) {
     if (error) *error = message;
     return false;
-}
-
-std::filesystem::path Utf8Path(std::string_view text) {
-    std::u8string utf8;
-    for (char c : text) utf8.push_back(static_cast<char8_t>(static_cast<unsigned char>(c)));
-    return std::filesystem::path(utf8);
 }
 
 }  // namespace
@@ -49,7 +42,7 @@ bool IsValidOutputName(std::string_view name) {
 }
 
 std::filesystem::path OutputFolder(const std::filesystem::path& outputRoot, std::string_view elementId) {
-    return outputRoot / Utf8Path(elementId);
+    return outputRoot / Utf8ToPath(elementId);
 }
 
 bool WriteOutputFile(const std::filesystem::path& outputRoot, std::string_view elementId, std::string_view name,
@@ -64,7 +57,7 @@ bool WriteOutputFile(const std::filesystem::path& outputRoot, std::string_view e
     std::filesystem::path folder = OutputFolder(outputRoot, elementId);
     std::filesystem::create_directories(folder, ec);
     if (ec) return Fail(error, "cannot create the output folder");
-    std::filesystem::path target = folder / Utf8Path(name);
+    std::filesystem::path target = folder / Utf8ToPath(name);
 
     if (!std::filesystem::exists(target, ec)) {
         size_t count = 0;
@@ -74,23 +67,10 @@ bool WriteOutputFile(const std::filesystem::path& outputRoot, std::string_view e
         if (count >= kMaxOutputFilesPerElement) return Fail(error, "too many output files (16 at most)");
     }
 
-    std::filesystem::path temporary = target;
-    temporary += ".tmp";
-    {
-        std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
-        if (!file) return Fail(error, "cannot write in the output folder");
-        file.write(text.data(), static_cast<std::streamsize>(text.size()));
-        if (!file) return Fail(error, "cannot write in the output folder");
-    }
-    std::filesystem::rename(temporary, target, ec);
-    if (ec) {
-        // A reader can hold the file open on Windows. Removing first then renaming is the fallback.
-        std::filesystem::remove(target, ec);
-        std::filesystem::rename(temporary, target, ec);
-        if (ec) {
-            std::filesystem::remove(temporary, ec);
-            return Fail(error, "output file in use by another program");
-        }
+    switch (WriteFileAtomically(target, text)) {
+        case WriteResult::CannotWrite: return Fail(error, "cannot write in the output folder");
+        case WriteResult::CannotReplace: return Fail(error, "output file in use by another program");
+        case WriteResult::Written: break;
     }
     return true;
 }

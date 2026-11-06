@@ -13,6 +13,7 @@
 
 #include "../src/core/json.hpp"
 #include "../src/core/manifest.hpp"
+#include "../src/core/text_util.hpp"
 #include "../src/cli/anonymize.hpp"
 #include "../src/cli/archive.hpp"
 #include "../src/cli/backup.hpp"
@@ -24,17 +25,10 @@
 #include "../src/cli/sha256.hpp"
 #include "../src/cli/watch.hpp"
 #include "../src/cli/zip_writer.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
-
-// A fresh, empty directory for each test, so files never leak between runs.
-std::filesystem::path ScratchDir(const std::string& name) {
-    std::filesystem::path dir = std::filesystem::temp_directory_path() / "ampify-cli-tests" / name;
-    std::filesystem::remove_all(dir);
-    std::filesystem::create_directories(dir);
-    return dir;
-}
 
 void WriteFile(const std::filesystem::path& path, const std::string& text) {
     std::filesystem::create_directories(path.parent_path());
@@ -90,7 +84,8 @@ TEST_CASE(Sha256_LongInputAcrossBlocks) {
 }
 
 TEST_CASE(Sha256_FileMatchesText) {
-    std::filesystem::path file = ScratchDir("sha-file") / "data.bin";
+    ampify::test::ScratchDir scratch("sha-file");
+    std::filesystem::path file = scratch / "data.bin";
     std::string content(200000, 'x');
     WriteFile(file, content);
     std::optional<std::string> digest = ampify::Sha256File(file);
@@ -252,7 +247,7 @@ TEST_CASE(Manifest_RejectsSubfoldersAndTraversalInFileNames) {
 }
 
 TEST_CASE(Folder_CheckKindRulesAndFiles) {
-    std::filesystem::path root = ScratchDir("folder-rules");
+    ampify::test::ScratchDir root("folder-rules");
 
     std::filesystem::path good = root / "demo";
     WriteFile(good / "manifest.json", kValidExtension);
@@ -273,7 +268,7 @@ TEST_CASE(Folder_CheckKindRulesAndFiles) {
 }
 
 TEST_CASE(Folder_ThemeAndSnippetRules) {
-    std::filesystem::path root = ScratchDir("folder-kinds");
+    ampify::test::ScratchDir root("folder-kinds");
 
     WriteFile(root / "theme-a" / "manifest.json",
               R"({"id": "theme-a", "name": "T", "version": "1.0.0", "kind": "theme", "author": "a",
@@ -457,7 +452,7 @@ TEST_CASE(Archive_ListingReportsFirstProblem) {
 }
 
 TEST_CASE(Archive_DetectsLinksInExtractedTree) {
-    std::filesystem::path root = ScratchDir("archive-links");
+    ampify::test::ScratchDir root("archive-links");
     WriteFile(root / "manifest.json", "{}");
     CHECK(!ampify::ContainsLink(root));
     std::error_code ec;
@@ -468,10 +463,10 @@ TEST_CASE(Archive_DetectsLinksInExtractedTree) {
 // ---- Versions and release metadata ----------------------------------------------------------------
 
 TEST_CASE(Version_ComparesNumerically) {
-    CHECK(ampify::CompareReleaseVersions("0.10.0", "0.9.0") == 1);
-    CHECK(ampify::CompareReleaseVersions("v1.2.3", "1.2.3") == 0);
-    CHECK(ampify::CompareReleaseVersions("1.2", "1.2.0") == 0);
-    CHECK(ampify::CompareReleaseVersions("0.1.0", "0.2.0") == -1);
+    CHECK(ampify::CompareDottedVersions("0.10.0", "0.9.0") == 1);
+    CHECK(ampify::CompareDottedVersions("v1.2.3", "1.2.3") == 0);
+    CHECK(ampify::CompareDottedVersions("1.2", "1.2.0") == 0);
+    CHECK(ampify::CompareDottedVersions("0.1.0", "0.2.0") == -1);
 }
 
 TEST_CASE(Release_ParsesGitHubJson) {
@@ -506,7 +501,7 @@ TEST_CASE(Release_ChecksumsAcceptBothFormats) {
 // ---- Kit layout, elements and activation -------------------------------------------------------------
 
 TEST_CASE(Kit_ListsValidElementsAndSkipsWorkInProgress) {
-    std::filesystem::path root = ScratchDir("kit-list");
+    ampify::test::ScratchDir root("kit-list");
     ampify::KitLayout kit(root);
     WriteFile(kit.Element("extension", "demo") / "manifest.json", kValidExtension);
     WriteFile(kit.Element("extension", "demo") / "main.js", "");
@@ -553,7 +548,7 @@ TEST_CASE(Kit_EnableAndDisableWriteTheRightKeys) {
 }
 
 TEST_CASE(Activation_ReportsWhatLoadsAndWhatCannot) {
-    std::filesystem::path root = ScratchDir("kit-active");
+    ampify::test::ScratchDir root("kit-active");
     ampify::KitLayout kit(root);
     WriteFile(kit.Element("extension", "demo") / "manifest.json", kValidExtension);
     WriteFile(kit.Element("extension", "demo") / "main.js", "");
@@ -590,7 +585,7 @@ TEST_CASE(Activation_ReportsWhatLoadsAndWhatCannot) {
 }
 
 TEST_CASE(Activation_InvalidEnabledElementIsAProblemNotAnItem) {
-    std::filesystem::path root = ScratchDir("kit-invalid-active");
+    ampify::test::ScratchDir root("kit-invalid-active");
     ampify::KitLayout kit(root);
     WriteFile(kit.Element("extension", "demo") / "manifest.json", kValidExtension);  // main.js missing
 
@@ -602,7 +597,8 @@ TEST_CASE(Activation_InvalidEnabledElementIsAProblemNotAnItem) {
 }
 
 TEST_CASE(WriteTextFile_CreatesFoldersAndReplacesAtomically) {
-    std::filesystem::path file = ScratchDir("write-text") / "deep" / "active.txt";
+    ampify::test::ScratchDir scratch("write-text");
+    std::filesystem::path file = scratch / "deep" / "active.txt";
     std::string error;
     CHECK(ampify::WriteTextFile(file, "first\n", error));
     CHECK(ampify::WriteTextFile(file, "second\n", error));
@@ -613,7 +609,7 @@ TEST_CASE(WriteTextFile_CreatesFoldersAndReplacesAtomically) {
 // ---- Backups -----------------------------------------------------------------------------------
 
 TEST_CASE(Backup_CreateListAndRestore) {
-    std::filesystem::path root = ScratchDir("backup-cycle");
+    ampify::test::ScratchDir root("backup-cycle");
     ampify::KitLayout kit(root);
     WriteFile(kit.Settings(), "theme.active = night\n");
     WriteFile(kit.Element("theme", "night") / "manifest.json", "{}");
@@ -642,7 +638,7 @@ TEST_CASE(Backup_CreateListAndRestore) {
 }
 
 TEST_CASE(Backup_RestoreRefusesUnsafeOrUnknownNames) {
-    std::filesystem::path root = ScratchDir("backup-names");
+    ampify::test::ScratchDir root("backup-names");
     ampify::KitLayout kit(root);
     std::string error;
     CHECK(!ampify::RestoreBackup(kit, "../etc", error));
@@ -652,7 +648,7 @@ TEST_CASE(Backup_RestoreRefusesUnsafeOrUnknownNames) {
 }
 
 TEST_CASE(Backup_WithoutSettingsStillCreatesTheSnapshot) {
-    std::filesystem::path root = ScratchDir("backup-empty");
+    ampify::test::ScratchDir root("backup-empty");
     ampify::KitLayout kit(root);
     std::string error;
     std::optional<std::string> name = ampify::CreateBackup(kit, error);
@@ -666,7 +662,7 @@ TEST_CASE(Backup_WithoutSettingsStillCreatesTheSnapshot) {
 // ---- Change detection --------------------------------------------------------------------------------
 
 TEST_CASE(Fingerprint_ChangesOnlyWhenTheKitChanges) {
-    std::filesystem::path root = ScratchDir("fingerprint");
+    ampify::test::ScratchDir root("fingerprint");
     ampify::KitLayout kit(root);
     WriteFile(kit.Settings(), "a = 1\n");
     WriteFile(kit.Element("theme", "night") / "colors.ini", "[Dark]\n");
@@ -700,7 +696,7 @@ TEST_CASE(Crc32_MatchesTheStandardCheckValue) {
 }
 
 TEST_CASE(WriteZip_IsDeterministicAndRefusesUnsafeNames) {
-    std::filesystem::path root = ScratchDir("zip-writer");
+    ampify::test::ScratchDir root("zip-writer");
     std::string error;
     std::vector<ampify::cli::ZipSource> files = {{"manifest.json", {}, "{}"}, {"main.js", {}, "Ampify.log(1);\n"}};
     CHECK(ampify::cli::WriteZip(root / "a.zip", files, error));
@@ -817,7 +813,7 @@ TEST_CASE(Manifest_PreviewIsAnImageNameAtTheRoot) {
 }
 
 TEST_CASE(Folder_PreviewMustExistAndStayUnderTwoMegabytes) {
-    std::filesystem::path root = ScratchDir("folder-preview");
+    ampify::test::ScratchDir root("folder-preview");
     std::filesystem::path folder = root / "demo";
     std::string manifest = kValidExtension;
     manifest.replace(manifest.find("\"main\": \"main.js\","), 18, "\"main\": \"main.js\", \"preview\": \"shot.png\",");
@@ -838,7 +834,7 @@ TEST_CASE(Folder_PreviewMustExistAndStayUnderTwoMegabytes) {
 }
 
 TEST_CASE(Folder_RefusesASymbolicLink) {
-    std::filesystem::path root = ScratchDir("folder-link");
+    ampify::test::ScratchDir root("folder-link");
     std::filesystem::path good = root / "demo";
     WriteFile(good / "manifest.json", kValidExtension);
     WriteFile(good / "main.js", "Ampify.log('ok');");
@@ -847,7 +843,7 @@ TEST_CASE(Folder_RefusesASymbolicLink) {
 
     std::error_code ec;
     std::filesystem::create_symlink(root / "elsewhere.js", good / "lib" / "link.js", ec);
-    if (ec) return;  // no symbolic links on this system
+    if (ec) SKIP("this account may not create symbolic links");
     ampify::FolderValidation linked = ampify::ValidateElementFolder(good);
     CHECK(!linked.ok());
     CHECK(MentionsField(linked.errors, "symbolic link not allowed in the element: lib/link.js"));
@@ -932,8 +928,8 @@ TEST_CASE(Report_HidesSecretLookingSettings) {
 namespace {
 
 // An element folder with a script: its manifest names main.js, and `files` are written beside it.
-std::filesystem::path ScriptFolder(const std::string& name, const std::vector<std::string>& files) {
-    std::filesystem::path dir = ScratchDir(name);
+ampify::test::ScratchDir ScriptFolder(const std::string& name, const std::vector<std::string>& files) {
+    ampify::test::ScratchDir dir(name);
     WriteFile(dir / "manifest.json", R"({"id":"demo","main":"main.js"})");
     for (const std::string& file : files) WriteFile(dir / file, "// " + file);
     return dir;
@@ -1002,7 +998,7 @@ TEST_CASE(Compile_NoSourceWithoutTypeScriptOrJsx) {
 
 TEST_CASE(Compile_NoSourceForAFolderWithoutScript) {
     FakeProgram program;
-    std::filesystem::path dir = ScratchDir("compile-theme");
+    ampify::test::ScratchDir dir("compile-theme");
     WriteFile(dir / "manifest.json", R"({"id":"demo","kind":"theme"})");
     WriteFile(dir / "main.ts", "export {};");
     std::string message;
@@ -1012,7 +1008,7 @@ TEST_CASE(Compile_NoSourceForAFolderWithoutScript) {
 
 TEST_CASE(Compile_UpToDateWhenMainIsNewerThanEverySource) {
     FakeProgram program;
-    std::filesystem::path dir = ScriptFolder("compile-fresh", {"main.ts", "util.tsx", "main.js"});
+    auto dir = ScriptFolder("compile-fresh", {"main.ts", "util.tsx", "main.js"});
     SetAge(dir / "main.ts", std::chrono::hours(3));
     SetAge(dir / "util.tsx", std::chrono::hours(2));
     SetAge(dir / "main.js", std::chrono::hours(1));
@@ -1022,9 +1018,10 @@ TEST_CASE(Compile_UpToDateWhenMainIsNewerThanEverySource) {
 }
 
 TEST_CASE(Compile_AChangedSourceRunsEsbuildOnMainWithTheJsxFactory) {
-    ScopedEnvironment roaming("APPDATA", ScratchDir("compile-no-npm").string());  // no global esbuild: the PATH one
+    ampify::test::ScratchDir scratch("compile-no-npm");
+    ScopedEnvironment roaming("APPDATA", scratch.string());  // no global esbuild: the PATH one
     FakeProgram program;
-    std::filesystem::path dir = ScriptFolder("compile-stale", {"main.tsx", "util.ts", "main.js"});
+    auto dir = ScriptFolder("compile-stale", {"main.tsx", "util.ts", "main.js"});
     SetAge(dir / "main.tsx", std::chrono::hours(3));
     SetAge(dir / "main.js", std::chrono::hours(2));
     SetAge(dir / "util.ts", std::chrono::hours(1));  // an imported file changed after the build
@@ -1042,7 +1039,7 @@ TEST_CASE(Compile_AChangedSourceRunsEsbuildOnMainWithTheJsxFactory) {
 
 TEST_CASE(Compile_BuildsMainWhenItIsMissing) {
     FakeProgram program;
-    std::filesystem::path dir = ScriptFolder("compile-first", {"main.ts"});
+    auto dir = ScriptFolder("compile-first", {"main.ts"});
     std::string message;
     CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Compiled);
     CHECK(program.calls == 1);
@@ -1051,7 +1048,7 @@ TEST_CASE(Compile_BuildsMainWhenItIsMissing) {
 TEST_CASE(Compile_SaysHowToInstallEsbuildWhenItIsNotThere) {
     FakeProgram program;
     program.code = -1;  // the program cannot start
-    std::filesystem::path dir = ScriptFolder("compile-missing", {"main.ts"});
+    auto dir = ScriptFolder("compile-missing", {"main.ts"});
     std::string message;
     CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Failed);
     CHECK(Has(message, "npm install --save-dev esbuild"));
@@ -1060,7 +1057,7 @@ TEST_CASE(Compile_SaysHowToInstallEsbuildWhenItIsNotThere) {
 TEST_CASE(Compile_ReportsAFailedBuild) {
     FakeProgram program;
     program.code = 1;
-    std::filesystem::path dir = ScriptFolder("compile-broken", {"main.ts"});
+    auto dir = ScriptFolder("compile-broken", {"main.ts"});
     std::string message;
     CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Failed);
     CHECK(Has(message, "esbuild failed") && Has(message, "code 1"));
@@ -1068,7 +1065,7 @@ TEST_CASE(Compile_ReportsAFailedBuild) {
 
 TEST_CASE(Compile_PrefersTheEsbuildInstalledInNodeModules) {
     FakeProgram program;
-    std::filesystem::path dir = ScriptFolder("compile-local", {"main.ts"});
+    auto dir = ScriptFolder("compile-local", {"main.ts"});
     WriteFile(dir / "node_modules" / "esbuild" / "bin" / "esbuild", "// stub");
     std::string message;
     CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Compiled);
@@ -1080,11 +1077,11 @@ TEST_CASE(Compile_PrefersTheEsbuildInstalledInNodeModules) {
 #ifdef _WIN32
 TEST_CASE(Compile_StartsNpmsGlobalEsbuildThroughNodeOnWindows) {
     // npm leaves only an esbuild.cmd on the PATH there, which CreateProcess cannot start.
-    std::filesystem::path roaming = ScratchDir("compile-roaming");
+    ampify::test::ScratchDir roaming("compile-roaming");
     WriteFile(roaming / "npm" / "node_modules" / "esbuild" / "bin" / "esbuild", "// stub");
     ScopedEnvironment appData("APPDATA", roaming.string());
     FakeProgram program;
-    std::filesystem::path dir = ScriptFolder("compile-global", {"main.ts"});
+    auto dir = ScriptFolder("compile-global", {"main.ts"});
     std::string message;
     CHECK(ampify::cli::CompileSources(dir, message, program.Runner()) == ampify::cli::CompileOutcome::Compiled);
     CHECK(program.command.size() > 2 && program.command[0] == "node");
@@ -1094,7 +1091,7 @@ TEST_CASE(Compile_StartsNpmsGlobalEsbuildThroughNodeOnWindows) {
 
 TEST_CASE(Compile_APlainModuleOrJsonThatChangedAfterTheBuildRunsEsbuild) {
     FakeProgram program;
-    std::filesystem::path dir = ScriptFolder("compile-plain", {"main.ts", "helper.js", "data.json", "main.js"});
+    auto dir = ScriptFolder("compile-plain", {"main.ts", "helper.js", "data.json", "main.js"});
     SetAge(dir / "main.ts", std::chrono::hours(4));
     SetAge(dir / "helper.js", std::chrono::hours(4));
     SetAge(dir / "main.js", std::chrono::hours(3));
@@ -1106,8 +1103,9 @@ TEST_CASE(Compile_APlainModuleOrJsonThatChangedAfterTheBuildRunsEsbuild) {
 
 TEST_CASE(Compile_MainIsAFileNameAtTheRootOfTheFolder) {
     FakeProgram program;
-    std::filesystem::path dir = ScratchDir("compile-escape");
-    WriteFile(dir.parent_path() / "escape.ts", "export {};");
+    ampify::test::ScratchDir outer("compile-escape");
+    std::filesystem::path dir = outer / "folder";
+    WriteFile(outer / "escape.ts", "export {};");
     WriteFile(dir / "main.ts", "export {};");
     std::filesystem::create_directories(dir / "sub");
     std::string message;
@@ -1121,7 +1119,7 @@ TEST_CASE(Compile_MainIsAFileNameAtTheRootOfTheFolder) {
 
 TEST_CASE(Compile_IgnoresNodeModulesAndHiddenFolders) {
     FakeProgram program;
-    std::filesystem::path dir = ScriptFolder("compile-deps", {"main.ts", "main.js"});
+    auto dir = ScriptFolder("compile-deps", {"main.ts", "main.js"});
     WriteFile(dir / "node_modules" / "lib" / "index.ts", "export {};");
     WriteFile(dir / ".cache" / "old.ts", "export {};");
     SetAge(dir / "main.ts", std::chrono::hours(3));

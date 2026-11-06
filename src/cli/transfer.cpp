@@ -113,7 +113,7 @@ int CmdExport(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() != 2) return Usage(ctx, "export needs the .zip file to write");
 
-    std::filesystem::path archive = PathArgument(args[1]);
+    std::filesystem::path archive = Utf8ToPath(args[1]);
     std::error_code ec;
     if (std::filesystem::exists(archive, ec)) return Failure(ctx, "the file already exists: " + Utf8(archive));
 
@@ -136,7 +136,7 @@ int CmdImport(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() != 2) return Usage(ctx, "import needs the .zip file of an export");
 
-    std::filesystem::path archive = PathArgument(args[1]);
+    std::filesystem::path archive = Utf8ToPath(args[1]);
     std::error_code ec;
     if (!std::filesystem::is_regular_file(archive, ec)) return Failure(ctx, "file not found: " + args[1]);
 

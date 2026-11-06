@@ -15,32 +15,18 @@
 #include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
 #include "pump.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
 
 namespace fs = std::filesystem;
 
-struct Fixture {
-    ampify::test::FakeHost host;
-    std::ostringstream out;
-    ampify::Journal journal{out, [] { return std::string("t"); }};
-
+struct Fixture : ampify::test::ElementFixture<> {
     std::unique_ptr<ampify::ScriptExtension> Make(const std::string& id, const std::string& main,
                                                const std::string& permissions = "") {
-        fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("module-" + id);
-        fs::remove_all(dir);
-        fs::create_directories(dir);
-        const std::string manifest =
-            R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
-            R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
-        std::ofstream(dir / "manifest.json") << manifest;
-        std::ofstream(dir / "main.js") << main;
-        ampify::ManifestResult result = ampify::ParseManifest(manifest, id, 1, [](const std::string&) { return true; });
-        return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, host, journal);
+        return ElementFixture<>::Make({.id = id, .permissions = permissions}, main);
     }
-
-    bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
 
     // The text of the first journal line that starts with `[id] prefix`, without the prefix.
     std::string Line(const std::string& id, const std::string& prefix) const {

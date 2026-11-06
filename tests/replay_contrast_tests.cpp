@@ -59,7 +59,7 @@ const ampify::Json* TextNamed(const ampify::Json& report, const std::string& ele
 }  // namespace
 
 TEST_CASE(ReplayContrast_JudgesATextOnTheNearestKnownOpaqueColourUpTheTree) {
-    fs::path dir = Scratch("contrast-walk");
+    ScratchDir dir("contrast-walk");
     // Pale grey on Apple's light page, through a band whose brush reads "present".
     std::optional<ampify::Json> pale = Replayed(dir, LightPage("#FFF3F3F3"), "TextBlock#Title { color: #FFC8C8C8; }\n");
     CHECK(pale.has_value());
@@ -92,7 +92,7 @@ TEST_CASE(ReplayContrast_JudgesATextOnTheNearestKnownOpaqueColourUpTheTree) {
 }
 
 TEST_CASE(ReplayContrast_DoesNotJudgeApplesColoursOfTheOtherMode) {
-    fs::path dir = Scratch("contrast-mode");
+    ScratchDir dir("contrast-mode");
     // A dark theme on a dump recorded light: the page's light grey is Apple's light mode, which Apple Music would
     // replace; the title's colour is the theme's.
     std::optional<ampify::Json> report = Replayed(dir, LightPage("#FFF3F3F3"), "TextBlock#Title { color: #FFEEEEEE; }\n",

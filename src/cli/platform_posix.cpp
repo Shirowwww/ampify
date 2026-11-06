@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "platform.hpp"
+#include "release_facts.hpp"
 
 namespace ampify::platform {
 
@@ -34,7 +35,7 @@ std::vector<std::string> Initialize(int argc, char** argv) {
 
 std::filesystem::path DefaultKitDirectory() {
     const char* home = std::getenv("HOME");
-    return std::filesystem::path(home ? home : ".") / "Ampify";
+    return std::filesystem::path(home ? home : ".") / kKitFolderName;
 }
 
 std::filesystem::path ExecutableDirectory() {

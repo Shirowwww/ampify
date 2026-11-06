@@ -1,10 +1,10 @@
 #include "backup.hpp"
 
 #include <algorithm>
-#include <chrono>
-#include <ctime>
 #include <filesystem>
 #include <system_error>
+
+#include "internal.hpp"
 
 namespace ampify {
 
@@ -16,20 +16,6 @@ constexpr std::string_view kKindFolders[] = {"extensions", "themes", "apps", "sn
 bool IsSafeBackupName(std::string_view name) {
     if (name.empty() || name == "." || name == "..") return false;
     return name.find_first_of("/\\:") == std::string_view::npos;
-}
-
-std::string TimeStamp() {
-    using namespace std::chrono;
-    std::time_t now = system_clock::to_time_t(system_clock::now());
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &now);
-#else
-    localtime_r(&now, &local);
-#endif
-    char buffer[32];
-    std::strftime(buffer, sizeof(buffer), "%Y%m%d-%H%M%S", &local);
-    return buffer;
 }
 
 // Copies a file or a folder tree, one entry at a time. Symbolic links are skipped, so a link cannot pull
@@ -85,10 +71,10 @@ bool CopyElementFolder(const std::filesystem::path& from, const std::filesystem:
 }
 
 std::optional<std::string> CreateBackup(const KitLayout& kit, std::string& error) {
-    std::string name = TimeStamp();
+    std::string name = cli::LocalTimeText("%Y%m%d-%H%M%S");
     std::filesystem::path target = kit.Backups() / name;
     for (int suffix = 2; std::filesystem::exists(target); suffix++) {
-        name = TimeStamp() + "-" + std::to_string(suffix);
+        name = cli::LocalTimeText("%Y%m%d-%H%M%S") + "-" + std::to_string(suffix);
         target = kit.Backups() / name;
     }
 

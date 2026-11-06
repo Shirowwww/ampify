@@ -2,6 +2,7 @@
 
 #include "../src/core/apple_music.hpp"
 #include "../src/core/drm_guard.hpp"
+#include "../src/core/text_util.hpp"
 #include "test.hpp"
 
 TEST_CASE(AppleMusic_VersionComesFromThePackageFullName) {
@@ -28,11 +29,11 @@ TEST_CASE(AppleMusic_RecognisesItsTwoProcesses) {
 
 // Self-updates change the package version: the launcher must see the newer one, numerically, not as text.
 TEST_CASE(AppleMusic_VersionsCompareAsNumbers) {
-    CHECK(ampify::CompareVersions("1.1792.39682.0", "1.1540.23042.0") > 0);
-    CHECK(ampify::CompareVersions("1.1540.23042.0", "1.1792.39682.0") < 0);
-    CHECK(ampify::CompareVersions("1.9.0.0", "1.10.0.0") < 0);  // not "1.9" > "1.10" as text
-    CHECK(ampify::CompareVersions("1.1540.23042.0", "1.1540.23042.0") == 0);
-    CHECK(ampify::CompareVersions("1.2", "1.2.0.0") == 0);      // a missing part counts as 0
+    CHECK(ampify::CompareDottedVersions("1.1792.39682.0", "1.1540.23042.0") > 0);
+    CHECK(ampify::CompareDottedVersions("1.1540.23042.0", "1.1792.39682.0") < 0);
+    CHECK(ampify::CompareDottedVersions("1.9.0.0", "1.10.0.0") < 0);  // not "1.9" > "1.10" as text
+    CHECK(ampify::CompareDottedVersions("1.1540.23042.0", "1.1540.23042.0") == 0);
+    CHECK(ampify::CompareDottedVersions("1.2", "1.2.0.0") == 0);      // a missing part counts as 0
 }
 
 TEST_CASE(DrmGuard_RefusesFairPlayModules) {

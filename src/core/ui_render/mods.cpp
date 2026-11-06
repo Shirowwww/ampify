@@ -21,7 +21,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr int kKitApiMajor = 1;                     // the same as ExtensionLoader
 constexpr std::uintmax_t kReloadLimit = 64 * 1024;  // rewritten past this size, as ampify does
 
 // One write per call, so the kernel sees a whole line; a file that grew too big starts again.

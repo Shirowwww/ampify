@@ -4,6 +4,7 @@
 list(APPEND AMPIFY_TESTS_SOURCES
     tests/main.cpp
     tests/core_tests.cpp
+    tests/text_util_tests.cpp
     tests/atmos_tests.cpp
     tests/apple_music_tests.cpp
     tests/policy_tests.cpp
@@ -43,4 +44,5 @@ list(APPEND AMPIFY_TESTS_SOURCES
     tests/reliability_tests.cpp
     tests/off_notice_tests.cpp)
 
-list(APPEND AMPIFY_TESTS_WIN_SOURCES tests/win_host_tests.cpp tests/win_common_tests.cpp tests/win/kernel_claim_tests.cpp)
+list(APPEND AMPIFY_TESTS_WIN_SOURCES tests/win_host_tests.cpp tests/win_common_tests.cpp tests/win/kernel_claim_tests.cpp
+    tests/win/ui_thread_tests.cpp tests/win/hook_lock_tests.cpp)

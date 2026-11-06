@@ -8,6 +8,7 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 #include "../json.hpp"
+#include "../kit_layout.hpp"
 
 namespace ampify {
 
@@ -33,8 +34,6 @@ namespace natives {
 
 namespace {
 
-constexpr std::string_view kMarketplaceId = "marketplace";
-
 struct KitNatives : ScriptBridge {
     static void Report(ScriptExtension* ext, double id, int code, const std::string& out, const std::string& err) {
         ext->DeliverEvent("kitDone", Json(Json::Object{{"id", id}, {"code", static_cast<double>(code)},
@@ -46,7 +45,7 @@ struct KitNatives : ScriptBridge {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "kit.manage", &failure)) return failure;
-        if (ext->id() != kMarketplaceId) {
+        if (!IsFirstParty(ext->id())) {
             return Throw(ctx, "PermissionDenied", "kit.manage is reserved for the Marketplace that ships with Ampify");
         }
         double id = 0;

@@ -9,6 +9,7 @@
 #include "internal.hpp"
 #include "kit.hpp"
 #include "platform.hpp"
+#include "release_facts.hpp"
 #include "watch.hpp"
 
 namespace ampify::cli {
@@ -65,10 +66,10 @@ int TurnAutoStartOn(Context& ctx) {
                 << (state.registered ? "on" : "off") << ".\n";
         return 0;
     }
-    std::filesystem::path launcher = folder / "ampify_launcher.exe";
+    std::filesystem::path launcher = folder / kLauncherFile;
     std::error_code ec;
     if (!std::filesystem::is_regular_file(launcher, ec)) {
-        return Failure(ctx, "ampify_launcher.exe not found next to ampify: " + Utf8(launcher));
+        return Failure(ctx, std::string(kLauncherFile) + " not found next to ampify: " + Utf8(launcher));
     }
     std::string error;
     if (!platform::EnableAutoStart(launcher, error)) return Failure(ctx, error);
@@ -93,7 +94,7 @@ int CmdLaunch(Context& ctx) {
     // A problem with one element is printed, and the app still starts: the kernel skips what cannot load.
     ApplyNow(ctx);
 
-    std::filesystem::path launcher = platform::ExecutableDirectory() / "ampify_launcher.exe";
+    std::filesystem::path launcher = platform::ExecutableDirectory() / kLauncherFile;
     // The launcher reads app_launch_flags itself and hands it to Apple Music. Shown here so the user sees what goes.
     Settings settings;
     settings.Load(ctx.kit.Settings().string());
@@ -107,7 +108,7 @@ int CmdLaunch(Context& ctx) {
     }
     std::error_code ec;
     if (!std::filesystem::is_regular_file(launcher, ec)) {
-        return Failure(ctx, "ampify_launcher.exe not found next to ampify: " + Utf8(launcher));
+        return Failure(ctx, std::string(kLauncherFile) + " not found next to ampify: " + Utf8(launcher));
     }
     if (!platform::StartDetached({Utf8(launcher)})) return Failure(ctx, "cannot start: " + Utf8(launcher));
     ctx.out << "Apple Music is starting with the kernel.\n";

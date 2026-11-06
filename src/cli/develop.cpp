@@ -129,7 +129,7 @@ int CmdDev(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() != 2) return Usage(ctx, "dev needs the folder of the element to develop");
 
-    std::filesystem::path source = PathArgument(args[1]);
+    std::filesystem::path source = Utf8ToPath(args[1]);
     std::string compiled;
     CompileOutcome compile = CompileElementSources(source, compiled);
     if (compile == CompileOutcome::Failed) return Failure(ctx, compiled);

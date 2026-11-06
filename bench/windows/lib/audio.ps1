@@ -64,27 +64,6 @@ namespace AmpifyAudio {
         [PreserveSig] int ActivateSpatialAudioStream(IntPtr activationParams, ref Guid riid, out IntPtr stream);
     }
 
-    // Undocumented but stable since Windows 7: what the Sound control panel uses to pick the default device.
-    // Only SetDefaultEndpoint is called; the slots before it keep the vtable order.
-    [ComImport, Guid("F8679F50-850A-41CF-9C72-430F290290C8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    interface IPolicyConfig {
-        [PreserveSig] int GetMixFormat();
-        [PreserveSig] int GetDeviceFormat();
-        [PreserveSig] int ResetDeviceFormat();
-        [PreserveSig] int SetDeviceFormat();
-        [PreserveSig] int GetProcessingPeriod();
-        [PreserveSig] int SetProcessingPeriod();
-        [PreserveSig] int GetShareMode();
-        [PreserveSig] int SetShareMode();
-        [PreserveSig] int GetPropertyValue();
-        [PreserveSig] int SetPropertyValue();
-        [PreserveSig] int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string id, int role);
-        [PreserveSig] int SetEndpointVisibility();
-    }
-
-    [ComImport, Guid("870AF99C-171D-4F9E-AF0D-E63DF40C2BC9")]
-    class PolicyConfigObject { }
-
     public class Endpoint {
         public string Id;
         public string Name;
@@ -140,16 +119,6 @@ namespace AmpifyAudio {
             return Describe(device);
         }
 
-        // Sets the default device for the three roles (console, multimedia, communications). Returns the first error.
-        public static int SetDefault(string id) {
-            IPolicyConfig policy = (IPolicyConfig)new PolicyConfigObject();
-            for (int role = 0; role < 3; role++) {
-                int hr = policy.SetDefaultEndpoint(id, role);
-                if (hr != 0) return hr;
-            }
-            return 0;
-        }
-
         // What ISpatialAudioClient says on the default render device: dynamic objects, and whether the plain object
         // stream and the metadata stream (Dolby Atmos) can be opened. 0 = available.
         public static SpatialState Spatial() {
@@ -180,21 +149,6 @@ namespace AmpifyAudio {
 '@
 }
 
-# Active render endpoints (name and id).
-function Get-RenderEndpoints {
-    return @([AmpifyAudio.Endpoints]::ActiveRender())
-}
-
-# Default render endpoint, or $null.
-function Get-DefaultRenderEndpoint {
-    return [AmpifyAudio.Endpoints]::DefaultRender()
-}
-
-function Set-DefaultRenderEndpoint {
-    param([Parameter(Mandatory)][string]$Id)
-    return [AmpifyAudio.Endpoints]::SetDefault($Id)
-}
-
 function Format-HResult {
     param([int]$Value)
     if ($Value -eq 0) { return 'yes' }
@@ -207,10 +161,6 @@ function Get-SpatialAudioSummary {
     if ($state.Error) { return $state.Error }
     return "max dynamic objects: $($state.MaxDynamicObjects); object stream: $(Format-HResult $state.ObjectStreamHr); " +
         "metadata stream (Atmos): $(Format-HResult $state.MetadataStreamHr)"
-}
-
-function Get-SpatialAudioState {
-    return [AmpifyAudio.Endpoints]::Spatial()
 }
 
 # Spatial sound format of the default render device, read (and set with -Enable) through the WinRT class

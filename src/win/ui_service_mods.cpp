@@ -7,6 +7,8 @@
 
 #include <shellapi.h>
 
+#include "../core/text_util.hpp"
+
 namespace ampify::win::ui_service_detail {
 
 namespace {
@@ -131,7 +133,7 @@ std::optional<std::string> NumberIn(std::string text, const SettingSpec& spec) {
     auto [stop, error] = std::from_chars(text.data(), end, number);
     if (text.empty() || error != std::errc() || stop != end || !std::isfinite(number)) return std::nullopt;
     if ((spec.min && number < *spec.min) || (spec.max && number > *spec.max)) return std::nullopt;
-    return SettingNumberText(number);
+    return ShortestNumberText(number);
 }
 
 // A text or number field, written when it is left or on Enter. A number that does not read puts the last value back.
@@ -186,7 +188,7 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
     const bool whole = std::floor(low) == low && std::floor(high) == high;
     std::optional<std::string> stored = NumberIn(value, spec);
     std::optional<std::string> fallback = NumberIn(spec.defaultValue, spec);
-    std::string start = SettingNumberText(low);
+    std::string start = ShortestNumberText(low);
     if (stored) {
         start = *stored;
     } else if (fallback) {
@@ -204,7 +206,7 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
 
     // A point in settings.txt, a comma for a French or German reader, as in SettingField.
     auto shown = [](double number) {
-        std::string text = SettingNumberText(number);
+        std::string text = ShortestNumberText(number);
         if (i18n::UsesDecimalComma()) std::replace(text.begin(), text.end(), '.', ',');
         return Wide(text);
     };
@@ -229,7 +231,7 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
     UiService::Shared* owner = &shared;
     rest.Tick([owner, target, key = spec.key, last, moved](auto const&, auto const&) noexcept {
         try {
-            std::string next = SettingNumberText(*moved);
+            std::string next = ShortestNumberText(*moved);
             if (next == *last) return;
             *last = next;
             CommitSetting(*owner, target, key, next);

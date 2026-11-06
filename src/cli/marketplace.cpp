@@ -11,6 +11,7 @@
 
 #include "../core/json.hpp"
 #include "../core/kit_layout.hpp"
+#include "apple_facts.hpp"
 #include "../core/settings.hpp"
 #include "../core/theme/files.hpp"
 #include "../core/theme/theme.hpp"
@@ -24,24 +25,15 @@
 #include "messages.hpp"
 #include "platform.hpp"
 #include "release.hpp"
+#include "release_facts.hpp"
 #include "setting_keys.hpp"
 #include "sha256.hpp"
-
-#ifndef AMPIFY_VERSION
-#define AMPIFY_VERSION "0.0.0-dev"
-#endif
 
 namespace ampify::cli {
 
 namespace {
 
-constexpr const char* kDefaultRelease =
-    "https://api.github.com/repos/Shirowwww/ampify/releases/latest";
-// A given release, by its tag: `ampify install-kit 0.1.0` reads .../releases/tags/v0.1.0.
-constexpr const char* kReleaseByTag = "https://api.github.com/repos/Shirowwww/ampify/releases/tags/";
-constexpr const char* kKitArchiveSuffix = "-windows-x64.zip";
-constexpr const char* kChecksums = "SHA256SUMS.txt";
-constexpr const char* kRequiredKitFiles[] = {"ampify.exe", "ampify_launcher.exe", "ampify_kernel.dll"};
+constexpr std::string_view kRequiredKitFiles[] = {kCliFile, kLauncherFile, kKernelFile};
 // A README is a page of text: anything larger is not one, and the detail page waits on it.
 constexpr std::uintmax_t kMaxReadmeBytes = 256 * 1024;
 constexpr int kReadmeSeconds = 15;
@@ -64,7 +56,7 @@ std::string LocalPathOf(std::string_view url) {
 bool FetchTo(const std::string& url, const std::filesystem::path& destination, std::string& error, int maxSeconds) {
     if (StartsWith(url, "file://")) {
         std::error_code ec;
-        std::filesystem::copy_file(PathArgument(LocalPathOf(url)), destination,
+        std::filesystem::copy_file(Utf8ToPath(LocalPathOf(url)), destination,
                                    std::filesystem::copy_options::overwrite_existing, ec);
         if (ec) {
             error = "cannot copy: " + LocalPathOf(url);
@@ -116,7 +108,7 @@ bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
     } else {
         local = true;
         std::string path = StartsWith(source, "file://") ? LocalPathOf(source) : source;
-        if (!ReadWholeFile(PathArgument(path), text)) {
+        if (!ReadWholeFile(Utf8ToPath(path), text)) {
             ctx.err << "ampify: catalog not found: " << path << "\n";
             return false;
         }
@@ -283,7 +275,7 @@ int UpdateElement(Context& ctx, const std::string& id) {
     }
 
     std::string installedVersion = installed.front().manifest ? installed.front().manifest->version : "0.0.0";
-    if (CompareReleaseVersions(entry->version, installedVersion) <= 0) {
+    if (CompareDottedVersions(entry->version, installedVersion) <= 0) {
         ctx.out << id << " is already up to date (version " << installedVersion << ").\n";
         return 0;
     }
@@ -293,8 +285,9 @@ int UpdateElement(Context& ctx, const std::string& id) {
 }  // namespace
 
 std::string DefaultReleaseUrl(std::string_view version) {
-    if (version.empty()) return kDefaultRelease;
-    return std::string(kReleaseByTag) + "v" + std::string(version);
+    // A given release, by its tag: `ampify install-kit 0.1.0` reads .../releases/tags/v0.1.0.
+    if (version.empty()) return std::string(kReleaseApiUrl) + "/latest";
+    return std::string(kReleaseApiUrl) + "/tags/v" + std::string(version);
 }
 
 std::optional<ReleaseInfo> FetchRelease(Context& ctx, const std::string& source, std::string& error, int maxSeconds) {
@@ -350,12 +343,12 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     std::string applyCommand = wanted.empty() ? "ampify update --apply" : "ampify install-kit " + wanted + " --apply";
 
     if (wanted.empty()) {
-        if (CompareReleaseVersions(release->version, AMPIFY_VERSION) <= 0) {
-            ctx.out << "ampify is up to date (version " << AMPIFY_VERSION << ").\n";
+        if (CompareDottedVersions(release->version, kKitVersion) <= 0) {
+            ctx.out << "ampify is up to date (version " << kKitVersion << ").\n";
             return 0;
         }
         if (ctx.options.check) {
-            ctx.out << "Version " << release->version << " is available (installed: " << AMPIFY_VERSION
+            ctx.out << "Version " << release->version << " is available (installed: " << kKitVersion
                     << "). Run ampify update to download it.\n";
             return 0;
         }
@@ -364,21 +357,22 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
             return Failure(ctx, "the release read is version " + release->version + ", not version " + wanted);
         }
         if (ctx.options.check) {
-            ctx.out << "Version " << wanted << " is available (installed: " << AMPIFY_VERSION
+            ctx.out << "Version " << wanted << " is available (installed: " << kKitVersion
                     << "). Run ampify install-kit " << wanted << " to download it.\n";
             return 0;
         }
-        if (CompareReleaseVersions(wanted, AMPIFY_VERSION) < 0) {
-            ctx.out << "Warning: version " << wanted << " is older than the installed one (" << AMPIFY_VERSION
+        if (CompareDottedVersions(wanted, kKitVersion) < 0) {
+            ctx.out << "Warning: version " << wanted << " is older than the installed one (" << kKitVersion
                     << "). Your settings and elements stay in place.\n";
         }
     }
 
-    std::string archiveName = "ampify-" + release->version + kKitArchiveSuffix;
+    std::string archiveName = std::string(kPackagePrefix) + release->version + std::string(kPackageSuffix);
+    const std::string checksums(kChecksumsFile);
     auto archiveAddress = release->assets.find(archiveName);
-    auto sumsAddress = release->assets.find(kChecksums);
+    auto sumsAddress = release->assets.find(checksums);
     if (archiveAddress == release->assets.end() || sumsAddress == release->assets.end()) {
-        return Failure(ctx, "release " + release->tag + " does not contain " + archiveName + " and " + kChecksums);
+        return Failure(ctx, "release " + release->tag + " does not contain " + archiveName + " and " + checksums);
     }
     if (!IsAllowedDownloadUrl(archiveAddress->second, releaseLocal) ||
         !IsAllowedDownloadUrl(sumsAddress->second, releaseLocal)) {
@@ -386,7 +380,7 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     }
 
     std::filesystem::path archive = ctx.kit.Updates() / archiveName;
-    std::filesystem::path sumsFile = ctx.kit.Updates() / kChecksums;
+    std::filesystem::path sumsFile = ctx.kit.Updates() / checksums;
     ctx.out << "Downloading version " << release->version << "...\n" << std::flush;
     if (!FetchTo(archiveAddress->second, archive, error) || !FetchTo(sumsAddress->second, sumsFile, error)) {
         RemoveQuietly(archive);
@@ -423,10 +417,10 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
         RemoveQuietly(staged);
         return Failure(ctx, "symbolic link not allowed in the update archive");
     }
-    for (const char* required : kRequiredKitFiles) {
+    for (std::string_view required : kRequiredKitFiles) {
         if (!std::filesystem::is_regular_file(staged / required, ec)) {
             RemoveQuietly(staged);
-            return Failure(ctx, std::string("incomplete archive, missing file: ") + required);
+            return Failure(ctx, "incomplete archive, missing file: " + std::string(required));
         }
     }
 
@@ -436,10 +430,11 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
         return 0;
     }
 
-    if (platform::IsProcessRunning("AppleMusic.exe") || platform::IsProcessRunning("AMPLibraryAgent.exe")) {
+    if (platform::IsProcessRunning(std::string(kAppleMusicImage)) ||
+        platform::IsProcessRunning(std::string(kLibraryAgentImage))) {
         return Failure(ctx, "close Apple Music before installing the update");
     }
-    std::filesystem::path installDir = ctx.options.installDir ? PathArgument(*ctx.options.installDir)
+    std::filesystem::path installDir = ctx.options.installDir ? Utf8ToPath(*ctx.options.installDir)
                                                               : platform::ExecutableDirectory();
     for (const auto& file : std::filesystem::directory_iterator(staged, ec)) {
         if (!file.is_regular_file(ec)) continue;
@@ -463,7 +458,7 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     platform::AutoStart autoStart = platform::AutoStartState();
     if ((autoStart.registered || autoStart.running) && platform::IsInstallDirectory(installDir)) {
         std::string error;
-        if (!platform::RestartAutoStart(installDir / "ampify_launcher.exe", error)) {
+        if (!platform::RestartAutoStart(installDir / kLauncherFile, error)) {
             ctx.err << "ampify: the background launcher did not restart (" << error << "): run ampify apply\n";
         }
     }
@@ -693,8 +688,7 @@ int CmdRemove(Context& ctx) {
 
     std::vector<InstalledElement> matches = InstalledNamed(ctx.kit, id);
     if (matches.empty()) {
-        if (std::find(std::begin(kBuiltinExtensions), std::end(kBuiltinExtensions), std::string_view(id)) !=
-            std::end(kBuiltinExtensions)) {
+        if (IsBuiltInExtension(id)) {
             return Failure(ctx, id + " is built into the kernel and cannot be removed, only turned off");
         }
         return Failure(ctx, "element not found: " + id);

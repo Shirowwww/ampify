@@ -4,6 +4,7 @@
 #include "../src/core/element_settings.hpp"
 #include "../src/core/i18n.hpp"
 #include "../src/core/json.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -231,7 +232,8 @@ TEST_CASE(SettingsPanel_ImportRefusesAFileBiggerThanTheLimit) {
 TEST_CASE(SettingsPanel_ARefusalIsToldInTheLanguageOfTheInterface) {
     const char* reasons[] = {"settings.refusedTooBig",       "settings.refusedNotSettings", "settings.refusedVersion",
                              "settings.refusedOtherElement", "settings.refusedUnknown",     "settings.refusedWrongValue"};
-    for (const char* language : {"en", "fr", "de", "es", "pt", "ru", "ja", "zh"}) {
+    ampify::test::LanguageScope scope("en");
+    for (std::string_view language : ampify::i18n::Languages()) {
         ampify::i18n::SetLanguage(language);
         for (const char* reason : reasons) CHECK(ampify::i18n::Text(reason) != reason);
     }

@@ -10,6 +10,7 @@
 #include "../src/cli/messages.hpp"
 #include "../src/core/i18n.hpp"
 #include "service_host.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -67,6 +68,7 @@ TEST_CASE(I18n_EveryTextIsFilledAndEveryKeyIsUnique) {
 }
 
 TEST_CASE(I18n_FrenchTextsForWhatPeopleSeeAndEnglishForTheRest) {
+    ampify::test::LanguageScope scope("en");
     CheckTable(ampify::i18n::KitMessagesIn("fr"), "kit fr");
     ampify::i18n::SetLanguage("fr");
     CHECK(ampify::i18n::Text("ui.on") == "Activé");
@@ -91,11 +93,23 @@ TEST_CASE(I18n_FrenchTextsForWhatPeopleSeeAndEnglishForTheRest) {
     }
 }
 
+TEST_CASE(I18n_TheListedLanguagesAreTheOnesWithATable) {
+    std::vector<std::string_view> languages = ampify::i18n::Languages();
+    REQUIRE(!languages.empty());
+    CHECK(languages.front() == "en");
+    CHECK(std::find(languages.begin(), languages.end(), "fr") != languages.end());
+    for (size_t i = 1; i < languages.size(); ++i) {
+        CHECK(ampify::i18n::KitMessagesIn(languages[i]).data() != ampify::i18n::KitMessages().data());
+    }
+    CHECK(ampify::i18n::KitMessagesIn("xx").data() == ampify::i18n::KitMessages().data());
+}
+
 TEST_CASE(I18n_EveryLanguageTranslatesWhatTheFrenchTableDoes) {
     auto french = ampify::i18n::KitMessagesIn("fr");
-    for (const char* language : {"de", "es", "pt", "ru", "ja", "zh"}) {
+    for (std::string_view language : ampify::i18n::Languages()) {
+        if (language == "en" || language == "fr") continue;
         auto table = ampify::i18n::KitMessagesIn(language);
-        CheckTable(table, language);
+        CheckTable(table, std::string(language).c_str());
         CHECK(table.size() == french.size());
         for (const ampify::i18n::Message& message : french) {
             std::string_view text = ampify::i18n::Lookup(table, message.key);

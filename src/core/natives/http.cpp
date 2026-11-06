@@ -16,6 +16,7 @@
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
+#include "../base64.hpp"
 #include "../form_data.hpp"
 #include "../image_host.hpp"
 #include "../json.hpp"

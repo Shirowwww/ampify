@@ -4,18 +4,17 @@
 #include <map>
 #include <set>
 
-#include "../core/form_data.hpp"
+#include "../core/base64.hpp"
 #include "internal.hpp"
 #include "messages.hpp"
 #include "platform.hpp"
+#include "release_facts.hpp"
 
 namespace ampify::cli {
 
 namespace {
 
-constexpr std::string_view kCatalogOwner = "Shirowwww";
-constexpr std::string_view kCatalogRepo = "Shirowwww/ampify-catalog";
-constexpr std::string_view kCatalogPage = "https://github.com/Shirowwww/ampify-catalog";
+const std::string kCatalogPage = "https://github.com/" + std::string(kCatalogRepository);
 constexpr std::string_view kBaseBranch = "main";
 
 // What one run sends. `target` is the folder of the element in the catalog repository.
@@ -41,7 +40,7 @@ std::string PermissionsText(const ElementManifest& manifest) {
 
 int Stopped(Context& ctx, const std::string& what) {
     return Failure(ctx, what + " Run ampify publish again (what was already sent is reused), or follow the steps at " +
-                            std::string(kCatalogPage));
+                            kCatalogPage);
 }
 
 // Runs gh and returns what it printed. gh writes its own error messages to the console.
@@ -115,7 +114,7 @@ void PrintManualSteps(Context& ctx, const Publication& publication, const std::s
         return;
     }
     // The file manager's command also opens an address in the browser: explorer.exe on Windows, xdg-open elsewhere.
-    if (!platform::StartDetached(platform::OpenFolderCommand(std::filesystem::path(std::string(kCatalogPage))))) {
+    if (!platform::StartDetached(platform::OpenFolderCommand(std::filesystem::path(kCatalogPage)))) {
         ctx.out << "The page could not be opened; open it yourself.\n";
     }
 }
@@ -128,11 +127,11 @@ void PrintPlan(Context& ctx, const Publication& publication) {
             << "  permissions  " << PermissionsText(manifest) << "\n"
             << "  files        " << publication.files.size() << "\n"
             << "With the GitHub CLI signed in, ampify publish would:\n"
-            << "  1. fork " << kCatalogRepo << " (or reuse your fork)\n"
+            << "  1. fork " << kCatalogRepository << " (or reuse your fork)\n"
             << "  2. create the branch " << publication.branch << " in your fork\n"
             << "  3. put the " << publication.files.size() << " file(s) in " << publication.target
             << "/, replacing the previous version's files\n"
-            << "  4. open a pull request on " << kCatalogRepo << " and print its address\n";
+            << "  4. open a pull request on " << kCatalogRepository << " and print its address\n";
 }
 
 // Your fork, kept level with the catalog. The author of the catalog works in the catalog itself.
@@ -141,12 +140,12 @@ bool PrepareFork(Context& ctx, Remote& remote) {
     std::optional<std::string> login = Gh({"api", "user", "--jq", ".login"});
     if (!login || login->empty()) return false;
     remote.login = *login;
-    if (ToLowerAscii(remote.login) == ToLowerAscii(kCatalogOwner)) {
-        remote.fork = std::string(kCatalogRepo);
+    if (ToLowerAscii(remote.login) == ToLowerAscii(kProjectOwner)) {
+        remote.fork = std::string(kCatalogRepository);
         return true;
     }
-    remote.fork = remote.login + "/" + std::string(kCatalogRepo.substr(kCatalogOwner.size() + 1));
-    if (!Gh({"repo", "fork", std::string(kCatalogRepo), "--clone=false", "--remote=false"})) return false;
+    remote.fork = remote.login + "/" + std::string(kCatalogRepository.substr(kProjectOwner.size() + 1));
+    if (!Gh({"repo", "fork", std::string(kCatalogRepository), "--clone=false", "--remote=false"})) return false;
     if (!Gh({"repo", "sync", remote.fork, "--branch", std::string(kBaseBranch)})) {
         ctx.out << "Your fork could not be brought up to date; going on with it as it is.\n";
     }
@@ -230,7 +229,7 @@ int OpenPullRequest(Context& ctx, const Publication& publication, const Remote& 
 
     std::string title = (update ? "Update " : "Add ") + manifest.name + " " + manifest.version;
     std::optional<std::string> address =
-        Gh({"pr", "create", "--repo", std::string(kCatalogRepo), "--base", std::string(kBaseBranch), "--head",
+        Gh({"pr", "create", "--repo", std::string(kCatalogRepository), "--base", std::string(kBaseBranch), "--head",
             remote.login + ":" + publication.branch, "--title", title, "--body-file", Utf8(bodyFile)});
     std::error_code ec;
     std::filesystem::remove(bodyFile, ec);
@@ -248,7 +247,7 @@ int CmdPublish(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() != 2) return Usage(ctx, "publish needs the element folder");
 
-    std::filesystem::path folder = PathArgument(args[1]);
+    std::filesystem::path folder = Utf8ToPath(args[1]);
     FolderValidation validation = ValidateElementFolder(folder);
     if (validation.manifest) {
         for (std::string& left : StarterLeftovers(*validation.manifest)) validation.errors.push_back(std::move(left));

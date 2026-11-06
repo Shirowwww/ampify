@@ -17,9 +17,6 @@ namespace ampify::win {
 // Cheap once they are in place: the display is looked for again only when Apple Music built a new one.
 void KeepDisplayLinks(Journal& journal) noexcept;
 
-// The storefront of Apple's public catalog for this PC ("FR"), from Windows' region; "US" when it gives none.
-std::wstring CatalogStorefront() noexcept;
-
 }  // namespace ampify::win
 
 #endif  // AMPIFY_WITH_XAML

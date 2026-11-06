@@ -3,7 +3,6 @@
 #include <objbase.h>
 
 #include <algorithm>
-#include <cstdio>
 #include <initializer_list>
 
 #include "win_common.hpp"
@@ -36,6 +35,38 @@ int HexDigit(char c) {
     return -1;
 }
 
+bool ParseGuid(std::string_view text, GUID& out) {
+    if (text.size() == 38 && text.front() == '{' && text.back() == '}') text = text.substr(1, 36);
+    if (text.size() != 36 || text[8] != '-' || text[13] != '-' || text[18] != '-' || text[23] != '-') return false;
+    unsigned char bytes[16];
+    size_t at = 0;
+    for (int i = 0; i < 16; ++i) {
+        if (text[at] == '-') ++at;
+        int high = HexDigit(text[at]);
+        int low = HexDigit(text[at + 1]);
+        if (high < 0 || low < 0) return false;
+        bytes[i] = static_cast<unsigned char>(high * 16 + low);
+        at += 2;
+    }
+    out.Data1 = (static_cast<unsigned long>(bytes[0]) << 24) | (static_cast<unsigned long>(bytes[1]) << 16) |
+                (static_cast<unsigned long>(bytes[2]) << 8) | bytes[3];
+    out.Data2 = static_cast<unsigned short>((bytes[4] << 8) | bytes[5]);
+    out.Data3 = static_cast<unsigned short>((bytes[6] << 8) | bytes[7]);
+    std::memcpy(out.Data4, bytes + 8, 8);
+    return true;
+}
+
+// The text of an HSTRING returned by a method, as UTF-8; deletes it.
+std::string TakeString(HSTRING text) {
+    const Combase* api = Api();
+    if (!api || !text) return {};
+    UINT32 length = 0;
+    LPCWSTR buffer = api->WindowsGetStringRawBuffer(text, &length);
+    std::string utf8 = buffer ? ToUtf8(std::wstring_view(buffer, length)) : std::string();
+    api->WindowsDeleteString(text);
+    return utf8;
+}
+
 }  // namespace
 
 const Combase* Api() {
@@ -44,7 +75,6 @@ const Combase* Api() {
         // combase.dll is part of every Windows 8+ process that uses WinRT; LoadLibrary only takes a reference.
         HMODULE module = LoadLibraryW(L"combase.dll");
         if (!module) return loaded;
-        Load(module, "RoInitialize", loaded.RoInitialize);
         Load(module, "RoGetActivationFactory", loaded.RoGetActivationFactory);
         Load(module, "WindowsCreateString", loaded.WindowsCreateString);
         Load(module, "WindowsDeleteString", loaded.WindowsDeleteString);
@@ -88,55 +118,16 @@ HString::~HString() {
     if (api && m_h) api->WindowsDeleteString(m_h);
 }
 
-std::string TakeString(HSTRING text) {
-    const Combase* api = Api();
-    if (!api || !text) return {};
-    UINT32 length = 0;
-    LPCWSTR buffer = api->WindowsGetStringRawBuffer(text, &length);
-    std::string utf8 = buffer ? ToUtf8(std::wstring_view(buffer, length)) : std::string();
-    api->WindowsDeleteString(text);
-    return utf8;
-}
-
 std::string ReadString(const Ref& object, int slot) {
     HSTRING text = nullptr;
     if (FAILED(CallSlot(object, slot, &text))) return {};
     return TakeString(text);
 }
 
-bool ParseGuid(std::string_view text, GUID& out) {
-    if (text.size() == 38 && text.front() == '{' && text.back() == '}') text = text.substr(1, 36);
-    if (text.size() != 36 || text[8] != '-' || text[13] != '-' || text[18] != '-' || text[23] != '-') return false;
-    unsigned char bytes[16];
-    size_t at = 0;
-    for (int i = 0; i < 16; ++i) {
-        if (text[at] == '-') ++at;
-        int high = HexDigit(text[at]);
-        int low = HexDigit(text[at + 1]);
-        if (high < 0 || low < 0) return false;
-        bytes[i] = static_cast<unsigned char>(high * 16 + low);
-        at += 2;
-    }
-    out.Data1 = (static_cast<unsigned long>(bytes[0]) << 24) | (static_cast<unsigned long>(bytes[1]) << 16) |
-                (static_cast<unsigned long>(bytes[2]) << 8) | bytes[3];
-    out.Data2 = static_cast<unsigned short>((bytes[4] << 8) | bytes[5]);
-    out.Data3 = static_cast<unsigned short>((bytes[6] << 8) | bytes[7]);
-    std::memcpy(out.Data4, bytes + 8, 8);
-    return true;
-}
-
 GUID GuidOf(const char* text) {
     GUID guid{};
     ParseGuid(text, guid);
     return guid;
-}
-
-std::string GuidText(const GUID& g) {
-    char text[40];
-    std::snprintf(text, sizeof text, "%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-                  static_cast<unsigned long>(g.Data1), g.Data2, g.Data3, g.Data4[0], g.Data4[1], g.Data4[2],
-                  g.Data4[3], g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7]);
-    return text;
 }
 
 // ---- Activation ---------------------------------------------------------------------------------------------------

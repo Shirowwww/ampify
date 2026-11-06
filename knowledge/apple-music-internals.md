@@ -25,8 +25,9 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   `MediaAppExecAgentCommandAsync` / `MediaAppExecFetchRequestAsync` (log: `kExecAgentCommand`). The engine starts at the
   first playback, or when that COM class is activated.
 - **Full component metadata.** The package contains `AMP.Core.winmd` (engine) and `AMP.Services.winmd` (1,035 types:
-  playback, queue, equalizer, lyrics, Atmos and lossless badges, settings...). Their content (types, methods, fields) is
-  in `winmd/*.txt`. It is the map of the app: an interface or a mod can call these services instead of guessing.
+  playback, queue, equalizer, lyrics, Atmos and lossless badges, settings...). The content of `AMP.Services` (types,
+  methods, fields) is in `winmd/AMP.Services.txt`, and that of the player views in `winmd/AMP.UI.Views.txt`. It is the
+  map of the app: an interface or a mod can call these services instead of guessing.
 - Protocols handled ([protocols.txt](protocols.txt)): `music:`, `musics:`, `itms:`, `itmss:`... A link
   `music://music.apple.com/...` opens the page in the app but does not start playback.
 - A module scan of a running `AppleMusic.exe` showed about 250 modules, including `Microsoft.Web.WebView2.Core.dll`,

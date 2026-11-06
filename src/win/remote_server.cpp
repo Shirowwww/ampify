@@ -93,7 +93,6 @@ void RemoteServer::Stop() {
 }
 
 void RemoteServer::Run() {
-    remote::Router router(m_token);
     SOCKET listener = AsSocket(m_socket);
     while (!m_stop) {
         fd_set readable;
@@ -126,13 +125,11 @@ void RemoteServer::Run() {
 
         remote::Response response;
         if (!loopback) {
-            response = router.Handle(request, false, *m_backend);  // 403, without reading anything
+            response = remote::Handle(request, false, m_token, *m_backend);  // 403, without reading anything
         } else if (status == remote::ParseStatus::Complete) {
-            response = router.Handle(request, true, *m_backend);
-        } else if (status == remote::ParseStatus::TooLarge) {
-            response = remote::Response{413, R"({"ok":false,"error":"request too large"})"};
+            response = remote::Handle(request, true, m_token, *m_backend);
         } else {
-            response = remote::Response{400, R"({"ok":false,"error":"unreadable HTTP request"})"};
+            response = remote::UnreadableResponse(status);
         }
         std::string bytes = remote::Serialize(response);
         size_t sent = 0;

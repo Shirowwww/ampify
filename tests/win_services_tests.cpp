@@ -25,6 +25,7 @@
 #include "../src/win/win_host.hpp"
 #include "../src/win/win_services.hpp"
 #include "fake_host.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -33,13 +34,6 @@ namespace fs = std::filesystem;
 using namespace std::chrono_literals;
 
 const std::string kToken = "abcdefghijklmnopqrstuvwxyz0123456789ABCD";
-
-fs::path KitFor(const std::string& name) {
-    fs::path kit = fs::temp_directory_path() / "ampify-tests" / ("win-services-" + name);
-    fs::remove_all(kit);
-    fs::create_directories(kit);
-    return kit;
-}
 
 // Waits up to `limit` for `done`, calling `tick` in between (the JavaScript thread's Service()).
 template <class Done, class Tick>
@@ -106,7 +100,7 @@ struct WinsockScope {
 struct StaticBackend : ampify::remote::Backend {
     std::atomic<int> commands{0};
     std::string StatusJson() override { return R"({"playing":false})"; }
-    bool Command(std::string_view) override {
+    bool Command(ampify::remote::Action) override {
         commands++;
         return true;
     }
@@ -290,7 +284,7 @@ TEST_CASE(WinRemote_LoopbackClientNeedsTheToken) {
 }
 
 TEST_CASE(WinServices_RemoteControlRunsCommandsOnTheJavaScriptThread) {
-    fs::path kit = KitFor("remote");
+    ampify::test::ScratchDir kit("remote");
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
     ampify::test::FakeHost host;
@@ -338,7 +332,7 @@ TEST_CASE(WinServices_MidiMappingWithoutADevice) {
         CHECK(error.find("no MIDI device") != std::string::npos);
     }
 
-    fs::path kit = KitFor("midi");
+    ampify::test::ScratchDir kit("midi");
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
     ampify::test::FakeHost host;
@@ -367,7 +361,7 @@ TEST_CASE(WinServices_MidiMappingWithoutADevice) {
 }
 
 TEST_CASE(WinServices_TrayIconWhenTheSessionHasANotificationArea) {
-    fs::path kit = KitFor("tray");
+    ampify::test::ScratchDir kit("tray");
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });
     ampify::test::FakeHost host;
@@ -422,7 +416,7 @@ TEST_CASE(WinTray_MenuChoicePostedToTheIconWindow) {
 }
 
 TEST_CASE(WinHost_OffersTheKitServicesAndPost) {
-    fs::path kit = KitFor("host");
+    ampify::test::ScratchDir kit("host");
     ampify::Settings settings;
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });

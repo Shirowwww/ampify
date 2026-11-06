@@ -90,7 +90,7 @@ Register-Case -Id 'playback-with-kit' -Title 'Stereo then Dolby Atmos playback w
         $agent = [string](Read-Journal 'AMPLibraryAgent.log')
         $lines = @($agent -split "`r?`n" | Where-Object { $_ -match 'Atmos: |kernel|Kernel' })
         Write-Host "----- AMPLibraryAgent.log: leveler lines ($($lines.Count))"
-        $lines | Select-Object -First 200 | ForEach-Object { Write-Host "  $(Protect-UiaText $_)" }
+        $lines | Select-Object -First 200 | ForEach-Object { Write-Host "  $_" }
         Write-Host '----- end of the leveler lines'
 
         $find = { param($pattern) $m = [regex]::Match($agent, $pattern); if ($m.Success) { $m } else { $null } }
@@ -107,7 +107,7 @@ Register-Case -Id 'playback-with-kit' -Title 'Stereo then Dolby Atmos playback w
             -Detail $(if ($stereoLufs) { "$($stereoLufs.Groups[1].Value) LUFS over $($stereoLufs.Groups[2].Value) s" } else { 'line "stereo track measured" missing' })
 
         $atmos = & $find 'Atmos: Dolby Atmos track, variant (\S+), starting gain (-?[\d.]+) dB'
-        $spatial = Get-SpatialAudioState
+        $spatial = [AmpifyAudio.Endpoints]::Spatial()
         if ($atmos) {
             Add-Check -Ctx $Ctx -Name 'Dolby Atmos detected (variant)' -Passed $true -Detail "$($atmos.Groups[1].Value), starting gain $($atmos.Groups[2].Value) dB"
         } elseif ($spatial.Error -or $spatial.MetadataStreamHr -ne 0) {

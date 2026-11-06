@@ -6,6 +6,7 @@
 #include "../src/core/build_signature.hpp"
 #include "../src/core/injection_policy.hpp"
 #include "../src/core/safe_mode.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -65,9 +66,7 @@ TEST_CASE(Kernel_UsesTheListItIsGiven) {
 }
 
 TEST_CASE(SafeMode_IsActiveOnlyAtTheThreshold) {
-    std::filesystem::path dir = std::filesystem::temp_directory_path() / "ampify-tests" / "safe-mode-active";
-    std::filesystem::remove_all(dir);
-    std::filesystem::create_directories(dir);
+    ampify::test::ScratchDir dir("safe-mode-active");
 
     ampify::SafeMode safeMode((dir / "state.txt").string(), 2);
     CHECK(!safeMode.IsActive());

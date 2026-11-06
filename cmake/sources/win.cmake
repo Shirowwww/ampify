@@ -8,8 +8,6 @@ list(APPEND AMPIFY_WIN_SOURCES src/win/win_common.cpp src/win/package.cpp src/wi
 
 list(APPEND AMPIFY_KERNEL_SOURCES src/kernel/kernel.cpp extensions/atmos-leveler/atmos_windows.cpp)
 
-list(APPEND AMPIFY_UI_THREAD_TEST_SOURCES tests/ui_thread_test.cpp)
-
 list(APPEND AMPIFY_XAML_SOURCES src/win/xaml_backend.cpp src/win/xaml_properties.cpp src/win/xaml_states.cpp
     src/win/xaml_values.cpp src/win/theme_animations.cpp src/win/theme_service.cpp src/win/xaml_host.cpp src/win/ui_renderer.cpp src/win/ui_service.cpp
     src/win/ui_service_settings.cpp src/win/ui_service_mods.cpp src/win/ui_service_settings_io.cpp src/win/ui_service_panels.cpp src/win/ui_service_pages.cpp

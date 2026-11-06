@@ -13,46 +13,24 @@
 #include "../src/core/script_extension.hpp"
 #include "../src/core/ui_model.hpp"
 #include "fake_host.hpp"
+#include "support.hpp"
 #include "test.hpp"
-
-#ifndef AMPIFY_SOURCE_DIR
-#define AMPIFY_SOURCE_DIR "."
-#endif
 
 namespace {
 
 namespace fs = std::filesystem;
 
-std::string ManifestText(const std::string& id, const std::string& kind, const std::string& permissions) {
-    return R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":")" + kind +
-           R"(","author":"Shirowwww","description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" +
-           permissions + "]}";
-}
-
-struct Fixture {
-    ampify::test::FakeHost host;
-    std::ostringstream out;
-    ampify::Journal journal{out, [] { return std::string("t"); }};
-
+struct Fixture : ampify::test::ElementFixture<> {
     std::unique_ptr<ampify::ScriptExtension> Make(const std::string& id, const std::string& main,
                                                const std::string& permissions = R"("ui.panel")",
                                                const std::string& kind = "extension") {
-        fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("react-" + id);
-        fs::remove_all(dir);
-        fs::create_directories(dir);
-        std::ofstream(dir / "manifest.json") << ManifestText(id, kind, permissions);
-        std::ofstream(dir / "main.js") << main;
-        ampify::ManifestResult result = ampify::ParseManifest(ManifestText(id, kind, permissions), id, 1,
-                                                        [](const std::string&) { return true; });
-        return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, host, journal);
+        return ElementFixture<>::Make({.id = id, .kind = kind, .permissions = permissions}, main);
     }
 
     std::string Panel(const std::string& id, const std::string& panel) const {
         auto slot = host.ui.Panel(id, panel);
         return slot ? slot->tree.Dump() : std::string("(absent)");
     }
-
-    bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
 
     size_t Count(const std::string& text) const {
         size_t count = 0;
@@ -786,19 +764,11 @@ TEST_CASE(React_TopbarButtonsStillGetTheirClicks) {
 
 TEST_CASE(React_TheReactPanelExampleRuns) {
     Fixture f;
-    // The fake host's locale is fr-FR: the panel shows its French texts.
     const std::string name = "react-panel";
-    fs::path dir = fs::path(AMPIFY_SOURCE_DIR) / "examples" / name;
-    std::ifstream manifestFile(dir / "manifest.json");
-    std::stringstream manifestText;
-    manifestText << manifestFile.rdbuf();
-    ampify::ManifestResult result = ampify::ParseManifest(manifestText.str(), name, 1, [&](const std::string& file) {
-        return fs::exists(dir / file);
-    });
-    CHECK(result.manifest.has_value());
-    if (!result.manifest) return;
+    ampify::test::ShippedElement shipped("examples", name);
+    REQUIRE(shipped.manifest.has_value());
 
-    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal);
+    ampify::ScriptExtension element(*shipped.manifest, shipped.dir, f.host, f.journal);
     CHECK(element.Start());
     element.Pump();
     CHECK(f.Logged("React panel ready"));
@@ -807,18 +777,18 @@ TEST_CASE(React_TheReactPanelExampleRuns) {
     if (!slot) return;
     std::string error;
     CHECK(ampify::ValidateTree(slot->tree, &error));
-    CHECK(FindNode(slot->tree, "title", "Minuteur") == nullptr);
+    CHECK(FindNode(slot->tree, "title", "Timer") == nullptr);
 
-    int plus = CallbackOf(f.host.ui, name, "react-panel", "label", "Ajouter un", "onClick");
+    int plus = CallbackOf(f.host.ui, name, "react-panel", "label", "Add one", "onClick");
     element.DeliverClick(plus);
     element.Pump();
     slot = f.host.ui.Panel(name, "react-panel");
-    CHECK(slot && FindNode(slot->tree, "text", "Clics : 1") != nullptr);
+    CHECK(slot && FindNode(slot->tree, "text", "Clicks: 1") != nullptr);
 
-    int view = CallbackOf(f.host.ui, name, "react-panel", "label", "Affichage", "onChange");
+    int view = CallbackOf(f.host.ui, name, "react-panel", "label", "View", "onChange");
     element.DeliverEvent("change", R"({"id":)" + std::to_string(view) + R"(,"value":"full"})");
     element.Pump();
-    int toggle = CallbackOf(f.host.ui, name, "react-panel", "label", "Activer", "onChange");
+    int toggle = CallbackOf(f.host.ui, name, "react-panel", "label", "Turn on", "onChange");
     CHECK(toggle > 0);
     element.DeliverEvent("change", R"({"id":)" + std::to_string(toggle) + R"(,"value":true})");
     element.Pump();
@@ -865,19 +835,11 @@ TEST_CASE(React_GridTabsAndMenusRenderTheirNodes) {
 
 TEST_CASE(React_TheUiPaletteExampleRuns) {
     Fixture f;
-    // The fake host's locale is fr-FR: the panel shows its French texts.
     const std::string name = "ui-palette";
-    fs::path dir = fs::path(AMPIFY_SOURCE_DIR) / "examples" / name;
-    std::ifstream manifestFile(dir / "manifest.json");
-    std::stringstream manifestText;
-    manifestText << manifestFile.rdbuf();
-    ampify::ManifestResult result = ampify::ParseManifest(manifestText.str(), name, 1, [&](const std::string& file) {
-        return fs::exists(dir / file);
-    });
-    CHECK(result.manifest.has_value());
-    if (!result.manifest) return;
+    ampify::test::ShippedElement shipped("examples", name);
+    REQUIRE(shipped.manifest.has_value());
 
-    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal);
+    ampify::ScriptExtension element(*shipped.manifest, shipped.dir, f.host, f.journal);
     CHECK(element.Start());
     element.Pump();
     CHECK(f.Logged("UI palette ready"));
@@ -886,18 +848,18 @@ TEST_CASE(React_TheUiPaletteExampleRuns) {
     if (!slot) return;
     std::string error;
     CHECK(ampify::ValidateTree(slot->tree, &error));
-    CHECK(FindNode(slot->tree, "label", "Plus") == nullptr);
+    CHECK(FindNode(slot->tree, "label", "More") == nullptr);
 
     element.DeliverClick(CallbackOf(f.host.ui, name, name, "label", "Menu", "onClick"));
     element.Pump();
     slot = f.host.ui.Panel(name, name);
-    CHECK(slot && FindNode(slot->tree, "label", "Plus") != nullptr);
+    CHECK(slot && FindNode(slot->tree, "label", "More") != nullptr);
 
-    element.DeliverClick(CallbackOf(f.host.ui, name, name, "label", "Grille", "onClick"));
+    element.DeliverClick(CallbackOf(f.host.ui, name, name, "label", "Grid", "onClick"));
     element.Pump();
-    element.DeliverClick(CallbackOf(f.host.ui, name, name, "label", "Case 1 : 0", "onClick"));
+    element.DeliverClick(CallbackOf(f.host.ui, name, name, "label", "Cell 1: 0", "onClick"));
     element.Pump();
     slot = f.host.ui.Panel(name, name);
-    CHECK(slot && FindNode(slot->tree, "label", "Case 1 : 1") != nullptr);
+    CHECK(slot && FindNode(slot->tree, "label", "Cell 1: 1") != nullptr);
     element.Stop();
 }

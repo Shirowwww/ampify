@@ -16,6 +16,7 @@
 #include "../src/core/player_watch.hpp"
 #include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -55,26 +56,11 @@ int SlotIn(const std::vector<std::string>& methods, const std::string& method) {
     return -1;
 }
 
-struct Fixture {
-    ampify::test::FakeHost host;
-    std::ostringstream out;
-    ampify::Journal journal{out, [] { return std::string("t"); }};
-
+struct Fixture : ampify::test::ElementFixture<> {
     std::unique_ptr<ampify::ScriptExtension> Make(const std::string& id, const std::string& permissions,
                                                const std::string& main) {
-        fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("player-model-" + id);
-        fs::remove_all(dir);
-        fs::create_directories(dir);
-        const std::string manifest =
-            R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
-            R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
-        std::ofstream(dir / "manifest.json") << manifest;
-        std::ofstream(dir / "main.js") << main;
-        ampify::ManifestResult result = ampify::ParseManifest(manifest, id, 1, [](const std::string&) { return true; });
-        return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, host, journal);
+        return ElementFixture<>::Make({.id = id, .permissions = permissions}, main);
     }
-
-    bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
 };
 
 // A host with a queue, as the Windows host offers it.
@@ -103,15 +89,7 @@ struct QueueFixture : Fixture {
     QueueFakeHost queueHost;
     std::unique_ptr<ampify::ScriptExtension> MakeWithQueue(const std::string& id, const std::string& permissions,
                                                         const std::string& main) {
-        fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("player-queue-" + id);
-        fs::remove_all(dir);
-        fs::create_directories(dir);
-        const std::string manifest =
-            R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
-            R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
-        std::ofstream(dir / "main.js") << main;
-        ampify::ManifestResult result = ampify::ParseManifest(manifest, id, 1, [](const std::string&) { return true; });
-        return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, queueHost, journal);
+        return ElementFixture<>::Make({.id = id, .permissions = permissions}, main, queueHost);
     }
 };
 

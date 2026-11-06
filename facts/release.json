@@ -1,0 +1,41 @@
+{
+  "$comment": "What a release of Ampify is. Changes with a release or a rename. CMake makes release_facts.hpp of it; the scripts and the tests read it as is.",
+  "version": "1.1.1",
+  "kitApi": "1.0",
+  "kitFolder": "Ampify",
+  "files": {
+    "launcher": "ampify_launcher.exe",
+    "kernel": "ampify_kernel.dll",
+    "setup": "ampify_setup.exe",
+    "cli": "ampify.exe"
+  },
+  "package": {
+    "prefix": "ampify-",
+    "suffix": "-windows-x64.zip",
+    "checksums": "SHA256SUMS.txt"
+  },
+  "elements": [
+    {"id": "marketplace", "kind": "app", "folder": "apps", "startsOn": true, "firstParty": true, "builtIn": false},
+    {"id": "now-playing", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
+    {"id": "song-panel", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
+    {"id": "playback-guard", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false},
+    {"id": "atmos-leveler", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": true}
+  ],
+  "languages": [
+    {"code": "fr", "decimalComma": true},
+    {"code": "de", "decimalComma": true},
+    {"code": "es", "decimalComma": true},
+    {"code": "pt", "decimalComma": true},
+    {"code": "ru", "decimalComma": true},
+    {"code": "ja", "decimalComma": false},
+    {"code": "zh", "decimalComma": false}
+  ],
+  "project": {
+    "owner": "Shirowwww",
+    "repository": "Shirowwww/ampify",
+    "catalogRepository": "Shirowwww/ampify-catalog",
+    "releaseApi": "https://api.github.com/repos/Shirowwww/ampify/releases",
+    "catalogUrl": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog.json",
+    "site": "https://shirowwww.github.io/ampify"
+  }
+}

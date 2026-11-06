@@ -152,7 +152,7 @@ std::map<std::string, ManifestText> ReadTranslations(const Json& object, const s
         std::string entryLabel = label + "." + code;
         if (std::find(std::begin(kTranslationLanguages), std::end(kTranslationLanguages), code) ==
             std::end(kTranslationLanguages)) {
-            errors.push_back(entryLabel + ": unknown language (fr, de, es, pt, ru, ja, zh)");
+            errors.push_back(entryLabel + ": unknown language (" + std::string(kTranslationLanguageList) + ")");
             continue;
         }
         if (!entry.IsObject()) {

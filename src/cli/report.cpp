@@ -1,13 +1,13 @@
 // `ampify report`: one zip with what helps to understand a problem (state, settings, logs, recent crashes), with the
 // names of the person, the computer and the music taken out (anonymize.hpp), ready to attach to an issue.
 
-#include <chrono>
-#include <ctime>
 #include <system_error>
 
 #include "anonymize.hpp"
+#include "apple_facts.hpp"
 #include "internal.hpp"
 #include "platform.hpp"
+#include "release_facts.hpp"
 
 namespace ampify::cli {
 
@@ -32,19 +32,6 @@ constexpr std::string_view kReadme =
     "logs/            the logs of the kernel, the launcher and the installer\n"
     "crashes.txt      recent crashes of Apple Music or Ampify reported by Windows (last 14 days)\n"
     "inspector.txt    the last interface tree (only with --tree)\n";
-
-std::string Stamp(const char* format) {
-    std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &now);
-#else
-    localtime_r(&now, &local);
-#endif
-    char text[32];
-    std::strftime(text, sizeof(text), format, &local);
-    return text;
-}
 
 // The output of a program, or an empty text when it cannot run.
 std::string Captured(const std::vector<std::string>& command) {
@@ -92,8 +79,8 @@ std::string PowerShell(std::string_view script) {
 #endif
 
 std::string SystemText(const Context& ctx) {
-    std::string text = "Ampify " AMPIFY_VERSION "\n";
-    text += "Report written: " + Stamp("%Y-%m-%d %H:%M:%S") + "\n";
+    std::string text = "Ampify " + std::string(kKitVersion) + "\n";
+    text += "Report written: " + LocalTimeText("%Y-%m-%d %H:%M:%S") + "\n";
     text += "Ampify folder: " + Utf8(ctx.kit.Root()) + "\n";
     text += "ampify.exe folder: " + Utf8(platform::ExecutableDirectory()) + "\n";
 #ifdef _WIN32
@@ -101,8 +88,9 @@ std::string SystemText(const Context& ctx) {
 #endif
     std::optional<std::filesystem::path> package = platform::AppPackageFolder();
     text += "Apple Music package: " + (package ? Utf8(package->filename()) : std::string("not found")) + "\n";
-    for (const char* process : {"AppleMusic.exe", "AMPLibraryAgent.exe", "ampify_launcher.exe"}) {
-        text += std::string(process) + ": " + (platform::IsProcessRunning(process) ? "running" : "not running") + "\n";
+    for (std::string_view name : {kAppleMusicImage, kLibraryAgentImage, kLauncherFile}) {
+        const std::string process(name);
+        text += process + ": " + (platform::IsProcessRunning(process) ? "running" : "not running") + "\n";
     }
     platform::AutoStart autoStart = platform::AutoStartState();
     if (autoStart.supported) {
@@ -122,7 +110,7 @@ std::string DoctorText(Context& ctx) {
 }
 
 std::filesystem::path DefaultArchive(const Context& ctx) {
-    return ctx.kit.Root() / "reports" / ("ampify-report-" + Stamp("%Y%m%d-%H%M%S") + ".zip");
+    return ctx.kit.Root() / "reports" / ("ampify-report-" + LocalTimeText("%Y%m%d-%H%M%S") + ".zip");
 }
 
 }  // namespace
@@ -131,7 +119,7 @@ int CmdReport(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() > 2) return Usage(ctx, "report takes at most the .zip file to write");
 
-    std::filesystem::path archive = args.size() == 2 ? PathArgument(args[1]) : DefaultArchive(ctx);
+    std::filesystem::path archive = args.size() == 2 ? Utf8ToPath(args[1]) : DefaultArchive(ctx);
     std::error_code ec;
     if (std::filesystem::exists(archive, ec)) return Failure(ctx, "the file already exists: " + Utf8(archive));
     if (archive.has_parent_path()) std::filesystem::create_directories(archive.parent_path(), ec);

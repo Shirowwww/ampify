@@ -6,22 +6,12 @@
 #include "../extensions/atmos-leveler/leveler.hpp"
 #include "../extensions/atmos-leveler/loudness_meter.hpp"
 #include "../extensions/atmos-leveler/object_pass.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
 
-// Interleaved sine, the same on every channel.
-std::vector<float> Sine(double sampleRate, int channels, double seconds, double frequency, double amplitude) {
-    size_t frames = static_cast<size_t>(sampleRate * seconds);
-    std::vector<float> samples(frames * channels);
-    for (size_t frame = 0; frame < frames; frame++) {
-        double value = amplitude * std::sin(2.0 * std::numbers::pi * frequency * frame / sampleRate);
-        for (int channel = 0; channel < channels; channel++) {
-            samples[frame * channels + channel] = static_cast<float>(value);
-        }
-    }
-    return samples;
-}
+using ampify::test::SineSeconds;
 
 double MeasureLufs(const std::vector<float>& samples, double sampleRate, int channels) {
     atmos::LoudnessMeter meter(sampleRate, channels);
@@ -32,7 +22,7 @@ double MeasureLufs(const std::vector<float>& samples, double sampleRate, int cha
 // A 1 kHz tone, scaled so that its integrated loudness is exactly `lufs`. Scaling by a factor is
 // a fixed dB shift, so this does not depend on the absolute calibration of the meter.
 std::vector<float> ToneAtLufs(double sampleRate, int channels, double seconds, double lufs) {
-    std::vector<float> samples = Sine(sampleRate, channels, seconds, 1000.0, 1.0);
+    std::vector<float> samples = SineSeconds(sampleRate, channels, seconds, 1000.0, 1.0);
     double shiftDb = lufs - MeasureLufs(samples, sampleRate, channels);
     float factor = static_cast<float>(atmos::DbToLinear(shiftDb));
     for (float& sample : samples) sample *= factor;
@@ -71,14 +61,14 @@ TEST_CASE(Meter_SilenceHasNoLoudness) {
 TEST_CASE(Meter_CalibrationOneKiloHertzMonoAtMinus23) {
     // A mono 1 kHz sine with an RMS of -23 dBFS is -23 LUFS (EBU Tech 3341 reference tone).
     double amplitude = std::sqrt(2.0) * std::pow(10.0, -23.0 / 20.0);
-    std::vector<float> tone = Sine(48000, 1, 10.0, 1000.0, amplitude);
+    std::vector<float> tone = SineSeconds(48000, 1, 10.0, 1000.0, amplitude);
     CHECK_NEAR(MeasureLufs(tone, 48000, 1), -23.0, 0.1);
 }
 
 TEST_CASE(Meter_DoublingTheAmplitudeAddsSixDecibels) {
     double amplitude = 0.1;
-    std::vector<float> quiet = Sine(48000, 2, 10.0, 1000.0, amplitude);
-    std::vector<float> loud = Sine(48000, 2, 10.0, 1000.0, amplitude * 2.0);
+    std::vector<float> quiet = SineSeconds(48000, 2, 10.0, 1000.0, amplitude);
+    std::vector<float> loud = SineSeconds(48000, 2, 10.0, 1000.0, amplitude * 2.0);
     CHECK_NEAR(MeasureLufs(loud, 48000, 2) - MeasureLufs(quiet, 48000, 2), 6.0206, 0.01);
 }
 
@@ -86,9 +76,9 @@ TEST_CASE(Meter_WeightingFollowsTheEarShape) {
     // Deep bass is filtered out by the RLB high-pass, and the head-related shelf adds about 4 dB
     // at high frequencies on top of the 1 kHz reference.
     double amplitude = 0.1;
-    double at1k = MeasureLufs(Sine(48000, 1, 10.0, 1000.0, amplitude), 48000, 1);
-    double at10 = MeasureLufs(Sine(48000, 1, 10.0, 10.0, amplitude), 48000, 1);
-    double at10k = MeasureLufs(Sine(48000, 1, 10.0, 10000.0, amplitude), 48000, 1);
+    double at1k = MeasureLufs(SineSeconds(48000, 1, 10.0, 1000.0, amplitude), 48000, 1);
+    double at10 = MeasureLufs(SineSeconds(48000, 1, 10.0, 10.0, amplitude), 48000, 1);
+    double at10k = MeasureLufs(SineSeconds(48000, 1, 10.0, 10000.0, amplitude), 48000, 1);
 
     CHECK(at10 - at1k < -15.0);
     CHECK(at10k - at1k > 2.5);
@@ -97,15 +87,15 @@ TEST_CASE(Meter_WeightingFollowsTheEarShape) {
 
 TEST_CASE(Meter_SameLoudnessAtAnySampleRate) {
     // Same tone, same amplitude, two rates: the K-weighting must be re-derived for each rate.
-    double at48 = MeasureLufs(Sine(48000, 2, 10.0, 1000.0, 0.1), 48000, 2);
-    double at96 = MeasureLufs(Sine(96000, 2, 10.0, 1000.0, 0.1), 96000, 2);
+    double at48 = MeasureLufs(SineSeconds(48000, 2, 10.0, 1000.0, 0.1), 48000, 2);
+    double at96 = MeasureLufs(SineSeconds(96000, 2, 10.0, 1000.0, 0.1), 96000, 2);
     CHECK_NEAR(at96, at48, 0.05);
 }
 
 TEST_CASE(Meter_GatingIgnoresQuietPassages) {
     // Half loud, half far below the relative gate: only the loud half counts.
-    std::vector<float> loud = Sine(48000, 1, 10.0, 1000.0, std::sqrt(2.0) * std::pow(10.0, -23.0 / 20.0));
-    std::vector<float> quiet = Sine(48000, 1, 10.0, 1000.0, std::sqrt(2.0) * std::pow(10.0, -50.0 / 20.0));
+    std::vector<float> loud = SineSeconds(48000, 1, 10.0, 1000.0, std::sqrt(2.0) * std::pow(10.0, -23.0 / 20.0));
+    std::vector<float> quiet = SineSeconds(48000, 1, 10.0, 1000.0, std::sqrt(2.0) * std::pow(10.0, -50.0 / 20.0));
     std::vector<float> both = loud;
     both.insert(both.end(), quiet.begin(), quiet.end());
     CHECK_NEAR(MeasureLufs(both, 48000, 1), -23.0, 0.1);
@@ -279,7 +269,7 @@ TEST_CASE(Leveler_AtmosPeakCeilingUsesTheRawObjectPeak) {
     std::vector<float> silence(static_cast<size_t>(kRate) * 2, 0.0f);
     leveler.Feed(silence.data(), silence.size() / 2, 0.25f);  // the slider at a quarter
     // A quiet track (about -25 LUFS, 15 dB under the target) with one peak at 0.9.
-    std::vector<float> tone = Sine(kRate, 2, 12.0, 1000.0, 0.05);
+    std::vector<float> tone = SineSeconds(kRate, 2, 12.0, 1000.0, 0.05);
     tone[48000 * 2] = 0.9f;
     FeedObjects(leveler, tone, kRate);
 

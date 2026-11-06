@@ -14,6 +14,7 @@
 
 #include "../core/apple_music.hpp"
 #include "../core/i18n.hpp"
+#include "../core/kit_layout.hpp"
 #include "../core/launch_flags.hpp"
 #include "../core/midi_map.hpp"
 #include "../core/natives/service_flags.hpp"
@@ -32,11 +33,8 @@
 #include "kit.hpp"
 #include "messages.hpp"
 #include "platform.hpp"
+#include "release_facts.hpp"
 #include "setting_keys.hpp"
-
-#ifndef AMPIFY_VERSION
-#define AMPIFY_VERSION "0.0.0-dev"
-#endif
 
 namespace ampify::cli {
 
@@ -190,8 +188,7 @@ int ToggleElement(Context& ctx, Settings& settings, std::string_view list, const
     if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     if (enable) {
-        bool builtin = kind == "extension" && std::find(std::begin(kBuiltinExtensions), std::end(kBuiltinExtensions),
-                                                        std::string_view(id)) != std::end(kBuiltinExtensions);
+        bool builtin = kind == "extension" && IsBuiltInExtension(id);
         bool installed = false;
         for (const InstalledElement& element : ListInstalled(ctx.kit)) {
             if (element.kind == kind && element.id == id) installed = element.Valid();
@@ -252,11 +249,11 @@ int PrintElements(Context& ctx, std::string_view filter) {
 
     bool any = false;
     PrintHeader(ctx);
-    for (std::string_view id : kBuiltinExtensions) {
-        if (!filter.empty() && filter != "extension") break;
-        ctx.out << Pad("extension", 11) << Pad(id, 26) << Pad(Tr("list.builtin"), 11)
-                << Tr(IsEnabled(settings, "extension", id) ? "state.on" : "state.off") << " " << Tr("list.inKernel")
-                << "\n";
+    for (const KitElement& element : kKitElements) {
+        if (!IsBuiltInExtension(element.id) || (!filter.empty() && filter != "extension")) continue;
+        ctx.out << Pad("extension", 11) << Pad(element.id, 26) << Pad(Tr("list.builtin"), 11)
+                << Tr(IsEnabled(settings, "extension", element.id) ? "state.on" : "state.off") << " "
+                << Tr("list.inKernel") << "\n";
         any = true;
     }
     for (const InstalledElement& element : ListInstalled(ctx.kit)) {
@@ -279,8 +276,7 @@ int SetElementState(Context& ctx, std::string_view kind, const std::string& id, 
 
     std::string permissions;
     if (enable) {
-        bool builtin = kind == "extension" && std::find(std::begin(kBuiltinExtensions), std::end(kBuiltinExtensions),
-                                                        std::string_view(id)) != std::end(kBuiltinExtensions);
+        bool builtin = kind == "extension" && IsBuiltInExtension(id);
         if (!builtin) {
             const InstalledElement* found = nullptr;
             std::vector<InstalledElement> elements = ListInstalled(ctx.kit);
@@ -368,7 +364,7 @@ std::map<std::string, std::string> Template(std::string_view kind, const std::st
     const std::string author(kStarterAuthor);
     std::string common = "  \"id\": \"" + id + "\",\n  \"name\": \"" + id + "\",\n  \"version\": \"0.1.0\",\n  \"kind\": \"" +
                          std::string(kind) + "\",\n  \"author\": \"" + author + "\",\n  \"description\": \"" +
-                         std::string(kStarterDescription) + "\",\n" + "  \"kitApi\": \"1.0\"";
+                         std::string(kStarterDescription) + "\",\n" + "  \"kitApi\": \"" + std::string(kKitApi) + "\"";
     if (kind == "extension") {
         // Starters show something at once in Apple Music. The guides (docs/extensions/guide.md,
         // docs/themes/guide.md) walk through these same files.
@@ -561,13 +557,6 @@ int Usage(Context& ctx, const std::string& message) {
     return 2;
 }
 
-std::filesystem::path PathArgument(std::string_view text) {
-    std::u8string utf8;
-    utf8.reserve(text.size());
-    for (char c : text) utf8.push_back(static_cast<char8_t>(static_cast<unsigned char>(c)));
-    return std::filesystem::path(utf8);
-}
-
 std::string Utf8(const std::filesystem::path& path) {
     std::u8string utf8 = path.u8string();
     return std::string(reinterpret_cast<const char*>(utf8.data()), utf8.size());
@@ -623,12 +612,12 @@ int CmdHelp(Context& ctx) {
     std::string command = args[1] == "catalog" ? "market" : args[1] == "auto" ? "launch" : args[1];
     std::string lines = HelpOf(Tr("help"), command);
     if (lines.empty()) return Usage(ctx, "no command named " + args[1] + "; ampify help lists them all");
-    ctx.out << lines << "\nMore in https://shirowwww.github.io/ampify/cli.html\n";
+    ctx.out << lines << "\nMore in " << kProjectSite << "/cli.html\n";
     return 0;
 }
 
 int CmdVersion(Context& ctx) {
-    ctx.out << Tr("version", {{"version", AMPIFY_VERSION}}) << "\n";
+    ctx.out << Tr("version", {{"version", kKitVersion}, {"kitApi", kKitApi}}) << "\n";
     return 0;
 }
 
@@ -782,7 +771,7 @@ int CmdTheme(Context& ctx) {
     if (action == "names") {
         if (args.size() < 3) return Usage(ctx, "theme names needs one or more inspector.json files");
         std::vector<std::filesystem::path> trees;
-        for (size_t i = 2; i < args.size(); i++) trees.push_back(PathArgument(args[i]));
+        for (size_t i = 2; i < args.size(); i++) trees.push_back(Utf8ToPath(args[i]));
         return theme::RunNames(trees, ctx.out, ctx.err);
     }
     // The offline bench: the engine on a saved tree (they read their own options, ParseOptions passes them through).
@@ -797,7 +786,7 @@ int CmdTheme(Context& ctx) {
         int polls = action == "check" ? -1 : ctx.options.maxCycles;
         if (polls >= 0) watchArgs.insert(watchArgs.end(), {"--polls", std::to_string(polls)});
         if (action == "check") {
-            std::filesystem::path folder = std::filesystem::absolute(PathArgument(args[2]));
+            std::filesystem::path folder = std::filesystem::absolute(Utf8ToPath(args[2]));
             std::error_code error;
             if (!std::filesystem::is_directory(folder, error)) return Failure(ctx, "folder not found: " + args[2]);
             theme::FolderFiles files(folder);
@@ -828,7 +817,7 @@ int CmdValidate(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() != 2) return Usage(ctx, "validate needs a folder or a catalog.json");
 
-    std::filesystem::path target = PathArgument(args[1]);
+    std::filesystem::path target = Utf8ToPath(args[1]);
     std::error_code ec;
     if (std::filesystem::is_directory(target, ec)) {
         FolderValidation validation = ValidateElementFolder(target);
@@ -865,7 +854,7 @@ int CmdNew(Context& ctx) {
     if (!IsKindFolderText(kind)) return Failure(ctx, "unknown type: " + kind + " (extension, theme, snippet or app)");
     if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
-    std::filesystem::path folder = std::filesystem::current_path() / PathArgument(id);
+    std::filesystem::path folder = std::filesystem::current_path() / Utf8ToPath(id);
     std::error_code ec;
     if (std::filesystem::exists(folder, ec)) return Failure(ctx, "the folder already exists: " + Utf8(folder));
 
@@ -964,7 +953,7 @@ bool IsChainLine(const std::vector<std::string>& positional) {
 }
 
 int Execute(const Options& options, std::istream& in, std::ostream& out, std::ostream& err) {
-    KitLayout kit(options.kitDir ? PathArgument(*options.kitDir) : platform::DefaultKitDirectory());
+    KitLayout kit(options.kitDir ? Utf8ToPath(*options.kitDir) : platform::DefaultKitDirectory());
     std::vector<std::vector<std::string>> commands;
     if (IsChainLine(options.positional)) {
         for (const std::string& verb : options.positional) commands.push_back({verb});

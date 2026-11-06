@@ -5,6 +5,7 @@
 
 #include "ui_service_detail.hpp"
 
+#include "../core/kit_layout.hpp"
 #include "../core/sidebar_entry.hpp"
 #include "../core/sidebar_hold.hpp"
 
@@ -159,7 +160,6 @@ controls::Button MakeSidebarButton(bool active) {
     return button;
 }
 
-constexpr char kMarketplaceId[] = "marketplace";
 constexpr double kMoreButtonWidth = 32;  // Apple's "···" before its first layout
 constexpr double kHeaderButtonHeight = 28;  // the height of "···"
 constexpr double kHeaderSpacing = 2;
@@ -168,7 +168,7 @@ constexpr double kHeaderSpacing = 2;
 // Nothing while the sidebar is folded: Apple hides the header then, and the entry stays in the list.
 controls::Grid EntryHeader(const UiService::Shared& shared, const controls::NavigationView& navigation,
                            const UiControl& control) {
-    if (control.elementId != kMarketplaceId || !shared.entryInHeader || !navigation.IsPaneOpen()) return nullptr;
+    if (!IsFirstParty(control.elementId) || !shared.entryInHeader || !navigation.IsPaneOpen()) return nullptr;
     return navigation.PaneHeader().try_as<controls::Grid>();
 }
 
@@ -219,7 +219,7 @@ controls::Button MakeHeaderButton(const controls::Grid& header, const UiControl&
 bool SidebarEntryIsOn(const WindowContext& context, const UiControl& control) {
     if (control.active) return true;
     if (!context.route || context.pageClosed) return false;
-    bool ampifyPage = context.route->second == kAmpifyPagePath && control.elementId == kMarketplaceId;
+    bool ampifyPage = context.route->second == kAmpifyPagePath && IsFirstParty(control.elementId);
     return ampifyPage || context.route->first == control.elementId;
 }
 

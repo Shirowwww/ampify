@@ -8,28 +8,13 @@
 #include "../extensions/atmos-leveler/leveler.hpp"
 #include "../extensions/atmos-leveler/loudness_meter.hpp"
 #include "../extensions/atmos-leveler/object_pass.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
 
-std::vector<float> Sine(double sampleRate, double seconds, double amplitude) {
-    size_t frames = static_cast<size_t>(sampleRate * seconds);
-    std::vector<float> samples(frames);
-    for (size_t frame = 0; frame < frames; frame++) {
-        samples[frame] = static_cast<float>(amplitude * std::sin(2.0 * std::numbers::pi * 1000.0 * frame / sampleRate));
-    }
-    return samples;
-}
-
-// The same mono signal on two channels, interleaved as a stereo stream is.
-std::vector<float> Stereo(const std::vector<float>& mono) {
-    std::vector<float> interleaved(mono.size() * 2);
-    for (size_t frame = 0; frame < mono.size(); frame++) {
-        interleaved[frame * 2] = mono[frame];
-        interleaved[frame * 2 + 1] = mono[frame];
-    }
-    return interleaved;
-}
+using ampify::test::SineSeconds;
+using ampify::test::Stereo;
 
 // Two object buffers that carry the left and right halves of a stereo signal.
 struct TwoObjects {
@@ -87,7 +72,7 @@ TEST_CASE(ApplyCurve_GainsEachFrameOfInterleavedSamples) {
 
 TEST_CASE(ObjectPass_MeasuresLikeAStereoMeter) {
     // Objects carry L and R of the same signal: BS.1770 sums the channel powers in both cases.
-    std::vector<float> mono = Sine(48000, 10.0, 0.1);
+    std::vector<float> mono = SineSeconds(48000, 1, 10.0, 1000.0, 0.1);
     std::vector<float> stereo = Stereo(mono);
 
     atmos::LoudnessMeter reference(48000, 2);
@@ -103,7 +88,7 @@ TEST_CASE(ObjectPass_MeasuresLikeAStereoMeter) {
 }
 
 TEST_CASE(ObjectPass_MeasuresBeforeTheGain) {
-    std::vector<float> mono = Sine(48000, 2.0, 0.1);
+    std::vector<float> mono = SineSeconds(48000, 1, 2.0, 1000.0, 0.1);
 
     TwoObjects unity{mono, mono};
     atmos::ObjectPass unityPass(48000);
@@ -118,7 +103,7 @@ TEST_CASE(ObjectPass_MeasuresBeforeTheGain) {
 }
 
 TEST_CASE(ObjectPass_AppliesTheGainToTheBuffers) {
-    std::vector<float> mono = Sine(48000, 2.0, 0.1);
+    std::vector<float> mono = SineSeconds(48000, 1, 2.0, 1000.0, 0.1);
     TwoObjects objects{mono, mono};
     atmos::ObjectPass pass(48000);
     pass.Process(objects.Buffers(), mono.size(), 2.0);
@@ -129,7 +114,7 @@ TEST_CASE(ObjectPass_AppliesTheGainToTheBuffers) {
 }
 
 TEST_CASE(ObjectPass_UnityLeavesTheBuffersBitExact) {
-    std::vector<float> mono = Sine(48000, 0.5, 0.99);  // loud enough to reach the knee if it were applied
+    std::vector<float> mono = SineSeconds(48000, 1, 0.5, 1000.0, 0.99);  // loud enough to reach the knee if it were applied
     std::vector<float> copy = mono;
     TwoObjects objects{mono, mono};
     atmos::ObjectPass pass(48000);
@@ -139,7 +124,7 @@ TEST_CASE(ObjectPass_UnityLeavesTheBuffersBitExact) {
 
 TEST_CASE(ObjectPass_FilterStateCarriesAcrossPasses) {
     // The same signal in 100 passes of 10 ms gives the same per-frame power as one pass.
-    std::vector<float> signal = Sine(48000, 1.0, 0.1);
+    std::vector<float> signal = SineSeconds(48000, 1, 1.0, 1000.0, 0.1);
 
     atmos::ObjectPass whole(48000);
     std::vector<float> wholeCopy = signal;
@@ -188,8 +173,8 @@ TEST_CASE(Leveler_PowerPathMeasuresLikeTheInterleavedPath) {
     config.settleSeconds = 0;
     const float volume = 0.5f;
 
-    std::vector<float> mono = Sine(48000, 12.0, 0.1);
-    std::vector<float> afterSlider = Sine(48000, 12.0, 0.1 * volume);
+    std::vector<float> mono = SineSeconds(48000, 1, 12.0, 1000.0, 0.1);
+    std::vector<float> afterSlider = SineSeconds(48000, 1, 12.0, 1000.0, 0.1 * volume);
     std::vector<float> stereo = Stereo(afterSlider);
 
     atmos::AtmosLeveler interleaved(config);
@@ -211,7 +196,7 @@ TEST_CASE(Leveler_PowerPathMeasuresLikeTheInterleavedPath) {
 TEST_CASE(Leveler_ReportsTheFinishedTrackOnce) {
     atmos::LevelerConfig config;
     config.settleSeconds = 0;
-    std::vector<float> stereo = Stereo(Sine(48000, 12.0, 0.1));
+    std::vector<float> stereo = Stereo(SineSeconds(48000, 1, 12.0, 1000.0, 0.1));
 
     atmos::AtmosLeveler leveler(config);
     CHECK(!leveler.TakeFinished().has_value());
@@ -232,8 +217,8 @@ TEST_CASE(Leveler_SampleRateChangeKeepsTheMeasurement) {
     atmos::LevelerConfig config;
     config.settleSeconds = 0;
     config.minSecondsToStore = 10.0;
-    std::vector<float> at48 = Stereo(Sine(48000, 6.0, 0.1));
-    std::vector<float> at96 = Stereo(Sine(96000, 6.0, 0.1));
+    std::vector<float> at48 = Stereo(SineSeconds(48000, 1, 6.0, 1000.0, 0.1));
+    std::vector<float> at96 = Stereo(SineSeconds(96000, 1, 6.0, 1000.0, 0.1));
 
     atmos::AtmosLeveler leveler(config, 48000, 48000);
     leveler.StartTrack("stereo", false);
@@ -244,7 +229,7 @@ TEST_CASE(Leveler_SampleRateChangeKeepsTheMeasurement) {
 
     std::optional<double> measured = leveler.MeasuredLufs();
     atmos::LoudnessMeter reference(48000, 2);
-    std::vector<float> whole = Stereo(Sine(48000, 12.0, 0.1));
+    std::vector<float> whole = Stereo(SineSeconds(48000, 1, 12.0, 1000.0, 0.1));
     reference.Process(whole.data(), whole.size() / 2);
     CHECK(measured.has_value());
     CHECK_NEAR(measured.value_or(-200.0), reference.IntegratedLufs().value_or(0.0), 0.05);

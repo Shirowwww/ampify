@@ -11,11 +11,9 @@
 
 #include "../core/json.hpp"
 #include "../core/manifest.hpp"
+#include "release_facts.hpp"
 
 namespace ampify {
-
-// Major version of the extension API this kit implements (docs/extensions/api.md, section 9).
-inline constexpr int kKitApiMajor = 1;
 
 // Largest preview image the Marketplace page is asked to load.
 inline constexpr std::uintmax_t kMaxPreviewBytes = 2 * 1024 * 1024;

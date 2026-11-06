@@ -7,6 +7,4 @@ dist/ampify-*-windows-x64.zip
 dist/SHA256SUMS.txt
 # Build output of the reference loudness meter (dotnet build).
 
-# Two-factor codes of the signed-in bench: never in the repository.
-.live/
 results/

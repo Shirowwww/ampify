@@ -13,6 +13,7 @@
 
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
+#include "../apple_music.hpp"
 #include "../audio/audio_host.hpp"
 #include "../audio/equalizer.hpp"
 
@@ -72,7 +73,7 @@ struct AudioAnalysisNatives : ScriptBridge {
         if (box.unavailableNoted) return;
         box.unavailableNoted = true;
         JournalOf(ext).Write("[" + ext->id() + "] audio analysis is not available in this process (" +
-                             HostOf(ext).Process() + "): sound is only processed in AMPLibraryAgent.exe");
+                             HostOf(ext).Process() + "): sound is only processed in " + std::string(kLibraryAgentImage));
     }
 
     static JSValue Text(JSContext* ctx, const std::string& text) { return JS_NewStringLen(ctx, text.data(), text.size()); }

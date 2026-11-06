@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace ampify::i18n {
 
@@ -33,14 +34,17 @@ std::string Placeholders(std::string_view pattern);
 // Texts of the kernel and of the Ampify services (tray menu, remote control, Discord, MIDI).
 std::span<const Message> KitMessages();
 
-// The texts people see in one language (fr, de, es, pt, ru, ja, zh), English otherwise. A key missing there uses KitMessages.
+// The texts people see in one language of kTranslationLanguages, English otherwise. A key missing there uses KitMessages.
 std::span<const Message> KitMessagesIn(std::string_view language);
+
+// The languages that have a table, English first.
+std::vector<std::string_view> Languages();
 
 // The language of Text, as two letters ("fr"). The kernel sets it once at start from the Windows locale; "en" before.
 void SetLanguage(std::string_view code);
 const std::string& Language();
 
-// Whether the language writes 0,5 rather than 0.5 (fr, de, es, pt, ru).
+// Whether the language writes 0,5 rather than 0.5 (kDecimalCommaLanguages).
 bool UsesDecimalComma();
 
 // Lookup in the language's table, then in KitMessages, then Format.

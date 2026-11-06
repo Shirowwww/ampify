@@ -301,7 +301,9 @@ std::optional<double> Services::Queue(const std::string& action, double db) {
     return answer.get();
 }
 
-bool Services::Command(std::string_view action) { return Queue(std::string(action), 0).has_value(); }
+bool Services::Command(remote::Action action) {
+    return Queue(std::string(remote::ActionName(action)), 0).has_value();
+}
 
 std::optional<double> Services::SetGainDb(double db) { return Queue("gain", db); }
 

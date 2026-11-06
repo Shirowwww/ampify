@@ -11,6 +11,7 @@
 #include "../src/core/player_modes.hpp"
 #include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -47,15 +48,8 @@ struct ModesFakeHost : ampify::test::FakeHost, ampify::PlayerModesHost, ampify::
 
 std::unique_ptr<ampify::ScriptExtension> Make(ampify::Host& host, ampify::Journal& journal, const std::string& id,
                                            const std::string& permissions, const std::string& main) {
-    fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("modes-" + id);
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    const std::string manifest =
-        R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
-        R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
-    std::ofstream(dir / "main.js") << main;
-    ampify::ManifestResult result = ampify::ParseManifest(manifest, id, 1, [](const std::string&) { return true; });
-    return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, host, journal);
+    static ampify::test::ElementShelf shelf;  // keeps the folders until the run ends
+    return shelf.Make({.id = id, .permissions = permissions}, main, host, journal);
 }
 
 bool Has(const std::ostringstream& out, const std::string& text) { return out.str().find(text) != std::string::npos; }

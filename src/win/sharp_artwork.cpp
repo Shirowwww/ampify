@@ -2,7 +2,7 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
-#include "lcd_links.hpp"
+#include "win_common.hpp"
 #include "player_controls.hpp"
 
 #include "../core/journal.hpp"

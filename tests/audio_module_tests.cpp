@@ -18,17 +18,15 @@
 #include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
 #include "pump.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
 
 namespace fs = std::filesystem;
 
-struct Fixture {
-    ampify::test::FakeHost host;
+struct Fixture : ampify::test::ElementFixture<> {
     ampify::audio::AudioEngine engine;
-    std::ostringstream out;
-    ampify::Journal journal{out, [] { return std::string("t"); }};
 
     explicit Fixture(bool withAudio = true) {
         host.process = "engine";  // the audio is rendered in AMPLibraryAgent.exe
@@ -37,19 +35,8 @@ struct Fixture {
 
     std::unique_ptr<ampify::ScriptExtension> Make(const std::string& id, const std::string& main,
                                                const std::string& permissions) {
-        fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("audio-" + id);
-        fs::remove_all(dir);
-        fs::create_directories(dir);
-        const std::string manifest =
-            R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
-            R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
-        std::ofstream(dir / "manifest.json") << manifest;
-        std::ofstream(dir / "main.js") << main;
-        ampify::ManifestResult result = ampify::ParseManifest(manifest, id, 1, [](const std::string&) { return true; });
-        return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, host, journal);
+        return ElementFixture<>::Make({.id = id, .permissions = permissions}, main);
     }
-
-    bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
 
     size_t Count(const std::string& text) const {
         size_t count = 0;
@@ -57,16 +44,10 @@ struct Fixture {
         return count;
     }
 
-    // `seconds` of a 1 kHz tone with a click every 0.5 s (120 BPM), stereo at 48 kHz.
+    // `seconds` of the click-track tone, fed to the engine in blocks of 480 frames.
     void Play(double seconds, size_t offset = 0) {
-        std::vector<float> block(960);
         for (size_t start = 0; start < static_cast<size_t>(seconds * 48000); start += 480) {
-            for (size_t i = 0; i < 480; i++) {
-                size_t n = offset + start + i;
-                double tone = 0.25 * std::sin(2 * std::numbers::pi * 1000.0 * static_cast<double>(n) / 48000.0);
-                double click = (n % 24000) < 96 ? 0.6 : 0.0;
-                block[2 * i] = block[2 * i + 1] = static_cast<float>(tone + click);
-            }
+            std::vector<float> block = ampify::test::ToneWithClicks(offset + start, 480);
             engine.FeedAnalysis(block.data(), 480, 2, 48000);
         }
     }

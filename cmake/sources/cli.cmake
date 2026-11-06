@@ -29,6 +29,7 @@ list(APPEND AMPIFY_CLI_SOURCES
     src/cli/publish.cpp
     src/cli/sdk_types.cpp
     src/cli/develop.cpp
+    src/cli/platform.cpp
     src/cli/diagnose.cpp
     src/cli/report.cpp
     src/cli/transfer.cpp
@@ -36,7 +37,7 @@ list(APPEND AMPIFY_CLI_SOURCES
     src/cli/theme_import.cpp
     src/cli/maintenance.cpp)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    list(APPEND AMPIFY_CLI_SOURCES src/cli/platform.cpp src/cli/platform_win.cpp)
+    list(APPEND AMPIFY_CLI_SOURCES src/cli/platform_win.cpp)
 else()
-    list(APPEND AMPIFY_CLI_SOURCES src/cli/platform.cpp src/cli/platform_posix.cpp)
+    list(APPEND AMPIFY_CLI_SOURCES src/cli/platform_posix.cpp)
 endif()

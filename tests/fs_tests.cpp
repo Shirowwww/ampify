@@ -10,18 +10,12 @@
 #include "../src/core/manifest.hpp"
 #include "../src/core/output_files.hpp"
 #include "service_host.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
 
 namespace fs = std::filesystem;
-
-fs::path Scratch(const std::string& name) {
-    fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("output-" + name);
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    return dir;
-}
 
 std::string ReadText(const fs::path& file) {
     std::ifstream in(file, std::ios::binary);
@@ -44,7 +38,7 @@ TEST_CASE(OutputFiles_AcceptOnlyPlainTextNames) {
 }
 
 TEST_CASE(OutputFiles_WriteReplaceAndLimits) {
-    fs::path root = Scratch("write");
+    ampify::test::ScratchDir root("write");
     std::string error;
     CHECK(ampify::WriteOutputFile(root, "demo", "now.txt", "Title - Artist", &error));
     CHECK(ReadText(root / "demo" / "now.txt") == "Title - Artist");
@@ -66,7 +60,8 @@ TEST_CASE(OutputFiles_WriteReplaceAndLimits) {
 
 TEST_CASE(FsModule_WritesOnlyInTheElementFolder) {
     ampify::test::ServiceFixture<> f;
-    f.host.outputRoot = Scratch("module");
+    ampify::test::ScratchDir scratch("module");
+    f.host.outputRoot = scratch;
     auto without = f.Make("fs-none", R"(try { Ampify.fs.writeText("a.txt", "x"); } catch (e) { Ampify.log("refused " + e.name); })");
     CHECK(without->Start());
     CHECK(f.Logged("refused PermissionDenied"));

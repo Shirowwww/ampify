@@ -219,7 +219,7 @@ int CmdTest(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() != 2) return Usage(ctx, "test needs the element folder");
 
-    std::filesystem::path folder = PathArgument(args[1]);
+    std::filesystem::path folder = Utf8ToPath(args[1]);
     FolderValidation validation = ValidateElementFolder(folder);
     if (!validation.ok() || !validation.errors.empty() || !validation.manifest) {
         ctx.err << Utf8(folder) << ": invalid\n";
@@ -244,7 +244,7 @@ int CmdTest(Context& ctx) {
     for (const std::string& warning : parsed.warnings) ctx.out << "  warning    " << warning << "\n";
 
     std::ostringstream journalText;
-    Journal journal(journalText, Journal::LocalTimeStamp);
+    Journal journal(journalText);
     TestHost host;
     ScriptExtension element(*parsed.manifest, folder, host, journal);
     bool started = element.Start();

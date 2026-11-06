@@ -1,7 +1,14 @@
-# Shared helpers of the live bench (signed-in Apple Music, real playback, UI). Loaded after harness.ps1 and uia.ps1.
+# Shared helpers of the live bench (signed-in Apple Music, real playback, UI). run-bench.ps1 -CasesDir live\cases
+# loads this file after harness.ps1 and before the cases.
 # Element names are matched in English and French: the runner's Windows is in English, a local PC may be in French.
 
 Set-StrictMode -Version Latest
+
+. (Join-Path $PSScriptRoot '..\lib\uia.ps1')
+. (Join-Path $PSScriptRoot '..\lib\audio.ps1')
+
+# Storefront of the test account for the music:// links (fr by default).
+$script:LiveStorefront = if ($env:AMPIFY_STOREFRONT) { $env:AMPIFY_STOREFRONT } else { 'fr' }
 
 # Catalog items for the playback test, checked on music.apple.com (fr and us storefronts) on 2026-10-30:
 # - stereo: Dave Brubeck, "Take Five" (Dave Brubeck's Greatest Hits), album badges dolbyAtmos=false.

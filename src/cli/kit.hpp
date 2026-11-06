@@ -10,9 +10,6 @@
 
 namespace ampify {
 
-// Extensions built into the kernel. They have no folder, only a settings key.
-inline constexpr std::string_view kBuiltinExtensions[] = {"atmos-leveler"};
-
 // Folder of a kind inside the kit: extension -> extensions, theme -> themes, app -> apps, snippet -> snippets.
 // Empty for an unknown kind.
 std::string_view FolderOfKind(std::string_view kind);

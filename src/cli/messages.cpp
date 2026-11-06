@@ -111,7 +111,7 @@ constexpr i18n::Message kCli[] = {
     {"tooManyArgs", "too many arguments for {command}"},
     {"invalidId", "invalid id: {id} (lowercase letters, digits and hyphens, 2 to 40 characters, starting with a letter or a digit)"},
     {"missingKey", "key not set: {key}"},
-    {"version", "ampify {version} (extension API 1.0)"},
+    {"version", "ampify {version} (extension API {kitApi})"},
     {"chainStopped", "\"{command}\" failed, the next commands are not run"},
     {"list.type", "TYPE"},
     {"list.id", "ID"},

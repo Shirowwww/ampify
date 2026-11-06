@@ -268,13 +268,12 @@ std::string DisplayLanguage() {
 // The text in the display language, English for a language Ampify does not speak, with its placeholders filled.
 std::wstring Tr(const Texts& texts, ampify::i18n::Args args = {}) {
     static const std::string language = DisplayLanguage();
-    const std::pair<std::string_view, const char*> columns[] = {
-        {"fr", texts.fr}, {"de", texts.de}, {"es", texts.es}, {"pt", texts.pt},
-        {"ru", texts.ru}, {"ja", texts.ja}, {"zh", texts.zh},
-    };
+    const char* const columns[] = {texts.fr, texts.de, texts.es, texts.pt, texts.ru, texts.ja, texts.zh};
+    static_assert(std::size(columns) == std::size(ampify::kTranslationLanguages),
+                  "Texts needs one column per language of facts/release.json, in its order");
     const char* chosen = texts.en;
-    for (const auto& [code, text] : columns) {
-        if (code == language) chosen = text;
+    for (std::size_t i = 0; i < std::size(columns); i++) {
+        if (ampify::kTranslationLanguages[i] == language) chosen = columns[i];
     }
     return ampify::win::FromUtf8(ampify::i18n::Format(chosen, args));
 }
@@ -293,7 +292,7 @@ public:
     explicit Log(const fs::path& file)
         : m_file(file, std::ios::trunc),
           m_out(file.empty() ? static_cast<std::ostream*>(&m_memory) : &m_file),
-          m_journal(*m_out, ampify::Journal::LocalTimeStamp) {}
+          m_journal(*m_out) {}
 
     void Write(const std::string& line) { m_journal.Write(line); }
 
@@ -373,8 +372,8 @@ bool UpdateUserPath(const fs::path& folder, bool add) {
 
 // The kernel lives inside Apple Music: no file of Ampify may be replaced or deleted under it.
 std::vector<DWORD> AppleMusicProcesses() {
-    std::vector<DWORD> ids = ampify::win::ProcessIdsNamed(L"AppleMusic.exe");
-    std::vector<DWORD> agent = ampify::win::ProcessIdsNamed(L"AMPLibraryAgent.exe");
+    std::vector<DWORD> ids = ampify::win::ProcessIdsNamed(ampify::kAppleMusicImageW);
+    std::vector<DWORD> agent = ampify::win::ProcessIdsNamed(ampify::kLibraryAgentImageW);
     ids.insert(ids.end(), agent.begin(), agent.end());
     return ids;
 }
@@ -579,7 +578,7 @@ bool WriteUninstallEntry(const fs::path& target, DWORD sizeKb) {
     std::wstring setup = (target / ampify::kSetupFile).wstring();
     SetRegistryString(key, L"DisplayName", ampify::win::FromUtf8(ampify::kDisplayName));
     SetRegistryString(key, L"DisplayVersion", ampify::win::FromUtf8(ampify::kKitVersion));
-    SetRegistryString(key, L"Publisher", ampify::win::FromUtf8(ampify::kPublisher));
+    SetRegistryString(key, L"Publisher", ampify::win::FromUtf8(ampify::kProjectOwner));
     SetRegistryString(key, L"InstallLocation", target.wstring());
     SetRegistryString(key, L"DisplayIcon", (target / ampify::kLauncherFile).wstring() + L",0");
     SetRegistryString(key, L"UninstallString", L"\"" + setup + L"\" /uninstall");

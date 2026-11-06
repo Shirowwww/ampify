@@ -4,10 +4,9 @@
 #include <string>
 #include <string_view>
 
-namespace ampify::cli {
+#include "release_facts.hpp"
 
-inline constexpr std::string_view kDefaultCatalogUrl =
-    "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog.json";
+namespace ampify::cli {
 
 // A key of settings.txt that Ampify reads, and what applies while it is not set. `fallback` is what
 // `ampify config <key>` prints then; `note` says it in words when the value alone would be empty.

@@ -6,25 +6,6 @@
 #include "../src/core/reload.hpp"
 #include "test.hpp"
 
-TEST_CASE(Reload_ParsesRestartLinesOnly) {
-    std::vector<std::string> ids =
-        ampify::ParseRestartRequests("1700000000000\nrestart demo\r\nrestart  other \nnoise\nrestart demo\nrestart \n");
-    CHECK(ids.size() == 2);
-    if (ids.size() == 2) {
-        CHECK(ids[0] == "demo");
-        CHECK(ids[1] == "other");
-    }
-}
-
-TEST_CASE(Reload_FirstTextIsABaseline) {
-    ampify::ReloadWatcher watcher;
-    CHECK(watcher.Changed("1\nrestart demo\n").empty());
-    CHECK(watcher.Changed("1\nrestart demo\n").empty());
-    std::vector<std::string> changed = watcher.Changed("2\nrestart demo\n");
-    CHECK(changed.size() == 1);
-    if (changed.size() == 1) CHECK(changed[0] == "demo");
-}
-
 TEST_CASE(Reload_ParsesEveryVerbAndRefusesBadTargets) {
     std::vector<ampify::ReloadRequest> requests = ampify::ParseReloadRequests(
         "1\nstart demo\nstop app:demo\nrestart demo\nrescan\nstart ../x\nstart app:\nstart Demo\nstop a b\nstart demo\n");

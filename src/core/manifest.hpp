@@ -40,8 +40,6 @@ struct ManifestText {
     std::map<std::string, std::string> settingDescriptions;  // a setting's description, by its key (optional)
 };
 
-inline constexpr std::string_view kTranslationLanguages[] = {"fr", "de", "es", "pt", "ru", "ja", "zh"};
-
 // The fields of a manifest.json that the kernel uses. The rules are those of docs/extensions/manifest.md, which
 // tools/validate.py also enforces. The kernel checks them again, because a folder can be edited by hand.
 struct Manifest {
@@ -98,7 +96,7 @@ std::vector<SettingSpec> DeclaredSettings(std::string_view manifestText, std::ve
 std::map<std::string, ManifestText> ReadManifestTranslations(const Json& field, std::vector<std::string>& errors);
 
 // The value a setting has now: `stored` (from settings.txt) when it fits the spec, else the default. A toggle comes
-// back as true or false, a number as SettingNumberText writes it.
+// back as true or false, a number as ShortestNumberText writes it.
 std::string SettingValue(const SettingSpec& spec, const std::optional<std::string>& stored);
 
 // Why `stored` does not fit the spec (a toggle that is not on or off, a choice not offered, a number out of its
@@ -109,8 +107,5 @@ std::string SettingProblem(const SettingSpec& spec, std::string_view stored);
 bool IsKnownPermission(std::string_view permission);
 
 std::string_view ToString(ElementKind kind);
-
-// The text a number takes in settings.txt, as JavaScript's String(n) writes ordinary values: 12, 0.5.
-std::string SettingNumberText(double value);
 
 }  // namespace ampify

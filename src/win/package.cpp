@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "../core/apple_music.hpp"
+#include "../core/text_util.hpp"
 
 namespace ampify::launcher {
 
@@ -32,7 +33,7 @@ std::optional<InstalledPackage> FindInstalledPackage(const wchar_t* familyName) 
     for (UINT32 i = 0; i < count; ++i) {
         std::wstring candidate = names[i];
         std::string version = ampify::AppleMusicVersion(std::string(candidate.begin(), candidate.end()));
-        if (fullName.empty() || ampify::CompareVersions(version, newestVersion) > 0) {
+        if (fullName.empty() || ampify::CompareDottedVersions(version, newestVersion) > 0) {
             fullName = candidate;
             newestVersion = version;
         }

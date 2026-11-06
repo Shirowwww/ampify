@@ -1,0 +1,29 @@
+#pragma once
+
+// Made by CMake (cmake/facts.cmake) from facts/apple.json: edit that file, not this one.
+
+#include <string_view>
+
+namespace ampify {
+
+// The Microsoft Store package that holds Apple Music for Windows, and the id that starts its app.
+inline constexpr std::string_view kPackageName = "@AMPIFY_APPLE_name@";
+inline constexpr std::string_view kPublisherId = "@AMPIFY_APPLE_publisherId@";
+inline constexpr std::string_view kPackageFamilyName = "@AMPIFY_APPLE_name@_@AMPIFY_APPLE_publisherId@";
+inline constexpr std::string_view kAppUserModelId = "@AMPIFY_APPLE_name@_@AMPIFY_APPLE_publisherId@!@AMPIFY_APPLE_appId@";
+
+// The processes of the package that the kernel is loaded into.
+inline constexpr std::string_view kAppleMusicImage = "@AMPIFY_APPLE_PROCESS_app@";
+inline constexpr std::string_view kLibraryAgentImage = "@AMPIFY_APPLE_PROCESS_agent@";
+inline constexpr wchar_t kAppleMusicImageW[] = L"@AMPIFY_APPLE_PROCESS_app@";
+inline constexpr wchar_t kLibraryAgentImageW[] = L"@AMPIFY_APPLE_PROCESS_agent@";
+
+// Builds of Apple Music the kernel has been tested on, as shown by the package version
+// (`AppleInc.AppleMusicWin_<version>_x64__...`). Hooks are only installed on these builds, or those of versions.txt.
+inline constexpr std::string_view kKnownAppVersions[] = {@AMPIFY_APPLE_BUILDS@};
+
+// The player DLL whose exports the kit depends on, and those exports.
+inline constexpr std::string_view kPlayerDllName = "@AMPIFY_APPLE_PLAYER_DLL@";
+inline constexpr std::string_view kRequiredPlayerExports[] = {@AMPIFY_APPLE_EXPORTS@};
+
+}  // namespace ampify

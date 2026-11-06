@@ -23,12 +23,12 @@ public:
     ThemeService(Journal& journal, std::filesystem::path kit);
     ~ThemeService();
 
-    // Starts the worker. `module` is the kernel DLL, `processId` the process whose interface gets the theme.
-    void Start(HINSTANCE module, DWORD processId);
+    // Starts the worker. `module` is the kernel DLL.
+    void Start(HINSTANCE module);
     void Stop();
 
 private:
-    void Run(HINSTANCE module, DWORD processId);
+    void Run(HINSTANCE module);
 
     Journal& m_journal;
     std::filesystem::path m_kit;

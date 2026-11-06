@@ -6,6 +6,7 @@
 
 #include "../src/core/kit_layout.hpp"
 #include "../src/core/natives/kit.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -71,6 +72,22 @@ TEST_CASE(KitLayout_TheMarketplaceAndNowPlayingShipWithTheKit) {
     CHECK(!ampify::IsBundledElement("themes", "now-playing"));
 }
 
+TEST_CASE(KitLayout_OnlyTheMarketplaceIsFirstParty) {
+    CHECK(ampify::IsFirstParty("marketplace"));
+    CHECK(!ampify::IsFirstParty("now-playing"));
+    CHECK(!ampify::IsFirstParty("atmos-leveler"));
+    CHECK(!ampify::IsFirstParty("community-thing"));
+}
+
+TEST_CASE(KitLayout_TheAtmosLevelerIsBuiltInStartsOffAndShipsNoFolder) {
+    CHECK(ampify::IsBuiltInExtension("atmos-leveler"));
+    CHECK(!ampify::IsBuiltInExtension("now-playing"));
+    CHECK(!ampify::IsBuiltInExtension("marketplace"));
+    CHECK(!ampify::IsBundledElement("extensions", "atmos-leveler"));
+    CHECK(!ampify::IsOnByDefault("extensions", "atmos-leveler"));
+    CHECK(ampify::BundledElements().size() == 4);
+}
+
 TEST_CASE(KitLayout_ThePlaybackGuardShipsTurnedOff) {
     CHECK(ampify::IsOnByDefault("apps", "marketplace"));
     CHECK(ampify::IsOnByDefault("extensions", "now-playing"));
@@ -80,8 +97,7 @@ TEST_CASE(KitLayout_ThePlaybackGuardShipsTurnedOff) {
 }
 
 TEST_CASE(KitLayout_InstallReplacesTheBundledElementsWithThePackagedOnes) {
-    fs::path root = fs::temp_directory_path() / "ampify-tests" / "bundled-install";
-    fs::remove_all(root);
+    ampify::test::ScratchDir root("bundled-install");
     fs::path package = root / "package";
     fs::path kit = root / "kit";
     for (std::string_view element : ampify::BundledElements()) {
@@ -101,8 +117,7 @@ TEST_CASE(KitLayout_InstallReplacesTheBundledElementsWithThePackagedOnes) {
 }
 
 TEST_CASE(KitLayout_ABundledElementMissingFromThePackageIsReportedAndKept) {
-    fs::path root = fs::temp_directory_path() / "ampify-tests" / "bundled-missing";
-    fs::remove_all(root);
+    ampify::test::ScratchDir root("bundled-missing");
     fs::create_directories(root / "package");  // a build folder: no examples
     fs::create_directories(root / "kit" / "apps" / "marketplace");
     std::ofstream(root / "kit" / "apps" / "marketplace" / "main.js") << "old";

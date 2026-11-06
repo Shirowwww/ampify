@@ -2,8 +2,11 @@
 // that every member named there appears here, so the two files cannot drift apart without a failing test.
 
 #include "internal.hpp"
+#include "release_facts.hpp"
 
 namespace ampify::cli {
+
+static_assert(kKitApiMajor == 1, "the first line of AmpifyDeclarations names kitApi 1.x");
 
 std::string_view AmpifyDeclarations() {
     return R"ts(// ampify.d.ts: types of the global Ampify object (extension API, kitApi 1.x).

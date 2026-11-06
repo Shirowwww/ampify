@@ -9,37 +9,19 @@
 #include "../src/core/manifest.hpp"
 #include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
 
 namespace fs = std::filesystem;
 
-std::string Manifest(const std::string& id, const std::string& kind, const std::string& permissions) {
-    return R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":")" + kind +
-           R"(","author":"Shirowwww","description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" +
-           permissions + "]}";
-}
-
 // An element with its own folder, a fake host, and a log in a string.
-struct Fixture {
-    ampify::test::FakeHost host;
-    std::ostringstream out;
-    ampify::Journal journal{out, [] { return std::string("t"); }};
-
+struct Fixture : ampify::test::ElementFixture<> {
     std::unique_ptr<ampify::ScriptExtension> Make(const std::string& id, const std::string& kind,
                                                const std::string& permissions, const std::string& main) {
-        fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("ui-" + id);
-        fs::remove_all(dir);
-        fs::create_directories(dir);
-        std::ofstream(dir / "manifest.json") << Manifest(id, kind, permissions);
-        std::ofstream(dir / "main.js") << main;
-        ampify::ManifestResult result = ampify::ParseManifest(Manifest(id, kind, permissions), id, 1,
-                                                        [](const std::string&) { return true; });
-        return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, host, journal);
+        return ElementFixture<>::Make({.id = id, .kind = kind, .permissions = permissions}, main);
     }
-
-    bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
 };
 
 }  // namespace
@@ -317,20 +299,11 @@ TEST_CASE(Interface_ASurfaceCarriesTheElementNameUntilItSetsATitle) {
 
 TEST_CASE(Interface_TheElementNameFollowsTheDisplayLanguage) {
     Fixture f;
-    const std::string manifest =
-        R"({"id":"translated","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)"
-        R"("description":"Test.","kitApi":"1.0","main":"main.js","translations":{"fr":{"name":"Démo","description":"Essai."}}})";
-    ampify::ManifestResult result = ampify::ParseManifest(manifest, "translated", 1, [](const std::string&) { return true; });
-    CHECK(result.manifest.has_value());
-    if (!result.manifest) return;
-    fs::path dir = fs::temp_directory_path() / "ampify-tests" / "ui-translated";
-    fs::create_directories(dir);
-    std::ofstream(dir / "main.js") << "";
-    std::string before = ampify::i18n::Language();
-    ampify::i18n::SetLanguage("fr");
-    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal);
+    ampify::test::ElementFolder folder(
+        {.id = "translated", .extra = R"("translations":{"fr":{"name":"Démo","description":"Essai."}})"}, "");
+    ampify::test::LanguageScope french("fr");
+    ampify::ScriptExtension element(folder.manifest, folder.dir.path(), f.host, f.journal);
     CHECK(element.Start());
-    ampify::i18n::SetLanguage(before);
     CHECK(f.host.ui.Title("translated") == std::optional<std::string>("Démo"));
 }
 

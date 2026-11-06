@@ -1,8 +1,5 @@
 // Ampify.link: the message channel between an app and the extension that has the same id.
 
-#include <filesystem>
-#include <fstream>
-#include <sstream>
 #include <string>
 
 #include "../src/core/extension.hpp"
@@ -10,44 +7,18 @@
 #include "../src/core/reload.hpp"
 #include "../src/core/settings.hpp"
 #include "fake_host.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
 
-namespace fs = std::filesystem;
-
-std::string Manifest(const std::string& id, const std::string& kind) {
-    return R"({"id":")" + id + R"(","name":"Lien","version":"1.0.0","kind":")" + kind +
-           R"(","author":"Shirowwww","description":"Test.","kitApi":"1.0","main":"main.js","processes":["ui"]})";
-}
-
 // A kit with an extensions and an apps folder, read by one loader in the interface process.
-struct LinkKit {
-    fs::path root;
-    ampify::test::FakeHost host;
-    std::ostringstream out;
-    ampify::Journal journal{out, [] { return std::string("t"); }};
-    ampify::ExtensionHost hosts{journal};
-    ampify::ExtensionLoader loader;
-    ampify::Settings settings;
-
-    explicit LinkKit(const std::string& name)
-        : root(Clean(name)), loader(hosts, host, journal, root / "extensions") {
-        host.process = "ui";
-        loader.SetAppRoot(root / "apps");
-    }
-
-    static fs::path Clean(const std::string& name) {
-        fs::path folder = fs::temp_directory_path() / "ampify-tests" / ("link-" + name);
-        fs::remove_all(folder);
-        return folder;
-    }
+struct LinkKit : ampify::test::KitFixture {
+    explicit LinkKit(const std::string& name) : KitFixture(name) {}
 
     void Add(const std::string& folder, const std::string& id, const std::string& main) {
         std::string kind = folder == "apps" ? "app" : "extension";
-        fs::create_directories(root / folder / id);
-        std::ofstream(root / folder / id / "manifest.json") << Manifest(id, kind);
-        std::ofstream(root / folder / id / "main.js") << main;
+        ampify::test::WriteElement(root / folder / id, {.id = id, .name = "Lien", .kind = kind, .processes = R"("ui")"}, main);
         settings.SetBool((kind == "app" ? "apps." : "extensions.") + id + ".enabled", true);
     }
 
@@ -59,8 +30,6 @@ struct LinkKit {
     void Pump(int times = 3) {
         for (int i = 0; i < times; i++) loader.Pump();
     }
-
-    bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
 };
 
 }  // namespace

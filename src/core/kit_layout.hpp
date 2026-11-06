@@ -7,20 +7,9 @@
 #include <string_view>
 #include <vector>
 
+#include "release_facts.hpp"
+
 namespace ampify {
-
-// Version shipped in this build. Shown in the uninstall list.
-inline constexpr std::string_view kKitVersion = "1.1.1";
-
-// Folder name under %LOCALAPPDATA%\Programs (the installed kit) and under %USERPROFILE% (the user's data).
-inline constexpr std::string_view kKitFolderName = "Ampify";
-
-// Files the installer copies into the install folder. The launcher loads the kernel from its own folder,
-// and the installer copies itself there as the uninstaller.
-inline constexpr std::string_view kLauncherFile = "ampify_launcher.exe";
-inline constexpr std::string_view kKernelFile = "ampify_kernel.dll";
-inline constexpr std::string_view kSetupFile = "ampify_setup.exe";
-inline constexpr std::string_view kCliFile = "ampify.exe";  // beside the kernel, which runs it for the Marketplace page
 
 // The Start menu shortcut of versions up to 1.0.2, which started Apple Music through the launcher. Removed on install.
 inline constexpr std::string_view kShortcutFile = "Apple Music with Ampify.lnk";
@@ -28,7 +17,6 @@ inline constexpr std::string_view kShortcutFile = "Apple Music with Ampify.lnk";
 // Uninstall entry under HKEY_CURRENT_USER, so the kit shows in Settings > Apps.
 inline constexpr std::string_view kUninstallKey = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Ampify";
 inline constexpr std::string_view kDisplayName = "Ampify for Apple Music";
-inline constexpr std::string_view kPublisher = "Shirowwww";
 
 // The files that make up the installed kit, in the order they are copied.
 std::vector<std::string_view> InstalledFiles();
@@ -42,16 +30,27 @@ bool IsUpdateLeftover(std::string_view fileName);
 // folder that passes this check, so a wrong path can never remove something else.
 bool IsKitDataFolder(std::string_view path);
 
-// The elements that ship with the kit, as <folder>/<id>: under examples\ in the package, under the user's data folder
-// once installed. They are Ampify's own, so they start until the user turns them off, and each install or update
-// replaces them, as it replaces the binaries.
-std::vector<std::string_view> BundledElements();
+// The elements of kKitElements that ship as a folder, as <folder>/<id>: under examples\ in the package, under the
+// user's data folder once installed. Each install or update replaces them, as it replaces the binaries.
+std::vector<std::string> BundledElements();
 
 // True for one of BundledElements(): `folder` is "apps" or "extensions", `id` the element's folder name.
 bool IsBundledElement(std::string_view folder, std::string_view id);
 
-// True for a bundled element that is on until the user turns it off; the others wait to be turned on.
+// True for an element of kKitElements that is on until the user turns it off. Any other element, a community one
+// included, waits to be turned on.
 bool IsOnByDefault(std::string_view folder, std::string_view id);
+
+// True for the id of a first-party element of kKitElements, whatever its kind.
+bool IsFirstParty(std::string_view id);
+
+// True for an extension built into the kernel, such as atmos-leveler: it has no folder and no manifest.
+constexpr bool IsBuiltInExtension(std::string_view id) {
+    for (const KitElement& element : kKitElements) {
+        if (element.builtIn && element.kind == "extension" && element.id == id) return true;
+    }
+    return false;
+}
 
 // Copies the bundled elements from <package>\examples into the data folder `kit`, each in place of the copy already
 // there. Returns one line per element left as it was, such as one missing from the package.

@@ -16,11 +16,8 @@
 #include "../core/version_list.hpp"
 #include "internal.hpp"
 #include "platform.hpp"
+#include "release_facts.hpp"
 #include "sha256.hpp"
-
-#ifndef AMPIFY_VERSION
-#define AMPIFY_VERSION "0.0.0-dev"
-#endif
 
 namespace ampify::cli {
 
@@ -82,7 +79,7 @@ std::optional<std::filesystem::file_time_type> WriteTime(const std::filesystem::
 bool WaitForInspectorTree(Context& ctx, const std::filesystem::path& file,
                           const std::optional<std::filesystem::file_time_type>& before,
                           const char* what = "the interface tree") {
-    if (ctx.kit.Root() != platform::DefaultKitDirectory() || !platform::IsProcessRunning("AppleMusic.exe")) return false;
+    if (ctx.kit.Root() != platform::DefaultKitDirectory() || !platform::IsProcessRunning(std::string(kAppleMusicImage))) return false;
     ctx.out << "Waiting for Apple Music to write " << what << "...\n" << std::flush;
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(kInspectorWaitSeconds);
     while (std::chrono::steady_clock::now() < deadline) {
@@ -101,7 +98,7 @@ int PickUnderPointer(Context& ctx) {
         ctx.out << "The pointer's place would be read in " << kPickDelaySeconds << " seconds. --dry-run: nothing was written.\n";
         return 0;
     }
-    if (ctx.kit.Root() != platform::DefaultKitDirectory() || !platform::IsProcessRunning("AppleMusic.exe")) {
+    if (ctx.kit.Root() != platform::DefaultKitDirectory() || !platform::IsProcessRunning(std::string(kAppleMusicImage))) {
         return Failure(ctx, "Apple Music must be open, with Ampify, to pick an element");
     }
     ctx.out << "Put the pointer on the element in Apple Music: its place is read in " << kPickDelaySeconds
@@ -301,8 +298,8 @@ void NotifyKitUpdate(Context& ctx) {
         std::string writeError;
         WriteTextFile(file, "checked=" + std::to_string(now) + "\nlatest=" + cache.latest + "\n", writeError);
     }
-    if (!IsValidVersion(cache.latest) || CompareReleaseVersions(cache.latest, AMPIFY_VERSION) <= 0) return;
-    ctx.err << "ampify: version " << cache.latest << " of Ampify is available (installed: " << AMPIFY_VERSION
+    if (!IsValidVersion(cache.latest) || CompareDottedVersions(cache.latest, kKitVersion) <= 0) return;
+    ctx.err << "ampify: version " << cache.latest << " of Ampify is available (installed: " << kKitVersion
             << "). Run ampify update to download it.\n";
 }
 
@@ -333,10 +330,11 @@ bool MayLookForUpdate(Context& ctx, uirender::KitUpdate mode, const std::filesys
 // Apple's library agent often stays open, with the kernel, long after Apple Music closed; Apple Music starts it again
 // when it opens. The installer ends it the same way (src/setup/setup.cpp). False while Apple Music itself is open.
 bool ReadyToInstall(Context& ctx) {
-    if (platform::IsProcessRunning("AppleMusic.exe")) return false;
-    if (platform::IsProcessRunning("AMPLibraryAgent.exe")) {
-        ctx.out << "AMPLibraryAgent.exe stayed open after Apple Music: ended before the update.\n";
-        platform::EndProcesses("AMPLibraryAgent.exe");
+    if (platform::IsProcessRunning(std::string(kAppleMusicImage))) return false;
+    const std::string agent(kLibraryAgentImage);
+    if (platform::IsProcessRunning(agent)) {
+        ctx.out << agent << " stayed open after Apple Music: ended before the update.\n";
+        platform::EndProcesses(agent);
     }
     return true;
 }
@@ -358,15 +356,15 @@ int CmdAutoUpdate(Context& ctx) {
     std::filesystem::create_directories(ctx.kit.Cache(), ec);
     std::string writeError;
     WriteTextFile(file, "checked=" + std::to_string(NowSeconds()) + "\nlatest=" + release->version + "\n", writeError);
-    if (CompareReleaseVersions(release->version, AMPIFY_VERSION) <= 0) {
-        ctx.out << "ampify is up to date (version " << AMPIFY_VERSION << ").\n";
+    if (CompareDottedVersions(release->version, kKitVersion) <= 0) {
+        ctx.out << "ampify is up to date (version " << kKitVersion << ").\n";
         return 0;
     }
 
     UseUserLanguage(settings);
     if (mode == uirender::KitUpdate::Ask &&
         !platform::AskYesNo(i18n::Text("update.askTitle", {{"version", release->version}}),
-                            i18n::Text("update.askText", {{"installed", AMPIFY_VERSION}}))) {
+                            i18n::Text("update.askText", {{"installed", kKitVersion}}))) {
         ctx.out << "Version " << release->version << " declined: asked again tomorrow.\n";
         return 0;
     }

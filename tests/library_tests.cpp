@@ -14,6 +14,7 @@
 #include "../src/core/library/musicdb.hpp"
 #include "pump.hpp"
 #include "service_host.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -305,8 +306,7 @@ TEST_CASE(MusicDb_DecryptsLikeAppleMusic) {
 
 TEST_CASE(LibraryModule_ListsTracksWithThePermission) {
     ampify::test::ServiceFixture<> f;
-    fs::path dir = fs::temp_directory_path() / "ampify-tests" / "library";
-    fs::create_directories(dir);
+    ampify::test::ScratchDir dir("library");
     f.host.libraryFile = dir / "Library.musicdb";
     std::ofstream(f.host.libraryFile, std::ios::binary) << Envelope(ZlibStored(LibraryPlain()), 0);
 

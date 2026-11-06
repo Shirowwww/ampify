@@ -13,7 +13,7 @@
 | `examples/` | Example extensions (MIT) |
 | `tools/` | The validator (`validate.py`), `pack.py`, the Python and Node tests |
 | `schemas/` | JSON schemas of manifests, the catalog and the version list |
-| `tests/` | C++ unit tests (`ampify_tests`, and `ampify_ui_thread_test` on Windows) |
+| `tests/` | C++ unit tests (`ampify_tests`) |
 | `bench/windows/` | The Windows bench ([testing.md](testing.md)) |
 | `scripts/` | Build, install, bench kit, listening test and packaging scripts, the pre-push hook |
 | `knowledge/` | What is known about Apple Music's internals |
@@ -41,7 +41,6 @@ generates the C++/WinRT projection with the newest SDK that has an x64 `cppwinrt
 
 ```powershell
 build-msvc\release\ampify_tests.exe                  # C++ unit tests
-build-msvc\release\ampify_ui_thread_test.exe         # the interface thread, with a real window
 npm run test:js                                      # example extensions and the Marketplace page, against a fake Ampify
 npm run lint:js                                      # oxlint on the JavaScript (config in .oxlintrc.json)
 $env:AMPIFY_BIN = "$PWD\build-msvc\release\ampify.exe"
@@ -70,8 +69,13 @@ AMPIFY_BIN=$PWD/build/ampify python3 -m unittest discover -s tools -p 'test_*.py
 | `AMPIFY_BENCH` | `OFF` | The kernel and launcher accept any Apple Music version. Never distribute this build; `BUILD_INFO.txt` says so |
 | `AMPIFY_XAML` | `OFF` | Builds the XAML theme backend and native interface (needs the C++/WinRT projection, `AMPIFY_WINAPPSDK_INCLUDE`) |
 
-The version lives in `CMakeLists.txt` (`project(Ampify VERSION ...)`); the configure step checks the C++ constants
-against it.
+What defines a kit lives in two data files, one per reason to change. `facts/release.json` changes with a release or a
+rename: the version, the extension API version, the kit folder, the binary names, the elements that ship (which start
+on, which are first-party or built into the kernel), the languages and the project's addresses. `facts/apple.json`
+changes when Apple ships a build: its package, its process names, the tested builds and the exports the kit needs. The
+configure step turns them into `release_facts.hpp` and `apple_facts.hpp` in the build folder; the scripts and the tests
+read the JSON. `scripts/install.ps1` runs without a checkout, so it keeps its own copies, which `tools/test_facts.py`
+checks.
 
 ## Running a build
 

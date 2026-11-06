@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "package_debug.hpp"
+#include "release_facts.hpp"
 #include "win_common.hpp"
 
 namespace ampify::win {
@@ -12,8 +13,6 @@ namespace {
 
 // After the background launcher released its mutex, the time left for its process to end, so its file can be replaced.
 constexpr DWORD kExitGraceMs = 1000;
-
-constexpr wchar_t kLauncherName[] = L"ampify_launcher.exe";
 
 std::wstring RunCommand(const std::filesystem::path& launcher) {
     return L"\"" + launcher.wstring() + L"\" " + kRegisterArgument;
@@ -66,7 +65,7 @@ bool UnregisterBackground() {
 }
 
 bool BackgroundRunning() {
-    return ResidentRunning() || AttachRegistered(AppleMusicFullName(), kLauncherName);
+    return ResidentRunning() || AttachRegistered(AppleMusicFullName(), kLauncherFile);
 }
 
 bool ResidentRunning() {
@@ -96,7 +95,7 @@ bool StopBackground(DWORD timeoutMs) {
     if (!ResidentRunning()) return true;
     // The launchers running now, kept to wait for the background one to really end once its mutex is gone.
     std::vector<HANDLE> launchers;
-    for (DWORD id : ProcessIdsNamed(kLauncherName)) {
+    for (DWORD id : ProcessIdsNamed(FromUtf8(kLauncherFile).c_str())) {
         if (launchers.size() == MAXIMUM_WAIT_OBJECTS) break;
         if (HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, id)) launchers.push_back(process);
     }

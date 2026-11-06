@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 #include <optional>
+
+#include "release_facts.hpp"
 
 namespace ampify::i18n {
 
@@ -1254,6 +1257,16 @@ constexpr LanguageTable kLanguages[] = {
     {"fr", kKitFr}, {"de", kKitDe}, {"es", kKitEs}, {"pt", kKitPt}, {"ru", kKitRu}, {"ja", kKitJa}, {"zh", kKitZh},
 };
 
+// A language added to facts/release.json needs its table here: the build stops until it has one.
+constexpr bool TablesFollowTheLanguages() {
+    if (std::size(kLanguages) != std::size(kTranslationLanguages)) return false;
+    for (std::size_t i = 0; i < std::size(kLanguages); i++) {
+        if (kLanguages[i].code != kTranslationLanguages[i]) return false;
+    }
+    return true;
+}
+static_assert(TablesFollowTheLanguages(), "src/core/i18n.cpp: one table per language of facts/release.json");
+
 std::string g_language = "en";  // set once at start, before any service reads it
 
 std::optional<std::string_view> Find(std::span<const Message> table, std::string_view key) {
@@ -1334,15 +1347,19 @@ std::span<const Message> KitMessagesIn(std::string_view language) {
     return kKit;
 }
 
+std::vector<std::string_view> Languages() {
+    std::vector<std::string_view> codes = {"en"};
+    for (const LanguageTable& table : kLanguages) codes.push_back(table.code);
+    return codes;
+}
+
 void SetLanguage(std::string_view code) { g_language = std::string(code); }
 
 const std::string& Language() { return g_language; }
 
 bool UsesDecimalComma() {
-    for (std::string_view code : {"fr", "de", "es", "pt", "ru"}) {
-        if (g_language == code) return true;
-    }
-    return false;
+    return std::find(std::begin(kDecimalCommaLanguages), std::end(kDecimalCommaLanguages), g_language) !=
+           std::end(kDecimalCommaLanguages);
 }
 
 std::string Text(std::string_view key, Args args) {

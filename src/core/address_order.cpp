@@ -4,11 +4,11 @@
 
 namespace ampify {
 
-std::vector<size_t> Ipv4FirstOrder(const std::vector<int>& families) {
+std::optional<std::vector<size_t>> Ipv4FirstOrder(const std::vector<int>& families) {
     auto firstV4 = std::find(families.begin(), families.end(), kFamilyIpv4);
-    if (firstV4 == families.end()) return {};
+    if (firstV4 == families.end()) return std::nullopt;
     // Nothing moves when no IPv6 address comes before an IPv4 one.
-    if (std::find(families.begin(), firstV4, kFamilyIpv6) == firstV4) return {};
+    if (std::find(families.begin(), firstV4, kFamilyIpv6) == firstV4) return std::nullopt;
     std::vector<size_t> order(families.size());
     for (size_t i = 0; i < order.size(); ++i) order[i] = i;
     std::stable_partition(order.begin(), order.end(), [&](size_t i) { return families[i] == kFamilyIpv4; });

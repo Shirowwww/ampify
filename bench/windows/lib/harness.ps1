@@ -3,11 +3,14 @@
 
 Set-StrictMode -Version Latest
 
-# App identity and Ampify paths on this PC (same values as src/core/apple_music.hpp and src/win/win_common.cpp).
-$script:PackageFamily = 'AppleInc.AppleMusicWin_nzyj5cx40ttqa'
-$script:AppUserModelId = "$($script:PackageFamily)!App"
-$script:StoreProductId = '9PFHDD62MXS1'
-$script:KitDir = Join-Path $env:USERPROFILE 'Ampify'
+# App identity and Ampify paths on this PC, from the facts the kernel is built with.
+$script:FactsDir = Join-Path $PSScriptRoot '..\..\..\facts'
+$script:AppleFacts = Get-Content -LiteralPath (Join-Path $script:FactsDir 'apple.json') -Raw | ConvertFrom-Json
+$script:ReleaseFacts = Get-Content -LiteralPath (Join-Path $script:FactsDir 'release.json') -Raw | ConvertFrom-Json
+$script:PackageFamily = "$($script:AppleFacts.package.name)_$($script:AppleFacts.package.publisherId)"
+$script:AppUserModelId = "$($script:PackageFamily)!$($script:AppleFacts.package.appId)"
+$script:StoreProductId = $script:AppleFacts.package.storeProductId
+$script:KitDir = Join-Path $env:USERPROFILE $script:ReleaseFacts.kitFolder
 $script:JournalDir = Join-Path $script:KitDir 'logs'
 $script:StateFile = Join-Path $script:KitDir 'state.txt'
 
@@ -349,7 +352,7 @@ function Get-KernelState {
     $unreadable = 0
     foreach ($process in $processes) {
         try {
-            if ($process.Modules | Where-Object { $_.ModuleName -ieq 'ampify_kernel.dll' }) { $loaded++ }
+            if ($process.Modules | Where-Object { $_.ModuleName -ieq $script:ReleaseFacts.files.kernel }) { $loaded++ }
         } catch {
             $unreadable++
         }
@@ -470,19 +473,17 @@ function Save-Screenshot {
     }
 }
 
-# Apple Music versions of the release list, read from src/core/version_gate.hpp to stay in line with the code.
+# Apple Music versions of the release list, from facts/apple.json, which the kernel is built with.
 function Get-KnownAppVersions {
     param([string]$RepoRoot)
-    $header = Get-Content -LiteralPath (Join-Path $RepoRoot 'src\core\version_gate.hpp') -Raw
-    $block = [regex]::Match($header, 'kKnownAppVersions\[\]\s*=\s*\{(?<body>.*?)\};', 'Singleline')
-    if (-not $block.Success) { throw 'kKnownAppVersions not found in src/core/version_gate.hpp' }
-    return @([regex]::Matches($block.Groups['body'].Value, '"([0-9.]+)"') | ForEach-Object { $_.Groups[1].Value })
+    $facts = Get-Content -LiteralPath (Join-Path $RepoRoot 'facts\apple.json') -Raw | ConvertFrom-Json
+    return @($facts.testedBuilds | ForEach-Object { $_.version })
 }
 
 # Full name of the Apple Music package installed for the current user, or '' when it is not installed.
 # Queried in Windows PowerShell 5.1: Get-AppxPackage goes through a compatibility module under PowerShell 7.
 function Get-AppleMusicFullName {
-    $query = "(Get-AppxPackage -Name 'AppleInc.AppleMusicWin' | Select-Object -First 1).PackageFullName"
+    $query = "(Get-AppxPackage -Name '$($script:AppleFacts.package.name)' | Select-Object -First 1).PackageFullName"
     $name = & powershell.exe -NoProfile -NonInteractive -Command $query 2>$null
     return [string]($name | Select-Object -First 1)
 }

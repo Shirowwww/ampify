@@ -1,0 +1,25 @@
+{
+  "$comment": "What Ampify knows of Apple Music for Windows. Changes when Apple ships a build. CMake makes apple_facts.hpp of it; the scripts and the tests read it as is.",
+  "package": {
+    "name": "AppleInc.AppleMusicWin",
+    "publisherId": "nzyj5cx40ttqa",
+    "appId": "App",
+    "storeProductId": "9PFHDD62MXS1"
+  },
+  "processes": {
+    "app": "AppleMusic.exe",
+    "agent": "AMPLibraryAgent.exe"
+  },
+  "testedBuilds": [
+    {"version": "1.1540.23042.0"},
+    {"version": "1.1792.39682.0", "note": "Windows bench, 30/10/2026: injection in both processes, export signature recognized"}
+  ],
+  "playerDll": "AVFoundationCF.dll",
+  "requiredPlayerExports": [
+    "AVCFPlayerCopyCurrentItem",
+    "AVCFPlayerItemCopyCurrentStableVariantID",
+    "AVCFPlayerItemCopyTracks",
+    "AVCFPlayerItemTrackCopyAssetTrack",
+    "AVCFPlayerSetVolume"
+  ]
+}

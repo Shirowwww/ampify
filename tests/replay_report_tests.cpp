@@ -41,7 +41,7 @@ std::optional<ampify::Json> ReplayJson(const th::ReplayRequest& request, std::st
 }  // namespace
 
 TEST_CASE(ReplayReport_CountsEachRefusalOnceWithTheElementsItWasRefusedOn) {
-    fs::path dir = Scratch("refusal-count");
+    ScratchDir dir("refusal-count");
     th::ReplayRequest request;
     request.tree = Fixture();
     request.out = dir / "out";
@@ -95,7 +95,7 @@ TEST_CASE(ReplayReport_GivesTheArtworkColoursToWhatReadsThem) {
     CHECK(!th::ArtworkVariablesOf("#111111,#222222,#333333,#444444", &problem));
     CHECK(!th::ArtworkVariablesOf("", &problem));
 
-    fs::path dir = Scratch("artwork");
+    ScratchDir dir("artwork");
     th::ReplayRequest request;
     request.tree = Fixture();
     request.out = dir / "out";
@@ -129,7 +129,7 @@ TEST_CASE(ReplayReport_GivesTheArtworkColoursToWhatReadsThem) {
 }
 
 TEST_CASE(ReplayReport_ShowsDecorValuesAndTheDiffSeesThemChange) {
-    fs::path dir = Scratch("decor-diff");
+    ScratchDir dir("decor-diff");
     th::ReplayRequest request;
     request.tree = Fixture();
     auto run = [&](const std::string& id, const std::string& colour, int bars) {
@@ -167,7 +167,7 @@ TEST_CASE(ReplayReport_ShowsDecorValuesAndTheDiffSeesThemChange) {
 }
 
 TEST_CASE(ReplayReport_WritesPathsRelativeToTheKitAndNeverTheProfileFolder) {
-    fs::path dir = Scratch("paths");
+    ScratchDir dir("paths");
     fs::path theme = ThemeFolder(dir, "decor",
                                  "Grid#TransportBar::before { content: url(\"images/mark.png\"); width: 12px; }\n"
                                  "TextBlock#CurrentTime { font-family: url(\"fonts/none.ttf\"); }\n");

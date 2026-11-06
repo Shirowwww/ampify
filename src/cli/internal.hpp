@@ -45,8 +45,7 @@ inline std::string Pad(std::string_view text, size_t width) {
     return cell;
 }
 
-// Command-line text is UTF-8. Converting it here keeps accented folder names working on Windows.
-std::filesystem::path PathArgument(std::string_view text);
+// A path as UTF-8 text, the reverse of Utf8ToPath: command-line text is UTF-8.
 std::string Utf8(const std::filesystem::path& path);
 
 // Prints "ampify: <message>" on the error stream. Failure returns 1 and Usage returns 2.
@@ -56,8 +55,8 @@ int Usage(Context& ctx, const std::string& message);
 bool LoadSettings(const Context& ctx, Settings& settings, std::string& error);
 bool SaveSettings(const Context& ctx, const Settings& settings, std::string& error);
 
-// The time as HH:MM:SS, for the lines that `watch` and `dev` print.
-inline std::string ClockText() {
+// The local time now, written with a strftime format.
+inline std::string LocalTimeText(const char* format) {
     std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::tm local{};
 #ifdef _WIN32
@@ -65,10 +64,13 @@ inline std::string ClockText() {
 #else
     localtime_r(&now, &local);
 #endif
-    char buffer[16];
-    std::strftime(buffer, sizeof(buffer), "%H:%M:%S", &local);
+    char buffer[32];
+    std::strftime(buffer, sizeof(buffer), format, &local);
     return buffer;
 }
+
+// The time as HH:MM:SS, for the lines that `watch` and `dev` print.
+inline std::string ClockText() { return LocalTimeText("%H:%M:%S"); }
 
 // True for the answers that mean yes: y, yes (spaces and case are ignored).
 inline bool IsYes(std::string answer) {

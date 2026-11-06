@@ -23,7 +23,11 @@ sys.path.insert(0, TOOLS)
 import pack  # noqa: E402
 
 Ampify = os.environ.get("AMPIFY_BIN") or os.path.join(ROOT, "build", "ampify")
-APP_ID = "AppleInc.AppleMusicWin_nzyj5cx40ttqa!App"
+with open(os.path.join(ROOT, "facts", "apple.json"), encoding="utf-8") as _facts:
+    APPLE = json.load(_facts)
+with open(os.path.join(ROOT, "facts", "release.json"), encoding="utf-8") as _facts:
+    RELEASE = json.load(_facts)
+APP_ID = f"{APPLE['package']['name']}_{APPLE['package']['publisherId']}!{APPLE['package']['appId']}"
 
 
 def file_url(path):
@@ -829,10 +833,11 @@ class KitUpdate(AmpifyTestCase):
         os.makedirs(bundle_dir, exist_ok=True)
         archive = os.path.join(bundle_dir, f"ampify-{version}-windows-x64.zip")
         with zipfile.ZipFile(archive, "w") as bundle:
-            for name in ("ampify.exe", "ampify_launcher.exe", "ampify_kernel.dll"):
+            for name in (RELEASE["files"]["cli"], RELEASE["files"]["launcher"], RELEASE["files"]["kernel"]):
                 bundle.writestr(name, f"{name} {version}")
-            for element in ("apps/marketplace", "extensions/now-playing", "extensions/song-panel", "extensions/playback-guard"):  # they ship with the kit
-                bundle.writestr(f"examples/{element}/manifest.json", "{}")
+            for element in RELEASE["elements"]:  # they ship with the kit
+                if not element["builtIn"]:
+                    bundle.writestr(f"examples/{element['folder']}/{element['id']}/manifest.json", "{}")
         digest = sha256_of(archive)
         sums = os.path.join(bundle_dir, "SHA256SUMS.txt")
         with open(sums, "w", encoding="utf-8") as handle:
@@ -1515,8 +1520,7 @@ class NewSettings(AmpifyTestCase):
 
 
 class TestedVersions(AmpifyTestCase):
-    REQUIRED = ["AVCFPlayerCopyCurrentItem", "AVCFPlayerItemCopyCurrentStableVariantID", "AVCFPlayerItemCopyTracks",
-                "AVCFPlayerItemTrackCopyAssetTrack", "AVCFPlayerSetVolume"]
+    REQUIRED = APPLE["requiredPlayerExports"]
 
     def write_versions(self, versions, sha=None):
         path = os.path.join(self.tmp, "versions.json")

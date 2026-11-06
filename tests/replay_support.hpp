@@ -13,34 +13,18 @@
 
 #include "../src/core/json.hpp"
 #include "../src/core/theme/replay.hpp"
+#include "support.hpp"
 
 namespace replay_support {
 
 namespace fs = std::filesystem;
 
-inline std::string ReadFile(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    std::stringstream text;
-    text << in.rdbuf();
-    return text.str();
-}
-
-inline void WriteFile(const fs::path& file, const std::string& text) {
-    fs::create_directories(file.parent_path());
-    std::ofstream(file, std::ios::binary) << text;
-}
+using ampify::test::ReadFile;
+using ampify::test::ScratchDir;
+using ampify::test::WriteFile;
 
 inline fs::path Fixture() {
     return fs::path(AMPIFY_SOURCE_DIR) / "tests" / "data" / "replay" / "transport-bar.json";
-}
-
-// A fresh folder for one test.
-inline fs::path Scratch(const std::string& name) {
-    fs::path dir = fs::temp_directory_path() / "ampify-replay-tests" / name;
-    std::error_code error;
-    fs::remove_all(dir, error);
-    fs::create_directories(dir);
-    return dir;
 }
 
 // A theme folder `id` under `dir` holding `css` as user.css, and `manifest` as manifest.json when given.

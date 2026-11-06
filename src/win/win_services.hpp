@@ -106,7 +106,7 @@ public:
 private:
     // remote::Backend, called on the server thread.
     std::string StatusJson() override;
-    bool Command(std::string_view action) override;
+    bool Command(remote::Action action) override;
     std::optional<double> SetGainDb(double db) override;
 
     struct RemoteTask {

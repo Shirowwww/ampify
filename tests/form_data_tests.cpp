@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "../src/core/base64.hpp"
 #include "../src/core/form_data.hpp"
 #include "pump.hpp"
 #include "service_host.hpp"

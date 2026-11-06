@@ -8,6 +8,7 @@
 #include <mutex>
 #include <string>
 
+#include "apple_facts.hpp"
 #include "hook.hpp"
 #include "winrt_abi.hpp"
 
@@ -50,7 +51,7 @@ bool AppleMusicInFront() {
     if (QueryFullProcessImageNameW(handle, 0, path, &length)) {
         std::wstring image(path, length);
         size_t slash = image.find_last_of(L"\\/");
-        apple = _wcsicmp(image.c_str() + (slash == std::wstring::npos ? 0 : slash + 1), L"AppleMusic.exe") == 0;
+        apple = _wcsicmp(image.c_str() + (slash == std::wstring::npos ? 0 : slash + 1), kAppleMusicImageW) == 0;
     }
     CloseHandle(handle);
     return apple;

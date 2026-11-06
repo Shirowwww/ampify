@@ -101,6 +101,9 @@ private:
     std::vector<DWORD> m_ids;
 };
 
+// The storefront of Apple's public catalog for this PC ("FR"), from Windows' region; "US" when it gives none.
+std::wstring CatalogStorefront();
+
 // Yes / No question in a dialog. Returns true for Yes.
 bool AskYesNo(const std::wstring& text, const std::wstring& title);
 

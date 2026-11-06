@@ -1,59 +1,37 @@
 #include <filesystem>
-#include <fstream>
 #include <memory>
 #include <sstream>
 #include <string>
 
 #include "../src/core/manifest.hpp"
 #include "../src/core/script_extension.hpp"
+#include "release_facts.hpp"
 #include "fake_host.hpp"
 #include "pump.hpp"
+#include "support.hpp"
 #include "test.hpp"
-
-#ifndef AMPIFY_SOURCE_DIR
-#define AMPIFY_SOURCE_DIR "."
-#endif
 
 namespace {
 
 namespace fs = std::filesystem;
 
-fs::path ScratchDir(const std::string& name) {
-    fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("element-" + name);
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    return dir;
-}
-
-std::string Manifest(const std::string& id, const std::string& permissions) {
-    return R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
-           R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
-}
-
 // Everything an element needs in one place: a fake host, a journal in a string, and a clock the test moves.
-struct Fixture {
-    ampify::test::FakeHost host;
-    std::ostringstream out;
-    ampify::Journal journal{out, [] { return std::string("t"); }};
+struct Fixture : ampify::test::ElementFixture<> {
     std::chrono::steady_clock::time_point now{std::chrono::seconds(1000)};
 
     ampify::Clock clock() {
         return [this] { return now; };
     }
 
-    // Writes the element's folder and returns the element. Each test uses its own id, so folders never clash.
     std::unique_ptr<ampify::ScriptExtension> Make(const std::string& id, const std::string& permissions,
                                                const std::string& main, ampify::js::Limits limits = {}) {
-        fs::path dir = ScratchDir(id);
-        std::ofstream(dir / "manifest.json") << Manifest(id, permissions);
-        std::ofstream(dir / "main.js") << main;
-        ampify::ManifestResult result = ampify::ParseManifest(Manifest(id, permissions), id, 1, [](const std::string&) {
-            return true;
-        });
-        return std::make_unique<ampify::ScriptExtension>(*result.manifest, dir, host, journal, clock(), limits);
+        return Make({.id = id, .permissions = permissions}, main, limits);
     }
 
-    bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
+    std::unique_ptr<ampify::ScriptExtension> Make(const ampify::test::ManifestSpec& spec, const std::string& main,
+                                               ampify::js::Limits limits = {}) {
+        return ElementFixture<>::Make(spec, main, clock(), limits);
+    }
 };
 
 }  // namespace
@@ -65,7 +43,7 @@ TEST_CASE(Element_RunsMainAndLogsWithItsId) {
     CHECK(element->Start());
     CHECK(element->running());
     CHECK(f.Logged("[demo] hello"));
-    CHECK(f.Logged("[demo] ui fr-FR"));
+    CHECK(f.Logged("[demo] ui en-US"));
     element->Stop();
     CHECK(!element->running());
 }
@@ -114,38 +92,25 @@ TEST_CASE(Element_ConfigReadsTypedValuesAndWritesOnlyItsOwnKeys) {
 // A theme's settings live under themes.<id>: its script reads the same values as its user.css.
 TEST_CASE(Element_ThemeScriptReadsTheThemesOwnSettings) {
     Fixture f;
-    std::string manifest = Manifest("glow", "");
-    manifest.replace(manifest.find("\"extension\""), 11, "\"theme\"");
-    manifest.insert(manifest.rfind('}'), R"(,"colors":"colors.ini")");
-    ampify::ManifestResult result = ampify::ParseManifest(manifest, "glow", 1, [](const std::string&) { return true; });
-    CHECK(result.manifest.has_value());
-    if (!result.manifest) return;
     f.host.settings["themes.glow.side-panel"] = "false";
     f.host.settings["extensions.glow.side-panel"] = "true";
-    fs::path dir = ScratchDir("glow");
-    std::ofstream(dir / "main.js") << R"(Ampify.log("panel=" + Ampify.config.get("side-panel", true));)";
-    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock(), {});
-    CHECK(element.Start());
+    auto element = f.Make({.id = "glow", .kind = "theme", .extra = R"("colors":"colors.ini")"},
+                          R"(Ampify.log("panel=" + Ampify.config.get("side-panel", true));)");
+    CHECK(element->Start());
     CHECK(f.Logged("panel=false"));
 }
 
 TEST_CASE(Element_ConfigGivesTheDeclaredDefaultsWithTheirType) {
     Fixture f;
-    std::string manifest = Manifest("decl", "");
-    manifest.insert(manifest.rfind('}'), R"(,"settings":[
+    f.host.settings["extensions.decl.size"] = "20";
+    f.host.settings["extensions.decl.count"] = "";      // emptied by hand
+    f.host.settings["extensions.decl.sound"] = "maybe";  // neither a yes nor a no
+    auto element = f.Make({.id = "decl", .extra = R"("settings":[
         {"key":"seconds","label":"Seconds","type":"toggle","default":true},
         {"key":"size","label":"Size","type":"number","default":12},
         {"key":"side","label":"Side","type":"choice","options":["Left","Right"],"default":"Left"},
         {"key":"count","label":"Count","type":"number","default":3},
-        {"key":"sound","label":"Sound","type":"toggle","default":true}])");
-    ampify::ManifestResult result = ampify::ParseManifest(manifest, "decl", 1, [](const std::string&) { return true; });
-    CHECK(result.manifest.has_value());
-    if (!result.manifest) return;
-    f.host.settings["extensions.decl.size"] = "20";
-    f.host.settings["extensions.decl.count"] = "";      // emptied by hand
-    f.host.settings["extensions.decl.sound"] = "maybe";  // neither a yes nor a no
-    fs::path dir = ScratchDir("decl");
-    std::ofstream(dir / "main.js") << R"(
+        {"key":"sound","label":"Sound","type":"toggle","default":true}])"}, R"(
         Ampify.log("seconds=" + (Ampify.config.get("seconds") === true));
         Ampify.log("size=" + (Ampify.config.get("size") + 1));
         Ampify.log("side=" + Ampify.config.get("side"));
@@ -153,9 +118,8 @@ TEST_CASE(Element_ConfigGivesTheDeclaredDefaultsWithTheirType) {
         Ampify.log("absent=" + Ampify.config.get("absent"));
         Ampify.log("count=" + Ampify.config.get("count"));
         Ampify.log("sound=" + Ampify.config.get("sound"));
-    )";
-    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock(), {});
-    CHECK(element.Start());
+    )");
+    CHECK(element->Start());
     CHECK(f.Logged("seconds=true"));
     CHECK(f.Logged("size=21"));  // the stored value, read as a number
     CHECK(f.Logged("side=Left"));
@@ -179,7 +143,7 @@ TEST_CASE(Element_CannotReplaceTheFrozenApi) {
     Fixture f;
     auto element = f.Make("frozen", "", R"(Ampify.version = "9.9"; Ampify.log(Ampify.version);)");
     CHECK(element->Start());
-    CHECK(f.Logged(std::string("[frozen] ") + ampify::kKernelVersion));
+    CHECK(f.Logged("[frozen] " + std::string(ampify::kKitVersion)));
 }
 
 TEST_CASE(Element_TimersFireWhenDueAndCanBeCleared) {
@@ -431,17 +395,11 @@ TEST_CASE(Element_IsCutWhenItLoopsForever) {
 TEST_CASE(Element_ExamplesStartWithTheirOwnPermissions) {
     for (const char* name : {"hello-extension", "keyboard-skip", "sleep-timer", "discord-presence", "scrobbler"}) {
         Fixture f;
-        fs::path dir = fs::path(AMPIFY_SOURCE_DIR) / "examples" / name;
-        std::ifstream manifestFile(dir / "manifest.json");
-        std::stringstream manifestText;
-        manifestText << manifestFile.rdbuf();
-        ampify::ManifestResult result = ampify::ParseManifest(manifestText.str(), name, 1, [&](const std::string& file) {
-            return fs::exists(dir / file);
-        });
-        CHECK(result.manifest.has_value());
-        if (!result.manifest) continue;
+        ampify::test::ShippedElement shipped("examples", name);
+        CHECK(shipped.manifest.has_value());
+        if (!shipped.manifest) continue;
 
-        ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock());
+        ampify::ScriptExtension element(*shipped.manifest, shipped.dir, f.host, f.journal, f.clock());
         CHECK(element.Start());
         element.Stop();
         CHECK(!element.running());
@@ -449,28 +407,21 @@ TEST_CASE(Element_ExamplesStartWithTheirOwnPermissions) {
 }
 
 TEST_CASE(Element_MainMayBeAModuleThatImportsItsOwnFiles) {
-    fs::path dir = ScratchDir("module-main");
-    std::string manifest = R"({"id":"module-main","name":"Module","version":"1.0.0","kind":"extension",)"
-                           R"("author":"Shirowwww","description":"Test.","kitApi":"1.0","main":"main.js",)"
-                           R"("type":"module"})";
-    std::ofstream(dir / "manifest.json") << manifest;
-    std::ofstream(dir / "main.js") << "import { greet } from './lib/greet.js';\nAmpify.log(greet('module'));\n";
-    fs::create_directories(dir / "lib");
-    std::ofstream(dir / "lib" / "greet.js") << "export const greet = (who) => 'hello ' + who;\n";
-    ampify::ManifestResult result = ampify::ParseManifest(manifest, "module-main", 1, [](const std::string&) { return true; });
-    CHECK(result.manifest && result.manifest->module);
+    ampify::test::ElementFolder folder({.id = "module-main", .name = "Module", .extra = R"("type":"module")"},
+                                       "import { greet } from './lib/greet.js';\nAmpify.log(greet('module'));\n");
+    ampify::test::WriteFile(folder.dir / "lib" / "greet.js", "export const greet = (who) => 'hello ' + who;\n");
+    CHECK(folder.manifest.module);
 
     Fixture f;
     f.host.process = "ui";
-    ampify::ScriptExtension element(*result.manifest, dir, f.host, f.journal, f.clock());
+    ampify::ScriptExtension element(folder.manifest, folder.dir.path(), f.host, f.journal, f.clock());
     CHECK(element.Start());
     CHECK(f.Logged("[module-main] hello module"));
     element.Stop();
 
     // Without "type": "module", a static import is a syntax error: the element fails, the reason is logged.
-    ampify::ManifestResult classic = ampify::ParseManifest(Manifest("module-main", ""), "module-main", 1,
-                                                     [](const std::string&) { return true; });
-    ampify::ScriptExtension script(*classic.manifest, dir, f.host, f.journal, f.clock());
+    ampify::Manifest classic = ampify::test::ParseTestManifest(ampify::test::ManifestJson({.id = "module-main"}), "module-main");
+    ampify::ScriptExtension script(classic, folder.dir.path(), f.host, f.journal, f.clock());
     CHECK(!script.Start());
     CHECK(script.lastError().find("SyntaxError") != std::string::npos);
 }

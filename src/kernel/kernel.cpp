@@ -85,7 +85,7 @@ void StartInterface(ampify::Journal& journal, [[maybe_unused]] const std::filesy
     // Never destroyed, like the interface service below: its theme session holds XAML objects (resource dictionary,
     // brushes, templates), and a static destructor would release them while Apple Music exits, after XAML is gone.
     static auto* themes = new ampify::win::ThemeService(journal, kit);
-    themes->Start(g_module, GetCurrentProcessId());
+    themes->Start(g_module);
 
     // Never destroyed: it holds XAML objects that may only be released on the interface thread.
     static auto* ui = new ampify::win::UiService(journal, kit, model, [target = &loader](const ampify::win::UiEvent& event) {
@@ -122,7 +122,7 @@ DWORD WINAPI KernelMain(LPVOID) {
         wchar_t self[MAX_PATH] = {};
         GetModuleFileNameW(g_module, self, MAX_PATH);
         std::ofstream log(logPath, std::ios::app);
-        ampify::Journal(log, ampify::Journal::LocalTimeStamp)
+        ampify::Journal(log)
             .Write("Another Ampify kernel already runs in this process: this one (" + ampify::win::ToUtf8(self) +
                    ") stays idle");
         return 0;
@@ -135,7 +135,7 @@ DWORD WINAPI KernelMain(LPVOID) {
     bool laterProcess = logTaken && GetLastError() == ERROR_ALREADY_EXISTS;
     if (!laterProcess) std::ofstream(logPath, std::ios::trunc).close();
     static std::ofstream file(logPath, std::ios::app);
-    static ampify::Journal journal(file, ampify::Journal::LocalTimeStamp);
+    static ampify::Journal journal(file);
 
     journal.Write("Kernel loaded in " + ampify::win::ExecutablePath().filename().string() + " (process " +
                   std::to_string(GetCurrentProcessId()) + ")");

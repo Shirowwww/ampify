@@ -73,8 +73,8 @@ A proxy DLL is not possible on a signed, read-only package; the injection method
 
 ## Version gate and safe mode
 
-The launcher and kernel load only on Apple Music versions in `src/core/version_gate.hpp` (plus `versions.txt` from
-`ampify versions update`), and only if `AVFoundationCF.dll` exports the names in `src/core/build_signature.hpp`. The
+The launcher and kernel load only on Apple Music versions in `facts/apple.json` (plus `versions.txt` from
+`ampify versions update`), and only if `AVFoundationCF.dll` exports the names listed there too. The
 kernel stores no addresses. A version counts as tested once the bench injects cleanly on it and its export signature is
 recognized. The bench build (`AMPIFY_BENCH=ON`) skips the version list.
 

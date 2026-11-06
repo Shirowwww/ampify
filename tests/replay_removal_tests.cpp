@@ -56,7 +56,7 @@ TEST_CASE(ReplayRemoval_FindsWhatOneTreeShowsAndAFreshOneDoesNot) {
 }
 
 TEST_CASE(ReplayRemoval_TakingAThemeOffLeavesNothingAndReportsTheSecondState) {
-    fs::path dir = Scratch("removal");
+    ScratchDir dir("removal");
     th::ReplayRequest request;
     request.tree = Fixture();
     request.out = dir / "out";
@@ -97,7 +97,7 @@ TEST_CASE(ReplayRemoval_TakingAThemeOffLeavesNothingAndReportsTheSecondState) {
 }
 
 TEST_CASE(ReplayRemoval_CommandWritesTheFreshTreeAndTheDiff) {
-    fs::path dir = Scratch("removal-cli");
+    ScratchDir dir("removal-cli");
     const std::string theme = Generic(ThemeFolder(dir, "busy", kBusy));
     const std::string snippet = Generic(ThemeFolder(dir, "dim", "TextBlock#Duration { opacity: 0.4; }\n",
                                                     R"({"id": "dim", "kind": "snippet"})"));

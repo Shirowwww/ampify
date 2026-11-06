@@ -25,9 +25,6 @@ namespace ampify::amp {
 
 inline constexpr int kInspectableSlots = 6;
 
-// Runtime class names, for RoGetActivationFactory.
-inline constexpr char kPlayerClass[] = "AMP.Services.Player";
-
 // Interface identifiers (see above).
 inline constexpr char kIidPlayerStatics[] = "34D100F9-0F0A-5980-8F04-7AF57FDB29B0";  // AMP.Services.IPlayerStatics
 inline constexpr char kIidPlayerState[] = "BEFB99EB-336F-5199-9FB2-63635BC47319";  // ...CommonModels.IPlayerState

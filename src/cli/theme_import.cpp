@@ -11,6 +11,7 @@
 #include "archive.hpp"
 #include "internal.hpp"
 #include "platform.hpp"
+#include "release_facts.hpp"
 
 namespace ampify::cli {
 
@@ -168,7 +169,7 @@ bool ConvertSpicetifyTheme(const std::filesystem::path& source, const std::files
     manifest << "{\n  \"id\": " << JsonText(id) << ",\n  \"name\": " << JsonText(Utf8(source.filename()))
              << ",\n  \"version\": \"1.0.0\",\n  \"kind\": \"theme\",\n  \"author\": " << JsonText(author)
              << ",\n  \"description\": " << JsonText("Imported from Spicetify: the colors of color.ini on Apple Music.")
-             << ",\n  \"kitApi\": \"1.0\",\n  \"colors\": \"color.ini\"";
+             << ",\n  \"kitApi\": \"" << kKitApi << "\",\n  \"colors\": \"color.ini\"";
     if (!schemes.empty()) manifest << ",\n  \"defaultScheme\": " << JsonText(schemes.front());
     manifest << "\n}\n";
     if (!css || !manifest) {
@@ -181,7 +182,7 @@ bool ConvertSpicetifyTheme(const std::filesystem::path& source, const std::files
 // Downloads or extracts `argument` into `work` when needed. Returns the folder to look into.
 std::optional<std::filesystem::path> Unpack(Context& ctx, const std::string& argument, const std::filesystem::path& work,
                                             ImportSource& source, std::string& error) {
-    std::filesystem::path local = PathArgument(argument);
+    std::filesystem::path local = Utf8ToPath(argument);
     std::error_code ec;
     std::filesystem::path archive;
     if (argument.starts_with("https://")) {
@@ -255,7 +256,7 @@ int CmdThemeImport(Context& ctx) {
     std::string name = Utf8(folder.filename());
     if (folder == work / "extracted") {
         std::string last = SplitPath(args[2]).empty() ? args[2] : SplitPath(args[2]).back();
-        name = Utf8(PathArgument(last).stem());
+        name = Utf8(Utf8ToPath(last).stem());
     }
     std::string id = args.size() == 4 ? args[3] : IdFromName(name);
     if (!IsValidId(id)) {

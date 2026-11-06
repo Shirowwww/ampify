@@ -22,6 +22,7 @@
 #include "../src/core/ui_render/style.hpp"
 #include "../src/core/ui_render/surfaces.hpp"
 #include "../src/core/ui_render/svg_icon.hpp"
+#include "support.hpp"
 #include "test.hpp"
 
 namespace {
@@ -91,30 +92,18 @@ struct FakeTree {
 
 const unsigned kStack = kProbePanel | kProbeStackPanel;
 
-fs::path FreshKit(const std::string& name) {
-    fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("ui-render-" + name);
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    return dir;
-}
+using ampify::test::ReadFile;
+using ampify::test::WriteFile;
 
-void WriteFile(const fs::path& file, const std::string& text) {
-    fs::create_directories(file.parent_path());
-    std::ofstream(file, std::ios::binary) << text;
-}
-
-std::string ReadFile(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    std::ostringstream buffer;
-    buffer << in.rdbuf();
-    return buffer.str();
+// The manifest.json of an element folder, from the fields of `spec`.
+void WriteManifest(const fs::path& folder, const ampify::test::ManifestSpec& spec) {
+    ampify::test::WriteElement(folder, ampify::test::ManifestJson(spec));
 }
 
 void AddExtension(const fs::path& kit, const std::string& id, const std::string& name) {
-    WriteFile(kit / "extensions" / id / "manifest.json",
-              R"({"id":")" + id + R"(","name":")" + name + R"(","version":"1.0.0","kind":"extension","author":"x",)"
-              R"("description":"Makes )" + name + R"(","kitApi":"1.0","main":"main.js","permissions":[]})");
-    WriteFile(kit / "extensions" / id / "main.js", "Ampify.log('ok');");
+    ampify::test::WriteElement(kit / "extensions" / id,
+                               {.id = id, .name = name, .author = "x", .description = "Makes " + name},
+                               "Ampify.log('ok');");
 }
 
 }  // namespace
@@ -541,7 +530,7 @@ TEST_CASE(UiRender_RefreshTicketQueuesOnceAndCloses) {
 }
 
 TEST_CASE(UiRender_ModsListsValidExtensionsWithTheirState) {
-    fs::path kit = FreshKit("mods-list");
+    ampify::test::ScratchDir kit("mods-list");
     AddExtension(kit, "react-panel", "React panel");
     AddExtension(kit, "hello-extension", "Hello");
     WriteFile(kit / "extensions" / "broken" / "manifest.json", "{");
@@ -557,18 +546,16 @@ TEST_CASE(UiRender_ModsListsValidExtensionsWithTheirState) {
         CHECK(mods[1].enabled);
         CHECK(mods[1].description == "Makes React panel");
     }
-    CHECK(ListMods(FreshKit("mods-empty")).empty());
+    CHECK(ListMods(ampify::test::ScratchDir("mods-empty")).empty());
 }
 
 TEST_CASE(UiRender_ModsShowTheTranslationOfTheLanguageElseTheEnglishText) {
-    fs::path kit = FreshKit("mods-translated");
-    WriteFile(kit / "extensions" / "clock" / "manifest.json",
-              R"({"id":"clock","name":"Clock","version":"1.0.0","kind":"extension","author":"x","description":"Time.",)"
-              R"("kitApi":"1.0","main":"main.js","translations":{"fr":{"name":"Horloge","description":"L'heure."}}})");
+    ampify::test::ScratchDir kit("mods-translated");
+    WriteManifest(kit / "extensions" / "clock",
+                  {.id = "clock", .name = "Clock", .author = "x", .description = "Time.",
+                   .extra = R"("translations":{"fr":{"name":"Horloge","description":"L'heure."}})"});
     WriteFile(kit / "extensions" / "clock" / "main.js", "");
-    WriteFile(kit / "extensions" / "plain" / "manifest.json",
-              R"({"id":"plain","name":"Plain","version":"1.0.0","kind":"extension","author":"x","description":"Text.",)"
-              R"("kitApi":"1.0","main":"main.js"})");
+    WriteManifest(kit / "extensions" / "plain", {.id = "plain", .name = "Plain", .author = "x", .description = "Text."});
     WriteFile(kit / "extensions" / "plain" / "main.js", "");
 
     std::vector<ModEntry> mods = ListMods(kit);
@@ -585,7 +572,7 @@ TEST_CASE(UiRender_ModsShowTheTranslationOfTheLanguageElseTheEnglishText) {
 }
 
 TEST_CASE(UiRender_ModsSwitchWritesTheSettingAndAReloadRequest) {
-    fs::path kit = FreshKit("mods-switch");
+    ampify::test::ScratchDir kit("mods-switch");
     WriteFile(kit / "settings.txt", "theme.active = midnight\n");
     WriteFile(kit / "reload.txt", "1700000000\n");
     std::string error;
@@ -603,7 +590,7 @@ TEST_CASE(UiRender_ModsSwitchWritesTheSettingAndAReloadRequest) {
 }
 
 TEST_CASE(UiRender_TheBuiltInLevelerIsReadAndSwitchedLikeAnExtension) {
-    fs::path kit = FreshKit("mods-leveler");
+    ampify::test::ScratchDir kit("mods-leveler");
     WriteFile(kit / "settings.txt", "theme.active = midnight\n");
     WriteFile(kit / "reload.txt", "");
     CHECK(!IsModOn(kit, "atmos-leveler"));  // off until asked for: it changes the sound
@@ -617,10 +604,10 @@ TEST_CASE(UiRender_TheBuiltInLevelerIsReadAndSwitchedLikeAnExtension) {
 }
 
 TEST_CASE(UiRender_SwitchingAnElementOnTurnsOnTheServicesItAsksFor) {
-    fs::path kit = FreshKit("mods-services");
-    WriteFile(kit / "extensions" / "presence" / "manifest.json",
-              R"({"id":"presence","name":"Presence","version":"1.0.0","kind":"extension","author":"x",)"
-              R"("description":"Discord.","kitApi":"1.0","main":"main.js","permissions":["ipc.discord","ui.tray"]})");
+    ampify::test::ScratchDir kit("mods-services");
+    WriteManifest(kit / "extensions" / "presence", {.id = "presence", .name = "Presence", .author = "x",
+                                                    .description = "Discord.",
+                                                    .permissions = R"("ipc.discord","ui.tray")"});
     WriteFile(kit / "extensions" / "presence" / "main.js", "");
     WriteFile(kit / "settings.txt", "tray.enabled = 0\n");
     std::string error;
@@ -638,12 +625,11 @@ TEST_CASE(UiRender_SwitchingAnElementOnTurnsOnTheServicesItAsksFor) {
 }
 
 TEST_CASE(UiRender_ModsCarryTheirDeclaredSettingsAndValues) {
-    fs::path kit = FreshKit("mods-settings");
-    WriteFile(kit / "extensions" / "clock" / "manifest.json",
-              R"({"id":"clock","name":"Clock","version":"1.0.0","kind":"extension","author":"x","description":"Time.",)"
-              R"("kitApi":"1.0","main":"main.js","settings":[)"
-              R"({"key":"seconds","label":"Seconds","type":"toggle","default":true},)"
-              R"({"key":"side","label":"Side","type":"choice","options":["Left","Right"],"default":"Left"}]})");
+    ampify::test::ScratchDir kit("mods-settings");
+    WriteManifest(kit / "extensions" / "clock",
+                  {.id = "clock", .name = "Clock", .author = "x", .description = "Time.", .extra = R"("settings":[)"
+                   R"({"key":"seconds","label":"Seconds","type":"toggle","default":true},)"
+                   R"({"key":"side","label":"Side","type":"choice","options":["Left","Right"],"default":"Left"}])"});
     WriteFile(kit / "extensions" / "clock" / "main.js", "");
     WriteFile(kit / "settings.txt", "extensions.clock.side = Right\n");
 
@@ -655,7 +641,7 @@ TEST_CASE(UiRender_ModsCarryTheirDeclaredSettingsAndValues) {
 }
 
 TEST_CASE(UiRender_ModsSettingIsWrittenAndRestartsTheExtension) {
-    fs::path kit = FreshKit("mods-setting");
+    ampify::test::ScratchDir kit("mods-setting");
     WriteFile(kit / "settings.txt", "extensions.clock.enabled = true\n");
     WriteFile(kit / "reload.txt", "");
     std::string error;
@@ -676,7 +662,7 @@ TEST_CASE(UiRender_ModsSettingIsWrittenAndRestartsTheExtension) {
 }
 
 TEST_CASE(UiRender_ModsSettingLeavesAnUnreadableSettingsFileAlone) {
-    fs::path kit = FreshKit("mods-unreadable");
+    ampify::test::ScratchDir kit("mods-unreadable");
     fs::create_directories(kit / "settings.txt");  // exists, but cannot be read as a file
     std::string error;
     CHECK(!SetModSetting(kit, "clock", "side", "Right", error));
@@ -688,12 +674,12 @@ TEST_CASE(UiRender_ModsSettingLeavesAnUnreadableSettingsFileAlone) {
 }
 
 TEST_CASE(UiRender_TheActiveThemeCarriesItsSettings) {
-    fs::path kit = FreshKit("theme-settings");
-    WriteFile(kit / "themes" / "night" / "manifest.json",
-              R"({"id":"night","name":"Night","version":"1.0.0","kind":"theme","author":"x","description":"Dark.",)"
-              R"("kitApi":"1.0","colors":"colors.ini","settings":[)"
-              R"({"key":"radius","label":"Corners","type":"number","min":0,"max":24,"default":8},)"
-              R"({"key":"hide-radio","label":"Hide Radio","type":"toggle","default":false}]})");
+    ampify::test::ScratchDir kit("theme-settings");
+    WriteManifest(kit / "themes" / "night",
+                  {.id = "night", .name = "Night", .kind = "theme", .author = "x", .description = "Dark.",
+                   .script = false, .extra = R"("colors":"colors.ini","settings":[)"
+                   R"({"key":"radius","label":"Corners","type":"number","min":0,"max":24,"default":8},)"
+                   R"({"key":"hide-radio","label":"Hide Radio","type":"toggle","default":false}])"});
     WriteFile(kit / "themes" / "night" / "colors.ini", "[Base]\nmain = 000000\n");
     WriteFile(kit / "themes" / "plain" / "colors.ini", "[Base]\nmain = 000000\n");
     CHECK(!ActiveThemeSettings(kit));  // no theme chosen
@@ -708,13 +694,13 @@ TEST_CASE(UiRender_TheActiveThemeCarriesItsSettings) {
 }
 
 TEST_CASE(UiRender_TheActiveThemeCarriesTheTranslationOfItsSettings) {
-    fs::path kit = FreshKit("theme-settings-fr");
-    WriteFile(kit / "themes" / "night" / "manifest.json",
-              R"({"id":"night","name":"Night","version":"1.0.0","kind":"theme","author":"x","description":"Dark.",)"
-              R"("kitApi":"1.0","colors":"colors.ini","settings":[)"
-              R"({"key":"play","label":"Play button","type":"choice","options":["White","Green"],"default":"White"}],)"
-              R"("translations":{"fr":{"name":"Nuit","description":"Sombre.","settings":{"play":"Bouton Lecture"},)"
-              R"("options":{"White":"Blanc","Green":"Vert"}}}})");
+    ampify::test::ScratchDir kit("theme-settings-fr");
+    WriteManifest(kit / "themes" / "night",
+                  {.id = "night", .name = "Night", .kind = "theme", .author = "x", .description = "Dark.",
+                   .script = false, .extra = R"("colors":"colors.ini","settings":[)"
+                   R"({"key":"play","label":"Play button","type":"choice","options":["White","Green"],"default":"White"}],)"
+                   R"("translations":{"fr":{"name":"Nuit","description":"Sombre.","settings":{"play":"Bouton Lecture"},)"
+                   R"("options":{"White":"Blanc","Green":"Vert"}}})"});
     WriteFile(kit / "themes" / "night" / "colors.ini", "[Base]\nmain = 000000\n");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
     std::optional<ModEntry> theme = ActiveThemeSettings(kit);
@@ -726,7 +712,7 @@ TEST_CASE(UiRender_TheActiveThemeCarriesTheTranslationOfItsSettings) {
 }
 
 TEST_CASE(UiRender_AThemeSettingIsWrittenWithoutAReloadRequest) {
-    fs::path kit = FreshKit("theme-setting");
+    ampify::test::ScratchDir kit("theme-setting");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
     std::string error;
     CHECK(SetThemeSetting(kit, "night", "radius", "12", error));
@@ -739,14 +725,14 @@ TEST_CASE(UiRender_AThemeSettingIsWrittenWithoutAReloadRequest) {
 }
 
 TEST_CASE(UiRender_ThemesAreListedByNameWithTheirTranslation) {
-    fs::path kit = FreshKit("theme-list");
-    WriteFile(kit / "themes" / "rose" / "manifest.json",
-              R"({"id":"rose","name":"Rose gold","version":"1.0.0","kind":"theme","author":"x","description":"Warm.",)"
-              R"("kitApi":"1.0","colors":"colors.ini","translations":{"fr":{"name":"Or rose","description":"Chaud."}}})");
+    ampify::test::ScratchDir kit("theme-list");
+    WriteManifest(kit / "themes" / "rose",
+                  {.id = "rose", .name = "Rose gold", .kind = "theme", .author = "x", .description = "Warm.",
+                   .script = false,
+                   .extra = R"("colors":"colors.ini","translations":{"fr":{"name":"Or rose","description":"Chaud."}})"});
     WriteFile(kit / "themes" / "rose" / "colors.ini", "[Base]\nmain = 000000\n");
-    WriteFile(kit / "themes" / "aurora" / "manifest.json",
-              R"({"id":"aurora","name":"Aurora","version":"1.0.0","kind":"theme","author":"x","description":"Cold.",)"
-              R"("kitApi":"1.0","colors":"colors.ini"})");
+    WriteManifest(kit / "themes" / "aurora", {.id = "aurora", .name = "Aurora", .kind = "theme", .author = "x",
+                                              .description = "Cold.", .script = false, .extra = R"("colors":"colors.ini")"});
     WriteFile(kit / "themes" / "aurora" / "colors.ini", "[Base]\nmain = 000000\n");
     WriteFile(kit / "themes" / "snippets" / "readme.txt", "not a theme");
     WriteFile(kit / "themes" / "broken" / "manifest.json", "{");
@@ -760,7 +746,7 @@ TEST_CASE(UiRender_ThemesAreListedByNameWithTheirTranslation) {
 }
 
 TEST_CASE(UiRender_ChoosingAThemeKeepsOnlyASchemeThatStillMeansSomething) {
-    fs::path kit = FreshKit("theme-choose");
+    ampify::test::ScratchDir kit("theme-choose");
     WriteFile(kit / "settings.txt", "theme.active = night\ntheme.scheme = Dark\nextensions.clock.enabled = true\n");
     std::string error;
     CHECK(ChooseTheme(kit, "night", error));  // the same theme keeps its scheme
@@ -780,7 +766,7 @@ TEST_CASE(UiRender_ChoosingAThemeKeepsOnlyASchemeThatStillMeansSomething) {
 }
 
 TEST_CASE(UiRender_AccentCanFollowTheArtwork) {
-    fs::path kit = FreshKit("accent-artwork");
+    ampify::test::ScratchDir kit("accent-artwork");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
     std::string error;
     CHECK(ChooseAccent(kit, "artwork", error));
@@ -798,7 +784,7 @@ TEST_CASE(UiRender_ArtworkAccentWordMatchesTheEngine) {
 }
 
 TEST_CASE(UiRender_AChosenAccentIsWrittenAsSixHexDigitsOrRemoved) {
-    fs::path kit = FreshKit("accent-choose");
+    ampify::test::ScratchDir kit("accent-choose");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
     CHECK(ChosenAccent(kit).empty());  // the theme's own
 
@@ -883,7 +869,7 @@ TEST_CASE(UiRender_KitUpdateInstallsOnItsOwnUnlessToldOtherwise) {
     settings.Set("kit_update", "weekly");
     CHECK(ReadKitUpdate(settings) == KitUpdate::Auto);
 
-    fs::path kit = FreshKit("kit-update");
+    ampify::test::ScratchDir kit("kit-update");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
     std::string error;
     CHECK(SetAppleTweak(kit, "kit_update", "ask", error));
@@ -895,7 +881,7 @@ TEST_CASE(UiRender_KitUpdateInstallsOnItsOwnUnlessToldOtherwise) {
 }
 
 TEST_CASE(UiRender_TheGlassLevelIsChosenFromThreeValues) {
-    fs::path kit = FreshKit("glass-choice");
+    ampify::test::ScratchDir kit("glass-choice");
     WriteFile(kit / "settings.txt", "theme.active = night\ntheme.glass = Balanced\n");
     TweakChoice choice = GlassChoice(kit);
     CHECK(choice.key == "theme.glass" && choice.value == "balanced");
@@ -920,7 +906,7 @@ TEST_CASE(UiRender_AmpifysEntryGoesInTheHeaderOnlyWhenChosen) {
     settings.Set("ampify.entry", "top");
     CHECK(!ReadEntryInHeader(settings));
 
-    fs::path kit = FreshKit("entry-choice");
+    ampify::test::ScratchDir kit("entry-choice");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
     CHECK(EntryChoice(kit).value == "sidebar");
     std::string error;
@@ -960,10 +946,10 @@ TEST_CASE(UiRender_ResolvedAddressesListIpv4FirstOnlyWhenSomethingMoves) {
     using ampify::Ipv4FirstOrder;
     constexpr int v4 = ampify::kFamilyIpv4, v6 = ampify::kFamilyIpv6;
     CHECK((Ipv4FirstOrder({v6, v6, v4, v6, v4}) == std::vector<size_t>{2, 4, 0, 1, 3}));
-    CHECK(Ipv4FirstOrder({v4, v6, v6}).empty());  // already first
-    CHECK(Ipv4FirstOrder({v4, v4}).empty());
-    CHECK(Ipv4FirstOrder({v6, v6}).empty());      // IPv6 only (NAT64): nothing to fall back to
-    CHECK(Ipv4FirstOrder({}).empty());
+    CHECK(!Ipv4FirstOrder({v4, v6, v6}));  // already first
+    CHECK(!Ipv4FirstOrder({v4, v4}));
+    CHECK(!Ipv4FirstOrder({v6, v6}));      // IPv6 only (NAT64): nothing to fall back to
+    CHECK(!Ipv4FirstOrder({}));
     CHECK((Ipv4FirstOrder({v6, v4, v6}) == std::vector<size_t>{1, 0, 2}));
 }
 
@@ -985,7 +971,7 @@ TEST_CASE(UiRender_ProxyDetectionIsSkippedOnlyWhenChosen) {
     CHECK(!ReadAppleTweaks(settings).proxyNoAutodetect);
     CHECK(AppleTweakValues("apple.proxy") == "system, no-autodetect");
 
-    fs::path kit = FreshKit("proxy-choice");
+    ampify::test::ScratchDir kit("proxy-choice");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
     std::string error;
     CHECK(SetAppleTweak(kit, "apple.proxy", "no-autodetect", error));
@@ -993,7 +979,7 @@ TEST_CASE(UiRender_ProxyDetectionIsSkippedOnlyWhenChosen) {
 }
 
 TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
-    fs::path kit = FreshKit("apple-tweaks");
+    ampify::test::ScratchDir kit("apple-tweaks");
     WriteFile(kit / "settings.txt", "theme.active = night\n");
     std::string error;
     CHECK(SetAppleTweak(kit, "apple.notifications", "never", error));
@@ -1184,11 +1170,11 @@ TEST_CASE(UiRender_EachFullscreenSessionIsANewSurface) {
 }
 
 TEST_CASE(UiRender_ElementSettingsListWhatAnInstalledElementDeclaresWithItsValues) {
-    fs::path kit = FreshKit("element-settings");
-    WriteFile(kit / "snippets" / "icons" / "manifest.json",
-              R"({"id":"icons","name":"Icons","version":"1.0.0","kind":"snippet","author":"x","description":"d",)"
-              R"("kitApi":"1.0","settings":[{"key":"shape","label":"Shape","type":"choice",)"
-              R"("options":["Round","Square"],"default":"Round"}]})");
+    ampify::test::ScratchDir kit("element-settings");
+    WriteManifest(kit / "snippets" / "icons",
+                  {.id = "icons", .name = "Icons", .kind = "snippet", .author = "x", .description = "d", .script = false,
+                   .extra = R"("settings":[{"key":"shape","label":"Shape","type":"choice",)"
+                   R"("options":["Round","Square"],"default":"Round"}])"});
     WriteFile(kit / "snippets" / "icons" / "user.css", "Page { opacity: 1; }\n");
     WriteFile(kit / "settings.txt", "snippets.icons.shape = Square\n");
 
@@ -1200,12 +1186,11 @@ TEST_CASE(UiRender_ElementSettingsListWhatAnInstalledElementDeclaresWithItsValue
 }
 
 TEST_CASE(UiRender_ChangingAnElementSettingChecksItAgainstTheManifest) {
-    fs::path kit = FreshKit("element-setting-change");
-    WriteFile(kit / "extensions" / "clock" / "manifest.json",
-              R"({"id":"clock","name":"Clock","version":"1.0.0","kind":"extension","author":"x","description":"d",)"
-              R"("kitApi":"1.0","main":"main.js","settings":[)"
-              R"({"key":"size","label":"Size","type":"number","min":1,"max":10,"default":4},)"
-              R"({"key":"seconds","label":"Seconds","type":"toggle","default":false}]})");
+    ampify::test::ScratchDir kit("element-setting-change");
+    WriteManifest(kit / "extensions" / "clock",
+                  {.id = "clock", .name = "Clock", .author = "x", .description = "d", .extra = R"("settings":[)"
+                   R"({"key":"size","label":"Size","type":"number","min":1,"max":10,"default":4},)"
+                   R"({"key":"seconds","label":"Seconds","type":"toggle","default":false}])"});
     WriteFile(kit / "extensions" / "clock" / "main.js", "");
     std::string error;
 
@@ -1224,12 +1209,11 @@ TEST_CASE(UiRender_ChangingAnElementSettingChecksItAgainstTheManifest) {
 }
 
 TEST_CASE(UiRender_ChangingSeveralElementValuesWritesAllOfThemOnceOrNone) {
-    fs::path kit = FreshKit("element-values-change");
-    WriteFile(kit / "extensions" / "clock" / "manifest.json",
-              R"({"id":"clock","name":"Clock","version":"1.0.0","kind":"extension","author":"x","description":"d",)"
-              R"("kitApi":"1.0","main":"main.js","settings":[)"
-              R"({"key":"size","label":"Size","type":"number","min":1,"max":10,"default":4},)"
-              R"({"key":"seconds","label":"Seconds","type":"toggle","default":false}]})");
+    ampify::test::ScratchDir kit("element-values-change");
+    WriteManifest(kit / "extensions" / "clock",
+                  {.id = "clock", .name = "Clock", .author = "x", .description = "d", .extra = R"("settings":[)"
+                   R"({"key":"size","label":"Size","type":"number","min":1,"max":10,"default":4},)"
+                   R"({"key":"seconds","label":"Seconds","type":"toggle","default":false}])"});
     WriteFile(kit / "extensions" / "clock" / "main.js", "");
     std::string error;
 
@@ -1247,12 +1231,12 @@ TEST_CASE(UiRender_ChangingSeveralElementValuesWritesAllOfThemOnceOrNone) {
 }
 
 TEST_CASE(UiRender_ResettingElementSettingsRemovesTheirKeysFromTheFile) {
-    fs::path kit = FreshKit("element-values-reset");
-    WriteFile(kit / "themes" / "glass" / "manifest.json",
-              R"({"id":"glass","name":"Glass","version":"1.0.0","kind":"theme","author":"x","description":"d",)"
-              R"("kitApi":"1.0","colors":"colors.ini","settings":[)"
-              R"({"key":"radius","label":"Radius","type":"number","min":0,"max":40,"default":24},)"
-              R"({"key":"grow","label":"Grow","type":"toggle","default":true}]})");
+    ampify::test::ScratchDir kit("element-values-reset");
+    WriteManifest(kit / "themes" / "glass",
+                  {.id = "glass", .name = "Glass", .kind = "theme", .author = "x", .description = "d", .script = false,
+                   .extra = R"("colors":"colors.ini","settings":[)"
+                   R"({"key":"radius","label":"Radius","type":"number","min":0,"max":40,"default":24},)"
+                   R"({"key":"grow","label":"Grow","type":"toggle","default":true}])"});
     WriteFile(kit / "themes" / "glass" / "colors.ini", "[Base]\nmain = 000000\n");
     WriteFile(kit / "settings.txt", "theme.active = glass\nthemes.glass.radius = 36\nthemes.glass.grow = false\n");
     std::string error;

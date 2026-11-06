@@ -2,6 +2,7 @@
 #include <string>
 
 #include "../src/core/manifest.hpp"
+#include "../src/core/text_util.hpp"
 #include "test.hpp"
 
 namespace {
@@ -234,7 +235,7 @@ TEST_CASE(Manifest_ReadsTheSettingsAnExtensionDeclares) {
     CHECK(settings[3].defaultValue == "12.5" && settings[3].min == 8.0 && settings[3].max == 32.0);
     CHECK(result.manifest->Setting("size") == &settings[3]);
     CHECK(result.manifest->Setting("other") == nullptr);
-    CHECK(ampify::SettingNumberText(12) == "12");
+    CHECK(ampify::ShortestNumberText(12) == "12");
 }
 
 TEST_CASE(Manifest_RefusesSettingsThatDoNotHold) {

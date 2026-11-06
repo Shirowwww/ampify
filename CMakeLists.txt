@@ -1,28 +1,21 @@
 cmake_minimum_required(VERSION 3.20)
-project(Ampify VERSION 1.1.1 LANGUAGES C CXX)
-
-# The Ampify version is written in three places: here (ampify --version), src/core/kit_layout.hpp (installer, uninstall entry) and
-# src/core/script_extension.hpp (Ampify.version). A release with two different numbers would confuse `ampify update`, so the
-# configure step refuses to go on when they disagree.
-foreach(ampify_version_file src/core/kit_layout.hpp src/core/script_extension.hpp)
-    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/${ampify_version_file}" ampify_version_text)
-    if(NOT ampify_version_text MATCHES "(kKitVersion|kKernelVersion) = \"${PROJECT_VERSION}\"")
-        message(FATAL_ERROR "${ampify_version_file} does not carry the project version ${PROJECT_VERSION}: make them agree.")
-    endif()
-endforeach()
+# The release number lives in facts/release.json only; C++ reads it from the header cmake/facts.cmake writes.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/facts/release.json" ampify_release_json)
+string(JSON ampify_release_version GET "${ampify_release_json}" version)
+project(Ampify VERSION ${ampify_release_version} LANGUAGES C CXX)
+include(cmake/facts.cmake)
 
 # Properties > Details of the files people download: product, publisher, description and version. MSVC builds only,
 # the ones the release is made from.
 if(MSVC)
     enable_language(RC)
 endif()
-function(ampify_version_resource target description)
+# `file` names the binary in facts/release.json (launcher, kernel, setup, cli), which gives its file name.
+function(ampify_version_resource target file description)
+    get_filename_component(ampify_rc_name "${AMPIFY_FILE_${file}}" NAME_WE)
+    set_target_properties(${target} PROPERTIES OUTPUT_NAME "${ampify_rc_name}")
     if(NOT MSVC)
         return()
-    endif()
-    get_target_property(ampify_rc_name ${target} OUTPUT_NAME)
-    if(NOT ampify_rc_name)
-        set(ampify_rc_name ${target})
     endif()
     get_target_property(ampify_rc_type ${target} TYPE)
     if(ampify_rc_type STREQUAL "EXECUTABLE")
@@ -79,7 +72,7 @@ endif()
 #     another package's, so that parallel work does not touch the same lines;
 #   - a new target is declared below, and its list gets a name of the form AMPIFY_<TARGET>_SOURCES.
 # Lists: AMPIFY_QUICKJS_SOURCES, AMPIFY_CORE_SOURCES, AMPIFY_THEME_SOURCES,AMPIFY_ATMOS_SOURCES,
-# AMPIFY_WIN_SOURCES, AMPIFY_KERNEL_SOURCES, AMPIFY_UI_THREAD_TEST_SOURCES, AMPIFY_XAML_SOURCES, AMPIFY_LAUNCHER_SOURCES,
+# AMPIFY_WIN_SOURCES, AMPIFY_KERNEL_SOURCES, AMPIFY_XAML_SOURCES, AMPIFY_LAUNCHER_SOURCES,
 # AMPIFY_SETUP_SOURCES, AMPIFY_CLI_PORTABLE_SOURCES, AMPIFY_CLI_SOURCES, AMPIFY_TESTS_SOURCES, AMPIFY_TESTS_WIN_SOURCES.
 file(GLOB AMPIFY_SOURCE_LISTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/sources/*.cmake")
 list(SORT AMPIFY_SOURCE_LISTS)
@@ -112,6 +105,7 @@ endif()
 # Apple Music identity, injection policy, DRM guard, package watch, kit file layout, JSON, manifests,
 # the JavaScript runtime and the extension loader.
 add_library(ampify_core STATIC ${AMPIFY_CORE_SOURCES})
+target_include_directories(ampify_core PUBLIC "${AMPIFY_FACTS_INCLUDE}")
 target_compile_options(ampify_core PRIVATE ${AMPIFY_WARNINGS})
 target_link_libraries(ampify_core PUBLIC ampify_quickjs)
 # BCrypt decrypts Apple Music's library file (src/core/library/musicdb.cpp).
@@ -146,15 +140,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
 
     # Loaded into AppleMusic.exe and AMPLibraryAgent.exe by the launcher.
     add_library(ampify_kernel MODULE ${AMPIFY_KERNEL_SOURCES})
-    set_target_properties(ampify_kernel PROPERTIES PREFIX "" OUTPUT_NAME ampify_kernel)
     target_link_libraries(ampify_kernel PRIVATE ampify_core ampify_win atmos_leveler)
     target_compile_options(ampify_kernel PRIVATE ${AMPIFY_WARNINGS})
-    ampify_version_resource(ampify_kernel "Ampify kernel, loaded into Apple Music")
+    ampify_version_resource(ampify_kernel kernel "Ampify kernel, loaded into Apple Music")
 
-    # Checks the interface-thread hook with a real window. CI runs it beside ampify_tests.
-    add_executable(ampify_ui_thread_test ${AMPIFY_UI_THREAD_TEST_SOURCES})
-    target_link_libraries(ampify_ui_thread_test PRIVATE ampify_win)
-    target_compile_options(ampify_ui_thread_test PRIVATE ${AMPIFY_WARNINGS})
 
     if(AMPIFY_XAML)
         target_sources(ampify_kernel PRIVATE ${AMPIFY_XAML_SOURCES})
@@ -179,14 +168,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_executable(ampify_launcher WIN32 ${AMPIFY_LAUNCHER_SOURCES})
     target_link_libraries(ampify_launcher PRIVATE ampify_core ampify_win)
     target_compile_options(ampify_launcher PRIVATE ${AMPIFY_WARNINGS})
-    ampify_version_resource(ampify_launcher "Ampify launcher")
+    ampify_version_resource(ampify_launcher launcher "Ampify launcher")
 
     # Installs the kit and uninstalls it. The same file is copied into the install folder as the uninstaller.
     add_executable(ampify_setup WIN32 ${AMPIFY_SETUP_SOURCES})
-    set_target_properties(ampify_setup PROPERTIES OUTPUT_NAME ampify_setup)
     target_link_libraries(ampify_setup PRIVATE ampify_core ampify_win)
     target_compile_options(ampify_setup PRIVATE ${AMPIFY_WARNINGS})
-    ampify_version_resource(ampify_setup "Ampify setup and uninstaller")
+    ampify_version_resource(ampify_setup setup "Ampify setup and uninstaller")
 endif()
 
 # Portable part of the command line `ampify`: SHA-256, manifests, catalog, kit layout, backups, theme commands.
@@ -198,8 +186,7 @@ target_compile_options(ampify_cli_portable PRIVATE ${AMPIFY_WARNINGS})
 add_executable(ampify ${AMPIFY_CLI_SOURCES})
 target_link_libraries(ampify PRIVATE ampify_cli_portable ampify_theme ampify_core)
 target_compile_options(ampify PRIVATE ${AMPIFY_WARNINGS})
-target_compile_definitions(ampify PRIVATE AMPIFY_VERSION="${PROJECT_VERSION}")
-ampify_version_resource(ampify "Ampify command line")
+ampify_version_resource(ampify cli "Ampify command line")
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_link_libraries(ampify PRIVATE shell32 ampify_win)
 endif()

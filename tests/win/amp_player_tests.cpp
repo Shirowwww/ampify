@@ -21,6 +21,7 @@
 #include "../../src/win/player_bridge.hpp"
 #include "../../src/win/win_host.hpp"
 #include "../../src/win/winrt_abi.hpp"
+#include "../support.hpp"
 #include "../test.hpp"
 
 namespace {
@@ -1031,9 +1032,7 @@ TEST_CASE(PlayerBridge_WithoutApplesQueueTheCurrentTrackIsAllThereIs) {
 }
 
 TEST_CASE(WinHost_OffersTheQueueCapability) {
-    namespace fs = std::filesystem;
-    fs::path kit = fs::temp_directory_path() / "ampify-tests" / "win-host-queue";
-    fs::create_directories(kit);
+    ampify::test::ScratchDir kit("win-host-queue");
     ampify::Settings settings;
     std::ostringstream log;
     ampify::Journal journal(log, [] { return std::string("t"); });

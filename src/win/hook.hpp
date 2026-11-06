@@ -29,7 +29,7 @@ size_t HookImportEverywhere(const char* dll, const char* function, void* replace
 // entries were replaced now. Never undone: meant for hooks that stay for the life of the process.
 size_t HookImportFromNowOn(const char* dll, const char* function, void* replacement, void** original);
 
-// Full path of the module that holds `address`. Empty when there is none.
+// Full path of the module that holds `address`. Empty when there is none. Not under the hook lock: it asks the loader.
 std::string ModuleOf(const void* address);
 
 }  // namespace ampify::win

@@ -7,17 +7,13 @@
 #include <system_error>
 
 #include "../core/kit_layout.hpp"
+#include "../core/text_util.hpp"
 
 namespace ampify {
 
 namespace {
 
 constexpr std::array<std::string_view, 4> kKinds = {"extension", "theme", "app", "snippet"};
-
-bool IsBuiltinExtension(std::string_view id) {
-    return std::find(std::begin(kBuiltinExtensions), std::end(kBuiltinExtensions), id) !=
-           std::end(kBuiltinExtensions);
-}
 
 // Splits `extensions.<id>.enabled` into its kind and its id. Empty kind when the key has another shape.
 std::pair<std::string, std::string> ParseEnabledKey(const std::string& key) {
@@ -120,8 +116,9 @@ bool AppendReloadRequests(const KitLayout& kit, const std::vector<std::string>& 
 ActiveReport ComputeActive(const KitLayout& kit, const Settings& settings) {
     ActiveReport report;
 
-    for (std::string_view id : kBuiltinExtensions) {
-        if (IsEnabled(settings, "extension", id)) report.items.push_back({"extension", std::string(id), "builtin", ""});
+    for (const KitElement& element : kKitElements) {
+        if (!IsBuiltInExtension(element.id) || !IsEnabled(settings, "extension", element.id)) continue;
+        report.items.push_back({"extension", std::string(element.id), "builtin", ""});
     }
 
     std::string themeId = settings.GetString("theme.active", "");
@@ -150,7 +147,7 @@ ActiveReport ComputeActive(const KitLayout& kit, const Settings& settings) {
     for (const auto& [key, value] : settings.Values()) {
         auto [kind, id] = ParseEnabledKey(key);
         if (kind.empty() || !IsValidId(id) || !settings.GetBool(key, false)) continue;
-        if (kind == "extension" && IsBuiltinExtension(id)) continue;
+        if (kind == "extension" && IsBuiltInExtension(id)) continue;
         bool installed = std::any_of(report.items.begin(), report.items.end(),
                                      [&](const ActiveItem& item) { return item.kind == kind && item.id == id; });
         if (!installed && !std::filesystem::exists(kit.Element(kind, id))) {
@@ -178,21 +175,10 @@ bool WriteTextFile(const std::filesystem::path& file, const std::string& text, s
         return false;
     }
 
-    std::filesystem::path temporary = file;
-    temporary += ".tmp";
-    {
-        std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
-        out << text;
-        if (!out) {
-            error = "cannot write: " + file.string();
-            return false;
-        }
-    }
-    std::filesystem::rename(temporary, file, ec);
-    if (ec) {
-        std::filesystem::remove(temporary, ec);
-        error = "cannot replace: " + file.string();
-        return false;
+    switch (WriteFileAtomically(file, text)) {
+        case WriteResult::CannotWrite: error = "cannot write: " + file.string(); return false;
+        case WriteResult::CannotReplace: error = "cannot replace: " + file.string(); return false;
+        case WriteResult::Written: break;
     }
     return true;
 }

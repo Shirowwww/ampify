@@ -25,40 +25,55 @@ bool IsKitDataFolder(std::string_view path) {
 }
 
 namespace {
-// Ships, but waits for the user: it reloads songs on its own.
-constexpr std::string_view kPlaybackGuard = "extensions/playback-guard";
+
+const KitElement* FindKitElement(std::string_view folder, std::string_view id) {
+    for (const KitElement& element : kKitElements) {
+        if (element.folder == folder && element.id == id) return &element;
+    }
+    return nullptr;
+}
+
 }  // namespace
 
-std::vector<std::string_view> BundledElements() {
-    return {"apps/marketplace", "extensions/now-playing", "extensions/song-panel", kPlaybackGuard};
+std::vector<std::string> BundledElements() {
+    std::vector<std::string> bundled;
+    for (const KitElement& element : kKitElements) {
+        if (!element.builtIn) bundled.push_back(std::string(element.folder) + "/" + std::string(element.id));
+    }
+    return bundled;
 }
 
 bool IsBundledElement(std::string_view folder, std::string_view id) {
-    std::string wanted = std::string(folder) + "/" + std::string(id);
-    std::vector<std::string_view> bundled = BundledElements();
-    return std::find(bundled.begin(), bundled.end(), wanted) != bundled.end();
+    const KitElement* element = FindKitElement(folder, id);
+    return element != nullptr && !element->builtIn;
 }
 
 bool IsOnByDefault(std::string_view folder, std::string_view id) {
-    return IsBundledElement(folder, id) && std::string(folder) + "/" + std::string(id) != kPlaybackGuard;
+    const KitElement* element = FindKitElement(folder, id);
+    return element != nullptr && element->startsOn;
+}
+
+bool IsFirstParty(std::string_view id) {
+    return std::any_of(std::begin(kKitElements), std::end(kKitElements),
+                       [&](const KitElement& element) { return element.firstParty && element.id == id; });
 }
 
 std::vector<std::string> InstallBundledElements(const std::filesystem::path& package, const std::filesystem::path& kit) {
     namespace fs = std::filesystem;
     std::vector<std::string> failures;
-    for (std::string_view element : BundledElements()) {
+    for (const std::string& element : BundledElements()) {
         fs::path source = package / "examples" / fs::path(element);
         fs::path destination = kit / fs::path(element);
         std::error_code error;
         if (!fs::is_regular_file(source / "manifest.json", error)) {
-            failures.push_back(std::string(element) + ": not in the package");
+            failures.push_back(element + ": not in the package");
             continue;
         }
         // The old copy goes first, so a file the new version dropped does not stay behind.
         fs::remove_all(destination, error);
         if (!error) fs::create_directories(destination.parent_path(), error);
         if (!error) fs::copy(source, destination, fs::copy_options::recursive, error);
-        if (error) failures.push_back(std::string(element) + ": " + error.message());
+        if (error) failures.push_back(element + ": " + error.message());
     }
     return failures;
 }

@@ -15,11 +15,11 @@ public:
     using Stamp = std::function<std::string()>;
 
     // `out` must outlive the journal. The kernel opens it in append mode.
-    Journal(std::ostream& out, Stamp stamp);
+    Journal(std::ostream& out, Stamp stamp = &Journal::LocalTimeStamp);
 
     void Write(std::string_view message);
 
-    // Formats `HH:MM:SS.mmm` from the local clock. Used by default.
+    // Formats `HH:MM:SS.mmm` from the local clock. The default stamp.
     static std::string LocalTimeStamp();
 
 private:

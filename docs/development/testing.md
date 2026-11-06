@@ -11,13 +11,30 @@ workflow").
 | Job | What it does |
 |---|---|
 | Unit tests (Linux) | `ampify_tests`, then the Python and Node tests against the Linux `ampify` |
-| Unit tests (Windows, MSVC) | `ampify_tests` and `ampify_ui_thread_test` |
+| Unit tests (Windows, MSVC) | `ampify_tests` |
 | Build the release kit, Build the bench kit | The two MSVC kits with XAML, in parallel |
 | Bench (launch, safety, tools, ui) | The bench cases on four runners, each with its own Apple Music |
 
 A run takes about five minutes with a warm cache. The release build injects only on tested versions; the bench build
 (`AMPIFY_BENCH=ON`) accepts the version installed on the runner. Results are in the job summary and in an artifact
 (`report.md`, `results.json`, `winget.log`, `preparation.txt`, and per case the Ampify logs and screenshots).
+
+## Writing a unit test
+
+`tests/test.hpp` is the whole harness: `TEST_CASE`, `CHECK`, `CHECK_NEAR`, `REQUIRE` (reports and ends the case, for a
+precondition) and `SKIP(reason)` (ends the case as not run; the summary counts skips apart from passes). Everything
+else the cases share is in `tests/support.hpp`:
+
+| Piece | Use |
+|---|---|
+| `ScratchDir` | An empty folder under a per-run root (`%TEMP%\ampify-tests-<pid>`), removed with the object |
+| `ManifestSpec`, `ElementFolder`, `WriteElement` | An element folder with a manifest.json written from named fields |
+| `ElementFixture<H>` | Elements running against a host `H`, with the journal on a string |
+| `KernelFixture`, `KitFixture` | The loader with its host, hosts, settings and journal, over a kit folder |
+| `LanguageScope` | Sets the interface language and puts the previous one back |
+| `Sine`, `Stereo`, `Clicks`, `ToneWithClicks` | The test signals |
+
+A new required manifest field is one edit in `ManifestJson`, not one per test file.
 
 ## The bench
 
@@ -83,20 +100,19 @@ Register-Case -Id 'my-case' -Title 'Sentence that says what is checked' -Require
 Helpers in `bench/windows/lib/harness.ps1`: `Reset-KitState`, `Start-Launcher`, `Start-AppNormally`, `Wait-Journal`,
 `Test-JournalContains`, `Find-JournalMatch`, `Get-KernelState`, `Get-AppCrashEvents`, `Save-Screenshot`,
 `Close-AppleMusic`, `Set-SafeModeCount`, `Get-SafeModeCount`. UI Automation helpers in `bench/windows/lib/uia.ps1`:
-`Find-Element`, `Wait-ForElement`, `Invoke-Click`, `Set-Text`, `Send-Key`, `Get-TreeDump`, `Write-TreeDump`,
+`Find-Element`, `Invoke-Click`, `Set-Text`, `Send-Key`, `Get-TreeDump`, `Write-TreeDump`,
 `Show-AppleMusicWindow`.
 
 ### Signed-in bench
 
-`bench/windows/live/` holds cases that sign in to Apple Music, play music with the kernel and read real element names.
-They need a throwaway Apple account with a subscription, never a personal one, and no workflow ships for them.
-`setup-audio.ps1` installs a virtual audio output (VB-CABLE, or Scream), the sign-in script signs in through UI
-Automation, then `run-bench.ps1 -CasesDir live\cases` checks the audio output, dumps the interface tree, and plays a
-stereo and a Dolby Atmos track with the leveler on.
+`bench/windows/live/` holds cases that play music with the kernel in a signed-in Apple Music and read real element
+names. They need an Apple account with a subscription, and no workflow runs them: `scripts/listen-test.ps1` runs them
+on a signed-in PC. `run-bench.ps1 -CasesDir live\cases` checks the audio output (a virtual one, VB-CABLE or Scream, on
+a machine without a sound card), dumps the interface tree, and plays a stereo and a Dolby Atmos track with the leveler
+on.
 
 Things learned the hard way:
 
-- A cached session rarely survives a new runner, and each runner can count as a new device on the account.
 - Find Settings entries and dialog buttons by AutomationId, which does not change with the language
   (`PlaybackNavigationViewItem`, `PrimaryButton`, `CloseButton`). Ctrl+, opens Settings.
 - UI Automation's Invoke throws on a disabled element. The transport controls stay disabled until a track is loaded.

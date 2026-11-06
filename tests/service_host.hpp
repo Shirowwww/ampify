@@ -25,6 +25,7 @@
 #include "../src/core/output_files.hpp"
 #include "../src/core/script_extension.hpp"
 #include "fake_host.hpp"
+#include "support.hpp"
 
 namespace ampify::test {
 
@@ -150,32 +151,11 @@ struct ServiceHost : FakeHost, HttpPostHost, BrowserHost, DiscordHost, TrayHost,
 
 // Runs elements against a host of type H (ServiceHost, or a plain FakeHost to check the hosts without a service).
 template <class H = ServiceHost>
-struct ServiceFixture {
-    H host;
-    std::ostringstream out;
-    Journal journal{out, [] { return std::string("t"); }};
-
+struct ServiceFixture : ElementFixture<H> {
     std::unique_ptr<ScriptExtension> Make(const std::string& id, const std::string& main,
                                           const std::string& permissions = "") {
-        namespace fs = std::filesystem;
-        fs::path dir = fs::temp_directory_path() / "ampify-tests" / ("service-" + id);
-        fs::remove_all(dir);
-        fs::create_directories(dir);
-        const std::string manifest =
-            R"({"id":")" + id + R"(","name":"Demo","version":"1.0.0","kind":"extension","author":"Shirowwww",)" +
-            R"("description":"Test.","kitApi":"1.0","main":"main.js","permissions":[)" + permissions + "]}";
-        std::ofstream(dir / "manifest.json") << manifest;
-        std::ofstream(dir / "main.js") << main;
-        ManifestResult result = ParseManifest(manifest, id, 1, [](const std::string&) { return true; });
-        if (!result.manifest) {
-            std::string reasons;
-            for (const std::string& error : result.errors) reasons += error + "; ";
-            throw std::runtime_error("test manifest refused: " + reasons);
-        }
-        return std::make_unique<ScriptExtension>(*result.manifest, dir, host, journal);
+        return ElementFixture<H>::Make({.id = id, .permissions = permissions}, main);
     }
-
-    bool Logged(const std::string& text) const { return out.str().find(text) != std::string::npos; }
 };
 
 }  // namespace ampify::test

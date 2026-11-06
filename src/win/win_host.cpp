@@ -301,16 +301,7 @@ bool WinHost::WriteStorage(const std::string& elementId, const std::string& json
     std::error_code error;
     std::filesystem::create_directories(m_kit / "storage", error);
     std::filesystem::path target = m_kit / "storage" / (elementId + ".json");
-    std::filesystem::path temporary = target;
-    temporary += ".tmp";
-    {
-        std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
-        if (!file) return false;
-        file << json;
-    }
-    // Replace the file in one step, so that a crash mid-write keeps the previous storage.
-    std::filesystem::rename(temporary, target, error);
-    return !error;
+    return WriteFileAtomically(target, json) == WriteResult::Written;
 }
 
 // Ampify.player: Apple's player in AppleMusic.exe, the Windows media controls (SMTC), then the media keys. See
@@ -323,7 +314,7 @@ void WinHost::SetGainDb(const std::string& elementId, double db) {
     // Only AMPLibraryAgent.exe renders the audio, so only there does the gain reach the samples.
     if (m_process != "engine") {
         static bool noticed = false;
-        if (!noticed) m_journal.Write("audio gain: applied only in AMPLibraryAgent.exe, ignored here");
+        if (!noticed) m_journal.Write("audio gain: applied only in " + std::string(kLibraryAgentImage) + ", ignored here");
         noticed = true;
         return;
     }

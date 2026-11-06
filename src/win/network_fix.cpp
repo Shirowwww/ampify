@@ -20,6 +20,8 @@
 
 namespace ampify::win {
 
+static_assert(kFamilyIpv4 == AF_INET && kFamilyIpv6 == AF_INET6);
+
 namespace {
 
 using GetHostByName = hostent*(WSAAPI*)(const char*);
@@ -106,11 +108,11 @@ bool PutIpv4First(Info* list) {
         nodes.push_back(node);
         families.push_back(node->ai_family);
     }
-    std::vector<size_t> order = Ipv4FirstOrder(families);
-    if (order.empty()) return false;
+    std::optional<std::vector<size_t>> order = Ipv4FirstOrder(families);
+    if (!order) return false;
     std::vector<Address<Info>> addresses;
     for (Info* node : nodes) addresses.push_back(Take(node));
-    for (size_t i = 0; i < nodes.size(); ++i) Put(nodes[i], addresses[order[i]]);
+    for (size_t i = 0; i < nodes.size(); ++i) Put(nodes[i], addresses[(*order)[i]]);
     return true;
 }
 

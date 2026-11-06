@@ -13,6 +13,13 @@ namespace ampify {
 
 namespace {
 
+// The file was written in text mode, so Windows gave it CRLF lines; the bytes stay the same.
+#ifdef _WIN32
+constexpr const char* kLineEnd = "\r\n";
+#else
+constexpr const char* kLineEnd = "\n";
+#endif
+
 }  // namespace
 
 bool Settings::Load(const std::string& path) {
@@ -43,25 +50,9 @@ bool Settings::Load(const std::string& path) {
 }
 
 bool Settings::Save(const std::string& path) const {
-    std::filesystem::path target(path);
-    std::filesystem::path temporary = target;
-    temporary += ".tmp";
-
-    {
-        std::ofstream out(temporary, std::ios::trunc);
-        if (!out) return false;
-        out << "# Ampify settings. Edit by hand if you like.\n";
-        for (const auto& [key, value] : m_values) out << key << " = " << value << "\n";
-        if (!out) return false;
-    }
-
-    std::error_code error;
-    std::filesystem::rename(temporary, target, error);
-    if (error) {
-        std::filesystem::remove(temporary, error);
-        return false;
-    }
-    return true;
+    std::string text = std::string("# Ampify settings. Edit by hand if you like.") + kLineEnd;
+    for (const auto& [key, value] : m_values) text += key + " = " + value + kLineEnd;
+    return WriteFileAtomically(std::filesystem::path(path), text) == WriteResult::Written;
 }
 
 std::optional<std::string> Settings::Get(const std::string& key) const {

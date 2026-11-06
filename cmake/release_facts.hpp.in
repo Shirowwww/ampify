@@ -1,0 +1,58 @@
+#pragma once
+
+// Made by CMake (cmake/facts.cmake) from facts/release.json: edit that file, not this one.
+
+#include <string_view>
+
+namespace ampify {
+
+// The release, as `ampify --version`, Ampify.version and the uninstall entry show it.
+inline constexpr std::string_view kKitVersion = "@PROJECT_VERSION@";
+// The extension API, as Ampify.kitApi; a manifest's kitApi must have the same major number.
+inline constexpr std::string_view kKitApi = "@AMPIFY_KIT_API@";
+inline constexpr int kKitApiMajor = @AMPIFY_KIT_API_MAJOR@;
+
+// Folder name under %LOCALAPPDATA%\Programs (the installed kit) and under %USERPROFILE% (the user's data).
+inline constexpr std::string_view kKitFolderName = "@AMPIFY_KIT_FOLDER@";
+
+// The binaries of the kit. The launcher loads the kernel from its own folder, the installer copies itself there as
+// the uninstaller, and the kernel runs the command line beside it for the Marketplace page.
+inline constexpr std::string_view kLauncherFile = "@AMPIFY_FILE_launcher@";
+inline constexpr std::string_view kKernelFile = "@AMPIFY_FILE_kernel@";
+inline constexpr std::string_view kSetupFile = "@AMPIFY_FILE_setup@";
+inline constexpr std::string_view kCliFile = "@AMPIFY_FILE_cli@";
+
+// A release's assets: <prefix><version><suffix>, and the checksums of that zip.
+inline constexpr std::string_view kPackagePrefix = "@AMPIFY_PACKAGE_prefix@";
+inline constexpr std::string_view kPackageSuffix = "@AMPIFY_PACKAGE_suffix@";
+inline constexpr std::string_view kChecksumsFile = "@AMPIFY_PACKAGE_checksums@";
+
+// An element Ampify ships. A built-in one lives in the kernel: no folder, no manifest, only its settings key. A
+// first-party one may hold the permissions reserved for Ampify's own elements.
+struct KitElement {
+    std::string_view kind;    // "app" or "extension"
+    std::string_view folder;  // "apps" or "extensions"
+    std::string_view id;
+    bool startsOn;
+    bool firstParty;
+    bool builtIn;
+};
+
+inline constexpr KitElement kKitElements[] = {
+@AMPIFY_KIT_ELEMENTS@};
+
+// The languages Ampify speaks besides English, the fallback.
+inline constexpr std::string_view kTranslationLanguages[] = {@AMPIFY_LANGUAGES@};
+inline constexpr std::string_view kTranslationLanguageList = "@AMPIFY_LANGUAGE_LINE@";
+// Those that write 0,5 rather than 0.5.
+inline constexpr std::string_view kDecimalCommaLanguages[] = {@AMPIFY_DECIMAL_COMMA@};
+
+inline constexpr std::string_view kProjectOwner = "@AMPIFY_PROJECT_owner@";
+inline constexpr std::string_view kProjectRepository = "@AMPIFY_PROJECT_repository@";
+inline constexpr std::string_view kCatalogRepository = "@AMPIFY_PROJECT_catalogRepository@";
+// GitHub's releases of kProjectRepository: /latest, or /tags/v<version>.
+inline constexpr std::string_view kReleaseApiUrl = "@AMPIFY_PROJECT_releaseApi@";
+inline constexpr std::string_view kDefaultCatalogUrl = "@AMPIFY_PROJECT_catalogUrl@";
+inline constexpr std::string_view kProjectSite = "@AMPIFY_PROJECT_site@";
+
+}  // namespace ampify

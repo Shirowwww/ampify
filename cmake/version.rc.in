@@ -17,15 +17,15 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-            VALUE "CompanyName", "Shirowwww"
+            VALUE "CompanyName", "@AMPIFY_PROJECT_OWNER@"
             VALUE "FileDescription", "@AMPIFY_RC_DESCRIPTION@"
             VALUE "FileVersion", "@PROJECT_VERSION@"
             VALUE "InternalName", "@AMPIFY_RC_NAME@"
-            VALUE "LegalCopyright", "Copyright (C) 2026 Shirowwww"
+            VALUE "LegalCopyright", "Copyright (C) 2026 @AMPIFY_PROJECT_OWNER@"
             VALUE "OriginalFilename", "@AMPIFY_RC_FILE@"
             VALUE "ProductName", "Ampify"
             VALUE "ProductVersion", "@PROJECT_VERSION@"
-            VALUE "Comments", "https://github.com/Shirowwww/ampify"
+            VALUE "Comments", "@AMPIFY_PROJECT_PAGE@"
         END
     END
     BLOCK "VarFileInfo"
