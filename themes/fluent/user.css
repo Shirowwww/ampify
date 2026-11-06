@@ -40,6 +40,24 @@
 
 @import "ampify:floating-panels";
 
+/* The bar-position setting: on the material at the top (the default), or along the bottom of the window, where
+   Windows' Media Player keeps its controls. The bar stays on the material, without a panel of its own. */
+@setting bar-position = Bottom {
+    :root {
+        --bar-room: calc(72 + 6);
+    }
+
+    @import "ampify:bottom-bar";
+}
+@setting bar-position = Centred {
+    :root {
+        --bar-room: calc(72 + 6);
+    }
+
+    @import "ampify:bottom-bar";
+    @import "ampify:centre-bar";
+}
+
 /* ---- The window ------------------------------------------------------------------------------------------------------ */
 
 /* The sidebar stands on the window's material, as Windows' navigation panes do: no panel of its own. */

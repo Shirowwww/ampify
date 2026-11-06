@@ -19,7 +19,13 @@
     horizontal-alignment: center;
     vertical-alignment: center;
     corner-radius: 999px;
-    animation: spin var(--turn) linear infinite playing;
+}
+
+/* On by default; off, the record holds still: a round artwork, like Spicetify's Circular Album Art. */
+@setting turn {
+    .lcd-artwork {
+        animation: spin var(--turn) linear infinite playing;
+    }
 }
 
 /* Apple Music gives the artwork, the area behind it and the grid inside a fixed width of 54, as large as its slot.
@@ -36,9 +42,11 @@
     corner-radius: 999px;
 }
 
-/* The grooves, the rim and the label, over the artwork. */
-.lcd-artwork::after {
-    content: url("images/record.png") fill;
+/* The grooves, the rim and the label, over the artwork; off, the cover shows whole in its circle. */
+@setting grooves {
+    .lcd-artwork::after {
+        content: url("images/record.png") fill;
+    }
 }
 
 @keyframes spin {

@@ -14,10 +14,10 @@
     --panel-radius: var(--setting-panel-radius);
     --radius-box: calc(var(--setting-panel-radius) * 2 / 3);
     --radius-small: calc(var(--setting-panel-radius) / 2);
-    --gap: 10;
+    --gap: var(--setting-gap);
     --compact-pane: 48;
     /* No bar at the top: the pages start one gap down, and keep room for the back arrow above their first line. */
-    --content-top: 10;
+    --content-top: var(--setting-gap);
     --page-top: 48;
     --bar-height: 76;
     --bar-room: calc(var(--bar-height) + var(--gap) * 2);

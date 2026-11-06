@@ -1,0 +1,18 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "dark-lyrics",
+  "name": "Dark lyrics",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "The lyrics and Up Next pane on a dark background with light text, plain or from the artwork's colours, on top of any theme, like Spicetify's Dark Lyrics and Pretty Lyrics.",
+  "translations": {"fr": {"name": "Paroles sur fond sombre", "description": "Le panneau des paroles et d'À suivre sur un fond sombre au texte clair, uni ou tiré des couleurs de la pochette, par-dessus n'importe quel thème, comme Dark Lyrics et Pretty Lyrics de Spicetify.", "settings": {"style": "Fond"}, "options": {"Dark": "Sombre", "Artwork": "Pochette"}}, "de": {"name": "Dunkle Liedtexte", "description": "Der Bereich für Liedtexte und „Als Nächstes“ auf dunklem Hintergrund mit heller Schrift, einfarbig oder aus den Farben des Covers, mit jedem Design, wie Dark Lyrics und Pretty Lyrics von Spicetify.", "settings": {"style": "Hintergrund"}, "options": {"Dark": "Dunkel", "Artwork": "Cover"}}, "es": {"name": "Letras sobre fondo oscuro", "description": "El panel de la letra y de A continuación sobre un fondo oscuro con texto claro, liso o con los colores de la portada, con cualquier tema, como Dark Lyrics y Pretty Lyrics de Spicetify.", "settings": {"style": "Fondo"}, "options": {"Dark": "Oscuro", "Artwork": "Portada"}}, "pt": {"name": "Letras em fundo escuro", "description": "O painel da letra e de A seguir em um fundo escuro com texto claro, liso ou com as cores da capa, com qualquer tema, como Dark Lyrics e Pretty Lyrics do Spicetify.", "settings": {"style": "Fundo"}, "options": {"Dark": "Escuro", "Artwork": "Capa"}}, "ru": {"name": "Тёмный текст песни", "description": "Панель текста песни и «Далее» на тёмном фоне со светлым текстом, однотонном или из цветов обложки, поверх любой темы, как Dark Lyrics и Pretty Lyrics в Spicetify.", "settings": {"style": "Фон"}, "options": {"Dark": "Тёмный", "Artwork": "Обложка"}}, "ja": {"name": "ダーク歌詞", "description": "歌詞と「次はこちら」のパネルを、明るい文字の暗い背景にします。単色かカバーの色から選べます。Spicetify の Dark Lyrics や Pretty Lyrics のように、どのテーマにも重ねられます。", "settings": {"style": "背景"}, "options": {"Dark": "ダーク", "Artwork": "カバー"}}, "zh": {"name": "深色歌词", "description": "让歌词和待播清单面板使用深色背景和浅色文字，可选纯色或封面的颜色，可叠加在任何主题上，就像 Spicetify 的 Dark Lyrics 和 Pretty Lyrics。", "settings": {"style": "背景"}, "options": {"Dark": "深色", "Artwork": "封面"}}},
+  "kitApi": "1.0",
+  "tags": [
+    "lyrics",
+    "dark"
+  ],
+  "settings": [
+    {"key": "style", "label": "Background", "type": "choice", "options": ["Dark", "Artwork"], "default": "Dark"}
+  ]
+}

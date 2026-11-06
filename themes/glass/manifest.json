@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "glass",
   "name": "Glass",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Apple's Liquid Glass: the song's artwork fills the window, and the sidebar, the pages and a floating capsule for the playback bar are clear panes over it, tinted by the music, with a bright rim of light.",
@@ -16,13 +16,24 @@
         "frost": "Opacité du verre (0,2 à 0,9)",
         "hover-grow": "Boutons et cartes qui se soulèvent au survol",
         "moving-artwork": "Pochette animée qui tourne en fond",
-        "bar-position": "Position de la barre de lecture"
+        "bar-position": "Position de la barre de lecture",
+        "gap": "Espace autour des panneaux"
       },
       "options": {
         "Artwork": "Pochette",
         "Neutral": "Neutre",
-        "Bottom": "En bas", "Centred": "En bas, centrée",
+        "Bottom": "En bas",
+        "Centred": "En bas, centrée",
         "Top": "En haut"
+      },
+      "groups": {
+        "Colours": "Couleurs",
+        "Details": "Détails",
+        "Layout": "Disposition",
+        "Shapes": "Formes"
+      },
+      "settingDescriptions": {
+        "moving-artwork": "Coupée, elle demande moins à la carte graphique."
       }
     },
     "de": {
@@ -34,13 +45,24 @@
         "frost": "Deckkraft des Glases (0,2 bis 0,9)",
         "hover-grow": "Tasten und Karten heben sich beim Darüberfahren",
         "moving-artwork": "Cover dreht sich langsam im Hintergrund",
-        "bar-position": "Position der Wiedergabeleiste"
+        "bar-position": "Position der Wiedergabeleiste",
+        "gap": "Abstand um die Panels"
       },
       "options": {
         "Artwork": "Cover",
         "Neutral": "Neutral",
-        "Bottom": "Unten", "Centred": "Unten, zentriert",
+        "Bottom": "Unten",
+        "Centred": "Unten, zentriert",
         "Top": "Oben"
+      },
+      "groups": {
+        "Colours": "Farben",
+        "Details": "Details",
+        "Layout": "Layout",
+        "Shapes": "Formen"
+      },
+      "settingDescriptions": {
+        "moving-artwork": "Aus entlastet es die Grafikkarte."
       }
     },
     "es": {
@@ -52,13 +74,24 @@
         "frost": "Opacidad del cristal (0,2 a 0,9)",
         "hover-grow": "Botones y tarjetas que se elevan al pasar el puntero",
         "moving-artwork": "Portada animada que gira al fondo",
-        "bar-position": "Posición de la barra de reproducción"
+        "bar-position": "Posición de la barra de reproducción",
+        "gap": "Espacio alrededor de los paneles"
       },
       "options": {
         "Artwork": "Portada",
         "Neutral": "Neutro",
-        "Bottom": "Abajo", "Centred": "Abajo, centrada",
+        "Bottom": "Abajo",
+        "Centred": "Abajo, centrada",
         "Top": "Arriba"
+      },
+      "groups": {
+        "Colours": "Colores",
+        "Details": "Detalles",
+        "Layout": "Disposición",
+        "Shapes": "Formas"
+      },
+      "settingDescriptions": {
+        "moving-artwork": "Desactivada, exige menos a la tarjeta gráfica."
       }
     },
     "pt": {
@@ -70,13 +103,24 @@
         "frost": "Opacidade do vidro (0,2 a 0,9)",
         "hover-grow": "Botões e cartões que se erguem ao passar o ponteiro",
         "moving-artwork": "Capa animada girando ao fundo",
-        "bar-position": "Posição da barra de reprodução"
+        "bar-position": "Posição da barra de reprodução",
+        "gap": "Espaço ao redor dos painéis"
       },
       "options": {
         "Artwork": "Capa",
         "Neutral": "Neutro",
-        "Bottom": "Embaixo", "Centred": "Embaixo, centralizada",
+        "Bottom": "Embaixo",
+        "Centred": "Embaixo, centralizada",
         "Top": "No topo"
+      },
+      "groups": {
+        "Colours": "Cores",
+        "Details": "Detalhes",
+        "Layout": "Layout",
+        "Shapes": "Formas"
+      },
+      "settingDescriptions": {
+        "moving-artwork": "Desligada, exige menos da placa de vídeo."
       }
     },
     "ru": {
@@ -88,13 +132,24 @@
         "frost": "Непрозрачность стекла (от 0,2 до 0,9)",
         "hover-grow": "Кнопки и карточки приподнимаются при наведении",
         "moving-artwork": "Обложка медленно вращается на фоне",
-        "bar-position": "Положение панели воспроизведения"
+        "bar-position": "Положение панели воспроизведения",
+        "gap": "Отступы вокруг панелей"
       },
       "options": {
         "Artwork": "Обложка",
         "Neutral": "Нейтральный",
-        "Bottom": "Внизу", "Centred": "Снизу, по центру",
+        "Bottom": "Внизу",
+        "Centred": "Снизу, по центру",
         "Top": "Вверху"
+      },
+      "groups": {
+        "Colours": "Цвета",
+        "Details": "Детали",
+        "Layout": "Раскладка",
+        "Shapes": "Формы"
+      },
+      "settingDescriptions": {
+        "moving-artwork": "Если выключить, видеокарта нагружается меньше."
       }
     },
     "ja": {
@@ -106,13 +161,24 @@
         "frost": "ガラスの不透明度（0.2〜0.9）",
         "hover-grow": "ポインターを合わせたボタンとカードが浮き上がる",
         "moving-artwork": "背景でアートワークがゆっくり回る",
-        "bar-position": "再生バーの位置"
+        "bar-position": "再生バーの位置",
+        "gap": "パネルの周りの余白"
       },
       "options": {
         "Artwork": "アートワーク",
         "Neutral": "ニュートラル",
-        "Bottom": "下", "Centred": "下、中央",
+        "Bottom": "下",
+        "Centred": "下、中央",
         "Top": "上"
+      },
+      "groups": {
+        "Colours": "色",
+        "Details": "細部",
+        "Layout": "レイアウト",
+        "Shapes": "形"
+      },
+      "settingDescriptions": {
+        "moving-artwork": "オフにするとグラフィックスカードの負荷が減ります。"
       }
     },
     "zh": {
@@ -124,13 +190,24 @@
         "frost": "玻璃不透明度（0.2 至 0.9）",
         "hover-grow": "鼠标悬停时按钮和卡片浮起",
         "moving-artwork": "封面在背景中缓缓旋转",
-        "bar-position": "播放栏位置"
+        "bar-position": "播放栏位置",
+        "gap": "面板周围的间距"
       },
       "options": {
         "Artwork": "封面",
         "Neutral": "中性",
-        "Bottom": "底部", "Centred": "底部，居中",
+        "Bottom": "底部",
+        "Centred": "底部，居中",
         "Top": "顶部"
+      },
+      "groups": {
+        "Colours": "颜色",
+        "Details": "细节",
+        "Layout": "布局",
+        "Shapes": "形状"
+      },
+      "settingDescriptions": {
+        "moving-artwork": "关闭后可减轻显卡负担。"
       }
     }
   },
@@ -154,7 +231,8 @@
         "Artwork",
         "Neutral"
       ],
-      "default": "Artwork"
+      "default": "Artwork",
+      "group": "Colours"
     },
     {
       "key": "panel-radius",
@@ -162,7 +240,8 @@
       "type": "number",
       "min": 8,
       "max": 36,
-      "default": 24
+      "default": 24,
+      "group": "Shapes"
     },
     {
       "key": "frost",
@@ -170,19 +249,23 @@
       "type": "number",
       "min": 0.2,
       "max": 0.9,
-      "default": 0.72
+      "default": 0.72,
+      "group": "Colours"
     },
     {
       "key": "hover-grow",
       "label": "Controls and cards lift under the pointer",
       "type": "toggle",
-      "default": true
+      "default": true,
+      "group": "Details"
     },
     {
       "key": "moving-artwork",
       "label": "Artwork turning slowly in the background",
       "type": "toggle",
-      "default": true
+      "default": true,
+      "group": "Details",
+      "description": "Off, it asks less of the graphics card."
     },
     {
       "key": "bar-position",
@@ -190,9 +273,20 @@
       "type": "choice",
       "options": [
         "Bottom",
-        "Top"
-      , "Centred"],
-      "default": "Bottom"
+        "Top",
+        "Centred"
+      ],
+      "default": "Bottom",
+      "group": "Layout"
+    },
+    {
+      "key": "gap",
+      "label": "Space around the panes",
+      "type": "number",
+      "min": 0,
+      "max": 24,
+      "default": 14,
+      "group": "Shapes"
     }
   ]
 }

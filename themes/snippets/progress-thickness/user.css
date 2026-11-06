@@ -1,8 +1,15 @@
 /* Progress line thickness: the progress line of the display, thinner or thicker than Apple's 3 pixels, with round ends,
-   like Spicetify's thin and thick bar snippets. The line stays inside the display's room for it (6 pixels). */
+   like Spicetify's thin and thick bar snippets. The line stays inside the display's room for it (6 pixels). The volume
+   slider, in its flyout, takes a thickness of its own: 4 pixels is WinUI's, the look Apple Music ships with. */
 
 .scrubber Rectangle#HorizontalTrackRect,
 .scrubber Rectangle#HorizontalDecreaseRect {
     height: var(--setting-thickness);
     corner-radius: calc(var(--setting-thickness) * 0.5);
+}
+
+.volume-slider Rectangle#HorizontalTrackRect,
+.volume-slider Rectangle#HorizontalDecreaseRect {
+    height: var(--setting-volume);
+    corner-radius: calc(var(--setting-volume) * 0.5);
 }

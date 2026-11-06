@@ -118,7 +118,20 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Centred lyrics | `centred-lyrics`: the lines and the static text sit in the middle of the panel | Partial: the line being sung keeps Apple's own fade, checked by tests only |
 | Bigger album artwork | `large-album-artwork`: a size setting, 120 to 360 pixels, on the album or playlist header | Partial: checked by tests only, not on screen |
 | Hover-revealed row actions | `hover-row-actions`: favourite, add, download and reaction buttons fade in under the pointer | Partial: checked by tests only, not on screen |
+| Hide the lyrics, download, queue and other buttons | `hide-buttons`: a switch each for lyrics, Up Next, AirPlay, volume and download. Apple Music has no full-screen or mini player button of its own in the bar; Ampify's Now Playing button goes with its extension | Partial: checked by tests only, not on screen |
+| Hide the profile name, the playing GIF, the playlist cover, the top gradient | `declutter` settings: account name, moving bars of the song playing, cover of the album or playlist header, backdrop and video behind pages | Partial: checked by tests only, not on screen |
+| Thicker or rounded volume bar | `progress-thickness`: a volume slider thickness from 2 to 10 pixels, round ends | Partial: checked by tests only, not on screen |
+| Dark Lyrics, Pretty Lyrics | `dark-lyrics`: the lyrics and Up Next pane dark with light text, plain or from the artwork's colours | Partial: checked by tests only, not on screen |
+| Dynamic search bar | `hover-search`: the search box fades out until the pointer reaches it, in the sidebar or the top bar | Partial: checked by tests only, not on screen |
+| Full screen: hide "playing from" and "next up" | Apple's player has no such cards; `minimal-fullscreen` hides its title and artist, times or lyrics and shows its buttons under the pointer only | Partial: checked by tests only, not on screen |
+| Circular album art that does not turn | `spinning-artwork` with "Turn" and "Grooves" off | Partial: checked by tests only, not on screen |
+| Sonic, Pokémon, Kirby and other mascots | `progress-mascot` has Ampify's own drawings (a comet, a note, a heart, a cat) and a rainbow trail; other characters belong to their owners | Done |
 | Hide more shelves on Home and New | Missing: Apple's shelves have no names of their own, so a plain hide would empty the page | Missing |
+| Hide the play count | The Songs page's columns have no stable name yet; one needs reading with the inspector there | Missing |
+| Remove the top spacing | Apple's 64 at the top of a page are the room under its own playback bar; the layouts already bring them to `--page-top` | Missing |
+| Left-aligned heart, sidebar on the right, unplayable songs in red | Apple's lists resist reordering; no `PanePlacement` property; no state for a row that cannot play | Missing |
+| Smooth progress bar, duotone artwork, pointer cursor | Transitions cover `transform`, `opacity` and `background` only; no image filter or cursor in XAML | Missing |
+| Friend activity, Connect bar, DJ, podcasts, audiobooks, episodes, Liked Songs, folders, custom app icons, forward button, fixes for Beautiful Lyrics and Listen Together | Spotify's own parts: Apple Music has none of them | Not applicable |
 
 ## Extensions (JavaScript API)
 

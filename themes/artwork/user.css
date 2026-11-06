@@ -45,15 +45,63 @@
     backdrop: var(--glass-light);
 }
 
-/* The bar stops before the window's buttons, so it needs no strip to keep them readable. */
 .playbar {
     backdrop: var(--glass);
     corner-radius: var(--panel-radius);
-    margin: var(--gap) 148 0 calc(var(--gap) * 2);
 }
 
-.caption-buttons-cover {
-    visibility: collapsed;
+/* The bar-position setting. At the top (the default), the bar stops before the window's buttons, so it needs no strip
+   to keep them readable. */
+@setting bar-position = Top {
+    .playbar {
+        margin: var(--gap) 148 0 calc(var(--gap) * 2);
+    }
+
+    .caption-buttons-cover {
+        visibility: collapsed;
+    }
+}
+
+/* At the bottom, a third panel a gap above the window's edge, from the sidebar's edge to the window's right. */
+@setting bar-position = Bottom {
+    :root {
+        --bar-height: 72;
+        --bar-room: calc(72 + var(--setting-gap) * 2);
+    }
+
+    @import "ampify:bottom-bar";
+
+    .playbar {
+        margin: 0 var(--gap) var(--gap) calc(var(--gap) - 290);
+    }
+}
+@setting bar-position = Centred {
+    :root {
+        --bar-height: 72;
+        --bar-room: calc(72 + var(--setting-gap) * 2);
+    }
+
+    @import "ampify:bottom-bar";
+    @import "ampify:centre-bar";
+
+    .playbar {
+        margin: 0 var(--gap) var(--gap) calc(var(--gap) - 290);
+    }
+}
+
+/* Folded at 1324 pixels and less, the page column starts at the column of icons. */
+@media (max-width: 1324px) {
+    @setting bar-position = Bottom {
+        .playbar {
+            margin: 0 var(--gap) var(--gap) calc(var(--gap) - 48);
+        }
+    }
+
+    @setting bar-position = Centred {
+        .playbar {
+            margin: 0 var(--gap) var(--gap) calc(var(--gap) - 48);
+        }
+    }
 }
 
 .playbar-toggles {

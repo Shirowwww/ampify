@@ -14,14 +14,14 @@
     --band-background: #0DFFFFFF;
     --raised: #1AFFFFFF;
     --hover: #24FFFFFF;
-    --accent: #FFF2C14E;
+    --accent: $AccentFillColorDefaultBrush;
     --bar-height: 76;
     --bar-room: calc(76 + var(--setting-gap));
 }
 
 @setting accent = Artwork {
     :root {
-        --accent: var(--art-2, #FFF2C14E);
+        --accent: var(--art-2, $AccentFillColorDefaultBrush);
     }
 }
 

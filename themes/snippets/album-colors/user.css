@@ -15,6 +15,20 @@
     }
 }
 
+/* The strength setting: a fainter wash under the header. It comes before the Page reach, which keeps its own colours:
+   a faint wash under light text would not read on a light theme. */
+@setting strength = Medium {
+    .list-page {
+        background: linear-gradient(to bottom, #D9var(--page-art-3-hex, 000000) 0%, #99var(--page-art-3-hex, 000000) 35%, #00var(--page-art-3-hex, 000000) 75%);
+    }
+}
+
+@setting strength = Soft {
+    .list-page {
+        background: linear-gradient(to bottom, #B3var(--page-art-3-hex, 000000) 0%, #73var(--page-art-3-hex, 000000) 35%, #00var(--page-art-3-hex, 000000) 75%);
+    }
+}
+
 @setting reach = Page {
     .list-page {
         color-scheme: dark;

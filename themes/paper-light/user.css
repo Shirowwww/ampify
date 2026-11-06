@@ -10,8 +10,16 @@
     --panel-radius: 0px;
     --gap: 0;
     --line: $ControlStrokeColorDefaultBrush;
-    --font-title: Georgia;
+    --title-face: Georgia;
+    --font-title: var(--title-face);
     --font-title-weight: 400;
+}
+
+/* The title-face setting: Windows' own face for the titles, for those who find the serif hard to read on screen. */
+@setting title-face = Sans {
+    :root {
+        --title-face: "Segoe UI Variable Display";
+    }
 }
 
 @import "ampify:floating-panels";
@@ -37,19 +45,19 @@
 /* ---- Type: serif titles, quiet small captions --------------------------------------------------------------------- */
 
 .page-title {
-    font-family: Georgia;
+    font-family: var(--title-face);
     font-weight: 400;
     font-size: 115%;
 }
 
 .shelf-title,
 .section-header {
-    font-family: Georgia;
+    font-family: var(--title-face);
     font-weight: 400;
 }
 
 .app-name {
-    font-family: Georgia;
+    font-family: var(--title-face);
     font-weight: 400;
 }
 
@@ -67,7 +75,7 @@
 }
 
 .track-title {
-    font-family: Georgia;
+    font-family: var(--title-face);
 }
 
 .play-button > Grid#Root {

@@ -56,3 +56,39 @@
         opacity: 0;
     }
 }
+
+/* Off unless chosen: the account name at the bottom of the sidebar, out of screenshots. */
+@setting account-name {
+    .account-name {
+        visibility: collapsed;
+    }
+}
+
+/* Off unless chosen: the moving bars beside the song playing. Apple shows them on one row and hides them on the
+   others itself: an opacity leaves that to it, and no row shows them wrongly once the setting goes. */
+@setting playing-bars {
+    .now-playing-indicator {
+        opacity: 0;
+    }
+}
+
+/* Off unless chosen: the cover at the top of an album or a playlist, and its shadow. Apple starts and stops the moving
+   cover of some albums itself: it goes by opacity too. */
+@setting header-artwork {
+    .album-header .artwork,
+    .album-header .artwork-shadow {
+        visibility: collapsed;
+    }
+
+    .album-header .motion-artwork {
+        opacity: 0;
+    }
+}
+
+/* Off unless chosen: the coloured backdrop and the video Apple lays behind some pages (an artist, an album with a
+   moving cover). Apple fills it page by page: an opacity hides it without fighting that. */
+@setting page-backdrop {
+    .page-background {
+        opacity: 0;
+    }
+}

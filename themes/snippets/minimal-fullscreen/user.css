@@ -1,0 +1,36 @@
+/* Minimal full screen: Apple's full-screen player (the Now Playing button opens it) with less around the artwork,
+   one switch per part, like Spicetify's full-screen "hide playing from" and "hide next up" snippets. Apple's player
+   has no such cards: what can go is the song's title and artist, the times, the lyrics column, and the buttons, which
+   can come back only under the pointer. */
+
+@setting title {
+    .fullscreen-title,
+    .fullscreen-artist {
+        visibility: collapsed;
+    }
+}
+
+@setting times {
+    .fullscreen-time {
+        visibility: collapsed;
+    }
+}
+
+/* Apple shows and hides the lyrics column itself, with its lyrics button: an opacity leaves that to it. */
+@setting lyrics {
+    .fullscreen-lyrics {
+        opacity: 0;
+    }
+}
+
+/* Faded, the buttons still take clicks: the pointer finds them where they always are. */
+@setting controls {
+    .fullscreen-transport {
+        opacity: 0;
+        transition: opacity 200ms;
+    }
+
+    .fullscreen-transport:hover {
+        opacity: 1;
+    }
+}

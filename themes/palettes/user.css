@@ -30,6 +30,18 @@
     @import "ampify:centre-bar";
 }
 
+/* The bar-height setting at the top: 8 less than at the bottom, where the bar holds the song too, so that the default
+   keeps Apple's 64. The panels start below the bar. */
+@setting bar-position = Top {
+    :root {
+        --content-top: calc(var(--setting-bar-height) - 8);
+    }
+
+    .playbar {
+        height: calc(var(--setting-bar-height) - 8);
+    }
+}
+
 /* The bar-background setting: the bar takes the colours of the playing song's artwork, fading into the window. */
 @setting bar-background = Artwork {
     .playbar {

@@ -145,6 +145,16 @@
   text at full opacity, not faded to 70%. Palettes Frappé and Latte get darker or lighter shades of their own family.
 - Declutter: Apple's info banners and its logo in the display each have a switch, on by default as before.
 - Square corners keeps Apple's round buttons and badges round.
+- Palettes and Greenroom: the playback bar height setting works with the bar at the top too (8 less than at the
+  bottom, so its default keeps Apple's height), and the panels start below it.
+- New snippets, from Spicetify's most useful ones: `hide-buttons` (a switch each for the lyrics, Up Next, AirPlay,
+  volume and download buttons), `dark-lyrics` (the lyrics and Up Next pane dark with light text, plain or from the
+  artwork), `hover-search` (the search box fades out until the pointer reaches it, and stays while one types) and
+  `minimal-fullscreen` (the full-screen player without title, times or lyrics, its buttons under the pointer only).
+- Declutter can hide the account name, the moving bars beside the song playing, the cover at the top of albums and
+  playlists, and the coloured backdrop or video behind pages.
+- Progress line thickness also sets the volume slider's thickness. Spinning artwork can hold still and leave out its
+  grooves, for a plain round cover. Progress mascot has a running cat and a rainbow trail on the played part.
 
 ### Extensions
 

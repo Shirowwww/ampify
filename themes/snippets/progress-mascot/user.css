@@ -1,6 +1,6 @@
 /* Progress mascot: a little animated figure rides the progress bar at the song's position, like Spicetify's Nyan Cat
-   and Kirby bars, with Ampify's own drawings: a comet, a bobbing note or a beating heart. It moves as the song plays and
-   jumps with a seek (docs/themes/format.md, "An image that follows the song's progress").
+   and Kirby bars, with Ampify's own drawings: a comet, a bobbing note, a beating heart or a running cat. It moves as
+   the song plays and jumps with a seek (docs/themes/format.md, "An image that follows the song's progress").
 
    The images are 28 by 18. The side margins, half the width, centre them on the song's position without taking room
    from the bar; the top and bottom ones sit them on the line, inside the display that would cut what hangs below. */
@@ -27,5 +27,18 @@
 @setting mascot = Heart {
     .scrubber Grid#HorizontalTemplate::after {
         content: url("images/heart.gif") contain;
+    }
+}
+
+@setting mascot = Cat {
+    .scrubber Grid#HorizontalTemplate::after {
+        content: url("images/cat.gif") contain;
+    }
+}
+
+/* Off unless chosen: the played part of the line in rainbow colours, the trail of Spicetify's Nyan Cat bar. */
+@setting rainbow {
+    .scrubber {
+        color: linear-gradient(to right, #FF3B30, #FF9500, #FFCC00, #34C759, #007AFF, #AF52DE);
     }
 }

@@ -1,0 +1,16 @@
+/* Search on hover: the search box fades out until the pointer reaches it, like Spicetify's Dynamic Search Bar. It works
+   where Apple Music puts the box, in the sidebar, and where the "Search and back arrow" top bar of Settings > Ampify
+   moves it, at the top of the window.
+
+   The box stays where it is and takes clicks while faded, so a click on its place still opens it; it stays shown
+   while it has the focus, the whole time one types, even with the pointer gone. */
+
+.search-box {
+    opacity: 0;
+    transition: opacity 150ms;
+}
+
+.search-box:hover,
+.search-box:focus-within {
+    opacity: 1;
+}

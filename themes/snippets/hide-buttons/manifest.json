@@ -1,0 +1,23 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "hide-buttons",
+  "name": "Hide buttons",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "Hides, one by one, the buttons you never use: lyrics, Up Next, AirPlay, volume and download, on top of any theme, like Spicetify's hide button snippets.",
+  "translations": {"fr": {"name": "Masquer des boutons", "description": "Masque, un par un, les boutons dont vous ne vous servez pas : paroles, À suivre, AirPlay, volume et téléchargement, par-dessus n'importe quel thème, comme les snippets « hide button » de Spicetify.", "settings": {"lyrics": "Masquer le bouton des paroles", "queue": "Masquer le bouton À suivre", "airplay": "Masquer le bouton AirPlay", "volume": "Masquer le bouton du volume", "download": "Masquer les boutons de téléchargement"}}, "de": {"name": "Schaltflächen ausblenden", "description": "Blendet einzeln die Schaltflächen aus, die Sie nie brauchen: Liedtexte, Als Nächstes, AirPlay, Lautstärke und Laden, mit jedem Design, wie die „hide button“-Snippets von Spicetify.", "settings": {"lyrics": "Liedtext-Schaltfläche ausblenden", "queue": "„Als Nächstes“ ausblenden", "airplay": "AirPlay-Schaltfläche ausblenden", "volume": "Lautstärke-Schaltfläche ausblenden", "download": "Download-Schaltflächen ausblenden"}}, "es": {"name": "Ocultar botones", "description": "Oculta uno a uno los botones que nunca usas: letra, A continuación, AirPlay, volumen y descarga, con cualquier tema, como los snippets «hide button» de Spicetify.", "settings": {"lyrics": "Ocultar el botón de la letra", "queue": "Ocultar el botón A continuación", "airplay": "Ocultar el botón AirPlay", "volume": "Ocultar el botón del volumen", "download": "Ocultar los botones de descarga"}}, "pt": {"name": "Ocultar botões", "description": "Oculta um a um os botões que você nunca usa: letra, A seguir, AirPlay, volume e download, com qualquer tema, como os snippets «hide button» do Spicetify.", "settings": {"lyrics": "Ocultar o botão da letra", "queue": "Ocultar o botão A seguir", "airplay": "Ocultar o botão AirPlay", "volume": "Ocultar o botão de volume", "download": "Ocultar os botões de download"}}, "ru": {"name": "Скрыть кнопки", "description": "Скрывает по одной кнопки, которыми вы не пользуетесь: текст песни, «Далее», AirPlay, громкость и загрузку, поверх любой темы, как сниппеты «hide button» в Spicetify.", "settings": {"lyrics": "Скрыть кнопку текста песни", "queue": "Скрыть кнопку «Далее»", "airplay": "Скрыть кнопку AirPlay", "volume": "Скрыть кнопку громкости", "download": "Скрыть кнопки загрузки"}}, "ja": {"name": "ボタンを隠す", "description": "使わないボタン（歌詞、次はこちら、AirPlay、音量、ダウンロード）を一つずつ隠します。Spicetify の「hide button」スニペットのように、どのテーマにも重ねられます。", "settings": {"lyrics": "歌詞ボタンを隠す", "queue": "「次はこちら」ボタンを隠す", "airplay": "AirPlay ボタンを隠す", "volume": "音量ボタンを隠す", "download": "ダウンロードボタンを隠す"}}, "zh": {"name": "隐藏按钮", "description": "逐个隐藏你从不使用的按钮：歌词、待播清单、AirPlay、音量和下载，可叠加在任何主题上，就像 Spicetify 的“hide button”片段。", "settings": {"lyrics": "隐藏歌词按钮", "queue": "隐藏待播清单按钮", "airplay": "隐藏 AirPlay 按钮", "volume": "隐藏音量按钮", "download": "隐藏下载按钮"}}},
+  "kitApi": "1.0",
+  "tags": [
+    "minimal",
+    "declutter",
+    "playback-bar"
+  ],
+  "settings": [
+    {"key": "lyrics", "label": "Hide the lyrics button", "type": "toggle", "default": false},
+    {"key": "queue", "label": "Hide the Up Next button", "type": "toggle", "default": false},
+    {"key": "airplay", "label": "Hide the AirPlay button", "type": "toggle", "default": true},
+    {"key": "volume", "label": "Hide the volume button", "type": "toggle", "default": false},
+    {"key": "download", "label": "Hide the download buttons", "type": "toggle", "default": true}
+  ]
+}

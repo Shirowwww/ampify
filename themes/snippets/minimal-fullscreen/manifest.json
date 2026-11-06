@@ -1,0 +1,21 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "minimal-fullscreen",
+  "name": "Minimal full screen",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "Apple's full-screen player with less around the artwork: hide the title and artist, the times or the lyrics, and show the buttons only under the pointer, on top of any theme.",
+  "translations": {"fr": {"name": "Plein écran épuré", "description": "Le lecteur plein écran d'Apple avec moins de choses autour de la pochette : masquer le titre et l'artiste, les temps ou les paroles, et n'afficher les boutons que sous le pointeur, par-dessus n'importe quel thème.", "settings": {"title": "Masquer le titre et l'artiste", "times": "Masquer les temps", "lyrics": "Masquer les paroles", "controls": "Boutons sous le pointeur seulement"}}, "de": {"name": "Schlichter Vollbildmodus", "description": "Apples Vollbild-Player mit weniger um das Cover: Titel und Interpret, Zeiten oder Liedtext ausblenden und die Tasten nur unter dem Zeiger zeigen, mit jedem Design.", "settings": {"title": "Titel und Interpret ausblenden", "times": "Zeiten ausblenden", "lyrics": "Liedtext ausblenden", "controls": "Tasten nur unter dem Zeiger"}}, "es": {"name": "Pantalla completa mínima", "description": "El reproductor a pantalla completa de Apple con menos alrededor de la portada: ocultar el título y el artista, los tiempos o la letra, y mostrar los botones solo bajo el puntero, con cualquier tema.", "settings": {"title": "Ocultar el título y el artista", "times": "Ocultar los tiempos", "lyrics": "Ocultar la letra", "controls": "Botones solo bajo el puntero"}}, "pt": {"name": "Tela cheia mínima", "description": "O player em tela cheia da Apple com menos em volta da capa: ocultar o título e o artista, os tempos ou a letra, e mostrar os botões só sob o ponteiro, com qualquer tema.", "settings": {"title": "Ocultar o título e o artista", "times": "Ocultar os tempos", "lyrics": "Ocultar a letra", "controls": "Botões só sob o ponteiro"}}, "ru": {"name": "Минимальный полный экран", "description": "Полноэкранный плеер Apple с меньшим количеством элементов вокруг обложки: скрыть название и исполнителя, время или текст песни и показывать кнопки только под указателем, поверх любой темы.", "settings": {"title": "Скрыть название и исполнителя", "times": "Скрыть время", "lyrics": "Скрыть текст песни", "controls": "Кнопки только под указателем"}}, "ja": {"name": "ミニマルなフルスクリーン", "description": "Apple のフルスクリーンプレーヤーのカバーの周りをすっきりさせます。曲名とアーティスト、時間、歌詞を隠し、ボタンはポインターの下でだけ表示できます。どのテーマにも重ねられます。", "settings": {"title": "曲名とアーティストを隠す", "times": "時間を隠す", "lyrics": "歌詞を隠す", "controls": "ボタンはポインターの下でだけ表示"}}, "zh": {"name": "极简全屏", "description": "让 Apple 的全屏播放器封面周围更简洁：隐藏歌名和艺人、时间或歌词，按钮只在指针下显示，可叠加在任何主题上。", "settings": {"title": "隐藏歌名和艺人", "times": "隐藏时间", "lyrics": "隐藏歌词", "controls": "按钮仅在指针下显示"}}},
+  "kitApi": "1.0",
+  "tags": [
+    "fullscreen",
+    "minimal"
+  ],
+  "settings": [
+    {"key": "title", "label": "Hide the title and artist", "type": "toggle", "default": true},
+    {"key": "times", "label": "Hide the times", "type": "toggle", "default": true},
+    {"key": "lyrics", "label": "Hide the lyrics", "type": "toggle", "default": false},
+    {"key": "controls", "label": "Show the buttons only under the pointer", "type": "toggle", "default": true}
+  ]
+}

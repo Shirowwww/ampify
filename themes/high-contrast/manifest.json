@@ -2,11 +2,11 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "high-contrast",
   "name": "High contrast",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Black and white with one bright accent, and outlines instead of shades: every panel, card and menu has a clear edge, and what is under the pointer gets an accent outline. A dark scheme and a light one.",
-  "translations": {"fr": {"name": "Contraste élevé", "description": "Noir et blanc avec un seul accent vif, et des contours plutôt que des nuances : chaque panneau, carte et menu a un bord net, et ce qui est sous le pointeur prend un contour d'accent. Une variante sombre et une claire."}, "de": {"name": "Hoher Kontrast", "description": "Schwarz und Weiß mit einem einzigen leuchtenden Akzent, Umrisse statt Schattierungen: Jedes Panel, jede Karte und jedes Menü hat eine klare Kante, und was unter dem Zeiger liegt, bekommt einen Akzentrahmen. Dunkel und hell."}, "es": {"name": "Alto contraste", "description": "Blanco y negro con un único acento vivo, y contornos en lugar de sombras: cada panel, tarjeta y menú tiene un borde nítido, y lo que está bajo el puntero recibe un contorno de acento. Una variante oscura y una clara."}, "pt": {"name": "Alto contraste", "description": "Preto e branco com um único destaque vivo, e contornos em vez de sombras: cada painel, cartão e menu tem uma borda nítida, e o que está sob o ponteiro ganha um contorno de destaque. Uma variante escura e uma clara."}, "ru": {"name": "Высокий контраст", "description": "Чёрное и белое с одним ярким акцентом и контуры вместо оттенков: у каждой панели, карточки и меню чёткий край, а то, что под указателем, обводится акцентом. Тёмный и светлый варианты."}, "ja": {"name": "ハイコントラスト", "description": "白と黒にひとつだけ鮮やかなアクセント。陰影の代わりに輪郭線を使い、パネル、カード、メニューの縁がはっきり見え、ポインターの下の要素はアクセント色で囲まれます。ダークとライトの2種類。"}, "zh": {"name": "高对比度", "description": "黑白配色加一种鲜明的强调色，用轮廓代替阴影：每个面板、卡片和菜单都有清晰的边缘，鼠标下的元素会显示强调色轮廓。提供深色和浅色两种配色。"}},
+  "translations": {"fr": {"name": "Contraste élevé", "description": "Noir et blanc avec un seul accent vif, et des contours plutôt que des nuances : chaque panneau, carte et menu a un bord net, et ce qui est sous le pointeur prend un contour d'accent. Une variante sombre et une claire.", "settings": {"line-width": "Épaisseur des contours"}}, "de": {"name": "Hoher Kontrast", "description": "Schwarz und Weiß mit einem einzigen leuchtenden Akzent, Umrisse statt Schattierungen: Jedes Panel, jede Karte und jedes Menü hat eine klare Kante, und was unter dem Zeiger liegt, bekommt einen Akzentrahmen. Dunkel und hell.", "settings": {"line-width": "Linienstärke der Umrisse"}}, "es": {"name": "Alto contraste", "description": "Blanco y negro con un único acento vivo, y contornos en lugar de sombras: cada panel, tarjeta y menú tiene un borde nítido, y lo que está bajo el puntero recibe un contorno de acento. Una variante oscura y una clara.", "settings": {"line-width": "Grosor de los contornos"}}, "pt": {"name": "Alto contraste", "description": "Preto e branco com um único destaque vivo, e contornos em vez de sombras: cada painel, cartão e menu tem uma borda nítida, e o que está sob o ponteiro ganha um contorno de destaque. Uma variante escura e uma clara.", "settings": {"line-width": "Espessura dos contornos"}}, "ru": {"name": "Высокий контраст", "description": "Чёрное и белое с одним ярким акцентом и контуры вместо оттенков: у каждой панели, карточки и меню чёткий край, а то, что под указателем, обводится акцентом. Тёмный и светлый варианты.", "settings": {"line-width": "Толщина контуров"}}, "ja": {"name": "ハイコントラスト", "description": "白と黒にひとつだけ鮮やかなアクセント。陰影の代わりに輪郭線を使い、パネル、カード、メニューの縁がはっきり見え、ポインターの下の要素はアクセント色で囲まれます。ダークとライトの2種類。", "settings": {"line-width": "輪郭の太さ"}}, "zh": {"name": "高对比度", "description": "黑白配色加一种鲜明的强调色，用轮廓代替阴影：每个面板、卡片和菜单都有清晰的边缘，鼠标下的元素会显示强调色轮廓。提供深色和浅色两种配色。", "settings": {"line-width": "轮廓粗细"}}},
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Dark",
@@ -17,5 +17,8 @@
     "light",
     "layout"
   ],
-  "preview": "preview.jpg"
+  "preview": "preview.jpg",
+  "settings": [
+    {"key": "line-width", "label": "Outline width", "type": "number", "min": 1, "max": 4, "default": 2}
+  ]
 }

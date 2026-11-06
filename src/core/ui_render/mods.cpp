@@ -198,8 +198,9 @@ bool ChooseAccent(const fs::path& kit, const std::string& accent, std::string& e
 
 const std::vector<AccentPreset>& AccentPresets() {
     static const std::vector<AccentPreset> presets = {
-        {"FA2D48", "accent.pink"}, {"1ED760", "accent.green"}, {"0A84FF", "accent.blue"},
-        {"BF5AF2", "accent.purple"}, {"FF9F0A", "accent.orange"}};
+        {"FA2D48", "accent.pink"},  {"FF3B30", "accent.red"},  {"FF9F0A", "accent.orange"},
+        {"FFD60A", "accent.yellow"}, {"1ED760", "accent.green"}, {"30B0C7", "accent.teal"},
+        {"0A84FF", "accent.blue"},  {"BF5AF2", "accent.purple"}};
     return presets;
 }
 

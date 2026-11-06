@@ -11,9 +11,9 @@
     --font-body: "Segoe UI Variable Text";
     --window-background: #0B0D12;
     --panel-radius: var(--setting-panel-radius);
-    --gap: 14;
+    --gap: var(--setting-gap);
     --bar-height: 76;
-    --bar-room: 98;
+    --bar-room: calc(84 + var(--setting-gap));
     --bar-radius: 40;
     --lcd-radius: 24;
     --radius-small: calc(var(--setting-panel-radius) * 0.5);

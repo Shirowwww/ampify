@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "../src/core/address_order.hpp"
+#include "../src/core/i18n.hpp"
 #include "../src/core/settings.hpp"
 #include "../src/core/theme/theme_settings.hpp"
 #include "../src/core/ui_model.hpp"
@@ -817,6 +818,20 @@ TEST_CASE(UiRender_AChosenAccentIsWrittenAsSixHexDigitsOrRemoved) {
     CHECK(ReadFile(kit / "settings.txt").find("theme.accent") == std::string::npos);
     CHECK(ReadFile(kit / "settings.txt").find("theme.active = night") != std::string::npos);
     CHECK(!AccentPresets().empty() && AccentPresets().front().value == std::string("FA2D48"));
+}
+
+// Eight presets around the colour wheel, each a valid accent with a French name of its own.
+TEST_CASE(UiRender_AccentPresetsCoverTheWheelAndAreTranslated) {
+    std::vector<std::string> values;
+    for (const AccentPreset& preset : AccentPresets()) {
+        values.push_back(preset.value);
+        CHECK(std::string(preset.value).size() == 6);
+        CHECK(std::string(preset.value).find_first_not_of("0123456789ABCDEF") == std::string::npos);
+        std::string_view french = ampify::i18n::Lookup(ampify::i18n::KitMessagesIn("fr"), preset.textKey);
+        CHECK(french != preset.textKey);
+    }
+    CHECK(values == (std::vector<std::string>{"FA2D48", "FF3B30", "FF9F0A", "FFD60A", "1ED760", "30B0C7", "0A84FF",
+                                              "BF5AF2"}));
 }
 
 TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {

@@ -10,6 +10,7 @@
     --panel-radius: 4px;
     --gap: 8;
     --line: $TextFillColorPrimaryBrush;
+    --line-width: var(--setting-line-width);
     --track: $ControlStrongFillColorDefaultBrush;
     --accent: $AccentFillColorDefaultBrush;
 }
@@ -22,7 +23,7 @@
 .sidebar,
 .content,
 .lyrics-panel {
-    border-width: 2;
+    border-width: var(--line-width);
     border-color: var(--line);
 }
 
@@ -39,7 +40,7 @@
 
 .lcd {
     background: $SolidBackgroundFillColorBaseBrush;
-    border-width: 2;
+    border-width: var(--line-width);
     border-color: var(--line);
     corner-radius: 4px;
 }
@@ -51,7 +52,7 @@
 /* Play: the accent, with a black outline that keeps the button's edge on any background. */
 .play-button > Grid#Root {
     background: var(--accent);
-    border-width: 2;
+    border-width: var(--line-width);
     border-color: var(--line);
     corner-radius: 4px;
 }
@@ -78,7 +79,7 @@
 .flyout,
 .tooltip {
     background: $SolidBackgroundFillColorBaseBrush;
-    border-width: 2;
+    border-width: var(--line-width);
     border-color: var(--line);
     corner-radius: 4px;
 }
@@ -101,7 +102,7 @@
 .shelf-arrow-left,
 .shelf-arrow-right {
     background: $SolidBackgroundFillColorBaseBrush;
-    border-width: 2;
+    border-width: var(--line-width);
     border-color: var(--line);
     corner-radius: 4px;
 }
@@ -116,7 +117,7 @@
    Apple Music sets each card's width: the padding takes the room from the artwork, as on Spotify. */
 .card {
     padding: 6;
-    border-width: 2;
+    border-width: var(--line-width);
     border-color: transparent;
     corner-radius: 4px;
 }
@@ -130,7 +131,7 @@
 }
 
 .track-row {
-    border-width: 2;
+    border-width: var(--line-width);
     border-color: transparent;
     corner-radius: 4px;
 }
@@ -141,14 +142,14 @@
 
 .settings-card {
     background: $SolidBackgroundFillColorBaseBrush;
-    border-width: 2;
+    border-width: var(--line-width);
     border-color: var(--line);
     corner-radius: 4px;
 }
 
 .album-play-button,
 .album-shuffle-button {
-    border-width: 2;
+    border-width: var(--line-width);
     border-color: var(--line);
     corner-radius: 4px;
 }
@@ -156,7 +157,7 @@
 /* Folded, the column of icons is the sidebar panel (ampify:floating-panels): it takes the outline. */
 @media (max-width: 1324px) {
     .sidebar-column {
-        border-width: 2;
+        border-width: var(--line-width);
         border-color: var(--line);
     }
 }

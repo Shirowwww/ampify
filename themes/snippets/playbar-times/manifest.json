@@ -1,0 +1,18 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "playbar-times",
+  "name": "Playback bar times",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "The time played and the length of the song, shown while the pointer is over the playback bar or all the time, wherever the bar sits. On top of any theme, like Comfy's hoverable timers.",
+  "translations": {"fr": {"name": "Temps de la barre de lecture", "description": "Le temps écoulé et la durée du morceau, affichés quand le pointeur passe sur la barre de lecture ou tout le temps, où que soit la barre. Par-dessus n'importe quel thème, comme les minuteurs au survol de Comfy.", "settings": {"show": "Afficher les temps"}, "options": {"Under the pointer": "Sous le pointeur", "Always": "Toujours"}}, "de": {"name": "Zeiten der Wiedergabeleiste", "description": "Die gespielte Zeit und die Länge des Titels, sichtbar, solange der Zeiger über der Wiedergabeleiste ist, oder immer, wo auch immer die Leiste sitzt. Mit jedem Theme, wie die Zeiten beim Darüberfahren in Comfy.", "settings": {"show": "Zeiten anzeigen"}, "options": {"Under the pointer": "Unter dem Zeiger", "Always": "Immer"}}, "es": {"name": "Tiempos de la barra de reproducción", "description": "El tiempo reproducido y la duración de la canción, visibles mientras el puntero está sobre la barra de reproducción o siempre, esté donde esté la barra. Sobre cualquier tema, como los tiempos al pasar el puntero de Comfy.", "settings": {"show": "Mostrar los tiempos"}, "options": {"Under the pointer": "Bajo el puntero", "Always": "Siempre"}}, "pt": {"name": "Tempos da barra de reprodução", "description": "O tempo tocado e a duração da música, visíveis enquanto o ponteiro está sobre a barra de reprodução ou sempre, onde quer que a barra esteja. Sobre qualquer tema, como os tempos ao passar o ponteiro do Comfy.", "settings": {"show": "Mostrar os tempos"}, "options": {"Under the pointer": "Sob o ponteiro", "Always": "Sempre"}}, "ru": {"name": "Время на панели воспроизведения", "description": "Прошедшее время и длительность песни видны, пока указатель над панелью воспроизведения, или всегда, где бы панель ни стояла. Поверх любой темы, как таймеры при наведении в Comfy.", "settings": {"show": "Показывать время"}, "options": {"Under the pointer": "При наведении", "Always": "Всегда"}}, "ja": {"name": "再生バーの時間", "description": "再生した時間と曲の長さを、再生バーにポインターがあるあいだ、または常に表示します。バーの位置は問いません。Comfy のホバータイマーのように、どのテーマにも重ねられます。", "settings": {"show": "時間の表示"}, "options": {"Under the pointer": "ポインターを合わせたとき", "Always": "常に"}}, "zh": {"name": "播放栏时间", "description": "已播放时间和歌曲时长，在指针位于播放栏上时显示，或一直显示，无论播放栏在哪里。可叠加在任何主题上，就像 Comfy 的悬停计时器。", "settings": {"show": "显示时间"}, "options": {"Under the pointer": "指针悬停时", "Always": "始终"}}},
+  "kitApi": "1.0",
+  "tags": [
+    "playback-bar",
+    "time"
+  ],
+  "settings": [
+    {"key": "show", "label": "Show the times", "type": "choice", "options": ["Under the pointer", "Always"], "default": "Under the pointer", "description": "Apple shows them under the pointer only while the bar is at the top; this works at the bottom too."}
+  ]
+}

@@ -1,0 +1,39 @@
+/* Playback bar times: the time played and the length, under the pointer or always, wherever the bar sits. Apple binds
+   their visibility to the pointer over its display, which never fires once a theme moves the bar to the bottom:
+   visibility: visible holds over that state, and the opacity does the showing. */
+
+.current-time,
+.duration {
+    visibility: visible;
+}
+
+@setting show = "Under the pointer" {
+    .current-time,
+    .duration {
+        opacity: 0;
+        transition: opacity 150ms;
+    }
+
+    .playbar:hover .duration {
+        opacity: 1;
+    }
+
+    /* A narrow display has room for one time, the time left (ampify:floating-panels): the time played stays out. */
+    @media (min-width: 1101px) {
+        .playbar:hover .current-time {
+            opacity: 1;
+        }
+    }
+}
+
+@setting show = Always {
+    .duration {
+        opacity: 1;
+    }
+
+    @media (min-width: 1101px) {
+        .current-time {
+            opacity: 1;
+        }
+    }
+}

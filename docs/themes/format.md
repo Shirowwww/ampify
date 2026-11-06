@@ -456,7 +456,8 @@ What the layouts take care of, so that a theme needs no rule for it:
   shows only the time left under the pointer.
 - `bottom-bar`: the progress line runs from the artwork to the display's end, and the elapsed and remaining times
   have their place at the end of the artist's line, not over the artist. Apple Music shows those times under the
-  pointer only while its display is in the bar at the top: with the bar at the bottom they stay hidden.
+  pointer only while its display is in the bar at the top: with the bar at the bottom they stay hidden. The Playback
+  bar times snippet shows them there, under the pointer or always (`visibility: visible`, then `opacity`).
 
 #### A column for the panels
 
@@ -701,6 +702,11 @@ playing instead: its vibrant colour, `--art-2`. It changes when the song does, a
 the theme keeps its own accent. The colour is kept between a lightness of 30% and 70%, so it never turns into black
 or white on a dark or a light page: a very dark or very pale cover gives a grey-tinted accent of that lightness. Text
 on the accent is still chosen for it as above.
+
+A theme's own "Artwork" accent setting (Ember, Fluent) and `theme.accent` do not fight: the theme's other choice
+(Amber, Windows) is written as `$AccentFillColorDefaultBrush`, so it follows `theme.accent`; its Artwork choice uses
+`--art-2` where the theme names its accent, whatever `theme.accent` says, and Apple's own accented controls keep
+`theme.accent`. A new theme needs no setting of its own for this: `theme.accent = artwork` does it for every theme.
 
 ## Glass level
 
