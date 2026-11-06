@@ -262,27 +262,6 @@ the page on screen with a selector for each element, and
 [knowledge/apple-music-xaml-tree.md](../../knowledge/apple-music-xaml-tree.md) describes the whole tree. Template
 parts and inner pieces change more often than the zones above.
 
-## Mini player
-
-Ampify's mini player is a small window that stays on top: the cover, the title and artist, previous, play or pause,
-next, the progress, and a button back to the main window. It is not Apple's mini player, and element rules do not reach
-it. Its four colours come from the theme's `:root` variables, written as `#RRGGBB` or `#AARRGGBB`. A missing or invalid
-one keeps Ampify's default.
-
-| Variable | What it colours | Default |
-|---|---|---|
-| `--mini-background` | the window and its title bar | `#1C1C1E` |
-| `--mini-foreground` | the title, the buttons, and the title bar's text and close button | `#FFFFFF` |
-| `--mini-muted` | the artist line, the frame of the cover, the rest of the progress bar, the title bar's text while the window is not in front | `#A1A1A6` |
-| `--mini-accent` | the part of the progress bar already played | `#FA2D48` |
-
-```css
-:root {
-  --mini-background: #101820;
-  --mini-accent: #00AAFF;
-}
-```
-
 ## Check the names after an update
 
 After an Apple Music update, save a few trees with the inspector (Home, an album, Search, the lyrics), then run:

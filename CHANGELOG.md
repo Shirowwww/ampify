@@ -18,14 +18,6 @@
   copied to the clipboard, read back on Import. Import refuses a file that is for another element or that holds a
   wrong value, and says why under the card.
 
-### Mini player
-
-- A small window that stays on top, with the cover, the title and artist, previous, play or pause, next, the progress
-  and a button back to the main window. It opens with Ctrl+Alt+M (`mini.shortcut`, `off` turns it off), or from an
-  extension with `Ampify.ui.miniPlayer.open()`, or from the "Mini player" entry of Apple Music's sidebar. It
-  remembers where it was left, follows the screen's scale, and closes with Apple Music. Closed until it is opened.
-- Its colours come from the theme's `--mini-background`, `--mini-foreground`, `--mini-muted` and `--mini-accent`.
-
 ### Reliability
 
 - Opening the lyrics over a song with lyrics no longer ends Apple Music under Glass and the other floating-panel
@@ -40,24 +32,16 @@
 
 ### Extensions
 
-- Full screen, complete (example): inside the view, F closes it, L shows the lyrics and Q shows Up Next. The controls
-  fade after 3 seconds without pointer movement. New `Ampify.ui.fullscreen.onKey` and `onPointer` events.
-- `inert: true` on any node of a view: the node and everything under it take no click, hover or keyboard focus. The
-  faded controls of the full-screen view use it, so a click there no longer presses an invisible button.
-- Each entry of `Ampify.player.queue.list()` has an `artwork`, ready for an `image` node's `src`; the full-screen
-  view's Up Next card shows the next song's cover.
-- Full screen, complete: the song's cover shows (it stayed blank), the view is centred in the window and never under
-  its Close button, the lyrics column is as tall as the window and scrolls with the song, Up Next lists only the songs
-  to come with their covers (three under the title, eight in its column) and follows the queue while the view is
-  open. The controls fade 3 seconds after the pointer stops, even while the view redraws.
+- `inert: true` on any node of a view: the node and everything under it take no click, hover or keyboard focus, so a
+  faded control no longer takes a click.
+- Each entry of `Ampify.player.queue.list()` has an `artwork`, ready for an `image` node's `src`.
+- The full-screen view of an element starts under its Close button, not behind it.
 - An `image` with `src: "artwork"` shows the song playing even where Apple's play-bar image cannot be found, through
   Apple's own loader, and follows each new song.
 - A view written as a plain tree, without `Ampify.React`, can give its nodes `onClick` and `onChange` functions; they
-  run as in a React tree. The full-screen view's Previous, Play and Next buttons did nothing before.
+  run as in a React tree; they were dropped before.
 - An `image` with `src: "artwork"` stays sharp when Apple shows the same cover again, as for two songs of one album; it
   kept Apple's small thumbnail stretched.
-- Full screen, complete: sized so the song column and the three columns side by side fit even the smallest window
-  Apple Music allows; the cover and the controls were cut at the top and bottom, and the song column at the left.
 
 ### Themes
 

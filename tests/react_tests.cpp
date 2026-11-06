@@ -651,38 +651,6 @@ TEST_CASE(Interface_ARemovedPanelDropsItsHandlers) {
     element->Stop();
 }
 
-TEST_CASE(Interface_FullscreenKeysAndPointerReachTheListeners) {
-    Fixture f;
-    auto element = f.Make("fullkeys", R"(
-        Ampify.ui.fullscreen.onKey((key) => Ampify.log("key " + key));
-        Ampify.ui.fullscreen.onPointer(() => Ampify.log("pointer"));
-        Ampify.ui.fullscreen.open({ type: "text", text: "one" });
-    )", R"("ui.fullscreen")");
-    CHECK(element->Start());
-    auto slot = f.host.ui.Fullscreen();
-    CHECK(slot.has_value());
-    if (!slot) return;
-    element->DeliverEvent("fullscreenKey", R"({"key":"L"})");
-    element->DeliverEvent("fullscreenPointer", "{}");
-    element->Pump();
-    CHECK(f.Logged("[fullkeys] key L"));
-    CHECK(f.Logged("[fullkeys] pointer"));
-
-    // Garbage from the host is logged and dropped, nothing reaches the listener.
-    element->DeliverEvent("fullscreenKey", "not json");
-    element->Pump();
-    CHECK(f.Logged("fullscreenKey"));
-
-    // Once the view has closed, late keys and moves are ignored.
-    element->DeliverEvent("fullscreenClose", R"({"session":)" + slot->id + "}");
-    element->Pump();
-    element->DeliverEvent("fullscreenKey", R"({"key":"Q"})");
-    element->DeliverEvent("fullscreenPointer", "{}");
-    element->Pump();
-    CHECK(!f.Logged("[fullkeys] key Q"));
-    element->Stop();
-}
-
 TEST_CASE(React_ReadyResolvesOnTheFirstPump) {
     Fixture f;
     auto element = f.Make("ready", R"(Ampify.ready.then(() => Ampify.log("ready"));)", "");

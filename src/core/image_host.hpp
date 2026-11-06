@@ -36,10 +36,6 @@ struct ArtworkHost {
     struct File {
         std::string contentType;  // "image/jpeg", "image/png"...
         std::string bytes;
-        // The title and artist the player gave with this image, read together with it; empty when the host does not
-        // tell them.
-        std::string title;
-        std::string artist;
     };
 
     // nullopt when nothing plays or the player gave no cover. Called from a worker thread of the element and may

@@ -6,7 +6,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "json.hpp"
@@ -143,21 +142,5 @@ bool IsPlacement(std::string_view placement);
 
 // The permission that adds to a placement: ui.topbar, ui.playbar or ui.menu.
 std::string_view PlacementPermission(std::string_view placement);
-
-// The pointer moves over the full-screen view are passed to its element at most every 250 ms, so that a timer there
-// only wakes up a few times a second. `lastMs` is the time the last move was passed, if any.
-constexpr std::int64_t kFullscreenPointerGapMs = 250;
-bool FullscreenPointerDue(std::int64_t nowMs, std::optional<std::int64_t> lastMs);
-
-// Lets through the pointer events of the full-screen view that moved the pointer, at most every 250 ms. WinUI also
-// raises one when the view is redrawn under a still pointer: passed on, it kept the faded controls shown.
-class FullscreenPointerGate {
-public:
-    bool Pass(std::int64_t nowMs, double x, double y);
-
-private:
-    std::optional<std::int64_t> m_lastMs;
-    std::optional<std::pair<double, double>> m_lastAt;
-};
 
 }  // namespace ampify

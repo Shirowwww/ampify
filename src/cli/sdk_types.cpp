@@ -250,12 +250,9 @@ declare const Ampify: {
     menu: { addItem(where: "context" | "app", item: MenuItem): number };
     popup: { open(view: UiNode): void };
     // permission ui.fullscreen; onClose runs when the user closes it or another element takes the screen
-    // onKey gets F, L or Q while the view has the keyboard; onPointer runs on the pointer's moves over it (250 ms apart)
-    fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void;
-                  onKey(fn: (key: string) => void): () => void; onPointer(fn: () => void): () => void };
+    fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void };
     // permission ui.fullscreen; Apple Music's own full-screen player, laid over the window
     applePlayer: { open(): void };
-    miniPlayer: { open(): void; close(): void };
     panel: { register(id: string, view: UiNode): void; remove(id: string): boolean; onClose(id: string, fn: () => void): () => void };
     title: { set(text: string): void };
     /** A new label for a top bar or play bar button this element added: its text without an icon, its tooltip with one. */

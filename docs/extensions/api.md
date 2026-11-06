@@ -295,11 +295,7 @@ Ampify.ui.popup.open(view)
 Ampify.ui.fullscreen.open(view)        // permission ui.fullscreen; called again, updates in place
 Ampify.ui.fullscreen.close()
 Ampify.ui.fullscreen.onClose(fn)       // returns a function that removes fn
-Ampify.ui.fullscreen.onKey(fn)         // fn("F" | "L" | "Q") while the view has the keyboard; returns a remover
-Ampify.ui.fullscreen.onPointer(fn)     // fn() when the pointer moves over the view, at most every 250 ms
 Ampify.ui.applePlayer.open()           // permission ui.fullscreen: Apple Music's own full-screen player
-Ampify.ui.miniPlayer.open()            // Ampify's mini player: a small window on top (no permission)
-Ampify.ui.miniPlayer.close()
 Ampify.ui.panel.register(id, view)     // a 380 px column on the right; it slides in from the right
 Ampify.ui.panel.remove(id)             // slides it back out; register brings it back
 Ampify.ui.panel.onClose(id, fn)        // the user closed it with its Close button: it is removed (register brings it
@@ -324,14 +320,10 @@ Ampify.ui.navigate(path)
   gets the bar Apple Music puts before its selected item, and it is on by itself while its element's page is open.
 - The full-screen view covers the window, above everything. Escape or its Close button closes it. The view's tree
   starts 64 px from the top, under the Close button, and fills the rest: give its root `valign: "stretch"` to lay
-  columns as tall as the window (a `lyrics` node that grows then scrolls within them). `onPointer` runs only when the
-  pointer really moves, not when the view is redrawn under a still pointer. One at a time: the
+  columns as tall as the window (a `lyrics` node that grows then scrolls within them). One at a time: the
   last element that opens it wins, and `onClose` runs when the user closes it or another element takes it.
 - `applePlayer.open()` opens Apple's full-screen player where the user chose in Ampify's settings page (`apple.fullscreen`).
   If Apple Music refuses, nothing opens and the log says why.
-- `miniPlayer.open()` and `close()` open or close Ampify's own mini player: the cover, the title, the play, previous and
-  next buttons, and the progress, in a small window that stays on top. It remembers its place. The user opens it with
-  the shortcut `mini.shortcut` (Ctrl+Alt+M) too, and the "Mini player" entry of the sidebar. Its colours come from the theme (`--mini-*`, see `docs/themes/names.md`).
 - An app page takes the place of Apple Music's page, with a Back button; Apple Music's own navigation closes it.
 - A `lyrics` node draws itself from Apple's player at the screen's pace: the element renders it once, with no timer of
   its own. Give it room, as a growing child of a `stack` of fixed `height`. An `image` with `src: "artwork"` shows

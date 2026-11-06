@@ -230,8 +230,6 @@ std::optional<ArtworkHost::File> ReadSmtcThumbnail(DWORD timeoutMs) {
         return std::nullopt;
     }
     ArtworkHost::File file;
-    file.title = rt::ReadString(properties, kPropertiesTitle);
-    file.artist = rt::ReadString(properties, kPropertiesArtist);
     rt::Ref typed, randomAccess;
     // Windows may list several names ("image/jpeg,image/jpe,image/jpg"): the first is the type.
     if (rt::Query(stream, kIidContentTypeProvider, typed)) file.contentType = rt::ReadString(typed, kContentType);

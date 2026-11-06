@@ -506,19 +506,4 @@ std::string_view PlacementPermission(std::string_view placement) {
     return "ui.menu";
 }
 
-bool FullscreenPointerDue(std::int64_t nowMs, std::optional<std::int64_t> lastMs) {
-    return !lastMs || nowMs - *lastMs >= kFullscreenPointerGapMs;
-}
-
-bool FullscreenPointerGate::Pass(std::int64_t nowMs, double x, double y) {
-    constexpr double kStillWithin = 1;  // pixels: below that the pointer did not move
-    if (m_lastAt && std::abs(x - m_lastAt->first) < kStillWithin && std::abs(y - m_lastAt->second) < kStillWithin) {
-        return false;
-    }
-    m_lastAt = std::make_pair(x, y);
-    if (!FullscreenPointerDue(nowMs, m_lastMs)) return false;
-    m_lastMs = nowMs;
-    return true;
-}
-
 }  // namespace ampify

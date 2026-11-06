@@ -9,7 +9,6 @@
 #include "../api/module.hpp"
 #include "../i18n.hpp"
 #include "../json.hpp"
-#include "../mini_player.hpp"
 #include "../ui_model.hpp"
 
 namespace ampify::natives {
@@ -126,14 +125,6 @@ struct UiNatives : ScriptBridge {
         return JS_UNDEFINED;
     }
 
-    // native.uiMiniPlayer(open): Ampify's own mini player opens (true) or closes (false). It is Ampify's window, not
-    // Apple's, so no permission is asked.
-    AMPIFY_NATIVE(UiMiniPlayer) {
-        bool open = argc >= 1 && JS_ToBool(ctx, argv[0]) != 0;
-        ampify::mini::RequestWindow(open ? ampify::mini::WindowAction::Open : ampify::mini::WindowAction::Close);
-        return JS_UNDEFINED;
-    }
-
     // native.uiFullscreenClose(session): closes the element's own fullscreen surface, so it needs no permission.
     AMPIFY_NATIVE(UiFullscreenClose) {
         ScriptExtension* ext = Owner(ctx);
@@ -197,7 +188,6 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiFullscreen", UiNatives::UiFullscreen, 2);
     scope.Function("uiFullscreenClose", UiNatives::UiFullscreenClose, 1);
     scope.Function("uiApplePlayer", UiNatives::UiApplePlayer, 0);
-    scope.Function("uiMiniPlayer", UiNatives::UiMiniPlayer, 1);
     scope.Function("uiPage", UiNatives::UiPage, 2);
     scope.Function("uiNavigate", UiNatives::UiNavigate, 1);
     scope.Function("uiTitle", UiNatives::UiTitle, 1);

@@ -88,7 +88,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Selected and playing rows | Selected rows (`selected-background`); the row of the song playing with `:playing` (`.list-item:playing`) | Done |
 | Lyrics lines | `.lyrics`, `.lyrics-synced`, `.lyrics-line`, `.lyrics-line-content`, `.lyrics-words`, `.lyrics-background-words`, `.lyrics-instrumental`; the line being sung with `:current` (`.lyrics-line-content:current`, the Lyrics spotlight snippet) | Done |
 | Full-screen player | Apple's player (`.fullscreen-*`) | Done |
-| Mini player | Ampify's own small window on top: cover, controls, progress, coloured by `--mini-*`. Apple's own mini player is not themed | Partial |
+| Mini player | Its own window and interface thread: themes do not reach it | Missing |
 | Layout changes (bar at the bottom, columns swapped) | `ampify:bottom-bar`, `order`, `grid-*`; Apple's lists resist | Partial |
 | `overflow`, `clip-path` | `overflow: hidden` and `clip-path: inset(...)` cut an element to a rectangle; no rounded or shaped clips | Done |
 | `filter`, `mix-blend-mode`, `position` | No XAML equivalent; `display: none`, alignment and grid placement instead | Missing |

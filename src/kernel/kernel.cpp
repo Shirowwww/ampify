@@ -3,7 +3,6 @@
 
 #include <windows.h>
 
-#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -21,7 +20,6 @@
 #include "../core/injection_policy.hpp"
 #include "../core/player_watch.hpp"
 #include "../core/journal.hpp"
-#include "../core/mini_player.hpp"
 #include "../core/reload.hpp"
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
@@ -40,7 +38,6 @@
 #if defined(AMPIFY_WITH_XAML)
 #include "../core/json.hpp"
 #include "../win/close_to_tray.hpp"
-#include "../win/mini_window.hpp"
 #include "../win/theme_service.hpp"
 #include "../win/ui_service.hpp"
 #include "../win/xaml_host.hpp"
@@ -77,55 +74,6 @@ void ServiceReloadRequests(const std::filesystem::path& kit, ampify::ReloadWatch
 
 HINSTANCE g_module = nullptr;  // the kernel DLL itself, passed to the interface-thread facade
 
-// The mini player's shortcut (mini.shortcut). Registered on the extension thread, which pumps the hotkeys.
-void StartMiniPlayerShortcut(ampify::WinHost& winHost, const ampify::Settings& settings, ampify::Journal& journal) {
-    std::string combo = settings.GetString(ampify::mini::kShortcutKey, ampify::mini::kDefaultShortcut);
-    if (combo.empty() || combo == "off") return;
-    SetLastError(ERROR_SUCCESS);  // a combo that does not parse never reaches RegisterHotKey, which sets the error
-    if (winHost.RegisterKey(ampify::mini::kElementId, combo)) {
-        journal.Write("Mini player: shortcut " + combo + " registered");
-        return;
-    }
-    const bool taken = GetLastError() == ERROR_HOTKEY_ALREADY_REGISTERED;
-    journal.Write(ampify::mini::ShortcutRefusal(combo, taken));
-}
-
-// The cover of `track`. Right after a song change Windows may still hold the previous song's thumbnail, so an image
-// read with another title is read again once, a moment later. `refused` is set when both reads were of another song.
-std::optional<ampify::ArtworkHost::File> FetchArtworkOf(ampify::WinHost& winHost, const ampify::TrackInfo& track,
-                                                        bool& refused) {
-    constexpr auto kSecondReadAfter = std::chrono::milliseconds(800);
-    for (int attempt = 0; attempt < 2; attempt++) {
-        if (attempt > 0) std::this_thread::sleep_for(kSecondReadAfter);
-        std::optional<ampify::ArtworkHost::File> file = winHost.CurrentArtwork();
-        if (!file) return std::nullopt;
-        if (ampify::mini::ArtworkIsFor(track, file->title, file->artist)) return file;
-    }
-    refused = true;
-    return std::nullopt;
-}
-
-// The mini player's data, every 250 ms: what plays, its cover while its window is open, and the buttons pressed in it.
-void FeedMiniPlayer(ampify::WinHost& winHost, const ampify::PlayerSnapshot& snapshot) {
-    ampify::mini::PublishInfo(ampify::mini::InfoFrom(snapshot));
-    for (ampify::PlayerCommand command : ampify::mini::TakeCommands()) winHost.Control(command, 0);
-    static std::atomic<bool> fetching{false};
-    if (!ampify::mini::WindowOpen() || !snapshot.track || fetching) return;
-    std::optional<ampify::mini::Artwork> shown = ampify::mini::CurrentArtwork();
-    if (shown && shown->trackId == snapshot.track->id) return;
-    static std::string refusedTrack;  // read and written only while `fetching` is held
-    if (refusedTrack == snapshot.track->id) return;
-    fetching = true;
-    // The host may wait a few seconds for the cover: a worker thread does, as the elements' own requests do.
-    std::thread([&winHost, track = *snapshot.track] {
-        bool refused = false;
-        std::optional<ampify::ArtworkHost::File> file = FetchArtworkOf(winHost, track, refused);
-        if (file) ampify::mini::PublishArtwork({track.id, file->contentType, file->bytes});
-        if (refused) refusedTrack = track.id;
-        fetching = false;
-    }).detach();
-}
-
 // Themes and the native interface only touch the interface, so only AppleMusic.exe starts them. Both reach the
 // interface thread through the DispatcherQueue of Apple Music's main window (src/win/xaml_host.hpp). The clicks and
 // changes of the rendered trees go back to the JavaScript thread through the elements' queues.
@@ -137,16 +85,11 @@ void StartInterface(ampify::Journal& journal, [[maybe_unused]] const std::filesy
     // brushes, templates), and a static destructor would release them while Apple Music exits, after XAML is gone.
     static auto* themes = new ampify::win::ThemeService(journal, kit);
     themes->Start(g_module, GetCurrentProcessId());
-    ampify::mini::AddSidebarEntry(model, ampify::i18n::Text("mini.entry"));
 
     // Never destroyed: it holds XAML objects that may only be released on the interface thread.
     static auto* ui = new ampify::win::UiService(journal, kit, model, [target = &loader](const ampify::win::UiEvent& event) {
         if (!event.entry.empty()) {
             target->DeliverEventTo(event.elementId, event.entry, event.valueJson);
-            return;
-        }
-        if (event.click && event.elementId == ampify::mini::kElementId) {
-            ampify::mini::RequestWindow(ampify::mini::WindowAction::Toggle);  // the sidebar entry, not a script
             return;
         }
         if (event.click) {
@@ -247,18 +190,10 @@ DWORD WINAPI KernelMain(LPVOID) {
                                        [] { atmos::hooks::StartSoundHooks(journal); });
     }
 
-#if defined(AMPIFY_WITH_XAML)
-    if (role == ampify::ProcessRole::AppleMusic) {
-        ampify::win::miniwin::Install(journal, kit, settings.GetString(ampify::mini::kPlacementKey, ""));
-    }
-#endif
-    const bool miniHere = role == ampify::ProcessRole::AppleMusic;
-
     // JavaScript runs on this one thread only: QuickJS is not thread-safe, and the shortcuts are delivered to the
     // thread that registered them. Starting the elements here keeps that true.
-    std::thread([kit, miniHere] {
+    std::thread([kit] {
         host.StartAll(settings);
-        if (miniHere) StartMiniPlayerShortcut(winHost, settings, journal);
         journal.Write("Extension host ready");
         ampify::PlayerWatcher playerWatcher;
         int ticks = 0;
@@ -266,10 +201,6 @@ DWORD WINAPI KernelMain(LPVOID) {
         auto nextReload = std::chrono::steady_clock::now();
         while (true) {
             winHost.Service([](const std::string& elementId, const std::string& combo) {
-                if (elementId == ampify::mini::kElementId) {
-                    ampify::mini::RequestWindow(ampify::mini::WindowAction::Toggle);
-                    return;
-                }
                 loader.DeliverKey(elementId, combo);
             });
             loader.Pump();
@@ -282,7 +213,6 @@ DWORD WINAPI KernelMain(LPVOID) {
                 for (const std::string& event : playerWatcher.Poll(snapshot, nowMs)) {
                     loader.DeliverPlayer(event, snapshot);
                 }
-                if (miniHere) FeedMiniPlayer(winHost, snapshot);
             }
             if (std::chrono::steady_clock::now() >= nextReload) {
                 ServiceReloadRequests(kit, reload, loader, settings);

@@ -120,8 +120,6 @@ const char kUi[] = R"AMPIFYJS(
   // the user closes it (button, Escape) or another element takes the screen, not on close().
   let fullscreenSession = 0;
   const fullscreenClosers = new Set();
-  const fullscreenKeyers = new Set();
-  const fullscreenPointers = new Set();
 
   const fullscreen = Object.freeze({
     open(vue) {
@@ -138,35 +136,7 @@ const char kUi[] = R"AMPIFYJS(
       fullscreenClosers.add(fn);
       return () => fullscreenClosers.delete(fn);
     },
-    // Plain letters the view takes while it has the keyboard (F, L, Q), and the pointer's moves over it (250 ms apart).
-    onKey(fn) {
-      if (typeof fn !== "function") throw new TypeError("fullscreen.onKey expects a function");
-      fullscreenKeyers.add(fn);
-      return () => fullscreenKeyers.delete(fn);
-    },
-    onPointer(fn) {
-      if (typeof fn !== "function") throw new TypeError("fullscreen.onPointer expects a function");
-      fullscreenPointers.add(fn);
-      return () => fullscreenPointers.delete(fn);
-    },
   });
-
-  // From the host, as JSON text: {"key": "F"}, and {} for a pointer move. Ignored while the view is closed.
-  dispatch.fullscreenKey = (payload) => {
-    if (!fullscreenSession) return;
-    let key = "";
-    try {
-      key = String(JSON.parse(payload).key || "");
-    } catch (error) {
-      native.log("[error] fullscreenKey: " + describe(error));
-      return;
-    }
-    for (const fn of [...fullscreenKeyers]) runGuarded("fullscreen onKey", fn, [key]);
-  };
-  dispatch.fullscreenPointer = () => {
-    if (!fullscreenSession) return;
-    for (const fn of [...fullscreenPointers]) runGuarded("fullscreen onPointer", fn, []);
-  };
 
   // From the host, as JSON text: {"session": <the session that was closed>}. An older session is ignored.
   dispatch.fullscreenClose = (payload) => {
@@ -214,10 +184,6 @@ const char kUi[] = R"AMPIFYJS(
     popup: Object.freeze({ open: (vue) => openPopup(vue) }),
     fullscreen,
     applePlayer: Object.freeze({ open: () => native.uiApplePlayer() }),
-    miniPlayer: Object.freeze({
-      open: () => native.uiMiniPlayer(true),
-      close: () => native.uiMiniPlayer(false),
-    }),
     panel: Object.freeze({
       register: (id, vue) => native.uiPanel(text(id), treeText(vue, "panel:" + text(id))),
       remove(id) {

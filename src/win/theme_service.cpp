@@ -7,7 +7,6 @@
 #include <chrono>
 #include <fstream>
 #include <functional>
-#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -24,7 +23,6 @@
 #include "window_backdrop.hpp"
 #include "xaml_backend.hpp"
 #include "xaml_watcher.hpp"
-#include "../core/mini_player.hpp"
 #include "../core/settings.hpp"
 #include "../core/theme/css.hpp"
 #include "../core/theme/fonts.hpp"
@@ -249,8 +247,6 @@ void ThemeService::Run(HINSTANCE module, DWORD processId) {
             std::optional<std::string> dump = ui->session.Tick(ui->backend, request);
             if (std::shared_ptr<const theme::Theme> applied = ui->session.Applied(); applied != ui->fontsOf) {
                 PublishFontRoles(theme::FontRolesJson(applied.get()));
-                // The mini player takes its colours from the same variables; without a theme, its own defaults.
-                mini::PublishColours(mini::ColoursFrom(applied ? applied->variables : std::map<std::string, std::string>()));
                 ui->fontsOf = std::move(applied);
             }
             KeepWindowMaterial(MaterialOf(ui->fontsOf.get()), journal);
