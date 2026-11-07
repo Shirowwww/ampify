@@ -170,6 +170,8 @@ public:
 
     std::optional<th::ViewSize> WindowSize() override { return size; }
     void WatchSize(const std::vector<th::MediaQuery>& queries) override { watched = queries; }
+    bool watchedOverPages = false;
+    void WatchSidebarOverPages(bool watch) override { watchedOverPages = watch; }
 
     bool SetHover(th::NodeId id, const std::vector<th::HoverValue>& values) override {
         bool alive = Find(id) != nullptr;
@@ -1511,6 +1513,62 @@ TEST_CASE(Pane_FoundOnlyUnderTheSplitViewThatPlacesIt) {
     CHECK(th::PaneOwner(nodes, 1) == -1);
 }
 
+TEST_CASE(Pane_SidebarLayersAreThePaneItsBorderAndItsColumn) {
+    std::vector<th::NodeInfo> nodes(7);
+    nodes[0] = {1, "SplitView", "", "RootSplitView", -1, 0};
+    nodes[1] = {2, "Grid", "", "", 0, 1};
+    nodes[2] = {3, "Grid", "", "PaneRoot", 1, 2};
+    nodes[3] = {4, "Border", "", "", 2, 3};
+    nodes[4] = {5, "Grid", "", "PaneContentGrid", 3, 4};
+    nodes[5] = {6, "Grid", "", "PaneHeaderGrid", 4, 5};  // inside the column: drawn over its opaque fill
+    nodes[6] = {7, "Grid", "", "", 1, 2};
+
+    CHECK(th::SidebarPaneLayer(nodes, 2) && th::SidebarPaneLayer(nodes, 3) && th::SidebarPaneLayer(nodes, 4));
+    CHECK(!th::SidebarPaneLayer(nodes, 5) && !th::SidebarPaneLayer(nodes, 6));
+    CHECK(!th::SidebarPaneLayer(nodes, 0) && !th::SidebarPaneLayer(nodes, 1));
+    nodes[0].name = "ContentSplitView";  // the lyrics pane is not the sidebar
+    CHECK(!th::SidebarPaneLayer(nodes, 2) && !th::SidebarPaneLayer(nodes, 4));
+}
+
+TEST_CASE(Engine_KeepsTheSidebarPaneOpaqueWhileItStandsOverThePages) {
+    // Cinema dims its sidebar until the pointer comes over it: pinned open over the pages in a narrow window, the
+    // pages showed through the dimmed pane, its entries under the page's titles and tiles.
+    MemoryFiles files;
+    files.files["user.css"] = ".sidebar { opacity: 0.5; }\n.sidebar-column { opacity: 0.8; }\n";
+    th::Theme theme = Load(files);
+
+    FakeTree tree;
+    th::Value opaque{th::ValueKind::Number, "1"};
+    tree.Add(-1, "SplitView", "RootSplitView");
+    tree.Add(0, "Grid", "");
+    th::NodeId pane = tree.Add(1, "Grid", "PaneRoot", {{"Opacity", opaque}});
+    tree.Add(2, "Border", "");
+    th::NodeId column = tree.Add(3, "Grid", "PaneContentGrid", {{"Opacity", opaque}});
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    tree.size = th::ViewSize{1200, 800, false};
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(pane, "Opacity").text == "0.5");
+    CHECK(tree.Shown(column, "Opacity").text == "0.8");
+    CHECK(tree.watchedOverPages);  // the backend asks for a pass when the pane opens over the pages or leaves them
+
+    tree.size->sidebarOverPages = true;
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(pane, "Opacity").text == "1");
+    CHECK(tree.Shown(column, "Opacity").text == "1");
+
+    tree.size->sidebarOverPages = false;
+    engine.Apply(theme, tree);
+    CHECK(tree.Shown(pane, "Opacity").text == "0.5");
+
+    MemoryFiles plain;
+    plain.files["user.css"] = ".sidebar { background: #FF101010; }\n";
+    engine.Apply(Load(plain), tree);
+    CHECK(!tree.watchedOverPages);  // no opacity on the pane: opening it costs no pass
+}
+
 TEST_CASE(Pane_FitsItsOpenLengthLessItsSideMargins) {
     CHECK(th::FittedPaneWidth("360", "0,64,14,98") == 346.0);
     CHECK(th::FittedPaneWidth("360", "8,0,8,0") == 344.0);
@@ -2384,7 +2442,7 @@ TEST_CASE(Engine_PutsADecorInAPanelOnceAndTakesItOff) {
 // played part, which Apple's Slider widens as the song plays. Negative margins keep the column's width at zero.
 TEST_CASE(Engine_PutsAnImageInTheScrubbersThumbColumn) {
     DecorPage page;
-    // The line gets room for the image (RoomForImagesOnTheLine): 18 high, moved 12 down.
+    // The line gets room for the image (RoomInFixedSlots): 18 high, moved 12 down.
     th::NodeId scrubber = page.tree.Add(0, "ScrubberControl", "LCDScrubber",
                                         {{"Height", {th::ValueKind::Length, "6"}},
                                          {"RenderTransform", {th::ValueKind::Opaque, "handle:1"}}});
@@ -2541,6 +2599,42 @@ TEST_CASE(Snippets_ProgressThicknessLeavesTheVolumeSliderAloneByDefault) {
     options.settings["custom-volume"] = "true";
     th::Theme chosen = th::LoadSnippet("progress-thickness", folder.generic_string(), files, nullptr, options);
     CHECK(volumeRules(chosen) > 0);
+}
+
+// The line's template centres the track in a row at least 4 high, 3 below its top, and the 6-pixel control clips the
+// rest: a 6-pixel track showed 3 rows and a 3-pixel one 2 (measured at 100%). The control grows to the track's bottom,
+// upwards, so the line's bottom stays where Apple's is; 1 and 2 pixels fit already.
+TEST_CASE(Snippets_ProgressThicknessGivesAThickLineItsWholeHeight) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "progress-thickness";
+    th::FolderFiles files(folder);
+    th::LoadOptions options;
+    for (int thickness = 1; thickness <= 6; ++thickness) {
+        options.settings = {{"thickness", std::to_string(thickness)}};
+        th::Theme snippet = th::LoadSnippet("progress-thickness", folder.generic_string(), files, nullptr, options);
+        const th::Assignment* height = AssignmentFor(snippet, ".scrubber", "Height");
+        const char* expected[] = {nullptr, nullptr, "7", "7", "8", "9"};
+        if (!expected[thickness - 1]) {
+            CHECK(height == nullptr);
+        } else {
+            CHECK(height && height->value.text == expected[thickness - 1]);
+        }
+        CHECK(AssignmentFor(snippet, ".scrubber", "RenderTransform") == nullptr);
+    }
+}
+
+TEST_CASE(Theme_AThickTrackUnderAnImageKeepsTheLinesBottom) {
+    const char* mascot = ".scrubber Grid#HorizontalTemplate::after { content: url(\"cat.gif\"); grid-column: 1; }\n";
+    MemoryFiles theme;
+    theme.files["cat.gif"] = "GIF89a";
+    theme.files["user.css"] = std::string(mascot) + ".scrubber { track-height: 6; }\n";
+    th::Theme loaded = Load(theme);
+    CHECK(Assigned(loaded, ".scrubber", "Height") == "18");
+    CHECK(Assigned(loaded, ".scrubber", "RenderTransform") == "1,1,0,0,9");
+
+    MemoryFiles track;
+    track.files["user.css"] = ".scrubber { track-height: 5; }\n";
+    CHECK(Assigned(Load(track), ".scrubber", "Height") == "8");
+    CHECK(Assigned(Load(track), ".scrubber", "RenderTransform") == "ABSENT");
 }
 
 TEST_CASE(Theme_BarsContentTakesACountAndAColour) {
@@ -3760,6 +3854,35 @@ TEST_CASE(Snippets_BeatTheThemeInIdOrder) {
     CHECK(tree.elements[1].properties["Background"].text == "#FF222222");  // a snippet type beats a theme #name
     CHECK(tree.elements[0].properties["Background"].text == "#FF303030");  // b comes after a
     CHECK(log.str().find("(snippets/b/user.css line 1)") != std::string::npos);
+}
+
+// A mascot from one snippet and a thick line from another: the room is worked out for both together, or the last
+// snippet's height would win while the first one's shift pushed the line out of the display.
+TEST_CASE(Snippets_AMascotAndAThickLineShareTheLinesRoom) {
+    MemoryFiles mascot;
+    mascot.files["cat.gif"] = "GIF89a";
+    mascot.files["user.css"] = ".scrubber Grid#HorizontalTemplate::after { content: url(\"cat.gif\"); }\n";
+    MemoryFiles thick;
+    thick.files["user.css"] = ".scrubber Rectangle#HorizontalTrackRect { height: 6; }\n";
+    std::vector<std::shared_ptr<const th::Theme>> snippets{Shared(LoadSnippetFrom(mascot, "a", nullptr)),
+                                                           Shared(LoadSnippetFrom(thick, "b", nullptr))};
+
+    th::Theme composed = th::ComposeTheme(nullptr, snippets, nullptr);
+    auto shown = [&](std::string_view property) {
+        const th::Assignment* best = nullptr;
+        for (const th::Assignment& assignment : composed.assignments) {
+            if (assignment.selector.text != ".scrubber" || assignment.property != property) continue;
+            if (!best || assignment.layer >= best->layer) best = &assignment;
+        }
+        return best ? best->value.text : std::string("ABSENT");
+    };
+    CHECK(shown("Height") == "18");
+    CHECK(shown("RenderTransform") == "1,1,0,0,9");
+    int heights = 0;
+    for (const th::Assignment& assignment : composed.assignments) {
+        if (assignment.selector.text == ".scrubber" && assignment.property == "Height") heights++;
+    }
+    CHECK(heights == 1);
 }
 
 TEST_CASE(Session_SnippetsComeAndGoWithoutTouchingTheTheme) {

@@ -1415,6 +1415,7 @@ function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = 
     update: ([id]) => Object.assign(copyOf(id), catalog.find((entry) => entry.id === id)),
     remove: ([id]) => { world.state.installed = world.state.installed.filter((item) => item.id !== id); },
     extension: ([action, id]) => { copyOf(id).enabled = action === "enable"; },
+    snippet: ([action, id]) => { copyOf(id).enabled = action === "enable"; },
     theme: ([action, id, , scheme]) => Object.assign(world.state, { theme: action === "set" ? id : "", scheme: scheme || "" }),
   };
   const h = react.React.h;
@@ -1638,6 +1639,40 @@ test("each catalog tab says in one line what its kind is, and Installed does not
   assert.ok(!textsOf(page.tree).some((text) => text.includes("ampify new")), "no command for someone without a terminal");
   buttonIn(page.tree, "Installed").onClick();
   assert.ok(!textsOf(page.tree).some((text) => text.startsWith("A snippet is")));
+});
+
+// Where a card sits on the page: which child of the page it is in, so a line added above it shows.
+const placeOf = (page, name) => page.tree.children.findIndex((child) => allNodes(child).some(
+  (node) => node.type === "card" && textsOf(node).includes(name)));
+
+test("turning a snippet on or off says so without moving the cards under the pointer", async () => {
+  const { world, page } = fakeMarketplace({ catalog: [marketEntry("compact", "snippet")],
+                                            installed: [marketCopy("compact", "snippet")], language: "fr" });
+  await settle();
+  buttonIn(page.tree, "Snippets").onClick();
+  const before = placeOf(page, "Compact");
+  buttonIn(cardOf(page, "Compact"), "Activer").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["snippet enable compact"]);
+  assert.ok(textsOf(page.tree).includes("Activé : Compact"), "a sentence right for a name of any gender");
+  assert.equal(placeOf(page, "Compact"), before, "the card has not moved");
+  buttonIn(cardOf(page, "Compact"), "Désactiver").onClick();
+  await settle();
+  assert.ok(textsOf(page.tree).includes("Désactivé : Compact"));
+  assert.equal(placeOf(page, "Compact"), before);
+});
+
+test("an action on a detail page leaves its buttons where they were", async () => {
+  const { page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension")],
+                                     installed: [marketCopy("demo", "extension")] });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  buttonIn(cardOf(page, "Demo"), "Details").onClick();
+  const before = placeOf(page, "Demo");
+  buttonIn(page.tree, "Turn on").onClick();
+  await settle();
+  assert.ok(textsOf(page.tree).includes("Demo turned on"));
+  assert.equal(placeOf(page, "Demo"), before, "no line was added above the element");
 });
 
 test("an element that cannot load says why on its detail page, not to run ampify doctor", async () => {

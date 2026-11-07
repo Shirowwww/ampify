@@ -9,6 +9,8 @@
 #include <string_view>
 #include <vector>
 
+#include "theme/color.hpp"
+
 namespace ampify {
 
 inline constexpr double kTopbarHeight = 40;         // the strip themes leave above the panels (--caption-room)
@@ -81,6 +83,28 @@ inline TopbarLayout LayOutTopbar(double windowWidth, double captionHeight) {
     const double top = std::max(kTopbarMinTop, (captionHeight - kTopbarControlHeight) / 2);
     return TopbarLayout{{left - kTopbarGap - kTopbarBackWidth, top, kTopbarBackWidth, kTopbarControlHeight},
                         {left, top, width, kTopbarControlHeight}};
+}
+
+// Over a picture on the window (a theme's artwork or image), Apple's see-through search box and the white caption
+// glyphs read on whatever the picture shows there. A veil darkens (or, light, pales) the strip and fades out where the
+// panels start, and the box gets a fill of its own: both are sized for 4.5:1 over pure white and pure black.
+struct TopbarBacking {
+    theme::Argb veil;   // at the window's top, faded by TopbarVeilShare
+    theme::Argb field;  // under Apple's box, which keeps its own rest fill on top
+};
+
+inline TopbarBacking TopbarBackingFor(bool dark) {
+    return dark ? TopbarBacking{{0xA6, 0, 0, 0}, {0xF2, 0x16, 0x16, 0x18}}
+                : TopbarBacking{{0xA6, 0xFF, 0xFF, 0xFF}, {0xD9, 0xF9, 0xF9, 0xF9}};
+}
+
+// The veil's share of its colour at `y` from the window's top: whole down to the caption glyphs' line, then a straight
+// fade to nothing at the strip's foot, so no edge shows in the gaps between the panels.
+inline constexpr double kTopbarVeilHold = kTopbarCaptionHeight / 2;
+
+inline double TopbarVeilShare(double y) {
+    if (y <= kTopbarVeilHold) return 1;
+    return std::max(0.0, (kTopbarHeight - y) / (kTopbarHeight - kTopbarVeilHold));
 }
 
 // Passthrough regions are in device pixels: the rectangle is rounded outwards so no pixel of the control is missed.

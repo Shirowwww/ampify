@@ -9,6 +9,9 @@
   field is hidden meanwhile. Typing, suggestions and going back stay Apple Music's own. It shows while the playback bar
   is at the bottom and the window is at least 612 pixels wide, and turning it off puts everything back where it was.
   Themes reach it as `.topbar-search` and `.topbar-back` (`apple.topbar`).
+- Under a theme that shows the song's artwork or an image behind the window (Ember, Artwork, Glass, Animated artwork),
+  the top strip stays readable: a veil that fades out where the panels start darkens the picture behind the back
+  arrow and the window buttons, and the search field gets a solid fill, so "Search" no longer melts into the artwork.
 
 - The settings of an extension, a theme or a snippet can be grouped under headings: a `group` on each setting, and a
   `description` line under its label. Translations cover both (`groups`, `settingDescriptions`). Without groups, the
@@ -26,9 +29,18 @@
 - Ampify's pages (Marketplace, Settings > Ampify) stay under the sidebar when it opens over the pages, as Apple's own
   pages do: their titles, tabs and cards no longer show through its entries. While one of them shows, only Ampify's
   entry is lit in the sidebar, and Apple's item comes back when the page closes.
+- The first time the Marketplace opened from the folded sidebar, the blue selection bar of the page Apple Music had
+  opened on (Radio, say) stayed lit beside Ampify's own; it now goes out on every opening.
+- Turning an element on or off in the Marketplace no longer pushes the cards down under the pointer: what was done
+  shows on the line of the tab's introduction, and on a detail page under its buttons, each on lines kept for it. The
+  French, Spanish and Portuguese messages put the element's name last, so they read right whatever its gender.
 - The sidebar opened over the pages (on hover or pinned, in a narrow window) no longer shows a square frame of shadow
   running down the window just inside its right edge, under every theme: Apple's shadow for that pane, cast from a
   rectangle at the window's edge, is gone wherever the pane is a floating panel.
+- That pane now has a thin outline instead, following its rounded corners, so it stands out from a page of its own
+  colour (Ember, Cinema), whether it opened under the pointer or is pinned; a theme's own border there stays alone.
+- Under Cinema, the sidebar pinned over the pages in a narrow window no longer lets the page's titles and tiles show
+  through its entries: a theme that dims the sidebar keeps it opaque while it stands over the pages.
 - The folded sidebar no longer cuts its last icon (Playlists) in half under Glass: Ampify's entries at the foot of the
   column give back the height the list above them lacks, in every theme, and take it again when the window grows.
 - Opening the lyrics over a song with lyrics no longer ends Apple Music under Glass and the other floating-panel
@@ -92,6 +104,10 @@
 - Experimental: `track-height`, `track-radius` and `thumb-visibility` on `.scrubber` write Apple's own properties of
   the progress line for the height and corners of its track and for its thumb. The inspector lists them. Their effect
   in the play bar is not checked on screen yet, nor whether the track can grow past the line's 6 pixels.
+- A thick progress line shows its whole thickness: the Progress line thickness snippet drew 3 pixels at 4, 5 and 6, and
+  2 at 3, cut by the line's slot. The slot now grows to the track (from `height` on its rectangles or `track-height`),
+  upwards, so the line's bottom, the song's title and the buttons stay where they were, in every theme and with the bar
+  at the top or the bottom. With the Progress mascot on as well, the line and the image share the room.
 - A rounded sidebar or lyrics and queue panel keeps its corners round whatever it holds: under Glass, the lyrics
   pane's corners no longer turn into square patches over its border. A folded sidebar is left to its column's corners.
 - The folded sidebar's column shows its whole outline: its two corners on the window's side were cut away by the
@@ -263,6 +279,8 @@
 - A sidebar pinned over the pages in a narrow window stays open after a click on one of its items, under every theme,
   and keeps "Apple Music" and "···" in its header: it showed as a squashed column for a moment (on the right, until
   the next click), and its header could lose both.
+- Mirror: the pages start level with the sidebar, under the window's buttons, so the search scopes no longer show
+  above a sidebar pinned over the pages and run under its top.
 - With a theme whose playback bar is at the bottom (Ember, Glass and the others), the open sidebar in a wide window
   keeps its hamburger in its own row under the logo: it sat on the logo, with an empty row below.
 - The buttons of an Ampify dialog keep the text font: every button in it, its content included, not only the three

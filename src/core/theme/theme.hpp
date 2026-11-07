@@ -146,6 +146,10 @@ Theme LoadAccentOnly(const LoadOptions& options);
 Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& files, const Theme* base,
                   const LoadOptions& options = {});
 
+// Works out again, for all the layers of a composed theme together, the room Apple's fixed slots (the progress line)
+// need: each theme and snippet derived its own, and one's height could win while another's shift moved the line.
+void ShareRoomInFixedSlots(Theme& composed);
+
 // The section names of colors.ini, in file order, without loading the theme. Empty when the file is missing.
 std::vector<std::string> ReadSchemes(FileSource& files);
 

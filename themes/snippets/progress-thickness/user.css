@@ -1,6 +1,7 @@
 /* Progress line thickness: the progress line of the display, thinner or thicker than Apple's 3 pixels, with round ends,
-   like Spicetify's thin and thick bar snippets. The line stays inside the display's room for it (6 pixels). The volume
-   slider, in its flyout, keeps Apple's own thickness unless "Set the volume slider thickness" is on. */
+   like Spicetify's thin and thick bar snippets. From 3 pixels, Ampify grows the line's slot so the track is not cut,
+   and its bottom stays where Apple's is. The volume slider, in its flyout, keeps Apple's own thickness unless "Set the
+   volume slider thickness" is on. */
 
 .scrubber Rectangle#HorizontalTrackRect,
 .scrubber Rectangle#HorizontalDecreaseRect {

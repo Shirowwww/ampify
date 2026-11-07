@@ -680,16 +680,21 @@ std::string ScrubberClearOfCorners(const Theme& theme) {
 // An element of Apple Music's whose height Apple fixes below what its template asks for: WinUI then clips the template
 // and all it holds to that height, so a ::before or ::after image put inside showed as a sliver (a Nyan Cat on the
 // progress line, 6 high, whose template asks for 18). Apple's bottom-aligned slots grow upwards: moved down by what
-// they gained, their first `height` pixels stay where they were.
+// they gained, their first `height` pixels stay where they were. The same clip cut a thicker track: the line's template
+// centres it in a row 3 below its top, as high as the track and at least 4 (an inline tick bar), so a 6-pixel line
+// showed 3 rows and a 3-pixel one 2. A theme's track gets a slot that reaches its bottom.
 struct FixedSlot {
     std::string_view name;      // the stable name (builtins.cpp)
     std::string_view selector;  // the element it names, for a theme that writes it in full
     double height;              // Apple's
     double asked;               // what its template asks for: the least room that clips nothing
+    double trackTop;            // where its template's row for the track starts, from its top
+    double trackRow;            // that row's least height; the track is centred in it
+    std::string_view tracks[2]; // the elements that draw it, whose height is its thickness
 };
 
 constexpr FixedSlot kFixedSlots[] = {
-    {".scrubber", "ScrubberControl#LCDScrubber", 6, 18},
+    {".scrubber", "ScrubberControl#LCDScrubber", 6, 18, 3, 4, {"HorizontalTrackRect", "HorizontalDecreaseRect"}},
 };
 
 bool InSlot(const std::string& selector, const FixedSlot& slot) {
@@ -723,24 +728,64 @@ double DecorLayoutHeight(const Theme& theme, const Assignment& content) {
     return std::max(0.0, height + margins);
 }
 
-std::string RoomForDecors(const Theme& theme) {
+double DecorRoom(const Theme& theme, const FixedSlot& slot) {
+    double room = 0;
+    for (const Assignment& assignment : theme.assignments) {
+        if (assignment.selector.pseudo == PseudoElement::None || assignment.property != kContentProperty ||
+            assignment.value.text.empty() || !InSlot(assignment.selector.text, slot)) {
+            continue;
+        }
+        room = std::max({room, slot.asked, DecorLayoutHeight(theme, assignment)});
+    }
+    return room;
+}
+
+bool DrawsTrack(const std::string& selector, const FixedSlot& slot) {
+    return std::any_of(std::begin(slot.tracks), std::end(slot.tracks),
+                       [&](std::string_view name) { return selector.find(name) != std::string::npos; });
+}
+
+// The thickest track a theme asks for, by the height of the elements that draw it or by the slot's own track-height; 0
+// when it leaves Apple's.
+double TrackThickness(const Theme& theme, const FixedSlot& slot) {
+    double thickness = 0;
+    for (const Assignment& assignment : theme.assignments) {
+        const std::string& text = assignment.selector.text;
+        if (assignment.media || assignment.selector.trigger != Trigger::Always ||
+            assignment.selector.pseudo != PseudoElement::None || !InSlot(text, slot)) {
+            continue;
+        }
+        bool drawn = assignment.property == "Height" && DrawsTrack(text, slot);
+        bool own = assignment.property == "TrackHeight" && (text == slot.name || text == slot.selector);
+        if (drawn || own) thickness = std::max(thickness, LengthOrZero(assignment.value.text));
+    }
+    return thickness;
+}
+
+// Their rules have a source of their own, so that a composed theme can work the room out again for all its layers.
+constexpr const char* kFixedSlotSource = "Ampify (room in a slot Apple fixes)";
+
+// Where a theme's track ends in the slot's template, in whole pixels: Apple's own (0) keeps the place it has.
+double TrackBottom(const FixedSlot& slot, double track) {
+    if (track <= 0) return slot.height;
+    return std::ceil(slot.trackTop + (std::max(slot.trackRow, track) + track) / 2);
+}
+
+// The room a slot needs for its decors and its track, moved down so the track's bottom stays where Apple's is.
+std::string RoomInFixedSlots(const Theme& theme) {
     std::string css;
     for (const FixedSlot& slot : kFixedSlots) {
-        double room = 0;
-        for (const Assignment& assignment : theme.assignments) {
-            if (assignment.selector.pseudo == PseudoElement::None || assignment.property != kContentProperty ||
-                assignment.value.text.empty() || !InSlot(assignment.selector.text, slot)) {
-                continue;
-            }
-            room = std::max({room, slot.asked, DecorLayoutHeight(theme, assignment)});
-        }
+        double bottom = TrackBottom(slot, TrackThickness(theme, slot));
+        double room = std::max({slot.height, DecorRoom(theme, slot), bottom});
         const std::string full(slot.selector);
         if (room <= slot.height || Sets(theme, slot.name, "Height") || Sets(theme, full, "Height") ||
             Sets(theme, slot.name, "RenderTransform") || Sets(theme, full, "RenderTransform")) {
             continue;
         }
-        css += std::string(slot.name) + " { height: " + FormatNumber(room) + "; transform: translateY(" +
-               FormatNumber(room - slot.height) + "px); }\n";
+        double shift = room - bottom;
+        css += std::string(slot.name) + " { height: " + FormatNumber(room) + ";";
+        if (shift > 0) css += " transform: translateY(" + FormatNumber(shift) + "px);";
+        css += " }\n";
     }
     return css;
 }
@@ -851,8 +896,14 @@ std::string RoomInsideALitCard(const Theme& theme) {
 
 // Rules a theme's own choices call for, below its user.css so that a theme which sets the same thing keeps its value.
 void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts& parts) {
-    std::string css = ScrubberClearOfCorners(theme) + RoomForDecors(theme) + OneLightPerSong(theme) +
-                      RoomInsideALitCard(theme);
+    std::string css = ScrubberClearOfCorners(theme) + OneLightPerSong(theme) + RoomInsideALitCard(theme);
+    if (std::string room = RoomInFixedSlots(theme); !room.empty()) {
+        RuleSource slots;
+        slots.file = kFixedSlotSource;
+        slots.layer = -1;
+        slots.applied = parts.resources;
+        LoadRuleText(room, context, theme, slots);
+    }
     if (parts.colors) {
         css += ScrubberInAccent(theme) + NowPlayingBarsInAccent(theme) + ShuffleInAccent(theme) + UpNextInAccent(theme) +
                ArtistInLinkColour(theme) +
@@ -967,9 +1018,9 @@ Theme ReadSnippet(const std::string& id, const std::string& folder, FileSource& 
     source.file = "snippets/" + id + "/user.css";
     source.base = base;
     LoadRules(files, context, snippet, source);
-    if (std::string css = RoomForDecors(snippet); !css.empty()) {
+    if (std::string css = RoomInFixedSlots(snippet); !css.empty()) {
         RuleSource derived;
-        derived.file = "Ampify (derived from the snippet)";
+        derived.file = kFixedSlotSource;
         derived.layer = -1;
         LoadRuleText(css, context, snippet, derived);
     }
@@ -1009,6 +1060,24 @@ std::optional<WindowMaterial> Theme::Material() const {
     if (value == variables.end()) return std::nullopt;
     std::optional<WindowMaterial> material = WindowMaterialOf(value->second);
     return material ? std::optional<WindowMaterial>(MaterialAt(glass, *material)) : std::nullopt;
+}
+
+void ShareRoomInFixedSlots(Theme& composed) {
+    std::erase_if(composed.assignments,
+                  [](const Assignment& assignment) { return assignment.source == kFixedSlotSource; });
+    std::string css = RoomInFixedSlots(composed);
+    if (css.empty()) return;
+    struct NoFiles final : FileSource {
+        std::optional<std::string> Read(std::string_view) override { return std::nullopt; }
+        bool Exists(std::string_view) override { return false; }
+    } files;
+    ValueContext context{composed.palette, files, std::string(), false};
+    RuleSource source;
+    source.file = kFixedSlotSource;
+    source.layer = -1;
+    Theme derived;
+    LoadRuleText(css, context, derived, source);
+    for (Assignment& assignment : derived.assignments) composed.assignments.push_back(std::move(assignment));
 }
 
 std::vector<std::string> ReadSchemes(FileSource& files) {

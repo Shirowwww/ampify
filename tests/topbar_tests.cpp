@@ -1,5 +1,6 @@
 #include "test.hpp"
 
+#include "../src/core/theme/color.hpp"
 #include "../src/core/topbar.hpp"
 
 using namespace ampify;
@@ -173,4 +174,51 @@ TEST_CASE(Topbar_HeaderHeldFromTheStartWithAppleMusicsOwnLayoutWithoutArrow) {
     CHECK(grid.Next(true, 5) == std::optional<double>(-20));
     ArrowRoom title{kAppleTitleLeft};
     CHECK(title.Next(true, 26) == std::optional<double>(kAppleTitleLeft));
+}
+
+namespace {
+
+// What a picture under the strip may show: its brightest, its darkest, Ember's pink and a mid grey.
+const theme::Argb kUnders[] = {{0xFF, 0xFF, 0xFF, 0xFF}, {0xFF, 0, 0, 0}, {0xFF, 0xC8, 0x64, 0x78}, {0xFF, 0x80, 0x80, 0x80}};
+
+theme::Argb Over(theme::Argb under, theme::Argb top) {
+    return theme::Blend(under, top, top.a / 255.0);
+}
+
+}  // namespace
+
+TEST_CASE(Topbar_SearchPlaceholderKeepsItsContrastOverAnyPicture) {
+    // The box's own rest fill in each mode; Fluent's placeholder, Ember's themed one, and the #9F9F9F Apple Music's box
+    // drew in the strip under Ember (measured at 100 %).
+    struct Mode { bool dark; theme::Argb fill; std::vector<theme::Argb> placeholders; };
+    const Mode modes[] = {{true, {0x0F, 0xFF, 0xFF, 0xFF},
+                           {{0xC5, 0xFF, 0xFF, 0xFF}, {0xFF, 0xC9, 0xBF, 0xD0}, {0xFF, 0x9F, 0x9F, 0x9F}}},
+                          {false, {0xB3, 0xFF, 0xFF, 0xFF}, {{0x9E, 0, 0, 0}}}};
+    for (const Mode& mode : modes) {
+        for (theme::Argb under : kUnders) {
+            theme::Argb box = Over(Over(under, TopbarBackingFor(mode.dark).field), mode.fill);
+            for (theme::Argb placeholder : mode.placeholders) CHECK(theme::ContrastRatio(Over(box, placeholder), box) >= 4.5);
+        }
+    }
+}
+
+TEST_CASE(Topbar_CaptionGlyphsKeepTheirContrastOverAnyPicture) {
+    for (bool dark : {true, false}) {
+        // A one-pixel stroke never reaches its full colour: the close glyph measured #EFEFEF at 100 %, so #E0E0E0 here.
+        theme::Argb glyph = dark ? theme::Argb{0xFF, 0xE0, 0xE0, 0xE0} : theme::Argb{0xE4, 0, 0, 0};
+        theme::Argb veil = TopbarBackingFor(dark).veil;
+        veil.a = static_cast<std::uint8_t>(veil.a * TopbarVeilShare(kTopbarCaptionHeight / 2));
+        for (theme::Argb under : kUnders) {
+            theme::Argb behind = Over(under, veil);
+            CHECK(theme::ContrastRatio(Over(behind, glyph), behind) >= 4.5);
+        }
+    }
+}
+
+TEST_CASE(Topbar_VeilFadesOutWhereThePanelsStart) {
+    CHECK(TopbarVeilShare(0) == 1);
+    CHECK(TopbarVeilShare(kTopbarCaptionHeight / 2) == 1);    // held over the glyphs' line
+    CHECK(TopbarVeilShare(28) > 0 && TopbarVeilShare(28) < 1);  // a soft edge, no band
+    CHECK(TopbarVeilShare(kTopbarHeight) == 0);
+    CHECK(TopbarVeilShare(kTopbarHeight + 10) == 0);
 }

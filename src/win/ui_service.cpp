@@ -174,6 +174,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
     try {
         ClearWatches(context);
         UncoverApplePage(context);
+        ForgetSelectionBars(context);
         ReleasePages(context);  // the pages' grid outlives the context: it takes its padding back
         if (context.panelPopup) context.panelPopup.IsOpen(false);
         RemoveFromParent(context.pageHost);
@@ -391,6 +392,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         context->surfaces.clear();
         context->placed.clear();
         UncoverApplePage(*context);
+        ForgetSelectionBars(*context);
         try {
             ReleasePages(*context);  // the old content's grid: the new pages make room again when a panel shows
             if (context->panelPopup) context->panelPopup.IsOpen(false);  // the overlays of the old content

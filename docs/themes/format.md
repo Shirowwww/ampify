@@ -199,9 +199,9 @@ explain them in one line; the page also resets them, and exports or imports them
 | `min-width`, `min-height` | `MinWidth`, `MinHeight` | A length, or `auto` |
 | `max-width`, `max-height` | `MaxWidth`, `MaxHeight` | A length, or `none` |
 | `compact-pane-length` | `CompactPaneLength` | On `.navigation`: the width of the folded sidebar (48 in Apple Music) |
-| `track-height`, `track-radius` | `TrackHeight`, `TrackRectRadius` | On `.scrubber`: properties of Apple's progress line itself, the height and corner radius its template gives the track. A length, not negative and not `auto`. Unlike `height`, they leave the control's place in the display alone. Not yet checked on screen: whether the line grows past the control's 6 pixels |
+| `track-height`, `track-radius` | `TrackHeight`, `TrackRectRadius` | On `.scrubber`: properties of Apple's progress line itself, the height and corner radius its template gives the track. A length, not negative and not `auto`. Unlike `height`, they leave the control's place in the display alone. A track thicker than 2 pixels, set here or by `height` on `.scrubber Rectangle#HorizontalTrackRect` and `#HorizontalDecreaseRect`, makes Ampify grow the line's slot upwards so the whole track shows and its bottom stays in place (checked from 1 to 6 pixels with the rectangles' `height`) |
 | `thumb-visibility` | `ThumbVisibility` | On `.scrubber`: `visible` or `collapsed`, the line's thumb (Apple hides it in the play bar). Not yet checked on screen |
-| `opacity` | `Opacity` | 0 to 1 |
+| `opacity` | `Opacity` | 0 to 1. On `.sidebar` or `.sidebar-column`, it holds only while the sidebar does not stand over the pages: open over them (under the pointer, or pinned in a narrow window), the pane stays opaque |
 | `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`). `visible` holds over Apple's visual states that collapse the element (the play bar's times, shown only under the pointer) |
 | `display` | `Visibility` | `none` hides; `block`, `flex`, `grid`... show (use them to undo a `display: none`) |
 | `template` | `Template` | `url(templates/file.xaml)`, a full `ControlTemplate`. Skipped on a control with a negative padding or border |

@@ -79,6 +79,18 @@ void UncoverApplePage(WindowContext& context, Selection selection) noexcept {
     }
 }
 
+// Takes the watch of WatchSelectionBars off and lets the bars go. Interface thread only, as the bars are XAML.
+void ForgetSelectionBars(WindowContext& context) noexcept {
+    try {
+        if (context.barsSidebar && context.barsToken) context.barsSidebar.SelectionChanged(context.barsToken);
+    } catch (...) {
+    }
+    context.barsSidebar = nullptr;
+    context.barsToken = {};
+    context.barsSelection = nullptr;
+    context.hiddenBars.clear();
+}
+
 namespace {
 
 // True when the host is shown: not before Apple's frame is found, which the next refresh tries again.
@@ -92,12 +104,75 @@ bool ShowPageHost(WindowContext& context, bool visible, Selection selection = Se
     return false;
 }
 
+constexpr int kPaneDepth = 12;          // the pane's grid sits 7 levels under the NavigationView
+constexpr int kSelectionBarDepth = 26;  // and the bars 14 to 20 levels under that grid (1.1792, nested groups)
+
+// The first element named `name` under `parent`, depth first, no deeper than `depth` levels.
+xaml::DependencyObject FindNamedBelow(const xaml::DependencyObject& parent, std::wstring_view name, int depth) {
+    if (depth <= 0) return nullptr;
+    int32_t count = media::VisualTreeHelper::GetChildrenCount(parent);
+    for (int32_t i = 0; i < count; i++) {
+        xaml::DependencyObject child = media::VisualTreeHelper::GetChild(parent, i);
+        auto element = child.try_as<xaml::FrameworkElement>();
+        if (element && element.Name() == name) return child;
+        if (auto found = FindNamedBelow(child, name, depth - 1)) return found;
+    }
+    return nullptr;
+}
+
+// The NavigationView puts out only the bar it lit itself: an item lit before its row was realized (the page Apple
+// Music opens on, in the folded column) kept its bar once the selection was cleared. Every lit bar of the pane goes
+// out here, kept with its opacity for WatchSelectionBars.
+void HideSelectionBars(WindowContext& context, const xaml::DependencyObject& parent, int depth) {
+    if (depth <= 0) return;
+    int32_t count = media::VisualTreeHelper::GetChildrenCount(parent);
+    for (int32_t i = 0; i < count; i++) {
+        xaml::DependencyObject child = media::VisualTreeHelper::GetChild(parent, i);
+        auto element = child.try_as<xaml::FrameworkElement>();
+        if (element && element.Name() == L"SelectionIndicator") {
+            if (element.Opacity() != 0) {
+                context.hiddenBars.emplace_back(element, element.Opacity());
+                element.Opacity(0);
+            }
+            continue;
+        }
+        HideSelectionBars(context, child, depth - 1);
+    }
+}
+
+// WinUI, which did not light those bars, does not light them again when their item comes back either: the next
+// selection of the sidebar puts them back when it is the item they were lit for. Another item lights its own bar.
+void WatchSelectionBars(const std::shared_ptr<WindowContext>& owner, const controls::NavigationView& sidebar) {
+    if (owner->hiddenBars.empty() || owner->barsSidebar) return;
+    WeakContext weakContext = owner;
+    owner->barsSidebar = sidebar;
+    owner->barsSelection = owner->coveredSelection;
+    using ChangedArgs = controls::NavigationViewSelectionChangedEventArgs;
+    owner->barsToken = sidebar.SelectionChanged(
+        [weakContext](controls::NavigationView const& sender, ChangedArgs const&) noexcept {
+            try {
+                auto live = weakContext.lock();
+                IInspectable selected = live ? sender.SelectedItem() : nullptr;
+                if (!selected) return;  // Ampify's own clearing, or nothing selected yet
+                if (selected == live->barsSelection) {
+                    for (auto& [bar, opacity] : live->hiddenBars) bar.Opacity(opacity);
+                }
+                ForgetSelectionBars(*live);
+            } catch (...) {
+            }
+        });
+}
+
 // Apple Music lights the sidebar item of its page: while an app page shows, none of Apple's items is lit (Ampify's
 // entry is), as on Apple's own Settings page. The item comes back when the app page closes (UncoverApplePage).
-void ClearSidebarSelection(WindowContext& context, const controls::NavigationView& sidebar) {
+void ClearSidebarSelection(const std::shared_ptr<WindowContext>& owner, const controls::NavigationView& sidebar) {
     if (auto selected = sidebar.SelectedItem()) {
-        context.coveredSelection = selected;
+        owner->coveredSelection = selected;
         sidebar.SelectedItem(nullptr);
+    }
+    if (auto pane = FindNamedBelow(sidebar, L"PaneContentGrid", kPaneDepth)) {
+        HideSelectionBars(*owner, pane, kSelectionBarDepth);
+        WatchSelectionBars(owner, sidebar);
     }
 }
 
@@ -160,7 +235,7 @@ void CoverApplePage(UiService::Shared& shared, const std::shared_ptr<WindowConte
                 }
             });
             context.coveredSidebar = sidebar;
-            ClearSidebarSelection(context, sidebar);
+            ClearSidebarSelection(owner, sidebar);
         }
     }
     context.coveredFrame = frame;

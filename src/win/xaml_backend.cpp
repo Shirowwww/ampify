@@ -67,16 +67,18 @@ std::optional<theme::ViewSize> XamlTreeBackend::WindowSize() {
         xaml::Window window = m_window.get();
         if (!window) return std::nullopt;
         winrt::Windows::Foundation::Rect bounds = window.Bounds();
-        return theme::ViewSize{bounds.Width, bounds.Height, SidebarKeptFolded()};
+        return theme::ViewSize{bounds.Width, bounds.Height, SidebarKeptFolded(), SidebarOverPages()};
     } catch (...) {
         return std::nullopt;
     }
 }
 
+// The answer of each watched query, then whether the sidebar stands over the pages when the theme reads that.
 std::vector<bool> XamlTreeBackend::MediaAnswers() {
     std::vector<bool> answers;
     std::optional<theme::ViewSize> size = WindowSize();
     for (const theme::MediaQuery& query : m_mediaQueries) answers.push_back(size && query.Matches(size->width, size->height, size->sidebarFolded));
+    if (m_watchOverPages) answers.push_back(size && size->sidebarOverPages);
     return answers;
 }
 
@@ -86,10 +88,16 @@ void XamlTreeBackend::WatchSize(const std::vector<theme::MediaQuery>& queries) {
     m_mediaAnswers = MediaAnswers();
 }
 
+void XamlTreeBackend::WatchSidebarOverPages(bool watch) {
+    if (watch == m_watchOverPages) return;
+    m_watchOverPages = watch;
+    m_mediaAnswers = MediaAnswers();
+}
+
 // Resizing fires many times a second: only a change of answer costs a pass.
 void XamlTreeBackend::OnSizeChanged() noexcept {
     try {
-        if (m_mediaQueries.empty()) return;
+        if (m_mediaQueries.empty() && !m_watchOverPages) return;
         std::vector<bool> answers = MediaAnswers();
         if (answers == m_mediaAnswers) return;
         m_mediaAnswers = std::move(answers);

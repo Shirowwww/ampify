@@ -11,6 +11,8 @@ namespace {
 
 constexpr std::string_view kPaneName = "PaneRoot";
 constexpr std::string_view kSplitViewType = "SplitView";
+constexpr std::string_view kSidebarSplitView = "RootSplitView";
+constexpr std::string_view kColumnName = "PaneContentGrid";
 
 }  // namespace
 
@@ -20,6 +22,20 @@ int PaneOwner(const std::vector<NodeInfo>& nodes, int position) {
     if (node.name != kPaneName || node.parent < 0) return -1;
     const int owner = nodes[node.parent].parent;
     return owner >= 0 && nodes[owner].type == kSplitViewType ? owner : -1;
+}
+
+bool SidebarPaneLayer(const std::vector<NodeInfo>& nodes, int position) {
+    if (position < 0 || position >= static_cast<int>(nodes.size())) return false;
+    auto sidebarPane = [&](int at) {
+        const int owner = PaneOwner(nodes, at);
+        return owner >= 0 && nodes[owner].name == kSidebarSplitView;
+    };
+    const NodeInfo& node = nodes[position];
+    if (sidebarPane(position)) return true;
+    if (node.parent >= 0 && node.type == "Border" && sidebarPane(node.parent)) return true;
+    if (node.name != kColumnName || node.parent < 0) return false;
+    const NodeInfo& border = nodes[node.parent];
+    return border.type == "Border" && border.parent >= 0 && sidebarPane(border.parent);
 }
 
 bool TemplatePlacesPane(std::string_view property) {

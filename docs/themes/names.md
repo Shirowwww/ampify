@@ -59,7 +59,7 @@ read on Apple Music 1.1792.
 | `.more-icon` | The dots drawn in it |
 | `.topnav` | The row of buttons that takes the place of the sidebar's header in a narrow window |
 | `.topbar-back` | With `apple.topbar = search`: the back arrow left of the search box, in the strip at the top of the window. It presses Apple's `.back-button`, which then stays in its place, transparent |
-| `.topbar-search` | With `apple.topbar = search`: the cell in that strip that holds Apple's own `.search-box`, centred in the window. `.search-area` stays empty and hidden in the sidebar meanwhile |
+| `.topbar-search` | With `apple.topbar = search`: the cell in that strip that holds Apple's own `.search-box`, centred in the window. `.search-area` stays empty and hidden in the sidebar meanwhile. When the window shows a picture (an image or gradient `background` on `.window`, or a `.window::before` or `::after`), Ampify lays a fill under the box and a veil over the strip that fades out at 40 pixels, so the field and the window buttons stay readable |
 | `.sidebar-scroll` | The scrolling list of the sidebar |
 | `.sidebar-items` | The items of that list |
 | `.sidebar-item` | One item: Home, Radio, a playlist... |

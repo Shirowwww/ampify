@@ -17,6 +17,11 @@ namespace ampify::theme {
 // The index of the SplitView whose template places the element at `position` as its pane, or -1.
 int PaneOwner(const std::vector<NodeInfo>& nodes, int position);
 
+// The sidebar's pane (`Grid#PaneRoot` of `SplitView#RootSplitView`), the Border it holds and the column in that
+// (`Grid#PaneContentGrid`): the layers an opacity makes see-through as a whole, the pages showing through them while the
+// pane is open over them. Elements inside the column are drawn over its fill, and are not listed.
+bool SidebarPaneLayer(const std::vector<NodeInfo>& nodes, int position);
+
 // True for a property the pane's visual states set: a theme's value there is refused.
 bool TemplatePlacesPane(std::string_view property);
 

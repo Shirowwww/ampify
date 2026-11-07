@@ -93,14 +93,14 @@ Ampify.i18n.define({
     "status.reading": "Lecture du catalogue…", "status.working": "En cours…",
     "status.unreadable": "Impossible de lire l'état d'Ampify : {error}", "status.unreadableReply": "réponse illisible",
     "status.failed": "Échec : {error}", "status.failedCode": "Échec (code {code})",
-    "done.installedInUse": "{name} installé et utilisé", "done.installedOn": "{name} installé et activé",
-    "done.installedUse": "{name} installé. Lisez ce qu'il peut faire, puis utilisez-le.",
-    "done.installedTurnOn": "{name} installé. Lisez ce qu'il peut faire, puis activez-le.",
-    "done.updated": "{name} mis à jour en {version}", "done.inUse": "{name} utilisé",
-    "done.inUseScheme": "{name} utilisé, variante {scheme}", "done.appleLook": "Le look d'Apple Music est revenu",
-    "done.on": "{name} activé", "done.off": "{name} désactivé", "done.removed": "{name} désinstallé",
+    "done.installedInUse": "Installé et utilisé : {name}", "done.installedOn": "Installé et activé : {name}",
+    "done.installedUse": "Installé : {name}. Lisez ce que cet élément peut faire, puis utilisez-le.",
+    "done.installedTurnOn": "Installé : {name}. Lisez ce que cet élément peut faire, puis activez-le.",
+    "done.updated": "Mis à jour en {version} : {name}", "done.inUse": "Utilisé : {name}",
+    "done.inUseScheme": "Utilisé : {name}, variante {scheme}", "done.appleLook": "Le look d'Apple Music est revenu",
+    "done.on": "Activé : {name}", "done.off": "Désactivé : {name}", "done.removed": "Désinstallé : {name}",
     "preview": "Aperçu de {name}",
-    "detail.settings": "Réglages", "detail.settingsNote": "Les changements s'appliquent tout de suite. Ils sont aussi dans les Réglages d'Apple Music, sous Ampify.", "done.setting": "{name} : {setting} modifié", "action.settingsOf": "Réglages de {name}",
+    "detail.settings": "Réglages", "detail.settingsNote": "Les changements s'appliquent tout de suite. Ils sont aussi dans les Réglages d'Apple Music, sous Ampify.", "done.setting": "{name} : réglage « {setting} » modifié", "action.settingsOf": "Réglages de {name}",
     "detail.readmeLoading": "Lecture de sa présentation…",
     "action.settings": "Réglages", "action.openSettings": "Ouvrir les réglages d'Ampify", "detail.can": "Ce qu'il peut faire", "detail.about": "À propos", "detail.kind": "Type", "detail.author": "Créé par", "detail.version": "Version", "detail.tags": "Mots-clés", "detail.gone": "Cet élément n'est plus dans le catalogue ni installé.", "detail.noDescription": "Pas encore de description.",
   },
@@ -191,14 +191,14 @@ Ampify.i18n.define({
     "status.reading": "Leyendo el catálogo…", "status.working": "Trabajando…",
     "status.unreadable": "No se puede leer el estado de Ampify: {error}", "status.unreadableReply": "respuesta ilegible",
     "status.failed": "Error: {error}", "status.failedCode": "Error (código {code})",
-    "done.installedInUse": "{name} instalado y en uso", "done.installedOn": "{name} instalado y activado",
-    "done.installedUse": "{name} instalado. Lee lo que puede hacer y luego úsalo.",
-    "done.installedTurnOn": "{name} instalado. Lee lo que puede hacer y luego actívalo.",
-    "done.updated": "{name} actualizado a {version}", "done.inUse": "{name} en uso",
+    "done.installedInUse": "Instalado y en uso: {name}", "done.installedOn": "Instalado y activado: {name}",
+    "done.installedUse": "Instalado: {name}. Lee lo que puede hacer y luego úsalo.",
+    "done.installedTurnOn": "Instalado: {name}. Lee lo que puede hacer y luego actívalo.",
+    "done.updated": "Actualizado a {version}: {name}", "done.inUse": "{name} en uso",
     "done.inUseScheme": "{name} en uso, variante {scheme}", "done.appleLook": "Ha vuelto el aspecto propio de Apple Music",
-    "done.on": "{name} activado", "done.off": "{name} desactivado", "done.removed": "{name} desinstalado",
+    "done.on": "Activado: {name}", "done.off": "Desactivado: {name}", "done.removed": "Desinstalado: {name}",
     "preview": "Vista previa de {name}",
-    "detail.settings": "Ajustes", "detail.settingsNote": "Los cambios se aplican al instante. También están en los Ajustes de Apple Music, en Ampify.", "done.setting": "{name}: {setting} cambiado", "action.settingsOf": "Ajustes de {name}",
+    "detail.settings": "Ajustes", "detail.settingsNote": "Los cambios se aplican al instante. También están en los Ajustes de Apple Music, en Ampify.", "done.setting": "{name}: ajuste «{setting}» cambiado", "action.settingsOf": "Ajustes de {name}",
     "detail.readmeLoading": "Leyendo su presentación…",
     "action.settings": "Ajustes", "action.openSettings": "Abrir los ajustes de Ampify", "detail.can": "Lo que puede hacer", "detail.about": "Información", "detail.kind": "Tipo", "detail.author": "Creado por", "detail.version": "Versión", "detail.tags": "Etiquetas", "detail.gone": "Este elemento ya no está en el catálogo ni instalado.", "detail.noDescription": "Todavía no hay descripción.",
   },
@@ -240,14 +240,14 @@ Ampify.i18n.define({
     "status.reading": "Lendo o catálogo…", "status.working": "Trabalhando…",
     "status.unreadable": "Não foi possível ler o estado do Ampify: {error}", "status.unreadableReply": "resposta ilegível",
     "status.failed": "Falhou: {error}", "status.failedCode": "Falhou (código {code})",
-    "done.installedInUse": "{name} instalado e em uso", "done.installedOn": "{name} instalado e ativado",
-    "done.installedUse": "{name} instalado. Leia o que ele pode fazer e depois use-o.",
-    "done.installedTurnOn": "{name} instalado. Leia o que ele pode fazer e depois ative-o.",
-    "done.updated": "{name} atualizado para {version}", "done.inUse": "{name} em uso",
+    "done.installedInUse": "Instalado e em uso: {name}", "done.installedOn": "Instalado e ativado: {name}",
+    "done.installedUse": "Instalado: {name}. Leia o que este item pode fazer e depois use-o.",
+    "done.installedTurnOn": "Instalado: {name}. Leia o que este item pode fazer e depois ative-o.",
+    "done.updated": "Atualizado para {version}: {name}", "done.inUse": "{name} em uso",
     "done.inUseScheme": "{name} em uso, variante {scheme}", "done.appleLook": "O visual próprio do Apple Music voltou",
-    "done.on": "{name} ativado", "done.off": "{name} desativado", "done.removed": "{name} desinstalado",
+    "done.on": "Ativado: {name}", "done.off": "Desativado: {name}", "done.removed": "Desinstalado: {name}",
     "preview": "Prévia de {name}",
-    "detail.settings": "Ajustes", "detail.settingsNote": "As mudanças valem na hora. Também estão nos Ajustes do Apple Music, em Ampify.", "done.setting": "{name}: {setting} alterado", "action.settingsOf": "Ajustes de {name}",
+    "detail.settings": "Ajustes", "detail.settingsNote": "As mudanças valem na hora. Também estão nos Ajustes do Apple Music, em Ampify.", "done.setting": "{name}: ajuste “{setting}” alterado", "action.settingsOf": "Ajustes de {name}",
     "detail.readmeLoading": "Lendo a apresentação…",
     "action.settings": "Ajustes", "action.openSettings": "Abrir os ajustes do Ampify", "detail.can": "O que ele pode fazer", "detail.about": "Sobre", "detail.kind": "Tipo", "detail.author": "Criado por", "detail.version": "Versão", "detail.tags": "Etiquetas", "detail.gone": "Este elemento não está mais no catálogo nem instalado.", "detail.noDescription": "Ainda não há descrição.",
   },
@@ -665,6 +665,8 @@ const TILE_SIZE = 160;        // the icon tile of a detail page without a pictur
 const DETAIL_WIDTH = 1000;    // as wide as Apple's settings rows: a wider page leaves the eye far from the buttons
 const SETTINGS_GLYPH = "";  // Settings, in Segoe Fluent Icons
 
+const STATUS_HEIGHT = 34;     // two caption lines, as a card's description
+
 // The last useful line of ampify's output, for the status line.
 const lastLine = (text) => String(text || "").trim().split(/\r?\n/).filter(Boolean).pop() || "";
 
@@ -818,6 +820,12 @@ function ItemCard({ item, activeTheme, busy, act, open, previewHeight }) {
                               onClick: () => openItem(item, "", true) })
         : null,
       h(ButtonTertiary, { label: t("action.details"), onClick: open })));
+}
+
+// The status line keeps its height, written or not, and never grows past two lines: a line that came and went would
+// move what is under the pointer, and a second click at the same place would miss.
+function StatusLine({ text }) {
+  return h("stack", { height: STATUS_HEIGHT }, h(Text, { variant: "caption", maxLines: 2 }, text || " "));
 }
 
 function Grid({ items, renderCard }) {
@@ -1100,7 +1108,8 @@ function Details({ item, activeTheme, scheme, busy, act, message }) {
       ? h(Dropdown, { label: t("scheme"), value: shownScheme(item, active ? scheme : ""), options: schemes, disabled: busy,
                       onChange: (value) => act.use(item, value) })
       : null,
-    actions);
+    actions,
+    h(StatusLine, { text: message }));
 
   const reasons = (item.installed && !item.installed.valid && item.installed.errors) || [];
   const broken = reasons.length
@@ -1122,9 +1131,8 @@ function Details({ item, activeTheme, scheme, busy, act, message }) {
       ? h("row", { gap: 8 }, h(Button, { label: t("action.openSettings"), onClick: openSettings }), h("stack", { grow: true }))
       : null);
 
-  // Keyed, as on the list: the status line coming and going leaves the rest in place.
+  // Keyed, as on the list: the settings panel moving above the picture leaves the rest in place.
   return h("stack", { gap: 20, maxWidth: DETAIL_WIDTH },
-    message ? h(Text, { key: "status", variant: "caption" }, message) : null,
     view.settingsFirst ? h(SettingsPanel, { key: "settings", item, act, named: true }) : null,
     item.preview
       ? h("stack", { key: "hero", gap: 20 }, h(Showcase, { item }), heading)
@@ -1280,7 +1288,7 @@ function useMarket(onItemPage) {
 
   // settings.txt may say "none" for no theme, as the kernel reads it.
   const activeTheme = state && state.theme && state.theme !== "none" ? state.theme : "";
-  return { state, message, busy, act, reread, activeTheme };
+  return { state, message, busy, act, reread, activeTheme, clearMessage: () => setMessage("") };
 }
 
 function MarketItem() {
@@ -1292,7 +1300,7 @@ function MarketItem() {
 }
 
 function Marketplace() {
-  const { state, message, busy, act, reread, activeTheme } = useMarket(false);
+  const { state, message, busy, act, reread, activeTheme, clearMessage } = useMarket(false);
   const [tab, setTabState] = useState(view.tab);
   const [search, setSearchState] = useState(view.search);
   const [page, setPageState] = useState(view.page);
@@ -1301,7 +1309,9 @@ function Marketplace() {
     view.page = value;
     setPageState(value);
   };
+  // Another tab shows its own introduction on the status line, not what was done on the last one.
   const setTab = (value) => {
+    if (value !== tab) clearMessage();
     view.tab = value;
     setTabState(value);
     setPage(0);
@@ -1334,7 +1344,7 @@ function Marketplace() {
                    action: h(Button, { label: t("action.refresh"), align: "center", disabled: busy, onClick: reread }) })
       : h(Empty, { key: "empty", title: t("empty.title"), text: t("empty." + current) });
 
-  // Keyed sections: the status line coming and going does not make the kernel rebuild the cards under it.
+  // Keyed sections: the status line changing does not make the kernel rebuild the cards under it.
   return h("stack", { gap: 16 },
     h("row", { key: "bar", gap: 8 },
       TABS.map((kind) => h(Button, { key: kind, label: t("tab." + kind), variant: kind === current ? "secondary" : "tertiary",
@@ -1344,8 +1354,8 @@ function Marketplace() {
       h(Button, { key: "refresh", label: t("action.refresh"), disabled: busy, onClick: reread }),
       h(Button, { key: "settings", label: t("action.settings"), icon: SETTINGS_GLYPH, tooltip: t("action.openSettings"),
                   onClick: openSettings })),
-    catalogTab ? h(Text, { key: "intro", variant: "caption" }, t("intro." + current)) : null,
-    message ? h(Text, { key: "status", variant: "caption" }, message) : null,
+    // What an action said stands in for the tab's introduction, on the same reserved lines.
+    h(StatusLine, { key: "status", text: message || (catalogTab ? t("intro." + current) : "") }),
     current === "theme" || current === "installed"
       ? h(ThemeBar, { key: "theme", items, activeTheme, scheme: state.scheme, busy, act })
       : null,

@@ -25,7 +25,12 @@ void SetSidebarOnHover(bool enabled) noexcept;
 // every width. False while the pin button keeps the pane open. Any thread.
 bool SidebarKeptFolded() noexcept;
 
-// Called on the interface thread when a click pins or unpins the pane, so the theme re-checks its media rules at once.
+// True while the pane is open over the pages: under the pointer, or pinned in a window too narrow to push them. Any
+// thread.
+bool SidebarOverPages() noexcept;
+
+// Called on the interface thread when a click pins or unpins the pane, or the pane opens over the pages or leaves
+// them, so the theme re-checks its media rules at once.
 void SetSidebarChangedListener(std::function<void()> changed);
 
 }  // namespace ampify::win

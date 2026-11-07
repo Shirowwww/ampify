@@ -89,6 +89,7 @@ public:
     // The main window's bounds. Window.SizeChanged asks for a pass when one of the watched queries changes its answer.
     std::optional<theme::ViewSize> WindowSize() override;
     void WatchSize(const std::vector<theme::MediaQuery>& queries) override;
+    void WatchSidebarOverPages(bool watch) override;
     // The element's place against its window's root (TransformToVisual) and its actual size, for the inspector.
     std::optional<theme::NodeBox> Box(theme::NodeId id) override;
     // Asks for a pass when a watched query changed its answer without the window changing size (the sidebar folded
@@ -295,6 +296,7 @@ private:
     std::string m_firstRefusal;
     std::vector<theme::MediaQuery> m_mediaQueries;  // the theme's @media conditions (WatchSize)
     std::vector<bool> m_mediaAnswers;               // whether each matched at the last pass
+    bool m_watchOverPages = false;                  // WatchSidebarOverPages: the theme dims the sidebar's pane
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);  // the pointer handlers hold a weak pointer to it
     winrt::Microsoft::UI::Xaml::ResourceDictionary m_merged{nullptr};
     std::shared_ptr<bool> m_closed = std::make_shared<bool>(false);  // set by Window.Closed, on the interface thread

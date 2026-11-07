@@ -222,6 +222,12 @@ struct WindowContext {
     controls::NavigationView coveredSidebar{nullptr};  // its item already selected does not navigate: watched too
     winrt::event_token coveredInvoked{};
     IInspectable coveredSelection{nullptr};  // Apple's sidebar item lit before the app page showed
+    // The sidebar's selection bars Ampify put out under an app page, with their opacity, until Apple's selection
+    // changes again (WatchSelectionBars); strong, released on the interface thread (ForgetSelectionBars).
+    std::vector<std::pair<xaml::FrameworkElement, double>> hiddenBars;
+    IInspectable barsSelection{nullptr};
+    controls::NavigationView barsSidebar{nullptr};
+    winrt::event_token barsToken{};
     media::Brush pageBackground{nullptr};  // the host's own, when Apple Music's page cannot be hidden
     // The fullscreen view: a Popup of the window over all of its content, strong like the other hosts.
     primitives::Popup fullscreenPopup{nullptr};
@@ -387,6 +393,7 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
 // What the sidebar's selection does when the app page stops covering Apple's.
 enum class Selection { GiveBack, Drop, Keep };
 void UncoverApplePage(WindowContext& context, Selection selection = Selection::GiveBack) noexcept;
+void ForgetSelectionBars(WindowContext& context) noexcept;
 UiEvent FullscreenClosed(const std::string& elementId, const std::string& session);
 void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                    const xaml::DependencyObject& content);

@@ -123,6 +123,16 @@ int FindContainer(const std::string& text, const std::vector<NodeInfo>& nodes) {
     return -1;
 }
 
+// A dimmed sidebar (Cinema's house lights) is see-through as a whole: open over the pages, they showed through its
+// entries. There its opacity leaves `winners`, so GiveBack puts Apple's back. True when the theme dims it at all.
+bool KeepSidebarOpaque(const std::vector<NodeInfo>& nodes, int position,
+                       std::map<std::string, const Assignment*>& winners, const std::optional<ViewSize>& size) {
+    auto opacity = winners.find("Opacity");
+    if (opacity == winners.end() || !SidebarPaneLayer(nodes, position)) return false;
+    if (size && size->sidebarOverPages) winners.erase(opacity);
+    return true;
+}
+
 }  // namespace
 
 ThemeEngine::ThemeEngine(Journal& journal) : m_journal(journal) {}
@@ -176,6 +186,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
     const bool darkScheme = theme.dark.value_or(false);  // the loader decided; neither dark nor light reads as light
     tree.WatchSize(MediaQueries(theme));
     std::vector<Winners> inherited(nodes.size());
+    bool sidebarDimmed = false;
     for (int position = 0; position < static_cast<int>(nodes.size()); position++) {
         const NodeInfo& node = nodes[position];
 
@@ -209,6 +220,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
         std::optional<Assignment> fittedWidth;  // `winners` may point to it until the end of this element
         InheritTextValues(node, position, winners, inherited, tree);
         PlacePane(nodes, position, winners, fittedWidth, tree, report);
+        sidebarDimmed = KeepSidebarOpaque(nodes, position, winners, size) || sidebarDimmed;
 
         // The transition first, so a transform or opacity written in the same pass already animates. The animation
         // last, so it starts from the opacity and around the origin the theme gives the element.
@@ -239,6 +251,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
             ApplyDecors(node, decorWinners, tree, report);
         }
     }
+    tree.WatchSidebarOverPages(sidebarDimmed);
     ApplyMoves(pending, tree, report);
     GiveBackReparents(reparents, nodes, tree, report);
     ApplyReparents(reparents, nodes, tree, report);

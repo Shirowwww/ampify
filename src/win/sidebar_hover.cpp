@@ -63,6 +63,7 @@ constexpr double kHeaderSpacing = 2;    // as between "···" and Ampify's entr
 
 std::atomic<bool> g_enabled{false};
 std::atomic<bool> g_folded{false};  // Take done, Release not yet, and not pinned open
+std::atomic<bool> g_over{false};    // the pane is open over the pages (OverPages), as the theme last heard
 std::function<void()> g_changed;    // asks the theme for a pass now: the themes' folded rules follow a pin at once
 
 struct State {
@@ -94,6 +95,10 @@ struct State {
     bool keysUsed = false;  // a key opened the pane or went down in it: it stays while the focus is on it
     controls::Grid fillGrid{nullptr};  // Apple's pane grid, and ours in it: the fill of the pane open over the pages
     controls::Border fill{nullptr};
+    winrt::weak_ref<controls::Grid> column;      // Apple's Grid#PaneContentGrid, found once
+    winrt::weak_ref<xaml::UIElement> caster;     // Apple's Grid#ShadowCaster, found once
+    controls::Grid edgeHost{nullptr};            // the grid that paints the pane, and our edge in it, held strong
+    controls::Border edge{nullptr};
     animation::Storyboard glyphStory{nullptr};
     shapes::Rectangle dismiss{nullptr};  // the sidebar's SplitView light-dismiss layer
     IInspectable dismissHit{nullptr};    // its local values before Ampify, or the unset value: put back as they were
@@ -459,6 +464,78 @@ void RemoveFill(State& state) {
     state.fill = nullptr;
 }
 
+// Apple's column of the pane (Grid#PaneContentGrid), searched once: a weak reference to Apple's own object resolves.
+controls::Grid Column(State& state, const controls::NavigationView& navigation) {
+    if (auto known = state.column.get()) return known;
+    auto grid = FindFirst<controls::Grid>(navigation, L"PaneContentGrid", 0);
+    if (grid) state.column = winrt::make_weak(grid);
+    return grid;
+}
+
+// Apple's own shadow under the open pane shows: Grid#ShadowCaster, unless a theme collapsed it (floating-panels).
+bool AppleShadowShows(State& state, const controls::NavigationView& navigation) {
+    auto caster = state.caster.get();
+    if (!caster) {
+        caster = FindFirst<controls::Grid>(navigation, L"ShadowCaster", 0);
+        if (!caster) return false;
+        state.caster = winrt::make_weak(caster);
+    }
+    return caster.Visibility() == xaml::Visibility::Visible;
+}
+
+// The theme already draws an edge round this grid (Glass's rim, High contrast's line).
+bool HasOwnEdge(const controls::Grid& grid) {
+    const xaml::Thickness sides = grid.BorderThickness();
+    return (sides.Left > 0 || sides.Top > 0 || sides.Right > 0 || sides.Bottom > 0) && Paints(grid.BorderBrush());
+}
+
+void RemoveEdge(State& state) {
+    uint32_t index = 0;
+    if (state.edgeHost && state.edge && state.edgeHost.Children().IndexOf(state.edge, index)) {
+        state.edgeHost.Children().RemoveAt(index);
+    }
+    state.edgeHost = nullptr;
+    state.edge = nullptr;
+}
+
+// Ours, on top of everything in the grid and over all its rows: a hairline in Windows' own surface outline, which
+// follows the app's mode through its theme resource.
+controls::Border MakeEdge(const controls::Grid& grid) {
+    const wchar_t* text =
+        L"<Border xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' BorderThickness='1' "
+        L"BorderBrush='{ThemeResource SurfaceStrokeColorDefaultBrush}' IsHitTestVisible='False'/>";
+    controls::Border edge{nullptr};
+    try {
+        edge = xaml::Markup::XamlReader::Load(text).as<controls::Border>();
+    } catch (...) {
+        return nullptr;  // a WinUI without that resource: the pane keeps no edge rather than a wrong one
+    }
+    controls::Grid::SetRowSpan(edge, std::max<int32_t>(1, static_cast<int32_t>(grid.RowDefinitions().Size())));
+    controls::Grid::SetColumnSpan(edge, std::max<int32_t>(1, static_cast<int32_t>(grid.ColumnDefinitions().Size())));
+    grid.Children().Append(edge);
+    return edge;
+}
+
+// Over the pages, Apple shadows its pane from a square rectangle at the window's edge, which floating-panels hides: a
+// pane of the page's own colour (Ember, Cinema) then had no edge at all. Where nothing else draws one, a hairline
+// follows the corners of the grid that paints the pane: its column, or the pane itself when only the pane is painted.
+void EdgeOverPages(State& state, const controls::NavigationView& navigation, bool over) {
+    auto pane = state.pane.get().try_as<controls::Grid>();
+    auto column = Column(state, navigation);
+    if (!pane || !column) return;
+    const bool paneOnly = Paints(pane.Background()) && !Paints(column.Background()) && !state.fill;
+    const controls::Grid host = paneOnly ? pane : column;
+    const bool shown = over && !AppleShadowShows(state, navigation) && !HasOwnEdge(host);
+    if (state.edge && state.edgeHost != host) RemoveEdge(state);
+    if (!state.edge && shown) {
+        state.edge = MakeEdge(host);
+        state.edgeHost = host;
+    }
+    if (!state.edge) return;
+    if (state.edge.CornerRadius() != host.CornerRadius()) state.edge.CornerRadius(host.CornerRadius());
+    state.edge.Visibility(shown ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+}
+
 // Ours, behind everything in Apple's pane grid and over all its rows: the in-app acrylic of Windows' menus.
 controls::Border MakeFill(const controls::Grid& grid) {
     auto resources = xaml::Application::Current().Resources();
@@ -480,7 +557,7 @@ controls::Border MakeFill(const controls::Grid& grid) {
 // background on Apple's grids would be written again by the theme.
 void FillOverPages(State& state, const controls::NavigationView& navigation, bool over) {
     auto pane = state.pane.get();
-    auto grid = state.fillGrid ? state.fillGrid : FindFirst<controls::Grid>(navigation, L"PaneContentGrid", 0);
+    auto grid = state.fillGrid ? state.fillGrid : Column(state, navigation);
     if (!pane || !grid) return;
     auto panel = pane.try_as<controls::Panel>();
     const bool painted = Paints(grid.Background()) || (panel && Paints(panel.Background()));
@@ -544,6 +621,15 @@ bool OverPages(const State& state, const controls::NavigationView& navigation) {
     return navigation.IsPaneOpen() && (!state.pinned || !PinPushes(navigation));
 }
 
+// The pane open over the pages gets its fill and its edge there, and the theme hears when it opens over them or leaves
+// them: a dimmed sidebar stays opaque over them (KeepSidebarOpaque in the theme engine).
+void DressOverPages(State& state, const controls::NavigationView& navigation) {
+    const bool over = OverPages(state, navigation);
+    FillOverPages(state, navigation, over);
+    EdgeOverPages(state, navigation, over);
+    if (g_over.exchange(over) != over && g_changed) g_changed();
+}
+
 // Follows IsPaneOpen whoever changes it (the hover, the hamburger, Apple), so the groups, the pin and the fill open and
 // fold with the pane. Opened by the hamburger, the pane closes again once the pointer is off it, as after a hover.
 void WatchPaneOpen(State& state, const controls::NavigationView& navigation) {
@@ -554,7 +640,7 @@ void WatchPaneOpen(State& state, const controls::NavigationView& navigation) {
             if (!current) return;
             SyncGroups(live, current);
             ShowPin(live, false);
-            FillOverPages(live, current, OverPages(live, current));
+            DressOverPages(live, current);
             if (!current.IsPaneOpen()) live.keysUsed = false;
             if (current.IsPaneOpen() && !live.pinned) Watch(live);
         } catch (...) {
@@ -662,8 +748,11 @@ void ReleaseChrome(State& state) {
         RemovePin(state);
         RestoreDismissLayer(state);
         RemoveFill(state);
+        RemoveEdge(state);
     } catch (...) {
     }
+    state.column = nullptr;
+    state.caster = nullptr;
     state.keysUsed = false;
 }
 
@@ -726,7 +815,7 @@ void ApplyPin(State& state, bool notify = true) {
         g_folded = true;
         Watch(state);
     }
-    FillOverPages(state, navigation, OverPages(state, navigation));
+    DressOverPages(state, navigation);
     if (notify && g_changed) g_changed();
 }
 
@@ -779,6 +868,7 @@ void Release(State& state) {
     state.toggle = nullptr;
     state.tracker.Forget();
     g_folded = false;
+    g_over = false;
     if (g_changed) g_changed();
 }
 
@@ -1047,6 +1137,7 @@ void KeepSidebarOnHover(Journal& journal) noexcept {
                 RemovePin(state);
                 AddPin(state, navigation);
             }
+            DressOverPages(state, navigation);  // a theme switched live shows or hides Apple's shadow, or paints the pane
             return;
         }
         Release(state);
@@ -1076,6 +1167,10 @@ void SetSidebarChangedListener(std::function<void()> changed) {
 
 bool SidebarKeptFolded() noexcept {
     return g_folded;
+}
+
+bool SidebarOverPages() noexcept {
+    return g_over;
 }
 
 }  // namespace ampify::win

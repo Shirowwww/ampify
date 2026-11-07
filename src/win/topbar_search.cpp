@@ -24,13 +24,18 @@
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 
+// After the projection: windows.h, which it brings, renames IAutomationPeer::GetClassName.
+#include "xaml_backend_detail.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace ampify::win {
@@ -92,9 +97,15 @@ struct State {
     std::vector<Watched> watched;
     // Ampify's: held strongly, since a weak reference to an element Ampify made never resolves (xaml-lessons.md).
     primitives::Popup popup{nullptr};
+    controls::Grid host{nullptr};      // the window's width, the strip's height: the veil, then the strip over it
+    controls::Border veil{nullptr};
     controls::StackPanel strip{nullptr};
     controls::Button back{nullptr};
     controls::Grid field{nullptr};
+    controls::Border fieldBacking{nullptr};  // under Apple's box, in the field's cell
+    winrt::weak_ref<xaml::FrameworkElement> pageRoot;  // Apple's Grid#PageRoot, which carries a theme's picture
+    controls::Control box{nullptr};    // Apple's TextBox, whose corners the backing follows
+    std::optional<std::pair<bool, bool>> backed;  // the backing last set: a picture under the strip, the dark mode
     std::vector<DeviceRect> regions;  // the passthrough regions Ampify added last
     dispatching::DispatcherQueueTimer timer{nullptr};
     std::string note;      // the last line written, so each change is logged once
@@ -179,23 +190,47 @@ controls::Button MakeBack() {
     return back;
 }
 
+// Decoration only: it never takes the pointer, so the caption region and the pages under it keep their clicks.
+controls::Border MakeBacking(const wchar_t* name) {
+    controls::Border backing;
+    backing.Name(name);
+    backing.IsHitTestVisible(false);
+    backing.Visibility(xaml::Visibility::Collapsed);
+    xaml::Automation::AutomationProperties::SetAccessibilityView(backing, xaml::Automation::Peers::AccessibilityView::Raw);
+    return backing;
+}
+
+controls::StackPanel MakeStrip(State& state) {
+    controls::StackPanel strip;
+    strip.Name(L"AMPIFY_Topbar");
+    strip.Orientation(controls::Orientation::Horizontal);
+    strip.Spacing(kTopbarGap);
+    strip.HorizontalAlignment(xaml::HorizontalAlignment::Left);
+    strip.VerticalAlignment(xaml::VerticalAlignment::Top);
+    strip.Children().Append(state.back);
+    strip.Children().Append(state.field);
+    return strip;
+}
+
 // The strip's elements are made once and kept: only the popup is new for each window, since its XamlRoot is set once.
 void BuildStrip(State& state, const xaml::XamlRoot& root) {
-    if (!state.strip) {
+    if (!state.host) {
         state.back = MakeBack();
+        state.fieldBacking = MakeBacking(L"AMPIFY_TopbarSearchBacking");
         state.field = controls::Grid();
         state.field.Name(L"AMPIFY_TopbarSearch");
         state.field.Height(kTopbarControlHeight);
-        state.strip = controls::StackPanel();
-        state.strip.Name(L"AMPIFY_Topbar");
-        state.strip.Orientation(controls::Orientation::Horizontal);
-        state.strip.Spacing(kTopbarGap);
-        state.strip.Children().Append(state.back);
-        state.strip.Children().Append(state.field);
+        state.field.Children().Append(state.fieldBacking);
+        state.strip = MakeStrip(state);
+        state.veil = MakeBacking(L"AMPIFY_TopbarVeil");
+        state.host = controls::Grid();
+        state.host.Height(kTopbarHeight);
+        state.host.Children().Append(state.veil);
+        state.host.Children().Append(state.strip);
     }
     state.popup = primitives::Popup();
     state.popup.XamlRoot(root);
-    state.popup.Child(state.strip);
+    state.popup.Child(state.host);
 }
 
 // Fallback when the presenter's setter could not be taken out of ClosedCompact (TakePresenterSetter): the NavigationView
@@ -415,6 +450,7 @@ bool Take(State& state, const xaml::UIElement& content, const controls::Navigati
         return false;
     }
     state.presenter = presenter;
+    state.box = FindFirst<controls::TextBox>(presenter, L"", 0);
     state.area = area;
     state.presenterIndex = index;
     state.navigation = winrt::make_weak(navigation);
@@ -490,6 +526,7 @@ void Release(State& state) {
     }
     state.popup = nullptr;
     state.presenter = nullptr;
+    state.box = nullptr;
     state.area = nullptr;
     state.appleBack = nullptr;
     state.closedCompact = nullptr;
@@ -557,8 +594,10 @@ void LayOut(State& state, const xaml::UIElement& content) {
     xaml::XamlRoot root = content.XamlRoot();
     const double scale = root.RasterizationScale();
     const TopbarLayout layout = LayOutTopbar(root.Size().Width, CaptionHeight(state, scale));
-    state.popup.HorizontalOffset(layout.back.x);
-    state.popup.VerticalOffset(layout.back.y);
+    state.popup.HorizontalOffset(0);
+    state.popup.VerticalOffset(0);
+    state.host.Width(root.Size().Width);
+    state.strip.Margin(xaml::Thickness{layout.back.x, layout.back.y, 0, 0});
     state.field.Width(layout.search.width);
     if (auto page = content.try_as<xaml::FrameworkElement>()) state.strip.RequestedTheme(page.ActualTheme());
     if (state.area) state.field.DataContext(state.area.DataContext());
@@ -571,6 +610,77 @@ void LayOut(State& state, const xaml::UIElement& content) {
     std::vector<DeviceRect> rects{ToDeviceRect(layout.back, scale), ToDeviceRect(layout.search, scale)};
     AddSuggestions(state, scale, rects);
     SetRegions(state, rects);
+}
+
+winrt::Windows::UI::Color ToColor(theme::Argb colour) {
+    return winrt::Windows::UI::Color{colour.a, colour.r, colour.g, colour.b};
+}
+
+// Whether a theme's picture reaches the strip: an image or gradient brush on Apple's page root, or a ::before or
+// ::after image on it. Unknown while the root is lost and `search` forbids walking the tree, so nothing flickers.
+std::optional<bool> PictureUnderStrip(State& state, const xaml::UIElement& content, bool search) {
+    auto root = state.pageRoot.get();
+    if ((!root || !root.IsLoaded()) && search) {
+        auto own = content.try_as<xaml::FrameworkElement>();
+        root = own && own.Name() == L"PageRoot" ? own : FindFirst<xaml::FrameworkElement>(content, L"PageRoot", 0);
+        state.pageRoot = root ? winrt::make_weak(root) : winrt::weak_ref<xaml::FrameworkElement>{};
+    }
+    auto panel = root && root.IsLoaded() ? root.try_as<controls::Panel>() : nullptr;
+    if (!panel) return std::nullopt;
+    media::Brush brush = panel.Background();
+    if (brush && (brush.try_as<media::ImageBrush>() || brush.try_as<media::GradientBrush>())) return true;
+    for (const xaml::UIElement& child : panel.Children()) {
+        if (xaml_detail::IsDecor(child) && child.Visibility() == xaml::Visibility::Visible && child.Opacity() > 0) return true;
+    }
+    return false;
+}
+
+// The veil's colour, faded by TopbarVeilShare from the window's top to the strip's foot.
+media::LinearGradientBrush VeilBrush(theme::Argb colour) {
+    media::LinearGradientBrush brush;
+    brush.StartPoint({0, 0});
+    brush.EndPoint({0, 1});
+    for (double y : {0.0, kTopbarVeilHold, kTopbarHeight}) {
+        theme::Argb stop = colour;
+        stop.a = static_cast<std::uint8_t>(std::lround(colour.a * TopbarVeilShare(y)));
+        media::GradientStop gradient;
+        gradient.Color(ToColor(stop));
+        gradient.Offset(y / kTopbarHeight);
+        brush.GradientStops().Append(gradient);
+    }
+    return brush;
+}
+
+// The backing covers Apple's box exactly, corners included: the presenter insets the box a few pixels in the cell, and a
+// backing filling the cell showed as a second, darker frame around it.
+void FollowBox(State& state) {
+    if (!state.box || !state.box.IsLoaded()) return;
+    if (state.fieldBacking.CornerRadius() != state.box.CornerRadius()) {
+        state.fieldBacking.CornerRadius(state.box.CornerRadius());
+    }
+    const winrt::Windows::Foundation::Point at = state.box.TransformToVisual(state.field).TransformPoint({0, 0});
+    const double right = state.field.ActualWidth() - at.X - state.box.ActualWidth();
+    const double bottom = state.field.ActualHeight() - at.Y - state.box.ActualHeight();
+    const xaml::Thickness margin{std::max(0.0, double(at.X)), std::max(0.0, double(at.Y)), std::max(0.0, right),
+                                 std::max(0.0, bottom)};
+    if (state.fieldBacking.Margin() != margin) state.fieldBacking.Margin(margin);
+}
+
+// Written only when the picture or the mode changes.
+void KeepBacking(State& state, const xaml::UIElement& content, bool search) {
+    FollowBox(state);
+    std::optional<bool> picture = PictureUnderStrip(state, content, search);
+    auto page = content.try_as<xaml::FrameworkElement>();
+    if (!picture || !page) return;
+    const bool dark = page.ActualTheme() == xaml::ElementTheme::Dark;
+    if (state.backed == std::pair{*picture, dark}) return;
+    state.backed = std::pair{*picture, dark};
+    const xaml::Visibility shown = *picture ? xaml::Visibility::Visible : xaml::Visibility::Collapsed;
+    state.veil.Visibility(shown);
+    state.fieldBacking.Visibility(shown);
+    const TopbarBacking backing = TopbarBackingFor(dark);
+    state.veil.Background(VeilBrush(backing.veil));
+    state.fieldBacking.Background(media::SolidColorBrush(ToColor(backing.field)));
 }
 
 // Why the strip does not show, for the log: empty when it shows, nullopt when that is not known yet.
@@ -631,6 +741,7 @@ void Step(State& state, bool search) {
         }
     }
     LayOut(state, content);
+    KeepBacking(state, content, search);
     Note(state, "Top bar: Apple Music's search field and a back arrow in the strip at the top");
 }
 

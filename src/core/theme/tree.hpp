@@ -130,6 +130,7 @@ struct ViewSize {
     double width = 0;
     double height = 0;
     bool sidebarFolded = false;  // Ampify keeps the sidebar folded at every width (MediaQuery::kSidebarFoldsAt)
+    bool sidebarOverPages = false;  // the sidebar's pane is open over the pages (hover, or pinned in a narrow window)
 };
 
 // The place and size of a laid out element, in device-independent pixels.
@@ -233,6 +234,10 @@ public:
     // The @media conditions of the theme, given on each pass: when the window's size makes one of them start or stop
     // matching, the backend asks for a pass, as it does for a new page.
     virtual void WatchSize(const std::vector<MediaQuery>& queries) { (void)queries; }
+
+    // True when the theme's values depend on ViewSize::sidebarOverPages, given on each pass: the backend then asks for
+    // a pass when the sidebar's pane opens over the pages or leaves them, and costs none otherwise.
+    virtual void WatchSidebarOverPages(bool watch) { (void)watch; }
 
     // Where the element is laid out, in the coordinates of its window or popup root, for the inspector and the offline
     // bench's wireframe. Never used to style: nothing when unknown or not laid out.
