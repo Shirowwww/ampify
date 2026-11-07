@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
 #include <cwchar>
 #include <fstream>
 #include <iterator>
@@ -120,6 +121,12 @@ std::filesystem::path KnownFolder(const KNOWNFOLDERID& folder) {
 
 std::filesystem::path InstallDirectory() {
     return KnownFolder(FOLDERID_LocalAppData) / L"Programs" / kKitFolderName;
+}
+
+std::string HresultText(long code) {
+    char text[16];
+    std::snprintf(text, sizeof(text), "0x%08lX", static_cast<unsigned long>(code));
+    return text;
 }
 
 std::string ToUtf8(std::wstring_view text) {

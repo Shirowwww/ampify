@@ -46,7 +46,6 @@ private:
     };
 
     void Tick();
-    bool MotionAllowed();
 
     std::vector<Set> m_sets;
     // The timer's handler holds a weak pointer to this: once the owner is destroyed (maybe off the interface thread,

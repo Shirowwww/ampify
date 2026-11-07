@@ -1,4 +1,5 @@
 #include "hosted_text_align.hpp"
+#include "xaml_chrome.hpp"
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -25,23 +26,17 @@ namespace comp = winrt::Microsoft::UI::Composition;
 constexpr int kMaxWrapperDepth = 3;  // containers holding a single container, gone through to reach the rows
 
 struct HostState {
-    winrt::weak_ref<controls::Border> host;
     th::RowAlign align = th::RowAlign::Start;
     winrt::event_token sized{};
     bool queued = false;
 };
 
 // Interface thread only. Never destroyed, like the other static services (xaml-lessons.md).
-std::unordered_map<void*, HostState>& States() {
-    static auto* states = new std::unordered_map<void*, HostState>();
-    return *states;
-}
+using HostStates = ElementMap<controls::Border, HostState>;
 
-void ForgetDeadHosts() {
-    auto& states = States();
-    for (auto it = states.begin(); it != states.end();) {
-        it = it->second.host.get() ? std::next(it) : states.erase(it);
-    }
+HostStates& States() {
+    static auto* states = new HostStates();
+    return *states;
 }
 
 // The visuals Apple drew the words with: below the Border's child visual, past wrappers that hold one container.
@@ -104,18 +99,18 @@ void AlignRows(const controls::Border& host, th::RowAlign align) {
 }
 
 // After the layout pass that resized the host: Apple lays its words out again in that pass.
-void QueueAlign(void* key) {
-    auto found = States().find(key);
-    if (found == States().end() || found->second.queued) return;
-    controls::Border host = found->second.host.get();
+void QueueAlign(HostStates::Key key) {
+    auto* found = States().FindKey(key);
+    if (!found || found->value.queued) return;
+    controls::Border host = found->element.get();
     if (!host) return;
-    found->second.queued = true;
+    found->value.queued = true;
     host.DispatcherQueue().TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low, [key]() noexcept {
         try {
-            auto state = States().find(key);
-            if (state == States().end()) return;
-            state->second.queued = false;
-            if (controls::Border alive = state->second.host.get()) AlignRows(alive, state->second.align);
+            auto* state = States().FindKey(key);
+            if (!state) return;
+            state->value.queued = false;
+            if (controls::Border alive = state->element.get()) AlignRows(alive, state->value.align);
         } catch (...) {
         }
     });
@@ -129,41 +124,41 @@ controls::Border DrawnTextHost(const xaml::DependencyObject& object) {
 }
 
 std::string_view HostedTextAlign(const controls::Border& host) noexcept {
-    auto found = States().find(winrt::get_abi(host));
-    if (found == States().end() || found->second.host.get() != host) return th::RowAlignKeyword(th::RowAlign::Start);
+    HostState* found = States().Find(host);
+    if (!found) return th::RowAlignKeyword(th::RowAlign::Start);
     // Words drawn again at the left read as Start, so the pass writes the theme's alignment again.
     try {
-        if (!found->second.queued && !RowsInPlace(host, found->second.align)) return th::RowAlignKeyword(th::RowAlign::Start);
+        if (!found->queued && !RowsInPlace(host, found->align)) return th::RowAlignKeyword(th::RowAlign::Start);
     } catch (...) {
     }
-    return th::RowAlignKeyword(found->second.align);
+    return th::RowAlignKeyword(found->align);
 }
 
 void SetHostedTextAlign(const controls::Border& host, th::RowAlign align) noexcept {
     try {
-        ForgetDeadHosts();
-        void* key = winrt::get_abi(host);
         auto& states = States();
-        auto found = states.find(key);
+        states.Sweep();
+        HostStates::Key key = HostStates::KeyOf(host);
+        HostState* found = states.Find(host);
         if (align == th::RowAlign::Start) {
-            if (found != states.end()) {
-                host.SizeChanged(found->second.sized);
-                states.erase(found);
+            if (found) {
+                host.SizeChanged(found->sized);
+                states.Erase(host);
             }
             AlignRows(host, align);
             return;
         }
-        if (found == states.end()) {
-            HostState state{winrt::make_weak(host), align};
+        if (!found) {
+            HostState state{align};
             state.sized = host.SizeChanged([key](const auto&, const auto&) noexcept {
                 try {
                     QueueAlign(key);
                 } catch (...) {
                 }
             });
-            found = states.emplace(key, state).first;
+            found = &states.Add(host, state);
         }
-        found->second.align = align;
+        found->align = align;
         AlignRows(host, align);
         QueueAlign(key);
     } catch (...) {

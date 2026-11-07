@@ -93,7 +93,7 @@ namespace {
 void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context);
 
 std::string WindowLabel(const WindowContext& context) {
-    return winrt::to_string(context.property);
+    return winrt::to_string(AppPropertyName(context.role));
 }
 
 }  // namespace
@@ -354,7 +354,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         ReleaseXaml(*context);
         return;
     }
-    if (AppWindow(context->property) != window) {
+    if (AppWindowOf(context->role) != window) {
         // The property holds another window, or none for a moment (GetAppProperty failed): this work is stale. The
         // ticket stays open, as in AMExclusive, so a passing failure does not end the window; the context and its XAML
         // objects go once the window object is gone (DiscoverWindows, DropContext).
@@ -434,7 +434,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
 
     if (context->discoverDirty.exchange(false)) Discover(shared, context, content);
     WatchSettingsPage(shared, context);
-    if (context->property == L"MainWindow") {
+    if (context->role == WindowRole::Main) {
         WatchSettingsEntry(shared, context);
         FollowFoldedLogo(shared, context);
         FollowSongRoom(shared, context);
@@ -451,8 +451,8 @@ void DiscoverWindows(UiService::Shared& shared) {
     }
     std::vector<std::shared_ptr<WindowContext>> toRefresh;
     std::vector<std::shared_ptr<WindowContext>> dropped;
-    for (const wchar_t* property : {L"MainWindow", L"MiniPlayerWindow"}) {
-        xaml::Window window = AppWindow(property);
+    for (WindowRole role : {WindowRole::Main, WindowRole::Mini}) {
+        xaml::Window window = AppWindowOf(role);
         if (!window) continue;
         dispatching::DispatcherQueue dispatcher{nullptr};
         try {
@@ -477,7 +477,7 @@ void DiscoverWindows(UiService::Shared& shared) {
             }
             if (!context) {
                 context = std::make_shared<WindowContext>();
-                context->property = property;
+                context->role = role;
                 context->window = winrt::make_weak(window);
                 context->dispatcher = dispatcher;
                 shared.windows.push_back(context);
@@ -485,7 +485,7 @@ void DiscoverWindows(UiService::Shared& shared) {
             }
         }
         if (created) {
-            shared.journal.Write("Interface: window \"" + winrt::to_string(property) +
+            shared.journal.Write("Interface: window \"" + winrt::to_string(AppPropertyName(role)) +
                                  "\" obtained through AMP.Utils (GetAppProperty), work sent to its DispatcherQueue");
         }
         context->discoverDirty = true;
@@ -536,7 +536,7 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
         windows = shared.windows;
     }
     for (const auto& context : windows) {
-        if (context->property == L"MainWindow") QueueRefresh(shared.weak_from_this(), context);
+        if (context->role == WindowRole::Main) QueueRefresh(shared.weak_from_this(), context);
     }
 }
 
@@ -549,7 +549,7 @@ void QueuePlayerCheck(const std::shared_ptr<UiService::Shared>& shared) {
         windows = shared->windows;
     }
     for (const auto& context : windows) {
-        if (context->property == L"MainWindow") QueueRefresh(shared, context);
+        if (context->role == WindowRole::Main) QueueRefresh(shared, context);
     }
 }
 
@@ -579,7 +579,7 @@ void UiService::Stop() {
 }
 
 void UiService::Run() {
-    EnsureMta();
+    rt::EnsureMultithreaded();
     // Out of context: the callback runs on this thread, from its message queue, pumped below.
     HWINEVENTHOOK hook = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_SHOW, nullptr, WindowEvent,
                                          GetCurrentProcessId(), 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNTHREAD);
@@ -622,7 +622,7 @@ void UiService::Run() {
                     windows = m_shared->windows;
                 }
                 for (const auto& context : windows) {
-                    if (context->property == L"MainWindow") QueueRefresh(m_shared, context);
+                    if (context->role == WindowRole::Main) QueueRefresh(m_shared, context);
                 }
             }
         } catch (const winrt::hresult_error& error) {

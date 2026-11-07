@@ -674,7 +674,7 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
     bool applePlayer = false;
     bool playerCheck = false;
     uirender::PlayerMode playerMode;
-    bool main = context->property == L"MainWindow";
+    bool main = context->role == WindowRole::Main;
     bool closeToTray = false;
     {
         std::lock_guard<std::mutex> lock(shared.mutex);

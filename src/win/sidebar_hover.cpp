@@ -2,7 +2,11 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
-#include "xaml_host.hpp"
+#include "win_common.hpp"
+#ifdef GetCurrentTime
+#undef GetCurrentTime  // windows.h macro that breaks Storyboard::GetCurrentTime in the projection
+#endif
+#include "xaml_chrome.hpp"
 
 #include "../core/i18n.hpp"
 #include "../core/journal.hpp"
@@ -12,7 +16,6 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.UI.h>
-#include <winrt/Windows.UI.ViewManagement.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Input.h>
 #include <winrt/Microsoft.UI.Windowing.h>
@@ -53,7 +56,6 @@ using Clock = std::chrono::steady_clock;
 using Group = controls::NavigationViewItem;
 
 constexpr int kSearchDepth = 32;  // the NavigationView and its pane sit some twenty levels under the window's content
-constexpr auto kWatchEvery = std::chrono::milliseconds(200);  // the real cursor, while the pane is open
 constexpr auto kRefocusFor = std::chrono::milliseconds(1500);  // a pane opened by a key: the hamburger keeps the keyboard
 constexpr int kTurnMs = 180;                                  // the pin's glyph turns in this time
 constexpr wchar_t kPinName[] = L"AMPIFY_SidebarPin";
@@ -138,15 +140,15 @@ T FindFirst(const xaml::DependencyObject& root, std::wstring_view name, int dept
 
 // The window under the cursor is Apple Music's, or one it owns: WinUI draws popups in windows of their own, and after a
 // tap on Alt its access-key layer (PopupWindowSiteBridge) lies over the column, which then counted as off the pane.
-bool OverWindow(const State& state, HWND under) {
-    return GetAncestor(under, GA_ROOT) == state.window || GetAncestor(under, GA_ROOTOWNER) == state.window;
+bool OverWindow(const State& state, const CursorSpot& spot) {
+    return spot.root == state.window || spot.rootOwner == state.window;
 }
 
 // The real cursor in `element`'s own coordinates, while it is over Apple Music's window.
 std::optional<winrt::Windows::Foundation::Point> CursorIn(const State& state, const xaml::UIElement& element) {
-    POINT cursor{};
-    if (!state.window || !GetCursorPos(&cursor)) return std::nullopt;
-    if (!OverWindow(state, WindowFromPoint(cursor)) || !ScreenToClient(state.window, &cursor)) return std::nullopt;
+    std::optional<CursorSpot> spot = state.window ? CursorOver(state.window) : std::nullopt;
+    if (!spot || !OverWindow(state, *spot) || !spot->client) return std::nullopt;
+    ClientPixel cursor = *spot->client;
     xaml::XamlRoot root = element.XamlRoot();
     double scale = root ? root.RasterizationScale() : 1.0;
     // Where one step along each axis lands too: a mirrored element (Mirror's pane on the right) counts from its right
@@ -268,7 +270,7 @@ bool CloseIfLeft(State& state) {
 void Watch(State& state) {
     if (!state.watch) {
         state.watch = dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
-        state.watch.Interval(kWatchEvery);
+        state.watch.Interval(kCursorPollEvery);  // the real cursor, while the pane is open
         state.watch.Tick([](auto const&, auto const&) noexcept {
             try {
                 State& live = TheState();
@@ -278,14 +280,6 @@ void Watch(State& state) {
         });
     }
     if (!state.watch.IsRunning()) state.watch.Start();
-}
-
-bool AnimationsOn() {
-    try {
-        return winrt::Windows::UI::ViewManagement::UISettings().AnimationsEnabled();
-    } catch (...) {
-        return false;
-    }
 }
 
 // A quarter turn into place while the element fades in: the pin's glyph, as it changes.
@@ -391,7 +385,7 @@ void ShowPin(State& state, bool animate) {
     if (auto control = more ? more.try_as<controls::Control>() : nullptr) state.pinGlyph.Foreground(control.Foreground());
     state.pin.Visibility(navigation.IsPaneOpen() ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
     PlacePin(state);
-    if (!animate || !AnimationsOn()) return;
+    if (!animate || !MotionAllowed()) return;
     if (state.glyphStory) state.glyphStory.Stop();
     state.glyphStory = EaseTurn(state.pinTurn, state.pinGlyph);
     state.glyphStory.Begin();
@@ -436,19 +430,10 @@ shapes::Rectangle FindDismissLayer(const controls::NavigationView& navigation) {
     return split ? FindOwnDismissLayer(split, 0) : nullptr;
 }
 
-// Puts a property back as it was: its local value, or none, so the template's or the style's value applies again.
-void PutBack(const xaml::DependencyObject& element, const xaml::DependencyProperty& property, const IInspectable& local) {
-    if (!local || local == xaml::DependencyProperty::UnsetValue()) {
-        element.ClearValue(property);
-    } else {
-        element.SetValue(property, local);
-    }
-}
-
 void RestoreDismissLayer(State& state) {
     if (!state.dismiss) return;
-    PutBack(state.dismiss, xaml::UIElement::IsHitTestVisibleProperty(), state.dismissHit);
-    PutBack(state.dismiss, shapes::Shape::FillProperty(), state.dismissFill);
+    PutBackLocal(state.dismiss, xaml::UIElement::IsHitTestVisibleProperty(), state.dismissHit);
+    PutBackLocal(state.dismiss, shapes::Shape::FillProperty(), state.dismissFill);
     state.dismiss = nullptr;
     state.dismissHit = nullptr;
     state.dismissFill = nullptr;
@@ -1177,13 +1162,13 @@ void KeepSidebarOnHover(Journal& journal) noexcept {
             return;
         }
         Release(state);
-        xaml::Window window = AppWindow(L"MainWindow");
+        xaml::Window window = AppWindowOf(WindowRole::Main);
         xaml::UIElement content = window ? window.Content() : nullptr;
         if (!content) return;
         auto navigation = FindFirst<controls::NavigationView>(content, L"", 0);
         auto pane = navigation ? FindFirst<xaml::FrameworkElement>(navigation, L"PaneRoot", 0) : nullptr;
         if (!pane) return;
-        state.window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(window.AppWindow().Id().Value));
+        state.window = WindowHandle(window);
         Take(state, navigation, pane);
         if (state.pinned) ApplyPin(state, false);
         MeasureLater(journal, navigation, pane);

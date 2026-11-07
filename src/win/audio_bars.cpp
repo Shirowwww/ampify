@@ -11,6 +11,7 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
 
 #include "audio/audio_sharing.hpp"
+#include "xaml_chrome.hpp"
 
 namespace ampify::win {
 
@@ -79,11 +80,6 @@ void AudioBars::Drop(const xaml::FrameworkElement& element) {
     if (!element) return;
     std::erase_if(m_sets, [&](const Set& set) { return set.grid == element; });
     if (m_sets.empty() && m_timer) m_timer.Stop();
-}
-
-bool AudioBars::MotionAllowed() {
-    if (!m_settings) m_settings = winrt::Windows::UI::ViewManagement::UISettings();
-    return m_settings.AnimationsEnabled();
 }
 
 void AudioBars::Tick() {

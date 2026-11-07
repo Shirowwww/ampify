@@ -48,10 +48,10 @@ using namespace xaml_detail;
 
 bool XamlTreeBackend::Attach() {
     if (*m_closed) return false;
-    xaml::Window window = AppWindow(L"MainWindow");
+    xaml::Window window = AppWindowOf(WindowRole::Main);
     if (!window) return false;
     m_window = winrt::make_weak(window);
-    m_animations.Window(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(window.AppWindow().Id().Value)));
+    m_animations.WindowShown([handle = WindowHandle(window)] { return !handle || WindowOnScreen(handle); });
     // Walking or writing the tree while Apple Music closes crashed it in Microsoft.UI.Xaml.dll (bench, 30/10).
     std::shared_ptr<bool> closed = m_closed;
     window.Closed([closed](IInspectable const&, xaml::WindowEventArgs const&) noexcept { *closed = true; });
@@ -142,18 +142,8 @@ namespace {
 
 using ColourRef = winrt::Windows::Foundation::IReference<winrt::Windows::UI::Color>;
 
-bool SameColour(const ColourRef& a, const ColourRef& b) {
-    if (!a || !b) return !a && !b;
-    winrt::Windows::UI::Color x = a.Value(), y = b.Value();
-    return x.A == y.A && x.R == y.R && x.G == y.G && x.B == y.B;
-}
-
 std::string ColourText(const ColourRef& colour) {
-    if (!colour) return "unset";
-    winrt::Windows::UI::Color c = colour.Value();
-    char hex[10];
-    std::snprintf(hex, sizeof(hex), "#%02X%02X%02X%02X", c.A, c.R, c.G, c.B);
-    return hex;
+    return colour ? ampify::win::ColourText(colour.Value()) : "unset";
 }
 
 ColourRef Grey(std::uint8_t alpha, std::uint8_t value) {
@@ -467,7 +457,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
 
     if (*m_closed) return nodes;
     xaml::Window window = m_window.get();  // the main window, from AMP.Utils (Attach)
-    if (!window) window = AppWindow(L"MainWindow");
+    if (!window) window = AppWindowOf(WindowRole::Main);
     if (!window) return nodes;
     xaml::UIElement content = window.Content();
     if (!content) return nodes;
@@ -495,9 +485,9 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     }
     // Apple's full-screen player is a window of its own on this same thread: its content is a root as well, so themes
     // reach it. A window on another thread (the mini player) cannot be walked from here.
-    for (const wchar_t* name : {L"FullScreenPlayerWindow", L"MiniPlayerWindow"}) {
+    for (WindowRole role : {WindowRole::Player, WindowRole::Mini}) {
         try {
-            xaml::Window other = AppWindow(name);
+            xaml::Window other = AppWindowOf(role);
             if (!other || other == window || !other.DispatcherQueue().HasThreadAccess()) continue;
             if (xaml::UIElement root = other.Content()) stack.push_back({root, -1, 0, 0, 1, true});
         } catch (...) {
@@ -1092,10 +1082,10 @@ std::optional<theme::Value> XamlTreeBackend::ReadResource(std::string_view key) 
     } catch (...) {
         return std::nullopt;  // a resource Apple Music cannot give out of its context: read as absent
     }
-    if (auto solid = value.try_as<media::SolidColorBrush>()) return theme::Value{theme::ValueKind::Color, ColorText(solid.Color())};
+    if (auto solid = value.try_as<media::SolidColorBrush>()) return theme::Value{theme::ValueKind::Color, ColourText(solid.Color())};
     // A Color resource reads as a colour too: an opaque handle would differ on every tick and be written again.
     if (auto color = value.try_as<winrt::Windows::Foundation::IReference<ColorValue>>()) {
-        return theme::Value{theme::ValueKind::Color, ColorText(color.Value())};
+        return theme::Value{theme::ValueKind::Color, ColourText(color.Value())};
     }
     return Keep(value);
 }

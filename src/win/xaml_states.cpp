@@ -565,9 +565,7 @@ void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::Dependency
     } catch (const winrt::hresult_error& error) {
         m_refusedStates++;  // costs the states their theme value, never the value itself
         if (m_firstRefusal.empty()) {
-            char code[16];
-            std::snprintf(code, sizeof code, "0x%08X", static_cast<unsigned>(error.code().value));
-            m_firstRefusal = std::string(property) + ": " + code + " " + Utf8(error.message());
+            m_firstRefusal = std::string(property) + ": " + HresultText(error.code()) + " " + Utf8(error.message());
         }
     } catch (...) {
         m_refusedStates++;

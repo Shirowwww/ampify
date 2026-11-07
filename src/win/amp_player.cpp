@@ -108,12 +108,6 @@ std::optional<RawLyrics> ReadLyrics(const rt::Ref& item) {
 // Word-timed TTML: Apple's syllable lyrics, which its own karaoke view lights word by word.
 bool TimedByWord(const RawLyrics& raw) { return raw.ttml.find("timing=\"Word\"") != std::string::npos; }
 
-std::string Hex(HRESULT hr) {
-    char text[16];
-    std::snprintf(text, sizeof text, "0x%08lX", static_cast<unsigned long>(hr));
-    return text;
-}
-
 }  // namespace
 
 AmpPlayer::AmpPlayer() = default;
@@ -133,14 +127,14 @@ bool AmpPlayer::Activate(std::string& failure) {
     rt::Ref statics;
     rt::Activation activation = rt::GetActivationFactory(L"AMP.Services.Player", kIidPlayerStatics, statics);
     if (FAILED(activation.result)) {
-        failure = "factory not found (" + activation.how + ", code " + Hex(activation.result) + ")";
+        failure = "factory not found (" + activation.how + ", code " + HresultText(activation.result) + ")";
         return false;
     }
     // IPlayerStatics.get_Current (slot 6): Apple's own player, the one the interface uses. It is never constructed.
     rt::Ref current;
     HRESULT hr = rt::CallSlot(statics, slot::kPlayerStaticsCurrent, current.Put());
     if (FAILED(hr) || !current) {
-        failure = FAILED(hr) ? "Player.Current failed (code " + Hex(hr) + ")" : "Player.Current is still empty";
+        failure = FAILED(hr) ? "Player.Current failed (code " + HresultText(hr) + ")" : "Player.Current is still empty";
         return false;
     }
     // The identifier of IPlayer is a hash of its methods (src/core/amp_abi.hpp): if Apple changed them, this fails.
@@ -327,7 +321,7 @@ rt::Ref CurrentPlayQueue(std::string& failure) {
     rt::Activation activation =
         rt::GetActivationFactory(L"AMP.Services.PlayQueue", rt::GuidOf(amp::kIidPlayQueueStatics), statics);
     if (FAILED(activation.result)) {
-        failure = "AMP.Services.PlayQueue not found (code " + Hex(activation.result) + ")";
+        failure = "AMP.Services.PlayQueue not found (code " + HresultText(activation.result) + ")";
         return {};
     }
     // IPlayQueueStatics.get_Current (slot 6).
@@ -529,7 +523,7 @@ rt::Ref StartAppleQueueRemove(uint64_t itemId, std::string& failure) {
     rt::Ref operation;
     HRESULT hr = rt::CallSlot(queue, slot::kPlayQueueDelete, ids.Get(), operation.Put());
     if (FAILED(hr) || !operation) {
-        failure = "DeletePlayQueueItemsAsync failed (code " + Hex(hr) + ")";
+        failure = "DeletePlayQueueItemsAsync failed (code " + HresultText(hr) + ")";
         return {};
     }
     return operation;

@@ -2,7 +2,8 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
-#include "xaml_host.hpp"
+#include "win_common.hpp"
+#include "xaml_chrome.hpp"
 
 #include "../core/journal.hpp"
 
@@ -56,7 +57,6 @@ constexpr double kSlack = 2;            // pixels past the measured width, for r
 constexpr double kMinCut = 3;           // a text cut by less shows whole enough
 constexpr int kMaxTexts = 4;            // cut texts of one row that scroll together
 constexpr int kRowSearchLimit = 300;    // elements looked at under a row
-constexpr auto kWatchEvery = std::chrono::milliseconds(200);  // the real cursor, while a text scrolls
 
 std::atomic<bool> g_enabled{true};  // apple.marquee, set from the settings' thread
 
@@ -138,8 +138,7 @@ comp::ScalarKeyFrameAnimation RoundTrip(const comp::Compositor& compositor, floa
 
 void PutBack(const controls::TextBlock& text, const xaml::DependencyProperty& property, const IInspectable& value) noexcept {
     try {
-        if (value == xaml::DependencyProperty::UnsetValue()) text.ClearValue(property);
-        else text.SetValue(property, value);
+        PutBackLocal(text, property, value);
     } catch (...) {  // a text gone from the tree: nothing left to put back
     }
 }
@@ -255,12 +254,9 @@ void Evaluate(Marquee& state);
 // A pointer that leaves in one jump, or a window that comes over Apple Music, may send no PointerExited: while a text
 // scrolls, the real cursor is looked at. Over another process the scroll stops; over the main window it is hit tested.
 void CheckPointer(Marquee& state) {
-    POINT cursor{};
-    if (!GetCursorPos(&cursor)) return;
-    HWND under = GetAncestor(WindowFromPoint(cursor), GA_ROOT);
-    DWORD process = 0;
-    if (under) GetWindowThreadProcessId(under, &process);
-    if (process != GetCurrentProcessId()) return StopAll(state);
+    std::optional<CursorSpot> spot = CursorOver(state.window);
+    if (!spot) return;
+    if (!spot->ourProcess) return StopAll(state);
     // A popup closed under the pointer (a menu item chosen, Escape) sends none either, nor a text Apple took away.
     bool gone = std::any_of(state.running.begin(), state.running.end(),
                             [](const Running& run) { return !run.text.IsLoaded() || !run.text.XamlRoot(); });
@@ -272,7 +268,8 @@ void CheckPointer(Marquee& state) {
         if (hooked == state.hooked.end() || !hooked->popup || !hooked->popup.IsOpen()) StopAll(state);
         return;
     }
-    if (under != state.window || !ScreenToClient(state.window, &cursor)) return StopAll(state);
+    if (spot->root != state.window || !spot->client) return StopAll(state);
+    ClientPixel cursor = *spot->client;
     xaml::XamlRoot root = state.content.XamlRoot();
     double scale = root ? root.RasterizationScale() : 1.0;
     state.lastPoint = {static_cast<float>(cursor.x / scale), static_cast<float>(cursor.y / scale)};
@@ -282,7 +279,7 @@ void CheckPointer(Marquee& state) {
 void Watch(Marquee& state) {
     if (!state.watch) {
         state.watch = dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
-        state.watch.Interval(kWatchEvery);
+        state.watch.Interval(kCursorPollEvery);  // the real cursor, while a text scrolls
         state.watch.Tick([](auto const&, auto const&) noexcept {
             try {
                 Marquee& state = State();
@@ -423,11 +420,11 @@ void KeepTextMarquee(Journal& journal) noexcept {
             state.hooked.clear();
             return;
         }
-        xaml::Window window = AppWindow(L"MainWindow");
+        xaml::Window window = AppWindowOf(WindowRole::Main);
         xaml::UIElement content = window ? window.Content() : nullptr;
         if (!content) return;
         state.content = content;
-        state.window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(window.AppWindow().Id().Value));
+        state.window = WindowHandle(window);
         MakeHandlers(state);
         HookAll(state, content);
         if (!state.told) journal.Write("Text marquee: a text cut with an ellipsis scrolls under the pointer");

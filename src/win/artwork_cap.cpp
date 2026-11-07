@@ -9,6 +9,7 @@
 #include <inspectable.h>
 
 #include "../core/theme/glyph_rows.hpp"
+#include "xaml_chrome.hpp"
 
 namespace ampify::win {
 
@@ -33,23 +34,15 @@ struct IArtworkImageAbi : ::IInspectable {
 constexpr GUID kArtworkImageIid = {0x8c023886, 0xc0f0, 0x52d8, {0x95, 0x70, 0x80, 0xbc, 0x6e, 0x99, 0x77, 0xc2}};
 
 struct Original {
-    winrt::weak_ref<xaml::FrameworkElement> element;
     Size cap{};
     double maxWidth = 0;   // the element's own MaxWidth and MaxHeight: Apple also sets MaxHeight to 270
     double maxHeight = 0;
 };
 
 // Apple's caps of the artworks whose cap is lifted. Interface thread only; never destroyed (xaml-lessons.md).
-std::unordered_map<void*, Original>& Originals() {
-    static auto* originals = new std::unordered_map<void*, Original>();
+ElementMap<xaml::FrameworkElement, Original>& Originals() {
+    static auto* originals = new ElementMap<xaml::FrameworkElement, Original>();
     return *originals;
-}
-
-void ForgetDeadArtworks() {
-    auto& originals = Originals();
-    for (auto it = originals.begin(); it != originals.end();) {
-        it = it->second.element.get() ? std::next(it) : originals.erase(it);
-    }
 }
 
 // The element's own bounds follow the cap: lifted with it, Apple's again once it is back.
@@ -70,19 +63,16 @@ void FollowArtworkCap(const xaml::FrameworkElement& element) noexcept {
         Size current{};
         if (FAILED(artwork->get_ArtworkMaxSize(&current))) return;
 
-        ForgetDeadArtworks();
         auto& originals = Originals();
-        void* key = winrt::get_abi(element);
-        auto found = originals.find(key);
-        Original apple = found != originals.end()
-                             ? found->second
-                             : Original{winrt::make_weak(element), current, element.MaxWidth(), element.MaxHeight()};
+        originals.Sweep();
+        Original* found = originals.Find(element);
+        Original apple = found ? *found : Original{current, element.MaxWidth(), element.MaxHeight()};
         th::BoxSize wanted = th::LiftedMaxSize({apple.cap.Width, apple.cap.Height}, element.Width(), element.Height());
         Size target{static_cast<float>(wanted.width), static_cast<float>(wanted.height)};
         bool lifted = target.Width != apple.cap.Width || target.Height != apple.cap.Height;
-        bool known = found != originals.end();
-        if (lifted && !known) originals.emplace(key, apple);
-        if (!lifted && known) originals.erase(found);
+        bool known = found != nullptr;
+        if (lifted && !known) originals.Add(element, apple);
+        if (!lifted && known) originals.Erase(element);
         if (lifted || known) FollowBounds(element, apple, target, lifted);
         if (target.Width == current.Width && target.Height == current.Height) return;
         if (SUCCEEDED(artwork->put_ArtworkMaxSize(target))) element.InvalidateMeasure();

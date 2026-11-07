@@ -6,11 +6,11 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.h>
-#include <winrt/Windows.UI.ViewManagement.h>
 
 #include <chrono>
 
 #include "../core/theme/glass.hpp"
+#include "xaml_chrome.hpp"
 
 namespace ampify::win {
 
@@ -19,14 +19,6 @@ namespace media = xaml::Media;
 namespace animation = media::Animation;
 
 namespace {
-
-bool AnimationsOn() {
-    try {
-        return winrt::Windows::UI::ViewManagement::UISettings().AnimationsEnabled();
-    } catch (...) {
-        return false;
-    }
-}
 
 animation::Storyboard FadeOut(const xaml::Controls::Border& layer, int ms) {
     animation::DoubleAnimation fade;
@@ -58,7 +50,7 @@ ArtworkFade MakeArtworkFade(media::Stretch stretch) {
 void FadeFromPrevious(ArtworkFade& fade, const media::ImageSource& previous, xaml::CornerRadius corner) {
     if (!fade.layer) return;
     if (fade.story) fade.story.Stop();
-    const int ms = theme::ArtworkFadeMs(theme::CurrentGlassLevel(), AnimationsOn());
+    const int ms = theme::ArtworkFadeMs(theme::CurrentGlassLevel(), MotionAllowed());
     if (!previous || ms == 0) {
         fade.brush.ClearValue(media::ImageBrush::ImageSourceProperty());
         return;

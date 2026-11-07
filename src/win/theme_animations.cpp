@@ -11,10 +11,6 @@
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Windows.Foundation.Numerics.h>
-#include <winrt/Windows.UI.ViewManagement.h>
-
-// After the projection: its macros (GetCurrentTime, GetClassName) would rename members of WinRT types.
-#include <windows.h>
 
 #include "../core/now_playing.hpp"
 #include "../core/theme/animation.hpp"
@@ -212,8 +208,7 @@ bool ThemeAnimations::Write(theme::NodeId id, const xaml::UIElement& element, co
     if (!animations) return false;
 
     Running running;
-    running.element = element;
-    if (!running.element.get()) running.held = element;  // made by Ampify: held strongly until Forget
+    running.element = HeldElement<xaml::UIElement>(element);
     running.text = text;
     if (!MotionAllowed()) {
         m_running.emplace(id, std::move(running));  // kept as written, so it is not tried again on every pass
@@ -251,17 +246,6 @@ bool ThemeAnimations::Write(theme::NodeId id, const xaml::UIElement& element, co
     }
     m_running.emplace(id, std::move(running));
     return true;
-}
-
-// False when "Animation effects" is off in Windows' settings (Accessibility > Visual effects): a person who turned
-// motion off does not get a theme's either.
-bool ThemeAnimations::MotionAllowed() {
-    try {
-        if (!m_settings) m_settings = winrt::Windows::UI::ViewManagement::UISettings();
-        return m_settings.AnimationsEnabled();
-    } catch (...) {
-        return true;
-    }
 }
 
 ThemeAnimations::~ThemeAnimations() {
@@ -313,7 +297,7 @@ void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> lo
 }
 
 void ThemeAnimations::StepLoops() {
-    const bool shown = !m_window || (IsWindowVisible(m_window) && !IsIconic(m_window));
+    const bool shown = !m_shown || m_shown();
     const bool playing = CurrentNowPlaying().playing;
     const auto now = std::chrono::steady_clock::now();
     const auto waits = [&](const th::Animation& loop) { return !playing && loop.whilePlaying; };
@@ -418,9 +402,9 @@ std::string ThemeAnimations::Read(theme::NodeId id) const {
 void ThemeAnimations::Sweep(const std::function<bool(theme::NodeId)>& isDecor) {
     for (auto it = m_running.begin(); it != m_running.end();) {
         bool gone = !Target(it->second);
-        if (!gone && it->second.held && !isDecor(it->first)) {
+        if (!gone && it->second.element.OwnedByAmpify() && !isDecor(it->first)) {
             try {
-                auto element = it->second.held.try_as<xaml::FrameworkElement>();
+                auto element = it->second.element.get().try_as<xaml::FrameworkElement>();
                 gone = element && !element.IsLoaded() && !xaml::Media::VisualTreeHelper::GetParent(element);
             } catch (...) {
             }
@@ -429,7 +413,7 @@ void ThemeAnimations::Sweep(const std::function<bool(theme::NodeId)>& isDecor) {
             ++it;
             continue;
         }
-        if (it->second.held) Stop(it->second);
+        if (it->second.element.OwnedByAmpify()) Stop(it->second);
         for (const auto& timer : it->second.ends) timer.Stop();
         it = m_running.erase(it);
     }
@@ -443,7 +427,7 @@ void ThemeAnimations::Forget(theme::NodeId id) {
 }
 
 xaml::UIElement ThemeAnimations::Target(const Running& running) {
-    return running.held ? running.held : running.element.get();
+    return running.element.get();
 }
 
 void ThemeAnimations::Stop(Running& running) {
@@ -498,9 +482,9 @@ void ThemeAnimations::EndAt(Running& running, double ms, std::vector<composition
     auto timer = queue.CreateTimer();
     timer.Interval(Span(ms));
     timer.IsRepeating(false);
-    timer.Tick([element = running.element, held = running.held, parts = std::move(parts)](auto const&, auto const&) noexcept {
+    timer.Tick([element = running.element, parts = std::move(parts)](auto const&, auto const&) noexcept {
         try {
-            if (xaml::UIElement target = held ? held : element.get()) {
+            if (xaml::UIElement target = element.get()) {
                 for (const composition::CompositionAnimation& part : parts) target.StopAnimation(part);
             }
         } catch (...) {

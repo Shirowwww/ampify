@@ -34,6 +34,25 @@ TEST_CASE(WinSources_NoStaticObjectIsDestroyedAtProcessExit) {
     CHECK(scanned > 20);
 }
 
+// Apple's windows, their handles, Windows' motion setting and the HRESULT text each have one home (xaml_chrome.cpp,
+// win_common.cpp): a module that finds them its own way drifts from the others when Apple or the rule changes.
+TEST_CASE(WinSources_ReachAppleWindowsThroughTheChromeKit) {
+    namespace fs = std::filesystem;
+    const std::regex own(
+        R"re(L"(MainWindow|MiniPlayerWindow|FullScreenPlayerWindow)"|AppWindow\(\)\.Id\(\)\.Value|AnimationsEnabled\(\)|"0x%08l?X")re");
+    const std::set<std::string> home = {"xaml_chrome.cpp", "win_common.cpp"};
+    for (const fs::directory_entry& entry : fs::directory_iterator(fs::path(AMPIFY_SOURCE_DIR) / "src" / "win")) {
+        if (entry.path().extension() != ".cpp" || home.count(entry.path().filename().string())) continue;
+        std::ifstream file(entry.path());
+        std::string line;
+        while (std::getline(file, line)) {
+            if (std::regex_search(line, own)) {
+                ampify::test::ReportFailure(entry.path().filename().string().c_str(), 0, "not through the chrome kit: " + line);
+            }
+        }
+    }
+}
+
 TEST_CASE(WinCommon_QuotedArgumentsReadBackUnchanged) {
     CHECK(ampify::win::QuoteArgument(L"plain") == L"plain");
     CHECK(ampify::win::QuoteArgument(L"") == L"\"\"");

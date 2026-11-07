@@ -3,7 +3,8 @@
 Problems met while drawing inside Apple Music, and what fixed them. Read this before changing `src/win/`.
 
 1. In a process you do not control, hold everything you create with a strong reference, and release it on the UI
-   thread.
+   thread. `src/win/xaml_chrome.hpp` holds the shared ways: `AppWindowOf` for Apple's windows, `HeldElement` and
+   `ElementMap` for elements, `PropertyLedger` to give Apple's local values back, `MotionAllowed`, `CursorOver`.
 2. Check a screenshot, since the log has said "mounted" or "applied" while nothing was visible.
 3. Compare before and after side by side. Colors close to Apple Music's own show no difference.
 

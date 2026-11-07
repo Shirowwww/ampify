@@ -148,9 +148,9 @@ struct PlacedControl {
     double width = 0;       // its width when it was folded: the room it needs to come back
 };
 
-// One XAML window of Apple Music (MainWindow or MiniPlayerWindow).
+// One XAML window of Apple Music (the main window or the mini player).
 struct WindowContext {
-    std::wstring property;
+    WindowRole role = WindowRole::Main;
     winrt::weak_ref<xaml::Window> window;
     dispatching::DispatcherQueue dispatcher{nullptr};
     uirender::RefreshTicket ticket;

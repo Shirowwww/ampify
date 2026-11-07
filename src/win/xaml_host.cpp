@@ -5,15 +5,13 @@
 #include "xaml_host.hpp"
 
 #include <atomic>
-#include <cstdio>
 #include <functional>
 #include <mutex>
 #include <string>
 
-#include <objbase.h>
-
 #include "player_controls.hpp"
 #include "ui_thread.hpp"
+#include "winrt_abi.hpp"
 
 namespace ampify::win {
 
@@ -21,19 +19,6 @@ namespace {
 
 namespace xaml = winrt::Microsoft::UI::Xaml;
 namespace dispatching = winrt::Microsoft::UI::Dispatching;
-using winrt::Windows::Foundation::IInspectable;
-
-using GetAppPropertyFn = IInspectable(__cdecl*)(winrt::hstring const&);
-
-GetAppPropertyFn GetAppPropertyFunction() noexcept {
-    static std::atomic<GetAppPropertyFn> cached{nullptr};
-    if (GetAppPropertyFn function = cached.load(std::memory_order_acquire)) return function;
-    HMODULE utils = GetModuleHandleW(L"AMP.Utils.dll");
-    if (!utils) return nullptr;
-    auto function = reinterpret_cast<GetAppPropertyFn>(GetProcAddress(utils, kGetAppPropertyExport));
-    if (function) cached.store(function, std::memory_order_release);
-    return function;
-}
 
 // The state of the DispatcherQueue backend. The queue is agile: any thread may enqueue.
 struct DispatchState {
@@ -62,8 +47,8 @@ bool XamlAttach() {
         std::lock_guard<std::mutex> lock(state.mutex);
         if (state.queue && state.window.get()) return true;
     }
-    EnsureMta();
-    xaml::Window window = AppWindow(L"MainWindow");
+    rt::EnsureMultithreaded();
+    xaml::Window window = AppWindowOf(WindowRole::Main);
     if (!window) {
         if (!AppPropertyAvailable() && !state.unavailableLogged.exchange(true)) {
             Log("Interface: AMP.Utils.dll or its GetAppProperty export is not available yet: the XAML window "
@@ -124,7 +109,7 @@ bool XamlPost(std::function<void()> work) {
                 }
                 work();
             } catch (const winrt::hresult_error& error) {
-                Log("Interface: a task on the interface thread failed (" + HresultText(error.code().value) + ")");
+                Log("Interface: a task on the interface thread failed (" + HresultText(error.code()) + ")");
             } catch (...) {
                 Log("Interface: a task on the interface thread failed (unknown exception)");
             }
@@ -148,39 +133,9 @@ const UiThreadBackend kXamlBackend{XamlAttach, XamlDetach, XamlPost, XamlAttache
 
 }  // namespace
 
-xaml::Window AppWindow(std::wstring_view property) noexcept {
-    GetAppPropertyFn function = GetAppPropertyFunction();
-    if (!function || property.empty()) return nullptr;
-    try {
-        IInspectable value = function(winrt::hstring(property));
-        return value ? value.try_as<xaml::Window>() : nullptr;
-    } catch (const winrt::hresult_error& error) {
-        // The mini player's and the full-screen player's windows are absent while closed: E_BOUNDS, not a problem.
-        bool playerWindow = property == L"MiniPlayerWindow" || property == L"FullScreenPlayerWindow";
-        if (!(playerWindow && error.code() == E_BOUNDS)) {
-            static std::atomic<int> logged{0};
-            if (logged++ < 3) {
-                Log("Interface: GetAppProperty failed (" + HresultText(error.code().value) + ")");
-            }
-        }
-        return nullptr;
-    } catch (...) {
-        return nullptr;
-    }
-}
-
-bool AppPropertyAvailable() noexcept {
-    return GetAppPropertyFunction() != nullptr;
-}
-
-void EnsureMta() noexcept {
-    // S_FALSE: already in the MTA. RPC_E_CHANGED_MODE: already single-threaded; WinRT calls still work there.
-    HRESULT result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    (void)result;
-}
-
 void InstallXamlUiThread(Journal& journal) {
     State().journal = &journal;
+    SetChromeJournal(&journal);
     SetUiThreadBackend(&kXamlBackend);
     InstallPlayerButtons(&ReadMainPlayerModes, &PressMainPlayerButton);
     InstallPlayerVolume(&SetMainPlayerVolume, &TakeMainPlayerVolumeProblem);  // through Apple's own volume model
@@ -189,12 +144,6 @@ void InstallXamlUiThread(Journal& journal) {
 
 std::uint64_t NowMs() noexcept {
     return GetTickCount64();
-}
-
-std::string HresultText(std::int32_t code) {
-    char buffer[16];
-    std::snprintf(buffer, sizeof(buffer), "0x%08X", static_cast<unsigned>(code));
-    return buffer;
 }
 
 }  // namespace ampify::win

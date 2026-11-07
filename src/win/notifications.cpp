@@ -2,8 +2,9 @@
 
 #include "notifications.hpp"
 
-// The WinRT headers (through xaml_host.hpp) come before windows.h, as in apple_player.cpp.
-#include "xaml_host.hpp"
+// The WinRT headers (through xaml_chrome.hpp) come before windows.h, as in apple_player.cpp.
+#include "xaml_chrome.hpp"
+#include "win_common.hpp"
 
 #include <windows.h>
 

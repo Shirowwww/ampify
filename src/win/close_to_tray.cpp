@@ -13,6 +13,7 @@
 #include <winrt/Microsoft.UI.Windowing.h>
 
 #include "../core/i18n.hpp"
+#include "xaml_chrome.hpp"
 
 namespace ampify::win {
 
@@ -202,7 +203,7 @@ void FollowCloseRule(const xaml::Window& mainWindow, bool toTray, Journal& journ
     try {
         g_journal = &journal;
         if (!toTray && !g_main) return;  // never on: Apple Music's window stays untouched
-        HWND main = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(mainWindow.AppWindow().Id().Value));
+        HWND main = WindowHandle(mainWindow);
         if (!main || g_hookFailed) return;
         if (main != g_main && !Hook(main)) {
             g_hookFailed = true;  // tried once: the log says why

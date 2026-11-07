@@ -18,7 +18,7 @@
 #include <string>
 #include <vector>
 
-#include "xaml_host.hpp"
+#include "xaml_chrome.hpp"
 
 namespace ampify::win {
 
@@ -71,7 +71,7 @@ std::string Describe(const xaml::UIElement& element) {
 
 // The elements under a place of the screen, topmost first, as text.
 std::string ElementsAt(long screenX, long screenY) {
-    xaml::Window window = AppWindow(L"MainWindow");
+    xaml::Window window = AppWindowOf(WindowRole::Main);
     xaml::UIElement content = window ? window.Content() : nullptr;
     if (!content || !content.XamlRoot()) return "Apple Music's main window has no content yet.\n";
 

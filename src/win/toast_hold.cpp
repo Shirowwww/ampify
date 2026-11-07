@@ -10,6 +10,7 @@
 
 #include "apple_facts.hpp"
 #include "hook.hpp"
+#include "win_common.hpp"
 #include "winrt_abi.hpp"
 
 namespace ampify::win {
@@ -69,17 +70,11 @@ HRESULT STDMETHODCALLTYPE HeldShow(void* notifier, void* notification) {
     return S_OK;  // the agent reads it as shown
 }
 
-std::string Hex(HRESULT code) {
-    char text[16];
-    std::snprintf(text, sizeof(text), "0x%08lX", static_cast<unsigned long>(code));
-    return text;
-}
-
 bool Notifier(rt::Ref& notifier, std::string& why) {
     rt::Ref statics;
     rt::Activation activation = rt::GetActivationFactory(kManagerClass, rt::GuidOf(kIidManagerStatics), statics);
     if (FAILED(activation.result) || !statics) {
-        why = "ToastNotificationManager not activated (" + Hex(activation.result) + ")";
+        why = "ToastNotificationManager not activated (" + HresultText(activation.result) + ")";
         return false;
     }
     rt::Ref created;
@@ -89,14 +84,14 @@ bool Notifier(rt::Ref& notifier, std::string& why) {
         wchar_t id[APPLICATION_USER_MODEL_ID_MAX_LENGTH] = {};
         UINT32 length = APPLICATION_USER_MODEL_ID_MAX_LENGTH;
         if (GetCurrentApplicationUserModelId(&length, id) != ERROR_SUCCESS) {
-            why = "CreateToastNotifier refused (" + Hex(result) + ") and no application id";
+            why = "CreateToastNotifier refused (" + HresultText(result) + ") and no application id";
             return false;
         }
         rt::HString name(id);
         result = rt::CallSlot(statics, kCreateNotifierWithIdSlot, name.Get(), created.Put());
     }
     if (FAILED(result) || !rt::Query(created, rt::GuidOf(kIidNotifier), notifier)) {
-        why = "CreateToastNotifier refused (" + Hex(result) + ")";
+        why = "CreateToastNotifier refused (" + HresultText(result) + ")";
         return false;
     }
     return true;

@@ -5,7 +5,11 @@
 #include "win_common.hpp"
 #include "win_host.hpp"
 #include "winrt_abi.hpp"
-#include "xaml_host.hpp"
+#include "win_common.hpp"
+#ifdef GetCurrentTime
+#undef GetCurrentTime  // windows.h macro that breaks Storyboard::GetCurrentTime in the projection
+#endif
+#include "xaml_chrome.hpp"
 
 #include "../core/amp_abi.hpp"
 #include "../core/ui_watchdog.hpp"
@@ -261,7 +265,7 @@ void KeepDisplayLinks(Journal& journal) noexcept {
         if (now < state.nextSearch) return;
         state.nextSearch = now + state.searchWait;
         state.searchWait = std::min<std::chrono::steady_clock::duration>(state.searchWait * 2, kSearchEveryMax);
-        xaml::Window window = AppWindow(L"MainWindow");
+        xaml::Window window = AppWindowOf(WindowRole::Main);
         auto content = window ? window.Content() : nullptr;
         xaml::FrameworkElement display = content ? FindNamed(content, kDisplayName, kDisplayClass) : nullptr;
         xaml::FrameworkElement title = display ? FindNamed(display, kTitleName) : nullptr;

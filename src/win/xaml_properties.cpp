@@ -127,7 +127,7 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
         if (auto solid = value.try_as<media::SolidColorBrush>()) {
             ColorValue color = solid.Color();
             color.A = static_cast<std::uint8_t>(std::lround(color.A * std::clamp(solid.Opacity(), 0.0, 1.0)));
-            kept.text += ";" + ColorText(color);
+            kept.text += ";" + ColourText(color);
         }
         return kept;
     };

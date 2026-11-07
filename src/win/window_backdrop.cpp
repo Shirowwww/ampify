@@ -2,7 +2,8 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
-#include "xaml_host.hpp"
+#include "win_common.hpp"
+#include "xaml_chrome.hpp"
 
 #include "../core/journal.hpp"
 
@@ -61,7 +62,7 @@ const char* NameOf(WindowMaterial material) {
 void KeepWindowMaterial(std::optional<WindowMaterial> material, Journal& journal) noexcept {
     try {
         Backdrop& state = State();
-        xaml::Window window = AppWindow(L"MainWindow");
+        xaml::Window window = AppWindowOf(WindowRole::Main);
         if (!window) return;
         if (window != state.window.get()) {
             if (!material) return;  // a new window keeps Apple's background until a theme asks for a material

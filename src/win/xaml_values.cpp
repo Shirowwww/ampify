@@ -65,12 +65,6 @@ bool IsIconText(const winrt::hstring& text) {
     return glyph;
 }
 
-std::string ColorText(ColorValue color) {
-    char buffer[16];
-    std::snprintf(buffer, sizeof(buffer), "#%02X%02X%02X%02X", color.A, color.R, color.G, color.B);
-    return buffer;
-}
-
 std::vector<double> Numbers(const std::string& text, char separator) {
     std::vector<double> numbers;
     size_t start = 0;
@@ -645,10 +639,6 @@ using Brushes = std::vector<comp::CompositionColorBrush>;
 // A control's own sprites hang a few levels down: BouncyBarControl > Grid#barsGrid > Canvas#bar0Host.
 constexpr int kSpriteDepth = 3;
 
-bool SameColour(const Colour& a, const Colour& b) {
-    return a.A == b.A && a.R == b.R && a.G == b.G && a.B == b.B;
-}
-
 void AddBrush(const comp::CompositionBrush& brush, Brushes& found) {
     if (auto plain = brush ? brush.try_as<comp::CompositionColorBrush>() : nullptr) found.push_back(plain);
 }
@@ -700,8 +690,8 @@ void FollowForegroundInSprites(const controls::Control& control) noexcept {
         if (found.empty()) return;
         Colour drawn = found.front().Color();
         bool single = std::all_of(found.begin(), found.end(),
-                                  [&](const comp::CompositionColorBrush& brush) { return SameColour(brush.Color(), drawn); });
-        if (!single || SameColour(drawn, now.Color())) return;
+                                  [&](const comp::CompositionColorBrush& brush) { return brush.Color() == drawn; });
+        if (!single || drawn == now.Color()) return;
         for (const comp::CompositionColorBrush& brush : found) brush.Color(now.Color());
     } catch (...) {
     }

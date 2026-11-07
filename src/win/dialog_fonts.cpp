@@ -3,6 +3,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "dialog_fonts.hpp"
+#include "xaml_chrome.hpp"
 
 #include <string_view>
 
@@ -36,7 +37,7 @@ xaml::FrameworkElement FindNamed(const xaml::DependencyObject& node, std::wstrin
 
 // A content button that sets its own font (a glyph written as text) keeps it: only the template's is replaced.
 bool KeepsOwnFont(const controls::Button& button) {
-    return button.ReadLocalValue(controls::Control::FontFamilyProperty()) != xaml::DependencyProperty::UnsetValue();
+    return HasLocalValue(button, controls::Control::FontFamilyProperty());
 }
 
 // Writes the font on the template buttons and on the content buttons that have none of their own, under `node`.

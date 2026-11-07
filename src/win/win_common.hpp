@@ -50,6 +50,9 @@ std::filesystem::path InstallDirectory();
 // False when there is no such key or the value cannot be written.
 bool SetDisplayVersion(const std::wstring& key, const std::wstring& version);
 
+// Text of an HRESULT as 0x8000FFFF, for the logs.
+std::string HresultText(long code);
+
 // Conversions between UTF-8 (what the logs and the report use) and UTF-16 (what Windows uses).
 std::string ToUtf8(std::wstring_view text);
 std::wstring FromUtf8(std::string_view text);

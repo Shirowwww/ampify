@@ -19,12 +19,10 @@
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
-#include <winrt/Windows.UI.ViewManagement.h>
 
 #include "../core/theme/animation.hpp"
 #include "../core/theme/tree.hpp"
-
-struct HWND__;  // windows.h's HWND, without its macros, which break the WinRT projection included after this
+#include "xaml_chrome.hpp"
 
 namespace ampify::win {
 
@@ -38,8 +36,8 @@ public:
     ThemeAnimations(const ThemeAnimations&) = delete;
     ThemeAnimations& operator=(const ThemeAnimations&) = delete;
 
-    // The main window, whose state pauses the endless animations.
-    void Window(HWND__* window) { m_window = window; }
+    // Whether the main window is on screen: the endless animations pause while it is not.
+    void WindowShown(std::function<bool()> shown) { m_shown = std::move(shown); }
     // Runs the animations of `text` (EncodeAnimations) on the element in place of the ones it ran, scaling and turning
     // it around `origin`, relative to its size. An empty text stops them. False when the element refuses: Apple Music
     // drives it through its composition visual or a RenderTransform.
@@ -64,10 +62,8 @@ public:
 
 private:
     struct Running {
-        winrt::weak_ref<winrt::Microsoft::UI::Xaml::UIElement> element;
-        // Set instead for an element Ampify made: a weak reference to it never resolves inside Apple Music, and the
-        // stepped loops of a decor (the turning artwork) never ran.
-        winrt::Microsoft::UI::Xaml::UIElement held{nullptr};
+        // Held strongly when Ampify made it (a decor): otherwise the stepped loops of the turning artwork never ran.
+        HeldElement<winrt::Microsoft::UI::Xaml::UIElement> element;
         std::string text;
         std::vector<winrt::Microsoft::UI::Composition::CompositionAnimation> animations;
         // Keeps the centre of scale and rotation on the origin while the element changes size.
@@ -104,16 +100,14 @@ private:
     static void EndAt(Running& running, double ms,
                       std::vector<winrt::Microsoft::UI::Composition::CompositionAnimation> parts);
 
-    bool MotionAllowed();
     void StartLoops(Running& running, std::vector<theme::Animation> loops);
     void StepLoops();
 
     bool m_wasPlaying = true;  // at the previous step of the loops
     std::map<theme::NodeId, Running> m_running;
-    HWND__* m_window = nullptr;
+    std::function<bool()> m_shown;
     winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_loopTimer{nullptr};
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
-    winrt::Windows::UI::ViewManagement::UISettings m_settings{nullptr};  // made once, read at each start
 };
 
 }  // namespace ampify::win

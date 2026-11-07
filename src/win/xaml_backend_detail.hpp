@@ -38,7 +38,6 @@ using ColorValue = winrt::Windows::UI::Color;
 
 std::optional<ColorValue> ColorFromText(const std::string& text);
 bool IsIconText(const winrt::hstring& text);
-std::string ColorText(ColorValue color);
 std::vector<double> Numbers(const std::string& text, char separator);
 std::vector<std::string> Split(const std::string& text, char separator);
 std::string FractionText(double number);

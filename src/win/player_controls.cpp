@@ -6,7 +6,11 @@
 #include "amp_item.hpp"
 #include "amp_player.hpp"
 #include "winrt_abi.hpp"
-#include "xaml_host.hpp"
+#include "win_common.hpp"
+#ifdef GetCurrentTime
+#undef GetCurrentTime  // windows.h macro that breaks Storyboard::GetCurrentTime in the projection
+#endif
+#include "xaml_chrome.hpp"
 
 #include "../core/amp_abi.hpp"
 #include "../core/player_modes.hpp"
@@ -137,7 +141,7 @@ bool IsOn(const xaml::FrameworkElement& source) {
     return dot && dot.Visibility() == xaml::Visibility::Visible && dot.Opacity() > 0;
 }
 
-bool SameColour(const media::Brush& first, const media::Brush& second) {
+bool SameBrushColour(const media::Brush& first, const media::Brush& second) {
     auto a = first.try_as<media::SolidColorBrush>();
     auto b = second.try_as<media::SolidColorBrush>();
     return a && b && a.Color() == b.Color();
@@ -150,13 +154,10 @@ controls::FontIcon CopyIcon(const controls::Button& copy) {
     return FindFirst<controls::FontIcon>(copy);
 }
 
-std::string ColourText(const media::Brush& brush) {
+std::string PaintText(const media::Brush& brush) {
     auto solid = brush.try_as<media::SolidColorBrush>();
     if (!solid) return brush ? "not a plain colour" : "none";
-    auto c = solid.Color();
-    char text[10];
-    std::snprintf(text, sizeof(text), "#%02X%02X%02X%02X", c.A, c.R, c.G, c.B);
-    return text;
+    return ColourText(solid.Color());
 }
 
 Journal* g_journal = nullptr;  // AddPlayerControls's, for the reports of Sync
@@ -164,8 +165,8 @@ Journal* g_journal = nullptr;  // AddPlayerControls's, for the reports of Sync
 // Once per change of a button's state: what Apple shows on its own button, and what the copy takes.
 void ReportColour(const xaml::FrameworkElement& source, bool on, const media::Brush& icon, const media::Brush& taken) {
     static std::map<std::wstring, std::string> seen;
-    std::string line = std::string(on ? "on" : "off") + ", Apple's icon " + ColourText(icon) + ", the copy " +
-                       (on ? ColourText(taken) : std::string("the player's"));
+    std::string line = std::string(on ? "on" : "off") + ", Apple's icon " + PaintText(icon) + ", the copy " +
+                       (on ? PaintText(taken) : std::string("the player's"));
     std::string& last = seen[std::wstring(source.Name())];
     if (!g_journal || last == line) return;
     last = line;
@@ -189,7 +190,7 @@ void Sync(const controls::Button& copy, const xaml::FrameworkElement& source) {
         // Taken from the dot first, the copies showed no accent when on.
         media::Brush colour = glyph.Foreground();
         auto control = source.try_as<controls::Control>();
-        if (!FindFirst<xaml::Shapes::Ellipse>(copy) && control && SameColour(colour, control.Foreground())) {
+        if (!FindFirst<xaml::Shapes::Ellipse>(copy) && control && SameBrushColour(colour, control.Foreground())) {
             // Not a clear dot: while Apple switches the mode, it read #00FFFFFF and the icon vanished.
             auto dot = FindNamed(source, std::wstring(source.Name()) + L"Dot").try_as<xaml::Shapes::Ellipse>();
             auto fill = dot ? dot.Fill().try_as<media::SolidColorBrush>() : nullptr;
@@ -517,10 +518,9 @@ constexpr unsigned kRepeatOneGlyph = 0x10029F;  // Apple Music 1.1792; the other
 std::string BrushText(const media::Brush& brush) {
     auto solid = brush ? brush.try_as<media::SolidColorBrush>() : nullptr;
     if (!solid) return "none";
-    auto c = solid.Color();
-    char text[48];
-    std::snprintf(text, sizeof(text), "#%02X%02X%02X%02X*%.2f", c.A, c.R, c.G, c.B, solid.Opacity());
-    return text;
+    char opacity[16];
+    std::snprintf(opacity, sizeof(opacity), "*%.2f", solid.Opacity());
+    return ColourText(solid.Color()) + opacity;
 }
 
 // How the repeat button looks, to tell its states apart: its dot (shown or not, how opaque, which colour) and its icon.
@@ -569,7 +569,7 @@ void NoteVolumeProblem(std::string text) {
 
 // A button of the main window, found by name from its content: the player need not have been opened.
 xaml::FrameworkElement MainWindowButton(std::wstring_view name) {
-    xaml::Window window = AppWindow(L"MainWindow");
+    xaml::Window window = AppWindowOf(WindowRole::Main);
     auto content = window ? window.Content() : nullptr;
     return content ? FindNamed(content, name) : nullptr;
 }
@@ -614,7 +614,7 @@ xaml::FrameworkElement MainLyricsView(LyricsViewSeen& seen) {
     auto now = std::chrono::steady_clock::now();
     if (now < seen.nextSearch) return nullptr;
     seen.nextSearch = now + kLyricsSearchEvery;
-    xaml::Window window = AppWindow(L"MainWindow");
+    xaml::Window window = AppWindowOf(WindowRole::Main);
     auto content = window ? window.Content() : nullptr;
     if (!content) return nullptr;
     const winrt::hstring wanted = winrt::to_hstring(amp::kClassKaraokeLyricsView);

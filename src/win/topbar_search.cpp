@@ -2,8 +2,6 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
-#include "xaml_host.hpp"
-
 #include "../core/i18n.hpp"
 #include "../core/journal.hpp"
 #include "../core/topbar.hpp"
@@ -24,8 +22,10 @@
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 
-// After the projection: windows.h, which it brings, renames IAutomationPeer::GetClassName.
+// After the projection: windows.h, which they bring, renames IAutomationPeer::GetClassName.
+#include "win_common.hpp"
 #include "xaml_backend_detail.hpp"
+#include "xaml_chrome.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -58,13 +58,6 @@ constexpr wchar_t kBackGlyph[] = L"\xE72B";  // Back in Segoe Fluent Icons, as A
 
 std::atomic<bool> g_enabled{false};
 
-// A local value written on one of Apple's elements, with the one before (or the unset value) to put back.
-struct Saved {
-    xaml::DependencyObject element{nullptr};
-    xaml::DependencyProperty property{nullptr};
-    IInspectable before{nullptr};
-};
-
 // A property callback registered on one of Apple's elements, taken off by its token in Release.
 struct Watched {
     xaml::DependencyObject element{nullptr};
@@ -88,7 +81,7 @@ struct State {
     xaml::VisualState closedCompact{nullptr};  // Apple's state, and the setter taken out of it (TakePresenterSetter)
     xaml::SetterBase presenterSetter{nullptr};
     uint32_t presenterSetterIndex = 0;
-    std::vector<Saved> saved;
+    PropertyLedger saved;  // Apple's local values that the top bar replaced
     // Apple's sidebar header and its title, kept where Apple lays them out without its arrow (ArrowRoom).
     xaml::FrameworkElement header{nullptr};
     xaml::FrameworkElement title{nullptr};
@@ -138,27 +131,6 @@ T FindFirst(const xaml::DependencyObject& root, std::wstring_view name, int dept
         if (T deeper = FindFirst<T>(child, name, depth + 1)) return deeper;
     }
     return nullptr;
-}
-
-void WriteKept(State& state, const xaml::DependencyObject& element, const xaml::DependencyProperty& property,
-               const IInspectable& value) {
-    state.saved.push_back({element, property, element.ReadLocalValue(property)});
-    element.SetValue(property, value);
-}
-
-// Last written, first put back, so a property written twice ends as Apple had it.
-void PutBackAll(State& state) {
-    for (auto it = state.saved.rbegin(); it != state.saved.rend(); ++it) {
-        try {
-            if (!it->before || it->before == xaml::DependencyProperty::UnsetValue()) {
-                it->element.ClearValue(it->property);
-            } else {
-                it->element.SetValue(it->property, it->before);
-            }
-        } catch (...) {
-        }
-    }
-    state.saved.clear();
 }
 
 // Presses Apple's back button, so Apple's own navigation goes back: the same as a click on it.
@@ -355,12 +327,12 @@ void WatchPresenter(State& state) {
 // The empty search row of the pane and Apple's back arrow stop showing; each value goes back as it was. The arrow
 // keeps its place, so the sidebar's header does not move.
 void HideApples(State& state, const controls::NavigationView& navigation) {
-    WriteKept(state, state.area, xaml::UIElement::VisibilityProperty(), winrt::box_value(xaml::Visibility::Collapsed));
+    state.saved.Write(state.area, xaml::UIElement::VisibilityProperty(), winrt::box_value(xaml::Visibility::Collapsed));
     state.appleBack = FindFirst<controls::Button>(navigation, L"NavigationViewBackButton", 0);
     if (state.appleBack) {
-        WriteKept(state, state.appleBack, xaml::UIElement::OpacityProperty(), winrt::box_value(0.0));
-        WriteKept(state, state.appleBack, xaml::UIElement::IsHitTestVisibleProperty(), winrt::box_value(false));
-        WriteKept(state, state.appleBack, xaml::UIElement::IsTabStopProperty(), winrt::box_value(false));
+        state.saved.Write(state.appleBack, xaml::UIElement::OpacityProperty(), winrt::box_value(0.0));
+        state.saved.Write(state.appleBack, xaml::UIElement::IsHitTestVisibleProperty(), winrt::box_value(false));
+        state.saved.Write(state.appleBack, xaml::UIElement::IsTabStopProperty(), winrt::box_value(false));
     }
 }
 
@@ -516,7 +488,7 @@ void Release(State& state) {
         if (navigation) PutBackPaneState(navigation);
     } catch (...) {
     }
-    PutBackAll(state);
+    state.saved.PutBackAll();
     try {
         if (state.popup) {
             state.popup.IsOpen(false);
@@ -695,7 +667,7 @@ std::optional<std::string> HiddenBecause(State& state, const xaml::UIElement& co
 }
 
 void WatchClose(State& state, const xaml::Window& window) {
-    HWND hwnd = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(window.AppWindow().Id().Value));
+    HWND hwnd = WindowHandle(window);
     if (hwnd == state.window) return;
     state.window = hwnd;
     state.windowId = window.AppWindow().Id();
@@ -716,11 +688,11 @@ void Step(State& state, bool search) {
         if (!state.note.empty()) Note(state, "Top bar: off, Apple Music's search field is back in its sidebar");
         return;
     }
-    xaml::Window window = AppWindow(L"MainWindow");
+    xaml::Window window = AppWindowOf(WindowRole::Main);
     xaml::UIElement content = window ? window.Content() : nullptr;
     if (!content || !content.XamlRoot()) return;
     WatchClose(state, window);
-    if (!IsWindowVisible(state.window) || IsIconic(state.window)) return;
+    if (!WindowOnScreen(state.window)) return;
     if (Taken(state) && !StillHeld(state)) Release(state);
     std::optional<std::string> why = HiddenBecause(state, content, search);
     if (!why) return;
