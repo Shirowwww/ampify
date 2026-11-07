@@ -1,8 +1,22 @@
 # Changelog
 
-## 1.2.0 (2026-11-07), beta
+## 1.2.1 (2026-11-07)
 
-This is an experimental release for testers: it is published as a pre-release, so Ampify does not offer it as an update to everyone.
+This is the stable release of the 1.2.0 work, and every user can update to it. It also fixes three things.
+
+### Reliability
+
+- Ampify now loads in every build of an Apple Music version it was tested on. Until now it stayed off, on purpose, in
+  a newer build of the same version (1.1792.39681 and later), so it seemed to do nothing there. A newer version of
+  Apple Music still keeps it off until it has been tested.
+- Turning a snippet on or off in the Marketplace no longer moves the cards under the pointer when the catalog warning
+  shows: the warning takes the line kept for the result of an action.
+- Space or Enter on the sidebar's hamburger opens the pane and then folds it again: the keyboard no longer jumps to
+  the header's "..." after the first key. Esc on the hamburger folds the pane too.
+
+## 1.2.0 (2026-11-07)
+
+This version adds a top bar, grouped settings, options for the library agent and the proxy, and more of Spicetify's API. 1.2.1 replaces it.
 
 ### Settings
 
