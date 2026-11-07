@@ -54,6 +54,7 @@ using Group = controls::NavigationViewItem;
 
 constexpr int kSearchDepth = 32;  // the NavigationView and its pane sit some twenty levels under the window's content
 constexpr auto kWatchEvery = std::chrono::milliseconds(200);  // the real cursor, while the pane is open
+constexpr auto kRefocusFor = std::chrono::milliseconds(1500);  // a pane opened by a key: the hamburger keeps the keyboard
 constexpr int kTurnMs = 180;                                  // the pin's glyph turns in this time
 constexpr wchar_t kPinName[] = L"AMPIFY_SidebarPin";
 constexpr double kPinSize = 28;         // the height of Apple's "···" beside it, square
@@ -93,6 +94,7 @@ struct State {
     int64_t moreToken = 0;  // its Margin callback, taken off by this token in Release
     winrt::event_token moreSizeToken{};  // its SizeChanged, taken off by this token in Release
     bool keysUsed = false;  // a key opened the pane or went down in it: it stays while the focus is on it
+    Clock::time_point refocusUntil{};  // a key opened the pane: until then, the keyboard goes back to the hamburger
     controls::Grid fillGrid{nullptr};  // Apple's pane grid, and ours in it: the fill of the pane open over the pages
     controls::Border fill{nullptr};
     winrt::weak_ref<controls::Grid> column;      // Apple's Grid#PaneContentGrid, found once
@@ -229,12 +231,32 @@ void ClosePane(const State& state, const controls::NavigationView& navigation, c
     navigation.IsPaneOpen(false);
 }
 
+// Opened by a key, WinUI and Apple's header move the focus into the pane, onto the "···": the next Space or Enter
+// went there and never folded the pane. The keyboard goes back to the hamburger, so a second press folds it again.
+// The focus can move more than once while the pane opens, so this holds for a moment, not for one look.
+void RefocusToggle(State& state, const xaml::FrameworkElement& pane) {
+    if (Clock::now() > state.refocusUntil || state.pinned || !FocusInside(pane)) return;
+    if (auto toggle = state.toggle.get()) toggle.Focus(xaml::FocusState::Keyboard);
+}
+
+// Tab and the arrows send the keyboard somewhere on purpose; any other key (an injected one included) does not.
+bool MovesFocus(winrt::Windows::System::VirtualKey key) {
+    using winrt::Windows::System::VirtualKey;
+    return key == VirtualKey::Tab || key == VirtualKey::Up || key == VirtualKey::Down || key == VirtualKey::Left ||
+           key == VirtualKey::Right;
+}
+
+void HoldToggleFocus(State& state) {
+    state.refocusUntil = state.keysUsed ? Clock::now() + kRefocusFor : Clock::time_point{};
+}
+
 // Closes the pane once the pointer is off it and nothing holds it; true while it stays open. Pinned, it never closes.
 // Every hold is read on each look, so the search text stays current even while the pointer is over the pane.
 bool CloseIfLeft(State& state) {
     auto navigation = state.navigation.get();
     auto pane = state.pane.get();
     if (!navigation || !pane || !navigation.IsPaneOpen() || state.pinned) return false;
+    RefocusToggle(state, pane);
     bool cursor = CursorOverPane(state, navigation, pane);
     bool typing = TypingHolds(state, pane);
     bool menu = HoldsForMenu(WindowInFront(state), MenuOpen(pane));
@@ -897,6 +919,8 @@ void NoteKeyOpen(bool byKey) {
             State& live = TheState();
             auto navigation = live.navigation.get();
             live.keysUsed = byKey && navigation && navigation.IsPaneOpen() && !live.pinned;
+            HoldToggleFocus(live);
+            if (auto pane = live.pane.get(); pane && live.keysUsed) RefocusToggle(live, pane);
         } catch (...) {
         }
     }));
@@ -946,6 +970,7 @@ void ToggleFromSpace() {
             }
             navigation.IsPaneOpen(!navigation.IsPaneOpen());
             live.keysUsed = navigation.IsPaneOpen();
+            HoldToggleFocus(live);
             if (live.keysUsed) Watch(live);
         } catch (...) {
         }
@@ -958,8 +983,18 @@ void MakeSpaceHandlers(State& state) {
     state.spaceDown = winrt::box_value(xaml::Input::KeyEventHandler(
         [](IInspectable const&, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
             try {
-                if (args.Key() != winrt::Windows::System::VirtualKey::Space || args.KeyStatus().WasKeyDown) return;
                 State& live = TheState();
+                // The keyboard is on the hamburger, outside the pane, where WinUI's own Esc does not reach: folded here.
+                if (args.Key() == winrt::Windows::System::VirtualKey::Escape) {
+                    auto navigation = live.navigation.get();
+                    auto pane = live.pane.get();
+                    if (!navigation || !pane || !navigation.IsPaneOpen() || live.pinned) return;
+                    ClosePane(live, navigation, pane);
+                    args.Handled(true);
+                    return;
+                }
+                if (MovesFocus(args.Key())) live.refocusUntil = {};  // Tab from the hamburger: the keyboard goes there
+                if (args.Key() != winrt::Windows::System::VirtualKey::Space || args.KeyStatus().WasKeyDown) return;
                 live.spacePressed = true;
                 live.clicked = false;
             } catch (...) {
@@ -1062,6 +1097,7 @@ void MakePaneHandlers(State& state) {
                 if (navigation && navigation.IsPaneOpen() && !args.OriginalSource().try_as<controls::TextBox>()) {
                     live.keysUsed = true;
                 }
+                if (MovesFocus(args.Key())) live.refocusUntil = {};  // Tab in the pane: the keyboard stays where it went
             } catch (...) {
             }
         }));
