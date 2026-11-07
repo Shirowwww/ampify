@@ -9,8 +9,13 @@
 
 namespace ampify {
 
-// Hooks are only installed on the builds of kKnownAppVersions (facts/apple.json) or versions.txt. On any other build
-// the kernel stays idle: the app runs untouched, nothing is guessed by address.
+// "1.1792" for "1.1792.39942.0": the first two numbers, which Apple changes when the app itself changes. Empty when
+// `version` is not a build of four numbers.
+std::string_view AppVersionFamily(std::string_view version);
+
+// Hooks are only installed on a build of a family tested in kKnownAppVersions (facts/apple.json) or versions.txt:
+// Apple ships several builds of one family, and the build signature, checked next, says whether the player changed.
+// On a build of any other family the kernel stays idle: the app runs untouched, nothing is guessed by address.
 bool IsKnownAppVersion(std::string_view version,
                        std::span<const std::string_view> known = kKnownAppVersions);
 

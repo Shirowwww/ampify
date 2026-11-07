@@ -2,6 +2,15 @@
 
 namespace ampify {
 
+namespace {
+
+// "version 1.1792.39942.0 (family 1.1792 tested)": what the log, ampify doctor and ampify versions all say.
+std::string Accepted(std::string_view appVersion) {
+    return "version " + std::string(appVersion) + " (family " + std::string(AppVersionFamily(appVersion)) + " tested)";
+}
+
+}  // namespace
+
 PolicyVerdict DecideInjection(std::string_view appVersion, bool safeMode, const BuildSignature& signature,
                               std::span<const std::string_view> known) {
     if (safeMode) return {false, "safe mode active: Apple Music starts without the kernel", OffCause::SafeMode};
@@ -14,7 +23,7 @@ PolicyVerdict DecideInjection(std::string_view appVersion, bool safeMode, const 
         return {false, DescribeSignature(signature) + ": Apple Music starts without the kernel",
                 OffCause::WrongExports};
     }
-    return {true, "version " + std::string(appVersion) + " tested: kernel injected"};
+    return {true, Accepted(appVersion) + ": kernel injected"};
 }
 
 PolicyVerdict DecideKernel(ProcessRole role, std::string_view appVersion, const BuildSignature& signature,
@@ -25,7 +34,7 @@ PolicyVerdict DecideKernel(ProcessRole role, std::string_view appVersion, const 
         return {false, "version " + std::string(appVersion) + " not tested: kernel inactive"};
     }
     if (!SignatureMatches(signature)) return {false, DescribeSignature(signature) + ": kernel inactive"};
-    return {true, "version " + std::string(appVersion) + " tested"};
+    return {true, Accepted(appVersion)};
 }
 
 }  // namespace ampify

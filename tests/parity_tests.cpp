@@ -97,7 +97,8 @@ TEST_CASE(VersionGate_FileAddsAVersion) {
     CHECK(known.size() == std::size(ampify::kKnownAppVersions) + 1);  // the built-in one is not listed twice
     CHECK(ampify::IsKnownAppVersion("1.1600.1.0", known));
     CHECK(ampify::IsKnownAppVersion("1.1540.23042.0", known));
-    CHECK(!ampify::IsKnownAppVersion("1.1600.1.1", known));
+    CHECK(ampify::IsKnownAppVersion("1.1600.1.1", known));  // the same family
+    CHECK(!ampify::IsKnownAppVersion("1.1601.1.0", known));
 
     ampify::PolicyVerdict launch = ampify::DecideInjection("1.1600.1.0", false, GoodSignature(), known);
     CHECK(launch.allowed);

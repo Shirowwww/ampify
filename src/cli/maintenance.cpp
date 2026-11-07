@@ -1,6 +1,7 @@
 // Upkeep commands: the interface inspector (devtools), the list of tested Apple Music builds (versions), the kit
 // folder in the file manager (config --dir), and the one-line notice about a new kit release (check_kit_update).
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <iterator>
@@ -202,12 +203,13 @@ int CmdVersions(Context& ctx) {
 
     if (action == "list") {
         std::vector<std::string> extra = LoadVersionList(listFile);
-        ctx.out << "Apple Music versions accepted by the kernel:\n";
+        ctx.out << "Apple Music versions tested (every build of their family is accepted):\n";
         for (std::string_view version : kKnownAppVersions) {
             ctx.out << "  " << Pad(version, 20) << "built into the kernel\n";
         }
         for (const std::string& version : extra) {
-            if (IsKnownAppVersion(version)) continue;
+            if (std::find(std::begin(kKnownAppVersions), std::end(kKnownAppVersions), version) !=
+                std::end(kKnownAppVersions)) continue;
             ctx.out << "  " << Pad(version, 20) << "versions.txt (ampify versions update)\n";
         }
         std::error_code ec;
@@ -231,7 +233,8 @@ int CmdVersions(Context& ctx) {
         }
         bool known = IsKnownAppVersion(installed, KnownAppVersionsWith(extra));
         ctx.out << "Installed Apple Music: " << installed
-                << (known ? " (tested)\n" : " (not tested: the kernel stays off. Try ampify versions update)\n");
+                << (known ? " (family " + std::string(AppVersionFamily(installed)) + " tested)\n"
+                          : std::string(" (family not tested: the kernel stays off. Try ampify versions update)\n"));
         return 0;
     }
 

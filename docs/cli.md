@@ -60,7 +60,7 @@ ampify doctor                            check that everything is in order
 | `ampify remove <id>` | Removes an element, after a backup |
 | `ampify update` | Downloads the latest Ampify release and checks it. `--check` only says whether one exists, `--apply` installs it (Apple Music closed). `--auto` follows `kit_update`, at most one look a day: the background launcher runs it every hour while Apple Music is closed, with its output in `logs\update.log` |
 | `ampify install-kit <version> [--apply]` | Installs a given Ampify release, even an older one |
-| `ampify versions [list]` | The Apple Music versions Ampify accepts, and the installed one |
+| `ampify versions [list]` | The tested Apple Music versions, and the installed one: every build of a tested family (same first two numbers, such as 1.1792) is accepted when its player library still exports what Ampify needs |
 | `ampify versions update` | Downloads the list of tested versions published with the catalog into `versions.txt` |
 | `ampify notice safe-mode` / `notice version <v>` / `notice exports <v>` | The Windows notification the launcher starts, once, when Ampify stays off (safe mode, an Apple Music version not tested yet, or a tested one whose player library no longer matches; only the first can say a new list just arrived). `--dry-run` prints its text instead |
 

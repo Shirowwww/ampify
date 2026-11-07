@@ -137,15 +137,27 @@ TEST_CASE(SafeMode_CountSurvivesANewInstance) {
     CHECK(second.BeginLaunch());  // the count was saved to disk, so this launch is safe
 }
 
-TEST_CASE(VersionGate_KnowsOnlyTestedBuilds) {
+TEST_CASE(VersionGate_KnowsOnlyTestedFamilies) {
     CHECK(ampify::IsKnownAppVersion("1.1540.23042.0"));
-    CHECK(!ampify::IsKnownAppVersion("1.1540.23042.1"));
+    CHECK(ampify::IsKnownAppVersion("1.1540.23042.1"));  // same family as a tested build
     CHECK(!ampify::IsKnownAppVersion("1.1541.0.0"));
+    CHECK(!ampify::IsKnownAppVersion("1.15.0.0"));
+    CHECK(!ampify::IsKnownAppVersion("1.1540"));         // a family alone is not a build
     CHECK(!ampify::IsKnownAppVersion(""));
 
     const std::string_view custom[] = {"2.0.0.0"};
     CHECK(ampify::IsKnownAppVersion("2.0.0.0", custom));
+    CHECK(ampify::IsKnownAppVersion("2.0.7.1", custom));
     CHECK(!ampify::IsKnownAppVersion("1.1540.23042.0", custom));
+}
+
+TEST_CASE(VersionGate_TakesEveryBuildOfTheTested1792Family) {
+    CHECK(ampify::IsKnownAppVersion("1.1792.39681.0"));
+    CHECK(ampify::IsKnownAppVersion("1.1792.39942.0"));
+    CHECK(!ampify::IsKnownAppVersion("1.1800.1.0"));
+    CHECK(ampify::AppVersionFamily("1.1792.39942.0") == "1.1792");
+    CHECK(ampify::AppVersionFamily("1.1792").empty());
+    CHECK(ampify::AppVersionFamily("").empty());
 }
 
 TEST_CASE(Journal_WritesStampedLines) {

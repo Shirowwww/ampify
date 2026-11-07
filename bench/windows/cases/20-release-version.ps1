@@ -7,7 +7,9 @@ Register-Case -Id 'release-version' -Title 'Release build: injection only on a t
     $launcher = Join-Path $script:BenchKitRoot 'release\ampify_launcher.exe'
 
     $version = $script:AppleMusicVersion
-    $tested = $script:KnownVersions -contains $version
+    # Every build of a tested family (same first two numbers) is accepted.
+    $family = ($version -split '[.]')[0..1] -join '.'
+    $tested = @($script:KnownVersions | Where-Object { (($_ -split '[.]')[0..1] -join '.') -eq $family }).Count -gt 0
     Add-Info -Ctx $Ctx -Name 'installed version' -Detail "$version (tested: $tested)"
 
     Reset-KitState
@@ -20,7 +22,7 @@ Register-Case -Id 'release-version' -Title 'Release build: injection only on a t
 
     if ($tested) {
         Add-Check -Ctx $Ctx -Name 'launcher: kernel injected, tested version' `
-            -Passed (Test-JournalContains -FileName 'launcher.log' -Text "version $version tested: kernel injected")
+            -Passed (Test-JournalContains -FileName 'launcher.log' -Text "version $version (family $family tested): kernel injected")
 
         $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched

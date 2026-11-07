@@ -181,7 +181,16 @@ int CmdDoctor(Context& ctx) {
     for (std::string_view version : KnownAppVersionsWith(extra)) {
         versions += (versions.empty() ? "" : ", ") + std::string(version);
     }
-    ok("tested Apple Music versions: " + versions + (extra.empty() ? "" : " (with versions.txt)"));
+    ok("tested Apple Music versions: " + versions + (extra.empty() ? "" : " (with versions.txt)") +
+       "; every build of their family is accepted");
+    if (std::optional<std::string> installed = platform::AppPackageVersion()) {
+        if (IsKnownAppVersion(*installed, KnownAppVersionsWith(extra))) {
+            ok("installed Apple Music " + *installed + ": family " + std::string(AppVersionFamily(*installed)) + " tested");
+        } else {
+            warn("installed Apple Music " + *installed + ": family not tested, the kernel stays off "
+                 "(try ampify versions update)");
+        }
+    }
     ok(std::string("Apple Music ") +
        (platform::IsProcessRunning(std::string(kAppleMusicImage)) ? "is open" : "is closed") +
        " (process check)");

@@ -50,8 +50,27 @@ TEST_CASE(Kernel_RunsOnlyInAppProcessesOnTestedBuilds) {
     CHECK(ampify::DecideKernel(ampify::ProcessRole::LibraryAgent, "1.1540.23042.0", kMatching).allowed);
 
     CHECK(!ampify::DecideKernel(ampify::ProcessRole::Unknown, "1.1540.23042.0", kMatching).allowed);
-    CHECK(!ampify::DecideKernel(ampify::ProcessRole::AppleMusic, "1.1540.23042.1", kMatching).allowed);
+    CHECK(!ampify::DecideKernel(ampify::ProcessRole::AppleMusic, "1.1541.23042.1", kMatching).allowed);
     CHECK(!ampify::DecideKernel(ampify::ProcessRole::LibraryAgent, "", kMatching).allowed);
+}
+
+TEST_CASE(Injection_TakesUntestedBuildsOfATestedFamilyWithTheSignature) {
+    for (std::string_view build : {"1.1792.39681.0", "1.1792.39942.0"}) {
+        ampify::PolicyVerdict launch = ampify::DecideInjection(build, false, kMatching);
+        CHECK(launch.allowed);
+        CHECK(launch.reason.find("family 1.1792 tested") != std::string::npos);
+        CHECK(ampify::DecideKernel(ampify::ProcessRole::AppleMusic, build, kMatching).allowed);
+        CHECK(ampify::DecideKernel(ampify::ProcessRole::LibraryAgent, build, kMatching).allowed);
+    }
+    ampify::PolicyVerdict other = ampify::DecideInjection("1.1800.1.0", false, kMatching);
+    CHECK(!other.allowed);
+    CHECK(other.cause == ampify::OffCause::UntestedVersion);
+    CHECK(!ampify::DecideKernel(ampify::ProcessRole::AppleMusic, "1.1800.1.0", kMatching).allowed);
+
+    ampify::PolicyVerdict wrong = ampify::DecideInjection("1.1792.39942.0", false, kMissingSetVolume);
+    CHECK(!wrong.allowed);
+    CHECK(wrong.cause == ampify::OffCause::WrongExports);
+    CHECK(!ampify::DecideKernel(ampify::ProcessRole::AppleMusic, "1.1792.39942.0", kUnreadable).allowed);
 }
 
 TEST_CASE(Kernel_RefusesWhenTheSignatureDoesNotMatch) {

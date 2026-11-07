@@ -384,7 +384,7 @@ std::optional<Session> OpenSession(ampify::Journal& journal, const std::filesyst
     return session;
 }
 
-// Tells the person, once, why Ampify stays off: Apple Music updated itself to a build that was not tested, or safe
+// Tells the person, once, why Ampify stays off: Apple Music updated itself to a family that was not tested, or safe
 // mode. It is `ampify notice` in a process of its own, so neither this launcher nor a held Apple Music waits for it.
 void TellIfOff(ampify::Journal& journal, const Session& session, const ampify::PolicyVerdict& verdict) {
     if (!ampify::TakeOffNotice(session.kit / "cache" / "off-notice.txt", verdict, session.version)) return;

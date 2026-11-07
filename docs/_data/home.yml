@@ -23,7 +23,7 @@ en:
   safe:
     - Nothing is written into Apple Music's package; uninstalling puts everything back.
     - Copy protection is never touched.
-    - On an Apple Music version that was not tested, Ampify stays off until it is.
+    - On an Apple Music version of a family that was not tested, Ampify stays off until it is.
     - Every theme and extension in the Marketplace has its source on GitHub, reviewed before it is listed.
 fr:
   title: Apple Music, à votre façon

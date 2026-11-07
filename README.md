@@ -38,7 +38,7 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 - English, French, German, Spanish, Portuguese, Russian, Japanese and Simplified Chinese.
 - Updates install themselves while Apple Music is closed, or after a question, as you choose in Settings > Ampify.
 - Nothing is written into Apple Music's package, and uninstalling gives the original app back. On an Apple Music
-  version that was not tested, Ampify stays off.
+  version of a family that was not tested (1.1792 is), Ampify stays off.
 
 <div align="center">
 <table>
