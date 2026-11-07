@@ -83,20 +83,40 @@ xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntr
 
 namespace {
 
-// Whose setting a control writes: an extension's, or the active theme's, and the card it sits in.
+// Whose setting a control writes: an extension's, the active theme's or a snippet's, and the card it sits in.
 struct SettingOwner {
-    std::string id;
-    bool theme = false;
-    bool snippet = false;
+    ElementRef element;
     std::weak_ptr<SettingsCard> card;
 };
+
+// What the journal adds after a setting written from the card.
+std::string AfterWrite(const ElementRef& element) {
+    switch (element.kind) {
+        case ElementKind::Snippet: return " (snippet)";
+        case ElementKind::Theme: return " (theme)";
+        case ElementKind::Extension:
+        case ElementKind::App: break;
+    }
+    return " (restart " + element.id + " requested)";
+}
+
+// The start of the automation name of a setting's control, which the bench and the inspector look for.
+const char* SettingNamePrefix(ElementKind kind) {
+    switch (kind) {
+        case ElementKind::Snippet: return "AMPIFY_SnippetSetting_";
+        case ElementKind::Theme: return "AMPIFY_ThemeSetting_";
+        case ElementKind::Extension:
+        case ElementKind::App: break;
+    }
+    return "AMPIFY_ModsSetting_";
+}
 
 // Reads the element back from settings.txt and turns each Reset on or off by it: a change made with a control shows
 // on its Reset at once, without building the card again under the pointer.
 void FollowValues(UiService::Shared& shared, const std::weak_ptr<SettingsCard>& weak) {
     std::shared_ptr<SettingsCard> card = weak.lock();
     if (!card) return;
-    std::optional<uirender::ModEntry> now = uirender::ElementSettings(shared.kit, SettingKindOf(card->mod), card->mod.id);
+    std::optional<uirender::ModEntry> now = uirender::ElementSettings(shared.kit, ToString(card->mod.kind), card->mod.id);
     if (!now) return;
     card->mod = std::move(*now);
     std::vector<bool> changed = settings_panel::ChangedSettings(card->mod.settings, card->mod.values);
@@ -106,21 +126,16 @@ void FollowValues(UiService::Shared& shared, const std::weak_ptr<SettingsCard>& 
     }
 }
 
-// Writes one declared setting from the card. An extension restarts with it (SetModSetting); the theme service sees
-// settings.txt change and applies the theme and the snippets again (SetThemeSetting, SetSnippetSetting).
+// Writes one declared setting from the card (SetElementSetting).
 void CommitSetting(UiService::Shared& shared, const SettingOwner& owner, const std::string& key, const std::string& value) {
     std::string error;
-    bool written = owner.snippet ? uirender::SetSnippetSetting(shared.kit, owner.id, key, value, error)
-                   : owner.theme ? uirender::SetThemeSetting(shared.kit, owner.id, key, value, error)
-                                 : uirender::SetModSetting(shared.kit, owner.id, key, value, error);
-    if (written) {
+    const std::string& id = owner.element.id;
+    if (uirender::SetElementSetting(shared.kit, owner.element, key, value, error)) {
         FollowValues(shared, owner.card);
-        shared.journal.Write("Settings: \"" + owner.id + "\" " + key + " = " + value + " from the Ampify page" +
-                             (owner.snippet ? std::string(" (snippet)")
-                              : owner.theme ? std::string(" (theme)")
-                                            : " (restart " + owner.id + " requested)"));
+        shared.journal.Write("Settings: \"" + id + "\" " + key + " = " + value + " from the Ampify page" +
+                             AfterWrite(owner.element));
     } else {
-        shared.journal.Write("Settings: could not change \"" + owner.id + "\" " + key + ": " + error);
+        shared.journal.Write("Settings: could not change \"" + id + "\" " + key + ": " + error);
     }
 }
 
@@ -365,7 +380,7 @@ controls::Button ResetButton(UiService::Shared& shared, SettingsCard& card, cons
     button.IsEnabled(changed);
     automation::AutomationProperties::SetName(button, Wide(i18n::Text("settings.reset") + " " + label));
     UiService::Shared* owner = &shared;
-    button.Click([owner, kind = std::string(SettingKindOf(card.mod)), id = card.mod.id, key = spec.key,
+    button.Click([owner, kind = std::string(ToString(card.mod.kind)), id = card.mod.id, key = spec.key,
                   refresh](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
             std::string error;
@@ -388,7 +403,7 @@ xaml::FrameworkElement SettingRowOf(UiService::Shared& shared, const std::shared
     const uirender::ModEntry& mod = card->mod;
     const SettingSpec& spec = mod.settings[index];
     settings_panel::SettingText shown = ShownText(mod, spec);
-    SettingOwner target{mod.id, mod.theme, mod.snippet, card};
+    SettingOwner target{mod.Ref(), card};
     controls::Grid row;
     row.ColumnSpacing(16);
     controls::ColumnDefinition text;
@@ -409,8 +424,7 @@ xaml::FrameworkElement SettingRowOf(UiService::Shared& shared, const std::shared
     xaml::FrameworkElement input = SettingControl(shared, target, spec, mod.values[index], LocalTextOf(mod));
     input.VerticalAlignment(xaml::VerticalAlignment::Center);
     input.HorizontalAlignment(xaml::HorizontalAlignment::Right);
-    const char* prefix = mod.snippet ? "AMPIFY_SnippetSetting_" : mod.theme ? "AMPIFY_ThemeSetting_" : "AMPIFY_ModsSetting_";
-    Name(input, std::string(prefix) + mod.id + "_" + spec.key, shown.label);
+    Name(input, std::string(SettingNamePrefix(mod.kind)) + mod.id + "_" + spec.key, shown.label);
 
     controls::StackPanel inputRow;
     inputRow.Orientation(controls::Orientation::Horizontal);
@@ -479,7 +493,7 @@ void SayUnder(SettingsCard& card, const std::string& line) {
 // Every setting back to its manifest default: their keys leave settings.txt in one write, then the card again.
 void ResetAll(UiService::Shared& shared, const uirender::ModEntry& mod, const SettingsRefresh& refresh) {
     std::string error;
-    if (!uirender::ResetElementValues(shared.kit, SettingKindOf(mod), mod.id, {}, error)) {
+    if (!uirender::ResetElementValues(shared.kit, ToString(mod.kind), mod.id, {}, error)) {
         shared.journal.Write("Settings: could not reset \"" + mod.id + "\": " + error);
         refresh("");
         return;
@@ -554,7 +568,7 @@ void FillSettings(UiService::Shared& shared, const std::shared_ptr<SettingsCard>
     card->resets.clear();
     card->mod = std::move(mod);
     SettingsRefresh refresh = [owner = &shared, weak = std::weak_ptr<SettingsCard>(card),
-                               kind = std::string(SettingKindOf(card->mod)), id = card->mod.id, query](const std::string& notice) {
+                               kind = std::string(ToString(card->mod.kind)), id = card->mod.id, query](const std::string& notice) {
         // Next turn of the interface: the button that asked for it is still in its own click.
         dispatching::DispatcherQueue::GetForCurrentThread().TryEnqueue([owner, weak, kind, id, query, notice]() {
             try {
@@ -587,9 +601,9 @@ xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::Mo
     // A card replaces only the one of the same element (its theme section built again). Parent() cannot tell whether
     // a card is still in the page: WinUI gives null for an element not yet connected to the window, as the whole page
     // is while it is built, so each new card dropped the others and only the last one built kept working.
-    std::string_view kind = SettingKindOf(mod);
+    std::string_view kind = ToString(mod.kind);
     std::erase_if(shared.settingsCards, [&](const std::shared_ptr<SettingsCard>& old) {
-        return old->mod.id == mod.id && SettingKindOf(old->mod) == kind;
+        return old->mod.id == mod.id && ToString(old->mod.kind) == kind;
     });
     shared.settingsCards.push_back(card);
     FillSettings(shared, card, mod, std::make_shared<std::string>());
@@ -600,15 +614,15 @@ xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::Mo
 xaml::FrameworkElement ThemeSettingsSection(UiService::Shared& shared, const uirender::ModEntry& theme) {
     controls::StackPanel section;
     section.Spacing(8);
-    Name(section, (theme.snippet ? "AMPIFY_SnippetSettings_" : "AMPIFY_ThemeSettings_") + theme.id,
+    Name(section, (theme.kind == ElementKind::Snippet ? "AMPIFY_SnippetSettings_" : "AMPIFY_ThemeSettings_") + theme.id,
          theme.NameIn(i18n::Language()));
     controls::TextBlock title =
-        MakeText(Wide(i18n::Text(theme.snippet ? "mods.snippetTitle" : "mods.themeTitle",
+        MakeText(Wide(i18n::Text(theme.kind == ElementKind::Snippet ? "mods.snippetTitle" : "mods.themeTitle",
                                  {{"name", theme.NameIn(i18n::Language())}}))
                      .c_str(),
                  "bodyStrong", false, &shared.probe);
     section.Children().Append(title);
-    section.Children().Append(MakeText(Wide(i18n::Text(theme.snippet ? "mods.snippetSubtitle" : "mods.themeSubtitle")).c_str(),
+    section.Children().Append(MakeText(Wide(i18n::Text(theme.kind == ElementKind::Snippet ? "mods.snippetSubtitle" : "mods.themeSubtitle")).c_str(),
                                        "caption", true, &shared.probe));
     section.Children().Append(ModSettings(shared, theme));
     return section;

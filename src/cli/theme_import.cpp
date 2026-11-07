@@ -259,7 +259,7 @@ int CmdThemeImport(Context& ctx) {
         name = Utf8(Utf8ToPath(last).stem());
     }
     std::string id = args.size() == 4 ? args[3] : IdFromName(name);
-    if (!IsValidId(id)) {
+    if (!IsElementId(id)) {
         std::filesystem::remove_all(work, ec);
         return Failure(ctx, "invalid id: " + id + " (lowercase letters, digits and hyphens)");
     }

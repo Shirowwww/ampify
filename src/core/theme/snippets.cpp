@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <system_error>
 
+#include "../element_ref.hpp"
+
 namespace ampify::theme {
 
 namespace {
@@ -47,7 +49,7 @@ std::vector<std::string> ListSnippetFolders(const std::filesystem::path& root) {
 std::vector<std::string> EnabledSnippets(const Settings& settings, const std::vector<std::string>& installed) {
     std::vector<std::string> enabled;
     for (const std::string& id : installed) {
-        if (settings.GetBool("snippets." + id + ".enabled", false)) enabled.push_back(id);
+        if (IsElementOn(settings, {ElementKind::Snippet, id})) enabled.push_back(id);
     }
     std::sort(enabled.begin(), enabled.end());
     return enabled;

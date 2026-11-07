@@ -680,5 +680,21 @@ class SnippetContentTests(unittest.TestCase):
                 self.assertEqual(unknown, [])
 
 
+class CheckFileTests(unittest.TestCase):
+    def test_returns_the_problems_instead_of_printing_them(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "manifest.json")
+            write_json(path, {"id": "x"})
+            self.assertTrue(validate.check_file("manifest", path))
+
+    def test_a_file_that_is_not_json_cannot_be_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "manifest.json")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("{")
+            with self.assertRaises(ValueError):
+                validate.check_file("manifest", path)
+
+
 if __name__ == "__main__":
     unittest.main()

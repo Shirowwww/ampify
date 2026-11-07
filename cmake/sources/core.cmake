@@ -15,10 +15,13 @@ list(APPEND AMPIFY_CORE_SOURCES
     src/core/drm_guard.cpp
     src/core/json.cpp
     src/core/manifest.cpp
+    src/core/element_ref.cpp
+    src/core/permissions.cpp
     src/core/js_runtime.cpp
     src/core/script_extension.cpp
     src/core/extension_loader.cpp
     src/core/gain_board.cpp
+    src/core/player_state.cpp
     src/core/player_watch.cpp
     src/core/ui_model.cpp
     src/core/reload.cpp

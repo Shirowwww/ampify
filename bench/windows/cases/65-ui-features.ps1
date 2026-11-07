@@ -8,14 +8,10 @@ function New-UiTestKit {
     return $dir
 }
 
-Register-Case -Id 'ui-hover-sidebar' -Title 'UI: the hover sidebar setting is known, off by default, and checked' -Action {
+Register-Case -Id 'ui-hover-sidebar' -Title 'UI: the hover sidebar setting is known, off by default, and checked' -Requires 'kit:ui' -Action {
     param($Ctx)
 
     $cli = Join-Path $script:BenchKitRoot 'ui\ampify.exe'
-    if (-not (Test-Path -LiteralPath $cli)) {
-        Add-Skip -Ctx $Ctx -Name 'ampify.exe present' -Reason "no UI build in this kit: $cli"
-        return
-    }
 
     $kit = New-UiTestKit
     try {
@@ -38,15 +34,11 @@ Register-Case -Id 'ui-hover-sidebar' -Title 'UI: the hover sidebar setting is kn
     }
 }
 
-Register-Case -Id 'ui-bar-position' -Title 'UI: Glass takes the playback bar at the top or at the bottom' -Action {
+Register-Case -Id 'ui-bar-position' -Title 'UI: Glass takes the playback bar at the top or at the bottom' -Requires 'kit:ui' -Action {
     param($Ctx)
 
     $cli = Join-Path $script:BenchKitRoot 'ui\ampify.exe'
     $glass = Join-Path $script:BenchKitRoot 'ui\themes\glass'
-    if (-not (Test-Path -LiteralPath $cli) -or -not (Test-Path -LiteralPath $glass)) {
-        Add-Skip -Ctx $Ctx -Name 'ampify.exe and the glass theme present' -Reason "no UI build in this kit: $cli / $glass"
-        return
-    }
 
     $kit = New-UiTestKit
     try {
@@ -69,15 +61,11 @@ Register-Case -Id 'ui-bar-position' -Title 'UI: Glass takes the playback bar at 
     }
 }
 
-Register-Case -Id 'ui-compact-sidebar' -Title 'UI: the Compact sidebar snippet is a valid element' -Action {
+Register-Case -Id 'ui-compact-sidebar' -Title 'UI: the Compact sidebar snippet is a valid element' -Requires 'kit:ui' -Action {
     param($Ctx)
 
     $cli = Join-Path $script:BenchKitRoot 'ui\ampify.exe'
     $snippet = Join-Path $script:BenchKitRoot 'ui\themes\snippets\compact-sidebar'
-    if (-not (Test-Path -LiteralPath $cli) -or -not (Test-Path -LiteralPath $snippet)) {
-        Add-Skip -Ctx $Ctx -Name 'ampify.exe and the snippet present' -Reason "no UI build in this kit: $cli / $snippet"
-        return
-    }
 
     $out = @(& $cli validate $snippet 2>&1)
     $code = $LASTEXITCODE
@@ -87,15 +75,11 @@ Register-Case -Id 'ui-compact-sidebar' -Title 'UI: the Compact sidebar snippet i
     Add-Check -Ctx $Ctx -Name 'compact-sidebar: names the Ampify entries (.sidebar-entry)' -Passed $named
 }
 
-Register-Case -Id 'ui-current-lyrics' -Title 'UI: Lyrics spotlight styles the line being sung (:current)' -Action {
+Register-Case -Id 'ui-current-lyrics' -Title 'UI: Lyrics spotlight styles the line being sung (:current)' -Requires 'kit:ui' -Action {
     param($Ctx)
 
     $cli = Join-Path $script:BenchKitRoot 'ui\ampify.exe'
     $snippet = Join-Path $script:BenchKitRoot 'ui\themes\snippets\lyrics-spotlight'
-    if (-not (Test-Path -LiteralPath $cli) -or -not (Test-Path -LiteralPath $snippet)) {
-        Add-Skip -Ctx $Ctx -Name 'ampify.exe and the snippet present' -Reason "no UI build in this kit: $cli / $snippet"
-        return
-    }
 
     $out = @(& $cli validate $snippet 2>&1)
     $code = $LASTEXITCODE

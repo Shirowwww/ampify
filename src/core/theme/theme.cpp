@@ -13,6 +13,7 @@
 #include "css_values.hpp"
 #include "fonts.hpp"
 #include "ini.hpp"
+#include "release_facts.hpp"
 #include "spicetify.hpp"
 
 namespace ampify::theme {
@@ -957,10 +958,8 @@ std::vector<std::string> ReadSchemes(FileSource& files) {
 
 std::string ReadDefaultScheme(FileSource& files) {
     std::optional<std::string> text = files.Read("manifest.json");
-    std::optional<Json> manifest = text ? Json::Parse(*text) : std::nullopt;
-    const Json* scheme = manifest ? manifest->Find("defaultScheme") : nullptr;
-    const std::string* name = scheme ? scheme->AsString() : nullptr;
-    return name ? *name : std::string();
+    if (!text) return {};
+    return ParseManifest(*text, "", kKitApiMajor, nullptr).partial.defaultScheme.value_or("");
 }
 
 bool IsEmptyDictionary(std::string_view xaml) {

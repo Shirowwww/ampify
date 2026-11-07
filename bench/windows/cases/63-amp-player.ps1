@@ -4,14 +4,10 @@
 # lines are copied into the job log, so they can be read without downloading the results.
 # Build: bench\ (AMPIFY_BENCH=ON). No setting is changed: player.appleCommands stays off.
 
-Register-Case -Id 'amp-player' -Title 'Player: AMP.Services.Player activated (or SMTC fallback) and first state read' -Requires 'apple-music' -Action {
+Register-Case -Id 'amp-player' -Title 'Player: AMP.Services.Player activated (or SMTC fallback) and first state read' -Requires 'apple-music', 'kit:bench' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'bench\ampify_launcher.exe'
-    if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Check -Ctx $Ctx -Name 'bench build present' -Passed $false -Detail $launcher
-        return
-    }
 
     Reset-KitState
     $since = Get-Date
@@ -24,6 +20,7 @@ Register-Case -Id 'amp-player' -Title 'Player: AMP.Services.Player activated (or
         Close-AppleMusic | Out-Null
         return
     }
+    Clear-FirstRun -Ctx $Ctx
 
     # The kernel waits for a visible window, then tries every 5 s for 2 minutes: one of the two lines ends up
     # arriving. "not reachable yet" alone means the attempts go on.

@@ -298,7 +298,7 @@ void NotifyKitUpdate(Context& ctx) {
         std::string writeError;
         WriteTextFile(file, "checked=" + std::to_string(now) + "\nlatest=" + cache.latest + "\n", writeError);
     }
-    if (!IsValidVersion(cache.latest) || CompareDottedVersions(cache.latest, kKitVersion) <= 0) return;
+    if (!IsReleaseVersion(cache.latest) || CompareDottedVersions(cache.latest, kKitVersion) <= 0) return;
     ctx.err << "ampify: version " << cache.latest << " of Ampify is available (installed: " << kKitVersion
             << "). Run ampify update to download it.\n";
 }
@@ -308,7 +308,7 @@ namespace {
 // The texts of the notices follow the `language` setting, or else the Windows display language.
 void UseUserLanguage(const Settings& settings) {
     std::string language = settings.GetString("language", "");
-    i18n::SetLanguage(i18n::LanguageCode(language.empty() ? platform::UserLocale() : language));
+    i18n::SetLanguage(i18n::LanguageCode(i18n::PreferredLocale(language, platform::UserLocale())));
 }
 
 // Whether ampify update --auto may look for a release now: kit_update allows it, this is the installed copy (a build

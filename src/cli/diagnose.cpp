@@ -49,7 +49,7 @@ std::vector<std::string> LastLines(const std::filesystem::path& file, size_t cou
 // Folders of the kit that have a name starting with '.': leftovers of an install or a dev reload that stopped midway.
 std::vector<std::filesystem::path> Leftovers(const KitLayout& kit) {
     std::vector<std::filesystem::path> found;
-    for (std::string_view kind : {"extension", "theme", "app", "snippet"}) {
+    for (std::string_view kind : kElementKindNames) {
         std::error_code ec;
         for (const auto& entry : std::filesystem::directory_iterator(kit.Folder(kind), ec)) {
             std::string name = Utf8(entry.path().filename());

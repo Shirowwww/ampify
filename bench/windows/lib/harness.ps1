@@ -13,6 +13,7 @@ $script:StoreProductId = $script:AppleFacts.package.storeProductId
 $script:KitDir = Join-Path $env:USERPROFILE $script:ReleaseFacts.kitFolder
 $script:JournalDir = Join-Path $script:KitDir 'logs'
 $script:StateFile = Join-Path $script:KitDir 'state.txt'
+$script:SettingsFile = Join-Path $script:KitDir 'settings.txt'
 
 # Filled in by run-bench.ps1 before the cases.
 # Names distinct from the run-bench.ps1 parameters: the harness is loaded in the same scope as the script.
@@ -22,6 +23,22 @@ $script:AppleMusicInstalled = $false
 $script:AppleMusicVersion = ''
 $script:KnownVersions = @()
 $script:Cases = New-Object System.Collections.Generic.List[object]
+
+# What each part of the kit holds, as laid out by scripts/bench-kit.ps1. A case names the parts it needs ('kit:ui').
+$script:KitParts = @{
+    release = @($script:ReleaseFacts.files.launcher, $script:ReleaseFacts.files.setup)
+    bench = @($script:ReleaseFacts.files.launcher)
+    cli = @($script:ReleaseFacts.files.cli)
+    ui = @($script:ReleaseFacts.files.launcher, $script:ReleaseFacts.files.cli, 'themes', 'examples\react-panel')
+}
+
+# The files of a kit part that are not there, as full paths.
+function Get-MissingKitFiles {
+    param([string]$Part)
+    if (-not $script:KitParts.ContainsKey($Part)) { throw "Unknown kit part: $Part" }
+    return @($script:KitParts[$Part] | ForEach-Object { Join-Path (Join-Path $script:BenchKitRoot $Part) $_ } |
+        Where-Object { -not (Test-Path -LiteralPath $_) })
+}
 
 function Write-Step {
     param([string]$Text)
@@ -308,6 +325,14 @@ function Close-AppleMusicFirstRun {
     return $closed
 }
 
+# Any case that waits for Apple Music's interface calls this right after "Apple Music started": on a new runner the
+# codec licence (and the welcome screen) open before the main window, which the kernel waits for.
+function Clear-FirstRun {
+    param($Ctx)
+    $closed = Close-AppleMusicFirstRun
+    Add-Info -Ctx $Ctx -Name 'first launch of Apple Music' -Detail "$closed screen(s) closed (licence, welcome)"
+}
+
 # Stops everything the bench may leave open. Called before and after each case.
 function Stop-BenchProcesses {
     Get-Process -Name 'ampify_launcher', 'AppleMusic', 'AMPLibraryAgent' -ErrorAction SilentlyContinue |
@@ -342,6 +367,36 @@ function Get-SafeModeCount {
     $match = [regex]::Match((Get-Content -LiteralPath $script:StateFile -Raw), 'unhealthy_launches\s*=\s*(\d+)')
     if ($match.Success) { return [int]$match.Groups[1].Value }
     return $null
+}
+
+# settings.txt, the file the bench cases switch Ampify's features with. Set-Settings replaces the lines of the keys it
+# is given and keeps every other; a case that must leave the file as found keeps Save-Settings for Restore-Settings.
+function Set-Settings {
+    param([hashtable]$Values)
+    New-Item -ItemType Directory -Force -Path $script:KitDir | Out-Null
+    $lines = @()
+    if (Test-Path -LiteralPath $script:SettingsFile) { $lines = @(Get-Content -LiteralPath $script:SettingsFile -Encoding UTF8) }
+    foreach ($key in $Values.Keys) {
+        $pattern = '^\s*' + [regex]::Escape($key) + '\s*='
+        $lines = @($lines | Where-Object { $_ -notmatch $pattern })
+        $lines += "$key = $($Values[$key])"
+    }
+    [System.IO.File]::WriteAllLines($script:SettingsFile, [string[]]$lines, [System.Text.UTF8Encoding]::new($false))
+}
+
+# The text of settings.txt, or $null when the file does not exist.
+function Save-Settings {
+    if (-not (Test-Path -LiteralPath $script:SettingsFile)) { return $null }
+    return [System.IO.File]::ReadAllText($script:SettingsFile)
+}
+
+function Restore-Settings {
+    param($Saved)
+    if ($null -eq $Saved) {
+        Remove-Item -LiteralPath $script:SettingsFile -Force -ErrorAction SilentlyContinue
+    } else {
+        [System.IO.File]::WriteAllText($script:SettingsFile, $Saved, [System.Text.UTF8Encoding]::new($false))
+    }
 }
 
 # Where the kernel stands in Apple Music's processes: how many have the ampify_kernel.dll module.

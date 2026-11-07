@@ -12,9 +12,9 @@ struct I18nNatives : ScriptBridge {
     // native.i18nKit(key): the English text of `key` in Ampify's own texts, or undefined when there is no such text.
     AMPIFY_NATIVE(KitText) {
         std::string key = String(ctx, argc, argv, 0).value_or("");
-        std::string_view found = i18n::Lookup(i18n::KitMessages(), key);
-        if (found == key) return JS_UNDEFINED;  // Lookup gives the key back when it has no text
-        return JS_NewStringLen(ctx, found.data(), found.size());
+        std::optional<std::string_view> found = i18n::Lookup(i18n::KitMessages(), key);
+        if (!found) return JS_UNDEFINED;
+        return JS_NewStringLen(ctx, found->data(), found->size());
     }
 
     // native.i18nKitShown(key): the same text in the display language, for the defaults of Ampify's components.

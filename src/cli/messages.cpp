@@ -138,6 +138,6 @@ constexpr i18n::Message kCli[] = {
 
 std::span<const i18n::Message> CliMessages() { return kCli; }
 
-std::string Tr(std::string_view key, i18n::Args args) { return i18n::Format(i18n::Lookup(kCli, key), args); }
+std::string Tr(std::string_view key, i18n::Args args) { return i18n::Format(i18n::Lookup(kCli, key).value_or(key), args); }
 
 }  // namespace ampify::cli

@@ -1,14 +1,10 @@
 # CLI case: tar.exe and curl.exe are there, and https is the only protocol accepted for a remote catalog.
 # Run by the bench (docs/development/testing.md). Does not need Apple Music. Needs dist\cli\ampify.exe.
 
-Register-Case -Id 'cli-windows-tools' -Title 'ampify finds tar.exe and curl.exe, and refuses http://' -Action {
+Register-Case -Id 'cli-windows-tools' -Title 'ampify finds tar.exe and curl.exe, and refuses http://' -Requires 'kit:cli' -Action {
     param($Ctx)
 
-    $ampify = Join-Path $script:KitRoot 'cli\ampify.exe'
-    if (-not (Test-Path -LiteralPath $ampify)) {
-        Add-Skip -Ctx $Ctx -Name 'ampify.exe present in dist\cli' -Reason 'missing: add the copy of ampify.exe to the build job'
-        return
-    }
+    $ampify = Join-Path $script:BenchKitRoot 'cli\ampify.exe'
 
     $kit = Join-Path ([IO.Path]::GetTempPath()) ('ampify-bench-kit-' + [guid]::NewGuid().ToString('N'))
     try {

@@ -77,7 +77,7 @@ bool SaveText(const std::filesystem::path& file, const std::string& text) {
 
 // The values come from settings.txt as it is now, not from the card's copy, which a change may have left behind.
 void ExportElementSettings(UiService::Shared& shared, const uirender::ModEntry& mod, const SettingsSay& say) {
-    std::string kind(SettingKindOf(mod));
+    std::string kind(ToString(mod.kind));
     std::optional<uirender::ModEntry> now = uirender::ElementSettings(shared.kit, kind, mod.id);
     const uirender::ModEntry& current = now ? *now : mod;
     std::string text = settings_panel::ExportSettings(kind, mod.id, current.settings, ValuesOf(current));
@@ -104,7 +104,7 @@ void ImportElementSettings(UiService::Shared& shared, const uirender::ModEntry& 
         refuse(i18n::Text("settings.noClipboard"));
         return;
     }
-    std::string kind(SettingKindOf(mod));
+    std::string kind(ToString(mod.kind));
     settings_panel::ImportRefusal refusal;
     std::optional<std::map<std::string, std::string>> values =
         settings_panel::ImportSettings(*text, kind, mod.id, mod.settings, refusal);

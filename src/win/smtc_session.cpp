@@ -203,7 +203,7 @@ bool SmtcSession::Command(PlayerCommand command, int64_t seekMs) {
                 rt::Query(timelineObject, kIidTimeline, timeline)) {
                 rt::CallSlot(timeline, kTimelineStart, &start);
             }
-            hr = rt::CallSlot(m_session, kSessionChangePosition, start + seekMs * 10'000, operation.Put());
+            hr = rt::CallSlot(m_session, kSessionChangePosition, start + MsToTicks(seekMs), operation.Put());
             break;
         }
     }

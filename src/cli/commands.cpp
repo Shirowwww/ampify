@@ -40,18 +40,11 @@ namespace ampify::cli {
 
 namespace {
 
-constexpr std::string_view kKindCommands[] = {"extension", "snippet", "app"};
-
-// Element lists of the settings that accept `ampify config <list> +id` and `-id`.
+// Element lists of the settings that accept `ampify config <list> +id` and `-id`: the folders of the kinds switched
+// by an enabled key (a theme is chosen with theme.active instead).
 std::string_view KindOfList(std::string_view list) {
-    if (list == "extensions") return "extension";
-    if (list == "apps") return "app";
-    if (list == "snippets") return "snippet";
-    return {};
-}
-
-bool IsKindFolderText(std::string_view text) {
-    return text == "extension" || text == "theme" || text == "app" || text == "snippet";
+    std::optional<ElementKind> kind = KindOfFolder(list);
+    return kind && *kind != ElementKind::Theme ? ToString(*kind) : std::string_view();
 }
 
 bool ParseBoolText(std::string_view text, bool& value) {
@@ -77,14 +70,14 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
     }
 
     if (key == "theme.active") {
-        if (!value.empty() && !IsValidId(value)) {
+        if (!value.empty() && !IsElementId(value)) {
             problem = "invalid theme id: " + value;
             return false;
         }
         return true;
     }
     if (key == "theme.scheme") {
-        if (!value.empty() && !IsValidScheme(value)) {
+        if (!value.empty() && !IsSchemeName(value)) {
             problem = "invalid scheme name: " + value;
             return false;
         }
@@ -98,7 +91,7 @@ bool CheckSetting(const std::string& key, const std::string& value, std::string&
         return true;
     }
     if (key == "catalog.url") {
-        if (!IsHttpsUrl(value) && value.rfind("file://", 0) != 0) {
+        if (!IsHttpsAddress(value, kMaxAddressLength) && value.rfind("file://", 0) != 0) {
             problem = "catalog.url must start with https:// (or file:// for a local catalog)";
             return false;
         }
@@ -185,7 +178,7 @@ int ToggleElement(Context& ctx, Settings& settings, std::string_view list, const
     std::string_view kind = KindOfList(list);
     std::string id = value.substr(1);
     bool enable = value[0] == '+';
-    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
+    if (!IsElementId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     if (enable) {
         bool builtin = kind == "extension" && IsBuiltInExtension(id);
@@ -268,7 +261,7 @@ int PrintElements(Context& ctx, std::string_view filter) {
 }
 
 int SetElementState(Context& ctx, std::string_view kind, const std::string& id, bool enable) {
-    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
+    if (!IsElementId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     Settings settings;
     std::string error;
@@ -308,7 +301,7 @@ int CmdThemeSet(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() < 3) return Usage(ctx, "theme set needs a theme id");
     const std::string& id = args[2];
-    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
+    if (!IsElementId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     const InstalledElement* found = nullptr;
     std::vector<InstalledElement> elements = ListInstalled(ctx.kit);
@@ -343,7 +336,7 @@ int CmdThemeSet(Context& ctx) {
 
     settings.Set("theme.active", id);
     if (ctx.options.scheme) {
-        if (!IsValidScheme(*ctx.options.scheme)) return Failure(ctx, "invalid scheme name: " + *ctx.options.scheme);
+        if (!IsSchemeName(*ctx.options.scheme)) return Failure(ctx, "invalid scheme name: " + *ctx.options.scheme);
         settings.Set("theme.scheme", *ctx.options.scheme);
     } else if (!keep) {
         settings.Remove("theme.scheme");
@@ -822,12 +815,14 @@ int CmdValidate(Context& ctx) {
     if (std::filesystem::is_directory(target, ec)) {
         FolderValidation validation = ValidateElementFolder(target);
         if (validation.ok() && validation.errors.empty()) {
-            ctx.out << Utf8(target) << ": valid (" << validation.manifest->kind << " " << validation.manifest->id
+            ctx.out << Utf8(target) << ": valid (" << ToString(validation.manifest->kind) << " " << validation.manifest->id
                     << " " << validation.manifest->version << ")\n";
+            for (const std::string& warning : validation.warnings) ctx.out << "  warning: " << warning << "\n";
             return 0;
         }
         ctx.err << Utf8(target) << ": invalid\n";
         for (const std::string& problem : validation.errors) ctx.err << "  - " << problem << "\n";
+        for (const std::string& warning : validation.warnings) ctx.err << "  warning: " << warning << "\n";
         return 1;
     }
 
@@ -851,8 +846,8 @@ int CmdNew(Context& ctx) {
     if (args.size() != 3) return Usage(ctx, "new needs a type and an id");
     const std::string& kind = args[1];
     const std::string& id = args[2];
-    if (!IsKindFolderText(kind)) return Failure(ctx, "unknown type: " + kind + " (extension, theme, snippet or app)");
-    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
+    if (!KindNamed(kind)) return Failure(ctx, "unknown type: " + kind + " (extension, theme, snippet or app)");
+    if (!IsElementId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     std::filesystem::path folder = std::filesystem::current_path() / Utf8ToPath(id);
     std::error_code ec;
@@ -924,9 +919,8 @@ int Dispatch(Context& ctx) {
     if (command == "export") return CmdExport(ctx);
     if (command == "import") return CmdImport(ctx);
     if (command == "test") return CmdTest(ctx);
-    for (std::string_view kind : kKindCommands) {
-        if (command == kind) return CmdKind(ctx, kind);
-    }
+    // `ampify theme` was answered above: the other kinds share one set of verbs.
+    if (std::optional<ElementKind> kind = KindNamed(command)) return CmdKind(ctx, ToString(*kind));
     return Usage(ctx, Tr("unknownCommand", {{"command", command}}));
 }
 

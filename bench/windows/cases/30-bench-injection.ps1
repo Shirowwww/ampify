@@ -1,14 +1,10 @@
 # Steps 1 and 2 of the M3 test, on the bench build (accepts any version): the kernel loads in both processes,
 # the app stays healthy, and the suspended launch is noted. The version verdict is the one of case 20.
 
-Register-Case -Id 'bench-injection' -Title 'Bench build: kernel in AppleMusic.exe and AMPLibraryAgent.exe' -Requires 'apple-music' -Action {
+Register-Case -Id 'bench-injection' -Title 'Bench build: kernel in AppleMusic.exe and AMPLibraryAgent.exe' -Requires 'apple-music', 'kit:bench' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'bench\ampify_launcher.exe'
-    if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Check -Ctx $Ctx -Name 'bench build present' -Passed $false -Detail $launcher
-        return
-    }
 
     # The bench injects on the installed version, even outside the release list: it goes into the report.
     Add-Info -Ctx $Ctx -Name 'injected version (bench mode)' `

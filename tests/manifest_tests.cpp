@@ -1,7 +1,10 @@
+#include <algorithm>
+#include <filesystem>
 #include <set>
 #include <string>
 
 #include "../src/core/manifest.hpp"
+#include "release_facts.hpp"
 #include "../src/core/text_util.hpp"
 #include "test.hpp"
 
@@ -10,6 +13,13 @@ namespace {
 // Pretends that every file of `files` exists in the element's folder.
 ampify::ManifestResult Check(const std::string& json, const std::string& folder, std::set<std::string> files = {"main.js"}) {
     return ampify::ParseManifest(json, folder, 1, [&](const std::string& file) { return files.count(file) > 0; });
+}
+
+// The errors of a manifest's settings field, as the theme engine reads them.
+std::vector<std::string> SettingsErrorsOf(const std::string& manifest) {
+    std::vector<std::string> errors;
+    ampify::DeclaredSettings(manifest, &errors);
+    return errors;
 }
 
 const std::string kHello = R"({
@@ -49,7 +59,7 @@ TEST_CASE(Manifest_SuggestsTheNearestPermissionName) {
     ampify::ManifestResult result = Check(typo, "hello-extension");
     CHECK(!result.manifest);
     CHECK(result.errors.size() == 1);
-    CHECK(result.errors[0] == "unknown permission: storag (did you mean \"storage\"?)");
+    CHECK(result.errors[0] == "permissions[0]: unknown permission: storag (did you mean \"storage\"?)");
 }
 
 TEST_CASE(Manifest_NamesNoSuggestionWhenNothingIsClose) {
@@ -57,7 +67,20 @@ TEST_CASE(Manifest_NamesNoSuggestionWhenNothingIsClose) {
     unknown.replace(unknown.find("\"storage\""), 9, "\"filesystem\"");
     ampify::ManifestResult result = Check(unknown, "hello-extension");
     CHECK(result.errors.size() == 1);
-    CHECK(result.errors[0] == "unknown permission: filesystem");
+    CHECK(result.errors[0] == "permissions[0]: unknown permission: filesystem");
+}
+
+// A key written twice is not refused, by the kernel or by the command line: both say it, and the first value counts.
+TEST_CASE(Manifest_RepeatedKeyIsAWarningWhenLoadingAndAuthoring) {
+    std::string twice = kHello;
+    twice.insert(twice.find("\"main\""), "\"name\": \"Second\", ");
+    for (ampify::ManifestMode mode : {ampify::ManifestMode::Load, ampify::ManifestMode::Author}) {
+        ampify::ManifestResult result = ampify::ParseManifest(
+            twice, "hello-extension", 1, [](const std::string& file) { return file == "main.js"; }, mode);
+        REQUIRE(result.manifest.has_value());
+        CHECK(result.manifest->name == "Hello");
+        CHECK(result.warnings == std::vector<std::string>({"duplicate key: name"}));
+    }
 }
 
 TEST_CASE(Manifest_SuggestsTheNearestFieldName) {
@@ -78,7 +101,7 @@ TEST_CASE(Manifest_ShowsAnExampleWhenPermissionsIsNotAList) {
     ampify::ManifestResult result = Check(text, "hello-extension");
     CHECK(!result.manifest);
     CHECK(result.errors.size() == 1);
-    CHECK(result.errors[0] == "permissions must be a list, for example [\"storage\"]");
+    CHECK(result.errors[0] == "permissions: list expected");
 }
 
 TEST_CASE(Manifest_AcceptsEveryPermissionOfTheV2Schema) {
@@ -262,14 +285,14 @@ TEST_CASE(Manifest_RefusesSettingsThatDoNotHold) {
     };
     for (const char* settings : wrong) {
         CHECK(!Check(WithSettings(settings), "hello-extension").manifest);
-        CHECK(!ampify::SettingsErrors(WithSettings(settings)).empty());
+        CHECK(!SettingsErrorsOf(WithSettings(settings)).empty());
     }
-    CHECK(ampify::SettingsErrors(kHello).empty());
+    CHECK(SettingsErrorsOf(kHello).empty());
 
     std::string app = WithSettings(R"([{"key": "a", "label": "A", "type": "toggle", "default": true}])");
     app.replace(app.find("\"extension\""), 11, "\"app\"");
     CHECK(!Check(app, "hello-extension").manifest);
-    CHECK(!ampify::SettingsErrors(app).empty());
+    CHECK(!SettingsErrorsOf(app).empty());
 }
 
 TEST_CASE(Manifest_AThemeAndASnippetDeclareSettingsAndAnAppDoesNot) {
@@ -280,7 +303,7 @@ TEST_CASE(Manifest_AThemeAndASnippetDeclareSettingsAndAnAppDoesNot) {
     ampify::ManifestResult result = Check(theme, "night", {"colors.ini"});
     CHECK(result.errors.empty());
     CHECK(result.manifest && result.manifest->settings.size() == 2);
-    CHECK(ampify::SettingsErrors(theme).empty());
+    CHECK(SettingsErrorsOf(theme).empty());
 
     std::vector<std::string> errors;
     std::vector<ampify::SettingSpec> declared = ampify::DeclaredSettings(theme, &errors);
@@ -289,12 +312,12 @@ TEST_CASE(Manifest_AThemeAndASnippetDeclareSettingsAndAnAppDoesNot) {
 
     std::string snippet = theme;
     snippet.replace(snippet.find("\"theme\""), 7, "\"snippet\"");
-    CHECK(ampify::SettingsErrors(snippet).empty());
+    CHECK(SettingsErrorsOf(snippet).empty());
     CHECK(ampify::DeclaredSettings(snippet, &errors).size() == 2);
 
     std::string app = theme;
     app.replace(app.find("\"theme\""), 7, "\"app\"");
-    CHECK(!ampify::SettingsErrors(app).empty());
+    CHECK(!SettingsErrorsOf(app).empty());
     CHECK(ampify::DeclaredSettings(app, &errors).empty());
 }
 
@@ -342,4 +365,57 @@ TEST_CASE(Manifest_SaysWhyAStoredSettingValueDoesNotFit) {
     choice.options = {"Blue", "Pink"};
     CHECK(ampify::SettingProblem(choice, "Pink").empty());
     CHECK(ampify::SettingProblem(choice, "Green") == "\"Green\" is not one of its choices: Blue, Pink");
+}
+
+namespace {
+
+// The fixed names of a schema's permission pattern, ^(player\.read|...|network:...)$, without their escapes.
+std::set<std::string> SchemaPermissions(const ampify::Json& schema) {
+    const ampify::Json* defs = schema.Find("$defs");
+    const ampify::Json* permission = defs ? defs->Find("permission") : nullptr;
+    const ampify::Json* pattern = permission ? permission->Find("pattern") : nullptr;
+    std::string text = pattern && pattern->AsString() ? *pattern->AsString() : "";
+    std::set<std::string> names;
+    if (text.size() < 4) return names;
+    text = text.substr(2, text.size() - 4);  // inside ^( and )$
+    for (size_t start = 0; start <= text.size();) {
+        size_t end = std::min(text.find('|', start), text.size());
+        std::string name = text.substr(start, end - start);
+        name.erase(std::remove(name.begin(), name.end(), '\\'), name.end());
+        if (name.rfind(std::string(ampify::kNetworkPermissionPrefix), 0) != 0) names.insert(name);
+        start = end + 1;
+    }
+    return names;
+}
+
+std::set<std::string> SchemaLanguages(const ampify::Json& schema) {
+    const ampify::Json* defs = schema.Find("$defs");
+    const ampify::Json* translations = defs ? defs->Find("translations") : nullptr;
+    const ampify::Json* properties = translations ? translations->Find("properties") : nullptr;
+    std::set<std::string> codes;
+    if (properties && properties->AsObject()) {
+        for (const auto& [code, value] : *properties->AsObject()) codes.insert(code);
+    }
+    return codes;
+}
+
+}  // namespace
+
+// The schemas that check an element before publication take the permissions and the languages the kernel takes.
+TEST_CASE(Manifest_SchemasListThePermissionsAndLanguagesOfTheCore) {
+    std::set<std::string> permissions;
+    for (const ampify::PermissionInfo& permission : ampify::kPermissions) {
+        permissions.insert(std::string(permission.name));
+    }
+    std::set<std::string> languages(std::begin(ampify::kTranslationLanguages), std::end(ampify::kTranslationLanguages));
+    for (const char* name : {"manifest", "catalog"}) {
+        std::filesystem::path file =
+            std::filesystem::path(AMPIFY_SOURCE_DIR) / "schemas" / (std::string(name) + ".schema.json");
+        std::optional<std::string> text = ampify::ReadWholeFile(file);
+        REQUIRE(text.has_value());
+        std::optional<ampify::Json> schema = ampify::Json::Parse(*text);
+        REQUIRE(schema.has_value());
+        CHECK(SchemaPermissions(*schema) == permissions);
+        CHECK(SchemaLanguages(*schema) == languages);
+    }
 }

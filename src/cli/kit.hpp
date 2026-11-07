@@ -14,11 +14,7 @@ namespace ampify {
 // Empty for an unknown kind.
 std::string_view FolderOfKind(std::string_view kind);
 
-// The settings key that switches an extension, an app or a snippet on: extensions.<id>.enabled and so on.
-// A theme has no such key: `theme.id` names the one active theme.
-std::string EnabledKey(std::string_view kind, std::string_view id);
-
-// How reload.txt names an element in its requests (src/core/reload.hpp): `app:<id>` for an app, `<id>` otherwise.
+// How reload.txt names an element in its requests: ElementRef::HostId.
 std::string ReloadTarget(std::string_view kind, std::string_view id);
 
 // Above this size, AppendReloadRequests starts reload.txt again with only the new lines.
@@ -53,7 +49,7 @@ private:
 struct InstalledElement {
     std::string kind;
     std::string id;  // the folder name
-    std::optional<ElementManifest> manifest;
+    std::optional<Manifest> manifest;
     std::vector<std::string> errors;
 
     bool Valid() const { return manifest.has_value() && errors.empty(); }

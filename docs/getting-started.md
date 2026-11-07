@@ -86,8 +86,8 @@ it on.
 ## Languages
 
 Ampify speaks English, French, German, Spanish, Portuguese (Brazilian), Russian, Japanese and Simplified Chinese. It
-follows the language of Windows' regional format (Settings > Time & language > Language & region). Traditional
-Chinese, and any text not translated yet, show in English. To force a language:
+follows the Windows display language (Settings > Time & language > Language & region). Traditional Chinese shows the
+Simplified texts, and any text not translated yet shows in English. To force a language:
 
 ```
 ampify config language de

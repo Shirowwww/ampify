@@ -16,8 +16,6 @@ namespace {
 
 namespace fs = std::filesystem;
 
-constexpr std::string_view kAppTargetPrefix = "app:";
-
 // A theme or a snippet with no script: `ampify dev` asks for its restart like any element, and the theme service, not
 // the loader, reloads its style.
 bool IsStyleFolder(const fs::path& themeRoot, const std::string& target) {
@@ -43,19 +41,15 @@ void ExtensionLoader::SetAppRoot(fs::path root) { m_appRoot = std::move(root); }
 
 void ExtensionLoader::SetThemeRoot(fs::path root) { m_themeRoot = std::move(root); }
 
-std::string ExtensionLoader::HostId(const Manifest& manifest) {
-    return manifest.kind == ElementKind::App ? std::string(kAppTargetPrefix) + manifest.id : manifest.id;
-}
-
 LoadReport ExtensionLoader::Discover() {
     LoadReport report;
-    LoadFolders(m_root, Origin::Extensions, report);
-    if (!m_appRoot.empty()) LoadFolders(m_appRoot, Origin::Apps, report);
-    if (!m_themeRoot.empty()) LoadFolders(m_themeRoot, Origin::Themes, report);
+    LoadFolders(m_root, ElementKind::Extension, report);
+    if (!m_appRoot.empty()) LoadFolders(m_appRoot, ElementKind::App, report);
+    if (!m_themeRoot.empty()) LoadFolders(m_themeRoot, ElementKind::Theme, report);
     return report;
 }
 
-void ExtensionLoader::LoadFolders(const fs::path& root, Origin origin, LoadReport& report) {
+void ExtensionLoader::LoadFolders(const fs::path& root, ElementKind kind, LoadReport& report) {
     std::error_code ec;
     if (!fs::is_directory(root, ec)) return;
 
@@ -69,14 +63,13 @@ void ExtensionLoader::LoadFolders(const fs::path& root, Origin origin, LoadRepor
 
     for (const fs::path& folder : folders) {
         // Already loaded from this same folder: a rescan leaves it as it is.
-        std::string name = folder.filename().string();
-        std::string hostId = origin == Origin::Apps ? std::string(kAppTargetPrefix) + name : name;
+        std::string hostId = ElementRef{kind, folder.filename().string()}.HostId();
         if (ScriptExtension* known = Find(hostId); known && FolderOf(*known) == folder) continue;
-        LoadFolder(folder, origin, report);
+        LoadFolder(folder, kind, report);
     }
 }
 
-void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadReport& report) {
+void ExtensionLoader::LoadFolder(const fs::path& folder, ElementKind kind, LoadReport& report) {
     std::string name = folder.filename().string();
     std::optional<std::string> text = ReadWholeFile(folder / "manifest.json");
     if (!text) return;  // a folder without a manifest is not an element
@@ -93,7 +86,7 @@ void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadRepo
     }
 
     Manifest manifest = std::move(*result.manifest);
-    if (origin == Origin::Themes) {
+    if (kind == ElementKind::Theme) {
         // A theme without a main.js has no script: its folder belongs to the theme engine. Its script runs in
         // AppleMusic.exe only, because the interface is the only thing a theme changes.
         if (manifest.kind != ElementKind::Theme) {
@@ -102,15 +95,12 @@ void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadRepo
             return;
         }
         if (!manifest.main || m_host.Process() != "ui") return;
-    } else {
+    } else if (manifest.kind != kind) {
         // Each kind has its own folder, where ampify installs it: extensions/<id> for an extension, apps/<id> for an app.
-        ElementKind expected = origin == Origin::Apps ? ElementKind::App : ElementKind::Extension;
-        if (manifest.kind != expected) {
-            m_journal.Write("[" + name + "] type " + std::string(ToString(manifest.kind)) +
-                            " not loaded from the folder " + (origin == Origin::Apps ? "apps" : "extensions"));
-            report.rejected.push_back(name);
-            return;
-        }
+        m_journal.Write("[" + name + "] type " + std::string(ToString(manifest.kind)) + " not loaded from the folder " +
+                        std::string(TraitsOf(kind).folder));
+        report.rejected.push_back(name);
+        return;
     }
 
     if (!manifest.RunsIn(m_host.Process())) {
@@ -119,28 +109,22 @@ void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadRepo
         return;
     }
 
-    std::string id = manifest.id;
-    std::string hostId = HostId(manifest);
+    ElementRef ref = manifest.Ref();
+    std::string hostId = ref.HostId();
     std::string displayName = manifest.name;
-    bool isApp = manifest.kind == ElementKind::App;
     auto element = std::make_unique<ScriptExtension>(std::move(manifest), folder, m_host, m_journal, m_clock);
     ScriptExtension* raw = element.get();
     ExtensionInfo info;
     info.id = hostId;
     info.name = displayName;
-    // A community element never starts unless the user enables it; most that ship with the kit start until the user
-    // turns them off.
-    bool byDefault = origin != Origin::Themes && IsOnByDefault(isApp ? "apps" : "extensions", id);
-    // expose_api = 0 keeps every JavaScript element off. An app is switched by apps.<id>.enabled, as `ampify app
-    // enable` writes it; an extension by extensions.<id>.enabled.
-    if (origin == Origin::Themes) {
-        info.isEnabled = [id](const Settings& settings) {
+    // expose_api = 0 keeps every JavaScript element off. A theme's script also needs theme.parts.script.
+    if (kind == ElementKind::Theme) {
+        info.isEnabled = [id = ref.id](const Settings& settings) {
             return ScriptsAllowed(settings) && ThemeScriptEnabled(settings, id);
         };
     } else {
-        std::string key = isApp ? "apps." + id + ".enabled" : ExtensionHost::SettingKey(id);
-        info.isEnabled = [key, byDefault](const Settings& settings) {
-            return ScriptsAllowed(settings) && settings.GetBool(key, byDefault);
+        info.isEnabled = [ref](const Settings& settings) {
+            return ScriptsAllowed(settings) && IsElementOn(settings, ref);
         };
     }
     info.start = [raw] { return raw->Start(); };
@@ -160,24 +144,17 @@ void ExtensionLoader::LoadFolder(const fs::path& folder, Origin origin, LoadRepo
 
 ScriptExtension* ExtensionLoader::Find(const std::string& hostId) const {
     for (const auto& element : m_elements) {
-        if (HostId(element->manifest()) == hostId) return element.get();
+        if (element->manifest().Ref().HostId() == hostId) return element.get();
     }
     return nullptr;
 }
 
-ExtensionLoader::Origin ExtensionLoader::OriginOf(const ScriptExtension& element) const {
-    switch (element.manifest().kind) {
-        case ElementKind::App: return Origin::Apps;
-        case ElementKind::Theme: return Origin::Themes;
-        default: return Origin::Extensions;
-    }
-}
-
 fs::path ExtensionLoader::FolderOf(const ScriptExtension& element) const {
-    switch (OriginOf(element)) {
-        case Origin::Apps: return m_appRoot / element.id();
-        case Origin::Themes: return m_themeRoot / element.id();
-        case Origin::Extensions: break;
+    switch (element.manifest().kind) {
+        case ElementKind::App: return m_appRoot / element.id();
+        case ElementKind::Theme: return m_themeRoot / element.id();
+        case ElementKind::Extension:
+        case ElementKind::Snippet: break;
     }
     return m_root / element.id();
 }
@@ -186,7 +163,7 @@ void ExtensionLoader::Forget(const std::string& hostId) {
     m_hosts.Remove(hostId);  // stops it first, which releases what it holds in the host
     std::lock_guard<std::mutex> lock(m_elementsMutex);
     m_elements.erase(std::remove_if(m_elements.begin(), m_elements.end(),
-                                    [&](const auto& element) { return HostId(element->manifest()) == hostId; }),
+                                    [&](const auto& element) { return element->manifest().Ref().HostId() == hostId; }),
                      m_elements.end());
 }
 
@@ -209,10 +186,10 @@ bool ExtensionLoader::Restart(const std::string& target, const Settings& setting
 
     // The folder is read again, so a new manifest (permissions, processes, type) counts as much as new code.
     fs::path folder = FolderOf(*element);
-    Origin origin = OriginOf(*element);
+    ElementKind kind = element->manifest().kind;
     Forget(target);
     LoadReport report;
-    LoadFolder(folder, origin, report);
+    LoadFolder(folder, kind, report);
     if (!Find(target)) {
         m_journal.Write("[" + target + "] cannot reload: the element is no longer valid, it stays stopped");
         return true;
@@ -225,7 +202,9 @@ LoadReport ExtensionLoader::Rescan(const Settings& settings) {
     std::vector<std::string> gone;
     for (const auto& element : m_elements) {
         std::error_code ec;
-        if (!fs::is_regular_file(FolderOf(*element) / "manifest.json", ec)) gone.push_back(HostId(element->manifest()));
+        if (!fs::is_regular_file(FolderOf(*element) / "manifest.json", ec)) {
+            gone.push_back(element->manifest().Ref().HostId());
+        }
     }
     for (const std::string& hostId : gone) {
         m_journal.Write("[" + hostId + "] removed: its folder no longer exists");

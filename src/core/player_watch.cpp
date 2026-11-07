@@ -6,16 +6,14 @@ namespace ampify {
 
 namespace {
 
-// A position this far from where steady playback would be counts as a seek.
-constexpr int64_t kSeekToleranceMs = 3000;
 constexpr int64_t kMsPerSecond = 1000;
 
 }  // namespace
 
 std::vector<std::string> PlayerWatcher::Poll(const PlayerSnapshot& snapshot, int64_t nowMs) {
-    std::optional<std::string> track;
-    // The queue entry counts too: the same song played again from the queue is a new track for the elements.
-    if (snapshot.track) track = snapshot.track->id + "|" + snapshot.track->variantId + "|" + snapshot.track->queueItemId;
+    std::optional<Heard> track;
+    // The variant counts too: the same entry switching to its Atmos version is a new track for the elements.
+    if (snapshot.track) track = Heard{TrackKey(snapshot), snapshot.track->variantId};
 
     const bool lyrics = track && snapshot.lyricsAvailable;
     std::vector<std::string> events;
@@ -41,7 +39,7 @@ bool PlayerWatcher::Moved(const PlayerSnapshot& snapshot, int64_t nowMs) const {
     // The length became known, or Windows replaced the previous track's length; rounding drift is not a change.
     if (snapshot.durationMs > 0 && std::llabs(snapshot.durationMs - m_durationMs) > kSeekToleranceMs) return true;
     if (nowMs < 0 || m_polledAtMs < 0) return false;
-    int64_t expected = m_positionMs + (snapshot.playing ? nowMs - m_polledAtMs : 0);
+    int64_t expected = ExtrapolatePosition(m_positionMs, m_polledAtMs, nowMs, snapshot.playing);
     return std::llabs(snapshot.positionMs - expected) > kSeekToleranceMs;
 }
 

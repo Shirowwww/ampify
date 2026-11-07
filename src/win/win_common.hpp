@@ -101,6 +101,10 @@ private:
     std::vector<DWORD> m_ids;
 };
 
+// The locale name ("fr-FR") of the Windows display language, empty when Windows gives none. The one answer to "which
+// language does this user read": the kernel, the command line and the installer all take it.
+std::string UserLocaleName();
+
 // The storefront of Apple's public catalog for this PC ("FR"), from Windows' region; "US" when it gives none.
 std::wstring CatalogStorefront();
 

@@ -14,7 +14,6 @@ namespace ampify {
 
 namespace {
 
-constexpr int64_t kTicksPerMs = 10'000;
 // Without SMTC, a duration below 20 000 is read as seconds (a song is rarely shorter than 20 s), and from 36 000 000
 // as 100 ns ticks (3.6 s; in ms it would be a 10 h track).
 constexpr int64_t kSecondsBelow = 20'000;
@@ -83,9 +82,7 @@ std::string CatalogLookupAddress(const std::string& catalogId, const std::string
     auto all = [](const std::string& text, int (*test)(int)) {
         return std::all_of(text.begin(), text.end(), [test](char c) { return test(static_cast<unsigned char>(c)) != 0; });
     };
-    if (catalogId.empty() || !all(catalogId, std::isdigit) || storefront.size() != 2 || !all(storefront, std::isalpha)) {
-        return "";
-    }
+    if (!IsCatalogId(catalogId) || storefront.size() != 2 || !all(storefront, std::isalpha)) return "";
     return "https://itunes.apple.com/lookup?id=" + catalogId + "&country=" + storefront;
 }
 
@@ -144,7 +141,7 @@ int64_t AmpTimeToMs(int64_t raw, AmpTimeUnit unit) {
     switch (unit) {
         case AmpTimeUnit::Seconds: return raw * 1000;
         case AmpTimeUnit::Milliseconds: return raw;
-        case AmpTimeUnit::Ticks100ns: return raw / kTicksPerMs;
+        case AmpTimeUnit::Ticks100ns: return TicksToMs(raw);
         case AmpTimeUnit::Unknown: return 0;
     }
     return 0;
@@ -201,7 +198,7 @@ QueueItem QueueItemFromAmp(const AmpQueueEntry& entry) {
     item.catalogId = entry.catalogId;
     // Apple Music 1.1792 keeps its covers' addresses internal: Apple's loader then draws the entry's cover.
     item.artwork = ArtworkAddress(entry.artwork);
-    if (item.artwork.empty() && entry.hasArtwork) item.artwork = QueueArtworkSource(entry.id);
+    if (item.artwork.empty() && entry.hasArtwork) item.artwork = AppleArtworkSource({entry.id});
     return item;
 }
 
@@ -244,7 +241,7 @@ int64_t PositionClock::Next(const std::string& track, bool playing, int64_t repo
         m_track = track;
     }
     if (!playing && m_playing) {
-        m_baseMs += Ahead(nowMs);  // paused: the clock keeps what it counted
+        m_baseMs = Position(nowMs);  // paused: the clock keeps what it counted
         m_learntMs = m_learntMs >= 0 ? nowMs : -1;
     }
     if (playing && !m_playing && m_learntMs >= 0) m_learntMs = nowMs;  // resumed: the pause is not counted
@@ -255,7 +252,7 @@ int64_t PositionClock::Next(const std::string& track, bool playing, int64_t repo
         m_learntMs = nowMs;
         m_fromApple = true;
     }
-    int64_t position = m_baseMs + Ahead(nowMs);
+    int64_t position = Position(nowMs);
     return durationMs > 0 ? std::min(position, durationMs) : position;
 }
 
@@ -266,14 +263,12 @@ void PositionClock::Seeked(int64_t positionMs, int64_t nowMs) {
 }
 
 bool PositionClock::Moving(int64_t nowMs) const {
-    constexpr int64_t kStallMs = 2000;  // Apple renews its value every ~1 s, read every 250 ms
     if (!m_playing || m_learntMs < 0) return false;
-    return !m_fromApple || nowMs - m_learntMs <= kStallMs;
+    return !m_fromApple || nowMs - m_learntMs <= kPositionStallMs;
 }
 
-// What the clock counts past its base: nothing while the song is not heard moving.
-int64_t PositionClock::Ahead(int64_t nowMs) const {
-    return Moving(nowMs) ? std::max<int64_t>(0, nowMs - m_learntMs) : 0;
+int64_t PositionClock::Position(int64_t nowMs) const {
+    return ExtrapolatePosition(m_baseMs, m_learntMs, nowMs, Moving(nowMs));
 }
 
 PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading) {
@@ -288,15 +283,14 @@ PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading) {
 
     int64_t length = std::max<int64_t>(0, reading.endTicks - reading.startTicks);
     int64_t position = std::max<int64_t>(0, reading.positionTicks - reading.startTicks);
-    // A song still at 0 two seconds after the timeline was set is not heard yet (loading, or a stream that never
-    // comes): Apple renews the timeline about once a second while a song plays.
-    constexpr int64_t kNotStartedTicks = 20'000'000;
-    const int64_t since = reading.now - reading.lastUpdated;
-    const bool started = position > 0 || since <= kNotStartedTicks;
-    if (snapshot.playing && reading.lastUpdated > 0 && since > 0 && started) position += since;
+    // A song still at 0 a stall after the timeline was set is not heard yet (loading, or a stream that never comes).
+    // Extrapolated in ticks, then rounded to ms once.
+    const bool started = position > 0 || reading.now - reading.lastUpdated <= MsToTicks(kPositionStallMs);
+    position = ExtrapolatePosition(position, reading.lastUpdated, reading.now,
+                                   snapshot.playing && reading.lastUpdated > 0 && started);
     if (length > 0) position = std::min(position, length);
-    snapshot.positionMs = position / kTicksPerMs;
-    snapshot.durationMs = length / kTicksPerMs;
+    snapshot.positionMs = TicksToMs(position);
+    snapshot.durationMs = TicksToMs(length);
 
     TrackInfo track;
     track.title = reading.title;
@@ -307,6 +301,18 @@ PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading) {
     track.id = TrackIdOf(track.title, track.artist, track.album);
     snapshot.track = std::move(track);
     return snapshot;
+}
+
+std::optional<int64_t> SmtcLengthMsOf(const SmtcReading& smtc, const std::string& title) {
+    if (smtc.title.empty() || smtc.title != title || smtc.endTicks <= smtc.startTicks) return std::nullopt;
+    return TicksToMs(smtc.endTicks - smtc.startTicks);
+}
+
+void FillArtistAlbumFromSmtc(TrackInfo& track, const SmtcReading& smtc) {
+    if (smtc.title != track.title || !track.artist.empty()) return;
+    auto [artist, album] = SplitArtistAlbum(smtc.artist);
+    track.artist = artist;
+    if (track.album.empty()) track.album = album.empty() ? smtc.album : album;
 }
 
 CommandPlan PlanCommand(PlayerCommand command, int64_t seekMs, const PlayerSnapshot& known,

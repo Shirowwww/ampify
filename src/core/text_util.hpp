@@ -32,6 +32,9 @@ std::filesystem::path Utf8ToPath(std::string_view text);
 // Appends `code` as UTF-8, 1 to 4 bytes. The caller has already refused surrogates and values above U+10FFFF.
 void AppendUtf8(std::string& out, uint32_t code);
 
+// The number of characters (Unicode code points) of UTF-8 text, the unit of every length limit of a manifest.
+size_t CodePointCount(std::string_view text);
+
 // The start of `text` that is at most `maxBytes` long and does not end inside a UTF-8 character, so a clipped label or
 // toast never holds half a character.
 std::string_view ClipUtf8(std::string_view text, size_t maxBytes);

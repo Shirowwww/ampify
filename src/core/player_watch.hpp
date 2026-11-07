@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "host.hpp"
+#include "player_state.hpp"
 
 namespace ampify {
 
@@ -26,7 +26,12 @@ private:
     // Same track: its length changed, or its position is not where steady playback would have taken it.
     bool Moved(const PlayerSnapshot& snapshot, int64_t nowMs) const;
 
-    std::optional<std::string> m_track;  // track id, variant and queue entry, or empty when nothing is loaded
+    struct Heard {
+        std::string entry;  // TrackKey
+        std::string variant;
+        bool operator==(const Heard&) const = default;
+    };
+    std::optional<Heard> m_track;  // empty when nothing is loaded
     bool m_playing = false;
     bool m_lyrics = false;  // lyrics were available for m_track at the last snapshot
     int64_t m_positionMs = 0;

@@ -46,13 +46,13 @@ CompileOutcome CompileElementSources(const std::filesystem::path& folder, std::s
 namespace {
 
 // The entry that goes into catalog.json, with a placeholder for the address of the release.
-std::string CatalogEntryText(const ElementManifest& manifest, const std::string& digest) {
+std::string CatalogEntryText(const Manifest& manifest, const std::string& digest) {
     std::ostringstream out;
     out << "{\n"
         << "  \"id\": " << Json::Quote(manifest.id) << ",\n"
         << "  \"name\": " << Json::Quote(manifest.name) << ",\n"
         << "  \"version\": " << Json::Quote(manifest.version) << ",\n"
-        << "  \"kind\": " << Json::Quote(manifest.kind) << ",\n"
+        << "  \"kind\": " << Json::Quote(ToString(manifest.kind)) << ",\n"
         << "  \"author\": " << Json::Quote(manifest.author) << ",\n"
         << "  \"description\": " << Json::Quote(manifest.description) << ",\n"
         << "  \"kitApi\": " << Json::Quote(manifest.kitApi) << ",\n";
@@ -102,7 +102,7 @@ int CmdBuild(Context& ctx) {
         PrintProblems(ctx, folder, validation, "nothing was written");
         return 1;
     }
-    const ElementManifest& manifest = *validation.manifest;
+    const Manifest& manifest = *validation.manifest;
 
     std::filesystem::path archive = args.size() == 3 ? Utf8ToPath(args[2])
                                                      : Utf8ToPath(manifest.id + "-" + manifest.version + ".zip");
@@ -146,7 +146,7 @@ int CmdInspect(Context& ctx) {
         if (FolderOfKind(args[1]).empty()) {
             return Failure(ctx, "unknown type: " + args[1] + " (extension, theme, snippet or app)");
         }
-        if (!IsValidId(args[2])) return Failure(ctx, Tr("invalidId", {{"id", args[2]}}));
+        if (!IsElementId(args[2])) return Failure(ctx, Tr("invalidId", {{"id", args[2]}}));
         folder = ctx.kit.Element(args[1], args[2]);
         installed = true;
     } else {
@@ -158,10 +158,10 @@ int CmdInspect(Context& ctx) {
         PrintProblems(ctx, folder, validation, "");
         return 1;
     }
-    const ElementManifest& manifest = *validation.manifest;
+    const Manifest& manifest = *validation.manifest;
 
     ctx.out << manifest.name << " (" << manifest.id << " " << manifest.version << ")\n"
-            << "  type         " << manifest.kind << "\n"
+            << "  type         " << ToString(manifest.kind) << "\n"
             << "  author       " << manifest.author << "\n"
             << "  Ampify API   " << manifest.kitApi << "\n"
             << "  description  " << manifest.description << "\n"
@@ -172,14 +172,13 @@ int CmdInspect(Context& ctx) {
         ctx.out << (i ? ", " : "") << manifest.permissions[i];
     }
     ctx.out << "\n  processes    ";
-    if (manifest.processes.empty()) ctx.out << "ui, engine (default)";
     for (size_t i = 0; i < manifest.processes.size(); i++) ctx.out << (i ? ", " : "") << manifest.processes[i];
     ctx.out << "\n";
     if (installed) {
         Settings settings;
         std::string error;
         if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
-        ctx.out << "  enabled      " << (IsEnabled(settings, manifest.kind, manifest.id) ? "yes" : "no") << "\n";
+        ctx.out << "  enabled      " << (IsEnabled(settings, ToString(manifest.kind), manifest.id) ? "yes" : "no") << "\n";
     }
 
     std::vector<ZipSource> files = FilesUnder(folder, "");

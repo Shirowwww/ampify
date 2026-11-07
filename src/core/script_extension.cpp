@@ -6,7 +6,7 @@
 
 #include "api/module.hpp"
 #include "json.hpp"
-#include "natives/player.hpp"
+#include "player_state.hpp"
 #include "text_util.hpp"
 
 // The API itself is made of modules: src/core/api/modules.cpp lists them, src/core/prelude holds their JavaScript and
@@ -32,12 +32,6 @@ ScriptExtension::ScriptExtension(Manifest manifest, std::filesystem::path folder
 ScriptExtension::~ScriptExtension() {
     Teardown();
     m_http.Join();  // bounded by the host's request timeout
-}
-
-std::string ScriptExtension::ConfigPrefix() const {
-    // A theme's script reads the settings its user.css reads (themes.<id>.<key>, src/core/manifest.hpp).
-    if (m_manifest.kind == ElementKind::Theme) return "themes.";
-    return m_manifest.kind == ElementKind::App ? "apps." : "extensions.";
 }
 
 bool ScriptExtension::Start() {
@@ -215,7 +209,7 @@ uint32_t ScriptExtension::SubmitHttp(std::function<HttpResponse()> request) {
 }
 
 void ScriptExtension::DeliverPlayer(const std::string& event, const PlayerSnapshot& snapshot) {
-    std::string json = natives::PlayerJson(snapshot).Dump();
+    std::string json = PlayerJson(snapshot).Dump();
     Post([this, event, json] { DispatchPlayer(event, json); });
 }
 

@@ -376,7 +376,6 @@ struct XamlRenderer::Mounted {
 
 namespace {
 
-constexpr std::string_view kArtworkSource = "artwork";
 constexpr double kArtworkPixels = 1200;  // Apple's library covers are 600 to 1200 px wide, its catalog ones larger
 constexpr int kArtworkSearchLimit = 20000;  // elements looked at in the window, a few thousand on the busiest pages
 
@@ -487,7 +486,7 @@ void RefreshArtwork(const std::shared_ptr<ArtworkFollow>& follow) {
     ShowCover(follow, follow->apple.Source(), PlayingArtworkSource(kArtworkPixels));
 }
 
-// A queue entry's cover (QueueArtworkSource): Apple's loader draws it, then it is decoded large. It does not follow
+// A queue entry's cover (AppleArtworkSource): Apple's loader draws it, then it is decoded large. It does not follow
 // anything, as the entry keeps its cover; the image gets a new src when the view shows another entry.
 std::shared_ptr<ArtworkFollow> ShowQueueArtwork(const media::ImageBrush& brush, const controls::Image& sizer,
                                                 std::uint64_t itemId) {
@@ -1707,15 +1706,15 @@ void XamlRenderer::SetImage(Mounted& mounted, const RenderNode& node) {
         DropFollow(frame, *mounted.artwork);
         mounted.artwork.reset();
     }
-    std::optional<std::uint64_t> queued = ampify::QueueArtworkItem(source);
-    if (source != mounted.source && mounted.brush && mounted.sizer && source == kArtworkSource) {
+    std::optional<ampify::AppleArtwork> apple = ampify::ParseAppleArtworkSource(source);
+    if (source != mounted.source && mounted.brush && mounted.sizer && apple && !apple->queueItem) {
         mounted.source = source;
         mounted.artwork = FollowPlayingArtwork(frame, mounted.brush, mounted.sizer);
-    } else if (source != mounted.source && mounted.brush && mounted.sizer && queued) {
+    } else if (source != mounted.source && mounted.brush && mounted.sizer && apple) {
         mounted.source = source;
         mounted.brush.ClearValue(media::ImageBrush::ImageSourceProperty());
         mounted.sizer.ClearValue(controls::Image::SourceProperty());
-        mounted.artwork = ShowQueueArtwork(mounted.brush, mounted.sizer, *queued);
+        mounted.artwork = ShowQueueArtwork(mounted.brush, mounted.sizer, *apple->queueItem);
     } else if (source != mounted.source && mounted.brush && mounted.sizer) {
         mounted.source = source;
         mounted.brush.ClearValue(media::ImageBrush::ImageSourceProperty());

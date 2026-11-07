@@ -40,7 +40,7 @@ struct Context {
 // Pads a table cell to `width` characters, not bytes, so accented names line up.
 inline std::string Pad(std::string_view text, size_t width) {
     std::string cell(text);
-    size_t characters = CharacterCount(text);
+    size_t characters = CodePointCount(text);
     if (characters < width) cell.append(width - characters, ' ');
     return cell;
 }

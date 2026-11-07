@@ -310,9 +310,10 @@ bool AmpPlayer::Command(PlayerCommand command, int64_t seekMs) {
     // The winmd list gives the names, not the parameters: play, pause, next and previous take none and return an
     // asynchronous action, which is why player.appleCommands is off by default until the PC confirms them.
     rt::Ref operation;
-    // A TimeSpan is one Int64 of 100 ns ticks, passed by value; scrubbing false is a jump, not a drag of the scrubber.
+    // A TimeSpan, so 100 ns ticks whatever unit CurrentPosition is read in (an Int64 the winmd leaves without one);
+    // passed by value, and scrubbing false is a jump, not a drag of the scrubber.
     HRESULT hr = command == PlayerCommand::Seek
-                     ? rt::CallSlot(m_player, method, seekMs * 10'000, static_cast<unsigned char>(0), operation.Put())
+                     ? rt::CallSlot(m_player, method, MsToTicks(seekMs), static_cast<unsigned char>(0), operation.Put())
                      : rt::CallSlot(m_player, method, operation.Put());
     if (FAILED(hr)) return false;
     return !operation || rt::Wait(operation, kCommandTimeoutMs);
@@ -449,24 +450,34 @@ void StoreQueueArtworks(std::unordered_map<uint64_t, rt::Ref> byId, unsigned lon
     index.builtAt = builtAt;
 }
 
-// One walk of the queue, at most kMaxQueueEntries entries in all: the cover of each entry, by its id.
+// The entries of the queue, section by section, until kMaxQueueEntries of them counted: `visit(model, sectionKind)`
+// says whether an entry counts. True when the queue holds more than were counted.
+template <class Visit>
+bool WalkQueue(const std::vector<rt::Ref>& sections, Visit&& visit) {
+    size_t counted = 0;
+    for (const rt::Ref& sectionModel : sections) {
+        int32_t kind = 0;
+        for (const rt::Ref& model : SectionEntries(sectionModel, kind)) {
+            if (counted >= kMaxQueueEntries) return true;
+            if (visit(model, kind)) ++counted;
+        }
+    }
+    return false;
+}
+
+// The cover of each entry, by its id, without reading the rest of the entry.
 std::unordered_map<uint64_t, rt::Ref> WalkQueueArtworks() {
     std::unordered_map<uint64_t, rt::Ref> byId;
     std::string failure;
-    size_t walked = 0;
-    for (const rt::Ref& sectionModel : QueueSections(failure)) {
-        int32_t kind = 0;
-        for (const rt::Ref& model : SectionEntries(sectionModel, kind)) {
-            if (walked++ >= kMaxQueueEntries) return byId;
-            rt::Ref item;
-            uint64_t id = 0;
-            if (!rt::Query(model, rt::GuidOf(amp::kIidPlayQueueItem), item) ||
-                FAILED(rt::CallSlot(item, slot::kQueueItemId, &id))) {
-                continue;
-            }
+    WalkQueue(QueueSections(failure), [&byId](const rt::Ref& model, int32_t) {
+        rt::Ref item;
+        uint64_t id = 0;
+        if (rt::Query(model, rt::GuidOf(amp::kIidPlayQueueItem), item) &&
+            SUCCEEDED(rt::CallSlot(item, slot::kQueueItemId, &id))) {
             if (rt::Ref artwork = QueueEntryArtwork(model)) byId.emplace(id, std::move(artwork));
         }
-    }
+        return true;
+    });
     return byId;
 }
 
@@ -482,21 +493,14 @@ std::optional<std::vector<AmpQueueEntry>> ReadAppleQueue(std::string& failure, b
     if (!failure.empty()) return std::nullopt;
     std::vector<AmpQueueEntry> entries;
     std::unordered_map<uint64_t, rt::Ref> artworks;
-    for (const rt::Ref& sectionModel : sections) {
-        int32_t kind = 0;
-        for (const rt::Ref& model : SectionEntries(sectionModel, kind)) {
-            if (entries.size() >= kMaxQueueEntries) {
-                cut = true;
-                StoreQueueArtworks(std::move(artworks), GetTickCount64());
-                return entries;
-            }
-            rt::Ref artwork;
-            std::optional<AmpQueueEntry> entry = ReadQueueEntry(model, kind, artwork);
-            if (!entry) continue;
-            if (artwork) artworks.emplace(entry->id, std::move(artwork));
-            entries.push_back(std::move(*entry));
-        }
-    }
+    cut = WalkQueue(sections, [&](const rt::Ref& model, int32_t kind) {
+        rt::Ref artwork;
+        std::optional<AmpQueueEntry> entry = ReadQueueEntry(model, kind, artwork);
+        if (!entry) return false;
+        if (artwork) artworks.emplace(entry->id, std::move(artwork));
+        entries.push_back(std::move(*entry));
+        return true;
+    });
     StoreQueueArtworks(std::move(artworks), GetTickCount64());
     return entries;
 }

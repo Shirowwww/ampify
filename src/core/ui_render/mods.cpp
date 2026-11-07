@@ -6,12 +6,9 @@
 #include <fstream>
 #include <sstream>
 
-#include "../extension.hpp"
-#include "../json.hpp"
 #include "../kit_layout.hpp"
 #include "../manifest.hpp"
-#include "../natives/service_flags.hpp"
-#include "../reload.hpp"
+#include "../permissions.hpp"
 #include "../settings.hpp"
 #include "../text_util.hpp"
 
@@ -39,15 +36,14 @@ bool AppendReload(const fs::path& kit, const std::string& line, std::string& err
     return true;
 }
 
-bool IsExtensionTarget(const std::string& id, std::string& error) {
-    if (IsReloadTarget(id) && id.rfind("app:", 0) != 0) return true;
-    error = "invalid extension id: " + id;
+bool IsIdOf(ElementKind kind, const std::string& id, std::string& error) {
+    if (IsElementId(id)) return true;
+    error = "invalid " + std::string(ToString(kind)) + " id: " + id;
     return false;
 }
 
-// A key a manifest may declare, never the activation key.
 bool IsDeclaredKey(const std::string& key, std::string& error) {
-    bool valid = key != "enabled" && IsSettingKey(key);
+    bool valid = IsDeclarableSettingKey(key);
     if (!valid) error = "invalid setting key: " + key;
     return valid;
 }
@@ -79,6 +75,7 @@ std::vector<Manifest> ReadManifests(const fs::path& root, ElementKind kind) {
 ModEntry EntryOf(const Manifest& manifest) {
     ModEntry entry;
     entry.id = manifest.id;
+    entry.kind = manifest.kind;
     entry.name = manifest.name.empty() ? manifest.id : manifest.name;
     entry.description = manifest.description;
     entry.translations = manifest.translations;
@@ -110,10 +107,10 @@ std::vector<ModEntry> ListMods(const fs::path& kit) {
 
     for (const Manifest& manifest : ReadManifests(kit / "extensions", ElementKind::Extension)) {
         ModEntry mod = EntryOf(manifest);
-        mod.enabled = settings.GetBool(ExtensionHost::SettingKey(mod.id), IsOnByDefault("extensions", mod.id));
+        mod.enabled = IsElementOn(settings, mod.Ref());
         mod.settings = manifest.settings;
         for (const SettingSpec& spec : mod.settings) {
-            mod.values.push_back(settings.GetString("extensions." + mod.id + "." + spec.key, spec.defaultValue));
+            mod.values.push_back(settings.GetString(mod.Ref().SettingsPrefix() + spec.key, spec.defaultValue));
         }
         mods.push_back(std::move(mod));
     }
@@ -124,24 +121,18 @@ std::vector<ModEntry> ListMods(const fs::path& kit) {
 bool IsModOn(const fs::path& kit, const std::string& id) {
     Settings settings;
     settings.Load((kit / "settings.txt").string());
-    return settings.GetBool(ExtensionHost::SettingKey(id), IsOnByDefault("extensions", id));
+    return IsElementOn(settings, {ElementKind::Extension, id});
 }
 
 std::vector<ModEntry> ListThemes(const fs::path& kit) {
     std::vector<ModEntry> themes;
-    for (const Manifest& manifest : ReadManifests(kit / "themes", ElementKind::Theme)) {
-        themes.push_back(EntryOf(manifest));
-        themes.back().theme = true;
-    }
+    for (const Manifest& manifest : ReadManifests(kit / "themes", ElementKind::Theme)) themes.push_back(EntryOf(manifest));
     SortByName(themes);
     return themes;
 }
 
 bool ChooseTheme(const fs::path& kit, const std::string& id, std::string& error) {
-    if (!id.empty() && !IsExtensionTarget(id, error)) {
-        error = "invalid theme id: " + id;
-        return false;
-    }
+    if (!id.empty() && !IsIdOf(ElementKind::Theme, id, error)) return false;
     return Settings::UpdateFile((kit / "settings.txt").string(), [&id](Settings& settings) {
         std::string scheme = settings.GetString("theme.scheme", "");
         bool keep = scheme == "auto" || (!id.empty() && settings.GetString("theme.active", "") == id);
@@ -206,9 +197,9 @@ bool WriteSetting(const fs::path& kit, const std::string& key, const std::string
 }
 
 bool SwitchMod(const fs::path& kit, const std::string& id, bool enabled, std::string& error) {
-    if (!IsExtensionTarget(id, error)) return false;
+    if (!IsIdOf(ElementKind::Extension, id, error)) return false;
     bool written = Settings::UpdateFile((kit / "settings.txt").string(), [&](Settings& settings) {
-        settings.Set(ExtensionHost::SettingKey(id), enabled ? "1" : "0");
+        settings.Set(ElementRef{ElementKind::Extension, id}.EnabledKey(), enabled ? "1" : "0");
         if (!enabled) return;
         // The user switched on an element whose permissions ask for a service: the service goes on with it, so
         // that the element works at once. An element still cannot turn a service on by itself.
@@ -223,11 +214,18 @@ bool SwitchMod(const fs::path& kit, const std::string& id, bool enabled, std::st
     return AppendReload(kit, (enabled ? "start " : "stop ") + id, error);
 }
 
+// An extension restarts with its new value; the theme service sees settings.txt change and applies the theme and the
+// snippets again.
+bool SetElementSetting(const fs::path& kit, const ElementRef& element, const std::string& key, const std::string& value,
+                       std::string& error) {
+    if (!IsIdOf(element.kind, element.id, error) || !IsDeclaredKey(key, error)) return false;
+    if (!WriteSetting(kit, element.SettingsPrefix() + key, OneLine(value), error)) return false;
+    return element.kind != ElementKind::Extension || AppendReload(kit, "restart " + element.id, error);
+}
+
 bool SetModSetting(const fs::path& kit, const std::string& id, const std::string& key, const std::string& value,
                    std::string& error) {
-    if (!IsExtensionTarget(id, error) || !IsDeclaredKey(key, error)) return false;
-    if (!WriteSetting(kit, "extensions." + id + "." + key, OneLine(value), error)) return false;
-    return AppendReload(kit, "restart " + id, error);
+    return SetElementSetting(kit, {ElementKind::Extension, id}, key, value, error);
 }
 
 std::string ActiveThemeId(const fs::path& kit) {
@@ -241,24 +239,20 @@ std::optional<ModEntry> ActiveThemeSettings(const fs::path& kit) {
     Settings settings;
     settings.Load((kit / "settings.txt").string());
     std::string id = ActiveThemeId(kit);
-    std::string error;
-    if (id.empty() || !IsExtensionTarget(id, error)) return std::nullopt;
+    if (id.empty() || !IsElementId(id)) return std::nullopt;
     std::optional<std::string> text = ReadWholeFile(kit / "themes" / id / "manifest.json");
     if (!text) return std::nullopt;
+    // The settings show even when another field of the manifest is wrong, and a bad translation leaves the English.
+    const Manifest manifest = ParseManifest(*text, id, kKitApiMajor, nullptr).partial;
+    if (manifest.settings.empty()) return std::nullopt;
     ModEntry theme;
     theme.id = id;
-    theme.theme = true;
-    theme.settings = DeclaredSettings(*text);
-    if (theme.settings.empty()) return std::nullopt;
-    std::optional<Json> manifest = Json::Parse(*text);
-    const Json* name = manifest ? manifest->Find("name") : nullptr;
-    theme.name = name && name->AsString() && !name->AsString()->empty() ? *name->AsString() : id;
-    if (const Json* translations = manifest ? manifest->Find("translations") : nullptr) {
-        std::vector<std::string> ignored;  // a bad translation leaves the English texts, the card still shows
-        theme.translations = ReadManifestTranslations(*translations, ignored);
-    }
+    theme.kind = ElementKind::Theme;
+    theme.name = manifest.name.empty() ? id : manifest.name;
+    theme.translations = manifest.translations;
+    theme.settings = manifest.settings;
     for (const SettingSpec& spec : theme.settings) {
-        theme.values.push_back(SettingValue(spec, settings.Get("themes." + id + "." + spec.key)));
+        theme.values.push_back(SettingValue(spec, settings.Get(theme.Ref().SettingsPrefix() + spec.key)));
     }
     return theme;
 }
@@ -268,13 +262,12 @@ std::vector<ModEntry> EnabledSnippetSettings(const fs::path& kit) {
     settings.Load((kit / "settings.txt").string());
     std::vector<ModEntry> snippets;
     for (const Manifest& manifest : ReadManifests(kit / "snippets", ElementKind::Snippet)) {
-        if (manifest.settings.empty() || !settings.GetBool("snippets." + manifest.id + ".enabled", false)) continue;
+        if (manifest.settings.empty() || !IsElementOn(settings, manifest.Ref())) continue;
         ModEntry snippet = EntryOf(manifest);
-        snippet.snippet = true;
         snippet.enabled = true;
         snippet.settings = manifest.settings;
         for (const SettingSpec& spec : snippet.settings) {
-            snippet.values.push_back(SettingValue(spec, settings.Get("snippets." + snippet.id + "." + spec.key)));
+            snippet.values.push_back(SettingValue(spec, settings.Get(snippet.Ref().SettingsPrefix() + spec.key)));
         }
         snippets.push_back(std::move(snippet));
     }
@@ -284,40 +277,22 @@ std::vector<ModEntry> EnabledSnippetSettings(const fs::path& kit) {
 
 bool SetSnippetSetting(const fs::path& kit, const std::string& id, const std::string& key, const std::string& value,
                        std::string& error) {
-    if (!IsExtensionTarget(id, error)) {
-        error = "invalid snippet id: " + id;
-        return false;
-    }
-    return IsDeclaredKey(key, error) && WriteSetting(kit, "snippets." + id + "." + key, OneLine(value), error);
+    return SetElementSetting(kit, {ElementKind::Snippet, id}, key, value, error);
 }
 
 bool SetThemeSetting(const fs::path& kit, const std::string& id, const std::string& key, const std::string& value,
                      std::string& error) {
-    if (!IsExtensionTarget(id, error)) {
-        error = "invalid theme id: " + id;
-        return false;
-    }
-    return IsDeclaredKey(key, error) && WriteSetting(kit, "themes." + id + "." + key, OneLine(value), error);
+    return SetElementSetting(kit, {ElementKind::Theme, id}, key, value, error);
 }
 
 namespace {
 
 constexpr size_t kMaxSettingText = 200;  // the length docs/extensions/manifest.md allows a text
 
-struct KindFolder {
-    std::string_view kind;
-    const char* folder;
-    ElementKind element;
-};
-constexpr KindFolder kSettingKinds[] = {{"extension", "extensions", ElementKind::Extension},
-                                        {"theme", "themes", ElementKind::Theme},
-                                        {"snippet", "snippets", ElementKind::Snippet}};
-
-const KindFolder* FolderOf(std::string_view kind) {
-    for (const KindFolder& entry : kSettingKinds) {
-        if (entry.kind == kind) return &entry;
-    }
-    return nullptr;
+// A kind that declares settings, from its name.
+std::optional<ElementKind> SettingKindNamed(std::string_view name) {
+    std::optional<ElementKind> kind = KindNamed(name);
+    return kind && TraitsOf(*kind).declaresSettings ? kind : std::nullopt;
 }
 
 // The value as settings.txt keeps it when it fits the spec: SettingValue with no default to fall back on.
@@ -332,27 +307,20 @@ std::optional<std::string> AcceptedValue(const SettingSpec& spec, const std::str
     return accepted.empty() ? std::nullopt : std::optional<std::string>(accepted);
 }
 
-// Where settings.txt keeps the element's settings: "themes.glass." for the theme glass.
-std::string KeyPrefix(const ModEntry& element) {
-    return std::string(element.snippet ? "snippets." : element.theme ? "themes." : "extensions.") + element.id + ".";
-}
-
 }  // namespace
 
 std::optional<ModEntry> ElementSettings(const fs::path& kit, std::string_view kind, const std::string& id) {
-    const KindFolder* folder = FolderOf(kind);
-    std::string error;
-    if (!folder || !IsExtensionTarget(id, error)) return std::nullopt;
-    for (const Manifest& manifest : ReadManifests(kit / folder->folder, folder->element)) {
+    std::optional<ElementKind> element = SettingKindNamed(kind);
+    if (!element || !IsElementId(id)) return std::nullopt;
+    for (const Manifest& manifest : ReadManifests(kit / TraitsOf(*element).folder, *element)) {
         if (manifest.id != id || manifest.settings.empty()) continue;
         Settings settings;
         settings.Load((kit / "settings.txt").string());
         ModEntry entry = EntryOf(manifest);
-        entry.theme = folder->element == ElementKind::Theme;
-        entry.snippet = folder->element == ElementKind::Snippet;
         entry.settings = manifest.settings;
-        std::string prefix = std::string(folder->folder) + "." + id + ".";
-        entry.enabled = settings.GetBool(prefix + "enabled", false);
+        std::string prefix = entry.Ref().SettingsPrefix();
+        // Not IsElementOn: the card has always shown an element without its key as off.
+        entry.enabled = settings.GetBool(entry.Ref().EnabledKey(), false);
         for (const SettingSpec& spec : entry.settings) {
             entry.values.push_back(SettingValue(spec, settings.Get(prefix + spec.key)));
         }
@@ -379,9 +347,7 @@ bool ChangeElementSetting(const fs::path& kit, std::string_view kind, const std:
         error = "\"" + value + "\" does not fit the setting \"" + key + "\" of \"" + id + "\"";
         return false;
     }
-    if (element->snippet) return SetSnippetSetting(kit, id, key, *accepted, error);
-    if (element->theme) return SetThemeSetting(kit, id, key, *accepted, error);
-    return SetModSetting(kit, id, key, *accepted, error);
+    return SetElementSetting(kit, element->Ref(), key, *accepted, error);
 }
 
 bool ChangeElementValues(const fs::path& kit, std::string_view kind, const std::string& id,
@@ -407,11 +373,11 @@ bool ChangeElementValues(const fs::path& kit, std::string_view kind, const std::
         accepted[key] = *fit;
     }
     // One write for all of them, so an extension restarts once and a theme applies once.
-    std::string prefix = KeyPrefix(*element);
+    std::string prefix = element->Ref().SettingsPrefix();
     bool written = Settings::UpdateFile((kit / "settings.txt").string(), [&](Settings& settings) {
         for (const auto& [key, value] : accepted) settings.Set(prefix + key, OneLine(value));
     }, error);
-    if (!written || element->theme || element->snippet) return written;
+    if (!written || element->kind != ElementKind::Extension) return written;
     return AppendReload(kit, "restart " + id, error);
 }
 
@@ -434,11 +400,11 @@ bool ResetElementValues(const fs::path& kit, std::string_view kind, const std::s
             return false;
         }
     }
-    std::string prefix = KeyPrefix(*element);
+    std::string prefix = element->Ref().SettingsPrefix();
     bool written = Settings::UpdateFile((kit / "settings.txt").string(), [&](Settings& settings) {
         for (const std::string& key : removed) settings.Remove(prefix + key);
     }, error);
-    if (!written || element->theme || element->snippet) return written;
+    if (!written || element->kind != ElementKind::Extension) return written;
     return AppendReload(kit, "restart " + id, error);
 }
 

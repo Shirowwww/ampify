@@ -61,6 +61,9 @@ public:
 
     PlayerSnapshot Snapshot();
     bool Control(PlayerCommand command, int64_t seekMs);
+    // Publishes `snapshot`, the last one read, to this process's now-playing feed (src/core/now_playing.hpp) with the
+    // song's lyrics parsed once. Called by the one subscriber that reads the player every kPlayerPeriod.
+    void PublishFeed(const PlayerSnapshot& snapshot);
 
     QueueSnapshot Queue() override;
     QueueResult AddToQueue(const std::string& trackId, QueuePosition position) override;
@@ -79,7 +82,9 @@ private:
     bool OnInterfaceThread(std::function<void()> work);
     std::optional<int64_t> LyricsLineStart();
     void FollowLyricsLine(PlayerSnapshot& snapshot, int64_t nowMs);
-    void PublishFeed(const PlayerSnapshot& snapshot);
+    void LearnTimeUnit(const AmpReading& apple, const SmtcReading* smtc);
+    PlayerSnapshot FromApple(const AmpReading& apple, const SmtcReading* smtc);
+    void LogCover(const AmpReading& apple);
     // Apple's whole queue, or nullopt with `failure`.
     std::optional<std::vector<AmpQueueEntry>> AppleQueue(std::string& failure, bool& cut);
 

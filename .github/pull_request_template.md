@@ -2,9 +2,11 @@
 
 ## Tests run
 
+The suites are listed in docs/development/testing.md ("Which tests to run"). Tick what you ran:
+
 - [ ] `ampify_tests`
+- [ ] `python -m unittest discover -s tools` (in the repository root, with `AMPIFY_BIN` set to the built `ampify`)
 - [ ] `node --test tools/test_examples.mjs`
-- [ ] `python -m unittest test_validate test_pack` (in `tools/`)
 
 ## Not checked
 

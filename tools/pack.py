@@ -13,11 +13,10 @@ points to it next to the archive's address. A README.md at the root of the folde
 """
 
 import argparse
-import contextlib
 import hashlib
-import io
 import json
 import os
+import re
 import shutil
 import sys
 import zipfile
@@ -37,28 +36,28 @@ def check_folder(folder):
     manifest = os.path.join(folder, "manifest.json")
     if not os.path.isfile(manifest):
         raise PackError(f"{folder}: manifest.json missing")
-    report = io.StringIO()
-    with contextlib.redirect_stdout(report):
-        status = validate.main(["manifest", manifest])
-    if status != 0:
-        raise PackError(report.getvalue().strip() or f"{manifest}: invalid")
+    check_json("manifest", manifest)
     with open(manifest, encoding="utf-8") as handle:
         return json.load(handle)
 
 
+def check_json(kind, path):
+    """Runs validate.py on a file (it also refuses links inside an element's folder). Raises PackError."""
+    try:
+        errors = validate.check_file(kind, path)
+    except (OSError, ValueError, validate.SchemaError, re.error) as error:
+        raise PackError(f"{path}: cannot check: {error}") from error
+    if errors:
+        raise PackError("\n".join(f"{path}: {message}" for message in errors))
+
+
 def files_of(folder):
-    """Every regular file under `folder`, as posix paths relative to it, sorted. Links are refused."""
+    """Every regular file under `folder`, as posix paths relative to it, sorted."""
     found = []
     for root, dirs, files in os.walk(folder):
         dirs.sort()
-        for name in sorted(files):
-            full = os.path.join(root, name)
-            if os.path.islink(full):
-                raise PackError(f"symbolic link not allowed: {full}")
-            found.append(os.path.relpath(full, folder).replace(os.sep, "/"))
-        for name in dirs:
-            if os.path.islink(os.path.join(root, name)):
-                raise PackError(f"symbolic link not allowed: {os.path.join(root, name)}")
+        for name in files:
+            found.append(os.path.relpath(os.path.join(root, name), folder).replace(os.sep, "/"))
     return sorted(found)
 
 
@@ -78,13 +77,16 @@ def build_archive(folder, archive):
     return digest.hexdigest()
 
 
-def publish_preview(folder, manifest, archive, url):
-    """Copies the manifest's preview next to the archive, under the archive's name, and returns its address next to
-    the archive's: the Marketplace shows a catalog preview only from the catalog's host or the archive's."""
+def preview_target(manifest, archive):
+    """Where the manifest's preview is published: next to the archive, under the archive's name. None without one."""
     if "preview" not in manifest:
         return None
-    target = os.path.splitext(archive)[0] + os.path.splitext(manifest["preview"])[1]
-    shutil.copyfile(os.path.join(folder, manifest["preview"]), target)
+    return os.path.splitext(archive)[0] + os.path.splitext(manifest["preview"])[1]
+
+
+def preview_address(target, url):
+    """The preview's address next to the archive's: the Marketplace shows a catalog preview only from the catalog's
+    host or the archive's."""
     return url.rsplit("/", 1)[0] + "/" + os.path.basename(target)
 
 
@@ -115,30 +117,47 @@ def catalog_entry(manifest, url, sha256, preview=None):
 
 
 def update_catalog(catalog_path, entry):
+    """Adds or replaces the entry. The new catalog is checked beside the old one and replaces it only when valid."""
     with open(catalog_path, encoding="utf-8") as handle:
         catalog = json.load(handle)
     entries = catalog["extensions"]
     entries[:] = [item for item in entries if item["id"] != entry["id"]] + [entry]
     entries.sort(key=lambda item: item["id"])
-    with open(catalog_path, "w", encoding="utf-8", newline="\n") as handle:
-        json.dump(catalog, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
-    report = io.StringIO()
-    with contextlib.redirect_stdout(report):
-        status = validate.main(["catalog", catalog_path])
-    if status != 0:
-        raise PackError(f"invalid catalog after adding {entry['id']}: {report.getvalue().strip()}")
+    candidate = catalog_path + ".new"
+    try:
+        with open(candidate, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(catalog, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+        check_json("catalog", candidate)
+        os.replace(candidate, catalog_path)
+    finally:
+        if os.path.exists(candidate):
+            os.remove(candidate)
+
+
+def check_same_name(archive, url):
+    """The preview and the README are published under the archive's name and the entry points to the address's:
+    the two names must agree, or the entry points to files that are not there."""
+    local = os.path.splitext(os.path.basename(archive))[0]
+    remote = os.path.splitext(url.rsplit("/", 1)[-1])[0]
+    if local != remote:
+        raise PackError(f"--out is named {local}.zip but --url ends with {remote}: use the same name for both")
 
 
 def pack(folder, archive, catalog=None, url=None):
     manifest = check_folder(folder)
     if catalog and not url:
         raise PackError("--catalog also needs --url, the https address where the archive will be published")
+    if catalog:
+        check_same_name(archive, url)
     sha256 = build_archive(folder, archive)
     if catalog:
-        preview = publish_preview(folder, manifest, archive, url)
+        preview = preview_target(manifest, archive)
+        entry = catalog_entry(manifest, url, sha256, preview and preview_address(preview, url))
+        update_catalog(catalog, entry)
+        if preview:
+            shutil.copyfile(os.path.join(folder, manifest["preview"]), preview)
         publish_readme(folder, archive)
-        update_catalog(catalog, catalog_entry(manifest, url, sha256, preview))
     return {"id": manifest["id"], "version": manifest["version"], "archive": archive, "sha256": sha256}
 
 
@@ -157,7 +176,6 @@ def main(argv=None):
         return 1
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

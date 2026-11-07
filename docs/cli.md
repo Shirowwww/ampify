@@ -144,7 +144,7 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `theme.live_reload` | `1` or `0`: apply the theme again when its files change | `1` |
 | `theme.inspect` | `1`: the kernel writes the interface tree once, then sets `0` | `0` |
 | `xaml.watcher` | `1`: WinUI tells Ampify of each element it adds, and the theme reaches it at once. No flash measured, but the interface slows down over a long session (Apple Music keeps a record of every element): leave it off | `0` |
-| `language` | `en`, `fr`, `de`, `es`, `pt`, `ru`, `ja` or `zh`; empty follows Windows' regional format | empty |
+| `language` | `en`, `fr`, `de`, `es`, `pt`, `ru`, `ja` or `zh`; empty follows the Windows display language | empty |
 | `apple.notifications` | `apple`, `background` (only while Apple Music is not in front) or `never` | `apple` |
 | `apple.close` | `quit`, or `tray` to keep playing behind a notification-area icon | `quit` |
 | `apple.network` | `ipv4-first` tries a server's IPv4 address before its IPv6 one (songs stuck at 0:00 where IPv6 does not answer), `system` keeps Windows' order; applies at the next start | `ipv4-first` |

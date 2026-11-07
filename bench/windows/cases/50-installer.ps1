@@ -15,14 +15,10 @@ function Invoke-KitProgram {
     return $process.ExitCode
 }
 
-Register-Case -Id 'installer' -Title 'Install, uninstall keeping and purging data, refusal while Apple Music is open' -Action {
+Register-Case -Id 'installer' -Title 'Install, uninstall keeping and purging data, refusal while Apple Music is open' -Requires 'kit:release' -Action {
     param($Ctx)
 
-    $setup = Join-Path $script:KitRoot 'release\ampify_setup.exe'
-    if (-not (Test-Path -LiteralPath $setup)) {
-        Add-Check -Ctx $Ctx -Name 'ampify_setup.exe present in release' -Passed $false -Detail $setup
-        return
-    }
+    $setup = Join-Path $script:BenchKitRoot 'release\ampify_setup.exe'
 
     $installDir = Join-Path $env:LOCALAPPDATA 'Programs\Ampify'
     $installedSetup = Join-Path $installDir 'ampify_setup.exe'

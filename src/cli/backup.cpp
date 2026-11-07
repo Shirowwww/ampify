@@ -10,8 +10,6 @@ namespace ampify {
 
 namespace {
 
-constexpr std::string_view kKindFolders[] = {"extensions", "themes", "apps", "snippets"};
-
 // A name is only ever used as one folder name, so it must not carry a separator or a parent reference.
 bool IsSafeBackupName(std::string_view name) {
     if (name.empty() || name == "." || name == "..") return false;
@@ -54,7 +52,7 @@ bool CopyTree(const std::filesystem::path& from, const std::filesystem::path& to
 bool ClearConfiguration(const KitLayout& kit, std::string& error) {
     std::error_code ec;
     std::filesystem::remove(kit.Settings(), ec);
-    for (std::string_view folder : kKindFolders) {
+    for (std::string_view folder : kElementKindFolders) {
         std::filesystem::remove_all(kit.Root() / folder, ec);
         if (ec) {
             error = "cannot delete: " + (kit.Root() / folder).string();
@@ -81,7 +79,7 @@ std::optional<std::string> CreateBackup(const KitLayout& kit, std::string& error
     if (std::filesystem::exists(kit.Settings()) && !CopyTree(kit.Settings(), target / "settings.txt", error)) {
         return std::nullopt;
     }
-    for (std::string_view folder : kKindFolders) {
+    for (std::string_view folder : kElementKindFolders) {
         std::error_code ec;
         std::filesystem::create_directories(target / folder, ec);
         if (ec) {
@@ -124,7 +122,7 @@ bool RestoreBackup(const KitLayout& kit, std::string_view name, std::string& err
         !CopyTree(source / "settings.txt", kit.Settings(), error)) {
         return false;
     }
-    for (std::string_view folder : kKindFolders) {
+    for (std::string_view folder : kElementKindFolders) {
         if (!CopyTree(source / folder, kit.Root() / folder, error)) return false;
     }
     return true;

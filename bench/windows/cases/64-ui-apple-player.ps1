@@ -1,8 +1,7 @@
 # Apple Music's own full-screen player, opened by Ampify.ui.applePlayer.open() and laid over the main window
 # (src/win/apple_player.cpp). The log says how it went, the captures show it, then Escape is pressed in the player to see
 # what Apple Music does with it once it is a window.
-# Job: MSVC, UI shard ($script:BenchKitRoot\ui with ampify_launcher.exe and ampify_kernel.dll). Uses Set-UiSettings and
-# Show-UiAppWindow of 63-ui-surfaces.ps1.
+# Job: MSVC, UI shard ($script:BenchKitRoot\ui with ampify_launcher.exe and ampify_kernel.dll).
 
 if (-not ('AmpifyBench.AppWindows' -as [type])) {
     Add-Type -TypeDefinition @'
@@ -81,14 +80,10 @@ function Get-AppleMusicWindowList {
     return @{ Handles = @($handles); Text = ($rows -join ' | ') }
 }
 
-Register-Case -Id 'ui-apple-player' -Title "UI: Apple Music's full-screen player laid over the main window" -Requires 'apple-music' -Action {
+Register-Case -Id 'ui-apple-player' -Title "UI: Apple Music's full-screen player laid over the main window" -Requires 'apple-music', 'kit:ui' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'ui\ampify_launcher.exe'
-    if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Skip -Ctx $Ctx -Name 'UI build present' -Reason "no UI build in this bench: $launcher"
-        return
-    }
 
     # A one-line extension that asks for the player when it starts; it starts hot, after the first capture.
     Reset-KitState
@@ -104,7 +99,7 @@ Register-Case -Id 'ui-apple-player' -Title "UI: Apple Music's full-screen player
     $settings = Join-Path $script:KitDir 'settings.txt'
     $reload = Join-Path $script:KitDir 'reload.txt'
     Remove-Item -LiteralPath $reload -Force -ErrorAction SilentlyContinue
-    Set-UiSettings -Path $settings -Values @{
+    Set-Settings -Values @{
         'extensions.apple-player-probe.enabled' = 'false'
         'theme.active' = 'none'
         'theme.inspect' = '0'
@@ -116,8 +111,7 @@ Register-Case -Id 'ui-apple-player' -Title "UI: Apple Music's full-screen player
         $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched
         if (-not $launched) { return }
-        $firstRun = Close-AppleMusicFirstRun
-        Add-Info -Ctx $Ctx -Name 'first launch of Apple Music' -Detail "$firstRun screen(s) closed (licence, welcome)"
+        Clear-FirstRun -Ctx $Ctx
         $bound = Wait-Journal -FileName 'AppleMusic.log' -Text 'Interface: window "MainWindow" bound' -TimeoutSeconds 90
         Add-Check -Ctx $Ctx -Name 'log: interface service bound to "MainWindow"' -Passed $bound
         Start-Sleep -Seconds 5
@@ -127,7 +121,7 @@ Register-Case -Id 'ui-apple-player' -Title "UI: Apple Music's full-screen player
         $before = Get-AppleMusicWindowList
         Add-Info -Ctx $Ctx -Name 'windows before' -Detail $before.Text
 
-        Set-UiSettings -Path $settings -Values @{ 'extensions.apple-player-probe.enabled' = 'true' }
+        Set-Settings -Values @{ 'extensions.apple-player-probe.enabled' = 'true' }
         [System.IO.File]::AppendAllText($reload, "start apple-player-probe`n", $utf8)
         $endPattern = 'Apple player: (a second later|not opened|shown, but|its window|already being|the main window)'
         $ended = Wait-Until -TimeoutSeconds 60 -Condition { $null -ne (Find-JournalMatch -FileName 'AppleMusic.log' -Pattern $endPattern) }
@@ -189,6 +183,6 @@ Register-Case -Id 'ui-apple-player' -Title "UI: Apple Music's full-screen player
             -Detail "$($crashes.Count) event(s): $(Format-CrashEvents -Events $crashes)"
         Copy-JournalToResults -Ctx $Ctx
         Remove-Item -LiteralPath $extensionDir -Recurse -Force -ErrorAction SilentlyContinue
-        Set-UiSettings -Path $settings -Values @{ 'extensions.apple-player-probe.enabled' = 'false' }
+        Set-Settings -Values @{ 'extensions.apple-player-probe.enabled' = 'false' }
     }
 }

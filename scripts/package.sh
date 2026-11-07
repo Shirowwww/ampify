@@ -107,11 +107,22 @@ high, low = struct.unpack_from("<II", data, at + 8)
 print(f"{high >> 16}.{high & 0xFFFF}.{low >> 16}")
 PY
 }
+# Whether the version resource marks a bench build (VS_FF_SPECIALBUILD in VS_FIXEDFILEINFO, set by CMake for
+# AMPIFY_BENCH=ON): such a binary accepts any Apple Music version and never ships, whichever folder it sits in.
+is_bench_build() {
+    python3 -I - "$1" <<'PY'
+import struct, sys
+data = open(sys.argv[1], "rb").read()
+at = data.find(struct.pack("<I", 0xFEEF04BD))
+sys.exit(0 if at >= 0 and struct.unpack_from("<I", data, at + 28)[0] & 0x20 else 1)
+PY
+}
 # A Windows PE file starts with MZ. Anything else is a Linux binary or a broken download. Binaries left over from
 # another version would install under the wrong number: each one's version resource must be the release's.
 for file in "${binaries[@]/#/$bin_dir/}" "$cli_dir/$cli_file"; do
     [[ "$(head -c 2 "$file")" == "MZ" ]] || die "$(basename "$file") is not a Windows executable"
     found="$(file_version "$file")" || die "$(basename "$file") has no version resource"
+    ! is_bench_build "$file" || die "$(basename "$file") is a bench build (AMPIFY_BENCH=ON): it is never shipped"
     [[ "$found" == "$version" ]] ||
         die "$(basename "$file") is version $found, not $version: binaries of another version (older run?)"
 done

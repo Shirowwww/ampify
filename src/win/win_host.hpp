@@ -63,6 +63,8 @@ public:
 
     PlayerSnapshot Player() override;
     bool Control(PlayerCommand command, int64_t seekMs) override;
+    // Hands `snapshot` to the interface thread's now-playing feed (src/core/now_playing.hpp).
+    void PublishNowPlaying(const PlayerSnapshot& snapshot);
 
     bool SetGainDb(const std::string& elementId, double db) override;
 

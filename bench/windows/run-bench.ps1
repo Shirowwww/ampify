@@ -57,6 +57,7 @@ if (-not $PSScriptRoot -or -not $env:USERPROFILE) {
 }
 
 . (Join-Path $PSScriptRoot 'lib\harness.ps1')
+. (Join-Path $PSScriptRoot 'lib\ui.ps1')
 # A case folder's shared helpers sit beside it as <parent>-common.ps1 (live\live-common.ps1 for live\cases).
 $casesPath = Get-Item -LiteralPath (Join-Path $PSScriptRoot $CasesDir)
 $caseHelpers = Join-Path $casesPath.Parent.FullName ($casesPath.Parent.Name + '-common.ps1')
@@ -67,20 +68,24 @@ Get-ChildItem -LiteralPath $casesPath.FullName -Filter '*.ps1' | Sort-Object Nam
 
 # -Only may arrive as one comma-separated string from the workflow (pwsh -File passes it as is).
 $Only = @($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+# An id that no case has would run nothing and still end green.
+$unknown = @($Only | Where-Object { $id = $_; -not ($script:Cases | Where-Object { $_.Id -eq $id }) })
+if ($unknown.Count -gt 0) {
+    throw "Unknown case id(s) in -Only: $($unknown -join ', '). Known: $(($script:Cases | ForEach-Object { $_.Id }) -join ', ')"
+}
 
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 $script:BenchKitRoot = (Resolve-Path -LiteralPath $KitRoot).Path
-# Cases use either name. Both are absolute, so a case may change folders (Push-Location) and still find the kit.
-$script:KitRoot = $script:BenchKitRoot
 $script:BenchOutputRoot = (Resolve-Path -LiteralPath $OutputRoot).Path
-$repo = (Resolve-Path -LiteralPath $RepoRoot).Path
+$script:RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 
 function Test-Requirement {
     param([string]$Name)
-    switch ($Name) {
+    switch -Wildcard ($Name) {
         'apple-music' { return $script:AppleMusicInstalled }
         # Set by scripts/listen-test.ps1: Apple Music is signed in on this PC.
         'apple-account' { return ($script:AppleMusicInstalled -and $env:AMPIFY_SIGNED_IN -eq 'true') }
+        'kit:*' { return (Get-MissingKitFiles -Part $Name.Substring(4)).Count -eq 0 }
         default { throw "Unknown requirement: $Name" }
     }
 }
@@ -106,6 +111,7 @@ Write-Step 'Preparation'
 $os = Get-CimInstance -ClassName Win32_OperatingSystem
 $preparation = New-Object System.Collections.Generic.List[string]
 $preparation.Add("System: $($os.Caption) $($os.Version)")
+if ($env:ImageOS) { $preparation.Add("Runner image: $env:ImageOS $env:ImageVersion") }
 $preparation.Add("PowerShell: $($PSVersionTable.PSVersion)")
 $preparation.Add("Date: $((Get-Date).ToString('s'))")
 $buildInfo = Join-Path $script:BenchKitRoot 'BUILD_INFO.txt'
@@ -113,7 +119,7 @@ if (Test-Path -LiteralPath $buildInfo) {
     Get-Content -LiteralPath $buildInfo | ForEach-Object { $preparation.Add($_) }
 }
 
-$script:KnownVersions = @(Get-KnownAppVersions -RepoRoot $repo)
+$script:KnownVersions = @(Get-KnownAppVersions -RepoRoot $script:RepoRoot)
 $preparation.Add("Tested versions (facts/apple.json): $($script:KnownVersions -join ', ')")
 
 $installState = 'install skipped (-SkipInstall)'
@@ -141,7 +147,12 @@ foreach ($case in $script:Cases) {
     $ctx = New-CaseContext -Case $case
     Stop-BenchProcesses
     $missing = @($case.Requires | Where-Object { -not (Test-Requirement -Name $_) })
-    if ($missing.Count -gt 0) {
+    $brokenKit = @($missing | Where-Object { $_ -like 'kit:*' })
+    if ($brokenKit.Count -gt 0) {
+        # A kit part that is not there is a broken build, never a case to leave out.
+        $files = @($brokenKit | ForEach-Object { Get-MissingKitFiles -Part $_.Substring(4) })
+        Add-Check -Ctx $ctx -Name 'the kit has what the case needs' -Passed $false -Detail ("missing: " + ($files -join ', '))
+    } elseif ($missing.Count -gt 0) {
         Add-Skip -Ctx $ctx -Name 'requirements' -Reason ("missing: " + ($missing -join ', ') + " (preparation: $installState)")
     } else {
         try {

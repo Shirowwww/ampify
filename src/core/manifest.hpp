@@ -7,11 +7,11 @@
 #include <string_view>
 #include <vector>
 
+#include "element_ref.hpp"
 #include "json.hpp"
+#include "permissions.hpp"
 
 namespace ampify {
-
-enum class ElementKind { Extension, Theme, App, Snippet };
 
 // A setting an extension or a theme declares: the Ampify page shows it. An extension reads it
 // with Ampify.config.get(key), a theme's user.css with var(--setting-<key>) and @setting blocks. The value lives in
@@ -29,6 +29,9 @@ struct SettingSpec {
     std::string description;           // one line under the label; empty for none
 };
 
+// "toggle", "choice", "text" or "number", as the manifest and the Marketplace page write a setting's type.
+std::string_view ToString(SettingSpec::Type type);
+
 // The name and description of an element in one language, from the manifest's "translations" field. The languages are
 // those Ampify speaks (kTranslationLanguages); the English name and description stay the fallback.
 struct ManifestText {
@@ -40,9 +43,8 @@ struct ManifestText {
     std::map<std::string, std::string> settingDescriptions;  // a setting's description, by its key (optional)
 };
 
-// The fields of a manifest.json that the kernel uses. The rules are those of docs/extensions/manifest.md, which
-// tools/validate.py also enforces. The kernel checks them again, because a folder can be edited by hand.
-struct Manifest {
+// The fields that a manifest.json and an entry of catalog.json share.
+struct ElementInfo {
     std::string id;
     std::string name;
     std::string version;
@@ -53,12 +55,22 @@ struct Manifest {
     std::string kitApi;
     std::optional<std::string> homepage;
     std::optional<std::string> license;
+    std::vector<std::string> permissions;
+    std::vector<std::string> tags;  // Marketplace labels, read when authoring
+
+    ElementRef Ref() const { return {kind, id}; }
+    bool HasPermission(std::string_view permission) const;
+};
+
+// A manifest.json, as docs/extensions/manifest.md describes it. The schemas and tools/validate.py check the same rules
+// before publication; the kernel checks them again, because a folder can be edited by hand.
+struct Manifest : ElementInfo {
     std::optional<std::string> main;
     std::optional<std::string> colors;
     std::optional<std::string> defaultScheme;
     std::optional<std::string> resources;
     std::optional<std::string> icon;
-    std::vector<std::string> permissions;
+    std::optional<std::string> preview;  // Marketplace image at the root of the folder, read when authoring
     std::vector<std::string> appVersions;
     // Where the element runs: "ui" (AppleMusic.exe), "engine" (AMPLibraryAgent.exe), or both.
     std::vector<std::string> processes = {"ui"};  // the interface only, unless the manifest asks for the engine too
@@ -66,7 +78,6 @@ struct Manifest {
     bool module = false;
     std::vector<SettingSpec> settings;  // in manifest order
 
-    bool HasPermission(std::string_view permission) const;
     const SettingSpec* Setting(std::string_view key) const;
     bool RunsIn(std::string_view process) const;
 
@@ -74,26 +85,34 @@ struct Manifest {
     std::vector<std::string> NetworkHosts() const;
 };
 
+// Loading takes what the kernel has always loaded. Authoring, for the command line, also refuses unknown fields and
+// checks what only publication needs: the Marketplace fields (tags, preview) and the length of an address.
+enum class ManifestMode { Load, Author };
+
 struct ManifestResult {
     std::optional<Manifest> manifest;  // set only when there are no errors
-    std::vector<std::string> errors;   // English messages, one per problem
-    std::vector<std::string> warnings; // unknown fields are ignored, with a warning
+    // Every field that could be read, for the readers that show what they can of a manifest with errors (the theme
+    // engine, the Ampify page). Its settings are empty when the settings field has an error.
+    Manifest partial;
+    std::vector<std::string> errors;          // English messages, one per problem, each starting with its field
+    std::vector<std::string> warnings;        // unknown fields while loading, and keys written twice
+    std::vector<std::string> settingsErrors;  // those of `errors` that come from the settings field
 };
 
-// Parses and checks the text of a manifest.json. `folderName` must match `id`. `hasFile` tells whether a file
-// named in the manifest exists in the element's folder; it is a plain name such as "main.js", never a path.
+// Parses and checks the text of a manifest.json. `folderName` must match `id`, unless it is empty. `hasFile` tells
+// whether a file named in the manifest exists in the element's folder (a plain name such as "main.js"); without it,
+// files are not checked.
 ManifestResult ParseManifest(std::string_view text, std::string_view folderName, int supportedKitApiMajor,
-                             const std::function<bool(const std::string&)>& hasFile);
+                             const std::function<bool(const std::string&)>& hasFile,
+                             ManifestMode mode = ManifestMode::Load);
 
-// The rules of the settings field alone, for `ampify validate`, which reads the other fields itself.
-std::vector<std::string> SettingsErrors(std::string_view manifestText);
+// The fields of ElementInfo in `object`, under the rules of `mode`. Each message starts with `where` (such as
+// "extensions[2]"), empty at the top level. Unknown fields are left to the caller.
+void ReadElementInfo(const Json& object, std::string_view where, ManifestMode mode, int supportedKitApiMajor,
+                     ElementInfo& info, std::vector<std::string>& errors);
 
-// The settings field alone, for the theme loader and the Ampify page. Empty, with the reasons in `errors`, when one
-// of them breaks a rule, or when the kind is neither extension nor theme.
+// The settings a manifest declares, as ParseManifest reads them, for the theme engine; none when one breaks a rule.
 std::vector<SettingSpec> DeclaredSettings(std::string_view manifestText, std::vector<std::string>* errors = nullptr);
-
-// The manifest's "translations" field, as ParseManifest reads it; problems go to `errors`.
-std::map<std::string, ManifestText> ReadManifestTranslations(const Json& field, std::vector<std::string>& errors);
 
 // The value a setting has now: `stored` (from settings.txt) when it fits the spec, else the default. A toggle comes
 // back as true or false, a number as ShortestNumberText writes it.
@@ -103,9 +122,14 @@ std::string SettingValue(const SettingSpec& spec, const std::optional<std::strin
 // bounds), empty when it fits. SettingValue takes the default for such a value.
 std::string SettingProblem(const SettingSpec& spec, std::string_view stored);
 
-// Accepts `storage`, `player.read`, ..., or `network:<host>` with a lowercase host name.
-bool IsKnownPermission(std::string_view permission);
+// The rules of single fields, for the command line's own arguments.
+bool IsReleaseVersion(std::string_view text);  // MAJOR.MINOR.PATCH
+bool IsSchemeName(std::string_view text);      // a colour scheme's name, as defaultScheme takes it
+bool IsMainFileName(std::string_view text);    // a .js file at the root of the folder, as main takes it
+// https:// and no space, of `maxLength` characters at most when it is not 0.
+bool IsHttpsAddress(std::string_view text, size_t maxLength = 0);
 
-std::string_view ToString(ElementKind kind);
+// The longest address authoring accepts: a homepage, a download, a catalog.
+inline constexpr size_t kMaxAddressLength = 512;
 
 }  // namespace ampify

@@ -2,20 +2,12 @@
 
 #include <algorithm>
 
+#include "element_ref.hpp"
 #include "text_util.hpp"
 
 namespace ampify {
 
 namespace {
-
-constexpr std::string_view kAppPrefix = "app:";
-
-bool IsIdText(std::string_view id) {
-    if (id.empty() || id.size() > 40 || id.front() == '-') return false;
-    return std::all_of(id.begin(), id.end(), [](char c) {
-        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
-    });
-}
 
 std::optional<ReloadRequest> ParseLine(std::string_view line) {
     line = TrimSpace(line);
@@ -44,8 +36,8 @@ std::string_view CompleteLines(std::string_view text) {
 }  // namespace
 
 bool IsReloadTarget(std::string_view target) {
-    if (target.substr(0, kAppPrefix.size()) == kAppPrefix) target.remove_prefix(kAppPrefix.size());
-    return IsIdText(target);
+    if (target.starts_with(kAppHostPrefix)) target.remove_prefix(kAppHostPrefix.size());
+    return IsElementId(target);
 }
 
 std::vector<ReloadRequest> ParseReloadRequests(std::string_view text) {

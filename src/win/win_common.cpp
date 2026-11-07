@@ -318,6 +318,14 @@ void ShowMessage(const std::wstring& text, bool error) {
     MessageBoxW(nullptr, text.c_str(), L"Ampify", (error ? MB_ICONERROR : MB_ICONINFORMATION) | MB_OK);
 }
 
+std::string UserLocaleName() {
+    wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
+    if (LCIDToLocaleName(MAKELCID(GetUserDefaultUILanguage(), SORT_DEFAULT), name, LOCALE_NAME_MAX_LENGTH, 0) == 0) {
+        return {};
+    }
+    return ToUtf8(name);
+}
+
 std::wstring CatalogStorefront() {
     wchar_t geo[16] = {};
     if (GetUserDefaultGeoName(geo, static_cast<int>(std::size(geo))) == 0 || std::wcslen(geo) != 2) return L"US";

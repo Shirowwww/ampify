@@ -4,26 +4,14 @@
 # Job: MSVC (msvc-build), AMPIFY_XAML=ON and AMPIFY_BENCH=ON build (otherwise the injection refuses the runner's version).
 # Needs $script:BenchKitRoot\ui\ with ampify_launcher.exe and ampify_kernel.dll side by side.
 
-Register-Case -Id 'ui-inspector' -Title 'UI: the inspector writes the interface tree, then resets itself' -Requires 'apple-music' -Action {
+Register-Case -Id 'ui-inspector' -Title 'UI: the inspector writes the interface tree, then resets itself' -Requires 'apple-music', 'kit:ui' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'ui\ampify_launcher.exe'
-    if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Skip -Ctx $Ctx -Name 'UI build present' -Reason "no UI build in this kit: $launcher"
-        return
-    }
 
     # Settings: the other keys are kept, the case sets its own. The theme is off so that nothing is applied.
     Reset-KitState
-    New-Item -ItemType Directory -Force -Path $script:KitDir | Out-Null  # Reset-KitState may leave no folder at all
-    $settings = Join-Path $script:KitDir 'settings.txt'
-    $lines = @()
-    if (Test-Path -LiteralPath $settings) {
-        $lines = @(Get-Content -LiteralPath $settings -Encoding UTF8 | Where-Object { $_ -notmatch '^\s*theme\.(active|inspect)\s*=' })
-    }
-    $lines += 'theme.active = none'
-    $lines += 'theme.inspect = 1'
-    Set-Content -LiteralPath $settings -Value $lines -Encoding UTF8
+    Set-Settings -Values @{ 'theme.active' = 'none'; 'theme.inspect' = '1' }
 
     $since = Get-Date
     $launcherProcess = Start-Launcher -LauncherPath $launcher
@@ -34,9 +22,7 @@ Register-Case -Id 'ui-inspector' -Title 'UI: the inspector writes the interface 
         Close-AppleMusic | Out-Null
         return
     }
-    # New runner: the MPEG LA licence opens before the main window, which the kernel waits for.
-    $firstRun = Close-AppleMusicFirstRun
-    Add-Info -Ctx $Ctx -Name 'first launch of Apple Music' -Detail "$firstRun screen(s) closed (licence, welcome)"
+    Clear-FirstRun -Ctx $Ctx
 
     $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text 'Themes: interface thread ready (DispatcherQueue of the main window)' -TimeoutSeconds 90
     Add-Check -Ctx $Ctx -Name 'interface thread ready (DispatcherQueue)' -Passed $hooked
@@ -82,7 +68,7 @@ Register-Case -Id 'ui-inspector' -Title 'UI: the inspector writes the interface 
         -Detail 'none: this case does not open the General page, its survey is still to be done'
 
     # The inspector sets theme.inspect back to 0 once the survey is written.
-    $now = @(Get-Content -LiteralPath $settings -Encoding UTF8)
+    $now = @(Get-Content -LiteralPath $script:SettingsFile -Encoding UTF8)
     $reset = @($now | Where-Object { $_ -match '^\s*theme\.inspect\s*=\s*0\s*$' }).Count -gt 0
     Add-Check -Ctx $Ctx -Name 'settings.txt: theme.inspect reset to 0' -Passed $reset
 

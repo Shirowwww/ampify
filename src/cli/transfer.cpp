@@ -15,8 +15,6 @@ namespace ampify::cli {
 
 namespace {
 
-constexpr std::string_view kKinds[] = {"extension", "theme", "app", "snippet"};
-
 // The first entry of every export. Import refuses an archive without it, so a random zip is never unpacked.
 constexpr std::string_view kExportMarker = "Ampify-EXPORT";
 constexpr std::string_view kExportFormat = "format 1\n";
@@ -24,7 +22,7 @@ constexpr std::string_view kExportFormat = "format 1\n";
 // Names an import accepts: the marker, settings.txt, and the four element folders. Anything else is refused.
 bool IsExportEntry(const std::string& entry) {
     if (entry == kExportMarker || entry == "settings.txt") return true;
-    for (std::string_view kind : kKinds) {
+    for (std::string_view kind : kElementKindNames) {
         std::string prefix = std::string(FolderOfKind(kind)) + "/";
         if (entry.compare(0, prefix.size(), prefix) == 0) return true;
     }
@@ -33,7 +31,7 @@ bool IsExportEntry(const std::string& entry) {
 
 // Profile names use the same rules as element ids: they become folder names.
 bool CheckProfileName(Context& ctx, const std::string& name) {
-    if (IsValidId(name)) return true;
+    if (IsElementId(name)) return true;
     ctx.err << "ampify: invalid profile name: " << name << " (lowercase letters, digits and hyphens, 2 to 40 characters)\n";
     return false;
 }
@@ -120,7 +118,7 @@ int CmdExport(Context& ctx) {
     std::vector<ZipSource> files;
     files.push_back({std::string(kExportMarker), {}, std::string(kExportFormat)});
     if (std::filesystem::is_regular_file(ctx.kit.Settings(), ec)) files.push_back({"settings.txt", ctx.kit.Settings(), {}});
-    for (std::string_view kind : kKinds) {
+    for (std::string_view kind : kElementKindNames) {
         std::vector<ZipSource> part = FilesUnder(ctx.kit.Folder(kind), std::string(FolderOfKind(kind)));
         files.insert(files.end(), part.begin(), part.end());
     }
@@ -168,7 +166,7 @@ int CmdImport(Context& ctx) {
     };
     std::vector<Planned> planned;
     std::vector<std::string> problems;
-    for (std::string_view kind : kKinds) {
+    for (std::string_view kind : kElementKindNames) {
         std::filesystem::path folder = staging / FolderOfKind(kind);
         if (!std::filesystem::is_directory(folder, ec)) continue;
         for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
@@ -181,7 +179,7 @@ int CmdImport(Context& ctx) {
                 for (const std::string& problem : check.errors) problems.push_back(name + " : " + problem);
                 continue;
             }
-            if (check.manifest->kind != kind) {
+            if (ToString(check.manifest->kind) != kind) {
                 problems.push_back(name + ": the type does not match the folder " + std::string(FolderOfKind(kind)));
                 continue;
             }

@@ -388,6 +388,7 @@ TEST_CASE(PlayerQueue_SectionsIdsAndPositions) {
     CHECK(!ampify::IsCatalogId("14408a3098"));
     CHECK(!ampify::IsCatalogId("1\"}]"));
     CHECK(!ampify::IsCatalogId(std::string(20, '1')));
+    CHECK(!ampify::IsCatalogId("0"));  // what Apple gives a file that is not in the catalog
     ampify::QueuePosition position = ampify::QueuePosition::Next;
     CHECK(ampify::ParseQueuePosition("", position) && position == ampify::QueuePosition::Last);
     CHECK(ampify::ParseQueuePosition("next", position) && position == ampify::QueuePosition::Next);
@@ -439,15 +440,21 @@ TEST_CASE(PlayerQueue_AnEntryWhoseArtworkAppleKeepsInternalIsLoadedThroughApple)
     CHECK(ampify::QueueItemFromAmp(entry).artwork == "artwork:42");
 }
 
-TEST_CASE(PlayerQueue_AnArtworkSourceNamesOneQueueEntry) {
-    CHECK(ampify::QueueArtworkSource(7) == "artwork:7");
-    CHECK(ampify::QueueArtworkItem("artwork:18446744073709551615") == std::optional<std::uint64_t>(18446744073709551615ull));
-    CHECK(!ampify::QueueArtworkItem("artwork"));
-    CHECK(!ampify::QueueArtworkItem("artwork:"));
-    CHECK(!ampify::QueueArtworkItem("artwork:12a"));
-    CHECK(!ampify::QueueArtworkItem("artwork:-3"));
-    CHECK(!ampify::QueueArtworkItem("artwork:18446744073709551616"));
-    CHECK(!ampify::QueueArtworkItem("https://x/artwork:3"));
+TEST_CASE(PlayerQueue_AnArtworkSourceNamesThePlayingSongOrOneQueueEntry) {
+    auto entry = [](std::string_view source) -> std::optional<std::uint64_t> {
+        std::optional<ampify::AppleArtwork> apple = ampify::ParseAppleArtworkSource(source);
+        return apple ? apple->queueItem : std::nullopt;
+    };
+    CHECK(ampify::AppleArtworkSource({7}) == "artwork:7");
+    CHECK(ampify::AppleArtworkSource({}) == "artwork");
+    CHECK(entry("artwork:18446744073709551615") == std::optional<std::uint64_t>(18446744073709551615ull));
+    CHECK(ampify::ParseAppleArtworkSource("artwork") && !ampify::ParseAppleArtworkSource("artwork")->queueItem);
+    CHECK(!ampify::ParseAppleArtworkSource("artwork:"));
+    CHECK(!ampify::ParseAppleArtworkSource("artwork:12a"));
+    CHECK(!ampify::ParseAppleArtworkSource("artwork:-3"));
+    CHECK(!ampify::ParseAppleArtworkSource("artwork:18446744073709551616"));
+    CHECK(!ampify::ParseAppleArtworkSource("artworks"));
+    CHECK(!ampify::ParseAppleArtworkSource("https://x/artwork:3"));
 }
 
 // ---- Ampify.player.queue and toggle ----------------------------------------------------------------------------------
@@ -621,4 +628,58 @@ TEST_CASE(PositionClock_ResumesWhereThePauseLeftIt) {
     CHECK(clock.Next("a", false, 0, 200000, 3500) == 13500);
     CHECK(clock.Next("a", true, 0, 200000, 33500) == 13500);
     CHECK(clock.Next("a", true, 0, 200000, 34000) == 14000);
+}
+
+// The same song played again from the queue is another entry; nothing loaded has no key.
+TEST_CASE(TrackKey_IsTheSongAndItsQueueEntry) {
+    ampify::PlayerSnapshot snapshot;
+    CHECK(ampify::TrackKey(snapshot).empty());
+    snapshot.track = ampify::TrackInfo{};
+    snapshot.track->id = "t-1";
+    snapshot.track->queueItemId = "7";
+    const std::string first = ampify::TrackKey(snapshot);
+    snapshot.track->variantId = "dolby-atmos";
+    CHECK(ampify::TrackKey(snapshot) == first);
+    snapshot.track->queueItemId = "8";
+    CHECK(ampify::TrackKey(snapshot) != first);
+}
+
+TEST_CASE(ExtrapolatePosition_MovesOnOnlyForwardAndWhileMoving) {
+    CHECK(ampify::ExtrapolatePosition(1000, 50, 300, true) == 1250);
+    CHECK(ampify::ExtrapolatePosition(1000, 50, 300, false) == 1000);
+    CHECK(ampify::ExtrapolatePosition(1000, 300, 50, true) == 1000);
+    CHECK(ampify::TicksToMs(ampify::MsToTicks(1234)) == 1234);
+}
+
+// Apple's item without an artist takes the media session's "Artist — Album" of the same title, its id unchanged.
+TEST_CASE(FillArtistAlbumFromSmtc_FillsOnlyAnEmptyArtistOfTheSameTrack) {
+    ampify::SmtcReading smtc;
+    smtc.title = "Song";
+    smtc.artist = "Artist \xE2\x80\x94 Album";
+    ampify::TrackInfo track;
+    track.title = "Song";
+    track.id = "t-x";
+    ampify::FillArtistAlbumFromSmtc(track, smtc);
+    CHECK(track.artist == "Artist" && track.album == "Album" && track.id == "t-x");
+    ampify::TrackInfo other;
+    other.title = "Other";
+    ampify::FillArtistAlbumFromSmtc(other, smtc);
+    CHECK(other.artist.empty());
+    smtc.artist = "Solo";
+    smtc.album = "Record";
+    ampify::TrackInfo plain;
+    plain.title = "Song";
+    ampify::FillArtistAlbumFromSmtc(plain, smtc);
+    CHECK(plain.artist == "Solo" && plain.album == "Record");
+}
+
+TEST_CASE(SmtcLengthMsOf_NeedsTheSameTitleAndALength) {
+    ampify::SmtcReading smtc;
+    smtc.title = "Song";
+    smtc.startTicks = 10'000'000;
+    smtc.endTicks = 2'010'000'000;
+    CHECK(ampify::SmtcLengthMsOf(smtc, "Song") == std::optional<int64_t>(200'000));
+    CHECK(!ampify::SmtcLengthMsOf(smtc, "Other"));
+    smtc.endTicks = smtc.startTicks;
+    CHECK(!ampify::SmtcLengthMsOf(smtc, "Song"));
 }

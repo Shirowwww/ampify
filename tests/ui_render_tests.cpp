@@ -686,7 +686,7 @@ TEST_CASE(UiRender_TheActiveThemeCarriesItsSettings) {
 
     WriteFile(kit / "settings.txt", "theme.active = night\nthemes.night.radius = 30\nthemes.night.hide-radio = 1\n");
     std::optional<ModEntry> theme = ActiveThemeSettings(kit);
-    CHECK(theme && theme->id == "night" && theme->name == "Night" && theme->theme);
+    CHECK(theme && theme->id == "night" && theme->name == "Night" && theme->kind == ampify::ElementKind::Theme);
     if (theme) CHECK(theme->values == std::vector<std::string>({"8", "true"}));  // 30 is out of bounds
 
     WriteFile(kit / "settings.txt", "theme.active = plain\n");
@@ -742,7 +742,7 @@ TEST_CASE(UiRender_ThemesAreListedByNameWithTheirTranslation) {
     if (themes.size() != 2) return;
     CHECK(themes[0].id == "aurora" && themes[1].id == "rose");
     CHECK(themes[1].NameIn("fr") == "Or rose");
-    CHECK(themes[1].theme);
+    CHECK(themes[1].kind == ampify::ElementKind::Theme);
 }
 
 TEST_CASE(UiRender_ChoosingAThemeKeepsOnlyASchemeThatStillMeansSomething) {
@@ -813,7 +813,8 @@ TEST_CASE(UiRender_AccentPresetsCoverTheWheelAndAreTranslated) {
         values.push_back(preset.value);
         CHECK(std::string(preset.value).size() == 6);
         CHECK(std::string(preset.value).find_first_not_of("0123456789ABCDEF") == std::string::npos);
-        std::string_view french = ampify::i18n::Lookup(ampify::i18n::KitMessagesIn("fr"), preset.textKey);
+        std::string_view french =
+            ampify::i18n::Lookup(ampify::i18n::KitMessagesIn("fr"), preset.textKey).value_or(preset.textKey);
         CHECK(french != preset.textKey);
     }
     CHECK(values == (std::vector<std::string>{"FA2D48", "FF3B30", "FF9F0A", "FFD60A", "1ED760", "30B0C7", "0A84FF",
@@ -1179,7 +1180,7 @@ TEST_CASE(UiRender_ElementSettingsListWhatAnInstalledElementDeclaresWithItsValue
     WriteFile(kit / "settings.txt", "snippets.icons.shape = Square\n");
 
     std::optional<ModEntry> icons = ElementSettings(kit, "snippet", "icons");
-    CHECK(icons && icons->snippet && icons->settings.size() == 1);
+    CHECK(icons && icons->kind == ampify::ElementKind::Snippet && icons->settings.size() == 1);
     CHECK(icons && icons->values.size() == 1 && icons->values[0] == "Square");
     CHECK(!ElementSettings(kit, "snippet", "missing"));
     CHECK(!ElementSettings(kit, "theme", "icons"));

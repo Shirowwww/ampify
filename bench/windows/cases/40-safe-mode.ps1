@@ -1,13 +1,9 @@
 # Step 4 of the M3 test: after two launches without an answer, the launcher starts Apple Music without the kernel, then resets the counter.
 
-Register-Case -Id 'safe-mode' -Title 'Safe mode: after two failures, Apple Music starts without the kernel' -Requires 'apple-music' -Action {
+Register-Case -Id 'safe-mode' -Title 'Safe mode: after two failures, Apple Music starts without the kernel' -Requires 'apple-music', 'kit:bench' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'bench\ampify_launcher.exe'
-    if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Check -Ctx $Ctx -Name 'bench build present' -Passed $false -Detail $launcher
-        return
-    }
 
     Reset-KitState
     Set-SafeModeCount -Count 2

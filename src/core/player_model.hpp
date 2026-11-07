@@ -126,7 +126,7 @@ public:
     bool Moving(int64_t nowMs) const;
 
 private:
-    int64_t Ahead(int64_t nowMs) const;
+    int64_t Position(int64_t nowMs) const;
 
     std::string m_track;
     int64_t m_baseMs = 0;        // the position last learnt
@@ -138,6 +138,13 @@ private:
 // The position moves on between two SMTC updates while playing: it is extrapolated to `now`, and kept within the
 // track.
 PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading);
+
+// SMTC's length in ms of the track titled `title`, what settles the unit of Apple's times; nullopt when SMTC shows
+// another track or no length.
+std::optional<int64_t> SmtcLengthMsOf(const SmtcReading& smtc, const std::string& title);
+// Apple's item sometimes leaves the artist and album empty: the media session of the same track has them, as
+// "Artist — Album" in its artist. Fills `track` from `smtc` when that is the case; the track id is kept.
+void FillArtistAlbumFromSmtc(TrackInfo& track, const SmtcReading& smtc);
 
 // ---- Commands -----------------------------------------------------------------------------------------------------
 

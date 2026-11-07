@@ -61,8 +61,6 @@ public:
 
     ExtensionState StateOf(const std::string& id) const;
 
-    static std::string SettingKey(const std::string& id);
-
 private:
     struct Entry {
         ExtensionInfo info;

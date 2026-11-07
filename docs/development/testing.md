@@ -5,19 +5,31 @@ Windows bench, which runs unattended in CI, and a pass on a real PC for sound an
 
 ## CI
 
-`.github/workflows/ci.yml` runs on each push to `dev` that touches the code, and by hand (Actions, "CI", "Run
-workflow").
+`.github/workflows/ci.yml` runs on each push to `dev` that touches the code, the schemas, the knowledge files, the
+docs or the scripts, and by hand (Actions, "CI", "Run workflow"). The signed-in bench in `bench/windows/live/` starts
+nothing.
 
 | Job | What it does |
 |---|---|
 | Unit tests (Linux) | `ampify_tests`, then the Python and Node tests against the Linux `ampify` |
 | Unit tests (Windows, MSVC) | `ampify_tests` |
 | Build the release kit, Build the bench kit | The two MSVC kits with XAML, in parallel |
-| Bench (launch, safety, tools, ui) | The bench cases on four runners, each with its own Apple Music |
+| Split the bench cases, Bench (group 1 to 4) | The case ids are read from the case files and dealt out over four runners, each with its own Apple Music |
 
 A run takes about five minutes with a warm cache. The release build injects only on tested versions; the bench build
 (`AMPIFY_BENCH=ON`) accepts the version installed on the runner. Results are in the job summary and in an artifact
 (`report.md`, `results.json`, `winget.log`, `preparation.txt`, and per case the Ampify logs and screenshots).
+
+## Which tests to run
+
+This is the list the CI, the pull request template and the `pre-push` hook (`scripts/hooks`, the fast part) draw on:
+
+| Suite | Command |
+|---|---|
+| C++ unit tests | the built `ampify_tests` (`ctest` runs it too) |
+| Validator and packer | `python -m unittest test_validate test_pack` in `tools/` (install `jsonschema` so the reference comparison runs) |
+| Command line | `AMPIFY_BIN=<ampify> python -m unittest discover -s tools -p test_cli.py` |
+| JavaScript elements | `node --test tools/test_examples.mjs`, `npm run lint:js` |
 
 ## Writing a unit test
 
@@ -50,8 +62,12 @@ Ampify card, with a screenshot per step) and the inspector.
 | `INFO` | A finding with no verdict (the installed version, for example) |
 | `SKIP` | Impossible on this runner, with the reason. Does not fail the job |
 
-If Apple Music does not install on the runner, the app cases are skipped and the job stays green: read the summary and
-`winget.log`.
+A case lists what it needs with `-Requires`: `apple-music`, and the kit parts `kit:release`, `kit:bench`, `kit:ui`,
+`kit:cli` (laid out by `scripts/bench-kit.ps1`). If Apple Music does not install on the runner, the app cases are skipped
+and the job stays green: read the summary and
+`winget.log`. A kit part that is missing fails the case: it is a broken build, not a case to leave out. `-Only` with an
+id that no case has stops the bench with the list of known ids. The report records the runner image (`ImageOS`,
+`ImageVersion`) beside the Windows caption.
 
 On a PC (not one where you use Apple Music: the bench kills it and empties `%USERPROFILE%\Ampify\logs` and
 `state.txt`):
@@ -75,11 +91,11 @@ the General page survey shows which names belong to the main window.
 ```powershell
 # What the case checks, in one sentence.
 
-Register-Case -Id 'my-case' -Title 'Sentence that says what is checked' -Requires 'apple-music' -Action {
+Register-Case -Id 'my-case' -Title 'Sentence that says what is checked' -Requires 'apple-music', 'kit:bench' -Action {
     param($Ctx)
 
     Reset-KitState
-    $launcher = Join-Path $script:KitRoot 'bench\ampify_launcher.exe'
+    $launcher = Join-Path $script:BenchKitRoot 'bench\ampify_launcher.exe'
     $launcherProcess = Start-Launcher -LauncherPath $launcher
 
     $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
@@ -90,18 +106,21 @@ Register-Case -Id 'my-case' -Title 'Sentence that says what is checked' -Require
 }
 ```
 
-- `-Id` is lowercase with dashes, used by `-Only`. `-Requires 'apple-music'` is the only prerequisite today
-  (`Test-Requirement` in `run-bench.ps1`).
+- `-Id` is lowercase with dashes, used by `-Only`. `-Requires` names what the case needs (`Test-Requirement` in
+  `run-bench.ps1`): `apple-music`, `apple-account`, or a kit part (`kit:release`, `kit:bench`, `kit:ui`, `kit:cli`).
 - `Add-Check` records PASS or FAIL, `Add-Info` a finding, `Add-Skip` a skip with its reason.
-- Start with `Reset-KitState` and end with `Close-AppleMusic`. Cases run under strict mode.
-- A case that needs a new executable adds it to the kit layout in `ci.yml`. Add its id to one of the four bench
-  groups, keeping them even.
+- Start with `Reset-KitState` and end with `Close-AppleMusic`. Cases run under strict mode. A case never calls a
+  function of another case: what two cases share goes in `lib/harness.ps1` or `lib/ui.ps1`.
+- A case that waits for Apple Music's interface calls `Clear-FirstRun` right after "Apple Music started".
+- A case that needs a new executable adds it to the layout in `scripts/bench-kit.ps1`, which CI calls. The case ids are
+  read from the case files and dealt out over the four runners by `bench/windows/shards.sh`: nothing to edit in `ci.yml`.
 
 Helpers in `bench/windows/lib/harness.ps1`: `Reset-KitState`, `Start-Launcher`, `Start-AppNormally`, `Wait-Journal`,
 `Test-JournalContains`, `Find-JournalMatch`, `Get-KernelState`, `Get-AppCrashEvents`, `Save-Screenshot`,
-`Close-AppleMusic`, `Set-SafeModeCount`, `Get-SafeModeCount`. UI Automation helpers in `bench/windows/lib/uia.ps1`:
-`Find-Element`, `Invoke-Click`, `Set-Text`, `Send-Key`, `Get-TreeDump`, `Write-TreeDump`,
-`Show-AppleMusicWindow`.
+`Close-AppleMusic`, `Set-SafeModeCount`, `Get-SafeModeCount`, `Set-Settings` (with `Save-Settings` and
+`Restore-Settings`, the one writer of `settings.txt`), `Clear-FirstRun`. UI Automation helpers for the cases are in
+`bench/windows/lib/ui.ps1` (`Find-UiById`, `Invoke-UiElement`, `Show-UiAppWindow`); the signed-in bench has its own in
+`bench/windows/live/lib/uia.ps1` (`Find-Element`, `Invoke-Click`, `Set-Text`, `Send-Key`, `Get-TreeDump`).
 
 ### Signed-in bench
 

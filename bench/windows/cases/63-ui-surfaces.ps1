@@ -10,151 +10,12 @@
 # ampify_kernel.dll, themes, examples\react-panel). Placement of the panels and buttons: provisional, see
 # docs/development/testing.md.
 
-# .NET UI Automation (WindowsDesktop), loaded once. $false when it is not available.
-function Initialize-UiAutomation {
-    try {
-        Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes -ErrorAction Stop
-        return $true
-    } catch {
-        Write-Host "  UI Automation not available: $($_.Exception.Message)"
-        return $false
-    }
-}
-
-# Apple Music's main window as a UI Automation element, or $null.
-function Get-UiAppWindow {
-    $process = Get-Process -Name 'AppleMusic' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
-        Select-Object -First 1
-    if (-not $process) { return $null }
-    try {
-        return [System.Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
-    } catch {
-        return $null
-    }
-}
-
-# The first descendant whose AutomationId is $Id, or $null.
-function Find-UiById {
-    param($Root, [string]$Id)
-    if (-not $Root) { return $null }
-    $condition = New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::AutomationIdProperty), $Id
-    try {
-        return $Root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
-    } catch {
-        return $null
-    }
-}
-
-# The first descendant whose name matches $Pattern (regular expression).
-function Find-UiByName {
-    param($Root, [string]$Pattern)
-    if (-not $Root) { return $null }
-    try {
-        $all = $Root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
-    } catch {
-        return $null
-    }
-    foreach ($element in $all) {
-        $name = [string]$element.Current.Name
-        if ($name -match $Pattern) { return $element }
-    }
-    return $null
-}
-
-# The "AMPIFY_..." AutomationIds of the window (at most 40), for the report.
-function Get-UiAmpifyIds {
-    param($Root)
-    if (-not $Root) { return @() }
-    try {
-        $all = $Root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
-    } catch {
-        return @()
-    }
-    $ids = @()
-    foreach ($element in $all) {
-        $id = [string]$element.Current.AutomationId
-        if ($id.StartsWith('AMPIFY_')) { $ids += $id }
-        if ($ids.Count -ge 40) { break }
-    }
-    return $ids
-}
-
-# Activates an element: Invoke, else selection, else Toggle. Returns the way used, or '' if nothing worked.
-function Invoke-UiElement {
-    param($Element)
-    if (-not $Element) { return '' }
-    $patterns = @(
-        @{ Pattern = [System.Windows.Automation.InvokePattern]::Pattern; Name = 'Invoke'; Action = { param($p) $p.Invoke() } },
-        @{ Pattern = [System.Windows.Automation.SelectionItemPattern]::Pattern; Name = 'Select'; Action = { param($p) $p.Select() } },
-        @{ Pattern = [System.Windows.Automation.TogglePattern]::Pattern; Name = 'Toggle'; Action = { param($p) $p.Toggle() } }
-    )
-    foreach ($entry in $patterns) {
-        $object = $null
-        try {
-            if ($Element.TryGetCurrentPattern($entry.Pattern, [ref]$object)) {
-                & $entry.Action $object
-                return $entry.Name
-            }
-        } catch {
-        }
-    }
-    return ''
-}
-
-# Brings Apple Music to the front, for the captures and the keyboard shortcuts.
-function Show-UiAppWindow {
-    try {
-        if (-not ('AmpifyBench.Foreground' -as [type])) {
-            Add-Type -Namespace AmpifyBench -Name Foreground -MemberDefinition @'
-[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr window);
-[DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr window, int command);
-'@
-        }
-        $process = Get-Process -Name 'AppleMusic' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
-            Select-Object -First 1
-        if ($process) {
-            [AmpifyBench.Foreground]::ShowWindow($process.MainWindowHandle, 3) | Out-Null  # SW_MAXIMIZE
-            [AmpifyBench.Foreground]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
-        }
-    } catch {
-    }
-}
-
-# The lines of AppleMusic.exe's log about the interface, the settings, the themes or react-panel.
-function Write-UiJournalLines {
-    $content = Read-Journal 'AppleMusic.log'
-    Write-Host '----- AppleMusic.log: Interface, Settings, Themes and react-panel lines'
-    if (-not $content) {
-        Write-Host '  (missing or empty)'
-        return
-    }
-    $content -split "`r?`n" | Where-Object { $_ -match '\] (Interface|Settings|Themes|Theme|Extension host|Extension react-panel|\[react-panel\]|Start requested)' } |
-        Select-Object -First 120 | ForEach-Object { Write-Host "  $_" }
-}
-
-function Set-UiSettings {
-    param([string]$Path, [hashtable]$Values)
-    $lines = @()
-    if (Test-Path -LiteralPath $Path) { $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8) }
-    foreach ($key in $Values.Keys) {
-        $pattern = '^\s*' + [regex]::Escape($key) + '\s*='
-        $lines = @($lines | Where-Object { $_ -notmatch $pattern })
-        $lines += "$key = $($Values[$key])"
-    }
-    [System.IO.File]::WriteAllLines($Path, [string[]]$lines, [System.Text.UTF8Encoding]::new($false))
-}
-
-Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, click, theme and Ampify settings page' -Requires 'apple-music' -Action {
+Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, click, theme and Ampify settings page' -Requires 'apple-music', 'kit:ui' -Action {
     param($Ctx)
 
     $ui = Join-Path $script:BenchKitRoot 'ui'
     $launcher = Join-Path $ui 'ampify_launcher.exe'
-    if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Skip -Ctx $Ctx -Name 'UI build present' -Reason "no UI build in this kit: $launcher"
-        return
-    }
     $example = Join-Path $ui 'examples\react-panel'
-    if (-not (Test-Path -LiteralPath $example)) { $example = Join-Path $repo 'examples\react-panel' }
     $palettes = Join-Path $ui 'themes\palettes'
 
     # The Ampify folder starts clean: the extension is installed but off, to capture the interface before the mount.
@@ -171,7 +32,7 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
     $settings = Join-Path $script:KitDir 'settings.txt'
     $reload = Join-Path $script:KitDir 'reload.txt'
     Remove-Item -LiteralPath $reload -Force -ErrorAction SilentlyContinue
-    Set-UiSettings -Path $settings -Values @{
+    Set-Settings -Values @{
         'extensions.react-panel.enabled' = 'false'
         'theme.active' = 'none'
         'theme.inspect' = '0'
@@ -185,9 +46,7 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
         $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched
         if (-not $launched) { return }
-        # New runner: the MPEG LA licence opens before the main window, which the kernel waits for.
-        $firstRun = Close-AppleMusicFirstRun
-        Add-Info -Ctx $Ctx -Name 'first launch of Apple Music' -Detail "$firstRun screen(s) closed (licence, welcome)"
+        Clear-FirstRun -Ctx $Ctx
 
         # 1. The window and the DispatcherQueue.
         $window = Wait-Journal -FileName 'AppleMusic.log' -Text 'Interface: main window obtained through AMP.Utils' -TimeoutSeconds 90
@@ -205,7 +64,7 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
         Save-Screenshot -Ctx $Ctx -Name 'ui-before-mount' | Out-Null
 
         # 2. Hot start of react-panel, like ampify extension enable, then the panel mounts.
-        Set-UiSettings -Path $settings -Values @{ 'extensions.react-panel.enabled' = 'true' }
+        Set-Settings -Values @{ 'extensions.react-panel.enabled' = 'true' }
         [System.IO.File]::AppendAllText($reload, "start react-panel`n", [System.Text.UTF8Encoding]::new($false))
         $mounted = Wait-Journal -FileName 'AppleMusic.log' -Text 'Interface: panel "react-panel/react-panel" mounted' -TimeoutSeconds 60
         Add-Check -Ctx $Ctx -Name 'log: panel "react-panel/react-panel" mounted' -Passed $mounted
@@ -242,7 +101,7 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
 
         # 4. The palettes theme on top of the panel.
         if (Test-Path -LiteralPath (Join-Path $script:KitDir 'themes\palettes')) {
-            Set-UiSettings -Path $settings -Values @{ 'theme.active' = 'palettes'; 'theme.scheme' = 'Midnight' }
+            Set-Settings -Values @{ 'theme.active' = 'palettes'; 'theme.scheme' = 'Midnight' }
             $themed = Wait-Until -TimeoutSeconds 60 -Condition {
                 $null -ne (Find-JournalMatch -FileName 'AppleMusic.log' -Pattern 'Theme "palettes": \d+ value\(s\) applied')
             }
@@ -250,7 +109,7 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
             Start-Sleep -Seconds 2
             Show-UiAppWindow
             Save-Screenshot -Ctx $Ctx -Name 'ui-theme-applied' | Out-Null
-            Set-UiSettings -Path $settings -Values @{ 'theme.active' = 'none' }
+            Set-Settings -Values @{ 'theme.active' = 'none' }
             Wait-Journal -FileName 'AppleMusic.log' -Text 'Theme removed: ' -TimeoutSeconds 30 | Out-Null
         } else {
             Add-Skip -Ctx $Ctx -Name 'palettes theme' -Reason "example theme missing from the UI build: $palettes"
@@ -328,6 +187,6 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
             -Detail "$($crashes.Count) event(s): $(Format-CrashEvents -Events $crashes)"
         Copy-JournalToResults -Ctx $Ctx
         Remove-Item -LiteralPath $extensionDir -Recurse -Force -ErrorAction SilentlyContinue
-        Set-UiSettings -Path $settings -Values @{ 'extensions.react-panel.enabled' = 'false'; 'theme.active' = 'none' }
+        Set-Settings -Values @{ 'extensions.react-panel.enabled' = 'false'; 'theme.active' = 'none' }
     }
 }

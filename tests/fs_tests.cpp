@@ -6,7 +6,6 @@
 #include <sstream>
 #include <string>
 
-#include "../src/cli/element.hpp"
 #include "../src/core/manifest.hpp"
 #include "../src/core/output_files.hpp"
 #include "service_host.hpp"
@@ -78,16 +77,6 @@ TEST_CASE(FsModule_WritesOnlyInTheElementFolder) {
     CHECK(ReadText(f.host.outputRoot / "fs-demo" / "now-playing.txt") == "Title - Artist");
 }
 
-// The command line (ampify validate, ampify test) and the kernel read the same permission list as the schema.
-TEST_CASE(Permissions_CommandLineAndKernelAgree) {
-    for (const char* permission :
-         {"player.read", "player.control", "audio.analyze", "audio.gain", "storage", "notifications", "ipc.discord",
-          "midi.input", "library.read", "library.write", "services.read", "ui.keyboard", "ui.topbar", "ui.playbar",
-          "ui.menu", "ui.popup", "ui.panel", "ui.page", "ui.window", "ui.tray", "fs.output", "network:api.example.org",
-          "fs.write", "fs", "network:", "network:Api.Example.org", "ui.*", ""}) {
-        if (ampify::IsKnownPermission(permission) != ampify::IsValidPermission(permission)) {
-            ampify::test::ReportFailure(__FILE__, __LINE__, std::string("disagreement on the permission ") + permission);
-        }
-    }
+TEST_CASE(Permissions_FsOutputIsKnown) {
     CHECK(ampify::IsKnownPermission("fs.output"));
 }

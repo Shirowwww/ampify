@@ -1,14 +1,10 @@
 # Release build (the one that ships): the kernel is injected only on a tested version, and the app stays healthy.
 # The expected verdict depends on the version installed on the runner, read from facts/apple.json.
 
-Register-Case -Id 'release-version' -Title 'Release build: injection only on a tested version' -Requires 'apple-music' -Action {
+Register-Case -Id 'release-version' -Title 'Release build: injection only on a tested version' -Requires 'apple-music', 'kit:release' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'release\ampify_launcher.exe'
-    if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Check -Ctx $Ctx -Name 'release build present' -Passed $false -Detail $launcher
-        return
-    }
 
     $version = $script:AppleMusicVersion
     $tested = $script:KnownVersions -contains $version

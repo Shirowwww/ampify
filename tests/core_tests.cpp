@@ -155,8 +155,8 @@ TEST_CASE(Extensions_StartOnlyWhatIsEnabled) {
     host.Add({"c", "C", true, [&] { cStarted = true; return true; }, nullptr});
 
     ampify::Settings settings;
-    settings.SetBool(ampify::ExtensionHost::SettingKey("b"), true);   // turned on by the user
-    settings.SetBool(ampify::ExtensionHost::SettingKey("c"), false);  // turned off by the user
+    settings.SetBool(ampify::ElementRef{ampify::ElementKind::Extension, "b"}.EnabledKey(), true);   // turned on by the user
+    settings.SetBool(ampify::ElementRef{ampify::ElementKind::Extension, "c"}.EnabledKey(), false);  // turned off by the user
 
     host.StartAll(settings);
     CHECK(aStarted);

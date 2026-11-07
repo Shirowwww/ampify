@@ -150,53 +150,7 @@ PlayerSnapshot PlayerBridge::Snapshot() {
         m_appleNextTry = GetTickCount64() + m_options.retryMs;
     }
     if (apple) {
-        // The unit of Apple's position is not written in the winmd: SMTC's length of the same track settles it.
-        std::optional<int64_t> smtcMs;
-        if (smtc && !smtc->title.empty() && smtc->title == apple->title && smtc->endTicks > smtc->startTicks) {
-            smtcMs = (smtc->endTicks - smtc->startTicks) / 10'000;
-        }
-        AmpTimeUnit unit = DetectAmpTimeUnit(apple->durationRaw, smtcMs);
-        if (unit != AmpTimeUnit::Unknown && (m_unit == AmpTimeUnit::Unknown || smtcMs)) {
-            if (unit != m_unit) {
-                m_journal.Write(std::string("Player: time unit of AMP.Services.Player: ") +
-                                AmpTimeUnitName(unit) +
-                                (smtcMs ? " (from the SMTC duration)" : " (from the duration alone)"));
-            }
-            m_unit = unit;
-        }
-        snapshot = SnapshotFromAmp(*apple, m_unit);
-        if (snapshot.track) {
-            const bool appleGave = snapshot.positionMs > 0;
-            const int64_t now = static_cast<int64_t>(GetTickCount64());
-            snapshot.positionMs = m_clock.Next(snapshot.track->id + "|" + snapshot.track->queueItemId,
-                                               snapshot.playing, snapshot.positionMs, snapshot.durationMs, now);
-            if (!appleGave) FollowLyricsLine(snapshot, now);
-        }
-        // Apple's item sometimes leaves the artist and album empty: the media session of the same track has them.
-        if (snapshot.track && smtc && smtc->title == apple->title && snapshot.track->artist.empty()) {
-            auto [artist, album] = SplitArtistAlbum(smtc->artist);
-            snapshot.track->artist = artist;
-            if (snapshot.track->album.empty()) snapshot.track->album = album.empty() ? smtc->album : album;
-        }
-        // The raw cover of the first tracks, since its address format may change with Apple Music.
-        if (apple->hasItem && apple->queueItemId != m_coverLoggedItem && m_coverLogs < 3) {
-            m_coverLoggedItem = apple->queueItemId;
-            m_coverLogs++;
-            const ArtworkReading& cover = apple->artwork;
-            m_journal.Write("Player: cover of \"" + apple->title + "\": address \"" + cover.uri + "\", format \"" +
-                            cover.format + "\", crop \"" + cover.cropCode + "\", " +
-                            std::to_string(static_cast<int>(cover.width)) + "x" +
-                            std::to_string(static_cast<int>(cover.height)) + ", colour " +
-                            (cover.hasColor ? ArtworkColorHex(cover) : std::string("none")) + ", lyrics " +
-                            (apple->lyricsAvailable ? "yes" : "not yet"));
-        }
-        if (snapshot.track && !snapshot.track->artwork.empty()) {
-            SayOnce("apple-artwork", "Player: cover read from Apple's player (" + snapshot.track->artwork + ")");
-        }
-        if (snapshot.lyricsAvailable) SayOnce("apple-lyrics", "Player: lyrics read from Apple's player");
-        if (m_apple->Notifications() > 0) {
-            SayOnce("apple-notified", "Player: Apple sends its PropertyChanged notifications (PlayerState, Player)");
-        }
+        snapshot = FromApple(*apple, smtc ? &*smtc : nullptr);
     } else if (smtc) {
         snapshot = SnapshotFromSmtc(*smtc);
     }
@@ -207,14 +161,62 @@ PlayerSnapshot PlayerBridge::Snapshot() {
         m_lastSource = snapshot.source;
     }
     m_last = snapshot;
-    PublishFeed(snapshot);
     return snapshot;
+}
+
+// The unit of Apple's times is not written in the winmd: SMTC's length of the same track settles it, and a duration
+// alone only guesses it until then.
+void PlayerBridge::LearnTimeUnit(const AmpReading& apple, const SmtcReading* smtc) {
+    std::optional<int64_t> smtcMs = smtc ? SmtcLengthMsOf(*smtc, apple.title) : std::nullopt;
+    AmpTimeUnit unit = DetectAmpTimeUnit(apple.durationRaw, smtcMs);
+    if (unit == AmpTimeUnit::Unknown || (m_unit != AmpTimeUnit::Unknown && !smtcMs)) return;
+    if (unit != m_unit) {
+        m_journal.Write(std::string("Player: time unit of AMP.Services.Player: ") + AmpTimeUnitName(unit) +
+                        (smtcMs ? " (from the SMTC duration)" : " (from the duration alone)"));
+    }
+    m_unit = unit;
+}
+
+PlayerSnapshot PlayerBridge::FromApple(const AmpReading& apple, const SmtcReading* smtc) {
+    LearnTimeUnit(apple, smtc);
+    PlayerSnapshot snapshot = SnapshotFromAmp(apple, m_unit);
+    if (snapshot.track) {
+        const bool appleGave = snapshot.positionMs > 0;
+        const int64_t now = static_cast<int64_t>(GetTickCount64());
+        snapshot.positionMs =
+            m_clock.Next(TrackKey(snapshot), snapshot.playing, snapshot.positionMs, snapshot.durationMs, now);
+        if (!appleGave) FollowLyricsLine(snapshot, now);
+        if (smtc) FillArtistAlbumFromSmtc(*snapshot.track, *smtc);
+    }
+    LogCover(apple);
+    if (snapshot.track && !snapshot.track->artwork.empty()) {
+        SayOnce("apple-artwork", "Player: cover read from Apple's player (" + snapshot.track->artwork + ")");
+    }
+    if (snapshot.lyricsAvailable) SayOnce("apple-lyrics", "Player: lyrics read from Apple's player");
+    if (m_apple->Notifications() > 0) {
+        SayOnce("apple-notified", "Player: Apple sends its PropertyChanged notifications (PlayerState, Player)");
+    }
+    return snapshot;
+}
+
+// The raw cover of the first tracks, since its address format may change with Apple Music.
+void PlayerBridge::LogCover(const AmpReading& apple) {
+    if (!apple.hasItem || apple.queueItemId == m_coverLoggedItem || m_coverLogs >= 3) return;
+    m_coverLoggedItem = apple.queueItemId;
+    m_coverLogs++;
+    const ArtworkReading& cover = apple.artwork;
+    m_journal.Write("Player: cover of \"" + apple.title + "\": address \"" + cover.uri + "\", format \"" +
+                    cover.format + "\", crop \"" + cover.cropCode + "\", " +
+                    std::to_string(static_cast<int>(cover.width)) + "x" +
+                    std::to_string(static_cast<int>(cover.height)) + ", colour " +
+                    (cover.hasColor ? ArtworkColorHex(cover) : std::string("none")) + ", lyrics " +
+                    (apple.lyricsAvailable ? "yes" : "not yet"));
 }
 
 // For the interface thread's karaoke (the `lyrics` node): the position as just read, and the song's lyrics parsed once.
 void PlayerBridge::PublishFeed(const PlayerSnapshot& snapshot) {
     NowPlaying now;
-    if (snapshot.track) now.trackKey = snapshot.track->id + "|" + snapshot.track->queueItemId;
+    now.trackKey = TrackKey(snapshot);
     now.playing = snapshot.playing;
     now.positionMs = snapshot.positionMs;
     now.atMs = static_cast<int64_t>(GetTickCount64());

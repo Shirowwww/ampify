@@ -1,6 +1,6 @@
 #!/bin/sh
-# Fast checks before a push (a few seconds), so a broken manifest or example never waits for CI to say so.
-# Turn it on once per clone: git config core.hooksPath scripts/hooks
+# The fast part of "Which tests to run" (docs/development/testing.md): a few seconds, so a broken manifest or example
+# never waits for CI to say so. Turn it on once per clone: git config core.hooksPath scripts/hooks
 set -e
 root="$(git rev-parse --show-toplevel)"
 cd "$root/tools"

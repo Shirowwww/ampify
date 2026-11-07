@@ -19,7 +19,7 @@ constexpr std::string_view kBaseBranch = "main";
 
 // What one run sends. `target` is the folder of the element in the catalog repository.
 struct Publication {
-    ElementManifest manifest;
+    Manifest manifest;
     std::vector<ZipSource> files;
     std::string branch;
     std::string target;
@@ -32,7 +32,7 @@ struct Remote {
     std::map<std::string, std::string> existing;  // path -> blob sha, for the files already under the target
 };
 
-std::string PermissionsText(const ElementManifest& manifest) {
+std::string PermissionsText(const Manifest& manifest) {
     std::string text;
     for (const std::string& permission : manifest.permissions) text += (text.empty() ? "" : ", ") + permission;
     return text.empty() ? "none" : text;
@@ -84,13 +84,13 @@ bool GhSend(const std::string& method, const std::string& endpoint, const std::s
 }
 
 std::string PullRequestBody(const Publication& publication, bool update) {
-    const ElementManifest& manifest = publication.manifest;
+    const Manifest& manifest = publication.manifest;
     std::ostringstream out;
     out << manifest.description << "\n\n"
         << "| | |\n|---|---|\n"
         << "| Name | " << manifest.name << " |\n"
         << "| Id | `" << manifest.id << "` |\n"
-        << "| Kind | " << manifest.kind << " |\n"
+        << "| Kind | " << ToString(manifest.kind) << " |\n"
         << "| Version | " << manifest.version << (update ? " (update)" : " (new)") << " |\n"
         << "| Author | " << manifest.author << " |\n"
         << "| Permissions | " << PermissionsText(manifest) << " |\n"
@@ -120,9 +120,9 @@ void PrintManualSteps(Context& ctx, const Publication& publication, const std::s
 }
 
 void PrintPlan(Context& ctx, const Publication& publication) {
-    const ElementManifest& manifest = publication.manifest;
+    const Manifest& manifest = publication.manifest;
     ctx.out << "--dry-run: nothing was sent.\n"
-            << "  element      " << manifest.name << " " << manifest.version << " (" << manifest.kind << ", "
+            << "  element      " << manifest.name << " " << manifest.version << " (" << ToString(manifest.kind) << ", "
             << manifest.id << ")\n"
             << "  permissions  " << PermissionsText(manifest) << "\n"
             << "  files        " << publication.files.size() << "\n"
@@ -222,7 +222,7 @@ bool SendFiles(Context& ctx, const Publication& publication, const Remote& remot
 int OpenPullRequest(Context& ctx, const Publication& publication, const Remote& remote) {
     ctx.out << "Step 4 of 4: the pull request\n";
     bool update = !remote.existing.empty();
-    const ElementManifest& manifest = publication.manifest;
+    const Manifest& manifest = publication.manifest;
     std::filesystem::path bodyFile = platform::TemporaryFile("ampify-pr");
     std::string error;
     if (!WriteTextFile(bodyFile, PullRequestBody(publication, update), error)) return Failure(ctx, error);
@@ -264,7 +264,7 @@ int CmdPublish(Context& ctx) {
         return 1;
     }
 
-    const ElementManifest& manifest = *validation.manifest;
+    const Manifest& manifest = *validation.manifest;
     Publication publication{manifest, FilesUnder(folder, ""), "add-" + manifest.id + "-" + manifest.version,
                             "sources/" + manifest.id};
     bool installed = platform::ToolWorks({"gh", "--version"});

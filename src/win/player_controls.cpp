@@ -10,6 +10,8 @@
 
 #include "../core/amp_abi.hpp"
 #include "../core/player_modes.hpp"
+#include "../core/player_queue.hpp"
+#include "../core/player_state.hpp"
 
 #include <inspectable.h>
 #include <winrt/Windows.Foundation.h>
@@ -48,7 +50,6 @@ namespace provider = xaml::Automation::Provider;
 
 constexpr int kSearchLimit = 6000;  // elements walked in one window to find a button
 constexpr auto kLyricsSearchEvery = std::chrono::seconds(2);  // while Apple's lyrics view is missing
-constexpr int64_t kTicksPerMs = 10'000;                       // a TimeSpan counts 100 ns ticks
 constexpr auto kFollowStep = std::chrono::milliseconds(400);
 constexpr int kRemeasureTicks = 10;  // the transport row's sides, measured again every 4 seconds
 constexpr double kRowGap = 8;        // between a side of the transport row and the transport: "···" touched shuffle
@@ -649,7 +650,7 @@ long long ReadLyricsLineStart() noexcept {
         }
         int64_t ticks = 0;  // Windows.Foundation.TimeSpan, passed through the out pointer
         if (FAILED(rt::CallSlot(line, amp::kKaraokeLyricsLineStartTime, &ticks)) || ticks < 0) return -1;
-        return ticks / kTicksPerMs;
+        return TicksToMs(ticks);
     } catch (...) {
         return -1;
     }
@@ -729,9 +730,7 @@ std::string PlayingCatalogId() noexcept {
         rt::Ref item = PlayingItem();
         rt::Ref descriptor = item ? ContentDescriptorOf(item) : rt::Ref{};
         std::string id = descriptor ? rt::ReadString(descriptor, amp::slot::kDescriptorAdamId) : std::string();
-        bool digits = !id.empty() && id != "0" &&
-                      std::all_of(id.begin(), id.end(), [](char c) { return c >= '0' && c <= '9'; });
-        return digits ? id : std::string();
+        return IsCatalogId(id) ? id : std::string();
     } catch (...) {
         return {};
     }

@@ -45,10 +45,6 @@ public:
     // folder is checked on its own, so one bad manifest does not stop the others. Nothing is started here.
     LoadReport Discover();
 
-    // The id of an element in the extension host and in reload.txt: its manifest id, or app:<id> for an app, so that
-    // an app and an extension can share an id.
-    static std::string HostId(const Manifest& manifest);
-
     // Requests of reload.txt (src/core/reload.hpp). Each returns false when no element answers to the target. A target
     // that no folder element has may be a native extension of the host, such as atmos-leveler.
     // Start: loads the element if it is new (Rescan), then starts it if the settings enable it.
@@ -88,13 +84,12 @@ public:
     const std::vector<std::unique_ptr<ScriptExtension>>& elements() const { return m_elements; }
 
 private:
-    enum class Origin { Extensions, Apps, Themes };
 
-    void LoadFolders(const std::filesystem::path& root, Origin origin, LoadReport& report);
-    void LoadFolder(const std::filesystem::path& folder, Origin origin, LoadReport& report);
+    // `kind` is the kind its folder holds: the extensions, the apps or the themes of the kit.
+    void LoadFolders(const std::filesystem::path& root, ElementKind kind, LoadReport& report);
+    void LoadFolder(const std::filesystem::path& folder, ElementKind kind, LoadReport& report);
     ScriptExtension* Find(const std::string& hostId) const;
     std::filesystem::path FolderOf(const ScriptExtension& element) const;
-    Origin OriginOf(const ScriptExtension& element) const;
     void Forget(const std::string& hostId);
 
     ExtensionHost& m_hosts;

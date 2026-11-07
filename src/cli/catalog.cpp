@@ -24,6 +24,28 @@ std::string EntryLabel(size_t index) {
     return "extensions[" + std::to_string(index) + "]";
 }
 
+// The https address of a card image: a .png, .jpg or .jpeg.
+bool IsPreviewUrl(std::string_view url) {
+    if (!IsHttpsAddress(url, kMaxAddressLength)) return false;
+    constexpr size_t kScheme = std::string_view("https://").size();
+    for (std::string_view extension : {".png", ".jpg", ".jpeg"}) {
+        if (url.size() > kScheme + extension.size() && url.ends_with(extension)) return true;
+    }
+    return false;
+}
+
+// A permission only an element of kKitElements may hold, such as kit.manage, which runs ampify itself: only the
+// Marketplace that ships with the kit has it, never a download.
+void RefuseFirstPartyPermissions(const CatalogEntry& entry, const std::string& where,
+                                 std::vector<std::string>& errors) {
+    for (const std::string& name : entry.permissions) {
+        const PermissionInfo* permission = FindPermission(name);
+        if (permission && permission->firstPartyOnly) {
+            errors.push_back(where + ".permissions: " + name + " is reserved for Ampify's Marketplace");
+        }
+    }
+}
+
 }  // namespace
 
 std::string UrlHost(std::string_view url) {
@@ -36,7 +58,7 @@ std::string UrlHost(std::string_view url) {
 }
 
 bool IsAllowedDownloadUrl(std::string_view url, bool localCatalog) {
-    if (IsHttpsUrl(url)) return true;
+    if (IsHttpsAddress(url, kMaxAddressLength)) return true;
     return localCatalog && IsFileUrl(url);
 }
 
@@ -103,11 +125,8 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
             // Fields this version does not know are left aside, so a catalog that gains one keeps working here.
             size_t entryBefore = errors.size();
             CatalogEntry entry;
-            ReadElementInfo(item, where, entry, errors);
-            // kit.manage runs ampify itself: only the Marketplace that ships with the kit has it, never a download.
-            if (std::find(entry.permissions.begin(), entry.permissions.end(), "kit.manage") != entry.permissions.end()) {
-                errors.push_back(where + ".permissions: kit.manage is reserved for Ampify's Marketplace");
-            }
+            ReadElementInfo(item, where, ManifestMode::Author, kKitApiMajor, entry, errors);
+            RefuseFirstPartyPermissions(entry, where, errors);
 
             const Json* url = item.Find("url");
             if (url == nullptr) {

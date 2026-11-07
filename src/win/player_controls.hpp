@@ -44,7 +44,7 @@ long long ReadLyricsLineStart() noexcept;
 // The cover of the song playing, loaded by Apple's own artwork loader at about `pixels` wide (its library and catalog
 // images, larger than the play bar's), or null. Interface thread only.
 winrt::Microsoft::UI::Xaml::Media::ImageSource PlayingArtworkSource(double pixels) noexcept;
-// The same for the queue entry whose PlayQueueItemID is `itemId` (QueueArtworkSource), or null. Interface thread only.
+// The same for the queue entry whose PlayQueueItemID is `itemId` (AppleArtworkSource), or null. Interface thread only.
 winrt::Microsoft::UI::Xaml::Media::ImageSource QueueArtworkImage(uint64_t itemId, double pixels) noexcept;
 // The catalog id (AdamId, digits) of the song playing, empty for a file that is not in the catalog. Interface thread only.
 std::string PlayingCatalogId() noexcept;

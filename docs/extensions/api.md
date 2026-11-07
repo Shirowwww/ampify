@@ -126,7 +126,7 @@ Ampify.i18n.t("kit.tray.next")          // Ampify's own texts, prefix kit.
 ```
 
 `Ampify.i18n.language` is one of `en`, `fr`, `de`, `es`, `pt`, `ru`, `ja`, `zh`, or another code when Windows uses a
-language Ampify does not translate. It follows Windows' regional format, or the `language` setting.
+language Ampify does not translate. It follows the Windows display language, or the `language` setting.
 
 ### 5.2 Settings and storage [stable]
 

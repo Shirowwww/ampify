@@ -9,11 +9,10 @@ on:
   push:
     branches: [dev]
     paths:
+      # Everything the tests and the build read: a change to any of it starts a run.
       - 'bench/windows/**'
       # The signed-in bench is run by hand on a signed-in PC (it needs an Apple account).
       - '!bench/windows/live/**'
-      - '!bench/windows/lib/uia.ps1'
-      - '!bench/windows/lib/audio.ps1'
       - 'src/**'
       - 'extensions/**'
       - 'apps/**'
@@ -22,9 +21,14 @@ on:
       - 'examples/**'
       - 'themes/**'
       - 'tools/**'
+      - 'schemas/**'
+      - 'knowledge/**'
+      - 'docs/**'
+      - 'scripts/**'
       - 'cmake/**'
       - 'facts/**'
       - 'CMakeLists.txt'
+      - 'package.json'
       - '.github/workflows/ci.yml'
       - '.github/actions/**'
   workflow_dispatch:
@@ -44,8 +48,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-      - name: Install Ninja and ccache
-        run: sudo apt-get install -y --no-install-recommends ninja-build ccache || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build ccache)
+      - name: Install Ninja, ccache and jsonschema (the validator tests compare against it)
+        run: sudo apt-get install -y --no-install-recommends ninja-build ccache python3-jsonschema || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build ccache python3-jsonschema)
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
@@ -117,31 +121,10 @@ jobs:
           cmake --build build --parallel --target ${{ matrix.targets }}
           if ($LASTEXITCODE -ne 0) { throw 'build failed' }
           ccache --show-stats
+      # The layout lives in scripts/bench-kit.ps1 (also used on a PC); BUILD_INFO.txt comes with the release part.
       - name: Lay out the kit
         shell: pwsh
-        run: |
-          $kit = Join-Path $PWD 'msvc-kit'
-          $files = (Get-Content -LiteralPath facts/release.json -Raw | ConvertFrom-Json).files
-          $layout = if ('${{ matrix.variant }}' -eq 'release') {
-            @{ release = @($files.launcher, $files.kernel, $files.setup, $files.cli); cli = @($files.cli) }
-          } else {
-            @{ bench = @($files.launcher, $files.kernel); ui = @($files.launcher, $files.kernel, $files.cli) }
-          }
-          foreach ($folder in $layout.Keys) {
-            $to = Join-Path $kit $folder
-            New-Item -ItemType Directory -Force -Path $to | Out-Null
-            foreach ($name in $layout[$folder]) { Copy-Item -LiteralPath (Join-Path build $name) -Destination $to }
-          }
-          if ('${{ matrix.variant }}' -eq 'bench') {
-            # The interface cases need the example themes and the React panel example (63-ui-surfaces).
-            New-Item -ItemType Directory -Force -Path (Join-Path $kit 'ui\examples') | Out-Null
-            Copy-Item -LiteralPath themes -Destination (Join-Path $kit 'ui') -Recurse
-            Copy-Item -LiteralPath examples/react-panel -Destination (Join-Path $kit 'ui\examples') -Recurse
-          } else {
-            # scripts/package.sh reads the commit here and checks that the kit was built with MSVC.
-            "Commit: $env:GITHUB_SHA`nrelease: AMPIFY_BENCH=OFF (MSVC, XAML)`nbench and ui: AMPIFY_BENCH=ON (MSVC, XAML). Never ship." |
-              Set-Content -LiteralPath (Join-Path $kit 'BUILD_INFO.txt')
-          }
+        run: ./scripts/bench-kit.ps1 -Variant ${{ matrix.variant }} -ReleaseBuild build -BenchBuild build -Out msvc-kit
       - uses: actions/upload-artifact@v5
         with:
           name: ampify-msvc-kit-${{ matrix.variant }}
@@ -149,24 +132,27 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # The cases on parallel runners, each with its own Apple Music. The groups are balanced to about two minutes each.
+  # The case ids are read from the case files (bench/windows/shards.sh), so a new case needs no edit here.
+  bench-plan:
+    name: Split the bench cases
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: plan
+        run: echo "shards=$(bash bench/windows/shards.sh 4)" >> "$GITHUB_OUTPUT"
+
+  # The cases on parallel runners, each with its own Apple Music, dealt out in turn so the groups weigh about the same.
   bench:
-    name: Bench (${{ matrix.shard }})
-    needs: windows-build
+    name: Bench (group ${{ matrix.shard }})
+    needs: [windows-build, bench-plan]
     runs-on: windows-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - shard: launch
-            cases: normal-launch,release-version,bench-injection,background-launch,ui-hover-sidebar
-          - shard: safety
-            cases: safe-mode,atmos-leveler,cli-windows-tools,extension-hello,installer
-          - shard: tools
-            cases: cli-build-installed,amp-player,ui-examples,ui-inspector,ui-bar-position
-          - shard: ui
-            cases: ui-theme-palettes,ui-surfaces,ui-apple-player,ui-compact-sidebar,ui-current-lyrics
+      matrix: ${{ fromJSON(needs.bench-plan.outputs.shards) }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5

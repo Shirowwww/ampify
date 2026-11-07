@@ -67,7 +67,7 @@ void ReloadOnce(Context& ctx, const std::filesystem::path& source, const std::st
         for (const std::string& problem : check.errors) ctx.err << "  - " << problem << "\n";
         return;
     }
-    if (check.manifest->id != id || check.manifest->kind != kind) {
+    if (check.manifest->id != id || ToString(check.manifest->kind) != kind) {
         ctx.err << stamp << "the id or the type changed: run ampify dev again\n";
         return;
     }
@@ -140,7 +140,7 @@ int CmdDev(Context& ctx) {
         for (const std::string& problem : first.errors) ctx.err << "  - " << problem << "\n";
         return 1;
     }
-    const std::string kind = first.manifest->kind;
+    const std::string kind(ToString(first.manifest->kind));
     const std::string id = first.manifest->id;
 
     // Every reload replaces the copy in the kit, so the copy that is there now is saved first.

@@ -54,9 +54,16 @@ const char* const kValidExtension = R"({
   "permissions": ["storage", "network:api.example.com"]
 })";
 
+// A manifest under the command line's rules, for a folder named demo, without looking at its files.
+std::optional<ampify::Manifest> ParseAuthored(const std::string& manifest, std::vector<std::string>& errors) {
+    ampify::ManifestResult result = ampify::ParseManifest(manifest, "demo", 1, nullptr, ampify::ManifestMode::Author);
+    errors.insert(errors.end(), result.errors.begin(), result.errors.end());
+    return result.manifest;
+}
+
 std::vector<std::string> ErrorsOf(const std::string& manifest) {
     std::vector<std::string> errors;
-    ampify::ParseManifest(manifest, errors);
+    ParseAuthored(manifest, errors);
     return errors;
 }
 
@@ -179,13 +186,13 @@ TEST_CASE(Json_QuoteEscapesControlCharacters) {
 
 TEST_CASE(Manifest_ValidExtensionParses) {
     std::vector<std::string> errors;
-    std::optional<ampify::ElementManifest> manifest = ampify::ParseManifest(kValidExtension, errors);
+    std::optional<ampify::Manifest> manifest = ParseAuthored(kValidExtension, errors);
     CHECK(errors.empty());
     CHECK(manifest.has_value());
     if (!manifest) return;
     CHECK(manifest->id == "demo");
     CHECK(manifest->name == "Demo");
-    CHECK(manifest->kind == "extension");
+    CHECK(manifest->kind == ampify::ElementKind::Extension);
     CHECK(manifest->main && *manifest->main == "main.js");
     CHECK(manifest->permissions.size() == 2);
 }
@@ -544,7 +551,8 @@ TEST_CASE(Kit_EnableAndDisableWriteTheRightKeys) {
     ampify::SetEnabled(settings, "theme", "night", false);
     CHECK(settings.GetString("theme.active", "x") == "");
 
-    CHECK(ampify::EnabledKey("extension", "atmos-leveler") == "extensions.atmos-leveler.enabled");
+    CHECK((ampify::ElementRef{ampify::ElementKind::Extension, "atmos-leveler"}.EnabledKey() ==
+           "extensions.atmos-leveler.enabled"));
 }
 
 TEST_CASE(Activation_ReportsWhatLoadsAndWhatCannot) {
@@ -680,14 +688,14 @@ TEST_CASE(Fingerprint_ChangesOnlyWhenTheKitChanges) {
 // ---- Fixed-width output helpers used by the commands ----------------------------------------------
 
 TEST_CASE(Path_ElementIdsAreCheckedBeforeUse) {
-    CHECK(ampify::IsValidId("atmos-leveler"));
-    CHECK(!ampify::IsValidId("../x"));
-    CHECK(!ampify::IsValidId("x"));
-    CHECK(!ampify::IsValidId("Demo"));
-    CHECK(ampify::IsValidVersion("1.0.0"));
-    CHECK(!ampify::IsValidVersion("1.0"));
-    CHECK(ampify::IsHttpsUrl("https://example.com/a.zip"));
-    CHECK(!ampify::IsHttpsUrl("http://example.com/a.zip"));
+    CHECK(ampify::IsElementId("atmos-leveler"));
+    CHECK(!ampify::IsElementId("../x"));
+    CHECK(!ampify::IsElementId("x"));
+    CHECK(!ampify::IsElementId("Demo"));
+    CHECK(ampify::IsReleaseVersion("1.0.0"));
+    CHECK(!ampify::IsReleaseVersion("1.0"));
+    CHECK(ampify::IsHttpsAddress("https://example.com/a.zip", ampify::kMaxAddressLength));
+    CHECK(!ampify::IsHttpsAddress("http://example.com/a.zip", ampify::kMaxAddressLength));
 }
 
 TEST_CASE(Crc32_MatchesTheStandardCheckValue) {
@@ -719,12 +727,12 @@ TEST_CASE(Manifest_ProcessesAreOneOrTwoDistinctNames) {
         R"({"id": "demo", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"
         R"("description": "Test.", "kitApi": "1.0", "main": "main.js", )";
     std::vector<std::string> errors;
-    CHECK(ampify::ParseManifest(base + R"("processes": ["ui"]})", errors).has_value());
-    CHECK(ampify::ParseManifest(base + R"("processes": ["ui", "engine"]})", errors).has_value());
+    CHECK(ParseAuthored(base + R"("processes": ["ui"]})", errors).has_value());
+    CHECK(ParseAuthored(base + R"("processes": ["ui", "engine"]})", errors).has_value());
     CHECK(errors.empty());
-    CHECK(!ampify::ParseManifest(base + R"("processes": []})", errors).has_value());
-    CHECK(!ampify::ParseManifest(base + R"("processes": ["ui", "ui"]})", errors).has_value());
-    CHECK(!ampify::ParseManifest(base + R"("processes": ["gpu"]})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("processes": []})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("processes": ["ui", "ui"]})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("processes": ["gpu"]})", errors).has_value());
     CHECK(!errors.empty());
 }
 
@@ -734,12 +742,26 @@ TEST_CASE(Manifest_TypeIsScriptOrModuleForTheCli) {
         R"({"id": "demo", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"
         R"("description": "Test.", "kitApi": "1.0", "main": "main.js", )";
     std::vector<std::string> errors;
-    std::optional<ampify::ElementManifest> module = ampify::ParseManifest(base + R"("type": "module"})", errors);
-    CHECK(module && module->type == std::optional<std::string>("module"));
-    CHECK(ampify::ParseManifest(base + R"("type": "script"})", errors).has_value());
+    std::optional<ampify::Manifest> module = ParseAuthored(base + R"("type": "module"})", errors);
+    CHECK(module && module->module);
+    CHECK(ParseAuthored(base + R"("type": "script"})", errors).has_value());
     CHECK(errors.empty());
-    CHECK(!ampify::ParseManifest(base + R"("type": "commonjs"})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("type": "commonjs"})", errors).has_value());
     CHECK(MentionsField(errors, "type: invalid value"));
+}
+
+// The command line takes every member of a translation the kernel takes.
+TEST_CASE(Manifest_TranslationsTakeGroupsAndSettingDescriptionsForTheCli) {
+    const std::string text =
+        R"({"id": "demo", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"
+        R"("description": "Test.", "kitApi": "1.0", "main": "main.js", "translations": {"fr": {"name": "Démo", )"
+        R"("description": "Un test.", "groups": {"Look": "Aspect"}, "settingDescriptions": {"size": "La taille."}}}})";
+    std::vector<std::string> errors;
+    std::optional<ampify::Manifest> manifest = ParseAuthored(text, errors);
+    CHECK(errors.empty());
+    REQUIRE(manifest.has_value());
+    CHECK(manifest->translations.at("fr").groups.at("Look") == "Aspect");
+    CHECK(manifest->translations.at("fr").settingDescriptions.at("size") == "La taille.");
 }
 
 TEST_CASE(Manifest_TranslationsKeepTheSameLengthRulesInEveryLanguage) {
@@ -747,20 +769,20 @@ TEST_CASE(Manifest_TranslationsKeepTheSameLengthRulesInEveryLanguage) {
         R"({"id": "demo", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"
         R"("description": "Test.", "kitApi": "1.0", "main": "main.js", )";
     std::vector<std::string> errors;
-    std::optional<ampify::ElementManifest> translated = ampify::ParseManifest(
+    std::optional<ampify::Manifest> translated = ParseAuthored(
         base + R"("translations": {"fr": {"name": "Démo", "description": "Un test."}}})", errors);
     CHECK(errors.empty());
     CHECK(translated && translated->translations.at("fr").name == "Démo");
     CHECK(translated && translated->translations.at("fr").description == "Un test.");
 
-    CHECK(!ampify::ParseManifest(base + R"("translations": {"it": {"name": "a", "description": "b"}}})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("translations": {"it": {"name": "a", "description": "b"}}})", errors).has_value());
     CHECK(MentionsField(errors, "translations.it: unknown language"));
     errors.clear();
-    CHECK(!ampify::ParseManifest(base + R"("translations": {"fr": {"name": "Démo"}}})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("translations": {"fr": {"name": "Démo"}}})", errors).has_value());
     CHECK(MentionsField(errors, "translations.fr.description: required field missing"));
     errors.clear();
-    CHECK(!ampify::ParseManifest(base + R"("translations": {"fr": {"name": "", "description": "b"}}})", errors).has_value());
-    CHECK(!ampify::ParseManifest(base + R"("translations": {"fr": {"name": "a", "description": "b", "x": 1}}})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("translations": {"fr": {"name": "", "description": "b"}}})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("translations": {"fr": {"name": "a", "description": "b", "x": 1}}})", errors).has_value());
     CHECK(MentionsField(errors, "translations.fr.x: unknown field"));
 }
 
@@ -778,20 +800,20 @@ TEST_CASE(Manifest_TagsAreFiveShortUniqueWords) {
         R"({"id": "demo", "name": "Demo", "version": "1.0.0", "kind": "extension", "author": "Shirowwww", )"
         R"("description": "Test.", "kitApi": "1.0", "main": "main.js", )";
     std::vector<std::string> errors;
-    std::optional<ampify::ElementManifest> tagged =
-        ampify::ParseManifest(base + R"("tags": ["dark", "glass-2", "a"]})", errors);
+    std::optional<ampify::Manifest> tagged =
+        ParseAuthored(base + R"("tags": ["dark", "glass-2", "a"]})", errors);
     CHECK(errors.empty());
     CHECK(tagged && tagged->tags.size() == 3 && tagged->tags[1] == "glass-2");
-    CHECK(ampify::ParseManifest(base + R"("tags": ["a", "b", "c", "d", "e"]})", errors).has_value());
+    CHECK(ParseAuthored(base + R"("tags": ["a", "b", "c", "d", "e"]})", errors).has_value());
 
-    CHECK(!ampify::ParseManifest(base + R"("tags": ["Dark"]})", errors).has_value());
-    CHECK(!ampify::ParseManifest(base + R"("tags": ["two words"]})", errors).has_value());
-    CHECK(!ampify::ParseManifest(base + R"("tags": ["-dark"]})", errors).has_value());
-    CHECK(!ampify::ParseManifest(base + R"("tags": ["abcdefghijklmnopqrstu"]})", errors).has_value());
-    CHECK(!ampify::ParseManifest(base + R"("tags": ["a", "b", "c", "d", "e", "f"]})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("tags": ["Dark"]})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("tags": ["two words"]})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("tags": ["-dark"]})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("tags": ["abcdefghijklmnopqrstu"]})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("tags": ["a", "b", "c", "d", "e", "f"]})", errors).has_value());
     CHECK(MentionsField(errors, "tags: at most 5 items"));
     errors.clear();
-    CHECK(!ampify::ParseManifest(base + R"("tags": ["dark", "dark"]})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("tags": ["dark", "dark"]})", errors).has_value());
     CHECK(MentionsField(errors, "tags[1]: duplicate value"));
 }
 
@@ -801,15 +823,15 @@ TEST_CASE(Manifest_PreviewIsAnImageNameAtTheRoot) {
         R"("description": "Test.", "kitApi": "1.0", "main": "main.js", )";
     std::vector<std::string> errors;
     for (const char* name : {"preview.png", "shot.jpg", "Shot-2.jpeg"}) {
-        std::optional<ampify::ElementManifest> manifest =
-            ampify::ParseManifest(base + R"("preview": ")" + name + R"("})", errors);
+        std::optional<ampify::Manifest> manifest =
+            ParseAuthored(base + R"("preview": ")" + name + R"("})", errors);
         CHECK(manifest && manifest->preview == std::optional<std::string>(name));
     }
     CHECK(errors.empty());
-    CHECK(!ampify::ParseManifest(base + R"("preview": "anim.gif"})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("preview": "anim.gif"})", errors).has_value());
     CHECK(MentionsField(errors, "preview: invalid value"));
-    CHECK(!ampify::ParseManifest(base + R"("preview": "img/shot.png"})", errors).has_value());
-    CHECK(!ampify::ParseManifest(base + R"("preview": "../shot.png"})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("preview": "img/shot.png"})", errors).has_value());
+    CHECK(!ParseAuthored(base + R"("preview": "../shot.png"})", errors).has_value());
 }
 
 TEST_CASE(Folder_PreviewMustExistAndStayUnderTwoMegabytes) {

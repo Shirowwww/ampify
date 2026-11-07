@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <iterator>
+#include <mutex>
 #include <optional>
 
 #include "release_facts.hpp"
@@ -176,6 +177,28 @@ constexpr Message kKit[] = {
     {"off.listedText", "Apple Music updated, and Ampify just got the new list of checked versions. Close Apple Music completely (also from the notification area), then open it again to get your theme back."},
     {"off.safeTitle", "Ampify skipped this start"},
     {"off.safeText", "Apple Music closed by itself twice in a row, so Ampify stayed off this time to keep it working. It tries again the next time you open Apple Music."},
+    {"setup.askCloseAppleMusic", "Apple Music is open. Close it now and continue?"},
+    {"setup.closeFailed", "Apple Music could not be closed. Close it yourself, then try again."},
+    {"setup.installed", "Ampify is installed."},
+    {"setup.noBackground",
+     "\n\nAmpify could not start in the background (details in logs\\install.log). Restart your PC, or run "
+     "\"ampify apply\" to try again."},
+    {"setup.noAppleMusic", "\n\nApple Music was not found: install it from the Microsoft Store."},
+    {"setup.bundledFailed",
+     "\n\nThe Marketplace or Now Playing could not be copied to your Ampify folder (details in logs\\install.log). Run "
+     "the install again from the extracted folder."},
+    {"setup.openNow",
+     "\n\nOpen Apple Music now? Then click Ampify at the bottom of the left sidebar to pick a theme. Ampify loads "
+     "with Apple Music each time."},
+    {"setup.fileMissing", "A file is missing next to the installer: {name}\n\nExtract the whole zip first, then run the installer again."},
+    {"setup.folderFailed", "The install folder could not be created."},
+    {"setup.copyFailed", "The install could not copy {name}. Close Apple Music, then run the install again."},
+    {"setup.askUninstall", "Uninstall Ampify for Apple Music?\n\nApple Music goes back to exactly how it was, without Ampify."},
+    {"setup.askKeepData", "Keep your themes, extensions and settings?\n\nYes: they stay in {folder}.\nNo: they are deleted."},
+    {"setup.stopFailed", "Ampify could not stop its background program. Try again."},
+    {"setup.removeFailed", "Could not remove {name}. Close Apple Music, then run the uninstall again."},
+    {"setup.uninstalled", "Ampify is uninstalled. Apple Music is back to normal."},
+    {"setup.dataKept", "\n\nYour themes, extensions and settings were kept in {folder}."},
 };
 
 // French texts of what people see (menus, buttons, the Settings card). The log stays in English, so a key missing here
@@ -330,6 +353,30 @@ constexpr Message kKitFr[] = {
     {"off.listedText", "Apple Music s'est mis à jour, et Ampify vient de recevoir la nouvelle liste des versions vérifiées. Fermez complètement Apple Music (aussi depuis la zone de notification), puis rouvrez-le pour retrouver votre thème."},
     {"off.safeTitle", "Ampify a sauté ce démarrage"},
     {"off.safeText", "Apple Music s'est fermé tout seul deux fois de suite, donc Ampify est resté coupé cette fois pour qu'il fonctionne. Il réessaie à la prochaine ouverture d'Apple Music."},
+    {"setup.askCloseAppleMusic", "Apple Music est ouvert. Le fermer maintenant et continuer ?"},
+    {"setup.closeFailed", "Apple Music n'a pas pu être fermé. Fermez-le vous-même, puis réessayez."},
+    {"setup.installed", "Ampify est installé."},
+    {"setup.noBackground",
+     "\n\nAmpify n'a pas pu démarrer en arrière-plan (détails dans logs\\install.log). Redémarrez votre PC, ou lancez "
+     "\"ampify apply\" pour réessayer."},
+    {"setup.noAppleMusic", "\n\nApple Music est introuvable : installez-le depuis le Microsoft Store."},
+    {"setup.bundledFailed",
+     "\n\nLe Marketplace ou « À l'écoute » n'a pas pu être copié dans votre dossier Ampify (détails dans "
+     "logs\\install.log). Relancez l'installation depuis le dossier extrait."},
+    {"setup.openNow",
+     "\n\nOuvrir Apple Music maintenant ? Cliquez ensuite sur Ampify en bas de la barre latérale pour choisir un "
+     "thème. Ampify se charge avec lui à chaque fois."},
+    {"setup.fileMissing",
+     "Un fichier manque à côté de l'installateur : {name}\n\nExtrayez d'abord tout le zip, puis relancez "
+     "l'installateur."},
+    {"setup.folderFailed", "Le dossier d'installation n'a pas pu être créé."},
+    {"setup.copyFailed", "L'installation n'a pas pu copier {name}. Fermez Apple Music, puis relancez l'installation."},
+    {"setup.askUninstall", "Désinstaller Ampify pour Apple Music ?\n\nApple Music redevient exactement comme avant, sans Ampify."},
+    {"setup.askKeepData", "Garder vos thèmes, extensions et réglages ?\n\nOui : ils restent dans {folder}.\nNon : ils sont supprimés."},
+    {"setup.stopFailed", "Ampify n'a pas pu arrêter son programme en arrière-plan. Réessayez."},
+    {"setup.removeFailed", "Impossible de supprimer {name}. Fermez Apple Music, puis relancez la désinstallation."},
+    {"setup.uninstalled", "Ampify est désinstallé. Apple Music est revenu à la normale."},
+    {"setup.dataKept", "\n\nVos thèmes, extensions et réglages ont été gardés dans {folder}."},
 };
 
 constexpr Message kKitDe[] = {
@@ -483,6 +530,32 @@ constexpr Message kKitDe[] = {
     {"off.listedText", "Apple Music wurde aktualisiert, und Ampify hat gerade die neue Liste geprüfter Versionen erhalten. Beenden Sie Apple Music vollständig (auch im Infobereich) und öffnen Sie es erneut, dann ist Ihr Design wieder da."},
     {"off.safeTitle", "Ampify hat diesen Start übersprungen"},
     {"off.safeText", "Apple Music hat sich zweimal hintereinander von selbst geschlossen, deshalb blieb Ampify diesmal aus. Beim nächsten Öffnen von Apple Music versucht es Ampify erneut."},
+    {"setup.askCloseAppleMusic", "Apple Music ist geöffnet. Jetzt schließen und fortfahren?"},
+    {"setup.closeFailed", "Apple Music konnte nicht geschlossen werden. Schließen Sie es selbst und versuchen Sie es dann erneut."},
+    {"setup.installed", "Ampify ist installiert."},
+    {"setup.noBackground",
+     "\n\nAmpify konnte nicht im Hintergrund starten (Details in logs\\install.log). Starten Sie den PC neu oder führen "
+     "Sie „ampify apply“ aus, um es erneut zu versuchen."},
+    {"setup.noAppleMusic", "\n\nApple Music wurde nicht gefunden: Installieren Sie es aus dem Microsoft Store."},
+    {"setup.bundledFailed",
+     "\n\nDer Marketplace oder „Jetzt läuft“ konnte nicht in Ihren Ampify-Ordner kopiert werden (Details in "
+     "logs\\install.log). Starten Sie die Installation erneut aus dem entpackten Ordner."},
+    {"setup.openNow",
+     "\n\nApple Music jetzt öffnen? Klicken Sie danach unten in der Seitenleiste auf Ampify, um ein Design zu "
+     "wählen. Ampify wird jedes Mal mitgeladen."},
+    {"setup.fileMissing",
+     "Neben dem Installationsprogramm fehlt eine Datei: {name}\n\nEntpacken Sie zuerst das gesamte Zip-Archiv und starten Sie das "
+     "Installationsprogramm dann erneut."},
+    {"setup.folderFailed", "Der Installationsordner konnte nicht erstellt werden."},
+    {"setup.copyFailed", "Die Installation konnte {name} nicht kopieren. Schließen Sie Apple Music und starten Sie die Installation erneut."},
+    {"setup.askUninstall", "Ampify für Apple Music deinstallieren?\n\nApple Music wird wieder genau so wie vorher, ohne Ampify."},
+    {"setup.askKeepData",
+     "Ihre Designs, Erweiterungen und Einstellungen behalten?\n\nJa: Sie bleiben in {folder}.\nNein: Sie werden "
+     "gelöscht."},
+    {"setup.stopFailed", "Ampify konnte sein Hintergrundprogramm nicht beenden. Versuchen Sie es erneut."},
+    {"setup.removeFailed", "{name} konnte nicht entfernt werden. Schließen Sie Apple Music und starten Sie die Deinstallation erneut."},
+    {"setup.uninstalled", "Ampify ist deinstalliert. Apple Music ist wieder wie vorher."},
+    {"setup.dataKept", "\n\nIhre Designs, Erweiterungen und Einstellungen wurden in {folder} behalten."},
 };
 
 constexpr Message kKitEs[] = {
@@ -636,6 +709,28 @@ constexpr Message kKitEs[] = {
     {"off.listedText", "Apple Music se actualizó y Ampify acaba de recibir la nueva lista de versiones comprobadas. Cierra Apple Music del todo (también desde el área de notificaciones) y ábrelo de nuevo para recuperar tu tema."},
     {"off.safeTitle", "Ampify se saltó este inicio"},
     {"off.safeText", "Apple Music se cerró solo dos veces seguidas, así que Ampify se quedó apagado esta vez para que funcione. Lo intenta de nuevo la próxima vez que abras Apple Music."},
+    {"setup.askCloseAppleMusic", "Apple Music está abierto. ¿Cerrarlo ahora y continuar?"},
+    {"setup.closeFailed", "No se pudo cerrar Apple Music. Ciérralo tú mismo y vuelve a intentarlo."},
+    {"setup.installed", "Ampify está instalado."},
+    {"setup.noBackground",
+     "\n\nAmpify no pudo iniciarse en segundo plano (detalles en logs\\install.log). Reinicia el PC o ejecuta "
+     "\"ampify apply\" para volver a intentarlo."},
+    {"setup.noAppleMusic", "\n\nNo se encontró Apple Music: instálalo desde Microsoft Store."},
+    {"setup.bundledFailed",
+     "\n\nNo se pudo copiar el Marketplace o «Reproduciendo» a tu carpeta de Ampify (detalles en logs\\install.log). "
+     "Vuelve a ejecutar la instalación desde la carpeta extraída."},
+    {"setup.openNow",
+     "\n\n¿Abrir Apple Music ahora? Después, haz clic en Ampify, al final de la barra lateral, para elegir un tema. "
+     "Ampify se carga con él cada vez."},
+    {"setup.fileMissing", "Falta un archivo junto al instalador: {name}\n\nExtrae primero todo el zip y vuelve a ejecutar el instalador."},
+    {"setup.folderFailed", "No se pudo crear la carpeta de instalación."},
+    {"setup.copyFailed", "La instalación no pudo copiar {name}. Cierra Apple Music y vuelve a ejecutar la instalación."},
+    {"setup.askUninstall", "¿Desinstalar Ampify para Apple Music?\n\nApple Music vuelve a quedar exactamente como estaba, sin Ampify."},
+    {"setup.askKeepData", "¿Conservar tus temas, extensiones y ajustes?\n\nSí: se quedan en {folder}.\nNo: se eliminan."},
+    {"setup.stopFailed", "Ampify no pudo detener su programa en segundo plano. Inténtalo de nuevo."},
+    {"setup.removeFailed", "No se pudo eliminar {name}. Cierra Apple Music y vuelve a ejecutar la desinstalación."},
+    {"setup.uninstalled", "Ampify se ha desinstalado. Apple Music ha vuelto a la normalidad."},
+    {"setup.dataKept", "\n\nTus temas, extensiones y ajustes se conservaron en {folder}."},
 };
 
 constexpr Message kKitPt[] = {
@@ -789,6 +884,28 @@ constexpr Message kKitPt[] = {
     {"off.listedText", "O Apple Music foi atualizado e o Ampify acabou de receber a nova lista de versões verificadas. Feche o Apple Music por completo (também na área de notificação) e abra-o de novo para ter o seu tema de volta."},
     {"off.safeTitle", "O Ampify pulou esta abertura"},
     {"off.safeText", "O Apple Music fechou sozinho duas vezes seguidas, então o Ampify ficou desligado desta vez para ele funcionar. Ele tenta de novo na próxima vez que você abrir o Apple Music."},
+    {"setup.askCloseAppleMusic", "O Apple Music está aberto. Fechar agora e continuar?"},
+    {"setup.closeFailed", "Não foi possível fechar o Apple Music. Feche-o você mesmo e tente de novo."},
+    {"setup.installed", "O Ampify foi instalado."},
+    {"setup.noBackground",
+     "\n\nO Ampify não conseguiu iniciar em segundo plano (detalhes em logs\\install.log). Reinicie o PC ou execute "
+     "\"ampify apply\" para tentar de novo."},
+    {"setup.noAppleMusic", "\n\nO Apple Music não foi encontrado: instale-o pela Microsoft Store."},
+    {"setup.bundledFailed",
+     "\n\nNão foi possível copiar o Marketplace ou o \"Tocando agora\" para a sua pasta do Ampify (detalhes em "
+     "logs\\install.log). Execute a instalação de novo a partir da pasta extraída."},
+    {"setup.openNow",
+     "\n\nAbrir o Apple Music agora? Depois, clique em Ampify no fim da barra lateral para escolher um tema. O "
+     "Ampify carrega junto toda vez."},
+    {"setup.fileMissing", "Falta um arquivo ao lado do instalador: {name}\n\nExtraia primeiro todo o zip e execute o instalador de novo."},
+    {"setup.folderFailed", "Não foi possível criar a pasta de instalação."},
+    {"setup.copyFailed", "A instalação não conseguiu copiar {name}. Feche o Apple Music e execute a instalação de novo."},
+    {"setup.askUninstall", "Desinstalar o Ampify do Apple Music?\n\nO Apple Music volta a ser exatamente como era, sem o Ampify."},
+    {"setup.askKeepData", "Manter seus temas, extensões e ajustes?\n\nSim: eles ficam em {folder}.\nNão: eles são apagados."},
+    {"setup.stopFailed", "O Ampify não conseguiu parar seu programa em segundo plano. Tente de novo."},
+    {"setup.removeFailed", "Não foi possível remover {name}. Feche o Apple Music e execute a desinstalação de novo."},
+    {"setup.uninstalled", "O Ampify foi desinstalado. O Apple Music voltou ao normal."},
+    {"setup.dataKept", "\n\nSeus temas, extensões e ajustes foram mantidos em {folder}."},
 };
 
 constexpr Message kKitRu[] = {
@@ -942,6 +1059,30 @@ constexpr Message kKitRu[] = {
     {"off.listedText", "Apple Music обновился, а Ampify только что получил новый список проверенных версий. Полностью закройте Apple Music (в том числе в области уведомлений) и откройте его снова, чтобы вернуть тему."},
     {"off.safeTitle", "Ampify пропустил этот запуск"},
     {"off.safeText", "Apple Music дважды подряд закрылся сам, поэтому в этот раз Ampify остался выключен, чтобы он работал. При следующем запуске Apple Music Ampify попробует снова."},
+    {"setup.askCloseAppleMusic", "Apple Music открыт. Закрыть его сейчас и продолжить?"},
+    {"setup.closeFailed", "Не удалось закрыть Apple Music. Закройте его сами и попробуйте снова."},
+    {"setup.installed", "Ampify установлен."},
+    {"setup.noBackground",
+     "\n\nAmpify не удалось запустить в фоне (подробности в logs\\install.log). Перезагрузите компьютер или выполните "
+     "\"ampify apply\", чтобы попробовать снова."},
+    {"setup.noAppleMusic", "\n\nApple Music не найден: установите его из Microsoft Store."},
+    {"setup.bundledFailed",
+     "\n\nНе удалось скопировать Marketplace или «Сейчас играет» в папку Ampify (подробности в logs\\install.log). "
+     "Запустите установку снова из распакованной папки."},
+    {"setup.openNow",
+     "\n\nОткрыть Apple Music сейчас? Затем нажмите Ampify внизу боковой панели, чтобы выбрать тему. Ampify будет "
+     "загружаться вместе с ним каждый раз."},
+    {"setup.fileMissing",
+     "Рядом с установщиком не хватает файла: {name}\n\nСначала распакуйте весь zip-архив, затем снова запустите "
+     "установщик."},
+    {"setup.folderFailed", "Не удалось создать папку установки."},
+    {"setup.copyFailed", "Установщику не удалось скопировать {name}. Закройте Apple Music и запустите установку снова."},
+    {"setup.askUninstall", "Удалить Ampify для Apple Music?\n\nApple Music вернётся в точности к прежнему виду, без Ampify."},
+    {"setup.askKeepData", "Сохранить ваши темы, расширения и настройки?\n\nДа: они останутся в {folder}.\nНет: они будут удалены."},
+    {"setup.stopFailed", "Ampify не удалось остановить свою фоновую программу. Попробуйте снова."},
+    {"setup.removeFailed", "Не удалось удалить {name}. Закройте Apple Music и запустите удаление снова."},
+    {"setup.uninstalled", "Ampify удалён. Apple Music снова работает как обычно."},
+    {"setup.dataKept", "\n\nВаши темы, расширения и настройки сохранены в {folder}."},
 };
 
 constexpr Message kKitJa[] = {
@@ -1095,6 +1236,26 @@ constexpr Message kKitJa[] = {
     {"off.listedText", "Apple Music が更新され、Ampify が確認済みバージョンの新しい一覧を受け取りました。Apple Music を通知領域も含めて完全に閉じ、もう一度開くとテーマが戻ります。"},
     {"off.safeTitle", "Ampify は今回の起動をスキップしました"},
     {"off.safeText", "Apple Music が 2 回続けて自動で閉じたため、動作を保つために今回は Ampify をオフにしました。次に Apple Music を開くときにもう一度試します。"},
+    {"setup.askCloseAppleMusic", "Apple Music が開いています。今すぐ閉じて続行しますか?"},
+    {"setup.closeFailed", "Apple Music を閉じられませんでした。手動で閉じてから、もう一度お試しください。"},
+    {"setup.installed", "Ampify をインストールしました。"},
+    {"setup.noBackground",
+     "\n\nAmpify をバックグラウンドで起動できませんでした (詳細は logs\\install.log)。PC を再起動するか、"
+     "\"ampify apply\" を実行してもう一度お試しください。"},
+    {"setup.noAppleMusic", "\n\nApple Music が見つかりません。Microsoft Store からインストールしてください。"},
+    {"setup.bundledFailed",
+     "\n\nMarketplace または「再生中」を Ampify フォルダーにコピーできませんでした (詳細は logs\\install.log)。"
+     "展開したフォルダーからもう一度インストールしてください。"},
+    {"setup.openNow", "\n\n今すぐ Apple Music を開きますか? 開いたら、サイドバー下部の Ampify をクリックしてテーマを選べます。Ampify は毎回一緒に読み込まれます。"},
+    {"setup.fileMissing", "インストーラーと同じ場所にファイルがありません: {name}\n\nまず zip をすべて展開してから、もう一度インストーラーを実行してください。"},
+    {"setup.folderFailed", "インストール先のフォルダーを作成できませんでした。"},
+    {"setup.copyFailed", "{name} をコピーできませんでした。Apple Music を閉じてから、もう一度インストールしてください。"},
+    {"setup.askUninstall", "Apple Music 用の Ampify をアンインストールしますか?\n\nApple Music は Ampify を入れる前とまったく同じ状態に戻ります。"},
+    {"setup.askKeepData", "テーマ、拡張機能、設定を残しますか?\n\nはい: {folder} に残ります。\nいいえ: 削除されます。"},
+    {"setup.stopFailed", "Ampify のバックグラウンドプログラムを停止できませんでした。もう一度お試しください。"},
+    {"setup.removeFailed", "{name} を削除できませんでした。Apple Music を閉じてから、もう一度アンインストールしてください。"},
+    {"setup.uninstalled", "Ampify をアンインストールしました。Apple Music は元に戻りました。"},
+    {"setup.dataKept", "\n\nテーマ、拡張機能、設定は {folder} に残してあります。"},
 };
 
 constexpr Message kKitZh[] = {
@@ -1246,6 +1407,24 @@ constexpr Message kKitZh[] = {
     {"off.listedText", "Apple Music 已更新，Ampify 刚获得最新的已检查版本列表。请完全关闭 Apple Music（包括通知区域中的），再重新打开，即可恢复你的主题。"},
     {"off.safeTitle", "Ampify 跳过了这次启动"},
     {"off.safeText", "Apple Music 连续两次自行关闭，所以这次 Ampify 保持关闭以确保其正常运行。下次打开 Apple Music 时会再试一次。"},
+    {"setup.askCloseAppleMusic", "Apple Music 正在运行。现在关闭并继续吗？"},
+    {"setup.closeFailed", "无法关闭 Apple Music。请手动关闭后再试一次。"},
+    {"setup.installed", "Ampify 已安装。"},
+    {"setup.noBackground", "\n\nAmpify 无法在后台启动（详情见 logs\\install.log）。请重启电脑，或运行 \"ampify apply\" 再试一次。"},
+    {"setup.noAppleMusic", "\n\n未找到 Apple Music：请从 Microsoft Store 安装。"},
+    {"setup.bundledFailed",
+     "\n\n无法将 Marketplace 或“正在播放”复制到你的 Ampify 文件夹（详情见 logs\\install.log）。请从解压后的文件夹"
+     "重新运行安装。"},
+    {"setup.openNow", "\n\n现在打开 Apple Music 吗？打开后，点击侧边栏底部的 Ampify 即可选择主题。Ampify 每次都会随它一起加载。"},
+    {"setup.fileMissing", "安装程序旁缺少一个文件：{name}\n\n请先解压整个 zip，再重新运行安装程序。"},
+    {"setup.folderFailed", "无法创建安装文件夹。"},
+    {"setup.copyFailed", "安装无法复制 {name}。请关闭 Apple Music，然后重新运行安装。"},
+    {"setup.askUninstall", "要卸载 Apple Music 的 Ampify 吗？\n\nApple Music 将完全恢复原样，不再有 Ampify。"},
+    {"setup.askKeepData", "保留你的主题、扩展和设置吗？\n\n是：它们保留在 {folder}。\n否：它们将被删除。"},
+    {"setup.stopFailed", "Ampify 无法停止其后台程序。请再试一次。"},
+    {"setup.removeFailed", "无法删除 {name}。请关闭 Apple Music，然后重新运行卸载。"},
+    {"setup.uninstalled", "Ampify 已卸载。Apple Music 已恢复正常。"},
+    {"setup.dataKept", "\n\n你的主题、扩展和设置已保留在 {folder}。"},
 };
 
 struct LanguageTable {
@@ -1267,19 +1446,13 @@ constexpr bool TablesFollowTheLanguages() {
 }
 static_assert(TablesFollowTheLanguages(), "src/core/i18n.cpp: one table per language of facts/release.json");
 
-std::string g_language = "en";  // set once at start, before any service reads it
-
-std::optional<std::string_view> Find(std::span<const Message> table, std::string_view key) {
-    for (const Message& message : table) {
-        if (message.key == key) return message.text;
-    }
-    return std::nullopt;
-}
+std::mutex g_languageLock;
+std::string g_language = "en";
 
 bool IsLetter(char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0; }
 
-// Taiwan, Hong Kong and Macau write Traditional Chinese: they get "zh-hant", which has no table yet, so English
-// rather than the Simplified texts of "zh". `locale` is in lower case.
+// Taiwan, Hong Kong and Macau write Traditional Chinese: they get "zh-hant", which reads the "zh" table. `locale` is
+// in lower case.
 bool IsTraditionalChinese(std::string_view locale) {
     for (std::string_view mark : {"hant", "-tw", "_tw", "-hk", "_hk", "-mo", "_mo"}) {
         if (locale.find(mark) != std::string_view::npos) return true;
@@ -1289,8 +1462,11 @@ bool IsTraditionalChinese(std::string_view locale) {
 
 }  // namespace
 
-std::string_view Lookup(std::span<const Message> table, std::string_view key) {
-    return Find(table, key).value_or(key);
+std::optional<std::string_view> Lookup(std::span<const Message> table, std::string_view key) {
+    for (const Message& message : table) {
+        if (message.key == key) return message.text;
+    }
+    return std::nullopt;
 }
 
 std::string Format(std::string_view pattern, Args args) {
@@ -1341,6 +1517,7 @@ std::string Placeholders(std::string_view pattern) {
 std::span<const Message> KitMessages() { return kKit; }
 
 std::span<const Message> KitMessagesIn(std::string_view language) {
+    if (language == "zh-hant") language = "zh";  // no Traditional table: the Simplified texts read better than English
     for (const LanguageTable& table : kLanguages) {
         if (table.code == language) return table.messages;
     }
@@ -1353,18 +1530,26 @@ std::vector<std::string_view> Languages() {
     return codes;
 }
 
-void SetLanguage(std::string_view code) { g_language = std::string(code); }
+void SetLanguage(std::string_view code) {
+    std::lock_guard lock(g_languageLock);
+    g_language = std::string(code);
+}
 
-const std::string& Language() { return g_language; }
+std::string Language() {
+    std::lock_guard lock(g_languageLock);
+    return g_language;
+}
 
 bool UsesDecimalComma() {
-    return std::find(std::begin(kDecimalCommaLanguages), std::end(kDecimalCommaLanguages), g_language) !=
+    std::string language = Language();
+    return std::find(std::begin(kDecimalCommaLanguages), std::end(kDecimalCommaLanguages), language) !=
            std::end(kDecimalCommaLanguages);
 }
 
 std::string Text(std::string_view key, Args args) {
-    std::optional<std::string_view> text = Find(KitMessagesIn(g_language), key);
-    return Format(text ? *text : Lookup(KitMessages(), key), args);
+    std::optional<std::string_view> text = Lookup(KitMessagesIn(Language()), key);
+    if (!text) text = Lookup(KitMessages(), key);
+    return Format(text.value_or(key), args);
 }
 
 std::string LanguageCode(std::string_view locale) {
@@ -1376,6 +1561,11 @@ std::string LanguageCode(std::string_view locale) {
     std::string code = lower.substr(0, 2);
     if (code == "zh" && IsTraditionalChinese(lower)) return "zh-hant";
     return code;
+}
+
+std::string PreferredLocale(std::string_view chosen, std::string_view osLocale) {
+    if (!chosen.empty()) return std::string(chosen);
+    return osLocale.empty() ? "en" : std::string(osLocale);
 }
 
 }  // namespace ampify::i18n

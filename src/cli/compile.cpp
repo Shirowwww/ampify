@@ -39,20 +39,13 @@ bool ChangesTheBuild(const std::filesystem::path& path) {
     return among(kSourceExtensions) || among(kBundledExtensions);
 }
 
-// The "main" of manifest.json, or nullopt when the folder has no script.
+// The "main" of manifest.json, or nullopt when the folder has no script. Only a name the manifest's rule takes, a .js
+// file at the root: the build never writes outside the folder.
 std::optional<std::string> MainName(const std::filesystem::path& folder) {
-    std::ifstream in(folder / "manifest.json", std::ios::binary);
-    if (!in) return std::nullopt;
-    std::ostringstream text;
-    text << in.rdbuf();
-    std::optional<Json> manifest = Json::Parse(text.str());
-    const Json* main = manifest ? manifest->Find("main") : nullptr;
-    const std::string* name = main ? main->AsString() : nullptr;
-    // A plain file name at the root, as the manifest check requires: the build never writes outside the folder.
-    if (!name || name->empty() || name->find_first_of("/\\:") != std::string::npos || *name == "." || *name == "..") {
-        return std::nullopt;
-    }
-    return *name;
+    std::optional<std::string> text = ampify::ReadWholeFile(folder / "manifest.json");
+    if (!text) return std::nullopt;
+    std::optional<std::string> main = ParseManifest(*text, "", kKitApiMajor, nullptr).partial.main;
+    return main && IsMainFileName(*main) ? main : std::nullopt;
 }
 
 struct Sources {

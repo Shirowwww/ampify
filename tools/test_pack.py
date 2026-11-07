@@ -85,8 +85,8 @@ class PackTests(unittest.TestCase):
         with open(catalog, "w", encoding="utf-8") as handle:
             json.dump({"catalogVersion": 1, "extensions": []}, handle)
 
-        pack.pack(folder, os.path.join(self.tmp, "1.zip"), catalog, "https://example.com/demo-1.zip")
-        pack.pack(folder, os.path.join(self.tmp, "2.zip"), catalog, "https://example.com/demo-2.zip")
+        pack.pack(folder, os.path.join(self.tmp, "demo-1.zip"), catalog, "https://example.com/demo-1.zip")
+        pack.pack(folder, os.path.join(self.tmp, "demo-2.zip"), catalog, "https://example.com/demo-2.zip")
 
         with open(catalog, encoding="utf-8") as handle:
             entries = json.load(handle)["extensions"]
@@ -160,6 +160,29 @@ class PackTests(unittest.TestCase):
             json.dump({"catalogVersion": 1, "extensions": []}, handle)
         with self.assertRaises(pack.PackError):
             pack.pack(folder, os.path.join(self.tmp, "x.zip"), catalog, "http://example.com/x.zip")
+
+    def test_archive_and_address_must_share_a_name(self):
+        folder = self.make_element()
+        catalog = os.path.join(self.tmp, "catalog.json")
+        with open(catalog, "w", encoding="utf-8") as handle:
+            json.dump({"catalogVersion": 1, "extensions": []}, handle)
+        with self.assertRaises(pack.PackError) as caught:
+            pack.pack(folder, os.path.join(self.tmp, "demo.zip"), catalog, "https://example.com/demo-1.0.0.zip")
+        self.assertIn("demo-1.0.0", str(caught.exception))
+        self.assertEqual(sorted(os.listdir(self.tmp)), ["catalog.json", "demo"])
+
+    def test_invalid_catalog_is_left_untouched(self):
+        folder = self.make_element()
+        catalog = os.path.join(self.tmp, "catalog.json")
+        with open(catalog, "w", encoding="utf-8") as handle:
+            json.dump({"catalogVersion": 1, "extensions": [{"id": "old", "kitApi": "9.0"}]}, handle)
+        with open(catalog, "rb") as handle:
+            before = handle.read()
+        with self.assertRaises(pack.PackError):
+            pack.pack(folder, os.path.join(self.tmp, "demo-1.zip"), catalog, "https://example.com/demo-1.zip")
+        with open(catalog, "rb") as handle:
+            self.assertEqual(handle.read(), before)
+        self.assertEqual(sorted(os.listdir(self.tmp)), ["catalog.json", "demo", "demo-1.zip"])
 
 
 if __name__ == "__main__":

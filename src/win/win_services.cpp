@@ -8,7 +8,7 @@
 #include <cstdlib>
 
 #include "../core/json.hpp"
-#include "../core/natives/player.hpp"
+#include "../core/player_state.hpp"
 #include "../core/natives/service_flags.hpp"
 #include "../core/output_files.hpp"
 #include "discord_ipc.hpp"
@@ -280,7 +280,7 @@ void Services::RemoveRemoteState(const std::string& elementId) {
 }
 
 void Services::RefreshStatus() {
-    Json status = natives::PlayerJson(m_host.Player());
+    Json status = PlayerJson(m_host.Player());
     status.Set("gainDb", Json(m_remoteGainDb));
     Json extensions(Json::Object{});
     for (const auto& [elementId, json] : m_remoteStates) {
@@ -394,8 +394,8 @@ void Services::Service() {
         }
     }
 
-    // The status of GET /status follows the player four times a second.
-    if (m_remote && ++m_ticks % 5 == 0) RefreshStatus();
+    // The status of GET /status follows the player at the pace the kernel reads it.
+    if (m_remote && ++m_ticks % kTicksPerPlayerRead == 0) RefreshStatus();
 }
 
 }  // namespace ampify::win

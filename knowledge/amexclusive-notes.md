@@ -36,7 +36,7 @@ read-only mode at commit `91f589d`. The references are paths in its `mod/` folde
   without the shortcut.
 - **WinUI metadata.** Apple Music 1.1540 is aligned with Windows App SDK 1.8. AMExclusive projects from
   `microsoft.windowsappsdk.winui` 1.8.251222000, with the SHA-256 of `Microsoft.UI.Xaml.winmd` pinned
-  (`A824AB1E380E384C382CEC14AC5DAD9D4C1B91F519D512082F0E7E5D6AC109DE`, `scripts/Get-WinUIMetadata.ps1`).
+  (`A824AB1E380E384C382CEC14AC5DAD9D4C1B91F519D512082F0E7E5D6AC109DE`, `scripts/msvc-winui.ps1`).
 
 ## What Ampify does not take
 

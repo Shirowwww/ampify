@@ -96,6 +96,13 @@ void AppendUtf8(std::string& out, uint32_t code) {
     }
 }
 
+size_t CodePointCount(std::string_view text) {
+    // Every byte that is not a UTF-8 continuation byte starts a character.
+    return static_cast<size_t>(std::count_if(text.begin(), text.end(), [](char c) {
+        return (static_cast<unsigned char>(c) & 0xC0) != 0x80;
+    }));
+}
+
 std::string_view ClipUtf8(std::string_view text, size_t maxBytes) {
     if (text.size() <= maxBytes) return text;
     size_t cut = maxBytes;

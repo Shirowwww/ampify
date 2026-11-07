@@ -216,16 +216,16 @@ int InstallEntry(Context& ctx, const CatalogEntry& entry, bool localCatalog, boo
         for (const std::string& message : validation.errors) ctx.err << "  - " << message << "\n";
         return 1;
     }
-    const ElementManifest& manifest = *validation.manifest;
+    const Manifest& manifest = *validation.manifest;
     if (manifest.id != entry.id || manifest.version != entry.version || manifest.kind != entry.kind) {
         RemoveQuietly(staging);
         return Failure(ctx, "the manifest in the archive does not match the catalog");
     }
 
     // Swap the folders: the previous version is kept until the new one is in place.
-    std::filesystem::path destination = ctx.kit.Element(entry.kind, entry.id);
-    std::filesystem::path previous = ctx.kit.Folder(entry.kind) / ("." + entry.id + ".previous");
-    std::filesystem::create_directories(ctx.kit.Folder(entry.kind), ec);
+    std::filesystem::path destination = ctx.kit.Element(ToString(entry.kind), entry.id);
+    std::filesystem::path previous = ctx.kit.Folder(ToString(entry.kind)) / ("." + entry.id + ".previous");
+    std::filesystem::create_directories(ctx.kit.Folder(ToString(entry.kind)), ec);
     RemoveQuietly(previous);
     if (std::filesystem::exists(destination, ec)) {
         std::filesystem::rename(destination, previous, ec);
@@ -243,18 +243,18 @@ int InstallEntry(Context& ctx, const CatalogEntry& entry, bool localCatalog, boo
     RemoveQuietly(staging);
     RemoveQuietly(previous);
     // A running kernel loads the new folder at once (installed disabled), or restarts the updated element.
-    RequestReload(ctx, {isUpdate ? "restart " + ReloadTarget(entry.kind, entry.id) : std::string("rescan")});
+    RequestReload(ctx, {isUpdate ? "restart " + ReloadTarget(ToString(entry.kind), entry.id) : std::string("rescan")});
 
     ctx.out << entry.id << " " << entry.version << (isUpdate ? " updated" : " installed") << ". ";
-    if (entry.kind == "theme") {
+    if (entry.kind == ElementKind::Theme) {
         ctx.out << "Use it with ampify theme set " << entry.id << ".\n";
     } else {
         Settings settings;
         settings.Load(ctx.kit.Settings().string());
-        if (IsEnabled(settings, entry.kind, entry.id)) {
+        if (IsEnabled(settings, ToString(entry.kind), entry.id)) {
             ctx.out << "It stays on.\n";
         } else {
-            ctx.out << "It is off: run ampify " << entry.kind << " enable " << entry.id << " to turn it on.\n";
+            ctx.out << "It is off: run ampify " << ToString(entry.kind) << " enable " << entry.id << " to turn it on.\n";
         }
     }
     return 0;
@@ -270,8 +270,8 @@ int UpdateElement(Context& ctx, const std::string& id) {
     if (!LoadCatalog(ctx, catalog, local)) return 1;
     const CatalogEntry* entry = FindCatalogEntry(catalog, id);
     if (entry == nullptr) return Failure(ctx, "element not in the catalog: " + id);
-    if (entry->kind != installed.front().kind) {
-        return Failure(ctx, "the catalog lists " + id + " as " + entry->kind + ", not as " + installed.front().kind);
+    if (ToString(entry->kind) != installed.front().kind) {
+        return Failure(ctx, "the catalog lists " + id + " as " + std::string(ToString(entry->kind)) + ", not as " + installed.front().kind);
     }
 
     std::string installedVersion = installed.front().manifest ? installed.front().manifest->version : "0.0.0";
@@ -308,7 +308,7 @@ std::optional<ReleaseInfo> FetchRelease(Context& ctx, const std::string& source,
 
     std::optional<ReleaseInfo> release = ParseRelease(text, error);
     if (!release) return std::nullopt;
-    if (!IsValidVersion(release->version)) {
+    if (!IsReleaseVersion(release->version)) {
         error = "invalid release version: " + release->tag;
         return std::nullopt;
     }
@@ -479,7 +479,7 @@ Json TextList(const std::vector<std::string>& items) {
 
 Json InfoJson(const ElementInfo& info) {
     Json item = Json::Object{{"id", info.id},           {"name", info.name},
-                             {"kind", info.kind},       {"version", info.version},
+                             {"kind", std::string(ToString(info.kind))},       {"version", info.version},
                              {"author", info.author},   {"description", info.description},
                              {"permissions", TextList(info.permissions)},
                              {"tags", TextList(info.tags)}};
@@ -506,13 +506,12 @@ Json InfoJson(const ElementInfo& info) {
 
 // The settings an installed element declares, each with its value now, for the Marketplace's settings panel.
 Json SettingsJson(const uirender::ModEntry& element) {
-    static constexpr const char* kTypes[] = {"toggle", "choice", "text", "number"};
     Json::Array list;
     for (size_t index = 0; index < element.settings.size(); index++) {
         const SettingSpec& spec = element.settings[index];
         Json setting = Json::Object{{"key", spec.key},
                                     {"label", spec.label},
-                                    {"type", kTypes[static_cast<int>(spec.type)]},
+                                    {"type", std::string(ToString(spec.type))},
                                     {"value", element.values[index]}};
         if (!spec.options.empty()) setting.Set("options", TextList(spec.options));
         if (spec.min) setting.Set("min", *spec.min);
@@ -658,11 +657,11 @@ int CmdMarket(Context& ctx) {
     for (const CatalogEntry& entry : catalog.entries) {
         std::string state = "not installed";
         for (const InstalledElement& element : installed) {
-            if (element.kind == entry.kind && element.id == entry.id) {
+            if (element.kind == ToString(entry.kind) && element.id == entry.id) {
                 state = "installed " + (element.manifest ? element.manifest->version : std::string("?"));
             }
         }
-        ctx.out << Pad(entry.id, 24) << Pad(entry.version, 10) << Pad(entry.kind, 10) << Pad(entry.author, 18)
+        ctx.out << Pad(entry.id, 24) << Pad(entry.version, 10) << Pad(ToString(entry.kind), 10) << Pad(entry.author, 18)
                 << state << ": " << entry.description << "\n";
     }
     return 0;
@@ -671,7 +670,7 @@ int CmdMarket(Context& ctx) {
 int CmdInstall(Context& ctx) {
     if (ctx.options.positional.size() != 2) return Usage(ctx, "install needs an element id");
     const std::string& id = ctx.options.positional[1];
-    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
+    if (!IsElementId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     Catalog catalog;
     bool local = false;
@@ -684,7 +683,7 @@ int CmdInstall(Context& ctx) {
 int CmdRemove(Context& ctx) {
     if (ctx.options.positional.size() != 2) return Usage(ctx, "remove needs an element id");
     const std::string& id = ctx.options.positional[1];
-    if (!IsValidId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
+    if (!IsElementId(id)) return Failure(ctx, Tr("invalidId", {{"id", id}}));
 
     std::vector<InstalledElement> matches = InstalledNamed(ctx.kit, id);
     if (matches.empty()) {
@@ -708,7 +707,7 @@ int CmdRemove(Context& ctx) {
     if (kind == "theme") {
         if (settings.GetString("theme.active", "") == id) settings.Set("theme.active", "");
     } else {
-        settings.Remove(EnabledKey(kind, id));
+        settings.Remove(ElementRef{KindNamed(kind).value_or(ElementKind::Extension), id}.EnabledKey());
     }
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
     RequestReload(ctx, {"stop " + ReloadTarget(kind, id), "rescan"});
@@ -723,7 +722,7 @@ int CmdInstallKit(Context& ctx) {
     if (args.size() != 2) return Usage(ctx, "install-kit needs a version of Ampify, for example: ampify install-kit 0.1.0");
     std::string version = args[1];
     if (!version.empty() && (version.front() == 'v' || version.front() == 'V')) version.erase(0, 1);
-    if (!IsValidVersion(version)) return Failure(ctx, "invalid version: " + args[1] + " (expected: 0.1.0)");
+    if (!IsReleaseVersion(version)) return Failure(ctx, "invalid version: " + args[1] + " (expected: 0.1.0)");
     return InstallKitRelease(ctx, ctx.options.releaseUrl ? *ctx.options.releaseUrl : DefaultReleaseUrl(version), version);
 }
 
@@ -734,7 +733,7 @@ int CmdUpdate(Context& ctx) {
         return InstallKitRelease(ctx, ctx.options.releaseUrl ? *ctx.options.releaseUrl : DefaultReleaseUrl(""), "");
     }
     if (args.size() == 2) {
-        if (!IsValidId(args[1])) return Failure(ctx, Tr("invalidId", {{"id", args[1]}}));
+        if (!IsElementId(args[1])) return Failure(ctx, Tr("invalidId", {{"id", args[1]}}));
         return UpdateElement(ctx, args[1]);
     }
     return Usage(ctx, "update needs an element id, or nothing to update Ampify");

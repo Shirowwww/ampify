@@ -1,5 +1,7 @@
 #include "extension.hpp"
 
+#include "element_ref.hpp"
+
 #include <algorithm>
 #include <exception>
 #include <utility>
@@ -25,7 +27,8 @@ void ExtensionHost::StartAll(const Settings& settings, std::string_view blockRea
 
 void ExtensionHost::StartEntry(Entry& entry, const Settings& settings, std::string_view blockReason) {
     bool enabled = entry.info.isEnabled ? entry.info.isEnabled(settings)
-                                        : settings.GetBool(SettingKey(entry.info.id), entry.info.enabledByDefault);
+                                        : settings.GetBool(ElementRef{ElementKind::Extension, entry.info.id}.EnabledKey(),
+                                                         entry.info.enabledByDefault);
     if (!enabled) {
         entry.state = ExtensionState::Off;
         return;
@@ -116,10 +119,6 @@ ExtensionState ExtensionHost::StateOf(const std::string& id) const {
         if (entry.info.id == id) return entry.state;
     }
     return ExtensionState::Off;
-}
-
-std::string ExtensionHost::SettingKey(const std::string& id) {
-    return "extensions." + id + ".enabled";
 }
 
 }  // namespace ampify

@@ -58,224 +58,9 @@ constexpr DWORD kEndWaitMs = 3000;         // time left to the ended processes t
 constexpr DWORD kPollMs = 200;
 constexpr DWORD kLauncherWaitMs = 3000;    // for the launcher to watch for Apple Music before Apple Music opens
 
-// One installer text in each language Ampify speaks, in UTF-8, with {name} placeholders. Logs stay in English.
-struct Texts {
-    const char* en;
-    const char* fr;
-    const char* de;
-    const char* es;
-    const char* pt;
-    const char* ru;
-    const char* ja;
-    const char* zh;
-};
-
-constexpr Texts kAskCloseAppleMusic = {
-    "Apple Music is open. Close it now and continue?",
-    "Apple Music est ouvert. Le fermer maintenant et continuer ?",
-    "Apple Music ist geöffnet. Jetzt schließen und fortfahren?",
-    "Apple Music está abierto. ¿Cerrarlo ahora y continuar?",
-    "O Apple Music está aberto. Fechar agora e continuar?",
-    "Apple Music открыт. Закрыть его сейчас и продолжить?",
-    "Apple Music が開いています。今すぐ閉じて続行しますか?",
-    "Apple Music 正在运行。现在关闭并继续吗？",
-};
-constexpr Texts kCloseFailed = {
-    "Apple Music could not be closed. Close it yourself, then try again.",
-    "Apple Music n'a pas pu être fermé. Fermez-le vous-même, puis réessayez.",
-    "Apple Music konnte nicht geschlossen werden. Schließen Sie es selbst und versuchen Sie es dann erneut.",
-    "No se pudo cerrar Apple Music. Ciérralo tú mismo y vuelve a intentarlo.",
-    "Não foi possível fechar o Apple Music. Feche-o você mesmo e tente de novo.",
-    "Не удалось закрыть Apple Music. Закройте его сами и попробуйте снова.",
-    "Apple Music を閉じられませんでした。手動で閉じてから、もう一度お試しください。",
-    "无法关闭 Apple Music。请手动关闭后再试一次。",
-};
-constexpr Texts kInstalled = {
-    "Ampify is installed.",
-    "Ampify est installé.",
-    "Ampify ist installiert.",
-    "Ampify está instalado.",
-    "O Ampify foi instalado.",
-    "Ampify установлен.",
-    "Ampify をインストールしました。",
-    "Ampify 已安装。",
-};
-constexpr Texts kNoBackground = {
-    "\n\nAmpify could not start in the background (details in logs\\install.log). Restart your PC, or run "
-    "\"ampify apply\" to try again.",
-    "\n\nAmpify n'a pas pu démarrer en arrière-plan (détails dans logs\\install.log). Redémarrez votre PC, ou lancez "
-    "\"ampify apply\" pour réessayer.",
-    "\n\nAmpify konnte nicht im Hintergrund starten (Details in logs\\install.log). Starten Sie den PC neu oder führen "
-    "Sie „ampify apply“ aus, um es erneut zu versuchen.",
-    "\n\nAmpify no pudo iniciarse en segundo plano (detalles en logs\\install.log). Reinicia el PC o ejecuta "
-    "\"ampify apply\" para volver a intentarlo.",
-    "\n\nO Ampify não conseguiu iniciar em segundo plano (detalhes em logs\\install.log). Reinicie o PC ou execute "
-    "\"ampify apply\" para tentar de novo.",
-    "\n\nAmpify не удалось запустить в фоне (подробности в logs\\install.log). Перезагрузите компьютер или выполните "
-    "\"ampify apply\", чтобы попробовать снова.",
-    "\n\nAmpify をバックグラウンドで起動できませんでした (詳細は logs\\install.log)。PC を再起動するか、"
-    "\"ampify apply\" を実行してもう一度お試しください。",
-    "\n\nAmpify 无法在后台启动（详情见 logs\\install.log）。请重启电脑，或运行 \"ampify apply\" 再试一次。",
-};
-constexpr Texts kNoAppleMusic = {
-    "\n\nApple Music was not found: install it from the Microsoft Store.",
-    "\n\nApple Music est introuvable : installez-le depuis le Microsoft Store.",
-    "\n\nApple Music wurde nicht gefunden: Installieren Sie es aus dem Microsoft Store.",
-    "\n\nNo se encontró Apple Music: instálalo desde Microsoft Store.",
-    "\n\nO Apple Music não foi encontrado: instale-o pela Microsoft Store.",
-    "\n\nApple Music не найден: установите его из Microsoft Store.",
-    "\n\nApple Music が見つかりません。Microsoft Store からインストールしてください。",
-    "\n\n未找到 Apple Music：请从 Microsoft Store 安装。",
-};
-constexpr Texts kBundledFailed = {
-    "\n\nThe Marketplace or Now Playing could not be copied to your Ampify folder (details in logs\\install.log). Run "
-    "the install again from the extracted folder.",
-    "\n\nLe Marketplace ou « À l'écoute » n'a pas pu être copié dans votre dossier Ampify (détails dans "
-    "logs\\install.log). Relancez l'installation depuis le dossier extrait.",
-    "\n\nDer Marketplace oder „Jetzt läuft“ konnte nicht in Ihren Ampify-Ordner kopiert werden (Details in "
-    "logs\\install.log). Starten Sie die Installation erneut aus dem entpackten Ordner.",
-    "\n\nNo se pudo copiar el Marketplace o «Reproduciendo» a tu carpeta de Ampify (detalles en logs\\install.log). "
-    "Vuelve a ejecutar la instalación desde la carpeta extraída.",
-    "\n\nNão foi possível copiar o Marketplace ou o \"Tocando agora\" para a sua pasta do Ampify (detalhes em "
-    "logs\\install.log). Execute a instalação de novo a partir da pasta extraída.",
-    "\n\nНе удалось скопировать Marketplace или «Сейчас играет» в папку Ampify (подробности в logs\\install.log). "
-    "Запустите установку снова из распакованной папки.",
-    "\n\nMarketplace または「再生中」を Ampify フォルダーにコピーできませんでした (詳細は logs\\install.log)。"
-    "展開したフォルダーからもう一度インストールしてください。",
-    "\n\n无法将 Marketplace 或“正在播放”复制到你的 Ampify 文件夹（详情见 logs\\install.log）。请从解压后的文件夹"
-    "重新运行安装。",
-};
-constexpr Texts kOpenNow = {
-    "\n\nOpen Apple Music now? Then click Ampify at the bottom of the left sidebar to pick a theme. Ampify loads "
-    "with Apple Music each time.",
-    "\n\nOuvrir Apple Music maintenant ? Cliquez ensuite sur Ampify en bas de la barre latérale pour choisir un "
-    "thème. Ampify se charge avec lui à chaque fois.",
-    "\n\nApple Music jetzt öffnen? Klicken Sie danach unten in der Seitenleiste auf Ampify, um ein Design zu "
-    "wählen. Ampify wird jedes Mal mitgeladen.",
-    "\n\n¿Abrir Apple Music ahora? Después, haz clic en Ampify, al final de la barra lateral, para elegir un tema. "
-    "Ampify se carga con él cada vez.",
-    "\n\nAbrir o Apple Music agora? Depois, clique em Ampify no fim da barra lateral para escolher um tema. O "
-    "Ampify carrega junto toda vez.",
-    "\n\nОткрыть Apple Music сейчас? Затем нажмите Ampify внизу боковой панели, чтобы выбрать тему. Ampify будет "
-    "загружаться вместе с ним каждый раз.",
-    "\n\n今すぐ Apple Music を開きますか? 開いたら、サイドバー下部の Ampify をクリックしてテーマを選べます。Ampify は毎回一緒に読み込まれます。",
-    "\n\n现在打开 Apple Music 吗？打开后，点击侧边栏底部的 Ampify 即可选择主题。Ampify 每次都会随它一起加载。",
-};
-constexpr Texts kFileMissing = {
-    "A file is missing next to the installer: {name}\n\nExtract the whole zip first, then run the installer again.",
-    "Un fichier manque à côté de l'installateur : {name}\n\nExtrayez d'abord tout le zip, puis relancez "
-    "l'installateur.",
-    "Neben dem Installationsprogramm fehlt eine Datei: {name}\n\nEntpacken Sie zuerst das gesamte Zip-Archiv und starten Sie das "
-    "Installationsprogramm dann erneut.",
-    "Falta un archivo junto al instalador: {name}\n\nExtrae primero todo el zip y vuelve a ejecutar el instalador.",
-    "Falta um arquivo ao lado do instalador: {name}\n\nExtraia primeiro todo o zip e execute o instalador de novo.",
-    "Рядом с установщиком не хватает файла: {name}\n\nСначала распакуйте весь zip-архив, затем снова запустите "
-    "установщик.",
-    "インストーラーと同じ場所にファイルがありません: {name}\n\nまず zip をすべて展開してから、もう一度インストーラーを実行してください。",
-    "安装程序旁缺少一个文件：{name}\n\n请先解压整个 zip，再重新运行安装程序。",
-};
-constexpr Texts kFolderFailed = {
-    "The install folder could not be created.",
-    "Le dossier d'installation n'a pas pu être créé.",
-    "Der Installationsordner konnte nicht erstellt werden.",
-    "No se pudo crear la carpeta de instalación.",
-    "Não foi possível criar a pasta de instalação.",
-    "Не удалось создать папку установки.",
-    "インストール先のフォルダーを作成できませんでした。",
-    "无法创建安装文件夹。",
-};
-constexpr Texts kCopyFailed = {
-    "The install could not copy {name}. Close Apple Music, then run the install again.",
-    "L'installation n'a pas pu copier {name}. Fermez Apple Music, puis relancez l'installation.",
-    "Die Installation konnte {name} nicht kopieren. Schließen Sie Apple Music und starten Sie die Installation erneut.",
-    "La instalación no pudo copiar {name}. Cierra Apple Music y vuelve a ejecutar la instalación.",
-    "A instalação não conseguiu copiar {name}. Feche o Apple Music e execute a instalação de novo.",
-    "Установщику не удалось скопировать {name}. Закройте Apple Music и запустите установку снова.",
-    "{name} をコピーできませんでした。Apple Music を閉じてから、もう一度インストールしてください。",
-    "安装无法复制 {name}。请关闭 Apple Music，然后重新运行安装。",
-};
-constexpr Texts kAskUninstall = {
-    "Uninstall Ampify for Apple Music?\n\nApple Music goes back to exactly how it was, without Ampify.",
-    "Désinstaller Ampify pour Apple Music ?\n\nApple Music redevient exactement comme avant, sans Ampify.",
-    "Ampify für Apple Music deinstallieren?\n\nApple Music wird wieder genau so wie vorher, ohne Ampify.",
-    "¿Desinstalar Ampify para Apple Music?\n\nApple Music vuelve a quedar exactamente como estaba, sin Ampify.",
-    "Desinstalar o Ampify do Apple Music?\n\nO Apple Music volta a ser exatamente como era, sem o Ampify.",
-    "Удалить Ampify для Apple Music?\n\nApple Music вернётся в точности к прежнему виду, без Ampify.",
-    "Apple Music 用の Ampify をアンインストールしますか?\n\nApple Music は Ampify を入れる前とまったく同じ状態に戻ります。",
-    "要卸载 Apple Music 的 Ampify 吗？\n\nApple Music 将完全恢复原样，不再有 Ampify。",
-};
-constexpr Texts kAskKeepData = {
-    "Keep your themes, extensions and settings?\n\nYes: they stay in {folder}.\nNo: they are deleted.",
-    "Garder vos thèmes, extensions et réglages ?\n\nOui : ils restent dans {folder}.\nNon : ils sont supprimés.",
-    "Ihre Designs, Erweiterungen und Einstellungen behalten?\n\nJa: Sie bleiben in {folder}.\nNein: Sie werden "
-    "gelöscht.",
-    "¿Conservar tus temas, extensiones y ajustes?\n\nSí: se quedan en {folder}.\nNo: se eliminan.",
-    "Manter seus temas, extensões e ajustes?\n\nSim: eles ficam em {folder}.\nNão: eles são apagados.",
-    "Сохранить ваши темы, расширения и настройки?\n\nДа: они останутся в {folder}.\nНет: они будут удалены.",
-    "テーマ、拡張機能、設定を残しますか?\n\nはい: {folder} に残ります。\nいいえ: 削除されます。",
-    "保留你的主题、扩展和设置吗？\n\n是：它们保留在 {folder}。\n否：它们将被删除。",
-};
-constexpr Texts kStopFailed = {
-    "Ampify could not stop its background program. Try again.",
-    "Ampify n'a pas pu arrêter son programme en arrière-plan. Réessayez.",
-    "Ampify konnte sein Hintergrundprogramm nicht beenden. Versuchen Sie es erneut.",
-    "Ampify no pudo detener su programa en segundo plano. Inténtalo de nuevo.",
-    "O Ampify não conseguiu parar seu programa em segundo plano. Tente de novo.",
-    "Ampify не удалось остановить свою фоновую программу. Попробуйте снова.",
-    "Ampify のバックグラウンドプログラムを停止できませんでした。もう一度お試しください。",
-    "Ampify 无法停止其后台程序。请再试一次。",
-};
-constexpr Texts kRemoveFailed = {
-    "Could not remove {name}. Close Apple Music, then run the uninstall again.",
-    "Impossible de supprimer {name}. Fermez Apple Music, puis relancez la désinstallation.",
-    "{name} konnte nicht entfernt werden. Schließen Sie Apple Music und starten Sie die Deinstallation erneut.",
-    "No se pudo eliminar {name}. Cierra Apple Music y vuelve a ejecutar la desinstalación.",
-    "Não foi possível remover {name}. Feche o Apple Music e execute a desinstalação de novo.",
-    "Не удалось удалить {name}. Закройте Apple Music и запустите удаление снова.",
-    "{name} を削除できませんでした。Apple Music を閉じてから、もう一度アンインストールしてください。",
-    "无法删除 {name}。请关闭 Apple Music，然后重新运行卸载。",
-};
-constexpr Texts kUninstalled = {
-    "Ampify is uninstalled. Apple Music is back to normal.",
-    "Ampify est désinstallé. Apple Music est revenu à la normale.",
-    "Ampify ist deinstalliert. Apple Music ist wieder wie vorher.",
-    "Ampify se ha desinstalado. Apple Music ha vuelto a la normalidad.",
-    "O Ampify foi desinstalado. O Apple Music voltou ao normal.",
-    "Ampify удалён. Apple Music снова работает как обычно.",
-    "Ampify をアンインストールしました。Apple Music は元に戻りました。",
-    "Ampify 已卸载。Apple Music 已恢复正常。",
-};
-constexpr Texts kDataKept = {
-    "\n\nYour themes, extensions and settings were kept in {folder}.",
-    "\n\nVos thèmes, extensions et réglages ont été gardés dans {folder}.",
-    "\n\nIhre Designs, Erweiterungen und Einstellungen wurden in {folder} behalten.",
-    "\n\nTus temas, extensiones y ajustes se conservaron en {folder}.",
-    "\n\nSeus temas, extensões e ajustes foram mantidos em {folder}.",
-    "\n\nВаши темы, расширения и настройки сохранены в {folder}.",
-    "\n\nテーマ、拡張機能、設定は {folder} に残してあります。",
-    "\n\n你的主题、扩展和设置已保留在 {folder}。",
-};
-
-// The Windows display language, as the kernel names it ("fr", "zh", "zh-hant"...).
-std::string DisplayLanguage() {
-    wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
-    if (LCIDToLocaleName(MAKELCID(GetUserDefaultUILanguage(), SORT_DEFAULT), name, LOCALE_NAME_MAX_LENGTH, 0) == 0) {
-        return "en";
-    }
-    return ampify::i18n::LanguageCode(ampify::win::ToUtf8(name));
-}
-
 // The text in the display language, English for a language Ampify does not speak, with its placeholders filled.
-std::wstring Tr(const Texts& texts, ampify::i18n::Args args = {}) {
-    static const std::string language = DisplayLanguage();
-    const char* const columns[] = {texts.fr, texts.de, texts.es, texts.pt, texts.ru, texts.ja, texts.zh};
-    static_assert(std::size(columns) == std::size(ampify::kTranslationLanguages),
-                  "Texts needs one column per language of facts/release.json, in its order");
-    const char* chosen = texts.en;
-    for (std::size_t i = 0; i < std::size(columns); i++) {
-        if (ampify::kTranslationLanguages[i] == language) chosen = columns[i];
-    }
-    return ampify::win::FromUtf8(ampify::i18n::Format(chosen, args));
+std::wstring Tr(const char* key, ampify::i18n::Args args = {}) {
+    return ampify::win::FromUtf8(ampify::i18n::Text(key, args));
 }
 
 bool HasFlag(int argc, wchar_t** argv, const wchar_t* flag) {
@@ -424,13 +209,13 @@ bool CloseAppleMusic(Log& log) {
 
 // Apple Music is open: asks, then closes it. False when the user says no or it stays open (already told to the user).
 bool CloseAppleMusicWithConsent(Log& log) {
-    if (!ampify::win::AskYesNo(Tr(kAskCloseAppleMusic), L"Ampify")) {
+    if (!ampify::win::AskYesNo(Tr("setup.askCloseAppleMusic"), L"Ampify")) {
         log.Write("Apple Music is open and the user chose to keep it: nothing changed");
         return false;
     }
     if (!CloseAppleMusic(log)) {
         log.Write("Apple Music could not be closed");
-        ampify::win::ShowMessage(Tr(kCloseFailed), true);
+        ampify::win::ShowMessage(Tr("setup.closeFailed"), true);
         return false;
     }
     return true;
@@ -559,12 +344,12 @@ AutoStartResult SetUpAutoStart(const fs::path& launcher, Log& log) {
 
 // `asksToOpen` tells whether the message ends with the question "open Apple Music now?".
 std::wstring InstalledMessage(const AutoStartResult& autoStart, bool appleMusicFound, bool bundledOk, bool& asksToOpen) {
-    std::wstring text = Tr(kInstalled);
-    if (!autoStart.registered || !autoStart.started) text += Tr(kNoBackground);
-    if (!appleMusicFound) text += Tr(kNoAppleMusic);
-    if (!bundledOk) text += Tr(kBundledFailed);
+    std::wstring text = Tr("setup.installed");
+    if (!autoStart.registered || !autoStart.started) text += Tr("setup.noBackground");
+    if (!appleMusicFound) text += Tr("setup.noAppleMusic");
+    if (!bundledOk) text += Tr("setup.bundledFailed");
     asksToOpen = appleMusicFound && autoStart.registered && autoStart.started;
-    if (asksToOpen) text += Tr(kOpenNow);
+    if (asksToOpen) text += Tr("setup.openNow");
     return text;
 }
 
@@ -627,7 +412,7 @@ int Install(bool silent) {
             std::string message = "File missing next to the installer: " + std::string(name);
             log.Write(message);
             if (!silent) {
-                ampify::win::ShowMessage(Tr(kFileMissing, {{"name", name}}), true);
+                ampify::win::ShowMessage(Tr("setup.fileMissing", {{"name", name}}), true);
             }
             return kExitError;
         }
@@ -664,7 +449,7 @@ int Install(bool silent) {
     if (error) {
         log.Write("Could not create the folder: " + error.message());
         if (!silent) {
-            ampify::win::ShowMessage(Tr(kFolderFailed), true);
+            ampify::win::ShowMessage(Tr("setup.folderFailed"), true);
         }
         return stopHere(kExitError);
     }
@@ -673,7 +458,7 @@ int Install(bool silent) {
         std::wstring wideName = ampify::win::FromUtf8(name);
         if (!CopyKitFile(source / wideName, target / wideName, log)) {
             if (!silent) {
-                ampify::win::ShowMessage(Tr(kCopyFailed, {{"name", name}}), true);
+                ampify::win::ShowMessage(Tr("setup.copyFailed", {{"name", name}}), true);
             }
             return stopHere(kExitRefused);
         }
@@ -748,7 +533,7 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
 
     if (silent && AppleMusicRunning()) return kExitRefused;
 
-    if (!silent && !ampify::win::AskYesNo(Tr(kAskUninstall), L"Ampify")) {
+    if (!silent && !ampify::win::AskYesNo(Tr("setup.askUninstall"), L"Ampify")) {
         return kExitDone;
     }
 
@@ -758,7 +543,7 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
         keepData = false;
     } else if (!keepFlag && !silent) {
         std::string folder = ampify::win::ToUtf8(ampify::win::KitDirectory().wstring());
-        keepData = ampify::win::AskYesNo(Tr(kAskKeepData, {{"folder", folder}}), L"Ampify");
+        keepData = ampify::win::AskYesNo(Tr("setup.askKeepData", {{"folder", folder}}), L"Ampify");
     }
 
     Log log(keepData ? ampify::win::JournalFile("uninstall.log") : fs::path());
@@ -773,7 +558,7 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
     if (!ampify::win::StopBackground()) {
         log.Write("The background launcher did not stop");
         if (!silent) {
-            ampify::win::ShowMessage(Tr(kStopFailed), true);
+            ampify::win::ShowMessage(Tr("setup.stopFailed"), true);
         }
         return kExitRefused;
     }
@@ -788,7 +573,7 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
         if (error && fs::exists(target / wideName)) {
             log.Write("Could not remove " + std::string(name) + ": " + error.message());
             if (!silent) {
-                ampify::win::ShowMessage(Tr(kRemoveFailed, {{"name", name}}), true);
+                ampify::win::ShowMessage(Tr("setup.removeFailed", {{"name", name}}), true);
             }
             return kExitRefused;
         }
@@ -825,8 +610,8 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
 
     log.Write("Uninstall finished");
     if (!silent) {
-        std::wstring text = Tr(kUninstalled);
-        if (keepData) text += Tr(kDataKept, {{"folder", ampify::win::ToUtf8(ampify::win::KitDirectory().wstring())}});
+        std::wstring text = Tr("setup.uninstalled");
+        if (keepData) text += Tr("setup.dataKept", {{"folder", ampify::win::ToUtf8(ampify::win::KitDirectory().wstring())}});
 
         ampify::win::ShowMessage(text);
     }
@@ -838,6 +623,7 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    ampify::i18n::SetLanguage(ampify::i18n::LanguageCode(ampify::win::UserLocaleName()));
 
     int argc = 0;
     wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);

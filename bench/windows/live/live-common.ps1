@@ -4,8 +4,8 @@
 
 Set-StrictMode -Version Latest
 
-. (Join-Path $PSScriptRoot '..\lib\uia.ps1')
-. (Join-Path $PSScriptRoot '..\lib\audio.ps1')
+. (Join-Path $PSScriptRoot 'lib\uia.ps1')
+. (Join-Path $PSScriptRoot 'lib\audio.ps1')
 
 # Storefront of the test account for the music:// links (fr by default).
 $script:LiveStorefront = if ($env:AMPIFY_STOREFRONT) { $env:AMPIFY_STOREFRONT } else { 'fr' }

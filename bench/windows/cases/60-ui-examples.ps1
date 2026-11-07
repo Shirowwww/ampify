@@ -2,14 +2,10 @@
 # Needs $script:BenchKitRoot\ui\ampify.exe and a copy of
 # themes/ in $script:BenchKitRoot\ui\themes.
 
-Register-Case -Id 'ui-examples' -Title 'UI: the example themes are usable (ampify theme check)' -Action {
+Register-Case -Id 'ui-examples' -Title 'UI: the example themes are usable (ampify theme check)' -Requires 'kit:ui' -Action {
     param($Ctx)
 
     $check = Join-Path $script:BenchKitRoot 'ui\ampify.exe'
-    if (-not (Test-Path -LiteralPath $check)) {
-        Add-Skip -Ctx $Ctx -Name 'ampify.exe present' -Reason "no UI build in this kit: $check"
-        return
-    }
 
     $examples = Join-Path $script:BenchKitRoot 'ui\themes'
     foreach ($name in Get-ChildItem -LiteralPath $examples -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'manifest.json') } | ForEach-Object Name) {

@@ -64,9 +64,6 @@ public:
     // except a line in the journal.
     void DeliverEvent(const std::string& entry, const std::string& payload);
 
-    // Settings prefix of the element: "extensions." or "apps.".
-    std::string ConfigPrefix() const;
-
 private:
     friend struct ScriptBridge;  // the natives of the API modules (src/core/api/bridge.hpp)
 

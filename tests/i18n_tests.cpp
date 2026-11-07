@@ -9,6 +9,7 @@
 #include "../src/cli/element.hpp"
 #include "../src/cli/messages.hpp"
 #include "../src/core/i18n.hpp"
+#include "../src/core/text_util.hpp"
 #include "service_host.hpp"
 #include "support.hpp"
 #include "test.hpp"
@@ -44,10 +45,10 @@ TEST_CASE(I18n_LanguageCodeIsTheFirstTwoLettersOfTheLocale) {
     CHECK(ampify::i18n::LanguageCode("POSIX") == "en");
 }
 
-TEST_CASE(I18n_LookupFallsBackToTheKeyAndFormatFillsPlaceholders) {
+TEST_CASE(I18n_LookupReportsAMissingKeyAndTextShowsIt) {
     const ampify::i18n::Message table[] = {{"a", "hello {name}"}};
     CHECK(ampify::i18n::Lookup(table, "a") == "hello {name}");
-    CHECK(ampify::i18n::Lookup(table, "absent") == "absent");
+    CHECK(!ampify::i18n::Lookup(table, "absent").has_value());
     CHECK(ampify::i18n::Format("hello {name}, {name}! {other}", {{"name", "Lea"}}) == "hello Lea, Lea! {other}");
     CHECK(ampify::i18n::Format("{x}{y}", {{"x", "1"}, {"y", "2"}}) == "12");
     CHECK(ampify::i18n::Format("lone { brace") == "lone { brace");
@@ -60,7 +61,7 @@ TEST_CASE(I18n_LookupFallsBackToTheKeyAndFormatFillsPlaceholders) {
 TEST_CASE(I18n_EveryTextIsFilledAndEveryKeyIsUnique) {
     CheckTable(ampify::i18n::KitMessages(), "kit");
     CheckTable(ampify::cli::CliMessages(), "cli");
-    std::string help(ampify::i18n::Lookup(ampify::cli::CliMessages(), "help"));
+    std::string help(ampify::i18n::Lookup(ampify::cli::CliMessages(), "help").value_or(""));
     for (const char* command : {"install <id>", "theme    check", "export <", "--kit-dir"}) {
         CHECK(help.find(command) != std::string::npos);
     }
@@ -77,7 +78,7 @@ TEST_CASE(I18n_FrenchTextsForWhatPeopleSeeAndEnglishForTheRest) {
     ampify::i18n::SetLanguage("it");
     CHECK(ampify::i18n::Text("ui.on") == "On");  // a language without a table reads English
     ampify::i18n::SetLanguage("zh-hant");
-    CHECK(ampify::i18n::Text("ui.on") == "On");
+    CHECK(ampify::i18n::Text("ui.on") == "开");  // Traditional Chinese reads the Simplified table
     ampify::i18n::SetLanguage("de");
     CHECK(ampify::i18n::Text("ui.on") == "Ein");
     CHECK(ampify::i18n::Text("mods.themeTitle", {{"name", "Nord"}}) == "Design: Nord");
@@ -89,8 +90,26 @@ TEST_CASE(I18n_FrenchTextsForWhatPeopleSeeAndEnglishForTheRest) {
     CHECK(ampify::i18n::Text("ui.on") == "On");
     // Every French key is one of the English table, so nothing French goes untranslated back to English by mistake.
     for (const ampify::i18n::Message& message : ampify::i18n::KitMessagesIn("fr")) {
-        CHECK(ampify::i18n::Lookup(ampify::i18n::KitMessages(), message.key) != message.key);
+        CHECK(ampify::i18n::Lookup(ampify::i18n::KitMessages(), message.key).has_value());
     }
+}
+
+TEST_CASE(I18n_PreferredLocaleIsTheSettingThenTheSystemThenEnglish) {
+    CHECK(ampify::i18n::PreferredLocale("de", "fr-FR") == "de");
+    CHECK(ampify::i18n::PreferredLocale("", "fr-FR") == "fr-FR");
+    CHECK(ampify::i18n::PreferredLocale("", "") == "en");
+    CHECK(ampify::i18n::LanguageCode(ampify::i18n::PreferredLocale("", "")) == "en");
+}
+
+TEST_CASE(I18n_TheInstallerTextsAreInEveryLanguage) {
+    ampify::test::LanguageScope scope("en");
+    CHECK(ampify::i18n::Text("setup.installed") == "Ampify is installed.");
+    CHECK(ampify::i18n::Text("setup.fileMissing", {{"name", "x"}}) ==
+          "A file is missing next to the installer: x\n\nExtract the whole zip first, then run the installer again.");
+    ampify::i18n::SetLanguage("fr");
+    CHECK(ampify::i18n::Text("setup.installed") == "Ampify est installé.");
+    ampify::i18n::SetLanguage("zh");
+    CHECK(ampify::i18n::Text("setup.installed") == "Ampify 已安装。");
 }
 
 TEST_CASE(I18n_TheListedLanguagesAreTheOnesWithATable) {
@@ -112,9 +131,9 @@ TEST_CASE(I18n_EveryLanguageTranslatesWhatTheFrenchTableDoes) {
         CheckTable(table, std::string(language).c_str());
         CHECK(table.size() == french.size());
         for (const ampify::i18n::Message& message : french) {
-            std::string_view text = ampify::i18n::Lookup(table, message.key);
-            CHECK(text != message.key);  // present
-            CHECK(ampify::i18n::Placeholders(text) == ampify::i18n::Placeholders(message.text));
+            auto text = ampify::i18n::Lookup(table, message.key);
+            REQUIRE(text.has_value());
+            CHECK(ampify::i18n::Placeholders(*text) == ampify::i18n::Placeholders(message.text));
         }
     }
 }
@@ -124,10 +143,10 @@ TEST_CASE(I18n_TheOffNoticesFitInABalloonInEveryLanguage) {
     for (const char* language : {"en", "fr", "de", "es", "pt", "ru", "ja", "zh"}) {
         auto table = std::string_view(language) == "en" ? ampify::i18n::KitMessages() : ampify::i18n::KitMessagesIn(language);
         for (const char* group : {"off.version", "off.listed", "off.exports", "off.safe"}) {
-            std::string title = std::string(ampify::i18n::Lookup(table, std::string(group) + "Title"));
-            std::string text = std::string(ampify::i18n::Lookup(table, std::string(group) + "Text"));
-            CHECK(ampify::CharacterCount(title) < 64);
-            CHECK(ampify::CharacterCount(text) < 256);
+            std::string title(ampify::i18n::Lookup(table, std::string(group) + "Title").value_or("off.missing"));
+            std::string text(ampify::i18n::Lookup(table, std::string(group) + "Text").value_or("off.missing"));
+            CHECK(ampify::CodePointCount(title) < 64);
+            CHECK(ampify::CodePointCount(text) < 256);
             CHECK(title.find("off.") == std::string::npos);
         }
     }

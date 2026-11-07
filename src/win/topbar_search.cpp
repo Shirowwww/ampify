@@ -4,6 +4,7 @@
 
 #include "xaml_host.hpp"
 
+#include "../core/i18n.hpp"
 #include "../core/journal.hpp"
 #include "../core/topbar.hpp"
 
@@ -478,7 +479,7 @@ void LayOut(State& state, const xaml::UIElement& content) {
     state.back.IsEnabled(apple && apple.IsEnabled() && apple.Visibility() == xaml::Visibility::Visible);
     if (apple) {
         winrt::hstring name = xaml::Automation::AutomationProperties::GetName(apple);
-        xaml::Automation::AutomationProperties::SetName(state.back, name.empty() ? winrt::hstring(L"Back") : name);
+        xaml::Automation::AutomationProperties::SetName(state.back, name.empty() ? winrt::to_hstring(i18n::Text("page.back")) : name);
     }
     std::vector<DeviceRect> rects{ToDeviceRect(layout.back, scale), ToDeviceRect(layout.search, scale)};
     AddSuggestions(state, scale, rects);

@@ -356,11 +356,6 @@ void WatchSettingsEntry(UiService::Shared& shared, const std::shared_ptr<WindowC
 // ui_service_mods.cpp
 void OpenKitFolder(const std::filesystem::path& kit);
 
-// The kind of an element as the settings functions name it: "extension", "theme" or "snippet".
-inline std::string_view SettingKindOf(const uirender::ModEntry& mod) {
-    return mod.snippet ? "snippet" : mod.theme ? "theme" : "extension";
-}
-
 // Export and import of one element's settings, as a file and through the clipboard (ui_service_settings_io.cpp).
 // `say` shows a short line under the card; `refresh` builds the card again from settings.txt, then shows its line.
 using SettingsSay = std::function<void(const std::string&)>;

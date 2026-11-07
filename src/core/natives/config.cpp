@@ -14,7 +14,7 @@ namespace {
 
 // Keys look like `theme.scheme`: letters, digits, '.', '-' and '_', starting with a letter or a digit.
 bool ValidConfigKey(const std::string& key) {
-    if (key.empty() || key.size() > 64 || key == "enabled") return false;
+    if (key.empty() || key.size() > 64 || key == kEnabledKey) return false;
     if (key.find("..") != std::string::npos) return false;
     if (!std::isalnum(static_cast<unsigned char>(key[0]))) return false;
     return std::all_of(key.begin(), key.end(), [](char c) {
@@ -27,7 +27,7 @@ struct ConfigNatives : ScriptBridge {
         ScriptExtension* ext = Owner(ctx);
         std::string key = String(ctx, argc, argv, 0).value_or("");
         if (!ValidConfigKey(key)) return Throw(ctx, "TypeError", "invalid setting key: " + key);
-        std::optional<std::string> value = HostOf(ext).ReadSetting(ext->ConfigPrefix() + ext->id() + "." + key);
+        std::optional<std::string> value = HostOf(ext).ReadSetting(ext->manifest().Ref().SettingsPrefix() + key);
         return value ? JS_NewStringLen(ctx, value->data(), value->size()) : JS_UNDEFINED;
     }
 
@@ -52,7 +52,7 @@ struct ConfigNatives : ScriptBridge {
         std::string key = String(ctx, argc, argv, 0).value_or("");
         std::string value = String(ctx, argc, argv, 1).value_or("");
         if (!ValidConfigKey(key)) return Throw(ctx, "TypeError", "invalid setting key: " + key);
-        HostOf(ext).WriteSetting(ext->ConfigPrefix() + ext->id() + "." + key, value);
+        HostOf(ext).WriteSetting(ext->manifest().Ref().SettingsPrefix() + key, value);
         return JS_UNDEFINED;
     }
 };

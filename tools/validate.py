@@ -325,6 +325,26 @@ SEMANTIC_CHECKS = {
 }
 
 
+def load_schema(kind):
+    """The schema of a kind of file, checked to stay inside the supported subset."""
+    with open(SCHEMAS[kind], encoding="utf-8") as handle:
+        schema = json.load(handle)
+    check_supported(schema, "schema")
+    return schema
+
+
+def check_file(kind, path, schema=None):
+    """The problems of one file as a list of messages, empty when it is valid.
+
+    Raises OSError, ValueError, SchemaError or re.error when the file cannot be checked at all."""
+    schema = schema or load_schema(kind)
+    with open(path, encoding="utf-8") as handle:
+        document = json.load(handle)
+    errors = []
+    validate(document, schema, schema, "", errors)
+    return errors or SEMANTIC_CHECKS[kind](document, path)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Check the catalog, the list of versions or element manifests.")
     parser.add_argument("kind", choices=sorted(SCHEMAS), help="what the file contains")
@@ -332,9 +352,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     try:
-        with open(SCHEMAS[args.kind], encoding="utf-8") as handle:
-            schema = json.load(handle)
-        check_supported(schema, "schema")
+        schema = load_schema(args.kind)
     except (OSError, ValueError, SchemaError) as error:
         print(f"unusable {args.kind} schema: {error}", file=sys.stderr)
         return 2
@@ -342,12 +360,7 @@ def main(argv=None):
     status = 0
     for path in args.files:
         try:
-            with open(path, encoding="utf-8") as handle:
-                document = json.load(handle)
-            errors = []
-            validate(document, schema, schema, "", errors)
-            if not errors:
-                errors = SEMANTIC_CHECKS[args.kind](document, path)
+            errors = check_file(args.kind, path, schema)
         except (OSError, ValueError, SchemaError, re.error) as error:
             print(f"{path}: cannot check: {error}", file=sys.stderr)
             return 2

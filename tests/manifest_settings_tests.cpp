@@ -23,6 +23,13 @@ ampify::ManifestResult Check(const std::string& json) {
     return ampify::ParseManifest(json, "hello-extension", 1, [](const std::string& file) { return file == "main.js"; });
 }
 
+// The errors of a manifest's settings field, as the theme engine reads them.
+std::vector<std::string> SettingsErrorsOf(const std::string& manifest) {
+    std::vector<std::string> errors;
+    ampify::DeclaredSettings(manifest, &errors);
+    return errors;
+}
+
 const std::string kToggle = R"({"key": "a", "label": "A", "type": "toggle", "default": true)";
 
 }  // namespace
@@ -48,9 +55,9 @@ TEST_CASE(ManifestSettings_RefusesAGroupOrADescriptionThatDoesNotFit) {
         kToggle + R"(, "group": 3})",
     };
     for (const std::string& setting : wrong) {
-        CHECK(!ampify::SettingsErrors(WithFields("[" + setting + "]")).empty());
+        CHECK(!SettingsErrorsOf(WithFields("[" + setting + "]")).empty());
     }
-    CHECK(ampify::SettingsErrors(WithFields("[" + kToggle + ", \"group\": \"Clock\", \"description\": \"Ok.\"}]")).empty());
+    CHECK(SettingsErrorsOf(WithFields("[" + kToggle + ", \"group\": \"Clock\", \"description\": \"Ok.\"}]")).empty());
 }
 
 TEST_CASE(ManifestSettings_TranslatesGroupsAndSettingDescriptions) {

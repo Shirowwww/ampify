@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "../host.hpp"
+#include "../permissions.hpp"
 
 namespace ampify {
 
@@ -18,14 +19,6 @@ inline bool IsOnText(std::string_view value) {
         if (c != ' ' && c != '\t') lowered.push_back(static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c));
     }
     return lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes";
-}
-
-// The service setting a permission needs, or null. Remote control has no permission: it is the user's alone.
-inline const char* ServiceSettingOf(std::string_view permission) {
-    if (permission == "ipc.discord") return "discord.enabled";
-    if (permission == "ui.tray") return "tray.enabled";
-    if (permission == "midi.input") return "midi.enabled";
-    return nullptr;
 }
 
 inline bool ServiceEnabled(Host& host, const std::string& key) {

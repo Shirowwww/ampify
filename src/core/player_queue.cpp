@@ -37,7 +37,7 @@ bool IsValidQueueId(std::string_view id) {
 }
 
 bool IsCatalogId(std::string_view id) {
-    if (id.empty() || id.size() > 19) return false;
+    if (id.empty() || id.size() > 19 || id == "0") return false;
     for (char c : id) {
         if (c < '0' || c > '9') return false;
     }
@@ -45,20 +45,26 @@ bool IsCatalogId(std::string_view id) {
 }
 
 namespace {
-constexpr std::string_view kQueueArtworkPrefix = "artwork:";
+constexpr std::string_view kAppleArtwork = "artwork";
+constexpr char kQueueItemSeparator = ':';
 }  // namespace
 
-std::string QueueArtworkSource(uint64_t itemId) {
-    return std::string(kQueueArtworkPrefix) + std::to_string(itemId);
+std::string AppleArtworkSource(const AppleArtwork& artwork) {
+    std::string source(kAppleArtwork);
+    if (artwork.queueItem) source += kQueueItemSeparator + std::to_string(*artwork.queueItem);
+    return source;
 }
 
-std::optional<uint64_t> QueueArtworkItem(std::string_view source) {
-    if (!source.starts_with(kQueueArtworkPrefix)) return std::nullopt;
-    std::string_view digits = source.substr(kQueueArtworkPrefix.size());
+std::optional<AppleArtwork> ParseAppleArtworkSource(std::string_view source) {
+    if (!source.starts_with(kAppleArtwork)) return std::nullopt;
+    std::string_view rest = source.substr(kAppleArtwork.size());
+    if (rest.empty()) return AppleArtwork{};
+    if (rest.front() != kQueueItemSeparator) return std::nullopt;
+    std::string_view digits = rest.substr(1);
     uint64_t id = 0;
     auto [end, error] = std::from_chars(digits.data(), digits.data() + digits.size(), id);
     if (digits.empty() || error != std::errc() || end != digits.data() + digits.size()) return std::nullopt;
-    return id;
+    return AppleArtwork{id};
 }
 
 bool ParseQueuePosition(std::string_view text, QueuePosition& position) {

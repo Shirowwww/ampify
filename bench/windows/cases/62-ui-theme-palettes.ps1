@@ -4,15 +4,11 @@
 # Job: MSVC (msvc-build), AMPIFY_XAML=ON and AMPIFY_BENCH=ON build (otherwise the injection refuses the runner's version).
 # Needs $script:BenchKitRoot\ui\ with ampify_launcher.exe, ampify_kernel.dll, and themes\palettes.
 
-Register-Case -Id 'ui-theme-palettes' -Title 'UI: the palettes theme applies, then is removed without a restart' -Requires 'apple-music' -Action {
+Register-Case -Id 'ui-theme-palettes' -Title 'UI: the palettes theme applies, then is removed without a restart' -Requires 'apple-music', 'kit:ui' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'ui\ampify_launcher.exe'
     $example = Join-Path $script:BenchKitRoot 'ui\themes\palettes'
-    if (-not (Test-Path -LiteralPath $launcher) -or -not (Test-Path -LiteralPath $example)) {
-        Add-Skip -Ctx $Ctx -Name 'UI build and palettes theme present' -Reason ("no UI build in this bench: " + "$launcher / $example")
-        return
-    }
 
     # The palettes theme is copied into the user's Ampify folder, as in step 2 of the UI test.
     $themes = Join-Path $script:KitDir 'themes'
@@ -28,15 +24,7 @@ Register-Case -Id 'ui-theme-palettes' -Title 'UI: the palettes theme applies, th
     }
 
     Reset-KitState
-    $settings = Join-Path $script:KitDir 'settings.txt'
-    $lines = @()
-    if (Test-Path -LiteralPath $settings) {
-        $lines = @(Get-Content -LiteralPath $settings -Encoding UTF8 | Where-Object { $_ -notmatch '^\s*theme\.(active|scheme|inspect)\s*=' })
-    }
-    $lines += 'theme.active = palettes'
-    $lines += 'theme.scheme = Midnight'
-    $lines += 'theme.inspect = 0'
-    Set-Content -LiteralPath $settings -Value $lines -Encoding UTF8
+    Set-Settings -Values @{ 'theme.active' = 'palettes'; 'theme.scheme' = 'Midnight'; 'theme.inspect' = '0' }
 
     $since = Get-Date
     $launcherProcess = Start-Launcher -LauncherPath $launcher
@@ -47,9 +35,7 @@ Register-Case -Id 'ui-theme-palettes' -Title 'UI: the palettes theme applies, th
         Close-AppleMusic | Out-Null
         return
     }
-    # New runner: the MPEG LA licence opens before the main window, which the kernel waits for.
-    $firstRun = Close-AppleMusicFirstRun
-    Add-Info -Ctx $Ctx -Name 'first launch of Apple Music' -Detail "$firstRun screen(s) closed (licence, welcome)"
+    Clear-FirstRun -Ctx $Ctx
 
     $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text 'Themes: interface thread ready (DispatcherQueue of the main window)' -TimeoutSeconds 90
     Add-Check -Ctx $Ctx -Name 'interface thread ready (DispatcherQueue)' -Passed $hooked
@@ -73,10 +59,7 @@ Register-Case -Id 'ui-theme-palettes' -Title 'UI: the palettes theme applies, th
     Save-Screenshot -Ctx $Ctx -Name 'palettes-applied' | Out-Null
 
     if (Test-Path -LiteralPath (Join-Path $themes 'glass')) {
-        $switch = @(Get-Content -LiteralPath $settings -Encoding UTF8 | Where-Object { $_ -notmatch '^\s*theme\.(active|scheme)\s*=' })
-        $switch += 'theme.active = glass'
-        $switch += 'theme.scheme = Midnight'
-        Set-Content -LiteralPath $settings -Value $switch -Encoding UTF8
+        Set-Settings -Values @{ 'theme.active' = 'glass'; 'theme.scheme' = 'Midnight' }
         $glassPattern = 'Theme "glass": (\d+) value\(s\) applied'
         $glassApplied = Wait-Until -TimeoutSeconds 60 -Condition { $null -ne (Find-JournalMatch -FileName 'AppleMusic.log' -Pattern $glassPattern) }
         $glassCount = 0
@@ -88,9 +71,7 @@ Register-Case -Id 'ui-theme-palettes' -Title 'UI: the palettes theme applies, th
     }
 
     # Removal: back to none in settings.txt, without restarting Apple Music.
-    $kept = @(Get-Content -LiteralPath $settings -Encoding UTF8 | Where-Object { $_ -notmatch '^\s*theme\.active\s*=' })
-    $kept += 'theme.active = none'
-    Set-Content -LiteralPath $settings -Value $kept -Encoding UTF8
+    Set-Settings -Values @{ 'theme.active' = 'none' }
 
     $restored = Wait-Journal -FileName 'AppleMusic.log' -Text 'Theme removed: ' -TimeoutSeconds 60
     Add-Check -Ctx $Ctx -Name 'removal without a restart: "Theme removed" in the log' -Passed $restored

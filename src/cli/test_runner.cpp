@@ -225,32 +225,19 @@ int CmdTest(Context& ctx) {
 
     std::filesystem::path folder = Utf8ToPath(args[1]);
     FolderValidation validation = ValidateElementFolder(folder);
-    if (!validation.ok() || !validation.errors.empty() || !validation.manifest) {
+    if (!validation.ok()) {
         ctx.err << Utf8(folder) << ": invalid\n";
         for (const std::string& problem : validation.errors) ctx.err << "  - " << problem << "\n";
         return 1;
     }
-    const ElementManifest& manifest = *validation.manifest;
-
-    // The engine checks the manifest again with its own rules, as it does at load time.
-    std::string text;
-    if (!ReadWholeFile(folder / "manifest.json", text)) return Failure(ctx, "unreadable manifest.json");
-    std::error_code ec;
-    ManifestResult parsed = ampify::ParseManifest(text, FolderName(folder), kKitApiMajor,
-                                               [&](const std::string& file) {
-                                                   return std::filesystem::is_regular_file(folder / file, ec);
-                                               });
-    if (!parsed.manifest) {
-        ctx.err << "the engine refuses the manifest:\n";
-        for (const std::string& problem : parsed.errors) ctx.err << "  - " << problem << "\n";
-        return 1;
-    }
-    for (const std::string& warning : parsed.warnings) ctx.out << "  warning    " << warning << "\n";
+    // The authoring rules hold every rule of loading: what passes them, the kernel loads.
+    const Manifest& manifest = *validation.manifest;
+    for (const std::string& warning : validation.warnings) ctx.out << "  warning    " << warning << "\n";
 
     std::ostringstream journalText;
     Journal journal(journalText);
     TestHost host;
-    ScriptExtension element(*parsed.manifest, folder, host, journal);
+    ScriptExtension element(manifest, folder, host, journal);
     bool started = element.Start();
     if (started) {
         host.PlaySyntheticAudio();  // only when the element asked for analysis frames or the tempo
@@ -264,7 +251,7 @@ int CmdTest(Context& ctx) {
     }
     element.Stop();
 
-    ctx.out << "ampify test: " << manifest.id << " (" << manifest.kind << " " << manifest.version << ")\n";
+    ctx.out << "ampify test: " << manifest.id << " (" << ToString(manifest.kind) << " " << manifest.version << ")\n";
     ctx.out << "  permissions  ";
     if (manifest.permissions.empty()) ctx.out << "none";
     for (size_t i = 0; i < manifest.permissions.size(); i++) ctx.out << (i ? ", " : "") << manifest.permissions[i];

@@ -3,24 +3,16 @@
 # plays sound, which needs the Apple Music account: without playback, it is a finding. The ±1 LU check stays on a
 # real PC (docs/development/testing.md).
 
-Register-Case -Id 'atmos-leveler' -Title 'Atmos leveler on: Apple Music starts, no hook on FairPlay' -Requires 'apple-music' -Action {
+Register-Case -Id 'atmos-leveler' -Title 'Atmos leveler on: Apple Music starts, no hook on FairPlay' -Requires 'apple-music', 'kit:bench' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'bench\ampify_launcher.exe'
-    if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Check -Ctx $Ctx -Name 'bench build present' -Passed $false -Detail $launcher
-        return
-    }
 
     # The case adds the enabling line to settings.txt, then puts the file back as it was at the end.
-    $settings = Join-Path $env:USERPROFILE 'Ampify\settings.txt'
-    $previous = if (Test-Path -LiteralPath $settings) { Get-Content -LiteralPath $settings -Raw -Encoding UTF8 } else { $null }
-    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $savedSettings = Save-Settings
 
     try {
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settings) | Out-Null
-        $base = if ($previous) { $previous.TrimEnd("`r", "`n") + "`r`n" } else { '' }
-        [System.IO.File]::WriteAllText($settings, $base + "extensions.atmos-leveler.enabled = true`r`n", $utf8)
+        Set-Settings -Values @{ 'extensions.atmos-leveler.enabled' = 'true' }
 
         Reset-KitState
         $since = Get-Date
@@ -57,10 +49,6 @@ Register-Case -Id 'atmos-leveler' -Title 'Atmos leveler on: Apple Music starts, 
         Close-AppleMusic | Out-Null
         Add-Check -Ctx $Ctx -Name 'launcher stopped' -Passed ($launcherProcess.WaitForExit(15000))
     } finally {
-        if ($null -eq $previous) {
-            Remove-Item -LiteralPath $settings -ErrorAction SilentlyContinue
-        } else {
-            [System.IO.File]::WriteAllText($settings, $previous, $utf8)
-        }
+        Restore-Settings -Saved $savedSettings
     }
 }

@@ -197,7 +197,8 @@ DWORD WINAPI KernelMain(LPVOID) {
 
     // JavaScript runs on this one thread only: QuickJS is not thread-safe, and the shortcuts are delivered to the
     // thread that registered them. Starting the elements here keeps that true.
-    std::thread([kit] {
+    // Only the process with an interface draws from the now-playing feed (the karaoke, the play bar's links).
+    std::thread([kit, feedsInterface = role == ampify::ProcessRole::AppleMusic] {
         host.StartAll(settings);
         journal.Write("Extension host ready");
         ampify::PlayerWatcher playerWatcher;
@@ -209,9 +210,10 @@ DWORD WINAPI KernelMain(LPVOID) {
                 loader.DeliverKey(elementId, combo);
             });
             loader.Pump();
-            // The player is looked at every 250 ms, and its changes go to the elements that subscribed to them.
-            if (++ticks % 5 == 0) {
+            // Changes of the player go to the elements that subscribed to them.
+            if (++ticks % ampify::kTicksPerPlayerRead == 0) {
                 ampify::PlayerSnapshot snapshot = winHost.Player();
+                if (feedsInterface) winHost.PublishNowPlaying(snapshot);
                 int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                                     std::chrono::steady_clock::now().time_since_epoch())
                                     .count();
@@ -224,7 +226,7 @@ DWORD WINAPI KernelMain(LPVOID) {
                 ServiceReloadRequests(kit, reload, loader, settings);
                 nextReload = std::chrono::steady_clock::now() + kReloadEvery;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            std::this_thread::sleep_for(ampify::kServiceTick);
         }
     }).detach();
 

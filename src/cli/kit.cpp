@@ -13,18 +13,15 @@ namespace ampify {
 
 namespace {
 
-constexpr std::array<std::string_view, 4> kKinds = {"extension", "theme", "app", "snippet"};
-
-// Splits `extensions.<id>.enabled` into its kind and its id. Empty kind when the key has another shape.
+// Splits `extensions.<id>.enabled` into its kind and its id. Empty kind when the key has another shape. A theme has no
+// such key: theme.active names the one on.
 std::pair<std::string, std::string> ParseEnabledKey(const std::string& key) {
-    static const std::pair<std::string_view, std::string_view> kPrefixes[] = {
-        {"extensions.", "extension"}, {"apps.", "app"}, {"snippets.", "snippet"}};
-    constexpr std::string_view kSuffix = ".enabled";
-    for (const auto& [prefix, kind] : kPrefixes) {
-        if (key.size() <= prefix.size() + kSuffix.size()) continue;
-        if (key.compare(0, prefix.size(), prefix) != 0) continue;
-        if (key.compare(key.size() - kSuffix.size(), kSuffix.size(), kSuffix) != 0) continue;
-        return {std::string(kind), key.substr(prefix.size(), key.size() - prefix.size() - kSuffix.size())};
+    const std::string suffix = "." + std::string(kEnabledKey);
+    for (const ElementKindTraits& traits : kElementKinds) {
+        if (traits.kind == ElementKind::Theme) continue;
+        const std::string prefix = std::string(traits.folder) + ".";
+        if (key.size() <= prefix.size() + suffix.size() || !key.starts_with(prefix) || !key.ends_with(suffix)) continue;
+        return {std::string(traits.name), key.substr(prefix.size(), key.size() - prefix.size() - suffix.size())};
     }
     return {};
 }
@@ -32,21 +29,13 @@ std::pair<std::string, std::string> ParseEnabledKey(const std::string& key) {
 }  // namespace
 
 std::string_view FolderOfKind(std::string_view kind) {
-    if (kind == "extension") return "extensions";
-    if (kind == "theme") return "themes";
-    if (kind == "app") return "apps";
-    if (kind == "snippet") return "snippets";
-    return {};
-}
-
-std::string EnabledKey(std::string_view kind, std::string_view id) {
-    std::string_view folder = FolderOfKind(kind);
-    return std::string(folder) + "." + std::string(id) + ".enabled";
+    std::optional<ElementKind> known = KindNamed(kind);
+    return known ? TraitsOf(*known).folder : std::string_view();
 }
 
 std::vector<InstalledElement> ListInstalled(const KitLayout& kit) {
     std::vector<InstalledElement> elements;
-    for (std::string_view kind : kKinds) {
+    for (std::string_view kind : kElementKindNames) {
         std::filesystem::path folder = kit.Folder(kind);
         std::error_code error;
         if (!std::filesystem::is_directory(folder, error)) continue;
@@ -74,8 +63,8 @@ std::vector<InstalledElement> ListInstalled(const KitLayout& kit) {
 }
 
 bool IsEnabled(const Settings& settings, std::string_view kind, std::string_view id) {
-    if (kind == "theme") return settings.GetString("theme.active", "") == id;
-    return settings.GetBool(EnabledKey(kind, id), IsOnByDefault(FolderOfKind(kind), id));
+    std::optional<ElementKind> known = KindNamed(kind);
+    return known && IsElementOn(settings, {*known, std::string(id)});
 }
 
 void SetEnabled(Settings& settings, std::string_view kind, std::string_view id, bool enabled) {
@@ -87,11 +76,13 @@ void SetEnabled(Settings& settings, std::string_view kind, std::string_view id, 
         }
         return;
     }
-    settings.SetBool(EnabledKey(kind, id), enabled);
+    if (std::optional<ElementKind> known = KindNamed(kind)) {
+        settings.SetBool(ElementRef{*known, std::string(id)}.EnabledKey(), enabled);
+    }
 }
 
 std::string ReloadTarget(std::string_view kind, std::string_view id) {
-    return (kind == "app" ? "app:" : "") + std::string(id);
+    return ElementRef{KindNamed(kind).value_or(ElementKind::Extension), std::string(id)}.HostId();
 }
 
 bool AppendReloadRequests(const KitLayout& kit, const std::vector<std::string>& lines, std::string& error) {
@@ -146,7 +137,7 @@ ActiveReport ComputeActive(const KitLayout& kit, const Settings& settings) {
     // A key that says "on" for something the kit does not have is reported, not silently ignored.
     for (const auto& [key, value] : settings.Values()) {
         auto [kind, id] = ParseEnabledKey(key);
-        if (kind.empty() || !IsValidId(id) || !settings.GetBool(key, false)) continue;
+        if (kind.empty() || !IsElementId(id) || !settings.GetBool(key, false)) continue;
         if (kind == "extension" && IsBuiltInExtension(id)) continue;
         bool installed = std::any_of(report.items.begin(), report.items.end(),
                                      [&](const ActiveItem& item) { return item.kind == kind && item.id == id; });

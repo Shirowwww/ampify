@@ -24,6 +24,7 @@
 #include "../core/apple_music.hpp"
 #include "../core/audio/audio_engine.hpp"
 #include "../core/gain_board.hpp"
+#include "../core/i18n.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_watchdog.hpp"
 #include "audio/audio_sharing.hpp"
@@ -274,11 +275,7 @@ std::string WinHost::Process() const { return m_process; }
 std::string WinHost::Locale() const {
     // "language = de" in settings.txt shows Ampify in German whatever the Windows language.
     if (std::optional<std::string> chosen = m_settings.Get("language"); chosen && !chosen->empty()) return *chosen;
-    wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
-    if (GetUserDefaultLocaleName(name, LOCALE_NAME_MAX_LENGTH) == 0) return "fr-FR";
-    std::string narrow;
-    for (const wchar_t* c = name; *c; ++c) narrow += static_cast<char>(*c);  // locale names are ASCII
-    return narrow;
+    return i18n::PreferredLocale("", win::UserLocaleName());
 }
 
 std::optional<std::string> WinHost::ReadSetting(const std::string& key) {
@@ -307,6 +304,8 @@ bool WinHost::WriteStorage(const std::string& elementId, const std::string& json
 // Ampify.player: Apple's player in AppleMusic.exe, the Windows media controls (SMTC), then the media keys. See
 // src/win/player_bridge.*. Never the volume.
 PlayerSnapshot WinHost::Player() { return m_player->Snapshot(); }
+
+void WinHost::PublishNowPlaying(const PlayerSnapshot& snapshot) { m_player->PublishFeed(snapshot); }
 
 bool WinHost::Control(PlayerCommand command, int64_t seekMs) { return m_player->Control(command, seekMs); }
 

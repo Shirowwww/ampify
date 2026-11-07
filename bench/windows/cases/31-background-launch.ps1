@@ -6,7 +6,7 @@
 # The package setting Windows reads, removed the way ampify restore does; by hand when the command line is absent.
 function Remove-AttachSetting {
     param([string]$FullName)
-    $ampify = Join-Path $script:KitRoot 'cli\ampify.exe'
+    $ampify = Join-Path $script:BenchKitRoot 'cli\ampify.exe'
     if (Test-Path -LiteralPath $ampify) {
         & $ampify restore | Out-Null
     }
@@ -15,14 +15,10 @@ function Remove-AttachSetting {
     }
 }
 
-Register-Case -Id 'background-launch' -Title 'Launcher started by Windows: Apple Music opened from its icon gets the kernel' -Requires 'apple-music' -Action {
+Register-Case -Id 'background-launch' -Title 'Launcher started by Windows: Apple Music opened from its icon gets the kernel' -Requires 'apple-music', 'kit:bench' -Action {
     param($Ctx)
 
     $launcher = Join-Path $script:BenchKitRoot 'bench\ampify_launcher.exe'
-    if (-not (Test-Path -LiteralPath $launcher)) {
-        Add-Check -Ctx $Ctx -Name 'bench build present' -Passed $false -Detail $launcher
-        return
-    }
     $fullName = (Get-AppxPackage -Name $script:AppleFacts.package.name -ErrorAction SilentlyContinue | Select-Object -First 1).PackageFullName
 
     Reset-KitState

@@ -84,7 +84,7 @@
       "uniqueItems": true,
       "minItems": 1,
       "maxItems": 2,
-      "description": "Process where the item runs: ui (AppleMusic.exe), engine (AMPLibraryAgent.exe). Both by default.",
+      "description": "Process where the item runs: ui (AppleMusic.exe), engine (AMPLibraryAgent.exe). ui only by default.",
       "items": {"enum": ["ui", "engine"]}
     },
     "appVersions": {

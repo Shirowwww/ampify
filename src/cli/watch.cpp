@@ -8,8 +8,6 @@ namespace ampify {
 
 namespace {
 
-constexpr std::string_view kKinds[] = {"extension", "theme", "app", "snippet"};
-
 // FNV-1a: small, fast and stable across runs, which is all a change detector needs.
 void Mix(std::uint64_t& hash, std::string_view text) {
     for (unsigned char byte : text) {
@@ -59,7 +57,7 @@ std::string KitFingerprint(const KitLayout& kit) {
     std::error_code ec;
 
     if (std::filesystem::is_regular_file(kit.Settings(), ec)) MixFile(hash, kit.Settings(), kit.Root());
-    for (std::string_view kind : kKinds) MixTree(hash, kit.Folder(kind), kit.Root());
+    for (std::string_view kind : kElementKindNames) MixTree(hash, kit.Folder(kind), kit.Root());
     return Hex(hash);
 }
 

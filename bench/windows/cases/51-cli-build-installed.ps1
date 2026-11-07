@@ -1,14 +1,10 @@
 # CLI case: ampify build makes a zip that tar.exe reads, ampify install puts it in the Ampify folder (SHA-256 checked),
 # then export, import and remove work with tar.exe. No Apple Music. Needs dist\cli\ampify.exe.
 
-Register-Case -Id 'cli-build-installed' -Title 'ampify build, install, export, import and remove with tar.exe' -Action {
+Register-Case -Id 'cli-build-installed' -Title 'ampify build, install, export, import and remove with tar.exe' -Requires 'kit:cli' -Action {
     param($Ctx)
 
-    $ampify = Join-Path $script:KitRoot 'cli\ampify.exe'
-    if (-not (Test-Path -LiteralPath $ampify)) {
-        Add-Skip -Ctx $Ctx -Name 'ampify.exe present in dist\cli' -Reason 'missing: add the copy of ampify.exe to the build job'
-        return
-    }
+    $ampify = Join-Path $script:BenchKitRoot 'cli\ampify.exe'
 
     $work = Join-Path ([IO.Path]::GetTempPath()) ('ampify-bench-work-' + [guid]::NewGuid().ToString('N'))
     $kit = Join-Path $work 'kit'

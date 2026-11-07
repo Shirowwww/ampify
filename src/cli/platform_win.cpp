@@ -240,9 +240,7 @@ bool EndProcesses(const std::string& imageName) {
 }
 
 std::string UserLocale() {
-    wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
-    if (GetUserDefaultLocaleName(name, LOCALE_NAME_MAX_LENGTH) == 0) return "en";
-    return ToUtf8(name);
+    return win::UserLocaleName();
 }
 
 bool AskYesNo(const std::string& title, const std::string& text) {

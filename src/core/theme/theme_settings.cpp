@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 
+#include "../element_ref.hpp"
 #include "../text_util.hpp"
 
 namespace ampify::theme {
@@ -109,13 +110,14 @@ std::map<std::string, std::string> ReadValues(const Settings& settings, const st
 
 std::map<std::string, std::string> ReadThemeValues(const Settings& settings, const std::string& id) {
     if (id.empty()) return {};
-    return ReadValues(settings, "themes." + id + ".");
+    return ReadValues(settings, ElementRef{ElementKind::Theme, id}.SettingsPrefix());
 }
 
 std::map<std::string, std::string> ReadSnippetValues(const Settings& settings, const std::string& id) {
     if (id.empty()) return {};
-    std::map<std::string, std::string> values = ReadValues(settings, "snippets." + id + ".");
-    values.erase("enabled");  // the snippet's switch, not one of its settings
+    std::map<std::string, std::string> values =
+        ReadValues(settings, ElementRef{ElementKind::Snippet, id}.SettingsPrefix());
+    values.erase(std::string(kEnabledKey));  // the snippet's switch, not one of its settings
     return values;
 }
 

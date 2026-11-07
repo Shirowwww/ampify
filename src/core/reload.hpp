@@ -26,7 +26,7 @@ struct ReloadRequest {
     bool operator==(const ReloadRequest& other) const = default;
 };
 
-// True for `<id>` or `app:<id>`, with an id made of lowercase letters, digits and dashes.
+// True for `<id>` or `app:<id>` (ElementRef::HostId), with an id as IsElementId takes it.
 bool IsReloadTarget(std::string_view target);
 
 // The requests of complete lines, in file order, without repeats. Blank and unknown lines are skipped.

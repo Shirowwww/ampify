@@ -140,7 +140,8 @@ otherwise. Ids, folder names and command-line messages never change with the lan
 `ampify validate <folder>` and [tools/validate.py](../../tools/validate.py) check, with the same rules: the schema
 (unknown fields refused), `id` equal to the folder name, the `kitApi` major version, the fields required by `kind`,
 that declared files exist, that there is no symbolic link, and that each setting fits its `type`. Apple Music checks
-everything again when it loads the element.
+everything again when it loads the element. A key written twice in one object is not refused, but `ampify validate`
+and Apple Music's log warn about it: write each key once.
 
 ```bash
 python3 tools/validate.py manifest examples/hello-extension/manifest.json
