@@ -28,7 +28,7 @@ Register-Case -Id 'playback-with-kit' -Title 'Stereo then Dolby Atmos playback w
         Reset-KitState
         $since = Get-Date
         $launcherProcess = Start-Launcher -LauncherPath $launcher
-        $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
+        $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher (bench build)' -Passed $launched
         if (-not $launched) { Write-JournalTail -FileName 'launcher.log'; return }
 
@@ -128,7 +128,7 @@ Register-Case -Id 'playback-with-kit' -Title 'Stereo then Dolby Atmos playback w
 
         # Never a hook in FairPlay or its modules. The refusals ("refused") show the guard working and are fine.
         $all = [string](Read-Journal 'AppleMusic.log') + "`n" + $agent + "`n" + [string](Read-Journal 'launcher.log')
-        $forbidden = @($all -split "`r?`n" | Where-Object { $_ -match 'placed in' -and $_ -match 'CoreFP|CoreADI64|FairPlay' })
+        $forbidden = @($all -split "`r?`n" | Where-Object { $_ -match 'placed in' -and $_ -match $script:ProtectedModulePattern })
         Add-Check -Ctx $Ctx -Name 'no hook on CoreFP, CoreADI64 or FairPlay' -Passed ($forbidden.Count -eq 0) -Detail ($forbidden -join ' | ')
 
         $crashes = @(Get-AppCrashEvents -Since $since)

@@ -4,7 +4,7 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
-#include "../core/theme/scheme_choice.hpp"
+#include "../core/theme/theme.hpp"
 
 #include <optional>
 

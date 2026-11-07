@@ -8,6 +8,7 @@
 
 #include "kit_layout.hpp"
 #include "manifest.hpp"
+#include "settings_catalog.hpp"
 #include "text_util.hpp"
 
 namespace ampify {
@@ -29,13 +30,13 @@ bool IsStyleFolder(const fs::path& themeRoot, const std::string& target) {
 ExtensionLoader::ExtensionLoader(ExtensionHost& hosts, Host& host, Journal& journal, fs::path root, Clock clock)
     : m_hosts(hosts), m_host(host), m_journal(journal), m_root(std::move(root)), m_clock(std::move(clock)) {}
 
-// A theme script runs while its theme is the active one, and while theme.parts.script is on. The keys are those of
-// src/core/theme/theme_settings.cpp; the theme library is not part of the kernel's core, so they are read here.
+// A theme script runs while its theme is the active one, and while theme.parts.script is on.
 bool ThemeScriptEnabled(const Settings& settings, const std::string& id) {
-    return settings.GetString("theme.active", "") == id && settings.GetBool("theme.parts.script", true);
+    return ActiveThemeId(settings) == id && ToggleOf(settings, kThemeScriptKey);
 }
 
-bool ScriptsAllowed(const Settings& settings) { return settings.GetBool(std::string(kExposeApiKey), true); }
+// expose_api (Spicetify's expose_apis) off keeps every JavaScript element off, whatever its own setting says.
+bool ScriptsAllowed(const Settings& settings) { return ToggleOf(settings, kExposeApiKey); }
 
 void ExtensionLoader::SetAppRoot(fs::path root) { m_appRoot = std::move(root); }
 

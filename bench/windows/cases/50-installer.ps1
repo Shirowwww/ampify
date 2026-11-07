@@ -34,7 +34,7 @@ Register-Case -Id 'installer' -Title 'Install, uninstall keeping and purging dat
     $inUserPath = { @(([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') | Where-Object { $_.TrimEnd('\') -eq $installDir }).Count -gt 0 }
     $backgroundRunning = {
         $mutex = $null
-        if ([System.Threading.Mutex]::TryOpenExisting('Local\AmpifyBackground', [ref]$mutex)) { $mutex.Dispose(); return $true }
+        if ([System.Threading.Mutex]::TryOpenExisting($script:BackgroundMutex, [ref]$mutex)) { $mutex.Dispose(); return $true }
         return $false
     }
 

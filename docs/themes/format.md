@@ -670,7 +670,8 @@ A snippet is a small style that people switch on by itself, in `%USERPROFILE%\Am
 - It applies on top of the active theme (or alone), and its rules win. Several snippets apply in alphabetical order.
 - It can import a ready-made layout too: `@import "ampify:bottom-bar";` is the whole of
   [`bottom-playbar`](../../themes/snippets/bottom-playbar/), which works with any theme or none.
-- It sees the theme's colors, variables, settings, `@keyframes` and font roles. A `colors.ini` in a snippet is ignored.
+- It sees the theme's colors, variables, settings, `@keyframes` and font roles. A `colors.ini` or `color.ini` in a
+  snippet is ignored.
 - `theme.parts.*` do not affect snippets. A refused key in its `resources.xaml` refuses the snippet only.
 - It can declare settings of its own, like a theme ([Theme settings](#theme-settings)): the Ampify
   card shows them while the snippet is on, they are stored as `snippets.<id>.<key>`, and its `user.css` reads them

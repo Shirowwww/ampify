@@ -25,15 +25,6 @@ namespace {
 constexpr auto kRemoteAnswerTimeout = std::chrono::seconds(2);
 constexpr auto kNotificationRulePeriod = std::chrono::seconds(2);
 
-int IntSetting(Host& host, const std::string& key, int fallback, int low, int high) {
-    std::optional<std::string> raw = host.ReadSetting(key);
-    if (!raw || raw->empty()) return fallback;
-    char* end = nullptr;
-    long value = std::strtol(raw->c_str(), &end, 10);
-    if (!end || *end != '\0' || value < low || value > high) return fallback;
-    return static_cast<int>(value);
-}
-
 // No default case: an action not mapped here sends no command, never another one.
 std::optional<PlayerCommand> CommandOf(remote::Action action) {
     switch (action) {
@@ -78,9 +69,9 @@ void* Services::Query(std::string_view name) {
 void Services::EnsureStarted() {
     if (m_started) return;
     m_started = true;
-    if (m_process == "ui" && ServiceEnabled(m_host, "tray.enabled")) StartTray();
-    if (m_process == "engine" && ServiceEnabled(m_host, "remote.enabled")) StartRemote();
-    if (m_process == "engine" && ServiceEnabled(m_host, "midi.enabled")) StartMidi();
+    if (m_process == "ui" && ServiceEnabled(m_host, kTrayKey)) StartTray();
+    if (m_process == "engine" && ServiceEnabled(m_host, kRemoteKey)) StartRemote();
+    if (m_process == "engine" && ServiceEnabled(m_host, kMidiKey)) StartMidi();
 }
 
 // The song notifications come from this process (toast_hold.hpp): it follows the card's rule. settings.txt is read
@@ -207,7 +198,7 @@ void Services::StartMidi() {
         return;
     }
     auto input = std::make_unique<MidiInput>();
-    unsigned index = static_cast<unsigned>(IntSetting(m_host, "midi.device", 0, 0, 255));
+    unsigned index = static_cast<unsigned>(IntegerOf(kMidiDeviceKey, m_host.ReadSetting(kMidiDeviceKey)));
     bool opened = input->Open(index,
                               [this](uint32_t packed) {
                                   std::lock_guard<std::mutex> guard(m_queueMutex);
@@ -248,12 +239,14 @@ bool Services::midiOpen() const { return m_midi && m_midi->open(); }
 
 void Services::StartRemote() {
     RemoteServer::Config config;
-    config.port = static_cast<uint16_t>(IntSetting(m_host, "remote.port", remote::kDefaultPort, 0, 65535));
-    config.token = m_host.ReadSetting("remote.token").value_or("");
-    if (!remote::IsValidToken(config.token)) {
-        // Created once, on the first start, and kept in settings.txt: ampify config remote.token shows it.
-        config.token = remote::NewToken();
-        m_host.WriteSetting("remote.token", config.token);
+    config.port = static_cast<uint16_t>(IntegerOf(kRemotePortKey, m_host.ReadSetting(kRemotePortKey)));
+    std::optional<std::string> stored = m_host.ReadSetting(kRemoteTokenKey);
+    config.token = stored.value_or("");
+    // remote.enabled turned on by hand comes without the token `ampify config` creates: the first start creates it
+    // by the same rule and keeps it in settings.txt, where ampify config remote.token shows it.
+    if (std::optional<std::string> created = RemoteTokenToCreate(stored)) {
+        config.token = *created;
+        m_host.WriteSetting(kRemoteTokenKey, config.token);
         m_journal.Write(i18n::Text("remote.tokenCreated"));
     }
     RefreshStatus();

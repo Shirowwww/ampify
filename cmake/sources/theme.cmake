@@ -20,6 +20,7 @@ list(APPEND AMPIFY_THEME_SOURCES
     src/core/theme/session.cpp
     src/core/theme/theme.cpp
     src/core/theme/theme_settings.cpp
+    src/core/theme/accent.cpp
     src/core/theme/fonts.cpp
     src/core/theme/hover.cpp
     src/core/theme/layout.cpp

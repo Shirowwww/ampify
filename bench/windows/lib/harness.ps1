@@ -15,6 +15,25 @@ $script:JournalDir = Join-Path $script:KitDir 'logs'
 $script:StateFile = Join-Path $script:KitDir 'state.txt'
 $script:SettingsFile = Join-Path $script:KitDir 'settings.txt'
 
+# The modules src/core/drm_guard.cpp refuses, as one case-insensitive pattern for -match (names and parts alike).
+$script:ProtectedModulePattern = (@($script:AppleFacts.protectedModules.names) + @($script:AppleFacts.protectedModules.nameContains) |
+    ForEach-Object { [regex]::Escape($_) }) -join '|'
+
+# Names the kernel and Windows give that the cases look for. The mutex is kBackgroundMutex (src/win/background.hpp);
+# PackagesDebug is where Windows keeps a package's debugger (src/win/package_debug.cpp).
+$script:BackgroundMutex = 'Local\AmpifyBackground'
+$script:PackagesDebugKey = 'HKCU:\Software\Classes\PackagesDebug'
+
+# Log lines that more than one case waits for, as the launcher and the kernel write them. A phrase only one case
+# reads stays in that case, next to its check. An object, so a mistyped name stops the case under strict mode.
+$script:LogPhrase = [pscustomobject]@{
+    AppleMusicStarted = 'Apple Music started'
+    ExtensionHostReady = 'Extension host ready'
+    ThemesThreadReady = 'Themes: interface thread ready (DispatcherQueue of the main window)'
+    MainWindowBound = 'Interface: window "MainWindow" bound'
+    ThemeRemoved = 'Theme removed: '
+}
+
 # Filled in by run-bench.ps1 before the cases.
 # Names distinct from the run-bench.ps1 parameters: the harness is loaded in the same scope as the script.
 $script:BenchKitRoot = $null

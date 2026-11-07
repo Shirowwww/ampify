@@ -8,13 +8,13 @@
 
 #include "i18n.hpp"
 #include "json.hpp"
+#include "settings.hpp"
 #include "text_util.hpp"
 
 namespace ampify::settings_panel {
 
 namespace {
 
-constexpr size_t kMaxSettingText = 200;  // the same as a text setting in docs/extensions/manifest.md
 
 // The accented letters a reader often types without the accent, so that "reglage" finds "réglage". UTF-8 bytes.
 const std::pair<const char*, const char*> kFoldedLetters[] = {
@@ -58,12 +58,7 @@ std::vector<std::string> WordsOf(std::string_view text) {
 
 // A text as settings.txt keeps it: one line, no spaces at either end, at most 200 characters.
 bool FitsSettingText(const std::string& text) {
-    auto space = [](char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; };
-    size_t characters = static_cast<size_t>(std::count_if(text.begin(), text.end(), [](char c) {
-        return (static_cast<unsigned char>(c) & 0xC0) != 0x80;
-    }));
-    return characters <= kMaxSettingText && text.find_first_of("\r\n") == std::string::npos &&
-           (text.empty() || (!space(text.front()) && !space(text.back())));
+    return CodePointCount(text) <= kMaxSettingText && KeepsItsValue(text);
 }
 
 // The value a file gives for one setting, as settings.txt keeps it; nothing when its type or range does not fit.

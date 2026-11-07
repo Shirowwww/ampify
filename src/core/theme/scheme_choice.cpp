@@ -89,13 +89,22 @@ Schedule ParseSchedule(std::string_view text) {
     return schedule;
 }
 
-std::string ScheduledScheme(const Schedule& schedule, int minute) {
-    if (schedule.entries.empty()) return {};
+namespace {
+
+const ScheduleEntry* EntryAt(const Schedule& schedule, int minute) {
+    if (schedule.entries.empty()) return nullptr;
     const ScheduleEntry* current = &schedule.entries.back();  // still in force from the previous day
     for (const ScheduleEntry& entry : schedule.entries) {
         if (entry.minute <= minute) current = &entry;
     }
-    return current->scheme;
+    return current;
+}
+
+}  // namespace
+
+std::string ScheduledScheme(const Schedule& schedule, int minute) {
+    const ScheduleEntry* entry = EntryAt(schedule, minute);
+    return entry ? entry->scheme : std::string();
 }
 
 std::string SystemScheme(const std::vector<std::string>& schemes, bool dark) {
@@ -121,12 +130,8 @@ SchemeChoice ChooseScheme(const std::string& scheme, const std::string& schedule
 
     Schedule parsed = ParseSchedule(schedule);
     choice.problems = parsed.problems;
-    if (!parsed.entries.empty()) {
-        wanted = ScheduledScheme(parsed, inputs.minute);
-        const ScheduleEntry* entry = &parsed.entries.back();
-        for (const ScheduleEntry& candidate : parsed.entries) {
-            if (candidate.minute <= inputs.minute) entry = &candidate;
-        }
+    if (const ScheduleEntry* entry = EntryAt(parsed, inputs.minute)) {
+        wanted = entry->scheme;
         choice.reason = "schedule " + TimeText(entry->minute);
     }
     if (wanted.empty() && !TrimSpace(defaultScheme).empty()) {
@@ -148,32 +153,20 @@ SchemeChoice ChooseScheme(const std::string& scheme, const std::string& schedule
         if (choice.reason.empty()) choice.reason = "first scheme";
         return choice;
     }
+    // An unknown name goes on as it is: LoadTheme alone decides what an unknown scheme gives (the first one, with a
+    // problem). Only the schedule knows where the name came from, so it says so too.
     choice.scheme = FindScheme(schemes, wanted);
     if (choice.reason.empty()) choice.reason = "theme.scheme";
     if (choice.scheme.empty()) {
-        // LoadTheme says it too, but only the schedule knows where the name came from.
         if (!parsed.entries.empty()) choice.problems.push_back("theme.schedule: scheme \"" + wanted + "\" not found in colors.ini");
-        choice.scheme = wanted;  // LoadTheme reports it and falls back to the first scheme
+        choice.scheme = wanted;
     }
     return choice;
 }
 
-bool IsDarkScheme(const std::string& scheme) {
-    return IsDark(scheme);
-}
-
-std::optional<bool> AppModeOf(std::optional<bool> dark, const std::string& scheme) {
-    if (dark) return dark;
+std::optional<bool> DarkByName(const std::string& scheme) {
     if (IsDark(scheme)) return true;
     if (IsLight(scheme)) return false;
-    return std::nullopt;
-}
-
-std::optional<WindowMaterial> WindowMaterialOf(std::string_view value) {
-    std::string name = ToLowerAscii(TrimSpace(value));
-    if (name == "mica") return WindowMaterial::Mica;
-    if (name == "mica-alt") return WindowMaterial::MicaAlt;
-    if (name == "acrylic") return WindowMaterial::Acrylic;
     return std::nullopt;
 }
 

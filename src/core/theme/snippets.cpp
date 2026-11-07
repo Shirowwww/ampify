@@ -4,16 +4,11 @@
 #include <system_error>
 
 #include "../element_ref.hpp"
+#include "library.hpp"
 
 namespace ampify::theme {
 
 namespace {
-
-bool HasSnippetFile(const std::filesystem::path& folder) {
-    std::error_code error;
-    return std::filesystem::is_regular_file(folder / "resources.xaml", error) ||
-           std::filesystem::is_regular_file(folder / "user.css", error);
-}
 
 // The text of a dictionary without its XML declaration, which may only appear at the start of a document.
 std::string WithoutDeclaration(const std::string& xaml) {
@@ -34,16 +29,7 @@ void AddLayer(const Theme& source, int layer, Theme& composed) {
 }  // namespace
 
 std::vector<std::string> ListSnippetFolders(const std::filesystem::path& root) {
-    std::vector<std::string> folders;
-    std::error_code error;
-    if (!std::filesystem::is_directory(root, error)) return folders;
-
-    for (const auto& entry : std::filesystem::directory_iterator(root, error)) {
-        if (!entry.is_directory(error) || !HasSnippetFile(entry.path())) continue;
-        folders.push_back(entry.path().filename().string());
-    }
-    std::sort(folders.begin(), folders.end());
-    return folders;
+    return ListFoldersHolding(root, kSnippetFiles);
 }
 
 std::vector<std::string> EnabledSnippets(const Settings& settings, const std::vector<std::string>& installed) {
@@ -73,24 +59,14 @@ std::string CombineDictionaries(const std::vector<std::string>& dictionaries) {
 }
 
 Theme ComposeTheme(const Theme* theme, const std::vector<std::shared_ptr<const Theme>>& snippets, const Theme* layout) {
-    Theme composed;
+    // The theme as a whole, so a field it gains is composed too; its problems stay its own.
+    const bool hasTheme = theme && theme->usable;
+    Theme composed = hasTheme ? *theme : Theme{};
     composed.usable = true;
+    composed.problems.clear();
     std::vector<std::string> dictionaries;
     std::vector<std::string> names;
-
-    if (theme && theme->usable) {
-        composed.id = theme->id;
-        composed.name = theme->name;
-        composed.scheme = theme->scheme;
-        composed.schemes = theme->schemes;
-        composed.dark = theme->dark;
-        composed.palette = theme->palette;
-        composed.resources = theme->resources;
-        composed.variables = theme->variables;
-        composed.fonts = theme->fonts;
-        dictionaries.push_back(theme->resourceDictionary);
-        AddLayer(*theme, 0, composed);
-    }
+    if (hasTheme) dictionaries.push_back(theme->resourceDictionary);
 
     int layer = 1;
     for (const std::shared_ptr<const Theme>& snippet : snippets) {
@@ -109,7 +85,7 @@ Theme ComposeTheme(const Theme* theme, const std::vector<std::shared_ptr<const T
     if (layout) AddLayer(*layout, layer, composed);
 
     composed.resourceDictionary = CombineDictionaries(dictionaries);
-    if (composed.name.empty()) composed.name = names.empty() ? std::string("disposition") : std::string("snippets");
+    if (composed.name.empty()) composed.name = names.empty() ? std::string("layout") : std::string("snippets");
     if (!names.empty()) {
         composed.name += " + ";
         for (size_t i = 0; i < names.size(); i++) composed.name += (i ? ", " : "") + names[i];

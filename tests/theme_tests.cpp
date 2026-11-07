@@ -16,6 +16,7 @@
 #include "../src/core/json.hpp"
 #include "../src/core/manifest.hpp"
 #include "../src/core/settings.hpp"
+#include "../src/core/settings_catalog.hpp"
 #include "../src/core/theme/animation.hpp"
 #include "../src/core/theme/builtins.hpp"
 #include "../src/core/theme/color.hpp"
@@ -39,6 +40,7 @@
 #include "../src/core/theme/session.hpp"
 #include "../src/core/theme/snippets.hpp"
 #include "../src/core/theme/theme.hpp"
+#include "../src/core/theme/accent.hpp"
 #include "../src/core/theme/theme_settings.hpp"
 #include "../src/core/theme/worker.hpp"
 #include "../src/core/color_extract.hpp"
@@ -2945,9 +2947,9 @@ TEST_CASE(Session_ReturnsAnInspectorDumpOnlyWhenAsked) {
     CHECK(!session.Tick(tree, request).has_value());
 
     request.inspect = true;
-    std::optional<std::string> dump = session.Tick(tree, request);
+    std::optional<th::Inspection> dump = session.Tick(tree, request);
     CHECK(dump.has_value());
-    if (dump) CHECK(dump->find("Tree (5 elements)") != std::string::npos);
+    if (dump) CHECK(th::InspectionText(*dump).find("Tree (5 elements)") != std::string::npos);
 
     FakeTree empty;
     CHECK(!session.Tick(empty, request).has_value());  // no content yet: asked again on the next tick
@@ -3683,6 +3685,10 @@ TEST_CASE(Snippets_LoadWithTheColoursOfTheTheme) {
     CHECK(snippet.usable);
     CHECK(snippet.resourceDictionary.empty());  // an empty dictionary is not merged
     CHECK(!ProblemContaining(snippet, "colors.ini ignored").empty());
+    MemoryFiles spicetify;
+    spicetify.files["color.ini"] = "[Base]\nmain = 000000\n";
+    spicetify.files["user.css"] = "Page { opacity: 0.5; }\n";
+    CHECK(!ProblemContaining(LoadSnippetFrom(spicetify, "s2", &theme), "color.ini ignored").empty());
     CHECK(!snippet.assignments.empty());
     if (!snippet.assignments.empty()) {
         CHECK(snippet.assignments[0].value.text == "#FFFF0000");  // the theme's colour
@@ -3820,13 +3826,51 @@ TEST_CASE(Scheme_ScheduleParsesAndPicksByTime) {
     CHECK(th::ScheduledScheme(th::ParseSchedule(""), 600).empty());
 }
 
-TEST_CASE(Scheme_AppModeLeavesAppleMusicAloneWithoutColours) {
-    CHECK(th::AppModeOf(std::nullopt, "Base") == std::nullopt);
-    CHECK(th::AppModeOf(std::nullopt, "") == std::nullopt);
-    CHECK(th::AppModeOf(std::nullopt, "Dark") == std::optional<bool>(true));
-    CHECK(th::AppModeOf(std::nullopt, "Light") == std::optional<bool>(false));
-    CHECK(th::AppModeOf(std::optional<bool>(true), "Light") == std::optional<bool>(true));
-    CHECK(th::AppModeOf(std::optional<bool>(false), "Base") == std::optional<bool>(false));
+TEST_CASE(Scheme_DarkByNameKnowsDarkNightLightAndDayOnly) {
+    CHECK(th::DarkByName("Base") == std::nullopt);
+    CHECK(th::DarkByName("") == std::nullopt);
+    CHECK(th::DarkByName("Sombre") == std::nullopt);  // English names only, as the header says
+    CHECK(th::DarkByName("Dark") == std::optional<bool>(true));
+    CHECK(th::DarkByName("Midnight dark") == std::optional<bool>(true));
+    CHECK(th::DarkByName("Light") == std::optional<bool>(false));
+    CHECK(th::DarkByName("day") == std::optional<bool>(false));
+}
+
+TEST_CASE(Theme_DarkComesFromTheBackgroundThenTheSchemeName) {
+    auto darkOf = [](const std::string& colors) {
+        MemoryFiles files;
+        files.files["colors.ini"] = colors;
+        return Load(files, {}).dark;
+    };
+    CHECK(darkOf("[Night]\nAccentFillColorDefaultBrush = 0A84FF\n") == std::optional<bool>(true));
+    CHECK(darkOf("[Light]\nAccentFillColorDefaultBrush = 0A84FF\n") == std::optional<bool>(false));
+    CHECK(darkOf("[Base]\nAccentFillColorDefaultBrush = 0A84FF\n") == std::nullopt);  // Apple Music keeps its own
+    CHECK(darkOf("[Light]\nApplicationPageBackgroundThemeBrush = 000000\n") == std::optional<bool>(true));
+}
+
+TEST_CASE(Theme_DarkFollowsTheBackgroundsContrastWithText) {
+    auto darkOn = [](const std::string& background) {
+        MemoryFiles files;
+        files.files["colors.ini"] = "[Base]\nApplicationPageBackgroundThemeBrush = " + background + "\n";
+        return Load(files, {}).dark;
+    };
+    CHECK(darkOn("FF0000") == std::optional<bool>(false));  // black text reads better than white on pure red
+    CHECK(darkOn("0000FF") == std::optional<bool>(true));
+    CHECK(darkOn("767676") == std::optional<bool>(false));
+    CHECK(darkOn("757575") == std::optional<bool>(true));
+}
+
+TEST_CASE(Theme_NamesItsSourcesInEnglish) {
+    MemoryFiles files;
+    files.files["color.ini"] = "[Base]\nmain = 101010\ntext = FFFFFF\n";
+    th::Theme theme = Load(files);
+    bool translated = std::any_of(theme.assignments.begin(), theme.assignments.end(), [](const th::Assignment& a) {
+        return a.source == "color.ini (Spicetify translation)";
+    });
+    CHECK(translated);
+
+    th::Theme layout;
+    CHECK(th::ComposeTheme(nullptr, {}, &layout).name == "layout");
 }
 
 TEST_CASE(Scheme_WindowMaterialReadsTheThemesVariable) {
@@ -3915,10 +3959,32 @@ TEST_CASE(Glass_BalancedStopsEndlessAnimationsAndShadows) {
 TEST_CASE(Glass_EcoShowsAnAcrylicWindowAsMica) {
     th::Theme theme;
     theme.variables["window-material"] = "acrylic";
+    CHECK(theme.Material() == std::optional<th::WindowMaterial>(th::WindowMaterial::Acrylic));
     th::ApplyGlassLevel(theme, th::GlassLevel::Balanced);
-    CHECK(theme.variables["window-material"] == "acrylic");  // balanced keeps the blur
+    CHECK(theme.Material() == std::optional<th::WindowMaterial>(th::WindowMaterial::Acrylic));  // balanced: the blur
     th::ApplyGlassLevel(theme, th::GlassLevel::Eco);
-    CHECK(theme.variables["window-material"] == "mica");  // eco: the window's blur goes too
+    CHECK(theme.Material() == std::optional<th::WindowMaterial>(th::WindowMaterial::Mica));  // eco: no blur
+    theme.variables["window-material"] = "mica-alt";
+    CHECK(theme.Material() == std::optional<th::WindowMaterial>(th::WindowMaterial::MicaAlt));
+}
+
+TEST_CASE(Glass_EveryLoaderLightensItsResultAndTheComposedThemeKeepsTheLevel) {
+    MemoryFiles files;
+    files.files["user.css"] = ":root { --window-material: acrylic; }\n.sidebar { box-shadow: 28px; }\n";
+    th::LoadOptions options;
+    options.glass = th::GlassLevel::Eco;
+    th::Theme theme = Load(files, options);
+    CHECK(theme.glass == th::GlassLevel::Eco && theme.assignments.empty());
+    th::Theme composed = th::ComposeTheme(&theme, {}, nullptr);
+    CHECK(composed.Material() == std::optional<th::WindowMaterial>(th::WindowMaterial::Mica));
+
+    MemoryFiles snippetFiles;
+    snippetFiles.files["user.css"] = ".content { box-shadow: 12px; }\n";
+    th::Theme snippet = th::LoadSnippet("s", "", snippetFiles, &theme, options);
+    CHECK(snippet.glass == th::GlassLevel::Eco && snippet.assignments.empty());
+
+    options.accent = th::Argb{0xFF, 0x0A, 0x84, 0xFF};
+    CHECK(th::LoadAccentOnly(options).glass == th::GlassLevel::Eco);
 }
 
 TEST_CASE(Glass_BalancedKeepsAShadowThatRemovesDepth) {
@@ -3942,8 +4008,6 @@ TEST_CASE(Glass_EcoPaintsAcrylicAsAPlainColour) {
 
 TEST_CASE(Scheme_SystemModePicksByName) {
     CHECK(th::SystemScheme({"Base", "Dark"}, true) == "Dark");
-    CHECK(th::IsDarkScheme("Dark") && th::IsDarkScheme("Night") && th::IsDarkScheme("Midnight dark"));
-    CHECK(!th::IsDarkScheme("Base") && !th::IsDarkScheme("Light") && !th::IsDarkScheme(""));
     CHECK(th::SystemScheme({"Base", "Dark"}, false) == "Base");
     CHECK(th::SystemScheme({"Dark", "Light"}, false) == "Light");
     CHECK(th::SystemScheme({"Dark", "Light"}, true) == "Dark");
@@ -4430,6 +4494,17 @@ TEST_CASE(Session_SidebarJsonHidesAndReordersThenRestores) {
     th::AddLayoutRules(sections, th::LayoutKind::Home, home);
     CHECK(home.assignments.size() == 1);  // no reorder: only the hiding
     if (!home.assignments.empty()) CHECK(home.assignments[0].selector.text == "#NewReleases");
+}
+
+TEST_CASE(Inspector_WritesBothDumpsFromOneWalk) {
+    FakeTree tree = MakePage();
+    tree.resources["AccentFillColorDefaultBrush"] = Brush("#FF0A84FF");
+    th::InspectOptions small;
+    small.maxLines = 2;
+    th::Inspection walk = th::Inspect(tree, small.maxLines);
+    CHECK(walk.Truncated() && walk.inspected.size() == 2);
+    CHECK(th::InspectionText(walk) == th::InspectTree(tree, small));
+    CHECK(th::InspectionJson(walk, small) == th::InspectTreeJson(tree, small));
 }
 
 TEST_CASE(Inspector_ExportsTheTreeAsJson) {
@@ -5526,6 +5601,32 @@ TEST_CASE(Worker_ReloadsForANewArtworkOnlyWhenTheThemeUsesIt) {
     std::filesystem::remove_all(kit);
 }
 
+TEST_CASE(Worker_EveryInputStartsANewGeneration) {
+    ampify::test::ScratchDir kit("worker-inputs");
+    WriteFile(kit / "themes" / "pane" / "user.css", ".sidebar { opacity: 0.5; }\n");
+    ampify::Settings settings;
+    settings.Set("theme.active", "pane");
+    th::ThemeWorker worker(kit);
+    th::SessionRequest first = worker.Tick(settings, 600);
+    CHECK(worker.Tick(settings, 600).generation == first.generation);  // nothing changed
+
+    settings.Set(ampify::kThemeScriptKey, "0");
+    th::SessionRequest noScript = worker.Tick(settings, 600);
+    CHECK(noScript.generation > first.generation);
+
+    WriteFile(kit / "resource-keys.txt", "# allowed\nAccentFillColorDefaultBrush\n");
+    th::SessionRequest keys = worker.Tick(settings, 600);
+    CHECK(keys.generation > noScript.generation);
+    std::filesystem::remove_all(kit);
+}
+
+TEST_CASE(Worker_AllowedKeysSkipCommentsAndLineEnds) {
+    CHECK(!th::ParseAllowedKeys(std::nullopt));
+    std::optional<std::set<std::string>> keys = th::ParseAllowedKeys(std::string("# list\r\nA \r\n\r\nB"));
+    CHECK(keys && *keys == (std::set<std::string>{"A", "B"}));
+    CHECK(th::ParseAllowedKeys(std::string()) == std::optional<std::set<std::string>>(std::set<std::string>{}));
+}
+
 TEST_CASE(Worker_GlassLevelLightensTheThemeAndItsSnippets) {
     ampify::test::ScratchDir kit("worker-glass");
     WriteFile(kit / "themes" / "pane" / "user.css", ".sidebar { backdrop: acrylic(#FF141822, 0.72); box-shadow: 28px; }\n");
@@ -5537,7 +5638,7 @@ TEST_CASE(Worker_GlassLevelLightensTheThemeAndItsSnippets) {
     th::SessionRequest full = worker.Tick(settings, 600);
     CHECK(full.theme && full.theme->assignments.size() == 2);
 
-    settings.Set(th::kGlassKey, "eco");
+    settings.Set(ampify::kGlassChoiceKey, "eco");
     th::SessionRequest eco = worker.Tick(settings, 600);
     CHECK(eco.generation > full.generation);
     CHECK(eco.theme && eco.theme->assignments.size() == 1);

@@ -40,6 +40,7 @@
 #include "../core/package_watch.hpp"
 #include "../core/safe_mode.hpp"
 #include "../core/settings.hpp"
+#include "../core/settings_catalog.hpp"
 #include "../core/version_gate.hpp"
 #include "../core/version_list.hpp"
 #include "../win/background.hpp"
@@ -219,13 +220,10 @@ bool EndOrphanAgent(ampify::Journal& journal, DWORD processId, const std::filesy
     return true;
 }
 
-// The apple.orphanAgent setting, read from settings.txt: "on" turns the recovery on, anything else leaves it off.
 bool OrphanAgentSettingOn(const std::filesystem::path& kit) {
     ampify::Settings settings;
     settings.Load((kit / "settings.txt").string());
-    std::string value = settings.GetString("apple.orphanAgent", "off");
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return std::tolower(c); });
-    return value == "on";
+    return ampify::ChoiceOf(settings, ampify::kOrphanAgentKey) == "on";
 }
 
 // One look, each time the launcher finds Apple Music closed, at a library agent of the package that is left running.

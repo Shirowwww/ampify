@@ -22,7 +22,7 @@ Register-Case -Id 'release-version' -Title 'Release build: injection only on a t
         Add-Check -Ctx $Ctx -Name 'launcher: kernel injected, tested version' `
             -Passed (Test-JournalContains -FileName 'launcher.log' -Text "version $version tested: kernel injected")
 
-        $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
+        $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched
         $kernelLoaded = Wait-Journal -FileName 'AppleMusic.log' -Text 'Kernel loaded in AppleMusic.exe' -TimeoutSeconds 60
         Add-Check -Ctx $Ctx -Name 'AppleMusic.log: kernel loaded in AppleMusic.exe' -Passed $kernelLoaded
@@ -30,7 +30,7 @@ Register-Case -Id 'release-version' -Title 'Release build: injection only on a t
         Add-Check -Ctx $Ctx -Name 'launcher: version refused, Apple Music starts without the kernel' `
             -Passed (Test-JournalContains -FileName 'launcher.log' -Text "version $version not tested: Apple Music starts without the kernel")
 
-        $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
+        $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched
         Start-Sleep -Seconds 30
         Add-Check -Ctx $Ctx -Name 'no kernel log (AppleMusic.log absent)' `

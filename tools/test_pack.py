@@ -62,6 +62,29 @@ class PackTests(unittest.TestCase):
         second = pack.pack(folder, os.path.join(self.tmp, "b.zip"))["sha256"]
         self.assertEqual(first, second)
 
+    def test_archive_is_stored_and_matches_the_bytes_of_ampify_build(self):
+        # The same hash is checked on src/cli/zip_writer.cpp in tests/cli_tests.cpp: one archive, one SHA-256.
+        entries = [("lib/é.js", b"x=1;\n"), ("main.js", b"Ampify.log(1);\n"), ("manifest.json", b"{}")]
+        data = pack.zip_bytes(entries)
+        self.assertEqual(hashlib.sha256(data).hexdigest(),
+                         "37e93ce42dec78b704561e8191016bad688a7414c1e2a80a5842b139211ad6fd")
+        path = os.path.join(self.tmp, "stored.zip")
+        with open(path, "wb") as handle:
+            handle.write(data)
+        with zipfile.ZipFile(path) as bundle:
+            self.assertIsNone(bundle.testzip())
+            self.assertEqual({info.compress_type for info in bundle.infolist()}, {zipfile.ZIP_STORED})
+            self.assertEqual(bundle.read("lib/é.js"), b"x=1;\n")
+
+    def test_hidden_files_and_node_modules_stay_out_like_in_ampify_build(self):
+        folder = self.make_element(extra={".hidden": "x"})
+        os.makedirs(os.path.join(folder, "node_modules"))
+        os.makedirs(os.path.join(folder, ".git"))
+        for relative in ("node_modules/a.js", ".git/config"):
+            with open(os.path.join(folder, relative), "w", encoding="utf-8") as handle:
+                handle.write("x")
+        self.assertEqual(pack.files_of(folder), ["main.js", "manifest.json"])
+
     def test_invalid_manifest_is_refused(self):
         folder = self.make_element()
         os.remove(os.path.join(folder, "main.js"))
@@ -135,7 +158,7 @@ class PackTests(unittest.TestCase):
             self.assertIn("README.md", bundle.namelist())
         with open(catalog, encoding="utf-8") as handle:
             entry = json.load(handle)["extensions"][0]
-        self.assertNotIn("readme", entry, "Ampify 1.1.0 refuses a catalog with a field it does not know")
+        self.assertNotIn("readme", entry, "the README is found from the archive's address, not from a field")
 
     def test_catalog_entry_leaves_the_translations_in_the_archive(self):
         folder = self.make_element()
@@ -151,7 +174,7 @@ class PackTests(unittest.TestCase):
         pack.pack(folder, archive, catalog, "https://example.com/demo-1.0.0.zip")
         with open(catalog, encoding="utf-8") as handle:
             entry = json.load(handle)["extensions"][0]
-        self.assertNotIn("translations", entry)  # Ampify 1.1.0 would refuse the whole catalog
+        self.assertNotIn("translations", entry)  # docs/extensions/catalog.md, "Compatibility"
 
     def test_catalog_needs_an_https_address(self):
         folder = self.make_element()

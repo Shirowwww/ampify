@@ -36,9 +36,9 @@ bool IsPreviewUrl(std::string_view url) {
 
 // A permission only an element of kKitElements may hold, such as kit.manage, which runs ampify itself: only the
 // Marketplace that ships with the kit has it, never a download.
-void RefuseFirstPartyPermissions(const CatalogEntry& entry, const std::string& where,
+void RefuseFirstPartyPermissions(const ElementInfo& element, const std::string& where,
                                  std::vector<std::string>& errors) {
-    for (const std::string& name : entry.permissions) {
+    for (const std::string& name : element.permissions) {
         const PermissionInfo* permission = FindPermission(name);
         if (permission && permission->firstPartyOnly) {
             errors.push_back(where + ".permissions: " + name + " is reserved for Ampify's Marketplace");
@@ -258,6 +258,20 @@ const CatalogEntry* FindCatalogEntry(const Catalog& catalog, std::string_view id
     auto found = std::find_if(catalog.entries.begin(), catalog.entries.end(),
                               [id](const CatalogEntry& entry) { return entry.id == id; });
     return found == catalog.entries.end() ? nullptr : &*found;
+}
+
+std::string CheckArchiveManifest(const ElementInfo& manifest, const CatalogEntry& entry) {
+    if (manifest.id != entry.id || manifest.version != entry.version || manifest.kind != entry.kind) {
+        return "the manifest in the archive does not match the catalog";
+    }
+    // The kernel grants what the manifest asks for, and the user agreed to what the entry showed.
+    std::set<std::string> asked(manifest.permissions.begin(), manifest.permissions.end());
+    if (asked != std::set<std::string>(entry.permissions.begin(), entry.permissions.end())) {
+        return "the permissions in the archive differ from the catalog's";
+    }
+    std::vector<std::string> errors;
+    RefuseFirstPartyPermissions(manifest, "manifest", errors);
+    return errors.empty() ? std::string() : errors.front();
 }
 
 }  // namespace ampify

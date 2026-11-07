@@ -434,6 +434,33 @@ TEST_CASE(Catalog_RejectsUnknownCatalogVersion) {
     CHECK(MentionsField(errors, "catalogVersion"));
 }
 
+TEST_CASE(Catalog_AnArchiveMustAskForThePermissionsItsEntryShowed) {
+    ampify::CatalogEntry entry;
+    entry.id = "demo";
+    entry.version = "1.0.0";
+    entry.permissions = {"storage", "network:example.com"};
+    ampify::ElementInfo manifest = entry;
+    manifest.permissions = {"network:example.com", "storage"};  // the order does not matter
+    CHECK(ampify::CheckArchiveManifest(manifest, entry).empty());
+
+    manifest.permissions.push_back("player.control");
+    CHECK(!ampify::CheckArchiveManifest(manifest, entry).empty());
+    manifest.permissions = {"storage"};
+    CHECK(!ampify::CheckArchiveManifest(manifest, entry).empty());
+    manifest.permissions = entry.permissions;
+    manifest.version = "1.0.1";
+    CHECK(!ampify::CheckArchiveManifest(manifest, entry).empty());
+}
+
+TEST_CASE(Catalog_AnArchiveCannotHoldAMarketplacePermission) {
+    ampify::CatalogEntry entry;  // an entry that slipped through with kit.manage is refused all the same
+    entry.id = "demo";
+    entry.version = "1.0.0";
+    entry.permissions = {"kit.manage"};
+    std::string problem = ampify::CheckArchiveManifest(entry, entry);
+    CHECK(problem.find("kit.manage") != std::string::npos);
+}
+
 // ---- Archives ----------------------------------------------------------------------------------
 
 TEST_CASE(Archive_RefusesEscapingEntries) {
@@ -720,6 +747,18 @@ TEST_CASE(WriteZip_IsDeterministicAndRefusesUnsafeNames) {
     CHECK(!ampify::cli::WriteZip(root / "bad.zip", {{"../escape.txt", {}, "x"}}, error));
     CHECK(!error.empty());
     CHECK(!std::filesystem::exists(root / "bad.zip"));
+}
+
+// tools/pack.py writes the same bytes (tools/test_pack.py holds the same hash): one archive, one SHA-256, whichever
+// tool made it.
+TEST_CASE(WriteZip_GivesTheBytesThatPackPyGives) {
+    ampify::test::ScratchDir root("zip-golden");
+    std::string error;
+    std::vector<ampify::cli::ZipSource> files = {
+        {"main.js", {}, "Ampify.log(1);\n"}, {"manifest.json", {}, "{}"}, {"lib/\xC3\xA9.js", {}, "x=1;\n"}};
+    REQUIRE(ampify::cli::WriteZip(root / "golden.zip", files, error));
+    CHECK(ampify::Sha256File(root / "golden.zip") ==
+          std::optional<std::string>("37e93ce42dec78b704561e8191016bad688a7414c1e2a80a5842b139211ad6fd"));
 }
 
 TEST_CASE(Manifest_ProcessesAreOneOrTwoDistinctNames) {

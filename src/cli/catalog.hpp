@@ -49,6 +49,10 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
 
 const CatalogEntry* FindCatalogEntry(const Catalog& catalog, std::string_view id);
 
+// Why the manifest found in an entry's archive cannot be installed, or empty: it must be the element the entry showed
+// (id, version, kind and the same permissions, in any order), with no permission reserved for Ampify's Marketplace.
+std::string CheckArchiveManifest(const ElementInfo& manifest, const CatalogEntry& entry);
+
 // Parses versions.json. On failure returns nullopt and appends one message per problem to `errors`.
 std::optional<VersionsCatalog> ParseVersionsCatalog(std::string_view text, std::vector<std::string>& errors);
 

@@ -1,9 +1,9 @@
 #pragma once
 
 // What Ampify changes in Apple Music's own behaviour, from the "Apple Music" section of Ampify's settings
-// page: its notifications, where its full-screen player goes and what closing its window does. Stored in
-// settings.txt; the kernel applies them (src/win/notifications.cpp, src/win/apple_player.cpp,
-// src/win/close_to_tray.cpp). Portable, so the choices are tested under Linux.
+// page: its notifications, where its full-screen player goes and what closing its window does. The keys, their
+// values and their defaults are rows of the settings catalogue (../settings_catalog.hpp); this reads them for the
+// kernel and builds the page's choices. Portable, so the choices are tested under Linux.
 
 #include <filesystem>
 #include <string>
@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "../settings.hpp"
+#include "../settings_catalog.hpp"
 
 namespace ampify::uirender {
 
@@ -44,24 +45,9 @@ struct AppleTweaks {
     bool sidebarOnHover = false;
     // Freezes of Apple Music's window written to its log, with what Ampify was doing (win/ui_watchdog.cpp). Off by default.
     bool freezeLog = false;
-    // A library agent left behind by a killed Apple Music is ended once Apple Music is closed (launcher). Off by default.
-    bool orphanAgent = false;
     // Apple's search field and a back arrow in the strip at the top of the window (win/topbar_search.cpp). Off by default.
     bool topbarSearch = false;
 };
-
-inline constexpr char kNotificationsKey[] = "apple.notifications";
-inline constexpr char kPlayerModeKey[] = "apple.fullscreen";
-inline constexpr char kPlayerControlsKey[] = "apple.playerControls";
-inline constexpr char kCloseKey[] = "apple.close";
-inline constexpr char kNetworkKey[] = "apple.network";
-inline constexpr char kProxyKey[] = "apple.proxy";
-inline constexpr char kArtworkKey[] = "apple.artwork";
-inline constexpr char kMarqueeKey[] = "apple.marquee";
-inline constexpr char kSidebarKey[] = "apple.sidebar";
-inline constexpr char kFreezeLogKey[] = "apple.watchdog";
-inline constexpr char kOrphanAgentKey[] = "apple.orphanAgent";
-inline constexpr char kTopbarKey[] = "apple.topbar";
 
 // An unknown value reads as the default.
 AppleTweaks ReadAppleTweaks(const Settings& settings);
@@ -80,19 +66,16 @@ std::vector<TweakChoice> AppleTweakChoices(const std::filesystem::path& kit);
 // New releases of Ampify (kit_update): installed on their own while Apple Music is closed, after a question, or never.
 // The background launcher runs `ampify update --auto`, which follows this choice (src/cli/maintenance.cpp).
 enum class KitUpdate { Auto, Ask, Off };
-inline constexpr char kKitUpdateKey[] = "kit_update";
 KitUpdate ReadKitUpdate(const Settings& settings);
 TweakChoice KitUpdateChoice(const std::filesystem::path& kit);
 
 // Where Ampify's own entry (the Marketplace's) stands: in the sidebar's list, or in its header next to Apple's "···"
 // while the sidebar is open (win/ui_service_sidebar.cpp). Folded, Apple hides the header: the entry stays in the list.
-inline constexpr char kEntryKey[] = "ampify.entry";
 bool ReadEntryInHeader(const Settings& settings);
 TweakChoice EntryChoice(const std::filesystem::path& kit);
 
 // How much glass the themes may draw (theme.glass, read by the theme engine in theme/glass.hpp, which this library
 // cannot include): full, balanced or eco.
-inline constexpr char kGlassChoiceKey[] = "theme.glass";
 TweakChoice GlassChoice(const std::filesystem::path& kit);
 
 // True when the card offers `value` for `key` (stored values, such as "auto" for kit_update).

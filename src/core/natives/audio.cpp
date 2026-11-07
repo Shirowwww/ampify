@@ -5,6 +5,7 @@
 #include "../api/bridge.hpp"
 #include "../api/module.hpp"
 #include "../gain_board.hpp"
+#include "../settings_catalog.hpp"
 
 namespace ampify::natives {
 

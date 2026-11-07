@@ -4,6 +4,7 @@
 list(APPEND AMPIFY_TESTS_SOURCES
     tests/main.cpp
     tests/core_tests.cpp
+    tests/settings_catalog_tests.cpp
     tests/text_util_tests.cpp
     tests/atmos_tests.cpp
     tests/apple_music_tests.cpp

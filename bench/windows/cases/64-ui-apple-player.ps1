@@ -108,11 +108,11 @@ Register-Case -Id 'ui-apple-player' -Title "UI: Apple Music's full-screen player
     $since = Get-Date
     $launcherProcess = Start-Launcher -LauncherPath $launcher
     try {
-        $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
+        $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched
         if (-not $launched) { return }
         Clear-FirstRun -Ctx $Ctx
-        $bound = Wait-Journal -FileName 'AppleMusic.log' -Text 'Interface: window "MainWindow" bound' -TimeoutSeconds 90
+        $bound = Wait-Journal -FileName 'AppleMusic.log' -Text $script:LogPhrase.MainWindowBound -TimeoutSeconds 90
         Add-Check -Ctx $Ctx -Name 'log: interface service bound to "MainWindow"' -Passed $bound
         Start-Sleep -Seconds 5
         Show-UiAppWindow

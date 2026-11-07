@@ -21,5 +21,10 @@
     "AVCFPlayerItemCopyTracks",
     "AVCFPlayerItemTrackCopyAssetTrack",
     "AVCFPlayerSetVolume"
-  ]
+  ],
+  "protectedModules": {
+    "$comment": "Modules no hook may touch (FairPlay and device identity), compared without case or extension. src/core/drm_guard.cpp refuses them; the bench checks the logs against the same list.",
+    "names": ["CoreFP", "CoreADI64"],
+    "nameContains": ["FairPlay"]
+  }
 }

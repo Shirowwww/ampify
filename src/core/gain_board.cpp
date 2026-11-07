@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdlib>
 
+#include "settings_catalog.hpp"
+
 namespace ampify {
 
 void GainBoard::Set(const std::string& elementId, double db, double ceilingDb) {
@@ -24,10 +26,9 @@ GainBoard& ElementGains() {
 }
 
 double GainCeilingDb(const std::optional<std::string>& setting) {
-    constexpr double kDefaultDb = 6.0;
-    constexpr double kHighestDb = 12.0;
-    if (!setting) return kDefaultDb;
-    return std::clamp(std::strtod(setting->c_str(), nullptr), 0.0, kHighestDb);
+    const KitSetting& row = *FindKitSetting(kGainCeilingSetting);
+    if (!setting) return std::strtod(std::string(row.fallback).c_str(), nullptr);
+    return std::clamp(std::strtod(setting->c_str(), nullptr), row.low, row.high);
 }
 
 }  // namespace ampify

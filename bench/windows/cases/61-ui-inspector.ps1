@@ -16,7 +16,7 @@ Register-Case -Id 'ui-inspector' -Title 'UI: the inspector writes the interface 
     $since = Get-Date
     $launcherProcess = Start-Launcher -LauncherPath $launcher
 
-    $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
+    $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
     Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched
     if (-not $launched) {
         Close-AppleMusic | Out-Null
@@ -24,7 +24,7 @@ Register-Case -Id 'ui-inspector' -Title 'UI: the inspector writes the interface 
     }
     Clear-FirstRun -Ctx $Ctx
 
-    $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text 'Themes: interface thread ready (DispatcherQueue of the main window)' -TimeoutSeconds 90
+    $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text $script:LogPhrase.ThemesThreadReady -TimeoutSeconds 90
     Add-Check -Ctx $Ctx -Name 'interface thread ready (DispatcherQueue)' -Passed $hooked
 
     $dumped = Wait-Journal -FileName 'AppleMusic.log' -Text 'Inspector: tree written' -TimeoutSeconds 90

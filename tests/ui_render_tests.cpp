@@ -2,6 +2,7 @@
 // XAML tree, the bounded walk, the refresh ticket and the Mods card files. The Windows half (src/win/ui_renderer.cpp,
 // src/win/ui_service.cpp) follows these decisions; it is only compiled by the MSVC job with the WinUI projection.
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -13,7 +14,8 @@
 #include "../src/core/address_order.hpp"
 #include "../src/core/i18n.hpp"
 #include "../src/core/settings.hpp"
-#include "../src/core/theme/theme_settings.hpp"
+#include "../src/core/settings_catalog.hpp"
+#include "../src/core/theme/accent.hpp"
 #include "../src/core/ui_model.hpp"
 #include "../src/core/ui_render/apple_tweaks.hpp"
 #include "../src/core/ui_render/mods.hpp"
@@ -934,11 +936,11 @@ TEST_CASE(UiRender_TheCardListsTheValuesOfEveryKeyItKnows) {
 TEST_CASE(UiRender_FreezeLogAndOrphanAgentAreOffUntilChosen) {
     Settings settings;
     CHECK(!ReadAppleTweaks(settings).freezeLog);
-    CHECK(!ReadAppleTweaks(settings).orphanAgent);
+    CHECK(ampify::ChoiceOf(settings, "apple.orphanAgent") == "off");
     settings.Set("apple.watchdog", "on");
     settings.Set("apple.orphanAgent", "On");
     CHECK(ReadAppleTweaks(settings).freezeLog);
-    CHECK(ReadAppleTweaks(settings).orphanAgent);
+    CHECK(ampify::ChoiceOf(settings, "apple.orphanAgent") == "on");
     settings.Set("apple.watchdog", "maybe");
     CHECK(!ReadAppleTweaks(settings).freezeLog);
 }
@@ -998,28 +1000,28 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     // notifications, where "never" (Apple's own switch does it) only shows for someone who chose it before; the network
     // fixes, then the stuck library agent and the freeze log, last.
     std::vector<TweakChoice> choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 12);
-    if (choices.size() == 12) {
-        CHECK(choices[9].key == "apple.proxy" && choices[9].value == "system");  // off by default
-        CHECK(choices[9].options.size() == 2);
-        CHECK(choices[10].key == "apple.orphanAgent" && choices[10].value == "off");
-        CHECK(choices[11].key == "apple.watchdog" && choices[11].value == "off");
-        CHECK(choices[11].options.size() == 2);
-        CHECK(choices[0].key == "apple.fullscreen" && choices[0].value == "screen");
-        CHECK(choices[0].options.size() == 4);
-        CHECK(choices[1].key == "apple.playerControls" && choices[1].value == "shown");
-        CHECK(choices[2].key == "apple.artwork" && choices[2].value == "sharp");
-        CHECK(choices[3].key == "apple.marquee" && choices[3].value == "hover");
-        CHECK(choices[4].key == "apple.sidebar" && choices[4].value == "open");
-        CHECK(choices[5].key == "apple.topbar" && choices[5].value == "off");  // off by default
-        CHECK(choices[5].options.size() == 2);
-        CHECK(choices[6].key == "apple.close" && choices[6].value == "tray");
-        CHECK(choices[6].options.size() == 2);
-        CHECK(choices[7].key == "apple.notifications" && choices[7].value == "never");
-        CHECK(choices[7].options.size() == 3);
-        CHECK(choices[8].key == "apple.network" && choices[8].value == "ipv4-first");
-        CHECK(choices[8].options.size() == 2);
-    }
+    std::vector<std::string> keys;
+    for (const TweakChoice& choice : choices) keys.push_back(choice.key);
+    CHECK((keys == std::vector<std::string>{"apple.fullscreen", "apple.playerControls", "apple.artwork",
+                                            "apple.marquee", "apple.sidebar", "apple.topbar", "apple.close",
+                                            "apple.notifications", "apple.network", "apple.proxy",
+                                            "apple.orphanAgent", "apple.watchdog"}));
+    auto card = [&choices](const std::string& key) {
+        auto found = std::find_if(choices.begin(), choices.end(), [&](const TweakChoice& c) { return c.key == key; });
+        return found == choices.end() ? TweakChoice{} : *found;
+    };
+    CHECK(card("apple.proxy").value == "system" && card("apple.proxy").options.size() == 2);  // off by default
+    CHECK(card("apple.orphanAgent").value == "off");
+    CHECK(card("apple.watchdog").value == "off" && card("apple.watchdog").options.size() == 2);
+    CHECK(card("apple.fullscreen").value == "screen" && card("apple.fullscreen").options.size() == 4);
+    CHECK(card("apple.playerControls").value == "shown");
+    CHECK(card("apple.artwork").value == "sharp");
+    CHECK(card("apple.marquee").value == "hover");
+    CHECK(card("apple.sidebar").value == "open");
+    CHECK(card("apple.topbar").value == "off" && card("apple.topbar").options.size() == 2);  // off by default
+    CHECK(card("apple.close").value == "tray" && card("apple.close").options.size() == 2);
+    CHECK(card("apple.notifications").value == "never" && card("apple.notifications").options.size() == 3);
+    CHECK(card("apple.network").value == "ipv4-first" && card("apple.network").options.size() == 2);
 
     CHECK(SetAppleTweak(kit, "apple.notifications", "background", error));
     CHECK(SetAppleTweak(kit, "apple.network", "system", error));
@@ -1031,11 +1033,11 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(SetAppleTweak(kit, "apple.topbar", "search", error));
     CHECK(!SetAppleTweak(kit, "apple.topbar", "always", error));
     choices = AppleTweakChoices(kit);
-    CHECK(choices.size() == 12 && choices[7].options.size() == 2 && choices[7].value == "background");
-    CHECK(choices.size() == 12 && choices[8].value == "system");
-    CHECK(choices.size() == 12 && choices[2].value == "apple" && choices[3].value == "off");
-    CHECK(choices.size() == 12 && choices[4].value == "hover");
-    CHECK(choices.size() == 12 && choices[5].value == "search");
+    CHECK(card("apple.notifications").options.size() == 2 && card("apple.notifications").value == "background");
+    CHECK(card("apple.network").value == "system");
+    CHECK(card("apple.artwork").value == "apple" && card("apple.marquee").value == "off");
+    CHECK(card("apple.sidebar").value == "hover");
+    CHECK(card("apple.topbar").value == "search");
 }
 
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {

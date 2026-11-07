@@ -2,7 +2,6 @@
 
 #include <utility>
 
-#include "inspector.hpp"
 #include "snippets.hpp"
 
 namespace ampify::theme {
@@ -57,7 +56,7 @@ void ThemeSession::Reapply(TreeBackend& tree) {
     if (m_composed) m_engine.Apply(*m_composed, tree);
 }
 
-std::optional<std::string> ThemeSession::Tick(TreeBackend& tree, const SessionRequest& request) {
+std::optional<Inspection> ThemeSession::Tick(TreeBackend& tree, const SessionRequest& request) {
     if (!m_hasGeneration || request.generation != m_generation || request.themeId != m_themeId) {
         bool sameTheme = m_hasGeneration && request.themeId == m_themeId;
         std::shared_ptr<const Theme> previous = m_composed;
@@ -94,7 +93,7 @@ std::optional<std::string> ThemeSession::Tick(TreeBackend& tree, const SessionRe
 
     // An empty tree is the window before its content (first-run licence, start-up): no dump yet, the request stays and
     // the next tick tries again (seen on the bench: "Tree (0 elements)" written two seconds after start).
-    if (request.inspect && !tree.Snapshot().empty()) return InspectTree(tree);
+    if (request.inspect && !tree.Snapshot().empty()) return Inspect(tree);
     return std::nullopt;
 }
 

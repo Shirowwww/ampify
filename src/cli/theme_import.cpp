@@ -3,10 +3,12 @@
 // web classes, so it is kept aside as spicetify-user.css and never applied. An Ampify theme (a folder
 // with a manifest.json of kind theme) is copied as it is.
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <set>
 
 #include "../core/theme/files.hpp"
+#include "../core/theme/library.hpp"
 #include "../core/theme/theme.hpp"
 #include "archive.hpp"
 #include "internal.hpp"
@@ -74,12 +76,11 @@ std::string RelativeText(const std::filesystem::path& folder, const std::filesys
     return text;
 }
 
+// A Spicetify theme is its colours and its user.css; resources.xaml, the third file of an Ampify theme, is not one.
+constexpr std::array<const char*, 3> kSpicetifyThemeFiles = {"color.ini", "colors.ini", "user.css"};
+
 bool IsThemeFolder(const std::filesystem::path& folder) {
-    std::error_code ec;
-    for (const char* name : {"color.ini", "colors.ini", "user.css"}) {
-        if (std::filesystem::is_regular_file(folder / name, ec)) return true;
-    }
-    return false;
+    return theme::HoldsAnyOf(folder, kSpicetifyThemeFiles);
 }
 
 // The theme folders under `root` (root included), at most four levels down, skipping hidden folders.

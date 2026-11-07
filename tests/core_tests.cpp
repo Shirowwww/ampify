@@ -96,6 +96,19 @@ TEST_CASE(Settings_UpdateFileKeepsWhatAnotherWriterChanged) {
     CHECK(error.empty());
 }
 
+TEST_CASE(Settings_UpdateFileRefusesAValueOnTwoLines) {
+    ampify::test::ScratchDir scratch("settings-update-line");
+    std::string path = (scratch / "settings.txt").string();
+    std::string error;
+    CHECK(ampify::Settings::UpdateFile(path, "extensions.demo.greeting", "hello", error));
+    CHECK(!ampify::Settings::UpdateFile(path, "extensions.demo.greeting", "a\nb", error));
+    CHECK(error.find("one line") != std::string::npos);
+
+    ampify::Settings now;
+    CHECK(now.Load(path));
+    CHECK(now.GetString("extensions.demo.greeting", "") == "hello");
+}
+
 TEST_CASE(SafeMode_TripsAfterTwoUnhealthyLaunchesAndRecovers) {
     ampify::test::ScratchDir scratch("safe-mode");
     std::string path = (scratch / "state.txt").string();

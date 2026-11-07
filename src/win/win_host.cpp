@@ -24,6 +24,7 @@
 #include "../core/apple_music.hpp"
 #include "../core/audio/audio_engine.hpp"
 #include "../core/gain_board.hpp"
+#include "../core/settings_catalog.hpp"
 #include "../core/i18n.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_watchdog.hpp"
@@ -396,10 +397,7 @@ std::optional<std::string> WinHost::PasteText() { return win::ReadClipboardText(
 
 std::string WinHost::AppVersion() { return AppleMusicVersion(win::PackageFullName()); }
 
-std::string WinHost::ActiveTheme() {
-    std::string id = m_settings.Get("theme.active").value_or("");
-    return id == "none" ? std::string() : id;
-}
+std::string WinHost::ActiveTheme() { return ActiveThemeId(m_settings); }
 
 bool WinHost::RegisterKey(const std::string& elementId, const std::string& combo) {
     UINT modifiers = 0;

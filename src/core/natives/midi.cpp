@@ -36,7 +36,7 @@ struct MidiNatives : ScriptBridge {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "midi.input", &failure)) return failure;
-        if (!ServiceGate::Open(ext, "midi.enabled", "MIDI")) return JS_FALSE;
+        if (!ServiceGate::Open(ext, kMidiKey, "MIDI")) return JS_FALSE;
         MidiHost* midiHost = HostOf(ext).Capability<MidiHost>();
         return JS_NewBool(ctx, midiHost && midiHost->SubscribeMidi(ext->id()));
     }

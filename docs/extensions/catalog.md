@@ -65,11 +65,23 @@ catalog's archives are always packed by the bot.
 | `sha256` | yes | SHA-256 of the archive, 64 lowercase characters |
 | `homepage`, `license`, `tags`, `permissions` | no | Copies of the manifest fields |
 | `preview` | no | An `https://` `.png`/`.jpg`/`.jpeg` address on the catalog's host or the archive's host |
-| `translations` | no | A copy of the manifest's. Left out of the public catalog, which the test builds before 1.0.0 would refuse for a field they do not know |
+| `translations` | no | A copy of the manifest's. Not written by `tools/pack.py` nor `ampify build` (see Compatibility) |
 
-Ampify reads a catalog and leaves aside any field it does not know. `kit.manage` is refused in the catalog. Next to it,
-`versions.json` lists the Apple Music versions tested after a release; `catalog.json` pins its address and SHA-256, and
-`ampify versions update` reads it. Schema: [schemas/catalog.schema.json](../../schemas/catalog.schema.json).
+`kit.manage` is refused in a catalog entry, by the clients and by the public check alike: only Ampify's own Marketplace
+holds it. Next to the entries, `versions.json` lists the Apple Music versions tested after a release; `catalog.json`
+pins its address and SHA-256, and `ampify versions update` reads it. Schema:
+[schemas/catalog.schema.json](../../schemas/catalog.schema.json), which refuses a field it does not list.
+
+### Compatibility
+
+- Ampify 1.0.0 and later read a catalog and leave aside any field they do not know. Builds before 1.0.0 refuse the
+  whole catalog for one. That is why the entries written by `tools/pack.py` and `ampify build` leave `translations`
+  out; the archive's manifest keeps them. Once no build before 1.0.0 is in use, the entries can carry them.
+- `ampify build` prints the fields every entry needs. The bot, through `tools/pack.py`, also writes `homepage`,
+  `license`, `preview` and the real address.
+- Both tools write the same archive: files sorted by name, hidden files and `node_modules` left out, every file stored
+  (not compressed), the date 1980-01-01. The same folder gives the same SHA-256 with either tool and any zlib. Archives
+  already published keep their SHA-256 and are never packed again.
 
 ## What install checks
 
@@ -80,7 +92,8 @@ Ampify reads a catalog and leaves aside any field it does not know. `kit.manage`
 3. The downloaded archive must have the catalog's SHA-256, or it is thrown away.
 4. Each file name is checked (no absolute path, no `..`, no `\`, no control character), then the archive is extracted
    to a work folder. A symbolic link refuses everything.
-5. The manifest must match the catalog's id, kind and version.
+5. The manifest must match the catalog's id, kind and version, and ask for the same permissions as the entry that was
+   shown (in any order). A permission reserved for Ampify's Marketplace (`kit.manage`) is refused in either.
 6. Only then is the folder put in place; an older version stays until this succeeds.
 
 Nothing downloaded runs during an install, and the new element starts off. In the Marketplace, an element that asks for

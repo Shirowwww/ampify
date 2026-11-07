@@ -14,13 +14,14 @@
 #include "../core/journal.hpp"
 #include "../core/json.hpp"
 #include "../core/settings.hpp"
+#include "../core/settings_catalog.hpp"
 #include "../core/theme/inspector.hpp"
 #include "../core/theme/properties.hpp"
 #include "../core/theme/replay.hpp"
 #include "../core/theme/replay_contrast.hpp"
-#include "../core/theme/scheme_choice.hpp"
 #include "../core/theme/selector.hpp"
 #include "../core/theme/session.hpp"
+#include "../core/theme/accent.hpp"
 #include "../core/theme/theme_settings.hpp"
 #include "../core/theme/worker.hpp"
 #include "dump_scrub.hpp"
@@ -158,8 +159,8 @@ Settings ReplaySettings(const ReplayRequest& request, std::string* problem, bool
         ok = false;
     }
     // The bench never asks for a dump and never watches files: one generation for the whole replay.
-    settings.Set("theme.inspect", "0");
-    settings.Set("theme.live_reload", "0");
+    settings.Set(kInspectKey, "0");
+    settings.Set(kLiveReloadKey, "0");
     if (!request.scheme.empty()) settings.Set("theme.scheme", request.scheme);
     for (const auto& [key, value] : request.values) settings.Set(key, value);
     return settings;
@@ -175,7 +176,7 @@ struct Pass {
 
 Json RulesJson(const Theme& theme, const std::vector<NodeInfo>& nodes, ReplayBackend& tree, Json::Array& unmatched) {
     std::optional<ViewSize> size = tree.WindowSize();
-    const bool dark = theme.dark.value_or(IsDarkScheme(theme.scheme));
+    const bool dark = theme.dark.value_or(false);
     std::map<std::string, std::pair<const Assignment*, int>> bySelector;  // selector text: first rule, elements
     Json::Array rules;
     for (const Assignment& assignment : theme.assignments) {
@@ -436,7 +437,7 @@ Run RunPasses(ThemeWorker& worker, const Settings& settings, const ReplayRequest
         const auto decors = tree.Decors();
         session.Tick(tree, wanted);
         // The theme service sets the app's mode after each pass: the theme's, or Apple's own when it says none.
-        tree.SetAppMode(wanted.theme ? AppModeOf(wanted.theme->dark, wanted.theme->scheme) : std::nullopt);
+        tree.SetAppMode(wanted.theme ? wanted.theme->dark : std::nullopt);
         Pass done;
         for (size_t i = first; i < tree.Changes().size(); i++) {
             const ReplayBackend::Change& change = tree.Changes()[i];

@@ -20,7 +20,7 @@ struct RemoteNatives : ScriptBridge {
         if (json.size() > kMaxRemoteStateBytes) return Throw(ctx, "RangeError", "remote.setState: 4 KB at most");
         std::optional<Json> value = Json::Parse(json);
         if (!value || !value->AsObject()) return Throw(ctx, "TypeError", "remote.setState expects an object");
-        if (!ServiceEnabled(HostOf(ext), "remote.enabled")) return JS_FALSE;
+        if (!ServiceEnabled(HostOf(ext), kRemoteKey)) return JS_FALSE;
         RemoteHost* remote = HostOf(ext).Capability<RemoteHost>();
         return JS_NewBool(ctx, remote && remote->PublishRemoteState(ext->id(), value->Dump()));
     }

@@ -26,4 +26,9 @@ inline constexpr std::string_view kKnownAppVersions[] = {@AMPIFY_APPLE_BUILDS@};
 inline constexpr std::string_view kPlayerDllName = "@AMPIFY_APPLE_PLAYER_DLL@";
 inline constexpr std::string_view kRequiredPlayerExports[] = {@AMPIFY_APPLE_EXPORTS@};
 
+// Modules no hook may touch: a file name equal to one of the names, or holding one of the parts, compared without
+// case or extension. src/core/drm_guard.cpp is the only reader.
+inline constexpr std::string_view kProtectedModuleNames[] = {@AMPIFY_PROTECTED_NAMES@};
+inline constexpr std::string_view kProtectedModuleParts[] = {@AMPIFY_PROTECTED_PARTS@};
+
 }  // namespace ampify

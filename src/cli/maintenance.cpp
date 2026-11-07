@@ -11,6 +11,7 @@
 #include "../core/apple_music.hpp"
 #include "../core/build_signature.hpp"
 #include "../core/i18n.hpp"
+#include "../core/settings_catalog.hpp"
 #include "../core/ui_render/apple_tweaks.hpp"
 #include "../core/version_gate.hpp"
 #include "../core/version_list.hpp"
@@ -146,7 +147,7 @@ int CmdDevtools(Context& ctx) {
     Settings settings;
     std::string error;
     if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
-    settings.SetBool("theme.inspect", action == "on");
+    settings.SetBool(kInspectKey, action == "on");
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
 
     if (action == "off") {
@@ -281,7 +282,7 @@ int CmdVersions(Context& ctx) {
 
 void NotifyKitUpdate(Context& ctx) {
     Settings settings;
-    if (!settings.Load(ctx.kit.Settings().string()) || !settings.GetBool("check_kit_update", false)) return;
+    if (!settings.Load(ctx.kit.Settings().string()) || !ToggleOf(settings, kCheckKitUpdateKey)) return;
 
     std::filesystem::path file = ctx.kit.Cache() / "kit-update.txt";
     UpdateCache cache = ReadUpdateCache(file);

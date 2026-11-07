@@ -28,7 +28,7 @@ struct DiscordNatives : ScriptBridge {
         std::optional<discord::Activity> activity = discord::ActivityFromJson(*value, &error);
         if (!activity) return Throw(ctx, "TypeError", error);
 
-        if (!ServiceGate::Open(ext, "discord.enabled", "Discord")) return JS_FALSE;
+        if (!ServiceGate::Open(ext, kDiscordKey, "Discord")) return JS_FALSE;
         DiscordHost* discordHost = HostOf(ext).Capability<DiscordHost>();
         if (!discordHost) return JS_FALSE;
         return JS_NewBool(ctx, discordHost->SetActivity(ext->id(), *clientId->AsString(), *activity));

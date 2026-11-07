@@ -73,7 +73,8 @@ same lines. For a module `foo`:
 5. Host service: a service only some hosts offer is a capability, read with `host.Capability<FooHost>()`. Do not
    add pure virtual methods to `Host`.
 6. Permission: add a row to `kPermissions` in `src/core/permissions.hpp` and the name to the permission pattern of
-   `schemas/manifest.schema.json` and `schemas/catalog.schema.json` (`tests/manifest_tests.cpp` compares them), and
+   `schemas/manifest.schema.json` and, unless it is `firstPartyOnly`, `schemas/catalog.schema.json`
+   (`tests/manifest_tests.cpp` compares them), and
    document it in [docs/extensions/api.md](docs/extensions/api.md), section 4.
 7. Tests: `tests/foo_tests.cpp`. `tests/api_module_tests.cpp` freezes the existing members of `Ampify`.
 8. Types and docs: section 5 of `docs/extensions/api.md` and `src/cli/sdk_types.cpp` (`ampify types`).

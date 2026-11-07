@@ -6,6 +6,7 @@
 #include <memory>
 #include <tuple>
 
+#include "../core/settings_catalog.hpp"
 #include "../core/ui_watchdog.hpp"
 #include "amp_player.hpp"
 #include "player_buttons.hpp"
@@ -79,7 +80,7 @@ void PlayerBridge::TryApple() {
                                 "state and commands go through SMTC, then the media keys");
         return;
     }
-    if (!m_settings.GetBool("player.apple", true)) {
+    if (!ToggleOf(m_settings, kPlayerAppleKey)) {
         SayOnce("apple-off", "Player: AMP.Services.Player turned off by the player.apple setting; SMTC instead");
         return;
     }
@@ -238,7 +239,7 @@ bool PlayerBridge::Control(PlayerCommand command, int64_t seekMs) {
     RouteAvailability available;
     // Seek needs no opt-in: SMTC is the only other route, and Apple Music ignores it there.
     available.apple = m_apple->Active() &&
-                      (command == PlayerCommand::Seek || m_settings.GetBool("player.appleCommands", false));
+                      (command == PlayerCommand::Seek || ToggleOf(m_settings, kPlayerAppleCommandsKey));
     available.smtc = m_smtc->Found();
     available.mediaKeys = true;
     CommandPlan plan = PlanCommand(command, seekMs, m_last, available);

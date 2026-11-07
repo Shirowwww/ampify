@@ -401,11 +401,14 @@ std::set<std::string> SchemaLanguages(const ampify::Json& schema) {
 
 }  // namespace
 
-// The schemas that check an element before publication take the permissions and the languages the kernel takes.
+// The schemas that check an element before publication take the permissions and the languages the kernel takes. The
+// catalog's entries leave out the permissions only Ampify's own elements may hold, as every client does.
 TEST_CASE(Manifest_SchemasListThePermissionsAndLanguagesOfTheCore) {
     std::set<std::string> permissions;
+    std::set<std::string> downloadable;
     for (const ampify::PermissionInfo& permission : ampify::kPermissions) {
         permissions.insert(std::string(permission.name));
+        if (!permission.firstPartyOnly) downloadable.insert(std::string(permission.name));
     }
     std::set<std::string> languages(std::begin(ampify::kTranslationLanguages), std::end(ampify::kTranslationLanguages));
     for (const char* name : {"manifest", "catalog"}) {
@@ -415,7 +418,7 @@ TEST_CASE(Manifest_SchemasListThePermissionsAndLanguagesOfTheCore) {
         REQUIRE(text.has_value());
         std::optional<ampify::Json> schema = ampify::Json::Parse(*text);
         REQUIRE(schema.has_value());
-        CHECK(SchemaPermissions(*schema) == permissions);
+        CHECK(SchemaPermissions(*schema) == (std::string(name) == "catalog" ? downloadable : permissions));
         CHECK(SchemaLanguages(*schema) == languages);
     }
 }

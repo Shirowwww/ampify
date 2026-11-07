@@ -10,6 +10,7 @@
 #include "../manifest.hpp"
 #include "../permissions.hpp"
 #include "../settings.hpp"
+#include "../settings_catalog.hpp"
 #include "../text_util.hpp"
 
 namespace ampify::uirender {
@@ -135,8 +136,8 @@ bool ChooseTheme(const fs::path& kit, const std::string& id, std::string& error)
     if (!id.empty() && !IsIdOf(ElementKind::Theme, id, error)) return false;
     return Settings::UpdateFile((kit / "settings.txt").string(), [&id](Settings& settings) {
         std::string scheme = settings.GetString("theme.scheme", "");
-        bool keep = scheme == "auto" || (!id.empty() && settings.GetString("theme.active", "") == id);
-        settings.Set("theme.active", id.empty() ? "none" : id);
+        bool keep = scheme == "auto" || (!id.empty() && ActiveThemeId(settings) == id);
+        settings.Set(kThemeActiveKey, id.empty() ? "none" : id);
         if (!keep) settings.Remove("theme.scheme");
     }, error);
 }
@@ -231,8 +232,7 @@ bool SetModSetting(const fs::path& kit, const std::string& id, const std::string
 std::string ActiveThemeId(const fs::path& kit) {
     Settings settings;
     settings.Load((kit / "settings.txt").string());
-    std::string id = settings.GetString("theme.active", "");
-    return ToLowerAscii(id) == "none" ? std::string() : id;
+    return ampify::ActiveThemeId(settings);
 }
 
 std::optional<ModEntry> ActiveThemeSettings(const fs::path& kit) {
@@ -286,8 +286,6 @@ bool SetThemeSetting(const fs::path& kit, const std::string& id, const std::stri
 }
 
 namespace {
-
-constexpr size_t kMaxSettingText = 200;  // the length docs/extensions/manifest.md allows a text
 
 // A kind that declares settings, from its name.
 std::optional<ElementKind> SettingKindNamed(std::string_view name) {

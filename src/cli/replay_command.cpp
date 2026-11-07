@@ -6,6 +6,8 @@
 
 #include "../core/json.hpp"
 #include "../core/manifest.hpp"
+#include "../core/settings_catalog.hpp"
+#include "../core/theme/accent.hpp"
 #include "../core/theme/theme_settings.hpp"
 #include "dump_scrub.hpp"
 #include "replay_util.hpp"
@@ -247,7 +249,7 @@ std::vector<std::string> SetProblems(const ReplayRequest& request) {
             why = ElementSetProblem(key, value, themes, snippets);
         } else if (key == "theme.active") {
             why = "the replayed theme is the first argument";
-        } else if (key == "theme.inspect" || key == "theme.live_reload") {
+        } else if (key == kInspectKey || key == kLiveReloadKey) {
             why = "the bench sets it itself";
         } else if (!kThemeKeys.count(key)) {
             why = key.starts_with("theme.") ? "not a key of the theme service"

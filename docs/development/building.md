@@ -72,7 +72,8 @@ AMPIFY_BIN=$PWD/build/ampify python3 -m unittest discover -s tools -p 'test_*.py
 What defines a kit lives in two data files, one per reason to change. `facts/release.json` changes with a release or a
 rename: the version, the extension API version, the kit folder, the binary names, the elements that ship (which start
 on, which are first-party or built into the kernel), the languages and the project's addresses. `facts/apple.json`
-changes when Apple ships a build: its package, its process names, the tested builds and the exports the kit needs. The
+changes when Apple ships a build: its package, its process names, the tested builds, the exports the kit needs and the
+modules no hook may touch (`protectedModules`, which `src/core/drm_guard.cpp` and the bench both read). The
 configure step turns them into `release_facts.hpp` and `apple_facts.hpp` in the build folder; the scripts and the tests
 read the JSON. `scripts/install.ps1` runs without a checkout, so it keeps its own copies, which `tools/test_facts.py`
 checks.

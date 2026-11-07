@@ -15,9 +15,9 @@ namespace ampify::theme {
 //   theme.scheme   = Dark                     this scheme
 //   theme.scheme   =                          the theme's defaultScheme (manifest.json), or the first scheme
 //
-// For `auto`, a dark scheme is a name such as Dark, Sombre, Night or Nuit (or one that contains dark, sombre, night or
-// nuit), a light scheme a name such as Light, Clair, Day or Jour (or one that contains light or clair). In light mode,
-// with no light name, the first scheme that is not dark is used: [Base] with [Dark] works as is.
+// For `auto`, a dark scheme is a name that contains dark or night (Dark, Midnight), a light scheme one that contains
+// light, or is Day. Case does not count. In light mode, with no light name, the first scheme that is not dark is used:
+// [Base] with [Dark] works as is.
 
 struct ScheduleEntry {
     int minute = 0;      // from midnight, 0 to 1439
@@ -40,21 +40,9 @@ std::string ScheduledScheme(const Schedule& schedule, int minute);
 // mode is asked and no scheme is dark (then the first scheme, the default, stays).
 std::string SystemScheme(const std::vector<std::string>& schemes, bool dark);
 
-// True when the name is a dark scheme by the rule above (Dark, Sombre, Night, Nuit). The app is then switched to its
-// own dark mode under the theme, so the brushes the theme does not name match the ones it does.
-bool IsDarkScheme(const std::string& scheme);
-
-// The app mode a theme asks for: dark or light from its background when it has one, else from its scheme's name, else
-// none, and Apple Music keeps its own (a theme that only hides buttons must not turn the app light).
-std::optional<bool> AppModeOf(std::optional<bool> dark, const std::string& scheme);
-
-// What the window shows behind the panels a theme leaves see-through: Windows 11's Mica (the desktop's colours, faint),
-// its darker Mica Alt, or the blur of the windows behind (acrylic).
-enum class WindowMaterial { Mica, MicaAlt, Acrylic };
-
-// The material a theme asks for in :root (--window-material: mica | mica-alt | acrylic), ignoring case and spaces.
-// None for `none`, an empty value or an unknown one: Apple Music's own window then stays.
-std::optional<WindowMaterial> WindowMaterialOf(std::string_view value);
+// Dark or light by the name rule above; nothing for a name that is neither (Base, Nord). The loader falls back on it
+// for a scheme that gives no background colour (Theme::dark).
+std::optional<bool> DarkByName(const std::string& scheme);
 
 // What the Windows side reports, read on each pass of the worker.
 struct SchemeInputs {

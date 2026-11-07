@@ -55,7 +55,7 @@ struct TrayNatives : ScriptBridge {
             items.push_back(std::move(item));
         }
 
-        if (!ServiceGate::Open(ext, "tray.enabled", "Notification area icon")) return JS_FALSE;
+        if (!ServiceGate::Open(ext, kTrayKey, "Notification area icon")) return JS_FALSE;
         TrayHost* tray = HostOf(ext).Capability<TrayHost>();
         if (!tray) return JS_FALSE;
         return JS_NewBool(ctx, tray->SetTrayMenu(ext->id(), items));
@@ -66,7 +66,7 @@ struct TrayNatives : ScriptBridge {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ui.tray", &failure)) return failure;
-        return JS_NewBool(ctx, ServiceGate::Open(ext, "tray.enabled", "Notification area icon") &&
+        return JS_NewBool(ctx, ServiceGate::Open(ext, kTrayKey, "Notification area icon") &&
                                    HostOf(ext).Capability<TrayHost>() != nullptr);
     }
 };

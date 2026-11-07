@@ -201,6 +201,10 @@ class Basics(AmpifyTestCase):
         self.assertEqual(self.ampify("config", "theme.active", "Pas Bon").returncode, 1)
         self.assertEqual(self.ampify("config", "catalog.url", "http://example.com/c.json").returncode, 1)
         self.assertEqual(self.ampify("config", "unknown.key").returncode, 1)
+        two_lines = self.ampify("config", "extensions.demo.greeting", "a\nb")
+        self.assertEqual(two_lines.returncode, 1)
+        self.assertIn("one line", two_lines.stderr)
+        self.assertNotIn("greeting", self.settings_text())
 
         self.assertEqual(self.ampify("config", "kit_update", "weekly").returncode, 1)
         self.assertEqual(self.ampify("config", "kit_update", "off").returncode, 0)
@@ -257,6 +261,14 @@ class Services(AmpifyTestCase):
         self.assertEqual(self.ampify("config", "remote.token", "short").returncode, 1)
         self.assertEqual(self.ampify("config", "remote.port", "80").returncode, 1)
         self.assertEqual(self.ampify("config", "remote.port", "8974").returncode, 0)
+
+    def test_gain_ceiling_and_schedule_are_checked_as_the_kernel_reads_them(self):
+        for key, value in (("audio.maxGainDb", "banana"), ("audio.maxGainDb", "13"), ("audio.maxGainDb", ""),
+                           ("theme.schedule", "7h=Light"), ("theme.schedule", "07:00=Light,07:00=Dark")):
+            self.assertEqual(self.ampify("config", key, value).returncode, 1, key + " " + value)
+        for key, value in (("audio.maxGainDb", "4.5"), ("audio.maxGainDb", "0"), ("theme.schedule", ""),
+                           ("theme.schedule", "07:00=Light;19:30=Dark")):
+            self.assertEqual(self.ampify("config", key, value).returncode, 0, key + " " + value)
 
     def test_midi_map_is_checked(self):
         self.assertEqual(self.ampify("config", "midi.map", "note:60=next;cc:7=gain").returncode, 0)
@@ -444,7 +456,7 @@ class Marketplace(AmpifyTestCase):
         with open(manifest_path, "w", encoding="utf-8") as handle:
             json.dump(manifest, handle)
         entry, _ = self.entry_for(folder)
-        self.assertNotIn("translations", entry)  # build leaves them out: Ampify 1.1.0 refuses the field
+        self.assertNotIn("translations", entry)  # left out of the catalog entry (docs/extensions/catalog.md)
         entry["translations"] = translations  # a later catalog may carry them, and they are read
         catalog = self.write_catalog([entry, self.night_entry])
         self.assertEqual(self.install("glow", catalog).returncode, 0)
@@ -956,6 +968,28 @@ class Build(AmpifyTestCase):
             self.assertEqual(sorted(bundle.namelist()), ["main.js", "manifest.json"])
         self.assertIn(sha256_of(out), result.stdout)
 
+    def test_build_and_pack_write_the_same_archive_and_the_same_entry(self):
+        folder = self.write_element("demo-same-as-pack", "extension", permissions=["storage"],
+                                    files={".hidden": "left out"})
+        os.makedirs(os.path.join(folder, "lib"))
+        with open(os.path.join(folder, "lib", "helper.js"), "w", encoding="utf-8") as handle:
+            handle.write("export {};\n")
+        manifest_path = os.path.join(folder, "manifest.json")
+        manifest = read_json(manifest_path)
+        manifest.update(tags=["demo"], translations={"fr": {"name": "Démo", "description": "Un test."}})
+        with open(manifest_path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle)
+        built = os.path.join(self.tmp, "built.zip")
+        packed = os.path.join(self.tmp, "packed.zip")
+        result = self.ampify("build", folder, built)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        digest = pack.pack(folder, packed)["sha256"]
+        self.assertEqual(sha256_of(built), digest)
+
+        printed = json.loads(result.stdout[result.stdout.index("{\n"):])
+        expected = pack.catalog_entry(manifest, "https://...", digest)
+        self.assertEqual(printed, expected)
+
     def test_build_refuses_a_starter_left_as_it_is(self):
         self.assertEqual(self.ampify("new", "theme", "fresh-theme").returncode, 0)
         result = self.ampify("build", os.path.join(self.tmp, "fresh-theme"))
@@ -1290,6 +1324,25 @@ class Transfer(AmpifyTestCase):
         self.assertIn("work", self.ampify("profile", "list").stdout.split())
         self.assertEqual(self.ampify("profile", "delete", "work").returncode, 0)
         self.assertIn("No profile", self.ampify("profile", "list").stdout)
+
+    def test_the_remote_token_stays_out_of_profiles_and_exports(self):
+        self.assertEqual(self.ampify("config", "remote.enabled", "1").returncode, 0)
+        token = self.ampify("config", "remote.token").stdout.strip()
+        self.assertEqual(self.ampify("profile", "save", "home").returncode, 0)
+        with open(os.path.join(self.kit, "profiles", "home", "settings.txt"), encoding="utf-8") as handle:
+            profile = handle.read()
+        self.assertIn("remote.enabled", profile)
+        self.assertNotIn("remote.token", profile)
+        self.assertEqual(self.ampify("profile", "use", "home").returncode, 0)
+        self.assertEqual(self.ampify("config", "remote.token").stdout.strip(), token)
+
+        out = self.export_one("demo-secret")
+        with zipfile.ZipFile(out) as bundle:
+            exported = bundle.read("settings.txt").decode("utf-8")
+        self.assertIn("remote.enabled", exported)
+        self.assertNotIn(token, exported)
+        self.assertEqual(self.ampify("import", out, "--yes").returncode, 0)
+        self.assertEqual(self.ampify("config", "remote.token").stdout.strip(), token)
 
     def test_profile_name_and_missing_profile_are_refused(self):
         self.assertEqual(self.ampify("profile", "save", "Pas Bon").returncode, 1)

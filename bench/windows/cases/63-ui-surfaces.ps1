@@ -43,7 +43,7 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
     $since = Get-Date
     $launcherProcess = Start-Launcher -LauncherPath $launcher
     try {
-        $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
+        $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched
         if (-not $launched) { return }
         Clear-FirstRun -Ctx $Ctx
@@ -56,7 +56,7 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
             (Test-JournalContains -FileName 'AppleMusic.log' -Text 'first refresh run by its DispatcherQueue')
         }
         Add-Check -Ctx $Ctx -Name 'log: the DispatcherQueue ran work' -Passed $ran
-        $bound = Wait-Journal -FileName 'AppleMusic.log' -Text 'Interface: window "MainWindow" bound' -TimeoutSeconds 60
+        $bound = Wait-Journal -FileName 'AppleMusic.log' -Text $script:LogPhrase.MainWindowBound -TimeoutSeconds 60
         Add-Check -Ctx $Ctx -Name 'log: interface service bound to "MainWindow"' -Passed $bound
         Start-Sleep -Seconds 5
         Show-UiAppWindow
@@ -110,7 +110,7 @@ Register-Case -Id 'ui-surfaces' -Title 'UI: native rendering of a React panel, c
             Show-UiAppWindow
             Save-Screenshot -Ctx $Ctx -Name 'ui-theme-applied' | Out-Null
             Set-Settings -Values @{ 'theme.active' = 'none' }
-            Wait-Journal -FileName 'AppleMusic.log' -Text 'Theme removed: ' -TimeoutSeconds 30 | Out-Null
+            Wait-Journal -FileName 'AppleMusic.log' -Text $script:LogPhrase.ThemeRemoved -TimeoutSeconds 30 | Out-Null
         } else {
             Add-Skip -Ctx $Ctx -Name 'palettes theme' -Reason "example theme missing from the UI build: $palettes"
         }

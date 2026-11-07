@@ -12,6 +12,7 @@
 #include "json.hpp"
 #include "permissions.hpp"
 #include "release_facts.hpp"
+#include "settings.hpp"
 #include "text_util.hpp"
 
 namespace ampify {
@@ -47,7 +48,6 @@ constexpr size_t kMinOptions = 2;
 constexpr size_t kMaxOptions = 20;
 constexpr size_t kMaxOptionText = 40;
 constexpr size_t kMaxLabel = 60;
-constexpr size_t kMaxSettingText = 200;
 constexpr size_t kMaxGroupText = 40;
 constexpr size_t kMaxDescriptionText = 200;
 
@@ -298,12 +298,6 @@ void Fields::Unknown(const Names& known, std::vector<std::string>* warnings) {
     }
 }
 
-// settings.txt holds one value per line and trims its ends: a value that would not come back as written is refused.
-bool FitsSettingsFile(const std::string& text) {
-    auto space = [](char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; };
-    return text.find_first_of("\r\n") == std::string::npos &&
-           (text.empty() || (!space(text.front()) && !space(text.back())));
-}
 
 // A choice's values: kMinOptions to kMaxOptions different texts of 1 to kMaxOptionText characters.
 bool ReadOptions(const Json* field, std::vector<std::string>& options) {
@@ -311,7 +305,7 @@ bool ReadOptions(const Json* field, std::vector<std::string>& options) {
     if (!list || list->size() < kMinOptions || list->size() > kMaxOptions) return false;
     for (const Json& item : *list) {
         const std::string* option = item.AsString();
-        if (!option || CodePoints(*option) < 1 || CodePoints(*option) > kMaxOptionText || !FitsSettingsFile(*option)) {
+        if (!option || CodePoints(*option) < 1 || CodePoints(*option) > kMaxOptionText || !KeepsItsValue(*option)) {
             return false;
         }
         if (std::find(options.begin(), options.end(), *option) != options.end()) return false;
@@ -366,7 +360,7 @@ void ReadSettingValue(const Json& item, const std::string& where, SettingSpec& s
         case SettingSpec::Type::Choice: return ReadChoiceValue(item, where, spec, errors);
         case SettingSpec::Type::Text:
             if (!value || !value->AsString() || CodePoints(*value->AsString()) > kMaxSettingText ||
-                !FitsSettingsFile(*value->AsString())) {
+                !KeepsItsValue(*value->AsString())) {
                 return errors.push_back(where + ": default must be a text of " + std::to_string(kMaxSettingText) +
                                         " characters at most, on one line, without spaces at either end");
             }
@@ -687,14 +681,6 @@ std::vector<SettingSpec> DeclaredSettings(std::string_view manifestText, std::ve
 
 namespace {
 
-bool IsOn(std::string_view lowered) {
-    return lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes";
-}
-
-bool IsOff(std::string_view lowered) {
-    return lowered == "0" || lowered == "false" || lowered == "off" || lowered == "no";
-}
-
 std::optional<double> SettingNumber(std::string_view text) {
     double number = 0;
     const char* end = text.data() + text.size();
@@ -707,10 +693,8 @@ std::optional<double> SettingNumber(std::string_view text) {
 
 std::string SettingProblem(const SettingSpec& spec, std::string_view stored) {
     switch (spec.type) {
-        case SettingSpec::Type::Toggle: {
-            std::string lowered = ToLowerAscii(stored);
-            return IsOn(lowered) || IsOff(lowered) ? std::string() : "\"" + std::string(stored) + "\" is not on or off";
-        }
+        case SettingSpec::Type::Toggle:
+            return ParseToggle(stored) ? std::string() : "\"" + std::string(stored) + "\" is not on or off";
         case SettingSpec::Type::Choice: {
             if (std::find(spec.options.begin(), spec.options.end(), stored) != spec.options.end()) return {};
             std::string offered;
@@ -738,7 +722,7 @@ std::string SettingValue(const SettingSpec& spec, const std::optional<std::strin
     if (!stored || !SettingProblem(spec, *stored).empty()) return spec.defaultValue;
     switch (spec.type) {
         case SettingSpec::Type::Toggle:
-            return IsOn(ToLowerAscii(*stored)) ? "true" : "false";
+            return *ParseToggle(*stored) ? "true" : "false";
         case SettingSpec::Type::Number:
             return ShortestNumberText(*SettingNumber(*stored));
         case SettingSpec::Type::Choice:

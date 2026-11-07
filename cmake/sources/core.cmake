@@ -2,6 +2,7 @@
 # of CMakeLists.txt.
 list(APPEND AMPIFY_CORE_SOURCES
     src/core/settings.cpp
+    src/core/settings_catalog.cpp
     src/core/journal.cpp
     src/core/safe_mode.cpp
     src/core/version_gate.cpp

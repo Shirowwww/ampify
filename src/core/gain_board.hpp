@@ -33,11 +33,9 @@ private:
 // The gain board of this process. Elements reach it through the Windows host; the audio hooks apply it.
 GainBoard& ElementGains();
 
-// The setting that bounds the elements' gain, apart from the Atmos leveler's own cap.
-constexpr const char* kGainCeilingSetting = "audio.maxGainDb";
-
-// The ceiling in dB from that setting's raw value: 0 to 12, 6 when it is not set. Shared by the script side, which
-// clamps what Ampify.audio.setGain returns, and the host, which clamps the total.
+// The ceiling in dB from the raw value of audio.maxGainDb (kGainCeilingSetting): the range and the default of its row
+// in settings_catalog.cpp, apart from the Atmos leveler's own cap. Shared by the script side, which clamps what
+// Ampify.audio.setGain returns, and the host, which clamps the total.
 double GainCeilingDb(const std::optional<std::string>& setting);
 
 }  // namespace ampify

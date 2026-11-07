@@ -24,12 +24,13 @@
 #include "xaml_backend.hpp"
 #include "xaml_watcher.hpp"
 #include "../core/settings.hpp"
+#include "../core/settings_catalog.hpp"
 #include "../core/theme/css.hpp"
 #include "../core/theme/fonts.hpp"
+#include "../core/theme/glass.hpp"
 #include "../core/theme/inspector.hpp"
 #include "../core/theme/layout.hpp"
 #include "../core/theme/library.hpp"
-#include "../core/theme/scheme_choice.hpp"
 #include "../core/theme/session.hpp"
 #include "../core/theme/theme_settings.hpp"
 #include "../core/theme/worker.hpp"
@@ -63,13 +64,6 @@ std::pair<std::filesystem::file_time_type, std::filesystem::file_time_type> Chan
     std::filesystem::file_time_type settings = std::filesystem::last_write_time(kit / "settings.txt", error);
     std::filesystem::file_time_type reload = std::filesystem::last_write_time(kit / "reload.txt", error);
     return {settings, reload};
-}
-
-// The window material of the theme on screen (--window-material in its :root), none without a theme.
-std::optional<theme::WindowMaterial> MaterialOf(const theme::Theme* applied) {
-    if (!applied) return std::nullopt;
-    auto value = applied->variables.find("window-material");
-    return value == applied->variables.end() ? std::nullopt : theme::WindowMaterialOf(value->second);
 }
 
 // Local time in minutes from midnight, for theme.schedule.
@@ -118,7 +112,9 @@ struct UiSide {
     int timedRefreshes = 0;  // the same for the window's resource refreshes
     std::size_t heldStates = 0;  // the counts last written to the log
     std::size_t refusedStates = 0;
-    std::shared_ptr<const theme::Theme> fontsOf;  // what the published font roles come from (null: the defaults)
+    // What the session applies, theme and snippets together (null: nothing): its font roles are published, its
+    // window material kept.
+    std::shared_ptr<const theme::Theme> shown;
     // The passes after changes over the current minute: how many, and how long they held the interface thread.
     std::chrono::steady_clock::time_point minuteStart = std::chrono::steady_clock::now();
     int minutePasses = 0;
@@ -169,7 +165,7 @@ void ThemeService::Run(HINSTANCE module) {
     {
         Settings settings;
         settings.Load((m_kit / "settings.txt").string());
-        if (settings.GetBool("xaml.watcher", false)) StartXamlWatcher(m_journal, module);
+        if (ToggleOf(settings, kXamlWatcherKey)) StartXamlWatcher(m_journal, module);
     }
 
     // Reads the settings, the theme, the snippets, sidebar.json and home.json, and reloads only what changed. The
@@ -204,6 +200,7 @@ void ThemeService::Run(HINSTANCE module) {
         std::filesystem::path kit = m_kit;
         PostToUiThread([ui, request, kit, &journal]() {
             ampify::ActivityScope activity("theme tick");
+            theme::SetCurrentGlassLevel(request.glass);
             if (!ui->attached) {
                 ui->attached = ui->backend.Attach();
                 if (!ui->attached) return;
@@ -244,12 +241,12 @@ void ThemeService::Run(HINSTANCE module) {
             KeepTopbarSearch(journal);
             ui->backend.RecheckMedia();
 
-            std::optional<std::string> dump = ui->session.Tick(ui->backend, request);
-            if (std::shared_ptr<const theme::Theme> applied = ui->session.Applied(); applied != ui->fontsOf) {
+            std::optional<theme::Inspection> inspection = ui->session.Tick(ui->backend, request);
+            if (std::shared_ptr<const theme::Theme> applied = ui->session.Applied(); applied != ui->shown) {
                 PublishFontRoles(theme::FontRolesJson(applied.get()));
-                ui->fontsOf = std::move(applied);
+                ui->shown = std::move(applied);
             }
-            KeepWindowMaterial(MaterialOf(ui->fontsOf.get()), journal);
+            KeepWindowMaterial(ui->shown ? ui->shown->Material() : std::nullopt, journal);
             std::size_t held = ui->backend.HeldStateCount();
             std::size_t refused = ui->backend.RefusedStateCount();
             if (held != ui->heldStates || refused != ui->refusedStates) {
@@ -263,8 +260,7 @@ void ThemeService::Run(HINSTANCE module) {
             // (the midnight theme alone left light text on Apple Music's white background). The scheme's background
             // decides when it gives one (a Spicetify scheme is often named Nord or Mocha), its name otherwise.
             auto modeStart = std::chrono::steady_clock::now();
-            bool refreshed = ui->backend.SetAppMode(
-                request.theme ? theme::AppModeOf(request.theme->dark, request.theme->scheme) : std::nullopt);
+            bool refreshed = ui->backend.SetAppMode(request.theme ? request.theme->dark : std::nullopt);
             if (std::string note = ui->backend.TakeCaptionNote(); !note.empty()) journal.Write(note);
             if (refreshed) {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - modeStart);
@@ -275,13 +271,13 @@ void ThemeService::Run(HINSTANCE module) {
                                   " ms (" + ui->backend.RefreshReason() + ")");
                 }
             }
-            if (dump) {
+            if (inspection) {
                 ampify::ActivityScope inspector("inspector tree");
-                std::ofstream(JournalFile("inspector.txt")) << *dump;
+                std::ofstream(JournalFile("inspector.txt")) << theme::InspectionText(*inspection);
                 theme::InspectOptions recorded;
                 recorded.theme = request.themeId;
                 recorded.originals = &ui->session.Originals();
-                std::ofstream(JournalFile("inspector.json")) << theme::InspectTreeJson(ui->backend, recorded);
+                std::ofstream(JournalFile("inspector.json")) << theme::InspectionJson(*inspection, recorded);
                 WriteSidebarIfMissing(kit, ui->backend);
                 UpdateThemeSettings(kit, journal, [](theme::ThemeSettings& value) { value.inspect = false; });
                 journal.Write("Inspector: tree written to logs\\inspector.txt and inspector.json");

@@ -192,8 +192,8 @@ QueueItem QueueItemFromAmp(const AmpQueueEntry& entry) {
     item.id = std::to_string(entry.id);
     item.title = entry.title;
     std::tie(item.artist, item.album) = SplitArtistAlbum(entry.subtitle);
-    // The unit of IPlayQueueItem.Duration is not written in the winmd either: a song lasts between 20 s and 10 h.
-    item.durationMs = AmpTimeToMs(entry.durationRaw, DetectAmpTimeUnit(entry.durationRaw, std::nullopt));
+    // The measured unit, not a guess from the value: a guess takes a song under 20 s for seconds.
+    item.durationMs = AmpTimeToMs(entry.durationRaw, kQueueDurationUnit);
     item.section = QueueSectionFromKind(entry.sectionKind);
     item.catalogId = entry.catalogId;
     // Apple Music 1.1792 keeps its covers' addresses internal: Apple's loader then draws the entry's cover.

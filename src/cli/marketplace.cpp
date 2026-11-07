@@ -13,6 +13,7 @@
 #include "../core/kit_layout.hpp"
 #include "apple_facts.hpp"
 #include "../core/settings.hpp"
+#include "../core/settings_catalog.hpp"
 #include "../core/theme/files.hpp"
 #include "../core/theme/theme.hpp"
 #include "../core/ui_render/mods.hpp"
@@ -26,7 +27,6 @@
 #include "platform.hpp"
 #include "release.hpp"
 #include "release_facts.hpp"
-#include "setting_keys.hpp"
 #include "sha256.hpp"
 
 namespace ampify::cli {
@@ -216,10 +216,10 @@ int InstallEntry(Context& ctx, const CatalogEntry& entry, bool localCatalog, boo
         for (const std::string& message : validation.errors) ctx.err << "  - " << message << "\n";
         return 1;
     }
-    const Manifest& manifest = *validation.manifest;
-    if (manifest.id != entry.id || manifest.version != entry.version || manifest.kind != entry.kind) {
+    std::string mismatch = CheckArchiveManifest(*validation.manifest, entry);
+    if (!mismatch.empty()) {
         RemoveQuietly(staging);
-        return Failure(ctx, "the manifest in the archive does not match the catalog");
+        return Failure(ctx, mismatch);
     }
 
     // Swap the folders: the previous version is kept until the new one is in place.
@@ -570,7 +570,7 @@ int PrintMarketJson(Context& ctx) {
     Json result = Json::Object{{"catalogOk", catalogOk},
                                {"catalog", std::move(entries)},
                                {"installed", std::move(installed)},
-                               {"theme", settings.GetString("theme.active", "")},
+                               {"theme", ActiveThemeId(settings)},
                                {"scheme", settings.GetString("theme.scheme", "")}};
     ctx.out << result.Dump() << "\n";
     return 0;
@@ -705,7 +705,7 @@ int CmdRemove(Context& ctx) {
     Settings settings;
     if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
     if (kind == "theme") {
-        if (settings.GetString("theme.active", "") == id) settings.Set("theme.active", "");
+        if (ActiveThemeId(settings) == id) settings.Set(kThemeActiveKey, "");
     } else {
         settings.Remove(ElementRef{KindNamed(kind).value_or(ElementKind::Extension), id}.EnabledKey());
     }

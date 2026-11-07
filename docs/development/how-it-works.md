@@ -199,7 +199,8 @@ the analysis on them; `extensions/atmos-leveler/` follows the songs, measures th
 - Atmos is measured on `ISpatialAudioObjectRenderStreamForMetadata` (mono objects at 48 kHz), before the volume, and
   brought to the same scale.
 - Loudness is BS.1770 per song, kept per audio variant in `atmos-levels.txt`. The target is the median of the last 30
-  stereo songs; the gain goes from 0 to 15 dB with a soft knee from 0.94 and a ceiling of 0.95.
+  stereo songs; the gain goes from 0 to 15 dB with a soft knee from 0.94 and a ceiling of 0.95. This cap is the
+  leveler's own (`extensions/atmos-leveler/leveler.hpp`): `audio.maxGainDb` bounds the gain the extensions add.
 - While AMExclusive holds the output in exclusive mode, the leveler pauses.
 
 Measurements: [knowledge/atmos-loudness.md](../../knowledge/atmos-loudness.md).

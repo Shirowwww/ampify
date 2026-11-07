@@ -431,6 +431,16 @@ TEST_CASE(PlayerQueue_AnEntryCarriesTheAddressOfTheArtworkAppleGives) {
           std::string::npos);
 }
 
+TEST_CASE(PlayerQueue_AnEntryDurationIsReadInTheMeasuredUnitWhateverItsLength) {
+    ampify::AmpQueueEntry entry;
+    entry.durationRaw = 15'000;  // a 15 s jingle, which a guess from the value alone takes for seconds
+    CHECK(ampify::QueueItemFromAmp(entry).durationMs == 15'000);
+    entry.durationRaw = 240'000;
+    CHECK(ampify::QueueItemFromAmp(entry).durationMs == 240'000);
+    entry.durationRaw = 0;
+    CHECK(ampify::QueueItemFromAmp(entry).durationMs == 0);
+}
+
 TEST_CASE(PlayerQueue_AnEntryWhoseArtworkAppleKeepsInternalIsLoadedThroughApple) {
     ampify::AmpQueueEntry entry;
     entry.id = 42;

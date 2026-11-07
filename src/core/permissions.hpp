@@ -1,7 +1,8 @@
 #pragma once
 
-// The permissions a manifest may ask for (docs/extensions/api.md, section 4). schemas/manifest.schema.json and
-// schemas/catalog.schema.json list the same names: tests/manifest_tests.cpp reads both and compares them to this table.
+// The permissions a manifest may ask for (docs/extensions/api.md, section 4). schemas/manifest.schema.json lists the
+// same names, and schemas/catalog.schema.json all but the firstPartyOnly ones: tests/manifest_tests.cpp reads both
+// and compares them to this table.
 
 #include <string_view>
 

@@ -55,7 +55,20 @@ struct ThemeParts {
     bool resources = true;
     bool assets = true;
     bool script = true;
+
+    bool operator==(const ThemeParts&) const = default;
 };
+
+// How much glass the themes may ask of the graphics card (theme.glass, see glass.hpp): every load applies it.
+enum class GlassLevel { Full, Balanced, Eco };
+
+// What the window shows behind the panels a theme leaves see-through: Windows 11's Mica (the desktop's colours, faint),
+// its darker Mica Alt, or the blur of the windows behind (acrylic).
+enum class WindowMaterial { Mica, MicaAlt, Acrylic };
+
+// The material of a --window-material value (mica | mica-alt | acrylic), ignoring case and spaces. None for `none`,
+// an empty value or an unknown one: Apple Music's own window then stays.
+std::optional<WindowMaterial> WindowMaterialOf(std::string_view value);
 
 // What the loader needs beyond the files themselves.
 struct LoadOptions {
@@ -70,6 +83,7 @@ struct LoadOptions {
     std::map<std::string, std::string> artwork;
     // theme.accent: the accent the user chose, over the scheme's. What Ampify derives from the accent follows it.
     std::optional<Argb> accent;
+    GlassLevel glass = GlassLevel::Full;
 };
 
 // The id of the theme LoadAccentOnly makes: no theme folder can have it.
@@ -87,9 +101,10 @@ struct Theme {
     std::string name;
     std::string scheme;               // the scheme in use, empty when colors.ini is missing
     std::vector<std::string> schemes;  // every scheme found in colors.ini, in file order
-    // Dark or light, from the background colour of the scheme (Spicetify's main, or the page brush). Unset when the
-    // scheme gives no background: its name decides then (IsDarkScheme).
+    // Dark or light, from the background colour of the scheme (Spicetify's main, or the page brush), else from the
+    // scheme's name (DarkByName). Unset when neither tells: Apple Music keeps its own mode, @media takes it as light.
     std::optional<bool> dark;
+    GlassLevel glass = GlassLevel::Full;  // the level its values were lightened for
 
     // False when the folder is not a theme, or when resources.xaml breaks the allowed list. An unusable theme is never applied.
     bool usable = false;
@@ -111,9 +126,13 @@ struct Theme {
 
     // Messages with the file and the line. Problems that do not stop the theme are listed here too.
     std::vector<std::string> problems;
+
+    // The window material the theme asks for in :root (--window-material), as its glass level allows it.
+    std::optional<WindowMaterial> Material() const;
 };
 
-// Reads and checks a theme. `folder` is the absolute path, used to resolve image paths.
+// Reads and checks a theme. `folder` is the absolute path, used to resolve image paths. Each of the three loaders below
+// lightens its result for options.glass (ApplyGlassLevel), which the result keeps in `glass`.
 Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& files, const LoadOptions& options = {});
 
 // With no theme active, the accent of theme.accent alone (options.accent) on Apple Music's look, with what Ampify

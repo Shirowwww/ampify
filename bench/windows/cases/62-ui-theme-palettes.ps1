@@ -29,7 +29,7 @@ Register-Case -Id 'ui-theme-palettes' -Title 'UI: the palettes theme applies, th
     $since = Get-Date
     $launcherProcess = Start-Launcher -LauncherPath $launcher
 
-    $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
+    $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
     Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched
     if (-not $launched) {
         Close-AppleMusic | Out-Null
@@ -37,7 +37,7 @@ Register-Case -Id 'ui-theme-palettes' -Title 'UI: the palettes theme applies, th
     }
     Clear-FirstRun -Ctx $Ctx
 
-    $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text 'Themes: interface thread ready (DispatcherQueue of the main window)' -TimeoutSeconds 90
+    $hooked = Wait-Journal -FileName 'AppleMusic.log' -Text $script:LogPhrase.ThemesThreadReady -TimeoutSeconds 90
     Add-Check -Ctx $Ctx -Name 'interface thread ready (DispatcherQueue)' -Passed $hooked
 
     # 'Theme "palettes": N value(s) applied, ...': N is the number of values written.
@@ -73,7 +73,7 @@ Register-Case -Id 'ui-theme-palettes' -Title 'UI: the palettes theme applies, th
     # Removal: back to none in settings.txt, without restarting Apple Music.
     Set-Settings -Values @{ 'theme.active' = 'none' }
 
-    $restored = Wait-Journal -FileName 'AppleMusic.log' -Text 'Theme removed: ' -TimeoutSeconds 60
+    $restored = Wait-Journal -FileName 'AppleMusic.log' -Text $script:LogPhrase.ThemeRemoved -TimeoutSeconds 60
     Add-Check -Ctx $Ctx -Name 'removal without a restart: "Theme removed" in the log' -Passed $restored
 
     Save-Screenshot -Ctx $Ctx -Name 'palettes-removed' | Out-Null

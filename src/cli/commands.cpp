@@ -17,14 +17,16 @@
 #include "../core/kit_layout.hpp"
 #include "../core/launch_flags.hpp"
 #include "../core/midi_map.hpp"
-#include "../core/natives/service_flags.hpp"
+#include "../core/permissions.hpp"
 #include "../core/remote_protocol.hpp"
+#include "../core/settings_catalog.hpp"
 #include "theme_commands.hpp"
 #include "theme_replay.hpp"
 #include "../core/theme/files.hpp"
+#include "../core/theme/scheme_choice.hpp"
 #include "../core/theme/theme.hpp"
+#include "../core/theme/accent.hpp"
 #include "../core/theme/theme_settings.hpp"
-#include "../core/ui_render/apple_tweaks.hpp"
 #include "../core/ui_render/mods.hpp"
 #include "archive.hpp"
 #include "catalog.hpp"
@@ -34,7 +36,6 @@
 #include "messages.hpp"
 #include "platform.hpp"
 #include "release_facts.hpp"
-#include "setting_keys.hpp"
 
 namespace ampify::cli {
 
@@ -47,116 +48,93 @@ std::string_view KindOfList(std::string_view list) {
     return kind && *kind != ElementKind::Theme ? ToString(*kind) : std::string_view();
 }
 
-bool ParseBoolText(std::string_view text, bool& value) {
-    std::string lowered = ToLowerAscii(text);
-    if (lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes") {
-        value = true;
-        return true;
+// The fixed keys, then the families, for the message that refuses an unknown key.
+std::string KnownSettingNames() {
+    std::string names;
+    for (const KitSetting& setting : FixedKitSettings()) names += (names.empty() ? "" : ", ") + std::string(setting.key);
+    for (const KitSetting& family : KitSettingFamilies()) names += ", " + std::string(family.key) + "...";
+    return names;
+}
+
+// The keys whose value has a format of its own (an id, a colour, an address...); nothing for the others.
+std::optional<bool> CheckOwnFormat(const std::string& key, const std::string& value, std::string& problem) {
+    auto refuse = [&problem](std::string text) {
+        problem = std::move(text);
+        return false;
+    };
+    if (key == kThemeActiveKey) return value.empty() || IsElementId(value) || refuse("invalid theme id: " + value);
+    if (key == "theme.scheme") return value.empty() || IsSchemeName(value) || refuse("invalid scheme name: " + value);
+    if (key == "theme.schedule") {
+        theme::Schedule schedule = theme::ParseSchedule(value);
+        return schedule.problems.empty() || refuse(schedule.problems.front() + " (empty: no schedule)");
     }
-    if (lowered == "0" || lowered == "false" || lowered == "off" || lowered == "no") {
-        value = false;
-        return true;
+    if (key == "theme.accent") {
+        return value.empty() || theme::ParseAccent(value) || theme::IsArtworkAccent(value) ||
+               refuse("theme.accent expects a colour as RRGGBB or #RRGGBB, such as FA2D48, or artwork (empty: the theme's own accent)");
     }
+    if (key == "catalog.url") {
+        return IsHttpsAddress(value, kMaxAddressLength) || value.rfind("file://", 0) == 0 ||
+               refuse("catalog.url must start with https:// (or file:// for a local catalog)");
+    }
+    if (key == "language") {
+        // Two letters, then optional subtags of 2 to 8 letters or digits: de, pt-BR, zh-Hant-TW. Empty follows Windows.
+        static const std::regex kLanguage("[A-Za-z]{2}([-_][A-Za-z0-9]{2,8})*");
+        return value.empty() || std::regex_match(value, kLanguage) ||
+               refuse("language expects a language code such as de, pt-BR or zh-Hant (empty: the Windows language)");
+    }
+    if (key == kLaunchFlagsKey) return SplitLaunchFlags(value, &problem).has_value();
+    if (key == kRemoteTokenKey) {
+        return value.empty() || remote::IsValidToken(value) ||
+               refuse("remote.token expects 32 to 128 characters among A-Z a-z 0-9 - _ (empty: a token is created)");
+    }
+    if (key == "midi.map") return midi::Map().Parse(value, &problem);
+    return std::nullopt;
+}
+
+bool CheckInteger(const std::string& key, const std::string& value, std::string& problem) {
+    const KitSetting& row = *FindKitSetting(key);
+    int low = static_cast<int>(row.low);
+    int high = static_cast<int>(row.high);
+    int number = -1;
+    auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), number);
+    if (error == std::errc() && end == value.data() + value.size() && number >= low && number <= high) return true;
+    problem = key + " expects a number from " + std::to_string(low) + " to " + std::to_string(high);
+    return false;
+}
+
+bool CheckNumber(const std::string& key, const std::string& value, std::string& problem) {
+    const KitSetting& row = *FindKitSetting(key);
+    double number = 0;
+    const char* end = value.data() + value.size();
+    auto [stop, error] = std::from_chars(value.data(), end, number);
+    if (!value.empty() && error == std::errc() && stop == end && number >= row.low && number <= row.high) return true;
+    problem = key + " expects a number from " + ShortestNumberText(row.low) + " to " + ShortestNumberText(row.high);
     return false;
 }
 
 // Checks a value before it is written. `stored` receives the form that goes into settings.txt.
 bool CheckSetting(const std::string& key, const std::string& value, std::string& stored, std::string& problem) {
     stored = value;
-    bool boolean = false;
-    if (!FindSetting(key)) {
+    std::optional<SettingKind> kind = KindOfSetting(key);
+    if (!kind) {
         problem = "unknown setting: " + key + " (known: " + KnownSettingNames() + ")";
         return false;
     }
-
-    if (key == "theme.active") {
-        if (!value.empty() && !IsElementId(value)) {
-            problem = "invalid theme id: " + value;
-            return false;
+    if (std::optional<bool> checked = CheckOwnFormat(key, value, problem)) return *checked;
+    switch (*kind) {
+        case SettingKind::Toggle: {
+            std::optional<bool> on = ParseToggle(value);
+            if (!on) problem = key + " expects 1 or 0 (true, false, on, off, yes, no)";
+            if (on) stored = *on ? "1" : "0";
+            return on.has_value();
         }
-        return true;
-    }
-    if (key == "theme.scheme") {
-        if (!value.empty() && !IsSchemeName(value)) {
-            problem = "invalid scheme name: " + value;
+        case SettingKind::Choice:
+            if (value.empty() || IsOfferedValue(key, value)) return true;
+            problem = key + " expects one of: " + OfferedValues(key) + " (empty: the default)";
             return false;
-        }
-        return true;
-    }
-    if (key == "theme.accent") {
-        if (!value.empty() && !theme::ParseAccent(value) && !theme::IsArtworkAccent(value)) {
-            problem = "theme.accent expects a colour as RRGGBB or #RRGGBB, such as FA2D48, or artwork (empty: the theme's own accent)";
-            return false;
-        }
-        return true;
-    }
-    if (key == "catalog.url") {
-        if (!IsHttpsAddress(value, kMaxAddressLength) && value.rfind("file://", 0) != 0) {
-            problem = "catalog.url must start with https:// (or file:// for a local catalog)";
-            return false;
-        }
-        return true;
-    }
-
-    if (key == "language") {
-        // Two letters, then optional subtags of 2 to 8 letters or digits: de, pt-BR, zh-Hant-TW. Empty follows Windows.
-        static const std::regex kLanguage("[A-Za-z]{2}([-_][A-Za-z0-9]{2,8})*");
-        if (!value.empty() && !std::regex_match(value, kLanguage)) {
-            problem = "language expects a language code such as de, pt-BR or zh-Hant (empty: the Windows language)";
-            return false;
-        }
-        return true;
-    }
-    if (key == kLaunchFlagsKey) {
-        if (!SplitLaunchFlags(value, &problem)) return false;
-        return true;
-    }
-    // Every choice of the Apple Music card (apple.*, theme.glass, ampify.entry, kit_update): a value it offers.
-    if (std::string offered = uirender::AppleTweakValues(key); !offered.empty()) {
-        if (!value.empty() && !uirender::IsAppleTweakValue(key, value)) {
-            problem = key + " expects one of: " + offered + " (empty: the default)";
-            return false;
-        }
-        return true;
-    }
-    if (key == "remote.port" || key == "midi.device") {
-        int low = key == "remote.port" ? 1024 : 0;
-        int high = key == "remote.port" ? 65535 : 255;
-        int number = -1;
-        auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), number);
-        if (error != std::errc() || end != value.data() + value.size() || number < low || number > high) {
-            problem = key + " expects a number from " + std::to_string(low) + " to " + std::to_string(high);
-            return false;
-        }
-        return true;
-    }
-    if (key == "remote.token") {
-        if (!value.empty() && !remote::IsValidToken(value)) {
-            problem = "remote.token expects 32 to 128 characters among A-Z a-z 0-9 - _ (empty: a token is created)";
-            return false;
-        }
-        return true;
-    }
-    if (key == "midi.map") {
-        midi::Map map;
-        if (!map.Parse(value, &problem)) return false;
-        return true;
-    }
-
-    bool isBooleanKey = key.rfind("theme.parts.", 0) == 0 || key == "theme.inspect" || key == "theme.live_reload" ||
-                        key == "xaml.watcher" ||
-                        key == "check_kit_update" || key == "expose_api" ||
-                        key == "discord.enabled" || key == "tray.enabled" || key == "remote.enabled" ||
-                        key == "midi.enabled" || key == "player.apple" || key == "player.appleCommands" ||
-                        (key.size() > 8 && key.compare(key.size() - 8, 8, ".enabled") == 0 &&
-                         (key.rfind("extensions.", 0) == 0 || key.rfind("apps.", 0) == 0 ||
-                          key.rfind("snippets.", 0) == 0));
-    if (isBooleanKey) {
-        if (!ParseBoolText(value, boolean)) {
-            problem = key + " expects 1 or 0 (true, false, on, off, yes, no)";
-            return false;
-        }
-        stored = boolean ? "1" : "0";
+        case SettingKind::Integer: return CheckInteger(key, value, problem);
+        case SettingKind::Number: return CheckNumber(key, value, problem);
+        case SettingKind::Text: return true;
     }
     return true;
 }
@@ -208,13 +186,8 @@ int CmdConfigSet(Context& ctx, Settings& settings) {
     std::string stored;
     std::string problem;
     if (!CheckSetting(key, value, stored, problem)) return Failure(ctx, problem);
-    settings.Set(key, stored);
-    // The remote control needs a token: it is created when the remote control is turned on, if none is set yet.
-    bool tokenCreated = false;
-    if (key == "remote.enabled" && stored == "1" && !remote::IsValidToken(settings.GetString("remote.token", ""))) {
-        settings.Set("remote.token", remote::NewToken());
-        tokenCreated = true;
-    }
+    if (!settings.Set(key, stored)) return Failure(ctx, "value must fit on one line: " + key);
+    bool tokenCreated = FillDerivedSettings(settings, key);
     std::string error;
     if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
     ctx.out << key << " = " << stored << "\n";
@@ -318,7 +291,7 @@ int CmdThemeSet(Context& ctx) {
     // Setting the same theme again keeps it, and so does "auto", which follows Windows whatever the theme.
     std::string stored = settings.GetString("theme.scheme", "");
     bool keep = !ctx.options.scheme && !stored.empty() &&
-                (stored == "auto" || settings.GetString("theme.active", "") == id);
+                (stored == "auto" || ActiveThemeId(settings) == id);
 
     // The manifest is valid; now the theme engine reads the theme as the kernel will, and refuses what it would refuse.
     std::filesystem::path folder = ctx.kit.Root() / "themes" / id;
@@ -334,7 +307,7 @@ int CmdThemeSet(Context& ctx) {
     }
     for (const std::string& problem : loaded.problems) ctx.out << "Warning: " << problem << "\n";
 
-    settings.Set("theme.active", id);
+    settings.Set(kThemeActiveKey, id);
     if (ctx.options.scheme) {
         if (!IsSchemeName(*ctx.options.scheme)) return Failure(ctx, "invalid scheme name: " + *ctx.options.scheme);
         settings.Set("theme.scheme", *ctx.options.scheme);
@@ -566,7 +539,8 @@ bool LoadSettings(const Context& ctx, Settings& settings, std::string& error) {
 bool SaveSettings(const Context& ctx, const Settings& settings, std::string& error) {
     std::error_code ec;
     std::filesystem::create_directories(ctx.kit.Root(), ec);
-    if (!settings.Save(ctx.kit.Settings().string())) {
+    std::string detail;  // the message below names the file in UTF-8, as every other message does
+    if (!settings.SaveChanges(ctx.kit.Settings().string(), detail)) {
         error = "cannot write: " + Utf8(ctx.kit.Settings());
         return false;
     }
@@ -693,7 +667,7 @@ int CmdConfig(Context& ctx) {
             ctx.out << *value << "\n";
             return 0;
         }
-        std::optional<KnownSetting> known = FindSetting(args[1]);
+        const KitSetting* known = FindKitSetting(args[1]);
         if (!known) return Failure(ctx, Tr("missingKey", {{"key", args[1]}}));
         // The value that applies goes to the output, for scripts; that it is a default goes to the error stream.
         ctx.out << known->fallback << "\n";
@@ -754,7 +728,7 @@ int CmdTheme(Context& ctx) {
         Settings settings;
         std::string error;
         if (!LoadSettings(ctx, settings, error)) return Failure(ctx, error);
-        settings.Set("theme.active", "");
+        settings.Set(kThemeActiveKey, "");
         settings.Remove("theme.scheme");
         if (!SaveSettings(ctx, settings, error)) return Failure(ctx, error);
         ctx.out << "No active theme. " << Tr("applyHint") << "\n";

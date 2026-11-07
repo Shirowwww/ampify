@@ -2,249 +2,95 @@
 
 #include <algorithm>
 
-#include "../text_util.hpp"
-
 namespace ampify::uirender {
 
 namespace fs = std::filesystem;
 
 namespace {
 
-// The stored values, in the order the card shows them; the first is the default.
-const std::vector<std::pair<std::string, std::string>>& NotificationOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"apple", "tweaks.notifications.apple"},
-        {"background", "tweaks.notifications.background"},
-        {"never", "tweaks.notifications.never"}};
-    return options;
+// The rows of the card, in the order it shows them: the player, its cover, the long texts, the sidebar and the top
+// bar, the close button, the notifications, the network fixes, then the stuck library agent and the freeze log.
+constexpr const char* kCardKeys[] = {
+    kPlayerModeKey, kPlayerControlsKey, kArtworkKey, kMarqueeKey, kSidebarKey,     kTopbarKey,
+    kCloseKey,      kNotificationsKey,  kNetworkKey, kProxyKey,   kOrphanAgentKey, kFreezeLogKey,
+};
+
+TweakChoice ChoiceFrom(const Settings& settings, std::string_view key) {
+    const KitSetting& row = *FindKitSetting(key);
+    TweakChoice choice{std::string(key), std::string(row.labelKey), std::string(row.helpKey), {},
+                       ChoiceOf(settings, key)};
+    for (const SettingOption& option : row.options) choice.options.emplace_back(option.value, option.labelKey);
+    return choice;
 }
 
-const std::vector<std::pair<std::string, std::string>>& PlayerOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"window", "tweaks.player.window"},
-        {"replace", "tweaks.player.replace"},
-        {"work-area", "tweaks.player.workArea"},
-        {"screen", "tweaks.player.screen"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& PlayerControlsOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"shown", "tweaks.playerControls.shown"},
-        {"hidden", "tweaks.playerControls.hidden"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& CloseOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"quit", "tweaks.close.quit"},
-        {"tray", "tweaks.close.tray"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& NetworkOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"ipv4-first", "tweaks.network.ipv4"},
-        {"system", "tweaks.network.system"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& ProxyOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"system", "tweaks.proxy.system"},
-        {"no-autodetect", "tweaks.proxy.noAutodetect"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& ArtworkOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"sharp", "tweaks.artwork.sharp"},
-        {"apple", "tweaks.artwork.apple"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& MarqueeOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"hover", "tweaks.marquee.hover"},
-        {"off", "tweaks.marquee.off"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& SidebarOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"open", "tweaks.sidebar.open"},
-        {"hover", "tweaks.sidebar.hover"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& FreezeLogOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"off", "ui.off"},
-        {"on", "ui.on"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& OrphanAgentOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"off", "ui.off"},
-        {"on", "tweaks.orphan.on"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& TopbarOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"off", "tweaks.topbar.off"},
-        {"search", "tweaks.topbar.search"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& KitUpdateOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"auto", "update.auto"},
-        {"ask", "update.ask"},
-        {"off", "update.off"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& GlassOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"full", "glass.full"},
-        {"balanced", "glass.balanced"},
-        {"eco", "glass.eco"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>& EntryOptions() {
-    static const std::vector<std::pair<std::string, std::string>> options{
-        {"sidebar", "entry.sidebar"},
-        {"header", "entry.header"}};
-    return options;
-}
-
-const std::vector<std::pair<std::string, std::string>>* OptionsOf(const std::string& key) {
-    if (key == kGlassChoiceKey) return &GlassOptions();
-    if (key == kEntryKey) return &EntryOptions();
-    if (key == kNotificationsKey) return &NotificationOptions();
-    if (key == kPlayerModeKey) return &PlayerOptions();
-    if (key == kPlayerControlsKey) return &PlayerControlsOptions();
-    if (key == kCloseKey) return &CloseOptions();
-    if (key == kNetworkKey) return &NetworkOptions();
-    if (key == kProxyKey) return &ProxyOptions();
-    if (key == kArtworkKey) return &ArtworkOptions();
-    if (key == kMarqueeKey) return &MarqueeOptions();
-    if (key == kSidebarKey) return &SidebarOptions();
-    if (key == kFreezeLogKey) return &FreezeLogOptions();
-    if (key == kOrphanAgentKey) return &OrphanAgentOptions();
-    if (key == kTopbarKey) return &TopbarOptions();
-    if (key == kKitUpdateKey) return &KitUpdateOptions();
-    return nullptr;
-}
-
-// The stored value when the card offers it, else its first option.
-std::string Known(const Settings& settings, const std::string& key) {
-    const auto& options = *OptionsOf(key);
-    std::string value = ToLowerAscii(settings.GetString(key, ""));
-    bool known = std::any_of(options.begin(), options.end(), [&](const auto& option) { return option.first == value; });
-    return known ? value : options.front().first;
+TweakChoice ChoiceIn(const fs::path& kit, std::string_view key) {
+    Settings settings;
+    settings.Load((kit / "settings.txt").string());
+    return ChoiceFrom(settings, key);
 }
 
 }  // namespace
 
 AppleTweaks ReadAppleTweaks(const Settings& settings) {
     AppleTweaks tweaks;
-    std::string notifications = Known(settings, kNotificationsKey);
+    std::string notifications = ChoiceOf(settings, kNotificationsKey);
     tweaks.notifications = notifications == "background" ? NotificationRule::Background
                            : notifications == "never"    ? NotificationRule::Never
                                                          : NotificationRule::Apple;
-    std::string player = Known(settings, kPlayerModeKey);
+    std::string player = ChoiceOf(settings, kPlayerModeKey);
     tweaks.player = player == "replace"     ? PlayerMode::Replace
                     : player == "work-area" ? PlayerMode::WorkArea
                     : player == "screen"    ? PlayerMode::Screen
                                             : PlayerMode::Window;
-    tweaks.closeToTray = Known(settings, kCloseKey) == "tray";
-    tweaks.playerControls = Known(settings, kPlayerControlsKey) == "shown";
-    tweaks.ipv4First = Known(settings, kNetworkKey) == "ipv4-first";
-    tweaks.proxyNoAutodetect = Known(settings, kProxyKey) == "no-autodetect";
-    tweaks.sharpArtwork = Known(settings, kArtworkKey) == "sharp";
-    tweaks.textMarquee = Known(settings, kMarqueeKey) == "hover";
-    tweaks.sidebarOnHover = Known(settings, kSidebarKey) == "hover";
-    tweaks.freezeLog = Known(settings, kFreezeLogKey) == "on";
-    tweaks.orphanAgent = Known(settings, kOrphanAgentKey) == "on";
-    tweaks.topbarSearch = Known(settings, kTopbarKey) == "search";
+    tweaks.closeToTray = ChoiceOf(settings, kCloseKey) == "tray";
+    tweaks.playerControls = ChoiceOf(settings, kPlayerControlsKey) == "shown";
+    tweaks.ipv4First = ChoiceOf(settings, kNetworkKey) == "ipv4-first";
+    tweaks.proxyNoAutodetect = ChoiceOf(settings, kProxyKey) == "no-autodetect";
+    tweaks.sharpArtwork = ChoiceOf(settings, kArtworkKey) == "sharp";
+    tweaks.textMarquee = ChoiceOf(settings, kMarqueeKey) == "hover";
+    tweaks.sidebarOnHover = ChoiceOf(settings, kSidebarKey) == "hover";
+    tweaks.freezeLog = ChoiceOf(settings, kFreezeLogKey) == "on";
+    tweaks.topbarSearch = ChoiceOf(settings, kTopbarKey) == "search";
     return tweaks;
 }
 
 std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
     Settings settings;
     settings.Load((kit / "settings.txt").string());
+    std::vector<TweakChoice> choices;
+    for (const char* key : kCardKeys) choices.push_back(ChoiceFrom(settings, key));
     // Apple's own switch (Settings, General) turns its notifications off: the card offers only what it does not, and
     // keeps "never" for someone who chose it before.
-    std::string notifications = Known(settings, kNotificationsKey);
-    std::vector<std::pair<std::string, std::string>> notificationOptions = NotificationOptions();
-    if (notifications != "never") notificationOptions.pop_back();
-    return {
-        {kPlayerModeKey, "tweaks.player", "tweaks.playerHelp", PlayerOptions(), Known(settings, kPlayerModeKey)},
-        {kPlayerControlsKey, "tweaks.playerControls", "tweaks.playerControlsHelp", PlayerControlsOptions(),
-         Known(settings, kPlayerControlsKey)},
-        {kArtworkKey, "tweaks.artwork", "tweaks.artworkHelp", ArtworkOptions(), Known(settings, kArtworkKey)},
-        {kMarqueeKey, "tweaks.marquee", "tweaks.marqueeHelp", MarqueeOptions(), Known(settings, kMarqueeKey)},
-        {kSidebarKey, "tweaks.sidebar", "tweaks.sidebarHelp", SidebarOptions(), Known(settings, kSidebarKey)},
-        {kTopbarKey, "tweaks.topbar", "tweaks.topbarHelp", TopbarOptions(), Known(settings, kTopbarKey)},
-        {kCloseKey, "tweaks.close", "tweaks.closeHelp", CloseOptions(), Known(settings, kCloseKey)},
-        {kNotificationsKey, "tweaks.notifications", "tweaks.notificationsHelp", std::move(notificationOptions),
-         notifications},
-        {kNetworkKey, "tweaks.network", "tweaks.networkHelp", NetworkOptions(), Known(settings, kNetworkKey)},
-        {kProxyKey, "tweaks.proxy", "tweaks.proxyHelp", ProxyOptions(), Known(settings, kProxyKey)},
-        {kOrphanAgentKey, "tweaks.orphan", "tweaks.orphanHelp", OrphanAgentOptions(), Known(settings, kOrphanAgentKey)},
-        {kFreezeLogKey, "tweaks.watchdog", "tweaks.watchdogHelp", FreezeLogOptions(), Known(settings, kFreezeLogKey)},
-    };
+    for (TweakChoice& choice : choices) {
+        if (choice.key != kNotificationsKey || choice.value == "never") continue;
+        std::erase_if(choice.options, [](const auto& option) { return option.first == "never"; });
+    }
+    return choices;
 }
 
 KitUpdate ReadKitUpdate(const Settings& settings) {
-    std::string value = Known(settings, kKitUpdateKey);
+    std::string value = ChoiceOf(settings, kKitUpdateKey);
     return value == "ask" ? KitUpdate::Ask : value == "off" ? KitUpdate::Off : KitUpdate::Auto;
 }
 
-TweakChoice KitUpdateChoice(const fs::path& kit) {
-    Settings settings;
-    settings.Load((kit / "settings.txt").string());
-    return {kKitUpdateKey, "update.title", "update.help", KitUpdateOptions(), Known(settings, kKitUpdateKey)};
-}
+TweakChoice KitUpdateChoice(const fs::path& kit) { return ChoiceIn(kit, kKitUpdateKey); }
 
-bool ReadEntryInHeader(const Settings& settings) { return Known(settings, kEntryKey) == "header"; }
+bool ReadEntryInHeader(const Settings& settings) { return ChoiceOf(settings, kEntryKey) == "header"; }
 
-TweakChoice EntryChoice(const fs::path& kit) {
-    Settings settings;
-    settings.Load((kit / "settings.txt").string());
-    return {kEntryKey, "entry.title", "entry.help", EntryOptions(), Known(settings, kEntryKey)};
-}
+TweakChoice EntryChoice(const fs::path& kit) { return ChoiceIn(kit, kEntryKey); }
 
-TweakChoice GlassChoice(const fs::path& kit) {
-    Settings settings;
-    settings.Load((kit / "settings.txt").string());
-    return {kGlassChoiceKey, "glass.title", "glass.help", GlassOptions(), Known(settings, kGlassChoiceKey)};
-}
+TweakChoice GlassChoice(const fs::path& kit) { return ChoiceIn(kit, kGlassChoiceKey); }
 
-bool IsAppleTweakValue(const std::string& key, const std::string& value) {
-    const auto* options = OptionsOf(key);
-    return options &&
-           std::any_of(options->begin(), options->end(), [&](const auto& option) { return option.first == value; });
-}
+bool IsAppleTweakValue(const std::string& key, const std::string& value) { return IsOfferedValue(key, value); }
 
-std::string AppleTweakValues(const std::string& key) {
-    const auto* options = OptionsOf(key);
-    std::string joined;
-    if (!options) return joined;
-    for (const auto& option : *options) joined += (joined.empty() ? "" : ", ") + option.first;
-    return joined;
-}
+std::string AppleTweakValues(const std::string& key) { return OfferedValues(key); }
 
 bool SetAppleTweak(const fs::path& kit, const std::string& key, const std::string& value, std::string& error) {
-    if (!OptionsOf(key)) {
+    if (OfferedValues(key).empty()) {
         error = "not an Apple Music setting of the card: " + key;
         return false;
     }
-    if (!IsAppleTweakValue(key, value)) {
+    if (!IsOfferedValue(key, value)) {
         error = "invalid value for " + key + ": " + value;
         return false;
     }

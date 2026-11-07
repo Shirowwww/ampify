@@ -4,6 +4,7 @@
 
 #include "kit_layout.hpp"
 #include "settings.hpp"
+#include "settings_catalog.hpp"
 #include "text_util.hpp"
 
 namespace ampify {
@@ -50,7 +51,7 @@ std::string ElementRef::SettingsPrefix() const { return std::string(Folder()) + 
 std::string ElementRef::EnabledKey() const { return SettingsPrefix() + std::string(kEnabledKey); }
 
 bool IsElementOn(const Settings& settings, const ElementRef& element) {
-    if (element.kind == ElementKind::Theme) return settings.GetString("theme.active", "") == element.id;
+    if (element.kind == ElementKind::Theme) return !element.id.empty() && ActiveThemeId(settings) == element.id;
     return settings.GetBool(element.EnabledKey(), IsOnByDefault(element.Folder(), element.id));
 }
 

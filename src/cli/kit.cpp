@@ -7,6 +7,7 @@
 #include <system_error>
 
 #include "../core/kit_layout.hpp"
+#include "../core/settings_catalog.hpp"
 #include "../core/text_util.hpp"
 
 namespace ampify {
@@ -71,7 +72,7 @@ void SetEnabled(Settings& settings, std::string_view kind, std::string_view id, 
     if (kind == "theme") {
         if (enabled) {
             settings.Set("theme.active", std::string(id));
-        } else if (settings.GetString("theme.active", "") == id) {
+        } else if (ActiveThemeId(settings) == id) {
             settings.Set("theme.active", "");
         }
         return;
@@ -112,8 +113,7 @@ ActiveReport ComputeActive(const KitLayout& kit, const Settings& settings) {
         report.items.push_back({"extension", std::string(element.id), "builtin", ""});
     }
 
-    std::string themeId = settings.GetString("theme.active", "");
-    if (themeId == "none") themeId.clear();  // what the theme engine writes for "no theme"
+    std::string themeId = ActiveThemeId(settings);
     bool themeFound = false;
     for (const InstalledElement& element : ListInstalled(kit)) {
         if (element.kind == "theme" && element.id == themeId) themeFound = true;

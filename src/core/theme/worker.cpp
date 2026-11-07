@@ -1,10 +1,8 @@
 #include "worker.hpp"
 
-#include <fstream>
-#include <functional>
-#include <sstream>
 #include <vector>
 
+#include "accent.hpp"
 #include "files.hpp"
 #include "glass.hpp"
 #include "layout.hpp"
@@ -17,16 +15,12 @@ namespace ampify::theme {
 
 namespace {
 
-std::string PartsKey(const ThemeParts& parts) {
-    return std::string(parts.colors ? "c" : "-") + (parts.resources ? "r" : "-") + (parts.assets ? "a" : "-");
-}
-
 // sidebar.json and home.json as one set of rules; null when neither file exists.
 std::shared_ptr<const Theme> LoadLayout(const std::optional<std::string>& sidebar, const std::optional<std::string>& home) {
     if (!sidebar && !home) return nullptr;
     auto layout = std::make_shared<Theme>();
-    layout->id = "disposition";
-    layout->name = "disposition";
+    layout->id = "layout";
+    layout->name = "layout";
     layout->usable = true;
     for (auto [text, kind] : {std::pair{&sidebar, LayoutKind::Sidebar}, std::pair{&home, LayoutKind::Home}}) {
         if (!*text) continue;
@@ -47,13 +41,15 @@ bool NamesArtwork(const std::filesystem::path& folder) {
 
 }  // namespace
 
-std::optional<std::set<std::string>> ReadAllowedKeys(const std::filesystem::path& file) {
-    std::ifstream in(file);
-    if (!in) return std::nullopt;
-
+std::optional<std::set<std::string>> ParseAllowedKeys(const std::optional<std::string>& text) {
+    if (!text) return std::nullopt;
     std::set<std::string> keys;
-    std::string line;
-    while (std::getline(in, line)) {
+    size_t start = 0;
+    while (start < text->size()) {
+        size_t end = text->find('\n', start);
+        if (end == std::string::npos) end = text->size();
+        std::string line = text->substr(start, end - start);
+        start = end + 1;
         while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
         if (!line.empty() && line[0] != '#') keys.insert(line);
     }
@@ -62,10 +58,8 @@ std::optional<std::set<std::string>> ReadAllowedKeys(const std::filesystem::path
 
 ThemeWorker::ThemeWorker(std::filesystem::path kit) : m_kit(std::move(kit)) {}
 
-SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
-    ThemeSettings wanted = ReadThemeSettings(settings);
+LoadInputs ThemeWorker::ReadInputs(const Settings& settings, const ThemeSettings& wanted, int minute) {
     const std::filesystem::path themeFolder = m_kit / "themes" / wanted.active;
-
     std::vector<std::string> schemes;
     std::string defaultScheme;
     if (!wanted.active.empty()) {
@@ -75,85 +69,81 @@ SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
     }
     m_scheme = ChooseScheme(wanted.scheme, wanted.schedule, schemes, {m_systemDark, minute}, defaultScheme);
 
-    const std::filesystem::path snippetRoot = m_kit / "snippets";
-    std::vector<std::string> snippets = EnabledSnippets(settings, ListSnippetFolders(snippetRoot));
-    std::optional<std::string> sidebar = ReadWholeFile(m_kit / LayoutFileName(LayoutKind::Sidebar));
-    std::optional<std::string> home = ReadWholeFile(m_kit / LayoutFileName(LayoutKind::Home));
-    std::optional<std::string> keysText = ReadWholeFile(m_kit / "resource-keys.txt");
-
-    // Everything that changes what is applied goes into the key. A new key is a new generation.
-    std::map<std::string, std::string> values = ReadThemeValues(settings, wanted.active);
+    LoadInputs inputs;
+    inputs.active = wanted.active;
+    inputs.scheme = m_scheme.scheme;
+    inputs.parts = wanted.parts;
     // theme.accent = artwork: the colour follows the song; the theme reloads only when that colour changes.
-    std::optional<Argb> accent = IsArtworkAccent(wanted.accent) ? ArtworkAccent(m_artwork) : ParseAccent(wanted.accent);
-    GlassLevel glass = GlassLevelOf(wanted.glass);
-    SetCurrentGlassLevel(glass);
-    std::string key = (wanted.active.empty() ? std::string("none") : wanted.active) + "|" + m_scheme.scheme + "|" +
-                      PartsKey(wanted.parts) + "|" + (accent ? ToXamlColor(*accent) : std::string("-")) + "|" +
-                      std::to_string(static_cast<int>(glass)) + "|";
-    for (const auto& [name, value] : values) key += name + "=" + value + ",";
-    key += "|";
-    std::map<std::string, std::map<std::string, std::string>> snippetValues;
-    for (const std::string& id : snippets) {
-        snippetValues[id] = ReadSnippetValues(settings, id);
-        key += id + "(";
-        for (const auto& [name, value] : snippetValues[id]) key += name + "=" + value + ",";
-        key += "),";
-    }
+    inputs.accent = IsArtworkAccent(wanted.accent) ? ArtworkAccent(m_artwork) : ParseAccent(wanted.accent);
+    inputs.glass = GlassLevelOf(wanted.glass);
+    inputs.values = ReadThemeValues(settings, wanted.active);
+    const std::filesystem::path snippetRoot = m_kit / "snippets";
     bool usesArtwork = !wanted.active.empty() && NamesArtwork(themeFolder);
-    for (const std::string& id : snippets) usesArtwork = usesArtwork || NamesArtwork(snippetRoot / id);
-    if (usesArtwork) {
-        for (const auto& [name, value] : m_artwork) key += "|" + name + "=" + value;
+    for (const std::string& id : EnabledSnippets(settings, ListSnippetFolders(snippetRoot))) {
+        inputs.snippets.push_back({id, ReadSnippetValues(settings, id)});
+        usesArtwork = usesArtwork || NamesArtwork(snippetRoot / id);
     }
-    key += "|" + sidebar.value_or("-") + "|" + home.value_or("-") + "|" +
-           (keysText ? std::to_string(std::hash<std::string>{}(*keysText)) : std::string("-"));
+    if (usesArtwork) inputs.artwork = m_artwork;
+    inputs.sidebar = ReadWholeFile(m_kit / LayoutFileName(LayoutKind::Sidebar));
+    inputs.home = ReadWholeFile(m_kit / LayoutFileName(LayoutKind::Home));
+    inputs.allowedKeys = ParseAllowedKeys(ReadWholeFile(m_kit / "resource-keys.txt"));
     if (wanted.liveReload) {
-        if (!wanted.active.empty()) key += "|" + FolderSignature(themeFolder);
-        for (const std::string& id : snippets) key += "|" + FolderSignature(snippetRoot / id);
+        if (!wanted.active.empty()) inputs.signatures.push_back(FolderSignature(themeFolder));
+        for (const LoadInputs::Snippet& snippet : inputs.snippets) {
+            inputs.signatures.push_back(FolderSignature(snippetRoot / snippet.id));
+        }
+    }
+    return inputs;
+}
+
+SessionRequest ThemeWorker::Load(const LoadInputs& inputs) const {
+    SessionRequest request;
+    request.generation = m_request.generation + 1;
+    request.themeId = inputs.active;
+    request.schemeReason = m_scheme.reason;
+    request.glass = inputs.glass;
+
+    LoadOptions options;
+    options.scheme = inputs.scheme;
+    options.parts = inputs.parts;
+    options.allowedKeys = inputs.allowedKeys ? &*inputs.allowedKeys : nullptr;
+    options.settings = inputs.values;
+    options.artwork = inputs.artwork;
+    options.accent = inputs.accent;
+    options.glass = inputs.glass;
+
+    if (!inputs.active.empty()) {
+        const std::filesystem::path folder = m_kit / "themes" / inputs.active;
+        FolderFiles files(folder);
+        Theme theme = LoadTheme(inputs.active, folder.generic_string(), files, options);
+        for (const std::string& problem : m_scheme.problems) theme.problems.push_back(problem);
+        request.theme = std::make_shared<const Theme>(std::move(theme));
+    } else if (inputs.accent) {
+        // No theme, but an accent: Apple Music's look in that accent.
+        request.themeId = kAccentOnlyId;
+        request.theme = std::make_shared<const Theme>(LoadAccentOnly(options));
     }
 
-    if (!m_hasKey || key != m_lastKey) {
-        m_hasKey = true;
-        m_lastKey = key;
-
-        SessionRequest request;
-        request.generation = m_request.generation + 1;
-        request.themeId = wanted.active;
-        request.schemeReason = m_scheme.reason;
-
-        std::optional<std::set<std::string>> allowed = ReadAllowedKeys(m_kit / "resource-keys.txt");
-        LoadOptions options;
-        options.scheme = m_scheme.scheme;
-        options.parts = wanted.parts;
-        options.allowedKeys = allowed ? &*allowed : nullptr;
-        options.settings = values;
-        options.artwork = usesArtwork ? m_artwork : std::map<std::string, std::string>{};
-        options.accent = accent;
-
-        if (!wanted.active.empty()) {
-            FolderFiles files(themeFolder);
-            Theme theme = LoadTheme(wanted.active, themeFolder.generic_string(), files, options);
-            for (const std::string& problem : m_scheme.problems) theme.problems.push_back(problem);
-            ApplyGlassLevel(theme, glass);
-            request.theme = std::make_shared<const Theme>(std::move(theme));
-        } else if (accent) {
-            // No theme, but an accent: Apple Music's look in that accent.
-            request.themeId = kAccentOnlyId;
-            request.theme = std::make_shared<const Theme>(LoadAccentOnly(options));
-        }
-
-        const Theme* base = request.theme && request.theme->usable ? request.theme.get() : nullptr;
-        for (const std::string& id : snippets) {
-            FolderFiles files(snippetRoot / id);
-            LoadOptions snippetOptions = options;
-            snippetOptions.settings = snippetValues[id];
-            Theme snippet = LoadSnippet(id, (snippetRoot / id).generic_string(), files, base, snippetOptions);
-            ApplyGlassLevel(snippet, glass);
-            request.snippets.push_back(std::make_shared<const Theme>(std::move(snippet)));
-        }
-        request.layout = LoadLayout(sidebar, home);
-        m_request = std::move(request);
+    const Theme* base = request.theme && request.theme->usable ? request.theme.get() : nullptr;
+    for (const LoadInputs::Snippet& snippet : inputs.snippets) {
+        const std::filesystem::path folder = m_kit / "snippets" / snippet.id;
+        FolderFiles files(folder);
+        LoadOptions snippetOptions = options;
+        snippetOptions.settings = snippet.values;
+        Theme loaded = LoadSnippet(snippet.id, folder.generic_string(), files, base, snippetOptions);
+        request.snippets.push_back(std::make_shared<const Theme>(std::move(loaded)));
     }
+    request.layout = LoadLayout(inputs.sidebar, inputs.home);
+    return request;
+}
 
+SessionRequest ThemeWorker::Tick(const Settings& settings, int minute) {
+    ThemeSettings wanted = ReadThemeSettings(settings);
+    LoadInputs inputs = ReadInputs(settings, wanted, minute);
+    if (!m_loaded || inputs != *m_loaded) {
+        m_request = Load(inputs);
+        m_loaded = std::move(inputs);
+    }
     m_request.inspect = wanted.inspect;
     return m_request;
 }

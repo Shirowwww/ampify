@@ -1,11 +1,18 @@
 #pragma once
 
+#include <array>
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
 
 namespace ampify::theme {
+
+// The files that make a folder a theme: its colours (colors.ini, or color.ini as Spicetify names it), its resource
+// dictionary and its rules. A snippet is made of the last two only.
+inline constexpr std::array<const char*, 2> kColorsFiles = {"colors.ini", "color.ini"};
+inline constexpr std::array<const char*, 2> kSnippetFiles = {"resources.xaml", "user.css"};
+inline constexpr std::array<const char*, 4> kThemeFiles = {"colors.ini", "color.ini", "resources.xaml", "user.css"};
 
 // True for a path that stays inside the theme folder: relative, no drive letter, no "..", no backslash tricks.
 bool IsSafeRelativePath(std::string_view path);

@@ -8,6 +8,7 @@
 
 #include "../journal.hpp"
 #include "engine.hpp"
+#include "inspector.hpp"
 #include "theme.hpp"
 #include "tree.hpp"
 
@@ -20,6 +21,7 @@ struct SessionRequest {
     std::string schemeReason;            // why this scheme ("Windows dark mode", "schedule 19:00"), may be empty
     std::vector<std::shared_ptr<const Theme>> snippets;  // the enabled snippets, loaded with LoadSnippet, in id order
     std::shared_ptr<const Theme> layout;  // the rules of sidebar.json and home.json, null when neither file exists
+    GlassLevel glass = GlassLevel::Full;  // the level every source was loaded with, for what Ampify draws itself
     std::uint64_t generation = 0;        // changes each time the worker loads again (settings, files, snippets, time)
     bool inspect = false;                // ask for an inspector dump on this tick
 };
@@ -35,9 +37,9 @@ public:
     // theme, or a change of order, restores everything first.
     // The same generation applies again, which styles the elements that appeared since the last tick and writes
     // nothing else. Empty themeId with no snippet and no layout restores. The problems of each source go to the
-    // log once per generation, with the name of the source. Returns the inspector dump when the request asks for one
-    // and the tree has elements (an empty tree waits for a later tick).
-    std::optional<std::string> Tick(TreeBackend& tree, const SessionRequest& request);
+    // log once per generation, with the name of the source. Returns the inspector's walk of the tree when the request
+    // asks for one and the tree has elements (an empty tree waits for a later tick).
+    std::optional<Inspection> Tick(TreeBackend& tree, const SessionRequest& request);
 
     // Applies the current set again, without reloading anything: for new elements (a page, rows realised while
     // scrolling) between two ticks. Does nothing before the first tick or when nothing is applied.

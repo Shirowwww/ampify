@@ -5,8 +5,8 @@
     python3 tools/pack.py <folder> --out <archive.zip> --catalog ../ampify-catalog/catalog.json --url https://...
 
 The archive holds the files of the folder at its root, with manifest.json among them, as docs/extensions/catalog.md
-requires. The zip is deterministic: entries are sorted and carry a fixed timestamp, so the same folder always gives
-the same SHA-256. With --catalog, the entry for the element is added or replaced, and the catalog is validated. The
+requires. The zip is deterministic: entries are sorted, stored (not compressed) and carry a fixed timestamp, so the same
+folder always gives the same SHA-256, with any zlib and byte for byte what `ampify build` writes (src/cli/zip_writer.cpp). With --catalog, the entry for the element is added or replaced, and the catalog is validated. The
 manifest's preview picture is copied next to the archive under the archive's name (demo-1.0.0.jpg), and the entry
 points to it next to the archive's address. A README.md at the root of the folder is copied the same way
 (demo-1.0.0.md), for the Marketplace's detail page: publish them all.
@@ -18,13 +18,19 @@ import json
 import os
 import re
 import shutil
+import struct
 import sys
-import zipfile
+import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import validate  # noqa: E402  (same folder: the schemas and rules of Ampify)
 
-FIXED_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+# The fields of src/cli/zip_writer.cpp: 1980-01-01 00:00:00, UTF-8 names, a Unix host, mode 0100644.
+DOS_DATE = (1 << 5) | 1
+UTF8_NAMES = 0x0800
+VERSION_NEEDED = 10
+VERSION_MADE_BY = 0x031E
+REGULAR_FILE_MODE = 0o100644 << 16
 
 
 class PackError(Exception):
@@ -52,24 +58,41 @@ def check_json(kind, path):
 
 
 def files_of(folder):
-    """Every regular file under `folder`, as posix paths relative to it, sorted."""
+    """Every regular file under `folder`, as posix paths relative to it, sorted by their UTF-8 bytes. Like `ampify
+    build`, it leaves out hidden files and folders, and node_modules."""
     found = []
     for root, dirs, files in os.walk(folder):
-        dirs.sort()
+        dirs[:] = sorted(name for name in dirs if not name.startswith(".") and name != "node_modules")
         for name in files:
-            found.append(os.path.relpath(os.path.join(root, name), folder).replace(os.sep, "/"))
-    return sorted(found)
+            if not name.startswith("."):
+                found.append(os.path.relpath(os.path.join(root, name), folder).replace(os.sep, "/"))
+    return sorted(found, key=lambda relative: relative.encode("utf-8"))
+
+
+def zip_bytes(entries):
+    """A zip of (name, data) pairs, in the given order, every file stored: the layout of src/cli/zip_writer.cpp."""
+    body, records = bytearray(), []
+    for name, data in entries:
+        raw, crc = name.encode("utf-8"), zlib.crc32(data)
+        records.append((raw, crc, len(data), len(body)))
+        body += struct.pack("<IHHHHHIIIHH", 0x04034B50, VERSION_NEEDED, UTF8_NAMES, 0, 0, DOS_DATE, crc, len(data),
+                            len(data), len(raw), 0) + raw + data
+    start = len(body)
+    for raw, crc, size, offset in records:
+        body += struct.pack("<IHHHHHHIIIHHHHHII", 0x02014B50, VERSION_MADE_BY, VERSION_NEEDED, UTF8_NAMES, 0, 0,
+                            DOS_DATE, crc, size, size, len(raw), 0, 0, 0, 0, REGULAR_FILE_MODE, offset) + raw
+    body += struct.pack("<IHHHHIIH", 0x06054B50, 0, 0, len(records), len(records), len(body) - start, start, 0)
+    return bytes(body)
 
 
 def build_archive(folder, archive):
     """Writes the zip and returns the SHA-256 of its bytes."""
-    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
-        for relative in files_of(folder):
-            info = zipfile.ZipInfo(relative, date_time=FIXED_TIMESTAMP)
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o644 << 16
-            with open(os.path.join(folder, relative), "rb") as source:
-                bundle.writestr(info, source.read())
+    entries = []
+    for relative in files_of(folder):
+        with open(os.path.join(folder, relative), "rb") as source:
+            entries.append((relative, source.read()))
+    with open(archive, "wb") as handle:
+        handle.write(zip_bytes(entries))
     digest = hashlib.sha256()
     with open(archive, "rb") as handle:
         for chunk in iter(lambda: handle.read(65536), b""):
@@ -91,8 +114,8 @@ def preview_address(target, url):
 
 
 def publish_readme(folder, archive):
-    """Copies the element's README.md next to the archive, under the archive's name (demo-1.0.0.md). The catalog gains
-    no field for it, which Ampify 1.1.0 would refuse: `ampify market readme` finds it from the archive's address."""
+    """Copies the element's README.md next to the archive, under the archive's name (demo-1.0.0.md). The catalog has
+    no field for it: `ampify market readme` finds it from the archive's address."""
     readme = os.path.join(folder, "README.md")
     if os.path.isfile(readme):
         shutil.copyfile(readme, os.path.splitext(archive)[0] + ".md")
@@ -103,8 +126,7 @@ def catalog_entry(manifest, url, sha256, preview=None):
         key: manifest[key]
         for key in ("id", "name", "version", "kind", "author", "description", "kitApi")
     }
-    # Not the translations: Ampify 1.1.0 refuses the whole catalog for a field it does not know. They stay in the
-    # archive's manifest, which every version reads.
+    # Not the translations: see "Compatibility" in docs/extensions/catalog.md. They stay in the archive's manifest.
     for key in ("homepage", "license", "tags"):
         if key in manifest:
             entry[key] = manifest[key]

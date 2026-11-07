@@ -56,7 +56,7 @@ std::string CatalogEntryText(const Manifest& manifest, const std::string& digest
         << "  \"author\": " << Json::Quote(manifest.author) << ",\n"
         << "  \"description\": " << Json::Quote(manifest.description) << ",\n"
         << "  \"kitApi\": " << Json::Quote(manifest.kitApi) << ",\n";
-    // No translations: Ampify 1.1.0 refuses the whole catalog for a field it does not know. The archive keeps them.
+    // No translations, as in tools/pack.py: see "Compatibility" in docs/extensions/catalog.md. The archive keeps them.
     if (!manifest.tags.empty()) {
         out << "  \"tags\": [";
         for (size_t i = 0; i < manifest.tags.size(); i++) out << (i ? ", " : "") << Json::Quote(manifest.tags[i]);

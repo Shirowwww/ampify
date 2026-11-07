@@ -58,42 +58,55 @@ std::string SuggestSelector(const std::vector<NodeInfo>& nodes, int index) {
     return selector;
 }
 
-std::string InspectTree(TreeBackend& tree, const InspectOptions& options) {
+Inspection Inspect(TreeBackend& tree, size_t maxLines) {
+    Inspection inspection;
+    inspection.maxLines = maxLines;
+    inspection.window = tree.WindowSize();
+    for (const std::string& key : tree.ResourceKeys()) inspection.resources.emplace_back(key, tree.ReadResource(key));
+    inspection.nodes = tree.Snapshot();
+    const size_t count = std::min(maxLines, inspection.nodes.size());
+    inspection.inspected.resize(count);
+    for (size_t index = 0; index < count; index++) {
+        const NodeId id = inspection.nodes[index].id;
+        InspectedNode& node = inspection.inspected[index];
+        for (const char* property : kInspectedProperties) {
+            if (std::optional<Value> value = tree.Read(id, property)) node.properties.emplace_back(property, *value);
+        }
+        node.box = tree.Box(id);
+    }
+    return inspection;
+}
+
+std::string InspectionText(const Inspection& inspection) {
     std::string dump;
     // The size @media rules compare with.
-    if (std::optional<ViewSize> size = tree.WindowSize()) {
+    if (const std::optional<ViewSize>& size = inspection.window) {
         dump += "Window: " + FormatNumber(size->width) + " x " + FormatNumber(size->height) + "\n\n";
     }
 
-    std::vector<std::string> keys = tree.ResourceKeys();
-    dump += "Application resources (" + std::to_string(keys.size()) + "):\n";
-    for (const std::string& key : keys) {
-        std::optional<Value> value = tree.ReadResource(key);
+    dump += "Application resources (" + std::to_string(inspection.resources.size()) + "):\n";
+    for (const auto& [key, value] : inspection.resources) {
         dump += "  " + key + " = " + (value ? ValueText(*value) : std::string("(unreadable)")) + "\n";
     }
 
-    std::vector<NodeInfo> nodes = tree.Snapshot();
+    const std::vector<NodeInfo>& nodes = inspection.nodes;
     dump += "\nTree (" + std::to_string(nodes.size()) + " elements):\n";
-
-    size_t lines = 0;
-    for (int index = 0; index < static_cast<int>(nodes.size()); index++) {
-        if (lines++ >= options.maxLines) {
-            dump += "... stopped after " + std::to_string(options.maxLines) + " lines\n";
-            break;
-        }
-
+    for (size_t index = 0; index < inspection.inspected.size(); index++) {
         const NodeInfo& node = nodes[index];
         dump += std::string(static_cast<size_t>(node.depth) * 2, ' ') + Label(node);
         if (!node.fullType.empty()) dump += "  (" + node.fullType + ")";
-        dump += "  selector: " + SuggestSelector(nodes, index);
-
-        for (const char* property : kInspectedProperties) {
-            std::optional<Value> value = tree.Read(node.id, property);
-            if (value) dump += "  " + std::string(property) + "=" + ValueText(*value, property);
+        dump += "  selector: " + SuggestSelector(nodes, static_cast<int>(index));
+        for (const auto& [property, value] : inspection.inspected[index].properties) {
+            dump += "  " + std::string(property) + "=" + ValueText(value, property);
         }
         dump += '\n';
     }
+    if (inspection.Truncated()) dump += "... stopped after " + std::to_string(inspection.maxLines) + " lines\n";
     return dump;
+}
+
+std::string InspectTree(TreeBackend& tree, const InspectOptions& options) {
+    return InspectionText(Inspect(tree, options.maxLines));
 }
 
 std::span<const char* const> InspectedProperties() {
@@ -114,12 +127,12 @@ Json::Object OriginalsOf(NodeId id, const OriginalValues* originals) {
     return entries;
 }
 
-std::string NodeJson(TreeBackend& tree, const std::vector<NodeInfo>& nodes, int index, const InspectOptions& options) {
-    const NodeInfo& node = nodes[index];
+std::string NodeJson(const Inspection& inspection, int index, const InspectOptions& options) {
+    const NodeInfo& node = inspection.nodes[index];
+    const InspectedNode& read = inspection.inspected[index];
     Json::Object properties;
-    for (const char* property : kInspectedProperties) {
-        std::optional<Value> value = tree.Read(node.id, property);
-        if (value) properties.emplace_back(property, Json(ValueText(*value, property)));
+    for (const auto& [property, value] : read.properties) {
+        properties.emplace_back(property, Json(ValueText(value, property)));
     }
 
     Json::Object entry;
@@ -130,12 +143,12 @@ std::string NodeJson(TreeBackend& tree, const std::vector<NodeInfo>& nodes, int 
     entry.emplace_back("name", Json(node.name));
     entry.emplace_back("parent", Json(static_cast<double>(node.parent)));
     entry.emplace_back("depth", Json(static_cast<double>(node.depth)));
-    entry.emplace_back("selector", Json(SuggestSelector(nodes, index)));
+    entry.emplace_back("selector", Json(SuggestSelector(inspection.nodes, index)));
     entry.emplace_back("icon", Json(node.icon));
     entry.emplace_back("panel", Json(node.panel));
     entry.emplace_back("player", Json(node.player));
     entry.emplace_back("playing", Json(node.playing));
-    if (std::optional<NodeBox> box = tree.Box(node.id)) {
+    if (const std::optional<NodeBox>& box = read.box) {
         entry.emplace_back("box", Json(Json::Array{Json(box->x), Json(box->y), Json(box->width), Json(box->height)}));
     }
     entry.emplace_back("properties", Json(std::move(properties)));
@@ -146,30 +159,22 @@ std::string NodeJson(TreeBackend& tree, const std::vector<NodeInfo>& nodes, int 
 
 }  // namespace
 
-std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options) {
+std::string InspectionJson(const Inspection& inspection, const InspectOptions& options) {
     std::vector<std::string> resources;
-    for (const std::string& key : tree.ResourceKeys()) {
-        std::optional<Value> value = tree.ReadResource(key);
+    for (const auto& [key, value] : inspection.resources) {
         Json::Object entry;
         entry.emplace_back("key", Json(key));
         entry.emplace_back("value", value ? Json(ValueText(*value)) : Json());
         resources.push_back(Json(std::move(entry)).Dump());
     }
-
-    std::vector<NodeInfo> nodes = tree.Snapshot();
     std::vector<std::string> list;
-    bool truncated = false;
-    for (int index = 0; index < static_cast<int>(nodes.size()); index++) {
-        if (static_cast<size_t>(index) >= options.maxLines) {
-            truncated = true;
-            break;
-        }
-        list.push_back(NodeJson(tree, nodes, index, options));
+    for (size_t index = 0; index < inspection.inspected.size(); index++) {
+        list.push_back(NodeJson(inspection, static_cast<int>(index), options));
     }
 
-    std::string head = std::string("{\n  \"version\": 2,\n  \"truncated\": ") + (truncated ? "true" : "false") +
-                       ",\n  \"theme\": " + Json(options.theme).Dump();
-    if (std::optional<ViewSize> size = tree.WindowSize()) {
+    std::string head = std::string("{\n  \"version\": 2,\n  \"truncated\": ") +
+                       (inspection.Truncated() ? "true" : "false") + ",\n  \"theme\": " + Json(options.theme).Dump();
+    if (const std::optional<ViewSize>& size = inspection.window) {
         Json::Object window;
         window.emplace_back("width", Json(size->width));
         window.emplace_back("height", Json(size->height));
@@ -177,6 +182,10 @@ std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options) {
         head += ",\n  \"window\": " + Json(std::move(window)).Dump();
     }
     return head + ",\n  \"resources\": " + JsonLines(resources) + ",\n  \"nodes\": " + JsonLines(list) + "\n}\n";
+}
+
+std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options) {
+    return InspectionJson(Inspect(tree, options.maxLines), options);
 }
 
 std::optional<std::vector<NodeInfo>> ReadInspectorTree(std::string_view text, std::string* problem) {

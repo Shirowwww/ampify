@@ -62,14 +62,11 @@ struct AmpQueueEntry {
     int32_t sectionKind = 0;  // AMP.Services.PlayQueueSectionKind of the entry's section
     std::string title;        // ITitledComponent.Title
     std::string subtitle;     // IPlayQueueItem.Subtitle, the artist
-    int64_t durationRaw = 0;  // IPlayQueueItem.Duration, in an AmpTimeUnit
+    int64_t durationRaw = 0;  // IPlayQueueItem.Duration, in kQueueDurationUnit
     std::string catalogId;    // IContentDescriptor.AdamId, empty for a file that is not in the catalog
     ArtworkReading artwork;   // ILockup.Artwork of the PlayQueueItem; every field may be missing
     bool hasArtwork = false;  // ILockup.Artwork gave an IArtwork, whatever its fields
 };
-
-// What Ampify.player.queue.list() gives for an entry of Apple's queue, its artwork as ArtworkAddress makes it.
-QueueItem QueueItemFromAmp(const AmpQueueEntry& entry);
 
 // What src/win/smtc_session.cpp reads from the Apple Music session of the Windows media controls.
 struct SmtcReading {
@@ -95,6 +92,13 @@ enum class AmpTimeUnit { Unknown, Seconds, Milliseconds, Ticks100ns };
 AmpTimeUnit DetectAmpTimeUnit(int64_t durationRaw, std::optional<int64_t> smtcDurationMs);
 int64_t AmpTimeToMs(int64_t raw, AmpTimeUnit unit);
 const char* AmpTimeUnitName(AmpTimeUnit unit);  // "s", "ms", "100 ns", "unknown"
+
+// The unit of IPlayQueueItem.Duration, measured on Apple Music 1.1792 (knowledge/apple-music-queue.md). It is another
+// property than the player item's, whose unit is still learned at run time, so neither is taken for the other.
+inline constexpr AmpTimeUnit kQueueDurationUnit = AmpTimeUnit::Milliseconds;
+
+// What Ampify.player.queue.list() gives for an entry of Apple's queue, its artwork as ArtworkAddress makes it.
+QueueItem QueueItemFromAmp(const AmpQueueEntry& entry);
 
 // A stable id for a track from its title, artist and album: "t-" and 16 hexadecimal characters. The same song gives
 // the same id whatever the source (Apple's player or SMTC), so an element can keep per-track data.

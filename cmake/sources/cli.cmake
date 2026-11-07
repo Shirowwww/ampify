@@ -22,7 +22,6 @@ list(APPEND AMPIFY_CLI_PORTABLE_SOURCES
 list(APPEND AMPIFY_CLI_SOURCES
     src/cli/ampify.cpp
     src/cli/commands.cpp
-    src/cli/setting_keys.cpp
     src/cli/marketplace.cpp
     src/cli/activation.cpp
     src/cli/author.cpp

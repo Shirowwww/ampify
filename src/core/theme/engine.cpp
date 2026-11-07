@@ -8,11 +8,14 @@
 
 #include "pane.hpp"
 #include "properties.hpp"
-#include "scheme_choice.hpp"
 
 namespace ampify::theme {
 
 namespace {
+
+// The log's verbosity: the first pass of a theme names every value it writes, the next few passes give one summary
+// line each while they still write something, and later passes stay silent (a tick every 3 s would flood the log).
+constexpr int kSummarisedPasses = 5;
 
 // True when `candidate` should replace `current` for the same element and property. !important first, then the layer
 // (a snippet beats the theme, sidebar.json beats both), then specificity, then the place in the file.
@@ -155,7 +158,8 @@ ThemeEngine::Report ThemeEngine::Apply(const Theme& theme, TreeBackend& tree) {
     ApplyAssignments(theme, tree, nodes, report);
     m_active = true;
 
-    if ((report.applied > 0 || report.refused > 0) && (m_detailed || (report.applied > 0 && m_passes <= 5))) {
+    const bool summarised = report.applied > 0 && m_passes <= kSummarisedPasses;
+    if ((report.applied > 0 || report.refused > 0) && (m_detailed || summarised)) {
         m_journal.Write("Theme \"" + theme.name + "\": " + std::to_string(report.applied) + " value(s) applied, " +
                         std::to_string(report.unchanged) + " already in place, " + std::to_string(report.refused) +
                         " refused");
@@ -169,7 +173,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
     std::vector<PendingMove> reparents;
     const RuleIndex index(theme.assignments);
     const std::optional<ViewSize> size = tree.WindowSize();
-    const bool darkScheme = theme.dark.value_or(IsDarkScheme(theme.scheme));
+    const bool darkScheme = theme.dark.value_or(false);  // the loader decided; neither dark nor light reads as light
     tree.WatchSize(MediaQueries(theme));
     std::vector<Winners> inherited(nodes.size());
     for (int position = 0; position < static_cast<int>(nodes.size()); position++) {

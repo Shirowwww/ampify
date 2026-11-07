@@ -32,8 +32,25 @@ std::span<const char* const> InspectedProperties();
 // The text inspector.json gives an original that was no value of the element's own (kNoOwnValue).
 inline constexpr std::string_view kNoOwnValueText = "no-own-value";
 
-// The dump written to the logs folder: the resource keys first, then the element tree, one element per line,
-// indented by depth, with the selector that finds it and the values of the common properties.
+// One walk of the tree, which both dumps below write: the window, the resources and, for each element up to the limit,
+// the InspectedProperties it has and its box.
+struct InspectedNode {
+    std::vector<std::pair<const char*, Value>> properties;
+    std::optional<NodeBox> box;
+};
+struct Inspection {
+    std::optional<ViewSize> window;
+    std::vector<std::pair<std::string, std::optional<Value>>> resources;
+    std::vector<NodeInfo> nodes;           // the whole tree
+    std::vector<InspectedNode> inspected;  // the first nodes, up to maxLines
+    size_t maxLines = 0;
+    bool Truncated() const { return inspected.size() < nodes.size(); }
+};
+Inspection Inspect(TreeBackend& tree, size_t maxLines = InspectOptions{}.maxLines);
+
+// The dump written to the logs folder as inspector.txt: the resource keys first, then the element tree, one element per
+// line, indented by depth, with the selector that finds it and the values of the common properties.
+std::string InspectionText(const Inspection& inspection);
 std::string InspectTree(TreeBackend& tree, const InspectOptions& options = {});
 
 // The same tree as JSON, written next to inspector.txt as logs\inspector.json, for tools such as `ampify inspect --tree`
@@ -48,7 +65,9 @@ std::string InspectTree(TreeBackend& tree, const InspectOptions& options = {});
 // "present", as in inspector.txt. The same element limit applies; `truncated` says when it was reached.
 // `box` (x, y, width, height in the root's coordinates) is left out for an element not laid out; `originals`, the values
 // the theme on screen will give back, only for the elements it changed ("no-own-value": none of the element's own).
-// Version 1 (before 06/11/2026) had no window, theme, flags, box nor originals.
+// Version 1 (before 06/11/2026) had no window, theme, flags, box nor originals. Only `theme` and `originals` of
+// `options` count here.
+std::string InspectionJson(const Inspection& inspection, const InspectOptions& options = {});
 std::string InspectTreeJson(TreeBackend& tree, const InspectOptions& options = {});
 
 // Reads back the `nodes` of inspector.json, for tools that check selectors against a saved tree

@@ -18,7 +18,7 @@ Register-Case -Id 'atmos-leveler' -Title 'Atmos leveler on: Apple Music starts, 
         $since = Get-Date
         $launcherProcess = Start-Launcher -LauncherPath $launcher
 
-        $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
+        $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music started with the leveler on' -Passed $launched
 
         if ($launched) {
@@ -35,7 +35,7 @@ Register-Case -Id 'atmos-leveler' -Title 'Atmos leveler on: Apple Music starts, 
             if ($agentLog) {
                 foreach ($line in ($agentLog -split "`r?`n")) {
                     if ($line -notmatch 'placed in') { continue }
-                    if ($line -match 'CoreFP|CoreADI64|FairPlay') { $hooked += $line }
+                    if ($line -match $script:ProtectedModulePattern) { $hooked += $line }
                 }
             }
             Add-Check -Ctx $Ctx -Name 'no hook on CoreFP, CoreADI64 or FairPlay' -Passed ($hooked.Count -eq 0) `

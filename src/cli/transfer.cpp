@@ -2,8 +2,11 @@
 
 #include <algorithm>
 #include <optional>
+#include <set>
+#include <string_view>
 #include <system_error>
 
+#include "../core/settings_catalog.hpp"
 #include "archive.hpp"
 #include "backup.hpp"
 #include "element.hpp"
@@ -27,6 +30,55 @@ bool IsExportEntry(const std::string& entry) {
         if (entry.compare(0, prefix.size(), prefix) == 0) return true;
     }
     return false;
+}
+
+// The key of one line of settings.txt; empty for a blank line or a comment.
+std::string KeyOfLine(std::string_view line) {
+    std::string_view trimmed = TrimSpace(line);
+    size_t equals = trimmed.find('=');
+    if (trimmed.empty() || trimmed.front() == '#' || equals == std::string_view::npos) return {};
+    return std::string(TrimSpace(trimmed.substr(0, equals)));
+}
+
+// Calls `visit` with each line of `text`, its line break included.
+template <typename Visit>
+void ForEachLine(std::string_view text, Visit visit) {
+    for (size_t start = 0; start < text.size();) {
+        size_t end = text.find('\n', start);
+        end = end == std::string_view::npos ? text.size() : end + 1;
+        visit(text.substr(start, end - start));
+        start = end;
+    }
+}
+
+// settings.txt without its secret keys (remote.token): they stay on this computer, out of exports and profiles.
+std::string WithoutSecrets(std::string_view text) {
+    std::string kept;
+    ForEachLine(text, [&kept](std::string_view line) {
+        if (!IsSecretSetting(KeyOfLine(line))) kept += line;
+    });
+    return kept;
+}
+
+// `text` with this computer's secret keys added where it has none: a profile or an import leaves the remote's
+// token, and the devices paired with it, as they were.
+std::string WithSecretsOf(std::string text, const Settings& current) {
+    std::set<std::string> present;
+    ForEachLine(text, [&present](std::string_view line) { present.insert(KeyOfLine(line)); });
+    std::string lineEnd = text.find("\r\n") != std::string::npos ? "\r\n" : "\n";
+    for (const KitSetting& row : FixedKitSettings()) {
+        std::optional<std::string> value = current.Get(std::string(row.key));
+        if (!row.secret || !value || present.count(std::string(row.key))) continue;
+        if (!text.empty() && text.back() != '\n') text += lineEnd;
+        text += std::string(row.key) + " = " + *value + lineEnd;
+    }
+    return text;
+}
+
+std::string WithSecretsOf(std::string text, const std::filesystem::path& settingsFile) {
+    Settings current;
+    current.Load(settingsFile.string());
+    return WithSecretsOf(std::move(text), current);
 }
 
 // Profile names use the same rules as element ids: they become folder names.
@@ -57,7 +109,7 @@ int ProfileSave(Context& ctx, const std::string& name) {
     std::string text;
     if (!ReadWholeFile(ctx.kit.Settings(), text)) text.clear();  // no settings yet: the profile starts empty
     std::string error;
-    if (!WriteTextFile(ctx.kit.Profiles() / name / "settings.txt", text, error)) return Failure(ctx, error);
+    if (!WriteTextFile(ctx.kit.Profiles() / name / "settings.txt", WithoutSecrets(text), error)) return Failure(ctx, error);
     ctx.out << "Profile " << name << " saved. It only holds the settings, not the elements.\n";
     return 0;
 }
@@ -70,7 +122,7 @@ int ProfileUse(Context& ctx, const std::string& name) {
     std::string error;
     std::optional<std::string> snapshot = CreateBackup(ctx.kit, error);
     if (!snapshot) return Failure(ctx, error);
-    if (!WriteTextFile(ctx.kit.Settings(), text, error)) return Failure(ctx, error);
+    if (!WriteTextFile(ctx.kit.Settings(), WithSecretsOf(text, ctx.kit.Settings()), error)) return Failure(ctx, error);
     ctx.out << "Profile " << name << " loaded. Previous state backed up: " << *snapshot << ". Run ampify apply.\n";
     return 0;
 }
@@ -117,7 +169,11 @@ int CmdExport(Context& ctx) {
 
     std::vector<ZipSource> files;
     files.push_back({std::string(kExportMarker), {}, std::string(kExportFormat)});
-    if (std::filesystem::is_regular_file(ctx.kit.Settings(), ec)) files.push_back({"settings.txt", ctx.kit.Settings(), {}});
+    if (std::filesystem::is_regular_file(ctx.kit.Settings(), ec)) {
+        std::string text;
+        if (!ReadWholeFile(ctx.kit.Settings(), text)) return Failure(ctx, "cannot read: " + Utf8(ctx.kit.Settings()));
+        files.push_back({"settings.txt", {}, WithoutSecrets(text)});
+    }
     for (std::string_view kind : kElementKindNames) {
         std::vector<ZipSource> part = FilesUnder(ctx.kit.Folder(kind), std::string(FolderOfKind(kind)));
         files.insert(files.end(), part.begin(), part.end());
@@ -235,7 +291,7 @@ int CmdImport(Context& ctx) {
     }
     if (hasSettings) {
         std::string text;
-        if (!ReadWholeFile(staging / "settings.txt", text) || !WriteTextFile(ctx.kit.Settings(), text, error)) {
+        if (!ReadWholeFile(staging / "settings.txt", text) || !WriteTextFile(ctx.kit.Settings(), WithSecretsOf(text, ctx.kit.Settings()), error)) {
             std::filesystem::remove_all(staging, ec);
             return Failure(ctx, "settings not imported (previous state backed up: " + *snapshot + ")");
         }

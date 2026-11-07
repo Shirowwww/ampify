@@ -132,8 +132,8 @@ The Marketplace and Ampify's settings page show the translation that matches the
 otherwise. Ids, folder names and command-line messages never change with the language.
 
 > [!NOTE]
-> The public catalog's index leaves `translations` out, because the test builds that came before the 1.0.0 release
-> refuse a catalog with a field they do not know; the archive's manifest keeps them.
+> The public catalog's index leaves `translations` out; the archive's manifest keeps them. See Compatibility in
+> [catalog.md](catalog.md#compatibility).
 
 ## Validation
 

@@ -14,7 +14,7 @@ Register-Case -Id 'bench-injection' -Title 'Bench build: kernel in AppleMusic.ex
     $since = Get-Date
     $launcherProcess = Start-Launcher -LauncherPath $launcher
 
-    $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
+    $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
     Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched
     if (-not $launched) {
         Write-JournalTail -FileName 'launcher.log'
@@ -50,7 +50,7 @@ Register-Case -Id 'bench-injection' -Title 'Bench build: kernel in AppleMusic.ex
     $appPattern = 'AppleMusic\.exe \(\d+\): kernel loaded'
     $kernelInApp = Wait-Until -TimeoutSeconds 60 -Condition { $null -ne (Find-JournalMatch -FileName 'launcher.log' -Pattern $appPattern) }
     Add-Check -Ctx $Ctx -Name 'launcher: kernel loaded in AppleMusic.exe' -Passed $kernelInApp
-    $hostReady = Wait-Journal -FileName 'AppleMusic.log' -Text 'Extension host ready' -TimeoutSeconds 60
+    $hostReady = Wait-Journal -FileName 'AppleMusic.log' -Text $script:LogPhrase.ExtensionHostReady -TimeoutSeconds 60
     Add-Check -Ctx $Ctx -Name 'AppleMusic.log: extension host ready' -Passed $hostReady
 
     $agentPattern = 'AMPLibraryAgent\.exe \(\d+\): kernel loaded'

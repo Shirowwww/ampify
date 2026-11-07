@@ -138,6 +138,11 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("permissions[0]", text)
 
+    def test_kit_manage_is_refused_as_every_client_refuses_it(self):
+        code, text = self.write([entry(permissions=["storage", "kit.manage"])])
+        self.assertEqual(code, 1)
+        self.assertIn("permissions[1]", text)
+
     def test_tags_and_preview_pass(self):
         code, text = self.write([entry(tags=["dark", "glass-2"], preview="https://example.com/demo.png")])
         self.assertEqual(code, 0, text)
@@ -608,11 +613,12 @@ def permission_patterns(node):
 
 
 class SchemaSubsetTests(unittest.TestCase):
-    def test_the_catalog_takes_the_permissions_a_manifest_takes(self):
+    def test_the_catalog_takes_the_permissions_a_manifest_takes_but_kit_manage(self):
         manifest = permission_patterns(load_schema("manifest"))
         catalog = permission_patterns(load_schema("catalog"))
         self.assertTrue(manifest and catalog)
-        self.assertEqual(set(catalog), set(manifest), "an element valid on its own must also be valid in the catalog")
+        self.assertEqual({p.replace("kit\\.manage|", "") for p in manifest}, set(catalog),
+                         "an element valid on its own must also be valid in the catalog, except the first-party kit.manage")
 
     def test_both_repository_schemas_use_only_supported_keywords(self):
         for kind, path in validate.SCHEMAS.items():

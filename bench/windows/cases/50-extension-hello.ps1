@@ -22,7 +22,7 @@ Register-Case -Id 'extension-hello' -Title 'hello-extension started in AppleMusi
         $since = Get-Date
         $launcherProcess = Start-Launcher -LauncherPath $launcher
 
-        $launched = Wait-Journal -FileName 'launcher.log' -Text 'Apple Music started' -TimeoutSeconds 120
+        $launched = Wait-Journal -FileName 'launcher.log' -Text $script:LogPhrase.AppleMusicStarted -TimeoutSeconds 120
         Add-Check -Ctx $Ctx -Name 'Apple Music started by the launcher' -Passed $launched
         if (-not $launched) {
             Close-AppleMusic | Out-Null

@@ -11,18 +11,17 @@
 
 namespace ampify::theme {
 
-enum class GlassLevel { Full, Balanced, Eco };
-
-inline constexpr char kGlassKey[] = "theme.glass";
-
 // The level of a value of theme.glass, ignoring case and spaces. Full for an empty or unknown value.
 GlassLevel GlassLevelOf(std::string_view value);
 
-// Lightens the theme's values for that level (see above). Full leaves them as they are.
+// Lightens the theme's values for that level (see above) and records it in theme.glass. Full leaves them as they are.
 void ApplyGlassLevel(Theme& theme, GlassLevel level);
 
-// The level the themes were last worked out with (the theme worker sets it), for what is drawn outside the theme's
-// values, such as the artwork's cross-fade. Full until then. Any thread.
+// The material a window asking for `material` gets at that level.
+WindowMaterial MaterialAt(GlassLevel level, WindowMaterial material);
+
+// The level of the themes on screen (the interface thread sets it from each request), for what is drawn outside the
+// theme's values, such as the artwork's cross-fade. Full until then. Any thread.
 void SetCurrentGlassLevel(GlassLevel level);
 GlassLevel CurrentGlassLevel();
 

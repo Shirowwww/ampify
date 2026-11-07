@@ -20,10 +20,25 @@ constexpr const char* kLineEnd = "\r\n";
 constexpr const char* kLineEnd = "\n";
 #endif
 
+bool FitsOnOneLine(std::string_view text) { return text.find_first_of("\r\n") == std::string_view::npos; }
+
 }  // namespace
+
+std::optional<bool> ParseToggle(std::string_view text) {
+    std::string lowered = ToLowerAscii(text);
+    if (lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes") return true;
+    if (lowered == "0" || lowered == "false" || lowered == "off" || lowered == "no") return false;
+    return std::nullopt;
+}
+
+bool KeepsItsValue(std::string_view text) {
+    auto space = [](char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; };
+    return FitsOnOneLine(text) && (text.empty() || (!space(text.front()) && !space(text.back())));
+}
 
 bool Settings::Load(const std::string& path) {
     m_values.clear();
+    m_changes.clear();
 
     // Linux opens a directory as a stream that reads nothing: it must fail like on Windows, or a save would follow.
     std::error_code ignored;
@@ -68,11 +83,7 @@ std::string Settings::GetString(const std::string& key, const std::string& fallb
 bool Settings::GetBool(const std::string& key, bool fallback) const {
     std::optional<std::string> value = Get(key);
     if (!value) return fallback;
-
-    std::string lowered = ToLowerAscii(*value);
-    if (lowered == "1" || lowered == "true" || lowered == "on" || lowered == "yes") return true;
-    if (lowered == "0" || lowered == "false" || lowered == "off" || lowered == "no") return false;
-    return fallback;
+    return ParseToggle(*value).value_or(fallback);
 }
 
 int Settings::GetInt(const std::string& key, int fallback) const {
@@ -99,8 +110,11 @@ double Settings::GetDouble(const std::string& key, double fallback) const {
     return result;
 }
 
-void Settings::Set(const std::string& key, const std::string& value) {
+bool Settings::Set(const std::string& key, const std::string& value) {
+    if (!FitsOnOneLine(key) || !FitsOnOneLine(value)) return false;
     m_values[key] = value;
+    m_changes[key] = value;
+    return true;
 }
 
 void Settings::SetBool(const std::string& key, bool value) {
@@ -113,6 +127,7 @@ void Settings::SetInt(const std::string& key, int value) {
 
 void Settings::Remove(const std::string& key) {
     m_values.erase(key);
+    m_changes[key] = std::nullopt;
 }
 
 bool Settings::UpdateFile(const std::string& path, const std::function<void(Settings&)>& change, std::string& error) {
@@ -133,7 +148,23 @@ bool Settings::UpdateFile(const std::string& path, const std::function<void(Sett
 
 bool Settings::UpdateFile(const std::string& path, const std::string& key, const std::string& value,
                           std::string& error) {
+    if (!FitsOnOneLine(key) || !FitsOnOneLine(value)) {
+        error = "value must fit on one line: " + key;
+        return false;
+    }
     return UpdateFile(path, [&](Settings& settings) { settings.Set(key, value); }, error);
+}
+
+bool Settings::SaveChanges(const std::string& path, std::string& error) const {
+    return UpdateFile(path, [this](Settings& current) {
+        for (const auto& [key, value] : m_changes) {
+            if (value) {
+                current.Set(key, *value);
+            } else {
+                current.Remove(key);
+            }
+        }
+    }, error);
 }
 
 }  // namespace ampify

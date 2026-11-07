@@ -12,8 +12,10 @@
 #include "builtins.hpp"
 #include "css_values.hpp"
 #include "fonts.hpp"
+#include "glass.hpp"
 #include "ini.hpp"
 #include "release_facts.hpp"
+#include "scheme_choice.hpp"
 #include "spicetify.hpp"
 
 namespace ampify::theme {
@@ -34,7 +36,7 @@ const Ini::Section* PickScheme(const Ini& ini, const std::string& wanted, Theme&
 
 // The colours file: colors.ini, or color.ini as Spicetify names it. Empty name when there is none.
 std::pair<std::string, std::optional<std::string>> ReadColorsFile(FileSource& files) {
-    for (const char* name : {"colors.ini", "color.ini"}) {
+    for (const char* name : kColorsFiles) {
         if (std::optional<std::string> text = files.Read(name)) return {name, std::move(text)};
     }
     return {};
@@ -48,45 +50,76 @@ bool IsSpicetifyName(std::string_view key) {
     return !key.empty();
 }
 
+// The WCAG luminance at which white and black text contrast equally: sqrt(1.05 * 0.05) - 0.05. Below it, white text
+// reads better, so the background is dark.
+constexpr double kDarkBelowLuminance = 0.1791;
+
 // Light or dark, from the background the scheme gives: Spicetify's main, or the app's page background.
 std::optional<bool> DarkFromPalette(const Palette& palette) {
     for (const char* key : {"main", "SolidBackgroundFillColorBaseBrush", "ApplicationPageBackgroundThemeBrush"}) {
-        if (std::optional<Argb> color = palette.Find(key)) {
-            double luminance = 0.2126 * color->r + 0.7152 * color->g + 0.0722 * color->b;
-            return luminance < 128.0;
-        }
+        if (std::optional<Argb> color = palette.Find(key)) return RelativeLuminance(*color) < kDarkBelowLuminance;
     }
     return std::nullopt;
 }
 
+// Light or dark, from the background the scheme gives (Spicetify's main, or the app's page background), else from the
+// scheme's name.
+std::optional<bool> DarkOf(const Palette& palette, const std::string& scheme) {
+    std::optional<bool> dark = DarkFromPalette(palette);
+    return dark ? dark : DarkByName(scheme);
+}
+
 constexpr const char* kAccent = "AccentFillColorDefaultBrush";
+
+// Where the colours of a scheme go: the palette, which $name and the derived rules read, and the app's brushes when
+// the colours part is on. Both change together.
+struct Colours {
+    Theme& theme;
+    bool applied;
+
+    bool Define(std::string_view key, Argb color) {
+        if (!theme.palette.Define(key, color)) return false;
+        AddBrush(key, color);
+        return true;
+    }
+    void Set(std::string_view key, Argb color) {
+        theme.palette.Set(key, color);
+        AddBrush(key, color);
+    }
+
+private:
+    void AddBrush(std::string_view key, Argb color) {
+        if (applied) theme.resources.push_back({std::string(key), {ValueKind::Color, ToXamlColor(color)}});
+    }
+};
 
 // A brush the theme does not name, worked out from one it does. The theme's resources.xaml has the last word: a key
 // it defines, or the one the colour comes from, is left to it.
-void DefineDerived(Theme& theme, const std::set<std::string>& owned, const char* from, const char* key, Argb color,
-                   bool applied) {
-    if (owned.count(from) || owned.count(key) || !theme.palette.Define(key, color)) return;
-    if (applied) theme.resources.push_back({key, {ValueKind::Color, ToXamlColor(color)}});
+void DefineDerived(Colours& colours, const std::set<std::string>& owned, const char* from, const char* key,
+                   Argb color) {
+    if (owned.count(from) || owned.count(key)) return;
+    colours.Define(key, color);
 }
 
 // Fluent's accent under the pointer and while pressed is the accent at 90% and 80%. A theme that names only the
 // accent would otherwise show Apple Music's own colour on hover.
-void DefineAccentStates(Theme& theme, const std::set<std::string>& owned, bool applied) {
+void DefineAccentStates(Colours& colours, const std::set<std::string>& owned) {
     constexpr std::pair<const char*, double> kStates[] = {{"AccentFillColorSecondaryBrush", 0.9},
                                                           {"AccentFillColorTertiaryBrush", 0.8}};
-    std::optional<Argb> accent = theme.palette.Find(kAccent);
+    std::optional<Argb> accent = colours.theme.palette.Find(kAccent);
     if (!accent) return;
     for (const auto& [key, opacity] : kStates) {
         Argb color = *accent;
         color.a = static_cast<std::uint8_t>(std::lround(accent->a * opacity));
-        DefineDerived(theme, owned, kAccent, key, color, applied);
+        DefineDerived(colours, owned, kAccent, key, color);
     }
 }
 
 // Apple Music lays white text on the accent whatever its colour. On an accent where white reads under 3:1 (a light
 // cyan, Spotify's green, a yellow) and that names no colour for its text, the text goes black, as in Fluent's dark
 // mode. Any other accent keeps Apple Music's white.
-void DefineTextOnAccent(Theme& theme, const std::set<std::string>& owned, bool applied) {
+void DefineTextOnAccent(Colours& colours, const std::set<std::string>& owned) {
+    const Theme& theme = colours.theme;
     constexpr const char* kPrimary = "TextOnAccentFillColorPrimaryBrush";
     constexpr const char* kSecondary = "TextOnAccentFillColorSecondaryBrush";
     constexpr double kMinimumWhiteContrast = 3.0;
@@ -96,7 +129,7 @@ void DefineTextOnAccent(Theme& theme, const std::set<std::string>& owned, bool a
     if (!accent || theme.palette.Find(kPrimary) || owned.count(kPrimary)) return;
     if (1.05 / (RelativeLuminance(*accent) + 0.05) >= kMinimumWhiteContrast) return;
     for (const auto& [key, color] : {std::pair{kPrimary, kBlack}, std::pair{kSecondary, kBlackSecondary}}) {
-        DefineDerived(theme, owned, kAccent, key, color, applied);
+        DefineDerived(colours, owned, kAccent, key, color);
     }
 }
 
@@ -105,7 +138,8 @@ void DefineTextOnAccent(Theme& theme, const std::set<std::string>& owned, bool a
 // blue (the Settings pages, the sidebar's selection mark, "Show the whole album", the playing row's bars). The list is
 // every key the inspector found still holding Apple's accent under a theme. Brushes only: WinUI builds its own brushes
 // from the SystemAccentColor colours once, so writing those left them in the theme's accent after the theme went.
-void DefineAccentControls(Theme& theme, const std::set<std::string>& owned, bool applied) {
+void DefineAccentControls(Colours& colours, const std::set<std::string>& owned) {
+    const Theme& theme = colours.theme;
     constexpr const char* kHover = "AccentFillColorSecondaryBrush";
     constexpr const char* kPressed = "AccentFillColorTertiaryBrush";
     // A theme that names no accent text colour has its links in the accent itself.
@@ -200,24 +234,26 @@ void DefineAccentControls(Theme& theme, const std::set<std::string>& owned, bool
         std::optional<Argb> color = theme.palette.Find(derived.from);
         if (!color) continue;
         color->a = static_cast<std::uint8_t>(std::lround(color->a * derived.opacity));
-        DefineDerived(theme, owned, derived.from, derived.key, *color, applied);
+        DefineDerived(colours, owned, derived.from, derived.key, *color);
     }
 }
 
 // Ampify's extension panels and WinUI's flyouts lie over the page in Fluent's grey acrylic, foreign to any theme. An
 // opaque card colour takes its place; a see-through one would let the page show through them.
-void DefineAcrylicSurfaces(Theme& theme, const std::set<std::string>& owned, bool applied) {
+void DefineAcrylicSurfaces(Colours& colours, const std::set<std::string>& owned) {
+    const Theme& theme = colours.theme;
     constexpr const char* kCard = "CardBackgroundFillColorDefaultBrush";
     std::optional<Argb> card = theme.palette.Find(kCard);
     if (!card || card->a != 0xFF) return;
     for (const char* key : {"AcrylicInAppFillColorDefaultBrush", "AcrylicBackgroundFillColorDefaultBrush"}) {
-        DefineDerived(theme, owned, kCard, key, *card, applied);
+        DefineDerived(colours, owned, kCard, key, *card);
     }
 }
 
 // The selected rows of song lists and cards of grids stay in Apple Music's grey unless a theme names them: Spicetify's
 // selected-row when the theme gives one, otherwise a veil of the accent (#33, #44, #55 as the themes that set them).
-void DefineSelectedRows(Theme& theme, const std::set<std::string>& owned, bool applied) {
+void DefineSelectedRows(Colours& colours, const std::set<std::string>& owned) {
+    const Theme& theme = colours.theme;
     std::optional<Argb> row = theme.palette.Find("selected-row");
     const char* from = row ? "selected-row" : kAccent;
     std::optional<Argb> base = row ? row : theme.palette.Find(kAccent);
@@ -230,41 +266,40 @@ void DefineSelectedRows(Theme& theme, const std::set<std::string>& owned, bool a
     for (const auto& [key, alpha] : kStates) {
         Argb color = *base;
         if (!row) color.a = alpha;
-        DefineDerived(theme, owned, from, key, color, applied);
+        DefineDerived(colours, owned, from, key, color);
     }
 }
 
 // The frost of a page header (a BackDrop in Apple's PageTemplates) is tinted by ContentAreaBackgroundBrush from its
 // first frame; the theme's pass that hides it comes a frame later, so in Apple's grey it flashed over a darker page.
-void DefinePageHeaderFrost(Theme& theme, const std::set<std::string>& owned, bool applied) {
+void DefinePageHeaderFrost(Colours& colours, const std::set<std::string>& owned) {
+    const Theme& theme = colours.theme;
     constexpr const char* kPage = "ApplicationPageBackgroundThemeBrush";
     if (std::optional<Argb> page = theme.palette.Find(kPage)) {
-        DefineDerived(theme, owned, kPage, "ContentAreaBackgroundBrush", *page, applied);
+        DefineDerived(colours, owned, kPage, "ContentAreaBackgroundBrush", *page);
     }
 }
 
 // Apple's shelf headers, captions and the search field's hint read Apple's own SecondaryTextBrush, white at 51%: on a
 // theme's page lighter than Apple's it fell under 4.5:1, so it takes the theme's secondary text. Only for a dark
 // scheme: Apple's dark-mode captions over artwork read the same key, where a light scheme's dark text would sink.
-void DefineAppleSecondaryText(Theme& theme, const std::set<std::string>& owned, bool applied) {
+void DefineAppleSecondaryText(Colours& colours, const std::set<std::string>& owned) {
+    const Theme& theme = colours.theme;
     constexpr const char* kSecondary = "TextFillColorSecondaryBrush";
     std::optional<Argb> secondary = theme.palette.Find(kSecondary);
     std::optional<bool> dark = DarkFromPalette(theme.palette);
     if (!secondary || !dark || !*dark) return;
-    DefineDerived(theme, owned, kSecondary, "SecondaryTextBrush", *secondary, applied);
+    DefineDerived(colours, owned, kSecondary, "SecondaryTextBrush", *secondary);
 }
 
 // The colours a theme leaves to Ampify, once its own resources.xaml is known.
-void DefineDerivedColors(Theme& theme, bool applied) {
-    std::vector<std::string> keys = XamlKeys(theme.resourceDictionary);
+void DefineDerivedColors(Colours& colours) {
+    std::vector<std::string> keys = XamlKeys(colours.theme.resourceDictionary);
     std::set<std::string> owned(keys.begin(), keys.end());
-    DefineAccentStates(theme, owned, applied);
-    DefineTextOnAccent(theme, owned, applied);
-    DefineAccentControls(theme, owned, applied);
-    DefineSelectedRows(theme, owned, applied);
-    DefineAcrylicSurfaces(theme, owned, applied);
-    DefinePageHeaderFrost(theme, owned, applied);
-    DefineAppleSecondaryText(theme, owned, applied);
+    for (auto define : {DefineAccentStates, DefineTextOnAccent, DefineAccentControls, DefineSelectedRows,
+                        DefineAcrylicSurfaces, DefinePageHeaderFrost, DefineAppleSecondaryText}) {
+        define(colours, owned);
+    }
 }
 
 // A Spicetify colour: a $name, a --spice-name variable as in Spicetify, and the app brushes that play its part
@@ -282,7 +317,8 @@ std::string DefineSpicetifyColor(const Ini::Entry& entry, Argb color, Theme& the
     return key;
 }
 
-std::set<std::string> LoadColors(FileSource& files, const std::string& wanted, bool applied, Theme& theme) {
+std::set<std::string> LoadColors(FileSource& files, const std::string& wanted, Colours& colours) {
+    Theme& theme = colours.theme;
     std::set<std::string> spicetify;
     auto [file, text] = ReadColorsFile(files);
     if (!text) return spicetify;
@@ -312,22 +348,18 @@ std::set<std::string> LoadColors(FileSource& files, const std::string& wanted, b
             if (!key.empty()) spicetify.insert(key);
             continue;
         }
-        if (!theme.palette.Define(entry.key, *color)) {
+        if (!colours.Define(entry.key, *color)) {
             theme.problems.push_back(file + " line " + std::to_string(entry.line) + ": \"" + entry.key +
                                      "\" defined twice, ignored");
-            continue;
         }
-        if (applied) theme.resources.push_back({entry.key, {ValueKind::Color, ToXamlColor(*color)}});
     }
 
     // The app brushes that play the part of a Spicetify colour, unless the scheme gives them itself.
     for (const SpicetifyResource& mapping : SpicetifyResources()) {
         std::optional<Argb> color = spicetify.count(mapping.spicetify) ? theme.palette.Find(mapping.spicetify) : std::nullopt;
-        if (!color || theme.palette.Find(mapping.resource)) continue;
-        theme.palette.Define(mapping.resource, *color);
-        if (applied) theme.resources.push_back({mapping.resource, {ValueKind::Color, ToXamlColor(*color)}});
+        if (color) colours.Define(mapping.resource, *color);
     }
-    theme.dark = DarkFromPalette(theme.palette);
+    theme.dark = DarkOf(theme.palette, theme.scheme);
     return spicetify;
 }
 
@@ -335,7 +367,8 @@ std::set<std::string> LoadColors(FileSource& files, const std::string& wanted, b
 // scheme gives along with its own accent (hover and pressed accents, text on the accent, links) would clash with it:
 // they go, and Ampify derives them from the chosen accent (DefineDerivedColors). Keys of the theme's resources.xaml
 // stay: Ampify does not rewrite a theme's own XAML.
-void ChooseAccent(Theme& theme, Argb accent, bool applied) {
+void ChooseAccent(Colours& colours, Argb accent) {
+    Theme& theme = colours.theme;
     static const std::set<std::string> kFollowers = {
         ToLowerAscii(kAccent),
         "accentfillcolorsecondarybrush",
@@ -351,8 +384,7 @@ void ChooseAccent(Theme& theme, Argb accent, bool applied) {
     std::erase_if(theme.resources, [](const ResourceOverride& resource) {
         return kFollowers.count(ToLowerAscii(resource.key)) > 0;
     });
-    theme.palette.Set(kAccent, accent);
-    if (applied) theme.resources.push_back({kAccent, {ValueKind::Color, ToXamlColor(accent)}});
+    colours.Set(kAccent, accent);
     for (const char* spicetify : {"button", "playback-bar"}) {
         if (!theme.palette.Find(spicetify)) continue;
         theme.palette.Set(spicetify, accent);
@@ -397,6 +429,7 @@ struct RuleSource {
     std::string file = "user.css";  // for the log and the problems
     const Theme* base = nullptr;    // the active theme, for a snippet: its font roles fill what the snippet leaves out
     int layer = 0;                  // -1 for the rules translated from color.ini: the theme's user.css wins over them
+    bool applied = true;            // false when its part is off: read for its problems only
 };
 
 // `--font-title`, `--font-title-weight`, `--font-title-size`: checks the value and records the role part.
@@ -524,22 +557,21 @@ void AddAssignment(const Rule& rule, const PropertySpec& spec, const Value& valu
 
 // `font-role: title` sets the family, the weight and the size of the role at once.
 bool AddFontRole(const Rule& rule, const Declaration& declaration, const std::string& value, int order,
-                 const RuleSource& source, bool applied, Theme& theme) {
+                 const RuleSource& source, Theme& theme) {
     std::optional<FontStyle> style = ResolveFontRole(std::vector<const Theme*>{&theme, source.base}, value);
     if (!style) {
         theme.problems.push_back(AtLine(source.file, declaration.line) + ": font role \"" + value +
                                  "\" is unknown, ignored");
         return false;
     }
-    if (!applied) return true;
+    if (!source.applied) return true;
     AddAssignment(rule, *FindProperty("font-family"), {ValueKind::Text, style->family}, declaration, order, source, theme);
     AddAssignment(rule, *FindProperty("font-weight"), {ValueKind::Number, style->weight}, declaration, order, source, theme);
     AddAssignment(rule, *FindProperty("font-size"), {ValueKind::Length, style->size}, declaration, order, source, theme);
     return true;
 }
 
-void LoadRuleText(const std::string& css, const ValueContext& context, Theme& theme, bool applied,
-                  const RuleSource& source) {
+void LoadRuleText(const std::string& css, const ValueContext& context, Theme& theme, const RuleSource& source) {
     Stylesheet sheet = ParseThemeStylesheet(css);
     for (const std::string& problem : sheet.problems) theme.problems.push_back(source.file + " " + problem);
 
@@ -577,7 +609,7 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
             }
 
             if (ToLowerAscii(declaration.property) == "font-role") {
-                if (AddFontRole(rule, declaration, *raw, order, from, applied, theme)) order++;
+                if (AddFontRole(rule, declaration, *raw, order, from, theme)) order++;
                 continue;
             }
 
@@ -597,14 +629,14 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
                 continue;
             }
 
-            if (applied) AddAssignment(rule, *spec, *conversion.value, declaration, order, from, theme);
+            if (from.applied) AddAssignment(rule, *spec, *conversion.value, declaration, order, from, theme);
             order++;
         }
     }
 }
 
-void LoadRules(FileSource& files, const ValueContext& context, Theme& theme, bool applied, const RuleSource& source) {
-    if (std::optional<std::string> css = files.Read("user.css")) LoadRuleText(*css, context, theme, applied, source);
+void LoadRules(FileSource& files, const ValueContext& context, Theme& theme, const RuleSource& source) {
+    if (std::optional<std::string> css = files.Read("user.css")) LoadRuleText(*css, context, theme, source);
 }
 
 double LargestCorner(std::string_view corners) {
@@ -819,7 +851,6 @@ std::string RoomInsideALitCard(const Theme& theme) {
 
 // Rules a theme's own choices call for, below its user.css so that a theme which sets the same thing keeps its value.
 void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts& parts) {
-    bool applied = parts.resources;
     std::string css = ScrubberClearOfCorners(theme) + RoomForDecors(theme) + OneLightPerSong(theme) +
                       RoomInsideALitCard(theme);
     if (parts.colors) {
@@ -832,17 +863,17 @@ void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts
     RuleSource source;
     source.file = "Ampify (derived from the theme)";
     source.layer = -1;
-    LoadRuleText(css, context, theme, applied, source);
+    source.applied = parts.resources;
+    LoadRuleText(css, context, theme, source);
 }
 
-}  // namespace
-
-Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& files, const LoadOptions& options) {
+Theme ReadTheme(const std::string& id, const std::string& folder, FileSource& files, const LoadOptions& options) {
     Theme theme;
     theme.id = id;
     theme.name = id;
 
-    std::set<std::string> spicetify = LoadColors(files, options.scheme, options.parts.colors, theme);
+    Colours colours{theme, options.parts.colors};
+    std::set<std::string> spicetify = LoadColors(files, options.scheme, colours);
 
     // A part that is off is still checked, so the problems show up before the part is turned on.
     bool dictionaryOk = LoadDictionary(files, options, theme);
@@ -858,24 +889,25 @@ Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& fi
     if (!dictionaryOk) return theme;
 
     if (!options.parts.resources) theme.resourceDictionary.clear();
-    if (options.accent) ChooseAccent(theme, *options.accent, options.parts.colors);
-    DefineDerivedColors(theme, options.parts.colors);
+    if (options.accent) ChooseAccent(colours, *options.accent);
+    DefineDerivedColors(colours);
     LoadSettings(files, options, theme);
     for (const auto& [name, value] : options.artwork) theme.variables[name] = value;
     ValueContext context{theme.palette, files, folder, options.parts.assets};
     // Spicetify's colours paint Apple Music's own elements first; the theme's user.css comes on top.
     if (std::string translated = SpicetifyStylesheet(spicetify); !translated.empty()) {
         RuleSource source;
-        source.file = "color.ini (traduction Spicetify)";
+        source.file = "color.ini (Spicetify translation)";
         source.layer = -1;
-        LoadRuleText(translated, context, theme, options.parts.colors, source);
+        source.applied = options.parts.colors;
+        LoadRuleText(translated, context, theme, source);
     }
-    LoadRules(files, context, theme, options.parts.resources, RuleSource{});
+    RuleSource rules;
+    rules.applied = options.parts.resources;
+    LoadRules(files, context, theme, rules);
     AddDerivedRules(context, theme, options.parts);
     return theme;
 }
-
-namespace {
 
 // The files of a theme that has none.
 class NoFiles final : public FileSource {
@@ -884,35 +916,36 @@ public:
     bool Exists(std::string_view) override { return false; }
 };
 
-}  // namespace
-
-Theme LoadAccentOnly(const LoadOptions& options) {
+Theme ReadAccentOnly(const LoadOptions& options) {
     Theme theme;
     theme.id = kAccentOnlyId;
     theme.name = "accent colour";
     theme.usable = true;
     if (!options.accent) return theme;
-    ChooseAccent(theme, *options.accent, options.parts.colors);
-    DefineDerivedColors(theme, options.parts.colors);
+    Colours colours{theme, options.parts.colors};
+    ChooseAccent(colours, *options.accent);
+    DefineDerivedColors(colours);
     NoFiles files;
     ValueContext context{theme.palette, files, "", false};
     AddDerivedRules(context, theme, options.parts);
     return theme;
 }
 
-Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& files, const Theme* base,
+Theme ReadSnippet(const std::string& id, const std::string& folder, FileSource& files, const Theme* base,
                   const LoadOptions& options) {
     Theme snippet;
     snippet.id = id;
     snippet.name = id;
+    // What a snippet sees of the theme; its font roles are read through `base` (RuleSource::base).
     if (base) {
         snippet.palette = base->palette;
         snippet.variables = base->variables;
         snippet.settings = base->settings;
         snippet.keyframes = base->keyframes;
     }
-    if (files.Exists("colors.ini")) {
-        snippet.problems.push_back("colors.ini ignored: a snippet uses the colors of the active theme ($name)");
+    for (const char* name : kColorsFiles) {
+        if (!files.Exists(name)) continue;
+        snippet.problems.push_back(std::string(name) + " ignored: a snippet uses the colors of the active theme ($name)");
     }
 
     bool dictionaryOk = LoadDictionary(files, options, snippet);
@@ -933,14 +966,49 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
     RuleSource source;
     source.file = "snippets/" + id + "/user.css";
     source.base = base;
-    LoadRules(files, context, snippet, true, source);
+    LoadRules(files, context, snippet, source);
     if (std::string css = RoomForDecors(snippet); !css.empty()) {
         RuleSource derived;
         derived.file = "Ampify (derived from the snippet)";
         derived.layer = -1;
-        LoadRuleText(css, context, snippet, true, derived);
+        LoadRuleText(css, context, snippet, derived);
     }
     return snippet;
+}
+
+Theme Lightened(Theme theme, GlassLevel level) {
+    ApplyGlassLevel(theme, level);
+    return theme;
+}
+
+}  // namespace
+
+Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& files, const LoadOptions& options) {
+    return Lightened(ReadTheme(id, folder, files, options), options.glass);
+}
+
+Theme LoadAccentOnly(const LoadOptions& options) {
+    return Lightened(ReadAccentOnly(options), options.glass);
+}
+
+Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& files, const Theme* base,
+                  const LoadOptions& options) {
+    return Lightened(ReadSnippet(id, folder, files, base, options), options.glass);
+}
+
+std::optional<WindowMaterial> WindowMaterialOf(std::string_view value) {
+    std::string name = ToLowerAscii(TrimSpace(value));
+    if (name == "mica") return WindowMaterial::Mica;
+    if (name == "mica-alt") return WindowMaterial::MicaAlt;
+    if (name == "acrylic") return WindowMaterial::Acrylic;
+    return std::nullopt;
+}
+
+std::optional<WindowMaterial> Theme::Material() const {
+    auto value = variables.find("window-material");
+    if (value == variables.end()) return std::nullopt;
+    std::optional<WindowMaterial> material = WindowMaterialOf(value->second);
+    return material ? std::optional<WindowMaterial>(MaterialAt(glass, *material)) : std::nullopt;
 }
 
 std::vector<std::string> ReadSchemes(FileSource& files) {

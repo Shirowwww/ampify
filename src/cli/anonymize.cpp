@@ -4,6 +4,9 @@
 #include <cstdlib>
 #include <regex>
 
+#include "../core/settings_catalog.hpp"
+#include "../core/text_util.hpp"
+
 namespace ampify::cli {
 
 namespace {
@@ -182,7 +185,7 @@ std::string HideSecretSettings(std::string_view settings) {
         if (!comment && equals != std::string::npos) {
             std::string key = line.substr(0, equals);
             while (!key.empty() && (key.back() == ' ' || key.back() == '\t')) key.pop_back();
-            if (std::regex_search(key, kSecretWord)) line = line.substr(0, equals + 1) + " <hidden>";
+            if (IsSecretSetting(TrimSpace(key)) || std::regex_search(key, kSecretWord)) line = line.substr(0, equals + 1) + " <hidden>";
         }
         result += line;
         if (end < settings.size()) result += '\n';

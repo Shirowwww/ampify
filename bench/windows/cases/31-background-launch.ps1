@@ -11,7 +11,7 @@ function Remove-AttachSetting {
         & $ampify restore | Out-Null
     }
     if ($FullName) {
-        Remove-Item -LiteralPath "HKCU:\Software\Classes\PackagesDebug\$FullName" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath "$script:PackagesDebugKey\$FullName" -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -27,7 +27,7 @@ Register-Case -Id 'background-launch' -Title 'Launcher started by Windows: Apple
     $registered = Wait-Journal -FileName 'background.log' -Text 'Windows starts the launcher with each process of' -TimeoutSeconds 30
     Add-Check -Ctx $Ctx -Name 'Windows starts the launcher with Apple Music (package debug setting)' -Passed $registered
     Add-Check -Ctx $Ctx -Name 'the launcher ends: nothing stays in the background' -Passed ($register.WaitForExit(30000))
-    $key = if ($fullName) { "HKCU:\Software\Classes\PackagesDebug\$fullName" } else { $null }
+    $key = if ($fullName) { "$script:PackagesDebugKey\$fullName" } else { $null }
     Add-Check -Ctx $Ctx -Name 'the setting is in the registry' -Passed ([bool]($key -and (Test-Path -LiteralPath $key))) -Detail $fullName
 
     $appPattern = 'AppleMusic\.exe \((\d+)\): kernel loaded'
@@ -38,7 +38,7 @@ Register-Case -Id 'background-launch' -Title 'Launcher started by Windows: Apple
     Add-Check -Ctx $Ctx -Name 'Windows handed Apple Music to the launcher' -Passed $held
     $loaded = Wait-Until -TimeoutSeconds 60 -Condition { $null -ne (Find-JournalMatch -FileName 'attach.log' -Pattern $appPattern) }
     Add-Check -Ctx $Ctx -Name 'kernel loaded in AppleMusic.exe opened from its icon' -Passed $loaded
-    $hostReady = Wait-Journal -FileName 'AppleMusic.log' -Text 'Extension host ready' -TimeoutSeconds 60
+    $hostReady = Wait-Journal -FileName 'AppleMusic.log' -Text $script:LogPhrase.ExtensionHostReady -TimeoutSeconds 60
     Add-Check -Ctx $Ctx -Name 'AppleMusic.log: extension host ready' -Passed $hostReady
     $agent = Wait-Until -TimeoutSeconds 90 -Condition {
         $null -ne (Find-JournalMatch -FileName 'attach.log' -Pattern 'AMPLibraryAgent\.exe \(\d+\): kernel loaded')

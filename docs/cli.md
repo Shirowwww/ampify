@@ -100,8 +100,8 @@ Commands without arguments can follow each other: `ampify backup apply launch`. 
 | `ampify logs [count] [--follow]` | The last lines (50 by default) of each log; `--follow` keeps printing |
 | `ampify report [file.zip] [--tree] [--dir]` | Writes an anonymised zip to attach to an issue (see below) |
 | `ampify profile list` | Lists settings profiles |
-| `ampify profile save\|use\|delete <name>` | Saves, loads (after a backup) or deletes a copy of `settings.txt` in `profiles\<name>\` |
-| `ampify export <file.zip>` | Exports the settings and installed elements |
+| `ampify profile save\|use\|delete <name>` | Saves, loads (after a backup) or deletes a copy of `settings.txt` in `profiles\<name>\`. The remote's `remote.token` stays out of a profile, and loading one keeps the current token |
+| `ampify export <file.zip>` | Exports the settings and installed elements, without `remote.token` (an import keeps the current one) |
 | `ampify import <file.zip> [--dry-run] [--yes]` | Imports an export after validating every element. Writes nothing if one fails |
 
 `ampify report` puts `system.txt` (versions, language, displays), `doctor.txt`, the settings, the logs and, on Windows,
@@ -165,7 +165,7 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `expose_api` | `0`: no JavaScript element starts | `1` |
 | `discord.enabled` | `1`: elements with `ipc.discord` can show a Discord presence | `0` |
 | `tray.enabled` | `1`: an Ampify icon in the notification area | `0` |
-| `remote.enabled`, `remote.port`, `remote.token` | The local remote on `127.0.0.1` ([API](extensions/api.md#57-local-services-preview)) | `0`, `8974`, created when turned on |
+| `remote.enabled`, `remote.port`, `remote.token` | The local remote on `127.0.0.1` ([API](extensions/api.md#57-local-services-preview)); the port goes from 1024 to 65535 | `0`, `8974`, created when turned on |
 | `midi.enabled`, `midi.device`, `midi.map` | A MIDI controller, e.g. `note:60=next;note:62=previous;cc:7=gain` | `0`, `0`, empty |
 | `audio.maxGainDb` | Highest gain an extension may add, 0 to 12 dB | `6` |
 | `player.apple` | `0`: read the player from Windows' media session only | `1` |

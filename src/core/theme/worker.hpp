@@ -7,6 +7,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "../settings.hpp"
 #include "scheme_choice.hpp"
@@ -26,6 +27,34 @@ namespace ampify::theme {
 //                             for theme.schedule
 //
 // Ampify folder layout read here: themes\<id>\, snippets\<id>\, resource-keys.txt, sidebar.json, home.json.
+
+struct ThemeSettings;
+
+// Everything a load reads, gathered once per pass. The worker loads again exactly when it differs from the last one
+// (a new generation), so an input added here can never be forgotten by the comparison.
+struct LoadInputs {
+    struct Snippet {
+        std::string id;
+        std::map<std::string, std::string> values;  // snippets.<id>.<key>
+        bool operator==(const Snippet&) const = default;
+    };
+
+    std::string active;  // the theme's folder name, empty for none
+    std::string scheme;  // as ChooseScheme names it
+    ThemeParts parts;
+    std::optional<Argb> accent;
+    GlassLevel glass = GlassLevel::Full;
+    std::map<std::string, std::string> values;  // themes.<active>.<key>
+    std::vector<Snippet> snippets;              // the enabled ones, in id order
+    std::map<std::string, std::string> artwork;  // the artwork's colours, only when a user.css names them
+    std::optional<std::string> sidebar;          // sidebar.json and home.json, as text
+    std::optional<std::string> home;
+    std::optional<std::set<std::string>> allowedKeys;  // resource-keys.txt
+    std::vector<std::string> signatures;  // with theme.live_reload, one FolderSignature per folder read
+
+    bool operator==(const LoadInputs&) const = default;
+};
+
 class ThemeWorker {
 public:
     explicit ThemeWorker(std::filesystem::path kit);
@@ -36,24 +65,26 @@ public:
     // when they change; the others are not.
     void SetArtwork(std::map<std::string, std::string> variables) { m_artwork = std::move(variables); }
 
-    // The request for this pass. Its generation changes when the active theme, the chosen scheme (by setting, by
-    // schedule or by Windows mode), the parts, the active theme's settings (themes.<id>.<key>), the enabled snippets,
-    // sidebar.json, home.json or resource-keys.txt change, and with theme.live_reload when a file of the theme or of an
-    // enabled snippet changes.
+    // The request for this pass. Its generation changes when its LoadInputs do: the active theme, the chosen scheme (by
+    // setting, by schedule or by Windows mode), the parts, the accent, the glass level, the theme's and the enabled
+    // snippets' settings, the artwork's colours a user.css names, sidebar.json, home.json, resource-keys.txt, and with
+    // theme.live_reload any file of the theme or of an enabled snippet.
     SessionRequest Tick(const Settings& settings, int minute);
 
 private:
+    LoadInputs ReadInputs(const Settings& settings, const ThemeSettings& wanted, int minute);
+    SessionRequest Load(const LoadInputs& inputs) const;
+
     std::filesystem::path m_kit;
     bool m_systemDark = false;
     std::map<std::string, std::string> m_artwork;
-    std::string m_lastKey;
-    bool m_hasKey = false;
+    std::optional<LoadInputs> m_loaded;
     SessionRequest m_request;
     SchemeChoice m_scheme;
 };
 
-// The resource keys that resources.xaml may define, one per line in resource-keys.txt (lines starting with # are
+// The resource keys that resources.xaml may define, one per line of resource-keys.txt (lines starting with # are
 // comments). Nothing when the file is missing: the check is then skipped and the problems say so.
-std::optional<std::set<std::string>> ReadAllowedKeys(const std::filesystem::path& file);
+std::optional<std::set<std::string>> ParseAllowedKeys(const std::optional<std::string>& text);
 
 }  // namespace ampify::theme

@@ -23,7 +23,8 @@ Identity CurrentIdentity();
 // playing (the lines of the player and of extensions, and the quoted text after words such as "track" or "album").
 std::string Anonymize(std::string_view text, const Identity& who);
 
-// settings.txt with the values of secret-looking keys (token, password, session, key...) replaced by <hidden>.
+// settings.txt with the values of the catalogue's secret keys and of secret-looking ones (an element's token, password,
+// session, key...) replaced by <hidden>.
 std::string HideSecretSettings(std::string_view settings);
 
 }  // namespace ampify::cli

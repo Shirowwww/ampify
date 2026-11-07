@@ -5,29 +5,27 @@
 
 namespace ampify::theme {
 
-namespace {
-
-bool HasThemeFile(const std::filesystem::path& folder) {
+bool HoldsAnyOf(const std::filesystem::path& folder, std::span<const char* const> names) {
     std::error_code error;
-    for (const char* name : {"colors.ini", "color.ini", "resources.xaml", "user.css"}) {
-        if (std::filesystem::is_regular_file(folder / name, error)) return true;
-    }
-    return false;
+    return std::any_of(names.begin(), names.end(),
+                       [&](const char* name) { return std::filesystem::is_regular_file(folder / name, error); });
 }
 
-}  // namespace
-
-std::vector<std::string> ListThemeFolders(const std::filesystem::path& root) {
+std::vector<std::string> ListFoldersHolding(const std::filesystem::path& root, std::span<const char* const> names) {
     std::vector<std::string> folders;
     std::error_code error;
     if (!std::filesystem::is_directory(root, error)) return folders;
 
     for (const auto& entry : std::filesystem::directory_iterator(root, error)) {
-        if (!entry.is_directory(error) || !HasThemeFile(entry.path())) continue;
+        if (!entry.is_directory(error) || !HoldsAnyOf(entry.path(), names)) continue;
         folders.push_back(entry.path().filename().string());
     }
     std::sort(folders.begin(), folders.end());
     return folders;
+}
+
+std::vector<std::string> ListThemeFolders(const std::filesystem::path& root) {
+    return ListFoldersHolding(root, kThemeFiles);
 }
 
 std::string FolderSignature(const std::filesystem::path& folder) {
