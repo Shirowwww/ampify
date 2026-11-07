@@ -1662,6 +1662,28 @@ test("turning a snippet on or off says so without moving the cards under the poi
   assert.equal(placeOf(page, "Compact"), before);
 });
 
+test("the catalog's warning after a first snippet turned on takes the status line, not a line above the cards", async () => {
+  const { world, page } = fakeMarketplace({ catalog: [marketEntry("compact", "snippet")],
+                                            installed: [marketCopy("compact", "snippet")] });
+  await settle();
+  buttonIn(page.tree, "Snippets").onClick();
+  const before = placeOf(page, "Compact");
+  const above = page.tree.children.slice(0, before).map((child) => child.type);
+  // The reading after the action finds no catalog: only the installed copy is left to show.
+  Object.assign(world.state, { catalogOk: false, catalog: [] });
+  world.state.installed[0].description = "Test compact.";
+  buttonIn(cardOf(page, "Compact"), "Turn on").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["snippet enable compact"]);
+  assert.equal(placeOf(page, "Compact"), before, "the card has not moved");
+  assert.deepEqual(page.tree.children.slice(0, before).map((child) => child.type), above, "nothing came above the grid");
+  buttonIn(page.tree, "Refresh").onClick();
+  await settle();
+  assert.equal(placeOf(page, "Compact"), before);
+  const status = page.tree.children[1];  // under the tabs, the reserved status line
+  assert.deepEqual(textsOf(status), ["The catalog cannot be read right now: these are the installed copies."]);
+});
+
 test("an action on a detail page leaves its buttons where they were", async () => {
   const { page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension")],
                                      installed: [marketCopy("demo", "extension")] });

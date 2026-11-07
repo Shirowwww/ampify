@@ -1335,6 +1335,7 @@ function Marketplace() {
   const shownPage = Math.min(page, pages - 1);
   const visible = shown.slice(shownPage * PAGE_SIZE, (shownPage + 1) * PAGE_SIZE);
   const catalogTab = current !== "installed";
+  const offline = catalogTab && !state.catalogOk && visible.length > 0;
 
   const empty = search.trim()
     ? h(Empty, { key: "empty", title: t("search.none", { search: search.trim() }), text: t("search.where"),
@@ -1354,13 +1355,11 @@ function Marketplace() {
       h(Button, { key: "refresh", label: t("action.refresh"), disabled: busy, onClick: reread }),
       h(Button, { key: "settings", label: t("action.settings"), icon: SETTINGS_GLYPH, tooltip: t("action.openSettings"),
                   onClick: openSettings })),
-    // What an action said stands in for the tab's introduction, on the same reserved lines.
-    h(StatusLine, { key: "status", text: message || (catalogTab ? t("intro." + current) : "") }),
+    // What an action said, or the catalog's warning, stands in for the tab's introduction on the same reserved lines:
+    // a line of its own above the grid moved every card when it came, under the pointer that had just clicked.
+    h(StatusLine, { key: "status", text: message || (offline ? t("catalog.offline") : catalogTab ? t("intro." + current) : "") }),
     current === "theme" || current === "installed"
       ? h(ThemeBar, { key: "theme", items, activeTheme, scheme: state.scheme, busy, act })
-      : null,
-    catalogTab && !state.catalogOk && visible.length
-      ? h(Text, { key: "offline", variant: "caption" }, t("catalog.offline"))
       : null,
     visible.length
       ? h(Grid, { key: "grid", items: visible,
