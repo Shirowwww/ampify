@@ -421,10 +421,10 @@ std::optional<Keyframes> ParseKeyframes(std::string_view name, size_t open, size
     return block;
 }
 
-// The blocks open around the place being read: one @media and one @setting at most, in the order they opened.
+// The blocks open around the place being read: one @media at most and any @setting, in the order they opened.
 struct Scope {
     std::optional<MediaQuery> media;
-    std::optional<SettingCondition> setting;
+    std::vector<SettingCondition> settings;  // innermost last
     std::vector<bool> blocks;  // true for a @setting block, false for a @media block
 };
 
@@ -434,10 +434,17 @@ bool IsAtKeyword(const std::string& lowered, std::string_view keyword) {
            (lowered.size() == keyword.size() || IsSpace(lowered[keyword.size()]) || lowered[keyword.size()] == '(');
 }
 
-// The condition of `@setting <key>` or `@setting <key> = <value>`, the value quoted or not.
+// The condition of `@setting <key>`, `@setting <key> = <value>` or `@setting <key> != <value>`, the value quoted or not.
 std::optional<SettingCondition> ParseSettingCondition(std::string_view text, std::string& problem) {
-    size_t equals = text.find('=');
     SettingCondition condition;
+    size_t equals = text.find("!=");
+    size_t operatorSize = 2;
+    if (equals != std::string_view::npos) {
+        condition.negated = true;
+    } else {
+        equals = text.find('=');
+        operatorSize = 1;
+    }
     condition.key = std::string(TrimSpace(text.substr(0, equals)));
     bool keyOk = !condition.key.empty() && condition.key.size() <= 32 && IsNameChar(condition.key[0]) &&
                  condition.key[0] != '-' && condition.key[0] != '_';
@@ -447,32 +454,29 @@ std::optional<SettingCondition> ParseSettingCondition(std::string_view text, std
         return std::nullopt;
     }
     if (equals == std::string_view::npos) return condition;
-    std::string_view value = TrimSpace(text.substr(equals + 1));
+    std::string_view value = TrimSpace(text.substr(equals + operatorSize));
     if (value.size() >= 2 && (value.front() == '"' || value.front() == '\'') && value.back() == value.front()) {
         value = value.substr(1, value.size() - 2);
     }
     if (value.empty()) {
-        problem = "@setting " + condition.key + " = needs a value";
+        problem = "@setting " + condition.key + (condition.negated ? " != " : " = ") + "needs a value";
         return std::nullopt;
     }
     condition.value = std::string(value);
     return condition;
 }
 
-// Opens a @setting block: its rules then carry the condition, until its brace closes. Returns where reading goes on.
+// Opens a @setting block: its rules then carry the condition, with those of the blocks around it, until its brace
+// closes. Returns where reading goes on.
 size_t OpenSettingBlock(std::string_view head, size_t open, size_t close, const std::string& where, Scope& scope,
                         std::vector<std::string>& problems) {
-    if (scope.setting) {
-        problems.push_back(where + "@setting inside @setting is not supported, ignored");
-        return close + 1;
-    }
     std::string problem;
     std::optional<SettingCondition> condition = ParseSettingCondition(head.substr(8), problem);
     if (!condition) {
         problems.push_back(where + problem + ", ignored");
         return close + 1;
     }
-    scope.setting = std::move(condition);
+    scope.settings.push_back(std::move(*condition));
     scope.blocks.push_back(true);
     return open + 1;
 }
@@ -492,7 +496,7 @@ size_t ReadAtRule(std::string_view head, size_t open, int line, const std::strin
         if (!lowered.starts_with(keyword) || (lowered.size() > keyword.size() && !IsSpace(lowered[keyword.size()]))) {
             continue;
         }
-        if (scope.media || scope.setting) {
+        if (scope.media || !scope.settings.empty()) {
             problems.push_back(where + "@keyframes inside @" + (scope.media ? "media" : "setting") +
                                " is not supported, ignored");
         } else if (std::optional<Keyframes> block =
@@ -662,7 +666,7 @@ void ReadStatement(std::string_view statement, int line, const Scope& scope, Sty
     for (Rule& rule : imported.rules) {
         rule.origin = "ampify:" + *layout;
         if (scope.media && !rule.media) rule.media = scope.media;
-        if (scope.setting && !rule.setting) rule.setting = scope.setting;
+        rule.settings.insert(rule.settings.begin(), scope.settings.begin(), scope.settings.end());
         sheet.rules.push_back(std::move(rule));
     }
     for (const std::string& problem : imported.problems) sheet.problems.push_back("ampify:" + *layout + " " + problem);
@@ -682,7 +686,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
             continue;
         }
         if (!scope.blocks.empty() && clean[pos] == '}') {  // the end of the innermost @media or @setting block
-            if (scope.blocks.back()) scope.setting.reset();
+            if (scope.blocks.back()) scope.settings.pop_back();
             else scope.media.reset();
             scope.blocks.pop_back();
             pos++;
@@ -722,7 +726,7 @@ Stylesheet ParseStylesheet(std::string_view css) {
         Rule rule;
         rule.line = line;
         rule.media = scope.media;
-        rule.setting = scope.setting;
+        rule.settings = scope.settings;
         if (ToLowerAscii(head) == ":root") {
             if (scope.media) {
                 sheet.problems.push_back("line " + std::to_string(line) + ": variables inside @media are not supported, "

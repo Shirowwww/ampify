@@ -40,6 +40,8 @@
 #include "../core/theme/tree.hpp"
 #include "artwork_fade.hpp"
 #include "audio_bars.hpp"
+#include "gradient_fit.hpp"
+#include "pane_corners.hpp"
 #include "theme_animations.hpp"
 
 namespace ampify::win {
@@ -386,6 +388,8 @@ private:
     };
     std::map<std::pair<theme::NodeId, theme::PseudoElement>, DecorImage> m_decors;
     AudioBars m_bars;  // the decors made by `content: bars(n)`, moved with the music
+    PaneCorners m_paneCorners;  // what a rounded SplitView pane holds, clipped to its corners
+    GradientFit m_gradientFit;  // the theme's gradients, fitted to the shape of what they paint
 };
 
 }  // namespace ampify::win

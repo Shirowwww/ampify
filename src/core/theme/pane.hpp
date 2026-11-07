@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -23,5 +24,19 @@ bool TemplatePlacesPane(std::string_view property);
 // text, "left,top,right,bottom"), so the pane fits its column instead of being cut by its margin. Never below 0.
 // Nothing when either cannot be read.
 std::optional<double> FittedPaneWidth(std::string_view openPaneLength, std::string_view margin);
+
+// WinUI rounds a panel's background and border, never what it holds: a child that paints into a rounded corner
+// squares it again. A rounded pane clips its content to the corners inside its border (CSS's inner radius).
+struct CornerEllipse {
+    double x = 0;
+    double y = 0;
+};
+
+// Top left, top right, bottom right, bottom left, from the corner radii in that order and the border's left, top,
+// right and bottom: each corner less the side border it meets across and the top or bottom one down, never below 0.
+std::array<CornerEllipse, 4> InnerCorners(const std::array<double, 4>& radius, const std::array<double, 4>& border);
+
+// True when one of the corners is rounded at all.
+bool Rounded(const std::array<CornerEllipse, 4>& corners);
 
 }  // namespace ampify::theme

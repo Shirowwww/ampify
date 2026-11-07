@@ -46,6 +46,7 @@ read on Apple Music 1.1792.
 | `.sidebar-toggle` | The button that folds the sidebar |
 | `.sidebar-toggle-area` | The area of that button, at the top of the folded sidebar |
 | `.sidebar-column` | The column of the sidebar's icons and items, all that shows of the sidebar when folded |
+| `.sidebar-pin` | With `apple.sidebar = hover`: the pin button just left of "···" in the open sidebar's header, shown only while the sidebar is open. Ampify places it beside "···" at each move of that button, so a `margin` here does not hold |
 | `.back-button` | The back button |
 | `.app-name` | The "Music" title |
 | `.search-area` | The area around the search box |
@@ -73,7 +74,7 @@ read on Apple Music 1.1792.
 | `.sidebar-footer` | The bottom of the sidebar, with the account and the Ampify entry |
 | `.sidebar-footer-items` | The items of that bottom part |
 | `.sidebar-separator` | The line above it |
-| `.sidebar-entry` | An entry Ampify adds at the bottom of the sidebar: the Marketplace, an extension's page. Folded, it is a centred icon as wide as the column less its margins; open, the full row. Its icon sits on the axis of Apple's own icons, wherever a theme moves them. Ampify sets that width and the padding itself, at each pass over the sidebar, so a `width` or `padding` here does not hold. Margin, height and colours are the theme's |
+| `.sidebar-entry` | An entry Ampify adds at the bottom of the sidebar: the Marketplace, an extension's page. Folded, it is a centred icon as wide as the column less its margins; open, the full row. Its icon sits on the axis of Apple's own icons, wherever a theme moves them. Ampify sets that width and the padding itself, at each pass over the sidebar, so a `width` or `padding` here does not hold. Margin, height and colours are the theme's, but folded in a window too low for the list above them, the entries give back up to 8 of height each (through `max-height`) so that Apple's last icon shows whole |
 | `.sidebar-drag-indicator` | The line shown above or below a pinned item while it is dragged to a new place |
 | `.sidebar-footer-scroll` | The scrolling list at the bottom of the sidebar |
 | `.account-picture` | The account picture |

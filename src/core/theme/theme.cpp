@@ -428,17 +428,23 @@ void DefineFontPart(const std::string& name, const std::string& value, int line,
     theme.fonts[CanonicalFontRole(role)].*part = conversion.value->text;
 }
 
-// A rule inside @setting counts only while its condition holds. A key the theme does not declare never holds.
+// A rule inside @setting blocks counts only while all their conditions hold. A key the theme does not declare never
+// holds; every such key is reported, even when another condition already fails.
 bool SettingHolds(const Rule& rule, const std::string& file, Theme& theme) {
-    if (!rule.setting) return true;
-    auto it = theme.settings.find(rule.setting->key);
-    if (it == theme.settings.end()) {
-        theme.problems.push_back(AtLine(file, rule.line) + ": @setting " + rule.setting->key +
-                                 ": the theme's manifest declares no such setting, ignored");
-        return false;
+    bool holds = true;
+    for (const SettingCondition& condition : rule.settings) {
+        auto it = theme.settings.find(condition.key);
+        if (it == theme.settings.end()) {
+            theme.problems.push_back(AtLine(file, rule.line) + ": @setting " + condition.key +
+                                     ": the theme's manifest declares no such setting, ignored");
+            holds = false;
+            continue;
+        }
+        bool equal = condition.value ? ToLowerAscii(it->second) == ToLowerAscii(*condition.value)
+                                     : it->second == "true";
+        holds = holds && equal != condition.negated;
     }
-    if (!rule.setting->value) return it->second == "true";
-    return ToLowerAscii(it->second) == ToLowerAscii(*rule.setting->value);
+    return holds;
 }
 
 // The settings manifest.json declares, with their value now: variables setting-<key>, and the @setting conditions.

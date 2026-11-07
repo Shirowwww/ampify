@@ -209,8 +209,7 @@ struct WindowContext {
     // Strong: nothing else holds a Popup that is outside the tree, and its panels went with it (mounted again on every
     // refresh, never on screen). Released on the interface thread (ReleaseXaml, DropContext).
     primitives::Popup panelPopup{nullptr};
-    primitives::Popup pagePopup{nullptr};  // app pages, over the content area
-    controls::Grid pageHost{nullptr};      // strong, like the panels: see MountedSurface
+    controls::Grid pageHost{nullptr};  // app pages, beside Apple's frame; strong, like the panels: see MountedSurface
     controls::Border pageSlot{nullptr};
     controls::ScrollViewer pageScroll{nullptr};  // shared by the pages: back to the top for each new one
     controls::TextBlock pageTitle{nullptr};
@@ -221,6 +220,7 @@ struct WindowContext {
     winrt::event_token coveredNavigated{};
     controls::NavigationView coveredSidebar{nullptr};  // its item already selected does not navigate: watched too
     winrt::event_token coveredInvoked{};
+    IInspectable coveredSelection{nullptr};  // Apple's sidebar item lit before the app page showed
     media::Brush pageBackground{nullptr};  // the host's own, when Apple Music's page cannot be hidden
     // The fullscreen view: a Popup of the window over all of its content, strong like the other hosts.
     primitives::Popup fullscreenPopup{nullptr};
@@ -248,6 +248,11 @@ struct WindowContext {
     winrt::weak_ref<xaml::FrameworkElement> sidebarAppleIcon;
     double sidebarIconShift = 0;
     double sidebarOpenIconShift = 0;
+    // Apple's scrolling list of sidebar items, watched while folded, and the height each entry gives back to it
+    // (FitFoldedList).
+    winrt::weak_ref<controls::ScrollViewer> sidebarScroll;
+    winrt::event_token sidebarScrollSize{};
+    double sidebarEntryCut = 0;
     std::set<std::string> closedPanels;
     std::optional<std::pair<std::string, std::string>> route;
     bool pageClosed = false;
@@ -370,6 +375,7 @@ xaml::FrameworkElement ThemeSettingsSection(UiService::Shared& shared, const uir
 // ui_service_panels.cpp
 void QuietScrollBar(const controls::ScrollViewer& scroll);
 ContentArea FindContentArea(const WindowContext& context, double windowHeight);
+std::optional<winrt::Windows::Foundation::Rect> NamedBounds(const WindowContext& context, std::string_view name);
 void OpenOverlay(WindowContext& context, const primitives::Popup& popup);
 void ReleasePages(WindowContext& context);
 void PlacePanelPopup(WindowContext& context, const xaml::XamlRoot& root);
@@ -382,7 +388,9 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
                 const xaml::DependencyObject& content, const Surface& surface);
 
 // ui_service_pages.cpp
-void UncoverApplePage(WindowContext& context) noexcept;
+// What the sidebar's selection does when the app page stops covering Apple's.
+enum class Selection { GiveBack, Drop, Keep };
+void UncoverApplePage(WindowContext& context, Selection selection = Selection::GiveBack) noexcept;
 UiEvent FullscreenClosed(const std::string& elementId, const std::string& session);
 void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                    const xaml::DependencyObject& content);

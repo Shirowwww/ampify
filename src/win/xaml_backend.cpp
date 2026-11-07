@@ -517,6 +517,9 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         node.fullType = Utf8(winrt::get_class_name(item.object));
         node.type = ShortName(node.fullType);
         if (auto element = item.object.try_as<xaml::FrameworkElement>()) node.name = Utf8(element.Name());
+        // Ampify's app pages sit beside Apple's frame but stay out of themes, as when they lived in a popup: the kit
+        // renderer owns their values.
+        if (node.name == "AMPIFY_PageHost") continue;
         if (auto text = item.object.try_as<controls::TextBlock>()) node.icon = IsIconText(text.Text());
         if (auto panel = item.object.try_as<controls::Panel>()) node.panel = TakesDecor(panel);
         node.parent = item.parent;
@@ -598,6 +601,8 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     std::erase_if(m_watched, [](const auto& entry) { return !entry.second.get(); });
     std::erase_if(m_touched, [](const auto& entry) { return !entry.second.get(); });
     DropDeadHolds();
+    m_paneCorners.Sweep();
+    m_gradientFit.Sweep();
     std::erase_if(m_decors, [this](const auto& entry) {
         if (entry.second.panel.get()) return false;
         m_bars.Drop(entry.second.image);

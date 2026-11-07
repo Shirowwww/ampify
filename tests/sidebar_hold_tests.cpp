@@ -56,9 +56,40 @@ TEST_CASE(SidebarHold_ForgetStartsOver) {
     CHECK(!ampify::HoldsForTyping(true, true, tracker.SinceTyped(start)));
 }
 
+TEST_CASE(SidebarHold_PinButtonOffersToPinWhileThePaneFolds) {
+    ampify::PinFace face = ampify::PinButtonFace(false);
+    CHECK(std::wstring_view(face.glyph) == L"\xE718");
+    CHECK(std::string_view(face.label) == "sidebar.pin");
+}
+
+TEST_CASE(SidebarHold_PinButtonOffersToUnpinWhilePinned) {
+    ampify::PinFace face = ampify::PinButtonFace(true);
+    CHECK(std::wstring_view(face.glyph) == L"\xE77A");
+    CHECK(std::string_view(face.label) == "sidebar.unpin");
+}
+
+TEST_CASE(SidebarHold_HeaderButtonStandsJustLeftOfMore) {
+    CHECK(ampify::LeftOfMoreMargin(4, 32, 2) == 38);
+    CHECK(ampify::LeftOfMoreMargin(48, 32, 2) == 82);
+}
+
+TEST_CASE(SidebarHold_HeaderButtonMakesRoomForThePin) {
+    CHECK(ampify::LeftOfMoreMargin(4, 32, 2, 30) == 68);
+}
+
 TEST_CASE(SidebarHold_PinPushesThePagesOnlyWhereAppleOpensItsSidebar) {
     CHECK(ampify::PinPushesPages(1325));
     CHECK(ampify::PinPushesPages(1920));
     CHECK(!ampify::PinPushesPages(1324));
     CHECK(!ampify::PinPushesPages(1094));
+}
+
+TEST_CASE(SidebarHold_KeysHoldThePaneWhileTheFocusStaysOnIt) {
+    CHECK(ampify::HoldsForKeyboard(true, true, true));
+    CHECK(!ampify::HoldsForKeyboard(true, true, false));
+    CHECK(!ampify::HoldsForKeyboard(false, true, true));
+}
+
+TEST_CASE(SidebarHold_FocusAloneDoesNotHoldAPaneOpenedByThePointer) {
+    CHECK(!ampify::HoldsForKeyboard(true, false, true));
 }

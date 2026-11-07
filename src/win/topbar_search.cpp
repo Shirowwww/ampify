@@ -217,11 +217,32 @@ xaml::VisualState ClosedCompactState(const controls::NavigationView& navigation)
     return nullptr;
 }
 
-bool TargetsVisibilityOf(const xaml::SetterBase& base, const xaml::FrameworkElement& element) {
+bool Collapses(const xaml::Setter& setter) {
+    IInspectable value = setter.Value();
+    if (auto visibility = value.try_as<winrt::Windows::Foundation::IReference<xaml::Visibility>>()) {
+        return visibility.Value() == xaml::Visibility::Collapsed;
+    }
+    return winrt::unbox_value_or<winrt::hstring>(value, L"") == L"Collapsed";
+}
+
+// Each part is read on its own: the target of a template's setter often does not resolve (StateSetterLook), and that
+// failure must not end the search.
+StateSetterLook LookAt(const xaml::SetterBase& base, const xaml::FrameworkElement& presenter) {
+    StateSetterLook look;
     auto setter = base.try_as<xaml::Setter>();
     auto target = setter ? setter.Target() : nullptr;
     auto path = target ? target.Path() : nullptr;
-    return path && path.Path() == L"Visibility" && target.Target() == element;
+    if (!path || path.Path() != L"Visibility") return look;
+    look.visibility = true;
+    try {
+        look.targetsPresenter = target.Target() == presenter;
+    } catch (const winrt::hresult_error&) {
+    }
+    try {
+        look.collapses = Collapses(setter);
+    } catch (const winrt::hresult_error&) {
+    }
+    return look;
 }
 
 // ClosedCompact (the sidebar folded and closed) collapses the presenter, and in Apple's template also shows the
@@ -231,19 +252,24 @@ bool TargetsVisibilityOf(const xaml::SetterBase& base, const xaml::FrameworkElem
 bool TakePresenterSetter(State& state, const controls::NavigationView& navigation) {
     try {
         xaml::VisualState visual = ClosedCompactState(navigation);
-        if (!visual) return false;
-        auto setters = visual.Setters();
-        for (uint32_t i = 0; i < setters.Size(); i++) {
-            xaml::SetterBase setter = setters.GetAt(i);
-            if (!TargetsVisibilityOf(setter, state.presenter)) continue;
-            xaml::VisualStateManager::GoToState(navigation, L"NotClosedCompact", false);
-            setters.RemoveAt(i);
-            state.closedCompact = visual;
-            state.presenterSetter = setter;
-            state.presenterSetterIndex = i;
-            PutBackPaneState(navigation);
-            return true;
+        auto setters = visual ? visual.Setters() : nullptr;
+        if (!setters) return false;
+        std::vector<StateSetterLook> looks;
+        for (const xaml::SetterBase& setter : setters) looks.push_back(LookAt(setter, state.presenter));
+        std::optional<std::size_t> found = PresenterSetterIndex(looks);
+        if (!found) {
+            Note(state, "Top bar: the search field's setter was not found in Apple Music's folded sidebar state");
+            return false;
         }
+        uint32_t i = static_cast<uint32_t>(*found);
+        xaml::SetterBase setter = setters.GetAt(i);
+        xaml::VisualStateManager::GoToState(navigation, L"NotClosedCompact", false);
+        setters.RemoveAt(i);
+        state.closedCompact = visual;
+        state.presenterSetter = setter;
+        state.presenterSetterIndex = i;
+        PutBackPaneState(navigation);
+        return true;
     } catch (const winrt::hresult_error& error) {
         Note(state, "Top bar: Apple Music's folded sidebar state kept as it is (" + HresultText(error.code()) + ")");
     }

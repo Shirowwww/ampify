@@ -58,6 +58,16 @@ std::span<const PropertySpec> KnownProperties();
 // Case-insensitive lookup. Nothing for a property the engine does not know.
 const PropertySpec* FindProperty(std::string_view css);
 
+// A linear-gradient's line, relative to the element (0 to 1), as ConvertGradient writes it for a square.
+struct GradientLine {
+    double x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+};
+
+// The same gradient on an element `width` by `height`: its lines stay square to the CSS angle on the element as it
+// shows, and the line still runs from corner to corner. A relative line drawn as is skews with the element's shape.
+// The square's line for a size of 0 or less.
+GradientLine FitGradient(const GradientLine& square, double width, double height);
+
 // For a CSS property the engine does not know, what a theme writes instead ("use backdrop: acrylic(tint, opacity)"),
 // or why nothing can stand in for it. Empty when there is no advice.
 std::string_view PropertyHint(std::string_view css);

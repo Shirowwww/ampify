@@ -589,6 +589,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         if (auto element = object.try_as<xaml::FrameworkElement>(); element && (property == "Width" || property == "Height")) {
             FollowArtworkCap(element);
         }
+        if (property == "CornerRadius" || property == "BorderThickness") m_paneCorners.Follow(id, object);
         Forget(id, property);
         UpdateStates(id, object, property, nullptr);  // or its states would keep the theme's colour under the pointer
         return true;
@@ -661,6 +662,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
             else if (auto stack = object.try_as<controls::StackPanel>()) { stack.BorderBrush(*target); written = true; }
         }
         if (!written) return false;
+        m_gradientFit.Follow(id, std::string(property), object, *target, made);
         if (made) {
             Remember(id, property, value, *target);
         } else {
@@ -723,7 +725,11 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
                 return true;
             }
             if (auto border = object.try_as<controls::Border>()) { border.BorderThickness(thickness); return true; }
-            if (auto grid = object.try_as<controls::Grid>()) { grid.BorderThickness(thickness); return true; }
+            if (auto grid = object.try_as<controls::Grid>()) {
+                grid.BorderThickness(thickness);
+                m_paneCorners.Follow(id, grid);
+                return true;
+            }
             if (auto stack = object.try_as<controls::StackPanel>()) { stack.BorderThickness(thickness); return true; }
         }
         return false;
@@ -736,7 +742,11 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         xaml::CornerRadius radius{corners[1], corners[2], corners[3], corners[0]};  // TopLeft, TopRight, BottomRight, BottomLeft
         if (auto control = object.try_as<controls::Control>()) { control.CornerRadius(radius); return true; }
         if (auto border = object.try_as<controls::Border>()) { border.CornerRadius(radius); return true; }
-        if (auto grid = object.try_as<controls::Grid>()) { grid.CornerRadius(radius); return true; }
+        if (auto grid = object.try_as<controls::Grid>()) {
+            grid.CornerRadius(radius);
+            m_paneCorners.Follow(id, grid);  // WinUI rounds the pane, not what it holds
+            return true;
+        }
         if (auto stack = object.try_as<controls::StackPanel>()) { stack.CornerRadius(radius); return true; }
         if (auto rectangle = object.try_as<xaml::Shapes::Rectangle>()) {  // one radius for all four: the top-left one
             rectangle.RadiusX(radius.TopLeft);

@@ -4,6 +4,7 @@
 
 #include "xaml_host.hpp"
 
+#include "../core/i18n.hpp"
 #include "../core/journal.hpp"
 #include "../core/sidebar_groups.hpp"
 #include "../core/sidebar_hold.hpp"
@@ -16,17 +17,21 @@
 #include <winrt/Microsoft.UI.Input.h>
 #include <winrt/Microsoft.UI.Windowing.h>
 #include <winrt/Microsoft.UI.Xaml.h>
+#include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
+#include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
 #include <winrt/Microsoft.UI.Xaml.Shapes.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -49,8 +54,12 @@ using Group = controls::NavigationViewItem;
 
 constexpr int kSearchDepth = 32;  // the NavigationView and its pane sit some twenty levels under the window's content
 constexpr auto kWatchEvery = std::chrono::milliseconds(200);  // the real cursor, while the pane is open
-constexpr wchar_t kPinGlyph[] = L"\xE718";                    // Pin in Segoe Fluent Icons (Unpin is E77A)
-constexpr int kTurnMs = 180;                                  // the hamburger and the pin turn in this time
+constexpr int kTurnMs = 180;                                  // the pin's glyph turns in this time
+constexpr wchar_t kPinName[] = L"AMPIFY_SidebarPin";
+constexpr double kPinSize = 28;         // the height of Apple's "···" beside it, square
+constexpr double kPinGlyphSize = 16;    // the size of Apple's own icons
+constexpr double kMoreWidth = 32;       // Apple's "···" before its first layout
+constexpr double kHeaderSpacing = 2;    // as between "···" and Ampify's entry in the header
 
 std::atomic<bool> g_enabled{false};
 std::atomic<bool> g_folded{false};  // Take done, Release not yet, and not pinned open
@@ -59,25 +68,28 @@ std::function<void()> g_changed;    // asks the theme for a pass now: the themes
 struct State {
     winrt::weak_ref<controls::NavigationView> navigation;
     winrt::weak_ref<xaml::FrameworkElement> pane;
-    winrt::weak_ref<controls::Button> toggle;  // Apple's hamburger, outside the pane: a click pins the pane
+    winrt::weak_ref<controls::Button> toggle;  // Apple's hamburger: its own toggle, and while pinned it unpins
     HWND window = nullptr;
     PaneMode apple = PaneMode::Auto;  // Apple's own mode, put back when turned off
     IInspectable entered{nullptr};    // the boxed handlers, kept to take them off again
     IInspectable exited{nullptr};
+    IInspectable keyed{nullptr};
     winrt::event_token clickToken{};  // the hamburger's Click, taken off by this token in Release
     dispatching::DispatcherQueueTimer watch{nullptr};
     bool told = false;
-    bool pinned = false;  // session only: a click on the hamburger keeps the pane open, like Apple's own mode
+    bool pinned = false;  // session only: the pin button keeps the pane open, like Apple's own mode
     ampify::TypingTracker tracker;
     // What Ampify changes in Apple's pane while it holds it; each is put back as Apple had it on Release.
-    controls::FontIcon pinGlyph{nullptr};  // ours: the pin, shown while pinned
+    controls::Button pin{nullptr};  // ours: the pin button in the open pane's header, held strong
+    controls::FontIcon pinGlyph{nullptr};
     media::CompositeTransform pinTurn{nullptr};
-    controls::Grid glyphGrid{nullptr};  // the grid the pin was added to
-    controls::AnimatedIcon appleGlyph{nullptr};  // Apple's hamburger icon
-    xaml::Visibility appleVisibility = xaml::Visibility::Visible;
-    media::Transform appleTransform{nullptr};
-    winrt::Windows::Foundation::Point appleOrigin{};
-    media::CompositeTransform appleTurn{nullptr};
+    controls::Grid pinHeader{nullptr};  // Apple's header grid the pin was added to
+    winrt::weak_ref<xaml::FrameworkElement> more;  // Apple's "···", which the pin stands beside
+    int64_t moreToken = 0;  // its Margin callback, taken off by this token in Release
+    winrt::event_token moreSizeToken{};  // its SizeChanged, taken off by this token in Release
+    bool keysUsed = false;  // a key opened the pane or went down in it: it stays while the focus is on it
+    controls::Grid fillGrid{nullptr};  // Apple's pane grid, and ours in it: the fill of the pane open over the pages
+    controls::Border fill{nullptr};
     animation::Storyboard glyphStory{nullptr};
     shapes::Rectangle dismiss{nullptr};  // the sidebar's SplitView light-dismiss layer
     IInspectable dismissHit{nullptr};    // its local values before Ampify, or the unset value: put back as they were
@@ -111,20 +123,30 @@ T FindFirst(const xaml::DependencyObject& root, std::wstring_view name, int dept
     return nullptr;
 }
 
+// The real cursor in `element`'s own coordinates, while it is over Apple Music's window.
+std::optional<winrt::Windows::Foundation::Point> CursorIn(const State& state, const xaml::UIElement& element) {
+    POINT cursor{};
+    if (!state.window || !GetCursorPos(&cursor)) return std::nullopt;
+    if (GetAncestor(WindowFromPoint(cursor), GA_ROOT) != state.window || !ScreenToClient(state.window, &cursor)) {
+        return std::nullopt;
+    }
+    xaml::XamlRoot root = element.XamlRoot();
+    double scale = root ? root.RasterizationScale() : 1.0;
+    winrt::Windows::Foundation::Point origin = element.TransformToVisual(nullptr).TransformPoint({0, 0});
+    return winrt::Windows::Foundation::Point{static_cast<float>(cursor.x / scale - origin.X),
+                                             static_cast<float>(cursor.y / scale - origin.Y)};
+}
+
 // The width the pane shows: the open sidebar, or the folded column (its layout box stays 290 px wide).
 bool CursorOverPane(const State& state, const controls::NavigationView& navigation, const xaml::FrameworkElement& pane) {
-    POINT cursor{};
-    if (!state.window || !GetCursorPos(&cursor)) return false;
-    if (GetAncestor(WindowFromPoint(cursor), GA_ROOT) != state.window || !ScreenToClient(state.window, &cursor)) {
-        return false;
-    }
-    xaml::XamlRoot root = pane.XamlRoot();
-    double scale = root ? root.RasterizationScale() : 1.0;
-    winrt::Windows::Foundation::Point origin = pane.TransformToVisual(nullptr).TransformPoint({0, 0});
-    double x = cursor.x / scale - origin.X;
-    double y = cursor.y / scale - origin.Y;
+    auto at = CursorIn(state, pane);
     double width = navigation.IsPaneOpen() ? navigation.OpenPaneLength() : navigation.CompactPaneLength();
-    return x >= 0 && y >= 0 && x < width && y < pane.ActualHeight();
+    return at && at->X >= 0 && at->Y >= 0 && at->X < width && at->Y < pane.ActualHeight();
+}
+
+bool CursorOver(const State& state, const xaml::FrameworkElement& element) {
+    auto at = CursorIn(state, element);
+    return at && at->X >= 0 && at->Y >= 0 && at->X < element.ActualWidth() && at->Y < element.ActualHeight();
 }
 
 // A menu or flyout (a playlist's menu, the account's) is a light-dismiss popup; tooltips and Ampify's panels are not.
@@ -161,6 +183,14 @@ bool TypingHolds(State& state, const xaml::FrameworkElement& pane) {
     return HoldsForTyping(true, WindowInFront(state), state.tracker.SinceTyped(Clock::now()));
 }
 
+// The keyboard uses the pane (see HoldsForKeyboard): opened from the hamburger with Enter, the pointer is elsewhere.
+bool KeyboardHolds(const State& state, const xaml::FrameworkElement& pane) {
+    if (!state.keysUsed || !pane.XamlRoot()) return false;
+    auto focused = xaml::Input::FocusManager::GetFocusedElement(pane.XamlRoot()).try_as<xaml::DependencyObject>();
+    const bool onToggle = focused && state.toggle.get() == focused;
+    return ampify::HoldsForKeyboard(WindowInFront(state), state.keysUsed, FocusInside(pane) || onToggle);
+}
+
 // The keyboard leaves the pane for the hamburger, which shows in both modes. Not the NavigationView itself: it hands
 // focus to its search field, and Apple opens its search page as soon as that field gets the focus.
 void ParkFocus(const State& state, const xaml::FrameworkElement& pane) {
@@ -183,7 +213,7 @@ bool CloseIfLeft(State& state) {
     bool cursor = CursorOverPane(state, navigation, pane);
     bool typing = TypingHolds(state, pane);
     bool menu = HoldsForMenu(WindowInFront(state), MenuOpen(pane));
-    if (cursor || typing || menu) return true;
+    if (cursor || typing || menu || KeyboardHolds(state, pane)) return true;
     ClosePane(state, navigation, pane);
     return false;
 }
@@ -211,7 +241,7 @@ bool AnimationsOn() {
     }
 }
 
-// A quarter turn into place while the element fades in: the pin and Apple's hamburger both use it.
+// A quarter turn into place while the element fades in: the pin's glyph, as it changes.
 animation::Storyboard EaseTurn(const media::CompositeTransform& turn, const xaml::UIElement& element) {
     animation::Storyboard story;
     animation::CubicEase spinEase;
@@ -239,69 +269,106 @@ animation::Storyboard EaseTurn(const media::CompositeTransform& turn, const xaml
     return story;
 }
 
-// Our pin, in the cell of Apple's hamburger glyph. Apple's icon stays in the tree; its own turn is put back on Release.
-void AddPinGlyph(State& state, const controls::Button& toggle) {
-    auto apple = FindFirst<controls::AnimatedIcon>(toggle, L"Icon", 0);
-    xaml::DependencyObject border = apple ? media::VisualTreeHelper::GetParent(apple) : nullptr;
-    auto grid = border ? media::VisualTreeHelper::GetParent(border).try_as<controls::Grid>() : nullptr;
-    if (!apple || !grid) return;
-    controls::FontIcon pin;
-    pin.FontFamily(xaml::Media::FontFamily(L"Segoe Fluent Icons, Segoe MDL2 Assets"));
-    pin.Glyph(kPinGlyph);
-    pin.FontSize(16);
-    pin.Foreground(toggle.Foreground());
-    pin.HorizontalAlignment(xaml::HorizontalAlignment::Center);
-    pin.VerticalAlignment(xaml::VerticalAlignment::Center);
-    pin.Visibility(xaml::Visibility::Collapsed);
-    media::CompositeTransform pinTurn;
-    pin.RenderTransformOrigin(winrt::Windows::Foundation::Point{0.5f, 0.5f});
-    pin.RenderTransform(pinTurn);
-    grid.Children().Append(pin);
-    state.pinGlyph = pin;
-    state.pinTurn = pinTurn;
-    state.glyphGrid = grid;
-    state.appleGlyph = apple;
-    state.appleVisibility = apple.Visibility();
-    state.appleTransform = apple.RenderTransform();
-    state.appleOrigin = apple.RenderTransformOrigin();
-    state.appleTurn = media::CompositeTransform();
-    apple.RenderTransformOrigin(winrt::Windows::Foundation::Point{0.5f, 0.5f});
-    apple.RenderTransform(state.appleTurn);
+// Apple's "···" in its header grid (MenuButton#MoreButton), which the pin stands beside.
+xaml::FrameworkElement FindMore(const controls::Grid& header) {
+    for (const xaml::UIElement& child : header.Children()) {
+        auto element = child.try_as<xaml::FrameworkElement>();
+        if (element && element.Name() == L"MoreButton") return element;
+    }
+    return nullptr;
 }
 
-// The pin while pinned, Apple's glyph while folded. A change turns once, unless the system animations are off.
-void ShowGlyph(State& state, bool animate) {
-    if (!state.pinGlyph || !state.appleGlyph) return;
-    state.appleGlyph.Visibility(state.pinned ? xaml::Visibility::Collapsed : state.appleVisibility);
-    state.pinGlyph.Visibility(state.pinned ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+// Just left of "···", in its cell and level with it. Read again whenever "···" moves: a theme's @media writes its
+// margin as the pane is pinned or the window changes size.
+void PlacePin(const State& state) {
+    auto more = state.more.get();
+    if (!state.pin || !more) return;
+    xaml::Thickness margin = more.Margin();
+    double width = more.ActualWidth() > 0 ? more.ActualWidth() : kMoreWidth;
+    xaml::Thickness wanted{0, margin.Top, ampify::LeftOfMoreMargin(margin.Right, width, kHeaderSpacing), margin.Bottom};
+    if (state.pin.Margin() != wanted) state.pin.Margin(wanted);
+    controls::Grid::SetRow(state.pin, controls::Grid::GetRow(more));
+    controls::Grid::SetColumn(state.pin, controls::Grid::GetColumn(more));
+    state.pin.VerticalAlignment(more.VerticalAlignment());
+}
+
+// A square flat button with Fluent's subtle hover, the corners of Apple's "···" (4, well under half its height).
+controls::Button MakePinButton() {
+    const std::wstring brushes =
+        L"<StaticResource x:Key='ButtonBackground' ResourceKey='SubtleFillColorTransparentBrush'/>"
+        L"<StaticResource x:Key='ButtonBackgroundPointerOver' ResourceKey='SubtleFillColorSecondaryBrush'/>"
+        L"<StaticResource x:Key='ButtonBackgroundPressed' ResourceKey='SubtleFillColorTertiaryBrush'/>"
+        L"<StaticResource x:Key='ButtonBorderBrush' ResourceKey='SubtleFillColorTransparentBrush'/>"
+        L"<StaticResource x:Key='ButtonBorderBrushPointerOver' ResourceKey='SubtleFillColorTransparentBrush'/>"
+        L"<StaticResource x:Key='ButtonBorderBrushPressed' ResourceKey='SubtleFillColorTransparentBrush'/>"
+        L"<StaticResource x:Key='ButtonForegroundPointerOver' ResourceKey='TextFillColorPrimaryBrush'/>"
+        L"<StaticResource x:Key='ButtonForegroundPressed' ResourceKey='TextFillColorSecondaryBrush'/>";
+    const std::wstring text =
+        L"<Button xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' "
+        L"xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' HorizontalAlignment='Right' "
+        L"VerticalAlignment='Center' MinWidth='0' MinHeight='0' Padding='0' CornerRadius='4' BorderThickness='0'>"
+        L"<Button.Resources><ResourceDictionary><ResourceDictionary.ThemeDictionaries>"
+        L"<ResourceDictionary x:Key='Default'>" + brushes + L"</ResourceDictionary>"
+        L"<ResourceDictionary x:Key='Light'>" + brushes + L"</ResourceDictionary>"
+        L"</ResourceDictionary.ThemeDictionaries></ResourceDictionary></Button.Resources></Button>";
+    controls::Button button = xaml::Markup::XamlReader::Load(text).as<controls::Button>();
+    button.Name(kPinName);
+    button.Width(kPinSize);
+    button.Height(kPinSize);
+    return button;
+}
+
+controls::FontIcon MakePinGlyph(media::CompositeTransform& turn) {
+    controls::FontIcon glyph;
+    glyph.FontFamily(media::FontFamily(L"Segoe Fluent Icons, Segoe MDL2 Assets"));
+    glyph.FontSize(kPinGlyphSize);
+    glyph.HorizontalAlignment(xaml::HorizontalAlignment::Center);
+    glyph.VerticalAlignment(xaml::VerticalAlignment::Center);
+    turn = media::CompositeTransform();
+    glyph.RenderTransformOrigin(winrt::Windows::Foundation::Point{0.5f, 0.5f});
+    glyph.RenderTransform(turn);
+    return glyph;
+}
+
+// The pin shows only while the pane is open, with the glyph and the words of the pane's state, in the colour of "···".
+// A change of state turns the glyph once, unless the system animations are off.
+void ShowPin(State& state, bool animate) {
+    auto navigation = state.navigation.get();
+    if (!state.pin || !navigation) return;
+    const ampify::PinFace face = ampify::PinButtonFace(state.pinned);
+    const winrt::hstring label = winrt::to_hstring(i18n::Text(face.label));
+    if (state.pinGlyph.Glyph() != face.glyph) state.pinGlyph.Glyph(face.glyph);
+    xaml::Automation::AutomationProperties::SetName(state.pin, label);
+    controls::ToolTipService::SetToolTip(state.pin, winrt::box_value(label));
+    auto more = state.more.get();
+    if (auto control = more ? more.try_as<controls::Control>() : nullptr) state.pinGlyph.Foreground(control.Foreground());
+    state.pin.Visibility(navigation.IsPaneOpen() ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+    PlacePin(state);
     if (!animate || !AnimationsOn()) return;
     if (state.glyphStory) state.glyphStory.Stop();
-    if (state.pinned) {
-        state.glyphStory = EaseTurn(state.pinTurn, state.pinGlyph);
-    } else {
-        state.glyphStory = EaseTurn(state.appleTurn, state.appleGlyph);
-    }
+    state.glyphStory = EaseTurn(state.pinTurn, state.pinGlyph);
     state.glyphStory.Begin();
 }
 
-// Apple's hamburger glyph back as Apple had it, and the pin taken out of its grid.
-void RestoreGlyph(State& state) {
+// The pin taken out of Apple's header, and the watch on "···" taken off.
+void RemovePin(State& state) {
     if (state.glyphStory) state.glyphStory.Stop();
     state.glyphStory = nullptr;
-    if (state.appleGlyph) {
-        state.appleGlyph.Visibility(state.appleVisibility);
-        state.appleGlyph.RenderTransform(state.appleTransform);
-        state.appleGlyph.RenderTransformOrigin(state.appleOrigin);
+    if (auto more = state.more.get(); more && state.moreToken != 0) {
+        more.UnregisterPropertyChangedCallback(xaml::FrameworkElement::MarginProperty(), state.moreToken);
+        if (state.moreSizeToken.value != 0) more.SizeChanged(state.moreSizeToken);
     }
+    state.moreSizeToken = {};
     uint32_t index = 0;
-    if (state.glyphGrid && state.pinGlyph && state.glyphGrid.Children().IndexOf(state.pinGlyph, index)) {
-        state.glyphGrid.Children().RemoveAt(index);
+    if (state.pinHeader && state.pin && state.pinHeader.Children().IndexOf(state.pin, index)) {
+        state.pinHeader.Children().RemoveAt(index);
     }
+    state.moreToken = 0;
+    state.more = nullptr;
+    state.pin = nullptr;
     state.pinGlyph = nullptr;
     state.pinTurn = nullptr;
-    state.glyphGrid = nullptr;
-    state.appleGlyph = nullptr;
-    state.appleTurn = nullptr;
+    state.pinHeader = nullptr;
 }
 
 // The light-dismiss layer of the sidebar's SplitView, searched below it but never inside another SplitView (the pages').
@@ -356,6 +423,56 @@ void SetDismissLayer(State& state, const controls::NavigationView& navigation, b
     state.dismiss.Fill(media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
 }
 
+// A brush that shows: a theme's acrylic or image, or a colour that is not see-through.
+bool Paints(const media::Brush& brush) {
+    if (!brush || brush.Opacity() <= 0) return false;
+    auto solid = brush.try_as<media::SolidColorBrush>();
+    return !solid || solid.Color().A > 0;
+}
+
+void RemoveFill(State& state) {
+    uint32_t index = 0;
+    if (state.fillGrid && state.fill && state.fillGrid.Children().IndexOf(state.fill, index)) {
+        state.fillGrid.Children().RemoveAt(index);
+    }
+    state.fillGrid = nullptr;
+    state.fill = nullptr;
+}
+
+// Ours, behind everything in Apple's pane grid and over all its rows: the in-app acrylic of Windows' menus.
+controls::Border MakeFill(const controls::Grid& grid) {
+    auto resources = xaml::Application::Current().Resources();
+    auto key = winrt::box_value(L"AcrylicInAppFillColorDefaultBrush");
+    auto brush = resources.HasKey(key) ? resources.Lookup(key).try_as<media::Brush>() : nullptr;
+    if (!brush) return nullptr;
+    controls::Border fill;
+    fill.Background(brush);
+    fill.IsHitTestVisible(false);
+    controls::Grid::SetRowSpan(fill, std::max<int32_t>(1, static_cast<int32_t>(grid.RowDefinitions().Size())));
+    controls::Grid::SetColumnSpan(fill, std::max<int32_t>(1, static_cast<int32_t>(grid.ColumnDefinitions().Size())));
+    grid.Children().InsertAt(0, fill);
+    return fill;
+}
+
+// Apple leaves its pane see-through over its own window backdrop, and so does a theme that sets the pane on the
+// window's material (Fluent): open over the pages, they showed through its search box and menu, and the pin sat on the
+// Play button. While it is open over them and nothing paints it, a layer of Ampify's own fills it; a theme's
+// background on Apple's grids would be written again by the theme.
+void FillOverPages(State& state, const controls::NavigationView& navigation, bool over) {
+    auto pane = state.pane.get();
+    auto grid = state.fillGrid ? state.fillGrid : FindFirst<controls::Grid>(navigation, L"PaneContentGrid", 0);
+    if (!pane || !grid) return;
+    auto panel = pane.try_as<controls::Panel>();
+    const bool painted = Paints(grid.Background()) || (panel && Paints(panel.Background()));
+    if (!state.fill && over && !painted) {
+        state.fill = MakeFill(grid);
+        state.fillGrid = state.fill ? grid : nullptr;
+    }
+    if (!state.fill) return;
+    state.fill.CornerRadius(grid.CornerRadius());
+    state.fill.Visibility(over && !painted ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+}
+
 // A group has children: realized ones, a MenuItems list, or an items source that the list fills in later.
 bool HasChildren(const Group& item) {
     return item.HasUnrealizedChildren() || item.MenuItems().Size() > 0 || item.MenuItemsSource() != nullptr;
@@ -400,12 +517,26 @@ void SyncGroups(State& state, const controls::NavigationView& navigation) {
     }
 }
 
-// Follows IsPaneOpen whoever changes it (the hover, a click, Apple), so the groups open and fold with the pane.
+bool PinPushes(const controls::NavigationView& navigation);
+
+// The pane stands over the pages: open under the pointer, or pinned in a window too narrow to push them.
+bool OverPages(const State& state, const controls::NavigationView& navigation) {
+    return navigation.IsPaneOpen() && (!state.pinned || !PinPushes(navigation));
+}
+
+// Follows IsPaneOpen whoever changes it (the hover, the hamburger, Apple), so the groups, the pin and the fill open and
+// fold with the pane. Opened by the hamburger, the pane closes again once the pointer is off it, as after a hover.
 void WatchPaneOpen(State& state, const controls::NavigationView& navigation) {
     auto changed = [](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
         try {
             State& live = TheState();
-            if (auto current = live.navigation.get()) SyncGroups(live, current);
+            auto current = live.navigation.get();
+            if (!current) return;
+            SyncGroups(live, current);
+            ShowPin(live, false);
+            FillOverPages(live, current, OverPages(live, current));
+            if (!current.IsPaneOpen()) live.keysUsed = false;
+            if (current.IsPaneOpen() && !live.pinned) Watch(live);
         } catch (...) {
         }
     };
@@ -413,7 +544,7 @@ void WatchPaneOpen(State& state, const controls::NavigationView& navigation) {
 }
 
 // Over narrow pages the pinned pane is LeftCompact, which WinUI closes itself after a click on an item: refused while
-// pinned, rather than reopened at the next tick. The hamburger unpins after WinUI's own toggle, and ApplyPin closes it.
+// pinned, rather than reopened at the next tick. The pin button and the hamburger unpin first, and ApplyPin closes it.
 void KeepPinnedOpen(State& state, const controls::NavigationView& navigation) {
     state.closingToken = navigation.PaneClosing(
         [](controls::NavigationView const&, controls::NavigationViewPaneClosingEventArgs const& args) noexcept {
@@ -425,10 +556,11 @@ void KeepPinnedOpen(State& state, const controls::NavigationView& navigation) {
         });
 }
 
+void AddPin(State& state, const controls::NavigationView& navigation);
+
 // What the hover needs from Apple's pane once taken: the pin, the dismiss layer, the groups and the pane watch.
-void TakeChrome(State& state, const controls::NavigationView& navigation, const controls::Button& toggle) {
-    if (toggle) AddPinGlyph(state, toggle);
-    ShowGlyph(state, false);
+void TakeChrome(State& state, const controls::NavigationView& navigation) {
+    AddPin(state, navigation);
     SetDismissLayer(state, navigation, !state.pinned);
     WatchPaneOpen(state, navigation);
     KeepPinnedOpen(state, navigation);
@@ -449,10 +581,12 @@ void ReleaseChrome(State& state) {
     state.paneToken = 0;
     state.closingToken = {};
     try {
-        RestoreGlyph(state);
+        RemovePin(state);
         RestoreDismissLayer(state);
+        RemoveFill(state);
     } catch (...) {
     }
+    state.keysUsed = false;
 }
 
 bool PinPushes(const controls::NavigationView& navigation) {
@@ -503,6 +637,7 @@ void ApplyPin(State& state, bool notify = true) {
         g_folded = true;
         Watch(state);
     }
+    FillOverPages(state, navigation, OverPages(state, navigation));
     if (notify && g_changed) g_changed();
 }
 
@@ -518,6 +653,7 @@ void Release(State& state) {
         try {
             if (state.entered) pane.RemoveHandler(xaml::UIElement::PointerEnteredEvent(), state.entered);
             if (state.exited) pane.RemoveHandler(xaml::UIElement::PointerExitedEvent(), state.exited);
+            if (state.keyed) pane.RemoveHandler(xaml::UIElement::KeyDownEvent(), state.keyed);
         } catch (...) {
         }
     }
@@ -554,61 +690,162 @@ void Release(State& state) {
     if (g_changed) g_changed();
 }
 
-// WinUI's own toggle flips IsPaneOpen on the same click: the state is applied again once that is done.
+// Closes the pane once the click is done: on the hamburger, WinUI's own toggle flips IsPaneOpen before or after.
+void CloseAfterClick() {
+    auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
+    if (!queue) return;
+    queue.TryEnqueue(dispatching::DispatcherQueueHandler([]() noexcept {
+        try {
+            State& live = TheState();
+            auto navigation = live.navigation.get();
+            auto pane = live.pane.get();
+            if (navigation && pane && !live.pinned) ClosePane(live, navigation, pane);
+        } catch (...) {
+        }
+    }));
+}
+
+// Once WinUI's toggle is done: a pane the hamburger opened with Enter stays open while the keyboard is on it
+// (KeyboardHolds), since the pointer is elsewhere and the next look would close it at once.
+void NoteKeyOpen(bool byKey) {
+    auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
+    if (!queue) return;
+    queue.TryEnqueue(dispatching::DispatcherQueueHandler([byKey]() noexcept {
+        try {
+            State& live = TheState();
+            auto navigation = live.navigation.get();
+            live.keysUsed = byKey && navigation && navigation.IsPaneOpen() && !live.pinned;
+        } catch (...) {
+        }
+    }));
+}
+
+// The hamburger keeps WinUI's own toggle. While pinned, it unpins too, and the pane folds.
+xaml::RoutedEventHandler MakeToggleHandler() {
+    return xaml::RoutedEventHandler([](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            State& live = TheState();
+            if (!live.pinned) {
+                // A click without the pointer on the button came from a key (or UI Automation). Its focus state does
+                // not tell: WinUI has already moved the focus into the pane it opened.
+                auto toggle = sender.try_as<xaml::FrameworkElement>();
+                NoteKeyOpen(toggle && !CursorOver(live, toggle));
+                return;
+            }
+            live.pinned = false;
+            ApplyPin(live);
+            ShowPin(live, true);
+            CloseAfterClick();
+        } catch (...) {
+        }
+    });
+}
+
+// The pin button: pins the pane, or unpins it and folds it, the keyboard parked on the hamburger (seen on screen: a
+// pane unpinned under the pointer folded anyway, the focus left on the hidden pin). Pinning can hand the keyboard to
+// the search field, where Apple opens its search page: it goes back to the pin.
 xaml::RoutedEventHandler MakePinHandler() {
     return xaml::RoutedEventHandler([](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
             State& live = TheState();
+            const xaml::FocusState focus = live.pin ? live.pin.FocusState() : xaml::FocusState::Unfocused;
             live.pinned = !live.pinned;
             ApplyPin(live);
-            ShowGlyph(live, true);
-            if (auto queue = dispatching::DispatcherQueue::GetForCurrentThread()) {
-                queue.TryEnqueue(dispatching::DispatcherQueueHandler([]() noexcept {
-                    try {
-                        ApplyPin(TheState(), false);
-                    } catch (...) {
-                    }
-                }));
+            ShowPin(live, true);
+            if (!live.pinned) {
+                CloseAfterClick();
+            } else if (live.pin && focus != xaml::FocusState::Unfocused) {
+                live.pin.Focus(focus);
             }
         } catch (...) {
         }
     });
 }
 
+// The pin button in Apple's header grid (the logo, "Apple Music" and "···"), beside "···". Found again when Apple
+// rebuilt its header.
+void AddPin(State& state, const controls::NavigationView& navigation) {
+    auto header = navigation.PaneHeader().try_as<controls::Grid>();
+    xaml::FrameworkElement more = header ? FindMore(header) : nullptr;
+    if (!more) return;
+    state.pin = MakePinButton();
+    state.pinGlyph = MakePinGlyph(state.pinTurn);
+    state.pin.Content(state.pinGlyph);
+    state.pin.Click(MakePinHandler());
+    uint32_t index = 0;
+    header.Children().IndexOf(more, index);
+    header.Children().InsertAt(index, state.pin);  // before "···", so the Tab key meets them in the order they show
+    state.pinHeader = header;
+    state.more = winrt::make_weak(more);
+    state.moreToken = more.RegisterPropertyChangedCallback(
+        xaml::FrameworkElement::MarginProperty(), [](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
+            try {
+                PlacePin(TheState());
+            } catch (...) {
+            }
+        });
+    // Its width too: a theme that sized "···" (Mirror) gives it back after its margin, at the next layout. Read with the
+    // margin alone, the first open after that theme left the pin 46 pixels short of "···" (seen at 125%).
+    state.moreSizeToken = more.SizeChanged([](IInspectable const&, xaml::SizeChangedEventArgs const&) noexcept {
+        try {
+            PlacePin(TheState());
+        } catch (...) {
+        }
+    });
+    ShowPin(state, false);
+}
+
+// The pane's handlers, made once and boxed so Release can take them off: the pointer opens and closes it, and a key
+// in it (but not in a text field, which HoldsForTyping already holds for a moment) keeps it for the keyboard.
+void MakePaneHandlers(State& state) {
+    if (state.entered) return;
+    state.entered = winrt::box_value(xaml::Input::PointerEventHandler(
+        [](IInspectable const&, xaml::Input::PointerRoutedEventArgs const&) noexcept {
+            try {
+                State& live = TheState();
+                auto navigation = live.navigation.get();
+                if (!navigation) return;
+                if (!navigation.IsPaneOpen()) navigation.IsPaneOpen(true);
+                Watch(live);
+            } catch (...) {
+            }
+        }));
+    // PointerExited bubbles from each child the pointer leaves for its neighbour: the cursor decides.
+    state.exited = winrt::box_value(xaml::Input::PointerEventHandler(
+        [](IInspectable const&, xaml::Input::PointerRoutedEventArgs const&) noexcept {
+            try {
+                CloseIfLeft(TheState());
+            } catch (...) {
+            }
+        }));
+    state.keyed = winrt::box_value(xaml::Input::KeyEventHandler(
+        [](IInspectable const&, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
+            try {
+                State& live = TheState();
+                auto navigation = live.navigation.get();
+                if (navigation && navigation.IsPaneOpen() && !args.OriginalSource().try_as<controls::TextBox>()) {
+                    live.keysUsed = true;
+                }
+            } catch (...) {
+            }
+        }));
+}
+
 void Take(State& state, const controls::NavigationView& navigation, const xaml::FrameworkElement& pane) {
     state.apple = navigation.PaneDisplayMode();
     state.navigation = winrt::make_weak(navigation);
     state.pane = winrt::make_weak(pane);
-    if (!state.entered) {
-        state.entered = winrt::box_value(xaml::Input::PointerEventHandler(
-            [](IInspectable const&, xaml::Input::PointerRoutedEventArgs const&) noexcept {
-                try {
-                    State& live = TheState();
-                    auto navigation = live.navigation.get();
-                    if (!navigation) return;
-                    if (!navigation.IsPaneOpen()) navigation.IsPaneOpen(true);
-                    Watch(live);
-                } catch (...) {
-                }
-            }));
-        // PointerExited bubbles from each child the pointer leaves for its neighbour: the cursor decides.
-        state.exited = winrt::box_value(xaml::Input::PointerEventHandler(
-            [](IInspectable const&, xaml::Input::PointerRoutedEventArgs const&) noexcept {
-                try {
-                    CloseIfLeft(TheState());
-                } catch (...) {
-                }
-            }));
-    }
+    MakePaneHandlers(state);
     navigation.PaneDisplayMode(PaneMode::LeftCompact);
     navigation.IsPaneOpen(false);
     pane.AddHandler(xaml::UIElement::PointerEnteredEvent(), state.entered, true);
     pane.AddHandler(xaml::UIElement::PointerExitedEvent(), state.exited, true);
+    pane.AddHandler(xaml::UIElement::KeyDownEvent(), state.keyed, true);
     if (auto toggle = FindFirst<controls::Button>(navigation, L"TogglePaneButton", 0)) {
         state.toggle = winrt::make_weak(toggle);
-        state.clickToken = toggle.Click(MakePinHandler());
+        state.clickToken = toggle.Click(MakeToggleHandler());
     }
-    TakeChrome(state, navigation, state.toggle.get());
+    TakeChrome(state, navigation);
     g_folded = !state.pinned;
 }
 
@@ -656,6 +893,10 @@ void KeepSidebarOnHover(Journal& journal) noexcept {
                 RepinForWidth(state, navigation);
             } else if (state.pinned && !navigation.IsPaneOpen()) {
                 ApplyPin(state);
+            }
+            if (!state.pin || navigation.PaneHeader() != state.pinHeader) {
+                RemovePin(state);
+                AddPin(state, navigation);
             }
             return;
         }

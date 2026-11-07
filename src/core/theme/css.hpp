@@ -32,7 +32,8 @@ namespace ampify::theme {
 // `@media (max-width: 1200px) { ... }` holds rules that apply only while the window has that size: min-width,
 // max-width, min-height and max-height, joined by `and`. `@keyframes name { ... }` describes an animation, which the
 // `animation` property runs (animation.hpp). `@setting key { ... }` and `@setting key = value { ... }` hold rules
-// that apply only while a setting the theme declares is on, or has that value. Other at-rules are skipped whole.
+// that apply only while a setting the theme declares is on, or has that value (`key != value`: another value). One
+// @setting may sit inside another: all their conditions must hold. Other at-rules are skipped whole.
 
 // The condition of an @media block, on the window's size in device-independent pixels, bounds included.
 struct MediaQuery {
@@ -59,10 +60,11 @@ struct MediaQuery {
 };
 
 // The condition of a @setting block. Without a value, it holds while the setting is true (a toggle that is on).
-// With one, while the setting has that value, compared without case.
+// With one, while the setting has that value, compared without case; `negated` (`key != value`) while it has another.
 struct SettingCondition {
     std::string key;
     std::optional<std::string> value;
+    bool negated = false;
 };
 
 enum class Combinator {
@@ -131,7 +133,7 @@ struct Rule {
     int line = 0;
     std::string origin;  // "ampify:<layout>" for a rule brought by @import, empty for the stylesheet's own
     std::optional<MediaQuery> media;  // the condition of the @media block around the rule
-    std::optional<SettingCondition> setting;  // the condition of the @setting block around the rule
+    std::vector<SettingCondition> settings;  // the conditions of the @setting blocks around the rule, all to hold
 };
 
 // One stop of a @keyframes block: `from`, `to` or percentages, several joined by commas, and its declarations.

@@ -131,8 +131,11 @@
             margin: 0 0 0 41;
         }
 
+        /* The box is 32 wide and ends 48 from the header's edge, clear of the arrow and the pin; the engine keeps
+           its template's copy of this margin at 0. The dots go 4 below the cell's centre, on the title's line (the
+           title itself is 3 down). */
         ContentControl#PaneHeaderContentBorder MenuButton#MoreButton {
-            margin: 2 48 0 0;
+            margin: 8 48 0 0;
         }
     }
 

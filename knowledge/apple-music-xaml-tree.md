@@ -102,7 +102,7 @@ Apple 1.1792. "Seen" comes from a file or a dump, "deduced" from two facts, "to 
 | Karaoke lyrics (`KaraokeLyricsLine`, `LyricsListViewItem`) | `SungColor`, `UnsungColor`, `LyricsOpacity_*`, `LineFontSize` are keys local to those views, not in the app's dictionaries; margins come from `TSLMargin` (seen) | None yet |
 | Sidebar (`Sidebar#MainSidebar`) | Narrow mode at 1324 px and below; the folded `SplitView` clips `Grid#PaneRoot` to `CompactPaneLength`. `Sidebar` has a public `ExpandedModeThresholdWidth` (seen) | `compact-pane-length` and `PinPushesPages`; the threshold is to check |
 | Play bar buttons (`RepeatButton`, `ShuffleButton` 40 by 40, `AppBarButton`) | Fixed sizes; a button clips its content (seen) | Move the button, not its glyph; no `padding` on every `Button` |
-| `Grid#TransportBar` | 76 high, and the first 64 pixels of each page are kept for it (`BackDrop` 64) (seen) | Take those 64 back where they are when panels move |
+| `Grid#TransportBar` | 64 high, and the first 64 pixels of each page are kept for it (`BackDrop` 64) (seen on the CI bench; a 76 in a home dump is the Mirror theme's own `--bar-height`) | Take those 64 back where they are when panels move |
 | Cards and artworks Apple animates (`Translation`, `Scale`, `Rotation`) | Their composition visual cannot be taken (seen) | `overflow` uses `UIElement.Clip`, rectangles only |
 
 The names above come from the string tables of Apple's compiled XAML: `makepri dump /if AMP.UI.Controls.pri /of

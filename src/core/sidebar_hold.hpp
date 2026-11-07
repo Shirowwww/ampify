@@ -23,10 +23,35 @@ inline bool HoldsForMenu(bool windowInFront, bool menuOpen) {
     return windowInFront && menuOpen;
 }
 
+// The keyboard uses the pane: it was opened from the hamburger with a key, or a key went down in it since it opened,
+// and the focus is still in it or on the hamburger. The pointer may be anywhere then. The focus alone does not hold:
+// WinUI moves it into a pane the pointer opened, which then never closed.
+inline bool HoldsForKeyboard(bool windowInFront, bool keysUsed, bool focusOnPane) {
+    return windowInFront && keysUsed && focusOnPane;
+}
+
 // A pin pushes the pages aside only where Apple Music opens its own sidebar beside them. Narrower, Apple's narrow
 // layout clips a pane opened beside the pages and hides the hamburger: the pinned pane stays over the pages instead.
 inline bool PinPushesPages(double windowWidth) {
     return windowWidth > theme::MediaQuery::kSidebarFoldsAt;
+}
+
+// The pin button of the open pane: the Pin glyph and its words while the pane folds under the pointer, the Unpin glyph
+// and its words while pinned (Segoe Fluent Icons; the label is an i18n key).
+struct PinFace {
+    const wchar_t* glyph;
+    const char* label;
+};
+
+inline PinFace PinButtonFace(bool pinned) {
+    if (pinned) return {L"\xE77A", "sidebar.unpin"};
+    return {L"\xE718", "sidebar.pin"};
+}
+
+// The right margin that puts a button of the sidebar's header just left of "···" (whose own right margin and width
+// are given), `spacing` apart, plus the room of the buttons already standing there.
+inline double LeftOfMoreMargin(double moreRight, double moreWidth, double spacing, double taken = 0) {
+    return moreRight + moreWidth + spacing + taken;
 }
 
 // Notes when the search text last changed while the keyboard was in the field. The first look is not typing.

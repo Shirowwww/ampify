@@ -20,6 +20,14 @@
 
 ### Reliability
 
+- Ampify's pages (Marketplace, Settings > Ampify) stay under the sidebar when it opens over the pages, as Apple's own
+  pages do: their titles, tabs and cards no longer show through its entries. While one of them shows, only Ampify's
+  entry is lit in the sidebar, and Apple's item comes back when the page closes.
+- The sidebar opened over the pages (on hover or pinned, in a narrow window) no longer shows a square frame of shadow
+  running down the window just inside its right edge, under every theme: Apple's shadow for that pane, cast from a
+  rectangle at the window's edge, is gone wherever the pane is a floating panel.
+- The folded sidebar no longer cuts its last icon (Playlists) in half under Glass: Ampify's entries at the foot of the
+  column give back the height the list above them lacks, in every theme, and take it again when the window grows.
 - Opening the lyrics over a song with lyrics no longer ends Apple Music under Glass and the other floating-panel
   themes: the pane keeps the place its `SplitView` gives it, at a fixed width that fits its panel, for every theme.
 - "Freeze log" in Settings > Apple Music (off by default): each time Apple Music's window stops answering for 0.3 s
@@ -81,6 +89,13 @@
 - Experimental: `track-height`, `track-radius` and `thumb-visibility` on `.scrubber` write Apple's own properties of
   the progress line for the height and corners of its track and for its thumb. The inspector lists them. Their effect
   in the play bar is not checked on screen yet, nor whether the track can grow past the line's 6 pixels.
+- A rounded sidebar or lyrics and queue panel keeps its corners round whatever it holds: under Glass, the lyrics
+  pane's corners no longer turn into square patches over its border. A folded sidebar is left to its column's corners.
+- The folded sidebar's column shows its whole outline: its two corners on the window's side were cut away by the
+  sidebar pane's rounder corners, folded, opened under the pointer and pinned over the pages, in every floating-panels
+  theme.
+- A `linear-gradient` keeps its angle on an element of any shape, as in CSS: its lines were drawn for a square, so
+  Glass's rim went dark at the top right and bottom left corners of the narrow column.
 - An `animation` on a `::before` or `::after` decor runs: the Animated artwork snippet's two layers turn again.
 - Ampify's own sidebar entries (Marketplace, extensions) fit the folded sidebar: a centred icon in the column, with
   the label as its tooltip; the full row with its label when the sidebar is open, including the hover overlay.
@@ -228,11 +243,18 @@
 
 ### Other
 
-- Hover sidebar (`apple.sidebar = hover`): the hamburger button pins the sidebar open, as Apple Music's own mode does,
-  and a second click folds it again. The pin is not saved. The hamburger shows a pin while pinned, and the folded
-  column hides the Library and Playlists groups until the sidebar opens.
+- Hover sidebar (`apple.sidebar = hover`): a pin button left of "···" in the open sidebar's header pins the sidebar
+  open, as Apple Music's own mode does, and a second click folds it again (so does the hamburger, which otherwise
+  keeps its own role and its own icon). The pin is not saved and shows only while the sidebar is open; themes reach it
+  as `.sidebar-pin`. The folded column hides the Library and Playlists groups until the sidebar opens.
 - The hover sidebar stays open while you type in its search field, and only while the window is in front; it no
   longer stays open on an idle field.
+- The hover sidebar opens from the keyboard: Enter on the hamburger opens it and it stays open while the
+  keyboard is in it, wherever the pointer is (it closed at once). Over the pages, with no theme or under Fluent, it
+  has Windows' in-app acrylic behind it instead of showing the pages through its entries, and its pin no longer sits
+  on the Play button. The pin keeps its 2 pixels from "···" on the first open after a theme that resized "···".
+- With a theme whose playback bar is at the bottom (Ember, Glass and the others), the open sidebar in a wide window
+  keeps its hamburger in its own row under the logo: it sat on the logo, with an empty row below.
 - The buttons of an Ampify dialog keep the text font: every button in it, its content included, not only the three
   of the template (a button added later showed WebDings again).
 - Nothing of Ampify runs in the background any more: Windows hands each Apple Music process to the launcher as it

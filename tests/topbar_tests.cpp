@@ -42,17 +42,20 @@ TEST_CASE(Topbar_BackSitsLeftOfTheCentredFieldAndBothClearTheCaptionButtons) {
     }
 }
 
-TEST_CASE(Topbar_ControlsCentreOnTheCaptionButtonsNotOnTheStrip) {
-    for (double caption : {kTopbarCaptionHeight, 40.0, 48.0}) {
+TEST_CASE(Topbar_ControlsCentreOnTallerCaptionButtonsNotOnTheStrip) {
+    for (double caption : {40.0, 48.0}) {
         TopbarLayout layout = LayOutTopbar(1140, caption);
         CHECK(layout.back.y + layout.back.height / 2 == caption / 2);
         CHECK(layout.search.y + layout.search.height / 2 == caption / 2);
     }
 }
 
-TEST_CASE(Topbar_ControlsNeverRiseAboveTheWindowUnderAShortCaption) {
-    TopbarLayout layout = LayOutTopbar(1140, 24);
-    CHECK(layout.back.y == 0 && layout.search.y == 0);
+TEST_CASE(Topbar_ControlsKeepAGapAboveThemUnderAStandardOrShortCaption) {
+    for (double caption : {kTopbarCaptionHeight, 24.0}) {
+        TopbarLayout layout = LayOutTopbar(1140, caption);
+        CHECK(layout.back.y == kTopbarMinTop && layout.search.y == kTopbarMinTop);
+        CHECK(layout.search.y + layout.search.height <= kTopbarHeight);
+    }
 }
 
 TEST_CASE(Topbar_CaptionHeightIsReadInDevicePixelsOrFallsBackToStandard) {
@@ -101,4 +104,26 @@ TEST_CASE(Topbar_OwnRegionsAreSwappedWithoutTouchingApplesOwn) {
     CHECK(merged[0] == apple[0] && merged[1] == apple[1]);
     CHECK(merged[2] == now[0] && merged[3] == now[1]);
     CHECK(MergeRegions(merged, now, {}) == apple);       // turned off: only Apple's are left
+}
+
+TEST_CASE(Topbar_PresenterSetterFoundByItsResolvedTarget) {
+    std::vector<StateSetterLook> setters{{true, false, false}, {true, true, true}, {false, std::nullopt, false}};
+    CHECK(PresenterSetterIndex(setters) == std::optional<std::size_t>(1));
+}
+
+TEST_CASE(Topbar_PresenterSetterFoundByItsCollapseWhenNoTargetResolves) {
+    // Apple's ClosedCompact: the presenter collapses, the search button and the hamburger show, the header's height.
+    std::vector<StateSetterLook> setters{{true, std::nullopt, true},
+                                         {true, std::nullopt, false},
+                                         {false, std::nullopt, false},
+                                         {true, std::nullopt, false}};
+    CHECK(PresenterSetterIndex(setters) == std::optional<std::size_t>(0));
+}
+
+TEST_CASE(Topbar_PresenterSetterRefusedWhenAmbiguousOrAbsent) {
+    std::vector<StateSetterLook> two{{true, std::nullopt, true}, {true, std::nullopt, true}};
+    CHECK(!PresenterSetterIndex(two));
+    std::vector<StateSetterLook> elsewhere{{true, false, true}, {false, std::nullopt, true}};
+    CHECK(!PresenterSetterIndex(elsewhere));             // a resolved target that is not the presenter never counts
+    CHECK(!PresenterSetterIndex({}));
 }

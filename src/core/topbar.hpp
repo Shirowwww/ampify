@@ -4,12 +4,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <optional>
 #include <vector>
 
 namespace ampify {
 
 inline constexpr double kTopbarHeight = 40;         // the strip themes leave above the panels (--caption-room)
-inline constexpr double kTopbarControlHeight = 32;  // Apple's search box and the back arrow
+inline constexpr double kTopbarControlHeight = 28;  // Apple's search box and the back arrow
+inline constexpr double kTopbarMinTop = 4;          // the gap kept above them, even under a standard 32 caption
 inline constexpr double kTopbarBackWidth = 40;
 inline constexpr double kTopbarGap = 8;             // between the back arrow and the field
 inline constexpr double kTopbarCaptionWidth = 138;  // the Windows 11 caption buttons
@@ -66,10 +69,11 @@ inline double TopbarCaptionHeight(int devicePixels, double scale) {
 
 // The field in the middle of the window, the back arrow just left of it, as Spotify lays them out. Both centre on the
 // caption buttons, not on the strip: centred on the strip they sat 4 pixels (5 to 6 at 125%) under the buttons' glyphs.
+// A 32 control filled the whole 32 caption line and touched the window's top edge: it is shorter and keeps a gap.
 inline TopbarLayout LayOutTopbar(double windowWidth, double captionHeight) {
     const double width = TopbarSearchWidth(windowWidth);
     const double left = (windowWidth - width) / 2;
-    const double top = std::max(0.0, (captionHeight - kTopbarControlHeight) / 2);
+    const double top = std::max(kTopbarMinTop, (captionHeight - kTopbarControlHeight) / 2);
     return TopbarLayout{{left - kTopbarGap - kTopbarBackWidth, top, kTopbarBackWidth, kTopbarControlHeight},
                         {left, top, width, kTopbarControlHeight}};
 }
@@ -81,6 +85,33 @@ inline DeviceRect ToDeviceRect(const TopbarRect& rect, double scale) {
     int right = static_cast<int>(std::ceil((rect.x + rect.width) * scale));
     int bottom = static_cast<int>(std::ceil((rect.y + rect.height) * scale));
     return DeviceRect{left, top, right - left, bottom - top};
+}
+
+// One setter of Apple's ClosedCompact state as Ampify can read it. `targetsPresenter` is unknown when WinUI cannot
+// resolve the target: TargetPropertyPath.Target looks the name up from the path itself, outside the template's
+// namescope, and fails with E_FAIL (0x80004005).
+struct StateSetterLook {
+    bool visibility = false;  // the setter's path is Visibility
+    std::optional<bool> targetsPresenter;
+    bool collapses = false;   // its value is Collapsed
+};
+
+// The setter that collapses the search presenter: the one whose target resolved to it, else the only Visibility setter
+// with an unknown target that collapses (the state's other Visibility setters show the hamburger and the search
+// button). Nullopt when neither is found, or when the second rule is ambiguous.
+inline std::optional<std::size_t> PresenterSetterIndex(const std::vector<StateSetterLook>& setters) {
+    std::optional<std::size_t> unresolved;
+    int candidates = 0;
+    for (std::size_t i = 0; i < setters.size(); i++) {
+        const StateSetterLook& look = setters[i];
+        if (!look.visibility) continue;
+        if (look.targetsPresenter.value_or(false)) return i;
+        if (!look.targetsPresenter && look.collapses) {
+            unresolved = i;
+            candidates++;
+        }
+    }
+    return candidates == 1 ? unresolved : std::nullopt;
 }
 
 // The window's passthrough regions with Ampify's previous ones taken out and its new ones added. Apple sets its own

@@ -64,6 +64,8 @@ const std::vector<ClassEntry> kClasses{
     {"sidebar-toggle", {"Button#TogglePaneButton"}},
     {"sidebar-toggle-area", {"Grid#PaneToggleButtonGrid"}},
     {"sidebar-column", {"SplitView#RootSplitView > Grid > Grid#PaneRoot > Border > Grid#PaneContentGrid"}},
+    // apple.sidebar = hover: Ampify's pin button, beside "···" in the open sidebar's header.
+    {"sidebar-pin", {"Button#AMPIFY_SidebarPin"}},
     {"back-button", {"Button#NavigationViewBackButton"}},
     {"app-name", {"TextBlock#AppName"}},
     {"search-area", {"Grid#AutoSuggestArea"}},
@@ -421,6 +423,13 @@ constexpr std::string_view kFloatingPanels = R"css(
     margin: var(--gap, 8) calc(var(--gap, 8) * -1) var(--gap, 8) var(--gap, 8);
 }
 
+/* Apple casts the open pane's shadow from a bare rectangle as wide as the pane, at the window's edge and as tall as the
+   window (NavigationView's ShadowCaster): the panel starts a gap in, rounded, so a square frame of shadow ended a gap
+   short of its right edge. Its states animate its opacity and width, never its visibility. */
+Grid#ShadowCaster {
+    visibility: collapsed;
+}
+
 /* Apple Music pins the back arrow to the window's corner, where it straddled the sidebar panel's rounded corner: it
    moves into the panel, centred on the app's logo (1 higher than the panel's edge plus a gap; 4 lower left the arrow
    5 pixels under the logo). */
@@ -450,9 +459,12 @@ PersonPicture#smallPersonPicture {
    column becomes the panel, rounded on both sides, and so does the sidebar Apple opens over the page from the menu
    button. That button sat at the window's edge, a gap left of the icons: it moves over them. */
 @media (max-width: 1324px) {
+    /* The pane's own corners stay square: the pane clips what it holds to them, and its corners, rounder than the
+       column's, cut the column's outline away at the two corners on the pane's edge (seen under Glass at 125%). */
     .sidebar {
         background: transparent !important;
         border-width: 0 !important;
+        corner-radius: 0 !important;
     }
 
     /* Apple insets the column 3 from the pane's top and bottom: it stood 3 lower and 3 shorter than the page panel. */
@@ -470,10 +482,15 @@ PersonPicture#smallPersonPicture {
         margin: 4 0 0 calc((var(--compact-pane, 48) - 22) / 2 - 15);
     }
 
-    /* "···" sat 2 above the logo's centre: it goes 2 down (4 put it 2 below, measured at 125%), with Apple's 4 on the
-       right. */
+    /* The button's template copies the button's margin onto its root, so any margin counted twice: the box grew by its
+       right margin and the dots sat off its centre. The root keeps none; the button's own margin is doubled to give
+       the dots the place 2 and 4 gave them, 2 below the cell's centre (level with the logo, measured at 125%). */
     ContentControl#PaneHeaderContentBorder MenuButton#MoreButton {
-        margin: 2 4 0 0;
+        margin: 4 8 0 0;
+    }
+
+    ContentControl#PaneHeaderContentBorder MenuButton#MoreButton > Grid#LayoutRoot {
+        margin: 0 0 0 0;
     }
 
     PersonPicture#smallPersonPicture {
@@ -718,10 +735,15 @@ HoverGrid#ThumbnailHoverGrid > Grid {
     margin: var(--caption-room, 40) var(--gap, 8) var(--bar-room, 80) calc(var(--gap, 8) * 2);
 }
 
-/* Apple keeps the back arrow at the window's top: it goes down into the sidebar's header, on the icons' axis (the
-   panel's edge, a gap in, plus 4, as in floating-panels). */
+/* Apple keeps its menu button and back arrow at the window's top. Open and wide, the panel came down without them: the
+   menu button sat on the logo and its own row under the title stood empty. The area that holds both comes down and in
+   with the panel; the arrow in it lands where it stood before, in the header on the icons' axis. */
+.sidebar-toggle-area {
+    margin: var(--sidebar-top, var(--caption-room, 40)) 0 0 var(--gap, 8);
+}
+
 .back-button {
-    margin: calc(var(--sidebar-top, var(--caption-room, 40)) - 2) 0 0 calc(var(--gap, 8) + 4);
+    margin: -2 0 0 4;
 }
 
 /* Folded, the logo comes down with the panel but the menu button stays where Apple put it, over the logo: it goes

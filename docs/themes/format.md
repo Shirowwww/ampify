@@ -162,9 +162,10 @@ explain them in one line; the page also resets them, and exports or imports them
 - `--setting-<key>` holds the chosen value, or the default. A toggle gives `true` or `false`, a number a plain number
   (pixels in a length).
 - `@setting <key> { }` applies while a toggle is on; `@setting <key> = <value> { }` while the setting has that value
-  (case-insensitive, quotes allowed).
-- A `@setting` block holds rules, `:root`, `@media` and `@import`. It may sit inside `@media` and the reverse. Not inside
-  another `@setting`, and no `@keyframes` inside it.
+  (case-insensitive, quotes allowed); `@setting <key> != <value> { }` while it has any other value.
+- A `@setting` block holds rules, `:root`, `@media` and `@import`. It may sit inside `@media` and the reverse, and inside
+  another `@setting`: its rules then apply only while every condition around them holds (`@setting bar-position = Top {
+  @setting bar-height != 72 { ... } }`). No `@keyframes` inside it.
 - The defaults should give the theme's normal look.
 
 ### Properties
@@ -246,7 +247,8 @@ explain them in one line; the page also resets them, and exports or imports them
 ```
 
 - `linear-gradient` takes an optional direction (an angle such as `90deg`, or `to right`) and at least two colors, each
-  with an optional percentage. Without a direction it goes down. `color` and `border-color` accept it too.
+  with an optional percentage. Without a direction it goes down. `color` and `border-color` accept it too. As in CSS,
+  the angle holds on the element as it shows, whatever its shape, and the line runs from corner to corner.
 - Image fits: `cover` (fills, crops), `contain` (whole image), `fill` or nothing (stretches). Paths start at the theme
   folder and cannot leave it.
 - `acrylic(tint, opacity)` blurs the window's elements behind (not the desktop). With transparency effects off in

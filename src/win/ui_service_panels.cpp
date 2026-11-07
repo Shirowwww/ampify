@@ -127,6 +127,8 @@ controls::Border MakeSurfaceFrame(const std::string& frameName, const std::strin
     return frame;
 }
 
+}  // namespace
+
 // Where a named element of Apple Music's window lies, in the window's coordinates; nothing while it is not laid out.
 std::optional<winrt::Windows::Foundation::Rect> NamedBounds(const WindowContext& context, std::string_view name) {
     std::optional<int> index = uirender::FindByName(context.probe, name);
@@ -137,6 +139,8 @@ std::optional<winrt::Windows::Foundation::Rect> NamedBounds(const WindowContext&
     return winrt::Windows::Foundation::Rect{origin.X, origin.Y, static_cast<float>(element.ActualWidth()),
                                             static_cast<float>(element.ActualHeight())};
 }
+
+namespace {
 
 // The bottom of the strip at the window's top that holds its buttons and takes the drags, 0 when it is not found.
 double TitlebarBottom(const WindowContext& context) noexcept {

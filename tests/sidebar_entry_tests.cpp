@@ -62,6 +62,26 @@ TEST_CASE(SidebarEntry_IconShiftIgnoresAnAxisFarOffTheColumn) {
     CHECK(ampify::EntryIconShift(-100, 24) == 0);
 }
 
+TEST_CASE(SidebarEntry_CutSharesTheMissingRoomAmongTheEntries) {
+    CHECK(ampify::EntryCutEach(0, 20, 0, 5, 8) == 4);
+    CHECK(ampify::EntryCutEach(0, 21, 0, 5, 8) == 5);
+}
+
+TEST_CASE(SidebarEntry_CutHoldsWhenTheListJustFits) {
+    CHECK(ampify::EntryCutEach(20, 0, 0, 5, 8) == 4);
+    CHECK(ampify::EntryCutEach(20, 0, 3, 5, 8) == 4);
+}
+
+TEST_CASE(SidebarEntry_CutIsGivenBackWhenTheListHasRoomToSpare) {
+    CHECK(ampify::EntryCutEach(20, 0, 20, 5, 8) == 0);
+    CHECK(ampify::EntryCutEach(20, 0, 12, 5, 8) == 2);
+}
+
+TEST_CASE(SidebarEntry_CutNeverPassesItsLimitOrNeedsNoEntry) {
+    CHECK(ampify::EntryCutEach(0, 400, 0, 5, 8) == 8);
+    CHECK(ampify::EntryCutEach(0, 20, 0, 0, 8) == 0);
+}
+
 TEST_CASE(SidebarEntry_LayoutChangesWhenTheIconShiftChanges) {
     CHECK(ampify::EntryLayoutChanged({false, false, 40, 0}, {false, false, 40, 1.5}));
     CHECK(!ampify::EntryLayoutChanged({true, false, kAuto, 1.5}, {true, false, kAuto, 1.5}));

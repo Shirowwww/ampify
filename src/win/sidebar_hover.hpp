@@ -22,7 +22,7 @@ void KeepSidebarOnHover(Journal& journal) noexcept;
 void SetSidebarOnHover(bool enabled) noexcept;
 
 // True while Ampify keeps the sidebar folded: the themes' folded rules (@media (max-width: 1324px)) then hold at
-// every width. False while the hamburger pins the pane open. Any thread.
+// every width. False while the pin button keeps the pane open. Any thread.
 bool SidebarKeptFolded() noexcept;
 
 // Called on the interface thread when a click pins or unpins the pane, so the theme re-checks its media rules at once.

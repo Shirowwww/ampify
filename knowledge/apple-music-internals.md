@@ -151,12 +151,17 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   `PaneHeaderGrid.Height` there, so `NotClosedCompact` is not an empty state: holding the NavigationView in it hid the
   folded sidebar's hamburger. While the field is in the strip Ampify takes only the presenter's `Visibility` setter out
   of `ClosedCompact` (after leaving the state, so WinUI undoes the collapse) and puts it back on release, entering the
-  state again from `NotClosedCompact`. Holding `NotClosedCompact` stays as a fallback if the setter cannot be found or
-  the collection refuses the change. The arrow is Ampify's button; a click invokes Apple's
+  state again from `NotClosedCompact`. The setter cannot be found by its target alone: `TargetPropertyPath.Target`
+  looks the element's name up from the path object, outside the template's namescope, and throws E_FAIL (0x80004005);
+  the first version stopped there and fell back, which left a 55-pixel band above the folded column's hamburger. Each
+  setter is read on its own, and without a resolved target the presenter's is the only `Visibility` setter of the
+  state that collapses (the others show `PaneAutoSuggestButton` and `TogglePaneButton`). Holding `NotClosedCompact`
+  stays as a fallback if the setter cannot be found or the collection refuses the change. The arrow is Ampify's button; a click invokes Apple's
   `Button#NavigationViewBackButton` through its automation peer (as a click on it would), and Apple's arrow stays in
   place with opacity 0.
 - The field and the arrow centre on the caption buttons, whose height is the AppWindow title bar's (`TitleBar.Height`,
   device pixels; 32 at 100%), not on the 40-pixel strip: centred on the strip they sat 5 to 6 pixels low at 125%.
+  They are 28 high with at least 4 above: at 32 they filled the caption line and touched the window's top edge.
 - Apple's own layout and a theme's top bar put `Grid#TransportBar` in the strip: the strip shows only when the bar
   starts lower than 40 pixels. The window's passthrough regions (`InputNonClientPointerSource`) are Apple's plus
   Ampify's, merged every quarter second, since Apple sets its own again as its layout changes.

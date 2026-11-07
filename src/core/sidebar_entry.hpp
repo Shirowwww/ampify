@@ -23,6 +23,16 @@ inline double EntryIconShift(double appleIconCentre, double entryIconCentre) {
     return shift;
 }
 
+// Folded, the entries sit in the pane's footer, which takes its room before Apple's list of items does: a window too low
+// for both cuts the list's last icon in half. Each entry gives back what the list lacks (`deficit`, the list's
+// scrollable height) and takes it again as the list gains room (`spare`, its viewport less its content), at most
+// `maxCut` each. `cutNow` is what all the entries give already. Rounded up, so the list fits and stays put.
+inline double EntryCutEach(double cutNow, double deficit, double spare, int entries, double maxCut) {
+    if (entries <= 0) return 0;
+    const double wanted = std::max(0.0, cutNow + deficit - spare);
+    return std::min(maxCut, std::ceil(wanted / entries));
+}
+
 // What an entry's button shows: the pane state, whether it is on, its width (NaN when open, the width is automatic),
 // and how far its icon is moved onto Apple's axis.
 struct EntryLayout {

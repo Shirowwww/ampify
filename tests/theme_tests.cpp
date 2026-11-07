@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -821,8 +822,13 @@ TEST_CASE(Builtins_FoldedLogoSitsOnTheIconsAxisWhateverTheColumnWidth) {
 }
 
 TEST_CASE(Builtins_FoldedMoreButtonSitsLevelWithTheLogo) {
-    // "···" sat 2 above the logo's centre: it goes 2 down (4 put it 2 below, measured), with Apple's 4 on the right.
-    CHECK(FoldedHeaderMargin("48", "ContentControl#PaneHeaderContentBorder MenuButton#MoreButton") == "0,2,4,0");
+    // The template copies the button's margin onto its root: the dots went where 2 down and 4 right put them, so the
+    // button now takes 4 and 8 and the root none. XAML order: left, top, right, bottom.
+    CHECK(FoldedHeaderMargin("48", "ContentControl#PaneHeaderContentBorder MenuButton#MoreButton") == "0,4,8,0");
+}
+
+TEST_CASE(Builtins_FoldedMoreButtonRootKeepsNoCopyOfTheButtonsMargin) {
+    CHECK(FoldedHeaderMargin("48", "MenuButton#MoreButton > Grid#LayoutRoot") == "0,0,0,0");
 }
 
 TEST_CASE(Inspector_ReadsASavedTreeWithEachPlace) {
@@ -1431,6 +1437,15 @@ TEST_CASE(Theme_FloatingLyricsPaneShrinksInsteadOfClippingItsRightEdge) {
     CHECK(Assigned(theme, ".lyrics-panel", "HorizontalAlignment") == "ABSENT");
 }
 
+TEST_CASE(Theme_FloatingSidebarPaneCastsNoShadowFromApplesRectangle) {
+    // NavigationView shadows its open pane from a bare rectangle at the window's edge, which a panel moved a gap in
+    // and rounded does not fill: a square frame of shadow showed inside its right edge.
+    MemoryFiles files;
+    files.files["user.css"] = "@import \"ampify:floating-panels\";\n";
+    th::Theme theme = Load(files);
+    CHECK(Assigned(theme, "Grid#ShadowCaster", "Visibility") == "Collapsed");
+}
+
 TEST_CASE(Pane_FoundOnlyUnderTheSplitViewThatPlacesIt) {
     std::vector<th::NodeInfo> nodes(5);
     nodes[0] = {1, "SplitView", "", "ContentSplitView", -1, 0};
@@ -1454,6 +1469,22 @@ TEST_CASE(Pane_FitsItsOpenLengthLessItsSideMargins) {
     CHECK(!th::FittedPaneWidth("NaN?", "0,0,0,0"));
     CHECK(th::TemplatePlacesPane("HorizontalAlignment") && th::TemplatePlacesPane("Grid.ColumnSpan"));
     CHECK(!th::TemplatePlacesPane("Margin") && !th::TemplatePlacesPane("Width"));
+}
+
+TEST_CASE(Pane_HoldsItsContentWithinTheCornersInsideItsBorder) {
+    auto same = [](const th::CornerEllipse& corner, double x, double y) { return corner.x == x && corner.y == y; };
+    std::array<th::CornerEllipse, 4> even = th::InnerCorners({24, 24, 24, 24}, {1.5, 1.5, 1.5, 1.5});
+    for (const th::CornerEllipse& corner : even) CHECK(same(corner, 22.5, 22.5));
+
+    // Top left, top right, bottom right, bottom left; each corner less the side and the top or bottom border it meets.
+    std::array<th::CornerEllipse, 4> uneven = th::InnerCorners({10, 0, 4, 30}, {2, 3, 6, 1});
+    CHECK(same(uneven[0], 8, 7));
+    CHECK(same(uneven[1], 0, 0));  // never below 0
+    CHECK(same(uneven[2], 0, 3));
+    CHECK(same(uneven[3], 28, 29));
+    CHECK(!th::Rounded(th::InnerCorners({0, 0, 0, 0}, {0, 0, 0, 0})));
+    CHECK(!th::Rounded(th::InnerCorners({2, 2, 2, 2}, {2, 2, 2, 2})));
+    CHECK(th::Rounded(uneven));
 }
 
 TEST_CASE(Engine_FitsASplitViewPaneInsteadOfLettingItFollowItsContent) {
@@ -2691,6 +2722,24 @@ TEST_CASE(Examples_EveryPaletteLoadsWithoutProblems) {
     }
 }
 
+// At the top and at the default height, Palettes and Greenroom leave Apple's bar as Apple sizes it; a taller setting
+// sets it, less the 8 the content keeps for its own margin.
+TEST_CASE(Examples_TopBarKeepsApplesHeightAtTheDefaultHeight) {
+    for (const char* name : {"palettes", "greenroom"}) {
+        std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
+        th::FolderFiles files(folder);
+        th::LoadOptions options;
+        options.settings = {{"bar-position", "Top"}};
+        th::Theme atDefault = th::LoadTheme(name, folder.generic_string(), files, options);
+        CHECK(atDefault.usable);
+        CHECK(Assigned(atDefault, ".playbar", "Height") == "ABSENT");
+
+        options.settings["bar-height"] = "88";
+        th::Theme taller = th::LoadTheme(name, folder.generic_string(), files, options);
+        CHECK(Assigned(taller, ".playbar", "Height") == "80");
+    }
+}
+
 // Cosy has a scheme per hue and one light: each loads alone, without a problem, and its flat sheet takes the page's
 // colour for the window.
 TEST_CASE(Examples_EveryCosySchemeLoadsWithoutProblems) {
@@ -3898,17 +3947,38 @@ TEST_CASE(Css_SettingBlocksGiveTheirRulesACondition) {
         "@setting Bad Key { D { width: 5 } }\n"
         "@setting a { @setting b { E { width: 6 } } }\n");
 
-    CHECK(sheet.rules.size() == 6);
-    if (sheet.rules.size() != 6) return;
-    CHECK(sheet.rules[0].setting && sheet.rules[0].setting->key == "hide-radio" && !sheet.rules[0].setting->value);
+    CHECK(sheet.rules.size() == 7);
+    if (sheet.rules.size() != 7) return;
+    CHECK(sheet.rules[0].settings.size() == 1 && sheet.rules[0].settings[0].key == "hide-radio" &&
+          !sheet.rules[0].settings[0].value);
     CHECK(!sheet.rules[0].media);
-    CHECK(sheet.rules[1].setting && sheet.rules[1].media && sheet.rules[1].media->maxWidth == 900);
-    CHECK(sheet.rules[2].root && sheet.rules[2].setting);
-    CHECK(sheet.rules[3].setting && sheet.rules[3].setting->value == std::optional<std::string>("Deep Pink"));
-    CHECK(sheet.rules[4].setting && sheet.rules[4].media && sheet.rules[4].setting->key == "compact");
-    CHECK(!sheet.rules[5].setting && !sheet.rules[5].media);
+    CHECK(sheet.rules[1].settings.size() == 1 && sheet.rules[1].media && sheet.rules[1].media->maxWidth == 900);
+    CHECK(sheet.rules[2].root && sheet.rules[2].settings.size() == 1);
+    CHECK(sheet.rules[3].settings.size() == 1 &&
+          sheet.rules[3].settings[0].value == std::optional<std::string>("Deep Pink"));
+    CHECK(sheet.rules[4].settings.size() == 1 && sheet.rules[4].media && sheet.rules[4].settings[0].key == "compact");
+    CHECK(sheet.rules[5].settings.empty() && !sheet.rules[5].media);
     CHECK(sheet.rules[5].selectors[0].parts[0].type == "C");
-    CHECK(sheet.problems.size() == 2);  // a bad key, a @setting inside @setting
+    CHECK(sheet.rules[6].settings.size() == 2 && sheet.rules[6].settings[0].key == "a" &&
+          sheet.rules[6].settings[1].key == "b");
+    CHECK(sheet.problems.size() == 1);  // the bad key alone
+}
+
+TEST_CASE(Css_SettingNotEqualIsReadAsANegatedCondition) {
+    th::Stylesheet sheet = th::ParseStylesheet(
+        "@setting bar-height != 72 { A { width: 1 } }\n"
+        "@setting accent != \"Deep Pink\" { B { width: 2 } }\n"
+        "@setting accent = Blue { C { width: 3 } }\n"
+        "@setting accent != { D { width: 4 } }\n");
+
+    CHECK(sheet.rules.size() == 3);
+    if (sheet.rules.size() != 3) return;
+    CHECK(sheet.rules[0].settings[0].key == "bar-height" && sheet.rules[0].settings[0].negated);
+    CHECK(sheet.rules[0].settings[0].value == std::optional<std::string>("72"));
+    CHECK(sheet.rules[1].settings[0].negated &&
+          sheet.rules[1].settings[0].value == std::optional<std::string>("Deep Pink"));
+    CHECK(!sheet.rules[2].settings[0].negated);
+    CHECK(sheet.problems.size() == 1);  // != with no value
 }
 
 namespace {
@@ -3955,6 +4025,38 @@ TEST_CASE(Theme_SettingsBecomeVariablesAndSwitchTheirBlocks) {
     th::Theme wrong = Load(files, options);
     CHECK(wrong.variables["setting-radius"] == "8");
     CHECK(wrong.variables["setting-accent"] == "Blue");
+}
+
+TEST_CASE(Theme_ANegatedSettingHoldsOnlyAwayFromItsValue) {
+    MemoryFiles files;
+    files.files["manifest.json"] = kSettingsManifest;
+    files.files["user.css"] = "@setting radius != 8 { Border { width: var(--setting-radius); } }\n"
+                              "@setting accent != BLUE { Button { background: #FF2D55; } }\n";
+
+    CHECK(Load(files).assignments.empty());  // the defaults: 8 and Blue, compared without case
+
+    th::LoadOptions options;
+    options.settings = {{"radius", "12"}, {"accent", "Pink"}};
+    CHECK(Load(files, options).assignments.size() == 2);
+}
+
+TEST_CASE(Theme_NestedSettingBlocksMustAllHold) {
+    MemoryFiles files;
+    files.files["manifest.json"] = kSettingsManifest;
+    files.files["user.css"] = "@setting accent = Pink { @setting radius != 8 { Border { width: 4; } } }\n";
+
+    th::LoadOptions options;
+    options.settings = {{"accent", "Pink"}};
+    CHECK(Load(files, options).assignments.empty());  // the radius is still at its default
+    options.settings = {{"radius", "12"}};
+    CHECK(Load(files, options).assignments.empty());  // the accent is not Pink
+    options.settings = {{"accent", "Pink"}, {"radius", "12"}};
+    CHECK(Load(files, options).assignments.size() == 1);
+
+    files.files["user.css"] = "@setting accent = Pink { @setting wide { Border { width: 4; } } }\n";
+    th::Theme unknown = Load(files, options);
+    CHECK(unknown.assignments.empty());
+    CHECK(!ProblemContaining(unknown, "@setting wide").empty());
 }
 
 TEST_CASE(Theme_ASettingBlockForAnUndeclaredKeyIsReported) {
@@ -4345,6 +4447,33 @@ TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
 }
 
 // --- Full redesign: gradients, acrylic, layout, transforms, shadows, fonts, :hover ------------------------
+
+// CSS draws a gradient's lines square to its angle on the element as it is, and the line from corner to corner; the
+// converted points assume a square. A tall narrow column at 135deg kept its top right and bottom left corners at the
+// middle of the line, where Glass's rim is dark, and its outline looked unfinished there.
+TEST_CASE(Properties_GradientFitsTheElementsShape) {
+    auto near = [](double a, double b) { return std::abs(a - b) < 1e-6; };
+    auto at = [](const th::GradientLine& line, double u, double v) {  // the position of a point of the element, 0 to 1
+        const double x = line.x2 - line.x1, y = line.y2 - line.y1;
+        return ((u - line.x1) * x + (v - line.y1) * y) / (x * x + y * y);
+    };
+    const th::GradientLine diagonal{0, 0, 1, 1};
+    th::GradientLine square = th::FitGradient(diagonal, 300, 300);
+    CHECK(near(square.x1, 0) && near(square.y1, 0) && near(square.x2, 1) && near(square.y2, 1));
+
+    // 48 wide, 800 high: every corner keeps the position CSS gives it, (x + y) / (48 + 800) along the line.
+    th::GradientLine column = th::FitGradient(diagonal, 48, 800);
+    CHECK(near(at(column, 0, 0), 0));
+    CHECK(near(at(column, 1, 0), 48.0 / 848));
+    CHECK(near(at(column, 0, 1), 800.0 / 848));
+    CHECK(near(at(column, 1, 1), 1));
+
+    // Along an axis the shape changes nothing; an element not laid out yet keeps the square's points.
+    th::GradientLine down = th::FitGradient({0.5, 0, 0.5, 1}, 48, 800);
+    CHECK(near(down.x1, 0.5) && near(down.y1, 0) && near(down.x2, 0.5) && near(down.y2, 1));
+    th::GradientLine unsized = th::FitGradient(diagonal, 0, 800);
+    CHECK(near(unsized.x2, 1) && near(unsized.y2, 1));
+}
 
 TEST_CASE(Properties_GradientsImagesAndAcrylic) {
     th::Palette palette;

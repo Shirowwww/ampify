@@ -924,6 +924,16 @@ std::span<const PropertySpec> KnownProperties() {
     return kProperties;
 }
 
+GradientLine FitGradient(const GradientLine& square, double width, double height) {
+    // Stretched to the element, relative lines square to (x, y) end square to the screen direction only when the line
+    // runs along (x * width, y * height); its ends then sit on the lines through the two far corners.
+    const double x = (square.x2 - square.x1) * width, y = (square.y2 - square.y1) * height;
+    const double length = x * x + y * y;
+    if (width <= 0 || height <= 0 || length <= 0) return square;
+    const double reach = (std::abs(x) + std::abs(y)) / 2 / length;
+    return {0.5 - x * reach, 0.5 - y * reach, 0.5 + x * reach, 0.5 + y * reach};
+}
+
 const PropertySpec* FindProperty(std::string_view css) {
     std::string key = ToLowerAscii(css);
     for (const PropertySpec& spec : KnownProperties()) {

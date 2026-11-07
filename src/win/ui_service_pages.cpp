@@ -1,4 +1,4 @@
-// The app pages over the content area, the popups (dialogs) and the fullscreen view, and the mounting of every
+// The app pages beside Apple Music's frame, the popups (dialogs) and the fullscreen view, and the mounting of every
 // surface of the model in one window (ApplySurfaces).
 
 #if defined(AMPIFY_WITH_XAML)
@@ -13,29 +13,66 @@ namespace {
 
 constexpr std::size_t kMaxRouteHistory = 16;
 
-// Covers the area of Apple Music's pages with the page host, wherever the theme put it.
+// The frame of Apple Music's pages, from the last walk of the window.
+controls::Frame ContentFrame(const WindowContext& context) {
+    std::optional<int> index = uirender::FindByName(context.probe, "ContentFrame");
+    if (!index || *index >= static_cast<int>(context.probeObjects.size())) return nullptr;
+    return context.probeObjects[*index].get().try_as<controls::Frame>();
+}
+
+// Puts the host in the grid of Apple Music's frame, in its cell and just above it: the app page lives in the layer of
+// Apple's pages, under the sidebar's pane when it opens over them (a Popup drew over the pane). Put back if Apple
+// Music takes it out.
+bool AttachPageHost(WindowContext& context) {
+    controls::Frame frame = ContentFrame(context);
+    auto grid = frame ? media::VisualTreeHelper::GetParent(frame).try_as<controls::Panel>() : nullptr;
+    if (!grid) return false;
+    if (media::VisualTreeHelper::GetParent(context.pageHost) != grid) {
+        RemoveFromParent(context.pageHost);
+        std::uint32_t at = 0;
+        grid.Children().IndexOf(frame, at);
+        grid.Children().InsertAt(at + 1, context.pageHost);
+    }
+    controls::Grid::SetRow(context.pageHost, controls::Grid::GetRow(frame));
+    controls::Grid::SetColumn(context.pageHost, controls::Grid::GetColumn(frame));
+    controls::Grid::SetRowSpan(context.pageHost, controls::Grid::GetRowSpan(frame));
+    controls::Grid::SetColumnSpan(context.pageHost, controls::Grid::GetColumnSpan(frame));
+    // Apple's modal state moves the frame's z-index: the host follows it, so Apple's modal still covers both.
+    int z = controls::Canvas::GetZIndex(frame);
+    if (controls::Canvas::GetZIndex(context.pageHost) != z) controls::Canvas::SetZIndex(context.pageHost, z);
+    return true;
+}
+
+// Keeps the host clear of Apple Music's see-through play bar, which the frame runs under, above or below it.
 void PlacePageHost(WindowContext& context, const xaml::XamlRoot& root) {
-    if (!context.pagePopup || !context.pageHost) return;
-    auto size = root.Size();
-    ContentArea area = FindContentArea(context, size.Height);
-    double width = std::max(200.0, area.width > 0 ? area.width : static_cast<double>(size.Width) - area.left);
-    double height = std::max(200.0, area.height > 0 ? area.height : static_cast<double>(size.Height) - area.top);
-    if (context.pageHost.Width() != width) context.pageHost.Width(width);
-    if (context.pageHost.Height() != height) context.pageHost.Height(height);
-    if (context.pagePopup.HorizontalOffset() != area.left) context.pagePopup.HorizontalOffset(area.left);
-    if (context.pagePopup.VerticalOffset() != area.top) context.pagePopup.VerticalOffset(area.top);
+    if (!context.pageHost || !media::VisualTreeHelper::GetParent(context.pageHost)) return;
+    std::optional<winrt::Windows::Foundation::Rect> frame = NamedBounds(context, "ContentFrame");
+    if (!frame) return;
+    ContentArea area = FindContentArea(context, root.Size().Height);
+    double top = std::max(0.0, area.top - frame->Y);
+    double bottom = area.height > 0 ? std::max(0.0, frame->Y + frame->Height - (area.top + area.height)) : 0.0;
+    xaml::Thickness margin{0, top, 0, bottom};
+    if (context.pageHost.Margin() != margin) context.pageHost.Margin(margin);
 }
 
 }  // namespace
 
 // Shows Apple Music's page again, and gives the host its own background back. Safe to call when nothing is covered.
-void UncoverApplePage(WindowContext& context) noexcept {
+// The sidebar's selection goes back as it was, unless Apple Music's navigation closed the page (it selects for itself)
+// or the host only hides while the route changes (Keep: the next cover finds the selection already cleared).
+void UncoverApplePage(WindowContext& context, Selection selection) noexcept {
     try {
         if (auto frame = std::exchange(context.coveredFrame, nullptr)) {
             frame.Navigated(context.coveredNavigated);
             frame.Opacity(context.coveredOpacity);
         }
-        if (auto sidebar = std::exchange(context.coveredSidebar, nullptr)) sidebar.ItemInvoked(context.coveredInvoked);
+        if (auto sidebar = std::exchange(context.coveredSidebar, nullptr)) {
+            sidebar.ItemInvoked(context.coveredInvoked);
+            if (selection == Selection::GiveBack && context.coveredSelection && !sidebar.SelectedItem()) {
+                sidebar.SelectedItem(context.coveredSelection);
+            }
+        }
+        if (selection != Selection::Keep) context.coveredSelection = nullptr;
         if (context.pageHost && context.pageBackground) context.pageHost.Background(context.pageBackground);
     } catch (...) {
     }
@@ -43,22 +80,24 @@ void UncoverApplePage(WindowContext& context) noexcept {
 
 namespace {
 
-void ShowPageHost(WindowContext& context, bool visible) {
-    if (!context.pagePopup || !context.pageHost) return;
+// True when the host is shown: not before Apple's frame is found, which the next refresh tries again.
+bool ShowPageHost(WindowContext& context, bool visible, Selection selection = Selection::GiveBack) {
+    if (!context.pageHost) return false;
+    if (visible && !AttachPageHost(context)) return false;
     context.pageHost.Visibility(visible ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
-    if (visible) {
-        if (context.pagePopup.IsOpen()) return;
-        OpenOverlay(context, context.pagePopup);
-        // The last Popup opened lies on top: the panels, opened first, went under the see-through page and showed
-        // through its header. Opened again, they float over the page as over Apple Music's own.
-        if (context.panelPopup && context.panelPopup.IsOpen()) {
-            context.panelPopup.IsOpen(false);
-            OpenOverlay(context, context.panelPopup);
-        }
-        return;
+    if (visible) return true;
+    UncoverApplePage(context, selection);
+    RemoveFromParent(context.pageHost);  // Apple's grid holds only its own children while no app page shows
+    return false;
+}
+
+// Apple Music lights the sidebar item of its page: while an app page shows, none of Apple's items is lit (Ampify's
+// entry is), as on Apple's own Settings page. The item comes back when the app page closes (UncoverApplePage).
+void ClearSidebarSelection(WindowContext& context, const controls::NavigationView& sidebar) {
+    if (auto selected = sidebar.SelectedItem()) {
+        context.coveredSelection = selected;
+        sidebar.SelectedItem(nullptr);
     }
-    UncoverApplePage(context);
-    if (context.pagePopup.IsOpen()) context.pagePopup.IsOpen(false);
 }
 
 // Hides Apple Music's page under the shown app page: the host turns see-through, so the app page sits on the theme's
@@ -66,17 +105,15 @@ void ShowPageHost(WindowContext& context, bool visible) {
 // search) closes the app page, as leaving a Spicetify app does.
 void CoverApplePage(const std::shared_ptr<WindowContext>& owner) {
     WindowContext& context = *owner;
-    std::optional<int> index = uirender::FindByName(context.probe, "ContentFrame");
-    if (!index || *index >= static_cast<int>(context.probeObjects.size()) || !context.pageHost) return;
-    auto frame = context.probeObjects[*index].get().try_as<controls::Frame>();
-    if (!frame || frame == context.coveredFrame) return;
-    UncoverApplePage(context);
+    controls::Frame frame = ContentFrame(context);
+    if (!frame || !context.pageHost || frame == context.coveredFrame) return;
+    UncoverApplePage(context, Selection::Keep);
     WeakContext weakContext = owner;
     auto leave = [weakContext]() noexcept {
         try {
             if (auto live = weakContext.lock()) {
                 live->pageClosed = true;
-                ShowPageHost(*live, false);
+                ShowPageHost(*live, false, Selection::Drop);
             }
         } catch (...) {
         }
@@ -96,6 +133,7 @@ void CoverApplePage(const std::shared_ptr<WindowContext>& owner) {
                 }
             });
             context.coveredSidebar = sidebar;
+            ClearSidebarSelection(context, sidebar);
         }
     }
     context.coveredFrame = frame;
@@ -105,18 +143,15 @@ void CoverApplePage(const std::shared_ptr<WindowContext>& owner) {
     context.pageHost.Background(media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));  // still takes clicks
 }
 
-// The host of an app page: a Popup of the window over the content area while the route points to the page (Apple
-// Music takes out what Ampify adds to its own panels). Apple Music's own frame is not replaced.
+// The host of an app page: a grid beside Apple Music's frame while the route points to the page (AttachPageHost).
+// Apple Music's own frame is not replaced.
 controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr<WindowContext>& owner,
                                 const xaml::DependencyObject& content) {
     WindowContext& context = *owner;
     auto rootElement = content.try_as<xaml::UIElement>();
     xaml::XamlRoot xamlRoot = rootElement ? rootElement.XamlRoot() : nullptr;
     if (!xamlRoot) return nullptr;
-    if (context.pageSlot) {
-        PlacePageHost(context, xamlRoot);
-        return context.pageSlot;
-    }
+    if (context.pageSlot) return context.pageSlot;
     controls::Grid host = LoadKitXaml(L"<Grid " + std::wstring(KitXmlns()) +
                                       L" Background='{ThemeResource SolidBackgroundFillColorBaseBrush}'/>")
                               .try_as<controls::Grid>();
@@ -162,9 +197,6 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
     host.Children().Append(scroll);
 
     host.Visibility(xaml::Visibility::Collapsed);
-    primitives::Popup popup;
-    popup.XamlRoot(xamlRoot);
-    popup.Child(host);
 
     // The handler holds the window context weakly, not the host: the host holds the button that holds the handler.
     // The arrow goes back to the page shown before (a detail view of the Marketplace to its list), as Apple Music's own
@@ -185,13 +217,11 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
         } catch (...) {
         }
     });
-    context.pagePopup = popup;
     context.pageHost = host;
     context.pageSlot = slot;
     context.pageScroll = scroll;
     context.pageTitle = title;
-    PlacePageHost(context, xamlRoot);
-    shared.Once("page-host", "Interface: app page host opened in a Popup of the window");
+    shared.Once("page-host", "Interface: app page host made, beside Apple Music's frame");
     return slot;
 }
 
@@ -206,17 +236,16 @@ void MountPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& 
     controls::Border slot = EnsurePageHost(shared, context, content);
     if (!slot) return;
     bool first = !mounted.mounted || mounted.slot != slot;
-    if (!first && mounted.surface.revision == surface.revision) return;
-    if (first) mounted.renderer.reset();
-    mounted.slot = slot;
-    mounted.title = context->pageTitle;
-    uirender::PatchStats stats = RenderInto(shared, mounted, surface);
-    mounted.mounted = true;
-    if (!context->pageClosed) {
-        ShowPageHost(*context, true);
-        CoverApplePage(context);
+    if (first || mounted.surface.revision != surface.revision) {
+        if (first) mounted.renderer.reset();
+        mounted.slot = slot;
+        mounted.title = context->pageTitle;
+        uirender::PatchStats stats = RenderInto(shared, mounted, surface);
+        mounted.mounted = true;
+        JournalRender(shared, "page", surface, stats, first);
     }
-    JournalRender(shared, "page", surface, stats, first);
+    // On every refresh: the host waits for Apple's frame, and goes back beside it if Apple Music took it out.
+    if (!context->pageClosed && ShowPageHost(*context, true)) CoverApplePage(context);
 }
 
 // The dialog of a popup. Close, alone, stands for the default button: Apple's plain style with Ampify's accent
@@ -541,8 +570,7 @@ void MountAmpifyPage(UiService::Shared& shared, const std::shared_ptr<WindowCont
     }
     if (slot.Child() != context->ampifyPage) slot.Child(context->ampifyPage);
     if (context->pageTitle && context->pageTitle.Text() != L"Ampify") context->pageTitle.Text(L"Ampify");
-    ShowPageHost(*context, true);
-    CoverApplePage(context);
+    if (ShowPageHost(*context, true)) CoverApplePage(context);
 }
 
 }  // namespace
@@ -582,7 +610,7 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
         if (context->pageScroll) {
             context->pageScroll.ChangeView(nullptr, winrt::Windows::Foundation::IReference<double>(0.0), nullptr, true);
         }
-        ShowPageHost(*context, false);
+        ShowPageHost(*context, false, Selection::Keep);
         for (auto& [key, mounted] : context->surfaces) {
             if (mounted.surface.kind == SurfaceKind::Page) mounted.surface.revision = 0;  // render again for the new route
         }
@@ -641,7 +669,7 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
         PlacePageHost(*context, element.XamlRoot());
         PlaceFullscreen(*context, element.XamlRoot());
         xaml::ElementTheme mode = element.ActualTheme();
-        for (xaml::FrameworkElement overlay : {xaml::FrameworkElement(context->panelHost), xaml::FrameworkElement(context->pageHost),
+        for (xaml::FrameworkElement overlay : {xaml::FrameworkElement(context->panelHost),
                                                xaml::FrameworkElement(context->fullscreenHost)}) {
             if (overlay && overlay.RequestedTheme() != mode) overlay.RequestedTheme(mode);
         }

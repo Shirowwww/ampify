@@ -176,7 +176,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
         UncoverApplePage(context);
         ReleasePages(context);  // the pages' grid outlives the context: it takes its padding back
         if (context.panelPopup) context.panelPopup.IsOpen(false);
-        if (context.pagePopup) context.pagePopup.IsOpen(false);
+        RemoveFromParent(context.pageHost);
         if (context.fullscreenPopup) context.fullscreenPopup.IsOpen(false);
         RemoveFromParent(context.settingsEntry);
     } catch (...) {
@@ -185,7 +185,6 @@ void ReleaseXaml(WindowContext& context) noexcept {
         ForgetFullscreenHost(context);
         context.settingsEntry = nullptr;
         context.panelPopup = nullptr;
-        context.pagePopup = nullptr;
         context.panelHost = nullptr;
         context.panelDocked = false;
         context.panelStack = nullptr;
@@ -395,7 +394,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         try {
             ReleasePages(*context);  // the old content's grid: the new pages make room again when a panel shows
             if (context->panelPopup) context->panelPopup.IsOpen(false);  // the overlays of the old content
-            if (context->pagePopup) context->pagePopup.IsOpen(false);
+            RemoveFromParent(context->pageHost);
             if (context->fullscreenPopup) context->fullscreenPopup.IsOpen(false);
         } catch (...) {
         }
@@ -403,7 +402,6 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         context->panelPopup = nullptr;
         context->panelHost = nullptr;
         context->panelStack = nullptr;
-        context->pagePopup = nullptr;
         context->pageHost = nullptr;
         context->pageSlot = nullptr;
         context->pageScroll = nullptr;

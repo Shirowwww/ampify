@@ -6,6 +6,7 @@
 #include "ui_service_detail.hpp"
 
 #include "../core/sidebar_entry.hpp"
+#include "../core/sidebar_hold.hpp"
 
 #include <limits>
 
@@ -39,6 +40,12 @@ void StopFollowingSidebarPane(WindowContext& context) {
                                                          context.sidebarModeToken);
         }
     }
+    if (auto scroll = context.sidebarScroll.get(); scroll && context.sidebarScrollSize) {
+        scroll.SizeChanged(context.sidebarScrollSize);
+    }
+    context.sidebarScroll = winrt::weak_ref<controls::ScrollViewer>{nullptr};
+    context.sidebarScrollSize = {};
+    context.sidebarEntryCut = 0;
     context.sidebarNavigation = winrt::weak_ref<controls::NavigationView>{nullptr};
     context.sidebarAppleIcon = winrt::weak_ref<xaml::FrameworkElement>{nullptr};
     context.sidebarPaneToken = 0;
@@ -165,8 +172,18 @@ controls::Grid EntryHeader(const UiService::Shared& shared, const controls::Navi
     return navigation.PaneHeader().try_as<controls::Grid>();
 }
 
-// Just left of "···" and level with it. Read again on each update: a theme's @media moves "···" as the window changes
-// size, or writes its margin after the entry was placed.
+// The room the hover sidebar's pin takes just left of "···" (sidebar_hover.cpp). It shows whenever the pane is open,
+// the only time the entry stands in the header, so its visibility is not read: it may change after this update.
+double PinRoom(const controls::Grid& header) {
+    for (const xaml::UIElement& child : header.Children()) {
+        auto pin = child.try_as<xaml::FrameworkElement>();
+        if (pin && pin.Name() == L"AMPIFY_SidebarPin") return pin.Width() + kHeaderSpacing;
+    }
+    return 0;
+}
+
+// Just left of "···" (and of the hover sidebar's pin) and level with it. Read again on each update: a theme's @media
+// moves "···" as the window changes size, or writes its margin after the entry was placed.
 void KeepBesideMore(const controls::Grid& header, const controls::Button& button) {
     xaml::Thickness margin{0, 0, kMoreButtonWidth + kHeaderSpacing, 0};
     for (const xaml::UIElement& child : header.Children()) {
@@ -174,7 +191,8 @@ void KeepBesideMore(const controls::Grid& header, const controls::Button& button
         if (!more || more.Name() != L"MoreButton") continue;
         xaml::Thickness moreMargin = more.Margin();
         double width = more.ActualWidth() > 0 ? more.ActualWidth() : kMoreButtonWidth;
-        margin = xaml::Thickness{0, moreMargin.Top, width + moreMargin.Right + kHeaderSpacing, moreMargin.Bottom};
+        double right = ampify::LeftOfMoreMargin(moreMargin.Right, width, kHeaderSpacing, PinRoom(header));
+        margin = xaml::Thickness{0, moreMargin.Top, right, moreMargin.Bottom};
         controls::Grid::SetColumn(button, controls::Grid::GetColumn(more));
         controls::Grid::SetRow(button, controls::Grid::GetRow(more));
     }
@@ -197,8 +215,12 @@ controls::Button MakeHeaderButton(const controls::Grid& header, const UiControl&
 }
 
 // An entry is on when its element asked for it (Ampify.ui.setActive), or while the page of that element is on screen.
+// Ampify's own page (Settings > Ampify) lights the Marketplace's entry, the one that stands for Ampify.
 bool SidebarEntryIsOn(const WindowContext& context, const UiControl& control) {
-    return control.active || (context.route && !context.pageClosed && context.route->first == control.elementId);
+    if (control.active) return true;
+    if (!context.route || context.pageClosed) return false;
+    bool ampifyPage = context.route->second == kAmpifyPagePath && control.elementId == kMarketplaceId;
+    return ampifyPage || context.route->first == control.elementId;
 }
 
 // Folded: the icon alone, centred; the label is the tooltip. Open: the row of SidebarContent.
@@ -336,10 +358,54 @@ void MeasureIconShift(WindowContext& context, const PlacedControl& placed, const
     (open ? context.sidebarOpenIconShift : context.sidebarIconShift) = ampify::EntryIconShift(*apple, *entry);
 }
 
+constexpr double kEntryHeight = 36;  // MakeSidebarButton's, when a theme has not written another
+constexpr double kMaxEntryCut = 8;   // an entry never gets lower than 28
+
+controls::ScrollViewer AppleItemsScroll(WindowContext& context) {
+    if (auto scroll = context.sidebarScroll.get()) return scroll;
+    std::optional<int> node = uirender::FindByName(context.probe, "MenuItemsScrollViewer");
+    if (!node || *node >= static_cast<int>(context.probeObjects.size())) return nullptr;
+    return context.probeObjects[*node].get().try_as<controls::ScrollViewer>();
+}
+
+std::vector<PlacedControl*> ListEntries(WindowContext& context) {
+    std::vector<PlacedControl*> entries;
+    for (auto& item : context.placed) {
+        PlacedControl& placed = item.second;
+        if (placed.button && !placed.inHeader && placed.button.Parent() == context.sidebarHost) entries.push_back(&placed);
+    }
+    return entries;
+}
+
+// Folded, the entries sit in the footer, which Apple Music's list yields to: a low window cut its last icon (Playlists)
+// in half. The entries give back what the list lacks, through MaxHeight, which a theme's Height never meets.
+void FitFoldedList(WindowContext& context) {
+    controls::NavigationView navigation = context.sidebarNavigation.get();
+    if (!navigation || !context.sidebarHost) return;
+    controls::ScrollViewer scroll = navigation.IsPaneOpen() ? nullptr : AppleItemsScroll(context);
+    std::vector<PlacedControl*> entries = ListEntries(context);
+    double each = 0;
+    if (scroll) {
+        // The content's own height: the extent stretches to the viewport, and would never show a spare.
+        auto content = scroll.Content().try_as<xaml::UIElement>();
+        const double room = scroll.ViewportHeight() - (content ? content.DesiredSize().Height : 0);
+        each = ampify::EntryCutEach(context.sidebarEntryCut * entries.size(), std::max(0.0, -room), std::max(0.0, room),
+                                    static_cast<int>(entries.size()), kMaxEntryCut);
+    }
+    context.sidebarEntryCut = each;
+    for (PlacedControl* placed : entries) {
+        const double height = placed->button.Height();
+        const double full = std::isfinite(height) ? height : kEntryHeight;
+        const double wanted = each > 0 ? full - each : std::numeric_limits<double>::infinity();
+        if (placed->button.MaxHeight() != wanted) placed->button.MaxHeight(wanted);
+    }
+}
+
 // The pane opened, folded or changed mode: every entry of the list follows it at once, not at the next walk.
 void RefreshSidebarEntries(WindowContext& context) {
     controls::NavigationView navigation = context.sidebarNavigation.get();
     if (!navigation || !context.sidebarHost) return;
+    FitFoldedList(context);
     // context.placed also holds the buttons of the top bar and the playback bar: only the list's own entries follow.
     for (auto& item : context.placed) {
         PlacedControl& placed = item.second;
@@ -359,6 +425,15 @@ void FollowSidebarPane(const std::shared_ptr<WindowContext>& context, const cont
         }
     };
     context->sidebarNavigation = winrt::make_weak(navigation);
+    if (auto scroll = AppleItemsScroll(*context)) {
+        context->sidebarScroll = winrt::make_weak(scroll);
+        context->sidebarScrollSize = scroll.SizeChanged([weakContext](IInspectable const&, xaml::SizeChangedEventArgs const&) noexcept {
+            try {
+                if (auto live = weakContext.lock()) FitFoldedList(*live);
+            } catch (...) {
+            }
+        });
+    }
     context->sidebarPaneToken =
         navigation.RegisterPropertyChangedCallback(controls::NavigationView::IsPaneOpenProperty(), changed);
     context->sidebarModeToken =
@@ -376,6 +451,7 @@ void UpdatePlacedEntry(WindowContext& context, PlacedControl& placed, const UiCo
         placed.entry = control;
         MeasureIconShift(context, placed, navigation);
         LayoutSidebarEntry(placed, navigation, active, EntryShift(context, navigation));
+        FitFoldedList(context);
         return;
     }
     KeepBesideMore(header, placed.button);

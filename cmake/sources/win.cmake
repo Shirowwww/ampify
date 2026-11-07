@@ -18,7 +18,7 @@ list(APPEND AMPIFY_XAML_SOURCES src/win/xaml_backend.cpp src/win/xaml_properties
     src/win/xaml_watcher.cpp src/win/element_picker.cpp src/win/lcd_links.cpp src/win/window_backdrop.cpp
     src/win/sharp_artwork.cpp src/win/text_marquee.cpp src/win/sidebar_hover.cpp src/win/dialog_fonts.cpp
     src/win/artwork_fade.cpp src/win/artwork_cap.cpp src/win/apple_properties.cpp src/win/hosted_text_align.cpp
-    src/win/topbar_search.cpp)
+    src/win/topbar_search.cpp src/win/pane_corners.cpp src/win/gradient_fit.cpp)
 
 list(APPEND AMPIFY_LAUNCHER_SOURCES
     src/launcher/launcher.cpp
