@@ -137,6 +137,8 @@ xaml::UIElement SidebarContent(const UiControl& control, bool active) {
 }
 
 // A flat button with the height, margins and corners of Apple Music's sidebar items, and the subtle hover of Fluent.
+// Its content stretches to its height, so the icon is centred on the button folded and open alike: centred in the
+// open row instead (as tall as its label), it was rounded a pixel lower than in the folded column.
 controls::Button MakeSidebarButton(bool active) {
     const std::wstring brushes =
         L"<StaticResource x:Key='ButtonBackground' ResourceKey='SubtleFillColorTransparentBrush'/>"
@@ -150,8 +152,8 @@ controls::Button MakeSidebarButton(bool active) {
     const std::wstring text =
         L"<Button xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' "
         L"xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' HorizontalAlignment='Stretch' "
-        L"HorizontalContentAlignment='Left' MinWidth='0' Height='36' Margin='4,2,4,2' Padding='12,0,12,0' CornerRadius='4' "
-        L"BorderThickness='0'><Button.Resources><ResourceDictionary><ResourceDictionary.ThemeDictionaries>"
+        L"HorizontalContentAlignment='Left' VerticalContentAlignment='Stretch' MinWidth='0' Height='36' "
+        L"Margin='4,2,4,2' Padding='12,0,12,0' CornerRadius='4' BorderThickness='0'><Button.Resources><ResourceDictionary><ResourceDictionary.ThemeDictionaries>"
         L"<ResourceDictionary x:Key='Default'>" + brushes + L"</ResourceDictionary>"
         L"<ResourceDictionary x:Key='Light'>" + brushes + L"</ResourceDictionary>"
         L"</ResourceDictionary.ThemeDictionaries></ResourceDictionary></Button.Resources></Button>";
@@ -355,7 +357,9 @@ void MeasureIconShift(WindowContext& context, const PlacedControl& placed, const
     std::optional<double> apple = icon ? AppleIconAxis(icon, context.sidebarHost) : std::nullopt;
     std::optional<double> entry = open ? OpenEntryAxis(placed) : std::optional<double>{FoldedEntryAxis(placed.button)};
     if (!apple || !entry) return;
-    (open ? context.sidebarOpenIconShift : context.sidebarIconShift) = ampify::EntryIconShift(*apple, *entry);
+    const xaml::XamlRoot root = placed.button.XamlRoot();
+    const double scale = root ? root.RasterizationScale() : 1.0;
+    (open ? context.sidebarOpenIconShift : context.sidebarIconShift) = ampify::EntryIconShift(*apple, *entry, scale);
 }
 
 constexpr double kEntryHeight = 36;  // MakeSidebarButton's, when a theme has not written another
@@ -461,6 +465,26 @@ void UpdatePlacedEntry(WindowContext& context, PlacedControl& placed, const UiCo
     automation::AutomationProperties::SetItemStatus(placed.button, active ? L"on" : L"");
 }
 
+// Once a list entry is laid out for a new pane state (its size changes as the pane opens or folds), the shift is
+// measured again and the entry moved at once: waiting for the next walk left the first opens a pixel off.
+void RemeasureOnResize(const std::shared_ptr<WindowContext>& context, const controls::Button& button) {
+    WeakContext weakContext = context;
+    button.SizeChanged([weakContext](IInspectable const& sender, xaml::SizeChangedEventArgs const&) noexcept {
+        try {
+            auto live = weakContext.lock();
+            controls::NavigationView navigation = live ? live->sidebarNavigation.get() : nullptr;
+            if (!navigation) return;
+            for (auto& item : live->placed) {
+                PlacedControl& placed = item.second;
+                if (!placed.button || placed.button != sender || placed.inHeader) continue;
+                MeasureIconShift(*live, placed, navigation);
+                LayoutSidebarEntry(placed, navigation, placed.active, EntryShift(*live, navigation));
+            }
+        } catch (...) {
+        }
+    });
+}
+
 // A click on the entry goes to the element that added it, as an event of the control.
 void WireSidebarClick(const controls::Button& button, const UiService::Shared& shared, const UiControl& control) {
     UiEventSink sink = shared.sink;
@@ -508,6 +532,7 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
         placed.button = button;
         placed.entry = control;
         LayoutSidebarEntry(placed, navigation, active, EntryShift(*context, navigation));  // before the entry shows
+        RemeasureOnResize(context, button);
     }
     Name(button, uirender::ElementName(control.elementId, "control-" + std::to_string(control.id)), control.label);
     WireSidebarClick(button, shared, control);
@@ -531,13 +556,15 @@ constexpr double kFoldedPaneWidth = 100;  // the folded column is 48 wide, the o
 
 // Folded, Apple Music moves the sidebar's header right when the back arrow shows, for the arrow and the logo to sit side
 // by side as in the open sidebar: the column cut the logo off but for 3 pixels, a sliver at its edge. The logo goes
-// while the column is folded and the arrow shows, and comes back when either changes.
+// while the column is folded and the arrow shows, and comes back when either changes. An arrow the top bar holds
+// (opacity 0) leaves the header in place (topbar_search.cpp), and the logo with it.
 void ShowFoldedLogo(const WindowContext& context) {
     xaml::FrameworkElement back = context.foldBack.get();
     xaml::FrameworkElement logo = context.foldLogo.get();
     xaml::FrameworkElement pane = context.foldPane.get();
     if (!back || !logo || !pane) return;
-    bool pushedOut = back.Visibility() == xaml::Visibility::Visible && pane.ActualWidth() < kFoldedPaneWidth;
+    bool arrow = back.Visibility() == xaml::Visibility::Visible && back.Opacity() > 0;
+    bool pushedOut = arrow && pane.ActualWidth() < kFoldedPaneWidth;
     double opacity = pushedOut ? 0 : 1;
     if (logo.Opacity() != opacity) logo.Opacity(opacity);
 }
@@ -573,9 +600,11 @@ void FollowFoldedLogo(UiService::Shared& shared, const std::shared_ptr<WindowCon
         } catch (...) {
         }
     };
-    backElement.RegisterPropertyChangedCallback(
-        xaml::UIElement::VisibilityProperty(),
-        [update](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept { update(); });
+    for (const xaml::DependencyProperty& property :
+         {xaml::UIElement::VisibilityProperty(), xaml::UIElement::OpacityProperty()}) {
+        backElement.RegisterPropertyChangedCallback(
+            property, [update](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept { update(); });
+    }
     paneElement.SizeChanged([update](IInspectable const&, xaml::SizeChangedEventArgs const&) noexcept { update(); });
     ShowFoldedLogo(*context);
     shared.Once("folded-logo", "Interface: the folded sidebar's logo follows its back arrow");

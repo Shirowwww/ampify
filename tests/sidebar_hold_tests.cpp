@@ -93,3 +93,23 @@ TEST_CASE(SidebarHold_KeysHoldThePaneWhileTheFocusStaysOnIt) {
 TEST_CASE(SidebarHold_FocusAloneDoesNotHoldAPaneOpenedByThePointer) {
     CHECK(!ampify::HoldsForKeyboard(true, false, true));
 }
+
+TEST_CASE(SidebarHold_OffsetCountsFromTheLeftOfAnElementReadLeftToRight) {
+    // The element's origin lands at 900 in the window, one step right at 901.
+    CHECK(ampify::LocalOffset(920, 900, 901) == 20);
+    CHECK(*ampify::LocalOffset(880, 900, 901) < 0);
+}
+
+TEST_CASE(SidebarHold_OffsetCountsFromTheRightOfAMirroredElement) {
+    // Mirrored (flow-direction rtl), its origin is its right edge at 1190, and a step goes left.
+    CHECK(ampify::LocalOffset(1170, 1190, 1189) == 20);
+    CHECK(*ampify::LocalOffset(1195, 1190, 1189) < 0);
+}
+
+TEST_CASE(SidebarHold_OffsetFollowsAScaledElement) {
+    CHECK(ampify::LocalOffset(940, 900, 902) == 20);
+}
+
+TEST_CASE(SidebarHold_NoOffsetOnAnElementSquashedFlat) {
+    CHECK(!ampify::LocalOffset(940, 900, 900).has_value());
+}

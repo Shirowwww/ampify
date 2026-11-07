@@ -75,6 +75,10 @@ struct State {
     IInspectable exited{nullptr};
     IInspectable keyed{nullptr};
     winrt::event_token clickToken{};  // the hamburger's Click, taken off by this token in Release
+    IInspectable spaceDown{nullptr};  // the hamburger's key handlers, kept to take them off again
+    IInspectable spaceUp{nullptr};
+    bool spacePressed = false;  // Space went down on the hamburger, and no Click came since
+    bool clicked = false;
     dispatching::DispatcherQueueTimer watch{nullptr};
     bool told = false;
     bool pinned = false;  // session only: the pin button keeps the pane open, like Apple's own mode
@@ -96,6 +100,8 @@ struct State {
     IInspectable dismissFill{nullptr};
     int64_t paneToken = 0;  // the IsPaneOpen callback, taken off by this token in Release
     winrt::event_token closingToken{};  // PaneClosing, taken off by this token in Release
+    winrt::event_token openingToken{};  // PaneOpening, likewise
+    std::vector<xaml::UIElement> openHeader;  // what Apple's header shows in the open pane
     bool repinning = false;  // RepinForWidth closes the pinned pane on purpose
     ampify::GroupMemory<Group> groups;  // the groups collapsed while the pane is folded
 };
@@ -123,18 +129,29 @@ T FindFirst(const xaml::DependencyObject& root, std::wstring_view name, int dept
     return nullptr;
 }
 
+// The window under the cursor is Apple Music's, or one it owns: WinUI draws popups in windows of their own, and after a
+// tap on Alt its access-key layer (PopupWindowSiteBridge) lies over the column, which then counted as off the pane.
+bool OverWindow(const State& state, HWND under) {
+    return GetAncestor(under, GA_ROOT) == state.window || GetAncestor(under, GA_ROOTOWNER) == state.window;
+}
+
 // The real cursor in `element`'s own coordinates, while it is over Apple Music's window.
 std::optional<winrt::Windows::Foundation::Point> CursorIn(const State& state, const xaml::UIElement& element) {
     POINT cursor{};
     if (!state.window || !GetCursorPos(&cursor)) return std::nullopt;
-    if (GetAncestor(WindowFromPoint(cursor), GA_ROOT) != state.window || !ScreenToClient(state.window, &cursor)) {
-        return std::nullopt;
-    }
+    if (!OverWindow(state, WindowFromPoint(cursor)) || !ScreenToClient(state.window, &cursor)) return std::nullopt;
     xaml::XamlRoot root = element.XamlRoot();
     double scale = root ? root.RasterizationScale() : 1.0;
-    winrt::Windows::Foundation::Point origin = element.TransformToVisual(nullptr).TransformPoint({0, 0});
-    return winrt::Windows::Foundation::Point{static_cast<float>(cursor.x / scale - origin.X),
-                                             static_cast<float>(cursor.y / scale - origin.Y)};
+    // Where one step along each axis lands too: a mirrored element (Mirror's pane on the right) counts from its right
+    // edge, so its origin alone put every point inside it at a negative X, and the pane closed under the pointer.
+    media::GeneralTransform transform = element.TransformToVisual(nullptr);
+    winrt::Windows::Foundation::Point origin = transform.TransformPoint({0, 0});
+    winrt::Windows::Foundation::Point right = transform.TransformPoint({1, 0});
+    winrt::Windows::Foundation::Point down = transform.TransformPoint({0, 1});
+    auto x = ampify::LocalOffset(cursor.x / scale, origin.X, right.X);
+    auto y = ampify::LocalOffset(cursor.y / scale, origin.Y, down.Y);
+    if (!x || !y) return std::nullopt;
+    return winrt::Windows::Foundation::Point{static_cast<float>(*x), static_cast<float>(*y)};
 }
 
 // The width the pane shows: the open sidebar, or the folded column (its layout box stays 290 px wide).
@@ -191,11 +208,14 @@ bool KeyboardHolds(const State& state, const xaml::FrameworkElement& pane) {
     return ampify::HoldsForKeyboard(WindowInFront(state), state.keysUsed, FocusInside(pane) || onToggle);
 }
 
-// The keyboard leaves the pane for the hamburger, which shows in both modes. Not the NavigationView itself: it hands
-// focus to its search field, and Apple opens its search page as soon as that field gets the focus.
+// The keyboard goes to the hamburger, or to the pin while pinned. Not the NavigationView itself: it hands focus to its
+// search field, and Apple opens its search page as soon as that field gets the focus.
 void ParkFocus(const State& state, const xaml::FrameworkElement& pane) {
     if (!FocusInside(pane)) return;
-    if (auto toggle = state.toggle.get()) toggle.Focus(xaml::FocusState::Programmatic);
+    auto toggle = state.toggle.get();
+    if (toggle && toggle.Focus(xaml::FocusState::Programmatic)) return;
+    // Pinned open, Apple's template hides the hamburger: the pin, in the open header, takes the keyboard instead.
+    if (state.pin) state.pin.Focus(xaml::FocusState::Programmatic);
 }
 
 // Closes the pane, the keyboard parked first so a collapsed field does not reopen it.
@@ -543,14 +563,67 @@ void WatchPaneOpen(State& state, const controls::NavigationView& navigation) {
     state.paneToken = navigation.RegisterPropertyChangedCallback(controls::NavigationView::IsPaneOpenProperty(), changed);
 }
 
+// The header's elements Apple shows in an open pane (its PaneOpening handler runs before Ampify's).
+void NoteOpenHeader(State& state, const controls::NavigationView& navigation) {
+    state.openHeader.clear();
+    auto header = navigation.PaneHeader().try_as<controls::Panel>();
+    if (!header) return;
+    for (const xaml::UIElement& child : header.Children()) {
+        if (child.Visibility() == xaml::Visibility::Visible) state.openHeader.push_back(child);
+    }
+}
+
+// Apple's PaneClosing handler hides the title and "···" before Ampify refuses the close: they show again. Only shown,
+// never hidden: Ampify's pin shows after the opening, and hiding it under the keyboard sent the focus to the search.
+void RestoreOpenHeader(const State& state) {
+    for (const xaml::UIElement& element : state.openHeader) {
+        if (element.Visibility() != xaml::Visibility::Visible) element.Visibility(xaml::Visibility::Visible);
+    }
+}
+
+void ShowIfCollapsed(const xaml::UIElement& element) {
+    if (element && element.Visibility() == xaml::Visibility::Collapsed) element.Visibility(xaml::Visibility::Visible);
+}
+
+// WinUI turns the NavigationView's IsPaneOpen off before its SplitView asks, so a refused close left the pane open
+// but laid out closed (a squashed column), and Apple's PaneClosing handler collapsed the header's title and "···",
+// which only its PaneOpening shows again. Once every handler has run, the pane is open again and so are they.
+void ReopenAfterRefusedClose() {
+    auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
+    if (!queue) return;
+    queue.TryEnqueue(dispatching::DispatcherQueueHandler([]() noexcept {
+        try {
+            const State& live = TheState();
+            auto navigation = live.navigation.get();
+            if (!live.pinned || live.repinning || !navigation) return;
+            if (!navigation.IsPaneOpen()) navigation.IsPaneOpen(true);
+            RestoreOpenHeader(live);
+            if (!live.pinHeader) return;
+            ShowIfCollapsed(FindFirst<controls::TextBlock>(live.pinHeader, L"AppName", 0));
+            ShowIfCollapsed(live.more.get());
+        } catch (...) {
+        }
+    }));
+}
+
 // Over narrow pages the pinned pane is LeftCompact, which WinUI closes itself after a click on an item: refused while
 // pinned, rather than reopened at the next tick. The pin button and the hamburger unpin first, and ApplyPin closes it.
+// WinUI raises PaneClosing late, after a pin that switched the mode has opened the pane again: refused as well.
 void KeepPinnedOpen(State& state, const controls::NavigationView& navigation) {
+    state.openingToken = navigation.PaneOpening([](controls::NavigationView const& sender, IInspectable const&) noexcept {
+        try {
+            NoteOpenHeader(TheState(), sender);
+        } catch (...) {
+        }
+    });
     state.closingToken = navigation.PaneClosing(
         [](controls::NavigationView const&, controls::NavigationViewPaneClosingEventArgs const& args) noexcept {
             try {
                 const State& live = TheState();
-                if (live.pinned && !live.repinning) args.Cancel(true);
+                if (!live.pinned || live.repinning) return;
+                args.Cancel(true);
+                RestoreOpenHeader(live);
+                ReopenAfterRefusedClose();
             } catch (...) {
             }
         });
@@ -576,10 +649,15 @@ void ReleaseChrome(State& state) {
         if (auto navigation = state.navigation.get(); navigation && state.closingToken.value != 0) {
             navigation.PaneClosing(state.closingToken);
         }
+        if (auto navigation = state.navigation.get(); navigation && state.openingToken.value != 0) {
+            navigation.PaneOpening(state.openingToken);
+        }
     } catch (...) {
     }
     state.paneToken = 0;
     state.closingToken = {};
+    state.openingToken = {};
+    state.openHeader.clear();
     try {
         RemovePin(state);
         RestoreDismissLayer(state);
@@ -601,18 +679,29 @@ PaneMode PinnedMode(const controls::NavigationView& navigation) {
     return PinPushes(navigation) ? PaneMode::Left : PaneMode::LeftCompact;
 }
 
-// The window crossed the width while pinned. Switched under the open pane, the template stays folded (a squashed column
-// over the pages): the pane closes with the switch, and the next tick opens it again (ApplyPin).
-void RepinForWidth(State& state, const controls::NavigationView& navigation) {
-    auto pane = state.pane.get();
-    if (pane) ParkFocus(state, pane);  // off the search field, which WinUI picks as the header changes
+// Apple lays out the pane's header (title, "···", hamburger row) when the pane opens, for the mode it opens in: a mode
+// switched under the open pane kept the other mode's header (pinned from the pointer: the hamburger over the logo
+// and a blank row; unpinned: no hamburger row). The pane closes first, so its next opening lays the header out again.
+// It closes in the Left mode, on either side of the switch; its late PaneClosing is refused (KeepPinnedOpen).
+void SwitchClosed(State& state, const controls::NavigationView& navigation, PaneMode mode) {
+    if (navigation.PaneDisplayMode() == mode) return;
+    if (auto pane = state.pane.get()) ParkFocus(state, pane);  // off the search field, which WinUI picks next
+    const bool fromLeft = navigation.PaneDisplayMode() == PaneMode::Left;
+    if (!fromLeft) navigation.PaneDisplayMode(mode);
     state.repinning = true;
     try {
         navigation.IsPaneOpen(false);
     } catch (...) {
     }
     state.repinning = false;
-    navigation.PaneDisplayMode(PinnedMode(navigation));
+    if (fromLeft) navigation.PaneDisplayMode(mode);
+}
+
+// The window crossed the width while pinned. Switched under the open pane, the template stays folded (a squashed column
+// over the pages): the pane closes with the switch (SwitchClosed), and the next tick opens it again (ApplyPin).
+void RepinForWidth(State& state, const controls::NavigationView& navigation) {
+    auto pane = state.pane.get();
+    SwitchClosed(state, navigation, PinnedMode(navigation));
     if (pane) ParkFocus(state, pane);
 }
 
@@ -624,13 +713,13 @@ void ApplyPin(State& state, bool notify = true) {
     if (state.pinned) {
         if (state.watch) state.watch.Stop();
         const bool pushes = PinPushes(navigation);
-        navigation.PaneDisplayMode(PinnedMode(navigation));
+        SwitchClosed(state, navigation, PinnedMode(navigation));
         navigation.IsPaneOpen(true);
         SetDismissLayer(state, navigation, !pushes);  // over the pages, a click on them must not close the pane
         g_folded = false;
     } else {
         ParkFocus(state, pane);  // the header's buttons go away as the pane folds: WinUI would pick the search field
-        navigation.PaneDisplayMode(PaneMode::LeftCompact);
+        SwitchClosed(state, navigation, PaneMode::LeftCompact);
         navigation.IsPaneOpen(CursorOverPane(state, navigation, pane));
         ParkFocus(state, pane);  // and again after: the switch itself moved it into the pane's header (seen on screen)
         SetDismissLayer(state, navigation, true);
@@ -660,10 +749,13 @@ void Release(State& state) {
     if (auto toggle = state.toggle.get(); toggle && state.clickToken.value != 0) {
         try {
             toggle.Click(state.clickToken);
+            toggle.RemoveHandler(xaml::UIElement::KeyDownEvent(), state.spaceDown);
+            toggle.RemoveHandler(xaml::UIElement::KeyUpEvent(), state.spaceUp);
         } catch (...) {
         }
     }
     state.clickToken = {};
+    state.spacePressed = false;
     ReleaseChrome(state);
     if (auto navigation = state.navigation.get()) {
         try {
@@ -720,11 +812,14 @@ void NoteKeyOpen(bool byKey) {
     }));
 }
 
+void UnpinFromToggle(State& state);
+
 // The hamburger keeps WinUI's own toggle. While pinned, it unpins too, and the pane folds.
 xaml::RoutedEventHandler MakeToggleHandler() {
     return xaml::RoutedEventHandler([](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
         try {
             State& live = TheState();
+            live.clicked = true;
             if (!live.pinned) {
                 // A click without the pointer on the button came from a key (or UI Automation). Its focus state does
                 // not tell: WinUI has already moved the focus into the pane it opened.
@@ -732,13 +827,64 @@ xaml::RoutedEventHandler MakeToggleHandler() {
                 NoteKeyOpen(toggle && !CursorOver(live, toggle));
                 return;
             }
-            live.pinned = false;
-            ApplyPin(live);
-            ShowPin(live, true);
-            CloseAfterClick();
+            UnpinFromToggle(live);
         } catch (...) {
         }
     });
+}
+
+void UnpinFromToggle(State& state) {
+    state.pinned = false;
+    ApplyPin(state);
+    ShowPin(state, true);
+    CloseAfterClick();
+}
+
+// Space on the hamburger, once released without a Click (Apple Music marks Space handled before the window's content
+// sees it, so the button never clicks): does what WinUI's toggle does on Enter, the pane then held for the keyboard.
+void ToggleFromSpace() {
+    auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
+    if (!queue) return;
+    queue.TryEnqueue(dispatching::DispatcherQueueHandler([]() noexcept {
+        try {
+            State& live = TheState();
+            auto navigation = live.navigation.get();
+            if (!navigation || live.clicked) return;
+            if (live.pinned) {
+                UnpinFromToggle(live);
+                return;
+            }
+            navigation.IsPaneOpen(!navigation.IsPaneOpen());
+            live.keysUsed = navigation.IsPaneOpen();
+            if (live.keysUsed) Watch(live);
+        } catch (...) {
+        }
+    }));
+}
+
+// Boxed once, so Release can take them off. Handled events too: what took Space marked it handled.
+void MakeSpaceHandlers(State& state) {
+    if (state.spaceDown) return;
+    state.spaceDown = winrt::box_value(xaml::Input::KeyEventHandler(
+        [](IInspectable const&, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
+            try {
+                if (args.Key() != winrt::Windows::System::VirtualKey::Space || args.KeyStatus().WasKeyDown) return;
+                State& live = TheState();
+                live.spacePressed = true;
+                live.clicked = false;
+            } catch (...) {
+            }
+        }));
+    state.spaceUp = winrt::box_value(xaml::Input::KeyEventHandler(
+        [](IInspectable const&, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
+            try {
+                State& live = TheState();
+                if (args.Key() != winrt::Windows::System::VirtualKey::Space || !live.spacePressed) return;
+                live.spacePressed = false;
+                ToggleFromSpace();
+            } catch (...) {
+            }
+        }));
 }
 
 // The pin button: pins the pane, or unpins it and folds it, the keyboard parked on the hamburger (seen on screen: a
@@ -844,6 +990,9 @@ void Take(State& state, const controls::NavigationView& navigation, const xaml::
     if (auto toggle = FindFirst<controls::Button>(navigation, L"TogglePaneButton", 0)) {
         state.toggle = winrt::make_weak(toggle);
         state.clickToken = toggle.Click(MakeToggleHandler());
+        MakeSpaceHandlers(state);
+        toggle.AddHandler(xaml::UIElement::KeyDownEvent(), state.spaceDown, true);
+        toggle.AddHandler(xaml::UIElement::KeyUpEvent(), state.spaceUp, true);
     }
     TakeChrome(state, navigation);
     g_folded = !state.pinned;

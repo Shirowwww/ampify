@@ -60,6 +60,13 @@ struct Saved {
     IInspectable before{nullptr};
 };
 
+// A property callback registered on one of Apple's elements, taken off by its token in Release.
+struct Watched {
+    xaml::DependencyObject element{nullptr};
+    xaml::DependencyProperty property{nullptr};
+    int64_t token = 0;
+};
+
 struct State {
     Journal* journal = nullptr;
     HWND window = nullptr;
@@ -77,6 +84,12 @@ struct State {
     xaml::SetterBase presenterSetter{nullptr};
     uint32_t presenterSetterIndex = 0;
     std::vector<Saved> saved;
+    // Apple's sidebar header and its title, kept where Apple lays them out without its arrow (ArrowRoom).
+    xaml::FrameworkElement header{nullptr};
+    xaml::FrameworkElement title{nullptr};
+    ArrowRoom headerRoom{kAppleHeaderLeft};
+    ArrowRoom titleRoom{kAppleTitleLeft};
+    std::vector<Watched> watched;
     // Ampify's: held strongly, since a weak reference to an element Ampify made never resolves (xaml-lessons.md).
     primitives::Popup popup{nullptr};
     controls::StackPanel strip{nullptr};
@@ -220,10 +233,14 @@ xaml::VisualState ClosedCompactState(const controls::NavigationView& navigation)
 
 bool Collapses(const xaml::Setter& setter) {
     IInspectable value = setter.Value();
+    std::optional<int> number;
     if (auto visibility = value.try_as<winrt::Windows::Foundation::IReference<xaml::Visibility>>()) {
-        return visibility.Value() == xaml::Visibility::Collapsed;
+        number = static_cast<int>(visibility.Value());
+    } else if (auto boxed = value.try_as<winrt::Windows::Foundation::IPropertyValue>();
+               boxed && boxed.Type() == winrt::Windows::Foundation::PropertyType::Int32) {
+        number = boxed.GetInt32();
     }
-    return winrt::unbox_value_or<winrt::hstring>(value, L"") == L"Collapsed";
+    return VisibilityCollapses(number, winrt::unbox_value_or<winrt::hstring>(value, L""));
 }
 
 // Each part is read on its own: the target of a template's setter often does not resolve (StateSetterLook), and that
@@ -312,6 +329,74 @@ void HideApples(State& state, const controls::NavigationView& navigation) {
     }
 }
 
+bool AppleArrowShows(const State& state) {
+    return state.appleBack && state.appleBack.Visibility() == xaml::Visibility::Visible;
+}
+
+void SetLeft(const xaml::FrameworkElement& element, std::optional<double> left) {
+    if (!element || !left) return;
+    xaml::Thickness margin = element.Margin();
+    margin.Left = *left;
+    element.Margin(margin);
+}
+
+// Apple's code moves the header right for its arrow, and the title closer to the logo, as soon as there is a page to
+// go back to: the logo jumped some 30 pixels after the first navigation, beside an arrow that shows in the strip.
+void HoldHeader(State& state) {
+    const bool arrow = AppleArrowShows(state);
+    if (state.header) SetLeft(state.header, state.headerRoom.Next(arrow, state.header.Margin().Left));
+    if (state.title) SetLeft(state.title, state.titleRoom.Next(arrow, state.title.Margin().Left));
+}
+
+// Apple writes the arrow's visibility, then both margins, in one go: the hold looks once that is over.
+void HoldHeaderLater() {
+    auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
+    if (!queue) return;
+    queue.TryEnqueue(dispatching::DispatcherQueueHandler([]() noexcept {
+        try {
+            State& live = TheState();
+            if (!live.closed && live.header) HoldHeader(live);
+        } catch (...) {
+        }
+    }));
+}
+
+void WatchFor(State& state, const xaml::DependencyObject& element, const xaml::DependencyProperty& property) {
+    if (!element) return;
+    auto changed = [](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept { HoldHeaderLater(); };
+    state.watched.push_back({element, property, element.RegisterPropertyChangedCallback(property, changed)});
+}
+
+void TakeHeader(State& state, const controls::NavigationView& navigation) {
+    state.header = FindFirst<xaml::FrameworkElement>(navigation, L"PaneHeaderGrid", 0);
+    state.title = state.header ? FindFirst<xaml::FrameworkElement>(state.header, L"AppName", 0) : nullptr;
+    WatchFor(state, state.appleBack, xaml::UIElement::VisibilityProperty());
+    WatchFor(state, state.header, xaml::FrameworkElement::MarginProperty());
+    WatchFor(state, state.title, xaml::FrameworkElement::MarginProperty());
+    HoldHeader(state);
+}
+
+// The callbacks off, and Apple's room for its arrow back while the arrow shows, since it shows there again.
+void GiveBackHeader(State& state) {
+    for (const Watched& watched : state.watched) {
+        try {
+            watched.element.UnregisterPropertyChangedCallback(watched.property, watched.token);
+        } catch (...) {
+        }
+    }
+    state.watched.clear();
+    try {
+        const bool arrow = AppleArrowShows(state);
+        SetLeft(state.header, state.headerRoom.Restore(arrow));
+        SetLeft(state.title, state.titleRoom.Restore(arrow));
+    } catch (...) {
+    }
+    state.header = nullptr;
+    state.title = nullptr;
+    state.headerRoom = ArrowRoom{kAppleHeaderLeft};
+    state.titleRoom = ArrowRoom{kAppleTitleLeft};
+}
+
 // Apple's presenter of the search box leaves the pane for the strip. The box inside it stays Apple's object, with its
 // handlers; the data context it inherited goes with it, so its bindings keep their source.
 bool Take(State& state, const xaml::UIElement& content, const controls::NavigationView& navigation) {
@@ -334,6 +419,7 @@ bool Take(State& state, const xaml::UIElement& content, const controls::Navigati
     state.presenterIndex = index;
     state.navigation = winrt::make_weak(navigation);
     HideApples(state, navigation);
+    TakeHeader(state, navigation);
     if (!TakePresenterSetter(state, navigation)) WatchPresenter(state);
     KeepPresenterShown(state);
     state.popup.IsOpen(true);
@@ -386,6 +472,7 @@ void Release(State& state) {
     } catch (...) {
     }
     state.visibilityToken = 0;
+    GiveBackHeader(state);
     try {
         GiveBackPresenter(state);
         auto navigation = state.navigation.get();

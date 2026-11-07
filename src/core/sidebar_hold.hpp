@@ -54,6 +54,15 @@ inline double LeftOfMoreMargin(double moreRight, double moreWidth, double spacin
     return moreRight + moreWidth + spacing + taken;
 }
 
+// A window coordinate `at` in an element's own coordinates along one axis, from where its local 0 and its local 1 land
+// in the window. Mirrored (flow-direction rtl), 1 lands left of 0 and the offset counts from the element's right edge.
+// None when the element is squashed flat.
+inline std::optional<double> LocalOffset(double at, double origin, double unit) {
+    const double step = unit - origin;
+    if (step == 0) return std::nullopt;
+    return (at - origin) / step;
+}
+
 // Notes when the search text last changed while the keyboard was in the field. The first look is not typing.
 class TypingTracker {
 public:

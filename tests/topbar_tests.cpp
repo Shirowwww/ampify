@@ -58,6 +58,14 @@ TEST_CASE(Topbar_ControlsKeepAGapAboveThemUnderAStandardOrShortCaption) {
     }
 }
 
+TEST_CASE(Topbar_SearchSlotIsAsTallAsApplesSearchBoxSoItsBottomIsNotCut) {
+    for (double caption : {kTopbarCaptionHeight, 40.0, 48.0}) {
+        TopbarLayout layout = LayOutTopbar(1140, caption);
+        CHECK(layout.search.height >= kAppleSearchBoxHeight);
+        CHECK(layout.back.height == layout.search.height);
+    }
+}
+
 TEST_CASE(Topbar_CaptionHeightIsReadInDevicePixelsOrFallsBackToStandard) {
     CHECK(TopbarCaptionHeight(40, 1.25) == 32);                   // Windows' standard caption at 125%
     CHECK(TopbarCaptionHeight(60, 1.25) == 48);                   // a tall caption
@@ -120,10 +128,49 @@ TEST_CASE(Topbar_PresenterSetterFoundByItsCollapseWhenNoTargetResolves) {
     CHECK(PresenterSetterIndex(setters) == std::optional<std::size_t>(0));
 }
 
+TEST_CASE(Topbar_CollapsedReadFromTheNumberOrTheText) {
+    // Apple's template boxes a Visibility setter's value as an Int32: Collapsed is 1, Visible 0.
+    CHECK(VisibilityCollapses(1, L""));
+    CHECK(!VisibilityCollapses(0, L""));
+    CHECK(VisibilityCollapses(std::nullopt, L"Collapsed"));
+    CHECK(!VisibilityCollapses(std::nullopt, L"Visible"));
+    CHECK(!VisibilityCollapses(std::nullopt, L""));
+}
+
 TEST_CASE(Topbar_PresenterSetterRefusedWhenAmbiguousOrAbsent) {
     std::vector<StateSetterLook> two{{true, std::nullopt, true}, {true, std::nullopt, true}};
     CHECK(!PresenterSetterIndex(two));
     std::vector<StateSetterLook> elsewhere{{true, false, true}, {false, std::nullopt, true}};
     CHECK(!PresenterSetterIndex(elsewhere));             // a resolved target that is not the presenter never counts
     CHECK(!PresenterSetterIndex({}));
+}
+
+TEST_CASE(Topbar_HeaderKeepsItsPlaceWithoutArrowWhileTheArrowIsInTheStrip) {
+    ArrowRoom grid;
+    CHECK(!grid.Next(false, -26));               // Apple's layout without its arrow: learnt, left alone
+    CHECK(grid.Next(true, 5) == std::optional<double>(-26));  // Apple made room for the arrow: held as without it
+    CHECK(!grid.Next(true, -26));                // Ampify's own write, seen again: nothing more to do
+    CHECK(grid.Restore(true) == std::optional<double>(5));    // given back while the arrow shows: Apple's room
+    CHECK(!grid.Next(false, -26));               // the arrow went: Apple's value stands
+    CHECK(!grid.Restore(true));                  // nothing of Apple's is held any more
+}
+
+TEST_CASE(Topbar_HeaderLeftAsAppleHadItUntilItsLayoutWithoutArrowIsKnown) {
+    ArrowRoom grid;
+    CHECK(!grid.Next(true, 5));                  // the arrow already showed when the strip took it
+    CHECK(!grid.Restore(true));
+    CHECK(!grid.Next(false, -26));
+    CHECK(grid.Next(true, 6) == std::optional<double>(-26));  // the folded column's room (6) is held the same
+    CHECK(!grid.Restore(false));                 // the arrow went meanwhile: Apple has written its own value
+}
+
+TEST_CASE(Topbar_HeaderHeldFromTheStartWithAppleMusicsOwnLayoutWithoutArrow) {
+    // The strip turned on with a page to go back to: Apple was never seen without its arrow.
+    ArrowRoom grid{kAppleHeaderLeft};
+    CHECK(grid.Next(true, 5) == std::optional<double>(kAppleHeaderLeft));
+    CHECK(grid.Restore(true) == std::optional<double>(5));
+    CHECK(!grid.Next(false, -20));               // Apple's own value, once seen, wins over the known one
+    CHECK(grid.Next(true, 5) == std::optional<double>(-20));
+    ArrowRoom title{kAppleTitleLeft};
+    CHECK(title.Next(true, 26) == std::optional<double>(kAppleTitleLeft));
 }

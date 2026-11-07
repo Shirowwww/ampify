@@ -16,9 +16,11 @@ inline double FoldedEntryWidth(double columnWidth, double marginLeft, double mar
 constexpr double kMaxEntryIconShift = 8;
 
 // How far an entry's icon moves to sit on the axis of Apple's own icons, which a theme can move off the column's
-// middle (Glass gives Apple's items no side margin). Half pixels, as the layout rounds them; less than half is none.
-inline double EntryIconShift(double appleIconCentre, double entryIconCentre) {
-    const double shift = std::round((appleIconCentre - entryIconCentre) * 2) / 2;
+// middle (Glass gives Apple's items no side margin). In whole device pixels at `scale`, as the layout rounds them: a
+// half pixel was rounded on screen, measured back as the other half, and the icon moved on every second open.
+inline double EntryIconShift(double appleIconCentre, double entryIconCentre, double scale) {
+    const double pixels = scale > 0 ? scale : 1;
+    const double shift = std::round((appleIconCentre - entryIconCentre) * pixels) / pixels;
     if (std::abs(shift) > kMaxEntryIconShift) return 0;
     return shift;
 }

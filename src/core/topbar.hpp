@@ -6,12 +6,16 @@
 #include <cmath>
 #include <cstddef>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 namespace ampify {
 
 inline constexpr double kTopbarHeight = 40;         // the strip themes leave above the panels (--caption-room)
-inline constexpr double kTopbarControlHeight = 28;  // Apple's search box and the back arrow
+// Apple's search box keeps its TextBox's 32 minimum height whatever its slot is: a shorter slot cut off its bottom
+// line and corners. The back arrow matches it.
+inline constexpr double kAppleSearchBoxHeight = 32;
+inline constexpr double kTopbarControlHeight = kAppleSearchBoxHeight;
 inline constexpr double kTopbarMinTop = 4;          // the gap kept above them, even under a standard 32 caption
 inline constexpr double kTopbarBackWidth = 40;
 inline constexpr double kTopbarGap = 8;             // between the back arrow and the field
@@ -69,7 +73,8 @@ inline double TopbarCaptionHeight(int devicePixels, double scale) {
 
 // The field in the middle of the window, the back arrow just left of it, as Spotify lays them out. Both centre on the
 // caption buttons, not on the strip: centred on the strip they sat 4 pixels (5 to 6 at 125%) under the buttons' glyphs.
-// A 32 control filled the whole 32 caption line and touched the window's top edge: it is shorter and keeps a gap.
+// Under the standard 32 caption the control touched the window's top edge: it keeps a gap above, and so sits centred
+// in the 40 strip, as much lower than the caption buttons' glyphs as that gap.
 inline TopbarLayout LayOutTopbar(double windowWidth, double captionHeight) {
     const double width = TopbarSearchWidth(windowWidth);
     const double left = (windowWidth - width) / 2;
@@ -96,6 +101,12 @@ struct StateSetterLook {
     bool collapses = false;   // its value is Collapsed
 };
 
+// A Visibility setter's value collapses: Apple's template boxes it as an Int32 (Collapsed is 1), not as a Visibility,
+// and markup read as text gives its name. Unread, it never collapses.
+inline bool VisibilityCollapses(std::optional<int> number, std::wstring_view text) {
+    return number ? *number == 1 : text == L"Collapsed";
+}
+
 // The setter that collapses the search presenter: the one whose target resolved to it, else the only Visibility setter
 // with an unknown target that collapses (the state's other Visibility setters show the hamburger and the search
 // button). Nullopt when neither is found, or when the second rule is ambiguous.
@@ -113,6 +124,33 @@ inline std::optional<std::size_t> PresenterSetterIndex(const std::vector<StateSe
     }
     return candidates == 1 ? unresolved : std::nullopt;
 }
+
+// One left margin Apple's sidebar header changes for its back arrow (the header grid's, the title's). While the strip
+// holds the arrow, Apple's own one is invisible: the header keeps its place without it, as Apple lays it out when
+// there is nowhere to go back to. That place is learnt from Apple; until Apple is seen without its arrow (the strip
+// turned on with a page to go back to), it is the one Apple Music 1.1792 writes (kAppleHeaderLeft, kAppleTitleLeft).
+inline constexpr double kAppleHeaderLeft = -26;  // Grid#PaneHeaderGrid without the arrow (5, or 6 folded, with it)
+inline constexpr double kAppleTitleLeft = 34;    // TextBlock#AppName without the arrow (26 with it)
+
+struct ArrowRoom {
+    std::optional<double> without;  // Apple's value while its arrow is away
+    std::optional<double> apple;    // Apple's value with the arrow, replaced while held
+
+    // The value to write now that Apple's arrow shows or not and the margin is `current`; nullopt leaves it.
+    std::optional<double> Next(bool arrowShows, double current) {
+        if (!arrowShows) {
+            without = current;
+            apple.reset();
+            return std::nullopt;
+        }
+        if (!without || current == *without) return std::nullopt;
+        apple = current;
+        return without;
+    }
+
+    // Apple's value to put back when the strip lets the arrow go, while it still shows.
+    std::optional<double> Restore(bool arrowShows) const { return arrowShows ? apple : std::nullopt; }
+};
 
 // The window's passthrough regions with Ampify's previous ones taken out and its new ones added. Apple sets its own
 // regions too: they are kept as they are, in their order.

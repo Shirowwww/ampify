@@ -23,6 +23,12 @@ enum class NotificationRule { Apple, Background, Never };
 // way), the screen above the taskbar, over the Apple Music window, or in place of that window (one window, not two).
 enum class PlayerMode { Screen, WorkArea, Window, Replace };
 
+// Whether the player hides the main window until it closes: in place of it, and only a main window on screen. From the
+// mini player, Apple keeps the main window minimized and brings the mini player back on close: it stays Apple's.
+constexpr bool PlayerReplacesMain(PlayerMode mode, bool mainVisible, bool mainMinimized) {
+    return mode == PlayerMode::Replace && mainVisible && !mainMinimized;
+}
+
 struct AppleTweaks {
     NotificationRule notifications = NotificationRule::Apple;
     PlayerMode player = PlayerMode::Window;

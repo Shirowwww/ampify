@@ -546,13 +546,15 @@ void Lay(const xaml::Window& player, const windowing::AppWindow& window, Placeme
     } else {
         SetCaption(player, state);
     }
-    if (state.mode == uirender::PlayerMode::Replace && IsWindowVisible(state.main)) {
+    if (uirender::PlayerReplacesMain(state.mode, IsWindowVisible(state.main) != FALSE, IsIconic(state.main) != FALSE)) {
         state.mainWasZoomed = IsZoomed(state.main) != FALSE;
         ShowWindow(state.main, SW_HIDE);
         HiddenMain() = state.main;
     }
+    bool leftMinimized = state.mode == uirender::PlayerMode::Replace && IsIconic(state.main);
     state.journal->Write("Apple player: laid " + std::string(ModeName(state.mode)) + " (" + before +
-                         " presenter before), " + RectText(VisibleRect(hwnd)));
+                         " presenter before), " + RectText(VisibleRect(hwnd)) +
+                         (leftMinimized ? ", the main window left minimized (mini player)" : ""));
 }
 
 // Whether Apple Music took the window back after the change: logged once, a second later (the bench reads it).

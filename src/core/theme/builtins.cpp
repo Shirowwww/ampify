@@ -468,12 +468,14 @@ PersonPicture#smallPersonPicture {
         corner-radius: 0 !important;
     }
 
-    /* Apple insets the column 3 from the pane's top and bottom: it stood 3 lower and 3 shorter than the page panel. */
+    /* Apple insets the column 3 from the pane's top and bottom: it stood 3 lower and 3 shorter than the page panel.
+       Flush with the pane, not past it: the pane clips the column to its bounds, and a 1 above cut the outline's top
+       row away (Console's top edge missing, folded and open) while the column stood 1 past the page panel. */
     /* The column is 48 wide: a corner above half of that (24) cut the items at its ends, so it stops at 16. */
     .sidebar-column {
         background: var(--panel-background, #17171A);
         corner-radius: calc(min(var(--panel-radius, 10px), var(--compact-pane, 48) / 2 - 8));
-        margin: -1 0 -1 0;
+        margin: 0;
     }
 
     /* The logo's centre on the column's axis. It is 22 wide, and Apple's header starts it 15 in from the column's edge

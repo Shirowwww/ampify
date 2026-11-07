@@ -218,6 +218,7 @@ struct WindowContext {
     controls::Frame coveredFrame{nullptr};
     double coveredOpacity = 1.0;
     winrt::event_token coveredNavigated{};
+    winrt::event_token coveredNavigating{};  // Apple's back, turned into the app page's own (GoBackInPage)
     controls::NavigationView coveredSidebar{nullptr};  // its item already selected does not navigate: watched too
     winrt::event_token coveredInvoked{};
     IInspectable coveredSelection{nullptr};  // Apple's sidebar item lit before the app page showed

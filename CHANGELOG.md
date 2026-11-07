@@ -20,6 +20,9 @@
 
 ### Reliability
 
+- Sidebar on hover: the pane opens under the pointer after a tap on Alt too, Space on the focused hamburger opens and
+  closes it as Enter does, and Ampify's entries at the bottom no longer move a pixel between the folded column and the
+  open pane, nor from one open to the next.
 - Ampify's pages (Marketplace, Settings > Ampify) stay under the sidebar when it opens over the pages, as Apple's own
   pages do: their titles, tabs and cards no longer show through its entries. While one of them shows, only Ampify's
   entry is lit in the sidebar, and Apple's item comes back when the page closes.
@@ -94,6 +97,8 @@
 - The folded sidebar's column shows its whole outline: its two corners on the window's side were cut away by the
   sidebar pane's rounder corners, folded, opened under the pointer and pinned over the pages, in every floating-panels
   theme.
+- The folded sidebar's column keeps its top edge, folded and opened under the pointer: it stood 1 pixel above its
+  pane, which cut that edge away (Console), and 1 past the page panel at both ends.
 - A `linear-gradient` keeps its angle on an element of any shape, as in CSS: its lines were drawn for a square, so
   Glass's rim went dark at the top right and bottom left corners of the narrow column.
 - An `animation` on a `::before` or `::after` decor runs: the Animated artwork snippet's two layers turn again.
@@ -253,6 +258,11 @@
   keyboard is in it, wherever the pointer is (it closed at once). Over the pages, with no theme or under Fluent, it
   has Windows' in-app acrylic behind it instead of showing the pages through its entries, and its pin no longer sits
   on the Play button. The pin keeps its 2 pixels from "···" on the first open after a theme that resized "···".
+- The hover sidebar works on the right as on the left (Mirror): it opens under the pointer, stays open while the
+  pointer is in it, and its pin and the hamburger pin and unpin it. It used to close as soon as it opened.
+- A sidebar pinned over the pages in a narrow window stays open after a click on one of its items, under every theme,
+  and keeps "Apple Music" and "···" in its header: it showed as a squashed column for a moment (on the right, until
+  the next click), and its header could lose both.
 - With a theme whose playback bar is at the bottom (Ember, Glass and the others), the open sidebar in a wide window
   keeps its hamburger in its own row under the logo: it sat on the logo, with an empty row below.
 - The buttons of an Ampify dialog keep the text font: every button in it, its content included, not only the three

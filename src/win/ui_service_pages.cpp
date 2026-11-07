@@ -64,6 +64,7 @@ void UncoverApplePage(WindowContext& context, Selection selection) noexcept {
     try {
         if (auto frame = std::exchange(context.coveredFrame, nullptr)) {
             frame.Navigated(context.coveredNavigated);
+            frame.Navigating(context.coveredNavigating);
             frame.Opacity(context.coveredOpacity);
         }
         if (auto sidebar = std::exchange(context.coveredSidebar, nullptr)) {
@@ -100,15 +101,41 @@ void ClearSidebarSelection(WindowContext& context, const controls::NavigationVie
     }
 }
 
+// The app page's own back: to the page shown before in this visit (a detail view of the Marketplace to its list), or,
+// from the first page of the visit, the host closes on Apple Music's page under it.
+void GoBackInPage(const WeakShared& weakShared, const std::shared_ptr<WindowContext>& context) {
+    if (!context->routeHistory.empty()) {
+        context->backPending = true;
+        QueueRefresh(weakShared, context);
+        return;
+    }
+    context->pageClosed = true;
+    ShowPageHost(*context, false);
+}
+
 // Hides Apple Music's page under the shown app page: the host turns see-through, so the app page sits on the theme's
 // panel (its colour, acrylic, corners) as Apple Music's pages do. A navigation of Apple Music (sidebar, back arrow,
 // search) closes the app page, as leaving a Spicetify app does.
-void CoverApplePage(const std::shared_ptr<WindowContext>& owner) {
+void CoverApplePage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& owner) {
     WindowContext& context = *owner;
     controls::Frame frame = ContentFrame(context);
     if (!frame || !context.pageHost || frame == context.coveredFrame) return;
     UncoverApplePage(context, Selection::Keep);
     WeakContext weakContext = owner;
+    WeakShared weakShared = shared.weak_from_this();
+    // Apple's back (its arrow, the top bar's, the mouse's back button) would leave the page under the app page, a step
+    // too far: it does what the app page's arrow does instead, so every back arrow agrees.
+    using NavigatingArgs = xaml::Navigation::NavigatingCancelEventArgs;
+    context.coveredNavigating = frame.Navigating([weakShared, weakContext](IInspectable const&,
+                                                                            NavigatingArgs const& args) noexcept {
+        try {
+            auto live = weakContext.lock();
+            if (!live || args.NavigationMode() != xaml::Navigation::NavigationMode::Back) return;
+            args.Cancel(true);
+            GoBackInPage(weakShared, live);
+        } catch (...) {
+        }
+    });
     auto leave = [weakContext]() noexcept {
         try {
             if (auto live = weakContext.lock()) {
@@ -199,21 +226,11 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
     host.Visibility(xaml::Visibility::Collapsed);
 
     // The handler holds the window context weakly, not the host: the host holds the button that holds the handler.
-    // The arrow goes back to the page shown before (a detail view of the Marketplace to its list), as Apple Music's own
-    // arrow does; from the first page of the visit, it closes the host.
     WeakShared weakShared = shared.weak_from_this();
     WeakContext weakContext = owner;
     back.Click([weakShared, weakContext](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
-            auto live = weakContext.lock();
-            if (!live) return;
-            if (!live->routeHistory.empty()) {
-                live->backPending = true;
-                QueueRefresh(weakShared, live);
-                return;
-            }
-            live->pageClosed = true;
-            ShowPageHost(*live, false);
+            if (auto live = weakContext.lock()) GoBackInPage(weakShared, live);
         } catch (...) {
         }
     });
@@ -245,7 +262,7 @@ void MountPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& 
         JournalRender(shared, "page", surface, stats, first);
     }
     // On every refresh: the host waits for Apple's frame, and goes back beside it if Apple Music took it out.
-    if (!context->pageClosed && ShowPageHost(*context, true)) CoverApplePage(context);
+    if (!context->pageClosed && ShowPageHost(*context, true)) CoverApplePage(shared, context);
 }
 
 // The dialog of a popup. Close, alone, stands for the default button: Apple's plain style with Ampify's accent
@@ -570,7 +587,7 @@ void MountAmpifyPage(UiService::Shared& shared, const std::shared_ptr<WindowCont
     }
     if (slot.Child() != context->ampifyPage) slot.Child(context->ampifyPage);
     if (context->pageTitle && context->pageTitle.Text() != L"Ampify") context->pageTitle.Text(L"Ampify");
-    if (ShowPageHost(*context, true)) CoverApplePage(context);
+    if (ShowPageHost(*context, true)) CoverApplePage(shared, context);
 }
 
 }  // namespace

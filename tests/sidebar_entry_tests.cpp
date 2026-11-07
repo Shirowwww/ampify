@@ -1,11 +1,22 @@
 #include "../src/core/sidebar_entry.hpp"
 #include "test.hpp"
 
+#include <cmath>
 #include <limits>
 
 namespace {
 
 constexpr double kAuto = std::numeric_limits<double>::quiet_NaN();
+
+// Where the layout puts an icon asked at `x`: on the nearest device pixel.
+double Laid(double x, double scale) {
+    return std::round(x * scale) / scale;
+}
+
+// The shift measured again on an entry laid out with `shift`, as MeasureIconShift does after each open.
+double Remeasured(double appleAxis, double entryAxis, double shift, double scale) {
+    return ampify::EntryIconShift(appleAxis, Laid(entryAxis + shift, scale) - shift, scale);
+}
 
 }  // namespace
 
@@ -43,23 +54,43 @@ TEST_CASE(SidebarEntry_LayoutPutsBackAWidthAThemeWrote) {
 }
 
 TEST_CASE(SidebarEntry_IconShiftMovesTheIconOntoApplesAxis) {
-    CHECK(ampify::EntryIconShift(25.5, 24) == 1.5);
-    CHECK(ampify::EntryIconShift(22, 24) == -2);
+    CHECK(ampify::EntryIconShift(25.5, 24, 2) == 1.5);
+    CHECK(ampify::EntryIconShift(22, 24, 1) == -2);
 }
 
-TEST_CASE(SidebarEntry_IconShiftSnapsToHalfPixels) {
-    CHECK(ampify::EntryIconShift(25.6, 24) == 1.5);
-    CHECK(ampify::EntryIconShift(25.8, 24) == 2);
+TEST_CASE(SidebarEntry_IconShiftSnapsToDevicePixels) {
+    CHECK(ampify::EntryIconShift(25.6, 24, 2) == 1.5);
+    CHECK(ampify::EntryIconShift(25.8, 24, 2) == 2);
+    CHECK(ampify::EntryIconShift(25.4, 24, 1) == 1);
+    CHECK(std::abs(ampify::EntryIconShift(25, 24, 1.25) - 0.8) < 1e-9);
 }
 
-TEST_CASE(SidebarEntry_IconShiftIgnoresLessThanHalfAPixel) {
-    CHECK(ampify::EntryIconShift(24.2, 24) == 0);
-    CHECK(ampify::EntryIconShift(23.8, 24) == 0);
+TEST_CASE(SidebarEntry_IconShiftIgnoresLessThanHalfADevicePixel) {
+    CHECK(ampify::EntryIconShift(24.2, 24, 2) == 0);
+    CHECK(ampify::EntryIconShift(23.8, 24, 2) == 0);
+    CHECK(ampify::EntryIconShift(24.4, 24, 1) == 0);
 }
 
 TEST_CASE(SidebarEntry_IconShiftIgnoresAnAxisFarOffTheColumn) {
-    CHECK(ampify::EntryIconShift(24 + ampify::kMaxEntryIconShift + 1, 24) == 0);
-    CHECK(ampify::EntryIconShift(-100, 24) == 0);
+    CHECK(ampify::EntryIconShift(24 + ampify::kMaxEntryIconShift + 1, 24, 1) == 0);
+    CHECK(ampify::EntryIconShift(-100, 24, 1) == 0);
+}
+
+TEST_CASE(SidebarEntry_IconShiftHoldsStillWhenMeasuredAgainOnItsOwnLayout) {
+    // Apple's axis half a pixel off the entry's: a half-pixel shift was rounded by the layout, measured back as the
+    // other half, and the icon went to and fro a pixel on every second open.
+    for (double scale : {1.0, 1.25, 1.5, 2.0}) {
+        double shift = Remeasured(24.5, 24, 0, scale);
+        const double settled = shift;
+        for (int open = 0; open < 4; open++) {
+            shift = Remeasured(24.5, 24, shift, scale);
+            CHECK(shift == settled);
+        }
+    }
+}
+
+TEST_CASE(SidebarEntry_IconShiftTakesAMissingScaleAsOne) {
+    CHECK(ampify::EntryIconShift(25.4, 24, 0) == 1);
 }
 
 TEST_CASE(SidebarEntry_CutSharesTheMissingRoomAmongTheEntries) {

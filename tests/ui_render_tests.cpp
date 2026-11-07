@@ -823,6 +823,16 @@ TEST_CASE(UiRender_AccentPresetsCoverTheWheelAndAreTranslated) {
                                               "BF5AF2"}));
 }
 
+TEST_CASE(UiRender_PlayerReplacesOnlyAMainWindowOnScreen) {
+    CHECK(PlayerReplacesMain(PlayerMode::Replace, true, false));
+    // Opened from the mini player: Apple keeps the main window minimized, and brings the mini player back on close.
+    CHECK(!PlayerReplacesMain(PlayerMode::Replace, true, true));
+    CHECK(!PlayerReplacesMain(PlayerMode::Replace, false, false));
+    CHECK(!PlayerReplacesMain(PlayerMode::Window, true, false));
+    CHECK(!PlayerReplacesMain(PlayerMode::WorkArea, true, false));
+    CHECK(!PlayerReplacesMain(PlayerMode::Screen, true, false));
+}
+
 TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     Settings settings;
     AppleTweaks none = ReadAppleTweaks(settings);

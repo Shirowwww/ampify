@@ -156,13 +156,25 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   looks the element's name up from the path object, outside the template's namescope, and throws E_FAIL (0x80004005);
   the first version stopped there and fell back, which left a 55-pixel band above the folded column's hamburger. Each
   setter is read on its own, and without a resolved target the presenter's is the only `Visibility` setter of the
-  state that collapses (the others show `PaneAutoSuggestButton` and `TogglePaneButton`). Holding `NotClosedCompact`
-  stays as a fallback if the setter cannot be found or the collection refuses the change. The arrow is Ampify's button; a click invokes Apple's
+  state that collapses (the others show `PaneAutoSuggestButton` and `TogglePaneButton`). The four setters' values come
+  boxed as `IReference<Int32>` (1, 0, a Double for the height, 0), never as `IReference<Visibility>`: read as the
+  enum, none collapsed, the fallback held `NotClosedCompact`, and the folded column started without its hamburger
+  until the first hover open and close (seen 2026-11-07). Holding `NotClosedCompact` stays as a fallback if the setter cannot be found or the collection refuses the change. The arrow is Ampify's button; a click invokes Apple's
   `Button#NavigationViewBackButton` through its automation peer (as a click on it would), and Apple's arrow stays in
   place with opacity 0.
+- Apple's sidebar header makes room for its own arrow in code (`AMP.UI.Views.dll`, read from the 1.1792 binary): while
+  the back button is enabled, `Grid#PaneHeaderGrid` gets a left margin of 5 (6 in the Compact display mode) instead
+  of -26, and `TextBlock#AppName` 26 instead of 34; the title and `MenuButton#MoreButton` are collapsed by its
+  `PaneClosing` handler and shown by its `PaneOpening` handler, and its `DisplayModeChanged` handler shows them unless
+  the mode is Compact. With the arrow in the strip, that room made the logo jump some 30 pixels right after the first
+  navigation (open and pinned pane), and the folded column hid its logo for an invisible arrow. While the strip holds
+  the arrow, both left margins are held at the values Apple wrote last without it (until it is seen without its arrow,
+  as when the strip turns on with a page to go back to, the 1.1792 values -26 and 34), and given back on release while
+  the arrow shows.
 - The field and the arrow centre on the caption buttons, whose height is the AppWindow title bar's (`TitleBar.Height`,
   device pixels; 32 at 100%), not on the 40-pixel strip: centred on the strip they sat 5 to 6 pixels low at 125%.
-  They are 28 high with at least 4 above: at 32 they filled the caption line and touched the window's top edge.
+  They keep at least 4 above: at the top of a 32 caption line they touched the window's top edge. They stay 32 high,
+  Apple's search box's own height (its TextBox's `MinHeight`): a 28 slot cut off the box's bottom line and corners.
 - Apple's own layout and a theme's top bar put `Grid#TransportBar` in the strip: the strip shows only when the bar
   starts lower than 40 pixels. The window's passthrough regions (`InputNonClientPointerSource`) are Apple's plus
   Ampify's, merged every quarter second, since Apple sets its own again as its layout changes.
