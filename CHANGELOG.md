@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 (2026-11-07), beta
+
+This is an experimental release for testers: it is published as a pre-release, so Ampify does not offer it as an update to everyone.
 
 ### Settings
 

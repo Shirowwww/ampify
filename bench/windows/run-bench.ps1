@@ -85,7 +85,7 @@ function Test-Requirement {
         'apple-music' { return $script:AppleMusicInstalled }
         # Set by scripts/listen-test.ps1: Apple Music is signed in on this PC.
         'apple-account' { return ($script:AppleMusicInstalled -and $env:AMPIFY_SIGNED_IN -eq 'true') }
-        'kit:*' { return (Get-MissingKitFiles -Part $Name.Substring(4)).Count -eq 0 }
+        'kit:*' { return @(Get-MissingKitFiles -Part $Name.Substring(4)).Count -eq 0 }
         default { throw "Unknown requirement: $Name" }
     }
 }

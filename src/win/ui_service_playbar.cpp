@@ -381,7 +381,7 @@ controls::Button MakePlaybarMore(const controls::Button& model, const UiEventSin
     return more;
 }
 
-// Victor's ask of 05/11: in a narrow window, Ampify's buttons go one by one into a "More" button, the last one first,
+// In a narrow window, Ampify's buttons go one by one into a "More" button, the last one first,
 // and come back as the room does, so the bar keeps room for the song and the transport. Apple's own buttons stay. One
 // step per call: the layout that follows calls again (SizeChanged). Folding a single button would gain nothing.
 void FoldPlaybarButtons(const UiEventSink& sink, const std::shared_ptr<WindowContext>& context) {
