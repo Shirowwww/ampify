@@ -1961,6 +1961,72 @@ TEST_CASE(Engine_LeavesTheFontOfAnIconAlone) {
     CHECK(log.str().find("Refused") == std::string::npos);
 }
 
+// A shelf's title is a Grid (.shelf-title), which has no font: its font goes to the texts inside it, as in CSS, while
+// its background stays on the Grid. A text's own rule, and a control with its own rule, keep theirs.
+TEST_CASE(Engine_PassesAPanelsFontToTheTextsInside) {
+    MemoryFiles files;
+    files.files["user.css"] = "Grid#Header { font-family: Georgia; font-weight: 700; background: #FF112233; }\n"
+                              "TextBlock#Own { font-weight: 300; }\n"
+                              "ContentControl#Box { font-weight: 500; }\n";
+    th::Theme theme = Load(files);
+
+    FakeTree tree;
+    std::map<std::string, th::Value> font = {{"FontFamily", {th::ValueKind::Text, "SF Hello"}},
+                                             {"FontWeight", {th::ValueKind::Number, "600"}}};
+    th::NodeId header = tree.Add(-1, "Grid", "Header", {{"Background", Brush("#FF000000")}});
+    th::NodeId stack = tree.Add(0, "StackPanel", "");
+    tree.elements[header - 1].info.panel = true;
+    tree.elements[stack - 1].info.panel = true;
+    th::NodeId title = tree.Add(1, "TextBlock", "Title", font);
+    th::NodeId own = tree.Add(1, "TextBlock", "Own", font);
+    tree.Add(0, "ContentControl", "Box", font);
+    th::NodeId boxed = tree.Add(4, "TextBlock", "Boxed", font);
+    std::ostringstream log;
+    ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+    th::ThemeEngine engine(journal);
+
+    th::ThemeEngine::Report report = engine.Apply(theme, tree);
+    CHECK(report.refused == 0);
+    CHECK(log.str().find("has no property") == std::string::npos);
+    CHECK(tree.Shown(header, "Background").text == "#FF112233");
+    CHECK(tree.Shown(title, "FontFamily").text == "Georgia");
+    CHECK(tree.Shown(title, "FontWeight").text == "700");
+    CHECK(tree.Shown(own, "FontWeight").text == "300");    // its own rule wins
+    CHECK(tree.Shown(own, "FontFamily").text == "Georgia");
+    CHECK(tree.Shown(boxed, "FontWeight").text == "600");  // under a control that takes the weight itself
+    CHECK(tree.Shown(boxed, "FontFamily").text == "Georgia");
+    CHECK(engine.Apply(theme, tree).applied == 0);  // settled
+
+    engine.Restore(tree);
+    CHECK(tree.Shown(title, "FontFamily").text == "SF Hello");
+    CHECK(tree.Shown(title, "FontWeight").text == "600");
+    CHECK(tree.Shown(header, "Background").text == "#FF000000");
+}
+
+// What the engine refuses on: a Grid has no TextWrapping, and Apple Music holds no value for the colour key.
+TEST_CASE(Engine_KeepsRefusedElementsOnlyWhenAskedTo) {
+    MemoryFiles files;
+    files.files["user.css"] = "Grid#Header { white-space: nowrap; background: $AccentFillColorDefaultBrush; }\n";
+    th::Theme theme = Load(files);
+
+    for (bool record : {false, true}) {
+        FakeTree tree;
+        th::NodeId header = tree.Add(-1, "Grid", "Header", {{"Background", Brush("#FF000000")}});
+        std::ostringstream log;
+        ampify::Journal journal(log, [] { return std::string("00:00:00.000"); });
+        th::ThemeEngine engine(journal);
+        engine.RecordRefusedElements(record);
+
+        CHECK(engine.Apply(theme, tree).refused == 2);
+        CHECK(engine.Refusals().size() == 2);
+        for (const auto& [key, refusal] : engine.Refusals()) {
+            CHECK(!refusal.message.empty());
+            // The colour refusal names its element as the other one does (not left with none)
+            CHECK(refusal.elements == (record ? std::set<th::NodeId>{header} : std::set<th::NodeId>{}));
+        }
+    }
+}
+
 TEST_CASE(Engine_ScalesEachTextFromItsOwnSize) {
     MemoryFiles files;
     files.files["user.css"] = "TextBlock { font-size: 120%; }\nTextBlock:hover { font-size: 1.5em; }\n";
@@ -2298,6 +2364,37 @@ TEST_CASE(Theme_BarsContentTakesACountAndAColour) {
     CHECK(!ProblemContaining(theme, "line 3: bars() takes a whole number of bars from 2 to 32").empty());
     CHECK(!ProblemContaining(theme, "line 4: bars() takes").empty());
     CHECK(!ProblemContaining(theme, "line 5: bars() takes").empty());
+}
+
+// A Fluent key the theme does not define is Apple Music's own colour for it: a snippet with no theme still works.
+TEST_CASE(Engine_TakesAppleMusicsColourForAKeyTheThemeLeaves) {
+    DecorPage page;
+    th::NodeId text = page.tree.Add(0, "TextBlock", "Title", {{"Foreground", Brush("#FFFFFFFF")}});
+    th::Theme theme = page.Css("TextBlock#Title { color: $accentfillcolordefaultbrush; }\n"
+                               "#Bar::after { content: bars(4); color: $AccentFillColorDefaultBrush; }\n");
+    CHECK(ProblemContaining(theme, "[colors]").empty());
+    page.tree.resources["AccentFillColorDefaultBrush"] = Brush("#FF0A84FF");
+
+    th::ThemeEngine::Report report = page.engine.Apply(theme, page.tree);
+    CHECK(report.refused == 0);
+    CHECK(page.tree.Shown(text, "Foreground").text == "#FF0A84FF");
+    const th::Decor* after = page.After();
+    CHECK(after && after->properties.size() == 1 && after->properties[0].second == Brush("#FF0A84FF"));
+    CHECK(page.engine.Apply(theme, page.tree).applied == 0);  // settled
+
+    // Apple's colour changes (another accent, light and dark): the next pass follows it.
+    page.tree.resources["AccentFillColorDefaultBrush"] = Brush("#FF30D158");
+    page.engine.Apply(theme, page.tree);
+    CHECK(page.tree.Shown(text, "Foreground").text == "#FF30D158");
+
+    // A key the app does not hold is refused, and a name that is no Fluent key stays a problem of the file.
+    page.tree.resources.erase("AccentFillColorDefaultBrush");
+    page.engine.Rearm();
+    page.engine.Apply(theme, page.tree);
+    CHECK(page.log.str().find("Apple Music has no colour AccentFillColorDefaultBrush") != std::string::npos);
+    CHECK(!ProblemContaining(page.Css("TextBlock { color: $NotAKey; }"), "is not in [colors]").empty());
+    CHECK(!ProblemContaining(page.Css("Grid { background: linear-gradient(#000, $AccentColor); }"), "a gradient")
+               .empty());
 }
 
 TEST_CASE(Engine_PutsBarsInAPanelLikeAnImage) {

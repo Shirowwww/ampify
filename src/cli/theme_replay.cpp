@@ -289,11 +289,14 @@ Json FinalJson(ReplayBackend& tree, const std::vector<NodeInfo>& nodes) {
     for (const auto& [node, properties] : before) {
         Json::Object values;
         for (const auto& [property, was] : properties) {
+            std::string now = ShownOf(property, tree.Shown(node, property));
+            if (now == was) continue;  // the first state touched it and the last gave it back (--then)
             Json::Object value;
             value.emplace_back("before", Json(was));
-            value.emplace_back("after", Json(ShownOf(property, tree.Shown(node, property))));
+            value.emplace_back("after", Json(std::move(now)));
             values.emplace_back(property, Json(std::move(value)));
         }
+        if (values.empty()) continue;
         Json::Object item;
         item.emplace_back("node", Number(node));
         item.emplace_back("element", Json(Label(tree.Nodes()[node])));
@@ -729,6 +732,7 @@ struct Bench {
     Bench(std::unique_ptr<ReplayBackend> loaded, const fs::path& kit, const ReplayRequest& request)
         : tree(std::move(loaded)), worker(kit) {
         worker.SetArtwork(request.artwork);
+        session.RecordRefusedElements(true);  // the report counts the elements each refusal was made on
     }
 
     std::vector<std::string> Lines() {

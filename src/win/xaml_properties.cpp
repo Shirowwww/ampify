@@ -146,6 +146,7 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
             std::vector<xaml::Documents::Inline> inlines = InlinesOf(text);
             return brush(HasLink(inlines) ? inlines.back().Foreground() : text.Foreground());
         }
+        if (auto rich = object.try_as<controls::RichTextBlock>()) return brush(rich.Foreground());
         if (auto icon = object.try_as<controls::IconElement>()) return brush(icon.Foreground());
         if (auto presenter = object.try_as<controls::ContentPresenter>()) return brush(presenter.Foreground());
     } else if (IsSelectionBrush(property)) {
@@ -158,13 +159,16 @@ std::optional<theme::Value> XamlTreeBackend::ReadRaw(theme::NodeId id, std::stri
     } else if (property == "FontSize") {
         if (auto control = object.try_as<controls::Control>()) return theme::Value{theme::ValueKind::Length, th::FormatNumber(control.FontSize())};
         if (auto text = object.try_as<controls::TextBlock>()) return theme::Value{theme::ValueKind::Length, th::FormatNumber(text.FontSize())};
+        if (auto rich = object.try_as<controls::RichTextBlock>()) return theme::Value{theme::ValueKind::Length, th::FormatNumber(rich.FontSize())};
     } else if (property == "FontFamily") {
         // A font of the theme reads back as the file URI and family it was written with (FontFamily.Source).
         if (auto control = object.try_as<controls::Control>()) return theme::Value{theme::ValueKind::Text, Utf8(control.FontFamily().Source())};
         if (auto text = object.try_as<controls::TextBlock>()) return theme::Value{theme::ValueKind::Text, Utf8(text.FontFamily().Source())};
+        if (auto rich = object.try_as<controls::RichTextBlock>()) return theme::Value{theme::ValueKind::Text, Utf8(rich.FontFamily().Source())};
     } else if (property == "FontWeight") {
         if (auto control = object.try_as<controls::Control>()) return number(control.FontWeight().Weight);
         if (auto text = object.try_as<controls::TextBlock>()) return number(text.FontWeight().Weight);
+        if (auto rich = object.try_as<controls::RichTextBlock>()) return number(rich.FontWeight().Weight);
     } else if (IsTextProperty(property)) {
         return ReadTextProperty(object, property);
     } else if (property == "Margin") {
@@ -640,6 +644,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
                 PaintLinks(text, &*target);
                 written = true;
             }
+            else if (auto rich = object.try_as<controls::RichTextBlock>()) { rich.Foreground(*target); written = true; }
             else if (auto icon = object.try_as<controls::IconElement>()) { icon.Foreground(*target); written = true; }
             else if (auto presenter = object.try_as<controls::ContentPresenter>()) {
                 presenter.Foreground(*target);
@@ -665,6 +670,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         double size = ParseLength(value.text);
         if (auto control = object.try_as<controls::Control>()) { control.FontSize(size); return true; }
         if (auto text = object.try_as<controls::TextBlock>()) { text.FontSize(size); return true; }
+        if (auto rich = object.try_as<controls::RichTextBlock>()) { rich.FontSize(size); return true; }
         return false;
     }
 
@@ -673,6 +679,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         media::FontFamily family(winrt::to_hstring(value.text));
         if (auto control = object.try_as<controls::Control>()) { control.FontFamily(family); return true; }
         if (auto text = object.try_as<controls::TextBlock>()) { text.FontFamily(family); return true; }
+        if (auto rich = object.try_as<controls::RichTextBlock>()) { rich.FontFamily(family); return true; }
         return false;
     }
 
@@ -680,6 +687,7 @@ bool XamlTreeBackend::WriteRaw(theme::NodeId id, std::string_view property, cons
         auto weight = static_cast<std::uint16_t>(std::stod(value.text));
         if (auto control = object.try_as<controls::Control>()) { control.FontWeight(winrt::Windows::UI::Text::FontWeight{weight}); return true; }
         if (auto text = object.try_as<controls::TextBlock>()) { text.FontWeight(winrt::Windows::UI::Text::FontWeight{weight}); return true; }
+        if (auto rich = object.try_as<controls::RichTextBlock>()) { rich.FontWeight(winrt::Windows::UI::Text::FontWeight{weight}); return true; }
         return false;
     }
 

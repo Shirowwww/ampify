@@ -46,6 +46,7 @@ public:
     bool Active() const { return m_engine.Active(); }
     const std::map<std::pair<NodeId, std::string>, Value>& Originals() const { return m_engine.Originals(); }
     const std::map<std::string, ThemeEngine::Refusal>& Refusals() const { return m_engine.Refusals(); }
+    void RecordRefusedElements(bool on) { m_engine.RecordRefusedElements(on); }
 
     // What the session applies, theme and snippets together; null when nothing is applied. For Ampify.fonts and the like.
     std::shared_ptr<const Theme> Applied() const { return m_composed; }

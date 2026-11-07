@@ -45,7 +45,7 @@ TEST_CASE(ReplayReport_CountsEachRefusalOnceWithTheElementsItWasRefusedOn) {
     th::ReplayRequest request;
     request.tree = Fixture();
     request.out = dir / "out";
-    request.theme = ThemeFolder(dir, "fonts", "Grid#Root { font-family: Georgia; }\n");
+    request.theme = ThemeFolder(dir, "fonts", "Grid#Root { white-space: nowrap; }\n");
     std::optional<ampify::Json> report = ReplayJson(request);
     CHECK(report.has_value());
     if (!report) return;
@@ -57,7 +57,7 @@ TEST_CASE(ReplayReport_CountsEachRefusalOnceWithTheElementsItWasRefusedOn) {
 
     int entries = 0;
     for (const ampify::Json& item : Items(*report, "refused")) {
-        if (Text(item.Find("reason")).find("has no property FontFamily") == std::string::npos) continue;
+        if (Text(item.Find("reason")).find("has no property TextWrapping") == std::string::npos) continue;
         entries++;
         CHECK(Text(item.Find("from")) == "engine");
         CHECK(NumberOf(item.Find("count")) == grids);

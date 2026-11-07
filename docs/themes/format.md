@@ -32,6 +32,10 @@ AccentFillColorDefaultBrush = 0A84FF
   `var(--spice-key)`.
 - A PascalCase key is the name of an app resource (a Fluent brush or color) and replaces it. It is also usable as
   `$Name` in `user.css`. A name the app does not have is logged as "missing resource".
+- `$Name` for a Fluent key the theme does not set (or in a snippet with no theme) is Apple Music's own colour for that
+  key, read when the value is written: `$AccentFillColorDefaultBrush` is the accent on screen, with or without a theme.
+  It works for a plain colour (`background`, `color`, `border-color`, `::before`), not inside `linear-gradient(...)`
+  or `acrylic(...)`, which need a colour of the theme or a hexadecimal value.
 - Values are hexadecimal, with or without `#`: `FA2D48`, `#FA2D48`, or `#80FA2D48` (alpha first).
 - The default scheme is the manifest's `defaultScheme`, or the first section. The setting `theme.scheme` picks
   another (see [Automatic scheme](#automatic-scheme)).
@@ -220,6 +224,11 @@ explain them in one line; the page also resets them, and exports or imports them
 - "(text)" properties exist on a `TextBlock` only; `font-style` and `letter-spacing` also work on a control.
 - A property an element does not have is refused once, in the log, without harm. Everything comes back to its
   original value when the theme is removed.
+- A panel (`Grid`, `StackPanel`) has no colour or font: `color`, `font-family`, `font-size`, `font-weight`,
+  `font-style`, `letter-spacing`, `line-height` and `text-align` on a panel go to the texts inside it, as CSS inherits
+  them. `.shelf-title { font-family: Georgia; }` reaches the title's texts, while a `background` or a `width` stays on
+  the panel. A text's own rule wins, the nearest panel wins over those around it, and a control with its own rule for
+  the property keeps it for what it holds. Values under the pointer (`:hover`) are not passed down.
 - An unknown property is ignored, and the log suggests the equivalent when there is one: `background-color` →
   `background`, `backdrop-filter` → `backdrop`, `justify-content`/`align-items` → alignment on the children, `gap` →
   `margin` on the children, `border` → `border-width` and `border-color`, `overflow-x`/`overflow-y` → `overflow` or

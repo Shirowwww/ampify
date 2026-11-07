@@ -44,6 +44,8 @@ enum class ValueKind {
     Clip,        // a rectangle inset from the element's edges, "left,top,right,bottom" in pixels (negative reaches past
                  // them), that the element and its children are cut to; empty for no clip
     Opaque,      // a token that Read gave back for an object the engine cannot express as text; Write restores it
+    ColorKey,    // a Fluent colour key the theme's [colors] do not define, such as "AccentFillColorDefaultBrush": the
+                 // engine writes Apple Music's own colour for it (ReadResource), so a backend never receives one
 };
 
 struct Value {

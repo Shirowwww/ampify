@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "../text_util.hpp"
+#include "colour_keys.hpp"
 #include "css.hpp"
 
 namespace ampify::theme {
@@ -262,15 +263,25 @@ std::string FormatFraction(double number) {
     return FormatNumber(number);
 }
 
-// A plain colour: `#hex`, `$palette` name or `transparent`.
+// Apple Music's own colour for a key is read when the value is written: a gradient or a tint is built at load time.
+Conversion FailOnAppColour(std::string_view name, std::string_view where) {
+    return Fail("color \"" + std::string(TrimSpace(name)) + "\" is not in [colors]: " + std::string(where) +
+                " takes a colour of the theme or a #hex");
+}
+
+// A plain colour: `#hex`, `$palette` name (or a Fluent key, Apple Music's colour for it) or `transparent`.
 Conversion ConvertColor(std::string_view raw, const ValueContext& context) {
     std::string_view text = TrimSpace(raw);
     if (text.empty()) return Fail("empty color");
 
     if (text.front() == '$') {
         std::optional<Argb> color = context.palette.Find(text.substr(1));
-        if (!color) return Fail("color \"" + std::string(text) + "\" is not in [colors]");
-        return Ok(ValueKind::Color, ToXamlColor(*color));
+        if (color) return Ok(ValueKind::Color, ToXamlColor(*color));
+        // A Fluent key the theme leaves alone (or a snippet with no theme): Apple Music's own colour for it.
+        if (std::optional<std::string_view> key = FindColourKey(text.substr(1))) {
+            return Ok(ValueKind::ColorKey, std::string(*key));
+        }
+        return Fail("color \"" + std::string(text) + "\" is not in [colors], nor a Fluent colour key");
     }
 
     if (ToLowerAscii(text) == "transparent") return Ok(ValueKind::Color, "#00FFFFFF");
@@ -336,6 +347,7 @@ Conversion ConvertGradient(std::string_view inside, const ValueContext& context)
         }
         Conversion color = ConvertColor(words[0], context);
         if (!color.value) return color;
+        if (color.value->kind == ValueKind::ColorKey) return FailOnAppColour(words[0], "a gradient");
         Stop stop{color.value->text, std::nullopt};
         if (words.size() == 2) {
             stop.offset = ParsePercent(words[1]);
@@ -431,6 +443,7 @@ Conversion ConvertBackdrop(std::string_view raw, const ValueContext& context) {
 
     Conversion tint = ConvertColor(pieces[0], context);
     if (!tint.value) return tint;
+    if (tint.value->kind == ValueKind::ColorKey) return FailOnAppColour(pieces[0], "an acrylic tint");
     std::optional<double> opacity = ParseNumber(pieces[1]);
     if (!opacity || *opacity < 0 || *opacity > 1) {
         return Fail("acrylic opacity outside 0 to 1: \"" + std::string(pieces[1]) + "\"");

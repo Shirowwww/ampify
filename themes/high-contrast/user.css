@@ -10,6 +10,7 @@
     --panel-radius: 4px;
     --gap: 8;
     --line: $TextFillColorPrimaryBrush;
+    --track: $ControlStrongFillColorDefaultBrush;
     --accent: $AccentFillColorDefaultBrush;
 }
 
@@ -59,11 +60,13 @@
     foreground: $TextOnAccentFillColorPrimaryBrush;
 }
 
-/* The progress line takes the volume's colours (older Ampify versions leave it to Apple Music). */
+/* The progress line takes the volume's colours (older Ampify versions leave it to Apple Music). The track is a grey
+   at least 3:1 from both the accent and the background (colors.ini): on the text colour, the accent fill read 1.43:1
+   in Dark and 2.08:1 in Light. */
 .volume-slider,
 .scrubber {
     color: var(--accent);
-    background: var(--line);
+    background: var(--track);
 }
 
 .volume-slider Thumb,

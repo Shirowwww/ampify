@@ -1,5 +1,9 @@
 #include "colour_keys.hpp"
 
+#include <string>
+
+#include "../text_util.hpp"
+
 namespace ampify::theme {
 
 namespace {
@@ -935,6 +939,14 @@ constexpr std::string_view kColourKeys[] = {
 
 std::span<const std::string_view> ColourResourceKeys() {
     return kColourKeys;
+}
+
+std::optional<std::string_view> FindColourKey(std::string_view name) {
+    const std::string wanted = ToLowerAscii(name);
+    for (std::string_view key : kColourKeys) {
+        if (key.size() == wanted.size() && ToLowerAscii(key) == wanted) return key;
+    }
+    return std::nullopt;
 }
 
 }  // namespace ampify::theme

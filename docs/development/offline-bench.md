@@ -75,6 +75,43 @@ rebuilds each selector from the scrubbed names. `ampify theme replay --tree insp
 same. Raw dumps never go into the repository; `tests/data/replay/transport-bar.json` is a scrubbed play bar of the CI
 bench's Apple Music, which has no account signed in.
 
+## Record a corpus
+
+`scripts\record-corpus.ps1` records every page the bench should know in one go, on a PC where Apple Music runs with
+Ampify:
+
+```
+pwsh -File scripts\record-corpus.ps1 -Corpus D:\corpus\2026-11-06
+pwsh -File scripts\record-corpus.ps1 -Pages home,album,lyrics -States idle
+pwsh -File scripts\record-corpus.ps1 -ListPages
+pwsh -File scripts\record-corpus.ps1 -ScrubOnly %USERPROFILE%\Ampify\logs\inspector.json -Pages home -States idle
+```
+
+It goes from page to page in the background through UI Automation, by AutomationId (`Sidebar_Home`, `Sidebar_New`,
+`Sidebar_Radio`, `Sidebar_Library_Albums`, `Sidebar_AllPlaylists`, `Sidebar_Library_Songs`, `LyricsToggleButton`,
+`PlayQueueToggleButton`, `MoreButton`, `AMPIFY_ModsOpenMarketplace`...), with the elements' own patterns (Invoke,
+Toggle, Select, Value), never the mouse or the keyboard. On each page it sets `theme.inspect = 1` in `settings.txt`,
+waits for `logs\inspector.json` to be written again, and keeps only its scrubbed copy (`ampify theme scrub`) as
+`<Corpus>\<state>\<page>.json`; `<Corpus>\index.json` lists each page, its file and why one was skipped.
+
+| Option | What it does |
+|---|---|
+| `-Corpus <folder>` | Where the dumps go (`.\corpus` by default) |
+| `-Pages a,b` | The pages, in this order: home, new, radio, albums, album (the library's first album), artist (that album's artist), playlists, songs, search, settings (Settings > Playback and the Ampify card), lyrics, queue, marketplace, dialog (About, closed again). All by default |
+| `-States idle,playing` | Nothing playing, then a song playing (play and pause through `TransportControl_PlayPauseStop`; skipped when nothing is loaded) |
+| `-Theme <id>` | The theme on screen while recording; empty by default, Apple Music's own look, on which any theme replays |
+| `-Search <words>` | What the search page looks for (`piano`) |
+| `-Ampify <ampify.exe>`, `-Kit <folder>` | The CLI for the scrub step (the PATH's, else `build-msvc\release`), and the Ampify folder (`%USERPROFILE%\Ampify`) |
+| `-TimeoutSeconds <n>` | How long to wait for a page, a pane or a dump (30) |
+| `-ListPages` | Prints the plan and stops; nothing is read or changed |
+| `-ScrubOnly <inspector.json>` | Only the scrub step, on a dump already recorded, into the first state and page given |
+
+It never buys, signs in, changes the account or writes to the library: an element whose AutomationId, or whose name for
+a button or a menu entry, speaks of that (buy, account, delete, add to, love, share...) is refused before it is
+invoked. It never brings Apple Music to the front, and reports a step after which Apple Music took the focus. At the
+end it puts back `theme.active` and `theme.inspect`, closes the panes and the dialog it opened, goes back home and
+leaves the playback as it found it. `tools/test_record_corpus.py` checks what runs without Apple Music.
+
 ## Run it
 
 ```
@@ -174,5 +211,6 @@ refusals (with their count), unmatched selectors and values under the pointer fo
   `theme_diff.cpp` the diff, `replay_command.cpp` the command line and its checks, `replay_util.hpp` what they share.
 - `src/cli/dump_scrub.cpp`: the scrubber.
 - `src/core/theme/inspector.cpp`: the dump, version 2.
+- `scripts/record-corpus.ps1`: the corpus recorder (see "Record a corpus").
 - `tests/replay_tests.cpp`, `replay_report_tests.cpp`, `replay_cli_tests.cpp`, `replay_contrast_tests.cpp`,
   `replay_removal_tests.cpp`.

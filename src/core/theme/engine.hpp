@@ -60,13 +60,15 @@ public:
     }
 
     // What the engine refused since the theme went on (or since Rearm), by the key the log names it once under: its
-    // message and every element it was refused on (none for a resource or the dictionary). The log line stays single,
-    // so a timer does not repeat it; the offline bench counts the elements here.
+    // message and, once RecordRefusedElements is on, every element it was refused on (none for a resource or the
+    // dictionary). The log line stays single, so a timer does not repeat it; the offline bench counts the elements.
     struct Refusal {
         std::string message;
         std::set<NodeId> elements;
     };
     const std::map<std::string, Refusal>& Refusals() const { return m_refusals; }
+    // Off in the app: a virtualised list would grow the set for the whole session. The offline bench turns it on.
+    void RecordRefusedElements(bool on) { m_recordRefusedElements = on; }
 
     bool Active() const { return m_active; }
     // The value each changed element and property gets back at Restore, for the inspector (inspector.json).
@@ -78,6 +80,13 @@ public:
 
 private:
     void ApplyAssignments(const Theme& theme, TreeBackend& tree, const std::vector<NodeInfo>& nodes, Report& report);
+    // The winning declaration of each property of one element.
+    using Winners = std::map<std::string, const Assignment*>;
+    // The text properties (colour, font) a panel cannot hold pass down to the texts inside it, as CSS inherits them.
+    // `inherited` holds, per snapshot index, what each element passes on; `winners` loses what goes down and a text
+    // gains what came from above when it has no rule of its own for it.
+    void InheritTextValues(const NodeInfo& node, int position, Winners& winners, std::vector<Winners>& inherited,
+                           TreeBackend& tree);
     void ApplyResources(const Theme& theme, TreeBackend& tree, Report& report);
     void ApplyDictionary(const Theme& theme, TreeBackend& tree, Report& report);
     void Refuse(const std::string& key, const std::string& message, Report& report, NodeId node = 0);
@@ -135,6 +144,7 @@ private:
     std::string m_dictionary;  // the resource dictionary currently merged, empty when none
     std::set<std::string> m_reported;  // refusals already written to the log, so a timer does not repeat them
     std::map<std::string, Refusal> m_refusals;
+    bool m_recordRefusedElements = false;
     bool m_active = false;
     // Passes since the theme was applied. The first one writes each value to the log; the later ones (page changes,
     // rows realised while scrolling) only a summary, for the first few, so the log stays readable.

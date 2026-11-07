@@ -75,6 +75,7 @@ TEST_CASE(ReplayRemoval_TakingAThemeOffLeavesNothingAndReportsTheSecondState) {
     CHECK(report && Text(Member(*report, "then")->Find("first")) == "busy");
     CHECK(report && Items(*report, "leftovers").empty() && Items(*report, "decors").empty() &&
           Items(*report, "hover").empty());
+    CHECK(report && Items(*report, "final").empty());  // everything the theme set was given back: nothing changed
     bool same = false;
     CHECK(th::DiffReports(outcome->report, outcome->freshReport, same, nullptr) && same);
 
@@ -84,6 +85,14 @@ TEST_CASE(ReplayRemoval_TakingAThemeOffLeavesNothingAndReportsTheSecondState) {
     CHECK(switched && switched->settled && switched->leftovers == 0);
     std::optional<ampify::Json> second = switched ? ampify::Json::Parse(switched->report) : std::nullopt;
     CHECK(second && Text(second->Find("theme")) == "plain");
+    if (second) {
+        CHECK(Items(*second, "final").size() == 1);  // the bar's background, not what the first theme set and gave back
+        for (const ampify::Json& item : Items(*second, "final")) {
+            for (const auto& [property, value] : *item.Find("values")->AsObject()) {
+                CHECK(Text(value.Find("before")) != Text(value.Find("after")));
+            }
+        }
+    }
     CHECK(switched && th::DiffReports(switched->report, switched->freshReport, same, nullptr) && same);
 }
 

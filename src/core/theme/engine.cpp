@@ -30,6 +30,24 @@ std::optional<Value> WithFontSize(NodeId id, const Value& value, TreeBackend& tr
     return size ? ApplyFontSize(value, *size) : std::nullopt;
 }
 
+// The text properties CSS inherits, which a panel passes to the texts inside it (InheritTextValues).
+bool IsInheritedTextProperty(std::string_view property) {
+    static constexpr std::string_view kInherited[] = {"CharacterSpacing", "FontFamily", "FontSize",      "FontStyle",
+                                                      "FontWeight",       "Foreground", "LineHeight",    "TextAlignment"};
+    return std::find(std::begin(kInherited), std::end(kInherited), property) != std::end(kInherited);
+}
+
+bool IsText(const NodeInfo& node) { return node.type == "TextBlock" || node.type == "RichTextBlock"; }
+
+// A Fluent colour key the theme leaves to Apple Music ($Key that its [colors] do not define): the colour the app holds
+// for it now. Any other value passes as it is; nothing when the app has no such colour.
+std::optional<Value> AppColour(const Value& value, TreeBackend& tree) {
+    if (value.kind != ValueKind::ColorKey) return value;
+    std::optional<Value> colour = tree.ReadResource(value.text);
+    if (!colour || colour->kind != ValueKind::Color) return std::nullopt;
+    return colour;
+}
+
 std::string Describe(const NodeInfo& node) {
     std::string text = node.type;
     if (!node.name.empty()) text += "#" + node.name;
@@ -153,12 +171,13 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
     const std::optional<ViewSize> size = tree.WindowSize();
     const bool darkScheme = theme.dark.value_or(IsDarkScheme(theme.scheme));
     tree.WatchSize(MediaQueries(theme));
+    std::vector<Winners> inherited(nodes.size());
     for (int position = 0; position < static_cast<int>(nodes.size()); position++) {
         const NodeInfo& node = nodes[position];
 
         // The winning declaration for each property of this element, and apart from them those of its states and of
         // its ::before and ::after images.
-        std::map<std::string, const Assignment*> winners;
+        Winners winners;
         StateWinners stateWinners;
         DecorWinners decorWinners;
         auto keep = [](auto& target, const auto& key, const Assignment& assignment) {
@@ -184,6 +203,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
             }
         });
         std::optional<Assignment> fittedWidth;  // `winners` may point to it until the end of this element
+        InheritTextValues(node, position, winners, inherited, tree);
         PlacePane(nodes, position, winners, fittedWidth, tree, report);
 
         // The transition first, so a transform or opacity written in the same pass already animates. The animation
@@ -218,6 +238,30 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
     ApplyMoves(pending, tree, report);
     GiveBackReparents(reparents, nodes, tree, report);
     ApplyReparents(reparents, nodes, tree, report);
+}
+
+// A panel (a Grid, a StackPanel) has no colour or font of its own: a rule giving it one means the texts inside, as in
+// CSS. `.shelf-title` names the Grid that holds a shelf's title, so its font goes to the title's texts, while its
+// background and sizes stay on the Grid. A text's own rule wins, the nearest panel wins over those above it, and an
+// element that takes the property itself (a control with its own rule for it) stops what came from above.
+void ThemeEngine::InheritTextValues(const NodeInfo& node, int position, Winners& winners,
+                                    std::vector<Winners>& inherited, TreeBackend& tree) {
+    Winners passed = node.parent >= 0 ? inherited[node.parent] : Winners{};
+    for (auto it = winners.begin(); it != winners.end();) {
+        if (!IsInheritedTextProperty(it->first)) {
+            ++it;
+        } else if (node.panel && !tree.Read(node.id, it->first)) {
+            passed[it->first] = it->second;
+            it = winners.erase(it);
+        } else {
+            passed.erase(it->first);
+            ++it;
+        }
+    }
+    if (IsText(node)) {
+        for (const auto& [property, assignment] : passed) winners.try_emplace(property, assignment);
+    }
+    inherited[position] = std::move(passed);
 }
 
 // Moves back each element of the snapshot that a `move-to` rule no longer moves: a setting changed, an @media stopped
@@ -258,7 +302,13 @@ void ThemeEngine::ApplyDecors(const NodeInfo& node, const DecorWinners& winners,
         Decor decor{content->second->value.text, {}};
         for (const auto& [key, assignment] : winners) {
             if (key.first != slot || key.second == kContentProperty) continue;
-            decor.properties.emplace_back(key.second, assignment->value);
+            std::optional<Value> given = AppColour(assignment->value, tree);
+            if (!given) {
+                Refuse(Describe(node) + PseudoElementName(slot) + " " + key.second,
+                       "Apple Music has no colour " + assignment->value.text, report, node.id);
+                continue;
+            }
+            decor.properties.emplace_back(key.second, std::move(*given));
         }
         PlaceDecor(node, slot, decor, *content->second, tree, report);
     }
@@ -338,10 +388,15 @@ std::vector<HoverValue> ThemeEngine::StateValues(const NodeInfo& node, const Sta
             }
             continue;
         }
+        std::optional<Value> given = AppColour(assignment->value, tree);
+        if (!given) {
+            Refuse(Describe(node) + " " + property, "Apple Music has no colour " + assignment->value.text, report, node.id);
+            continue;
+        }
         // A relative size under the pointer scales the size underneath, the theme's own when it has one.
-        std::optional<Value> value = IsRelativeSize(assignment->value) ? ScaleFontSize(assignment->value, *current)
-                                     : NeedsFontSize(assignment->value) ? WithFontSize(node.id, assignment->value, tree)
-                                                                        : assignment->value;
+        std::optional<Value> value = IsRelativeSize(*given)  ? ScaleFontSize(*given, *current)
+                                     : NeedsFontSize(*given) ? WithFontSize(node.id, *given, tree)
+                                                             : given;
         if (!value) {
             Refuse(Describe(node) + " " + property, "\"" + Describe(node) + " " + property + "\" has no size to scale",
                    report, node.id);
@@ -446,7 +501,12 @@ bool ThemeEngine::WriteValue(const NodeInfo& node, const Assignment& assignment,
         }
         return false;
     }
-    std::optional<Value> value = Resolve(node.id, property, assignment.value, *current, tree);
+    std::optional<Value> given = AppColour(assignment.value, tree);
+    if (!given) {
+        Refuse(Describe(node) + " " + property, "Apple Music has no colour " + assignment.value.text, report, node.id);
+        return false;
+    }
+    std::optional<Value> value = Resolve(node.id, property, *given, *current, tree);
     if (!value) {
         Refuse(Describe(node) + " " + property, "\"" + Describe(node) + " " + property + "\" has no size to scale", report, node.id);
         return false;
@@ -580,7 +640,7 @@ void ThemeEngine::Refuse(const std::string& key, const std::string& message, Rep
     report.refused++;
     Refusal& refusal = m_refusals[key];
     if (refusal.message.empty()) refusal.message = message;
-    if (node) refusal.elements.insert(node);
+    if (node && m_recordRefusedElements) refusal.elements.insert(node);
     if (m_reported.insert(key).second) m_journal.Write("Refused: " + message);
 }
 
