@@ -34,8 +34,6 @@
 
 namespace ampify::test {
 
-// ---- Folders ------------------------------------------------------------------------------------------------------
-
 // One folder per process run, so two runs of the suite at once never delete each other's files.
 inline const std::filesystem::path& ScratchRoot() {
 #ifdef _WIN32
@@ -99,8 +97,6 @@ inline std::string ReadFile(const std::filesystem::path& file) {
     buffer << in.rdbuf();
     return buffer.str();
 }
-
-// ---- Elements -----------------------------------------------------------------------------------------------------
 
 // The fields of a test manifest.json. `permissions` and `processes` are the inside of the JSON list, as typed:
 // R"("ui.panel", "storage")". `processes` is left out when empty (the element then runs in the interface only), and
@@ -245,8 +241,6 @@ struct KitFixture : KitRoot, KernelFixture {
     }
 };
 
-// ---- Language -----------------------------------------------------------------------------------------------------
-
 // Sets the interface language for the scope and puts the previous one back, even when the case throws.
 class LanguageScope {
 public:
@@ -259,8 +253,6 @@ public:
 private:
     std::string before_;
 };
-
-// ---- Signals ------------------------------------------------------------------------------------------------------
 
 // Interleaved sine, the same on every channel.
 inline std::vector<float> Sine(double frequency, double amplitude, double sampleRate, size_t frames, int channels = 2,

@@ -3,13 +3,10 @@
 #include <windows.h>
 #include <appmodel.h>
 
-#include <atomic>
-#include <cstdio>
-#include <mutex>
 #include <string>
 
 #include "apple_facts.hpp"
-#include "hook.hpp"
+#include "held_show.hpp"
 #include "win_common.hpp"
 #include "winrt_abi.hpp"
 
@@ -17,26 +14,13 @@ namespace ampify::win {
 
 namespace {
 
-using uirender::NotificationRule;
-
 constexpr wchar_t kManagerClass[] = L"Windows.UI.Notifications.ToastNotificationManager";
-// IToastNotificationManagerStatics: CreateToastNotifier 6, CreateToastNotifierWithId 7. IToastNotifier: Show 6
-// (Windows.UI.Notifications in Windows.winmd).
+// Slots and identifiers: Windows.UI.Notifications in Windows.winmd.
 constexpr char kIidManagerStatics[] = "50AC103F-D235-4598-BBEF-98FE4D1A3AD4";
 constexpr char kIidNotifier[] = "75927B93-03F3-41EC-91D3-6E5BAC1B38E7";
 constexpr int kCreateNotifierSlot = 6;
 constexpr int kCreateNotifierWithIdSlot = 7;
 constexpr int kNotifierShowSlot = 6;
-constexpr int kHeldReports = 3;  // held notifications described in the log
-
-using ShowMethod = HRESULT(STDMETHODCALLTYPE*)(void*, void*);
-
-std::atomic<int> g_rule{static_cast<int>(NotificationRule::Apple)};
-std::atomic<ShowMethod> g_originalShow{nullptr};
-std::atomic<Journal*> g_journal{nullptr};
-std::atomic<int> g_heldReports{0};
-std::mutex g_installLock;
-bool g_tried = false;  // under g_installLock
 
 // True when the window in front is Apple Music's, which lives in another process than this one.
 bool AppleMusicInFront() {
@@ -56,18 +40,6 @@ bool AppleMusicInFront() {
     }
     CloseHandle(handle);
     return apple;
-}
-
-HRESULT STDMETHODCALLTYPE HeldShow(void* notifier, void* notification) {
-    auto rule = static_cast<NotificationRule>(g_rule.load());
-    bool hold = rule == NotificationRule::Never || (rule == NotificationRule::Background && AppleMusicInFront());
-    ShowMethod original = g_originalShow.load();
-    if (!hold && original) return original(notifier, notification);
-    if (Journal* journal = g_journal.load(); journal && g_heldReports++ < kHeldReports) {
-        journal->Write(std::string("Notifications: one held back in the library process (") +
-                       (rule == NotificationRule::Never ? "never" : "Apple Music in front") + ")");
-    }
-    return S_OK;  // the agent reads it as shown
 }
 
 bool Notifier(rt::Ref& notifier, std::string& why) {
@@ -97,32 +69,27 @@ bool Notifier(rt::Ref& notifier, std::string& why) {
     return true;
 }
 
-bool Install(std::string& why) {
+// The vtable entry of a notifier's Show.
+bool ShowEntry(void**& entry, std::string& why) {
     rt::Ref notifier;
     if (!Notifier(notifier, why)) return false;
-    void** entry = VtableEntry(notifier.Get(), kNotifierShowSlot);
-    // Known before the entry changes, so a notification shown meanwhile still reaches the original method.
-    g_originalShow = reinterpret_cast<ShowMethod>(*entry);
-    void* replaced = nullptr;
-    return HookVtableEntry(entry, reinterpret_cast<void*>(&HeldShow), &replaced, why);
+    entry = VtableEntry(notifier.Get(), kNotifierShowSlot);
+    return true;
 }
+
+constexpr HeldShowTarget kToasts{
+    "Notifications: ToastNotifier.Show hooked in the library process",
+    "Notifications: cannot hold back the library process's ones, ",
+    "Notifications: one held back in the library process ",
+    false,
+    AppleMusicInFront,
+    ShowEntry,
+};
 
 }  // namespace
 
-void SetToastRule(NotificationRule rule, Journal& journal) {
-    g_journal = &journal;
-    int previous = g_rule.exchange(static_cast<int>(rule));
-    if (previous != static_cast<int>(rule)) g_heldReports = 0;
-    if (rule == NotificationRule::Apple) return;  // nothing to hook: Apple's own behaviour
-    std::lock_guard<std::mutex> lock(g_installLock);
-    if (g_tried) return;
-    g_tried = true;
-    std::string why;
-    if (Install(why)) {
-        journal.Write("Notifications: ToastNotifier.Show hooked in the library process");
-    } else {
-        journal.Write("Notifications: cannot hold back the library process's ones, " + why);
-    }
+void SetToastRule(uirender::NotificationRule rule, Journal& journal) {
+    HeldShowHook<kToasts>::SetRule(rule, journal);
 }
 
 }  // namespace ampify::win

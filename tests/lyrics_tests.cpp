@@ -48,8 +48,6 @@ const char kWordTtml[] =
 
 }  // namespace
 
-// ---- Times --------------------------------------------------------------------------------------------------------
-
 TEST_CASE(Lyrics_ParsesTheTimeFormsOfTtml) {
     CHECK(ampify::ParseTtmlTime("12.345") == 12345);
     CHECK(ampify::ParseTtmlTime("0.5") == 500);
@@ -73,8 +71,6 @@ TEST_CASE(Lyrics_RefusesMalformedTimes) {
     CHECK(!ampify::ParseTtmlTime("."));
     CHECK(!ampify::ParseTtmlTime("12345678901234"));
 }
-
-// ---- The scanner --------------------------------------------------------------------------------------------------
 
 TEST_CASE(Lyrics_ReadsLinesAndWordsOfATimedDocument) {
     ampify::Lyrics lyrics = ampify::ParseTtml(kWordTtml);
@@ -144,8 +140,6 @@ TEST_CASE(Lyrics_DeepNestingDoesNotBlowUp) {
     CHECK(ampify::ParseTtml(deep).lines.size() == 1);
 }
 
-// ---- From the raw strings -----------------------------------------------------------------------------------------
-
 TEST_CASE(Lyrics_StaticTextBecomesUntimedLines) {
     ampify::RawLyrics raw;
     raw.staticText = "\n\nFirst\r\nSecond\n\n\nThird\n\n";
@@ -195,8 +189,6 @@ TEST_CASE(Lyrics_TheJsonHasTheDocumentedShape) {
     CHECK(json.find("\"start\"") == std::string::npos);
     CHECK(json.find("\"lines\":[{\"text\":\"Only text\",\"words\":[]}]") != std::string::npos);
 }
-
-// ---- The cover ----------------------------------------------------------------------------------------------------
 
 TEST_CASE(Artwork_FillsTheTemplate) {
     ampify::ArtworkReading artwork;
@@ -283,8 +275,6 @@ TEST_CASE(Artwork_ReachesTheTrackOfTheSnapshotAndItsJson) {
     CHECK(out.str().find("[cover] https://example.com/1000x1000.jpg #FF0000") != std::string::npos);
 }
 
-// ---- The event ----------------------------------------------------------------------------------------------------
-
 namespace {
 
 ampify::PlayerSnapshot Snap(const std::string& id, bool lyrics) {
@@ -353,8 +343,6 @@ TEST_CASE(PlayerWatcher_StateChangesWhenTheLengthBecomesKnownOrAfterASeek) {
     // Without the time of the poll, only the start and the stop count.
     CHECK(watcher.Poll(at(false, 5'000, 163'000)).empty());
 }
-
-// ---- Ampify.player.lyrics() ---------------------------------------------------------------------------------------
 
 TEST_CASE(PlayerLyrics_ReturnsTheParsedLyricsToAnElementThatMayRead) {
     LyricsFakeHost host;

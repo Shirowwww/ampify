@@ -7,15 +7,15 @@
 namespace ampify {
 namespace {
 
-constexpr std::size_t kLfanewOffset = 0x3C;     // DOS header: offset of the PE header
-constexpr std::size_t kPeSignatureSize = 4;     // "PE\0\0"
+constexpr std::size_t kLfanewOffset = 0x3C;
+constexpr std::size_t kPeSignatureSize = 4;
 constexpr std::size_t kCoffHeaderSize = 20;
 constexpr std::size_t kSectionHeaderSize = 40;
 constexpr std::uint16_t kMagicPe32 = 0x10B;
 constexpr std::uint16_t kMagicPe32Plus = 0x20B;
-constexpr std::size_t kDataDirectoriesPe32 = 96;      // offset of the data directories in the optional header
+constexpr std::size_t kDataDirectoriesPe32 = 96;  // from the start of the optional header
 constexpr std::size_t kDataDirectoriesPe32Plus = 112;
-constexpr std::size_t kExportNumberOfNames = 24;      // offsets inside IMAGE_EXPORT_DIRECTORY
+constexpr std::size_t kExportNumberOfNames = 24;  // from the start of IMAGE_EXPORT_DIRECTORY
 constexpr std::size_t kExportAddressOfNames = 32;
 constexpr std::size_t kMaxNameLength = 512;
 
@@ -74,15 +74,14 @@ std::optional<std::string> ReadName(std::span<const std::byte> image, std::size_
 }  // namespace
 
 std::optional<std::vector<std::string>> PeExportNames(std::span<const std::byte> image) {
-    // DOS header, then the PE signature, the COFF header and the optional header.
     std::optional<std::uint16_t> dos = ReadU16(image, 0);
-    if (!dos || *dos != 0x5A4D) return std::nullopt;  // "MZ"
+    if (!dos || *dos != 0x5A4D) return std::nullopt;
     std::optional<std::uint32_t> peOffset = ReadU32(image, kLfanewOffset);
     if (!peOffset) return std::nullopt;
 
     std::size_t pe = *peOffset;
     std::optional<std::uint32_t> peSignature = ReadU32(image, pe);
-    if (!peSignature || *peSignature != 0x00004550) return std::nullopt;  // "PE\0\0"
+    if (!peSignature || *peSignature != 0x00004550) return std::nullopt;
 
     std::size_t coff = pe + kPeSignatureSize;
     std::optional<std::uint16_t> sectionCount = ReadU16(image, coff + 2);

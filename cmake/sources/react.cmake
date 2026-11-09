@@ -1,5 +1,4 @@
-# The module react of the Ampify object (Ampify.React, ReactDOM, hooks, components, ready): its JavaScript, its natives
-# and its tests. See docs/extensions/api.md, "Organisation du code".
+# Module react: Ampify.React, ReactDOM, hooks, components, ready.
 list(APPEND AMPIFY_CORE_SOURCES
     src/core/prelude/react.cpp
     src/core/natives/react.cpp)

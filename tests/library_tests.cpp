@@ -47,8 +47,6 @@ std::string DynamicText() {
     return text;
 }
 
-// ---- Building a library file ----------------------------------------------------------------------------------
-
 constexpr uint32_t kMacEpochToUnix = 2082844800;
 
 void Put32(std::string& bytes, size_t at, uint32_t value) {

@@ -3,22 +3,17 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "win_common.hpp"
-#include "player_controls.hpp"
+#include "larger_cover.hpp"
 
 #include "../core/journal.hpp"
 #include "../core/ui_watchdog.hpp"
-#include "../core/player_model.hpp"
 
 #ifdef GetCurrentTime
 #undef GetCurrentTime  // windows.h macro that breaks Storyboard::GetCurrentTime in the projection
 #endif
 
-#include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
-#include <winrt/Windows.System.Threading.h>
-#include <winrt/Windows.Web.Http.h>
-#include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
@@ -27,7 +22,6 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
-#include <map>
 #include <string>
 #include <vector>
 
@@ -39,20 +33,17 @@ namespace xaml = winrt::Microsoft::UI::Xaml;
 namespace controls = xaml::Controls;
 namespace media = xaml::Media;
 namespace imaging = xaml::Media::Imaging;
-namespace dispatching = winrt::Microsoft::UI::Dispatching;
 using winrt::Windows::Foundation::IInspectable;
 
 constexpr wchar_t kArtworkName[] = L"ActualArtwork";  // Apple's ArtworkImage in the full-screen player
 constexpr int kSearchLimit = 4000;                     // elements walked to find it
-constexpr double kSoftRatio = 0.9;  // a cover with fewer pixels than this share of the size shown looks soft
 constexpr auto kFade = std::chrono::milliseconds(150);
-constexpr auto kLookupTimeout = std::chrono::seconds(10);
 constexpr double kResizeRatio = 0.1;  // a cover shown this much larger or smaller is judged again
 
 std::atomic<bool> g_enabled{true};  // apple.artwork, set from the settings' thread
 
 // Ampify's cover lies over Apple's, in the same place, and Apple's is never written to: its source is bound, and a
-// value set on it cut the binding, which left the first song's cover on all the next ones (05/11). Interface thread
+// value set on it cut the binding, which left the first song's cover on all the next ones. Interface thread
 // only. Never freed: releasing WinRT objects while the process exits can crash it.
 struct Sharp {
     Journal* journal = nullptr;
@@ -69,8 +60,8 @@ struct Sharp {
     imaging::BitmapImage loading{nullptr};
     winrt::event_token opened{};
     winrt::event_token failed{};
-    std::map<std::string, std::string> covers;  // catalog id -> the lookup's artworkUrl100, "" when it has none
     unsigned serial = 0;                        // moves on at each change of Apple's cover: a late answer is dropped
+    std::string lastNote;                       // why Apple's cover was kept, written once until it changes
 };
 
 Sharp& State() {
@@ -79,6 +70,13 @@ Sharp& State() {
 }
 
 void Refresh(Sharp& state);
+
+// Why the player keeps Apple's soft cover, for the log.
+void Note(Sharp& state, const std::string& why) {
+    if (!state.journal || why == state.lastNote) return;
+    state.lastNote = why;
+    state.journal->Write("Full-screen player: Apple's cover stays, " + why);
+}
 
 // The first element under `root`, breadth first, that `match` accepts.
 template <typename Match>
@@ -179,9 +177,10 @@ double ShownPixels(const controls::Image& image) {
 // Loads `address` decoded at the size shown into the overlay, which shows it once it has opened.
 void Load(Sharp& state, const std::string& address, double shown, int appleWidth) {
     controls::Image image = state.image.get();
-    if (!image || address.empty()) return;
+    if (!image) return;
     if (!state.overlay) state.overlay = MakeOverlay(image);
-    if (!state.overlay) return;  // Apple's image is not in a panel: nowhere to lay a cover over it
+    if (!state.overlay) return Note(state, "its image is not in a panel");
+    state.lastNote.clear();
     imaging::BitmapImage large;
     large.DecodePixelWidth(static_cast<int>(std::lround(shown)));
     state.loading = large;
@@ -199,6 +198,7 @@ void Load(Sharp& state, const std::string& address, double shown, int appleWidth
                                      std::to_string(appleWidth) + " px one");
             }
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     state.failed = large.ImageFailed([](IInspectable const& sender, xaml::ExceptionRoutedEventArgs const&) noexcept {
@@ -208,56 +208,14 @@ void Load(Sharp& state, const std::string& address, double shown, int appleWidth
             DropLoading(state);
             if (state.journal) state.journal->Write("Full-screen player: the sharper cover did not load, Apple's stays");
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     large.UriSource(winrt::Windows::Foundation::Uri(winrt::to_hstring(address)));
     state.overlay.Source(large);  // decoded while hidden: WinUI decodes what the tree holds, even at opacity 0
 }
 
-// Asks the catalog for the song's cover, then loads it on the interface thread if Apple still shows the same song.
-winrt::fire_and_forget Lookup(std::string id, unsigned serial, double shown, int appleWidth) {
-    auto dispatcher = dispatching::DispatcherQueue::GetForCurrentThread();
-    std::string thumb;
-    bool answered = false;  // only an answer is kept: offline now, the next song asks again
-    try {
-        std::string address = CatalogLookupAddress(id, winrt::to_string(CatalogStorefront()));
-        if (address.empty()) co_return;
-        winrt::Windows::Web::Http::HttpClient client;
-        auto request = client.GetStringAsync(winrt::Windows::Foundation::Uri(winrt::to_hstring(address)));
-        auto timeout = winrt::Windows::System::Threading::ThreadPoolTimer::CreateTimer(
-            [request](auto&&) {
-                try {
-                    request.Cancel();
-                } catch (...) {
-                }
-            },
-            kLookupTimeout);
-        winrt::hstring reply = co_await request;
-        timeout.Cancel();
-        auto results = winrt::Windows::Data::Json::JsonObject::Parse(reply).GetNamedArray(L"results", nullptr);
-        if (results && results.Size() > 0) {
-            thumb = winrt::to_string(results.GetObjectAt(0).GetNamedString(L"artworkUrl100", L""));
-        }
-        answered = true;
-    } catch (...) {
-        thumb.clear();  // offline, too slow, or an answer of another shape: Apple's cover stays
-    }
-    if (!dispatcher) co_return;
-    dispatcher.TryEnqueue([id, serial, thumb, answered, shown, appleWidth]() noexcept {
-        try {
-            Sharp& state = State();
-            if (answered) state.covers[id] = thumb;
-            // The song may have moved on while Apple's image had not yet: never the last song's cover on this one.
-            if (state.serial == serial && PlayingCatalogId() == id) {
-                Load(state, CatalogCoverAddress(thumb, shown), shown, appleWidth);
-            }
-        } catch (...) {
-        }
-    });
-}
-
-// Apple's cover changed. Shown larger than it is, it gets a sharper one over it: the same image decoded at the size
-// shown, Apple's catalog image asked at that size, or for the library's cache (600 px), the catalog's cover of the song.
+// Apple's cover changed. Shown larger than it is, it gets a sharper one over it, found by FindLargerCover.
 void Refresh(Sharp& state) {
     controls::Image image = state.image.get();
     if (!image) return;
@@ -272,34 +230,41 @@ void Refresh(Sharp& state) {
     state.appleAddress = address;
     state.shown = ShownPixels(image);
     ++state.serial;
-    if (!bitmap) return;
+    state.lastNote.clear();  // a new cover: the same reason for it is worth a line again
+    if (!bitmap) return Note(state, "its image is not a bitmap");
     int natural = bitmap.PixelWidth();
-    if (!uri || natural <= 0) {
-        if (natural > 0) return;  // an image given as data, with no address to ask larger
+    if (natural <= 0) {
         state.appleAddress = winrt::hstring();  // still opening, or given its address after: looked at once it opened
         state.apple = bitmap;
         state.appleOpened = bitmap.ImageOpened([](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
             try {
                 Refresh(State());
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
         return;
     }
     double shown = state.shown;
     if (shown <= 0) return;  // not laid out yet: judged at the next look, within a second
-    int decoded = bitmap.DecodePixelWidth() > 0 ? std::min(bitmap.DecodePixelWidth(), natural) : natural;
-    if (decoded >= shown * kSoftRatio) return;
-    std::string text = winrt::to_string(address);
-    if (natural >= shown * kSoftRatio) return Load(state, text, shown, decoded);  // only decoded too small
-    if (uri.SchemeName() == L"https") return Load(state, CatalogCoverAddress(text, shown), shown, decoded);
-    if (uri.SchemeName() != L"file") return;
-    std::string id = PlayingCatalogId();
-    if (id.empty()) return;  // a file of its own, not in the catalog: Apple's cover is all there is
-    if (auto known = state.covers.find(id); known != state.covers.end()) {
-        return Load(state, CatalogCoverAddress(known->second, shown), shown, decoded);
+    // Without a decode size of Apple's, WinUI decodes the image at the size it is first laid out, which is smaller when
+    // the player opens (its window grows from Apple's mini player or the page): the cover stayed soft at full size on
+    // some openings only. Such a cover is never judged sharp by its file: the same image is decoded again at the size
+    // shown (FindLargerCover answers with its own address).
+    const bool autoDecoded = bitmap.DecodePixelWidth() <= 0;
+    int decoded = autoDecoded ? natural : std::min(bitmap.DecodePixelWidth(), natural);
+    if (!autoDecoded && decoded >= shown * kSoftCoverRatio) {
+        // Said once: on a 1920x1080 screen at 100 %, Apple's cover is large enough and the player never changes it.
+        return Note(state, "sharp enough (" + std::to_string(decoded) + " px shown at " +
+                               std::to_string(std::lround(shown)) + " px)");
     }
-    Lookup(id, state.serial, shown, decoded);
+    FindLargerCover(bitmap, shown, [serial = state.serial, shown, decoded](const std::string& larger,
+                                                                           const std::string& why) {
+        Sharp& state = State();
+        if (state.serial != serial) return;  // Apple's cover changed meanwhile
+        if (larger.empty()) return Note(state, why);
+        Load(state, larger, shown, decoded);
+    });
 }
 
 void Unfollow(Sharp& state) {
@@ -347,12 +312,14 @@ void SharpenPlayerArtwork(const xaml::UIElement& root, Journal& journal) noexcep
             try {
                 Refresh(State());
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         };
         auto sync = [](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
             try {
                 SyncOverlay(State());
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         };
         state.sourceToken = image.RegisterPropertyChangedCallback(controls::Image::SourceProperty(), refresh);
@@ -360,6 +327,7 @@ void SharpenPlayerArtwork(const xaml::UIElement& root, Journal& journal) noexcep
         state.opacityToken = image.RegisterPropertyChangedCallback(xaml::UIElement::OpacityProperty(), sync);
         Refresh(state);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 

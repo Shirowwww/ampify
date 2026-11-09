@@ -44,11 +44,13 @@ void GradientFit::Follow(theme::NodeId id, const std::string& property, const xa
                 auto it = m_entries.find(key);
                 if (it != m_entries.end()) Fit(it->second, args.NewSize().Width, args.NewSize().Height);
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
         Fit(entry, element.ActualWidth(), element.ActualHeight());
         m_entries.emplace(std::move(key), std::move(entry));
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 

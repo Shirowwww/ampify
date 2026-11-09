@@ -21,7 +21,6 @@ namespace {
 std::atomic<ReadLyricsLineStartFn> g_readLineStart{nullptr};
 
 constexpr unsigned long long kSmtcRetryMs = 30'000;
-constexpr unsigned kInterfaceTimeoutMs = 2000;
 constexpr DWORD kQueueChangeTimeoutMs = 3000;
 
 // A media key is handled by the system and by Apple Music, as on a keyboard. It never changes the volume.
@@ -313,8 +312,8 @@ bool PlayerBridge::OnInterfaceThread(std::function<void()> work) {
         ampify::ActivityScope activity("player command");
         work();
     };
-    if (m_options.onInterfaceThread) return m_options.onInterfaceThread(std::move(named), kInterfaceTimeoutMs);
-    return RunOnUiThreadAndWait(std::move(named), kInterfaceTimeoutMs);
+    if (m_options.onInterfaceThread) return m_options.onInterfaceThread(std::move(named), kInterfaceWaitMs);
+    return RunOnUiThreadAndWait(std::move(named), kInterfaceWaitMs);
 }
 
 std::optional<std::vector<AmpQueueEntry>> PlayerBridge::AppleQueue(std::string& failure, bool& cut) {

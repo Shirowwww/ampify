@@ -17,7 +17,7 @@ struct Rgb {
     uint8_t r = 0, g = 0, b = 0;
 
     bool operator==(const Rgb& other) const { return r == other.r && g == other.g && b == other.b; }
-    std::string Hex() const;  // "#rrggbb"
+    std::string Hex() const;
 };
 
 struct Swatch {

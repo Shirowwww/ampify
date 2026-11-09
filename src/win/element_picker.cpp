@@ -69,7 +69,6 @@ std::string Describe(const xaml::UIElement& element) {
     return line.str();
 }
 
-// The elements under a place of the screen, topmost first, as text.
 std::string ElementsAt(long screenX, long screenY) {
     xaml::Window window = AppWindowOf(WindowRole::Main);
     xaml::UIElement content = window ? window.Content() : nullptr;

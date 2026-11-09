@@ -28,8 +28,6 @@ namespace {
 
 namespace rt = ampify::win::rt;
 
-// ---- A tiny fake WinRT object model -------------------------------------------------------------------------------
-
 struct Fake;
 struct Facet {
     void** vtable;
@@ -48,6 +46,8 @@ struct World {
     int64_t seekTicks = -1;  // the TimeSpan SetPositionAsync received, -1 when never called
     unsigned char seekScrubbing = 0;
     int lyricsRequested = 0;     // GetNowPlayingLyricsAsync calls
+    int wordsRequested = 0;      // GetLyricsAsync calls
+    bool itemDescriptor = false;  // the now playing item has a content descriptor
     int32_t lyricsSource = -1;   // the LyricsSource of the last one
     int handlersAdded = 0, handlersRemoved = 0;
     IUnknown* playerHandler = nullptr;
@@ -140,8 +140,6 @@ struct Vtable {
     }
 };
 
-// ---- Apple's player -----------------------------------------------------------------------------------------------
-
 Vtable staticsVt, playerVt, notifyVt, stateVt, stateNotifyVt, itemVt, asyncVt, asyncInfoVt;
 Fake staticsObj, playerObj, stateObj, itemObj, asyncObj;
 Facet staticsF{staticsVt.slots, &staticsObj}, playerF{playerVt.slots, &playerObj}, notifyF{notifyVt.slots, &playerObj},
@@ -190,6 +188,11 @@ HRESULT STDMETHODCALLTYPE NowPlayingLyricsAsync(Facet*, int32_t source, void** o
     ++g.lyricsRequested;
     g.lyricsSource = source;
     *out = &asyncF;
+    return S_OK;
+}
+HRESULT STDMETHODCALLTYPE LyricsAsync(Facet*, void*, int32_t, void** out) {  // GetLyricsAsync, slot 50
+    ++g.wordsRequested;
+    *out = nullptr;  // no operation: the request is made again later
     return S_OK;
 }
 HRESULT STDMETHODCALLTYPE AddHandler(Facet* self, IUnknown* handler, int64_t* token) {  // add_PropertyChanged, 6
@@ -251,8 +254,6 @@ HRESULT STDMETHODCALLTYPE AsyncCompleted(Facet*, int32_t* status) {  // IAsyncIn
     *status = 1;
     return S_OK;
 }
-
-// ---- The cover and the lyrics (1.1792) ----------------------------------------------------------------------------
 
 Vtable artworkVt, uriVt, lyricsVt;
 Fake artworkObj, uriObj, lyricsObj;
@@ -316,8 +317,6 @@ HRESULT STDMETHODCALLTYPE LyricsLanguage(Facet*, HSTRING* out) {  // GetLanguage
     return S_OK;
 }
 
-// ---- Apple's queue: three sections (history, current, next) of PlayQueueItem entries --------------------------------
-
 Vtable queueStaticsVt, queueVt, sectionsVt, sectionVt, containerVt, entriesVt, entryVt, titledVt, drivenVt,
     descriptorVt, lockupVt;
 Fake queueStaticsObj, queueObj, sectionsObj;
@@ -340,6 +339,13 @@ EntryFake entries[] = {
     {103, L"Soon", L"Artist C", 240'000, L"1003"},
     {104, L"Later", L"Artist D", 210'000, L""},
 };
+
+Vtable itemDrivenVt;
+Facet itemDrivenF{itemDrivenVt.slots, &itemObj};
+HRESULT STDMETHODCALLTYPE ItemDescriptor(Facet*, void** out) {  // get_ContentDescriptor of the now playing item, 6
+    *out = g.itemDescriptor ? &entries[1].descriptor : nullptr;
+    return S_OK;
+}
 
 struct SectionFake {
     int32_t kind;  // PlayQueueSectionKind
@@ -463,6 +469,7 @@ void Build() {
     playerVt.slots[17] = Fn(&SkipNextAsync);
     playerVt.slots[22] = Fn(&SetPositionAsync);
     playerVt.slots[49] = Fn(&NowPlayingLyricsAsync);
+    playerVt.slots[50] = Fn(&LyricsAsync);
     notifyVt.slots[6] = Fn(&AddHandler);
     notifyVt.slots[7] = Fn(&RemoveHandler);
 
@@ -472,7 +479,9 @@ void Build() {
     stateNotifyVt.slots[6] = Fn(&AddHandler);
     stateNotifyVt.slots[7] = Fn(&RemoveHandler);
 
-    itemObj.facets = {{rt::GuidOf(ampify::amp::kIidsNowPlayingItem[0]), &itemF}};
+    itemObj.facets = {{rt::GuidOf(ampify::amp::kIidsNowPlayingItem[0]), &itemF},
+                      {rt::GuidOf(ampify::amp::kIidContentDescriptorDriven), &itemDrivenF}};
+    itemDrivenVt.slots[6] = Fn(&ItemDescriptor);
     itemVt.slots[6] = Fn(&Subtitle);
     itemVt.slots[7] = Fn(&Artist);
     itemVt.slots[8] = Fn(&Album);
@@ -667,8 +676,8 @@ TEST_CASE(AmpPlayer_ASecondTrackIsReadAgainAndLyricsLateAreRetried) {
     g.queueId = 43;
     reading = player.Read();
     CHECK(reading.has_value() && reading->lyricsAvailable && g.lyricsAsked == 2);
-    // Each new track asks Apple's player to load its word-timed lyrics, as its lyrics pane would.
-    CHECK(g.lyricsRequested == 2 && g.lyricsSource == 4);
+    // The now playing lyrics are left to Apple's own panes, which ask for them when they open.
+    CHECK(g.lyricsRequested == 0);
 
     // Lyrics that show up some seconds later are found by the retry.
     g.queueId = 44;
@@ -677,6 +686,24 @@ TEST_CASE(AmpPlayer_ASecondTrackIsReadAgainAndLyricsLateAreRetried) {
     g.haveLyrics = 1;
     Sleep(3200);
     CHECK(player.Read()->lyricsAvailable);
+    CHECK(g.unexpected == 0);
+}
+
+TEST_CASE(AmpPlayer_ATrackAsksItsWordTimedLyricsByItsDescriptorAgainUntilApplesPlayerAnswers) {
+    Reset();
+    Hook hook(FakeActivation);
+    ampify::win::AmpPlayer player;
+    std::string failure;
+    CHECK(player.Activate(failure));
+    g.itemDescriptor = true;
+    CHECK(player.Read().has_value());
+    CHECK(g.wordsRequested == 1);
+    CHECK(player.Read().has_value() && g.wordsRequested == 1);  // not before the retry delay
+    Sleep(3200);
+    CHECK(player.Read().has_value() && g.wordsRequested == 2);  // no answer: asked again
+    g.queueId = 43;
+    CHECK(player.Read().has_value() && g.wordsRequested == 3);  // a new track asks at once
+    CHECK(g.lyricsRequested == 0);  // never the now playing lyrics, Apple's panes' own request
     CHECK(g.unexpected == 0);
 }
 

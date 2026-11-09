@@ -141,6 +141,12 @@ bool IsOn(const xaml::FrameworkElement& source) {
     return dot && dot.Visibility() == xaml::Visibility::Visible && dot.Opacity() > 0;
 }
 
+// The fill of a dot that is a shape with a plain colour, else nothing.
+media::SolidColorBrush DotFill(const xaml::FrameworkElement& dot) {
+    auto shape = dot ? dot.try_as<xaml::Shapes::Shape>() : nullptr;
+    return shape && shape.Fill() ? shape.Fill().try_as<media::SolidColorBrush>() : nullptr;
+}
+
 bool SameBrushColour(const media::Brush& first, const media::Brush& second) {
     auto a = first.try_as<media::SolidColorBrush>();
     auto b = second.try_as<media::SolidColorBrush>();
@@ -148,7 +154,7 @@ bool SameBrushColour(const media::Brush& first, const media::Brush& second) {
 }
 
 // The copy's own icon. An AppBarButton's template has a FontIcon of its own (SubItemChevron, collapsed) above the
-// icon in the tree: found first, it took the colour and the glyph, and the copies stayed white (05/11).
+// icon in the tree: found first, it took the colour and the glyph, and the copies stayed white.
 controls::FontIcon CopyIcon(const controls::Button& copy) {
     if (auto bar = copy.try_as<controls::AppBarButton>()) return bar.Icon().try_as<controls::FontIcon>();
     return FindFirst<controls::FontIcon>(copy);
@@ -298,6 +304,7 @@ controls::Button MakeCopy(const xaml::FrameworkElement& model, const xaml::Frame
         try {
             Press(mirror);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     Sync(copy, source);
@@ -450,6 +457,7 @@ void StartFollowing(const xaml::UIElement& playerRoot) {
             FitTransportRow();
             SyncAll();  // a mode changed elsewhere (menu, keyboard, the main window)
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     state.timer.Start();
@@ -540,24 +548,10 @@ std::string DescribeRepeat(const xaml::FrameworkElement& button, const controls:
 // off (seen on 1.1792: #00FFFFFF off, the accent colour on). A button without such a dot falls back to IsOn.
 bool RepeatOn(const xaml::FrameworkElement& button) {
     auto dot = FindNamed(button, std::wstring(button.Name()) + L"Dot");
-    auto shape = dot ? dot.try_as<xaml::Shapes::Shape>() : nullptr;
-    auto solid = shape && shape.Fill() ? shape.Fill().try_as<media::SolidColorBrush>() : nullptr;
-    if (!solid) return IsOn(button);
-    return dot.Visibility() == xaml::Visibility::Visible && dot.Opacity() > 0 && solid.Color().A > 0 &&
-           solid.Opacity() > 0;
+    if (!DotFill(dot)) return IsOn(button);
+    return DotLit(dot);
 }
 
-// AMP.UI.Controls.IVolumeControl of AMP.UI.Controls.winmd 1.1792 (GuidAttribute 3e70ba1e-a754-535b-85df-d7b9b18c4137),
-// its slots after IInspectable. Level is a double: the position of Apple's volume slider. Apple binds it both ways (no
-// data context is involved): setting it on the control makes Apple's own code set the player volume, and its slider,
-// its icon and the volume menu follow. The player must have started, as for the audio process's setter.
-struct IVolumeControlAbi : ::IInspectable {
-    virtual HRESULT __stdcall get_CurrentVolumeGlyph(HSTRING* value) = 0;
-    virtual HRESULT __stdcall put_CurrentVolumeGlyph(HSTRING value) = 0;
-    virtual HRESULT __stdcall get_Level(double* value) = 0;
-    virtual HRESULT __stdcall put_Level(double value) = 0;
-};
-constexpr GUID kVolumeControlIid = {0x3e70ba1e, 0xa754, 0x535b, {0x85, 0xdf, 0xd7, 0xb9, 0xb1, 0x8c, 0x41, 0x37}};
 
 std::mutex g_volumeProblemLock;
 std::string g_volumeProblem;
@@ -575,6 +569,16 @@ xaml::FrameworkElement MainWindowButton(std::wstring_view name) {
 }
 
 }  // namespace
+
+bool DotLit(const xaml::FrameworkElement& dot) noexcept {
+    try {
+        if (!dot || dot.Visibility() != xaml::Visibility::Visible || dot.Opacity() <= 0) return false;
+        media::SolidColorBrush fill = DotFill(dot);
+        return !fill || (fill.Color().A > 0 && fill.Opacity() > 0);
+    } catch (...) {
+        return false;  // a dot being torn down: read again at the next pass
+    }
+}
 
 MainPlayerModes ReadMainPlayerModes() noexcept {
     MainPlayerModes modes;
@@ -596,6 +600,7 @@ MainPlayerModes ReadMainPlayerModes() noexcept {
             modes.detail = DescribeRepeat(repeat, icon);
         }
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
     return modes;
 }
@@ -658,21 +663,13 @@ long long ReadLyricsLineStart() noexcept {
 
 namespace {
 
-template <size_t N>
-bool QueryFirst(const rt::Ref& object, const char* const (&iids)[N], rt::Ref& out) {
-    for (const char* iid : iids) {
-        if (rt::Query(object, rt::GuidOf(iid), out)) return true;
-    }
-    return false;
-}
-
 // The INowPlayingItem Apple's player holds now, or an empty Ref.
 rt::Ref PlayingItem() {
     rt::Ref statics, current, player, itemObject, item;
     rt::Activation activation =
         rt::GetActivationFactory(L"AMP.Services.Player", rt::GuidOf(amp::kIidPlayerStatics), statics);
     if (FAILED(activation.result) || FAILED(rt::CallSlot(statics, amp::slot::kPlayerStaticsCurrent, current.Put())) ||
-        !current || !QueryFirst(current, amp::kIidsPlayer, player) ||
+        !current || !rt::QueryAny(current, amp::kIidsPlayer, player) ||
         FAILED(rt::CallSlot(player, amp::slot::kPlayerNowPlayingItem, itemObject.Put())) || !itemObject ||
         !rt::Query(itemObject, rt::GuidOf(amp::kIidsNowPlayingItem[0]), item)) {
         return {};
@@ -743,18 +740,21 @@ bool SetMainPlayerVolume(double gain) noexcept {
             NoteVolumeProblem("no VolumeControl in the main window");
             return false;
         }
-        winrt::com_ptr<IVolumeControlAbi> abi;
-        if (FAILED(winrt::get_unknown(control)->QueryInterface(kVolumeControlIid, abi.put_void()))) {
+        rt::Ref unknown(winrt::detach_abi(control.as<winrt::Windows::Foundation::IUnknown>()));
+        rt::Ref volume;
+        if (!rt::Query(unknown, rt::GuidOf(amp::kIidVolumeControl), volume)) {
             NoteVolumeProblem("the VolumeControl is not the interface this Apple Music version has");
             return false;
         }
         double position = SliderPositionOfGain(gain);
-        if (FAILED(abi->put_Level(position))) {
+        if (FAILED(rt::CallSlot(volume.Get(), amp::kVolumeControlPutLevel, position))) {
             NoteVolumeProblem("the volume control refused the level");
             return false;
         }
         double now = -1;
-        if (SUCCEEDED(abi->get_Level(&now)) && std::abs(now - position) < 0.01) return true;
+        if (SUCCEEDED(rt::CallSlot(volume.Get(), amp::kVolumeControlGetLevel, &now)) && std::abs(now - position) < 0.01) {
+            return true;
+        }
         NoteVolumeProblem("the volume control did not keep the level: asked " + std::to_string(position) + ", holds " +
                           std::to_string(now));
     } catch (...) {
@@ -782,6 +782,7 @@ bool PressMainPlayerButton(bool shuffle) noexcept {
             return true;
         }
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
     return false;
 }

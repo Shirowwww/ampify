@@ -27,6 +27,11 @@ namespace ampify::win {
 void AddPlayerControls(const winrt::Microsoft::UI::Xaml::UIElement& playerRoot,
                        const winrt::Microsoft::UI::Xaml::UIElement& mainRoot, Journal& journal) noexcept;
 
+// Apple's dot under a mode button ("ShuffleButtonDot", "RepeatButtonDot") shows the mode on: visible, not see-through,
+// and a fill that is not clear (repeat keeps its dot visible and only clears the fill while off, 1.1792). The theme
+// engine's :checked reads it too (MarkCheckedByDot). Interface thread only.
+bool DotLit(const winrt::Microsoft::UI::Xaml::FrameworkElement& dot) noexcept;
+
 // apple.playerControls: off, the next opening adds nothing and an open player loses the two buttons. Any thread.
 void SetPlayerControlsShown(bool shown) noexcept;
 

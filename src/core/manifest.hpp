@@ -21,12 +21,12 @@ struct SettingSpec {
     std::string key;
     std::string label;
     Type type = Type::Toggle;
-    std::string defaultValue;          // as settings.txt holds it: true or false, the number, or the text
-    std::vector<std::string> options;  // a choice's values
-    std::optional<double> min;         // a number's bounds
+    std::string defaultValue;  // as settings.txt holds it: true or false, the number, or the text
+    std::vector<std::string> options;
+    std::optional<double> min;
     std::optional<double> max;
-    std::string group;                 // the heading the setting sits under; empty for none
-    std::string description;           // one line under the label; empty for none
+    std::string group;        // empty for none
+    std::string description;  // empty for none
 };
 
 // "toggle", "choice", "text" or "number", as the manifest and the Marketplace page write a setting's type.
@@ -37,10 +37,10 @@ std::string_view ToString(SettingSpec::Type type);
 struct ManifestText {
     std::string name;
     std::string description;
-    std::map<std::string, std::string> settings;  // the label of a declared setting, by its key (optional)
-    std::map<std::string, std::string> options;   // the text of a choice's option, by its stored value (optional)
-    std::map<std::string, std::string> groups;    // the heading of a group, by its name (optional)
-    std::map<std::string, std::string> settingDescriptions;  // a setting's description, by its key (optional)
+    std::map<std::string, std::string> settings;  // label of a declared setting, by its key
+    std::map<std::string, std::string> options;   // text of a choice's option, by its stored value
+    std::map<std::string, std::string> groups;    // heading of a group, by its name
+    std::map<std::string, std::string> settingDescriptions;  // by the setting's key
 };
 
 // The fields that a manifest.json and an entry of catalog.json share.
@@ -51,7 +51,7 @@ struct ElementInfo {
     ElementKind kind = ElementKind::Extension;
     std::string author;
     std::string description;
-    std::map<std::string, ManifestText> translations;  // by language code
+    std::map<std::string, ManifestText> translations;
     std::string kitApi;
     std::optional<std::string> homepage;
     std::optional<std::string> license;
@@ -68,6 +68,8 @@ struct Manifest : ElementInfo {
     std::optional<std::string> main;
     std::optional<std::string> colors;
     std::optional<std::string> defaultScheme;
+    // A theme's place for the playback bar (top, bottom or centred) while apple.playbar leaves it to the theme.
+    std::optional<std::string> playbar;
     std::optional<std::string> resources;
     std::optional<std::string> icon;
     std::optional<std::string> preview;  // Marketplace image at the root of the folder, read when authoring
@@ -76,7 +78,7 @@ struct Manifest : ElementInfo {
     std::vector<std::string> processes = {"ui"};  // the interface only, unless the manifest asks for the engine too
     // "type": "module" runs main as an ES module (static import). "script", the default, runs it as a classic script.
     bool module = false;
-    std::vector<SettingSpec> settings;  // in manifest order
+    std::vector<SettingSpec> settings;
 
     const SettingSpec* Setting(std::string_view key) const;
     bool RunsIn(std::string_view process) const;

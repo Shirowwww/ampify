@@ -112,6 +112,7 @@ void QueueAlign(HostStates::Key key) {
             state->value.queued = false;
             if (controls::Border alive = state->element.get()) AlignRows(alive, state->value.align);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
 }
@@ -130,6 +131,7 @@ std::string_view HostedTextAlign(const controls::Border& host) noexcept {
     try {
         if (!found->queued && !RowsInPlace(host, found->align)) return th::RowAlignKeyword(th::RowAlign::Start);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
     return th::RowAlignKeyword(found->align);
 }
@@ -154,6 +156,7 @@ void SetHostedTextAlign(const controls::Border& host, th::RowAlign align) noexce
                 try {
                     QueueAlign(key);
                 } catch (...) {
+                    // A handler runs inside Apple Music's XAML frame: nothing may escape it.
                 }
             });
             found = &states.Add(host, state);
@@ -162,6 +165,7 @@ void SetHostedTextAlign(const controls::Border& host, th::RowAlign align) noexce
         AlignRows(host, align);
         QueueAlign(key);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 

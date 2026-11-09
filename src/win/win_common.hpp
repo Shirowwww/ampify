@@ -25,7 +25,7 @@ std::filesystem::path JournalFile(const std::string& name);
 // The executable this code runs in: the launcher, or AppleMusic.exe / AMPLibraryAgent.exe for the kernel.
 std::filesystem::path ExecutablePath();
 
-// Full name of the package this process runs in. Empty when the process is not packaged.
+// Empty when the process is not packaged.
 std::string PackageFullName();
 
 // False while a visible top-level window of `processId` is hung. True otherwise, including when it has no window.
@@ -108,14 +108,15 @@ private:
 // language does this user read": the kernel, the command line and the installer all take it.
 std::string UserLocaleName();
 
+// Windows apps in dark mode (AppsUseLightTheme = 0), for theme.scheme = auto; light when the value cannot be read.
+// The kernel picks the scheme with it and the command line tells the Marketplace the same one.
+bool SystemUsesDarkMode();
+
+// Local time in minutes from midnight, for theme.schedule.
+int LocalMinute();
+
 // The storefront of Apple's public catalog for this PC ("FR"), from Windows' region; "US" when it gives none.
 std::wstring CatalogStorefront();
-
-// Yes / No question in a dialog. Returns true for Yes.
-bool AskYesNo(const std::wstring& text, const std::wstring& title);
-
-// Dialog with one OK button. `error` picks the error icon.
-void ShowMessage(const std::wstring& text, bool error = false);
 
 // Ampify's logo, from the module this code is built into (each Ampify file carries it, cmake/version.rc.in), at the
 // small size (notification area) or the large one. Windows' application icon when the module has none (the tests).

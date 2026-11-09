@@ -84,6 +84,7 @@ xaml::DependencyProperty Cached(const AppleSpec& spec) {
         try {
             entry.property = Fetch(spec);
         } catch (...) {
+            // A class Apple Music lacks (another version): the property stays empty and is not asked again.
         }
     }
     return entry.property;

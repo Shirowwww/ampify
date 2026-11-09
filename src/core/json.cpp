@@ -82,7 +82,7 @@ private:
     }
 
     std::optional<Json> ParseObject(int depth) {
-        m_pos++;  // '{'
+        m_pos++;
         Json::Object members;
         SkipSpace();
         if (m_pos < m_text.size() && m_text[m_pos] == '}') {
@@ -118,7 +118,7 @@ private:
     }
 
     std::optional<Json> ParseArray(int depth) {
-        m_pos++;  // '['
+        m_pos++;
         Json::Array items;
         SkipSpace();
         if (m_pos < m_text.size() && m_text[m_pos] == ']') {
@@ -195,7 +195,7 @@ private:
     }
 
     std::optional<std::string> ParseString() {
-        m_pos++;  // opening quote
+        m_pos++;
         std::string out;
         while (m_pos < m_text.size()) {
             unsigned char c = static_cast<unsigned char>(m_text[m_pos++]);
@@ -227,7 +227,6 @@ private:
                     }
                     unsigned point = *code;
                     if (point >= 0xD800 && point <= 0xDBFF) {
-                        // A high surrogate must be followed by a low one.
                         if (!Consume("\\u")) {
                             Fail("incomplete surrogate pair");
                             return std::nullopt;

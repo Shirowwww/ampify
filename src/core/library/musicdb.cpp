@@ -77,7 +77,7 @@ std::string TooLargeMessage() {
     return "the library file is larger than " + std::to_string(kMaxMusicDbFileBytes >> 20) + " MB";
 }
 
-// Little-endian reads. The caller has checked that the bytes are there.
+// The caller has checked that the bytes are there.
 uint32_t U32(std::string_view data, size_t at) {
     uint32_t value = 0;
     for (int i = 3; i >= 0; i--) value = (value << 8) | static_cast<uint8_t>(data[at + i]);

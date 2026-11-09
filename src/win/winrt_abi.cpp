@@ -130,8 +130,6 @@ GUID GuidOf(const char* text) {
     return guid;
 }
 
-// ---- Activation ---------------------------------------------------------------------------------------------------
-
 void SetActivationHookForTests(ActivationHook hook) { g_hook.store(hook); }
 
 Activation GetActivationFactory(std::wstring_view className, const GUID& iid, Ref& factory) {
@@ -171,8 +169,6 @@ Activation GetActivationFactory(std::wstring_view className, const GUID& iid, Re
     return {registered, "RoGetActivationFactory"};
 }
 
-// ---- Asynchronous operations --------------------------------------------------------------------------------------
-
 AsyncState StateOf(const Ref& operation) {
     Ref info;
     if (!Query(operation, kIidAsyncInfo, info)) return AsyncState::Failed;
@@ -191,8 +187,6 @@ bool Wait(const Ref& operation, DWORD timeoutMs) {
         Sleep(5);
     }
 }
-
-// ---- Collections --------------------------------------------------------------------------------------------------
 
 namespace {
 
@@ -412,8 +406,6 @@ Ref MakeVector(const VectorIids& iids, std::vector<uint64_t> values) {
     auto* vector = new FixedVector(iids, std::move(values));
     return Ref(vector->Identity());  // takes the reference the object was born with
 }
-
-// ---- Property change notifications --------------------------------------------------------------------------------
 
 ChangeCounter::ChangeCounter(const GUID& delegateIid, std::shared_ptr<std::atomic<unsigned>> count)
     : m_iid(delegateIid), m_count(std::move(count)) {}

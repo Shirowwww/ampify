@@ -1,7 +1,6 @@
 # The modules of the Ampify object, built into ampify_core: the registry (src/core/api), the JavaScript of each module
-# (src/core/prelude) and its natives (src/core/natives). A new module lists its files in its own package file, such as
-# cmake/sources/<package>.cmake, with list(APPEND AMPIFY_CORE_SOURCES ...). See docs/extensions/api.md,
-# "Organisation du code", and the convention at the top of CMakeLists.txt.
+# (src/core/prelude) and its natives (src/core/natives). A new module lists its files in its own package file, with
+# list(APPEND AMPIFY_CORE_SOURCES ...).
 list(APPEND AMPIFY_CORE_SOURCES
     src/core/api/modules.cpp
     src/core/prelude/frame.cpp

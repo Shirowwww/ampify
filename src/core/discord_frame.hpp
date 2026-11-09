@@ -25,7 +25,6 @@ struct Frame {
     std::string json;
 };
 
-// The bytes of one frame.
 std::string EncodeFrame(Opcode opcode, std::string_view json);
 
 // Cuts frames out of the bytes read from the pipe, in any chunk sizes.
@@ -78,7 +77,6 @@ inline constexpr size_t kMaxButtons = 2;
 inline constexpr size_t kMaxButtonLabel = 32;
 inline constexpr size_t kMaxButtonUrl = 512;
 
-// A Discord application id: 17 to 20 digits.
 bool IsValidClientId(std::string_view id);
 
 // {"v":1,"client_id":"..."}, sent with Opcode::Handshake right after the pipe opens.

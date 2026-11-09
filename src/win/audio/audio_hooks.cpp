@@ -232,8 +232,6 @@ void PollLoop() {
     }
 }
 
-// --- WASAPI: stereo stream -----------------------------------------------------------------------
-
 bool IsFloat32(const WAVEFORMATEX* format) {
     if (!format || format->wBitsPerSample != 32) return false;
     if (format->wFormatTag == WAVE_FORMAT_IEEE_FLOAT) return true;
@@ -348,8 +346,6 @@ HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 fr
     }
     return g_releaseBufferOriginal(self, frames, flags);
 }
-
-// --- WASAPI: spatial objects (Dolby Atmos) --------------------------------------------------------
 
 // The original behind the slot `self` was called through. Every spatial stream and object method is hooked
 // through g_spatialOriginals, so it is always there.
@@ -484,8 +480,6 @@ HRESULT STDMETHODCALLTYPE ObjectSetVolume_Hook(ISpatialAudioObject* self, float 
     }
     return g_objectSetVolumeOriginal(self, volume);
 }
-
-// --- Vtable entries, read from throwaway objects of this process ---------------------------------
 
 // The entries to hook. The stereo lists hold one entry per interface pointer that can call the method.
 struct AudioEntries {

@@ -16,13 +16,11 @@ constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
 }  // namespace
 
 TEST_CASE(GlyphRows_CentreMovesEachWrappedRowToTheMiddleOfTheHost) {
-    // Arrange: two words on the first row (0..120), one on the second (0..60), in a host 200 wide
+    // two words on the first row (0..120), one on the second (0..60), in a host 200 wide
     std::vector<th::GlyphBox> boxes{{0, 0, 50, 30}, {60, 0, 60, 30}, {0, 36, 60, 30}};
 
-    // Act
     std::vector<double> shifts = th::RowShifts(boxes, 200, th::RowAlign::Center);
 
-    // Assert
     CHECK(shifts.size() == 3);
     CHECK(Near(shifts[0], 40));
     CHECK(Near(shifts[1], 40));
@@ -58,7 +56,7 @@ TEST_CASE(GlyphRows_AWordLiftedAFewPixelsWhileSungStaysOnItsRow) {
 }
 
 TEST_CASE(GlyphRows_RowsGroupByPositionNotByOrder) {
-    // Arrange: Apple may list the visuals in any order
+    // Apple may list the visuals in any order
     std::vector<th::GlyphBox> boxes{{0, 36, 60, 30}, {0, 0, 50, 30}, {60, 0, 60, 30}};
 
     std::vector<double> shifts = th::RowShifts(boxes, 200, th::RowAlign::Center);
@@ -111,6 +109,18 @@ TEST_CASE(LiftedMaxSize_ASmallerSizeLeavesTheCapAlone) {
     CHECK(Near(kept.height, 270));
 }
 
+TEST_CASE(LiftedMaxSize_ACapOnOneSideGrowsAndTheOtherSideStaysOpen) {
+    // Apple caps only the width of an editorial playlist's cover (Best Songs of 2026): kept at 270, it asked a
+    // picture 270 wide and 360 high, a portrait drawn small in the square
+    th::BoxSize width = th::LiftedMaxSize({270, 0}, 360, 360);
+    th::BoxSize height = th::LiftedMaxSize({0, 270}, 360, 360);
+
+    CHECK(Near(width.width, 360));
+    CHECK(Near(width.height, 0));
+    CHECK(Near(height.width, 0));
+    CHECK(Near(height.height, 360));
+}
+
 TEST_CASE(LiftedMaxSize_NoCapStaysNoCap) {
     th::BoxSize none = th::LiftedMaxSize({0, 0}, 360, 360);
     CHECK(Near(none.width, 0));
@@ -118,13 +128,11 @@ TEST_CASE(LiftedMaxSize_NoCapStaysNoCap) {
 }
 
 TEST_CASE(LiftedBound_GrowsAnAppleMaximumBelowTheCapToTheCap) {
-    // Arrange: Apple keeps an artwork's MaxHeight at 270 while its cap was lifted to 360
+    // Apple keeps an artwork's MaxHeight at 270 while its cap was lifted to 360
     double appleMax = 270;
 
-    // Act
     double bound = th::LiftedBound(appleMax, 360);
 
-    // Assert
     CHECK(Near(bound, 360));
 }
 
@@ -136,14 +144,12 @@ TEST_CASE(LiftedBound_LeavesNoMaximumOrALargerOneAlone) {
 }
 
 TEST_CASE(ShiftsInPlace_HoldsWhenEveryWordSitsWhereItsRowIsAligned) {
-    // Arrange: the shifts written last pass, read back from the visuals in single precision
+    // the shifts written last pass, read back from the visuals in single precision
     std::vector<double> wanted{40.0, 40.0, 70.0};
     std::vector<double> current{40.0000019, 39.9999981, 70.0};
 
-    // Act
     bool inPlace = th::ShiftsInPlace(current, wanted);
 
-    // Assert
     CHECK(inPlace);
 }
 

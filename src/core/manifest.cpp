@@ -21,7 +21,7 @@ namespace {
 
 constexpr std::string_view kKnownFields[] = {
     "$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage", "license",
-    "main", "colors", "defaultScheme", "resources", "icon", "permissions", "appVersions", "processes", "type",
+    "main", "colors", "defaultScheme", "playbar", "resources", "icon", "permissions", "appVersions", "processes", "type",
     "preview", "tags", "settings", "translations",
 };
 
@@ -136,6 +136,7 @@ bool IsImageFile(std::string_view name) { return IsRootFile(name, {"png", "jpg",
 bool IsTypeText(std::string_view text) { return text == "script" || text == "module"; }
 bool IsHttpsText(std::string_view text) { return IsHttpsAddress(text); }
 bool IsProcessText(std::string_view text) { return text == "ui" || text == "engine"; }
+bool IsPlaybarText(std::string_view text) { return text == "top" || text == "bottom" || text == "centred"; }
 
 // A GitHub user name: letters, digits and inner hyphens.
 bool IsAuthorText(std::string_view text) {
@@ -191,6 +192,7 @@ struct Rules {
     TextRule preview{IsImageFile, 0, 0, "a .png, .jpg or .jpeg file name, at the root of the folder"};
     TextRule type{IsTypeText, 0, 0, "script or module"};
     TextRule process{IsProcessText, 0, 0, "ui or engine"};
+    TextRule playbar{IsPlaybarText, 0, 0, "top, bottom or centred"};
     TextRule appVersion{IsAppVersionText, 0, 0, "Apple Music version, for example 1.1540.23042.0"};
     TextRule tag{IsTagText, 0, 0, "lowercase letters, digits and hyphens, " + Between(1, kMaxTag)};
     TextRule permission{IsKnownPermission, 0, 0, "", UnknownPermission};
@@ -509,6 +511,7 @@ void ReadManifestOnly(Fields& fields, ManifestMode mode, Manifest& m) {
     if (std::optional<std::string> type = fields.Text("type", rules.type, false)) m.module = *type == "module";
     m.colors = fields.Text("colors", rules.colors, false);
     m.defaultScheme = fields.Text("defaultScheme", rules.scheme, false);
+    m.playbar = fields.Text("playbar", rules.playbar, false);
     m.resources = fields.Text("resources", rules.resources, false);
     m.icon = fields.Text("icon", rules.icon, false);
     if (mode == ManifestMode::Author) m.preview = fields.Text("preview", rules.preview, false);

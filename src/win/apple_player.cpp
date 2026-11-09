@@ -38,6 +38,7 @@
 
 #include "../core/amp_abi.hpp"
 #include "../core/ui_watchdog.hpp"
+#include "lyrics_window.hpp"
 #include "player_controls.hpp"
 #include "sharp_artwork.hpp"
 #include "winrt_abi.hpp"
@@ -58,9 +59,9 @@ constexpr auto kReportDelay = std::chrono::seconds(1);
 constexpr auto kWatchStep = std::chrono::milliseconds(250);  // while laid out: notices the close soon enough
 constexpr int kPressReports = 3;     // presses described in the log, to see what takes them
 constexpr int kSearchLimit = 4000;   // elements walked to find Apple's close button
-constexpr int kSettleTicks = 4;      // ticks the main window is watched after a close (a second)
-constexpr int kCaptionEvery = 2;    // ticks between two layouts of the caption regions (half a second)
-constexpr int kArtworkEvery = 4;    // ticks between two looks for the cover's image (a second)
+constexpr int kSettleTicks = 4;      // a second
+constexpr int kCaptionEvery = 2;    // half a second
+constexpr int kArtworkEvery = 4;    // a second
 constexpr int kDragStart = 4;       // pixels the pointer moves, button down, before the window follows: a click stays one
 
 // Interface thread only. Never freed: releasing WinRT objects while the process exits can crash it.
@@ -90,8 +91,8 @@ struct Placement {
     POINT windowOrigin{};    // the window's top left corner at the press
     bool captionSet = false;      // the background is a caption for Windows (SetCaption): Ampify moves nothing itself
     bool captionRefused = false;  // SetCaption failed once: logged once
-    int captionTicks = 0;         // the regions are laid out again every few ticks
-    int artworkTicks = 0;         // the cover is looked for again every few ticks (SharpenPlayerArtwork)
+    int captionTicks = 0;
+    int artworkTicks = 0;
     bool systemMoving = false;      // inside the system's move loop (OnMove)
     bool systemMoveFailed = false;  // the loop did not start once: the drags move the window by hand
     // The row of the progress line and its two times, and Apple's margin on it (WidenScrubberRow).
@@ -110,39 +111,27 @@ std::atomic<HWND>& HiddenMain() {
     return hidden;
 }
 
-using MethodNoArgument = HRESULT(STDMETHODCALLTYPE*)(void*);
-using MethodOut = HRESULT(STDMETHODCALLTYPE*)(void*, void**);
-
-template <typename Fn>
-Fn Slot(const winrt::com_ptr<::IUnknown>& object, int slot) {
-    return reinterpret_cast<Fn>((*reinterpret_cast<void***>(object.get()))[slot]);
-}
-
-winrt::com_ptr<::IUnknown> Query(::IUnknown* object, const char* iid) {
-    winrt::com_ptr<::IUnknown> out;
-    if (object) object->QueryInterface(rt::GuidOf(iid), out.put_void());
-    return out;
-}
-
 // Shows Apple's player. Empty on success, otherwise what stopped it.
 std::string ShowFullScreenPlayer() {
-    auto factory = winrt::get_activation_factory<winrt::Windows::Foundation::IActivationFactory>(
-        winrt::to_hstring(amp::kFullScreenPlayerClass));
-    auto statics = Query(static_cast<::IUnknown*>(winrt::get_abi(factory)), amp::kIidFullScreenPlayerStatics);
-    if (!statics) return "IFullScreenPlayerStatics refused (another Apple Music version?)";
+    rt::Ref statics;
+    rt::Activation activation = rt::GetActivationFactory(winrt::to_hstring(amp::kFullScreenPlayerClass).c_str(),
+                                                         rt::GuidOf(amp::kIidFullScreenPlayerStatics), statics);
+    if (FAILED(activation.result)) return "IFullScreenPlayerStatics refused (another Apple Music version?)";
 
-    winrt::com_ptr<::IUnknown> instance;
-    HRESULT result = Slot<MethodOut>(statics, amp::slot::kFullScreenPlayerStaticsInstance)(statics.get(), instance.put_void());
+    rt::Ref instance;
+    HRESULT result = rt::CallSlot(statics.Get(), amp::slot::kFullScreenPlayerStaticsInstance, instance.Put());
     if (FAILED(result) || !instance) return "FullScreenPlayer.Instance failed (" + HresultText(result) + ")";
-    auto player = Query(instance.get(), amp::kIidFullScreenPlayer);
-    if (!player) return "IFullScreenPlayer refused (another Apple Music version?)";
+    rt::Ref player;
+    if (!rt::Query(instance, rt::GuidOf(amp::kIidFullScreenPlayer), player)) {
+        return "IFullScreenPlayer refused (another Apple Music version?)";
+    }
 
     // Apple gives the player its view model at start. Without one, Show is not called: what it would do is unknown.
-    winrt::com_ptr<::IUnknown> viewModel;
-    Slot<MethodOut>(player, amp::slot::kFullScreenPlayerViewModel)(player.get(), viewModel.put_void());
+    rt::Ref viewModel;
+    rt::CallSlot(player.Get(), amp::slot::kFullScreenPlayerViewModel, viewModel.Put());
     if (!viewModel) return "the player has no view model yet";
 
-    result = Slot<MethodNoArgument>(player, amp::slot::kFullScreenPlayerShow)(player.get());
+    result = rt::CallSlot(player.Get(), amp::slot::kFullScreenPlayerShow);
     if (FAILED(result)) return "FullScreenPlayer.Show failed (" + HresultText(result) + ")";
     return "";
 }
@@ -227,7 +216,7 @@ void ControlRects(const xaml::UIElement& root, double scale, std::vector<winrt::
 
 // The player's background is a caption for Windows, its controls pass through: a drag from it is the window's own, so
 // Windows' snap layouts and PowerToys FancyZones see it, and it ends on the release. Ampify's moves never could: a move
-// loop started from a press XAML had taken left the window stuck to the pointer until the next click (05/11). Laid out
+// loop started from a press XAML had taken left the window stuck to the pointer until the next click. Laid out
 // again as the player's layout changes.
 void SetCaption(const xaml::Window& player, Placement& state) {
     using winrt::Microsoft::UI::Input::InputNonClientPointerSource;
@@ -301,9 +290,9 @@ void OnRelease(const xaml::UIElement& root) {
 // Past a few pixels with the button down, the window moves as from a title bar; a plain click never gets here and
 // reaches Apple's own handlers. The system's move loop first: Windows' snap layouts and PowerToys FancyZones only see a
 // window moved by it. A press on a caption, sent while the button is down, so the loop ends on the release: SC_MOVE
-// (WM_SYSCOMMAND) moved the window as from its menu, stuck to the pointer until the next click (05/11), and posted
+// (WM_SYSCOMMAND) moved the window as from its menu, stuck to the pointer until the next click, and posted
 // rather than sent, a message ran only once the button was up. A return with the button still down means no loop
-// started (a posted press did not on the bench, 31/10), and Ampify moves the window itself from then on.
+// started (a posted press did not on the bench), and Ampify moves the window itself from then on.
 void OnMove(HWND window, const xaml::UIElement& root, xaml::Input::PointerRoutedEventArgs const& args) {
     Placement& state = State();
     if (!state.dragArmed || state.systemMoving || state.captionSet) return;  // with a caption, Windows moves it
@@ -384,18 +373,21 @@ void HookInput(const xaml::Window& player, HWND window) {
         try {
             if (auto element = weakRoot.get()) OnPress(window, element, args);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     };
     auto onMove = [window, weakRoot](auto const&, xaml::Input::PointerRoutedEventArgs const& args) noexcept {
         try {
             if (auto element = weakRoot.get()) OnMove(window, element, args);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     };
     auto onRelease = [weakRoot](auto const&, xaml::Input::PointerRoutedEventArgs const&) noexcept {
         try {
             if (auto element = weakRoot.get()) OnRelease(element);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     };
     auto onKey = [window, weakRoot](auto const&, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
@@ -404,6 +396,7 @@ void HookInput(const xaml::Window& player, HWND window) {
             if (!element || args.Key() != winrt::Windows::System::VirtualKey::Escape || args.KeyStatus().WasKeyDown) return;
             if (Windowed(window) && OnEscape(element)) args.Handled(true);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     };
     root.AddHandler(xaml::UIElement::PointerPressedEvent(), winrt::box_value(xaml::Input::PointerEventHandler(onPress)), true);
@@ -422,9 +415,19 @@ RECT MonitorRect(HWND window, bool workArea) {
 }
 
 // Where the player goes: the main window's visible rectangle, or its monitor's work area when it is minimized.
+// Kept inside the work area: a main window reaching under the taskbar (moved down at each opening, as Windows cascades
+// new windows) put the player's buttons under it.
 RECT TargetRect(HWND main) {
-    if (IsWindow(main) && !IsIconic(main)) return VisibleRect(main);
-    return MonitorRect(main, true);
+    const RECT work = MonitorRect(main, true);
+    if (!IsWindow(main) || IsIconic(main)) return work;
+    RECT target = VisibleRect(main);
+    const LONG width = std::min(target.right - target.left, work.right - work.left);
+    const LONG height = std::min(target.bottom - target.top, work.bottom - work.top);
+    target.left = std::clamp(target.left, work.left, work.right - width);
+    target.top = std::clamp(target.top, work.top, work.bottom - height);
+    target.right = target.left + width;
+    target.bottom = target.top + height;
+    return target;
 }
 
 const char* ModeName(uirender::PlayerMode mode) {
@@ -438,7 +441,7 @@ const char* ModeName(uirender::PlayerMode mode) {
 }
 
 // Above the taskbar the player reads as a full screen: no frame, square corners. The overlapped presenter leaves the
-// dialog frame Apple's window was made with, a 3 px light line around the screen (02/11), and puts it back on any
+// dialog frame Apple's window was made with, a 3 px light line around the screen, and puts it back on any
 // style change: the client area fills `target` and a window region cuts the frame off.
 void FillWithClient(HWND window, const RECT& target) {
     RECT outer{};
@@ -468,7 +471,7 @@ void SetScreenFrame(HWND window, bool screenLike) {
 }
 
 // Apple's shrink button turns its player into the mini player. Laid out by Ampify, the player stands for the Apple
-// Music window: shrinking it left only the mini player in a corner (02/11), so the button goes and its close button
+// Music window: shrinking it left only the mini player in a corner, so the button goes and its close button
 // (or Escape) brings Apple Music back. Apple's own full screen keeps it.
 void ShowShrinkButton(const xaml::UIElement& root, bool shown) {
     if (!root) return;
@@ -573,12 +576,13 @@ void Report(Journal& journal) {
 void OnClosed(Placement& state) {
     state.timer.Stop();
     state.laid = false;
+    ReleaseLyricsWindow();
     HWND main = HiddenMain().exchange(nullptr);
     if (!main) {
         state.journal->Write("Apple player: closed");
         return;
     }
-    // A player moved, snapped or resized hands its place to the main window, even one that was maximized (05/11).
+    // A player moved, snapped or resized hands its place to the main window, even one that was maximized.
     bool unmoved = EqualRect(&state.lastRect, &state.laidRect) != FALSE;
     bool placed = false;
     if (state.playerZoomed || (state.mainWasZoomed && unmoved)) {
@@ -594,7 +598,7 @@ void OnClosed(Placement& state) {
                          (placed ? ", the player was at " + RectText(state.lastRect) : std::string()));
     if (!placed) return;
     // Moved to a screen of another scale, the window takes the new scale after this call, and grows or shrinks by its
-    // ratio (too wide on a second screen, 05/11): it is put back a few times while it settles.
+    // ratio (too wide on a second screen): it is put back a few times while it settles.
     state.settleMain = main;
     state.settleTicks = kSettleTicks;
     state.timer.Start();
@@ -625,6 +629,7 @@ void Step(Placement& state) {
         state.lastRect = VisibleRect(hwnd);
         state.playerZoomed = IsZoomed(hwnd) != FALSE;
         WidenScrubberRow(state, player.Content().try_as<xaml::UIElement>());
+        FollowLyricsWindow(player.Content().try_as<xaml::UIElement>());
         if (++state.artworkTicks % kArtworkEvery == 0) {
             SharpenPlayerArtwork(player.Content().try_as<xaml::UIElement>(), *state.journal);  // built once a song plays
         }
@@ -640,6 +645,40 @@ void Step(Placement& state) {
             if (state.mode == uirender::PlayerMode::WorkArea) FillWithClient(hwnd, MonitorRect(state.main, true));
             state.laidRect = VisibleRect(hwnd);  // settled: a later change is the person's
             Report(*state.journal);
+            // Which engine themes it: the main window's walks it on this thread only (mini_player_theme.cpp otherwise).
+            auto content = player.Content();
+            state.journal->Write("Apple player: on the main interface thread, content " +
+                                 (content ? winrt::to_string(winrt::get_class_name(content)) : std::string("none")));
+            // Whether a theme's fade of the buttons (minimal-fullscreen) reached them, and what Apple left there.
+            // Journal only: an element leaving the tree here must not stop the watch (OnTick stops it on a throw).
+            try {
+            auto row = content ? FindNamed(content, {L"TransportGrid"}) : nullptr;
+            if (row && row.XamlRoot()) {
+                auto parent = xaml::Media::VisualTreeHelper::GetParent(row);
+                auto box = row.TransformToVisual(nullptr).TransformBounds(
+                    {0, 0, static_cast<float>(row.ActualWidth()), static_cast<float>(row.ActualHeight())});
+                auto panel = row.try_as<xaml::Controls::Panel>();
+                std::string children;
+                for (int i = 0; i < xaml::Media::VisualTreeHelper::GetChildrenCount(row); i++) {
+                    auto child = xaml::Media::VisualTreeHelper::GetChild(row, i).try_as<xaml::UIElement>();
+                    if (child) children += " " + std::to_string(child.Opacity()).substr(0, 4);
+                }
+                bool focusIn = false;
+                auto focused = xaml::Input::FocusManager::GetFocusedElement(row.XamlRoot()).try_as<xaml::DependencyObject>();
+                for (auto at = focused; at && !focusIn; at = xaml::Media::VisualTreeHelper::GetParent(at)) focusIn = at == row;
+                if (focusIn) children += ", the keyboard focus in it";
+                state.journal->Write("Apple player: TransportGrid opacity " + std::to_string(row.Opacity()).substr(0, 4) +
+                                     (row.OpacityTransition() ? ", with a transition" : "") + ", parent " +
+                                     (parent ? winrt::to_string(winrt::get_class_name(parent)) : std::string("none")) +
+                                     ", at " + std::to_string(std::lround(box.X)) + "," +
+                                     std::to_string(std::lround(box.Y)) + " " + std::to_string(std::lround(box.Width)) +
+                                     "x" + std::to_string(std::lround(box.Height)) +
+                                     (panel && panel.Background() ? ", a background (takes the pointer)" : "") +
+                                     ", children's opacity" + (children.empty() ? " none" : children));
+            }
+            } catch (...) {
+                // The line is left out; the player is still followed.
+            }
         }
         return;
     }
@@ -748,6 +787,7 @@ void FollowApplePlayer(const xaml::Window& mainWindow, Journal& journal, uirende
         journal.Write("Apple player: opened by Apple Music itself");
         Watch(mainWindow, journal, mode);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 

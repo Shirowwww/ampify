@@ -1,5 +1,3 @@
-# The command line `ampify`: its portable library (ampify_cli_portable) and the executable (ampify). See the convention at
-# the top of CMakeLists.txt.
 list(APPEND AMPIFY_CLI_PORTABLE_SOURCES
     src/cli/sha256.cpp
     src/cli/element.cpp

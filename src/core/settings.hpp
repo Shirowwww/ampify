@@ -17,11 +17,11 @@ inline constexpr size_t kMaxSettingText = 200;
 // One line with no space at either end: settings.txt gives it back as it was written.
 bool KeepsItsValue(std::string_view text);
 
-// Persistent settings: a plain text file with one `key = value` per line,
-// readable and editable by hand. Blank lines and lines starting with '#' are ignored.
+// Persistent settings: a plain text file with one `key = value` per line, editable by hand. Blank lines and lines
+// starting with '#' are ignored.
 class Settings {
 public:
-    // A missing file is not an error: it simply yields empty settings.
+    // A missing file is not an error: it yields empty settings.
     bool Load(const std::string& path);
 
     // Writes to a temporary file first, then replaces the target, so a crash mid-write
@@ -31,7 +31,7 @@ public:
     std::optional<std::string> Get(const std::string& key) const;
     std::string GetString(const std::string& key, const std::string& fallback) const;
 
-    // Accepts 1/0, true/false, on/off, yes/no. Anything else gives the fallback.
+    // Reads the words ParseToggle accepts; anything else gives the fallback.
     bool GetBool(const std::string& key, bool fallback) const;
     int GetInt(const std::string& key, int fallback) const;
     double GetDouble(const std::string& key, double fallback) const;
@@ -41,10 +41,8 @@ public:
     void SetBool(const std::string& key, bool value);
     void SetInt(const std::string& key, int value);
 
-    // Forgets the key. A missing key is not an error.
     void Remove(const std::string& key);
 
-    // Every key, sorted by name, as read from the file and set since.
     const std::map<std::string, std::string>& Values() const { return m_values; }
 
     // Changes keys of the file as it is now and keeps every other key: the kernel, the Ampify page and the command line

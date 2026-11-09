@@ -110,7 +110,7 @@ bool Scrollable(const controls::TextBlock& text) {
 }
 
 // The width of the whole text on one line, measured on the text itself, untrimmed: a copy outside the tree came out
-// about 15 px short (05/11), which left the end cut. The margin it is about to get asks for a new layout anyway.
+// about 15 px short, which left the end cut. The margin it is about to get asks for a new layout anyway.
 double NaturalWidth(const controls::TextBlock& text) {
     constexpr float kOpen = std::numeric_limits<float>::infinity();
     text.Measure({kOpen, kOpen});
@@ -151,6 +151,7 @@ void Stop(Running& run) noexcept {
     try {
         if (run.textToken) run.text.UnregisterPropertyChangedCallback(controls::TextBlock::TextProperty(), run.textToken);
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
     try {
         if (run.distance) run.distance.StopAnimation(L"d");
@@ -164,6 +165,7 @@ void Stop(Running& run) noexcept {
             run.visual.Clip(run.clipBefore);
         }
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
 }
 
@@ -225,6 +227,7 @@ void Run(Marquee& state, Running& run, double width) {
             try {
                 StopAll(State());
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
     state.running.push_back(run);
@@ -286,6 +289,7 @@ void Watch(Marquee& state) {
                 if (state.running.empty()) state.watch.Stop();
                 else CheckPointer(state);
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
     }
@@ -335,6 +339,7 @@ void OnMoved(const IInspectable& sender, const xaml::Input::PointerRoutedEventAr
             try {
                 Evaluate(State());
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
     }
@@ -348,6 +353,7 @@ void MakeHandlers(Marquee& state) {
             try {
                 OnMoved(sender, args);
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         }));
     auto stop = []() {
@@ -362,6 +368,7 @@ void MakeHandlers(Marquee& state) {
             try {
                 if (args.OriginalSource() == sender) stop();
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         }));
     state.wheel = winrt::box_value(xaml::Input::PointerEventHandler(  // a list that scrolls moves the rows
@@ -369,6 +376,7 @@ void MakeHandlers(Marquee& state) {
             try {
                 stop();
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         }));
 }
@@ -386,6 +394,7 @@ void Unhook(Marquee& state, const Hooked& hooked) {
         hooked.element.RemoveHandler(xaml::UIElement::PointerExitedEvent(), state.exited);
         hooked.element.RemoveHandler(xaml::UIElement::PointerWheelChangedEvent(), state.wheel);
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
 }
 
@@ -430,6 +439,7 @@ void KeepTextMarquee(Journal& journal) noexcept {
         if (!state.told) journal.Write("Text marquee: a text cut with an ellipsis scrolls under the pointer");
         state.told = true;
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 

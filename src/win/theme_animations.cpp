@@ -274,6 +274,7 @@ void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> lo
             try {
                 element.StopAnimation(running.center);
             } catch (...) {
+                // The animation already ended, or its element left the tree.
             }
             running.center = nullptr;
         }
@@ -289,6 +290,7 @@ void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> lo
             try {  // a XAML call that throws would end the process from a noexcept handler
                 if (!alive.expired()) StepLoops();
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
     }
@@ -354,6 +356,7 @@ void ThemeAnimations::StepLoops() {
             }
             Apply(element, values);
         } catch (...) {
+            // An element that refuses a value keeps what it has: the next step writes it again.
         }
         running.stillShown = still;
         if (backgroundEnded) {
@@ -362,6 +365,7 @@ void ThemeAnimations::StepLoops() {
             try {
                 SetBackgroundBrush(element, running.ownBackground);
             } catch (...) {
+                // An element that refuses the brush keeps whatever it shows.
             }
             running.backgroundAnimated = false;
             running.wantedBackground.reset();
@@ -407,6 +411,7 @@ void ThemeAnimations::Sweep(const std::function<bool(theme::NodeId)>& isDecor) {
                 auto element = it->second.element.get().try_as<xaml::FrameworkElement>();
                 gone = element && !element.IsLoaded() && !xaml::Media::VisualTreeHelper::GetParent(element);
             } catch (...) {
+                // A property read on an element being torn down: kept, and looked at again at the next sweep.
             }
         }
         if (!gone) {
@@ -438,6 +443,7 @@ void ThemeAnimations::Stop(Running& running) {
         try {
             action();
         } catch (...) {
+            // The element may be torn down already: nothing is left to put back.
         }
     };
     for (const composition::CompositionAnimation& animation : running.animations) {
@@ -488,6 +494,7 @@ void ThemeAnimations::EndAt(Running& running, double ms, std::vector<composition
                 for (const composition::CompositionAnimation& part : parts) target.StopAnimation(part);
             }
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     timer.Start();

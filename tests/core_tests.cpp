@@ -114,14 +114,30 @@ TEST_CASE(SafeMode_TripsAfterTwoUnhealthyLaunchesAndRecovers) {
     std::string path = (scratch / "state.txt").string();
 
     ampify::SafeMode safeMode(path, 2);
-    CHECK(!safeMode.BeginLaunch());  // first launch: normal
-    CHECK(!safeMode.BeginLaunch());  // second launch, still no sign of life: normal
-    CHECK(safeMode.BeginLaunch());   // third: two failures in a row, so safe mode
+    CHECK(!safeMode.BeginLaunch());
+    CHECK(!safeMode.BeginLaunch());
+    CHECK(safeMode.BeginLaunch());  // two failures in a row, so safe mode
     CHECK(safeMode.UnhealthyLaunches() == 3);
 
     safeMode.MarkHealthy();
     CHECK(safeMode.UnhealthyLaunches() == 0);
     CHECK(!safeMode.BeginLaunch());  // back to normal after a healthy run
+}
+
+TEST_CASE(SafeMode_ALaunchWithoutTheKernelStaysSoOnceItsCountIsCleared) {
+    ampify::test::ScratchDir scratch("safe-mode-launch");
+    std::string path = (scratch / "state.txt").string();
+
+    ampify::SafeMode safeMode(path, 2);
+    CHECK(!safeMode.BeginLaunch());
+    CHECK(!safeMode.ThisLaunchSafe());
+    CHECK(!safeMode.BeginLaunch());
+    CHECK(safeMode.BeginLaunch());
+    safeMode.MarkHealthy();  // nothing of Ampify runs: the next launch tries again
+    CHECK(!safeMode.IsActive());
+    CHECK(safeMode.ThisLaunchSafe());  // but the library agent of this launch stays without the kernel
+    CHECK(!safeMode.BeginLaunch());
+    CHECK(!safeMode.ThisLaunchSafe());
 }
 
 TEST_CASE(SafeMode_CountSurvivesANewInstance) {
@@ -167,6 +183,16 @@ TEST_CASE(Journal_WritesStampedLines) {
     journal.Write("second line");
 
     CHECK(out.str() == "[12:00:00.000] kernel started\n[12:00:00.000] second line\n");
+}
+
+TEST_CASE(Journal_PrefixedCopyWritesIntoItsParent) {
+    std::ostringstream out;
+    ampify::Journal journal(out, [] { return std::string("t"); });
+    ampify::Journal mini(journal, "Mini player: ");
+    mini.Write("Themes: theme applied");
+    journal.Write("plain");
+
+    CHECK(out.str() == "[t] Mini player: Themes: theme applied\n[t] plain\n");
 }
 
 TEST_CASE(Extensions_StartOnlyWhatIsEnabled) {

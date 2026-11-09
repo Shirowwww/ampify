@@ -4,6 +4,7 @@ file(READ "${CMAKE_CURRENT_SOURCE_DIR}/facts/release.json" ampify_release_json)
 string(JSON ampify_release_version GET "${ampify_release_json}" version)
 project(Ampify VERSION ${ampify_release_version} LANGUAGES C CXX)
 include(cmake/facts.cmake)
+include(cmake/layouts.cmake)
 
 # Properties > Details of the files people download: product, publisher, description and version. MSVC builds only,
 # the ones the release is made from.
@@ -72,16 +73,9 @@ if(MSVC AND CMAKE_GENERATOR MATCHES "Visual Studio")
     add_compile_options(/MP)
 endif()
 
-# Source lists. No source file is named in this file: each package lists its files in cmake/sources/<package>.cmake,
-# and every *.cmake file of that folder is included here, in alphabetical order, before any target is defined.
-# Convention for those files:
-#   - only append, with list(APPEND <LIST> file...), never set(): several files may add to the same list;
-#   - a new package (an API module, a native extension, a group of tests) adds its own new file rather than editing
-#     another package's, so that parallel work does not touch the same lines;
-#   - a new target is declared below, and its list gets a name of the form AMPIFY_<TARGET>_SOURCES.
-# Lists: AMPIFY_QUICKJS_SOURCES, AMPIFY_CORE_SOURCES, AMPIFY_THEME_SOURCES, AMPIFY_ATMOS_SOURCES, AMPIFY_ATMOS_WIN_SOURCES,
-# AMPIFY_WIN_SOURCES, AMPIFY_KERNEL_SOURCES, AMPIFY_XAML_SOURCES, AMPIFY_LAUNCHER_SOURCES,
-# AMPIFY_SETUP_SOURCES, AMPIFY_CLI_PORTABLE_SOURCES, AMPIFY_CLI_SOURCES, AMPIFY_TESTS_SOURCES, AMPIFY_TESTS_WIN_SOURCES.
+# Source lists: each package lists its files in cmake/sources/<package>.cmake, all included here before any target.
+# Those files only append, with list(APPEND AMPIFY_<TARGET>_SOURCES file...), never set(). A new package adds its own
+# file rather than editing another's, so parallel work does not touch the same lines.
 file(GLOB AMPIFY_SOURCE_LISTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/sources/*.cmake")
 list(SORT AMPIFY_SOURCE_LISTS)
 foreach(source_list IN LISTS AMPIFY_SOURCE_LISTS)
@@ -109,9 +103,6 @@ else()
     target_compile_options(ampify_quickjs PRIVATE -w -funsigned-char)
 endif()
 
-# Portable kernel: settings, journal, safe mode, version gate, extension host,
-# Apple Music identity, injection policy, DRM guard, package watch, kit file layout, JSON, manifests,
-# the JavaScript runtime and the extension loader.
 add_library(ampify_core STATIC ${AMPIFY_CORE_SOURCES})
 target_include_directories(ampify_core PUBLIC "${AMPIFY_FACTS_INCLUDE}")
 target_compile_options(ampify_core PRIVATE ${AMPIFY_WARNINGS})
@@ -121,26 +112,24 @@ if(WIN32)
     target_link_libraries(ampify_core PUBLIC bcrypt)
 endif()
 
-# Theme engine: colour schemes, resources, CSS-like rules, cascade, apply and restore, live reload, inspector.
-# Pure C++ over the TreeBackend interface, so it builds and tests on any host. The Windows backend implements that interface.
+# Pure C++ over the TreeBackend interface, so it builds and tests on any host; the Windows backend implements it.
 add_library(ampify_theme STATIC ${AMPIFY_THEME_SOURCES})
 target_link_libraries(ampify_theme PUBLIC ampify_core)
+target_include_directories(ampify_theme PRIVATE "${AMPIFY_LAYOUTS_INCLUDE}")
 target_compile_options(ampify_theme PRIVATE ${AMPIFY_WARNINGS})
 
-# Atmos leveler: BS.1770 integrated meter, track kinds, gain policy and levels file, over the portable audio of
-# ampify_core. Pure C++, no Windows API. Its files include the tree from src/ ("core/audio/...").
+# Its files include the tree from src/ ("core/audio/...").
 add_library(atmos_leveler STATIC ${AMPIFY_ATMOS_SOURCES})
 target_include_directories(atmos_leveler PUBLIC extensions src)
 target_link_libraries(atmos_leveler PUBLIC ampify_core)
 target_compile_options(atmos_leveler PRIVATE ${AMPIFY_WARNINGS})
 
-# XAML theme backend (src/win/xaml_backend.cpp, src/win/theme_service.cpp). Off by default: it needs the C++/WinRT projection
-# of WinUI, which scripts/build-msvc.ps1 and CI (ci.yml) generate. See docs/development/xaml-lessons.md.
+# Off by default: the XAML backend needs the C++/WinRT projection of WinUI, which scripts/build-msvc.ps1 and CI
+# (ci.yml) generate. See docs/development/xaml-lessons.md.
 option(AMPIFY_XAML "Build the XAML theme backend and native interface in the kernel (needs the Windows App SDK C++/WinRT headers)" OFF)
 set(AMPIFY_WINAPPSDK_INCLUDE "" CACHE PATH "Folder that holds winrt/Microsoft.UI.Xaml.h, from the Windows App SDK NuGet package")
 
-# Windows only: the kernel DLL, the launcher, the installer, and the helpers they share.
-# Built when targeting Windows. Every executable is static, so it runs without any DLL beside it.
+# Every executable is static, so it runs without any DLL beside it.
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_library(ampify_win STATIC ${AMPIFY_WIN_SOURCES})
     target_compile_options(ampify_win PRIVATE ${AMPIFY_WARNINGS})
@@ -149,7 +138,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_link_libraries(ampify_win PUBLIC ole32 shell32 user32 comctl32 advapi32 psapi winhttp ws2_32 winmm windowscodecs
                           mfuuid ampify_core)
 
-    # The Atmos leveler's Windows side: the gain policy it plugs into the audio platform of ampify_win (src/win/audio/).
     add_library(atmos_leveler_win STATIC ${AMPIFY_ATMOS_WIN_SOURCES})
     target_link_libraries(atmos_leveler_win PUBLIC atmos_leveler ampify_win)
     target_compile_options(atmos_leveler_win PRIVATE ${AMPIFY_WARNINGS})
@@ -180,25 +168,22 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         endif()
     endif()
 
-    # Starts Apple Music, holds its first process while the kernel loads, then follows the package.
     add_executable(ampify_launcher WIN32 ${AMPIFY_LAUNCHER_SOURCES})
     target_link_libraries(ampify_launcher PRIVATE ampify_core ampify_win)
     target_compile_options(ampify_launcher PRIVATE ${AMPIFY_WARNINGS})
     ampify_version_resource(ampify_launcher launcher "Ampify launcher")
 
-    # Installs the kit and uninstalls it. The same file is copied into the install folder as the uninstaller.
     add_executable(ampify_setup WIN32 ${AMPIFY_SETUP_SOURCES})
-    target_link_libraries(ampify_setup PRIVATE ampify_core ampify_win)
+    # Direct2D, DirectWrite, DWM and Active Accessibility, all part of Windows, draw its window (setup_window.cpp).
+    target_link_libraries(ampify_setup PRIVATE ampify_core ampify_win d2d1 dwrite dwmapi oleacc)
     target_compile_options(ampify_setup PRIVATE ${AMPIFY_WARNINGS})
     ampify_version_resource(ampify_setup setup "Ampify setup and uninstaller")
 endif()
 
-# Portable part of the command line `ampify`: SHA-256, manifests, catalog, kit layout, backups, theme commands.
 add_library(ampify_cli_portable STATIC ${AMPIFY_CLI_PORTABLE_SOURCES})
 target_link_libraries(ampify_cli_portable PUBLIC ampify_theme ampify_core)
 target_compile_options(ampify_cli_portable PRIVATE ${AMPIFY_WARNINGS})
 
-# The command line `ampify`: commands, platform glue, and the marketplace.
 add_executable(ampify ${AMPIFY_CLI_SOURCES})
 target_link_libraries(ampify PRIVATE ampify_cli_portable ampify_theme ampify_core)
 target_compile_options(ampify PRIVATE ${AMPIFY_WARNINGS})

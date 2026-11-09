@@ -12,16 +12,14 @@ namespace ampify {
 // total, which is published atomically. The gain goes into the decoded samples only, never the volume slider.
 class GainBoard {
 public:
-    // Sets the gain of one element. 0 removes it. The total is then clamped to +/- ceilingDb.
+    // 0 removes the element's gain. The total is clamped to +/- ceilingDb.
     void Set(const std::string& elementId, double db, double ceilingDb);
 
-    // The clamped total in dB, as set by the last call.
     double TotalDb() const { return m_totalDb; }
 
     // The linear factor of the total, for the audio threads. 1 when no element has a gain.
     float Linear() const { return m_linear.load(std::memory_order_relaxed); }
 
-    // How many elements currently have a gain.
     size_t Count() const { return m_gains.size(); }
 
 private:

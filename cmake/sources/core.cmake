@@ -1,5 +1,4 @@
-# Portable kernel: target ampify_core. The modules of the Ampify object are in api.cmake. See the convention at the top
-# of CMakeLists.txt.
+# The modules of the Ampify object are in api.cmake.
 list(APPEND AMPIFY_CORE_SOURCES
     src/core/settings.cpp
     src/core/settings_catalog.cpp
@@ -25,6 +24,7 @@ list(APPEND AMPIFY_CORE_SOURCES
     src/core/player_state.cpp
     src/core/player_watch.cpp
     src/core/ui_model.cpp
+    src/core/ui_vocab.cpp
     src/core/reload.cpp
     src/core/package_watch.cpp
     src/core/kit_layout.cpp

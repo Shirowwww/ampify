@@ -12,6 +12,7 @@
 #include <thread>
 #include <vector>
 
+#include "../core/api/dispatch_names.hpp"
 #include "../core/apple_music.hpp"
 #include "../core/build_signature.hpp"
 #include "../core/extension.hpp"
@@ -76,7 +77,7 @@ void ServiceReloadRequests(const std::filesystem::path& kit, ampify::ReloadWatch
     loader.Apply(requests, settings);
 }
 
-HINSTANCE g_module = nullptr;  // the kernel DLL itself, passed to the interface-thread facade
+HINSTANCE g_module = nullptr;  // passed to the interface-thread facade
 
 // Themes and the native interface only touch the interface, so only AppleMusic.exe starts them. Both reach the
 // interface thread through the DispatcherQueue of Apple Music's main window (src/win/xaml_host.hpp). The clicks and
@@ -104,7 +105,7 @@ void StartInterface(ampify::Journal& journal, [[maybe_unused]] const std::filesy
         payload.Set("id", ampify::Json(static_cast<double>(event.callbackId)));
         std::optional<ampify::Json> value = ampify::Json::Parse(event.valueJson);
         payload.Set("value", value ? *value : ampify::Json());
-        target->DeliverEventTo(event.elementId, "change", payload.Dump());
+        target->DeliverEventTo(event.elementId, ampify::dispatch::kChange, payload.Dump());
     });
     ui->Start();
 #else
@@ -112,8 +113,8 @@ void StartInterface(ampify::Journal& journal, [[maybe_unused]] const std::filesy
 #endif
 }
 
-// Runs once per process. Log, extension host and safe mode state stay alive until the process exits,
-// so nothing is torn down while the app still runs.
+// Log, extension host and safe-mode state stay alive until the process exits, so nothing is torn down while the app
+// still runs.
 DWORD WINAPI KernelMain(LPVOID) {
     ampify::ProcessRole role = ampify::RoleOfImageName(ampify::win::ExecutablePath().string());
     if (role == ampify::ProcessRole::Unknown) return 0;
@@ -158,8 +159,8 @@ DWORD WINAPI KernelMain(LPVOID) {
     ampify::BuildSignature signature = ampify::CheckBuildSignature(
         ampify::win::ReadFileBytes(ampify::win::ExecutablePath().parent_path() / std::string(ampify::kPlayerDllName)));
     journal.Write(ampify::DescribeSignature(signature));
-    // Builds tested after this build of Ampify was compiled, from `ampify versions update` (<data folder>\versions.txt). The signature
-    // check above still applies, and an unknown build still leaves the kernel idle.
+    // Builds tested after this build of Ampify was compiled, from `ampify versions update` (<data folder>\versions.txt).
+    // The signature check above still applies, and an unknown build still leaves the kernel idle.
     std::vector<std::string> extraVersions =
         ampify::LoadVersionList(ampify::win::KitDirectory() / std::string(ampify::kVersionListFile));
     ampify::PolicyVerdict verdict = ampify::DecideKernel(role, version, signature, ampify::KnownAppVersionsWith(extraVersions));
@@ -174,8 +175,7 @@ DWORD WINAPI KernelMain(LPVOID) {
     ampify::uirender::AppleTweaks tweaks = ampify::uirender::ReadAppleTweaks(settings);
     ampify::win::InstallNetworkFixes(journal, {tweaks.ipv4First, tweaks.proxyNoAutodetect, tweaks.freezeLog});
 
-    // JavaScript elements live in %USERPROFILE%\Ampify\extensions\<id> and apps\<id>. Both processes
-    // load them: an element tells them apart with Ampify.process.
+    // Both processes load the JavaScript elements: an element tells them apart with Ampify.process.
     static ampify::WinHost winHost(role == ampify::ProcessRole::AppleMusic ? "ui" : "engine", kit, settings, journal);
     ampify::i18n::SetLanguage(ampify::i18n::LanguageCode(winHost.Locale()));
     static ampify::ExtensionHost host(journal);

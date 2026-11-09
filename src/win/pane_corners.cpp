@@ -70,6 +70,7 @@ void PaneCorners::Follow(theme::NodeId id, const xaml::DependencyObject& object)
         if (known == m_entries.end() && !Start(id, pane)) return;
         Update(m_entries.at(id));
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -127,6 +128,7 @@ void PaneCorners::OnChange(theme::NodeId id) noexcept {
     try {
         if (auto it = m_entries.find(id); it != m_entries.end()) Update(it->second);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -138,6 +140,7 @@ void PaneCorners::Drop(Entry& entry) noexcept {
         }
         if (entry.visual && entry.visual.Clip() == entry.clip) entry.visual.Clip(entry.before);
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
 }
 

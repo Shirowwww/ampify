@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdlib>
 
+#include "../core/api/dispatch_names.hpp"
 #include "../core/json.hpp"
 #include "../core/player_state.hpp"
 #include "../core/natives/service_flags.hpp"
@@ -93,8 +94,6 @@ void Services::Emit(const std::string& entry, const std::string& payload) {
     if (m_sink) m_sink(entry, payload);
 }
 
-// ---- Notification area icon ----------------------------------------------------------------------------------
-
 void Services::StartTray() {
     auto tray = std::make_unique<TrayIcon>();
     std::string error;
@@ -168,8 +167,6 @@ void Services::InjectTrayCommand(unsigned command) {
 
 bool Services::trayRunning() const { return m_tray && m_tray->running(); }
 
-// ---- Discord ---------------------------------------------------------------------------------------------------
-
 bool Services::SetActivity(const std::string& elementId, const std::string& clientId,
                            const discord::Activity& activity) {
     EnsureStarted();
@@ -184,8 +181,6 @@ void Services::ClearActivity(const std::string& elementId) {
     m_discord->Set({}, std::nullopt);
     m_discordOwner.clear();
 }
-
-// ---- MIDI ------------------------------------------------------------------------------------------------------
 
 void Services::StartMidi() {
     std::string error;
@@ -234,8 +229,6 @@ void Services::InjectMidi(uint32_t packed) {
 }
 
 bool Services::midiOpen() const { return m_midi && m_midi->open(); }
-
-// ---- Remote control --------------------------------------------------------------------------------------------
 
 void Services::StartRemote() {
     RemoteServer::Config config;
@@ -311,8 +304,6 @@ bool Services::Command(remote::Action action) {
 
 std::optional<double> Services::SetGainDb(double db) { return Queue(std::nullopt, db); }
 
-// ---- Output files ----------------------------------------------------------------------------------------------
-
 bool Services::WriteOutputText(const std::string& elementId, const std::string& name, const std::string& text,
                                std::string* error) {
     return WriteOutputFile(m_kit / "output", elementId, name, text, error);
@@ -324,8 +315,6 @@ std::filesystem::path Services::LibraryFile() {
     if (music.empty()) return {};
     return music / L"Apple Music" / L"Apple Music Library.musiclibrary" / L"Library.musicdb";
 }
-
-// ---- The JavaScript thread's turn ------------------------------------------------------------------------------
 
 void Services::Service() {
     EnsureStarted();
@@ -367,12 +356,12 @@ void Services::Service() {
                 case midi::Action::Gain: m_host.SetGainDb("midi", decision->gainDb); break;
             }
         }
-        if (!m_midiSubscribers.empty()) Emit("midi", midi::EventJson(*event));
+        if (!m_midiSubscribers.empty()) Emit(dispatch::kMidi, midi::EventJson(*event));
     }
 
     for (unsigned command : trayCommands) {
         if (command == 0) {
-            Emit("tray", R"({"click":true})");
+            Emit(dispatch::kTray, R"({"click":true})");
         } else if (command == kTrayPrevious) {
             m_host.Control(PlayerCommand::Previous, 0);
         } else if (command == kTrayNext) {
@@ -383,7 +372,7 @@ void Services::Service() {
             Json payload(Json::Object{});
             payload.Set("to", Json(found->second.first));
             payload.Set("item", Json(static_cast<double>(found->second.second)));
-            Emit("tray", payload.Dump());
+            Emit(dispatch::kTray, payload.Dump());
         }
     }
 

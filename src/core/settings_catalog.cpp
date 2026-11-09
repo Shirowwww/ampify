@@ -30,6 +30,13 @@ KitSetting Choice(std::string_view key, std::string_view label, std::string_view
             .helpKey = help};
 }
 
+// All the lines (the default, as Apple shows them), or 0 to 5 of them.
+std::vector<SettingOption> LyricLineOptions() {
+    return {{"all", "tweaks.lyricsLines.all"}, {"0", "tweaks.lyricsLines.0"}, {"1", "tweaks.lyricsLines.1"},
+            {"2", "tweaks.lyricsLines.2"},     {"3", "tweaks.lyricsLines.3"}, {"4", "tweaks.lyricsLines.4"},
+            {"5", "tweaks.lyricsLines.5"}};
+}
+
 const std::vector<KitSetting>& Fixed() {
     static const std::vector<KitSetting> rows{
         Text(kThemeActiveKey, "no theme"),
@@ -81,11 +88,18 @@ const std::vector<KitSetting>& Fixed() {
                     {{"hover", "tweaks.marquee.hover"}, {"off", "tweaks.marquee.off"}}),
         Choice(kSidebarKey, "tweaks.sidebar", "tweaks.sidebarHelp",
                     {{"open", "tweaks.sidebar.open"}, {"hover", "tweaks.sidebar.hover"}}),
-        Choice(kFreezeLogKey, "tweaks.watchdog", "tweaks.watchdogHelp", {{"off", "ui.off"}, {"on", "ui.on"}}),
+        Choice(kFreezeLogKey, "tweaks.watchdog", "tweaks.watchdogHelp", {{"on", "ui.on"}, {"off", "ui.off"}}),
         Choice(kOrphanAgentKey, "tweaks.orphan", "tweaks.orphanHelp",
-                    {{"off", "ui.off"}, {"on", "tweaks.orphan.on"}}),
+                    {{"on", "tweaks.orphan.on"}, {"off", "ui.off"}}),
+        Choice(kPlaybarKey, "tweaks.playbar", "tweaks.playbarHelp",
+                    {{"theme", "tweaks.playbar.theme"},
+                     {"top", "tweaks.playbar.top"},
+                     {"bottom", "tweaks.playbar.bottom"},
+                     {"centred", "tweaks.playbar.centred"}}),
         Choice(kTopbarKey, "tweaks.topbar", "tweaks.topbarHelp",
                     {{"off", "tweaks.topbar.off"}, {"search", "tweaks.topbar.search"}}),
+        Choice(kLyricsBeforeKey, "tweaks.lyricsBefore", "tweaks.lyricsBeforeHelp", LyricLineOptions()),
+        Choice(kLyricsAfterKey, "tweaks.lyricsAfter", "tweaks.lyricsAfterHelp", LyricLineOptions()),
         Choice(kEntryKey, "entry.title", "entry.help", {{"sidebar", "entry.sidebar"}, {"header", "entry.header"}}),
         Text("language", "the Windows language"),
     };

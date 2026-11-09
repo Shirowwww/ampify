@@ -67,8 +67,14 @@ struct Links {
     std::chrono::steady_clock::duration searchWait = kSearchEvery;
     std::string trackKey;  // the song of the last search: a new one starts the searches again
     bool told = false;          // the log said once that the links are in place
-    bool commandMissing = false;  // the log said once that Apple's "go to" command was not found
+    bool modelMissing = false;    // the log said once that Apple's view model was not found
+    bool actionRefused = false;   // the log said once that Apple's "go to" action did not run
 };
+
+void NoteOnce(bool& said, Journal* journal, const char* line) {
+    if (!said && journal) journal->Write(line);
+    said = true;
+}
 
 Links& State() {
     static Links* state = new Links();  // never destroyed: it holds XAML references, released with the process
@@ -104,8 +110,7 @@ bool GoToAlbum(const xaml::FrameworkElement& display) {
         FAILED(rt::CallSlot(control, amp::kNowPlayingControlViewModel, modelObject.Put())) || !modelObject ||
         !rt::Query(modelObject, rt::GuidOf(amp::kIidNowPlayingViewModel), model) ||
         FAILED(rt::CallSlot(model, amp::kNowPlayingViewModelGoToItemAction, actionObject.Put())) || !actionObject) {
-        if (!state.commandMissing && state.journal) state.journal->Write("Display links: Apple's view model was not found");
-        state.commandMissing = true;
+        NoteOnce(state.modelMissing, state.journal, "Display links: Apple's view model was not found");
         return false;
     }
     IInspectable action{nullptr};
@@ -121,8 +126,7 @@ bool GoToAlbum(const xaml::FrameworkElement& display) {
                                                          rt::GuidOf(amp::kIidUiBrokerStatics), broker);
     if (FAILED(activation.result) ||
         FAILED(rt::CallSlot(broker, amp::kUiBrokerGlobalDispatchAction, actionObject.Get(), operation.Put()))) {
-        if (!state.commandMissing && state.journal) state.journal->Write("Display links: Apple's go-to action did not run");
-        state.commandMissing = true;
+        NoteOnce(state.actionRefused, state.journal, "Display links: Apple's go-to action did not run");
         return false;
     }
     return true;
@@ -184,6 +188,7 @@ double ArtistEnd(const controls::TextBlock& text, std::size_t separator, std::si
                                                                 xaml::Documents::LogicalDirection::Forward);
         if (position) return position.GetCharacterRect(xaml::Documents::LogicalDirection::Forward).X;
     } catch (...) {
+        // The text has no such position (yet): the estimate below is used.
     }
     return length ? text.ActualWidth() * static_cast<double>(separator) / static_cast<double>(length) : 0;
 }
@@ -221,6 +226,7 @@ void Link(const xaml::FrameworkElement& ticker, bool title) {
             }
             args.Handled(true);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     auto underline = [weak = winrt::make_weak(ticker)](bool on) {
@@ -233,12 +239,14 @@ void Link(const xaml::FrameworkElement& ticker, bool title) {
         try {
             underline(true);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     ticker.PointerExited([underline](IInspectable const&, xaml::Input::PointerRoutedEventArgs const&) noexcept {
         try {
             underline(false);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
 }
@@ -280,6 +288,7 @@ void KeepDisplayLinks(Journal& journal) noexcept {
         if (!state.told) journal.Write("Display links: the title, artist and album of the display open their pages");
         state.told = true;
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 

@@ -79,8 +79,6 @@ TEST_CASE(Runtime_HasNoFileNetworkOrProcessGlobals) {
           "undefined,undefined,undefined,undefined,undefined");
 }
 
-// ---- ES modules ---------------------------------------------------------------------------------------------------
-
 namespace {
 
 namespace fs = std::filesystem;

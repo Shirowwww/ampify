@@ -27,7 +27,6 @@ std::optional<ReloadRequest> ParseLine(std::string_view line) {
     return std::nullopt;
 }
 
-// The part of `text` up to and including its last newline.
 std::string_view CompleteLines(std::string_view text) {
     size_t end = text.rfind('\n');
     return end == std::string_view::npos ? std::string_view() : text.substr(0, end + 1);

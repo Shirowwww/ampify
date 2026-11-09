@@ -19,6 +19,7 @@ inline constexpr double kTopbarHeight = 40;         // the strip themes leave ab
 inline constexpr double kAppleSearchBoxHeight = 32;
 inline constexpr double kTopbarControlHeight = kAppleSearchBoxHeight;
 inline constexpr double kTopbarMinTop = 4;          // the gap kept above them, even under a standard 32 caption
+inline constexpr double kTopbarMaxStrip = 56;       // a taller strip than this is a theme's own band, not room to centre in
 inline constexpr double kTopbarBackWidth = 40;
 inline constexpr double kTopbarGap = 8;             // between the back arrow and the field
 inline constexpr double kTopbarCaptionWidth = 138;  // the Windows 11 caption buttons
@@ -50,10 +51,9 @@ struct TopbarLayout {
     TopbarRect search;
 };
 
-// On when the setting asks for it, the window is wide enough, and Apple's transport bar is not at the top (the strip
-// would cover it).
-inline bool TopbarShown(bool setting, bool transportAtTop, double windowWidth) {
-    return setting && !transportAtTop && windowWidth >= kTopbarMinWidth;
+// The window is wide enough for the strip's field, back arrow and caption buttons side by side.
+inline bool TopbarFits(double windowWidth) {
+    return windowWidth >= kTopbarMinWidth;
 }
 
 // The transport bar is at the top when it shows and starts inside the strip: Apple's own layout, or a theme's top bar.
@@ -76,11 +76,14 @@ inline double TopbarCaptionHeight(int devicePixels, double scale) {
 // The field in the middle of the window, the back arrow just left of it, as Spotify lays them out. Both centre on the
 // caption buttons, not on the strip: centred on the strip they sat 4 pixels (5 to 6 at 125%) under the buttons' glyphs.
 // Under the standard 32 caption the control touched the window's top edge: it keeps a gap above, and so sits centred
-// in the 40 strip, as much lower than the caption buttons' glyphs as that gap.
-inline TopbarLayout LayOutTopbar(double windowWidth, double captionHeight) {
+// in the 40 strip, as much lower than the caption buttons' glyphs as that gap. A theme whose panels start lower (Glass)
+// leaves a taller strip: the controls centre in it instead.
+inline TopbarLayout LayOutTopbar(double windowWidth, double captionHeight, double stripHeight = kTopbarHeight) {
     const double width = TopbarSearchWidth(windowWidth);
     const double left = (windowWidth - width) / 2;
-    const double top = std::max(kTopbarMinTop, (captionHeight - kTopbarControlHeight) / 2);
+    const double strip = stripHeight > kTopbarMaxStrip ? kTopbarHeight : std::max(stripHeight, kTopbarHeight);
+    const double top = std::max({kTopbarMinTop, (captionHeight - kTopbarControlHeight) / 2,
+                                 (strip - kTopbarControlHeight) / 2});
     return TopbarLayout{{left - kTopbarGap - kTopbarBackWidth, top, kTopbarBackWidth, kTopbarControlHeight},
                         {left, top, width, kTopbarControlHeight}};
 }

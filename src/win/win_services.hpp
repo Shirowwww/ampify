@@ -70,24 +70,18 @@ public:
     // JavaScript thread, regularly: starts the services on first use, then runs what their threads queued.
     void Service();
 
-    // DiscordHost
     bool SetActivity(const std::string& elementId, const std::string& clientId,
                      const discord::Activity& activity) override;
     void ClearActivity(const std::string& elementId) override;
-    // TrayHost
     bool SetTrayMenu(const std::string& elementId, const std::vector<TrayItem>& items) override;
     void RemoveTrayMenu(const std::string& elementId) override;
-    // MidiHost
     bool SubscribeMidi(const std::string& elementId) override;
     void UnsubscribeMidi(const std::string& elementId) override;
     std::vector<std::string> MidiDevices() override;
-    // RemoteHost
     bool PublishRemoteState(const std::string& elementId, const std::string& json) override;
     void RemoveRemoteState(const std::string& elementId) override;
-    // OutputFilesHost
     bool WriteOutputText(const std::string& elementId, const std::string& name, const std::string& text,
                          std::string* error) override;
-    // LibraryHost
     std::filesystem::path LibraryFile() override;
 
     // For the tests: what a device, the icon or a remote client would send.

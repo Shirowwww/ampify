@@ -1,8 +1,8 @@
-# Theme engine: target ampify_theme. See the convention at the top of CMakeLists.txt.
 list(APPEND AMPIFY_THEME_SOURCES
     src/core/theme/animation.cpp
     src/core/theme/builtins.cpp
     src/core/theme/color.cpp
+    src/core/theme/color_matrix.cpp
     src/core/theme/colour_keys.cpp
     src/core/theme/css.cpp
     src/core/theme/css_values.cpp
@@ -14,12 +14,18 @@ list(APPEND AMPIFY_THEME_SOURCES
     src/core/theme/inspector.cpp
     src/core/theme/library.cpp
     src/core/theme/properties.cpp
+    src/core/theme/properties_effects.cpp
+    src/core/theme/properties_paint.cpp
     src/core/theme/replay.cpp
     src/core/theme/replay_contrast.cpp
+    src/core/theme/retired.cpp
     src/core/theme/selector.cpp
     src/core/theme/session.cpp
     src/core/theme/theme.cpp
+    src/core/theme/theme_colours.cpp
+    src/core/theme/theme_derived.cpp
     src/core/theme/theme_settings.cpp
+    src/core/theme/value_codec.cpp
     src/core/theme/accent.cpp
     src/core/theme/fonts.cpp
     src/core/theme/hover.cpp

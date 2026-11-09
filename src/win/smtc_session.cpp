@@ -17,19 +17,10 @@ const GUID kIidPlaybackInfo = rt::GuidOf("94B4B6CF-E8BA-51AD-87A7-C10ADE106127")
 const GUID kIidTimeline = rt::GuidOf("EDE34136-6F25-588D-8ECF-EA5B6735AAA5");
 const GUID kIidMediaProperties = rt::GuidOf("68856CF6-ADB4-54B2-AC16-05837907ACB6");
 
-// IGlobalSystemMediaTransportControlsSessionManagerStatics: RequestAsync 6.
 constexpr int kStaticsRequestAsync = 6;
-// IGlobalSystemMediaTransportControlsSessionManager: GetCurrentSession 6, GetSessions 7.
 constexpr int kManagerGetSessions = 7;
-// IVectorView<T>: GetAt 6, get_Size 7, IndexOf 8, GetMany 9.
 constexpr int kVectorViewGetAt = 6;
 constexpr int kVectorViewSize = 7;
-// IGlobalSystemMediaTransportControlsSession: SourceAppUserModelId 6, TryGetMediaPropertiesAsync 7,
-// GetTimelineProperties 8, GetPlaybackInfo 9, TryPlayAsync 10, TryPauseAsync 11, TryStopAsync 12, TryRecordAsync 13,
-// TryFastForwardAsync 14, TryRewindAsync 15, TrySkipNextAsync 16, TrySkipPreviousAsync 17,
-// TryChangeChannelUpAsync 18, TryChangeChannelDownAsync 19, TryTogglePlayPauseAsync 20,
-// TryChangeAutoRepeatModeAsync 21, TryChangePlaybackRateAsync 22, TryChangeShuffleActiveAsync 23,
-// TryChangePlaybackPositionAsync 24.
 constexpr int kSessionAppId = 6;
 constexpr int kSessionMediaPropertiesAsync = 7;
 constexpr int kSessionTimeline = 8;
@@ -39,24 +30,17 @@ constexpr int kSessionPause = 11;
 constexpr int kSessionSkipNext = 16;
 constexpr int kSessionSkipPrevious = 17;
 constexpr int kSessionChangePosition = 24;
-// IGlobalSystemMediaTransportControlsSessionPlaybackInfo: Controls 6, PlaybackStatus 7.
 constexpr int kInfoStatus = 7;
-// IGlobalSystemMediaTransportControlsSessionTimelineProperties: StartTime 6, EndTime 7, MinSeekTime 8,
-// MaxSeekTime 9, Position 10, LastUpdatedTime 11.
 constexpr int kTimelineStart = 6;
 constexpr int kTimelineEnd = 7;
 constexpr int kTimelinePosition = 10;
 constexpr int kTimelineLastUpdated = 11;
-// IGlobalSystemMediaTransportControlsSessionMediaProperties: Title 6, Subtitle 7, AlbumArtist 8, Artist 9,
-// AlbumTitle 10.
 constexpr int kPropertiesTitle = 6;
 constexpr int kPropertiesArtist = 9;
 constexpr int kPropertiesAlbum = 10;
-// ... TrackNumber 11, Genres 12, AlbumTrackCount 13, PlaybackType 14, Thumbnail 15.
 constexpr int kPropertiesThumbnail = 15;
 
-// Windows.Storage.Streams, from windows.storage.streams.h: IRandomAccessStreamReference.OpenReadAsync 6,
-// IContentTypeProvider.get_ContentType 6.
+// Windows.Storage.Streams, from windows.storage.streams.h.
 const GUID kIidStreamReference = rt::GuidOf("33EE3134-1DD6-4E3A-8067-D1C162E8642B");
 const GUID kIidContentTypeProvider = rt::GuidOf("97D098A5-3B99-4DE9-88A5-E11D2F50C795");
 const GUID kIidRandomAccessStream = rt::GuidOf("905A0FE1-BC53-11DF-8C49-001E4FC686DA");
@@ -68,7 +52,7 @@ constexpr unsigned long long kSearchEveryMs = 2000;
 constexpr unsigned long long kPropertiesEveryMs = 1000;
 constexpr DWORD kCommandTimeoutMs = 3000;
 
-// Apple Music's package family is AppleInc.AppleMusicWin_nzyj5cx40ttqa; its session id contains "AppleMusic".
+// The session id of Apple Music contains "AppleMusic" (its package family is AppleInc.AppleMusicWin_...).
 bool IsAppleMusic(const std::string& appId) {
     std::string lower = ToLowerAscii(appId);
     return lower.find("applemusic") != std::string::npos;

@@ -67,6 +67,10 @@ inline constexpr char kSidebarKey[] = "apple.sidebar";
 inline constexpr char kFreezeLogKey[] = "apple.watchdog";
 inline constexpr char kOrphanAgentKey[] = "apple.orphanAgent";
 inline constexpr char kTopbarKey[] = "apple.topbar";
+inline constexpr char kPlaybarKey[] = "apple.playbar";
+// The full-screen player's lyrics lines kept above and below the sung one: "all", or 0 to 5 (win/lyrics_window.cpp).
+inline constexpr char kLyricsBeforeKey[] = "apple.lyricsBefore";
+inline constexpr char kLyricsAfterKey[] = "apple.lyricsAfter";
 inline constexpr char kKitUpdateKey[] = "kit_update";
 inline constexpr char kEntryKey[] = "ampify.entry";
 inline constexpr char kGlassChoiceKey[] = "theme.glass";

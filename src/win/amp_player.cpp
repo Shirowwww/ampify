@@ -23,25 +23,19 @@ const GUID kIidPlayerState = rt::GuidOf(amp::kIidPlayerState);
 const GUID kIidNotifyPropertyChanged = rt::GuidOf(amp::kIidNotifyPropertyChanged);
 const GUID kIidPropertyChangedHandler = rt::GuidOf(amp::kIidPropertyChangedHandler);
 
-// INotifyPropertyChanged (Microsoft.UI.Xaml.Data): add_PropertyChanged 6 (handler, token*), remove_PropertyChanged 7.
+// INotifyPropertyChanged (Microsoft.UI.Xaml.Data); add_PropertyChanged takes (handler, token*).
 constexpr int kAddPropertyChangedSlot = 6;
 constexpr int kRemovePropertyChangedSlot = 7;
 
-// The first identifier of `iids` that `object` answers to: one per Apple Music version (src/core/amp_abi.hpp).
-template <size_t N>
-bool QueryAny(const rt::Ref& object, const char* const (&iids)[N], rt::Ref& out) {
-    for (const char* iid : iids) {
-        if (rt::Query(object, rt::GuidOf(iid), out)) return true;
-    }
-    return false;
-}
-
 constexpr DWORD kCommandTimeoutMs = 3000;
 constexpr unsigned long long kStringsEveryMs = 5000;
-// Apple may fetch the lyrics some seconds after a track starts: asked again every 3 s for about a minute.
+// Apple may fetch the lyrics some seconds after a track starts, or later (when its lyrics panel opens).
 constexpr unsigned long long kLyricsRetryMs = 3000;
-// Apple Music may fetch the lyrics late (when its lyrics panel opens, for example): look for them for 10 minutes.
+// 200 tries of kLyricsRetryMs: the lyrics are looked for during 10 minutes.
 constexpr int kLyricsMaxTries = 200;
+// GetLyricsAsync starts a download in Apple's player: a song without word-timed lyrics is asked three times, not for
+// 10 minutes.
+constexpr int kWordsMaxTries = 3;
 
 // Windows.UI.Color, which IArtwork.get_BGColor writes through its out pointer (four bytes, by value).
 struct WinRtColor {
@@ -56,18 +50,18 @@ ArtworkReading ReadArtworkObject(const rt::Ref& object) {
     if (!object || !rt::Query(object, rt::GuidOf(amp::kIidArtwork), artwork)) return out;
 
     WinRtColor color;
-    out.hasColor = SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkBgColor, &color));  // slot 6
+    out.hasColor = SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkBgColor, &color));
     out.alpha = color.a;
     out.red = color.r;
     out.green = color.g;
     out.blue = color.b;
-    out.format = rt::ReadString(artwork, slot::kArtworkFormat);      // slot 10
-    out.cropCode = rt::ReadString(artwork, slot::kArtworkCropCode);  // slot 17
+    out.format = rt::ReadString(artwork, slot::kArtworkFormat);
+    out.cropCode = rt::ReadString(artwork, slot::kArtworkCropCode);
     double height = 0, width = 0;
-    if (SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkHeight, &height))) out.height = height;  // slot 12
-    if (SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkWidth, &width))) out.width = width;      // slot 14
+    if (SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkHeight, &height))) out.height = height;
+    if (SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkWidth, &width))) out.width = width;
 
-    // get_Uri (slot 16) gives a Windows.Foundation.Uri; IUriRuntimeClass.get_AbsoluteUri is its slot 6.
+    // get_Uri gives a Windows.Foundation.Uri, read through IUriRuntimeClass.
     rt::Ref uriObject, uri;
     if (SUCCEEDED(rt::CallSlot(artwork, slot::kArtworkUri, uriObject.Put())) && uriObject &&
         rt::Query(uriObject, rt::GuidOf(amp::kIidUriRuntimeClass), uri)) {
@@ -76,7 +70,6 @@ ArtworkReading ReadArtworkObject(const rt::Ref& object) {
     return out;
 }
 
-// The cover of an INowPlayingItem: its get_Artwork (slot 11).
 ArtworkReading ReadArtwork(const rt::Ref& item) {
     rt::Ref object;
     if (FAILED(rt::CallSlot(item, slot::kItemArtwork, object.Put()))) return {};
@@ -87,18 +80,18 @@ ArtworkReading ReadArtwork(const rt::Ref& item) {
 std::optional<RawLyrics> ReadLyricsInfo(const rt::Ref& object) {
     rt::Ref info;
     if (!object || !rt::Query(object, rt::GuidOf(amp::kIidLyricsInfo), info)) return std::nullopt;
-    unsigned char have = 0;  // HaveLyrics (slot 12): a WinRT Boolean, one byte
+    unsigned char have = 0;  // HaveLyrics: a WinRT Boolean, one byte
     if (FAILED(rt::CallSlot(info, slot::kLyricsHaveLyrics, &have)) || have == 0) return std::nullopt;
 
     RawLyrics raw;
-    raw.ttml = rt::ReadString(info, slot::kLyricsTtml);          // GetTTML, slot 14
-    raw.staticText = rt::ReadString(info, slot::kLyricsStatic);  // GetStaticLyrics, slot 13
-    raw.language = rt::ReadString(info, slot::kLyricsLanguage);  // GetLanguage, slot 15
+    raw.ttml = rt::ReadString(info, slot::kLyricsTtml);
+    raw.staticText = rt::ReadString(info, slot::kLyricsStatic);
+    raw.language = rt::ReadString(info, slot::kLyricsLanguage);
     if (raw.ttml.empty() && raw.staticText.empty()) return std::nullopt;
     return raw;
 }
 
-// The lyrics of an INowPlayingItem (1.1792): INowPlayingItem.get_LyricsInfo (slot 46), then ILyricsInfo.
+// The lyrics of an INowPlayingItem (1.1792 interface only).
 std::optional<RawLyrics> ReadLyrics(const rt::Ref& item) {
     rt::Ref object;
     if (FAILED(rt::CallSlot(item, slot::kItemLyricsInfo, object.Put())) || !object) return std::nullopt;
@@ -130,7 +123,7 @@ bool AmpPlayer::Activate(std::string& failure) {
         failure = "factory not found (" + activation.how + ", code " + HresultText(activation.result) + ")";
         return false;
     }
-    // IPlayerStatics.get_Current (slot 6): Apple's own player, the one the interface uses. It is never constructed.
+    // Apple's own player, the one the interface uses. It is never constructed.
     rt::Ref current;
     HRESULT hr = rt::CallSlot(statics, slot::kPlayerStaticsCurrent, current.Put());
     if (FAILED(hr) || !current) {
@@ -138,7 +131,7 @@ bool AmpPlayer::Activate(std::string& failure) {
         return false;
     }
     // The identifier of IPlayer is a hash of its methods (src/core/amp_abi.hpp): if Apple changed them, this fails.
-    if (!QueryAny(current, amp::kIidsPlayer, m_player)) {
+    if (!rt::QueryAny(current, amp::kIidsPlayer, m_player)) {
         failure = "IPlayer missing: this version of Apple Music changed the player interface";
         return false;
     }
@@ -171,7 +164,6 @@ std::optional<AmpReading> AmpPlayer::Read() {
     if (!m_player) return std::nullopt;
     AmpReading reading;
 
-    // IPlayer.get_PlayerState (slot 7), then IPlayerState.get_IsPlaying (25) and get_IsPaused (24).
     rt::Ref stateObject;
     HRESULT hr = rt::CallSlot(m_player, slot::kPlayerPlayerState, stateObject.Put());
     if (FAILED(hr)) {
@@ -191,11 +183,11 @@ std::optional<AmpReading> AmpPlayer::Read() {
         }
     }
 
-    // IPlayer.get_NowPlayingItem (slot 6). Null while nothing is loaded.
+    // Null while nothing is loaded.
     rt::Ref itemObject;
     rt::Ref item;
     if (SUCCEEDED(rt::CallSlot(m_player, slot::kPlayerNowPlayingItem, itemObject.Put())) &&
-        QueryAny(itemObject, amp::kIidsNowPlayingItem, item)) {
+        rt::QueryAny(itemObject, amp::kIidsNowPlayingItem, item)) {
         reading.hasItem = true;
         unsigned char placeholder = 0;
         rt::CallSlot(item, slot::kItemIsPlaceholder, &placeholder);
@@ -214,6 +206,7 @@ std::optional<AmpReading> AmpPlayer::Read() {
             m_lyrics.reset();
             m_lyricsTries = 0;
             m_lyricsNextTry = 0;
+            m_wordsTries = 0;
             m_wordsObtained = !RequestLyrics(itemObject);
         }
         bool lyricsDue = !m_lyrics && m_lyricsTries < kLyricsMaxTries && now >= m_lyricsNextTry;
@@ -245,9 +238,9 @@ std::optional<AmpReading> AmpPlayer::Read() {
             }
             m_syllable.Reset();
         }
-        // The word-timed request that failed or came back empty is made again with the item lyrics' retries, and
-        // within the same tries; the first request of an item is already running this tick.
-        const bool wordsDue = !changed && !m_wordsObtained && !m_syllable && m_lyricsTries < kLyricsMaxTries &&
+        // The word-timed request that failed or came back empty is made again at the item lyrics' retry times,
+        // kWordsMaxTries in all; the first request of an item is already running this tick.
+        const bool wordsDue = !changed && !m_wordsObtained && !m_syllable && m_wordsTries < kWordsMaxTries &&
                               now >= m_lyricsNextTry;
         lyricsDue = lyricsDue && !m_lyrics;
         if (lyricsDue || wordsDue) {
@@ -274,19 +267,18 @@ std::optional<AmpReading> AmpPlayer::Read() {
     return reading;
 }
 
-// Apple loads a song's lyrics when its lyrics pane opens. Asking its player for them makes them come without the
-// pane: the item's lyrics info fills in when the action completes, which the next reads pick up. The item's lyrics
-// are often timed by line only, so the word-timed ones are asked for as well (GetLyricsAsync), as Apple's karaoke
-// view does.
+// The item's word-timed lyrics, asked by its descriptor (GetLyricsAsync) as Apple's karaoke view does: the answer is a
+// lyrics info of its own. GetNowPlayingLyricsAsync is left to Apple's lyrics panes, which call it when they open: made
+// from this thread at every song too, it could race with theirs. The item's own lyrics still fill in once a pane has
+// loaded them, and the next reads pick them up. False when nothing can be asked.
 bool AmpPlayer::RequestLyrics(const rt::Ref& item) noexcept {
     m_syllable.Reset();
-    // Slots 49 and 50 exist on the newest IPlayer only: the older identifier has other slots after 22.
+    // Slot 50 exists on the newest IPlayer only: the older identifier has other slots after 22.
     rt::Ref player;
     if (!m_player || !rt::Query(m_player, rt::GuidOf(amp::kIidsPlayer[0]), player)) return false;
-    rt::Ref operation;
-    rt::CallSlot(player, slot::kPlayerNowPlayingLyricsAsync, slot::kLyricsSourceStoreSyllable, operation.Put());
     rt::Ref descriptor = ContentDescriptorOf(item);
-    if (!descriptor) return true;
+    if (!descriptor) return false;
+    ++m_wordsTries;
     rt::CallSlot(player, slot::kPlayerLyricsAsync, descriptor.Get(), slot::kLyricsSourceStoreSyllable, m_syllable.Put());
     return true;
 }
@@ -295,11 +287,11 @@ bool AmpPlayer::Command(PlayerCommand command, int64_t seekMs) {
     if (!m_player) return false;
     int method = 0;
     switch (command) {
-        case PlayerCommand::Play: method = slot::kPlayerPlayAsync; break;               // IPlayer.PlayAsync
-        case PlayerCommand::Pause: method = slot::kPlayerPauseAsync; break;             // IPlayer.PauseAsync
-        case PlayerCommand::Next: method = slot::kPlayerSkipNextAsync; break;           // IPlayer.SkipNextAsync
-        case PlayerCommand::Previous: method = slot::kPlayerSkipPreviousAsync; break;   // IPlayer.SkipPreviousAsync
-        case PlayerCommand::Seek: method = slot::kPlayerSetPositionAsync; break;        // IPlayer.SetPositionAsync
+        case PlayerCommand::Play: method = slot::kPlayerPlayAsync; break;
+        case PlayerCommand::Pause: method = slot::kPlayerPauseAsync; break;
+        case PlayerCommand::Next: method = slot::kPlayerSkipNextAsync; break;
+        case PlayerCommand::Previous: method = slot::kPlayerSkipPreviousAsync; break;
+        case PlayerCommand::Seek: method = slot::kPlayerSetPositionAsync; break;
     }
     // The winmd list gives the names, not the parameters: play, pause, next and previous take none and return an
     // asynchronous action, which is why player.appleCommands is off by default until the PC confirms them.
@@ -324,7 +316,6 @@ rt::Ref CurrentPlayQueue(std::string& failure) {
         failure = "AMP.Services.PlayQueue not found (code " + HresultText(activation.result) + ")";
         return {};
     }
-    // IPlayQueueStatics.get_Current (slot 6).
     if (FAILED(rt::CallSlot(statics, slot::kPlayQueueStaticsCurrent, current.Put())) || !current) {
         failure = "PlayQueue.Current is empty";
         return {};
@@ -356,7 +347,7 @@ std::optional<std::vector<rt::Ref>> ComponentModels(const rt::Ref& collection, s
     return out;
 }
 
-// ILockup.get_Artwork (slot 6) of a queue entry, as an IArtwork: the cover Apple's Up Next pane shows. Empty without.
+// The cover Apple's Up Next pane shows for a queue entry (ILockup.get_Artwork). Empty without.
 rt::Ref QueueEntryArtwork(const rt::Ref& model) {
     rt::Ref lockup, object, artwork;
     if (!rt::Query(model, rt::GuidOf(amp::kIidLockup), lockup) ||
@@ -369,20 +360,17 @@ rt::Ref QueueEntryArtwork(const rt::Ref& model) {
 
 std::optional<AmpQueueEntry> ReadQueueEntry(const rt::Ref& model, int32_t sectionKind, rt::Ref& artworkOut) {
     rt::Ref item, titled;
-    // IPlayQueueItem: get_PlayQueueItemID 6, get_Subtitle 7, get_Duration 10.
     if (!rt::Query(model, rt::GuidOf(amp::kIidPlayQueueItem), item)) return std::nullopt;
     AmpQueueEntry entry;
     entry.sectionKind = sectionKind;
     if (FAILED(rt::CallSlot(item, slot::kQueueItemId, &entry.id))) return std::nullopt;
     entry.subtitle = rt::ReadString(item, slot::kQueueItemSubtitle);
     rt::CallSlot(item, slot::kQueueItemDuration, &entry.durationRaw);
-    // ITitledComponent.get_Title (slot 6).
     if (rt::Query(model, rt::GuidOf(amp::kIidTitledComponent), titled)) {
         entry.title = rt::ReadString(titled, slot::kTitledTitle);
     }
-    // IContentDescriptor.get_AdamId (slot 21).
     if (rt::Ref descriptor = ContentDescriptorOf(model)) entry.catalogId = rt::ReadString(descriptor, slot::kDescriptorAdamId);
-    // ILockup.get_Artwork (slot 6): the same Artwork as the now playing item's, the cover Apple's Up Next pane shows.
+    // The same Artwork object as the now playing item's.
     if (rt::Ref artwork = QueueEntryArtwork(model)) {
         entry.artwork = ReadArtworkObject(artwork);
         entry.hasArtwork = true;
@@ -395,7 +383,7 @@ std::optional<AmpQueueEntry> ReadQueueEntry(const rt::Ref& model, int32_t sectio
 std::vector<rt::Ref> QueueSections(std::string& failure) {
     rt::Ref queue = CurrentPlayQueue(failure);
     rt::Ref sections;
-    // IPlayQueue.get_Sections (slot 9): IObservableVector<IComponentModel>.
+    // An IObservableVector<IComponentModel>.
     if (queue && (FAILED(rt::CallSlot(queue, slot::kPlayQueueSections, sections.Put())) || !sections)) {
         failure = "the queue has no sections";
     }
@@ -407,14 +395,13 @@ std::vector<rt::Ref> QueueSections(std::string& failure) {
     return models.value_or(std::vector<rt::Ref>{});
 }
 
-// The entries of one section, with the section's kind (IPlayQueueSection.get_SectionKind, slot 6).
+// The entries of one section, with the section's kind.
 std::vector<rt::Ref> SectionEntries(const rt::Ref& sectionModel, int32_t& kind) {
     rt::Ref section, container, items;
     kind = 0;
     if (rt::Query(sectionModel, rt::GuidOf(amp::kIidPlayQueueSection), section)) {
         rt::CallSlot(section, slot::kSectionKind, &kind);
     }
-    // IComponentModelContainer.get_Items (slot 6).
     if (!rt::Query(sectionModel, rt::GuidOf(amp::kIidComponentModelContainer), container) ||
         FAILED(rt::CallSlot(container, slot::kContainerItems, items.Put())) || !items) {
         return {};
@@ -518,7 +505,7 @@ void ForgetQueuedArtworkForTests() { StoreQueueArtworks({}, 0); }
 rt::Ref StartAppleQueueRemove(uint64_t itemId, std::string& failure) {
     rt::Ref queue = CurrentPlayQueue(failure);
     if (!queue) return {};
-    // IPlayQueue.DeletePlayQueueItemsAsync (slot 15): IVector<UInt64> of entry ids, then an IAsyncAction.
+    // DeletePlayQueueItemsAsync takes an IVector<UInt64> of entry ids and returns an IAsyncAction.
     rt::Ref ids = rt::MakeVector(CollectionIids(amp::kIidsUInt64Collections), std::vector<uint64_t>{itemId});
     rt::Ref operation;
     HRESULT hr = rt::CallSlot(queue, slot::kPlayQueueDelete, ids.Get(), operation.Put());

@@ -8,8 +8,6 @@
 
 namespace ampify::js {
 
-// ---- ES modules -----------------------------------------------------------------------------------------------------
-
 namespace {
 
 constexpr size_t kMaxModuleDepth = 16;

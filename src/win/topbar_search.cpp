@@ -20,6 +20,7 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.Provider.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
+#include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 
 // After the projection: windows.h, which they bring, renames IAutomationPeer::GetClassName.
@@ -97,6 +98,7 @@ struct State {
     controls::Grid field{nullptr};
     controls::Border fieldBacking{nullptr};  // under Apple's box, in the field's cell
     winrt::weak_ref<xaml::FrameworkElement> pageRoot;  // Apple's Grid#PageRoot, which carries a theme's picture
+    winrt::weak_ref<xaml::FrameworkElement> pages;     // Apple's page panel, whose top ends the strip (StripHeight)
     controls::Control box{nullptr};    // Apple's TextBox, whose corners the backing follows
     std::optional<std::pair<bool, bool>> backed;  // the backing last set: a picture under the strip, the dark mode
     std::vector<DeviceRect> regions;  // the passthrough regions Ampify added last
@@ -117,7 +119,7 @@ void Note(State& state, const std::string& line) {
     state.journal->Write(line);
 }
 
-// Depth-first, the first element under `root` that is a T named `name` (any T when `name` is empty).
+// Depth-first; an empty `name` matches any T.
 template <typename T>
 T FindFirst(const xaml::DependencyObject& root, std::wstring_view name, int depth) {
     if (!root || depth > kSearchDepth) return nullptr;
@@ -133,7 +135,7 @@ T FindFirst(const xaml::DependencyObject& root, std::wstring_view name, int dept
     return nullptr;
 }
 
-// Presses Apple's back button, so Apple's own navigation goes back: the same as a click on it.
+// Invokes Apple's back button through its automation peer, so Apple's own navigation goes back.
 void PressAppleBack() noexcept {
     try {
         namespace peers = xaml::Automation::Peers;
@@ -142,17 +144,21 @@ void PressAppleBack() noexcept {
         auto pattern = peer ? peer.GetPattern(peers::PatternInterface::Invoke) : nullptr;
         if (auto invoke = pattern.try_as<xaml::Automation::Provider::IInvokeProvider>()) invoke.Invoke();
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
+// A flat arrow with the subtle fill of Apple's own under the pointer (SubtleButtonResources): the default Button's
+// near-white fill did not show on Glass's light strip.
 controls::Button MakeBack() {
-    controls::Button back;
+    const std::wstring text =
+        L"<Button xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' "
+        L"xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Padding='0' BorderThickness='0'>" +
+        SubtleButtonResources() + L"</Button>";
+    controls::Button back = xaml::Markup::XamlReader::Load(text).as<controls::Button>();
     back.Name(L"AMPIFY_TopbarBack");
     back.Width(kTopbarBackWidth);
     back.Height(kTopbarControlHeight);
-    back.Padding(xaml::Thickness{0, 0, 0, 0});
-    back.BorderThickness(xaml::Thickness{0, 0, 0, 0});
-    back.Background(media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
     controls::FontIcon glyph;
     glyph.FontFamily(media::FontFamily(L"Segoe Fluent Icons, Segoe MDL2 Assets"));
     glyph.Glyph(kBackGlyph);
@@ -318,6 +324,7 @@ void WatchPresenter(State& state) {
             try {
                 KeepPresenterShown(TheState());
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         }));
     };
@@ -364,6 +371,7 @@ void HoldHeaderLater() {
             State& live = TheState();
             if (!live.closed && live.header) HoldHeader(live);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     }));
 }
@@ -389,6 +397,7 @@ void GiveBackHeader(State& state) {
         try {
             watched.element.UnregisterPropertyChangedCallback(watched.property, watched.token);
         } catch (...) {
+            // The element may be torn down already: nothing is left to put back.
         }
     }
     state.watched.clear();
@@ -397,11 +406,20 @@ void GiveBackHeader(State& state) {
         SetLeft(state.header, state.headerRoom.Restore(arrow));
         SetLeft(state.title, state.titleRoom.Restore(arrow));
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
     state.header = nullptr;
     state.title = nullptr;
     state.headerRoom = ArrowRoom{kAppleHeaderLeft};
     state.titleRoom = ArrowRoom{kAppleTitleLeft};
+}
+
+// The popup without the strip, as the veil alone leaves it (KeepVeilOnly).
+void CloseVeil(State& state) {
+    if (!state.popup) return;
+    state.popup.IsOpen(false);
+    state.popup.Child(nullptr);
+    state.popup = nullptr;
 }
 
 // Apple's presenter of the search box leaves the pane for the strip. The box inside it stays Apple's object, with its
@@ -411,17 +429,22 @@ bool Take(State& state, const xaml::UIElement& content, const controls::Navigati
     auto area = presenter ? media::VisualTreeHelper::GetParent(presenter).try_as<controls::Panel>() : nullptr;
     uint32_t index = 0;
     if (!area || !area.Children().IndexOf(presenter, index)) return false;
+    CloseVeil(state);  // the host goes to a new popup, and an element has one parent
     BuildStrip(state, content.XamlRoot());
+    state.strip.Visibility(xaml::Visibility::Visible);
     state.field.DataContext(presenter.DataContext());
     area.Children().RemoveAt(index);
     try {
         state.field.Children().Append(presenter);
     } catch (...) {
         area.Children().InsertAt(index, presenter);  // never leave Apple's field out of every tree
-        state.popup = nullptr;
+        CloseVeil(state);
         return false;
     }
     state.presenter = presenter;
+    // In the pane, the presenter keeps 10 on each side: in the strip, the box fills the field's cell, its frame then
+    // matching the region that takes the pointer, 8 from the arrow.
+    state.saved.Write(presenter, xaml::FrameworkElement::MarginProperty(), winrt::box_value(xaml::Thickness{0, 0, 0, 0}));
     state.box = FindFirst<controls::TextBox>(presenter, L"", 0);
     state.area = area;
     state.presenterIndex = index;
@@ -472,12 +495,14 @@ void Release(State& state) {
     try {
         if (!state.regions.empty()) SetRegions(state, {});
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
     try {
         if (state.presenter && state.visibilityToken != 0) {
             state.presenter.UnregisterPropertyChangedCallback(xaml::UIElement::VisibilityProperty(), state.visibilityToken);
         }
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
     state.visibilityToken = 0;
     GiveBackHeader(state);
@@ -487,16 +512,15 @@ void Release(State& state) {
         PutBackPresenterSetter(state, navigation);
         if (navigation) PutBackPaneState(navigation);
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
     state.saved.PutBackAll();
     try {
-        if (state.popup) {
-            state.popup.IsOpen(false);
-            state.popup.Child(nullptr);
-        }
+        CloseVeil(state);
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
-    state.popup = nullptr;
+    state.popup = nullptr;  // even when closing threw
     state.presenter = nullptr;
     state.box = nullptr;
     state.area = nullptr;
@@ -504,10 +528,6 @@ void Release(State& state) {
     state.closedCompact = nullptr;
     state.presenterSetter = nullptr;
     state.regions.clear();
-}
-
-bool Taken(const State& state) {
-    return static_cast<bool>(state.presenter);
 }
 
 // Still in place: Apple's sidebar loaded, and the presenter still in the strip (Apple did not rebuild its template).
@@ -559,13 +579,27 @@ double CaptionHeight(const State& state, double scale) {
     }
 }
 
+// The strip a theme leaves above the pages: where its page panel (Apple's Grid#ContentRoot in the pages' split view)
+// starts. Looked for again only when `search` allows a walk of the tree; the standard strip while it is not known.
+double StripHeight(State& state, const xaml::UIElement& content, bool search) {
+    auto pages = state.pages.get();
+    if ((!pages || !pages.IsLoaded()) && search) {
+        auto split = FindFirst<controls::SplitView>(content, L"ContentSplitView", 0);
+        pages = split ? FindFirst<xaml::FrameworkElement>(split, L"ContentRoot", 0) : nullptr;
+        state.pages = pages ? winrt::make_weak(pages) : winrt::weak_ref<xaml::FrameworkElement>{};
+    }
+    if (!pages || !pages.IsLoaded()) return kTopbarHeight;
+    return pages.TransformToVisual(content).TransformPoint({0, 0}).Y;
+}
+
 // Places the strip for the window's width, follows Apple's back button and mode, and sets the passthrough regions in
 // device pixels at the window's current scale.
-void LayOut(State& state, const xaml::UIElement& content) {
+void LayOut(State& state, const xaml::UIElement& content, bool search) {
     KeepPresenterShown(state);
     xaml::XamlRoot root = content.XamlRoot();
     const double scale = root.RasterizationScale();
-    const TopbarLayout layout = LayOutTopbar(root.Size().Width, CaptionHeight(state, scale));
+    const TopbarLayout layout =
+        LayOutTopbar(root.Size().Width, CaptionHeight(state, scale), StripHeight(state, content, search));
     state.popup.HorizontalOffset(0);
     state.popup.VerticalOffset(0);
     state.host.Width(root.Size().Width);
@@ -655,15 +689,18 @@ void KeepBacking(State& state, const xaml::UIElement& content, bool search) {
     state.fieldBacking.Background(media::SolidColorBrush(ToColor(backing.field)));
 }
 
-// Why the strip does not show, for the log: empty when it shows, nullopt when that is not known yet.
-std::optional<std::string> HiddenBecause(State& state, const xaml::UIElement& content, bool search) {
-    std::optional<bool> atTop = TransportOnTop(state, content, search);
-    if (!atTop) return std::nullopt;
-    if (*atTop) return "the playback bar is at the top";
-    if (!TopbarShown(true, false, content.XamlRoot().Size().Width)) {
-        return "the window is narrower than " + std::to_string(static_cast<int>(kTopbarMinWidth)) + " px";
+// Off, or in a window too narrow for the strip, the veil alone stays under the caption buttons: over a theme's picture
+// their white glyphs read on whatever it shows (white on a white artwork under Ember). It takes no pointer.
+void KeepVeilOnly(State& state, const xaml::UIElement& content, bool search) {
+    if (!state.popup) {
+        BuildStrip(state, content.XamlRoot());
+        state.strip.Visibility(xaml::Visibility::Collapsed);
     }
-    return std::string();
+    state.popup.HorizontalOffset(0);
+    state.popup.VerticalOffset(0);
+    state.host.Width(content.XamlRoot().Size().Width);
+    if (!state.popup.IsOpen()) state.popup.IsOpen(true);
+    KeepBacking(state, content, search);
 }
 
 void WatchClose(State& state, const xaml::Window& window) {
@@ -678,31 +715,36 @@ void WatchClose(State& state, const xaml::Window& window) {
     });
 }
 
-// One look: give back when turned off or hidden, take when shown, then lay out. Cheap once in place: the whole tree is
-// walked only with `search` (the theme's tick), never on the quarter-second timer.
+// One look: the strip when it is on and fits, the veil alone when it is off or does not fit, nothing when the playback
+// bar is at the top. Cheap once in place: the whole tree is walked only with `search` (the theme's tick), never on the
+// quarter-second timer.
 void Step(State& state, bool search) {
     if (state.closed) return;
-    if (!g_enabled) {
-        if (Taken(state)) Release(state);
-        if (state.timer) state.timer.Stop();
-        if (!state.note.empty()) Note(state, "Top bar: off, Apple Music's search field is back in its sidebar");
-        return;
-    }
+    if (!g_enabled && state.presenter) Release(state);
     xaml::Window window = AppWindowOf(WindowRole::Main);
     xaml::UIElement content = window ? window.Content() : nullptr;
     if (!content || !content.XamlRoot()) return;
     WatchClose(state, window);
     if (!WindowOnScreen(state.window)) return;
-    if (Taken(state) && !StillHeld(state)) Release(state);
-    std::optional<std::string> why = HiddenBecause(state, content, search);
-    if (!why) return;
-    if (!why->empty()) {
-        if (Taken(state)) Release(state);
-        Note(state, "Top bar: hidden, " + *why);
+    if (state.presenter && !StillHeld(state)) Release(state);
+    std::optional<bool> atTop = TransportOnTop(state, content, search);
+    if (!atTop) return;
+    if (*atTop) {
+        if (state.presenter) Release(state);
+        CloseVeil(state);
+        Note(state, "Top bar: hidden, the playback bar is at the top");
+        return;
+    }
+    if (!g_enabled || !TopbarFits(content.XamlRoot().Size().Width)) {
+        if (state.presenter) Release(state);
+        KeepVeilOnly(state, content, search);
+        Note(state, g_enabled ? "Top bar: hidden, the window is narrower than " +
+                                    std::to_string(static_cast<int>(kTopbarMinWidth)) + " px"
+                              : "Top bar: off, Apple Music's search field stays in its sidebar");
         return;
     }
     if (search) state.refused = false;
-    if (!Taken(state)) {
+    if (!state.presenter) {
         controls::NavigationView navigation{nullptr};
         if (!state.refused) navigation = Navigation(state, content, search);
         if (!navigation) return;
@@ -712,7 +754,7 @@ void Step(State& state, bool search) {
             return;
         }
     }
-    LayOut(state, content);
+    LayOut(state, content, search);
     KeepBacking(state, content, search);
     Note(state, "Top bar: Apple Music's search field and a back arrow in the strip at the top");
 }
@@ -725,6 +767,7 @@ void StartTimer(State& state) {
             try {
                 Step(TheState(), false);
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
     }
@@ -738,9 +781,10 @@ void KeepTopbarSearch(Journal& journal) noexcept {
         State& state = TheState();
         state.journal = &journal;
         if (state.closed) return;
-        if (g_enabled) StartTimer(state);
+        StartTimer(state);  // the veil follows the window's width with the strip off too
         Step(state, true);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 

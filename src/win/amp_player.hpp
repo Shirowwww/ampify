@@ -3,8 +3,8 @@
 // Apple's own player object, AMP.Services.Player, reached from inside AppleMusic.exe through its private WinRT
 // interfaces (slots and identifiers in src/core/amp_abi.hpp, with their evidence). Read: playing or paused, position,
 // duration, title, artist, album, audio format, queue entry, cover and its colour, lyrics. Commands: PlayAsync, PauseAsync, SkipNextAsync,
-// SkipPreviousAsync, only when the setting player.appleCommands allows them (see src/win/player_bridge.cpp). Never the
-// volume, never the DRM.
+// SkipPreviousAsync, only when the setting player.appleCommands allows them (see src/win/player_bridge.cpp). The
+// volume is not set here (SetMainPlayerVolume does it), and never the DRM.
 //
 // Threads: every method runs on the JavaScript thread, in the multithreaded apartment. AMExclusive reads the same
 // objects on the interface thread; Ampify reads them from its own thread first, as the plan of record asks, and
@@ -81,6 +81,7 @@ private:
     std::optional<RawLyrics> m_lyrics;  // of the item in m_item
     rt::Ref m_syllable;                // GetLyricsAsync of the item, word-timed, while it runs
     bool m_wordsObtained = false;      // GetLyricsAsync answered for the item (or cannot be asked)
+    int m_wordsTries = 0;              // GetLyricsAsync calls for the item
     int m_lyricsTries = 0;
     unsigned long long m_lyricsNextTry = 0;
 };

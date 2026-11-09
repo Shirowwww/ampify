@@ -1,4 +1,4 @@
-// The button font of an Ampify dialog (dialog_fonts.hpp). Apple's template puts WebDings on its buttons: 05/11.
+// The button font of an Ampify dialog (dialog_fonts.hpp). Apple's template puts WebDings on its buttons.
 
 #if defined(AMPIFY_WITH_XAML)
 

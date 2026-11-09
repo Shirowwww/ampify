@@ -317,20 +317,26 @@ bool SetDisplayVersion(const std::wstring& key, const std::wstring& version) {
     return status == ERROR_SUCCESS;
 }
 
-bool AskYesNo(const std::wstring& text, const std::wstring& title) {
-    return MessageBoxW(nullptr, text.c_str(), title.c_str(), MB_ICONQUESTION | MB_YESNO) == IDYES;
-}
-
-void ShowMessage(const std::wstring& text, bool error) {
-    MessageBoxW(nullptr, text.c_str(), L"Ampify", (error ? MB_ICONERROR : MB_ICONINFORMATION) | MB_OK);
-}
-
 std::string UserLocaleName() {
     wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
     if (LCIDToLocaleName(MAKELCID(GetUserDefaultUILanguage(), SORT_DEFAULT), name, LOCALE_NAME_MAX_LENGTH, 0) == 0) {
         return {};
     }
     return ToUtf8(name);
+}
+
+bool SystemUsesDarkMode() {
+    DWORD light = 1;
+    DWORD size = sizeof(light);
+    LONG status = RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                               L"AppsUseLightTheme", RRF_RT_REG_DWORD, nullptr, &light, &size);
+    return status == ERROR_SUCCESS && light == 0;
+}
+
+int LocalMinute() {
+    SYSTEMTIME now{};
+    GetLocalTime(&now);
+    return now.wHour * 60 + now.wMinute;
 }
 
 std::wstring CatalogStorefront() {

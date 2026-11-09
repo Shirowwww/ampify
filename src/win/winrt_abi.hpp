@@ -2,8 +2,8 @@
 
 // Plain WinRT at the ABI level, for the player (src/win/amp_player.*, src/win/smtc_session.*): no C++/WinRT projection, so
 // that it builds without the WinRT projection. The combase functions are looked up at run time, so the kernel still loads
-// where one is missing. Every interface method is called by its vtable slot, with the slot written next to the call
-// and its evidence (winmd method order, or the Windows SDK) in a comment. Nothing here throws.
+// where one is missing. Every interface method is called by its vtable slot, a named constant that carries its
+// evidence (winmd method order, or the Windows SDK). Nothing here throws.
 
 #include <windows.h>
 #include <unknwn.h>
@@ -34,7 +34,7 @@ const Combase* Api();
 // apartment (the calls still work, the log says it).
 bool EnsureMultithreaded();
 
-// An owned reference to a COM object, released at the end of its life.
+// An owned COM reference.
 class Ref {
 public:
     Ref() = default;
@@ -70,7 +70,20 @@ private:
 // QueryInterface. False (and `out` empty) when the object does not have the interface.
 bool Query(const Ref& object, const GUID& iid, Ref& out);
 
-// Calls the method in `slot` of the vtable of `object`. The caller writes the slot and its evidence next to the call.
+// "34D100F9-0F0A-5980-8F04-7AF57FDB29B0", with or without braces; for constants known to be well formed. Zero when not.
+GUID GuidOf(const char* text);
+
+// The first of `iids` that `object` answers to: Apple changes an interface's identifier between versions and keeps
+// its methods (core/amp_abi.hpp lists one per version, newest first).
+template <size_t N>
+bool QueryAny(const Ref& object, const char* const (&iids)[N], Ref& out) {
+    for (const char* iid : iids) {
+        if (Query(object, GuidOf(iid), out)) return true;
+    }
+    return false;
+}
+
+// Calls the method in `slot` of the vtable of `object`. The slot is a named constant that holds its evidence.
 template <class... Args>
 HRESULT CallSlot(void* object, int slot, Args... args) {
     if (!object) return E_POINTER;
@@ -85,7 +98,7 @@ HRESULT CallSlot(const Ref& object, int slot, Args... args) {
     return CallSlot(object.Get(), slot, args...);
 }
 
-// An HSTRING made from text, deleted at the end of its life.
+// An owned HSTRING made from text.
 class HString {
 public:
     explicit HString(std::wstring_view text);
@@ -100,11 +113,6 @@ private:
 
 // Reads a string property (a getter whose only parameter is HSTRING*) and returns it as UTF-8. Empty on failure.
 std::string ReadString(const Ref& object, int slot);
-
-// "34D100F9-0F0A-5980-8F04-7AF57FDB29B0", with or without braces; for constants known to be well formed. Zero when not.
-GUID GuidOf(const char* text);
-
-// ---- Activation ---------------------------------------------------------------------------------------------------
 
 // Tests replace the activation of runtime classes with fakes. With a hook set, only the hook is asked.
 using ActivationHook = HRESULT (*)(std::wstring_view className, const GUID& iid, void** factory);
@@ -121,8 +129,6 @@ struct Activation {
 // never loads Apple's code into a process that does not have it.
 Activation GetActivationFactory(std::wstring_view className, const GUID& iid, Ref& factory);
 
-// ---- Asynchronous operations --------------------------------------------------------------------------------------
-
 enum class AsyncState { Running, Completed, Failed };
 // IAsyncInfo::get_Status of an IAsyncAction or IAsyncOperation<T>.
 AsyncState StateOf(const Ref& operation);
@@ -131,8 +137,6 @@ bool Wait(const Ref& operation, DWORD timeoutMs);
 // IAsyncOperation<T>::GetResults is slot 8 for every T (put_Completed 6, get_Completed 7, GetResults 8), and so is
 // IAsyncAction::GetResults.
 inline constexpr int kAsyncGetResultsSlot = 8;
-
-// ---- Collections --------------------------------------------------------------------------------------------------
 
 // IVector<T> and IVectorView<T>, for every T (windows.foundation.collections.h): GetAt 6 (index, T*), get_Size 7.
 inline constexpr int kVectorGetAtSlot = 6;
@@ -148,8 +152,6 @@ struct VectorIids {
 // It answers IVector, IVectorView and IIterable; the methods that would change it answer E_ACCESSDENIED. Agile and
 // never changed once made, since an asynchronous method may read it later from another thread.
 Ref MakeVector(const VectorIids& iids, std::vector<uint64_t> values);
-
-// ---- Property change notifications --------------------------------------------------------------------------------
 
 // A delegate that counts its calls: PropertyChangedEventHandler, or any delegate whose Invoke (slot 3) takes two
 // pointers. Agile, so that the object that raises the event may call it from any thread.

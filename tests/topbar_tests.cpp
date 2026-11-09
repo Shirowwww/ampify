@@ -5,12 +5,10 @@
 
 using namespace ampify;
 
-TEST_CASE(Topbar_ShownOnlyWhenAskedWideEnoughAndNotAtTheTop) {
-    CHECK(!TopbarShown(false, false, 1600));  // off by default
-    CHECK(TopbarShown(true, false, 1600));
-    CHECK(!TopbarShown(true, true, 1600));    // Apple's transport bar sits at the top: no strip over it
-    CHECK(!TopbarShown(true, false, kTopbarMinWidth - 1));
-    CHECK(TopbarShown(true, false, kTopbarMinWidth));
+TEST_CASE(Topbar_FitsOnlyAWideEnoughWindow) {
+    CHECK(TopbarFits(1600));
+    CHECK(!TopbarFits(kTopbarMinWidth - 1));
+    CHECK(TopbarFits(kTopbarMinWidth));
 }
 
 TEST_CASE(Topbar_TransportCountsAtTheTopOnlyWhenVisibleAndInTheStrip) {
@@ -57,6 +55,19 @@ TEST_CASE(Topbar_ControlsKeepAGapAboveThemUnderAStandardOrShortCaption) {
         CHECK(layout.back.y == kTopbarMinTop && layout.search.y == kTopbarMinTop);
         CHECK(layout.search.y + layout.search.height <= kTopbarHeight);
     }
+}
+
+// A theme that leaves a taller strip above its panels (Glass) gets the controls centred in it, with room above them
+// (seen on screen: the field all but touched the window's top); the standard strip keeps the gap of 4.
+TEST_CASE(Topbar_ControlsCentreInAStripTallerThanTheCaptionButtons) {
+    TopbarLayout tall = LayOutTopbar(1140, kTopbarCaptionHeight, 48);
+    CHECK(tall.search.y == 8 && tall.back.y == 8);
+    TopbarLayout standard = LayOutTopbar(1140, kTopbarCaptionHeight, kTopbarHeight);
+    CHECK(standard.search.y == kTopbarMinTop);
+    TopbarLayout tallCaption = LayOutTopbar(1140, 48, kTopbarHeight);
+    CHECK(tallCaption.search.y + tallCaption.search.height / 2 == 24);
+    TopbarLayout band = LayOutTopbar(1140, kTopbarCaptionHeight, 120);  // pages under a theme's own band
+    CHECK(band.search.y == kTopbarMinTop);
 }
 
 TEST_CASE(Topbar_SearchSlotIsAsTallAsApplesSearchBoxSoItsBottomIsNotCut) {

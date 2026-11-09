@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string_view>
 
+#include "api/dispatch_names.hpp"
 #include "api/module.hpp"
 #include "json.hpp"
 #include "player_state.hpp"
@@ -16,7 +17,7 @@ namespace ampify {
 
 namespace {
 
-constexpr size_t kMaxTimerDispatchesPerPump = 256;  // a repeating timer cannot starve the other work
+constexpr size_t kMaxTimerDispatchesPerPump = 256;
 
 }  // namespace
 
@@ -80,7 +81,7 @@ bool ScriptExtension::Start() {
     if (!m_runtime->RunJobs(&error)) return fail(error);
 
     m_running = true;
-    DeliverEvent("ready", "");  // Ampify.ready resolves on the first Pump (src/core/prelude/react.cpp)
+    DeliverEvent(dispatch::kReady, "");  // Ampify.ready resolves on the first Pump (src/core/prelude/react.cpp)
     return true;
 }
 
@@ -95,7 +96,7 @@ void ScriptExtension::Stop() {
     }
     m_timers.clear();
 
-    if (m_runtime) CallDispatch("stop", 0, nullptr);
+    if (m_runtime) CallDispatch(dispatch::kStop, 0, nullptr);
     // Each module releases what the element holds in the host: gain, shortcuts, interface.
     for (const api::ApiModule& module : api::Modules()) {
         if (module.stop) module.stop(*this);
@@ -132,7 +133,7 @@ bool ScriptExtension::CallDispatch(const char* entry, int argc, JSValueConst* ar
     m_runtime->Free(fn);
     if (!ok) {
         m_journal.Write("[" + id() + "] " + error);
-        if (std::string_view(entry) != "stop") CountFailure(error);
+        if (std::string_view(entry) != dispatch::kStop) CountFailure(error);
     }
     return ok;
 }
@@ -200,7 +201,7 @@ uint32_t ScriptExtension::SubmitHttp(std::function<HttpResponse()> request) {
                                   .Dump();
         // The generation changes at Stop, so an answer of an earlier run never reaches a restarted element.
         Post([this, generation, payload = std::move(payload)] {
-            if (generation == m_http.Generation()) DispatchEvent("http", payload);
+            if (generation == m_http.Generation()) DispatchEvent(dispatch::kHttp, payload);
         });
     });
     if (!started) return 0;
@@ -220,7 +221,7 @@ void ScriptExtension::DeliverKey(const std::string& combo) {
 void ScriptExtension::DispatchPlayer(const std::string& event, const std::string& stateJson) {
     JSContext* ctx = m_runtime->context();
     JSValue args[2] = {JS_NewString(ctx, event.c_str()), JS_NewStringLen(ctx, stateJson.data(), stateJson.size())};
-    CallDispatch("player", 2, args);
+    CallDispatch(dispatch::kPlayer, 2, args);
     m_runtime->Free(args[0]);
     m_runtime->Free(args[1]);
 }
@@ -228,7 +229,7 @@ void ScriptExtension::DispatchPlayer(const std::string& event, const std::string
 void ScriptExtension::DispatchKey(const std::string& combo) {
     JSContext* ctx = m_runtime->context();
     JSValue arg = JS_NewString(ctx, combo.c_str());
-    CallDispatch("key", 1, &arg);
+    CallDispatch(dispatch::kKey, 1, &arg);
     m_runtime->Free(arg);
 }
 
@@ -248,14 +249,14 @@ void ScriptExtension::DeliverClick(int controlId) {
 
 void ScriptExtension::DispatchClick(int controlId) {
     JSValue arg = JS_NewInt32(m_runtime->context(), controlId);
-    CallDispatch("click", 1, &arg);
+    CallDispatch(dispatch::kClick, 1, &arg);
     m_runtime->Free(arg);
 }
 
 void ScriptExtension::DispatchTimer(uint32_t id) {
     JSContext* ctx = m_runtime->context();
     JSValue arg = JS_NewInt32(ctx, static_cast<int32_t>(id));
-    CallDispatch("timer", 1, &arg);
+    CallDispatch(dispatch::kTimer, 1, &arg);
     m_runtime->Free(arg);
 }
 

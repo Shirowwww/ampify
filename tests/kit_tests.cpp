@@ -88,10 +88,10 @@ TEST_CASE(KitLayout_TheAtmosLevelerIsBuiltInStartsOffAndShipsNoFolder) {
     CHECK(ampify::BundledElements().size() == 4);
 }
 
-TEST_CASE(KitLayout_ThePlaybackGuardShipsTurnedOff) {
+TEST_CASE(KitLayout_TheBundledElementsShipTurnedOn) {
     CHECK(ampify::IsOnByDefault("apps", "marketplace"));
     CHECK(ampify::IsOnByDefault("extensions", "now-playing"));
-    CHECK(!ampify::IsOnByDefault("extensions", "playback-guard"));
+    CHECK(ampify::IsOnByDefault("extensions", "playback-guard"));  // off until 1.3.0
     CHECK(ampify::IsOnByDefault("extensions", "song-panel"));
     CHECK(!ampify::IsOnByDefault("extensions", "community-thing"));
 }

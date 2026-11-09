@@ -13,7 +13,8 @@ namespace ampify::win {
 
 // Moves the field into the strip and keeps it laid out (a quarter-second timer follows the window's width, its DPI and
 // the passthrough regions Apple sets), or gives everything back when turned off, when the window is too narrow, or
-// when the playback bar is at the top. Interface thread only.
+// when the playback bar is at the top. Off or too narrow, the strip's veil still darkens a theme's picture under the
+// caption buttons. Interface thread only.
 void KeepTopbarSearch(Journal& journal) noexcept;
 
 // apple.topbar: search or off, applied at the next KeepTopbarSearch. Any thread.

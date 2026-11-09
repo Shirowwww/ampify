@@ -26,7 +26,6 @@ struct Event {
 // controllers are kept; a note on with velocity 0 is a note off, as the MIDI standard says.
 std::optional<Event> Decode(uint32_t packed);
 
-// The packed form of a message, for tests and for the fake device.
 uint32_t Pack(uint8_t status, uint8_t data1, uint8_t data2);
 
 // {"type":"note"|"noteoff"|"cc","channel":1,"number":60,"value":100}, as the elements receive it.
@@ -40,10 +39,10 @@ struct Binding {
     int number = -1;
 };
 
-// Reads a binding. On error returns nullopt and fills `error` in English.
+// On error returns nullopt and fills `error` in English.
 std::optional<Binding> ParseBinding(std::string_view text, std::string* error = nullptr);
 
-// The canonical text of a binding ("ch2:note:60", "cc:*", "*").
+// The canonical text, such as "ch2:note:60".
 std::string BindingText(const Binding& binding);
 
 // True when the event is a note on (for a note binding) or a controller message (for a cc binding) that the

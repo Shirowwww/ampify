@@ -16,6 +16,9 @@ public:
 
     // `out` must outlive the journal. The kernel opens it in append mode.
     Journal(std::ostream& out, Stamp stamp = &Journal::LocalTimeStamp);
+    // Writes each line into `parent` behind `prefix` ("Mini player: "), so a second copy of a service tells its
+    // lines apart in the same log. `parent` must outlive this journal.
+    Journal(Journal& parent, std::string prefix);
 
     void Write(std::string_view message);
 
@@ -25,6 +28,8 @@ public:
 private:
     std::ostream& m_out;
     Stamp m_stamp;
+    Journal* m_parent = nullptr;
+    std::string m_prefix;
     std::mutex m_mutex;
 };
 

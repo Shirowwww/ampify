@@ -108,10 +108,12 @@ void RunAmpifyInBackground(const std::vector<std::string>& arguments, std::funct
         try {
             code = RunAmpify(arguments).code;
         } catch (...) {
+            // A command that cannot start leaves the code at -1.
         }
         try {
             done(code);
         } catch (...) {
+            // The callback threw: nothing may escape a detached thread.
         }
     }).detach();
 }
@@ -140,6 +142,7 @@ void KitCommandRunner::RunKitCommand(const std::string& owner, const std::vector
         try {
             done(result.code, result.out, result.err);
         } catch (...) {
+            // The callback threw: nothing may escape a detached thread.
         }
     }).detach();
 }

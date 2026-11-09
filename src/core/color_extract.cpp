@@ -51,14 +51,13 @@ Rgb FromHsl(Hsl hsl) {
     return Rgb{byte(r + m), byte(g + m), byte(b + m)};
 }
 
-// One box of the median cut: a range of the pixel array.
 struct Box {
     size_t begin = 0, end = 0;
 
     size_t Count() const { return end - begin; }
 };
 
-// The channel with the widest range in the box, and that range.
+// The channel with the widest range, and that range.
 std::pair<int, int> WidestChannel(const std::vector<Pixel>& pixels, const Box& box) {
     std::array<int, 3> low{255, 255, 255}, high{0, 0, 0};
     for (size_t i = box.begin; i < box.end; i++) {

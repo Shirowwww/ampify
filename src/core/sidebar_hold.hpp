@@ -2,7 +2,7 @@
 // The hover sidebar stays open while someone uses it: typing in its search field, or a menu open in it, and only
 // while the window is in front.
 
-#include "theme/css.hpp"
+#include "sidebar_fold.hpp"
 
 #include <chrono>
 #include <optional>
@@ -33,7 +33,7 @@ inline bool HoldsForKeyboard(bool windowInFront, bool keysUsed, bool focusOnPane
 // A pin pushes the pages aside only where Apple Music opens its own sidebar beside them. Narrower, Apple's narrow
 // layout clips a pane opened beside the pages and hides the hamburger: the pinned pane stays over the pages instead.
 inline bool PinPushesPages(double windowWidth) {
-    return windowWidth > theme::MediaQuery::kSidebarFoldsAt;
+    return windowWidth > kSidebarFoldsAt;
 }
 
 // The pin button of the open pane: the Pin glyph and its words while the pane folds under the pointer, the Unpin glyph

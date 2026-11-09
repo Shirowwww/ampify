@@ -1,6 +1,5 @@
-# Unit tests: target ampify_tests (when AMPIFY_BUILD_TESTS is on). AMPIFY_TESTS_WIN_SOURCES is added when targeting
-# Windows. A package may list its own tests in its own file with list(APPEND AMPIFY_TESTS_SOURCES ...). See the
-# convention at the top of CMakeLists.txt.
+# AMPIFY_TESTS_WIN_SOURCES is added when targeting Windows. A package may list its own tests in its own file with
+# list(APPEND AMPIFY_TESTS_SOURCES ...).
 list(APPEND AMPIFY_TESTS_SOURCES
     tests/main.cpp
     tests/core_tests.cpp
@@ -26,9 +25,16 @@ list(APPEND AMPIFY_TESTS_SOURCES
     tests/theme_color_animation_tests.cpp
     tests/gain_board_tests.cpp
     tests/sidebar_hold_tests.cpp
+    tests/song_room_tests.cpp
+    tests/playbar_place_tests.cpp
+    tests/progress_mark_tests.cpp
+    tests/merged_snippets_tests.cpp
+    tests/lyrics_window_tests.cpp
+    tests/caption_clearance_tests.cpp
     tests/sidebar_groups_tests.cpp
     tests/sidebar_entry_tests.cpp
     tests/topbar_tests.cpp
+    tests/value_codec_tests.cpp
     tests/player_watch_tests.cpp
     tests/ui_model_tests.cpp
     tests/ui_element_tests.cpp

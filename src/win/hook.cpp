@@ -193,6 +193,7 @@ VOID CALLBACK OnDllLoaded(ULONG reason, const LoadedDll* data, PVOID) {
                            hook.original, hook.exported);
         }
     } catch (...) {
+        // The loader calls this: nothing may escape it, and a module left unpatched keeps its own import.
     }
 }
 

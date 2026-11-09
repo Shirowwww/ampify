@@ -62,8 +62,6 @@ std::string DecodeEntities(std::string_view text) {
     return out;
 }
 
-// ---- Times --------------------------------------------------------------------------------------------------------
-
 // "12" or "12.345": whole units and thousandths. No sign, no exponent.
 bool ParseDecimal(std::string_view text, bool allowFraction, int64_t& whole, int64_t& thousandths) {
     size_t dot = text.find('.');
@@ -122,8 +120,6 @@ std::optional<int64_t> ParseTtmlTime(std::string_view text) {
 }
 
 namespace {
-
-// ---- The scanner --------------------------------------------------------------------------------------------------
 
 struct Attribute {
     std::string name;  // lower case, without the namespace prefix: "ttm:role" is "role"

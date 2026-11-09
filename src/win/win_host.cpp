@@ -49,14 +49,6 @@ constexpr size_t kMaxResponseBytes = size_t{8} << 20;
 constexpr std::chrono::seconds kAnswerDeadline{15};       // reading the answer, after the headers came
 constexpr auto kBalloonDuration = std::chrono::seconds(8);
 
-std::wstring ToWide(const std::string& text) {
-    if (text.empty()) return {};
-    int size = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
-    std::wstring out(static_cast<size_t>(size), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), size);
-    return out;
-}
-
 // Returns the virtual key of a key name written by Ampify's normalizer (see src/core/prelude/keyboard.cpp), or 0.
 UINT VirtualKeyOf(const std::string& name) {
     static const std::map<std::string, UINT> named = {
@@ -121,7 +113,6 @@ void InstallPlayerVolume(SetPlayerVolumeFn setter, PlayerVolumeProblemFn problem
 
 namespace {
 
-constexpr unsigned kInterfaceTimeoutMs = 1500;
 constexpr auto kButtonSettle = std::chrono::milliseconds(60);  // Apple redraws its button on its own turn
 constexpr int kSettleChecks = 70;  // a press is read back for 4.2 s at most: Apple's first one took 2.8 s, the next 0.1 s
 std::atomic<unsigned> g_repeatGlyphSeen{0};
@@ -132,11 +123,7 @@ std::optional<win::MainPlayerModes> ReadButtons() {
     win::ReadPlayerModesFn read = win::g_readModes.load();
     if (!read) return std::nullopt;
     auto result = std::make_shared<win::MainPlayerModes>();
-    auto readOnUi = [read, result] {
-        ampify::ActivityScope activity("player buttons read");
-        *result = read();
-    };
-    if (!win::RunOnUiThreadAndWait(readOnUi, kInterfaceTimeoutMs)) return std::nullopt;
+    if (!win::RunNamedOnUiThread("player buttons read", [read, result] { *result = read(); })) return std::nullopt;
     return *result;
 }
 
@@ -144,11 +131,7 @@ bool PressButton(bool shuffle) {
     win::PressPlayerButtonFn press = win::g_pressButton.load();
     if (!press) return false;
     auto pressed = std::make_shared<bool>(false);
-    auto pressOnUi = [press, pressed, shuffle] {
-        ampify::ActivityScope activity("player buttons press");
-        *pressed = press(shuffle);
-    };
-    if (!win::RunOnUiThreadAndWait(pressOnUi, kInterfaceTimeoutMs)) {
+    if (!win::RunNamedOnUiThread("player buttons press", [press, pressed, shuffle] { *pressed = press(shuffle); })) {
         return false;
     }
     return *pressed;
@@ -216,11 +199,7 @@ bool WinHost::SetVolume(double volume) {
     if (!setter) return false;
     if (m_process != "ui") return setter(volume);
     auto done = std::make_shared<bool>(false);
-    auto setOnUi = [setter, volume, done] {
-        ampify::ActivityScope activity("player volume");
-        *done = setter(volume);
-    };
-    if (!win::RunOnUiThreadAndWait(setOnUi, kInterfaceTimeoutMs)) {
+    if (!win::RunNamedOnUiThread("player volume", [setter, volume, done] { *done = setter(volume); })) {
         m_journal.Write("Player: the volume was not set: the interface thread did not answer in time");
         return false;
     }
@@ -303,7 +282,7 @@ bool WinHost::WriteStorage(const std::string& elementId, const std::string& json
 }
 
 // Ampify.player: Apple's player in AppleMusic.exe, the Windows media controls (SMTC), then the media keys. See
-// src/win/player_bridge.*. Never the volume.
+// src/win/player_bridge.*. The volume is a separate capability (SetVolume).
 PlayerSnapshot WinHost::Player() { return m_player->Snapshot(); }
 
 void WinHost::PublishNowPlaying(const PlayerSnapshot& snapshot) { m_player->PublishFeed(snapshot); }
@@ -369,8 +348,8 @@ void WinHost::Notify(const std::string& elementId, const std::string& title, con
     icon.uFlags = NIF_ICON | NIF_TIP | NIF_INFO;
     icon.hIcon = win::AmpifyIcon(false);
     wcsncpy_s(icon.szTip, L"Ampify", _TRUNCATE);
-    wcsncpy_s(icon.szInfoTitle, ToWide(title).c_str(), _TRUNCATE);
-    wcsncpy_s(icon.szInfo, ToWide(text).c_str(), _TRUNCATE);
+    wcsncpy_s(icon.szInfoTitle, win::FromUtf8(title).c_str(), _TRUNCATE);
+    wcsncpy_s(icon.szInfo, win::FromUtf8(text).c_str(), _TRUNCATE);
     icon.dwInfoFlags = NIIF_USER | NIIF_LARGE_ICON;  // the balloon shows Ampify's logo
     icon.hBalloonIcon = win::AmpifyIcon(true);
 
@@ -458,7 +437,7 @@ HttpResponse WinHost::HttpGetWithHeaders(const std::string& url, const HttpHeade
 
 HttpResponse WinHost::HttpSend(const std::string& method, const std::string& url, const std::string& body,
                                const HttpHeaders& headers) {
-    return Send(ToWide(method).c_str(), url, body, headers);
+    return Send(win::FromUtf8(method).c_str(), url, body, headers);
 }
 
 namespace {
@@ -497,7 +476,7 @@ namespace {
 
 // Opens a URL with Windows, through `progId` when it is not empty (the music: scheme has no default app of its own).
 bool ShellOpen(const std::string& url, const std::wstring& progId) {
-    std::wstring wide = ToWide(url);
+    std::wstring wide = win::FromUtf8(url);
     SHELLEXECUTEINFOW info{};
     info.cbSize = sizeof info;
     info.fMask = SEE_MASK_NOASYNC | (progId.empty() ? 0 : SEE_MASK_CLASSNAME);
@@ -525,7 +504,7 @@ bool WinHost::OpenInBrowser(const std::string& url) {
 
 HttpResponse WinHost::Send(const wchar_t* verb, const std::string& url, const std::string& body,
                            const HttpHeaders& headers) {
-    std::wstring wide = ToWide(url);
+    std::wstring wide = win::FromUtf8(url);
     wchar_t host[256] = {};
     wchar_t path[2048] = {};
     URL_COMPONENTSW parts{};
@@ -553,7 +532,7 @@ HttpResponse WinHost::Send(const wchar_t* verb, const std::string& url, const st
                                    : nullptr;
     // The names were checked by the http module (content-type, authorization, accept), the values have no line break.
     std::wstring extra;
-    for (const auto& [name, value] : headers) extra += ToWide(name) + L": " + ToWide(value) + L"\r\n";
+    for (const auto& [name, value] : headers) extra += win::FromUtf8(name) + L": " + win::FromUtf8(value) + L"\r\n";
     bool ok = request &&
               WinHttpSendRequest(request, extra.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : extra.c_str(),
                                  extra.empty() ? 0 : static_cast<DWORD>(-1L),

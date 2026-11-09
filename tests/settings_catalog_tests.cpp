@@ -125,11 +125,11 @@ TEST_CASE(SettingsCatalog_FamiliesSwitchTheirElementsAndHoldTheirSettings) {
 
 TEST_CASE(SettingsCatalog_ChoicesReadInAnyCaseAndFallBackToTheirDefault) {
     Settings settings;
-    CHECK(ampify::ChoiceOf(settings, "apple.orphanAgent") == "off");
-    settings.Set("apple.orphanAgent", "On");
     CHECK(ampify::ChoiceOf(settings, "apple.orphanAgent") == "on");
-    settings.Set("apple.orphanAgent", "true");
+    settings.Set("apple.orphanAgent", "Off");
     CHECK(ampify::ChoiceOf(settings, "apple.orphanAgent") == "off");
+    settings.Set("apple.orphanAgent", "false");
+    CHECK(ampify::ChoiceOf(settings, "apple.orphanAgent") == "on");
     CHECK(ampify::IsOfferedValue("apple.close", "tray") && !ampify::IsOfferedValue("apple.close", "Tray"));
     CHECK(ampify::OfferedValues("kit_update") == "auto, ask, off");
     CHECK(ampify::OfferedValues("remote.port").empty());

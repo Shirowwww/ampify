@@ -14,17 +14,22 @@
 #include <vector>
 
 #include "element_picker.hpp"
-#include "lcd_links.hpp"
+#include "mini_player_theme.hpp"
+#include "apple_tweak.hpp"
+#include "artwork_passthrough.hpp"
 #include "sidebar_hover.hpp"
-#include "topbar_search.hpp"
-#include "text_marquee.hpp"
 #include "ui_thread.hpp"
 #include "win_common.hpp"
 #include "window_backdrop.hpp"
 #include "xaml_backend.hpp"
 #include "xaml_watcher.hpp"
+#include "release_facts.hpp"
+#include "../core/manifest.hpp"
+#include "../core/panel_radius.hpp"
 #include "../core/settings.hpp"
 #include "../core/settings_catalog.hpp"
+#include "../core/text_util.hpp"
+#include "../core/theme/retired.hpp"
 #include "../core/theme/css.hpp"
 #include "../core/theme/fonts.hpp"
 #include "../core/theme/glass.hpp"
@@ -47,15 +52,7 @@ constexpr auto kAttachRetry = std::chrono::seconds(1);
 constexpr int kTimedPasses = 5;
 constexpr long long kSlowPassMs = 120;
 constexpr int kMaxTimedPasses = 40;
-
-// Windows apps in dark mode, for theme.scheme = auto. Light when the value cannot be read (older Windows).
-bool SystemUsesDarkMode() {
-    DWORD light = 1;
-    DWORD size = sizeof(light);
-    LONG status = RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-                               L"AppsUseLightTheme", RRF_RT_REG_DWORD, nullptr, &light, &size);
-    return status == ERROR_SUCCESS && light == 0;
-}
+constexpr int kMaxAsideCopies = 100;  // copies of one retired folder kept in kit/retired
 
 // When settings.txt and reload.txt were last written. `ampify theme set`, the Marketplace and `ampify dev` write one of
 // them: the next pass then starts at once instead of at the end of the tick.
@@ -64,13 +61,6 @@ std::pair<std::filesystem::file_time_type, std::filesystem::file_time_type> Chan
     std::filesystem::file_time_type settings = std::filesystem::last_write_time(kit / "settings.txt", error);
     std::filesystem::file_time_type reload = std::filesystem::last_write_time(kit / "reload.txt", error);
     return {settings, reload};
-}
-
-// Local time in minutes from midnight, for theme.schedule.
-int LocalMinute() {
-    SYSTEMTIME now{};
-    GetLocalTime(&now);
-    return now.wHour * 60 + now.wMinute;
 }
 
 // After an inspection, writes sidebar.json when it does not exist yet: every NavigationViewItem of the tree, in the
@@ -96,6 +86,39 @@ void UpdateThemeSettings(const std::filesystem::path& kit, Journal& journal,
         theme::WriteThemeSettings(settings, value);
     }, error);
     if (!written) journal.Write("Settings: theme keys not written, " + error);
+}
+
+// Once per start: settings.txt moves the keys of the elements Ampify retired or merged (theme/retired.hpp), and
+// Ampify's own copies of those elements move to kit/retired, so that the settings page no longer offers them. A
+// folder someone else wrote under the same name stays.
+void MoveRetiredElements(const std::filesystem::path& kit, Journal& journal) {
+    const std::string path = (kit / "settings.txt").string();
+    Settings settings;
+    settings.Load(path);
+    if (theme::MoveRetiredSettings(settings)) {
+        std::string error;
+        bool written = Settings::UpdateFile(path, [](Settings& current) { theme::MoveRetiredSettings(current); }, error);
+        journal.Write(written ? "Settings: keys of retired and merged elements moved"
+                              : "Settings: keys of retired elements not moved, " + error);
+        // The folders wait for the keys: a theme.active naming a removed folder would leave no theme at all.
+        if (!written) return;
+    }
+    for (std::string_view retired : theme::RetiredFolders()) {
+        const std::filesystem::path folder = kit / std::filesystem::path(retired);
+        std::optional<std::string> text = ReadWholeFile(folder / "manifest.json");
+        if (!text) continue;
+        if (ParseManifest(*text, "", kKitApiMajor, nullptr).partial.author != "Shirowwww") continue;
+        // Set aside in kit/retired, never deleted: the copy may hold changes made by hand.
+        std::filesystem::path aside = kit / "retired" / std::filesystem::path(retired);
+        for (int copy = 2; std::filesystem::exists(aside) && copy < kMaxAsideCopies; ++copy) {
+            aside = kit / "retired" / std::filesystem::path(std::string(retired) + "-" + std::to_string(copy));
+        }
+        std::error_code error;
+        std::filesystem::create_directories(aside.parent_path(), error);
+        if (!error) std::filesystem::rename(folder, aside, error);
+        journal.Write("Themes: retired " + std::string(retired) +
+                      (error ? ", not moved: " + error.message() : ", set aside in " + aside.generic_string()));
+    }
 }
 
 }  // namespace
@@ -155,6 +178,7 @@ void ThemeService::Start(HINSTANCE module) {
 void ThemeService::Stop() {
     m_running = false;
     if (m_worker.joinable()) m_worker.join();
+    StopMiniPlayerTheme();
     DetachUiThread();
 }
 
@@ -167,6 +191,7 @@ void ThemeService::Run(HINSTANCE module) {
         settings.Load((m_kit / "settings.txt").string());
         if (ToggleOf(settings, kXamlWatcherKey)) StartXamlWatcher(m_journal, module);
     }
+    MoveRetiredElements(m_kit, m_journal);
 
     // Reads the settings, the theme, the snippets, sidebar.json and home.json, and reloads only what changed. The
     // Windows mode and the local time choose the scheme for theme.scheme = auto and theme.schedule.
@@ -194,6 +219,7 @@ void ThemeService::Run(HINSTANCE module) {
             }
         }
         theme::SessionRequest request = worker.Tick(settings, LocalMinute());
+        OfferMiniPlayerTheme(request, m_journal);  // Apple's mini player, on its own thread, gets the same
 
         std::shared_ptr<UiSide> ui = m_ui;
         Journal& journal = m_journal;
@@ -201,8 +227,12 @@ void ThemeService::Run(HINSTANCE module) {
         PostToUiThread([ui, request, kit, &journal]() {
             ampify::ActivityScope activity("theme tick");
             theme::SetCurrentGlassLevel(request.glass);
+            auto tickStart = std::chrono::steady_clock::now();
             if (!ui->attached) {
-                ui->attached = ui->backend.Attach();
+                {
+                    ampify::ActivityScope step("theme tick: attach to the window");
+                    ui->attached = ui->backend.Attach();
+                }
                 if (!ui->attached) return;
                 // New pages and rows get the theme within a fraction of a second instead of at the next tick.
                 std::weak_ptr<UiSide> weak = ui;
@@ -234,16 +264,34 @@ void ThemeService::Run(HINSTANCE module) {
             // pass waits, and the first tick once the window shows again applies what changed meanwhile. Not the very
             // first tick: a window that starts hidden still gets its theme before it first shows.
             if (ui->ticked && !ui->backend.WindowShown()) return;
+            bool firstTick = !ui->ticked;
             ui->ticked = true;
-            KeepDisplayLinks(journal);
-            KeepTextMarquee(journal);
-            KeepSidebarOnHover(journal);
-            KeepTopbarSearch(journal);
-            ui->backend.RecheckMedia();
+            {
+                ampify::ActivityScope step("theme tick: Apple Music tweaks");
+                KeepAppleTweaks(journal);
+                ui->backend.RecheckMedia();
+            }
 
-            std::optional<theme::Inspection> inspection = ui->session.Tick(ui->backend, request);
+            std::optional<theme::Inspection> inspection;
+            {
+                ampify::ActivityScope step("theme tick: apply the theme");
+                inspection = ui->session.Tick(ui->backend, request);
+            }
+            // The first tick puts the whole theme on the window: its length is part of the start-up time.
+            if (firstTick) {
+                auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - tickStart);
+                journal.Write("Themes: first tick, " + std::to_string(ms.count()) + " ms on the interface thread");
+            }
             if (std::shared_ptr<const theme::Theme> applied = ui->session.Applied(); applied != ui->shown) {
                 PublishFontRoles(theme::FontRolesJson(applied.get()));
+                PublishPanelRadius(applied ? PanelRadiusOf(applied->variables) : std::nullopt);
+                const std::string* veil = nullptr;
+                if (applied) {
+                    if (auto found = applied->variables.find("artwork-veil"); found != applied->variables.end()) {
+                        veil = &found->second;
+                    }
+                }
+                KeepArtworkVeil(veil);
                 ui->shown = std::move(applied);
             }
             KeepWindowMaterial(ui->shown ? ui->shown->Material() : std::nullopt, journal);
@@ -260,8 +308,13 @@ void ThemeService::Run(HINSTANCE module) {
             // (the midnight theme alone left light text on Apple Music's white background). The scheme's background
             // decides when it gives one (a Spicetify scheme is often named Nord or Mocha), its name otherwise.
             auto modeStart = std::chrono::steady_clock::now();
-            bool refreshed = ui->backend.SetAppMode(request.theme ? request.theme->dark : std::nullopt);
+            bool refreshed = false;
+            {
+                ampify::ActivityScope step("theme tick: light or dark mode");
+                refreshed = ui->backend.SetAppMode(request.theme ? request.theme->dark : std::nullopt);
+            }
             if (std::string note = ui->backend.TakeCaptionNote(); !note.empty()) journal.Write(note);
+            if (std::string note = ui->backend.TakeArtworkNote(); !note.empty()) journal.Write(note);
             if (refreshed) {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - modeStart);
                 bool worthLogging = ui->timedRefreshes < kTimedPasses || ms.count() > kSlowPassMs;

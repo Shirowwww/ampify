@@ -75,7 +75,7 @@ TEST_CASE(I18n_FrenchTextsForWhatPeopleSeeAndEnglishForTheRest) {
     CHECK(ampify::i18n::Text("ui.on") == "Activé");
     CHECK(ampify::i18n::Text("page.back") == "Retour");
     CHECK(ampify::i18n::Text("discord.connected") == "Discord: connected, the presence is shown");  // the log stays English
-    ampify::i18n::SetLanguage("it");
+    ampify::i18n::SetLanguage("sv");
     CHECK(ampify::i18n::Text("ui.on") == "On");  // a language without a table reads English
     ampify::i18n::SetLanguage("zh-hant");
     CHECK(ampify::i18n::Text("ui.on") == "开");  // Traditional Chinese reads the Simplified table
@@ -84,6 +84,12 @@ TEST_CASE(I18n_FrenchTextsForWhatPeopleSeeAndEnglishForTheRest) {
     CHECK(ampify::i18n::Text("mods.themeTitle", {{"name", "Nord"}}) == "Design: Nord");
     CHECK(ampify::i18n::UsesDecimalComma());
     ampify::i18n::SetLanguage("ja");
+    CHECK(!ampify::i18n::UsesDecimalComma());
+    ampify::i18n::SetLanguage("it");
+    CHECK(ampify::i18n::Text("ui.on") == "Attivo");
+    CHECK(ampify::i18n::UsesDecimalComma());
+    ampify::i18n::SetLanguage("ko");
+    CHECK(ampify::i18n::Text("ui.on") == "켜짐");
     CHECK(!ampify::i18n::UsesDecimalComma());
 
     ampify::i18n::SetLanguage("en");
@@ -103,13 +109,16 @@ TEST_CASE(I18n_PreferredLocaleIsTheSettingThenTheSystemThenEnglish) {
 
 TEST_CASE(I18n_TheInstallerTextsAreInEveryLanguage) {
     ampify::test::LanguageScope scope("en");
-    CHECK(ampify::i18n::Text("setup.installed") == "Ampify is installed.");
+    CHECK(ampify::i18n::Text("setup.installedTitle") == "Ampify is installed");
     CHECK(ampify::i18n::Text("setup.fileMissing", {{"name", "x"}}) ==
           "A file is missing next to the installer: x\n\nExtract the whole zip first, then run the installer again.");
+    CHECK(ampify::i18n::Text("setup.untested", {{"version", "1.2.3.4"}}).rfind("Apple Music 1.2.3.4 has not", 0) == 0);
     ampify::i18n::SetLanguage("fr");
-    CHECK(ampify::i18n::Text("setup.installed") == "Ampify est installé.");
+    CHECK(ampify::i18n::Text("setup.installedTitle") == "Ampify est installé");
+    CHECK(ampify::i18n::Text("setup.deleteData", {{"folder", "C:\\A"}}) ==
+          "Supprimer aussi vos thèmes, réglages et extensions (C:\\A)");
     ampify::i18n::SetLanguage("zh");
-    CHECK(ampify::i18n::Text("setup.installed") == "Ampify 已安装。");
+    CHECK(ampify::i18n::Text("setup.installedTitle") == "Ampify 已安装");
 }
 
 TEST_CASE(I18n_TheListedLanguagesAreTheOnesWithATable) {
@@ -140,7 +149,7 @@ TEST_CASE(I18n_EveryLanguageTranslatesWhatTheFrenchTableDoes) {
 
 // A Windows balloon cuts a title at 63 characters and a text at 255; the notices of a stopped Ampify must fit.
 TEST_CASE(I18n_TheOffNoticesFitInABalloonInEveryLanguage) {
-    for (const char* language : {"en", "fr", "de", "es", "pt", "ru", "ja", "zh"}) {
+    for (const char* language : {"en", "fr", "de", "es", "pt", "ru", "ja", "zh", "it", "ko"}) {
         auto table = std::string_view(language) == "en" ? ampify::i18n::KitMessages() : ampify::i18n::KitMessagesIn(language);
         for (const char* group : {"off.version", "off.listed", "off.exports", "off.safe"}) {
             std::string title(ampify::i18n::Lookup(table, std::string(group) + "Title").value_or("off.missing"));

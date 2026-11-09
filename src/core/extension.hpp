@@ -51,7 +51,7 @@ public:
     // Starts one extension if the settings enable it and it is not running yet. Returns false for an unknown id.
     bool Start(const std::string& id, const Settings& settings);
 
-    // Stops one extension. Returns false for an unknown id.
+    // False for an unknown id.
     bool Stop(const std::string& id);
 
     // Stops one extension and forgets it, so that its id can be added again. Returns false for an unknown id.

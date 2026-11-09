@@ -19,7 +19,8 @@
 // which declares them from the same metadata for Apple Music 1.1540.23042.0. Reused with the owner's permission. The
 // 1.1792 ones are the GuidAttribute values of AMP.Services.winmd 1.1792.
 //
-// Never called, by rule: SetVolumeAsync, SetMuteAsync and the EQ methods of IPlayer, and every FairPlay/DRM type.
+// Never called: every FairPlay/DRM type (drm_guard.cpp). The player volume is set through IVolumeControl, not through
+// IPlayer.SetVolumeAsync.
 
 namespace ampify::amp {
 
@@ -58,6 +59,21 @@ inline constexpr char kIidKaraokeLyricsViewModel[] = "A454EA99-2DC3-540F-883A-05
 inline constexpr int kKaraokeLyricsViewModelCurrentLine = 6;
 inline constexpr char kIidKaraokeLyricsLine[] = "AD6B009B-E221-5827-8A3B-85DC8B27DD87";
 inline constexpr int kKaraokeLyricsLineStartTime = 17;
+
+// AMP.UI.Controls.IVolumeControl (AMP.UI.Controls.winmd 1.1792): Level, a double, is the position of Apple's volume
+// slider. Apple binds it both ways: setting it on the control makes Apple's own code set the player volume, and its
+// slider, icon and volume menu follow. The player must have started.
+inline constexpr char kIidVolumeControl[] = "3E70BA1E-A754-535B-85DF-D7B9B18C4137";
+inline constexpr int kVolumeControlGetLevel = 8;
+inline constexpr int kVolumeControlPutLevel = 9;
+
+// AMP.UI.Views.IArtworkImage (AMP.UI.Views.winmd 1.1792): Artwork, the picture it shows, and ArtworkMaxSize, a
+// Windows.Foundation.Size, the cap Apple puts on its covers (270 in the play bar).
+inline constexpr char kIidArtworkImage[] = "8C023886-C0F0-52D8-9570-80BC6E9977C2";
+inline constexpr int kArtworkImageGetArtwork = 6;
+inline constexpr int kArtworkImagePutArtwork = 7;
+inline constexpr int kArtworkImageGetMaxSize = 12;
+inline constexpr int kArtworkImagePutMaxSize = 13;
 
 // AMP.UI.Views.IUIBrokerStatics: GetImageSource(Artwork, Double effectivePixelScale, Double width, Double height) ->
 // ImageSource at slot 34, the loader Apple's own artwork images use (read from AMP.UI.Views.winmd 1.1792).
@@ -126,18 +142,14 @@ inline constexpr char kIidFullScreenPlayerStatics[] = "4D31E252-6ACE-5007-9125-9
 inline constexpr char kIidFullScreenPlayer[] = "98034843-19EB-5B19-8A3F-A1AEDEDD9727";
 
 namespace slot {
-// AMP.UI.Views.IFullScreenPlayerStatics: Instance, Shutdown. AMP.UI.Views.IFullScreenPlayer: get_ViewModel,
-// put_ViewModel, Show (no argument).
+// AMP.UI.Views.IFullScreenPlayerStatics and IFullScreenPlayer. Show takes no argument.
 inline constexpr int kFullScreenPlayerStaticsInstance = 6;
 inline constexpr int kFullScreenPlayerViewModel = 6;
 inline constexpr int kFullScreenPlayerShow = 8;
 
-// AMP.Services.IPlayerStatics: get_Current.
 inline constexpr int kPlayerStaticsCurrent = 6;
 
-// AMP.Services.IPlayer: get_NowPlayingItem, get_PlayerState, StartOrQueueLibraryPlaybackAsync, StartVUIPlaybackAsync,
-// CreateAndPlayStationAsync, EnsureObjectGraphAsync, PlayAsync, PauseAsync, StopAsync, GoBackAsync, SkipPreviousAsync,
-// SkipNextAsync, ClearAsync, ... SetPositionAsync (22), ... SetVolumeAsync (27 in 1.1792, never called) ...
+// AMP.Services.IPlayer.
 inline constexpr int kPlayerNowPlayingItem = 6;
 inline constexpr int kPlayerPlayerState = 7;
 inline constexpr int kPlayerPlayAsync = 12;
@@ -156,11 +168,11 @@ inline constexpr int kPlayerLyricsAsync = 50;
 // AMP.Services.CommonModels.LyricsSource: Any, None, UserCustom, Store, StoreSyllable (timed word by word).
 inline constexpr int32_t kLyricsSourceStoreSyllable = 4;
 
-// AMP.Services.CommonModels.IPlayerState: get_CanPlay, get_CanPause, ... get_IsMuted, get_IsPaused, get_IsPlaying.
+// AMP.Services.CommonModels.IPlayerState.
 inline constexpr int kStateIsPaused = 24;
 inline constexpr int kStateIsPlaying = 25;
 
-// AMP.Services.CommonModels.INowPlayingItem: get_Subtitle, get_Artist, get_Album, ... get_Name (13th), ...
+// AMP.Services.CommonModels.INowPlayingItem.
 inline constexpr int kItemSubtitle = 6;
 inline constexpr int kItemArtist = 7;
 inline constexpr int kItemAlbum = 8;
@@ -173,50 +185,42 @@ inline constexpr int kItemAudioFormat = 38;
 inline constexpr int kItemPlayQueueItemId = 45;
 inline constexpr int kItemLyricsInfo = 46;
 
-// AMP.Services.CommonModels.IArtwork: get_BGColor (Windows.UI.Color: four bytes A, R, G, B, written through the out
-// pointer), put_BGColor, get_CropStyle, put_CropStyle, get_Format, put_Format, get_Height (double), put_Height,
-// get_Width (double), put_Width, get_Uri (Windows.Foundation.Uri), GetCropCode. Only the getters are called.
+// AMP.Services.CommonModels.IArtwork. get_BGColor writes a Windows.UI.Color (four bytes A, R, G, B) through the out
+// pointer, get_Height and get_Width a double, get_Uri a Windows.Foundation.Uri.
 inline constexpr int kArtworkBgColor = 6;
 inline constexpr int kArtworkFormat = 10;
 inline constexpr int kArtworkHeight = 12;
 inline constexpr int kArtworkWidth = 14;
 inline constexpr int kArtworkUri = 16;
 inline constexpr int kArtworkCropCode = 17;
-// Windows.Foundation.IUriRuntimeClass: get_AbsoluteUri is its first method.
+// Windows.Foundation.IUriRuntimeClass.
 inline constexpr int kUriAbsoluteUri = 6;
 
-// AMP.Services.CommonModels.ILyricsInfo: get_LyricsState, get_LyricsSource, get_ContentDescriptor, get_IsEditable,
-// get_RequiresReporting, get_MetricsJSON, HaveLyrics, GetStaticLyrics, GetTTML, GetLanguage.
+// AMP.Services.CommonModels.ILyricsInfo.
 inline constexpr int kLyricsHaveLyrics = 12;
 inline constexpr int kLyricsStatic = 13;
 inline constexpr int kLyricsTtml = 14;
 inline constexpr int kLyricsLanguage = 15;
 
-// AMP.Services.IPlayQueueStatics: get_Current. AMP.Services.IPlayQueue: get_AutoPlaySupported, get_AutoPlayEnabled,
-// get_AutoPlayActive, get_Sections, add_/remove_EnginePlayQueueChanged, SetAutoPlayEnabledAsync,
-// PlayPlayQueueItemAsync, MovePlayQueueItemsAsync, DeletePlayQueueItemsAsync (IVector<UInt64>, IAsyncAction).
+// AMP.Services.IPlayQueueStatics and IPlayQueue. DeletePlayQueueItemsAsync takes an IVector<UInt64> and returns an
+// IAsyncAction.
 inline constexpr int kPlayQueueStaticsCurrent = 6;
 inline constexpr int kPlayQueueSections = 9;
 inline constexpr int kPlayQueueDelete = 15;
 
-// AMP.Services.IPlayQueueSection: get_SectionKind (PlayQueueSectionKind, Int32), ... CommonModels:
-// IComponentModelContainer.get_Items; IPlayQueueItem: get_PlayQueueItemID (UInt64), get_Subtitle,
-// get_PlayQueueSectionKind, put_PlayQueueSectionKind, get_Duration (Int64); ITitledComponent.get_Title;
-// IContentDescriptorDriven.get_ContentDescriptor; IContentDescriptor: ... get_AdamId (16th, a string).
+// AMP.Services.IPlayQueueSection (get_SectionKind is an Int32) and, in CommonModels, IComponentModelContainer,
+// IPlayQueueItem (the id is a UInt64, the duration an Int64), ITitledComponent, IContentDescriptorDriven.
 inline constexpr int kSectionKind = 6;
 inline constexpr int kContainerItems = 6;
 inline constexpr int kQueueItemId = 6;
 inline constexpr int kQueueItemSubtitle = 7;
 inline constexpr int kQueueItemDuration = 10;
-// CommonModels.ILockup, which PlayQueueItem implements: get_Artwork, put_Artwork, get_Headline...
+// CommonModels.ILockup, which PlayQueueItem implements.
 inline constexpr int kLockupArtwork = 6;
 inline constexpr int kTitledTitle = 6;
 inline constexpr int kDrivenContentDescriptor = 6;
 inline constexpr int kDescriptorAdamId = 21;
-// IContentDescriptor: get_HasCloudCatalogIdentifiers, get_HasCloudIdentifiers, get_HasCloudLibraryIdentifiers,
-// get_HasLocalLibraryIdentifiers, HasMatchingIdentifiers, get_IsAlbum (11th slot), get_IsArtist, get_IsComposer,
-// get_IsGenre, get_IsPlaylist, get_IsRadioStation, MakeIdentifier, get_IsContainer, get_IsVideo, get_IsConcert,
-// get_AdamId, get_CanonicalId. The Is* getters write a Boolean (one byte).
+// IContentDescriptor: get_AdamId is a string; the Is* getters write a Boolean (one byte).
 inline constexpr int kDescriptorIsAlbum = 11;
 inline constexpr int kDescriptorIsArtist = 12;
 inline constexpr int kDescriptorIsComposer = 13;
@@ -228,8 +232,7 @@ inline constexpr int kDescriptorIsVideo = 19;
 inline constexpr int kDescriptorIsConcert = 20;
 inline constexpr int kDescriptorCanonicalId = 22;
 
-// AMP.UI.Controls.IScrubberControlStatics: get_ThumbVisibilityProperty, get_TrackHeightProperty,
-// get_TrackRectRadiusProperty, each a DependencyProperty.
+// AMP.UI.Controls.IScrubberControlStatics: each getter returns a DependencyProperty.
 inline constexpr int kScrubberThumbVisibilityProperty = 6;
 inline constexpr int kScrubberTrackHeightProperty = 7;
 inline constexpr int kScrubberTrackRectRadiusProperty = 8;
@@ -304,6 +307,16 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.UI.Views.INowPlayingControl", "get_ViewModel", kNowPlayingControlViewModel},
     {"AMP.Services.CommonModels.INowPlayingViewModel", "get_GoToNowPlayingItemAction", kNowPlayingViewModelGoToItemAction},
     {"AMP.UI.Views.IUIBrokerStatics", "GlobalDispatchActionAsync", kUiBrokerGlobalDispatchAction},
+    {"AMP.UI.Views.IUIBrokerStatics", "GetImageSource", kUiBrokerGetImageSource},
+    {"AMP.UI.Controls.IVolumeControl", "get_Level", kVolumeControlGetLevel},
+    {"AMP.UI.Controls.IVolumeControl", "put_Level", kVolumeControlPutLevel},
+    {"AMP.UI.Views.IArtworkImage", "get_Artwork", kArtworkImageGetArtwork},
+    {"AMP.UI.Views.IArtworkImage", "put_Artwork", kArtworkImagePutArtwork},
+    {"AMP.UI.Views.IArtworkImage", "get_ArtworkMaxSize", kArtworkImageGetMaxSize},
+    {"AMP.UI.Views.IArtworkImage", "put_ArtworkMaxSize", kArtworkImagePutMaxSize},
+    {"AMP.UI.Views.IKaraokeLyricsView", "get_ViewModel", kKaraokeLyricsViewViewModel},
+    {"AMP.Services.CommonModels.IKaraokeLyricsViewModel", "get_CurrentLine", kKaraokeLyricsViewModelCurrentLine},
+    {"AMP.Services.CommonModels.IKaraokeLyricsLine", "get_StartTime", kKaraokeLyricsLineStartTime},
     {"AMP.UI.Controls.IScrubberControlStatics", "get_ThumbVisibilityProperty", slot::kScrubberThumbVisibilityProperty},
     {"AMP.UI.Controls.IScrubberControlStatics", "get_TrackHeightProperty", slot::kScrubberTrackHeightProperty},
     {"AMP.UI.Controls.IScrubberControlStatics", "get_TrackRectRadiusProperty", slot::kScrubberTrackRectRadiusProperty},

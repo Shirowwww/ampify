@@ -58,7 +58,6 @@ public:
     // The interface that the elements add to. Thread-safe: the host renders it, and the tests read it.
     virtual UiModel& Ui() = 0;
 
-    // ---- Optional capabilities --------------------------------------------------------------------------------
     // The pure virtuals above are what every host has. A new service is a capability instead, so that adding one
     // does not touch every host. A module declares it in its own header:
     //

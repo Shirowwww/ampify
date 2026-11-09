@@ -332,6 +332,15 @@ TEST_CASE(Element_NotifyNeedsPermissionAndTruncates) {
     CHECK(!denied->Start());
 }
 
+TEST_CASE(Element_NotifyNeverCutsACharacterInHalf) {
+    Fixture f;
+    auto element = f.Make("cut", R"("notifications")", R"(
+        Ampify.notify({ title: "x".repeat(119) + "é", text: "y".repeat(499) + "é" });)");
+    CHECK(element->Start());
+    CHECK(f.host.notifications.size() == 1);
+    CHECK(f.host.notifications[0] == std::string(119, 'x') + "|" + std::string(499, 'y'));
+}
+
 TEST_CASE(Element_KeyboardBindingIsNormalizedAndDelivered) {
     Fixture f;
     auto element = f.Make("keys", R"("ui.keyboard")", R"(

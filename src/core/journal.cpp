@@ -9,7 +9,14 @@ namespace ampify {
 
 Journal::Journal(std::ostream& out, Stamp stamp) : m_out(out), m_stamp(std::move(stamp)) {}
 
+Journal::Journal(Journal& parent, std::string prefix)
+    : m_out(parent.m_out), m_parent(&parent), m_prefix(std::move(prefix)) {}
+
 void Journal::Write(std::string_view message) {
+    if (m_parent) {
+        m_parent->Write(m_prefix + std::string(message));
+        return;
+    }
     std::lock_guard<std::mutex> lock(m_mutex);
     m_out << '[' << m_stamp() << "] " << message << '\n';
     m_out.flush();

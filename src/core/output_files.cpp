@@ -51,7 +51,7 @@ bool WriteOutputFile(const std::filesystem::path& outputRoot, std::string_view e
         return Fail(error, "file name refused: '" + std::string(name) +
                                "' (letters, digits, . _ -, and .txt, .json, .csv, .html or .xml)");
     }
-    if (text.size() > kMaxOutputFileBytes) return Fail(error, "text too long (256 KB at most)");
+    if (text.size() > kMaxOutputFileBytes) return Fail(error, "text too long (" + std::to_string(kMaxOutputFileBytes / 1024) + " KB at most)");
 
     std::error_code ec;
     std::filesystem::path folder = OutputFolder(outputRoot, elementId);
