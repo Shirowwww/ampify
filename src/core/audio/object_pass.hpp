@@ -33,12 +33,16 @@ public:
 
     // Meters every object, then applies the gain eased towards `targetLinear`, then `stage` when one is given
     // (Ampify's equalizer, keyed by object), then the knee. A buffer is read before it is gained, so the
-    // measurement never sees the gain.
+    // measurement never sees the gain. While the pass gains its objects, its first frames fade in (FadeIn).
     const PassLevels& Process(std::span<const ObjectBuffer> objects, size_t frames, double targetLinear,
                               SampleStage* stage = nullptr);
 
 private:
+    // Lowers the start of `m_curve`, from frame `m_elapsed` on, while the stream is in its first kFadeInSeconds.
+    void FadeIn(size_t frames);
+
     double m_sampleRate;
+    size_t m_elapsed = 0;  // frames this pass has processed since the stream was opened
     GainRamp m_ramp;
     std::vector<float> m_curve;
     std::unordered_map<const void*, KWeighting> m_filters;  // per object: the filter state carries over

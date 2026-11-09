@@ -16,6 +16,7 @@
 #include "../src/core/audio/audio_engine.hpp"
 #include "../src/core/audio/audio_share.hpp"
 #include "../src/core/audio/bar_meter.hpp"
+#include "../src/core/audio/bar_shapes.hpp"
 #include "../src/core/audio/equalizer.hpp"
 #include "../src/core/audio/gain_ramp.hpp"
 #include "../src/core/audio/live_loudness.hpp"
@@ -78,8 +79,6 @@ double MeasuredGainDb(EqSettings& settings, double frequency, double rate, int c
 }
 
 }  // namespace
-
-// ---- Analysis -------------------------------------------------------------------------------------------------------
 
 TEST_CASE(Analysis_LevelsOfASine) {
     std::vector<float> sine = Sine(1000, 1.0, 48000, 48000, 1);
@@ -148,8 +147,6 @@ TEST_CASE(Analysis_TempoUnknownOnSilenceAndShortInput) {
     FeedInBlocks(shortInput, Clicks(120, 48000, 2), 2, 48000);
     CHECK(shortInput.Tempo().bpm == 0);  // under 3 s of envelope
 }
-
-// ---- Equalizer ------------------------------------------------------------------------------------------------------
 
 TEST_CASE(Equalizer_DesignsHitTheirGain) {
     using ampify::audio::BiquadCoefficients;
@@ -251,8 +248,6 @@ TEST_CASE(Equalizer_SettingsClampAndPresets) {
     for (const std::string& name : ampify::audio::PresetNames()) CHECK(ampify::audio::PresetGains(name).has_value());
 }
 
-// ---- Loudness -------------------------------------------------------------------------------------------------------
-
 TEST_CASE(LiveLoudness_SineAtMinusTwentyLufs) {
     // A 997 Hz sine of amplitude 0.1 on both channels is -20 LUFS.
     for (double rate : {44100.0, 48000.0, 96000.0}) {
@@ -277,8 +272,6 @@ TEST_CASE(LiveLoudness_MomentaryFollowsAChange) {
     CHECK_NEAR(meter.MomentaryLufs().value_or(0), -40.0, 0.3);
     CHECK(meter.ShortTermLufs().value_or(0) > -30.0);  // 2 s of the loud part still in the 3 s window
 }
-
-// ---- Ampify's steps on the sample path -------------------------------------------------------------------------------
 
 TEST_CASE(SamplePath_UnityGainAndFlatEqLeaveTheStreamUntouched) {
     ampify::audio::AudioEngine engine;
@@ -352,8 +345,6 @@ TEST_CASE(SamplePath_LoudnessAndAnalysisIgnoreTheSlider) {
     if (result.frame) CHECK_NEAR(result.frame->peak, 0.1, 0.005);
 }
 
-// ---- Engine ---------------------------------------------------------------------------------------------------------
-
 TEST_CASE(AudioEngine_DeliversEachFrameOnceAndStopsOnRelease) {
     ampify::audio::AudioEngine engine;
     std::vector<float> sine = Sine(1000, 0.5, 48000, 4800);
@@ -416,8 +407,6 @@ TEST_CASE(AudioEngine_DeliveryThreadSendsFrames) {
     engine.Release("a");
 }
 
-// ---- Colours --------------------------------------------------------------------------------------------------------
-
 namespace {
 
 std::vector<uint8_t> TwoColours(size_t width, size_t height, ampify::Rgb first, ampify::Rgb second, size_t firstColumns) {
@@ -473,8 +462,6 @@ TEST_CASE(ColorExtract_LargeImageIsSampled) {
     auto colors = ampify::ExtractColors(image.data(), image.size(), 1000, 1000);
     CHECK(colors.has_value() && colors->palette.size() == 2);
 }
-
-// --- Sharing with the interface process ---------------------------------------------------------------------
 
 TEST_CASE(AudioShare_AFrameWrittenIsReadWhileFresh) {
     ampify::audio::SharedAudio block{};
@@ -557,6 +544,65 @@ TEST_CASE(BarMeter_LoudBandsRiseAtOnceAndFallSlowly) {
     CHECK(meter.Levels()[0] > 0.5f);  // still falling
     meter.Update(nullptr, 0.5);       // paused: every bar goes down
     CHECK(meter.Levels()[0] < 0.01f);
+}
+
+TEST_CASE(BarShapes_TheMirrorPutsTheLowNotesInTheMiddle) {
+    using ampify::audio::MirrorSource;
+    CHECK(ampify::audio::MirrorBands(10) == 5 && ampify::audio::MirrorBands(9) == 5);
+    CHECK(MirrorSource(4, 10) == 0 && MirrorSource(5, 10) == 0);  // the two middle bars: the lowest band
+    CHECK(MirrorSource(0, 10) == 4 && MirrorSource(9, 10) == 4);  // both ends: the highest
+    CHECK(MirrorSource(4, 9) == 0 && MirrorSource(0, 9) == 4 && MirrorSource(8, 9) == 4);
+    for (size_t i = 0; i < 32; i++) CHECK(MirrorSource(i, 32) < ampify::audio::MirrorBands(32));
+}
+
+TEST_CASE(BarShapes_ARingBarStandsOnTheRingAndPointsOutwards) {
+    const size_t count = 8;
+    ampify::audio::Ring ring = ampify::audio::LayRing(100, 60, count);
+    CHECK(ring.centreX == 50 && ring.centreY == 30);
+    CHECK(std::abs(ring.radius + ring.length - 30) < 1e-4f);  // the tips of full bars touch the shorter side
+    CHECK(ring.thickness >= 1.5f && ring.thickness <= 6.0f);
+    const auto apply = [](const ampify::audio::Affine& m, float x, float y) {
+        return std::pair{x * m.m11 + y * m.m21 + m.dx, x * m.m12 + y * m.m22 + m.dy};
+    };
+    for (size_t i = 0; i < count; i++) {
+        float level = 0.5f;
+        ampify::audio::Affine m = ampify::audio::RingBar(ring, i, count, level);
+        auto [footX, footY] = apply(m, ring.thickness / 2, ring.length);
+        auto [tipX, tipY] = apply(m, ring.thickness / 2, 0);
+        float foot = std::hypot(footX - ring.centreX, footY - ring.centreY);
+        float tip = std::hypot(tipX - ring.centreX, tipY - ring.centreY);
+        CHECK(std::abs(foot - ring.radius) < 1e-3f);
+        CHECK(std::abs(tip - (ring.radius + ring.length * level)) < 1e-3f);
+    }
+    // Bar 0 points straight up, bar 2 of 8 to the right (clockwise).
+    auto [upX, upY] = apply(ampify::audio::RingBar(ring, 0, count, 1), ring.thickness / 2, 0);
+    CHECK(std::abs(upX - 50) < 1e-3f && std::abs(upY) < 1e-3f);
+    auto [rightX, rightY] = apply(ampify::audio::RingBar(ring, 2, count, 1), ring.thickness / 2, 0);
+    CHECK(std::abs(rightX - 80) < 1e-3f && std::abs(rightY - 30) < 1e-3f);
+}
+
+TEST_CASE(BarShapes_TheLineRunsFromEdgeToEdgeInsideTheDecor) {
+    std::vector<ampify::audio::Point> points;
+    std::vector<float> levels{0.0f, 1.0f, 0.0f, 1.0f};
+    ampify::audio::TraceLine(levels, 200, 40, 2, points);
+    CHECK(points.size() > levels.size() * 3);  // a curve, not a zigzag
+    CHECK(points.front().x == 0 && points.back().x == 200);
+    for (size_t i = 0; i < points.size(); i++) {
+        CHECK(points[i].y >= 2 && points[i].y <= 38);  // the curve's overshoot stays inside, past the stroke
+        if (i) CHECK(points[i].x >= points[i - 1].x);
+    }
+    // A full bar reaches the top at its middle, an empty one the bottom.
+    auto at = [&](float x) {
+        return std::min_element(points.begin(), points.end(), [&](auto a, auto b) {
+                   return std::abs(a.x - x) < std::abs(b.x - x);
+               })->y;
+    };
+    CHECK(std::abs(at(75) - 2) < 1e-3f);   // bar 1, at (1 + 0.5) / 4 of the width
+    CHECK(std::abs(at(25) - 38) < 1e-3f);  // bar 0
+
+    std::vector<ampify::audio::Point> reused = points;
+    ampify::audio::TraceLine(levels, 0, 40, 2, reused);
+    CHECK(reused.empty());  // nothing laid out yet
 }
 
 TEST_CASE(BarMeter_AQuietSongStillFillsTheBars) {

@@ -14,6 +14,7 @@
 #include <string>
 
 #include "../api/bridge.hpp"
+#include "../api/dispatch_names.hpp"
 #include "../api/module.hpp"
 #include "../apple_music.hpp"
 #include "../audio/audio_host.hpp"
@@ -143,7 +144,7 @@ struct AudioAnalysisNatives : ScriptBridge {
             box->latest = std::move(json);
             if (box->pending) return;
             box->pending = true;
-            ext->DeliverEvent("audioFrame", "");
+            ext->DeliverEvent(dispatch::kAudioFrame, "");
         });
         return JS_TRUE;
     }

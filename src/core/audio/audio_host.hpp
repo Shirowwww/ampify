@@ -6,8 +6,8 @@
 // has what the engine shares, read only (AudioHost::Reach).
 //
 // Rules that every implementation keeps: the samples are only the decoded ones the kit's own hooks already see,
-// they stay in memory, and only small frames of numbers reach the elements. The player volume is read, never set:
-// the equalizer acts on the samples, so Apple Music's slider never moves.
+// they stay in memory, and only small frames of numbers reach the elements. This interface only reads the player
+// volume; the equalizer acts on the samples, so it never moves Apple Music's slider.
 
 #include <cmath>
 #include <cstddef>

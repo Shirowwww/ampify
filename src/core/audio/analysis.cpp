@@ -47,8 +47,6 @@ std::vector<float> HannWindow(size_t size) {
     return window;
 }
 
-// ---- FFT ---------------------------------------------------------------------------------------------------------
-
 Fft::Fft(size_t size) : m_size(NextPowerOfTwo(size)), m_reversed(m_size), m_twiddles(m_size / 2) {
     size_t bits = 0;
     while ((size_t{1} << bits) < m_size) bits++;
@@ -83,8 +81,6 @@ void Fft::Forward(std::vector<std::complex<float>>& data) const {
         }
     }
 }
-
-// ---- Spectrum ----------------------------------------------------------------------------------------------------
 
 std::vector<double> LogBandEdges(size_t bands, double lowHz, double highHz) {
     bands = std::max<size_t>(1, bands);
@@ -139,8 +135,6 @@ void SpectrumAnalyzer::Analyze(const float* block, double sampleRate, std::vecto
         bandsDb[band] = std::max(kFloorDb, static_cast<float>(db));
     }
 }
-
-// ---- Tempo -------------------------------------------------------------------------------------------------------
 
 TempoEstimator::TempoEstimator(double seconds)
     : m_capacity(static_cast<size_t>(std::max(4.0, seconds) * kEnvelopeRate)), m_ring(m_capacity, 0.0f) {}
@@ -230,8 +224,6 @@ TempoEstimate TempoEstimator::Current() const {
     estimate.confidence = std::clamp(centre / energy, 0.0, 1.0);
     return estimate;
 }
-
-// ---- The whole analysis ------------------------------------------------------------------------------------------
 
 AudioAnalyzer::AudioAnalyzer()
     : m_ring(kRingSize, 0.0f),

@@ -31,7 +31,6 @@ void DefineAudio(api::NativeScope& scope) {
     scope.Function("setGain", AudioNatives::SetGain, 1);
 }
 
-// Removes the element's gain when it stops.
 void StopAudio(ScriptExtension& extension) {
     if (ScriptBridge::GainDbOf(&extension) != 0) ScriptBridge::HostOf(&extension).SetGainDb(extension.id(), 0);
 }

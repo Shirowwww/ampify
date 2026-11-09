@@ -30,8 +30,6 @@ public:
     AudioEngine(const AudioEngine&) = delete;
     AudioEngine& operator=(const AudioEngine&) = delete;
 
-    // ---- The sample path ----------------------------------------------------------------------------------------
-
     // The equalizer's target gains. Each stream keeps its own EqProcessor over them.
     EqSettings& Eq() { return m_eq; }
 
@@ -46,15 +44,11 @@ public:
     void PublishLoudness(const LoudnessReading& reading);
     void PublishPlayerVolume(double volume);
 
-    // ---- Delivery -------------------------------------------------------------------------------------------------
-
     // Hands the newest frame to every sink, once per frame. Called by the delivery thread, or by a test.
     void DeliverPending();
 
     // Starts a thread that calls DeliverPending every `period` (50 ms: 20 frames a second at most). Once only.
     void StartDeliveryThread(std::chrono::milliseconds period = std::chrono::milliseconds(50));
-
-    // ---- AudioHost -------------------------------------------------------------------------------------------------
 
     void SubscribeFrames(const std::string& elementId, FrameSink sink) override;
     AudioAnalysisResult Analyze(const std::string& elementId) override;

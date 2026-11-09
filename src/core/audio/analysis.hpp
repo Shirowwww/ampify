@@ -18,7 +18,7 @@ struct Levels {
 };
 Levels MeasureLevels(const float* samples, size_t count);
 
-// The periodic Hann window of `size` points.
+// Periodic (not symmetric) Hann window.
 std::vector<float> HannWindow(size_t size);
 
 // Radix-2 complex FFT of a fixed power-of-two size, in place, forward only.
@@ -79,7 +79,6 @@ public:
     void Push(float onset);
     void Reset();
 
-    // Seconds of envelope held, at most the window.
     double Seconds() const;
 
     // Needs at least 3 s of envelope.

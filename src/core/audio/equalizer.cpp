@@ -136,8 +136,6 @@ const std::vector<std::string>& PresetNames() {
     return names;
 }
 
-// ---- Settings ----------------------------------------------------------------------------------------------------
-
 EqSettings::EqSettings(std::vector<EqBandSpec> bands) : m_bands(std::move(bands)) {
     if (m_bands.size() > kMaxBands) m_bands.resize(kMaxBands);
     for (auto& gain : m_gains) gain.store(0.0f, std::memory_order_relaxed);
@@ -167,8 +165,6 @@ bool EqSettings::IsFlat() const {
     }
     return true;
 }
-
-// ---- Processor ---------------------------------------------------------------------------------------------------
 
 EqProcessor::EqProcessor(const EqSettings& settings) : m_settings(settings), m_bands(settings.Bands().size()) {}
 
