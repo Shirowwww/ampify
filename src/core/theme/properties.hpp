@@ -38,7 +38,10 @@ enum class PropertyKind {
     Transform,   // scale(x[, y]) rotate(<deg>) translate(x[, y]) and their X / Y forms, or none
     TransformOrigin,  // one or two percentages or keywords (left, center, right, top, bottom)
     Shadow,      // a depth in pixels from 0 to 100 (ThemeShadow and Translation Z), or none
-    Transition,  // `<property> <duration> [easing], ...` for transform, opacity, background or all; or none
+    Filter,      // `blur(<px>) [edges(<%> [<%>])]`, from 0 to 20 px, and the colour filters (saturate, grayscale, sepia,
+                 // brightness, contrast, invert, hue-rotate, tint, duotone), or none: the element drawn filtered
+                 // (ValueKind::Blur)
+    Transition,  // `<property> <duration> [easing], ...` for transform, opacity, background, filter or all; or none
     Animation,   // `<name> <duration> [easing] [delay] [count] [direction] [fill], ...` running @keyframes blocks of
                  // the theme (animation.hpp); or none
     Clip,        // `overflow: hidden | clip | visible`, or `clip-path: inset(<lengths>) | none`: a rectangle the element

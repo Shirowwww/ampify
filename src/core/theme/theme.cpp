@@ -1,5 +1,7 @@
 #include "theme.hpp"
 
+#include "theme_detail.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <set>
@@ -10,6 +12,7 @@
 #include "../manifest.hpp"
 #include "../text_util.hpp"
 #include "builtins.hpp"
+#include "colour_keys.hpp"
 #include "css_values.hpp"
 #include "fonts.hpp"
 #include "glass.hpp"
@@ -20,417 +23,32 @@
 
 namespace ampify::theme {
 
+using namespace detail;
+
 namespace {
 
-// Picks the scheme to use: the requested one (case-insensitive), or the first section when none is requested.
-const Ini::Section* PickScheme(const Ini& ini, const std::string& wanted, Theme& theme) {
-    if (!wanted.empty()) {
-        if (const Ini::Section* section = ini.FindSection(wanted)) return section;
-        theme.problems.push_back("colors.ini: scheme \"" + wanted + "\" not found, the first one is used");
-    }
-    for (const Ini::Section& section : ini.Sections()) {
-        if (!section.name.empty()) return &section;
-    }
-    return nullptr;
+constexpr const char* kPlaybarSetting = "bar-position";
+
+constexpr const char* kPlaybarLayoutId = "(playbar)";
+
+// LoadPlaybarLayout: the bar at the bottom for a theme that leaves it to Ampify. Apple paints the page column a shade
+// lighter than the sidebar, and the bar runs under both: the column takes the window's colour, as floating panels do.
+constexpr std::string_view kPlaybarLayout = R"css(
+@import "ampify:bottom-bar";
+
+@setting bar-position = Centred {
+    @import "ampify:centre-bar";
 }
 
-// The colours file: colors.ini, or color.ini as Spicetify names it. Empty name when there is none.
-std::pair<std::string, std::optional<std::string>> ReadColorsFile(FileSource& files) {
-    for (const char* name : kColorsFiles) {
-        if (std::optional<std::string> text = files.Read(name)) return {name, std::move(text)};
-    }
-    return {};
+.main-column {
+    background: transparent;
+    border-width: 0;
 }
-
-// A Spicetify colour is written in lowercase (main, main-elevated, main_fg); an app brush in PascalCase.
-bool IsSpicetifyName(std::string_view key) {
-    for (char c : key) {
-        if (std::isupper(static_cast<unsigned char>(c))) return false;
-    }
-    return !key.empty();
-}
-
-// The WCAG luminance at which white and black text contrast equally: sqrt(1.05 * 0.05) - 0.05. Below it, white text
-// reads better, so the background is dark.
-constexpr double kDarkBelowLuminance = 0.1791;
-
-// Light or dark, from the background the scheme gives: Spicetify's main, or the app's page background.
-std::optional<bool> DarkFromPalette(const Palette& palette) {
-    for (const char* key : {"main", "SolidBackgroundFillColorBaseBrush", "ApplicationPageBackgroundThemeBrush"}) {
-        if (std::optional<Argb> color = palette.Find(key)) return RelativeLuminance(*color) < kDarkBelowLuminance;
-    }
-    return std::nullopt;
-}
-
-// Light or dark, from the background the scheme gives (Spicetify's main, or the app's page background), else from the
-// scheme's name.
-std::optional<bool> DarkOf(const Palette& palette, const std::string& scheme) {
-    std::optional<bool> dark = DarkFromPalette(palette);
-    return dark ? dark : DarkByName(scheme);
-}
-
-constexpr const char* kAccent = "AccentFillColorDefaultBrush";
-
-// Where the colours of a scheme go: the palette, which $name and the derived rules read, and the app's brushes when
-// the colours part is on. Both change together.
-struct Colours {
-    Theme& theme;
-    bool applied;
-
-    bool Define(std::string_view key, Argb color) {
-        if (!theme.palette.Define(key, color)) return false;
-        AddBrush(key, color);
-        return true;
-    }
-    void Set(std::string_view key, Argb color) {
-        theme.palette.Set(key, color);
-        AddBrush(key, color);
-    }
-
-private:
-    void AddBrush(std::string_view key, Argb color) {
-        if (applied) theme.resources.push_back({std::string(key), {ValueKind::Color, ToXamlColor(color)}});
-    }
-};
-
-// A brush the theme does not name, worked out from one it does. The theme's resources.xaml has the last word: a key
-// it defines, or the one the colour comes from, is left to it.
-void DefineDerived(Colours& colours, const std::set<std::string>& owned, const char* from, const char* key,
-                   Argb color) {
-    if (owned.count(from) || owned.count(key)) return;
-    colours.Define(key, color);
-}
-
-// Fluent's accent under the pointer and while pressed is the accent at 90% and 80%. A theme that names only the
-// accent would otherwise show Apple Music's own colour on hover.
-void DefineAccentStates(Colours& colours, const std::set<std::string>& owned) {
-    constexpr std::pair<const char*, double> kStates[] = {{"AccentFillColorSecondaryBrush", 0.9},
-                                                          {"AccentFillColorTertiaryBrush", 0.8}};
-    std::optional<Argb> accent = colours.theme.palette.Find(kAccent);
-    if (!accent) return;
-    for (const auto& [key, opacity] : kStates) {
-        Argb color = *accent;
-        color.a = static_cast<std::uint8_t>(std::lround(accent->a * opacity));
-        DefineDerived(colours, owned, kAccent, key, color);
-    }
-}
-
-// Apple Music lays white text on the accent whatever its colour. On an accent where white reads under 3:1 (a light
-// cyan, Spotify's green, a yellow) and that names no colour for its text, the text goes black, as in Fluent's dark
-// mode. Any other accent keeps Apple Music's white.
-void DefineTextOnAccent(Colours& colours, const std::set<std::string>& owned) {
-    const Theme& theme = colours.theme;
-    constexpr const char* kPrimary = "TextOnAccentFillColorPrimaryBrush";
-    constexpr const char* kSecondary = "TextOnAccentFillColorSecondaryBrush";
-    constexpr double kMinimumWhiteContrast = 3.0;
-    constexpr Argb kBlack{0xFF, 0, 0, 0};
-    constexpr Argb kBlackSecondary{0xB3, 0, 0, 0};  // 70%, as Fluent's secondary text on the accent
-    std::optional<Argb> accent = theme.palette.Find(kAccent);
-    if (!accent || theme.palette.Find(kPrimary) || owned.count(kPrimary)) return;
-    if (1.05 / (RelativeLuminance(*accent) + 0.05) >= kMinimumWhiteContrast) return;
-    for (const auto& [key, color] : {std::pair{kPrimary, kBlack}, std::pair{kSecondary, kBlackSecondary}}) {
-        DefineDerived(colours, owned, kAccent, key, color);
-    }
-}
-
-// WinUI's toggles, sliders, check boxes, selection marks, links and the system accent brushes read keys of their own,
-// which its dictionaries set to the accent once, when they load: a theme's accent alone left them in Apple Music's
-// blue (the Settings pages, the sidebar's selection mark, "Show the whole album", the playing row's bars). The list is
-// every key the inspector found still holding Apple's accent under a theme. Brushes only: WinUI builds its own brushes
-// from the SystemAccentColor colours once, so writing those left them in the theme's accent after the theme went.
-void DefineAccentControls(Colours& colours, const std::set<std::string>& owned) {
-    const Theme& theme = colours.theme;
-    constexpr const char* kHover = "AccentFillColorSecondaryBrush";
-    constexpr const char* kPressed = "AccentFillColorTertiaryBrush";
-    // A theme that names no accent text colour has its links in the accent itself.
-    const char* kLink = theme.palette.Find("AccentTextFillColorPrimaryBrush") ? "AccentTextFillColorPrimaryBrush" : kAccent;
-    constexpr double kDisabled = 0.35;  // Fluent's disabled accent, #59 alpha
-    struct Derived {
-        const char* key;
-        const char* from;
-        double opacity;
-    };
-    constexpr const char* kOnAccent = "TextOnAccentFillColorPrimaryBrush";
-    const Derived kControls[] = {
-        {"AccentButtonBackground", kAccent, 1.0},
-        {"AccentButtonBackgroundPointerOver", kHover, 1.0},
-        {"AccentButtonBackgroundPressed", kPressed, 1.0},
-        {"AccentButtonForeground", kOnAccent, 1.0},
-        {"AccentButtonForegroundPointerOver", kOnAccent, 1.0},
-        {"AccentButtonForegroundPressed", kOnAccent, 1.0},
-        {"AccentFillColorDisabledBrush", kAccent, kDisabled},
-        {"AccentFillColorSelectedTextBackgroundBrush", kAccent, 1.0},
-        {"TextControlSelectionHighlightColor", kAccent, 1.0},
-        {"ListViewItemSelectionIndicatorBrush", kAccent, 1.0},
-        {"ListViewItemSelectionIndicatorPointerOverBrush", kHover, 1.0},
-        {"ListViewItemSelectionIndicatorPressedBrush", kPressed, 1.0},
-        {"ListViewItemSelectionIndicatorDisabledBrush", kAccent, kDisabled},
-        {"NavigationViewSelectionIndicatorForeground", kAccent, 1.0},
-        {"ListViewItemCheckBoxSelectedBrush", kAccent, 1.0},
-        {"ListViewItemCheckBoxSelectedDisabledBrush", kAccent, kDisabled},
-        {"GridViewItemCheckBoxSelectedBrush", kAccent, 1.0},
-        {"GridViewItemCheckBoxSelectedDisabledBrush", kAccent, kDisabled},
-        {"GridViewItemSelectedBorderBrush", kAccent, 1.0},
-        {"GridViewItemSelectedDisabledBorderBrush", kAccent, kDisabled},
-        {"ListBoxItemSelectedBackgroundThemeBrush", kAccent, 1.0},
-        {"ComboBoxItemPillFillBrush", kAccent, 1.0},
-        {"CalendarViewSelectedBorderBrush", kAccent, 1.0},
-        {"CalendarViewSelectedDisabledBorderBrush", kAccent, kDisabled},
-        {"PersonPictureEllipseBadgeFillThemeBrush", kAccent, 1.0},
-        {"ProgressRingForegroundThemeBrush", kAccent, 1.0},
-        {"VerticalThumbBrush", kAccent, 1.0},
-        {"HoverUIButtonBackgroundPointerOverBrush", kHover, 1.0},
-        {"HoverUIButtonBackgroundPressedBrush", kPressed, 1.0},
-        {"SystemControlBackgroundAccentBrush", kAccent, 1.0},
-        {"SystemControlForegroundAccentBrush", kAccent, 1.0},
-        {"SystemControlDisabledAccentBrush", kAccent, kDisabled},
-        {"SystemControlHighlightAccentBrush", kAccent, 1.0},
-        {"SystemControlHighlightAltAccentBrush", kAccent, 1.0},
-        {"SystemControlHighlightListAccentLowBrush", kAccent, 1.0},
-        {"SystemControlHighlightListAccentMediumLowBrush", kAccent, 1.0},
-        {"SystemControlHighlightListAccentMediumBrush", kAccent, 1.0},
-        {"SystemControlHighlightListAccentHighBrush", kAccent, 1.0},
-        {"SystemControlHighlightListAccentVeryHighBrush", kAccent, 1.0},
-        {"SystemControlHighlightAltListAccentLowBrush", kAccent, 1.0},
-        {"SystemControlHighlightAltListAccentMediumBrush", kAccent, 1.0},
-        {"SystemControlHighlightAltListAccentHighBrush", kAccent, 1.0},
-        {"SystemControlHyperlinkTextBrush", kLink, 1.0},
-        {"ButtonAccentTextFillColorPrimaryBrush", kLink, 1.0},
-        {"ContentDialogBorderThemeBrush", kAccent, 1.0},
-        {"SystemControlBackgroundAccentRevealBorderBrush", kAccent, 1.0},
-        {"SystemControlHighlightAccentRevealBorderBrush", kAccent, 1.0},
-        {"SystemControlHighlightAccent3RevealBackgroundBrush", kAccent, 1.0},
-        {"SystemControlHighlightAccent3RevealAccent2BackgroundBrush", kAccent, 1.0},
-        {"ToggleButtonBackgroundChecked", kAccent, 1.0},
-        {"ToggleButtonBackgroundCheckedPointerOver", kHover, 1.0},
-        {"ToggleButtonBackgroundCheckedPressed", kPressed, 1.0},
-        {"ToggleButtonBorderBrushChecked", kAccent, 1.0},
-        {"ToggleSwitchFillOn", kAccent, 1.0},
-        {"ToggleSwitchFillOnPointerOver", kHover, 1.0},
-        {"ToggleSwitchFillOnPressed", kPressed, 1.0},
-        {"ToggleSwitchStrokeOn", kAccent, 1.0},
-        {"SliderTrackValueFill", kAccent, 1.0},
-        {"SliderTrackValueFillPointerOver", kHover, 1.0},
-        {"SliderTrackValueFillPressed", kPressed, 1.0},
-        {"SliderThumbBackground", kAccent, 1.0},
-        {"SliderThumbBackgroundPointerOver", kHover, 1.0},
-        {"SliderThumbBackgroundPressed", kPressed, 1.0},
-        {"SliderTrackValueFillDisabled", kAccent, 0.4},
-        {"SliderThumbBackgroundDisabled", kAccent, 0.4},
-        {"CheckBoxCheckBackgroundFillChecked", kAccent, 1.0},
-        {"CheckBoxCheckBackgroundFillCheckedPointerOver", kHover, 1.0},
-        {"CheckBoxCheckBackgroundFillCheckedPressed", kPressed, 1.0},
-        {"CheckBoxCheckBackgroundStrokeChecked", kAccent, 1.0},
-        {"RadioButtonOuterEllipseCheckedFill", kAccent, 1.0},
-        {"RadioButtonOuterEllipseCheckedFillPointerOver", kHover, 1.0},
-        {"RadioButtonOuterEllipseCheckedFillPressed", kPressed, 1.0},
-        {"RadioButtonOuterEllipseCheckedStroke", kAccent, 1.0},
-        {"ProgressBarForeground", kAccent, 1.0},
-        {"HyperlinkButtonForeground", kLink, 1.0},
-        {"HyperlinkButtonForegroundPointerOver", kLink, 0.9},
-        {"HyperlinkButtonForegroundPressed", kLink, 0.8},
-    };
-    for (const Derived& derived : kControls) {
-        std::optional<Argb> color = theme.palette.Find(derived.from);
-        if (!color) continue;
-        color->a = static_cast<std::uint8_t>(std::lround(color->a * derived.opacity));
-        DefineDerived(colours, owned, derived.from, derived.key, *color);
-    }
-}
-
-// Ampify's extension panels and WinUI's flyouts lie over the page in Fluent's grey acrylic, foreign to any theme. An
-// opaque card colour takes its place; a see-through one would let the page show through them.
-void DefineAcrylicSurfaces(Colours& colours, const std::set<std::string>& owned) {
-    const Theme& theme = colours.theme;
-    constexpr const char* kCard = "CardBackgroundFillColorDefaultBrush";
-    std::optional<Argb> card = theme.palette.Find(kCard);
-    if (!card || card->a != 0xFF) return;
-    for (const char* key : {"AcrylicInAppFillColorDefaultBrush", "AcrylicBackgroundFillColorDefaultBrush"}) {
-        DefineDerived(colours, owned, kCard, key, *card);
-    }
-}
-
-// The selected rows of song lists and cards of grids stay in Apple Music's grey unless a theme names them: Spicetify's
-// selected-row when the theme gives one, otherwise a veil of the accent (#33, #44, #55 as the themes that set them).
-void DefineSelectedRows(Colours& colours, const std::set<std::string>& owned) {
-    const Theme& theme = colours.theme;
-    std::optional<Argb> row = theme.palette.Find("selected-row");
-    const char* from = row ? "selected-row" : kAccent;
-    std::optional<Argb> base = row ? row : theme.palette.Find(kAccent);
-    if (!base) return;
-    constexpr std::pair<const char*, std::uint8_t> kStates[] = {
-        {"ListViewItemBackgroundSelected", 0x33},           {"ListViewItemBackgroundSelectedPointerOver", 0x44},
-        {"ListViewItemBackgroundSelectedPressed", 0x55},    {"GridViewItemBackgroundSelected", 0x33},
-        {"GridViewItemBackgroundSelectedPointerOver", 0x44}, {"GridViewItemBackgroundSelectedPressed", 0x55},
-    };
-    for (const auto& [key, alpha] : kStates) {
-        Argb color = *base;
-        if (!row) color.a = alpha;
-        DefineDerived(colours, owned, from, key, color);
-    }
-}
-
-// The frost of a page header (a BackDrop in Apple's PageTemplates) is tinted by ContentAreaBackgroundBrush from its
-// first frame; the theme's pass that hides it comes a frame later, so in Apple's grey it flashed over a darker page.
-void DefinePageHeaderFrost(Colours& colours, const std::set<std::string>& owned) {
-    const Theme& theme = colours.theme;
-    constexpr const char* kPage = "ApplicationPageBackgroundThemeBrush";
-    if (std::optional<Argb> page = theme.palette.Find(kPage)) {
-        DefineDerived(colours, owned, kPage, "ContentAreaBackgroundBrush", *page);
-    }
-}
-
-// Apple's shelf headers, captions and the search field's hint read Apple's own SecondaryTextBrush, white at 51%: on a
-// theme's page lighter than Apple's it fell under 4.5:1, so it takes the theme's secondary text. Only for a dark
-// scheme: Apple's dark-mode captions over artwork read the same key, where a light scheme's dark text would sink.
-void DefineAppleSecondaryText(Colours& colours, const std::set<std::string>& owned) {
-    const Theme& theme = colours.theme;
-    constexpr const char* kSecondary = "TextFillColorSecondaryBrush";
-    std::optional<Argb> secondary = theme.palette.Find(kSecondary);
-    std::optional<bool> dark = DarkFromPalette(theme.palette);
-    if (!secondary || !dark || !*dark) return;
-    DefineDerived(colours, owned, kSecondary, "SecondaryTextBrush", *secondary);
-}
-
-// The colours a theme leaves to Ampify, once its own resources.xaml is known.
-void DefineDerivedColors(Colours& colours) {
-    std::vector<std::string> keys = XamlKeys(colours.theme.resourceDictionary);
-    std::set<std::string> owned(keys.begin(), keys.end());
-    for (auto define : {DefineAccentStates, DefineTextOnAccent, DefineAccentControls, DefineSelectedRows,
-                        DefineAcrylicSurfaces, DefinePageHeaderFrost, DefineAppleSecondaryText}) {
-        define(colours, owned);
-    }
-}
-
-// A Spicetify colour: a $name, a --spice-name variable as in Spicetify, and the app brushes that play its part
-// (SpicetifyResources) unless the scheme names them itself. Returns the Spicetify name.
-std::string DefineSpicetifyColor(const Ini::Entry& entry, Argb color, Theme& theme) {
-    std::string key = SpicetifyKey(entry.key);
-    if (key.empty()) key = ToLowerAscii(entry.key);  // a colour of the theme's own, such as accent
-    if (!theme.palette.Define(key, color)) {
-        theme.problems.push_back("colors.ini line " + std::to_string(entry.line) + ": \"" + entry.key +
-                                 "\" defined twice, ignored");
-        return {};
-    }
-    if (ToLowerAscii(entry.key) != key) theme.palette.Define(ToLowerAscii(entry.key), color);  // main_fg stays usable too
-    theme.variables["spice-" + key] = ToXamlColor(color);
-    return key;
-}
-
-std::set<std::string> LoadColors(FileSource& files, const std::string& wanted, Colours& colours) {
-    Theme& theme = colours.theme;
-    std::set<std::string> spicetify;
-    auto [file, text] = ReadColorsFile(files);
-    if (!text) return spicetify;
-
-    Ini ini;
-    for (const std::string& problem : ini.Parse(*text)) theme.problems.push_back(file + " " + problem);
-    for (const Ini::Section& section : ini.Sections()) {
-        if (!section.name.empty()) theme.schemes.push_back(section.name);
-    }
-
-    const Ini::Section* scheme = PickScheme(ini, wanted, theme);
-    if (!scheme) {
-        theme.problems.push_back(file + ": no scheme (a [Base] section, for example)");
-        return spicetify;
-    }
-    theme.scheme = scheme->name;
-
-    for (const Ini::Entry& entry : scheme->entries) {
-        std::optional<Argb> color = ParseColor(entry.value);
-        if (!color) {
-            theme.problems.push_back(file + " line " + std::to_string(entry.line) + ": color \"" + entry.value +
-                                     "\" is unreadable");
-            continue;
-        }
-        if (IsSpicetifyName(entry.key)) {
-            std::string key = DefineSpicetifyColor(entry, *color, theme);
-            if (!key.empty()) spicetify.insert(key);
-            continue;
-        }
-        if (!colours.Define(entry.key, *color)) {
-            theme.problems.push_back(file + " line " + std::to_string(entry.line) + ": \"" + entry.key +
-                                     "\" defined twice, ignored");
-        }
-    }
-
-    // The app brushes that play the part of a Spicetify colour, unless the scheme gives them itself.
-    for (const SpicetifyResource& mapping : SpicetifyResources()) {
-        std::optional<Argb> color = spicetify.count(mapping.spicetify) ? theme.palette.Find(mapping.spicetify) : std::nullopt;
-        if (color) colours.Define(mapping.resource, *color);
-    }
-    theme.dark = DarkOf(theme.palette, theme.scheme);
-    return spicetify;
-}
-
-// theme.accent over the scheme: its accent and Spicetify's button and playback bar take the chosen colour. The colours a
-// scheme gives along with its own accent (hover and pressed accents, text on the accent, links) would clash with it:
-// they go, and Ampify derives them from the chosen accent (DefineDerivedColors). Keys of the theme's resources.xaml
-// stay: Ampify does not rewrite a theme's own XAML.
-void ChooseAccent(Colours& colours, Argb accent) {
-    Theme& theme = colours.theme;
-    static const std::set<std::string> kFollowers = {
-        ToLowerAscii(kAccent),
-        "accentfillcolorsecondarybrush",
-        "accentfillcolortertiarybrush",
-        "textonaccentfillcolorprimarybrush",
-        "textonaccentfillcolorsecondarybrush",
-        "accenttextfillcolorprimarybrush",
-        "accenttextfillcolorsecondarybrush",
-        "accenttextfillcolortertiarybrush",
-    };
-    for (const std::string& key : kFollowers) theme.palette.Remove(key);
-    theme.palette.Remove("button-active");
-    std::erase_if(theme.resources, [](const ResourceOverride& resource) {
-        return kFollowers.count(ToLowerAscii(resource.key)) > 0;
-    });
-    colours.Set(kAccent, accent);
-    for (const char* spicetify : {"button", "playback-bar"}) {
-        if (!theme.palette.Find(spicetify)) continue;
-        theme.palette.Set(spicetify, accent);
-        theme.variables[std::string("spice-") + spicetify] = ToXamlColor(accent);
-    }
-}
-
-// Returns false when the theme must be refused. Refusing is the rule the API sets: a bad key breaks the theme.
-bool LoadDictionary(FileSource& files, const LoadOptions& options, Theme& theme) {
-    std::optional<std::string> xaml = files.Read("resources.xaml");
-    if (!xaml) return true;
-
-    if (xaml->find("<ResourceDictionary") == std::string::npos) {
-        theme.problems.push_back("resources.xaml: no <ResourceDictionary>, theme refused");
-        return false;
-    }
-
-    if (XamlKeys(*xaml).empty()) {
-        // No key to check: implicit styles only, or an empty dictionary such as the one `ampify new snippet` writes.
-    } else if (!options.allowedKeys) {
-        theme.problems.push_back("resources.xaml: list of allowed keys missing, check not done");
-    } else {
-        bool allAllowed = true;
-        for (const std::string& key : XamlKeys(*xaml)) {
-            if (options.allowedKeys->count(key)) continue;
-            theme.problems.push_back("resources.xaml: key \"" + key + "\" is not in the allowed list, theme refused");
-            allAllowed = false;
-        }
-        if (!allAllowed) return false;
-    }
-
-    theme.resourceDictionary = std::move(*xaml);
-    return true;
-}
+)css";
 
 std::string AtLine(const std::string& source, int line) {
     return source + " line " + std::to_string(line);
 }
-
-// What the rules of one file need besides the theme they fill.
-struct RuleSource {
-    std::string file = "user.css";  // for the log and the problems
-    const Theme* base = nullptr;    // the active theme, for a snippet: its font roles fill what the snippet leaves out
-    int layer = 0;                  // -1 for the rules translated from color.ini: the theme's user.css wins over them
-    bool applied = true;            // false when its part is off: read for its problems only
-};
 
 // `--font-title`, `--font-title-weight`, `--font-title-size`: checks the value and records the role part.
 void DefineFontPart(const std::string& name, const std::string& value, int line, const ValueContext& context,
@@ -467,6 +85,7 @@ void DefineFontPart(const std::string& name, const std::string& value, int line,
 bool SettingHolds(const Rule& rule, const std::string& file, Theme& theme) {
     bool holds = true;
     for (const SettingCondition& condition : rule.settings) {
+        if (condition.key == kPlaybarSetting) theme.placesPlaybar = true;
         auto it = theme.settings.find(condition.key);
         if (it == theme.settings.end()) {
             theme.problems.push_back(AtLine(file, rule.line) + ": @setting " + condition.key +
@@ -481,19 +100,34 @@ bool SettingHolds(const Rule& rule, const std::string& file, Theme& theme) {
     return holds;
 }
 
+bool NamesPlace(std::string_view place) { return place == "top" || place == "bottom" || place == "centred"; }
+
+// bar-position, which every stylesheet can read. Themes made before 1.3.0 declare it themselves: their value stands
+// while apple.playbar leaves the place to the theme, and so does the theme's place a snippet was given.
+void SetPlaybarPlace(const LoadOptions& options, const std::optional<std::string>& theirs, Theme& theme) {
+    if (!NamesPlace(ToLowerAscii(options.playbar)) && theme.settings.contains(kPlaybarSetting)) return;
+    std::string place = PlaybarPlace(options.playbar, theirs);
+    theme.settings[kPlaybarSetting] = place;
+    theme.variables[std::string("setting-") + kPlaybarSetting] = place;
+}
+
 // The settings manifest.json declares, with their value now: variables setting-<key>, and the @setting conditions.
 void LoadSettings(FileSource& files, const LoadOptions& options, Theme& theme) {
     std::optional<std::string> text = files.Read("manifest.json");
-    if (!text) return;
-    std::vector<std::string> errors;
-    for (const SettingSpec& spec : DeclaredSettings(*text, &errors)) {
-        auto stored = options.settings.find(spec.key);
-        std::string value = SettingValue(spec, stored == options.settings.end() ? std::nullopt
-                                                                                : std::optional<std::string>(stored->second));
-        theme.settings[spec.key] = value;
-        theme.variables["setting-" + spec.key] = value;
+    std::optional<std::string> theirs;
+    if (text) {
+        std::vector<std::string> errors;
+        for (const SettingSpec& spec : DeclaredSettings(*text, &errors)) {
+            auto stored = options.settings.find(spec.key);
+            std::string value = SettingValue(
+                spec, stored == options.settings.end() ? std::nullopt : std::optional<std::string>(stored->second));
+            theme.settings[spec.key] = value;
+            theme.variables["setting-" + spec.key] = value;
+        }
+        for (const std::string& error : errors) theme.problems.push_back("manifest.json: " + error + ", settings ignored");
+        theirs = ParseManifest(*text, "", kKitApiMajor, nullptr).partial.playbar;
     }
-    for (const std::string& error : errors) theme.problems.push_back("manifest.json: " + error + ", settings ignored");
+    SetPlaybarPlace(options, theirs, theme);
 }
 
 // The declarations of the :root blocks, in file order. A variable can use the ones defined before it.
@@ -539,6 +173,18 @@ std::optional<std::string> MisplacedProperty(const Selector& selector, const Pro
     return std::nullopt;
 }
 
+// A list row draws its selection over its background, from brushes of its own: `background` on a selected row
+// (`.list-item:selected`) goes to them, or Apple's grey would cover it. Nothing for any other selector.
+std::vector<std::string_view> SelectedRowBrushes(const Selector& selector, std::string_view property) {
+    if (property != "Background" || selector.parts.empty() || selector.trigger != Trigger::Always ||
+        selector.pseudo != PseudoElement::None) {
+        return {};
+    }
+    const Compound& last = selector.parts.back();
+    if (!last.selected || (last.type != "ListViewItemPresenter" && last.type != "GridViewItemPresenter")) return {};
+    return {"SelectedBackground", "SelectedPointerOverBackground", "SelectedPressedBackground"};
+}
+
 void AddAssignment(const Rule& rule, const PropertySpec& spec, const Value& value, const Declaration& declaration,
                    int order, const RuleSource& source, Theme& theme) {
     for (const Selector& selector : rule.selectors) {
@@ -546,12 +192,16 @@ void AddAssignment(const Rule& rule, const PropertySpec& spec, const Value& valu
             theme.problems.push_back(AtLine(source.file, declaration.line) + ": " + *problem + ", ignored");
             continue;
         }
-        Assignment assignment{selector, SpecificityOf(selector), std::string(spec.xaml), value, declaration.important,
-                              order, declaration.line};
-        assignment.source = source.file;
-        assignment.layer = source.layer;
-        assignment.media = rule.media;
-        theme.assignments.push_back(std::move(assignment));
+        std::vector<std::string_view> properties = SelectedRowBrushes(selector, spec.xaml);
+        if (properties.empty()) properties.push_back(spec.xaml);
+        for (std::string_view property : properties) {
+            Assignment assignment{selector, SpecificityOf(selector), std::string(property), value,
+                                  declaration.important, order, declaration.line};
+            assignment.source = source.file;
+            assignment.layer = source.layer;
+            assignment.media = rule.media;
+            theme.assignments.push_back(std::move(assignment));
+        }
     }
 }
 
@@ -571,352 +221,14 @@ bool AddFontRole(const Rule& rule, const Declaration& declaration, const std::st
     return true;
 }
 
-void LoadRuleText(const std::string& css, const ValueContext& context, Theme& theme, const RuleSource& source) {
-    Stylesheet sheet = ParseThemeStylesheet(css);
-    for (const std::string& problem : sheet.problems) theme.problems.push_back(source.file + " " + problem);
-
-    // Variables first: as in CSS, a rule may use a variable that a :root block defines further down. The @keyframes
-    // too: an `animation` may name a block written after it.
-    LoadVariables(sheet, context, source, theme);
-    for (const Keyframes& block : sheet.keyframes) {
-        std::vector<std::pair<int, std::string>> problems;
-        theme.keyframes[block.name] = ReadKeyframes(block, context, theme.variables, problems);
-        for (const auto& [line, problem] : problems) {
-            theme.problems.push_back(AtLine(source.file, line) + ": " + problem + ", ignored");
-        }
-    }
-    ValueContext rules = context;
-    rules.keyframes = &theme.keyframes;
-
-    int order = 0;
-    for (const Rule& rule : sheet.rules) {
-        if (rule.root) continue;
-        RuleSource from = source;
-        if (!rule.origin.empty()) from.file = rule.origin;
-        if (!SettingHolds(rule, from.file, theme)) continue;
-        for (const Declaration& declaration : rule.declarations) {
-            if (declaration.property.starts_with("--")) {
-                theme.problems.push_back(AtLine(from.file, declaration.line) + ": variable \"" +
-                                         declaration.property + "\" outside :root, ignored");
-                continue;
-            }
-
-            std::string problem;
-            std::optional<std::string> raw = ResolveValue(declaration.value, theme.variables, &problem);
-            if (!raw) {
-                theme.problems.push_back(AtLine(from.file, declaration.line) + ": " + problem + ", ignored");
-                continue;
-            }
-
-            if (ToLowerAscii(declaration.property) == "font-role") {
-                if (AddFontRole(rule, declaration, *raw, order, from, theme)) order++;
-                continue;
-            }
-
-            const PropertySpec* spec = FindProperty(declaration.property);
-            if (!spec) {
-                std::string_view hint = PropertyHint(declaration.property);
-                theme.problems.push_back(AtLine(from.file, declaration.line) + ": property \"" +
-                                         declaration.property + "\" is unknown, ignored" +
-                                         (hint.empty() ? std::string() : " (" + std::string(hint) + ")"));
-                continue;
-            }
-
-            Conversion conversion = ConvertValue(*spec, *raw, rules);
-            if (!conversion.value) {
-                theme.problems.push_back(AtLine(from.file, declaration.line) + ": " + conversion.problem +
-                                         ", ignored");
-                continue;
-            }
-
-            if (from.applied) AddAssignment(rule, *spec, *conversion.value, declaration, order, from, theme);
-            order++;
-        }
-    }
-}
-
 void LoadRules(FileSource& files, const ValueContext& context, Theme& theme, const RuleSource& source) {
     if (std::optional<std::string> css = files.Read("user.css")) LoadRuleText(*css, context, theme, source);
 }
 
-double LargestCorner(std::string_view corners) {
-    double largest = 0;
-    for (std::string_view corner : SplitArguments(corners)) {
-        largest = std::max(largest, ParseNumber(corner).value_or(0));
-    }
-    return largest;
-}
-
-bool Sets(const Theme& theme, std::string_view selector, std::string_view property) {
-    return std::any_of(theme.assignments.begin(), theme.assignments.end(), [&](const Assignment& assignment) {
-        return !assignment.media && assignment.selector.trigger == Trigger::Always &&
-               assignment.selector.text == selector && assignment.property == property;
-    });
-}
-
-// The progress line runs along the bottom of the song's display, up to its right edge: a theme that rounds the display
-// cut its end off with the corner. It stops where the corner's curve meets the line, 2 above the display's edge: a
-// margin of the whole radius left a gap at the end that read as a line too short.
-constexpr double kScrubberLift = 2;
-
-std::string ScrubberClearOfCorners(const Theme& theme) {
-    if (Sets(theme, ".scrubber", "Margin")) return {};
-    double radius = 0;
-    int order = -1;
-    for (const Assignment& assignment : theme.assignments) {
-        if (assignment.media || assignment.selector.trigger != Trigger::Always) continue;
-        if (assignment.selector.text == ".lcd" && assignment.property == "CornerRadius" && assignment.order >= order) {
-            order = assignment.order;
-            radius = LargestCorner(assignment.value.text);
-        }
-    }
-    if (radius <= kScrubberLift) return {};
-    // Half of it: the line's template repeats its margin inside (see .scrubber in builtins.cpp).
-    double curve = radius - std::sqrt(radius * radius - (radius - kScrubberLift) * (radius - kScrubberLift));
-    double inset = std::ceil(curve / 2);
-    return ".scrubber { margin: 0 " + FormatNumber(inset) + " 0 0; }\n";
-}
-
-// An element of Apple Music's whose height Apple fixes below what its template asks for: WinUI then clips the template
-// and all it holds to that height, so a ::before or ::after image put inside showed as a sliver (a Nyan Cat on the
-// progress line, 6 high, whose template asks for 18). Apple's bottom-aligned slots grow upwards: moved down by what
-// they gained, their first `height` pixels stay where they were. The same clip cut a thicker track: the line's template
-// centres it in a row 3 below its top, as high as the track and at least 4 (an inline tick bar), so a 6-pixel line
-// showed 3 rows and a 3-pixel one 2. A theme's track gets a slot that reaches its bottom.
-struct FixedSlot {
-    std::string_view name;      // the stable name (builtins.cpp)
-    std::string_view selector;  // the element it names, for a theme that writes it in full
-    double height;              // Apple's
-    double asked;               // what its template asks for: the least room that clips nothing
-    double trackTop;            // where its template's row for the track starts, from its top
-    double trackRow;            // that row's least height; the track is centred in it
-    std::string_view tracks[2]; // the elements that draw it, whose height is its thickness
-};
-
-constexpr FixedSlot kFixedSlots[] = {
-    {".scrubber", "ScrubberControl#LCDScrubber", 6, 18, 3, 4, {"HorizontalTrackRect", "HorizontalDecreaseRect"}},
-};
-
-bool InSlot(const std::string& selector, const FixedSlot& slot) {
-    std::string_view element = slot.selector.substr(slot.selector.find('#') + 1);
-    return selector.find(slot.name) != std::string::npos || selector.find(element) != std::string::npos;
-}
-
-double LengthOrZero(std::string_view text) {
-    double value = 0;
-    auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-    return error == std::errc() && std::isfinite(value) ? value : 0;
-}
-
-// The height a decor takes in its panel's layout: its own, plus its top and bottom margins (negative ones give room
-// back, as the progress mascot's do, so it takes none).
-double DecorLayoutHeight(const Theme& theme, const Assignment& content) {
-    double height = 0;
-    double margins = 0;
-    for (const Assignment& assignment : theme.assignments) {
-        if (assignment.selector.text != content.selector.text || assignment.selector.pseudo != content.selector.pseudo) {
-            continue;
-        }
-        if (assignment.property == "Height") height = LengthOrZero(assignment.value.text);
-        if (assignment.property == "Margin") {
-            std::string_view sides = assignment.value.text;  // left,top,right,bottom
-            size_t top = sides.find(','), right = sides.find(',', top + 1), bottom = sides.find(',', right + 1);
-            if (bottom == std::string_view::npos) continue;
-            margins = LengthOrZero(sides.substr(top + 1, right - top - 1)) + LengthOrZero(sides.substr(bottom + 1));
-        }
-    }
-    return std::max(0.0, height + margins);
-}
-
-double DecorRoom(const Theme& theme, const FixedSlot& slot) {
-    double room = 0;
-    for (const Assignment& assignment : theme.assignments) {
-        if (assignment.selector.pseudo == PseudoElement::None || assignment.property != kContentProperty ||
-            assignment.value.text.empty() || !InSlot(assignment.selector.text, slot)) {
-            continue;
-        }
-        room = std::max({room, slot.asked, DecorLayoutHeight(theme, assignment)});
-    }
-    return room;
-}
-
-bool DrawsTrack(const std::string& selector, const FixedSlot& slot) {
-    return std::any_of(std::begin(slot.tracks), std::end(slot.tracks),
-                       [&](std::string_view name) { return selector.find(name) != std::string::npos; });
-}
-
-// The thickest track a theme asks for, by the height of the elements that draw it or by the slot's own track-height; 0
-// when it leaves Apple's.
-double TrackThickness(const Theme& theme, const FixedSlot& slot) {
-    double thickness = 0;
-    for (const Assignment& assignment : theme.assignments) {
-        const std::string& text = assignment.selector.text;
-        if (assignment.media || assignment.selector.trigger != Trigger::Always ||
-            assignment.selector.pseudo != PseudoElement::None || !InSlot(text, slot)) {
-            continue;
-        }
-        bool drawn = assignment.property == "Height" && DrawsTrack(text, slot);
-        bool own = assignment.property == "TrackHeight" && (text == slot.name || text == slot.selector);
-        if (drawn || own) thickness = std::max(thickness, LengthOrZero(assignment.value.text));
-    }
-    return thickness;
-}
-
-// Their rules have a source of their own, so that a composed theme can work the room out again for all its layers.
-constexpr const char* kFixedSlotSource = "Ampify (room in a slot Apple fixes)";
-
-// Where a theme's track ends in the slot's template, in whole pixels: Apple's own (0) keeps the place it has.
-double TrackBottom(const FixedSlot& slot, double track) {
-    if (track <= 0) return slot.height;
-    return std::ceil(slot.trackTop + (std::max(slot.trackRow, track) + track) / 2);
-}
-
-// The room a slot needs for its decors and its track, moved down so the track's bottom stays where Apple's is.
-std::string RoomInFixedSlots(const Theme& theme) {
-    std::string css;
-    for (const FixedSlot& slot : kFixedSlots) {
-        double bottom = TrackBottom(slot, TrackThickness(theme, slot));
-        double room = std::max({slot.height, DecorRoom(theme, slot), bottom});
-        const std::string full(slot.selector);
-        if (room <= slot.height || Sets(theme, slot.name, "Height") || Sets(theme, full, "Height") ||
-            Sets(theme, slot.name, "RenderTransform") || Sets(theme, full, "RenderTransform")) {
-            continue;
-        }
-        double shift = room - bottom;
-        css += std::string(slot.name) + " { height: " + FormatNumber(room) + ";";
-        if (shift > 0) css += " transform: translateY(" + FormatNumber(shift) + "px);";
-        css += " }\n";
-    }
-    return css;
-}
-
-// The volume slider takes the accent through WinUI's slider keys (DefineAccentControls), but Apple Music's progress line
-// reads keys of its own and stays white: it takes the accent too, as Spicetify's playback bar takes `button`.
-std::string ScrubberInAccent(const Theme& theme) {
-    if (Sets(theme, ".scrubber", "Foreground") || Sets(theme, "ScrubberControl#LCDScrubber", "Foreground")) return {};
-    if (!theme.palette.Find(kAccent)) return {};
-    return std::string(".scrubber { color: $") + kAccent + "; }\n";
-}
-
-// Apple's "now playing" bars take the accent once, when their row is built: a new song's row is built before its
-// accent comes (theme.accent = artwork) and kept the colour of the song before. Set on the bars, it follows each change.
-std::string NowPlayingBarsInAccent(const Theme& theme) {
-    if (Sets(theme, ".now-playing-indicator", "Foreground")) return {};
-    if (!theme.palette.Find(kAccent)) return {};
-    return std::string(".now-playing-indicator { color: $") + kAccent + "; }\n";
-}
-
-// Apple Music's shuffle icon, while on, takes a blue of Apple's own (its button's ToggleButtonForegroundChecked keys),
-// while repeat and both dots take the accent: shuffle takes the accent too.
-std::string ShuffleInAccent(const Theme& theme) {
-    if (Sets(theme, ".shuffle-button", kCheckedForegroundProperty)) return {};
-    if (!theme.palette.Find(kAccent)) return {};
-    return std::string(".shuffle-button { checked-color: $") + kAccent + "; }\n";
-}
-
-// Apple Music's Up Next paints "Clear" in its own red and the autoplay toggle, while on, in its own blue, colours of
-// their templates that no theme key reaches: both take the accent, so the pane reads in the theme's colours.
-std::string UpNextInAccent(const Theme& theme) {
-    if (!theme.palette.Find(kAccent)) return {};
-    std::string css;
-    if (!Sets(theme, ".queue-clear", "Foreground")) css += std::string(".queue-clear { color: $") + kAccent + "; }\n";
-    if (!Sets(theme, ".queue-autoplay", kCheckedForegroundProperty)) {
-        css += std::string(".queue-autoplay { checked-color: $") + kAccent + "; }\n";
-    }
-    return css;
-}
-
-// Apple Music paints an album's artist in its own blue, in code: the theme's link colour takes over, as WinUI's links
-// do (DefineAccentControls). On a light theme, Apple's light blue barely read.
-std::string ArtistInLinkColour(const Theme& theme) {
-    if (Sets(theme, ".album-artist", "Foreground")) return {};
-    for (const char* key : {"AccentTextFillColorPrimaryBrush", kAccent}) {
-        if (theme.palette.Find(key)) return ".album-artist { color: $" + std::string(key) + "; }\n";
-    }
-    return {};
-}
-
-// A tile's subtitle that links to the artist keeps the colour Apple gives its link in code, for the mode the page was
-// built in: white on a light theme's page, unreadable. It takes the theme's secondary text, as the plain subtitles do,
-// at full opacity: Apple fades it to 70% for its own grey, which put a theme's secondary text under 4.5:1.
-std::string CardLinksInSecondaryText(const Theme& theme) {
-    if (!theme.palette.Find("TextFillColorSecondaryBrush")) return {};
-    std::string declarations;
-    if (!Sets(theme, ".card-subtitle", "Foreground")) declarations += " color: $TextFillColorSecondaryBrush;";
-    if (!Sets(theme, ".card-subtitle", "Opacity")) declarations += " opacity: 1;";
-    return declarations.empty() ? std::string() : ".card-subtitle {" + declarations + " }\n";
-}
-
-// Apple Music paints the tiles of a search's top results in its own grey, in code: the theme's card colour instead.
-std::string SearchTilesInCardColour(const Theme& theme) {
-    if (Sets(theme, ".search-top-result", "Background")) return {};
-    if (!theme.palette.Find("CardBackgroundFillColorDefaultBrush")) return {};
-    return ".search-top-result { background: $CardBackgroundFillColorDefaultBrush; }\n";
-}
-
-// Apple Music's lists give their rows' selection colours in their own style, which never reads the ListViewItem keys
-// of colors.ini: the rows take them from these rules instead (DefineSelectedRows fills the keys a theme leaves out).
-std::string SelectedRowsInThemeColour(const Theme& theme) {
-    constexpr std::pair<const char*, const char*> kStates[] = {
-        {"selected-background", "ListViewItemBackgroundSelected"},
-        {"selected-hover-background", "ListViewItemBackgroundSelectedPointerOver"},
-        {"selected-active-background", "ListViewItemBackgroundSelectedPressed"},
-    };
-    std::string declarations;
-    for (const auto& [property, key] : kStates) {
-        if (!theme.palette.Find(key) || Sets(theme, ".list-item", FindProperty(property)->xaml)) continue;
-        declarations += std::string(" ") + property + ": $" + key + ";";
-    }
-    return declarations.empty() ? std::string() : ".list-item {" + declarations + " }\n";
-}
-
-// A theme that lights a song of a list under the pointer (.track-row:hover) showed two lights: its own, and Apple's
-// list row across the whole width, a square edge out of the theme's. The theme's light stays alone.
-std::string OneLightPerSong(const Theme& theme) {
-    bool lit = std::any_of(theme.assignments.begin(), theme.assignments.end(), [](const Assignment& assignment) {
-        const Selector& selector = assignment.selector;
-        return selector.trigger == Trigger::Hover && assignment.property == "Background" && !selector.parts.empty() &&
-               selector.parts.back().type == "TracklistGrid" && selector.parts.back().name == "RootGrid";
-    });
-    if (!lit || Sets(theme, ".track-list-item", "PointerOverBackground")) return {};
-    return ".track-list-item { hover-background: transparent; active-background: transparent; }\n";
-}
-
-// A theme that lights a tile under the pointer (.card:hover) drew its light right against the artwork and the titles:
-// the tile keeps room inside, as Spotify's do.
-std::string RoomInsideALitCard(const Theme& theme) {
-    bool lit = std::any_of(theme.assignments.begin(), theme.assignments.end(), [](const Assignment& assignment) {
-        const Selector& selector = assignment.selector;
-        return selector.trigger == Trigger::Hover && assignment.property == "Background" && !selector.parts.empty() &&
-               selector.parts.back().type == "HoverGrid" && selector.parts.back().name == "SquareLockupContent";
-    });
-    if (!lit || Sets(theme, ".card", "Padding")) return {};
-    return ".card { padding: 8; }\n";
-}
-
-// Rules a theme's own choices call for, below its user.css so that a theme which sets the same thing keeps its value.
-void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts& parts) {
-    std::string css = ScrubberClearOfCorners(theme) + OneLightPerSong(theme) + RoomInsideALitCard(theme);
-    if (std::string room = RoomInFixedSlots(theme); !room.empty()) {
-        RuleSource slots;
-        slots.file = kFixedSlotSource;
-        slots.layer = -1;
-        slots.applied = parts.resources;
-        LoadRuleText(room, context, theme, slots);
-    }
-    if (parts.colors) {
-        css += ScrubberInAccent(theme) + NowPlayingBarsInAccent(theme) + ShuffleInAccent(theme) + UpNextInAccent(theme) +
-               ArtistInLinkColour(theme) +
-               CardLinksInSecondaryText(theme) +
-               SearchTilesInCardColour(theme) + SelectedRowsInThemeColour(theme);
-    }
-    if (css.empty()) return;
-    RuleSource source;
-    source.file = "Ampify (derived from the theme)";
-    source.layer = -1;
-    source.applied = parts.resources;
-    LoadRuleText(css, context, theme, source);
-}
+// Apple's progress line grows its played part once a second, in steps: with every theme it glides between them
+// instead, as Spicetify's smooth progress bar (`transition: width`, src/win/width_glide.hpp). The thumb and a mascot
+// riding the line follow, being laid out after it. A theme's own transition on the played part keeps its value.
+constexpr char kPlayedPart[] = ".scrubber Rectangle#HorizontalDecreaseRect";
 
 Theme ReadTheme(const std::string& id, const std::string& folder, FileSource& files, const LoadOptions& options) {
     Theme theme;
@@ -959,13 +271,6 @@ Theme ReadTheme(const std::string& id, const std::string& folder, FileSource& fi
     AddDerivedRules(context, theme, options.parts);
     return theme;
 }
-
-// The files of a theme that has none.
-class NoFiles final : public FileSource {
-public:
-    std::optional<std::string> Read(std::string_view) override { return std::nullopt; }
-    bool Exists(std::string_view) override { return false; }
-};
 
 Theme ReadAccentOnly(const LoadOptions& options) {
     Theme theme;
@@ -1034,12 +339,123 @@ Theme Lightened(Theme theme, GlassLevel level) {
 
 }  // namespace
 
+namespace detail {
+
+void LoadRuleText(const std::string& css, const ValueContext& context, Theme& theme, const RuleSource& source) {
+    Stylesheet sheet = ParseThemeStylesheet(css);
+    for (const std::string& problem : sheet.problems) theme.problems.push_back(source.file + " " + problem);
+
+    // Variables first: as in CSS, a rule may use a variable that a :root block defines further down. The @keyframes
+    // too: an `animation` may name a block written after it.
+    LoadVariables(sheet, context, source, theme);
+    for (const Keyframes& block : sheet.keyframes) {
+        std::vector<std::pair<int, std::string>> problems;
+        theme.keyframes[block.name] = ReadKeyframes(block, context, theme.variables, problems);
+        for (const auto& [line, problem] : problems) {
+            theme.problems.push_back(AtLine(source.file, line) + ": " + problem + ", ignored");
+        }
+    }
+    ValueContext rules = context;
+    rules.keyframes = &theme.keyframes;
+
+    int order = 0;
+    for (const Rule& rule : sheet.rules) {
+        if (rule.root) continue;
+        RuleSource from = source;
+        if (!rule.origin.empty()) from.file = rule.origin;
+        if (!SettingHolds(rule, from.file, theme)) continue;
+        for (const Declaration& declaration : rule.declarations) {
+            if (declaration.property.starts_with("--")) {
+                theme.problems.push_back(AtLine(from.file, declaration.line) + ": variable \"" +
+                                         declaration.property + "\" outside :root, ignored");
+                continue;
+            }
+
+            std::string problem;
+            std::optional<std::string> raw = ResolveValue(declaration.value, theme.variables, &problem);
+            if (!raw) {
+                theme.problems.push_back(AtLine(from.file, declaration.line) + ": " + problem + ", ignored");
+                continue;
+            }
+
+            if (ToLowerAscii(declaration.property) == "font-role") {
+                if (AddFontRole(rule, declaration, *raw, order, from, theme)) order++;
+                continue;
+            }
+
+            const PropertySpec* spec = FindProperty(declaration.property);
+            if (!spec) {
+                std::string_view hint = PropertyHint(declaration.property);
+                theme.problems.push_back(AtLine(from.file, declaration.line) + ": property \"" +
+                                         declaration.property + "\" is unknown, ignored" +
+                                         (hint.empty() ? std::string() : " (" + std::string(hint) + ")"));
+                continue;
+            }
+
+            Conversion conversion = ConvertValue(*spec, *raw, rules);
+            if (!conversion.value) {
+                theme.problems.push_back(AtLine(from.file, declaration.line) + ": " + conversion.problem +
+                                         ", ignored");
+                continue;
+            }
+
+            if (from.applied) AddAssignment(rule, *spec, *conversion.value, declaration, order, from, theme);
+            order++;
+        }
+    }
+}
+
+std::string SmoothProgressLine(const Theme& theme) {
+    if (Sets(theme, kPlayedPart, "Transition")) return {};
+    return std::string(kPlayedPart) + " { transition: width 1s linear; }\n";
+}
+
+// Apple's suggestions open right under the search box, but their frame starts with its 1-pixel top edge and a padding
+// of 2: a band of 3 between the field and the first suggestion, which read as a gap under every theme. The list meets
+// the field; the frame keeps its sides and its bottom. A theme that sets either keeps its own.
+constexpr char kSuggestionsFrame[] = ".search-suggestions Border#SuggestionsContainer";
+
+std::string SuggestionsAgainstTheBox(const Theme& theme) {
+    std::string css;
+    if (!Sets(theme, kSuggestionsFrame, "Padding")) css += " padding: 0 0 2 0;";
+    if (!Sets(theme, kSuggestionsFrame, "BorderThickness")) css += " border-width: 0 1 1 1;";
+    return css.empty() ? css : std::string(kSuggestionsFrame) + " {" + css + " }\n";
+}
+
+}  // namespace detail
+
 Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& files, const LoadOptions& options) {
     return Lightened(ReadTheme(id, folder, files, options), options.glass);
 }
 
 Theme LoadAccentOnly(const LoadOptions& options) {
     return Lightened(ReadAccentOnly(options), options.glass);
+}
+
+std::string PlaybarPlace(std::string_view chosen, const std::optional<std::string>& theirs) {
+    std::string place = ToLowerAscii(chosen);
+    if (!NamesPlace(place)) place = theirs ? ToLowerAscii(*theirs) : "top";
+    if (place == "bottom") return "Bottom";
+    if (place == "centred") return "Centred";
+    return "Top";
+}
+
+std::optional<Theme> LoadPlaybarLayout(const Theme* base, const LoadOptions& options) {
+    if (base && base->placesPlaybar) return std::nullopt;
+    auto known = base ? base->settings.find(kPlaybarSetting) : std::map<std::string, std::string>::const_iterator{};
+    std::string place = base && known != base->settings.end() ? known->second : PlaybarPlace(options.playbar, std::nullopt);
+    if (!NamesPlace(ToLowerAscii(place)) || ToLowerAscii(place) == "top") return std::nullopt;
+
+    struct LayoutFiles final : FileSource {
+        std::optional<std::string> Read(std::string_view path) override {
+            return path == "user.css" ? std::optional<std::string>(kPlaybarLayout) : std::nullopt;
+        }
+        bool Exists(std::string_view path) override { return path == "user.css"; }
+    } files;
+    LoadOptions own = options;
+    own.settings.clear();
+    own.playbar = ToLowerAscii(place);
+    return LoadSnippet(kPlaybarLayoutId, "", files, base, own);
 }
 
 Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& files, const Theme* base,
@@ -1060,24 +476,6 @@ std::optional<WindowMaterial> Theme::Material() const {
     if (value == variables.end()) return std::nullopt;
     std::optional<WindowMaterial> material = WindowMaterialOf(value->second);
     return material ? std::optional<WindowMaterial>(MaterialAt(glass, *material)) : std::nullopt;
-}
-
-void ShareRoomInFixedSlots(Theme& composed) {
-    std::erase_if(composed.assignments,
-                  [](const Assignment& assignment) { return assignment.source == kFixedSlotSource; });
-    std::string css = RoomInFixedSlots(composed);
-    if (css.empty()) return;
-    struct NoFiles final : FileSource {
-        std::optional<std::string> Read(std::string_view) override { return std::nullopt; }
-        bool Exists(std::string_view) override { return false; }
-    } files;
-    ValueContext context{composed.palette, files, std::string(), false};
-    RuleSource source;
-    source.file = kFixedSlotSource;
-    source.layer = -1;
-    Theme derived;
-    LoadRuleText(css, context, derived, source);
-    for (Assignment& assignment : derived.assignments) composed.assignments.push_back(std::move(assignment));
 }
 
 std::vector<std::string> ReadSchemes(FileSource& files) {

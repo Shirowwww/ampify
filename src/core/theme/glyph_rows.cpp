@@ -64,11 +64,13 @@ std::string_view RowAlignKeyword(RowAlign align) {
 }
 
 BoxSize LiftedMaxSize(BoxSize original, double width, double height) {
-    if (!(original.width > 0) || !(original.height > 0)) return original;
+    bool cappedWidth = original.width > 0;
+    bool cappedHeight = original.height > 0;
     double scale = 1.0;
-    if (std::isfinite(width)) scale = std::max(scale, width / original.width);
-    if (std::isfinite(height)) scale = std::max(scale, height / original.height);
-    return {original.width * scale, original.height * scale};
+    if (cappedWidth && std::isfinite(width)) scale = std::max(scale, width / original.width);
+    if (cappedHeight && std::isfinite(height)) scale = std::max(scale, height / original.height);
+    return {cappedWidth ? original.width * scale : original.width,
+            cappedHeight ? original.height * scale : original.height};
 }
 
 double LiftedBound(double appleMax, double cap) {

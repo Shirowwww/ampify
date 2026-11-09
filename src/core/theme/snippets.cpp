@@ -84,6 +84,8 @@ Theme ComposeTheme(const Theme* theme, const std::vector<std::shared_ptr<const T
 
     if (layout) AddLayer(*layout, layer, composed);
     ShareRoomInFixedSlots(composed);
+    KeepTogglesAtTheRightEnd(composed);
+    KeepLcdVeilInItsArtwork(composed);
 
     composed.resourceDictionary = CombineDictionaries(dictionaries);
     if (composed.name.empty()) composed.name = names.empty() ? std::string("layout") : std::string("snippets");

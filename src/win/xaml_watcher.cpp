@@ -53,7 +53,6 @@ std::string Narrow(BSTR text) {
 
 class Tap final : public IObjectWithSite, public IVisualTreeServiceCallback2 {
 public:
-    // IUnknown
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** out) override {
         if (!out) return E_POINTER;
         *out = nullptr;
@@ -121,6 +120,7 @@ public:
             }
             if (mutation == Add && g_added) g_added();
         } catch (...) {
+            // A log line must never fail the tree notification Windows is waiting for.
         }
         if (m_hooks) m_hooks->UnregisterInstance(element.Handle);
         return S_OK;  // element's strings belong to the caller

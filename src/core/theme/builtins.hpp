@@ -5,7 +5,8 @@
 //   names few of its elements and the paths to them are long; a class stands for that path, so a theme reads well and
 //   one table here follows Apple Music's updates for every theme (as Spicetify's css-map.json does for Spotify);
 // - ready-made layouts, imported with `@import "ampify:<name>";` (floating panels, the playback bar at the bottom),
-//   tuned once so that every theme gets aligned edges and even gaps.
+//   tuned once so that every theme gets aligned edges and even gaps. They are plain CSS in layouts/, built into the
+//   kernel by cmake/layouts.cmake.
 
 #include <optional>
 #include <string>

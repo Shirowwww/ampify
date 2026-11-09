@@ -5,6 +5,7 @@
 
 #include "../json.hpp"
 #include "properties.hpp"
+#include "value_codec.hpp"
 
 namespace ampify::theme {
 
@@ -32,9 +33,9 @@ std::string Label(const NodeInfo& node) {
 
 std::string ValueText(const Value& value, std::string_view property = {}) {
     if (value.kind == ValueKind::Opaque) {
-        // "handle:N;#AARRGGBB": an app brush kept as an object, with its colour (opacity included) when it is plain.
-        size_t colour = value.text.find(';');
-        return colour == std::string::npos ? "present" : value.text.substr(colour + 1);
+        // An app brush kept as an object shows its colour (opacity included) when it is plain.
+        std::string_view colour = HandleColour(value.text);
+        return colour.empty() ? "present" : std::string(colour);
     }
     if (value.kind == ValueKind::Template) return "present";
     return ShownText(property, value);
@@ -148,6 +149,9 @@ std::string NodeJson(const Inspection& inspection, int index, const InspectOptio
     entry.emplace_back("panel", Json(node.panel));
     entry.emplace_back("player", Json(node.player));
     entry.emplace_back("playing", Json(node.playing));
+    if (node.checked) entry.emplace_back("checked", Json(true));
+    if (node.selected) entry.emplace_back("selected", Json(true));
+    if (node.disabled) entry.emplace_back("disabled", Json(true));
     if (const std::optional<NodeBox>& box = read.box) {
         entry.emplace_back("box", Json(Json::Array{Json(box->x), Json(box->y), Json(box->width), Json(box->height)}));
     }
@@ -227,6 +231,9 @@ std::optional<std::vector<NodeInfo>> ReadInspectorTree(std::string_view text, st
         node.panel = flag("panel");
         node.player = flag("player");
         node.playing = flag("playing");
+        node.checked = flag("checked");
+        node.selected = flag("selected");
+        node.disabled = flag("disabled");
         if (node.parent < -1 || node.parent >= static_cast<int>(nodes.size())) {
             return fail("node " + std::to_string(nodes.size()) + " comes before its parent");
         }

@@ -27,6 +27,10 @@ std::string ToXamlColor(Argb color);
 // WCAG relative luminance, 0 (black) to 1 (white); the alpha is not counted.
 double RelativeLuminance(Argb color);
 
+// The WCAG luminance at which white and black text contrast equally: sqrt(1.05 * 0.05) - 0.05. Below it, white text
+// reads better, so the background is dark.
+inline constexpr double kDarkBelowLuminance = 0.1791;
+
 // WCAG contrast ratio of two opaque colours, from 1 (the same) to 21 (black on white).
 double ContrastRatio(Argb a, Argb b);
 

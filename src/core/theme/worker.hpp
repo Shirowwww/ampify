@@ -45,6 +45,7 @@ struct LoadInputs {
     std::optional<Argb> accent;
     GlassLevel glass = GlassLevel::Full;
     std::map<std::string, std::string> values;  // themes.<active>.<key>
+    std::string playbar;                        // apple.playbar
     std::vector<Snippet> snippets;              // the enabled ones, in id order
     std::map<std::string, std::string> artwork;  // the artwork's colours, only when a user.css names them
     std::optional<std::string> sidebar;          // sidebar.json and home.json, as text
@@ -84,7 +85,7 @@ private:
 };
 
 // The resource keys that resources.xaml may define, one per line of resource-keys.txt (lines starting with # are
-// comments). Nothing when the file is missing: the check is then skipped and the problems say so.
+// comments). Nothing when the file is missing: the known colour keys are then the list (colour_keys.hpp).
 std::optional<std::set<std::string>> ParseAllowedKeys(const std::optional<std::string>& text);
 
 }  // namespace ampify::theme

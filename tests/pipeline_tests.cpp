@@ -113,6 +113,38 @@ TEST_CASE(ObjectPass_AppliesTheGainToTheBuffers) {
     CHECK_NEAR(objects.left[last], 2.0 * mono[last], 1e-3);
 }
 
+TEST_CASE(ObjectPass_NewStreamFadesItsGainIn) {
+    // Apple Music opens a new spatial stream at each seek, and the Dolby renderer plays its first 0.8 s about 12 dB
+    // too loud. A new pass therefore starts well under the dry level and reaches its gain once that is over.
+    constexpr size_t kRate = 48000;
+    std::vector<float> dry(kRate, 0.1f);
+    std::vector<float> wet = dry;
+    ampify::audio::ObjectPass pass(kRate);
+    for (size_t start = 0; start < wet.size(); start += 480) {
+        ampify::audio::ObjectBuffer buffer{&wet, wet.data() + start};
+        pass.Process(std::span(&buffer, 1), 480, 2.0);
+    }
+
+    CHECK(wet[kRate / 10] < 0.5f * dry[kRate / 10]);        // 0.1 s: under the dry level, not boosted
+    CHECK(wet[kRate * 3 / 10] < 0.5f * dry[kRate * 3 / 10]);  // still held down while the renderer is loud
+    CHECK(wet[kRate * 6 / 10] < wet[kRate * 9 / 10]);         // then rising
+    CHECK_NEAR(wet[kRate * 9 / 10], 2.0 * dry[kRate * 9 / 10], 1e-3);  // and at the full gain after it
+}
+
+TEST_CASE(ObjectPass_FadeHappensOncePerStream) {
+    constexpr size_t kRate = 48000;
+    ampify::audio::ObjectPass pass(kRate);
+    std::vector<float> first(kRate, 0.1f);
+    ampify::audio::ObjectBuffer buffer{&first, first.data()};
+    pass.Process(std::span(&buffer, 1), first.size(), 2.0);
+
+    // Later passes of the same stream keep the full gain from their first frame.
+    std::vector<float> later(4800, 0.1f);
+    ampify::audio::ObjectBuffer next{&first, later.data()};
+    pass.Process(std::span(&next, 1), later.size(), 2.0);
+    CHECK_NEAR(later.front(), 0.2, 1e-3);
+}
+
 TEST_CASE(ObjectPass_UnityLeavesTheBuffersBitExact) {
     std::vector<float> mono = SineSeconds(48000, 1, 0.5, 1000.0, 0.99);  // loud enough to reach the knee if it were applied
     std::vector<float> copy = mono;

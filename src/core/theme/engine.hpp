@@ -125,9 +125,11 @@ private:
                                         const std::vector<NodeInfo>& nodes, TreeBackend& tree, Report& report);
     void GiveBack(const NodeInfo& node, const std::map<std::string, const Assignment*>& winners, TreeBackend& tree,
                   Report& report);
-    // The winning declaration of each ::before and ::after property of an element.
+    // The winning declaration of each ::before and ::after property of an element: among every source, and among the
+    // theme's own (ThemeKeepsDecor).
     using DecorWinners = std::map<std::pair<PseudoElement, std::string>, const Assignment*>;
-    void ApplyDecors(const NodeInfo& node, const DecorWinners& winners, TreeBackend& tree, Report& report);
+    void ApplyDecors(const NodeInfo& node, const DecorWinners& winners, const DecorWinners& themeWinners,
+                     TreeBackend& tree, Report& report);
     void PlaceDecor(const NodeInfo& node, PseudoElement slot, const Decor& decor, const Assignment& content,
                     TreeBackend& tree, Report& report);
     void ForgetDecors(const std::function<bool(NodeId)>& kept, TreeBackend& tree);

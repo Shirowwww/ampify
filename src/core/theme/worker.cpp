@@ -9,6 +9,7 @@
 #include "library.hpp"
 #include "snippets.hpp"
 #include "theme_settings.hpp"
+#include "../settings_catalog.hpp"
 #include "../text_util.hpp"
 
 namespace ampify::theme {
@@ -77,6 +78,7 @@ LoadInputs ThemeWorker::ReadInputs(const Settings& settings, const ThemeSettings
     inputs.accent = IsArtworkAccent(wanted.accent) ? ArtworkAccent(m_artwork) : ParseAccent(wanted.accent);
     inputs.glass = GlassLevelOf(wanted.glass);
     inputs.values = ReadThemeValues(settings, wanted.active);
+    inputs.playbar = ChoiceOf(settings, kPlaybarKey);
     const std::filesystem::path snippetRoot = m_kit / "snippets";
     bool usesArtwork = !wanted.active.empty() && NamesArtwork(themeFolder);
     for (const std::string& id : EnabledSnippets(settings, ListSnippetFolders(snippetRoot))) {
@@ -111,6 +113,7 @@ SessionRequest ThemeWorker::Load(const LoadInputs& inputs) const {
     options.artwork = inputs.artwork;
     options.accent = inputs.accent;
     options.glass = inputs.glass;
+    options.playbar = inputs.playbar;
 
     if (!inputs.active.empty()) {
         const std::filesystem::path folder = m_kit / "themes" / inputs.active;
@@ -125,6 +128,9 @@ SessionRequest ThemeWorker::Load(const LoadInputs& inputs) const {
     }
 
     const Theme* base = request.theme && request.theme->usable ? request.theme.get() : nullptr;
+    if (std::optional<Theme> layout = LoadPlaybarLayout(base, options)) {
+        request.snippets.push_back(std::make_shared<const Theme>(std::move(*layout)));
+    }
     for (const LoadInputs::Snippet& snippet : inputs.snippets) {
         const std::filesystem::path folder = m_kit / "snippets" / snippet.id;
         FolderFiles files(folder);

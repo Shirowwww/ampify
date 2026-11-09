@@ -124,6 +124,13 @@ public:
     void Sweep() {
         std::erase_if(m_entries, [](const auto& pair) { return !pair.second.element.get(); });
     }
+    // `visit(element, value)` for each live element.
+    template <class Visit>
+    void ForEach(Visit&& visit) {
+        for (auto& [key, entry] : m_entries) {
+            if (Element element = entry.element.get()) visit(element, entry.value);
+        }
+    }
 
 private:
     std::unordered_map<Key, Entry> m_entries;
@@ -151,6 +158,11 @@ std::string ColourText(winrt::Windows::UI::Color colour);
 // Both empty, or both the same colour.
 bool SameColour(const winrt::Windows::Foundation::IReference<winrt::Windows::UI::Color>& a,
                 const winrt::Windows::Foundation::IReference<winrt::Windows::UI::Color>& b);
+
+// The <Button.Resources> of a flat button with Fluent's subtle fill under the pointer and pressed, in both modes, as
+// Apple's own back arrow and "···": the default Button's control fill is near white, unseen on a light theme's strip.
+// For XAML read with XamlReader under a root that declares the x: namespace.
+std::wstring SubtleButtonResources();
 
 }  // namespace ampify::win
 

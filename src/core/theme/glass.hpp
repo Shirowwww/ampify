@@ -2,7 +2,8 @@
 // How much glass the themes may ask of the graphics card (theme.glass in settings.txt), for every theme and snippet:
 // a laptop on battery or an older card keeps the look, without the costliest effects.
 //   full      the theme as written (default)
-//   balanced  no animation that never ends (a turning artwork) and no depth shadows; the blur of acrylic stays
+//   balanced  no animation that never ends (a turning artwork), no width that glides (the smooth progress line) and
+//             no depth shadows; the blur of acrylic stays
 //   eco       the same, and acrylic panes are painted as plain colours, and an acrylic window as Mica, without the blur
 
 #include <string_view>

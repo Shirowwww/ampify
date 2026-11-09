@@ -31,6 +31,15 @@ struct Assignment {
     std::optional<MediaQuery> media;  // applies only while the window matches it (@media)
 };
 
+// True when `candidate` should replace `current` for the same element and property. !important first, then the layer
+// (a snippet beats the theme, sidebar.json beats both), then specificity, then the place in the file.
+inline bool Beats(const Assignment& candidate, const Assignment& current) {
+    if (candidate.important != current.important) return candidate.important;
+    if (candidate.layer != current.layer) return candidate.layer > current.layer;
+    if (candidate.specificity != current.specificity) return current.specificity < candidate.specificity;
+    return candidate.order > current.order;
+}
+
 // One font role (title, body...), as user.css sets it with --font-<role>, --font-<role>-weight, --font-<role>-size.
 // Each part is the converted value (FontFamily, FontWeight, FontSize), empty when the theme does not set it.
 struct FontRole {
@@ -45,7 +54,7 @@ struct ResourceOverride {
     Value value;
 };
 
-// The parts of a theme that are applied, as in docs/extensions/api.md section 2 (theme.parts.*).
+// The parts of a theme that are applied, as in docs/themes/format.md, "Theme parts" (theme.parts.*).
 //   colors     the colours of colors.ini replace the app's brushes
 //   resources  resources.xaml and the rules of user.css (Spicetify's inject_css)
 //   assets     images in url(...) (Spicetify's overwrite_assets)
@@ -73,7 +82,8 @@ std::optional<WindowMaterial> WindowMaterialOf(std::string_view value);
 // What the loader needs beyond the files themselves.
 struct LoadOptions {
     std::string scheme;                          // the [section] of colors.ini to use; empty takes the first one
-    const std::set<std::string>* allowedKeys = nullptr;  // resource keys that resources.xaml may define; null skips the check
+    // Resource keys that resources.xaml may define (resource-keys.txt); null allows the known colour keys.
+    const std::set<std::string>* allowedKeys = nullptr;
     ThemeParts parts;                            // a part that is off is read for its problems only, and not applied
     // The values settings.txt holds for the theme's declared settings (themes.<id>.<key>), by key. A missing or
     // unfit value takes the manifest's default.
@@ -84,6 +94,8 @@ struct LoadOptions {
     // theme.accent: the accent the user chose, over the scheme's. What Ampify derives from the accent follows it.
     std::optional<Argb> accent;
     GlassLevel glass = GlassLevel::Full;
+    // apple.playbar: top, bottom or centred for every theme; theme (or empty) leaves the place to the theme's manifest.
+    std::string playbar;
 };
 
 // The id of the theme LoadAccentOnly makes: no theme folder can have it.
@@ -118,7 +130,10 @@ struct Theme {
     // setting is one too, as setting-<key>.
     std::map<std::string, std::string> variables;
     // The value of each setting the manifest declares, by key (true or false for a toggle), for the @setting blocks.
+    // bar-position is always there: Top, Bottom or Centred (PlaybarPlace).
     std::map<std::string, std::string> settings;
+    // True when a rule of its user.css depends on @setting bar-position: the theme places the playback bar itself.
+    bool placesPlaybar = false;
     // The font roles the theme sets itself, by canonical role name (see fonts.hpp).
     std::map<std::string, FontRole> fonts;
     // The @keyframes blocks of user.css by name, which `animation` runs. A snippet also sees those of the active theme.
@@ -135,6 +150,15 @@ struct Theme {
 // lightens its result for options.glass (ApplyGlassLevel), which the result keeps in `glass`.
 Theme LoadTheme(const std::string& id, const std::string& folder, FileSource& files, const LoadOptions& options = {});
 
+// The place of the playback bar, as the @setting bar-position blocks name it: Top, Bottom or Centred. apple.playbar
+// (`chosen`) when it names one, else the theme's own (`theirs`: its manifest's playbar), else Top.
+std::string PlaybarPlace(std::string_view chosen, const std::optional<std::string>& theirs);
+
+// Ampify's own bottom bar (ampify:bottom-bar, and centre-bar when centred), as a snippet that applies before the
+// others: while the bar is away from the top under no theme, or under a theme that does not place it itself
+// (Theme::placesPlaybar). Nothing otherwise.
+std::optional<Theme> LoadPlaybarLayout(const Theme* base, const LoadOptions& options);
+
 // With no theme active, the accent of theme.accent alone (options.accent) on Apple Music's look, with what Ampify
 // derives from it: the controls, links, selected rows and progress line take it.
 Theme LoadAccentOnly(const LoadOptions& options);
@@ -149,6 +173,13 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
 // Works out again, for all the layers of a composed theme together, the room Apple's fixed slots (the progress line)
 // need: each theme and snippet derived its own, and one's height could win while another's shift moved the line.
 void ShareRoomInFixedSlots(Theme& composed);
+
+// Under every theme and snippet, the playback bar's toggles keep to the right end of their cell, a little apart,
+// unless the composed theme places them itself.
+void KeepTogglesAtTheRightEnd(Theme& composed);
+
+// Under every theme, the veil over the playback bar's artwork keeps the artwork's size (its icon small and centred).
+void KeepLcdVeilInItsArtwork(Theme& composed);
 
 // The section names of colors.ini, in file order, without loading the theme. Empty when the file is missing.
 std::vector<std::string> ReadSchemes(FileSource& files);

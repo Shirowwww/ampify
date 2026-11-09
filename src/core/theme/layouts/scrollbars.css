@@ -1,0 +1,38 @@
+ScrollBar RepeatButton#VerticalSmallDecrease,
+ScrollBar RepeatButton#VerticalSmallIncrease,
+ScrollBar RepeatButton#HorizontalSmallDecrease,
+ScrollBar RepeatButton#HorizontalSmallIncrease {
+    visibility: collapsed;
+}
+
+/* The scroll bar's expanded state animates the arrows' visibility back: no room and no ink keeps them gone. */
+ScrollBar RepeatButton#VerticalSmallDecrease,
+ScrollBar RepeatButton#VerticalSmallIncrease {
+    height: 0;
+    opacity: 0;
+}
+
+ScrollBar RepeatButton#HorizontalSmallDecrease,
+ScrollBar RepeatButton#HorizontalSmallIncrease {
+    width: 0;
+    opacity: 0;
+}
+
+/* Out of sight until the pointer reaches it: the wheel scrolls without it, and it no longer cuts into the panels. */
+.scrollbar {
+    background: transparent;
+    opacity: 0;
+    transition: opacity 160ms;
+}
+
+.scrollbar:hover {
+    opacity: 1;
+}
+
+ScrollBar#VerticalScrollBar {
+    margin: var(--panel-radius, 8px) 3 var(--panel-radius, 8px) 0;
+}
+
+ScrollBar#HorizontalScrollBar {
+    margin: 0 var(--panel-radius, 8px) 3 var(--panel-radius, 8px);
+}

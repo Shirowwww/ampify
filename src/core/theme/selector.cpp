@@ -7,7 +7,10 @@ namespace ampify::theme {
 
 namespace {
 
-bool CompoundMatches(const Compound& compound, const NodeInfo& node) {
+bool HasInside(const std::vector<Compound>& parts, const std::vector<NodeInfo>& nodes, int index);
+
+bool CompoundMatches(const Compound& compound, const std::vector<NodeInfo>& nodes, int index) {
+    const NodeInfo& node = nodes[index];
     if (!compound.type.empty() && compound.type != node.type && compound.type != node.fullType) return false;
     if (!compound.name.empty() && compound.name != node.name) return false;
     if (compound.nth > 0 && node.position + 1 != compound.nth) return false;
@@ -15,8 +18,14 @@ bool CompoundMatches(const Compound& compound, const NodeInfo& node) {
     if (compound.last && (node.position < 0 || node.position != node.siblings - 1)) return false;
     if (compound.only && (node.position != 0 || node.siblings != 1)) return false;
     if (compound.playing && !node.playing) return false;
+    if (compound.checked && !node.checked) return false;
+    if (compound.selected && !node.selected) return false;
+    if (compound.disabled && !node.disabled) return false;
     for (const Compound& negated : compound.negations) {
-        if (CompoundMatches(negated, node)) return false;
+        if (CompoundMatches(negated, nodes, index)) return false;
+    }
+    for (const std::vector<Compound>& relative : compound.has) {
+        if (!HasInside(relative, nodes, index)) return false;
     }
     return true;
 }
@@ -38,6 +47,9 @@ struct Match {
     const std::vector<NodeInfo>& nodes;
     size_t wanted = static_cast<size_t>(-1);
     int found = -1;
+    // For :has(), the element the parts are relative to: the match stays inside it, its first part in it (or, for
+    // `:has(> X)`, a child of it).
+    int scope = -1;
 };
 
 bool MatchFrom(Match& match, size_t part, int index);
@@ -49,7 +61,7 @@ bool MatchBefore(Match& match, size_t part, int index) {
     const Combinator combinator = match.parts[part].combinator;
     if (combinator == Combinator::Child) {
         int parent = nodes[index].parent;
-        return parent >= 0 && MatchFrom(match, part - 1, parent);
+        return parent > match.scope && MatchFrom(match, part - 1, parent);
     }
     if (combinator == Combinator::Adjacent) {
         int previous = PreviousSibling(nodes, index);
@@ -61,7 +73,7 @@ bool MatchBefore(Match& match, size_t part, int index) {
         }
         return false;
     }
-    for (int ancestor = nodes[index].parent; ancestor >= 0; ancestor = nodes[ancestor].parent) {
+    for (int ancestor = nodes[index].parent; ancestor > match.scope; ancestor = nodes[ancestor].parent) {
         if (MatchFrom(match, part - 1, ancestor)) return true;
     }
     return false;
@@ -70,10 +82,27 @@ bool MatchBefore(Match& match, size_t part, int index) {
 // `part` is the index of the compound to match against `nodes[index]`. Every caller stops at the first success, so the
 // element recorded for `wanted` belongs to the match that is kept: the nearest one.
 bool MatchFrom(Match& match, size_t part, int index) {
-    if (!CompoundMatches(match.parts[part], match.nodes[index])) return false;
+    if (!CompoundMatches(match.parts[part], match.nodes, index)) return false;
+    if (part == 0 && match.scope >= 0 && match.parts[0].combinator == Combinator::Child &&
+        match.nodes[index].parent != match.scope) {
+        return false;
+    }
     if (part > 0 && !MatchBefore(match, part, index)) return false;
     if (part == match.wanted) match.found = index;
     return true;
+}
+
+// The elements inside `index` are those listed after it whose parent is it or one of them: the snapshot lists each
+// element's subtree right after it.
+bool HasInside(const std::vector<Compound>& parts, const std::vector<NodeInfo>& nodes, int index) {
+    if (parts.empty()) return false;
+    const int count = static_cast<int>(nodes.size());
+    for (int inside = index + 1; inside < count && nodes[inside].parent >= index; inside++) {
+        Match match{parts, nodes};
+        match.scope = index;
+        if (MatchFrom(match, parts.size() - 1, inside)) return true;
+    }
+    return false;
 }
 
 // As in CSS, :not(x) counts what x counts; the :except(x) of a built-in name counts nothing.
@@ -84,9 +113,15 @@ void AddSpecificity(const Compound& compound, Specificity& specificity) {
     if (compound.last) specificity.classes++;
     if (compound.only) specificity.classes++;
     if (compound.playing) specificity.classes++;
+    if (compound.checked) specificity.classes++;
+    if (compound.selected) specificity.classes++;
+    if (compound.disabled) specificity.classes++;
     if (!compound.type.empty()) specificity.types++;
     for (const Compound& negated : compound.negations) {
         if (negated.counted) AddSpecificity(negated, specificity);
+    }
+    for (const std::vector<Compound>& relative : compound.has) {  // as in CSS, :has(x) counts what x counts
+        for (const Compound& part : relative) AddSpecificity(part, specificity);
     }
 }
 
@@ -134,6 +169,41 @@ void MarkPlayingRows(std::vector<NodeInfo>& nodes, const std::vector<int>& bars)
         for (int k = nodes[bar].parent; k != row; k = nodes[k].parent) nodes[k].playing = true;
         nodes[row].playing = true;
     }
+}
+
+void MarkSelectedPresenters(std::vector<NodeInfo>& nodes) {
+    for (NodeInfo& node : nodes) {
+        if (node.selected || node.parent < 0 || !nodes[node.parent].selected) continue;
+        if (node.type == "ListViewItemPresenter" || node.type == "GridViewItemPresenter") node.selected = true;
+    }
+}
+
+void MarkCheckedByDot(std::vector<NodeInfo>& nodes, const std::vector<int>& dots) {
+    constexpr std::string_view kDot = "Dot";
+    const int count = static_cast<int>(nodes.size());
+    for (int dot : dots) {
+        if (dot < 0 || dot >= count || !nodes[dot].name.ends_with(kDot) || nodes[dot].name.size() == kDot.size()) {
+            continue;
+        }
+        const std::string_view name = nodes[dot].name;
+        const std::string_view button = name.substr(0, name.size() - kDot.size());
+        for (int k = nodes[dot].parent; k >= 0; k = nodes[k].parent) {
+            if (nodes[k].name != button) continue;
+            if (nodes[k].type == "Button") nodes[k].checked = true;
+            break;
+        }
+    }
+}
+
+bool UsesControlStates(const std::vector<Compound>& parts) {
+    for (const Compound& part : parts) {
+        if (part.checked || part.selected || part.disabled) return true;
+        if (UsesControlStates(part.negations)) return true;
+        for (const std::vector<Compound>& relative : part.has) {
+            if (UsesControlStates(relative)) return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace ampify::theme

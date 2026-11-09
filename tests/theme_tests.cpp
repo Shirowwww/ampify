@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -20,6 +21,7 @@
 #include "../src/core/theme/animation.hpp"
 #include "../src/core/theme/builtins.hpp"
 #include "../src/core/theme/color.hpp"
+#include "../src/core/theme/color_matrix.hpp"
 #include "../src/core/theme/colour_keys.hpp"
 #include "../src/core/theme/css.hpp"
 #include "../src/core/theme/css_values.hpp"
@@ -51,6 +53,15 @@
 namespace th = ampify::theme;
 
 namespace {
+
+// The rules a test's stylesheet gave, without the one every theme gets (the gliding progress line, see
+// Theme_ProgressLineGlidesWithEveryTheme).
+size_t OwnRules(const th::Theme& theme) {
+    return std::count_if(theme.assignments.begin(), theme.assignments.end(), [](const th::Assignment& assignment) {
+        return assignment.selector.text != ".scrubber Rectangle#HorizontalDecreaseRect" &&
+               assignment.selector.text != ".search-suggestions Border#SuggestionsContainer";
+    });
+}
 
 // Theme files held in memory: the tests do not touch the disk.
 class MemoryFiles final : public th::FileSource {
@@ -335,8 +346,6 @@ std::string ProblemContaining(const th::Theme& theme, std::string_view fragment)
 
 }  // namespace
 
-// --- INI -------------------------------------------------------------------------------------------------
-
 TEST_CASE(Ini_ReadsSectionsKeysAndComments) {
     th::Ini ini;
     std::vector<std::string> problems =
@@ -370,8 +379,6 @@ TEST_CASE(Ini_ReportsBadLinesAndKeepsTheRest) {
     CHECK(!problems.empty() && problems[0].find("line 3") != std::string::npos);
 }
 
-// --- Colours ---------------------------------------------------------------------------------------------
-
 TEST_CASE(Color_ParsesTheThreeHexForms) {
     CHECK((th::ParseColor("#FFF") == th::Argb{0xFF, 0xFF, 0xFF, 0xFF}));
     CHECK((th::ParseColor("#F80") == th::Argb{0xFF, 0xFF, 0x88, 0x00}));
@@ -391,8 +398,6 @@ TEST_CASE(Palette_NamesAreCaseInsensitiveAndUnique) {
     CHECK((palette.Find("ACCENT") == th::Argb{0xFF, 1, 2, 3}));
     CHECK(!palette.Find("missing"));
 }
-
-// --- CSS subset ------------------------------------------------------------------------------------------
 
 TEST_CASE(Css_ParsesSelectorsDeclarationsAndLines) {
     th::Stylesheet sheet = th::ParseThemeStylesheet(
@@ -629,7 +634,10 @@ TEST_CASE(Builtins_EveryClassAndLayoutIsValid) {
         th::Stylesheet sheet = th::ParseThemeStylesheet(*th::BuiltinStylesheet(name));
         CHECK(sheet.problems.empty());
         for (const th::Rule& rule : sheet.rules) {
-            for (const th::Declaration& declaration : rule.declarations) CHECK(th::FindProperty(declaration.property));
+            for (const th::Declaration& declaration : rule.declarations) {
+                if (rule.root) CHECK(declaration.property.rfind("--", 0) == 0);
+                else CHECK(th::FindProperty(declaration.property));
+            }
         }
     }
 }
@@ -684,6 +692,17 @@ bool ClassReaches(const char* name, const std::vector<th::NodeInfo>& nodes, int 
 }
 
 }  // namespace
+
+TEST_CASE(Classes_TheAlbumHeaderReachesTheHeadersOfAlbumsPlaylistsAndEditorialPlaylists) {
+    std::vector<th::NodeInfo> nodes(3);
+    nodes[0] = {1, "Grid", "", "ContainerDetailHeaderLockupRegularContent", -1, 0};
+    nodes[1] = {2, "Grid", "", "AlbumDetailHeaderLockupContent", -1, 0};
+    nodes[2] = {3, "Grid", "", "PlaylistDetailHeaderLockupContent", -1, 0};
+
+    CHECK(ClassReaches(".album-header", nodes, 0));
+    CHECK(ClassReaches(".album-header", nodes, 1));
+    CHECK(ClassReaches(".album-header", nodes, 2));
+}
 
 TEST_CASE(Builtins_SidebarSelectionIsOnlyTheSelectedItemsIndicator) {
     // NavigationView > NavigationViewItem > Rectangle#SelectionIndicator (index 2), and another rectangle (index 3)
@@ -840,15 +859,37 @@ TEST_CASE(Theme_ALayoutTakesTheThemesVariablesAndReportsUnderItsName) {
         if (assignment.property == "Margin") margins[assignment.selector.text] = assignment.value.text;
     }
     // XAML order: left, top, right, bottom. The sidebar reaches a gap into the page column, the pages start two gaps
-    // into it: one gap between the panels, open or folded.
+    // into it: one gap between the panels, open or folded. They start a gap under the bar, which stands a gap down.
     CHECK(margins[".sidebar"] == "12,12,-12,12");
-    CHECK(margins[".content"] == "24,64,12,12");
+    CHECK(margins[".content"] == "24,88,12,12");
+}
+
+// At the top the bar is a panel of its own: aligned with the pages, ending before the window's buttons, and its
+// columns let the bar's own background show across all of it.
+TEST_CASE(Theme_FloatingPanelsPlacesTheTopBarLikeAPanel) {
+    MemoryFiles files;
+    files.files["user.css"] = ":root { --gap: 12; --bar-top-end: 160; }\n@import \"ampify:floating-panels\";\n";
+
+    th::Theme theme = Load(files);
+    CHECK(theme.problems.empty());
+    std::string barMargin;
+    std::set<std::string> clearColumns;
+    for (const th::Assignment& assignment : theme.assignments) {
+        if (assignment.source != "ampify:floating-panels") continue;
+        if (assignment.selector.text == ".playbar" && assignment.property == "Margin") barMargin = assignment.value.text;
+        if (assignment.property == "Background") clearColumns.insert(assignment.selector.text);
+    }
+    CHECK(barMargin == "24,12,160,0");
+    CHECK(clearColumns.contains(".playbar-controls"));
+    CHECK(clearColumns.contains(".now-playing"));
+    CHECK(clearColumns.contains(".playbar-extras"));
 }
 
 namespace {
 
-// The Margin floating-panels gives the elements whose selector ends with `tail`, keyed by the column's width.
-std::string FoldedHeaderMargin(const char* compactPane, std::string_view tail) {
+// The Margin floating-panels gives the elements whose selector ends with `tail`, keyed by the column's width (folded,
+// open under the pointer and pinned alike).
+std::string HeaderMargin(const char* compactPane, std::string_view tail) {
     MemoryFiles files;
     files.files["user.css"] =
         std::string(":root { --compact-pane: ") + compactPane + "; }\n@import \"ampify:floating-panels\";\n";
@@ -857,7 +898,7 @@ std::string FoldedHeaderMargin(const char* compactPane, std::string_view tail) {
     for (const th::Assignment& assignment : theme.assignments) {
         const std::string& text = assignment.selector.text;
         bool ends = text.size() >= tail.size() && text.compare(text.size() - tail.size(), tail.size(), tail) == 0;
-        if (ends && assignment.property == "Margin" && assignment.media) margin = assignment.value.text;
+        if (ends && assignment.property == "Margin") margin = assignment.value.text;
     }
     return margin;
 }
@@ -867,18 +908,18 @@ std::string FoldedHeaderMargin(const char* compactPane, std::string_view tail) {
 TEST_CASE(Builtins_FoldedLogoSitsOnTheIconsAxisWhateverTheColumnWidth) {
     // Apple's header starts its content 15 in from the column's edge (its margin of 6 and a column of 9): a 22-wide
     // logo is centred on a 48 column at -2, on a 56 column at 2. XAML order: left, top, right, bottom.
-    CHECK(FoldedHeaderMargin("48", "> Grid > Image") == "-2,4,0,0");
-    CHECK(FoldedHeaderMargin("56", "> Grid > Image") == "2,4,0,0");
+    CHECK(HeaderMargin("48", "> Grid > Image") == "-2,4,0,0");
+    CHECK(HeaderMargin("56", "> Grid > Image") == "2,4,0,0");
 }
 
 TEST_CASE(Builtins_FoldedMoreButtonSitsLevelWithTheLogo) {
     // The template copies the button's margin onto its root: the dots went where 2 down and 4 right put them, so the
     // button now takes 4 and 8 and the root none. XAML order: left, top, right, bottom.
-    CHECK(FoldedHeaderMargin("48", "ContentControl#PaneHeaderContentBorder MenuButton#MoreButton") == "0,4,8,0");
+    CHECK(HeaderMargin("48", "ContentControl#PaneHeaderContentBorder MenuButton#MoreButton") == "0,4,8,0");
 }
 
 TEST_CASE(Builtins_FoldedMoreButtonRootKeepsNoCopyOfTheButtonsMargin) {
-    CHECK(FoldedHeaderMargin("48", "MenuButton#MoreButton > Grid#LayoutRoot") == "0,0,0,0");
+    CHECK(HeaderMargin("48", "MenuButton#MoreButton > Grid#LayoutRoot") == "0,0,0,0");
 }
 
 TEST_CASE(Inspector_ReadsASavedTreeWithEachPlace) {
@@ -900,8 +941,6 @@ TEST_CASE(Inspector_ReadsASavedTreeWithEachPlace) {
     CHECK(problem.find("before its parent") != std::string::npos);
     CHECK(!th::ReadInspectorTree("[]", &problem));
 }
-
-// --- Selectors and specificity ---------------------------------------------------------------------------
 
 TEST_CASE(Selector_MatchesTypesNamesAndCombinators) {
     // Page
@@ -1003,6 +1042,81 @@ TEST_CASE(Selector_MarkPlayingRowsStopsAtTheRow) {
     CHECK(!nodes[5].playing);
 }
 
+TEST_CASE(Selector_CheckedSelectedAndDisabledMatchTheControlsState) {
+    // A ListView with a selected row (its item, then the presenter `.list-item` names), a switch on and a button off.
+    std::vector<th::NodeInfo> nodes(6);
+    nodes[0] = {1, "ListView", "", "", -1, 0};
+    nodes[1] = {2, "ListViewItem", "", "", 0, 1};
+    nodes[2] = {3, "ListViewItemPresenter", "", "", 1, 2};
+    nodes[3] = {4, "ListViewItem", "", "", 0, 1};
+    nodes[4] = {5, "ToggleSwitch", "", "", -1, 0};
+    nodes[5] = {6, "Button", "", "Next", -1, 0};
+    nodes[1].selected = true;
+    nodes[4].checked = true;
+    nodes[5].disabled = true;
+    th::MarkSelectedPresenters(nodes);
+    CHECK(nodes[2].selected);   // the presenter follows its item
+    CHECK(!nodes[3].selected);
+
+    CHECK(th::Matches(Sel("ListViewItemPresenter:selected"), nodes, 2));
+    CHECK(!th::Matches(Sel("ListViewItem:selected"), nodes, 3));
+    CHECK(th::Matches(Sel("ListViewItem:not(:selected)"), nodes, 3));
+    CHECK(th::Matches(Sel("ToggleSwitch:checked"), nodes, 4));
+    CHECK(th::Matches(Sel("Button#Next:disabled"), nodes, 5));
+    CHECK(!th::Matches(Sel("ToggleSwitch:disabled"), nodes, 4));
+    CHECK(th::Matches(Sel("ListViewItemPresenter:selected:hover"), nodes, 2));
+    CHECK(th::SpecificityOf(Sel("Button:disabled")) > th::SpecificityOf(Sel("Grid Button")));
+
+    CHECK(th::UsesControlStates(Sel("ListView ListViewItem:selected").parts));
+    CHECK(th::UsesControlStates(Sel("Button:not(:disabled)").parts));
+    CHECK(!th::UsesControlStates(Sel("ListViewItemPresenter:playing:hover").parts));
+}
+
+TEST_CASE(Selector_HasMatchesAnElementInsideAndNothingAboveOrBeside) {
+    // A section holding a card, a section holding a header, and a card outside both.
+    std::vector<th::NodeInfo> nodes(6);
+    nodes[0] = {1, "StackPanel", "", "Section", -1, 0};
+    nodes[1] = {2, "Grid", "", "Row", 0, 1};
+    nodes[2] = {3, "HoverGrid", "", "Card", 1, 2};
+    nodes[3] = {4, "StackPanel", "", "Section", -1, 0};
+    nodes[4] = {5, "Grid", "", "Header", 3, 1};
+    nodes[5] = {6, "HoverGrid", "", "Card", -1, 0};
+
+    CHECK(th::Matches(Sel("StackPanel:has(HoverGrid#Card)"), nodes, 0));
+    CHECK(!th::Matches(Sel("StackPanel:has(HoverGrid#Card)"), nodes, 3));  // the card after it is not inside
+    CHECK(th::Matches(Sel("StackPanel:has(Grid#Row > HoverGrid)"), nodes, 0));
+    CHECK(!th::Matches(Sel("StackPanel:has(> HoverGrid)"), nodes, 0));  // a grandchild, not a child
+    CHECK(th::Matches(Sel("StackPanel:has(> Grid#Row)"), nodes, 0));
+    // The first part stays inside: the section itself does not stand for StackPanel in the argument.
+    CHECK(!th::Matches(Sel("StackPanel:has(StackPanel Grid)"), nodes, 0));
+    CHECK(th::Matches(Sel("StackPanel:except(:has(Grid#Header))"), nodes, 0));
+    CHECK(!th::Matches(Sel("StackPanel:except(:has(Grid#Header))"), nodes, 3));
+    CHECK(th::SpecificityOf(Sel("StackPanel:has(#Card)")) > th::SpecificityOf(Sel("StackPanel")));
+    CHECK(th::UsesControlStates(Sel("Grid:has(ListViewItem:selected)").parts));
+
+    std::string problem;
+    CHECK(!th::ParseSelector("Grid:has()", &problem));
+    CHECK(!th::ParseSelector("Grid:has(Button:hover)", &problem));
+    CHECK(!th::ParseSelector("Grid:has(Button", &problem));
+}
+
+TEST_CASE(Selector_AButtonWithItsDotLitIsChecked) {
+    // Apple's repeat is a plain Button: its dot under the icon says it is on.
+    std::vector<th::NodeInfo> nodes(5);
+    nodes[0] = {1, "Button", "", "RepeatButton", -1, 0};
+    nodes[1] = {2, "Grid", "", "", 0, 1};
+    nodes[2] = {3, "Ellipse", "", "RepeatButtonDot", 1, 2};
+    nodes[3] = {4, "Button", "", "Other", -1, 0};
+    nodes[4] = {5, "Ellipse", "", "LoneDot", 3, 1};
+    th::MarkCheckedByDot(nodes, {2, 4});
+    CHECK(nodes[0].checked);
+    CHECK(!nodes[3].checked);  // its dot names another button
+
+    nodes[0].checked = false;
+    th::MarkCheckedByDot(nodes, {});  // the dot cleared: off
+    CHECK(!nodes[0].checked);
+}
+
 TEST_CASE(Selector_SpecificityOrdersNamesBeforeTypes) {
     CHECK(th::SpecificityOf(Sel("#Bar TextBlock")) > th::SpecificityOf(Sel("Grid > TextBlock > Border")));
     CHECK(th::SpecificityOf(Sel("Grid > TextBlock")) < th::SpecificityOf(Sel("Grid#A TextBlock")));
@@ -1040,18 +1154,17 @@ TEST_CASE(Selector_RejectsWhatItDoesNotKnow) {
     std::string problem;
     CHECK(!th::ParseSelector("Grid[Name=x]", &problem));
     CHECK(problem.find("is not supported") != std::string::npos);
-    CHECK(!th::ParseSelector("Grid:checked", &problem));
-    CHECK(problem.find(":checked") != std::string::npos);
+    CHECK(!th::ParseSelector("Grid:visited", &problem));
+    CHECK(problem.find(":visited") != std::string::npos);
     CHECK(!th::ParseSelector("Grid:hover:focus > TextBlock", &problem));
     CHECK(problem.find("only one of") != std::string::npos);
     CHECK(problem.find(":focus-within, :active and :current") != std::string::npos);
-    CHECK(!th::ParseSelector("Grid:checked", &problem));
+    CHECK(!th::ParseSelector("Grid:visited", &problem));
     CHECK(problem.find("(:hover, :focus, :focus-within, :active, :current, :first-child") != std::string::npos);
+    CHECK(problem.find(":checked, :selected, :disabled") != std::string::npos);
     CHECK(!th::ParseSelector("TextBlock >", &problem));
     CHECK(!th::ParseSelector("# ", &problem));
 }
-
-// --- Values ----------------------------------------------------------------------------------------------
 
 TEST_CASE(Properties_ConvertBrushesAndImages) {
     th::Palette palette;
@@ -1115,6 +1228,8 @@ TEST_CASE(Properties_ConvertLengthsAndThickness) {
     // WinUI keeps numbers in single precision: what it reads back is still the value written.
     CHECK(th::SameValue({th::ValueKind::Length, "16.8"}, {th::ValueKind::Length, "16.799999237060547"}));
     CHECK(th::SameValue({th::ValueKind::Thickness, "8,4.1,8,4"}, {th::ValueKind::Thickness, "8,4.099999904632568,8,4"}));
+    CHECK(th::SameValue({th::ValueKind::Blur, "9,0.3,0.3"}, {th::ValueKind::Blur, "9,0.30000001192092896,0.30000001192092896"}));
+    CHECK(!th::SameValue({th::ValueKind::Blur, "9,0.3,0.3"}, {th::ValueKind::Blur, "9"}));
     CHECK(!th::SameValue({th::ValueKind::Length, "16.8"}, {th::ValueKind::Length, "16.9"}));
     CHECK(!th::SameValue({th::ValueKind::Thickness, "8,4,8,4"}, {th::ValueKind::Thickness, "8,4,8"}));
     CHECK(!th::SameValue({th::ValueKind::Color, "#FF000000"}, {th::ValueKind::Color, "#FF000001"}));
@@ -1233,8 +1348,6 @@ TEST_CASE(Xaml_ExtractsResourceKeys) {
     }
 }
 
-// --- Theme loading ---------------------------------------------------------------------------------------
-
 TEST_CASE(Theme_UsesTheRequestedSchemeAndFallsBack) {
     MemoryFiles files;
     files.files["colors.ini"] = "[Base]\nAccent = FA2D48\n[Dark]\nAccent = 0A84FF\n";
@@ -1245,14 +1358,14 @@ TEST_CASE(Theme_UsesTheRequestedSchemeAndFallsBack) {
     CHECK(dark.scheme == "Dark");
     CHECK(dark.schemes.size() == 2);
     CHECK(dark.problems.empty());
-    CHECK(dark.assignments.size() == 1);
-    if (dark.assignments.size() == 1) CHECK(dark.assignments[0].value.text == "#FF0A84FF");
+    CHECK(OwnRules(dark) == 1);
+    if (OwnRules(dark) == 1) CHECK(dark.assignments[0].value.text == "#FF0A84FF");
     if (!dark.resources.empty()) CHECK(dark.resources[0].value.text == "#FF0A84FF");
 
     th::Theme missing = Load(files, {"Light", nullptr, {}});
     CHECK(missing.scheme == "Base");  // falls back to the first scheme
     CHECK(!ProblemContaining(missing, "scheme \"Light\" not found").empty());
-    if (missing.assignments.size() == 1) CHECK(missing.assignments[0].value.text == "#FFFA2D48");
+    if (OwnRules(missing) == 1) CHECK(missing.assignments[0].value.text == "#FFFA2D48");
 }
 
 TEST_CASE(Theme_RefusesResourcesOutsideTheAllowedList) {
@@ -1272,12 +1385,11 @@ TEST_CASE(Theme_RefusesResourcesOutsideTheAllowedList) {
     CHECK(accepted.usable);
     CHECK(!accepted.resourceDictionary.empty());
 
-    th::Theme unchecked = Load(files, {"", nullptr, {}});
-    CHECK(unchecked.usable);
-    CHECK(!ProblemContaining(unchecked, "check not done").empty());
+    // Without resource-keys.txt the known colour keys are the list: neither AccentBrush nor Secret is one of them.
+    th::Theme byKnownKeys = Load(files, {"", nullptr, {}});
+    CHECK(!byKnownKeys.usable);
+    CHECK(!ProblemContaining(byKnownKeys, "\"AccentBrush\" is not in the allowed list").empty());
 }
-
-// --- Spicetify's color.ini, read as is ------------------------------------------------------------------------
 
 const th::Assignment* AssignmentFor(const th::Theme& theme, std::string_view selector, std::string_view property) {
     for (const th::Assignment& assignment : theme.assignments) {
@@ -1652,6 +1764,18 @@ TEST_CASE(Theme_ListRowsDrawTheThemesSelection) {
     CHECK(Assigned(Load(none), ".list-item", "SelectedBackground") == "ABSENT");
 }
 
+TEST_CASE(Theme_ABackgroundOnASelectedRowGoesToItsSelectionBrushes) {
+    // A row draws its selection over its background: Apple's grey covered `.list-item:selected { background }`.
+    MemoryFiles files;
+    files.files["user.css"] = ".list-item:selected { background: #33FF3B7A; }\nGrid:selected { background: #FF000000; }\n";
+    th::Theme theme = Load(files);
+    CHECK(Assigned(theme, ".list-item:selected", "SelectedBackground") == "#33FF3B7A");
+    CHECK(Assigned(theme, ".list-item:selected", "SelectedPointerOverBackground") == "#33FF3B7A");
+    CHECK(Assigned(theme, ".list-item:selected", "SelectedPressedBackground") == "#33FF3B7A");
+    CHECK(Assigned(theme, ".list-item:selected", "Background") == "ABSENT");
+    CHECK(Assigned(theme, "Grid:selected", "Background") == "#FF000000");  // not a list row: as written
+}
+
 TEST_CASE(Theme_ASongLitByTheThemeHasNoSecondLight) {
     // Apple's list row lit the whole width under the pointer, beside the theme's own light on the song.
     MemoryFiles lit;
@@ -1699,6 +1823,31 @@ TEST_CASE(Theme_ALitCardKeepsRoomAroundItsTitles) {
     MemoryFiles own;
     own.files["user.css"] = ".card:hover { background: #22FFFFFF; }\n.card { padding: 6; }\n";
     CHECK(Assigned(Load(own), ".card", "Padding") == "6,6,6,6");
+}
+
+TEST_CASE(Theme_TheArtworkVeilTakesTheArtworksCorners) {
+    // Apple's veil over the playing song's artwork is a square Rectangle: it showed a square over a rounded artwork.
+    const char* veil = ".lcd-artwork-hover > Rectangle";
+    MemoryFiles own;
+    own.files["user.css"] = ".lcd-artwork-image { corner-radius: 12px; }\n";
+    CHECK(Assigned(Load(own), veil, "CornerRadius") == "12,12,12,12");
+
+    // The artwork's winning radius: .lcd-artwork-image outweighs .artwork, a snippet beats the theme.
+    MemoryFiles both;
+    both.files["user.css"] = ".lcd-artwork-image { corner-radius: 6px; }\n.artwork { corner-radius: 2px; }\n";
+    CHECK(Assigned(Load(both), veil, "CornerRadius") == "6,6,6,6");
+    MemoryFiles covers;
+    covers.files["user.css"] = ".artwork { corner-radius: 9px; }\n";
+    CHECK(Assigned(Load(covers), veil, "CornerRadius") == "9,9,9,9");
+
+    // A theme that leaves the artwork alone leaves Apple's veil, and a theme's own veil stays.
+    MemoryFiles none;
+    none.files["user.css"] = ".lcd { opacity: 0.9; }\n";
+    CHECK(Assigned(Load(none), veil, "CornerRadius") == "ABSENT");
+    MemoryFiles placed;
+    placed.files["user.css"] = ".lcd-artwork-image { corner-radius: 12px; }\n" + std::string(veil) +
+                               " { corner-radius: 3px; }\n";
+    CHECK(Assigned(Load(placed), veil, "CornerRadius") == "3,3,3,3");
 }
 
 TEST_CASE(Theme_ArtworkCornersLeaveArtistsRound) {
@@ -1765,6 +1914,32 @@ TEST_CASE(Theme_UpNextClearAndAutoplayTakeTheAccent) {
     MemoryFiles none;
     none.files["user.css"] = ".queue { padding: 4; }\n";
     CHECK(Assigned(Load(none), ".queue-clear", "Foreground") == "ABSENT");
+}
+
+TEST_CASE(Theme_ProgressLineGlidesWithEveryTheme) {
+    constexpr char kPlayed[] = ".scrubber Rectangle#HorizontalDecreaseRect";
+    MemoryFiles plain;
+    plain.files["user.css"] = ".queue { padding: 4; }\n";
+    CHECK(Assigned(Load(plain), kPlayed, "Transition") == "width:1000");
+
+    // A theme that sets its own transition there keeps it, `none` included.
+    MemoryFiles own;
+    own.files["user.css"] = std::string(kPlayed) + " { transition: none; }\n";
+    CHECK(Assigned(Load(own), kPlayed, "Transition").empty());
+}
+
+TEST_CASE(Theme_SuggestionsMeetTheSearchBoxWithEveryTheme) {
+    constexpr char kFrame[] = ".search-suggestions Border#SuggestionsContainer";
+    MemoryFiles plain;
+    plain.files["user.css"] = ".queue { padding: 4; }\n";
+    CHECK(Assigned(Load(plain), kFrame, "Padding") == "0,0,0,2");
+    CHECK(Assigned(Load(plain), kFrame, "BorderThickness") == "1,0,1,1");
+
+    // A theme's own frame wins, side by side: its padding stays, the edge is still taken off.
+    MemoryFiles own;
+    own.files["user.css"] = std::string(kFrame) + " { padding: 6; }\n";
+    CHECK(Assigned(Load(own), kFrame, "Padding") == "6,6,6,6");
+    CHECK(Assigned(Load(own), kFrame, "BorderThickness") == "1,0,1,1");
 }
 
 TEST_CASE(Theme_ProgressLineTakesTheAccent) {
@@ -1950,13 +2125,11 @@ TEST_CASE(Theme_ReportsBadRulesWithTheirLineAndKeepsTheGoodOnes) {
 
     th::Theme theme = Load(files);
     CHECK(theme.usable);
-    CHECK(theme.assignments.size() == 1);
+    CHECK(OwnRules(theme) == 1);
     CHECK(!ProblemContaining(theme, "line 2").empty());
     CHECK(!ProblemContaining(theme, "line 3").empty());
-    if (theme.assignments.size() == 1) CHECK(theme.assignments[0].line == 4);
+    if (OwnRules(theme) == 1) CHECK(theme.assignments[0].line == 4);
 }
-
-// --- Apply, restore and live reload ----------------------------------------------------------------------
 
 namespace {
 
@@ -2550,6 +2723,23 @@ TEST_CASE(Snippets_TheDisplayEqualizerLoadsWithoutProblems) {
     CHECK(contents.size() == 2 && contents[0].ends_with("/images/dance.gif") && contents[1] == "bars:10");
 }
 
+TEST_CASE(Snippets_AnimatedArtworkDrawsApplesImmersionBackgroundWithTheArtworkAsFallback) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "animated-artwork";
+    th::FolderFiles files(folder);
+    th::Theme snippet = th::LoadSnippet("animated-artwork", folder.generic_string(), files, nullptr);
+
+    CHECK(snippet.usable);
+    for (const std::string& problem : snippet.problems) ampify::test::ReportFailure(__FILE__, __LINE__, problem);
+    // The artwork first, for the versions of Ampify that do not know immersion; Apple's background comes later and wins.
+    std::vector<std::string> contents;
+    for (const th::Assignment& assignment : snippet.assignments) {
+        if (assignment.selector.text == ".window::before" && assignment.property == "Content") {
+            contents.push_back(assignment.value.text);
+        }
+    }
+    CHECK(contents.size() == 2 && contents[0] == "artwork:|UniformToFill" && contents[1] == th::kImmersionContent);
+}
+
 TEST_CASE(Snippets_ASnippetReadsItsOwnSettings) {
     std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "display-equalizer";
     th::FolderFiles files(folder);
@@ -2567,6 +2757,73 @@ TEST_CASE(Snippets_ASnippetReadsItsOwnSettings) {
     CHECK(hidden != nullptr);
 }
 
+TEST_CASE(Snippets_TheEqualizerTakesItsShapeHeightAndOpacity) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "display-equalizer";
+    th::FolderFiles files(folder);
+    th::LoadOptions options;
+    options.settings = {{"position", "Whole playback bar"}, {"shape", "Line"}, {"height", "60"}, {"opacity", "50"}};
+    th::Theme bar = th::LoadSnippet("display-equalizer", folder.generic_string(), files, nullptr, options);
+    for (const std::string& problem : bar.problems) ampify::test::ReportFailure(__FILE__, __LINE__, problem);
+    CHECK(Assigned(bar, ".playbar::before", "Content") == "bars:10:line:60");
+    CHECK(Assigned(bar, ".playbar::before", "Opacity") == "0.1");
+    CHECK(AssignmentFor(bar, ".lcd::before", "Visibility") != nullptr);
+
+    // Every shape in every place loads without a problem, and a ring always gets a square.
+    for (std::string_view position : {"Display, right", "Display, left", "Across the display", "On the artwork",
+                                      "Whole playback bar", "Page background"}) {
+        for (std::string_view shape : {"Bars", "Line", "Circle", "Mirror"}) {
+            options.settings = {{"position", std::string(position)}, {"shape", std::string(shape)}};
+            th::Theme snippet = th::LoadSnippet("display-equalizer", folder.generic_string(), files, nullptr, options);
+            CHECK(snippet.usable && snippet.problems.empty());
+        }
+    }
+    // White turns to dark ink on a light scheme, where it vanished (Paper light).
+    options.settings = {{"colour", "White"}};
+    th::Theme white = th::LoadSnippet("display-equalizer", folder.generic_string(), files, nullptr, options);
+    bool ink = false;
+    for (const th::Assignment& assignment : white.assignments) {
+        ink = ink || (assignment.selector.text == ".lcd::before" && assignment.property == "Foreground" &&
+                      assignment.media && assignment.value.text == "#D91C1C21");
+    }
+    CHECK(ink);
+    CHECK(Assigned(white, ".lcd::before", "Foreground") == "#D91C1C21");  // last in the file: it wins where it applies
+
+    options.settings = {{"shape", "Circle"}};
+    th::Theme ring = th::LoadSnippet("display-equalizer", folder.generic_string(), files, nullptr, options);
+    CHECK(Assigned(ring, ".lcd::before", "Width") == Assigned(ring, ".lcd::before", "Height"));
+    CHECK(Assigned(ring, ".lcd::before", "Content") == "bars:10:circle:100");
+
+    // Thin bars by default, as since Ampify 1.3; thick ones, as before, when chosen, in every place.
+    options.settings = {};
+    th::Theme thin = th::LoadSnippet("display-equalizer", folder.generic_string(), files, nullptr, options);
+    CHECK(Assigned(thin, ".lcd::before", "Content") == "bars:10");
+    options.settings = {{"thickness", "Thick"}, {"position", "On the artwork"}};
+    th::Theme thick = th::LoadSnippet("display-equalizer", folder.generic_string(), files, nullptr, options);
+    CHECK(thick.problems.empty());
+    CHECK(Assigned(thick, ".lcd::after", "Content") == "bars:10:bars:100:thick");
+}
+
+TEST_CASE(Snippets_ProgressLineMascotComesSmallOrLarge) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "progress-line";
+    th::FolderFiles files(folder);
+    th::LoadOptions options;
+    const char* mascot = ".scrubber Grid#HorizontalTemplate::after";
+    options.settings = {{"mascot", "Cat"}};
+    th::Theme small = th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options);
+    CHECK(small.problems.empty());
+    CHECK(Assigned(small, mascot, "RenderTransform") == "1,1,0,0,0");
+    CHECK(Assigned(small, mascot, "Transition") == "transform:200");
+
+    options.settings["mascot-size"] = "Large";
+    th::Theme large = th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options);
+    CHECK(Assigned(large, mascot, "RenderTransform") == "1.27,1.27,0,0,0");
+
+    // No mascot, no image: the size alone makes none.
+    options.settings = {{"mascot-size", "Large"}};
+    th::Theme none = th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options);
+    CHECK(AssignmentFor(none, mascot, "RenderTransform") == nullptr);
+}
+
 TEST_CASE(Snippets_DeclutterHidesTheAccountNameOnlyWhenAsked) {
     std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "declutter";
     th::FolderFiles files(folder);
@@ -2580,11 +2837,11 @@ TEST_CASE(Snippets_DeclutterHidesTheAccountNameOnlyWhenAsked) {
     CHECK(hidden && hidden->value.text == "Collapsed");
 }
 
-TEST_CASE(Snippets_ProgressThicknessLeavesTheVolumeSliderAloneByDefault) {
-    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "progress-thickness";
+TEST_CASE(Snippets_ProgressLineLeavesTheVolumeSliderAloneByDefault) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "progress-line";
     th::FolderFiles files(folder);
     th::LoadOptions options;
-    options.settings = {{"thickness", "5"}, {"volume", "4"}};
+    options.settings = {{"custom-thickness", "true"}, {"thickness", "5"}, {"volume", "4"}};
     auto volumeRules = [&](const th::Theme& theme) {
         int count = 0;
         for (const th::Assignment& assignment : theme.assignments) {
@@ -2592,25 +2849,25 @@ TEST_CASE(Snippets_ProgressThicknessLeavesTheVolumeSliderAloneByDefault) {
         }
         return count;
     };
-    th::Theme byDefault = th::LoadSnippet("progress-thickness", folder.generic_string(), files, nullptr, options);
+    th::Theme byDefault = th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options);
     CHECK(AssignmentFor(byDefault, ".scrubber Rectangle#HorizontalTrackRect", "Height") != nullptr);
     CHECK(volumeRules(byDefault) == 0);
 
     options.settings["custom-volume"] = "true";
-    th::Theme chosen = th::LoadSnippet("progress-thickness", folder.generic_string(), files, nullptr, options);
+    th::Theme chosen = th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options);
     CHECK(volumeRules(chosen) > 0);
 }
 
 // The line's template centres the track in a row at least 4 high, 3 below its top, and the 6-pixel control clips the
 // rest: a 6-pixel track showed 3 rows and a 3-pixel one 2 (measured at 100%). The control grows to the track's bottom,
 // upwards, so the line's bottom stays where Apple's is; 1 and 2 pixels fit already.
-TEST_CASE(Snippets_ProgressThicknessGivesAThickLineItsWholeHeight) {
-    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "progress-thickness";
+TEST_CASE(Snippets_ProgressLineGivesAThickLineItsWholeHeight) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "progress-line";
     th::FolderFiles files(folder);
     th::LoadOptions options;
     for (int thickness = 1; thickness <= 6; ++thickness) {
-        options.settings = {{"thickness", std::to_string(thickness)}};
-        th::Theme snippet = th::LoadSnippet("progress-thickness", folder.generic_string(), files, nullptr, options);
+        options.settings = {{"custom-thickness", "true"}, {"thickness", std::to_string(thickness)}};
+        th::Theme snippet = th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options);
         const th::Assignment* height = AssignmentFor(snippet, ".scrubber", "Height");
         const char* expected[] = {nullptr, nullptr, "7", "7", "8", "9"};
         if (!expected[thickness - 1]) {
@@ -2656,6 +2913,49 @@ TEST_CASE(Theme_BarsContentTakesACountAndAColour) {
     CHECK(!ProblemContaining(theme, "line 3: bars() takes a whole number of bars from 2 to 32").empty());
     CHECK(!ProblemContaining(theme, "line 4: bars() takes").empty());
     CHECK(!ProblemContaining(theme, "line 5: bars() takes").empty());
+}
+
+TEST_CASE(Theme_BarsContentTakesAShapeAndAHeight) {
+    MemoryFiles files;
+    files.files["user.css"] =
+        "#A::after { content: bars(10, Line); }\n"
+        "#B::after { content: bars(16, 60%, circle); }\n"
+        "#C::after { content: bars(8, mirror, 100%); }\n"
+        "#D::after { content: bars(12, bars, 45.4%); }\n"
+        "#E::after { content: bars(12, wave); }\n"
+        "#F::after { content: bars(12, line, 5%); }\n"
+        "#G::after { content: bars(12, line, circle); }\n"
+        "#H::after { content: bars(12, line, 50%, 50%); }\n"
+        "#I::after { content: bars(12, bars, 100%, Thick); }\n"
+        "#J::after { content: bars(12, thin); }\n"
+        "#K::after { content: bars(12, thin, thick); }\n";
+    th::Theme theme = Load(files);
+
+    CHECK(Assigned(theme, "#A::after", "Content") == "bars:10:line:100");
+    CHECK(Assigned(theme, "#B::after", "Content") == "bars:16:circle:60");
+    CHECK(Assigned(theme, "#C::after", "Content") == "bars:8:mirror:100");
+    CHECK(Assigned(theme, "#D::after", "Content") == "bars:12:bars:45");
+    CHECK(Assigned(theme, "#I::after", "Content") == "bars:12:bars:100:thick");
+    CHECK(Assigned(theme, "#J::after", "Content") == "bars:12");  // thin is the default: as before widths
+    CHECK(!ProblemContaining(theme, "line 11: bars() takes").empty());
+    for (int line = 5; line <= 8; line++) {
+        CHECK(!ProblemContaining(theme, "line " + std::to_string(line) + ": bars() takes").empty());
+    }
+}
+
+TEST_CASE(Theme_BarsContentReadsBackWhatItWrote) {
+    for (th::BarShape shape : {th::BarShape::Bars, th::BarShape::Line, th::BarShape::Circle, th::BarShape::Mirror}) {
+        th::BarsContent bars{24, shape, 70};
+        CHECK(th::ReadBarsContent(th::WriteBarsContent(bars)) == bars);
+        bars.thick = true;
+        CHECK(th::ReadBarsContent(th::WriteBarsContent(bars)) == bars);
+    }
+    CHECK(!th::ReadBarsContent("bars:12:bars:100:wide"));
+    CHECK(th::WriteBarsContent({12, th::BarShape::Bars, 100}) == "bars:12");  // as before shapes, for saved themes
+    CHECK(th::ReadBarsContent("bars:12") == th::BarsContent{});
+    CHECK(!th::ReadBarsContent("bars:12:line"));
+    CHECK(!th::ReadBarsContent("bars:12:wave:50"));
+    CHECK(!th::ReadBarsContent("C:/theme/bars.png"));
 }
 
 // A Fluent key the theme does not define is Apple Music's own colour for it: a snippet with no theme still works.
@@ -2709,8 +3009,6 @@ TEST_CASE(Engine_ForgetsTheDecorOfAPanelThatWentAway) {
     page.engine.Apply(theme, page.tree);
     CHECK(page.engine.OriginalCount() == 0);
 }
-
-// --- Library, watcher and settings -----------------------------------------------------------------------
 
 TEST_CASE(Library_ListsOnlyFoldersWithThemeFiles) {
     ampify::test::ScratchDir rootDir("library");
@@ -2772,8 +3070,6 @@ TEST_CASE(Settings_ThemeKeysRoundTrip) {
     CHECK(th::ReadThemeSettings(settings).liveReload);  // default on
 }
 
-// --- Inspector -------------------------------------------------------------------------------------------
-
 TEST_CASE(Inspector_SuggestsASelectorThatMatchesItsElement) {
     FakeTree tree = MakePage();
     std::vector<th::NodeInfo> nodes = tree.Snapshot();
@@ -2821,11 +3117,9 @@ TEST_CASE(Inspector_ShowsTheColourOfAnAppBrushKeptAsAnObject) {
     CHECK(dump.find("BorderBrush=present") != std::string::npos);
 }
 
-// --- Example themes shipped in the repository ------------------------------------------------------------
-
 TEST_CASE(Examples_LoadWithoutProblems) {
     for (const char* name : {"glass", "artwork", "palettes", "console", "mirror", "cinema", "paper-light", "greenroom",
-                             "high-contrast", "ember", "fluent", "cosy"}) {
+                             "fluent", "cosy"}) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
@@ -2878,7 +3172,7 @@ TEST_CASE(Examples_TopBarKeepsApplesHeightAtTheDefaultHeight) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         th::LoadOptions options;
-        options.settings = {{"bar-position", "Top"}};
+        options.playbar = "top";
         th::Theme atDefault = th::LoadTheme(name, folder.generic_string(), files, options);
         CHECK(atDefault.usable);
         CHECK(Assigned(atDefault, ".playbar", "Height") == "ABSENT");
@@ -2886,6 +3180,64 @@ TEST_CASE(Examples_TopBarKeepsApplesHeightAtTheDefaultHeight) {
         options.settings["bar-height"] = "88";
         th::Theme taller = th::LoadTheme(name, folder.generic_string(), files, options);
         CHECK(Assigned(taller, ".playbar", "Height") == "80");
+    }
+}
+
+// Mirror's sidebar on the right: the lyrics pane starts level with the pages, below the strip of the window's buttons
+// (its edge started in that strip, seen on screen).
+TEST_CASE(Examples_MirrorLyricsPaneStartsLevelWithThePages) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "mirror";
+    th::FolderFiles files(folder);
+    th::Theme theme = th::LoadTheme("mirror", folder.generic_string(), files);
+    auto top = [](const std::string& margin) {  // written left,top,right,bottom
+        const size_t from = margin.find(',') + 1;
+        return margin.substr(from, margin.find(',', from) - from);
+    };
+    const std::string pages = Assigned(theme, ".content", "Margin");
+    CHECK(pages != "ABSENT");
+    CHECK(top(Assigned(theme, ".lyrics-panel", "Margin")) == top(pages));
+}
+
+namespace {
+
+// What a selector's property gets in a window `width` wide, the sidebar folded or not: the last declaration that holds
+// there, as the engine picks between the rules of one selector.
+std::string ValueAtWidth(const th::Theme& theme, std::string_view selector, std::string_view property, double width,
+                         bool folded = false) {
+    std::string value;
+    int order = -1;
+    for (const th::Assignment& assignment : theme.assignments) {
+        if (assignment.selector.text != selector || assignment.property != property) continue;
+        if (assignment.order < order || (assignment.media && !assignment.media->Matches(width, 900, folded))) continue;
+        value = assignment.value.text;
+        order = assignment.order;
+    }
+    return value;
+}
+
+}  // namespace
+
+// Pinned, the sidebar opens wide (not folded); under the pointer it opens folded. Its header must not move between the
+// two (logo, title, pin and "···" 1 to 3 pixels apart under Glass, seen on screen): the same rules hold in both.
+TEST_CASE(Examples_SidebarHeaderIsTheSamePinnedAndOpenUnderThePointer) {
+    const std::pair<const char*, const char*> placed[] = {
+        {".sidebar-column", "Margin"},
+        {"ContentControl#PaneHeaderContentBorder > ContentPresenter > Grid > Image", "Margin"},
+        {"ContentControl#PaneHeaderContentBorder MenuButton#MoreButton", "Margin"},
+        {"ContentControl#PaneHeaderContentBorder MenuButton#MoreButton > Grid#LayoutRoot", "Margin"},
+        {"ContentControl#PaneHeaderContentBorder", "Margin"},  // Mirror's, with the sidebar on the right
+        {"ContentControl#PaneHeaderContentBorder", "Grid.Column"},
+    };
+    for (const char* name : {"glass", "mirror"}) {
+        std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
+        th::FolderFiles files(folder);
+        th::Theme theme = th::LoadTheme(name, folder.generic_string(), files);
+        for (const auto& [selector, property] : placed) {
+            if (ValueAtWidth(theme, selector, property, 1500) != ValueAtWidth(theme, selector, property, 1500, true)) {
+                ampify::test::ReportFailure(__FILE__, __LINE__,
+                                            std::string(name) + " : " + selector + " " + property + " moves when pinned");
+            }
+        }
     }
 }
 
@@ -2910,8 +3262,8 @@ TEST_CASE(Examples_EveryCosySchemeLoadsWithoutProblems) {
 
 // Each shipped theme with settings, every setting moved off its default: still no problem, and more or fewer rules.
 TEST_CASE(Examples_LoadWithEverySettingChanged) {
-    for (const char* name : {"greenroom", "glass", "palettes", "artwork", "cinema", "console", "mirror", "ember", "fluent",
-                             "high-contrast", "paper-light", "cosy"}) {
+    for (const char* name : {"greenroom", "glass", "palettes", "artwork", "cinema", "console", "mirror", "fluent",
+                             "paper-light", "cosy"}) {
         std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / name;
         th::FolderFiles files(folder);
         std::optional<std::string> manifest = files.Read("manifest.json");
@@ -2931,11 +3283,16 @@ TEST_CASE(Examples_LoadWithEverySettingChanged) {
         for (const std::string& problem : changed.problems) {
             ampify::test::ReportFailure(__FILE__, __LINE__, std::string(name) + " : " + problem);
         }
-        // A setting adds or removes rules (@setting) or changes values (--setting-<key>): either shows here.
+        // A setting adds or removes rules (@setting) or changes values (--setting-<key>), including the :root values the
+        // theme service reads itself (--window-material, Fluent's only effect once the bar's place left the themes):
+        // any of them shows here. The setting-<key> variables themselves always differ, so they do not count.
         auto written = [](const th::Theme& theme) {
             std::vector<std::string> lines;
             for (const th::Assignment& a : theme.assignments) {
                 lines.push_back(a.selector.text + " " + a.property + " " + a.value.text);
+            }
+            for (const auto& [variable, value] : theme.variables) {
+                if (!variable.starts_with("setting-")) lines.push_back("--" + variable + " " + value);
             }
             return lines;
         };
@@ -2944,8 +3301,6 @@ TEST_CASE(Examples_LoadWithEverySettingChanged) {
         }
     }
 }
-
-// --- Session: the decisions taken on each tick -----------------------------------------------------------
 
 TEST_CASE(Session_RestoresOnANewGenerationAndStylesNewElements) {
     MemoryFiles files;
@@ -3070,8 +3425,6 @@ TEST_CASE(Session_RefusesAThemeThatIsNotUsable) {
     CHECK(log.str().find("\"broken\" refused") != std::string::npos);
 }
 
-// --- theme.parts ------------------------------------------------------------------------------------------
-
 TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
     MemoryFiles files;
     files.files["colors.ini"] = "[Base]\nAccentFillColorDefaultBrush = 0A84FF\n";
@@ -3088,7 +3441,7 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
     // With the album's artist in the accent, in its two forms (ArtistInLinkColour), the progress line in the accent
     // (ScrubberInAccent), the now-playing bars (NowPlayingBarsInAccent), the shuffle icon while on (ShuffleInAccent),
     // Up Next's Clear and autoplay (UpNextInAccent).
-    CHECK(full.assignments.size() == 9);
+    CHECK(OwnRules(full) == 9);
 
     th::LoadOptions none{"", &allowed, {false, false, false}};
     th::Theme off = Load(files, none);
@@ -3100,7 +3453,25 @@ TEST_CASE(Parts_ColoursResourcesAndAssetsCanBeSwitchedOff) {
 
     th::LoadOptions noAssets{"", &allowed, {true, true, false}};
     th::Theme withoutImages = Load(files, noAssets);
-    CHECK(withoutImages.assignments.size() == 8);  // the font and accent rules stay, not the image's
+    CHECK(OwnRules(withoutImages) == 8);  // the font and accent rules stay, not the image's
+    CHECK(!ProblemContaining(withoutImages, "assets").empty());
+}
+
+TEST_CASE(Parts_AssetsOffAlsoTurnOffApplesImmersionBackground) {
+    MemoryFiles files;
+    files.files["user.css"] = "Grid::before { content: immersion; }\n";
+    std::set<std::string> allowed;
+
+    th::Theme withImages = Load(files, th::LoadOptions{"", &allowed, {true, true, true}});
+    th::Theme withoutImages = Load(files, th::LoadOptions{"", &allowed, {true, true, false}});
+
+    auto immersion = [](const th::Theme& theme) {
+        return std::any_of(theme.assignments.begin(), theme.assignments.end(), [](const th::Assignment& assignment) {
+            return assignment.property == "Content" && assignment.value.text == th::kImmersionContent;
+        });
+    };
+    CHECK(immersion(withImages));
+    CHECK(!immersion(withoutImages));
     CHECK(!ProblemContaining(withoutImages, "assets").empty());
 }
 
@@ -3115,8 +3486,6 @@ TEST_CASE(Parts_ReadBackFromSettings) {
     CHECK(!back.parts.assets);
     CHECK(th::ReadThemeSettings(ampify::Settings{}).parts.colors);  // defaults are on
 }
-
-// --- Commands: ampify theme watch and ampify theme names ----------------------------------------------------------
 
 namespace {
 
@@ -3184,8 +3553,6 @@ TEST_CASE(Commands_WatchRejectsBadUse) {
     CHECK(th::RunWatch(Args({"watch", "/no/such/folder/for/ampify"}), out, err, nothing) == 2);
     CHECK(th::RunWatch(Args({"watch", "x", "--polls", "many"}), out, err, nothing) == 2);
 }
-
-// --- Spicetify parity: flow-direction, order, variables, font roles, snippets, schemes, layout, inspector JSON ----
 
 namespace {
 
@@ -3470,24 +3837,10 @@ TEST_CASE(Builtins_CentreBarMovesTheProgressLineIntoTheControls) {
         moved.push_back(assignment.selector.text);
         CHECK(assignment.value.text == "Grid#TransportBar > Grid:nth-child(1)");
     }
-    CHECK(moved.size() == 3);  // the progress line and the two times
+    CHECK(moved.size() == 2);  // the progress line and the elapsed time
 }
 
 namespace {
-
-// What a selector's property gets in a window `width` wide: the last declaration that holds there, as the engine
-// picks between the rules of one selector.
-std::string ValueAtWidth(const th::Theme& theme, std::string_view selector, std::string_view property, double width) {
-    std::string value;
-    int order = -1;
-    for (const th::Assignment& assignment : theme.assignments) {
-        if (assignment.selector.text != selector || assignment.property != property) continue;
-        if (assignment.order < order || (assignment.media && !assignment.media->Matches(width, 900))) continue;
-        value = assignment.value.text;
-        order = assignment.order;
-    }
-    return value;
-}
 
 // "left,top,right,bottom" as numbers.
 std::vector<double> Sides(const std::string& thickness) {
@@ -3518,16 +3871,15 @@ TEST_CASE(Builtins_CentreBarGivesTheLineNoTopOrBottomMargin) {
     }
 }
 
-// On screen the line's inset is twice its margin (the template repeats it): the times stand just outside its ends.
-TEST_CASE(Builtins_CentreBarPutsTheTimesAtTheEndsOfTheLine) {
+// On screen the line's inset is twice its margin (the template repeats it): the elapsed time stands just outside its
+// left end, and the line stays centred under the buttons.
+TEST_CASE(Builtins_CentreBarPutsTheElapsedTimeAtTheLinesStart) {
     th::Theme theme = CentreBar();
     for (double width : kBarWidths) {
         std::vector<double> line = Sides(ValueAtWidth(theme, ".scrubber", "Margin", width));
         std::vector<double> elapsed = Sides(ValueAtWidth(theme, ".current-time", "Margin", width));
-        std::vector<double> length = Sides(ValueAtWidth(theme, ".duration", "Margin", width));
         CHECK(line[0] == line[2]);
         CHECK(line[0] * 2 == elapsed[0] + 44);
-        CHECK(line[2] * 2 == length[2] + 44);
     }
 }
 
@@ -3538,11 +3890,10 @@ TEST_CASE(Builtins_CentreBarShowsTheThumbOverTheLine) {
 }
 
 // The 3-pixel track is at the top of the 6-pixel line: 6 under the cell's foot puts the digits' middle on it (measured).
-TEST_CASE(Builtins_CentreBarCentresTheTimesOnTheTrack) {
+TEST_CASE(Builtins_CentreBarCentresTheElapsedTimeOnTheTrack) {
     th::Theme theme = CentreBar();
     for (double width : kBarWidths) {
         CHECK(Sides(ValueAtWidth(theme, ".current-time", "Margin", width))[3] == -6);
-        CHECK(Sides(ValueAtWidth(theme, ".duration", "Margin", width))[3] == -6);
     }
 }
 
@@ -3560,14 +3911,14 @@ TEST_CASE(Builtins_CentreBarFollowsTheSongWidthOfTheTheme) {
     CHECK(Sides(ValueAtWidth(theme, ".current-time", "Margin", 1200))[0] == 330 + 8 + 16);
 }
 
-// Apple Music shows the times only while the pointer is over the song; under the buttons they always show.
-TEST_CASE(Builtins_CentreBarShowsTheTimesAlways) {
+// Apple Music shows the times only while the pointer is over the song; under the buttons the elapsed time always shows,
+// and the length stays where bottom-bar keeps it (hidden).
+TEST_CASE(Builtins_CentreBarShowsTheElapsedTimeAlways) {
     th::Theme theme = CentreBar();
     CHECK(theme.problems.empty());
-    for (std::string_view time : {".current-time", ".duration"}) {
-        CHECK(ValueAtWidth(theme, time, "Visibility", 1500) == "Visible");
-        CHECK(ValueAtWidth(theme, time, "Opacity", 1500) == "1");
-    }
+    CHECK(ValueAtWidth(theme, ".current-time", "Visibility", 1500) == "Visible");
+    CHECK(ValueAtWidth(theme, ".current-time", "Opacity", 1500) == "1");
+    CHECK(ValueAtWidth(theme, ".duration", "Visibility", 1500) != "Visible");
 }
 
 TEST_CASE(Variables_RootBlockAndVar) {
@@ -3801,6 +4152,15 @@ TEST_CASE(Snippets_LoadWithTheColoursOfTheTheme) {
     options.allowedKeys = &allowed;
     CHECK(!LoadSnippetFrom(refused, "s2", &theme, options).usable);
 
+    // Without resource-keys.txt, the known colour keys are the list.
+    CHECK(!LoadSnippetFrom(refused, "s2", &theme).usable);
+    MemoryFiles colour;
+    colour.files["resources.xaml"] =
+        "<ResourceDictionary><SolidColorBrush x:Key=\"SliderTrackValueFill\" Color=\"Red\"/></ResourceDictionary>";
+    th::Theme known = LoadSnippetFrom(colour, "s4", &theme);
+    CHECK(known.usable);
+    CHECK(ProblemContaining(known, "resources.xaml").empty());
+
     MemoryFiles empty;
     empty.files["manifest.json"] = "{}";
     CHECK(!LoadSnippetFrom(empty, "s3", &theme).usable);
@@ -3854,6 +4214,69 @@ TEST_CASE(Snippets_BeatTheThemeInIdOrder) {
     CHECK(tree.elements[1].properties["Background"].text == "#FF222222");  // a snippet type beats a theme #name
     CHECK(tree.elements[0].properties["Background"].text == "#FF303030");  // b comes after a
     CHECK(log.str().find("(snippets/b/user.css line 1)") != std::string::npos);
+}
+
+// Console's equalizer in the display and the equalizer snippet on: the theme's stays as the theme draws it, and the
+// snippet's bars still go where the theme has none.
+TEST_CASE(Snippets_LeaveAThemesOwnDecorInPlace) {
+    DecorPage page;
+    th::Theme theme = page.Css("#Bar::before { content: bars(20); color: #FFFF8800; width: 116px; }\n");
+    MemoryFiles snippetFiles;
+    snippetFiles.files["user.css"] = "#Bar::before { content: bars(10, line); opacity: 0.25; visibility: collapsed; }\n"
+                                     "#Bar::after { content: bars(8); }\n";
+    std::vector<std::shared_ptr<const th::Theme>> snippets{Shared(LoadSnippetFrom(snippetFiles, "eq", &theme))};
+    th::Theme composed = th::ComposeTheme(&theme, snippets, nullptr);
+
+    th::ThemeEngine::Report report = page.engine.Apply(composed, page.tree);
+    CHECK(report.refused == 0);
+    auto before = page.tree.decors.find({page.bar, th::PseudoElement::Before});
+    CHECK(before != page.tree.decors.end() && before->second.image == "bars:20");
+    CHECK(before != page.tree.decors.end() && before->second.properties.size() == 2);  // Foreground and Width only
+    const th::Decor* after = page.After();
+    CHECK(after && after->image == "bars:8");
+
+    // A snippet with no content of its own still tunes the theme's decor.
+    MemoryFiles tuning;
+    tuning.files["user.css"] = "#Bar::before { opacity: 0.5; }\n";
+    std::vector<std::shared_ptr<const th::Theme>> tuned{Shared(LoadSnippetFrom(tuning, "fade", &theme))};
+    page.engine.Apply(th::ComposeTheme(&theme, tuned, nullptr), page.tree);
+    before = page.tree.decors.find({page.bar, th::PseudoElement::Before});
+    CHECK(before != page.tree.decors.end() && before->second.properties.size() == 3);
+
+    // With the theme's decor off (its setting, `content: none`), the snippet's takes the slot.
+    th::Theme bare = page.Css("#Bar::before { content: none; }\n");
+    std::vector<std::shared_ptr<const th::Theme>> again{Shared(LoadSnippetFrom(snippetFiles, "eq", &bare))};
+    page.engine.Apply(th::ComposeTheme(&bare, again, nullptr), page.tree);
+    before = page.tree.decors.find({page.bar, th::PseudoElement::Before});
+    CHECK(before != page.tree.decors.end() && before->second.image == "bars:10:line:100");
+}
+
+// Snippets alone follow Apple Music's own mode: the equalizer's white turned to dark ink on Apple's dark display,
+// because no theme read as light.
+TEST_CASE(Snippets_WithNoThemeFollowAppleMusicsScheme) {
+    MemoryFiles files;
+    files.files["user.css"] = "@media (prefers-color-scheme: light) { #Bar { background: #FF111111; } }\n"
+                              "@media (prefers-color-scheme: dark) { #Bar { background: #FFEEEEEE; } }\n";
+    std::vector<std::shared_ptr<const th::Theme>> snippets{Shared(LoadSnippetFrom(files, "s", nullptr))};
+    th::Theme composed = th::ComposeTheme(nullptr, snippets, nullptr);
+
+    // @media waits for the window's size: give each page one.
+    DecorPage dark;
+    dark.tree.size = th::ViewSize{1400, 900};
+    dark.tree.resources["SolidBackgroundFillColorBaseBrush"] = Brush("#FF202020");
+    dark.engine.Apply(composed, dark.tree);
+    CHECK(dark.tree.Shown(dark.bar, "Background").text == "#FFEEEEEE");
+
+    DecorPage light;
+    light.tree.size = th::ViewSize{1400, 900};
+    light.tree.resources["SolidBackgroundFillColorBaseBrush"] = Brush("#FFF3F3F3");
+    light.engine.Apply(composed, light.tree);
+    CHECK(light.tree.Shown(light.bar, "Background").text == "#FF111111");
+
+    DecorPage unknown;  // no colour to read: light, as before
+    unknown.tree.size = th::ViewSize{1400, 900};
+    unknown.engine.Apply(composed, unknown.tree);
+    CHECK(unknown.tree.Shown(unknown.bar, "Background").text == "#FF111111");
 }
 
 // A mascot from one snippet and a thick line from another: the room is worked out for both together, or the last
@@ -4068,7 +4491,7 @@ TEST_CASE(Glass_FullKeepsTheThemeAsWritten) {
 TEST_CASE(Glass_BalancedStopsEndlessAnimationsAndShadows) {
     th::Theme theme = GlassTheme();
     th::ApplyGlassLevel(theme, th::GlassLevel::Balanced);
-    CHECK(theme.assignments.size() == 3);
+    CHECK(OwnRules(theme) == 3);
     if (theme.assignments.size() != 3) return;
     CHECK(theme.assignments[0].value.kind == th::ValueKind::Acrylic);
     CHECK(theme.assignments[1].property == "Animation");
@@ -4077,6 +4500,57 @@ TEST_CASE(Glass_BalancedStopsEndlessAnimationsAndShadows) {
     if (!kept || kept->size() != 1) return;
     CHECK((*kept)[0].iterations == 1);
     CHECK(theme.assignments[2].value.text == "#FF000000");
+}
+
+TEST_CASE(Glass_EcoDropsTheBlurOfAFilterAndKeepsItsColours) {
+    const std::string colours = th::FormatMatrix(th::GrayscaleMatrix(1));
+    th::Theme theme;
+    theme.assignments = {GlassAssignment("Blur", th::ValueKind::Blur, "8"),
+                         GlassAssignment("Blur", th::ValueKind::Blur, "8,0.2,0.2," + colours),
+                         GlassAssignment("Blur", th::ValueKind::Blur, "0,0,0," + colours),
+                         GlassAssignment("Background", th::ValueKind::Acrylic, "#FF141822;0.3;glass,12,1.8")};
+    th::ApplyGlassLevel(theme, th::GlassLevel::Eco);
+    CHECK(theme.assignments.size() == 3);
+    if (theme.assignments.size() != 3) return;
+    CHECK(theme.assignments[0].value.text == "0,0,0," + colours);
+    CHECK(theme.assignments[1].value.text == "0,0,0," + colours);
+    // Liquid glass becomes a plain colour, as acrylic does.
+    CHECK(theme.assignments[2].value.kind == th::ValueKind::Color);
+}
+
+TEST_CASE(ColorMatrix_FiltersMapColoursAsCssSays) {
+    // A pixel through a matrix, straight alpha, 0 to 1.
+    auto apply = [](const th::ColorMatrix& m, std::array<float, 4> in) {
+        std::array<float, 4> out{};
+        for (int c = 0; c < 4; c++) {
+            out[c] = m[16 + c];
+            for (int k = 0; k < 4; k++) out[c] += in[k] * m[k * 4 + c];
+        }
+        return out;
+    };
+    auto near = [](float a, float b) { return std::abs(a - b) < 1e-3f; };
+    CHECK(th::IsIdentity(th::IdentityMatrix()));
+    CHECK(th::IsIdentity(th::SaturateMatrix(1)) && th::IsIdentity(th::HueRotateMatrix(0)));
+    CHECK(th::IsIdentity(th::ContrastMatrix(1)) && th::IsIdentity(th::InvertMatrix(0)));
+    std::array<float, 4> red = apply(th::GrayscaleMatrix(1), {1, 0, 0, 1});
+    CHECK(near(red[0], 0.2126f) && near(red[1], 0.2126f) && near(red[2], 0.2126f) && near(red[3], 1));
+    std::array<float, 4> inverted = apply(th::InvertMatrix(1), {0.25f, 0.5f, 1, 0.5f});
+    CHECK(near(inverted[0], 0.75f) && near(inverted[1], 0.5f) && near(inverted[2], 0) && near(inverted[3], 0.5f));
+    std::array<float, 4> grey = apply(th::ContrastMatrix(2), {0.5f, 0.75f, 0.25f, 1});
+    CHECK(near(grey[0], 0.5f) && near(grey[1], 1) && near(grey[2], 0));
+    // Duotone: black to the dark ink, white to the light one.
+    const th::Argb dark{0xFF, 0x10, 0x20, 0x80}, light{0xFF, 0xF0, 0xE0, 0x40};
+    const th::ColorMatrix duotone = th::DuotoneMatrix(dark, light);
+    std::array<float, 4> shadow = apply(duotone, {0, 0, 0, 1}), highlight = apply(duotone, {1, 1, 1, 1});
+    CHECK(near(shadow[0], 0x10 / 255.0f) && near(shadow[2], 0x80 / 255.0f));
+    CHECK(near(highlight[0], 0xF0 / 255.0f) && near(highlight[2], 0x40 / 255.0f));
+    // Then: in order, the constant of the first going through the second.
+    const th::ColorMatrix both = th::Then(th::InvertMatrix(1), th::BrightnessMatrix(0.5));
+    std::array<float, 4> dimmed = apply(both, {0, 0, 0, 1});
+    CHECK(near(dimmed[0], 0.5f) && near(dimmed[3], 1));
+    std::optional<th::ColorMatrix> back = th::ParseMatrix(th::FormatMatrix(duotone));
+    CHECK(back && th::FormatMatrix(*back) == th::FormatMatrix(duotone));
+    CHECK(!th::ParseMatrix("1,2,3"));
 }
 
 TEST_CASE(Glass_EcoShowsAnAcrylicWindowAsMica) {
@@ -4097,7 +4571,7 @@ TEST_CASE(Glass_EveryLoaderLightensItsResultAndTheComposedThemeKeepsTheLevel) {
     th::LoadOptions options;
     options.glass = th::GlassLevel::Eco;
     th::Theme theme = Load(files, options);
-    CHECK(theme.glass == th::GlassLevel::Eco && theme.assignments.empty());
+    CHECK(theme.glass == th::GlassLevel::Eco && OwnRules(theme) == 0);
     th::Theme composed = th::ComposeTheme(&theme, {}, nullptr);
     CHECK(composed.Material() == std::optional<th::WindowMaterial>(th::WindowMaterial::Mica));
 
@@ -4115,7 +4589,20 @@ TEST_CASE(Glass_BalancedKeepsAShadowThatRemovesDepth) {
     theme.assignments = {GlassAssignment("Shadow", th::ValueKind::Shadow, "0"),
                          GlassAssignment("Shadow", th::ValueKind::Shadow, "28")};
     th::ApplyGlassLevel(theme, th::GlassLevel::Balanced);
-    CHECK(theme.assignments.size() == 1);
+    CHECK(OwnRules(theme) == 1);
+    if (theme.assignments.size() != 1) return;
+    CHECK(theme.assignments[0].value.text == "0");
+}
+
+TEST_CASE(Glass_EcoDropsBlursButKeepsTheOnesThatRemoveThem) {
+    th::Theme theme;
+    theme.assignments = {GlassAssignment("Blur", th::ValueKind::Blur, "4"),
+                         GlassAssignment("Blur", th::ValueKind::Blur, "10,0.3,0.3"),
+                         GlassAssignment("Blur", th::ValueKind::Blur, "0")};
+    th::ApplyGlassLevel(theme, th::GlassLevel::Balanced);
+    CHECK(OwnRules(theme) == 3);  // balanced keeps blurs, as it keeps acrylic's
+    th::ApplyGlassLevel(theme, th::GlassLevel::Eco);
+    CHECK(OwnRules(theme) == 1);
     if (theme.assignments.size() != 1) return;
     CHECK(theme.assignments[0].value.text == "0");
 }
@@ -4123,7 +4610,7 @@ TEST_CASE(Glass_BalancedKeepsAShadowThatRemovesDepth) {
 TEST_CASE(Glass_EcoPaintsAcrylicAsAPlainColour) {
     th::Theme theme = GlassTheme();
     th::ApplyGlassLevel(theme, th::GlassLevel::Eco);
-    CHECK(theme.assignments.size() == 3);
+    CHECK(OwnRules(theme) == 3);
     if (theme.assignments.size() != 3) return;
     CHECK(theme.assignments[0].value.kind == th::ValueKind::Color);
     CHECK(theme.assignments[0].value.text == "#F7141822");  // the tint, more opaque: 0.72 + 0.25 of its alpha
@@ -4179,8 +4666,6 @@ TEST_CASE(Scheme_TheThemesDefaultComesAfterTheSettings) {
     CHECK(choice.scheme.empty());
     CHECK(choice.reason == "first scheme");
 }
-
-// --- Theme settings ------------------------------------------------------------------------------------------------
 
 TEST_CASE(Css_SettingBlocksGiveTheirRulesACondition) {
     th::Stylesheet sheet = th::ParseThemeStylesheet(
@@ -4252,14 +4737,14 @@ TEST_CASE(Theme_SettingsBecomeVariablesAndSwitchTheirBlocks) {
     CHECK(defaults.variables["setting-radius"] == "8");
     CHECK(defaults.variables["setting-hide-radio"] == "false");
     CHECK(defaults.variables["setting-accent"] == "Blue");
-    CHECK(defaults.assignments.size() == 1);
+    CHECK(OwnRules(defaults) == 1);
     CHECK(defaults.variables["corner"] == "2");
 
     th::LoadOptions options;
     options.settings = {{"radius", "12"}, {"hide-radio", "true"}, {"accent", "Pink"}};
     th::Theme chosen = Load(files, options);
     CHECK(chosen.settings["hide-radio"] == "true");
-    CHECK(chosen.assignments.size() == 3);
+    CHECK(OwnRules(chosen) == 3);
     bool corner = false, hidden = false, pink = false;
     for (const th::Assignment& assignment : chosen.assignments) {
         corner = corner || assignment.property == "CornerRadius";
@@ -4281,11 +4766,11 @@ TEST_CASE(Theme_ANegatedSettingHoldsOnlyAwayFromItsValue) {
     files.files["user.css"] = "@setting radius != 8 { Border { width: var(--setting-radius); } }\n"
                               "@setting accent != BLUE { Button { background: #FF2D55; } }\n";
 
-    CHECK(Load(files).assignments.empty());  // the defaults: 8 and Blue, compared without case
+    CHECK(OwnRules(Load(files)) == 0);  // the defaults: 8 and Blue, compared without case
 
     th::LoadOptions options;
     options.settings = {{"radius", "12"}, {"accent", "Pink"}};
-    CHECK(Load(files, options).assignments.size() == 2);
+    CHECK(OwnRules(Load(files, options)) == 2);
 }
 
 TEST_CASE(Theme_NestedSettingBlocksMustAllHold) {
@@ -4295,15 +4780,15 @@ TEST_CASE(Theme_NestedSettingBlocksMustAllHold) {
 
     th::LoadOptions options;
     options.settings = {{"accent", "Pink"}};
-    CHECK(Load(files, options).assignments.empty());  // the radius is still at its default
+    CHECK(OwnRules(Load(files, options)) == 0);  // the radius is still at its default
     options.settings = {{"radius", "12"}};
-    CHECK(Load(files, options).assignments.empty());  // the accent is not Pink
+    CHECK(OwnRules(Load(files, options)) == 0);  // the accent is not Pink
     options.settings = {{"accent", "Pink"}, {"radius", "12"}};
-    CHECK(Load(files, options).assignments.size() == 1);
+    CHECK(OwnRules(Load(files, options)) == 1);
 
     files.files["user.css"] = "@setting accent = Pink { @setting wide { Border { width: 4; } } }\n";
     th::Theme unknown = Load(files, options);
-    CHECK(unknown.assignments.empty());
+    CHECK(OwnRules(unknown) == 0);
     CHECK(!ProblemContaining(unknown, "@setting wide").empty());
 }
 
@@ -4311,7 +4796,7 @@ TEST_CASE(Theme_ASettingBlockForAnUndeclaredKeyIsReported) {
     MemoryFiles files;
     files.files["user.css"] = "@setting wide { Border { width: 10 } }\n";
     th::Theme theme = Load(files);
-    CHECK(theme.assignments.empty());
+    CHECK(OwnRules(theme) == 0);
     CHECK(!ProblemContaining(theme, "@setting wide").empty());
 
     files.files["manifest.json"] = R"({"kind": "theme", "settings": [{"key": "a"}]})";
@@ -4330,6 +4815,24 @@ TEST_CASE(Theme_ASnippetSeesTheSettingsOfTheActiveTheme) {
     snippetFiles.files["user.css"] = "@setting hide-radio { #Radio { width: var(--setting-radius); } }\n";
     th::Theme snippet = th::LoadSnippet("calm", "C:/snippets/calm", snippetFiles, &theme);
     CHECK(snippet.assignments.size() == 1);
+}
+
+// Spinning artwork keeps the size a theme gives the artwork (Cosy's bar at the bottom), and its own without one.
+TEST_CASE(Theme_ASnippetTakesUpAVariableTheThemeSetsUnderASetting) {
+    MemoryFiles snippetFiles;
+    snippetFiles.files["user.css"] = ":root { --disc: var(--artwork-size, 48); }\n#Radio { width: var(--disc); }\n";
+    auto widthWith = [&](const char* hideRadio) {
+        MemoryFiles themeFiles;
+        themeFiles.files["manifest.json"] = kSettingsManifest;
+        themeFiles.files["user.css"] = "@setting hide-radio { :root { --artwork-size: 72; } }\nPage { opacity: 1; }\n";
+        th::LoadOptions options;
+        options.settings = {{"hide-radio", hideRadio}};
+        th::Theme theme = Load(themeFiles, options);
+        th::Theme snippet = th::LoadSnippet("spin", "C:/snippets/spin", snippetFiles, &theme);
+        return snippet.assignments.empty() ? std::string() : snippet.assignments[0].value.text;
+    };
+    CHECK(widthWith("true") == "72");
+    CHECK(widthWith("false") == "48");
 }
 
 TEST_CASE(Settings_ThemeValuesAreReadUnderTheirOwnPrefix) {
@@ -4353,12 +4856,12 @@ TEST_CASE(Worker_ReloadsWhenASettingOfTheActiveThemeChanges) {
     settings.Set("theme.active", "test");
     th::ThemeWorker worker(kit);
     th::SessionRequest first = worker.Tick(settings, 600);
-    CHECK(first.theme && first.theme->assignments.empty());
+    CHECK(first.theme && OwnRules(*first.theme) == 0);
 
     settings.Set("themes.test.hide-radio", "true");
     th::SessionRequest second = worker.Tick(settings, 600);
     CHECK(second.generation == first.generation + 1);
-    CHECK(second.theme && second.theme->assignments.size() == 1);
+    CHECK(second.theme && OwnRules(*second.theme) == 1);
     CHECK(worker.Tick(settings, 600).generation == second.generation);
     std::filesystem::remove_all(kit);
 }
@@ -4386,12 +4889,12 @@ TEST_CASE(Worker_ReloadsAfterAnImportAndAfterAReset) {
     }
     th::SessionRequest afterImport = worker.Tick(settings, 600);
     CHECK(afterImport.generation == first.generation + 1);
-    CHECK(afterImport.theme && afterImport.theme->assignments.size() == 1);
+    CHECK(afterImport.theme && OwnRules(*afterImport.theme) == 1);
 
     settings.Remove("themes.test.hide-radio");
     th::SessionRequest afterReset = worker.Tick(settings, 600);
     CHECK(afterReset.generation == afterImport.generation + 1);
-    CHECK(afterReset.theme && afterReset.theme->assignments.empty());
+    CHECK(afterReset.theme && OwnRules(*afterReset.theme) == 0);
     std::filesystem::remove_all(kit);
 }
 
@@ -4705,8 +5208,6 @@ TEST_CASE(Examples_AllThemesAndSnippetsLoadWithoutProblems) {
     }
 }
 
-// --- Full redesign: gradients, acrylic, layout, transforms, shadows, fonts, :hover ------------------------
-
 // CSS draws a gradient's lines square to its angle on the element as it is, and the line from corner to corner; the
 // converted points assume a square. A tall narrow column at 135deg kept its top right and bottom left corners at the
 // middle of the line, where Glass's rim is dark, and its outline looked unfinished there.
@@ -4769,6 +5270,12 @@ TEST_CASE(Properties_GradientsImagesAndAcrylic) {
     CHECK(Converted("backdrop", "acrylic($accent, 1)", palette, files) == "#FFFA2D48;1");
     CHECK(Converted("backdrop", "acrylic(#1C1C1E, 1.5)", palette, files).find("outside 0 to 1") != std::string::npos);
     CHECK(Converted("backdrop", "acrylic(#1C1C1E)", palette, files).find("two values") != std::string::npos);
+    // liquid-glass: Ampify's glass, its blur and saturation optional (12 px, 1.8 times more vivid).
+    CHECK(Converted("backdrop", "liquid-glass(#1C1C1E, 0.3)", palette, files) == "#FF1C1C1E;0.3;glass,12,1.8");
+    CHECK(Converted("backdrop", "Liquid-Glass($accent, 0.2, 20px, 1.2)", palette, files) == "#FFFA2D48;0.2;glass,20,1.2");
+    CHECK(Converted("backdrop", "liquid-glass(#fff, 0.2, 50px)", palette, files).find("0 to 40") != std::string::npos);
+    CHECK(Converted("backdrop", "liquid-glass(#fff, 0.2, 8px, 9)", palette, files).find("0 to 4") != std::string::npos);
+    CHECK(Converted("backdrop", "liquid-glass(#fff)", palette, files).find("two to four") != std::string::npos);
     CHECK(Converted("backdrop", "#1C1C1E", palette, files).find("acrylic(") != std::string::npos);
 }
 
@@ -4817,7 +5324,8 @@ TEST_CASE(Properties_LayoutTransformsShadowsAndFonts) {
     // background; the easing words are accepted and ignored.
     CHECK(Converted("transition", "transform 200ms", palette, files) == "transform:200");
     CHECK(Converted("transition", "opacity .15s ease, background 300ms", palette, files) == "opacity:150;background:300");
-    CHECK(Converted("transition", "all 250ms ease-out", palette, files) == "transform:250;opacity:250;background:250");
+    CHECK(Converted("transition", "all 250ms ease-out", palette, files) ==
+          "transform:250;opacity:250;background:250;filter:250");
     CHECK(Converted("transition", "background 0.2s, transform 120ms linear", palette, files) ==
           "transform:120;background:200");
     CHECK(Converted("transition", "none", palette, files).empty());
@@ -4825,6 +5333,49 @@ TEST_CASE(Properties_LayoutTransformsShadowsAndFonts) {
           std::string::npos);
     CHECK(Converted("transition", "transform", palette, files).find("duration") != std::string::npos);
     CHECK(Converted("transition", "opacity 9s", palette, files).find("5 s") != std::string::npos);
+    CHECK(Converted("transition", "filter 300ms", palette, files) == "filter:300");
+    // width glides Apple's own widths frame by frame: only when named, never through `all`.
+    CHECK(Converted("transition", "width 1s linear", palette, files) == "width:1000");
+    CHECK(Converted("transition", "opacity 150ms, width 800ms", palette, files) == "opacity:150;width:800");
+    CHECK(Converted("transition", "all 200ms", palette, files).find("width") == std::string::npos);
+
+    // filter: a blur in pixels (the standard deviation, as in CSS), 0 for none; other filters are not available.
+    CHECK(Converted("filter", "blur(4px)", palette, files) == "4");
+    CHECK(Converted("filter", "blur(2.5)", palette, files) == "2.5");
+    CHECK(Converted("filter", "none", palette, files) == "0");
+    CHECK(Converted("filter", "blur(0)", palette, files) == "0");
+    CHECK(Converted("filter", "blur(40px)", palette, files).find("0 to 20") != std::string::npos);
+    // edges(): only towards the top and bottom, over that share of the height each, or top then bottom.
+    CHECK(Converted("filter", "blur(10px) edges(30%)", palette, files) == "10,0.3,0.3");
+    CHECK(Converted("filter", "Blur(8PX)  Edges( 50% )", palette, files) == "8,0.5,0.5");
+    CHECK(Converted("filter", "blur(8px) edges(0% 45%)", palette, files) == "8,0,0.45");
+    CHECK(Converted("filter", "blur(8px) edges(0% 0%)", palette, files).find("edges") != std::string::npos);
+    CHECK(Converted("filter", "blur(8px) edges(10% 20% 30%)", palette, files).find("edges") != std::string::npos);
+    CHECK(Converted("filter", "blur(10px) edges(60%)", palette, files).find("at most 50%") != std::string::npos);
+    CHECK(Converted("filter", "blur(10px) edges(0%)", palette, files).find("edges") != std::string::npos);
+    CHECK(Converted("filter", "blur(10px) edges(30px)", palette, files).find("edges") != std::string::npos);
+    CHECK(Converted("filter", "edges(30%)", palette, files).find("after blur()") != std::string::npos);
+    CHECK(Converted("filter", "blur(2px) blur(4px)", palette, files).find("unreadable") != std::string::npos);
+    CHECK(Converted("filter", "drop-shadow(2px)", palette, files).find("unreadable") != std::string::npos);
+    // Colour filters fold into one matrix after the amount and the edges ("0,0" without edges).
+    const std::string gray = Converted("filter", "grayscale(1)", palette, files);
+    CHECK(gray.starts_with("0,0,0,0.2126,0.2126,0.2126,0,"));
+    CHECK(Converted("filter", "grayscale(100%)", palette, files) == gray);
+    CHECK(Converted("filter", "saturate(0)", palette, files) == gray);
+    CHECK(Converted("filter", "blur(6px) grayscale(1)", palette, files) == "6" + gray.substr(1));
+    CHECK(Converted("filter", "blur(6px) edges(20%) sepia(1)", palette, files).starts_with("6,0.2,0.2,0.393,"));
+    // A filter that changes nothing writes no matrix.
+    CHECK(Converted("filter", "saturate(1) brightness(100%)", palette, files) == "0");
+    CHECK(Converted("filter", "blur(3px) hue-rotate(0deg)", palette, files) == "3");
+    CHECK(Converted("filter", "saturate(-1)", palette, files).find("unreadable saturate") != std::string::npos);
+    CHECK(Converted("filter", "contrast(20)", palette, files).find("unreadable contrast") != std::string::npos);
+    CHECK(Converted("filter", "hue-rotate(90)", palette, files).find("unreadable hue-rotate") != std::string::npos);
+    // tint and duotone take the theme's colours; not Apple's own (read when written, after the matrix is built).
+    CHECK(Converted("filter", "tint(#ff0000)", palette, files).starts_with("0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,"));
+    CHECK(Converted("filter", "tint($accent, 0.5)", palette, files).find(",") != std::string::npos);
+    CHECK(Converted("filter", "tint(#ff0000, 2)", palette, files).find("unreadable tint") != std::string::npos);
+    CHECK(Converted("filter", "duotone(#000, #fff)", palette, files) == gray);
+    CHECK(Converted("filter", "duotone(#102030)", palette, files).find("unreadable duotone") != std::string::npos);
 
     CHECK(Converted("box-shadow", "16px", palette, files) == "16");
     CHECK(Converted("box-shadow", "none", palette, files) == "0");
@@ -4887,7 +5438,7 @@ TEST_CASE(Css_HoverOnTheLastPartOnly) {
     files.files["user.css"] = "Button, Button:hover { order: 1; opacity: 0.5; }\n";
     th::Theme theme = Load(files);
     CHECK(!ProblemContaining(theme, "not possible under :hover").empty());
-    CHECK(theme.assignments.size() == 3);  // order and opacity for Button, opacity only for Button:hover
+    CHECK(OwnRules(theme) == 3);  // order and opacity for Button, opacity only for Button:hover
 }
 
 TEST_CASE(Css_ActiveAndFocusGoOnAnyPart) {
@@ -5169,10 +5720,12 @@ TEST_CASE(Css_StateOnAnAncestorRecordsThePartItSitsOn) {
     for (const th::Selector& selector : sheet.rules.empty() ? std::vector<th::Selector>{} : sheet.rules[0].selectors) {
         CHECK(selector.trigger == th::Trigger::Hover);
         CHECK(selector.statePart + 1 < selector.parts.size());
-        // The row itself, in either form (a playlist's TracklistGrid, an album's HoverGrid), not one of its ancestors
+        // The row itself, in each form (a playlist's TracklistGrid, an album's HoverGrid, the Songs page's HoverGrid),
+        // not one of its ancestors
         const std::string& row = selector.parts[selector.statePart].type;
+        const std::string& name = selector.parts[selector.statePart].name;
         CHECK(row == "TracklistGrid" || row == "HoverGrid");
-        CHECK(selector.parts[selector.statePart].name == "RootGrid");
+        CHECK(name == "RootGrid" || name == "RowGrid");
         CHECK(selector.parts.back().name == "FavoriteButton");
     }
 }
@@ -5629,8 +6182,8 @@ TEST_CASE(Theme_KeyframesGiveTracksToTheAnimationsThatNameThem) {
     }
     CHECK(!ProblemContaining(theme, "\"width\" does not animate").empty());
     CHECK(!ProblemContaining(theme, "animates nothing").empty());  // glow
-    CHECK(theme.assignments.size() == 1);
-    if (theme.assignments.size() == 1) {
+    CHECK(OwnRules(theme) == 1);
+    if (OwnRules(theme) == 1) {
         CHECK(theme.assignments[0].property == "Animation");
         std::optional<std::vector<th::Animation>> animations = th::DecodeAnimations(theme.assignments[0].value.text);
         CHECK(animations && animations->size() == 1 && (*animations)[0].tracks == pulse->second);
@@ -5759,12 +6312,12 @@ TEST_CASE(Worker_GlassLevelLightensTheThemeAndItsSnippets) {
     settings.Set("snippets.frost.enabled", "1");
     th::ThemeWorker worker(kit);
     th::SessionRequest full = worker.Tick(settings, 600);
-    CHECK(full.theme && full.theme->assignments.size() == 2);
+    CHECK(full.theme && OwnRules(*full.theme) == 2);
 
     settings.Set(ampify::kGlassChoiceKey, "eco");
     th::SessionRequest eco = worker.Tick(settings, 600);
     CHECK(eco.generation > full.generation);
-    CHECK(eco.theme && eco.theme->assignments.size() == 1);
+    CHECK(eco.theme && OwnRules(*eco.theme) == 1);
     CHECK(eco.theme && Assigned(*eco.theme, ".sidebar", "Background") == "#F7141822");
     CHECK(eco.snippets.size() == 1 && eco.snippets[0]->assignments.size() == 1 &&
           eco.snippets[0]->assignments[0].value.kind == th::ValueKind::Color);
@@ -5876,8 +6429,6 @@ TEST_CASE(Selector_PlayerWindowsTakeOnlyRulesThatNameThem) {
     CHECK(th::Matches(*scoped, nodes, 1));
     CHECK(!th::Matches(*scoped, nodes, 2));
 }
-
-// --- Text properties, display, hints and more selectors -------------------------------------------------
 
 TEST_CASE(Properties_ConvertTheTextPropertiesOfCss) {
     th::Palette palette;

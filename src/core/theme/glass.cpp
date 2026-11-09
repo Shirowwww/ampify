@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdlib>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "../text_util.hpp"
@@ -30,6 +32,18 @@ std::optional<Value> PlainColourOf(const std::string& acrylic) {
     return Value{ValueKind::Color, ToXamlColor(*tint)};
 }
 
+// The colour matrix of a ValueKind::Blur text ("amount,top,bottom,m1,...,m20"), nothing when it has none.
+std::optional<std::string> ColourPartOf(const std::string& blur) {
+    constexpr int kAmountAndEdges = 3;
+    size_t start = 0;
+    for (int i = 0; i < kAmountAndEdges; i++) {
+        const size_t comma = blur.find(',', start);
+        if (comma == std::string::npos) return std::nullopt;
+        start = comma + 1;
+    }
+    return blur.substr(start);
+}
+
 // The animations of the value that end; nothing left when every one of them runs forever.
 std::optional<std::string> WithoutEndless(const std::string& text) {
     std::optional<std::vector<Animation>> animations = DecodeAnimations(text);
@@ -37,6 +51,21 @@ std::optional<std::string> WithoutEndless(const std::string& text) {
     std::erase_if(*animations, [](const Animation& animation) { return animation.iterations == 0; });
     if (animations->empty()) return std::nullopt;
     return EncodeAnimations(*animations);
+}
+
+// A transition ("transform:200;width:1000") without its width; nothing left when the width was all of it.
+std::optional<std::string> WithoutWidth(const std::string& text) {
+    std::string kept;
+    std::string_view rest = text;
+    while (!rest.empty()) {
+        size_t end = rest.find(';');
+        std::string_view item = rest.substr(0, end);
+        rest = end == std::string_view::npos ? std::string_view{} : rest.substr(end + 1);
+        if (item.empty() || item.starts_with("width:")) continue;
+        kept += (kept.empty() ? "" : ";") + std::string(item);
+    }
+    if (kept.empty()) return std::nullopt;
+    return kept;
 }
 
 }  // namespace
@@ -82,6 +111,19 @@ void ApplyGlassLevel(Theme& theme, GlassLevel level) {
             std::optional<std::string> ending = WithoutEndless(value.text);
             if (!ending) continue;
             value.text = std::move(*ending);
+        }
+        // A width that glides lays out a frame at a time for as long as a song plays, as an endless animation does.
+        if (value.kind == ValueKind::Transition && !value.text.empty()) {
+            std::optional<std::string> still = WithoutWidth(value.text);
+            if (!still) continue;
+            value.text = std::move(*still);
+        }
+        // A blur costs the graphics card a pass each frame its area changes; "0" removes one, so it stays. A colour
+        // filter (the matrix after the amount and edges) costs one cheap pass and stays, unblurred.
+        if (level == GlassLevel::Eco && value.kind == ValueKind::Blur && std::atof(value.text.c_str()) != 0) {
+            std::optional<std::string> colours = ColourPartOf(value.text);
+            if (!colours) continue;
+            value.text = "0,0,0," + *colours;
         }
         if (level == GlassLevel::Eco && value.kind == ValueKind::Acrylic) {
             if (std::optional<Value> plain = PlainColourOf(value.text)) value = std::move(*plain);

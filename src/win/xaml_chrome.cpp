@@ -158,6 +158,25 @@ bool SameColour(const winrt::Windows::Foundation::IReference<winrt::Windows::UI:
     return a.Value() == b.Value();
 }
 
+// The fills are colours, not Fluent's SubtleFillColor keys: read through StaticResource in a button made by XamlReader,
+// those gave no fill at all on Glass's light strip (seen on screen). The values are Fluent's, a little stronger.
+std::wstring SubtleButtonResources() {
+    auto brushes = [](const wchar_t* over, const wchar_t* pressed) {
+        return std::wstring(L"<SolidColorBrush x:Key='ButtonBackground' Color='Transparent'/>"
+                            L"<SolidColorBrush x:Key='ButtonBackgroundPointerOver' Color='") + over + L"'/>"
+               L"<SolidColorBrush x:Key='ButtonBackgroundPressed' Color='" + pressed + L"'/>"
+               L"<SolidColorBrush x:Key='ButtonBorderBrush' Color='Transparent'/>"
+               L"<SolidColorBrush x:Key='ButtonBorderBrushPointerOver' Color='Transparent'/>"
+               L"<SolidColorBrush x:Key='ButtonBorderBrushPressed' Color='Transparent'/>"
+               L"<StaticResource x:Key='ButtonForegroundPointerOver' ResourceKey='TextFillColorPrimaryBrush'/>"
+               L"<StaticResource x:Key='ButtonForegroundPressed' ResourceKey='TextFillColorSecondaryBrush'/>";
+    };
+    return L"<Button.Resources><ResourceDictionary><ResourceDictionary.ThemeDictionaries>"
+           L"<ResourceDictionary x:Key='Default'>" + brushes(L"#14FFFFFF", L"#0AFFFFFF") + L"</ResourceDictionary>"
+           L"<ResourceDictionary x:Key='Light'>" + brushes(L"#0F000000", L"#08000000") + L"</ResourceDictionary>"
+           L"</ResourceDictionary.ThemeDictionaries></ResourceDictionary></Button.Resources>";
+}
+
 }  // namespace ampify::win
 
 #endif  // AMPIFY_WITH_XAML

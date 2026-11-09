@@ -1,0 +1,216 @@
+/* Laid out as at the top: a gap from the window's edges, below and on both sides, and a gap above it to the panels
+   (--bar-room). Flush with the window's foot, it read as part of Apple's frame. */
+.playbar {
+    vertical-alignment: bottom;
+    height: var(--bar-height, 72);
+    margin: 0 var(--bar-reach-end, var(--gap, 8)) var(--gap, 8) var(--bar-reach, calc(var(--gap, 8) - 290));
+}
+
+/* At 1324 pixels and less Apple Music folds the sidebar to its icons: the page column starts there instead. A theme
+   with the sidebar on the right sets the -end reaches instead. */
+@media (max-width: 1324px) {
+    .playbar {
+        margin: 0 var(--bar-reach-end-folded, var(--gap, 8)) var(--gap, 8) var(--bar-reach-folded, calc(var(--gap, 8) - var(--compact-pane, 48)));
+    }
+}
+
+/* The buttons in the middle of the window and the toggles against its right edge: each column spans every cell of the
+   bar (four, the last a narrow one Apple keeps for the window's buttons), so Apple's column widths no longer push them
+   off centre. */
+.playbar-controls,
+.playbar-extras {
+    grid-column: 0;
+    grid-column-span: 4;
+}
+
+/* The toggles' column stays as wide as the toggles: spread over the bar, it lay over the buttons and the song (the
+   last of the three, it is drawn on top) and took their clicks. The toggles stand closer, as in floating-panels. */
+.playbar-extras {
+    horizontal-alignment: right;
+}
+
+StackPanel#NowPlayingToggleButtons > Button,
+StackPanel#NowPlayingToggleButtons > VolumeControl,
+StackPanel#NowPlayingToggleButtons > StackPanel > ToggleButton {
+    margin: 0 -4 0 -4;
+}
+
+/* The cell kept for the window's buttons, which stay at the top: the toggles take it. */
+.caption-buttons-cover {
+    visibility: collapsed;
+}
+
+/* The song stands a gap in from the window's edge, and the bar's height around its 54-pixel artwork leaves it square:
+   flush with the corner, it looked cut off. */
+.now-playing {
+    grid-column: 0;
+    margin: 4 0 4 var(--gap, 8);
+}
+
+/* Apple's column kept the song small at the left of the bar: it spreads towards the buttons, a clear space short of
+   them at every width (the buttons are centred, so the room grows with the window). */
+.now-playing {
+    grid-column-span: 2;
+    horizontal-alignment: left;
+    width: var(--song-width, 560);
+}
+
+@media (max-width: 1600px) {
+    .now-playing {
+        width: var(--song-width-medium, 460);
+    }
+}
+
+/* 1323, not 1324: the engine reads (max-width: 1324px) as "the sidebar is folded", true at every width when Ampify
+   keeps it folded, and the song then stayed at 380 in a wide window, its artist cut. The room follows the window. */
+@media (max-width: 1323px) {
+    .now-playing {
+        width: var(--song-width-folded, 380);
+    }
+}
+
+@media (max-width: 1100px) {
+    .now-playing {
+        width: var(--song-width-narrow, 340);
+    }
+}
+
+@media (max-width: 960px) {
+    .now-playing {
+        width: var(--song-width-small, 270);
+    }
+}
+
+/* With nothing loaded, Apple Music centres its logo in the display, far from everything else on the bar. Its opacity,
+   not its visibility: Apple Music binds the visibility to what plays, so the value read before the theme would come
+   back stale when the theme goes, and show the logo over the title. */
+.apple-logo {
+    opacity: 0;
+}
+
+/* The song's title and artist start next to its artwork instead of in the middle of the display. */
+.track-lines {
+    grid-column: 0;
+    grid-column-span: 3;
+    margin: 0 0 0 12;
+    horizontal-alignment: left;
+}
+
+.track-line {
+    horizontal-alignment: left;
+}
+
+/* Apple Music centres each line between a spacer and the More button; at the left, the title would sit apart from the
+   artist. */
+.track-title,
+.track-artist {
+    grid-column: 0;
+    grid-column-span: 2;
+    horizontal-alignment: left;
+}
+
+/* Apple Music pins the Lossless and Dolby Atmos badge to the display's top left corner, clear of its centred title.
+   The title starts there now, so the badge moves to the other corner, just before the favourite star. */
+.audio-badge {
+    horizontal-alignment: right;
+    margin: 2 36 2 1;
+}
+
+/* Volume, lyrics and queue at the right end of the bar. */
+.playbar-toggles {
+    grid-column-span: 2;
+    horizontal-alignment: right;
+    margin: 0 var(--gap, 8) 0 0;
+}
+
+/* Apple shows the elapsed and remaining times under the pointer, at the bottom corners of the title block: with the
+   title and artist at the left, they covered the artist. Both go to the right end of the artist's line, side by side,
+   and the artist's line stops short of them. */
+.current-time {
+    horizontal-alignment: right;
+    margin: 0 48 0 0;
+}
+
+.duration {
+    horizontal-alignment: right;
+    margin: 0 4 0 0;
+}
+
+/* Both lines stop before the quality badge and the star at the display's end: in a narrow window the title ran
+   under them. */
+.track-line {
+    margin: 0 64 0 0;
+}
+
+.track-artist {
+    margin: 0 32 0 0;
+}
+
+/* The progress line runs from the artwork's side to the display's end. Its template repeats the margin inside, so 6
+   here is 12 on screen. */
+.scrubber {
+    margin: 0 6 0 0;
+}
+
+/* Apple draws a hairline between the artwork and the title: on a bar without the display's box it hangs alone. */
+HoverGrid#ThumbnailHoverGrid > Grid {
+    border-width: 0;
+}
+
+.frost {
+    visibility: collapsed;
+}
+
+/* The window's buttons are square, drawn by the system: astride a panel's rounded corner, their hover spilled over it.
+   The panels start below them, leaving the buttons a strip of the window's background, as in Spotify. A theme whose
+   sidebar starts elsewhere sets --sidebar-top: the back arrow and the folded menu button follow it. */
+.sidebar {
+    margin: var(--sidebar-top, var(--caption-room, 40)) calc(var(--gap, 8) * -1) var(--bar-room, calc(var(--bar-height, 72) + var(--gap, 8) * 2)) var(--gap, 8);
+}
+
+.content {
+    margin: var(--caption-room, 40) var(--gap, 8) var(--bar-room, calc(var(--bar-height, 72) + var(--gap, 8) * 2)) calc(var(--gap, 8) * 2);
+}
+
+/* Apple keeps its menu button and back arrow at the window's top. Open and wide, the panel came down without them: the
+   menu button sat on the logo and its own row under the title stood empty. The area that holds both comes down and in
+   with the panel; the arrow in it lands where it stood before, in the header on the icons' axis. */
+.sidebar-toggle-area {
+    margin: var(--sidebar-top, var(--caption-room, 40)) 0 0 var(--gap, 8);
+}
+
+.back-button {
+    margin: -2 0 0 4;
+}
+
+/* Folded, the logo comes down with the panel but the menu button stays where Apple put it, over the logo: it goes
+   under it, in Apple's own order (logo, menu, search). */
+@media (max-width: 1324px) {
+    .sidebar-toggle-area {
+        margin: calc(var(--sidebar-top, var(--caption-room, 40)) - 4) 0 0 var(--gap, 8);
+    }
+
+    /* The arrow is in that toggle area: with the header's margin as well, it came down onto the menu button. 3 more
+       than the area put it in the logo's place, 4 more on the icons' axis. */
+    .back-button {
+        margin: 3 0 0 4;
+    }
+}
+
+/* The pane starts below the window's buttons, which sit at the top right with no bar under them any more. */
+.lyrics-panel {
+    margin: var(--caption-room, 40) var(--gap, 8) var(--bar-room, calc(var(--bar-height, 72) + var(--gap, 8) * 2)) 0;
+}
+
+/* Nothing sits over the top of the pages any more: they start close to the panel's edge. */
+.page-top-spacer {
+    height: var(--page-top, 8);
+}
+
+.stacked-list {
+    padding: var(--page-top, 8) 0 0 0;
+}
+
+.search-header {
+    padding: 0 40 0 40;
+}

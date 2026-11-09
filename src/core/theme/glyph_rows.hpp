@@ -39,7 +39,8 @@ struct BoxSize {
 };
 
 // The cap to give an artwork whose width and height (NaN when unset) a theme wrote: the original grown evenly until
-// both fit, never shrunk. A cap of 0 means none, and stays none.
+// both fit, never shrunk. A side capped at 0 has no cap and keeps none, while the other side still grows: Apple caps
+// only the width of an editorial playlist's cover.
 BoxSize LiftedMaxSize(BoxSize original, double width, double height);
 
 // An artwork's own MaxWidth or MaxHeight once its cap is lifted: raised to the cap when below it, else kept.

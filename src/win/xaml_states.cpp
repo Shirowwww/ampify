@@ -5,6 +5,8 @@
 
 #include "xaml_backend.hpp"
 
+#include "artwork_passthrough.hpp"
+
 #include <cctype>
 #include <chrono>
 #include <cstdint>
@@ -19,6 +21,7 @@
 #include <functional>
 #include <set>
 
+#include <winrt/Microsoft.UI.Content.h>
 #include <winrt/Microsoft.UI.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
@@ -34,6 +37,7 @@
 #include "../core/theme/properties.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_render/render_tree.hpp"
+#include "glass_brush.hpp"
 #include "xaml_host.hpp"
 #include "xaml_backend_detail.hpp"
 
@@ -151,6 +155,40 @@ std::array<xaml::RoutedEvent, 3> PointerLosses() {
 }
 
 // Whether the pointer is within the element's bounds, in its own coordinates.
+// The cursor in the element's box, in its own window (its XamlRoot's): false when the cursor is over another program,
+// nothing when it cannot be told, which keeps the :hover (a list row went dark under the pointer while its window was
+// not known here).
+std::optional<bool> CursorWithin(const xaml::UIElement& element) {
+    auto framework = element.try_as<xaml::FrameworkElement>();
+    xaml::XamlRoot root = framework ? framework.XamlRoot() : nullptr;
+    if (!root || !root.Content()) return std::nullopt;
+    const std::uint64_t windowId = root.ContentIslandEnvironment().AppWindowId().Value;
+    auto window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(windowId));
+    std::optional<CursorSpot> spot = CursorOver(window);
+    if (!window || !spot) return std::nullopt;
+    if (!spot->ourProcess) return false;
+    if (!spot->client) return std::nullopt;
+    const double scale = root.RasterizationScale() > 0 ? root.RasterizationScale() : 1.0;
+    const winrt::Windows::Foundation::Rect own{0, 0, static_cast<float>(framework.ActualWidth()),
+                                               static_cast<float>(framework.ActualHeight())};
+    const winrt::Windows::Foundation::Rect box = framework.TransformToVisual(root.Content()).TransformBounds(own);
+    const double x = spot->client->x / scale;
+    const double y = spot->client->y / scale;
+    return x >= box.X && y >= box.Y && x < box.X + box.Width && y < box.Y + box.Height;
+}
+
+// Corners at least half the shorter side: a disc, whose box holds more than its shape.
+bool RoundShape(const xaml::UIElement& element) {
+    auto framework = element.try_as<xaml::FrameworkElement>();
+    if (!framework) return false;
+    double radius = 0;
+    if (auto control = element.try_as<controls::Control>()) radius = control.CornerRadius().TopLeft;
+    else if (auto grid = element.try_as<controls::Grid>()) radius = grid.CornerRadius().TopLeft;
+    else if (auto border = element.try_as<controls::Border>()) radius = border.CornerRadius().TopLeft;
+    const double side = std::min(framework.ActualWidth(), framework.ActualHeight());
+    return side > 0 && radius * 2 >= side - 1;
+}
+
 bool PointerInside(const xaml::UIElement& element, const xaml::Input::PointerRoutedEventArgs& args) {
     auto framework = element.try_as<xaml::FrameworkElement>();
     if (!framework) return false;
@@ -237,6 +275,7 @@ void XamlTreeBackend::FollowStates(theme::NodeId id, const xaml::UIElement& elem
                     if (!alive.expired()) OnFocusLost(id);
                 });
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
         if (FocusWithin(element)) m_hover.Toggle(id, theme::Trigger::Focus, true, *this);
@@ -259,6 +298,7 @@ void XamlTreeBackend::FollowStates(theme::NodeId id, const xaml::UIElement& elem
                     try {
                         if (!alive.expired()) OnState(id, theme::Trigger::Current, NamesCurrent(args.NewState()));
                     } catch (...) {
+                        // A handler runs inside Apple Music's XAML frame: nothing may escape it.
                     }
                 });
             m_hover.Toggle(id, theme::Trigger::Current, NamesCurrent(group.CurrentState()), *this);
@@ -283,6 +323,7 @@ void XamlTreeBackend::FollowPointer(theme::NodeId id, const xaml::UIElement& ele
                 xaml::UIElement self = weak.get();
                 if (!alive.expired() && self) OnState(id, theme::Trigger::Hover, PointerOnOwnRow(self, args));
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         };
         handlers.entered = element.PointerEntered(follow);
@@ -293,16 +334,40 @@ void XamlTreeBackend::FollowPointer(theme::NodeId id, const xaml::UIElement& ele
             if (!alive.expired()) OnState(id, theme::Trigger::Hover, true);
         });
     }
-    auto leave = [this, alive, id, weak](bool exited) {
-        return [this, alive, id, weak, exited](IInspectable const&, xaml::Input::PointerRoutedEventArgs const& args) noexcept {
+    // The play bar's artwork: its hover's end went unseen under a filter, and these lines say which event came.
+    auto named = element.try_as<xaml::FrameworkElement>();
+    const bool traced = named && named.Name() == L"ThumbnailHoverGrid";
+    if (traced) NoteArtworkFilter("hover followed on " + std::to_string(id % 100000));
+    auto leave = [this, alive, id, weak, traced](bool exited) {
+        return [this, alive, id, weak, exited, traced](IInspectable const&,
+                                                       xaml::Input::PointerRoutedEventArgs const& args) noexcept {
             try {
                 if (alive.expired() || *m_closed) return;
                 bool watched = m_hover.WatchedByOthers(id, theme::Trigger::Hover);
-                if (!exited && !watched) return;  // the element's own :hover follows PointerExited only, as it always did
                 xaml::UIElement self = weak.get();
+                if (traced) {
+                    NoteArtworkFilter("hover end? " + std::string(exited ? "exited" : "lost or handled") +
+                                      (watched ? ", watched" : "") +
+                                      (self && PointerInside(self, args) ? ", pointer inside" : ", pointer out"));
+                }
+                // A round element (the play bar's artwork under Spinning artwork) is left through its box's corners,
+                // which the box test takes for inside: its own exit ends the :hover, even marked handled, and a
+                // doubtful one has the cursor looked at again. Every other element keeps the rules below.
+                if (self && RoundShape(self)) {
+                    const bool own = winrt::get_abi(args.OriginalSource()) ==
+                                     winrt::get_abi(self.as<winrt::Windows::Foundation::IInspectable>());
+                    if (!own && PointerInside(self, args)) {
+                        WatchHoverEnd(id);
+                        return;
+                    }
+                    OnState(id, theme::Trigger::Hover, false);
+                    return;
+                }
+                if (!exited && !watched) return;  // the element's own :hover follows PointerExited only, as it always did
                 if (watched && self && PointerInside(self, args)) return;
                 OnState(id, theme::Trigger::Hover, false);
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         };
     };
@@ -311,7 +376,39 @@ void XamlTreeBackend::FollowPointer(theme::NodeId id, const xaml::UIElement& ele
     for (const xaml::RoutedEvent& end : PointerLosses()) element.AddHandler(end, handlers.lost, true);
 }
 
+void XamlTreeBackend::WatchHoverEnd(theme::NodeId id) {
+    auto found = m_hoverHandlers.find(id);
+    if (found == m_hoverHandlers.end()) return;
+    HoverHandlers& handlers = found->second;
+    xaml::UIElement element = handlers.element.get();
+    if (!element) return;
+    handlers.exitChecks = 0;
+    if (!handlers.exitCheck) {
+        constexpr auto kLookAgain = std::chrono::milliseconds(100);
+        handlers.exitCheck = element.DispatcherQueue().CreateTimer();
+        handlers.exitCheck.Interval(kLookAgain);
+        handlers.exitCheck.IsRepeating(true);
+        std::weak_ptr<bool> alive = m_alive;
+        handlers.exitCheck.Tick([this, alive, id](auto const& timer, auto const&) noexcept {
+            try {
+                if (alive.expired() || *m_closed) return timer.Stop();
+                constexpr int kMostChecks = 50;  // 5 s: a pointer still there by then is in the shape for real
+                auto it = m_hoverHandlers.find(id);
+                xaml::UIElement self = it == m_hoverHandlers.end() ? nullptr : it->second.element.get();
+                if (!self || ++it->second.exitChecks > kMostChecks) return timer.Stop();
+                if (CursorWithin(self).value_or(true)) return;
+                timer.Stop();
+                OnState(id, theme::Trigger::Hover, false);
+            } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
+            }
+        });
+    }
+    handlers.exitCheck.Start();
+}
+
 void XamlTreeBackend::StopFollowingPointer(const xaml::UIElement& element, HoverHandlers& handlers) {
+    if (handlers.exitCheck) handlers.exitCheck.Stop();
     element.PointerEntered(handlers.entered);
     element.PointerExited(handlers.exited);
     if (handlers.moved) element.RemoveHandler(xaml::UIElement::PointerMovedEvent(), handlers.moved);
@@ -325,8 +422,17 @@ void XamlTreeBackend::StopFollowingPointer(const xaml::UIElement& element, Hover
 void XamlTreeBackend::OnState(theme::NodeId id, theme::Trigger trigger, bool on) noexcept {
     try {
         if (*m_closed) return;
+        if (trigger == theme::Trigger::Hover) {
+            auto handlers = m_hoverHandlers.find(id);
+            xaml::FrameworkElement element{nullptr};
+            if (handlers != m_hoverHandlers.end()) element = handlers->second.element.get().try_as<xaml::FrameworkElement>();
+            if (element && element.Name() == L"ThumbnailHoverGrid") {
+                NoteArtworkFilter("hover " + std::string(on ? "on " : "off ") + std::to_string(id % 100000));
+            }
+        }
         m_hover.Toggle(id, trigger, on, *this);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -338,6 +444,7 @@ void XamlTreeBackend::OnFocusLost(theme::NodeId id) noexcept {
         if (element && FocusWithin(element)) return;
         m_hover.Toggle(id, theme::Trigger::Focus, false, *this);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -365,10 +472,9 @@ void XamlTreeBackend::RemoveHoverHandlers(theme::NodeId id) {
 namespace {
 
 // The keys a control template reads for its pointer states, and the control whose resources hold them. WinUI names most
-// of them {Control}{Property}{State}, for the control's own type and the WinUI control it derives from (Apple's
-// transport buttons are AppBarButtons whose template reads both AppBarButton... and Button... keys). A menu entry that
-// opens a submenu stays lit while the submenu shows. A slider names its keys after its parts: the track for Background,
-// the part left of the thumb for Foreground, and the thumb, whose keys it holds.
+// {Control}{Property}{State}, for the control's own type and the one it derives from (Apple's transport buttons are
+// AppBarButtons whose template reads AppBarButton... and Button... keys). A menu entry that opens a submenu stays lit
+// while it shows. A slider names its keys after its parts: the track, the part left of the thumb, and the thumb.
 struct StateKeys {
     controls::Control holder{nullptr};
     std::vector<std::wstring> keys;
@@ -499,6 +605,10 @@ bool SameBrush(const IInspectable& a, const IInspectable& b) {
         }
         return true;
     }
+    if (std::optional<std::string> glass = LiquidGlassText(a.try_as<media::Brush>())) {
+        std::optional<std::string> other = LiquidGlassText(b.try_as<media::Brush>());
+        return other && *glass == *other;
+    }
     if (auto first = a.try_as<media::AcrylicBrush>()) {
         auto second = b.try_as<media::AcrylicBrush>();
         return second && first.TintColor() == second.TintColor() && first.TintOpacity() == second.TintOpacity() &&
@@ -559,6 +669,31 @@ void XamlTreeBackend::HoldThroughStates(theme::NodeId id, const xaml::Dependency
             resources.Insert(name, want);
             changed = true;
         }
+        // Apple's resting background is a transparent white: eased towards a dark theme's colour (a transition), the
+        // entry went through a light grey first (Cinema, Greenroom). With no resting value of the theme's, it is the
+        // hover colour, transparent, so only the opacity eases.
+        auto hover = property == "Background" && !plain ? value.try_as<media::SolidColorBrush>() : nullptr;
+        for (const std::wstring& key : hover ? states.keys : std::vector<std::wstring>{}) {
+            constexpr std::wstring_view kOver = L"PointerOver";
+            if (!key.ends_with(kOver)) continue;
+            const std::wstring rest = key.substr(0, key.size() - kOver.size());
+            IInspectable name = winrt::box_value(winrt::hstring(rest));
+            IInspectable before = resources.HasKey(name) ? resources.Lookup(name) : nullptr;
+            auto app = xaml::Application::Current().Resources();
+            IInspectable resting = before ? before : app.HasKey(name) ? app.Lookup(name) : nullptr;
+            auto now = resting.try_as<media::SolidColorBrush>();
+            if (!now || now.Color().A != 0) continue;
+            winrt::Windows::UI::Color clear = hover.Color();
+            clear.A = 0;
+            if (now.Color() == clear) continue;
+            auto kept = std::find_if(held.keys.begin(), held.keys.end(),
+                                     [&](const auto& item) { return item.first == rest; });
+            if (kept == held.keys.end()) {
+                held.keys.emplace_back(rest, KeyOriginal(held.holder, rest, entry).value_or(before));
+            }
+            resources.Insert(name, media::SolidColorBrush(clear));
+            changed = true;
+        }
         // Only on a real change: a refresh made Apple Music reset the play button's background, which was then written
         // again, every 3 s.
         if (changed) ReadThemeAgain(states.holder);
@@ -604,6 +739,7 @@ void XamlTreeBackend::UpdateStates(theme::NodeId id, const xaml::DependencyObjec
             if (media::Brush brush = StateBrush(*active)) pressed = brush;
         }
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
     if (shown || pressed) {
         HoldThroughStates(id, object, property, shown, pressed, plain);
@@ -623,11 +759,13 @@ void XamlTreeBackend::ReleaseStates(theme::NodeId id, std::string_view property)
                 if (original) control.Resources().Insert(name, original);
                 else if (control.Resources().HasKey(name)) control.Resources().Remove(name);
             } catch (...) {
+                // The element may be torn down already: nothing is left to put back.
             }
         }
         try {
             ReadThemeAgain(control);
         } catch (...) {
+            // The element may be torn down already: nothing is left to put back.
         }
     }
     m_heldStates.erase(it);
@@ -697,6 +835,7 @@ void XamlTreeBackend::HoldVisible(theme::NodeId id, const xaml::UIElement& eleme
         known->second.story.Stop();
         known->second.story.Begin();
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -716,6 +855,7 @@ void XamlTreeBackend::OnHeldVisibility(theme::NodeId id) noexcept {
             if (held && held.Visibility() != xaml::Visibility::Visible) HoldVisible(id, held);
         });
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -729,6 +869,7 @@ bool XamlTreeBackend::ReleaseVisible(theme::NodeId id, const xaml::UIElement& el
         same = !element || held == element;
         if (held) held.UnregisterPropertyChangedCallback(xaml::UIElement::VisibilityProperty(), known->second.token);
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
     m_visibleHolds.erase(known);
     return same;

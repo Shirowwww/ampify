@@ -22,6 +22,7 @@
 #include <winrt/Microsoft.UI.Composition.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
+#include <winrt/Microsoft.UI.Xaml.Data.h>
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
@@ -38,6 +39,7 @@
 #include "../core/text_util.hpp"
 #include "../core/ui_render/render_tree.hpp"
 #include "apple_properties.hpp"
+#include "glass_brush.hpp"
 #include "hosted_text_align.hpp"
 #include "xaml_host.hpp"
 #include "xaml_backend_detail.hpp"
@@ -112,6 +114,41 @@ std::string ThicknessText(const xaml::Thickness& value) {
 }
 
 namespace {
+
+using Presenter = primitives::ListViewItemPresenter;
+
+// A list row's own brushes, one row each: the theme's name, the property, and how to read and write it.
+struct SelectionBrushRow {
+    std::string_view name;
+    xaml::DependencyProperty (*property)();
+    media::Brush (*get)(const Presenter& row);
+    void (*set)(const Presenter& row, const media::Brush& brush);
+};
+
+constexpr SelectionBrushRow kSelectionBrushes[] = {
+    {"PointerOverBackground", &Presenter::PointerOverBackgroundProperty,
+     [](const Presenter& row) { return row.PointerOverBackground(); },
+     [](const Presenter& row, const media::Brush& brush) { row.PointerOverBackground(brush); }},
+    {"PressedBackground", &Presenter::PressedBackgroundProperty,
+     [](const Presenter& row) { return row.PressedBackground(); },
+     [](const Presenter& row, const media::Brush& brush) { row.PressedBackground(brush); }},
+    {"SelectedBackground", &Presenter::SelectedBackgroundProperty,
+     [](const Presenter& row) { return row.SelectedBackground(); },
+     [](const Presenter& row, const media::Brush& brush) { row.SelectedBackground(brush); }},
+    {"SelectedPointerOverBackground", &Presenter::SelectedPointerOverBackgroundProperty,
+     [](const Presenter& row) { return row.SelectedPointerOverBackground(); },
+     [](const Presenter& row, const media::Brush& brush) { row.SelectedPointerOverBackground(brush); }},
+    {"SelectedPressedBackground", &Presenter::SelectedPressedBackgroundProperty,
+     [](const Presenter& row) { return row.SelectedPressedBackground(); },
+     [](const Presenter& row, const media::Brush& brush) { row.SelectedPressedBackground(brush); }},
+};
+
+const SelectionBrushRow* SelectionBrushNamed(std::string_view property) {
+    for (const SelectionBrushRow& row : kSelectionBrushes) {
+        if (row.name == property) return &row;
+    }
+    return nullptr;
+}
 
 // BorderBrush, Padding, BorderThickness and CornerRadius, on the four kinds of element that carry them.
 xaml::DependencyProperty OwnBoxProperty(const xaml::DependencyObject& object, std::string_view property) {
@@ -286,14 +323,8 @@ xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::
         if (text) return controls::TextBlock::ForegroundProperty();
         if (object.try_as<controls::IconElement>()) return controls::IconElement::ForegroundProperty();
         if (object.try_as<controls::ContentPresenter>()) return controls::ContentPresenter::ForegroundProperty();
-    } else if (IsSelectionBrush(property)) {
-        if (!object.try_as<primitives::ListViewItemPresenter>()) return nullptr;
-        using Presenter = primitives::ListViewItemPresenter;
-        if (property == "PointerOverBackground") return Presenter::PointerOverBackgroundProperty();
-        if (property == "PressedBackground") return Presenter::PressedBackgroundProperty();
-        if (property == "SelectedBackground") return Presenter::SelectedBackgroundProperty();
-        if (property == "SelectedPointerOverBackground") return Presenter::SelectedPointerOverBackgroundProperty();
-        return Presenter::SelectedPressedBackgroundProperty();
+    } else if (const SelectionBrushRow* row = SelectionBrushNamed(property)) {
+        return object.try_as<primitives::ListViewItemPresenter>() ? row->property() : nullptr;
     } else if (property == "BorderBrush" || property == "Padding" || property == "BorderThickness" ||
                property == "CornerRadius") {
         return OwnBoxProperty(object, property);
@@ -327,26 +358,31 @@ xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::
     return nullptr;
 }
 
+bool IsSelectionBrush(std::string_view property) {
+    return SelectionBrushNamed(property) != nullptr;
+}
+
 media::Brush SelectionBrush(const primitives::ListViewItemPresenter& row, std::string_view property) {
-    if (property == "PointerOverBackground") return row.PointerOverBackground();
-    if (property == "PressedBackground") return row.PressedBackground();
-    if (property == "SelectedBackground") return row.SelectedBackground();
-    if (property == "SelectedPointerOverBackground") return row.SelectedPointerOverBackground();
-    return row.SelectedPressedBackground();
+    const SelectionBrushRow* known = SelectionBrushNamed(property);
+    return known ? known->get(row) : nullptr;
 }
 
 void SetSelectionBrush(const primitives::ListViewItemPresenter& row, std::string_view property, const media::Brush& brush) {
-    if (property == "PointerOverBackground") row.PointerOverBackground(brush);
-    else if (property == "PressedBackground") row.PressedBackground(brush);
-    else if (property == "SelectedBackground") row.SelectedBackground(brush);
-    else if (property == "SelectedPointerOverBackground") row.SelectedPointerOverBackground(brush);
-    else row.SelectedPressedBackground(brush);
+    if (const SelectionBrushRow* known = SelectionBrushNamed(property)) known->set(row, brush);
 }
 
-// The order of a corner-radius value (properties.cpp): bottom-left, top-left, top-right, bottom-right.
 std::string CornerText(const xaml::CornerRadius& value) {
-    return th::FormatNumber(value.BottomLeft) + "," + th::FormatNumber(value.TopLeft) + "," +
-           th::FormatNumber(value.TopRight) + "," + th::FormatNumber(value.BottomRight);
+    return th::EncodeCorners({value.TopLeft, value.TopRight, value.BottomRight, value.BottomLeft});
+}
+
+media::Stretch StretchOf(th::ImageFit fit, media::Stretch fallback) {
+    switch (fit) {
+        case th::ImageFit::Fill: return media::Stretch::Fill;
+        case th::ImageFit::Uniform: return media::Stretch::Uniform;
+        case th::ImageFit::UniformToFill: return media::Stretch::UniformToFill;
+        case th::ImageFit::Default: break;
+    }
+    return fallback;
 }
 
 // A theme template's Border takes the control's Padding and BorderThickness and refuses a negative side at the next
@@ -381,9 +417,15 @@ media::Brush GradientFrom(const std::string& text) {
 // "#AARRGGBB;opacity" (theme::ValueKind::Acrylic) to the in-app AcrylicBrush of WinUI 3. Null for another text.
 media::Brush AcrylicFrom(const std::string& text) {
     std::vector<std::string> parts = Split(text, ';');
-    if (parts.size() != 2) return nullptr;
+    if (parts.size() != 2 && parts.size() != 3) return nullptr;
     std::optional<ColorValue> tint = ColorFromText(parts[0]);
     if (!tint) return nullptr;
+    if (parts.size() == 3) {
+        // "glass,blur,saturation" (theme::kLiquidGlass): Ampify's liquid glass.
+        std::vector<std::string> glass = Split(parts[2], ',');
+        if (glass.size() != 3 || glass[0] != th::kLiquidGlass) return nullptr;
+        return LiquidGlassBrush({*tint, std::stod(parts[1]), std::stod(glass[1]), std::stod(glass[2])}, text);
+    }
     media::AcrylicBrush acrylic;
     acrylic.TintColor(*tint);
     acrylic.TintOpacity(std::stod(parts[1]));
@@ -393,17 +435,10 @@ media::Brush AcrylicFrom(const std::string& text) {
 
 // "path|Stretch" (theme::ValueKind::Image, the stretch optional) to an ImageBrush on the file.
 media::Brush ImageFrom(const std::string& text) {
-    std::string path = text;
-    std::string stretch;
-    if (size_t bar = path.find('|'); bar != std::string::npos) {
-        stretch = path.substr(bar + 1);
-        path.resize(bar);
-    }
+    const th::ImageRef ref = th::DecodeImage(text);
     media::ImageBrush image;
-    image.ImageSource(media::Imaging::BitmapImage(winrt::Windows::Foundation::Uri(FileUri(path))));
-    if (stretch == "UniformToFill") image.Stretch(media::Stretch::UniformToFill);
-    else if (stretch == "Uniform") image.Stretch(media::Stretch::Uniform);
-    else if (stretch == "Fill") image.Stretch(media::Stretch::Fill);
+    image.ImageSource(media::Imaging::BitmapImage(winrt::Windows::Foundation::Uri(FileUri(ref.path))));
+    if (ref.fit != th::ImageFit::Default) image.Stretch(StretchOf(ref.fit, image.Stretch()));
     return image;
 }
 
@@ -435,11 +470,10 @@ std::string ShortName(const std::string& fullType) {
     return dot == std::string::npos ? fullType : fullType.substr(dot + 1);
 }
 
-// The position of `object` in the list that holds it and can reorder it (theme::kOrderProperty). A NavigationViewItem
-// lives in the MenuItems of the nearest NavigationView; another element in the Children of its direct parent Panel
-// (not an ItemsRepeater, whose children it manages itself). With `target`, the element moves there first. Nothing when
-// no such list holds it, for example items generated from MenuItemsSource or footer items. To check on the PC: moving
-// the selected entry may change the selection.
+// The position of `object` in the list that holds it (theme::kOrderProperty): the MenuItems of the nearest
+// NavigationView for a NavigationViewItem, else the Children of its direct parent Panel (not an ItemsRepeater, which
+// manages its own). With `target`, it moves there first. Nothing for MenuItemsSource or footer items. Moving the
+// selected entry may change the selection (to check on the PC).
 std::optional<std::uint32_t> ItemPosition(const xaml::DependencyObject& object, std::optional<std::uint32_t> target) {
     if (object.try_as<controls::NavigationViewItemBase>()) {
         for (xaml::DependencyObject parent = media::VisualTreeHelper::GetParent(object); parent;
@@ -497,17 +531,14 @@ bool TakesDecor(const controls::Panel& panel) {
 // BitmapImage plays an animated GIF in an Image, which an ImageBrush would show still. The image never takes the
 // pointer and stays out of the accessibility tree: it is decoration.
 controls::Image DecorImageFrom(const std::string& text, th::PseudoElement slot) {
-    size_t bar = text.find('|');
-    std::string stretch = bar == std::string::npos ? std::string() : text.substr(bar + 1);
+    const th::ImageRef ref = th::DecodeImage(text);
     media::Imaging::BitmapImage bitmap;
     bitmap.AutoPlay(true);
-    bitmap.UriSource(winrt::Windows::Foundation::Uri(FileUri(text.substr(0, bar))));
+    bitmap.UriSource(winrt::Windows::Foundation::Uri(FileUri(ref.path)));
     controls::Image image;
     image.Name(slot == th::PseudoElement::Before ? L"AmpifyDecorBefore" : L"AmpifyDecorAfter");
     image.IsHitTestVisible(false);
-    image.Stretch(stretch == "UniformToFill" ? media::Stretch::UniformToFill
-                  : stretch == "Fill"        ? media::Stretch::Fill
-                                             : media::Stretch::Uniform);
+    image.Stretch(StretchOf(ref.fit, media::Stretch::Uniform));
     xaml::Automation::AutomationProperties::SetAccessibilityView(image, xaml::Automation::Peers::AccessibilityView::Raw);
     image.Source(bitmap);
     return image;
@@ -624,9 +655,11 @@ void ReadPopupsAgain(const xaml::XamlRoot& root) noexcept {
             try {
                 if (auto child = popup.Child().try_as<xaml::FrameworkElement>()) ReadThemeAgain(child);
             } catch (...) {
+                // Nothing may escape into Apple Music's XAML frame.
             }
         }
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -694,7 +727,42 @@ void FollowForegroundInSprites(const controls::Control& control) noexcept {
         if (!single || drawn == now.Color()) return;
         for (const comp::CompositionColorBrush& brush : found) brush.Color(now.Color());
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
+}
+
+namespace {
+
+// The control whose template `object` is the root of: its visual parent, of which it is the only child.
+controls::Control TemplatedControl(const xaml::DependencyObject& object) {
+    auto control = media::VisualTreeHelper::GetParent(object).try_as<controls::Control>();
+    if (!control || media::VisualTreeHelper::GetChildrenCount(control) != 1) return nullptr;
+    return media::VisualTreeHelper::GetChild(control, 0) == object ? control : nullptr;
+}
+
+}  // namespace
+
+// The same non-zero margin as its control: a zero margin on both is too common to tell a copy from a coincidence.
+bool CopiesControlMargin(const xaml::DependencyObject& object) {
+    auto root = object.try_as<xaml::FrameworkElement>();
+    controls::Control control = root ? TemplatedControl(object) : nullptr;
+    if (!control) return false;
+    const xaml::Thickness margin = control.Margin();
+    const bool zero = margin.Left == 0 && margin.Top == 0 && margin.Right == 0 && margin.Bottom == 0;
+    return !zero && root.Margin() == margin;
+}
+
+// What {TemplateBinding Margin} did, as a binding to the templated parent: it follows the control's margin again.
+bool FollowControlMargin(const xaml::DependencyObject& object) {
+    auto root = object.try_as<xaml::FrameworkElement>();
+    if (!root) return false;
+    xaml::Data::Binding binding;
+    xaml::Data::RelativeSource parent;
+    parent.Mode(xaml::Data::RelativeSourceMode::TemplatedParent);
+    binding.RelativeSource(parent);
+    binding.Path(xaml::PropertyPath(L"Margin"));
+    root.SetBinding(xaml::FrameworkElement::MarginProperty(), binding);
+    return true;
 }
 
 }  // namespace ampify::win::xaml_detail

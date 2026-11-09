@@ -29,7 +29,6 @@ void InstallXamlUiThread(Journal& journal);
 // Milliseconds since boot, for the refresh tickets.
 std::uint64_t NowMs() noexcept;
 
-// A WinRT string as UTF-8, for the log and the core.
 inline std::string Utf8(const winrt::hstring& text) {
     return winrt::to_string(text);
 }

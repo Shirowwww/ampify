@@ -99,6 +99,30 @@ std::optional<std::string> ReadNegation(std::string_view s, size_t& i, Compound&
     return std::nullopt;
 }
 
+// `:has(<selector>)` from the bracket at `i`; moves `i` past it. The selector is relative to the element: a leading
+// `>` wants a child, else any element inside. No state and no pseudo-element. The reason when it cannot be read.
+std::optional<std::string> ReadHas(std::string_view s, size_t& i, Compound& compound, const std::string& text) {
+    size_t close = i < s.size() && s[i] == '(' ? ClosingBracket(s, i) : std::string_view::npos;
+    const std::string shape = ":has() takes a selector of the elements inside, like :has(TextBlock) or "
+                              ":has(> Grid#Bar), without a state or ::before, in \"" + text + "\"";
+    if (close == std::string_view::npos) return shape;
+    std::string_view inside = TrimSpace(s.substr(i + 1, close - i - 1));
+    Combinator lead = Combinator::Descendant;
+    if (!inside.empty() && inside.front() == '>') {
+        lead = Combinator::Child;
+        inside = TrimSpace(inside.substr(1));
+    }
+    if (inside.empty()) return shape;
+    std::string problem;
+    std::optional<Selector> relative = ParseSelector(inside, &problem);
+    if (!relative) return problem + " (in \"" + text + "\")";
+    if (relative->trigger != Trigger::Always || relative->pseudo != PseudoElement::None) return shape;
+    relative->parts.front().combinator = lead;
+    compound.has.push_back(std::move(relative->parts));
+    i = close + 1;
+    return std::nullopt;
+}
+
 // The structural pseudo-classes, which go on any part. Nothing when `pseudo` is none of them; else the reason it
 // cannot be read, empty when it was.
 std::optional<std::string> ReadStructural(const std::string& pseudo, std::string_view s, size_t& i, Compound& compound,
@@ -111,12 +135,20 @@ std::optional<std::string> ReadStructural(const std::string& pseudo, std::string
         compound.only = true;
     } else if (pseudo == "playing") {
         compound.playing = true;
+    } else if (pseudo == "checked") {
+        compound.checked = true;
+    } else if (pseudo == "selected") {
+        compound.selected = true;
+    } else if (pseudo == "disabled") {
+        compound.disabled = true;
     } else if (pseudo == "nth-child" || pseudo == "nth-last-child") {
         int& target = pseudo == "nth-child" ? compound.nth : compound.nthLast;
         return ReadNthChild(s, i, target, pseudo, text).value_or("");
     } else if (pseudo == "not" || pseudo == "except") {
         // :except() is :not() without weight, for the exclusions inside a built-in name (builtins.cpp).
         return ReadNegation(s, i, compound, text, pseudo == "not").value_or("");
+    } else if (pseudo == "has") {
+        return ReadHas(s, i, compound, text).value_or("");
     } else {
         return std::nullopt;
     }
@@ -163,7 +195,7 @@ std::optional<std::string> ReadPseudo(std::string_view s, size_t& i, Compound& c
     }
     return "pseudo-class \":" + written + "\" is not supported in \"" + selector.text +
            "\" (" + StateList(", ") + ", :first-child, :last-child, :only-child, :nth-child(n), :nth-last-child(n), "
-           ":playing, :not(...), ::before and ::after are)";
+           ":playing, :checked, :selected, :disabled, :not(...), :has(...), ::before and ::after are)";
 }
 
 // One part of a selector from `i`: a type or `*`, a #name, then pseudo-classes. Moves `i` past what it read.

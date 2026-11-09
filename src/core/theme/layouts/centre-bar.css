@@ -1,0 +1,97 @@
+/* The buttons sit on the line, not at the top of the cell: close above it at every bar height (a progress mascot may
+   reach over them, which is fine). --transport-lift is the room between the cell's foot and the buttons. */
+.transport {
+    vertical-alignment: bottom;
+    margin: 0 0 var(--transport-lift, 6) 0;
+}
+
+/* The line and the times stand 10 above the bar's edge. */
+.playbar-controls {
+    padding: 0 0 10 0;
+}
+
+.scrubber {
+    move-to: "Grid#TransportBar > Grid:nth-child(1)";
+    grid-row: 0;
+    grid-column: 0;
+    grid-column-span: 4;
+    vertical-alignment: bottom;
+    horizontal-alignment: stretch;
+}
+
+/* No height here: Apple's 6 stays, and a progress mascot (an image on the line) still gets the room the engine gives
+   it. A height of 6 written here counted as the layout sizing the line, and the line clipped the mascot to its foot. */
+
+/* Apple Music shows the thumb while the pointer is over the song; out of it, the line shows it under the pointer. */
+.scrubber:hover Thumb#HorizontalThumb {
+    visibility: visible;
+}
+
+/* The elapsed time only, at the line's left end: the length stays hidden, as bottom-bar keeps it. Always visible:
+   out of the song, Apple's pointer states no longer hide it. The opacity is written after floating-panels, so it
+   shows on narrow windows too. Centred on the track: 6 under the cell's foot. */
+.current-time {
+    move-to: "Grid#TransportBar > Grid:nth-child(1)";
+    grid-row: 0;
+    grid-column: 0;
+    grid-column-span: 4;
+    vertical-alignment: bottom;
+    horizontal-alignment: left;
+    opacity: 1;
+    visibility: visible;
+}
+
+/* The line keeps clear of the song on the left, and as far from the right edge: centred under the buttons at every
+   width. Each step follows the song's width in bottom-bar; --line-inset sets one inset for all of them. */
+.scrubber {
+    margin: 0 calc((var(--line-inset, calc(var(--song-width, 560) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width, 560) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+}
+
+.current-time {
+    margin: 0 0 -6 var(--line-inset, calc(var(--song-width, 560) + var(--gap, 8) + 16));
+}
+
+
+@media (max-width: 1600px) {
+    .scrubber {
+        margin: 0 calc((var(--line-inset, calc(var(--song-width-medium, 460) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-medium, 460) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+    }
+
+    .current-time {
+        margin: 0 0 -6 var(--line-inset, calc(var(--song-width-medium, 460) + var(--gap, 8) + 16));
+    }
+
+}
+
+@media (max-width: 1323px) {
+    .scrubber {
+        margin: 0 calc((var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+    }
+
+    .current-time {
+        margin: 0 0 -6 var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16));
+    }
+
+}
+
+@media (max-width: 1100px) {
+    .scrubber {
+        margin: 0 calc((var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+    }
+
+    .current-time {
+        margin: 0 0 -6 var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16));
+    }
+
+}
+
+@media (max-width: 960px) {
+    .scrubber {
+        margin: 0 calc((var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+    }
+
+    .current-time {
+        margin: 0 0 -6 var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16));
+    }
+
+}

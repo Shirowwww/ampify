@@ -24,6 +24,7 @@
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
 
 #include "xaml_backend.hpp"
+#include "../core/theme/value_codec.hpp"
 
 namespace ampify::win::xaml_detail {
 
@@ -43,21 +44,25 @@ std::vector<std::string> Split(const std::string& text, char separator);
 std::string FractionText(double number);
 std::string ThicknessText(const xaml::Thickness& value);
 xaml::DependencyProperty OwnProperty(const xaml::DependencyObject& object, std::string_view property);
+// The original of a template root whose margin is its control's ({TemplateBinding Margin}, as in Apple's "···"): a
+// local value replaces that binding, so a margin read back and written again froze the copy of a theme's margin.
+// Written back, it follows its control's margin again.
+inline const th::Value kControlMarginCopy{th::ValueKind::Opaque, "control-margin-copy"};
+bool CopiesControlMargin(const xaml::DependencyObject& object);
+bool FollowControlMargin(const xaml::DependencyObject& object);
 // CharacterSpacing, FontStyle, LineHeight, TextAlignment, TextTrimming and TextWrapping: read and written by
 // ReadTextProperty and WriteTextProperty, on a TextBlock (CharacterSpacing and FontStyle on a Control too).
 bool IsTextProperty(std::string_view property);
 std::optional<th::Value> ReadTextProperty(const xaml::DependencyObject& object, std::string_view property);
 bool WriteTextProperty(const xaml::DependencyObject& object, std::string_view property, const th::Value& value);
 // A list row's own colours: under the pointer, pressed, and its selection in its three states.
-inline bool IsSelectionBrush(std::string_view property) {
-    return property == "PointerOverBackground" || property == "PressedBackground" ||
-           property == "SelectedBackground" || property == "SelectedPointerOverBackground" ||
-           property == "SelectedPressedBackground";
-}
+bool IsSelectionBrush(std::string_view property);
 // The brush property of a list row behind one of those names.
 media::Brush SelectionBrush(const primitives::ListViewItemPresenter& row, std::string_view property);
 void SetSelectionBrush(const primitives::ListViewItemPresenter& row, std::string_view property, const media::Brush& brush);
 std::string CornerText(const xaml::CornerRadius& value);
+// The stretch of an image value's fit; `fallback` for ImageFit::Default.
+media::Stretch StretchOf(th::ImageFit fit, media::Stretch fallback);
 bool NoNegativeSide(const xaml::Thickness& sides);
 media::Brush GradientFrom(const std::string& text);
 media::Brush AcrylicFrom(const std::string& text);

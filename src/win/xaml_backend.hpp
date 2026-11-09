@@ -31,7 +31,7 @@
 #include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 // ComboBox inherits SelectedItem and SelectionChanged from Selector, declared in Primitives. Without this include,
-// MSVC reported C3779 on both members (run 41071266204).
+// MSVC reported C3779 on both members.
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
@@ -39,10 +39,15 @@
 #include "../core/theme/hover.hpp"
 #include "../core/theme/tree.hpp"
 #include "artwork_fade.hpp"
+#include "artwork_large.hpp"
+#include "immersion.hpp"
 #include "audio_bars.hpp"
+#include "element_blur.hpp"
 #include "gradient_fit.hpp"
 #include "pane_corners.hpp"
+#include "width_glide.hpp"
 #include "theme_animations.hpp"
+#include "xaml_chrome.hpp"
 
 namespace ampify::win {
 
@@ -64,9 +69,14 @@ inline constexpr char kPageArtworkPrefix[] = "page-";
 // without the hover; Read and Write go through the tracker.
 class XamlTreeBackend final : public theme::TreeBackend, private theme::HoverTracker::Access {
 public:
-    // Takes Apple Music's main window from AMP.Utils.dll (xaml_host.hpp: Window::Current() is null in a WinUI 3
-    // desktop app). False when the window is not up yet. The caller retries on the next tick.
-    bool Attach();
+    // Takes one of Apple Music's windows from AMP.Utils.dll (xaml_host.hpp: Window::Current() is null in a WinUI 3
+    // desktop app), the main one unless `role` says otherwise. False when the window is not up yet; the caller retries
+    // on the next tick. Runs on that window's own interface thread: the mini player has a thread of its own, so it
+    // gets a backend of its own (mini_player_theme.hpp).
+    bool Attach(WindowRole role = WindowRole::Main);
+    // From this thread, the application's resources are the very object the main window's backend writes: this
+    // backend then leaves them alone (a mini player backend can only find that out; Attach logs nothing itself).
+    bool SharesMainResources() const { return m_sharedResources; }
 
     std::vector<theme::NodeInfo> Snapshot() override;
     bool Alive(theme::NodeId id) override;
@@ -90,6 +100,10 @@ public:
     std::optional<theme::ViewSize> WindowSize() override;
     void WatchSize(const std::vector<theme::MediaQuery>& queries) override;
     void WatchSidebarOverPages(bool watch) override;
+    void WatchStates(bool watch) override {
+        if (watch && !m_watchStates) SchedulePass(0);  // this pass's snapshot was taken without them
+        m_watchStates = watch;
+    }
     // The element's place against its window's root (TransformToVisual) and its actual size, for the inspector.
     std::optional<theme::NodeBox> Box(theme::NodeId id) override;
     // Asks for a pass when a watched query changed its answer without the window changing size (the sidebar folded
@@ -117,12 +131,11 @@ public:
     const std::string& RefreshReason() const { return m_refreshReason; }
     // What the caption buttons were set to before the first theme, once, for the log; empty after.
     std::string TakeCaptionNote() { return std::exchange(m_captionNote, std::string()); }
+    std::string TakeArtworkNote() { return m_largeArtwork.TakeNote(); }
 
-    // Runs `pass` on the interface thread soon after the interface may hold new elements: a page navigated
-    // (Frame.Navigated, then twice more while the page fills in), rows or cards realised while scrolling
-    // (ListViewBase.ContainerContentChanging, ItemsRepeater.ElementPrepared), a flyout, menu or tooltip that opens. A
-    // burst of events makes one pass. Snapshot follows each such element once, so a theme reaches new content without
-    // waiting for the next tick.
+    // Runs `pass` on the interface thread soon after new elements may exist: a page navigated (Frame.Navigated, then
+    // twice more as it fills in), rows realised while scrolling (ContainerContentChanging, ElementPrepared), a flyout,
+    // menu or tooltip opening. A burst makes one pass, so a theme reaches new content without waiting for the tick.
     void WatchChanges(std::function<void()> pass);
     // An element entered the tree (XAML Diagnostics, xaml.watcher): the same pass, grouped with the other changes.
     void ElementAdded() noexcept { SchedulePass(0); }
@@ -131,7 +144,56 @@ private:
     winrt::Microsoft::UI::Xaml::DependencyObject Resolve(theme::NodeId id) const;
 
     std::optional<theme::Value> ReadRaw(theme::NodeId id, std::string_view property) override;
+    // ReadRaw's readers, tried in this order: each knows its own property names (xaml_read.cpp).
+    std::optional<theme::Value> ReadBrush(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                          std::string_view property);
+    std::optional<theme::Value> ReadFont(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                         std::string_view property);
+    std::optional<theme::Value> ReadThickness(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                              std::string_view property);
+    std::optional<theme::Value> ReadSize(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                         std::string_view property);
+    std::optional<theme::Value> ReadKeyword(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                            std::string_view property);
+    std::optional<theme::Value> ReadPlace(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                          std::string_view property);
+    std::optional<theme::Value> ReadMotion(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                           std::string_view property);
+    std::optional<theme::Value> ReadOwn(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                        std::string_view property);
+    theme::Value BrushValue(theme::NodeId id, std::string_view property,
+                            const winrt::Microsoft::UI::Xaml::Media::Brush& value);
+    theme::Value KeptValue(theme::NodeId id, std::string_view property,
+                           const winrt::Windows::Foundation::IInspectable& value);
     bool WriteRaw(theme::NodeId id, std::string_view property, const theme::Value& value) override;
+    bool ClearOwnValue(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object, std::string_view property);
+    // WriteRaw's writers, tried in this order; nullopt: not this writer's property (xaml_properties.cpp).
+    std::optional<bool> WriteBrush(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                   std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteFont(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                  std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteThickness(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                       std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteCorner(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                    std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteSize(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                  std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteShown(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                   std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteKeyword(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                     std::string_view property, const theme::Value& value);
+    std::optional<bool> WritePlace(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                   std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteMotion(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                    std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteTransform(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                       std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteEffect(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                    std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteClip(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                  std::string_view property, const theme::Value& value);
+    std::optional<bool> WriteTemplate(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
+                                      std::string_view property, const theme::Value& value);
 
     // A value that is not text (a brush with an image, a control template) is kept as an object and given a token.
     // The same object always gets the same token, so a value read on each tick or each hover does not pile up.
@@ -151,8 +213,9 @@ private:
 
     winrt::Microsoft::UI::Xaml::Media::Brush ArtworkBrush(const std::string& text);
     winrt::Microsoft::UI::Xaml::Controls::Border ArtworkDecor(const std::string& text, const wchar_t* name);
-    bool DecorHolds(const winrt::Microsoft::UI::Xaml::Controls::Border& owner) const;
-    void FollowArtwork(const winrt::Microsoft::UI::Xaml::Media::ImageSource& artwork);
+    bool DecorHolds(const winrt::Microsoft::UI::Xaml::FrameworkElement& owner) const;
+    void FollowArtwork(const winrt::Microsoft::UI::Xaml::Controls::Image& image,
+                       const winrt::Microsoft::UI::Xaml::Media::ImageSource& artwork);
     void SampleArtwork(const winrt::Microsoft::UI::Xaml::Controls::Image& image, const std::string& prefix = {});
     void FollowArtworkImage(const winrt::Microsoft::UI::Xaml::Controls::Image& image);
     void OnArtworkChanged() noexcept;
@@ -173,6 +236,7 @@ private:
     winrt::Windows::Foundation::Point OriginOf(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element) const;
     theme::DecorChange PlaceDecor(theme::NodeId id, theme::PseudoElement slot, const theme::Decor& decor);
     theme::DecorChange RemoveDecor(theme::NodeId id, theme::PseudoElement slot);
+    void ForgetDecorMotion(theme::NodeId imageId);
     void WriteDecor(theme::NodeId imageId, const winrt::Microsoft::UI::Xaml::Controls::Panel& panel,
                     const theme::Decor& decor);
     void SchedulePass(int followUps) noexcept;
@@ -192,13 +256,13 @@ private:
     void Refollow(theme::NodeId id);
     struct HoverHandlers;
     void FollowPointer(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element, HoverHandlers& handlers);
+    // Looks at the cursor every 100 ms, for 5 s at most, and ends the element's :hover once it is out of its box.
+    void WatchHoverEnd(theme::NodeId id);
     static void StopFollowingPointer(const winrt::Microsoft::UI::Xaml::UIElement& element, HoverHandlers& handlers);
-    // The PointerOver and Pressed states of a control template write some properties of its parts above any local
-    // value: a theme's background on a button's Root vanished under the pointer and while pressed (greenroom's white
-    // play button showed its black icon on black). The brushes those states read ({Control}{Property}PointerOver and
-    // Pressed) get the theme's value in that control's own resources, the Pressed ones the :active value when the theme
-    // gives one; a null value leaves that state Apple Music's. Keys a control reads at rest (a scroll bar's) get `plain`,
-    // the written value. ReleaseStates gives Apple Music's back.
+    // The PointerOver and Pressed states of a control template write properties of its parts above any local value (a
+    // theme's button background vanished under the pointer: greenroom's play button showed a black icon on black). The
+    // brushes they read ({Control}{Property}PointerOver and Pressed) get the theme's value in that control's own
+    // resources (Pressed: the :active value; null leaves Apple Music's); at-rest keys get `plain`. ReleaseStates undoes.
     void HoldThroughStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
                            std::string_view property, const winrt::Windows::Foundation::IInspectable& value,
                            const winrt::Windows::Foundation::IInspectable& pressed,
@@ -231,7 +295,12 @@ private:
     CaptionColours Restored(const winrt::Microsoft::UI::Windowing::AppWindowTitleBar& bar) const;
 
     winrt::weak_ref<winrt::Microsoft::UI::Xaml::Window> m_window;
+    WindowRole m_role = WindowRole::Main;
+    bool m_sharedResources = false;
     std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_elements;
+    // Elements of the last snapshot whose weak reference is dead as soon as taken (the Rectangle of the veil over the
+    // bar's artwork): held until the next snapshot, or no value ever reached them.
+    std::map<theme::NodeId, winrt::Microsoft::UI::Xaml::DependencyObject> m_held;
     std::map<theme::NodeId, std::string> m_templates;  // the XAML text of the template last written to each element
     std::map<std::uint64_t, winrt::Windows::Foundation::IInspectable> m_kept;
     std::map<void*, std::uint64_t> m_keptTokens;  // the token of each kept object, by its COM identity
@@ -266,6 +335,10 @@ private:
         winrt::event_token exited;
         winrt::Windows::Foundation::IInspectable moved{nullptr};  // a navigation entry's: off over its sub-entries
         winrt::Windows::Foundation::IInspectable lost{nullptr};   // PointerCanceled, PointerCaptureLost
+        // An end the element's box still holds (a round artwork's corner): the cursor is looked at again until it is
+        // out, as no other event may come.
+        winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer exitCheck{nullptr};
+        int exitChecks = 0;
         bool active = false;  // added with handledEventsToo: a button marks its pointer events handled
         winrt::Windows::Foundation::IInspectable pressed{nullptr};
         winrt::Windows::Foundation::IInspectable released{nullptr};
@@ -297,6 +370,11 @@ private:
     std::vector<theme::MediaQuery> m_mediaQueries;  // the theme's @media conditions (WatchSize)
     std::vector<bool> m_mediaAnswers;               // whether each matched at the last pass
     bool m_watchOverPages = false;                  // WatchSidebarOverPages: the theme dims the sidebar's pane
+    bool m_watchStates = false;                     // WatchStates: the theme has :checked, :selected or :disabled
+    // The controls whose IsChecked, IsOn or IsSelected asks for a pass when it changes (TakeStates).
+    std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_stateWatched;
+    void TakeStates(const winrt::Microsoft::UI::Xaml::DependencyObject& object, theme::NodeInfo& node);
+    void WatchDot(const winrt::Microsoft::UI::Xaml::FrameworkElement& dot, theme::NodeId id);
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);  // the pointer handlers hold a weak pointer to it
     winrt::Microsoft::UI::Xaml::ResourceDictionary m_merged{nullptr};
     std::shared_ptr<bool> m_closed = std::make_shared<bool>(false);  // set by Window.Closed, on the interface thread
@@ -328,6 +406,8 @@ private:
     };
     winrt::Microsoft::UI::Xaml::Media::ImageSource m_artwork{nullptr};
     std::vector<ArtworkLayer> m_artworkLayers;
+    LargeArtwork m_largeArtwork;  // what those brushes paint: the cover decoded large, not Apple's thumbnail
+    ImmersionBackgrounds m_immersion;  // the decors of content: immersion, Apple's own background, on the same song
     std::shared_ptr<ArtworkColours> m_artworkColours = std::make_shared<ArtworkColours>();
     // That image is followed between passes: a new song's artwork is read as soon as it opens, not at the next tick. A
     // reading asked while another runs is tried again shortly (m_artworkRetry).
@@ -392,6 +472,8 @@ private:
     AudioBars m_bars;  // the decors made by `content: bars(n)`, moved with the music
     PaneCorners m_paneCorners;  // what a rounded SplitView pane holds, clipped to its corners
     GradientFit m_gradientFit;  // the theme's gradients, fitted to the shape of what they paint
+    ElementBlur m_blur;         // the elements a theme blurs (`filter: blur()`)
+    WidthGlides m_widthGlides;  // the elements whose widths glide (`transition: width`)
 };
 
 }  // namespace ampify::win

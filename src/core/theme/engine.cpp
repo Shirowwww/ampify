@@ -17,14 +17,8 @@ namespace {
 // line each while they still write something, and later passes stay silent (a tick every 3 s would flood the log).
 constexpr int kSummarisedPasses = 5;
 
-// True when `candidate` should replace `current` for the same element and property. !important first, then the layer
-// (a snippet beats the theme, sidebar.json beats both), then specificity, then the place in the file.
-bool Beats(const Assignment& candidate, const Assignment& current) {
-    if (candidate.important != current.important) return candidate.important;
-    if (candidate.layer != current.layer) return candidate.layer > current.layer;
-    if (candidate.specificity != current.specificity) return current.specificity < candidate.specificity;
-    return candidate.order > current.order;
-}
+// The highest layer of the theme's own rules; snippets come above it (snippets.cpp).
+constexpr int kThemeLayer = 0;
 
 // A line-height factor or a letter-spacing in pixels, measured against the element's font size now: nothing for an
 // element without one.
@@ -49,6 +43,19 @@ std::optional<Value> AppColour(const Value& value, TreeBackend& tree) {
     std::optional<Value> colour = tree.ReadResource(value.text);
     if (!colour || colour->kind != ValueKind::Color) return std::nullopt;
     return colour;
+}
+
+// The scheme `@media (prefers-color-scheme)` follows: the theme's, as its loader decided. With none (snippets alone, or
+// a theme that gives no background), Apple Music's own, from the background it holds now: a snippet's light rules
+// darkened Apple's dark display. Unknown reads as light.
+bool DarkScheme(const Theme& theme, TreeBackend& tree) {
+    if (theme.dark) return *theme.dark;
+    for (const char* key : {"SolidBackgroundFillColorBaseBrush", "ApplicationPageBackgroundThemeBrush"}) {
+        std::optional<Value> background = tree.ReadResource(key);
+        if (!background || background->kind != ValueKind::Color) continue;
+        if (std::optional<Argb> colour = ParseColor(background->text)) return RelativeLuminance(*colour) < kDarkBelowLuminance;
+    }
+    return false;
 }
 
 std::string Describe(const NodeInfo& node) {
@@ -183,8 +190,11 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
     std::vector<PendingMove> reparents;
     const RuleIndex index(theme.assignments);
     const std::optional<ViewSize> size = tree.WindowSize();
-    const bool darkScheme = theme.dark.value_or(false);  // the loader decided; neither dark nor light reads as light
+    const bool darkScheme = DarkScheme(theme, tree);
     tree.WatchSize(MediaQueries(theme));
+    tree.WatchStates(std::any_of(theme.assignments.begin(), theme.assignments.end(), [](const Assignment& assignment) {
+        return UsesControlStates(assignment.selector.parts);
+    }));
     std::vector<Winners> inherited(nodes.size());
     bool sidebarDimmed = false;
     for (int position = 0; position < static_cast<int>(nodes.size()); position++) {
@@ -195,6 +205,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
         Winners winners;
         StateWinners stateWinners;
         DecorWinners decorWinners;
+        DecorWinners themeDecorWinners;
         auto keep = [](auto& target, const auto& key, const Assignment& assignment) {
             auto [it, inserted] = target.try_emplace(key, &assignment);
             if (!inserted && Beats(assignment, *it->second)) it->second = &assignment;
@@ -209,6 +220,9 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
             const Selector& selector = assignment.selector;
             if (selector.pseudo != PseudoElement::None) {
                 keep(decorWinners, std::make_pair(selector.pseudo, assignment.property), assignment);
+                if (assignment.layer <= kThemeLayer) {
+                    keep(themeDecorWinners, std::make_pair(selector.pseudo, assignment.property), assignment);
+                }
             } else if (selector.trigger == Trigger::Always) {
                 keep(winners, assignment.property, assignment);
             } else {
@@ -248,7 +262,7 @@ void ThemeEngine::ApplyAssignments(const Theme& theme, TreeBackend& tree, const 
         if (!stateWinners.empty() || m_hovers.count(node.id)) ApplyHover(node, stateWinners, nodes, tree, report);
         if (!decorWinners.empty() || m_decors.count({node.id, PseudoElement::Before}) ||
             m_decors.count({node.id, PseudoElement::After})) {
-            ApplyDecors(node, decorWinners, tree, report);
+            ApplyDecors(node, decorWinners, themeDecorWinners, tree, report);
         }
     }
     tree.WatchSidebarOverPages(sidebarDimmed);
@@ -305,8 +319,19 @@ void ThemeEngine::GiveBackReparents(const std::vector<PendingMove>& pending, con
 
 // The ::before and ::after images of one element: put in or kept when a `content` image wins, taken off when none does
 // any more (`content: none`, a rule edited out, the element out of the selector).
-void ThemeEngine::ApplyDecors(const NodeInfo& node, const DecorWinners& winners, TreeBackend& tree, Report& report) {
+void ThemeEngine::ApplyDecors(const NodeInfo& node, const DecorWinners& allWinners, const DecorWinners& themeWinners,
+                              TreeBackend& tree, Report& report) {
     for (PseudoElement slot : {PseudoElement::Before, PseudoElement::After}) {
+        // A snippet that brings its own image or bars to a slot where the theme has one leaves that slot whole to the
+        // theme (an equalizer that is a theme's signature stays as the theme draws it); without a content of its own,
+        // a snippet still tunes the theme's decor.
+        const auto given = [slot](const DecorWinners& winners) -> const Assignment* {
+            auto found = winners.find({slot, std::string(kContentProperty)});
+            return found == winners.end() || found->second->value.text.empty() ? nullptr : found->second;
+        };
+        const Assignment* overall = given(allWinners);
+        const bool themeKeeps = given(themeWinners) && overall && overall->layer > kThemeLayer;
+        const DecorWinners& winners = themeKeeps ? themeWinners : allWinners;
         auto content = winners.find({slot, std::string(kContentProperty)});
         auto known = m_decors.find({node.id, slot});
         if (content == winners.end() || content->second->value.text.empty()) {
@@ -662,6 +687,7 @@ void ThemeEngine::Refuse(const std::string& key, const std::string& message, Rep
 }
 
 void ThemeEngine::Restore(TreeBackend& tree) {
+    tree.WatchStates(false);
     int restored = 0;
     int gone = 0;
 

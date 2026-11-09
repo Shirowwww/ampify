@@ -25,7 +25,8 @@ enum class ValueKind {
                  // artwork of the song playing
     Gradient,    // a linear gradient: "x1,y1,x2,y2;#AARRGGBB@offset;...", points relative to the element (0 to 1),
                  // at least two stops, offsets from 0 to 1 in order
-    Acrylic,     // an acrylic brush: "#AARRGGBB;opacity", the tint and its opacity (0 to 1)
+    Acrylic,     // an acrylic brush: "#AARRGGBB;opacity", the tint and its opacity (0 to 1); or Ampify's liquid glass,
+                 // "#AARRGGBB;opacity;glass,blur,saturation" (kLiquidGlass): the blur in pixels, the saturation factor
     Length,      // device-independent pixels, "18", or "NaN" for auto ("120%" in a theme's font size, which the engine
                  // turns into pixels before Write)
     Thickness,   // "left,top,right,bottom", such as "8,4,8,4"
@@ -41,6 +42,10 @@ enum class ValueKind {
                  // empty for none
     Animation,   // the animations running on the element, as EncodeAnimations writes them (animation.hpp), empty for
                  // none
+    Blur,        // the filter of what the element's rectangle shows: "amount", a Gaussian blur in pixels (0 for none), or
+                 // "amount,top,bottom": only towards the top and bottom, over those fractions of the height (0 to 0.5
+                 // each, not both 0), fading to none in the middle; then, for colour filters, the 20 numbers of a
+                 // colour matrix (color_matrix.hpp), the edges written "0,0" when the whole rectangle is blurred
     Clip,        // a rectangle inset from the element's edges, "left,top,right,bottom" in pixels (negative reaches past
                  // them), that the element and its children are cut to; empty for no clip
     Opaque,      // a token that Read gave back for an object the engine cannot express as text; Write restores it
@@ -80,6 +85,11 @@ struct NodeInfo {
     // A list row that shows Apple's "now playing" bars (Grid#NowPlayingIndicator visible), and every element between the
     // row and those bars: what `:playing` matches.
     bool playing = false;
+    // What Apple's controls say of themselves, read only while the theme uses these states (TreeBackend::WatchStates):
+    // a toggle, check box or switch that is on, a selected list row or sidebar entry, a control that takes no input.
+    bool checked = false;
+    bool selected = false;
+    bool disabled = false;
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";
@@ -95,16 +105,45 @@ inline constexpr std::string_view kTemplateProperty = "Template";
 // The path of an Image value that stands for the artwork of the song playing (`background: artwork` in user.css).
 inline constexpr std::string_view kArtworkImage = "artwork:";
 
+// The third part of an Acrylic value that makes it Ampify's liquid glass: "#AARRGGBB;opacity;glass,blur,saturation".
+inline constexpr std::string_view kLiquidGlass = "glass";
+
 // The original of a property the element had no value of its own for (TreeBackend::ReadOriginal).
 inline const Value kNoOwnValue{ValueKind::Opaque, "no-own-value"};
 
 // `content` of ::before and ::after: the image of a decor (Decor::image), never a property of an element.
 inline constexpr std::string_view kContentProperty = "Content";
 
-// The text of `content: bars(n)`: kBarsContent then the count, such as "bars:12". Bars that follow the music.
+// The text of `content: bars(n[, shape][, reach%])`: kBarsContent then the count, such as "bars:12", and for another
+// shape or reach both of them, such as "bars:12:line:60". Bars that follow the music.
 inline constexpr std::string_view kBarsContent = "bars:";
 inline constexpr int kMinBars = 2;
 inline constexpr int kMaxBars = 32;
+inline constexpr int kMinBarsReach = 10;  // percent of the decor's height (or of the ring's room) a bar may fill
+
+enum class BarShape {
+    Bars,    // side by side, rising from the bottom
+    Line,    // one smooth line through the tops of the bars
+    Circle,  // a ring of bars pointing outwards from the centre
+    Mirror,  // bars that grow up and down from the middle, the low notes in the centre
+};
+
+struct BarsContent {
+    int count = 12;
+    BarShape shape = BarShape::Bars;
+    int reach = 100;  // kMinBarsReach to 100
+    bool thick = false;  // side bars: as wide as their column, or (thin, the default) a few pixels, centred in it
+
+    bool operator==(const BarsContent&) const = default;
+};
+
+// The image text of bars, and back: nullopt for any other text.
+std::string WriteBarsContent(const BarsContent& bars);
+std::optional<BarsContent> ReadBarsContent(std::string_view image);
+
+// The text of `content: immersion`: Apple Music's own full-screen background (the song's artwork as a slow, blurred,
+// moving wash), drawn by Apple's ImmersionLockup and following the song.
+inline constexpr std::string_view kImmersionContent = "immersion:";
 
 // A decorative image a theme puts into a panel with ::before or ::after and `content: url(...)`, or bars that move
 // with the music (`content: bars(n)`).
@@ -238,6 +277,10 @@ public:
     // True when the theme's values depend on ViewSize::sidebarOverPages, given on each pass: the backend then asks for
     // a pass when the sidebar's pane opens over the pages or leaves them, and costs none otherwise.
     virtual void WatchSidebarOverPages(bool watch) { (void)watch; }
+
+    // True when the theme has a :checked, :selected or :disabled rule, given on each pass: the backend then fills
+    // NodeInfo's states and asks for a pass when a toggle or a selection changes, and reads nothing otherwise.
+    virtual void WatchStates(bool watch) { (void)watch; }
 
     // Where the element is laid out, in the coordinates of its window or popup root, for the inspector and the offline
     // bench's wireframe. Never used to style: nothing when unknown or not laid out.

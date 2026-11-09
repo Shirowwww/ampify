@@ -155,6 +155,8 @@ std::optional<Value> Derived(const ReplayBackend::Node& node, std::string_view p
         if (element) return none;
     } else if (property == "RenderTransformOrigin") {
         if (element) return Value{ValueKind::Point, "0,0"};
+    } else if (property == "Blur") {
+        if (element) return Value{ValueKind::Blur, "0"};
     } else if (property == "Transition") {
         if (element) return Value{ValueKind::Transition, ""};
     } else if (property == "Animation") {
@@ -224,6 +226,12 @@ std::string KindRefusal(std::string_view property, const Value& value) {
         if (kind != ValueKind::Point || !Numbers(value.text, 2)) return where + ": not a point";
     } else if (property == "Shadow") {
         if (kind != ValueKind::Shadow || !Number(value.text)) return where + ": not a depth";
+    } else if (property == "Blur") {
+        constexpr size_t kWithColours = 23;  // amount, edges, the 20 numbers of a colour matrix
+        if (kind != ValueKind::Blur ||
+            (!Numbers(value.text, 1) && !Numbers(value.text, 3) && !Numbers(value.text, kWithColours))) {
+            return where + ": not a filter";
+        }
     } else if (property == "Clip") {
         if (kind != ValueKind::Clip || (!value.text.empty() && !Numbers(value.text, 4))) return where + ": not a clip";
     } else if (property == "Transition") {
@@ -362,6 +370,9 @@ std::unique_ptr<ReplayBackend> ReplayBackend::Load(std::string_view text, std::s
         node.panel = FlagOf(item, "panel", flags);
         node.player = FlagOf(item, "player", flags);
         node.playing = FlagOf(item, "playing", flags);
+        node.checked = FlagOf(item, "checked", flags);
+        node.selected = FlagOf(item, "selected", flags);
+        node.disabled = FlagOf(item, "disabled", flags);
         node.box = BoxOf(item);
         backend->m_hasBoxes = backend->m_hasBoxes || node.box.has_value();
         if (const Json* properties = item.Find("properties"); properties && properties->AsObject()) {
@@ -481,6 +492,9 @@ std::vector<NodeInfo> ReplayBackend::Snapshot() {
         info.player = node.player;
         info.panel = node.panel;
         info.playing = node.playing;
+        info.checked = node.checked;
+        info.selected = node.selected;
+        info.disabled = node.disabled;
         const int at = static_cast<int>(infos.size());
         infos.push_back(std::move(info));
         const int count = static_cast<int>(node.children.size());
@@ -660,7 +674,8 @@ DecorChange ReplayBackend::SetDecor(NodeId id, PseudoElement slot, const Decor* 
     const auto key = std::make_pair(index, slot);
     if (!decor) return m_decors.erase(key) ? DecorChange::Applied : DecorChange::Unchanged;
     if (index < 0 || !m_nodes[index].reachable || !m_nodes[index].panel) return DecorChange::Refused;
-    if (!decor->image.starts_with(kBarsContent) && !decor->image.starts_with(kArtworkImage)) {
+    if (!decor->image.starts_with(kBarsContent) && !decor->image.starts_with(kArtworkImage) &&
+        !decor->image.starts_with(kImmersionContent)) {
         std::string path = decor->image.substr(0, decor->image.find('|'));
         std::error_code error;
         if (!std::filesystem::is_regular_file(std::filesystem::path(std::u8string(path.begin(), path.end())), error)) return DecorChange::Refused;

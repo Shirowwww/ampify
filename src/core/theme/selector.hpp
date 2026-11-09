@@ -33,4 +33,16 @@ int MatchedElement(const Selector& selector, const std::vector<NodeInfo>& nodes,
 // list row mark nothing, so `:playing` never reaches a page.
 void MarkPlayingRows(std::vector<NodeInfo>& nodes, const std::vector<int>& bars);
 
+// A list row's presenter (ListViewItemPresenter, GridViewItemPresenter), which `.list-item` names, is selected with the
+// item that holds it: `:selected` then reaches the row a theme names, not only Apple's ListViewItem around it.
+void MarkSelectedPresenters(std::vector<NodeInfo>& nodes);
+
+// Apple shows some switches as a plain Button with a dot under it when on (repeat: Button#RepeatButton and
+// Ellipse#RepeatButtonDot). Sets NodeInfo::checked on the Button named like each of `dots`, the indexes of visible
+// elements named "<button>Dot", without "Dot", when it holds that dot; `:checked` then reaches it as it does a toggle.
+void MarkCheckedByDot(std::vector<NodeInfo>& nodes, const std::vector<int>& dots);
+
+// True when a rule of `parts` waits on :checked, :selected or :disabled (TreeBackend::WatchStates).
+bool UsesControlStates(const std::vector<Compound>& parts);
+
 }  // namespace ampify::theme

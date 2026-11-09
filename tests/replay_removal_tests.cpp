@@ -86,7 +86,18 @@ TEST_CASE(ReplayRemoval_TakingAThemeOffLeavesNothingAndReportsTheSecondState) {
     std::optional<ampify::Json> second = switched ? ampify::Json::Parse(switched->report) : std::nullopt;
     CHECK(second && Text(second->Find("theme")) == "plain");
     if (second) {
-        CHECK(Items(*second, "final").size() == 1);  // the bar's background, not what the first theme set and gave back
+        // The bar's background, not what the first theme set and gave back. Ampify's own rule for the bar's toggles
+        // (KeepTogglesAtTheRightEnd) holds under every theme, so the toggles' row is left out of the count, and so is
+        // the icon of the veil over the bar's artwork (KeepLcdVeilInItsArtwork).
+        std::vector<ampify::Json> finals;
+        for (const ampify::Json& item : Items(*second, "final")) {
+            const std::string element = Text(item.Find("element"));
+            if (element != "StackPanel#NowPlayingToggleButtons" && element != "VolumeControl#VolumeControl" &&
+                element != "ToggleButton#LyricsToggleButton" && element.find("FontIcon") == std::string::npos) {
+                finals.push_back(item);
+            }
+        }
+        CHECK(finals.size() == 1 && Text(finals.front().Find("element")) == "Grid#TransportBar");
         for (const ampify::Json& item : Items(*second, "final")) {
             for (const auto& [property, value] : *item.Find("values")->AsObject()) {
                 CHECK(Text(value.Find("before")) != Text(value.Find("after")));

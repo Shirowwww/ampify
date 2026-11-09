@@ -5,6 +5,7 @@
 
 #include "xaml_backend.hpp"
 
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cstdint>
@@ -26,6 +27,7 @@
 #include <winrt/Microsoft.UI.Xaml.Media.Animation.h>
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
+#include <winrt/Microsoft.UI.Xaml.Shapes.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.UI.h>
@@ -38,6 +40,9 @@
 #include "../core/theme/selector.hpp"
 #include "../core/text_util.hpp"
 #include "../core/ui_render/render_tree.hpp"
+#include "artwork_cap.hpp"
+#include "artwork_passthrough.hpp"
+#include "player_controls.hpp"
 #include "sidebar_hover.hpp"
 #include "xaml_host.hpp"
 #include "xaml_backend_detail.hpp"
@@ -46,13 +51,31 @@ namespace ampify::win {
 
 using namespace xaml_detail;
 
-bool XamlTreeBackend::Attach() {
+namespace {
+
+// The application's resources as the main window's thread sees them, by COM identity only (never called from another
+// thread). WinUI is expected to give each interface thread its own copy, as UWP did for each view: the mini player's
+// thread writing the theme into its copy is what colours it. When a build of WinUI shares one copy, the main window's
+// backend alone writes it.
+std::atomic<void*> g_mainResources{nullptr};
+
+}  // namespace
+
+bool XamlTreeBackend::Attach(WindowRole role) {
     if (*m_closed) return false;
-    xaml::Window window = AppWindowOf(WindowRole::Main);
+    xaml::Window window = AppWindowOf(role);
     if (!window) return false;
+    void* resources = winrt::get_abi(xaml::Application::Current().Resources());
+    if (role == WindowRole::Main) {
+        g_mainResources = resources;
+    } else {
+        void* main = g_mainResources.load();
+        m_sharedResources = !main || main == resources;  // the main window not themed yet: nothing is assumed
+    }
+    m_role = role;
     m_window = winrt::make_weak(window);
     m_animations.WindowShown([handle = WindowHandle(window)] { return !handle || WindowOnScreen(handle); });
-    // Walking or writing the tree while Apple Music closes crashed it in Microsoft.UI.Xaml.dll (bench, 30/10).
+    // Walking or writing the tree while Apple Music closes crashed it in Microsoft.UI.Xaml.dll.
     std::shared_ptr<bool> closed = m_closed;
     window.Closed([closed](IInspectable const&, xaml::WindowEventArgs const&) noexcept { *closed = true; });
     std::weak_ptr<bool> alive = m_alive;
@@ -103,6 +126,7 @@ void XamlTreeBackend::OnSizeChanged() noexcept {
         m_mediaAnswers = std::move(answers);
         SchedulePass(0);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -150,9 +174,10 @@ ColourRef Grey(std::uint8_t alpha, std::uint8_t value) {
     return ColourRef(winrt::Windows::UI::Color{alpha, value, value, value});
 }
 
-// The header of a playlist's page and of an album's (.album-header in builtins.cpp).
+// The header of a playlist's page, an album's or an editorial playlist's of Apple (.album-header in builtins.cpp).
 bool IsPageHeader(const std::string& name) {
-    return name == "ContainerDetailHeaderLockupRegularContent" || name == "AlbumDetailHeaderLockupContent";
+    return name == "ContainerDetailHeaderLockupRegularContent" || name == "AlbumDetailHeaderLockupContent" ||
+           name == "PlaylistDetailHeaderLockupContent";
 }
 
 }  // namespace
@@ -182,6 +207,7 @@ void XamlTreeBackend::SetCaptionMode(std::optional<bool> dark) {
         m_captionWritten = CaptionColours{Grey(0xFF, ink), Grey(0xFF, ink), Grey(0x33, ink), Grey(0xFF, ink), Grey(0x66, ink)};
         WriteCaption(bar, *m_captionWritten);
     } catch (...) {
+        // The title bar refuses the colours: Windows keeps its own.
     }
 }
 
@@ -224,6 +250,7 @@ xaml::DependencyObject XamlTreeBackend::Resolve(theme::NodeId id) const {
     for (const auto& [key, decor] : m_decors) {
         if (decor.imageId == id) return decor.image;
     }
+    if (auto held = m_held.find(id); held != m_held.end()) return held->second;
     auto it = m_elements.find(id);
     if (it != m_elements.end()) return it->second.get();  // null when the element has been destroyed since the snapshot
     // An element written to or followed for :hover may be out of the last snapshot and still alive: the entry of a
@@ -239,12 +266,12 @@ xaml::DependencyObject XamlTreeBackend::Resolve(theme::NodeId id) const {
 theme::Value XamlTreeBackend::Keep(IInspectable object) {
     void* identity = ComIdentity(object);
     auto known = m_keptTokens.find(identity);
-    if (known != m_keptTokens.end()) return {theme::ValueKind::Opaque, "handle:" + std::to_string(known->second)};
+    if (known != m_keptTokens.end()) return {theme::ValueKind::Opaque, theme::EncodeHandle(known->second)};
 
     std::uint64_t token = m_nextToken++;
     m_kept[token] = object;  // holds the object, so its identity cannot be reused while the token exists
     m_keptTokens[identity] = token;
-    return {theme::ValueKind::Opaque, "handle:" + std::to_string(token)};
+    return {theme::ValueKind::Opaque, theme::EncodeHandle(token)};
 }
 
 void XamlTreeBackend::Remember(theme::NodeId id, std::string_view property, const theme::Value& value, IInspectable object) {
@@ -264,200 +291,20 @@ void XamlTreeBackend::Forget(theme::NodeId id, std::string_view property) {
     m_written.erase(std::make_pair(id, std::string(property)));
 }
 
-media::Brush XamlTreeBackend::ArtworkBrush(const std::string& text) {
-    media::ImageBrush brush;
-    std::string stretch = text.substr(text.find('|') == std::string::npos ? text.size() : text.find('|') + 1);
-    brush.Stretch(stretch == "Uniform" ? media::Stretch::Uniform
-                  : stretch == "Fill"  ? media::Stretch::Fill
-                                       : media::Stretch::UniformToFill);
-    if (m_artwork) brush.ImageSource(m_artwork);
-    m_artworkLayers.push_back(ArtworkLayer{brush, nullptr, {}});
-    return brush;
-}
-
-// `content: artwork`: a Border painted by an artwork brush, with the layer that fades the previous cover out on top.
-controls::Border XamlTreeBackend::ArtworkDecor(const std::string& text, const wchar_t* name) {
-    controls::Border artwork;
-    artwork.Name(name);
-    artwork.IsHitTestVisible(false);
-    xaml::Automation::AutomationProperties::SetAccessibilityView(artwork, xaml::Automation::Peers::AccessibilityView::Raw);
-    auto brush = ArtworkBrush(text).as<media::ImageBrush>();
-    ArtworkLayer& layer = m_artworkLayers.back();
-    layer.owner = artwork;
-    layer.fade = MakeArtworkFade(brush.Stretch());
-    artwork.Background(brush);
-    artwork.Child(layer.fade.layer);
-    return artwork;
-}
-
-bool XamlTreeBackend::DecorHolds(const controls::Border& owner) const {
-    for (const auto& [key, decor] : m_decors) {
-        if (decor.image && ComIdentity(decor.image) == ComIdentity(owner)) return true;
-    }
-    return false;
-}
-
-// Gives the artwork brushes the image of the song playing, and lets go of those nothing holds any more (the theme was
-// removed, the decor replaced). Strong references: weak ones to what Ampify made never resolve in Apple Music.
-void XamlTreeBackend::FollowArtwork(const media::ImageSource& artwork) {
-    if (artwork) m_artwork = artwork;  // between two songs the image may be missing for a moment: keep the last one
-    // COM identity: the brush is stored as a Brush, an interface pointer other than the ImageBrush one.
-    std::erase_if(m_artworkLayers, [&](const ArtworkLayer& layer) {
-        if (layer.owner) return !DecorHolds(layer.owner);
-        for (const auto& [key, written] : m_written) {
-            if (ComIdentity(written.object) == ComIdentity(layer.brush)) return false;
-        }
-        return true;
-    });
-    for (ArtworkLayer& layer : m_artworkLayers) {
-        media::ImageSource shown = layer.brush.ImageSource();
-        if (!m_artwork || shown == m_artwork) continue;
-        if (layer.owner) FadeFromPrevious(layer.fade, shown, layer.owner.CornerRadius());
-        layer.brush.ImageSource(m_artwork);
-    }
-}
-
-// Reads the colours of an artwork once per image: rendered small, then median cut (color_extract.hpp). Each prefix
-// ("" for the play bar, kPageArtworkPrefix for the page on screen) holds its own variables and key. A blank or failed
-// reading leaves the key unset, so the next pass tries again.
-void XamlTreeBackend::SampleArtwork(const controls::Image& image, const std::string& prefix) {
-    constexpr int kSampleSize = 48;
-    media::ImageSource source = image.Source();
-    if (!source || image.ActualWidth() < 1) return;
-    std::string key;
-    if (auto bitmap = source.try_as<media::Imaging::BitmapImage>()) {
-        if (bitmap.PixelWidth() == 0) return;  // not decoded yet
-        if (auto uri = bitmap.UriSource()) key = Utf8(uri.AbsoluteUri());
-    }
-    if (key.empty()) key = std::to_string(reinterpret_cast<std::uintptr_t>(winrt::get_abi(source)));
-    std::shared_ptr<ArtworkColours> shared = m_artworkColours;
-    bool later = false;
-    {
-        std::lock_guard<std::mutex> guard(shared->lock);
-        if (shared->keys[prefix] == key) return;
-        later = !shared->busy.insert(prefix).second;
-    }
-    if (later && !prefix.empty()) return;  // the page's artwork waits for the next pass
-    if (later) {
-        // The reading of the previous image is still under way: this one is read right after it.
-        constexpr auto kRetry = std::chrono::milliseconds(120);
-        try {
-            if (!m_artworkRetry) {
-                m_artworkRetry = image.DispatcherQueue().CreateTimer();
-                m_artworkRetry.IsRepeating(false);
-                std::weak_ptr<bool> alive = m_alive;
-                m_artworkRetry.Tick([this, alive](auto const&, auto const&) noexcept {
-                    if (!alive.expired()) OnArtworkChanged();
-                });
-            }
-            m_artworkRetry.Interval(kRetry);
-            m_artworkRetry.Start();
-        } catch (...) {
-        }
-        return;
-    }
-    auto done = [shared, prefix](std::optional<std::map<std::string, std::string>> variables, const std::string& from) {
-        {
-            std::lock_guard<std::mutex> guard(shared->lock);
-            shared->busy.erase(prefix);
-            if (!variables) return;
-            const std::string own = prefix + "art-";
-            std::erase_if(shared->variables, [&](const auto& entry) { return entry.first.starts_with(own); });
-            for (auto& [name, value] : *variables) shared->variables[prefix + name] = std::move(value);
-            shared->keys[prefix] = from;
-        }
-        shared->changed.notify_all();
-    };
-    try {
-        media::Imaging::RenderTargetBitmap target;
-        using winrt::Windows::Foundation::AsyncStatus;
-        target.RenderAsync(image, kSampleSize, kSampleSize)
-            .Completed([target, key, done](auto const&, AsyncStatus status) {
-                if (status != AsyncStatus::Completed) return done(std::nullopt, key);
-                target.GetPixelsAsync().Completed([target, key, done](auto const& operation, AsyncStatus read) {
-                    try {
-                        if (read != AsyncStatus::Completed) return done(std::nullopt, key);
-                        auto buffer = operation.GetResults();
-                        size_t width = static_cast<size_t>(target.PixelWidth());
-                        size_t height = static_cast<size_t>(target.PixelHeight());
-                        if (buffer.Length() != width * height * 4) return done(std::nullopt, key);
-                        // BGRA with premultiplied alpha, to the straight RGBA the extractor reads.
-                        std::vector<uint8_t> rgba(buffer.Length());
-                        const uint8_t* bgra = buffer.data();
-                        for (size_t i = 0; i < rgba.size(); i += 4) {
-                            uint8_t alpha = bgra[i + 3];
-                            auto straight = [alpha](uint8_t channel) {
-                                return alpha ? static_cast<uint8_t>(std::min(255, channel * 255 / alpha)) : uint8_t{0};
-                            };
-                            rgba[i] = straight(bgra[i + 2]);
-                            rgba[i + 1] = straight(bgra[i + 1]);
-                            rgba[i + 2] = straight(bgra[i]);
-                            rgba[i + 3] = alpha;
-                        }
-                        std::optional<ExtractedColors> colors = ExtractColors(rgba.data(), rgba.size(), width, height);
-                        if (!colors) return done(std::nullopt, key);
-                        done(ArtworkVariables(*colors), key);
-                    } catch (...) {
-                        done(std::nullopt, key);
-                    }
-                });
-            });
-    } catch (...) {
-        done(std::nullopt, key);
-    }
-}
-
-// Follows the play bar's artwork between passes: ImageOpened for an image that loads, and Source for one Apple Music
-// had already loaded (a cached artwork opens nothing). Apple's own image, so a weak reference resolves. The handlers
-// read the artwork at once, not through SchedulePass: a song's colours follow it within a quarter second, and
-// OnArtworkChanged lets nothing escape into Apple Music's XAML.
-void XamlTreeBackend::FollowArtworkImage(const controls::Image& image) {
-    controls::Image followed = m_artworkImage.get();
-    if (followed == image) return;
-    try {
-        if (followed) {
-            followed.ImageOpened(m_artworkOpened);
-            followed.UnregisterPropertyChangedCallback(controls::Image::SourceProperty(), m_artworkSourceToken);
-        }
-        std::weak_ptr<bool> alive = m_alive;
-        m_artworkOpened = image.ImageOpened([this, alive](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
-            if (!alive.expired()) OnArtworkChanged();
-        });
-        m_artworkSourceToken = image.RegisterPropertyChangedCallback(
-            controls::Image::SourceProperty(),
-            [this, alive](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
-                if (!alive.expired()) OnArtworkChanged();
-            });
-        m_artworkImage = winrt::make_weak(image);
-    } catch (...) {
-        m_artworkImage = nullptr;  // the next pass tries again
-    }
-}
-
-void XamlTreeBackend::OnArtworkChanged() noexcept {
-    try {
-        if (*m_closed) return;
-        controls::Image image = m_artworkImage.get();
-        if (!image) return;
-        FollowArtwork(image.Source());
-        SampleArtwork(image);
-    } catch (...) {
-    }
-}
-
 IInspectable XamlTreeBackend::Restore(const theme::Value& token) const {
-    std::uint64_t number = std::stoull(token.text.substr(std::string("handle:").size()));
-    auto it = m_kept.find(number);
+    std::optional<std::uint64_t> number = theme::DecodeHandle(token.text);
+    auto it = number ? m_kept.find(*number) : m_kept.end();
     return it == m_kept.end() ? IInspectable{nullptr} : it->second;
 }
 
 std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     std::vector<theme::NodeInfo> nodes;
     m_elements.clear();
+    m_held.clear();
 
     if (*m_closed) return nodes;
-    xaml::Window window = m_window.get();  // the main window, from AMP.Utils (Attach)
-    if (!window) window = AppWindowOf(WindowRole::Main);
+    xaml::Window window = m_window.get();  // the window of m_role, from AMP.Utils (Attach)
+    if (!window) window = AppWindowOf(m_role);
     if (!window) return nodes;
     xaml::UIElement content = window.Content();
     if (!content) return nodes;
@@ -484,21 +331,27 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         if (primitives::Popup popup = it->get()) stack.push_back({popup, -1, 0, 0, 1});
     }
     // Apple's full-screen player is a window of its own on this same thread: its content is a root as well, so themes
-    // reach it. A window on another thread (the mini player) cannot be walked from here.
+    // reach it. A window on another thread (the mini player) cannot be walked from here: it has a backend of its own.
     for (WindowRole role : {WindowRole::Player, WindowRole::Mini}) {
+        if (m_role != WindowRole::Main) break;
         try {
             xaml::Window other = AppWindowOf(role);
             if (!other || other == window || !other.DispatcherQueue().HasThreadAccess()) continue;
             if (xaml::UIElement root = other.Content()) stack.push_back({root, -1, 0, 0, 1, true});
         } catch (...) {
+            // A window of another thread, or one closing, is not walked.
         }
     }
-    stack.push_back({content, -1, 0, 0, 1});
+    // A player window's own content stays a player's tree: only selectors that name the player reach it, as above.
+    stack.push_back({content, -1, 0, 0, 1, m_role != WindowRole::Main});
     std::set<void*> popupsSeen;  // a popup of the window's tree, reached there first, is not walked twice
     std::set<theme::NodeId> decorPanels;  // their ::before and ::after images are left out, so no selector meets them
     for (const auto& [key, decor] : m_decors) decorPanels.insert(key.first);
     std::vector<int> playingBars;  // the visible Grid#NowPlayingIndicator of list rows (MarkPlayingRows)
+    std::vector<int> litDots;      // the lit dots under Apple's mode buttons (MarkCheckedByDot)
     int lcdDepth = -1;
+    xaml::FrameworkElement lcdArtwork{nullptr};  // the play bar's HoverGrid#ThumbnailHoverGrid (KeepArtworkPassthrough)
+    xaml::FrameworkElement paneRoot{nullptr};    // the sidebar's Grid#PaneRoot, for the same
     int headerDepth = -1;
     media::ImageSource artwork{nullptr};
     controls::Image artworkImage{nullptr};
@@ -517,9 +370,12 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         if (auto element = item.object.try_as<xaml::FrameworkElement>()) node.name = Utf8(element.Name());
         // Ampify's app pages sit beside Apple's frame but stay out of themes, as when they lived in a popup: the kit
         // renderer owns their values.
-        if (node.name == "AMPIFY_PageHost") continue;
+        if (node.name == "AMPIFY_PageHost" || node.name == kLargeArtworkLoaderName || node.name == kEffectHostName) {
+            continue;
+        }
         if (auto text = item.object.try_as<controls::TextBlock>()) node.icon = IsIconText(text.Text());
         if (auto panel = item.object.try_as<controls::Panel>()) node.panel = TakesDecor(panel);
+        if (m_watchStates) TakeStates(item.object, node);
         node.parent = item.parent;
         node.depth = item.depth;
         node.position = item.position;
@@ -528,6 +384,10 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         // The play bar's artwork: the first Image#StaticArtwork under NowPlayingControl#LCD.
         if (lcdDepth >= 0 && item.depth <= lcdDepth) lcdDepth = -1;
         if (node.name == "LCD" && node.type == "NowPlayingControl") lcdDepth = item.depth;
+        if (lcdDepth >= 0 && !lcdArtwork && !item.player && node.name == "ThumbnailHoverGrid") {
+            lcdArtwork = item.object.try_as<xaml::FrameworkElement>();
+        }
+        if (!paneRoot && !item.player && node.name == "PaneRoot") paneRoot = item.object.try_as<xaml::FrameworkElement>();
         if (lcdDepth >= 0 && !artwork && node.name == "StaticArtwork") {
             if (auto image = item.object.try_as<controls::Image>()) {
                 artwork = image.Source();
@@ -544,8 +404,15 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
             auto element = item.object.try_as<xaml::UIElement>();
             if (element && element.Visibility() == xaml::Visibility::Visible) playingBars.push_back(index);
         }
+        if (m_watchStates && node.name.size() > 3 && node.name.ends_with("Dot")) {
+            if (auto dot = item.object.try_as<xaml::FrameworkElement>()) {
+                if (DotLit(dot)) litDots.push_back(index);
+                WatchDot(dot, node.id);
+            }
+        }
         nodes.push_back(node);
-        m_elements.emplace(node.id, winrt::weak_ref<xaml::DependencyObject>(item.object));
+        auto [kept, added] = m_elements.emplace(node.id, winrt::weak_ref<xaml::DependencyObject>(item.object));
+        if (added && !kept->second.get()) m_held.insert_or_assign(node.id, item.object);
         if (m_pass) Watch(item.object, node.id, node.type);
 
         int count = media::VisualTreeHelper::GetChildrenCount(item.object);
@@ -572,6 +439,13 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     }
 
     theme::MarkPlayingRows(nodes, playingBars);
+    if (m_watchStates) theme::MarkSelectedPresenters(nodes);
+    if (m_watchStates) theme::MarkCheckedByDot(nodes, litDots);
+    if (m_role == WindowRole::Main) {
+        KeepArtworkCaps();  // its map belongs to the main window's thread
+        KeepArtworkPassthrough(lcdArtwork, paneRoot);
+        KeepVeilOnArtwork(lcdArtwork);
+    }
 
     // What Ampify remembers of destroyed elements cannot be used any more: a long session stays small.
     for (auto it = m_written.begin(); it != m_written.end();) {
@@ -590,17 +464,20 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     }
     for (const auto& [id, property] : gone) ReleaseStates(id, property);
     std::erase_if(m_checked, [](const auto& entry) { return !entry.second.control.get(); });
-    FollowArtwork(artwork);
+    FollowArtwork(artworkImage, artwork);
     if (artworkImage) {
         FollowArtworkImage(artworkImage);
         SampleArtwork(artworkImage);
     }
     if (pageImage) SampleArtwork(pageImage, kPageArtworkPrefix);
     std::erase_if(m_watched, [](const auto& entry) { return !entry.second.get(); });
+    std::erase_if(m_stateWatched, [](const auto& entry) { return !entry.second.get(); });
     std::erase_if(m_touched, [](const auto& entry) { return !entry.second.get(); });
     DropDeadHolds();
     m_paneCorners.Sweep();
     m_gradientFit.Sweep();
+    m_blur.Sweep();
+    m_widthGlides.Sweep();
     std::erase_if(m_decors, [this](const auto& entry) {
         if (entry.second.panel.get()) return false;
         m_bars.Drop(entry.second.image);
@@ -619,6 +496,63 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         return std::any_of(m_decors.begin(), m_decors.end(), [id](const auto& entry) { return entry.second.imageId == id; });
     });
     return nodes;
+}
+
+// :checked, :selected and :disabled as the control says them. A change of toggle or selection asks for a pass at once;
+// a control that turns disabled is seen at the next pass (watching IsEnabled would put a handler on every control).
+void XamlTreeBackend::TakeStates(const xaml::DependencyObject& object, theme::NodeInfo& node) {
+    xaml::DependencyProperty watched{nullptr};
+    if (auto toggle = object.try_as<primitives::ToggleButton>()) {
+        auto checked = toggle.IsChecked();
+        node.checked = checked && checked.Value();
+        watched = primitives::ToggleButton::IsCheckedProperty();
+    } else if (auto toggleSwitch = object.try_as<controls::ToggleSwitch>()) {
+        node.checked = toggleSwitch.IsOn();
+        watched = controls::ToggleSwitch::IsOnProperty();
+    } else if (auto item = object.try_as<primitives::SelectorItem>()) {
+        node.selected = item.IsSelected();
+        watched = primitives::SelectorItem::IsSelectedProperty();
+    } else if (auto entry = object.try_as<controls::NavigationViewItemBase>()) {
+        node.selected = entry.IsSelected();
+        watched = controls::NavigationViewItemBase::IsSelectedProperty();
+    }
+    if (auto control = object.try_as<controls::Control>()) node.disabled = !control.IsEnabled();
+    if (!watched) return;
+    if (auto known = m_stateWatched.find(node.id); known != m_stateWatched.end() && known->second.get() == object) return;
+    std::weak_ptr<bool> alive = m_alive;
+    try {
+        object.RegisterPropertyChangedCallback(watched, [this, alive](xaml::DependencyObject const&, xaml::DependencyProperty const&) {
+            // The handler runs inside Apple Music's XAML: SchedulePass lets nothing escape, and the weak pointer makes
+            // it do nothing once the backend is gone, as for the other watchers.
+            if (!alive.expired() && m_watchStates) SchedulePass(0);
+        });
+        m_stateWatched[node.id] = winrt::make_weak(object);
+    } catch (...) {
+        // A control being torn down refuses the callback: its state is read again at the next pass.
+    }
+}
+
+// A mode button's dot asks for a pass when Apple lights or clears it: its fill (replaced, or its colour changed),
+// opacity or visibility. Once per dot, as TakeStates.
+void XamlTreeBackend::WatchDot(const xaml::FrameworkElement& dot, theme::NodeId id) {
+    if (auto known = m_stateWatched.find(id); known != m_stateWatched.end() && known->second.get() == dot) return;
+    std::weak_ptr<bool> alive = m_alive;
+    auto changed = [this, alive](xaml::DependencyObject const&, xaml::DependencyProperty const&) {
+        if (!alive.expired() && m_watchStates) SchedulePass(0);
+    };
+    try {
+        dot.RegisterPropertyChangedCallback(xaml::UIElement::OpacityProperty(), changed);
+        dot.RegisterPropertyChangedCallback(xaml::UIElement::VisibilityProperty(), changed);
+        if (auto shape = dot.try_as<xaml::Shapes::Shape>()) {
+            shape.RegisterPropertyChangedCallback(xaml::Shapes::Shape::FillProperty(), changed);
+            if (auto fill = shape.Fill().try_as<media::SolidColorBrush>()) {
+                fill.RegisterPropertyChangedCallback(media::SolidColorBrush::ColorProperty(), changed);
+            }
+        }
+        m_stateWatched[id] = winrt::make_weak(dot.as<xaml::DependencyObject>());
+    } catch (...) {
+        // A dot being torn down refuses the callback: it is read again at the next pass.
+    }
 }
 
 void XamlTreeBackend::WatchChanges(std::function<void()> pass) {
@@ -684,6 +618,7 @@ void XamlTreeBackend::StopFollowingRewrites(theme::NodeId id) noexcept {
             text.UnregisterPropertyChangedCallback(controls::TextBlock::TextAlignmentProperty(), known->second.token);
         }
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
     m_rewritesFollowed.erase(known);
 }
@@ -715,6 +650,7 @@ void XamlTreeBackend::SchedulePass(int followUps) noexcept {
         m_passTimer.Interval(kSoon);
         m_passTimer.Start();
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -729,6 +665,7 @@ void XamlTreeBackend::RunPass() noexcept {
             m_passTimer.Start();
         }
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -742,7 +679,7 @@ bool XamlTreeBackend::LearnPopups(const xaml::XamlRoot& root) {
         for (const primitives::Popup& popup : media::VisualTreeHelper::GetOpenPopupsForXamlRoot(root)) {
             auto child = popup.Child().try_as<xaml::FrameworkElement>();
             std::string name = child ? Utf8(child.Name()) : std::string();
-            if (uirender::IsOwnName(name) || uirender::IsForeignModName(name)) continue;
+            if (uirender::IsAmpifyOrModName(name)) continue;
             void* identity = winrt::get_abi(popup.as<winrt::Windows::Foundation::IUnknown>());
             open.push_back(identity);
             if (std::find(m_openPopups.begin(), m_openPopups.end(), identity) == m_openPopups.end()) opened = true;
@@ -780,6 +717,7 @@ void XamlTreeBackend::WatchPopups(const xaml::UIElement& content) {
                                                     if (!alive.expired()) CheckPopups();
                                                 });
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     };
     content.AddHandler(xaml::UIElement::PointerReleasedEvent(),
@@ -797,6 +735,7 @@ void XamlTreeBackend::CheckPopups() noexcept {
         xaml::UIElement content = window.Content();
         if (content && LearnPopups(content.XamlRoot())) SchedulePass(1);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -805,7 +744,14 @@ bool XamlTreeBackend::WindowShown() const {
         xaml::Window window = m_window.get();
         xaml::UIElement content = window ? window.Content() : nullptr;
         xaml::XamlRoot root = content ? content.XamlRoot() : nullptr;
-        return !root || root.IsHostVisible();
+        if (!root || root.IsHostVisible()) return true;
+        // Hidden while Apple's full-screen player stands in its place: this window's passes theme that player (its
+        // content is walked from here, on this thread), so they go on (minimal-fullscreen did nothing there).
+        if (m_role != WindowRole::Main) return false;
+        xaml::Window player = AppWindowOf(WindowRole::Player);
+        if (!player || !player.DispatcherQueue().HasThreadAccess()) return false;
+        xaml::UIElement shown = player.Content();
+        return shown && shown.XamlRoot() && shown.XamlRoot().IsHostVisible();
     } catch (...) {
         return true;
     }
@@ -850,418 +796,6 @@ std::optional<theme::NodeBox> XamlTreeBackend::Box(theme::NodeId id) {
     } catch (...) {
         return std::nullopt;
     }
-}
-
-// Puts the element into `panel` at `index` (or last). False when the panel refuses it.
-static bool InsertChild(const controls::Panel& panel, const xaml::UIElement& element, int index) noexcept {
-    try {
-        controls::UIElementCollection children = panel.Children();
-        const std::uint32_t size = children.Size();
-        const auto place = index < 0 ? size : std::min(static_cast<std::uint32_t>(index), size);
-        children.InsertAt(place, element);
-        return true;
-    } catch (...) {
-        return false;
-    }
-}
-
-// The parents walked up from a moved element to the visual states that name it: the times sit 2 to 4 below the root of
-// the song display's template.
-constexpr int kStatesReach = 8;
-
-// A state's target given as the name, or as an element of that name (the element itself, or its stand-in).
-static bool NamesElement(const IInspectable& target, const winrt::hstring& name) {
-    if (!target) return false;
-    if (auto framework = target.try_as<xaml::FrameworkElement>()) return framework.Name() == name;
-    return winrt::unbox_value_or<winrt::hstring>(target, L"") == name;
-}
-
-// A state's animations that name the element point at `to` (with no `to`, nothing changes). True when one names it.
-static bool PointStory(const animation::Storyboard& story, const winrt::hstring& name,
-                       const xaml::DependencyObject& to) {
-    bool named = false;
-    bool running = false;
-    for (const animation::Timeline& timeline : story.Children()) {
-        try {
-            if (animation::Storyboard::GetTargetName(timeline) != name) continue;
-            if (!to) return true;
-            // A state that ran keeps its end on its old target (the song's times faded out): it lets go, and plays
-            // again on the new one, so the element back in place looks as Apple left the state.
-            if (!named) {
-                running = story.GetCurrentState() != animation::ClockState::Stopped;
-                story.Stop();
-            }
-            named = true;
-            animation::Storyboard::SetTarget(timeline, to);
-        } catch (...) {
-        }
-    }
-    try {
-        if (running) story.Begin();
-    } catch (...) {
-    }
-    return named;
-}
-
-// One state's setters and animations that name the element point at `to` (with no `to`, nothing changes). True when
-// the state names it.
-static bool PointState(const xaml::VisualState& state, const winrt::hstring& name, const xaml::DependencyObject& to) {
-    bool named = false;
-    for (const xaml::SetterBase& base : state.Setters()) {
-        try {
-            auto setter = base.try_as<xaml::Setter>();
-            xaml::TargetPropertyPath path = setter ? setter.Target() : nullptr;
-            if (!path || !NamesElement(path.Target(), name)) continue;
-            named = true;
-            if (to) path.Target(to);
-        } catch (...) {
-        }
-    }
-    animation::Storyboard story = state.Storyboard();
-    return (story && PointStory(story, name, to)) || named;
-}
-
-// The states of `from` and the parents above it that name the element point at `to`. True when one of them names it.
-static bool PointStates(const xaml::DependencyObject& from, const winrt::hstring& name,
-                        const xaml::DependencyObject& to) {
-    bool named = false;
-    xaml::DependencyObject node = from;
-    for (int up = 0; node && up < kStatesReach; up++, node = media::VisualTreeHelper::GetParent(node)) {
-        auto owner = node.try_as<xaml::FrameworkElement>();
-        if (!owner) continue;
-        for (const xaml::VisualStateGroup& group : xaml::VisualStateManager::GetVisualStateGroups(owner)) {
-            for (const xaml::VisualState& state : group.States()) named = PointState(state, name, to) || named;
-        }
-    }
-    return named;
-}
-
-// An element of the same class and name, empty, sized 0 and out of the walk (Snapshot), that stands where a moved
-// element was. Null when the class cannot be made outside its template.
-xaml::FrameworkElement XamlTreeBackend::StandIn(const xaml::FrameworkElement& element) {
-    const std::wstring key = std::wstring(winrt::get_class_name(element)) + L"#" + std::wstring(element.Name());
-    if (auto known = m_standIns.find(key); known != m_standIns.end()) return known->second;
-    xaml::FrameworkElement made{nullptr};
-    try {
-        made = winrt::get_activation_factory(winrt::get_class_name(element)).ActivateInstance<xaml::FrameworkElement>();
-        made.Name(element.Name());
-        made.Width(0);
-        made.Height(0);
-        made.IsHitTestVisible(false);
-        made.Visibility(xaml::Visibility::Collapsed);
-        m_standInIds.insert(winrt::get_abi(made.as<xaml::DependencyObject>()));  // as the walk sees it
-    } catch (...) {
-        made = nullptr;
-    }
-    m_standIns.emplace(key, made);
-    return made;
-}
-
-// Apple's states find their targets by name in the template, and an element that leaves the tree leaves its name
-// there: moved, the times made the song display's pointer states fail ("animation target not specified", 0x800F1000)
-// and Apple Music closed at the first hover of the song. The stand-in takes the element's place and name, and the
-// states play on it, so they hide nothing the theme placed elsewhere; back in place, they drive the element again.
-void XamlTreeBackend::HandStatesOver(const xaml::UIElement& element, const controls::Panel& from, std::uint32_t at,
-                                     const controls::Panel& to) noexcept {
-    try {
-        auto framework = element.try_as<xaml::FrameworkElement>();
-        if (!framework || framework.Name().empty()) return;
-        PointStates(to, framework.Name(), element);
-        if (!PointStates(from, framework.Name(), nullptr)) return;  // no state names it: nothing to stand in for
-        xaml::FrameworkElement standIn = StandIn(framework);
-        PointStates(from, framework.Name(), standIn ? xaml::DependencyObject(standIn) : element);
-        if (!standIn) return;
-        // Still in a template Apple Music has since rebuilt: it moves to the new one.
-        if (auto old = media::VisualTreeHelper::GetParent(standIn).try_as<controls::Panel>()) {
-            if (old == from) return;
-            WithdrawStandIn(element, old);
-        }
-        from.Children().InsertAt(std::min(at, from.Children().Size()), standIn);
-    } catch (...) {
-    }
-}
-
-// Before the element comes back to `panel`, its stand-in leaves it: the name is the element's again.
-void XamlTreeBackend::WithdrawStandIn(const xaml::UIElement& element, const controls::Panel& panel) noexcept {
-    try {
-        auto framework = element.try_as<xaml::FrameworkElement>();
-        if (!framework || framework.Name().empty()) return;
-        const std::wstring key = std::wstring(winrt::get_class_name(framework)) + L"#" + std::wstring(framework.Name());
-        auto known = m_standIns.find(key);
-        std::uint32_t at = 0;
-        if (known == m_standIns.end() || !known->second || !panel.Children().IndexOf(known->second, at)) return;
-        panel.Children().RemoveAt(at);
-    } catch (...) {
-    }
-}
-
-bool XamlTreeBackend::IsStandIn(const xaml::DependencyObject& object) const {
-    return !m_standInIds.empty() && m_standInIds.count(winrt::get_abi(object)) > 0;
-}
-
-// The element leaves its panel and joins the other one at `index` (or last): the visual parent says which panel it
-// leaves, so no snapshot is needed. When the other panel refuses it, the element goes back to its old place.
-bool XamlTreeBackend::Reparent(theme::NodeId id, theme::NodeId parent, int index) {
-    try {
-        auto element = Resolve(id).try_as<xaml::UIElement>();
-        auto target = Resolve(parent).try_as<controls::Panel>();
-        if (!element || !target) return false;
-        auto from = media::VisualTreeHelper::GetParent(element).try_as<controls::Panel>();
-        std::uint32_t at = 0;
-        if (!from || !from.Children().IndexOf(element, at)) return false;
-        from.Children().RemoveAt(at);
-        WithdrawStandIn(element, target);
-        if (InsertChild(target, element, index)) {
-            HandStatesOver(element, from, at, target);
-            return true;
-        }
-        // Without this the scrubber and the times would vanish from Apple Music's bar.
-        return InsertChild(from, element, static_cast<int>(at));
-    } catch (...) {
-        return false;
-    }
-}
-
-// An icon or a text usually shows its button's colour and font, a template part its control's values: none of them
-// its own. Those read as kNoOwnValue, so that removing the theme clears them instead of freezing what they showed.
-std::optional<theme::Value> XamlTreeBackend::ReadOriginal(theme::NodeId id, std::string_view property) {
-    try {
-        xaml::DependencyObject object = Resolve(id);
-        if (!object) return std::nullopt;
-        if (!m_hover.Has(id)) {
-            xaml::DependencyProperty own = OwnProperty(object, property);
-            IInspectable local = own ? object.ReadLocalValue(own) : nullptr;
-            if (own && local == xaml::DependencyProperty::UnsetValue()) return theme::kNoOwnValue;
-            // Apple painted it in code with a brush of Ampify's resources: that brush comes back, recoloured by then
-            // (OwnBrush), not the theme's colour it showed when it was read.
-            if (local && IsOwnBrush(local)) return Keep(local);
-        }
-        return Read(id, property);
-    } catch (...) {
-        return std::nullopt;
-    }
-}
-
-bool XamlTreeBackend::IsOwnBrush(const IInspectable& value) const {
-    if (!value.try_as<media::SolidColorBrush>()) return false;
-    return std::any_of(m_ownBrushes.begin(), m_ownBrushes.end(),
-                       [&](const auto& own) { return own.second && own.second == value; });
-}
-
-// One brush per key for the life of the process, recoloured in place: Apple Music paints some texts in code (an
-// album's artist) with the brush it looked up then, which kept a theme's accent after the theme until a restart.
-media::SolidColorBrush XamlTreeBackend::OwnBrush(const std::string& key, ColorValue color) {
-    media::SolidColorBrush& brush = m_ownBrushes.try_emplace(key, nullptr).first->second;
-    if (!brush) brush = media::SolidColorBrush(color);
-    else if (brush.Color() != color) brush.Color(color);
-    return brush;
-}
-
-// The known colour keys the application holds. Its dictionaries are not enumerated: that realised every deferred
-// resource out of its context, and Apple Music crashed at the next theme change (0xc000027b, ERROR_NOT_FOUND stowed in
-// Microsoft.UI.Xaml.dll; 4 launches out of 4 with the inspector on, 31/10). Looking up a known key is safe.
-std::vector<std::string> XamlTreeBackend::ResourceKeys() {
-    std::vector<std::string> keys;
-    xaml::ResourceDictionary resources = xaml::Application::Current().Resources();
-    for (std::string_view key : theme::ColourResourceKeys()) {
-        try {
-            if (resources.HasKey(winrt::box_value(winrt::to_hstring(std::string(key))))) keys.emplace_back(key);
-        } catch (...) {
-        }
-    }
-    return keys;
-}
-
-std::optional<theme::Value> XamlTreeBackend::ReadResource(std::string_view key) {
-    xaml::ResourceDictionary resources = xaml::Application::Current().Resources();
-    winrt::hstring name = winrt::to_hstring(std::string(key));
-    IInspectable value{nullptr};
-    try {
-        if (!resources.HasKey(winrt::box_value(name))) return std::nullopt;
-        value = resources.Lookup(winrt::box_value(name));
-    } catch (...) {
-        return std::nullopt;  // a resource Apple Music cannot give out of its context: read as absent
-    }
-    if (auto solid = value.try_as<media::SolidColorBrush>()) return theme::Value{theme::ValueKind::Color, ColourText(solid.Color())};
-    // A Color resource reads as a colour too: an opaque handle would differ on every tick and be written again.
-    if (auto color = value.try_as<winrt::Windows::Foundation::IReference<ColorValue>>()) {
-        return theme::Value{theme::ValueKind::Color, ColourText(color.Value())};
-    }
-    return Keep(value);
-}
-
-bool XamlTreeBackend::WriteResource(std::string_view key, const theme::Value& value) {
-    std::string keyText(key);
-    xaml::ResourceDictionary resources = xaml::Application::Current().Resources();
-    IInspectable name = winrt::box_value(winrt::to_hstring(keyText));
-    // The value Apple Music had comes back: a key Ampify added on top of the theme dictionaries is removed, so the
-    // app's light and dark values work again, instead of the one read under the theme staying for good.
-    if (auto added = m_addedKeys.find(keyText); added != m_addedKeys.end() && added->second == value) {
-        m_addedKeys.erase(added);
-        std::optional<ColorValue> before = value.kind == theme::ValueKind::Color ? ColorFromText(value.text) : std::nullopt;
-        if (auto own = m_ownBrushes.find(keyText); own != m_ownBrushes.end() && own->second && before) {
-            own->second.Color(*before);  // what Apple painted with it takes Apple's colour back
-        }
-        if (OwnsKey(resources, name)) resources.Remove(name);
-        MarkResourcesDirty("resource " + keyText + " removed");
-        return true;
-    }
-    if (!OwnsKey(resources, name) && !m_addedKeys.count(keyText)) {
-        if (std::optional<theme::Value> before = ReadResource(key)) m_addedKeys.emplace(keyText, *before);
-    }
-
-    std::optional<IInspectable> object;
-    if (value.kind == theme::ValueKind::Color) {
-        std::optional<ColorValue> color = ColorFromText(value.text);
-        if (!color) return false;
-        object = OwnBrush(keyText, *color);
-    } else if (value.kind == theme::ValueKind::Opaque) {
-        object = Restore(value);
-    }
-    if (!object) return false;
-
-    // Fluent names a Color without the Brush suffix (SolidBackgroundFillColorBase) and the brush with it: a brush in
-    // place of a Color breaks every brush built on it, so the value keeps the kind already there.
-    if (value.kind == theme::ValueKind::Color && resources.HasKey(name)) {
-        if (std::optional<ColorValue> color = ColorFromText(value.text);
-            color && resources.Lookup(name).try_as<winrt::Windows::Foundation::IReference<ColorValue>>()) {
-            object = winrt::box_value(*color);
-        }
-    }
-    // Our brush already holds the key: recoloured above, everything drawn with it follows, nothing to read again.
-    if (OwnsKey(resources, name) && resources.Lookup(name) == *object) return true;
-    resources.Insert(name, *object);
-    MarkResourcesDirty("resource " + keyText);
-    return true;
-}
-
-void XamlTreeBackend::MarkResourcesDirty(std::string why) {
-    if (!m_resourcesDirty) {
-        m_dirtyReason = std::move(why);
-        m_dirtyCount = 0;
-    }
-    m_resourcesDirty = true;
-    m_dirtyCount++;
-}
-
-bool XamlTreeBackend::SetDictionary(std::string_view xaml) {
-    xaml::ResourceDictionary resources = xaml::Application::Current().Resources();
-    auto merged = resources.MergedDictionaries();
-
-    if (m_merged) {
-        uint32_t index = 0;
-        if (merged.IndexOf(m_merged, index)) merged.RemoveAt(index);
-        m_merged = nullptr;
-    }
-    MarkResourcesDirty("dictionary");
-    if (xaml.empty()) return true;
-
-    xaml::ResourceDictionary dictionary = xaml::Markup::XamlReader::Load(winrt::to_hstring(std::string(xaml))).try_as<xaml::ResourceDictionary>();
-    if (!dictionary) return false;
-    merged.Append(dictionary);
-    m_merged = dictionary;
-    return true;
-}
-
-// A panel that refuses a child (a sealed collection, a decode the app refuses) costs only its own image.
-theme::DecorChange XamlTreeBackend::SetDecor(theme::NodeId id, theme::PseudoElement slot, const theme::Decor* decor) {
-    if (*m_closed) return theme::DecorChange::Refused;
-    try {
-        return decor ? PlaceDecor(id, slot, *decor) : RemoveDecor(id, slot);
-    } catch (...) {
-        return theme::DecorChange::Refused;
-    }
-}
-
-// A changed decor gets a new Image where the old one stood (Children.SetAt): no value of the old one (a width the
-// rule no longer gives, a running animation) is left behind, and the panel never holds two.
-theme::DecorChange XamlTreeBackend::PlaceDecor(theme::NodeId id, theme::PseudoElement slot, const theme::Decor& decor) {
-    controls::Panel panel{nullptr};
-    if (xaml::DependencyObject object = Resolve(id)) panel = object.try_as<controls::Panel>();
-    if (!TakesDecor(panel)) return theme::DecorChange::Refused;
-    controls::UIElementCollection children = panel.Children();
-    auto key = std::make_pair(id, slot);
-    auto known = m_decors.find(key);
-    const bool same = known != m_decors.end() && known->second.decor == decor;
-    if (same && KeepDecorInPlace(children, known->second.image, slot)) return theme::DecorChange::Unchanged;
-    xaml::FrameworkElement old{nullptr};  // held until it leaves the panel
-    if (known != m_decors.end()) {
-        old = known->second.image;
-        m_animations.Forget(known->second.imageId);
-    }
-    xaml::FrameworkElement image{nullptr};
-    const wchar_t* name = slot == theme::PseudoElement::Before ? L"AmpifyDecorBefore" : L"AmpifyDecorAfter";
-    if (decor.image.starts_with(theme::kBarsContent)) {
-        image = m_bars.Make(std::stoi(decor.image.substr(theme::kBarsContent.size())), name);
-    } else if (decor.image.starts_with(theme::kArtworkImage)) {
-        // The song's artwork, painted by a brush FollowArtwork keeps up to date: a Border, so it moves and turns.
-        image = ArtworkDecor(decor.image, name);
-    } else {
-        image = DecorImageFrom(decor.image, slot);
-    }
-    auto imageId = reinterpret_cast<std::uint64_t>(winrt::get_abi(image.as<xaml::DependencyObject>()));
-    m_decors[key] = DecorImage{winrt::make_weak(panel), image, imageId, decor};
-    WriteDecor(imageId, panel, decor);
-    std::uint32_t index = 0;
-    if (old && children.IndexOf(old, index)) {
-        children.SetAt(index, image);
-    } else if (slot == theme::PseudoElement::Before) {
-        children.InsertAt(0, image);
-    } else {
-        children.Append(image);
-    }
-    m_bars.Drop(old);
-    // In the tree first: the compositor animates an element that has its visual.
-    for (const auto& [property, value] : decor.properties) {
-        if (property == "Animation") WriteRaw(imageId, property, value);
-    }
-    return theme::DecorChange::Applied;
-}
-
-// Size, margin, alignment, cell, opacity, transform: the values AppliesToDecor lets through, written as on any element.
-// Over the whole Grid unless the theme names a row or a column, so the image lies over the panel.
-void XamlTreeBackend::WriteDecor(theme::NodeId imageId, const controls::Panel& panel, const theme::Decor& decor) {
-    bool row = false;
-    bool column = false;
-    for (const auto& [property, value] : decor.properties) {
-        row = row || property == "Grid.Row" || property == "Grid.RowSpan";
-        column = column || property == "Grid.Column" || property == "Grid.ColumnSpan";
-        if (property != "Animation" && property != "Foreground") WriteRaw(imageId, property, value);
-    }
-    xaml::FrameworkElement element{nullptr};
-    if (xaml::DependencyObject object = Resolve(imageId)) element = object.try_as<xaml::FrameworkElement>();
-    // `color` paints the bars of bars(n); an image has no colour of its own.
-    auto bars = decor.image.starts_with(theme::kBarsContent) && element ? element.try_as<controls::Grid>() : nullptr;
-    for (const auto& [property, value] : decor.properties) {
-        if (property != "Foreground" || !bars) continue;
-        media::Brush brush{nullptr};
-        if (value.kind == theme::ValueKind::Color) {
-            if (std::optional<ColorValue> color = ColorFromText(value.text)) brush = media::SolidColorBrush(*color);
-        } else if (value.kind == theme::ValueKind::Gradient) {
-            brush = GradientFrom(value.text);
-        }
-        if (brush) m_bars.SetBrush(bars, brush);
-    }
-    auto grid = panel.try_as<controls::Grid>();
-    if (!grid || !element) return;
-    auto span = [](std::uint32_t count) { return std::max<std::int32_t>(1, static_cast<std::int32_t>(count)); };
-    if (!row) controls::Grid::SetRowSpan(element, span(grid.RowDefinitions().Size()));
-    if (!column) controls::Grid::SetColumnSpan(element, span(grid.ColumnDefinitions().Size()));
-}
-
-theme::DecorChange XamlTreeBackend::RemoveDecor(theme::NodeId id, theme::PseudoElement slot) {
-    auto known = m_decors.find(std::make_pair(id, slot));
-    if (known == m_decors.end()) return theme::DecorChange::Unchanged;
-    DecorImage held = std::move(known->second);  // released at the end of this call, on the interface thread
-    m_decors.erase(known);
-    m_bars.Drop(held.image);
-    m_animations.Forget(held.imageId);
-    controls::Panel panel = held.panel.get();
-    if (!panel) return theme::DecorChange::Refused;
-    controls::UIElementCollection children = panel.Children();
-    std::uint32_t index = 0;
-    if (children.IndexOf(held.image, index)) children.RemoveAt(index);
-    return theme::DecorChange::Applied;
 }
 
 }  // namespace ampify::win

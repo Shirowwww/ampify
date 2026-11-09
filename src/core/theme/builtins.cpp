@@ -1,6 +1,6 @@
 #include "builtins.hpp"
 
-#include "builtins_css.hpp"
+#include "builtin_layouts.hpp"
 #include "css_values.hpp"
 
 #include <array>
@@ -154,6 +154,19 @@ const std::vector<ClassEntry> kClasses{
 
     // Shelves and sections
     {"section-header", {"ContentControl#SectionHeader"}},
+    // The sections of a stacked page (Home, New) by kind, each a template of its own: Apple's titles are text, and
+    // change with the language and the person, so a kind is what a theme can hide safely.
+    // Apple 1.1792 makes every section a shelf (ShelfSectionContent); the kind then shows in what it holds: large
+    // posters straight in the shelf's rows for the picks, tiles under no title for the banners at the top of New.
+    {"section-grid",
+     {"Grid#StackedPageContent StackPanel#StackedGridSectionContent",
+      "Grid#StackedPageContent StackPanel#ShelfSectionContent:has(GridViewItem > ListViewItemPresenter > "
+      "HoverGrid#RootGrid)"}},
+    {"section-single",
+     {"Grid#StackedPageContent StackPanel#SingleItemSectionContent",
+      "Grid#StackedPageContent StackPanel#ShelfSectionContent:except(:has(Grid#DefaultSectionHeaderContent))"
+      ":has(GridViewItem > ListViewItemPresenter > TileControl)"}},
+    {"section-shelf", {"Grid#StackedPageContent StackPanel#ShelfSectionContent"}},
     {"shelf", {"ShelfView"}},
     {"shelf-title", {"Grid#DefaultSectionHeaderContent"}},
     // The title as Apple's own link control, and the text in it (a link that goes somewhere, or a plain text).
@@ -208,7 +221,10 @@ const std::vector<ClassEntry> kClasses{
     {"now-playing-indicator", {"BouncyBarControl#BouncyBarAnimation"}},  // the bars: their Grid has no colour
 
     // Albums, playlists and songs
-    {"album-header", {"Grid#ContainerDetailHeaderLockupRegularContent", "Grid#AlbumDetailHeaderLockupContent"}},
+    // A playlist's, an album's, and an editorial playlist's of Apple (Best Songs of 2026): three headers.
+    {"album-header",
+     {"Grid#ContainerDetailHeaderLockupRegularContent", "Grid#AlbumDetailHeaderLockupContent",
+      "Grid#PlaylistDetailHeaderLockupContent"}},
     {"album-play-button", {"Button#PlayButtonElement"}},
     {"album-shuffle-button", {"Button#ShuffleButtonElement"}},
     {"album-description", {"ContentControl#DescriptionText"}},
@@ -224,13 +240,17 @@ const std::vector<ClassEntry> kClasses{
     {"radio-play-button", {"Button#RadioPlayButton"}},
     {"track-list", {"TracklistGrid#ColumnsTracklistGrid"}},
     // A playlist's rows are TracklistGrids; an album's are HoverGrids in a UserControl, the row's only child.
+    // The library's Songs page draws its rows in a grid of columns (DataGridRowControl), not a track list.
+    // Not the Songs page's HoverGrid#RowGrid: lit by a theme, it flashed Apple's light for 100 ms first and took
+    // other colours than Apple's; those rows keep Apple's own light.
     {"track-row", {"TracklistGrid#RootGrid", "ListViewItemPresenter > UserControl > HoverGrid#RootGrid"}},
     {"track-play-button", {"Button#PlayPauseButton"}},
     {"reactions-button", {"Button#ReactionsButton"}},
     {"song-list", {"ListView#DataGridListView"}},
     {"song-row", {"StackPanel#DataGridRowStack"}},
     {"list-item", {"ListViewItemPresenter"}},
-    {"track-list-item", {"Grid#FixedListPageContent > ListView ListViewItemPresenter"}},
+    {"track-list-item", {"Grid#FixedListPageContent > ListView ListViewItemPresenter",
+                         "ListViewItemPresenter:has(> DataGridRowControl)"}},
     {"suggested-songs", {"StackPanel#SuggestedSongSectionContent"}},
 
     // Search
@@ -280,6 +300,8 @@ const std::vector<ClassEntry> kClasses{
     {"lcd", {"NowPlayingControl#LCD > Grid#LCD"}},
     {"lcd-artwork", {"HoverGrid#ThumbnailHoverGrid"}},
     {"lcd-artwork-image", {"ArtworkImage#ActualArtwork"}},
+    // The picture inside that frame: the frame and its area refuse a transform, the picture zooms within the frame.
+    {"lcd-artwork-picture", {"ArtworkImage#ActualArtwork > AspectRatioGrid"}},
     {"lcd-artwork-hover", {"HoverGrid#ThumbnailHoverGrid Grid#ArtworkHoverContent"}},  // shown under the pointer
     {"lcd-loading", {"NowPlayingControl#LCD Rectangle#Indeterminate"}},
     {"lcd-placeholder", {"Border#PlaceHolderArtwork"}},
@@ -354,444 +376,16 @@ const std::vector<ClassEntry> kClasses{
     {"rating", {"RatingControl"}},
 };
 
-// Rounded panels floating on the window, with even gaps and aligned edges: the sidebar on the left, the pages on the
-// right below the playback bar. Colours come from variables a theme sets in its :root. The title bar strip keeps its
-// own background: with a colour, it catches the clicks meant for the buttons under it.
-constexpr std::string_view kFloatingPanels = R"css(
-.window {
-    background: var(--window-background, #0B0B0D);
-}
-
-.navigation,
-.main-column,
-.page,
-.content-background {
-    background: transparent;
-}
-
-.main-column {
-    border-width: 0;
-}
-
-.frost {
-    visibility: collapsed;
-}
-
-/* Apple's line under the bar started at the sidebar panel's edge, a seam against its rounded side. */
-.playbar {
-    background: transparent;
-    border-width: 0;
-}
-
-/* Apple's column kept the song to a third of the bar: in a narrow window the title was cut while an empty stretch stood
-   before the volume. The song spans the toggles' column too, and Ampify ends it a clear space short of the first toggle,
-   whatever their number (FollowSongRoom in ui_service_playbar.cpp). */
-.now-playing {
-    grid-column-span: 2;
-}
-
-/* A narrow display has room for one time, at the top as at the bottom: the time left, which says when the song ends.
-   Its opacity, not its visibility, which Apple Music binds to the pointer. */
-@media (max-width: 1100px) {
-    .current-time {
-        opacity: 0;
-    }
-}
-
-/* Apple's column for the toggles fits its own four: with Ampify's buttons added, the centred row ran past both edges
-   and lost the volume icon and the last button's text. The column reaches back over the song's, and the toggles stand
-   against the window's buttons; the song stays clickable through it. */
-.playbar-extras {
-    grid-column: 1;
-    grid-column-span: 3;
-}
-
-.playbar-toggles {
-    horizontal-alignment: right;
-}
-
-/* A shelf's arrows were a bare chevron at the end of its row, easy to miss: they stand on a grey tile, which reads on
-   dark and light pages alike. */
-.shelf-arrow-left,
-.shelf-arrow-right {
-    background: #1F808080;
-    corner-radius: 8px;
-}
-
-.sidebar {
-    background: var(--panel-background, #17171A);
-    corner-radius: var(--panel-radius, 10px);
-    margin: var(--gap, 8) calc(var(--gap, 8) * -1) var(--gap, 8) var(--gap, 8);
-}
-
-/* Apple casts the open pane's shadow from a bare rectangle as wide as the pane, at the window's edge and as tall as the
-   window (NavigationView's ShadowCaster): the panel starts a gap in, rounded, so a square frame of shadow ended a gap
-   short of its right edge. Its states animate its opacity and width, never its visibility. */
-Grid#ShadowCaster {
-    visibility: collapsed;
-}
-
-/* Apple Music pins the back arrow to the window's corner, where it straddled the sidebar panel's rounded corner: it
-   moves into the panel, centred on the app's logo (1 higher than the panel's edge plus a gap; 4 lower left the arrow
-   5 pixels under the logo). */
-.back-button {
-    margin: calc(var(--gap, 8) - 1) 0 0 calc(var(--gap, 8) + 4);
-}
-
-/* The "Apple Music" title sat high against the logo: it moves 3 down, to meet the logo's centre (not measured on
-   screen; check it with a capture). A transform keeps Apple's margins. */
-.app-name {
-    transform: translateY(3px);
-}
-
-/* The profile picture at the foot of the sidebar stood 2 right of the icons above it. */
-PersonPicture#smallPersonPicture {
-    margin: 0 0 0 -2;
-}
-
-/* Folded, the sidebar shows the first 48 pixels from its own edge, so it ends a gap into the page column: the pages
-   start two gaps into it, and the open sidebar reaches one gap into it. The space between the panels is one gap either
-   way. Wider than 48 shows the start of the texts Apple Music hides there. */
-.navigation {
-    compact-pane-length: var(--compact-pane, 48);
-}
-
-/* Folded, Apple Music cuts the sidebar panel at the end of its column of icons, a square edge on a rounded panel: the
-   column becomes the panel, rounded on both sides, and so does the sidebar Apple opens over the page from the menu
-   button. That button sat at the window's edge, a gap left of the icons: it moves over them. */
-@media (max-width: 1324px) {
-    /* The pane's own corners stay square: the pane clips what it holds to them, and its corners, rounder than the
-       column's, cut the column's outline away at the two corners on the pane's edge (seen under Glass at 125%). */
-    .sidebar {
-        background: transparent !important;
-        border-width: 0 !important;
-        corner-radius: 0 !important;
-    }
-
-    /* Apple insets the column 3 from the pane's top and bottom: it stood 3 lower and 3 shorter than the page panel.
-       Flush with the pane, not past it: the pane clips the column to its bounds, and a 1 above cut the outline's top
-       row away (Console's top edge missing, folded and open) while the column stood 1 past the page panel. */
-    /* The column is 48 wide: a corner above half of that (24) cut the items at its ends, so it stops at 16. */
-    .sidebar-column {
-        background: var(--panel-background, #17171A);
-        corner-radius: calc(min(var(--panel-radius, 10px), var(--compact-pane, 48) / 2 - 8));
-        margin: 0;
-    }
-
-    /* The logo's centre on the column's axis. It is 22 wide, and Apple's header starts it 15 in from the column's edge
-       (the header's margin of 6, then a column of 9 before its content): at 7, it stood 9 to 12 pixels right of the
-       icons in every theme, measured at 125%. */
-    ContentControl#PaneHeaderContentBorder > ContentPresenter > Grid > Image {
-        margin: 4 0 0 calc((var(--compact-pane, 48) - 22) / 2 - 15);
-    }
-
-    /* The button's template copies the button's margin onto its root, so any margin counted twice: the box grew by its
-       right margin and the dots sat off its centre. The root keeps none; the button's own margin is doubled to give
-       the dots the place 2 and 4 gave them, 2 below the cell's centre (level with the logo, measured at 125%). */
-    ContentControl#PaneHeaderContentBorder MenuButton#MoreButton {
-        margin: 4 8 0 0;
-    }
-
-    ContentControl#PaneHeaderContentBorder MenuButton#MoreButton > Grid#LayoutRoot {
-        margin: 0 0 0 0;
-    }
-
-    PersonPicture#smallPersonPicture {
-        margin: 0 0 0 -3;
-    }
-
-    .sidebar-toggle-area {
-        margin: 0 0 0 var(--gap, 8);
-    }
-
-    /* Folded, the arrow sits in the toggle area, which .sidebar-toggle-area already moves one gap right: 4 more put it
-       on the icons' axis, whatever the gap (gap - 6 held for a gap of 10 only, 12 pixels off with none). */
-    .back-button {
-        margin: calc(var(--gap, 8) - 1) 0 0 4;
-    }
-}
-
-.content {
-    background: var(--panel-background, #17171A);
-    corner-radius: var(--panel-radius, 10px);
-    margin: var(--content-top, 64) var(--gap, 8) var(--gap, 8) calc(var(--gap, 8) * 2);
-}
-
-.page-top-spacer {
-    height: var(--page-top, 8);
-}
-
-/* Apple Music lays an artist's video and a page's coloured backdrop 64 down, under its own playback bar. The panel
-   already starts below the bar: they go back up to its top edge, where a dark band showed above them. */
-.page-background {
-    margin: -64 0 0 0;
-}
-
-/* The lyrics and queue pane: a third panel on the right, below the bar like the pages, instead of a strip glued to the
-   window's edge and running up under its buttons. Its first 64 were room for Apple's bar: the panel starts below it.
-   Apple gives it a fixed width, which a margin only clipped (the queue's durations and its autoplay button cut at the
-   right): `width: auto` on a pane is its column less the margins, which the engine works out. */
-.lyrics-panel {
-    background: var(--panel-background, #17171A);
-    corner-radius: var(--panel-radius, 10px);
-    margin: var(--content-top, 64) var(--gap, 8) var(--gap, 8) 0;
-    width: auto;
-}
-
-.lyrics-panel-top-spacer {
-    height: var(--page-top, 8);
-}
-
-/* The column titles of the Songs list stay at the top as it scrolls: they take the panel's colour, not Apple's grey. */
-.list-header {
-    background: var(--panel-background, #17171A);
-}
-
-/* Under an album or a playlist, Apple paints the other shelves on a grey band: a shade of the panel instead. */
-.list-page-shelves {
-    background: var(--band-background, #1E1E22);
-}
-
-/* Under a playlist, Apple's suggested songs sat in a box of its own grey: the same shade. */
-.suggested-songs {
-    background: var(--band-background, #1E1E22);
-    corner-radius: var(--radius-box, 12);
-}
-
-.stacked-list {
-    padding: var(--page-top, 8) 0 0 0;
-}
-
-/* The search page's header is the top of the panel, and the results scroll in from under it (48 high). */
-.search-top-spacer {
-    height: 0;
-}
-
-.search-header {
-    background: var(--panel-background, #17171A);
-    corner-radius: var(--panel-radius, 10px) var(--panel-radius, 10px) 0 0;
-}
-
-Frame#SearchContentFrame .stacked-list {
-    padding: calc(48 + var(--gap, 8)) 0 0 0;
-}
-)css";
-
-// The playback bar along the bottom of the window, under both panels: the song on the left, the controls in the
-// middle, volume and toggles on the right. Pairs with floating-panels (import it first).
-constexpr std::string_view kBottomBar = R"css(
-.playbar {
-    vertical-alignment: bottom;
-    height: var(--bar-height, 72);
-    margin: 0 var(--bar-reach-end, 0) 0 var(--bar-reach, calc(var(--gap, 8) - 290));
-}
-
-/* At 1324 pixels and less Apple Music folds the sidebar to its icons: the page column starts there instead. A theme
-   with the sidebar on the right sets the -end reaches instead. */
-@media (max-width: 1324px) {
-    .playbar {
-        margin: 0 var(--bar-reach-end-folded, 0) 0 var(--bar-reach-folded, calc(var(--gap, 8) - var(--compact-pane, 48)));
-    }
-}
-
-/* The buttons in the middle of the window and the toggles against its right edge: each column spans every cell of the
-   bar (four, the last a narrow one Apple keeps for the window's buttons), so Apple's column widths no longer push them
-   off centre. */
-.playbar-controls,
-.playbar-extras {
-    grid-column: 0;
-    grid-column-span: 4;
-}
-
-/* The cell kept for the window's buttons, which stay at the top: the toggles take it. */
-.caption-buttons-cover {
-    visibility: collapsed;
-}
-
-/* The song stands a gap in from the window's edge, and the bar's height around its 54-pixel artwork leaves it square:
-   flush with the corner, it looked cut off. */
-.now-playing {
-    grid-column: 0;
-    margin: 4 0 4 var(--gap, 8);
-}
-
-/* Apple's column kept the song small at the left of the bar: it spreads towards the buttons, a clear space short of
-   them at every width (the buttons are centred, so the room grows with the window). */
-.now-playing {
-    grid-column-span: 2;
-    horizontal-alignment: left;
-    width: var(--song-width, 560);
-}
-
-@media (max-width: 1600px) {
-    .now-playing {
-        width: var(--song-width-medium, 460);
-    }
-}
-
-@media (max-width: 1324px) {
-    .now-playing {
-        width: var(--song-width-folded, 380);
-    }
-}
-
-@media (max-width: 1100px) {
-    .now-playing {
-        width: var(--song-width-narrow, 340);
-    }
-}
-
-@media (max-width: 960px) {
-    .now-playing {
-        width: var(--song-width-small, 270);
-    }
-}
-
-/* With nothing loaded, Apple Music centres its logo in the display, far from everything else on the bar. Its opacity,
-   not its visibility: Apple Music binds the visibility to what plays, so the value read before the theme would come
-   back stale when the theme goes, and show the logo over the title. */
-.apple-logo {
-    opacity: 0;
-}
-
-/* The song's title and artist start next to its artwork instead of in the middle of the display. */
-.track-lines {
-    grid-column: 0;
-    grid-column-span: 3;
-    margin: 0 0 0 12;
-    horizontal-alignment: left;
-}
-
-.track-line {
-    horizontal-alignment: left;
-}
-
-/* Apple Music centres each line between a spacer and the More button; at the left, the title would sit apart from the
-   artist. */
-.track-title,
-.track-artist {
-    grid-column: 0;
-    grid-column-span: 2;
-    horizontal-alignment: left;
-}
-
-/* Apple Music pins the Lossless and Dolby Atmos badge to the display's top left corner, clear of its centred title.
-   The title starts there now, so the badge moves to the other corner, just before the favourite star. */
-.audio-badge {
-    horizontal-alignment: right;
-    margin: 2 36 2 1;
-}
-
-/* Volume, lyrics and queue at the right end of the bar. */
-.playbar-toggles {
-    grid-column-span: 2;
-    horizontal-alignment: right;
-    margin: 0 var(--gap, 8) 0 0;
-}
-
-/* Apple shows the elapsed and remaining times under the pointer, at the bottom corners of the title block: with the
-   title and artist at the left, they covered the artist. Both go to the right end of the artist's line, side by side,
-   and the artist's line stops short of them. */
-.current-time {
-    horizontal-alignment: right;
-    margin: 0 48 0 0;
-}
-
-.duration {
-    horizontal-alignment: right;
-    margin: 0 4 0 0;
-}
-
-/* Both lines stop before the quality badge and the star at the display's end: in a narrow window the title ran
-   under them. */
-.track-line {
-    margin: 0 64 0 0;
-}
-
-.track-artist {
-    margin: 0 32 0 0;
-}
-
-/* The progress line runs from the artwork's side to the display's end. Its template repeats the margin inside, so 6
-   here is 12 on screen. */
-.scrubber {
-    margin: 0 6 0 0;
-}
-
-/* Apple draws a hairline between the artwork and the title: on a bar without the display's box it hangs alone. */
-HoverGrid#ThumbnailHoverGrid > Grid {
-    border-width: 0;
-}
-
-.frost {
-    visibility: collapsed;
-}
-
-/* The window's buttons are square, drawn by the system: astride a panel's rounded corner, their hover spilled over it.
-   The panels start below them, leaving the buttons a strip of the window's background, as in Spotify. A theme whose
-   sidebar starts elsewhere sets --sidebar-top: the back arrow and the folded menu button follow it. */
-.sidebar {
-    margin: var(--sidebar-top, var(--caption-room, 40)) calc(var(--gap, 8) * -1) var(--bar-room, 80) var(--gap, 8);
-}
-
-.content {
-    margin: var(--caption-room, 40) var(--gap, 8) var(--bar-room, 80) calc(var(--gap, 8) * 2);
-}
-
-/* Apple keeps its menu button and back arrow at the window's top. Open and wide, the panel came down without them: the
-   menu button sat on the logo and its own row under the title stood empty. The area that holds both comes down and in
-   with the panel; the arrow in it lands where it stood before, in the header on the icons' axis. */
-.sidebar-toggle-area {
-    margin: var(--sidebar-top, var(--caption-room, 40)) 0 0 var(--gap, 8);
-}
-
-.back-button {
-    margin: -2 0 0 4;
-}
-
-/* Folded, the logo comes down with the panel but the menu button stays where Apple put it, over the logo: it goes
-   under it, in Apple's own order (logo, menu, search). */
-@media (max-width: 1324px) {
-    .sidebar-toggle-area {
-        margin: calc(var(--sidebar-top, var(--caption-room, 40)) - 4) 0 0 var(--gap, 8);
-    }
-
-    /* The arrow is in that toggle area: with the header's margin as well, it came down onto the menu button. 3 more
-       than the area put it in the logo's place, 4 more on the icons' axis. */
-    .back-button {
-        margin: 3 0 0 4;
-    }
-}
-
-/* The pane starts below the window's buttons, which sit at the top right with no bar under them any more. */
-.lyrics-panel {
-    margin: var(--caption-room, 40) var(--gap, 8) var(--bar-room, 80) 0;
-}
-
-/* Nothing sits over the top of the pages any more: they start close to the panel's edge. */
-.page-top-spacer {
-    height: var(--page-top, 8);
-}
-
-.stacked-list {
-    padding: var(--page-top, 8) 0 0 0;
-}
-
-.search-header {
-    padding: 0 40 0 40;
-}
-)css";
-
 struct BuiltinEntry {
     std::string_view name;
     std::vector<std::string_view> parts;
 };
 
 const std::array<BuiltinEntry, 4> kBuiltins{{
-    {"floating-panels", {kFloatingPanels, kScrollbars}},
-    {"bottom-bar", {kBottomBar}},
-    {"centre-bar", {kCentreBar}},
-    {"scrollbars", {kScrollbars}},
+    {"floating-panels", {layouts::kFloatingPanels, layouts::kScrollbars}},
+    {"bottom-bar", {layouts::kBottomBar}},
+    {"centre-bar", {layouts::kCentreBar}},
+    {"scrollbars", {layouts::kScrollbars}},
 }};
 
 constexpr size_t kMaxExpansions = 32;

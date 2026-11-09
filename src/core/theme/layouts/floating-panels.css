@@ -1,0 +1,260 @@
+.window {
+    background: var(--window-background, #0B0B0D);
+}
+
+.navigation,
+.main-column,
+.page,
+.content-background {
+    background: transparent;
+}
+
+.main-column {
+    border-width: 0;
+}
+
+.frost {
+    visibility: collapsed;
+}
+
+/* Apple's line under the bar started at the sidebar panel's edge, a seam against its rounded side. */
+.playbar {
+    background: transparent;
+    border-width: 0;
+}
+
+/* Apple paints each of the bar's three columns with a brush of its own: a theme's or a snippet's background on the bar
+   showed only where the columns left it, a coloured stretch behind the buttons and the rest of the bar dark. The bar
+   is one surface, whatever paints it. */
+.playbar-controls,
+.now-playing,
+.playbar-extras {
+    background: transparent;
+}
+
+/* Apple's column kept the song to a third of the bar: in a narrow window the title was cut while an empty stretch stood
+   before the volume. The song spans the toggles' column too, and Ampify ends it a clear space short of the first toggle,
+   whatever their number (FollowSongRoom in ui_service_playbar.cpp). */
+.now-playing {
+    grid-column-span: 2;
+}
+
+/* A narrow display has room for one time, at the top as at the bottom: the time left, which says when the song ends.
+   Its opacity, not its visibility, which Apple Music binds to the pointer. */
+@media (max-width: 1100px) {
+    .current-time {
+        opacity: 0;
+    }
+}
+
+/* Apple's column for the toggles fits its own four: with Ampify's buttons added, the centred row ran past both edges
+   and lost the volume icon and the last button's text. The column reaches back over the song's, and the toggles stand
+   against the window's buttons. It is only as wide as the toggles: painted (even transparent), a column over the
+   song's took its clicks, and at the bottom, spread over the whole bar, the buttons' and the progress line's too. */
+.playbar-extras {
+    grid-column: 1;
+    grid-column-span: 3;
+    horizontal-alignment: right;
+}
+
+/* Apple's toggles are 44 wide round a 16-pixel icon, wide gaps at the bar's right end: they stand closer. Ampify's own
+   buttons there take the width of Apple's neighbour, so these are all of them. bottom-bar says the same. */
+StackPanel#NowPlayingToggleButtons > Button,
+StackPanel#NowPlayingToggleButtons > VolumeControl,
+StackPanel#NowPlayingToggleButtons > StackPanel > ToggleButton {
+    margin: 0 -4 0 -4;
+}
+
+.playbar-toggles {
+    horizontal-alignment: right;
+}
+
+/* A shelf's arrows were a bare chevron at the end of its row, easy to miss: they stand on a grey tile, which reads on
+   dark and light pages alike. */
+.shelf-arrow-left,
+.shelf-arrow-right {
+    background: #1F808080;
+    corner-radius: 8px;
+}
+
+.sidebar {
+    background: var(--panel-background, #17171A);
+    corner-radius: var(--panel-radius, 10px);
+    margin: var(--gap, 8) calc(var(--gap, 8) * -1) var(--gap, 8) var(--gap, 8);
+}
+
+/* Apple casts the open pane's shadow from a bare rectangle as wide as the pane, at the window's edge and as tall as the
+   window (NavigationView's ShadowCaster): the panel starts a gap in, rounded, so a square frame of shadow ended a gap
+   short of its right edge. Its states animate its opacity and width, never its visibility. */
+Grid#ShadowCaster {
+    visibility: collapsed;
+}
+
+/* Apple Music pins the back arrow to the window's corner, where it straddled the sidebar panel's rounded corner: it
+   moves into the panel, centred on the app's logo (1 higher than the panel's edge plus a gap; 4 lower left the arrow
+   5 pixels under the logo). */
+.back-button {
+    margin: calc(var(--gap, 8) - 1) 0 0 calc(var(--gap, 8) + 4);
+}
+
+/* The "Apple Music" title sat high against the logo: it moves 3 down, to meet the logo's centre (not measured on
+   screen; check it with a capture). A transform keeps Apple's margins. */
+.app-name {
+    transform: translateY(3px);
+}
+
+/* The profile picture at the foot of the sidebar stood 2 right of the icons above it. */
+PersonPicture#smallPersonPicture {
+    margin: 0 0 0 -2;
+}
+
+/* Folded, the sidebar shows the first 48 pixels from its own edge, so it ends a gap into the page column: the pages
+   start two gaps into it, and the open sidebar reaches one gap into it. The space between the panels is one gap either
+   way. Wider than 48 shows the start of the texts Apple Music hides there. */
+.navigation {
+    compact-pane-length: var(--compact-pane, 48);
+}
+
+/* Folded, Apple Music cuts the sidebar panel at the end of its column of icons, a square edge on a rounded panel: the
+   column becomes the panel, rounded on both sides, and so does the sidebar Apple opens over the page from the menu
+   button. That button sat at the window's edge, a gap left of the icons: it moves over them. */
+@media (max-width: 1324px) {
+    /* The pane's own corners stay square: the pane clips what it holds to them, and its corners, rounder than the
+       column's, cut the column's outline away at the two corners on the pane's edge (seen under Glass at 125%). */
+    .sidebar {
+        background: transparent !important;
+        border-width: 0 !important;
+        corner-radius: 0 !important;
+    }
+
+    /* The column is 48 wide: a corner above half of that (24) cut the items at its ends, so it stops at 16. */
+    .sidebar-column {
+        background: var(--panel-background, #17171A);
+        corner-radius: calc(min(var(--panel-radius, 10px), var(--compact-pane, 48) / 2 - 8));
+    }
+
+    PersonPicture#smallPersonPicture {
+        margin: 0 0 0 -3;
+    }
+
+    .sidebar-toggle-area {
+        margin: 0 0 0 var(--gap, 8);
+    }
+
+    /* Folded, the arrow sits in the toggle area, which .sidebar-toggle-area already moves one gap right: 4 more put it
+       on the icons' axis, whatever the gap (gap - 6 held for a gap of 10 only, 12 pixels off with none). */
+    .back-button {
+        margin: calc(var(--gap, 8) - 1) 0 0 4;
+    }
+}
+
+/* The column and the header are placed the same way folded, open under the pointer and pinned open: pinned, Apple's
+   own values came back and the logo, the title, the pin and "···" stood 1 to 3 pixels off (seen under Glass). */
+
+/* Apple insets the column 3 from the pane's top and bottom: it stood 3 lower and 3 shorter than the page panel.
+   Flush with the pane, not past it: the pane clips the column to its bounds, and a 1 above cut the outline's top
+   row away (Console's top edge missing, folded and open) while the column stood 1 past the page panel. */
+.sidebar-column {
+    margin: 0;
+}
+
+/* The logo's centre on the column's axis. It is 22 wide, and Apple's header starts it 15 in from the column's edge
+   (the header's margin of 6, then a column of 9 before its content): at 7, it stood 9 to 12 pixels right of the
+   icons in every theme, measured at 125%. */
+ContentControl#PaneHeaderContentBorder > ContentPresenter > Grid > Image {
+    margin: 4 0 0 calc((var(--compact-pane, 48) - 22) / 2 - 15);
+}
+
+/* The button's template copies the button's margin onto its root, so any margin counted twice: the box grew by its
+   right margin and the dots sat off its centre. The root keeps none; the button's own margin is doubled to give
+   the dots the place 2 and 4 gave them, 2 below the cell's centre (level with the logo, measured at 125%). */
+ContentControl#PaneHeaderContentBorder MenuButton#MoreButton {
+    margin: 4 8 0 0;
+}
+
+ContentControl#PaneHeaderContentBorder MenuButton#MoreButton > Grid#LayoutRoot {
+    margin: 0 0 0 0;
+}
+
+/* At the top, the bar is placed like a panel: a gap from the window's top, two gaps into the page column like the
+   pages, and clear of the window's buttons (--bar-top-end), so it no longer ran past the pages on both sides and into
+   those buttons. The pages start a gap under it. bottom-bar places the bar again. */
+.playbar {
+    margin: var(--gap, 8) var(--bar-top-end, 150) 0 calc(var(--gap, 8) * 2);
+}
+
+/* The page column starts at the folded column's width, and the column floats a gap from the window's corner: a band
+   painted edge to edge at the top (cover-ambience) reaches back this far, under the column, so the window does not
+   show above and left of it. The column lies over the band, folded or open, so nothing moves as it opens. */
+:root {
+    --bar-band-reach: var(--compact-pane, 48);
+}
+
+.caption-buttons-cover {
+    visibility: collapsed;
+}
+
+.content {
+    background: var(--panel-background, #17171A);
+    corner-radius: var(--panel-radius, 10px);
+    margin: var(--content-top, calc(64 + var(--gap, 8) * 2)) var(--gap, 8) var(--gap, 8) calc(var(--gap, 8) * 2);
+}
+
+.page-top-spacer {
+    height: var(--page-top, 8);
+}
+
+/* Apple Music lays an artist's video and a page's coloured backdrop 64 down, under its own playback bar. The panel
+   already starts below the bar: they go back up to its top edge, where a dark band showed above them. */
+.page-background {
+    margin: -64 0 0 0;
+}
+
+/* The lyrics and queue pane: a third panel on the right, below the bar like the pages, instead of a strip glued to the
+   window's edge and running up under its buttons. Its first 64 were room for Apple's bar: the panel starts below it.
+   Apple gives it a fixed width, which a margin only clipped (the queue's durations and its autoplay button cut at the
+   right): `width: auto` on a pane is its column less the margins, which the engine works out. */
+.lyrics-panel {
+    background: var(--panel-background, #17171A);
+    corner-radius: var(--panel-radius, 10px);
+    margin: var(--content-top, calc(64 + var(--gap, 8) * 2)) var(--gap, 8) var(--gap, 8) 0;
+    width: auto;
+}
+
+.lyrics-panel-top-spacer {
+    height: var(--page-top, 8);
+}
+
+/* The column titles of the Songs list stay at the top as it scrolls: they take the panel's colour, not Apple's grey. */
+.list-header {
+    background: var(--panel-background, #17171A);
+}
+
+/* Under an album or a playlist, Apple paints the other shelves on a grey band: a shade of the panel instead. */
+.list-page-shelves {
+    background: var(--band-background, #1E1E22);
+}
+
+/* Under a playlist, Apple's suggested songs sat in a box of its own grey: the same shade. */
+.suggested-songs {
+    background: var(--band-background, #1E1E22);
+    corner-radius: var(--radius-box, 12);
+}
+
+.stacked-list {
+    padding: var(--page-top, 8) 0 0 0;
+}
+
+/* The search page's header is the top of the panel, and the results scroll in from under it (48 high). */
+.search-top-spacer {
+    height: 0;
+}
+
+.search-header {
+    background: var(--panel-background, #17171A);
+    corner-radius: var(--panel-radius, 10px) var(--panel-radius, 10px) 0 0;
+}
+
+Frame#SearchContentFrame .stacked-list {
+    padding: calc(48 + var(--gap, 8)) 0 0 0;
+}

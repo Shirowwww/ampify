@@ -13,6 +13,11 @@ namespace ampify::win {
 // Nothing for an element that is not an ArtworkImage. Interface thread only.
 void FollowArtworkCap(const winrt::Microsoft::UI::Xaml::FrameworkElement& element) noexcept;
 
+// Once per theme pass: an artwork whose cap Ampify lifted and Apple set back (a new picture, a layout change) gets the
+// lifted cap again and loads its picture at it, a few times at most. Apple's cap left in place made it ask a picture
+// 270 wide for a 360 square: a portrait drawn small between bands. Interface thread only.
+void KeepArtworkCaps() noexcept;
+
 }  // namespace ampify::win
 
 #endif  // AMPIFY_WITH_XAML

@@ -8,6 +8,8 @@
 #include <string_view>
 #include <vector>
 
+#include "../sidebar_fold.hpp"
+
 namespace ampify::theme {
 
 // The CSS subset that themes use (user.css). Selectors name XAML elements:
@@ -19,6 +21,7 @@ namespace ampify::theme {
 //   A + B, A ~ B    a B right after an A among the children of one parent, or anywhere after it
 // Parts can be combined: `Grid#Bar > TextBlock`. Structural pseudo-classes go on any part: :first-child, :last-child,
 // :only-child, :nth-child(n), :nth-last-child(n), and :not(part) with one part made of a type, a #name and those.
+// :has(selector) holds when an element inside matches the selector; `:has(> X)` wants a direct child.
 // One state per selector, on any part:
 //   Button:hover           a Button, while the pointer is over it (the values come back when it leaves)
 //   Grid#Row:hover Button  a Button inside Grid#Row, while the pointer is over that Grid#Row
@@ -47,10 +50,9 @@ struct MediaQuery {
     std::optional<bool> dark;  // (prefers-color-scheme: dark) or (light): the theme's scheme in use, not Windows'
     std::string text;  // as written, for the log
 
-    // Apple Music folds its sidebar at this width and less, and themes write (max-width: 1324px) for "folded" and
-    // (min-width: 1325px) for "open". While Ampify keeps it folded at every width (apple.sidebar = hover), those two
-    // bounds follow the sidebar instead of the window.
-    static constexpr double kSidebarFoldsAt = 1324;
+    // While Ampify keeps the sidebar folded at every width (apple.sidebar = hover), the two bounds of Apple's fold
+    // follow the sidebar instead of the window.
+    static constexpr double kSidebarFoldsAt = ampify::kSidebarFoldsAt;
 
     bool Matches(double width, double height, bool sidebarFolded = false) const {
         double max = maxWidth;
@@ -85,7 +87,13 @@ struct Compound {
     bool last = false;  // :last-child
     bool only = false;  // :only-child
     bool playing = false;  // :playing, the row of the song playing and its parts (NodeInfo::playing)
+    bool checked = false;   // :checked, a toggle, check box or switch that is on (NodeInfo::checked)
+    bool selected = false;  // :selected, a list row or sidebar entry that is selected (NodeInfo::selected)
+    bool disabled = false;  // :disabled, a control that takes no input (NodeInfo::disabled)
     std::vector<Compound> negations;  // :not(...): parts the element must not match
+    // :has(...): the parts of each relative selector, one of whose elements inside this one must match. The combinator
+    // of the first part is how that part stands to this element: Child for `:has(> X)`, else Descendant.
+    std::vector<std::vector<Compound>> has;
     bool counted = true;  // a negation that weighs in the specificity; not the internal :except() of a built-in name
     Combinator combinator = Combinator::Descendant;  // relation to the compound before it; unused for the first
 };
