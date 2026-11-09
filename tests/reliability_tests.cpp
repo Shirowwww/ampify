@@ -141,3 +141,26 @@ TEST_CASE(Reliability_CrashDumpsAreRecordedOnlyWhereTheFolderExists) {
     CHECK(ampify::CrashDumpsAreRecorded(dumps));
     CHECK(!ampify::CrashDumpsAreRecorded(dumps / "missing"));
 }
+
+TEST_CASE(Reliability_TheFreezeDigestKeepsOnlyTheFreezeLogsLinesAndItsWorstStall) {
+    const std::string log =
+        "[10:00:00.000] Kernel loaded\r\n"
+        "[10:00:01.000] UI thread stalled 420 ms, while: theme tick\r\n"
+        "[10:00:02.000] Network: proxy detection took 900 ms, on the interface thread\r\n"
+        "[10:00:03.000] Network: automatic proxy detection skipped (apple.proxy = no-autodetect)\r\n"
+        "[10:00:04.000] Memory: AppleMusic.exe uses 610 MB\r\n"
+        "[10:00:05.000] UI thread stalled 1800 ms, while: no Ampify work\r\n"
+        "[10:01:00.000] UI watchdog, last minute: 290 beats, worst delay 1800 ms, 2 stall(s)";
+    ampify::FreezeDigest digest = ampify::DigestFreezeLog(log);
+    CHECK(digest.stalls == 2);
+    CHECK(digest.worstStallMs == 1800);
+    CHECK(digest.lines.size() == 5);
+    CHECK(digest.lines.front() == "[10:00:01.000] UI thread stalled 420 ms, while: theme tick");
+    CHECK(digest.lines.back().find("last minute") != std::string::npos);
+}
+
+TEST_CASE(Reliability_ALogWithoutFreezesGivesAnEmptyDigest) {
+    ampify::FreezeDigest digest = ampify::DigestFreezeLog("[10:00:00.000] Kernel loaded\n\n");
+    CHECK(digest.lines.empty() && digest.stalls == 0 && digest.worstStallMs == 0);
+    CHECK(!ampify::IsFreezeLogLine("Network: example.com resolved IPv6 first; its IPv4 addresses are tried first now"));
+}

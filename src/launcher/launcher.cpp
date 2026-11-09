@@ -95,7 +95,6 @@ void Alert(const wchar_t* text) {
     MessageBoxW(nullptr, text, L"Ampify", MB_ICONERROR | MB_OK);
 }
 
-// Loads the kernel into one process and writes the outcome to the log. Returns true on success.
 bool InjectInto(ampify::Journal& journal, DWORD processId, const std::filesystem::path& kernelDll,
                 const std::string& label) {
     HANDLE process = ampify::launcher::OpenProcessForInjection(processId);
@@ -161,7 +160,6 @@ ampify::WatchConfig MakeWatchConfig(bool inject, bool reportHealth) {
     return config;
 }
 
-// Process ids as the watch counts them.
 std::vector<uint32_t> PackageIds(const std::vector<DWORD>& processIds) {
     return std::vector<uint32_t>(processIds.begin(), processIds.end());
 }
@@ -226,8 +224,8 @@ bool OrphanAgentSettingOn(const std::filesystem::path& kit) {
     return ampify::ChoiceOf(settings, ampify::kOrphanAgentKey) == "on";
 }
 
-// One look, each time the launcher finds Apple Music closed, at a library agent of the package that is left running.
-// The agent gets kOrphanGraceMs to leave by itself; after that it is ended. Nothing is done while Apple Music runs.
+// One look at a library agent left running, each time the launcher finds Apple Music closed. The agent gets
+// kOrphanGraceMs to leave by itself, then is ended; nothing is done while Apple Music runs.
 class OrphanAgentWatch {
 public:
     explicit OrphanAgentWatch(bool enabled) : m_enabled(enabled) {}
@@ -237,7 +235,6 @@ public:
         m_since = 0;
     }
 
-    // `appRunning`: an AppleMusic.exe of the package runs. Returns what the look decided.
     ampify::OrphanAction Step(ampify::Journal& journal, const std::filesystem::path& packageDirectory, bool appRunning) {
         if (!m_enabled || appRunning) {
             m_since = 0;
@@ -271,7 +268,7 @@ private:
     ampify::OrphanRefusals m_refusals;
 };
 
-// Before Apple Music starts: a left-over agent would hold the library (error 9039), so it is waited for or ended first.
+// A left-over agent would hold the library (error 9039).
 void ClearOrphanAgent(ampify::Journal& journal, const std::filesystem::path& packageDirectory, bool enabled) {
     OrphanAgentWatch watch(enabled);
     while (true) {
@@ -403,7 +400,7 @@ void TellIfOff(ampify::Journal& journal, const Session& session, const ampify::P
 // Apple Music was already open: nothing was started, so this is not a launch to count.
 void FollowOpenApp(ampify::Journal& journal, const Session& session, ampify::SafeMode& safeMode, DWORD processId,
                    HANDLE stop) {
-    ampify::PolicyVerdict verdict = session.Decide(safeMode.IsActive());
+    ampify::PolicyVerdict verdict = session.Decide(safeMode.IsActive() || safeMode.ThisLaunchSafe());
     bool inject = verdict.allowed && session.kernelPresent;
     TellIfOff(journal, session, verdict);
     journal.Write("Apple Music already open (process " + std::to_string(processId) + "): " + verdict.reason);
@@ -439,7 +436,6 @@ std::wstring LaunchArguments(ampify::Journal& journal, const std::filesystem::pa
     return ToWide(flags);
 }
 
-// ampify_launcher.exe: starts Apple Music with the kernel.
 int Run(ampify::Journal& journal, const std::filesystem::path& kit) {
     std::wstring appId = ToWide(ampify::kAppUserModelId);
     std::wstring appFamily = ToWide(ampify::kPackageFamilyName);
@@ -656,10 +652,9 @@ std::wstring ImageName(DWORD processId) {
     return std::filesystem::path(path).filename().wstring();
 }
 
-// ampify_launcher.exe --attach -p <process> -tid <thread>: Windows created the process suspended and waits for this
-// thread to be resumed. The kernel loads first: the loader starts in the thread that runs LoadLibraryW, before any of
-// Apple Music's code. The opening of the app counts for safe mode, not its library agent nor the short AppleMusic.exe
-// that a music:// link starts while the app is open.
+// Windows holds the process suspended until this thread is resumed, so the kernel loads before any of Apple Music's
+// code. Only the opening of the app counts for safe mode, not its library agent nor the short AppleMusic.exe that a
+// music:// link starts while the app is open.
 int RunAttach(ampify::Journal& journal, const std::filesystem::path& kit, DWORD processId, DWORD threadId) {
     HeldThread held(threadId);
     std::string image = ToNarrow(ImageName(processId));
@@ -682,7 +677,10 @@ int RunAttach(ampify::Journal& journal, const std::filesystem::path& kit, DWORD 
                    ampify::launcher::FindPackageProcesses(ampify::kAppleMusicImageW, session->package.directory).size() > 1;
     bool counted = isApp && !appOpen;
     ampify::SafeMode safeMode((kit / "state.txt").string());
-    ampify::PolicyVerdict verdict = session->Decide(counted ? safeMode.BeginLaunch() : safeMode.IsActive());
+    // Not counted (the library agent, a second AppleMusic.exe): safe when the app's own launch was, whose count is
+    // already cleared for the next one.
+    ampify::PolicyVerdict verdict = session->Decide(counted ? safeMode.BeginLaunch()
+                                                            : safeMode.IsActive() || safeMode.ThisLaunchSafe());
     journal.Write(label + " started, held by Windows: " + verdict.reason);
     TellIfOff(journal, *session, verdict);
     if (!verdict.allowed || !session->kernelPresent) {

@@ -11,7 +11,7 @@ std::string ErrorText(DWORD code) {
     return "Windows error " + std::to_string(code);
 }
 
-// Suspends or resumes each thread of the process. Returns how many actually changed state.
+// Returns how many threads actually changed state.
 int ChangeThreadSuspension(DWORD processId, bool suspend) {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
     if (snapshot == INVALID_HANDLE_VALUE) return 0;

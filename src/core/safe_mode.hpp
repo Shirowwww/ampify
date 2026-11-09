@@ -13,7 +13,7 @@ class SafeMode {
 public:
     explicit SafeMode(std::string statePath, int maxUnhealthyLaunches = 2);
 
-    // Call once when the kernel starts. Returns true when extensions must stay off for this launch.
+    // Call once when the kernel starts. True when extensions must stay off for this launch.
     bool BeginLaunch();
 
     // Call once the app has been up and responsive for a while (8 seconds in the kernel).
@@ -21,8 +21,12 @@ public:
 
     int UnhealthyLaunches() const;
 
-    // Read-only version of BeginLaunch's answer: true while safe mode is on. Does not count a launch.
+    // BeginLaunch's answer without counting a launch.
     bool IsActive() const;
+
+    // Whether the app's current launch started in safe mode. Its count is cleared at once so the next launch tries
+    // again: the library agent of this launch, and `ampify doctor`, read this instead.
+    bool ThisLaunchSafe() const;
 
 private:
     std::string m_statePath;

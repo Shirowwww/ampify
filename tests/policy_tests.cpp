@@ -27,7 +27,7 @@ TEST_CASE(Injection_OnlyOnTestedBuildsOutsideSafeMode) {
 
     CHECK(!ampify::DecideInjection("1.1540.23042.0", true, kMatching).allowed);  // safe mode wins over a known build
     CHECK(!ampify::DecideInjection("1.1541.0.0", false, kMatching).allowed);     // untested build: app starts untouched
-    CHECK(!ampify::DecideInjection("", false, kMatching).allowed);               // version not found
+    CHECK(!ampify::DecideInjection("", false, kMatching).allowed);
 }
 
 TEST_CASE(Injection_ReasonSaysWhyTheAppStartsUntouched) {

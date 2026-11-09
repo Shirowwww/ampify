@@ -11,17 +11,17 @@ namespace ampify {
 // What the launcher sees at one poll of the package.
 struct WatchSnapshot {
     double seconds = 0;                    // since the watch started
-    std::vector<uint32_t> appProcesses;    // AppleMusic.exe of the package, running now
-    std::vector<uint32_t> agentProcesses;  // AMPLibraryAgent.exe of the package, running now
+    std::vector<uint32_t> appProcesses;    // AppleMusic.exe
+    std::vector<uint32_t> agentProcesses;  // AMPLibraryAgent.exe
     bool appResponsive = false;            // at least one app process has no hung window
 };
 
 // What the launcher must do after a poll.
 struct WatchActions {
-    std::vector<uint32_t> inject;  // load the kernel into these processes now
-    bool markHealthy = false;      // clear the safe-mode count
-    bool stop = false;             // nothing is left to follow
-    std::string stopReason;        // for the journal, when `stop` is set
+    std::vector<uint32_t> inject;
+    bool markHealthy = false;  // clear the safe-mode count
+    bool stop = false;
+    std::string stopReason;  // when `stop` is set
     bool settled = false;          // the app has run past its start: the launcher may look less often
 };
 
@@ -46,7 +46,7 @@ class PackageWatch {
 public:
     explicit PackageWatch(WatchConfig config);
 
-    // Records a process the launcher has already dealt with, so it is not injected a second time.
+    // For a process the launcher has already dealt with, so it is not injected a second time.
     void MarkHandled(uint32_t processId);
 
     WatchActions Step(const WatchSnapshot& snapshot);

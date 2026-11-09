@@ -9,6 +9,7 @@ namespace ampify {
 namespace {
 
 constexpr const char* kUnhealthyKey = "unhealthy_launches";
+constexpr const char* kSafeLaunchKey = "safe_launch";
 
 }  // namespace
 
@@ -23,8 +24,15 @@ bool SafeMode::BeginLaunch() {
     bool safe = unhealthy >= m_maxUnhealthyLaunches;
 
     state.SetInt(kUnhealthyKey, unhealthy + 1);
+    state.SetInt(kSafeLaunchKey, safe ? 1 : 0);
     state.Save(m_statePath);
     return safe;
+}
+
+bool SafeMode::ThisLaunchSafe() const {
+    Settings state;
+    state.Load(m_statePath);
+    return state.GetInt(kSafeLaunchKey, 0) != 0;
 }
 
 void SafeMode::MarkHealthy() {

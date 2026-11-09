@@ -71,4 +71,16 @@ std::vector<std::string> RecentAppleCrashDumps(const std::filesystem::path& fold
 // True when `folder` exists. Without it Windows records no crash dumps, so "none found" would prove nothing.
 bool CrashDumpsAreRecorded(const std::filesystem::path& folder);
 
+// What the freeze log (apple.watchdog) wrote in a log: its lines in order (stalls of the interface thread, the summary
+// of each minute, slow network waits, memory steps), how many stalls and the longest. `ampify doctor` and `ampify
+// report` read it from every log.
+struct FreezeDigest {
+    std::vector<std::string> lines;
+    int stalls = 0;
+    int64_t worstStallMs = 0;
+};
+
+bool IsFreezeLogLine(std::string_view line);
+FreezeDigest DigestFreezeLog(std::string_view logText);
+
 }  // namespace ampify

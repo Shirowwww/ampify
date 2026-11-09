@@ -18,7 +18,7 @@ inline constexpr DWORD kInjectionRights = PROCESS_CREATE_THREAD | PROCESS_QUERY_
 
 inline constexpr DWORD kDefaultRemoteLoadTimeoutMs = 10000;
 
-// Opens a process with kInjectionRights. Null on failure: GetLastError says why.
+// Opens with kInjectionRights. Null on failure: GetLastError says why.
 HANDLE OpenProcessForInjection(DWORD processId);
 
 // Loads `kernelDll` into `process` by running LoadLibraryW there, and waits at most `timeoutMs`.
@@ -35,10 +35,10 @@ bool InjectKernel(HANDLE process, const std::filesystem::path& kernelDll, std::s
 // True when LoadLibraryW returned a module. On failure, `failure` says why.
 bool FinishRemoteLoad(HANDLE thread, DWORD timeoutMs, std::string& failure);
 
-// Suspends every thread of `processId`. Returns how many were suspended.
+// Returns how many threads were suspended.
 int SuspendProcessThreads(DWORD processId);
 
-// Resumes every thread of `processId` that was suspended. Returns how many were resumed.
+// Returns how many suspended threads were resumed.
 int ResumeProcessThreads(DWORD processId);
 
 // Ids of the running processes that have this image name and run from under `directory`.

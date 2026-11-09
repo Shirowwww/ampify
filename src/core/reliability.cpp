@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdlib>
 #include <optional>
 #include <system_error>
 #include <utility>
@@ -121,6 +122,48 @@ std::vector<std::string> RecentAppleCrashDumps(const std::filesystem::path& fold
 bool CrashDumpsAreRecorded(const std::filesystem::path& folder) {
     std::error_code ec;
     return std::filesystem::is_directory(folder, ec);
+}
+
+namespace {
+
+constexpr std::string_view kStallStart = "UI thread stalled ";
+
+bool StartsWith(std::string_view text, std::string_view start) { return text.substr(0, start.size()) == start; }
+
+// The message of a log line, after its "[12:34:56.789] " stamp.
+std::string_view MessageOf(std::string_view line) {
+    if (!line.empty() && line.front() == '[') {
+        size_t end = line.find("] ");
+        if (end != std::string_view::npos) return line.substr(end + 2);
+    }
+    return line;
+}
+
+}  // namespace
+
+bool IsFreezeLogLine(std::string_view line) {
+    std::string_view message = MessageOf(line);
+    if (StartsWith(message, kStallStart) || StartsWith(message, "UI watchdog, last minute: ")) return true;
+    if (StartsWith(message, "Memory: ")) return true;
+    return StartsWith(message, "Network: ") && message.find(" took ") != std::string_view::npos;
+}
+
+FreezeDigest DigestFreezeLog(std::string_view logText) {
+    FreezeDigest digest;
+    while (!logText.empty()) {
+        size_t end = logText.find('\n');
+        std::string_view line = logText.substr(0, end);
+        logText = end == std::string_view::npos ? std::string_view() : logText.substr(end + 1);
+        if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
+        if (!IsFreezeLogLine(line)) continue;
+        digest.lines.emplace_back(line);
+        std::string_view message = MessageOf(line);
+        if (!StartsWith(message, kStallStart)) continue;
+        digest.stalls++;
+        int64_t ms = std::strtoll(std::string(message.substr(kStallStart.size())).c_str(), nullptr, 10);
+        digest.worstStallMs = std::max(digest.worstStallMs, ms);
+    }
+    return digest;
 }
 
 }  // namespace ampify
