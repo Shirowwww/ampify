@@ -43,11 +43,7 @@ struct PlayerNatives : ScriptBridge {
             answer.emplace_back("base64", Json(Base64Encode(file->bytes)));
             return {200, Json(std::move(answer)).Dump()};
         });
-        if (id == 0) {
-            return Throw(ctx, "RangeError",
-                         "too many requests in flight (" + std::to_string(kMaxHttpInFlight) + " at most)");
-        }
-        return JS_NewUint32(ctx, id);
+        return RequestStarted(ctx, id);
     }
 
     AMPIFY_NATIVE(PlayerControl) {

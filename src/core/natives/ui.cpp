@@ -11,16 +11,15 @@
 #include "../api/module.hpp"
 #include "../i18n.hpp"
 #include "../json.hpp"
+#include "../text_util.hpp"
 #include "../ui_model.hpp"
+#include "../ui_vocab.hpp"
 
 namespace ampify::natives {
 
 namespace {
 
-// Sizes of the interface, in characters, and the names that panels, pages and routes may use.
-constexpr size_t kMaxUiLabel = 60;
-constexpr size_t kMaxUiIcon = 8000;
-constexpr size_t kMaxUiTitle = 120;
+// The names that panels, pages and routes may use. The sizes of the texts are in ui_vocab.hpp.
 constexpr size_t kMaxUiName = 64;
 constexpr double kMaxSession = 9007199254740991.0;  // the largest whole number a JavaScript number holds exactly
 
@@ -39,7 +38,12 @@ std::string DefaultTitle(const ScriptExtension& extension) {
     const std::string& name = translated != manifest.translations.end() && !translated->second.name.empty()
                                   ? translated->second.name
                                   : manifest.name;
-    return name.substr(0, kMaxUiTitle);
+    return std::string(ClipUtf8(name, uivocab::kMaxTitle));
+}
+
+// The text, cut at a character boundary when it passes `limit` bytes.
+std::string Clipped(const std::optional<std::string>& text, size_t limit) {
+    return std::string(ClipUtf8(text.value_or(""), limit));
 }
 
 struct UiNatives : ScriptBridge {
@@ -59,8 +63,8 @@ struct UiNatives : ScriptBridge {
         if (!IsPlacement(placement)) return Throw(ctx, "TypeError", "unknown placement: " + placement);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, std::string(PlacementPermission(placement)), &failure)) return failure;
-        std::string label = String(ctx, argc, argv, 1).value_or("").substr(0, kMaxUiLabel);
-        std::string icon = String(ctx, argc, argv, 2).value_or("").substr(0, kMaxUiIcon);
+        std::string label = Clipped(String(ctx, argc, argv, 1), uivocab::kMaxControlLabel);
+        std::string icon = Clipped(String(ctx, argc, argv, 2), uivocab::kMaxControlIcon);
         // Argument 3, false for a text that only shows something (no onClick).
         bool clickable = JS_ToBool(ctx, argv[3]) != 0;
         // Argument 4, the submenu an entry of a menu belongs to (0 or left out: the menu itself).
@@ -74,7 +78,7 @@ struct UiNatives : ScriptBridge {
     AMPIFY_NATIVE(UiControlLabel) {
         ScriptExtension* ext = Owner(ctx);
         int id = static_cast<int>(Number(ctx, argc, argv, 0));
-        std::string label = String(ctx, argc, argv, 1).value_or("").substr(0, kMaxUiLabel);
+        std::string label = Clipped(String(ctx, argc, argv, 1), uivocab::kMaxControlLabel);
         return JS_NewBool(ctx, HostOf(ext).Ui().SetControlLabel(ext->id(), id, label));
     }
 
@@ -92,6 +96,15 @@ struct UiNatives : ScriptBridge {
         int id = static_cast<int>(Number(ctx, argc, argv, 0));
         bool disabled = argc >= 2 && JS_ToBool(ctx, argv[1]) != 0;
         return JS_NewBool(ctx, HostOf(ext).Ui().SetControlDisabled(ext->id(), id, disabled));
+    }
+
+    // Same rule: the element can only mark the progress line for a play bar button it added.
+    AMPIFY_NATIVE(UiControlMark) {
+        ScriptExtension* ext = Owner(ctx);
+        int id = static_cast<int>(Number(ctx, argc, argv, 0));
+        double from = Number(ctx, argc, argv, 1);
+        double to = Number(ctx, argc, argv, 2);
+        return JS_NewBool(ctx, HostOf(ext).Ui().SetControlMark(ext->id(), id, from, to));
     }
 
     AMPIFY_NATIVE(UiControlRemove) {
@@ -213,7 +226,7 @@ struct UiNatives : ScriptBridge {
         ScriptExtension* ext = Owner(ctx);
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, "ui.window", &failure)) return failure;
-        HostOf(ext).Ui().SetTitle(ext->id(), String(ctx, argc, argv, 0).value_or("").substr(0, kMaxUiTitle));
+        HostOf(ext).Ui().SetTitle(ext->id(), Clipped(String(ctx, argc, argv, 0), uivocab::kMaxTitle));
         return JS_UNDEFINED;
     }
 
@@ -237,10 +250,13 @@ struct UiNatives : ScriptBridge {
 }  // namespace
 
 void DefineUi(api::NativeScope& scope) {
+    // The lists the prelude of ui and react read instead of copying them (JSON, see uivocab::VocabularyJson).
+    scope.String("uiVocabulary", uivocab::VocabularyJson());
     scope.Function("uiControl", UiNatives::UiControl, 5);
     scope.Function("uiControlLabel", UiNatives::UiControlLabel, 2);
     scope.Function("uiControlActive", UiNatives::UiControlActive, 2);
     scope.Function("uiControlDisabled", UiNatives::UiControlDisabled, 2);
+    scope.Function("uiControlMark", UiNatives::UiControlMark, 3);
     scope.Function("uiControlRemove", UiNatives::UiControlRemove, 1);
     scope.Function("uiControlKinds", UiNatives::UiControlKinds, 2);
     scope.Function("uiPanel", UiNatives::UiPanel, 2);
@@ -262,7 +278,6 @@ void StartUi(ScriptExtension& extension) {
     ScriptBridge::HostOf(&extension).Ui().SetTitle(extension.id(), DefaultTitle(extension));
 }
 
-// Removes what the element added to the interface when it stops.
 void StopUi(ScriptExtension& extension) { ScriptBridge::HostOf(&extension).Ui().RemoveElement(extension.id()); }
 
 }  // namespace ampify::natives

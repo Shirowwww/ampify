@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "../api/bridge.hpp"
+#include "../api/dispatch_names.hpp"
 #include "../api/module.hpp"
 
 namespace ampify::natives {
@@ -66,7 +67,7 @@ struct LinkNatives : ScriptBridge {
         std::lock_guard<std::mutex> lock(Registry().mutex);
         ScriptExtension* peer = PeerOf(ext);
         if (!peer || !peer->running()) return JS_FALSE;
-        peer->DeliverEvent("link", json);
+        peer->DeliverEvent(dispatch::kLink, json);
         return JS_TRUE;
     }
 

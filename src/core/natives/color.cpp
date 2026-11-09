@@ -78,11 +78,7 @@ struct ColorNatives : ScriptBridge {
         ArtworkHost* artworks = host->Capability<ArtworkHost>();
         ImageHost* images = host->Capability<ImageHost>();
         uint32_t id = SubmitHttp(ext, [artworks, images] { return PlayingColors(artworks, images); });
-        if (id == 0) {
-            return Throw(ctx, "RangeError",
-                         "too many requests in flight (" + std::to_string(kMaxHttpInFlight) + " at most)");
-        }
-        return JS_NewUint32(ctx, id);
+        return RequestStarted(ctx, id);
     }
 
     // native.colorExtract(bytes: Uint8Array, width, height): JSON text with Spicetify's keys, or null.
@@ -114,11 +110,7 @@ struct ColorNatives : ScriptBridge {
         Host* host = &HostOf(ext);
         ImageHost* images = host->Capability<ImageHost>();
         uint32_t id = SubmitHttp(ext, [host, images, url] { return ArtworkColors(*host, images, url); });
-        if (id == 0) {
-            return Throw(ctx, "RangeError",
-                         "too many requests in flight (" + std::to_string(kMaxHttpInFlight) + " at most)");
-        }
-        return JS_NewUint32(ctx, id);
+        return RequestStarted(ctx, id);
     }
 };
 

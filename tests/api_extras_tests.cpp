@@ -13,6 +13,7 @@
 #include "../src/core/manifest.hpp"
 #include "../src/core/script_extension.hpp"
 #include "../src/core/ui_model.hpp"
+#include "../src/core/ui_vocab.hpp"
 #include "fake_host.hpp"
 #include "test.hpp"
 
@@ -63,8 +64,6 @@ struct Fixture {
 
 }  // namespace
 
-// ---- Buttons and menu entries ----------------------------------------------------------------------------------
-
 TEST_CASE(ApiExtras_AButtonIsTakenOutAndItsClickGoesWithIt) {
     Fixture f;
     auto element = f.Make("remove", R"("ui.topbar", "ui.playbar")", R"(
@@ -75,6 +74,16 @@ TEST_CASE(ApiExtras_AButtonIsTakenOutAndItsClickGoesWithIt) {
     CHECK(f.Logged("[remove] removed true again false"));
     auto controls = f.host.ui.Controls();
     CHECK(controls.size() == 1 && controls[0].label == "B");
+}
+
+TEST_CASE(ApiExtras_ALabelCutAtItsLimitNeverEndsInHalfACharacter) {
+    Fixture f;
+    // 59 bytes and a two-byte letter: the limit falls inside the letter, so the label stops before it.
+    auto element = f.Make("clip", R"("ui.topbar")", R"(
+        Ampify.ui.topbar.addButton({ label: "x".repeat(59) + "é", onClick: () => {} });)");
+    CHECK(element->Start());
+    auto controls = f.host.ui.Controls();
+    CHECK(controls.size() == 1 && controls[0].label == std::string(ampify::uivocab::kMaxControlLabel - 1, 'x'));
 }
 
 TEST_CASE(ApiExtras_RemovingASubmenuTakesItsEntries) {
@@ -157,8 +166,6 @@ TEST_CASE(ApiExtras_AnEntryWithoutKindsShowsInEveryMenu) {
     CHECK(!ampify::IsMenuItemKind("track"));
 }
 
-// ---- Popups and title ----------------------------------------------------------------------------------------------
-
 TEST_CASE(ApiExtras_ANamedPopupIsShownChangedInPlaceAndClosed) {
     Fixture f;
     auto element = f.Make("popup", R"("ui.popup")", R"(
@@ -190,8 +197,6 @@ TEST_CASE(ApiExtras_TheTitleIsReadAndGoesBackToTheName) {
     CHECK(f.Logged("[title] set Now playing"));
     CHECK(f.Logged("[title] reset Demo"));
 }
-
-// ---- Storage, uri, app ---------------------------------------------------------------------------------------------
 
 TEST_CASE(ApiExtras_StorageClearEmptiesTheElementsValues) {
     Fixture f;
@@ -239,8 +244,6 @@ TEST_CASE(ApiExtras_AppleMusicsVersionAndTheActiveTheme) {
     CHECK(f.Logged("[bare] version [] theme null"));
 }
 
-// ---- Components ----------------------------------------------------------------------------------------------------
-
 TEST_CASE(ApiExtras_ConfirmDialogShowsTwoButtonsInTheDisplayLanguage) {
     Fixture f;
     auto element = f.Make("confirm", R"("ui.popup")", R"(
@@ -262,6 +265,28 @@ TEST_CASE(ApiExtras_ConfirmDialogShowsTwoButtonsInTheDisplayLanguage) {
     }
     CHECK(shown);
     CHECK(!f.HasPopup("closed"));
+}
+
+TEST_CASE(ApiExtras_TheNewComponentsGiveTheirNodes) {
+    Fixture f;
+    auto element = f.Make("palette", R"("ui.popup")", R"(
+        const { h } = Ampify.React;
+        const c = Ampify.components;
+        Ampify.ReactDOM.render(h("stack", null,
+          h(c.Checkbox, { label: "Shuffle", checked: true, onChange: (on) => Ampify.log("on " + on) }),
+          h(c.ProgressBar, { value: 30, max: 60 }), h(c.Divider), h(c.Spinner, { size: 24 }), h("hr")), "popup:palette");)");
+    CHECK(element->Start());
+    bool shown = false;
+    for (const auto& popup : f.host.ui.Popups()) {
+        if (popup.id != "palette") continue;
+        shown = true;
+        std::string tree = popup.tree.Dump();
+        for (const char* type : {"\"checkbox\"", "\"progress\"", "\"divider\"", "\"spinner\""}) {
+            CHECK(tree.find(type) != std::string::npos);
+        }
+        CHECK(tree.find("Shuffle") != std::string::npos);
+    }
+    CHECK(shown);
 }
 
 TEST_CASE(ApiExtras_ConfirmDialogClosesWhenRenderedClosed) {

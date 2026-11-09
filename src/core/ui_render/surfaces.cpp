@@ -32,7 +32,9 @@ std::string Signature(const Surface& surface) {
         std::string kinds;
         for (const std::string& kind : surface.control.kinds) kinds += kind + ",";
         return surface.control.placement + "\n" + surface.control.label + "\n" + surface.control.icon + "\n" +
-               (surface.control.active ? "on" : "off") + (surface.control.disabled ? " disabled\n" : "\n") + kinds;
+               (surface.control.clickable ? "click " : "show ") + std::to_string(surface.control.parent) + "\n" +
+               (surface.control.active ? "on" : "off") + (surface.control.disabled ? " disabled\n" : "\n") + kinds +
+               "\n" + std::to_string(surface.control.markFrom) + " " + std::to_string(surface.control.markTo);
     }
     return surface.title + "\n" + surface.tree.Dump();
 }

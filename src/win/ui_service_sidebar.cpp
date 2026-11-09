@@ -15,8 +15,6 @@ namespace ampify::win::ui_service_detail {
 
 namespace {
 
-// ---- Buttons of the top bar and the play bar ----------------------------------------------------------------------
-
 // Sidebar entries. Apple Music fills its menu and footer through item sources of its own view models: an item Ampify
 // added to its footer source crashed it at once (1.1792), and a NavigationViewItem anywhere in the pane would report
 // its taps to Apple Music's navigation. So the entries are flat buttons laid out like the sidebar's items, in a panel
@@ -77,15 +75,17 @@ void ReleaseSidebarHost(WindowContext& context) {
         context.sidebarHost.Children().Clear();
         navigation.PaneFooter(context.sidebarOriginal);
     }
-    StopFollowingSidebarPane(context);
+    // An entry in the header still follows the pane, to come back to the list as soon as it folds.
+    const bool inHeader = std::any_of(context.placed.begin(), context.placed.end(), [](const auto& item) {
+        return item.second.button && item.second.inHeader;
+    });
+    if (!inHeader) StopFollowingSidebarPane(context);
     context.sidebarHost = nullptr;
     context.sidebarOriginal = nullptr;
 }
 
 namespace {
 
-// The inside of a sidebar entry: the icon and the label, and a bar at the left edge like Apple Music's own selected item.
-// An entry that is on takes the accent colour. The icon is drawn again with the colour, so a state change rebuilds it.
 // The icon of a sidebar entry, in the text brush like Apple Music's own icons (the Marketplace gives Ampify's logo as
 // an SVG), or in the accent while the entry is on.
 xaml::FrameworkElement SidebarIcon(const UiControl& control, bool active) {
@@ -105,6 +105,8 @@ xaml::FrameworkElement SidebarIcon(const UiControl& control, bool active) {
     return icon;
 }
 
+// The inside of a sidebar entry: the icon and the label, and a bar at the left edge like Apple Music's own selected item.
+// An entry that is on takes the accent colour. The icon is drawn again with the colour, so a state change rebuilds it.
 xaml::UIElement SidebarContent(const UiControl& control, bool active) {
     const wchar_t* key = active ? L"AccentTextFillColorPrimaryBrush" : L"TextFillColorPrimaryBrush";
     const media::Brush accent = active ? ThemeResource(key).try_as<media::Brush>() : nullptr;
@@ -418,14 +420,32 @@ void RefreshSidebarEntries(WindowContext& context) {
     }
 }
 
+// Ampify's own entry moves between the list and the header as the pane opens or folds (ampify.entry = header). Done in
+// the pane's own callback, before the next frame: left to the next walk of the tree, the entry stood in the list of the
+// open pane for a moment, then showed in the header late.
+void MoveHeaderEntries(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
+    if (!shared.entryInHeader) return;
+    for (auto& item : context->placed) {
+        PlacedControl& placed = item.second;
+        if (!placed.button || placed.entry.placement != "sidebar" || !IsFirstParty(placed.entry.elementId)) continue;
+        const UiControl control = placed.entry;  // PlaceSidebarItem writes placed.entry again
+        PlaceSidebarItem(shared, context, placed, control);
+    }
+}
+
 // Watches the pane's state of this NavigationView. The callbacks hold the context weakly and lock it when they run.
-void FollowSidebarPane(const std::shared_ptr<WindowContext>& context, const controls::NavigationView& navigation) {
+void FollowSidebarPane(const WeakShared& weakShared, const std::shared_ptr<WindowContext>& context,
+                       const controls::NavigationView& navigation) {
     StopFollowingSidebarPane(*context);
     WeakContext weakContext = context;
-    auto changed = [weakContext](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
+    auto changed = [weakShared, weakContext](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
         try {
-            if (auto live = weakContext.lock()) RefreshSidebarEntries(*live);
+            auto live = weakContext.lock();
+            if (!live) return;
+            if (SharedPtr shared = weakShared.lock()) MoveHeaderEntries(*shared, live);
+            RefreshSidebarEntries(*live);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     };
     context->sidebarNavigation = winrt::make_weak(navigation);
@@ -435,6 +455,7 @@ void FollowSidebarPane(const std::shared_ptr<WindowContext>& context, const cont
             try {
                 if (auto live = weakContext.lock()) FitFoldedList(*live);
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
     }
@@ -481,6 +502,7 @@ void RemeasureOnResize(const std::shared_ptr<WindowContext>& context, const cont
                 LayoutSidebarEntry(placed, navigation, placed.active, EntryShift(*live, navigation));
             }
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
 }
@@ -494,6 +516,7 @@ void WireSidebarClick(const controls::Button& button, const UiService::Shared& s
         try {
             if (sink) sink(UiEvent{elementId, id, true, {}});
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
 }
@@ -516,7 +539,9 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
     controls::StackPanel host = inHeader ? nullptr : EnsureSidebarHost(*context, navigation);
     controls::UIElementCollection place = inHeader ? header.Children() : host.Children();
     const bool active = SidebarEntryIsOn(*context, control);
-    if (!inHeader && context->sidebarNavigation.get() != navigation) FollowSidebarPane(context, navigation);
+    // Followed in the header too: the pane folding takes the entry back to the list at once.
+    if (context->sidebarNavigation.get() != navigation) FollowSidebarPane(shared.weak_from_this(), context, navigation);
+    placed.entry = control;
     std::uint32_t index = 0;
     if (placed.button && placed.inHeader == inHeader && place.IndexOf(placed.button, index)) {
         UpdatePlacedEntry(*context, placed, control, navigation, header, active);  // in place: its state may change
@@ -530,7 +555,6 @@ void PlaceSidebarItem(UiService::Shared& shared, const std::shared_ptr<WindowCon
     placed.laidOut = false;
     if (!inHeader) {
         placed.button = button;
-        placed.entry = control;
         LayoutSidebarEntry(placed, navigation, active, EntryShift(*context, navigation));  // before the entry shows
         RemeasureOnResize(context, button);
     }
@@ -598,6 +622,7 @@ void FollowFoldedLogo(UiService::Shared& shared, const std::shared_ptr<WindowCon
         try {
             if (auto live = weakContext.lock()) ShowFoldedLogo(*live);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     };
     for (const xaml::DependencyProperty& property :

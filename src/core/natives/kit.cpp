@@ -6,6 +6,7 @@
 #include <array>
 
 #include "../api/bridge.hpp"
+#include "../api/dispatch_names.hpp"
 #include "../api/module.hpp"
 #include "../json.hpp"
 #include "../kit_layout.hpp"
@@ -36,7 +37,7 @@ namespace {
 
 struct KitNatives : ScriptBridge {
     static void Report(ScriptExtension* ext, double id, int code, const std::string& out, const std::string& err) {
-        ext->DeliverEvent("kitDone", Json(Json::Object{{"id", id}, {"code", static_cast<double>(code)},
+        ext->DeliverEvent(dispatch::kKitDone, Json(Json::Object{{"id", id}, {"code", static_cast<double>(code)},
                                                        {"out", out}, {"err", err}})
                                          .Dump());
     }

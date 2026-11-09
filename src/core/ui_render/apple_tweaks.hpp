@@ -49,10 +49,13 @@ struct AppleTweaks {
     bool textMarquee = true;
     // The sidebar folded to its icons, opening over the pages under the pointer (win/sidebar_hover.cpp).
     bool sidebarOnHover = false;
-    // Freezes of Apple Music's window written to its log, with what Ampify was doing (win/ui_watchdog.cpp). Off by default.
-    bool freezeLog = false;
+    // Freezes of Apple Music's window written to its log, with what Ampify was doing (win/ui_watchdog.cpp). On by default.
+    bool freezeLog = true;
     // Apple's search field and a back arrow in the strip at the top of the window (win/topbar_search.cpp). Off by default.
     bool topbarSearch = false;
+    // The full-screen player's lyrics lines above and below the sung one, kAllLines for all (win/lyrics_window.cpp).
+    int lyricsBefore = -1;
+    int lyricsAfter = -1;
 };
 
 // An unknown value reads as the default.
@@ -67,7 +70,10 @@ struct TweakChoice {
     std::vector<std::pair<std::string, std::string>> options;
     std::string value;
 };
-std::vector<TweakChoice> AppleTweakChoices(const std::filesystem::path& kit);
+// The sections of Ampify's settings page that hold Apple Music's own behaviour: the window (sidebar, top bar, Ampify's
+// entry, long texts, closing, notifications), the full-screen player, and the network and reliability fixes.
+enum class TweakGroup { Window, Player, Reliability };
+std::vector<TweakChoice> AppleTweakChoices(const std::filesystem::path& kit, TweakGroup group);
 
 // New releases of Ampify (kit_update): installed on their own while Apple Music is closed, after a question, or never.
 // The background launcher runs `ampify update --auto`, which follows this choice (src/cli/maintenance.cpp).

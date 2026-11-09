@@ -44,6 +44,7 @@
 #endif
 
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -143,9 +144,15 @@ public:
 
     winrt::Microsoft::UI::Xaml::FrameworkElement Root() const;
 
+    // The largest corner radius the tree's boxes and images take, from the next render on: a panel's content keeps
+    // within the corners of its frame, square ones included (Corners snippet). No limit by default.
+    void SetCornerLimit(double limit) { m_cornerLimit = limit; }
+
 private:
     struct Mounted;
     struct Callbacks;
+    struct Makers;   // the element of each node type (ui_renderer_build.cpp)
+    struct Setters;  // the values of each node type (ui_renderer_attributes.cpp)
 
     Mounted Build(const uirender::RenderNode& node, const StyleProbe& probe);
     void Apply(Mounted& mounted, const uirender::Patch& patch, const StyleProbe& probe);
@@ -165,6 +172,7 @@ private:
     std::unique_ptr<uirender::RenderNode> m_tree;
     std::unique_ptr<Mounted> m_root;
     winrt::Microsoft::UI::Xaml::Controls::ControlTemplate m_primaryTemplate{nullptr};  // shared by the primary buttons
+    double m_cornerLimit = std::numeric_limits<double>::infinity();
 };
 
 }  // namespace ampify::win

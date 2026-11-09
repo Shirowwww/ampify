@@ -112,6 +112,18 @@ const char kUi[] = R"AMPIFYJS(
     return id;
   };
 
+  // A stretch of the progress line for a play bar button, as parts of the song (0 to 1): no `to` marks the start alone,
+  // no `from` clears it. The kernel keeps them on the line and in order.
+  const markLine = (id, from, to) => {
+    const part = (value) => {
+      if (value === undefined || value === null) return -1;
+      if (typeof value !== "number" || !Number.isFinite(value)) throw new TypeError("ui: mark expects numbers from 0 to 1");
+      return Math.max(0, value);
+    };
+    const start = part(from);
+    return native.uiControlMark(Number(id), start, start < 0 ? -1 : part(to));
+  };
+
   // The kernel checks each kind's name; an unknown one takes the new entry out again before throwing.
   const applyKinds = (id, kinds) => {
     if (!kinds) return;
@@ -142,7 +154,7 @@ const char kUi[] = R"AMPIFYJS(
     return removed;
   };
 
-  const kMaxSubmenuEntries = 20;
+  const kMaxSubmenuEntries = JSON.parse(native.uiVocabulary).maxSubmenuEntries;
 
   // A menu entry with `items` is a submenu: its entries are { label, icon, onClick }, one level only.
   const addMenuItem = (placement, options) => {
@@ -223,7 +235,11 @@ const char kUi[] = R"AMPIFYJS(
 
   Ampify.ui = Object.freeze({
     topbar: Object.freeze({ addButton: (options) => addControl("topbar", options), remove: (id) => removeControl(id) }),
-    playbar: Object.freeze({ addButton: (options) => addControl("playbar", options), remove: (id) => removeControl(id) }),
+    playbar: Object.freeze({
+      addButton: (options) => addControl("playbar", options),
+      remove: (id) => removeControl(id),
+      mark: (id, from, to) => markLine(id, from, to),
+    }),
     sidebar: Object.freeze({ addItem: (options) => addControl("sidebar", options), remove: (id) => removeControl(id) }),
     menu: Object.freeze({
       addItem(kind, options) {

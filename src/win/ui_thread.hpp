@@ -5,8 +5,8 @@
 // (Microsoft.UI.Dispatching) of Apple Music's main window, obtained from AMP.Utils.dll. Without a backend nothing is
 // attached and every call fails cleanly, which is the state of the unit tests.
 //
-// The WH_GETMESSAGE hook used before is gone: on Windows Server 2025 (bench run 41097054052) it was installed on the
-// right thread and PostThreadMessage succeeded, but the hook was never called, so the posted work never ran.
+// No WH_GETMESSAGE hook: on Windows Server 2025 it was installed on the right thread and PostThreadMessage
+// succeeded, but the hook was never called, so the posted work never ran.
 //
 // Work is queued from any thread.
 
@@ -32,7 +32,12 @@ bool PostToUiThread(std::function<void()> work);
 // when it could not be queued or did not end in time: it may still run later, so it must own what it touches.
 bool RunOnUiThreadAndWait(std::function<void()> work, DWORD timeoutMs);
 
-// True when attached.
+// How long a caller waits for Apple's objects on the interface thread: its slowest answer seen took close to 2 s.
+inline constexpr DWORD kInterfaceWaitMs = 2000;
+
+// RunOnUiThreadAndWait with kInterfaceWaitMs, the work named `activity` for the freeze log (core/ui_watchdog.hpp).
+bool RunNamedOnUiThread(const char* activity, std::function<void()> work);
+
 bool UiThreadAttached();
 
 // The interface thread, 0 when not attached or unknown. For diagnostics.

@@ -173,11 +173,7 @@ struct HttpNatives : ScriptBridge {
     // dispatch.http gets the answer. Over the cap, throws instead of queuing.
     static JSValue Start(JSContext* ctx, ScriptExtension* ext, std::function<HttpResponse()> request) {
         uint32_t id = SubmitHttp(ext, std::move(request));
-        if (id == 0) {
-            return Throw(ctx, "RangeError",
-                         "too many requests in flight (" + std::to_string(kMaxHttpInFlight) + " at most)");
-        }
-        return JS_NewUint32(ctx, id);
+        return RequestStarted(ctx, id);
     }
 
     // native.httpGet(url[, headersJson]): with headers, through the host's HttpPostHost service.

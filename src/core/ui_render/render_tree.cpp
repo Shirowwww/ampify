@@ -142,17 +142,21 @@ RenderNode BuildRenderTree(const Json& tree, const std::string& rootId) {
     return root;
 }
 
+constexpr std::string_view kOwnPrefix = "AMPIFY_";
+
 std::string ElementName(std::string_view elementId, std::string_view nodeId) {
-    return "AMPIFY_" + Sanitized(elementId, '_', true, false) + "_" + Sanitized(nodeId, '_', true, true);
+    return std::string(kOwnPrefix) + Sanitized(elementId, '_', true, false) + "_" + Sanitized(nodeId, '_', true, true);
 }
 
 bool IsOwnName(std::string_view name) {
-    return name.starts_with("AMPIFY_") || name.starts_with("Ampify");
+    return name.starts_with(kOwnPrefix) || name.starts_with("Ampify");
 }
 
 bool IsForeignModName(std::string_view name) {
     return name.substr(0, 11) == "AMExclusive";
 }
+
+bool IsAmpifyOrModName(std::string_view name) { return IsOwnName(name) || IsForeignModName(name); }
 
 Patch Reconcile(const RenderNode* old, const RenderNode& next) {
     Patch patch;

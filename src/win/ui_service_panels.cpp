@@ -38,6 +38,7 @@ void SetOpacityOf(IInspectable const& sender, double opacity) noexcept {
     try {
         sender.as<xaml::UIElement>().Opacity(opacity);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -65,18 +66,18 @@ void QuietScrollBar(const controls::ScrollViewer& scroll) {
                     try {
                         HideArrows(loaded.as<xaml::DependencyObject>());
                     } catch (...) {
+                        // A handler runs inside Apple Music's XAML frame: nothing may escape it.
                     }
                 });
                 return;
             }
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
 }
 
 namespace {
-
-// ---- Panels, pages, popups ---------------------------------------------------------------------------------------
 
 // The frame of a panel: a flyout-like surface with a title and a close button, and a slot for the rendered tree.
 controls::Border MakeSurfaceFrame(const std::string& frameName, const std::string& title,
@@ -182,8 +183,6 @@ ContentArea FindContentArea(const WindowContext& context, double windowHeight) {
     return area;
 }
 
-// Places the Popup of the panels on the right of the window, under the play bar. Called on every refresh and when
-// the window changes size, so the panels follow it.
 // Opens one of the overlays under the fullscreen view, and counts it so the view goes back on top (ApplySurfaces).
 void OpenOverlay(WindowContext& context, const primitives::Popup& popup) {
     if (popup.IsOpen()) return;
@@ -198,13 +197,17 @@ namespace {
 void DressPanelFrames(WindowContext& context, bool docked) {
     if (!context.panelStack) return;
     xaml::Thickness border = docked ? xaml::Thickness{} : xaml::Thickness{1, 1, 1, 1};
-    xaml::Thickness padding = docked ? xaml::Thickness{} : xaml::Thickness{16, 12, 16, 16};
+    // Docked, the column keeps no padding of its own: each card holds it, so a card filled with its panel's colour
+    // (FillPanelFrame) reaches the column's edges.
+    xaml::Thickness padding = docked ? xaml::Thickness{16, 16, 16, 16} : xaml::Thickness{16, 12, 16, 16};
     for (const xaml::UIElement& child : context.panelStack.Children()) {
         auto frame = child.try_as<controls::Border>();
         if (!frame || frame.BorderThickness() == border) continue;
         frame.BorderThickness(border);
         frame.Padding(padding);
-        if (docked) {
+        if (auto fill = frame.Tag().try_as<media::Brush>()) {
+            frame.Background(fill);
+        } else if (docked) {
             frame.Background(media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
         } else if (auto brush = ThemeResource(L"AcrylicInAppFillColorDefaultBrush").try_as<media::Brush>()) {
             frame.Background(brush);
@@ -277,7 +280,7 @@ bool DockPanelPopup(WindowContext& context, const winrt::Windows::Foundation::Si
     xaml::CornerRadius corners = pages.CornerRadius();
     xaml::CornerRadius held = context.panelHost.CornerRadius();
     if (held.TopLeft != corners.TopLeft || held.BottomRight != corners.BottomRight) context.panelHost.CornerRadius(corners);
-    if (!context.panelDocked) context.panelHost.Padding(xaml::Thickness{16, 16, 16, 16});
+    if (!context.panelDocked) context.panelHost.Padding(xaml::Thickness{});
     context.panelDocked = true;
     DressPanelFrames(context, true);
     return true;
@@ -353,6 +356,8 @@ bool PagesKeepRoom(const WindowContext& context) {
 
 }  // namespace
 
+// Places the Popup of the panels on the right of the window, under the play bar. Called on every refresh and when
+// the window changes size, so the panels follow it.
 void PlacePanelPopup(WindowContext& context, const xaml::XamlRoot& root) {
     auto size = root.Size();
     if (AnyPanelShown(context)) {
@@ -476,7 +481,7 @@ constexpr float kPanelSlide = 48;  // how far a panel comes from, on the right
 constexpr auto kPanelIn = std::chrono::milliseconds(280);
 constexpr auto kPanelOut = std::chrono::milliseconds(200);  // leaving is quicker than coming
 
-// A new panel comes in from the right and fades in, on the compositor thread, once it is in the window.
+// Runs on the compositor thread, once the panel is in the window.
 void SlidePanelIn(const controls::Border& frame) {
     frame.Translation({kPanelSlide, 0, 0});
     frame.Opacity(0);
@@ -493,6 +498,7 @@ void SlidePanelIn(const controls::Border& frame) {
             loaded.Translation({0, 0, 0});
             loaded.Opacity(1);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
 }
@@ -500,9 +506,11 @@ void SlidePanelIn(const controls::Border& frame) {
 }  // namespace
 
 // A panel taken out slides back to the right and fades, then leaves the column; the column itself goes when it is
-// empty, so a theme's docked column does not stay behind as an empty card.
+// empty, so a theme's docked column does not stay behind as an empty card. The pages take their room back only then:
+// laying Apple's page out again as the slide starts held its first frames, and the panel jumped out instead.
 void SlidePanelOut(WindowContext& context, const xaml::FrameworkElement& frame) {
     if (!frame) return;
+    if (!frame.IsHitTestVisible()) return;  // already leaving
     auto timer = std::make_shared<winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer>(
         winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer());
     xaml::Vector3Transition slide;
@@ -514,22 +522,85 @@ void SlidePanelOut(WindowContext& context, const xaml::FrameworkElement& frame) 
     frame.Translation({kPanelSlide, 0, 0});
     frame.Opacity(0);
     frame.IsHitTestVisible(false);  // leaving (AnyPanelShown)
-    if (!AnyPanelShown(context)) ReleasePages(context);
+    WeakContext weakContext = context.weak_from_this();
     controls::StackPanel stack = context.panelStack;
     primitives::Popup popup = context.panelPopup;
     timer->Interval(kPanelOut);
     timer->IsRepeating(false);
-    timer->Tick([timer, frame, stack, popup](auto&&, auto&&) mutable noexcept {
+    timer->Tick([timer, frame, stack, popup, weakContext](auto&&, auto&&) mutable noexcept {
         try {
             RemoveFromParent(frame);
+            if (auto live = weakContext.lock(); live && !AnyPanelShown(*live)) ReleasePages(*live);
             if (stack && stack.Children().Size() == 0 && popup && popup.IsOpen()) popup.IsOpen(false);
             timer->Stop();
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
         timer.reset();  // the timer held this handler, which held the timer
     });
     timer->Start();
 }
+
+namespace {
+
+constexpr double kFrameRadius = 8;  // a floating panel's corners while the theme gives its panels none
+
+// The theme's --panel-radius (panel_radius.hpp): a floating frame takes it, and what the element draws inside keeps
+// within it, so square corners reach the panels too. A docked column already takes the pages' corners.
+void FollowPanelRadius(UiService::Shared& shared, const WindowContext& context, MountedSurface& mounted,
+                       const Surface& surface) {
+    std::optional<double> radius = PublishedPanelRadius();
+    if (!mounted.renderer) mounted.renderer = std::make_unique<XamlRenderer>(surface.elementId, shared.sink);
+    mounted.renderer->SetCornerLimit(radius ? *radius : std::numeric_limits<double>::infinity());
+    if (context.panelDocked || !mounted.panelFrame) return;
+    auto frame = mounted.panelFrame.try_as<controls::Border>();
+    double corner = radius ? *radius : kFrameRadius;
+    if (frame && frame.CornerRadius().TopLeft != corner) frame.CornerRadius(xaml::CornerRadius{corner, corner, corner, corner});
+}
+
+media::Brush BackgroundOf(const xaml::UIElement& element) {
+    if (auto border = element.try_as<controls::Border>()) return border.Background();
+    if (auto panel = element.try_as<controls::Panel>()) return panel.Background();
+    if (auto control = element.try_as<controls::Control>()) return control.Background();
+    return nullptr;
+}
+
+void ClearBackground(const xaml::UIElement& element) {
+    if (auto border = element.try_as<controls::Border>()) border.Background(nullptr);
+    else if (auto panel = element.try_as<controls::Panel>()) panel.Background(nullptr);
+    else if (auto control = element.try_as<controls::Control>()) control.Background(nullptr);
+}
+
+// A panel whose root has a background fills its whole card with it, title and edges included: the song panel's
+// colour stopped a margin short of the card, which stayed grey around it (and the column, docked). The root gives
+// its brush to the card, so a see-through colour is not laid twice; the card keeps it in its Tag for DressPanelFrames.
+// Docked, the card takes the column's corners.
+void FillPanelFrame(const WindowContext& context, MountedSurface& mounted) {
+    auto frame = mounted.panelFrame.try_as<controls::Border>();
+    xaml::UIElement root = mounted.slot ? mounted.slot.Child() : nullptr;
+    if (!frame || !root) return;
+    if (media::Brush brush = BackgroundOf(root)) {
+        ClearBackground(root);
+        frame.Tag(brush);
+        frame.Background(brush);
+        mounted.filledRoot = root;
+    } else if (frame.Tag() && root != mounted.filledRoot) {
+        // A new root without a background (nothing playing): the card takes its own look back.
+        frame.Tag(nullptr);
+        mounted.filledRoot = nullptr;
+        if (context.panelDocked) {
+            frame.Background(media::SolidColorBrush(winrt::Windows::UI::Colors::Transparent()));
+        } else if (auto plain = ThemeResource(L"AcrylicInAppFillColorDefaultBrush").try_as<media::Brush>()) {
+            frame.Background(plain);
+        }
+    }
+    if (context.panelDocked && frame.Tag() && context.panelHost) {
+        xaml::CornerRadius corners = context.panelHost.CornerRadius();
+        if (frame.CornerRadius() != corners) frame.CornerRadius(corners);
+    }
+}
+
+}  // namespace
 
 void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                 const xaml::DependencyObject& content, const Surface& surface) {
@@ -561,7 +632,7 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
         Journal* journal = &shared.journal;
         // The element is told (entry "panelClose"): its panel leaves its model, so its button can show it again with
         // one click, and its React root unmounts. Until the model drops it, closedPanels keeps it from coming back.
-        UiEvent closed{surface.elementId, 0, false, "{\"panel\":" + Json::Quote(surface.id) + "}", "panelClose"};
+        UiEvent closed{surface.elementId, 0, false, "{\"panel\":" + Json::Quote(surface.id) + "}", dispatch::kPanelClose};
         close.Click([weakContext, weakShared, key, label, journal, closed](IInspectable const& sender,
                                                                          xaml::RoutedEventArgs const&) noexcept {
             try {
@@ -571,16 +642,13 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
                 live->closedPanels.insert(key);
                 auto found = live->surfaces.find(key);
                 if (found != live->surfaces.end()) {
-                    RemoveFromParent(found->second.panelFrame);
-                    if (!AnyPanelShown(*live)) {
-                        ReleasePages(*live);
-                        if (live->panelPopup) live->panelPopup.IsOpen(false);
-                    }
+                    SlidePanelOut(*live, found->second.panelFrame);  // as smooth as a panel its element takes out
                     live->surfaces.erase(found);
                 }
                 journal->Write("Interface: panel \"" + label + "\" closed by the user");
                 (void)sender;
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
         SlidePanelIn(frame);
@@ -594,7 +662,9 @@ void MountPanel(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
         mounted.slot = slot;
         mounted.title = title;
     }
+    FollowPanelRadius(shared, *context, mounted, surface);
     uirender::PatchStats stats = RenderInto(shared, mounted, surface);
+    FillPanelFrame(*context, mounted);
     JournalRender(shared, "panel", surface, stats, first);
 }
 

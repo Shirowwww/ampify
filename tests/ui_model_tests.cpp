@@ -1,6 +1,8 @@
 #include <string>
 
+#include "../src/core/text_util.hpp"
 #include "../src/core/ui_model.hpp"
+#include "../src/core/ui_vocab.hpp"
 #include "test.hpp"
 
 namespace {
@@ -9,6 +11,16 @@ ampify::Json Parse(const std::string& text) {
     std::string error;
     std::optional<ampify::Json> value = ampify::Json::Parse(text, &error);
     return value ? *value : ampify::Json();
+}
+
+constexpr int kDepth = ampify::uivocab::kMaxTreeDepth;
+constexpr int kNodes = ampify::uivocab::kMaxTreeNodes;
+
+// A stack holding `count` texts.
+std::string StackOfTexts(int count) {
+    std::string children;
+    for (int i = 0; i < count; i++) children += (i ? "," : "") + std::string(R"({"type":"text"})");
+    return R"({"type":"stack","children":[)" + children + "]}";
 }
 
 // A stack nested `depth` levels deep, with one text at the bottom.
@@ -55,23 +67,96 @@ TEST_CASE(UiTree_RefusesAnObjectOrAListAsAnAttribute) {
 
 TEST_CASE(UiTree_RefusesTooMuchDepth) {
     std::string error;
-    CHECK(ampify::ValidateTree(Parse(Nested(7)), &error));
-    CHECK(!ampify::ValidateTree(Parse(Nested(9)), &error));
-    CHECK(error.find("too deep") != std::string::npos);
+    // Nested(n) is n stacks and a text: n + 1 levels.
+    CHECK(ampify::ValidateTree(Parse(Nested(kDepth - 1)), &error));
+    CHECK(!ampify::ValidateTree(Parse(Nested(kDepth)), &error));
+    CHECK(error == "interface too deep (" + std::to_string(kDepth) + " levels at most)");
 }
 
 TEST_CASE(UiTree_RefusesTooManyElements) {
     std::string error;
-    std::string children;
-    for (int i = 0; i < 300; i++) children += (i ? "," : "") + std::string(R"({"type":"text"})");
-    CHECK(ampify::ValidateTree(Parse(R"({"type":"stack","children":[)" + children + "]}"), &error) == false);
-    CHECK(error.find("too large") != std::string::npos);
+    // The stack is one node, so kMaxTreeNodes - 1 texts fill the tree and one more overflows it.
+    CHECK(ampify::ValidateTree(Parse(StackOfTexts(kNodes - 1)), &error));
+    CHECK(!ampify::ValidateTree(Parse(StackOfTexts(kNodes)), &error));
+    CHECK(error == "interface too large (" + std::to_string(kNodes) + " elements at most)");
 }
 
 TEST_CASE(UiTree_RefusesLongText) {
     std::string error;
-    std::string text(501, 'a');
-    CHECK(!ampify::ValidateTree(Parse(R"({"type":"text","text":")" + text + R"("})"), &error));
+    std::string atLimit(ampify::uivocab::kMaxText, 'a');
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"text","text":")" + atLimit + R"("})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"text","text":")" + atLimit + R"(a"})"), &error));
+    CHECK(error == "text too long in text (" + std::to_string(ampify::uivocab::kMaxText) + " characters at most)");
+}
+
+TEST_CASE(UiTree_MessagesNameTheLimitsOfTheVocabulary) {
+    namespace vocab = ampify::uivocab;
+    auto refusal = [](const std::string& tree) {
+        std::string error;
+        ampify::ValidateTree(Parse(tree), &error);
+        return error;
+    };
+    auto number = [](double value) { return ampify::ShortestNumberText(value); };
+    CHECK(refusal(R"({"type":"stack","cornerRadius":-1})") == "cornerRadius expects a number between 0 and " + number(vocab::kMaxCorner));
+    CHECK(refusal(R"({"type":"row","width":-1})") == "width expects a number of pixels between 0 and " + number(vocab::kMaxLength));
+    CHECK(refusal(R"({"type":"stack","padding":-1})") == "padding expects a number or \"top,right,bottom,left\" (0 to " + number(vocab::kMaxPadding) + " each)");
+    CHECK(refusal(R"({"type":"text","size":1})") == "size expects a number of pixels between " + number(vocab::kMinTextSize) + " and " + number(vocab::kMaxTextSize));
+    CHECK(refusal(R"({"type":"text","maxLines":-1})") == "maxLines expects a whole number between 0 and " + number(vocab::kMaxLines));
+    CHECK(refusal(R"({"type":"text","scale":-1})") == "scale expects a number between 0 and " + number(vocab::kMaxScale));
+    CHECK(refusal(R"({"type":"grid","gap":-1})") == "gap expects a number of pixels between 0 and " + number(vocab::kMaxGridGap));
+    CHECK(refusal(R"({"type":"grid","columns":0})") == "columns expects a whole number between 1 and " + number(vocab::kMaxGridColumns));
+    CHECK(refusal(R"({"type":"button","tooltipDelay":-1})") == "tooltipDelay expects a number of milliseconds between 0 and " + number(vocab::kMaxTooltipDelayMs));
+    CHECK(refusal(R"({"type":"text","transition":"fade"})") == "transition expects \"<opacity|scale|translation|all> <duration>ms\", comma-separated (" + number(vocab::kMaxTransitionMs / 1000) + " s at most), or \"none\"");
+}
+
+TEST_CASE(UiTree_LimitsAreAcceptedAtTheirEdgeAndRefusedBeyond) {
+    namespace vocab = ampify::uivocab;
+    std::string error;
+    auto stack = [](const std::string& attribute, double value) {
+        return Parse(R"({"type":"stack",")" + attribute + R"(":)" + ampify::ShortestNumberText(value) + "}");
+    };
+    CHECK(ampify::ValidateTree(stack("cornerRadius", vocab::kMaxCorner), &error));
+    CHECK(!ampify::ValidateTree(stack("cornerRadius", vocab::kMaxCorner + 1), &error));
+    CHECK(ampify::ValidateTree(stack("maxWidth", vocab::kMaxLength), &error));
+    CHECK(!ampify::ValidateTree(stack("maxWidth", vocab::kMaxLength + 1), &error));
+    CHECK(ampify::ValidateTree(stack("padding", vocab::kMaxPadding), &error));
+    CHECK(!ampify::ValidateTree(stack("padding", vocab::kMaxPadding + 1), &error));
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"text","transition":"opacity )" + std::to_string(static_cast<int>(vocab::kMaxTransitionMs)) + R"(ms"})"), &error));
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"text","transition":"opacity )" + std::to_string(static_cast<int>(vocab::kMaxTransitionMs) + 1) + R"(ms"})"), &error));
+}
+
+TEST_CASE(UiModel_ProgressCheckboxDividerAndSpinnerAreValid) {
+    std::string error;
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"stack","children":[{"type":"progress","value":40,"max":80,"label":"Upload"},)"
+                                     R"({"type":"progress"},{"type":"checkbox","label":"Shuffle","checked":true,"onChange":3},)"
+                                     R"({"type":"divider"},{"type":"spinner","size":24,"label":"Loading"}]})"),
+                               &error));
+    CHECK(error.empty());
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"progress","onClick":1})"), &error));  // a bar takes no click
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"divider","children":[{"type":"text","text":"x"}]})"), &error));
+}
+
+TEST_CASE(UiVocab_EveryPrimitiveAndPlacementIsListedOnce) {
+    namespace vocab = ampify::uivocab;
+    CHECK(vocab::Primitives().size() == 24);
+    for (const auto& primitive : vocab::Primitives()) CHECK(vocab::FindPrimitive(primitive.name) == &primitive);
+    CHECK(vocab::FindPrimitive("script") == nullptr);
+    CHECK(vocab::Placements().size() == 5);
+    CHECK(vocab::FindPlacement("sidebar") && vocab::FindPlacement("sidebar")->slot == vocab::Slot::Sidebar);
+    CHECK(vocab::FindPlacement("footer") == nullptr);
+    CHECK(vocab::DefaultGap("row", 8) == 12 && vocab::DefaultGap("tabs", 8) == 4 && vocab::DefaultGap("button", 8) == 8);
+}
+
+TEST_CASE(UiVocab_ThePreludeListsComeFromTheTable) {
+    std::string error;
+    std::optional<ampify::Json> vocabulary = ampify::Json::Parse(ampify::uivocab::VocabularyJson(), &error);
+    CHECK(vocabulary.has_value());
+    const ampify::Json::Array* containers = vocabulary->Find("containers")->AsArray();
+    CHECK(containers && containers->size() == 9);
+    const ampify::Json::Array* place = vocabulary->Find("place")->AsArray();
+    CHECK(place && place->size() == ampify::uivocab::kCommonStyle.size());
+    CHECK(*vocabulary->Find("textAttribute")->Find("toggle")->AsString() == "label");
+    CHECK(*vocabulary->Find("maxSubmenuEntries")->AsNumber() == ampify::uivocab::kMaxSubmenuEntries);
 }
 
 TEST_CASE(UiModel_AddsAControlAndFindsIt) {
@@ -192,21 +277,24 @@ TEST_CASE(UiTree_RefusesTabsAndItemsOutsideTheirContainer) {
 TEST_CASE(UiTree_RefusesAGridWithoutAWholeColumnCount) {
     std::string error;
     CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","columns":0})"), &error));
-    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","columns":13})"), &error));
+    int most = ampify::uivocab::kMaxGridColumns;
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","columns":)" + std::to_string(most + 1) + "}"), &error));
     CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","columns":2.5})"), &error));
     CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","columns":"3"})"), &error));
     CHECK(error.find("columns") != std::string::npos);
-    CHECK(ampify::ValidateTree(Parse(R"({"type":"grid","columns":12})"), &error));
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"grid","columns":)" + std::to_string(most) + "}"), &error));
 }
 
 TEST_CASE(UiTree_RefusesAGridWithAGapOutOfRange) {
     std::string error;
     CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","gap":-1})"), &error));
-    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","gap":1001})"), &error));
+    std::string most = std::to_string(static_cast<int>(ampify::uivocab::kMaxGridGap));
+    std::string beyond = std::to_string(static_cast<int>(ampify::uivocab::kMaxGridGap) + 1);
+    CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","gap":)" + beyond + "}"), &error));
     CHECK(!ampify::ValidateTree(Parse(R"({"type":"grid","gap":"8"})"), &error));
     CHECK(error.find("gap") != std::string::npos);
     CHECK(ampify::ValidateTree(Parse(R"({"type":"grid","gap":0})"), &error));
-    CHECK(ampify::ValidateTree(Parse(R"({"type":"grid","gap":1000})"), &error));
+    CHECK(ampify::ValidateTree(Parse(R"({"type":"grid","gap":)" + most + "}"), &error));
 }
 
 TEST_CASE(UiModel_NamedPopupsAreReplacedAndClosed) {

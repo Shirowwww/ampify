@@ -55,6 +55,12 @@ struct ScriptBridge {
     static uint32_t SubmitHttp(ScriptExtension* ext, std::function<HttpResponse()> request) {
         return ext->SubmitHttp(std::move(request));
     }
+    // What a native returns for a request it handed to SubmitHttp: its id, which dispatch.http answers later, or a
+    // RangeError when kMaxHttpInFlight requests of the element are still running (id 0).
+    static JSValue RequestStarted(JSContext* ctx, uint32_t id) {
+        if (id != 0) return JS_NewUint32(ctx, id);
+        return Throw(ctx, "RangeError", "too many requests in flight (" + std::to_string(kMaxHttpInFlight) + " at most)");
+    }
     static std::chrono::steady_clock::time_point Now(ScriptExtension* ext) { return ext->m_clock(); }
 
     // State of the built-in modules, kept by ScriptExtension.

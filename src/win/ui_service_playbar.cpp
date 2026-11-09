@@ -164,6 +164,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
             try {
                 if (sink) sink(UiEvent{elementId, id, true, {}});
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
 
@@ -197,6 +198,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
     context->appEntries = std::move(appEntries);
     context->contextEntries = std::move(contextEntries);
     FollowMenus(shared, context);
+    FollowPlaybarMark(shared, context, surfaces);
     QueueSongRoom(shared.sink, context);  // a button gone may leave a single one folded
 }
 
@@ -242,10 +244,23 @@ bool KeepSongClearOfTransport(WindowContext& context, const xaml::FrameworkEleme
     return limit < song.ActualWidth() - 0.5 || binding;
 }
 
+Edges EdgesOf(const xaml::Thickness& margin) {
+    Edges edges;
+    edges.left = margin.Left;
+    edges.top = margin.Top;
+    edges.right = margin.Right;
+    edges.bottom = margin.Bottom;
+    return edges;
+}
+
+xaml::Thickness ThicknessOf(const Edges& edges) {
+    return {edges.left, edges.top, edges.right, edges.bottom};
+}
+
 // A layout that spans the song over the toggles' column (floating-panels) leaves its end to Ampify: Apple's columns
 // left the song a third of the bar, with an empty stretch before the volume, and the title cut in a narrow window. The
 // song ends a clear space short of the toggles, whatever their number. A layout that sizes the song itself (a width,
-// or another alignment) keeps it; a single column gets Apple's margin back.
+// or another alignment) keeps it; a single column gets the layout's margin back (SongMargin tells the two apart).
 // True when it gave the song a new margin, which the next layout pass lays out.
 bool FitSongRoom(WindowContext& context) {
     xaml::FrameworkElement song = context.songColumn.get();
@@ -254,22 +269,28 @@ bool FitSongRoom(WindowContext& context) {
     if (!song || !toggles || !parent) return false;
     bool ours = controls::Grid::GetColumnSpan(song) >= 2 && std::isnan(song.Width()) &&
                 song.HorizontalAlignment() == xaml::HorizontalAlignment::Stretch;
-    xaml::Thickness margin = song.Margin();
+    Edges margin = EdgesOf(song.Margin());
     if (!ours) {
-        bool restored = context.songMargin.has_value();
-        if (restored) song.Margin(*context.songMargin);
-        context.songMargin.reset();
-        return KeepSongClearOfTransport(context, song, parent) || restored;
+        context.songFitting = false;
+        std::optional<Edges> back = context.songMargin.Release(margin);
+        if (back) song.Margin(ThicknessOf(*back));
+        return KeepSongClearOfTransport(context, song, parent) || back.has_value();
     }
     if (KeepSongClearOfTransport(context, song, parent)) return true;  // gives Apple's maximum back
-    if (!context.songMargin) context.songMargin = margin;
+    Edges base = context.songMargin.Base(margin);
+    context.songFitting = true;
     if (song.ActualWidth() <= 0 || toggles.ActualWidth() <= 0) return false;
-    double songLeft = song.TransformToVisual(parent).TransformPoint({0, 0}).X;
     double togglesLeft = toggles.TransformToVisual(parent).TransformPoint({0, 0}).X;
-    double slotRight = songLeft + song.ActualWidth() + margin.Right;
-    double right = std::max(context.songMargin->Right, slotRight - (togglesLeft - kSongClearance));
-    if (std::abs(right - margin.Right) < 0.5) return false;
-    song.Margin({margin.Left, margin.Top, right, margin.Bottom});
+    // The slot's end, not the song's width plus its margin: a margin just written is not laid out yet, and adding it to
+    // the old width doubled it for a frame (the display flashed narrow at each theme change).
+    winrt::Windows::Foundation::Rect slot = primitives::LayoutInformation::GetLayoutSlot(song);
+    double slotRight = slot.X + slot.Width;
+    double right = std::max(base.right, slotRight - (togglesLeft - kSongClearance));
+    if (std::abs(right - margin.right) < 0.5) return false;
+    Edges fitted = margin;
+    fitted.right = right;
+    song.Margin(ThicknessOf(fitted));
+    context.songMargin.Wrote(fitted);
     return true;
 }
 
@@ -302,7 +323,7 @@ std::optional<double> PlaybarRoom(const WindowContext& context, const xaml::Fram
         room = std::min(room, togglesLeft - (left + element.ActualWidth()) - kPlaybarClearance);
     };
     measure(context.transport.get());
-    if (!context.songMargin) measure(context.songDisplay.get());
+    if (!context.songFitting) measure(context.songDisplay.get());
     xaml::FrameworkElement display = context.songDisplay.get();
     xaml::FrameworkElement song = context.songColumn.get();
     if (display && song && display.ActualWidth() > 0 && std::isnan(display.Width()) && std::isnan(song.Width())) {
@@ -346,6 +367,7 @@ void FillPlaybarMenu(const controls::MenuFlyout& menu, WindowContext& context, c
             try {
                 if (sink) sink(UiEvent{elementId, id, true, {}});
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
         menu.Items().Append(item);
@@ -375,6 +397,7 @@ controls::Button MakePlaybarMore(const controls::Button& model, const UiEventSin
         try {
             if (auto live = weakContext.lock()) FillPlaybarMenu(sender.as<controls::MenuFlyout>(), *live, sink);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     more.Flyout(menu);
@@ -435,6 +458,26 @@ void FoldPlaybarButtons(const UiEventSink& sink, const std::shared_ptr<WindowCon
     context->playbarMore.Visibility(xaml::Visibility::Visible);
 }
 
+// The row of toggles a little lower while it runs under the window's buttons (caption_clearance.hpp). Through its
+// Translation, which leaves its margin and its transform to the theme, and with a short glide.
+void KeepTogglesClearOfCaption(WindowContext& context) {
+    xaml::FrameworkElement toggles = context.songToggles.get();
+    if (!toggles || toggles.ActualWidth() <= 0 || !toggles.XamlRoot()) return;
+    winrt::Windows::Foundation::Point origin = toggles.TransformToVisual(nullptr).TransformPoint({0, 0});
+    winrt::Windows::Foundation::Numerics::float3 shift = toggles.Translation();
+    double top = origin.Y - shift.y;  // where the row stands without Ampify's drop
+    double drop = TogglesDrop(origin.X + toggles.ActualWidth(), top, toggles.XamlRoot().Size().Width);
+    if (std::abs(drop - context.togglesDrop) < 0.5) return;
+    if (!toggles.TranslationTransition()) {
+        xaml::Vector3Transition glide;
+        glide.Duration(std::chrono::milliseconds(150));
+        toggles.TranslationTransition(glide);
+    }
+    shift.y += static_cast<float>(drop - context.togglesDrop);
+    toggles.Translation(shift);
+    context.togglesDrop = drop;
+}
+
 // Fits the song and folds the buttons once the layout pass is over, a single time for all the sizes it changed: within
 // the pass, the widths read are not yet those of the step just taken, and folding on them went back and forth until
 // WinUI ended Apple Music for a layout cycle. Each step lays out again, which queues the next one.
@@ -449,11 +492,15 @@ void QueueSongRoom(const UiEventSink& sink, const std::shared_ptr<WindowContext>
                     if (!live) return;
                     live->songRoomQueued = false;
                     // A new margin is laid out first: the widths read now would be those before it.
-                    if (!FitSongRoom(*live)) FoldPlaybarButtons(sink, live);
+                    if (FitSongRoom(*live)) return;
+                    FoldPlaybarButtons(sink, live);
+                    KeepTogglesClearOfCaption(*live);
                 } catch (...) {
+                    // A handler runs inside Apple Music's XAML frame: nothing may escape it.
                 }
             });
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -469,9 +516,12 @@ void FollowSongRoom(UiService::Shared& shared, const std::shared_ptr<WindowConte
     auto song = displayElement ? media::VisualTreeHelper::GetParent(displayElement).try_as<xaml::FrameworkElement>()
                                : nullptr;
     if (!song || !togglesElement || context->songColumn.get() == song) return;
+    // The drop lives in the row's own Translation: it starts again only with another row.
+    if (context->songToggles.get() != togglesElement) context->togglesDrop = 0;
     context->songColumn = winrt::make_weak(song);
     context->songToggles = winrt::make_weak(togglesElement);
-    context->songMargin.reset();
+    context->songMargin = {};
+    context->songFitting = false;
     context->songMaxWidth.reset();
     WeakContext weakContext = context;
     std::optional<int> transport = uirender::FindByName(nodes, "TransportControl");

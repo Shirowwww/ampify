@@ -4,6 +4,8 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <charconv>
+#include <system_error>
 #include <string_view>
 #include <tuple>
 
@@ -110,6 +112,20 @@ std::string CatalogCoverAddress(const std::string& artworkUrl100, double pixels)
     int wanted = static_cast<int>(std::ceil(std::max(0.0, pixels) / kStep)) * kStep;
     std::string side = std::to_string(std::clamp(wanted, kSmallest, kLargest));
     return artworkUrl100.substr(0, name) + side + "x" + side + artworkUrl100.substr(crop);
+}
+
+std::optional<CoverSize> CatalogCoverSize(const std::string& address) {
+    if (CatalogCoverAddress(address, 0).empty()) return std::nullopt;  // the same checks: Apple's host, "<w>x<h>..."
+    size_t name = address.rfind('/') + 1;
+    size_t cross = address.find('x', name);
+    CoverSize size;
+    const char* text = address.data();
+    auto width = std::from_chars(text + name, text + cross, size.width);
+    auto height = std::from_chars(text + cross + 1, text + address.size(), size.height);
+    // A side too long for an int is no size Apple asks: nothing, rather than a wrapped number.
+    if (width.ec != std::errc{} || height.ec != std::errc{}) return std::nullopt;
+    if (size.width <= 0 || size.height <= 0) return std::nullopt;
+    return size;
 }
 
 AmpTimeUnit DetectAmpTimeUnit(int64_t durationRaw, std::optional<int64_t> smtcDurationMs) {

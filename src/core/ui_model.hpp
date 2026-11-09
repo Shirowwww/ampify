@@ -16,19 +16,23 @@ namespace ampify {
 // it (XAML) and the tests read it. Every method takes the lock, because the renderer and the owner thread of the
 // elements both use it.
 //
-// Placements: "topbar" and "playbar" (buttons), "menu-context" and "menu-app" (menu items).
+// Placements: the list, with their permissions, is in ui_vocab.cpp.
 struct UiControl {
     int id = 0;  // reported back by the host when the control is clicked
     std::string elementId;
     std::string placement;
     std::string label;
-    std::string icon;  // SVG text, as Ampify.icons gives it
+    std::string icon;  // SVG text, as Ampify.icons gives it, or a Segoe Fluent glyph of 8 bytes at most
     bool clickable = true;  // false: a play bar or top bar text that only shows something, or a menu's submenu
     int parent = 0;         // the submenu (a menu control that is not clickable) this menu entry sits in; 0: the menu itself
     bool active = false;    // a top bar or play bar button that is on: it takes the accent colour
     bool disabled = false;  // drawn greyed and ignores clicks (top bar, play bar, menu entry)
     // A context menu entry shows only in the menus of these kinds of item (IsMenuItemKind); empty: in every one.
     std::vector<std::string> kinds;
+    // A play bar button's stretch of the progress line, as parts of the song from 0 to 1 (the A-B loop's passage);
+    // -1: not marked. A start without an end shows the start alone.
+    double markFrom = -1;
+    double markTo = -1;
 };
 
 struct UiSlot {
@@ -55,6 +59,11 @@ public:
 
     // Greys a control the element added, or brings it back. False when the element has no such control.
     bool SetControlDisabled(const std::string& elementId, int controlId, bool disabled);
+
+    // Marks a stretch of the progress line for a play bar button the element added (see UiControl::markFrom), kept
+    // within 0 to 1 and in order; a negative `from` clears it, a negative `to` marks the start alone. False when the
+    // element has no such play bar button.
+    bool SetControlMark(const std::string& elementId, int controlId, double from, double to);
 
     // The kinds of item a context menu entry is for (see UiControl::kinds). False when the element has no such control.
     bool SetControlKinds(const std::string& elementId, int controlId, std::vector<std::string> kinds);
@@ -98,14 +107,12 @@ public:
 
     void SetTitle(const std::string& elementId, const std::string& title);
 
-    // The page that the last navigate call asked for.
     void Navigate(const std::string& elementId, const std::string& path);
 
     // Ampify.ui.applePlayer.open: one more each time an element asks for Apple's own full-screen player.
     void RequestApplePlayer();
     std::uint64_t ApplePlayerRequests() const;
 
-    // Removes everything that the element added, when it stops.
     void RemoveElement(const std::string& elementId);
 
     std::optional<UiControl> Find(int controlId) const;
@@ -136,20 +143,16 @@ private:
     std::uint64_t m_applePlayerRequests = 0;
 };
 
-// Checks a tree sent by an element: only the known primitives, with bounded depth, size and text. Attributes are
-// scalars, never objects or lists. On failure `error` gets one English line.
+// Checks a tree sent by an element: only the primitives of ui_vocab.cpp, with the depth, size and text limits of
+// ui_vocab.hpp. Attributes are scalars, never objects or lists. On failure `error` gets one English line.
 //
-// Primitives: stack, row, list, layer, card (with children), text, button, toggle, slider, textfield, image, icon,
-// dropdown (whose children are options only) and option (only inside a dropdown). Checked attributes: onClick
-// (button, card, image, icon) and onChange (toggle, slider, textfield, dropdown) hold a callback id, a positive
-// integer; tooltip is a text on any primitive, tooltipPlacement is top, bottom, left or right, and tooltipDelay is
-// a number of milliseconds between 0 and 10000. The style attributes (docs/extensions/api.md, section 5.5) are
-// checked where the renderer reads them: opacity, scale, transition, align, valign, grow and inert on any node;
-// background, padding, cornerRadius, width, height, minWidth and maxWidth on stack, row, layer and card; fit,
-// cornerRadius, width and height on image; size, weight, color, wrap and maxLines on text.
+// Checked attributes: onClick and onChange hold a callback id, a positive integer, on the primitives that take them;
+// tooltip is a text on any primitive, tooltipPlacement is top, bottom, left or right, and tooltipDelay is a number of
+// milliseconds. The style attributes (docs/extensions/api.md, section 5.5) are checked where the renderer reads them,
+// by the style kind of the primitive.
 bool ValidateTree(const Json& tree, std::string* error);
 
-// True for the placements listed above.
+// True for the placements of ui_vocab.cpp.
 bool IsPlacement(std::string_view placement);
 
 // The kinds of item Apple Music's data gives a menu: song, album, artist, composer, genre, playlist, station, video,
@@ -159,7 +162,7 @@ bool IsMenuItemKind(std::string_view kind);
 // Whether a context menu entry goes in the menu of an item of `kind` (empty when Apple's data does not say).
 bool ShowsForItem(const UiControl& control, std::string_view kind);
 
-// The permission that adds to a placement: ui.topbar, ui.playbar or ui.menu.
+// The permission that adds to a placement (ui.menu for a name that is not a placement).
 std::string_view PlacementPermission(std::string_view placement);
 
 }  // namespace ampify

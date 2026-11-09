@@ -10,6 +10,7 @@
 #include <string_view>
 
 #include "../src/core/api/bridge.hpp"
+#include "../src/core/api/dispatch_names.hpp"
 #include "../src/core/api/module.hpp"
 #include "../src/core/manifest.hpp"
 #include "../src/core/script_extension.hpp"
@@ -97,10 +98,10 @@ const Expected kMembers[] = {
             "isArtist:f1=isArtist,isStation:f1=isStation}"},  // the predicates added in kitApi 1.x
     {"color", "object!{extract:f3=extract,fromArtwork:f1=fromArtwork,playing:f0=playing}"},
     {"fonts", "object!{roles:f0=roles,style:f1=style}"},
-    // setLabel, setActive, setDisabled, panel.onClose, the removes, popup.show and close, title.get and reset added in
+    // setLabel, setActive, setDisabled, playbar.mark, panel.onClose, the removes, popup.show and close, title.get and reset added in
     // kitApi 1.x, compatible additions
     {"ui", "object!{topbar:object!{addButton:f1=addButton,remove:f1=remove},"
-           "playbar:object!{addButton:f1=addButton,remove:f1=remove},sidebar:object!{addItem:f1=addItem,remove:f1=remove},"
+           "playbar:object!{addButton:f1=addButton,remove:f1=remove,mark:f3=mark},sidebar:object!{addItem:f1=addItem,remove:f1=remove},"
            "menu:object!{addItem:f2=addItem,remove:f1=remove},popup:object!{open:f1=open,show:f2=show,close:f1=close},"
            "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},"
            "panel:object!{register:f2=register,remove:f1=remove,onClose:f2=onClose},"
@@ -144,6 +145,15 @@ TEST_CASE(Prelude_AmpifySurfaceIsUnchanged) {
         size_t at = order.find(std::string(",") + member.name + ",");
         CHECK(at != std::string::npos && at >= previous);
         previous = at == std::string::npos ? previous : at;
+    }
+}
+
+TEST_CASE(Prelude_DefinesEveryEntryTheKernelDispatches) {
+    const std::string& prelude = ampify::api::Prelude();
+    for (const char* entry : ampify::dispatch::kKernelEntries) {
+        if (prelude.find("dispatch." + std::string(entry) + " =") == std::string::npos) {
+            ampify::test::ReportFailure(__FILE__, __LINE__, std::string("no dispatch.") + entry + " in the prelude");
+        }
     }
 }
 
@@ -285,7 +295,7 @@ TEST_CASE(KitModule_OnlyTheMarketplaceRunsTheKitCommands) {
     CHECK(ampify::test::PumpUntil(*market, [&] { return f.Logged("[marketplace] folder "); }));
     CHECK(f.Logged("[marketplace] refused PermissionDenied"));
     CHECK(f.Logged("[marketplace] folder PermissionDenied"));
-    CHECK(kit.runs.size() == 1);  // only the install reached the runner
+    CHECK(kit.runs.size() == 1);
     CHECK(kit.runs.size() == 1 && kit.runs[0] == std::vector<std::string>({"install", "glass"}));
     CHECK(kit.lastOwner == "marketplace");
 

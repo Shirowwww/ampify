@@ -96,6 +96,19 @@ std::optional<Background> ParseBackground(std::string_view text) {
         }
         return background;
     }
+    constexpr std::string_view kGradient = "linear-gradient(";
+    if (text.substr(0, kGradient.size()) == kGradient && text.size() > kGradient.size() && text.back() == ')') {
+        std::vector<std::string_view> parts =
+            Split(text.substr(kGradient.size(), text.size() - kGradient.size() - 1), ',');
+        if (parts.size() != 2) return std::nullopt;
+        std::optional<Rgba> top = ParseColor(TrimSpace(parts[0]));
+        std::optional<Rgba> bottom = ParseColor(TrimSpace(parts[1]));
+        if (!top || !bottom) return std::nullopt;
+        background.gradient = true;
+        background.color = *top;
+        background.end = *bottom;
+        return background;
+    }
     std::optional<Rgba> color = ParseColor(text);
     if (!color) return std::nullopt;
     background.color = *color;

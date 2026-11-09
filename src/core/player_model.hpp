@@ -38,6 +38,13 @@ std::string CatalogLookupAddress(const std::string& catalogId, const std::string
 // (https://...mzstatic.com/.../100x100bb.jpg); empty for any other address.
 std::string CatalogCoverAddress(const std::string& artworkUrl100, double pixels);
 
+// The size an address CatalogCoverAddress accepts asks for: 270 by 360 for ".../270x360bb.jpg". Nothing for another.
+struct CoverSize {
+    int width = 0;
+    int height = 0;
+};
+std::optional<CoverSize> CatalogCoverSize(const std::string& address);
+
 // What src/win/amp_player.cpp reads from AMP.Services.Player, as raw values.
 struct AmpReading {
     bool playing = false;
@@ -91,7 +98,7 @@ enum class AmpTimeUnit { Unknown, Seconds, Milliseconds, Ticks100ns };
 // it, a song is assumed to last between 20 s and 10 h. Unknown when the duration is 0.
 AmpTimeUnit DetectAmpTimeUnit(int64_t durationRaw, std::optional<int64_t> smtcDurationMs);
 int64_t AmpTimeToMs(int64_t raw, AmpTimeUnit unit);
-const char* AmpTimeUnitName(AmpTimeUnit unit);  // "s", "ms", "100 ns", "unknown"
+const char* AmpTimeUnitName(AmpTimeUnit unit);
 
 // The unit of IPlayQueueItem.Duration, measured on Apple Music 1.1792 (knowledge/apple-music-queue.md). It is another
 // property than the player item's, whose unit is still learned at run time, so neither is taken for the other.
@@ -104,8 +111,6 @@ QueueItem QueueItemFromAmp(const AmpQueueEntry& entry);
 // the same id whatever the source (Apple's player or SMTC), so an element can keep per-track data.
 std::string TrackIdOf(const std::string& title, const std::string& artist, const std::string& album);
 
-// The audio format as variantId ("lossless", "hi-res-lossless", "dolby-atmos", "spatial", "surround", "other"), and
-// whether it is Atmos or lossless.
 std::string VariantOfAudioFormat(int32_t format);
 bool IsAtmosFormat(int32_t format);
 bool IsLosslessFormat(int32_t format);
@@ -150,8 +155,6 @@ std::optional<int64_t> SmtcLengthMsOf(const SmtcReading& smtc, const std::string
 // "Artist — Album" in its artist. Fills `track` from `smtc` when that is the case; the track id is kept.
 void FillArtistAlbumFromSmtc(TrackInfo& track, const SmtcReading& smtc);
 
-// ---- Commands -----------------------------------------------------------------------------------------------------
-
 enum class CommandRoute {
     Apple,     // IPlayer.PlayAsync and the others, in Apple Music's process
     Smtc,      // the Windows media controls, from any process
@@ -180,7 +183,7 @@ struct CommandPlan {
 CommandPlan PlanCommand(PlayerCommand command, int64_t seekMs, const PlayerSnapshot& known,
                         const RouteAvailability& available);
 
-const char* CommandName(PlayerCommand command);  // "play", "pause", "next", "previous", "seek"
-const char* RouteName(CommandRoute route);       // "Apple", "SMTC", "media key"
+const char* CommandName(PlayerCommand command);
+const char* RouteName(CommandRoute route);
 
 }  // namespace ampify

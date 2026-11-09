@@ -156,7 +156,11 @@ controls::TextBox SettingField(UiService::Shared& shared, const SettingOwner& ta
                                const std::string& value) {
     controls::TextBox box;
     if (shared.probe.textBox) box.Style(shared.probe.textBox);
-    box.MinWidth(spec.type == SettingSpec::Type::Number ? 96 : 200);
+    if (spec.type == SettingSpec::Type::Number) {
+        box.MinWidth(96);
+    } else {
+        box.Width(kSettingControlWidth);
+    }
     box.MaxLength(200);  // the length docs/extensions/manifest.md allows a text default
     // settings.txt keeps a point; a French or German reader sees a comma, like the labels' "0,3 à 0,9".
     auto shown = [number = spec.type == SettingSpec::Type::Number](std::string text) {
@@ -181,12 +185,14 @@ controls::TextBox SettingField(UiService::Shared& shared, const SettingOwner& ta
         try {
             commit(sender.as<controls::TextBox>());
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     box.KeyDown([commit](IInspectable const& sender, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
         try {
             if (args.Key() == winrt::Windows::System::VirtualKey::Enter) commit(sender.as<controls::TextBox>());
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     return box;
@@ -197,7 +203,9 @@ controls::TextBox SettingField(UiService::Shared& shared, const SettingOwner& ta
 xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwner& target, const SettingSpec& spec,
                                      const std::string& value) {
     constexpr auto kRestDelay = std::chrono::milliseconds(350);
-    constexpr double kSliderWidth = 200;
+    constexpr double kReadingWidth = 48;
+    constexpr double kReadingGap = 12;
+    constexpr double kSliderWidth = kSettingControlWidth - kReadingWidth - kReadingGap;  // as wide as a menu in all
     const double low = *spec.min;
     const double high = *spec.max;
     const bool whole = std::floor(low) == low && std::floor(high) == high;
@@ -226,13 +234,13 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
         return Wide(text);
     };
     controls::TextBlock reading = MakeText(shown(slider.Value()).c_str(), "body", false, &shared.probe);
-    reading.MinWidth(32);
+    reading.Width(kReadingWidth);
     reading.TextAlignment(xaml::TextAlignment::Right);
     reading.VerticalAlignment(xaml::VerticalAlignment::Center);
 
     controls::StackPanel box;
     box.Orientation(controls::Orientation::Horizontal);
-    box.Spacing(12);
+    box.Spacing(kReadingGap);
     box.Children().Append(reading);
     box.Children().Append(slider);
 
@@ -251,6 +259,7 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
             *last = next;
             CommitSetting(*owner, target, key, next);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     slider.ValueChanged([rest, reading, shown, moved](IInspectable const&,
@@ -261,6 +270,7 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
             rest.Stop();
             rest.Start();
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     return box;
@@ -290,6 +300,7 @@ xaml::FrameworkElement SettingControl(UiService::Shared& shared, const SettingOw
             try {
                 CommitSetting(*owner, target, key, sender.as<controls::ToggleSwitch>().IsOn() ? "true" : "false");
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
         return toggle;
@@ -297,7 +308,7 @@ xaml::FrameworkElement SettingControl(UiService::Shared& shared, const SettingOw
     if (spec.type == SettingSpec::Type::Choice) {
         controls::ComboBox combo;
         if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
-        combo.MinWidth(200);
+        combo.Width(kSettingControlWidth);
         for (const std::string& option : spec.options) {
             combo.Items().Append(winrt::box_value(Wide(Localized(local, &ManifestText::options, option, option))));
         }
@@ -310,6 +321,7 @@ xaml::FrameworkElement SettingControl(UiService::Shared& shared, const SettingOw
                 int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
                 if (index >= 0 && index < static_cast<int32_t>(options.size())) CommitSetting(*owner, target, key, options[index]);
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
         return combo;
@@ -320,7 +332,6 @@ xaml::FrameworkElement SettingControl(UiService::Shared& shared, const SettingOw
     return SettingField(shared, target, spec, value);
 }
 
-// The manifest's translation in the interface's language, or null when there is none.
 const ManifestText* LocalTextOf(const uirender::ModEntry& mod) {
     auto language = mod.translations.find(i18n::Language());
     return language == mod.translations.end() ? nullptr : &language->second;
@@ -391,6 +402,7 @@ controls::Button ResetButton(UiService::Shared& shared, SettingsCard& card, cons
             }
             refresh("");
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     card.resets[spec.key] = button;
@@ -436,7 +448,6 @@ xaml::FrameworkElement SettingRowOf(UiService::Shared& shared, const std::shared
     return row;
 }
 
-// The heading of a group, in the language of the card.
 controls::TextBlock GroupHeading(UiService::Shared& shared, const uirender::ModEntry& mod, const std::string& group) {
     const std::string& shown = Localized(LocalTextOf(mod), &ManifestText::groups, group, group);
     controls::TextBlock heading = MakeText(Wide(shown).c_str(), "bodyStrong", false, &shared.probe);
@@ -478,6 +489,7 @@ controls::Button ToolButton(UiService::Shared& shared, const char* textKey, std:
         try {
             action();
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     return button;
@@ -519,6 +531,7 @@ controls::TextBox SearchBox(UiService::Shared& shared, const std::shared_ptr<Sea
             *query = Utf8(sender.as<controls::TextBox>().Text());
             ApplySearch(*targets, *query);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     search.Text(Wide(*query));
@@ -578,6 +591,7 @@ void FillSettings(UiService::Shared& shared, const std::shared_ptr<SettingsCard>
                 FillSettings(*owner, live, std::move(*fresh), query);
                 if (!notice.empty()) SayUnder(*live, notice);
             } catch (...) {
+                // The card left the tree meanwhile: the rows are not rebuilt.
             }
         });
     };
@@ -590,6 +604,12 @@ void FillSettings(UiService::Shared& shared, const std::shared_ptr<SettingsCard>
 }
 
 }  // namespace
+
+std::vector<settings_panel::SettingText> ElementSettingTexts(const uirender::ModEntry& mod) {
+    std::vector<settings_panel::SettingText> texts;
+    for (const SettingSpec& spec : mod.settings) texts.push_back(ShownText(mod, spec));
+    return texts;
+}
 
 // The settings an extension or the active theme declares, under its row: a toolbar, then the settings by group, each
 // with its label, its description and its controls.
@@ -608,24 +628,6 @@ xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::Mo
     shared.settingsCards.push_back(card);
     FillSettings(shared, card, mod, std::make_shared<std::string>());
     return card->panel;
-}
-
-// The active theme's settings: its name, a line on what they do, then the settings.
-xaml::FrameworkElement ThemeSettingsSection(UiService::Shared& shared, const uirender::ModEntry& theme) {
-    controls::StackPanel section;
-    section.Spacing(8);
-    Name(section, (theme.kind == ElementKind::Snippet ? "AMPIFY_SnippetSettings_" : "AMPIFY_ThemeSettings_") + theme.id,
-         theme.NameIn(i18n::Language()));
-    controls::TextBlock title =
-        MakeText(Wide(i18n::Text(theme.kind == ElementKind::Snippet ? "mods.snippetTitle" : "mods.themeTitle",
-                                 {{"name", theme.NameIn(i18n::Language())}}))
-                     .c_str(),
-                 "bodyStrong", false, &shared.probe);
-    section.Children().Append(title);
-    section.Children().Append(MakeText(Wide(i18n::Text(theme.kind == ElementKind::Snippet ? "mods.snippetSubtitle" : "mods.themeSubtitle")).c_str(),
-                                       "caption", true, &shared.probe));
-    section.Children().Append(ModSettings(shared, theme));
-    return section;
 }
 
 }  // namespace ampify::win::ui_service_detail

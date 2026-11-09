@@ -3,6 +3,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <utility>
 
 #include "../src/core/i18n.hpp"
 #include "../src/core/journal.hpp"
@@ -212,6 +213,60 @@ TEST_CASE(Interface_AnElementCannotSwitchAnotherElementsButton) {
         if (control.id == mine) active = control.active;
     }
     CHECK(active);
+}
+
+TEST_CASE(Interface_APlaybarButtonMarksAStretchOfTheProgressLine) {
+    Fixture f;
+    auto element = f.Make("marker", "extension", R"("ui.playbar")", R"(
+        const id = Ampify.ui.playbar.addButton({ label: "Loop", onClick: () => {} });
+        Ampify.log("both " + Ampify.ui.playbar.mark(id, 0.75, 0.25));
+        Ampify.log("unknown " + Ampify.ui.playbar.mark(999, 0.1));
+        try { Ampify.ui.playbar.mark(id, "half"); } catch (e) { Ampify.log("text " + e.name); })");
+    CHECK(element->Start());
+    CHECK(f.Logged("[marker] both true"));
+    CHECK(f.Logged("[marker] unknown false"));
+    CHECK(f.Logged("[marker] text TypeError"));
+    std::vector<ampify::UiControl> controls = f.host.ui.Controls();
+    CHECK(controls.size() == 1);
+    if (controls.size() != 1) return;
+    CHECK_NEAR(controls[0].markFrom, 0.25, 1e-9);  // marked backwards: the two ends swap
+    CHECK_NEAR(controls[0].markTo, 0.75, 1e-9);
+    element->Stop();
+}
+
+TEST_CASE(Interface_AMarkKeepsToTheLineAndClearsWithoutAStart) {
+    ampify::UiModel model;
+    int loop = model.AddControl("one", "playbar", "Loop", "", true, 0);
+    int top = model.AddControl("one", "topbar", "Top", "", true, 0);
+    auto markOf = [&model, loop]() {
+        for (const ampify::UiControl& control : model.Controls()) {
+            if (control.id == loop) return std::make_pair(control.markFrom, control.markTo);
+        }
+        return std::make_pair(-2.0, -2.0);
+    };
+    CHECK(!model.SetControlMark("two", loop, 0.5, -1));  // another element's button
+    CHECK(!model.SetControlMark("one", top, 0.5, -1));   // only the play bar has a progress line
+    CHECK(model.SetControlMark("one", loop, 0.2, 1.5));
+    CHECK(markOf() == std::make_pair(0.2, 1.0));
+    CHECK(model.SetControlMark("one", loop, 1.5, -1));  // a start alone: the end is not marked yet
+    CHECK(markOf() == std::make_pair(1.0, -1.0));
+    CHECK(model.SetControlMark("one", loop, -1, -1));
+    CHECK(markOf() == std::make_pair(-1.0, -1.0));
+}
+
+TEST_CASE(Interface_APlaybarMarkClearsWhenCalledWithoutAStart) {
+    Fixture f;
+    auto element = f.Make("unmark", "extension", R"("ui.playbar")", R"(
+        const id = Ampify.ui.playbar.addButton({ label: "Loop", onClick: () => {} });
+        Ampify.ui.playbar.mark(id, 0.2);
+        Ampify.log("cleared " + Ampify.ui.playbar.mark(id));)");
+    CHECK(element->Start());
+    CHECK(f.Logged("[unmark] cleared true"));
+    std::vector<ampify::UiControl> controls = f.host.ui.Controls();
+    CHECK(controls.size() == 1);
+    if (controls.size() != 1) return;
+    CHECK(controls[0].markFrom < 0 && controls[0].markTo < 0);
+    element->Stop();
 }
 
 TEST_CASE(Interface_ABadTreeIsRefusedWhenItIsRegistered) {

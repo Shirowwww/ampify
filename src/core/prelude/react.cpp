@@ -195,11 +195,13 @@ const char kReact[] = R"AMPIFYJS(
 
   // HTML names that Spicetify code often uses, and what they become.
   const ALIASES = { div: "stack", section: "stack", span: "text", p: "text", label: "text", h1: "text", h2: "text",
-                    h3: "text", img: "image", select: "dropdown", ul: "list" };
+                    h3: "text", img: "image", select: "dropdown", ul: "list", hr: "divider" };
   const VARIANTS = { h1: "title", h2: "subtitle", h3: "subtitle" };
-  const CONTAINERS = new Set(["stack", "row", "list", "card", "dropdown", "layer", "grid", "tabs", "menu"]);
+  // The primitives' lists come from the kernel (src/core/ui_vocab.cpp), so they cannot drift from the validator.
+  const VOCAB = JSON.parse(native.uiVocabulary);
+  const CONTAINERS = new Set(VOCAB.containers);
   // Where the text children of a primitive without children go.
-  const TEXT_ATTRIBUTE = { text: "text", button: "label", option: "label", toggle: "label" };
+  const TEXT_ATTRIBUTE = VOCAB.textAttribute;
 
   function kindOf(child) {
     if (typeof child === "string" || typeof child === "number") return "text";
@@ -608,8 +610,8 @@ const char kReact[] = R"AMPIFYJS(
   const h = createElement;
   const TIP = ["tooltip", "tooltipPlacement", "tooltipDelay"];
   // The style attributes of section 5.5: those of any node, and those of a box (card).
-  const PLACE = ["opacity", "scale", "transition", "align", "valign", "grow", "inert"];
-  const BOX = ["background", "padding", "cornerRadius", "width", "height", "minWidth", "maxWidth"];
+  const PLACE = VOCAB.place;
+  const BOX = VOCAB.box;
 
   function pick(props, names) {
     const out = {};
@@ -641,6 +643,18 @@ const char kReact[] = R"AMPIFYJS(
     relay(attributes, props.onChange || props.onSelected, (value) => value === true);
     return h("toggle", attributes, attributes.label === undefined ? props.children : undefined);
   }
+
+  function Checkbox(props) {
+    const attributes = pick(props, ["label", "disabled", ...TIP]);
+    attributes.checked = Boolean(props.checked !== undefined ? props.checked : props.value);
+    relay(attributes, props.onChange, (value) => value === true);
+    return h("checkbox", attributes, attributes.label === undefined ? props.children : undefined);
+  }
+
+  // value out of max (100 by default); without a value the bar moves on its own.
+  const ProgressBar = (props) => h("progress", pick(props, ["value", "max", "label", ...TIP, ...PLACE]));
+  const Divider = (props) => h("divider", pick(props, PLACE));
+  const Spinner = (props) => h("spinner", pick(props, ["size", "label", ...TIP, ...PLACE]));
 
   function Slider(props) {
     const attributes = pick(props, ["label", "min", "max", "step", "value", "disabled", ...TIP]);
@@ -763,7 +777,8 @@ const char kReact[] = R"AMPIFYJS(
                               createContext, memo }, hooks);
   Ampify.ReactDOM = { render: renderInto, unmountComponentAtNode: unmountAt, createRoot };
   Ampify.hooks = Object.assign({ usePlayer, useArtworkColor }, hooks);
-  Ampify.components = { Button, ButtonPrimary, ButtonSecondary, ButtonTertiary, Toggle, Slider, TextField, Dropdown,
+  Ampify.components = { Button, ButtonPrimary, ButtonSecondary, ButtonTertiary, Toggle, Checkbox, Slider, TextField,
+                     Dropdown, ProgressBar, Divider, Spinner,
                      Grid, Tabs, Menu, Card, List, Text, TextComponent: Text, Tooltip, TooltipWrapper: Tooltip,
                      ConfirmDialog };
 

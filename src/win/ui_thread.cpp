@@ -4,6 +4,8 @@
 #include <memory>
 #include <utility>
 
+#include "../core/ui_watchdog.hpp"
+
 namespace ampify::win {
 
 namespace {
@@ -57,13 +59,27 @@ bool RunOnUiThreadAndWait(std::function<void()> work, DWORD timeoutMs) {
     };
     auto done = std::make_shared<Done>();
     if (!done->event) return false;
+    // Signalled however the work ends: one that throws (and is dropped) no longer leaves the caller waiting it out.
+    struct Signal {
+        std::shared_ptr<Done> done;
+        ~Signal() { SetEvent(done->event); }
+    };
     if (!PostToUiThread([work = std::move(work), done] {
+            Signal signal{done};
             work();
-            SetEvent(done->event);
         })) {
         return false;
     }
     return WaitForSingleObject(done->event, timeoutMs) == WAIT_OBJECT_0;
+}
+
+bool RunNamedOnUiThread(const char* activity, std::function<void()> work) {
+    return RunOnUiThreadAndWait(
+        [activity, work = std::move(work)] {
+            ampify::ActivityScope scope(activity);
+            work();
+        },
+        kInterfaceWaitMs);
 }
 
 }  // namespace ampify::win

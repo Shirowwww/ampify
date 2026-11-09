@@ -1,6 +1,9 @@
 #include "apple_tweaks.hpp"
 
 #include <algorithm>
+#include <span>
+
+#include "../lyrics_window.hpp"
 
 namespace ampify::uirender {
 
@@ -8,12 +11,21 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// The rows of the card, in the order it shows them: the player, its cover, the long texts, the sidebar and the top
-// bar, the close button, the notifications, the network fixes, then the stuck library agent and the freeze log.
-constexpr const char* kCardKeys[] = {
-    kPlayerModeKey, kPlayerControlsKey, kArtworkKey, kMarqueeKey, kSidebarKey,     kTopbarKey,
-    kCloseKey,      kNotificationsKey,  kNetworkKey, kProxyKey,   kOrphanAgentKey, kFreezeLogKey,
-};
+// The rows of each section of the page, in the order it shows them.
+constexpr const char* kWindowKeys[] = {kSidebarKey, kPlaybarKey, kTopbarKey,       kEntryKey,
+                                       kMarqueeKey, kCloseKey,   kNotificationsKey};
+constexpr const char* kPlayerKeys[] = {kPlayerModeKey, kPlayerControlsKey, kLyricsBeforeKey, kLyricsAfterKey,
+                                       kArtworkKey};
+constexpr const char* kReliabilityKeys[] = {kNetworkKey, kProxyKey, kOrphanAgentKey, kFreezeLogKey};
+
+std::span<const char* const> KeysOf(TweakGroup group) {
+    switch (group) {
+        case TweakGroup::Window: return kWindowKeys;
+        case TweakGroup::Player: return kPlayerKeys;
+        case TweakGroup::Reliability: return kReliabilityKeys;
+    }
+    return {};
+}
 
 TweakChoice ChoiceFrom(const Settings& settings, std::string_view key) {
     const KitSetting& row = *FindKitSetting(key);
@@ -51,14 +63,16 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.sidebarOnHover = ChoiceOf(settings, kSidebarKey) == "hover";
     tweaks.freezeLog = ChoiceOf(settings, kFreezeLogKey) == "on";
     tweaks.topbarSearch = ChoiceOf(settings, kTopbarKey) == "search";
+    tweaks.lyricsBefore = LyricLinesOf(ChoiceOf(settings, kLyricsBeforeKey));
+    tweaks.lyricsAfter = LyricLinesOf(ChoiceOf(settings, kLyricsAfterKey));
     return tweaks;
 }
 
-std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit) {
+std::vector<TweakChoice> AppleTweakChoices(const fs::path& kit, TweakGroup group) {
     Settings settings;
     settings.Load((kit / "settings.txt").string());
     std::vector<TweakChoice> choices;
-    for (const char* key : kCardKeys) choices.push_back(ChoiceFrom(settings, key));
+    for (const char* key : KeysOf(group)) choices.push_back(ChoiceFrom(settings, key));
     // Apple's own switch (Settings, General) turns its notifications off: the card offers only what it does not, and
     // keeps "never" for someone who chose it before.
     for (TweakChoice& choice : choices) {

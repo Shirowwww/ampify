@@ -109,8 +109,6 @@ ampify::AmpReading Reading() {
 
 }  // namespace
 
-// ---- Slots against the winmd list ---------------------------------------------------------------------------------
-
 TEST_CASE(AmpAbi_EverySlotMatchesTheMethodOrderOfTheWinmd) {
     auto types = WinmdMethods();
     CHECK(!types.empty());
@@ -172,7 +170,14 @@ TEST_CASE(AmpAbi_TheAudioFormatEnumHasTheFieldsTheMappingAssumes) {
                     "Spatial, Surround") != std::string::npos);
 }
 
-// ---- Readings to snapshots ----------------------------------------------------------------------------------------
+TEST_CASE(AmpAbi_TheLyricsSourceEnumPutsStoreSyllableWhereTheKernelAsks) {
+    std::ifstream file(fs::path(AMPIFY_SOURCE_DIR) / "knowledge" / "winmd" / "AMP.Services.txt");
+    std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    const std::string fields = "fields: Any, None, UserCustom, Store, StoreSyllable";
+    CHECK(text.find("AMP.Services.CommonModels.LyricsSource\n  " + fields) != std::string::npos ||
+          text.find("AMP.Services.CommonModels.LyricsSource\r\n  " + fields) != std::string::npos);
+    CHECK(ampify::amp::slot::kLyricsSourceStoreSyllable == 4);  // the fifth field
+}
 
 TEST_CASE(PlayerModel_TheTimeUnitComesFromTheSmtcLengthWhenThereIsOne) {
     using ampify::AmpTimeUnit;
@@ -317,8 +322,6 @@ TEST_CASE(PlayerModel_ANewQueueEntryOfTheSameSongIsATrackChange) {
     CHECK(events.size() == 1 && events[0] == "statechange");
 }
 
-// ---- Command routes -----------------------------------------------------------------------------------------------
-
 TEST_CASE(PlayerModel_PlayWhilePlayingIsAlreadyDone) {
     ampify::PlayerSnapshot known;
     known.source = "smtc";
@@ -369,8 +372,6 @@ TEST_CASE(PlayerModel_SeekGoesThroughApplesPlayerThenSmtcWithinTheTrack) {
     CHECK(plan.steps.size() == 1 && plan.steps[0].route == ampify::CommandRoute::Smtc);
     CHECK(ampify::PlanCommand(ampify::PlayerCommand::Seek, 1000, known, {false, false, true}).steps.empty());
 }
-
-// ---- Queue model --------------------------------------------------------------------------------------------------
 
 TEST_CASE(PlayerQueue_SectionsIdsAndPositions) {
     CHECK(ampify::QueueSectionFromKind(2) == ampify::QueueSection::Current);
@@ -466,8 +467,6 @@ TEST_CASE(PlayerQueue_AnArtworkSourceNamesThePlayingSongOrOneQueueEntry) {
     CHECK(!ampify::ParseAppleArtworkSource("artworks"));
     CHECK(!ampify::ParseAppleArtworkSource("https://x/artwork:3"));
 }
-
-// ---- Ampify.player.queue and toggle ----------------------------------------------------------------------------------
 
 TEST_CASE(PlayerQueue_ListNeedsPlayerReadAndWritesNeedPlayerControl) {
     QueueFixture f;
@@ -610,6 +609,16 @@ TEST_CASE(CatalogLookupAddress_TakesDigitsAndATwoLetterStorefront) {
     CHECK(ampify::CatalogLookupAddress("12a", "FR").empty());
     CHECK(ampify::CatalogLookupAddress("12", "FRA").empty());
     CHECK(ampify::CatalogLookupAddress("12", "F&").empty());
+}
+
+TEST_CASE(CatalogCoverSize_ReadsTheSizeAnAddressAsksFor) {
+    // An editorial playlist's cover asked 270 wide and 360 high: a portrait padded with white.
+    std::optional<ampify::CoverSize> portrait =
+        ampify::CatalogCoverSize("https://is1-ssl.mzstatic.com/image/thumb/Features/v4/aa/270x360bb.jpg");
+    CHECK(portrait && portrait->width == 270 && portrait->height == 360);
+    CHECK(!ampify::CatalogCoverSize("https://example.com/a/270x360bb.jpg"));
+    CHECK(!ampify::CatalogCoverSize("https://is1.mzstatic.com/a/cover.jpg"));
+    CHECK(!ampify::CatalogCoverSize("https://is1.mzstatic.com/a/99999999999x360bb.jpg"));  // too long for an int
 }
 
 TEST_CASE(CatalogCoverAddress_AsksTheSizeShownOfAppleImages) {

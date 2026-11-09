@@ -50,6 +50,9 @@ bool IsOwnName(std::string_view name);
 // True for a name given by AMExclusive ("AMExclusive" prefix): Ampify never touches those elements.
 bool IsForeignModName(std::string_view name);
 
+// True for a node of Ampify or of another mod: the discovery and the popup watch leave both alone.
+bool IsAmpifyOrModName(std::string_view name);
+
 // What the Windows side does with one node.
 enum class PatchOp {
     Keep,     // same type and attributes: nothing to change on this node (its children may still change)
@@ -84,7 +87,6 @@ struct PatchStats {
 // Counts the nodes of a patch, for the log line of each render.
 PatchStats CountPatch(const Patch& patch);
 
-// Number of nodes in a render tree.
 std::size_t CountNodes(const RenderNode& node);
 
 }  // namespace ampify::uirender

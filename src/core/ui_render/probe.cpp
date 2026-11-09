@@ -8,10 +8,6 @@ namespace ampify::uirender {
 
 namespace {
 
-bool IsModName(const std::string& name) {
-    return IsOwnName(name) || IsForeignModName(name);
-}
-
 bool NamedLike(const ProbeNode& node, std::string_view name) {
     return node.name == name || node.automationId == name;
 }
@@ -43,7 +39,7 @@ std::vector<unsigned> ToggleCounts(const std::vector<ProbeNode>& nodes) {
     std::vector<bool> excluded(nodes.size(), false);
     for (std::size_t index = 0; index < nodes.size(); index++) {
         int parent = nodes[index].parent;
-        excluded[index] = IsModName(nodes[index].name) || (parent >= 0 && excluded[parent]);
+        excluded[index] = IsAmpifyOrModName(nodes[index].name) || (parent >= 0 && excluded[parent]);
     }
     for (std::size_t index = nodes.size(); index-- > 0;) {
         if (excluded[index]) continue;
@@ -93,7 +89,7 @@ bool IsUnder(const std::vector<ProbeNode>& nodes, int node, int ancestor) {
 
 bool InsideModElement(const std::vector<ProbeNode>& nodes, int node) {
     for (int current = node; current >= 0; current = nodes[current].parent) {
-        if (IsModName(nodes[current].name)) return true;
+        if (IsAmpifyOrModName(nodes[current].name)) return true;
     }
     return false;
 }
@@ -146,7 +142,7 @@ std::vector<int> ChildrenOf(const std::vector<ProbeNode>& nodes, int parent) {
 std::optional<int> ChooseTemplateRow(const std::vector<ProbeNode>& nodes, int anchor) {
     std::optional<int> row;
     for (int child : ChildrenOf(nodes, anchor)) {
-        if (!IsModName(nodes[child].name)) row = child;
+        if (!IsAmpifyOrModName(nodes[child].name)) row = child;
     }
     return row;
 }

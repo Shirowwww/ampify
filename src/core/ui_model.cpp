@@ -6,69 +6,32 @@
 #include <optional>
 #include <utility>
 
-#include "ui_render/style.hpp"
+#include "text_util.hpp"
+#include "ui_render/style_values.hpp"
+#include "ui_vocab.hpp"
 
 namespace ampify {
 
 namespace {
 
-constexpr int kMaxTreeDepth = 8;
-constexpr int kMaxTreeNodes = 300;
-constexpr size_t kMaxText = 500;
+using uivocab::Primitive;
+using uivocab::StyleKind;
 
 bool Fail(std::string* error, const std::string& message) {
     if (error) *error = message;
     return false;
 }
 
-constexpr double kMaxTooltipDelayMs = 10000;
+// A limit as it reads in a message: 300, 0.5, 10000.
+std::string Num(double value) { return ShortestNumberText(value); }
+
+// "between 0 and 1000", from the limits.
+std::string Between(double low, double high) { return "between " + Num(low) + " and " + Num(high); }
 
 template <size_t N>
 bool OneOf(const std::array<std::string_view, N>& names, std::string_view name) {
     return std::find(names.begin(), names.end(), name) != names.end();
 }
-
-bool IsPrimitive(const std::string& name) {
-    static const std::array<std::string_view, 20> kPrimitives = {
-        "stack", "row", "text", "button", "toggle", "slider", "list", "image", "icon", "card", "textfield",
-        "dropdown", "option", "layer", "lyrics", "grid", "tabs", "tab", "menu", "item"};
-    return OneOf(kPrimitives, name);
-}
-
-bool HasChildren(const std::string& name) {
-    static const std::array<std::string_view, 9> kContainers = {"stack", "row", "list", "card", "dropdown", "layer",
-                                                                "grid", "tabs", "menu"};
-    return OneOf(kContainers, name);
-}
-
-// The node a container holds and nothing else: options in a dropdown, tabs in tabs, items in a menu.
-std::string_view OnlyChildOf(const std::string& parent) {
-    if (parent == "dropdown") return "option";
-    if (parent == "tabs") return "tab";
-    if (parent == "menu") return "item";
-    return {};
-}
-
-// The container a node must sit in: option, tab and item belong to one only.
-std::string_view ContainerOf(const std::string& name) {
-    if (name == "option") return "dropdown";
-    if (name == "tab") return "tabs";
-    if (name == "item") return "menu";
-    return {};
-}
-
-// The containers that take a background, a padding, rounded corners and a size.
-bool IsBox(const std::string& name) {
-    static const std::array<std::string_view, 4> kBoxes = {"stack", "row", "layer", "card"};
-    return OneOf(kBoxes, name);
-}
-
-constexpr double kMaxLength = 10000;    // width, height, minWidth, maxWidth, in pixels
-constexpr double kMaxCorner = 1000;
-constexpr double kMaxScale = 10;
-constexpr double kMinTextSize = 8;
-constexpr double kMaxTextSize = 120;
-constexpr double kMaxLines = 100;
 
 bool NumberIn(const Json& value, double low, double high) {
     const double* number = value.AsNumber();
@@ -86,19 +49,21 @@ bool TextOneOf(const Json& value, const std::array<std::string_view, N>& names) 
 }
 
 // The style attributes that every node takes: its opacity, scale, transitions and place in its parent.
-std::optional<bool> CheckCommonStyle(const std::string& name, const std::string& key, const Json& value,
+std::optional<bool> CheckCommonStyle(const Primitive& primitive, const std::string& key, const Json& value,
                                      std::string* error) {
     static const std::array<std::string_view, 4> kPlaces = {"start", "center", "end", "stretch"};
     static const std::array<std::string_view, 3> kTextAligns = {"left", "center", "right"};
     if (key == "opacity") {
         if (!NumberIn(value, 0, 1)) return Fail(error, "opacity expects a number between 0 and 1");
     } else if (key == "scale") {
-        if (!NumberIn(value, 0, kMaxScale)) return Fail(error, "scale expects a number between 0 and 10");
+        if (!NumberIn(value, 0, uivocab::kMaxScale)) {
+            return Fail(error, "scale expects a number " + Between(0, uivocab::kMaxScale));
+        }
     } else if (key == "transition") {
         const std::string* text = value.AsString();
         if (!text || !uirender::ParseTransition(*text)) {
-            return Fail(error, "transition expects \"<opacity|scale|translation|all> <duration>ms\", comma-separated "
-                               "(10 s at most), or \"none\"");
+            return Fail(error, "transition expects \"<opacity|scale|translation|all> <duration>ms\", comma-separated (" +
+                                   Num(uivocab::kMaxTransitionMs / 1000) + " s at most), or \"none\"");
         }
     } else if (key == "valign") {
         if (!TextOneOf(value, kPlaces)) return Fail(error, "valign expects start, center, end or stretch");
@@ -107,29 +72,39 @@ std::optional<bool> CheckCommonStyle(const std::string& name, const std::string&
     } else if (key == "inert") {
         if (!value.AsBool()) return Fail(error, "inert expects true or false");
     } else if (key == "align") {
-        if (name == "text" && !TextOneOf(value, kTextAligns)) return Fail(error, "align on text expects left, center or right");
-        if (name != "text" && !TextOneOf(value, kPlaces)) return Fail(error, "align expects start, center, end or stretch");
+        if (primitive.textAlign && !TextOneOf(value, kTextAligns)) {
+            return Fail(error, "align on text expects left, center or right");
+        }
+        if (!primitive.textAlign && !TextOneOf(value, kPlaces)) {
+            return Fail(error, "align expects start, center, end or stretch");
+        }
     } else {
         return std::nullopt;  // not a common style attribute
     }
     return true;
 }
 
-bool CheckBoxStyle(const std::string& name, const std::string& key, const Json& value, std::string* error) {
-    bool box = IsBox(name);
-    bool image = name == "image";
+bool CheckBoxStyle(StyleKind style, const std::string& key, const Json& value, std::string* error) {
+    bool box = style == StyleKind::Box;
+    bool image = style == StyleKind::Image;
     if ((box || image) && key == "cornerRadius") {
-        if (!NumberIn(value, 0, kMaxCorner)) return Fail(error, "cornerRadius expects a number between 0 and 1000");
+        if (!NumberIn(value, 0, uivocab::kMaxCorner)) {
+            return Fail(error, "cornerRadius expects a number " + Between(0, uivocab::kMaxCorner));
+        }
     } else if ((box && (key == "minWidth" || key == "maxWidth")) || ((box || image) && (key == "width" || key == "height"))) {
-        if (!NumberIn(value, 0, kMaxLength)) return Fail(error, key + " expects a number of pixels between 0 and 10000");
+        if (!NumberIn(value, 0, uivocab::kMaxLength)) {
+            return Fail(error, key + " expects a number of pixels " + Between(0, uivocab::kMaxLength));
+        }
     } else if (box && key == "background") {
         const std::string* text = value.AsString();
         if (!text || !uirender::ParseBackground(*text)) {
-            return Fail(error, "background expects #RRGGBB, #AARRGGBB, acrylic or acrylic(#AARRGGBB, 0.6)");
+            return Fail(error, "background expects #RRGGBB, #AARRGGBB, acrylic, acrylic(#AARRGGBB, 0.6) or "
+                               "linear-gradient(#top, #bottom)");
         }
     } else if (box && key == "padding") {
         if (!uirender::ParsePadding(value)) {
-            return Fail(error, "padding expects a number or \"top,right,bottom,left\" (0 to 1000 each)");
+            return Fail(error, "padding expects a number or \"top,right,bottom,left\" (0 to " +
+                                   Num(uivocab::kMaxPadding) + " each)");
         }
     } else if (image && key == "fit") {
         static const std::array<std::string_view, 3> kFits = {"cover", "contain", "fill"};
@@ -140,7 +115,9 @@ bool CheckBoxStyle(const std::string& name, const std::string& key, const Json& 
 
 bool CheckTextStyle(const std::string& key, const Json& value, std::string* error) {
     if (key == "size") {
-        if (!NumberIn(value, kMinTextSize, kMaxTextSize)) return Fail(error, "size expects a number of pixels between 8 and 120");
+        if (!NumberIn(value, uivocab::kMinTextSize, uivocab::kMaxTextSize)) {
+            return Fail(error, "size expects a number of pixels " + Between(uivocab::kMinTextSize, uivocab::kMaxTextSize));
+        }
     } else if (key == "weight") {
         if (!WholeIn(value, 100, 900)) return Fail(error, "weight expects a whole number between 100 and 900");
     } else if (key == "color") {
@@ -149,43 +126,34 @@ bool CheckTextStyle(const std::string& key, const Json& value, std::string* erro
     } else if (key == "wrap") {
         if (!value.AsBool()) return Fail(error, "wrap expects true or false");
     } else if (key == "maxLines") {
-        if (!WholeIn(value, 0, kMaxLines)) return Fail(error, "maxLines expects a whole number between 0 and 100");
+        if (!WholeIn(value, 0, uivocab::kMaxLines)) {
+            return Fail(error, "maxLines expects a whole number " + Between(0, uivocab::kMaxLines));
+        }
     }
     return true;
 }
-
-// The space between the cells of a grid, in pixels: a Grid spacing beyond it is not a layout anyone wants.
-constexpr double kMaxGridGap = 1000;
 
 bool CheckGridStyle(const std::string& key, const Json& value, std::string* error) {
     if (key == "gap") {
-        if (!NumberIn(value, 0, kMaxGridGap)) return Fail(error, "gap expects a number of pixels between 0 and 1000");
+        if (!NumberIn(value, 0, uivocab::kMaxGridGap)) {
+            return Fail(error, "gap expects a number of pixels " + Between(0, uivocab::kMaxGridGap));
+        }
         return true;
     }
     if (key != "columns") return true;
-    if (!WholeIn(value, 1, uirender::kMaxGridColumns)) {
-        return Fail(error, "columns expects a whole number between 1 and 12");
+    if (!WholeIn(value, 1, uivocab::kMaxGridColumns)) {
+        return Fail(error, "columns expects a whole number " + Between(1, uivocab::kMaxGridColumns));
     }
     return true;
 }
 
-bool CheckStyle(const std::string& name, const std::string& key, const Json& value, std::string* error) {
-    if (std::optional<bool> common = CheckCommonStyle(name, key, value, error)) return *common;
-    if (name == "text" || name == "lyrics") return CheckTextStyle(key, value, error);
-    if (name == "grid") return CheckGridStyle(key, value, error);
-    return CheckBoxStyle(name, key, value, error);
-}
-
-// The primitives that report a click, and those that report a new value.
-bool TakesClick(const std::string& name) {
-    static const std::array<std::string_view, 6> kClickable = {"button", "card", "image", "icon", "tab", "item"};
-    return OneOf(kClickable, name);
-}
-
-bool TakesChange(const std::string& name) {
-    // A lyrics node reports the start of the line the user picked, in ms.
-    static const std::array<std::string_view, 5> kEditable = {"toggle", "slider", "textfield", "dropdown", "lyrics"};
-    return OneOf(kEditable, name);
+bool CheckStyle(const Primitive& primitive, const std::string& key, const Json& value, std::string* error) {
+    if (std::optional<bool> common = CheckCommonStyle(primitive, key, value, error)) return *common;
+    switch (primitive.style) {
+        case StyleKind::Text: return CheckTextStyle(key, value, error);
+        case StyleKind::Grid: return CheckGridStyle(key, value, error);
+        default: return CheckBoxStyle(primitive.style, key, value, error);
+    }
 }
 
 bool IsCallbackId(const Json& value) {
@@ -194,10 +162,10 @@ bool IsCallbackId(const Json& value) {
 }
 
 // The attributes whose value is checked beyond "a scalar".
-bool CheckAttribute(const std::string& name, const std::string& key, const Json& value, std::string* error) {
+bool CheckAttribute(const Primitive& primitive, const std::string& key, const Json& value, std::string* error) {
     if (key == "onClick" || key == "onChange") {
-        bool allowed = key == "onClick" ? TakesClick(name) : TakesChange(name);
-        if (!allowed) return Fail(error, key + " is not allowed on " + name);
+        bool allowed = key == "onClick" ? primitive.click : primitive.change;
+        if (!allowed) return Fail(error, key + " is not allowed on " + std::string(primitive.name));
         if (!IsCallbackId(value)) return Fail(error, key + " must be a callback id (a positive whole number)");
     } else if (key == "tooltip") {
         if (!value.IsString()) return Fail(error, "tooltip must be a text");
@@ -209,50 +177,89 @@ bool CheckAttribute(const std::string& name, const std::string& key, const Json&
         }
     } else if (key == "tooltipDelay") {
         const double* delay = value.AsNumber();
-        if (!delay || *delay < 0 || *delay > kMaxTooltipDelayMs) {
-            return Fail(error, "tooltipDelay expects a number of milliseconds between 0 and 10000");
+        if (!delay || *delay < 0 || *delay > uivocab::kMaxTooltipDelayMs) {
+            return Fail(error, "tooltipDelay expects a number of milliseconds " + Between(0, uivocab::kMaxTooltipDelayMs));
         }
     }
-    return CheckStyle(name, key, value, error);
+    return CheckStyle(primitive, key, value, error);
 }
 
-bool CheckNode(const Json& node, const std::string& parent, int depth, int& nodes, std::string* error) {
-    if (++nodes > kMaxTreeNodes) return Fail(error, "interface too large (300 elements at most)");
-    if (depth > kMaxTreeDepth) return Fail(error, "interface too deep (8 levels at most)");
+// Where a node may sit: option, tab and item belong to one container only, and that container holds nothing else.
+bool CheckPlace(const Primitive& primitive, const Primitive* parent, std::string* error) {
+    if (!primitive.container.empty() && (!parent || parent->name != primitive.container)) {
+        return Fail(error, std::string(primitive.name) + " outside " + std::string(primitive.container));
+    }
+    if (parent && !parent->onlyChild.empty() && primitive.name != parent->onlyChild) {
+        return Fail(error, std::string(parent->name) + " only holds " + std::string(parent->onlyChild) + " nodes");
+    }
+    return true;
+}
+
+bool CheckNode(const Json& node, const Primitive* parent, int depth, int& nodes, std::string* error) {
+    if (++nodes > uivocab::kMaxTreeNodes) {
+        return Fail(error, "interface too large (" + std::to_string(uivocab::kMaxTreeNodes) + " elements at most)");
+    }
+    if (depth > uivocab::kMaxTreeDepth) {
+        return Fail(error, "interface too deep (" + std::to_string(uivocab::kMaxTreeDepth) + " levels at most)");
+    }
     const Json::Object* attributes = node.AsObject();
     if (!attributes) return Fail(error, "each element of the interface must be an object");
 
     const Json* type = node.Find("type");
     const std::string* name = type ? type->AsString() : nullptr;
     if (!name) return Fail(error, "element without a type");
-    if (!IsPrimitive(*name)) return Fail(error, "unknown primitive: " + *name);
-    std::string_view container = ContainerOf(*name);
-    if (!container.empty() && container != std::string_view(parent)) {
-        return Fail(error, *name + " outside " + std::string(container));
-    }
-    std::string_view only = OnlyChildOf(parent);
-    if (!only.empty() && std::string_view(*name) != only) {
-        return Fail(error, parent + " only holds " + std::string(only) + " nodes");
-    }
+    const Primitive* primitive = uivocab::FindPrimitive(*name);
+    if (!primitive) return Fail(error, "unknown primitive: " + *name);
+    if (!CheckPlace(*primitive, parent, error)) return false;
 
     for (const auto& [key, value] : *attributes) {
         if (key == "children") continue;
         if (value.AsArray() || value.AsObject()) return Fail(error, "attribute not allowed: " + key);
         if (const std::string* text = value.AsString()) {
-            if (text->size() > kMaxText) return Fail(error, "text too long in " + key + " (500 characters at most)");
+            if (text->size() > uivocab::kMaxText) {
+                return Fail(error, "text too long in " + key + " (" + std::to_string(uivocab::kMaxText) + " characters at most)");
+            }
         }
-        if (!CheckAttribute(*name, key, value, error)) return false;
+        if (!CheckAttribute(*primitive, key, value, error)) return false;
     }
 
     const Json* children = node.Find("children");
     if (!children) return true;
     const Json::Array* items = children->AsArray();
     if (!items) return Fail(error, "children must be a list");
-    if (!items->empty() && !HasChildren(*name)) return Fail(error, "primitive " + *name + " cannot have children");
+    if (!items->empty() && !primitive->children) return Fail(error, "primitive " + *name + " cannot have children");
     for (const Json& child : *items) {
-        if (!CheckNode(child, *name, depth + 1, nodes, error)) return false;
+        if (!CheckNode(child, primitive, depth + 1, nodes, error)) return false;
     }
     return true;
+}
+
+// The slot of an element with this id, in a list of panels, pages or popups.
+template <typename Slots>
+auto* FindSlot(Slots& slots, const std::string& elementId, const std::string& id) {
+    auto found = std::find_if(slots.begin(), slots.end(),
+                              [&](const UiSlot& slot) { return slot.elementId == elementId && slot.id == id; });
+    return found == slots.end() ? nullptr : &*found;
+}
+
+// Registering the same slot again replaces its tree.
+void Upsert(std::vector<UiSlot>& slots, const std::string& elementId, const std::string& id, Json tree) {
+    if (UiSlot* slot = FindSlot(slots, elementId, id)) {
+        slot->tree = std::move(tree);
+    } else {
+        slots.push_back(UiSlot{elementId, id, std::move(tree)});
+    }
+}
+
+// Applies `change` to the control the element added, false when it has none with this id.
+template <typename Change>
+bool ChangeControl(std::vector<UiControl>& controls, const std::string& elementId, int controlId, Change change) {
+    for (UiControl& control : controls) {
+        if (control.id != controlId || control.elementId != elementId) continue;
+        change(control);
+        return true;
+    }
+    return false;
 }
 
 }  // namespace
@@ -282,33 +289,17 @@ int UiModel::AddControl(const std::string& elementId, const std::string& placeme
 
 void UiModel::SetPanel(const std::string& elementId, const std::string& panelId, Json tree) {
     std::lock_guard<std::mutex> guard(m_mutex);
-    auto same = [&](const UiSlot& slot) { return slot.elementId == elementId && slot.id == panelId; };
-    auto found = std::find_if(m_panels.begin(), m_panels.end(), same);
-    if (found != m_panels.end()) {
-        found->tree = std::move(tree);
-    } else {
-        m_panels.push_back(UiSlot{elementId, panelId, std::move(tree)});
-    }
+    Upsert(m_panels, elementId, panelId, std::move(tree));
 }
 
 bool UiModel::RemovePanel(const std::string& elementId, const std::string& panelId) {
     std::lock_guard<std::mutex> guard(m_mutex);
-    auto same = [&](const UiSlot& slot) { return slot.elementId == elementId && slot.id == panelId; };
-    auto found = std::find_if(m_panels.begin(), m_panels.end(), same);
-    if (found == m_panels.end()) return false;
-    m_panels.erase(found);
-    return true;
+    return std::erase_if(m_panels, [&](const UiSlot& slot) { return slot.elementId == elementId && slot.id == panelId; }) > 0;
 }
 
 void UiModel::SetPage(const std::string& elementId, const std::string& path, Json tree) {
     std::lock_guard<std::mutex> guard(m_mutex);
-    auto same = [&](const UiSlot& slot) { return slot.elementId == elementId && slot.id == path; };
-    auto found = std::find_if(m_pages.begin(), m_pages.end(), same);
-    if (found != m_pages.end()) {
-        found->tree = std::move(tree);
-    } else {
-        m_pages.push_back(UiSlot{elementId, path, std::move(tree)});
-    }
+    Upsert(m_pages, elementId, path, std::move(tree));
 }
 
 void UiModel::OpenPopup(const std::string& elementId, Json tree) {
@@ -318,13 +309,7 @@ void UiModel::OpenPopup(const std::string& elementId, Json tree) {
 
 void UiModel::SetPopup(const std::string& elementId, const std::string& popupId, Json tree) {
     std::lock_guard<std::mutex> guard(m_mutex);
-    auto same = [&](const UiSlot& slot) { return slot.elementId == elementId && slot.id == popupId; };
-    auto found = std::find_if(m_popups.begin(), m_popups.end(), same);
-    if (found != m_popups.end()) {
-        found->tree = std::move(tree);
-    } else {
-        m_popups.push_back(UiSlot{elementId, popupId, std::move(tree)});
-    }
+    Upsert(m_popups, elementId, popupId, std::move(tree));
 }
 
 void UiModel::ClosePopup(const std::string& elementId, const std::string& popupId) {
@@ -372,29 +357,33 @@ int UiModel::ReserveId() {
 
 bool UiModel::SetControlLabel(const std::string& elementId, int controlId, const std::string& label) {
     std::lock_guard<std::mutex> guard(m_mutex);
-    for (UiControl& control : m_controls) {
-        if (control.id != controlId || control.elementId != elementId) continue;
-        control.label = label;
-        return true;
-    }
-    return false;
+    return ChangeControl(m_controls, elementId, controlId, [&](UiControl& control) { control.label = label; });
 }
 
 bool UiModel::SetControlActive(const std::string& elementId, int controlId, bool active) {
     std::lock_guard<std::mutex> guard(m_mutex);
-    for (UiControl& control : m_controls) {
-        if (control.id != controlId || control.elementId != elementId) continue;
-        control.active = active;
-        return true;
-    }
-    return false;
+    return ChangeControl(m_controls, elementId, controlId, [&](UiControl& control) { control.active = active; });
 }
 
 bool UiModel::SetControlDisabled(const std::string& elementId, int controlId, bool disabled) {
     std::lock_guard<std::mutex> guard(m_mutex);
+    return ChangeControl(m_controls, elementId, controlId, [&](UiControl& control) { control.disabled = disabled; });
+}
+
+bool UiModel::SetControlMark(const std::string& elementId, int controlId, double from, double to) {
+    std::lock_guard<std::mutex> guard(m_mutex);
     for (UiControl& control : m_controls) {
         if (control.id != controlId || control.elementId != elementId) continue;
-        control.disabled = disabled;
+        if (control.placement != "playbar") return false;
+        if (!(from >= 0)) {  // NaN too
+            control.markFrom = control.markTo = -1;
+        } else if (!(to >= 0)) {
+            control.markFrom = std::min(from, 1.0);
+            control.markTo = -1;
+        } else {
+            control.markFrom = std::clamp(std::min(from, to), 0.0, 1.0);
+            control.markTo = std::clamp(std::max(from, to), 0.0, 1.0);
+        }
         return true;
     }
     return false;
@@ -402,12 +391,8 @@ bool UiModel::SetControlDisabled(const std::string& elementId, int controlId, bo
 
 bool UiModel::SetControlKinds(const std::string& elementId, int controlId, std::vector<std::string> kinds) {
     std::lock_guard<std::mutex> guard(m_mutex);
-    for (UiControl& control : m_controls) {
-        if (control.id != controlId || control.elementId != elementId) continue;
-        control.kinds = std::move(kinds);
-        return true;
-    }
-    return false;
+    return ChangeControl(m_controls, elementId, controlId,
+                         [&](UiControl& control) { control.kinds = std::move(kinds); });
 }
 
 bool UiModel::RemoveControl(const std::string& elementId, int controlId) {
@@ -464,18 +449,14 @@ std::vector<UiControl> UiModel::Controls() const {
 
 std::optional<UiSlot> UiModel::Panel(const std::string& elementId, const std::string& panelId) const {
     std::lock_guard<std::mutex> guard(m_mutex);
-    for (const UiSlot& slot : m_panels) {
-        if (slot.elementId == elementId && slot.id == panelId) return slot;
-    }
-    return std::nullopt;
+    const UiSlot* slot = FindSlot(m_panels, elementId, panelId);
+    return slot ? std::optional<UiSlot>(*slot) : std::nullopt;
 }
 
 std::optional<UiSlot> UiModel::Page(const std::string& elementId, const std::string& path) const {
     std::lock_guard<std::mutex> guard(m_mutex);
-    for (const UiSlot& slot : m_pages) {
-        if (slot.elementId == elementId && slot.id == path) return slot;
-    }
-    return std::nullopt;
+    const UiSlot* slot = FindSlot(m_pages, elementId, path);
+    return slot ? std::optional<UiSlot>(*slot) : std::nullopt;
 }
 
 std::vector<UiSlot> UiModel::Panels() const {
@@ -522,13 +503,10 @@ std::uint64_t UiModel::ApplePlayerRequests() const {
 
 bool ValidateTree(const Json& tree, std::string* error) {
     int nodes = 0;
-    return CheckNode(tree, "", 1, nodes, error);
+    return CheckNode(tree, nullptr, 1, nodes, error);
 }
 
-bool IsPlacement(std::string_view placement) {
-    return placement == "topbar" || placement == "playbar" || placement == "sidebar" || placement == "menu-context" ||
-           placement == "menu-app";
-}
+bool IsPlacement(std::string_view placement) { return uivocab::FindPlacement(placement) != nullptr; }
 
 bool IsMenuItemKind(std::string_view kind) {
     static constexpr std::array<std::string_view, 10> kKinds = {
@@ -542,10 +520,8 @@ bool ShowsForItem(const UiControl& control, std::string_view kind) {
 }
 
 std::string_view PlacementPermission(std::string_view placement) {
-    if (placement == "topbar") return "ui.topbar";
-    if (placement == "playbar") return "ui.playbar";
-    if (placement == "sidebar") return "ui.sidebar";
-    return "ui.menu";
+    const uivocab::Placement* found = uivocab::FindPlacement(placement);
+    return found ? found->permission : "ui.menu";  // what an unnamed placement has always asked for
 }
 
 }  // namespace ampify

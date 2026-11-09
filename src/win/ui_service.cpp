@@ -6,8 +6,12 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "ui_service_detail.hpp"
-#include "sidebar_hover.hpp"
-#include "topbar_search.hpp"
+#include "apple_tweak.hpp"
+#include "lyrics_window.hpp"
+#include "mini_player_theme.hpp"
+#include "../core/ui_watchdog.hpp"
+
+#include <winrt/Microsoft.UI.Windowing.h>
 
 namespace ampify::win {
 
@@ -35,9 +39,48 @@ void CALLBACK WindowEvent(HWINEVENTHOOK, DWORD event, HWND window, LONG objectId
     if (event == EVENT_OBJECT_SHOW) g_windowShown = true;
 }
 
+constexpr auto kMiniCloseSettle = std::chrono::milliseconds(400);  // the full-screen player shows within this time
+
+// Apple minimizes its main window when the mini player opens and leaves it so when the mini player's cross closes it:
+// only the taskbar button was left of Apple Music. Unless the full-screen player took over, the main window comes back,
+// a moment later, on its own thread. Called from the mini player's Closed, on the mini player's thread.
+void RestoreMainAfterMini(std::weak_ptr<UiService::Shared> weakShared) noexcept {
+    try {
+        xaml::Window main = AppWindowOf(WindowRole::Main);
+        auto queue = main ? main.DispatcherQueue() : nullptr;
+        if (!queue) return;
+        queue.TryEnqueue([weakShared]() noexcept {
+            try {
+                // Held until it fires, then let go: a timer no one holds may never fire.
+                auto held = std::make_shared<dispatching::DispatcherQueueTimer>(
+                    dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer());
+                held->Interval(kMiniCloseSettle);
+                held->IsRepeating(false);
+                held->Tick([weakShared, held](auto const&, auto const&) noexcept {
+                    try {
+                        *held = nullptr;
+                        xaml::Window player = AppWindowOf(WindowRole::Player);
+                        if (player && player.AppWindow() && player.AppWindow().IsVisible()) return;
+                        HWND hwnd = WindowHandle(AppWindowOf(WindowRole::Main));
+                        if (!hwnd || !IsIconic(hwnd)) return;
+                        ShowWindow(hwnd, SW_RESTORE);
+                        if (auto shared = weakShared.lock()) {
+                            shared->journal.Write("Interface: the mini player closed, Apple Music's window shown again");
+                        }
+                    } catch (...) {
+                    }
+                });
+                held->Start();
+            } catch (...) {
+            }
+        });
+    } catch (...) {
+    }
+}
+
 }  // namespace
 
-// What the discovery knows of a node, read with try_as on the projected types.
+// Read with try_as on the projected types.
 ProbeNode Describe(const xaml::DependencyObject& node, int parent) {
     ProbeNode probe;
     probe.parent = parent;
@@ -85,6 +128,7 @@ void RemoveFromParent(const xaml::FrameworkElement& element) {
             popup.Child(nullptr);
         }
     } catch (...) {
+        // The parent left the tree while it was changed: the element is already out.
     }
 }
 
@@ -110,6 +154,8 @@ void QueueRefresh(const WeakShared& weakShared, const std::shared_ptr<WindowCont
                                                if (!live || !live->ticket.Take(ticket)) return;
                                                SharedPtr shared = weakShared.lock();
                                                if (!shared || !shared->running) return;
+                                               // Named for the freeze log: buttons, menus and pages placed by Ampify.
+                                               ampify::ActivityScope activity("interface refresh");
                                                try {
                                                    Refresh(*shared, live);
                                                } catch (const winrt::hresult_error& error) {
@@ -138,6 +184,7 @@ void Wake(const WeakShared& weakShared, const WeakContext& weakContext, std::uin
         if (discover) live->discoverDirty = true;
         QueueRefresh(weakShared, live);
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -161,6 +208,7 @@ void ClearWatches(WindowContext& context) {
                 if (watch.property) element.UnregisterPropertyChangedCallback(watch.property, watch.propertyToken);
             }
         } catch (...) {
+            // The element may be torn down already: nothing is left to put back.
         }
     }
     context.watches.clear();
@@ -181,6 +229,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
         if (context.fullscreenPopup) context.fullscreenPopup.IsOpen(false);
         RemoveFromParent(context.settingsEntry);
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
     try {
         ForgetFullscreenHost(context);
@@ -204,10 +253,12 @@ void ReleaseXaml(WindowContext& context) noexcept {
         context.surfaces.clear();
         context.placed.clear();
         context.playbarMore = nullptr;
+        ReleasePlaybarMark(context);
         context.probe.clear();
         context.probeObjects.clear();
         context.dialogOpen = false;
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
 }
 
@@ -226,11 +277,10 @@ void DropContext(std::shared_ptr<WindowContext> context) noexcept {
             return;
         }
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
     // Not queued: `holder` is never freed.
 }
-
-// ---- Discovery ---------------------------------------------------------------------------------------------------
 
 // Bounded breadth-first walk of the window content (512 nodes), never into item lists, buttons or Ampify's
 // elements. Watches Loaded, Unloaded and Content of the Frame, Page and UserControl met, so a navigation wakes the
@@ -344,8 +394,6 @@ void Discover(UiService::Shared& shared, const std::shared_ptr<WindowContext>& c
                     " page(s), " + std::to_string(context->watches.size()) + " container(s) followed");
 }
 
-// ---- One refresh of one window, on its interface thread ---------------------------------------------------------
-
 void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
     if (context->ticket.Closed() || !context->dispatcher.HasThreadAccess()) return;
     xaml::Window window = context->window.get();
@@ -356,7 +404,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
     }
     if (AppWindowOf(context->role) != window) {
         // The property holds another window, or none for a moment (GetAppProperty failed): this work is stale. The
-        // ticket stays open, as in AMExclusive, so a passing failure does not end the window; the context and its XAML
+        // ticket stays open, so a passing failure does not end the window; the context and its XAML
         // objects go once the window object is gone (DiscoverWindows, DropContext).
         return;
     }
@@ -364,13 +412,15 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
     WeakContext weakContext = context;
     if (!context->observed) {
         context->observed = true;
-        window.Closed([weakContext](IInspectable const&, xaml::WindowEventArgs const&) noexcept {
+        window.Closed([weakContext, weakShared](IInspectable const&, xaml::WindowEventArgs const&) noexcept {
             try {
                 if (auto live = weakContext.lock()) {
                     live->ticket.Close();
                     ReleaseXaml(*live);
+                    if (live->role == WindowRole::Mini) RestoreMainAfterMini(weakShared);
                 }
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
         shared.journal.Write("Interface: window \"" + WindowLabel(*context) +
@@ -399,6 +449,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
             RemoveFromParent(context->pageHost);
             if (context->fullscreenPopup) context->fullscreenPopup.IsOpen(false);
         } catch (...) {
+            // An old element already torn down: the new content is set up regardless.
         }
         ForgetFullscreenHost(*context);
         context->panelPopup = nullptr;
@@ -420,6 +471,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
                     auto live = weakContext.lock();
                     if (live && live->ticket.OnLayout(NowMs())) Wake(weakShared, weakContext, revision, true);
                 } catch (...) {
+                    // A handler runs inside Apple Music's XAML frame: nothing may escape it.
                 }
             });
             // The overlays (panels, app pages) follow the window's size.
@@ -458,6 +510,7 @@ void DiscoverWindows(UiService::Shared& shared) {
         try {
             dispatcher = window.DispatcherQueue();  // documented as callable from any thread
         } catch (...) {
+            // A window being closed has no queue: it is skipped.
         }
         if (!dispatcher) continue;
         std::shared_ptr<WindowContext> context;
@@ -487,6 +540,7 @@ void DiscoverWindows(UiService::Shared& shared) {
         if (created) {
             shared.journal.Write("Interface: window \"" + winrt::to_string(AppPropertyName(role)) +
                                  "\" obtained through AMP.Utils (GetAppProperty), work sent to its DispatcherQueue");
+            if (role == WindowRole::Mini) MiniPlayerOpened();  // the theme reaches it now, not at the next tick
         }
         context->discoverDirty = true;
         toRefresh.push_back(context);
@@ -513,12 +567,7 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
         shared.playerMode = tweaks.player;
         closeChanged = std::exchange(shared.closeToTray, tweaks.closeToTray) != tweaks.closeToTray;
     }
-    SetNotificationRule(tweaks.notifications, shared.journal);
-    SetPlayerControlsShown(tweaks.playerControls);
-    SetSharpArtwork(tweaks.sharpArtwork);
-    SetTextMarquee(tweaks.textMarquee);
-    SetSidebarOnHover(tweaks.sidebarOnHover);
-    SetTopbarSearch(tweaks.topbarSearch);
+    ApplyAppleTweaks(tweaks, shared.journal);
     const bool inHeader = uirender::ReadEntryInHeader(settings);
     const bool entryMoved = shared.entryInHeader.exchange(inHeader) != inHeader;
 

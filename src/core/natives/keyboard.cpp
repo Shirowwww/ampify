@@ -35,7 +35,6 @@ void DefineKeyboard(api::NativeScope& scope) {
     scope.Function("unbindKey", KeyboardNatives::UnbindKey, 1);
 }
 
-// Releases the element's shortcuts when it stops.
 void StopKeyboard(ScriptExtension& extension) { ScriptBridge::HostOf(&extension).UnregisterKeys(extension.id()); }
 
 }  // namespace ampify::natives

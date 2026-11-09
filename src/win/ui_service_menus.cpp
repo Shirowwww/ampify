@@ -127,8 +127,9 @@ controls::MenuFlyoutItem MakeMenuEntry(const UiEventSink& sink, const UiControl&
     std::string elementId = control.elementId;
     item.Click([sink, elementId, payload](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
-            if (sink) sink(UiEvent{elementId, 0, false, payload, "menuClick"});
+            if (sink) sink(UiEvent{elementId, 0, false, payload, dispatch::kMenuClick});
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     return item;
@@ -187,9 +188,11 @@ void AppendMenuEntries(const UiEventSink& sink, const primitives::Popup& popup, 
                             if (IsMenuEntry(items.GetAt(index))) items.RemoveAt(index);
                         }
                     } catch (...) {
+                        // A handler runs inside Apple Music's XAML frame: nothing may escape it.
                     }
                 });
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
 }
@@ -273,6 +276,7 @@ void LookForMenu(const WeakShared& weakShared, const WeakContext& weakContext) n
         }
         if (!context->menuTimer.IsRunning()) context->menuTimer.Start();
     } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
     }
 }
 
@@ -297,6 +301,7 @@ void FollowMenus(UiService::Shared& shared, const std::shared_ptr<WindowContext>
                 LookForMenu(weakShared, weakContext);
             });
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     };
     content.AddHandler(xaml::UIElement::PointerReleasedEvent(), winrt::box_value(xaml::Input::PointerEventHandler(look)),

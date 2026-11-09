@@ -51,10 +51,14 @@
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Windows.System.h>
 
+#include "../core/api/dispatch_names.hpp"
+#include "../core/caption_clearance.hpp"
 #include "../core/element_settings.hpp"
 #include "../core/i18n.hpp"
+#include "../core/panel_radius.hpp"
 #include "../core/json.hpp"
 #include "../core/settings.hpp"
+#include "../core/song_room.hpp"
 #include "../core/ui_render/apple_tweaks.hpp"
 #include "../core/ui_render/mods.hpp"
 #include "../core/ui_render/probe.hpp"
@@ -65,10 +69,6 @@
 #include "apple_player.hpp"
 #include "close_to_tray.hpp"
 #include "kit_command.hpp"
-#include "notifications.hpp"
-#include "player_controls.hpp"
-#include "sharp_artwork.hpp"
-#include "text_marquee.hpp"
 #include "xaml_host.hpp"
 
 namespace ampify::win {
@@ -89,6 +89,9 @@ using uirender::SurfaceKind;
 // Ampify's own settings page, shown in the host of the app pages: the Ampify row of Settings and any app with ui.page
 // (Ampify.ui.navigate) open it.
 constexpr char kAmpifyPagePath[] = "/ampify/settings";
+
+// Every menu and text field of that page has this width, so they line up and a longer choice never moves the row.
+constexpr double kSettingControlWidth = 280;
 
 inline winrt::hstring Wide(const std::string& text) {
     return winrt::to_hstring(text);
@@ -121,10 +124,12 @@ struct MountedSurface {
     // Released on the interface thread with the context (ReleaseXaml, DropContext).
     xaml::FrameworkElement panelFrame{nullptr};
     controls::Border slot{nullptr};  // holds the renderer's root
+    xaml::UIElement filledRoot{nullptr};  // the root whose background the panel's card took (FillPanelFrame)
     controls::TextBlock title{nullptr};
     controls::ContentDialog dialog{nullptr};
     bool mounted = false;
     bool dismissed = false;  // a popup the user closed
+    bool redrawnEmpty = false;  // a page found drawn empty was rendered again once for this route (DrawnEmpty)
 };
 
 struct PlacedControl {
@@ -149,7 +154,7 @@ struct PlacedControl {
 };
 
 // One XAML window of Apple Music (the main window or the mini player).
-struct WindowContext {
+struct WindowContext : std::enable_shared_from_this<WindowContext> {
     WindowRole role = WindowRole::Main;
     winrt::weak_ref<xaml::Window> window;
     dispatching::DispatcherQueue dispatcher{nullptr};
@@ -183,7 +188,9 @@ struct WindowContext {
     // The playback bar's song column and the toggles at its right (FollowSongRoom), and the song's own margin.
     winrt::weak_ref<xaml::FrameworkElement> songColumn;
     winrt::weak_ref<xaml::FrameworkElement> songToggles;
-    std::optional<xaml::Thickness> songMargin;  // Apple's, while Ampify moves its right side
+    SongMargin songMargin;                      // the layout's and Ampify's, told apart (song_room.hpp)
+    bool songFitting = false;                   // Ampify moves the song's right side
+    double togglesDrop = 0;                     // how much lower Ampify put the toggles (KeepTogglesClearOfCaption)
     std::optional<double> songMaxWidth;         // Apple's, while Ampify keeps the song clear of the transport
     double songLimitedFor = 0;                  // the song's width when Ampify limited it
     double songLimit = 0;                       // the maximum width Ampify gave it
@@ -193,6 +200,12 @@ struct WindowContext {
     winrt::weak_ref<xaml::FrameworkElement> transport;
     controls::Button playbarMore{nullptr};
     bool songRoomQueued = false;  // FollowSongRoom's update waits for the layout pass to end
+    // A play bar button's stretch of the progress line (Ampify.ui.playbar.mark, FollowPlaybarMark): Ampify's layer in
+    // the track of Apple's scrubber, the track it was put in, and the stretch it shows, as parts of the song.
+    controls::Grid markLayer{nullptr};
+    winrt::weak_ref<controls::Grid> markTrack;
+    double markFrom = -1;
+    double markTo = -1;
 
     // Main window only.
     // Strong, like the Popup: the panels stay ours even when Apple Music rebuilds the children of its page (in the
@@ -289,6 +302,49 @@ struct SettingsCard {
     std::map<std::string, controls::Button> resets;  // each setting's Reset, by key
 };
 
+// One element's settings folded under its name on the Ampify page (a theme, a snippet, an extension): closed until
+// opened, and open again after the page is built again when it was left open (UiService::Shared::openFolds).
+struct SettingsFold {
+    controls::Expander expander{nullptr};
+    std::string key;                                 // "<kind>:<id>"
+    std::vector<settings_panel::SettingText> texts;  // its name, then each of its settings, for the search
+};
+
+// The tabs and the search of the Ampify page: each tab shows one pane, a pane holds groups (a heading and a card), a
+// group holds rows. The search looks through every pane at once and shows what matches under each pane's name. Built
+// with the page and owned by UiService::Shared::settingsNav; the controls reach it through a std::weak_ptr.
+struct SettingsNav {
+    struct Row {
+        xaml::FrameworkElement unit{nullptr};     // the row with the line above it
+        xaml::FrameworkElement divider{nullptr};  // null for a card's first row
+        settings_panel::SettingText text;         // empty label: a row shown only for its folds
+        std::vector<SettingsFold> folds;
+    };
+    struct Group {
+        xaml::FrameworkElement whole{nullptr};
+        std::size_t pane = 0;
+        std::vector<std::size_t> rows;
+    };
+    struct Pane {
+        controls::StackPanel panel{nullptr};
+        xaml::FrameworkElement heading{nullptr};  // shown while searching only: the tab says it otherwise
+        controls::Button tab{nullptr};
+        controls::TextBlock label{nullptr};
+    };
+    std::vector<Row> rows;
+    std::vector<Group> groups;
+    std::vector<Pane> panes;
+    controls::TextBox search{nullptr};
+    controls::Grid tabRow{nullptr};
+    controls::Border indicator{nullptr};
+    controls::TextBlock none{nullptr};
+    controls::StackPanel host{nullptr};
+    std::size_t shownPane = std::numeric_limits<std::size_t>::max();  // the pane on screen, to animate a change only
+    bool wasSearching = false;
+    bool searching = false;  // the search is opening folds: their state is not remembered
+    bool placed = false;     // the indicator has its first place
+};
+
 using SharedPtr = std::shared_ptr<UiService::Shared>;
 using WeakShared = std::weak_ptr<UiService::Shared>;
 using WeakContext = std::weak_ptr<WindowContext>;
@@ -334,6 +390,10 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     // The settings cards of the Ampify page, which owns them: dropped when the page is built again, and a card out of
     // the page (its theme section rebuilt) when the next card is made.
     std::vector<std::shared_ptr<ui_service_detail::SettingsCard>> settingsCards;
+    std::shared_ptr<ui_service_detail::SettingsNav> settingsNav;  // the page's tabs and search
+    std::size_t settingsTab = 0;      // the tab shown, kept when the page is built again
+    std::string settingsQuery;        // what the search holds, kept the same way
+    std::set<std::string> openFolds;  // the folds left open (SettingsFold::key)
 
     std::mutex onceMutex;
     std::set<std::string> logged;
@@ -372,7 +432,20 @@ void ImportElementSettings(UiService::Shared& shared, const uirender::ModEntry& 
                            const SettingsSay& say);
 xaml::FrameworkElement ModRow(UiService::Shared& shared, const uirender::ModEntry& mod);
 xaml::FrameworkElement ModSettings(UiService::Shared& shared, const uirender::ModEntry& mod);
-xaml::FrameworkElement ThemeSettingsSection(UiService::Shared& shared, const uirender::ModEntry& theme);
+// The label and description of each of an element's settings, in the language the page shows.
+std::vector<settings_panel::SettingText> ElementSettingTexts(const uirender::ModEntry& mod);
+
+// ui_service_settings_nav.cpp: the tabs, the search and the folds of the Ampify page (SettingsNav).
+controls::StackPanel AddSettingsPane(UiService::Shared& shared, SettingsNav& nav, const std::string& tabKey);
+controls::StackPanel AddSettingsGroup(UiService::Shared& shared, SettingsNav& nav, const std::string& name,
+                                      const std::string& titleKey, const std::string& subtitleKey);
+std::size_t AddSettingsRow(SettingsNav& nav, const controls::StackPanel& rows, const xaml::FrameworkElement& row,
+                           settings_panel::SettingText text);
+controls::Expander AddSettingsFold(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& nav, std::size_t row,
+                                   const uirender::ModEntry& mod, bool named);
+xaml::FrameworkElement SettingsNavBar(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& nav);
+xaml::FrameworkElement SettingsPanes(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& nav);
+void ShowSettingsState(UiService::Shared& shared, SettingsNav& nav, bool animate);
 
 // ui_service_panels.cpp
 void QuietScrollBar(const controls::ScrollViewer& scroll);
@@ -413,6 +486,11 @@ std::uint32_t StableIndex(const std::map<std::string, PlacedControl>& placed, co
 void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                    const std::vector<Surface>& surfaces);
 void FollowSongRoom(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context);
+
+// ui_service_mark.cpp
+void FollowPlaybarMark(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
+                       const std::vector<Surface>& surfaces);
+void ReleasePlaybarMark(WindowContext& context) noexcept;
 
 }  // namespace ui_service_detail
 

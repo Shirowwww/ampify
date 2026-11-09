@@ -6,6 +6,7 @@
 #include "ui_service_detail.hpp"
 
 #include "dialog_fonts.hpp"
+#include "../core/topbar.hpp"
 
 namespace ampify::win::ui_service_detail {
 
@@ -49,7 +50,9 @@ void PlacePageHost(WindowContext& context, const xaml::XamlRoot& root) {
     std::optional<winrt::Windows::Foundation::Rect> frame = NamedBounds(context, "ContentFrame");
     if (!frame) return;
     ContentArea area = FindContentArea(context, root.Size().Height);
-    double top = std::max(0.0, area.top - frame->Y);
+    // With the bar at the bottom, the pages run under the window's caption and the search strip (Cosy): the page's
+    // header went under them. It starts below that strip, as Apple's pages do with their top spacer.
+    double top = std::max(0.0, std::max(area.top, kTopbarHeight) - frame->Y);
     double bottom = area.height > 0 ? std::max(0.0, frame->Y + frame->Height - (area.top + area.height)) : 0.0;
     xaml::Thickness margin{0, top, 0, bottom};
     if (context.pageHost.Margin() != margin) context.pageHost.Margin(margin);
@@ -76,6 +79,7 @@ void UncoverApplePage(WindowContext& context, Selection selection) noexcept {
         if (selection != Selection::Keep) context.coveredSelection = nullptr;
         if (context.pageHost && context.pageBackground) context.pageHost.Background(context.pageBackground);
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
 }
 
@@ -84,6 +88,7 @@ void ForgetSelectionBars(WindowContext& context) noexcept {
     try {
         if (context.barsSidebar && context.barsToken) context.barsSidebar.SelectionChanged(context.barsToken);
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
     context.barsSidebar = nullptr;
     context.barsToken = {};
@@ -159,6 +164,7 @@ void WatchSelectionBars(const std::shared_ptr<WindowContext>& owner, const contr
                 }
                 ForgetSelectionBars(*live);
             } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
             }
         });
 }
@@ -209,6 +215,7 @@ void CoverApplePage(UiService::Shared& shared, const std::shared_ptr<WindowConte
             args.Cancel(true);
             GoBackInPage(weakShared, live);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     auto leave = [weakContext]() noexcept {
@@ -218,6 +225,7 @@ void CoverApplePage(UiService::Shared& shared, const std::shared_ptr<WindowConte
                 ShowPageHost(*live, false, Selection::Drop);
             }
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     };
     context.coveredNavigated = frame.Navigated(
@@ -232,6 +240,7 @@ void CoverApplePage(UiService::Shared& shared, const std::shared_ptr<WindowConte
                     auto item = args.InvokedItemContainer().try_as<controls::NavigationViewItem>();
                     if (args.IsSettingsInvoked() || !item || item.SelectsOnInvoked()) leave();
                 } catch (...) {
+                    // A handler runs inside Apple Music's XAML frame: nothing may escape it.
                 }
             });
             context.coveredSidebar = sidebar;
@@ -307,6 +316,7 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
         try {
             if (auto live = weakContext.lock()) GoBackInPage(weakShared, live);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     context.pageHost = host;
@@ -315,6 +325,14 @@ controls::Border EnsurePageHost(UiService::Shared& shared, const std::shared_ptr
     context.pageTitle = title;
     shared.Once("page-host", "Interface: app page host made, beside Apple Music's frame");
     return slot;
+}
+
+// A page shown and laid out whose slot holds nothing, or a root of no height in a slot that has some.
+bool DrawnEmpty(const MountedSurface& mounted, const controls::Border& slot) {
+    if (!mounted.mounted || mounted.redrawnEmpty || mounted.slot != slot || !slot.IsLoaded()) return false;
+    if (slot.Visibility() != xaml::Visibility::Visible || slot.ActualHeight() <= 0) return false;
+    auto root = slot.Child().try_as<xaml::FrameworkElement>();
+    return !root || root.ActualHeight() <= 0;
 }
 
 void MountPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
@@ -327,6 +345,13 @@ void MountPage(UiService::Shared& shared, const std::shared_ptr<WindowContext>& 
     }
     controls::Border slot = EnsurePageHost(shared, context, content);
     if (!slot) return;
+    if (DrawnEmpty(mounted, slot)) {
+        // Seen after a change of theme: the first visit showed an empty page, the second one drew it. Drawn again
+        // from the model the element already gave, once per visit, so a page that is empty on purpose stays so.
+        mounted.redrawnEmpty = true;
+        mounted.mounted = false;
+        shared.journal.Write("Interface: page \"" + SurfaceLabel(surface) + "\" was drawn empty, rendered again");
+    }
     bool first = !mounted.mounted || mounted.slot != slot;
     if (first || mounted.surface.revision != surface.revision) {
         if (first) mounted.renderer.reset();
@@ -366,6 +391,7 @@ controls::ContentDialog MakePopupDialog(UiService::Shared& shared, const Surface
         try {
             GiveDialogButtonsTextFont(sender);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     return dialog;
@@ -380,7 +406,7 @@ void WatchPopupClose(UiService::Shared& shared, const std::shared_ptr<WindowCont
     std::string key = surface.key;
     std::optional<UiEvent> closedEvent;
     if (!surface.id.empty() && surface.id[0] != '#') {
-        closedEvent = UiEvent{surface.elementId, 0, false, "{\"popup\":" + Json::Quote(surface.id) + "}", "popupClose"};
+        closedEvent = UiEvent{surface.elementId, 0, false, "{\"popup\":" + Json::Quote(surface.id) + "}", dispatch::kPopupClose};
     }
     dialog.Closed([weakShared, weakContext, key, closedEvent](controls::ContentDialog const& sender,
                                                               controls::ContentDialogClosedEventArgs const&) noexcept {
@@ -398,6 +424,7 @@ void WatchPopupClose(UiService::Shared& shared, const std::shared_ptr<WindowCont
             }
             QueueRefresh(weakShared, live);  // the next popup, if one waits
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
 }
@@ -442,12 +469,11 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
 
 }  // namespace
 
-// ---- The fullscreen view ------------------------------------------------------------------------------------------
 // A Popup of the window that covers all of its content, above Apple Music and the other overlays, with a Close button
 // at the top right. Escape closes it too. It lives outside Apple Music's pages, so their navigation leaves it alone.
 
 UiEvent FullscreenClosed(const std::string& elementId, const std::string& session) {
-    return UiEvent{elementId, 0, false, "{\"session\":" + session + "}", "fullscreenClose"};
+    return UiEvent{elementId, 0, false, "{\"session\":" + session + "}", dispatch::kFullscreenClose};
 }
 
 namespace {
@@ -570,6 +596,7 @@ controls::Border EnsureFullscreenHost(UiService::Shared& shared, const std::shar
             args.Handled(true);
             DismissFullscreen(weakShared, weakContext);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     context.fullscreenPopup = popup;
@@ -629,6 +656,7 @@ void Unmount(WindowContext& context, MountedSurface& mounted) {
             }
         }
     } catch (...) {
+        // The element may be torn down already: nothing is left to put back.
     }
 }
 
@@ -704,7 +732,9 @@ void ApplySurfaces(UiService::Shared& shared, const std::shared_ptr<WindowContex
         }
         ShowPageHost(*context, false, Selection::Keep);
         for (auto& [key, mounted] : context->surfaces) {
-            if (mounted.surface.kind == SurfaceKind::Page) mounted.surface.revision = 0;  // render again for the new route
+            if (mounted.surface.kind != SurfaceKind::Page) continue;
+            mounted.surface.revision = 0;  // render again for the new route
+            mounted.redrawnEmpty = false;
         }
     }
 

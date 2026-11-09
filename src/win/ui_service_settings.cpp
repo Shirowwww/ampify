@@ -6,6 +6,9 @@
 #include "ui_service_detail.hpp"
 
 #include "../core/kit_layout.hpp"
+#include "ui_motion.hpp"
+
+#include <winrt/Microsoft.UI.Xaml.Shapes.h>
 
 namespace ampify::win::ui_service_detail {
 
@@ -14,12 +17,14 @@ namespace {
 constexpr std::size_t kPageLimit = 4000;
 
 constexpr double kAmpifyPageWidth = 1000;  // as wide as Apple's settings rows
+constexpr double kAccentFieldWidth = 110;  // "#RRGGBB" with room to type
+constexpr auto kFieldFade = std::chrono::milliseconds(150);
+constexpr auto kRingFade = std::chrono::milliseconds(200);   // the accent ring, from one swatch to the next
+constexpr auto kRingSettle = std::chrono::milliseconds(40);  // a frame or two more before the accent is written
 
 constexpr char kAmpifyPageOwner[] = "ampify";
 constexpr char kAtmosLeveler[] = "atmos-leveler";
-static_assert(IsBuiltInExtension(kAtmosLeveler), "SoundRows writes the row of an extension built into the kernel");
-
-// ---- The Mods card in Settings > Playback ------------------------------------------------------------------------
+static_assert(IsBuiltInExtension(kAtmosLeveler), "AddSoundRows writes the row of an extension built into the kernel");
 
 // The page's own tree, depth first, parents before children (4000 nodes at most).
 void CollectPage(const xaml::DependencyObject& page, std::vector<ProbeNode>& nodes,
@@ -36,7 +41,7 @@ void CollectPage(const xaml::DependencyObject& page, std::vector<ProbeNode>& nod
     }
 }
 
-// A row of the card: a label and its help on the left, a control on the right.
+// Label and help on the left, the control on the right.
 controls::Grid LabelledRow(UiService::Shared& shared, const std::string& label, const std::string& help,
                            const xaml::FrameworkElement& control) {
     controls::Grid row;
@@ -58,18 +63,26 @@ controls::Grid LabelledRow(UiService::Shared& shared, const std::string& label, 
     return row;
 }
 
-// Shows the settings of the theme active now under the theme list, then those of the snippets switched on, or nothing
-// when none declares any.
-void FillThemeSettings(UiService::Shared& shared, const controls::StackPanel& host) {
-    host.Children().Clear();
-    if (std::optional<uirender::ModEntry> theme = uirender::ActiveThemeSettings(shared.kit)) {
-        host.Children().Append(MakeDivider());
-        host.Children().Append(ThemeSettingsSection(shared, *theme));
+// Where the settings of the active theme and snippets go: a row of the page's navigation that holds their folds.
+struct ThemeFolds {
+    controls::StackPanel host;
+    std::size_t row = 0;
+};
+
+// Folds the settings of the theme active now, then those of the snippets switched on, each under its name; the row
+// stays hidden when none declares any. A search under way looks through the new folds at once.
+void FillThemeFolds(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& nav, const ThemeFolds& folds) {
+    if (!nav || folds.row >= nav->rows.size()) return;
+    folds.host.Children().Clear();
+    nav->rows[folds.row].folds.clear();
+    std::vector<uirender::ModEntry> elements;
+    if (std::optional<uirender::ModEntry> theme = uirender::ActiveThemeSettings(shared.kit)) elements.push_back(*theme);
+    for (uirender::ModEntry& snippet : uirender::EnabledSnippetSettings(shared.kit)) elements.push_back(std::move(snippet));
+    for (const uirender::ModEntry& element : elements) {
+        if (folds.host.Children().Size() > 0) folds.host.Children().Append(MakeDivider());
+        folds.host.Children().Append(AddSettingsFold(shared, nav, folds.row, element, true));
     }
-    for (const uirender::ModEntry& snippet : uirender::EnabledSnippetSettings(shared.kit)) {
-        host.Children().Append(MakeDivider());
-        host.Children().Append(ThemeSettingsSection(shared, snippet));
-    }
+    ShowSettingsState(shared, *nav, false);
 }
 
 // Writes theme.accent ("" for the theme's own), which the theme engine follows like theme.scheme.
@@ -90,7 +103,7 @@ bool CommitAccent(UiService::Shared& shared, const std::string& accent) {
 controls::TextBox AccentField(UiService::Shared& shared, const std::string& value) {
     controls::TextBox box;
     if (shared.probe.textBox) box.Style(shared.probe.textBox);
-    box.MinWidth(110);
+    box.Width(kAccentFieldWidth);
     box.MaxLength(7);
     box.PlaceholderText(L"#RRGGBB");
     box.Text(Wide(value.empty() ? value : "#" + value));
@@ -107,60 +120,177 @@ controls::TextBox AccentField(UiService::Shared& shared, const std::string& valu
         try {
             commit(sender.as<controls::TextBox>());
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     box.KeyDown([commit](IInspectable const& sender, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
         try {
             if (args.Key() == winrt::Windows::System::VirtualKey::Enter) commit(sender.as<controls::TextBox>());
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     return box;
 }
 
-// The accent over the theme's: the theme's own, a preset, or a colour typed in hex ("Custom…" shows the field).
+media::SolidColorBrush HexBrush(std::string_view hex) {
+    auto byte = [&](std::size_t at) {
+        unsigned value = 0;
+        std::from_chars(hex.data() + at, hex.data() + at + 2, value, 16);
+        return static_cast<uint8_t>(value);
+    };
+    return media::SolidColorBrush(winrt::Windows::UI::Color{255, byte(0), byte(2), byte(4)});
+}
+
+// What a swatch shows: the theme's own accent as a ring of the text colour, the artwork's as a warm-to-cool blend, a
+// preset as its colour, "custom" as a plus.
+xaml::FrameworkElement SwatchFace(const std::string& value, bool custom) {
+    constexpr double kDot = 18;
+    if (custom) {
+        controls::FontIcon plus;
+        plus.Glyph(L"");  // Add, in Segoe Fluent Icons
+        plus.FontSize(12);
+        return plus;
+    }
+    winrt::Microsoft::UI::Xaml::Shapes::Ellipse dot;
+    dot.Width(kDot);
+    dot.Height(kDot);
+    if (value.empty()) {
+        if (auto ring = ThemeResource(L"TextFillColorSecondaryBrush").try_as<media::Brush>()) dot.Stroke(ring);
+        dot.StrokeThickness(2);
+    } else if (value == uirender::kArtworkAccent) {
+        media::LinearGradientBrush blend;
+        blend.StartPoint({0, 0});
+        blend.EndPoint({1, 1});
+        media::GradientStop warm;
+        warm.Color(winrt::Windows::UI::Color{255, 0xE7, 0xA6, 0x4B});
+        media::GradientStop cool;
+        cool.Color(winrt::Windows::UI::Color{255, 0x4B, 0x6B, 0xE7});
+        cool.Offset(1);
+        blend.GradientStops().Append(warm);
+        blend.GradientStops().Append(cool);
+        dot.Fill(blend);
+    } else {
+        dot.Fill(HexBrush(value));
+    }
+    return dot;
+}
+
+// One round button of the accent row, with the ring that marks the choice (faded in and out, motion::FadeTo).
+controls::Button Swatch(const std::string& value, bool custom, const std::string& name,
+                        winrt::Microsoft::UI::Xaml::Shapes::Ellipse& ring) {
+    constexpr double kSize = 28;
+    controls::Grid face;
+    ring.Width(kSize - 2);
+    ring.Height(kSize - 2);
+    if (auto brush = ThemeResource(L"TextFillColorPrimaryBrush").try_as<media::Brush>()) ring.Stroke(brush);
+    ring.StrokeThickness(2);
+    ring.Opacity(0);
+    face.Children().Append(ring);
+    xaml::FrameworkElement inner = SwatchFace(value, custom);
+    inner.HorizontalAlignment(xaml::HorizontalAlignment::Center);
+    inner.VerticalAlignment(xaml::VerticalAlignment::Center);
+    face.Children().Append(inner);
+    controls::Button swatch;
+    swatch.Width(kSize);
+    swatch.Height(kSize);
+    swatch.MinWidth(0);
+    swatch.MinHeight(0);
+    swatch.Padding(xaml::Thickness{0, 0, 0, 0});
+    swatch.CornerRadius(xaml::CornerRadius{kSize / 2, kSize / 2, kSize / 2, kSize / 2});
+    swatch.Background(media::SolidColorBrush(winrt::Windows::UI::Color{0, 0, 0, 0}));
+    swatch.BorderThickness(xaml::Thickness{0, 0, 0, 0});
+    swatch.Content(face);
+    controls::ToolTipService::SetToolTip(swatch, winrt::box_value(Wide(name)));
+    Name(swatch, "AMPIFY_Accent_" + (custom ? std::string("custom") : value.empty() ? std::string("theme") : value), name);
+    return swatch;
+}
+
+// The accent over the theme's, chosen in one click: the theme's own, a preset, the artwork's, or a colour typed in
+// hex (the plus shows the field). The ring moves to the swatch chosen.
 xaml::FrameworkElement AccentChoice(UiService::Shared& shared) {
     std::string chosen = uirender::ChosenAccent(shared.kit);
-    controls::ComboBox combo;
-    if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
-    combo.MinWidth(220);
-    Name(combo, "AMPIFY_AccentChoice", i18n::Text("accent.title"));
-    auto values = std::make_shared<std::vector<std::string>>(1, "");  // "" is the theme's own accent
-    combo.Items().Append(winrt::box_value(Wide(i18n::Text("accent.theme"))));
+    std::vector<std::pair<std::string, std::string>> choices{{"", i18n::Text("accent.theme")}};  // "": the theme's
     for (const uirender::AccentPreset& preset : uirender::AccentPresets()) {
-        values->push_back(preset.value);
-        combo.Items().Append(winrt::box_value(Wide(i18n::Text(preset.textKey))));
+        choices.emplace_back(preset.value, i18n::Text(preset.textKey));
     }
-    values->push_back(uirender::kArtworkAccent);
-    combo.Items().Append(winrt::box_value(Wide(i18n::Text("accent.artwork"))));
-    combo.Items().Append(winrt::box_value(Wide(i18n::Text("accent.custom"))));
-    auto known = std::find(values->begin(), values->end(), chosen);
-    int32_t customIndex = static_cast<int32_t>(values->size());
-    combo.SelectedIndex(known == values->end() ? customIndex : static_cast<int32_t>(known - values->begin()));
+    choices.emplace_back(uirender::kArtworkAccent, i18n::Text("accent.artwork"));
+    auto known = std::find_if(choices.begin(), choices.end(), [&](const auto& choice) { return choice.first == chosen; });
+    const std::size_t customIndex = choices.size();
+    std::size_t selected = known == choices.end() ? customIndex : static_cast<std::size_t>(known - choices.begin());
 
-    controls::TextBox custom = AccentField(shared, known == values->end() ? chosen : "");
-    custom.Visibility(known == values->end() ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
+    // The field keeps its place while hidden, so the plus fades it in without moving the row or its text.
+    controls::TextBox custom = AccentField(shared, known == choices.end() ? chosen : "");
+    xaml::ScalarTransition fade;
+    fade.Duration(kFieldFade);
+    custom.OpacityTransition(fade);
+    auto showCustom = [custom](bool shown) {
+        custom.Opacity(shown ? 1.0 : 0.0);
+        custom.IsEnabled(shown);  // out of the Tab order while hidden, and out of screen readers' tree
+        automation::AutomationProperties::SetAccessibilityView(
+            custom, shown ? automation::Peers::AccessibilityView::Content : automation::Peers::AccessibilityView::Raw);
+    };
+    showCustom(selected == customIndex);
+
+    controls::StackPanel swatches;
+    swatches.Orientation(controls::Orientation::Horizontal);
+    swatches.Spacing(4);
+    Name(swatches, "AMPIFY_AccentChoice", i18n::Text("accent.title"));
+    // The ring for the eyes, the item status for screen readers. The swatches are found through their row when it is
+    // marked, so no swatch holds the others (a cycle would keep every page built so far).
+    auto mark = [](const controls::Panel& row, std::size_t chosenIndex) {
+        for (std::uint32_t other = 0; other < row.Children().Size(); other++) {
+            auto button = row.Children().GetAt(other).as<controls::Button>();
+            bool chosen = other == chosenIndex;
+            motion::FadeTo(button.Content().as<controls::Grid>().Children().GetAt(0), chosen ? 1.0 : 0.0, kRingFade);
+            automation::AutomationProperties::SetItemStatus(button, chosen ? Wide(i18n::Text("accent.chosen")) : winrt::hstring{});
+        }
+    };
     UiService::Shared* owner = &shared;
-    combo.SelectionChanged([owner, values, customIndex, custom](IInspectable const& sender,
-                                                                controls::SelectionChangedEventArgs const&) noexcept {
+    // A new accent makes the window read its theme resources again, which holds the interface thread for most of a
+    // second: written at the click, the ring's fade waited behind it and jumped in a frame. The ring moves first, and
+    // the accent is written once it has (the last click wins).
+    dispatching::DispatcherQueueTimer commit = dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
+    commit.Interval(kRingFade + kRingSettle);
+    commit.IsRepeating(false);
+    auto pending = std::make_shared<std::string>();
+    commit.Tick([owner, pending](auto const&, auto const&) noexcept {
         try {
-            int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
-            if (index < 0 || index > customIndex) return;
-            bool typed = index == customIndex;
-            custom.Visibility(typed ? xaml::Visibility::Visible : xaml::Visibility::Collapsed);
-            if (typed) {
-                custom.Focus(xaml::FocusState::Programmatic);
-            } else if ((*values)[index] != uirender::ChosenAccent(owner->kit)) {
-                CommitAccent(*owner, (*values)[index]);
-            }
+            if (*pending != uirender::ChosenAccent(owner->kit)) CommitAccent(*owner, *pending);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
+    for (std::size_t index = 0; index <= customIndex; index++) {
+        bool isCustom = index == customIndex;
+        std::string value = isCustom ? std::string() : choices[index].first;
+        std::string name = isCustom ? i18n::Text("accent.custom") : choices[index].second;
+        winrt::Microsoft::UI::Xaml::Shapes::Ellipse ring;
+        controls::Button swatch = Swatch(value, isCustom, name, ring);
+        swatch.Click([mark, index, isCustom, value, custom, showCustom, commit, pending](
+                         IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+            try {
+                if (auto row = sender.as<controls::Button>().Parent().try_as<controls::Panel>()) mark(row, index);
+                showCustom(isCustom);
+                commit.Stop();
+                if (isCustom) {
+                    custom.Focus(xaml::FocusState::Programmatic);
+                } else {
+                    *pending = value;
+                    commit.Start();
+                }
+            } catch (...) {
+                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
+            }
+        });
+        swatches.Children().Append(swatch);
+    }
+    mark(swatches, selected);
     controls::StackPanel control;
     control.Orientation(controls::Orientation::Horizontal);
     control.Spacing(8);
     control.Children().Append(custom);
-    control.Children().Append(combo);
+    control.Children().Append(swatches);
     return LabelledRow(shared, i18n::Text("accent.title"), i18n::Text("accent.help"), control);
 }
 
@@ -169,7 +299,7 @@ xaml::FrameworkElement TweakRow(UiService::Shared& shared, const uirender::Tweak
     UiService::Shared* owner = &shared;
     controls::ComboBox combo;
     if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
-    combo.MinWidth(220);
+    combo.Width(kSettingControlWidth);
     auto values = std::make_shared<std::vector<std::string>>();
     for (const auto& [value, textKey] : choice.options) {
         values->push_back(value);
@@ -190,16 +320,16 @@ xaml::FrameworkElement TweakRow(UiService::Shared& shared, const uirender::Tweak
                 owner->journal.Write("Settings: could not change " + key + ": " + error);
             }
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     return LabelledRow(shared, i18n::Text(choice.labelKey), i18n::Text(choice.helpKey), combo);
 }
 
-// The theme in use, chosen from the installed ones, then its settings. A choice is written to settings.txt, which the
-// theme service watches: the theme changes at once, and its settings replace the last one's.
-xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
-    controls::StackPanel section;
-    section.Spacing(10);
+// The theme in use, chosen from the installed ones. A choice is written to settings.txt, which the theme service
+// watches: the theme changes at once, and its settings replace the last one's in `folds`.
+xaml::FrameworkElement ThemeChoice(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& nav,
+                                   const std::shared_ptr<ThemeFolds>& folds) {
     std::vector<uirender::ModEntry> themes = uirender::ListThemes(shared.kit);
     std::string active = uirender::ActiveThemeId(shared.kit);
     {
@@ -208,7 +338,7 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
     }
     controls::ComboBox combo;
     if (shared.probe.comboBox) combo.Style(shared.probe.comboBox);
-    combo.MinWidth(220);
+    combo.Width(kSettingControlWidth);
     Name(combo, "AMPIFY_ThemeChoice", i18n::Text("mods.theme"));
     auto ids = std::make_shared<std::vector<std::string>>(1, "");  // "" is the choice "None"
     combo.Items().Append(winrt::box_value(Wide(i18n::Text("mods.themeNone"))));
@@ -218,19 +348,10 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
     }
     auto chosen = std::find(ids->begin(), ids->end(), active);
     combo.SelectedIndex(chosen == ids->end() ? 0 : static_cast<int32_t>(chosen - ids->begin()));
-    section.Children().Append(LabelledRow(shared, i18n::Text("mods.theme"), i18n::Text("mods.themeHelp"), combo));
-    section.Children().Append(AccentChoice(shared));
-    // Like the accent, the glass level holds for every theme and snippet, and the engine follows it within a tick.
-    section.Children().Append(TweakRow(shared, uirender::GlassChoice(shared.kit)));
-
-    controls::StackPanel settingsHost;
-    settingsHost.Spacing(10);
-    FillThemeSettings(shared, settingsHost);
-    section.Children().Append(settingsHost);
-
     UiService::Shared* owner = &shared;
-    combo.SelectionChanged([owner, ids, settingsHost](IInspectable const& sender,
-                                                      controls::SelectionChangedEventArgs const&) noexcept {
+    std::weak_ptr<SettingsNav> weak = nav;
+    combo.SelectionChanged([owner, ids, weak, folds](IInspectable const& sender,
+                                                     controls::SelectionChangedEventArgs const&) noexcept {
         try {
             int32_t index = sender.as<controls::ComboBox>().SelectedIndex();
             if (index < 0 || index >= static_cast<int32_t>(ids->size())) return;
@@ -247,28 +368,30 @@ xaml::FrameworkElement ThemeChoice(UiService::Shared& shared) {
             }
             owner->journal.Write("Settings: theme \"" + (id.empty() ? std::string("none") : id) +
                                  "\" chosen from the Ampify page");
-            FillThemeSettings(*owner, settingsHost);
+            FillThemeFolds(*owner, weak.lock(), *folds);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
-    return section;
+    return LabelledRow(shared, i18n::Text("mods.theme"), i18n::Text("mods.themeHelp"), combo);
 }
 
-// Adds a row to the rows of a section's card, under a line when it is not the first.
-void AddRow(const controls::StackPanel& rows, const xaml::UIElement& row) {
-    if (rows.Children().Size() > 0) rows.Children().Append(MakeDivider());
-    rows.Children().Append(row);
+settings_panel::SettingText TextOf(const std::string& labelKey, const std::string& helpKey) {
+    return {i18n::Text(labelKey), helpKey.empty() ? std::string() : i18n::Text(helpKey)};
 }
 
-// One choice of the card as a menu row, written to settings.txt when it changes (uirender::SetAppleTweak).
-void AddTweakRow(UiService::Shared& shared, const controls::StackPanel& rows, const uirender::TweakChoice& choice) {
-    AddRow(rows, TweakRow(shared, choice));
+void AddTweakRow(UiService::Shared& shared, SettingsNav& nav, const controls::StackPanel& rows,
+                 const uirender::TweakChoice& choice) {
+    AddSettingsRow(nav, rows, TweakRow(shared, choice), TextOf(choice.labelKey, choice.helpKey));
 }
 
-// What Ampify changes in Apple Music's own behaviour (uirender::AppleTweakChoices): one choice per row. The kernel
-// reads settings.txt again within a second (UiService::Run), so a choice applies at once.
-void AddAppleTweakRows(UiService::Shared& shared, const controls::StackPanel& rows) {
-    for (const uirender::TweakChoice& choice : uirender::AppleTweakChoices(shared.kit)) AddTweakRow(shared, rows, choice);
+// What Ampify changes in one part of Apple Music's own behaviour (uirender::AppleTweakChoices): one choice per row.
+// The kernel reads settings.txt again within a second (UiService::Run), so a choice applies at once.
+void AddAppleTweakRows(UiService::Shared& shared, SettingsNav& nav, const controls::StackPanel& rows,
+                       uirender::TweakGroup group) {
+    for (const uirender::TweakChoice& choice : uirender::AppleTweakChoices(shared.kit, group)) {
+        AddTweakRow(shared, nav, rows, choice);
+    }
 }
 
 // A zip of the state and the logs with names, folders and music taken out (`ampify report`), opened in Explorer once
@@ -294,10 +417,12 @@ xaml::FrameworkElement ReportRow(UiService::Shared& shared) {
                         held->IsEnabled(true);
                         held->Content(winrt::box_value(Wide(i18n::Text(code == 0 ? "mods.report.done" : "mods.report.failed"))));
                     } catch (...) {
+                        // A handler runs inside Apple Music's XAML frame: nothing may escape it.
                     }
                 });
             });
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     return LabelledRow(shared, i18n::Text("mods.report"), i18n::Text("mods.reportHelp"), report);
@@ -316,54 +441,48 @@ controls::Button MakeButton(UiService::Shared& shared, const std::string& textKe
     return button;
 }
 
-// A section of the Ampify page, as Apple groups its own settings: a heading, a line on what it holds, then one card
-// whose rows are split by lines.
-controls::StackPanel Section(UiService::Shared& shared, const std::string& name, const std::string& titleKey,
-                             const std::string& subtitleKey, const controls::StackPanel& rows) {
-    controls::StackPanel section;
-    section.Spacing(4);
-    const std::string title = i18n::Text(titleKey);
-    Name(section, "AMPIFY_Settings_" + name, title);
-    controls::TextBlock heading = MakeText(Wide(title).c_str(), "subtitle", false, nullptr);
-    automation::AutomationProperties::SetHeadingLevel(heading, automation::Peers::AutomationHeadingLevel::Level2);
-    section.Children().Append(heading);
-    if (!subtitleKey.empty()) {
-        section.Children().Append(MakeText(Wide(i18n::Text(subtitleKey)).c_str(), "caption", true, &shared.probe));
-    }
-    controls::Border card = MakeCardBorder(shared.probe);
-    card.Margin(xaml::Thickness{0, 8, 0, 0});
-    rows.Spacing(12);
-    card.Child(rows);
-    section.Children().Append(card);
-    return section;
-}
-
-// One row per installed extension, its settings under it.
-controls::StackPanel ExtensionRows(UiService::Shared& shared) {
-    controls::StackPanel rows;
+// One row per installed extension, its settings folded under it.
+void AddExtensionRows(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& nav, const controls::StackPanel& rows) {
     std::vector<uirender::ModEntry> mods = uirender::ListMods(shared.kit);
-    if (mods.empty()) rows.Children().Append(MakeText(Wide(i18n::Text("mods.none")).c_str(), "caption", true, &shared.probe));
+    if (mods.empty()) {
+        AddSettingsRow(*nav, rows, MakeText(Wide(i18n::Text("mods.none")).c_str(), "caption", true, &shared.probe),
+                       TextOf("mods.none", ""));
+    }
     for (const uirender::ModEntry& mod : mods) {
         controls::StackPanel item;
-        item.Spacing(10);
+        item.Spacing(4);
         item.Children().Append(ModRow(shared, mod));
-        if (!mod.settings.empty()) item.Children().Append(ModSettings(shared, mod));
-        AddRow(rows, item);
+        std::size_t row = AddSettingsRow(*nav, rows, item,
+                                         {mod.NameIn(i18n::Language()), mod.DescriptionIn(i18n::Language())});
+        if (!mod.settings.empty()) item.Children().Append(AddSettingsFold(shared, nav, row, mod, false));
     }
-    return rows;
 }
 
 // The Atmos leveler is built into the kernel, so no manifest brings its row: it is written here, in words a beginner
 // reads, and switched like an extension (uirender::SwitchMod).
-controls::StackPanel SoundRows(UiService::Shared& shared) {
+void AddSoundRows(UiService::Shared& shared, SettingsNav& nav, const controls::StackPanel& rows) {
     uirender::ModEntry leveler;
     leveler.id = kAtmosLeveler;
     leveler.name = i18n::Text("sound.leveler");
     leveler.description = i18n::Text("sound.levelerHelp");
     leveler.enabled = uirender::IsModOn(shared.kit, kAtmosLeveler);
-    controls::StackPanel rows;
-    AddRow(rows, ModRow(shared, leveler));
-    return rows;
+    AddSettingsRow(nav, rows, ModRow(shared, leveler), {leveler.name, leveler.description});
+}
+
+// The look: theme, accent and glass, then the folded settings of the theme and the snippets switched on.
+void AddLookPane(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& nav) {
+    AddSettingsPane(shared, *nav, "mods.look");
+    controls::StackPanel rows = AddSettingsGroup(shared, *nav, "Look", "", "");
+    auto folds = std::make_shared<ThemeFolds>();
+    folds->host = controls::StackPanel();
+    folds->host.Spacing(4);
+    AddSettingsRow(*nav, rows, ThemeChoice(shared, nav, folds), TextOf("mods.theme", "mods.themeHelp"));
+    AddSettingsRow(*nav, rows, AccentChoice(shared), TextOf("accent.title", "accent.help"));
+    // Like the accent, the glass level holds for every theme and snippet, and the engine follows it within a tick.
+    AddTweakRow(shared, *nav, rows, uirender::GlassChoice(shared.kit));
+    controls::StackPanel elements = AddSettingsGroup(shared, *nav, "Elements", "section.elementSettings", "");
+    folds->row = AddSettingsRow(*nav, elements, folds->host, {});
+    FillThemeFolds(shared, nav, *folds);
 }
 
 xaml::FrameworkElement FolderRow(UiService::Shared& shared) {
@@ -373,6 +492,7 @@ xaml::FrameworkElement FolderRow(UiService::Shared& shared) {
         try {
             OpenKitFolder(kit);
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     return LabelledRow(shared, i18n::Text("mods.folder"), i18n::Text("mods.folderHelp"), open);
@@ -384,7 +504,7 @@ xaml::FrameworkElement FolderRow(UiService::Shared& shared) {
 controls::StackPanel BuildAmpifyPage(UiService::Shared& shared) {
     shared.settingsCards.clear();  // the page shown until now is replaced, its cards with it
     controls::StackPanel page;
-    page.Spacing(28);
+    page.Spacing(20);
     page.MaxWidth(kAmpifyPageWidth);
     page.HorizontalAlignment(xaml::HorizontalAlignment::Left);
     page.Padding(xaml::Thickness{0, 0, 0, 24});
@@ -404,31 +524,45 @@ controls::StackPanel BuildAmpifyPage(UiService::Shared& shared) {
     controls::Button market = MakeButton(shared, "mods.openMarketplace", "AMPIFY_ModsOpenMarketplace", true);
     UiModel* model = &shared.model;
     Journal* journal = &shared.journal;
-    market.Click([model, journal](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
+    const UiEventSink* sink = &shared.sink;
+    market.Click([model, journal, sink](IInspectable const&, xaml::RoutedEventArgs const&) noexcept {
         try {
             model->Navigate("marketplace", "/marketplace");
+            // As the sidebar's entry does (Ampify.ui.navigate): the page mounts anew and reads the kit again, or it
+            // opened empty after this page.
+            if (*sink) (*sink)(UiEvent{"marketplace", 0, false, "/marketplace", dispatch::kPageShow});
             journal->Write("Settings: Marketplace opened from the Ampify page");
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     controls::Grid::SetColumn(market, 1);
     intro.Children().Append(market);
     page.Children().Append(intro);
 
-    page.Children().Append(Section(shared, "Extensions", "mods.extensions", "mods.extensionsHelp", ExtensionRows(shared)));
-    page.Children().Append(Section(shared, "Sound", "sound.title", "", SoundRows(shared)));
-    controls::StackPanel lookRows;
-    lookRows.Children().Append(ThemeChoice(shared));
-    page.Children().Append(Section(shared, "Look", "mods.look", "", lookRows));
-    controls::StackPanel appleRows;
-    AddAppleTweakRows(shared, appleRows);
-    page.Children().Append(Section(shared, "AppleMusic", "tweaks.title", "tweaks.subtitle", appleRows));
-    controls::StackPanel helpRows;
-    AddTweakRow(shared, helpRows, uirender::KitUpdateChoice(shared.kit));
-    AddTweakRow(shared, helpRows, uirender::EntryChoice(shared.kit));
-    AddRow(helpRows, FolderRow(shared));
-    AddRow(helpRows, ReportRow(shared));
-    page.Children().Append(Section(shared, "Help", "mods.help", "", helpRows));
+    // One tab per subject, what people change most first: the look, the window, the player, the sound and the
+    // extensions, then what works in the background and Ampify's own upkeep. The search looks through all of them.
+    auto nav = std::make_shared<SettingsNav>();
+    shared.settingsNav = nav;
+    AddLookPane(shared, nav);
+    AddSettingsPane(shared, *nav, "section.window");
+    AddAppleTweakRows(shared, *nav, AddSettingsGroup(shared, *nav, "Window", "", ""), uirender::TweakGroup::Window);
+    AddSettingsPane(shared, *nav, "section.playerTab");
+    AddAppleTweakRows(shared, *nav, AddSettingsGroup(shared, *nav, "Player", "", ""), uirender::TweakGroup::Player);
+    AddSettingsPane(shared, *nav, "section.soundExtensions");
+    AddSoundRows(shared, *nav, AddSettingsGroup(shared, *nav, "Sound", "sound.title", ""));
+    AddExtensionRows(shared, nav, AddSettingsGroup(shared, *nav, "Extensions", "mods.extensions", "mods.extensionsHelp"));
+    AddSettingsPane(shared, *nav, "section.advanced");
+    AddAppleTweakRows(shared, *nav,
+                      AddSettingsGroup(shared, *nav, "Reliability", "section.reliability", "section.reliabilityHelp"),
+                      uirender::TweakGroup::Reliability);
+    controls::StackPanel helpRows = AddSettingsGroup(shared, *nav, "Help", "mods.help", "");
+    AddTweakRow(shared, *nav, helpRows, uirender::KitUpdateChoice(shared.kit));
+    AddSettingsRow(*nav, helpRows, FolderRow(shared), TextOf("mods.folder", "mods.folderHelp"));
+    AddSettingsRow(*nav, helpRows, ReportRow(shared), TextOf("mods.report", "mods.reportHelp"));
+
+    page.Children().Append(SettingsNavBar(shared, nav));
+    page.Children().Append(SettingsPanes(shared, nav));
     return page;
 }
 
@@ -462,6 +596,7 @@ void WatchSettingsPage(UiService::Shared& shared, const std::shared_ptr<WindowCo
             try {
                 current.LayoutUpdated(context->settingsLayout);
             } catch (...) {
+                // The old page is gone: its handler went with it.
             }
         }
         context->settingsPage = page ? winrt::make_weak(page) : winrt::weak_ref<xaml::FrameworkElement>{};
@@ -479,6 +614,7 @@ void WatchSettingsPage(UiService::Shared& shared, const std::shared_ptr<WindowCo
                         Wake(weakShared, weakContext, revision, false);
                     }
                 } catch (...) {
+                    // A handler runs inside Apple Music's XAML frame: nothing may escape it.
                 }
             });
             context->ticket.ArmLayout(NowMs());
@@ -496,8 +632,6 @@ void WatchSettingsPage(UiService::Shared& shared, const std::shared_ptr<WindowCo
 
 namespace {
 
-// ---- The Ampify row at the top of Settings -----------------------------------------------------------------------
-
 // Ampify's logo, the puzzle piece of the sidebar entry (apps/marketplace/main.js).
 constexpr char kAmpifyIcon[] =
     "<svg viewBox=\"0 0 64 64\"><path d=\"M12.3 13L19 13C21.5 13 22.25 11.25 20.75 9.25C17.75 5 20.5 .75 26 .75"
@@ -505,7 +639,7 @@ constexpr char kAmpifyIcon[] =
     " 54.75 32.75C59 29.75 63.25 32.5 63.25 38C63.25 43.5 59 46.25 54.75 43.25C52.75 41.75 51 42.5 51 45L51 51.7"
     "A11.3 11.3 0 0 1 39.7 63L12.3 63A11.3 11.3 0 0 1 1 51.7L1 24.3A11.3 11.3 0 0 1 12.3 13Z\"/></svg>";
 
-// The index of the TextBlock named `name` (the title of one of Apple's rows, such as "PlaybackNavigationViewItem").
+// The index of the node named `name` (the title of one of Apple's rows, such as "PlaybackNavigationViewItem").
 std::optional<int> FindNamed(const std::vector<ProbeNode>& nodes, std::string_view name) {
     for (std::size_t index = 0; index < nodes.size(); index++) {
         if (nodes[index].name == name) return static_cast<int>(index);
@@ -586,6 +720,7 @@ controls::Button BuildSettingsEntry(UiService::Shared& shared, const controls::B
             model->Navigate(kAmpifyPageOwner, kAmpifyPagePath);
             journal->Write("Settings: Ampify page opened from the Ampify row");
         } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
     return entry;

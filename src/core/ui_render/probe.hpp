@@ -77,7 +77,6 @@ std::string QuotedMenuName(const std::vector<std::string>& texts);
 // AMExclusive's elements). On a tie the outermost wins, as in AMExclusive. Nothing when the page has no toggle.
 std::optional<int> ChooseSettingsAnchor(const std::vector<ProbeNode>& nodes, int page);
 
-// The direct children of `parent`, in order.
 std::vector<int> ChildrenOf(const std::vector<ProbeNode>& nodes, int parent);
 
 // The row that serves as model for a new card: the last direct child of `anchor` that is not an Ampify or AMExclusive

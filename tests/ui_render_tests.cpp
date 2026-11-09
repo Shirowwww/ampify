@@ -1,6 +1,5 @@
-// The portable half of the native renderer: render trees, reconciliation, node names, surfaces, anchors in a fake
-// XAML tree, the bounded walk, the refresh ticket and the Mods card files. The Windows half (src/win/ui_renderer.cpp,
-// src/win/ui_service.cpp) follows these decisions; it is only compiled by the MSVC job with the WinUI projection.
+// The portable half of the native renderer. The Windows half (src/win/ui_renderer.cpp, src/win/ui_service.cpp)
+// follows these decisions and is only compiled by the MSVC job with the WinUI projection.
 
 #include <algorithm>
 #include <filesystem>
@@ -936,23 +935,23 @@ TEST_CASE(UiRender_TheCardListsTheValuesOfEveryKeyItKnows) {
         CHECK(!IsAppleTweakValue(key, "not-a-value"));
     }
     CHECK(AppleTweakValues("apple.topbar") == "off, search");
-    CHECK(AppleTweakValues("apple.watchdog") == "off, on");
-    CHECK(AppleTweakValues("apple.orphanAgent") == "off, on");
+    CHECK(AppleTweakValues("apple.watchdog") == "on, off");
+    CHECK(AppleTweakValues("apple.orphanAgent") == "on, off");
     CHECK(AppleTweakValues("theme.glass") == "full, balanced, eco");
     CHECK(AppleTweakValues("ampify.entry") == "sidebar, header");
     CHECK(AppleTweakValues("theme.active").empty());  // not a key of the card
 }
 
-TEST_CASE(UiRender_FreezeLogAndOrphanAgentAreOffUntilChosen) {
+TEST_CASE(UiRender_FreezeLogAndOrphanAgentAreOnUntilTurnedOff) {
     Settings settings;
-    CHECK(!ReadAppleTweaks(settings).freezeLog);
-    CHECK(ampify::ChoiceOf(settings, "apple.orphanAgent") == "off");
-    settings.Set("apple.watchdog", "on");
-    settings.Set("apple.orphanAgent", "On");
     CHECK(ReadAppleTweaks(settings).freezeLog);
     CHECK(ampify::ChoiceOf(settings, "apple.orphanAgent") == "on");
-    settings.Set("apple.watchdog", "maybe");
+    settings.Set("apple.watchdog", "off");
+    settings.Set("apple.orphanAgent", "Off");
     CHECK(!ReadAppleTweaks(settings).freezeLog);
+    CHECK(ampify::ChoiceOf(settings, "apple.orphanAgent") == "off");
+    settings.Set("apple.watchdog", "maybe");
+    CHECK(ReadAppleTweaks(settings).freezeLog);
 }
 
 TEST_CASE(UiRender_ResolvedAddressesListIpv4FirstOnlyWhenSomethingMoves) {
@@ -1006,25 +1005,44 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "apple.notifications", "loud", error));
     CHECK(!SetAppleTweak(kit, "theme.active", "screen", error));
 
-    // The player, its cover, the long texts, the sidebar and the top bar first, then the close button; the
-    // notifications, where "never" (Apple's own switch does it) only shows for someone who chose it before; the network
-    // fixes, then the stuck library agent and the freeze log, last.
-    std::vector<TweakChoice> choices = AppleTweakChoices(kit);
-    std::vector<std::string> keys;
-    for (const TweakChoice& choice : choices) keys.push_back(choice.key);
-    CHECK((keys == std::vector<std::string>{"apple.fullscreen", "apple.playerControls", "apple.artwork",
-                                            "apple.marquee", "apple.sidebar", "apple.topbar", "apple.close",
-                                            "apple.notifications", "apple.network", "apple.proxy",
-                                            "apple.orphanAgent", "apple.watchdog"}));
+    // Three sections: the window (sidebar, top bar, Ampify's entry, long texts, closing, then the notifications, where
+    // "never" only shows for someone who chose it before: Apple's own switch does it), the full-screen player, and the
+    // network and reliability fixes.
+    auto keysOf = [&kit](TweakGroup group) {
+        std::vector<std::string> keys;
+        for (const TweakChoice& choice : AppleTweakChoices(kit, group)) keys.push_back(choice.key);
+        return keys;
+    };
+    CHECK((keysOf(TweakGroup::Window) == std::vector<std::string>{"apple.sidebar", "apple.playbar", "apple.topbar",
+                                                                  "ampify.entry",
+                                                                  "apple.marquee", "apple.close",
+                                                                  "apple.notifications"}));
+    CHECK((keysOf(TweakGroup::Player) ==
+           std::vector<std::string>{"apple.fullscreen", "apple.playerControls", "apple.lyricsBefore",
+                                    "apple.lyricsAfter", "apple.artwork"}));
+    CHECK((keysOf(TweakGroup::Reliability) ==
+           std::vector<std::string>{"apple.network", "apple.proxy", "apple.orphanAgent", "apple.watchdog"}));
+    auto allChoices = [&kit] {
+        std::vector<TweakChoice> all;
+        for (TweakGroup group : {TweakGroup::Window, TweakGroup::Player, TweakGroup::Reliability}) {
+            std::vector<TweakChoice> part = AppleTweakChoices(kit, group);
+            all.insert(all.end(), part.begin(), part.end());
+        }
+        return all;
+    };
+    std::vector<TweakChoice> choices = allChoices();
     auto card = [&choices](const std::string& key) {
         auto found = std::find_if(choices.begin(), choices.end(), [&](const TweakChoice& c) { return c.key == key; });
         return found == choices.end() ? TweakChoice{} : *found;
     };
     CHECK(card("apple.proxy").value == "system" && card("apple.proxy").options.size() == 2);  // off by default
-    CHECK(card("apple.orphanAgent").value == "off");
-    CHECK(card("apple.watchdog").value == "off" && card("apple.watchdog").options.size() == 2);
+    CHECK(card("apple.orphanAgent").value == "on");
+    CHECK(card("apple.watchdog").value == "on" && card("apple.watchdog").options.size() == 2);
     CHECK(card("apple.fullscreen").value == "screen" && card("apple.fullscreen").options.size() == 4);
     CHECK(card("apple.playerControls").value == "shown");
+    // Every lyrics line by default, as Apple shows them, or 0 to 5 of them on each side of the sung one.
+    CHECK(card("apple.lyricsBefore").value == "all" && card("apple.lyricsBefore").options.size() == 7);
+    CHECK(card("apple.lyricsAfter").value == "all" && card("apple.lyricsAfter").options.size() == 7);
     CHECK(card("apple.artwork").value == "sharp");
     CHECK(card("apple.marquee").value == "hover");
     CHECK(card("apple.sidebar").value == "open");
@@ -1042,7 +1060,16 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "apple.sidebar", "hidden", error));
     CHECK(SetAppleTweak(kit, "apple.topbar", "search", error));
     CHECK(!SetAppleTweak(kit, "apple.topbar", "always", error));
-    choices = AppleTweakChoices(kit);
+    CHECK(SetAppleTweak(kit, "apple.lyricsBefore", "1", error));
+    CHECK(SetAppleTweak(kit, "apple.lyricsAfter", "2", error));
+    CHECK(!SetAppleTweak(kit, "apple.lyricsAfter", "6", error));
+    choices = allChoices();
+    {
+        ampify::Settings saved;
+        saved.Load((kit / "settings.txt").string());
+        ampify::uirender::AppleTweaks read = ampify::uirender::ReadAppleTweaks(saved);
+        CHECK(read.lyricsBefore == 1 && read.lyricsAfter == 2);
+    }
     CHECK(card("apple.notifications").options.size() == 2 && card("apple.notifications").value == "background");
     CHECK(card("apple.network").value == "system");
     CHECK(card("apple.artwork").value == "apple" && card("apple.marquee").value == "off");
@@ -1091,6 +1118,11 @@ TEST_CASE(UiRender_ColorsAndBackgroundsKeepTheAlphaFirst) {
     CHECK(!ParseBackground("acrylic(#101010, 1.5)"));
     CHECK(!ParseBackground("acrylic(red)"));
     CHECK(!ParseBackground("blur"));
+
+    std::optional<Background> gradient = ParseBackground("linear-gradient(#FF402020, #B3100808)");
+    CHECK(gradient && gradient->gradient && !gradient->acrylic && gradient->color.r == 0x40 && gradient->end.a == 0xB3);
+    CHECK(!ParseBackground("linear-gradient(#FF402020)"));
+    CHECK(!ParseBackground("linear-gradient(#FF402020, red)"));
 }
 
 TEST_CASE(UiRender_PaddingReadsTopRightBottomLeft) {
