@@ -108,6 +108,10 @@
     corner-radius: 2px;
 }
 
+.menu-item {
+    transition: background 120ms;
+}
+
 .menu-item:hover {
     background: $CardBackgroundFillColorDefaultBrush;
 }
@@ -151,6 +155,7 @@
     border-width: 0 0 1 0;
     border-color: var(--line);
     corner-radius: 0;
+    transition: background 120ms;
 }
 
 .track-row:hover {

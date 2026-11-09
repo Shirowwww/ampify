@@ -22,7 +22,12 @@
 }
 
 @import "ampify:floating-panels";
-@import "ampify:bottom-bar";
+
+/* The rack unit stands along the bottom unless Ampify's playback bar setting puts it at the top. Centred keeps the
+   rack's own layout: the display already takes the middle of the bar. */
+@setting bar-position != Top {
+    @import "ampify:bottom-bar";
+}
 
 /* ---- Panels ------------------------------------------------------------------------------------------------------- */
 
@@ -60,12 +65,17 @@
     border-width: 1;
     border-color: var(--spice-edge-light);
     corner-radius: var(--panel-radius);
-    margin: 0 var(--gap) var(--gap) var(--bar-reach);
 }
 
-@media (max-width: 1324px) {
+@setting bar-position != Top {
     .playbar {
-        margin: 0 var(--gap) var(--gap) var(--bar-reach-folded);
+        margin: 0 var(--gap) var(--gap) var(--bar-reach);
+    }
+
+    @media (max-width: 1324px) {
+        .playbar {
+            margin: 0 var(--gap) var(--gap) var(--bar-reach-folded);
+        }
     }
 }
 
@@ -77,6 +87,13 @@
 
 .transport {
     margin: 0 0 0 calc(var(--gap) * 2);
+}
+
+/* Centred, the keys stand on the progress line (centre-bar's room under them). */
+@setting bar-position = Centred {
+    .transport {
+        margin: 0 0 var(--transport-lift, 6) calc(var(--gap) * 2);
+    }
 }
 
 /* The display: centred on the whole bar, wide, and dark like backlit glass. */
@@ -206,6 +223,7 @@
 
 .menu-item {
     corner-radius: var(--radius-small);
+    transition: background 120ms;
 }
 
 .menu-item:hover {

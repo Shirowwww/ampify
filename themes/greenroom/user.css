@@ -15,7 +15,7 @@
     --hover: #2A2A2A;
     --band-background: #181818;
     --bar-height: var(--setting-bar-height);
-    --bar-room: calc(var(--setting-bar-height) + var(--setting-gap));
+    --bar-room: calc(var(--setting-bar-height) + var(--setting-gap) * 2);
 }
 
 @import "ampify:floating-panels";
@@ -117,6 +117,10 @@
     background: #282828;
 }
 
+.menu-item {
+    transition: background 120ms;
+}
+
 .menu-item:hover {
     background: #3E3E3E;
 }
@@ -157,16 +161,6 @@
 
 .track-row:hover {
     background: var(--raised);
-}
-
-/* ---- Settings ----------------------------------------------------------------------------------------------------- */
-
-@setting hide-badges {
-    .explicit-badge,
-    .lossless-badge,
-    .digital-master-badge {
-        visibility: collapsed;
-    }
 }
 
 /* An album's or a playlist's Play: the theme's corners. Apple's pill read as an oval beside the round buttons. */

@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "mirror",
   "name": "Mirror",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Apple Music turned around: the sidebar on the right, the pages on the left, and the playback bar under them at the bottom left. Calm neutral greys, light text on dark, one sea-green accent. A setting puts the sidebar back on the left.",
@@ -13,8 +13,11 @@
     "pt": {"name": "Espelho", "description": "O Apple Music ao contrário: a barra lateral à direita, as páginas à esquerda e a barra de reprodução embaixo delas, no canto inferior esquerdo. Cinzas neutros e calmos, texto claro sobre fundo escuro, um único destaque verde-água. Um ajuste devolve a barra lateral à esquerda.", "settings": {"sidebar-side": "Lado da barra lateral", "panel-radius": "Cantos dos painéis", "gap": "Espaço ao redor dos painéis"}, "options": {"Right": "Direita", "Left": "Esquerda"}},
     "ru": {"name": "Зеркало", "description": "Apple Music наоборот: боковая панель справа, страницы слева, а панель воспроизведения под ними, внизу слева. Спокойные нейтральные серые тона, светлый текст на тёмном фоне, один акцент цвета морской волны. Настройка возвращает боковую панель влево.", "settings": {"sidebar-side": "Сторона боковой панели", "panel-radius": "Скругление панелей", "gap": "Отступы вокруг панелей"}, "options": {"Right": "Справа", "Left": "Слева"}},
     "ja": {"name": "ミラー", "description": "左右を入れ替えた Apple Music。サイドバーは右、ページは左、再生バーはその下の左下に。落ち着いたニュートラルなグレー、暗い背景に明るい文字、アクセントはシーグリーンひとつ。設定でサイドバーを左に戻せます。", "settings": {"sidebar-side": "サイドバーの位置", "panel-radius": "パネルの角丸", "gap": "パネルの周りの余白"}, "options": {"Right": "右", "Left": "左"}},
-    "zh": {"name": "镜像", "description": "左右翻转的 Apple Music:侧边栏在右,页面在左,播放栏在页面下方的左下角。沉静的中性灰,深色背景上的浅色文字,只有一种海绿色强调色。可在设置中把侧边栏放回左侧。", "settings": {"sidebar-side": "侧边栏位置", "panel-radius": "面板圆角", "gap": "面板周围的间距"}, "options": {"Right": "右侧", "Left": "左侧"}}
+    "zh": {"name": "镜像", "description": "左右翻转的 Apple Music:侧边栏在右,页面在左,播放栏在页面下方的左下角。沉静的中性灰,深色背景上的浅色文字,只有一种海绿色强调色。可在设置中把侧边栏放回左侧。", "settings": {"sidebar-side": "侧边栏位置", "panel-radius": "面板圆角", "gap": "面板周围的间距"}, "options": {"Right": "右侧", "Left": "左侧"}},
+    "it": {"name": "Specchio", "description": "Apple Music capovolto: la barra laterale a destra, le pagine a sinistra, e la barra di riproduzione sotto di esse, in basso a sinistra. Grigi neutri e calmi, testo chiaro su sfondo scuro, un solo accento verde mare. Un'impostazione rimette la barra laterale a sinistra.", "settings": {"sidebar-side": "Lato della barra laterale", "panel-radius": "Angoli dei pannelli", "gap": "Spazio attorno ai pannelli"}, "options": {"Right": "A destra", "Left": "A sinistra"}},
+    "ko": {"name": "거울", "description": "뒤집힌 Apple Music입니다. 사이드바는 오른쪽, 페이지는 왼쪽, 재생 바는 그 아래 왼쪽 하단에 있습니다. 차분한 중립 회색, 어두운 배경 위의 밝은 글자, 바다색 포인트 색 하나. 설정으로 사이드바를 다시 왼쪽에 둘 수 있습니다.", "settings": {"sidebar-side": "사이드바 위치", "panel-radius": "패널 모서리", "gap": "패널 사이 간격"}, "options": {"Right": "오른쪽", "Left": "왼쪽"}}
   },
+  "playbar": "bottom",
   "kitApi": "1.0",
   "colors": "colors.ini",
   "preview": "preview.jpg",

@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "glass",
   "name": "Glass",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Apple's Liquid Glass: the song's artwork fills the window, and the sidebar, the pages and a floating capsule for the playback bar are clear panes over it, tinted by the music, with a bright rim of light.",
@@ -15,16 +15,13 @@
         "panel-radius": "Arrondi des vitres",
         "frost": "Opacité du verre (0,2 à 0,9)",
         "hover-grow": "Boutons et cartes qui se soulèvent au survol",
-        "moving-artwork": "Pochette animée qui tourne en fond",
-        "bar-position": "Position de la barre de lecture",
-        "gap": "Espace autour des panneaux"
+        "moving-artwork": "Pochette animée en fond, comme en plein écran",
+        "gap": "Espace autour des panneaux",
+        "liquid": "Verre liquide : plus clair, couleurs plus vives"
       },
       "options": {
         "Artwork": "Pochette",
-        "Neutral": "Neutre",
-        "Bottom": "En bas",
-        "Centred": "En bas, centrée",
-        "Top": "En haut"
+        "Neutral": "Neutre"
       },
       "groups": {
         "Colours": "Couleurs",
@@ -44,16 +41,13 @@
         "panel-radius": "Ecken der Scheiben",
         "frost": "Deckkraft des Glases (0,2 bis 0,9)",
         "hover-grow": "Tasten und Karten heben sich beim Darüberfahren",
-        "moving-artwork": "Cover dreht sich langsam im Hintergrund",
-        "bar-position": "Position der Wiedergabeleiste",
-        "gap": "Abstand um die Panels"
+        "moving-artwork": "Bewegtes Cover im Hintergrund, wie im Vollbild",
+        "gap": "Abstand um die Panels",
+        "liquid": "Flüssiges Glas: klarer, kräftigere Farben"
       },
       "options": {
         "Artwork": "Cover",
-        "Neutral": "Neutral",
-        "Bottom": "Unten",
-        "Centred": "Unten, zentriert",
-        "Top": "Oben"
+        "Neutral": "Neutral"
       },
       "groups": {
         "Colours": "Farben",
@@ -73,16 +67,13 @@
         "panel-radius": "Esquinas de los cristales",
         "frost": "Opacidad del cristal (0,2 a 0,9)",
         "hover-grow": "Botones y tarjetas que se elevan al pasar el puntero",
-        "moving-artwork": "Portada animada que gira al fondo",
-        "bar-position": "Posición de la barra de reproducción",
-        "gap": "Espacio alrededor de los paneles"
+        "moving-artwork": "Portada animada al fondo, como en pantalla completa",
+        "gap": "Espacio alrededor de los paneles",
+        "liquid": "Cristal líquido: más claro, colores más vivos"
       },
       "options": {
         "Artwork": "Portada",
-        "Neutral": "Neutro",
-        "Bottom": "Abajo",
-        "Centred": "Abajo, centrada",
-        "Top": "Arriba"
+        "Neutral": "Neutro"
       },
       "groups": {
         "Colours": "Colores",
@@ -102,16 +93,13 @@
         "panel-radius": "Cantos dos vidros",
         "frost": "Opacidade do vidro (0,2 a 0,9)",
         "hover-grow": "Botões e cartões que se erguem ao passar o ponteiro",
-        "moving-artwork": "Capa animada girando ao fundo",
-        "bar-position": "Posição da barra de reprodução",
-        "gap": "Espaço ao redor dos painéis"
+        "moving-artwork": "Capa animada ao fundo, como em tela cheia",
+        "gap": "Espaço ao redor dos painéis",
+        "liquid": "Vidro líquido: mais claro, cores mais vivas"
       },
       "options": {
         "Artwork": "Capa",
-        "Neutral": "Neutro",
-        "Bottom": "Embaixo",
-        "Centred": "Embaixo, centralizada",
-        "Top": "No topo"
+        "Neutral": "Neutro"
       },
       "groups": {
         "Colours": "Cores",
@@ -131,16 +119,13 @@
         "panel-radius": "Скругление стёкол",
         "frost": "Непрозрачность стекла (от 0,2 до 0,9)",
         "hover-grow": "Кнопки и карточки приподнимаются при наведении",
-        "moving-artwork": "Обложка медленно вращается на фоне",
-        "bar-position": "Положение панели воспроизведения",
-        "gap": "Отступы вокруг панелей"
+        "moving-artwork": "Живая обложка на фоне, как в полноэкранном режиме",
+        "gap": "Отступы вокруг панелей",
+        "liquid": "Жидкое стекло: прозрачнее, цвета ярче"
       },
       "options": {
         "Artwork": "Обложка",
-        "Neutral": "Нейтральный",
-        "Bottom": "Внизу",
-        "Centred": "Снизу, по центру",
-        "Top": "Вверху"
+        "Neutral": "Нейтральный"
       },
       "groups": {
         "Colours": "Цвета",
@@ -160,16 +145,13 @@
         "panel-radius": "ガラスの角丸",
         "frost": "ガラスの不透明度（0.2〜0.9）",
         "hover-grow": "ポインターを合わせたボタンとカードが浮き上がる",
-        "moving-artwork": "背景でアートワークがゆっくり回る",
-        "bar-position": "再生バーの位置",
-        "gap": "パネルの周りの余白"
+        "moving-artwork": "フルスクリーンのように背景でアートワークが動く",
+        "gap": "パネルの周りの余白",
+        "liquid": "リキッドグラス：より透明で鮮やかな色"
       },
       "options": {
         "Artwork": "アートワーク",
-        "Neutral": "ニュートラル",
-        "Bottom": "下",
-        "Centred": "下、中央",
-        "Top": "上"
+        "Neutral": "ニュートラル"
       },
       "groups": {
         "Colours": "色",
@@ -189,16 +171,13 @@
         "panel-radius": "玻璃圆角",
         "frost": "玻璃不透明度（0.2 至 0.9）",
         "hover-grow": "鼠标悬停时按钮和卡片浮起",
-        "moving-artwork": "封面在背景中缓缓旋转",
-        "bar-position": "播放栏位置",
-        "gap": "面板周围的间距"
+        "moving-artwork": "像全屏播放器一样的动态封面背景",
+        "gap": "面板周围的间距",
+        "liquid": "液态玻璃：更通透，色彩更鲜艳"
       },
       "options": {
         "Artwork": "封面",
-        "Neutral": "中性",
-        "Bottom": "底部",
-        "Centred": "底部，居中",
-        "Top": "顶部"
+        "Neutral": "中性"
       },
       "groups": {
         "Colours": "颜色",
@@ -209,11 +188,62 @@
       "settingDescriptions": {
         "moving-artwork": "关闭后可减轻显卡负担。"
       }
+    },
+    "it": {
+      "name": "Vetro",
+      "description": "Il Liquid Glass di Apple: la copertina del brano riempie la finestra, e la barra laterale, le pagine e una capsula fluttuante per la riproduzione sono vetri chiari posati sopra, tinti dalla musica, con un bordo di luce.",
+      "settings": {
+        "tint": "Tinta del vetro",
+        "panel-radius": "Angoli dei vetri",
+        "frost": "Opacità del vetro (da 0,2 a 0,9)",
+        "hover-grow": "Pulsanti e schede che si sollevano al passaggio",
+        "moving-artwork": "Copertina animata sullo sfondo, come a schermo intero",
+        "gap": "Spazio attorno ai pannelli",
+        "liquid": "Vetro liquido: più chiaro, colori più vivi"
+      },
+      "options": {
+        "Artwork": "Copertina",
+        "Neutral": "Neutra"
+      },
+      "groups": {
+        "Colours": "Colori",
+        "Details": "Dettagli",
+        "Shapes": "Forme"
+      },
+      "settingDescriptions": {
+        "moving-artwork": "Se disattivata, chiede meno alla scheda grafica."
+      }
+    },
+    "ko": {
+      "name": "유리",
+      "description": "Apple의 Liquid Glass입니다. 곡의 커버가 창을 가득 채우고, 사이드바, 페이지, 재생용 떠 있는 캡슐이 그 위에 놓인 투명한 유리판이 되어 음악의 색으로 물들며 빛나는 테두리를 가집니다.",
+      "settings": {
+        "tint": "유리 색조",
+        "panel-radius": "유리판 모서리",
+        "frost": "유리 불투명도(0.2~0.9)",
+        "hover-grow": "포인터를 올리면 버튼과 카드가 떠오름",
+        "moving-artwork": "배경에서 움직이는 커버, 전체 화면처럼",
+        "gap": "패널 사이 간격",
+        "liquid": "리퀴드 글래스: 더 투명하고 색이 더 선명하게"
+      },
+      "options": {
+        "Artwork": "커버",
+        "Neutral": "중립"
+      },
+      "groups": {
+        "Colours": "색상",
+        "Details": "세부 사항",
+        "Shapes": "모양"
+      },
+      "settingDescriptions": {
+        "moving-artwork": "끄면 그래픽 카드 부담이 줄어듭니다."
+      }
     }
   },
   "kitApi": "1.0",
   "colors": "colors.ini",
   "defaultScheme": "Dark",
+  "playbar": "bottom",
   "tags": [
     "glass",
     "artwork",
@@ -261,23 +291,11 @@
     },
     {
       "key": "moving-artwork",
-      "label": "Artwork turning slowly in the background",
+      "label": "Moving artwork in the background, as in full screen",
       "type": "toggle",
       "default": true,
       "group": "Details",
       "description": "Off, it asks less of the graphics card."
-    },
-    {
-      "key": "bar-position",
-      "label": "Playback bar position",
-      "type": "choice",
-      "options": [
-        "Bottom",
-        "Top",
-        "Centred"
-      ],
-      "default": "Bottom",
-      "group": "Layout"
     },
     {
       "key": "gap",
@@ -287,6 +305,14 @@
       "max": 24,
       "default": 14,
       "group": "Shapes"
+    },
+    {
+      "key": "liquid",
+      "label": "Liquid glass: clearer, more vivid colours",
+      "type": "toggle",
+      "default": false,
+      "group": "Colours",
+      "description": "Asks a little more of the graphics card than acrylic."
     }
   ]
 }

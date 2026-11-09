@@ -24,9 +24,12 @@
     --glass-light: acrylic(var(--tint), var(--setting-veil));
     --panel-radius: var(--setting-panel-radius);
     --gap: var(--setting-gap);
-    /* The bar: 64 high, 10 from the top, then a gap of 10 before the pages. */
-    --content-top: calc(var(--setting-gap) + 74);
+    /* The bar at the top: 64 high, a gap from the window's top, then a gap before the pages, as every floating panel
+       (floating-panels' --content-top). A fixed 10 there kept "Space around the panels" off that one space. */
     --band-background: #0FFFFFFF;
+    /* Apple's veil over the bar's artwork under the pointer is opaque: the zoom below ran behind it, unseen. At half
+       strength the picture reads through it, its icon as white as ever. */
+    --artwork-veil: 0.55;
 }
 
 @import "ampify:floating-panels";
@@ -114,13 +117,18 @@
     corner-radius: 12px;
 }
 
-/* The artwork in the bar grows on hover. */
 .lcd-artwork-image {
-    transform-origin: center;
     corner-radius: 6px;
 }
 
-.lcd-artwork-image:hover {
+/* Under the pointer, the picture zooms in its own frame, smoothly: the display around the artwork cuts what passes
+   its edge, so the artwork cannot grow past its place in the bar. */
+.lcd-artwork-picture {
+    transform-origin: center;
+    transition: transform 160ms;
+}
+
+.lcd-artwork:hover .lcd-artwork-picture {
     transform: scale(1.1);
 }
 
@@ -129,6 +137,24 @@
 .volume-slider,
 .scrubber {
     color: var(--art-2, #FFFF5C8A);
+}
+
+/* The art-accent setting (Ember's Artwork accent, merged here): the toggles that are on, the Play button of an album
+   and the song playing take the artwork's vibrant colour too, like the progress line and the volume. */
+@setting art-accent {
+    .shuffle-button,
+    .repeat-button {
+        checked-color: var(--art-2, #FFFF5C8A);
+    }
+
+    .album-play-button > Grid#Root,
+    .album-play-button {
+        background: var(--art-2, #FFFF5C8A);
+    }
+
+    .list-item:playing TextBlock {
+        color: var(--art-2, #FFFF5C8A);
+    }
 }
 
 .app-name {

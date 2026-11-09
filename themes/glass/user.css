@@ -27,6 +27,14 @@
 
 @import "ampify:floating-panels";
 
+/* With the bar below, the strip under the window's buttons holds Ampify's search field (apple.topbar = search): a little
+   taller than the field and the buttons, so the field has room above it and the panes keep theirs below. */
+@setting bar-position != Top {
+    :root {
+        --caption-room: 48;
+    }
+}
+
 /* The bar-position setting: a capsule over the bottom of the window (the default), or at the top as Apple has it. */
 @setting bar-position = Bottom {
     @import "ampify:bottom-bar";
@@ -42,15 +50,13 @@
     background: artwork;
 }
 
-/* The moving-artwork setting: the artwork turns slowly behind the glass, enlarged so that its corners never show, as
-   behind Apple Music's full-screen player, and rests in pause. The panes blur it; Windows' animation effects off, it
-   stands still. */
+/* The moving-artwork setting: Apple Music's own full-screen background behind the glass, the song's artwork as a slow,
+   blurred, moving wash; the panes blur it further. An Ampify without content: immersion keeps the still artwork. */
 @setting moving-artwork {
     .window::before {
         content: artwork cover;
-        transform-origin: center;
+        content: immersion;
         opacity: 0.85;
-        animation: drift 90s linear infinite playing;
     }
 }
 
@@ -60,19 +66,23 @@
     backdrop: acrylic(#FF000000, 0.45);
 }
 
-@keyframes drift {
-    from {
-        transform: scale(1.9) rotate(0deg);
-    }
-
-    to {
-        transform: scale(1.9) rotate(360deg);
-    }
-}
-
 @setting tint = Neutral {
     :root {
         --glass: acrylic(#FF14161C, var(--setting-frost));
+    }
+}
+
+/* Liquid glass: a clearer pane than acrylic, what lies behind blurred less and its colours more vivid, with a sheen
+   along its top edge (Ampify's liquid-glass). It eases in when a pane appears. */
+@setting liquid {
+    :root {
+        --glass: liquid-glass(var(--art-3, #FF141822), var(--setting-frost));
+    }
+
+    @setting tint = Neutral {
+        :root {
+            --glass: liquid-glass(#FF14161C, var(--setting-frost));
+        }
     }
 }
 
@@ -103,6 +113,11 @@
     }
 }
 
+/* The pages stop just above the panel's rim: the tiles of the last row covered its bottom edge. */
+.content-frame {
+    margin: 0 0 3 0;
+}
+
 .search-header,
 .list-header {
     backdrop: var(--glass);
@@ -119,6 +134,7 @@
     corner-radius: 12;
     margin: 2 0;
     transform-origin: left center;
+    transition: transform 140ms;
 }
 
 @setting hover-grow {

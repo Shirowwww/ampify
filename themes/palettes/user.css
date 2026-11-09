@@ -15,7 +15,7 @@
     --radius-small: calc(var(--setting-panel-radius) * 0.5);
     --radius-play: calc(var(--setting-panel-radius) * 1.5);
     --bar-height: var(--setting-bar-height);
-    --bar-room: calc(var(--setting-bar-height) + var(--setting-gap));
+    --bar-room: calc(var(--setting-bar-height) + var(--setting-gap) * 2);
 }
 
 @import "ampify:floating-panels";
@@ -121,6 +121,7 @@
 
 .menu-item {
     corner-radius: var(--radius-small);
+    transition: background 120ms;
 }
 
 .menu-item:hover {
@@ -182,14 +183,6 @@
 .settings-card {
     background: $CardBackgroundFillColorDefaultBrush;
     corner-radius: var(--radius-box);
-}
-
-@setting hide-badges {
-    .explicit-badge,
-    .lossless-badge,
-    .digital-master-badge {
-        visibility: collapsed;
-    }
 }
 
 /* An album's or a playlist's Play: the theme's corners. Apple's pill read as an oval beside the round buttons. */

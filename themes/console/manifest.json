@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "console",
   "name": "Console",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Studio hardware: graphite panels with fine edges and square corners, the playback bar as a rack unit at the bottom, and a wide display in its middle with an equalizer that follows the music. Three accents, as schemes: amber, VU green and ice.",
@@ -13,12 +13,15 @@
     "pt": {"name": "Console", "description": "Equipamento de estúdio: painéis grafite com bordas finas e cantos retos, a barra de reprodução como um módulo de rack embaixo e, no meio dela, um visor largo com um equalizador que segue a música. Três destaques, como variantes: âmbar, verde VU e gelo.", "settings": {"equalizer": "Equalizador no visor"}},
     "ru": {"name": "Пульт", "description": "Студийная техника: графитовые панели с тонкой каймой и прямыми углами, панель воспроизведения внизу как рэковый блок, а в её центре широкий дисплей с эквалайзером, который следует за музыкой. Три акцента в виде вариантов: янтарь, зелёный VU и лёд.", "settings": {"equalizer": "Эквалайзер на дисплее"}},
     "ja": {"name": "コンソール", "description": "スタジオ機材の佇まい。細い縁と角ばった角のグラファイトのパネル、下部にラックユニットのような再生バー、その中央に音楽に合わせて動くイコライザー付きの横長ディスプレイ。アクセントはバリエーションで 3 種類:アンバー、VU グリーン、アイス。", "settings": {"equalizer": "ディスプレイにイコライザー"}},
-    "zh": {"name": "调音台", "description": "录音室设备风格:细边框、方角的石墨面板,底部像机架单元一样的播放栏,中间是一块宽显示屏,内有随音乐跳动的均衡器。三种强调色作为配色方案:琥珀、VU 绿和冰蓝。", "settings": {"equalizer": "显示屏中的均衡器"}}
+    "zh": {"name": "调音台", "description": "录音室设备风格:细边框、方角的石墨面板,底部像机架单元一样的播放栏,中间是一块宽显示屏,内有随音乐跳动的均衡器。三种强调色作为配色方案:琥珀、VU 绿和冰蓝。", "settings": {"equalizer": "显示屏中的均衡器"}},
+    "it": {"name": "Console", "description": "Hardware da studio: pannelli grafite con bordi sottili e angoli squadrati, la barra di riproduzione come unità rack in basso, e al centro un ampio display con un equalizzatore che segue la musica. Tre accenti, come varianti: ambra, verde VU e ghiaccio.", "settings": {"equalizer": "Equalizzatore nel display"}},
+    "ko": {"name": "콘솔", "description": "스튜디오 장비 스타일입니다. 가는 테두리와 각진 모서리의 그래파이트 패널, 하단에 랙 유닛 모양의 재생 바, 그 가운데에는 음악을 따라 움직이는 이퀄라이저가 있는 넓은 디스플레이가 있습니다. 호박색, VU 그린, 아이스의 세 가지 포인트 색이 변형으로 제공됩니다.", "settings": {"equalizer": "디스플레이의 이퀄라이저"}}
   },
   "kitApi": "1.0",
   "colors": "colors.ini",
   "preview": "preview.jpg",
   "defaultScheme": "Amber",
+  "playbar": "bottom",
   "tags": ["dark", "layout", "hardware", "equalizer", "bottom-bar"],
   "settings": [
     {"key": "equalizer", "label": "Equalizer in the display", "type": "toggle", "default": true}

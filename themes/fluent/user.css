@@ -1,9 +1,13 @@
-/* Fluent: Apple Music as a Windows 11 app. The window is Mica, the material of Windows' own Settings and Media Player,
-   faintly coloured by the desktop behind it; the sidebar stands on it, and the pages and the lyrics lie on one light
-   layer with Windows' corners and its hairline edge. Segoe UI Variable, Windows' accent blue, 4-pixel controls.
+/* Fluent: Apple Music as a Windows 11 music player. The window is Mica, faintly coloured by the desktop; the rail of
+   icons, the pages and the lyrics stand on it as raised cards with Windows' 8-pixel corners and a hairline edge, a
+   gap apart. The playback bar floats a gap above the window's bottom edge: an acrylic card, compact, the song on the
+   left, the buttons in the middle with a short progress line under them, the volume and the toggles on the right,
+   everything centred on the bar's height. In-page controls, rows and bars take Windows' 4 pixels, menus and flyouts
+   its 8. Segoe UI Variable in Windows' type ramp, the accent kept for what acts (play, the primary button, the
+   progress, the song playing), and quick fades in place of movement.
 
-   --window-material asks the engine for the window's material (mica, mica-alt or acrylic, docs/themes/format.md). The
-   window and the panes leave it see-through. */
+   --window-material asks the engine for the window's material (docs/themes/format.md, "The window's material"). The
+   window leaves it see-through; colours.ini holds Windows' own brushes for both schemes. */
 
 :root {
     --font-title: "Segoe UI Variable Display";
@@ -13,11 +17,29 @@
     --panel-background: var(--spice-layer);
     --band-background: var(--spice-band);
     --panel-radius: 8px;
-    --radius-box: 8px;
+    --radius-box: 4px;
     --radius-small: 4px;
-    --gap: 6;
-    /* The play button and the volume and progress lines: Windows' accent, or the artwork's colour (the setting). */
+    --lcd-radius: 4;
+    --bar-radius: 8;
+    --gap: 10;
+    /* The floating bar: as high as Windows' player keeps its own, and the room the cards leave under them for it. */
+    --bar-height: 84;
+    --bar-room: calc(84 + 10 * 2);
+    /* The song's room on the bar, at each width step: wide enough for long titles, and what keeps the progress line
+       short, centred under the buttons (bottom-bar and centre-bar read these). */
+    --song-width: 470;
+    --song-width-medium: 410;
+    --song-width-folded: 350;
+    --song-width-narrow: 300;
+    --song-width-small: 240;
+    /* Windows' timings: a fade or a press settles in well under a fifth of a second. */
+    --fade: 120ms;
+    /* The play button, the progress and the volume: Windows' accent, or the artwork's colour (the setting). */
     --accent: $AccentFillColorDefaultBrush;
+    /* A control's edge: Windows lights the top of a dark control and shades the bottom of a light one, over its last
+       pixels. */
+    --control-edge: linear-gradient(to bottom, $control-stroke 88%, $control-stroke-edge 100%);
+    --accent-edge: linear-gradient(to bottom, $accent-stroke 88%, $accent-stroke-edge 100%);
 }
 
 @setting accent = Artwork {
@@ -26,57 +48,65 @@
     }
 }
 
+/* Each material takes the layer Windows lays on it: denser on the darker Mica Alt, fainter on Acrylic, which is
+   already a tinted frost. */
 @setting material = Mica Alt {
     :root {
         --window-material: mica-alt;
+        --panel-background: var(--spice-layer-mica-alt);
     }
 }
 
 @setting material = Acrylic {
     :root {
         --window-material: acrylic;
+        --panel-background: var(--spice-layer-acrylic);
     }
 }
 
 @import "ampify:floating-panels";
 
-/* The bar-position setting: on the material at the top (the default), or along the bottom of the window, where
-   Windows' Media Player keeps its controls. The bar stays on the material, without a panel of its own. */
+/* Where the bar goes is Ampify's own setting (apple.playbar), read here as bar-position; the manifest's "playbar"
+   starts Fluent on Centred, the floating bar of a Windows player. Bottom: the same bar with the buttons by the song.
+   Top: Apple's own place, in the title bar. */
 @setting bar-position = Bottom {
-    :root {
-        --bar-room: calc(72 + 6);
-    }
-
     @import "ampify:bottom-bar";
 }
 @setting bar-position = Centred {
-    :root {
-        --bar-room: calc(72 + 6);
-    }
-
     @import "ampify:bottom-bar";
     @import "ampify:centre-bar";
 }
 
-/* ---- The window ------------------------------------------------------------------------------------------------------ */
-
-/* The sidebar stands on the window's material, as Windows' navigation panes do: no panel of its own. */
-.sidebar {
-    background: transparent;
-    border-width: 0;
-}
-
-@media (max-width: 1324px) {
-    .sidebar-column {
-        background: transparent;
+/* Each scheme draws the whole window in its own mode, as a Windows app follows light or dark: Apple's own brushes
+   (the artist links of a song list stayed white on the light pages) follow it too, whatever Windows' mode. */
+@media (prefers-color-scheme: light) {
+    .window {
+        color-scheme: light;
     }
 }
 
-/* One layer for the pages and one for the lyrics, edged by Windows' hairline. */
+@media (prefers-color-scheme: dark) {
+    .window {
+        color-scheme: dark;
+    }
+}
+
+/* ---- The cards: rail, pages, lyrics ------------------------------------------------------------------------------- */
+
+/* Raised on the Mica by their fill, edged by Windows' hairline. */
+.sidebar,
 .content,
 .lyrics-panel {
-    border-color: var(--spice-stroke);
+    border-color: var(--spice-edge);
     border-width: 1px;
+}
+
+/* Folded (and with the sidebar that opens under the pointer), the rail of icons is the card. */
+@media (max-width: 1324px) {
+    .sidebar-column {
+        border-color: var(--spice-edge);
+        border-width: 1px;
+    }
 }
 
 .search-header,
@@ -84,33 +114,102 @@
     background: transparent;
 }
 
+/* The title, as Windows writes an app's name in its title bar: small and plain. */
 .app-name {
-    font-role: title;
-    font-size: 14px;
-    font-weight: 600;
+    font-role: caption;
 }
 
-/* ---- The playback bar, on the material at the top ------------------------------------------------------------------- */
+/* Windows' navigation: 4-pixel backplates; the short bar that marks the selected item takes the accent from the
+   brushes. */
+.sidebar-items NavigationViewItem {
+    corner-radius: 4;
+}
 
-.lcd {
-    background: $CardBackgroundFillColorDefaultBrush;
-    border-color: var(--spice-stroke);
-    border-width: 1px;
-    corner-radius: var(--radius-box);
+.search-box {
+    corner-radius: 4;
+}
+
+/* ---- The floating bar ------------------------------------------------------------------------------------------------ */
+
+@setting bar-position != Top {
+    /* A card of its own, a gap from the window's edges: from under the rail to the right edge, as the cards above
+       it. bottom-bar starts the bar at the page column; it reaches back under the rail, to the window's edge plus a
+       gap (290 open, the folded rail's 48 at 1324 pixels and less). */
+    .playbar {
+        backdrop: acrylic($bar, 0.88);
+        border-color: var(--spice-edge);
+        border-width: 1px;
+        corner-radius: var(--bar-radius);
+        box-shadow: 32px;
+        height: var(--bar-height);
+        margin: 0 var(--gap) var(--gap) calc(var(--gap) - 290);
+    }
+
+    .now-playing {
+        vertical-alignment: center;
+        margin: 0 0 0 12;
+    }
+
+    .playbar-toggles {
+        vertical-alignment: center;
+        margin: 0 12 0 0;
+    }
+
+    /* The song sits on the bar itself, as in a Windows player: no box of its own. */
+    .lcd {
+        background: transparent;
+        border-width: 0;
+    }
+}
+
+@media (max-width: 1324px) {
+    @setting bar-position != Top {
+        .playbar {
+            margin: 0 var(--gap) var(--gap) calc(var(--gap) - 48);
+        }
+    }
+}
+
+/* The card is tall enough for the buttons at full size and the line under them, a clear 11 apart: centre-bar's
+   smaller buttons, for bars where the line crowds them, are not needed here. */
+@setting bar-position = Centred {
+    .transport {
+        transform: none;
+    }
+}
+
+/* Bottom: the buttons beside the song, centred on the bar. */
+@setting bar-position = Bottom {
+    .transport {
+        vertical-alignment: center;
+    }
+}
+
+/* At the top, the display is a card on the Mica, edged like Windows' cards. */
+@setting bar-position = Top {
+    .lcd {
+        background: $CardBackgroundFillColorDefaultBrush;
+        border-color: var(--spice-stroke);
+        border-width: 1px;
+        corner-radius: 4px;
+    }
 }
 
 .lcd-artwork-image {
     corner-radius: 4px;
 }
 
+/* Windows' subtle buttons: no fill at rest, Apple's own light under the pointer, on a 4-pixel backplate. */
 .transport AppBarButton,
 .transport ToggleButton,
 .transport Button,
-.playbar-toggles ToggleButton {
+.playbar-toggles ToggleButton,
+.playbar-toggles Button {
     corner-radius: 4;
 }
 
-/* Play: Windows' accent button, a filled circle. */
+/* Play: a disc in the accent, its icon in the text colour Windows puts on the accent. It gives a little when pressed;
+   Apple animates this button itself, so its transition takes the transform alone. */
 .play-button > Grid#Root {
     background: var(--accent);
     corner-radius: 50;
@@ -121,23 +220,51 @@
     color: $TextOnAccentFillColorPrimaryBrush;
 }
 
+.play-button {
+    transform-origin: center;
+    transition: transform var(--fade);
+}
+
+.play-button:active {
+    transform: scale(0.94);
+}
+
+/* Windows' slider: a 4-pixel track, rounded, filled in the accent. */
 .volume-slider,
 .scrubber {
     color: var(--accent);
 }
 
-/* ---- Lists and cards --------------------------------------------------------------------------------------------------- */
-
-.sidebar-items NavigationViewItem {
-    corner-radius: 4;
+.scrubber {
+    track-height: 4px;
+    track-radius: 2px;
 }
+
+/* ---- Type ------------------------------------------------------------------------------------------------------------ */
 
 .content-frame TextBlock {
     font-family: var(--font-body);
 }
 
+/* Windows' type ramp: a page's title in Title (28, semibold), a shelf's in Subtitle (20, semibold). */
+.page-title {
+    font-role: title;
+}
+
+.shelf-title-text {
+    font-role: subtitle;
+}
+
+/* ---- Lists and cards --------------------------------------------------------------------------------------------------- */
+
 .card {
-    corner-radius: 8px;
+    corner-radius: 4px;
+    transition: background var(--fade);
+}
+
+/* A grid item under the pointer, as in Windows: a faint backplate behind the picture and its titles. */
+.card:hover {
+    background: $SubtleFillColorSecondaryBrush;
 }
 
 .artwork {
@@ -146,6 +273,7 @@
 
 .track-row {
     corner-radius: 4px;
+    transition: background var(--fade);
 }
 
 .track-row:hover {
@@ -157,17 +285,61 @@
     selected-hover-background: $SubtleFillColorTertiaryBrush;
 }
 
-.album-play-button,
-.album-shuffle-button {
-    corner-radius: 4;
+/* The song playing reads in the accent, as a Windows player marks it in its list. */
+.list-item:playing TextBlock {
+    color: $AccentTextFillColorPrimaryBrush;
 }
 
 .album-artist {
     color: $AccentTextFillColorPrimaryBrush;
 }
 
+/* An album's buttons as Windows' buttons: Play is the accent button, the page's one primary action; Shuffle a standard
+   button. Both have the control's lit or shaded edge and fade a little under the pointer. */
+.album-play-button,
+.album-shuffle-button {
+    corner-radius: 4;
+    border-width: 1px;
+    transition: opacity var(--fade);
+}
+
+.album-play-button {
+    background: $AccentFillColorDefaultBrush;
+    border-color: var(--accent-edge);
+    color: $TextOnAccentFillColorPrimaryBrush;
+}
+
+.album-play-button TextBlock,
+.album-play-button FontIcon {
+    color: $TextOnAccentFillColorPrimaryBrush;
+}
+
+.album-shuffle-button {
+    background: $ControlFillColorDefaultBrush;
+    border-color: var(--control-edge);
+}
+
+.album-play-button:hover,
+.album-shuffle-button:hover {
+    opacity: 0.9;
+}
+
+.album-play-button:active,
+.album-shuffle-button:active {
+    opacity: 0.8;
+}
+
+/* The settings pages are Windows' own Settings: each row a card with a hairline edge. */
+.settings-card {
+    background: $CardBackgroundFillColorDefaultBrush;
+    border-color: var(--spice-stroke);
+    border-width: 1px;
+    corner-radius: 4px;
+}
+
 /* ---- Menus ------------------------------------------------------------------------------------------------------------ */
 
+/* Overlays take Windows' 8 pixels, a tooltip and a menu's items its 4. */
 .menu,
 .flyout {
     corner-radius: 8px;

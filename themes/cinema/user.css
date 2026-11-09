@@ -246,6 +246,7 @@
 
 .menu-item {
     corner-radius: var(--radius-small);
+    transition: background 120ms;
 }
 
 .menu-item:hover {

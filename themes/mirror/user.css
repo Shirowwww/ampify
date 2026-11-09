@@ -16,9 +16,7 @@
     --radius-small: calc(var(--setting-panel-radius) / 2);
     --gap: var(--setting-gap);
     --compact-pane: 48;
-    /* No bar at the top: the pages start one gap down (level with the sidebar on the right), and keep room for the
-       back arrow above their first line. */
-    --content-top: var(--setting-gap);
+    /* The pages keep room for the back arrow above their first line. */
     --page-top: 48;
     --bar-height: 76;
     --bar-room: calc(var(--bar-height) + var(--gap) * 2);
@@ -28,34 +26,70 @@
 
 @import "ampify:floating-panels";
 
-/* ---- The playback bar, at the bottom of the page column --------------------------------------------------------- */
+/* ---- The playback bar ------------------------------------------------------------------------------------------- */
 
-/* Apple's own order, left to right: transport, song, volume. Only the bar's place changes. */
-.playbar {
-    vertical-alignment: bottom;
-    height: var(--bar-height);
-    background: var(--panel-background);
-    corner-radius: var(--panel-radius);
+/* Not at the top, the pages start one gap down, level with the sidebar on the right. At the top they start a gap under
+   the bar (floating-panels' --content-top), and --pages-top follows. */
+@setting bar-position != Top {
+    :root {
+        --content-top: var(--setting-gap);
+        --pages-top: var(--caption-room);
+    }
 }
 
-/* The cell Apple keeps under the window's buttons, which are no longer above the bar: the toggles take it. */
-.caption-buttons-cover {
-    visibility: collapsed;
+@setting bar-position = Top {
+    :root {
+        --content-top: calc(64 + var(--gap) * 2);
+        --pages-top: calc(64 + var(--gap) * 2);
+        --bar-room: var(--gap);
+    }
 }
 
-.playbar-extras {
-    grid-column: 0;
-    grid-column-span: 4;
+/* At the bottom (the theme's place), a panel under the pages, in Apple's own order left to right: transport, song,
+   volume. */
+@setting bar-position = Bottom {
+    .playbar {
+        vertical-alignment: bottom;
+        height: var(--bar-height);
+        background: var(--panel-background);
+        corner-radius: var(--panel-radius);
+    }
+
+    /* The cell Apple keeps under the window's buttons, which are no longer above the bar: the toggles take it. */
+    .caption-buttons-cover {
+        visibility: collapsed;
+    }
+
+    .playbar-extras {
+        grid-column: 0;
+        grid-column-span: 4;
+    }
+
+    .playbar-toggles {
+        grid-column-span: 2;
+        horizontal-alignment: right;
+        margin: 0 14 0 0;
+    }
+
+    .transport {
+        margin: 0 0 0 6;
+    }
 }
 
-.playbar-toggles {
-    grid-column-span: 2;
-    horizontal-alignment: right;
-    margin: 0 14 0 0;
-}
+/* Centred, Ampify's bar along the whole window, under the sidebar on the right too (the reaches below), on the same
+   panel as at the bottom. The sidebar then stops above it. */
+@setting bar-position = Centred {
+    @import "ampify:bottom-bar";
+    @import "ampify:centre-bar";
 
-.transport {
-    margin: 0 0 0 6;
+    :root {
+        --sidebar-room: var(--bar-room);
+    }
+
+    .playbar {
+        background: var(--panel-background);
+        corner-radius: var(--panel-radius);
+    }
 }
 
 .lcd {
@@ -70,7 +104,7 @@
 /* ---- Sidebar on the right (the default) ------------------------------------------------------------------------- */
 
 @setting sidebar-side = Right {
-    /* With ampify:bottom-bar (the Bottom playback bar snippet), the bar runs under the sidebar, on the right. */
+    /* With ampify:bottom-bar (the centred bar), the bar runs under the sidebar, on the right. */
     :root {
         --bar-reach: var(--gap);
         --bar-reach-end: calc(var(--gap) - 290);
@@ -92,22 +126,32 @@
     /* The pane's margins count from its start, now the window's right edge: one gap there, and a gap into the page
        column (floating-panels' numbers, mirrored by the split view). It starts below the window's buttons. */
     .sidebar {
-        margin: var(--caption-room) calc(var(--gap) * -1) var(--gap) var(--gap);
+        margin: var(--caption-room) calc(var(--gap) * -1) var(--sidebar-room, var(--gap)) var(--gap);
     }
 
     /* The page column: one gap from the window's left edge, two from the sidebar, and level with the sidebar's top. A
        gap from the top, the search scopes at the page header's right end showed above a sidebar open over the pages.
-       !important: these hold when a snippet brings ampify:bottom-bar, whose numbers are for a sidebar on the left. */
+       !important: these hold over ampify:bottom-bar, whose numbers are for a sidebar on the left. */
     .content {
-        margin: var(--caption-room) calc(var(--gap) * 2) var(--bar-room) var(--gap) !important;
+        margin: var(--pages-top) calc(var(--gap) * 2) var(--bar-room) var(--gap) !important;
     }
 
-    .playbar {
-        margin: 0 calc(var(--gap) * 2) var(--gap) var(--gap);
+    /* At the bottom and at the top, the bar spans the page column like the pages, clear of the sidebar. */
+    @setting bar-position = Bottom {
+        .playbar {
+            margin: 0 calc(var(--gap) * 2) var(--gap) var(--gap);
+        }
     }
 
+    @setting bar-position = Top {
+        .playbar {
+            margin: var(--gap) calc(var(--gap) * 2) 0 var(--gap);
+        }
+    }
+
+    /* Level with the pages and the sidebar, below the strip of the window's buttons. */
     .lyrics-panel {
-        margin: var(--content-top) calc(var(--gap) * 2) var(--bar-room) 0 !important;
+        margin: var(--pages-top) calc(var(--gap) * 2) var(--bar-room) 0 !important;
     }
 
     /* The back arrow stays at the window's top left corner, over the page's top: the search scopes start after it. */
@@ -122,23 +166,26 @@
             horizontal-alignment: right;
             margin: calc(var(--caption-room) - 10) var(--gap) 0 0 !important;
         }
+    }
 
-        /* Apple widens the header's first columns while the arrow shows, for an arrow on the left; here it is on the
-           right. The header takes all its columns from Apple's grid edge, 26 left of the column, plus the 15 the
-           other themes get before the logo (41): the logo stays on the axis, arrow or not. A right margin here left
-           the folded header no room for the logo: "···" keeps the title clear of the buttons instead. */
-        ContentControl#PaneHeaderContentBorder {
-            grid-column: 0;
-            grid-column-span: 3;
-            margin: 0 0 0 41;
-        }
+    /* The header below holds folded, open under the pointer and pinned alike: pinned, Apple's own columns came back
+       and the pin and "···" stood apart from where the pointer opened them. */
 
-        /* The box is 32 wide and ends 48 from the header's edge, clear of the arrow and the pin; the engine keeps
-           its template's copy of this margin at 0. The dots go 4 below the cell's centre, on the title's line (the
-           title itself is 3 down). */
-        ContentControl#PaneHeaderContentBorder MenuButton#MoreButton {
-            margin: 8 48 0 0;
-        }
+    /* Apple widens the header's first columns while the arrow shows, for an arrow on the left; here it is on the
+       right. The header takes all its columns from Apple's grid edge, 26 left of the column, plus the 15 the other
+       themes get before the logo (41): the logo stays on the axis, arrow or not. A right margin here left the folded
+       header no room for the logo: "···" keeps the title clear of the buttons instead. */
+    ContentControl#PaneHeaderContentBorder {
+        grid-column: 0;
+        grid-column-span: 3;
+        margin: 0 0 0 41;
+    }
+
+    /* The box is 32 wide and ends 48 from the header's edge, clear of the arrow and the pin; the engine keeps its
+       template's copy of this margin at 0. The dots go 4 below the cell's centre, on the title's line (the title
+       itself is 3 down). */
+    ContentControl#PaneHeaderContentBorder MenuButton#MoreButton {
+        margin: 8 48 0 0;
     }
 
     /* The signature: an entry leans towards the pages under the pointer. */
@@ -154,13 +201,15 @@
         margin: var(--content-top) var(--gap) var(--bar-room) calc(var(--gap) * 2);
     }
 
-    .playbar {
-        margin: 0 var(--gap) var(--gap) calc(var(--gap) * 2);
+    @setting bar-position = Bottom {
+        .playbar {
+            margin: 0 var(--gap) var(--gap) calc(var(--gap) * 2);
+        }
     }
 
     /* The window's buttons sit over the top right of the pages here. */
     .lyrics-panel {
-        margin: var(--caption-room) var(--gap) var(--bar-room) 0;
+        margin: var(--pages-top) var(--gap) var(--bar-room) 0;
     }
 
     .search-header {
@@ -234,6 +283,7 @@
 
 .menu-item {
     corner-radius: var(--radius-small);
+    transition: background 120ms;
 }
 
 .menu-item:hover {
