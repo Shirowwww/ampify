@@ -1,11 +1,11 @@
 // ampify_setup.exe: installs Ampify and uninstalls it. The same file is copied into the install folder as the uninstaller.
 //
-//   ampify_setup.exe                          install, after a confirmation
+//   ampify_setup.exe                          install, from its window
 //   ampify_setup.exe /silent                  install without any dialog (tests, scripts)
-//   ampify_setup.exe /uninstall               uninstall, asks whether to keep the user's data
+//   ampify_setup.exe /uninstall               uninstall; its window asks whether to delete the user's data too (No)
 //   ampify_setup.exe /uninstall /keepdata     uninstall and keep settings, logs and reports
-//   ampify_setup.exe /uninstall /purgedata    uninstall and delete the user's data folder too
-//   add /silent to any uninstall to skip the dialogs (without a data choice, the data is kept)
+//   ampify_setup.exe /uninstall /purgedata    uninstall and delete the user's data folder too (ticked in the window)
+//   add /silent to skip the window (without a data choice, the data is kept); `ampify uninstall` runs these
 //
 // Exit codes: 0 done (or cancelled by the user), 1 error, 3 refused (Apple Music is open and could not or may not be closed).
 //
@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <optional>
 #include <sstream>
@@ -38,10 +39,13 @@
 #include "../core/i18n.hpp"
 #include "../core/journal.hpp"
 #include "../core/kit_layout.hpp"
+#include "../core/version_gate.hpp"
+#include "../core/version_list.hpp"
 #include "../win/background.hpp"
 #include "../win/close_to_tray.hpp"
 #include "../win/package.hpp"
 #include "../win/win_common.hpp"
+#include "setup_window.hpp"
 
 #undef ShellExecute  // shellapi.h renames it to ShellExecuteW, which IShellDispatch2 does not have
 
@@ -57,6 +61,7 @@ constexpr DWORD kQuitWaitMs = 10000;       // Apple Music's time to quit by itse
 constexpr DWORD kEndWaitMs = 3000;         // time left to the ended processes to disappear
 constexpr DWORD kPollMs = 200;
 constexpr DWORD kLauncherWaitMs = 3000;    // for the launcher to watch for Apple Music before Apple Music opens
+constexpr DWORD kInUseWaitMs = 10000;     // for a file of Ampify still in use (ampify.exe closing) to be freed
 
 // The text in the display language, English for a language Ampify does not speak, with its placeholders filled.
 std::wstring Tr(const char* key, ampify::i18n::Args args = {}) {
@@ -155,7 +160,7 @@ bool UpdateUserPath(const fs::path& folder, bool add) {
     return ok;
 }
 
-// The kernel lives inside Apple Music: no file of Ampify may be replaced or deleted under it.
+// Both the app and its library agent: the kernel is loaded in each.
 std::vector<DWORD> AppleMusicProcesses() {
     std::vector<DWORD> ids = ampify::win::ProcessIdsNamed(ampify::kAppleMusicImageW);
     std::vector<DWORD> agent = ampify::win::ProcessIdsNamed(ampify::kLibraryAgentImageW);
@@ -205,20 +210,6 @@ bool CloseAppleMusic(Log& log) {
         CloseHandle(process);
     }
     return !AppleMusicRunning();
-}
-
-// Apple Music is open: asks, then closes it. False when the user says no or it stays open (already told to the user).
-bool CloseAppleMusicWithConsent(Log& log) {
-    if (!ampify::win::AskYesNo(Tr("setup.askCloseAppleMusic"), L"Ampify")) {
-        log.Write("Apple Music is open and the user chose to keep it: nothing changed");
-        return false;
-    }
-    if (!CloseAppleMusic(log)) {
-        log.Write("Apple Music could not be closed");
-        ampify::win::ShowMessage(Tr("setup.closeFailed"), true);
-        return false;
-    }
-    return true;
 }
 
 void LogComFailure(Log& log, const char* step, HRESULT result) {
@@ -312,7 +303,6 @@ void OpenAppleMusic(Log& log) {
     log.Write(opened ? "Apple Music opened" : "Could not open Apple Music");
 }
 
-// What the install left of the automatic start, for the log and the final message.
 struct AutoStartResult {
     bool registered = false;
     bool started = false;
@@ -342,18 +332,6 @@ AutoStartResult SetUpAutoStart(const fs::path& launcher, Log& log) {
     return result;
 }
 
-// `asksToOpen` tells whether the message ends with the question "open Apple Music now?".
-std::wstring InstalledMessage(const AutoStartResult& autoStart, bool appleMusicFound, bool bundledOk, bool& asksToOpen) {
-    std::wstring text = Tr("setup.installed");
-    if (!autoStart.registered || !autoStart.started) text += Tr("setup.noBackground");
-    if (!appleMusicFound) text += Tr("setup.noAppleMusic");
-    if (!bundledOk) text += Tr("setup.bundledFailed");
-    asksToOpen = appleMusicFound && autoStart.registered && autoStart.started;
-    if (asksToOpen) text += Tr("setup.openNow");
-    return text;
-}
-
-// The entry that makes Ampify show in Settings > Apps, and gives the uninstall command.
 bool WriteUninstallEntry(const fs::path& target, DWORD sizeKb) {
     HKEY key = nullptr;
     LSTATUS status = RegCreateKeyExW(HKEY_CURRENT_USER, ampify::win::FromUtf8(ampify::kUninstallKey).c_str(), 0, nullptr,
@@ -375,7 +353,6 @@ bool WriteUninstallEntry(const fs::path& target, DWORD sizeKb) {
     return true;
 }
 
-// Sum of the installed files, in kilobytes, as Settings > Apps shows it.
 DWORD InstalledSizeKb(const fs::path& directory) {
     std::uintmax_t bytes = 0;
     for (std::string_view name : ampify::InstalledFiles()) {
@@ -386,7 +363,7 @@ DWORD InstalledSizeKb(const fs::path& directory) {
     return static_cast<DWORD>(bytes / 1024);
 }
 
-// Copies one file of Ampify. Skips the copy when the source already is the destination.
+// Skips the copy when the source already is the destination.
 bool CopyKitFile(const fs::path& source, const fs::path& destination, Log& log) {
     std::error_code error;
     if (fs::exists(destination, error) && fs::equivalent(source, destination, error)) return true;
@@ -400,96 +377,272 @@ bool CopyKitFile(const fs::path& source, const fs::path& destination, Log& log) 
     return true;
 }
 
-int Install(bool silent) {
-    Log log(ampify::win::JournalFile("install.log"));
-    fs::path source = ampify::win::ExecutablePath().parent_path();
-    fs::path target = ampify::win::InstallDirectory();
+using ampify::setup::Choice;
+using ampify::setup::Page;
+using ampify::setup::Progress;
+using ampify::setup::StepState;
+using ampify::setup::Window;
 
-    log.Write("Installing Ampify " + std::string(ampify::kKitVersion) + " from " + ampify::win::ToUtf8(source.wstring()));
-    for (std::string_view name : ampify::InstalledFiles()) {
-        std::error_code error;
-        if (!fs::exists(source / ampify::win::FromUtf8(name), error)) {
-            std::string message = "File missing next to the installer: " + std::string(name);
-            log.Write(message);
-            if (!silent) {
-                ampify::win::ShowMessage(Tr("setup.fileMissing", {{"name", name}}), true);
-            }
-            return kExitError;
-        }
+// The steps a run shows, in their order: each is marked by its name, and one the page does not list is skipped.
+template <typename Step>
+class Steps {
+public:
+    Steps(Progress& progress, std::vector<Step> order) : m_progress(progress), m_order(std::move(order)) {}
+    void Begin(Step step) { Set(step, StepState::Running); }
+    void End(Step step, bool ok) { Set(step, ok ? StepState::Done : StepState::Failed); }
+
+private:
+    void Set(Step step, StepState state) {
+        auto found = std::find(m_order.begin(), m_order.end(), step);
+        if (found != m_order.end()) m_progress.Set(static_cast<size_t>(found - m_order.begin()), state);
     }
+    Progress& m_progress;
+    std::vector<Step> m_order;
+};
 
+struct Outcome {
+    int code = kExitDone;
+    std::wstring error;
+};
+
+void RunSteps(std::optional<Window>& window, const Page& page, const std::function<void(Progress&)>& work) {
+    if (window) {
+        window->Run(page, work);
+        return;
+    }
+    ampify::setup::NoProgress none;
+    work(none);
+}
+
+// The page of a failed run; returns `code`. A silent run has only the log.
+int Failed(std::optional<Window>& window, const std::wstring& text, int code) {
+    if (window) {
+        Page page;
+        page.title = Tr("setup.failedTitle");
+        page.text = text;
+        page.primary = Tr("setup.close");
+        page.failure = true;
+        window->Ask(page);
+    }
+    return code;
+}
+
+Page StepsPage(const std::wstring& title, const std::vector<std::wstring>& labels) {
+    Page page;
+    page.title = title;
+    page.steps = labels;
+    return page;
+}
+
+// Closing Apple Music is a step of its own, only when the person agreed to it on the first page.
+Outcome CloseAppleMusicStep(bool agreed, const std::function<void(bool)>& end, Log& log) {
+    if (!AppleMusicRunning()) {
+        end(true);  // it closed by itself since the first page
+        return {};
+    }
+    bool closed = agreed && CloseAppleMusic(log);
+    if (!agreed) log.Write("Apple Music opened during the run: nothing more is changed");
+    end(closed);
+    if (!closed) return {kExitRefused, Tr("setup.closeFailed")};
+    return {};
+}
+
+enum class InstallStep { CloseAppleMusic, Copy, Bundled, AutoStart, Entry };
+
+// The Apple Music on this PC, and whether its family was tested: an untested one does not stop the install, the kernel
+// stays off in it until it is tested (src/core/injection_policy.cpp).
+struct AppleMusicCheck {
+    bool found = false;
+    std::string version;
+    bool tested = true;
+};
+
+AppleMusicCheck CheckAppleMusic(Log& log) {
+    AppleMusicCheck check;
     std::optional<ampify::launcher::InstalledPackage> package =
         ampify::launcher::FindInstalledPackage(ampify::win::FromUtf8(ampify::kPackageFamilyName).c_str());
-    std::string packageLine = package
-                                  ? "Apple Music found: " + ampify::win::ToUtf8(package->fullName)
-                                  : "Apple Music for Windows not found: Ampify installs anyway, but it will "
-                                    "start nothing until Apple Music is installed";
-    log.Write(packageLine);
-
-    if (AppleMusicRunning()) {
-        if (silent) {
-            log.Write("Apple Music is open: nothing installed");
-            return kExitRefused;
-        }
-        if (!CloseAppleMusicWithConsent(log)) return kExitRefused;
+    if (!package) {
+        log.Write("Apple Music for Windows not found: Ampify installs anyway, but it will start nothing until Apple "
+                  "Music is installed");
+        return check;
     }
+    check.found = true;
+    check.version = ampify::AppleMusicVersion(ampify::win::ToUtf8(package->fullName));
+    log.Write("Apple Music found: " + ampify::win::ToUtf8(package->fullName));
+    if (check.version.empty()) return check;
+    std::vector<std::string> extra = ampify::LoadVersionList(ampify::win::KitDirectory() / ampify::kVersionListFile);
+    check.tested = ampify::IsKnownAppVersion(check.version, ampify::KnownAppVersionsWith(extra));
+    log.Write(check.tested ? "Apple Music " + check.version + ": family " +
+                                 std::string(ampify::AppVersionFamily(check.version)) + " tested"
+                           : "Apple Music " + check.version + " not tested: Ampify installs anyway, and the kernel stays "
+                                                              "off in it until it is tested");
+    return check;
+}
 
-    // The background launcher runs from the install folder: it stops while its file is replaced, and starts again if
-    // the install stops half way.
+std::optional<std::string> MissingFile(const fs::path& source) {
+    for (std::string_view name : ampify::InstalledFiles()) {
+        std::error_code error;
+        if (!fs::exists(source / ampify::win::FromUtf8(name), error)) return std::string(name);
+    }
+    return std::nullopt;
+}
+
+Page InstallWelcome(const fs::path& target, const AppleMusicCheck& check, bool appleMusicOpen) {
+    Page page;
+    page.title = Tr("setup.installTitle", {{"version", ampify::kKitVersion}});
+    page.text = Tr("setup.installText", {{"folder", ampify::win::ToUtf8(target.wstring())}});
+    if (!check.found) page.notices.push_back({Tr("setup.noAppleMusic"), true});
+    if (check.found && !check.tested) page.notices.push_back({Tr("setup.untested", {{"version", check.version}}), true});
+    if (appleMusicOpen) page.notices.push_back({Tr("setup.closesAppleMusic")});
+    page.secondary = Tr("setup.cancel");
+    page.primary = Tr("setup.install");
+    return page;
+}
+
+std::vector<InstallStep> InstallOrder(bool appleMusicOpen) {
+    std::vector<InstallStep> order;
+    if (appleMusicOpen) order.push_back(InstallStep::CloseAppleMusic);
+    order.insert(order.end(), {InstallStep::Copy, InstallStep::Bundled, InstallStep::AutoStart, InstallStep::Entry});
+    return order;
+}
+
+std::vector<std::wstring> InstallLabels(const std::vector<InstallStep>& order) {
+    std::vector<std::wstring> labels;
+    for (InstallStep step : order) {
+        switch (step) {
+        case InstallStep::CloseAppleMusic: labels.push_back(Tr("setup.stepCloseAppleMusic")); break;
+        case InstallStep::Copy: labels.push_back(Tr("setup.stepCopy")); break;
+        case InstallStep::Bundled: labels.push_back(Tr("setup.stepBundled")); break;
+        case InstallStep::AutoStart: labels.push_back(Tr("setup.stepAutoStart")); break;
+        case InstallStep::Entry: labels.push_back(Tr("setup.stepEntry")); break;
+        }
+    }
+    return labels;
+}
+
+struct InstallRun {
+    Outcome outcome;
+    AutoStartResult autoStart;
+    bool bundledOk = true;
+};
+
+// Copies the programs. The background launcher runs from the install folder: it stops while its file is replaced, and
+// starts again if the copy stops half way.
+Outcome CopyProgramFiles(const fs::path& source, const fs::path& target, Log& log) {
     fs::path launcher = target / ampify::win::FromUtf8(ampify::kLauncherFile);
     bool wasRunning = ampify::win::BackgroundRunning();
     if (!ampify::win::StopBackground()) log.Write("The background launcher did not stop: its file may stay in use");
-    auto stopHere = [&](int code) {
+    auto stopHere = [&](int code, std::wstring text) {
         if (wasRunning) ampify::win::StartBackground(launcher);
-        return code;
+        return Outcome{code, std::move(text)};
     };
-
     std::error_code error;
     fs::create_directories(target, error);
     if (error) {
         log.Write("Could not create the folder: " + error.message());
-        if (!silent) {
-            ampify::win::ShowMessage(Tr("setup.folderFailed"), true);
-        }
-        return stopHere(kExitError);
+        return stopHere(kExitError, Tr("setup.folderFailed"));
     }
-
     for (std::string_view name : ampify::InstalledFiles()) {
         std::wstring wideName = ampify::win::FromUtf8(name);
         if (!CopyKitFile(source / wideName, target / wideName, log)) {
-            if (!silent) {
-                ampify::win::ShowMessage(Tr("setup.copyFailed", {{"name", name}}), true);
-            }
-            return stopHere(kExitRefused);
+            return stopHere(kExitRefused, Tr("setup.copyFailed", {{"name", name}}));
         }
     }
+    return {};
+}
+
+InstallRun RunInstall(const fs::path& source, const fs::path& target, Steps<InstallStep>& steps, bool agreedToClose,
+                      Log& log) {
+    InstallRun run;
+    steps.Begin(InstallStep::CloseAppleMusic);
+    run.outcome = CloseAppleMusicStep(agreedToClose, [&](bool ok) { steps.End(InstallStep::CloseAppleMusic, ok); }, log);
+    if (run.outcome.code != kExitDone) return run;
+
+    steps.Begin(InstallStep::Copy);
+    run.outcome = CopyProgramFiles(source, target, log);
+    steps.End(InstallStep::Copy, run.outcome.code == kExitDone);
+    if (run.outcome.code != kExitDone) return run;
 
     // A copy left by an older version would keep its old page, so each install replaces them.
+    steps.Begin(InstallStep::Bundled);
     std::vector<std::string> notInstalled = ampify::InstallBundledElements(source, ampify::win::KitDirectory());
     for (const std::string& line : notInstalled) log.Write("Not installed: " + line);
-    if (notInstalled.empty()) log.Write("Marketplace and Now Playing installed in the Ampify folder");
-
+    run.bundledOk = notInstalled.empty();
+    if (run.bundledOk) log.Write("Marketplace and Now Playing installed in the Ampify folder");
     RemoveOldShortcut(log);
     log.Write(UpdateUserPath(target, true) ? "Install folder in the user's Path: ampify works in a new terminal"
                                            : "Could not add the install folder to the user's Path");
-    AutoStartResult autoStart = SetUpAutoStart(launcher, log);
+    steps.End(InstallStep::Bundled, run.bundledOk);
 
+    steps.Begin(InstallStep::AutoStart);
+    run.autoStart = SetUpAutoStart(target / ampify::win::FromUtf8(ampify::kLauncherFile), log);
+    steps.End(InstallStep::AutoStart, run.autoStart.registered && run.autoStart.started);
+
+    steps.Begin(InstallStep::Entry);
     bool entryOk = WriteUninstallEntry(target, InstalledSizeKb(target));
-    log.Write(entryOk ? "Uninstall entry written (Settings > Apps)"
-                      : "Could not write the uninstall entry");
+    log.Write(entryOk ? "Uninstall entry written (Settings > Apps)" : "Could not write the uninstall entry");
+    steps.End(InstallStep::Entry, entryOk);
+    return run;
+}
 
-    log.Write("Install finished in " + ampify::win::ToUtf8(target.wstring()));
-    if (!silent) {
-        bool asksToOpen = false;
-        std::wstring text = InstalledMessage(autoStart, package.has_value(), notInstalled.empty(), asksToOpen);
-        if (!asksToOpen) {
-            ampify::win::ShowMessage(text);
-        } else if (ampify::win::AskYesNo(text, L"Ampify")) {
-            OpenAppleMusic(log);
-        }
+// The last page. True when the person asks to open Apple Music now.
+bool ShowInstalled(Window& window, const InstallRun& run, bool appleMusicFound) {
+    Page page;
+    page.title = Tr("setup.installedTitle");
+    bool background = run.autoStart.registered && run.autoStart.started;
+    bool canOpen = appleMusicFound && background;
+    if (canOpen) page.text = Tr("setup.installedText");
+    if (!background) page.notices.push_back({Tr("setup.noBackground"), true});
+    if (!appleMusicFound) page.notices.push_back({Tr("setup.noAppleMusic"), true});
+    if (!run.bundledOk) page.notices.push_back({Tr("setup.bundledFailed"), true});
+    if (canOpen) {
+        page.secondary = Tr("setup.close");
+        page.primary = Tr("setup.openAppleMusic");
+    } else {
+        page.primary = Tr("setup.done");
     }
+    return window.Ask(page) == Choice::Primary && canOpen;
+}
+
+int Install(bool silent) {
+    Log log(ampify::win::JournalFile("install.log"));
+    fs::path source = ampify::win::ExecutablePath().parent_path();
+    fs::path target = ampify::win::InstallDirectory();
+    log.Write("Installing Ampify " + std::string(ampify::kKitVersion) + " from " + ampify::win::ToUtf8(source.wstring()));
+    std::optional<Window> window;
+    if (!silent) window.emplace(ampify::win::FromUtf8(ampify::kKitVersion));
+
+    if (std::optional<std::string> missing = MissingFile(source)) {
+        log.Write("File missing next to the installer: " + *missing);
+        return Failed(window, Tr("setup.fileMissing", {{"name", *missing}}), kExitError);
+    }
+    AppleMusicCheck check = CheckAppleMusic(log);
+    bool appleMusicOpen = AppleMusicRunning();
+    if (appleMusicOpen && silent) {
+        log.Write("Apple Music is open: nothing installed");
+        return kExitRefused;
+    }
+    if (window && window->Ask(InstallWelcome(target, check, appleMusicOpen)) != Choice::Primary) {
+        log.Write("Install cancelled: nothing changed");
+        return kExitDone;
+    }
+
+    std::vector<InstallStep> order = InstallOrder(appleMusicOpen);
+    InstallRun run;
+    RunSteps(window, StepsPage(Tr("setup.installing"), InstallLabels(order)), [&](Progress& progress) {
+        Steps<InstallStep> steps(progress, order);
+        run = RunInstall(source, target, steps, appleMusicOpen, log);
+    });
+    if (run.outcome.code != kExitDone) return Failed(window, run.outcome.error, run.outcome.code);
+    log.Write("Install finished in " + ampify::win::ToUtf8(target.wstring()));
+    // The window goes first: opening Apple Music may wait a few seconds for the launcher, with nothing left to show.
+    bool open = window && ShowInstalled(*window, run, check.found);
+    window.reset();
+    if (open) OpenAppleMusic(log);
     return kExitDone;
 }
+
+enum class UninstallStep { CloseAppleMusic, Stop, Remove, Clean, Data };
 
 // A hidden cmd waits for this process to exit, then deletes the file and its folder (rmdir only removes an empty one).
 // It starts in the parent folder, or it would hold the folder in use. If it cannot start, Windows does it at next boot.
@@ -528,77 +681,169 @@ void RemoveUpdateLeftovers(const fs::path& target, Log& log) {
     }
 }
 
-int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
-    fs::path target = ampify::win::InstallDirectory();
-
-    if (silent && AppleMusicRunning()) return kExitRefused;
-
-    if (!silent && !ampify::win::AskYesNo(Tr("setup.askUninstall"), L"Ampify")) {
-        return kExitDone;
+// Removes one file, waiting a moment while it is in use: `ampify uninstall` starts the uninstaller and exits, so
+// ampify.exe may still be closing when its turn comes.
+bool RemoveFileWhenFree(const fs::path& file) {
+    ULONGLONG deadline = GetTickCount64() + kInUseWaitMs;
+    while (true) {
+        std::error_code error;
+        fs::remove(file, error);
+        if (!error || !fs::exists(file)) return true;
+        if (GetTickCount64() >= deadline) return false;
+        Sleep(kPollMs);
     }
+}
 
-    // Themes, extensions and settings stay unless the user asks for them to go. Silent runs keep them by default.
-    bool keepData = true;
-    if (purgeFlag) {
-        keepData = false;
-    } else if (!keepFlag && !silent) {
-        std::string folder = ampify::win::ToUtf8(ampify::win::KitDirectory().wstring());
-        keepData = ampify::win::AskYesNo(Tr("setup.askKeepData", {{"folder", folder}}), L"Ampify");
-    }
-
-    Log log(keepData ? ampify::win::JournalFile("uninstall.log") : fs::path());
-    log.Write("Uninstalling Ampify " + std::string(ampify::kKitVersion) +
-              (keepData ? " (data kept)" : " (data deleted)"));
-
-    if (!silent && AppleMusicRunning() && !CloseAppleMusicWithConsent(log)) return kExitRefused;
-
-    // The background launcher goes first: from now on Apple Music starts without Ampify, even if a file stays.
-    log.Write(ampify::win::UnregisterBackground() ? "Background launcher removed from sign-in"
-                                                  : "Could not remove the background launcher from sign-in");
-    if (!ampify::win::StopBackground()) {
-        log.Write("The background launcher did not stop");
-        if (!silent) {
-            ampify::win::ShowMessage(Tr("setup.stopFailed"), true);
-        }
-        return kExitRefused;
-    }
-
-    // Files first: if one is in use, nothing else is removed yet, so the uninstall can simply be run again.
+// Files first: if one is in use, nothing else is removed yet, so the uninstall can simply be run again. Returns the
+// name of a file that stayed.
+std::optional<std::string> RemoveProgramFiles(const fs::path& target, Log& log) {
     for (std::string_view name : ampify::InstalledFiles()) {
         std::wstring wideName = ampify::win::FromUtf8(name);
         if (wideName == ampify::win::FromUtf8(ampify::kSetupFile)) continue;
-
-        std::error_code error;
-        fs::remove(target / wideName, error);
-        if (error && fs::exists(target / wideName)) {
-            log.Write("Could not remove " + std::string(name) + ": " + error.message());
-            if (!silent) {
-                ampify::win::ShowMessage(Tr("setup.removeFailed", {{"name", name}}), true);
-            }
-            return kExitRefused;
+        if (!RemoveFileWhenFree(target / wideName)) {
+            log.Write("Could not remove " + std::string(name) + ": it is in use");
+            return std::string(name);
         }
         log.Write("Removed: " + std::string(name));
     }
+    return std::nullopt;
+}
 
+Page UninstallWelcome(bool appleMusicOpen, bool deleteData) {
+    Page page;
+    page.title = Tr("setup.uninstallTitle");
+    page.text = Tr("setup.uninstallText");
+    if (appleMusicOpen) page.notices.push_back({Tr("setup.closesAppleMusic")});
+    page.checkbox = Tr("setup.deleteData", {{"folder", ampify::win::ToUtf8(ampify::win::KitDirectory().wstring())}});
+    page.checked = deleteData;
+    page.secondary = Tr("setup.cancel");
+    page.primary = Tr("setup.uninstall");
+    return page;
+}
+
+std::vector<UninstallStep> UninstallOrder(bool appleMusicOpen, bool deleteData) {
+    std::vector<UninstallStep> order;
+    if (appleMusicOpen) order.push_back(UninstallStep::CloseAppleMusic);
+    order.insert(order.end(), {UninstallStep::Stop, UninstallStep::Remove, UninstallStep::Clean});
+    if (deleteData) order.push_back(UninstallStep::Data);
+    return order;
+}
+
+std::vector<std::wstring> UninstallLabels(const std::vector<UninstallStep>& order) {
+    std::vector<std::wstring> labels;
+    for (UninstallStep step : order) {
+        switch (step) {
+        case UninstallStep::CloseAppleMusic: labels.push_back(Tr("setup.stepCloseAppleMusic")); break;
+        case UninstallStep::Stop: labels.push_back(Tr("setup.stepStop")); break;
+        case UninstallStep::Remove: labels.push_back(Tr("setup.stepRemove")); break;
+        case UninstallStep::Clean: labels.push_back(Tr("setup.stepClean")); break;
+        case UninstallStep::Data: labels.push_back(Tr("setup.stepData")); break;
+        }
+    }
+    return labels;
+}
+
+// The Path entry, the old shortcut and the entry of Settings > Apps, once the programs are gone.
+void RemoveTraces(const fs::path& target, Log& log) {
     RemoveUpdateLeftovers(target, log);
     RemoveOldShortcut(log);
     log.Write(UpdateUserPath(target, false) ? "Install folder removed from the user's Path"
                                             : "Could not remove the install folder from the user's Path");
-
     LSTATUS status = RegDeleteTreeW(HKEY_CURRENT_USER, ampify::win::FromUtf8(ampify::kUninstallKey).c_str());
     log.Write(status == ERROR_SUCCESS || status == ERROR_FILE_NOT_FOUND ? "Uninstall entry removed"
                                                                         : "Uninstall entry: error");
+}
 
-    if (!keepData) {
-        fs::path data = ampify::win::KitDirectory();
-        if (ampify::IsKitDataFolder(ampify::win::ToUtf8(data.wstring()))) {
-            std::error_code error;
-            fs::remove_all(data, error);
-        }
+// Deletes the user's Ampify folder. False when something stayed.
+bool DeleteUserData() {
+    fs::path data = ampify::win::KitDirectory();
+    if (!ampify::IsKitDataFolder(ampify::win::ToUtf8(data.wstring()))) return false;
+    std::error_code error;
+    fs::remove_all(data, error);
+    return !fs::exists(data, error);
+}
+
+struct UninstallRun {
+    Outcome outcome;
+    bool dataDeleted = false;
+};
+
+UninstallRun RunUninstall(const fs::path& target, Steps<UninstallStep>& steps, bool agreedToClose, bool deleteData,
+                          Log& log) {
+    UninstallRun run;
+    steps.Begin(UninstallStep::CloseAppleMusic);
+    run.outcome = CloseAppleMusicStep(agreedToClose, [&](bool ok) { steps.End(UninstallStep::CloseAppleMusic, ok); }, log);
+    if (run.outcome.code != kExitDone) return run;
+
+    // The background launcher goes first: from now on Apple Music starts without Ampify, even if a file stays.
+    steps.Begin(UninstallStep::Stop);
+    log.Write(ampify::win::UnregisterBackground() ? "Background launcher removed from sign-in"
+                                                  : "Could not remove the background launcher from sign-in");
+    if (!ampify::win::StopBackground()) {
+        log.Write("The background launcher did not stop");
+        steps.End(UninstallStep::Stop, false);
+        run.outcome = {kExitRefused, Tr("setup.stopFailed")};
+        return run;
+    }
+    steps.End(UninstallStep::Stop, true);
+
+    steps.Begin(UninstallStep::Remove);
+    if (std::optional<std::string> stayed = RemoveProgramFiles(target, log)) {
+        steps.End(UninstallStep::Remove, false);
+        run.outcome = {kExitRefused, Tr("setup.removeFailed", {{"name", *stayed}})};
+        return run;
+    }
+    steps.End(UninstallStep::Remove, true);
+
+    steps.Begin(UninstallStep::Clean);
+    RemoveTraces(target, log);
+    steps.End(UninstallStep::Clean, true);
+
+    if (deleteData) {
+        steps.Begin(UninstallStep::Data);
+        run.dataDeleted = DeleteUserData();
+        steps.End(UninstallStep::Data, run.dataDeleted);
+    }
+    return run;
+}
+
+void ShowUninstalled(Window& window, bool deleteData, bool dataDeleted) {
+    std::string folder = ampify::win::ToUtf8(ampify::win::KitDirectory().wstring());
+    Page page;
+    page.title = Tr("setup.uninstalledTitle");
+    page.text = Tr("setup.uninstalledText") + L"\n\n" +
+                (!deleteData   ? Tr("setup.dataKept", {{"folder", folder}})
+                 : dataDeleted ? Tr("setup.dataDeleted")
+                               : Tr("setup.dataNotDeleted", {{"folder", folder}}));
+    page.primary = Tr("setup.done");
+    window.Ask(page);
+}
+
+int Uninstall(bool silent, bool purgeFlag) {
+    fs::path target = ampify::win::InstallDirectory();
+    bool appleMusicOpen = AppleMusicRunning();
+    if (silent && appleMusicOpen) return kExitRefused;
+
+    // Themes, extensions and settings stay unless the person asks for them to go; silent runs keep them by default.
+    bool deleteData = purgeFlag;
+    std::optional<Window> window;
+    if (!silent) {
+        window.emplace(ampify::win::FromUtf8(ampify::kKitVersion));
+        if (window->Ask(UninstallWelcome(appleMusicOpen, deleteData), &deleteData) != Choice::Primary) return kExitDone;
     }
 
+    Log log(deleteData ? fs::path() : ampify::win::JournalFile("uninstall.log"));
+    log.Write("Uninstalling Ampify " + std::string(ampify::kKitVersion) + (deleteData ? " (data deleted)" : " (data kept)"));
+    std::vector<UninstallStep> order = UninstallOrder(appleMusicOpen, deleteData);
+    UninstallRun run;
+    RunSteps(window, StepsPage(Tr("setup.uninstalling"), UninstallLabels(order)), [&](Progress& progress) {
+        Steps<UninstallStep> steps(progress, order);
+        run = RunUninstall(target, steps, appleMusicOpen, deleteData, log);
+    });
+    if (run.outcome.code != kExitDone) return Failed(window, run.outcome.error, run.outcome.code);
+
     // The installer cannot delete itself while it runs: only when it runs from the install folder does a short-lived
-    // command do it after the final dialog, once this process has exited.
+    // command do it after the final page, once this process has exited.
     fs::path selfFile = target / ampify::win::FromUtf8(ampify::kSetupFile);
     std::error_code selfError;
     fs::remove(selfFile, selfError);
@@ -607,14 +852,9 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
         std::error_code folderError;
         fs::remove(target, folderError);
     }
-
     log.Write("Uninstall finished");
-    if (!silent) {
-        std::wstring text = Tr("setup.uninstalled");
-        if (keepData) text += Tr("setup.dataKept", {{"folder", ampify::win::ToUtf8(ampify::win::KitDirectory().wstring())}});
-
-        ampify::win::ShowMessage(text);
-    }
+    if (window) ShowUninstalled(*window, deleteData, run.dataDeleted);
+    window.reset();
     if (selfStays) ScheduleSelfDelete(selfFile, log);
     return kExitDone;
 }
@@ -623,17 +863,18 @@ int Uninstall(bool silent, bool keepFlag, bool purgeFlag) {
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     ampify::i18n::SetLanguage(ampify::i18n::LanguageCode(ampify::win::UserLocaleName()));
 
     int argc = 0;
     wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     bool silent = HasFlag(argc, argv, L"/silent");
     bool uninstall = HasFlag(argc, argv, L"/uninstall");
-    bool keep = HasFlag(argc, argv, L"/keepdata");
+    // /keepdata is the default: it stays accepted, for the uninstall entry's quiet command.
     bool purge = HasFlag(argc, argv, L"/purgedata");
     LocalFree(argv);
 
-    int code = uninstall ? Uninstall(silent, keep, purge) : Install(silent);
+    int code = uninstall ? Uninstall(silent, purge) : Install(silent);
 
     CoUninitialize();
     return code;
