@@ -1,37 +1,84 @@
-/* Round corners: rounds the covers, tiles, rows, the display and the menus with one radius, on top of any theme, like
-   Spicetify's Rounded Images. Small parts (rows, menu entries, tooltips) take half of it, so they stay in proportion.
-   The panels keep the theme's own --panel-radius. The opposite of square-corners. */
+/* Corners: one radius for the covers, tiles, rows, the display and the menus, like Spicetify's Rounded Images, or
+   square corners everywhere, like Be Square, on top of any theme. Rounded: small parts (rows, menu entries, tooltips)
+   take half of the radius, so they stay in proportion, and the panels keep the theme's own --panel-radius. Square:
+   every button, frame and panel, so that no panel keeps a rounded corner next to a square one (the Square corners
+   snippet until Ampify 1.3). */
 
-:root {
-    --round: var(--setting-radius);
-    --round-small: calc(var(--setting-radius) * 0.5);
-    /* What other parts draw around the display (cover-ambience's glow) follows its corners. */
-    --lcd-radius: var(--round);
+@setting shape = Rounded {
+    :root {
+        --round: var(--setting-radius);
+        --round-small: calc(var(--setting-radius) * 0.5);
+        /* What other parts draw around the display (cover-ambience's glow) follows its corners. */
+        --lcd-radius: var(--round);
+    }
+
+    .card,
+    .card-wide,
+    .card-track,
+    .card-poster,
+    .artwork,
+    .lcd,
+    .lcd-artwork-image,
+    .settings-card,
+    .menu,
+    .flyout,
+    .fullscreen-artwork {
+        corner-radius: var(--round);
+    }
+
+    .card-poster-chin {
+        corner-radius: 0 0 var(--round) var(--round);
+    }
+
+    .track-row,
+    .sidebar-item,
+    .menu-item,
+    .tooltip,
+    .album-play-button,
+    .album-shuffle-button {
+        corner-radius: var(--round-small);
+    }
 }
 
-.card,
-.card-wide,
-.card-track,
-.card-poster,
-.artwork,
-.lcd,
-.lcd-artwork-image,
-.settings-card,
-.menu,
-.flyout,
-.fullscreen-artwork {
-    corner-radius: var(--round);
-}
+/* A snippet comes after the active theme: its rules win, whatever their specificity. Apple's round buttons and badges
+   are circles, not rounded corners: they stay round. */
+@setting shape = Square {
+    :root {
+        --corner: 0;
+        --panel-radius: 0;
+        --lcd-radius: 0;
+    }
 
-.card-poster-chin {
-    corner-radius: 0 0 var(--round) var(--round);
-}
+    Button:not(#RadioPlayButton):not(#PlayButton):not(#leftPlayButton):not(#RightMoreButton),
+    Border:not(#AutoPlayBadge),
+    .play-button > Grid#Root,
+    .playbar,
+    .sidebar,
+    .sidebar-item,
+    .content,
+    .lyrics-panel,
+    .search-header,
+    .card,
+    .card-brick,
+    .card-wide,
+    .card-track,
+    .card-poster,
+    .artwork,
+    .track-row,
+    .lcd,
+    .lcd-artwork-image,
+    .settings-card,
+    .menu,
+    .menu-item,
+    .flyout,
+    .tooltip,
+    .fullscreen-artwork {
+        corner-radius: var(--corner);
+    }
 
-.track-row,
-.sidebar-item,
-.menu-item,
-.tooltip,
-.album-play-button,
-.album-shuffle-button {
-    corner-radius: var(--round-small);
+    /* The round button beside a station's Play has no name to leave out above: it gets back Apple's half of its 32.
+       !important because the names left out above weigh more than this one. */
+    .radio-play-button + Button {
+        corner-radius: 16 !important;
+    }
 }

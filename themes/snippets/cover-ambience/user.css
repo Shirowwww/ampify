@@ -2,9 +2,8 @@
    towards the end of the display, like Spicetify's Cover Ambience. It follows each song within 3 seconds. Raise the
    two leading digits of each colour (00 to FF) for a stronger glow.
 
-   The reach setting spreads the glow over the whole playback bar, from one end to the other, behind the buttons. With
-   a theme that puts the bar at the bottom its row runs the window's width; the corners follow the theme's
-   --bar-radius when it gives one. */
+   The reach setting spreads the glow over the whole playback bar, from one end to the other, behind the buttons, at
+   the top as at the bottom. */
 
 @setting reach = Display {
     .lcd {
@@ -16,21 +15,60 @@
 }
 
 @setting reach = Bar {
-    .lcd {
-        background: transparent;
-        border-width: 0;
+    /* The bar itself carries the glow, and its three columns let it through (Apple paints each with a brush of its
+       own: the glow showed behind the shuffle and previous buttons only). The artwork's two main colours only, to the
+       far end: its third one is an accent, often far from the cover's tone, and the bar drifted to it. */
+    .playbar {
+        background: linear-gradient(to right, #A6var(--art-2-hex, 5A5A64) 0%, #80var(--art-1-hex, 5A5A64) 55%, #6Bvar(--art-2-hex, 5A5A64) 100%);
     }
 
-    /* The buttons' row spans the bar: it carries the glow, under the display. */
-    .playbar-controls {
-        background: linear-gradient(to right, #A6var(--art-2-hex, 5A5A64) 0%, #4Dvar(--art-1-hex, 5A5A64) 40%, #1Avar(--art-3-hex, 5A5A64) 100%);
-        corner-radius: var(--bar-radius, 0);
-        z-index: -1;
+    .playbar-controls,
+    .now-playing,
+    .playbar-extras {
+        background: transparent;
+    }
+
+    /* The song's display takes a faint wash of the same colours, with no frame: the song reads as one block without
+       a box of another colour on the glow. */
+    .lcd {
+        background: linear-gradient(to right, #29var(--art-2-hex, FFFFFF) 0%, #0Fvar(--art-1-hex, FFFFFF) 100%);
+        border-width: 0;
+        corner-radius: var(--lcd-radius, 8px);
+    }
+
+    /* At the top, the glow is the whole band, edge to edge, under the window's buttons too: a box of colour inset in
+       the dark band looked cut out. The bar's content keeps its place, the room moving from the margin into the
+       padding, and the cell Apple keeps for the window's buttons goes (that room counted twice, and the bar's buttons
+       folded under "···" with room to spare). Under floating panels the column stands a gap from the window's
+       corner: the band reaches back under it (--bar-band-reach), or the bare window showed above and left of it. */
+    @setting bar-position = Top {
+        .playbar {
+            margin: 0 0 0 calc(var(--bar-band-reach, 0) * -1);
+            padding: var(--gap, 8) var(--bar-top-end, 150) 0 calc(var(--bar-band-reach, 0) + var(--gap, 8) * 2);
+            corner-radius: 0;
+        }
+
+        .caption-buttons-cover {
+            visibility: collapsed;
+        }
+    }
+
+    /* At the bottom, the bar keeps its place and size: edge to edge it read too wide. The glow fills it to its very
+       edge, without the capsule's rim (Glass), which left a few pixels without colour, and rises from its foot,
+       fading towards its top instead of starting on a hard line. */
+    @setting bar-position = Bottom {
+        .playbar {
+            background: linear-gradient(to top, #B3var(--art-2-hex, 5A5A64) 0%, #80var(--art-1-hex, 5A5A64) 55%, #26var(--art-1-hex, 5A5A64) 100%);
+            border-width: 0;
+        }
     }
 }
 
-/* The time and the progress bar keep their contrast on the glow. */
-.current-time,
-.duration {
-    color: #E6FFFFFF;
+/* The time keeps its contrast on the glow of a dark scheme. A light one (Paper light) keeps its own ink: white times
+   read as a wrong colour at the top left of its light bar. */
+@media (prefers-color-scheme: dark) {
+    .current-time,
+    .duration {
+        color: #E6FFFFFF;
+    }
 }

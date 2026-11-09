@@ -6,11 +6,12 @@
    Apple Music drives the artwork's own transform and refuses one, so the turn goes on the area around it. That area
    is round, and clips the artwork inside it: a square would sweep its corners around. Its slot is rarely square
    (54 wide, 40 to 64 high from one theme to the next), so the record takes a size of its own, centred in the slot:
-   stretched, it would be an oval turning around a point off its centre. */
+   stretched, it would be an oval turning around a point off its centre. A theme that sizes the artwork itself (Cosy's
+   bar at the bottom) gives that size in --artwork-size, and the record keeps it. */
 
 :root {
     --turn: 24s;
-    --disc: 48;
+    --disc: var(--artwork-size, 48);
 }
 
 .lcd-artwork {
@@ -42,10 +43,16 @@
     corner-radius: 999px;
 }
 
-/* The grooves, the rim and the label, over the artwork; off, the cover shows whole in its circle. */
+/* The grooves, the rim and the label, over the artwork; off, the cover shows whole in its circle. With no song, the
+   record's label and spindle hole fell across Apple's small note in the middle, which showed cut: the empty record
+   stands alone. */
 @setting grooves {
     .lcd-artwork::after {
         content: url("images/record.png") fill;
+    }
+
+    .lcd-placeholder > Image {
+        opacity: 0;
     }
 }
 

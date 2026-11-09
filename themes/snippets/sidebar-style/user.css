@@ -1,0 +1,38 @@
+/* Sidebar style: tighter rows, so more playlists fit, and one shape for every pinned item and playlist, on top of any
+   theme or none, like Comfy's compact sidebar on Spicetify. One snippet since Ampify 1.3.
+
+   Compact: rows of 32 pixels instead of 40. Apple's item holds its 36 pixels on three grids of its template, and each
+   row keeps a gap of 2 between its hover tile and the next one. Ampify's own entries at the bottom follow.
+   Icons: Apple Music draws artists round and the rest as rounded squares; the hover layer takes the same shape, or
+   its corners would show around a round artwork. */
+
+@setting compact {
+    .sidebar-item Grid#LayoutRoot,
+    .sidebar-item Grid#PresenterContentRootGrid,
+    .sidebar-item Grid#ContentGrid {
+        min-height: 30;
+    }
+
+    .sidebar-item Grid#LayoutRoot,
+    .sidebar-entry {
+        margin: 1 4 1 4;
+    }
+
+    .sidebar-entry {
+        height: 30;
+    }
+}
+
+@setting icons = Round {
+    .sidebar .artwork,
+    .sidebar-item-artwork {
+        corner-radius: 999px;
+    }
+}
+
+@setting icons = Square {
+    .sidebar .artwork,
+    .sidebar-item-artwork {
+        corner-radius: 4px;
+    }
+}

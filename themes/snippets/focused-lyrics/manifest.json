@@ -1,0 +1,28 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "focused-lyrics",
+  "name": "Focused lyrics",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "The lyrics blur away towards the top and bottom of their column, so the sung line and the lines around it stand out, as in Apple Music on the Mac and the iPhone.",
+  "translations": {
+    "fr": {"name": "Paroles en focus", "description": "Les paroles se floutent vers le haut et le bas de leur colonne, pour que la ligne chantée et ses voisines ressortent, comme dans Apple Music sur Mac et iPhone.", "settings": {"strength": "Flou"}, "options": {"Light": "Léger", "Medium": "Moyen", "Strong": "Fort"}},
+    "de": {"name": "Fokussierter Songtext", "description": "Der Songtext wird zum oberen und unteren Rand seiner Spalte hin unscharf, damit die gesungene Zeile und ihre Nachbarn hervortreten, wie in Apple Music auf dem Mac und dem iPhone.", "settings": {"strength": "Unschärfe"}, "options": {"Light": "Leicht", "Medium": "Mittel", "Strong": "Stark"}},
+    "es": {"name": "Letra enfocada", "description": "La letra se difumina hacia arriba y hacia abajo de su columna para que la línea que se canta y las cercanas destaquen, como en Apple Music en el Mac y el iPhone.", "settings": {"strength": "Desenfoque"}, "options": {"Light": "Ligero", "Medium": "Medio", "Strong": "Fuerte"}},
+    "pt": {"name": "Letra em foco", "description": "A letra fica desfocada em direção ao topo e à base da coluna, para que a linha cantada e as vizinhas se destaquem, como no Apple Music no Mac e no iPhone.", "settings": {"strength": "Desfoque"}, "options": {"Light": "Leve", "Medium": "Médio", "Strong": "Forte"}},
+    "ru": {"name": "Текст в фокусе", "description": "Текст размывается к верху и низу своей колонки, чтобы исполняемая строка и соседние выделялись, как в Apple Music на Mac и iPhone.", "settings": {"strength": "Размытие"}, "options": {"Light": "Слабое", "Medium": "Среднее", "Strong": "Сильное"}},
+    "ja": {"name": "フォーカス歌詞", "description": "歌詞が列の上下に向かってぼけていき、歌われている行とその前後が際立ちます。Mac や iPhone の Apple Music のように。", "settings": {"strength": "ぼかし"}, "options": {"Light": "弱", "Medium": "中", "Strong": "強"}},
+    "zh": {"name": "聚焦歌词", "description": "歌词向所在栏的顶部和底部逐渐模糊，让正在演唱的那一行及其前后几行更突出，就像 Mac 和 iPhone 上的 Apple Music。", "settings": {"strength": "模糊"}, "options": {"Light": "轻", "Medium": "中", "Strong": "强"}},
+    "it": {"name": "Testi a fuoco", "description": "I testi sfumano verso l'alto e il basso della loro colonna, così la riga cantata e quelle vicine risaltano, come in Apple Music su Mac e iPhone.", "settings": {"strength": "Sfocatura"}, "options": {"Light": "Leggera", "Medium": "Media", "Strong": "Forte"}},
+    "ko": {"name": "포커스 가사", "description": "Mac과 iPhone의 Apple Music처럼 가사 열의 위아래로 갈수록 흐려져서, 지금 부르는 줄과 주변 줄이 돋보입니다.", "settings": {"strength": "흐림"}, "options": {"Light": "약하게", "Medium": "보통", "Strong": "강하게"}}
+  },
+  "kitApi": "1.0",
+  "tags": [
+    "lyrics",
+    "karaoke"
+  ],
+  "settings": [
+    {"key": "strength", "label": "Blur", "type": "choice", "options": ["Light", "Medium", "Strong"], "default": "Medium"}
+  ]
+}

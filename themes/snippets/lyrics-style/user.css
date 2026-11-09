@@ -1,0 +1,53 @@
+/* Lyrics style: how Apple's lyrics read, in its side pane and in the full-screen player, on top of any theme. The lines
+   centred or at the left, the line being sung on a soft tile of the song's colour, and the pane on a dark background,
+   like Spicetify's centred lyrics, lyrics highlight, Dark Lyrics and Pretty Lyrics. One snippet since Ampify 1.3, so
+   the three never fight: Focused lyrics, which blurs the lines away from the sung one, goes with any of them.
+
+   Apple sets a word-by-word line's text width when it builds the line, and Apple's own fading by state keeps the sung
+   line the brightest: only alignments, colours and corners change here. A margin, padding or border on
+   .lyrics-line-content would cut the end of its words. */
+
+/* Centred: each line, the static text and each row of a line that wraps, word-by-word lyrics included. */
+@setting align = Centred {
+    .lyrics-line-content {
+        horizontal-alignment: center;
+    }
+
+    .lyrics-words,
+    .lyrics-background-words,
+    .lyrics-line-content TextBlock,
+    .lyrics-static TextBlock {
+        text-align: center;
+    }
+}
+
+/* The sung line on a tile that follows the song (:current). The tile spans the whole line: a centred line shrinks to
+   its words, and a tile with corners then clipped the word-by-word text, which Apple draws outside the line's measure,
+   so the words of a centred line went blank. The words stay centred by text-align above. */
+@setting spotlight {
+    .lyrics-line-content {
+        horizontal-alignment: stretch;
+        corner-radius: 10;
+        transition: background 200ms;
+    }
+
+    .lyrics-line-content:current {
+        background: #38var(--art-2-hex, FFFFFF);
+    }
+}
+
+/* A dark pane with light text, whatever the theme or the window's mode: color-scheme turns Apple's own texts and
+   buttons inside it light. "Artwork" starts from a dark colour of the song's artwork and follows each song. */
+@setting background = Dark {
+    .lyrics-panel {
+        color-scheme: dark;
+        background: linear-gradient(to bottom, #1C1C1E, #0B0B0D);
+    }
+}
+
+@setting background = Artwork {
+    .lyrics-panel {
+        color-scheme: dark;
+        background: linear-gradient(to bottom, var(--art-3, #1C1C1E), #0B0B0D 85%);
+    }
+}

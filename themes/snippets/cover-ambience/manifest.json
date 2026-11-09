@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "cover-ambience",
   "name": "Cover ambience",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "The song glows in the colours of its artwork and changes with each song, on the display or along the whole playback bar, like Spicetify's Cover Ambience.",
@@ -82,6 +82,28 @@
       "options": {
         "Display": "显示区",
         "Bar": "整条播放栏"
+      }
+    },
+    "it": {
+      "name": "Alone della copertina",
+      "description": "Il brano si illumina dei colori della sua copertina e cambia a ogni brano, sul display o lungo tutta la barra di riproduzione, come Cover Ambience di Spicetify.",
+      "settings": {
+        "reach": "Estensione dell'alone"
+      },
+      "options": {
+        "Display": "Il display",
+        "Bar": "Tutta la barra"
+      }
+    },
+    "ko": {
+      "name": "커버 앰비언스",
+      "description": "Spicetify의 Cover Ambience처럼 곡이 커버의 색으로 빛나며 곡마다 바뀝니다. 디스플레이에만 적용하거나 재생 바 전체에 적용할 수 있습니다.",
+      "settings": {
+        "reach": "빛의 범위"
+      },
+      "options": {
+        "Display": "디스플레이",
+        "Bar": "바 전체"
       }
     }
   },

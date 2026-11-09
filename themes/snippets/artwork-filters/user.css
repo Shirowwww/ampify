@@ -1,0 +1,37 @@
+/* Artwork filters: the artwork of the song playing, in the playback bar, at the top of its album and in the full-screen
+   player, printed in two inks of the theme's accent, in black and white, in sepia, or more vivid. Under the pointer the
+   playback bar's artwork takes its own colours back. Every change fades on the compositor, so it stays smooth.
+   Only these few artworks: a filter draws its element again each frame it changes, too much for every card. */
+
+:root {
+    --look: duotone(#FF14101E, var(--accent, #FFFA2D48));
+}
+
+@setting look = Grayscale {
+    :root {
+        --look: grayscale(1) contrast(1.1);
+    }
+}
+
+@setting look = Sepia {
+    :root {
+        --look: sepia(0.8) saturate(1.2);
+    }
+}
+
+@setting look = Vivid {
+    :root {
+        --look: saturate(1.6) contrast(1.05);
+    }
+}
+
+.lcd-artwork-image,
+.album-header .artwork,
+.fullscreen-artwork {
+    filter: var(--look);
+    transition: filter 400ms;
+}
+
+.lcd-artwork:hover .lcd-artwork-image {
+    filter: none;
+}

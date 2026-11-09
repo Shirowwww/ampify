@@ -1,0 +1,92 @@
+/* Progress line: the progress line of the display thinner or thicker, with round ends, and a little animated figure
+   that rides it at the song's position, like Spicetify's thin and thick bars and its Nyan Cat and Kirby bars, with
+   Ampify's own drawings: a comet, a bobbing note, a beating heart or a running cat. One snippet since Ampify 1.3.
+
+   The thickness: from 3 pixels, Ampify grows the line's slot so the track is not cut, and its bottom stays where
+   Apple's is. The volume slider, in its flyout, keeps Apple's own thickness unless "Set the volume slider thickness"
+   is on. The mascot moves as the song plays and jumps with a seek (docs/themes/format.md, "An image that follows the
+   song's progress"); its images are drawn 22 by 14, low enough to keep
+   off the artist's line above, and the side margins, half the width, centre them on the song's
+   position without taking room from the bar. */
+
+@setting custom-thickness {
+    .scrubber Rectangle#HorizontalTrackRect,
+    .scrubber Rectangle#HorizontalDecreaseRect {
+        height: var(--setting-thickness);
+        corner-radius: calc(var(--setting-thickness) * 0.5);
+    }
+}
+
+@setting custom-volume {
+    .volume-slider Rectangle#HorizontalTrackRect,
+    .volume-slider Rectangle#HorizontalDecreaseRect {
+        height: var(--setting-volume);
+        corner-radius: calc(var(--setting-volume) * 0.5);
+    }
+}
+
+@setting mascot = Comet {
+    .scrubber Grid#HorizontalTemplate::after {
+        content: url("images/comet.gif") contain;
+        grid-column: 1;
+        width: 22px;
+        height: 14px;
+        margin: -11px -11px -3px;
+    }
+}
+
+@setting mascot = Note {
+    .scrubber Grid#HorizontalTemplate::after {
+        content: url("images/note.gif") contain;
+        grid-column: 1;
+        width: 22px;
+        height: 14px;
+        margin: -11px -11px -3px;
+    }
+}
+
+@setting mascot = Heart {
+    .scrubber Grid#HorizontalTemplate::after {
+        content: url("images/heart.gif") contain;
+        grid-column: 1;
+        width: 22px;
+        height: 14px;
+        margin: -11px -11px -3px;
+    }
+}
+
+@setting mascot = Cat {
+    .scrubber Grid#HorizontalTemplate::after {
+        content: url("images/cat.gif") contain;
+        grid-column: 1;
+        width: 22px;
+        height: 14px;
+        margin: -11px -11px -3px;
+    }
+}
+
+/* Small (Ampify 1.3's) or large (before it): the same drawing, grown about its centre, so a switch glides. */
+:root {
+    --mascot-scale: 1;
+}
+
+@setting mascot-size = Large {
+    :root {
+        --mascot-scale: 1.27;
+    }
+}
+
+@setting mascot != None {
+    .scrubber Grid#HorizontalTemplate::after {
+        transform: scale(var(--mascot-scale));
+        transform-origin: center;
+        transition: transform 200ms;
+    }
+}
+
+/* Off unless chosen: the played part of the line in rainbow colours, the trail of Spicetify's Nyan Cat bar. */
+@setting rainbow {
+    .scrubber {
+        color: linear-gradient(to right, #FF3B30, #FF9500, #FFCC00, #34C759, #007AFF, #AF52DE);
+    }
+}

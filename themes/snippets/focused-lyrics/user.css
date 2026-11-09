@@ -1,0 +1,32 @@
+/* Focused lyrics: the lyrics blur away from the line being sung, so the eye stays on it and on the lines around it,
+   as in Apple Music on the Mac and the iPhone. One blurred copy of the whole column shows towards its edges: a
+   single pass for the graphics card, however many lines show. Apple keeps the sung line near the top of the side
+   panel and a little above the middle of the full-screen player, so the side panel blurs mostly its bottom. */
+
+.lyrics-panel .lyrics-synced {
+    filter: blur(9px) edges(8% 50%);
+}
+
+.fullscreen-lyrics .lyrics-synced {
+    filter: blur(9px) edges(28% 40%);
+}
+
+@setting strength = Light {
+    .lyrics-panel .lyrics-synced {
+        filter: blur(6px) edges(6% 45%);
+    }
+
+    .fullscreen-lyrics .lyrics-synced {
+        filter: blur(6px) edges(24% 34%);
+    }
+}
+
+@setting strength = Strong {
+    .lyrics-panel .lyrics-synced {
+        filter: blur(13px) edges(10% 55%);
+    }
+
+    .fullscreen-lyrics .lyrics-synced {
+        filter: blur(13px) edges(32% 45%);
+    }
+}

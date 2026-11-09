@@ -2,19 +2,24 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "animated-artwork",
   "name": "Animated artwork",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "kind": "snippet",
   "author": "Shirowwww",
-  "description": "The window's background is the artwork of the song, in two layers that turn slowly in opposite directions. It stops in pause and while Apple Music is hidden.",
+  "description": "The window's background is Apple Music's own full-screen background: the song's artwork as a slow, blurred, moving wash, faint behind the pages and the playback bar.",
   "translations": {
-    "fr": {"name": "Pochette animée", "description": "Le fond de la fenêtre est la pochette du morceau, en deux couches qui tournent lentement en sens contraire. Elle s'arrête en pause et quand Apple Music est caché."},
-    "de": {"name": "Animiertes Cover", "description": "Der Fensterhintergrund ist das Cover des Titels, in zwei Ebenen, die sich langsam in entgegengesetzte Richtungen drehen. Er hält bei Pause und wenn Apple Music ausgeblendet ist an."},
-    "es": {"name": "Portada animada", "description": "El fondo de la ventana es la portada de la canción, en dos capas que giran lentamente en sentidos opuestos. Se detiene en pausa y cuando Apple Music está oculto."},
-    "pt": {"name": "Capa animada", "description": "O fundo da janela é a capa da música, em duas camadas que giram devagar em sentidos opostos. Para em pausa e quando o Apple Music está oculto."},
-    "ru": {"name": "Анимированная обложка", "description": "Фон окна — обложка трека в двух слоях, которые медленно вращаются в противоположные стороны. Останавливается на паузе и когда Apple Music скрыта."},
-    "ja": {"name": "動くアートワーク", "description": "ウィンドウの背景に曲のアートワークを2層で表示し、ゆっくり逆向きに回転させます。一時停止中や Apple Music が隠れている間は止まります。"},
-    "zh": {"name": "动态封面背景", "description": "窗口背景是当前歌曲的封面，分两层沿相反方向缓慢旋转。暂停和 Apple Music 隐藏时会停止。"}
+    "fr": {"name": "Pochette animée", "description": "Le fond de la fenêtre est celui du plein écran d'Apple Music : la pochette du morceau, floue, qui bouge lentement, discrète derrière les pages et la barre de lecture.", "settings": {"strength": "Intensité du fond (0,1 à 0,8)"}},
+    "de": {"name": "Animiertes Cover", "description": "Der Fensterhintergrund ist der Vollbild-Hintergrund von Apple Music: das Cover des Titels, unscharf und langsam bewegt, dezent hinter den Seiten und der Wiedergabeleiste.", "settings": {"strength": "Stärke des Hintergrunds (0,1 bis 0,8)"}},
+    "es": {"name": "Portada animada", "description": "El fondo de la ventana es el de la pantalla completa de Apple Music: la portada de la canción, difuminada y en lento movimiento, discreta detrás de las páginas y la barra de reproducción.", "settings": {"strength": "Intensidad del fondo (0,1 a 0,8)"}},
+    "pt": {"name": "Capa animada", "description": "O fundo da janela é o da tela cheia do Apple Music: a capa da música, desfocada e em movimento lento, discreta atrás das páginas e da barra de reprodução.", "settings": {"strength": "Intensidade do fundo (0,1 a 0,8)"}},
+    "ru": {"name": "Анимированная обложка", "description": "Фон окна — фон полноэкранного режима Apple Music: размытая, медленно движущаяся обложка трека, едва заметная за страницами и панелью воспроизведения.", "settings": {"strength": "Яркость фона (от 0,1 до 0,8)"}},
+    "ja": {"name": "動くアートワーク", "description": "ウィンドウの背景を Apple Music のフルスクリーンと同じにします。曲のアートワークがぼかされてゆっくり動き、ページと再生バーの後ろに控えめに表示されます。", "settings": {"strength": "背景の濃さ（0.1〜0.8）"}},
+    "zh": {"name": "动态封面背景", "description": "窗口背景与 Apple Music 全屏播放器相同：当前歌曲封面经过模糊并缓慢流动，淡淡地显示在页面和播放栏后面。", "settings": {"strength": "背景强度（0.1 至 0.8）"}},
+    "it": {"name": "Copertina animata", "description": "Lo sfondo della finestra è quello a schermo intero di Apple Music: la copertina del brano come una sfumatura lenta, sfocata e in movimento, tenue dietro le pagine e la barra di riproduzione.", "settings": {"strength": "Intensità dello sfondo (da 0,1 a 0,8)"}},
+    "ko": {"name": "움직이는 커버", "description": "창 배경이 Apple Music 전체 화면의 배경과 같아집니다. 곡 커버가 흐리게 처리되어 천천히 움직이는 색의 물결로, 페이지와 재생 바 뒤에서 은은하게 보입니다.", "settings": {"strength": "배경 강도(0.1~0.8)"}}
   },
   "kitApi": "1.0",
+  "settings": [
+    {"key": "strength", "label": "Strength of the background (0.1 to 0.8)", "type": "number", "min": 0.1, "max": 0.8, "default": 0.4}
+  ],
   "tags": ["animation", "artwork", "background"]
 }

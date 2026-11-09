@@ -23,15 +23,15 @@
     }
 }
 
-/* Faded, the buttons still take clicks: the pointer finds them where they always are. */
+/* Faded, the buttons still take clicks: the pointer finds them where they always are. Not :focus-within: Apple's
+   player puts the keyboard on its "···" button as it opens, which kept the buttons shown. */
 @setting controls {
     .fullscreen-transport {
         opacity: 0;
         transition: opacity 200ms;
     }
 
-    .fullscreen-transport:hover,
-    .fullscreen-transport:focus-within {
+    .fullscreen-transport:hover {
         opacity: 1;
     }
 }

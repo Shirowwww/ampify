@@ -1,0 +1,28 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "artwork-filters",
+  "name": "Artwork filters",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "The artwork of the song playing, in the playback bar, at the top of its album and in full screen, in two inks of the accent, in black and white, in sepia or more vivid. Under the pointer, the playback bar's artwork takes its colours back.",
+  "translations": {
+    "fr": {"name": "Filtres de pochette", "description": "La pochette du morceau en cours, dans la barre de lecture, en haut de son album et en plein écran, en deux encres de l'accent, en noir et blanc, en sépia ou plus vive. Sous le pointeur, la pochette de la barre retrouve ses couleurs.", "settings": {"look": "Rendu"}, "options": {"Duotone": "Deux encres", "Grayscale": "Noir et blanc", "Sepia": "Sépia", "Vivid": "Plus vive"}},
+    "de": {"name": "Cover-Filter", "description": "Das Cover des laufenden Songs in der Wiedergabeleiste, oben im Album und im Vollbild, in zwei Farben des Akzents, schwarz-weiß, in Sepia oder kräftiger. Unter dem Zeiger bekommt das Cover der Leiste seine Farben zurück.", "settings": {"look": "Darstellung"}, "options": {"Duotone": "Zwei Farben", "Grayscale": "Schwarz-weiß", "Sepia": "Sepia", "Vivid": "Kräftiger"}},
+    "es": {"name": "Filtros de portada", "description": "La portada de la canción en curso, en la barra de reproducción, arriba de su álbum y a pantalla completa, en dos tintas del acento, en blanco y negro, en sepia o más viva. Bajo el puntero, la portada de la barra recupera sus colores.", "settings": {"look": "Aspecto"}, "options": {"Duotone": "Dos tintas", "Grayscale": "Blanco y negro", "Sepia": "Sepia", "Vivid": "Más viva"}},
+    "pt": {"name": "Filtros de capa", "description": "A capa da música em reprodução, na barra de reprodução, no topo do álbum e em tela cheia, em duas tintas do destaque, em preto e branco, em sépia ou mais viva. Sob o ponteiro, a capa da barra recupera as cores.", "settings": {"look": "Aparência"}, "options": {"Duotone": "Duas tintas", "Grayscale": "Preto e branco", "Sepia": "Sépia", "Vivid": "Mais viva"}},
+    "ru": {"name": "Фильтры обложки", "description": "Обложка текущей песни на панели воспроизведения, вверху её альбома и в полноэкранном режиме: в двух цветах акцента, чёрно-белая, в сепии или ярче. Под указателем обложка на панели возвращает свои цвета.", "settings": {"look": "Вид"}, "options": {"Duotone": "Два цвета", "Grayscale": "Чёрно-белая", "Sepia": "Сепия", "Vivid": "Ярче"}},
+    "ja": {"name": "アートワークのフィルター", "description": "再生中の曲のアートワークを、再生バー、アルバムの上部、フルスクリーンで、アクセントの2色、白黒、セピア、またはより鮮やかに表示します。ポインターを合わせると再生バーのアートワークは元の色に戻ります。", "settings": {"look": "見た目"}, "options": {"Duotone": "2色", "Grayscale": "白黒", "Sepia": "セピア", "Vivid": "鮮やか"}},
+    "zh": {"name": "封面滤镜", "description": "正在播放歌曲的封面（播放栏、专辑顶部和全屏）以强调色的双色、黑白、复古或更鲜艳的样子显示。鼠标悬停时，播放栏的封面恢复原色。", "settings": {"look": "效果"}, "options": {"Duotone": "双色", "Grayscale": "黑白", "Sepia": "复古", "Vivid": "更鲜艳"}},
+    "it": {"name": "Filtri copertina", "description": "La copertina del brano in riproduzione, nella barra di riproduzione, in cima all'album e a schermo intero, in due inchiostri dell'accento, in bianco e nero, in seppia o più viva. Sotto il puntatore, la copertina della barra riprende i suoi colori.", "settings": {"look": "Aspetto"}, "options": {"Duotone": "Due inchiostri", "Grayscale": "Bianco e nero", "Sepia": "Seppia", "Vivid": "Più viva"}},
+    "ko": {"name": "커버 필터", "description": "재생 중인 곡의 커버를 재생 바, 앨범 위쪽, 전체 화면에서 강조색 두 가지, 흑백, 세피아 또는 더 선명하게 보여 줍니다. 포인터를 올리면 재생 바의 커버가 원래 색으로 돌아옵니다.", "settings": {"look": "효과"}, "options": {"Duotone": "두 가지 색", "Grayscale": "흑백", "Sepia": "세피아", "Vivid": "더 선명하게"}}
+  },
+  "kitApi": "1.0",
+  "tags": [
+    "artwork",
+    "colours"
+  ],
+  "settings": [
+    {"key": "look", "label": "Look", "type": "choice", "options": ["Duotone", "Grayscale", "Sepia", "Vivid"], "default": "Duotone"}
+  ]
+}

@@ -25,10 +25,18 @@
     }
 }
 
-/* Off unless chosen: the "E" of explicit songs. */
+/* Off unless chosen: the "E" of explicit songs, in the lists and beside the song playing. Apple shows and hides the
+   display's one with each song: it goes by opacity and gives its room back, so Apple's own switching keeps working
+   once the setting goes. */
 @setting explicit {
     .explicit-badge {
         visibility: collapsed;
+    }
+
+    .lcd-explicit-badge {
+        opacity: 0;
+        width: 0;
+        margin: 0;
     }
 }
 
@@ -37,6 +45,21 @@
 @setting suggestions {
     .suggested-songs,
     .list-page-shelves {
+        visibility: collapsed;
+    }
+}
+
+/* Off unless chosen: the sections of Home and New by kind (their titles are Apple's text, which changes with the
+   language and the person): the grid of large picks at the top of Home, and the banners made of one large item. The
+   shelves stay, so the page never goes empty. */
+@setting home-picks {
+    .section-grid {
+        visibility: collapsed;
+    }
+}
+
+@setting section-banners {
+    .section-single {
         visibility: collapsed;
     }
 }
@@ -90,5 +113,32 @@
 @setting page-backdrop {
     .page-background {
         opacity: 0;
+    }
+}
+
+/* The buttons, one switch each (the Hide buttons snippet until Ampify 1.3); turned off, the button comes back. */
+@setting lyrics-button {
+    .lyrics-button {
+        visibility: collapsed;
+    }
+}
+
+@setting queue-button {
+    .queue-button {
+        visibility: collapsed;
+    }
+}
+
+@setting volume-button {
+    .volume {
+        visibility: collapsed;
+    }
+}
+
+/* Only the button that starts a download: the mark of a song already downloaded and the ring of one on its way stay,
+   so what is on the PC still shows. */
+@setting download-button {
+    .download-button {
+        visibility: collapsed;
     }
 }

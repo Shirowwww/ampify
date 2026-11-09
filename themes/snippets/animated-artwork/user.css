@@ -1,42 +1,32 @@
-/* Animated artwork: the window's background is the artwork of the song, in two layers that turn slowly in opposite
-   directions. Both stop in pause, hold while Apple Music is hidden or minimized, and stand still with Windows'
-   "Animation effects" off. Change --veil to make the artwork stronger or fainter behind the panes.
-   On a new song the engine cross-fades each layer from the previous cover (at once in eco glass). */
+/* Animated artwork: the window's background is Apple Music's own full-screen background (the song's artwork as a slow,
+   blurred, moving wash), faint behind the pages and the playback bar, which turn see-through for it. It follows the
+   song. Its strength is a setting (0.4 by default): the window's own colour (the theme's, or Apple Music's dark or
+   light background) shows through it, so the text above stays readable.
 
-:root {
-    --veil: 0.5;
+   It is the window's ::before, the one layer under everything: a ::after would lie over the whole window and veil it
+   (1.0.0 did). An Ampify without `content: immersion` keeps the line before: the song's artwork, still. */
+
+.window {
+    background: var(--window-background, $SolidBackgroundFillColorBaseBrush);
 }
 
 .window::before {
     content: artwork cover;
-    transform-origin: center;
-    opacity: 0.85;
-    animation: drift 90s linear infinite playing;
+    content: immersion;
+    opacity: var(--setting-strength, 0.4);
 }
 
-.window::after {
-    content: artwork cover;
-    transform-origin: center;
-    opacity: var(--veil);
-    animation: drift-back 110s linear infinite playing;
+/* Apple's layers between the window and its pages, see-through as a theme's floating panels makes them; the pages'
+   panel too, so the background shows behind the lists. The sidebar keeps its own background. */
+.navigation,
+.main-column,
+.content,
+.page,
+.content-background,
+.playbar {
+    background: transparent;
 }
 
-@keyframes drift {
-    from {
-        transform: scale(1.9) rotate(0deg);
-    }
-
-    to {
-        transform: scale(1.9) rotate(360deg);
-    }
-}
-
-@keyframes drift-back {
-    from {
-        transform: scale(2) rotate(360deg);
-    }
-
-    to {
-        transform: scale(2) rotate(0deg);
-    }
+.frost {
+    visibility: collapsed;
 }
